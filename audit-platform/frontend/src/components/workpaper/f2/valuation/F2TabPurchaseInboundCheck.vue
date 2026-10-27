@@ -291,11 +291,12 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column v-if="wpId && !isReadonly" label="📎" width="48" align="center">
+          <el-table-column v-if="wpId" label="📎" width="72" align="center">
             <template #default="{ row }">
-              <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="ocrLoadingId === row.id" @change="(f: any) => handleOcrUpload(row.id, f?.raw)">
+              <el-upload v-if="!isReadonly" style="display:inline-block" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="ocrLoadingId === row.id" @change="(f: any) => handleOcrUpload(row.id, f?.raw)">
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="F2_PURCHASE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="92" fixed="right">
@@ -445,6 +446,7 @@
       v-model="voucherDialogVisible"
       :row="voucherDialogRow"
       :wp-id="wpId"
+      :project-id="projectId"
       :readonly="isReadonly"
       @save="handleSaveVoucher"
     />
@@ -452,10 +454,12 @@
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, onMounted, inject, toRef, type Ref } from 'vue'
 import { useF2PurchaseInboundCheck } from '../../composables/useF2InspectionCheck'
-import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
+import { F2_PURCHASE_EVIDENCE_SHEET, useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   F2_INSPECTION_CATEGORIES,

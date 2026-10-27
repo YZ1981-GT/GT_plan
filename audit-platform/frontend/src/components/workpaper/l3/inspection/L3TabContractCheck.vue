@@ -77,17 +77,19 @@
       <el-table-column type="index" label="#" width="42" fixed />
 
       <!-- 📎 OCR列 -->
-      <el-table-column label="📎" width="50" fixed align="center">
+      <el-table-column label="📎" width="72" fixed align="center">
         <template #default="{ $index }">
           <el-upload
             v-if="!isReadonly"
             :show-file-list="false"
             :auto-upload="false"
             accept=".pdf,.jpg,.jpeg,.png"
+            style="display:inline-block"
             @change="(uploadFile: any) => handleOcrUpload(uploadFile, $index)"
           >
             <el-button text size="small" title="上传合同OCR识别">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell($index + 1)" />
         </template>
       </el-table-column>
 
@@ -447,6 +449,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useL3ImportExport } from '@/components/workpaper/composables/useL3ImportExport'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -455,6 +459,9 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
 }>()
+/** 合同识别附件挂到本行（行级证据，按序号；删行时随行前移），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'L3-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 defineEmits<{
   (e: 'navigate', sheetName: string): void
@@ -632,6 +639,10 @@ async function handleAddRow(): Promise<void> {
 function handleRemoveRow(index: number): void {
   contractRows.value.splice(index, 1)
   _persist()
+  // 行没有稳定 id、附件按序号挂：其后各行的附件随行前移，被删行的附件转为表页级
+  void rowEv.shiftAfterRemove(EVIDENCE_SHEET, index + 1).then((failed) => {
+    if (failed > 0) ElMessage.warning(`有 ${failed} 份附件的位置未能随行调整，请在右侧附件页签核对`)
+  })
 }
 
 // ─── OCR Upload ──────────────────────────────────────────────────────────────
@@ -642,6 +653,7 @@ async function handleOcrUpload(uploadFile: any, index: number): Promise<void> {
 
   const fd = new FormData()
   fd.append('file', file)
+  rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(index + 1))
 
   try {
     const res = await http.post(
@@ -649,6 +661,7 @@ async function handleOcrUpload(uploadFile: any, index: number): Promise<void> {
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR完成，未识别到可填充字段')

@@ -320,6 +320,7 @@
               </td>
               <td class="col-act">
                 <el-button link type="primary" size="small" @click="openCheckDialog(row)">核对</el-button>
+                <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
                 <el-button v-if="!isReadonly" link type="danger" size="small" @click="chk.removeSample(row.id)">删</el-button>
               </td>
             </tr>
@@ -397,6 +398,7 @@
       v-model="checkDialogVisible"
       :row="checkDialogRow"
       :wp-id="wpId"
+      :project-id="projectId"
       :readonly="isReadonly"
       @save="saveCheckedSample"
     />
@@ -425,6 +427,9 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
 import F2ContractCostCheckDialog from './F2ContractCostCheckDialog.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { F2_SPE_EVIDENCE_SHEET } from '../../composables/useF2SpecialContractOcr'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'

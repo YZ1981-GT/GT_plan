@@ -98,12 +98,13 @@
         <el-table-column label="贷方" width="110" align="right">
           <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.credit" size="small" class="amt-in" @change="persist" /><span v-else class="amt">{{ fmtAmt(row.credit) }}</span></template>
         </el-table-column>
-        <el-table-column label="附件" width="80" align="center">
+        <el-table-column label="附件" width="104" align="center">
           <template #default="{ row }">
-            <el-upload v-if="!isReadonly" :show-file-list="false" :auto-upload="false" :on-change="(f: any) => onOcrUpload(row, f)" accept=".pdf,.png,.jpg,.jpeg">
+            <el-upload v-if="!isReadonly" :show-file-list="false" :auto-upload="false" :on-change="(f: any) => onOcrUpload(row, f)" accept=".pdf,.png,.jpg,.jpeg" style="display:inline-block">
               <el-button size="small" :loading="ocrLoadingId === row.id" text bg>📎{{ row.attachment ? '✓' : '' }}</el-button>
             </el-upload>
             <span v-else>{{ row.attachment ? '有' : '-' }}</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="非货币性福利形式" min-width="130">
@@ -183,6 +184,8 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -209,7 +212,9 @@ const debitTotal = computed(() => rows.value.reduce((s, r) => s + (r.debit || 0)
 const creditTotal = computed(() => rows.value.reduce((s, r) => s + (r.credit || 0), 0))
 
 const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
-const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId))
+const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId), computed(() => props.projectId))
+/** 识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（只读也能看）（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'J1-9'
 
 function newRow(): NmRow {
   return {
@@ -232,7 +237,7 @@ function onOcrUpload(row: NmRow, uploadFile: any) {
     if (patch.debitAmount) row.debit = patch.debitAmount
     if (patch.businessContent) row.business = patch.businessContent
     persist()
-  })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(row.id) })
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────

@@ -249,6 +249,8 @@
         :rows="b2fRows"
         :is-readonly="isReadonly"
         :show-ocr="true"
+        :wp-id="wpId"
+        :project-id="projectId"
         :ocr-loading-id="ocr.ocrLoadingId.value"
         empty-text="暂无「账面→实物」明细；可从 H1-2 / H1-9 带入或新增"
         @update="onRowUpdate"
@@ -283,6 +285,8 @@
         :rows="f2bRows"
         :is-readonly="isReadonly"
         :show-ocr="true"
+        :wp-id="wpId"
+        :project-id="projectId"
         :ocr-loading-id="ocr.ocrLoadingId.value"
         empty-text="暂无「实物→账面」明细；完整性测试不可省略"
         @update="onRowUpdate"
@@ -402,7 +406,7 @@ const { exportTemplate, exportData, importData } = useH1ImportExport({
   },
 })
 
-const ocr = useH1StocktakeOcr(toRef(props, 'wpId'))
+const ocr = useH1StocktakeOcr(toRef(props, 'wpId'), toRef(props, 'projectId'))
 
 const meta = computed(() => state.checkMeta.value)
 const b2fRows = computed(() => state.bookToFloorRows.value)

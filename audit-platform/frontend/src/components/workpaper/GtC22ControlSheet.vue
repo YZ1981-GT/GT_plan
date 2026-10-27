@@ -25,6 +25,7 @@ import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import {
   itgcItemId,
@@ -757,6 +758,7 @@ defineExpose({
           <div v-for="(att, idx) in evidenceAttachments" :key="att.id" class="c22cs-attachment-item">
             <span class="c22cs-attachment-index">{{ att.index }}</span>
             <span class="c22cs-attachment-name" :title="att.name">{{ att.name }}</span>
+            <AttachmentEyeButton :attachment-id="att.id" :file-name="att.name" />
             <el-tag v-if="att.ocrMerged" size="small" type="success" effect="plain">OCR已填入</el-tag>
             <el-button
               v-if="!isReadonly"
@@ -875,6 +877,7 @@ defineExpose({
             <template #default="{ row, $index }">
               <div v-if="row.attachment" class="c22cs-sample-attach">
                 <span class="c22cs-attachment-name" :title="row.attachment.name">{{ row.attachment.name }}</span>
+                <AttachmentEyeButton :attachment-id="row.attachment.id" :file-name="row.attachment.name" />
                 <el-button v-if="!isReadonly" size="small" type="danger" link @click="removeSampleAttachment($index)">×</el-button>
               </div>
               <el-upload

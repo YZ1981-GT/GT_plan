@@ -197,7 +197,7 @@
       </el-table-column>
 
       <!-- 抽凭 + OCR列 -->
-      <el-table-column label="📎" width="90" align="center">
+      <el-table-column label="📎" width="110" align="center">
         <template #default="{ row }">
           <el-button size="small" link @click="handleVoucherSampling(row)" title="行级抽凭">📋</el-button>
           <el-upload
@@ -208,6 +208,7 @@
           >
             <el-button size="small" link title="OCR识别">📎</el-button>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
         </template>
       </el-table-column>
 
@@ -307,6 +308,8 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -322,6 +325,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K3-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -500,11 +506,15 @@ async function handleOcrUpload(row: K3RelatedPartyRow, file: File): Promise<bool
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
 
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    // 识别端点按底稿挂载（原写 `/api/d4/contract-ocr` 缺底稿 id，后端无此路由 ⇒ 恒 404）；回执正文字段是 ocr_text
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrResult = res.data?.data?.text || res.data?.text || ''
+    rowEv.refresh()
+    const data = res.data?.data ?? res.data
+    const ocrResult: string = data?.ocr_text || ''
 
     if (!ocrResult) {
       ElMessage.warning('OCR未识别出内容')

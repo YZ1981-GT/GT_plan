@@ -8,6 +8,10 @@ import http from '@/utils/http'
 import type { SubcontractSupplier2Row } from './useF2InspectionCheckFormulas'
 import type { F2PurchaseOcrFields } from './useF2PurchaseOcr'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
+import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
+
+/** 识别附件挂到本行（F2-35 + `row:{行 id}`，合同组 / 结算组同一行），小眼睛按同一位置读取 */
+export const F2_SUBCONTRACT_EVIDENCE_SHEET = 'F2-35'
 
 /** contract=合同/加工单位组；fee=加工费结算单据组 */
 export type SubcontractOcrTarget = 'contract' | 'fee'
@@ -64,12 +68,15 @@ export function useF2SubcontractOcr(wpId: Ref<string>, projectId?: Ref<string>) 
       const { form } = await buildLinkedOcrFormData(file, {
         projectId: projectId?.value,
         wpId: wpId.value,
+        evidenceSheet: F2_SUBCONTRACT_EVIDENCE_SHEET,
+        evidenceCell: rowEvidenceCell(rowId),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2/contract-ocr`,
         form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as F2PurchaseOcrFields
       const confidence = data?.confidence ?? 0

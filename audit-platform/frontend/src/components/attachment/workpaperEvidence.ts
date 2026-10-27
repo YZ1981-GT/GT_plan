@@ -46,8 +46,11 @@ export function evidencePositionLabel(pos: { sheet_name?: string | null; cell_re
   if (pos.sheet_name) parts.push(pos.sheet_name)
   const cell = pos.cell_ref || ''
   if (cell.startsWith('item:')) parts.push(`第 ${cell.slice(5)} 项`)
-  else if (cell.startsWith('row:')) parts.push(`行 ${cell.slice(4)}`)
-  else if (cell) parts.push(cell)
+  else if (cell.startsWith('row:')) {
+    // 行内识别的行槽位多是内部行 id（uuid / 随机串），不展示给用户（spec attachment-inline-preview design §2）
+    const key = cell.slice(4)
+    parts.push(/^\d+$/.test(key) ? `第 ${key} 行` : '行内证据')
+  } else if (cell) parts.push(cell)
   if (pos.page_ref) parts.push(`第 ${pos.page_ref} 页`)
   return parts.join(' · ') || '整张底稿'
 }

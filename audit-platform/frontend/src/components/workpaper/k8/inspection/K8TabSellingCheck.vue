@@ -193,10 +193,11 @@
         <el-table-column v-if="isColVisible('remark')" label="备注说明" min-width="120">
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
         </el-table-column>
-        <el-table-column v-if="isColVisible('ocr')" label="附件OCR" width="80" align="center">
+        <el-table-column v-if="isColVisible('ocr')" label="附件OCR" width="92" align="center">
           <template #default="{ row }">
             <el-button link size="small" :disabled="isReadonly" @click="triggerOcr(row.id)">📎</el-button>
             <span v-if="row.ocrAttachment" class="ocr-indicator" :title="row.ocrAttachment">✓</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
@@ -287,6 +288,8 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -297,6 +300,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K8-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
@@ -456,21 +462,26 @@ async function handleOcrFile(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   input.value = ''
+  const rowId = currentOcrRowId
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
     ElMessage.info('正在OCR识别...')
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrText = res.data?.data?.text || res.data?.text || ''
-    if (!ocrText) { ElMessage.warning('OCR未识别到文字内容'); return }
+    rowEv.refresh()
+    // 回执正文字段是 ocr_text（原读 text，恒读不到 ⇒ 每次都提示「未识别到文字」）
+    const data = res.data?.data ?? res.data
+    const ocrText: string = data?.ocr_text || ''
+    if (!ocrText) { ElMessage.warning('附件已上传，但OCR未识别到文字内容'); return }
     await ElMessageBox.confirm(
       `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
       'OCR识别确认',
       { confirmButtonText: '填入业务内容', cancelButtonText: '取消', type: 'info' },
     )
-    const row = occurrenceRows.value.find((r: K1VoucherRow) => r.id === currentOcrRowId)
+    const row = occurrenceRows.value.find((r: K1VoucherRow) => r.id === rowId)
     if (row) {
       row.businessContent = row.businessContent ? `${row.businessContent}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
       row.ocrAttachment = file.name

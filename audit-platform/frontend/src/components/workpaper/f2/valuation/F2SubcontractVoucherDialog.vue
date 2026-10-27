@@ -24,6 +24,7 @@
             >
               <el-button link size="small" data-testid="f2-35-ocr-contract" :loading="ocrLoadingId?.endsWith(':contract')">📎 上传识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SUBCONTRACT_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="f2sc-grid">
             <div class="f2sc-field"><label>加工单位</label><el-input v-model="form.processor" size="small" :disabled="readonly" /></div>
@@ -46,6 +47,7 @@
             >
               <el-button link size="small" data-testid="f2-35-ocr-fee" :loading="ocrLoadingId?.endsWith(':fee')">📎 上传识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SUBCONTRACT_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="f2sc-grid">
             <div class="f2sc-field"><label>发出材料成本</label><el-input-number v-model="form.issueCost" :controls="false" size="small" :disabled="readonly" style="width:100%" /></div>
@@ -109,12 +111,20 @@ import {
   type PurchaseCheckStatus,
 } from '../../composables/useF2InspectionCheckFormulas'
 import { useVoucherCheckDialog } from '../../composables/useVoucherCheckDialog'
-import { useF2SubcontractOcr, type SubcontractOcrTarget } from '../../composables/useF2SubcontractOcr'
+import {
+  F2_SUBCONTRACT_EVIDENCE_SHEET,
+  useF2SubcontractOcr,
+  type SubcontractOcrTarget,
+} from '../../composables/useF2SubcontractOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { routeProjectId, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   modelValue: boolean
   row: SubcontractSupplier2Row | null
   wpId?: string
+  /** 识别后刷新本行附件的小眼睛用（缺省取路由参数） */
+  projectId?: string
   readonly?: boolean
 }>()
 
@@ -142,8 +152,10 @@ const checks = computed(() => (form.value ? evaluateSubcontractRecoverChecks(for
 const ICON: Record<PurchaseCheckStatus, string> = { ok: '✓', mismatch: '✗', missing: '!', pending: '…' }
 
 const canOcr = computed(() => !!props.wpId && !props.readonly)
+const routePid = routeProjectId()
 const { ocrLoadingId, uploadAndMerge } = useF2SubcontractOcr(
   computed(() => props.wpId || '') as Ref<string>,
+  computed(() => props.projectId || routePid) as Ref<string>,
 )
 
 function runOcr(file: File | undefined, target: SubcontractOcrTarget) {

@@ -24,6 +24,8 @@ import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -79,6 +81,7 @@ const {
 // ─── 导入导出（E1-21 bank / E1-22 other） ─────────────────────────────────────
 
 const sheetCode = computed(() => (variant.value === 'other' ? 'E1-22' : 'E1-21'))
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
   wpId: toRef(props, 'wpId') as unknown as Ref<string>,
   sheet: sheetCode as unknown as Ref<string>,
@@ -199,8 +202,11 @@ const ocrFileName = ref('')
 async function onOcrUpload(file: File): Promise<boolean> {
   const form = new FormData()
   form.append('file', file)
+  // 凭证挂到本表页（表页级证据），按钮旁的小眼睛读取（spec attachment-inline-preview）
+  rowEv.append(form, sheetCode.value)
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/e1/cutoff-ocr`, form)
+    rowEv.refresh()
     const data = res?.data ?? res
     ocrFields.value = data?.fields ?? {}
     ocrConfidence.value = data?.confidence
@@ -294,6 +300,7 @@ async function generateAuditConclusion(): Promise<void> {
         <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="onOcrUpload" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
           <el-button size="small" :disabled="isReadonly">📎 凭证OCR</el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="sheetCode" />
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">

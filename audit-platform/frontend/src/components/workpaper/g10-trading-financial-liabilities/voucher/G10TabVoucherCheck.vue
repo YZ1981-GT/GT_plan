@@ -295,9 +295,10 @@
         </el-table-column>
       </template>
       <template v-else-if="vc.activeTab.value === 'check'">
-        <el-table-column label="📎" width="52">
+        <el-table-column label="📎" width="76">
           <template #default="{ row }">
             <el-button size="small" link :disabled="isReadonly" @click="uploadOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="支持性文件" min-width="140">
@@ -426,6 +427,8 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
@@ -439,6 +442,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G10-7'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -640,12 +646,14 @@ async function uploadOcr(row: G10VoucherCheckRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id))
       let res
       try {
         res = await http.post(`/api/workpapers/${props.wpId}/g10/contract-ocr`, formData)
       } catch {
         res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
       }
+      rowEv.refresh()
       const data = res.data?.data ?? res.data ?? {}
       const summary = data.summary ?? data.extracted_fields?.businessContent ?? ''
       if (!summary) { ElMessage.warning('OCR 未识别到内容'); return }

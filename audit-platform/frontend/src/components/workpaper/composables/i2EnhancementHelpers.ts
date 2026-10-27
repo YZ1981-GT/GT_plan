@@ -2,6 +2,7 @@
  * I2 跨表增强辅助：委外合计、项目名单、调整草稿、完成度标记、截止日、行业模板、OCR
  */
 import http from '@/utils/http'
+import { refreshRowEvidence } from '@/components/attachment/rowEvidence'
 
 function _num(v: unknown): number {
   const n = Number(v)
@@ -232,11 +233,21 @@ export function buildOutsourceSuperDeductionTip(bookAmount: number): string {
   return `本期委外账面约 ${bookAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，加计口径参考基数（×80%）约 ${base.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}；请与 I6 加计扣除计算交叉核对。`
 }
 
-/** 通用 OCR：复用 D4 contract-ocr；可选 attachment 回流 */
+/**
+ * 通用 OCR：复用 D4 contract-ocr；可选 attachment 回流。
+ * 带 evidenceSheet / evidenceCell 时新建的附件挂到该行（行级证据，spec attachment-inline-preview），
+ * 识别后让本底稿共享链接仓失效，行内小眼睛立即看到新文件。
+ */
 export async function runWorkpaperOcr(
   wpId: string,
   file: File,
-  opts?: { projectId?: string; attachmentId?: string; forceReocr?: boolean },
+  opts?: {
+    projectId?: string
+    attachmentId?: string
+    forceReocr?: boolean
+    evidenceSheet?: string
+    evidenceCell?: string
+  },
 ): Promise<Record<string, any>> {
   const { buildLinkedOcrFormData } = await import('./ocrAttachmentLinkage')
   const { form: fd } = await buildLinkedOcrFormData(file, {
@@ -244,11 +255,14 @@ export async function runWorkpaperOcr(
     wpId,
     attachmentId: opts?.attachmentId,
     forceReocr: opts?.forceReocr,
+    evidenceSheet: opts?.evidenceSheet,
+    evidenceCell: opts?.evidenceCell,
   })
   const res = await http.post(`/api/workpapers/${wpId}/d4/contract-ocr`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     _silent: true,
   } as any)
+  refreshRowEvidence(opts?.projectId, wpId)
   const data = res.data?.data ?? res.data ?? {}
   return (data.extracted_fields || data.fields || data) as Record<string, any>
 }

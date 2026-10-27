@@ -78,7 +78,9 @@ describe('位置键与标签', () => {
 
   it('evidencePositionLabel 覆盖槽位、行、单元格、页码与整稿', () => {
     expect(evidencePositionLabel({ sheet_name: 'D2A', cell_ref: 'item:3' })).toBe('D2A · 第 3 项')
-    expect(evidencePositionLabel({ sheet_name: 'F2-3', cell_ref: 'row:r-9', page_ref: '2' })).toBe('F2-3 · 行 r-9 · 第 2 页')
+    // 行槽位是内部行 id（uuid / 随机串）⇒ 不展示；纯数字才显示行号（spec attachment-inline-preview）
+    expect(evidencePositionLabel({ sheet_name: 'F2-3', cell_ref: 'row:r-9', page_ref: '2' })).toBe('F2-3 · 行内证据 · 第 2 页')
+    expect(evidencePositionLabel({ sheet_name: 'G8-6', cell_ref: 'row:3' })).toBe('G8-6 · 第 3 行')
     expect(evidencePositionLabel({ cell_ref: 'B5' })).toBe('B5')
     expect(evidencePositionLabel({})).toBe('整张底稿')
   })

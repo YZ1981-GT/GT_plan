@@ -48,6 +48,7 @@
             <el-upload v-if="canOcr" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="!!ocrLoadingId" @change="(f: any) => runOcr(f?.raw)">
               <el-button link size="small" :loading="!!ocrLoadingId">📎 上传识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_PURCHASE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="f2pv-grid">
             <div class="f2pv-field"><label>日期/编号</label><el-input v-model="form.recvDateNo" size="small" :disabled="readonly" /></div>
@@ -79,6 +80,7 @@
             <el-upload v-if="canOcr" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="!!ocrLoadingId" @change="(f: any) => runOcr(f?.raw)">
               <el-button link size="small" :loading="!!ocrLoadingId">📎 上传识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_PURCHASE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="f2pv-grid">
             <div class="f2pv-field"><label>日期/编号</label><el-input v-model="form.invoiceDateNo" size="small" :disabled="readonly" /></div>
@@ -139,7 +141,9 @@
  * 逐项红黄提示，与主表「是否异常」同源。保存 emit 整行 patch 回父组件 updateRow。
  */
 import { computed, toRef, type Ref } from 'vue'
-import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
+import { F2_PURCHASE_EVIDENCE_SHEET, useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { routeProjectId, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { useVoucherCheckDialog } from '../../composables/useVoucherCheckDialog'
 import {
   evaluatePurchaseInboundChecks,
@@ -153,6 +157,8 @@ const props = defineProps<{
   modelValue: boolean
   row: PurchaseInboundRow | null
   wpId?: string
+  /** 识别后刷新本行附件的小眼睛用（缺省取路由参数） */
+  projectId?: string
   readonly?: boolean
 }>()
 
@@ -178,8 +184,10 @@ const autoAbnormal = computed(() =>
 const ICON: Record<PurchaseCheckStatus, string> = { ok: '✓', mismatch: '✗', missing: '!', pending: '…' }
 const canOcr = computed(() => !!props.wpId && !props.readonly)
 
+const routePid = routeProjectId()
 const { ocrLoadingId, uploadAndMerge } = useF2PurchaseOcr(
   computed(() => props.wpId || '') as Ref<string>,
+  computed(() => props.projectId || routePid) as Ref<string>,
 )
 
 function runOcr(file?: File) {

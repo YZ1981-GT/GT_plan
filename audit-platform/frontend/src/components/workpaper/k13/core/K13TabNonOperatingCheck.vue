@@ -184,10 +184,11 @@
         </template>
       </el-table-column>
       <!-- 📎 行级OCR列 -->
-      <el-table-column label="📎" width="55" align="center">
+      <el-table-column label="📎" width="84" align="center">
         <template #default="{ row }">
           <el-button link size="small" :disabled="isReadonly" @click="handleOcrUpload(row.rowKey)">📎</el-button>
           <span v-if="row.ocrAttachment" class="ocr-indicator">✓</span>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowKey)" />
         </template>
       </el-table-column>
       <el-table-column prop="indexNo" label="索引号" width="90">
@@ -335,6 +336,8 @@ import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import { eventBus } from '@/utils/eventBus'
 import { generateK13AiText } from '../../composables/useK13AiText'
 
@@ -367,6 +370,9 @@ const props = defineProps<{
   year?: number
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K13-4'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -737,20 +743,24 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   input.value = ''
+  const rowKey = currentOcrRowKey
 
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowKey))
 
     ElMessage.info('正在OCR识别...')
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    rowEv.refresh()
     const ocrData = res.data?.data || res.data || {}
-    const ocrText = ocrData.text || ocrData.content || ''
+    // 回执正文字段是 ocr_text（原读 text / content，恒读不到 ⇒ 每次都提示「未识别到文字」）
+    const ocrText: string = ocrData.ocr_text || ''
 
     if (!ocrText) {
-      ElMessage.warning('OCR未识别到文字内容')
+      ElMessage.warning('附件已上传，但OCR未识别到文字内容')
       return
     }
 
@@ -760,7 +770,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
       { confirmButtonText: '填入备注', cancelButtonText: '取消', type: 'info' },
     )
 
-    const row = checkRows.value.find(r => r.rowKey === currentOcrRowKey)
+    const row = checkRows.value.find(r => r.rowKey === rowKey)
     if (row) {
       row.remark = row.remark ? `${row.remark}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
       row.ocrAttachment = file.name

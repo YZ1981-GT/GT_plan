@@ -23,6 +23,8 @@ import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // ─── Props ───────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -31,6 +33,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'D4-16'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
@@ -61,8 +66,10 @@ const ocrTargetId = ref('')
 async function handleOcrUpload(rowId: string, file: File) {
   const formData = new FormData()
   formData.append('file', file)
+  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any)
+    rowEv.refresh()
     const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (fields.amount) {
       const row = rows.value.find(r => r.id === rowId)
@@ -387,6 +394,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               @change="(f: any) => handleOcrUpload(row.id, f.raw || f)" style="display:inline-block;">
               <el-button link size="small" :disabled="isReadonly" title="OCR识别附件">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             <el-popconfirm title="确认删除？" @confirm="removeRow(row.id)">
               <template #reference><el-button link type="danger" size="small" :disabled="isReadonly">删除</el-button></template>
             </el-popconfirm>

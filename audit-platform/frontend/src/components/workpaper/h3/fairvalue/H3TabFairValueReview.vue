@@ -120,9 +120,13 @@
             <template #default="{ row, $index }">
               <div v-if="!row.isSubtotal && !isReadonly" class="ref-price-cell">
                 <el-input v-model.number="row.refUnitPrice" size="small" @change="onCalcRowChange($index, row)" />
-                <el-button size="small" link title="OCR识别成交凭证" @click="handleRefPriceOcr($index)">📎</el-button>
+                <el-button size="small" link title="OCR识别成交凭证" @click="handleRefPriceOcr($index, row.rowId)">📎</el-button>
+                <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
               </div>
-              <span v-else class="amount-cell">{{ fmtNum(row.refUnitPrice) }}</span>
+              <span v-else class="amount-cell">
+                {{ fmtNum(row.refUnitPrice) }}
+                <RowEvidenceEye v-if="!row.isSubtotal" :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
+              </span>
             </template>
           </el-table-column>
           <el-table-column label="来源⑤" min-width="100">
@@ -361,6 +365,8 @@ import { useH3FormData } from '../../composables/useH3FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -369,6 +375,9 @@ const props = defineProps<{
   isReadonly: boolean
   measurementModel?: 'cost' | 'fair_value'
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H3-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -558,7 +567,7 @@ async function handleDraftConclusion() {
   ElMessage.success('已生成审计结论草稿')
 }
 
-async function handleRefPriceOcr(index: number) {
+async function handleRefPriceOcr(index: number, rowId: string) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -568,11 +577,14 @@ async function handleRefPriceOcr(index: number) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 按行 id 挂（不按序号：删行后序号会前移，附件会错位到下一行）
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       const ocrData = res.data?.data ?? res.data
       if (!ocrData) return
       await ElMessageBox.confirm(

@@ -145,10 +145,11 @@
           <span v-else>{{ row.conclusion || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="📎" width="70" align="center">
+      <el-table-column label="📎" width="84" align="center">
         <template #default="{ row }">
           <el-button link size="small" :disabled="isReadonly" @click="handleOcrUpload(row.rowKey)">📎</el-button>
           <span v-if="row.ocrAttachment" class="ocr-indicator">✓</span>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowKey)" />
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="操作" width="88" align="center" fixed="right">
@@ -249,6 +250,8 @@ import type { Ref } from 'vue'
  */
 import { k8QueryCodes } from '../../composables/k8AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -267,6 +270,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K8-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
@@ -417,25 +423,30 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   input.value = ''
+  const rowKey = currentOcrRowKey
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowKey))
     ElMessage.info('正在OCR识别...')
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    const ocrText = res.data?.data?.text || res.data?.text || ''
-    if (!ocrText) { ElMessage.warning('OCR未识别到文字内容'); return }
+    rowEv.refresh()
+    // 回执正文字段是 ocr_text（原读 text，恒读不到 ⇒ 每次都提示「未识别到文字」）
+    const data = res.data?.data ?? res.data
+    const ocrText: string = data?.ocr_text || ''
+    if (!ocrText) { ElMessage.warning('附件已上传，但OCR未识别到文字内容'); return }
     await ElMessageBox.confirm(
       `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
       'OCR识别确认',
       { confirmButtonText: '填入合同内容', cancelButtonText: '取消', type: 'info' },
     )
-    const row = rows.value.find((r: K8AmortRow) => r.rowKey === currentOcrRowKey)
+    const row = rows.value.find((r: K8AmortRow) => r.rowKey === rowKey)
     if (row) {
       const merged = row.contractContent ? `${row.contractContent}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
-      updateCell(currentOcrRowKey, 'contractContent', merged)
-      updateCell(currentOcrRowKey, 'ocrAttachment', file.name)
+      updateCell(rowKey, 'contractContent', merged)
+      updateCell(rowKey, 'ocrAttachment', file.name)
       ElMessage.success('OCR内容已填入合同内容')
     }
   } catch (err: any) {

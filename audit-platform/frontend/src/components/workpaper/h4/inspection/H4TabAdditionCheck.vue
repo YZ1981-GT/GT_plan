@@ -271,6 +271,7 @@
                 title="上传合同/发票/入库单 OCR 填入"
                 @click="handleOcr(row)"
               >OCR</el-button>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
             </div>
           </template>
         </el-table-column>
@@ -529,6 +530,8 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -542,6 +545,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H4-4'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -712,12 +718,14 @@ async function handleOcr(row: H4AdditionCheckRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const { fields, confidence } = extractOcrFields(res.data)
       const { patch, previewLines } = mapOcrToAdditionPatch(fields)
       if (!previewLines.length && !Object.keys(patch).length) {

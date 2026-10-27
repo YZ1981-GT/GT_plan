@@ -263,6 +263,7 @@
         <el-table-column label="📎" width="50" align="center">
           <template #default="{ row }">
             <el-button size="small" link @click="handleOcr(row.rowId)" :disabled="isReadonly">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="auditConclusion" label="检查结论" min-width="100">
@@ -392,6 +393,8 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -405,6 +408,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H2-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 /** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
 const samplingYear = computed<number | null>(() => props.year ?? null)
@@ -533,12 +539,14 @@ function handleOcr(rowId: string) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      rowEv.refresh()
       const data = res.data?.data ?? res.data
       const fields = data?.extracted_fields || {}
       if (!Object.keys(fields).length) {

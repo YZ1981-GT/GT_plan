@@ -377,10 +377,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="56" align="center">
+        <el-table-column label="📎" width="84" align="center">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" size="small" link @click="uploadOcr(row)">OCR</el-button>
             <span v-else>{{ row.attachmentRef || '—' }}</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
       </template>
@@ -612,6 +613,8 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../../voucher-sampling/PostFillAiReviewDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G9AuditTextCards from '../G9AuditTextCards.vue'
 import {
   useG9VoucherCheck,
@@ -661,6 +664,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G9-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const tabOptions = [
   { label: '凭证基础', value: 'basic' },
@@ -963,12 +969,14 @@ async function uploadOcr(row: G9VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
       let res
       try {
         res = await http.post(`/api/workpapers/${props.wpId}/g9/contract-ocr`, formData)
       } catch {
         res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
       }
+      rowEv.refresh()
       const { fields, confidence } = extractG9OcrPayload(res.data)
       const { patch, lowConfidence } = mapG9OcrToVoucherFields(fields, confidence)
       const merged = computeG9OcrMergePatch(row, patch)

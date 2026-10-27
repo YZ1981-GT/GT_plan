@@ -206,10 +206,11 @@
         >{{ creditEvidenceStatus(row).label }}</el-tag>
       </template>
     </el-table-column>
-    <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+    <!-- 只读时也显示本列：已识别的凭证可用小眼睛预览（spec attachment-inline-preview） -->
+    <el-table-column v-if="!isReadonly || wpId" label="OCR" width="76" align="center" fixed="right">
       <template #default="{ row }">
         <el-upload
-          v-if="row.rowId !== '__subtotal__'"
+          v-if="!isReadonly && row.rowId !== '__subtotal__'"
           :show-file-list="false"
           accept="image/*,.pdf"
           :disabled="ocrLoadingRowId === row.rowId"
@@ -217,6 +218,13 @@
         >
           <el-button link size="small" :loading="ocrLoadingRowId === row.rowId" title="上传凭证 OCR">📎</el-button>
         </el-upload>
+        <RowEvidenceEye
+          v-if="wpId && evidenceSection && row.rowId !== '__subtotal__'"
+          :project-id="projectId"
+          :wp-id="wpId"
+          :sheet-key="f1VoucherEvidence(evidenceSection, row.rowId).sheet"
+          :cell-ref="f1VoucherEvidence(evidenceSection, row.rowId).cell"
+        />
       </template>
     </el-table-column>
     <el-table-column label="操作" :width="isReadonly ? 80 : 130" fixed="right">
@@ -234,12 +242,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { f1VoucherEvidence } from './f1VoucherEvidence'
 import {
   F1_ABNORMAL_OPTIONS,
   evaluateF1CreditEvidence,
   f1EvidenceStatusLabel,
   isAbnormalFlag,
   type F1CreditCheckRow,
+  type F1VoucherSection,
 } from '../composables/useF1ComprehensiveCheck'
 
 const props = defineProps<{
@@ -247,6 +258,10 @@ const props = defineProps<{
   checkedTotal: number
   isReadonly: boolean
   ocrLoadingRowId?: string | null
+  /** 本笔凭证附件的小眼睛（位置与父组件识别请求、逐笔核对弹窗 ⑤ 同口径，见 f1VoucherEvidence） */
+  wpId?: string
+  projectId?: string
+  evidenceSection?: F1VoucherSection
 }>()
 
 const emit = defineEmits<{

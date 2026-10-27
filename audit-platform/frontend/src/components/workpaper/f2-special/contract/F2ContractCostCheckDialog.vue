@@ -26,6 +26,7 @@
               @change="(file: any) => runOcr(file?.raw, 'voucher')">
               <el-button link type="primary" size="small" :loading="isOcrLoading('voucher')">📎 上传凭证并识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="field-grid">
             <label>凭证号<el-input v-model="form.voucherNo" size="small" :disabled="readonly" /></label>
@@ -44,6 +45,7 @@
               @change="(file: any) => runOcr(file?.raw, 'contract')">
               <el-button link type="primary" size="small" :loading="isOcrLoading('contract')">📎 上传合同并识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="field-grid">
             <label>日期/编号<el-input v-model="form.contractDateNo" size="small" :disabled="readonly" /></label>
@@ -64,6 +66,7 @@
             >
               <el-button link type="primary" size="small" :loading="isOcrLoading('receipt')">📎 上传验收单并识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="field-grid">
             <label>产品名称<el-input v-model="form.receiptProductName" size="small" :disabled="readonly" /></label>
@@ -79,6 +82,7 @@
               @change="(file: any) => runOcr(file?.raw, 'logistics')">
               <el-button link type="primary" size="small" :loading="isOcrLoading('logistics')">📎 上传物流单并识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="field-grid">
             <label>数量<el-input-number v-model="form.logisticsQty" :controls="false" size="small" :disabled="readonly" /></label>
@@ -96,6 +100,7 @@
               @change="(file: any) => runOcr(file?.raw, 'allocation')">
               <el-button link type="primary" size="small" :loading="isOcrLoading('allocation')">📎 上传分配表并识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_SPE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(form.id)" />
           </template>
           <div class="field-grid">
             <label>数量<el-input-number v-model="form.allocQty" :controls="false" size="small" :disabled="readonly" /></label>
@@ -157,9 +162,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, type Ref } from 'vue'
 import {
+  F2_SPE_EVIDENCE_SHEET,
   useF2SpecialContractOcr,
   type F2SpeDocumentType,
 } from '../../composables/useF2SpecialContractOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { routeProjectId, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { useF2SpecialAiGenerate } from '../../composables/useF2SpecialAiGenerate'
 import {
   evaluateContractCostEvidence,
@@ -171,6 +179,8 @@ const props = defineProps<{
   modelValue: boolean
   row: ContractCostCheckSample | null
   wpId?: string
+  /** 识别后刷新本行附件的小眼睛用（缺省取路由参数） */
+  projectId?: string
   readonly?: boolean
 }>()
 
@@ -199,8 +209,10 @@ const statusIcon: Record<ContractCostCheckStatus, string> = {
   mismatch: '✕',
 }
 const canOcr = computed(() => !!props.wpId && !props.readonly)
+const routePid = routeProjectId()
 const { ocrLoadingId, uploadAndMerge } = useF2SpecialContractOcr(
   computed(() => props.wpId || '') as Ref<string>,
+  computed(() => props.projectId || routePid) as Ref<string>,
 )
 const {
   aiAvailable,

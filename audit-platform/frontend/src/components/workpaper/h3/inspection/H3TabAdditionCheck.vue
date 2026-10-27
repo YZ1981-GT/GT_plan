@@ -294,9 +294,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="48" align="center">
-          <template #default="{ $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index)">📎</el-button>
+        <el-table-column label="📎" width="72" align="center">
+          <template #default="{ row, $index }">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注说明" min-width="100">
@@ -442,9 +443,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="48" align="center">
-          <template #default="{ $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index)">📎</el-button>
+        <el-table-column label="📎" width="72" align="center">
+          <template #default="{ row, $index }">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注说明" min-width="100">
@@ -755,6 +757,8 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -768,6 +772,9 @@ const props = defineProps<{
   /** render 下发的整册载荷（抽凭引擎的科目码取自其 `tb_source_codes`） */
   htmlData?: Record<string, any> | null
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H3-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -986,7 +993,7 @@ function onSamplesFilled(payload: { samples?: any[] }) {
   ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已回填 ${n} 笔抽样凭证到增减检查行` : '未回填新凭证（可能已存在或无样本）')
 }
 
-async function handleOcr(index: number) {
+async function handleOcr(index: number, rowId: string) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -996,11 +1003,14 @@ async function handleOcr(index: number) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 按行 id 挂（不按序号：删行后序号会前移，附件会错位到下一行）
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       const ocrData = res.data?.data ?? res.data
       if (!ocrData) return
       await ElMessageBox.confirm(

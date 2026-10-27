@@ -181,6 +181,7 @@
                         >📎</el-button>
                       </el-tooltip>
                     </el-upload>
+                    <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="evidenceSheet" :cell-ref="rowEvidenceCell(row.key)" />
                   </div>
                 </template>
               </el-table-column>
@@ -305,6 +306,8 @@ const B1_RISK_ENTRY_ID = 'xlsx/gt-b1-risk-assessment'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import GtReviewTrigger from './GtReviewTrigger.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // 版本快照由 Runtime Boundary(GtWpRenderer) 提供的运行时上下文承载；复核对话由 GtReviewTrigger 自行 inject
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
@@ -325,7 +328,7 @@ const {
   loading, saveStatus, variant, sourceSheet, sections, headerFields, header,
   overall, conclusionOptions, projectContext, priorYear, kaaHint, evalClientRisk,
   updateAnswer, updateNote, updateHeader, updateOverallConclusion, updateOverallExplanation,
-  flushPendingSaves, loadData, suggestedConclusion, ocrRowNote, ocrLoadingKey,
+  flushPendingSaves, loadData, suggestedConclusion, ocrRowNote, ocrLoadingKey, evidenceSheet,
 } = useB1RiskAssessment({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),

@@ -253,7 +253,7 @@
           </el-table-column>
 
           <!-- 📎 附件 -->
-          <el-table-column label="📎" width="60" align="center">
+          <el-table-column label="📎" width="96" align="center">
             <template #default="{ row }">
               <div class="attach-cell">
                 <el-tooltip
@@ -268,6 +268,11 @@
                     @click.stop.prevent="downloadAttachment(c26Attachments[row.__idx]!.id, c26Attachments[row.__idx]!.fileName)"
                   >📎</a>
                 </el-tooltip>
+                <AttachmentEyeButton
+                  v-if="c26Attachments[row.__idx]"
+                  :attachment-id="c26Attachments[row.__idx]!.id"
+                  :file-name="c26Attachments[row.__idx]!.fileName"
+                />
                 <el-upload
                   v-if="!isReadonly"
                   :auto-upload="true"
@@ -401,6 +406,7 @@ import { computed, ref, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { InfoFilled, Plus, Delete, MagicStick, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useC25C26Data } from '@/composables/useC25C26Data'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'

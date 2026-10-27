@@ -909,6 +909,7 @@
               <el-tooltip v-if="procAttachName()" :content="procAttachName()" placement="top">
                 <el-icon class="c1-attach-flag"><Paperclip /></el-icon>
               </el-tooltip>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="procEvidenceSheet()" />
             </div>
           </div>
 
@@ -1125,6 +1126,7 @@
                   <el-icon class="c1-attach-flag"><Paperclip /></el-icon>
                 </el-tooltip>
                 <span v-else-if="isReadonly" class="c1-ref-empty">—</span>
+                <RowEvidenceEye :project-id="projectId" :wp-id="wpId" sheet-key="C1-4-4" :cell-ref="rowEvidenceCell(row.__rid)" />
               </td>
               <td v-if="!isReadonly">
                 <el-button type="danger" size="small" text @click="removeSampleRow(i)">删除</el-button>
@@ -1212,6 +1214,9 @@ import {
   normalizeConclusion,
 } from './composables/useC1ConclusionEngine'
 
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 
@@ -1226,6 +1231,8 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
 }>()
+/** 识别附件挂到位置：样本行 = C1-4-4 + `row:{rid}`；过程记录 = C1-4-{k} 表页级（spec attachment-inline-preview） */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 defineEmits<{
   (e: 'save'): void
@@ -2063,6 +2070,8 @@ const procAttachItemId = (): string => {
   const k = activeProcessIndex.value + 1
   return `${C1_ITEM_PREFIX}4-${k}-attach`
 }
+/** 过程记录附件的表页键（C1-4-1 ~ C1-4-6） */
+const procEvidenceSheet = (): string => `C1-4-${activeProcessIndex.value + 1}`
 
 function sampleAttachName(rid: number): string {
   return c1data.getRemark(sampleAttachItemId(rid)) || ''
@@ -2084,6 +2093,7 @@ async function onUploadSampleOcr(i: number, rawFile: File): Promise<void> {
   c1data.setFieldDebounced(sampleAttachItemId(row.__rid), { remark: rawFile.name })
   const formData = new FormData()
   formData.append('file', rawFile)
+  rowEv.append(formData, 'C1-4-4', rowEvidenceCell(row.__rid))
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(
@@ -2091,6 +2101,7 @@ async function onUploadSampleOcr(i: number, rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     ocrFields = unwrapOcrFields(res)
   } catch {
     ElMessage.warning('识别失败，请手动填写')
@@ -2129,6 +2140,7 @@ async function onUploadProcOcr(rawFile: File): Promise<void> {
   c1data.setFieldDebounced(procAttachItemId(), { remark: rawFile.name })
   const formData = new FormData()
   formData.append('file', rawFile)
+  rowEv.append(formData, procEvidenceSheet())
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(
@@ -2136,6 +2148,7 @@ async function onUploadProcOcr(rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     ocrFields = unwrapOcrFields(res)
   } catch {
     ElMessage.warning('识别失败，请手动填写')

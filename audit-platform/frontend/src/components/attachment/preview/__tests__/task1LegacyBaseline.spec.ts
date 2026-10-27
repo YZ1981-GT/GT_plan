@@ -257,14 +257,15 @@ describe('Task1/14 Drawer_Host matrix', () => {
 })
 
 describe('Task13/14 AttachmentTabPanel 接线', () => {
-  it('源码把 file_type 写入 type_hint，并传递 OCR', () => {
+  it('源码经统一构造把 file_type 与 OCR 交给预览（spec attachment-inline-preview ADR-AIP-02）', () => {
+    // 原先 `type_hint: att.file_type` 直传：file_type 是分类词 image / word，预览按 MIME 判图片 ⇒ 图片判不出。
+    // 现在由 toAttachmentPreview 按扩展名给 MIME（判型见 attachmentPreviewTarget.spec.ts）。
     const src = readFileSync(
       resolve(__dirname, '../../../workpaper/AttachmentTabPanel.vue'),
       'utf8',
     )
-    expect(src).toMatch(/type_hint:\s*att\.file_type/)
-    expect(src).toMatch(/ocr_status:\s*att\.ocr_status/)
-    expect(src).toMatch(/ocr_text:\s*att\.ocr_text/)
+    expect(src).toMatch(/toAttachmentPreview\(\{[\s\S]*?file_type:\s*att\.file_type[\s\S]*?ocr_status:\s*att\.ocr_status[\s\S]*?ocr_text:\s*att\.ocr_text[\s\S]*?\}\)/)
+    expect(src).not.toMatch(/type_hint:\s*att\.file_type/)
     expect(src).not.toMatch(/mime_type:\s*att\.file_type/)
   })
 

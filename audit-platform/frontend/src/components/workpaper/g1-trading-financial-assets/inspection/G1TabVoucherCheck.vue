@@ -240,7 +240,7 @@
       </template>
 
       <template v-else-if="vc.activeTab.value === 'check'">
-        <el-table-column label="📎" width="56" align="center">
+        <el-table-column label="📎" width="80" align="center">
           <template #default="{ row }">
             <el-upload
               :show-file-list="false"
@@ -250,6 +250,7 @@
             >
               <el-button size="small" link :loading="ocrLoadingRowId === row.id" :disabled="isReadonly">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId || ''" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="支持性文件" min-width="140">
@@ -372,6 +373,8 @@ import {
 } from '../../composables/useG1VoucherCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
 import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 import type { SampledVoucher, FillMode, Phase } from '../../composables/useSamplingAlgorithms'
@@ -415,6 +418,9 @@ const samplingAccountCode = computed(() =>
 
 const emit = defineEmits<{ imported: [] }>()
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G1-13'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const vc = useG1VoucherCheck({
   allResponses: toRef(props, 'allResponses'),
@@ -530,11 +536,13 @@ async function handleRowOcr(rowId: string, file: File): Promise<boolean> {
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR完成，未识别到可填充字段')

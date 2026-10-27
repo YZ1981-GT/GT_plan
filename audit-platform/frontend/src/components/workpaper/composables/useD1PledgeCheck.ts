@@ -32,6 +32,7 @@ import { sumColumn, computePledgeRatio, type PledgeRow } from './d1InspectionFor
 import { readD1AdjudicationTotals } from './d1AdjudicationModel'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
 import http from '@/utils/http'
+import { appendRowEvidence, refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -486,8 +487,10 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
   // ─── 行级 OCR ─────────────────────────────────────────────────────────────────
 
   /**
-   * 行级 OCR 上传：上传附件 → 调 /api/d4/contract-ocr → 确认后填入空字段
-   * 映射: counterparty → pledgee, amount → pledgeAmount, date → pledgePeriod
+   * 行级 OCR 上传：上传附件 → 调 /api/workpapers/{wpId}/d4/contract-ocr → 确认后填入空字段
+   * 映射: counterparty → pledgee, contractAmount → pledgeAmount, date → pledgePeriod
+   * 识别附件挂到本行（D1-12 + `row:{行 id}`，spec attachment-inline-preview）。
+   * 🔴 现状：D1TabPledgeCheck 未接本函数（表格无 📎 列），覆盖守卫豁免清单登记。
    */
   async function handleOcrUpload(rowId: string, file: File): Promise<void> {
     if (isReadonly.value) return
@@ -502,16 +505,22 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      appendRowEvidence(formData, 'D1-12', rowEvidenceCell(rowId))
 
-      const res = await http.post('/api/d4/contract-ocr', formData, {
+      // 原写 `/api/d4/contract-ocr`（缺底稿 id，后端无此路由 ⇒ 恒 404）
+      const res = await http.post(`/api/workpapers/${wpId.value}/d4/contract-ocr`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      refreshRowEvidence(_projectId.value, wpId.value)
       const ocrData = res.data?.data ?? res.data ?? {}
+      const fields = ocrData.extracted_fields ?? {}
 
-      // 映射 OCR 字段
+      // 映射 OCR 字段（合同识别回执的字段在 extracted_fields 下：counterparty / contractAmount）
       const mappedFields: Array<{ label: string; field: keyof PledgeRow; value: string }> = []
-      if (ocrData.counterparty) mappedFields.push({ label: '质权人', field: 'pledgee', value: String(ocrData.counterparty) })
-      if (ocrData.amount) mappedFields.push({ label: '质押金额', field: 'pledgeAmount', value: String(ocrData.amount) })
+      const counterparty = ocrData.counterparty || fields.counterparty
+      const amount = ocrData.amount || fields.contractAmount
+      if (counterparty) mappedFields.push({ label: '质权人', field: 'pledgee', value: String(counterparty) })
+      if (amount) mappedFields.push({ label: '质押金额', field: 'pledgeAmount', value: String(amount) })
       if (ocrData.date) mappedFields.push({ label: '质押期限', field: 'pledgePeriod', value: String(ocrData.date) })
 
       if (mappedFields.length === 0) {

@@ -72,6 +72,7 @@
             >
               <el-button link size="small" type="primary" :loading="ocrLoading">📎 OCR 识别</el-button>
             </el-upload>
+            <RowEvidenceEye v-if="wpId && evidenceCell" :project-id="projectId" :wp-id="wpId" sheet-key="K1-12" :cell-ref="evidenceCell" />
           </template>
           <div class="k1vc-grid">
             <div class="k1vc-field k1vc-span2">
@@ -143,7 +144,8 @@
  */
 import { computed, toRef } from 'vue'
 import { useVoucherCheckDialog } from '../../composables/useVoucherCheckDialog'
-import { useK1VoucherOcr } from '../../composables/useK1VoucherOcr'
+import { useK1VoucherOcr, voucherEvidenceCell } from '../../composables/useK1VoucherOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import {
   K1_VOUCHER_CHECK_LABELS,
   evaluateK1VoucherChecks,
@@ -158,6 +160,9 @@ const props = defineProps<{
   row: K1VoucherRow | null
   mode?: 'occurrence' | 'post'
   readonly?: boolean
+  /** 识别附件挂到本行用（K1-12 + `row:{表}-{行 id}`，与表格 📎 列同一位置） */
+  wpId?: string
+  projectId?: string
 }>()
 
 const emit = defineEmits<{
@@ -174,7 +179,8 @@ const { form, buildSavePatch } = useVoucherCheckDialog<K1VoucherRow>({
   overrideKey: false,
 })
 
-const { ocrLoading, runOcr } = useK1VoucherOcr()
+const { ocrLoading, runOcr } = useK1VoucherOcr(() => props.wpId, () => props.projectId)
+const evidenceCell = computed(() => (form.value?.id ? voucherEvidenceCell(mode.value, form.value.id) : ''))
 
 const dialogTitle = computed(() => {
   if (!form.value) return '逐笔核对'
@@ -219,7 +225,7 @@ function onOcrFile(file?: File): void {
         ? `${form.value.remark}\n[OCR附件] ${fileName}`
         : `[OCR附件] ${fileName}`
     }
-  })
+  }, evidenceCell.value ? { sheet: 'K1-12', cell: evidenceCell.value } : undefined)
 }
 
 function handleSave(): void {

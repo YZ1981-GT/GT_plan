@@ -20,6 +20,7 @@ import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
+import { appendRowEvidence, refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,12 +97,14 @@ export const CHOICE_OPTIONS = ['是', '否', 'N/A'] as const
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useB1RiskAssessment(opts: UseB1RiskOptions) {
-  const { wpId, htmlData, onAfterSave } = opts
+  const { wpId, projectId, htmlData, onAfterSave } = opts
 
   const loading = ref(false)
   const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
 
   const variant = ref<'acceptance' | 'retention'>('acceptance')
+  /** 行内附件的表页键：承接 B1-1 / 保持 B1-2（spec attachment-inline-preview） */
+  const evidenceSheet = computed(() => (variant.value === 'retention' ? 'B1-2' : 'B1-1'))
   const sourceSheet = ref('')
   const sections = ref<B1RiskSection[]>([])
   const headerFields = ref<B1HeaderField[]>([])
@@ -199,14 +202,18 @@ export function useB1RiskAssessment(opts: UseB1RiskOptions) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 附件挂到本事项行（B1-1 / B1-2 + `row:{事项 key}`），「说明或附件」旁的小眼睛按同一位置读取
+      appendRowEvidence(formData, evidenceSheet.value, rowEvidenceCell(key))
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId.value, wpId.value)
       const data = (res as any)?.data?.data ?? (res as any)?.data
       const fields = data?.extracted_fields || {}
-      text = String(fields.full_text || fields.fullText || '').trim()
+      // 原文在 ocr_text（原先只读 extracted_fields.full_text，合同识别回执里没有这个字段 ⇒ 恒「未识别到文本」）
+      text = String(data?.ocr_text || fields.full_text || fields.fullText || '').trim()
     } catch {
       ocrLoadingKey.value = null
       ElMessage.warning('OCR 识别失败，请稍后重试或手工填写')
@@ -316,5 +323,6 @@ export function useB1RiskAssessment(opts: UseB1RiskOptions) {
     suggestedConclusion,
     ocrRowNote,
     ocrLoadingKey,
+    evidenceSheet,
   }
 }

@@ -2,6 +2,7 @@
 /**
  * E1KeyPersonFlowOcrConfirmDialog — 个人流水 OCR 确认（复用 statement-ocr 结果）
  */
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { reactive, watch } from 'vue'
 
 export interface KeyPersonOcrLine {
@@ -29,6 +30,8 @@ const props = defineProps<{
   confidence?: number
   ocrPreview?: string
   fileName?: string
+  /** 本次识别的附件编号：有则在文件名旁给小眼睛看原件（spec attachment-inline-preview） */
+  attachmentId?: string
 }>()
 
 const emit = defineEmits<{
@@ -112,6 +115,7 @@ function onCancel(): void {
   >
     <div class="meta">
       <el-tag v-if="fileName" size="small">{{ fileName }}</el-tag>
+      <AttachmentEyeButton v-if="attachmentId" :attachment-id="attachmentId" :file-name="fileName" />
       <el-tag v-if="confidence != null" size="small" type="success">置信度 {{ confidence }}</el-tag>
     </div>
     <el-form label-width="72px" size="small" class="meta-form">

@@ -317,7 +317,7 @@
             <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="OCR" width="72" align="center" fixed="right">
+        <el-table-column label="OCR" width="90" align="center" fixed="right">
           <template #default="{ row }">
             <el-upload
               v-if="!isReadonly"
@@ -325,6 +325,7 @@
               :auto-upload="false"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               :disabled="ocrLoading"
+              style="display:inline-block"
               @change="(f: any) => onRowOcr(row, 'occurrence', f?.raw)"
             >
               <el-button link size="small" type="primary" :loading="ocrLoading">
@@ -333,6 +334,7 @@
             </el-upload>
             <span v-else-if="row.ocrAttachment" class="ocr-ok">✓</span>
             <span v-else>-</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="voucherEvidenceCell('occurrence', row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100" align="center" fixed="right">
@@ -465,7 +467,7 @@
             <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="OCR" width="72" align="center" fixed="right">
+        <el-table-column label="OCR" width="90" align="center" fixed="right">
           <template #default="{ row }">
             <el-upload
               v-if="!isReadonly"
@@ -473,6 +475,7 @@
               :auto-upload="false"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               :disabled="ocrLoading"
+              style="display:inline-block"
               @change="(f: any) => onRowOcr(row, 'post', f?.raw)"
             >
               <el-button link size="small" type="primary" :loading="ocrLoading">
@@ -481,6 +484,7 @@
             </el-upload>
             <span v-else-if="row.ocrAttachment" class="ocr-ok">✓</span>
             <span v-else>-</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="voucherEvidenceCell('post', row.id)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100" align="center" fixed="right">
@@ -598,6 +602,8 @@
       :row="voucherDialogRow"
       :mode="voucherDialogMode"
       :readonly="isReadonly"
+      :wp-id="wpId"
+      :project-id="projectId"
       @save="handleSaveVoucher"
     />
   </div>
@@ -615,7 +621,8 @@ import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import type { ElTable } from 'element-plus'
 import { useK1VoucherCheck, k1VoucherCardStatus, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
-import { useK1VoucherOcr } from '../../composables/useK1VoucherOcr'
+import { useK1VoucherOcr, voucherEvidenceCell } from '../../composables/useK1VoucherOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import {
   K1RowNavigationKey,
   applyK1IncomingFocus,
@@ -692,7 +699,9 @@ const {
   buildAbnormalAdjDrafts, serialize,
 } = useK1VoucherCheck({ allResponses: allResponsesRef as any })
 
-const { ocrLoading, runOcr } = useK1VoucherOcr()
+const { ocrLoading, runOcr } = useK1VoucherOcr(() => props.wpId, () => props.projectId)
+/** 行内识别附件挂到本行（K1-12 + `row:{本期/期后}-{行 id}`），📎 旁与逐笔核对弹窗里的小眼睛按同一位置读取 */
+const EVIDENCE_SHEET = 'K1-12'
 
 const viewMode = ref<'table' | 'card'>('table')
 const voucherDialogVisible = ref(false)
@@ -727,7 +736,7 @@ function onRowOcr(row: K1VoucherRow, target: 'occurrence' | 'post', file?: File)
         : (row.remark ? `${row.remark}\n[OCR附件] ${fileName}` : `[OCR附件] ${fileName}`),
     })
     persist()
-  })
+  }, { sheet: EVIDENCE_SHEET, cell: voucherEvidenceCell(target, row.id) })
 }
 
 onMounted(() => {

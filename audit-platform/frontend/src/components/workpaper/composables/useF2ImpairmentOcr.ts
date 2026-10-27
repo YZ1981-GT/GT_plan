@@ -6,6 +6,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { ImpairmentTestRow } from './useF2ImpairmentTest'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
+import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
+
+/** 识别附件挂到本行（F2-47 + `row:{行 id}`），小眼睛按同一位置读取 */
+export const F2_IMPAIRMENT_EVIDENCE_SHEET = 'F2-47'
 
 export interface F2ImpairmentOcrFields {
   itemName?: string
@@ -36,12 +40,15 @@ export function useF2ImpairmentOcr(wpId: Ref<string>, projectId?: Ref<string>) {
       const { form } = await buildLinkedOcrFormData(file, {
         projectId: projectId?.value,
         wpId: wpId.value,
+        evidenceSheet: F2_IMPAIRMENT_EVIDENCE_SHEET,
+        evidenceCell: rowEvidenceCell(rowId),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-val/contract-ocr`,
         form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as F2ImpairmentOcrFields
       const confidence = data?.confidence ?? 0

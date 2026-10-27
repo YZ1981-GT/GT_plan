@@ -10,6 +10,8 @@ import {
 } from '../composables/useF4VoucherCheck'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { itemCellRef } from '@/components/attachment/workpaperEvidence'
 import type { F4ImportableSheet } from '../composables/useF4ImportExport'
 
 const SCROLL_THRESHOLD = 50
@@ -267,9 +269,11 @@ async function generateSectionNoteAi(): Promise<void> {
             <el-tag size="small" :type="evidenceStatus(row).type">{{ evidenceStatus(row).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="145" fixed="right">
+        <el-table-column label="操作" width="169" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="emit('open-check', row.rowId)">单据核对</el-button>
+            <!-- 本笔附件（与单据核对弹窗 ⑤ 同一位置）的小眼睛 -->
+            <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="`F4-8-${section}`" :cell-ref="itemCellRef(row.attSlot)" />
             <el-button
               link
               type="danger"

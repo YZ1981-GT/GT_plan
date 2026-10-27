@@ -2,6 +2,7 @@
 /**
  * E1TabKeyPersonFlow.vue — E1-32 董监高关键岗位及其他关联方资金流水核查
  */
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { MagicStick, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -91,6 +92,11 @@ const ocrFileName = ref('')
 const ocrAttachmentId = ref('')
 const ocrSkippedCount = ref(0)
 
+/** 最近一次流水识别（附件编号随 ocrJobs 持久化）：「最近OCR」标签旁的小眼睛看原件 */
+const lastOcrJob = computed(() => {
+  const jobs = pack.value.ocrJobs || []
+  return jobs.length ? jobs[jobs.length - 1] : null
+})
 const lastOcrHint = computed(() => {
   const jobs = pack.value.ocrJobs || []
   if (!jobs.length) return ''
@@ -409,6 +415,7 @@ async function onRemovePerson(): Promise<void> {
           </template>
         </el-dropdown>
         <el-tag v-if="lastOcrHint" size="small" type="info" effect="plain">{{ lastOcrHint }}</el-tag>
+        <AttachmentEyeButton v-if="lastOcrJob?.attachmentId" :attachment-id="lastOcrJob.attachmentId" :file-name="lastOcrJob.fileName" />
       </template>
 
         <el-card shadow="never" class="section-card">
@@ -638,6 +645,7 @@ async function onRemovePerson(): Promise<void> {
 
     <E1KeyPersonFlowOcrConfirmDialog
       v-model="ocrVisible"
+      :attachment-id="ocrAttachmentId"
       :fields="ocrFields"
       :confidence="ocrConfidence"
       :ocr-preview="ocrPreview"

@@ -171,7 +171,7 @@
           </template>
         </el-table-column>
         <!-- 📎 核查证据上传列 (Req 10.2) -->
-        <el-table-column label="📎" width="60" align="center">
+        <el-table-column label="📎" width="96" align="center">
           <template #default="{ row, $index }">
             <div class="attach-cell">
               <!-- 已有附件 -->
@@ -187,6 +187,11 @@
                   @click.stop.prevent="downloadAttachment(evidenceAttachments[$index]!.id, evidenceAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
+              <AttachmentEyeButton
+                v-if="evidenceAttachments[$index]"
+                :attachment-id="evidenceAttachments[$index]!.id"
+                :file-name="evidenceAttachments[$index]!.fileName"
+              />
               <!-- 上传按钮 (非只读) -->
               <el-upload
                 v-if="!isReadonly"
@@ -240,6 +245,7 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'

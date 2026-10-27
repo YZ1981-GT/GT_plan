@@ -146,6 +146,11 @@
                       @click.stop.prevent="downloadAttachment(c25Attachments[row.index]!.id, c25Attachments[row.index]!.fileName)"
                     >📎</a>
                   </el-tooltip>
+                  <AttachmentEyeButton
+                    v-if="c25Attachments[row.index]"
+                    :attachment-id="c25Attachments[row.index]!.id"
+                    :file-name="c25Attachments[row.index]!.fileName"
+                  />
                   <el-upload
                     v-if="!isReadonly"
                     :auto-upload="true"
@@ -289,6 +294,7 @@ import { computed, ref, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { InfoFilled, MagicStick, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { useC25C26Data } from '@/composables/useC25C26Data'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'

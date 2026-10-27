@@ -71,8 +71,10 @@
     />
 
     <!-- 合同 OCR 智能识别 -->
-    <div v-if="!isReadonly && wpId" class="ocr-row">
+    <!-- 只读也显示本行：已上传的合同可用小眼睛预览（spec attachment-inline-preview） -->
+    <div v-if="wpId" class="ocr-row">
       <el-upload
+        v-if="!isReadonly"
         :show-file-list="false"
         :before-upload="onContractOcrUpload"
         accept=".pdf,.png,.jpg,.jpeg"
@@ -82,7 +84,8 @@
           📎 上传合同智能识别变量
         </el-button>
       </el-upload>
-      <span class="ocr-hint">上传贷款/投资/存款协议，自动识别利率/汇率/商品价格等挂钩条款并勾选 B 问卷（需人工复核）</span>
+      <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="G1_14_EVIDENCE_SHEET" />
+      <span v-if="!isReadonly" class="ocr-hint">上传贷款/投资/存款协议，自动识别利率/汇率/商品价格等挂钩条款并勾选 B 问卷（需人工复核）</span>
     </div>
 
     <div class="questionnaire-list">
@@ -427,6 +430,8 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 /**
  * 科目码 inject 驱动。衍生金融资产 1102 走 `g1DerivativeCode(src)`。
  * spec: voucher-attach-account-mapping-closure Task 16
@@ -448,6 +453,9 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
+/** 合同识别附件挂到本表页（表页级证据），上传按钮旁的小眼睛读取（spec attachment-inline-preview） */
+const G1_14_EVIDENCE_SHEET = 'G1-14'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 /** 抽凭科目码 —— inject 驱动（衍生金融资产 1102） */
 const samplingAccountCode = computed(() => g1DerivativeCode(_injectedTbSrc?.value ?? null))
@@ -520,11 +528,14 @@ async function onContractOcrUpload(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
+    // 表页级：合同挂到本表页，上传按钮旁的小眼睛按表页读取（spec attachment-inline-preview）
+    rowEv.append(form, G1_14_EVIDENCE_SHEET)
     const res: any = await api.post(
       `/api/workpapers/${wpId.value}/g1/contract-ocr`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } } as any,
     )
+    rowEv.refresh()
     const data = res?.data ?? res
     const fields = data?.extracted_fields ?? {}
     const hitKeys = Object.keys(fields).filter(

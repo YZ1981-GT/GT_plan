@@ -23,8 +23,13 @@ import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'D4-34'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
@@ -140,8 +145,10 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
+  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(`${type}-${rowId}`))
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any)
+    rowEv.refresh()
     const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) { ElMessage.info('OCR完成，未识别到可填充字段'); return }
 
@@ -217,6 +224,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
                 <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="(f:any) => handleOcrUpload('rental', row.id, f.raw||f)"><span>上传文件夹</span></el-upload></el-dropdown-item>
               </el-dropdown-menu></template>
             </el-dropdown>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(`rental-${row.id}`)" />
           </template>
         </el-table-column>
         <el-table-column width="40" align="center"><template #default="{ row }"><el-popconfirm title="删除？" @confirm="removeRental(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">×</el-button></template></el-popconfirm></template></el-table-column>
@@ -246,6 +254,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
                 <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="(f:any) => handleOcrUpload('consult', row.id, f.raw||f)"><span>上传文件夹</span></el-upload></el-dropdown-item>
               </el-dropdown-menu></template>
             </el-dropdown>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(`consult-${row.id}`)" />
           </template>
         </el-table-column>
         <el-table-column width="40" align="center"><template #default="{ row }"><el-popconfirm title="删除？" @confirm="removeConsult(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">×</el-button></template></el-popconfirm></template></el-table-column>

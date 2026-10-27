@@ -345,9 +345,10 @@
             <span v-else>{{ fmt(row.creditAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="附件" width="72">
+        <el-table-column label="附件" width="88">
           <template #default="{ row }">
             <el-button size="small" link :disabled="isReadonly" @click="uploadOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
       </template>
@@ -523,6 +524,8 @@ import GCycleProcedureCutoffPanel from '../../shared/GCycleProcedureCutoffPanel.
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -534,6 +537,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G11-5'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -718,7 +724,9 @@ async function uploadOcr(row: G11VoucherCheckRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id))
       const res = await http.post(`/api/workpapers/${props.wpId}/g11/contract-ocr`, formData)
+      rowEv.refresh()
       const data = res.data?.data ?? res.data ?? {}
       const summary = data.summary ?? data.extracted_fields?.businessContent ?? ''
       if (!summary) { ElMessage.warning('OCR 未识别到内容'); return }

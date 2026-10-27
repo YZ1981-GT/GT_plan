@@ -158,6 +158,9 @@
             :check-labels="grp.key === 'debit' ? debitCheckLabels : checkLabels"
             :is-readonly="isReadonly"
             :ocr-loading-id="ocrLoadingId"
+            :wp-id="wpId"
+            :project-id="projectId"
+            :evidence-sheet="EVIDENCE_SHEET"
             @change="persist"
             @remove="(id) => removeRow(grp.key, id)"
             @upload="onCardUpload"
@@ -200,10 +203,11 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="证据" width="70" align="center">
+          <el-table-column label="证据" width="96" align="center">
             <template #default="{ row }">
               <el-tag v-if="attachmentCount(row) > 0" size="small" type="success" effect="plain">📎{{ attachmentCount(row) }}</el-tag>
               <span v-else class="muted">—</span>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="异常" width="64" align="center">
@@ -300,6 +304,8 @@ import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1Vou
 import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import J1VoucherCard from './J1VoucherCard.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 /**
  * 抽凭科目码取自单一真源 `jAccountScope`（J1 应付职工薪酬）。原为模板内字面量；
@@ -357,7 +363,9 @@ const {
   fillFromSamples, serialize,
 } = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: ITEM_ID })
 
-const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId))
+const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId), computed(() => props.projectId))
+/** 卡片三类单据（薪酬计算表 / 付款审批单 / 银行回单）的识别附件都挂到本笔凭证行（J1-8 + `row:{行 id}`） */
+const EVIDENCE_SHEET = 'J1-8'
 const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
 
 // 借方检查的核对内容标签（发放）
@@ -439,7 +447,7 @@ function onCardUpload(payload: { rowId: string; file: File; evidenceKey: string 
       }
     }
     persist()
-  })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(payload.rowId) })
 }
 
 // ─── selfLoad 从 checklist-responses 恢复 ────────────────────────────────────

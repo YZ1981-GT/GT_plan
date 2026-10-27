@@ -243,6 +243,8 @@ import {
 } from '../composables/useF4VoucherCheck'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import ItemAttachment from '../ItemAttachment.vue'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
+import { itemCellRef } from '@/components/attachment/workpaperEvidence'
 
 type F4OcrDocumentType = 'voucher' | 'approval' | 'bank-receipt' | 'goods-receipt' | 'invoice'
 
@@ -301,10 +303,13 @@ async function runOcr(file: File | undefined, documentType: F4OcrDocumentType): 
     const formData = new FormData()
     formData.append('file', file)
     formData.append('document_type', documentType)
+    // 识别的单据挂到「⑤ 本笔附件」同一位置（原先只挂整稿，⑤ 与表格行里都看不到）
+    appendRowEvidence(formData, `F4-8-${props.section}`, itemCellRef(form.value.attSlot))
     const res = await http.post(`/api/workpapers/${props.wpId}/f4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,
     } as any)
+    refreshRowEvidence(props.projectId, props.wpId)
     const data = res.data?.data ?? res.data
     const fields = (data?.extracted_fields ?? {}) as Record<string, unknown>
     const confidence = Number(data?.confidence ?? 0)

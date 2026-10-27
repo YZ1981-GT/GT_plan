@@ -314,10 +314,12 @@
                 :auto-upload="false"
                 accept=".pdf,.png,.jpg,.jpeg"
                 :disabled="ocrLoadingId === row.id"
+                style="display:inline-block"
                 @change="(uf: any) => handleOcrUpload(row.id, uf?.raw)"
               >
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
+              <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="F2_IMPAIRMENT_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
               <el-button v-if="!isReadonly" link type="danger" size="small" @click="imp.removeProduct(row.id)">删</el-button>
             </td>
           </tr>
@@ -413,7 +415,9 @@
 import { ref, computed, onMounted, watch, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF2ImpairmentTest } from '../../composables/useF2ImpairmentTest'
-import { useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
+import { F2_IMPAIRMENT_EVIDENCE_SHEET, useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   F2_47_OBJECTIVES,
