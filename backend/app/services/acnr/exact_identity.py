@@ -9,7 +9,7 @@
 旧启发式。计划接入：catalog / full_resolve（T10）、`acnr.wp_cell_target`（T12）、
 V2 规范化与 stale 引擎（T21）、`check_ccr_resolve`（T22）、生成器名称规则（T06 / T07）。
 
-只依赖标准库与本包的 `catalog` / `reasons`（CI 无需新增依赖）。
+只依赖标准库与本包的 `catalog` / `reasons` / `catalog_contract`（CI 无需新增依赖）。
 """
 from __future__ import annotations
 
@@ -18,12 +18,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from . import reasons
+from .catalog_contract import A1_PATTERN
 
 if TYPE_CHECKING:  # 避免运行期强依赖（纯函数可独立测试）
     from .catalog import CatalogIndex
 
-# A1 地址：1~3 个大写字母 + 1~7 位数字
-_A1_RE = re.compile(r"^[A-Z]{1,3}[0-9]{1,7}$")
+# A1 地址：1~3 个大写字母 + 1~7 位数字（口径唯一来源 catalog_contract.A1_PATTERN）
+_A1_RE = re.compile(A1_PATTERN)
 # 编码词元边界字符
 _TOKEN_CH = re.compile(r"[A-Za-z0-9-]")
 

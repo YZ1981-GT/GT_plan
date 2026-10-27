@@ -324,6 +324,8 @@ D5-1 不在本节：它是 D5 册审定表 tab 的平台编号（§1.2），按�
 
 新模块 `services/acnr/catalog_release.py`（生成器、CI、测试共用）：`GateViolation(check, addr_id, detail)`；`run_release_gates(new, previous, report, *, today) -> list[GateViolation]` 全部跑完再汇总，`check` ∈ schema / duplicate / sheet_code / orphan / a1 / roundtrip / immutable / alias / ack / verdict / override。往返用新目录解析：`catalog.py` 增 `use_catalog(index)`（`ContextVar` 覆盖，只供门禁与测试；守卫断言生产代码不调用）。
 
+段四审计 F4-08 补记（实现细节，不改上述口径）：①往返的身份判定用 `exact_identity`，`sheet:{code}` / `cell:{code}!{A1}` 用生产解析函数 `catalog._index_ref_to_addr_id`（在 `use_catalog(新目录)` 内），父 sheet 不在目录的 cell 只由 orphan 报；②immutable 用 `immutability.validate_addr_id_immutable`（`check_addr_id_immutable` 的不抛版本，同一判据）；③「所指问题是否还在」需要本批次现算的问题清单，约定由生成器在跑门禁前放进 `report["open_problems"]`：`unregistered_alias_keys`（标签源里不在目录的键，§7.3 的 28 条属此类）、`alias_conflicts`（别名冲突，§7.2）、`ccr_unresolved`（§10.3 统一判定后仍不可解析的 CCR id），分别由 T07 / T09 / T22 产出；覆盖这几类问题的 `alias_policy`（non_address_label / merge_into）与豁免在对应清单缺失时按「无法核实」阻断，不放行；④带 `head_resolvable_at` 的豁免须登记 `writing{wp_code, sheet}`（HEAD 时错配的那条写法），写法在新目录里若已解析到别的 sheet 即判失效（§7.4）。
+
 ### 5.3 生成流程、幂等与 `--check`
 
 CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 `--offline`（恒读缓存，参数无意义）、`--cycle` 与 `--no-shards`（单循环写出会缺其他循环的 import_export）。**R2-N3：`generate_catalog()` 函数签名保留 `offline`（接受但忽略）与 `cycle` 关键字参数**（`test_x3_ie_manifest_registration.py` L274/441/622/637、`test_x3_ie_registrar.py` L436 以 `generate_catalog(offline=True, …, cycle=…)` 调用，须保持全绿），只删 CLI 选项；同步改模块 docstring 的 Usage（L6）。函数参数 `cycle` 只留给单测，非 `"all"` 时 `write_catalog` 拒写。流程：

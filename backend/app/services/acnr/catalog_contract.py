@@ -53,7 +53,11 @@ SKIP_REASONS: list = [
 #: 不允许出现项目态字段（L1 目录不含 project_id / wp_id）。
 NOT_PROJECT_CTX = {"required": ["project_id", "wp_id"]}
 
-# ─── 地址形态（与 exact_identity 的 A1 口径一致） ────────────────────────────
+# ─── 地址形态（A1 口径唯一来源：schema、exact_identity、发布门禁都取这一个） ──────
+
+#: A1 坐标：1~3 个大写字母 + 1~7 位数字（段四审计 F4-15：此前 schema / 门禁写 ^[A-Z]+[0-9]+$，
+#: 与 exact_identity 不一致；真实目录与 4 份快照的 cell_address 全部满足本口径，现算 0 例外）。
+A1_PATTERN = r"^[A-Z]{1,3}[0-9]{1,7}$"
 
 _SHEET_ADDR_ID_PATTERN = r"^[A-S][A-Za-z0-9-]*/[A-Za-z0-9-]+$"
 _CELL_ADDR_ID_PATTERN = (
@@ -136,6 +140,7 @@ def _sheet_entry() -> dict:
                     "depends_on_sheets": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": ["enabled", "api_prefix", "item_id"],
+                "additionalProperties": False,
             },
             "skip_reason": {
                 "type": ["string", "null"],
@@ -201,7 +206,7 @@ def _cell_entry() -> dict:
             "cell_address": {
                 "type": ["string", "null"],
                 "description": "A1 坐标（如 E100）；semantic_only 时为 null",
-                "pattern": r"^[A-Z]+[0-9]+$",
+                "pattern": A1_PATTERN,
             },
             "semantic_label": {"type": ["string", "null"], "description": "语义名（如 合计行-期末余额）"},
             "semantic_only": {
@@ -291,6 +296,7 @@ def schema_json(schema: dict | None = None) -> str:
 
 
 __all__ = [
+    "A1_PATTERN",
     "REGISTRY_VERSION_PATTERN",
     "FUNCTIONAL_TYPES",
     "PURPOSE_PATTERN",

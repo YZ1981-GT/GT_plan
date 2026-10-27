@@ -210,7 +210,8 @@
             "enabled",
             "api_prefix",
             "item_id"
-          ]
+          ],
+          "additionalProperties": false
         },
         "skip_reason": {
           "type": [
@@ -312,7 +313,7 @@
             "null"
           ],
           "description": "A1 坐标（如 E100）；semantic_only 时为 null",
-          "pattern": "^[A-Z]+[0-9]+$"
+          "pattern": "^[A-Z]{1,3}[0-9]{1,7}$"
         },
         "semantic_label": {
           "type": [

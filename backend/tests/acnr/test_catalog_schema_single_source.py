@@ -144,3 +144,47 @@ def test_mutation_cell_project_id_rejected():
     bad["cells"][0]["wp_id"] = "w1"
     errs = list(v.iter_errors(bad))
     assert errs, "cell 带 project_id/wp_id 应被 not 约束拒"
+
+
+# ─── 段四审计 F4-15：import_export 封闭、A1 口径单一来源 ──────────────────────
+
+
+def test_import_export_closed_extra_field_rejected():
+    """import_export 内多余字段被拒（此前新旧 schema 都不拦）；合法字段仍接受。"""
+    v = Draft7Validator(cc.build_schema())
+    good = _good_catalog()
+    good["sheets"][0]["import_export"] = {"enabled": True, "api_prefix": "/api/x", "item_id": ["a", "b"],
+                                          "storage_field": "s", "import_order": 1, "depends_on_sheets": ["D2-1"]}
+    assert list(v.iter_errors(good)) == []
+    bad = copy.deepcopy(good)
+    bad["sheets"][0]["import_export"]["bogus"] = 1
+    errs = list(v.iter_errors(bad))
+    assert errs and any("import_export" in list(e.absolute_path) for e in errs), "import_export 多余字段应被拒"
+
+
+def test_real_catalog_import_export_fields_within_contract():
+    """真实目录 import_export 实际出现的字段 ⊆ 契约字段（封闭前先现算，0 例外）。"""
+    cat = json.loads((_ACNR / "global_catalog.json").read_text(encoding="utf-8"))
+    allowed = set(cc.build_schema()["$defs"]["SheetCatalogEntry"]["properties"]["import_export"]["properties"])
+    seen = {k for s in cat["sheets"] if isinstance(s.get("import_export"), dict) for k in s["import_export"]}
+    assert seen, "真实目录没有 import_export（防空转）"
+    assert seen <= allowed, f"真实目录出现契约外 import_export 字段：{sorted(seen - allowed)}"
+
+
+def test_a1_pattern_single_source():
+    """schema 的 cell_address、exact_identity、发布门禁三处 A1 口径都取 catalog_contract.A1_PATTERN。"""
+    from app.services.acnr import catalog_release, exact_identity
+
+    schema = cc.build_schema()
+    assert schema["$defs"]["CellCatalogEntry"]["properties"]["cell_address"]["pattern"] == cc.A1_PATTERN
+    assert exact_identity._A1_RE.pattern == cc.A1_PATTERN
+    assert catalog_release._A1_RE.pattern == cc.A1_PATTERN
+
+
+def test_mutation_cell_address_outside_a1_pattern_rejected():
+    """A1 口径收紧为 1~3 个字母 + 1~7 位数字：4 个字母的列被拒（旧口径 ^[A-Z]+[0-9]+$ 会放过）。"""
+    v = Draft7Validator(cc.build_schema())
+    bad = _good_catalog()
+    bad["cells"][0]["cell_address"] = "ABCD1"
+    errs = list(v.iter_errors(bad))
+    assert errs and any("cell_address" in list(e.absolute_path) for e in errs)
