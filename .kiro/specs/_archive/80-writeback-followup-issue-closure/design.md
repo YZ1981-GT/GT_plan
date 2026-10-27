@@ -93,6 +93,55 @@
   - 改动范围：后端一条迁移（participant 记延迟离开）、离开端点的延迟模式（现在 request 为 `correlated` 时离开回 409，`rooms._OPEN_REQUEST_STATES`）、application 终态结算同事务执行延迟离开（锁序 room → request → participant）；前端桥新增「待合并」态，operation 追踪要从宿主挪到桥或页面（现在故意放在宿主、随宿主卸载停掉，回表单正是卸载宿主），挂载 `WorkpaperSyncEditorHost` 的 108 个 `.vue` 文件经 `useWorkpaperEntryDualMode`（31 处）、`useGRenderModeSwitch`（18 处）与直接用桥的组件补只读绑定，加横幅组件。
   - 交互代价：合并期间表单必须只读（否则 HTML 编辑与 apply 撞 CAS ⇒ 落 conflict）；conflict / error 要在表单模式下给出路（现在只在编辑器宿主里有）；合并中再进在线编辑、关页、多标签页都要定规则；apply 中断时由 R3.2 的重驱补完（约 5~6 分钟），这段时间表单一直是旧值。
   - 建议：本轮不做。apply 已降到约 6 s，P10 的收益小于它带来的新状态与 108 个宿主接线；还嫌慢时先做 P8。
+- **D13（R11）实施后定稿**：
+  - 和平药房 2025 D2（R11.1，wp `ef7f88e3`）：
+    - 现状：`D2-detail-rows` 741 行，末尾 12 行是骨架身份 `GTROW-D22-0013..0024`，逐行按 OO→HTML 镜像同一判据（`template_skeleton_baseline().carries_user_content`）都是模板原样；另外第 1 行 `dr-mtl5bqmm-vmn6qy0` 的客户名被 G4 canary 的探针标记 `g4h205660` 覆盖。内容版本 1~14 是原名「中国联合网络通信有限公司重庆市分公司」，15~33 带 G4 探针标记；rev14 与 rev51 规范化后逐项比，只差这 13 处（12 行骨架 + 1 处标记）。
+    - 处置：先备份（`backend/backups/hp2025_d2_store_repair_ef7f88e3-…_20261023_230550.json`），经正常保存路径（PUT checklist-responses，带 `if_match`）删 12 行、还原原名：741 → 729 行，md5 `68dc9b1c…` → `5f101fd1…`。再跑 `republish_entry_from_template.py --apply`：rev 51 → 52，首个业务行 25 → 13（上方骨架行 12 → 0）。浏览器：D2-2 729 行、首行客户名正确、在线编辑正常打开。
+    - 同项目其余带骨架身份的表（只读探针逐张核对）共 4 张，行全是骨架身份，各带一个 G4/G5 canary 探针标记（2026-09-11/12 写入，证据在 `_archive/17-…/evidence/g4-1-h1-*`、`g5-1-d3/d5/d6-*`）：D3 `D3-det-rows` 1 行（`GTROW-D32-0012`，`g5d3439283`）、D5 `D5-2-rows` 1 行（`GTROW-D52-0012`，`g5d5979837`）、D6 `D6-2-rows` 12 行（`GTROW-D62-0014` 带 `g5d6309270`，0015~0025 只有自动序号）、H1 `H1-8-rows` 1 行（`GTROW-H18-0013`，`g4h1324785`，`test_task42_h1_grouped_dynamic_pilot_pg.py` 把它登记为已知 E2E 残留）。未删：是真实项目上的删除，H1 那行还有测试登记，交用户。
+  - 重药安徽 2025 D2（R11.2，wp `e2c95d10`），差异逐项：
+    1. D2-1 坏账准备合计为 0：D2-2 的 500 行「信用风险组合方式」全空（和平药房 729 行也全空），属审计师分类工作；横幅现在点名未分类行数。
+    2. 横幅里的 596,123,623.29 是净额锚点 `D2-adj-tb-amount`（TB 1122 审定 623,025,343.06 − 1231-02 26,901,719.77），却标成「1122 审定额」⇒ 标签改通用口径（上市口径用整个 1231，不写死 1231-02）。
+    3. 辅助余额导入只取前 500 家（`agg.entries[:500]`）：1260 家期末合计 624,025,343.06，前 500 家 230,957,032.43，丢掉 760 家 393,068,310.63；内容版本 1~28 都只有这 500 家。修：D2-2 上限 3000（契约每行 39 个字段，3000×39 不超过 `max_projection_fields` 20 万的 75%；store 每行约 680 B），截断在返回字段、提示文案、前端常驻警告三处回报；D3/D5/D6/D7 上限仍 500，但同样回报截断。
+    4. 1122 有一笔 −1,000,000 的 AJE 未分到 D2-2 任何一行，属审计师工作。
+    5. D2-1 的 TB 差异拿原值合计比净额锚点 ⇒ 改成净额比净额（`provisionTotalAudited` / `netTotalAudited`，ECL 检查复用计提合计）。锚点归公式推送所有，模板也是净额比净额（A27），所以不改锚点。
+    6. `loadAll` 兜底拿原值覆盖锚点 ⇒ 只在既无人工值也无已存值时播种，播种值是净额。
+    7. D2-2 ↔ TB 横幅改比试算表 1122 原值（试算表接口与其余加载并行取）。不用锚点（净额）；不用渲染的 `tb_amount_gross`（只在 `D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED` 打开时有，默认关）。取不到原值时差异为 null，不显示假差异。
+    8. `d2_review_context` 的 tb_amount 回落到净额锚点 ⇒ 改取 1122 原值，取不到记 0。
+    - 改后只读核对（store md5 `42391fbf…`、rev 28 不变）：横幅 1「500 行未填信用风险组合方式」；横幅 2 原值 623,025,343.06、差异 −392,068,310.63（= 截断的 −393,068,310.63 + AJE 1,000,000）。补导入其余 760 家要改真实数据，且 1260 行之后每次在线保存都更慢，交用户。
+    - 守卫：`test_d_aux_import_truncation.py` 19 例、`d2TbReconciliationBasis.spec.ts` 15 例；变异 B1~B13、F1~F15 全杀；19 个相关后端文件与相关 vitest 前后对比零新增失败；单区域 vue-tsc 本次 5 个文件零新错（注入错误可被报出）；浏览器只读核对三条横幅文案，截断提示用拦截的导入响应测（单条警告，无成功提示）。
+  - 期间的新发现（范围外，均未改真实数据）：
+    - 试算表未审数符号：`trial_balance_service.recalc_unadjusted` 按方向取绝对值（借 +abs、贷 −abs），默认 `closing_direction` 是余额的实际方向。一次性脚本 `_fix_balance_direction_backfill.py`（5f671fb6c，2026-06-16，已删）给方向为空的行按借贷分列回填方向：借方列是负数时默认判「借」且不动余额，留下「方向 = 借、余额为负」的行（`*_direction_source='backfill_from_split'`），取绝对值后符号翻转。全库 active 数据集叶子行实测期末 5 行、期初 4 行（和平药房 4 + 4，重药安徽 1 + 0）。和平药房 `1122.11 应收账款_收款通` −40,319,819.03 被算成正数 ⇒ TB 1122 未审数 156,276,412.37，真值 75,636,774.31（差 2 × 40,319,819.03）；同样受影响的还有期末 1811.02 / 1221.98.07 / 1606、期初 1221.15.08 等，以及重药安徽 1221.98.08（−10,500）。现行导入（converter `_apply_sign_convention`）写的是实际方向，不再产生这种行。修法建议：备份后把这几行的方向改成实际方向，两个项目重算试算表（会触发下游重算），另加守卫（active 叶子行「按方向取绝对值」须等于借贷分列净额）。要改真实项目的试算表，交用户。
+    - OO 在文本列填数字致回写失败：见 R13 / D14。
+    - 生产 `docker/nginx/nginx.conf` 未设 `client_max_body_size`（默认 1 MB），D2-2 约 1500 行以上的保存、序时账上传会被 nginx 拒，后端允许 `MAX_UPLOAD_SIZE_MB` 800。
+    - 和平药房 g9 room 已 closed，仍有 1 个 active participant（01:25:40 UTC 建，05:25 UTC 过期）：status 2 只在所有人离开文档后才到，此时的 active 行都是没走离开接口的残留；closed room 上不能写，republish 的在编人数也排除 closed room，无实际影响，按租约过期。
+- **D14（R13）实施后定稿**：
+  - 根因（用 `apply_replay_hp.py` 重放 10-24 那条失败的 application 拿到原始异常；operation 行的 error_code 是 NULL、日志也不带堆栈）：incoming 的 C13 是数值 231，extract 对 text 字段记了 `type_normalization_failure` 观测并「保留原值供裁决」；但协调器调 `adapter.extract` 只拿 projection，观测被丢掉（`adapters/excel.py` 只收 `outcome.projection`，`merge_projections` 从未收到 `structural_anomalies` —— 这个参数只有单测在用）。base / current 都没有这个字段，三次 `envelopes_equal` 都在 present 上短路、不碰值 ⇒ `took_incoming` 采纳 int ⇒ 物化 `_normalised_write_value` 抛 `EditableCellWriteError`。base 有值时同一个值会在比较里抛规范化错误、记 schema 冲突（现行为）。
+  - 改法两处：①`excel_extract._collect_fields` 对**可编辑**文本列把 OO 存的数值按键入的文本读回（新模块 `oo_text_cell.numeric_cell_as_text`：int → 十进制串；有限 float 且绝对值 < 2**53 → 最短十进制、去多余零、定点；有限 Decimal 同理；bool、NaN / Inf、≥ 2**53、日期、字符串不转换）。只在 incoming 形态（OO 保存回来的文件）上转换，`extract_projection` 按 `substrate_role` 算一次开关、三个调用点（动态区的静态块、行域、静态区 binding）都传；已发布版本与物化产物照旧严格读，反读校验靠它看出漏写的文本格 —— 首版不分形态，被 `test_single_pass_artifact_equivalence` 的漏写反证打红（K11 模板文本列存的是数字，漏写后反读本应变回 int）。受保护文本列不转换（值由公式决定，类型不符是契约 / 模板问题，照旧记观测）；枚举列不在本次范围。比较口径 `normalize_value` 不变（仍不把数字与其字符串判等）。②`merge_projections` 在 base 与 current 都没有该字段、incoming 有值时校验 incoming 能否规范化，不能 ⇒ `type_normalization_failure` schema 冲突、保留 current（与 base 有值时同形），不再让读不懂的值走到物化。只在这一种组合上多做一次规范化（其余组合比较时已经规范化过）。
+  - 守卫：`test_oo_numeric_text_input.py` 44 例 —— 纯函数 28 例（含不转换边界）；`_collect_fields` 用生产 D2 契约 9 例（可编辑文本转换、字符串原样、已发布 / 物化形态不转换；受保护文本 / 日期 / 布尔 / ≥ 2**53 / 金额列填文字 / 枚举填数字仍记观测并保留原值）；K11 真模板页脚加一个可编辑文本格，incoming 与已发布两种形态各读一次；D2 三个调用点的开关逐个核对（D2-1 是静态区 binding）；真 D2 链路（生产 instrument → HTML→OO 物化 → 像 OO 那样把首行 C 列存成数值格 → OO→HTML adapter 三方提取与合并 → 在 incoming 上重物化 → roundtrip 与未管理区域校验 → 落盘为文本格 "231"，同一文件按已发布形态读仍是数值）；merge 4 例（无对照 + 读不懂 ⇒ schema 冲突、OO 新增行同样只扣这一格、能规范化照常采纳、base 有值的现行为不变）。磁盘变异 X1~X11 / T1~T10 / G1~G2 共 23 条全杀（首轮 X10「动态区的静态块不传开关」存活 ⇒ 补 K11 用例）；两处修复同时撤掉时真链路用例报的正是线上那条错误（`EditableCellWriteError: 受管格 C13 … 实得 int 231`）。
+  - 实证：重放那条真实 application（外层事务回滚、文件根换临时副本、事件截空，真实存储前后核对不变）：改前 `error`（`excel_materialize_editable_write_failed`，post_durable），改后 `applied`、rev 52 → 53（回滚未落库），合并摘要 = incoming 摘要 `09bada633c12`，产出文件 D2-2 第 13 行 C 列是文本 "231"、客户名是还原后的原名。真库那条 operation 仍是 error，没有替用户重试（231 是谁填的不确定）；用户点「重试回写」即可落地。
+  - 回归：93 个相关测试文件（import 了 extract / merge / oo_to_html 一类入口的）前后对比，现状 69 红 / 改动前 68 红，共同 69 条，新增 1 条是 `test_committed_code_imports_only_committed_modules`（已提交的 `excel_extract.py` import 了未跟踪的 `oo_text_cell.py`），`git add` 后该文件 10 例全绿；首轮不分形态时多出的漏写反证红已随「只在 incoming 上转换」消失。行数门按暂存内容过（`excel_extract.py` 4523 ≤ 4616、`merge.py` 1868 ≤ 1944）。
+  - 未改（交用户）：协调器不把 extract 的结构观测交给合并 —— 行身份类观测（空 / 重复 / 复用已删身份）接上后会让现在能过的 OO 保存 fail closed；另外冲突预览把所有 schema 冲突都标成「不可选边」（`ConflictPreviewItem.adjudicable_by_value_choice`），与 `SchemaAnomalyKind` 把类型失败判为可选边不一致，界面对类型冲突只显示「结构冲突，需先修复结构后重试」，而选「采用回传」会在物化时再失败。两件一起定：类型冲突只给「保留当前 / 手工合并」，身份类观测接线前先量化真实保存里出现的频率。
+- **D15（R12）实施后定稿**：
+  - 口径：import 了 cpu-hotspots 那 8 个模块的 188 个测试文件（HEAD 干净检出 244 failed + 11 errors），加本轮改动波及的 33 个，共 221 个；与「R12 改动前」逐条对比见 tasks 13。
+  - 已修，按根因：
+    1. 守卫认不出合法形态（task75 78 → 2 红等）：委托目标按委托方文件的 import 现解析成模块再对白名单，只认薄委托与严格的异常转译外壳；工厂 `build_orchestration` 的闭包按 qualname + 源文件认，判据落到闭包捕获的 cfg（共用 `provider_attach_identity.py`）。C 控制测试补本模块 digest 比对。台账 25 行 `pilot_class` 抄成 "phase5"、14 行 `template_relative_path` 抄错 / 缺失（K1~K13 写成盘上不存在的名字、A5-1 无此键），一律改回契约值，property49 逐行点名。
+    2. attach 只挂主 binding（真缺陷）：`ExcelSyncAdapter._all_bindings()` 是 materialize / extract 唯一遍历面，多表 entry 漏传兄弟 binding 时两个方向静默退化成单表，生产三道门照样全绿。真库已注册 31 个 adapter，F3 / F4 / F5 / F2 盘点 / K1 在当前已发布产物上反读受管字段 0 / 5 / 0 / 0 / 0 → 59 / 68 / 16 / 0 / 0，补上后行表全覆盖、三道门全绿。补法：框架一行入口 `observed_sibling_bindings`（仍走 `attach_sibling_bindings` 同一对齐内核）；H 骨架加 `provider_name`；K1 工厂注入复数 specs；未注册的 G1 / G3 / G9 / H3 / H7 / I5 一并接上。对齐内核两处：spec 先按 `resolved_sheet_key` 认契约 sheet（I5-2 两张契约 sheet 共用一个 Excel 名，原先两张 spec 落到同一张表）；`_row_bearing_table_key` 同 sheet 多区按首张 spec 的 UUID 列配（G1 / G3 / G9 原先恒抛），全台账前后逐值对比只有这 4 条变化。F2 盘点 / 计价 / 专项的 attach 直调观测器，本模块的 contract digest 比对从未被生产调用，改经它。
+    3. 丢失的合并：观测器同 sheet 多表主 binding（6bca74514）与 I5 同 store 多区投影 / 合回（02c7eb404，`~gt:{table_key}` 后缀）只在未合入分支 `work/2026-10-01-i-cycle-classification-convergence` 上，测试却已合入 ⇒ 前者原样恢复，后者拆成新模块 `phase5_shared_store_regions.py`（骨架已到行数上限）。
+    4. 裁决表：digest 重算（1780892fc 追加 d2-inspection 未重算）；c450c3fbf 的批量占位覆盖了 L2~L8 / N4 / I1~I6 / J1 的评审依据，用各自 cycle 脚本恢复；13 条已交付 entry 从未登记（J2 / J3 / K2~K7 / M6 / N1 / N2 / N3 / N5），9 条占位依据指向不存在的模板或整册名（C2 / E1 / K1 / K8~K13），新工具 `fix_wp_code_adjudication_backfill.py` 按 10-24 真库现查补录 / 修复（缺行只追加，修复只碰已知坏形态，wp_codes 不动）；这 22 条里有 published representation 的 19 条，其底稿 wp_code 与裁决码逐条相等。Property 36 76 / 89 → 89 / 89，task76 结构判据全绿，六个裁决脚本 `--check` 全 OK。
+    5. 前提 / 常量过期：single-pass D4 常量（binding 40 / loads 85 / substrate 80 / zip 144 / 坐标 785，binding 数单一来源）、兄弟区首行等于插入点不位移（`>=`）、转置注册表按 sheet_key 分派、store 行集合权威、L6 子集、task61 / task44 的定位、纯静态 entry 不派生行身份表（`is_static_only_provider`，与 `_identity_binding` 同一谓词）。
+  - 守卫：`test_attach_wiring_completeness.py` 113 例（多表 entry 必须补兄弟 binding，缺口逐条登记可伪证原因；接上的离线跑生产对齐内核须恰好覆盖全部行表；def 形态 attach 不得直调观测器；判据自检）；磁盘变异 task75 13/13、零散 2/2、兄弟 binding 10/10、补充 3/4（B12「合回不切片」是等价变异：引擎按 `stable_key_for(spec, …)` 只取本表键）。
+  - 未修（真阳性 / 需拍板 / 他人 lane），见 tasks 13.x：
+    | 组 | 红 | 根因 | 去向 |
+    |---|---|---|---|
+    | 裁决 sheet 不可观测 | registration 16、d3_expansion 5、d1 等 6 | 16 份契约的 fixed_rows 裁决 sheet 只有 `excel_table_sheet_association` 锚点，无 region_boundary / definedName ⇒ 观测器找不到物理 sheet，注册期 `ContractDriftError`（D1 / G6 真库注册失败）；新 instrument 的模板同样失败 | 方案 A 接成静态 definedName 区重发 16 份 / 方案 B 撤出契约 |
+    | D3 / D5 / D6 / D7 扩展只做一半 | 同上组内 | 契约含扩展 sheet，工厂 cfg 未注入复数 instrumentation（发布的是基表单数那份），扩展模块的 specs 不含基表 ⇒ 兄弟 binding 无法对齐；守卫登记为缺口 | 随上一组定 |
+    | g4 / g6 `ecl_stage` 孤儿契约 | task75 2 | 2c70600fb 落盘未入台账 | 入台账或删 |
+    | H / I manifest 回退 single | h9、h_cycle、task50 / 51、i_cycle 等 | 601707554 把已裁决的 bidirectional 翻回 single_onlyoffice | 重生成 manifest |
+    | 引用改写碰撞（Task 10 3a / 3b） | ref_collision 11 | 归档 spec 记「已修」，实现从未入库（测试来自 e7f942ff2）：apply 不守 token 边界（`A1` ⊂ `A10`、外部簿前缀）⇒ fail closed；同一引用两个 after 不抛（静默取一）；`MaterializeWorkbookChangeSet` 无 `trips`；两条变异前提随缓存改造过期。D3-4 真适配器 k3 / k8 用例是绿的 | 另立任务重做 |
+    | writer inventory 改名漂移 | task44 1 | overlay 仍裁决已改名 / 搬家的三个写入方（`_apply_settled_locked` → `_apply_settled`、`_mirror_d4_dual_stores` → `store_mirror._mirror_dual_stores`、`generate_project_workpapers` 改为薄壳） | task74 lane 重裁 |
+    | F2-57 字段映射与模板 / 前端都不符 | （新发现，无红） | spec 的 store 键（revenue / auditOpen …）前端不存在（实为 bookBalance / isImpaired …），I 列是「是否发生减值」文本公式却标 amount ⇒ 已注册的 f2.inventory_special 在当前发布产物上 materialize 即抛 `EditableCellWriteError` | F2 lane 重做 F2-55~58 映射 |
+    | K2 / K4 / K6 结构漂移、M9 descriptor 漂移、d2-inspection 红基线、A5-1 漂移旁路、task61 前提 | 各 1~3 | 见 R12 前几轮记录 | 交用户 |
+    | 其余（golden digest 基线、aos 棘轮、k1 candidate 缺文件、G overlay、lazy import 新增 3 处等） | 若干 | 他人 lane / 并发改动 | 登记不改 |
 
 ## §3 拒绝方案
 
