@@ -517,16 +517,20 @@ def run_check() -> int:
         return 2
 
     drift = _structural_drift(committed, cand.catalog)
-    if _strip_generated_at(report) != cand.report:
-        rk = sorted(k for k in set(_strip_generated_at(report)) | set(cand.report)
-                    if _strip_generated_at(report).get(k) != cand.report.get(k))
-        drift += [f"(报告): {k}" for k in rk]
     schema_text = _SCHEMA_PATH.read_text(encoding="utf-8") if _SCHEMA_PATH.exists() else ""
     if schema_text != schema_json():
         drift.append("(schema): global_catalog.schema.json 与 build_schema() 不一致")
     snap = _SNAPSHOTS_DIR / f"{committed['registry_version']}.json"
     if not snap.exists() or snap.read_text(encoding="utf-8") != _CATALOG_PATH.read_text(encoding="utf-8"):
         drift.append(f"(快照): {snap.name} 缺失或与目录不同")
+    if not drift and cand.violations:
+        # 目录与重算一致但门禁不过（如豁免到期）：按门禁违规退出 1，报告 blocking 组的差异是它的结果、不另报漂移
+        _print_violations(cand.violations)
+        return 1
+    if _strip_generated_at(report) != cand.report:
+        rk = sorted(k for k in set(_strip_generated_at(report)) | set(cand.report)
+                    if _strip_generated_at(report).get(k) != cand.report.get(k))
+        drift += [f"(报告): {k}" for k in rk]
     if drift:
         print(f"[ACNR check] 漂移 {len(drift)} 处（绕过生成器改了产物，或输入变了未重新发布）：", file=sys.stderr)
         for line in drift[:_MAX_DRIFT_LINES]:
@@ -591,8 +595,8 @@ def run_write(registry_version: str | None) -> int:
     _atomic_write(_CATALOG_PATH, catalog_text)
     summary = cand.report.get("summary", {})
     print(f"[ACNR] 已发布 {version}（上一批次 {cand.report['release']['previous_version']}）")
-    print(f"  sheets {summary.get('total_sheets')} / cells {summary.get('total_cells')} / "
-          f"停用 sheet {summary.get('deprecated_sheets')} / 停用 cell {summary.get('deprecated_cells')}")
+    print(f"  sheets {summary.get('total_sheets')} / cells {summary.get('total_cells')} / blocking {summary.get('blocking')} / "
+          f"豁免 {summary.get('acknowledged')} / 停用 {summary.get('deprecated')} / 提示 {summary.get('info')}")
     print(f"  目录 sha256 {cand.report['release']['catalog_sha256'][:16]}… 输入指纹 {cand.report['release']['inputs_fingerprint'][:16]}…")
     _run_offline_gc()
     return 0

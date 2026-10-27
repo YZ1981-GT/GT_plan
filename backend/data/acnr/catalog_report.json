@@ -1,40 +1,954 @@
 {
-  "acknowledged_conflicts": [],
-  "alias_conflicts": [
-    {
-      "action": "blocked",
-      "alias": "附注披露信息（上市公司）",
-      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
-      "sheet_codes": [
-        "D4-附注上市",
-        "D5-附注上市",
-        "附注上市"
-      ]
-    },
-    {
-      "action": "blocked",
-      "alias": "附注披露信息（国企）",
-      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
-      "sheet_codes": [
-        "D4-附注国企",
-        "D5-附注国企",
-        "附注国企"
-      ]
-    },
-    {
-      "action": "blocked",
-      "alias": "访谈记录与核对示例",
-      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
-      "sheet_codes": [
-        "D4-31T",
-        "D4-访谈模板"
-      ]
-    },
-    {
-      "action": "blocked",
-      "alias": "底稿目录",
-      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
-      "sheet_codes": [
+  "acknowledged": {
+    "count": 1,
+    "items": [
+      {
+        "covers": {
+          "addr_ids": [
+            "F3/F3-5/B25",
+            "F3/F3-5/C10",
+            "F3/F3-6/B25",
+            "G14/G14-2/E15",
+            "G14/G14-2/E25",
+            "G14/G14-2/E35",
+            "G8/G8-4/B35",
+            "G8/G8-4/F30",
+            "J1/J1-4/F20",
+            "J1/J1-4/G20",
+            "J1/J1-4/H20",
+            "J1/J1-4/I20",
+            "K1/K1-2/F30",
+            "K1/K1-2/G30",
+            "K1/K1-2/H30",
+            "K1/K1-2/I30",
+            "K3/K3-2/F25",
+            "K3/K3-2/G25",
+            "K3/K3-2/H25",
+            "K3/K3-2/I25",
+            "K8/K8-2/D30",
+            "K8/K8-2/E30",
+            "K8/K8-2/F30",
+            "K8/K8-2/G30",
+            "K9/K9-2/D35",
+            "K9/K9-2/E35",
+            "K9/K9-2/F35",
+            "K9/K9-2/G35",
+            "S15/S15/C12",
+            "S15/S15/C8",
+            "S15/S15/D12",
+            "S15/S15/D16",
+            "S15/S15/D8"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-seed-semantic-unverified-2026-10-27",
+        "kind": "seed_semantic_unverified",
+        "owner": "acnr-foundation-defect-closure"
+      }
+    ]
+  },
+  "blocking": {
+    "count": 0,
+    "items": []
+  },
+  "deprecated": {
+    "count": 44,
+    "items": [
+      {
+        "addr_id": "F3/F3-6/E30",
+        "kind": "cell",
+        "replaced_by": "F3/F3-6"
+      },
+      {
+        "addr_id": "F4/F4-3/E50",
+        "kind": "cell",
+        "replaced_by": "F4/F4-3"
+      },
+      {
+        "addr_id": "F4/F4-3/F50",
+        "kind": "cell",
+        "replaced_by": "F4/F4-3"
+      },
+      {
+        "addr_id": "F4/F4-3/G50",
+        "kind": "cell",
+        "replaced_by": "F4/F4-3"
+      },
+      {
+        "addr_id": "F4/F4-3/H50",
+        "kind": "cell",
+        "replaced_by": "F4/F4-3"
+      },
+      {
+        "addr_id": "G14/G14-2/B50",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G14/G14-2/E40",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G14/G14-2/F40",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G8/G8-3/B35",
+        "kind": "cell",
+        "replaced_by": "G8/G8-3"
+      },
+      {
+        "addr_id": "G8/G8-3/E30",
+        "kind": "cell",
+        "replaced_by": "G8/G8-3"
+      },
+      {
+        "addr_id": "I6/I6-7/B25",
+        "kind": "cell",
+        "replaced_by": "I6/I6-7"
+      },
+      {
+        "addr_id": "I6/I6-7/C5",
+        "kind": "cell",
+        "replaced_by": "I6/I6-7"
+      },
+      {
+        "addr_id": "I6/I6-7/E20",
+        "kind": "cell",
+        "replaced_by": "I6/I6-7"
+      },
+      {
+        "addr_id": "I6/I6-7/F20",
+        "kind": "cell",
+        "replaced_by": "I6/I6-7"
+      },
+      {
+        "addr_id": "I6/I6-7/G20",
+        "kind": "cell",
+        "replaced_by": "I6/I6-7"
+      },
+      {
+        "addr_id": "J1/J1-3/F30",
+        "kind": "cell",
+        "replaced_by": "J1/J1-3"
+      },
+      {
+        "addr_id": "J1/J1-3/G30",
+        "kind": "cell",
+        "replaced_by": "J1/J1-3"
+      },
+      {
+        "addr_id": "J1/J1-3/H30",
+        "kind": "cell",
+        "replaced_by": "J1/J1-3"
+      },
+      {
+        "addr_id": "J1/J1-3/I30",
+        "kind": "cell",
+        "replaced_by": "J1/J1-3"
+      },
+      {
+        "addr_id": "J2/J2-5/E10",
+        "kind": "cell",
+        "replaced_by": "J2/J2-5"
+      },
+      {
+        "addr_id": "J2/J2-5/E20",
+        "kind": "cell",
+        "replaced_by": "J2/J2-5"
+      },
+      {
+        "addr_id": "J2/J2-5/F10",
+        "kind": "cell",
+        "replaced_by": "J2/J2-5"
+      },
+      {
+        "addr_id": "J2/J2-5/F20",
+        "kind": "cell",
+        "replaced_by": "J2/J2-5"
+      },
+      {
+        "addr_id": "J2/J2-5/G10",
+        "kind": "cell",
+        "replaced_by": "J2/J2-5"
+      },
+      {
+        "addr_id": "J3/J3-4/C10",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-4/C5",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-4/C6",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-4/C7",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-4/C8",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-4/C9",
+        "kind": "cell",
+        "replaced_by": "J3/J3-4"
+      },
+      {
+        "addr_id": "J3/J3-5/E10",
+        "kind": "cell",
+        "replaced_by": "J3/J3-5"
+      },
+      {
+        "addr_id": "J3/J3-5/F10",
+        "kind": "cell",
+        "replaced_by": "J3/J3-5"
+      },
+      {
+        "addr_id": "J3/J3-5/G10",
+        "kind": "cell",
+        "replaced_by": "J3/J3-5"
+      },
+      {
+        "addr_id": "J3/J3-5/H10",
+        "kind": "cell",
+        "replaced_by": "J3/J3-5"
+      },
+      {
+        "addr_id": "K14/K14",
+        "kind": "sheet",
+        "replaced_by": "H10/H10-1"
+      },
+      {
+        "addr_id": "K15/K15",
+        "kind": "sheet",
+        "replaced_by": "K10/K10-1"
+      },
+      {
+        "addr_id": "K16/K16",
+        "kind": "sheet",
+        "replaced_by": "G11/G11-1"
+      },
+      {
+        "addr_id": "K17/K17",
+        "kind": "sheet",
+        "replaced_by": "G13/G13-1"
+      },
+      {
+        "addr_id": "K18/K18",
+        "kind": "sheet",
+        "replaced_by": "K7/K7-1"
+      },
+      {
+        "addr_id": "M6/M6-5/C5",
+        "kind": "cell",
+        "replaced_by": "M6/M6-5"
+      },
+      {
+        "addr_id": "M6/M6-5/C6",
+        "kind": "cell",
+        "replaced_by": "M6/M6-5"
+      },
+      {
+        "addr_id": "M6/M6-5/C7",
+        "kind": "cell",
+        "replaced_by": "M6/M6-5"
+      },
+      {
+        "addr_id": "M6/M6-5/D7",
+        "kind": "cell",
+        "replaced_by": "M6/M6-5"
+      },
+      {
+        "addr_id": "M6/M6-5/E7",
+        "kind": "cell",
+        "replaced_by": "M6/M6-5"
+      }
+    ]
+  },
+  "generated_at": "2026-10-27T14:58:57.832790+00:00",
+  "info": {
+    "count": 114,
+    "items": [
+      {
+        "addr_id": "A18/A18",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A18/A18-1",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A18/A18-2",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A26/A26",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A26/A26-1",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A26/A26-2",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A26/A26-3",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A26/A26-4",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A27/A27",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "A27/A27-1",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "B5/B5",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "G1/G1-10",
+        "aliases": [
+          "合同现金流量特征测试表G1-10"
+        ],
+        "kind": "carried_over_alias"
+      },
+      {
+        "addr_id": "G1/G1-12",
+        "aliases": [
+          "盘点倒轧表G1-12"
+        ],
+        "kind": "carried_over_alias"
+      },
+      {
+        "addr_id": "G1/G1-8",
+        "aliases": [
+          "业务模式评估问卷G1-8"
+        ],
+        "kind": "carried_over_alias"
+      },
+      {
+        "addr_id": "G1/G1A",
+        "aliases": [
+          "交易性金融资产实质性程序表G1A"
+        ],
+        "kind": "carried_over_alias"
+      },
+      {
+        "addr_id": "H5/H5-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:h5"
+      },
+      {
+        "addr_id": "H5/H5-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:h5"
+      },
+      {
+        "addr_id": "H7/H7-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:h7"
+      },
+      {
+        "addr_id": "H7/H7-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:h7"
+      },
+      {
+        "addr_id": "I1/I1",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I1/I1-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I1/I1-5",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I1/I1-6",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I1/I1-8",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I1/I1-9",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+      },
+      {
+        "addr_id": "I2/I2-1",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+      },
+      {
+        "addr_id": "I2/I2-13",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+      },
+      {
+        "addr_id": "I2/I2-14",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+      },
+      {
+        "addr_id": "I2/I2-7",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+      },
+      {
+        "addr_id": "I3/I3-1",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I3/I3-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I3/I3-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I3/I3-4",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I3/I3-6",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I3/I3-7",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+      },
+      {
+        "addr_id": "I4/I4-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i4"
+      },
+      {
+        "addr_id": "I4/I4-6",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i4"
+      },
+      {
+        "addr_id": "I5/I5-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i5"
+      },
+      {
+        "addr_id": "I5/I5-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i5"
+      },
+      {
+        "addr_id": "I6/I6-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+      },
+      {
+        "addr_id": "I6/I6-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+      },
+      {
+        "addr_id": "I6/I6-5",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+      },
+      {
+        "addr_id": "I6/I6-6",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+      },
+      {
+        "addr_id": "I6/I6-7",
+        "kind": "platform_sheet_added"
+      },
+      {
+        "addr_id": "J2/J2-5",
+        "kind": "platform_sheet_added"
+      },
+      {
+        "addr_id": "J3/J3-4",
+        "kind": "platform_sheet_added"
+      },
+      {
+        "addr_id": "J3/J3-5",
+        "kind": "platform_sheet_added"
+      },
+      {
+        "addr_id": "L1/L1-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l1"
+      },
+      {
+        "addr_id": "L1/L1-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l1"
+      },
+      {
+        "addr_id": "L3/L3-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l3"
+      },
+      {
+        "addr_id": "L3/L3-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l3"
+      },
+      {
+        "addr_id": "L4/L4-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l4"
+      },
+      {
+        "addr_id": "L4/L4-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l4"
+      },
+      {
+        "addr_id": "L5/L5-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l5"
+      },
+      {
+        "addr_id": "L5/L5-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:l5"
+      },
+      {
+        "addr_id": "M6/M6-5",
+        "kind": "platform_sheet_added"
+      },
+      {
+        "addr_id": "N4/N4-2",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:n4"
+      },
+      {
+        "addr_id": "N4/N4-3",
+        "kind": "override_import_export",
+        "source": "fix_acnr_catalog_ie_gap:SAFE:n4"
+      },
+      {
+        "addr_id": "S17/S17",
+        "kind": "display_name_is_code"
+      },
+      {
+        "addr_id": "S33/S33-3",
+        "kind": "display_name_is_code"
+      },
+      {
+        "alias": "D4-22A",
+        "kind": "non_address_label",
+        "reason": "D4 册程序表 tab，目录未收录（design §7.3 / §16 Q4）"
+      },
+      {
+        "alias": "D4-31T",
+        "kind": "non_address_label",
+        "reason": "示例 / 模板 tab（访谈记录与核对示例），不是底稿 sheet（design §7.3）"
+      },
+      {
+        "alias": "D4-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "D4-访谈模板",
+        "kind": "non_address_label",
+        "reason": "示例 / 模板 tab（访谈记录与核对示例），不是底稿 sheet（design §7.3）"
+      },
+      {
+        "alias": "D4-附注上市",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D4-附注国企",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D4A",
+        "kind": "non_address_label",
+        "reason": "D4 册程序表 tab，目录未收录（design §7.3 / §16 Q4）"
+      },
+      {
+        "alias": "D5-1",
+        "kind": "merge_into",
+        "merged_aliases": [
+          "应收款项融资审定表D5-1"
+        ],
+        "reason": "D5 册审定表 tab 的平台编号（design §1.2 / §7.3）：标签源别名「应收款项融资审定表D5-1」并入 D5/D5，并入后在 D5 父级内唯一",
+        "target": "D5/D5"
+      },
+      {
+        "alias": "D5-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "D5-附注上市",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D5-附注国企",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D6-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "D6-附注上市",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D6-附注国企",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D7-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "D7-附注上市",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "D7-附注国企",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "G10-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G11-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G12-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G13-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G14-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G8-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "G9-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "H10-目录",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "IT审计总结备忘录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "A27",
+        "sheet_codes": [
+          "A27",
+          "A27-1"
+        ]
+      },
+      {
+        "alias": "专业技术委员会业务报告审核提交资料清单",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "A26",
+        "sheet_codes": [
+          "A26",
+          "A26-1"
+        ]
+      },
+      {
+        "alias": "函证结果汇总",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "D0": "D0-1",
+          "E0": "E0-1",
+          "F0": "F0-1",
+          "K0": "K0-1",
+          "L0": "L0-1"
+        }
+      },
+      {
+        "alias": "参考中证协",
+        "kind": "non_address_label",
+        "reason": "参考资料 tab（中证协估值指引），无可寻址单元格（design §7.3）"
+      },
+      {
+        "alias": "向监管部门报送审计小结的函",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "A18",
+        "sheet_codes": [
+          "A18",
+          "A18-1"
+        ]
+      },
+      {
+        "alias": "差异调节",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "D0": "D0-4",
+          "F0": "F0-4",
+          "K0": "K0-4",
+          "L0": "L0-4"
+        }
+      },
+      {
+        "alias": "应付票据审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "F3",
+        "sheet_codes": [
+          "F3",
+          "F3-1"
+        ]
+      },
+      {
+        "alias": "应付账款审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "F4",
+        "sheet_codes": [
+          "F4",
+          "F4-1"
+        ]
+      },
+      {
+        "alias": "应收票据审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "D1",
+        "sheet_codes": [
+          "D1",
+          "D1-1"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "D5",
+        "sheet_codes": [
+          "D5"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "D6",
+        "sheet_codes": [
+          "D6"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "D7",
+        "sheet_codes": [
+          "D7"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G10",
+        "sheet_codes": [
+          "G10"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G11",
+        "sheet_codes": [
+          "G11"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G12",
+        "sheet_codes": [
+          "G12"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G13",
+        "sheet_codes": [
+          "G13"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G14",
+        "sheet_codes": [
+          "G14"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G8",
+        "sheet_codes": [
+          "G8"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "G9",
+        "sheet_codes": [
+          "G9"
+        ]
+      },
+      {
+        "alias": "底稿目录",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "H10",
+        "sheet_codes": [
+          "H10"
+        ]
+      },
+      {
+        "alias": "替代程序",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "D0": "D0-5",
+          "F0": "F0-5",
+          "K0": "K0-5",
+          "L0": "L0-5"
+        }
+      },
+      {
+        "alias": "核实被函证单位",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "D0": "D0-2",
+          "F0": "F0-2",
+          "G0": "G0-2",
+          "H0": "H0-2",
+          "K0": "K0-2",
+          "L0": "L0-2"
+        }
+      },
+      {
+        "alias": "营业成本审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "F5",
+        "sheet_codes": [
+          "F5",
+          "F5-1"
+        ]
+      },
+      {
+        "alias": "财务报告文件包",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "A6": "A6-1",
+          "B30": "B30-13-1"
+        }
+      },
+      {
+        "alias": "跟函控制",
+        "kind": "parent_qualified_alias",
+        "sheets": {
+          "D0": "D0-3",
+          "F0": "F0-3",
+          "K0": "K0-3",
+          "L0": "L0-3"
+        }
+      },
+      {
+        "alias": "附注上市",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "附注国企",
+        "kind": "non_address_label",
+        "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+      },
+      {
+        "alias": "预付账款审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "F1",
+        "sheet_codes": [
+          "F1",
+          "F1-1"
+        ]
+      },
+      {
+        "alias": "预收账款审定表",
+        "kind": "forbidden_alias",
+        "parent_wp_code": "D3",
+        "sheet_codes": [
+          "D3",
+          "D3-1"
+        ]
+      }
+    ]
+  },
+  "open_problems": {
+    "alias_conflict_members": {
+      "底稿目录": [
         "D5",
         "D5-目录",
         "D6",
@@ -57,13 +971,28 @@
         "G9-目录",
         "H10",
         "H10-目录"
+      ],
+      "访谈记录与核对示例": [
+        "D4-31T",
+        "D4-访谈模板"
+      ],
+      "附注披露信息（上市公司）": [
+        "D4-附注上市",
+        "D5-附注上市",
+        "附注上市"
+      ],
+      "附注披露信息（国企）": [
+        "D4-附注国企",
+        "D5-附注国企",
+        "附注国企"
       ]
-    }
-  ],
-  "gaps": [],
-  "generated_at": "2026-10-27T13:00:15.366215+00:00",
-  "manifest_blocked": false,
-  "open_problems": {
+    },
+    "alias_conflicts": [
+      "底稿目录",
+      "访谈记录与核对示例",
+      "附注披露信息（上市公司）",
+      "附注披露信息（国企）"
+    ],
     "unregistered_alias_keys": [
       "D4-22A",
       "D4-31T",
@@ -95,9 +1024,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261027130014",
+  "registry_version": "20261027145857",
   "release": {
-    "catalog_sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd",
+    "catalog_sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -176,8 +1105,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20260727115337.json",
-        "sha256": "e98a127ed7c4f275b41c0e3315585479e0d1f36b122a2cded1fc1abdade3126e"
+        "path": "backend/data/acnr/catalog_snapshots/20261027130014.json",
+        "sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -190,6 +1119,14 @@
       {
         "path": "backend/data/acnr/sheet_display_names.json",
         "sha256": "ff5ea15465896a046eaaa94ed9b7cb203e51c403a07587c601608e003c03fe84"
+      },
+      {
+        "path": "backend/data/acnr/sources/acknowledgements.json",
+        "sha256": "88306490c087a8c46fb7ab0425459dc2dc2eff65fa9e35170e6e1729d701580f"
+      },
+      {
+        "path": "backend/data/acnr/sources/alias_policy.json",
+        "sha256": "ce33ef513e0371abbdcaa084e2c189b590947fa3428e92881d10432513c668a0"
       },
       {
         "path": "backend/data/acnr/sources/classification_cache.json",
@@ -292,225 +1229,18 @@
         "sha256": "082b8a081990db1618e28abdaa2059460d16d293283cccb6e90d7856af5acfa3"
       }
     ],
-    "inputs_fingerprint": "4e6b3f8b49815db541cdbe50c7a04c015ebe6682db4d252dd76c41f8da5b53c7",
-    "previous_catalog_sha256": "e98a127ed7c4f275b41c0e3315585479e0d1f36b122a2cded1fc1abdade3126e",
-    "previous_version": "20260727115337",
-    "registry_version": "20261027130014",
+    "inputs_fingerprint": "5dd3c0af6b16e03d8b68666a20d3d3935952ebf73110743602e543b390d85ffb",
+    "previous_catalog_sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd",
+    "previous_version": "20261027130014",
+    "registry_version": "20261027145857",
     "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
   },
   "summary": {
-    "acknowledged_conflict_count": 0,
-    "alias_conflict_count": 4,
-    "carried_over_alias_sheets": 4,
-    "deprecated_cells": 39,
-    "deprecated_sheets": 5,
-    "formula_ref_by_sheet_code": 4,
-    "formula_ref_by_template_name": 470,
-    "gap_count": 32,
-    "platform_alias_codes": 833,
-    "semantic_unverified_cells": 33,
-    "sheets_with_skip_reason": 0,
+    "acknowledged": 1,
+    "blocking": 0,
+    "deprecated": 44,
+    "info": 114,
     "total_cells": 474,
-    "total_sheets": 1225,
-    "unregistered_alias_count": 28
-  },
-  "unregistered_aliases": [
-    {
-      "aliases": [
-        "附注披露信息（上市公司）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "附注上市"
-    },
-    {
-      "aliases": [
-        "附注披露信息（国有企业）",
-        "附注披露信息（国企）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "附注国企"
-    },
-    {
-      "aliases": [
-        "D4"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-目录"
-    },
-    {
-      "aliases": [
-        "营业收入审计程序表D4A"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4A"
-    },
-    {
-      "aliases": [
-        "程序表D4-22A"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-22A"
-    },
-    {
-      "aliases": [
-        "访谈记录与核对示例"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-31T"
-    },
-    {
-      "aliases": [
-        "访谈记录与核对示例"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-访谈模板"
-    },
-    {
-      "aliases": [
-        "附注披露信息（上市公司）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-附注上市"
-    },
-    {
-      "aliases": [
-        "附注披露信息（国企）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D4-附注国企"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D5-目录"
-    },
-    {
-      "aliases": [
-        "应收款项融资审定表D5-1"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D5-1"
-    },
-    {
-      "aliases": [
-        "附注披露信息（上市公司）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D5-附注上市"
-    },
-    {
-      "aliases": [
-        "附注披露信息（国企）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D5-附注国企"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D6-目录"
-    },
-    {
-      "aliases": [
-        "合同资产附注披露信息（上市公司）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D6-附注上市"
-    },
-    {
-      "aliases": [
-        "合同资产附注披露信息（国企）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D6-附注国企"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D7-目录"
-    },
-    {
-      "aliases": [
-        "合同负债附注披露信息（上市公司）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D7-附注上市"
-    },
-    {
-      "aliases": [
-        "合同负债附注披露信息（国企）"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "D7-附注国企"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G10-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G11-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G12-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G13-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G14-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G8-目录"
-    },
-    {
-      "aliases": [
-        "参考中证协《非上市公司股权估值指引》"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "参考中证协"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "G9-目录"
-    },
-    {
-      "aliases": [
-        "底稿目录"
-      ],
-      "reason": "sheet_code not found in classification catalog",
-      "sheet_code": "H10-目录"
-    }
-  ]
+    "total_sheets": 1225
+  }
 }

@@ -16,7 +16,7 @@
 
 | 事实 | 值 | 复算键 |
 |---|---|---|
-| 目录版本号 | `20261027130014` | `catalog.registry_version` |
+| 目录版本号 | `20261027145857` | `catalog.registry_version` |
 | 目录 sheet 条目数 | `1225` | `catalog.sheets` |
 | 目录 cell 条目数 | `474` | `catalog.cells` |
 | 父 sheet 在目录内的 cell | `474` | `catalog.cells_with_parent` |
@@ -28,7 +28,7 @@
 | cell 自带 formula_ref 能解析回本身的条目 | `474` | `catalog.formula_ref_roundtrip_ok` |
 | 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
 | 报告是否带 release 段 | `是` | `report.has_release` |
-| 历史快照份数 | `5` | `snapshots.count` |
+| 历史快照份数 | `6` | `snapshots.count` |
 | 仍在仓库的分片文件 | `无` | `shards.files` |
 | 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
 | 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
@@ -52,18 +52,18 @@
 | 平台底稿索引名 loader（名称规则模块调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
 | 生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码 | 后端 | `backend/app/services/acnr/catalog_names.py` | `merge_platform_names`、`apply_cell_names`、`apply_cell_verdicts` | `backend/tests/acnr/test_name_system.py` |
 | 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
+门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
-| 报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单 | T09 |
 | exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返 | T10 |
 | 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T11、T12、T13、T14、T15、T16 |
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog）与按库引用的快照清理 | T17、T18、T19 |

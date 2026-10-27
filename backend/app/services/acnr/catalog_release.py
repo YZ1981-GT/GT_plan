@@ -17,7 +17,10 @@ check ∈ schema / duplicate / sheet_code / orphan / a1 / roundtrip / immutable 
 - alias：父级禁止别名与本父级 sheet_name / sheet_code 不相交（目录顶层 `alias_policy.forbidden` 与传入的
   alias_policy 两种写法都核）；alias_policy 条目须有 owner / reason、处置在五类之内；non_address_label / merge_into
   的键不得已是目录 sheet_code，且须仍是本批次的未登记别名键，否则为失效条目；merge_into 的目标须在目录。
-- ack（design §7.4）：豁免须有 owner / reason / expires_on 且未过期、kind 在登记范围、声明了覆盖对象；所覆盖的问题
+  未处置即阻断（T09）：本批次每个未登记别名键须有 merge_into / non_address_label；每条别名冲突在目录 sheet 上的
+  成员须有 forbidden / parent_qualified / project_context，处置冲突的条目所指冲突已不存在即失效条目。
+- ack（design §7.4）：标「语义待核对」的有效 cell 须被 seed_semantic_unverified 豁免覆盖（未处置即阻断）；
+  豁免须有 owner / reason / expires_on 且未过期、kind 在登记范围、声明了覆盖对象；所覆盖的问题
   已不存在即为失效条目——addr_id / sheet_code 不在新目录；seed_semantic_unverified 覆盖的 cell 已停用或已有语义名；
   ccr_ids / aliases 不在本批次的当前问题清单里；带 head_resolvable_at 的条目，其写法（writing）在新目录里已能解析到
   别的 sheet（不再错配）。
@@ -25,14 +28,14 @@ check ∈ schema / duplicate / sheet_code / orphan / a1 / roundtrip / immutable 
   有效 cell」/「判定停用的 sheet 仍是有效条目」）；add_platform_sheet 判定的 sheet 须写入新目录。
 - override：每条 override 须有 owner / reason / source，所指 addr_id 在目录中。
 
-本批次的当前问题清单由生成器在跑门禁前放进 `report["open_problems"]`（T07 / T09 / T22 产出）：
-`{"unregistered_alias_keys": [...], "alias_conflicts": [...], "ccr_unresolved": [...]}`。覆盖这几类问题的处置与豁免，
-在对应清单缺失时按「无法核实」阻断（fail-closed），不放行。
+本批次的当前问题清单由生成器（`catalog_build.build_release`）在跑门禁前放进 `report["open_problems"]`：
+`{"unregistered_alias_keys": [...], "alias_conflicts": [...], "alias_conflict_members": {别名: [sheet_code]},
+"ccr_unresolved": [...]}`（ccr_unresolved 由 T22 产出，现未提供）。覆盖这几类问题的处置与豁免，在对应清单缺失时
+按「无法核实」阻断（fail-closed），不放行。
 
 往返检查用「待发布的新目录」解析：构造临时 `CatalogIndex(new)` 并经 `catalog.use_catalog(index)` 作用域让
-`get_catalog()` 返回新目录。现状：只有本模块与测试调用 `use_catalog`；「生产代码不调用 use_catalog」的 AST 守卫随
-T07 落地（段四审计 F4-13：此前这里引用的守卫并不存在）。现状：本模块尚未接入生成器，生产代码中导入它的文件数为 0
-（T07 接入）。
+`get_catalog()` 返回新目录。只有本模块与测试调用 `use_catalog`（守卫 `tests/acnr/test_only_generator_writes_catalog.py`）；
+生成器经 `catalog_build.build_release` 调用本模块，写出与 `--check` 都跑门禁。
 
 本模块只依赖标准库 + 本包（exact_identity / catalog / catalog_contract / immutability）；`jsonschema` 为可选依赖，
 缺失时 schema 检查退化为「跳过并记一条 info 违规」，生产 CI 环境已钉 `jsonschema==4.26.0`。
@@ -55,6 +58,8 @@ ALIAS_DISPOSITIONS = frozenset({"parent_qualified", "forbidden", "project_contex
 ACK_KINDS = frozenset({"seed_semantic_unverified", "ccr_unresolved", "head_resolvable_errmatch"})
 #: report["open_problems"] 的三类问题清单（见模块文档）
 OPEN_PROBLEM_KEYS = ("unregistered_alias_keys", "alias_conflicts", "ccr_unresolved")
+#: 「语义待核对」cell_label 后缀（与 catalog_names.apply_cell_verdicts 写出的一致）
+SEMANTIC_UNVERIFIED_SUFFIX = "（语义待核对）"
 
 
 # ─── 违规对象 ──────────────────────────────────────────────────────────────
@@ -331,6 +336,7 @@ def _gate_alias(new: dict[str, Any], alias_policy: Any, report: dict[str, Any] |
     by_code = {s.get("sheet_code", ""): s for s in new.get("sheets", [])}
     sheet_ids = {s.get("addr_id", "") for s in new.get("sheets", [])}
     open_keys = _open_problems(report).get("unregistered_alias_keys")
+    out += _alias_undisposed(_alias_entries(alias_policy), report, open_keys, set(by_code))
     for e in _alias_entries(alias_policy):
         alias, disp = e.get("alias", ""), e.get("disposition", "")
         for req in ("alias", "owner", "reason"):
@@ -355,6 +361,42 @@ def _gate_alias(new: dict[str, Any], alias_policy: Any, report: dict[str, Any] |
                 out.append(GateViolation("alias", "", f"失效条目：{disp}「{alias}」已不是本批次的未登记别名键（所指问题已不存在）"))
             if disp == "merge_into" and e.get("target") not in sheet_ids:
                 out.append(GateViolation("alias", "", f"alias_policy「{alias}」merge_into 目标「{e.get('target')}」不在目录中"))
+    return out
+
+
+_CONFLICT_DISPOSITIONS = ("forbidden", "parent_qualified", "project_context")
+_LABEL_KEY_DISPOSITIONS = ("non_address_label", "merge_into")
+
+
+def _alias_undisposed(entries: list[dict], report: dict[str, Any] | None, open_keys: frozenset[str] | None,
+                      catalog_codes: set[str]) -> list[GateViolation]:
+    """未处置即阻断（design §7.1 / 需求 6.2~6.3）：本批次的未登记别名键须有 merge_into / non_address_label；
+    别名冲突在目录 sheet 上的成员须有 forbidden / parent_qualified / project_context，不在目录的成员须是已处置的
+    未登记键；处置冲突的条目所指冲突已不存在即失效条目。清单缺失时，引用它的条目按「无法核实」阻断。"""
+    out: list[GateViolation] = []
+    disposed_keys = {e.get("alias") for e in entries if e.get("disposition") in _LABEL_KEY_DISPOSITIONS}
+    for key in sorted((open_keys or frozenset()) - disposed_keys):
+        out.append(GateViolation("alias", "", f"未登记别名键「{key}」未处置（须在 alias_policy 登记 merge_into 或 non_address_label）"))
+    conflicts = _open_problems(report).get("alias_conflicts")
+    raw = report.get("open_problems") if isinstance(report, dict) else None
+    members = raw.get("alias_conflict_members") if isinstance(raw, dict) else None
+    covering = [e for e in entries if e.get("disposition") in _CONFLICT_DISPOSITIONS and e.get("alias")]
+    if conflicts is None:
+        out += [GateViolation("alias", "", f"{e['disposition']}「{e['alias']}」无法核实：报告未提供 open_problems.alias_conflicts")
+                for e in covering]
+        return out
+    if not isinstance(members, dict):
+        return out + [GateViolation("alias", "", "别名冲突无法核实：报告未提供 open_problems.alias_conflict_members")]
+    for e in covering:
+        if e["alias"] not in conflicts:
+            out.append(GateViolation("alias", "", f"失效条目：{e['disposition']}「{e['alias']}」所指别名冲突已不存在"))
+    for alias in sorted(conflicts):
+        covered = {c for e in covering if e["alias"] == alias for c in (e.get("sheet_codes") or [])}
+        for code in members.get(alias) or []:
+            if code in catalog_codes and code not in covered:
+                out.append(GateViolation("alias", "", f"别名冲突「{alias}」在目录 sheet「{code}」上未处置（须登记 forbidden / parent_qualified / project_context）"))
+            elif code not in catalog_codes and code not in disposed_keys:
+                out.append(GateViolation("alias", "", f"别名冲突「{alias}」的成员「{code}」是未处置的未登记键"))
     return out
 
 
@@ -398,16 +440,23 @@ def _gate_ack(
     *,
     today: date,
 ) -> list[GateViolation]:
-    """豁免可伪证：字段齐全、未过期，且所覆盖的问题仍然存在（否则为失效条目，design §7.4）。"""
+    """豁免可伪证：字段齐全、未过期，且所覆盖的问题仍然存在（否则为失效条目，design §7.4）；
+    反向：标「语义待核对」的有效 cell 必须被 seed_semantic_unverified 豁免覆盖（design §6.4，未处置即阻断）。"""
+    covered_sem = {x for kind, item in _ack_entries(acknowledgements) if kind == "seed_semantic_unverified"
+                   and isinstance(item, dict) and isinstance(item.get("covers"), dict)
+                   for x in (item["covers"].get("addr_ids") or [])}
+    pre = [GateViolation("ack", c.get("addr_id", ""), "语义待核对的 cell 未登记 seed_semantic_unverified 豁免（未处置）")
+           for c in new.get("cells", []) if not c.get("deprecated")
+           and str(c.get("cell_label") or "").endswith(SEMANTIC_UNVERIFIED_SUFFIX) and c.get("addr_id") not in covered_sem]
     if not acknowledgements:
-        return []
+        return pre
     by_id = {s.get("addr_id", ""): s for s in new.get("sheets", [])}
     cell_ids = {c.get("addr_id", "") for c in new.get("cells", [])}
     by_id.update({c.get("addr_id", ""): c for c in new.get("cells", [])})
     codes = {s.get("sheet_code", "") for s in new.get("sheets", [])}
     problems = _open_problems(report)
     index = _try_index(new)
-    out: list[GateViolation] = []
+    out: list[GateViolation] = pre
     for kind, item in _ack_entries(acknowledgements):
         if not isinstance(item, dict):
             out.append(GateViolation("ack", "", f"{kind} 的豁免条目格式非法"))

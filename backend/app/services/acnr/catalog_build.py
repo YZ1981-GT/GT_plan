@@ -8,8 +8,9 @@
    `release_exceptions.json` 登记其内容 sha256，否则拒绝（不取工作区目录作沿用来源，R2-F11）。
 2. `inputs_fingerprint`：全部输入文件按仓库相对路径排序的 (路径, LF 内容 sha256)，再取 sha256；含上一批次快照。
 3. `build_release`：在基础产物（`generate_catalog()`：classification 骨架 + I/E manifest + 渲染注册 + 标签别名 + 坐标种子
-   + overrides）之上叠加 sheet_verdicts（补登 5 张父 sheet、K14~K18 停用）、平台底稿名与禁止别名、上一批次别名沿用、
-   cell_verdicts（孤儿 25 / 超范围 14 停用、范围内 33 语义待核对）、cell 名称规则，再跑发布门禁并产出带 release 段的报告。
+   + overrides）之上叠加 sheet_verdicts（补登 5 张父 sheet、K14~K18 停用）、平台底稿名与禁止别名、标签源别名处置
+   （`sources/alias_policy.json`，T09）、上一批次别名沿用、cell_verdicts（孤儿 25 / 超范围 14 停用、范围内 33 语义待核对）、
+   cell 名称规则，再跑发布门禁，产出带 open_problems、release 段与四组分组（`catalog_report_buckets`）的报告。
 
 只依赖标准库与本包。
 """
@@ -23,7 +24,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
-from . import catalog_contract, catalog_names, catalog_release
+from . import catalog_contract, catalog_names, catalog_release, catalog_report_buckets
 from .catalog_integrity import content_sha256
 from .loaders.from_classification import SheetCatalogEntry, load_sheet_skeletons_from_classification
 from .loaders.from_sheet_verdicts import load_sheet_verdicts
@@ -222,30 +223,26 @@ def build_release(
     _apply_sheet_verdicts(catalog, verdicts, registry_version=registry_version, render_types=render_data.render_types,
                           component_types=render_data.component_types, previous=previous)
     names = catalog_names.merge_platform_names(catalog)
+    alias_policy = _load_optional(acnr_dir / "sources" / "alias_policy.json")
+    alias_entries = catalog_release._alias_entries(alias_policy)
+    label_aliases = {u.get("sheet_code", ""): list(u.get("aliases") or []) for u in base_report.get("unregistered_aliases", [])}
+    merged = catalog_names.apply_alias_policy(catalog, alias_entries, label_aliases)
     kept = _carry_over_aliases(catalog, previous)
     catalog_names.apply_cell_verdicts(catalog, [{"addr_id": c.addr_id, "verdict": c.verdict, "replaced_by": c.replaced_by}
                                                 for c in verdicts.cell_verdicts])
-    named = catalog_names.apply_cell_names(catalog)
+    catalog_names.apply_cell_names(catalog)
     catalog["sheets"].sort(key=lambda s: s["addr_id"])
     catalog["cells"].sort(key=lambda c: c["addr_id"])
 
     catalog_text = deterministic_json(catalog)
     schema_text = catalog_contract.schema_json()
     fp, inputs = inputs_fingerprint(input_files(backend_root, previous))
-    report = copy.deepcopy(base_report)
-    report.pop("generated_at", None)
-    report["registry_version"] = registry_version
-    summary = report.setdefault("summary", {})
-    summary.update({
-        "total_sheets": len(catalog["sheets"]), "total_cells": len(catalog["cells"]),
-        "deprecated_sheets": sum(1 for s in catalog["sheets"] if s.get("deprecated")),
-        "deprecated_cells": sum(1 for c in catalog["cells"] if c.get("deprecated")),
-        "semantic_unverified_cells": sum(1 for c in catalog["cells"] if (c.get("cell_label") or "").endswith("（语义待核对）")),
-        "platform_alias_codes": len(names.merged_aliases), "carried_over_alias_sheets": len(kept),
-        "formula_ref_by_template_name": named.by_template_name, "formula_ref_by_sheet_code": named.by_sheet_code,
-    })
+    conflicts = base_report.get("alias_conflicts", [])
+    report: dict[str, Any] = {"registry_version": registry_version}
     report["open_problems"] = {
-        "unregistered_alias_keys": sorted({u.get("sheet_code", "") for u in base_report.get("unregistered_aliases", [])}),
+        "unregistered_alias_keys": sorted(label_aliases),
+        "alias_conflicts": sorted({c.get("alias", "") for c in conflicts}),
+        "alias_conflict_members": {c.get("alias", ""): sorted(c.get("sheet_codes") or []) for c in conflicts},
     }
     report["release"] = {
         "registry_version": registry_version,
@@ -259,11 +256,15 @@ def build_release(
     }
     overrides = _load_optional(acnr_dir / OVERRIDES_NAME)
     sv_raw = json.loads((acnr_dir / "sources" / "sheet_verdicts.json").read_text(encoding="utf-8"))
+    acknowledgements = _load_optional(acnr_dir / "sources" / "acknowledgements.json")
     violations = catalog_release.run_release_gates(
         catalog, previous.catalog if previous else None, report, today=today, sheet_verdicts=sv_raw,
-        alias_policy=_load_optional(acnr_dir / "sources" / "alias_policy.json"),
-        acknowledgements=_load_optional(acnr_dir / "sources" / "acknowledgements.json"), overrides=overrides,
+        alias_policy=alias_policy, acknowledgements=acknowledgements, overrides=overrides,
     )
+    report.update(catalog_report_buckets.build_buckets(
+        catalog, violations=violations, acknowledgements=acknowledgements, alias_entries=alias_entries,
+        parent_qualified=names.parent_qualified, carried_over=kept, merged=merged, sheet_verdicts=sv_raw,
+        overrides=overrides))
     return ReleaseCandidate(catalog=catalog, report=report, violations=violations, inputs=inputs)
 
 

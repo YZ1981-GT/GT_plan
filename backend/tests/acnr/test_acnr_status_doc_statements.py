@@ -27,6 +27,7 @@ R2-D7：发布后规模 1225 / 449 / 0、前端「统一从目录取显示名」
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 
@@ -141,9 +142,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
-            task_open("T09", "T10", "T22", "T24", "T29", "T30"),
-            in_planned("T09", "T10", "T22", "T24", "T29", "T30")),
+        "随本 spec 后续任务加入的门禁见下表——往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
+            task_open("T10", "T22", "T24", "T29", "T30"),
+            in_planned("T10", "T22", "T24", "T29", "T30")),
         "L1 目录加载与内存索引": CB(
             _A + "catalog.py", ("CatalogIndex", "get_catalog", "list_sheets", "list_cells"),
             _T + "test_catalog_index_fail_closed.py"),
@@ -194,6 +195,14 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段": CB(
             _BUILD_REL, ("build_release", "locate_previous", "inputs_fingerprint"), _T + "test_generator_release_flow.py",
             has_tests(_T + "test_generator_release_flow.py", "test_release_section_is_consistent_with_artifacts")),
+        "目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断）": CB(
+            _A + "catalog_report_buckets.py", ("build_buckets", "bucket_problems"), _T + "test_catalog_report_buckets.py",
+            calls(_BUILD_REL, "build_release", "build_buckets"), calls(_NAMES_REL, "apply_alias_policy", "sheet_of"),
+            claim("已提交报告四组 count == len(items) 且 blocking 为 0", lambda: (lambda r: not __import__(
+                "app.services.acnr.catalog_report_buckets", fromlist=["bucket_problems"]).bucket_problems(r)
+                and r["blocking"]["count"] == 0)(json.loads(_read(_REPO / "backend/data/acnr/catalog_report.json")))),
+            has_tests(_T + "test_catalog_report_buckets.py", "test_every_key_and_conflict_disposed_per_design",
+                      "test_forbidden_conflict_disposition_removed_blocked", "test_ack_expired_blocked")),
         "目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对）": CB(
             _GEN_REL, ("generate_catalog", "run_write", "run_check", "main"), _T + "test_generator_release_flow.py",
             claim("生成器命令行有 --check（AST）", lambda: "--check" in _facts()["generator.cli_flags"].split("、")),
@@ -216,7 +225,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单": L("T09"),
         "exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返": L("T10"),
         "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T11、T12、T13、T14、T15、T16"),
         "版本锁持久化（迁移、lock_project_registry、effective_catalog）与按库引用的快照清理": L("T17、T18、T19"),

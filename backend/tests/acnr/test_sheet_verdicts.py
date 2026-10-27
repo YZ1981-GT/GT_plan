@@ -207,8 +207,10 @@ _OFFLINE_KEYS = ("classification_count", "in_classification_skeleton", "template
 
 @lru_cache(maxsize=1)
 def _static_texts() -> tuple[str, ...]:
-    """backend/data 全 JSON/YAML 文本（排除目录、快照与本判定记录）。"""
-    skip_files = {_ACNR / "global_catalog.json", _ACNR / "sources" / "sheet_verdicts.json"}
+    """backend/data 全 JSON/YAML 文本（排除目录、快照、同批报告与本判定记录）。
+
+    catalog_report.json 与目录同批由生成器写出，其 deprecated 组逐条列出停用条目（T09），是目录的发布记录、不是引用。"""
+    skip_files = {_ACNR / "global_catalog.json", _ACNR / "catalog_report.json", _ACNR / "sources" / "sheet_verdicts.json"}
     out = []
     for p in _DATA.rglob("*"):
         if not p.is_file() or p.suffix.lower() not in (".json", ".yaml", ".yml"):

@@ -60,8 +60,11 @@ def test_release_section_is_consistent_with_artifacts():
     assert rel["schema_sha256"] == content_sha256(_SCHEMA.read_bytes())
     snap = _ACNR / "catalog_snapshots" / f"{rel['registry_version']}.json"
     assert content_sha256(snap.read_bytes()) == rel["catalog_sha256"], "当前版本快照须与目录同字节"
-    exc = catalog_build.load_release_exceptions(_ACNR)["exceptions"][0]
-    assert (rel["previous_version"], rel["previous_catalog_sha256"]) == (exc["registry_version"], exc["snapshot_content_sha256"])
+    # 上一批次：快照存在且内容 sha256 等于记录值（首个合规批次 20261027130014 的上一批次是登记在 release_exceptions 的
+    # 20260727115337；T09 之后的批次以上一份已发布批次为上一批次），且版本号严格递增
+    prev = catalog_build.locate_previous(report, _ACNR, for_check=True)
+    assert prev is not None and (prev.version, prev.content_sha256) == (rel["previous_version"], rel["previous_catalog_sha256"])
+    assert prev.version < rel["registry_version"]
     fp, rows = catalog_build.inputs_fingerprint([(r["path"], _BACKEND.parent / r["path"]) for r in rel["inputs"]])
     assert (fp, rows) == (rel["inputs_fingerprint"], rel["inputs"]), "输入指纹须可由记录的输入清单复算"
 

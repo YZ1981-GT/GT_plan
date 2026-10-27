@@ -11,6 +11,7 @@
 3. §6.4 种子名不一致的 cell：`cell_verdicts` 判 keep_semantic_unverified 的格保留地址、
    `semantic_label=null`、`cell_label="{A1}（语义待核对）"`；判 deprecate 的格（孤儿 25 + 超范围 14）
    标 `deprecated` + `replaced_by`，`cell_label="{A1}（坐标待核对）"`。
+4. 标签源别名的冲突与未登记键按 `sources/alias_policy.json` 处置（`apply_alias_policy`，design §7.2 / §7.3，T09）。
 
 只依赖标准库与本包（catalog / exact_identity / loaders.from_wp_account_mapping）。
 """
@@ -81,6 +82,67 @@ def merge_platform_names(catalog: dict[str, Any], *, mapping_path: Path | None =
     return out
 
 
+def apply_alias_policy(catalog: dict[str, Any], entries: list[dict[str, Any]],
+                       label_aliases: dict[str, list[str]]) -> dict[str, list[str]]:
+    """规则 4（design §7.2 / §7.3）：按 `sources/alias_policy.json` 处置标签源别名，返回 {目标 addr_id: 新并入别名}。
+
+    - merge_into：把标签源里该键（未登记的 sheet_code）的全部别名并入 `target` sheet；并入后逐条断言
+      `sheet_of(父级, 别名)` 回到 target，否则 `NameSystemError`；
+    - forbidden：别名在所列 sheet 的父级内写进目录顶层 `alias_policy.forbidden`（第 3 步据此拒绝并给理由）；
+    - parent_qualified：别名加回所列 sheet（每个父级内唯一，缺父级时由 exact_identity 判歧义）；
+    - non_address_label / project_context：不写目录（只进报告 info）。
+    所指 sheet / 目标不在目录的条目不在这里处理，由发布门禁 alias 报失效条目。
+    """
+    sheets = catalog.get("sheets", [])
+    by_code = {s.get("sheet_code", ""): s for s in sheets}
+    by_id = {s.get("addr_id", ""): s for s in sheets}
+    merged: dict[str, list[str]] = {}
+    forbidden: dict[str, dict[str, list[str]]] = {}
+
+    def _add(entry: dict[str, Any], names: list[str]) -> list[str]:
+        cur = list(entry.get("sheet_name_aliases") or [])
+        added = [n for n in names if n not in cur and n != entry.get("sheet_name")]
+        if added:
+            entry["sheet_name_aliases"] = cur + added
+        return added
+
+    for e in entries:
+        disp, alias = e.get("disposition"), e.get("alias", "")
+        if disp == "merge_into" and e.get("target") in by_id:
+            added = _add(by_id[e["target"]], list(label_aliases.get(alias, [])))
+            if added:
+                merged.setdefault(e["target"], []).extend(added)
+        elif disp in ("forbidden", "parent_qualified"):
+            for code in e.get("sheet_codes", []) or []:
+                sheet = by_code.get(code)
+                if sheet is None:
+                    continue
+                if disp == "forbidden":
+                    forbidden.setdefault(sheet.get("parent_wp_code", ""), {}).setdefault(alias, []).append(code)
+                elif _add(sheet, [alias]):
+                    merged.setdefault(sheet["addr_id"], []).append(alias)
+    if forbidden:
+        policy = dict(catalog.get("alias_policy") or {})
+        cur = {p: dict(v) for p, v in (policy.get("forbidden") or {}).items()}
+        for parent, by_alias in forbidden.items():
+            for name, codes in by_alias.items():
+                cur.setdefault(parent, {})[name] = sorted(set(cur.get(parent, {}).get(name, [])) | set(codes))
+        policy["forbidden"] = {p: dict(sorted(v.items())) for p, v in sorted(cur.items())}
+        catalog["alias_policy"] = policy
+
+    index = _index(catalog)
+    bad = []
+    for aid, names in sorted(merged.items()):
+        for name in names:
+            sm = exact_identity.sheet_of(by_id[aid].get("parent_wp_code", ""), name, index=index)
+            got = (sm.entry or {}).get("addr_id") if sm.ok else sm.state
+            if got != aid:
+                bad.append(f"{aid} 别名「{name}」并入后解析为 {got}")
+    if bad:
+        raise NameSystemError("alias_policy 并入的别名不能回到目标 sheet（design §7.2）：" + "；".join(bad[:10]))
+    return merged
+
+
 def apply_cell_verdicts(catalog: dict[str, Any], cell_verdicts: list[dict[str, Any]]) -> None:
     """规则 3：按 cell_verdicts 停用 / 标语义待核对（只改目录里已有的 cell，不新增、不删除）。"""
     by_id = {c.get("addr_id", ""): c for c in catalog.get("cells", [])}
@@ -124,6 +186,7 @@ __all__ = [
     "KEEP_SEMANTIC_UNVERIFIED",
     "NameSystemError",
     "NameSystemOutcome",
+    "apply_alias_policy",
     "apply_cell_names",
     "apply_cell_verdicts",
     "merge_platform_names",

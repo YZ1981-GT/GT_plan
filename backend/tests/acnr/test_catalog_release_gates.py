@@ -467,7 +467,8 @@ def test_alias_policy_valid_entries_ok():
         _alias_entry("D2-目录", "non_address_label"),
         _alias_entry("E1-1旧", "merge_into", target="E1/E1-1"),
     ]}
-    report = {"open_problems": {"unregistered_alias_keys": ["D2-目录", "E1-1旧"]}}
+    report = {"open_problems": {"unregistered_alias_keys": ["D2-目录", "E1-1旧"], "alias_conflicts": ["通用名"],
+                                "alias_conflict_members": {"通用名": ["D2-1", "D2-目录"]}}}
     g = group_by_check(run_release_gates(_two_parent_catalog(), None, report, today=_TODAY, alias_policy=policy))
     assert "alias" not in g, [str(x) for x in g.get("alias", [])]
 
