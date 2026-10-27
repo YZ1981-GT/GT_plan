@@ -28,10 +28,14 @@ from app.services.custom_query.acnr_target_values import read_acnr_target_values
 _TABLES = [User.__table__, Project.__table__, WpIndex.__table__, WorkingPaper.__table__]
 _E1_15 = get_catalog().sheets_by_addr_id["E1/E1-15"]["sheet_name"]
 _D2_2 = get_catalog().sheets_by_addr_id["D2/D2-2"]["sheet_name"]
+#: 目录里真实存在的同底稿同 A1 目标对（E1/E1-18/B20 与 E1/E1-19/B20），两张表写不同数值
+_E1_18, _E1_19 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (18, 19))
 _PAPERS = {
     "E1": {"html_data": {
         "货币资金分析表E1-14": {"cells": {"C10": "0.125", "B30": "结论文本"}},
         _E1_15: {"cells": {"C8": "222", "C10": "999"}},
+        _E1_18: {"cells": {"B20": "11"}},
+        _E1_19: {"cells": {"B20": "22"}},
     }},
     "D2": {"html_data": {_D2_2: {"cells": {"E100": "1"}}}},
     "D2-2": {"html_data": {_D2_2: {"cells": {"E100": "2"}}}},
@@ -74,9 +78,12 @@ async def _run(db, pid, raws, year=2025):
 
 async def test_two_sheets_same_a1_each_read_their_own(world):
     db, pid, ids = world
-    got = await _run(db, pid, ["E1/E1-14/C10", "E1/E1-15/C8"])
+    got = await _run(db, pid, ["E1/E1-14/C10", "E1/E1-15/C8", "E1/E1-18/B20", "E1/E1-19/B20"])
     assert got["registry_version"] == get_catalog().registry_version and got["year"] == 2025
-    a, b = got["items"]
+    a, b, c, d = got["items"]
+    assert [(i["addr_id"], i["state"], i["value"], i["source"]["sheet_code"], i["source"]["sheet_key"])
+            for i in (c, d)] == [("E1/E1-18/B20", "ok", "11", "E1-18", _E1_18),
+                                 ("E1/E1-19/B20", "ok", "22", "E1-19", _E1_19)]
     assert (a["state"], a["value"], a["text"]) == ("ok", "0.125", "0.125")
     assert (b["state"], b["value"]) == ("ok", "222")
     assert a["source"]["sheet_key"] == "货币资金分析表E1-14" and b["source"]["sheet_key"] == _E1_15
