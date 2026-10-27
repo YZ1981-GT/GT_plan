@@ -39,6 +39,7 @@ from app.services.custom_query.param_sql_builder import (
 )
 
 _psb_build_where = _ParamSQLBuilder.build_where
+from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
     JOIN_WHITELIST,
@@ -68,7 +69,9 @@ class OrderBy(BaseModel):
     direction: Literal["asc", "desc"] = "asc"
 
 
-class QueryDSL(BaseModel):
+class QueryDSL(StrictRequestModel):
+    """构建器请求（未声明的键 ⇒ 422 并点名，acnr-foundation-defect-closure T14）。"""
+
     table: str = Field(..., min_length=1, max_length=64)
     fields: list[str] = Field(default_factory=list)
     filters: list[FilterCond] = Field(default_factory=list)
@@ -86,6 +89,9 @@ class QueryDSL(BaseModel):
     # OwnershipGuard 校验（不可访问 / 已删除 ⇒ 403 且不执行），年度注入到计划中每张有 year 列的表
     project_id: UUID | None = None
     year: int | None = Field(default=None, ge=2000, le=2100)
+    #: 选中的底稿单元格（acnr-foundation-defect-closure 需求 1，本字段只在此定义一次）：经 ACNR 解析后逐格取值，
+    #: 结果单独成块 ``acnr_results``，不混入 rows / columns
+    acnr_targets: AcnrTargetList = Field(default_factory=list)
 
 
 class ExportDSL(QueryDSL):

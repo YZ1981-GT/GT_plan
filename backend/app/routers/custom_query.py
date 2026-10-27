@@ -65,6 +65,7 @@ from app.services.custom_query.pagination import (
 from app.services.custom_query.fetchers.disclosure import _query_disclosure  # noqa: F401 — 再导出（test_note_table_payload_readers_pg）
 from app.services.custom_query.fetchers.workpaper_cells import render_sheet_preview
 from app.services.custom_query.source_registry import resolve_source
+from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel
 from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
@@ -95,7 +96,7 @@ class ConditionSpec(BaseModel):
     value: Any | None = None
 
 
-class QueryRequest(BaseModel):
+class QueryRequest(StrictRequestModel):
     project_id: str
     year: int = Field(..., ge=2000, le=2100)
     source: str  # 注册源键 / 别名 / consol_unit: / workpaper: / disclosure_note: 形态（source_registry.resolve_source）
@@ -118,7 +119,7 @@ class QueryRequest(BaseModel):
     pivot: dict | None = None
     #: ACNR 寻址目标（addr_id / uri / report:/note:/tb: 语法糖）。
     #: 改造前该字段未被 pydantic 声明 ⇒ 前端发送后被静默丢弃、无 warning。
-    acnr_targets: list[str] = Field(default_factory=list)
+    acnr_targets: AcnrTargetList = Field(default_factory=list)
 
 
 @router.get("/indicators")

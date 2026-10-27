@@ -86,6 +86,23 @@ _A = "backend/app/services/acnr/"
 _T = "backend/tests/acnr/"
 _BUILD_REL = _A + "catalog_build.py"
 _NAMES_REL = _A + "catalog_names.py"
+_CQ = "backend/app/services/custom_query/"
+
+
+def _query_models_are_strict() -> bool:
+    """QueryDSL（builder_dsl）与业务视图 QueryRequest（routers/custom_query）的基类是 StrictRequestModel，
+    acnr_targets 的注解是 AcnrTargetList（AST，T14）。"""
+    import ast as _ast
+
+    def _ok(rel: str, cls_name: str) -> bool:
+        tree = _ast.parse(_read(_REPO / rel))
+        cls = next((n for n in tree.body if isinstance(n, _ast.ClassDef) and n.name == cls_name), None)
+        if cls is None or [getattr(b, "id", None) for b in cls.bases] != ["StrictRequestModel"]:
+            return False
+        return any(isinstance(n, _ast.AnnAssign) and getattr(n.target, "id", None) == "acnr_targets"
+                   and getattr(n.annotation, "id", None) == "AcnrTargetList" for n in cls.body)
+
+    return _ok(_CQ + "builder_dsl.py", "QueryDSL") and _ok("backend/app/routers/custom_query.py", "QueryRequest")
 _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_INTRO: {
         "本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**": P(
@@ -186,7 +203,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_database_error_propagates"),
             claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
                   lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
-        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；生产调用方只有底稿公式三参 WP 的 A1 第三参（WPExecutor），高级查询接线见下表）": CB(
+        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）与高级查询取值编排，后者尚未接到端点）": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",
             calls(_A + "wp_cell_target.py", "read_entry_cell", "resolve_wp_cell", "bind_wp_code", "sheet_key_for"),
@@ -195,10 +212,36 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             not_imports(_A + "wp_cell_target.py", "project_registry_lock"), task_open("T17", "T18"),
             has_tests(_T + "test_wp_cell_target.py", "test_locked_project_judges_identity_by_locked_catalog",
                       "test_sheet_level_paper_preferred_over_parent", "test_borrowed_and_ambiguous_names_block"),
-            claim("生产代码里导入 wp_cell_target 的恰为 formula_engine（AST）",
-                  lambda: _production_importers_of("wp_cell_target") == ["backend/app/services/formula_engine.py"]),
+            claim("生产代码里导入 wp_cell_target 的恰为 formula_engine 与 custom_query/acnr_target_values（AST）",
+                  lambda: sorted(_production_importers_of("wp_cell_target")) == [
+                      "backend/app/services/custom_query/acnr_target_values.py",
+                      "backend/app/services/formula_engine.py"]),
             calls("backend/app/services/formula_engine.py", "read_sheet_cell", "effective_catalog", "read_formula_cell"),
-            task_open("T14"), in_planned("T14")),
+            claim("生产代码里没有导入 acnr_target_values 的模块（尚未接到端点，AST）",
+                  lambda: _production_importers_of("acnr_target_values") == []),
+            task_open("T15"), in_planned("T15")),
+        "高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；尚无生产调用方，端点接线、项目鉴权与年度补齐见下表）": CB(
+            _CQ + "acnr_target_values.py", ("resolve_acnr_targets", "read_acnr_target_values", "classify_target"),
+            _T + "test_acnr_targets_single_reader.py",
+            calls(_CQ + "acnr_target_values.py", "resolve_acnr_targets", "resolve_target", "classify_target"),
+            calls(_CQ + "acnr_target_values.py", "read_acnr_target_values", "effective_catalog", "read_entry_cell"),
+            not_calls(_CQ + "acnr_target_values.py", "resolve_wp_cell", "extract_custom_cells"),
+            has_tests(_T + "test_acnr_targets_single_reader.py", "test_each_rejection_code_is_422_and_reads_nothing",
+                      "test_first_unavailable_stops_and_is_503", "test_whole_batch_deadline_is_503"),
+            has_tests(_T + "test_acnr_target_values.py", "test_two_sheets_same_a1_each_read_their_own",
+                      "test_missing_paper_is_wp_missing_not_zero"),
+            has_tests(_T + "test_acnr_targets_three_way_pg.py", "test_formula_targets_and_stored_values_are_equal"),
+            claim("生产代码里没有导入 acnr_target_values 的模块（AST）",
+                  lambda: _production_importers_of("acnr_target_values") == []),
+            task_open("T15"), in_planned("T15")),
+        "高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验）": CB(
+            _CQ + "strict_model.py", ("StrictRequestModel", "AcnrTargetList"),
+            "backend/tests/test_query_dsl_rejects_unknown_fields.py",
+            claim("QueryDSL 与业务视图 QueryRequest 都继承 StrictRequestModel、acnr_targets 声明为 AcnrTargetList（AST）",
+                  _query_models_are_strict),
+            has_tests("backend/tests/test_query_dsl_rejects_unknown_fields.py",
+                      "test_unknown_key_rejected_with_chinese_message", "test_builder_endpoints_reject_unknown_key",
+                      "test_business_execute_rejects_unknown_key")),
         "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
             _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
             calls(_RESOLVER_REL, "full_resolve", "step1_identity"),
@@ -261,7 +304,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T14、T15、T16"),
+        "高级查询三个入口接上 acnr_targets（响应带 acnr_results 结果块、422 / 503 / YEAR_REQUIRED、项目鉴权）、前端结果区与下钻": L("T15、T16"),
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
         "异步追溯拿到规范 addr_id": L("T20"),
         "V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置": L("T21、T22"),

@@ -9,7 +9,7 @@
       归一输入 → `asyncio.wait_for(full_resolve(...), timeout=5.0)`；
       `found=True` 采用 `ResolveResult.addr_id` 作 canonical 身份并附 `wp_id`；
       超时 / resolve 不可用 → `error="resolve_unavailable"`。
-  - `resolve_many(raws, *, project_id, db)`：`asyncio.gather` 并发解析；
+  - `resolve_many(raws, *, project_id, db)`：带 db 逐个顺序解析（同一会话不能并发），否则 `asyncio.gather` 并发；
       封装 ACNR 出口不重写；上层按 R1.4 归集 `found=False` 清单、整体不执行。
 
 输入语法（归一顺序，语法糖在入口即收敛为 ACNR 输入形态，单点解析）：
@@ -38,7 +38,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.acnr.resolver import full_resolve
+from app.services.acnr.resolver import ResolveResult, full_resolve
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,8 @@ class ResolvedTarget:
     jump_route: Optional[str] = None
     entry_type: Optional[str] = None
     error: Optional[str] = None
+    #: full_resolve 的原始结果（超时 / 异常时为 None）；acnr_targets 逐项分类读它（acnr-foundation-defect-closure T14）
+    result: Optional[ResolveResult] = None
 
 
 @dataclass
@@ -251,6 +253,7 @@ class AddressingService:
                 found=False,
                 entry_type=result.entry_type,
                 error=result.error or ERR_UNRESOLVABLE,
+                result=result,
             )
 
         return ResolvedTarget(
@@ -261,6 +264,7 @@ class AddressingService:
             jump_route=result.jump_route,
             entry_type=result.entry_type,
             error=None,
+            result=result,
         )
 
     async def resolve_many(
@@ -271,14 +275,20 @@ class AddressingService:
         db: AsyncSession | None = None,
         timeout_s: float = DEFAULT_RESOLVE_TIMEOUT_S,
     ) -> list[ResolvedTarget]:
-        """并发解析多个目标，返回与输入同序的结果列表。
+        """解析多个目标，返回与输入同序的结果列表。
 
-        用 `asyncio.gather` 并发解析（封装 ACNR 出口，不重写）；结果顺序与
-        `raws` 一致。上层按 R1.4「全有或全无」：任一 `found=False` 时归集
-        无法解析清单、整体不执行、不返回部分结果。
+        带 ``db`` 时逐个顺序解析：同一个 AsyncSession 不能被并发协程同时使用（acnr-foundation-defect-closure
+        design §1.2）；不带 ``db`` 时用 `asyncio.gather` 并发。上层按 R1.4「全有或全无」：任一 `found=False`
+        时归集无法解析清单、整体不执行、不返回部分结果。
         """
         if not raws:
             return []
+
+        if db is not None:
+            return [
+                await self.resolve_target(raw, project_id=project_id, db=db, timeout_s=timeout_s)
+                for raw in raws
+            ]
 
         return list(
             await asyncio.gather(
