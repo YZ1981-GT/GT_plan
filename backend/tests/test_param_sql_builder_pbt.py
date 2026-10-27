@@ -109,12 +109,16 @@ def test_p17_scalar_injection_value_bound_not_in_sql(payload, op):
 
 @settings(max_examples=5)
 @given(payload=_injection_strategy)
+# advanced-query-linkage-closure B2 起 like 先把 ``\ % _`` 转义为字面字符（``ESCAPE '\'``）：绑定值是转义后的
+# payload，原断言「绑定值含原 payload」遇到含 ``_`` / ``%`` 的负载必误报（hypothesis 在 B3 全量回归里抽到本例）
+@example(payload="') UNION SELECT * FROM staff_members --")
 def test_p17_like_injection_value_bound_not_in_sql(payload):
     clause = build_filter(_Row.code, "like", payload)
     sql, params = _compile(clause)
-    # LIKE 把 payload 包进 %...% 后仍作为绑定参数，原文本不出现在 SQL 中
+    # LIKE 把转义后的 payload 包进 %...% 后作为绑定参数，原文本不出现在 SQL 中
     assert payload not in sql
-    assert any(payload in str(v) for v in params.values())
+    escaped = payload.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    assert f"%{escaped}%" in params.values()
     assert "LIKE" in sql.upper()
 
 

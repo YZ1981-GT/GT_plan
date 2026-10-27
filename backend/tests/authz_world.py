@@ -132,10 +132,15 @@ PRODUCTION_GATES: tuple[str, ...] = (
     # 附注编辑门禁的 design 定级形态（任务 6.3）：多项目与角色限定
     "app.services.note_edit_gate.assert_note_edit_access_on_projects",
     "app.services.note_edit_gate.assert_note_role_access",
+    # 高级构建器准入（advanced-query-linkage-closure 任务 12）：路由门禁与 access 接口共用的判定
+    "app.routers.query_builder.require_query_builder_access",
+    "app.services.custom_query.builder_access.builder_admission",
+    "app.services.custom_query.builder_access.resolve_builder_access",
 )
 # 门禁、判定（成员级别 / 归档 / 操作矩阵 / 合并锁 / EQCR）与基础设施所在的模块：其中的对象一律不能当业务 service 打桩
 _GUARDED_MODULES: frozenset[str] = frozenset({
     "app.deps", "app.services.eqcr_resolver", "app.services.note_edit_gate", "app.core.database", "app.core.redis",
+    "app.services.custom_query.builder_access",
 })
 REPLACEABLE_POINTS: frozenset[str] = frozenset({"rls", "archive_guard", "eqcr_query"})
 _REPLACEABLE_NAMES: frozenset[str] = frozenset(

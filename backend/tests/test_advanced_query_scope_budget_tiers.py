@@ -267,8 +267,14 @@ class _Guard:
 
 @pytest.fixture
 def patch_guard(monkeypatch):
+    async def _all_live(_db, project_ids):
+        # 作用域的下一层「排除已删项目」查库；本组用例不带库（db=None），按全部未删处理。
+        # 已删项目的排除另由 advanced_query_linkage 的真库用例覆盖。
+        return frozenset(project_ids)
+
     def _apply(guard):
         monkeypatch.setattr(bs, "ownership_guard", guard)
+        monkeypatch.setattr(bs, "_live_project_ids", _all_live)
         return guard
 
     return _apply

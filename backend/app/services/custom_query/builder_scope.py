@@ -1,57 +1,73 @@
-"""白名单构建器的项目作用域注入（R2）。
+"""白名单构建器的项目作用域（advanced-query-hardening-wiring-closure R2；advanced-query-linkage-closure 任务 9，
+ADR-AQL-09、design §3.4；R1.2、R3.1~R3.3、R3.5 后端）。
 
-设计对应 `.kiro/specs/advanced-query-hardening-wiring-closure/design.md` §Components 2。
+**存在理由（浏览器 + 认证 token 双实测）**：最初 ``routers/query_builder.py`` 全链路零 ``project_id`` 注入，一次查询即可跨
+全部客户；hardening 收口后只给**基表**加了 ``project_id IN (可访问集合)``，仍有四处缺口（AQ-02 / AQ-06 / AQ-18）：
 
-**存在理由（浏览器 + 认证 token 双实测）**：改造前 ``routers/query_builder.py``
-全链路零 ``project_id`` 注入 —— ``_build_select`` 只做表 / 列 / 算子白名单，
-``current_user`` 仅用于缓存键。实测以合法 token 请求
-``POST /api/query/execute {"table": "trial_balance", "fields": ["project_id"],
-"limit": 1000}``，返回的 1000 行**覆盖 9 个不同项目**；而 ``projects`` 表在白名单内，
-一次查询即可跨全部客户。缓存键更写死 ``project_id="__query_builder__"``，
-不同可访问范围的用户共用同一命名空间。
+- 没有 ``project_id`` 列的表（``projects``、``staff_members``）记入 ``unscoped_tables`` 不过滤 —— 系统经理查 ``projects``
+  得到全部项目（含已删）、查 ``staff_members`` 得到全体员工；
+- 可访问集合不排除已删项目，JOIN 目标表完全不加作用域、不排除已删行；
+- 科目余额表 / 序时账不按生效数据集过滤（同一项目年度的历史数据集一并查出）；
+- 请求里指定的项目从未传进来（``QueryDSL`` 没有 ``project_id``），指定了也是查全部可访问项目。
 
-作用域来源复用 ``OwnershipGuard.get_accessible_project_ids``（已存在的公开出口），
-不新写第二套项目可见性判定。
-
-_Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
+作用域来源仍是 ``OwnershipGuard``（不另写第二套项目可见性判定）；谓词只由 :func:`scope_predicates` 生成：基表的谓词由
+:func:`apply_scope_to_select` 在 WHERE 组装的**最后一步**追加（用户 DSL 无法放宽），JOIN 目标表的谓词并入该 JOIN 的 ON
+（左连接没有匹配行时目标列为空、基表行保留；放进 WHERE 会把左连接变成内连接）。
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
-from typing import Any, Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import Select
+from sqlalchemy import Select, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
+from app.models.core import Project
+from app.services.custom_query.builder_access import role_value
 from app.services.custom_query.ownership_guard import ownership_guard
-from app.services.custom_query.table_whitelist import TABLE_WHITELIST
+from app.services.custom_query.table_whitelist import (
+    DATASET_SCOPED_TABLES,
+    ROLE_RESTRICTED_TABLES,
+    TABLE_WHITELIST,
+)
+from app.services.dataset_query import active_rows_predicate
 
 logger = logging.getLogger(__name__)
 
-#: 不含 ``project_id`` 列的全局配置表 —— 跳过项目过滤并在 warnings 明示（R2.3）。
-#: 这类表是平台级模板/配置（对所有项目相同），不加过滤不构成越权。
+#: 不含项目维度、但有「项目副本行」的平台级配置表：副本行只对能访问该项目的用户可见
 GLOBAL_CONFIG_TABLES: frozenset[str] = frozenset({"report_config"})
+#: 报表配置的项目副本行写法（``applicable_standard = 'project:{项目 id}'``）
+PROJECT_COPY_PREFIX = "project:"
 
-#: 作用域过滤所用的列名
+#: 作用域过滤所用的列名（``projects`` 表本身按 ``id``）
 SCOPE_COLUMN = "project_id"
+
+_ROLE_LABELS = {"admin": "管理员", "partner": "合伙人", "manager": "经理"}
+EMPTY_SCOPE_WARNING = "当前账号未被分派任何项目，查询范围为空；请联系项目经理分派后重试"
+ALL_PROJECTS_WARNING = "当前角色可访问全部项目，本次查询未限定项目范围"
 
 
 @dataclass(frozen=True)
 class BuilderScope:
     """一次构建器查询的生效作用域。
 
-    ``project_ids is None`` 表示「全项目可访问」（admin / partner），此时不加过滤
-    但仍要在响应中标注实际作用域，避免「看到了全平台数据却不知道」（R2.2）。
+    ``project_ids is None`` 表示「全部未删除项目」（admin / partner）：仍要排除已删项目，并在响应中标注实际作用域，避免
+    「看到了全平台数据却不知道」（R2.2）。``dataset_predicates``：计划中四表（科目余额 / 序时账 / 辅助余额 / 辅助明细）各
+    一条生效数据集谓词，由 ``dataset_query.active_rows_predicate`` 预先算好（谓词构造因此保持同步）。
     """
 
     project_ids: frozenset[UUID] | None
     unscoped_tables: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+    requested_project_id: UUID | None = None
+    dataset_predicates: Mapping[str, ColumnElement] = field(default_factory=dict)
 
     @property
     def is_all_projects(self) -> bool:
@@ -63,22 +79,70 @@ class BuilderScope:
             "all_projects": self.is_all_projects,
             "project_count": None if self.is_all_projects else len(self.project_ids or ()),
             "unscoped_tables": list(self.unscoped_tables),
+            "requested_project_id": str(self.requested_project_id) if self.requested_project_id else None,
         }
 
 
-def _scope_column(table_name: str) -> Any | None:
-    """取该表的 project_id 列；表无此列返回 None。"""
+def _table(table_name: str) -> Any | None:
     meta = TABLE_WHITELIST.get(table_name)
-    if not meta:
+    return meta["model"].__table__ if meta else None
+
+
+def _project_column(table_name: str) -> Any | None:
+    """该表的项目列：``projects`` 用 ``id``，其余用 ``project_id``；没有项目维度返回 None。"""
+    table = _table(table_name)
+    if table is None:
         return None
-    if SCOPE_COLUMN not in (meta.get("fields") or ()):
-        return None
-    return getattr(meta["model"], SCOPE_COLUMN, None)
+    if table_name == "projects":
+        return table.c.id
+    return table.c.get(SCOPE_COLUMN)
 
 
 def table_is_scopable(table_name: str) -> bool:
-    """该表是否可施加项目作用域过滤。"""
-    return _scope_column(table_name) is not None
+    """该表是否可施加项目作用域过滤（``projects`` 按 ``id``）。"""
+    return _project_column(table_name) is not None
+
+
+def _unscoped_warning(table_name: str) -> str:
+    if table_name in GLOBAL_CONFIG_TABLES:
+        return f"表 '{table_name}' 为平台级配置；项目副本行只含可访问项目"
+    return f"表 '{table_name}' 无项目维度（平台级配置），本次查询未按项目过滤"
+
+
+def _enforce_role_restricted_tables(tables: Iterable[str], user: Any) -> None:
+    """人员表等只对限定系统角色开放（基表与 JOIN 目标同样适用，R3.2）。"""
+    role = role_value(user)
+    for table_name in tables:
+        allowed = ROLE_RESTRICTED_TABLES.get(table_name)
+        if allowed is None or role in allowed:
+            continue
+        label = TABLE_WHITELIST[table_name]["label"]
+        roles = "、".join(_ROLE_LABELS.get(r, r) for r in sorted(allowed))
+        raise HTTPException(
+            status_code=403,
+            detail={"error_code": "TABLE_ROLE_FORBIDDEN", "message": f"表「{label}」仅对{roles}开放", "table": table_name},
+        )
+
+
+async def _live_project_ids(db: AsyncSession, project_ids: Iterable[Any]) -> frozenset[UUID]:
+    """``project_ids`` 中未删除的项目（构建器作用域恒排除已删项目）。"""
+    ids = sorted({pid for pid in (_to_uuid(p) for p in project_ids) if pid is not None}, key=str)
+    if not ids:
+        return frozenset()
+    rows = await db.execute(select(Project.id).where(Project.id.in_(ids), Project.is_deleted == false()))
+    return frozenset(pid for pid in (_to_uuid(r[0]) for r in rows.all()) if pid is not None)
+
+
+async def _dataset_predicates(
+    db: AsyncSession, tables: Iterable[str], project_ids: frozenset[UUID] | None, year: int | None
+) -> dict[str, ColumnElement]:
+    """计划中四表各一条生效数据集谓词（查询失败原样上抛，不退化为不按数据集过滤）。"""
+    found: dict[str, ColumnElement] = {}
+    for table_name in dict.fromkeys(tables):
+        table = _table(table_name)
+        if table_name in DATASET_SCOPED_TABLES and table is not None:
+            found[table_name] = await active_rows_predicate(db, table, project_ids=project_ids, year=year)
+    return found
 
 
 async def resolve_builder_scope(
@@ -86,67 +150,50 @@ async def resolve_builder_scope(
     user: Any,
     dsl_tables: Iterable[str],
     requested_project_id: Any = None,
+    year: int | None = None,
     db: AsyncSession,
 ) -> BuilderScope:
-    """解析本次查询的生效作用域（R2.1 / R2.2 / R2.3 / R2.5）。
+    """解析本次查询的生效作用域（R1.2、R3.1~R3.3、R3.5）。
 
-    - admin / partner → ``project_ids=None``（全项目），仍标注作用域；
-    - 其余角色 → 可访问项目集合；集合为空时 fail-closed 403（无可查项目时返回空
-      结果会被误读为「这些表没数据」）；
-    - 显式指定 ``requested_project_id`` 且不可访问 → 403，且不执行查询（R2.5）；
-    - 命中全局配置表 → 记入 ``unscoped_tables`` 并产出 warning（R2.3）。
+    - 人员表（基表或 JOIN 目标）对 admin / partner 以外的角色 → 403 ``TABLE_ROLE_FORBIDDEN``，先于一切取数；
+    - 显式指定 ``requested_project_id``：经 ``OwnershipGuard`` 校验（含 RLS context 与越权审计），不可访问或已删除 → 403
+      ``FORBIDDEN_PROJECT`` 且不执行；作用域只含该项目；
+    - 未指定：admin / partner → 全部未删除项目；其余角色 → 可访问集合 − 已删项目；集合为空时作用域为空（永假谓词，
+      结果 0 行）并写 warning —— 不报 403，免得把「你没有项目」与「你没权限用构建器」混成同一个提示；
+    - 没有项目维度的表记入 ``unscoped_tables`` 并产出 warning（报表配置的项目副本行仍只含可访问项目）。
     """
     tables = [str(t) for t in dsl_tables if t]
-    unscoped = tuple(
-        t for t in tables if t in GLOBAL_CONFIG_TABLES or not table_is_scopable(t)
-    )
-    warnings: list[str] = []
-    for table_name in unscoped:
-        warnings.append(
-            f"表 '{table_name}' 无项目维度（平台级配置），本次查询未按项目过滤"
-        )
+    _enforce_role_restricted_tables((t for t in tables if t in TABLE_WHITELIST), user)
+    unscoped = tuple(dict.fromkeys(t for t in tables if t in TABLE_WHITELIST and not table_is_scopable(t)))
+    warnings = [_unscoped_warning(t) for t in unscoped]
 
-    accessible = await ownership_guard.get_accessible_project_ids(user, db)
-
+    requested: UUID | None = None
     if requested_project_id:
         # 显式指定项目：走既有守卫（含 RLS context 设置与越权审计）
-        await ownership_guard.assert_target_accessible(
-            user=user, project_id=requested_project_id, db=db
-        )
-        pid = _to_uuid(requested_project_id)
-        if pid is None:
+        await ownership_guard.assert_target_accessible(user=user, project_id=requested_project_id, db=db)
+        requested = _to_uuid(requested_project_id)
+        if requested is None or not await _live_project_ids(db, (requested,)):
             raise HTTPException(
                 status_code=403,
-                detail={
-                    "error_code": "FORBIDDEN_PROJECT",
-                    "message": "目标项目标识无效，拒绝访问",
-                },
+                detail={"error_code": "FORBIDDEN_PROJECT", "message": "目标项目不存在或已删除，拒绝访问"},
             )
-        return BuilderScope(
-            project_ids=frozenset({pid}),
-            unscoped_tables=unscoped,
-            warnings=tuple(warnings),
-        )
-
-    if accessible is None:
-        warnings.append("当前角色可访问全部项目，本次查询未限定项目范围")
-        return BuilderScope(
-            project_ids=None, unscoped_tables=unscoped, warnings=tuple(warnings)
-        )
-
-    if not accessible:
-        # 空集合：注入永假过滤（`project_id IN ()`）而非 403。
-        # 选空结果而非拒绝，是因为 403 会把「你没有项目」与「你没权限用构建器」
-        # 混成同一个提示；而空结果 + 明确 warning 能让用户知道该去要项目分派。
-        # 安全性等价 —— 永假条件不会返回任何行。
-        warnings.append(
-            "当前账号未被分派任何项目，查询范围为空；请联系项目经理分派后重试"
-        )
+        project_ids: frozenset[UUID] | None = frozenset({requested})
+    else:
+        accessible = await ownership_guard.get_accessible_project_ids(user, db)
+        if accessible is None:
+            warnings.append(ALL_PROJECTS_WARNING)
+            project_ids = None
+        else:
+            project_ids = await _live_project_ids(db, accessible)
+            if not project_ids:
+                warnings.append(EMPTY_SCOPE_WARNING)
 
     return BuilderScope(
-        project_ids=frozenset(accessible),
+        project_ids=project_ids,
         unscoped_tables=unscoped,
         warnings=tuple(warnings),
+        requested_project_id=requested,
+        dataset_predicates=await _dataset_predicates(db, tables, project_ids, year),
     )
 
 
@@ -159,20 +206,52 @@ def _to_uuid(value: Any) -> UUID | None:
         return None
 
 
-def apply_scope_to_select(
-    stmt: Select, *, scope: BuilderScope, table_name: str
-) -> Select:
-    """把作用域约束追加到 ``SELECT``（R2.1）。
+def _live_projects_subquery() -> Select:
+    """「全部未删除项目」的 id 子查询（不随外层的 ``projects`` 自动关联）。"""
+    projects = Project.__table__
+    return select(projects.c.id).where(projects.c.is_deleted == false()).correlate(None)
 
-    调用点必须是 WHERE 组装的**最后一步**：追加而非合并，用户 DSL 里即便自己写了
-    ``project_id`` 过滤也只会与本约束取交集，无法放宽（AND 语义）。
+
+def scope_predicates(table_name: str, scope: BuilderScope, *, year: int | None = None) -> list[ColumnElement]:
+    """计划中一张表（基表或 JOIN 目标）的作用域谓词（ADR-AQL-09）。
+
+    项目（``projects`` 按 ``id``；不限项目时其余表为 ``project_id IN (未删除项目)``）、``is_deleted = false``（有列时）、
+    四表生效数据集口径、请求年度（有 ``year`` 列且请求带年度）、报表配置的项目副本行只含可访问项目（不限项目时不加）。
     """
-    if scope.is_all_projects:
-        return stmt
-    column = _scope_column(table_name)
-    if column is None:
-        return stmt  # 全局配置表：无 project_id 列，跳过（已在 warnings 标注）
-    return stmt.where(column.in_(list(scope.project_ids or ())))
+    table = _table(table_name)
+    if table is None:
+        return []
+    predicates: list[ColumnElement] = []
+    project_col = _project_column(table_name)
+    if project_col is not None:
+        if not scope.is_all_projects:
+            predicates.append(project_col.in_(sorted(scope.project_ids or (), key=str)))
+        elif table_name != "projects":
+            predicates.append(project_col.in_(_live_projects_subquery()))
+    if "is_deleted" in table.c:
+        predicates.append(table.c.is_deleted == false())
+    dataset = scope.dataset_predicates.get(table_name)
+    if dataset is not None:
+        predicates.append(dataset)
+    if year is not None and "year" in table.c:
+        predicates.append(table.c.year == year)
+    if table_name in GLOBAL_CONFIG_TABLES and not scope.is_all_projects:
+        column = table.c.applicable_standard
+        copies = [f"{PROJECT_COPY_PREFIX}{pid}" for pid in sorted(scope.project_ids or (), key=str)]
+        predicates.append(or_(column.notlike(f"{PROJECT_COPY_PREFIX}%"), column.in_(copies)))
+    return predicates
+
+
+def apply_scope_to_select(
+    stmt: Select, *, scope: BuilderScope, table_name: str, year: int | None = None
+) -> Select:
+    """把基表的作用域谓词追加到 ``SELECT``（R2.1）。
+
+    调用点必须是 WHERE 组装的**最后一步**：追加而非合并，用户 DSL 里即便自己写了 ``project_id`` 过滤也只会与本约束
+    取交集，无法放宽（AND 语义）。JOIN 目标表的谓词不走这里，见 ``builder_dsl._build_select``（并入 ON）。
+    """
+    predicates = scope_predicates(table_name, scope, year=year)
+    return stmt.where(*predicates) if predicates else stmt
 
 
 def scope_signature(scope: BuilderScope) -> str:

@@ -3,11 +3,14 @@
 从 ``routers/query_builder.py`` 抽出：router 只保留 HTTP 层职责（依赖注入、
 响应头、审计、错误映射），DSL 校验与 ``select()`` 构建属服务层。
 
-安全铁律（与抽出前完全一致，仅位置变化）：
+安全铁律：
 - 表 / 字段 / 算子 / 聚合 / JOIN 一律经 ``table_whitelist`` 白名单，无字符串拼接；
-- 项目作用域约束由 ``builder_scope.apply_scope_to_select`` 在 WHERE 组装的
-  **最后一步**追加，用户 DSL 无法放宽；
-- 默认列集取 ``default_fields``（业务列），技术列与 PII 列需显式请求且经角色校验。
+- 作用域谓词只由 ``builder_scope.scope_predicates`` 生成：基表的由 ``apply_scope_to_select`` 在 WHERE 组装的
+  **最后一步**追加（用户 DSL 无法放宽），JOIN 目标表的与登记的目标条件一起并入该 JOIN 的 ON（左连接不丢基表行；
+  advanced-query-linkage-closure ADR-AQL-09）；
+- 默认列集取 ``default_fields``（业务列），技术列与 PII 列需显式请求且经角色校验；
+- 排序：可空列空值一律排在最后，无分组 / 聚合时末尾追加各表主键，翻页稳定（R2.2）；``total`` 由 :func:`build_count`
+  对同一语句计数（R2.6）。
 
 ``routers/query_builder`` 对本模块的符号做 re-export，既有
 ``from app.routers.query_builder import QueryDSL, _build_select`` 的调用方与测试
@@ -20,13 +23,14 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any, Literal
+from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, Select, and_, asc, desc, func, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.services.custom_query.builder_scope import apply_scope_to_select
+from app.services.custom_query.builder_scope import apply_scope_to_select, scope_predicates
 from app.services.custom_query.param_sql_builder import (
     ParamSQLBuilder as _ParamSQLBuilder,
     build_filter as _psb_build_filter,
@@ -38,6 +42,7 @@ _psb_build_where = _ParamSQLBuilder.build_where
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
     JOIN_WHITELIST,
+    ONE_TO_MANY_WARNING,
     OPERATOR_WHITELIST,
     TABLE_WHITELIST,
     enforce_complexity_budget,
@@ -77,6 +82,10 @@ class QueryDSL(BaseModel):
     # S-3 v2 新增：JOIN 关联（声明式白名单，不接受用户传 ON）
     # joins 元素：{"table": "wp_index", "type": "inner"|"left"}
     joins: list[dict[str, str]] = Field(default_factory=list)
+    # 限定项目与审计年度（advanced-query-linkage-closure 任务 9，AQ-18；本 spec 先加，acnr 复用）：指定的项目经
+    # OwnershipGuard 校验（不可访问 / 已删除 ⇒ 403 且不执行），年度注入到计划中每张有 year 列的表
+    project_id: UUID | None = None
+    year: int | None = Field(default=None, ge=2000, le=2100)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -202,7 +211,7 @@ def _build_select(
         enforce_pii_field_access(dsl.table, requested, role)
 
     # ── S-3 v2：解析 joins ──
-    join_specs: list[tuple[str, str, list[tuple[str, str]]]] = []  # (target_table, join_type, on_pairs)
+    join_specs: list[tuple[str, str, dict[str, Any]]] = []  # (target_table, join_type, 登记规格)
     join_tables: set[str] = set()
     for j in dsl.joins:
         target = j.get("table", "")
@@ -236,11 +245,13 @@ def _build_select(
                     "available_joins_for_base": sorted(allowed_joins.keys()),
                 },
             )
-        on_pairs = allowed_joins[target]["on"]
+        spec = allowed_joins[target]
         # 运行期复核 ON 含业务键（登记期不变式已拦一层，这里防绕过白名单直调）
-        enforce_join_business_key(dsl.table, target, on_pairs)
-        join_specs.append((target, jtype, on_pairs))
+        enforce_join_business_key(dsl.table, target, spec["on"])
+        join_specs.append((target, jtype, spec))
         join_tables.add(target)
+        if spec["cardinality"] == "one_to_many":
+            notes.append(f"{table_meta['label']} → {TABLE_WHITELIST[target]['label']}：{ONE_TO_MANY_WARNING}")
 
     # ── 单一门禁（R2.6）：表 / JOIN 统一经服务层校验 ──
     # 改造前构建器走自己的 `_resolve_table` 私有路径，`enforce_query_plan` 声明为
@@ -312,17 +323,25 @@ def _build_select(
                     "message": "fields 与 aggregates 不能同时为空"},
         )
 
-    stmt: Select = select(*select_cols)
+    # 显式以基表为 FROM 的左侧：只选聚合（或只选 JOIN 目标列）时，SQLAlchemy 无从推断左侧——「只有 count(*)」得到
+    # 不带 FROM 的语句，「count(目标表.id) + JOIN」直接报 Don't know how to join（前端显示「查询执行失败」）。
+    stmt: Select = select(*select_cols).select_from(model)
 
     # ── S-3 v2：应用 JOIN ──
-    for target_table, jtype, on_pairs in join_specs:
+    # ON = 登记的关联列 + 登记的目标条件 + 目标表的作用域谓词（ADR-AQL-09）：目标表的作用域放在 ON 而不是 WHERE，
+    # 左连接没有匹配行时目标列为空、基表行保留（放进 WHERE 会把左连接变成内连接）。
+    for target_table, jtype, spec in join_specs:
         target_meta = _resolve_table(target_table)
         target_model = target_meta["model"]
         on_clauses = []
-        for left_col, right_col in on_pairs:
+        for left_col, right_col in spec["on"]:
             left = _resolve_column(table_meta, left_col)
             right = _resolve_column(target_meta, right_col)
             on_clauses.append(left == right)
+        for column, value in spec.get("target_where") or ():
+            on_clauses.append(_resolve_column(target_meta, column) == value)
+        if scope is not None:
+            on_clauses.extend(scope_predicates(target_table, scope, year=dsl.year))
         on_expr = and_(*on_clauses) if len(on_clauses) > 1 else on_clauses[0]
         if jtype == "left":
             stmt = stmt.outerjoin(target_model, on_expr)
@@ -345,7 +364,7 @@ def _build_select(
     # ── 项目作用域（R2.1）：必须是 WHERE 组装的最后一步 ──
     # 追加语义（AND），用户 DSL 里自写的 project_id 过滤只能与之取交集、无法放宽。
     if scope is not None:
-        stmt = apply_scope_to_select(stmt, scope=scope, table_name=dsl.table)
+        stmt = apply_scope_to_select(stmt, scope=scope, table_name=dsl.table, year=dsl.year)
         notes.extend(scope.warnings)
 
     # ── GROUP BY ──
@@ -354,16 +373,20 @@ def _build_select(
         stmt = stmt.group_by(col)
 
     # ── ORDER BY ──
-    # 稳定排序（R4.3）：order_by 为空时 PG 对结果集不保证顺序，而下面紧接 offset
-    # ⇒ 翻页会重复/漏行。故无用户排序时补一个确定性键。
+    # 空值排最后（R2.2，与业务视图一致）：PG 降序默认把 NULL 排在最前，和平药房序时账按借方降序首行曾是借方为空的行；
+    # 只给可空列加（非空列加不加语义相同，不加还能用上索引）。
+    # 稳定排序（R4.3）：PG 对同值行不保证顺序，而下面紧接 offset ⇒ 翻页会重复/漏行。故无分组 / 聚合时末尾追加
+    # 基表与各 JOIN 目标表的主键作确定性键。
     order_cols: list[Any] = []
     for ob in dsl.order_by:
         col = _resolve_field_ref(dsl.table, ob.field, join_tables)
-        order_cols.append(asc(col) if ob.direction == "asc" else desc(col))
-    if not order_cols and not dsl.group_by and not dsl.aggregates:
-        tie_col = getattr(model, "id", None)
-        if tie_col is not None:
-            order_cols.append(asc(tie_col))
+        term = asc(col) if ob.direction == "asc" else desc(col)
+        order_cols.append(term.nulls_last() if getattr(col, "nullable", False) else term)
+    if not dsl.group_by and not dsl.aggregates:
+        for tie_model in (model, *(TABLE_WHITELIST[t]["model"] for t, _, _ in join_specs)):
+            tie_col = getattr(tie_model, "id", None)
+            if tie_col is not None:
+                order_cols.append(asc(tie_col))
     for col in order_cols:
         stmt = stmt.order_by(col)
 
@@ -371,6 +394,15 @@ def _build_select(
     stmt = stmt.limit(min(dsl.limit, 1000)).offset(dsl.offset)
 
     return stmt, column_names
+
+
+def build_count(stmt: Select) -> Select:
+    """同一查询（含作用域、条件、JOIN 与分组）的全量行数；分组时为组数（R2.6）。
+
+    改造前 ``total`` 是本页行数：和平药房序时账翻到 offset 1,000 时 total 显示 1,000 而不是 1,147,414。
+    """
+    inner = stmt.limit(None).offset(None).order_by(None)
+    return select(func.count()).select_from(inner.subquery())
 
 
 def _stmt_to_sql(stmt: Select) -> str:

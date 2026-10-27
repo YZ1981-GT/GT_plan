@@ -4,6 +4,7 @@ POST /api/query/preview      预览生成的 SQL（不执行）
 POST /api/query/execute      执行查询，返回结构化结果
 POST /api/query/export-excel 执行查询并导出 Excel
 GET  /api/query/schema       返回白名单表/字段元信息（前端用于构造可视化选择器）
+GET  /api/query/access       当前用户能否使用构建器、作用域内项目数与置灰原因（前端入口与后端判定同源）
 
 设计要点：
 - 仅允许查询白名单的只读 audit/财务表（trial_balance / working_paper / wp_index /
@@ -12,7 +13,8 @@ GET  /api/query/schema       返回白名单表/字段元信息（前端用于�
 - 完全使用 SQLAlchemy core `select()` 按列引用构造，**不做字符串拼接**，
   绑定参数走 SQLAlchemy bindparam，杜绝 SQL 注入
 - 字段名/表名/操作符/排序方向通过白名单核对后才写入 query
-- 仅 admin / manager 可访问
+- 准入：系统角色 admin / partner / manager，或任一未删除项目的项目经理 / 合伙人（edit 级）
+  （``services/custom_query/builder_access``，ADR-AQL-08）；能查哪些项目由构建器作用域决定
 - 不暴露 user / role / token / auth 表
 
 注册到 router_registry.system 域 §117。
@@ -36,7 +38,14 @@ from app.deps import get_current_user
 from app.models.core import User
 # 白名单单一真源在 services/custom_query/table_whitelist；DSL→SQL 构建在
 # services/custom_query/builder_dsl（见下方 re-export 段）。router 只保留 HTTP 层。
+from app.services.custom_query.builder_access import (
+    FORBIDDEN_REASON,
+    SYSTEM_BUILDER_ROLES,
+    builder_admission,
+    resolve_builder_access,
+)
 from app.services.custom_query.builder_scope import (
+    BuilderScope,
     resolve_builder_scope,
     scope_signature,
 )
@@ -60,42 +69,43 @@ router = APIRouter(prefix="/api/query", tags=["query-builder"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RBAC：仅 admin / manager / partner（partner ⊃ manager 权限超集）可访问
+# 准入：系统角色 admin / manager / partner，或任一未删除项目的项目经理 / 合伙人（edit 级）
 # ─────────────────────────────────────────────────────────────────────────────
 def _get_role_value(user: User) -> str:
     role = getattr(user, "role", "")
     return role.value if hasattr(role, "value") else str(role)
 
 
-# 白名单构建器可访问角色（R11.2）：admin / manager；partner 为 manager 权限超集，
-# 平台既有约定纳入（signing partner 亦可用构建器）。auditor / qc / readonly 等
-# 其余已认证角色一律 403 ROLE_FORBIDDEN（R11.3）。
-_QUERY_BUILDER_ROLES = ("admin", "manager", "partner")
+# 凭系统角色即可使用构建器的角色（R11.2）：真源在 builder_access，此处引用同一对象。
+# 系统角色不在其中的用户，凭项目成员行（项目经理 / 合伙人、edit 级）也可使用（AQ-21）。
+_QUERY_BUILDER_ROLES = SYSTEM_BUILDER_ROLES
+
+
+def _forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail={"error_code": "ROLE_FORBIDDEN", "message": FORBIDDEN_REASON})
 
 
 def _require_admin_or_manager(user: User) -> None:
-    """角色门禁纯函数（保留供内部/测试直接调用）。
+    """系统角色门禁纯函数（不含项目经理分支，保留供内部 / 测试直接调用）。
 
     error_code 对齐 design.md Error Handling 表：构建器角色不足 → ``ROLE_FORBIDDEN`` 403。
     """
-    role = _get_role_value(user)
-    if role not in _QUERY_BUILDER_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail={"error_code": "ROLE_FORBIDDEN",
-                    "message": "高级查询构建器仅 admin / manager 可访问"},
-        )
+    if _get_role_value(user) not in _QUERY_BUILDER_ROLES:
+        raise _forbidden()
 
 
-def require_query_builder_access(
+async def require_query_builder_access(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    """FastAPI 依赖：白名单构建器统一角色门禁（R11.2 / R11.3）。
+    """FastAPI 依赖：白名单构建器统一准入门禁（R3.6 / R11.2 / R11.3）。
 
-    作为 Whitelist_Query_Builder 全部端点的单点准入依赖注入。未认证请求由
-    ``get_current_user`` 先行拦截（R11.4）；已认证但角色不足 → 403 ``ROLE_FORBIDDEN``。
+    作为 Whitelist_Query_Builder 全部端点的单点准入依赖注入，判定只在 ``builder_access.builder_admission``
+    （与 ``GET /api/query/access`` 同一实现）。未认证请求由 ``get_current_user`` 先行拦截（R11.4）；已认证但没有准入
+    → 403 ``ROLE_FORBIDDEN``（中文原因含合伙人与项目经理，AQ-29）。
     """
-    _require_admin_or_manager(current_user)
+    if not (await builder_admission(current_user, db)).allowed:
+        raise _forbidden()
     return current_user
 
 
@@ -114,6 +124,7 @@ from app.services.custom_query.builder_dsl import (  # noqa: E402
     QueryDSL,
     _build_filter,
     _build_select,
+    build_count,
     _coerce_value,
     _excel_cell_value,
     _resolve_column,
@@ -157,6 +168,8 @@ async def get_schema(
                             {"left_field": l, "right_field": r}
                             for l, r in spec["on"]
                         ],
+                        # many_to_one / one_to_many：一对多的关联会放大结果行数（R3.4）
+                        "cardinality": spec["cardinality"],
                     }
                     for target, spec in JOIN_WHITELIST.get(name, {}).items()
                     if target in TABLE_WHITELIST
@@ -167,6 +180,36 @@ async def get_schema(
         "operators": sorted(OPERATOR_WHITELIST),
         "aggregates": sorted(AGGREGATE_WHITELIST),
     }
+
+
+@router.get("/access")
+async def get_access(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """当前用户能否使用构建器（前端入口据此置灰并显示原因，与后端门禁同一判定，R3.6）。
+
+    返回 ``allowed`` / ``basis`` / ``reason`` / ``all_projects`` / ``accessible_project_count``：admin / partner 不限项目
+    （计数为 null）；其余身份的计数按构建器作用域计（与执行时同一函数），为 0 时 ``reason`` 写明原因。
+    """
+    return (await resolve_builder_access(current_user, db)).to_dict()
+
+
+async def _builder_scope(
+    body: QueryDSL, *, user: User, db: AsyncSession, requested_project_id: Any, year: int | None
+) -> BuilderScope:
+    """解析作用域；人员表角色门（``TABLE_ROLE_FORBIDDEN``）等可区分拒绝记审计后原样上抛（R5.5）。"""
+    try:
+        return await resolve_builder_scope(
+            user=user,
+            dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
+            requested_project_id=requested_project_id,
+            year=year,
+            db=db,
+        )
+    except HTTPException as http_exc:
+        await _audit_query_rejection(http_exc, user=user, table=body.table)
+        raise
 
 
 @router.post("/preview")
@@ -181,10 +224,8 @@ async def preview_query(
     「预览无 WHERE project_id」正是本次改造前实测到的现象。
     """
     warnings: list[str] = []
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
     stmt, column_names = _build_select(
         body, scope=scope, role=_get_role_value(current_user), warnings=warnings
@@ -219,34 +260,21 @@ async def _audit_query_rejection(
 
 
 def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
-    """为查询结果每行派生可用的公式引用语法（无法定位返回 None）。
+    """为查询结果每行派生可用的公式引用语法（无法定位返回 None；R3.7，ADR-AQL-18）。
 
-    打通高级查询（自由 SQL 探查）与结构化公式引用层：
-    - trial_balance → ``TB('{standard_account_code}','审定数')``
-    - tb_balance    → ``TB('{standard_account_code}','期末')``
+    只给试算表行：``TB('{standard_account_code}','审定数')``，与 ``address_registry.formula_ref_to_uri`` 的 ref 语法
+    一致，前端可直接校验或复制进公式编辑器。
 
-    与 ``address_registry.formula_ref_to_uri`` 的 ref 语法保持一致，
-    前端可直接把 ref 丢给 useAddressRegistry.resolve/validate 或复制进公式编辑器。
-    其余表（working_paper/report_config 等）暂无稳定单值定位语义，返回 None。
-
-    Req 21.3（grammar_v1 契约）：此处产出的 ``TB('{code}','审定数')`` /
-    ``TB('{code}','期末')`` 均为 grammar_v1-valid 的 TB 域 ref —— TB 是非 wp 域，
-    经 ``acnr.resolver.full_resolve`` 的 V1 delegation（``_delegate_v1`` →
-    ``address_registry.formula_ref_to_uri`` → ``tb://{code}#{col}``）解析为
-    ``found=True``（非 null），不会产出畸形 ref。两种列名（审定数/期末）都仅作为 URI
-    的 ``#cell`` 段透传，解析恒成立。契约由 task 34.2 的公式构造 grammar_v1 断言测试统一覆盖。
+    科目余额表（tb_balance）行不再生成（AQ-27）：原先给的 ``TB('{客户科目码}','期末')`` 有两处错——TB 域按**标准**科目码
+    取数（客户科目码不属于 TB 域），「期末」也不是试算表列名（地址库认 审定数 / 未审数 / 期末余额 等）——地址库校验判无效。
+    旧的写法闭包测试只用「能解析成 URI」判它，``#cell`` 段原样透传，恒成立，是假绿。其余表无稳定单值定位语义。
     """
+    if table != "trial_balance":
+        return [None] * len(rows)
     refs: list[str | None] = []
-    if table == "trial_balance":
-        for row in rows:
-            code = row.get("standard_account_code")
-            refs.append(f"TB('{code}','审定数')" if code else None)
-    elif table == "tb_balance":
-        for row in rows:
-            code = row.get("standard_account_code") or row.get("account_code")
-            refs.append(f"TB('{code}','期末')" if code else None)
-    else:
-        refs = [None] * len(rows)
+    for row in rows:
+        code = row.get("standard_account_code")
+        refs.append(f"TB('{code}','审定数')" if code else None)
     return refs
 
 
@@ -257,13 +285,11 @@ async def execute_query(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_query_builder_access),
 ):
-    """执行查询，返回结构化结果。"""
+    """执行查询，返回结构化结果（``total`` 为全量行数，分组时为组数）。"""
     warnings: list[str] = []
     # ─── 项目作用域（R2）：解析先于 SQL 构建与缓存读取 ────────────────────
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
     try:
         stmt, column_names = _build_select(
@@ -292,6 +318,10 @@ async def execute_query(
 
     try:
         async with cancellable_query(db, QUERY_TIMEOUT_MS):
+            # total 对同一语句计数（R2.6）：改造前是本页行数，翻页后 total 跟着变成页大小。
+            # 不分组的聚合恒为一行（与 offset 无关），不必再把整条聚合跑第二遍去数它
+            ungrouped_aggregate = bool(body.aggregates) and not body.group_by
+            total = 1 if ungrouped_aggregate else (await db.execute(build_count(stmt))).scalar_one()
             result = await db.execute(stmt)
             rows = result.fetchall()
     except HTTPException as http_exc:
@@ -321,7 +351,7 @@ async def execute_query(
     query_result = {
         "rows": rows_serialized,
         "columns": column_names,
-        "total": len(rows_serialized),
+        "total": int(total),
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
         # 明示本次生效的项目范围（R2.2）：admin/partner 不限项目时也要让用户知道
@@ -352,10 +382,8 @@ async def export_excel(
     current_user: User = Depends(require_query_builder_access),
 ):
     """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
-    scope = await resolve_builder_scope(
-        user=current_user,
-        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
-        db=db,
+    scope = await _builder_scope(
+        body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
     stmt, column_names = _build_select(
         body, scope=scope, role=_get_role_value(current_user)

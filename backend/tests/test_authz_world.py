@@ -354,6 +354,9 @@ def test_gate_snapshot_is_the_production_code_of_this_tree() -> None:
         "app.services.note_edit_gate.assert_note_edit_access_for_object",
         "app.services.note_edit_gate.assert_note_edit_access_on_projects",
         "app.services.note_edit_gate.assert_note_role_access",
+        "app.routers.query_builder.require_query_builder_access",
+        "app.services.custom_query.builder_access.builder_admission",
+        "app.services.custom_query.builder_access.resolve_builder_access",
     )
     for dotted in PRODUCTION_GATES:
         module_name, _, attr = dotted.rpartition(".")
@@ -368,6 +371,9 @@ def test_gate_snapshot_is_the_production_code_of_this_tree() -> None:
         "app.deps.require_project_access",
         "app.deps.require_project_access.<locals>.dependency",
         "app.routers.deliverable._guard_action",
+        "app.routers.query_builder.require_query_builder_access",
+        "app.services.custom_query.builder_access.builder_admission",
+        "app.services.custom_query.builder_access.resolve_builder_access",
         "app.services.eqcr_resolver.is_project_eqcr",
         "app.services.note_edit_gate.assert_note_edit_access",
         "app.services.note_edit_gate.assert_note_edit_access_for_object",

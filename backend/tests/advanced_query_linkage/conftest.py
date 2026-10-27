@@ -7,6 +7,8 @@
   事务（被测代码出错使事务 aborted 时金标准照常可读）。SQL 片段见 ``gold.active_sql``。
 - ``pg_rollback_session``：真库回滚事务会话。同一连接 ``begin()``，会话以 ``join_transaction_mode="create_savepoint"``
   加入——被测代码的 ``commit`` 只释放保存点；结束整体 rollback，不留任何写入。只许写名称带【测试】/【UAT】的项目。
+- ``builder``：真库构建器客户端（``builder_client.BuilderClient``），请求经生产注册的 query_builder router，会话即上面的
+  回滚事务会话。
 
 连接串只取进程环境变量 ``DATABASE_URL``（与 ``tests.authz_world.pg_engine`` 同一入口），命令行里设置、跑完即删。
 """
@@ -18,6 +20,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tests.advanced_query_linkage.builder_client import BuilderClient, builder_client
 from tests.advanced_query_linkage.gold import Gold, require_pg_only
 from tests.authz_world import pg_engine
 
@@ -48,3 +51,10 @@ async def pg_rollback_session(request: pytest.FixtureRequest) -> AsyncIterator[A
                 await outer.rollback()
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def builder(pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[BuilderClient]:
+    """真库构建器客户端：生产注册的 query_builder router + 回滚事务会话（见 ``builder_client``）。"""
+    async with builder_client(pg_rollback_session, monkeypatch) as client:
+        yield client

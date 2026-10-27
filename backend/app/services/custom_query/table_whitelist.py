@@ -29,6 +29,7 @@ from fastapi import HTTPException
 
 from app.models.audit_platform_models import (
     AccountChart,
+    AccountSource,
     Adjustment,
     Materiality,
     ReportLineMapping,
@@ -214,73 +215,53 @@ TABLE_WHITELIST: dict[str, dict[str, Any]] = {
 
 
 # S-3 v2：JOIN 白名单（声明式，不接受任意 ON 条件）
-# 格式: {table_name: {target_table: {on: [(left_col, right_col), ...]}, ...}}
-# 仅枚举常用业务关联，新增 JOIN 必须显式登记
-JOIN_WHITELIST: dict[str, dict[str, dict[str, list[tuple[str, str]]]]] = {
+# 格式: {table_name: {target_table: {on: [(left_col, right_col), ...], target_where: ((目标列, 值), ...),
+#                                    cardinality: "many_to_one" | "one_to_many"}}}
+# 仅枚举常用业务关联，新增 JOIN 必须显式登记，且必须声明基数（导入期不变式 _assert_all_joins_declare_cardinality）。
+# target_where 与作用域谓词一起并入该 JOIN 的 ON（advanced-query-linkage-closure ADR-AQL-09；AQ-19）：科目表一个项目
+# 同时有 standard / client 两套行，只按科目码关联时同一试算行会命中两行（华氏试算表 LEFT JOIN 科目表 100 行变 200 行）。
+# 已删除的登记：trial_balance / adjustments → wp_index（ON 只有 project_id，项目内笛卡尔积，见 enforce_join_business_key）；
+# projects 作为 base 向 8 张业务表的发散登记（「1 项目 × 该项目全部行」，多条叠加即多表笛卡尔积；projects 仍可单表查询，
+# 也仍可作为 N:1 的 JOIN 目标）；report_line_mapping → report_config（同一行次码在各准则与项目副本各有一行 = 一对多，
+# 准则随项目而定、写不成常量条件，行名已在 report_line_mapping.report_line_name；恢复进 W13）。
+_M2O, _O2M = "many_to_one", "one_to_many"
+JOIN_CARDINALITIES: frozenset[str] = frozenset({_M2O, _O2M})
+ONE_TO_MANY_WARNING = "该关联为一对多，结果行数可能多于基表行数"
+JOIN_WHITELIST: dict[str, dict[str, dict[str, Any]]] = {
     "trial_balance": {
-        # 已移除 `wp_index`：其 ON 仅 project_id ↔ project_id，两表无业务关系 ⇒
-        # N 行试算表 × M 行底稿索引 = 项目内笛卡尔积（真实项目 TB 数千行 ×
-        # wp_index 数百行 → 百万行级），且 LIMIT 施加在积之后、PG 仍须物化整个
-        # join 结果。见 enforce_join_business_key。
-        "account_chart": {
-            "on": [
-                ("project_id", "project_id"),
-                ("standard_account_code", "account_code"),
-            ]
-        },
-        "report_line_mapping": {
-            "on": [
-                ("project_id", "project_id"),
-                ("standard_account_code", "standard_account_code"),
-            ]
-        },
+        "account_chart": {"on": [("project_id", "project_id"), ("standard_account_code", "account_code")],
+                          "target_where": (("source", AccountSource.standard),), "cardinality": _M2O},
+        # 现库 2 个科目映射到多行
+        "report_line_mapping": {"on": [("project_id", "project_id"),
+                                       ("standard_account_code", "standard_account_code")], "cardinality": _O2M},
     },
     "adjustments": {
-        # 已移除 `wp_index`：同为纯 project_id 关联的笛卡尔积（见上）。
-        "trial_balance": {
-            "on": [
-                ("project_id", "project_id"),
-                ("account_code", "standard_account_code"),
-            ]
-        },
+        "trial_balance": {"on": [("project_id", "project_id"), ("year", "year"), ("company_code", "company_code"),
+                                 ("account_code", "standard_account_code")], "cardinality": _M2O},
     },
-    "working_paper": {
-        "wp_index": {"on": [("wp_index_id", "id")]},
-    },
-    "wp_index": {
-        "working_paper": {"on": [("id", "wp_index_id")]},
-    },
+    "working_paper": {"wp_index": {"on": [("wp_index_id", "id")], "cardinality": _M2O}},
+    "wp_index": {"working_paper": {"on": [("id", "wp_index_id")], "cardinality": _O2M}},
     "tb_balance": {
-        "account_chart": {
-            "on": [("project_id", "project_id"), ("account_code", "account_code")]
-        },
+        "account_chart": {"on": [("project_id", "project_id"), ("account_code", "account_code")],
+                          "target_where": (("source", AccountSource.client),), "cardinality": _M2O},
     },
     "tb_ledger": {
-        "account_chart": {
-            "on": [("project_id", "project_id"), ("account_code", "account_code")]
-        },
-    },
-    "report_line_mapping": {
-        "report_config": {"on": [("report_line_code", "row_code")]},
+        "account_chart": {"on": [("project_id", "project_id"), ("account_code", "account_code")],
+                          "target_where": (("source", AccountSource.client),), "cardinality": _M2O},
     },
     # ── 业务维度 JOIN ──
-    # 已移除 `projects` 作为 base 向 8 张业务表的发散登记：以 projects 为 base 时
-    # 每条 JOIN 都是「1 项目 × 该项目全部行」，多条叠加即多表笛卡尔积
-    # （projects ⋈ trial_balance ⋈ tb_ledger ⋈ work_hours = 三表行数相乘，
-    # tb_ledger 实测约 697 万行）。projects 仍在 TABLE_WHITELIST 内可单表查询，
-    # 也仍可作为 JOIN **目标**（下方 disclosure_notes / work_hours → projects），
-    # 那个方向是 N:1 收敛而非 1:N 发散。
-    "disclosure_notes": {
-        "projects":          {"on": [("project_id", "id")]},
-    },
-    "staff_members": {
-        "work_hours":        {"on": [("id", "staff_id")]},
-    },
+    "disclosure_notes": {"projects": {"on": [("project_id", "id")], "cardinality": _M2O}},
+    # 只对能看人员表的角色可用（ROLE_RESTRICTED_TABLES）
+    "staff_members": {"work_hours": {"on": [("id", "staff_id")], "cardinality": _O2M}},
     "work_hours": {
-        "staff_members":     {"on": [("staff_id", "id")]},
-        "projects":          {"on": [("project_id", "id")]},
+        "staff_members": {"on": [("staff_id", "id")], "cardinality": _M2O},
+        "projects": {"on": [("project_id", "id")], "cardinality": _M2O},
     },
 }
+
+#: 按生效数据集取数的四表（构建器作用域注入 ``dataset_query.active_rows_predicate``，R1.2）；
+#: 辅助余额 / 辅助明细在登记进 TABLE_WHITELIST 后自动生效（任务 21）
+DATASET_SCOPED_TABLES: frozenset[str] = frozenset({"tb_balance", "tb_ledger", "tb_aux_balance", "tb_aux_ledger"})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -401,6 +382,27 @@ def _assert_all_joins_have_business_key() -> None:
 _assert_all_joins_have_business_key()
 
 
+def _assert_all_joins_declare_cardinality() -> None:
+    """导入时不变式：每条 JOIN 登记都声明基数，``target_where`` 的列都在目标表白名单内（R3.4）。
+
+    基数决定 schema 与结果里是否提示「行数可能多于基表行数」；漏声明 = 一对多的关联被当成多对一静默放大结果。
+    """
+    problems: list[str] = []
+    for base_table, targets in JOIN_WHITELIST.items():
+        for target_table, spec in targets.items():
+            if spec.get("cardinality") not in JOIN_CARDINALITIES:
+                problems.append(f"{base_table} -> {target_table}：基数 {spec.get('cardinality')!r} 未声明或不合法")
+            target_fields = (TABLE_WHITELIST.get(target_table) or {}).get("fields") or ()
+            for column, _value in spec.get("target_where") or ():
+                if column not in target_fields:
+                    problems.append(f"{base_table} -> {target_table}：目标条件列 {column!r} 不在目标表白名单内")
+    if problems:
+        raise RuntimeError("JOIN_WHITELIST 登记不完整：" + "；".join(sorted(problems)))
+
+
+_assert_all_joins_declare_cardinality()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 敏感表排除 — user / role / auth / token（R10.6 / R10.7）
 # ─────────────────────────────────────────────────────────────────────────────
@@ -443,6 +445,9 @@ PII_FIELDS_BY_TABLE: dict[str, frozenset[str]] = {
 #: 账号、partner 需要联系人员，而 manager 是现场项目管理、不需要全体员工的邮箱
 #: 与手机号。
 PII_ALLOWED_ROLES: frozenset[str] = frozenset({"admin", "partner"})
+
+#: 整表只对限定系统角色开放（基表与 JOIN 目标都算，R3.2）：人员表是全体员工名册，没有项目维度，构建器作用域管不住它
+ROLE_RESTRICTED_TABLES: dict[str, frozenset[str]] = {"staff_members": PII_ALLOWED_ROLES}
 
 
 class FieldTiers(dict):

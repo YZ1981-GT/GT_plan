@@ -475,22 +475,12 @@ PENDING: dict[str, dict[str, str]] = {
     "20": _each(("E", "PM", "P", "AD"),
                 "任务 14（AQ-04）：确认先按 wp_id 锁他项目行再比项目，WritebackPermissionDenied 未映射（500）"),
     "22": _each(_LOGGED_IN, "任务 32（AQ-17）：wp_template_registry 表不存在时 address-resolve 500"),
-    "23": {"*": "任务 12（AQ-21）：GET /api/query/access 尚未实现（404）"},
-    "24": {"PM": "任务 12（AQ-21）：构建器准入只认系统角色，项目经理（系统 auditor）403"},
-    "25": {"PM": "任务 12（AQ-21）：构建器准入只认系统角色，项目经理（系统 auditor）403"},
-    "26": {"PM": "任务 9、12（AQ-06、AQ-21）：项目经理被准入拒绝；projects 不按可访问项目过滤",
-           "SM": "任务 9（AQ-06）：projects 表无 project_id 列被记入 unscoped，返回全部项目（含已删）",
-           "P": "任务 9（AQ-06）：projects 不排除已删项目", "AD": "任务 9（AQ-06）：projects 不排除已删项目"},
-    "27": {"PM": "任务 9、12（AQ-06、AQ-21）：项目经理被准入拒绝（ROLE_FORBIDDEN），人员表角色门未实现",
-           "SM": "任务 9（AQ-06）：staff_members 对系统经理开放（应只对 admin / partner）"},
-    "28": {"PM": "任务 9、12（AQ-18、AQ-21）：项目经理被准入拒绝（ROLE_FORBIDDEN）；指定项目不传给作用域",
-           "P": "任务 9（AQ-18）：QueryDSL 没有 project_id，指定的项目被忽略，返回全部项目的行",
-           "AD": "任务 9（AQ-18）：QueryDSL 没有 project_id，指定的项目被忽略，返回全部项目的行"},
-    "23c": {"CR": "任务 12、23（AQ-21、R3.8）：access 接口未实现；循环受限项目的排除与原因未实现"},
-    "25c": {"CR": "任务 12、23（AQ-21、R3.8）：项目经理被准入拒绝；循环受限项目未排除"},
-    "26c": {"CR": "任务 12、23（AQ-21、R3.8）：项目经理被准入拒绝；循环受限项目未排除"},
-    "28c": {"CR": "任务 12、23（AQ-21、R3.8）：得到 ROLE_FORBIDDEN 而不是 CYCLE_SCOPED_PROJECT"},
-    "23n": {"NM": "任务 12（AQ-21）：GET /api/query/access 尚未实现（404）"},
+    # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表等任务 23（B6，须合入远端后）：B3 起 CR 已有构建器准入，
+    # 但循环受限项目尚未排除（access 计数 1、执行返回 X 的行、指定 X 得 200）
+    "23c": {"CR": "任务 23（R3.8）：循环受限项目未排除，access 计数为 1、无循环范围原因"},
+    "25c": {"CR": "任务 23（R3.8）：循环受限项目未排除，返回 X 的行、无排除提示"},
+    "26c": {"CR": "任务 23（R3.8）：循环受限项目未排除，返回 X、无排除提示"},
+    "28c": {"CR": "任务 23（R3.8）：指定循环受限项目得 200 而不是 403 CYCLE_SCOPED_PROJECT"},
 }
 
 
