@@ -23,6 +23,7 @@ from app.routers.voucher_sampling import router
 from app.services.sampling_population_reconcile import PopulationReconcileFacts
 
 from tests.test_voucher_sampling_integration import (
+    _legacy_exclusions,
     _make_extract_request,
     _make_ledger_rows,
     _make_stats,
@@ -46,19 +47,6 @@ def _bypass_extract_auth():
     ):
         yield
 
-
-@pytest.fixture(autouse=True)
-def _bridge_exclusions_to_legacy(monkeypatch):
-    import app.routers.voucher_sampling as _vs
-
-    async def _delegate(db, wp, preliminary_only=False):
-        if preliminary_only:
-            nos = await _vs._get_preliminary_voucher_nos(db, wp)
-        else:
-            nos = await _vs._get_voucher_sampling_extracted_nos(db, wp)
-        return list(nos), []
-
-    monkeypatch.setattr(_vs, "_get_voucher_sampling_exclusions", _delegate)
 
 
 def _make_app():
@@ -95,12 +83,9 @@ async def _extract(app, account_codes=None):
     with patch(
         "app.routers.voucher_sampling.LedgerSamplingService"
     ) as MockService, patch(
-        "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-        new=AsyncMock(return_value=[]),
-    ), patch(
-        "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-        new=AsyncMock(return_value=[]),
-    ):
+        "app.routers.voucher_sampling.collect_exclusions",
+        new=_legacy_exclusions(extracted=[], preliminary=[]),
+    ) as mock_excl:
         MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
         MockService.execute_with_stats = AsyncMock(
             return_value=(population, _make_stats(population))

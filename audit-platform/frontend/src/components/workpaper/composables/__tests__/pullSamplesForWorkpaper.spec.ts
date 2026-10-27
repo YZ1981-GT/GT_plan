@@ -260,3 +260,55 @@ describe('只取手工挂凭（manual_only）', () => {
     })
   })
 })
+
+describe('凭证键：同日同号多凭证字（spec voucher-identity-writeback-and-audit-phase 任务 4）', () => {
+  function lineCallOf(get: ReturnType<typeof vi.fn>) {
+    return get.mock.calls.find((c: unknown[]) => String(c[0]).includes('/voucher/'))
+  }
+
+  it('挂凭记录带凭证字时，分录请求带 voucher_type 且静默，样本带出凭证字', async () => {
+    const get = mockHttp([rec({ voucher_type: 'FY' })], [line('1002', { voucher_type: 'FY' })])
+    const { samples } = await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect(lineCallOf(get)![1]).toMatchObject({
+      params: { year: YEAR, voucher_date: '2025-01-03', voucher_type: 'FY' },
+      _silent: true,
+    })
+    expect(samples).toHaveLength(1)
+    expect(samples[0].voucherType).toBe('FY')
+  })
+
+  it('凭证字为空串也照传（= 凭证字为空的那张），未记凭证字的旧行不传', async () => {
+    let get = mockHttp([rec({ voucher_type: '' })], [line('1002')])
+    await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect((lineCallOf(get)![1] as { params: Record<string, unknown> }).params.voucher_type).toBe('')
+    get = mockHttp([rec()], [line('1002')])
+    await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect((lineCallOf(get)![1] as { params: Record<string, unknown> }).params).not.toHaveProperty('voucher_type')
+  })
+
+  it('后端 409 命中多张凭证 → 占位样本列出候选、提示重新挂凭，不并入任何分录', async () => {
+    const get = http.get as unknown as ReturnType<typeof vi.fn>
+    get.mockReset()
+    const cand = (t: string) => ({
+      voucher_key: `["2025","001","2025-01-03","${t}","0075"]`, company_code: '001', voucher_date: '2025-01-03',
+      voucher_type: t, voucher_no: '0075', line_count: 2, debit_total: '100.00', summary: '',
+    })
+    get.mockImplementation((url: string) => {
+      if (url.includes('sampled-vouchers')) return Promise.resolve({ data: { items: [rec()] } })
+      return Promise.reject({
+        response: {
+          status: 409,
+          data: { code: 409, message: { error_code: 'VOUCHER_KEY_AMBIGUOUS', message: '对应 2 张凭证', candidates: [cand('FY'), cand('ZZ')], truncated: false } },
+        },
+      })
+    })
+    const { samples, misattached } = await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect(samples).toHaveLength(1)
+    expect(samples[0].debitAmount).toBeNull()
+    expect(samples[0].creditAmount).toBeNull()
+    expect(samples[0].summary).toContain('2025-01-03 FY-0075')
+    expect(samples[0].summary).toContain('2025-01-03 ZZ-0075')
+    expect(samples[0].summary).toContain('重新挂凭')
+    expect(misattached).toEqual([])
+  })
+})

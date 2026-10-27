@@ -22,6 +22,7 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 // 说明：readonly 支持 Ref 或 ComputedRef（组件侧多以 computed 传入）
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { exclusionCaveats } from '@/utils/voucherIdentity'
 import { determineCutoffStatus, computeDateRange, type CutoffDirection, type CutoffStatus } from './cutoffJudgment'
 import { inWindow as canonicalInWindow, judgeCrossPeriod as canonicalJudge } from './cutoffCanonical'
 
@@ -40,6 +41,9 @@ export interface CutoffConfig {
 }
 
 export interface ExtractedVoucher {
+  /** 凭证键 / 分录指纹（后端 voucher_identity）；回填留痕 filled_voucher_keys / filled_line_fps，排除已提取按它 */
+  voucherKey?: string | null
+  lineFp?: string | null
   voucherNo: string
   voucherDate: string
   summary: string | null
@@ -325,6 +329,8 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
         )
 
         return {
+          voucherKey: item.voucher_key ?? null,
+          lineFp: item.line_fp ?? null,
           voucherNo: item.voucher_no ?? item.voucherNo ?? '',
           voucherDate,
           summary: item.summary ?? null,
@@ -348,6 +354,7 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
         byVoucherType: statsData.by_voucher_type ?? statsData.byVoucherType ?? {},
         truncated: statsData.truncated ?? false,
       }
+      exclusionCaveats(statsData).forEach(msg => ElMessage.warning(msg))
 
       // 打开预览弹窗
       previewVisible.value = true
@@ -438,6 +445,8 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
         )
 
         return {
+          voucherKey: item.voucher_key ?? null,
+          lineFp: item.line_fp ?? null,
           voucherNo: item.voucher_no ?? item.voucherNo ?? '',
           voucherDate,
           summary: item.summary ?? null,
@@ -526,8 +535,15 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
           filled_count: selected.length,
           fill_mode: mode,
           before_data: existing,
-          // 已填充凭证号 → 后端存入 extraction_criteria.filled_voucher_nos，
-          // 供下次 exclude_extracted 排除，避免重复抽取
+          // 样本身份 → 后端并入 extraction_criteria，下次「排除已提取」按凭证键整张排除（需求 2.6）。
+          // 凭证号只给旧后端兼容：只按号会连带同号别日、同日同号别凭证字的凭证。
+          filled_voucher_keys: Array.from(
+            new Set(selected.map(v => v.voucherKey).filter((x): x is string => !!x)),
+          ),
+          // 有一行缺指纹（后端补全失败）就整批不发，后端退回按凭证键
+          filled_line_fps: selected.every(v => v.lineFp)
+            ? Array.from(new Set(selected.map(v => v.lineFp as string)))
+            : [],
           filled_voucher_nos: selected.map(v => v.voucherNo).filter(Boolean),
         },
       )

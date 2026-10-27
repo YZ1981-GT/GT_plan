@@ -14,13 +14,16 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listWorkpapersPaged } from '@/services/workpaperApi'
-import { attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import { attachFailureReason, attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import { voucherLabel } from '@/utils/voucherIdentity'
 import { findAllRecommendedWpCodes } from './accountToWpMapping'
 
 interface VoucherTarget {
   voucherNo: string
   /** 凭证日期 YYYY-MM-DD。🔴 凭证号跨日重复，无日期时底稿回拉可能命中同号别张凭证。 */
   voucherDate?: string | null
+  /** 凭证字（'' = 凭证字为空）；同日同号可能有多种凭证字，null = 不知道（后端命中多张时拒绝并列候选） */
+  voucherType?: string | null
   accountCode?: string | null
 }
 
@@ -293,6 +296,7 @@ async function confirm(): Promise<void> {
   submitting.value = true
   try {
     let ok = 0
+    const failures: string[] = []
     for (const v of props.vouchers) {
       if (!v.voucherNo) continue
       try {
@@ -300,15 +304,24 @@ async function confirm(): Promise<void> {
           year: props.year,
           voucherNo: v.voucherNo,
           voucherDate: v.voucherDate ?? null,
+          voucherType: v.voucherType ?? null,
           accountCode: v.accountCode ?? null,
           workpaperId: selectedWpId.value,
           source: 'ledger',
           note: note.value || `序时账挂入${v.accountCode ? ' · ' + v.accountCode : ''}`,
         })
         ok += 1
-      } catch {
-        /* 单张失败不阻断其余 */
+      } catch (e) {
+        // 单张失败不阻断其余，原因汇总给用户（多张凭证 / 账套里没有 / 无权限）
+        failures.push(`${voucherName(v)}：${attachFailureReason(e)}`)
       }
+    }
+    if (failures.length > 0) {
+      ElMessage.warning({
+        message: `${failures.length} 张凭证没挂上：${failures.slice(0, 3).join('；')}${failures.length > 3 ? ' 等' : ''}`,
+        duration: 8000,
+        showClose: true,
+      })
     }
     if (ok > 0) {
       const wp = wpOptions.value.find((o) => o.wp_id === selectedWpId.value)
@@ -337,12 +350,17 @@ async function confirm(): Promise<void> {
       } catch {
         // 用户点了「留在当前页」或关闭，什么都不做
       }
-    } else {
+    } else if (failures.length === 0) {
       ElMessage.error('挂凭失败，请稍后重试')
     }
   } finally {
     submitting.value = false
   }
+}
+
+/** 凭证称呼：「2025-01-07 FY-0003」（凭证字未知时只写号） */
+function voucherName(v: VoucherTarget): string {
+  return `${v.voucherDate ? `${v.voucherDate} ` : ''}${voucherLabel(v.voucherType, v.voucherNo)}`
 }
 </script>
 
@@ -372,7 +390,7 @@ async function confirm(): Promise<void> {
             size="small"
             type="warning"
             effect="plain"
-          >{{ v.voucherNo }}</el-tag>
+          >{{ voucherName(v) }}</el-tag>
           <span v-if="voucherCount === 0" class="empty-hint">（无凭证，请在凭证/明细层选择带凭证号的行）</span>
         </div>
       </div>

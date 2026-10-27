@@ -25,6 +25,7 @@ import { ref, computed, watch, unref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { exclusionCaveats, voucherLabel } from '@/utils/voucherIdentity'
 import { useAuthStore } from '@/stores/auth'
 import {
   validateSamplingConfig,
@@ -75,6 +76,12 @@ import { useVersionTrail } from './useVersionTrail'
 /** 跨底稿重复抽凭项（后端 `cross_workpaper_duplicates` 的一条，R8.1） */
 export interface CrossWpDuplicate {
   voucherNo: string
+  /** 凭证键（按它认重复与剔除；旧后端只回号时为 null，退回按号） */
+  voucherKey?: string | null
+  voucherDate?: string | null
+  voucherType?: string | null
+  /** 对方是只有凭证号的旧登记：可能是同号的另一张凭证 */
+  legacy?: boolean
   /** 抽过它的底稿编码（去重排序）；取不到 wp_code 时为空数组 */
   wpCodes: string[]
   /** 涉及的批次数 */
@@ -144,6 +151,8 @@ export interface ExtractionLogEntry {
   resampleReason?: string | null
   /** 抽样结论文案（R18.5/18.6） */
   conclusion?: string | null
+  /** 只记了凭证号的旧记录：它参与的已抽排除按凭证号整张排除（会连带同号的其他凭证） */
+  legacyExclusion?: boolean
 }
 
 export interface CompareResult {
@@ -835,6 +844,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 映射为 SampledVoucher（默认全选、phase取当前阶段）
       sampledVouchers.value = items.map((item: any) => ({
         id: item.id != null ? String(item.id) : undefined,  // 序时账行 id（P3 行级排除）
+        voucherKey: item.voucher_key ?? null,
+        lineFp: item.line_fp ?? null,
         voucherNo: item.voucher_no ?? item.voucherNo ?? '',
         voucherDate: item.voucher_date ?? item.voucherDate ?? '',
         summary: item.summary ?? null,
@@ -874,6 +885,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
 
       // 总体完整性核对信息（科目余额表发生额 vs 序时账）
       reconcileInfo.value = parseReconcileInfo(statsData)
+      exclusionCaveats(statsData).forEach(msg => ElMessage.warning(msg))
 
       // ─── 方法学单一真源：优先消费后端权威快照（interval/suggested/algo_version）───
       // 后端以 CAS1314 权威口径计算；前端 computeSuggestedSampleSize 仅作即时预览兜底。
@@ -920,6 +932,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       crossWpDuplicates.value = (data?.cross_workpaper_duplicates ?? []).map(
         (d: any) => ({
           voucherNo: String(d.voucher_no ?? d.voucherNo ?? ''),
+          voucherKey: d.voucher_key ?? null,
+          voucherDate: d.voucher_date ?? null,
+          voucherType: d.voucher_type ?? null,
+          legacy: d.legacy === true,
           wpCodes: Array.isArray(d.wp_codes ?? d.wpCodes)
             ? (d.wp_codes ?? d.wpCodes).map((c: any) => String(c))
             : [],
@@ -953,7 +969,9 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     const shown = dups.slice(0, maxLines)
     const lines = shown.map((d) => {
       const where = d.wpCodes.length ? d.wpCodes.join('、') : '未知底稿'
-      return `${d.voucherNo}（已被 ${where} 抽取）`
+      const name = `${d.voucherDate ? `${d.voucherDate} ` : ''}${voucherLabel(d.voucherType, d.voucherNo)}`
+      const caveat = d.legacy ? '；对方是只记凭证号的旧登记，可能是同号的另一张' : ''
+      return `${name}（已被 ${where} 抽取${caveat}）`
     })
     if (dups.length > shown.length) {
       lines.push(`……另有 ${dups.length - shown.length} 张，共 ${dups.length} 张`)
@@ -969,7 +987,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    */
   async function confirmCrossWpDuplicates(): Promise<boolean> {
     const dups = crossWpDuplicates.value
-    const dupSet = new Set(dups.map((d) => d.voucherNo))
+    // 按凭证键认（同号别日、同日同号别凭证字是不同凭证）；旧后端只回号的退回按号
+    const dupKeys = new Set(dups.map((d) => d.voucherKey).filter(Boolean))
+    const dupNos = new Set(dups.filter((d) => !d.voucherKey).map((d) => d.voucherNo))
+    const isDup = (v: SampledVoucher) => (!!v.voucherKey && dupKeys.has(v.voucherKey)) || dupNos.has(v.voucherNo)
     const body =
       `本次抽到的 <b>${dups.length}</b> 张凭证已被本项目其它底稿抽查过：<br/><br/>` +
       buildDuplicateSummary(dups) +
@@ -992,9 +1013,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       if (action === 'cancel') {
         // 「剔除重复项」：移除重复凭证并按剩余样本重算覆盖率展示（R8.6）
         const before = sampledVouchers.value.length
-        sampledVouchers.value = sampledVouchers.value.filter(
-          (v) => !dupSet.has(v.voucherNo),
-        )
+        sampledVouchers.value = sampledVouchers.value.filter((v) => !isDup(v))
         duplicateDecision.value = 'removed'
         recomputeCoverageAfterRemoval()
         const removed = before - sampledVouchers.value.length
@@ -1138,6 +1157,15 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             filled_voucher_nos: Array.from(
               new Set(selected.map(v => v.voucherNo).filter(Boolean)),
             ),
+            // 样本身份（需求 2.4）：分录指纹与凭证键。后端已抽排除、登记、幂等键都按它，
+            // 凭证号只给旧后端兼容；账套重导后指纹仍能认出同一笔分录（行 id 会全换）。
+            // 有一行缺指纹（后端补全失败）就整批不发：后端退回按凭证键整张排除，宁多排不漏排。
+            filled_line_fps: selected.every(v => v.lineFp)
+              ? Array.from(new Set(selected.map(v => v.lineFp as string)))
+              : [],
+            filled_voucher_keys: Array.from(
+              new Set(selected.map(v => v.voucherKey).filter((x): x is string => !!x)),
+            ),
             // 本次回填的分录行 id 清单（P3 行级排除）：ledger_line 单位下后端据此按行排除，
             // 避免"同一凭证号跨不同科目"被整张误排。有 id 才发送（向后兼容旧样本无 id）。
             filled_unit_ids: Array.from(
@@ -1161,6 +1189,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             // R8.7：跨底稿重复抽凭的审计判断留痕（keep_all / removed / none）
             duplicate_decision: duplicateDecision.value,
             duplicate_voucher_nos: crossWpDuplicates.value.map((d) => d.voucherNo),
+            duplicate_voucher_keys: crossWpDuplicates.value.map((d) => d.voucherKey).filter(Boolean),
             // 🔴 必须含 population_amount / sample_amount：后端
             // `sampling_registry_service.build_record_fields` 从
             // `coverage_stats.population_amount` 投影 `sampling_records.
@@ -1248,6 +1277,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           samplingInterval: item.sampling_interval ?? item.samplingInterval ?? criteria.sampling_interval ?? null,
           resampleReason: item.resample_reason ?? item.resampleReason ?? criteria.resample_reason ?? null,
           conclusion: item.conclusion ?? criteria.conclusion ?? null,
+          legacyExclusion: Boolean(item.legacy_exclusion ?? false),
         }
       })
 

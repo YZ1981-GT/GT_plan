@@ -38,18 +38,18 @@ from app.services.sampling_population_reconcile import resolve_effective_codes, 
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
-    enrich_counterpart_accounts,
     enrich_items_with_aux_party,
+    enrich_voucher_context,
 )
 from app.services.sampling_methodology import build_methodology_snapshot
+from app.services.sampled_voucher_queries import cross_workpaper_duplicate_vouchers, project_sampling_coverage
 from app.services.sampling_registry_service import (
-    cross_workpaper_duplicate_vouchers,
-    project_level_extracted_voucher_nos,
-    project_sampling_coverage,
     resolve_project_year as registry_resolve_project_year,
     undo_sampling_registration,
     update_sampling_record_evaluation,
 )
+from app.services.voucher_identity import VoucherKey, parse_voucher_keys
+from app.services.voucher_sampling_exclusion import collect_exclusions, compare_identity, log_identity
 from app.services.voucher_sampling_algorithms import (
     SamplingMethod,
     SamplingParams,
@@ -203,50 +203,14 @@ async def voucher_extract(
         if date_from_override is None and date_to_override is None and period_range:
             months_filter = [int(m) for m in period_range if 1 <= int(m) <= 12]
 
-        # 2~3. 排除已提取（unit 感知，P3）：
-        #   - ledger_line 单位：新日志按行 id 排除（避免跨科目整张误排），旧日志回退 voucher_no。
-        #   - voucher 单位：按 voucher_no 排除（整张凭证已检查，语义正确）。
-        exclude_voucher_nos: list[str] = []
-        exclude_unit_ids: list[str] = []
-        if sampling_unit == "ledger_line":
-            if exclude_extracted:
-                legacy_nos, unit_ids = await _get_voucher_sampling_exclusions(
-                    db, req.workpaper_id
-                )
-                exclude_voucher_nos = legacy_nos
-                exclude_unit_ids = unit_ids
-            if req.phase == "final":
-                p_nos, p_uids = await _get_voucher_sampling_exclusions(
-                    db, req.workpaper_id, preliminary_only=True
-                )
-                exclude_voucher_nos = list(set(exclude_voucher_nos) | set(p_nos))
-                exclude_unit_ids = list(set(exclude_unit_ids) | set(p_uids))
-            if exclude_extracted and exclude_scope == "project":
-                # 叠加项目级已抽凭证（按凭证号）。ledger_line 单位下与行级排除并存：
-                # 行级防"同凭证跨科目被整张误排"，项目级防"跨循环重复抽同一凭证"。
-                proj_nos = await project_level_extracted_voucher_nos(
-                    db, pid, req.year
-                )
-                exclude_voucher_nos = list(set(exclude_voucher_nos) | set(proj_nos))
-        else:
-            if exclude_extracted:
-                exclude_voucher_nos = await _get_voucher_sampling_extracted_nos(
-                    db, req.workpaper_id
-                )
-            if req.phase == "final":
-                preliminary_nos = await _get_preliminary_voucher_nos(
-                    db, req.workpaper_id
-                )
-                existing_set = set(exclude_voucher_nos)
-                for no in preliminary_nos:
-                    if no not in existing_set:
-                        exclude_voucher_nos.append(no)
-                        existing_set.add(no)
-            if exclude_extracted and exclude_scope == "project":
-                proj_nos = await project_level_extracted_voucher_nos(
-                    db, pid, req.year
-                )
-                exclude_voucher_nos = list(set(exclude_voucher_nos) | set(proj_nos))
+        # 2~3. 已抽排除（需求 2.4）：分录行单位按分录指纹（重导后映射到新行），整张凭证单位按
+        #   凭证键；年审另排除预审回填；项目级叠加登记表凭证键。旧日志只有凭证号的按旧口径兼容
+        #   并回 legacy_exclusion。口径全在 voucher_sampling_exclusion.collect_exclusions。
+        exclusions = await collect_exclusions(
+            db, project_id=pid, year=req.year, workpaper_id=req.workpaper_id,
+            extraction_type="voucher_sampling", sampling_unit=sampling_unit,
+            exclude_extracted=exclude_extracted, phase=req.phase, exclude_scope=exclude_scope,
+        )
 
         # 4. 科目映射反查：标准编码 → 企业原始编码（无映射退回标准编码）
         effective_codes, _mapping_used = await resolve_effective_codes(
@@ -264,8 +228,7 @@ async def voucher_extract(
             direction_filter=direction_filter,
             voucher_type_filter=voucher_type_filter,
             summary_keyword=summary_keyword,
-            exclude_voucher_nos=exclude_voucher_nos,
-            exclude_unit_ids=exclude_unit_ids,
+            **exclusions.filter_kwargs(),
         )
 
         # 6. 构建查询
@@ -341,13 +304,13 @@ async def voucher_extract(
             seed_used_val = selection.seed_used
             result_truncated = selection.truncated
         elif sampling_unit == "voucher":
-            # 内存路径 voucher 单位：按凭证号聚合 items（金额=行 GREATEST 之和），对凭证抽样，
+            # 内存路径 voucher 单位：按凭证键聚合 items（金额=行 GREATEST 之和），对凭证抽样，
             # 抽中一张凭证带出其全部分录行（与两阶段 voucher 单位口径一致）。
             voucher_map: dict[str, dict] = {}
             for it in items:
-                vno = it.get("voucher_no") or ""
+                vno = VoucherKey.from_row(it, year=req.year).to_str()
                 entry = voucher_map.setdefault(
-                    vno, {"greatest": Decimal("0"), "date": it.get("voucher_date"), "lines": []}
+                    vno, {"greatest": Decimal("0"), "date": it.get("voucher_date"), "no": it.get("voucher_no"), "lines": []}
                 )
                 entry["greatest"] += _greatest_amount(it)
                 entry["lines"].append(it)
@@ -359,7 +322,7 @@ async def voucher_extract(
                     "debit_amount": str(v["greatest"]),
                     "credit_amount": None,
                     "voucher_date": v["date"],
-                    "voucher_no": vno,
+                    "voucher_no": v["no"],  # 系统抽样按 (日期, 号) 排序，与两阶段路径同口径
                     "_vno": vno,
                 }
                 for vno, v in voucher_map.items()
@@ -444,10 +407,9 @@ async def voucher_extract(
             db, pid, req.year, sample_items
         )
 
-        # 9.10 对方科目补全：从同凭证反方向分录推导对方科目代码和名称。
-        #      源数据 counterpart_account 为空时（多数财务软件导出不带此字段），
-        #      按 (voucher_no, voucher_date) 分组查同凭证借贷反方向科目填入。
-        sample_items = await enrich_counterpart_accounts(
+        # 9.10 凭证上下文：凭证键、借贷栏、分录指纹、整张凭证分录与对方科目（按凭证键取整张凭证，
+        #      不再按凭证号取全年）。回填留痕的 filled_line_fps / filled_voucher_keys 取自这里。
+        sample_items = await enrich_voucher_context(
             db, pid, req.year, sample_items
         )
 
@@ -464,14 +426,11 @@ async def voucher_extract(
         # 11. 跨底稿重复抽凭检测（R8）：把「这张凭证别的底稿已经抽过」这一事实交给
         #     审计师判断（有意交叉复核 vs 样本浪费），而非由 exclude_scope 静默决定。
         #     exclude_scope='project' 时重复项已在第 2~3 步排除 → 此处自然为空（R8.8）。
-        sample_voucher_nos = [
-            str(it.get("voucher_no")) for it in marked_items if it.get("voucher_no")
-        ]
         cross_wp_duplicates = await cross_workpaper_duplicate_vouchers(
             db,
             project_id=pid,
             year=req.year,
-            voucher_nos=sample_voucher_nos,
+            voucher_keys=parse_voucher_keys(it.get("voucher_key") for it in marked_items if it.get("voucher_key")),
             exclude_workpaper_id=req.workpaper_id,
         )
 
@@ -500,6 +459,8 @@ async def voucher_extract(
                 # 全量框硬上限命中（极端超大总体仍未覆盖全体）→ 前端如实提示
                 "frame_capped": frame_capped,
                 "sampling_unit": sampling_unit,
+                # 已抽排除计数；legacy_exclusion = 有旧日志按凭证号整张排除（会连带同号别日凭证）
+                **exclusions.to_stats(),
                 # 抽样框数据集版本（R1）：序时账重导后据此判定该批次已不可复算。
                 # None = 未识别到 active 账套版本（如尚未导入账套），前端如实提示不阻断。
                 "dataset_id": (
@@ -636,6 +597,8 @@ async def voucher_history(
             ),
             # R2.6：抽样评价（推断错报/UML/结论），未评价为 null
             "evaluation": _echo_criteria_field(row, "evaluation"),
+            # 需求 2.4：只有凭证号的旧记录，它参与的排除按凭证号整张排除（界面标「旧记录按凭证号排除」）
+            "legacy_exclusion": log_identity(row.extraction_criteria).legacy,
         }
         for row in rows
     ]
@@ -779,9 +742,8 @@ async def voucher_compare(
         if record_a is None or record_b is None:
             raise ValueError("对比记录不存在")
 
-        # 提取凭证号集合
-        set_a = _extract_voucher_nos_from_log(record_a)
-        set_b = _extract_voucher_nos_from_log(record_b)
+        # 两批都有凭证键时按凭证比（「2025-01-07 FY-0003」），否则按凭证号（旧记录）
+        set_a, set_b, compare_by = compare_identity(record_a, record_b)
 
         # 计算差异
         added = sorted(set_b - set_a)
@@ -795,6 +757,7 @@ async def voucher_compare(
             "added_count": len(added),
             "removed_count": len(removed),
             "retained_count": len(retained),
+            "compare_by": compare_by,
         }
 
     except ValueError as e:
@@ -1319,124 +1282,5 @@ def _build_sampling_params(method: SamplingMethod, sp: dict) -> SamplingParams:
     return params
 
 
-async def _get_voucher_sampling_exclusions(
-    db: AsyncSession,
-    workpaper_id: UUID,
-    preliminary_only: bool = False,
-) -> tuple[list[str], list[str]]:
-    """P3 行级排除拆分：返回 (legacy_voucher_nos, unit_ids)。
-
-    - unit_ids：新日志 criteria.filled_unit_ids（ledger 行 id）→ 行级排除，避免"同一凭证号
-      跨不同科目"被整张误排（跨科目过度排除）。
-    - legacy_voucher_nos：仅来自**无 filled_unit_ids** 的旧日志 → 凭证级回退（向后兼容）。
-    有 unit_ids 的日志不再贡献其 voucher_no，避免行级与凭证级双重排除。
-    preliminary_only=True 时仅统计 phase='preliminary' 的日志。
-    """
-    stmt = select(WorkpaperExtractionLog.extraction_criteria).where(
-        WorkpaperExtractionLog.workpaper_id == workpaper_id,
-        WorkpaperExtractionLog.extraction_type == "voucher_sampling",
-        WorkpaperExtractionLog.is_undone == False,  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-
-    legacy_nos: list[str] = []
-    unit_ids: list[str] = []
-    for criteria in rows:
-        if not (criteria and isinstance(criteria, dict)):
-            continue
-        if preliminary_only and criteria.get("phase") != "preliminary":
-            continue
-        uids = criteria.get("filled_unit_ids")
-        if isinstance(uids, list) and uids:
-            unit_ids.extend(str(x) for x in uids)
-        else:
-            nos = criteria.get("filled_voucher_nos", [])
-            if isinstance(nos, list):
-                legacy_nos.extend(nos)
-    return list(set(legacy_nos)), list(set(unit_ids))
-
-
-async def _get_voucher_sampling_extracted_nos(
-    db: AsyncSession,
-    workpaper_id: UUID,
-) -> list[str]:
-    """从非撤销的 voucher_sampling 日志中收集所有已填充的凭证号
-
-    查询 workpaper_extraction_log 中 extraction_type='voucher_sampling'
-    且 is_undone=False 的记录，从 extraction_criteria.filled_voucher_nos 提取。
-    """
-    stmt = select(
-        WorkpaperExtractionLog.extraction_criteria
-    ).where(
-        WorkpaperExtractionLog.workpaper_id == workpaper_id,
-        WorkpaperExtractionLog.extraction_type == "voucher_sampling",
-        WorkpaperExtractionLog.is_undone == False,  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-
-    voucher_nos: list[str] = []
-    for criteria in rows:
-        if criteria and isinstance(criteria, dict):
-            filled = criteria.get("filled_voucher_nos", [])
-            if isinstance(filled, list):
-                voucher_nos.extend(filled)
-
-    return list(set(voucher_nos))
-
-
-async def _get_preliminary_voucher_nos(
-    db: AsyncSession,
-    workpaper_id: UUID,
-) -> list[str]:
-    """获取预审阶段已抽到的凭证号（用于年审排除）
-
-    查询 extraction_type='voucher_sampling' 且 phase='preliminary' 且未撤销的记录。
-    """
-    stmt = select(
-        WorkpaperExtractionLog.extraction_criteria
-    ).where(
-        WorkpaperExtractionLog.workpaper_id == workpaper_id,
-        WorkpaperExtractionLog.extraction_type == "voucher_sampling",
-        WorkpaperExtractionLog.is_undone == False,  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-
-    voucher_nos: list[str] = []
-    for criteria in rows:
-        if criteria and isinstance(criteria, dict):
-            # 仅取 phase='preliminary' 的记录
-            if criteria.get("phase") == "preliminary":
-                filled = criteria.get("filled_voucher_nos", [])
-                if isinstance(filled, list):
-                    voucher_nos.extend(filled)
-
-    return list(set(voucher_nos))
-
-
-def _extract_voucher_nos_from_log(record: Any) -> set[str]:
-    """从提取日志记录中提取凭证号集合
-
-    优先从 extraction_criteria.filled_voucher_nos 获取，
-    其次从 before_data 中提取 voucher_no 字段。
-    """
-    nos: set[str] = set()
-
-    # 从 extraction_criteria 提取
-    criteria = record.extraction_criteria
-    if criteria and isinstance(criteria, dict):
-        filled = criteria.get("filled_voucher_nos", [])
-        if isinstance(filled, list):
-            nos.update(filled)
-
-    # 如果 extraction_criteria 没有，尝试从 before_data 提取
-    if not nos and record.before_data:
-        before = record.before_data
-        if isinstance(before, list):
-            for item in before:
-                if isinstance(item, dict) and "voucher_no" in item:
-                    nos.add(item["voucher_no"])
-
-    return nos
+# 已抽排除、预审排除、批次比较的凭证身份口径见 app.services.voucher_sampling_exclusion
+# （按凭证键与分录指纹；旧日志只有凭证号的按旧口径兼容）。

@@ -32,6 +32,7 @@ from app.models.audit_platform_models import (
     TbLedger,
 )
 from app.services.dataset_query import get_active_filter
+from app.services.voucher_identity import annotate_lines, single_voucher_lines, voucher_type_condition
 
 
 def _stable_ledger_order(tbl) -> tuple:
@@ -382,18 +383,20 @@ class LedgerPenetrationService:
         *,
         month: int | None = None,
         voucher_date: str | None = None,
+        voucher_type: str | None = None,
     ) -> list[dict]:
-        """第三层：凭证分录明细（按凭证号穿透）
+        """第三层：一张凭证的分录明细（按凭证键穿透：日期 + 凭证字 + 号，主体随行）。
 
-        🔴 voucher_no 单独并不唯一。真实库实测（8 个项目）：7 个项目的凭证号
-        跨月甚至跨日重复，单个号最多对应 83 个不同日期。唯一定位一张凭证的键是
-        ``(voucher_date, voucher_no)`` —— 该粒度下借贷 100% 平衡（29162/29162），
-        证明其恰好对应一张完整凭证。
+        🔴 凭证号单独不唯一（单号最多对应 83 个日期），同日同号也不唯一：四川物流、宜宾临港、
+        辽宁卫生分别有 167 / 118 / 1,247 组同日同号混了 2~5 种凭证字（2025-01-07 的 FY-0003
+        与 ZZ-0003）。「(日期, 号) 借贷 100% 平衡」证明不了唯一 —— 两张各自平衡的凭证并在
+        一起照样平衡。命中多张凭证时抛 VoucherKeyAmbiguous（409 + 候选），不合并分录。
+        每行带 voucher_key / side / line_fp。
 
         Args:
-            month: 月份过滤（1~12）。粗粒度，同月内仍可能有多张同号凭证。
-            voucher_date: 凭证日期（YYYY-MM-DD）。与 voucher_no 组合唯一定位
-                          一张凭证，是推荐的精确过滤方式。
+            month: 月份过滤（1~12），只在不给日期时用。
+            voucher_date: 凭证日期（YYYY-MM-DD）。
+            voucher_type: 凭证字；空串 = 凭证字为空的那张，None = 不限。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
@@ -405,19 +408,23 @@ class LedgerPenetrationService:
             conditions.append(tbl.c.voucher_date == parsed)
         elif month is not None:
             conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
+        if voucher_type is not None:
+            conditions.append(voucher_type_condition(tbl, voucher_type))
         stmt = (
             sa.select(
-                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.id, tbl.c.year, tbl.c.company_code, tbl.c.voucher_date,
+                tbl.c.voucher_type, tbl.c.voucher_no,
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
                 tbl.c.raw_extra,
             )
             .where(*conditions)
-            .order_by(tbl.c.account_code)
+            .order_by(tbl.c.account_code, tbl.c.id)
         )
         result = await self.db.execute(stmt)
-        return _attach_extra_fields([dict(r._mapping) for r in result.fetchall()])
+        rows = single_voucher_lines([dict(r._mapping) for r in result.fetchall()], year=year)
+        return _attach_extra_fields(annotate_lines(rows, year=year))
 
     async def get_all_aux_balance(
         self, project_id: UUID, year: int,

@@ -23,35 +23,53 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from pydantic import BaseModel, Field
 from sqlalchemy import Select
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import TbLedger, WorkpaperExtractionLog
+from app.models.audit_platform_models import TbAuxLedger, TbLedger, WorkpaperExtractionLog
 from app.services.dataset_query import get_active_filter
 from app.services.sampling_batch_service import SAMPLING_BATCH_STATUSES
+from app.services.voucher_identity import (
+    VoucherKey,
+    fingerprint_lines,
+    group_by_voucher_key,
+    legacy_voucher_nos_condition,
+    norm_text,
+    parse_voucher_keys,
+    side_of,
+    voucher_key_sql,
+    voucher_keys_in,
+    voucher_keys_not_in,
+)
 
 
 def derive_idempotency_key(
     workpaper_id: UUID,
     extraction_type: str,
     fill_mode: str,
-    filled_voucher_nos: list[str],
+    filled: list[str],
+    *,
+    phase: str | None = None,
+    population_mode: str | None = None,
 ) -> str:
-    """派生稳定幂等键：同一底稿+类型+模式+相同凭证集合 → 同一键（重复提交去重）。
+    """派生稳定幂等键：同一底稿 + 类型 + 模式 + 相同回填集合（+ 阶段 + 年审口径）→ 同一键。
 
-    凭证集合排序后参与哈希，保证顺序无关；不同凭证集合 → 不同键（合法新批次）。
+    回填集合是分录指纹（新日志 ``filled_line_fps``；没有指纹时凭证键 ``filled_voucher_keys``）；
+    旧日志只有凭证号时用凭证号，且不带阶段与口径 —— 旧日志派生出的键与改造前逐字相同。
+    集合排序后参与哈希，顺序无关。
+    同一批分录在预审与年审、或按两种年审口径各回填一次，是不同批次（键不同）。
     """
-    payload = json.dumps(
-        {
-            "wp": str(workpaper_id),
-            "type": extraction_type or "",
-            "mode": fill_mode or "",
-            "vouchers": sorted(filled_voucher_nos or []),
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-    )
+    body: dict = {
+        "wp": str(workpaper_id),
+        "type": extraction_type or "",
+        "mode": fill_mode or "",
+        "vouchers": sorted(filled or []),
+    }
+    if phase:
+        body["phase"] = phase
+    if population_mode:
+        body["population_mode"] = population_mode
+    payload = json.dumps(body, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 logger = logging.getLogger(__name__)
@@ -88,14 +106,8 @@ AUX_PARTY_TYPES: tuple[str, ...] = ("客户", "供应商", "往来单位", "职�
 """
 
 
-def _aux_match_key(
-    voucher_no: str | None,
-    voucher_date,
-    account_code: str | None,
-    debit,
-    credit,
-) -> tuple:
-    """辅助明细账 ↔ 序时账的行级匹配键。
+def _aux_match_key(vk: VoucherKey, account_code: str | None, debit, credit) -> tuple:
+    """辅助明细账 ↔ 序时账的行级匹配键：凭证键 + 科目 + 借贷金额。
 
     金额归一为 2 位小数字符串：两表都是 numeric，但精度声明可能不同
     （如 12.10 vs 12.1），直接用 Decimal 比较会漏匹配。
@@ -105,13 +117,7 @@ def _aux_match_key(
             return ""
         return f"{Decimal(str(v)):.2f}"
 
-    return (
-        (voucher_no or "").strip(),
-        voucher_date.isoformat() if voucher_date else "",
-        (account_code or "").strip(),
-        _amt(debit),
-        _amt(credit),
-    )
+    return (vk, (account_code or "").strip(), _amt(debit), _amt(credit))
 
 
 async def enrich_items_with_aux_party(
@@ -138,55 +144,38 @@ async def enrich_items_with_aux_party(
         it.setdefault("party_ambiguous", False)
 
     try:
-        vouchers = sorted({
-            (it.get("voucher_no") or "").strip()
+        keys = {
+            VoucherKey.from_row(it, year=year)
             for it in items
-            if (it.get("voucher_no") or "").strip()
-        })
-        if not vouchers:
+            if norm_text(it.get("voucher_no")) and it.get("voucher_date")
+        }
+        if not keys:
             return items
 
-        # 🔴 列必须带类型声明：裸 `sa.column("project_id")` 无类型信息 → asyncpg 按
-        # 调用方实参推断，传 str 时按 VARCHAR 绑参，PG 抛
-        # `operator does not exist: uuid = character varying`（实测过）。
-        # 生产路径 pid 是 UUID 对象故"碰巧能跑"，但那是对调用方类型的隐式依赖 ——
-        # 显式声明后 str / UUID 两种入参都正确。
-        aux = sa.table(
-            "tb_aux_ledger",
-            sa.column("project_id", PGUUID(as_uuid=True)),
-            sa.column("year", sa.Integer),
-            sa.column("voucher_no", sa.String),
-            sa.column("voucher_date", sa.Date),
-            sa.column("account_code", sa.String),
-            sa.column("aux_type", sa.String),
-            sa.column("aux_name", sa.String),
-            sa.column("debit_amount", sa.Numeric),
-            sa.column("credit_amount", sa.Numeric),
-            sa.column("is_deleted", sa.Boolean),
-        )
+        # 按凭证键取（日期收窄，同日同号的别种凭证字不混进来），且只读当前账套：
+        # 旧版本账套的行 is_deleted 也是 false，裸按项目 + 年度会把重导前的往来单位一起读进来。
+        aux = TbAuxLedger.__table__
+        pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+        active_filter = await get_active_filter(db, aux, pid, year)
         stmt = sa.select(
-            aux.c.voucher_no,
+            aux.c.year,
+            aux.c.company_code,
             aux.c.voucher_date,
+            aux.c.voucher_type,
+            aux.c.voucher_no,
             aux.c.account_code,
             aux.c.debit_amount,
             aux.c.credit_amount,
             aux.c.aux_type,
             aux.c.aux_name,
         ).where(
-            # 归一为 UUID 对象：调用方可能传字符串（诊断脚本/旧调用点），而列已声明
-            # PGUUID → 传 str 时 asyncpg 仍会按 VARCHAR 编码而报
-            # `operator does not exist: uuid = character varying`。
-            aux.c.project_id == (
-                project_id if isinstance(project_id, UUID) else UUID(str(project_id))
-            ),
-            aux.c.year == year,
-            sa.not_(aux.c.is_deleted),
+            active_filter,
             aux.c.aux_type.in_(list(AUX_PARTY_TYPES)),
             aux.c.aux_name.isnot(None),
             aux.c.aux_name != "",
-            aux.c.voucher_no.in_(vouchers),
+            voucher_keys_in(aux, keys),
         )
-        rows = (await db.execute(stmt)).all()
+        rows = (await db.execute(stmt)).mappings().all()
         if not rows:
             return items
 
@@ -194,17 +183,17 @@ async def enrich_items_with_aux_party(
         buckets: dict[tuple, set[tuple[str, str]]] = {}
         for r in rows:
             key = _aux_match_key(
-                r.voucher_no, r.voucher_date, r.account_code,
-                r.debit_amount, r.credit_amount,
+                VoucherKey.from_row(r), r["account_code"], r["debit_amount"], r["credit_amount"]
             )
             buckets.setdefault(key, set()).add(
-                ((r.aux_type or "").strip(), (r.aux_name or "").strip())
+                ((r["aux_type"] or "").strip(), (r["aux_name"] or "").strip())
             )
 
         for it in items:
+            if not (norm_text(it.get("voucher_no")) and it.get("voucher_date")):
+                continue
             key = _aux_match_key(
-                it.get("voucher_no"),
-                date.fromisoformat(it["voucher_date"]) if it.get("voucher_date") else None,
+                VoucherKey.from_row(it, year=year),
                 it.get("account_code"),
                 it.get("debit_amount"),
                 it.get("credit_amount"),
@@ -241,7 +230,7 @@ def _ledger_row_to_item(row) -> dict:
         "debit_amount": str(row.debit_amount) if row.debit_amount is not None else None,
         "credit_amount": str(row.credit_amount) if row.credit_amount is not None else None,
         "counterpart_account": row.counterpart_account,
-        "counterpart_account_name": None,  # 由 enrich_counterpart_accounts 补全
+        "counterpart_account_name": None,  # 由 enrich_voucher_context 补全
         "summary": row.summary,
         "entry_seq": row.entry_seq,
         "accounting_period": row.accounting_period,
@@ -251,130 +240,90 @@ def _ledger_row_to_item(row) -> dict:
     }
 
 
-async def enrich_counterpart_accounts(
+async def enrich_voucher_context(
     db: AsyncSession,
     project_id: UUID,
     year: int,
     items: list[dict],
 ) -> list[dict]:
-    """给样本行补全对方科目和完整凭证分录明细。
+    """给样本行补凭证上下文：凭证键、借贷栏、分录指纹、整张凭证分录与对方科目（需求 2.2）。
 
-    对每个样本行，查出同一凭证（voucher_no + voucher_date）的全部借贷分录，
-    写入 voucher_entries 列表供前端完整展示。
+    按样本的**凭证键**取整张凭证（键里有日期，不再按凭证号取全年，也不把同日同号的别种
+    凭证字并进来），在 Python 端给整张凭证编分录指纹，样本行按行 id 认领自己的指纹。
+    每条样本行补：``voucher_key`` / ``side`` / ``line_fp`` / ``voucher_entries``（每条分录带
+    ``side`` 与 ``line_fp``）。
 
-    分录展示逻辑：
-    - 1对1：counterpart_account/counterpart_account_name 直接填对方科目
-    - 1对多 / 多对1 / 多对多：counterpart_account 填"多科目"，
-      voucher_entries 里放完整分录明细（代码+名称+借方+贷方）
+    对方科目按借贷栏判（红字借方仍在借方栏，不看正负号）：对方栏只有一个科目时直填，
+    多个科目时填「多科目」并附整张凭证分录；精确配对见 voucher_pairing（任务 7）。
+    源数据已带对方科目的不改。
 
     与 enrich_items_with_aux_party 同范式：fail-open，补全失败不阻断抽样。
     """
     if not items:
         return items
 
-    # 收集所有样本凭证号
-    voucher_keys: set[tuple[str, str]] = set()
+    keys: dict[VoucherKey, None] = {}
     for it in items:
-        vno = (it.get("voucher_no") or "").strip()
-        vdate = it.get("voucher_date") or ""
-        if vno and vdate:
-            voucher_keys.add((vno, vdate))
-
-    if not voucher_keys:
+        if norm_text(it.get("voucher_no")) and it.get("voucher_date"):
+            vk = VoucherKey.from_row(it, year=year)
+            it["voucher_key"] = vk.to_str()
+            it["side"] = side_of(it.get("debit_amount"), it.get("credit_amount"))
+            keys[vk] = None
+    if not keys:
         return items
 
     try:
-        voucher_nos = sorted({k[0] for k in voucher_keys})
-        active_filter = await get_active_filter(
-            db, TbLedger.__table__, project_id, year
-        )
+        tbl = TbLedger.__table__
+        active_filter = await get_active_filter(db, tbl, project_id, year)
         stmt = (
             sa.select(
-                TbLedger.voucher_no,
-                TbLedger.voucher_date,
-                TbLedger.account_code,
-                TbLedger.account_name,
-                TbLedger.debit_amount,
-                TbLedger.credit_amount,
-                TbLedger.summary,
+                tbl.c.id, tbl.c.year, tbl.c.company_code, tbl.c.voucher_date, tbl.c.voucher_type,
+                tbl.c.voucher_no, tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.summary,
             )
-            .where(
-                active_filter,
-                TbLedger.voucher_no.in_(voucher_nos),
-            )
-            .order_by(TbLedger.voucher_no, TbLedger.voucher_date)
+            .where(active_filter, voucher_keys_in(tbl, keys))
+            .order_by(tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.account_code, tbl.c.id)
         )
-        rows = (await db.execute(stmt)).all()
-        if not rows:
-            return items
+        rows = (await db.execute(stmt)).mappings().all()
 
-        # 按 (voucher_no, voucher_date) 分组，收集完整分录列表
-        from collections import defaultdict
-        voucher_entries_map: dict[tuple[str, str], list[dict]] = defaultdict(list)
-        for r in rows:
-            vkey = (
-                (r.voucher_no or "").strip(),
-                r.voucher_date.isoformat() if r.voucher_date else "",
-            )
-            entry = {
-                "account_code": (r.account_code or "").strip(),
-                "account_name": (r.account_name or "").strip(),
-                "debit_amount": str(r.debit_amount) if r.debit_amount is not None else None,
-                "credit_amount": str(r.credit_amount) if r.credit_amount is not None else None,
-                "summary": r.summary or "",
-            }
-            if entry["account_code"]:
-                voucher_entries_map[vkey].append(entry)
+        fp_by_id: dict[str, str] = {}
+        entries_by_key: dict[str, list[dict]] = {}
+        for vk, lines in group_by_voucher_key(rows, year=year).items():
+            entries = entries_by_key.setdefault(vk.to_str(), [])
+            for line, fp in zip(lines, fingerprint_lines(lines, year=year)):
+                fp_by_id[str(line["id"])] = fp
+                entries.append({
+                    "account_code": norm_text(line["account_code"]),
+                    "account_name": norm_text(line["account_name"]),
+                    "debit_amount": str(line["debit_amount"]) if line["debit_amount"] is not None else None,
+                    "credit_amount": str(line["credit_amount"]) if line["credit_amount"] is not None else None,
+                    "summary": line["summary"] or "",
+                    "side": side_of(line["debit_amount"], line["credit_amount"]),
+                    "line_fp": fp,
+                })
 
-        # 对每个样本行填充
+        opposite = {"D": "C", "C": "D"}
         for it in items:
-            if it.get("counterpart_account") and it.get("voucher_entries"):
-                continue  # 源数据已带且已有明细
-            vno = (it.get("voucher_no") or "").strip()
-            vdate = it.get("voucher_date") or ""
-            vkey = (vno, vdate)
-            entries = voucher_entries_map.get(vkey, [])
-
-            # 始终附带完整凭证分录
+            if not it.get("voucher_key"):
+                continue
+            entries = entries_by_key.get(it["voucher_key"], [])
             it["voucher_entries"] = entries
-
+            it["line_fp"] = fp_by_id.get(str(it.get("id") or ""))
             if it.get("counterpart_account"):
                 continue  # 源数据已带对方科目代码
-
-            # 按借贷方向分桶去重
-            debit_accounts: set[tuple[str, str]] = set()
-            credit_accounts: set[tuple[str, str]] = set()
-            for e in entries:
-                code = e["account_code"]
-                name = e["account_name"]
-                if e.get("debit_amount") and Decimal(e["debit_amount"]) > 0:
-                    debit_accounts.add((code, name))
-                if e.get("credit_amount") and Decimal(e["credit_amount"]) > 0:
-                    credit_accounts.add((code, name))
-
-            # 判断当前行方向
-            is_debit = False
-            try:
-                d = Decimal(str(it.get("debit_amount") or 0))
-                is_debit = d > 0
-            except Exception:
-                pass
-
-            counterparts = credit_accounts if is_debit else debit_accounts
-            if not counterparts:
-                continue
-
+            other = opposite.get(it["side"])
+            counterparts = {
+                (e["account_code"], e["account_name"])
+                for e in entries
+                if other and e["side"] == other and e["account_code"]
+            }
             if len(counterparts) == 1:
-                cp_code, cp_name = next(iter(counterparts))
-                it["counterpart_account"] = cp_code
-                it["counterpart_account_name"] = cp_name
-            else:
-                it["counterpart_account"] = "多科目"
-                it["counterpart_account_name"] = "多科目"
-
+                it["counterpart_account"], it["counterpart_account_name"] = next(iter(counterparts))
+            elif counterparts:
+                it["counterpart_account"] = it["counterpart_account_name"] = "多科目"
     except Exception as exc:  # noqa: BLE001 — 补全是增强，绝不阻断抽样
         logger.warning(
-            "对方科目补全失败（不影响抽样）：project=%s year=%s err=%s",
+            "凭证上下文补全失败（不影响抽样）：project=%s year=%s err=%s",
             project_id, year, exc,
         )
     return items
@@ -397,9 +346,13 @@ class LedgerQueryFilters(BaseModel):
     direction_filter: str = "all"  # "debit" | "credit" | "all"
     voucher_type_filter: list[str] = Field(default_factory=list)  # 空=不限
     summary_keyword: str = ""
-    exclude_voucher_nos: list[str] = Field(default_factory=list)  # 排除的凭证号列表
-    # P3 行级排除：排除的分录行 id（ledger id）。ledger_line 单位下按行排除，避免"同一
-    # 凭证号跨不同科目"被整张误排（跨科目过度排除）；voucher 单位仍按 voucher_no 排除。
+    # 已抽排除（voucher_sampling_exclusion.collect_exclusions 给出）：
+    # - exclude_voucher_keys：凭证键串，整张凭证排除（行值 NOT IN）
+    # - exclude_line_ids：当前账套分录行 id（分录指纹经 resolve_line_fps 映射而来）
+    # - exclude_voucher_nos / exclude_unit_ids：只兼容旧日志（凭证号整张排除 / 旧行 id）
+    exclude_voucher_keys: list[str] = Field(default_factory=list)
+    exclude_line_ids: list[str] = Field(default_factory=list)
+    exclude_voucher_nos: list[str] = Field(default_factory=list)
     exclude_unit_ids: list[str] = Field(default_factory=list)
 
 
@@ -562,17 +515,20 @@ class LedgerSamplingService:
                 TbLedger.voucher_type.in_(filters.voucher_type_filter)
             )
 
-        # 排除已提取凭证号：voucher_no NOT IN (...)
-        # asyncpg 兼容：使用 .notin_ + list（SQLAlchemy 会转为 != ALL）
+        # 已抽排除：凭证键整张排除；旧日志只有凭证号的按旧口径整张排除（会连带同号别日凭证）
+        exclude_keys = parse_voucher_keys(filters.exclude_voucher_keys)
+        if exclude_keys:
+            stmt = stmt.where(voucher_keys_not_in(TbLedger.__table__, exclude_keys))
         if filters.exclude_voucher_nos:
             stmt = stmt.where(
-                TbLedger.voucher_no.notin_(filters.exclude_voucher_nos)
+                legacy_voucher_nos_condition(TbLedger.voucher_no, filters.exclude_voucher_nos, exclude=True)
             )
 
-        # P3 行级排除：排除具体分录行 id（ledger_line 单位）。非法 UUID 静默跳过。
-        if filters.exclude_unit_ids:
+        # 分录行排除：指纹解析出的当前行 id + 旧日志的行 id。非法 UUID 静默跳过。
+        line_ids = [*filters.exclude_line_ids, *filters.exclude_unit_ids]
+        if line_ids:
             valid_ids = []
-            for raw in filters.exclude_unit_ids:
+            for raw in line_ids:
                 try:
                     valid_ids.append(UUID(str(raw)))
                 except (ValueError, AttributeError, TypeError):
@@ -704,22 +660,28 @@ class LedgerSamplingService:
         if status not in SAMPLING_BATCH_STATUSES:
             raise ValueError(f"非法的抽样批次状态：{status}")
 
-        # 幂等键：优先用调用方传入，否则从 criteria.filled_voucher_nos 稳定派生
+        # 幂等键：优先用调用方传入，否则从回填样本身份稳定派生 —— 分录指纹，没有指纹时凭证键
+        # （截止测试按整张凭证回填），都没有的旧日志用凭证号
         idem_key = log_data.idempotency_key
         if not idem_key:
-            filled_nos = []
-            crit = log_data.extraction_criteria or {}
-            if isinstance(crit, dict):
-                fv = crit.get("filled_voucher_nos")
-                if isinstance(fv, list):
-                    filled_nos = [str(v) for v in fv]
-            # 无凭证号可派生时不设幂等键（key 为 NULL，不参与去重，保持向后兼容）
-            if filled_nos:
+            crit = log_data.extraction_criteria if isinstance(log_data.extraction_criteria, dict) else {}
+            raw_fps, raw_keys, raw_nos = (
+                crit.get("filled_line_fps"), crit.get("filled_voucher_keys"), crit.get("filled_voucher_nos"),
+            )
+            fps = [str(v) for v in raw_fps if v] if isinstance(raw_fps, list) else []
+            keys = [str(v) for v in raw_keys if v] if isinstance(raw_keys, list) else []
+            ident = fps or keys
+            # 旧日志：与改造前逐字同口径（凭证号列表原样参与派生，不带阶段与口径）
+            nos = [str(v) for v in raw_nos] if isinstance(raw_nos, list) and not ident else []
+            # 都没有时不设幂等键（key 为 NULL，不参与去重，保持向后兼容）
+            if ident or nos:
                 idem_key = derive_idempotency_key(
                     log_data.workpaper_id,
                     log_data.extraction_type,
                     log_data.fill_mode,
-                    filled_nos,
+                    ident or nos,
+                    phase=crit.get("phase") if ident else None,
+                    population_mode=crit.get("final_population_mode") if ident else None,
                 )
 
         # 幂等去重：同一底稿+幂等键已有未撤销记录 → 直接返回既有（幂等 no-op，不重复落库）
@@ -944,9 +906,17 @@ class LedgerSamplingService:
         result = await db.execute(proj)
         units: list[dict] = []
         for row in result.all():
+            if unit == "voucher":  # unit_id = 凭证键串（同号别日、同日同号别凭证字是不同单位）
+                vk = VoucherKey.of(
+                    year=row.year, company_code=row.company_code, voucher_date=row.voucher_date,
+                    voucher_type=row.voucher_type, voucher_no=row.voucher_no,
+                )
+                unit_id = vk.to_str()
+            else:
+                unit_id = str(row.unit_id)
             units.append(
                 {
-                    "unit_id": str(row.unit_id),
+                    "unit_id": unit_id,
                     "voucher_no": row.voucher_no,
                     "voucher_date": (
                         row.voucher_date.isoformat() if row.voucher_date else None
@@ -967,7 +937,8 @@ class LedgerSamplingService:
         """构建阶段 A 最小投影 Select（不执行）——供 locate_sampling_units 与单测复用。
 
         - ledger_line：select id/voucher_no/voucher_date/greatest_line，按日期+凭证号排序。
-        - voucher：group by voucher_no，金额=Σ行 GREATEST，日期=min。
+        - voucher：按凭证键（年度、主体、日期、凭证字、号）分组，金额=Σ行 GREATEST；
+          unit_id 由 locate_sampling_units 拼成凭证键串。
         - min_greatest（P2，仅 specific_item）：ledger_line 用 WHERE、voucher 用 HAVING
           在 DB 侧过滤 GREATEST >= 阈值。
         """
@@ -977,16 +948,19 @@ class LedgerSamplingService:
         )
         if unit == "voucher":
             voucher_greatest = sa.func.coalesce(sa.func.sum(greatest_line), 0)
+            company, vdate, vtype, vno = voucher_key_sql(subq)
             stmt = (
                 sa.select(
-                    subq.c.voucher_no.label("unit_id"),
-                    subq.c.voucher_no.label("voucher_no"),
-                    sa.func.min(subq.c.voucher_date).label("voucher_date"),
+                    subq.c.year.label("year"),
+                    company.label("company_code"),
+                    vdate.label("voucher_date"),
+                    vtype.label("voucher_type"),
+                    vno.label("voucher_no"),
                     voucher_greatest.label("greatest_amount"),
                 )
                 .select_from(subq)
-                .group_by(subq.c.voucher_no)
-                .order_by(sa.func.min(subq.c.voucher_date), subq.c.voucher_no)
+                .group_by(subq.c.year, company, vdate, vtype, vno)
+                .order_by(vdate, vno, vtype, company)
             )
             if min_greatest is not None:
                 stmt = stmt.having(voucher_greatest >= min_greatest)
@@ -1015,7 +989,7 @@ class LedgerSamplingService:
         """阶段 B：按阶段 A 命中的抽样单位标识取回完整样本行（与 execute_with_stats item 同结构）。
 
         - ledger_line：按 TbLedger.id ∈ unit_ids 取回（每单位一行）。
-        - voucher：按 TbLedger.voucher_no ∈ unit_ids 在过滤范围内取回该凭证全部分录行。
+        - voucher：unit_ids 是凭证键串，按凭证键在过滤范围内取回该凭证全部分录行。
 
         保持过滤范围（复用传入 query 的 WHERE），不越过原过滤取数。
         """
@@ -1030,8 +1004,12 @@ class LedgerSamplingService:
         )
         # 上述 join 等价于"在过滤结果内"，再按单位键过滤
         if unit == "voucher":
-            stmt = base.where(TbLedger.voucher_no.in_(unit_ids)).order_by(
-                TbLedger.voucher_date, TbLedger.voucher_no, TbLedger.entry_seq
+            keys = parse_voucher_keys(unit_ids)
+            if not keys:
+                return []
+            stmt = base.where(voucher_keys_in(TbLedger.__table__, keys)).order_by(
+                TbLedger.voucher_date, TbLedger.voucher_no, TbLedger.voucher_type,
+                TbLedger.entry_seq, TbLedger.id,
             )
         else:
             # 分录行：unit_id 是 ledger id（字符串）→ 直接按 id 过滤

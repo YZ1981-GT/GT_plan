@@ -38,6 +38,16 @@ _LOG_ID = uuid.uuid4()
 # ─── Fake User ────────────────────────────────────────────────────────────────
 
 
+def _cutoff_exclusions(extracted=()):
+    """旧测试的「已提取凭证号」桩接到 collect_exclusions（旧日志只有凭证号 → 按凭证号排除）。"""
+    from app.services.voucher_sampling_exclusion import SamplingExclusions
+
+    async def _collect(db, **kw):
+        return SamplingExclusions(voucher_nos=list(extracted) if kw.get("exclude_extracted") else [])
+
+    return AsyncMock(side_effect=_collect)
+
+
 class _FakeUser:
     id = _USER_ID
     username = "审计助理李四"
@@ -176,8 +186,8 @@ class TestCutoffSamplingIntegration:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=[]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions([]),
         ):
             # Step 1: Extract
             from app.services.ledger_sampling_service import StatsResult
@@ -280,8 +290,8 @@ class TestCutoffSamplingIntegration:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=[]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions([]),
         ):
             from app.services.ledger_sampling_service import StatsResult
 
@@ -342,8 +352,8 @@ class TestCutoffSamplingIntegration:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=[]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions([]),
         ):
             from app.services.ledger_sampling_service import StatsResult
 
@@ -385,8 +395,8 @@ class TestCutoffSamplingIntegration:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=[]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions([]),
         ):
             from app.services.ledger_sampling_service import StatsResult
 
@@ -431,8 +441,8 @@ class TestCutoffSamplingIntegration:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=[]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions([]),
         ):
             from app.services.ledger_sampling_service import StatsResult
 
@@ -476,7 +486,7 @@ class TestCutoffSamplingIntegration:
 
 
 class TestCutoffExcludeExtracted:
-    """验证 exclude_extracted 功能通过 _get_extracted_voucher_nos 正确排除。
+    """验证 exclude_extracted 功能通过 collect_exclusions 正确排除。
 
     **Validates: Requirements 2.12**
     """
@@ -490,8 +500,8 @@ class TestCutoffExcludeExtracted:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=previously_extracted),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions(previously_extracted),
         ):
             from app.services.ledger_sampling_service import StatsResult
 
@@ -526,8 +536,8 @@ class TestCutoffExcludeExtracted:
         with patch(
             "app.routers.cutoff_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.cutoff_sampling._get_extracted_voucher_nos",
-            new=AsyncMock(return_value=["should-not-be-called"]),
+            "app.routers.cutoff_sampling.collect_exclusions",
+            new=_cutoff_exclusions(["should-not-be-called"]),
         ) as mock_get_extracted:
             from app.services.ledger_sampling_service import StatsResult
 
@@ -546,8 +556,8 @@ class TestCutoffExcludeExtracted:
                 )
                 assert resp.status_code == 200
 
-                # _get_extracted_voucher_nos should NOT be called when disabled
-                mock_get_extracted.assert_not_called()
+                # 关掉 exclude_extracted 时收集器按「不排除」调用
+                assert mock_get_extracted.await_args.kwargs["exclude_extracted"] is False
 
                 # filters should have empty exclude_voucher_nos
                 call_args = MockService.build_ledger_query.call_args

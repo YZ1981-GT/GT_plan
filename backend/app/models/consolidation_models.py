@@ -466,6 +466,10 @@ class ConsolNoteTemplatePushLog(Base):
     failure_count: Mapped[int] = mapped_column(
         Integer, server_default=text("0"), nullable=False
     )
+    # `'[]'` 而不是 `'[]'::jsonb`：带 `::` 的文本被原样塞进 CREATE TABLE，SQLite 报
+    # `unrecognized token: ":"`，任何走 `Base.metadata.create_all(sqlite)` 的测试都在 setup
+    # 阶段报错（2026-10-27 实测 117 例）。真实表由 V204 创建，PG 对 jsonb 列的 `DEFAULT '[]'`
+    # 隐式转型，两种写法在真实库上等价。守卫：tests/test_orm_server_default_dialect_neutral.py
     failures: Mapped[dict | None] = mapped_column(
-        JSONB, server_default=text("'[]'::jsonb"), nullable=True
+        JSONB, server_default=text("'[]'"), nullable=True
     )

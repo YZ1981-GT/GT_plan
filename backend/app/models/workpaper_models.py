@@ -800,6 +800,13 @@ class SampledVoucher(Base):
     # （该粒度下借贷 100% 平衡实证）。NULL = 历史行或未提供日期的手工标记，回拉分录时
     # 退化为按年度匹配，可能命中同号别张凭证。
     voucher_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
+    # ── V210（voucher-identity-writeback-and-audit-phase）──
+    # 凭证键 = (年度, 主体, 日期, 凭证字, 号)：同日同号可有多种凭证字（四川物流 FY-0003 与
+    # ZZ-0003 是两张凭证），一套账也可能有两个主体。NULL = 旧行未记录，去重时按空串参与。
+    company_code: Mapped[str | None] = mapped_column(sa.String, nullable=True)
+    voucher_type: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
+    # 登记时的审计阶段 preliminary / final（CHECK 约束 ck_sampled_vouchers_phase）；NULL = 旧行未标
+    phase: Mapped[str | None] = mapped_column(sa.String(16), nullable=True)
     account_code: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     sampling_record_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True

@@ -197,6 +197,14 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
             <el-tag v-if="entry.isUndone" size="small" type="info" class="tag-undone">
               已撤销
             </el-tag>
+            <el-tag
+              v-if="entry.legacyExclusion"
+              size="small"
+              type="warning"
+              title="这条记录只记了凭证号：排除已抽凭证时按凭证号整张排除，可能连带同号的其他凭证"
+            >
+              旧记录按凭证号排除
+            </el-tag>
           </div>
 
           <!-- 主要信息 -->

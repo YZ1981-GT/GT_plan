@@ -29,7 +29,9 @@ from app.services.ledger_sampling_service import (
     ExtractionLogCreate,
     LedgerQueryFilters,
     LedgerSamplingService,
+    enrich_voucher_context,
 )
+from app.services.voucher_sampling_exclusion import collect_exclusions
 from app.services.sampling_registry_service import (
     register_sampled_vouchers,
     register_sampling_batch,
@@ -70,6 +72,10 @@ class CutoffFillRequest(BaseModel):
     filled_count: int
     fill_mode: str  # "append" | "replace" | "merge"
     before_data: Optional[list[dict]] = None
+    # 本批回填样本的身份（需求 2.4 / 2.6）：凭证键 + 分录指纹（取自 cutoff-extract / voucher-extract
+    # 返回的 voucher_key / line_fp）；凭证号只为旧前端兼容
+    filled_voucher_keys: list[str] = Field(default_factory=list)
+    filled_line_fps: list[str] = Field(default_factory=list)
     filled_voucher_nos: list[str] = Field(default_factory=list)
 
 
@@ -93,12 +99,12 @@ async def cutoff_extract(
         date_start = req.cutoff_date - timedelta(days=req.days_before)
         date_end = req.cutoff_date + timedelta(days=req.days_after)
 
-        # 2. 排除已提取凭证号（从 workpaper_extraction_log 获取）
-        exclude_voucher_nos: list[str] = []
-        if req.exclude_extracted:
-            exclude_voucher_nos = await _get_extracted_voucher_nos(
-                db, req.workpaper_id
-            )
+        # 2. 排除已提取（按凭证键整张排除；旧日志只有凭证号的按旧口径，见 voucher_sampling_exclusion）
+        year = req.cutoff_date.year
+        exclusions = await collect_exclusions(
+            db, project_id=pid, year=year, workpaper_id=req.workpaper_id, extraction_type="cutoff",
+            sampling_unit="voucher", exclude_extracted=req.exclude_extracted,
+        )
 
         # 3. 构建过滤条件
         filters = LedgerQueryFilters(
@@ -109,23 +115,23 @@ async def cutoff_extract(
             direction_filter=req.direction_filter,
             voucher_type_filter=req.voucher_type_filter,
             summary_keyword=req.summary_keyword,
-            exclude_voucher_nos=exclude_voucher_nos,
+            **exclusions.filter_kwargs(),
         )
 
         # 4. 构建查询（year 从 cutoff_date 推导）
-        year = req.cutoff_date.year
         query = await LedgerSamplingService.build_ledger_query(
             db, pid, year, filters
         )
 
-        # 5. 执行查询并获取统计
+        # 5. 执行查询并获取统计；样本行补凭证键与分录指纹（回填时随 cutoff-fill 留痕）
         items, stats = await LedgerSamplingService.execute_with_stats(
             db, query, req.page, req.page_size
         )
+        items = await enrich_voucher_context(db, pid, year, items)
 
         return {
             "items": items,
-            "stats": stats.model_dump(),
+            "stats": {**stats.model_dump(), **exclusions.to_stats()},
             "page": req.page,
             "page_size": req.page_size,
         }
@@ -207,10 +213,11 @@ async def cutoff_fill(
             description="，".join(desc_parts),
         )
 
-        # 将 filled_voucher_nos 合并到 extraction_criteria 中
+        # 样本身份并入 extraction_criteria（排除已提取、登记、幂等键都读它）
         criteria = dict(req.extraction_criteria)
-        if req.filled_voucher_nos:
-            criteria["filled_voucher_nos"] = req.filled_voucher_nos
+        for key in ("filled_voucher_keys", "filled_line_fps", "filled_voucher_nos"):
+            if getattr(req, key):
+                criteria[key] = getattr(req, key)
 
         # ── R2.5：回填时随带的抽样评价必须与 /voucher-evaluation 走**同一归一器** ──
         # 否则该路径写进去的 evaluation 缺 `evaluated_at` / `evaluated_by`
@@ -298,31 +305,5 @@ async def _load_log_row(
         return None
 
 
-async def _get_extracted_voucher_nos(
-    db: AsyncSession,
-    workpaper_id: UUID,
-) -> list[str]:
-    """从非撤销的提取日志中收集所有已填充的凭证号
-
-    查询 workpaper_extraction_log 中 is_undone=False 的记录，
-    从 extraction_criteria.filled_voucher_nos 提取凭证号列表。
-    """
-    stmt = select(
-        WorkpaperExtractionLog.extraction_criteria
-    ).where(
-        WorkpaperExtractionLog.workpaper_id == workpaper_id,
-        WorkpaperExtractionLog.extraction_type == "cutoff",
-        WorkpaperExtractionLog.is_undone == False,  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-
-    voucher_nos: list[str] = []
-    for criteria in rows:
-        if criteria and isinstance(criteria, dict):
-            filled = criteria.get("filled_voucher_nos", [])
-            if isinstance(filled, list):
-                voucher_nos.extend(filled)
-
-    # 去重
-    return list(set(voucher_nos))
+# 「排除已提取」的口径见 app.services.voucher_sampling_exclusion.collect_exclusions（按凭证键整张排除，
+# 旧日志只有凭证号的按旧口径兼容）。

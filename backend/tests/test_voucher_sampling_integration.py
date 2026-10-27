@@ -30,22 +30,6 @@ from app.routers.voucher_sampling import router
 from app.services.ledger_sampling_service import StatsResult
 
 
-@pytest.fixture(autouse=True)
-def _bridge_exclusions_to_legacy(monkeypatch):
-    """P3：新增的 `_get_voucher_sampling_exclusions`（ledger_line 单位行级排除入口）委托到
-    各测试已 mock 的 legacy 收集器（`_get_voucher_sampling_extracted_nos` /
-    `_get_preliminary_voucher_nos`），使既有排除/阶段隔离/去重测试意图不变——测试数据无
-    `filled_unit_ids`，行级拆分退化为 legacy voucher_no 口径，行为等价。行级拆分本身由
-    test_voucher_sampling_row_exclusion.py 独立覆盖。"""
-
-    async def _delegate(db, wp, preliminary_only=False):
-        if preliminary_only:
-            nos = await _vs_module._get_preliminary_voucher_nos(db, wp)
-        else:
-            nos = await _vs_module._get_voucher_sampling_extracted_nos(db, wp)
-        return list(nos), []
-
-    monkeypatch.setattr(_vs_module, "_get_voucher_sampling_exclusions", _delegate)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,6 +77,23 @@ class _FakeUser:
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _legacy_exclusions(extracted=(), preliminary=()):
+    """旧测试的「已抽凭证号 / 预审凭证号」桩接到 collect_exclusions：旧日志只有凭证号 → 按凭证号排除。
+
+    收集器的真实口径（凭证键 / 分录指纹 / 旧日志兼容）由 test_voucher_sampling_exclusion.py 用真 ORM 行覆盖；
+    这里只验证端点把收集器给出的排除原样交给 LedgerQueryFilters。
+    """
+    from app.services.voucher_sampling_exclusion import SamplingExclusions
+
+    async def _collect(db, **kw):
+        nos = list(extracted) if kw.get("exclude_extracted") else []
+        if kw.get("phase") == "final":
+            nos += [n for n in preliminary if n not in nos]
+        return SamplingExclusions(voucher_nos=nos, legacy=bool(nos))
+
+    return AsyncMock(side_effect=_collect)
 
 
 def _make_app() -> tuple[FastAPI, AsyncMock]:
@@ -233,12 +234,9 @@ class TestVoucherSamplingFullFlow:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -272,12 +270,9 @@ class TestVoucherSamplingFullFlow:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -312,12 +307,9 @@ class TestVoucherSamplingFullFlow:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -349,12 +341,9 @@ class TestVoucherSamplingFullFlow:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -384,12 +373,9 @@ class TestVoucherSamplingFullFlow:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -557,7 +543,7 @@ class TestVoucherSamplingPhaseIsolation:
     async def test_final_phase_excludes_preliminary_voucher_nos(self):
         """phase='final' 时自动追加预审已抽凭证号到排除列表
 
-        验证 _get_preliminary_voucher_nos 结果被传入 LedgerQueryFilters.exclude_voucher_nos
+        验证收集器给出的预审排除被传入 LedgerQueryFilters.exclude_voucher_nos
         """
         app, mock_db = _make_app()
         population = _make_ledger_rows(20)
@@ -566,12 +552,9 @@ class TestVoucherSamplingPhaseIsolation:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=preliminary_nos),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=preliminary_nos),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -601,11 +584,8 @@ class TestVoucherSamplingPhaseIsolation:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=["should-not-appear"]),
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=["should-not-appear"]),
         ) as mock_get_prelim:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
@@ -620,8 +600,10 @@ class TestVoucherSamplingPhaseIsolation:
                 )
                 assert resp.status_code == 200
 
-                # _get_preliminary_voucher_nos should NOT be called for preliminary phase
-                mock_get_prelim.assert_not_called()
+                # 预审阶段：收集器按预审调用（不叠加预审排除）
+                assert mock_get_prelim.await_args.kwargs["phase"] == "preliminary"
+                filters_arg = MockService.build_ledger_query.call_args[0][3]
+                assert "should-not-appear" not in filters_arg.exclude_voucher_nos
 
     @pytest.mark.asyncio
     async def test_phase_isolation_preliminary_then_final(self):
@@ -636,12 +618,9 @@ class TestVoucherSamplingPhaseIsolation:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=preliminary_extracted),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=preliminary_extracted),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=preliminary_extracted, preliminary=preliminary_extracted),
+        ) as mock_excl:
             # 年审查询的 population 应是排除预审凭证后的子集
             final_population = [
                 r for r in full_population if r["voucher_no"] not in preliminary_extracted
@@ -809,12 +788,9 @@ class TestVoucherSamplingSeedReproducibility:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -858,12 +834,9 @@ class TestVoucherSamplingSeedReproducibility:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -920,12 +893,9 @@ class TestVoucherSamplingExcludeDedup:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=previously_extracted),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=previously_extracted, preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -954,12 +924,9 @@ class TestVoucherSamplingExcludeDedup:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=["should-not-appear"]),
-        ) as mock_get_extracted, patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=["should-not-appear"], preliminary=[]),
+        ) as mock_get_extracted:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -973,8 +940,8 @@ class TestVoucherSamplingExcludeDedup:
                 )
                 assert resp.status_code == 200
 
-                # _get_voucher_sampling_extracted_nos 不应被调用
-                mock_get_extracted.assert_not_called()
+                # 关掉 exclude_extracted 时收集器按「不排除」调用
+                assert mock_get_extracted.await_args.kwargs["exclude_extracted"] is False
 
                 # exclude_voucher_nos 应为空
                 call_args = MockService.build_ledger_query.call_args
@@ -995,12 +962,9 @@ class TestVoucherSamplingExcludeDedup:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=extracted_nos),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=preliminary_nos),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=extracted_nos, preliminary=preliminary_nos),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(population, _make_stats(population))
@@ -1049,12 +1013,9 @@ class TestVoucherSamplingSecurityIsolation:
         with patch(
             "app.routers.voucher_sampling.LedgerSamplingService"
         ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ):
+            "app.routers.voucher_sampling.collect_exclusions",
+            new=_legacy_exclusions(extracted=[], preliminary=[]),
+        ) as mock_excl:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
                 return_value=(items_a, _make_stats(items_a))

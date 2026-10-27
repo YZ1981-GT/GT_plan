@@ -31,6 +31,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import SampledVoucher, SamplingRecord
+from app.services.voucher_identity import parse_voucher_keys
 
 logger = logging.getLogger(__name__)
 
@@ -356,47 +357,66 @@ async def register_sampled_vouchers(
 ) -> int:
     """把本批次实际回填的凭证登记进 `sampled_vouchers`（项目级已抽凭证清单）。
 
-    走 `ON CONFLICT DO NOTHING` 配 V139 的部分唯一索引
-    `(project_id, year, voucher_no, working_paper_id, batch_id) WHERE NOT is_deleted`：
-    同批次重复回填不增行；**不同 batch_id 的同一凭证允许共存** —— 那正是
-    「该凭证被抽过两次」这一需要被发现的事实。
+    走 `ON CONFLICT DO NOTHING` 配 V210 的部分唯一索引 `uq_sampled_vouchers_batch`
+    `(project_id, year, voucher_no, COALESCE(日期), COALESCE(主体), COALESCE(凭证字),
+    working_paper_id, batch_id) WHERE NOT is_deleted`：同批次重复回填不增行；
+    **不同 batch_id 的同一凭证允许共存** —— 那正是「该凭证被抽过两次」这一需要被发现的事实。
+
+    凭证来源：回填日志的 ``filled_voucher_keys``（凭证键串，日期 / 主体 / 凭证字齐全，
+    同号不同日、同日同号不同凭证字各登记一行）；没有时退回旧格式 ``filled_voucher_nos``
+    （只有号，三列为空，按号去重）。阶段取日志的 ``phase``（preliminary / final）。
 
     fail-open：异常时 warning 后返回 0。
     """
     try:
         criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
-        voucher_nos = criteria.get("filled_voucher_nos") or []
-        nos = [str(v).strip() for v in voucher_nos if str(v).strip()]
-        if not nos:
+        keys = [
+            (k.company_code, k.date_value, k.voucher_type, k.voucher_no)
+            for k in parse_voucher_keys(criteria.get("filled_voucher_keys") or [])
+        ]
+        if not keys:  # 旧格式日志只有凭证号：主体 / 日期 / 凭证字为空，按号去重
+            nos = [str(v).strip() for v in criteria.get("filled_voucher_nos") or [] if str(v).strip()]
+            keys = [(None, None, None, no) for no in dict.fromkeys(nos)]
+        if not keys:
             return 0
 
         filters = criteria.get("filters") if isinstance(criteria.get("filters"), dict) else {}
         codes = filters.get("account_codes") or []
         account_code = str(codes[0]) if codes else None
         batch_id = getattr(log, "batch_id", None)
+        phase = criteria.get("phase") if criteria.get("phase") in ("preliminary", "final") else None
+        note = build_sampling_purpose(criteria)
 
         rows = [
             {
                 "project_id": log.project_id,
                 "year": year,
                 "voucher_no": no,
+                "voucher_date": vdate,
+                "company_code": company,
+                "voucher_type": vtype,
+                "phase": phase,
                 "account_code": account_code,
                 "working_paper_id": log.workpaper_id,
                 "sampling_record_id": sampling_record_id,
                 "batch_id": batch_id,
                 "sampled_by": getattr(log, "user_id", None),
-                "note": build_sampling_purpose(criteria),
+                "note": note,
             }
-            # 同一批次内去重（前端已去重，此处兜底防唯一索引报错路径）
-            for no in dict.fromkeys(nos)
+            for company, vdate, vtype, no in keys
         ]
 
         stmt = pg_insert(SampledVoucher.__table__).values(rows)
+        # 🔴 目标须与 V210 的 uq_sampled_vouchers_batch 逐字一致（表达式列也是），否则 PG 推断不到
+        #    该索引，抛错后被下方 fail-open 吞成 WARNING，登记每次都静默失败。
         stmt = stmt.on_conflict_do_nothing(
             index_elements=[
                 "project_id",
                 "year",
                 "voucher_no",
+                sa.text("(COALESCE(voucher_date, DATE '1900-01-01'))"),
+                sa.text("(COALESCE(company_code, ''))"),
+                sa.text("(COALESCE(voucher_type, ''))"),
                 "working_paper_id",
                 "batch_id",
             ],
@@ -427,7 +447,7 @@ async def undo_sampling_registration(
     两张投影表原封不动。而投影已在产出真实数据（2026-08-05 实测 `sampled_vouchers` 21 行
     引擎登记），四个消费方全部被污染：
 
-    - `project_level_extracted_voucher_nos` 仍返回已撤销批次的凭证号 ⇒ 审计师选「全项目
+    - `project_level_extracted_vouchers` 仍返回已撤销批次的凭证 ⇒ 审计师选「全项目
       排除」时那些凭证**再也抽不到**，且界面上看不出原因（不可见的选择偏差）
     - `cross_workpaper_duplicate_vouchers` 基于已撤销批次误报重复，逼审计师对不存在的
       重复做判断并留痕
@@ -564,199 +584,11 @@ async def resolve_project_year(db: AsyncSession, project_id: UUID) -> int | None
 
 
 # ─── 查询：跨底稿排除 + 项目级概览 ───────────────────────────────────────────
+# 已迁到 sampled_voucher_queries（按凭证键，spec voucher-identity-writeback-and-audit-phase 任务 5），
+# 这里保留同名导出，旧导入点不变。
 
-
-async def project_level_extracted_voucher_nos(
-    db: AsyncSession,
-    project_id: UUID,
-    year: int,
-) -> list[str]:
-    """项目级已抽凭证号（R5.5：跨底稿排除的来源）。
-
-    仅取抽凭引擎登记的行（`batch_id IS NOT NULL`）—— `ledger_penetration` 的穿透页
-    手工标记不是「已执行抽凭程序」，不应据此排除。
-
-    fail-open：查询失败返回空清单 + WARNING，不阻断抽样。判据有三条 ——
-    ①本函数读的是**投影表**，权威留痕不依赖它；②`batch_id` 是 V139 新增列，未应用
-    迁移的环境下这条查询会直接把整个 `/voucher-extract` 打成 500，审计师一选「全项目
-    排除」就无法抽样；③降级为「不排除」不会让重复抽凭被掩盖 ——
-    `cross_workpaper_duplicate_vouchers` 是独立且不受 `exclude_scope` 门控的检测，
-    重复项仍会在预览前弹窗提示审计师（R8）。
-    """
-    try:
-        rows = (
-            await db.execute(
-                sa.select(sa.distinct(SampledVoucher.voucher_no)).where(
-                    SampledVoucher.project_id == project_id,
-                    SampledVoucher.year == year,
-                    SampledVoucher.is_deleted == sa.false(),
-                    SampledVoucher.batch_id.isnot(None),
-                )
-            )
-        ).scalars().all()
-        return [r for r in rows if r]
-    except Exception:  # noqa: BLE001 — 排除是增强，失败不得阻断抽样
-        logger.warning(
-            "项目级已抽凭证查询失败，本次不做跨底稿排除"
-            "（重复项仍由 cross_workpaper_duplicate_vouchers 弹窗提示）"
-            " project=%s year=%s",
-            project_id,
-            year,
-            exc_info=True,
-        )
-        return []
-
-
-async def cross_workpaper_duplicate_vouchers(
-    db: AsyncSession,
-    *,
-    project_id: UUID,
-    year: int,
-    voucher_nos: list[str],
-    exclude_workpaper_id: UUID | None,
-) -> list[dict[str, Any]]:
-    """本次样本中已被**其它底稿**抽取登记过的凭证（R8.1，供前端弹窗让审计师判断）。
-
-    重复抽同一张凭证有时是**有意的**（不同循环从不同认定角度检查同一笔交易），有时是
-    **样本浪费**（覆盖率虚高）—— 这个判断必须交给审计师并留痕，不能由配置项静默决定。
-
-    范围（R8.2 / R8.3）：
-    - 排除当前底稿自身的登记（同一底稿内重复由 `exclude_extracted` 处理）
-    - 只统计 `batch_id IS NOT NULL` 的行 —— `ledger_penetration` 穿透页的手工标记
-      不是「已执行抽凭程序」，据它提示会产生大量噪声
-
-    失败降级（R8.9）：返回空清单 + WARNING，绝不阻断抽样。
-
-    Returns:
-        `[{"voucher_no": str, "wp_codes": [str], "batch_count": int}]`，按凭证号排序。
-    """
-    nos = [str(v).strip() for v in (voucher_nos or []) if str(v).strip()]
-    if not nos:
-        return []
-    try:
-        from app.models.workpaper_models import WorkingPaper, WpIndex
-
-        conds = [
-            SampledVoucher.project_id == project_id,
-            SampledVoucher.year == year,
-            SampledVoucher.is_deleted == sa.false(),
-            SampledVoucher.batch_id.isnot(None),
-            SampledVoucher.voucher_no.in_(nos),
-        ]
-        if exclude_workpaper_id is not None:
-            # 排除当前底稿；NULL working_paper_id 的登记行也保留（来源未知的引擎登记，
-            # 仍属"别处抽过"的事实）
-            conds.append(
-                sa.or_(
-                    SampledVoucher.working_paper_id.is_(None),
-                    SampledVoucher.working_paper_id != exclude_workpaper_id,
-                )
-            )
-
-        # wp_code 在 wp_index（working_paper 表无该列，须 JOIN）
-        stmt = (
-            sa.select(
-                SampledVoucher.voucher_no,
-                WpIndex.wp_code,
-                SampledVoucher.batch_id,
-            )
-            .select_from(SampledVoucher)
-            .join(
-                WorkingPaper,
-                WorkingPaper.id == SampledVoucher.working_paper_id,
-                isouter=True,
-            )
-            .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id, isouter=True)
-            .where(*conds)
-        )
-        rows = (await db.execute(stmt)).all()
-        if not rows:
-            return []
-
-        grouped: dict[str, dict[str, Any]] = {}
-        for voucher_no, wp_code, batch_id in rows:
-            entry = grouped.setdefault(
-                voucher_no, {"wp_codes": set(), "batches": set()}
-            )
-            if wp_code:
-                entry["wp_codes"].add(str(wp_code))
-            if batch_id is not None:
-                entry["batches"].add(str(batch_id))
-
-        return [
-            {
-                "voucher_no": no,
-                "wp_codes": sorted(data["wp_codes"]),
-                "batch_count": len(data["batches"]),
-            }
-            for no, data in sorted(grouped.items())
-        ]
-    except Exception:  # noqa: BLE001 — 检测是增强，失败不得阻断抽样
-        logger.warning(
-            "跨底稿重复抽凭检测失败，本次不提示（project=%s year=%s wp=%s）",
-            project_id,
-            year,
-            exclude_workpaper_id,
-            exc_info=True,
-        )
-        return []
-
-
-async def project_sampling_coverage(
-    db: AsyncSession,
-    project_id: UUID,
-    year: int,
-) -> dict[str, Any]:
-    """项目级抽样登记概览（R5.6）。
-
-    - by_workpaper：按底稿汇总批次数 / 样本数
-    - duplicated：被 ≥2 个底稿抽取的凭证（跨循环重复抽凭，此前项目层面发现不了）
-    """
-    by_wp_rows = (
-        await db.execute(
-            sa.select(
-                SamplingRecord.working_paper_id,
-                sa.func.count(sa.distinct(SamplingRecord.batch_id)).label("batch_count"),
-                sa.func.coalesce(sa.func.sum(SamplingRecord.sample_size), 0).label("sample_count"),
-            )
-            .where(
-                SamplingRecord.project_id == project_id,
-                SamplingRecord.is_deleted == sa.false(),
-            )
-            .group_by(SamplingRecord.working_paper_id)
-        )
-    ).all()
-
-    dup_rows = (
-        await db.execute(
-            sa.select(
-                SampledVoucher.voucher_no,
-                sa.func.count(sa.distinct(SampledVoucher.working_paper_id)).label("wp_count"),
-            )
-            .where(
-                SampledVoucher.project_id == project_id,
-                SampledVoucher.year == year,
-                SampledVoucher.is_deleted == sa.false(),
-                SampledVoucher.batch_id.isnot(None),
-            )
-            .group_by(SampledVoucher.voucher_no)
-            .having(sa.func.count(sa.distinct(SampledVoucher.working_paper_id)) >= 2)
-            .order_by(sa.func.count(sa.distinct(SampledVoucher.working_paper_id)).desc())
-            .limit(500)
-        )
-    ).all()
-
-    return {
-        "by_workpaper": [
-            {
-                "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
-                "batch_count": int(r.batch_count or 0),
-                "sample_count": int(r.sample_count or 0),
-            }
-            for r in by_wp_rows
-        ],
-        "duplicated": [
-            {"voucher_no": r.voucher_no, "workpaper_count": int(r.wp_count or 0)}
-            for r in dup_rows
-        ],
-    }
+from app.services.sampled_voucher_queries import (  # noqa: E402,F401
+    cross_workpaper_duplicate_vouchers,
+    project_level_extracted_vouchers,
+    project_sampling_coverage,
+)

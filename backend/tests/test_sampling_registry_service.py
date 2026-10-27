@@ -23,10 +23,14 @@ import pytest
 import sqlalchemy as sa
 
 from app.services import sampling_registry_service as reg
+from app.services.voucher_identity import VoucherKey
 
+_VK = VoucherKey.of(year=2025, company_code="001", voucher_date="2025-01-07", voucher_type="FY", voucher_no="V-1")
 _BACKEND = Path(__file__).resolve().parent.parent
 _APP = _BACKEND / "app"
 _MIGRATION = _BACKEND / "migrations" / "V139__sampling_registry_batch_binding.sql"
+#: V210 起批次唯一索引按凭证键去重（含日期 / 主体 / 凭证字三个表达式列），是 ON CONFLICT 目标的现行依据
+_BATCH_INDEX_MIGRATION = _BACKEND / "migrations" / "V210__voucher_identity_sampled_vouchers.sql"
 
 
 def _strip_comments(src: str) -> str:
@@ -233,30 +237,32 @@ class TestFailOpenLeavesWarning:
         """
         with caplog.at_level(logging.WARNING):
             got = asyncio.run(
-                reg.project_level_extracted_voucher_nos(_BoomDB(), uuid4(), 2025)
+                reg.project_level_extracted_vouchers(_BoomDB(), uuid4(), 2025)
             )
-        assert got == []
+        assert got == ([], [])
         assert any(r.levelno >= logging.WARNING for r in caplog.records)
 
     def test_all_task13_entrypoints_are_fail_open(self):
-        """源码级：Task 13 声明的四个入口函数体内必须同时有 except 与 logger.warning。
+        """源码级：Task 13 声明的入口函数体内必须同时有 except 与 logger.warning。
 
         行为级 caplog 断言只能证明「异常时留了 WARNING」，本条防的是另一种退化 ——
         有人把 try 收窄到只包一句、或把 warning 降成 debug/静默 pass。
+        三个查询函数在凭证身份 spec 任务 5 迁到 sampled_voucher_queries.py（登记服务已到行数上限）。
         """
-        src = _strip_comments(
-            (_APP / "services" / "sampling_registry_service.py").read_text(encoding="utf-8")
-        )
-        for name in (
-            "register_sampling_batch",
-            "register_sampled_vouchers",
-            "update_sampling_record_evaluation",
-            "project_level_extracted_voucher_nos",
+        for file_name, names in (
+            ("sampling_registry_service.py", (
+                "register_sampling_batch", "register_sampled_vouchers", "update_sampling_record_evaluation",
+            )),
+            ("sampled_voucher_queries.py", (
+                "project_level_extracted_vouchers", "cross_workpaper_duplicate_vouchers",
+            )),
         ):
-            body = _func_body(src, name)
-            assert body, f"抽不到 {name} 函数体 → 断言会空转"
-            assert "except Exception" in body, f"{name} 未 fail-open"
-            assert "logger.warning" in body, f"{name} fail-open 未留 WARNING（静默黑洞）"
+            src = _strip_comments((_APP / "services" / file_name).read_text(encoding="utf-8"))
+            for name in names:
+                body = _func_body(src, name)
+                assert body, f"抽不到 {name} 函数体 → 断言会空转"
+                assert "except Exception" in body, f"{name} 未 fail-open"
+                assert "logger.warning" in body, f"{name} fail-open 未留 WARNING（静默黑洞）"
 
     def test_reverse_selfcheck_fail_open_detector(self):
         """反向自检：静默吞异常的替身函数必须被上一条判据判红。"""
@@ -373,10 +379,16 @@ class TestRegistryWiring:
         src = _strip_comments(
             (_APP / "routers" / "voucher_sampling.py").read_text(encoding="utf-8")
         )
-        assert "project_level_extracted_voucher_nos" in src
-        assert 'exclude_scope' in src
+        # 排除口径收在 voucher_sampling_exclusion.collect_exclusions（凭证身份 spec 任务 5）
+        assert "collect_exclusions(" in src and "exclude_scope=exclude_scope" in src
         # 缺省必须是 workpaper（零回归）
         assert 'filters.get("exclude_scope", "workpaper")' in src
+        body = _func_body(
+            _strip_comments((_APP / "services" / "voucher_sampling_exclusion.py").read_text(encoding="utf-8")),
+            "collect_exclusions",
+        )
+        assert body, "抽不到 collect_exclusions 函数体 → 断言会空转"
+        assert "project_level_extracted_vouchers(" in body and 'exclude_scope == "project"' in body
 
     def test_coverage_endpoint_exists(self):
         src = _strip_comments(
@@ -403,11 +415,12 @@ class TestRegistryWiring:
     def test_cross_workpaper_detection_scope(self):
         """R8.2/8.3：排除当前底稿 + 只算引擎登记行（穿透页手工标记不算已抽凭）。"""
         src = _strip_comments(
-            (_APP / "services" / "sampling_registry_service.py").read_text(encoding="utf-8")
+            (_APP / "services" / "sampled_voucher_queries.py").read_text(encoding="utf-8")
         )
-        body = src[src.index("async def cross_workpaper_duplicate_vouchers") :]
-        body = body[: body.index("async def project_sampling_coverage")]
-        assert "batch_id.isnot(None)" in body, "须只统计抽凭引擎登记行"
+        body = _func_body(src, "cross_workpaper_duplicate_vouchers")
+        assert body, "抽不到 cross_workpaper_duplicate_vouchers 函数体 → 断言会空转"
+        # 只统计抽凭引擎登记行：条件收在 _engine_rows（batch_id 非空）
+        assert "_engine_rows(" in body and "batch_id.isnot(None)" in _func_body(src, "_engine_rows")
         assert "working_paper_id != exclude_workpaper_id" in body, "须排除当前底稿"
         # wp_code 在 wp_index，须 JOIN（working_paper 表无该列）
         assert "WpIndex" in body
@@ -420,7 +433,7 @@ class TestRegistryWiring:
                     _BoomDB(),
                     project_id=uuid4(),
                     year=2025,
-                    voucher_nos=["V-1"],
+                    voucher_keys=[_VK],
                     exclude_workpaper_id=uuid4(),
                 )
             )
@@ -434,7 +447,7 @@ class TestRegistryWiring:
                 _BoomDB(),
                 project_id=uuid4(),
                 year=2025,
-                voucher_nos=[],
+                voucher_keys=[],
                 exclude_workpaper_id=None,
             )
         )
@@ -443,17 +456,33 @@ class TestRegistryWiring:
     def test_project_exclusion_only_counts_engine_rows(self):
         """项目级排除只取 batch_id 非空的登记行 —— 穿透页手工标记不是"已执行抽凭程序"。"""
         src = _strip_comments(
-            (_APP / "services" / "sampling_registry_service.py").read_text(encoding="utf-8")
+            (_APP / "services" / "sampled_voucher_queries.py").read_text(encoding="utf-8")
         )
-        body = src[src.index("async def project_level_extracted_voucher_nos") :]
-        body = body[: body.index("async def project_sampling_coverage")]
-        assert "batch_id.isnot(None)" in body
+        body = _func_body(src, "project_level_extracted_vouchers")
+        assert body, "抽不到 project_level_extracted_vouchers 函数体 → 断言会空转"
+        assert "_engine_rows(" in body and "batch_id.isnot(None)" in _func_body(src, "_engine_rows")
 
 
-# ─── Property 11（写入侧）：ON CONFLICT 目标必须与 V139 唯一索引逐列一致 ──────
+# ─── Property 11（写入侧）：ON CONFLICT 目标必须与现行批次唯一索引（V210）逐列一致 ──
 
 
-_ON_CONFLICT_COLS = ("project_id", "year", "voucher_no", "working_paper_id", "batch_id")
+_ON_CONFLICT_COLS = (
+    "project_id",
+    "year",
+    "voucher_no",
+    "(COALESCE(voucher_date, DATE '1900-01-01'))",
+    "(COALESCE(company_code, ''))",
+    "(COALESCE(voucher_type, ''))",
+    "working_paper_id",
+    "batch_id",
+)
+
+
+def _batch_index_sql() -> str:
+    """V210 里批次唯一索引的建索引语句（到 WHERE 为止），表达式列须与 ON CONFLICT 目标逐字相同。"""
+    sql = _BATCH_INDEX_MIGRATION.read_text(encoding="utf-8")
+    start = sql.index("CREATE UNIQUE INDEX IF NOT EXISTS uq_sampled_vouchers_batch")
+    return sql[start : sql.index("WHERE", start)]
 
 
 def _declared_conflict_target(src: str) -> tuple[list[str], str]:
@@ -473,7 +502,8 @@ class TestSampledVoucherConflictTarget:
     `no unique or exclusion constraint matching the ON CONFLICT specification`
     → 被 `register_sampled_vouchers` 的 fail-open 吞成 WARNING → 登记**每次都静默失败**。
     V139→V140 返工正是这一形态（声明五列索引却撞上另一个全局唯一索引），故本组把
-    「服务源码声明」与「V139 迁移文本」交叉锁死，改一侧另一侧必红。
+    「服务源码声明」与「现行建索引迁移文本」交叉锁死，改一侧另一侧必红。V210 起索引含
+    表达式列，ON CONFLICT 目标必须写出同样的表达式（PG 才推断得到表达式索引）。
     """
 
     def _src(self) -> str:
@@ -487,11 +517,12 @@ class TestSampledVoucherConflictTarget:
     def test_conflict_target_columns_match_migration_index(self):
         cols, _ = _declared_conflict_target(self._src())
         assert cols, "未声明 index_elements → ON CONFLICT 目标不确定"
-        sql = _MIGRATION.read_text(encoding="utf-8")
-        idx = sql[sql.index("uq_sampled_vouchers_batch") : sql.index("WHERE is_deleted = false")]
+        idx = _batch_index_sql()
         assert set(cols) == set(_ON_CONFLICT_COLS), f"声明列集与预期不符: {cols}"
         for col in cols:
-            assert col in idx, f"声明的 {col} 不在 V139 唯一索引里 → ON CONFLICT 必报错"
+            assert col in idx, f"声明的 {col} 不在 V210 批次唯一索引里 → ON CONFLICT 必报错"
+        for col in _ON_CONFLICT_COLS:
+            assert col in idx, f"V210 批次唯一索引缺 {col}"
 
     def test_conflict_predicate_matches_partial_index(self):
         """部分唯一索引必须配同谓词的 `index_where`，否则 PG 匹配不到该索引。"""

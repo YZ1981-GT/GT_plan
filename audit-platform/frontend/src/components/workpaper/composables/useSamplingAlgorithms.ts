@@ -72,7 +72,7 @@ export interface SamplingConfig {
    *   用于避免同一凭证被多个循环重复抽取（该问题此前项目层面发现不了）
    */
   excludeScope?: 'workpaper' | 'project'
-  /** 抽样单位：分录行（默认）或整张凭证（按凭证号聚合，抽中带出完整分录） */
+  /** 抽样单位：分录行（默认）或整张凭证（按凭证键聚合，抽中带出该凭证在过滤范围内的分录） */
   samplingUnit?: 'ledger_line' | 'voucher'
   // ─── 方法学增强（可选，向后兼容）─────────────────────────────────
   /** 置信度/信赖水平，如 0.95（R20）；驱动可信赖度系数与样本量推导 */
@@ -98,6 +98,10 @@ export interface EditTrailEntry {
 export interface SampledVoucher {
   /** 序时账分录行 id（ledger id）；用于 ledger_line 单位的行级排除（P3），后端返回时映射 */
   id?: string
+  /** 凭证键（后端 voucher_identity，含年度 / 主体 / 日期 / 凭证字 / 号）；回填留痕 filled_voucher_keys */
+  voucherKey?: string | null
+  /** 分录指纹（账套重导后仍能认出同一笔分录）；回填留痕 filled_line_fps，已抽排除按它 */
+  lineFp?: string | null
   voucherNo: string
   voucherDate: string
   summary: string | null

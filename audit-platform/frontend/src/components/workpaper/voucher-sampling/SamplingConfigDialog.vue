@@ -521,7 +521,7 @@ function hasError(key: string): boolean {
                 <el-radio value="voucher">整张凭证</el-radio>
               </el-radio-group>
               <span class="hint-text" style="margin-left: 8px">
-                整张凭证：按凭证号聚合抽样，抽中带出完整借贷分录
+                整张凭证：按凭证（日期 + 凭证字 + 号）聚合抽样，抽中带出该凭证在所选科目内的分录
               </span>
             </div>
 
@@ -560,7 +560,7 @@ function hasError(key: string): boolean {
                 active-text="开启"
                 inactive-text="关闭"
               />
-              <span class="hint-text">开启后自动排除历史已抽凭证号</span>
+              <span class="hint-text">开启后排除本底稿已抽过的样本（按分录 / 凭证认，账套重导后仍有效；同号的其他凭证不受影响）</span>
             </div>
 
             <!-- 排除范围（R5.5）：默认仅当前底稿，可扩到全项目防跨循环重复抽凭 -->

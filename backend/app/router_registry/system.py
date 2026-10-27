@@ -73,6 +73,8 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §3. 查账与试算 ═══
     from app.routers.drilldown import router as drilldown_router
     from app.routers.ledger_penetration import router as ledger_router
+    # 挂凭（sample-voucher / sampled-vouchers）：与 ledger_router 同一 URL 前缀，凭证身份 spec 任务 6 迁出
+    from app.routers.voucher_links import router as voucher_links_router
     from app.routers.trial_balance import router as tb_router
     from app.routers.adjustments import router as adj_router
     from app.routers.materiality import router as mat_router
@@ -82,7 +84,7 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.data_validation import router as dv_router
     from app.routers.consistency import router as consistency_router
 
-    for r in [drilldown_router, ledger_router, tb_router, adj_router,
+    for r in [drilldown_router, ledger_router, voucher_links_router, tb_router, adj_router,
               mat_router, mis_router, events_router, tb_sync_router,
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])

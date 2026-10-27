@@ -771,10 +771,10 @@
     <template v-if="currentLevel === 'voucher'">
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
-        <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
-        <el-button size="small" plain @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
-        <el-button size="small" type="primary" plain @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
-        <el-button size="small" type="warning" plain @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表">挂凭到底稿</el-button>
+        <el-tag type="info" size="small">凭证 {{ voucherLabel(currentVoucherType, currentVoucher) }}</el-tag>
+        <el-button size="small" plain :disabled="!!voucherAmbiguity" @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
+        <el-button size="small" type="primary" plain :disabled="!!voucherAmbiguity" @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
+        <el-button size="small" type="warning" plain :disabled="!!voucherAmbiguity" @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表（同号多张凭证时先在下方选定一张）">挂凭到底稿</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportVoucherExcel">导出Excel</el-button>
         <el-popover v-if="voucherExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
@@ -796,7 +796,15 @@
         </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
+      <VoucherKeyCandidates
+        v-if="voucherAmbiguity"
+        :candidates="voucherAmbiguity.candidates"
+        :message="voucherAmbiguity.message"
+        :truncated="voucherAmbiguity.truncated"
+        @pick="pickVoucherCandidate"
+      />
       <el-table
+        v-else
         :data="voucherItems"
         border
         stripe
@@ -1376,6 +1384,9 @@ import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDi
 import { buildExtraColumns, buildClipboardTable, fmtExtraCell } from '@/views/ledgerExtraColumns'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
+import { attachFailureReason, attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import VoucherKeyCandidates from '@/views/ledger/VoucherKeyCandidates.vue'
+import { voucherKeyAmbiguityOf, voucherLabel, type VoucherKeyAmbiguity, type VoucherKeyCandidate } from '@/utils/voucherIdentity'
 // Domain-split composables (platform-global-hardening Req 6.1/6.3)
 import { useLedgerImport } from '@/views/composables/useLedgerImport'
 import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
@@ -2447,7 +2458,7 @@ function onContextAction(action: string) {
 
 // ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
 const attachDialogVisible = ref(false)
-const attachVouchers = ref<Array<{ voucherNo: string; accountCode?: string | null }>>([])
+const attachVouchers = ref<Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; accountCode?: string | null }>>([])
 /** 当前凭证所有分录涉及的科目编码（去重），供弹窗推荐底稿 */
 const attachAllAccountCodes = ref<string[]>([])
 
@@ -2459,28 +2470,30 @@ function openAttachToWorkpaper(fallbackRow?: any) {
     : (fallbackRow ? [fallbackRow] : [])
 
   const seen = new Set<string>()
-  const list: Array<{ voucherNo: string; voucherDate?: string | null; accountCode?: string | null }> = []
+  const list: Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; accountCode?: string | null }> = []
   for (const r of pool) {
     const vno = String(r?.voucher_no || '').trim()
     if (!vno) continue
-    // 🔴 去重键必须含日期：凭证号在真实数据中跨日重复（实测单号最多对应 83 个日期），
-    //    只按 voucher_no 去重会把「1月的0075」和「3月的0075」误并成一条，
-    //    导致只挂进去一张、另一张静默丢失。
+    // 🔴 去重键 = 日期 + 凭证字 + 号：凭证号跨日重复（单号最多对应 83 个日期），同日同号也可能是
+    //    多张凭证（FY-0003 / ZZ-0003）。少一样就会把两张凭证并成一条，只挂进去一张。
     const vdate = normalizeVoucherDate(r?.voucher_date)
-    const key = `${vno}@${vdate || ''}`
+    const vtype = rowVoucherType(r)
+    const key = `${vno}@${vdate || ''}@${vtype ?? '?'}`
     if (seen.has(key)) continue
     seen.add(key)
     list.push({
       voucherNo: vno,
       voucherDate: vdate,
+      voucherType: vtype,
       accountCode: r?.account_code || currentAccount.value || null,
     })
   }
-  // 凭证层：右键行无 voucher_no 时用当前凭证兜底（带当前穿透的日期）
+  // 凭证层：右键行无 voucher_no 时用当前凭证兜底（带当前穿透的日期与凭证字）
   if (list.length === 0 && currentLevel.value === 'voucher' && currentVoucher.value) {
     list.push({
       voucherNo: currentVoucher.value,
       voucherDate: currentVoucherDate.value || null,
+      voucherType: currentVoucherType.value,
       accountCode: currentAccount.value || null,
     })
   }
@@ -2522,6 +2535,7 @@ function attachCurrentVoucher() {
   attachVouchers.value = [{
     voucherNo: currentVoucher.value,
     voucherDate: currentVoucherDate.value || null,
+    voucherType: currentVoucherType.value,
     accountCode: currentAccount.value || null,
   }]
   // 从当前凭证所有分录提取涉及的科目（多对多凭证推荐所有相关底稿）
@@ -2569,16 +2583,16 @@ function copyCurrentVoucher() {
 async function sampleCurrentVoucher() {
   if (!currentVoucher.value) return
   try {
-    await api.post(`/api/projects/${projectId.value}/ledger/sample-voucher`, {
+    await attachVoucher(projectId.value, {
       year: year.value,
-      voucher_no: currentVoucher.value,
-      voucher_date: currentVoucherDate.value || null,
-      account_code: currentAccount.value || null,
+      voucherNo: currentVoucher.value,
+      voucherDate: currentVoucherDate.value || null,
+      voucherType: currentVoucherType.value,
+      accountCode: currentAccount.value || null,
     })
-    ElMessage.success(`已将凭证 ${currentVoucher.value} 加入抽样`)
+    ElMessage.success(`已将凭证 ${voucherLabel(currentVoucherType.value, currentVoucher.value)} 加入抽样`)
   } catch (e: any) {
-    // 后端端点未就绪时降级为本地提示（不阻断）
-    ElMessage.warning(`抽样登记失败：${e?.message || '功能待后端支持'}`)
+    ElMessage.warning(`抽样登记失败：${attachFailureReason(e)}`)
   }
 }
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
@@ -2591,6 +2605,10 @@ const currentVoucherMonth = ref<number | null>(null)
 // 🔴 凭证号在真实数据中不唯一（实测 8 个项目里 7 个跨月/跨日重复，单号最多对应
 // 83 个不同日期）。(voucher_date, voucher_no) 才唯一对应一张凭证，故穿透时带上日期。
 const currentVoucherDate = ref<string>('')
+// 凭证字：同日同号也可能是多张凭证（四川物流 2025-01-07 的 FY-0003 与 ZZ-0003）。null = 不知道，
+// 交给后端判断；命中多张时后端回 409 + 候选（voucherCandidates），用户选一张再穿透，不合并分录。
+const currentVoucherType = ref<string | null>(null)
+const voucherAmbiguity = ref<VoucherKeyAmbiguity | null>(null)
 const currentAuxType = ref('')
 const currentAuxCode = ref('')
 const searchKeyword = ref('')
@@ -2604,7 +2622,10 @@ const auxPageSize = ref(100)
 const auxPageSizeOptions = [50, 100, 200, 500]
 const dateRange = ref<string[] | null>(null)
 
-interface Crumb { label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string }
+interface Crumb {
+  label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string
+  voucherDate?: string; voucherType?: string | null; voucherMonth?: number | null
+}
 const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 
 // ── 数据 ──
@@ -3369,18 +3390,40 @@ async function loadLedger() {
 
 async function loadVoucher() {
   loading.value = true
+  voucherAmbiguity.value = null
   try {
     const params: Record<string, unknown> = { year: year.value }
-    // 优先用完整日期（唯一定位一张凭证），无日期时退化为月份过滤
+    // 优先用完整日期，无日期时退化为月份过滤；凭证字已知才传（空串 = 凭证字为空的那张）
     if (currentVoucherDate.value) params.voucher_date = currentVoucherDate.value
     else if (currentVoucherMonth.value != null) params.month = currentVoucherMonth.value
+    if (currentVoucherType.value != null) params.voucher_type = currentVoucherType.value
+    // _silent：409（命中多张凭证）由本处列候选，其余错误由 handleApiError 提示一次
     const data = await api.get(
       P_ledger.voucher(projectId.value, currentVoucher.value),
-      { params }
+      { params, _silent: true } as any
     )
     voucherItems.value = data ?? []
-  } catch { voucherItems.value = [] }
+  } catch (e: any) {
+    voucherItems.value = []
+    voucherAmbiguity.value = voucherKeyAmbiguityOf(e)
+    if (!voucherAmbiguity.value) handleApiError(e, '加载凭证分录')
+  }
   finally { loading.value = false }
+}
+
+/** 从 409 候选里选一张凭证：带上日期与凭证字重新穿透，并把面包屑改成这张凭证。 */
+function pickVoucherCandidate(c: VoucherKeyCandidate) {
+  currentVoucherDate.value = c.voucher_date
+  currentVoucherType.value = c.voucher_type
+  currentVoucherMonth.value = Number(c.voucher_date.slice(5, 7)) || null
+  const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
+  if (crumb?.level === 'voucher') {
+    Object.assign(crumb, {
+      label: `凭证 ${voucherLabel(c.voucher_type, c.voucher_no)}（${c.voucher_date}）`,
+      voucherDate: c.voucher_date, voucherType: c.voucher_type, voucherMonth: currentVoucherMonth.value,
+    })
+  }
+  loadVoucher()
 }
 
 async function loadAuxBalance() {
@@ -4261,6 +4304,7 @@ function drillToVoucherFromTab(row: any) {
   currentAccount.value = acct
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
+  currentVoucherType.value = rowVoucherType(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
@@ -4269,9 +4313,10 @@ function drillToVoucherFromTab(row: any) {
     { label: `${acct} 序时账`, level: 'ledger', account: acct },
     {
       label: currentVoucherDate.value
-        ? `凭证 ${row.voucher_no}（${currentVoucherDate.value}）`
+        ? `凭证 ${voucherLabel(currentVoucherType.value, row.voucher_no)}（${currentVoucherDate.value}）`
         : `凭证 ${row.voucher_no}`,
       level: 'voucher', voucher: row.voucher_no, voucherDate: currentVoucherDate.value,
+      voucherType: currentVoucherType.value,
     },
   ]
   loadVoucher()
@@ -4558,20 +4603,27 @@ function normalizeVoucherDate(raw: unknown): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''
 }
 
+/** 行上带了凭证字列就算已知（NULL = 凭证字为空，按空串）；没有这一列返回 null，交给后端判歧义。 */
+function rowVoucherType(row: any): string | null {
+  return row && 'voucher_type' in row ? String(row.voucher_type ?? '').trim() : null
+}
+
 function drillToVoucher(row: any) {
   if (!row.voucher_no) return
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
+  currentVoucherType.value = rowVoucherType(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
   breadcrumbs.value.push({
     label: currentVoucherDate.value
-      ? `凭证 ${row.voucher_no}（${currentVoucherDate.value}）`
+      ? `凭证 ${voucherLabel(currentVoucherType.value, row.voucher_no)}（${currentVoucherDate.value}）`
       : `凭证 ${row.voucher_no}`,
     level: 'voucher',
     voucher: row.voucher_no,
     voucherDate: currentVoucherDate.value,
+    voucherType: currentVoucherType.value,
     voucherMonth: currentVoucherMonth.value,
   })
   loadVoucher()
@@ -4612,7 +4664,7 @@ function navigateTo(index: number) {
   currentLevel.value = crumb.level
   if (crumb.level === 'balance') loadBalance()
   else if (crumb.level === 'ledger') { currentAccount.value = crumb.account || ''; loadLedger() }
-  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher() }
+  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherType.value = crumb.voucherType ?? null; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher() }
   else if (crumb.level === 'aux_balance') { currentAccount.value = crumb.account || ''; loadAuxBalance() }
   else if (crumb.level === 'aux_ledger') {
     currentAccount.value = crumb.account || currentAccount.value

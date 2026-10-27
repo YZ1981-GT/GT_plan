@@ -26,6 +26,13 @@ from app.models.audit_platform_schemas import (
     PageResult,
 )
 from app.services.dataset_query import get_active_filter
+from app.services.voucher_identity import (
+    VoucherKey,
+    annotate_lines,
+    single_voucher_lines,
+    voucher_key_sql,
+    voucher_type_condition,
+)
 
 
 class DrilldownService:
@@ -500,21 +507,18 @@ class DrilldownService:
         *,
         month: int | None = None,
         voucher_date: str | None = None,
+        voucher_type: str | None = None,
     ) -> dict:
-        """按凭证号查询完整分录，包含借贷合计和平衡状态。
+        """一张凭证的完整分录，包含借贷合计和平衡状态（按凭证键定位：日期 + 凭证字 + 号）。
 
-        返回该凭证的所有分录行 + 借方合计 + 贷方合计 + 是否平衡。
-
-        🔴 voucher_no 单独并不唯一。真实库实测（8 个项目）：7 个项目的凭证号
-        跨月甚至跨日重复，单个号最多对应 83 个不同日期。唯一定位一张凭证的键是
-        ``(voucher_date, voucher_no)`` —— 该粒度下借贷 100% 平衡，证明其恰好
-        对应一张完整凭证。不传日期时 ``is_balanced`` 反映的是全年同号凭证合计，
-        并非单张凭证的平衡状态。
+        🔴 凭证号单独不唯一，同日同号也不唯一（四川物流 2025-01-07 的 FY-0003 与 ZZ-0003 是两张
+        凭证）。两张各自平衡的凭证并在一起照样平衡，「借贷平衡」证明不了唯一；命中多张凭证时
+        抛 VoucherKeyAmbiguous（409 + 候选），``is_balanced`` 只对单张凭证计算。
 
         Args:
-            month: 月份过滤（1~12）。粗粒度，同月内仍可能有多张同号凭证。
-            voucher_date: 凭证日期（YYYY-MM-DD）。与 voucher_no 组合唯一定位
-                          一张凭证，是推荐的精确过滤方式。
+            month: 月份过滤（1~12），只在不给日期时用。
+            voucher_date: 凭证日期（YYYY-MM-DD）。
+            voucher_type: 凭证字；空串 = 凭证字为空的那张，None = 不限。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
@@ -527,11 +531,16 @@ class DrilldownService:
             conditions.append(tbl.c.voucher_date == parsed)
         elif month is not None:
             conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
+        if voucher_type is not None:
+            conditions.append(voucher_type_condition(tbl, voucher_type))
 
         stmt = (
             sa.select(
                 tbl.c.id,
+                tbl.c.year,
+                tbl.c.company_code,
                 tbl.c.voucher_date,
+                tbl.c.voucher_type,
                 tbl.c.voucher_no,
                 tbl.c.account_code,
                 tbl.c.account_name,
@@ -542,36 +551,40 @@ class DrilldownService:
                 tbl.c.preparer,
             )
             .where(*conditions)
-            .order_by(tbl.c.account_code)
+            .order_by(tbl.c.account_code, tbl.c.id)
         )
         result = await self.db.execute(stmt)
-        rows = result.fetchall()
+        rows = single_voucher_lines([dict(r._mapping) for r in result.fetchall()], year=year)
+        annotate_lines(rows, year=year)
 
         entries = []
         total_debit = Decimal("0")
         total_credit = Decimal("0")
-        voucher_date = None
 
         for r in rows:
-            d = r.debit_amount or Decimal("0")
-            c = r.credit_amount or Decimal("0")
+            d = r["debit_amount"] or Decimal("0")
+            c = r["credit_amount"] or Decimal("0")
             total_debit += d
             total_credit += c
-            if voucher_date is None:
-                voucher_date = r.voucher_date
             entries.append({
-                "id": r.id,
-                "account_code": r.account_code,
-                "account_name": r.account_name,
+                "id": r["id"],
+                "account_code": r["account_code"],
+                "account_name": r["account_name"],
                 "debit_amount": d,
                 "credit_amount": c,
-                "summary": r.summary,
+                "summary": r["summary"],
+                "side": r["side"],
+                "line_fp": r["line_fp"],
             })
 
+        first = rows[0] if rows else {}
         return {
             "voucher_no": voucher_no,
-            "voucher_date": voucher_date,
-            "preparer": rows[0].preparer if rows else None,
+            "voucher_date": first.get("voucher_date"),
+            "voucher_type": first.get("voucher_type"),
+            "company_code": first.get("company_code"),
+            "voucher_key": first.get("voucher_key"),
+            "preparer": first.get("preparer"),
             "entries": entries,
             "total_debit": total_debit,
             "total_credit": total_credit,
@@ -589,18 +602,21 @@ class DrilldownService:
         keyword: str | None = None,
         page: int = 1, page_size: int = 50,
     ) -> PageResult:
-        """凭证列表：按凭证号分组，显示日期、摘要、借贷合计。
+        """凭证列表：一行一张凭证（按凭证键分组：主体、日期、凭证字、号），显示摘要、借贷合计。
 
-        使用 GROUP BY 在数据库层面聚合，支持百万行序时账。
+        使用 GROUP BY 在数据库层面聚合，支持百万行序时账。凭证号单独不唯一（同号别日、
+        同日同号别凭证字都是不同凭证），按号分组会把多张凭证并成一行。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
 
-        # 按凭证号分组聚合
+        company, vdate, vtype, vno = voucher_key_sql(tbl)
         group_q = (
             sa.select(
-                tbl.c.voucher_no,
-                sa.func.min(tbl.c.voucher_date).label("voucher_date"),
+                company.label("company_code"),
+                vdate.label("voucher_date"),
+                vtype.label("voucher_type"),
+                vno.label("voucher_no"),
                 sa.func.min(tbl.c.preparer).label("preparer"),
                 sa.func.string_agg(
                     sa.func.distinct(tbl.c.summary),
@@ -611,13 +627,13 @@ class DrilldownService:
                 sa.func.count().label("entry_count"),
             )
             .where(active_filter)
-            .group_by(tbl.c.voucher_no)
+            .group_by(company, vdate, vtype, vno)
         )
 
         if date_from:
-            group_q = group_q.having(sa.func.min(tbl.c.voucher_date) >= date_from)
+            group_q = group_q.where(tbl.c.voucher_date >= date_from)
         if date_to:
-            group_q = group_q.having(sa.func.min(tbl.c.voucher_date) <= date_to)
+            group_q = group_q.where(tbl.c.voucher_date <= date_to)
         if keyword:
             # 筛选包含关键词的凭证（摘要或凭证号）
             group_q = group_q.having(
@@ -645,6 +661,12 @@ class DrilldownService:
             {
                 "voucher_no": r.voucher_no,
                 "voucher_date": r.voucher_date,
+                "voucher_type": r.voucher_type,
+                "company_code": r.company_code,
+                "voucher_key": VoucherKey.of(
+                    year=year, company_code=r.company_code, voucher_date=r.voucher_date,
+                    voucher_type=r.voucher_type, voucher_no=r.voucher_no,
+                ).to_str(),
                 "preparer": r.preparer,
                 "summaries": r.summaries,
                 "total_debit": r.total_debit,
