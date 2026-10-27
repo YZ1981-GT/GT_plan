@@ -6,10 +6,11 @@
      （YAML 解析）、地址种子、I/E manifest、wp_account_mapping、classification 缓存、是否已在目录；
      孤儿 cell 的 static_refs（backend/data 全 JSON/YAML 对 addr_id / formula_ref 命中）、formula_ref 与目录一致、
      A1 在父 sheet 的种子坐标里。
-  3. pg_only（真库只读）：10 个 sheet 编码（5 张补登父 sheet + K14~K18）在未删项目 wp_index 里在用；
-     5 张补登父 sheet 的 sheet 级底稿 parsed_data 里没有单元格数据（无物理来源）；17 个 formula / expression
-     文本列对 25 个孤儿 addr_id / formula_ref 命中为 0（= 记录的 pg_formula_refs）；记录的 wp_index / project_files
-     数字是 as_of 当日的现算，守卫断言在用与无数据这两条判定前提仍成立。
+  3. pg_only（真库只读）：记录的 wp_index / project_files 是 as_of 当日的快照，逐值等于真库现算（10 个 sheet 编码
+     的在用项目数、sheet 级底稿数、有文件数、parsed_data 是否全空，25 个孤儿 cell 的 project_files 等于父 sheet 的
+     现算值；真库变化即红，须重录证据并复核判定）；判定前提——10 个编码在用、5 张补登父 sheet 的 sheet 级底稿都有
+     文件但没有单元格数据；17 个 formula / expression 文本列对 25 个孤儿 addr_id / formula_ref 命中为 0（= 记录的
+     pg_formula_refs）。
   4. 「删 I6-7 → 门禁点名 I6/I6-7」的门禁级变异须等 T07 门禁接上判定记录后重做（本任务因此仍为 [ ]）。
 """
 from __future__ import annotations
@@ -402,53 +403,77 @@ def _pg_available() -> bool:
 _PG = pytest.mark.skipif(not _pg_available(), reason="需要本机 PG（audit_platform）只读")
 
 
-@_PG
-def test_sheet_codes_in_use_pg(verdicts):
-    """10 个 sheet 编码（5 张补登 + K14~K18）在未删项目的 wp_index 里在用（导航落点 / 停用不得静默消失）。"""
+def _live_db_evidence(codes: list[str]) -> tuple[dict[str, int], dict[str, dict[str, Any]]]:
+    """真库只读现算：sheet 编码 → 在用项目数；sheet 编码 → sheet 级底稿 {数量, 有文件, parsed_data 全空}。"""
     conn = _pg_conn()
     try:
         cur = conn.cursor()
-        codes = sorted(v.sheet_code for v in verdicts.sheet_verdicts)
         cur.execute(
             "SELECT wi.wp_code, count(DISTINCT wi.project_id) FROM wp_index wi JOIN projects p ON p.id = wi.project_id "
             "WHERE wi.wp_code = ANY(%s) AND COALESCE(p.is_deleted, false) = false GROUP BY wi.wp_code",
             (codes,),
         )
-        live = {r[0]: r[1] for r in cur.fetchall()}
+        projects = {r[0]: r[1] for r in cur.fetchall()}
+        cur.execute(
+            "SELECT wi.wp_code, count(*), count(*) FILTER (WHERE wp.file_path IS NOT NULL), "
+            "bool_and(wp.parsed_data IS NULL OR wp.parsed_data::text IN ('null', '{}')) "
+            "FROM wp_index wi JOIN projects p ON p.id = wi.project_id "
+            "JOIN working_paper wp ON wp.wp_index_id = wi.id "
+            "WHERE wi.wp_code = ANY(%s) AND COALESCE(p.is_deleted, false) = false GROUP BY wi.wp_code",
+            (codes,),
+        )
+        files = {r[0]: {"sheet_level_workpapers": r[1], "with_file": r[2], "parsed_data_null": bool(r[3])}
+                 for r in cur.fetchall()}
         conn.rollback()
     finally:
         conn.close()
-    missing = [c for c in codes if live.get(c, 0) < 1]
-    assert not missing, f"这些 sheet 编码已无在用项目（判定前提变化，须复核）：{missing}"
-    for v in verdicts.sheet_verdicts:
-        assert v.evidence["wp_index"]["projects"] >= 1 and v.evidence["wp_index"]["as_of"], v.addr_id
+    return projects, files
+
+
+def _pf_values(pf: dict[str, Any]) -> dict[str, Any]:
+    return {k: pf.get(k) for k in ("sheet_level_workpapers", "with_file", "parsed_data_null")}
 
 
 @_PG
-def test_add_platform_sheet_level_workpapers_have_no_cell_data_pg(verdicts):
-    """5 张补登父 sheet 的 sheet 级底稿：parsed_data 里没有单元格数据（无物理来源的判定前提）。"""
-    conn = _pg_conn()
-    try:
-        cur = conn.cursor()
-        codes = sorted(v.sheet_code for v in verdicts.add_platform_sheets())
-        cur.execute(
-            "SELECT wi.wp_code, wp.file_path IS NOT NULL, "
-            "(wp.parsed_data IS NULL OR wp.parsed_data::text IN ('null', '{}')) "
-            "FROM wp_index wi JOIN projects p ON p.id = wi.project_id "
-            "JOIN working_paper wp ON wp.wp_index_id = wi.id "
-            "WHERE wi.wp_code = ANY(%s) AND COALESCE(p.is_deleted, false) = false",
-            (codes,),
-        )
-        rows = cur.fetchall()
-        conn.rollback()
-    finally:
-        conn.close()
-    assert {r[0] for r in rows} == set(codes), f"补登 sheet 的 sheet 级底稿不全：{sorted({r[0] for r in rows})}"
-    with_data = sorted({r[0] for r in rows if not r[2]})
-    assert not with_data, f"这些补登 sheet 的底稿已有数据（无物理来源判定须复核）：{with_data}"
+def test_db_evidence_snapshot_matches_live_pg(verdicts):
+    """记录的 wp_index / project_files 是 as_of 当日的快照：逐值等于真库现算（段四复审 F4-06：此前只做阈值核对）。
+
+    真库变化（新生成 / 删除了这些编码的底稿）即红：须按现算重录证据、更新 as_of，并复核判定是否仍成立。
+    """
+    codes = sorted(v.sheet_code for v in verdicts.sheet_verdicts)
+    projects, files = _live_db_evidence(codes)
+    problems = []
+    for v in verdicts.sheet_verdicts:
+        wi, pf = v.evidence["wp_index"], v.evidence["project_files"]
+        assert wi.get("as_of") and pf.get("as_of"), f"{v.addr_id} 证据缺 as_of"
+        if wi.get("projects") != projects.get(v.sheet_code, 0):
+            problems.append(f"{v.addr_id}.wp_index.projects: 记录 {wi.get('projects')}（as_of {wi.get('as_of')}）"
+                            f" ≠ 真库 {projects.get(v.sheet_code, 0)}")
+        live_pf = files.get(v.sheet_code, {"sheet_level_workpapers": 0, "with_file": 0, "parsed_data_null": None})
+        if _pf_values(pf) != live_pf:
+            problems.append(f"{v.addr_id}.project_files: 记录 {_pf_values(pf)}（as_of {pf.get('as_of')}） ≠ 真库 {live_pf}")
+    parents = {v.addr_id: v.sheet_code for v in verdicts.sheet_verdicts}
     for cv in verdicts.cell_verdicts:
-        pf = cv.evidence["project_files"]
-        assert pf["parsed_data_null"] is True and pf["sheet_level_workpapers"] >= 1 and pf["as_of"], cv.addr_id
+        live_pf = files.get(parents[cv.parent_sheet_code], {})
+        if _pf_values(cv.evidence["project_files"]) != live_pf:
+            problems.append(f"{cv.addr_id}.project_files: 记录 {_pf_values(cv.evidence['project_files'])} ≠ 父 sheet 真库 {live_pf}")
+    assert not problems, "判定记录的数据库证据与真库不符（重录证据并复核判定）：\n" + "\n".join(problems)
+
+
+@_PG
+def test_db_evidence_supports_verdicts_pg(verdicts):
+    """判定前提：10 个 sheet 编码在未删项目 wp_index 里在用（导航落点 / 停用不得静默消失）；5 张补登父 sheet 的
+    sheet 级底稿都有文件但 parsed_data 里没有单元格数据（无物理来源）。"""
+    codes = sorted(v.sheet_code for v in verdicts.sheet_verdicts)
+    projects, files = _live_db_evidence(codes)
+    missing = [c for c in codes if projects.get(c, 0) < 1]
+    assert not missing, f"这些 sheet 编码已无在用项目（判定前提变化，须复核）：{missing}"
+    add_codes = sorted(v.sheet_code for v in verdicts.add_platform_sheets())
+    assert set(add_codes) <= set(files), f"补登 sheet 的 sheet 级底稿不全：{sorted(set(add_codes) - set(files))}"
+    with_data = [c for c in add_codes if not files[c]["parsed_data_null"]]
+    assert not with_data, f"这些补登 sheet 的底稿已有数据（无物理来源判定须复核）：{with_data}"
+    no_file = [c for c in add_codes if files[c]["with_file"] != files[c]["sheet_level_workpapers"]]
+    assert not no_file, f"这些补登 sheet 有底稿没有文件（与记录的证据前提不符）：{no_file}"
 
 
 @_PG
