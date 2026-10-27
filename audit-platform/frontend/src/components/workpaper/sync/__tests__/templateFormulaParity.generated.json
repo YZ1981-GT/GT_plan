@@ -1196,6 +1196,8 @@
     "pricePreContract",
     "qty",
     "qtyTotal",
+    "sellingExpenseRate",
+    "taxRate",
     "unitCost",
     "unitPrice"
    ],
@@ -1204,6 +1206,8 @@
     "pricePreContract": "amount",
     "qty": "amount",
     "qtyTotal": "amount",
+    "sellingExpenseRate": "percent_points",
+    "taxRate": "percent_points",
     "unitCost": "amount",
     "unitPrice": "amount"
    },
@@ -1215,9 +1219,7 @@
     "itemCode",
     "itemName",
     "remark",
-    "sellingExpenseRate",
     "status",
-    "taxRate",
     "unit"
    ],
    "auto_fields": [],
@@ -1326,12 +1328,12 @@
     "审定表F3-1!adjudication_seed_rows@7"
    ],
    "inputs": [
-    "priorAje",
-    "priorRje"
+    "openingAje",
+    "openingRje"
    ],
    "input_types": {
-    "priorAje": "amount",
-    "priorRje": "amount"
+    "openingAje": "amount",
+    "openingRje": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
@@ -1346,25 +1348,25 @@
     "审定表F3-1!adjudication_slot_rows@9"
    ],
    "inputs": [
-    "endAje",
-    "endRje",
-    "endUnadjusted",
-    "priorAje",
-    "priorRje",
-    "priorUnadjusted"
+    "closingAje",
+    "closingRje",
+    "closingUnadjusted",
+    "openingAje",
+    "openingRje",
+    "openingUnadjusted"
    ],
    "input_types": {
-    "endAje": "amount",
-    "endRje": "amount",
-    "endUnadjusted": "amount",
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorUnadjusted": "amount"
+    "closingAje": "amount",
+    "closingRje": "amount",
+    "closingUnadjusted": "amount",
+    "openingAje": "amount",
+    "openingRje": "amount",
+    "openingUnadjusted": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "category",
-    "indexRef"
+    "indexRef",
+    "label"
    ],
    "auto_fields": [],
    "literals": []
@@ -1376,24 +1378,26 @@
    ],
    "inputs": [
     "bookInterest",
-    "faceAmount",
+    "faceValue",
     "interestRate"
    ],
    "input_types": {
     "bookInterest": "amount",
-    "faceAmount": "amount",
-    "interestRate": "amount"
+    "faceValue": "amount",
+    "interestRate": "percent_points"
    },
-   "date_inputs": [],
-   "text_inputs": [
-    "issueDate",
-    "maturityDate",
-    "noteNumber",
-    "noteType",
-    "remark",
-    "term"
+   "date_inputs": [
+    "dueDate",
+    "issueDate"
    ],
-   "auto_fields": [],
+   "text_inputs": [
+    "note",
+    "noteType",
+    "ticketNo"
+   ],
+   "auto_fields": [
+    "termDays"
+   ],
    "literals": []
   },
   "F4-1-adj-aging-seed-rows": {
@@ -1402,20 +1406,20 @@
     "审定表F4-1!adjudication_aging_seed_rows@17"
    ],
    "inputs": [
-    "endRje",
-    "priorAje",
-    "priorRje",
-    "priorUnadjusted"
+    "closingRje",
+    "openingAje",
+    "openingRje",
+    "openingUnadjusted"
    ],
    "input_types": {
-    "endRje": "amount",
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorUnadjusted": "amount"
+    "closingRje": "amount",
+    "openingAje": "amount",
+    "openingRje": "amount",
+    "openingUnadjusted": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "reason"
+    "reasonAnalysis"
    ],
    "auto_fields": [],
    "literals": []
@@ -1426,25 +1430,25 @@
     "审定表F4-1!adjudication_aging_slot_rows@21"
    ],
    "inputs": [
-    "endAje",
-    "endRje",
-    "endUnadjusted",
-    "priorAje",
-    "priorRje",
-    "priorUnadjusted"
+    "closingAje",
+    "closingRje",
+    "closingUnadjusted",
+    "openingAje",
+    "openingRje",
+    "openingUnadjusted"
    ],
    "input_types": {
-    "endAje": "amount",
-    "endRje": "amount",
-    "endUnadjusted": "amount",
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorUnadjusted": "amount"
+    "closingAje": "amount",
+    "closingRje": "amount",
+    "closingUnadjusted": "amount",
+    "openingAje": "amount",
+    "openingRje": "amount",
+    "openingUnadjusted": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "category",
-    "reason"
+    "label",
+    "reasonAnalysis"
    ],
    "auto_fields": [],
    "literals": []
@@ -1455,18 +1459,18 @@
     "审定表F4-1!adjudication_nature_rows@8"
    ],
    "inputs": [
-    "priorAje",
-    "priorRje",
-    "priorUnadjusted"
+    "openingAje",
+    "openingRje",
+    "openingUnadjusted"
    ],
    "input_types": {
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorUnadjusted": "amount"
+    "openingAje": "amount",
+    "openingRje": "amount",
+    "openingUnadjusted": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "reason"
+    "reasonAnalysis"
    ],
    "auto_fields": [],
    "literals": []
@@ -4091,7 +4095,7 @@
    "field": "relatedTax",
    "header": "相关税费",
    "formula": "=O20*Q20",
-   "expr": "taxRate * nrv",
+   "expr": "( taxRate / 100 ) * nrv",
    "skip": null
   },
   {
@@ -4102,7 +4106,7 @@
    "field": "sellingExpense",
    "header": "估计销售费用",
    "formula": "=N20*Q20",
-   "expr": "sellingExpenseRate * nrv",
+   "expr": "( sellingExpenseRate / 100 ) * nrv",
    "skip": null
   },
   {
@@ -4241,19 +4245,8 @@
    "store_item": "F3-1-adj-seed-rows",
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
-   "cell": "G7",
-   "field": "endAje",
-   "header": "期末账项调整",
-   "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!P$15:P$30))",
-   "expr": null,
-   "skip": "函数 SUMPRODUCT 不在支持范围"
-  },
-  {
-   "store_item": "F3-1-adj-seed-rows",
-   "contract": "f3.notes_payable_detail",
-   "sheet": "审定表F3-1",
    "cell": "I7",
-   "field": "endAudited",
+   "field": "closingAdjusted",
    "header": "期末审定数",
    "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!R$15:R$30))",
    "expr": null,
@@ -4263,8 +4256,19 @@
    "store_item": "F3-1-adj-seed-rows",
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
+   "cell": "G7",
+   "field": "closingAje",
+   "header": "期末账项调整",
+   "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!P$15:P$30))",
+   "expr": null,
+   "skip": "函数 SUMPRODUCT 不在支持范围"
+  },
+  {
+   "store_item": "F3-1-adj-seed-rows",
+   "contract": "f3.notes_payable_detail",
+   "sheet": "审定表F3-1",
    "cell": "H7",
-   "field": "endRje",
+   "field": "closingRje",
    "header": "期末重分类调整",
    "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!Q$15:Q$30))",
    "expr": null,
@@ -4275,7 +4279,7 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
    "cell": "F7",
-   "field": "endUnadjusted",
+   "field": "closingUnadjusted",
    "header": "期末未审数",
    "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!O$15:O$30))",
    "expr": null,
@@ -4286,10 +4290,10 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
    "cell": "E7",
-   "field": "priorAudited",
+   "field": "openingAdjusted",
    "header": "期初审定数",
    "formula": "=B7+C7+D7",
-   "expr": "priorUnadjusted + priorAje + priorRje",
+   "expr": "openingUnadjusted + openingAje + openingRje",
    "skip": null
   },
   {
@@ -4297,7 +4301,7 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
    "cell": "B7",
-   "field": "priorUnadjusted",
+   "field": "openingUnadjusted",
    "header": "期初未审数",
    "formula": "=SUMPRODUCT(('明细表F3-2'!$B$15:$B$30=$A7)*('明细表F3-2'!L$15:L$30))",
    "expr": null,
@@ -4308,10 +4312,10 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
    "cell": "I9",
-   "field": "endAudited",
+   "field": "closingAdjusted",
    "header": "期末审定数",
    "formula": "=F9+G9+H9",
-   "expr": "endUnadjusted + endAje + endRje",
+   "expr": "closingUnadjusted + closingAje + closingRje",
    "skip": null
   },
   {
@@ -4319,10 +4323,10 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "审定表F3-1",
    "cell": "E9",
-   "field": "priorAudited",
+   "field": "openingAdjusted",
    "header": "期初审定数",
    "formula": "=B9+C9+D9",
-   "expr": "priorUnadjusted + priorAje + priorRje",
+   "expr": "openingUnadjusted + openingAje + openingRje",
    "skip": null
   },
   {
@@ -4330,10 +4334,10 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "应付票据（带息）利息测算表F3-4",
    "cell": "H11",
-   "field": "accruedInterest",
+   "field": "payableInterest",
    "header": "应计利息",
    "formula": "=ROUND(F11*G11,2)",
-   "expr": "ROUND( faceAmount * interestRate , 2 )",
+   "expr": "ROUND( faceValue * ( interestRate / 100 ) , 2 )",
    "skip": null
   },
   {
@@ -4341,10 +4345,10 @@
    "contract": "f3.notes_payable_detail",
    "sheet": "应付票据（带息）利息测算表F3-4",
    "cell": "J11",
-   "field": "diff",
+   "field": "variance",
    "header": "差异",
    "formula": "=H11-I11",
-   "expr": "accruedInterest - bookInterest",
+   "expr": "payableInterest - bookInterest",
    "skip": null
   },
   {
@@ -4355,7 +4359,7 @@
    "field": "changeAmount",
    "header": "变动额",
    "formula": "=I17-E17",
-   "expr": "endAudited - priorAudited",
+   "expr": "closingAdjusted - openingAdjusted",
    "skip": null
   },
   {
@@ -4366,18 +4370,7 @@
    "field": "changeRate",
    "header": "变动率",
    "formula": "=IF(AND(E17=0,J17=0),0,IF(AND(E17=0,J17>0),1,J17/E17))",
-   "expr": "IF( AND( priorAudited = 0 , changeAmount = 0 ) , 0 , IF( AND( priorAudited = 0 , changeAmount > 0 ) , 1 , changeAmount / priorAudited ) )",
-   "skip": null
-  },
-  {
-   "store_item": "F4-1-adj-aging-seed-rows",
-   "contract": "f4.accounts_payable_detail",
-   "sheet": "审定表F4-1",
-   "cell": "G17",
-   "field": "endAje",
-   "header": "期末账项调整",
-   "formula": "=I17-F17-H17",
-   "expr": "endAudited - endUnadjusted - endRje",
+   "expr": "IF( AND( openingAdjusted = 0 , changeAmount = 0 ) , 0 , IF( AND( openingAdjusted = 0 , changeAmount > 0 ) , 1 , changeAmount / openingAdjusted ) )",
    "skip": null
   },
   {
@@ -4385,7 +4378,7 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "I17",
-   "field": "endAudited",
+   "field": "closingAdjusted",
    "header": "期末审定数",
    "formula": "='明细表F4-2'!U32",
    "expr": null,
@@ -4395,8 +4388,19 @@
    "store_item": "F4-1-adj-aging-seed-rows",
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
+   "cell": "G17",
+   "field": "closingAje",
+   "header": "期末账项调整",
+   "formula": "=I17-F17-H17",
+   "expr": "closingAdjusted - closingUnadjusted - closingRje",
+   "skip": null
+  },
+  {
+   "store_item": "F4-1-adj-aging-seed-rows",
+   "contract": "f4.accounts_payable_detail",
+   "sheet": "审定表F4-1",
    "cell": "F17",
-   "field": "endUnadjusted",
+   "field": "closingUnadjusted",
    "header": "期末未审数",
    "formula": "='明细表F4-2'!N32",
    "expr": null,
@@ -4407,10 +4411,10 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "E17",
-   "field": "priorAudited",
+   "field": "openingAdjusted",
    "header": "期初审定数",
    "formula": "=B17+C17+D17",
-   "expr": "priorUnadjusted + priorAje + priorRje",
+   "expr": "openingUnadjusted + openingAje + openingRje",
    "skip": null
   },
   {
@@ -4421,7 +4425,7 @@
    "field": "changeAmount",
    "header": "变动额",
    "formula": "=I21-E21",
-   "expr": "endAudited - priorAudited",
+   "expr": "closingAdjusted - openingAdjusted",
    "skip": null
   },
   {
@@ -4432,7 +4436,7 @@
    "field": "changeRate",
    "header": "变动率",
    "formula": "=IF(AND(E21=0,J21=0),0,IF(AND(E21=0,J21>0),1,J21/E21))",
-   "expr": "IF( AND( priorAudited = 0 , changeAmount = 0 ) , 0 , IF( AND( priorAudited = 0 , changeAmount > 0 ) , 1 , changeAmount / priorAudited ) )",
+   "expr": "IF( AND( openingAdjusted = 0 , changeAmount = 0 ) , 0 , IF( AND( openingAdjusted = 0 , changeAmount > 0 ) , 1 , changeAmount / openingAdjusted ) )",
    "skip": null
   },
   {
@@ -4440,10 +4444,10 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "I21",
-   "field": "endAudited",
+   "field": "closingAdjusted",
    "header": "期末审定数",
    "formula": "=F21+G21+H21",
-   "expr": "endUnadjusted + endAje + endRje",
+   "expr": "closingUnadjusted + closingAje + closingRje",
    "skip": null
   },
   {
@@ -4451,10 +4455,10 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "E21",
-   "field": "priorAudited",
+   "field": "openingAdjusted",
    "header": "期初审定数",
    "formula": "=B21+C21+D21",
-   "expr": "priorUnadjusted + priorAje + priorRje",
+   "expr": "openingUnadjusted + openingAje + openingRje",
    "skip": null
   },
   {
@@ -4465,7 +4469,7 @@
    "field": "changeAmount",
    "header": "变动额",
    "formula": "=I8-E8",
-   "expr": "endAudited - priorAudited",
+   "expr": "closingAdjusted - openingAdjusted",
    "skip": null
   },
   {
@@ -4476,7 +4480,18 @@
    "field": "changeRate",
    "header": "变动率",
    "formula": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))",
-   "expr": "IF( AND( priorAudited = 0 , changeAmount = 0 ) , 0 , IF( AND( priorAudited = 0 , changeAmount > 0 ) , 1 , changeAmount / priorAudited ) )",
+   "expr": "IF( AND( openingAdjusted = 0 , changeAmount = 0 ) , 0 , IF( AND( openingAdjusted = 0 , changeAmount > 0 ) , 1 , changeAmount / openingAdjusted ) )",
+   "skip": null
+  },
+  {
+   "store_item": "F4-1-adj-nature-rows",
+   "contract": "f4.accounts_payable_detail",
+   "sheet": "审定表F4-1",
+   "cell": "I8",
+   "field": "closingAdjusted",
+   "header": "期末审定数",
+   "formula": "=F8+G8+H8",
+   "expr": "closingUnadjusted + closingAje + closingRje",
    "skip": null
   },
   {
@@ -4484,7 +4499,7 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "G8",
-   "field": "endAje",
+   "field": "closingAje",
    "header": "期末账项调整",
    "formula": "=SUMIF('明细表F4-2'!$D$11:$D$32,'审定表F4-1'!A8,'明细表F4-2'!$R$11:$R$32)",
    "expr": null,
@@ -4494,19 +4509,8 @@
    "store_item": "F4-1-adj-nature-rows",
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
-   "cell": "I8",
-   "field": "endAudited",
-   "header": "期末审定数",
-   "formula": "=F8+G8+H8",
-   "expr": "endUnadjusted + endAje + endRje",
-   "skip": null
-  },
-  {
-   "store_item": "F4-1-adj-nature-rows",
-   "contract": "f4.accounts_payable_detail",
-   "sheet": "审定表F4-1",
    "cell": "H8",
-   "field": "endRje",
+   "field": "closingRje",
    "header": "期末重分类调整",
    "formula": "=SUMIF('明细表F4-2'!$D$11:$D$32,'审定表F4-1'!A8,'明细表F4-2'!$S$11:$S$32)",
    "expr": null,
@@ -4517,7 +4521,7 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "F8",
-   "field": "endUnadjusted",
+   "field": "closingUnadjusted",
    "header": "期末未审数",
    "formula": "=SUMIF('明细表F4-2'!$D$11:$D$32,'审定表F4-1'!A8,'明细表F4-2'!$M$11:$M$32)",
    "expr": null,
@@ -4528,10 +4532,10 @@
    "contract": "f4.accounts_payable_detail",
    "sheet": "审定表F4-1",
    "cell": "E8",
-   "field": "priorAudited",
+   "field": "openingAdjusted",
    "header": "期初审定数",
    "formula": "=B8+C8+D8",
-   "expr": "priorUnadjusted + priorAje + priorRje",
+   "expr": "openingUnadjusted + openingAje + openingRje",
    "skip": null
   },
   {

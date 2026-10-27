@@ -35,6 +35,8 @@ import * as f2Impairment from '../../composables/useF2ContractCostImpairmentForm
 import * as f2Detail from '../../composables/useF2DetailSheet'
 import * as f2Obsolete from '../../composables/useF2ObsoleteInventoryFormulas'
 import * as f2Stocktake from '../../f2/stocktake/f2StocktakeRowCalc'
+import * as f3Interest from '../../composables/useF3InterestCalc'
+import * as f4Adjudication from '../../composables/useF4Adjudication'
 import * as f4RelatedParty from '../../composables/useF4RelatedParty'
 import * as f5Rollforward from '../../composables/useF5CostRollforward'
 import { buildG13CategorySkeleton } from '../../composables/g13CategorySkeleton'
@@ -269,6 +271,16 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
   'F2-57-rows': {
     source: 'useF2ContractCostImpairmentFormulas.enrichImpairmentProject',
     compute: (raw) => asRow(f2Impairment.enrichImpairmentProject(merged(f2Impairment.emptyImpairmentProject(), raw))),
+  },
+  'F3-4-rows': {
+    source: 'useF3InterestCalc.safeParseInterestRows（载入：migrateRow + computeInterestRow）',
+    compute: (raw) => asRow(f3Interest.safeParseInterestRows(JSON.stringify([raw]))[0]),
+  },
+  'F4-1-adj-nature-rows': {
+    source: 'useF4Adjudication.migrateF4AdjRows + computeF4AdjudicationRow（性质区首行「货款」）',
+    compute: (raw) => asRow(f4Adjudication.computeF4AdjudicationRow(
+      f4Adjudication.migrateF4AdjRows(JSON.stringify([raw]), f4Adjudication.F4_NATURE_DEFAULTS)[0],
+    )),
   },
   'F4-6-rows': {
     source: 'useF4RelatedParty.migrateF4RelatedPartyRows + computeRow',

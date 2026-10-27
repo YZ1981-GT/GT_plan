@@ -43,7 +43,7 @@
   - [ ] 9.4 E1 / F2 / D 循环零散字段
     - [x] 9.4a F2-25 / F2-26 / F2-48 / F2-57 按模板表头接前端字段，F2-48 / F2-57 dict store 走 state 合并；回写合并只合本表的键（平台，8 家串表 + G9 / L5 落错区），守卫 `test_store_merge_table_isolation.py` 与三条磁盘变异；对拍适配器 +5、未覆盖 25 → 20（design §4.1）
     - [x] 9.4b E1-2 / E1-4、D3-rp、D6-3（两区）、D7-4 贷方区按模板接前端字段（D7-4 前端补「与对方科目核对」等三列、导入导出带新列）；触类旁通修后端复算口径四处（D6-2 / D6-3 / D7-2 导入、D1 附注推送）；守卫 `test_d6_03_dual_zone_spec.py` / `test_d7_4_analysis_counter_check.py` / `test_period_end_from_prior_unadjusted_backend.py` / `d7AnalysisTemplateColumns.spec.ts`，14 条磁盘变异全红；对拍适配器 +3、未覆盖 20 → 16、例外 5 → 3（design §4.2）
-    - [ ] 9.4c F3-1 / F3-4、F4-1（F3-4 计息口径待用户确认）
+    - [x] 9.4c D3-4 两区（行身份 rowKey、区② 按 R20 接 counterCheck / remark，表单与导入导出补列）、F3-4、F4-1 性质区按模板接前端字段；F3-1 两区、F4-1 账龄两区只改 json 键（store item 与区判据留批 B）；对拍生成器支持百分点列；守卫 `test_d3_4_analysis_counter_check.py` / `d3AnalysisTemplateColumns.spec.ts`；对拍适配器 +2、未覆盖 16 → 14、例外 3 → 4（新增 F3-4 计息口径，待用户裁决）（design §4.3）
   - [ ] 9.5 守卫 `test_contract_field_names_in_frontend.py` + 例外表只许减少；变异必须打红
 
 - [x] 10. 删除死代码（R8）：`usePeriodAdjudication.ts` / `CycleTabAdjudication.vue` 零挂载（全前端无模板标签、无 import），连同只喂给它们的 `cycleAdjudicationConfigs.ts` 删除；6 份 G 复盘守卫里核这份配置的用例随之删除；`components.d.ts` 同步

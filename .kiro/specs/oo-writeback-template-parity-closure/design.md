@@ -163,9 +163,23 @@
 | 后端复算（R2 同族，触类旁通） | D6-2 / D6-3 / D7-2 导入复算派生列、D1 附注推送（`tier_a._d1_note_rows_from_entries`，docstring 自称与前端同口径）仍从期初审定起算，有期初调整时与前端 / 模板差一个期初调整额；导入写库的 endUnadjusted 还被预填锚点直接读 | 改为期初未审起算；守卫 `test_period_end_from_prior_unadjusted_backend.py`（每例带非零期初调整）；三个旧判据钉的是旧口径，改写并注明。全仓普查后端其余 `prior_audited ±` 写法只剩注释与变动率 |
 
 - 对拍：适配器 +3（E1-2 / E1-4 / D3-rp），未覆盖 20 → 16（含 D7-4 贷方区已无公式），逐字段例外 5 → 3。
-- 新发现、未改（并入任务 9.5）：D3-4 贷方区与 D7-4 同版式（R20 金额 / 数据来源 / 与对方科目核对 / 说明），契约 D 列仍接 `remark`、E 列未管；D3-4 前端行身份是 `rowKey`，契约声明 `rowId`（接通后整表 fail-closed）。行身份键属字段名对拍的一部分，由 9.5 守卫一并纳入。
+- 新发现、未改（并入任务 9.5；批 A2c 已修，见 §4.3）：D3-4 贷方区与 D7-4 同版式（R20 金额 / 数据来源 / 与对方科目核对 / 说明），契约 D 列仍接 `remark`、E 列未管；D3-4 前端行身份是 `rowKey`，契约声明 `rowId`（接通后整表 fail-closed）。行身份键属字段名对拍的一部分，由 9.5 守卫一并纳入。
 - D1 契约 `reviewed_basis` 仍写「前端 recalcRow 用 priorAudited+inc-dec，数值语义等价」：前端早已按模板改、两式也不等价。只是冻结的说明文字，改它会让已发布 D1 产物与契约脱钩，不改，记此备查。
 - E1-4 / D3-6 / D6-3 / D7-4 所在 provider 仍在 `KNOWN_UNWIRED`（出 / 回两方向只镜像主 store item），D6 / D7 扩容面也还不在已发布 instrumentation 里：契约改对后要接通才生效。
+
+### §4.3 批 A2c：D3-4 / F3-4 / F4-1 性质区与 F3-1、F4-1 账龄区字段名（2026-10-27）
+
+| 表 / 面 | 原状 | 处置 |
+|---|---|---|
+| D3-4 分析表（两区） | 行身份键写 `rowId`（照抄 D3-6），前端与导入只写 `rowKey` ⇒ 一接通每行都按「缺少稳定行身份」拒收；区② 共用区① R10 的四列，D「与对方科目核对」接成备注、E「说明」没管 | 两区身份键 `rowKey`；区② 表头取 R20，D 接 `counterCheck`、E 接 `remark`（受管区 A22:E23）；表单贷方区补显示「与对方科目核对」「说明」；导入导出带新列（旧文件缺该列照常导入，同 D7-4） |
+| F3-4 利息测算表 | json 键 noteNumber / maturityDate / term / faceAmount / accruedInterest / diff / remark 整表不通；C / D 日期按文本、E 期限当录入、G 利率按金额 | 改前端 ticketNo / dueDate / termDays / faceValue / payableInterest / variance / note；C / D 改 date（同册 F3-5），E 改 auto_source（前端按到期日 − 出票日现算、载入即覆盖存值），G 改 percent_points（模板 `0.00%`，物化 ÷100） |
+| F4-1 性质区 | prior* / end* / reason，K 变动率按金额 | opening* / closing* / reasonAnalysis，K 改 ratio |
+| F3-1 两区、F4-1 账龄两区 | json 键 prior* / end* / category / reason | json 键同上改前端名（项目列接 `label`）；store item 仍是前端没有的 `…-seed-rows` / `…-slot-rows`（前端两区共存一个 item：`F3-1-adj-rows` / `F4-1-adj-aging-rows`），要区判据 + 多区门面（同 G1 / G3），留批 B |
+| 对拍生成器 | percent_points 列不算数值录入（落进文本录入）、公式里按原值代入 | 百分点列算数值录入；公式引用它时 ÷100 换回小数（F2-47 的 N / O 两列同受益）；百分点公式字段跳过（现无） |
+
+- 对拍：适配器 +2（F3-4、F4-1 性质区），未覆盖 16 → 14；例外 3 → 4，新增一条不是接错列，是字段接通后才看得见、待用户裁决的计息口径：模板 F3-4 H = ROUND(F*G,2)（不含天数），前端有出票日 / 到期日时按 票面金额 × 利率% × 期限 / 360，没有日期时两侧一致。H 是公式列、不回写，裁决前两侧各按自己的口径显示。
+- F3-1 前端行模型与模板不同构（R2）：模板首区（银行承兑 / 商业承兑 / 信用证 / 供应链）期初未审与期末三列全是 F3-2 的 SUMPRODUCT，前端期初未审可录（并从试算表带出）、期末账项 / 重分类调整在本表录入、另存本期借贷。并入批 B 一起裁。
+- F3 只注册 `F3-5-rows`、F4 只注册 `F4-6-rows`（`KNOWN_UNWIRED`），本批改的是契约声明，接通后才生效（同 §4.2 末条）。
 
 ## §5 受保护字段统一（R7，已做）
 

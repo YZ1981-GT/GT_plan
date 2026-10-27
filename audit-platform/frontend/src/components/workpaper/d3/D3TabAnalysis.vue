@@ -65,7 +65,9 @@
         </template>
       </el-table-column>
       <el-table-column prop="source" label="来源" width="140" />
-      <el-table-column prop="remark" label="备注" min-width="120" />
+      <!-- 模板「（三）贷方发生额分析」D / E 列：与对方科目核对 / 说明 -->
+      <el-table-column prop="counterCheck" label="与对方科目核对" min-width="140" />
+      <el-table-column prop="remark" label="说明" min-width="120" />
     </el-table>
   </div>
 

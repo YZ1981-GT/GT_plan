@@ -33,7 +33,9 @@ OUT_REL = Path("audit-platform/frontend/src/components/workpaper/sync/__tests__/
 
 SUPPORTED_FUNCS = frozenset({"SUM", "IF", "AND", "OR", "NOT", "ROUND", "ABS", "MAX", "MIN", "IFERROR"})
 #: 取值为数的字段类型（对拍时随机生成输入）
-NUMERIC_TYPES = frozenset({"amount", "number", "ratio", "percent", "integer", "decimal", "rate"})
+NUMERIC_TYPES = frozenset({"amount", "number", "ratio", "percent", "integer", "decimal", "rate", "percent_points"})
+#: 百分点字段：store 存百分数（3.6 = 3.6%），模板格存小数（0.036），物化 ÷100 / 回写 ×100（FC-10）
+PERCENT_POINTS = "percent_points"
 _REF = re.compile(r"^(\$?)([A-Z]{1,3})(\$?)(\d+)$")
 _SRC = re.compile(r"^源xlsx!(?P<sheet>.+)!(?P<cell>\$?[A-Z]{1,3}\$?\d+)$")
 
@@ -81,7 +83,8 @@ def _split_ref(text: str) -> tuple[str, int, bool]:
 def _operand(ctx: TableCtx, col: str) -> str:
     column = ctx.columns.get(col)
     if column is not None:
-        return column.field
+        # 模板公式里引用的是格里的小数，store 字段是百分数 ⇒ 换算回小数再代入
+        return f"( {column.field} / 100 )" if column.value_type == PERCENT_POINTS else column.field
     if col in ctx.blank_columns:
         return "0"
     value = ctx.ws[f"{col}{ctx.data_row}"].value if ctx.ws is not None else None
@@ -282,6 +285,8 @@ def _collect_table(cid: str, sheet_name: str, table: dict, book, entries: list, 
                 raise Skip(f"store item 未接通（{store_item or '空'}，R3）")
             if sheet_skip:
                 raise Skip(sheet_skip)
+            if f.get("value_type") == PERCENT_POINTS:
+                raise Skip("百分点公式字段：模板算出小数、store 存百分数，两侧口径要先换算（暂不对拍）")
             value = ws[cell].value
             if value is None or not isinstance(value, str) or not value.startswith("="):
                 entry["formula"] = None if value is None else str(value)

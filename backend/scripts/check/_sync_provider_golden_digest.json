@@ -48,11 +48,11 @@
     {
       "label": "d3",
       "adapter_id": "d3.prepaid_receipts_detail",
-      "contract_payload_sha256": "9049ed388597a59e37691355fc5daa4081c1b889553f8f0f8b4ba5cb16a0d0ac",
+      "contract_payload_sha256": "84aa34743b112e72e4b8217bc5bc016655b0b68c5e0cd6308d14b3030cc808e6",
       "sheet_digests": {
         "d32-managed": "621527ec5b826f0b827a6a4b423897628003a26b472031822522db2657347445",
         "d36-managed": "c3e09fa8c797eaf043e1a987306c4b1dd723a9b98ddda58c0d85a667cda43f63",
-        "d34-managed": "765ea7868034493ba5a44ef5a3186e362f6f0fbb50788eac8eb7bf2b33e433f5",
+        "d34-managed": "8441971b84b821487524f57e91e1fa70e15b9aafcab70a967a7995f807c250c5",
         "d35-managed": "a97ad10bdb73476148ca31dcf4d1ef53551bd111191bf3bfdad475960b5149cd",
         "d37-managed": "704ae41bffa91075ea526c77f94f58790286cb42fe35227b4cd8a6695c747abd",
         "d31-managed": "e7c515d85f6e3766011d2553b59ce26af3a664cd446fe59e9afe270d7c552ff6"
@@ -425,14 +425,14 @@
     {
       "label": "f3",
       "adapter_id": "f3.notes_payable_detail",
-      "contract_payload_sha256": "6777c89743d1be804dc374821b6e16e5eb105fafbdf8a4adf6fe36da8d9fa9e2",
+      "contract_payload_sha256": "e28c290981a470e8a938b6a128a9b51280ec8edb460b3119e7b9f7526adef784",
       "sheet_digests": {
         "f35-managed": "7fba4dc22ac87e8b1485057ffa376fd6cf64d79ebd4c31ff1aff800178f2a33e",
         "f36-managed": "34118045f15318f5b8ed0a5da9235eee510b2940e7228db64c99183392d9b545",
         "f37-managed": "3f24a8978bc45b844b98d459fd294708ac2fb14a76ec362dc4cf3d247ea805a7",
         "f32-managed": "af5ad06625479914c0bda87bbe827f75f2a5957506af48778268a30481400526",
-        "f34-managed": "481d820ff7c318787e4c0334c7421a5e9b1c9a7835a69863b98c9113070012d5",
-        "f31-managed": "9bed7826d9bb48585b134c805d88a54365814d851e7258e4d713bf702d9c2e4c"
+        "f34-managed": "28e174eb13a4c3fc23e485539d614dd71c2e0648a998261023d758466e7724d8",
+        "f31-managed": "dac841ec7ace958328e8c30a5c267244f78bbbc182c0738366211175f3e523f0"
       },
       "store_projection_sha256": "5588c70d44410196b25548b505bbbd0d76c5978704ecbeb5933510f669d0b13e",
       "instrumentation_sha256": "ffd916d2c7e0b329854d6889163b40a48bc5f0b63ecbd8de0d3733a1493484a1"
@@ -440,14 +440,14 @@
     {
       "label": "f4",
       "adapter_id": "f4.accounts_payable_detail",
-      "contract_payload_sha256": "b7390ec07b9cd5c0b5daea48128f69a9f06f515be0bd5fc77814ff10fc9b12c6",
+      "contract_payload_sha256": "d26737483ea086c56415b5ac1e791bc9653005d1b244edb57b84d01151a3673f",
       "sheet_digests": {
         "f46-managed": "9c32a11b8602e924a0fdadf973177fa0ee6ea8737ebe8d53a9044b5e2121529a",
         "f45-managed": "afe60e15ae242f596157a4beaf2c36f6becb6d5f5457af4db9e51e4964565840",
         "f48-managed": "55c118bb94c92ee1e3adc733bb4668105f0e7bb872fcb649faa7d45e1daa6e62",
         "f47-managed": "dc4f75afa0737ed9bf76d7ab0853c5ff6b5c15029a9d03e7c9753ac0d8e294a4",
         "f42-managed": "449207bced43672e5f39ff0dcf81e685028a6fccd1b479c0bbf52280eb92d9d1",
-        "f41-managed": "2e1b9a3ab8a7ce6726c4417494b3bcfaa3e38841b931c38e493b294248572929"
+        "f41-managed": "872ce8a957eb005368bc46439c4d511fbaa1a7a2cd6282567ea5a822f852adcd"
       },
       "store_projection_sha256": "4295e6b7e9ab117bc9eaa1302ebc40212e98f65a89a64092a28f26816b5043e1",
       "instrumentation_sha256": "984d52da2502b73e163363a5663c8886fd008ee28f4229a14092e4aba1d22e32"

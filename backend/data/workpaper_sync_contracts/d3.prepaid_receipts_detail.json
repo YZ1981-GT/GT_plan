@@ -730,13 +730,13 @@
           "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
-            "json_pointer": "/rows/*/rowId",
+            "json_pointer": "/rows/*/rowKey",
             "kind": "field"
           },
           "table_key": "analysis_debit_rows"
         },
         {
-          "anchor": "A10",
+          "anchor": "A20",
           "delete_policy": "tombstone",
           "fields": [
             {
@@ -745,7 +745,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "label",
-              "header_source_ref": "源xlsx!预收账款分析表D3-4!A10",
+              "header_source_ref": "源xlsx!预收账款分析表D3-4!A20",
               "header_text": "项目",
               "json_pointer": "/rows/{row_uuid}/label",
               "mode": "editable",
@@ -760,7 +760,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "amount",
-              "header_source_ref": "源xlsx!预收账款分析表D3-4!B10",
+              "header_source_ref": "源xlsx!预收账款分析表D3-4!B20",
               "header_text": "金额",
               "json_pointer": "/rows/{row_uuid}/amount",
               "mode": "editable",
@@ -775,7 +775,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "source",
-              "header_source_ref": "源xlsx!预收账款分析表D3-4!C10",
+              "header_source_ref": "源xlsx!预收账款分析表D3-4!C20",
               "header_text": "数据来源",
               "json_pointer": "/rows/{row_uuid}/source",
               "mode": "editable",
@@ -789,12 +789,27 @@
                 "column": "D",
                 "row_from": "row_identity"
               },
-              "column_key": "remark",
-              "header_source_ref": "源xlsx!预收账款分析表D3-4!D10",
-              "header_text": "备注",
-              "json_pointer": "/rows/{row_uuid}/remark",
+              "column_key": "counter_check",
+              "header_source_ref": "源xlsx!预收账款分析表D3-4!D20",
+              "header_text": "与对方科目核对",
+              "json_pointer": "/rows/{row_uuid}/counterCheck",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款分析表D3-4!D22",
+              "stable_field_key": "analysis_credit_rows/{row_uuid}/counter_check",
+              "store_item_id": "D3-ana-credit-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!预收账款分析表D3-4!E20",
+              "header_text": "说明",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款分析表D3-4!E22",
               "stable_field_key": "analysis_credit_rows/{row_uuid}/remark",
               "store_item_id": "D3-ana-credit-rows",
               "value_type": "text"
@@ -808,7 +823,7 @@
           "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
-            "json_pointer": "/rows/*/rowId",
+            "json_pointer": "/rows/*/rowKey",
             "kind": "field"
           },
           "table_key": "analysis_credit_rows"

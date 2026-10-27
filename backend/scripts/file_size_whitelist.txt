@@ -1691,3 +1691,8 @@ backend/app/services/ledger_import/identifier.py  1164
 #   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
 # attachment-evidence-intake（2026-10-27）：底稿统一视图组装挪到 attachment_wp_view.py，1391 → 1309，基线随之下调。
 backend/app/services/attachment_service.py  1309
+#   test_workbook_propagation_ref_collision.py —— 历史大文件（HEAD 已 901 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-27 oo-writeback-template-parity-closure 任务 9.4c：D3-4 区②贷方受管到 E 列（definedName 与计划期声明值随改）、
+#     D3-4 两区行身份键改 rowKey（+1）。
+#     拆分方向：碰撞判据纯函数用例（_CASES）/ D3-4 真实 adapter 用例（_D34World）/ 多趟归一化用例三组拆文件。
+backend/tests/workpaper_sync/test_workbook_propagation_ref_collision.py  902

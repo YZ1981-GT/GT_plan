@@ -115,6 +115,17 @@ def test_convert_skips_what_it_cannot_express(gen, formula, reason):
         gen.convert(formula, ctx)
 
 
+def test_convert_divides_percent_points_columns_by_100(gen):
+    """百分点列（store 存 3.6 = 3.6%，模板格存 0.036）：公式里引用它时换回小数（F3-4 应计利息 = ROUND(F*G,2)）；
+    百分点列也算数值录入（随机取数，按录入核对）。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ctx = _ctx(gen, ws, 10, {"F": "faceValue"})
+    ctx.columns["G"] = gen.Column("interestRate", "editable", "percent_points", "票面利率")
+    assert gen.convert("=ROUND(F10*G10,2)", ctx) == "ROUND( faceValue * ( interestRate / 100 ) , 2 )"
+    assert "percent_points" in gen.NUMERIC_TYPES
+
+
 def test_convert_inlines_unmanaged_formula_columns_and_zeroes_blank_gaps(gen):
     """非受管的公式列（小计列）同行展开；数据格与表头都空的间隔列按 0；有表头的非受管录入列跳过。"""
     wb = openpyxl.Workbook()
