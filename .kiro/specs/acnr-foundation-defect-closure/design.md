@@ -702,7 +702,7 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 
 段四审计 F4-01 / F4-02 修订（2026-10-27，取代上段中「发布后的目录规模」写成现状的做法）：现状节**只写当前 HEAD 可验证的事实**，结构固定为三张表——「已落地：目录与代码现算事实」（每行带复算键）、「已落地：组件」（模块 / 符号 / 测试）、「计划中（未落地）」（每行带任务号）；发布后规模（1225 / 449 / 0）等预演值只能出现在「计划中」并注明是预演值；节末用固定结束行与提案原文分界。守卫逐项复算：事实表每个值从 `global_catalog.json`、`catalog_report.json`、快照与生成器源码 AST 现算并逐字比对，守卫认识的复算键必须全部在表里；组件表后端行用 AST 确认模块定义了所列符号、测试文件有 `test_` 函数，前端行由 vitest 守卫 `acnrArchitectureStatusDoc.spec.ts` 用 TS 编译器 API 核对导出符号；计划表的任务号必须在 tasks.md 里仍为 `[ ]`；节内表格之外提到登记的计划中符号（`lock_project_registry`、`v2_canonical`、`--check` 等）而代码里还没有时，同一行必须带仍未勾选的任务号；resolver 模块文档须含「canonical resolver + legacy 委托」且不得再称「唯一解析入口」。每条判据配一条磁盘变异（见 tasks T32）。
 
-### 15.2 勘误（不改历史报告原文；本 spec 提交不含 `.agents/tasks/` 下任何文件）
+### 15.2 勘误（不改历史报告原文；本 spec 提交在 `.agents/tasks/` 下只触及本 spec 收尾报告，段四裁定见 §15.4）
 
 | # | 出处与原表述 | 勘误 |
 |---|---|---|
@@ -724,6 +724,12 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 - **公式管理评估勘误**：按本节现有安排记于 §15.2（第 5、6 条），不另开文件。核心结论：公式管理评估报告第 11 节所列定向套件不含 ACNR 目录产物与 acnr_targets 链路校验，不能据此推出地址底座无缺陷；其 §3「V1/ACNR/V2/V199 dependency 未统一为 Resolver」与本审计一致；审计报告 §11 归于公式管理评估的第 1、2、4 条，经全目录关键词现扫未在该评估原文中找到，应视为对 resolver 注释与架构提案的复核，不改历史报告原文。
 
 不改历史报告原文；本批次提交只含上述两份文档文件（架构提案 + 本 spec design.md），不含 `.agents/tasks/` 任何文件。`resolver.py` 模块注释更正与 INDEX 登记随 T32/T33 代码批次处理，不在本文档批次提交内。
+
+### 15.4 段四补记：收尾报告入库裁定、预存挂起用例与测试数口径
+
+- **需求 14.2 / T33 判据裁定（段四审计 F4-19）**：14.2「不修改历史报告原文：本 spec 的提交不含 `.agents/tasks/` 下的任何文件」保护的是**历史报告原文**——ACNR 审计报告 `.agents/tasks/acnr-platform-foundation-assessment-2026-10-26.md` 与上一轮公式管理评估报告——不得改写。本 spec 自己的收尾报告 `.agents/tasks/acnr-foundation-defect-closure-2026-10-26.md` 是本 spec 的交付物，段四任务书第三节第 6 步明确要求更新它（覆盖 33 个任务的最终状态），因此允许随本 spec 提交与修改（`00d56b039` 新增、`95e03e72a` 就地更正都属此类）。§15.2 标题与 T33 判据据此收窄为：本 spec 的提交在 `.agents/tasks/` 下只触及这一份收尾报告（`git log --name-only` 现算核查），不触及审计报告与公式管理评估报告。需求 14.2 原文加注同一裁定。
+- **预存挂起用例（段四审计 F4-18）**：`backend/tests/acnr/test_overlay_persistence_roundtrip.py` 在 HEAD 与 `b5fc200e0` 上都挂起（段四审计实测：HEAD 613 秒无输出被终止，基线 300 秒超时；日志 `tmp_acnr_foundation/out/段四_a04_HEAD_run.log`、`段四_a04_BASE_run.log`），属预存问题，非本 spec 引入。该用例由 `c267ce8c4` 引入，所属 spec（`acnr-runtime-convergence`、`acnr-invalidation-overlay-hardening`）已归档到 `.kiro/specs/_archive/04-infra-architecture/`，归档 spec 不回填修改，故登记在这里并写进最终收尾报告，修复另立工单。初步线索（未定位挂起点）：该文件的 hypothesis 用例每例 `asyncio.new_event_loop()` 并新建 SQLite 内存异步引擎（`StaticPool`）。本 spec 的回归命令一律带 `--ignore=tests/acnr/test_overlay_persistence_roundtrip.py`，tasks.md 文件头注明排除原因。
+- **测试数口径（段四审计 F4-17 复审复现）**：交付记录与提交信息里的通过数，一律来自 `tmp_acnr_foundation/verify_wt` 检出当时 HEAD、只覆盖本次提交文件（覆盖前后两侧 sha256 逐个记录、与提交内容逐字节相同）的运行结果；主树运行的数字（可能含下一组未提交改动）不写进交付记录。段四修复第一轮 `7e3603024` 记的「tests/acnr 634 passed」是主树含下一组改动的数，对该提交不可复现（复审在该提交检出只收集到 619 例），以本口径为准更正。
 
 ## 16. 待拍板（本 spec 不做，登记建议）
 

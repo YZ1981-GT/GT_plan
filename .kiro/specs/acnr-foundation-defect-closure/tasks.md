@@ -2,6 +2,7 @@
 
 > **当前状态（2026-10-27，段四审计与修复）**：段四独立审计（`tmp_acnr_foundation/out/段四_审计报告.md`）复核了此前声称交付的 11 个任务，判 T01、T04、T05、T08、T23、T27、T32 不成立，已在下方逐条改回 `[ ]` 并写明原因；复核通过并保持 `[x]` 的是 T02、T03、T25、T28。段四修复（F4-01~F4-19，记录见 `tmp_acnr_foundation/out/段四_修复记录.md`）提交后，这 7 个任务是否复勾以评审核实为准；任务完成状态一律以评审写入的 `tmp_acnr_foundation/out/段四_进度.json` 为准，实施方不自证。其余任务未实施，如实为 `[ ]`。
 > **路径勘误（段四审计 A5）**：下文 Files 行里的 `scripts/acnr/…` 实为 `backend/scripts/acnr/…`；`scripts/check/check_catalog_drift.py` 实为 `backend/scripts/acnr/check_catalog_drift.py`；`scripts/check/check_acnr_catalog_drift.py`、`check_sheet_display_names.py`、`check_acnr_consumer_coverage.py` 在 `backend/scripts/check/`；三个 fix 脚本（`fix_acnr_catalog_ie_gap.py`、`fix_acnr_dangling_api_prefix.py`、`fix_x3_adjustment_ie_registration.py`）在 `backend/scripts/fix/`；`scripts/gen_sheet_display_names.py` 实为 `backend/scripts/gen_sheet_display_names.py`；stale 引擎是 `backend/app/services/stale_propagation_engine.py`（不在 `services/acnr/` 下）；前端 `useAcnr.ts` 实为 `src/services/acnr/useAcnr.ts`。任务内容不变，只更正位置。
+> **回归口径（段四复审 F4-17 / F4-18，design §15.4）**：交付记录与提交信息里的测试通过数，一律来自 `tmp_acnr_foundation/verify_wt` 检出当时 HEAD、只覆盖本次提交文件（两侧 sha256 逐个记录、与提交内容逐字节相同）的运行结果，主树数字不写进交付记录；后端回归命令一律带 `--ignore=tests/acnr/test_overlay_persistence_roundtrip.py`——该用例在 HEAD 与 `b5fc200e0` 上都挂起，属预存问题、非本 spec 引入，所属 spec 已归档，登记见 design §15.4。
 > 以 design.md 为权威（修订轮 2）。每个任务可独立验收；标完成须有代码 + 测试证据与至少一条磁盘变异证明（备份到 `tmp_acnr_foundation/mutations/`、注入缺陷、确认对应守卫红且红在预期处、逐字节还原并核对 sha256）。环境做不到的标 `[ ]*` 并写「代码已改但未实测」。编号 T01~T40 按发布顺序（§18）排，分 P0 / P1 / P2 / 文档四批。问题编号映射见文末。
 > 铁律：根因修复不换参数绕开；生成产物禁手改、改生成器输入；被引用的 addr_id 不得静默消失；每条门禁配可打红的变异。约束：Windows PowerShell 用 `;` 不用 `&&`、用 `cwd` 不 `cd`；含中文 / 正则的脚本写成 `.py` 执行；行数用 Python `len(text.split("\n"))` 统计；后端 `python -m pytest -p no:playwright`，`hypothesis max_examples=5`，PG 专有 SQL 加方言判断；前端 vitest + 单区域 tsconfig（全量 vue-tsc 会 OOM）；前端改动用 chrome-devtools 浏览器实测、关键点击前校验 `location.pathname`、写入型验收只用【测试】项目并走平台路径清理对账。提交只含本 spec 文件（`git diff --cached --name-only` 核对），不碰 §0.3 的他人脏文件。
 
@@ -211,9 +212,10 @@
       Verify: `python -m pytest backend/tests/acnr/test_acnr_architecture_status_doc.py -p no:playwright`（该节存在、节内版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致）。变异：把该节版本格式改回 `YYYY.N.N` 或删该节 → 守卫红。
 
 - [ ] 33. 勘误节、INDEX 登记与提交边界核对（需求 14.2~14.3 / D12）
+      段四裁定（段四审计 F4-19，design §15.4）：下文「本 spec 提交不含 `.agents/tasks/` 任何文件」收窄为「本 spec 的提交在 `.agents/tasks/` 下只触及本 spec 收尾报告 `acnr-foundation-defect-closure-2026-10-26.md`」——段四任务书要求更新该报告；ACNR 审计报告与公式管理评估报告仍不得改动。需求 14.2 原文已加注。
       本 spec design 已设「勘误」节（§15.2 七条，承接审计报告 §11 + 本轮新发现，不改历史报告原文；本 spec 提交不含 `.agents/tasks/` 任何文件）。在 `.kiro/specs/INDEX.md` 顶部登记本 spec（纯 CRLF：Python 读 bytes 解码再写回 bytes；表格单元格禁裸竖线、校验只数未转义竖线；不覆盖他人行），注明「acnr_targets 字段与面板以本 spec 为准（与 advanced-query-linkage-closure 的裁决 §16 Q0）」。
       Files: `.kiro/specs/INDEX.md`（登记）；本 spec design.md（勘误节已就位）
-      Verify: `git diff --name-only` 不含 `.agents/tasks/` 任何文件（现算核查）；INDEX 登记行用 bytes 校验（Python 读写、每行行尾 CRLF、无裸竖线）。变异：无（文档任务，核查即验收）。
+      Verify: `git log --name-only` 核对本 spec 的提交在 `.agents/tasks/` 下只触及本 spec 收尾报告（段四裁定，现算核查）；INDEX 登记行用 bytes 校验（Python 读写、每行行尾 CRLF、无裸竖线）。变异：无（文档任务，核查即验收）。
 
 ## 问题编号 → 任务映射
 

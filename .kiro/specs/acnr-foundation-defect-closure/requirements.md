@@ -327,7 +327,7 @@
 
 14.1 在 `docs/proposals/address-coordinate-name-registry-architecture.md` 中新增「现状（2026-10-26）」一节，写明：已落地的组件、目录规模、版本格式（时间戳）、L1 只覆盖底稿域、V1 / V2 / legacy 的并行关系、本 spec 完成后的门禁清单。定位写为「canonical resolver + legacy 委托」，不称全平台唯一入口。原有内容不改写，过时的陈述在新节中逐条指出。
 
-14.2 本 spec 的 design 设「勘误」节，承接审计报告 §11 与上一轮公式管理评估中需要勘误的结论：高级查询只复用了地址树；ACNR 不是唯一入口；157 个定向测试没有覆盖真实产物与端到端链路；只能称「resolver 支持版本锁定」。同时补入本轮的新发现。不修改历史报告原文：本 spec 的提交不含 `.agents/tasks/` 下的任何文件。核查：现算 `git diff --name-only`。
+14.2 本 spec 的 design 设「勘误」节，承接审计报告 §11 与上一轮公式管理评估中需要勘误的结论：高级查询只复用了地址树；ACNR 不是唯一入口；157 个定向测试没有覆盖真实产物与端到端链路；只能称「resolver 支持版本锁定」。同时补入本轮的新发现。不修改历史报告原文：本 spec 的提交不含 `.agents/tasks/` 下的任何文件。核查：现算 `git diff --name-only`。段四裁定（design §15.4，段四审计 F4-19）：「历史报告原文」指 ACNR 审计报告与公式管理评估报告；本 spec 自己的收尾报告 `.agents/tasks/acnr-foundation-defect-closure-2026-10-26.md` 是交付物，段四任务书要求更新它，允许随本 spec 提交，核查改为「本 spec 的提交在 `.agents/tasks/` 下只触及这一份收尾报告」。
 
 14.3 在 `.kiro/specs/INDEX.md` 登记本 spec（CRLF 与竖线规则见 0.9）。
 
