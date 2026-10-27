@@ -2,40 +2,40 @@
 
 > 每个任务 = 一个可独立测试的交付单元；引用 `R x.y` / `ADR-AQL-NN` / 变异 `#N`（design §10.4），不复述。标 `[ ]*` 的任务依赖外部运行环境（start-dev 运行环境 / 合并项目数据），未实测时保持未勾，并在任务下写「代码已改但未实测」。
 > 通用纪律：后端测试 `rtk ..\.venv\Scripts\python.exe -m pytest <文件> -q -p no:playwright`（cwd `backend`）；前端 `rtk npx vitest run <文件>`（cwd `audit-platform/frontend`）；改前端后跑单区域 vue-tsc（先例 `tsconfig._g-single-region.json`），并用一条故意的类型错误证明它会报错；真 PG 测试只用回滚事务或【测试】/【UAT】项目；每个任务开工前对涉及文件重跑现状确认（grep / 行数 / 调用方）并写入勾选说明（design §12）；每个断点在根因处修复并配一条防御测试；临时产物放仓库根 `tmp_aql_linkage/`；勾选必须附测试命令与结果摘要，依赖环境的项不得改标星或假绿。
-> 依赖：0 → 1 → 全部；2 → 35；1 → 6 → 7；3 → 4 → 5 → 7 → 8；7 → 16~23、26；9 → 10 → 11；9 → 23；12 → 23 → 30；13 → 14、15；24 → 25 → 33；27 → 28~33；11、26 → 28~30；28~34 → 35 → 36 → 40~44（W3）→ 45~47（W6）→ 37*、38* → 39。W3、W6 两批互不依赖，可按实施时的依赖调换先后（两批都改弹窗，先做的一批提交后另一批再开工）；40 → 41 → 43 → 44，42 独立；45 → 46 → 47。
+> 依赖（2026-10-27 按用户决定改写；执行顺序与批次见实施计划）：任务 0 分两段，第 1~4 条（现算、试合并、守卫、阻塞清单与 INDEX 本行）做完即可开工「合入前可做」的任务，第 5~6 条（主树合入与合入后重算）在阻塞清单为空时立即做。**合入前可做**：1~18、21、22、26、27、30——只用两侧都有的符号（如 `project_audit_year.fetch_project_audit_year`），不用远端独有的 `services/wp_visibility/effective_scope`、`deps.require_project_audit_year`、`project_audit_year.resolve_project_audit_year_for_request`、远端年度棘轮的 `CALENDAR_YEAR_EXEMPT`；本地 `deps.get_user_scope_cycles` 语义与远端不同，合入前不依赖它。**须合入后**：19、20、23（附注年度与循环范围）、24、25（`deps.require_project_audit_year`；`RecycleBin.vue` 远端已改）、28、29（弹窗 / 选区器年度远端已改、`CALENDAR_YEAR_EXEMPT`）、31~33（ThreeColumnLayout、ReportView 远端已改）、34~36、38*、40~47、37*。与原依赖行的两处差异：①原「0 → 1 → 全部」改为上述分段（用户 2026-10-27 决定合入前先做不依赖远端的任务）；②原「12 → 23 → 30」改为「12 → 30」：30 只显示 access 接口给的 `reason`，接口形状在 12 定型，23 只改计数与原因文案，循环范围原因在 28~30 的浏览器复测里补看。其余不变：2 → 35；1 → 6 → 7；3 → 4 → 5 → 7 → 8；7 → 16~23、26；9 → 10 → 11；9 → 23；12 → 23；13 → 14、15；24 → 25 → 33；27 → 28~33；11、26 → 28~30；28~34 → 35 → 36 → 40~44（W3）→ 45~47（W6）→ 37*、38* → 39。W3、W6 两批互不依赖，可按实施时的依赖调换先后（两批都改弹窗，先做的一批提交后另一批再开工）；40 → 41 → 43 → 44，42 独立；45 → 46 → 47。
 > 与评估 report.md §7 批次表的对应（编号按加入顺序，执行按阶段顺序；阶段 H、I 是用户 2026-10-26 追加的 W3、W6 两批，在批次表之外，排在全部断点任务之后）：
 >
 > | 阶段 | 任务 | 断点 | 与批次表的差异及理由 |
 > |---|---|---|---|
-> | 0 | 0 | — | 新增：本地与远端分叉，合入后才开工（第 2 轮评审 #1）；先在分离头 worktree 试合并、冲突两侧都保留，主树前移由用户决定（第 3 轮评审 #1） |
+> | 0 | 0 | — | 新增：本地与远端分叉（第 2 轮评审 #1）；分离头 worktree 试合并、冲突两侧都保留（第 3 轮评审 #1），全部冲突临时解开后再跑守卫、阻塞清单按精确口径（第 4 轮评审 #1、#2）；用户 2026-10-27 拍板 merge 合入，不依赖远端独有代码的任务合入前先做（依赖行） |
 > | A 测试地基 | 1、2 | AQ-32（夹具部分） | 批 6 → 最先：后面每个任务都要靠能跑的构建器测试与权限配方表验收 |
 > | B 口径、计数与隔离 | 3~12 | 批 1 的 AQ-02、03、06、19；另含 AQ-25 的 batch-execute 族（任务 6）、AQ-13 / 18 / 21 / 28 的后端部分、AQ-26 的默认排序、AQ-27、AQ-32 的假绿用例改写 | batch-execute 直接调 router 内取数器，须先于取数器下沉删除（第 1 轮评审 #6）；构建器的准入、作用域、total、公式引用都在 `builder_dsl` / `query_builder` 两个文件里，随作用域一起改省返工 |
 > | C 写入安全 | 13~16 | 批 2 的 AQ-04、05、23 | 无 |
 > | D 数据源 | 17~23 | 批 3 的 AQ-01、07、08、10、11、12、26、33；另含 AQ-31（任务 19）、AQ-35（任务 22）与 R3.8 循环范围（任务 23） | 指标树与附注源同一处改（AQ-31 随 AQ-10）；列标签跟着新列走（AQ-35 随 AQ-26 / 33）；R3.8 是第 1 轮评审 #14 新增、不在批次表 |
 > | E 模板与导出后端 | 24~26 | 批 4 的 AQ-16、30；批 5 的 AQ-20 | 无 |
-> | F 前端联动 | 27~33 | 批 4 / 5 的 AQ-09、13、14、15、17、18、20、21、22、24、28、29、31、34（页面级）、36、37；新断点 AQ-38（任务 31） | AQ-38 是第 2 轮评审新发现（模板库按钮源键恒 400），与入口上下文同一处修 |
+> | F 前端联动 | 27~33 | 批 4 / 5 的 AQ-09、13、14、15、17、18、20、21、22、24、28、29、31、34（页面级）、36、37；新断点 AQ-38（任务 31） | AQ-38 是第 2 轮评审新发现（模板库按钮源键恒 400），与入口上下文同一处修；AQ-15 按用户裁决 Q0 移交 acnr D1（ADR-AQL-12），本 spec 只保证模板执行与界面改造不丢 acnr_targets |
 > | G 收敛与验收 | 34~36 | 批 6 的 AQ-25（其余删除）、AQ-32（e2e 与变异） | 无 |
 > | H W3 / I W6 | 40~44 / 45~47 | AQ-34 的行级入口由 W6 交付 | 用户追加 |
 > | J 实测与收尾 | 37*、38*、39 | — | — |
 
-## 阶段 0　分支同步（阻塞全部任务）
-- [ ] 0. 合入远端与现状重算（requirements A6；design §1 分支行、§9、§14.4、§16 #1）
-  - `git fetch --prune`，现算 `git rev-list --left-right --count HEAD...origin/spec/disclosure-note-doc-upload-and-batch-fill` 与 merge-base；逐个列出本地侧（merge-base..HEAD）与远端侧改到本 spec 目标 / 守卫的文件与提交（第 3 轮修订时本地侧是 design §1 分支行的 6 个文件）
-  - 试合并只在分离头 worktree 里做：`git worktree add --detach d:\GT_plan\tmp_aql_verify HEAD` → `git worktree lock` → 在其中 `git merge --no-commit --no-ff origin/spec/disclosure-note-doc-upload-and-batch-fill`，记下冲突清单。本 spec 相关的冲突按「两侧都保留、不整文件取一侧」拟定解决结果：年度兜底基线 JSON = 远端 13 条去掉本地已删的 `composables/useEditorSave.ts`、`composables/useStaleImpact.ts`（11 条）；后端年度棘轮取远端版（`BASELINE = {}` + `CALENDAR_YEAR_EXEMPT`，本地删的一条已被包含）；body_carried 两段注释都保留，`_BODY_IDENTITY_ONLY_BASELINE` 按合并后的代码现算。其余冲突（`address_registry_v2.py`、`GtAProgramLinkedChips.vue`、`GtWpRenderer.runtime-boundary.test.ts`）不属本 spec，只列出、不拟定
-  - 在试合并树上跑四个守卫：`test_project_endpoint_authz_body_carried.py`、`test_project_endpoint_authorization_baseline.py`、`test_audit_year_calendar_fallback_ratchet.py`（cwd 为该 worktree 的 `backend`，用仓库根 venv）与 `auditYearCalendarFallbackRatchet.spec.ts`（临时建 node_modules 联接，跑完 `cmd /c rmdir`）；随后 `git merge --abort`，按 unlock → 拆联接 → `git worktree remove --force` → `git worktree prune` 拆除
-  - send_message warning 交用户决定：ahead / behind、两侧提交列表、冲突清单与拟定的解决结果、四个守卫结果。写明主工作树的 `components.d.ts`、`auto-imports.d.ts` 有他人未提交改动（`components.d.ts` 两侧都改过），在主树直接 `git merge` 会中止；主树如何、何时前移（如等对方提交后再合入，或由用户处理）由用户决定；前移会让共享开发环境对远端改动的 878 个文件热重载。不改写历史、不 stash、不 `--no-verify`；用户决定前不开工任何任务
-  - 合入后确认 `git merge-base --is-ancestor d0de87a6c HEAD` 为真，在主树重跑上述四个守卫，结果写入本条；重算并写入本条：design §1 的年度 / 行数门 / 循环范围三行、§9 全表的「现状」列（`check_file_size.py` 门限与 HARD_CAPS、`test_hard_cap_ratchet.py` 结果，DisclosureEditor 应仍为 3,265 行）、年度兜底基线与 `CALENDAR_YEAR_EXEMPT` 中与本 spec 相关的条目、`deps.require_project_audit_year` 与 `effective_scope.resolve_member_scope` 的签名（`inspect.signature` 打印一次）；与 design 不符的数字在本条写明差异，结论不同的停下改 design 再开工
-  - 对本 spec 全部目标文件现查 `git status`，有他人未提交改动的文件列入本条，后续任务只改、只提交自己的块
+## 阶段 0　分支同步（第 1~4 条在 B0 做完；第 5~6 条在阻塞清单为空时做，见依赖行）
+- [ ] 0. 合入远端与现状重算（requirements A6；design §1 分支行、§9、§14.4、§16 #1、§17 #1 / #2、§18）
+  - ① 现算（B0 已做，2026-10-27）：`git fetch` 后 HEAD b6d9ae6f9 / 远端 709b21275，领先 24、落后 17，merge-base 3f7d857d2；merge-base 起本地改 208 个文件、远端改 1,140 个、两侧都改 140 个（计数逐批现算，不写进判据）。改到本 spec 目标 / 守卫路径的提交：本地侧 64eade2e1、841308327、60168a027（acnr D8 / D9）、40561d2c6、979b1e93c（S 循环）；远端侧 709b21275、e36cf246d、97b3534c2、cb050a670、e1d561d4b、b00ff36fc、13120d6d6、d0de87a6c、a8bc2c83e、ce6d40637、2d36c6425。两侧都改的本 spec 目标 / 守卫文件 7 个：INDEX.md、年度兜底基线 JSON、`components.d.ts`、DisclosureEditor、`address_registry_v2.py`、后端年度棘轮、body_carried 守卫。远端自设计现读点 13120d6d6 起又改了 ThreeColumnLayout（1,546 → 1,548）、WorkpaperEditor（1,455 → 1,361，两个工具栏仍在 `projectYear != null` 门控内）、`eventBus.ts`（789 → 825）与行数白名单（+11 行）
+  - ② 试合并（B0 已做）：`git worktree add --detach d:\GT_plan\tmp_aql_verify HEAD`（当时 HEAD 232e17ec5）并 lock，其中 `git merge --no-ff --no-commit origin/spec/disclosure-note-doc-upload-and-batch-fill` 冲突 7 个，全部按规则临时解开（脚本 `tmp_aql_linkage/probe/merge_resolve.py`，每个冲突文件的 base / ours / theirs / resolved blob 与取法写进 `tmp_aql_linkage/merge/manifest.json`，主树合入时远端 blob 没变就直接复用；两者是临时产物，收尾删除，取法以本条为准）：年度兜底基线 JSON = 远端 13 条 − 本地已删的 `composables/useEditorSave.ts`、`composables/useStaleImpact.ts` = 11 条（`json.dumps(indent=2)` 能逐字节复现远端格式）；后端年度棘轮取远端版（`BASELINE = {}` + `CALENDAR_YEAR_EXEMPT`）；body_carried 两段注释都保留（远端 2026-10-24 在前、本地 2026-10-27 在后），`_BODY_IDENTITY_ONLY_BASELINE` 按合并后代码现算 84 → 81；`address_registry_v2.py` 取本地版（acnr D8 已把 notify-cell-change 下线为 410 并去掉请求体，远端对同一函数只改了年度取法，下线后没有落点）；`GtAProgramLinkedChips.vue` 取远端版（补回 `chipCompletionKey`）；`GtWpRenderer.runtime-boundary.test.ts` 取远端版（`data-test="result"`，远端版已含本地侧新增的用例）；`chain_orchestrator.py`（第 4 轮评审后新出现，不属本 spec）逐行核对本地侧 979b1e93c / 40561d2c6 的新增行（`business_category_flags`、`Project.business_category` 等）全部已在远端版里，取远端版（远端另加 `begin_nested` 与 `SQLAlchemyError` 收窄）。跑守卫前 `git diff --name-only --diff-filter=U` 为空
+  - ③ 试合并树上的守卫（B0 已做；cwd 为该 worktree 的 `backend`，用仓库根 venv）：`test_project_endpoint_authz_body_carried.py`、`test_project_endpoint_authorization_baseline.py`、`test_audit_year_calendar_fallback_ratchet.py`、`tests/scripts/test_hard_cap_ratchet.py` ⇒ 94 passed（123 s）；临时建 node_modules 联接后 `auditYearCalendarFallbackRatchet.spec.ts` ⇒ 6 passed。body_carried「仅登录」档按 `address_registry_v2.py` 两种取法各算一次：取本地版 81（notify-cell-change 不再带项目、不在本维），取远端版 82（在本维、identity 档）⇒ 合并后基线下调为 81。试合并之后主树 HEAD 又前移 a46714cca（acnr T06，只改 `services/acnr/loaders/*` 与其测试）、b6d9ae6f9（下一条的 INDEX 本行）：都不碰冲突文件与路由文件，用远端年度棘轮的扫描函数扫两处新改的 app 文件均 0 命中 ⇒ 结论仍适用。随后 `merge --abort`，按 unlock → `cmd /c rmdir` 拆联接 → `git worktree remove --force` → `git worktree prune` 拆除（`git worktree list` 不含 tmp_aql_verify；真 node_modules 仍在）
+  - ④ 阻塞清单与 INDEX 本行（B0 已做）：精确口径 = `git merge-tree --write-tree` 的合并结果相对 HEAD 会改的路径 ∩ 主树 `git status --untracked-files=all`（已修改 / 未跟踪撞名 / 工作树删除而合并会复活三类）+ 共享索引暂存（`git diff --cached --name-only`）。现算阻塞 4 个、共享索引无暂存：`.kiro/specs/INDEX.md`（acnr-foundation-defect-closure、formula-hub-integrity-closure 与 2026-10-27 新建的 voucher-identity-writeback-and-audit-phase、ledger-incremental-append-true-merge、adjustment-client-booking-status 各一行，都是对方会话的未提交改动）、`.kiro/steering/memory.md`（2026-10-26 写入的临时产物目录规则，写入会话不明，非本 spec）、`audit-platform/frontend/src/components.d.ts`（S 循环会话的 `BundleAssigneeDisplay` 与自动登记的 ElAutocomplete / ElTour / ElTourStep）、`audit-platform/frontend/src/services/workpaperApi.ts`（S 循环会话的 `assigned_to_name` / `assigned_to_username`）；`auto-imports.d.ts` 远端未改、不阻塞。本 spec 的 INDEX 行按私有索引法提前提交 b6d9ae6f9（「0/39」改为「0/48」，HEAD blob 为 LF），工作树本行已改成与提交一致（CRLF），`git diff HEAD -- .kiro/specs/INDEX.md` 只剩他人的 5 行
+  - ⑤ 主树合入（实施计划 BM；任一批开工前阻塞清单为空且共享索引无暂存即做）：在 tmp_aql_verify 检出主树 HEAD 重做试合并（复用 manifest；远端 blob 变了按第 2 条规则重解；任务 6 已删 `useBatchQuery.ts` 时年度基线再去掉这一条；body_carried 基线按合并后代码现算、只许下调），`--diff-filter=U` 为空，跑上述守卫、`test_function_global_names_ratchet.py`、`test_lazy_import_resolvability.py`、`tests/scripts/test_committed_code_imports_only_committed_modules.py` 与已完成任务的测试，在 worktree 提交合并 M（父 = 主树 HEAD 与远端头）；主树再核 HEAD 未前移、阻塞为空、无暂存后 `git merge --ff-only M`。不 rebase、不改写历史、不 force push、不 stash、不 `--no-verify`；合并提交的检查因不属本 spec 的文件失败即暂停
+  - ⑥ 合入后（BM）：`git merge-base --is-ancestor d0de87a6c HEAD` 为真；新合进来的迁移用 `MigrationRunner(...).run_pending()` 落库，`/api/health` 200；主树重跑上述守卫与任务 1 的回归基线；重算并写入本条：design §1 的年度 / 行数门 / 循环范围三行、§9 全表「现状」列（`check_file_size.py` 门限与 HARD_CAPS、`test_hard_cap_ratchet.py` 结果，DisclosureEditor 应仍为 3,265 行）、年度兜底基线与 `CALENDAR_YEAR_EXEMPT` 中与本 spec 相关的条目、`deps.require_project_audit_year` 与 `effective_scope.resolve_member_scope` 的签名（`inspect.signature` 打印一次）、深链契约（`useLedgerUrlSync.readFromUrl` 的键、调整分录页 `?group=`、底稿编辑器 `?sheet=&cell=`、附注编辑器 `?section=&table_index=`）；与 design 不符的数字写明差异，结论不同的先改 design 再继续；对本 spec 全部目标文件现查 `git status`，有他人未提交改动的列入本条，后续任务只改、只提交自己的块
 
 ## 阶段 A　测试地基
-- [ ] 1. 测试地基与基线（R12.3、R12.5 底座；在任务 0 合入后的树上跑）
+- [ ] 1. 测试地基与基线（R12.3、R12.5 底座；合入前在本地树上建立并跑一遍基线，主树合入后在合入后的树上重跑，任务 0 第 6 条）
   - `tests/test_query_builder_endpoint.py`、`tests/test_query_builder_joins.py` 夹具改为只建构建器所需表（`Base.metadata.create_all(tables=[…])`），两文件 32 条恢复运行
   - `tests/authz_world.py`：`sqlite_world` / `pg_world` 增可选参数 `extra_tables`（缺省仍只建六张表，`test_world_has_exactly_the_six_tables` 不变）；`test_authz_world.py` 加「extra_tables 建出、缺省仍六张」用例
   - 新建 `tests/advanced_query_linkage/conftest.py`：`pg_only`、金标准 SQL 助手（统计排除软删项目）、真库回滚事务会话夹具
   - 前端 `advancedQueryFrontend-p7.spec.ts`「legacy global 显示为公开」超时：定位 `mountTabForScope('manager')` 不 resolve 的根因并修复（禁止只调大超时）
   - 现跑评估列出的 10 个后端 + 4 个前端测试文件，以及 `tests/scripts/test_hard_cap_ratchet.py`、`auditYearCalendarFallbackRatchet.spec.ts`，结果写入本条作为回归基线（合入前本地已红的棘轮用例合入后应转绿；合入后仍红的写明归属，不算到本 spec 头上）
 - [ ] 2. 端点权限配方表骨架（R12.5、N2，design §10.3）
-  - 新建 `tests/advanced_query_linkage/test_aql_endpoint_authz.py`：基于 authz_world 表驱动，design §10.3 的 29 行（W3 的第 30~32 行在任务 41 补）逐格按「底座」列选 `sqlite_world` / `pg_world`；PM、SM 按 §10.3 补 `eqcr_assignment("manager")`（每个身份只调一次），PM / SM 走到循环范围的格 `extra_tables` 含 `wp_index`；第 25 / 26 行的世界在 X、Y 各造一行 trial_balance 并断言结果非空；循环受限身份 CR 的子表（23c、25c、26c、28c）与身份 NM 的第 23n 行一并建好；SM 的委派写 `project=SM.other_project`；现已成立的格直接断言，待修复的格 `xfail(strict=True)` 并注明修复任务号
+  - 新建 `tests/advanced_query_linkage/test_aql_endpoint_authz.py`：基于 authz_world 表驱动，design §10.3 的第 1~29 行与第 29b 行（cross-sheet-trace 暂缓删除，按现有门禁断言；W3 的第 30~32 行在任务 41 补）逐格按「底座」列选 `sqlite_world` / `pg_world`；PM、SM 按 §10.3 补 `eqcr_assignment("manager")`（每个身份只调一次），PM / SM 走到循环范围的格 `extra_tables` 含 `wp_index`；第 25 / 26 行的世界在 X、Y 各造一行 trial_balance 并断言结果非空；循环受限身份 CR 的子表（23c、25c、26c、28c）与身份 NM 的第 23n 行一并建好；SM 的委派写 `project=SM.other_project`；现已成立的格直接断言，待修复的格 `xfail(strict=True)` 并注明修复任务号
   - 路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由都出现在表中，缺失即红（新增路由在其任务里补行）
 
 ## 阶段 B　口径、计数与隔离（P0）
@@ -55,8 +55,8 @@
   - `auditYearCalendarFallbackBaseline.json` 删 `composables/useBatchQuery.ts` 一行（只改这一行；该文件是共享文件，提交前 `git diff --cached` 只含这一块），删后跑 `auditYearCalendarFallbackRatchet.spec.ts`
   - 删后同组测试全绿；提交前打 tag
 - [ ] 7. 取数分派切换与取数器下沉（R2、N4）
-  - `business_fetchers.py` 改为注册表分派，删跨模块单元格分支与 `fetch_cap_warning`；同时删 `routers/custom_query.py` 里它的导入与调用（现 L1145 导入、L1200 调用，行号开工时现查），删后跑 `test_function_global_names_ratchet.py` 与 `test_lazy_import_resolvability.py`
-  - 新建 `services/custom_query/fetchers/{__init__,disclosure,worksheet,workpaper_cells}.py`（行为原样迁移，只读改造在任务 16）；router 删 14 个 `_query_*`，`_query_disclosure` 由 fetchers 再导出
+  - `business_fetchers.py` 改为注册表分派，删 `fetch_cap_warning`（跨模块单元格分支移到任务 34，与该源族同一提交）；同时删 `routers/custom_query.py` 里它的导入与调用（现 L1145 导入、L1200 调用，行号开工时现查），删后跑 `test_function_global_names_ratchet.py` 与 `test_lazy_import_resolvability.py`
+  - 新建 `services/custom_query/fetchers/{__init__,disclosure,worksheet,workpaper_cells}.py`（行为原样迁移，只读改造在任务 16）；router 删 `_query_*`，`_query_disclosure` 由 fetchers 再导出；分批调整（实施计划 B2，2026-10-27）：本任务的注册表先登记 trial_balance / tb_detail、account_balance、ledger_entries、workpaper、workhours 与 `consol_unit:{cc}:{account_balance|ledger_entries|tb_detail}`，报表、报表行次、调整分录三个取数器暂留 router，任务 17 / 18 切到注册表后再删，使 AQ-01 / 07 / 08 的修复与其 PG 守卫、变异同批闭环；最终状态与 design 一致
   - 改写依赖旧分派的测试（`test_advanced_query_hardening_wave012.py` 的 `_query_trial_balance` 替身用例），理由写入本条
   - `backend/scripts/file_size_whitelist.txt` 中 `custom_query.py` 基线下调为真实行数（只改这一行）
 - [ ] 8. 业务视图口径真 PG 回归（R1.1、R1.3、R2.1~R2.5、R2.7、R5.8，ADR-AQL-07；变异 #1、#3、#4）
@@ -118,6 +118,7 @@
 - [ ] 24. 模板后端（R9.1~R9.3，ADR-AQL-11；变异 #12）
   - `template_service.py`（只用 adapter 归一与可见性、`visible_templates`、`config_to_request`、错误码 `TEMPLATE_NOT_VISIBLE`）；`template_scope_adapter.py` 报错改中文；router 模板端点（list / get / execute 走 service、`TemplateForbiddenError` → 403、`TemplateInvalidError` → 400、删 update 末尾的原值覆盖、execute 分页，年度经 `deps.require_project_audit_year`；参数占位的取值在任务 41 接入）
   - 改写固化旧 scope 模型的断言（design §10.1 所列三个文件），逐条写明理由；新用例：非作者执行私有模板 403、更新 `scope=global` 入库为 public、adapter 报错为中文
+  - `config_to_request` 原样带上 `config.acnr_targets`（字段归 acnr D1 定义，用户裁决 Q0，design ADR-AQL-12 / §18），单元测试钉住透传；acnr 若已在 `execute_template` 把 `QueryRequest` 构造包进 `ValidationError ⇒ 422`，沿用其实现，未提交则本任务照做同一处理，先后顺序记入本条
 - [ ] 25. 模板软删与回收站（R9.5，ADR-AQL-11；迁移 design §8；变异 #35、#37）
   - 迁移 V{n} / R{n}（号实施时现扫并写入本条）；ORM 混入 `SoftDeleteMixin`；`template_service.soft_delete`；`routers/recycle_bin.py` 作者类型（作者 = `coalesce(creator_id, created_by)`，列表逐行 `can_restore` / `can_purge`）；`views/RecycleBin.vue` 操作列按行分支（design §3.6：带 `can_restore` 的行用逐行能力，其余行原样保留两个 `v-permission` 按钮，不经 `usePermission()`；+6 行，≤ §9）；`MigrationRunner(...).run_pending()` 落本地库
   - 测试：软删后列表 / 详情 / 执行 404；回收站作者与 admin 可见、可恢复、可彻底删除，他人 403；列表里模板行带 `can_restore` / `can_purge`、其余类型不带；vitest `RecycleBin.rowActions.spec.ts`（注册真实 `vPermission` 指令）：系统 auditor 作者看得到并能点「恢复」；项目类型行在 auditor 下隐藏、在 `{role: 'manager', permissions: [后端矩阵的 10 个权限码]}` 下可见（design §10.1 回收站条）；列 / 索引 / 约束存在，R 文件可回放
@@ -134,10 +135,11 @@
   - vitest：换路由后项目跟随、非项目页不自动选、年度为空禁用查询、错误不落空态、翻页显示 total、「仅筛选本页」、操作列打开 / 复制引用（不可用时显示原因）、结果区没有回写入口（R7.5）；操作、翻页、导出控件带 aria-label（N5，页面版与构建器同口径断言）
 - [ ] 29. 页面版改造（R6.1~R6.5、R7、R10.2、R10.4、N5，ADR-AQL-12 / 16）
   - `CustomQueryTab.vue` 按 design §4.2，条件区做成独立组件 `components/query/QueryConditionEditor.vue`（W3 在弹窗复用）；改写 `advancedQueryFrontend.spec.ts` 的「今年 − 1」断言；删掉 `defaultAuditYear()` 后同步删除 `auditYearCalendarFallbackRatchet.spec.ts` 的 `CALENDAR_YEAR_EXEMPT` 中 `components/template-library/CustomQueryTab.vue` 一条（只改这一条，提交时只含这一块），跑该棘轮 spec
-  - vitest：结构化条件与 AND / OR 进请求、未知字段提示、条件值框可输入、中文列名、ACNR 面板「开发中」且请求不带 acnr_targets、指标树带项目与年度加载
+  - vitest：结构化条件与 AND / OR 进请求、未知字段提示、条件值框可输入、中文列名、选了 ACNR 格时请求里仍带 acnr_targets（面板与字段归 acnr D1，用户裁决 Q0，本 spec 不改面板）、指标树带项目与年度加载
 - [ ] 30. 构建器前端（R2.6、R3.5、R3.6、R6.5、N5，ADR-AQL-08 / 12）
   - `AdvancedQueryBuilder.vue`、`useQueryBuilderAccess.ts`（access 接口）、`services/apiPaths/system.ts`（queryBuilder 组）；改写 `test_advanced_query_hardening_properties_scope.py::test_p23_*`
-  - vitest：无权禁用 + 原因、准入通过但作用域为空（`accessible_project_count = 0`）时禁用并显示接口 reason、默认当前项目、跨项目开关（计数 > 1 或 all_projects）、翻页
+  - vitest：无权禁用 + 原因、准入通过但作用域为空（`accessible_project_count = 0`）时禁用并显示接口 reason、默认当前项目、跨项目开关（计数 > 1 或 all_projects）、翻页、选了 ACNR 格时请求仍带 acnr_targets
+  - 「ACNR 选字段」面板不改、不标「开发中」（ADR-AQL-12 已改为移交 acnr D1，用户裁决 Q0）
 - [ ] 31. 入口上下文与模板库按钮（R10.1~R10.3、R10.5，ADR-AQL-15；AQ-38；变异 #33）
   - `ThreeColumnLayout.vue`：只新增 `customQueryYear`（`currentYear` 不动），经 `resolveDialogOpenContext` 处理 override / 侧栏预选 / 模板库源映射 / 关闭清空，弹窗增 `:initial-notice`；行数 ≤ design §9；年度兜底基线中 ThreeColumnLayout 条目保留
   - `queryEntryContext.resolveTemplateLibrarySource`；弹窗显示 `initialNotice`；三个模板宿主与 `TemplateLibraryButton` 不改（`TemplateLibraryButton.test.ts` 保持通过）
@@ -151,7 +153,8 @@
 
 ## 阶段 G　收敛与验收
 - [ ] 34. 删除其余收敛对象（R12.1，ADR-AQL-04 / 13；按 design §3.9 一类一提交）
-  - 每类删前 grep 0 调用方、删前后跑同一组测试（跨模块单元格源族另跑 `test_lazy_import_resolvability.py`）、提交前打 tag；下调 `test_module_cell_resolver.py` 白名单基线；`SheetCellRangePicker.vue` 删模块模式
+  - 每类删前 grep 0 调用方、删前后跑同一组测试（跨模块单元格源族另跑 `test_lazy_import_resolvability.py`）、提交前打 tag；下调 `test_module_cell_resolver.py` 白名单基线；`SheetCellRangePicker.vue` 删模块模式；`business_fetchers.py` 的跨模块单元格分派分支（从任务 7 移来）与该源族同一提交
+  - `GET /cross-sheet-trace` + `cross_sheet_trace_orchestrator.py` + `FormulaTracePopover.vue` 三件**暂缓**：acnr-foundation-defect-closure 任务 20（D6）要改进这两个后端文件（其 e2e 用 TestClient 调该端点），与 ADR-AQL-04 冲突，待用户拍板；推荐由 acnr D6 接手、本 spec 不删（design ADR-AQL-04、§18）；配方表第 29b 行按其现有门禁断言；`/index-health` 按 ADR-AQL-13 不动
 - [ ] 35. 权限配方表全部转正与磁盘变异（R12.5、N2，design §10.3 / §10.4）
   - 删除全部 xfail，路由对账通过；变异 #1~#21、#10b、#19b、#33、#35~#37、#39 逐条打红（单独一条命令跑，在 `tmp_aql_verify` 里做，逐字节恢复后 sha256 核对），结果写入本条；W3 / W6 的变异 #22~#32、#34、#38 在阶段 H、I 各自任务内按同样方式跑
 - [ ] 36. 性能与 e2e 静态复核（N1、R12.4）
@@ -196,4 +199,4 @@
 - [ ]* 37. 浏览器全链路实测（写后读回，design §10.5，含 W3 / W6 段落）：需 start-dev 运行环境；未实测时写「代码已改但未实测」
 - [ ]* 38. 合并项目路径实测（tb_summary / ws_* / consol_unit / 合并附注）：现库 0 个合并项目；未实测时写「代码已改但未实测」
 - [ ] 39. 收尾
-  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16；W3 / W6 标「已纳入」），写明只做周末、不做节假日的原因、design §14.5 的范围外登记、新断点 AQ-38 的处置、e2e_manager 构建器基线按 design §10.2 口径的结果（现库 0 行 + 排除提示）、「按裁决调整的基线」（批 5 完整导出改为按月完整导出 + 超限 400 不产生文件，附 W11 推荐默认值，不写「通过」，design §12），供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数（0~47，共 48 个）与 INDEX 一致
+  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16；W3 / W6 标「已纳入」，W4 标「已移交 acnr D1（用户裁决 Q0）」），另列跨 spec 待拍板（cross-sheet-trace 三件：ADR-AQL-04 与 acnr D6），写明只做周末、不做节假日的原因、design §14.5 的范围外登记、新断点 AQ-38 的处置、e2e_manager 构建器基线按 design §10.2 口径的结果（现库 0 行 + 排除提示）、「按裁决调整的基线」（批 5 完整导出改为按月完整导出 + 超限 400 不产生文件，附 W11 推荐默认值，不写「通过」，design §12），供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数（0~47，共 48 个）与 INDEX 一致
