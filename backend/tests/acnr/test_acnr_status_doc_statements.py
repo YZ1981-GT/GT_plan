@@ -196,7 +196,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "生成器名称规则：cell 的 formula_ref / uri 按名称归属选模板名或 sheet_code，449 个非孤儿 cell 全部往返；13 张种子名不一致 sheet 的 47 格三路判定写入 cell_verdicts": L("T06"),
         "生成器流程重写：目录只由生成器写出，写出前跑 catalog_release 门禁；`--check` 结构化比对（漂移退出 2、门禁违规退出 1）；幂等；快照、schema、带 release 段的报告与目录同批写出；删分片；迁回 57 张外科补丁；首个合规发布批次": L("T07"),
         "判定记录落进目录：补登 5 张父 sheet、K14~K18 停用、25 个孤儿 cell 停用。设计预演的发布后规模为 sheet 1225 / 有效 cell 449 / 孤儿 0，这是预演值，不是现状": L("T05、T07"),
-        "加载期 release 互校在生产目录上生效（删除旧格式报告的过渡期登记）": L("T07、T08"),
+        "加载期 release 互校在生产目录上生效（删除旧格式报告的过渡期登记）": L("T07"),
         "报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单": L("T09"),
         "exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返": L("T10"),
         "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T11、T12、T13、T14、T15、T16"),
