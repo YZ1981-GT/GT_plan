@@ -9,6 +9,8 @@
   加入——被测代码的 ``commit`` 只释放保存点；结束整体 rollback，不留任何写入。只许写名称带【测试】/【UAT】的项目。
 - ``builder``：真库构建器客户端（``builder_client.BuilderClient``），请求经生产注册的 query_builder router，会话即上面的
   回滚事务会话。
+- ``business``：真库业务视图客户端（``business_client.BusinessClient``，系统管理员），请求经生产注册的 custom_query
+  router，会话同上。
 
 连接串只取进程环境变量 ``DATABASE_URL``（与 ``tests.authz_world.pg_engine`` 同一入口），命令行里设置、跑完即删。
 """
@@ -21,6 +23,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.advanced_query_linkage.builder_client import BuilderClient, builder_client
+from tests.advanced_query_linkage.business_client import BusinessClient, business_client
 from tests.advanced_query_linkage.gold import Gold, require_pg_only
 from tests.authz_world import pg_engine
 
@@ -57,4 +60,11 @@ async def pg_rollback_session(request: pytest.FixtureRequest) -> AsyncIterator[A
 async def builder(pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[BuilderClient]:
     """真库构建器客户端：生产注册的 query_builder router + 回滚事务会话（见 ``builder_client``）。"""
     async with builder_client(pg_rollback_session, monkeypatch) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def business(pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[BusinessClient]:
+    """真库业务视图客户端：生产注册的 custom_query router + 回滚事务会话（见 ``business_client``）。"""
+    async with business_client(pg_rollback_session, monkeypatch) as client:
         yield client

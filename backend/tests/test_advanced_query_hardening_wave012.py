@@ -791,7 +791,9 @@ async def test_legacy_fetcher_routes_sql_sources_to_database_paging(monkeypatch)
 
     advanced-query-linkage-closure 任务 7 把试算表切到注册表（COUNT / ORDER BY / LIMIT / OFFSET 在数据库内）后该
     取数器已删除；改为替换注册表的**下一层** ``paged_fetch.page``：收到的是试算表定义与请求的 limit / offset，
-    返回的 FetchPage 原样交给编排器。暂留 router 的取数器（报表行次）仍按旧口径请求不截断的行（limit=None）。
+    返回的 FetchPage 原样交给编排器。任务 17 / 18 把报表行次（及报表、调整分录）也切到注册表后，router 里不再有
+    取数器：原后半段替身 ``_query_report_lines``、断言其收到 ``limit=None``，固化的是已删除的内部形态，改为断言
+    报表行次同样交给 ``paged_fetch.page``。
     """
     import uuid as _uuid
 
@@ -815,19 +817,15 @@ async def test_legacy_fetcher_routes_sql_sources_to_database_paging(monkeypatch)
     assert seen["spec"] is source_registry.TRIAL_BALANCE and (seen["limit"], seen["offset"]) == (8, 16)
     assert fetched.paged and fetched.total == 1234 and len(fetched.rows) == 8
 
-    legacy = {}
-
-    async def report_lines(db, pid, year, filters, limit):
-        legacy["limit"] = limit
-        return {"rows": [{"id": index} for index in range(8)], "columns": ["id"], "total": 8}
-
-    monkeypatch.setattr(router_module, "_query_report_lines", report_lines)
-    rows, columns = await router_module._legacy_business_fetcher(
-        QueryRequest(entry="business", project_id="p1", year=2025, source="report_lines"),
+    seen.clear()
+    lines = await router_module._legacy_business_fetcher(
+        QueryRequest(entry="business", project_id=str(_uuid.uuid4()), year=2025, source="report_lines",
+                     limit=50, offset=0),
         [], object(),
     )
-    assert legacy["limit"] is None
-    assert len(rows) == 8 and columns[0].key == "id"
+    assert seen["spec"] is source_registry.REPORT_LINES and (seen["limit"], seen["offset"]) == (50, 0)
+    assert lines.paged and lines.total == 1234
+    assert not hasattr(router_module, "_query_report_lines"), "报表行次取数器已随任务 17 删除"
 
 
 # ─── Wave1 Task 1.4: 加固 writeback preview/confirm 权限 ─────────────────────

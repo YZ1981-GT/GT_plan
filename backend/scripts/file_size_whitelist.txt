@@ -134,7 +134,8 @@ backend/scripts/fix/fix_projection_representation_rehash.py  1090
 #     custom_query.py 的剩余拆分方向：14 个 _query_* 取数器（约 900 行）下沉为
 #     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
 #     spec: advanced-query-hardening-wiring-closure
-backend/app/routers/custom_query.py  1993
+#     2026-10-27 advanced-query-linkage-closure 任务 7 / 17 / 18：上述取数器已全部下沉（source_registry + fetchers/），baseline 按实际行数下调（1993 → 1841）。
+backend/app/routers/custom_query.py  1841
 
 #   disclosure_notes.py（改动前 1454 行）/ wp_editor_router.py（1120 行）——
 #     **两者改动前即已超限**。

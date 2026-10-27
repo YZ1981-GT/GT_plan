@@ -14,8 +14,14 @@ COUNT、ORDER BY、LIMIT / OFFSET 与条件全部交给 ``paged_fetch`` 在数�
 - 默认排序只由本注册表定义（``pagination.DEFAULT_SORT_BY_SOURCE`` 不再登记 SQL 源），末项恒追加唯一键；
 - 未登记的筛选键 / 条件字段 / 列 → 400（``paged_fetch``）。
 
-本批（实施计划 B2）登记试算表、科目余额、序时账、底稿清单、工时与合并单位前缀；报表、报表行次、调整分录
-三个源仍由 router 内取数器承担（任务 17 / 18 切到本注册表后删除），JSON 内存源在 ``fetchers/``。
+登记的 SQL 源：试算表、科目余额、序时账、底稿清单、工时、合并单位前缀（实施计划 B2），报表、报表行次、调整分录
+（B5 任务 17 / 18；router 内的旧取数器随之删除）；JSON 内存源在 ``fetchers/``。
+
+- 报表源（AQ-01）：结构 = 项目适用准则的行 ∪ 本项目独有的 ``project:{项目}`` 行（准则取报表生成用的
+  ``ReportConfigService.resolve_applicable_standard``，覆盖行的结构仍取准则行，与 ``load_effective_report_configs``
+  同口径），金额 LEFT JOIN 项目已生成的 ``financial_report``；改造前金额取自全库 0 行的 ``report_snapshot``。
+- 报表行次（AQ-08）：只含准则行与本项目副本行，按行号排序；改造前按不存在的 ``sort_order`` 排序，恒 500。
+- 调整分录（AQ-07）：按 PG 枚举小写值查询；改造前绑大写 ``'AJE'`` / ``'RCL'``（枚举里没有），恒 500。
 """
 
 from __future__ import annotations
@@ -30,11 +36,13 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import Cast, ColumnElement, Label
 
-from app.models.audit_platform_models import TbBalance, TbLedger, TrialBalance
+from app.models.audit_platform_models import Adjustment, TbBalance, TbLedger, TrialBalance
 from app.models.core import Project
+from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig
 from app.models.staff_models import WorkHour
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.dataset_query import get_active_dataset_id_or_none, get_active_filter
+from app.services.report_config_service import ReportConfigService
 
 Dtype = Literal["number", "text", "date", "bool"]
 #: 旧筛选键的谓词形态；``code_family`` = 编码精确或其子编码（``E1`` 带出 ``E1-1``），即底稿树叶子的口径
@@ -68,10 +76,18 @@ class SourceColumn:
     dtype: Dtype
     conditionable: bool = True
     sortable: bool = True
+    #: 来自 LEFT JOIN 的被连接一侧：没有匹配行时为空，排序按可空列处理（NULLS LAST）
+    outer: bool = False
+    #: 排序用的表达式（缺省 = ``expr``）：如报表类型显示与条件按文本、排序仍按枚举声明顺序
+    sort_expr: Any = None
 
     @property
     def nullable(self) -> bool:
-        return bool(getattr(_base_column(self.expr), "nullable", True))
+        return self.outer or bool(getattr(_base_column(self.expr), "nullable", True))
+
+    @property
+    def order_expr(self) -> Any:
+        return self.expr if self.sort_expr is None else self.sort_expr
 
 
 @dataclass(frozen=True)
@@ -81,6 +97,8 @@ class FilterKey:
     key: str
     column: str  # 对应 SourceColumn.key（显示列或隐藏列）
     op: FilterOp
+    #: 取值归一（如调整类型 AJE / RCL → 枚举小写值）；取值非法时抛 400
+    normalize: Callable[[Any], Any] | None = None
 
 
 @dataclass
@@ -118,6 +136,10 @@ class SourceSpec:
     warn: WarnBuilder | None = None
     #: 只回显、不筛选的键（如底稿叶子 ``workpaper:{code}|{sheet}`` 的 sheet 名），以隐藏列随行返回
     echo_filters: tuple[str, ...] = ()
+    #: 由本源口径谓词 / 提示自己消费的键（如报表类型、准则）：不生成通用谓词，取值在 ``base_where`` 里校验
+    context_filters: tuple[str, ...] = ()
+    #: 源键自带、覆盖请求同名键的筛选（如 adj_aje ⇒ 调整类型 aje）
+    fixed_filters: tuple[tuple[str, Any], ...] = ()
 
     def column(self, key: str) -> SourceColumn | None:
         for col in (*self.columns, *self.hidden):
@@ -173,6 +195,129 @@ async def _workpaper_where(ctx: FetchContext) -> list[ColumnElement]:
 async def _workhours_where(ctx: FetchContext) -> list[ColumnElement]:
     h = WorkHour.__table__
     return [h.c.project_id == ctx.project_id, sa.extract("year", h.c.work_date) == ctx.year, h.c.is_deleted == sa.false()]
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _invalid_filter(key: str, message: str, allowed: list[str]) -> HTTPException:
+    return HTTPException(status_code=400, detail={
+        "error_code": "INVALID_FILTER_VALUE", "message": message, "filter_key": key, "allowed": allowed,
+    })
+
+
+# ── 报表 / 报表行次（任务 17）──
+
+#: 报表类型（financial_report_type 枚举的取值，顺序同枚举声明）
+REPORT_TYPES: tuple[str, ...] = tuple(t.value for t in FinancialReportType)
+#: 通用报表源（``report``）不带报表类型时按资产负债表（与旧取数器相同）
+DEFAULT_REPORT_TYPE = "balance_sheet"
+#: 报表配置的项目副本行写法（``applicable_standard = 'project:{项目 id}'``）
+PROJECT_STANDARD_PREFIX = "project:"
+REPORT_NOT_GENERATED_WARNING = "该项目尚未生成此报表，金额为空"
+REPORT_STALE_WARNING = "报表数据已过期，请在报表页重新生成"
+
+_RC = ReportConfig.__table__
+_RC_STANDARD = _RC.alias("rc_standard")
+_FR = FinancialReport.__table__
+
+
+def _report_type(ctx: FetchContext) -> str:
+    raw = ctx.filters.get("report_type")
+    value = DEFAULT_REPORT_TYPE if _blank(raw) else str(raw).strip()
+    if value not in REPORT_TYPES:
+        raise _invalid_filter("report_type", f"报表类型「{value}」不存在，可用：{'、'.join(REPORT_TYPES)}",
+                              list(REPORT_TYPES))
+    return value
+
+
+async def _report_standard(ctx: FetchContext) -> str:
+    """本次报表结构用的准则：显式 ``filters.standard``（限平台准则）优先，否则同报表生成（项目模板类型 + 报表范围）。"""
+    if "report_standard" not in ctx.memo:
+        raw = ctx.filters.get("standard")
+        if _blank(raw):
+            standard = await ReportConfigService.resolve_applicable_standard(ctx.db, ctx.project_id)
+        else:
+            standard = str(raw).strip()
+            allowed = sorted(ReportConfigService.VALID_STANDARDS)
+            if standard not in allowed:
+                raise _invalid_filter("standard", f"报表准则「{standard}」不存在，可用：{'、'.join(allowed)}", allowed)
+        ctx.memo["report_standard"] = standard
+    return ctx.memo["report_standard"]
+
+
+def _report_from(ctx: FetchContext) -> Any:
+    # 金额 = 项目已生成的报表结果（同项目年度、同类型行次、未删）；financial_report 在这组键上唯一，不会放大行数
+    return _RC.outerjoin(_FR, sa.and_(
+        _FR.c.project_id == ctx.project_id,
+        _FR.c.year == ctx.year,
+        _FR.c.report_type == _RC.c.report_type,
+        _FR.c.row_code == _RC.c.row_code,
+        _FR.c.is_deleted == sa.false(),
+    ))
+
+
+async def _report_where(ctx: FetchContext) -> list[ColumnElement]:
+    report_type = _report_type(ctx)
+    standard = await _report_standard(ctx)
+    # 本项目独有行 = 项目副本行中准则下没有同（报表类型, 行次码）的行；覆盖行的结构仍取准则行（行名 / 缩进 / 合计），
+    # 与报表生成用的 load_effective_report_configs 同口径
+    shadowed = sa.exists().where(
+        _RC_STANDARD.c.applicable_standard == standard,
+        _RC_STANDARD.c.report_type == _RC.c.report_type,
+        _RC_STANDARD.c.row_code == _RC.c.row_code,
+        _RC_STANDARD.c.is_deleted == sa.false(),
+    )
+    own_rows = sa.and_(_RC.c.applicable_standard == f"{PROJECT_STANDARD_PREFIX}{ctx.project_id}", ~shadowed)
+    return [
+        _RC.c.is_deleted == sa.false(),
+        _RC.c.report_type == report_type,
+        sa.or_(_RC.c.applicable_standard == standard, own_rows),
+    ]
+
+
+async def _report_warn(ctx: FetchContext) -> list[str]:
+    total, stale = (await ctx.db.execute(
+        sa.select(sa.func.count(), sa.func.coalesce(sa.func.sum(sa.case((_FR.c.is_stale == sa.true(), 1), else_=0)), 0))
+        .where(_FR.c.project_id == ctx.project_id, _FR.c.year == ctx.year,
+               _FR.c.report_type == _report_type(ctx), _FR.c.is_deleted == sa.false())
+    )).one()
+    if not total:
+        return [REPORT_NOT_GENERATED_WARNING]
+    return [REPORT_STALE_WARNING] if stale else []
+
+
+async def _report_lines_where(ctx: FetchContext) -> list[ColumnElement]:
+    # 准则行 + 本项目副本行（他项目副本行不可见）
+    return [
+        _RC.c.is_deleted == sa.false(),
+        sa.or_(_RC.c.applicable_standard.notlike(f"{PROJECT_STANDARD_PREFIX}%"),
+               _RC.c.applicable_standard == f"{PROJECT_STANDARD_PREFIX}{ctx.project_id}"),
+    ]
+
+
+# ── 调整分录（任务 18）──
+
+#: 调整类型取值（大小写不敏感）→ PG 枚举 ``adjustment_type`` 的值；RCL 是旧叶子的写法，即重分类调整（rje）
+_ADJUSTMENT_TYPE_VALUES = {"aje": "aje", "rje": "rje", "rcl": "rje"}
+
+
+def normalize_adjustment_type(value: Any) -> str:
+    """调整类型归一：AJE → aje、RJE / RCL → rje；其余（含 cf）400。"""
+    key = str(value).strip().lower()
+    if key not in _ADJUSTMENT_TYPE_VALUES:
+        raise _invalid_filter("adjustment_type", f"调整类型「{value}」不存在，可用：AJE（审计调整）、RJE（重分类调整）",
+                              ["AJE", "RJE"])
+    return _ADJUSTMENT_TYPE_VALUES[key]
+
+
+async def _adjustment_where(ctx: FetchContext) -> list[ColumnElement]:
+    a = Adjustment.__table__
+    clauses: list[ColumnElement] = [a.c.project_id == ctx.project_id, a.c.year == ctx.year, a.c.is_deleted == sa.false()]
+    if ctx.company_code:
+        clauses.append(a.c.company_code == ctx.company_code)
+    return clauses
 
 
 # ─── 源定义 ──────────────────────────────────────────────────────────────────
@@ -319,20 +464,134 @@ WORKHOURS = SourceSpec(
     unique_key="id",
 )
 
-#: 注册表：源键 → 定义（别名见 SOURCE_ALIASES）
+REPORT = SourceSpec(
+    key="report",
+    label="报表",
+    from_clause=_report_from,
+    columns=(
+        _c(_RC, "row_code", "text"),
+        _c(_RC, "row_name", "text"),
+        SourceColumn("current_period_amount", _FR.c.current_period_amount, "number", outer=True),
+        SourceColumn("prior_period_amount", _FR.c.prior_period_amount, "number", outer=True),
+        # 响应键沿用旧取数器（indent / is_total），前端标签与编码类列判定按它
+        SourceColumn("indent", _RC.c.indent_level, "number"),
+        SourceColumn("is_total", _RC.c.is_total_row, "bool"),
+    ),
+    hidden=(
+        _id(_RC),
+        _c(_RC, "row_number", "number", conditionable=False),
+        SourceColumn("is_stale", _FR.c.is_stale, "bool", conditionable=False, outer=True),
+        SourceColumn("blank_reason", _FR.c.blank_reason, "text", conditionable=False, outer=True),
+    ),
+    base_where=_report_where,
+    filter_keys=(),
+    default_sort=(("row_number", "asc"), ("row_code", "asc")),
+    unique_key="id",
+    warn=_report_warn,
+    context_filters=("report_type", "standard"),
+)
+
+REPORT_LINES = SourceSpec(
+    key="report_lines",
+    label="报表行次配置",
+    from_clause=lambda ctx: _RC,
+    columns=(
+        _c(_RC, "row_code", "text"),
+        _c(_RC, "row_name", "text"),
+        # 显示与条件按文本（非法值是查不到，不是 PG 报错 500），排序仍按枚举声明顺序（资产负债表、利润表……）
+        SourceColumn("report_type", sa.cast(_RC.c.report_type, sa.String), "text", sort_expr=_RC.c.report_type),
+        _c(_RC, "applicable_standard", "text"),
+        _c(_RC, "indent_level", "number"),
+        _c(_RC, "is_total_row", "bool"),
+        _c(_RC, "formula", "text"),
+        _c(_RC, "row_number", "number"),
+    ),
+    hidden=(_id(_RC),),
+    base_where=_report_lines_where,
+    filter_keys=(
+        FilterKey("report_type", "report_type", "eq"),
+        FilterKey("applicable_standard", "applicable_standard", "eq"),
+        FilterKey("has_formula", "formula", "nonempty"),
+        FilterKey("row_name", "row_name", "like"),
+    ),
+    default_sort=(("applicable_standard", "asc"), ("report_type", "asc"), ("row_number", "asc")),
+    unique_key="id",
+)
+
+_ADJ = Adjustment.__table__
+#: 枚举列按文本读写比较：PG 枚举有 cf、ORM 枚举没有，按 ORM 类型读会 LookupError
+_ADJ_TYPE = SourceColumn("adjustment_type", sa.cast(_ADJ.c.adjustment_type, sa.String), "text")
+_ADJ_COLUMNS = (
+    _c(_ADJ, "adjustment_no", "text"),
+    _c(_ADJ, "account_code", "text"),
+    _c(_ADJ, "account_name", "text"),
+    _c(_ADJ, "debit_amount", "number"),
+    _c(_ADJ, "credit_amount", "number"),
+    _c(_ADJ, "description", "text"),
+    SourceColumn("review_status", sa.cast(_ADJ.c.review_status, sa.String), "text"),
+)
+_ADJ_HIDDEN = (
+    _id(_ADJ),
+    _c(_ADJ, "entry_group_id", "text", conditionable=False),  # 下钻到调整分录页按分录组
+    _c(_ADJ, "company_code", "text", conditionable=False),
+)
+_ADJ_FILTERS = (
+    FilterKey("adjustment_type", "adjustment_type", "eq", normalize=normalize_adjustment_type),
+    FilterKey("account_name", "account_name", "like"),
+    FilterKey("review_status", "review_status", "eq"),
+    FilterKey("company_code", "company_code", "eq"),
+)
+
+ADJUSTMENT = SourceSpec(
+    key="adjustment",
+    label="调整分录（全部类型）",
+    from_clause=lambda ctx: _ADJ,
+    columns=(_ADJ_COLUMNS[0], _ADJ_TYPE, *_ADJ_COLUMNS[1:]),
+    hidden=_ADJ_HIDDEN,
+    base_where=_adjustment_where,
+    filter_keys=_ADJ_FILTERS,
+    default_sort=(("adjustment_no", "asc"),),
+    unique_key="id",
+)
+
+
+def _typed_adjustment(key: str, label: str, adjustment_type: str) -> SourceSpec:
+    """单一类型的调整分录源：类型列不显示（随行返回），类型由源键固定、覆盖请求里的同名键。"""
+    return SourceSpec(
+        key=key,
+        label=label,
+        from_clause=lambda ctx: _ADJ,
+        columns=_ADJ_COLUMNS,
+        hidden=(*_ADJ_HIDDEN, _ADJ_TYPE),
+        base_where=_adjustment_where,
+        filter_keys=_ADJ_FILTERS,
+        default_sort=(("adjustment_no", "asc"),),
+        unique_key="id",
+        fixed_filters=(("adjustment_type", adjustment_type),),
+    )
+
+
+ADJUSTMENT_AJE = _typed_adjustment("adj_aje", "审计调整分录(AJE)", "aje")
+ADJUSTMENT_RJE = _typed_adjustment("adj_rje", "重分类调整分录(RJE)", "rje")
+
+#: 注册表：源键 → 定义（别名见 SOURCE_ALIASES；``report_{类型}`` 前缀见 resolve_source）
 SOURCE_REGISTRY: dict[str, SourceSpec] = {
-    spec.key: spec for spec in (TRIAL_BALANCE, ACCOUNT_BALANCE, LEDGER_ENTRIES, WORKPAPER, WORKHOURS)
+    spec.key: spec for spec in (TRIAL_BALANCE, ACCOUNT_BALANCE, LEDGER_ENTRIES, WORKPAPER, WORKHOURS, REPORT,
+                                REPORT_LINES, ADJUSTMENT, ADJUSTMENT_AJE, ADJUSTMENT_RJE)
 }
-#: 别名 → 源键（tb_detail 是指标树叶子键）
-SOURCE_ALIASES: dict[str, str] = {"tb_detail": "trial_balance"}
-#: ``consol_unit:{company_code}:{kind}`` 中由本注册表承担的 kind
+#: 别名 → 源键（tb_detail 是指标树叶子键；adj_rcl 是「重分类调整」旧叶子键）
+SOURCE_ALIASES: dict[str, str] = {"tb_detail": "trial_balance", "adj_rcl": "adj_rje"}
+#: ``consol_unit:{company_code}:{kind}`` 中由本注册表承担的 kind（单位下的「调整分录」= 该单位全部类型）
 CONSOL_UNIT_KINDS: dict[str, str] = {
     "account_balance": "account_balance",
     "ledger_entries": "ledger_entries",
     "tb_detail": "trial_balance",
+    "adjustment": "adjustment",
 }
+#: 报表源的类型前缀：``report_{类型}`` ⇒ 报表源 + 固定报表类型
+REPORT_SOURCE_PREFIX = "report_"
 
-# ─── 内存源（fetchers/）与暂留 router 的取数器 ────────────────────────────────
+# ─── 内存源（fetchers/）────────────────────────────────────────────────────────
 
 #: JSON 内存源：源键 → (fetchers 子模块, 函数名)。行序即取数顺序（_row_index），不支持 conditions。
 JSON_SOURCES: dict[str, tuple[str, str]] = {
@@ -345,25 +604,21 @@ JSON_PREFIXES: tuple[tuple[str, tuple[str, str]], ...] = (("ws_", ("worksheet", 
 #: 底稿单元格区域（签名不同：``(db, pid, filters)``）
 WORKPAPER_CELLS: tuple[str, str] = ("workpaper_cells", "_query_workpaper_cell_range")
 
-#: 暂留 router 的取数器（任务 17 / 18 切到注册表后删除；在此之前它们不支持 conditions）
-LEGACY_SOURCES: dict[str, str] = {
-    "report": "_query_report",
-    "adjustment": "_query_adjustments",
-    "report_lines": "_query_report_lines",
-}
-LEGACY_PREFIXES: tuple[tuple[str, str], ...] = (("report_", "_query_report"), ("adj_", "_query_adjustments"))
-
 
 @dataclass(frozen=True)
 class ResolvedSource:
-    """源键解析结果：三者恰有其一（SQL 定义 / JSON 取数器 / 暂留 router 的取数器）。"""
+    """源键解析结果：二者恰有其一（SQL 定义 / JSON 取数器）。"""
 
     source: str
     spec: SourceSpec | None = None
     json_fetcher: tuple[str, str] | None = None
-    legacy_fetcher: str | None = None
     fixed_filters: Mapping[str, Any] = field(default_factory=dict)
     company_code: str | None = None
+
+
+def _sql_source(source: str, spec: SourceSpec, *, company_code: str | None = None, **extra: Any) -> ResolvedSource:
+    return ResolvedSource(source, spec=spec, fixed_filters={**dict(spec.fixed_filters), **extra},
+                          company_code=company_code)
 
 
 def unknown_source(source: str) -> HTTPException:
@@ -394,10 +649,7 @@ def resolve_source(source: str, filters: Mapping[str, Any] | None = None) -> Res
             raise unknown_source(key)
         _, company_code, kind = parts
         if kind in CONSOL_UNIT_KINDS:
-            return ResolvedSource(key, spec=SOURCE_REGISTRY[CONSOL_UNIT_KINDS[kind]], company_code=company_code)
-        if kind == "adjustment":  # 任务 18 切到注册表（并改小写枚举）
-            return ResolvedSource(key, legacy_fetcher="_query_adjustments",
-                                  fixed_filters={"company_code": company_code, "adjustment_type": "AJE"})
+            return _sql_source(key, SOURCE_REGISTRY[CONSOL_UNIT_KINDS[kind]], company_code=company_code)
         raise unknown_source(key)
 
     if key.startswith("workpaper:"):
@@ -410,24 +662,22 @@ def resolve_source(source: str, filters: Mapping[str, Any] | None = None) -> Res
             fixed["sheet_name"] = sheet_name
         if merged.get("cell_range"):
             return ResolvedSource(key, json_fetcher=WORKPAPER_CELLS, fixed_filters=fixed)
-        return ResolvedSource(key, spec=WORKPAPER, fixed_filters=fixed)
+        return _sql_source(key, WORKPAPER, **fixed)
 
     if key == "workpaper" and merged.get("wp_code") and merged.get("cell_range"):
         return ResolvedSource(key, json_fetcher=WORKPAPER_CELLS)
 
     canonical = SOURCE_ALIASES.get(key, key)
     if canonical in SOURCE_REGISTRY:
-        return ResolvedSource(key, spec=SOURCE_REGISTRY[canonical])
+        return _sql_source(key, SOURCE_REGISTRY[canonical])
     if key in JSON_SOURCES:
         return ResolvedSource(key, json_fetcher=JSON_SOURCES[key])
-    if key in LEGACY_SOURCES:
-        return ResolvedSource(key, legacy_fetcher=LEGACY_SOURCES[key])
     for prefix, target in JSON_PREFIXES:
         if key.startswith(prefix):
             return ResolvedSource(key, json_fetcher=target)
-    for prefix, name in LEGACY_PREFIXES:
-        if key.startswith(prefix):
-            return ResolvedSource(key, legacy_fetcher=name)
+    if key.startswith(REPORT_SOURCE_PREFIX) and key[len(REPORT_SOURCE_PREFIX):] in REPORT_TYPES:
+        # 报表叶子：源键决定报表类型（改造前后端只认 filters.report_type，页面版不带时一律当资产负债表）
+        return _sql_source(key, REPORT, report_type=key[len(REPORT_SOURCE_PREFIX):])
     raise unknown_source(key)
 
 

@@ -3,18 +3,16 @@
 设计对应 `.kiro/specs/advanced-query-hardening-wiring-closure/design.md` §Components 4 与
 `.kiro/specs/advanced-query-linkage-closure/design.md` §3.1~§3.3（ADR-AQL-06）。
 
-分派只有一处：``source_registry.resolve_source`` 把源键解析为三种实现之一——
+分派只有一处：``source_registry.resolve_source`` 把源键解析为两种实现之一——
 
-- **注册表 SQL 源**（试算表、科目余额、序时账、底稿清单、工时、合并单位前缀）：交 ``paged_fetch``，COUNT、
-  排序、分页与条件都在数据库内，返回 ``FetchPage(paged=True)``；带分组 / 透视时取全量（> 5,000 行即 400）
-  交编排器内存处理。
+- **注册表 SQL 源**（试算表、科目余额、序时账、底稿清单、工时、报表、报表行次、调整分录、合并单位前缀）：交
+  ``paged_fetch``，COUNT、排序、分页与条件都在数据库内，返回 ``FetchPage(paged=True)``；带分组 / 透视时取全量
+  （> 5,000 行即 400）交编排器内存处理。
 - **JSON 内存源**（附注、合并工作底稿、底稿单元格区域，``fetchers/``）：行带隐藏列 ``_row_index``（取数顺序），
   行数 > ``FETCH_HARD_CAP`` 即 400 ``RESULT_TOO_LARGE``，不支持结构化条件。
-- **暂留 router 的取数器**（报表、报表行次、调整分录）：任务 17 / 18 切到注册表后删除；在此之前同样不支持
-  结构化条件，结果触顶（取数层 LIMIT 5,000）即 400，不再返回截断样本。
 
 改造前取数层一律 ``LIMIT 5000``、编排器在样本上内存排序计数，``fetch_cap_warning`` 拿本页行数比 5,000 永不触发
-（AQ-03），已删除。
+（AQ-03），已删除；router 内暂留的报表 / 报表行次 / 调整分录取数器随 B5 任务 17 / 18 切到注册表删除。
 
 _Requirements: 3.7, 4.8, 5.3（hardening）；R1、R2、R6（linkage-closure）_
 """
@@ -33,26 +31,6 @@ from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage, 
 from app.services.custom_query.source_registry import FetchContext, ResolvedSource, resolve_source
 
 logger = logging.getLogger(__name__)
-
-
-def _router_module() -> Any:
-    """惰性取 router 模块（暂留取数器的宿主），避免 service ↔ router 循环导入。"""
-    from app.routers import custom_query as router_module
-
-    return router_module
-
-
-def _legacy_fetcher(name: str) -> Callable[..., Awaitable[dict]]:
-    fn = getattr(_router_module(), name, None)
-    if fn is None:  # pragma: no cover — 取数器改名即应立刻暴露，不静默降级
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error_code": "FETCHER_NOT_FOUND",
-                "message": f"取数器 '{name}' 不存在（注册表与实现已漂移）",
-            },
-        )
-    return fn
 
 
 def _json_fetcher(target: tuple[str, str]) -> Callable[..., Awaitable[dict]]:
@@ -158,24 +136,6 @@ async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any) -> Fet
     return FetchPage(rows=indexed, columns=columns, total=len(indexed), paged=False, meta=dict(meta), warnings=warnings)
 
 
-async def _fetch_legacy(req: QueryRequest, target: ResolvedSource, db: Any) -> tuple[list[dict], list[ColumnMeta]]:
-    assert target.legacy_fetcher is not None
-    _reject_conditions(req)
-    filters = {**dict(req.filters or {}), **dict(target.fixed_filters)}
-    result = await _legacy_fetcher(target.legacy_fetcher)(db, req.project_id, req.year, filters, None)
-    if not isinstance(result, dict):  # pragma: no cover — 取数器契约违约应立刻暴露
-        raise HTTPException(status_code=500, detail={
-            "error_code": "FETCHER_CONTRACT_VIOLATION",
-            "message": f"取数器返回类型非 dict：{type(result).__name__}",
-        })
-    _raise_fetch_error(req, result)
-    rows = list(result.get("rows") or [])
-    # 取数层 LIMIT 5,000（router._effective_limit）：触顶即可能截断，宁可 400 也不返回不完整的 total
-    if len(rows) >= FETCH_HARD_CAP:
-        raise _too_large(req, len(rows))
-    return rows, _columns_from_result(result, rows)
-
-
 async def business_fetcher(
     req: QueryRequest, resolved: list[Any], db: Any
 ) -> "tuple[list[dict], list[ColumnMeta]] | FetchPage":
@@ -199,6 +159,4 @@ async def business_fetcher(
     target = resolve_source(source, filters)
     if target.spec is not None:
         return await _fetch_sql(req, target, db)
-    if target.json_fetcher is not None:
-        return await _fetch_json(req, target, db)
-    return await _fetch_legacy(req, target, db)
+    return await _fetch_json(req, target, db)

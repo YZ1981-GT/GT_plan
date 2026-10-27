@@ -57,6 +57,10 @@ def _detail(exc: pytest.ExceptionInfo) -> dict:
 # ─── 注册表自洽 ──────────────────────────────────────────────────────────────
 
 
+#: 响应列键与表列名不同的登记（沿用旧取数器的响应键，前端标签与编码类列判定都按它）
+_RENAMED_KEYS = {("report", "indent"): "indent_level", ("report", "is_total"): "is_total_row"}
+
+
 @pytest.mark.parametrize("spec", list(sr.SOURCE_REGISTRY.values()), ids=list(sr.SOURCE_REGISTRY))
 def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
     keys = [c.key for c in (*spec.columns, *spec.hidden)]
@@ -65,7 +69,12 @@ def test_registry_entries_are_real_orm_columns(spec: sr.SourceSpec) -> None:
         base = sr._base_column(column.expr)
         assert isinstance(base, sa.Column), f"{spec.key}.{column.key} 不是表列：{base!r}"
         assert Base.metadata.tables.get(base.table.name) is base.table, f"{spec.key}.{column.key} 不在 ORM 元数据里"
-        assert base.name == column.key, f"{spec.key}.{column.key} 与列名 {base.name} 不一致"
+        expected_name = _RENAMED_KEYS.get((spec.key, column.key), column.key)
+        assert base.name == expected_name, f"{spec.key}.{column.key} 与列名 {base.name} 不一致"
+    filter_keys = {fk.key for fk in spec.filter_keys}
+    assert not (set(spec.context_filters) & filter_keys), f"{spec.key} 口径筛选键与通用筛选键重叠"
+    for key, _value in spec.fixed_filters:
+        assert key in filter_keys or key in spec.context_filters, f"{spec.key} 固定筛选 {key} 没有消费方"
     for fk in spec.filter_keys:
         assert spec.column(fk.column) is not None, f"{spec.key} 筛选键 {fk.key} 指向未登记的列 {fk.column}"
     sortable = {c.key for c in (*spec.columns, *spec.hidden) if c.sortable}
@@ -98,29 +107,34 @@ def test_nullable_is_read_from_column_definition() -> None:
     ("workpaper", {"wp_code": "E1", "cell_range": "A1"}, ("json", sr.WORKPAPER_CELLS, {}, None)),
     ("consol_unit:C01:ledger_entries", {}, ("spec", "ledger_entries", {}, "C01")),
     ("consol_unit:C01:tb_detail", {}, ("spec", "trial_balance", {}, "C01")),
-    ("consol_unit:C01:adjustment", {}, ("legacy", "_query_adjustments", {"company_code": "C01", "adjustment_type": "AJE"}, None)),
+    # 合并单位下唯一的「调整分录」叶子 = 该单位的全部类型（原写死大写 'AJE'，PG 枚举没有这个值、恒 500）
+    ("consol_unit:C01:adjustment", {}, ("spec", "adjustment", {}, "C01")),
     ("disclosure_note:八、1", {}, ("json", ("disclosure", "_query_disclosure"), {"section_id": "八、1"}, None)),
     ("disclosure", {}, ("json", ("disclosure", "_query_disclosure"), {}, None)),
     ("tb_summary", {}, ("json", ("worksheet", "_query_tb_summary"), {}, None)),
     ("ws_consol_tb", {}, ("json", ("worksheet", "_query_worksheet"), {}, None)),
-    ("report_balance_sheet", {}, ("legacy", "_query_report", {}, None)),
-    ("report_lines", {}, ("legacy", "_query_report_lines", {}, None)),
-    ("adj_aje", {}, ("legacy", "_query_adjustments", {}, None)),
+    ("report", {}, ("spec", "report", {}, None)),
+    ("report_balance_sheet", {}, ("spec", "report", {"report_type": "balance_sheet"}, None)),
+    ("report_impairment_provision", {}, ("spec", "report", {"report_type": "impairment_provision"}, None)),
+    ("report_lines", {}, ("spec", "report_lines", {}, None)),
+    ("adjustment", {}, ("spec", "adjustment", {}, None)),
+    ("adj_aje", {}, ("spec", "adj_aje", {"adjustment_type": "aje"}, None)),
+    ("adj_rje", {}, ("spec", "adj_rje", {"adjustment_type": "rje"}, None)),
+    ("adj_rcl", {}, ("spec", "adj_rje", {"adjustment_type": "rje"}, None)),
 ])
 def test_resolve_source(source: str, filters: dict, expect: tuple) -> None:
     kind, target, fixed, company = expect
     resolved = sr.resolve_source(source, filters)
     if kind == "spec":
         assert resolved.spec is sr.SOURCE_REGISTRY[target] and resolved.json_fetcher is None
-    elif kind == "json":
-        assert resolved.json_fetcher == target and resolved.spec is None
     else:
-        assert resolved.legacy_fetcher == target and resolved.spec is None
+        assert resolved.json_fetcher == target and resolved.spec is None
     assert dict(resolved.fixed_filters) == fixed and resolved.company_code == company
 
 
 @pytest.mark.parametrize("source", ["", "nope", "consol_unit:C01", "consol_unit::ledger_entries",
-                                    "consol_unit:C01:workhours", "workpaper:"])
+                                    "consol_unit:C01:workhours", "workpaper:", "report_nope", "report_",
+                                    "adj_cf", "adj_"])
 def test_unknown_source_is_400(source: str) -> None:
     with pytest.raises(HTTPException) as exc:
         sr.resolve_source(source, {})
@@ -174,6 +188,89 @@ async def test_trial_balance_and_workpaper_statement_shape() -> None:
     assert "wp_index.wp_code = %(" in wp_sql and "wp_index.wp_code LIKE %(" in wp_sql, "编码精确或其子编码"
     assert " AS sheet_name" in wp_sql, "底稿叶子的 sheet 名以隐藏列回显"
     assert "working_paper.project_id = %(" in wp_sql and "working_paper.is_deleted = false" in wp_sql
+
+
+async def test_report_statement_joins_generated_amounts_and_project_rows() -> None:
+    """报表源（任务 17）：准则行 ∪ 本项目独有行，金额 LEFT JOIN financial_report（同项目年度、同类型行次、未删）。"""
+    ctx = _ctx(filters={"report_type": "income_statement", "standard": "soe_standalone"})
+    stmt, display = await paged_fetch.build_statement(sr.REPORT, ctx)
+    sql = _pg(stmt)
+    join = sql.split("LEFT OUTER JOIN financial_report ON", 1)[1].split("WHERE", 1)[0]
+    for clause in ("financial_report.project_id = %(", "financial_report.year = %(",
+                   "financial_report.report_type = report_config.report_type",
+                   "financial_report.row_code = report_config.row_code", "financial_report.is_deleted = false"):
+        assert clause in join, f"金额关联条件缺 {clause}：{join}"
+    where = sql.split("WHERE", 1)[1]
+    assert "report_config.is_deleted = false" in where and "report_config.report_type = %(" in where
+    assert "report_config.applicable_standard = %(" in where
+    shadow = where.split("NOT (EXISTS (SELECT *", 1)[1]
+    assert shadow.lstrip().startswith("FROM report_config AS rc_standard"), "独有行判定只看准则下的同号行（相关子查询）"
+    assert "rc_standard.report_type = report_config.report_type" in shadow
+    assert "rc_standard.row_code = report_config.row_code" in shadow
+    params = stmt.compile(dialect=postgresql.dialect()).params
+    assert "income_statement" in params.values() and f"project:{_PID}" in params.values()
+    assert [c.key for c in display] == sr.REPORT.display_keys
+    ordered = _pg(stmt.order_by(*paged_fetch._order_by(sr.REPORT, ()))).split("ORDER BY", 1)[1]
+    assert ordered.strip() == "report_config.row_number ASC, report_config.row_code ASC, report_config.id ASC"
+    by_amount = _pg(stmt.order_by(*paged_fetch._order_by(
+        sr.REPORT, [{"field": "current_period_amount", "direction": "desc"}]))).split("ORDER BY", 1)[1]
+    assert "financial_report.current_period_amount DESC NULLS LAST" in by_amount
+    assert sr.REPORT.column("is_stale").nullable, "外连接一侧的列按可空处理（无匹配行时为空）"
+    str(stmt.compile(dialect=sqlite.dialect()))
+
+
+@pytest.mark.parametrize(("filters", "key"), [
+    ({"report_type": "nope", "standard": "soe_standalone"}, "report_type"),
+    ({"report_type": "balance_sheet", "standard": f"project:{_PID}"}, "standard"),
+])
+async def test_report_context_filters_are_validated(filters: dict, key: str) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.REPORT, _ctx(filters=filters))
+    assert _detail(exc)["error_code"] == "INVALID_FILTER_VALUE" and _detail(exc)["filter_key"] == key
+    with pytest.raises(HTTPException) as unknown:
+        await paged_fetch.build_statement(sr.REPORT, _ctx(filters={"report_type": "balance_sheet", "row_code": "x"}))
+    assert _detail(unknown)["error_code"] == "UNKNOWN_FILTER_KEY"
+    assert {"report_type", "standard"} <= set(_detail(unknown)["allowed"]), "口径筛选键也列在可用项里"
+
+
+async def test_report_lines_statement_and_enum_sort() -> None:
+    """报表行次（任务 17）：只含准则行与本项目副本行；报表类型显示 / 条件按文本，排序按枚举声明顺序。"""
+    stmt, _ = await paged_fetch.build_statement(sr.REPORT_LINES, _ctx(filters={"has_formula": True}))
+    sql = _pg(stmt)
+    assert "CAST(report_config.report_type AS VARCHAR) AS report_type" in sql
+    assert "report_config.applicable_standard NOT LIKE %(" in sql and "report_config.applicable_standard = %(" in sql
+    assert "trim(report_config.formula" in sql, "has_formula = 非「为空或空白」"
+    ordered = _pg(stmt.order_by(*paged_fetch._order_by(sr.REPORT_LINES, ()))).split("ORDER BY", 1)[1]
+    assert ordered.strip() == ("report_config.applicable_standard ASC, report_config.report_type ASC, "
+                               "report_config.row_number ASC, report_config.id ASC")
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("AJE", "aje"), ("aje", "aje"), (" Rje ", "rje"), ("RCL", "rje"),
+                                               ("rcl", "rje")])
+def test_adjustment_type_values_are_normalized(raw: str, expected: str) -> None:
+    assert sr.normalize_adjustment_type(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["CF", "cf", "XYZ", "1"])
+def test_unknown_adjustment_type_is_400(raw: str) -> None:
+    with pytest.raises(HTTPException) as exc:
+        sr.normalize_adjustment_type(raw)
+    assert _detail(exc)["error_code"] == "INVALID_FILTER_VALUE" and "AJE" in _detail(exc)["message"]
+
+
+async def test_adjustment_statement_compares_type_as_text() -> None:
+    stmt, display = await paged_fetch.build_statement(sr.ADJUSTMENT, _ctx(filters={"adjustment_type": "RCL"},
+                                                                            company_code="C01"))
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    sql = str(compiled)
+    assert "CAST(adjustments.adjustment_type AS VARCHAR) = %(" in sql, "枚举列按文本比较（非法值是查不到，不是 500）"
+    assert "rje" in compiled.params.values() and "RCL" not in compiled.params.values()
+    for clause in ("adjustments.project_id = %(", "adjustments.year = %(", "adjustments.is_deleted = false",
+                   "adjustments.company_code = %("):
+        assert clause in sql, sql
+    assert "adjustment_type" in [c.key for c in display], "通用源带类型列"
+    typed, typed_display = await paged_fetch.build_statement(sr.ADJUSTMENT_AJE, _ctx(filters={"adjustment_type": "aje"}))
+    assert "adjustment_type" not in [c.key for c in typed_display] and " AS entry_group_id" in _pg(typed)
 
 
 # ─── 未登记的输入一律 400 ─────────────────────────────────────────────────────
@@ -342,12 +439,13 @@ async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -
     tree = await router_module.get_indicators(project_id=None, depth=1, branch=None, response=None, db=None,
                                               current_user=None)
     leaves = {leaf["key"]: leaf for group in tree for leaf in group.get("children") or [] if "key" in leaf}
-    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours"):
-        spec = sr.SOURCE_REGISTRY[sr.SOURCE_ALIASES.get(key, key)]
-        assert leaves[key]["columns"] == spec.display_keys, key
+    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours", "report_lines", "adj_aje", "adj_rcl",
+                "report_balance_sheet", "report_income_statement", "report_impairment_provision"):
+        assert leaves[key]["columns"] == sr.resolve_source(key).spec.display_keys, key
+    assert "entry_number" not in leaves["adj_aje"]["columns"], "旧叶子声明了表里没有的列（页面版按叶子列发 columns ⇒ 400）"
     for kind, canonical in sr.CONSOL_UNIT_KINDS.items():  # 合并单位叶子（_build_consol_units_tree）同一定义
-        assert router_module._registry_columns(kind) == sr.SOURCE_REGISTRY[canonical].display_keys
-    assert router_module._INDICATORS_SCHEMA_VERSION >= 11, "叶子列变了，旧缓存必须失效"
+        assert router_module._registry_columns(f"consol_unit:C01:{kind}") == sr.SOURCE_REGISTRY[canonical].display_keys
+    assert router_module._INDICATORS_SCHEMA_VERSION >= 12, "叶子列变了（任务 17 / 18 / 22），旧缓存必须失效"
 
 
 async def test_ref_context_follows_project_template_type() -> None:

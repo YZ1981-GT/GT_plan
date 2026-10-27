@@ -58,13 +58,12 @@ from app.services.custom_query.pagination import (
     MAX_LIMIT as PAGE_MAX_LIMIT,
     MIN_LIMIT as PAGE_MIN_LIMIT,
 )
-# 取数器下沉（advanced-query-linkage-closure 任务 7）：SQL 源由 source_registry + paged_fetch 在数据库内
-# 计数 / 排序 / 分页，JSON 内存源与底稿选区辅助在 fetchers/；这里只留暂未切换的报表 / 报表行次 / 调整分录
-# 取数器（任务 17 / 18 切换后删除）；wp-sheet-preview 的只读取数在 fetchers/workpaper_cells（任务 16）。
-from app.services.custom_query.fetchers import effective_fetch_limit as _effective_limit
+# 取数器下沉（advanced-query-linkage-closure 任务 7 / 17 / 18）：SQL 源由 source_registry + paged_fetch 在数据库内
+# 计数 / 排序 / 分页，JSON 内存源与底稿选区辅助在 fetchers/，本模块不再有取数器；wp-sheet-preview 的只读取数在
+# fetchers/workpaper_cells（任务 16）。
 from app.services.custom_query.fetchers.disclosure import _query_disclosure  # noqa: F401 — 再导出（test_note_table_payload_readers_pg）
 from app.services.custom_query.fetchers.workpaper_cells import render_sheet_preview
-from app.services.custom_query.source_registry import CONSOL_UNIT_KINDS, SOURCE_ALIASES, SOURCE_REGISTRY
+from app.services.custom_query.source_registry import resolve_source
 from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
@@ -182,16 +181,17 @@ async def get_indicators(
     # ─── 报表树：项目模板类型决定大类标签 + 报表清单 ───────────────
     # 6 张报表：BS / IS / CFS / CFS-补充资料 / 权益变动 / 减值准备表
     # 减值准备表 (impairment_provision) 仅 soe 模板有数据，listed 自动隐藏避免误点
+    report_columns = _registry_columns("report")
     report_children = [
-        {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_cash_flow_supplement", "label": f"现金流量表补充资料（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
-        {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type},
+        {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": report_columns, "standard": template_type},
+        {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": report_columns, "standard": template_type},
+        {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": report_columns, "standard": template_type},
+        {"key": "report_cash_flow_supplement", "label": f"现金流量表补充资料（{standard_label}）", "columns": report_columns, "standard": template_type},
+        {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": report_columns, "standard": template_type},
     ]
     if template_type == "soe":
         report_children.append(
-            {"key": "report_impairment_provision", "label": f"减值准备表（{standard_label}）", "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "standard": template_type}
+            {"key": "report_impairment_provision", "label": f"减值准备表（{standard_label}）", "columns": report_columns, "standard": template_type}
         )
 
     # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
@@ -233,8 +233,8 @@ async def get_indicators(
         "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
         "domain": "wp",
         "children": [
-            {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
-            {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
+            {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": _registry_columns("adj_aje")},
+            {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": _registry_columns("adj_rcl")},
         ],
     })
     base_tree.append({
@@ -256,7 +256,7 @@ async def get_indicators(
         "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
         "domain": "report",
         "children": [
-            {"key": "report_lines", "label": "报表行次配置", "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula"]},
+            {"key": "report_lines", "label": "报表行次配置", "columns": _registry_columns("report_lines")},
         ],
     })
     base_tree.append({
@@ -287,12 +287,16 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 # v11：注册表 SQL 源的叶子 columns 由 source_registry 生成（advanced-query-linkage-closure 任务 7）——
 #      execute 起对未登记列返回 400 UNKNOWN_COLUMN，旧缓存里「科目明细」的 account_code / closing_balance 等
 #      试算表没有的列必须失效
-_INDICATORS_SCHEMA_VERSION = 11
+# v12：报表、报表行次、调整分录（含合并单位）切到注册表，叶子 columns 同样由它生成（任务 17 / 18：调整分录旧叶子声明
+#      表里没有的 entry_number，页面版按叶子列发 columns 会 400）
+_INDICATORS_SCHEMA_VERSION = 12
 
 
 def _registry_columns(source: str) -> list[str]:
-    """指标树叶子声明的列 = 注册表显示列（同一定义生成，R5.7；只登记了注册表 SQL 源）。"""
-    return list(SOURCE_REGISTRY[SOURCE_ALIASES.get(source, CONSOL_UNIT_KINDS.get(source, source))].display_keys)
+    """指标树叶子声明的列 = 注册表显示列（同一定义生成，R5.7；只用于注册表 SQL 源的叶子）。"""
+    spec = resolve_source(source).spec
+    assert spec is not None, f"指标树叶子 {source} 不是注册表 SQL 源"
+    return list(spec.display_keys)
 
 #: 支持按分支懒加载的大类 key → 子节点构建器名（见 _build_indicator_branch）
 LAZY_INDICATOR_BRANCHES: tuple[str, ...] = ("disclosure", "workpaper")
@@ -423,7 +427,7 @@ async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> 
                 {"key": f"consol_unit:{cc}:account_balance", "label": "科目余额", "columns": _registry_columns("account_balance"), "company_code": cc},
                 {"key": f"consol_unit:{cc}:ledger_entries", "label": "序时账明细", "columns": _registry_columns("ledger_entries"), "company_code": cc},
                 {"key": f"consol_unit:{cc}:tb_detail", "label": "试算表（个体）", "columns": _registry_columns("tb_detail"), "company_code": cc},
-                {"key": f"consol_unit:{cc}:adjustment", "label": "调整分录", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"], "company_code": cc},
+                {"key": f"consol_unit:{cc}:adjustment", "label": "调整分录", "columns": _registry_columns("adjustment"), "company_code": cc},
             ],
         })
     return {
@@ -948,167 +952,11 @@ async def _legacy_business_fetcher(req, resolved, db):
     """编排器 ``business_fetcher`` 的 router 侧入口（R3.7 / R4.8）。
 
     实现委托 ``services.custom_query.business_fetchers.business_fetcher``，不构成第二条分派路径；返回
-    ``FetchPage``（注册表 SQL 源 / JSON 内存源）或 ``(rows, columns)``（暂留本模块的报表 / 报表行次 / 调整分录
-    取数器，仍在本模块命名空间里查找，便于替身）。
+    ``FetchPage``（注册表 SQL 源 / JSON 内存源）或 ``(rows, columns)``（跨模块单元格源，任务 34 删除）。
     """
     from app.services.custom_query.business_fetchers import business_fetcher
 
     return await business_fetcher(req, resolved, db)
-
-
-async def _query_report(db, pid, year, filters, limit):
-    """报表数据查询：双源策略
-
-    模板源（report_config）：永远有数据，提供报表结构（行次/行名/缩进/总计标识/公式描述）
-    项目源（report_snapshot.data JSONB）：项目实际生成的报表金额（按 report_type/year 索引）
-    返回：模板结构 + JOIN 项目金额（无项目时金额为 None，模板浏览模式可用）
-    """
-    report_type = filters.get("report_type", "balance_sheet")
-    # standard 优先级：filters.standard > 项目 template_type + report_scope > soe_standalone
-    standard = filters.get("standard")
-    if not standard:
-        template_type = await _resolve_project_template_type(db, pid)
-        scope = await _resolve_project_report_scope(db, pid)
-        if template_type == "soe":
-            standard = "soe_standalone"
-        else:
-            standard = f"listed_{scope or 'standalone'}"
-
-    # 1) 模板结构（无项目时也可查）
-    structure_sql = """
-        SELECT row_code, row_name, indent_level, is_total_row, formula, formula_description
-        FROM report_config
-        WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false
-        ORDER BY row_number
-        LIMIT :lim
-    """
-    result = await db.execute(text(structure_sql), {"rt": report_type, "std": standard, "lim": _effective_limit(limit)})
-    structure_rows = result.fetchall()
-
-    # 2) 项目金额（report_snapshot.data JSONB），仅传 pid + year 时可用
-    amount_map: dict[str, dict] = {}
-    source_marker = "template_only"
-    if pid and year:
-        try:
-            snap_row = (await db.execute(text("""
-                SELECT data FROM report_snapshot
-                WHERE project_id = :pid AND year = :y AND report_type = :rt
-                ORDER BY generated_at DESC
-                LIMIT 1
-            """), {"pid": pid, "y": year, "rt": report_type})).first()
-            if snap_row and isinstance(snap_row[0], dict):
-                # report_snapshot.data 通常是 {rows: [{row_code, current_period_amount, prior_period_amount, ...}]}
-                data = snap_row[0]
-                rows_arr = data.get("rows") if isinstance(data, dict) else None
-                if isinstance(rows_arr, list):
-                    for item in rows_arr:
-                        if isinstance(item, dict) and item.get("row_code"):
-                            amount_map[str(item["row_code"])] = item
-                    source_marker = "project_snapshot"
-        except Exception as e:
-            logger.debug("report_snapshot 读取失败 pid=%s year=%s: %s", pid, year, e)
-
-    # 3) 合并模板结构 + 项目金额
-    rows = []
-    for r in structure_rows:
-        row_code = r[0]
-        amt = amount_map.get(str(row_code), {})
-        rows.append({
-            "row_code": row_code,
-            "row_name": r[1],
-            "current_period_amount": amt.get("current_period_amount"),
-            "prior_period_amount": amt.get("prior_period_amount"),
-            "indent": r[2],
-            "is_total": r[3],
-            "formula": r[4],
-            "formula_description": r[5],
-        })
-    return {
-        "rows": rows,
-        "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount", "indent", "is_total"],
-        "total": len(rows),
-        "applicable_standard": standard,
-        "source": source_marker,
-    }
-
-
-async def _query_adjustments(db, pid, year, filters, limit):
-    # 真实列（audit_platform_models.Adjustment）：adjustment_no（非 entry_number）/
-    # review_status（非 status）。account_name/debit_amount/credit_amount 确实存在（单行式分录）。
-    adj_type = filters.get("adjustment_type", "AJE")
-    result = await db.execute(
-        text(
-            "SELECT adjustment_no, account_name, debit_amount, credit_amount, "
-            "description, review_status::text "
-            "FROM adjustments WHERE project_id = :pid AND year = :y "
-            "AND adjustment_type = :at AND is_deleted = false "
-            "ORDER BY adjustment_no LIMIT :lim"
-        ),
-        {"pid": pid, "y": year, "at": adj_type, "lim": _effective_limit(limit)},
-    )
-    rows = [
-        {
-            "adjustment_no": r[0],
-            "account_name": r[1],
-            "debit_amount": float(r[2]) if r[2] is not None else None,
-            "credit_amount": float(r[3]) if r[3] is not None else None,
-            "description": r[4],
-            "review_status": r[5],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": [
-            "adjustment_no", "account_name", "debit_amount",
-            "credit_amount", "description", "review_status",
-        ],
-        "total": len(rows),
-    }
-
-
-async def _query_report_lines(db, pid, year, filters, limit):
-    """报表行次配置（report_config）"""
-    sql = """
-        SELECT row_code, row_name, report_type, applicable_standard,
-               indent_level, is_total_row, formula, sort_order
-        FROM report_config
-        WHERE is_deleted = false
-    """
-    params: dict = {"lim": _effective_limit(limit)}
-    if filters.get("report_type"):
-        sql += " AND report_type = :rt"
-        params["rt"] = filters["report_type"]
-    if filters.get("applicable_standard"):
-        sql += " AND applicable_standard = :std"
-        params["std"] = filters["applicable_standard"]
-    if filters.get("has_formula") is True:
-        sql += " AND formula IS NOT NULL AND formula != ''"
-    elif filters.get("has_formula") is False:
-        sql += " AND (formula IS NULL OR formula = '')"
-    if filters.get("row_name"):
-        sql += " AND row_name LIKE :rn"
-        params["rn"] = f"%{filters['row_name']}%"
-    sql += " ORDER BY applicable_standard, report_type, sort_order LIMIT :lim"
-    result = await db.execute(text(sql), params)
-    rows = [
-        {
-            "row_code": r[0],
-            "row_name": r[1],
-            "report_type": r[2],
-            "applicable_standard": r[3],
-            "indent_level": r[4],
-            "is_total_row": r[5],
-            "formula": r[6],
-            "sort_order": r[7],
-        }
-        for r in result.fetchall()
-    ]
-    return {
-        "rows": rows,
-        "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula", "sort_order"],
-        "total": len(rows),
-    }
 
 
 # ──────────────────────────────────────────────────────────────────────────

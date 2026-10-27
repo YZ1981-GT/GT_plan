@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from hypothesis import given, settings, HealthCheck, assume
+from hypothesis import example, given, settings, HealthCheck, assume
 from hypothesis import strategies as st
 
 
@@ -51,6 +51,9 @@ def _mock_db_for_admin(project_id: str):
     # admin path in get_visible_project_ids queries Project.id → .all() returns project list
     mock_exec_result = MagicMock()
     mock_exec_result.all.return_value = [(uuid.UUID(project_id),)]
+    # 报表源（advanced-query-linkage-closure 任务 17）的提示查询取单行（行数, 过期行数）并解包；MagicMock 默认
+    # 迭代为空、解包即 ValueError——给「未生成报表」的结果，让本用例照旧只验证鉴权保持
+    mock_exec_result.one.return_value = (0, 0)
     db.execute.return_value = mock_exec_result
     # OwnershipGuard.assert_target_accessible 成功路径会调用 set_rls_context(db, pid)，
     # 后者读取 db.get_bind().dialect.name。真实 AsyncSession.get_bind() 是同步返回；
@@ -72,6 +75,8 @@ def _mock_db_for_admin(project_id: str):
     project_id=st_project_id,
     source=st_source,
 )
+# 报表源固定必跑（任务 17 起它走注册表、多一条提示查询），不靠随机抽样碰上
+@example(project_id=str(uuid.UUID(int=1)), source="report")
 async def test_admin_execute_returns_result(project_id, source):
     """Property 2a: Preservation — admin user on any project returns query results.
 
@@ -122,6 +127,7 @@ async def test_admin_execute_returns_result(project_id, source):
     project_id=st_project_id,
     source=st_source,
 )
+@example(project_id=str(uuid.UUID(int=1)), source="report")
 async def test_partner_execute_returns_result(project_id, source):
     """Property 2b: Preservation — partner user on any project returns query results.
 

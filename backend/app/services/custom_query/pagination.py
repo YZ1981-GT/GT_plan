@@ -39,15 +39,11 @@ _DIRECTIONS = ("asc", "desc")
 #: 字段若不存在于实际结果列中会被跳过——数据源的列集随 filters/group 变化，
 #: 硬指定不存在的列会让默认排序整体失效，故按实际列集过滤而非报错。
 #:
-#: 注册表 SQL 源（试算表、科目余额、序时账、底稿清单、工时）的默认排序只由
+#: 注册表 SQL 源（试算表、科目余额、序时账、底稿清单、工时、报表、报表行次、调整分录）的默认排序只由
 #: ``source_registry`` 定义、在数据库内执行，这里不再登记（一个源只有一个所有者，advanced-query-linkage-closure
-#: 任务 5）。JSON 内存源默认按取数顺序 ``_row_index``（附注合计行仍在最后、底稿单元格按行列而非字符串序，R2.8）。
-#: 报表 / 报表行次 / 调整分录三个源仍由 router 内取数器承担，其条目在任务 17 / 18 切到注册表后删除。
+#: 任务 5；报表 / 报表行次 / 调整分录的条目随任务 17 / 18 删除，其中报表行次原按不存在的 ``sort_order``）。
+#: JSON 内存源默认按取数顺序 ``_row_index``（附注合计行仍在最后、底稿单元格按行列而非字符串序，R2.8）。
 DEFAULT_SORT_BY_SOURCE: dict[str, tuple[tuple[str, str], ...]] = {
-    "report": (("row_code", "asc"),),
-    "report_lines": (("applicable_standard", "asc"), ("report_type", "asc"), ("sort_order", "asc")),
-    "adjustment": (("adjustment_no", "asc"),),
-    "adjustments": (("adjustment_no", "asc"),),
     "tb_summary": (("_row_index", "asc"),),
     "disclosure": (("_row_index", "asc"),),
 }

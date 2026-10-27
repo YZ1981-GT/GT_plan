@@ -53,11 +53,11 @@ def _filter_predicates(spec: SourceSpec, filters: Mapping[str, Any]) -> list[Any
     by_key = {fk.key: fk for fk in spec.filter_keys}
     clauses: list[Any] = []
     for key, value in filters.items():
-        if key in spec.echo_filters:
+        if key in spec.echo_filters or key in spec.context_filters:  # 回显键；口径键由源的 base_where 消费并校验
             continue
         fk = by_key.get(key)
         if fk is None:
-            allowed = sorted([*by_key, *spec.echo_filters])
+            allowed = sorted([*by_key, *spec.echo_filters, *spec.context_filters])
             raise _bad_request(
                 "UNKNOWN_FILTER_KEY",
                 f"数据源「{spec.label}」不支持筛选键「{key}」，可用：{'、'.join(allowed) or '无'}",
@@ -67,6 +67,8 @@ def _filter_predicates(spec: SourceSpec, filters: Mapping[str, Any]) -> list[Any
             continue
         if isinstance(value, (dict, list, tuple, set)):
             raise _bad_request("INVALID_FILTER_VALUE", f"筛选键「{key}」的值必须是单个值", filter_key=key)
+        if fk.normalize is not None:
+            value = fk.normalize(value)
         column = spec.column(fk.column)
         assert column is not None, f"{spec.key}.{fk.key} 指向未登记的列 {fk.column}"  # 注册表自洽（单元测试守住）
         if fk.op == "code_family":
@@ -180,7 +182,8 @@ def _order_by(spec: SourceSpec, sort: Sequence[Mapping[str, Any]]) -> list[Any]:
         keys.append((sortable[spec.unique_key], "asc"))
     clauses = []
     for column, direction in keys:
-        clause = column.expr.desc() if direction == "desc" else column.expr.asc()
+        expr = column.order_expr
+        clause = expr.desc() if direction == "desc" else expr.asc()
         clauses.append(clause.nulls_last() if column.nullable else clause)
     return clauses
 
