@@ -97,6 +97,7 @@ import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { useRangeMemory, clampRange } from '@/composables/useRangeMemory'
 import { ElMessage } from 'element-plus'
+import { buildBusinessPayload, isKnownYear } from '@/components/custom-query/queryPayloads'
 
 const props = defineProps<{
   modelValue: boolean
@@ -208,12 +209,15 @@ async function loadSheetData() {
     try {
       // 用全范围 A1:G100 预加载虚拟 sheet 数据
       const fullSource = `${props.moduleSource}|A1:G100`
-      const data = await api.post('/api/custom-query/execute', {
-        project_id: props.projectId,
-        year: props.year || new Date().getFullYear(),
-        source: fullSource,
-        filters: {},
-      }) as any
+      // 年度只用调用方给的项目年度（T16 去掉日历年兜底：猜错年度会读到别年的数据）
+      if (!isKnownYear(props.year)) {
+        loadStatus.value = 'unavailable'
+        unavailableReason.value = '项目审计年度未知，请先选择年度'
+        return
+      }
+      const data = await api.post('/api/custom-query/execute', buildBusinessPayload({
+        projectId: props.projectId, year: props.year, source: fullSource, filters: {},
+      })) as any
       if (data?.error) {
         loadStatus.value = 'unavailable'
         unavailableReason.value = data.error

@@ -74,8 +74,9 @@ def CB(module: str, symbols: tuple[str, ...], test: str, *checks: Check) -> Stmt
     return Stmt("component", checks, ("后端", f"`{module}`", "、".join(f"`{s}`" for s in symbols), f"`{test}`"))
 
 
-def CF(module: str, symbol: str, test: str, *checks: Check) -> Stmt:
-    return Stmt("component", checks, ("前端", f"`{module}`", f"`{symbol}`", f"`{test}`"))
+def CF(module: str, symbol: str | tuple[str, ...], test: str, *checks: Check) -> Stmt:
+    names = (symbol,) if isinstance(symbol, str) else symbol
+    return Stmt("component", checks, ("前端", f"`{module}`", "、".join(f"`{s}`" for s in names), f"`{test}`"))
 
 
 def L(tasks: str) -> Stmt:
@@ -378,9 +379,13 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "前端当前项目上下文": CF(
             "audit-platform/frontend/src/composables/useCurrentProjectId.ts", "useCurrentProjectId",
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
+        "高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目才发送单元格目标，构建器的项目与年度只随单元格目标发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）": CF(
+            "audit-platform/frontend/src/components/custom-query/queryPayloads.ts", ("buildBusinessPayload", "buildBuilderPayload", "queryErrorText"),
+            "audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts", exists(_FE_GUARD_REL),
+            exists("audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue"),
+            has_tests(_T + "test_query_request_fields_fixture.py", "test_fixture_holds_for_backend_models")),
     },
     H_PLANNED: {
-        "高级查询 acnr_targets 前端结果区、请求构造与下钻": L("T16"),
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
         "异步追溯拿到规范 addr_id": L("T20"),
         "V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置": L("T21、T22"),

@@ -169,7 +169,8 @@ describe('AdvancedQueryBuilder — buildPayload 序列化', () => {
     await vm.doPreview()
     await flushPromises()
 
-    expect(mockPost).toHaveBeenCalledWith('/api/query/preview', expect.any(Object))
+    // T16：调用方自管错误提示，请求带 _silent
+    expect(mockPost).toHaveBeenCalledWith('/api/query/preview', expect.any(Object), expect.objectContaining({ _silent: true }))
     const sentPayload = mockPost.mock.calls[0][1]
 
     expect(sentPayload.table).toBe('trial_balance')
@@ -241,7 +242,7 @@ describe('AdvancedQueryBuilder — execute & emit', () => {
     await vm.doExecute()
     await flushPromises()
 
-    expect(mockPost).toHaveBeenCalledWith('/api/query/execute', expect.any(Object))
+    expect(mockPost).toHaveBeenCalledWith('/api/query/execute', expect.any(Object), expect.objectContaining({ _silent: true }))
     expect(vm.result.total).toBe(2)
     expect(vm.result.columns).toEqual(['standard_account_code', 'audited_amount'])
     // SQL 预览同步更新

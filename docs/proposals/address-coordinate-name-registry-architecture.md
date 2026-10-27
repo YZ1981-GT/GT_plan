@@ -62,6 +62,7 @@
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
+| 高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目才发送单元格目标，构建器的项目与年度只随单元格目标发送、年度未知不发；拒绝、无权、解析不可用转成中文提示） | 前端 | `audit-platform/frontend/src/components/custom-query/queryPayloads.ts` | `buildBusinessPayload`、`buildBuilderPayload`、`queryErrorText` | `audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts` |
 
 门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
 
@@ -69,7 +70,6 @@
 
 | 事项 | 任务 |
 |---|---|
-| 高级查询 acnr_targets 前端结果区、请求构造与下钻 | T16 |
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
 | 异步追溯拿到规范 addr_id | T20 |
 | V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置 | T21、T22 |

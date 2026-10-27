@@ -220,6 +220,7 @@
         <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树） -->
         <div class="gt-cqt-panel" style="margin-top: 12px">
           <CustomQueryFieldPicker v-model="acnrFieldIds" />
+          <div v-if="!formCtx.project_id" class="gt-cqt-empty-tip" data-testid="acnr-no-project">{{ BUSINESS_NO_PROJECT_HINT }}</div>
         </div>
 
         <div class="gt-cqt-panel-actions">
@@ -265,6 +266,7 @@
         </div>
 
         <div class="gt-cqt-result-body">
+          <AcnrTargetResults :block="result.acnr_results" :project-id="formCtx.project_id" />
           <el-empty
             v-if="!executing && result.rows.length === 0 && !result.error"
             :description="emptyHint || '点击 [执行查询] 开始检索'"
@@ -506,15 +508,11 @@ import { exportQueryResultToXlsx } from '@/components/query/queryExport'
 import { reportTypeOfSource } from '@/components/query/querySourceUri'
 import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
+import { BUSINESS_NO_PROJECT_HINT, buildBusinessPayload, notifyQueryError } from '@/components/custom-query/queryPayloads'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import {
-  useAcnrDrill,
-  normalizeColumns,
-  cellAddrId,
-  addrIdToIndexRef,
-  type QueryColumnMeta,
-} from '@/composables/useAcnrDrill'
+import { useAcnrDrill, normalizeColumns, cellAddrId, addrIdToIndexRef, type QueryColumnMeta } from '@/composables/useAcnrDrill'
 
 interface IndicatorChild {
   key: string
@@ -543,6 +541,8 @@ interface QueryResult {
   /** 非致命提示（取数达上限、全局配置表未按项目过滤等） */
   warnings?: string[]
   error?: string
+  /** 单元格取值结果（只在请求带 acnr_targets 时出现） */
+  acnr_results?: AcnrResultsBlock
 }
 interface ProjectItem {
   id: string
@@ -891,19 +891,12 @@ async function onExecute(keepPage = false) {
     result.value = { rows: [], columns: [], total: 0 }
   }
   try {
-    const data = await api.post<QueryResult>(P_cq.execute, {
-      project_id: formCtx.value.project_id,
-      year: formCtx.value.year,
-      source: formCtx.value.source,
-      filters: buildFilters(),
-      columns: selectedColumns.value,
-      // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
-      acnr_targets: acnrFieldIds.value,
-      limit: pageSize.value,
-      // 真实分页（R11.4）：改造前这里恒传 0 且后端把 offset 声明后从不使用，
-      // 业务视图实际只有第 1 页。
-      offset: (page.value - 1) * pageSize.value,
-    })
+    // 请求体唯一构造处（T16）；单元格取值目标只在有项目时发送。offset 真实分页（R11.4）
+    const data = await api.post<QueryResult>(P_cq.execute, buildBusinessPayload({
+      projectId: formCtx.value.project_id, year: formCtx.value.year, source: formCtx.value.source,
+      filters: buildFilters(), columns: selectedColumns.value,
+      limit: pageSize.value, offset: (page.value - 1) * pageSize.value,
+    }, acnrFieldIds.value), { _silent: true } as any)
     if (data) {
       result.value = data
       if (data.error) {
@@ -919,7 +912,7 @@ async function onExecute(keepPage = false) {
       }
     }
   } catch (e: any) {
-    handleApiError(e, '执行查询')
+    notifyQueryError(e, '执行查询')
     result.value = { rows: [], columns: [], total: 0, error: String(e?.message || e) }
   } finally {
     executing.value = false

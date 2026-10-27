@@ -239,6 +239,7 @@ import { useAuthStore } from '@/stores/auth'
 import { listProjectsWithProgress } from '@/services/commonApi'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import SheetCellRangePicker from '@/components/query/SheetCellRangePicker.vue'
+import { buildBusinessPayload } from '@/components/custom-query/queryPayloads'
 
 const props = defineProps<{
   modelValue: boolean
@@ -817,11 +818,11 @@ async function executeQuery() {
     if (source.startsWith('ws_')) filters.sheet_key = source.replace('ws_', '')
     if (filterText.value && (source === 'tb_detail')) filters.account_name = filterText.value
 
-    const data = await api.post('/api/custom-query/execute', {
-      project_id: localProjectId.value, year: localYear.value, source,
+    const data = await api.post('/api/custom-query/execute', buildBusinessPayload({
+      projectId: localProjectId.value, year: localYear.value, source,
       filters: sheetCellRange.value ? { ...filters, cell_range: sheetCellRange.value } : filters,
       limit: queryLimit.value, offset: 0,
-    }, { validateStatus: (s: number) => s < 600 })
+    }), { validateStatus: (s: number) => s < 600 })
     const result = data
     resultRows.value = result?.rows || []
     resultColumns.value = result?.columns || (resultRows.value.length ? Object.keys(resultRows.value[0]) : [])

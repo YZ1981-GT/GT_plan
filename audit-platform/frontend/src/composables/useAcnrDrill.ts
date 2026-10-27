@@ -206,14 +206,26 @@ export function useAcnrDrill(getProjectId: () => string) {
       }
     }
 
-    if (projectId) route = route.replace('{project_id}', projectId)
-    // 追加单元格高亮（保留 ACNR 提供的底稿+sheet 路由，不自行拼底稿路由）
-    if (coord) {
-      route += (route.includes('?') ? '&' : '?') + `cell=${encodeURIComponent(coord)}`
-    }
-    // 新标签页打开，保持当前查询结果视图不变（R4.2）
-    window.open(route, '_blank', 'noopener')
+    openRoute(route, coord)
   }
 
-  return { drill }
+  /**
+   * 打开已解析好的跳转路由（acnr_targets 结果的 `source.jump_route` 直接用它，T16）：替换 `{project_id}` 占位、
+   * 追加单元格高亮，在新标签页打开（保持当前查询结果视图不变，R4.2）。站内路由（以 `/` 开头）不带 `noopener`：
+   * 登录令牌在 sessionStorage，`noopener` 的新标签拿不到 ⇒ 跳登录页；站外地址保留 `noopener`。
+   */
+  function openRoute(jumpRoute: string | null | undefined, cell?: string | null): void {
+    if (!jumpRoute) {
+      ElMessage.warning('目标已失效')
+      return
+    }
+    const projectId = getProjectId()
+    let route = projectId ? jumpRoute.replace('{project_id}', projectId) : jumpRoute
+    // 追加单元格高亮（保留 ACNR 提供的底稿+sheet 路由，不自行拼底稿路由）
+    if (cell) route += (route.includes('?') ? '&' : '?') + `cell=${encodeURIComponent(cell)}`
+    const features: [] | ['noopener'] = route.startsWith('/') && !route.startsWith('//') ? [] : ['noopener']
+    window.open(route, '_blank', ...features)
+  }
+
+  return { drill, openRoute }
 }

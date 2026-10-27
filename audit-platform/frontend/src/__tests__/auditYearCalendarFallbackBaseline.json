@@ -15,7 +15,6 @@
   "components/ledger-import/ImportTimeline.vue": 1,
   "components/ledger-import/LedgerDataManager.vue": 1,
   "components/query/CustomQueryDialog.vue": 1,
-  "components/query/SheetCellRangePicker.vue": 1,
   "components/report/MultiYearCompare.vue": 2,
   "components/template-library/CustomQueryTab.vue": 1,
   "components/wizard/MaterialityStep.vue": 1,

@@ -70,6 +70,7 @@
           <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；跨模块 cell 级字段） -->
           <el-form-item label="ACNR 选字段（跨模块单元格）">
             <CustomQueryFieldPicker v-model="acnrFieldIds" />
+            <div v-if="!routeProjectId" class="gt-aqb-field-hint" data-testid="acnr-no-project">{{ BUILDER_NO_PROJECT_HINT }}</div>
           </el-form-item>
 
           <!-- 过滤条件 -->
@@ -281,6 +282,7 @@
             show-icon
             class="gt-aqb-warning"
           />
+          <AcnrTargetResults :block="result?.acnr_results" :project-id="routeProjectId" />
           <el-table
             v-if="result && result.rows.length"
             :data="result.rows"
@@ -362,14 +364,11 @@ import {
   groupFieldsByTier,
 } from '@/components/query/queryFieldTiers'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
+import { BUILDER_NO_PROJECT_HINT, buildBuilderPayload, notifyQueryError } from '@/components/custom-query/queryPayloads'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import {
-  useAcnrDrill,
-  normalizeColumns,
-  cellAddrId,
-  addrIdToIndexRef,
-  type QueryColumnMeta,
-} from '@/composables/useAcnrDrill'
+import { useProjectStore } from '@/stores/project'
+import { useAcnrDrill, normalizeColumns, cellAddrId, addrIdToIndexRef, type QueryColumnMeta } from '@/composables/useAcnrDrill'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
@@ -419,6 +418,8 @@ interface QueryResult {
   scope?: { all_projects: boolean; project_count: number | null; unscoped_tables: string[] }
   /** 非致命提示（全局配置表未按项目过滤、无项目分派等） */
   warnings?: string[]
+  /** 单元格取值结果（只在请求带 acnr_targets 时出现） */
+  acnr_results?: AcnrResultsBlock
 }
 
 const schema = ref<Schema | null>(null)
@@ -433,7 +434,9 @@ const result = ref<QueryResult | null>(null)
 
 // 结果列下钻（R4.2/R4.4/R4.6/R4.7）：project 上下文取自路由（构建器可在项目内嵌入使用）
 const route = useRoute()
-const { drill } = useAcnrDrill(() => (route.params.projectId as string) || '')
+const projectStore = useProjectStore()
+const routeProjectId = computed(() => (route.params.projectId as string) || '')
+const { drill } = useAcnrDrill(() => routeProjectId.value)
 // 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
 // ─── 列分层（R7.2 / R11.3）：真源在后端 table_whitelist，前端只分组不硬编码列名 ───
 const fieldGroups = computed(() => groupFieldsByTier(currentTable.value))
@@ -595,53 +598,10 @@ function opLabel(op: string): string {
   } as Record<string, string>)[op] || op
 }
 
-/** 把前端字符串值转成后端期望的类型/数组。 */
+/** 请求体：单元格取值目标随路由项目与项目审计年度发送（年度未知不发，由后端补齐），T16。 */
 function buildPayload() {
-  return {
-    table: dsl.table,
-    fields: dsl.fields,
-    filters: dsl.filters
-      .filter((f) => f.field && f.op)
-      .map((f) => {
-        const op = f.op
-        let v: any = f.value
-        if (op === 'is_null' || op === 'is_not_null') {
-          v = null
-        } else if (op === 'in' || op === 'not_in') {
-          v = String(f.value || '')
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        } else if (op === 'between') {
-          const [lo, hi] = String(f.value || '')
-            .split(',')
-            .map((s) => s.trim())
-          v = [tryNumber(lo), tryNumber(hi)]
-        } else if (['gt', 'gte', 'lt', 'lte', 'eq', 'neq'].includes(op)) {
-          // 数字优先，失败保留字符串
-          v = tryNumber(String(f.value ?? ''))
-        }
-        return { field: f.field, op, value: v }
-      }),
-    filter_logic: dsl.filter_logic,
-    order_by: dsl.order_by.filter((o) => o.field),
-    joins: dsl.joins.filter((j) => j.table).map((j) => ({ table: j.table, type: j.type })),
-    aggregates: dsl.aggregates.filter((a) => a.func && a.field).map((a) => ({
-      func: a.func,
-      field: a.field,
-      alias: a.alias || `${a.func}_${a.field}`,
-    })),
-    group_by: dsl.group_by,
-    limit: dsl.limit,
-    // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
-    acnr_targets: acnrFieldIds.value,
-  }
-}
-
-function tryNumber(v: string): any {
-  if (v === '' || v === null || v === undefined) return v
-  const n = Number(v)
-  return Number.isFinite(n) && /^-?\d+(\.\d+)?$/.test(v) ? n : v
+  const pid = routeProjectId.value
+  return buildBuilderPayload(dsl, acnrFieldIds.value, { projectId: pid, year: projectStore.projectId === pid ? projectStore.auditYear : null })
 }
 
 async function doPreview() {
@@ -654,10 +614,11 @@ async function doPreview() {
     const resp = await api.post<{ sql: string; columns: string[] }>(
       '/api/query/preview',
       buildPayload(),
+      { _silent: true } as any,
     )
     sqlPreview.value = resp.sql
   } catch (e: any) {
-    handleApiError(e, '生成 SQL 预览')
+    notifyQueryError(e, '生成 SQL 预览')
   } finally {
     loadingPreview.value = false
   }
@@ -670,11 +631,11 @@ async function doExecute() {
   }
   loadingExecute.value = true
   try {
-    const resp = await api.post<QueryResult>('/api/query/execute', buildPayload())
+    const resp = await api.post<QueryResult>('/api/query/execute', buildPayload(), { _silent: true } as any)
     result.value = resp
     sqlPreview.value = resp.sql
   } catch (e: any) {
-    handleApiError(e, '查询执行')
+    notifyQueryError(e, '查询执行')
   } finally {
     loadingExecute.value = false
   }

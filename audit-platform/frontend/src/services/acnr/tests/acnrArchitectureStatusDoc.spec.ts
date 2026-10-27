@@ -126,6 +126,54 @@ const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
     if (!callsIdentifier(fn, 'useProjectStore')) problems.push('须读取项目 store（useProjectStore）')
     return problems
   },
+  '高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目才发送单元格目标，构建器的项目与年度只随单元格目标发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）': (sf) => {
+    const problems: string[] = []
+    /** 函数体内对 payload.<key> 的赋值，及其外层 if 条件文本（由内到外） */
+    const guardsOf = (fn: ts.FunctionDeclaration, key: string): string[][] => {
+      const out: string[][] = []
+      const visit = (n: ts.Node, conds: string[]) => {
+        if (ts.isIfStatement(n)) {
+          ts.forEachChild(n, (c) => visit(c, c === n.expression ? conds : [n.expression.getText(sf), ...conds]))
+          return
+        }
+        if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          && ts.isPropertyAccessExpression(n.left) && n.left.name.text === key) out.push(conds)
+        ts.forEachChild(n, (c) => visit(c, conds))
+      }
+      visit(fn, [])
+      return out
+    }
+    for (const name of ['buildBusinessPayload', 'buildBuilderPayload']) {
+      const fn = exportedFunction(sf, name)
+      if (!fn) { problems.push(`未导出函数 ${name}`); continue }
+      const g = guardsOf(fn, 'acnr_targets')
+      if (!g.length || !g.every((c) => c.some((t) => t.includes('projectId')))) {
+        problems.push(`${name}：acnr_targets 须只在有项目（条件含 projectId）时写入`)
+      }
+    }
+    const builder = exportedFunction(sf, 'buildBuilderPayload')
+    if (builder) {
+      for (const key of ['project_id', 'year']) {
+        const g = guardsOf(builder, key)
+        if (!g.length || !g.every((c) => c.some((t) => t.includes('acnrTargets.length')))) {
+          problems.push(`buildBuilderPayload：${key} 须只随单元格目标（条件含 acnrTargets.length）写入`)
+        }
+      }
+      if (!guardsOf(builder, 'year').every((c) => c.some((t) => t.includes('isKnownYear')))) {
+        problems.push('buildBuilderPayload：year 须只在年度已知（isKnownYear）时写入')
+      }
+    }
+    const errText = exportedFunction(sf, 'queryErrorText')
+    const literals = new Set<string>()
+    if (errText) {
+      const v = (n: ts.Node) => { if (ts.isStringLiteral(n)) literals.add(n.text); ts.forEachChild(n, v) }
+      v(errText)
+    }
+    for (const want of ['无权访问该项目', '地址解析服务暂不可用，请稍后重试']) {
+      if (!literals.has(want)) problems.push(`queryErrorText 须给出中文提示「${want}」`)
+    }
+    return problems
+  },
 }
 
 describe('架构提案现状节：前端组件行（TS 编译器 API）', () => {

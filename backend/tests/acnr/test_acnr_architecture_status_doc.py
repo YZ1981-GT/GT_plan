@@ -60,7 +60,6 @@ _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
     "v2_canonical": ("T21", ("file", "backend/app/services/acnr/v2_canonical.py")),
     "display.py": ("T29", ("file", "backend/app/services/acnr/display.py")),
-    "AcnrTargetResults": ("T16", ("file", "audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue")),
     "AcnrCandidatesHint": ("T31", ("file", "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue")),
     "reconcile_v2_canonical": ("T22", ("file", "backend/scripts/acnr/reconcile_v2_canonical.py")),
     "acnr_bypass_scan": ("T24", ("file", "backend/scripts/check/acnr_bypass_scan.py")),
