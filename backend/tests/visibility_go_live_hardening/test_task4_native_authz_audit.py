@@ -394,10 +394,21 @@ class TestNewlyGatedRouteIsolation:
         finally:
             await ctx.__aexit__()
 
-    async def test_ocr_fields_deny_outsider_404_before_service(self):
-        """ocr-fields：越权成员在 gate 处即 404（先于 OCR 服务，Req 3.4 deny）。"""
-        from app.routers.ocr_fields import extract_ocr_fields
+    async def test_ocr_fields_deny_outsider_404_before_service(self, monkeypatch):
+        """ocr-fields：项目级 edit 但底稿不可见的成员在 gate 处即 404（先于 OCR 服务，Req 3.4 deny）。
 
+        spec attachment-security-baseline 需求 2.3 在底稿门之前加了项目级门（未缓存要 edit）；
+        成员行默认 readonly，原写法在项目门就 403、根本走不到底稿门 ⇒ 这里显式给 edit，
+        让本用例继续证明「底稿门拒绝」。项目门本身的拒绝见下一条用例。
+        """
+        from app.models.base import PermissionLevel
+        from app.routers.ocr_fields import extract_ocr_fields
+        from app.services.ocr_fields_service import OcrFieldsService
+
+        async def _must_not_run(*_a, **_k):
+            raise AssertionError("越权请求不得进入 OCR 服务")
+
+        monkeypatch.setattr(OcrFieldsService, "get_or_trigger_ocr_fields", _must_not_run)
         ctx = _PgCtx()
         s = await ctx.__aenter__()
         try:
@@ -405,11 +416,38 @@ class TestNewlyGatedRouteIsolation:
             att = await _mk_attachment(s, proj.id)
             await _link_att_wp(s, att.id, wp.id)
             outsider = await mk_user(s)
-            await mk_project_user(s, proj.id, outsider.id, scope_cycles="")
+            pu = await mk_project_user(s, proj.id, outsider.id, scope_cycles="")
+            pu.permission_level = PermissionLevel.edit
             await s.flush()
             with pytest.raises(HTTPException) as ei:
                 await extract_ocr_fields(attachment_id=att.id, db=s, current_user=outsider)
             assert ei.value.status_code == 404
+            assert ei.value.detail == EXTERNAL_NOT_FOUND_DETAIL
+        finally:
+            await ctx.__aexit__()
+
+    async def test_ocr_fields_readonly_member_403_at_project_gate(self, monkeypatch):
+        """ocr-fields：只读成员触发识别（未缓存、会写库）在项目门 403，先于底稿门与 OCR 服务
+        （spec attachment-security-baseline 需求 2.3）。"""
+        from app.routers.ocr_fields import extract_ocr_fields
+        from app.services.ocr_fields_service import OcrFieldsService
+
+        async def _must_not_run(*_a, **_k):
+            raise AssertionError("越权请求不得进入 OCR 服务")
+
+        monkeypatch.setattr(OcrFieldsService, "get_or_trigger_ocr_fields", _must_not_run)
+        ctx = _PgCtx()
+        s = await ctx.__aenter__()
+        try:
+            proj, _lead, _wi, wp = await _lead_scenario(s)
+            att = await _mk_attachment(s, proj.id)
+            await _link_att_wp(s, att.id, wp.id)
+            member = await mk_user(s)
+            await mk_project_user(s, proj.id, member.id, scope_cycles="D")  # 默认 readonly
+            await s.flush()
+            with pytest.raises(HTTPException) as ei:
+                await extract_ocr_fields(attachment_id=att.id, db=s, current_user=member)
+            assert ei.value.status_code == 403
         finally:
             await ctx.__aexit__()
 

@@ -244,6 +244,8 @@ inclusion: always
 ### 附件安全底线 `attachment-security-baseline`（2026-10-27，12/12，已推送；本地 16e2ee5ea / ddad8f8e7 / cf18e39c0 / 6033c0b2a，远端合成 978ba4521 + d76f89921）
 - 承接 `.agents/tasks/attachment-linkage-assessment-2026-10-27.md` 的 Spec A（B~G 待做，顺序 B → C / D → E → F → G）：上传类型枚举 + 落盘根校验、旁路目录 `workpaper_side_storage`、函证路由级门 `confirmation_project_gate`、OCR 全文与确认（V211 四列）、删除 / 回滚 / 回收站永久删除守卫 `attachment_destructive_guard`、版本回滚走服务层
 - 🔴 教训：①浏览器原生加载（iframe / img 的 src、a 的 href、window.open）带不上 Bearer 头，指向 /api 恒 401 ⇒ 内嵌预览用 `composables/useAuthedObjectUrl.ts`、下载用 `downloadFile` / `downloadAttachment`，守卫 `NativeLoadBearerGuard.spec.ts`（新增原生加载须登记类别）②迁移号提交前现扫 `git ls-tree origin/<分支> backend/migrations`：本 spec 的 V209 与远端已推送的 V209 撞号改为 V211，共享库里删掉自己那条 schema_version 后经 `run_pending()` 重新登记 ③本地与远端分叉时两边各提交一份（本地私有索引 + update-ref + 只 reset 本 spec 路径；远端在分离头 worktree 里 cherry-pick），不替别人合并 ④改为加载全文后文本框 autosize 溢出盖住按钮，只有浏览器里 `elementFromPoint` 看得出
+### 底稿证据入口 `attachment-evidence-intake`（2026-10-27，12/12，Spec B）
+- 底稿内上传与 26 个 OCR 端点统一经 `workpaper_evidence_intake` 先建附件再识别；行级证据只写 `evidence_links`（V213）；统一视图 `attachment_wp_view`（`linked_wp_count` = 整稿 ∪ 行级 ∪ reference）；前端唯一写法 `uploadWorkpaperEvidence` + 按底稿共享的 `useWpEvidenceLinks`；旧上传端点只许附件管理页与函证抽屉（守卫 `LegacyUploadCallersGuard.spec.ts`）。🔴 教训：①本地线与远端线分叉时，本地 HEAD 引用了只在远端的模块（程序表组件、`procedure_scope_retention` 等），本地起的前端打不开带程序表的底稿 ⇒ 走查直接在「远端头 + 本 spec」候选树上做，也正是要推送的树 ②底稿索引 id ≠ 底稿 id（附件管理「关联到底稿」取错恒 404）③只在 PG 上跑的用例在 SQLite 回归里被跳过，改鉴权顺序要单独跑 PG 用例（Spec A 漏了 ocr-fields 一条）
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 ### 知识库链路（2026-10-01：两份 spec 随单一提交入库）

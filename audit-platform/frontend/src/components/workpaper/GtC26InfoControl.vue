@@ -403,7 +403,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
 import { useC25C26Data } from '@/composables/useC25C26Data'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from './GtIndexChip.vue'
@@ -570,26 +570,15 @@ async function onUploadC26Attachment(index: number, file: File) {
 
   uploadingC26Row.value = index
   try {
-    // 1) 上传附件
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${file.name} [C26 控制${index + 1}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联底稿
-    try {
-      await api.post(`/api/attachments/${attachmentId}/associate`, {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `C26-ctrl-${index + 1}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 1) 经底稿证据入口上传：只写本控制行的证据链接（C26 · 第 n 项，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file,
+      sheetName: 'C26',
+      cellRef: itemCellRef(index + 1),
+    })
+    const attachmentId = String(uploaded.id)
 
     // 存储附件引用
     const attachment: C26Attachment = { id: attachmentId, fileName: file.name, ocrMerged: false }
@@ -602,7 +591,7 @@ async function onUploadC26Attachment(index: number, file: File) {
 
     // 2) OCR 识别
     if (isOcrEligible(file.name)) {
-      await doC26OcrMerge(file, index)
+      await doC26OcrMerge(file, index, attachmentId)
     }
   } catch (e: any) {
     const detail = e?.response?.data?.detail || e?.message || '上传失败'
@@ -618,9 +607,11 @@ function isOcrEligible(filename: string): boolean {
 }
 
 /** OCR → 确认弹窗 → merge */
-async function doC26OcrMerge(file: File, index: number): Promise<void> {
+async function doC26OcrMerge(file: File, index: number, attachmentId: string): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachmentId)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

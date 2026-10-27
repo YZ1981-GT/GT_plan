@@ -269,7 +269,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 
 /** 样本行附件信息 */
 export interface SampleAttachment {
@@ -429,26 +429,15 @@ async function onUploadSampleAttachment(index: number, file: File) {
 
   uploadingRow.value = index
   try {
-    // 1) 上传附件
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${file.name} [C23-2 样本${index + 1}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联到底稿
-    try {
-      await api.post(`/api/attachments/${attachmentId}/associate`, {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `C23-sample-${index + 1}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 1) 经底稿证据入口上传：只写本样本行的证据链接（C23-2 · 第 n 项，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file,
+      sheetName: 'C23-2',
+      cellRef: itemCellRef(index + 1),
+    })
+    const attachmentId = String(uploaded.id)
 
     // 存储附件引用
     const attachment: SampleAttachment = { id: attachmentId, fileName: file.name, ocrMerged: false }
@@ -462,7 +451,7 @@ async function onUploadSampleAttachment(index: number, file: File) {
 
     // 2) OCR 识别（仅图片/PDF 可识别）
     if (isOcrEligible(file.name)) {
-      await doOcrMerge(file, index)
+      await doOcrMerge(file, index, attachmentId)
     }
   } catch (e: any) {
     const detail = e?.response?.data?.detail || e?.message || '上传失败'
@@ -482,9 +471,11 @@ function isOcrEligible(filename: string): boolean {
  * OCR 识别 + 确认弹窗 + merge 填入（Req 10.1）
  * 识别：编制人/过账人/审核人/日期
  */
-async function doOcrMerge(file: File, index: number): Promise<void> {
+async function doOcrMerge(file: File, index: number, attachmentId: string): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachmentId)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

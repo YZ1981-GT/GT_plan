@@ -53,7 +53,9 @@ const TEMPLATE_BINDINGS: Entry[] = [
   { file: 'views/KnowledgeBase.vue', expr: 'previewUrl', count: 2, kind: 'object-url', why: 'api.get(blob) + createObjectURL' },
   { file: 'components/extension/MetabaseDashboard.vue', expr: 'embedUrl', kind: 'external', why: '后端签发的 Metabase 嵌入地址（自带签名）' },
   { file: 'components/workpaper/confirmation/reliability/ReliabilityGrid.vue', expr: "tooltipMap['注2'].link.url", kind: 'external', why: '致同技术提示外部文档' },
-  { file: 'components/workpaper/h1/stocktake/H1TabStocktakeSummary.vue', expr: 'row.photoUrl', kind: 'user-link', why: '盘点表「照片」列是用户填写的文本（证据入附件表属 Spec B）' },
+  { file: 'components/workpaper/h1/stocktake/H1TabStocktakeSummary.vue', expr: 'row.photoUrl', kind: 'user-link', why: '盘点表「照片」列是用户填写的文本（照片改存附件、按行挂证据属 Spec D）' },
+  // 以下由「脚本在前的 SFC 也扫模板」新扫出（spec attachment-evidence-intake 需求 6.2）
+  { file: 'components/workpaper/d2/D2VcCardView.vue', expr: 'att.thumbnailUrl', kind: 'dormant', why: 'VcAttachment.thumbnailUrl 无写入方（缩略图未接线；接线时指向 /api 须改 useAuthedObjectUrl）' },
 ]
 
 const SCRIPT_NAVIGATIONS: Entry[] = [
@@ -85,10 +87,16 @@ const ATTR = /(?:^|\s)(:|v-bind:)?(src|data|href)\s*=\s*"([^"]*)"/g
 
 interface Hit { file: string; expr: string; bound?: boolean; tag?: string; attr?: string }
 
-/** 模板段：`<script` 之前的部分（SFC 约定模板在前）；按引号配平找标签结尾。 */
+/**
+ * 模板段：去掉 `<script>` / `<style>` 块后的其余部分；按引号配平找标签结尾。
+ *
+ * 原先取「`<script` 之前的部分」（假设模板在前）：脚本在前的 SFC 整份模板被跳过 ——
+ * `GtB212Evaluation.vue` 的 `<a :href="/api/attachments/{id}/preview">` 因此漏网（spec attachment-evidence-intake 需求 6.2）。
+ */
 export function scanTemplate(file: string, source: string): Hit[] {
-  const cut = source.indexOf('<script')
-  const tpl = stripHtmlComments(cut < 0 ? source : source.slice(0, cut))
+  const tpl = stripHtmlComments(
+    source.replace(/<script[^>]*>[\s\S]*?<\/script>/g, '').replace(/<style[^>]*>[\s\S]*?<\/style>/g, ''),
+  )
   const hits: Hit[] = []
   for (const m of tpl.matchAll(TAG_START)) {
     const tag = m[1].toLowerCase()
@@ -254,6 +262,22 @@ describe('浏览器原生加载 / 跳转不得指向 /api（带不上 Bearer 头
     expect(n.map((h) => h.expr)).toEqual(['`/api/exports/${id}`', 'P_att.download(id)'])
     // location.href = … 同时被两条判据看到（重复覆盖无害）
     expect(scanHrefAssignments('synthetic.vue', sfc).map((h) => h.expr)).toEqual(['P_att.download(id)', "'/api/x/download'"])
+  })
+
+  it('D：脚本在前的 SFC 也扫模板（原先只取 <script 之前的部分，整份模板被跳过）', () => {
+    const scriptFirst = [
+      '<script setup lang="ts">',
+      "const css = '<a :href=\"/api/in-script\">'",
+      '</script>',
+      '<template>',
+      '  <a :href="`/api/attachments/${id}/preview`" target="_blank">📎</a>',
+      '  <img :src="thumbUrl">',
+      '</template>',
+      '<style scoped>.x { background: url("/api/not-a-tag"); }</style>',
+    ].join('\n')
+    expect(scanTemplate('script-first.vue', scriptFirst).map((h) => h.expr)).toEqual([
+      '`/api/attachments/${id}/preview`', 'thumbUrl',
+    ])
   })
 
   it('D：前缀登记只放行同文件、同前缀的写法；精确登记要求逐字一致；计数与失效照常判', () => {

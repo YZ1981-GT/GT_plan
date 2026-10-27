@@ -12,19 +12,24 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
 
-import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+    record_ocr_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +114,8 @@ def _empty_fields(section: str) -> dict:
 async def h1_stocktake_summary_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     section: str = Query(
         "narrative",
         description="location|narrative|precheck|building|recount|client-plan|plan-narrative",
@@ -123,17 +130,16 @@ async def h1_stocktake_summary_ocr(
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    attachment_id = str(uuid4())
-    storage_dir = side_storage_dir(wp_id, "h1-stocktake-summary")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
-
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    wp_uuid = parse_workpaper_id(wp_id)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=True,
+        user=current_user, native_type="stocktake", native_prefix="H1", options=options,
+    )
+    attachment_id = str(src.attachment_id)
+    file_path = src.path
 
     ocr_text = ""
     try:
@@ -142,22 +148,22 @@ async def h1_stocktake_summary_ocr(
         ocr_text = ocr_result.get("text", "") or ""
     except Exception as e:
         logger.warning("H1-11 OCR failed for %s/%s: %s", wp_id, section, e)
-        return H1StocktakeSummaryOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, H1StocktakeSummaryOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=_empty_fields(section),
             confidence=0,
             section=section,
-        )
+        ))
 
     if not ocr_text.strip():
-        return H1StocktakeSummaryOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, H1StocktakeSummaryOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=_empty_fields(section),
             confidence=0,
             section=section,
-        )
+        ))
 
     schema = _SECTION_SCHEMAS[section]
     system = (
@@ -205,10 +211,10 @@ async def h1_stocktake_summary_ocr(
     # 始终附带全文，便于二次编辑
     extracted["full_text"] = ocr_text[:8000]
 
-    return H1StocktakeSummaryOcrResponse(
+    return await record_ocr_response(db, wp_uuid, src, H1StocktakeSummaryOcrResponse(
         attachment_id=attachment_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         confidence=confidence,
         section=section,
-    )
+    ))

@@ -199,7 +199,8 @@ class EvidenceLink(Base):
         nullable=False,
     )
     sheet_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    cell_ref: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # V213 放宽到 100：A1 单元格 / item:{槽位} / row:{行 id}（spec attachment-evidence-intake 需求 3.6）
+    cell_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
     attachment_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("attachments.id"),
@@ -216,6 +217,7 @@ class EvidenceLink(Base):
     __table_args__ = (
         Index("idx_evidence_wp", "wp_id"),
         Index("idx_evidence_attachment", "attachment_id"),
+        Index("idx_evidence_links_position", "wp_id", "sheet_name", "cell_ref"),
     )
 
 

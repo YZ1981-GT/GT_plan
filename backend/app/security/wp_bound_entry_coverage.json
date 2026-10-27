@@ -9856,20 +9856,6 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.process_record:link_attachment",
-      "callable": "link_attachment",
-      "route": "/api/process-record/link-attachment",
-      "method": "POST",
-      "family": "non_wp_bound",
-      "action": "create",
-      "wp_bound": false,
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": []
-    },
-    {
-      "kind": "http",
       "entrypoint": "app.routers.process_record:get_pending_ai_content",
       "callable": "get_pending_ai_content",
       "route": "/api/process-record/projects/{project_id}/ai-content/pending",
@@ -20358,6 +20344,23 @@
       "matrix": "workpaper.dedicated_subroute/dedicated_write",
       "test_ids": [
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.wp_evidence:upload_evidence",
+      "callable": "upload_evidence",
+      "route": "/api/projects/{project_id}/workpapers/{wp_id}/evidence/upload",
+      "method": "POST",
+      "family": "save",
+      "action": "create",
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/attachment_evidence_intake/test_evidence_role_matrix_pg.py::test_row_upload_by_role"
       ],
       "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },

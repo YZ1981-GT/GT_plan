@@ -14,7 +14,6 @@ from app.core.database import get_db
 from app.routers._wp_gate import dedicated_wp_gate
 from app.routers.wp_render_strategies import RENDERER_DISPATCH
 from app.routers.wp_render_strategies._g11_investment_income_import_export import _G11_SPECS
-from app.services import workpaper_side_storage
 
 
 class _FakeUser:
@@ -86,6 +85,10 @@ async def test_g11_ai_sections(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_g11_contract_ocr_route_exists(monkeypatch, tmp_path):
+    """识别前先建附件并关联底稿（spec attachment-evidence-intake 需求 2）：SQLite 世界 + 只挂本路由、不挂统一门。"""
+    from app.routers.wp_render_strategies._g11_contract_ocr import router as g11_ocr_router
+    from tests.attachment_evidence_intake._helpers import ocr_world, unwrap
+
     async def _fake_ocr(*_a, **_k):
         return {"text": "凭证摘要测试"}
 
@@ -97,20 +100,13 @@ async def test_g11_contract_ocr_route_exists(monkeypatch, tmp_path):
         "app.routers.wp_render_strategies._g11_contract_ocr.chat_completion",
         AsyncMock(return_value='{"summary":"测试","businessContent":"投资收益"}'),
     )
-    # 底稿 ID 必须是合法 UUID：非 UUID 直接 400（spec attachment-security-baseline 需求 1.6）；
-    # 本例测路由在且能识别，可见性门另有 procedure_delegation_visibility 套件覆盖
-    async def _skip_wp_gate():
-        return None
-
-    app.dependency_overrides[dedicated_wp_gate] = _skip_wp_gate
-    monkeypatch.setattr(workpaper_side_storage, "SIDE_STORAGE_ROOT", tmp_path / "workpapers")
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/api/workpapers/7d4c0a1e-3b2f-4c5d-9e8f-0a1b2c3d4e11/g11/contract-ocr",
+    async with ocr_world(monkeypatch, tmp_path, g11_ocr_router, wp_code="G11-3") as w:
+        resp = await w.client.post(
+            f"/api/workpapers/{w.wp.id}/g11/contract-ocr",
             files={"file": ("v.pdf", b"%PDF-1.4", "application/pdf")},
         )
-    assert resp.status_code in (200, 500)
+    assert resp.status_code == 200, resp.text
+    assert unwrap(resp.json())["written_back"] is True
 
 
 @pytest.mark.asyncio

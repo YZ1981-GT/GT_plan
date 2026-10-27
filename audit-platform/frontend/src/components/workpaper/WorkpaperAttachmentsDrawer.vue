@@ -18,9 +18,15 @@ import { handleApiError } from '@/utils/errorHandler'
 import { View, Download, TopRight, Link } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
 import { SOURCE_LABEL, resolveSourceKeys, canUnlinkSources } from './workpaperAttachmentSources'
-import { uploadAndAssociateToWorkpaper } from './composables/ocrAttachmentLinkage'
+import {
+  EVIDENCE_TYPE_LABEL,
+  EVIDENCE_TYPE_OPTIONS,
+  evidencePositionLabel,
+  uploadWorkpaperEvidence,
+} from '@/components/attachment/workpaperEvidence'
 
 type EvidenceRequirement = { type: string; label: string; satisfied: boolean }
+type EvidencePosition = { link_id: string; sheet_name: string | null; cell_ref: string | null; page_ref: string | null }
 
 type StaleInfo = {
   has_stale: boolean
@@ -68,12 +74,32 @@ const previewType = ref('')
 const previewId = ref('')
 const previewDownloadUrl = ref('')
 
-const ASSOC_LABEL: Record<string, string> = {
-  evidence: '审计证据',
-  support: '支持文件',
-  confirmation: '函证回函',
-  contract: '合同',
-  bank_statement: '银行对账单',
+const ASSOC_LABEL = EVIDENCE_TYPE_LABEL
+
+/** 上传时的证据类型：缺省预选第一类尚未满足的声明类型；用户改过就不再自动改。空 = 交给后端按底稿缺省。 */
+const uploadType = ref('')
+const uploadTypeTouched = ref(false)
+/** 「上传此类证据」点击时指定的类型（只用于这一次选择文件） */
+const pendingUploadType = ref<string | null>(null)
+const KNOWN_TYPES = new Set<string>(EVIDENCE_TYPE_OPTIONS.map((opt) => opt.value))
+
+function syncDefaultUploadType() {
+  if (uploadTypeTouched.value) return
+  const firstMissing = missingEvidence.value.find((req) => KNOWN_TYPES.has(req.type))
+  uploadType.value = firstMissing?.type ?? ''
+}
+
+function onUploadTypeChange(value: string) {
+  uploadType.value = value || ''
+  uploadTypeTouched.value = true
+}
+
+/** 行级证据位置（统一视图 evidence_positions），最多列 3 处。 */
+function positionsText(row: any): string {
+  const list: EvidencePosition[] = Array.isArray(row?.evidence_positions) ? row.evidence_positions : []
+  if (!list.length) return ''
+  const shown = list.slice(0, 3).map((pos) => evidencePositionLabel(pos)).join('、')
+  return list.length > 3 ? `${shown} 等 ${list.length} 处` : shown
 }
 
 async function load() {
@@ -85,7 +111,7 @@ async function load() {
   }
   loading.value = true
   try {
-    const data: any = await api.get(`/api/working-papers/${props.wpId}/attachments`)
+    const data: any = await api.get(P_att.wpView(props.wpId))
     const envelope = Array.isArray(data) ? { items: data } : (data || {})
     rows.value = envelope.items ?? []
     evidenceRequirements.value = Array.isArray(envelope.evidence_requirements)
@@ -100,6 +126,7 @@ async function load() {
     staleInfo.value = null
   } finally {
     loading.value = false
+    syncDefaultUploadType()
   }
 }
 
@@ -145,7 +172,7 @@ async function unlink(row: any) {
   if (!props.canEdit || !props.wpId || !row?.id) return
   try {
     await ElMessageBox.confirm(
-      `确定解除「${row.file_name || '该附件'}」与本底稿的关联？不会删除附件文件本身。`,
+      `确定解除「${row.file_name || '该附件'}」与本底稿的关联？整稿关联与本底稿各行上的证据链接一并解除，不会删除附件文件本身。`,
       '解除关联',
       { type: 'warning', confirmButtonText: '解除', cancelButtonText: '取消' },
     )
@@ -164,7 +191,8 @@ async function unlink(row: any) {
   }
 }
 
-function pickUploadFile() {
+function pickUploadFile(evidenceType: string | null = null) {
+  pendingUploadType.value = evidenceType
   fileInputRef.value?.click()
 }
 
@@ -172,10 +200,17 @@ async function onUploadSelected(ev: Event) {
   const input = ev.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
+  const evidenceType = pendingUploadType.value ?? uploadType.value
+  pendingUploadType.value = null
   if (!file || !props.canEdit || !props.wpId || !props.projectId) return
   uploading.value = true
   try {
-    await uploadAndAssociateToWorkpaper(props.projectId, props.wpId, file)
+    await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      evidenceType: evidenceType || null,
+    })
     ElMessage.success('已上传并关联到本底稿')
     await load()
   } catch (e: any) {
@@ -225,11 +260,34 @@ function formatDate(d: string): string {
         show-icon
         class="wp-att-tip"
         :title="canEdit
-          ? '可查看本底稿关联证据；错误关联可在此解除（不删文件）。检查项级证据请在检查项页查看（本面板不收录）。'
-          : '此处仅展示已关联到本底稿的证据附件。检查项级证据请在检查项页查看。'"
+          ? '可查看本底稿关联证据（含各行上传的行级证据）。行级证据请在对应行移除；在此解除会同时移除本底稿的整稿关联与全部行级链接（不删文件）。'
+          : '此处展示已关联到本底稿的证据附件（含各行上传的行级证据）。'"
       />
       <div v-if="canEdit" class="wp-att-actions-bar">
-        <el-button type="primary" size="small" :loading="uploading" @click="pickUploadFile">
+        <el-select
+          :model-value="uploadType"
+          size="small"
+          clearable
+          placeholder="证据类型（缺省按底稿）"
+          class="wp-att-type-select"
+          data-testid="evidence-type-select"
+          aria-label="上传证据类型"
+          @update:model-value="onUploadTypeChange"
+        >
+          <el-option
+            v-for="opt in EVIDENCE_TYPE_OPTIONS"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
+        <el-button
+          type="primary"
+          size="small"
+          :loading="uploading"
+          data-testid="wp-att-upload"
+          @click="pickUploadFile()"
+        >
           上传并关联到本底稿
         </el-button>
         <el-button size="small" @click="goHub">打开附件管理</el-button>
@@ -294,6 +352,16 @@ function formatDate(d: string): string {
           >
             <span v-if="req.satisfied" class="wp-att-evidence-req__ok">✓ {{ req.label }}</span>
             <span v-else class="wp-att-evidence-req__miss">⚠ 缺「{{ req.label }}」证据</span>
+            <el-button
+              v-if="!req.satisfied && canEdit && KNOWN_TYPES.has(req.type)"
+              type="primary"
+              link
+              size="small"
+              class="wp-att-evidence-req__upload"
+              :data-type="req.type"
+              :disabled="uploading"
+              @click="pickUploadFile(req.type)"
+            >上传此类证据</el-button>
           </li>
         </ul>
         <el-alert
@@ -306,8 +374,12 @@ function formatDate(d: string): string {
         />
       </div>
 
-      <el-empty v-if="!loading && rows.length === 0" description="本底稿暂无关联附件">
-        <el-button type="primary" @click="goHub">前往附件管理上传并关联</el-button>
+      <el-empty
+        v-if="!loading && rows.length === 0"
+        :description="canEdit ? '本底稿暂无关联附件，可在上方选择证据类型后上传' : '本底稿暂无关联附件'"
+      >
+        <!-- 抽屉内已能直接上传；这里只引导去关联项目里已有的附件 -->
+        <el-button @click="goHub">前往附件管理关联已有附件</el-button>
       </el-empty>
 
       <div v-else class="wp-att-list">
@@ -333,13 +405,23 @@ function formatDate(d: string): string {
               <span>{{ formatSize(row.file_size) }}</span>
               <span>{{ formatDate(row.created_at) }}</span>
             </div>
+            <div
+              v-if="positionsText(row)"
+              class="wp-att-item__positions"
+              data-testid="evidence-positions"
+            >行级位置：{{ positionsText(row) }}</div>
           </div>
           <div class="wp-att-item__actions">
+            <!-- 图标按钮只有悬浮提示，读屏读不到 ⇒ 补 aria-label（带文件名，区分多行） -->
             <el-tooltip content="预览" placement="top">
-              <el-button circle size="small" @click="preview(row)"><el-icon><View /></el-icon></el-button>
+              <el-button circle size="small" :aria-label="`预览 ${row.file_name || ''}`" @click="preview(row)">
+                <el-icon><View /></el-icon>
+              </el-button>
             </el-tooltip>
             <el-tooltip content="下载" placement="top">
-              <el-button circle size="small" @click="download(row)"><el-icon><Download /></el-icon></el-button>
+              <el-button circle size="small" :aria-label="`下载 ${row.file_name || ''}`" @click="download(row)">
+                <el-icon><Download /></el-icon>
+              </el-button>
             </el-tooltip>
             <el-tooltip v-if="showUnlink(row)" content="解除关联" placement="top">
               <el-button
@@ -347,6 +429,7 @@ function formatDate(d: string): string {
                 size="small"
                 type="danger"
                 class="wp-att-unlink-btn"
+                :aria-label="`解除关联 ${row.file_name || ''}`"
                 :loading="unlinkingId === row.id"
                 @click="unlink(row)"
               >
@@ -354,7 +437,14 @@ function formatDate(d: string): string {
               </el-button>
             </el-tooltip>
             <el-tooltip content="在附件管理中查看" placement="top">
-              <el-button circle size="small" @click="viewInHub(row)"><el-icon><TopRight /></el-icon></el-button>
+              <el-button
+                circle
+                size="small"
+                :aria-label="`在附件管理中查看 ${row.file_name || ''}`"
+                @click="viewInHub(row)"
+              >
+                <el-icon><TopRight /></el-icon>
+              </el-button>
             </el-tooltip>
           </div>
         </div>
@@ -379,14 +469,12 @@ function formatDate(d: string): string {
   </el-drawer>
 </template>
 
-<script lang="ts">
-import { View, Download, TopRight, Link } from '@element-plus/icons-vue'
-export default { components: { View, Download, TopRight, Link } }
-</script>
-
 <style scoped>
 .wp-att-tip { margin-bottom: 12px; }
 .wp-att-actions-bar { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wp-att-type-select { width: 170px; }
+.wp-att-evidence-req__upload { margin-left: 6px; }
+.wp-att-item__positions { margin-top: 2px; font-size: 12px; color: var(--gt-color-text-secondary, #606266); }
 .wp-att-file-input { display: none; }
 .wp-att-stale { margin-bottom: 12px; }
 .wp-att-stale__body { font-size: 12px; line-height: 1.6; }

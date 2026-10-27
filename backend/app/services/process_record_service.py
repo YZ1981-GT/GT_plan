@@ -121,27 +121,14 @@ class AttachmentLinkService:
         db: AsyncSession,
         attachment_id: UUID,
     ) -> list[dict[str, Any]]:
-        """获取附件关联的底稿列表"""
-        stmt = sa.text(
-            "SELECT a.reference_id as wp_id, w.wp_code, w.wp_name "
-            "FROM attachments a "
-            "LEFT JOIN wp_index w ON w.id = ("
-            "  SELECT wp_index_id FROM working_paper WHERE id = a.reference_id LIMIT 1"
-            ") "
-            "WHERE a.id = :att_id "
-            "AND a.reference_type = 'working_paper' "
-            "AND (a.is_deleted = false OR a.is_deleted IS NULL)"
-        )
-        result = await db.execute(stmt, {"att_id": str(attachment_id)})
-        rows = result.fetchall()
-        return [
-            {
-                "wp_id": str(r.wp_id) if r.wp_id else None,
-                "wp_code": r.wp_code,
-                "wp_name": r.wp_name,
-            }
-            for r in rows
-        ]
+        """获取附件出现的底稿列表：整稿关联 ∪ 行级证据链接 ∪ reference（同项目、未删除，按编码排序）。
+
+        原先只读 ``reference_type='working_paper'``（至多一行），侧栏「关联底稿数」徽标因此从未出现过
+        （spec attachment-evidence-intake 需求 4.3）。
+        """
+        from app.services.attachment_wp_view import linked_workpapers
+
+        return await linked_workpapers(db, attachment_id)
 
     async def link_attachment_to_workpaper(
         self,

@@ -353,7 +353,7 @@
 import { onMounted, reactive, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { api } from '@/services/apiProxy'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import { useF2RelatedPartyInquiry } from '../../composables/useF2RelatedPartyInquiry'
 import {
   F2_65_OBJECTIVE,
@@ -495,19 +495,18 @@ async function uploadAndRecognize(file: File): Promise<void> {
   if (!props.wpId || props.isReadonly) return
   ocrUploading.value = true
   let attachmentSaved = false
+  let attachmentId = ''
   try {
     if (props.projectId) {
-      const objectId = `${props.wpId}:F2-65:1`
-      const attachmentForm = new FormData()
-      attachmentForm.append('file', file)
-      attachmentForm.append('attachment_type', 'workpaper_item')
-      attachmentForm.append('reference_type', 'workpaper_item')
-      attachmentForm.append('title', objectId)
-      attachmentForm.append('document_type', objectId)
-      await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        _silent: true,
-      } as any)
+      // 经底稿证据入口存为 F2-65 的行级证据（与下方「已关联附件」同一位置，spec attachment-evidence-intake 需求 5.4）
+      const { attachment } = await uploadWorkpaperEvidence({
+        projectId: props.projectId,
+        wpId: props.wpId,
+        file,
+        sheetName: 'F2-65',
+        cellRef: itemCellRef(1),
+      })
+      attachmentId = String(attachment.id)
       attachmentSaved = true
       attachmentRefresh.value += 1
     }
@@ -515,6 +514,8 @@ async function uploadAndRecognize(file: File): Promise<void> {
     const ocrForm = new FormData()
     ocrForm.append('file', file)
     ocrForm.append('document_type', 'inquiry-letter')
+    // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+    if (attachmentId) ocrForm.append('attachment_id', attachmentId)
     const response = await http.post(
       `/api/workpapers/${props.wpId}/f2-spe/contract-ocr`,
       ocrForm,

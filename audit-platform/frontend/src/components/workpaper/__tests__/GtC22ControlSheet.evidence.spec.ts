@@ -30,8 +30,10 @@ vi.mock('@/utils/http', () => ({
   },
 }))
 
-vi.mock('@/services/commonApi', () => ({
-  uploadAttachment: vi.fn(),
+// 上传经底稿证据入口（spec attachment-evidence-intake 需求 5.4）：桩在入口函数这一层
+vi.mock('@/components/attachment/workpaperEvidence', () => ({
+  uploadWorkpaperEvidence: vi.fn(),
+  itemCellRef: (n: number | string) => `item:${n}`,
 }))
 
 vi.mock('element-plus', () => ({
@@ -61,14 +63,16 @@ vi.mock('@/composables/useWpAiSuggest', () => ({
 // Import mocked modules to get references
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
-import { uploadAttachment } from '@/services/commonApi'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const mockGet = api.get as ReturnType<typeof vi.fn>
 const mockPut = api.put as ReturnType<typeof vi.fn>
 const mockPost = api.post as ReturnType<typeof vi.fn>
 const mockHttpPost = (http as any).post as ReturnType<typeof vi.fn>
-const mockUploadAttachment = uploadAttachment as ReturnType<typeof vi.fn>
+const mockUpload = uploadWorkpaperEvidence as ReturnType<typeof vi.fn>
+/** 入口回执（行级上传带证据链接）。 */
+const uploaded = (id: string) => ({ attachment: { id }, evidenceLink: { id: `link-${id}` } })
 const mockElMessage = ElMessage as { success: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> }
 const mockElMessageBox = ElMessageBox as { confirm: ReturnType<typeof vi.fn> }
 
@@ -131,7 +135,7 @@ beforeEach(() => {
   mockPut.mockReset()
   mockPost.mockReset()
   mockHttpPost.mockReset()
-  mockUploadAttachment.mockReset()
+  mockUpload.mockReset()
   mockElMessage.success.mockReset()
   mockElMessage.warning.mockReset()
   mockElMessage.error.mockReset()
@@ -146,7 +150,7 @@ beforeEach(() => {
 
 describe('GtC22ControlSheet — 📎 附件上传（Req 11.1）', () => {
   it('审计证据区附件上传成功 → 附件记录加入 evidenceAttachments', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-001' })
+    mockUpload.mockResolvedValue(uploaded('att-001'))
     const wrapper = mountSheet()
     await flushPromises()
 
@@ -158,10 +162,16 @@ describe('GtC22ControlSheet — 📎 附件上传（Req 11.1）', () => {
     expect(attachments.length).toBe(1)
     expect(attachments[0].id).toBe('att-001')
     expect(attachments[0].name).toBe('policy.docx')
+    // 审计证据区：证据链接挂在控制点（表页）上，不指定行；不再另调 associate
+    expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'proj-1', wpId: 'wp-c22', file, sheetName: 'SA-3',
+    }))
+    expect(mockUpload.mock.calls[0][0].cellRef).toBeUndefined()
+    expect(mockPost).not.toHaveBeenCalledWith(expect.stringContaining('/associate'), expect.anything())
   })
 
   it('样本记录行附件上传成功 → 附件关联到样本行', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-sample-1' })
+    mockUpload.mockResolvedValue(uploaded('att-sample-1'))
     const wrapper = mountSheet()
     await flushPromises()
 
@@ -177,6 +187,13 @@ describe('GtC22ControlSheet — 📎 附件上传（Req 11.1）', () => {
     expect(row.attachment).toBeDefined()
     expect(row.attachment.id).toBe('att-sample-1')
     expect(row.attachment.name).toBe('approval.pdf')
+    // 样本行：证据链接带样本序号
+    expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({
+      sheetName: 'SA-3', cellRef: `item:${row.seq}`,
+    }))
+    // 识别带上刚建的附件，不再另建一份
+    const ocrForm = mockHttpPost.mock.calls[0][1] as FormData
+    expect(ocrForm.get('attachment_id')).toBe('att-sample-1')
   })
 
   it('文件超过 20MB → 拒绝上传并提示', async () => {
@@ -190,7 +207,7 @@ describe('GtC22ControlSheet — 📎 附件上传（Req 11.1）', () => {
     await (wrapper.vm as any).onUploadEvidence(bigFile)
     await flushPromises()
 
-    expect(mockUploadAttachment).not.toHaveBeenCalled()
+    expect(mockUpload).not.toHaveBeenCalled()
     expect(mockElMessage.warning).toHaveBeenCalled()
   })
 })
@@ -201,7 +218,7 @@ describe('GtC22ControlSheet — 📎 附件上传（Req 11.1）', () => {
 
 describe('GtC22ControlSheet — 证据索引号自动建议（Req 11.2）', () => {
   it('首个附件建议 C22.SA-3-1，第二个建议 C22.SA-3-2', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-001' })
+    mockUpload.mockResolvedValue(uploaded('att-001'))
     const wrapper = mountSheet()
     await flushPromises()
 
@@ -213,7 +230,7 @@ describe('GtC22ControlSheet — 证据索引号自动建议（Req 11.2）', () =
     expect((wrapper.vm as any).evidenceAttachments[0].index).toBe('C22.SA-3-1')
 
     // 第二次上传
-    mockUploadAttachment.mockResolvedValue({ id: 'att-002' })
+    mockUpload.mockResolvedValue(uploaded('att-002'))
     const file2 = new File(['b'], 'evidence2.docx', { type: 'application/msword' })
     await (wrapper.vm as any).onUploadEvidence(file2)
     await flushPromises()
@@ -243,7 +260,7 @@ describe('GtC22ControlSheet — 证据索引号自动建议（Req 11.2）', () =
 
 describe('GtC22ControlSheet — OCR merge（Req 11.3）', () => {
   it('图片/PDF 上传 → 调用 OCR → 确认 → merge 到审计证据描述', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-ocr-1' })
+    mockUpload.mockResolvedValue(uploaded('att-ocr-1'))
     mockHttpPost.mockResolvedValue({
       data: { data: { extracted_fields: { title: '数据安全管理制度', approval_date: '2024-06-01', approver: '张三' } } },
     })
@@ -256,12 +273,13 @@ describe('GtC22ControlSheet — OCR merge（Req 11.3）', () => {
     await (wrapper.vm as any).onUploadEvidence(file)
     await flushPromises()
 
-    // OCR 被调用
+    // OCR 被调用，且带上刚建的附件（识别结果写回该附件）
     expect(mockHttpPost).toHaveBeenCalledWith(
       '/api/workpapers/wp-c22/d4/contract-ocr',
       expect.any(FormData),
       expect.objectContaining({ headers: { 'Content-Type': 'multipart/form-data' } }),
     )
+    expect((mockHttpPost.mock.calls[0][1] as FormData).get('attachment_id')).toBe('att-ocr-1')
 
     // 确认弹窗被调用
     expect(mockElMessageBox.confirm).toHaveBeenCalled()
@@ -278,7 +296,7 @@ describe('GtC22ControlSheet — OCR merge（Req 11.3）', () => {
   })
 
   it('用户取消确认弹窗 → 不 merge，附件保留', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-ocr-2' })
+    mockUpload.mockResolvedValue(uploaded('att-ocr-2'))
     mockHttpPost.mockResolvedValue({
       data: { data: { extracted_fields: { title: '制度X' } } },
     })
@@ -298,7 +316,7 @@ describe('GtC22ControlSheet — OCR merge（Req 11.3）', () => {
   })
 
   it('非 OCR 类型文件（.docx）→ 不调用 OCR', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-non-ocr' })
+    mockUpload.mockResolvedValue(uploaded('att-non-ocr'))
 
     const wrapper = mountSheet()
     await flushPromises()
@@ -318,7 +336,7 @@ describe('GtC22ControlSheet — OCR merge（Req 11.3）', () => {
 
 describe('GtC22ControlSheet — OCR 失败处理（Req 11.4）', () => {
   it('OCR 请求失败 → 提示手动填写，附件保留', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-ocr-fail' })
+    mockUpload.mockResolvedValue(uploaded('att-ocr-fail'))
     mockHttpPost.mockRejectedValue(new Error('OCR 服务不可用'))
 
     const wrapper = mountSheet()
@@ -336,7 +354,7 @@ describe('GtC22ControlSheet — OCR 失败处理（Req 11.4）', () => {
   })
 
   it('OCR 返回空 fields → 提示手动补充，附件保留', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-ocr-empty' })
+    mockUpload.mockResolvedValue(uploaded('att-ocr-empty'))
     mockHttpPost.mockResolvedValue({ data: { data: { extracted_fields: {} } } })
 
     const wrapper = mountSheet()
@@ -357,7 +375,7 @@ describe('GtC22ControlSheet — OCR 失败处理（Req 11.4）', () => {
 
 describe('GtC22ControlSheet — 附件持久化与只读（Req 11.5）', () => {
   it('附件上传后 persistAttachments → PUT checklist-responses（evidence-attachments JSON）', async () => {
-    mockUploadAttachment.mockResolvedValue({ id: 'att-persist' })
+    mockUpload.mockResolvedValue(uploaded('att-persist'))
     const wrapper = mountSheet()
     await flushPromises()
     mockPut.mockClear()
@@ -404,7 +422,7 @@ describe('GtC22ControlSheet — 附件持久化与只读（Req 11.5）', () => {
     await (wrapper.vm as any).onUploadEvidence(file)
     await flushPromises()
 
-    expect(mockUploadAttachment).not.toHaveBeenCalled()
+    expect(mockUpload).not.toHaveBeenCalled()
     expect((wrapper.vm as any).evidenceAttachments.length).toBe(0)
   })
 

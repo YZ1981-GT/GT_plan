@@ -125,6 +125,11 @@ async def _reference(world, att: Attachment, kind: str) -> None:
 async def test_delete_referenced_attachment_is_409(world, kind, category):
     att = await add_attachment(world, world.target)
     await _reference(world, att, kind)
+    visibility = None
+    if kind == "evidence_links":
+        # 只挂在某一行上的证据按所在底稿隔离（spec attachment-evidence-intake 需求 3.7），删除端点先过底稿可见性门；
+        # 本世界里统一门不可用 ⇒ 换成放行桩，只观测引用守卫（隔离本身见 attachment_evidence_intake/test_visibility_evidence_links_pg.py）
+        visibility = world.stub(attachments_router_module, "enforce_attachment_wp_visibility", None)
     user = await _user(world, "edit")
     async with world.client(ATT_ROUTER, user=user) as client:
         resp = await client.delete(f"/api/attachments/{att.id}")
@@ -133,6 +138,8 @@ async def test_delete_referenced_attachment_is_409(world, kind, category):
     assert detail["error_code"] == "ATTACHMENT_IN_USE" and detail["references"] == {category: 1}
     assert guard.REFERENCE_LABELS[category] in detail["message"]
     assert await _deleted_flag(world, att) is False
+    if visibility is not None:
+        assert visibility.count == 1
 
 
 async def test_count_references_sees_workpaper_links(world):

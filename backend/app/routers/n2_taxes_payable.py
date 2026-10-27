@@ -24,11 +24,9 @@ import logging
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
-from uuid import uuid4
 
-import aiofiles
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +35,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.deps import authorize_wp_edit, get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.project_audit_year import fetch_project_audit_year
 from app.services.tb_audited_writer import publish_rows
@@ -46,7 +45,13 @@ from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
     attach_shape_a_routes,
 )
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+    record_ocr_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -435,6 +440,8 @@ _EMPTY_FIELDS = {k: (0 if k in ("debitAmount", "creditAmount") else "") for k in
 async def n2_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> N2VoucherOcrResponse:
@@ -448,17 +455,16 @@ async def n2_contract_ocr(
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，支持: {', '.join(allowed)}")
 
-    attachment_id = str(uuid4())
-    storage_dir = side_storage_dir(wp_id, "vouchers")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
-
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    wp_uuid = parse_workpaper_id(wp_id)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=True,
+        user=current_user, native_type="voucher", native_prefix="N2", options=options,
+    )
+    attachment_id = str(src.attachment_id)
+    file_path = src.path
 
     # OCR识别
     ocr_text = ""
@@ -467,22 +473,22 @@ async def n2_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:  # noqa: BLE001
         logger.warning("N2 voucher OCR failed: %s", e)
-        return N2VoucherOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             summary="",
             confidence=0,
-        )
+        ))
 
     if not ocr_text.strip():
-        return N2VoucherOcrResponse(
+        return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             summary="",
             confidence=0,
-        )
+        ))
 
     # LLM结构化提取
     extracted = dict(_EMPTY_FIELDS)
@@ -521,13 +527,13 @@ async def n2_contract_ocr(
     filled = sum(1 for k, v in extracted.items() if v and v != "" and v != 0)
     confidence = round(filled / max(len(_VOUCHER_FIELDS), 1), 2)
 
-    return N2VoucherOcrResponse(
+    return await record_ocr_response(db, wp_uuid, src, N2VoucherOcrResponse(
         attachment_id=attachment_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         summary=summary,
         confidence=confidence,
-    )
+    ))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

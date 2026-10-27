@@ -12,9 +12,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,16 +20,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.attachment_ocr_writeback import (
-    finalize_linked_ocr_writeback,
-    load_reusable_ocr,
-    parse_optional_uuid,
-    provision_wp_linked_attachment,
-)
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.attachment_service import AttachmentService
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,59 +165,42 @@ async def e1_statement_ocr(
     file: UploadFile = File(...),
     attachment_id: str | None = Form(None),
     force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> E1StatementOcrResponse:
     """上传银行对账单/流水，OCR + AI 提取明细供 E1-31 确认回填。"""
-    try:
-        wp_uuid = UUID(wp_id)
-    except ValueError:
-        raise HTTPException(400, "无效的 wp_id")
-
-    linked_att_id = parse_optional_uuid(attachment_id)
-
+    wp_uuid = parse_workpaper_id(wp_id)
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".xlsx", ".xls")
     filename = file.filename or "bank-statement.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed}")
 
-    if linked_att_id is not None and not force_reocr:
-        reused = await load_reusable_ocr(db, linked_att_id)
-        if reused is not None:
-            fields = reused["extracted_fields"] or {}
-            lines = fields.get("lines") if isinstance(fields, dict) else []
-            skipped = fields.get("skippedLineCount", 0) if isinstance(fields, dict) else 0
-            return E1StatementOcrResponse(
-                attachment_id=str(linked_att_id),
-                ocr_text=reused["ocr_text"],
-                extracted_fields=fields,
-                confidence=float(reused.get("confidence") or 0),
-                file_name=filename,
-                line_count=len(lines) if isinstance(lines, list) else 0,
-                skipped_line_count=int(skipped or 0),
-                reused=True,
-                written_back=False,
-            )
-
-    content = await file.read()
-    out_attachment_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    if linked_att_id is None:
-        out_attachment_id, linked_att_id = await provision_wp_linked_attachment(
-            db,
-            wp_id=wp_uuid,
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=_user, native_type="bank_statement", native_prefix="E1", options=options,
+    )
+    if src.reused is not None:
+        fields = src.reused["extracted_fields"] or {}
+        lines = fields.get("lines") if isinstance(fields, dict) else []
+        skipped = fields.get("skippedLineCount", 0) if isinstance(fields, dict) else 0
+        return E1StatementOcrResponse(
+            attachment_id=str(src.attachment_id),
+            ocr_text=src.reused["ocr_text"],
+            extracted_fields=fields,
+            confidence=float(src.reused.get("confidence") or 0),
             file_name=filename,
-            content=content,
-            attachment_type="bank_statement",
-            created_by=getattr(_user, "id", None),
+            line_count=len(lines) if isinstance(lines, list) else 0,
+            skipped_line_count=int(skipped or 0),
+            reused=True,
+            written_back=False,
         )
 
-    storage_dir = side_storage_dir(wp_id, "bank-statements")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{out_attachment_id}{suffix}"
-
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    linked_att_id = src.attachment_id
+    out_attachment_id = str(linked_att_id)
+    file_path = src.path
+    suffix = Path(file_path).suffix.lower() or suffix  # 带 attachment_id 时以附件原件为准（Excel 走读单元格）
 
     ocr_text = ""
     try:

@@ -24,7 +24,9 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
+const mockHttpPost = vi.fn()
 vi.mock('@/utils/http', () => ({
+  default: { post: (...args: any[]) => mockHttpPost(...args), get: vi.fn(), delete: vi.fn() },
   downloadFile: vi.fn(),
 }))
 
@@ -68,6 +70,12 @@ const globalStubs = {
   },
   'el-tooltip': { template: '<span><slot /></span>', props: ['content', 'placement'] },
   'el-icon': { template: '<i><slot /></i>' },
+  'el-select': {
+    template: '<select class="el-select" :data-value="modelValue" :data-testid="$attrs[\'data-testid\']"><slot /></select>',
+    props: ['modelValue', 'size', 'clearable', 'placeholder'],
+    inheritAttrs: false,
+  },
+  'el-option': { template: '<option :value="value">{{ label }}</option>', props: ['label', 'value'] },
 }
 
 const sampleItems = [
@@ -120,19 +128,21 @@ describe('resolveSourceKeys / canUnlinkSources', () => {
     expect(resolveSourceKeys({})).toEqual([])
   })
 
-  it('仅 associated/referenced 可解除', () => {
+  it('associated/referenced/行级证据可解除，纯函证不可', () => {
     expect(canUnlinkSources(['associated'])).toBe(true)
     expect(canUnlinkSources(['referenced'])).toBe(true)
+    expect(canUnlinkSources(['evidence_link'])).toBe(true)
     expect(canUnlinkSources(['confirmation'])).toBe(false)
     expect(canUnlinkSources(['associated', 'confirmation'])).toBe(true)
   })
 })
 
 describe('SOURCE_LABEL', () => {
-  it('覆盖四类来源文案', () => {
+  it('覆盖各类来源文案', () => {
     expect(SOURCE_LABEL.associated.label).toBe('关联证据')
     expect(SOURCE_LABEL.referenced.label).toBe('底稿引用')
     expect(SOURCE_LABEL.confirmation.label).toBe('函证回函')
+    expect(SOURCE_LABEL.evidence_link.label).toBe('行级证据')
     expect(SOURCE_LABEL.checklist.label).toBe('检查项证据')
   })
 })
@@ -193,7 +203,7 @@ describe('WorkpaperAttachmentsDrawer', () => {
     // a1 associated + a2 referenced → 2；a3 confirmation-only → 无
     expect(wrapper.findAll('.wp-att-unlink-btn').length).toBe(2)
     expect(wrapper.find('[data-testid="confirmation-unlink-tip"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('检查项级证据')
+    expect(wrapper.text()).toContain('行级证据')
     expect(wrapper.text()).toContain('上传并关联到本底稿')
   })
 
@@ -307,5 +317,120 @@ describe('WorkpaperAttachmentsDrawer', () => {
     })
     await flushPromises()
     expect(wrapper.find('[data-testid="stale-info"]').exists()).toBe(false)
+  })
+
+  // ── spec attachment-evidence-intake 需求 5.2 / 5.3 ──
+
+  async function chooseFile(wrapper: ReturnType<typeof mount>, name = '回函.pdf') {
+    const input = wrapper.find('input[type="file"]')
+    const file = new File(['%PDF-1.4'], name, { type: 'application/pdf' })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+  }
+
+  it('缺省预选第一类未满足的声明类型；「上传此类证据」按该类走证据入口', async () => {
+    mockGet.mockResolvedValue({
+      items: sampleItems,
+      evidence_requirements: [
+        { type: 'bank_statement', label: '银行对账单', satisfied: true },
+        { type: 'confirmation', label: '银行询证函回函', satisfied: false },
+      ],
+    })
+    mockHttpPost.mockResolvedValue({ data: { attachment: { id: 'new-1' }, evidence_link: null } })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="evidence-type-select"]').attributes('data-value')).toBe('confirmation')
+
+    const quick = wrapper.findAll('.wp-att-evidence-req__upload')
+    expect(quick.map((b) => b.attributes('data-type'))).toEqual(['confirmation'])
+    await quick[0].trigger('click')
+    await chooseFile(wrapper)
+
+    expect(mockHttpPost).toHaveBeenCalledTimes(1)
+    const [url, form] = mockHttpPost.mock.calls[0]
+    expect(url).toBe('/api/projects/proj-1/workpapers/wp-1/evidence/upload')
+    expect((form as FormData).get('evidence_type')).toBe('confirmation')
+    expect((form as FormData).has('sheet_name')).toBe(false)
+    expect((form as FormData).has('cell_ref')).toBe(false)
+  })
+
+  it('无声明时工具栏上传不带类型（交给后端按底稿缺省）', async () => {
+    mockGet.mockResolvedValue({ items: sampleItems })
+    mockHttpPost.mockResolvedValue({ data: { attachment: { id: 'new-2' }, evidence_link: null } })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="evidence-type-select"]').attributes('data-value')).toBe('')
+    await wrapper.find('[data-testid="wp-att-upload"]').trigger('click')
+    await chooseFile(wrapper, '凭证.pdf')
+    const form = mockHttpPost.mock.calls[0][1] as FormData
+    expect(form.has('evidence_type')).toBe(false)
+    expect((form.get('file') as File).name).toBe('凭证.pdf')
+  })
+
+  it('行级证据显示来源与位置，可解除', async () => {
+    mockGet.mockResolvedValue({
+      items: [{
+        id: 'r1', file_name: '行证据.pdf', file_type: 'pdf', file_size: 10, created_at: '2026-10-27T00:00:00Z',
+        source: 'evidence_link', sources: ['evidence_link'], association_type: null,
+        evidence_positions: [
+          { link_id: 'l1', sheet_name: 'D2A', cell_ref: 'item:3', page_ref: null },
+          { link_id: 'l2', sheet_name: 'D2A', cell_ref: 'B7', page_ref: '2' },
+        ],
+      }],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-source="evidence_link"]').text()).toBe('行级证据')
+    expect(wrapper.find('[data-testid="evidence-positions"]').text()).toBe('行级位置：D2A · 第 3 项、D2A · B7 · 第 2 页')
+    expect(wrapper.findAll('.wp-att-unlink-btn').length).toBe(1)
+  })
+})
+
+describe('WorkpaperAttachmentsDrawer — 图标按钮可读名与空态（spec attachment-evidence-intake 走查补）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDelete.mockResolvedValue({ ok: true })
+  })
+
+  it('行内图标按钮带含文件名的 aria-label（只有悬浮提示时读屏读不到）', async () => {
+    mockGet.mockResolvedValue({ items: sampleItems })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    const labels = wrapper.findAll('button[aria-label]').map((b) => b.attributes('aria-label'))
+    expect(labels).toEqual(expect.arrayContaining([
+      '预览 回函.pdf', '下载 回函.pdf', '解除关联 回函.pdf', '在附件管理中查看 回函.pdf', '预览 纯函证.pdf',
+    ]))
+    // 纯函证不可解除 ⇒ 没有它的「解除关联」可读名
+    expect(labels).not.toContain('解除关联 纯函证.pdf')
+  })
+
+  it('无附件：可编辑时提示在上方上传，只读时不提上传', async () => {
+    mockGet.mockResolvedValue({ items: [] })
+    const editable = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(editable.find('.el-empty').text()).toBe('本底稿暂无关联附件，可在上方选择证据类型后上传')
+
+    const readonly = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: false },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(readonly.find('.el-empty').text()).toBe('本底稿暂无关联附件')
   })
 })

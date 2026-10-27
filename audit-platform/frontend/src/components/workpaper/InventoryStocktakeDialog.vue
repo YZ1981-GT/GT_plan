@@ -53,10 +53,10 @@
 
       <el-form-item label="照片附件">
         <el-upload
-          :action="uploadAction"
-          :headers="uploadHeaders"
+          :http-request="uploadMedia"
           accept="image/*"
           :on-success="onPhotoUploadSuccess"
+          :on-error="onMediaUploadError"
           :on-remove="onPhotoUploadRemove"
           :file-list="photoFileList"
           :limit="20"
@@ -71,10 +71,10 @@
 
       <el-form-item label="录像附件">
         <el-upload
-          :action="uploadAction"
-          :headers="uploadHeaders"
+          :http-request="uploadMedia"
           accept="video/*"
           :on-success="onVideoUploadSuccess"
+          :on-error="onMediaUploadError"
           :on-remove="onVideoUploadRemove"
           :file-list="videoFileList"
           :limit="5"
@@ -190,9 +190,9 @@
  */
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'element-plus'
+import type { FormInstance, FormRules, UploadFile, UploadRequestOptions, UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { getAuthHeaders } from '@/utils/authToken'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
@@ -264,11 +264,6 @@ const draftKey = computed(
   () => `gt:stocktake-draft:${props.projectId}:${props.wpId}:${sheetKey.value}`
 )
 
-const uploadAction = computed(
-  () => `/api/projects/${props.projectId}/attachments/upload`
-)
-// el-upload 原生上传不经 http 拦截器：鉴权头必须走 authToken 单一入口（旧读 localStorage 恒空 → 401）
-const uploadHeaders = computed(() => getAuthHeaders())
 
 function diffOf(row: StocktakeDiffItem): number {
   return (Number(row.actualQty) || 0) - (Number(row.bookQty) || 0)
@@ -300,33 +295,40 @@ function removeDiffRow(idx: number) {
   form.value.differences.splice(idx, 1)
 }
 
-function onPhotoUploadSuccess(response: any, _file: UploadFile) {
-  if (response?.id) {
-    form.value.attachments.push({
-      uuid: response.id,
-      type: 'image',
-      name: response.filename || _file.name,
-    })
-  }
+// 照片 / 录像经底稿证据入口上传，挂到本次监盘表页（spec attachment-evidence-intake 需求 5.4）。
+// 原先 el-upload 原生上传：回执被 {code,message,data} 信封包着，按 response.id 取恒空 ⇒ 附件从未记进监盘记录，也不关联底稿。
+function uploadMedia(options: UploadRequestOptions) {
+  return uploadWorkpaperEvidence({
+    projectId: props.projectId,
+    wpId: props.wpId,
+    file: options.file,
+    evidenceType: 'stocktake',
+    sheetName: sheetKey.value,
+  })
 }
-function onPhotoUploadRemove(_file: UploadFile) {
-  form.value.attachments = form.value.attachments.filter(
-    (a) => a.type !== 'image' || a.uuid !== (_file as any)?.response?.id
-  )
+function uploadedAttachment(response: unknown): { id: string; file_name?: string } | null {
+  const att = (response as { attachment?: { id?: string; file_name?: string } } | null)?.attachment
+  return att?.id ? { id: String(att.id), file_name: att.file_name } : null
 }
-function onVideoUploadSuccess(response: any, _file: UploadFile) {
-  if (response?.id) {
-    form.value.attachments.push({
-      uuid: response.id,
-      type: 'video',
-      name: response.filename || _file.name,
-    })
-  }
+function onMediaUploadError(error: unknown) {
+  handleApiError(error, '上传监盘附件')
 }
-function onVideoUploadRemove(_file: UploadFile) {
-  form.value.attachments = form.value.attachments.filter(
-    (a) => a.type !== 'video' || a.uuid !== (_file as any)?.response?.id
-  )
+
+function onPhotoUploadSuccess(response: unknown, file: UploadFile) {
+  const att = uploadedAttachment(response)
+  if (att) form.value.attachments.push({ uuid: att.id, type: 'image', name: att.file_name || file.name })
+}
+function onPhotoUploadRemove(file: UploadFile) {
+  const id = uploadedAttachment(file.response)?.id
+  if (id) form.value.attachments = form.value.attachments.filter((a) => a.type !== 'image' || a.uuid !== id)
+}
+function onVideoUploadSuccess(response: unknown, file: UploadFile) {
+  const att = uploadedAttachment(response)
+  if (att) form.value.attachments.push({ uuid: att.id, type: 'video', name: att.file_name || file.name })
+}
+function onVideoUploadRemove(file: UploadFile) {
+  const id = uploadedAttachment(file.response)?.id
+  if (id) form.value.attachments = form.value.attachments.filter((a) => a.type !== 'video' || a.uuid !== id)
 }
 
 function loadDraft() {

@@ -60,11 +60,15 @@ class AttachmentService:
         project_id: UUID,
         data: dict[str, Any],
         created_by: UUID | None = None,
+        *,
+        version_chain: bool = True,
     ) -> dict:
         """创建附件记录（AT-3：同名自动建版本链）
 
         同 (project_id, reference_id, reference_type, file_name) 第二次调用时
         新行 version=N+1，previous_version_id 指向当前最新版本。
+        ``version_chain=False``（底稿证据入口）：新证据一律是新附件，恒为版本 1、不发替换信号
+        （spec attachment-evidence-intake ADR-AEI-03）。
 
         ``attachment_type`` 必须在登记表内（spec attachment-security-baseline 需求 1.1）；
         有 ``created_by`` 时写 actor 列，``audit_year`` 未给时取项目审计年度（需求 1.5）。
@@ -95,7 +99,7 @@ class AttachmentService:
             file_name=data["file_name"],
             reference_id=ref_id,
             reference_type=data.get("reference_type"),
-        )
+        ) if version_chain else (1, None)
 
         attachment = Attachment(
             project_id=project_id,
@@ -138,6 +142,8 @@ class AttachmentService:
         content: bytes,
         metadata: dict[str, Any] | None = None,
         created_by: UUID | None = None,
+        *,
+        version_chain: bool = True,
     ) -> dict:
         """上传附件，优先存储到 Paperless-ngx，失败时回退到本地存储
 
@@ -196,6 +202,7 @@ class AttachmentService:
                             "ocr_status": metadata.get("ocr_status", "processing"),
                         },
                         created_by=created_by,
+                        version_chain=version_chain,
                     )
                 if not self.fallback_to_local:
                     raise RuntimeError("Paperless-ngx 上传失败，且未启用本地回退存储")
@@ -221,6 +228,7 @@ class AttachmentService:
                     "ocr_status": metadata.get("ocr_status", "pending"),
                 },
                 created_by=created_by,
+                version_chain=version_chain,
             )
         finally:
             temp_path.unlink(missing_ok=True)
@@ -261,7 +269,10 @@ class AttachmentService:
             stmt = stmt.where(Attachment.reference_id == reference_id)
 
         result = await self.db.execute(stmt)
-        return [self._to_dict(a) for a in result.scalars().all()]
+        from app.services.attachment_wp_view import annotate_linked_wp_count
+
+        # 每项带整稿关联的底稿数（附件管理页「已关联底稿」统计用，spec attachment-evidence-intake 需求 4.5）
+        return await annotate_linked_wp_count(self.db, [self._to_dict(a) for a in result.scalars().all()])
 
     async def get_attachment(self, attachment_id: UUID) -> dict | None:
         """附件详情（对外序列化：file_path 已投影为 opaque locator，见 _to_dict）"""
@@ -420,154 +431,14 @@ class AttachmentService:
         return link
 
     async def get_wp_attachments(self, wp_id: UUID) -> dict:
-        """获取底稿关联附件的统一反查视图（envelope）。
+        """底稿关联附件的统一反查视图（组装见 ``attachment_wp_view.build_wp_attachment_view``）。
 
-        权威链表 ∪ reference 关联 ∪ 函证只读（best-effort），按 attachment.id 去重；
-        多来源合并 ``sources``，主 ``source`` 优先级：
-        associated > referenced > confirmation。
-
-        返回 ``{ "items": [ ... ] }``；行内保留既有 ``_to_dict`` 字段，并 additive
-        ``source`` / ``sources`` / ``association_type``（仅链表有值；其余来源为 null）。
-
-        spec: attachment-workpaper-linkage-convergence Task 2.2 / 3.1
+        整稿关联 ∪ reference ∪ 函证 ∪ 本底稿证据链接，按附件去重；返回 ``{"items": [...]}`` 及可选的
+        ``evidence_requirements`` / ``stale_info``（spec attachment-evidence-intake 需求 4.1）。
         """
-        by_id: dict[str, dict] = {}
+        from app.services.attachment_wp_view import build_wp_attachment_view
 
-        # 1) 权威链表
-        link_stmt = (
-            sa.select(Attachment, AttachmentWorkingPaper.association_type)
-            .join(
-                AttachmentWorkingPaper,
-                AttachmentWorkingPaper.attachment_id == Attachment.id,
-            )
-            .where(
-                AttachmentWorkingPaper.wp_id == wp_id,
-                Attachment.is_deleted == sa.false(),
-            )
-        )
-        link_rows = (await self.db.execute(link_stmt)).all()
-        for att, assoc_type in link_rows:
-            row = self._to_dict(att)
-            row["source"] = "associated"
-            row["sources"] = ["associated"]
-            row["association_type"] = assoc_type
-            by_id[row["id"]] = row
-
-        # 2) reference 关联（兼容路径）
-        ref_stmt = (
-            sa.select(Attachment)
-            .where(
-                Attachment.reference_type == "working_paper",
-                Attachment.reference_id == wp_id,
-                Attachment.is_deleted == sa.false(),
-            )
-        )
-        ref_atts = (await self.db.execute(ref_stmt)).scalars().all()
-        for att in ref_atts:
-            aid = str(att.id)
-            existing = by_id.get(aid)
-            if existing is not None:
-                if "referenced" not in existing["sources"]:
-                    existing["sources"].append("referenced")
-                continue
-            row = self._to_dict(att)
-            row["source"] = "referenced"
-            row["sources"] = ["referenced"]
-            row["association_type"] = None
-            by_id[aid] = row
-
-        # 3) 函证只读纳入（wp → confirmations → confirmation_attachment_link）
-        # fail-open：异常跳过，仍返回链表 + reference
-        try:
-            from app.models.confirmation_models import (
-                Confirmation,
-                ConfirmationAttachmentLink,
-            )
-
-            conf_stmt = (
-                sa.select(Attachment)
-                .join(
-                    ConfirmationAttachmentLink,
-                    ConfirmationAttachmentLink.attachment_id == Attachment.id,
-                )
-                .join(
-                    Confirmation,
-                    Confirmation.id == ConfirmationAttachmentLink.confirmation_id,
-                )
-                .where(
-                    Confirmation.wp_id == wp_id,
-                    Attachment.is_deleted == sa.false(),
-                )
-            )
-            conf_atts = (await self.db.execute(conf_stmt)).scalars().unique().all()
-            for att in conf_atts:
-                aid = str(att.id)
-                existing = by_id.get(aid)
-                if existing is not None:
-                    if "confirmation" not in existing["sources"]:
-                        existing["sources"].append("confirmation")
-                    continue
-                row = self._to_dict(att)
-                row["source"] = "confirmation"
-                row["sources"] = ["confirmation"]
-                row["association_type"] = None
-                by_id[aid] = row
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_confirmation_lookup_fail_open",
-                wp_id=wp_id,
-            )
-
-        items = list(by_id.values())
-        result: dict = {"items": items}
-
-        # 一次取 wp 元数据，供证据声明 + stale 共用（减一次 WorkingPaper 往返）
-        wp_meta = await self._resolve_wp_meta(wp_id)
-
-        # Req4：证据类型声明（无声明不附加键；失败 fail-open）
-        try:
-            from app.services.workpaper_evidence_requirements import (
-                build_evidence_requirements,
-            )
-
-            ev_req = build_evidence_requirements(
-                wp_meta.get("wp_code") if wp_meta else None,
-                items,
-            )
-            if ev_req is not None:
-                result["evidence_requirements"] = ev_req
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_evidence_requirements_fail_open",
-                wp_id=wp_id,
-            )
-
-        # Req6：stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
-        try:
-            from app.services.workpaper_attachment_stale import build_stale_info
-
-            att_ids = [str(it.get("id")) for it in items if it.get("id")]
-            stale = await build_stale_info(
-                self.db,
-                wp_id=wp_id,
-                attachment_ids=att_ids,
-                wp_meta=wp_meta,
-            )
-            if stale is not None:
-                result["stale_info"] = stale
-        except Exception:
-            from app.services.attachment_wp_fail_open import log_awp_fail_open
-
-            log_awp_fail_open(
-                "awp_stale_fail_open",
-                wp_id=wp_id,
-            )
-
-        return result
+        return await build_wp_attachment_view(self, wp_id)
 
     async def _resolve_wp_meta(self, wp_id: UUID) -> dict | None:
         """一次查出 wp_code / project_id / prefill_stale / audit_year；失败 None。"""
@@ -611,12 +482,16 @@ class AttachmentService:
         """解除附件与底稿的关联（权威链表硬删 + 同步清空 matching reference）。
 
         - 删除 ``attachment_working_paper`` 中 (attachment_id, wp_id) 链行（若无则跳过）。
+        - 同时删除该附件在本底稿的证据链接（「解除与本底稿的关联」= 全部解除，
+          spec attachment-evidence-intake 需求 4.2）。
         - 若该附件 ``reference_type=='working_paper'`` 且 ``reference_id==wp_id``，置空。
         - 不删附件本身；不改函证 ``confirmation_attachment_link``。
         - 幂等：无关联时仍返回 ok（no-op 200）。
 
         spec: attachment-workpaper-linkage-convergence Task 4.1 / Property 5
         """
+        from app.services.wp_evidence_service import WpEvidenceService
+
         del_result = await self.db.execute(
             sa.delete(AttachmentWorkingPaper).where(
                 AttachmentWorkingPaper.attachment_id == attachment_id,
@@ -624,6 +499,7 @@ class AttachmentService:
             )
         )
         link_removed = int(del_result.rowcount or 0)
+        evidence_removed = await WpEvidenceService(self.db).delete_links_for_attachment(wp_id, attachment_id)
 
         ref_cleared = False
         att = (
@@ -647,6 +523,7 @@ class AttachmentService:
         return {
             "ok": True,
             "link_removed": link_removed,
+            "evidence_links_removed": evidence_removed,
             "reference_cleared": ref_cleared,
         }
 

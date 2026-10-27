@@ -3,7 +3,8 @@
 import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import {
   SECTION_CONFIGS,
   useF4UnrecordedCheck,
@@ -164,23 +165,22 @@ async function uploadAndRecognize(file: File): Promise<void> {
   evidenceUploading.value = true
   let attachmentSaved = false
   try {
-    const objectId = `${props.wpId}:${activeConfig.value.sheet}:${row.attSlot}`
-    const attachmentForm = new FormData()
-    attachmentForm.append('file', file)
-    attachmentForm.append('attachment_type', 'workpaper_item')
-    attachmentForm.append('reference_type', 'workpaper_item')
-    attachmentForm.append('title', objectId)
-    attachmentForm.append('document_type', objectId)
-    await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      _silent: true,
-    } as any)
+    // 经底稿证据入口存为本行的行级证据（与下方逐项附件同一位置，spec attachment-evidence-intake 需求 5.4）
+    const { attachment } = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      sheetName: activeConfig.value.sheet,
+      cellRef: itemCellRef(row.attSlot),
+    })
     attachmentSaved = true
     attachmentRefresh.value += 1
 
     const ocrForm = new FormData()
     ocrForm.append('file', file)
     ocrForm.append('document_type', activeConfig.value.ocrDocumentType)
+    // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+    ocrForm.append('attachment_id', String(attachment.id))
     const response = await http.post(
       `/api/workpapers/${props.wpId}/f4/contract-ocr`,
       ocrForm,
@@ -200,9 +200,9 @@ async function uploadAndRecognize(file: File): Promise<void> {
     ocrConfidence.value = Number(data?.confidence || 0)
     overwriteExisting.value = false
     ocrPreviewVisible.value = true
-  } catch {
+  } catch (error: unknown) {
     if (attachmentSaved) ElMessage.warning('附件已关联，但OCR识别失败，可在主表二次编辑')
-    else ElMessage.error('附件上传失败')
+    else handleApiError(error, '上传附件')
   } finally {
     evidenceUploading.value = false
   }

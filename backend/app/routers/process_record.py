@@ -32,11 +32,6 @@ class ConfirmAIContentRequest(BaseModel):
     status: str  # accepted / modified / rejected
 
 
-class LinkAttachmentRequest(BaseModel):
-    attachment_id: str
-    wp_id: str
-
-
 # ── 底稿编辑记录 ──────────────────────────────────────────
 
 @router.get("/projects/{project_id}/workpapers/{wp_id}/edit-history")
@@ -90,34 +85,38 @@ async def get_attachment_workpapers(
     db: AsyncSession = Depends(get_db),
 current_user: User = Depends(get_current_user),
 ):
-    """获取附件关联的底稿"""
-    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）：
-    # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
+    """获取附件出现的底稿（侧栏「关联底稿数」悬停时取）。
+
+    先按附件真实所属项目判 readonly（原先只要登录，未绑定底稿的附件对任何登录用户放行，
+    spec attachment-evidence-intake 需求 4.3）；再过附件 wp-link 可见性隔离（全部关联底稿都不可见 → 404）；
+    清单只列当前用户看得到的底稿（编码 / 名称不向不可见的人泄露，与底稿搜索同口径）。
+    """
+    from app.services.attachment_access import require_attachment_permission
     from app.services.wp_visibility.entry_integration import (
         enforce_attachment_wp_visibility,
+        try_gate_wp,
     )
 
+    await require_attachment_permission(db, current_user, attachment_id, "readonly")
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
     svc = AttachmentLinkService()
-    return await svc.get_attachment_workpapers(db, attachment_id)
+    visible = []
+    for wp in await svc.get_attachment_workpapers(db, attachment_id):
+        ctx = await try_gate_wp(
+            db, current_user, entrypoint="attachment.read", action="attach_read", method="GET",
+            wp_id=UUID(wp["wp_id"]), entry_family="attachment",
+        )
+        if ctx is not None:
+            visible.append(wp)
+    return visible
 
 
-@router.post("/link-attachment")
-async def link_attachment(
-    req: LinkAttachmentRequest,
-    db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
-):
-    """将附件关联到底稿"""
-    svc = AttachmentLinkService()
-    await svc.link_attachment_to_workpaper(
-        db, UUID(req.attachment_id), UUID(req.wp_id)
-    )
-    await db.commit()
-    return {"linked": True}
+# POST /link-attachment 已删除（spec attachment-evidence-intake 需求 4.4）：只要登录就能把任意附件挂到任意底稿
+# （不校项目、不过统一门），前端零调用方。关联已有附件走 POST /api/attachments/{id}/associate，上传新证据走
+# POST /api/projects/{pid}/workpapers/{wp_id}/evidence/upload。
 
 
 # ── AI 内容人机协同标注 ───────────────────────────────────

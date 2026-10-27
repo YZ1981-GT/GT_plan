@@ -94,10 +94,10 @@
 
       <el-form-item label="照片/视频附件">
         <el-upload
-          :action="uploadAction"
-          :headers="uploadHeaders"
+          :http-request="uploadMedia"
           accept="image/*,video/*"
           :on-success="onAttachmentUploadSuccess"
+          :on-error="onAttachmentUploadError"
           :on-remove="onAttachmentUploadRemove"
           :file-list="attachmentFileList"
           :limit="30"
@@ -159,9 +159,9 @@
  */
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'element-plus'
+import type { FormInstance, FormRules, UploadFile, UploadRequestOptions, UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { getAuthHeaders } from '@/utils/authToken'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
@@ -247,11 +247,22 @@ const draftKey = computed(
   () => `gt:h-stocktake-draft:${props.projectId}:${props.wpId}:${sheetKey.value}`
 )
 
-const uploadAction = computed(
-  () => `/api/projects/${props.projectId}/attachments/upload`
-)
-// el-upload 原生上传不经 http 拦截器：鉴权头必须走 authToken 单一入口（旧读 localStorage 恒空 → 401）
-const uploadHeaders = computed(() => getAuthHeaders())
+// 照片 / 视频经底稿证据入口上传，挂到本次监盘表页（spec attachment-evidence-intake 需求 5.4）。
+// 原先 el-upload 原生上传：回执被 {code,message,data} 信封包着，按 response.id 取恒空 ⇒ 附件从未记进监盘记录，也不关联底稿。
+function uploadMedia(options: UploadRequestOptions) {
+  return uploadWorkpaperEvidence({
+    projectId: props.projectId,
+    wpId: props.wpId,
+    file: options.file,
+    evidenceType: 'stocktake',
+    sheetName: sheetKey.value,
+  })
+}
+
+function uploadedAttachment(response: unknown): { id: string; file_name?: string } | null {
+  const att = (response as { attachment?: { id?: string; file_name?: string } } | null)?.attachment
+  return att?.id ? { id: String(att.id), file_name: att.file_name } : null
+}
 
 const doubleSigned = computed(
   () => !!form.value.counter?.trim() && !!form.value.reviewer?.trim()
@@ -281,20 +292,23 @@ function captureGPS() {
   )
 }
 
-function onAttachmentUploadSuccess(response: any, file: UploadFile) {
-  if (response?.id) {
+function onAttachmentUploadSuccess(response: unknown, file: UploadFile) {
+  const att = uploadedAttachment(response)
+  if (att) {
     const isVideo = file.name?.match(/\.(mp4|mov|avi|wmv|flv|mkv)$/i)
     form.value.attachments.push({
-      uuid: response.id,
+      uuid: att.id,
       type: isVideo ? 'video' : 'image',
-      name: response.filename || file.name,
+      name: att.file_name || file.name,
     })
   }
 }
+function onAttachmentUploadError(error: unknown) {
+  handleApiError(error, '上传照片/视频')
+}
 function onAttachmentUploadRemove(file: UploadFile) {
-  form.value.attachments = form.value.attachments.filter(
-    (a) => a.uuid !== (file as any)?.response?.id
-  )
+  const id = uploadedAttachment(file.response)?.id
+  if (id) form.value.attachments = form.value.attachments.filter((a) => a.uuid !== id)
 }
 
 function loadDraft() {

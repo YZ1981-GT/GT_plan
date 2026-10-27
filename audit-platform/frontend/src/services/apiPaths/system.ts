@@ -245,7 +245,6 @@ export const processRecord = {
   editHistory: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/edit-history`,
   attachments: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/attachments`,
   attachmentWorkpapers: (attachmentId: string) => `/api/process-record/attachments/${attachmentId}/workpapers`,
-  linkAttachment: '/api/process-record/link-attachment',
   pendingAIContent: (pid: string) => `/api/process-record/projects/${pid}/ai-content/pending`,
   confirmAIContent: (contentId: string) => `/api/process-record/ai-content/${contentId}/confirm`,
   aiCheck: (pid: string, wpId: string) => `/api/process-record/projects/${pid}/workpapers/${wpId}/ai-check`,
@@ -274,6 +273,17 @@ export const attachments = {
   versions: (id: string) => `/api/attachments/${id}/versions`,
   /** 回滚附件到指定版本（创建新版本复制旧版本内容） */
   rollback: (id: string, versionId: string) => `/api/attachments/${id}/versions/${versionId}/rollback`,
+  /** 本底稿附件统一视图：整稿关联 ∪ reference ∪ 函证挂载 ∪ 行级证据链接 */
+  wpView: (wpId: string) => `/api/working-papers/${wpId}/attachments`,
+  /** 底稿内上传证据（唯一写法）：不带表页 / 单元格 ⇒ 整稿关联；带 ⇒ 只写行级证据链接 */
+  evidenceUpload: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/upload`,
+  /** 本底稿证据链接（可按 sheet_name / cell_ref 过滤，带附件元数据） */
+  evidenceLinks: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence`,
+  /** 把本底稿已有附件链接到表页 / 单元格 */
+  evidenceLinkCreate: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/link`,
+  /** 删除一条证据链接（不删附件） */
+  evidenceLink: (pid: string, wpId: string, linkId: string) =>
+    `/api/projects/${pid}/workpapers/${wpId}/evidence/${linkId}`,
 } as const
 
 /** Office 在线预览健康探测（决定是否展示 iframe） */

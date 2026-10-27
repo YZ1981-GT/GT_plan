@@ -16,8 +16,8 @@
  * D1SheetAttachments — D1 披露表子节级证据归档
  *
  * 直接复用平台既有 `ItemAttachment`（比照 F1/F3/F4/F5SheetAttachments），
- * **不新建上传后端**：走 `/api/projects/{id}/attachments/upload` +
- * `/api/working-papers/{wp_id}/attachments` 既有通道。
+ * **不新建上传后端**：走底稿证据入口（`uploadWorkpaperEvidence`，行级证据链接）+
+ * 本底稿共享链接仓（spec attachment-evidence-intake）。
  *
  * 用在需要证据支撑的披露项：核销（履行的核销程序）、质押、背书贴现。
  *

@@ -23,7 +23,7 @@ ATTACHMENT_TYPES: frozenset[str] = frozenset({
     "general",          # 上传表单默认值（附件管理页）
     "evidence",         # 底稿内上传（拖放区、C 类控制测试、底稿附件抽屉）
     "support",          # E1 授信 / 账户清单 / 承诺函识别自动建附件
-    "workpaper_item",   # 行级附件（ItemAttachment、F2/F3/F4 行内上传）
+    "workpaper_item",   # 行级附件的历史取值（spec attachment-evidence-intake 起行级上传写证据类型 + 证据链接，无新写入方）
     "confirmation",     # 函证发函件 / 回函件
     "bank_statement",   # E1 银行对账单识别自动建附件
     # 证据声明类型（尚无写入方，Spec B 起由上传时的证据类型选择写入）
@@ -45,6 +45,10 @@ ALLOWED_EXTENSIONS: frozenset[str] = frozenset({
     ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz",
     ".eml", ".msg",
     ".dxf", ".dwg", ".ofd",
+    # 访谈录音、监盘录像（底稿弹窗 accept="audio/*" / "video/*"；Spec A 白名单漏了它们 ⇒ 上传恒 422，
+    # spec attachment-evidence-intake 需求 6.1）
+    ".mp3", ".m4a", ".wav", ".aac", ".amr",
+    ".mp4", ".mov", ".avi", ".wmv", ".mkv", ".flv",
 })
 
 

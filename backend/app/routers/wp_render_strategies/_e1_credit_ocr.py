@@ -13,9 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import UUID, uuid4
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,16 +21,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.attachment_ocr_writeback import (
-    finalize_linked_ocr_writeback,
-    load_reusable_ocr,
-    parse_optional_uuid,
-    provision_wp_linked_attachment,
-)
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.attachment_service import AttachmentService
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,53 +91,35 @@ async def e1_credit_ocr(
     file: UploadFile = File(...),
     attachment_id: str | None = Form(None),
     force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> E1CreditOcrResponse:
     """上传企业信用报告打印件，OCR + AI 提取 E1-18 表单字段。"""
-    try:
-        wp_uuid = UUID(wp_id)
-    except ValueError:
-        raise HTTPException(400, "无效的 wp_id")
-
-    linked_att_id = parse_optional_uuid(attachment_id)
-
+    wp_uuid = parse_workpaper_id(wp_id)
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
     filename = file.filename or "credit-report.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed}")
 
-    if linked_att_id is not None and not force_reocr:
-        reused = await load_reusable_ocr(db, linked_att_id)
-        if reused is not None:
-            return E1CreditOcrResponse(
-                attachment_id=str(linked_att_id),
-                ocr_text=reused["ocr_text"],
-                extracted_fields=reused["extracted_fields"] or {},
-                confidence=float(reused.get("confidence") or 0),
-                reused=True,
-                written_back=False,
-            )
-
-    content = await file.read()
-    out_attachment_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    if linked_att_id is None:
-        out_attachment_id, linked_att_id = await provision_wp_linked_attachment(
-            db,
-            wp_id=wp_uuid,
-            file_name=filename,
-            content=content,
-            attachment_type="support",
-            created_by=getattr(_user, "id", None),
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=_user, native_type="support", native_prefix="E1", options=options,
+    )
+    if src.reused is not None:
+        return E1CreditOcrResponse(
+            attachment_id=str(src.attachment_id),
+            ocr_text=src.reused["ocr_text"],
+            extracted_fields=src.reused["extracted_fields"] or {},
+            confidence=float(src.reused.get("confidence") or 0),
+            reused=True,
+            written_back=False,
         )
 
-    storage_dir = side_storage_dir(wp_id, "credit-reports")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{out_attachment_id}{suffix}"
-
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    linked_att_id = src.attachment_id
+    out_attachment_id = str(linked_att_id)
+    file_path = src.path
 
     ocr_text = ""
     try:

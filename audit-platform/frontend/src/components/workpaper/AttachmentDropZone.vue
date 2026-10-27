@@ -44,9 +44,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
-import { uploadAttachment } from '@/services/commonApi'
-import { api as httpApi } from '@/services/apiProxy'
-import { attachments as P_att } from '@/services/apiPaths'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 
 export interface AttachmentLinkResult {
   attachment_id: string
@@ -146,26 +144,29 @@ async function processFile(file: File) {
     return
   }
 
-  // 3. 上传
+  // 3. 经底稿证据入口上传并关联：选中了单元格 ⇒ 挂到该单元格（行级证据链接），否则整稿关联
+  //    （spec attachment-evidence-intake 需求 5.4；原先先建项目附件再调 associate，编制人调 associate 恒 404）
   uploading.value = true
   uploadProgress.value = 0
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('attachment_type', 'evidence')
-    formData.append('reference_type', 'workpaper')
-
-    const uploadResult = await uploadAttachment(props.projectId, formData, (percent) => {
-      uploadProgress.value = percent
+    const cellRef = props.currentCellRef || null
+    const { attachment } = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      cellRef,
+      onProgress: (percent) => { uploadProgress.value = percent },
     })
-    const attachmentId = uploadResult?.id || uploadResult?.attachment_id
+    const uploadResult = attachment as Record<string, any>
+    const attachmentId = String(attachment.id)
 
-    if (!attachmentId) {
-      throw new Error('上传返回无效的附件 ID')
-    }
-
-    // 4. 创建关联（workpaper_attachment_link）
-    await createAttachmentLink(attachmentId)
+    // 4. 通知父组件（WorkpaperEditor 渲染 📎 装饰）
+    emit('link-created', {
+      attachment_id: attachmentId,
+      wp_id: props.wpId,
+      cell_ref: cellRef,
+      association_type: 'evidence',
+    })
 
     ElMessage.success({
       message: `附件 "${file.name}" 已上传并关联到底稿${props.currentCellRef ? ` (${props.currentCellRef})` : ''}`,
@@ -190,30 +191,6 @@ async function processFile(file: File) {
     uploading.value = false
     uploadProgress.value = 0
   }
-}
-
-/** 创建附件与底稿的关联 */
-async function createAttachmentLink(attachmentId: string) {
-  const cellRef = props.currentCellRef || null
-  const notes = cellRef ? `cell_ref:${cellRef}` : null
-
-  const result = await httpApi.post(
-    P_att.associate(attachmentId),
-    {
-      wp_id: props.wpId,
-      association_type: 'evidence',
-      notes,
-    },
-  )
-
-  emit('link-created', {
-    attachment_id: attachmentId,
-    wp_id: props.wpId,
-    cell_ref: cellRef,
-    association_type: 'evidence',
-  })
-
-  return result
 }
 
 /** 校验文件类型（MIME + 扩展名双重校验） */

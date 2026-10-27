@@ -1,8 +1,12 @@
-"""底稿 OCR 端点旁路落盘目录（spec attachment-security-baseline 需求 1.6，ADR-ASB-07）。
+"""底稿 OCR 端点的底稿 ID 校验与旁路目录（spec attachment-security-baseline 需求 1.6，ADR-ASB-07）。
 
 回归背景：26 个底稿 OCR 端点把上传文件写到 ``storage/workpapers/{wp_id}/{子目录}/``，目录段用路径参数原文。
 14 个端点在 ``wp_id`` 不是 UUID 时兜底成全零 UUID 继续写盘、识别、调大模型，另有端点完全不校验；
 路由级 ``dedicated_wp_gate`` 对非 UUID 路径段按设计不判定 ⇒ 任何登录用户都能借这些端点落盘、耗识别算力。
+
+spec attachment-evidence-intake 起这些端点先经证据入口建附件再识别，旁路目录与 ``workpaper_side_storage`` 已删除：
+本文件保留「非 UUID ⇒ 400 且无副作用」「生产代码不拼旁路目录、不兜底全零 UUID」两条；
+建附件、写回与 26 个路由逐个覆盖见 ``tests/attachment_evidence_intake/test_ocr_intake.py``。
 """
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ import io
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -21,14 +25,12 @@ from httpx import ASGITransport, AsyncClient
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
-from app.routers._wp_gate import dedicated_wp_gate, include_router_with_wp_gate
+from app.routers._wp_gate import include_router_with_wp_gate
 from app.routers.wp_render_strategies._d2_derecognition import router as d2_router
 from app.routers.wp_render_strategies._d4_contract_ocr import router as d4_router
-from app.services import workpaper_side_storage
-from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
+from app.services.workpaper_evidence_intake import parse_workpaper_id
 
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
-HELPER = APP_DIR / "services" / "workpaper_side_storage.py"
 #: 底稿 OCR 端点所在位置（全零 UUID 兜底只在这里出现过）
 OCR_SOURCES = sorted((APP_DIR / "routers" / "wp_render_strategies").glob("*.py")) + [
     APP_DIR / "routers" / "n2_taxes_payable.py",
@@ -36,7 +38,7 @@ OCR_SOURCES = sorted((APP_DIR / "routers" / "wp_render_strategies").glob("*.py")
 PDF = b"%PDF-1.4\n%side-storage\n"
 
 
-# ── 统一函数 ──
+# ── 底稿 ID 解析 ──
 
 def test_parse_accepts_uuid_forms():
     wp = uuid4()
@@ -53,25 +55,7 @@ def test_parse_rejects_non_uuid(raw):
     assert exc.value.detail == "无效的底稿 ID"
 
 
-def test_side_storage_dir_uses_canonical_uuid():
-    wp = uuid4()
-    got = side_storage_dir(str(wp).upper(), "contracts")
-    assert got == workpaper_side_storage.SIDE_STORAGE_ROOT / str(wp) / "contracts"
-
-
-@pytest.mark.parametrize("subdir", ["..", "A", "", "a/b", "contracts/../x", "-x"])
-def test_side_storage_dir_rejects_bad_subdir(subdir):
-    with pytest.raises(ValueError):
-        side_storage_dir(uuid4(), subdir)
-
-
-def test_side_storage_dir_rejects_non_uuid_before_subdir():
-    with pytest.raises(HTTPException) as exc:
-        side_storage_dir("..", "derecognition")
-    assert exc.value.status_code == 400
-
-
-# ── AST 守卫：生产代码不再自己拼旁路目录、不再兜底全零 UUID ──
+# ── AST 守卫：生产代码不拼旁路目录、不兜底全零 UUID ──
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:
     ids: set[int] = set()
@@ -103,7 +87,7 @@ def _is_path_call(node: ast.AST, literal: str) -> bool:
 
 
 def side_path_violations(source: str) -> list[int]:
-    """返回自己拼 ``storage/workpapers`` 旁路目录的行号（docstring 里的说明不算）。"""
+    """返回拼 ``storage/workpapers`` 旁路目录的行号（docstring 里的说明不算）。"""
     tree = ast.parse(source)
     docstrings = _docstring_nodes(tree)
     lines: list[int] = []
@@ -146,7 +130,7 @@ def zero_uuid_calls(source: str) -> list[int]:
         ('p = os.path.join("storage/workpapers", wp_id)', 1),
         ('p = Path("storage") / "workpapers" / wp_id / "x"', 1),
         ('p = Path("storage") / "projects" / str(pid) / "workpapers"', 0),
-        ('def f():\n    """写到 storage/workpapers/{wp_id}/ 下"""\n    return side_storage_dir(wp_id, "x")', 0),
+        ('def f():\n    """写到 storage/workpapers/{wp_id}/ 下"""\n    return wp_id', 0),
     ],
 )
 def test_side_path_detector_is_not_vacuous(snippet, expected):
@@ -167,15 +151,14 @@ def _app_sources() -> dict[Path, str]:
     return {py: py.read_text(encoding="utf-8-sig") for py in sorted(APP_DIR.rglob("*.py"))}
 
 
-def test_no_hand_built_side_storage_path_in_app():
+def test_no_side_storage_path_in_app():
+    """旁路目录已整体退役（文件一律经证据入口进附件存储）：生产代码里一处都不能再拼。"""
     offenders = {}
     for py, src in _app_sources().items():
-        if py == HELPER:
-            continue
         hits = side_path_violations(src)
         if hits:
             offenders[py.relative_to(APP_DIR).as_posix()] = hits
-    assert offenders == {}, f"旁路目录只能经 workpaper_side_storage.side_storage_dir 取：{offenders}"
+    assert offenders == {}, f"底稿文件只能经证据入口落到附件存储：{offenders}"
 
 
 def test_no_zero_uuid_fallback_in_ocr_endpoints():
@@ -187,17 +170,7 @@ def test_no_zero_uuid_fallback_in_ocr_endpoints():
     assert {k: v for k, v in offenders.items() if v} == {}
 
 
-def test_side_storage_helper_is_used_by_ocr_endpoints():
-    """防空转：改造后的 26 处落盘都经统一函数（Spec B 改成先建附件后可下调）。"""
-    calls = 0
-    for src in _app_sources().values():
-        for node in ast.walk(ast.parse(src)):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "side_storage_dir":
-                calls += 1
-    assert calls >= 26
-
-
-# ── 端点：非 UUID ⇒ 400，不建目录、不调识别 ──
+# ── 端点：非 UUID ⇒ 400，不落盘、不调识别 ──
 
 def _app() -> FastAPI:
     app = FastAPI()
@@ -212,14 +185,6 @@ def _app() -> FastAPI:
     return app
 
 
-@pytest.fixture
-def sandbox(tmp_path, monkeypatch) -> Path:
-    """工作目录与旁路根都指到临时目录：老写法（相对路径拼接）与新写法写盘都会落在这里。"""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(workpaper_side_storage, "SIDE_STORAGE_ROOT", tmp_path / "storage" / "workpapers")
-    return tmp_path
-
-
 def _entries(base: Path) -> list[str]:
     return sorted(p.relative_to(base).as_posix() for p in base.rglob("*"))
 
@@ -231,7 +196,8 @@ def _entries(base: Path) -> list[str]:
         ("/api/workpapers/{wp}/d2/derecognition-ocr", "app.routers.wp_render_strategies._d2_derecognition.UnifiedOCRService"),
     ],
 )
-async def test_non_uuid_wp_id_rejected_before_side_effects(sandbox, path, ocr_target):
+async def test_non_uuid_wp_id_rejected_before_side_effects(tmp_path, monkeypatch, path, ocr_target):
+    monkeypatch.chdir(tmp_path)  # 任何相对路径落盘都会留在这里
     with patch(ocr_target) as ocr_cls:
         ocr_cls.return_value.recognize = AsyncMock(return_value={"text": ""})
         async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as client:
@@ -241,29 +207,22 @@ async def test_non_uuid_wp_id_rejected_before_side_effects(sandbox, path, ocr_ta
             )
     assert resp.status_code == 400
     assert resp.json()["detail"] == "无效的底稿 ID"
-    assert _entries(sandbox) == []
+    assert _entries(tmp_path) == []
     ocr_cls.return_value.recognize.assert_not_called()
 
 
-async def test_valid_uuid_reaches_side_storage_and_ocr(sandbox):
-    """正向对照：合法 UUID 时同一套夹具确实会落盘并调识别（上一条的「没落盘」不是夹具空转）。"""
-    wp = uuid4()
-    app = _app()
+async def test_valid_uuid_reaches_ocr(tmp_path, monkeypatch):
+    """正向对照：合法底稿时同一请求确实走到识别（上一条的「没调识别」不是夹具空转）。"""
+    from tests.attachment_evidence_intake._helpers import ocr_world
 
-    async def _skip_gate():
-        return None
-
-    app.dependency_overrides[dedicated_wp_gate] = _skip_gate
     target = "app.routers.wp_render_strategies._d4_contract_ocr.UnifiedOCRService"
-    with patch(target) as ocr_cls:
-        ocr_cls.return_value.recognize = AsyncMock(return_value={"text": ""})
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
-            resp = await client.post(
-                f"/api/workpapers/{str(wp).upper()}/d4/contract-ocr",
+    async with ocr_world(monkeypatch, tmp_path, d4_router) as w:
+        with patch(target) as ocr_cls:
+            ocr_cls.return_value.recognize = AsyncMock(return_value={"text": ""})
+            resp = await w.client.post(
+                f"/api/workpapers/{str(w.wp.id).upper()}/d4/contract-ocr",
                 files={"file": ("c.pdf", io.BytesIO(PDF), "application/pdf")},
             )
     assert resp.status_code == 200, resp.text
     ocr_cls.return_value.recognize.assert_awaited_once()
-    saved = list((sandbox / "storage" / "workpapers" / str(wp) / "contracts").iterdir())
-    assert len(saved) == 1 and saved[0].read_bytes() == PDF
-    assert UUID(saved[0].stem)
+    assert not (tmp_path / "storage" / "workpapers").exists()
