@@ -117,7 +117,9 @@
 - 迁移经 `MigrationRunner(...).run_pending()` 落到 `audit_platform`：先按 V209 应用（待应用清单只有它），改号后删掉 version 209 记录、再以 V211 登记（ADR-08），四列已在库。
 - 私有实例：后端 9987（验证 worktree 代码，`--lifespan off`）、前端 3037（独立 cacheDir、关 HMR）；没有重启共享 9980 / 3030。
 - 接口走查（新建【测试】项目）：穿越类型上传 422 `ATTACHMENT_TYPE_NOT_ALLOWED`；`ocr-status` 无 base 409、带 base 200；列表预览 200 字、`ocr_text_length` 3607、`truncated` 为真；`ocr-text` 返回全文且 sha256 正确；`created_by` 为上传人；匿名请求预览 401、带令牌 200 `application/pdf`。
-- 浏览器走查：修复前原件区显示 401 JSON、「确认入库」被文本框盖住点不到（截图 01）；修复后原件区显示 PDF（blob: 地址）、右栏全文 3607 字、按钮可点（截图 03）；确认后提示「识别结果已确认入库」，列表刷新后徽标消失，整页刷新后仍为「已完成」。库内 `ocr_text` 仍是 3607 字，`ocr_confirmed_sha256` 等于全文 sha256，`ocr_confirmed_by` 为 admin，`ocr_confirmed_edited` 为假。
+- 浏览器走查：修复前原件区显示 401 JSON、「确认入库」被文本框盖住点不到（`evidence/01_before_fix_preview_401.png`）；修复后原件区显示 PDF（blob: 地址）、右栏全文 3607 字、按钮可点（`evidence/02_after_fix_preview_and_full_text.png`）；确认后提示「识别结果已确认入库」，列表刷新后徽标消失，整页刷新后仍为「已完成」。库内 `ocr_text` 仍是 3607 字，`ocr_confirmed_sha256` 等于全文 sha256，`ocr_confirmed_by` 为 admin，`ocr_confirmed_edited` 为假。
 - 清理走平台接口：删除附件 → 回收站永久删除 → 删除项目；对账：附件行 0、版本行 0、底稿关联 0、项目 `is_deleted` 为真（可经项目回收站恢复）。永久删除后两份物理文件仍在存储目录（Spec G 范围，已手工删除走查产物）。
 
 **未在浏览器里验证的**：批量上传结果弹窗（本机无识别引擎，上传回执不带识别文本，弹窗不进入核对分支）；任务 12 的下载类改动（`ItemAttachment`、C24 / C25 / C26 / 控制测试 📎、函证附件抽屉、模板详情、合并透视导出、批量导出 ZIP、交付件下载、上年底稿文件）只有组件测试与守卫；版本回滚只有接口级测试。
+
+**提交与推送**：本地分支与远端分支当时已分叉（本地领先 45、落后 29），本 spec 没有替别的会话合并两条线，而是两边各提交一份：本地分支 `16e2ee5ea`（主体）、`ddad8f8e7`（迁移改号）、`cf18e39c0`（令牌证明挪位、守卫前缀登记）；远端分支在远端头上合成一个提交 `978ba4521`，各自再加一个证据提交（本节与 `evidence/` 两张截图）。两条线上本 spec 的文件内容一致，日后合并时只有 INDEX、行数白名单、鉴权基线常量（本地 243、远端 239，差在远端另有 4 个端点改挂项目级）会碰到别人的改动。远端头上另有一条与本 spec 无关的预存红：`test_identity_only_endpoints_do_not_grow`（166 → 169，切到纯远端头同样红）。
