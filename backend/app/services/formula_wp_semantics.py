@@ -30,6 +30,8 @@ from dataclasses import dataclass
 PREFILL_WP_IMPL = "app/services/formula_preloader.py::_load_wp"
 ENGINE_WP_IMPL = "app/services/formula_engine.py::_handle_wp"
 EXECUTOR_WP_IMPL = "app/services/formula_engine.py::WPExecutor.execute"
+#: 共享单元格读取函数（formula-hub ADR-FHIC-06 第 1 点 / §8.2；acnr-foundation-defect-closure T11 先落地）
+WP_CELL_READER_IMPL = "app/services/wp_cell_reader.py::resolve_wp_cell"
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,19 @@ WP_IMPLS: tuple[WpImplSpec, ...] = (
         ),
         on_missing="Decimal('0')（底稿不存在 / 键缺失 / 异常一律 0）",
         measured="2026-10-24 现读：报表引擎与 FormulaEngine.execute 预载两参 WP 用它；未改动",
+    ),
+    WpImplSpec(
+        impl=WP_CELL_READER_IMPL,
+        positional_args=("wp_code", "sheet_key", "cell"),
+        data_source=(
+            "working_paper.parsed_data（经 extract_custom_cells）；底稿经 wp_index.wp_code JOIN 未删 working_paper，"
+            "工作表按 normalize_sheet_key 归一后与可接受键比较（sheet_key 为 None 时不判表）"
+        ),
+        on_missing="state=missing / blocked + 中文 reason，value=None（不代 0）",
+        measured=(
+            "2026-10-28 acnr-foundation-defect-closure T11 新建（formula-hub 任务 23 未入库）；当时尚无生产调用方，"
+            "WPExecutor 两参分支改调它归 formula-hub 任务 23"
+        ),
     ),
 )
 
