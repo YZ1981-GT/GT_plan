@@ -10,6 +10,7 @@ from .from_ie_manifest import load_ie_manifest
 from .from_address_seeds import load_cell_entries_from_seeds
 from .from_frontend_labels import load_sheet_name_aliases
 from .from_render_registry import load_render_registry_edges
+from .from_sheet_verdicts import load_sheet_verdicts
 
 __all__ = [
     "load_sheet_skeletons_from_classification",
@@ -17,4 +18,5 @@ __all__ = [
     "load_cell_entries_from_seeds",
     "load_sheet_name_aliases",
     "load_render_registry_edges",
+    "load_sheet_verdicts",
 ]
