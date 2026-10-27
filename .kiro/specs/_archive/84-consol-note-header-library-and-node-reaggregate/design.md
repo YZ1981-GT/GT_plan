@@ -240,7 +240,7 @@ rollforward_columns(table)   RollForward(opening, closing, increase, decrease, u
 
 ### 15.2 V202：只分析，待拍板（R6.2）
 
-`V202__consol_note_mapping_reuse_and_reference.sql` 建 4 张表（映射规则模板、结构锁定 + 锁定企业、合并附注数值确认）和 1 列（`consol_note_mapping_rule.promoted_to_template_id`），真库全 0 行；路由 `consol_note_mapping_templates.py` 有规则晋升模板 / 模板列表与删除 / 科目引用 / 数值待确认汇总 / 确认 / 确认状态 / 就绪检查 / 结构锁定加解锁；前端只有 `useConsolNoteReuse.ts`（0 调用方）与 apiPaths；数值变化时 `consol_note_value_change_service` 会把确认降级（后端已接线）。它不是第二条汇总路径，是设计好但没做界面的功能，删还是补界面要产品判断。
+`V202__consol_note_mapping_reuse_and_reference.sql` 建 4 张表（映射规则模板、结构锁定 + 锁定企业、合并附注数值确认）和 1 列（`consol_note_mapping_rule.promoted_to_template_id`），真库全 0 行；路由 `consol_note_mapping_templates.py` 有规则晋升模板 / 模板列表与删除 / 科目引用 / 数值待确认汇总 / 确认 / 确认状态 / 就绪检查 / 结构锁定加解锁；前端只有 `useConsolNoteReuse.ts`（0 调用方）与 apiPaths；数值变化时 `consol_note_value_change_service` 会把确认降级（后端已接线）。它不是第二条汇总路径，是设计好但没做界面的功能，删还是补界面要产品判断。（2026-10-27 追记：已退役，见 §17.3 末条。）
 
 ### 15.3 合并种子多级表头错位（R6.3）
 
@@ -523,6 +523,7 @@ V202（`V202__consol_note_mapping_reuse_and_reference.sql`，spec consol-note-ma
 - 记录失真：`_archive/65-consol-note-pull-from-standalone/tasks.md` 第 87 行与 memory 一行说「V202 值确认端点已在 R6.1 退役（全仓 0 命中）」—— 端点、服务、表都还在（R6.1 删的是 V2 汇总器与 `useNoteAggregation`）。是并发会话的记录，未改，在此登记。
 - 建议：另立 spec 退役，不做界面。做界面要补服务端值指纹（现在「值变化」是每次保存都通知）、闸门接线、锁的写入拦截和上面 3 处鉴权，且与现有待更新横幅（`is_stale` + `consol.note_stale` SSE）、出具前就绪检查、V204 功能重叠。退役 = 一次协调改动：删路由 / 3 个服务 / composable / 3 个模型，`on_note_section_saved` 只留标待更新，迁移工具去掉 3 张表，ORM 去掉列；前向迁移 DROP 列与 4 张表（先备份；不改 V202 本身，运行时迁移按版本号记 checksum，改旧文件会让已执行过的库报漂移）。
 - 顺带发现（并发会话 spec 66 未提交的 `consol_note_template_push_service.py`，只登记）：`_push_to_one` 从不存在的 `app.models.disclosure_note_models` 导入 `DisclosureNote`（实际在 `report_models`）⇒ 每家子企业下推都失败；激活结构锁从 `consol_note_mapping_models` 导入结构锁模型（实际在 `consol_note_mapping_template_models`），`ImportError` 被吞后只记日志 ⇒ 锁永远不激活。
+- 后续（2026-10-27 追记）：已由 spec note-pull-followup-closure R16 按上面的建议退役 —— V208 删 4 张表与 `promoted_to_template_id` 列（R208 回滚、删前备份在 `backend/backups/`），路由 / 3 个服务 / 模型 / `useConsolNoteReuse` / apiPaths 删除，下推不再写结构锁（固定行改由子企业保存时按下推标记校验），`on_note_section_saved` 只标 `is_stale`；`find_previous_year_rules` 保留（只读 `consol_note_mapping_rule`，仍零调用方）。
 
 ### 17.4 单体附注模板按底稿披露表校对（R8.4，批 9b）
 
