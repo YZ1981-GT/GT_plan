@@ -283,7 +283,7 @@ class SourceSpec:
 |---|---|
 | `POST /batch-execute` + `BatchQueryToolbar.vue` + `useBatchQuery.ts` + `customQuery.batchExecute`（tasks 6，先于取数器下沉） | 删 `test_batch_query.py`、`useBatchQuery.test.ts`；`test_custom_query_auth_bug_condition.py`、`test_advanced_query_audit_helper.py` 的 batch 用例删除；年度兜底基线删 `composables/useBatchQuery.ts` 一行（只改这一行）并跑 `auditYearCalendarFallbackRatchet.spec.ts`；`test_function_global_names_ratchet.py` 同步跑 |
 | `GET /cross-sheet-trace` + `cross_sheet_trace_orchestrator.py` + `FormulaTracePopover.vue`（**暂缓**：与 acnr D6 冲突待拍板，ADR-AQL-04；拍板删除前本行不执行） | 删 `test_cross_sheet_trace_orchestrator.py`、`test_cross_sheet_trace_wiring.py`、`useFormulaTrace.test.ts`；`audit_helper.record_cross_sheet_trace` 若 0 调用方一并删并改 `test_audit_helper_pbt.py` / `test_audit_throttle.py` 对应用例 |
-| 跨模块单元格源族 + 选区器模块模式 | `module_cell_resolver.py` 只留 `parse_source_uri` / `format_source_uri` / `_NOTE_COLUMNS`（`_REPORT_COLUMNS` / `_ADJ_COLUMNS` 随 tasks 13 写入实现删除）；删前后跑 `test_lazy_import_resolvability.py`（覆盖 `write_note_cell` 的惰性导入名）；`test_module_cell_resolver.py` 只留解析用例并下调白名单基线；删 `test_formula_tb_sign_passthrough.py::test_module_cell_resolver_tb_columns_pure` |
+| 跨模块单元格源族 + 选区器模块模式 | `module_cell_resolver.py` 只留 `parse_source_uri` / `format_source_uri` / `_NOTE_COLUMNS`（`_REPORT_COLUMNS` / `_ADJ_COLUMNS` 随本行删除：2026-10-27 B4 现查，tasks 13 删写入实现后它们仍被本源族的取数函数 `_query_report_cells` / `_query_adj_cells` 与 `test_module_cell_resolver.py` 使用，按删旧代码铁律不随 tasks 13 删）；删前后跑 `test_lazy_import_resolvability.py`（覆盖 `write_note_cell` 的惰性导入名）；`test_module_cell_resolver.py` 只留解析用例并下调白名单基线；删 `test_formula_tb_sign_passthrough.py::test_module_cell_resolver_tb_columns_pure` |
 | tb / adj / report 写入 | `test_snapshot_writer.py` 对应用例删除并按实际行数下调白名单基线 1,418；`test_custom_query_auth_*` 的 tb 用例改为断言 422；`test_project_endpoint_authz_body_carried.py` 证明链不变（`_assert_writeback_authorized` 保留） |
 | `SaveAsTemplateButton.vue`、`SnapshotStalenessChip.vue`、`customQuery.cellWriteback` | 删 `useSnapshotStaleness.test.ts`；`components.d.ts` 随构建工具重新生成 |
 
@@ -668,7 +668,7 @@ END $$;
 | 18 | 导出去掉文本强制 | 读回 `data_type` 用例 |
 | 19 | 试算表源去掉循环过滤 | 循环范围 PG 用例 |
 | 20 | 报表源去掉本项目独有行 | 报表源集合等价用例 |
-| 21 | 预览去掉 `target_not_in_project` 判定 | 预览门 PG 用例与配方表第 19、20 行 |
+| 21 | 预览去掉 `target_not_in_project` 判定 | 预览门 PG 用例（预览、确认两例；地址解析在类上换成恒能解析，确认实得 200 而非 409）与配方表第 19 行。配方表第 20 行不随本变异变红（B4 实测）：权限世界里该目标的地址本就解析不到，同样 `found=false`、不可确认，确认链由前述 PG 确认用例守住 |
 | 19b | `cycle_scope` 改为自读 `project_users.scope_cycles`（绕开平台入口） | 循环范围 PG 用例（团队分配勾选 D、成员行为空的成员只见 D） |
 | 22 | `starts_with` 不转义，或改成「包含」 | `50%_` 字面匹配用例 / 开头是 1002 计数用例 |
 | 23 | 星期映射错位（0 当周一）或改为拼接 SQL 文本 | 周末计数 PG 用例 / 绑定参数断言 |
