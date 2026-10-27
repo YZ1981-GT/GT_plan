@@ -1,10 +1,9 @@
 """ACNR Resolver — 统一 resolve 决策树 + resolve_instance + ProjectBinding
 
-full_resolve() 是底稿域（wp）的 canonical resolver，执行完整决策树；非底稿域
-（tb/report/note/aux）委托 V1。定位是「canonical resolver + legacy 委托」，并非全平台
-唯一入口——仍有绕过点（acnr-foundation-defect-closure design §14.1、§15.2 第 2 条）。
-resolve_instance(project_id, parent_wp_code, sheet_code) 是平台唯一的 wp_id
-解析出口 (R13.1)。通过运行时查询 WpIndex → WorkingPaper 链实现 ProjectBinding。
+full_resolve() 是底稿域（wp）的 canonical resolver，执行完整决策树，非底稿域（tb/report/note/aux）委托 V1；
+定位是「canonical resolver + legacy 委托」，并非全平台唯一入口，仍有绕过点（design §14.1、§15.2 第 2 条）。
+resolve_instance(project_id, parent_wp_code, sheet_code) 是平台唯一的 wp_id 解析出口 (R13.1)，
+运行时查询 WpIndex → WorkingPaper 链实现 ProjectBinding（M1 阶段不物化缓存，M2+ 可选 DB 物化）。
 
 决策树（design.md §6.1.1）：
   1. grammar 规范化（URI profile + 索引 ns 映射）
@@ -16,8 +15,6 @@ resolve_instance(project_id, parent_wp_code, sheet_code) 是平台唯一的 wp_i
   6. L3 RuntimeCellEntry（project-scoped）
   7. 非 wp 域（tb/report/note/aux）→ 委托 V1 动态 build（R5.7）
   8. miss → metrics + 相近项推荐（candidates ≤ 5）（R5.6）
-
-M1 阶段 ProjectBinding 为运行时查询（非物化缓存），M2+ 可选 DB 物化。
 
 Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 13.1
 """
@@ -333,7 +330,7 @@ async def full_resolve(
     _instance_memo: dict | None = None,
     verify_existence: bool = True,
 ) -> ResolveResult:
-    """统一 resolve 决策树入口 — 四库唯一解析方法（R5.1）。
+    """底稿域 canonical resolver 的统一决策树入口（R5.1；非底稿域委托 V1，平台另有绕过点，见 design §15.2 第 2 条）。
 
     输入接受四种语法（五域 URI / WP() 公式 / 索引 ns:target / 裸 addr_id），
     按设计文档 §6.1.1 的八步决策树依次执行，输出统一 canonical 响应。

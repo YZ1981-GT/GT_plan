@@ -8,10 +8,16 @@ r"""T32 守卫：架构提案「现状（2026-10-26）」节逐项复算（desig
 2. 「已落地：组件」表：后端行用 AST 确认模块里定义了所列符号、测试文件里有 test_ 函数；
    前端行确认文件存在（TS 符号由 vitest 守卫 acnrArchitectureStatusDoc.spec.ts 用编译器 API 核对）。
 3. 「计划中（未落地）」表：每行至少一个任务号，且这些任务在 tasks.md 里仍是 `[ ]`。
-4. 节内（表格之外）提到登记的「计划中符号」（如 lock_project_registry、v2_canonical、`--check`）时，
-   若该符号在代码里还不存在，同一行必须带一个仍未勾选的任务号——把未落地写成现状即红。
+4. 节内任何一行（含表格单元格与组件描述）提到登记的「计划中符号」（如 lock_project_registry、v2_canonical、
+   `--check`）时，若该符号在代码里还不存在，同一行必须带一个仍未勾选的任务号——把未落地写成现状即红。
 5. 版本格式与 catalog_contract.REGISTRY_VERSION_PATTERN 逐字一致；旧 YYYY.N.N 只能以勘误出现。
-6. resolver 模块文档定位为「canonical resolver + legacy 委托」，不得再称「唯一解析入口」（design §15.2 第 2 条）。
+6. resolver 的模块与函数文档定位为「canonical resolver + legacy 委托」，不得再称「唯一解析入口 / 方法」
+   （design §15.2 第 2 条）。
+7. 「已落地」两子节里，事实表「值」列以外出现的阿拉伯数字必须绑定复算键：同一句里写出 `复算键`，且数字等于
+   该键的现算值；没有绑定的数字即红（数字一律进事实表或带键）。
+8. 完成态措辞（「已…接入 / 清零 / 停用 / 持久化 / 生效 / 删除 / 更正 / 转发…」「现已」「清零」「退出 1/2」
+   「写出前运行 / 跑」）必须被 _COMPLETION_CLAIMS 里登记的复算判据证实；「已落地」两子节不接受任务号豁免，
+   其余子节同一句带仍未勾选的任务号时视为计划表述。「计划中（未落地）」子节不在此列；「…」引文（勘误引用的旧说法）不计。
 
 节范围 = 「## 现状（2026-10-26）」标题行到下一个顶层「## 」标题行（按标题定位，不写死行号）。
 变异证明见 tmp_acnr_foundation/out/段四_修复记录.md（每条判据各一条磁盘变异，在 verify_wt 做）。
@@ -379,12 +385,11 @@ def test_planned_rows_reference_unchecked_tasks():
 # ─── 5. 计划中符号不得写成现状 ───────────────────────────────────────────────
 
 
-def test_planned_symbols_outside_tables_carry_unchecked_task():
+def test_planned_symbols_carry_unchecked_task():
+    """节内每一行（含「已落地」两张表的单元格与组件描述）提到尚未落地的计划中符号，同一行须带未勾选任务号。"""
     states = _task_states()
     problems: list[str] = []
     for ln in _section():
-        if ln.strip().startswith("|"):
-            continue  # 表格行由上面三条判据核对
         for sym, (task, probe) in _PLANNED_SYMBOLS.items():
             if sym not in ln or _symbol_landed(probe):
                 continue
@@ -417,13 +422,31 @@ def test_status_section_marks_old_format_as_deprecated():
 # ─── 7. resolver 定位措辞 ────────────────────────────────────────────────────
 
 
+#: design §15.2 第 2 条要求更正的过时定位措辞（模块与函数文档都不得出现）。
+_RESOLVER_FORBIDDEN = ("唯一解析入口", "唯一解析方法", "四库唯一", "四大消费库的唯一")
+
+
+def _resolver_doc_problems() -> list[str]:
+    tree = ast.parse(_RESOLVER.read_text(encoding="utf-8"))
+    problems: list[str] = []
+    module_doc = ast.get_docstring(tree) or ""
+    if not ("canonical resolver" in module_doc and "legacy 委托" in module_doc):
+        problems.append("resolver 模块文档须写明「canonical resolver + legacy 委托」定位")
+    owners = [("模块", tree)] + [
+        (n.name, n) for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    ]
+    for name, node in owners:
+        doc = ast.get_docstring(node) or ""
+        hits = [p for p in _RESOLVER_FORBIDDEN if p in doc]
+        if hits:
+            problems.append(f"resolver {name} 的文档仍称 {hits}（design §15.2 第 2 条要求更正）")
+    return problems
+
+
 def test_resolver_docstring_positioning():
-    """design §15.2 第 2 条：定位为「canonical resolver + legacy 委托」，不得再称唯一解析入口。"""
-    doc = ast.get_docstring(ast.parse(_RESOLVER.read_text(encoding="utf-8"))) or ""
-    assert "canonical resolver" in doc and "legacy 委托" in doc, (
-        "resolver 模块文档须写明「canonical resolver + legacy 委托」定位"
-    )
-    assert "唯一解析入口" not in doc, "resolver 模块文档仍称「唯一解析入口」（design §15.2 第 2 条要求更正）"
+    """design §15.2 第 2 条：模块与每个函数 / 类的文档都按「canonical resolver + legacy 委托」定位，不称唯一入口。"""
+    problems = _resolver_doc_problems()
+    assert not problems, "\n".join(problems)
 
 
 # ─── 判据自检：守卫认识的计划中符号此刻确实都未落地（防登记失效） ───────────
@@ -438,3 +461,196 @@ def test_planned_symbol_registry_has_no_stale_entry(sym):
         f"「{sym}」已在代码里出现：从 _PLANNED_SYMBOLS 删除本条（失效条目），并更新现状节"
     )
     assert _task_states().get(task) is False, f"「{sym}」未落地但 {task} 已勾选：任务状态与代码不符"
+
+
+# ─── 8. 「已落地」两子节：数字必须绑定复算键（段四复审 F4-02 残留） ─────────────
+
+#: 阿拉伯数字（左右不贴英文字母 / 数字 / 下划线 / 点 / 连字符 / §、/、{}：排除 T07、b5fc200e0、§15.2、2026-10-27、\d{14}）
+_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_.\-§/{])\d+(?:\.\d+)?(?![A-Za-z0-9_\-/}])")
+_BACKTICK_RE = re.compile(r"`([^`]+)`")
+_CLAUSE_RE = re.compile(r"[^。；;]+")
+_QUOTE_RE = re.compile(r"「[^」]*」")
+
+
+def _landed_text_units() -> list[tuple[str, str]]:
+    """「已落地」两子节里须核数字的文本单元 (位置, 文本)：事实表只取「事实」列（值列由判据 2 复算），其余表格取全部单元格，表外取整行。"""
+    section = _section()
+    units: list[tuple[str, str]] = []
+    for heading in (H_FACTS, H_COMPONENTS):
+        lines = _subsection(section, heading)
+        rows = [ln for ln in lines if ln.strip().startswith("|")]
+        for ln in lines:
+            s = ln.strip()
+            if not s or ln in rows[:2]:
+                continue  # 空行、表头与分隔行
+            if s.startswith("|"):
+                cells = _cells(ln)
+                for c in (cells[:1] if heading == H_FACTS else cells):
+                    units.append((f"{heading} 表格「{c[:16]}」", c))
+            else:
+                units.append((f"{heading} 正文", s))
+    return units
+
+
+def _number_problems(units: list[tuple[str, str]]) -> list[str]:
+    facts = _facts()
+    problems: list[str] = []
+    for where, text in units:
+        for clause in _CLAUSE_RE.findall(text):
+            nums = _NUMBER_RE.findall(clause)
+            if not nums:
+                continue
+            keys = [k for k in (_strip_code(x) for x in _BACKTICK_RE.findall(clause)) if k in facts]
+            if not keys:
+                problems.append(f"{where}：数字 {nums} 没有绑定复算键（写进事实表，或同一句写出 `复算键`）：{clause.strip()[:60]}")
+                continue
+            values = {facts[k] for k in keys}
+            bad = [n for n in nums if n not in values]
+            if bad:
+                problems.append(f"{where}：数字 {bad} 与所绑复算键 {keys} 的现算值 {sorted(values)} 不符：{clause.strip()[:60]}")
+    return problems
+
+
+def test_landed_numbers_bound_to_fact_keys():
+    units = _landed_text_units()
+    assert len(units) >= 10, f"「已落地」两子节可核文本过少（防空转）：{len(units)}"
+    problems = _number_problems(units)
+    assert not problems, "已落地子节有未经复算的数字：\n" + "\n".join(problems)
+
+
+@pytest.mark.parametrize("text,expect_red", [
+    ("孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25）", False),
+    ("25 个孤儿 cell 已全部停用、孤儿计数已清零", True),            # 复审 R-G3e：数字没有绑定复算键
+    ("孤儿 cell 已停用（`catalog.orphan_cells` 为 0）", True),      # 绑定了键但数字与现算不符
+    ("生成器（写出前跑门禁；--check 结构化比对，漂移退出 2）", True),  # 复审 R-G3d：退出码数字没有复算键
+])
+def test_number_rule_self_check(text, expect_red):
+    assert bool(_number_problems([("自检", text)])) is expect_red
+
+
+# ─── 9. 完成态措辞必须被复算判据证实（段四复审 F4-02 残留） ─────────────────────
+
+_COMPLETION_RE = re.compile(
+    r"已[^，。；、（）()]{0,8}?(?:接入|清零|停用|持久化|落库|生效|删除|下线|迁回|重新生成|重生成|统一|实现|完成|更正|转发|创建|改为|加)"
+    r"|现已|清零|退出\s*[12]|写出前(?:运行|跑)"
+)
+_LINKAGE_BUS = _BACKEND / "app" / "routers" / "linkage_bus.py"
+_WP_INDEX_RESOLVE = _BACKEND / "app" / "routers" / "wp_index_resolve.py"
+
+
+def _called_names(path: Path, fn: str | None = None) -> set[str]:
+    """path 里（或其中名为 fn 的函数里，含参数默认值）被调用的函数名（AST）。"""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    roots = [tree] if fn is None else [
+        n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == fn
+    ]
+    names: set[str] = set()
+    for root in roots:
+        for n in ast.walk(root):
+            if isinstance(n, ast.Call):
+                names.add(n.func.id if isinstance(n.func, ast.Name) else getattr(n.func, "attr", ""))
+    return names
+
+
+def _claim_stale_authz() -> bool:
+    return ("assert_project_permission" in _called_names(_LINKAGE_BUS, "stale_impact")
+            and "require_project_access" in _called_names(_LINKAGE_BUS, "stale_impact_by_addr"))
+
+
+def _claim_legacy_forwarding() -> bool:
+    tree = ast.parse(_WP_INDEX_RESOLVE.read_text(encoding="utf-8"))
+    imported = any(
+        isinstance(n, ast.ImportFrom) and n.module == "app.services.acnr.resolver"
+        and any(a.name == "full_resolve" for a in n.names) for n in ast.walk(tree)
+    )
+    return imported and "full_resolve" in _called_names(_WP_INDEX_RESOLVE)
+
+
+def _claim_version_format() -> bool:
+    return cc.REGISTRY_VERSION_PATTERN == r"^\d{14}$" and bool(
+        re.match(cc.REGISTRY_VERSION_PATTERN, _facts()["catalog.registry_version"]))
+
+
+#: 完成态说法 → 复算判据（判据为真才证实该说法）。现在为假的判据只起拦截作用；新增完成态说法须先在这里登记。
+_COMPLETION_CLAIMS: list[tuple[str, re.Pattern, object]] = [
+    ("写 stale 端点项目鉴权", re.compile(r"已加项目鉴权"), _claim_stale_authz),
+    ("legacy 导航门面转发 ACNR", re.compile(r"已转发\s*ACNR"), _claim_legacy_forwarding),
+    ("resolver 注释更正", re.compile(r"注释已[^，。；]{0,4}更正"), lambda: not _resolver_doc_problems()),
+    ("实施 spec 已创建", re.compile(r"`acnr-foundation-defect-closure`\s*已创建"), lambda: _TASKS.is_file()),
+    ("版本号改为 14 位 UTC 时间戳", re.compile(r"版本号已改为\s*14\s*位\s*UTC\s*时间戳"), _claim_version_format),
+    ("L1 按 classification 骨架覆盖各循环", re.compile(r"现已按\s*classification\s*骨架覆盖"),
+     lambda: bool(_facts()["catalog.parent_cycles"]) and _facts()["catalog.domains"] == "wp"),
+    ("发布门禁接入生成器", re.compile(r"已[^，。；、（）()]{0,8}?接入生成器|写出前(?:运行|跑)"),
+     lambda: _facts()["generator.runs_release_gates"] == "是"),
+    ("孤儿 cell 清零 / 停用", re.compile(r"孤儿[^。；]*?(?:已[^，。；、（）()]{0,8}?停用|清零)"),
+     lambda: _facts()["catalog.orphan_cells"] == "0"),
+    ("目录条目已停用", re.compile(r"已[^，。；、（）()]{0,8}?停用"), lambda: _facts()["catalog.deprecated_entries"] != "0"),
+    ("生成器 --check 退出码", re.compile(r"退出\s*[12]"), lambda: "--check" in _facts()["generator.cli_flags"].split("、")),
+    ("版本锁持久化", re.compile(r"已[^，。；、（）()]{0,8}?(?:持久化|落库)"),
+     lambda: (_REPO / "backend" / "app" / "services" / "acnr" / "project_registry_lock.py").is_file()),
+    ("加载期 release 互校生效", re.compile(r"已[^，。；、（）()]{0,8}?生效"), lambda: _facts()["report.has_release"] == "是"),
+]
+
+
+def _completion_scope() -> list[tuple[str, str, bool]]:
+    """(子节, 行, 是否「已落地」子节)：现状节除标题行与「计划中（未落地）」子节以外的全部行。"""
+    out: list[tuple[str, str, bool]] = []
+    current = "导言"
+    for ln in _section()[1:]:
+        s = ln.strip()
+        if s.startswith("### "):
+            current = s
+            continue
+        if s and current != H_PLANNED:
+            out.append((current, s, current in (H_FACTS, H_COMPONENTS)))
+    return out
+
+
+def _overlap(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return a[0] < b[1] and b[0] < a[1]
+
+
+def _completion_problems(scope: list[tuple[str, str, bool]]) -> list[str]:
+    states = _task_states()
+    problems: list[str] = []
+    for where, line, landed in scope:
+        for clause in _CLAUSE_RE.findall(_QUOTE_RE.sub("", line)):
+            phrases = list(_COMPLETION_RE.finditer(clause))
+            if not phrases:
+                continue
+            if not landed and any(states.get(f"T{t}") is False for t in _TASK_RE.findall(clause)):
+                continue  # 非「已落地」子节：同一句带仍未勾选的任务号 = 计划表述
+            for m in phrases:
+                hits = [(name, check) for name, rx, check in _COMPLETION_CLAIMS
+                        if any(_overlap(m.span(), x.span()) for x in rx.finditer(clause))]
+                if not hits:
+                    problems.append(f"{where}：完成态说法「{m.group(0)}」未登记复算判据：{clause.strip()[:70]}")
+                problems += [f"{where}：「{m.group(0)}」与现算不符（{name}）：{clause.strip()[:70]}"
+                             for name, check in hits if not check()]
+    return problems
+
+
+def test_completion_claims_certified_by_recompute():
+    scope = _completion_scope()
+    assert len(scope) >= 20, f"现状节可核文本过少（防空转）：{len(scope)}"
+    problems = _completion_problems(scope)
+    assert not problems, "现状节的完成态说法未被复算证实：\n" + "\n".join(problems)
+
+
+def test_true_completion_claims_are_in_use():
+    """现在为真的判据会证实匹配到的说法，须至少证实现状节里的一句（否则是失效登记，删掉）。"""
+    text = "\n".join(_QUOTE_RE.sub("", line) for _w, line, _l in _completion_scope())
+    stale = [name for name, rx, check in _COMPLETION_CLAIMS if check() and not rx.search(text)]
+    assert not stale, f"这些完成态判据现在为真却没有证实任何一句（失效登记）：{stale}"
+
+
+@pytest.mark.parametrize("line,landed,expect_red", [
+    ("| 目录生成器（写出前跑 catalog_release 门禁；`--check` 结构化比对，漂移退出 2） | 后端 |", True, True),  # R-G3d
+    ("| 发布门禁模块（已接入生成器，目录写出前运行） | 后端 |", True, True),                              # R-G3f
+    ("25 个孤儿 cell 已全部停用、孤儿计数已清零。", True, True),                                          # R-G3e
+    ("| 发布门禁模块（尚未接入生成器） | 后端 |", True, False),
+    ("生成器写出前跑门禁、`--check` 退出 2（T07）。", False, False),
+    ("生成器写出前跑门禁（T07）。", True, True),  # 「已落地」子节不接受任务号豁免
+])
+def test_completion_rule_self_check(line, landed, expect_red):
+    assert bool(_completion_problems([("自检", line, landed)])) is expect_red

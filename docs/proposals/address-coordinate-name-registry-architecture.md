@@ -22,7 +22,7 @@
 | 父 sheet 在目录内的 cell | `449` | `catalog.cells_with_parent` |
 | 孤儿 cell（父 sheet 不在目录） | `25` | `catalog.orphan_cells` |
 | 孤儿 cell 所属 sheet 编码 | `I6-7、J2-5、J3-4、J3-5、M6-5` | `catalog.orphan_parent_sheet_codes` |
-| 已停用（deprecated）条目 | `0` | `catalog.deprecated_entries` |
+| 停用（deprecated）条目数 | `0` | `catalog.deprecated_entries` |
 | 条目所属域 | `wp` | `catalog.domains` |
 | 父级编码覆盖的循环 | `A、B、C、D、E、F、G、H、I、J、K、L、M、N、S` | `catalog.parent_cycles` |
 | cell 自带 formula_ref 能解析回本身的条目 | `30` | `catalog.formula_ref_roundtrip_ok` |
@@ -34,7 +34,7 @@
 | 生成器写出前是否跑发布门禁 | `否` | `generator.runs_release_gates` |
 | 生产代码中导入发布门禁模块的文件数 | `0` | `catalog_release.production_importers` |
 
-说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成真实 10 种、`registry_version` 改 14 位时间戳、`item_id` 允许数组，均有设计依据），所以「0 错误」是 schema 修正的结果，不是目录本身被修正：审计报告记的 512 处是旧 schema 对同一份目录的报错；孤儿 cell 25 个仍在目录里，待 T07 按判定记录停用（见下表）。
+说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25），待 T07 按判定记录停用（见下表）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
 
 ### 已落地：组件
 
