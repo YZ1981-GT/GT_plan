@@ -335,6 +335,21 @@ def test_numeric_condition_value_is_coerced_and_bad_value_400() -> None:
     assert _detail(exc)["error_code"] == "INVALID_DECIMAL"
 
 
+async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -> None:
+    """指标树叶子声明的列 = 注册表显示列（R5.7；任务 7 起 execute 对未登记列 400，页面版按叶子列发 columns）。"""
+    from app.routers import custom_query as router_module
+
+    tree = await router_module.get_indicators(project_id=None, depth=1, branch=None, response=None, db=None,
+                                              current_user=None)
+    leaves = {leaf["key"]: leaf for group in tree for leaf in group.get("children") or [] if "key" in leaf}
+    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours"):
+        spec = sr.SOURCE_REGISTRY[sr.SOURCE_ALIASES.get(key, key)]
+        assert leaves[key]["columns"] == spec.display_keys, key
+    for kind, canonical in sr.CONSOL_UNIT_KINDS.items():  # 合并单位叶子（_build_consol_units_tree）同一定义
+        assert router_module._registry_columns(kind) == sr.SOURCE_REGISTRY[canonical].display_keys
+    assert router_module._INDICATORS_SCHEMA_VERSION >= 11, "叶子列变了，旧缓存必须失效"
+
+
 async def test_ref_context_follows_project_template_type() -> None:
     class _DB:
         def __init__(self, project):

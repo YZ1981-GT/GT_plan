@@ -786,21 +786,47 @@ class TestReadonlyGateConvergence:
 
 
 @pytest.mark.asyncio
-async def test_legacy_fetcher_requests_untruncated_source_rows(monkeypatch):
+async def test_legacy_fetcher_routes_sql_sources_to_database_paging(monkeypatch):
+    """旧用例替身 router 的 ``_query_trial_balance``，固化「取数层不截断、编排器内存切片」的内部形态。
+
+    advanced-query-linkage-closure 任务 7 把试算表切到注册表（COUNT / ORDER BY / LIMIT / OFFSET 在数据库内）后该
+    取数器已删除；改为替换注册表的**下一层** ``paged_fetch.page``：收到的是试算表定义与请求的 limit / offset，
+    返回的 FetchPage 原样交给编排器。暂留 router 的取数器（报表行次）仍按旧口径请求不截断的行（limit=None）。
+    """
+    import uuid as _uuid
+
     import app.routers.custom_query as router_module
+    from app.services.custom_query import paged_fetch, source_registry
+    from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage
 
     seen = {}
 
-    async def trial_balance(db, pid, year, filters, limit):
-        seen["limit"] = limit
-        return {"rows": [{"id": index} for index in range(8)], "columns": ["id"], "total": 8}
+    async def page(spec, ctx, **kwargs):
+        seen.update(spec=spec, ctx=ctx, **kwargs)
+        return FetchPage(rows=[{"id": index} for index in range(8)], columns=[ColumnMeta(key="id", title="id")],
+                         total=1234, paged=True)
 
-    monkeypatch.setattr(router_module, "_query_trial_balance", trial_balance)
-    rows, columns = await router_module._legacy_business_fetcher(
-        QueryRequest(entry="business", project_id="p1", year=2025, source="trial_balance"),
+    monkeypatch.setattr(paged_fetch, "page", page)
+    fetched = await router_module._legacy_business_fetcher(
+        QueryRequest(entry="business", project_id=str(_uuid.uuid4()), year=2025, source="trial_balance",
+                     limit=8, offset=16),
         [], object(),
     )
-    assert seen["limit"] is None
+    assert seen["spec"] is source_registry.TRIAL_BALANCE and (seen["limit"], seen["offset"]) == (8, 16)
+    assert fetched.paged and fetched.total == 1234 and len(fetched.rows) == 8
+
+    legacy = {}
+
+    async def report_lines(db, pid, year, filters, limit):
+        legacy["limit"] = limit
+        return {"rows": [{"id": index} for index in range(8)], "columns": ["id"], "total": 8}
+
+    monkeypatch.setattr(router_module, "_query_report_lines", report_lines)
+    rows, columns = await router_module._legacy_business_fetcher(
+        QueryRequest(entry="business", project_id="p1", year=2025, source="report_lines"),
+        [], object(),
+    )
+    assert legacy["limit"] is None
     assert len(rows) == 8 and columns[0].key == "id"
 
 

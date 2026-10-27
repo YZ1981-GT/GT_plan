@@ -35,29 +35,27 @@ MAX_LIMIT = 2000
 
 _DIRECTIONS = ("asc", "desc")
 
-#: 各数据源的领域默认排序（无用户 sort 时使用）。
+#: 内存路径的领域默认排序（无用户 sort 时使用）。
 #: 字段若不存在于实际结果列中会被跳过——数据源的列集随 filters/group 变化，
 #: 硬指定不存在的列会让默认排序整体失效，故按实际列集过滤而非报错。
+#:
+#: 注册表 SQL 源（试算表、科目余额、序时账、底稿清单、工时）的默认排序只由
+#: ``source_registry`` 定义、在数据库内执行，这里不再登记（一个源只有一个所有者，advanced-query-linkage-closure
+#: 任务 5）。JSON 内存源默认按取数顺序 ``_row_index``（附注合计行仍在最后、底稿单元格按行列而非字符串序，R2.8）。
+#: 报表 / 报表行次 / 调整分录三个源仍由 router 内取数器承担，其条目在任务 17 / 18 切到注册表后删除。
 DEFAULT_SORT_BY_SOURCE: dict[str, tuple[tuple[str, str], ...]] = {
     "report": (("row_code", "asc"),),
     "report_lines": (("applicable_standard", "asc"), ("report_type", "asc"), ("sort_order", "asc")),
-    "trial_balance": (("standard_account_code", "asc"),),
-    "tb_detail": (("account_code", "asc"),),
-    # JSON 内存源默认按取数顺序 _row_index（附注合计行仍在最后、底稿单元格按行列而非字符串序，R2.8）
-    "tb_summary": (("_row_index", "asc"),),
-    "account_balance": (("account_code", "asc"),),
-    "ledger_entries": (("voucher_date", "desc"), ("voucher_no", "asc"), ("entry_seq", "asc")),
     "adjustment": (("adjustment_no", "asc"),),
     "adjustments": (("adjustment_no", "asc"),),
+    "tb_summary": (("_row_index", "asc"),),
     "disclosure": (("_row_index", "asc"),),
-    "workhours": (("work_date", "desc"),),
-    "workpaper": (("sheet_name", "asc"), ("cell_ref", "asc")),
 }
 
 #: 优先作为 tie-breaker 的候选列（按此顺序取第一个存在的）。
-#: ``_row_index``（内存源的取数顺序，advanced-query-linkage-closure 任务 5）打头：用户按某列排序时同值行
-#: 保持原序（R2.8）；行里没有它（旧取数器、分组 / 透视结果）时沿用原候选。之所以不只用 ``id``：分组/透视后
-#: 的结果行不含 ``id``（如 ``{dept, sum_amount}``），此时退化为「全部列参与排序」以取得全序。
+#: ``_row_index``（内存源的取数顺序）打头：用户按某列排序时同值行保持原序（R2.8）；行里没有它
+#: （旧取数器、分组 / 透视结果）时沿用原候选。之所以不只用 ``id``：分组/透视后的结果行不含 ``id``
+#: （如 ``{dept, sum_amount}``），此时退化为「全部列参与排序」以取得全序。
 TIE_BREAKER_CANDIDATES = ("_row_index", "id", "addr_id", "account_code", "row_code", "voucher_no")
 
 
@@ -285,13 +283,9 @@ def apply_pagination(
 # ── 取数层硬上限（R4.8）────────────────────────────────────────────────────
 #: 取数层单次最多拉取的行数。
 #:
-#: 改造前 router 把**展示用** ``limit`` 直接压进各取数器的 ``LIMIT :lim``
-#: （``limit = min(body.limit, 2000)``），于是 ``total = len(rows)`` 恒等于截断后的
-#: 行数 —— 前端拿到 ``total == limit`` 时无从判断「刚好这么多」还是「被截断了」。
-#: 现在取数层按本上限取数、由 :func:`apply_pagination` 在其后切片，``total`` 因此
-#: 在上限内是真实值；触达上限时由调用方追加 warning 明示结果可能不完整。
-#:
-#: 注意**不能**按 ``offset + limit`` 只取当前页所需：那样 ``total`` 又会退化为
-#: 「取到的行数」，与 R4.1「total 反映聚合后真实行数」直接冲突。故取数层统一按本
-#: 上限取数，由 :func:`apply_pagination` 在其后切片。
+#: 只用于**内存路径**（JSON 内存源、暂留 router 的取数器、带分组 / 透视的 SQL 源全量）：
+#: 内存分页必须建立在完整行集上，超过本上限即 400（``RESULT_TOO_LARGE`` /
+#: ``AGGREGATION_TOO_LARGE``），不再返回截断样本上的 total 与排序（advanced-query-linkage-closure
+#: AQ-03：改造前取数层以本上限 LIMIT、编排器在 ≤5,000 行上排序计数，和平药房序时账 total 恒为 5,000）。
+#: 注册表 SQL 源的计数、排序与分页在数据库内完成（``paged_fetch``），不受本上限约束。
 FETCH_HARD_CAP = 5000
