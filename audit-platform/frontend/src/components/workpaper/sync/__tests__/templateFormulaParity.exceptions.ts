@@ -15,10 +15,6 @@ const R3_FIELD_NAMES = 'R3 任务 9：契约字段名与前端行模型不同，
 export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'B60-1-hour-budget-rows': '前端不算预算成本（模板 F 列独有，面板只录工时与费率）；R3 任务 9 决定前端补列或契约移出',
   'D2-ecl-discount-rows': 'R3 任务 9：前端是嵌套 scenarios[]、单一现值，模板是平铺情景行、两年现值（design §3.1 D2-10）',
-  'D3-rp-rows': `${R3_FIELD_NAMES}（契约 openingBalance / creditAmount / debitAmount / closingBalance，前端 priorBalance / credit / debit / endBalance）`,
-  'D7-4-credit-rows': 'R3 任务 9：契约把「期末主要债权人余额分析」接到前端存「贷方发生额分析」的 item，前端该 item 只有 item / amount 两列、不算变动额',
-  'E1-cash-detail-rows': `${R3_FIELD_NAMES}（契约 closingOriginal / closingRmb / adjustmentOriginal / closingAudited，前端 endingFc / endingRmb / adjustment / auditedRmb）`,
-  'E1-digital-rows': `${R3_FIELD_NAMES}（契约 *Original / *Local，前端 opening / endingFc / auditedFc …；行计算还在 E1TabDigitalCurrency.vue 内）`,
   'F2-47-rows': 'R3 任务 9：契约列名仍与模板表头错位，且前端行模型与模板不同构（双价 pricePreContract / priceContract 对模板单价 P；销售费用 / 税费前端可手改，模板 T = N × Q、U = O × Q；应补提前端截 0，模板 Z = W − Y 可为负），回写未接通，先不改契约',
   'F3-1-adj-seed-rows': 'R3 任务 9：契约 store item 前端不存在（前端审定表存 F3-1-adj-rows）',
   'F3-1-adj-slot-rows': 'R3 任务 9：契约 store item 前端不存在（前端审定表存 F3-1-adj-rows）',
@@ -35,7 +31,7 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'N4-2-detail-rows': 'R3 任务 9：前端 N4-2 存「计税依据 × 税率」，不是模板的 未审 + 调整 = 审定',
 }
 
-export const UNCOVERED_BASELINE = 20
+export const UNCOVERED_BASELINE = 16
 
 export interface ParityException {
   storeItem: string
@@ -48,14 +44,6 @@ export interface ParityException {
 }
 
 export const PARITY_EXCEPTIONS: readonly ParityException[] = [
-  {
-    storeItem: 'D6-3-rows', field: 'priorAudited', kind: 'formula',
-    reason: 'R3 任务 9：契约 B~D 错一列（B → category、C → priorUnadjusted、D → priorAje，priorRje 没接），模板式代入的是类别文本',
-  },
-  {
-    storeItem: 'D6-3-rows', field: 'endUnadjusted', kind: 'formula',
-    reason: 'R3 任务 9：同上，模板 K = B + SUM(F:G) − SUM(H:J) 的 B 接成了 category',
-  },
   {
     storeItem: 'G11-detail-rows', field: 'seq', kind: 'input',
     reason: 'R3 任务 9：模板 A 列序号是固定数字、前端按位置编号；契约应与 H1-8 一样改 auto_source',
@@ -70,4 +58,4 @@ export const PARITY_EXCEPTIONS: readonly ParityException[] = [
   },
 ]
 
-export const PARITY_EXCEPTION_BASELINE = 5
+export const PARITY_EXCEPTION_BASELINE = 3

@@ -1,8 +1,8 @@
 {
  "_source": "backend/scripts/gen/gen_template_formula_parity.py（勿手改；重生成后 --check 无漂移）",
  "summary": {
-  "formula_fields": 481,
-  "ok": 373,
+  "formula_fields": 483,
+  "ok": 375,
   "skip": 108
  },
  "items": {
@@ -609,23 +609,23 @@
     "关联关系及交易检查表D3-6!related_party_rows@12"
    ],
    "inputs": [
-    "creditAmount",
-    "debitAmount",
-    "openingBalance"
+    "credit",
+    "debit",
+    "priorBalance"
    ],
    "input_types": {
-    "creditAmount": "amount",
-    "debitAmount": "amount",
-    "openingBalance": "amount"
+    "credit": "amount",
+    "debit": "amount",
+    "priorBalance": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "agingInfo",
-    "indexNo",
-    "relatedPartyName",
-    "relatedRelationship",
-    "remark",
-    "transactionReason"
+    "agingDescription",
+    "indexRef",
+    "natureDescription",
+    "partyName",
+    "relationship",
+    "remark"
    ],
    "auto_fields": [],
    "literals": []
@@ -828,7 +828,8 @@
   "D6-3-rows": {
    "contract": "d6.contract_assets_detail",
    "tables": [
-    "合同资产减值准备明细表D6-3!impairment_detail_rows@13"
+    "合同资产减值准备明细表D6-3!impairment_single_rows@13",
+    "合同资产减值准备明细表D6-3!impairment_group_rows@18"
    ],
    "inputs": [
     "endAje",
@@ -836,6 +837,7 @@
     "otherDecrease",
     "otherIncrease",
     "priorAje",
+    "priorRje",
     "priorUnadjusted",
     "provision",
     "reversal",
@@ -847,6 +849,7 @@
     "otherDecrease": "amount",
     "otherIncrease": "amount",
     "priorAje": "amount",
+    "priorRje": "amount",
     "priorUnadjusted": "amount",
     "provision": "amount",
     "reversal": "amount",
@@ -854,7 +857,6 @@
    },
    "date_inputs": [],
    "text_inputs": [
-    "category",
     "itemName"
    ],
    "auto_fields": [],
@@ -971,28 +973,6 @@
    "auto_fields": [],
    "literals": []
   },
-  "D7-4-credit-rows": {
-   "contract": "d7.contract_liabilities_detail",
-   "tables": [
-    "合同负债分析表D7-4!analysis_credit_rows@27"
-   ],
-   "inputs": [
-    "currentBalance",
-    "priorBalance"
-   ],
-   "input_types": {
-    "currentBalance": "amount",
-    "priorBalance": "amount"
-   },
-   "date_inputs": [],
-   "text_inputs": [
-    "customerName",
-    "reason",
-    "remark"
-   ],
-   "auto_fields": [],
-   "literals": []
-  },
   "D7-6-rows": {
    "contract": "d7.contract_liabilities_detail",
    "tables": [
@@ -1028,14 +1008,14 @@
     "现金明细表E1-2!cash_detail_rows@15"
    ],
    "inputs": [
-    "adjustmentOriginal",
+    "adjustment",
     "decrease",
     "fxRate",
     "increase",
     "opening"
    ],
    "input_types": {
-    "adjustmentOriginal": "amount",
+    "adjustment": "amount",
     "decrease": "amount",
     "fxRate": "amount",
     "increase": "amount",
@@ -1044,7 +1024,7 @@
    "date_inputs": [],
    "text_inputs": [
     "currency",
-    "remark"
+    "note"
    ],
    "auto_fields": [],
    "literals": []
@@ -1055,27 +1035,32 @@
     "数字货币明细表E1-4!digital_currency_rows@10"
    ],
    "inputs": [
-    "adjustmentOriginal",
-    "decreaseOriginal",
+    "adjustment",
+    "decrease",
     "fxRate",
-    "increaseOriginal",
-    "openingOriginal",
-    "seqNo"
+    "increase",
+    "opening",
+    "queryBalance"
    ],
    "input_types": {
-    "adjustmentOriginal": "amount",
-    "decreaseOriginal": "amount",
+    "adjustment": "amount",
+    "decrease": "amount",
     "fxRate": "amount",
-    "increaseOriginal": "amount",
-    "openingOriginal": "amount",
-    "seqNo": "integer"
+    "increase": "amount",
+    "opening": "amount",
+    "queryBalance": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "bank",
-    "currency"
+    "bankName",
+    "confirmationIndexNo",
+    "currency",
+    "indexNo",
+    "note"
    ],
-   "auto_fields": [],
+   "auto_fields": [
+    "seq"
+   ],
    "literals": []
   },
   "F1-rp-rows": {
@@ -3476,10 +3461,10 @@
    "contract": "d3.prepaid_receipts_detail",
    "sheet": "关联关系及交易检查表D3-6",
    "cell": "F12",
-   "field": "closingBalance",
+   "field": "endBalance",
    "header": "期末余额",
    "formula": "=C12+E12-D12",
-   "expr": "openingBalance + creditAmount - debitAmount",
+   "expr": "priorBalance + credit - debit",
    "skip": null
   },
   {
@@ -3664,8 +3649,19 @@
    "sheet": "合同资产减值准备明细表D6-3",
    "cell": "N13",
    "field": "endAudited",
-   "header": "审定数",
+   "header": "审定余额",
    "formula": "=K13+L13+M13",
+   "expr": "endUnadjusted + endAje + endRje",
+   "skip": null
+  },
+  {
+   "store_item": "D6-3-rows",
+   "contract": "d6.contract_assets_detail",
+   "sheet": "合同资产减值准备明细表D6-3",
+   "cell": "N18",
+   "field": "endAudited",
+   "header": "审定余额",
+   "formula": "=K18+L18+M18",
    "expr": "endUnadjusted + endAje + endRje",
    "skip": null
   },
@@ -3675,9 +3671,20 @@
    "sheet": "合同资产减值准备明细表D6-3",
    "cell": "K13",
    "field": "endUnadjusted",
-   "header": "期末未审数",
+   "header": "未审余额",
    "formula": "=B13+SUM(F13:G13)-SUM(H13:J13)",
-   "expr": "category + SUM( provision, otherIncrease ) - SUM( reversal, writeOff, otherDecrease )",
+   "expr": "priorUnadjusted + SUM( provision, otherIncrease ) - SUM( reversal, writeOff, otherDecrease )",
+   "skip": null
+  },
+  {
+   "store_item": "D6-3-rows",
+   "contract": "d6.contract_assets_detail",
+   "sheet": "合同资产减值准备明细表D6-3",
+   "cell": "K18",
+   "field": "endUnadjusted",
+   "header": "未审余额",
+   "formula": "=B18+SUM(F18:G18)-SUM(H18:J18)",
+   "expr": "priorUnadjusted + SUM( provision, otherIncrease ) - SUM( reversal, writeOff, otherDecrease )",
    "skip": null
   },
   {
@@ -3686,9 +3693,20 @@
    "sheet": "合同资产减值准备明细表D6-3",
    "cell": "E13",
    "field": "priorAudited",
-   "header": "审定数",
+   "header": "审定余额",
    "formula": "=B13+C13+D13",
-   "expr": "category + priorUnadjusted + priorAje",
+   "expr": "priorUnadjusted + priorAje + priorRje",
+   "skip": null
+  },
+  {
+   "store_item": "D6-3-rows",
+   "contract": "d6.contract_assets_detail",
+   "sheet": "合同资产减值准备明细表D6-3",
+   "cell": "E18",
+   "field": "priorAudited",
+   "header": "审定余额",
+   "formula": "=B18+C18+D18",
+   "expr": "priorUnadjusted + priorAje + priorRje",
    "skip": null
   },
   {
@@ -3780,28 +3798,6 @@
    "skip": null
   },
   {
-   "store_item": "D7-4-credit-rows",
-   "contract": "d7.contract_liabilities_detail",
-   "sheet": "合同负债分析表D7-4",
-   "cell": "D27",
-   "field": "changeAmount",
-   "header": "变动额",
-   "formula": "=B27-C27",
-   "expr": "priorBalance - currentBalance",
-   "skip": null
-  },
-  {
-   "store_item": "D7-4-credit-rows",
-   "contract": "d7.contract_liabilities_detail",
-   "sheet": "合同负债分析表D7-4",
-   "cell": "E27",
-   "field": "changeRate",
-   "header": "变动率",
-   "formula": "=D27/C27",
-   "expr": "changeAmount / currentBalance",
-   "skip": null
-  },
-  {
    "store_item": "D7-6-rows",
    "contract": "d7.contract_liabilities_detail",
    "sheet": "关联方关系及交易检查表D7-6",
@@ -3817,10 +3813,10 @@
    "contract": "e1.monetary_fund_detail",
    "sheet": "现金明细表E1-2",
    "cell": "I15",
-   "field": "closingAudited",
+   "field": "auditedRmb",
    "header": "期末审定数（人民币金额）",
    "formula": "=G15+H15*F15",
-   "expr": "closingRmb + adjustmentOriginal * fxRate",
+   "expr": "endingRmb + adjustment * fxRate",
    "skip": null
   },
   {
@@ -3828,7 +3824,7 @@
    "contract": "e1.monetary_fund_detail",
    "sheet": "现金明细表E1-2",
    "cell": "E15",
-   "field": "closingOriginal",
+   "field": "endingFc",
    "header": "期末余额（原币）",
    "formula": "=B15+C15-D15",
    "expr": "opening + increase - decrease",
@@ -3839,21 +3835,10 @@
    "contract": "e1.monetary_fund_detail",
    "sheet": "现金明细表E1-2",
    "cell": "G15",
-   "field": "closingRmb",
+   "field": "endingRmb",
    "header": "期末折算人民币金额",
    "formula": "=E15*F15",
-   "expr": "closingOriginal * fxRate",
-   "skip": null
-  },
-  {
-   "store_item": "E1-digital-rows",
-   "contract": "e1.monetary_fund_detail",
-   "sheet": "数字货币明细表E1-4",
-   "cell": "L10",
-   "field": "auditedLocal",
-   "header": "审定后余额(本币)",
-   "formula": "=K10*D10",
-   "expr": "auditedOriginal * fxRate",
+   "expr": "endingFc * fxRate",
    "skip": null
   },
   {
@@ -3861,21 +3846,32 @@
    "contract": "e1.monetary_fund_detail",
    "sheet": "数字货币明细表E1-4",
    "cell": "K10",
-   "field": "auditedOriginal",
-   "header": "审定后余额(原币)",
+   "field": "auditedFc",
+   "header": "期末审定数（原币）",
    "formula": "=H10+J10",
-   "expr": "closingOriginal + adjustmentOriginal",
+   "expr": "endingFc + adjustment",
    "skip": null
   },
   {
    "store_item": "E1-digital-rows",
    "contract": "e1.monetary_fund_detail",
    "sheet": "数字货币明细表E1-4",
-   "cell": "I10",
-   "field": "closingLocal",
-   "header": "期末余额(本币)",
-   "formula": "=H10*D10",
-   "expr": "closingOriginal * fxRate",
+   "cell": "L10",
+   "field": "auditedRmb",
+   "header": "期末审定数（人民币）",
+   "formula": "=K10*D10",
+   "expr": "auditedFc * fxRate",
+   "skip": null
+  },
+  {
+   "store_item": "E1-digital-rows",
+   "contract": "e1.monetary_fund_detail",
+   "sheet": "数字货币明细表E1-4",
+   "cell": "N10",
+   "field": "diff",
+   "header": "期末账面余额与银行查询余额的差异",
+   "formula": "=M10-K10",
+   "expr": "queryBalance - auditedFc",
    "skip": null
   },
   {
@@ -3883,10 +3879,21 @@
    "contract": "e1.monetary_fund_detail",
    "sheet": "数字货币明细表E1-4",
    "cell": "H10",
-   "field": "closingOriginal",
+   "field": "endingFc",
    "header": "期末余额(原币)",
    "formula": "=E10+F10-G10",
-   "expr": "openingOriginal + increaseOriginal - decreaseOriginal",
+   "expr": "opening + increase - decrease",
+   "skip": null
+  },
+  {
+   "store_item": "E1-digital-rows",
+   "contract": "e1.monetary_fund_detail",
+   "sheet": "数字货币明细表E1-4",
+   "cell": "I10",
+   "field": "endingRmb",
+   "header": "期末余额(本位币)",
+   "formula": "=H10*D10",
+   "expr": "endingFc * fxRate",
    "skip": null
   },
   {

@@ -1480,16 +1480,17 @@ def test_d1_note_rows_with_aje_rje():
 
     bank = rows[0]
     # 分类：priorAudited = 500000+10000+5000 = 515000
-    # currentUnadjusted = 515000+300000-0 = 815000
-    # currentAudited = 815000+20000+10000 = 845000
+    # currentUnadjusted = 期初**未审** 500000+300000-0 = 800000（模板 D1-2 H = B + F − G，与前端
+    # readD1CategoryAmounts 同口径；原判据钉的是期初审定起算的 815000 —— spec oo-writeback-template-parity-closure R2）
+    # currentAudited = 800000+20000+10000 = 830000
     assert bank["prior_balance"] == 515000.0
-    assert bank["end_balance"] == 845000.0
+    assert bank["end_balance"] == 830000.0
     # 坏账：priorAudited = 30000+2000+1000 = 33000
     # currentAudited = 50000+3000+1500 = 54500
     assert bank["prior_provision"] == 33000.0
     assert bank["end_provision"] == 54500.0
     # 账面价值
-    assert bank["end_book_value"] == 845000.0 - 54500.0
+    assert bank["end_book_value"] == 830000.0 - 54500.0
     assert bank["prior_book_value"] == 515000.0 - 33000.0
 
 

@@ -56,8 +56,9 @@ def _instrumentation_of(spec: Any) -> ExcelInstrumentationSpec:
 def managed_row_table_specs() -> tuple[Any, ...]:
     specs: list[Any] = []
     if _INCLUDE_D603_IMPAIRMENT:
-        from app.services.workpaper_sync.phase5_d6_03_impairment import SPEC_D603
-        specs.append(SPEC_D603)
+        # 双区（单项 / 组合）共用 store 键 D6-3-rows，按行内 category 分区
+        from app.services.workpaper_sync.phase5_d6_03_impairment import SPECS_D603
+        specs.extend(SPECS_D603)
     if _INCLUDE_D605_RELATED_PARTY:
         from app.services.workpaper_sync.phase5_d6_05_related_party import SPEC_D605
         specs.append(SPEC_D605)

@@ -594,7 +594,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
         prior_audited = prior_unadj + prior_aje + prior_rje
         debit = _safe_float(_col_val(row, actual_headers, "借方发生"))
         credit = _safe_float(_col_val(row, actual_headers, "贷方发生"))
-        end_unadj = prior_audited + debit - credit
+        # 期末未审 = 期初未审 + 借方 − 贷方（模板 D6-2 Q = G + O − P，与前端 useD6Detail.recalcRow 同口径；
+        # 原用期初审定 —— spec oo-writeback-template-parity-closure R2）
+        end_unadj = prior_unadj + debit - credit
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
         end_rje = _safe_float(_col_val(row, actual_headers, "期末RJE"))
         end_audited = end_unadj + end_aje + end_rje
@@ -636,7 +638,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
         reversal = _safe_float(_col_val(row, actual_headers, "本期转回"))
         writeoff = _safe_float(_col_val(row, actual_headers, "本期核销"))
         other_dec = _safe_float(_col_val(row, actual_headers, "本期其他减少"))
-        end_unadj = prior_audited + provision + other_inc - reversal - writeoff - other_dec
+        # 期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少（模板 D6-3 K = B + SUM(F:G) − SUM(H:J)，
+        # 与前端 recalcImpairmentRow 同口径；原用期初审定 —— spec oo-writeback-template-parity-closure R2）
+        end_unadj = prior_unadj + provision + other_inc - reversal - writeoff - other_dec
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
         end_rje = _safe_float(_col_val(row, actual_headers, "期末RJE"))
         return {

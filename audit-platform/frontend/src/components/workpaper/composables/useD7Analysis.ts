@@ -24,7 +24,22 @@ export interface AnalysisRow {
   item: string            // 科目/对方科目
   amount: number          // 金额
   dataSource: string      // 数据来源
+  /** 借方区 = 备注（模板 D 列）；贷方区 = 说明（模板 E 列） */
   remark: string
+  /** 与对方科目核对（仅贷方区，模板「（三）贷方发生额分析」D 列） */
+  counterCheck?: string
+}
+
+/** 存库的贷方分析行 → 前端行（载入与对拍守卫共用；缺省字段补空） */
+export function normalizeD7CreditRow(r: any): AnalysisRow {
+  return {
+    rowId: r.rowId || generateRowId(),
+    item: r.item || '',
+    amount: parseNum(r.amount),
+    dataSource: r.dataSource || '',
+    remark: r.remark || '',
+    counterCheck: r.counterCheck || '',
+  }
 }
 
 export interface Top10Row {
@@ -101,13 +116,7 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
   watch(
     () => allResponses.value.get('D7-4-credit-rows')?.remark,
     (jsonStr) => {
-      creditRows.value = safeParseArray(jsonStr).map((r: any) => ({
-        rowId: r.rowId || generateRowId(),
-        item: r.item || '',
-        amount: parseNum(r.amount),
-        dataSource: r.dataSource || '',
-        remark: r.remark || '',
-      }))
+      creditRows.value = safeParseArray(jsonStr).map(normalizeD7CreditRow)
     },
     { immediate: true },
   )
@@ -219,7 +228,7 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
   }
 
   function addCreditRow(): void {
-    creditRows.value = [...creditRows.value, { rowId: generateRowId(), item: '', amount: 0, dataSource: '', remark: '' }]
+    creditRows.value = [...creditRows.value, normalizeD7CreditRow({})]
     persistCreditRows()
   }
 
@@ -287,12 +296,10 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
       // Fill credit rows
       const creditByCounter: Array<{ counter_account: string; amount: number }> = data.credit_by_counter || []
       if (creditByCounter.length > 0) {
-        creditRows.value = creditByCounter.map((r: any) => ({
-          rowId: generateRowId(),
+        creditRows.value = creditByCounter.map((r: any) => normalizeD7CreditRow({
           item: r.counter_account || '未知',
           amount: r.amount || 0,
           dataSource: '序时账导入',
-          remark: '',
         }))
         persistCreditRows()
       }

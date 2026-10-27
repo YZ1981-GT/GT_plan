@@ -114,6 +114,13 @@
             <span v-else>{{ row.dataSource }}</span>
           </template>
         </el-table-column>
+        <!-- 模板 D 列「备注」 -->
+        <el-table-column label="备注" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'remark', v)" />
+            <span v-else>{{ row.remark }}</span>
+          </template>
+        </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
           <template #default="{ row }">
             <el-button type="danger" text size="small" @click="removeDebitRow(row.rowId)">删除</el-button>
@@ -150,6 +157,19 @@
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.dataSource" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'dataSource', v)" />
             <span v-else>{{ row.dataSource }}</span>
+          </template>
+        </el-table-column>
+        <!-- 模板 D / E 列「与对方科目核对」「说明」 -->
+        <el-table-column label="与对方科目核对" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.counterCheck" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'counterCheck', v)" />
+            <span v-else>{{ row.counterCheck }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'remark', v)" />
+            <span v-else>{{ row.remark }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">

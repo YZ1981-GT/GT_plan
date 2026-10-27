@@ -57,18 +57,24 @@ from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
     expand_aging_fields,
     managed_field_specs,
 )
-from app.services.workpaper_sync.phase5_d6_03_impairment import SPEC_D603  # noqa: E402
+from app.services.workpaper_sync.phase5_d6_03_impairment import (  # noqa: E402
+    SPEC_D603_GROUP,
+    SPEC_D603_SINGLE,
+)
 from app.services.workpaper_sync.phase5_d6_05_related_party import SPEC_D605  # noqa: E402
 from app.services.workpaper_sync.phase5_d6_08_ecl import SPEC_D608  # noqa: E402
 from app.services.workpaper_sync.phase5_d6_contract_assets import SPEC_D62  # noqa: E402
 
 #: 三张 D6 新 sheet（Task 9/10 交付物）+ 其 store 键。
 #: 🔴 `D6-8` 是 `-single-rows` **不是** `-rows`（后者全仓零写入点，Task 10 已钉住此陷阱）。
+#: D6-3 自 spec oo-writeback-template-parity-closure R3 起是双区（单项 / 组合共用 `D6-3-rows`，按 category 分区）。
 _NEW_D6_SHEETS = [
-    ("D6-3", SPEC_D603, "D6-3-rows", 14),
+    ("D6-3-single", SPEC_D603_SINGLE, "D6-3-rows", 14),
+    ("D6-3-group", SPEC_D603_GROUP, "D6-3-rows", 14),
     ("D6-5", SPEC_D605, "D6-5-rows", 14),
     ("D6-8", SPEC_D608, "D6-8-single-rows", 8),
 ]
+SPEC_D603 = SPEC_D603_SINGLE  # 下方静默面实验只需任一无账龄的 D6 spec
 
 
 def _all_row_table_specs() -> list[tuple[str, str, RowTableSheetSpec]]:

@@ -33,7 +33,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    纯 Excel entry」—— 那描述的是「前端还没有 HTML 面」这个时点事实，
     #    `b60/GtB60HourBudgetPanel.vue` 落地后不再成立。契约是**真的变了**，
     #    不是度量漂移，故更新基线而非改判据形态。
-    "b60.hour_budget.json": "aadb548da7f60e11",
+    # 🔴 2026-10-27 勘误（`aadb548da7f60e11` → 本值，spec oo-writeback-template-parity-closure R3）：
+    #    上一条记的值与任何已提交版本都对不上 —— 加 html_store 的提交 8d7a52059 入库的字节是
+    #    本值，其前一版 42d2f6e6f 是 `91beaa2a…`，之后再无提交改过此文件 ⇒ 当时取样的是未提交草稿，
+    #    本条在 HEAD 上一直是红的。契约内容与上一条描述的变化相同，只改正记录值。
+    "b60.hour_budget.json": "1b100509185361df",
     # 🔴 2026-09-28 更新（`62b589551bd99050` → 本值）：D1-4 三区的 `json_key` 与前端
     #    实际持久化键**不一致**（实测 13 列），契约里的 `json_pointer` 因此全是死指针
     #    —— materialize 取不到值会把 Excel 格写成 `0`/清空，extract 把值写进前端从不读
@@ -82,12 +86,22 @@ GOLDEN_BASELINE: dict[str, str] = {
     #       已发布 instrumentation 覆盖」由 `test_published_instrumentation_covers_contract_sheets.py`
     #       守护。契约是**真的变了**，不是度量漂移，故更新基线。
     "d2.receivable_detail.json": "1943d1d3950f7af0",
-    "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
+    # 🔴 2026-10-27 更新 d3 / e1（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：
+    #    d3 的旧基线在 HEAD 上本就已过期（c450c3fbf 全循环 provision、1a8f666fe D3-1 审定表进契约
+    #    时未同步本表）；本批又把 D3-6 关联方表的 json_key 改成前端实际存的键（partyName / priorBalance /
+    #    debit / credit / endBalance …），e1 把 E1-2 现金明细与 E1-4 数字货币的 json_key 改成前端键、
+    #    E1-4 序号改 auto_source 并补管 M~Q 五列（模板有表头）。列键（column_key）不变。
+    "d3.prepaid_receipts_detail.json": "62bb2dd7007f2762",
     "d4.revenue_detail.json": "7b1d6362eeba4a7d",
     "d5.receivables_financing_detail.json": "b76e345cc29797b5",
-    "d6.contract_assets_detail.json": "1640ff157e360066",
-    "d7.contract_liabilities_detail.json": "392d96f81ef1d123",
-    "e1.monetary_fund_detail.json": "4a0cf6c928566c96",
+    # 🔴 2026-10-27 同批更新 d6 / d7（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：
+    #    D6-3 由单区改双区（单项 R13-16 / 组合 R18-21，共用 D6-3-rows、按 category 分区），B/C/D 三列
+    #    改接 priorUnadjusted / priorAje / priorRje（原 B 接成 category、priorRje 没接）；
+    #    D7-4 区② 由「期末主要债权人余额分析」R27-36 改接「贷方发生额分析」R21-22（前端 D7-4-credit-rows
+    #    存的是后者），D / E 两列接 counterCheck / remark。
+    "d6.contract_assets_detail.json": "8d53379f4378d3ba",
+    "d7.contract_liabilities_detail.json": "617ef0d359cd448a",
+    "e1.monetary_fund_detail.json": "ddfa0e9a7e5379a3",
     "f1.prepayment_detail.json": "0439591e2e504c74",
     "g7.soe_subsidiary_disclosure.json": "6fdd12a7e008eb24",
     "h1.disposal_check.json": "e7d6c1b75af2d600",

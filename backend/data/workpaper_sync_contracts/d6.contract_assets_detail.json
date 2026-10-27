@@ -537,7 +537,7 @@
               "json_pointer": "/rows/{row_uuid}/itemName",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!A13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/item_name",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/item_name",
               "store_item_id": "D6-3-rows",
               "value_type": "text"
             },
@@ -546,28 +546,30 @@
                 "column": "B",
                 "row_from": "row_identity"
               },
-              "column_key": "category",
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B11",
-              "header_text": "分类",
-              "json_pointer": "/rows/{row_uuid}/category",
+              "header_text": "未审余额",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!B13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/category",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/prior_unadjusted",
               "store_item_id": "D6-3-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
                 "column": "C",
                 "row_from": "row_identity"
               },
-              "column_key": "prior_unadjusted",
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!C11",
-              "header_text": "未审数",
-              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!C13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/prior_unadjusted",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/prior_aje",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -576,13 +578,14 @@
                 "column": "D",
                 "row_from": "row_identity"
               },
-              "column_key": "prior_aje",
+              "column_key": "prior_rje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!D11",
-              "header_text": "账项调整",
-              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!D13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/prior_aje",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/prior_rje",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -592,12 +595,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!E11",
-              "header_text": "审定数",
+              "header_text": "审定余额",
               "json_pointer": "/rows/{row_uuid}/priorAudited",
               "mode": "formula",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!E13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/prior_audited",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/prior_audited",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -607,12 +611,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "provision",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F11",
               "header_text": "计提",
               "json_pointer": "/rows/{row_uuid}/provision",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!F13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/provision",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/provision",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -622,12 +627,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "other_increase",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!G11",
               "header_text": "其他增加",
               "json_pointer": "/rows/{row_uuid}/otherIncrease",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!G13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/other_increase",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/other_increase",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -637,12 +643,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "reversal",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H11",
               "header_text": "转回",
               "json_pointer": "/rows/{row_uuid}/reversal",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!H13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/reversal",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/reversal",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -652,12 +659,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "write_off",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!I11",
               "header_text": "核销",
               "json_pointer": "/rows/{row_uuid}/writeOff",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!I13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/write_off",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/write_off",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -667,12 +675,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "other_decrease",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!J11",
               "header_text": "其他减少",
               "json_pointer": "/rows/{row_uuid}/otherDecrease",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!J13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/other_decrease",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/other_decrease",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -682,12 +691,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "end_unadjusted",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K11",
-              "header_text": "期末未审数",
+              "header_text": "未审余额",
               "json_pointer": "/rows/{row_uuid}/endUnadjusted",
               "mode": "formula",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!K13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/end_unadjusted",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/end_unadjusted",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -697,12 +707,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "end_aje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!L11",
               "header_text": "账项调整",
               "json_pointer": "/rows/{row_uuid}/endAje",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!L13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/end_aje",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/end_aje",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -712,12 +723,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "end_rje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!M11",
               "header_text": "重分类调整",
               "json_pointer": "/rows/{row_uuid}/endRje",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!M13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/end_rje",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/end_rje",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             },
@@ -727,12 +739,13 @@
                 "row_from": "row_identity"
               },
               "column_key": "end_audited",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
               "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!N11",
-              "header_text": "审定数",
+              "header_text": "审定余额",
               "json_pointer": "/rows/{row_uuid}/endAudited",
               "mode": "formula",
               "source_ref": "源xlsx!合同资产减值准备明细表D6-3!N13",
-              "stable_field_key": "impairment_detail_rows/{row_uuid}/end_audited",
+              "stable_field_key": "impairment_single_rows/{row_uuid}/end_audited",
               "store_item_id": "D6-3-rows",
               "value_type": "amount"
             }
@@ -752,7 +765,252 @@
             "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
-          "table_key": "impairment_detail_rows"
+          "table_key": "impairment_single_rows"
+        },
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!A11",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!A18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/item_name",
+              "store_item_id": "D6-3-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B11",
+              "header_text": "未审余额",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!B18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!C11",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!C18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!D11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!D18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!B10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!E11",
+              "header_text": "审定余额",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!E18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "provision",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F11",
+              "header_text": "计提",
+              "json_pointer": "/rows/{row_uuid}/provision",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!F18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/provision",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_increase",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!F10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!G11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/otherIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!G18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/other_increase",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "reversal",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H11",
+              "header_text": "转回",
+              "json_pointer": "/rows/{row_uuid}/reversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!H18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/reversal",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "write_off",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!I11",
+              "header_text": "核销",
+              "json_pointer": "/rows/{row_uuid}/writeOff",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!I18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/write_off",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_decrease",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!H10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!J11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/otherDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!J18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/other_decrease",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K11",
+              "header_text": "未审余额",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!K18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!L11",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!L18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/end_aje",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!M11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!M18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/end_rje",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "group_source_ref": "源xlsx!合同资产减值准备明细表D6-3!K10",
+              "header_source_ref": "源xlsx!合同资产减值准备明细表D6-3!N11",
+              "header_text": "审定余额",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!合同资产减值准备明细表D6-3!N18",
+              "stable_field_key": "impairment_group_rows/{row_uuid}/end_audited",
+              "store_item_id": "D6-3-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E18:E21",
+            "K18:K21",
+            "N18:N21"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "impairment_group_rows"
         }
       ]
     },

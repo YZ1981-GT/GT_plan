@@ -18,6 +18,7 @@ import * as d2Detail from '../../composables/useD2Detail'
 import * as d2Ecl from '../../composables/useD2Ecl'
 import * as d2RelatedParty from '../../composables/useD2RelatedParty'
 import * as d3Detail from '../../composables/useD3Detail'
+import * as d3RelatedParty from '../../composables/useD3RelatedParty'
 import * as d4Revenue from '../../composables/useD4RevenueDetail'
 import * as d5Detail from '../../composables/useD5Detail'
 import * as d5FairValue from '../../composables/useD5FairValue'
@@ -27,6 +28,8 @@ import * as d6Impairment from '../../composables/useD6ImpairmentDetail'
 import * as d6RelatedParty from '../../composables/useD6RelatedParty'
 import * as d7Detail from '../../composables/useD7Detail'
 import * as d7RelatedParty from '../../composables/useD7RelatedParty'
+import * as e1CashDetail from '../../composables/useE1CashDetail'
+import * as e1Digital from '../../e1/e1DigitalRowCalc'
 import * as f1RelatedParty from '../../composables/useF1RelatedParty'
 import * as f2Impairment from '../../composables/useF2ContractCostImpairmentFormulas'
 import * as f2Detail from '../../composables/useF2DetailSheet'
@@ -184,6 +187,10 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
     source: 'useD3Detail.recalcRowFormulas',
     compute: (raw) => asRow(d3Detail.recalcRowFormulas(merged(d3Detail.createEmptyRow([]), raw))),
   },
+  'D3-rp-rows': {
+    source: 'useD3RelatedParty.normalizeD3RelatedPartyRow',
+    compute: (raw) => asRow(d3RelatedParty.normalizeD3RelatedPartyRow(raw)),
+  },
   'D4-2-rows': {
     source: 'useD4RevenueDetail.computeRow',
     compute: (raw) => asRow(d4Revenue.computeRow(merged<d4Revenue.StoredRevenueRow>({
@@ -224,6 +231,14 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
   'D7-6-rows': {
     source: 'useD7RelatedParty.normalizeRow + recalcRow',
     compute: (raw) => asRow(d7RelatedParty.recalcRow(d7RelatedParty.normalizeRow(raw))),
+  },
+  'E1-cash-detail-rows': {
+    source: 'useE1CashDetail.normalizeE1CashDetailRow',
+    compute: (raw) => asRow(e1CashDetail.normalizeE1CashDetailRow(raw)),
+  },
+  'E1-digital-rows': {
+    source: 'e1DigitalRowCalc.normalizeE1DigitalRow',
+    compute: (raw) => asRow(e1Digital.normalizeE1DigitalRow(raw, 0)),
   },
   'F1-rp-rows': {
     source: 'useF1RelatedParty.normalizeRelatedPartyRow',

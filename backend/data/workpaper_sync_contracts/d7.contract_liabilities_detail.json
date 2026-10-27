@@ -898,7 +898,7 @@
           "table_key": "analysis_debit_rows"
         },
         {
-          "anchor": "A26",
+          "anchor": "A19",
           "delete_policy": "tombstone",
           "fields": [
             {
@@ -906,13 +906,13 @@
                 "column": "A",
                 "row_from": "row_identity"
               },
-              "column_key": "customer_name",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!A26",
-              "header_text": "债权人名称",
-              "json_pointer": "/rows/{row_uuid}/customerName",
+              "column_key": "item",
+              "header_source_ref": "源xlsx!合同负债分析表D7-4!A19",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/item",
               "mode": "editable",
-              "source_ref": "源xlsx!合同负债分析表D7-4!A27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/customer_name",
+              "source_ref": "源xlsx!合同负债分析表D7-4!A21",
+              "stable_field_key": "analysis_credit_rows/{row_uuid}/item",
               "store_item_id": "D7-4-credit-rows",
               "value_type": "text"
             },
@@ -921,13 +921,13 @@
                 "column": "B",
                 "row_from": "row_identity"
               },
-              "column_key": "prior_balance",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!B26",
-              "header_text": "期初余额",
-              "json_pointer": "/rows/{row_uuid}/priorBalance",
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!合同负债分析表D7-4!B19",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
               "mode": "editable",
-              "source_ref": "源xlsx!合同负债分析表D7-4!B27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/prior_balance",
+              "source_ref": "源xlsx!合同负债分析表D7-4!B21",
+              "stable_field_key": "analysis_credit_rows/{row_uuid}/amount",
               "store_item_id": "D7-4-credit-rows",
               "value_type": "amount"
             },
@@ -936,86 +936,53 @@
                 "column": "C",
                 "row_from": "row_identity"
               },
-              "column_key": "current_balance",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!C26",
-              "header_text": "期末余额",
-              "json_pointer": "/rows/{row_uuid}/currentBalance",
+              "column_key": "data_source",
+              "header_source_ref": "源xlsx!合同负债分析表D7-4!C19",
+              "header_text": "数据来源",
+              "json_pointer": "/rows/{row_uuid}/dataSource",
               "mode": "editable",
-              "source_ref": "源xlsx!合同负债分析表D7-4!C27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/current_balance",
+              "source_ref": "源xlsx!合同负债分析表D7-4!C21",
+              "stable_field_key": "analysis_credit_rows/{row_uuid}/data_source",
               "store_item_id": "D7-4-credit-rows",
-              "value_type": "amount"
+              "value_type": "text"
             },
             {
               "cell": {
                 "column": "D",
                 "row_from": "row_identity"
               },
-              "column_key": "change_amount",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!D26",
-              "header_text": "变动额",
-              "json_pointer": "/rows/{row_uuid}/changeAmount",
-              "mode": "formula",
-              "source_ref": "源xlsx!合同负债分析表D7-4!D27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/change_amount",
+              "column_key": "counter_check",
+              "header_source_ref": "源xlsx!合同负债分析表D7-4!D19",
+              "header_text": "与对方科目核对",
+              "json_pointer": "/rows/{row_uuid}/counterCheck",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同负债分析表D7-4!D21",
+              "stable_field_key": "analysis_credit_rows/{row_uuid}/counter_check",
               "store_item_id": "D7-4-credit-rows",
-              "value_type": "amount"
+              "value_type": "text"
             },
             {
               "cell": {
                 "column": "E",
                 "row_from": "row_identity"
               },
-              "column_key": "change_rate",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!E26",
-              "header_text": "变动率",
-              "json_pointer": "/rows/{row_uuid}/changeRate",
-              "mode": "formula",
-              "source_ref": "源xlsx!合同负债分析表D7-4!E27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/change_rate",
-              "store_item_id": "D7-4-credit-rows",
-              "value_type": "amount"
-            },
-            {
-              "cell": {
-                "column": "F",
-                "row_from": "row_identity"
-              },
-              "column_key": "reason",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!F26",
-              "header_text": "变动原因",
-              "json_pointer": "/rows/{row_uuid}/reason",
-              "mode": "editable",
-              "source_ref": "源xlsx!合同负债分析表D7-4!F27",
-              "stable_field_key": "analysis_credit_rows/{row_uuid}/reason",
-              "store_item_id": "D7-4-credit-rows",
-              "value_type": "text"
-            },
-            {
-              "cell": {
-                "column": "G",
-                "row_from": "row_identity"
-              },
               "column_key": "remark",
-              "header_source_ref": "源xlsx!合同负债分析表D7-4!G26",
-              "header_text": "备注",
+              "header_source_ref": "源xlsx!合同负债分析表D7-4!E19",
+              "header_text": "说明",
               "json_pointer": "/rows/{row_uuid}/remark",
               "mode": "editable",
-              "source_ref": "源xlsx!合同负债分析表D7-4!G27",
+              "source_ref": "源xlsx!合同负债分析表D7-4!E21",
               "stable_field_key": "analysis_credit_rows/{row_uuid}/remark",
               "store_item_id": "D7-4-credit-rows",
               "value_type": "text"
             }
           ],
           "footer_anchor": {
-            "carries_total_formula": true,
-            "marker": "小计",
+            "carries_total_formula": false,
+            "marker": "差异合理性分析",
             "search_column": "A"
           },
-          "formula_mask": [
-            "D27:D36",
-            "E27:E36"
-          ],
+          "formula_mask": [],
           "header_rows": 1,
           "row_identity": {
             "json_pointer": "/rows/*/rowId",

@@ -151,6 +151,22 @@
 - 复读重裁两条旧登记：aos8 多 item 场景「F3-5 新增行没长出来」原归因于中文业务名被值类型归一成 null，实测是别表同名 `note_type`（值为 null）在本表之后合并、把锚点覆盖掉（KEEP 行还被写进 F3-2 的 `ticketNo`）——修后新增行落库、KEEP 行带上 OO 改过的名称；D1「去掉切片必须膨胀」的变异反证改为「去掉切片也不串」。
 - 留给批 B：G1 门面只取区① 的 spec（区②/③ 两个方向都没接）；G3 重导出的 store 门面绑死在 G9 的 spec 上（出方向投影恒空、回写按 G9 的列写）；G1 / G3 的载荷在 `conclusion`，镜像写的是 `remark`。
 
+### §4.2 批 A2：E1 / D3-6 / D6-3 / D7-4 与后端复算口径（2026-10-27）
+
+| 表 / 面 | 原状 | 处置 |
+|---|---|---|
+| E1-2 现金明细 | json 键 closingOriginal / closingRmb / adjustmentOriginal / closingAudited / remark，前端存 endingFc / endingRmb / adjustment / auditedRmb / note | 契约 json 键改前端名（列键不变）；载入行计算外提 `normalizeE1CashDetailRow` 供对拍 |
+| E1-4 数字货币 | json 键 *Original / *Local；A 序号当录入（前端按位置编号）；M~Q 未受管（docstring 称模板无表头，实测 R9 有）；前端载入 `parseNum(fxRate) \|\| 1` 把录入的 0 汇率改成 1 | json 键改前端名；序号改 auto_source（幽灵行锚点改 B 开户银行）；补管 M 查询余额 / N 差异 = M − K / O、P 索引号 / Q 备注；行计算外提 `e1/e1DigitalRowCalc.ts`，只在汇率缺省时按 1 |
+| D3-6 关联方 | json 键 relatedPartyName / openingBalance / debitAmount … 整表不通 | 改为前端 partyName / priorBalance / debit / credit / endBalance …（F = C + E − D） |
+| D6-3 减值准备 | 只受管单项区；B 接 category、C / D 错一列、priorRje 没接；组合区的行全投影进单项区 | 双区（单项 R13-16 / 组合 R18-21，共用 `D6-3-rows`，`row_section_field=category`，各用 O / P 列），B / C / D 接期初未审 / 账项调整 / 重分类调整；对拍例外 2 条删除 |
+| D7-4 分析表 | 区② 接「期末主要债权人余额分析」R27-36（期末 / 期初对调），而前端 `D7-4-credit-rows` 存的是「贷方发生额分析」 | 区② 改接 R21-22（A 项目 / B 金额 / C 数据来源 / D 与对方科目核对 / E 说明，footer R24「差异合理性分析」无公式）；前端补 `counterCheck`，表单借方区补显示「备注」、贷方区补「与对方科目核对」「说明」；导入导出带上新列（旧文件缺该列照常导入、字段留空）。债权人区由前端按 D7-2 现算、不落库 ⇒ 不受管（同 D3-4 段③） |
+| 后端复算（R2 同族，触类旁通） | D6-2 / D6-3 / D7-2 导入复算派生列、D1 附注推送（`tier_a._d1_note_rows_from_entries`，docstring 自称与前端同口径）仍从期初审定起算，有期初调整时与前端 / 模板差一个期初调整额；导入写库的 endUnadjusted 还被预填锚点直接读 | 改为期初未审起算；守卫 `test_period_end_from_prior_unadjusted_backend.py`（每例带非零期初调整）；三个旧判据钉的是旧口径，改写并注明。全仓普查后端其余 `prior_audited ±` 写法只剩注释与变动率 |
+
+- 对拍：适配器 +3（E1-2 / E1-4 / D3-rp），未覆盖 20 → 16（含 D7-4 贷方区已无公式），逐字段例外 5 → 3。
+- 新发现、未改（并入任务 9.5）：D3-4 贷方区与 D7-4 同版式（R20 金额 / 数据来源 / 与对方科目核对 / 说明），契约 D 列仍接 `remark`、E 列未管；D3-4 前端行身份是 `rowKey`，契约声明 `rowId`（接通后整表 fail-closed）。行身份键属字段名对拍的一部分，由 9.5 守卫一并纳入。
+- D1 契约 `reviewed_basis` 仍写「前端 recalcRow 用 priorAudited+inc-dec，数值语义等价」：前端早已按模板改、两式也不等价。只是冻结的说明文字，改它会让已发布 D1 产物与契约脱钩，不改，记此备查。
+- E1-4 / D3-6 / D6-3 / D7-4 所在 provider 仍在 `KNOWN_UNWIRED`（出 / 回两方向只镜像主 store item），D6 / D7 扩容面也还不在已发布 instrumentation 里：契约改对后要接通才生效。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。

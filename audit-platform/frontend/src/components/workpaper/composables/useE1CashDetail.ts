@@ -98,6 +98,26 @@ function createDefaultRmbRow(): CashDetailRow {
   })
 }
 
+/**
+ * 存库行 → 算好公式列的一行（载入与对拍守卫共用）。
+ * 公式按模板「现金明细表E1-2」：E = B + C − D；G = E × F；I = G + H × F。
+ */
+export function normalizeE1CashDetailRow(r: Record<string, unknown>): CashDetailRow {
+  return recalcRow({
+    id: String(r.id || generateRowId()),
+    currency: String(r.currency || ''),
+    opening: parseNum(r.opening),
+    increase: parseNum(r.increase),
+    decrease: parseNum(r.decrease),
+    endingFc: 0, // recalculated
+    fxRate: parseNum(r.fxRate),
+    endingRmb: 0, // recalculated
+    adjustment: parseNum(r.adjustment),
+    auditedRmb: 0, // recalculated
+    note: String(r.note || ''),
+  })
+}
+
 /** 创建空白行 */
 function createEmptyRow(): CashDetailRow {
   return recalcRow({
@@ -140,19 +160,9 @@ export function useE1CashDetail(options: UseE1BaseOptions) {
         rows.value = [createDefaultRmbRow()]
         return
       }
-      const loadedRows: CashDetailRow[] = parsed.map((r: Record<string, unknown>) => recalcRow({
-        id: String(r.id || generateRowId()),
-        currency: String(r.currency || ''),
-        opening: parseNum(r.opening),
-        increase: parseNum(r.increase),
-        decrease: parseNum(r.decrease),
-        endingFc: 0, // recalculated
-        fxRate: parseNum(r.fxRate),
-        endingRmb: 0, // recalculated
-        adjustment: parseNum(r.adjustment),
-        auditedRmb: 0, // recalculated
-        note: String(r.note || ''),
-      }))
+      const loadedRows: CashDetailRow[] = parsed.map(
+        (r: Record<string, unknown>) => normalizeE1CashDetailRow(r),
+      )
 
       // Ensure default RMB row exists
       const hasRmb = loadedRows.some(r => r.id === 'fixed-rmb')

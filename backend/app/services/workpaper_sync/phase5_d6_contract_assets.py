@@ -346,7 +346,7 @@ _REVIEWED_BASIS: Final[str] = (
 
 
 def _d567_expansion_sheets() -> list[dict[str, Any]]:
-    """D6 扩容面 sheets（D6-3/D6-5/D6-8 单区 + D6-6/D6-9 双区 + 审定表D6-1）。
+    """D6 扩容面 sheets（D6-5/D6-8 单区 + D6-3/D6-6/D6-9 双区 + 审定表D6-1）。
 
     spec: d567-sync-coverage-via-row-table-engine · Task 9/10/14/15/18
     """

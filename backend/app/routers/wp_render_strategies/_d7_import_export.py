@@ -125,7 +125,8 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "借方调整金额", "贷方调整金额", "索引", "备注", "款项性质", "账龄段",
     ],
     "D7-4": [
-        "记录类型", "项目", "金额", "数据来源", "备注",
+        # 「与对方科目核对」= 模板「（三）贷方发生额分析」D 列，只有贷方行有值（spec oo-writeback-template-parity-closure R3）
+        "记录类型", "项目", "金额", "数据来源", "备注", "与对方科目核对",
     ],
     "D7-6": [
         "关联方名称", "关联关系", "期初余额", "借方发生", "贷方发生", "期末余额",
@@ -158,6 +159,15 @@ _SHEET_ITEM_ID: dict[str, str] = {
 
 def _get_headers(sheet_code: str) -> list[str]:
     return _SHEET_HEADERS.get(sheet_code, [])
+
+
+#: 导入时可缺的列（后加的列；旧版导出文件没有它，缺了照常导入、该字段留空）。
+_OPTIONAL_IMPORT_HEADERS: dict[str, frozenset[str]] = {"D7-4": frozenset({"与对方科目核对"})}
+
+
+def _required_import_headers(sheet_code: str) -> list[str]:
+    optional = _OPTIONAL_IMPORT_HEADERS.get(sheet_code, frozenset())
+    return [h for h in _get_headers(sheet_code) if h not in optional]
 
 
 def _validate_sheet(sheet_code: str) -> None:
@@ -480,7 +490,7 @@ async def d7_import_data(
             lambda _h: None, actual_headers, d7_2_segments, subject_aging_periods("D7"),
         )
     else:
-        expected_headers = _get_headers(sheet)
+        expected_headers = _required_import_headers(sheet)
 
     errors: list[str] = []
     missing_cols = [h for h in expected_headers if h not in actual_headers]
@@ -740,7 +750,7 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
         return [
             _safe_str(data.get("_rowType")), _safe_str(data.get("item")),
             _safe_float(data.get("amount")), _safe_str(data.get("dataSource")),
-            _safe_str(data.get("remark")),
+            _safe_str(data.get("remark")), _safe_str(data.get("counterCheck")),
         ]
     elif sheet == "D7-7-period":
         check_items = data.get("checkItems") or [False] * 5
@@ -790,8 +800,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str], segments: list
         prior_audited = prior_unadj + prior_aje + prior_rje
         credit = _safe_float(_col_val(row, actual_headers, "贷方发生"))
         debit = _safe_float(_col_val(row, actual_headers, "借方发生"))
-        # 贷方科目：期末余额=期初审定+贷方-借方
-        end_balance = prior_audited + credit - debit
+        # 贷方科目：期末余额 = 期初未审 − 借方 + 贷方（模板 D7-2 P = F − N + O，与前端 useD7Detail.recalcRow 同口径；
+        # 原用期初审定，有期初调整的行导入后与表单 / OnlyOffice 差一个期初调整额 —— spec oo-writeback-template-parity-closure R2）
+        end_balance = prior_unadj + credit - debit
         entity_reclass = _safe_float(_col_val(row, actual_headers, "重分类调整"))
         end_unadjusted = end_balance + entity_reclass
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
@@ -868,7 +879,7 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str], segments: list
             "agingBand": _safe_str(_col_val(row, actual_headers, "账龄段")),
         }
     elif sheet == "D7-4":
-        return {
+        parsed_d74: dict[str, Any] = {
             "rowId": str(uuid4()),
             "_rowType": _safe_str(_col_val(row, actual_headers, "记录类型")).lower() or "debit",
             "item": _safe_str(_col_val(row, actual_headers, "项目")),
@@ -876,6 +887,10 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str], segments: list
             "dataSource": _safe_str(_col_val(row, actual_headers, "数据来源")),
             "remark": _safe_str(_col_val(row, actual_headers, "备注")),
         }
+        if parsed_d74["_rowType"] == "credit":
+            # 只有贷方行有「与对方科目核对」（模板 D 列）；旧版导出文件缺这一列 ⇒ 留空
+            parsed_d74["counterCheck"] = _safe_str(_col_val(row, actual_headers, "与对方科目核对"))
+        return parsed_d74
     elif sheet == "D7-7-period":
         check_items = [
             _safe_str(_col_val(row, actual_headers, f"核对内容{i}")).upper() in ("Y", "是", "TRUE", "1")

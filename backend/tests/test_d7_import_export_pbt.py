@@ -158,8 +158,9 @@ def test_d7_2_export_import_round_trip(rows: list[dict]) -> None:
         expected_prior_audited = float(original["priorUnadjusted"]) + float(original["priorAje"]) + float(original["priorRje"])
         assert abs(imported["priorAudited"] - expected_prior_audited) < 1e-6
 
-        # 贷方科目：期末余额=期初审定+贷方-借方
-        expected_end_balance = expected_prior_audited + float(original["creditAmount"]) - float(original["debitAmount"])
+        # 贷方科目：期末余额 = 期初**未审** − 借方 + 贷方（模板 D7-2 P = F − N + O；
+        # spec oo-writeback-template-parity-closure R2 —— 原判据钉的是期初审定起算的旧口径）
+        expected_end_balance = float(original["priorUnadjusted"]) + float(original["creditAmount"]) - float(original["debitAmount"])
         assert abs(imported["endBalance"] - expected_end_balance) < 1e-6
 
         expected_end_unadj = expected_end_balance + float(original["entityReclass"])
