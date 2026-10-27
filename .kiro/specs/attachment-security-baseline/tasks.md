@@ -18,7 +18,7 @@
 - [x] 3. 函证路由级门（需求 2.1、2.2，ADR-ASB-03）
   - 新建 `services/confirmation_scope_gate.py`；`routers/confirmations.py` 挂门、角色常量移到文件头、四个端点去掉坏角色集
   - 测试 `test_confirmation_scope_authz.py`：design §5 前四行逐格；跨项目函证 / 附件 / 挂载记录 404；请求体底稿跨项目 422；审计员 edit 成员挂载回函成功
-  - 记录：169 例绿；函证既有用例 82 passed / 21 xfailed；删 `_EDIT_ROLES`（不含审计员）与零引用的 `_ASSIGN_ROLES`，`_MANAGER_PLUS_ROLES` 留给回填与终态撤回；鉴权守卫登记 `confirmation_project_gate` 并配可伪证用例，前缀维基线 270 → 243；变异 #2、#3 红
+  - 记录：169 例绿；函证既有用例 82 passed / 21 xfailed；删 `_EDIT_ROLES`（不含审计员）与零引用的 `_ASSIGN_ROLES`，`_MANAGER_PLUS_ROLES` 留给回填与终态撤回；鉴权守卫登记 `confirmation_project_gate` 并配可伪证用例，前缀维「仅登录不校项目」减 17 个端点（基线按现算下调，见任务 9）；变异 #2、#3 红
 
 - [x] 4. OCR 字段与任务端点项目校验（需求 2.3）
   - `routers/ocr_fields.py`
@@ -45,7 +45,7 @@
 
 - [x] 9. 全仓守卫与棘轮（需求 5.3）
   - 鉴权三维守卫、行数门、lazy import、函数全局名棘轮、证据边界、底稿关联波次、函证与回收站既有用例；`scripts/fix/resync_data_line_anchors.py --check`；棘轮常量按现算调整并写入本条
-  - 记录：前缀维基线 `_PREFIXED_IDENTITY_ONLY_BASELINE` 270 → 243；`routers/attachments.py::_ensure_project_access` 的请求体维证明链改为要求 `assert_project_permission`；`test_project_endpoint_authorization_baseline.py` 现 857 行（白名单 821 未改，门限 862）；锚点「均无需平移」；扩大回归 856 passed，失败与错误在纯 HEAD 上逐条复现（design §8）
+  - 记录：前缀维基线 `_PREFIXED_IDENTITY_ONLY_BASELINE` 按现算下调：本地分支 270 → 243；远端分支已因 consol-autotree 先降到 256，重放后 239（差 4 个端点来自远端）；`routers/attachments.py::_ensure_project_access` 的请求体维证明链改为要求 `assert_project_permission`；`test_project_endpoint_authorization_baseline.py` 现 857 行（白名单 821 未改，门限 862）；锚点「均无需平移」；扩大回归 856 passed，失败与错误在纯 HEAD 上逐条复现（design §8）
 
 - [x] 10. 共享库迁移与走查（需求 5.4）
   - `MigrationRunner(...).run_pending()` 应用本 spec 迁移（V211）；【测试】项目上接口走查 + 浏览器走查（附件管理页上传、写入长识别文本、弹窗全文、确认、刷新）；走查数据走平台路径清理并逐表对账

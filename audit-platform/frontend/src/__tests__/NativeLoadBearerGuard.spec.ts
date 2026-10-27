@@ -65,7 +65,7 @@ const SCRIPT_NAVIGATIONS: Entry[] = [
   { file: 'components/common/GtPrintPreview.vue', expr: "''", kind: 'blank-window', why: '打印预览自己写入内容' },
   { file: 'components/ledger-import/DiagnosticPanel.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },
   { file: 'components/ledger-import/ErrorDialog.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },
-  { file: 'components/workpaper/composables/g7ConsolLinkageEntry.ts', expr: '`/projects/${projectId.value}/consolidation?year=${year.value}`', kind: 'frontend-route', why: '合并页' },
+  { file: 'components/workpaper/composables/g7ConsolLinkageEntry.ts', expr: '`/projects/${projectId.value}/consolidation*', kind: 'frontend-route', why: '合并页（查询串写法随审计年度改动，前缀匹配）' },
   { file: 'composables/useAcnrDrill.ts', expr: 'route', kind: 'frontend-route', why: '地址穿透的站内路由' },
   { file: 'stores/auth.ts', expr: "'/login'", kind: 'frontend-route', why: '登录页' },
   { file: 'utils/http.ts', expr: "'/login'", count: 3, kind: 'frontend-route', why: '登录页' },
@@ -166,18 +166,24 @@ const TEMPLATE_HITS = [...SOURCES].filter(([f]) => f.endsWith('.vue')).flatMap((
 const NAV_HITS = [...SOURCES].flatMap(([f, s]) => scanNavigations(f, s))
 const HREF_HITS = [...SOURCES].flatMap(([f, s]) => scanHrefAssignments(f, s))
 
-function tally(hits: Hit[]): Map<string, number> {
-  const m = new Map<string, number>()
-  for (const h of hits) m.set(`${h.file} :: ${h.expr}`, (m.get(`${h.file} :: ${h.expr}`) ?? 0) + 1)
-  return m
-}
-function registered(entries: Entry[]): Map<string, number> {
-  return new Map(entries.map((e) => [`${e.file} :: ${e.expr}`, e.count ?? 1]))
-}
-function diff(actual: Map<string, number>, expected: Map<string, number>) {
-  const unregistered = [...actual].filter(([k, n]) => (expected.get(k) ?? 0) !== n && !expected.has(k)).map(([k, n]) => `${k} ×${n}`)
-  const countMismatch = [...actual].filter(([k, n]) => expected.has(k) && expected.get(k) !== n).map(([k, n]) => `${k}：实际 ×${n}，登记 ×${expected.get(k)}`)
-  const stale = [...expected.keys()].filter((k) => !actual.has(k))
+/**
+ * 实际命中与登记逐条对账。登记的 expr 以 `*` 结尾表示前缀匹配：站内路由拼接查询串这类无害改写
+ * （如追加 `?year=`）不必每次改登记；改出 /api 仍由判据 B 的 /api 检查拦住。
+ */
+function diff(hits: Hit[], entries: Entry[]) {
+  const owner = (h: Hit) => entries.find((e) => e.file === h.file
+    && (e.expr.endsWith('*') ? h.expr.startsWith(e.expr.slice(0, -1)) : h.expr === e.expr))
+  const counts = new Map<Entry, number>()
+  const unregisteredTally = new Map<string, number>()
+  for (const h of hits) {
+    const e = owner(h)
+    if (e) counts.set(e, (counts.get(e) ?? 0) + 1)
+    else unregisteredTally.set(`${h.file} :: ${h.expr}`, (unregisteredTally.get(`${h.file} :: ${h.expr}`) ?? 0) + 1)
+  }
+  const unregistered = [...unregisteredTally].map(([k, n]) => `${k} ×${n}`)
+  const countMismatch = entries.filter((e) => counts.has(e) && counts.get(e) !== (e.count ?? 1))
+    .map((e) => `${e.file} :: ${e.expr}：实际 ×${counts.get(e)}，登记 ×${e.count ?? 1}`)
+  const stale = entries.filter((e) => !counts.has(e)).map((e) => `${e.file} :: ${e.expr}`)
   return { unregistered, countMismatch, stale }
 }
 
@@ -195,7 +201,7 @@ describe('浏览器原生加载 / 跳转不得指向 /api（带不上 Bearer 头
 
   it('A：模板里每个绑定的 src / href 都已登记来源类别，且登记无失效条目', () => {
     const bound = TEMPLATE_HITS.filter((h) => h.bound)
-    const { unregistered, countMismatch, stale } = diff(tally(bound), registered(TEMPLATE_BINDINGS))
+    const { unregistered, countMismatch, stale } = diff(bound, TEMPLATE_BINDINGS)
     expect(unregistered, '新的原生加载绑定：指向 /api 的改走 useAuthedObjectUrl / downloadFile，其余按类别登记').toEqual([])
     expect(countMismatch).toEqual([])
     expect(stale, '登记条目已不存在，请删除').toEqual([])
@@ -208,7 +214,7 @@ describe('浏览器原生加载 / 跳转不得指向 /api（带不上 Bearer 头
   })
 
   it('B：每个 window.open / location 调用点都已登记，且登记无失效条目', () => {
-    const { unregistered, countMismatch, stale } = diff(tally(NAV_HITS), registered(SCRIPT_NAVIGATIONS))
+    const { unregistered, countMismatch, stale } = diff(NAV_HITS, SCRIPT_NAVIGATIONS)
     expect(unregistered, '新的原生跳转：指向 /api 的改走 downloadFile，站内路由 / 外链按类别登记').toEqual([])
     expect(countMismatch).toEqual([])
     expect(stale, '登记条目已不存在，请删除').toEqual([])
@@ -248,5 +254,24 @@ describe('浏览器原生加载 / 跳转不得指向 /api（带不上 Bearer 头
     expect(n.map((h) => h.expr)).toEqual(['`/api/exports/${id}`', 'P_att.download(id)'])
     // location.href = … 同时被两条判据看到（重复覆盖无害）
     expect(scanHrefAssignments('synthetic.vue', sfc).map((h) => h.expr)).toEqual(['P_att.download(id)', "'/api/x/download'"])
+  })
+
+  it('D：前缀登记只放行同文件、同前缀的写法；精确登记要求逐字一致；计数与失效照常判', () => {
+    const entries: Entry[] = [
+      { file: 'a.ts', expr: '`/projects/${pid}/x*', count: 2, kind: 'frontend-route', why: '' },
+      { file: 'a.ts', expr: "'/login'", kind: 'frontend-route', why: '' },
+      { file: 'a.ts', expr: "'/gone'", kind: 'frontend-route', why: '' },
+    ]
+    const hits: Hit[] = [
+      { file: 'a.ts', expr: '`/projects/${pid}/x?year=${y}`' },
+      { file: 'a.ts', expr: '`/projects/${pid}/x`' },
+      { file: 'b.ts', expr: '`/projects/${pid}/x`' }, // 别的文件：不受 a.ts 的前缀登记放行
+      { file: 'a.ts', expr: "'/login' " },             // 精确登记不放行近似写法
+    ]
+    const r = diff(hits, entries)
+    expect(r.unregistered).toEqual(['b.ts :: `/projects/${pid}/x` ×1', "a.ts :: '/login'  ×1"])
+    expect(r.countMismatch).toEqual([])
+    expect(r.stale).toEqual(["a.ts :: '/login'", "a.ts :: '/gone'"])
+    expect(diff(hits.slice(0, 1), entries).countMismatch).toEqual(['a.ts :: `/projects/${pid}/x*：实际 ×1，登记 ×2'])
   })
 })
