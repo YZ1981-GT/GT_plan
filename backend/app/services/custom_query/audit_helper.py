@@ -209,8 +209,8 @@ async def record_query_execution(
 
     节流判定复用 ``audit_throttle.should_record``（Redis SET NX EX；Redis 不可用时
     降级为全部记录）。节流键的动作名固定用非敏感的 ``custom_query.execute``（确保
-    参与节流），落库审计的动作类型标签由 ``action`` 决定（如批量执行传
-    ``custom_query.batch_execute``）。
+    参与节流），落库审计的动作类型标签由 ``action`` 决定（缺省 ``custom_query.execute``；
+    批量执行端点 ``custom_query.batch_execute`` 已随 advanced-query-linkage-closure 任务 6 删除）。
 
     Args:
         redis:    Redis 客户端（None → should_record 降级为全部记录）。

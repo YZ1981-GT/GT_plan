@@ -248,7 +248,6 @@
   "components/workpaper/shared/GCycleProcedureCutoffPanel.vue": 1,
   "composables/useAuditContext.ts": 2,
   "composables/useAuditData.ts": 1,
-  "composables/useBatchQuery.ts": 1,
   "composables/useFCycleEditor.ts": 1,
   "composables/usePenetrate.ts": 1,
   "composables/useProjectSelector.ts": 2,
