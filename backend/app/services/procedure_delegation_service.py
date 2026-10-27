@@ -14,9 +14,9 @@ Properties：P11（selector 展开等价）、P12（preview token 防篡改与�
   “当前粗裁保留（scope 非 skip/not_applicable）且 applicability=execute” 的 ProcedureRowTask 集合
   （Req 4.1 / P11）。三种 selector 统一走同一谓词，故 cycle/workpaper 展开集合 ==
   对全项目 tasks 应用范围+粗裁+applicability 谓词后的 row 集合。
-- **materialize 前置**：preview 若发现目标 wp_index 存在未物化 definition 行，先经 Task 4 的
-  ``materialize_job_store`` + ``ProcedureTaskMaterializationService.materialize`` 物化并返回
-  ``status=materialization_pending``（不产生可消费 preview）；客户端 job 成功后重新请求 preview（Req 4.2 / 2.8）。
+- **materialize 前置**：preview 同步完成前置（``procedure_delegation_prepare.prepare_row_tasks``：导入当前版本定义 →
+  物化缺的行任务 → 绑定已生成底稿，一个保存点；失败 ``preparation_ready=False``、计数清零），``status`` 恒为 ``ready``。
+  （原设计的 ``status=materialization_pending`` 异步 job 已不再产生，见 docs/contracts/procedure-chain/。）
 - **preview**：解析目标 + 分类（assign/reassign/unchanged/conflict/terminal），创建一次性
   ``ProcedureOperationPreview``（复用 Task 5 的 create_preview）；返回目标数 / 已分配 / 执行中 /
   已提交 / 冲突数 / 成员负载 / 受影响底稿 / 逐项双版本（lock+assignment）（Req 4.3）。
@@ -409,9 +409,8 @@ class ProcedureDelegationService(DelegationTargetScopeMixin):
     ) -> dict:
         """委派预览：materialize 前置 + 解析目标 + 分类 + 创建一次性 preview（只 flush）。
 
-        - selector 目标存在未物化行 → 触发前置 materialize job 并返回 ``status=materialization_pending``，
-          不产生 preview；客户端 job 成功后重新请求（Req 2.8 / 4.2）。
-        - 否则返回 ``status=ready`` + preview_id + 统计（Req 4.3）。
+        - cycle / workpaper selector 先同步完成前置（导入定义 / 物化 / 绑定底稿），再解析目标；
+          恒返回 ``status=ready`` + preview_id + 统计（Req 4.3；前置失败见 ``preparation_ready``）。
         """
         if conflict_policy not in (CONFLICT_REJECT, CONFLICT_REPLACE):
             raise HTTPException(status_code=422, detail=f"非法 conflict_policy: {conflict_policy}")

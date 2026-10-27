@@ -195,3 +195,28 @@ R14 变异 D6（去掉 `--confirm` 校验）时，`test_script_refuses_apply_wit
 - V207 生效要全量重启 start-dev（或经用户同意用 `MigrationRunner(...).run_pending()`）。
 - 约 40 处测试各自判断 `startswith("postgresql")`（不认 `postgres://`），`GT_REQUIRE_PG` 只管 pg_only 标记的用例。
 - `GET` / `POST /api/projects/{project_id}/assignments` 只要求登录（团队名单跨项目可读；保存同样只校登录，即已登记待立 spec 的「委派自封经理」R1），本 spec 未改。
+
+## §12 实施记录（批 5，2026-10-27）
+
+### 12.1 与设计的偏差
+
+- 契约 11 份 + `common`：R22 列的名字里 DelegationPreview / DelegationApply 拆成两份。粗裁预览 / 应用的请求与响应放在 `trimmed-scope.schema.json#/$defs`，按编码生成 / 模板集生成的请求与响应放在 `generation-receipt.schema.json#/$defs`，没有另立文件；成功信封与 422 体在 `common`。
+- schema 文件不写 `$schema`（IDE 会去下载远程元模式）：方言由校验器固定为 2020-12（Python `Draft202012Validator`，Java networknt），自检用例断言不写。
+- 设计写「`test_procedure_chain_contracts.py` 用 TestClient + 夹具取真实响应」：委派前置（导入定义、物化任务）与粗裁读取用到 PG 方言，SQLite 上走不通 ⇒ 拆成两份：`tests/contracts/test_procedure_chain_contracts.py`（不连库：schema 自检、`cases/` 共享用例逐条跑 Python 实现、服务层真实产物）+ `tests/procedure_chain_e2e/test_procedure_chain_contracts_pg.py`（真实应用 + 真库回滚事务：按编码 / 模板集生成、粗裁预览与应用、委派预览与应用（原子 / best_effort / 冲突 409 / 跨循环 400 后带理由重试）、程序行归属、覆盖值批量、422 与信封；以及同事务落库的生命周期事件、程序行定义与任务、任务历史、outbox 载荷）。每处校验旁断言确有内容，免得空列表让校验空转。
+- 序列化放在数据类方法上（`TrimmedScope.decide / to_payload`、`GenerationPlan.to_payload`、`MemberScope.to_payload`、`BacklogRow.to_payload`），没有单独的适配层。
+- 修一处真实行为：转派的任务历史 / outbox 的 `from_status` 恒记 `assigned`（11.4）⇒ 记转派前的真实状态，契约照修正后的行为写；更早的历史行不回填（前端不读这个字段，全前端 0 处）。委派服务文档里早已不再产生的 `materialization_pending` 说明删掉。
+- R21 用例与 PG 契约用例共用 `tests/procedure_chain_e2e/conftest.py`（`db`、旁路写入换内存）与 `_chain_world.py`；世界里的人员改为快照：路由出错回滚保存点会让会话里的 ORM 对象过期，之后读属性是异步懒加载（MissingGreenlet，契约用例冲突 409 之后踩到）。
+- OpenAPI 子集：这些路由返回普通 dict，FastAPI 生成的响应 schema 全是空的 ⇒ 2xx 的 `data` 与登记的错误详情 `$ref` 到契约（每个接口 `x-contract` 写明对应关系）；422 用平台真实的 `{code, message, detail}`（FastAPI 默认的 `HTTPValidationError` 与 `validation_exception_handler` 不符）；组件按模型名命名、只取传递闭包；tags 与文档字符串不进子集（调整路由分组、改注释不让 `--check` 红）。另加请求比对：pydantic 请求模型与契约请求定义的字段、必填逐层一致（含选择器 / 条目 / 覆盖项），比对器自带三种漂移的自检。
+- `jsonschema==4.26.0`、`referencing==0.37.0` 写进 `backend/requirements.txt`（此前只是 schemathesis 的传递依赖）。`procedure_task_transition_service.py` 在 HEAD 已 918 行且未登记白名单，改一行即被行数门拒 ⇒ 登记 919（拆分方向写在白名单注释）。
+
+### 12.2 预存失败（709b21275 干净检出逐条复现，非本 spec）
+
+后端链路 12 例、守卫 13 例、PG 3 + 3 与批 4（11.2）逐条相同；批 5 没有前端改动，前端未重跑。`tests/procedure_delegation` 下 transition / review / performance 用例连真库并提交，本批未跑（它们不断言 `from_status`，已核对源码）。
+
+### 12.3 浏览器实测
+
+批 5 没有前端改动；转派历史前态的修正前端不读（见 12.1），由状态机共享用例覆盖，界面无可测之处。
+
+### 12.4 范围外发现（未改，汇报用户）
+
+- 全应用 `/openapi.json`：返回 dict 的路由响应 schema 全是空的；422 按 FastAPI 默认的 `{detail}` 描述，与平台真实的 `{code, message, detail}` 不符；导出时有重复 operationId 告警（j1 导入导出、B60 章节定义）。照它生成的类型化客户端会拿错错误体。

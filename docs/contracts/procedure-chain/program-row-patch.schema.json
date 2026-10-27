@@ -1,0 +1,54 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/program-row-patch.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/routers/wp_field_overrides.py（POST /api/workpapers/field-overrides/batch）",
+  "title": "ProgramRowPatch（程序表行字段覆盖值批量写入）",
+  "description": "一次鉴权（项目 edit 级）、每项一个保存点、一次提交；不能写的项逐条回报原因、不影响其他项。每项判定与单条端点相同：程序表行（scope = procedure_table:*）受限用户只能写派给本人的行、且只能写 status / execution_summary；非委派人不能把行改成 / 改出「不适用」。顶层 = 响应；请求见 $defs/request。",
+  "type": "object",
+  "required": ["saved", "failed"],
+  "additionalProperties": false,
+  "properties": {
+    "saved": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/itemKey" }
+    },
+    "failed": {
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/itemKey" }],
+        "required": ["status", "reason"],
+        "properties": {
+          "status": { "description": "该项被拒的 HTTP 状态（403 / 404 / 409 / 422）。", "type": "integer", "minimum": 400, "maximum": 599 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "itemKey": {
+      "type": "object",
+      "required": ["scope", "item_key", "field"],
+      "properties": {
+        "scope": { "type": "string", "maxLength": 50 },
+        "item_key": { "type": "string", "maxLength": 100 },
+        "field": { "type": "string", "maxLength": 50 }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["project_id", "year", "items"],
+      "properties": {
+        "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "year": { "type": "integer" },
+        "items": {
+          "description": "单次上限 200 项（超出 422，不截断）。",
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "allOf": [{ "$ref": "#/$defs/itemKey" }],
+            "properties": { "value": {} }
+          }
+        }
+      }
+    }
+  }
+}

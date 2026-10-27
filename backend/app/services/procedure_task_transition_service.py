@@ -547,6 +547,7 @@ class ProcedureTaskTransitionService:
             return self._result(task, changed=False)
 
         old_assignee = task.assignee_staff_id
+        from_status = task.workflow_status  # 历史记真实前态（原先一律记 assigned：执行中 / 已提交的转派也显示 assigned→assigned）
         task.assignee_staff_id = new_assignee_staff_id
         task.workflow_status = WORKFLOW_ASSIGNED
         task.assignment_version = (task.assignment_version or 0) + 1
@@ -558,7 +559,7 @@ class ProcedureTaskTransitionService:
         await self._emit(
             task,
             event_type="reassigned",
-            from_status=WORKFLOW_ASSIGNED,
+            from_status=from_status,
             to_status=WORKFLOW_ASSIGNED,
             actor_user_id=actor_user_id,
             request_id=request_id,

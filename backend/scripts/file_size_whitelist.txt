@@ -1676,3 +1676,7 @@ audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.s
 #     入册而不拆：拆分会动判据实现本身，变异证明要重做。拆分方向：模板层（openpyxl 事实）/
 #     源码层（域文件、行身份、import 图）两个模块，入口模块保留 re-export。
 backend/scripts/analyze/n_cycle_scanner.py  977
+#   procedure_task_transition_service.py —— 历史大文件（HEAD 已 918 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-27 procedure-chain-hardening-and-java-contracts R22：转派的任务历史 / outbox 改记转派前的真实状态（+1）。
+#     拆分方向：状态转换（assign / reassign / submit …）与写入（任务历史 + 有序 outbox + 精确投影）两块，写入块抽成独立模块。
+backend/app/services/procedure_task_transition_service.py  919

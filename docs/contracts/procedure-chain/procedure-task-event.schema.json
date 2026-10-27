@@ -1,0 +1,85 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/procedure-task-event.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_task_transition_service.py（_write_outbox / _append_history）、procedure_trim_service.py、wp_visibility/delegation_transaction.py、procedure_reconcile_service.py",
+  "title": "ProcedureTaskEvent（程序行任务事件）",
+  "description": "顶层 = 有序 outbox 事件载荷（task_events.payload；信封 event_type = procedure_task.{event_type}，aggregate = procedure_row_task / task_id，aggregate_version = lock_version，idempotency_key = {task_id}:{event_type}:{lock_version}）。每个成功的状态转换同事务写一条任务历史（$defs/historyRow）+ 一条 outbox + 精确投影。from_status = 转换前的真实工作流状态。状态机见 README「任务状态机」与 cases/task-state-machine.cases.json。",
+  "type": "object",
+  "required": [
+    "task_id", "project_id", "wp_index_id", "wp_id", "sheet_key", "definition_key", "event_type",
+    "from_status", "to_status", "assignment_version", "lock_version", "actor_user_id",
+    "assignee_staff_id", "reviewer_staff_id", "audit_cycle_snapshot", "detail"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "task_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "wp_index_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "wp_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+    "sheet_key": { "type": "string" },
+    "definition_key": { "type": "string" },
+    "event_type": { "$ref": "#/$defs/transitionEvent" },
+    "from_status": { "anyOf": [{ "$ref": "#/$defs/workflowStatus" }, { "type": "null" }] },
+    "to_status": { "anyOf": [{ "$ref": "#/$defs/workflowStatus" }, { "type": "null" }] },
+    "assignment_version": { "$ref": "common.schema.json#/$defs/count" },
+    "lock_version": { "$ref": "common.schema.json#/$defs/count" },
+    "actor_user_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+    "assignee_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+    "reviewer_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+    "audit_cycle_snapshot": { "type": "string" },
+    "detail": { "type": "object" }
+  },
+  "$defs": {
+    "workflowStatus": {
+      "enum": ["unassigned", "assigned", "acknowledged", "in_progress", "submitted", "changes_requested", "reviewed", "cancelled"]
+    },
+    "applicabilityStatus": { "enum": ["execute", "not_applicable"] },
+    "transitionEvent": {
+      "description": "经状态机写的事件（同时进 outbox）。cancel / reopen 的调用方可换成更具体的名字：细裁 trim_not_applicable / trim_restore，裁剪方案行条目 scheme_not_applicable / scheme_restore，粗裁级联 scheme_scope_cascade / scheme_scope_restore。",
+      "enum": [
+        "cancel", "reopen", "assigned", "reassigned", "reviewer_changed", "acknowledged", "started",
+        "submitted", "changes_requested", "reviewed", "backfill_seed",
+        "trim_not_applicable", "trim_restore", "scheme_not_applicable", "scheme_restore",
+        "scheme_scope_cascade", "scheme_scope_restore"
+      ]
+    },
+    "historyOnlyEvent": {
+      "description": "只写任务历史、不进 outbox 的事件：定义迁移 reconcile_migrate；底稿门委派事务 {assignee|reviewer}_{assign|reassign|clear}。",
+      "enum": [
+        "reconcile_migrate", "assignee_assign", "assignee_reassign", "assignee_clear",
+        "reviewer_assign", "reviewer_reassign", "reviewer_clear"
+      ]
+    },
+    "historyRow": {
+      "description": "procedure_row_task_history 一行（只追加）。",
+      "type": "object",
+      "required": [
+        "id", "task_id", "project_id", "event_type", "from_status", "to_status", "old_assignee_staff_id",
+        "new_assignee_staff_id", "old_reviewer_staff_id", "new_reviewer_staff_id", "actor_user_id", "reason",
+        "request_id", "assignment_version", "lock_version", "definition_revision_hash", "audit_cycle_snapshot",
+        "detail", "created_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "task_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "event_type": { "anyOf": [{ "$ref": "#/$defs/transitionEvent" }, { "$ref": "#/$defs/historyOnlyEvent" }] },
+        "from_status": { "anyOf": [{ "$ref": "#/$defs/workflowStatus" }, { "type": "null" }] },
+        "to_status": { "anyOf": [{ "$ref": "#/$defs/workflowStatus" }, { "type": "null" }] },
+        "old_assignee_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "new_assignee_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "old_reviewer_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "new_reviewer_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "actor_user_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "reason": { "type": ["string", "null"] },
+        "request_id": { "type": ["string", "null"], "maxLength": 80 },
+        "assignment_version": { "$ref": "common.schema.json#/$defs/count" },
+        "lock_version": { "$ref": "common.schema.json#/$defs/count" },
+        "definition_revision_hash": { "anyOf": [{ "$ref": "common.schema.json#/$defs/sha256Hex" }, { "type": "null" }] },
+        "audit_cycle_snapshot": { "type": ["string", "null"] },
+        "detail": { "type": "object" },
+        "created_at": { "$ref": "common.schema.json#/$defs/dateTime" }
+      }
+    }
+  }
+}

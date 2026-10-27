@@ -1,0 +1,48 @@
+{
+  "contract": "program-row-identity.schema.json",
+  "description": "程序行身份共享用例。definition_keys 的期望值由 Python 参考实现（procedure_definition_importer.compute_definition_key）算出后冻结，输入是已规范化的字段（procedure_text 已经 normalize_text、ref_snapshot 已经拆分去重）；ref_snapshot 先排序再进摘要，所以两种顺序得同一个键。normalize_text = NFKC + \\r\\n / \\r → \\n + 去首尾空白；ref_snapshot = ref_index 把 \\ 换成 / 后按 / 拆开、各段去空白、丢空段，再加 auto:{自动取数源}（源为空或 none / null 不加），去重保序。task_program_no = 任务 / 覆盖值匹配用（procedure_row_trim_service.normalize_program_no：能解析成整数的都写成整数，其余原样去空白）；definition_program_no = 定义导入用（保留模板文字：NFKC + 去空白，浮点整数转整数）。",
+  "definition_keys": [
+    {
+      "template_code": "D2A", "sheet_key": "D2A", "program_no": "1",
+      "procedure_text": "获取或编制应收账款明细表，复核加计是否正确",
+      "ref_snapshot": ["D2-1", "auto:adjustment_count_aje"],
+      "definition_key": "D2A::D2A::86767904d98a6b2e"
+    },
+    {
+      "template_code": "D2A", "sheet_key": "D2A", "program_no": "1",
+      "procedure_text": "获取或编制应收账款明细表，复核加计是否正确",
+      "ref_snapshot": ["auto:adjustment_count_aje", "D2-1"],
+      "definition_key": "D2A::D2A::86767904d98a6b2e"
+    },
+    {
+      "template_code": "E1A", "sheet_key": "E1A", "program_no": "23",
+      "procedure_text": "检查银行存款余额调节表\n核对未达账项",
+      "ref_snapshot": [],
+      "definition_key": "E1A::E1A::cda7fe35a08cd559"
+    },
+    {
+      "template_code": "H3A", "sheet_key": "H3A", "program_no": "",
+      "procedure_text": "Quote \"x\" \\ back\tslash",
+      "ref_snapshot": ["H3-1"],
+      "definition_key": "H3A::H3A::f7f2d0aa8ddc2238"
+    }
+  ],
+  "normalize_text": [
+    ["第一步\r\n核对\r末尾", "第一步\n核对\n末尾"],
+    ["  ＡＢＣ１２３　", "ABC123"],
+    [null, ""],
+    ["\t混合 空白\n", "混合 空白"]
+  ],
+  "ref_snapshot": [
+    { "ref_index": "G1-1/G1-2", "auto_data_source": "adjustment_count_aje", "expected": ["G1-1", "G1-2", "auto:adjustment_count_aje"] },
+    { "ref_index": "D2-1\\D2-2/D2-1", "auto_data_source": null, "expected": ["D2-1", "D2-2"] },
+    { "ref_index": "", "auto_data_source": "none", "expected": [] },
+    { "ref_index": " / ", "auto_data_source": "NULL", "expected": [] }
+  ],
+  "task_program_no": [
+    [1, "1"], [1.0, "1"], ["1", "1"], ["1.0", "1"], ["05", "5"], [" 3 ", "3"], ["1.5", "1.5"], ["A1", "A1"], [null, ""], ["", ""]
+  ],
+  "definition_program_no": [
+    [1, "1"], [1.0, "1"], ["05", "05"], [" 3 ", "3"], ["１", "1"], [null, ""], ["", ""]
+  ]
+}

@@ -51,6 +51,14 @@ class MemberScope:
     is_member: bool = False    # 本项目有未删除的项目成员行（没有就无从扩大可见范围）
     is_admin: bool = False     # 系统管理员
 
+    def to_payload(self) -> dict:
+        """契约 member-scope.schema.json：集合按升序列出。"""
+        return {
+            "is_supervisor": self.is_supervisor, "cycles": sorted(self.cycles), "assigned": sorted(self.assigned),
+            "expanded": sorted(self.expanded), "roles": sorted(self.roles), "is_member": self.is_member,
+            "is_admin": self.is_admin,
+        }
+
 
 def normalize_role(role: str | None) -> str:
     return (role or "").strip().lower()

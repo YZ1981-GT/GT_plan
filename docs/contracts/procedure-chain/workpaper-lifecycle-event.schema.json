@@ -1,0 +1,49 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/workpaper-lifecycle-event.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/migrations/V207__workpaper_lifecycle_events.sql + app/models/workpaper_lifecycle_models.py；写入：app/services/workpaper_recycle_service.py",
+  "title": "WorkpaperLifecycleEvent（底稿移入 / 恢复回收站事件）",
+  "description": "一张底稿（wp_index + 名下 working_paper）的一次移入 / 恢复。只追加（UPDATE / DELETE 被触发器拒绝），与移入 / 恢复同事务写入。不对 wp_index 建外键（事件比行活得久），对 projects 建外键（项目彻底删除时随项目清掉）。created_at 由应用在写入时给（同一事务先移入再恢复不会同一时刻）。回收站「删除人」= 该底稿最近一条事件为 recycled 时的 actor_user_id；没有事件的旧数据回退 wp_index.cross_ref_codes._recycle_lineage（$defs/legacyLineageEntry）。",
+  "type": "object",
+  "required": [
+    "id", "project_id", "wp_index_id", "wp_code", "event_type", "kind", "reason",
+    "actor_user_id", "request_id", "working_paper_ids", "trim_codes", "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "wp_index_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "wp_code": { "type": "string", "minLength": 1 },
+    "event_type": { "enum": ["recycled", "restored"] },
+    "kind": {
+      "description": "原因类别：trim（程序裁剪）/ standard_conversion（准则切换）/ 空串（手工删除；回收站手工恢复不限原因时取最后一次移入的类别）。",
+      "enum": ["trim", "standard_conversion", ""]
+    },
+    "reason": { "type": "string" },
+    "actor_user_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+    "request_id": { "type": ["string", "null"] },
+    "working_paper_ids": { "$ref": "common.schema.json#/$defs/uuidList" },
+    "trim_codes": {
+      "description": "导致移入的程序行编码（如 H3-2 ← H3）；恢复事件为空数组。",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "created_at": { "$ref": "common.schema.json#/$defs/dateTime" }
+  },
+  "$defs": {
+    "legacyLineageEntry": {
+      "description": "旧去向记录（JSON，仍照写以兼容）：wp_index.cross_ref_codes._recycle_lineage 的一项。",
+      "type": "object",
+      "required": ["action", "kind", "reason", "working_paper_ids", "actor", "at"],
+      "properties": {
+        "action": { "enum": ["recycled", "restored"] },
+        "kind": { "type": "string" },
+        "reason": { "type": "string" },
+        "trim_codes": { "type": "array", "items": { "type": "string" } },
+        "working_paper_ids": { "$ref": "common.schema.json#/$defs/uuidList" },
+        "actor": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "at": { "$ref": "common.schema.json#/$defs/dateTime" }
+      }
+    }
+  }
+}

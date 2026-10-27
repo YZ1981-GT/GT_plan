@@ -1,0 +1,74 @@
+{
+  "contract": "member-scope.schema.json",
+  "description": "有效循环范围共享用例。输入：system_role = users.role；staff_count = 该账号未删除的人员档案数；member_rows = 本项目未删除的 project_users 行（每项为 scope_cycles 原值，空列表 = 不是项目成员）；assignments = 挂在第一份人员档案上的团队分配（deleted=true 表示已软删）；index_cycles = 本项目底稿索引里出现的循环。supervisor_roles / standard_cycles 是契约常量（Python 与 Java 必须逐值一致）。",
+  "supervisor_roles": ["eqcr", "manager", "partner", "qc", "signing_partner", "合伙人", "独立复核合伙人", "质控", "项目经理"],
+  "standard_cycles": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"],
+  "cases": [
+    {
+      "name": "系统管理员：全部循环（含底稿索引里的其他循环）",
+      "input": { "system_role": "admin", "staff_count": 0, "member_rows": [], "assignments": [], "index_cycles": ["X1"] },
+      "expected": {
+        "is_supervisor": true,
+        "cycles": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S", "X1"],
+        "assigned": [], "expanded": [], "roles": [], "is_member": false, "is_admin": true
+      }
+    },
+    {
+      "name": "经理唯一链路：主管看全部（角色去空白、小写）",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": " Manager ", "assigned_cycles": null }], "index_cycles": [] },
+      "expected": {
+        "is_supervisor": true,
+        "cycles": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"],
+        "assigned": [], "expanded": [], "roles": ["manager"], "is_member": true, "is_admin": false
+      }
+    },
+    {
+      "name": "中文别名：项目经理",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": "项目经理", "assigned_cycles": ["D"] }], "index_cycles": [] },
+      "expected": {
+        "is_supervisor": true,
+        "cycles": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"],
+        "assigned": ["D"], "expanded": [], "roles": ["项目经理"], "is_member": true, "is_admin": false
+      }
+    },
+    {
+      "name": "质控也是主管",
+      "input": { "system_role": "qc", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": "qc", "assigned_cycles": null }], "index_cycles": [] },
+      "expected": {
+        "is_supervisor": true,
+        "cycles": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"],
+        "assigned": [], "expanded": [], "roles": ["qc"], "is_member": true, "is_admin": false
+      }
+    },
+    {
+      "name": "审计员：团队勾选 ∪ 扩权",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": ["E, F"], "assignments": [{ "role": "auditor", "assigned_cycles": ["D"] }], "index_cycles": ["X1"] },
+      "expected": { "is_supervisor": false, "cycles": ["D", "E", "F"], "assigned": ["D"], "expanded": ["E", "F"], "roles": ["auditor"], "is_member": true, "is_admin": false }
+    },
+    {
+      "name": "审计员什么都没勾 ⇒ 空集（不按「空 = 全部」）",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": "auditor", "assigned_cycles": [] }], "index_cycles": [] },
+      "expected": { "is_supervisor": false, "cycles": [], "assigned": [], "expanded": [], "roles": ["auditor"], "is_member": true, "is_admin": false }
+    },
+    {
+      "name": "经理但人员档案不唯一 ⇒ 按受限",
+      "input": { "system_role": "manager", "staff_count": 2, "member_rows": [null], "assignments": [{ "role": "manager", "assigned_cycles": ["G"] }], "index_cycles": [] },
+      "expected": { "is_supervisor": false, "cycles": ["G"], "assigned": ["G"], "expanded": [], "roles": ["manager"], "is_member": true, "is_admin": false }
+    },
+    {
+      "name": "勾选循环的旧写法 {cycles: [...]}",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": "auditor", "assigned_cycles": { "cycles": ["H"] } }], "index_cycles": [] },
+      "expected": { "is_supervisor": false, "cycles": ["H"], "assigned": ["H"], "expanded": [], "roles": ["auditor"], "is_member": true, "is_admin": false }
+    },
+    {
+      "name": "没有项目成员行的审计员",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [], "assignments": [{ "role": "auditor", "assigned_cycles": ["D"] }], "index_cycles": [] },
+      "expected": { "is_supervisor": false, "cycles": ["D"], "assigned": ["D"], "expanded": [], "roles": ["auditor"], "is_member": false, "is_admin": false }
+    },
+    {
+      "name": "已软删的团队分配不算（经理身份随之失效）",
+      "input": { "system_role": "auditor", "staff_count": 1, "member_rows": [null], "assignments": [{ "role": "manager", "assigned_cycles": ["D"], "deleted": true }], "index_cycles": [] },
+      "expected": { "is_supervisor": false, "cycles": [], "assigned": [], "expanded": [], "roles": [], "is_member": true, "is_admin": false }
+    }
+  ]
+}

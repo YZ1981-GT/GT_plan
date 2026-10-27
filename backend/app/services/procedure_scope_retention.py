@@ -196,6 +196,16 @@ class TrimmedScope:
             (trimmed if self.is_trimmed(code) else kept).append(code)
         return kept, trimmed
 
+    def decide(self, wp_code: str) -> dict:
+        """单码判定（契约 trimmed-scope ``$defs/decision``）：``wp_code`` 原样回填，没有程序行覆盖时 ``decided_by`` 为 None。"""
+        verdict = self.decided_by(wp_code)
+        return {"wp_code": wp_code, "decided_by": verdict[0] if verdict else None,
+                "trimmed": bool(verdict and verdict[1])}
+
+    def to_payload(self) -> dict:
+        """快照规范形（契约 docs/contracts/procedure-chain/trimmed-scope.schema.json）：编码 → 是否已裁，键排序。"""
+        return {"exact": dict(sorted(self.exact.items())), "ranges": dict(sorted(self.ranges.items()))}
+
 
 async def load_trimmed_scope(db: AsyncSession, project_id: UUID) -> TrimmedScope:
     """读取项目的粗裁结果。读取失败抛 :class:`TrimScopeUnavailable`（调用方不得按「无裁剪」继续）。"""
@@ -258,6 +268,15 @@ class GenerationPlan:
         return {
             "skipped_trimmed_codes": list(self.skipped_trimmed_codes),
             "in_recycle_codes": list(self.in_recycle_codes),
+        }
+
+    def to_payload(self) -> dict[str, list[str]]:
+        """四类分流（契约 generation-plan.schema.json），各列表保持输入顺序。"""
+        return {
+            "to_create": list(self.to_create),
+            "skipped_trimmed_codes": list(self.skipped_trimmed_codes),
+            "in_recycle_codes": list(self.in_recycle_codes),
+            "existing_codes": list(self.existing_codes),
         }
 
 

@@ -79,9 +79,16 @@
 
 ## 5. 批 5：Java 契约
 
-- [ ] 5.1 R22 十个 JSON Schema + README（状态机 / 错误码 / 事务边界 / 鉴权口径）
-- [ ] 5.2 R23 契约测试（真实响应校验 + schema 自检 + 变异）；OpenAPI 子集导出 `--check`
-- [ ] 5.3 批 5 回归、提交推送
+- [x] 5.1 R22 十个 JSON Schema + README（状态机 / 错误码 / 事务边界 / 鉴权口径）
+  - `docs/contracts/procedure-chain/`：11 份契约 + `common`（2020-12，`$id` 带 `v1`，不写 `$schema`）；`cases/` 6 份共享用例（粗裁判定 3 组、生成分流 2、程序行身份 29 条、成员范围 10 + 常量、任务状态机 31、存量分类 8）；`README.md`（文件、校验方式与 Java 侧前缀映射、粗裁判定、回执措辞、状态机表、委派、鉴权口径、事务边界、错误码、已知差异）；`docs/README.md` 目录加 `contracts/`
+  - Python 侧序列化：`TrimmedScope.decide / to_payload`、`GenerationPlan / MemberScope / BacklogRow.to_payload`；转派历史 / outbox 的 `from_status` 改记转派前的真实状态（design §12.1）
+- [x] 5.2 R23 契约测试（真实响应校验 + schema 自检 + 变异）；OpenAPI 子集导出 `--check`
+  - `tests/contracts/test_procedure_chain_contracts.py`（65）：schema 集合固定、2020-12 自检、`$id` 与 `$ref` 可解析；共享用例逐条跑 Python 实现（状态机 31 条经真实转换服务，失败零副作用）；服务层产物（生成回执、生命周期事件与旧去向记录、任务历史与 outbox、存量分类与汇总）按 schema 校验
+  - `tests/procedure_chain_e2e/test_procedure_chain_contracts_pg.py`（2，真库回滚事务）：按编码 / 模板集生成、粗裁预览与应用、委派预览与应用（原子 / best_effort / 冲突 409 / 跨循环 400 与带理由重试）、程序行归属、覆盖值批量、422 与信封，以及同事务落库的事件 / 定义 / 任务 / 历史 / outbox 按 schema 校验；跑完真库无孤儿行、无残留模板集
+  - `scripts/gen/export_procedure_chain_openapi.py` → `openapi.procedure-chain.json`（8 个接口、10 个组件）；`tests/contracts/test_procedure_chain_openapi.py`（5）：重跑写回与仓库文件逐字节相同、`--check` 不写且逐处列出差异、结构与引用全可解析、请求模型 ⇔ 契约请求逐层一致（比对器自检三种漂移）、子集规则、只在内容变化时写（不计行尾）
+  - 变异 28 条全红：契约实现 9（回执字段、同码多行、摘要位数、程序号、主管角色、转派前态、范围排序、单码判定、存量字段）、真实响应 9（预览前置标志、行归属、覆盖值失败项、扩权回执、拒绝体、422 体、事件 trim_codes、模板集 count、冲突体）、OpenAPI 10（路由改名、请求模型加字段 2、契约请求多字段、data 不挂契约、行尾、差异符号、闭包、命名、--check 写盘）
+- [x] 5.3 批 5 回归、提交推送
+  - 回归（709b21275 干净检出对照）：后端链路 112 文件 12 红 = 基线 108 文件逐条相同（2514 / 2420 passed，多出的 70 = 新契约用例）；PG 36 文件 3 红 + 3 错误 = 基线 33 文件逐条相同（399 / 393 passed）；守卫 25 文件 13 红 = 基线逐条相同；批 5 没有前端改动；行数门通过（转换服务登记白名单 919）
 
 ## 6. 收尾
 

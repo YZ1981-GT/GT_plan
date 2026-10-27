@@ -1,0 +1,100 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/generation-receipt.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/wp_generation_receipt.py（GenerationReceipt.to_payload）",
+  "title": "GenerationReceipt（建底稿统一回执）",
+  "description": "模板集生成 / 按编码生成 / 自定义底稿 / 链路编排 / IPO / B60 / 准则转换共用。失败不计入新建：单码保存点内建行或落文件失败只回滚该码、删掉已落文件、进 failures。created == len(created_codes)；blank_codes ⊆ created_codes。各入口另加的原有字段保留（additionalProperties 放开），见 $defs。",
+  "type": "object",
+  "required": [
+    "created", "created_codes", "existing_codes", "skipped_trimmed_codes", "in_recycle_codes",
+    "blank_codes", "failures", "header_failures", "header_unfilled", "ignored_codes", "message"
+  ],
+  "properties": {
+    "created": { "$ref": "common.schema.json#/$defs/count" },
+    "created_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "existing_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "skipped_trimmed_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "in_recycle_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "blank_codes": {
+      "description": "找不到模板、建了空白底稿的编码（已计入新建）。",
+      "$ref": "common.schema.json#/$defs/codeList"
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["wp_code", "error"],
+        "additionalProperties": false,
+        "properties": {
+          "wp_code": { "type": "string" },
+          "error": { "type": "string", "minLength": 1, "maxLength": 300 }
+        }
+      }
+    },
+    "header_failures": {
+      "description": "填了表头但没填上（底稿已建）。",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["wp_code", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "wp_code": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "header_unfilled": {
+      "description": "请求内不填表头的入口（模板集 / 链路编排 / IPO / B60）新建的 xlsx / xlsm 份数。",
+      "$ref": "common.schema.json#/$defs/count"
+    },
+    "ignored_codes": {
+      "description": "选中但不在所选模板集里的编码（只有模板集生成有）。",
+      "$ref": "common.schema.json#/$defs/codeList"
+    },
+    "message": {
+      "description": "给用户看的一句话，各入口同一措辞（README「回执措辞」）。",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "generateFromCodesRequest": {
+      "description": "POST /api/projects/{project_id}/working-papers/generate-from-codes（extra=forbid）。year 缺省按项目审计年度。",
+      "type": "object",
+      "required": ["wp_codes"],
+      "additionalProperties": false,
+      "properties": {
+        "wp_codes": { "type": "array", "items": { "type": "string" } },
+        "year": { "type": ["integer", "null"] }
+      }
+    },
+    "generateFromCodesResponse": {
+      "description": "回执 + 原有字段 skipped（= 已存在数）/ skipped_codes（= existing_codes）。",
+      "allOf": [{ "$ref": "#" }],
+      "required": ["skipped", "skipped_codes"],
+      "properties": {
+        "skipped": { "$ref": "common.schema.json#/$defs/count" },
+        "skipped_codes": { "$ref": "common.schema.json#/$defs/codeList" }
+      }
+    },
+    "templateSetGenerateRequest": {
+      "description": "POST /api/projects/{project_id}/working-papers/generate（extra=forbid）。selected_templates 不传 = 整套生成，空列表 = 一个都不生成；不在模板集里的编码进回执 ignored_codes。",
+      "type": "object",
+      "required": ["template_set_id"],
+      "additionalProperties": false,
+      "properties": {
+        "template_set_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "year": { "type": ["integer", "null"] },
+        "selected_templates": { "anyOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }] }
+      }
+    },
+    "templateSetGenerateResponse": {
+      "description": "POST /api/projects/{project_id}/working-papers/generate：回执 + count（原有字段，= 新建的底稿份数，与 created 相同）。",
+      "allOf": [{ "$ref": "#" }],
+      "required": ["count"],
+      "properties": {
+        "count": { "$ref": "common.schema.json#/$defs/count" }
+      }
+    }
+  }
+}
