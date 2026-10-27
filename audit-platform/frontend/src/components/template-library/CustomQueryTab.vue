@@ -503,6 +503,7 @@ import { customQuery as P_cq, projects as P_proj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
 import { exportQueryResultToXlsx } from '@/components/query/queryExport'
+import { reportTypeOfSource } from '@/components/query/querySourceUri'
 import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
@@ -863,12 +864,9 @@ function buildFilters(): Record<string, any> {
       out[c.field] = c.value
     }
   }
-  // 后端期望的常用字段
-  if (formCtx.value.source === 'report' || formCtx.value.source.startsWith('report_')) {
-    if (formCtx.value.source.startsWith('report_')) {
-      out.report_type = formCtx.value.source.replace('report_', '')
-    }
-  }
+  // 后端期望的常用字段：只给报表叶子带报表类型（报表行次配置 report_lines 也以 report_ 开头，带上即 0 行）
+  const reportType = reportTypeOfSource(formCtx.value.source)
+  if (reportType) out.report_type = reportType
   return out
 }
 

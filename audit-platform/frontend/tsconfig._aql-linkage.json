@@ -12,6 +12,9 @@
     "src/views/__tests__/AdvancedQueryBuilder.spec.ts",
     "src/components/query/queryColumnLabels.ts",
     "src/components/query/__tests__/queryColumnLabels.spec.ts",
+    "src/components/query/querySourceUri.ts",
+    "src/components/query/__tests__/querySourceUri.spec.ts",
+    "src/components/query/CustomQueryDialog.vue",
     "src/env.d.ts"
   ]
 }

@@ -234,7 +234,7 @@ import http from '@/utils/http'
 import { fmtAmount } from '@/utils/formatters'
 import { resolveColumnLabel } from './queryColumnLabels'
 import { exportQueryResultToXlsx, sanitizeExportName } from './queryExport'
-import { buildTraceUri, RESOLVE_FAIL_MSG } from './querySourceUri'
+import { buildTraceUri, reportTypeOfSource, RESOLVE_FAIL_MSG } from './querySourceUri'
 import { useAuthStore } from '@/stores/auth'
 import { listProjectsWithProgress } from '@/services/commonApi'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
@@ -810,7 +810,8 @@ async function executeQuery() {
   try {
     const source = selectedSource.value
     const filters: Record<string, any> = {}
-    if (source.startsWith('report_')) filters.report_type = filterReportType.value
+    // 只给报表叶子带报表类型；报表行次配置（report_lines）也以 report_ 开头，带上即按 report_type='lines' 过滤得 0 行
+    if (reportTypeOfSource(source)) filters.report_type = filterReportType.value
     if (source === 'adj_aje') filters.adjustment_type = 'AJE'
     if (source === 'adj_rcl') filters.adjustment_type = 'RCL'
     if (source.startsWith('ws_')) filters.sheet_key = source.replace('ws_', '')

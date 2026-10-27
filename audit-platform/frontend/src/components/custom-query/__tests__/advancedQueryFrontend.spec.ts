@@ -395,6 +395,28 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     await flushPromises()
     expect(wrapper.vm.emptyHint).toBe('')
   })
+
+  it('报表行次配置不带 report_type，报表叶子才带（advanced-query-linkage-closure 任务 17）', async () => {
+    // 改造前两处都按 startsWith('report_') 派生：report_lines ⇒ report_type='lines'，后端按不存在的报表类型过滤得 0 行
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+    ])
+    wrapper.vm.formCtx.project_id = 'p-2025'
+    apiMocks.post.mockClear()
+    apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
+    for (const source of ['report_lines', 'report_income_statement']) {
+      wrapper.vm.formCtx.source = source
+      await wrapper.vm.onExecute()
+      await flushPromises()
+    }
+    const bodies = apiMocks.post.mock.calls
+      .filter(([url]: any[]) => String(url).includes('execute'))
+      .map(([, body]: any[]) => body)
+    expect(bodies.map((b: any) => b.source)).toEqual(['report_lines', 'report_income_statement'])
+    expect(bodies[0].filters).not.toHaveProperty('report_type')
+    expect(bodies[1].filters.report_type).toBe('income_statement')
+    apiMocks.post.mockResolvedValue({})
+  })
 })
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildWorkpaperUri, buildTraceUri, RESOLVE_FAIL_MSG } from '../querySourceUri'
+import { buildWorkpaperUri, buildTraceUri, reportTypeOfSource, RESOLVE_FAIL_MSG } from '../querySourceUri'
 
 describe('buildWorkpaperUri — URI 拼装 (Property 7)', () => {
   it('完整三段', () => {
@@ -46,6 +46,26 @@ describe('buildTraceUri — 溯源 URI 推断分支', () => {
 
   it('全无则返回空串', () => {
     expect(buildTraceUri({}, '')).toBe('')
+  })
+})
+
+describe('reportTypeOfSource — 只有报表叶子带报表类型（advanced-query-linkage-closure 任务 17）', () => {
+  it('报表叶子 report_{类型} → 类型', () => {
+    expect(reportTypeOfSource('report_balance_sheet')).toBe('balance_sheet')
+    expect(reportTypeOfSource('report_income_statement')).toBe('income_statement')
+    expect(reportTypeOfSource('report_impairment_provision')).toBe('impairment_provision')
+  })
+
+  it('报表行次配置 report_lines 不是报表叶子（否则请求带 report_type=lines，后端得 0 行）', () => {
+    expect(reportTypeOfSource('report_lines')).toBeNull()
+  })
+
+  it('通用 report、其他源与空键 → null', () => {
+    expect(reportTypeOfSource('report')).toBeNull()
+    expect(reportTypeOfSource('report_')).toBeNull()
+    expect(reportTypeOfSource('tb_detail')).toBeNull()
+    expect(reportTypeOfSource('adj_aje')).toBeNull()
+    expect(reportTypeOfSource('')).toBeNull()
   })
 })
 
