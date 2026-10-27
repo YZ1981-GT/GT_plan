@@ -199,6 +199,29 @@ def task_done(*ids: str) -> Check:
     return (f"tasks.md 里 {_ids(ids)} 已勾选", lambda: all(_task_states().get(t) is True for t in ids))
 
 
+@lru_cache(maxsize=None)
+def _task_states_at(commit: str) -> dict[str, bool]:
+    """历史提交里 tasks.md 顶层任务 → 是否勾选（`git show <commit>:<tasks.md>`；取不到即空表，判据随之不成立）。"""
+    import subprocess
+
+    rel = (_REPO / ".kiro" / "specs" / "acnr-foundation-defect-closure" / "tasks.md").relative_to(_REPO).as_posix()
+    proc = subprocess.run(["git", "-C", str(_REPO), "show", f"{commit}:{rel}"], capture_output=True)
+    if proc.returncode != 0:
+        return {}
+    states: dict[str, bool] = {}
+    for ln in proc.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").split("\n"):
+        m = re.match(r"^- \[([ xX])\]\*? (\d+)\. ", ln)
+        if m:
+            states[f"T{int(m.group(2)):02d}"] = m.group(1).lower() == "x"
+    return states
+
+
+def task_open_at(commit: str, *ids: str) -> Check:
+    """历史陈述（「某提交时尚未实施」）的判据：该提交的 tasks.md 里这些任务为 [ ]，不随之后的勾选失效。"""
+    return (f"提交 {commit} 的 tasks.md 里 {_ids(ids)} 为 [ ]",
+            lambda: (st := _task_states_at(commit)) != {} and all(st.get(t) is False for t in ids))
+
+
 def fact_eq(key: str, value: str) -> Check:
     return (f"现算 {key} = {value}", lambda: _facts()[key] == value)
 

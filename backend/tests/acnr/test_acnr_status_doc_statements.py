@@ -42,7 +42,7 @@ from tests.acnr._status_doc_checks import (
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
     _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, has_tests,
-    in_planned, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open,
+    in_planned, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
 )
 from tests.acnr.test_acnr_architecture_status_doc import (
     _REPO, H_COMPONENTS, H_FACTS, H_PLANNED, _cells, _claim_legacy_forwarding, _claim_stale_authz,
@@ -101,7 +101,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "本文其余段落为架构提案原文，未改一字，其中对「当前状态」的陈述以本节为准（见末尾「过时陈述勘误」）": P(
             outside_unchanged()),
         "修订（2026-10-27，段四审计 F4-01）：本节初版（提交 `96fba2c49`）把尚未实施的内容写成了现状（发布后目录规模、生成器结构化比对、版本锁持久化、跨模块单元格取值、显示名统一、「已完成 P0/P1/P2」等），已按上述口径重写": P(
-            task_open("T05", "T07", "T14", "T17", "T29", "T30"),
+            task_open_at("96fba2c49", "T05", "T07", "T14", "T17", "T29", "T30"),
             claim("tasks.md 的 33 个任务并未全部勾选（「已完成 P0/P1/P2」不成立）",
                   lambda: len(_task_states()) == 33 and not all(_task_states().values())),
             claim("现状节结构封闭（三张表与固定子节）", lambda: not _parsed()[1])),
