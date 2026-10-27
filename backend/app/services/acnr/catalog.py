@@ -108,6 +108,16 @@ class CatalogLoadError(Exception):
     """
     pass
 
+
+class CatalogIntegrityError(CatalogLoadError):
+    """目录自身完整性破坏（addr_id 重复 / 加载期互校不一致）时抛出。
+
+    继承 `CatalogLoadError`，`_load_catalog` 的降级分支与 `load_versioned_catalog`
+    按同一路径处理（§8 映射 409）。消息列前 10 个问题与总数。
+    Requirements: design §5.5 / D4
+    """
+    pass
+
 # ─── Catalog 数据路径 ───────────────────────────────────────────────────────
 _CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "acnr" / "global_catalog.json"
 
@@ -150,13 +160,23 @@ class CatalogIndex:
         self.cells_by_parent: dict[str, list[dict]] = {}
         # cell addr_id → entry
         self.cells_by_addr_id: dict[str, dict] = {}
+        # 父级 wp_code → 该父级下的 sheet 列表（§6.2 第 1 步用）
+        self.sheets_by_parent: dict[str, list[dict]] = {}
+
+        # ─── fail-closed：收集三类 addr_id 重复（design §5.5） ────────────
+        # sheet_code 重复不在此拦（以列表承载、解析时报歧义）。
+        _sheet_seen: dict[str, int] = {}
+        _cell_seen: dict[str, int] = {}
+        dup_problems: list[str] = []
 
         for s in sheets:
             aid = s.get("addr_id", "")
+            _sheet_seen[aid] = _sheet_seen.get(aid, 0) + 1
             self.sheets_by_addr_id[aid] = s
 
             code = s.get("sheet_code", "")
             self.sheets_by_code.setdefault(code, []).append(s)
+            self.sheets_by_parent.setdefault(s.get("parent_wp_code", ""), []).append(s)
 
             # 别名索引（含 sheet_name 本身作为 alias key）
             name = s.get("sheet_name", "")
@@ -167,9 +187,38 @@ class CatalogIndex:
 
         for c in cells:
             aid = c.get("addr_id", "")
+            _cell_seen[aid] = _cell_seen.get(aid, 0) + 1
             self.cells_by_addr_id[aid] = c
             parent = c.get("parent_addr_id", "")
             self.cells_by_parent.setdefault(parent, []).append(c)
+
+        for aid, n in _sheet_seen.items():
+            if n > 1:
+                dup_problems.append(f"sheets 内 addr_id 重复 {n} 次: {aid}")
+        for aid, n in _cell_seen.items():
+            if n > 1:
+                dup_problems.append(f"cells 内 addr_id 重复 {n} 次: {aid}")
+        for aid in set(_sheet_seen) & set(_cell_seen):
+            dup_problems.append(f"addr_id 同时是 sheet 与 cell: {aid}")
+
+        if dup_problems:
+            dup_problems.sort()
+            head = "；".join(dup_problems[:10])
+            raise CatalogIntegrityError(
+                f"目录 addr_id 重复 {len(dup_problems)} 处（前 10）：{head}"
+            )
+
+        # ─── 禁止别名索引：同一父级内 (alias) 对应 >= 2 个 sheet_code ────────
+        # exact_identity._forbidden_aliases 优先读此属性，否则现场推导。
+        _alias_buckets: dict[tuple[str, str], list[str]] = {}
+        for s in sheets:
+            parent = s.get("parent_wp_code", "")
+            code = s.get("sheet_code", "")
+            for alias in s.get("sheet_name_aliases", []) or []:
+                _alias_buckets.setdefault((parent, alias), []).append(code)
+        self.forbidden_aliases: dict[tuple[str, str], list[str]] = {
+            k: sorted(v) for k, v in _alias_buckets.items() if len(v) >= 2
+        }
 
         # 合并全部条目（sheet + cell）用于 fuzzy 搜索
         self._all_entries: list[dict] = sheets + cells
@@ -195,7 +244,9 @@ def _load_catalog() -> CatalogIndex:
     catalog_path = Path(os.environ.get("ACNR_CATALOG_PATH", str(_CATALOG_PATH)))
 
     try:
-        data = json.loads(catalog_path.read_text(encoding="utf-8"))
+        raw = catalog_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        _cross_check_release_report(catalog_path, raw, data)
         _catalog = CatalogIndex(data)
         _last_good_catalog = _catalog  # 保存为下次降级缓存
         logger.info(
@@ -205,13 +256,18 @@ def _load_catalog() -> CatalogIndex:
             len(_catalog.cells_by_addr_id),
         )
         return _catalog
-    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+    except (FileNotFoundError, json.JSONDecodeError, OSError, CatalogIntegrityError) as e:
         # Branch 1: 有旧缓存 → 只读上一版 + 告警
         if _last_good_catalog is not None:
             logger.error(
                 "ACNR catalog 加载失败，降级为只读上一版: %s", e
             )
-            _alert_admin("catalog_load_failed", str(e))
+            event = (
+                "catalog_integrity_failed"
+                if isinstance(e, CatalogIntegrityError)
+                else "catalog_load_failed"
+            )
+            _alert_admin(event, str(e))
             _catalog = _last_good_catalog
             return _catalog
 
@@ -220,9 +276,50 @@ def _load_catalog() -> CatalogIndex:
             "ACNR catalog 加载失败且无可用缓存，需人工介入: %s", e
         )
         _alert_admin("catalog_load_failed_no_cache", str(e))
+        if isinstance(e, CatalogIntegrityError):
+            raise
         raise CatalogLoadError(
             "Catalog 加载失败且不存在可用的上一版缓存，操作整体失败"
         ) from e
+
+
+def _cross_check_release_report(catalog_path: Path, raw: str, data: dict[str, Any]) -> None:
+    """加载期互校：目录同目录有 catalog_report.json 且含 release 段时，比对
+    `release.registry_version` 与 `release.catalog_sha256`。
+
+    兼容性（design §5.5 + 本 spec 依赖口径）：
+    - T07 首个合规发布批次产出前，报告无 `release` 段 → 跳过互校（否则运行中
+      平台会立即 fail-closed）；
+    - 报告缺失 → 同样跳过（测试目录 ACNR_CATALOG_PATH 常无报告，守卫断言生产
+      路径报告存在由 T07 之后另行加卡）。
+    有 release 段但版本号或 sha256 不一致 → CatalogIntegrityError。
+    """
+    import hashlib
+
+    report_path = catalog_path.parent / "catalog_report.json"
+    if not report_path.exists():
+        return
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return  # 报告损坏不拦目录加载（目录自身互校已覆盖）
+    release = report.get("release")
+    if not isinstance(release, dict):
+        return  # 旧格式报告无 release 段 → 跳过（T07 之后产出后才生效）
+
+    rv_report = release.get("registry_version")
+    rv_catalog = data.get("registry_version")
+    if rv_report and rv_report != rv_catalog:
+        raise CatalogIntegrityError(
+            f"加载期互校失败：报告 release.registry_version={rv_report} 与目录 {rv_catalog} 不一致"
+        )
+    sha_report = release.get("catalog_sha256")
+    if sha_report:
+        actual = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        if actual != sha_report:
+            raise CatalogIntegrityError(
+                f"加载期互校失败：目录 sha256={actual[:16]}… 与报告 release.catalog_sha256={str(sha_report)[:16]}… 不一致"
+            )
 
 
 def get_catalog() -> CatalogIndex:

@@ -142,7 +142,11 @@ def _gate_roundtrip(new: dict[str, Any]) -> list[GateViolation]:
     cell ：cell_of(parent, sheet_code, A1) 回到本 addr_id（跳过 semantic_only）。
     """
     out: list[GateViolation] = []
-    index = _catalog_mod.CatalogIndex(new)
+    try:
+        index = _catalog_mod.CatalogIndex(new)
+    except _catalog_mod.CatalogIntegrityError:
+        # addr_id 重复由 _gate_duplicate 单独报告；此处无法建索引，跳过往返。
+        return out
     with _catalog_mod.use_catalog(index):
         for s in new.get("sheets", []):
             if s.get("deprecated"):
@@ -191,8 +195,11 @@ def _gate_alias(
     new: dict[str, Any], alias_policy: dict[str, Any] | None
 ) -> list[GateViolation]:
     """禁止别名不得同时是本父级内某 sheet 的 sheet_name / sheet_code（不相交不变量）。"""
-    index = _catalog_mod.CatalogIndex(new)
     out: list[GateViolation] = []
+    try:
+        index = _catalog_mod.CatalogIndex(new)
+    except _catalog_mod.CatalogIntegrityError:
+        return out  # 重复由 _gate_duplicate 报告
     for desc in exact_identity.forbidden_disjoint_violations(index):
         out.append(GateViolation("alias", "", desc))
     return out
