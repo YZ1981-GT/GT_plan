@@ -191,6 +191,27 @@ async def test_requests_without_targets_are_unchanged(world: World):
         assert a == b
 
 
+async def test_values_are_read_fresh_even_on_cache_hit(world: World):
+    """构建器同一查询第二次命中查询缓存（``X-Cache: HIT``），单元格取值仍现读：两次之间改库内值，命中的响应给新值。
+
+    业务视图的同类判据在编排器单元测试 ``test_cache_hit_returns_cached_without_compute``（缓存命中仍现读取值）；
+    端到端里业务视图缓存在本夹具下未命中（同键重复达阈值后仍为 cache_hit=False，缓存实现归 advanced-query），
+    这里只断言两次都现读到当时的库内值。
+    """
+    admin = await world.aw.user(UserRole.admin)
+    body_b, body_q = _business(world.x, targets=["E1/E1-14/C10"]), _builder(world.x, targets=["E1/E1-14/C10"], year=2025)
+    async with world.client(admin) as c:
+        first_b, first_q = await c.post(BUSINESS, json=body_b), await c.post(BUILDER, json=body_q)
+        await world.aw.db.execute(text(
+            "UPDATE working_paper SET parsed_data = jsonb_set(parsed_data, ARRAY['html_data', :s, 'cells', 'C10'], "
+            "'\"0.5\"'::jsonb) WHERE id = :id"), {"s": _E1_14, "id": world.wp_ids["E1"]})
+        second_b, second_q = await c.post(BUSINESS, json=body_b), await c.post(BUILDER, json=body_q)
+    assert second_q.headers.get("X-Cache") == "HIT" and first_q.headers.get("X-Cache") is None
+    for first, second in ((first_b, second_b), (first_q, second_q)):
+        assert first.json()["acnr_results"]["items"][0]["value"] == "0.125"
+        assert second.json()["acnr_results"]["items"][0]["value"] == "0.5"
+
+
 async def test_preview_resolves_without_reading_and_export_appends_sheet(world: World, monkeypatch):
     calls = {"n": 0}
     real = wp_cell_target.resolve_wp_cell

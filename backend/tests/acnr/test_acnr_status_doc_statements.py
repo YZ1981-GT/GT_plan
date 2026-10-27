@@ -306,7 +306,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_builder_year_is_filled_from_project_and_required_when_unknown",
                       "test_permission_matrix_is_the_same_for_both_entries",
                       "test_preview_resolves_without_reading_and_export_appends_sheet",
-                      "test_requests_without_targets_are_unchanged")),
+                      "test_requests_without_targets_are_unchanged", "test_values_are_read_fresh_even_on_cache_hit")),
         "高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误）": CB(
             _CQ + "strict_model.py", ("StrictRequestModel", "AcnrTargetList", "TemplateConfig", "template_config_rejected"),
             "backend/tests/test_query_dsl_rejects_unknown_fields.py",
