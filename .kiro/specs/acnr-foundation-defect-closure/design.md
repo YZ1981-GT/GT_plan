@@ -160,6 +160,13 @@ ACNR 一侧的唯一接线模块 `services/acnr/wp_cell_target.py`（不读 `par
 - **R2-F7（锁定项目用锁定目录判身份）**：`full_resolve` 按锁定快照解析，但 `sheet_key_for`/`read_formula_cell` 的名称归属（`exact_identity.name_owner`、`sheet_of`）与三参取值若用当前目录，升级后锁定项目会被误判 `sheet_name_borrowed` 或取到不同结果；打开归档项目底稿时 `wp_formula.py` L570 的 Tier A GET 求值同样走当前目录。修法：新增 `async effective_catalog(db, project_id) -> CatalogIndex`（`get_locked_version(db, project_id)` 命中 → `load_versioned_catalog(版本)`，否则 `get_catalog()`），`wp_cell_target`（`sheet_key_for` / `read_entry_cell` / `read_formula_cell`）、acnr_targets、三参取值统一用它，并把该 `CatalogIndex` 显式传给 `exact_identity.*(…, index=…)`（`exact_identity` 的 `index` 缺省参数本就支持，§6.2）。`test_project_registry_lock_pg.py` 加一例：v1 与 v2 对同一名称归属不同，锁定项目取数按 v1。
 - 数据库异常一律上抛（端点 500 + ERROR 日志，带项目与 addr_id），不伪装成 missing。
 
+**T11 实施记录与跨 spec 登记（2026-10-28，段七第 2 轮；formula-hub 的 tasks.md 是对方未跟踪文件，按约定只在本节登记，不改对方文件）**：
+- 核对：`git log --all -S "resolve_wp_cell"` 无 `wp_cell_reader.py` 的提交，`refs/wip/formula-hub/A~C` 与 `_tmp_formula_hub/wt` 也没有该文件 ⇒ 读取函数未入库，本 spec 先落地。编号勘误：本设计与 tasks.md 写的「formula-hub 任务 22」在对方现行 tasks.md 里是任务 23（任务 22 是「依赖解析认双引号」）。
+- 提交一（`bd49254f4`）：按 ADR-FHIC-06 第 1 点 / §8.2 原文建 `services/wp_cell_reader.py`，并提交 §8.2 指定由先落地方提交的契约测试 `tests/test_wp_cell_reader_contract.py`（逐行钉签名、返回、年度、底稿绑定、工作表、单元格、异常）。`WpCellRead` 字段名按 §8.2 用 `sheet_key`（本节上文写的 `sheet` 以 §8.2 为准）；签名六参均为位置或关键字参数（本节上文写的 `*` 仅关键字以 §8.2 为准，关键字调用照样成立）。`_catalog_sheet_keys` 按 §8.2 首次落地恒 `not_found`：本 spec 不改写它——ACNR 的身份判定在 `wp_cell_target` 里用 `effective_catalog`（R2-F7）做，读取函数若自读当前目录，锁定项目会按新目录判名。`formula_wp_semantics.py` 只新增 `WP_CELL_READER_IMPL` 一条登记；`EXECUTOR_WP_IMPL.data_source` 改写与 `typed_eval_strictness` 属两参分支改调，归 formula-hub。
+- 提交二（`17e8acab0`，回退流程 B 的单独一次提交）：`WpCellRead` 追加 `reason_code` / `raw`（默认 None），各返回路径填值。码表：`year_unknown`（§8.2「项目未设置审计年度」，七个码之外的第八个，原文七条路径未含这一条）、`year_mismatch`、`wp_missing`、`wp_ambiguous`、`sheet_ambiguous`（目录判名歧义、别名不能用于取值、同一工作表有多份数据三处共用，与 T12 对 ambiguous / alias_forbidden 的写法一致）、`sheet_missing`、`cell_empty`、`non_numeric`。`test_wp_cell_reader.py` 原不存在、没有整对象相等断言要改，新建该文件钉码表与 `raw`。
+- 与真库的差异：真库 `working_paper` 有 `(project_id, wp_index_id)`、`wp_index` 有 `(project_id, wp_code)` 非部分唯一索引（2026-10-28 现查），「多份底稿 ⇒ blocked」分支真库造不出来，契约测试拆掉 SQLite 里的索引钉这条防御分支。
+- 需 formula-hub 知悉（由用户转达）：读取函数与契约测试已入库，对方任务 23 按其「已提交则以其提交为底，只做向后兼容扩展」执行；两参分支改调、`EXECUTOR_WP_IMPL.data_source` 与 `typed_eval_strictness` 仍归对方。
+
 ### 2.5 WP 三参接线与 `formula_wp_semantics`
 
 `WPExecutor.execute` 现有 4 个调用方（AST）：
