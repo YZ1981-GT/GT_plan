@@ -214,6 +214,7 @@ for match in _WP3_PATTERN.finditer(raw):
 | `WP_KNOWN_DIFFERENCES` | 维度集合不变；只改 `positional_arg_count.detail`：「预填路径三参读 checklist_responses；WPExecutor 三参只对 A1 第三参按 sheet 精确取值，语义第三参仍不支持；报表路径三参报错」 | 本 spec |
 
 T13 实施记录（2026-10-28）：三个文件实际在 `backend/app/services/` 下。formula-hub 第 6 点的 `wp_values` / `strict_wp` 两支尚未入库，三参循环现只有本 spec 的 `_A1` 一支与原逻辑；`WPExecutor.execute` 签名尚无 formula-hub 要加的 `year`，其 A1 分支暂传 `year=None`（不做年度闸门），等对方加 `year` 后透传（需用户转达 formula-hub）。底稿公式路径的 A1 分支直接调 `read_sheet_cell` 并传 `evaluate_wp_formula_expression` 的年度。
+- 归属更正（RV7.2-01，段七续做复审第 2 次）：上表把 `EXECUTOR_WP_IMPL` 两参的 `data_source / on_missing / measured` 划给 formula-hub，但 T13 实际整条改写了 `on_missing` 与 `measured`（内容同时写了两参与三参 A1 的情况），`data_source` 只追加 A1 一句。这两个字段的现行文字由本 spec 写入（`c2384a8df`）；formula-hub 任务 23（本设计写的「任务 22」）接手时以本 spec 的提交为底，只做向后兼容扩展（需用户转达 formula-hub）。模块文档对照表「取不到时」一行同步补了「第三参为 A1 时返回 None」。
 
 ### 2.6 前端
 

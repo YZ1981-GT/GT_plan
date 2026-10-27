@@ -11,7 +11,7 @@ formula-fetch-followup-defect-closure 6.5 按收敛后的现状改写。
 实参          ``(wp_code, sheet_name, cell_ref)`` — 3 个         ``(wp_code, column[, field])`` — field 为 D2-3 字段或 A1
 数据源        ``checklist_responses.remark``（经中文锚点映射）   ``working_paper.parsed_data``（顶层键 / 单元格）
 存进 ctx 的键 ``wp_data[wp_code]['表!锚点']``                    ``wp_data[wp_code][列名]``
-取不到时      不存键 ⇒ L1 三参报错，该格不写                     ``Decimal('0')``（与「值确实为 0」不可区分）
+取不到时      不存键 ⇒ L1 三参报错，该格不写                     两参与 D2-3 ``Decimal('0')``（与「值确实为 0」不可区分）；第三参为 A1 时返回 None
 ============  ================================================  ================================================
 
 🔴 2026-10-24（formula-fetch-followup 6.5）：预填收敛到「预载 + L1」（formula-execution-path-convergence）后，

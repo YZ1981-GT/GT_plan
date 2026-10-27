@@ -67,7 +67,7 @@
 
 | 事项 | 任务 |
 |---|---|
-| 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T13、T14、T15、T16 |
+| 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T14、T15、T16 |
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
 | 异步追溯拿到规范 addr_id | T20 |
 | V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置 | T21、T22 |
