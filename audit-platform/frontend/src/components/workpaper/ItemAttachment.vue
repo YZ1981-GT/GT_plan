@@ -7,7 +7,7 @@
         class="gt-item-attach-row"
       >
         <el-icon><Document /></el-icon>
-        <a :href="downloadUrl(att.id)" target="_blank" class="gt-item-attach-link">{{ att.filename }}</a>
+        <a href="#" class="gt-item-attach-link" @click.prevent="downloadAttachment(att.id, att.filename)">{{ att.filename }}</a>
         <span class="gt-item-attach-size">{{ formatSize(att.file_size) }}</span>
         <el-button text size="small" type="danger" @click="onDelete(att.id)">×</el-button>
       </div>
@@ -38,6 +38,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { confirmDelete } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
 
 interface AttItem {
   id: string
@@ -143,10 +144,6 @@ async function onDelete(id: string) {
   // 后端暂无通用 DELETE；先本地移除，避免误报 404
   attachments.value = attachments.value.filter((a) => a.id !== id)
   ElMessage.info('已从本页移除显示（服务端删除接口待接入）')
-}
-
-function downloadUrl(id: string): string {
-  return `/api/attachments/${id}/download`
 }
 
 function formatSize(bytes: number): string {

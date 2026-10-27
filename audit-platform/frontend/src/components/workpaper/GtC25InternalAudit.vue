@@ -140,10 +140,10 @@
                     placement="top"
                   >
                     <a
-                      :href="`/api/attachments/${c25Attachments[row.index]!.id}/download`"
-                      target="_blank"
+                      href="#"
                       class="attach-link"
-                      @click.stop
+                      :aria-label="`下载 ${c25Attachments[row.index]!.fileName}`"
+                      @click.stop.prevent="downloadAttachment(c25Attachments[row.index]!.id, c25Attachments[row.index]!.fileName)"
                     >📎</a>
                   </el-tooltip>
                   <el-upload
@@ -288,6 +288,7 @@
 import { computed, ref, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { InfoFilled, MagicStick, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
 import { useC25C26Data } from '@/composables/useC25C26Data'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import { uploadAttachment } from '@/services/commonApi'

@@ -324,10 +324,13 @@
       append-to-body
     >
       <iframe
-        v-if="previewOpen && previewUrl"
-        :src="previewUrl"
+        v-if="previewObjectUrl"
+        :src="previewObjectUrl"
         class="gt-wpd-preview-frame"
+        title="模板预览"
       />
+      <div v-else-if="previewState === 'loading'" v-loading="true" class="gt-wpd-preview-frame" />
+      <el-empty v-else-if="previewOpen" :description="authedObjectUrlFailureText(previewState) || '暂无预览'" />
     </el-drawer>
 
     <!-- 3. 合并 sheets 列表 -->
@@ -568,6 +571,8 @@ import {
   officePreview as P_office,
 } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { downloadFile } from '@/utils/http'
+import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
 import TemplateLibraryButton from './TemplateLibraryButton.vue'
 import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
 
@@ -1104,12 +1109,14 @@ async function onDeleteOverride() {
 
 // ─── 主文件下载 ───────────────────────────────────────────────────────────
 
-function onDownloadMain() {
+async function onDownloadMain() {
   if (!props.projectId || !props.wpCode) return
-  // 直接通过浏览器跳转到下载端点（带 token 由 axios 拦截器或 cookie 处理；
-  // 这里使用 window.open 简化处理；如需 blob 下载可改 api.get blob）
-  const url = P_wp.templateDownload(props.projectId, props.wpCode)
-  window.open(url, '_blank')
+  // 经 http 取 blob 再保存：原先 window.open 新标签页带不上 Bearer 头，恒 401（没有 cookie 鉴权）
+  try {
+    await downloadFile(P_wp.templateDownload(props.projectId, props.wpCode), { silent: true })
+  } catch (e) {
+    handleApiError(e, '下载主文件')
+  }
 }
 
 // ─── 在线预览（LibreOffice 转 PDF）─────────────────────────────────────────
@@ -1127,6 +1134,11 @@ const previewUrl = computed(() => {
   if (!props.projectId || !props.wpCode) return ''
   return P_wp.templatePreviewPdf(props.projectId, props.wpCode)
 })
+// 预览 PDF 经已鉴权请求取 blob：iframe 直接用 /api 路径带不上令牌，恒 401；抽屉关闭即释放
+const { url: previewObjectUrl, state: previewState } = useAuthedObjectUrl(
+  () => (previewOpen.value ? previewUrl.value : ''),
+  { type: () => 'application/pdf' },
+)
 
 async function probeOfficeHealth() {
   if (officeHealthCache !== null) {

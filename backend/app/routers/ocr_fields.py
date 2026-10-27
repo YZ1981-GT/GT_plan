@@ -10,13 +10,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
+from app.models.attachment_models import Attachment
 from app.models.core import User
+from app.services.attachment_access import load_attachment
 from app.services.ocr_fields_service import OcrFieldsService
 from app.services.wp_visibility.entry_integration import (
     enforce_attachment_wp_visibility,
@@ -36,7 +39,13 @@ async def extract_ocr_fields(
     - 若 ocr_status='completed' 且有缓存，直接返回 200 + fields
     - 若未完成，触发异步 OCR，返回 202 + job_id
     - 同一附件多次调用复用缓存结果（幂等）
+
+    权限（spec attachment-security-baseline 需求 2.3）：按附件所属项目判 —— 只读缓存要求 readonly，
+    会写库（补提取字段 / 触发识别）要求 edit。原先只校验登录与底稿可见性，未关联底稿的附件任何登录用户都能触发识别。
     """
+    att = await load_attachment(db, attachment_id)
+    cached = att.ocr_status == "completed" and bool(att.ocr_fields_cache)
+    await assert_project_permission(db, current_user, att.project_id, "readonly" if cached else "edit")
     # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）：
     # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
     await enforce_attachment_wp_visibility(
@@ -64,9 +73,19 @@ async def get_ocr_job_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """查询异步 OCR 任务状态（前端轮询用）"""
+    """查询异步 OCR 任务状态（前端轮询用）；要求任务所属附件的项目 readonly（结果里有识别出的字段）。"""
     svc = OcrFieldsService(db)
     status = await svc.get_job_status(job_id)
     if status is None:
         raise HTTPException(status_code=404, detail="任务不存在")
+    try:
+        attachment_id = UUID(str(status.get("attachment_id")))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    project_id = (await db.execute(
+        sa.select(Attachment.project_id).where(Attachment.id == attachment_id)
+    )).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    await assert_project_permission(db, current_user, project_id, "readonly")
     return status

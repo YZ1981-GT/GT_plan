@@ -12,6 +12,8 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { ElButton, ElProgress, ElMessage } from 'element-plus'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
+import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   /** 后端任务 id（POST batch-export-async 返回） */
@@ -72,9 +74,13 @@ watch(
   },
 )
 
-function triggerDownload() {
-  if (downloadUrl.value) {
-    window.open(downloadUrl.value, '_blank')
+async function triggerDownload() {
+  if (!downloadUrl.value) return
+  // 经 http 取 blob 再保存：原先 window.open 新标签页带不上 Bearer 头，恒 401
+  try {
+    await downloadFile(downloadUrl.value, { fileName: '底稿批量导出.zip', silent: true })
+  } catch (e) {
+    handleApiError(e, '下载 ZIP')
   }
 }
 </script>

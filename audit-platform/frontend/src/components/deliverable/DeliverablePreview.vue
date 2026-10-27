@@ -36,7 +36,7 @@
       />
     </div>
     <template #footer>
-      <el-button v-if="url" type="primary" :href="url" target="_blank">下载</el-button>
+      <el-button v-if="url" type="primary" :loading="downloading" @click="onDownload">下载</el-button>
       <el-button @click="emit('close')">关闭</el-button>
     </template>
   </el-dialog>
@@ -51,6 +51,8 @@ import VueOfficeExcel from '@vue-office/excel'
 import '@vue-office/docx/lib/index.css'
 import '@vue-office/excel/lib/index.css'
 import { useAuthStore } from '@/stores/auth'
+import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   title: string
@@ -80,6 +82,21 @@ watch(() => props.previewType, () => {
 
 function onError() {
   loading.value = false
+}
+
+// 原先 <el-button :href target="_blank">：el-button 渲染的是 <button>，href 不生效，点了没反应；
+// 即便改成链接，新标签页也带不上 Bearer 头（恒 401）。经 http 取 blob 再保存。
+const downloading = ref(false)
+async function onDownload() {
+  if (!props.url) return
+  downloading.value = true
+  try {
+    await downloadFile(props.url, { silent: true })
+  } catch (e) {
+    handleApiError(e, '下载')
+  } finally {
+    downloading.value = false
+  }
 }
 </script>
 

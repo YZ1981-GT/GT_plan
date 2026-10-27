@@ -311,10 +311,10 @@
                 placement="top"
               >
                 <a
-                  :href="`/api/attachments/${sampleAttachments[$index]!.id}/download`"
-                  target="_blank"
+                  href="#"
                   class="cct-attach-link"
-                  @click.stop
+                  :aria-label="`下载 ${sampleAttachments[$index]!.fileName}`"
+                  @click.stop.prevent="downloadAttachment(sampleAttachments[$index]!.id, sampleAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
               <!-- 上传按钮（非只读模式） -->
@@ -512,6 +512,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { ArrowLeft, Plus, Delete, MagicStick, InfoFilled, WarningFilled, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { suggestSampleSize } from '@/composables/useSampleSizeEngine'
 import { api } from '@/services/apiProxy'

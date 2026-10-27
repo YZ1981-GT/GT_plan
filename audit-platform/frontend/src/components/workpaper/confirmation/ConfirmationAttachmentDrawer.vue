@@ -211,6 +211,9 @@
         </div>
       </div>
     </div>
+
+    <!-- 原件预览：已鉴权的预览抽屉（append-to-body，不受本抽屉布局影响） -->
+    <AttachmentPreviewDrawer v-model="previewOpen" :attachment="previewTarget" />
   </el-drawer>
 </template>
 
@@ -219,6 +222,10 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import AttachmentPreviewDrawer, {
+  type AttachmentForPreview,
+} from '@/components/common/AttachmentPreviewDrawer.vue'
+import { attachments as P_att } from '@/services/apiPaths'
 
 interface Props {
   visible: boolean
@@ -344,10 +351,28 @@ async function handleUnlink(att: AttachmentLink) {
 
 // ─── 预览/下载 ───
 
+// 原先 window.open 了一条不存在的路由（/api/projects/{pid}/attachments/{id}/download），
+// 且新标签页带不上 Bearer 头 ⇒ 预览恒失败。改用已鉴权的预览抽屉（spec attachment-security-baseline 任务 12）。
+const previewOpen = ref(false)
+const previewTarget = ref<AttachmentForPreview | null>(null)
+
+/** 链接行没有 file_type：按扩展名给抽屉一个类型提示（PDF / 图片可在线看，其余给下载） */
+function typeHintOf(fileName: string): string {
+  const ext = (fileName.split('.').pop() || '').toLowerCase()
+  if (ext === 'pdf') return 'application/pdf'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return `image/${ext === 'jpg' ? 'jpeg' : ext}`
+  return ''
+}
+
 function handlePreview(att: AttachmentLink) {
-  // 复用附件安全预览/下载通道
-  const url = `/api/projects/${props.projectId}/attachments/${att.attachment_id}/download`
-  window.open(url, '_blank')
+  previewTarget.value = {
+    id: att.attachment_id,
+    name: att.file_name,
+    type_hint: typeHintOf(att.file_name),
+    preview_url: P_att.preview(att.attachment_id),
+    download_url: P_att.download(att.attachment_id),
+  }
+  previewOpen.value = true
 }
 
 // ─── OCR 识别 + 比对 ───

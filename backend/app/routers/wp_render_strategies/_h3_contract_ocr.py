@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -31,6 +31,7 @@ from app.services.attachment_ocr_writeback import (
 )
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
+from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -143,12 +144,7 @@ async def h3_contract_ocr(
     """上传租赁合同附件，OCR识别并提取租赁要素；可选回流已关联附件证据链。"""
     _ = current_user
     linked_att_id = parse_optional_uuid(attachment_id)
-    try:
-        wp_uuid = UUID(wp_id)
-    except ValueError:
-        if linked_att_id is not None:
-            raise HTTPException(400, "无效的 wp_id")
-        wp_uuid = UUID(int=0)
+    wp_uuid = parse_workpaper_id(wp_id)
 
     if linked_att_id is not None and not force_reocr:
         reused = await load_reusable_ocr(db, linked_att_id)
@@ -172,7 +168,7 @@ async def h3_contract_ocr(
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed_types}")
 
     temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "h3-lease-contracts"
+    storage_dir = side_storage_dir(wp_id, "h3-lease-contracts")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{temp_id}{suffix}"
 

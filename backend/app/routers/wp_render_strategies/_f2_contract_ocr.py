@@ -28,6 +28,7 @@ from app.services.attachment_ocr_writeback import (
 )
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
+from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +117,7 @@ async def f2_contract_ocr(
     current_user: User = Depends(get_current_user),
 ) -> F2PurchaseOcrResponse:
     linked_att_id = parse_optional_uuid(attachment_id)
-    try:
-        wp_uuid = UUID(wp_id)
-    except ValueError:
-        if linked_att_id is not None:
-            raise HTTPException(400, "无效的 wp_id")
-        wp_uuid = UUID(int=0)
+    wp_uuid = parse_workpaper_id(wp_id)
 
     if linked_att_id is not None and not force_reocr:
         reused = await load_reusable_ocr(db, linked_att_id)
@@ -144,7 +140,7 @@ async def f2_contract_ocr(
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
     temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "purchase"
+    storage_dir = side_storage_dir(wp_id, "purchase")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{temp_id}{suffix}"
 

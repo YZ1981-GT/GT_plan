@@ -1685,3 +1685,8 @@ backend/app/routers/excel_html.py  805
 #   identifier.py — 并发会话扩展（本 spec 只改 2 行：路径 parents[4]→[3] + 内置别名补「核算类型」）。
 #     HEAD 1062 行已超限但此前未登记。拆分方向：规则加载 / Level 1~3 识别 / 别名管理分三个模块。
 backend/app/services/ledger_import/identifier.py  1164
+# attachment-security-baseline（2026-10-27）：附件服务 HEAD 即 1391 行超限（历史大文件，此前从未改动、未登记）。
+#   本 spec 只加入口校验、落盘根校验、actor / 审计年度与 OCR 确认字段（新逻辑放 attachment_upload_policy /
+#   attachment_ocr_text 两个新模块），基线取 HEAD 值。拆分方向：版本链（_lock_version_chain 起至文件尾）、
+#   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
+backend/app/services/attachment_service.py  1391

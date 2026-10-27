@@ -193,7 +193,9 @@ CREATE TABLE attachments (
     ocr_status varchar(20), ocr_text text, ocr_fields_cache json,
     version int DEFAULT 1, previous_version_id uuid,
     created_by uuid, created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now(), is_deleted boolean DEFAULT false
+    updated_at timestamptz DEFAULT now(), is_deleted boolean DEFAULT false,
+    -- V209 识别文本确认留痕（ORM Attachment 映射列）
+    ocr_confirmed_sha256 varchar(64), ocr_confirmed_by uuid, ocr_confirmed_at timestamptz, ocr_confirmed_edited boolean
 );
 """
 

@@ -84,6 +84,10 @@ _PROJECT_LEVEL_TOKENS = (
     "require_note_edit_access",
     "assert_note_edit_access",
     "assert_note_role_access",
+    # 2026-10-27 补（spec attachment-security-baseline 需求 2.1）：函证路由的路由级门 services/confirmation_scope_gate.py
+    # —— 先 assert_project_permission（GET readonly / 其余 edit），再核对路径与请求体对象属于路径项目。
+    # 可伪证：tests/attachment_security_baseline/test_confirmation_gate_token_proof.py::test_confirmation_project_gate_is_really_project_level
+    "confirmation_project_gate",
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -606,7 +610,8 @@ _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
 #: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277。
 #: 2026-10-27 现算 256（改前 260）：spec consol-autotree-residual-closure R1.3 报表映射 3 个端点 + 报表 Excel 导出改挂项目级。
-_PREFIXED_IDENTITY_ONLY_BASELINE = 256
+#: 2026-10-27 spec attachment-security-baseline：函证路由 17 个端点挂路由级项目门，在上一条基础上再减 17，现算 → 239
+_PREFIXED_IDENTITY_ONLY_BASELINE = 239
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

@@ -573,7 +573,8 @@ function openOcrConfirm(row: any) {
 
 async function retryOCR(row: any) {
   try {
-    await api.put(P_att.ocrStatus(row.id), { status: 'pending' })
+    // 原先只把状态改回 pending，后端不会调度识别（spec attachment-security-baseline 需求 3.6）
+    await api.post(P_att.retryOcr(row.id))
     ElMessage.success('已重新提交 OCR 识别')
     await loadAttachments()
   } catch (e: any) { handleApiError(e, '重试') }

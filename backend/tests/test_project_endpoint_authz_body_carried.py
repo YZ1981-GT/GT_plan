@@ -46,9 +46,10 @@ _EXTRA_PROJECT_TOKENS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] =
     # 报表配置写：按行归属分流 —— 项目行 assert_project_permission(edit)，全局模板行仅 admin
     "_authorize_report_config_write": (
         ("routers/report_config.py", "_authorize_report_config_write", ("assert_project_permission",)),),
-    # 附件 / 附件预览：ProjectUser 成员级别比对（admin 放行）
+    # 附件：委托 assert_project_permission（spec attachment-security-baseline 起，原自写成员比对不判归档）；
+    # 附件预览：ProjectUser 成员级别比对（admin 放行）
     "_ensure_project_access": (
-        ("routers/attachments.py", "_ensure_project_access", ("ProjectUser", "PERMISSION_HIERARCHY")),
+        ("routers/attachments.py", "_ensure_project_access", ("assert_project_permission",)),
         ("routers/office_preview.py", "_ensure_project_access", ("ProjectUser", "PERMISSION_HIERARCHY")),
     ),
     # 自定义查询回写：项目可见集 + 编辑级成员 + 逐目标 ownership_guard

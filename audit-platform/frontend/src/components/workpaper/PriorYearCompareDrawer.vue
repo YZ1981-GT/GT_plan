@@ -61,8 +61,8 @@
               <div class="data-row" v-if="priorYearData.file_url">
                 <label>底稿文件：</label>
                 <div class="data-value">
-                  <el-link type="primary" :href="priorYearData.file_url" target="_blank">
-                    查看上年底稿文件
+                  <el-link type="primary" @click="downloadPriorFile">
+                    下载上年底稿文件
                   </el-link>
                 </div>
               </div>
@@ -96,6 +96,8 @@ import { confirmDangerous } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 interface PriorYearData {
   wp_id: string
@@ -168,6 +170,17 @@ async function open() {
     error.value = '加载上年底稿失败: ' + (err?.message || '未知错误')
   } finally {
     loading.value = false
+  }
+}
+
+/** 下载上年底稿文件：经 http 取 blob 再保存（原先 el-link href 新标签页带不上 Bearer 头，恒 401） */
+async function downloadPriorFile() {
+  const url = priorYearData.value?.file_url
+  if (!url) return
+  try {
+    await downloadFile(url, { silent: true })
+  } catch (e) {
+    handleApiError(e, '下载上年底稿文件')
   }
 }
 

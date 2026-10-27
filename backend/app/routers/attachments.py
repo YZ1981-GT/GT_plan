@@ -14,24 +14,27 @@ Validates: Requirements 14.2, 14.5, 14.8
 from __future__ import annotations
 
 import logging
-import sqlalchemy as sa
 from uuid import UUID
-
-logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import PERMISSION_HIERARCHY, authorize_wp_edit, get_current_user, require_project_access
-from app.models.core import ProjectUser, User
+from app.deps import assert_project_permission, authorize_wp_edit, get_current_user, require_project_access
+from app.models.core import User
+from app.services import attachment_destructive_guard as destructive_guard
+from app.services.attachment_access import load_attachment
+from app.services.attachment_ocr_text import OcrTextConflict, assert_base_matches, confirm_ocr_text, full_text_payload
 from app.services.attachment_service import AttachmentService
+from app.services.attachment_upload_policy import UploadRejected
 from app.services.wp_visibility.entry_integration import (
     enforce_attachment_wp_visibility,
     gate_attachment_associate,
     gate_wp,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["attachments"])
 
@@ -64,24 +67,11 @@ async def _ensure_project_access(
     project_id: UUID,
     min_permission: str = "readonly",
 ):
-    if current_user.role.value == "admin":
-        return
+    """按附件所属项目判成员级别：与 ``require_project_access`` 同一实现（admin 放行；写级别判归档 ⇒ 423）。
 
-    result = await db.execute(
-        sa.select(ProjectUser).where(
-            ProjectUser.project_id == project_id,
-            ProjectUser.user_id == current_user.id,
-            ProjectUser.is_deleted == sa.false(),
-        )
-    )
-    project_user = result.scalar_one_or_none()
-    if project_user is None:
-        raise HTTPException(status_code=403, detail="权限不足")
-
-    user_level = PERMISSION_HIERARCHY.get(project_user.permission_level.value, 0)
-    required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
-    if user_level < required_level:
-        raise HTTPException(status_code=403, detail="权限不足")
+    原先自写一份成员判定，不判归档 ⇒ 归档项目里的附件照样能改识别状态、重试识别、删除、回滚。
+    """
+    await assert_project_permission(db, current_user, project_id, min_permission)
 
 
 def _paperless_document_id_from_path(file_path: str) -> str:
@@ -97,7 +87,10 @@ async def create_attachment(
     current_user: User = Depends(require_project_access("edit")),
 ):
     svc = _svc(db)
-    result = await svc.create_attachment(project_id, body.model_dump())
+    try:
+        result = await svc.create_attachment(project_id, body.model_dump(), created_by=current_user.id)
+    except UploadRejected as exc:
+        raise HTTPException(status_code=422, detail=exc.as_detail())
     await db.commit()
     return result
 
@@ -127,20 +120,24 @@ async def upload_attachment(
         )
 
     svc = _svc(db)
-    result = await svc.upload_attachment_file(
-        project_id=project_id,
-        file_name=file.filename or "attachment.bin",
-        content=content,
-        metadata={
-            "attachment_type": attachment_type,
-            "reference_id": reference_id,
-            "reference_type": reference_type,
-            "file_type": file_type,
-            "title": title,
-            "correspondent": correspondent,
-            "document_type": document_type,
-        },
-    )
+    try:
+        result = await svc.upload_attachment_file(
+            project_id=project_id,
+            file_name=file.filename or "attachment.bin",
+            content=content,
+            metadata={
+                "attachment_type": attachment_type,
+                "reference_id": reference_id,
+                "reference_type": reference_type,
+                "file_type": file_type,
+                "title": title,
+                "correspondent": correspondent,
+                "document_type": document_type,
+            },
+            created_by=current_user.id,
+        )
+    except UploadRejected as exc:
+        raise HTTPException(status_code=422, detail=exc.as_detail())
     await db.commit()
 
     # SSE 广播附件上传事件，供其他打开的页面实时同步
@@ -219,6 +216,9 @@ async def associate_with_wp(
         attachment_id=attachment_id,
         target_wp_id=body.wp_id,
     )
+    # 归档项目只读（spec attachment-security-baseline 需求 4.2；gate 已核对附件与底稿同项目）
+    att = await load_attachment(db, attachment_id)
+    await destructive_guard.assert_project_writable(db, att.project_id, current_user)
     result = await svc.associate_with_wp(
         attachment_id, body.wp_id, body.association_type, body.notes,
         created_by=current_user.id,
@@ -259,6 +259,12 @@ async def unlink_wp_attachment(
         wp_id=wp_id, entry_family="attachment",
     )
     await authorize_wp_edit(db, current_user, wp_id)
+    # 归档项目只读（需求 4.2）：项目取底稿所属项目（gate 已确认底稿可见）
+    from app.models.workpaper_models import WorkingPaper
+
+    wp = await db.get(WorkingPaper, wp_id)
+    if wp is not None:
+        await destructive_guard.assert_project_writable(db, wp.project_id, current_user)
 
     svc = _svc(db)
     result = await svc.unlink_wp_attachment(wp_id, attachment_id)
@@ -269,6 +275,45 @@ async def unlink_wp_attachment(
 class OCRStatusUpdate(BaseModel):
     status: str  # pending / processing / completed / failed
     ocr_text: str | None = None
+    # 改写文本时必带：打开核对时全文的 sha256（spec attachment-security-baseline 需求 3.3）
+    base_sha256: str | None = None
+
+
+class OcrConfirmRequest(BaseModel):
+    base_sha256: str
+    ocr_text: str | None = None  # 修订后的全文；不带 = 原文确认
+
+
+@router.get("/api/attachments/{attachment_id}/ocr-text")
+async def get_ocr_text(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """识别全文 + sha256 + 确认状态（确认弹窗打开时取；列表里的 ocr_text 只是 200 字预览）。"""
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "readonly")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
+    return full_text_payload(att)
+
+
+@router.post("/api/attachments/{attachment_id}/ocr-confirm")
+async def confirm_ocr(
+    attachment_id: UUID, body: OcrConfirmRequest, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """核对后确认识别结果：base 与当前全文一致才写，否则 409 且库内不变。"""
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "edit")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="POST", entrypoint="attachment.read",
+    )
+    try:
+        result = confirm_ocr_text(att, base_sha256=body.base_sha256, ocr_text=body.ocr_text, actor_id=current_user.id)
+    except OcrTextConflict as exc:
+        raise HTTPException(status_code=409, detail=exc.as_detail())
+    await db.commit()
+    return result
 
 
 @router.put("/api/attachments/{attachment_id}/ocr-status")
@@ -286,6 +331,12 @@ async def update_ocr_status(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
+    if body.ocr_text is not None:
+        # 改写文本必须基于当前全文（原先确认弹窗拿 200 字预览整体写回 ⇒ 全文被截断）
+        try:
+            assert_base_matches(await load_attachment(db, attachment_id), body.base_sha256)
+        except OcrTextConflict as exc:
+            raise HTTPException(status_code=409, detail=exc.as_detail())
     result = await svc.update_ocr_status(attachment_id, body.status, body.ocr_text)
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
@@ -606,36 +657,26 @@ async def retry_ocr(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """重试 OCR 处理（将状态重置为 pending，触发重新处理）"""
-    svc = _svc(db)
-    att = await svc.get_attachment(attachment_id)
-    if not att:
-        raise HTTPException(404, "附件不存在")
-    # Task 10 · 补齐项目级授权 + wp-link 隔离层（原实现缺项目授权，Req 8.7）。
-    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    """重新识别：状态重置为待识别并调度识别任务（与 ``POST ocr-fields`` 同一个后台识别）。
+
+    原先只把状态改成 pending，再引用不存在的 ``TaskType.ocr_upload``（异常被吞）⇒ 没有任何识别被调度，
+    附件一直停在「待识别」（spec attachment-security-baseline 需求 3.6）。
+    """
+    from app.services.ocr_fields_service import OcrFieldsService
+
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "edit")
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
-
-    # 更新 OCR 状态为 pending
-    from app.models.attachment_models import Attachment as AttachmentModel
-    result = await db.execute(
-        sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
-    )
-    att_obj = result.scalar_one_or_none()
-    if att_obj:
-        att_obj.ocr_status = "pending"
-        await db.flush()
-        await db.commit()
-
-    # 创建 OCR 重试任务
-    try:
-        from app.services.task_center import create_task, TaskType
-        task_id = create_task(TaskType.ocr_upload, project_id=att.get("project_id", ""), object_id=str(attachment_id))
-        return {"message": "OCR 重试任务已创建", "task_id": task_id}
-    except Exception:
-        return {"message": "OCR 状态已重置为 pending"}
+    att.ocr_status = "pending"
+    await db.flush()
+    body, status_code = await OcrFieldsService(db).get_or_trigger_ocr_fields(attachment_id)
+    if status_code == 404:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await db.commit()
+    return {"message": "已重新提交识别", "status": body.get("status"), "job_id": body.get("job_id")}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -647,37 +688,28 @@ async def retry_ocr(
 async def delete_attachment(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
-    """软删除附件（标记 is_deleted=True，不物理删除文件）。
+    """软删除附件（进回收站，不物理删除文件）。
 
-    权限：项目 edit 权限 + 可见性隔离检查。
+    权限按附件真实所属项目判 edit（原先另挂 ``require_project_access``，项目取自查询参数）；
+    归档 423、法定保全 423、仍被引用 409，三种拒绝都不改库（spec attachment-security-baseline 需求 4.1）。
     """
-    svc = _svc(db)
-    att = await svc.get_attachment(attachment_id)
-    if not att:
-        raise HTTPException(status_code=404, detail="附件不存在")
-    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "edit")
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="DELETE", entrypoint="attachment.delete",
     )
+    await destructive_guard.assert_destructible(db, current_user, att, operation="delete")
 
-    from app.models.attachment_models import Attachment as AttachmentModel
-    result = await db.execute(
-        sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
-    )
-    att_obj = result.scalar_one_or_none()
-    if not att_obj or att_obj.is_deleted:
-        raise HTTPException(status_code=404, detail="附件不存在")
-
-    att_obj.is_deleted = True
+    att.is_deleted = True
     await db.flush()
     await db.commit()
 
     logger.info(
         "attachment_deleted: user=%s attachment_id=%s file_name=%s",
-        str(current_user.id), str(attachment_id), att.get("file_name", ""),
+        str(current_user.id), str(attachment_id), att.file_name,
     )
     return {"deleted": True, "id": str(attachment_id)}
 
@@ -693,129 +725,61 @@ async def list_attachment_versions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出附件版本链（按 version 降序）。"""
-    svc = _svc(db)
-    att = await svc.get_attachment(attachment_id)
-    if not att:
-        raise HTTPException(status_code=404, detail="附件不存在")
-    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    """列出附件版本链（按 version 降序）。
+
+    委托 ``AttachmentService.list_versions``：按「文件名 + reference_id + reference_type（含空值）」归链
+    （spec attachment-security-baseline 需求 4.4；原先路由自写一份，不区分 reference 类型与空值）。
+    """
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "readonly")
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="GET", entrypoint="attachment.read",
     )
-
-    # 沿 previous_version_id 链回溯所有版本
-    from app.models.attachment_models import Attachment as AttachmentModel
-    versions = []
-    current_id = attachment_id
-
-    # 先向前找到最新版本（可能 attachment_id 不是最新）
-    # 查同 project_id + file_name + reference_id 的全部版本
-    stmt = (
-        sa.select(AttachmentModel)
-        .where(
-            AttachmentModel.project_id == UUID(att["project_id"]),
-            AttachmentModel.file_name == att.get("file_name"),
-            AttachmentModel.is_deleted == sa.false(),
-        )
-        .order_by(AttachmentModel.version.desc())
-    )
-    if att.get("reference_id"):
-        stmt = stmt.where(AttachmentModel.reference_id == UUID(att["reference_id"]))
-
-    result = await db.execute(stmt)
-    for a in result.scalars().all():
-        versions.append({
-            "id": str(a.id),
-            "version": a.version,
-            "file_name": a.file_name,
-            "file_size": a.file_size,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-            "is_current": str(a.id) == str(attachment_id),
-        })
-
+    rows = await _svc(db).list_versions(attachment_id)
+    versions = [
+        {**row, "uploaded_at": row["created_at"], "uploaded_by": row["created_by"],
+         "is_current": row["id"] == str(attachment_id)}
+        for row in reversed(rows)
+    ]
     return {"versions": versions, "total": len(versions)}
 
 
-@router.post("/api/attachments/{attachment_id}/rollback")
+@router.post("/api/attachments/{attachment_id}/versions/{version_id}/rollback")
 async def rollback_attachment_version(
     attachment_id: UUID,
+    version_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
-    """回退到此版本（创建新版本指向此版本的内容）。"""
-    svc = _svc(db)
-    att = await svc.get_attachment(attachment_id)
-    if not att:
-        raise HTTPException(status_code=404, detail="附件不存在")
-    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    """回滚到 ``version_id``：追加一个新版本复制目标版本内容，旧版本保留。
+
+    委托 ``AttachmentService.rollback_to_version``（取版本链锁、写回滚人、发版本替换信号；需求 4.4）。
+    前端一直调这个路径，后端原先只注册了 ``/api/attachments/{id}/rollback`` ⇒ 版本回滚按钮恒 404；
+    那份旧实现不取链锁、不发失效信号、项目取自查询参数，已删除。
+    """
+    att = await load_attachment(db, attachment_id)
+    await _ensure_project_access(db, current_user, att.project_id, "edit")
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
         action="attach_read", method="POST", entrypoint="attachment.rollback",
     )
-
-    from app.models.attachment_models import Attachment as AttachmentModel
-
-    # 找当前最新版本
-    stmt = (
-        sa.select(AttachmentModel)
-        .where(
-            AttachmentModel.project_id == UUID(att["project_id"]),
-            AttachmentModel.file_name == att.get("file_name"),
-            AttachmentModel.is_deleted == sa.false(),
-        )
-        .order_by(AttachmentModel.version.desc())
-        .limit(1)
-    )
-    if att.get("reference_id"):
-        stmt = stmt.where(AttachmentModel.reference_id == UUID(att["reference_id"]))
-
-    result = await db.execute(stmt)
-    latest = result.scalar_one_or_none()
-    if not latest:
-        raise HTTPException(status_code=404, detail="版本链异常")
-
-    target = await db.get(AttachmentModel, attachment_id)
-    if not target:
+    svc = _svc(db)
+    chain = await svc.list_versions(attachment_id)
+    target = next((row for row in chain if row["id"] == str(version_id)), None)
+    if target is None:
         raise HTTPException(status_code=404, detail="目标版本不存在")
-
-    if target.version == latest.version:
-        return {"message": "已是最新版本，无需回退", "version": latest.version}
-
-    # 创建新版本（复制目标版本的文件引用）
-    import uuid as _uuid
-    from datetime import datetime, timezone
-
-    new_version = latest.version + 1
-    rollback_att = AttachmentModel(
-        id=_uuid.uuid4(),
-        project_id=target.project_id,
-        file_name=target.file_name,
-        file_path=target.file_path,
-        file_type=target.file_type,
-        file_size=target.file_size,
-        attachment_type=target.attachment_type,
-        reference_id=target.reference_id,
-        reference_type=target.reference_type,
-        storage_type=target.storage_type,
-        paperless_document_id=target.paperless_document_id,
-        ocr_status=target.ocr_status,
-        ocr_text=target.ocr_text,
-        created_by=current_user.id,
-        version=new_version,
-        previous_version_id=latest.id,
-    )
-    db.add(rollback_att)
-    await db.flush()
+    latest = max(row["version"] for row in chain)
+    if target["version"] == latest:
+        return {"message": "已是最新版本，无需回退", "version": latest}
+    try:
+        result = await svc.rollback_to_version(attachment_id=attachment_id, version_id=version_id,
+                                               created_by=current_user.id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="目标版本不存在")
     await db.commit()
-
     logger.info(
-        "attachment_rollback: user=%s from_version=%d to_version=%d (target=%s) new_id=%s",
-        str(current_user.id), latest.version, target.version, str(attachment_id), str(rollback_att.id),
+        "attachment_rollback: user=%s attachment=%s to_version=%d new_id=%s new_version=%d",
+        str(current_user.id), str(attachment_id), target["version"], result["id"], result["version"],
     )
-    return {
-        "id": str(rollback_att.id),
-        "version": new_version,
-        "rolled_back_to": target.version,
-        "message": f"已回退到版本 {target.version}",
-    }
+    return {**result, "rolled_back_to": target["version"], "message": f"已回退到版本 {target['version']}"}
