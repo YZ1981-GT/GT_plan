@@ -80,8 +80,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L184",
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L342",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L282",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L467",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -91,7 +91,7 @@
      "L1-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L184）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L342），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L282）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L467），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -2579,7 +2579,7 @@
      "audit-platform/frontend/src/components/workpaper/l3/core/L3TabIndex.vue#L222",
      "audit-platform/frontend/src/components/workpaper/l4/core/L4TabIndex.vue#L222",
      "audit-platform/frontend/src/components/workpaper/l5/core/L5TabIndex.vue#L220",
-     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabDetail.vue#L533",
+     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabDetail.vue#L546",
      "audit-platform/frontend/src/components/workpaper/l6/core/L6TabIndex.vue#L215",
      "audit-platform/frontend/src/components/workpaper/l7/core/L7TabIndex.vue#L215",
      "audit-platform/frontend/src/components/workpaper/l8/core/L8TabIndex.vue#L218"

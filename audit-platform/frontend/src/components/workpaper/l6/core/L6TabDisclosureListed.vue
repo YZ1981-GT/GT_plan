@@ -157,6 +157,7 @@ import { useRouter } from 'vue-router'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useL6FormData } from '../../composables/useL6FormData'
+import { readL6DetailRows } from '../../composables/useL6Detail'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { L5_NOTE_SECTION, buildL6SyncPayload } from '../../composables/l5NoteSectionMap'
@@ -223,28 +224,20 @@ function loadDisclosureData() {
   const responses = formData.responses.value
   const rows: DisclosureRow[] = []
 
-  // 从L6-2明细表审定数区(P~T列)拉取数据
-  // item_id 格式: L6-L6-2-row{n}-{field}
-  for (let i = 1; i <= 20; i++) {
-    const projectName = responses.get(`L6-L6-2-row${i}-project`)?.remark
-    if (!projectName) continue
-
-    const beginBalance = parseFloat(responses.get(`L6-L6-2-row${i}-audited_begin`)?.remark || '0') || 0
-    const increase = parseFloat(responses.get(`L6-L6-2-row${i}-audited_increase`)?.remark || '0') || 0
-    const settleAmount = parseFloat(responses.get(`L6-L6-2-row${i}-audited_settle`)?.remark || '0') || 0
-    const returnAmount = parseFloat(responses.get(`L6-L6-2-row${i}-audited_return`)?.remark || '0') || 0
-    const endBalance = parseFloat(responses.get(`L6-L6-2-row${i}-audited_end`)?.remark || '0') || 0
-    const reason = responses.get(`L6-disclosure-listed-reason-${i}`)?.remark || ''
-
+  // 从 L6-2 明细表（整表一条 L6-L6-2-rows）取审定数区 P~T（模板附注同取 L6-2 审定列）。
+  // 🔴 原读 `L6-L6-2-row{n}-{field}` 逐格键 —— 全仓没有写入方，附注恒显示「暂无数据」。
+  const detail = readL6DetailRows(responses).filter((r) => String(r.project || '').trim())
+  detail.forEach((r, idx) => {
+    const i = idx + 1
     rows.push({
-      project: projectName,
-      beginBalance,
-      increase,
-      decrease: settleAmount + returnAmount,
-      endBalance,
-      reason,
+      project: r.project,
+      beginBalance: r.auditedBegin,
+      increase: r.auditedCredit,
+      decrease: r.auditedCarryFwd + r.auditedRefund,
+      endBalance: r.auditedEnd,
+      reason: responses.get(`L6-disclosure-listed-reason-${i}`)?.remark || '',
     })
-  }
+  })
 
   // 如果没有数据则显示默认空行
   if (rows.length === 0) {

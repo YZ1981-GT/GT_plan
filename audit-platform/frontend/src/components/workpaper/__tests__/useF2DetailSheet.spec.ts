@@ -122,6 +122,22 @@ describe('useF2DetailSheet', () => {
     expect(detail.totals.value.agingOk).toBe(true)
   })
 
+  it('数量为 0 的单价按模板 IF(数量=0,0,金额/数量) 记 0（F2-3~F2-8 同式）', () => {
+    const rows = [legacyRow({
+      id: '1', itemName: '钢材', openingQty: 0, openingAmt: 500, increaseQty: 10, increaseAmt: 100,
+    })]
+    const detail = useF2DetailSheet({
+      config: makeConfig(),
+      allResponses: ref(makeResponses(rows)),
+      isReadonly: ref(false),
+    })
+    const row = detail.rows.value[0]
+    expect(row.openingUnitPrice).toBe(0)
+    expect(row.increaseUnitPrice).toBe(10)
+    expect(row.decreaseUnitPrice).toBe(0)
+    expect(row.unitPrice).toBe(60) // 期末 10 件、600 元
+  })
+
   it('addRow 弹出输入框后新增行', async () => {
     const detail = useF2DetailSheet({
       config: makeConfig(),

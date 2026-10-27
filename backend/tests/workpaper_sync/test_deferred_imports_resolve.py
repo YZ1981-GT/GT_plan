@@ -58,9 +58,9 @@ _SRC = _BACKEND / "app" / "services" / "workpaper_sync"
 #:    每条都注明归属 lane，便于 lane 收口时一并清掉。
 _KNOWN_MISSING: frozenset[tuple[str, str, str]] = frozenset(
     {
-        # ── F 循环：尚未交付的 2 个子模块。归属：f4 lane spec。
+        # ── F 循环：尚未交付的 1 个子模块。归属：f4 lane spec。
+        #    （`phase5_f4_01_adjudication` 已随 5cb7ebe70 交付，按「修好必须删」移出）
         ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_09_supplier_financing"),
-        ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_01_adjudication"),
     }
 )
 

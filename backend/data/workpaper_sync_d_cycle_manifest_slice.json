@@ -843,8 +843,8 @@
       },
       {
         "name": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-        "size": 105407,
-        "sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466",
+        "size": 105569,
+        "sha256": "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044",
         "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
         "read_with": "openpyxl data_only"
       },
@@ -942,8 +942,8 @@
       },
       {
         "name": "D6 合同资产.xlsx",
-        "size": 125594,
-        "sha256": "bb41ed4931dfff38a6f3e7886135969d5807388d46fa10eb6ac2ea08c1e02b12",
+        "size": 125596,
+        "sha256": "a349f632451064feb1f573d0e867a4b4b66c6369846766458462a34f25f3d4f5",
         "belongs_to_entry": "xlsx/gt-d6-contract-assets",
         "read_with": "openpyxl data_only"
       },

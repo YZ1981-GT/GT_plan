@@ -72,7 +72,7 @@ ADAPTER_ID: Final[str] = "g5.long_term_receivable_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G5L"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G5 长期应收款.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；399,066 B）
 TEMPLATE_SHA256: Final[str] = (
     "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c"
 )

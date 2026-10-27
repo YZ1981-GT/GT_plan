@@ -77,7 +77,7 @@ function safeParseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {
   }
 }
 
-function normalizeRow(raw: any): RelatedPartyRow {
+export function normalizeRow(raw: any): RelatedPartyRow {
   return {
     rowId: raw.rowId || generateRowId(),
     partyName: raw.partyName || '',
@@ -97,7 +97,7 @@ function normalizeRow(raw: any): RelatedPartyRow {
 /**
  * 贷方科目公式：期末余额 = 期初 + 贷方 - 借方
  */
-function recalcRow(row: RelatedPartyRow): RelatedPartyRow {
+export function recalcRow(row: RelatedPartyRow): RelatedPartyRow {
   const endBalance = calcCreditEndBalance(row.openingBalance, row.creditAmount, row.debitAmount)
   return { ...row, endBalance }
 }

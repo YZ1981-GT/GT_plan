@@ -396,7 +396,7 @@
         "transport_key_shape": "H4-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L186",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": true,
         "row_identity_positional_defect": "🔴 与 H2 同型：载入/新增路径的身份是生成串，但四表种子是位置化的 —— `composables/h4DetailPrefill.ts#L50` 的 `buildH4DetailSeedRows()` 把 `detail_prefill` 逐项映射成 `rowId: \\`seed-${idx}\\``，宿主 `GtH4EngineeringMaterials.vue#L384` 把它写进 primary managed table 的真实键 `H4-2-rows`。已登记 BP-6，本任务不改。",
@@ -539,14 +539,14 @@
         "shape": "json_array_of_row_objects",
         "transport_key_kind": "composite_prefix_plus_table_role",
         "transport_key_shape": "`${ITEM_PREFIX}-rows` ⇒ H5-2-rows（同族还有 `${ITEM_PREFIX}-audit-note` / `-audit-conclusion`）",
-        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53(ITEM_PREFIX) / #L90(读) / #L190(写)",
+        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53(ITEM_PREFIX) / #L130(读) / #L205(写)",
         "transport_key_composition_note": "🔴 本 entry 的键不是字面量常量，而是由模块级前缀常量 `ITEM_PREFIX = 'H5-2'` 拼出 `${ITEM_PREFIX}-rows`。契约里若按字面量 'H5-2-rows' 声明也对，但守卫必须去源码里找**拼接式**（`${ITEM_PREFIX}-rows`），按字面量 grep 会在 useH5Detail.ts 里找不到而假红。",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L181",
         "row_identity_generator_form": "`row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`（新增）/ `row-${Math.random().toString(36).slice(2, 10)}`（载入回填，#L108）",
         "row_identity_is_positional": false,
-        "row_identity_note": "另有一个**固定**身份 `rowId: 'subtotal'`（useH5Detail.ts#L139，合计行，派生只读不落库）。契约里必须把它排除在业务行之外，否则 roundtrip 会把合计行当成一条可编辑明细行推回 OO。",
+        "row_identity_note": "另有一个**固定**身份 `rowId: 'subtotal'`（useH5Detail.ts#L154，合计行，派生只读不落库）。契约里必须把它排除在业务行之外，否则 roundtrip 会把合计行当成一条可编辑明细行推回 OO。",
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -687,10 +687,10 @@
         "transport_key_shape": "H6-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L266",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
-        "row_identity_note": "载入路径同行还有 `seq: raw.seq ?? idx + 1`（useH6Detail.ts#L295），那是展示序号不是身份 —— 与 H3 同型，判据只取 `rowId:` 自己的值表达式。",
+        "row_identity_note": "载入路径同行还有 `seq: raw.seq ?? idx + 1`（useH6Detail.ts#L267），那是展示序号不是身份 —— 与 H3 同型，判据只取 `rowId:` 自己的值表达式。",
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -1197,7 +1197,7 @@
         "transport_key_shape": "H9-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L149",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1789,7 +1789,7 @@
         "row_identity": {
           "kind": "generated_opaque_string_with_prefill_array_index_seed",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L186"
         }
       },
       {
@@ -1799,7 +1799,7 @@
         "row_identity": {
           "kind": "generated_opaque_string_with_fixed_subtotal_row",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L181"
         }
       },
       {
@@ -1809,7 +1809,7 @@
         "row_identity": {
           "kind": "generated_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L266"
         }
       },
       {
@@ -1839,7 +1839,7 @@
         "row_identity": {
           "kind": "generated_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L149"
         }
       },
       {
@@ -1922,7 +1922,7 @@
         "must_not_be_flagged": [
           "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L142(seq: raw.seq ?? idx + 1)",
           "audit-platform/frontend/src/components/workpaper/composables/useH3DetailFair.ts#L111(seq: raw.seq ?? idx + 1)",
-          "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L295(seq: raw.seq ?? idx + 1)"
+          "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L267(seq: raw.seq ?? idx + 1)"
         ],
         "how": "判据只取身份字段自己的值表达式（到同层逗号止），不看整行。"
       }

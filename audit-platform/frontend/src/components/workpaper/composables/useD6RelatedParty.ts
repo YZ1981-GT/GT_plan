@@ -124,7 +124,7 @@ export function recalcRelatedPartyRow(row: RelatedPartyRow): RelatedPartyRow {
   return { ...row, endBalance, bookValue }
 }
 
-function createEmptyRow(): RelatedPartyRow {
+export function createEmptyRow(): RelatedPartyRow {
   return {
     rowId: generateRowId(),
     partyName: '',

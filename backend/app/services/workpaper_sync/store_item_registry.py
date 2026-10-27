@@ -367,9 +367,9 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
     # 🔴 `L` 列是**布尔**校验列 `=D=K`（裁决 G1R-H4）：`value_type=boolean` +
     #    `mode=formula` ⇒ 不入 store（`PROTECTED_MODES`），TRUE/FALSE 不会落库。
     #
-    # 🔴 模板缺陷：`K=G+H` 把「本期转回」当成增加损益，而同表 `J` 的 `-H` 要求 H 填正数
-    #    ⇒ 会计正确应为 `=G-H`。`formula_templates` 逐字记模板原式（判据比对模板），
-    #    前端按正确口径算 ⇒ 有转回时两侧相差 2×转回，如实登记为欠账。
+    # 🔴 模板原先 `K=G+H` 把「本期转回」当成增加损益，与同表 `J` 的 `-H`（H 填正数）矛盾
+    #    ⇒ 第三批已把权威模板修为 `=G-H`（spec oo-writeback-template-parity-closure），
+    #    `formula_templates` 逐字记修后的模板式，与前端同口径。
     #
     # 🔴 GC-2：G14 册裸 IF **11 格**（全在 `审定表G14-1`，受管表零命中）。
     #    per-file 保守策略 ⇒ 受管表干净也必须挂；中性化函数与 G7/G2/G9/G10/G8/H9 共用。

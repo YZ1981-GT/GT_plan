@@ -58,7 +58,7 @@ export interface RelatedPartyAPRow {
   riskLevel: 'none' | 'warning' | 'danger'
 }
 
-interface StoredRelatedPartyRow {
+export interface StoredRelatedPartyRow {
   rowId: string
   seq: number
   sourceRowId: string
@@ -271,7 +271,7 @@ function isBlankRow(row: StoredRelatedPartyRow): boolean {
     && !row.postPaymentAmount && !row.indexNo && !row.remark && !row.sourceRowId
 }
 
-function computeRow(
+export function computeRow(
   stored: StoredRelatedPartyRow,
   totalClosing: number,
   source?: F4RelatedPartyCandidate,

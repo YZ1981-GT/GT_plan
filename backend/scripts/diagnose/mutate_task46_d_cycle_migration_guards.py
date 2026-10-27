@@ -500,26 +500,26 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M21", side="be", path=CONTRACT, kind="replace",
-        anchor='    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"',
-        new='    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3460"',
+        anchor='    "template_sha256": "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"',
+        new='    "template_sha256": "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b040"',
         want=f"{_P28}::test_d2_contract_template_digests_recompute_from_the_template_bytes",
         wants=(f"{_P28}::test_d2_contract_identity_digests_are_real_digests",),
         why="🔴 首轮 Property 28 的整个论证是「没有 definition bundle → 无可漂移 identity → 通过」"
             "（空分母重言式）。D2 契约的 template_sha256 是**真分母**：改一位必须红",
         scope_check=_contract_path_is(
-            "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3460",
+            "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b040",
             "template", "template_sha256",
         ),
         tags=("digest", "data", "tautology"),
     ),
     Mutation(
         id="M22", side="be", path=CONTRACT, kind="replace",
-        anchor='    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b79233b",',
-        new='    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b792330",',
+        anchor='    "normalized_structure_hash": "bd19b4dba8f3d05dfe55e1a18782671860a278b9cd1764042345267c34cc80c4",',
+        new='    "normalized_structure_hash": "bd19b4dba8f3d05dfe55e1a18782671860a278b9cd1764042345267c34cc80c0",',
         want=f"{_P28}::test_d2_contract_template_digests_recompute_from_the_template_bytes",
         why="结构 hash 改一位仍绿 ⇒ 「可见业务结构漂移 fail closed」在 D 循环上没有落点",
         scope_check=_contract_path_is(
-            "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b792330",
+            "bd19b4dba8f3d05dfe55e1a18782671860a278b9cd1764042345267c34cc80c0",
             "template", "normalized_structure_hash",
         ),
         tags=("digest", "data", "tautology"),

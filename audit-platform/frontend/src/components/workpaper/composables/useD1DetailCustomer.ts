@@ -84,7 +84,7 @@ const CONCLUSION_KEY = 'D1-cust-conclusion'
  * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
  * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。同 F1-2 裁决 F1-H3。
  */
-function recalcRow(row: CustomerRow): CustomerRow {
+export function recalcRow(row: CustomerRow): CustomerRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const currentBalance = row.priorUnadjusted + row.currentIncrease - row.currentDecrease
   const currentUnadjusted = currentBalance + row.reclassification
@@ -108,7 +108,7 @@ function generateRowId(): string {
 }
 
 /** 创建空白客户行 */
-function createEmptyRow(): CustomerRow {
+export function createEmptyRow(): CustomerRow {
   return recalcRow({
     rowId: generateRowId(),
     customerName: '',

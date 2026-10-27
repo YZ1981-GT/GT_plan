@@ -99,7 +99,7 @@ const DEFAULT_FIXED_ROWS: CategoryRow[] = [
  * 🔴 期末未审以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
  * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。同 F1-2 裁决 F1-H3。
  */
-function recalcRow(row: CategoryRow): CategoryRow {
+export function recalcRow(row: CategoryRow): CategoryRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const currentUnadjusted = calcCurrentUnadjusted(row.priorUnadjusted, row.currentIncrease, row.currentDecrease)
   const currentAudited = calcAuditedAmount(currentUnadjusted, row.currentAje, row.currentRje)

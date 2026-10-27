@@ -82,7 +82,7 @@ function generateRowId(): string {
 }
 
 /** 创建空子行 */
-function createEmptySubRow(category: BadDebtRow['category']): BadDebtRow {
+export function createEmptySubRow(category: BadDebtRow['category']): BadDebtRow {
   return {
     rowId: generateRowId(),
     category,
@@ -140,7 +140,7 @@ function createFixedRow(category: BadDebtRow['category']): BadDebtRow {
  *   且在线编辑时 OO 按模板重算，表单与 OO 来回改值（spec oo-formula-recompute-not-tamper R4）
  * - currentAudited = currentUnadjusted + currentAje + currentRje
  */
-function recalcRow(row: BadDebtRow): BadDebtRow {
+export function recalcRow(row: BadDebtRow): BadDebtRow {
   row.priorAudited = getAuditedAmount(
     parseNum(row.priorUnadjusted),
     parseNum(row.priorAje),

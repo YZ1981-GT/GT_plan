@@ -28,7 +28,7 @@ spec: `g-cycle-single-region-detail-lanes` · Task 10 / C-9
 GC-6 裁决它是**最稳**的一族（源模板固定行集，插行/改名都不漂移）。
 🔴 照抄 F 循环的 `row_identity_key in ('rowId','id')` 白名单会把它判违规。
 
-═══ 🔴 二：`K` 列公式是模板缺陷（`=G+H` 应为 `=G-H`）═══
+═══ 🔴 二：`K` 列公式（模板原为 `=G+H`，已按会计口径修为 `=G-H`）═══
 
 逐格实测 R11-R19 四个公式列（每行同型）：
 
@@ -36,24 +36,22 @@ GC-6 裁决它是**最稳**的一族（源模板固定行集，插行/改名都�
 |---|---|---|
 | `D` | `=B{r}+C{r}` | 审定数 = 未审 + 调整 |
 | `J` | `=F{r}+G{r}-H{r}-I{r}` | 期末余额 = 期初 + 计提 − 转回 − 转销 |
-| `K` | `=G{r}+H{r}` | 🔴 计入损益，**应为 `=G-H`** |
+| `K` | `=G{r}-H{r}` | 计入损益 = 计提 − 转回（原 `=G+H`，已修） |
 | `L` | `=D{r}=K{r}` | 布尔核对：审定数 == 计入损益 |
 
-`J` 要求 `H`「本期转回」填**正数**（转回减少准备）。同一张表里 `K=G+H` 却把转回当成
+`J` 要求 `H`「本期转回」填**正数**（转回减少准备）。模板原先的 `K=G+H` 却把转回当成
 **增加**损益 —— 两式对 `H` 的符号约定互相矛盾，必有一错。判定「`K` 错」的三条依据：
 
 1. 会计口径：信用减值损失（损益）= 本期计提 − 本期转回，转回冲减损益；
 2. `J` 的形式与准则口径「期初 + 计提 − 转回 − 转销 = 期末」逐字一致，它是对的；
-3. 平台早已裁定「转回填正数」—— 前端 `useG14FormulaEngine.migrateReversalToPositive`
-   专门把历史负数统一成正数。
+3. 平台早已裁定「转回填正数」（表头与填报说明）；录入值按原样参与计算，前端载入时
+   不改号（原先取绝对值，OO 侧填的负数会被表单改正，第三批对拍守卫抓到后去掉）。
 
-处置同 G8 的模板缺陷口径：`K` 在模板**每行都有公式** ⇒ 判 `mode=formula`（进
-:data:`FORMULA_COLUMNS_G1402`，OO 侧改不了），`formula_templates` 逐字记模板原式
-（判据要逐格比对模板，记成 `=G-H` 会必红）。前端按会计正确口径 `计提 − 转回` 算 ⇒
-**有转回时 Excel 侧 `K` 比平台侧多 2×转回**。这个差异是如实登记的欠账（见 spec
-evidence `task10-c9-g14-rootfix.md` §2.2）：修模板要么改字节（`backend/wp_templates/`
-运行时只读 + sha 冻结，禁止）、要么走覆盖层（框架层尚无该机制）+ 会计专业复核。
-🔴 模板自带的 `L=D=K` 核对列会在有转回时显示不平 —— 用户看得见，不是静默错。
+spec `oo-writeback-template-parity-closure` 第三批已改权威模板字节（`backend/scripts/fix/
+fix_template_formula_defects.py` #29），原式登记留痕在 :data:`TEMPLATE_DEFECT_K_G1402`。
+`K` 每行都有公式 ⇒ 判 `mode=formula`（进 :data:`FORMULA_COLUMNS_G1402`，OO 侧改不了），
+`formula_templates` 逐字记修后的模板式；前端 `calcNetImpairmentLoss` 同为 `计提 − 转回`，
+两侧不再相差 2×转回，模板自带的 `L=D=K` 核对列在审定数等于计入损益时即平。
 
 ═══ 🔴 三：`L` 是布尔校验列（裁决 G1R-H4）═══
 
@@ -86,7 +84,7 @@ __all__ = [
     "FORMULA_COLUMNS_G1402",
     "BOOLEAN_COLUMNS_G1402",
     "TEMPLATE_ROW_LABELS_G1402",
-    "TEMPLATE_ROW_DEFECTS_G1402",
+    "TEMPLATE_DEFECT_K_G1402",
     "FRONTEND_ONLY_FIELDS_G1402",
     "FIELD_SPECS_G1402",
     "FOOTER_ROW_G1402",
@@ -131,27 +129,33 @@ FORMULA_COLUMNS_G1402: Final[tuple[str, ...]] = ("D", "J", "K", "L")
 BOOLEAN_COLUMNS_G1402: Final[tuple[str, ...]] = ("L",)
 
 #: 公式列 → 数据行公式模板（`{r}` 为行号）。**逐字实测**自 R11 且 R11-R19 同型。
-#: 🔴 `K` 逐字记模板原式 `=G+H`（含缺陷）—— 判据逐格比对模板，记成 `=G-H` 会必红。
-#:   会计正确口径 `计提 − 转回` 由前端算，差异见模块头与 TEMPLATE_ROW_DEFECTS。
+#: `K` 是修后的模板式（原 `=G+H`，见 :data:`TEMPLATE_DEFECT_K_G1402`）。
 FORMULA_TEMPLATES_G1402: Final[dict[str, str]] = {
     "D": "=B{r}+C{r}",                      # 审定数 = 未审 + 调整
     "J": "=F{r}+G{r}-H{r}-I{r}",            # 期末余额 = 期初 + 计提 − 转回 − 转销
-    "K": "=G{r}+H{r}",                      # 🔴 计入损益，应为 =G-H（模板缺陷）
+    "K": "=G{r}-H{r}",                      # 计入损益 = 计提 − 转回
     "L": "=D{r}=K{r}",                      # 布尔核对：审定数 == 计入损益
 }
 
-#: 模板缺陷台账（逐格实测）。判据按它断言「缺陷仍在」—— 一旦模板被修复，判据会红并
-#: 提示同步更新本表与 `FORMULA_TEMPLATES_G1402`（而不是静默失配）。
-TEMPLATE_ROW_DEFECTS_G1402: Final[
-    tuple[tuple[str, tuple[int, ...], str], ...]
-] = (
-    (
-        "K",
-        tuple(range(11, 20)),
-        "=G{r}+H{r} 把「本期转回」当成增加损益；同表 J 的 -H 要求 H 填正数 ⇒ "
-        "会计正确应为 =G{r}-H{r}（信用减值损失 = 计提 − 转回）",
+#: 模板缺陷（已修模板，登记留痕）：K 列原式把「本期转回」当成增加损益。
+TEMPLATE_DEFECT_K_G1402: Final[dict[str, object]] = {
+    "cells": [
+        f"{MANAGED_SHEET_G1402}!K{r}"
+        for r in range(FIRST_DATA_ROW_G1402, LAST_DATA_ROW_G1402 + 1)
+    ],
+    "was": "=G{r}+H{r}",
+    "expected": "=G{r}-H{r}",
+    "root_cause": (
+        "同表 J=F+G-H-I 要求「本期转回」H 填正数，K=G+H 却把转回当成增加损益 —— "
+        "两式对 H 的符号约定矛盾；会计口径：信用减值损失 = 计提 − 转回"
     ),
-)
+    "effect": "修复前有转回时 Excel 侧 K 比平台侧多 2×转回，模板自带的 L=D=K 核对列显示不平",
+    "handling": "template_fixed",
+    "handling_note": (
+        "已改权威模板字节（spec oo-writeback-template-parity-closure 第三批"
+        "（scripts/fix/fix_template_formula_defects.py #29））。"
+    ),
+}
 
 #: 前端行接口里**不是模板列**的派生字段（试算余额对账用，不受管、不进 store）。
 FRONTEND_ONLY_FIELDS_G1402: Final[tuple[str, ...]] = (
@@ -177,11 +181,11 @@ FIELD_SPECS_G1402: Final[
     # ── F9:K9 对应科目-减值准备 ────────────────────────────────────────
     ("opening_provision", "F", "editable", "amount", "openingProvision", "期初余额", "F9"),
     ("current_provision", "G", "editable", "amount", "currentProvision", "本期计提", "F9"),
-    #: 🔴 「本期转回」填**正数**（J 的 -H 与前端 migrateReversalToPositive 同口径）
+    #: 🔴 「本期转回」填**正数**（J 的 -H、K 的 -H 同口径；录入值按原样计算，前端不改号）
     ("current_reversal", "H", "editable", "amount", "currentReversal", "本期转回", "F9"),
     ("current_writeoff", "I", "editable", "amount", "currentWriteoff", "本期转销", "F9"),
     ("closing_provision", "J", "formula", "amount", "closingProvision", "期末余额", "F9"),
-    #: 🔴 模板公式 `=G+H` 是缺陷（应 `=G-H`）；每行都有公式 ⇒ 仍判 formula
+    #: 模板公式 `=G-H`（第三批修模板，原 `=G+H`）；每行都有公式 ⇒ formula
     ("profit_loss", "K", "formula", "amount", "profitLoss", "计入损益", "F9"),
     # ── L / M 单列（布尔核对 / 索引号）────────────────────────────────
     #: 🔴 布尔校验列（裁决 G1R-H4）：`value_type="boolean"` + `mode="formula"`

@@ -717,8 +717,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # G9-2 明细
         "G9-2": [
-            ("期末余额", "期初审定 + 增加 − 减少 + 公允价值变动 + 利息 − 减值 + OCI变动", "计算",
-             "calcEndingBalance", "useG9Detail / useG9FormulaEngine"),
+            ("期初 / 期末报表数", "审定公允价值 + 重分类（L=J+K、Y=W+X；期末未审走未审线 P=C+M、Q=D+N）", "计算",
+             "enrichG9DetailRow（按模板 12 条公式重算）", "useG9Detail"),
         ],
         # G9-4 公允价值测试
         "G9-4": [
@@ -969,10 +969,10 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "G14-2": [
             ("计入损益(K列)", "本期计提 − 本期转回（转回按正数录入）", "计算",
              "calcNetImpairmentLoss（= currentAudited）", "useG14Detail / useG14FormulaEngine"),
-            ("减值准备期末(J列)", "期初 + 计提 − 转回 − 转销 + 其他变动", "计算",
-             "calcProvisionRollForward", "useG14FormulaEngine"),
-            ("准备滚动核对", "期初+计提−转回−转销+其他 = 期末实际（容差 0.01）", "logic_check",
-             "isRollForwardBalanced", "useG14FormulaEngine"),
+            ("减值准备期末(J列)", "期初 + 计提 − 转回 − 转销（模板 J=F+G−H−I）", "计算",
+             "calcProvisionRollForward（其他变动传 0）", "useG14Detail / useG14FormulaEngine"),
+            ("期末 ↔ 试算核对", "减值准备期末 − 对应科目试算期末（容差 0.01）", "logic_check",
+             "isClosingReconciledWithTb（tbClosingMatched）", "useG14Detail / g14ProvisionTb"),
             ("审定 ↔ 计入损益核对", "审定数 D = 计入损益 K（容差 0.01）", "logic_check",
              "isReconciled", "useG14FormulaEngine"),
         ],

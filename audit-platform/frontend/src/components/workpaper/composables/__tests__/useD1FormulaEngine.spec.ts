@@ -456,6 +456,12 @@ describe('Feature: d1-endorsement-discount, Property 3: 贴息天数计算正确
       { numRuns: 100 },
     )
   })
+
+  it('贴现日晚于到期日时为负数（与模板 H = F − G 同，不再记 0）；日期未填完记 0', () => {
+    expect(calcDiscountDays('2025-03-01', '2025-03-31')).toBe(-30)
+    expect(calcDiscountDays('', '2025-03-31')).toBe(0)
+    expect(calcDiscountDays('2025-03-01', '不是日期')).toBe(0)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════

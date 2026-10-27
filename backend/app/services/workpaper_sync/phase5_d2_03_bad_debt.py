@@ -13,7 +13,7 @@ sheet_key=``d23-managed``，共享 adapter ``d2.receivable_detail``。
 ═══ 结构：单 sheet **双区**（实测反转 spec 裁决 E2，见 evidence/T03）═══
 
 受管 sheet = ``坏账准备明细表D2-3``（openpyxl 直读权威模板，与父 pilot 同 workbook，
-sha256=``7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466``）：
+sha256=``4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044``）：
 
 * **两级表头**：组标题 R10（项目/期初数/本期增加/本期减少/期末数）+ 二级 R11（13 列细分）。
 * **单项段**（``bad_debt_individual_rows``）：小计 R12（=SUM(B13:B16)），数据 R13-16，
@@ -76,7 +76,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
+    "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"
 )
 
 MANAGED_SHEET_D23: Final[str] = "坏账准备明细表D2-3"

@@ -414,6 +414,18 @@ describe('Feature: d1-ecl-provision, Property 7: JSON Round-Trip行数据持久�
       { numRuns: 100 },
     )
   })
+
+  it('载入不截断损失率：存库 1.5 / −0.2 原样保留并参与计算（与模板 D=B×C 同；录入时才校验区间）', () => {
+    const [over, under] = deserializeRows(JSON.stringify([
+      { id: 'a', balance: 1000, lossRate: 1.5, actualProvision: 100 },
+      { id: 'b', balance: 1000, lossRate: -0.2, actualProvision: 0 },
+    ]))
+    expect(over.lossRate).toBe(1.5)
+    expect(over.shouldProvision).toBe(1500)
+    expect(over.difference).toBe(1400)
+    expect(under.lossRate).toBe(-0.2)
+    expect(under.shouldProvision).toBe(-200)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════

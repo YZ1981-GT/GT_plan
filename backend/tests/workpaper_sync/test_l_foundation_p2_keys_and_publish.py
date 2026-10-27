@@ -427,22 +427,18 @@ class TestTask13PositionalSubDifferences:
             hyphen_hits += len(hyphen_re.findall(text))
         assert hyphen_hits > 0, "row-${…} 带连字符应非空"
 
-    def test_l6_disclosure_uses_row_no_hyphen(self, l_files: list[pathlib.Path]) -> None:
-        """L6 Disclosure 使用 row${i} 形态（row 后直接 ${，无连字符分隔）（LF-P21）。"""
-        # L6 Disclosure 的 item_id 模板：`L6-L6-2-row${i}-project`
-        # 这里 row 和 ${ 之间无连字符
-        l6_disclosure_files = [
-            p for p in l_files
-            if "L6TabDisclosure" in p.name
-        ]
+    def test_l6_disclosure_reads_the_detail_rows_item(self, l_files: list[pathlib.Path]) -> None:
+        """L6 附注改从 `L6-L6-2-rows` 读（LF-P21 取证的 `row${i}` 逐格键已删）。
+
+        原读侧 `L6-L6-2-row${i}-{field}` 全仓没有写入方（明细表写整表一条 JSON），附注恒显示
+        「暂无数据」；spec oo-writeback-template-parity-closure 第三批改为 `readL6DetailRows`。
+        """
+        l6_disclosure_files = [p for p in l_files if "L6TabDisclosure" in p.name]
         assert len(l6_disclosure_files) >= 2, "应有 L6 Disclosure 文件"
-        found = False
         for p in l6_disclosure_files:
             text = _strip_comments(_cached_text(p))
-            # row${i} 不带连字符——键形态是 -row${i}-
-            if re.search(r"row\$\{[^}]*\}", text):
-                found = True
-        assert found, "L6 Disclosure 应有 row${i} 形态"
+            assert not re.search(r"L6-L6-2-row\$\{", text), f"{p.name} 仍按无写入方的逐格键读"
+            assert "readL6DetailRows(responses)" in text, f"{p.name} 未改读整表"
 
     def test_index_basis_write_and_read(self, l_files: list[pathlib.Path]) -> None:
         """写侧 ${i + 1} 与读侧 ${i} 同时存在（LF-P22）。"""

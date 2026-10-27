@@ -67,6 +67,46 @@ export const SEGMENT_CONFIGS: SegmentConfig[] = [
   },
 ]
 
+// ─── Row formulas（纯函数） ───────────────────────────────────────────────────
+
+/** 重算行内公式：原值期末 = 期初 + 增加 − 减少；折耗期末 = 期初 + 计提 − 转回；净值 = 原值 − 折耗 */
+export function recalcH5DetailRow(row: H5DetailRow): void {
+  row.originalCostEnd = calcAssetEndBalance(row.originalCostBegin, row.originalCostIncrease, row.originalCostDecrease)
+  row.accDepletionEnd = calcContraEndBalance(row.accDepletionBegin, row.accDepletionReversal, row.accDepletionProvision)
+  row.netValue = calcNetValue(row.originalCostEnd, row.accDepletionEnd, 0)
+}
+
+/**
+ * store 行 → 表单行（加载时重算公式列）。纯函数，不碰 store。
+ * 🔴 读库沿用 `raw.rowId`（真库 `row-c-*` 历史身份）—— `test_h_lane1_variant_axis_and_identity`
+ * 按 `function _normalize*` 的函数体守这个 `??`，函数名因此保留下划线前缀。
+ */
+function _normalizeRow(raw: any): H5DetailRow {
+  const r: H5DetailRow = {
+    rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
+    category: raw.category ?? '',
+    name: raw.name ?? '',
+    oilField: raw.oilField ?? '',
+    block: raw.block ?? '',
+    originalCostBegin: Number(raw.originalCostBegin) || 0,
+    originalCostIncrease: Number(raw.originalCostIncrease) || 0,
+    originalCostDecrease: Number(raw.originalCostDecrease) || 0,
+    originalCostEnd: 0,
+    increaseReason: raw.increaseReason ?? '',
+    decreaseReason: raw.decreaseReason ?? '',
+    accDepletionBegin: Number(raw.accDepletionBegin) || 0,
+    accDepletionProvision: Number(raw.accDepletionProvision) || 0,
+    accDepletionReversal: Number(raw.accDepletionReversal) || 0,
+    accDepletionEnd: 0,
+    netValue: 0,
+    remark: raw.remark ?? '',
+  }
+  recalcH5DetailRow(r)
+  return r
+}
+
+export const normalizeH5DetailRow = _normalizeRow
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useH5Detail(opts: {
@@ -103,34 +143,9 @@ export function useH5Detail(opts: {
     return (item?.remark ?? item?.conclusion ?? '') as string
   }
 
-  function _normalizeRow(raw: any): H5DetailRow {
-    const r: H5DetailRow = {
-      rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-      category: raw.category ?? '',
-      name: raw.name ?? '',
-      oilField: raw.oilField ?? '',
-      block: raw.block ?? '',
-      originalCostBegin: Number(raw.originalCostBegin) || 0,
-      originalCostIncrease: Number(raw.originalCostIncrease) || 0,
-      originalCostDecrease: Number(raw.originalCostDecrease) || 0,
-      originalCostEnd: 0,
-      increaseReason: raw.increaseReason ?? '',
-      decreaseReason: raw.decreaseReason ?? '',
-      accDepletionBegin: Number(raw.accDepletionBegin) || 0,
-      accDepletionProvision: Number(raw.accDepletionProvision) || 0,
-      accDepletionReversal: Number(raw.accDepletionReversal) || 0,
-      accDepletionEnd: 0,
-      netValue: 0,
-      remark: raw.remark ?? '',
-    }
-    _recalcRow(r)
-    return r
-  }
-
+  // 行归一（模块级 `_normalizeRow`）/ 重算是模块级纯函数，对拍守卫直接调用
   function _recalcRow(row: H5DetailRow): void {
-    row.originalCostEnd = calcAssetEndBalance(row.originalCostBegin, row.originalCostIncrease, row.originalCostDecrease)
-    row.accDepletionEnd = calcContraEndBalance(row.accDepletionBegin, row.accDepletionReversal, row.accDepletionProvision)
-    row.netValue = calcNetValue(row.originalCostEnd, row.accDepletionEnd, 0)
+    recalcH5DetailRow(row)
   }
 
   // ─── Computed ──────────────────────────────────────────────────────────────

@@ -172,6 +172,72 @@ export function recomputeH4DetailRow(row: H4DetailRow): H4DetailRow {
   }
 }
 
+/** store 行 → 表单行（兼容旧字段 quantity / 无数量拆分；加载时重算公式列）。纯函数，不碰 store。 */
+export function normalizeH4DetailRow(raw: any): H4DetailRow {
+  const beginQty = _n(raw.beginQty ?? raw.openingQty)
+  const increaseQty = _n(raw.increaseQty)
+  const decreaseQty = _n(raw.decreaseQty)
+  // 旧版单一 quantity → 视为期末数量；若无拆分则期初=期末
+  const legacyQty = _n(raw.quantity)
+  const resolvedBeginQty = beginQty || (legacyQty && !increaseQty && !decreaseQty ? legacyQty : beginQty)
+  const resolvedEndQtyHint = _n(raw.endQty) || legacyQty
+
+  const row: H4DetailRow = {
+    rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    category: String(raw.category ?? ''),
+    name: String(raw.name ?? ''),
+    spec: String(raw.spec ?? ''),
+    unit: String(raw.unit ?? ''),
+    supplier: String(raw.supplier ?? ''),
+    beginQty: resolvedBeginQty,
+    increaseQty,
+    decreaseQty,
+    endQty: 0,
+    beginAmount: _n(raw.beginAmount ?? raw.openingAmount),
+    purchaseAmount: _n(raw.purchaseAmount ?? raw.purchased),
+    otherIncrease: _n(raw.otherIncrease),
+    increaseSubtotal: 0,
+    usageAmount: _n(raw.usageAmount ?? raw.usedOut),
+    returnAmount: _n(raw.returnAmount ?? raw.returned),
+    scrapAmount: _n(raw.scrapAmount ?? raw.scrapped),
+    otherDecrease: _n(raw.otherDecrease),
+    decreaseTotal: 0,
+    endAmount: 0,
+    beginUnitPrice: null,
+    increaseUnitPrice: null,
+    decreaseUnitPrice: null,
+    endUnitPrice: null,
+    ajeBegin: _n(raw.ajeBegin),
+    ajeIncrease: _n(raw.ajeIncrease),
+    ajeDecrease: _n(raw.ajeDecrease),
+    auditedBegin: 0,
+    auditedIncrease: 0,
+    auditedDecrease: 0,
+    auditedEnd: 0,
+    impairBegin: _n(raw.impairBegin),
+    impairIncrease: _n(raw.impairIncrease),
+    impairDecrease: _n(raw.impairDecrease),
+    impairEnd: 0,
+    ajeImpair: _n(raw.ajeImpair),
+    auditedImpairEnd: 0,
+    bookValueBegin: 0,
+    bookValueEnd: 0,
+    auditedBookValue: 0,
+    bookValueDiff: 0,
+    aging: String(raw.aging ?? ''),
+    quality: String(raw.quality ?? ''),
+  }
+
+  const computed = recomputeH4DetailRow(row)
+  // 若旧数据仅有期末数量且无增减，保持期末=旧 quantity
+  if (!increaseQty && !decreaseQty && resolvedEndQtyHint && !beginQty) {
+    computed.beginQty = resolvedEndQtyHint
+    computed.endQty = resolvedEndQtyHint
+    computed.endUnitPrice = calcUnitPrice(computed.endAmount, computed.endQty)
+  }
+  return computed
+}
+
 /** 按物资分类汇总（对齐 Excel SUMPRODUCT 分类小计） */
 export function buildCategorySubtotals(rows: H4DetailRow[]): H4CategorySubtotal[] {
   const map = new Map<string, H4CategorySubtotal>()
@@ -235,70 +301,9 @@ export function useH4Detail(params: {
     try { return JSON.parse(raw) } catch { return raw }
   }
 
-  /** 规范化行（兼容旧字段 quantity / 无数量拆分） */
+  /** 规范化行（模块级纯函数 normalizeH4DetailRow；这里留函数声明，提升） */
   function _normalizeRow(raw: any): H4DetailRow {
-    const beginQty = _n(raw.beginQty ?? raw.openingQty)
-    const increaseQty = _n(raw.increaseQty)
-    const decreaseQty = _n(raw.decreaseQty)
-    // 旧版单一 quantity → 视为期末数量；若无拆分则期初=期末
-    const legacyQty = _n(raw.quantity)
-    const resolvedBeginQty = beginQty || (legacyQty && !increaseQty && !decreaseQty ? legacyQty : beginQty)
-    const resolvedEndQtyHint = _n(raw.endQty) || legacyQty
-
-    const row: H4DetailRow = {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      category: String(raw.category ?? ''),
-      name: String(raw.name ?? ''),
-      spec: String(raw.spec ?? ''),
-      unit: String(raw.unit ?? ''),
-      supplier: String(raw.supplier ?? ''),
-      beginQty: resolvedBeginQty,
-      increaseQty,
-      decreaseQty,
-      endQty: 0,
-      beginAmount: _n(raw.beginAmount ?? raw.openingAmount),
-      purchaseAmount: _n(raw.purchaseAmount ?? raw.purchased),
-      otherIncrease: _n(raw.otherIncrease),
-      increaseSubtotal: 0,
-      usageAmount: _n(raw.usageAmount ?? raw.usedOut),
-      returnAmount: _n(raw.returnAmount ?? raw.returned),
-      scrapAmount: _n(raw.scrapAmount ?? raw.scrapped),
-      otherDecrease: _n(raw.otherDecrease),
-      decreaseTotal: 0,
-      endAmount: 0,
-      beginUnitPrice: null,
-      increaseUnitPrice: null,
-      decreaseUnitPrice: null,
-      endUnitPrice: null,
-      ajeBegin: _n(raw.ajeBegin),
-      ajeIncrease: _n(raw.ajeIncrease),
-      ajeDecrease: _n(raw.ajeDecrease),
-      auditedBegin: 0,
-      auditedIncrease: 0,
-      auditedDecrease: 0,
-      auditedEnd: 0,
-      impairBegin: _n(raw.impairBegin),
-      impairIncrease: _n(raw.impairIncrease),
-      impairDecrease: _n(raw.impairDecrease),
-      impairEnd: 0,
-      ajeImpair: _n(raw.ajeImpair),
-      auditedImpairEnd: 0,
-      bookValueBegin: 0,
-      bookValueEnd: 0,
-      auditedBookValue: 0,
-      bookValueDiff: 0,
-      aging: String(raw.aging ?? ''),
-      quality: String(raw.quality ?? ''),
-    }
-
-    const computed = recomputeH4DetailRow(row)
-    // 若旧数据仅有期末数量且无增减，保持期末=旧 quantity
-    if (!increaseQty && !decreaseQty && resolvedEndQtyHint && !beginQty) {
-      computed.beginQty = resolvedEndQtyHint
-      computed.endQty = resolvedEndQtyHint
-      computed.endUnitPrice = calcUnitPrice(computed.endAmount, computed.endQty)
-    }
-    return computed
+    return normalizeH4DetailRow(raw)
   }
 
   function load(): void {

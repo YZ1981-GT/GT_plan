@@ -55,7 +55,7 @@ function generateRowId(): string {
   return `rp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function createEmptyRow(): RelatedPartyRow {
+export function createEmptyRow(): RelatedPartyRow {
   return {
     rowId: generateRowId(),
     debtorName: '',
@@ -73,7 +73,7 @@ function createEmptyRow(): RelatedPartyRow {
 }
 
 /** 行公式重算 */
-function recalcRow(row: RelatedPartyRow): RelatedPartyRow {
+export function recalcRow(row: RelatedPartyRow): RelatedPartyRow {
   row.endBalance = row.priorBalance + row.debitAmount - row.creditAmount
   row.bookValue = row.endBalance - row.badDebtProvision
   return row

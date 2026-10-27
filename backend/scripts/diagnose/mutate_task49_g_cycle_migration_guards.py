@@ -585,12 +585,12 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M28", side="be", path=SLICE, kind="replace",
-        anchor='        "size": 60094,',
-        new='        "size": 60095,',
+        anchor='        "size": 51758,',
+        new='        "size": 51759,',
         want=f"{_P28}::test_authoritative_templates_digests_recompute",
         wants=(f"{_P28}::test_every_entry_template_ref_is_registered_with_digest",),
         why="G14 权威模板 size 差一字节仍绿 ⇒ size 只是抄下来的数字，没有 stat() 比对",
-        scope_check=_template_field("G14 信用减值损失.xlsx", "size", 60095),
+        scope_check=_template_field("G14 信用减值损失.xlsx", "size", 51759),
         tags=("property28", "data"),
     ),
     Mutation(

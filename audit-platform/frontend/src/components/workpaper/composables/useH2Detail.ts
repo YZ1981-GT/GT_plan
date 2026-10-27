@@ -509,8 +509,10 @@ function _normalizeRow(raw: any): H2DetailRow {
   row.impairIncAdj = _getNum(raw.impairIncAdj)
   row.impairDecAdj = _getNum(raw.impairDecAdj)
 
-  // 旧数据若只存了 beginAudited/endAudited，尽量反推调整额（仅当调整为空）
-  if (!_getNum(raw.adjustBegin) && raw.beginAudited != null) {
+  // 旧数据若只存了 beginAudited、根本没有 adjustBegin 键，反推期初调整额。
+  // 🔴 只认「键不存在」：调整为 0 是合法录入（OO 侧清空调整、而存库的 beginAudited 是上一版
+  //    公式缓存值时，原先的「为 0 就反推」会把用户清掉的调整算回来，表单与模板 Z=J+S 不同）。
+  if (raw.adjustBegin === undefined && raw.beginAudited != null) {
     const implied = _getNum(raw.beginAudited) - row.cipBegin
     if (Math.abs(implied) > 0.005) row.adjustBegin = implied
   }

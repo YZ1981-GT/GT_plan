@@ -48,8 +48,8 @@ describe('useD5FormulaEngine - 单元测试', () => {
       expect(calcRemainingDays('', '2026-01-31')).toBe(0)
       expect(calcRemainingDays('2026-01-01', '')).toBe(0)
     })
-    it('returns 0 when maturity before measurement', () => {
-      expect(calcRemainingDays('2026-06-30', '2026-01-01')).toBe(0)
+    it('到期日早于计量日时为负数（与模板 G = F − E 同，不再记 0）', () => {
+      expect(calcRemainingDays('2026-06-30', '2026-01-01')).toBe(-180)
     })
     it('returns 0 for invalid dates', () => {
       expect(calcRemainingDays('invalid', '2026-01-31')).toBe(0)

@@ -213,7 +213,7 @@
         ],
         "row_identity_key": "id",
         "row_identity_generator": "inline String(Date.now())",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L461",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L467",
         "row_identity_generator_form": "const id = String(Date.now())",
         "row_identity_is_positional": true,
         "row_identity_positional_defect": "🔴 载入路径 useF2DetailSheet.ts#L235 写的是 `...emptyRow(String(r.id || i + 1), segments)` —— 持久化行缺 id 时用**数组下标 i+1** 补，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改（改法会动 11 张表的既存持久化数据）。",
@@ -1334,7 +1334,7 @@
         "row_identity": {
           "kind": "generated_timestamp_string_with_array_index_fallback",
           "identity_field": "id",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L235"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L241"
         }
       },
       {

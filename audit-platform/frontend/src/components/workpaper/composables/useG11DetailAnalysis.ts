@@ -106,7 +106,7 @@ function buildSkeletonRows(): G11DetailRow[] {
   )
 }
 
-function enrichRow(
+export function enrichRow(
   raw: Partial<G11DetailRow> & { id?: string },
   seq: number,
   totals?: { current: number; prior: number },

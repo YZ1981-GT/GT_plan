@@ -14,12 +14,13 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { calcLiabilityEndBalance, calcSubtotal } from '@/composables/useL1FormulaEngine'
+import { calcSubtotal } from '@/composables/useL1FormulaEngine'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { DetailRow } from '@/composables/useL1FormData'
 import {
   DETAIL_ROWS_ITEM_ID,
   createEmptyDetailRow,
+  recalcL1DetailRow,
 } from '@/composables/useL1FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -124,12 +125,9 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
 
   // ─── 3. 计算属性：每行 endBalance ──────────────────────────────────────
 
-  /** 各行 endBalance 自动计算（负债类：期末=期初+贷方-借方） */
+  /** 各行按模板公式重算（K 期末未审 = 期初 + 贷方 − 借方；R~U 审定 = 未审 + 账项 + 重分类） */
   const computedRows: ComputedRef<DetailRow[]> = computed(() => {
-    return detailRows.value.map(row => ({
-      ...row,
-      endBalance: calcLiabilityEndBalance(row.beginning, row.creditAmount, row.debitAmount),
-    }))
+    return detailRows.value.map(row => recalcL1DetailRow(row))
   })
 
   /** 合计 endBalance（供与审定表L1-1交叉验证） */
@@ -204,10 +202,8 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
     const row = detailRows.value[index] as any
     row[field] = value
 
-    // 如果是金额字段，重算 endBalance
-    if (field === 'beginning' || field === 'creditAmount' || field === 'debitAmount') {
-      row.endBalance = calcLiabilityEndBalance(row.beginning, row.creditAmount, row.debitAmount)
-    }
+    // 金额（含期初 / 本期的账项与重分类调整）变了 ⇒ 按模板重算 K 与 R~U
+    Object.assign(row, recalcL1DetailRow(row))
 
     _persist()
   }
@@ -231,7 +227,7 @@ export function useL1Detail(formData: ReturnType<typeof useL1FormData>) {
       {
         item_id: DETAIL_ROWS_ITEM_ID,
         conclusion: null,
-        remark: detailRows.value.length ? JSON.stringify(detailRows.value) : null,
+        remark: detailRows.value.length ? JSON.stringify(detailRows.value.map(recalcL1DetailRow)) : null,
       },
     ])
   }

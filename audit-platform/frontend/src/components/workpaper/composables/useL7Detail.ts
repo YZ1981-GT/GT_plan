@@ -100,6 +100,32 @@ export const L7_DETAIL_SEGMENTS = [
   },
 ] as const
 
+// ─── Row formulas（纯函数） ───────────────────────────────────────────────────
+
+/** 单行公式列（对应xlsx E/L/M/N/O列公式）。纯函数，不碰 store。 */
+export function computeL7DetailRow(row: L7DetailRow): L7DetailRow {
+  // E = B + C - D（期初审定）— 实际是期初未审+AJE+RJE，公式写"减"可能是原模板误导
+  // 按xlsx公式 E12=B12+C12-D12，其中D是"重分类"减少
+  const beginAudited = row.beginUnadjusted + row.beginAje - row.beginRje
+  // L = B + F + G（期末未审数 = 期初未审 + 本期AJE增 + 本期RJE增）
+  const endUnadjusted = row.beginUnadjusted + row.ajeIncrease + row.rjeIncrease
+  // M = C + H + J（期末AJE = 期初AJE + 本期增AJE + 本期减AJE）
+  const endAje = row.beginAje + row.endAjeIncrease + row.endAjeDecrease
+  // N = D + I + K（期末RJE = 期初RJE + 本期增RJE + 本期减RJE）
+  const endRje = row.beginRje + row.endRjeDecrease + row.endRjeIncrease
+  // O = L + M - N（期末审定 = 期末未审 + 期末AJE - 期末RJE）
+  const endAudited = endUnadjusted + endAje - endRje
+
+  return {
+    ...row,
+    beginAudited,
+    endUnadjusted,
+    endAje,
+    endRje,
+    endAudited,
+  }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 /**
@@ -124,30 +150,9 @@ export function useL7Detail(
 
   // ─── 2. 计算属性：公式列自动计算 ─────────────────────────────────────────
 
-  /** 各行公式列自动计算（对应xlsx E/L/M/N/O列公式） */
+  /** 各行公式列自动计算（对应xlsx E/L/M/N/O列公式；逐行纯函数 computeL7DetailRow） */
   const computedRows: ComputedRef<L7DetailRow[]> = computed(() => {
-    return detailRows.value.map(row => {
-      // E = B + C - D（期初审定）— 实际是期初未审+AJE+RJE，公式写"减"可能是原模板误导
-      // 按xlsx公式 E12=B12+C12-D12，其中D是"重分类"减少
-      const beginAudited = row.beginUnadjusted + row.beginAje - row.beginRje
-      // L = B + F + G（期末未审数 = 期初未审 + 本期AJE增 + 本期RJE增）
-      const endUnadjusted = row.beginUnadjusted + row.ajeIncrease + row.rjeIncrease
-      // M = C + H + J（期末AJE = 期初AJE + 本期增AJE + 本期减AJE）
-      const endAje = row.beginAje + row.endAjeIncrease + row.endAjeDecrease
-      // N = D + I + K（期末RJE = 期初RJE + 本期增RJE + 本期减RJE）
-      const endRje = row.beginRje + row.endRjeDecrease + row.endRjeIncrease
-      // O = L + M - N（期末审定 = 期末未审 + 期末AJE - 期末RJE）
-      const endAudited = endUnadjusted + endAje - endRje
-
-      return {
-        ...row,
-        beginAudited,
-        endUnadjusted,
-        endAje,
-        endRje,
-        endAudited,
-      }
-    })
+    return detailRows.value.map(computeL7DetailRow)
   })
 
   /** 期末审定合计（供L7-1交叉验证） */

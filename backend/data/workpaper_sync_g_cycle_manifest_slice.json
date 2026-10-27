@@ -84,7 +84,7 @@
         "payload_column": "conclusion",
         "payload_column_mode": "conclusion_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 conclusion（remark 留给纯文本说明）",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L740",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L735",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -93,7 +93,7 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L482",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L477",
         "row_identity_generator_form": "`g1d-${mintRowIdSuffix()}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -124,7 +124,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG1TraFinFormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L653",
+        "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L648",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G1 交易性金融资产.xlsx!明细表G1-2!A9 = '类别'"
@@ -1459,7 +1459,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L553",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L554",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1499,7 +1499,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG9FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L322",
+        "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L323",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G9 其他非流动金融资产.xlsx!明细表G9-2!A9 = '类别'"
@@ -2078,7 +2078,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L295",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L291",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -2087,7 +2087,7 @@
         "row_identity_key": "rowKey",
         "row_identity_kind": "stable_template_row_key",
         "row_identity_generator": "createDefaultRows() / G14_LINE_ITEMS",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L151",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L149",
         "row_identity_generator_form": "stable_template_row_key（行集由 G14_LINE_ITEMS 固定，rowKey 不生成也不派生自位置；合计行 rowKey='total'）",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -2118,7 +2118,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG14FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L199",
+        "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L195",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G14 信用减值损失.xlsx!明细表G14-2!A9 = '项目'"
@@ -2221,11 +2221,11 @@
       },
       {
         "name": "G14 信用减值损失.xlsx",
-        "size": 60094,
-        "sha256": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6",
+        "size": 51758,
+        "sha256": "952d7adabd035fedb1bc29267525e6592f8437aba0ff34295ceed9497ea703d9",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g14-credit-impairment-loss",
-        "normalized_structure_hash": "2b2f65f65d0ab76c4bc3c275e38015a33f8aacb3b0456694d3947caa3a949c0b"
+        "normalized_structure_hash": "c2ea7ecd4a5de305fd89cb99ae5a7ba5622ee0f48d75b7d2dcb87f1938b53e2e"
       },
       {
         "name": "G2 应收利息.xlsx",
@@ -2297,11 +2297,11 @@
       },
       {
         "name": "G9 其他非流动金融资产.xlsx",
-        "size": 88636,
-        "sha256": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379",
+        "size": 76973,
+        "sha256": "8eb68bfc0491c0d92e7820d697e4facfcb109e936347adad4ec35cafaf86b65c",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g9-other-noncurrent-financial",
-        "normalized_structure_hash": "ac654db9baf0c1fc01583995cca0d4f34fea5da313d3b296d535d1ebcec93cf8"
+        "normalized_structure_hash": "feeb5155c4fe931a7e5bd9c62be1647b1b780c506996718241ebdb8493f084a1"
       }
     ]
   },
@@ -2448,7 +2448,7 @@
         "row_identity": {
           "kind": "generated_timestamp_string",
           "identity_field": "id",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L704"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L699"
         }
       },
       {
@@ -2608,7 +2608,7 @@
         "row_identity": {
           "kind": "stable_template_row_key",
           "identity_field": "rowKey",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L61"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L59"
         }
       }
     ]

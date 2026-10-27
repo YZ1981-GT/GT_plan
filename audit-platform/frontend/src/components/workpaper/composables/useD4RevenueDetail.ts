@@ -46,7 +46,7 @@ export interface RevenueDetailRow {
 }
 
 /** Stored row (without computed fields) */
-interface StoredRevenueRow {
+export interface StoredRevenueRow {
   rowId: string
   product: string
   months: number[]
@@ -102,7 +102,7 @@ function safeParseRows(jsonStr: string | null | undefined): StoredRevenueRow[] {
 /**
  * Compute full RevenueDetailRow from stored data (apply formulas)
  */
-function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
+export function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
   const months = stored.months.length === 12 ? stored.months : [...EMPTY_MONTHS]
   const periodTotal = calcMonthlyTotal(months)
   const audited = calcAuditedWithAdj(periodTotal, stored.auditAdjustment)

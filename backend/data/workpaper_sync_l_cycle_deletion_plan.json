@@ -367,8 +367,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L1 实测**有** HTML 对端（checklist_responses + `L1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L1 短期借款.xlsx`（13 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L184",
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L342",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L282",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L467",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],

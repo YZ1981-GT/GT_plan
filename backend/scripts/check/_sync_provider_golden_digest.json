@@ -36,13 +36,13 @@
     {
       "label": "d2",
       "adapter_id": "d2.receivable_detail",
-      "contract_payload_sha256": "2909b5f52dfd666b6cbd8d9725e8942c013b9ac35e70bf5d2fe6247043f6b87e",
+      "contract_payload_sha256": "661bb271b4f574fa3d56849e6ccdcea0aaebf79e0f34b5a5dc0c77a5fd43e979",
       "sheet_digests": {
-        "d22-managed": "31f1458f39fb568773512a06177e9a40b375a9baee2277b6058176dc05eb5957",
+        "d22-managed": "4d699eb8add8002acbdcb9a768aff15905c5520371eaf3f4d6dd2d05eb5c16c2",
         "d23-managed": "b5b8f846bfb6d3edb41f30f0160090fa071a1fe69e9ccebfa3ffb2e63451c677",
         "d21-managed": "58ad4b96cd7863c90abd3a84316e120ce6e7941d860237549a5ccc61149ed6ba"
       },
-      "store_projection_sha256": "0108dd8681a27d9c45b0f2093ad2c5f24d678d0d6cfd050d7170608373b0cd63",
+      "store_projection_sha256": "bdbc98346c6a42ba998c6a0aa98d1a5241b27ac8172aa73bafbf02929970f792",
       "instrumentation_sha256": "d5b81add1c26c384639c02b1ea477924d352fbf5646113dce401a78b730ef974"
     },
     {
@@ -120,7 +120,7 @@
     {
       "label": "d6",
       "adapter_id": "d6.contract_assets_detail",
-      "contract_payload_sha256": "ec1a6fddb71096a237d61b8d013804b807db0994254f44e27135f17add1358a7",
+      "contract_payload_sha256": "588fe6a3c0c44717f853829fa777bd4106628b2d7e0cb20fb79f057cd7c183e1",
       "sheet_digests": {
         "d62-managed": "18e8757cb34f21c1f8d21cf656dfee34dd34ec6dfbaf96051b2f0f1eb8a6bef5",
         "d63-managed": "f76e0b870c0baac9e5a55f690c47f84c4354d69c9caf7720cb35c9a3833ff099",
@@ -295,7 +295,7 @@
     {
       "label": "g9",
       "adapter_id": "g9.other_noncurrent_detail",
-      "contract_payload_sha256": "d2b26f43010214adeea44971c6dbee20d423830aef0119a2604b264b7958ed7d",
+      "contract_payload_sha256": "58af1cb9059b147e3f72c15a50ea8d62f5ace2342a7795cc2595fcec32bcf9a2",
       "sheet_digests": {
         "g902-managed": "d9abce4001bf33dd76b83104aea2fbfa223fab6a17baf9df34cfaf328275152e",
         "g91-managed": "7afd84e05cbe9ce358004a697c3f712d0a246cc1d6d8326f8c8bf0b89f8cc5a1"
@@ -328,7 +328,7 @@
     {
       "label": "g14",
       "adapter_id": "g14.credit_impairment_detail",
-      "contract_payload_sha256": "0f3a47d2855c24810a8df87ee02d03a5fbaf1322e1b11f9fc1dadcb5b9a3edb4",
+      "contract_payload_sha256": "486572102e2cc0a92ddc6b54a31b05ae4728571b51c89b17bbb6a5494bc11598",
       "sheet_digests": {
         "g1402-managed": "a02861856c74200f2b68f5de0fa9a7ef4c42d29fcea47e9d363b712e0c8dd17d",
         "g141-managed": "e05991ec096b1c5986d896167cd20dbc4515e4b0c10ec7b1f8ac3308a8e1365d"

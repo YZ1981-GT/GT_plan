@@ -115,7 +115,7 @@ export function recalcImpairmentRow(row: ImpairmentDetailRow): ImpairmentDetailR
   return { ...row, priorAudited, endUnadjusted, endAudited }
 }
 
-function createEmptyRow(category: 'single' | 'group'): ImpairmentDetailRow {
+export function createEmptyRow(category: 'single' | 'group'): ImpairmentDetailRow {
   return {
     rowId: generateRowId(),
     itemName: '',

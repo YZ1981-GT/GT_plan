@@ -37,13 +37,16 @@ class Fix:
     coord: str
     old: str | None  # openpyxl 读到的现状（公式带 =；None = 空格）
     new: str | None  # 期望值（公式带 =；否则是文本；None = 清成空的录入格，保留样式）
+    #: 空格补公式时一并写的缓存值（None = 只写 <f>，由 Excel / OO 打开时重算）
+    cached: str | None = None
 
 
-def _col(column: str, rows: range, old: str | None, new: str, template: str, sheet: str) -> list[Fix]:
+def _col(column: str, rows: range, old: str | None, new: str, template: str, sheet: str,
+         cached: str | None = None) -> list[Fix]:
     out = []
     for r in rows:
         out.append(Fix(template, sheet, f"{column}{r}",
-                       None if old is None else old.format(r=r), new.format(r=r)))
+                       None if old is None else old.format(r=r), new.format(r=r), cached))
     return out
 
 
@@ -55,6 +58,7 @@ I3, H3 = "I/I3 商誉.xlsx", "H/H3 投资性房地产.xlsx"
 G7, K6, L4 = "G/G7 长期股权投资.xlsx", "K/K6 持有待售资产和负债.xlsx", "L/L4 应付债券.xlsx"
 D2I, D7, G10 = "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx", "D/D7 合同负债.xlsx", "G/G10 交易性金融负债.xlsx"
 D2A, G13 = "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx", "G/G13 公允价值变动收益.xlsx"
+G14, G9 = "G/G14 信用减值损失.xlsx", "G/G9 其他非流动金融资产.xlsx"
 D4_BOOKS = ("D/D4 收入底稿.xlsx", "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx")
 N12S, N32S = "递延所得税资产明细表N1-2", "递延所得税负债明细表N3-2"
 
@@ -179,6 +183,25 @@ def fixes() -> list[Fix]:
     out += [Fix(G13, g131, "G17", "=SUM(G9,G10,G13,G15:G16)", "=SUM(G7,G10,G13,G15:G16)"),
             Fix(G13, g131, "I7", '=IF(AND(G9=0,D7=0),"",IF(AND(G9=0,D7>0),1,H7/G9))',
                 '=IF(AND(G7=0,D7=0),"",IF(AND(G7=0,D7>0),1,H7/G7))')]
+    # ── 第三批（前端 ↔ 模板公式普查核出，design §2 #29~#32）──
+    # §2-29 G14-2 K「计入损益」= 计提 + 转回；同行 J = F+G−H−I 把 H（转回，正数）作减项 ⇒ 损益 = G − H
+    out += _col("K", range(11, 20), "=G{r}+H{r}", "=G{r}-H{r}", G14, "明细表G14-2")
+    # §2-30 D6-8 单项区差异写成 ①−④（表头 ⑤=③−④，组合区各行都是 D−E）；小计行损失率 / 应计提两格互换
+    #       （与 D2-9 #22 同一处错）
+    d68 = "减值准备测算D6-8"
+    out += _col("F", range(13, 18), "=B{r}-E{r}", "=D{r}-E{r}", D6, d68)
+    out += [Fix(D6, d68, "C18", "=SUM(C13:C17)", '=IF(B18=0,"",D18/B18)'),
+            Fix(D6, d68, "D18", '=IF(B18=0,"",C18/B18)', "=SUM(D13:D17)")]
+    # §2-31 G9-2「期初 / 期末报表数」取了未审公允价值 E / R；报表数 = 审定 + 重分类（同结构 G1-2 是 J+K / W+X）
+    g92 = "明细表G9-2"
+    for rows in (range(12, 17), range(19, 24), range(26, 29)):
+        out += _col("L", rows, "=E{r}+K{r}", "=J{r}+K{r}", G9, g92)
+        out += _col("Y", rows, "=R{r}+X{r}", "=W{r}+X{r}", G9, g92)
+    # §2-32 D2-2 期初审定余额 H 漏公式（同表期末审定 AB=S+Z+AA，同结构 D1-3 / D3-2 / D5-2 / D6-2 / D7-2 期初审定
+    #       都是 未审 + 账项 + 重分类）
+    #       补的公式格带缓存值 0：同行 Q/S/AB 模板格都是 `<f>…</f><v>0</v>`（数据行 E/F/G 为空，算得 0），
+    #       只写 <f> 时未经 OO 重算的反读读不到 H（键缺失），与同行三列不同形
+    out += _col("H", range(13, 26), None, "=E{r}+F{r}+G{r}", D2A, "明细表D2-2", cached="0")
     return out
 
 
@@ -290,7 +313,8 @@ def _patch_sheet(xml: str, items: list[Fix]) -> str:
                 continue  # 随主格一起改
             else:  # 空格 / 只有值：补公式
                 clean = re.sub(r'\s+t="[^"]*"', "", attrs)
-                new_cell = f'<c r="{fix.coord}"{clean}><f>{_esc(fix.new[1:])}</f></c>'
+                cached = "" if fix.cached is None else f"<v>{_esc(fix.cached)}</v>"
+                new_cell = f'<c r="{fix.coord}"{clean}><f>{_esc(fix.new[1:])}</f>{cached}</c>'
         xml = xml[: m.start()] + new_cell + xml[m.end():]
     return xml
 

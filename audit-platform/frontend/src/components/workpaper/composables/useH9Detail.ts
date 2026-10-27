@@ -124,6 +124,61 @@ export function applyH8TerminationToH92Rows(
   return { rows, matched }
 }
 
+/** store 行 → 表单行（加载时按模板重算 E / I~L / N）。纯函数，不碰 store。 */
+export function normalizeH9DetailRow(raw: any): H9DetailRow {
+  const begin = Number(raw.beginBalance) || 0
+  const repay = Number(raw.repayment) || 0
+  const interest = Number(raw.interestAccrued) || 0
+  const beginAje = Number(raw.beginAje) || 0
+  const repayAje = Number(raw.repayAje) || 0
+  const interestAje = Number(raw.interestAje) || 0
+  const reclassification = Number(raw.reclassification) || 0
+
+  // 公式：负债贷方 E=B-C+D (期末=期初-偿还+利息)
+  const endBalance = calcLiabilityEndBalance(begin, interest, repay)
+  // I=B+F, J=C+G, K=D+H
+  const auditedBegin = begin + beginAje
+  const auditedRepay = repay + repayAje
+  const auditedInterest = interest + interestAje
+  // L=I-J+K (审定期末=审定期初-审定偿还+审定利息)
+  const auditedEnd = calcLiabilityEndBalance(auditedBegin, auditedInterest, auditedRepay)
+  // N=L-M
+  const finalAudited = auditedEnd - reclassification
+
+  return {
+    rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    lessor: raw.lessor ?? '',
+    contractNo: raw.contractNo ?? '',
+    assetDesc: raw.assetDesc ?? '',
+    ibrRate: Number(raw.ibrRate) || 0,
+    leaseTerm: Number(raw.leaseTerm) || 0,
+    beginBalance: begin,
+    repayment: repay,
+    interestAccrued: interest,
+    endBalance,
+    beginAje,
+    repayAje,
+    interestAje,
+    auditedBegin,
+    auditedRepay,
+    auditedInterest,
+    auditedEnd,
+    reclassification,
+    finalAudited,
+    dueWithin1Y: Number(raw.dueWithin1Y) || 0,
+    due1To2Y: Number(raw.due1To2Y) || 0,
+    due2To3Y: Number(raw.due2To3Y) || 0,
+    dueOver3Y: Number(raw.dueOver3Y) || 0,
+    isRelatedParty: raw.isRelatedParty ?? '否',
+    isConfirmed: raw.isConfirmed ?? '否',
+    isTerminated: raw.isTerminated === '是' || raw.isTerminated === true || raw.terminatedFromH8
+      ? '是'
+      : (raw.isTerminated ?? '否'),
+    terminationDate: raw.terminationDate ?? '',
+    terminatedFromH8: Boolean(raw.terminatedFromH8) || raw.isTerminated === '是',
+  }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useH9Detail(params: {
@@ -148,58 +203,9 @@ export function useH9Detail(params: {
     try { return JSON.parse(raw) } catch { return raw }
   }
 
+  // 行归一是模块级纯函数（对拍守卫直接调用）；这里留函数声明（提升）
   function _normalizeRow(raw: any): H9DetailRow {
-    const begin = Number(raw.beginBalance) || 0
-    const repay = Number(raw.repayment) || 0
-    const interest = Number(raw.interestAccrued) || 0
-    const beginAje = Number(raw.beginAje) || 0
-    const repayAje = Number(raw.repayAje) || 0
-    const interestAje = Number(raw.interestAje) || 0
-    const reclassification = Number(raw.reclassification) || 0
-
-    // 公式：负债贷方 E=B-C+D (期末=期初-偿还+利息)
-    const endBalance = calcLiabilityEndBalance(begin, interest, repay)
-    // I=B+F, J=C+G, K=D+H
-    const auditedBegin = begin + beginAje
-    const auditedRepay = repay + repayAje
-    const auditedInterest = interest + interestAje
-    // L=I-J+K (审定期末=审定期初-审定偿还+审定利息)
-    const auditedEnd = calcLiabilityEndBalance(auditedBegin, auditedInterest, auditedRepay)
-    // N=L-M
-    const finalAudited = auditedEnd - reclassification
-
-    return {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      lessor: raw.lessor ?? '',
-      contractNo: raw.contractNo ?? '',
-      assetDesc: raw.assetDesc ?? '',
-      ibrRate: Number(raw.ibrRate) || 0,
-      leaseTerm: Number(raw.leaseTerm) || 0,
-      beginBalance: begin,
-      repayment: repay,
-      interestAccrued: interest,
-      endBalance,
-      beginAje,
-      repayAje,
-      interestAje,
-      auditedBegin,
-      auditedRepay,
-      auditedInterest,
-      auditedEnd,
-      reclassification,
-      finalAudited,
-      dueWithin1Y: Number(raw.dueWithin1Y) || 0,
-      due1To2Y: Number(raw.due1To2Y) || 0,
-      due2To3Y: Number(raw.due2To3Y) || 0,
-      dueOver3Y: Number(raw.dueOver3Y) || 0,
-      isRelatedParty: raw.isRelatedParty ?? '否',
-      isConfirmed: raw.isConfirmed ?? '否',
-      isTerminated: raw.isTerminated === '是' || raw.isTerminated === true || raw.terminatedFromH8
-        ? '是'
-        : (raw.isTerminated ?? '否'),
-      terminationDate: raw.terminationDate ?? '',
-      terminatedFromH8: Boolean(raw.terminatedFromH8) || raw.isTerminated === '是',
-    }
+    return normalizeH9DetailRow(raw)
   }
 
   // ─── Load ──────────────────────────────────────────────────────────────────

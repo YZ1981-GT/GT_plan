@@ -74,7 +74,7 @@ ADAPTER_ID: Final[str] = "g3.dividend_receivable_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G3D"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G3 应收股利.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；480,411 B）
 TEMPLATE_SHA256: Final[str] = (
     "02a5727230a7e2b1f0d3504b87e45ab1998505bb891e8687f3fe0bd9be17a093"
 )
