@@ -75,9 +75,15 @@ export interface ConfirmScopeRequest {
 const basePath = (projectId: string) =>
   `/api/consolidation/${projectId}/scope-confirmation`
 
-/** 只读预览：重建当前服务端树，返回指纹、revision 与确认状态。 */
-export function previewScopeConfirmation(projectId: string) {
-  return api.get<ScopeConfirmationPreview>(`${basePath(projectId)}/preview`)
+/**
+ * 只读预览：重建当前服务端树，返回指纹、revision 与确认状态。
+ * `opts.silent`：调用方自己处理失败（合并总览逐棵树读、失败只是不提示），不经全局拦截器弹错。
+ */
+export function previewScopeConfirmation(projectId: string, opts?: { silent?: boolean }) {
+  const url = `${basePath(projectId)}/preview`
+  return opts?.silent
+    ? api.get<ScopeConfirmationPreview>(url, { _silent: true } as any)
+    : api.get<ScopeConfirmationPreview>(url)
 }
 
 /** 手动把当前企业树记录为新版本（CAS：fingerprint + revision 必须与服务端一致）。 */

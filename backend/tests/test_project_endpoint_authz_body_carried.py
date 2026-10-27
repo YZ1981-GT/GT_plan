@@ -78,7 +78,11 @@ _BODY_IDENTITY_BY_DESIGN: dict[str, str] = {
     "address_registry.py::get_jump_route": "只做字符串换算、不读库",
 }
 
-_BODY_PROJECT_TOKENS = _PROJECT_LEVEL_TOKENS + tuple(_EXTRA_PROJECT_TOKENS)
+#: ``require_operation`` 只校验路径 / 查询参数里的项目 id；本维项目在请求体里，它看不到项目 ⇒ 在本维只算身份档。
+#: 原先照搬基线把它算项目级：生成报表只挂它、对任何项目的成员都不校，本维却一直把它记成已隔离
+#: （spec consol-autotree-residual-closure R3.3；``test_require_operation_is_identity_tier_in_body_dimension`` 钉住）。
+_BODY_PROJECT_TOKENS = tuple(t for t in _PROJECT_LEVEL_TOKENS if t != "require_operation") + tuple(_EXTRA_PROJECT_TOKENS)
+_BODY_IDENTITY_TOKENS = _IDENTITY_ONLY_TOKENS + ("require_operation",)
 
 #: 本 spec 修过的端点（回归钉子：必须在本维且是项目级）
 _FIXED_ENDPOINTS = frozenset({
@@ -98,6 +102,8 @@ _FIXED_ENDPOINTS = frozenset({
     "wp_template_list.py::get_template_list",
     "wp_field_overrides.py::get_field_overrides",
     "wp_field_overrides.py::set_field_override",
+    # spec consol-autotree-residual-closure R1.2：生成报表（项目在请求体）在函数体里按请求体项目校验 edit
+    "reports.py::generate_reports",
 })
 
 #: 不用会话令牌、自带签名校验的端点 → 必须调到的校验依赖（可伪证：``test_body_self_auth_endpoints_really_verify``）
@@ -177,7 +183,7 @@ def _scan_source(rel: str, src: str) -> list[tuple[str, str, str]]:
                 break
             names = _auth_names_in_node(node) | router_deps
             tier = "project" if _matches(names, _BODY_PROJECT_TOKENS) else \
-                "identity" if _matches(names, _IDENTITY_ONLY_TOKENS) else "none"
+                "identity" if _matches(names, _BODY_IDENTITY_TOKENS) else "none"
             out.append((f"{rel}::{node.name}", f"{method.upper()} {full}", tier))
             break
     return out
@@ -348,6 +354,21 @@ def test_scanner_self_check():
     got = {k: tier for k, _, tier in _scan_source("s.py", sample)}
     assert got == {"s.py::bare": "none", "s.py::via_dict": "identity", "s.py::via_subscript": "identity",
                    "s.py::via_query": "project", "s.py::via_helper": "project"}, got
+
+
+def test_require_operation_is_identity_tier_in_body_dimension():
+    """项目在请求体时 ``require_operation`` 取不到项目、只按系统角色判 ⇒ 本维只算身份档；函数体再直调门禁才是项目级。"""
+    sample = (
+        'router = APIRouter(prefix="/api/x")\n'
+        '@router.post("/only-operation")\n'
+        'async def only_operation(data: Body, db=Depends(get_db), user=Depends(require_operation("report:edit"))):\n'
+        "    return data.project_id\n"
+        '@router.post("/operation-and-gate")\n'
+        'async def operation_and_gate(data: Body, db=Depends(get_db), user=Depends(require_operation("report:edit"))):\n'
+        '    await assert_project_permission(db, user, data.project_id, "edit")\n'
+    )
+    got = {k: tier for k, _, tier in _scan_source("s.py", sample)}
+    assert got == {"s.py::only_operation": "identity", "s.py::operation_and_gate": "project"}, got
 
 
 def _calls_project_token(tree: ast.AST) -> bool:

@@ -58,6 +58,9 @@ _ROUTERS = _ROOT / "backend/app/routers"
 _PROJECT_LEVEL_TOKENS = (
     "require_project_access",
     "assert_project_permission",
+    # 项目 id 在路径 / 查询参数里时，矩阵放行后再 assert_project_permission（2026-10-27 起；此前只看权限矩阵、
+    # 不校成员却一直记作项目级 —— spec consol-autotree-residual-closure R3）。项目在请求体里它看不到，
+    # 请求体维不认它（test_project_endpoint_authz_body_carried）。可伪证：test_require_operation_token_tier.py
     "require_operation",
     "require_wp_edit_permission",
     "authorize_wp_read",
@@ -420,7 +423,9 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 准则切换两端点补项目级判定（edit / readonly）后降 7。
 #: 2026-10-26 现算 191：spec procedure-chain-followup-closure R2.3 给程序行任务物化两端点（materialize /
 #: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
-_IDENTITY_ONLY_BASELINE = 191
+#: 2026-10-27 现算 169（改前 189）：spec consol-autotree-residual-closure R1.1 / R1.3 给报表页 / 报表行次映射 / 报表行关联
+#: 底稿 / 试算分析四个 router 共 20 个端点改挂 ``require_project_access``（readonly / edit）后降 20。
+_IDENTITY_ONLY_BASELINE = 169
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -590,8 +595,9 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
 _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
-#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
-_PREFIXED_IDENTITY_ONLY_BASELINE = 270
+#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277。
+#: 2026-10-27 现算 256（改前 260）：spec consol-autotree-residual-closure R1.3 报表映射 3 个端点 + 报表 Excel 导出改挂项目级。
+_PREFIXED_IDENTITY_ONLY_BASELINE = 256
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

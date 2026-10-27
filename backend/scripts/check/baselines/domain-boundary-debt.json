@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Exact domain-boundary debt identities. Checker fails on NEW identities only; shrink -> update this file.",
-    "count": 899
+    "count": 898
   },
   "entries": [
     {
@@ -238,11 +238,6 @@
       "identity": "forbidden_edge:consolidation->backend-services:backend/app/routers/consol_report.py->backend/app/services/audit_log_helper.py",
       "kind": "forbidden_edge",
       "detail": "consolidation may not depend on backend-services (backend/app/routers/consol_report.py -> backend/app/services/audit_log_helper.py)"
-    },
-    {
-      "identity": "forbidden_edge:consolidation->backend-services:backend/app/routers/consol_scope_diff.py->backend/app/services/scope_diff_service.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on backend-services (backend/app/routers/consol_scope_diff.py -> backend/app/services/scope_diff_service.py)"
     },
     {
       "identity": "forbidden_edge:consolidation->backend-services:backend/app/routers/consolidation.py->backend/app/services/elimination_service.py",

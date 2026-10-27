@@ -20,6 +20,7 @@
  */
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
 import {
   syncAdjustmentFromWorkpaper,
   getAdjustmentBySourceRef,
@@ -76,13 +77,13 @@ function unwrap<T>(v: Ref<T> | (() => T) | T): T {
   return v as T
 }
 
-/** 复核状态中文标签 */
-export const CENTRAL_STATUS_LABELS: Record<string, string> = {
-  draft: '草稿',
-  pending_review: '待复核',
-  approved: '已通过',
-  rejected: '已驳回',
-}
+/**
+ * 复核状态中文标签：取调整分录页同一常量（系统字典「调整分录状态」）。原先这里单写一份，
+ * 「已批准」写成了「已通过」，底稿侧与调整分录页对同一条分录叫法不同（spec consol-autotree-residual-closure R4）。
+ */
+export const CENTRAL_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(ADJUSTMENT_STATUS_LABELS).map(([status, entry]) => [status, entry.label]),
+)
 
 /**
  * 计算分录组内容签名（简单哈希，用于变化检测）。

@@ -576,6 +576,24 @@ async def get_visible_project_ids(
     return [r[0] for r in result.all()]
 
 
+async def readable_project_ids(db: AsyncSession, current_user: User) -> set[UUID] | None:
+    """当前用户按 ``assert_project_permission(..., "readonly")`` 能读的项目（「参照其他项目」类候选的筛选口径）。
+
+    与门禁同一口径：admin 不限（返回 ``None``）；其余 = 本人未删除成员行所在的项目（任何级别都不低于 readonly）。
+    不能用 ``get_visible_project_ids``：它给 partner 全部项目，而门禁不给 partner 越过成员行 —— 用它筛候选，
+    列出来的项目一读就 403（spec consol-autotree-residual-closure R2）。
+    """
+    if current_user.role.value == "admin":
+        return None
+    result = await db.execute(
+        select(ProjectUser.project_id).where(
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    return {r[0] for r in result.all()}
+
+
 # ---------------------------------------------------------------------------
 # get_user_scope_cycles — 循环级权限过滤
 # ---------------------------------------------------------------------------
@@ -639,8 +657,17 @@ def require_operation(operation: str) -> Callable:
     """操作级权限校验依赖工厂。
 
     根据 permission_matrix_service.can(system_role, project_role, operation) 判断。
-    admin/partner 始终通过（矩阵中已定义全集）。
-    project_id 从路径参数/查询参数自动获取；无 project_id 的全局端点仅按 system_role 判断。
+    admin/partner 的系统角色在矩阵里有全集。
+    project_id 从路径参数/查询参数自动获取；无 project_id 的全局端点仅按 system_role 判断
+    （project_id 在请求体里的端点，须在函数体内另调 ``assert_project_permission``）。
+
+    请求带 project_id 时另有两道项目判定（spec consol-autotree-residual-closure R3）：
+
+    - 最先：会改项目数据的操作遇已归档项目 ⇒ 423（与 ``require_project_access`` 的 edit / review 级同一守卫）；
+    - 矩阵放行后：须为本项目成员（``assert_project_permission(..., "readonly")``，admin 例外）。
+
+    原先只看矩阵：系统角色为 manager / auditor / partner 的用户矩阵里就有 wp:edit / report:edit，于是对任何
+    项目都放行 —— 改路径里的项目 id 即可往别人的项目里建调整分录、编排归档；归档项目也照改不误。
     """
 
     async def dependency(
@@ -649,6 +676,10 @@ def require_operation(operation: str) -> Callable:
         db: AsyncSession = Depends(get_db),
     ) -> User:
         from app.services.permission_matrix_service import can
+
+        if project_id is not None and operation not in _OPERATIONS_ALLOWED_ON_ARCHIVED:
+            # 已归档项目只读：与 require_project_access 的 edit / review 级同一守卫、同一次序（最先判，任何人都是 423）
+            await _check_project_not_archived(db, project_id, current_user, "edit")
 
         system_role = current_user.role.value
         project_role = await _resolve_project_role(db, current_user.id, project_id)
@@ -661,9 +692,17 @@ def require_operation(operation: str) -> Callable:
                     "operation": operation,
                 },
             )
+        if project_id is not None:
+            await assert_project_permission(db, current_user, project_id, "readonly")
         return current_user
 
     return dependency
+
+
+# 已归档项目上仍可执行的操作：只读查看；归档编排本身要能对已归档项目幂等重入（再次推送、查任务）。
+# 其余操作都会改项目数据 ⇒ 已归档即 423。这些端点原先挂 require_project_access("edit")（含归档守卫），
+# 换成 require_operation 后归档守卫与成员判定一起丢了（test_archived_project_guard 自那时起一直红）。
+_OPERATIONS_ALLOWED_ON_ARCHIVED: frozenset[str] = frozenset({"project:view", "archive:manage"})
 
 
 # ---------------------------------------------------------------------------

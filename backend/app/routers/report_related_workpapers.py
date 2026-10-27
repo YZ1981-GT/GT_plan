@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
 
 router = APIRouter(
@@ -26,7 +26,7 @@ async def get_related_workpapers(
     report_type: str,
     row_code: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """返回与报表行关联的底稿列表。
 

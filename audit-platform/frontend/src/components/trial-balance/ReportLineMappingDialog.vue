@@ -186,7 +186,8 @@ const confirmAllLoading = ref(false)
 const showRefDialog = ref(false)
 const refSourceCode = ref('')
 const refLoading = ref(false)
-const projectOptions = computed(() => projectStore.projectOptions)
+// 来源单位不列本项目：选了也只会被后端拒绝（「不能参照本项目」）
+const projectOptions = computed(() => projectStore.projectOptions.filter(p => p.id !== props.projectId))
 
 // 报表行次分组（供下拉选择）
 const reportLineGroups = computed(() => {
@@ -514,7 +515,12 @@ async function onDelete(row: any) {
 async function onReferenceCopy() {
   refLoading.value = true
   try {
-    const result: any = await api.post(reportLineMapping.referenceCopy(props.projectId), { source_company_code: refSourceCode.value })
+    // 下拉选的是项目 id：按来源项目复制（原先塞进 source_company_code 去比客户名称，恒比不上）
+    const result: any = await api.post(reportLineMapping.referenceCopy(props.projectId), { source_project_id: refSourceCode.value })
+    if (result?.source_found === false) {
+      ElMessage.warning('没有找到可参照的来源单位，请换一个单位再试')
+      return
+    }
     ElMessage.success(`已复制 ${result?.copied_count ?? 0} 条映射`)
     showRefDialog.value = false
     await loadMappings()

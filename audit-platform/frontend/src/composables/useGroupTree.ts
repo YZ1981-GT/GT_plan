@@ -77,8 +77,6 @@ export interface GroupTree {
   ultimateName: string
   rootProjectId: string | null // consolidated 根项目 ID（可能不存在）
   children: TreeNode[]
-  /** 与合并范围（consol_scope）差异（Task 12 填充，可选） */
-  hasScopeDiff?: boolean
 }
 
 /** 后端 `GET /api/projects/tree` 响应 */

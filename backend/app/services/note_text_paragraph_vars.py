@@ -149,49 +149,48 @@ async def _load_consolidation_vars(
     project_id: UUID,
     year: int,
 ) -> dict[str, Any]:
-    """从 ``consol_scope`` 加载子公司清单 / 数量.
+    """合并项目的子公司清单 / 数量：成员 = 合并企业树里的子公司类企业（与合并计算同一棵树）.
 
     输出键：
-    - ``subsidiary_count`` 包含在合并范围内的子公司数（int）
-    - ``subsidiaries`` 简化清单 ``[{"name", "company_code", "ownership_ratio"}]``
+    - ``subsidiary_count`` 合并范围内的子公司数（int）
+    - ``subsidiaries`` 简化清单 ``[{"name", "company_code", "ownership_ratio"}]``，按企业树顺序
     - ``has_consolidation`` bool
 
-    任意异常都吞掉，返回 ``{}``。
+    持股比例取合并范围表里同一企业代码、本年度的属性行，没有则为空；非合并项目 0 / 空 / False。
+    原先成员读的就是合并范围表（真库 0 行）⇒ 合并项目的子公司数恒 0（spec consol-autotree-residual-closure R5.1）。
+
+    任意异常都吞掉，返回 ``{}``；查询在保存点里，失败不连累调用方的事务。
     """
     try:
         from app.models.consolidation_models import ConsolScope
-    except Exception:  # pragma: no cover - defensive
-        return {}
-    try:
-        result = await db.execute(
-            sa.select(ConsolScope).where(
-                ConsolScope.project_id == project_id,
-                ConsolScope.year == year,
-                ConsolScope.is_included == sa.true(),
-                ConsolScope.is_deleted == sa.false(),
-            )
-        )
-        rows = result.scalars().all()
+        from app.services.consol_scope_members import tree_subsidiaries
+
+        async with db.begin_nested():
+            members = await tree_subsidiaries(db, project_id)
+            ratios: dict[str, Any] = {}
+            if members:
+                rows = await db.execute(
+                    sa.select(ConsolScope.company_code, ConsolScope.ownership_ratio).where(
+                        ConsolScope.project_id == project_id,
+                        ConsolScope.year == year,
+                        ConsolScope.is_deleted == sa.false(),
+                        ConsolScope.company_code.in_([m.company_code for m in members]),
+                    )
+                )
+                ratios = {code: ratio for code, ratio in rows.all() if ratio is not None}
     except Exception as exc:  # pragma: no cover - DB failures tolerated
-        logger.warning("collect_paragraph_vars: load consol_scope failed: %s", exc)
-        try:
-            await db.rollback()
-        except Exception:
-            pass
+        logger.warning("collect_paragraph_vars: load consolidation members failed: %s", exc)
         return {}
-    if not rows:
+    if not members:
         return {"subsidiary_count": 0, "subsidiaries": [], "has_consolidation": False}
-    subs: list[dict[str, Any]] = []
-    for r in rows:
-        subs.append(
-            {
-                "name": r.company_name,
-                "company_code": r.company_code,
-                "ownership_ratio": (
-                    float(r.ownership_ratio) if r.ownership_ratio is not None else None
-                ),
-            }
-        )
+    subs = [
+        {
+            "name": m.company_name,
+            "company_code": m.company_code,
+            "ownership_ratio": float(ratios[m.company_code]) if m.company_code in ratios else None,
+        }
+        for m in members
+    ]
     return {
         "subsidiary_count": len(subs),
         "subsidiaries": subs,

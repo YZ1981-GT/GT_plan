@@ -5,11 +5,12 @@ Validates: Requirements 3.9-3.14
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import deps
 from app.core.database import get_db
-from app.deps import get_current_user, check_consol_lock
+from app.deps import assert_project_permission, check_consol_lock, readable_project_ids, require_project_access
 from app.models.audit_platform_schemas import (
     ReferenceCopyRequest,
     ReferenceCopyResult,
@@ -32,7 +33,7 @@ async def ai_suggest(
     project_id: UUID,
     force_refresh: bool = Query(False, description="强制刷新所有 ai_suggested 记录(包括已确认的),用于修复老 BSXXX→BS-XXX 格式"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> list[dict]:
     """AI建议报表行次映射(数据驱动 + 项目维度感知).
 
@@ -52,7 +53,7 @@ async def ai_suggest(
 async def fix_bad_debt(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """修复 account_mapping 中 1231 坏账准备总分类→二级分项错配.
 
@@ -179,7 +180,7 @@ async def get_mappings(
     project_id: UUID,
     report_type: str | None = Query(None, description="筛选报表类型"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[ReportLineMappingResponse]:
     """获取报表行次映射列表。
 
@@ -197,7 +198,7 @@ async def update_mapping(
     mapping_id: UUID,
     body: ReportLineMappingUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ) -> ReportLineMappingResponse:
     return await svc.update_mapping(project_id, mapping_id, body, db)
@@ -211,7 +212,7 @@ async def confirm_mapping(
     project_id: UUID,
     mapping_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> ReportLineMappingResponse:
     """确认单条报表行次映射。
 
@@ -228,7 +229,7 @@ async def batch_confirm(
     project_id: UUID,
     body: ReportLineMappingConfirm,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """批量确认报表行次映射。
 
@@ -246,7 +247,7 @@ async def delete_mapping(
     project_id: UUID,
     mapping_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ) -> dict:
     await svc.delete_mapping(project_id, mapping_id, db)
@@ -261,7 +262,7 @@ async def create_manual_mapping(
     project_id: UUID,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """手动创建单条报表行次映射（用户从下拉选择报表项目）。"""
     from app.models.audit_platform_models import (
@@ -323,13 +324,23 @@ async def reference_copy(
     project_id: UUID,
     body: ReferenceCopyRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> ReferenceCopyResult:
-    """集团内企业一键参照复制。
+    """集团内企业一键参照复制；来源只能是当前用户能读的项目（spec consol-autotree-residual-closure R2.3）。
 
     Validates: Requirements 3.12, 3.13
     """
-    return await svc.reference_copy(body.source_company_code, project_id, db)
+    if body.source_project_id is not None:
+        if body.source_project_id == project_id:
+            raise HTTPException(status_code=400, detail="不能参照本项目")
+        await assert_project_permission(db, current_user, body.source_project_id, "readonly")
+        # 上一句把 RLS 上下文设到了来源项目；复制写入的是本项目 ⇒ 设回本项目
+        await deps.set_rls_context(db, project_id)
+        return await svc.reference_copy_from_project(body.source_project_id, project_id, db)
+    readable = await readable_project_ids(db, current_user)
+    return await svc.reference_copy(
+        body.source_company_code, project_id, db, readable_project_ids=readable,
+    )
 
 
 @router.get(
@@ -340,7 +351,7 @@ async def get_report_lines(
     project_id: UUID,
     report_type: str | None = Query(None, description="筛选报表类型"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[ReportLine]:
     """获取已确认的报表行次列表（供调整分录下拉）。
 

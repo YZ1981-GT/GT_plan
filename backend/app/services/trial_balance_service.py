@@ -542,19 +542,12 @@ class TrialBalanceService:
         rc = ReportConfig.__table__
 
         # 1. 从 report_config 加载标准行次模板（所有企业共用）
-        # 确定 applicable_standard（从项目配置推断）
-        from app.models.core import Project
-        proj_result = await self.db.execute(
-            sa.select(Project).where(Project.id == project_id)
-        )
-        proj = proj_result.scalar_one_or_none()
-        template_type = 'soe'
-        report_scope = 'standalone'
-        if proj and proj.wizard_state:
-            basic = (proj.wizard_state or {}).get('basic_info', {}).get('data', {})
-            template_type = basic.get('template_type', 'soe')
-            report_scope = basic.get('report_scope', 'standalone')
-        applicable_standard = f"{template_type}_{report_scope}"
+        # 报表标准与报表页同一个解析（项目两列 template_type + report_scope）。原先读向导
+        # wizard_state["basic_info"]["data"]：向导确认前那里不存在，上市 / 合并项目的汇总一直按国企单户的行次出
+        # （spec consol-autotree-residual-closure R6）。
+        from app.services.report_config_service import ReportConfigService
+
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
 
         rc_q = (
             sa.select(
