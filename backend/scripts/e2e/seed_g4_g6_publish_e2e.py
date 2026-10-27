@@ -58,10 +58,11 @@ LANE_FIXTURES = [
         "template_path": "G/G4 债权投资.xlsx",
         "store_items": [
             # G4-7 盘点表 → dual_write
+            # 证券名称键与前端 InventoryItem / 契约一致（securitiesName；原写 securityName 前端读不到）
             ("G4-7-items", "conclusion", json.dumps([{
                 "id": "e2e-g4inv-001",
                 "seq": 1,
-                "securityName": "E2E测试债券",
+                "securitiesName": "E2E测试债券",
                 "faceValue": 100,
                 "quantity": 10,
             }], ensure_ascii=False)),

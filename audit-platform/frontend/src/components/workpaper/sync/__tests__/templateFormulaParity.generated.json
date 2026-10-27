@@ -1613,15 +1613,13 @@
     "currentAdjustment",
     "currentUnadjusted",
     "priorAdjustment",
-    "priorUnadjusted",
-    "seq"
+    "priorUnadjusted"
    ],
    "input_types": {
     "currentAdjustment": "amount",
     "currentUnadjusted": "amount",
     "priorAdjustment": "amount",
-    "priorUnadjusted": "amount",
-    "seq": "integer"
+    "priorUnadjusted": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
@@ -1631,7 +1629,8 @@
    ],
    "auto_fields": [
     "currentShare",
-    "priorShare"
+    "priorShare",
+    "seq"
    ],
    "literals": []
   },
@@ -1829,34 +1828,34 @@
     "公允价值测试表G6-5!g6_5_fair_value@9"
    ],
    "inputs": [
-    "auditedQuantity",
-    "auditedUnitFv",
-    "unauditedFv",
-    "unauditedQuantity",
-    "unauditedUnitFv"
+    "auditedPrice",
+    "auditedQty",
+    "unadjPrice",
+    "unadjQty"
    ],
    "input_types": {
-    "auditedQuantity": "amount",
-    "auditedUnitFv": "amount",
-    "unauditedFv": "amount",
-    "unauditedQuantity": "amount",
-    "unauditedUnitFv": "amount"
+    "auditedPrice": "amount",
+    "auditedQty": "amount",
+    "unadjPrice": "amount",
+    "unadjQty": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "auditedFvTier",
-    "fvInputFactors",
-    "fvSourceMechanism",
-    "investTarget",
-    "unauditedFvTier",
+    "auditedFairValueLevel",
+    "consistencyWithPrior",
+    "inputSource",
+    "inputValue",
+    "investProject",
+    "sourceInstitution",
+    "unadjFairValueLevel",
     "unobservableInputs",
-    "unobservableValue",
-    "valuationConsistent",
+    "valuationFileRef",
     "valuationMethod",
-    "valuationRef",
     "valuationTechnique"
    ],
-   "auto_fields": [],
+   "auto_fields": [
+    "unadjFairValue"
+   ],
    "literals": []
   },
   "G7-main-disclosure-soe-v2": {
@@ -2126,12 +2125,10 @@
     "beginAmount",
     "beginQty",
     "decreaseQty",
-    "decreaseTotal",
     "impairBegin",
     "impairDecrease",
     "impairIncrease",
-    "increaseQty",
-    "increaseSubtotal"
+    "increaseQty"
    ],
    "input_types": {
     "ajeBegin": "amount",
@@ -2140,12 +2137,10 @@
     "beginAmount": "amount",
     "beginQty": "amount",
     "decreaseQty": "amount",
-    "decreaseTotal": "amount",
     "impairBegin": "amount",
     "impairDecrease": "amount",
     "impairIncrease": "amount",
-    "increaseQty": "amount",
-    "increaseSubtotal": "amount"
+    "increaseQty": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
@@ -2155,7 +2150,10 @@
     "quality",
     "unit"
    ],
-   "auto_fields": [],
+   "auto_fields": [
+    "decreaseTotal",
+    "increaseSubtotal"
+   ],
    "literals": []
   },
   "H5-2-rows": {
@@ -5489,10 +5487,10 @@
    "contract": "g6.other_bond_main",
    "sheet": "公允价值测试表G6-5",
    "cell": "H9",
-   "field": "auditedFv",
+   "field": "auditedFairValue",
    "header": "公允价值",
    "formula": "=F9*G9",
-   "expr": "auditedQuantity * auditedUnitFv",
+   "expr": "auditedQty * auditedPrice",
    "skip": null
   },
   {
@@ -5500,10 +5498,10 @@
    "contract": "g6.other_bond_main",
    "sheet": "公允价值测试表G6-5",
    "cell": "J9",
-   "field": "fvDifference",
+   "field": "difference",
    "header": "差异",
    "formula": "=H9-D9",
-   "expr": "auditedFv - unauditedFv",
+   "expr": "auditedFairValue - unadjFairValue",
    "skip": null
   },
   {

@@ -91,9 +91,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    时未同步本表）；本批又把 D3-6 关联方表的 json_key 改成前端实际存的键（partyName / priorBalance /
     #    debit / credit / endBalance …），e1 把 E1-2 现金明细与 E1-4 数字货币的 json_key 改成前端键、
     #    E1-4 序号改 auto_source 并补管 M~Q 五列（模板有表头）。列键（column_key）不变。
-    #    同 spec 批 A2c（`62bb2dd7…` → 本值）：D3-4 两区行身份键 rowId → rowKey（前端与导入只写 rowKey），
+    #    同 spec 批 A2c（`62bb2dd7…` → `04a93e55…`）：D3-4 两区行身份键 rowId → rowKey（前端与导入只写 rowKey），
     #    区②贷方表头改取 R20、D / E 两列接 counterCheck / remark（原共用区①四列，D 接成备注、E 没管）。
-    "d3.prepaid_receipts_detail.json": "04a93e55001e3193",
+    #    同 spec 批 B1（→ 本值）：D3-5 长期挂账表 json 键改前端 customerName / endBalance / businessDescription /
+    #    reason / settlementAmount（字段名守卫报出）。
+    "d3.prepaid_receipts_detail.json": "6496af76ac9f0cb0",
     "d4.revenue_detail.json": "7b1d6362eeba4a7d",
     "d5.receivables_financing_detail.json": "b76e345cc29797b5",
     # 🔴 2026-10-27 同批更新 d6 / d7（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：

@@ -64,16 +64,6 @@
    "receivableType"
   ]
  },
- "d3.prepaid_receipts_detail|D3-lt-rows": {
-  "reason": "待核：D3 长期挂账表（债权人 / 期末余额 / 业务原因 / 截至审计日是否结清 / 未结清原因）前端另名或缺列",
-  "fields": [
-   "businessReason",
-   "counterpartyName",
-   "endingBalance",
-   "settledByAuditDate",
-   "unsettledReason"
-  ]
- },
  "d3.prepaid_receipts_detail|D3-vc-current-rows": {
   "reason": "待核：凭证抽查核对内容 check1~5 / 对方明细科目 / 索引号前端另名（疑同 D7-7 的 checkItems 数组）",
   "fields": [
@@ -206,30 +196,12 @@
    "rowKey"
   ]
  },
- "f4.accounts_payable_detail|F4-2-rows": {
-  "reason": "待核：F4-2 明细表借贷发生额 / 期末调整 / 账龄未审 / 期后付款 / 重分类列前端另名（currentDebit / currentCredit / aje / rje …）",
-  "fields": [
-   "agingUnadjusted",
-   "creditOccurrence",
-   "currentAje",
-   "currentRje",
-   "debitOccurrence",
-   "postPeriodPayment",
-   "reclassAdjustment"
-  ]
- },
  "g3.dividend_receivable_detail|": {
   "reason": "契约表未声明 store item（两方向都未接），字段名与前端不同；接通时一并按前端定名（G3-1 审定表减值 / 期末转入列）",
   "fields": [
    "impairmentRelated",
    "increaseEnd",
    "transferInEnd"
-  ]
- },
- "g4.bond_main|G4-7-items": {
-  "reason": "待核：G4-7 有价证券盘点「证券名称」列前端另名",
-  "fields": [
-   "securityName"
   ]
  },
  "g4.ecl_stage|": {
@@ -288,26 +260,6 @@
    "overduePerformanceChange",
    "rateOrTermChange",
    "repaymentMechanismChange"
-  ]
- },
- "g6.other_bond_main|G6-5-fair-value-data": {
-  "reason": "批 B：G6-5 契约字段名改前端名（investProject / unadjQty / unadjPrice / auditedQty / auditedPrice / difference …）；store 是 {rows, conclusion} 对象、存 conclusion 列，接通另需 state 门面",
-  "fields": [
-   "auditedFv",
-   "auditedFvTier",
-   "auditedQuantity",
-   "auditedUnitFv",
-   "fvDifference",
-   "fvInputFactors",
-   "fvSourceMechanism",
-   "investTarget",
-   "unauditedFv",
-   "unauditedFvTier",
-   "unauditedQuantity",
-   "unauditedUnitFv",
-   "unobservableValue",
-   "valuationConsistent",
-   "valuationRef"
   ]
  },
  "g7.soe_subsidiary_disclosure|G7-main-disclosure-soe-v2": {

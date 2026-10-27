@@ -45,6 +45,7 @@ import { G14_LINE_ITEMS } from '../../composables/g14Constants'
 import * as g1Detail from '../../composables/useG1Detail'
 import * as g2Detail from '../../composables/useG2Detail'
 import * as g3Detail from '../../composables/useG3Detail'
+import * as g6FairValue from '../../composables/useG6SppiFairValue'
 import * as g8Detail from '../../composables/useG8Detail'
 import * as g9Detail from '../../composables/useG9Detail'
 import * as g10Detail from '../../composables/useG10Detail'
@@ -313,6 +314,10 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
   'G3-2-detail-rows': {
     source: 'useG3Detail.enrich',
     compute: (raw) => asRow(g3Detail.enrich(merged(g3Detail.emptyRow('parity', 1), raw))),
+  },
+  'G6-5-fair-value-data': {
+    source: 'useG6SppiFairValue.migrateFairValueRow（载入）',
+    compute: (raw) => asRow(g6FairValue.migrateFairValueRow(raw, 1)),
   },
   'G8-detail-rows': {
     source: 'useG8Detail.enrichG8DetailRow',

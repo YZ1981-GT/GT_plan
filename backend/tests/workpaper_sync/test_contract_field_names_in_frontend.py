@@ -25,8 +25,8 @@ from tests.workpaper_sync import contract_field_names_scan as S
 REGISTRY = Path(__file__).resolve().parent / "data" / "contract_field_names_frontend_exceptions.json"
 
 #: 登记的组数 / 字段名数（只许减少：接通一组删一组并改小这里；新增要在评审里说明为什么不改契约或前端）
-BASELINE_GROUPS = 50
-BASELINE_NAMES = 473
+BASELINE_GROUPS = 46
+BASELINE_NAMES = 445
 
 
 @pytest.fixture(scope="module")
@@ -78,9 +78,12 @@ def test_extra_scope_entries_exist(corpus: S.Corpus) -> None:
 
 
 def test_wired_table_reports_nothing(misses: dict[str, set[str]]) -> None:
-    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4）一个都不报 —— 现算不是「什么都报」。"""
+    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4 / E1-4，批 B 起 D3-5 / F4-2 / G6-5）一个都不报 ——
+    现算不是「什么都报」。"""
     for key in ("d5.receivables_financing_detail|D5-2-rows", "d3.prepaid_receipts_detail|D3-ana-credit-rows",
-                "f3.notes_payable_detail|F3-4-rows", "e1.monetary_fund_detail|E1-digital-rows"):
+                "f3.notes_payable_detail|F3-4-rows", "e1.monetary_fund_detail|E1-digital-rows",
+                "d3.prepaid_receipts_detail|D3-lt-rows", "f4.accounts_payable_detail|F4-2-rows",
+                "g6.other_bond_main|G6-5-fair-value-data", "g4.bond_main|G4-7-items"):
         assert key not in misses, (key, sorted(misses.get(key, ())))
 
 

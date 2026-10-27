@@ -189,6 +189,23 @@
 - 新发现（登记在册，未改）：D1-8 背书区前端沿用贴现行字段、缺模板 K / L 两列；D7-7 前端核对内容存为 5 项布尔数组 `checkItems`（模板 7 项）、支持文件键 `supportDocs`；K2 / K3 / K4 / K5 / K6 / K7 调整分录前端缺 类别 / 报表项目 / 附注项目 / 索引列（K11 已有）；G4-9 / G6-11 三阶段转置表与 B60-1 表头、G3-1 部分列契约未声明 store item。
 - 变异 5 条各自只打红对应用例、逐字节复原：契约把已接通表的字段改名、前端把已接通字段改名、登记了的名字在前端出现、去掉手工入口、去掉常量拼键识别。
 
+### §4.5 批 B1：D3 长期挂账 / F4-2 / G4-7 / G6-5 / G11-2 / H4-2（2026-10-28）
+
+| 表 / 面 | 原状 | 处置 |
+|---|---|---|
+| D3 长期挂账 | json 键 counterpartyName / endingBalance / businessReason / unsettledReason / settledByAuditDate 前端全无 | 改前端与导入导出同名 customerName / endBalance / businessDescription / reason / settlementAmount |
+| F4-2 明细表 | 借贷发生、被审单位重分类、期末账项 / 重分类、期后付款 6 列与未审账龄组前缀另名；模块头「前端已对齐」只核了公式口径 | 改 currentDebit / currentCredit / entityReclassification / closingAje / closingRje / subsequentPayment，账龄组前缀 agingUnadjusted → agingCurrent（与导入导出同） |
+| G4-7 有价证券盘点 | B 写 securityName（前端 securitiesName）；E 总计模板无公式、前端按 面值 × 数量 现算 | B 改 securitiesName；E 改 auto_source |
+| G6-5 公允价值 | 15 个键前端全无；D 未审公允价值前端恒按 数量 × 单价 现算 | 全表改前端 `FairValueItem` 名，D 改 auto_source；前端旧数据反推单价 / 数量改为只在键缺失时做（原按「为 0」判，OO 侧录的 0 单价会被 HTML 用上次的公允价值反推改回，两侧来回变） |
+| G11-2 投资收益明细 | A 序号 editable，前端载入与重算都按位置重编（OO 改的序号回流后下次载入即被覆盖）；对拍例外登记 | A 改 auto_source，幽灵行锚点改 B；删例外 |
+| H4-2 工程物资 | J 增加金额 / M 减少金额模板是录入格，前端由子项推出（子项模板没有）；对拍例外两条 | J / M 改 auto_source；删两条例外 |
+
+- 对拍：适配器 +1（G6-5），未覆盖 14 → 13；例外 4 → 1（剩 F3-4 计息口径）。字段名守卫：4 组 28 个名字接通、删登记，50 组 / 473 → 46 / 445。
+- 新守卫 `test_ghost_row_anchor_not_protected.py`：回写合并跳过受保护字段，幽灵行防护对新增行判「锚点空 ⇒ 剔除」⇒ 锚点若受保护，OO 侧新增的行全部丢弃、零报错（G11-2 序号改 auto_source 时锚点仍是 A，变异实测即此）。全仓现扫 186 个 `RowTableSheetSpec`，锚点不得越界、不得受保护，导入失败判红。例外 1 条：F3-1 种子区（R7-R8 固定两行，A 类别是 SUMPRODUCT 匹配键、不受管，B 是公式；新增行走空槽区），登记可伪证：锚点列与 mode、标签列不受管、同 sheet 扩展区的锚点与标签列可编辑，任一不成立即红。
+- 仍未接通（契约改对、接通后才生效）：D3 长期挂账、F4-2、G4-7、G6-5 都在 `KNOWN_UNWIRED`；G6-5 另有两处：前端 store 是 `{rows, conclusion}` 对象、存 conclusion 列（契约按行数组声明），provider 的 store 门面借自 G9（`specs_for` 只取 G9 的 spec）。留批 B3。
+- 变异 5 条各自打红、逐字节复原：G6-5 反推退回「为 0」（显式 0 单测）、G11-2 序号退回 editable（同构测试 + 对拍）、H4-2 J 退回 editable（对拍）、G11-2 锚点退回 A（锚点守卫 + 同构测试）、F4-2 借方发生退回旧键（字段名守卫）；改契约的三条同时打红 golden 摘要门。
+- 同口径子集（57 个文件）对 30849124c：由过转红 1 条，`test_g11_column_isomorphism` 钉着「A 序号 editable」，改为钉 auto_source + 锚点 B + 前端按位置重编的两处源码；由红转过 12 条是 G6 的 AI 端点 503：基线所在的检出没有仓库根 `.env`（AI 服务未配置），提交树在同一检出上同样 12 条 503，非本批。提交树（a39c94827 + 本批）同口径对基线：由过转红 0。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。

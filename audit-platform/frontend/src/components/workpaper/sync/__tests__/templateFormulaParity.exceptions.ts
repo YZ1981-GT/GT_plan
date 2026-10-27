@@ -22,7 +22,6 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'F4-1-adj-aging-seed-rows': 'R3 任务 9：字段名已对齐（9.4c），但契约 store item 前端不存在（前端账龄段行 + 残差行共存 F4-1-adj-aging-rows，要区判据 + 多区门面）',
   'F4-1-adj-aging-slot-rows': 'R3 任务 9：字段名已对齐（9.4c），但契约 store item 前端不存在（前端账龄段行 + 残差行共存 F4-1-adj-aging-rows，要区判据 + 多区门面）',
   'G5-2-rows': 'R3 任务 9：前端行模型与模板列不同构（前端 合同金额 − 已收回，模板 期初 + 借 − 贷 与审定三列，期初 / 调整列前端都没有）',
-  'G6-5-fair-value-data': `${R3_FIELD_NAMES}（契约 auditedQuantity / auditedUnitFv / auditedFv / unauditedFv / fvDifference，前端 auditedQty / auditedPrice / auditedFairValue / unadjFairValue / difference）`,
   'H3-2-cost-rows': 'R3 任务 9：前端期末多算转入 / 转出两列，审定三列按「未审 + AJE + RJE」而模板是审定滚动；模板 I~N / V~AA / AI~AN 前端无字段（design §3.2）',
   'N1-2-rows': 'R3 任务 9：契约 store item 是 N1-2-rows，前端存 N1-2-detail-rows，字段名也不同（priorTempDiff ↔ beginDiff …）',
   'N2-2-rows': 'R3 任务 9：契约 store item 是 N2-2-rows，前端存 N2-2-detail-rows，字段名也不同（priorOpening ↔ unadjBegin …，前端无 H 列期初重分类）',
@@ -30,7 +29,7 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'N4-2-detail-rows': 'R3 任务 9：前端 N4-2 存「计税依据 × 税率」，不是模板的 未审 + 调整 = 审定',
 }
 
-export const UNCOVERED_BASELINE = 14
+export const UNCOVERED_BASELINE = 13
 
 export interface ParityException {
   storeItem: string
@@ -44,18 +43,6 @@ export interface ParityException {
 
 export const PARITY_EXCEPTIONS: readonly ParityException[] = [
   {
-    storeItem: 'G11-detail-rows', field: 'seq', kind: 'input',
-    reason: 'R3 任务 9：模板 A 列序号是固定数字、前端按位置编号；契约应与 H1-8 一样改 auto_source',
-  },
-  {
-    storeItem: 'H4-2-rows', field: 'increaseSubtotal', kind: 'input',
-    reason: 'R3 任务 9：契约把 J「本期增加金额」当录入，前端由采购 + 其他增加两子项推出（子项模板没有）',
-  },
-  {
-    storeItem: 'H4-2-rows', field: 'decreaseTotal', kind: 'input',
-    reason: 'R3 任务 9：契约把 M「本期减少金额」当录入，前端由领用 / 退回 / 报废 / 其他减少四子项推出（子项模板没有）',
-  },
-  {
     // 字段名接通后（9.4c）新暴露、待用户裁决的口径差异，不是接错列：H 是公式列、不回写，两侧各按自己的口径显示
     storeItem: 'F3-4-rows', field: 'payableInterest', kind: 'formula',
     reason: '计息口径待用户确认：模板 H = ROUND(F*G,2)（不含天数），前端有出票日 / 到期日时按 票面金额 × 利率% × 期限 / 360；没有日期时两侧一致',
@@ -63,4 +50,4 @@ export const PARITY_EXCEPTIONS: readonly ParityException[] = [
   },
 ]
 
-export const PARITY_EXCEPTION_BASELINE = 4
+export const PARITY_EXCEPTION_BASELINE = 1
