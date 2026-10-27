@@ -445,6 +445,8 @@ export type Events = {
   'sse:disconnect': { reason: string }
   /** 年度切换后重建 SSE 订阅。 */
   'sse:reconnect': { projectId: string; year: number }
+  /** 账表导入已提交：导入进度轮询立即查一次（没有任务时轮询降到 30 秒，见 useAdaptivePoll） */
+  'ledger-import:submitted': { projectId: string }
 
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload

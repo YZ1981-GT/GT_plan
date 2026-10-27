@@ -91,6 +91,7 @@ from app.models.workpaper_models import (
     WpTemplateStatus,
 )
 from app.models.workpaper_template_version import WorkpaperTemplateVersion
+from app.models.workpaper_lifecycle_models import WorkpaperLifecycleEvent
 from app.models.project_wp_sheet_override import ProjectWorkpaperSheetOverride
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
@@ -302,6 +303,7 @@ __all__ = [
     "ReviewRecord",
     "WorkpaperSheetClassification",
     "WorkpaperTemplateVersion",
+    "WorkpaperLifecycleEvent",
     "ProjectWorkpaperSheetOverride",
     # --- archive models ---
     "ArchiveJob",

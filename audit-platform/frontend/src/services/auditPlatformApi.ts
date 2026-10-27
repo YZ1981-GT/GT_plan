@@ -4,6 +4,7 @@
   */
  import type { AxiosRequestConfig } from 'axios'
  import http from '@/utils/http'
+ import { api } from '@/services/apiProxy'
  import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
  import {
    projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
@@ -26,9 +27,9 @@
    return Array.isArray(data) ? data : (data?.items ?? [])
  }
 
+/** 项目详情：经 apiProxy 共享同址在途请求（R16：编辑器打开时项目 store / 页面各取一次，原先各发一条）。 */
  export async function getProject(projectId: string): Promise<ProjectListItem> {
-  const { data } = await http.get(P_proj.detail(projectId))
-  return data
+  return api.get<ProjectListItem>(P_proj.detail(projectId))
 }
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {

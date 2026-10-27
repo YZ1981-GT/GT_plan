@@ -80,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { Loading, CircleClose } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import UploadStep from '@/components/ledger-import/UploadStep.vue'
@@ -179,6 +180,7 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
       { timeout: 600000, _silent: true } as any
     )
     jobId.value = (res as { job_id: string }).job_id
+    eventBus.emit('ledger-import:submitted', { projectId })
   } catch (err: any) {
     console.error('提交导入作业失败', err)
     // 提交失败 → 停留在 step 3 显示失败态 + 重试按钮（不突兀地弹窗+退步骤）

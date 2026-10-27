@@ -59,11 +59,23 @@
 
 ## 4. 批 4：请求收敛与工程化
 
-- [ ] 4.1 R15 chip 批量解析；R16 项目 / 详情共享在途；R17 轮询降频
-- [ ] 4.2 R18 生命周期事件表（迁移 + 模型 + 写入 + 回收站读取）
-- [ ] 4.3 R19 显式门禁（✅ 随批 2：路由自带底稿门、注册表不重复挂，变异 B2-15/16 全红）；R20 PG 必跑开关
-- [ ] 4.4 R21 跨角色接口级 PG 用例 + Playwright 可重放脚本
-- [ ] 4.5 批 4 测试 + 变异、回归、浏览器实测（请求数前后对比）、提交推送
+- [x] 4.1 R15 chip 批量解析；R16 项目 / 详情共享在途；R17 轮询降频
+  - R15：`useAcnr.resolveIndexBatched`（微任务末尾合并、去重、每批 ≤50 调 `/resolve-batch`、同键在途共享、缓存纪元变了不回写）；`GtIndexChip` 改用它，`disabled` 不解析，批量失败显示「暂时无法校验，仍可点击尝试跳转」；测试 `GtIndexChip.batch.spec.ts`（7）+ `GtIndexChip.spec.ts`；变异 R15a~j 全红
+  - R16：apiProxy 对只带 `_silent` / `_dedupe` 的 GET 也共享在途（静默的可并入任何在途请求，有提示的只并入同类）；`auditPlatformApi.getProject` 经 apiProxy；`stores/project.syncFromRoute` 只取一次详情；测试 `apiProxy.inflightShare.spec.ts`（9）+ `project.syncFromRoute.fetchOnce.spec.ts`（4）；变异 R16a~g 全红
+  - R17：`composables/useAdaptivePoll`（处理中 5 秒 / 空闲 30 秒 / 页面隐藏暂停 / `poke` / 作用域销毁即停）供 ThreeColumnLayout 与 DetailProjectPanel 共用；提交导入后经 `ledger-import:submitted` 立即刷新；测试 `useAdaptivePoll.spec.ts`（8，含源码守卫）+ `DetailProjectPanel.importPoll.spec.ts`（3）；变异 R17a~i 全红
+- [x] 4.2 R18 生命周期事件表（迁移 + 模型 + 写入 + 回收站读取）
+  - V207 / R207 `workpaper_lifecycle_events`（只对 projects 建外键、CHECK 事件类型、只追加触发器复用 V115 的 `wp_visibility_forbid_mutation()`）+ 模型 `WorkpaperLifecycleEvent`；移入 / 恢复同事务在保存点里写事件（只在表不存在时降级为警告，见 design §11.1）；回收站「删除人」先读事件，旧数据回退去向 JSON
+  - 测试：`test_workpaper_lifecycle_events.py`（SQLite 开外键，6）+ `test_workpaper_lifecycle_events_pg.py`（事务里执行 V207 本身，3）；变异 E1~E12、E3pg 全红
+  - 🔴 真库还没有这张表（开发服热重载不跑迁移）：下次全量重启 start-dev 才建；在那之前不记事件、回收站回退 JSON、`/api/health` 因 orm_extra 报 degraded（状态码 200，前端不读这一项）
+- [x] 4.3 R19 显式门禁（✅ 随批 2：路由自带底稿门、注册表不重复挂，变异 B2-15/16 全红）；R20 PG 必跑开关
+  - R20：`GT_REQUIRE_PG=1` 而地址不是 PG、又收集到 pg_only 用例 ⇒ `pytest.UsageError`；识别 `postgres://`（`tests/_pg_url.py`，`_factories.IS_PG` 同用）；本 spec 涉及外键的 4 个 SQLite 用例文件开外键（`tests/_sqlite_fk.py`）；测试 `test_pg_requirement_guard.py`（18，子进程收集）；变异 F1~F6 全红
+- [x] 4.4 R21 跨角色接口级 PG 用例 + Playwright 可重放脚本
+  - `tests/procedure_chain_e2e/test_cross_role_chain_pg.py`：真实应用 + 回滚事务，admin / 经理 / 审计员走「生成 → 粗裁（移入回收站 + 事件 + 删除人）→ 再生成跳过 → 审计员不能裁剪 / 委派 → 委派 → 可见（列表 / 详情 / 渲染配置）→ 编辑锁（409 带持有人、只有持有人能释放）→ 恢复执行 → 再生成按已存在 / 新建分流」；文件落临时目录，跑完真库无孤儿行；变异 11 条全红（生成 2 / 粗裁 3 / 可见 3 / 编辑锁 1 / 事件 2）
+  - `e2e/procedure-chain-cross-role.spec.ts`：`GT_E2E_*` 指定【测试】项目与账号；未配置整组跳过（实测 6 skipped）；项目名不含【测试】在任何写入前拒绝（实测：admin 指向重药安徽）；中途失败收尾恢复粗裁；单文件 tsc 0 条（注入 TS2322 打红）
+  - 未实跑完整重放：真库没有带团队（经理 + 审计员账号）的【测试】项目，可用账号只有 admin（ptgd_auditor 停用、无人员档案）；实跑需新建两个测试账号与团队分配，待用户放行
+- [x] 4.5 批 4 测试 + 变异、回归、浏览器实测（请求数前后对比）、提交推送
+  - 回归（e36cf246d 干净检出对照）：后端链路 110 文件 12 红 = 基线 108 文件逐条相同（2444 / 2420 passed）；PG 35 文件 1 红 + 3 错误 = 基线 33 文件逐条相同（399 / 395）；守卫 25 文件 13 红 = 基线逐条相同（新加 7 个迁移 / 模型守卫，其中红的 4 个基线同红）；前端 281 文件 32 红 = 基线 276 文件逐条相同，新增 5 个用例文件 31 例全绿；按引用补跑 321 个用例文件 21 红 = 基线逐条相同；单区域 vue-tsc 19 个文件 1845 条 = 基线 1845、新增 0（注入 TS2322 打红）
+  - 浏览器（【测试】公式同步甲 E1 编辑页，15~20 秒窗口，前后对比）：ACNR 56 次单条解析（28 次被取消）→ 1 次批量（28 项）0 取消；误灰芯片 8 → 2（剩下 A1-15 / A1-16 真不存在）；项目详情 4 → 3；导入队列轮询 15 秒 5 次 → 20 秒 1 次；render-config 3 → 3（有提示的调用方不并入静默在途，设计如此）；无控制台错误
 
 ## 5. 批 5：Java 契约
 

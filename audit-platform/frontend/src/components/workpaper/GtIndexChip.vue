@@ -115,7 +115,7 @@ const router = useRouter()
 const { push: pushNavHistory } = useWpNavigationHistory()
 
 // ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
-const { resolve: acnrResolve, resolveInstance: acnrResolveInstance } = useAcnr()
+const { resolveIndexBatched, resolveInstance: acnrResolveInstance } = useAcnr()
 
 // ─── State ───
 const parsed = ref<ResolvedIndexRef | null>(null)
@@ -226,6 +226,10 @@ const tooltipContent = computed(() => {
     return '正在校验...'
   }
 
+  if (resolveStatus.value === 'error') {
+    return '暂时无法校验，仍可点击尝试跳转'
+  }
+
   return ''
 })
 
@@ -244,11 +248,10 @@ async function resolveRef() {
   resolving.value = true
   try {
     // R13.3: 调 resolve(ns:target) 获取 addr_id + jump_route，不自行 parse
+    // R15（procedure-chain-hardening）：同一轮渲染的 chip 合并成批量解析、同编码在途共享 —— 原先各发一条 GET，
+    // 同 URL 的并发 GET 被去重取消，被取消的 chip 显示成「底稿不存在」
     const indexRef = buildIndexRef(parsed.value)
-    const result = await acnrResolve({
-      index_ref: indexRef,
-      project_id: projectId.value || undefined,
-    })
+    const result = await resolveIndexBatched(indexRef, projectId.value || undefined)
 
     acnrResult.value = result
 
@@ -257,6 +260,9 @@ async function resolveRef() {
       if (result.trimmed) {
         resolveStatus.value = 'trimmed'
         trimReason.value = result.reason || ''
+      } else if (result.error === 'batch_resolve_failed') {
+        // 整批请求失败（useAcnr BATCH_RESOLVE_FAILED）≠ 引用不存在：不灰显，仍可点击尝试跳转
+        resolveStatus.value = 'error'
       } else {
         resolveStatus.value = 'not_exists'
       }
@@ -497,12 +503,17 @@ function init() {
   } else {
     parsed.value = parseIndexRef(refValue.value)
   }
-  if (parsed.value) {
+  // 禁用（程序步骤不适用）的 chip 不解析（R15）；解除禁用时再解析
+  if (parsed.value && !props.disabled) {
     resolveRef()
   }
 }
 
 onMounted(init)
+
+watch(() => props.disabled, (disabled, was) => {
+  if (!disabled && was && parsed.value && resolveStatus.value === 'pending') resolveRef()
+})
 
 // Re-parse and re-validate when value changes
 watch(refValue, () => {

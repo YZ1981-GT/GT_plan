@@ -610,6 +610,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
+import { eventBus } from '@/utils/eventBus'
 import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
@@ -1257,7 +1259,6 @@ interface ImportStatusInfo {
   eta: string
 }
 const importStatus = ref<ImportStatusInfo | null>(null)
-let importPollTimer: ReturnType<typeof setInterval> | null = null
 
 const IMPORT_PHASE_LABEL: Record<string, string> = {
   bootstrap: '启动', parsing: '解析', validating: '校验',
@@ -1288,9 +1289,10 @@ const importPhaseTagType = computed<'success' | 'warning' | 'info' | 'danger' | 
   return 'info'
 })
 
-async function pollImportStatus() {
+/** 查一次导入状态；返回「是否有进行中的导入」（决定下一轮 5 秒还是 30 秒，R17） */
+async function pollImportStatus(): Promise<boolean> {
   const pid = props.project?.id
-  if (!pid) { importStatus.value = null; return }
+  if (!pid) { importStatus.value = null; return false }
   try {
     const data: any = await api.get(
       `/api/projects/${pid}/ledger-import/active-job`,
@@ -1305,28 +1307,30 @@ async function pollImportStatus() {
         ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
         : ''
       importStatus.value = { progress: pct, phase, message: msg, eta: etaText }
-    } else {
-      importStatus.value = null
+      return true
     }
+    importStatus.value = null
   } catch {
     importStatus.value = null
   }
+  return false
 }
 
-function startImportPoll() {
-  stopImportPoll()
-  pollImportStatus()
-  importPollTimer = setInterval(pollImportStatus, 5000)
+// R17：有进行中的导入每 5 秒、没有每 30 秒（原先固定每 5 秒）；页面隐藏暂停（原先这里不暂停）
+const importPoll = useAdaptivePoll(pollImportStatus)
+function onImportSubmitted(e: { projectId: string }) {
+  if (e.projectId === props.project?.id) importPoll.poke()
 }
-function stopImportPoll() {
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-}
+eventBus.on('ledger-import:submitted', onImportSubmitted)
 
 watch(() => props.project?.id, (newId) => {
-  if (newId) { startImportPoll() } else { stopImportPoll(); importStatus.value = null }
+  if (newId) { importPoll.start() } else { importPoll.stop(); importStatus.value = null }
 }, { immediate: true })
 
-onUnmounted(() => { stopImportPoll() })
+onUnmounted(() => {
+  importPoll.dispose()
+  eventBus.off('ledger-import:submitted', onImportSubmitted)
+})
 </script>
 
 <style scoped>

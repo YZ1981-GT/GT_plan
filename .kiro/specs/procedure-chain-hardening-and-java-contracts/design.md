@@ -167,3 +167,31 @@ R14 变异 D6（去掉 `--confirm` 校验）时，`test_script_refuses_apply_wit
 - 委派预览被拒（422 所选人员没有关联登录账号）弹两条同样的提示：`previewProcedureDelegation` 不能静默 ⇒ 全局拦截器先弹一次、组合式再弹一次。加 `{ silent }` 选项（转 `_silent`），程序行委派对话框带上，错误只经 `handleApiError(e, '委派预览')` 提示一次；变异 S1~S3 全红。
 - 删除人员的二次确认框里项目名出现两次：后端 409 提示已点名项目（最多 5 个，超出写「等」），前端又拼了一遍「涉及项目：…」。改为 `staffBusyConfirmMessage`：点名全了原样用，点名不全才补全部项目名；变异 H1 / H2 全红。
 - 冻结契约守卫 `test_task23_zero_regression` 要求新增的响应字段显式登记：R13 的 `preview.preparation_ready` 已登记为 additive（登记前该守卫 2 例红，正是它应有的作用）。
+
+## §11 实施记录（批 4，2026-10-27）
+
+### 11.1 与设计的偏差
+
+- R15：批量解析只给 `GtIndexChip` 用（其他调用方仍逐个 `resolve`，没有改全局行为）；批量失败标记按字符串 `batch_resolve_failed` 比对，不 import 常量（用例里对 `@/services/acnr` 的 mock 不导出它时 import 会抛）。
+- R16：设计写「getProject / loadProjectMeta 改为不带 config」。实施改在 apiProxy：只带 `_silent` / `_dedupe` 标志的 GET 也共享在途，按「静默 / 有提示 × 去重 / 不去重 × url」分组；静默的可以并入有提示的在途请求，有提示的不并入静默的（否则出错时丢了它该弹的提示）。`stores/project.syncFromRoute` 原先同一次切项目先后取两次详情，改为复用第一次。`loadProjectMeta` 不用改（它带 `_silent`，由上一条覆盖）。
+- R17：节奏照设计（处理中 5 秒、空闲 30 秒、页面隐藏暂停），抽成 `useAdaptivePoll` 两处共用；另加「提交导入后立即刷新」（`ledger-import:submitted` → `poke`）—— 否则空闲节奏下刚提交的导入最多 30 秒后才显示进度。
+- R18：迁移号 V207 / R207。只对 projects 建外键（不对 wp_index：事件要比行活得久；项目彻底删除走 replica 角色级联，绕过只追加触发器）；事件 `created_at` 由应用写（库默认 now() 是事务开始时间，同一事务先移入再恢复会是同一时刻）。事件表不存在（42P01 / UndefinedTable / sqlite no such table）时只记警告、照常移入 / 恢复 —— 开发服热重载不跑迁移，fail-closed 会让回收站在重启前整体不可用；其他库错误照常抛出。
+- R20：识别口径放 `tests/_pg_url.py`，外键开关放 `tests/_sqlite_fk.py`（`with_fk_parents` 补齐被引用表），只开本 spec 涉及的 4 个 SQLite 用例文件；`postgres://` 的子进程用例去掉（应用的 `create_async_engine` 不接受这种写法，只在收集期判定）。
+- R21：PG 用例按设计；Playwright 脚本只验证了「未配置跳过 / 非【测试】项目拒绝」（见 tasks 4.4）。
+
+### 11.2 预存失败（e36cf246d 干净检出逐条复现，非本 spec）
+
+后端链路 12 例同批 3（10.2 / 3.5）；PG 1 + 3 同批 3；守卫在批 3 的 9 例之外，新加入回归的迁移守卫有 4 例基线同红：`test_migration_drift_ledger[V200]` / `[V201]`（已应用迁移被编辑）、`test_zero_downtime_migration_compat::test_property9_vr_pairing_complete`（44 个旧迁移缺 R 文件，V207 已配对、不在其中）、`test_evidence_governance_migration_allocation::test_real_db_state_is_consistent`；前端 32 + 21 例同基线。
+
+### 11.3 浏览器实测
+
+见 tasks 4.5（请求数前后对比）。R18 回收站「删除人」读事件未在浏览器测：真库还没有事件表（11.4），由 SQLite / PG 用例与 R21 用例覆盖。
+
+### 11.4 范围外发现（未改，汇报用户）
+
+- 回收站列表与恢复只按项目成员判，不按底稿可见性：只勾选 D 循环的审计员能在回收站看到 H 循环底稿的编码与名称，也能恢复别的循环里手工删除的底稿（被粗裁的恢复会 409）。代码确认（`recycle_bin._visibility_filter` / `_authorize_row`），未实测。
+- 底稿详情 GET 判两次底稿门：注册表给 working_paper 路由挂了 router 级 `dedicated_wp_gate`，处理函数里又调 `enforce_wp_gate`（拒绝在依赖处一次、记一条；放行时判两次）。R21 变异只去掉处理函数那层时用例不红，两层都去掉才红。
+- 转派的任务历史 `from_status` 恒记 `assigned`（`procedure_task_transition_service.reassign`）：执行中 / 已提交的任务转派后历史显示「assigned→assigned」（批 5 契约按真实前一状态写，见 §12）。
+- V207 生效要全量重启 start-dev（或经用户同意用 `MigrationRunner(...).run_pending()`）。
+- 约 40 处测试各自判断 `startswith("postgresql")`（不认 `postgres://`），`GT_REQUIRE_PG` 只管 pg_only 标记的用例。
+- `GET` / `POST /api/projects/{project_id}/assignments` 只要求登录（团队名单跨项目可读；保存同样只校登录，即已登记待立 spec 的「委派自封经理」R1），本 spec 未改。

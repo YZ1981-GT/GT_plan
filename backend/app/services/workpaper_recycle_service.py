@@ -10,6 +10,9 @@ spec procedure-trim-generation-delegation-chain 需求 3 / ADR-4。
 (project_id, wp_index_id)`` 都不含 ``is_deleted`` ⇒ 同码底稿只能复活原行，不能新建；恢复按 wp_index 把
 两层一起复活。
 
+每次移入 / 恢复同事务写一条只追加的领域事件 ``workpaper_lifecycle_events``（spec procedure-chain-hardening-and-java-contracts
+R18：操作人、原因类别、原因、编码、底稿 id、请求 id）；回收站「删除人」先读最近一条事件，没有（旧数据）再回退去向记录。
+
 去向记录（lineage）写在 ``wp_index.cross_ref_codes["_recycle_lineage"]``（与准则转换的
 ``_conversion_lineage`` 同一落点），最后一条 ``action == "recycled"`` 的 ``kind`` 标明因何移入：
 ``trim`` = 程序裁剪，``standard_conversion`` = 准则切换后不适用。粗裁恢复执行只恢复 ``trim`` 的，准则切回
@@ -31,6 +34,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.models.workpaper_lifecycle_models import EVENT_RECYCLED, WorkpaperLifecycleEvent
 from app.models.workpaper_models import WorkingPaper, WpFileStatus, WpIndex, WpReviewStatus
 
 logger = logging.getLogger(__name__)
@@ -131,6 +135,73 @@ def _append_lineage(wp_index: WpIndex, entry: dict) -> None:
     data[RECYCLE_LINEAGE_KEY] = [*read_lineage(wp_index), entry]
     wp_index.cross_ref_codes = data
     flag_modified(wp_index, "cross_ref_codes")
+
+
+def _is_missing_events_table(exc: BaseException) -> bool:
+    """库里还没有事件表：迁移 V207 未落（开发服热重载不跑迁移，重启后才建表）。只认这一种，别的错误照常抛。"""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if getattr(cur, "sqlstate", None) == "42P01" or type(cur).__name__ == "UndefinedTableError":
+            return True
+        if "no such table" in str(cur) and WorkpaperLifecycleEvent.__tablename__ in str(cur):  # SQLite
+            return True
+        cur = getattr(cur, "orig", None) or cur.__cause__
+    return False
+
+
+async def _record_events(db: AsyncSession, events: list[WorkpaperLifecycleEvent]) -> None:
+    """同事务写事件（调用方已 flush 本次的底稿改动）。事件表还没建时：保存点回滚这一步、记警告，
+    移入 / 恢复照常完成（去向记录照写，回收站「删除人」回退去向记录）。"""
+    if not events:
+        return
+    try:
+        async with db.begin_nested():
+            db.add_all(events)
+            await db.flush()
+    except SQLAlchemyError as exc:
+        if not _is_missing_events_table(exc):
+            raise
+        logger.warning("[workpaper_recycle] 事件表 %s 不存在（迁移 V207 未执行），本次 %d 条事件未记录",
+                       WorkpaperLifecycleEvent.__tablename__, len(events))
+
+
+def _event(project_id: UUID, index: WpIndex, papers: Sequence[WorkingPaper], *, event_type: str, kind: str,
+           reason: str, actor_user_id: UUID | None, request_id: str | None,
+           trim_codes: Sequence[str] = ()) -> WorkpaperLifecycleEvent:
+    return WorkpaperLifecycleEvent(
+        project_id=project_id, wp_index_id=index.id, wp_code=index.wp_code, event_type=event_type,
+        kind=kind or "", reason=reason or "", actor_user_id=actor_user_id, request_id=request_id,
+        working_paper_ids=[str(wp.id) for wp in papers], trim_codes=list(trim_codes),
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+async def latest_recycle_actors(db: AsyncSession, wp_index_ids: Sequence[UUID]) -> dict[UUID, str | None]:
+    """按事件取操作人：最近一条事件是「移入」的底稿 ⇒ ``{wp_index_id: actor_user_id}``（无操作人为 ``None``）。
+    没有事件（旧数据）或最近一条不是移入的不在结果里 ⇒ 调用方回退去向记录。事件表还没建时返回空。"""
+    ids = list(dict.fromkeys(wp_index_ids))
+    if not ids:
+        return {}
+    latest: dict[UUID, tuple[str, UUID | None]] = {}
+    try:
+        async with db.begin_nested():
+            for i in range(0, len(ids), _IN_CHUNK):
+                rows = (await db.execute(
+                    sa.select(WorkpaperLifecycleEvent.wp_index_id, WorkpaperLifecycleEvent.event_type,
+                              WorkpaperLifecycleEvent.actor_user_id)
+                    .where(WorkpaperLifecycleEvent.wp_index_id.in_(ids[i:i + _IN_CHUNK]))
+                    .order_by(WorkpaperLifecycleEvent.created_at)
+                )).all()
+                for wp_index_id, event_type, actor in rows:  # 按时间升序，后来的覆盖先来的
+                    latest[wp_index_id] = (event_type, actor)
+    except SQLAlchemyError as exc:
+        if not _is_missing_events_table(exc):
+            raise
+        return {}
+    return {wid: (str(actor) if actor else None)
+            for wid, (event_type, actor) in latest.items() if event_type == EVENT_RECYCLED}
 
 
 async def _count_related(db: AsyncSession, wp_ids: Sequence[UUID]) -> dict[UUID, list[str]]:
@@ -252,21 +323,26 @@ async def move_to_recycle_bin(
     loaded = await _load_targets(db, project_id, codes, deleted=False, lock=True)
     now = datetime.now(timezone.utc)
     moved: list[str] = []
+    events: list[WorkpaperLifecycleEvent] = []
     for index, papers in loaded:
         for wp in papers:
             wp.is_deleted = True
             wp.updated_at = now
         index.is_deleted = True
         index.updated_at = now
+        codes_for_index = list((trim_codes or {}).get(index.wp_code, []))
         _append_lineage(index, {
             "action": ACTION_RECYCLED, "kind": kind, "reason": reason,
-            "trim_codes": list((trim_codes or {}).get(index.wp_code, [])),
+            "trim_codes": codes_for_index,
             "working_paper_ids": [str(wp.id) for wp in papers],
             "actor": str(actor_user_id) if actor_user_id else None, "at": _now_iso(),
         })
+        events.append(_event(project_id, index, papers, event_type=ACTION_RECYCLED, kind=kind, reason=reason,
+                             actor_user_id=actor_user_id, request_id=request_id, trim_codes=codes_for_index))
         moved.append(index.wp_code)
     if moved:
         await db.flush()
+        await _record_events(db, events)
         await _bump_epoch(db, project_id, "workpaper_recycled", moved, actor_user_id, request_id)
         await db.flush()
     return moved
@@ -297,6 +373,7 @@ async def restore_from_recycle_bin(
     """
     loaded = await _load_targets(db, project_id, codes, deleted=True, lock=True)
     restored: list[str] = []
+    events: list[WorkpaperLifecycleEvent] = []
     now = datetime.now(timezone.utc)
     for index, papers in loaded:
         if kind is not None and last_recycle_kind(index.cross_ref_codes) != kind:
@@ -306,14 +383,18 @@ async def restore_from_recycle_bin(
         for wp in papers:
             wp.is_deleted = False
             wp.updated_at = now
+        restored_kind = kind or last_recycle_kind(index.cross_ref_codes) or ""
         _append_lineage(index, {
-            "action": ACTION_RESTORED, "kind": kind or last_recycle_kind(index.cross_ref_codes) or "",
+            "action": ACTION_RESTORED, "kind": restored_kind,
             "reason": reason, "working_paper_ids": [str(wp.id) for wp in papers],
             "actor": str(actor_user_id) if actor_user_id else None, "at": _now_iso(),
         })
+        events.append(_event(project_id, index, papers, event_type=ACTION_RESTORED, kind=restored_kind, reason=reason,
+                             actor_user_id=actor_user_id, request_id=request_id))
         restored.append(index.wp_code)
     if restored:
         await db.flush()
+        await _record_events(db, events)
         await _bump_epoch(db, project_id, "workpaper_restored", restored, actor_user_id, request_id)
         await db.flush()
     return restored

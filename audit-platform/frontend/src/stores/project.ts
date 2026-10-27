@@ -29,7 +29,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { getProject, getProjectAuditYear } from '@/services/auditPlatformApi'
+import { getProject, type ProjectListItem } from '@/services/auditPlatformApi'
 import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -89,12 +89,15 @@ export const useProjectStore = defineStore('project', () => {
 
     // 从 query 解析年度
     const qy = Number(route.query.year)
+    // 本次切换已取到的项目详情：下面加载项目信息时复用（R16：原先先取一次只为年度、再整份取一次，同一项目连发两条）
+    let fetched: ProjectListItem | undefined
     if (Number.isFinite(qy) && qy > 2000) {
       year.value = qy
     } else if (changed) {
       // 路由没带 year，尝试从后端获取项目审计年度
       try {
-        const ay = await getProjectAuditYear(pid)
+        fetched = await getProject(pid)
+        const ay = resolveAuditYearFromProject(fetched)
         if (ay) {
           auditYear.value = ay
           year.value = ay
@@ -107,7 +110,7 @@ export const useProjectStore = defineStore('project', () => {
       resetProjectScopedState('route-change')
       loadDataYears(pid)
       try {
-        const proj = await getProject(pid)
+        const proj = fetched ?? await getProject(pid)
         clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
         projectStatus.value = (proj as any)?.status || ''
         auditScope.value = (proj as any)?.audit_scope || ((proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone')

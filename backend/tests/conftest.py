@@ -174,10 +174,20 @@ def _is_evidence_governance_file(path_str: str) -> bool:
 
 def pytest_collection_modifyitems(config, items):
     """Skip pg_only tests when DATABASE_URL is not PostgreSQL, and tag the
-    evidence-governance aggregation suite (Task 8.3)."""
+    evidence-governance aggregation suite (Task 8.3).
+
+    spec procedure-chain-hardening-and-java-contracts R20：PG 判定认 ``postgres://``（原先只认含 ``postgresql`` 的地址）；
+    设 ``GT_REQUIRE_PG=1`` 时地址不是 PG 而收集到了 pg_only 用例 ⇒ ``UsageError``，不再静默跳过。
+    """
+    from tests._pg_url import is_pg_url, pg_requirement_error
+
     db_url = os.getenv("DATABASE_URL", "sqlite")
+    error = pg_requirement_error(db_url, os.getenv("GT_REQUIRE_PG"),
+                                 [item.nodeid for item in items if "pg_only" in item.keywords])
+    if error:
+        raise pytest.UsageError(error)
     skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
-    tag_pg = "postgresql" not in db_url
+    tag_pg = not is_pg_url(db_url)
     for item in items:
         if tag_pg and "pg_only" in item.keywords:
             item.add_marker(skip_pg)
