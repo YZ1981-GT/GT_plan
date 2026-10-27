@@ -20,7 +20,7 @@ S32~S35 bundle、S3/S4/S5/S6/S12/S13/S14/S15/S20/S21 专属组件已存在，但
 - **S_Checklist_Component**：`frontend/src/components/workpaper/s-checklist/` 中的 12 个专属类型。
 - **BatchSaveRequest**：`checklist_responses.py` 的 `project_id + items[]` 保存合约，item 含 `item_id`、`conclusion`、`remark`。
 - **S17_Classification**：`workpaper_sheet_classification` 中用于 S17 sheet 的分类记录；当前实证为 0 行。
-- **S_Resolver**：S 类只读自动取数 resolver；当前既有 11 个，本 spec 新增 3 个。
+- **S_Resolver**：S 类只读自动取数 resolver；目标 14 个（既有 11 个 + 本 spec 新增 3 个），完整清单见 design §4.1。
 
 ## 实施前约束
 
@@ -71,7 +71,7 @@ S32~S35 bundle、S3/S4/S5/S6/S12/S13/S14/S15/S20/S21 专属组件已存在，但
 #### Acceptance Criteria
 
 1. WHEN render-config 返回下列 12 个类型时，THE `Renderer_Dispatch` SHALL 经 `_s_checklist_sheets.py` 返回专属 payload：`s1-regulation-record`、`s8-adjudication`、`s9-adjudication`、`s9-internal-control`、`s9-legal-regulations`、`s9-program-description`、`s10-adjudication`、`s10-internal-control`、`s10-environmental-regulations`、`s17-nonrecurring-detail`、`s17-reconciliation`、`s17-tax-impact`。
-2. THE S-checklist strategy SHALL 返回 `component_type`、精确 sheet identity 和组件所需 payload；strategy SHALL 不返回 `cells`，render-config SHALL 不把这些类型改写为 `onlyoffice-sheet` 或通用网格 fallback。
+2. THE S-checklist strategy SHALL 返回 `component_type`、精确 sheet identity 和组件所需 payload；strategy SHALL 不返回 `cells`，render-config SHALL 不把这些类型改写为 `onlyoffice-sheet` 或通用网格 fallback。Contract test SHALL assert：策略输出 dict 无 `cells` 键，且 render-config 响应中 12 个类型的 componentType 不属于 `{'onlyoffice-sheet', 'noRendererGridFallback', 'audit-sheet'}`。
 3. THE frontend registry、overrides、backend valid-type/whitelist 与 `RENDERER_DISPATCH` SHALL 具有相同 12-type 集合；contract tests SHALL 逐类型检查集合、payload 和无 fallback。
 4. WHEN S1/S8/S9/S10/S17 目标 sheet 被打开，THE renderer SHALL 选择对应 S-checklist 组件；S17 的 detail/reconciliation/tax mapping SHALL 遵循 R-P0-6。
 
@@ -133,7 +133,7 @@ S32~S35 bundle、S3/S4/S5/S6/S12/S13/S14/S15/S20/S21 专属组件已存在，但
 
 #### Acceptance Criteria
 
-1. WHEN `risk_assessments` contains a mapped high-fraud or S-related conclusion，THE S checklist SHALL report `recommended` or `applicable` according to the documented mapping；the value domain SHALL be verified with `SELECT DISTINCT account_or_cycle ... LIMIT 50`。
+1. WHEN `risk_assessments` contains a mapped high-fraud or S-related conclusion，THE S checklist SHALL report `recommended` or `applicable` according to the documented mapping；the value domain SHALL be verified with `SELECT DISTINCT account_or_cycle ... LIMIT 50`。风险数据的代码真源路径为 `b50_risk_reader.py`（从 B50 checklist 的 `checklist_responses` 中按 `item_id LIKE 'B50-T3-%'` 读取循环值与风险矩阵），消费方包括 `b60_data_pull`、`auto_data_resolvers/_cycle.py`、`_control_b.py` 及 `a176_agenda_prefill.py`。
 2. WHEN risk exists without a workpaper，THE checklist SHALL report `recommended`；when risk or an existing workpaper is present，THE checklist SHALL report `applicable`；when neither is present，THE checklist SHALL report `not_applicable`。
 3. WHEN a bundle tab has `assigned_to`，THE bundle UI SHALL resolve `users.id → staff_members.user_id → staff_members.name` and fall back to `users.username` when staff data is absent。
 

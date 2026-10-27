@@ -25,6 +25,11 @@
 - `/api/s-special/*` 当前不存在；S1/S17 导入导出入口标记“导入导出（开发中）”并禁用，不把端点实现列为完成条件。
 - S17 classification dry-run 的候选行从 `.xls` 模板实读；dry-run 及审批前均禁止写共享数据库。
 - 若选择加宽 `String(10)`，迁移另行批准并遵守运行时迁移规范；若选择 canonical code，须先给出持久化值与映射契约。两者未决时，`refinancing` 的真实 PG/render 验收阻塞，但内存 predicate 单测仍可覆盖 flag 语义。
+
+**切换点路径（用户拍板后按对应路径执行）**：
+  - **选 A（加宽迁移）**→ 新增 `V{next}__widen_business_category.sql`：`ALTER TABLE projects ALTER COLUMN business_category TYPE VARCHAR(20)`；配对 `R{next}__widen_business_category.sql`：`ALTER TABLE projects ALTER COLUMN business_category TYPE VARCHAR(10)`（数据长度不超时安全回滚）。predicate 测试增加 `'refinancing'` 真库场景（PG 事务回滚）。
+  - **选 B（短 canonical code）**→ 确定映射（如 `refi` → `refinancing`），predicate 维护 `CANONICAL_ALIAS = {'refi': 'refinancing'}`；`wp_code_overrides.json` 和 `wp_account_mapping.json` 用短码 `refi`，`business_category_flags` 输出不变（内部展开别名后计算 flag）。新增 `test_canonical_alias_mapping` 确认双向一致。
+  - **未决前**：纯函数测试覆盖 refinancing flag 语义（已有），PG/render 场景标 `[ ]*`。
 - S34 前端公式引擎是运行时计算层；`formula_settings` 是后端公式定义治理层，两者正交。`formula_push_rules.json` 当前 S 规则为 0，S 类不进入 formula-push 写回。
 
 ## Architecture
@@ -113,6 +118,8 @@ S17 detail 是一个 componentType，按 `sheetName` 在 S17-1/S17-2/S17-3 视�
 
 九个可写组件统一使用：
 
+> **九个可写类型**：`{s1-regulation-record, s8-adjudication, s9-adjudication, s9-internal-control, s10-adjudication, s10-internal-control, s17-nonrecurring-detail, s17-reconciliation, s17-tax-impact}`。三个只读类型（`s9-legal-regulations`、`s9-program-description`、`s10-environmental-regulations`）只返回轻量专属 payload，无保存 item。
+
 ```ts
 { project_id: props.projectId,
   items: [{ item_id, conclusion: null, remark: JSON.stringify(payload) }] }
@@ -171,7 +178,28 @@ S17 detail 是一个 componentType，按 `sheetName` 在 S17-1/S17-2/S17-3 视�
 
 在 `backend/data/wp_account_mapping.json` 补 S20→D4、S15→D4/M2、S17→K12/K13、S6→K1、S33-5→D4/F5；实施时 grep 现有消费方，若按 componentType 过滤则扩展白名单而不新造面板。
 
-新增 `_s_linkage.py` 的 3 个 resolver，和既有 11 个一起以 `async (db, project_id, year, **kwargs) -> dict` 注册；分别读取关联方余额、D4/F5 收入成本、估计相关 TB 数据。注册后必须在 render-schema 或通用程序表取数路径有调用绑定，避免“注册成功但无人调用”。所有 resolver 只读。
+新增 `_s_linkage.py` 的 3 个 resolver，和既有 11 个一起以 `async (db, project_id, year, **kwargs) -> dict` 注册；分别读取关联方余额、D4/F5 收入成本、估计相关 TB 数据。
+
+> **14 个 S resolver 完整清单**（既有 11 + 新增 3）：
+>
+> | # | resolver 名 | 来源模块 | 新增/既有 |
+> |---|---|---|---|
+> | 1 | `s1_regulation_consideration` | `_s_special.py` | 既有 |
+> | 2 | `s8_lease_summary` | `_s_special.py` | 既有 |
+> | 3 | `s9_ecommerce_consideration` | `_s_special.py` | 既有 |
+> | 4 | `s10_environmental_consideration` | `_s_special.py` | 既有 |
+> | 5 | `s12_segment_reporting` | `_s_special.py` | 既有 |
+> | 6 | `s13_subsequent_events` | `_s_special.py` | 既有 |
+> | 7 | `s14_accounting_estimates` | `_s_special.py` | 既有 |
+> | 8 | `s15_going_concern` | `_s_special.py` | 既有 |
+> | 9 | `s20_revenue_recognition` | `_s_special.py` | 既有 |
+> | 10 | `s21_related_party` | `_s_special.py` | 既有 |
+> | 11 | `s34_ipo_checklist` | `_s_special.py` | 既有 |
+> | 12 | `s6_related_party_summary` | `_s_linkage.py` | **新增** |
+> | 13 | `s33_5_revenue_cost_check` | `_s_linkage.py` | **新增** |
+> | 14 | `s14_estimate_related_data` | `_s_linkage.py` | **新增** |
+>
+> 注：表中来源模块名为目标位置；实施时须现读 `auto_data_resolvers/` 目录确认 11 个既有 resolver 的实际文件名和签名。注册后必须在 render-schema 或通用程序表取数路径有调用绑定，避免“注册成功但无人调用”。所有 resolver 只读。
 
 #### §4.2 S34 formula engine
 
@@ -238,7 +266,7 @@ For any business-category string and any `allowedCats` value, `isIpoProject` SHA
 
 ### Property 4: S34 公式计算保持定义不变量
 
-For any valid S34 subtable grid accepted by a supported parent, the extracted ratio/sum/threshold results SHALL equal the configured formula evaluation, and recalculating the same grid SHALL not introduce a second write or change the result。
+For any valid S34 subtable grid accepted by a supported parent, the extracted ratio/sum/threshold results SHALL equal the configured formula evaluation, and recalculating the same grid SHALL not alter the input grid or produce side effects。
 
 **Validates: Requirements 8.2**
 
@@ -290,3 +318,63 @@ For any combination of risk presence and workpaper presence, the P2 classifier S
 
 ### 回归
 - 相关套件全绿：`test_s_linkage_resolvers`(13) + `test_s17_override_mapping`(?) + `test_s17_classification_dry_run` + `test_s_checklist_render_strategy` + `test_s_checklist_registry_parity` + `test_render_config_wire_contract` 合计 40 passed；`business_category_service`/`linkage_service` 映射加载 1025 条不变。
+
+
+## 阻塞项详细执行记录（从 tasks.md 搬入）
+
+> 本节为 append-only 执行轨迹归档。tasks.md 只保留摘要引用。
+
+### 0.4 复现记录（capability manifest 预存失败；仅记录，不修复）
+
+- 归因：这是 capability manifest 生成器的既有基线问题，不由本 spec 引入。`registry/index.ts` 第 204 行为 `export type HtmlComponentType = HtmlRendererEntry['componentType']`；`git blame` 显示该行来自 `82f58ea443`（2026-09-13 23:21:39 +0800）。生成器当前只接受字符串字面量 union，因此在该 indexed-access 声明处 fail-closed。
+- 复现位置：仓库根目录 `D:/GT_plan`。
+- 复现命令 1：`python backend/scripts/gen/generate_component_capability_manifest.py --check`
+  真实输出：`[FAIL] ... HtmlComponentType must contain only string literals`，`PROCESS_EXIT=2`。
+- 复现命令 2：`rtk python -m pytest backend/tests/test_component_capability_contract.py::test_checked_in_manifest_is_canonical_and_current -q -p no:playwright`
+  真实结果：`1 failed, 1 warning in 1.44s`，失败栈 `check_manifest() → build_manifest() → extract_observed_sources() → extract_ts_string_union()` 触发 `SourceExtractionError`。
+- 边界：未运行 `--apply`，未修改 capability manifest、TypeScript projection、registry、allowlist 或任何生产/测试代码。
+
+
+### D5.1 执行记录（2026-10-25）
+
+- 直接读取 `backend/wp_templates/S/S17 非经常性损益.xls` 得到 5 张 sheet：`审定表S17-1`、`审核表（合并）S17-2`、`审核表（个别报表）S17-3`、`与营业外收支等核对表S17-11`、`非经常性损益项目的所得税影响S17-21`。
+- 据此将前三张表统一映射到 `s17-nonrecurring-detail`，后两张分别映射到 `s17-reconciliation`、`s17-tax-impact`。
+- 本记录只涉及五个 `wp_code_overrides.json` 精确值和对应 pytest；未实现 D3 backend dispatch，也未执行 D6 classification dry-run。
+
+
+### D6.2 执行记录（2026-10-25 20:16 +08:00；外部阻塞，未批准）
+
+- **任务状态**：D6.2 保持 `[-]`，不标记为 `[x]`。本记录只登记"等待用户批准"的外部阻塞。
+- **D6.1 证据**：`.agents/tasks/s-cycle-p0-impl-2026-10-25/s17_classification_dry_run.json`（report_version=1，`mode=dry-run`）。模板 SHA-256 为 `392f9bf65f...`，候选数 **8**，`shared_database_accessed=false`、`writes_shared_database=false`。
+- **候选清单**（均为待批准候选）：表头（I-占位）、审计程序S17（A-S 议题程序）、审定表S17-1（F-审定表）、审核表（合并）S17-2（D-检查表，冲突：legacy_xlsx_classifier_mismatch）、审核表（个别报表）S17-3（D-检查表，冲突：legacy_xlsx_classifier_mismatch）、提示（H-辅助说明，冲突）、S17-11（D-检查表）、S17-21（D-检查表，冲突）。
+- **批准状态**：`awaiting_user_approval`。4 处 legacy-xlsx 分类器不一致待用户裁决。
+- **更新（2026-10-26）**：用户已明确批准。经 `backfill_s17_classification.py --apply` 落库 8 行（ON CONFLICT DO NOTHING），实时 HTTP 复验 S17 8 sheet 全部正确命中专属 componentType。tasks.md D6.2 已标 `[x]`。
+- **验证补记**：`test_s17_classification_dry_run.py` 3 passed，确认 dry-run / no-write / 无 SQLAlchemy import。
+
+
+### D8.2 执行记录（2026-10-25 21:34 +08:00；环境/预存失败，仅记录）
+
+- **全量 vue-tsc**：进程约 45.7 秒后 exit **134**（OOM），堆 ~4.14 GB。未输出 TypeScript 诊断。归类为环境/预存问题。
+- **capability manifest `--check`**：exit **2**，`HtmlComponentType must contain only string literals`。
+- **capability manifest 契约测试**：`1 failed, 1 warning in 1.27s`，`SourceExtractionError`。
+- 归因与边界：均只作为环境/预存证据记录；未修改 capability manifest、TypeScript projection、registry、allowlist、tsconfig、生产代码或测试代码。
+
+
+### P0.3 执行记录（2026-10-25；Playwright 真实运行）
+
+- **环境**：`http://127.0.0.1:9980/api/health` HTTP 200，`http://127.0.0.1:3030/` HTTP 200；`admin/admin123` 登录。测试项目 `proj_f7b784dd`（ID `19522381-430c-4e4e-8ee5-a22e5e90ad68`）。
+- **生成底稿**：通过真实 UI 生成 S1/S8/S9/S10 共 4 张，总计 5 张（含原有 D2）。
+- **S17 边界**：D6 classification 尚无用户批准。本次未生成/打开/保存/请求 S17。
+- **初次 render-config 结果**：S1/S8/S9/S10 均返回通用 componentType（`a-program-console`/`audit-sheet`/`h-static-doc`），含 `grid_fallback`。根因：运行中 uvicorn worker 加载旧代码（启动早于 D3 改动），非代码缺陷。
+- **重启后复验**：经用户授权重启 backend，S1→`s1-regulation-record`、S8→`s8-adjudication`、S9 四张、S10 三张全部正确，无 grid_fallback/onlyoffice 劫持。顶层 `not_applicable` 正确输出 False。
+- **UI/侧边栏**：各页显示中文名称和精确 sheet tab；侧边栏可打开，但程序区显示「完成率：0%」「暂无程序清单」。
+- **保存**：render-config 挂载了专属 componentType 后未进一步执行专属保存验收（属 D4 范畴）。
+
+
+### P2.1 执行记录（2026-10-25 23:08 +08:00；实时 PG 只读核查，数据阻塞）
+
+- `public.risk_assessments` 为 `BASE TABLE`，`account_or_cycle` 为 `character varying NOT NULL`（ORM `String(100)`）。
+- `SELECT DISTINCT account_or_cycle FROM risk_assessments LIMIT 50` 返回空集；`risk_rows=0`、`risk_projects=0`。
+- B50 联查：7 个 B50 工作稿（7 个项目），对应 `checklist_responses` 为 **0 行**。
+- `b50_risk_reader.py` 确认为现行风险联动代码真源路径（`load_b50_accounts` / `load_b50_risks`），消费方包括 `b60_data_pull`、`_cycle.py`、`_control_b.py`、`a176_agenda_prefill.py`。
+- 边界：只执行 SELECT / schema 元数据读取。P2.1 保持数据阻塞。
