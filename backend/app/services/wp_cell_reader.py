@@ -49,6 +49,10 @@ class WpCellRead:
     #: 两参（不判表）时 = 含该单元格的表数
     matches: int = 0
     candidates: tuple[str, ...] = ()
+    #: J1 补充（ACNR design §2.4 回退流程 B，默认 None 不改三态语义）：与 reason 对应的机器码，ok 为 None
+    reason_code: str | None = None
+    #: 找到单元格时为原文（文本格据此展示），否则 None
+    raw: str | None = None
 
 
 @dataclass(frozen=True)
@@ -75,9 +79,10 @@ async def _year_gate(db, project_id: UUID, year: int | None) -> WpCellRead | Non
         return None
     audit_year = await fetch_project_audit_year(db, project_id)
     if audit_year is None:
-        return WpCellRead("blocked", None, "项目未设置审计年度", None, None)
+        return WpCellRead("blocked", None, "项目未设置审计年度", None, None, reason_code="year_unknown")
     if audit_year != year:
-        return WpCellRead("missing", None, f"底稿年度与项目年度不符（项目 {audit_year}，请求 {year}）", None, None)
+        return WpCellRead("missing", None, f"底稿年度与项目年度不符（项目 {audit_year}，请求 {year}）", None, None,
+                          reason_code="year_mismatch")
     return None
 
 
@@ -114,10 +119,10 @@ async def resolve_wp_cell(db, project_id, year, wp_code, sheet_key, cell) -> WpC
         .limit(2)
     )).all()
     if not rows:
-        return WpCellRead("missing", None, f"项目中没有底稿 {wp_code}", None, None)
+        return WpCellRead("missing", None, f"项目中没有底稿 {wp_code}", None, None, reason_code="wp_missing")
     if len(rows) > 1:
         return WpCellRead("blocked", None, "底稿记录有歧义", None, None,
-                          candidates=tuple(str(r[0]) for r in rows))
+                          candidates=tuple(str(r[0]) for r in rows), reason_code="wp_ambiguous")
     wp_id, parsed_data = rows[0]
     cell_up = str(cell or "").strip().upper()
     records = extract_custom_cells(parsed_data if isinstance(parsed_data, dict) else None)
@@ -125,31 +130,36 @@ async def resolve_wp_cell(db, project_id, year, wp_code, sheet_key, cell) -> WpC
     if sheet_key is None:
         hits = [r for r in records if r.cell == cell_up]
         if not hits:
-            return WpCellRead("missing", None, "单元格未录入", wp_id, None)
+            return WpCellRead("missing", None, "单元格未录入", wp_id, None, reason_code="cell_empty")
         return _value_read(hits[0].value, wp_id, hits[0].sheet, matches=len(hits))
 
     catalog = _catalog_sheet_keys(wp_code, sheet_key)
     if catalog.verdict == "ambiguous":
-        return WpCellRead("blocked", None, "工作表名有歧义", wp_id, None, candidates=catalog.candidates)
+        return WpCellRead("blocked", None, "工作表名有歧义", wp_id, None, candidates=catalog.candidates,
+                          reason_code="sheet_ambiguous")
     if catalog.verdict == "alias_forbidden":
-        return WpCellRead("blocked", None, "该别名不能用于取值", wp_id, None, candidates=catalog.candidates)
+        return WpCellRead("blocked", None, "该别名不能用于取值", wp_id, None, candidates=catalog.candidates,
+                          reason_code="sheet_ambiguous")
     accepted = {normalize_sheet_key(k) for k in catalog.keys} | {normalize_sheet_key(sheet_key)}
     in_sheet = [r for r in records if normalize_sheet_key(r.sheet) in accepted]
     if not in_sheet:
-        return WpCellRead("missing", None, "没有该工作表的数据", wp_id, None)
+        return WpCellRead("missing", None, "没有该工作表的数据", wp_id, None, reason_code="sheet_missing")
     hits = [r for r in in_sheet if r.cell == cell_up]
     if not hits:
-        return WpCellRead("missing", None, "单元格未录入", wp_id, None)
+        return WpCellRead("missing", None, "单元格未录入", wp_id, None, reason_code="cell_empty")
     if len({str(h.value) for h in hits}) > 1:
         return WpCellRead("blocked", None, "同一工作表有多份数据", wp_id, None,
-                          matches=len(hits), candidates=tuple(h.sheet for h in hits))
+                          matches=len(hits), candidates=tuple(h.sheet for h in hits), reason_code="sheet_ambiguous")
     return _value_read(hits[0].value, wp_id, hits[0].sheet, matches=len(hits))
 
 
 def _value_read(raw: object, wp_id: UUID, sheet: str, *, matches: int) -> WpCellRead:
+    text = None if raw is None else str(raw)
     if _is_empty(raw):
-        return WpCellRead("missing", None, "单元格未录入", wp_id, sheet, matches=matches)
+        return WpCellRead("missing", None, "单元格未录入", wp_id, sheet, matches=matches,
+                          reason_code="cell_empty", raw=text)
     value = _to_decimal(raw)
     if value is None:
-        return WpCellRead("blocked", None, f"单元格内容不是数值：{str(raw)[:50]}", wp_id, sheet, matches=matches)
-    return WpCellRead("ok", value, None, wp_id, sheet, matches=matches)
+        return WpCellRead("blocked", None, f"单元格内容不是数值：{text[:50]}", wp_id, sheet, matches=matches,
+                          reason_code="non_numeric", raw=text)
+    return WpCellRead("ok", value, None, wp_id, sheet, matches=matches, reason_code=None, raw=text)
