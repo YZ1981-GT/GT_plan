@@ -92,6 +92,6 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 INDEX / memory / dev-history；清理探针、临时 worktree 与测试数据（对账）
+- [x] 6.1 INDEX / memory / dev-history；清理探针、临时 worktree 与测试数据（对账）
   - 已做：INDEX / memory / dev-history（2026-10-27）；仓库内没有本 spec 的探针（一次性脚本都在仓库外 `C:\Users\Administrator\ptgd_deliver\`），临时 worktree 推送后删除
-  - 待用户放行（真库写入）：E1 第 23 行测试数据 —— 程序行任务 `ef4f5b7e-…` 1、任务历史 2（只追加表，删除走触发器的维护开关）、任务 outbox 2、程序行定义 `E1A::E1A::b2cfac47a62843b4` 1（只被这条任务引用、无修订行）；`cleanup_e1_row23.py` dry-run 已逐项核对并备份 `cleanup_20261027/backup.json`，`--apply` 在一个事务里删、行数不符即回滚
+  - E1 第 23 行测试数据已清理（2026-10-27 验证：四张表全 0 行，`cleanup_e1_row23.py` dry-run 报「已清理过，无事可做」），备份在 `C:\Users\Administrator\ptgd_deliver\cleanup_20261027/backup.json`
