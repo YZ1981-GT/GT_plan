@@ -15,7 +15,9 @@ import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
-import { uploadAttachment } from '@/services/commonApi'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import { handleApiError } from '@/utils/errorHandler'
 
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
@@ -220,26 +222,31 @@ function saveSteps() { saveItem('B2-12-steps', JSON.stringify(steps.value)) }
 
 // ─── 步骤附件上传（Task G / 证据留痕） ───
 async function handleStepUpload(index: number, options: any) {
-  if (props.readonly || !props.projectId) return
+  if (props.readonly || !props.projectId || !props.wpId) return
   try {
-    const fd = new FormData()
-    fd.append('file', options.file)
-    const att: any = await uploadAttachment(props.projectId, fd)
-    const id = att?.id || att?.data?.id
-    const name = att?.file_name || att?.data?.file_name || options.file?.name || '附件'
-    if (id && steps.value[index]) {
-      steps.value[index].attachmentId = id
+    // 经底稿证据入口上传：挂到本步骤行（B2-12 · 第 n 项），原先只建项目附件、不关联本底稿
+    const { attachment } = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file: options.file,
+      sheetName: 'B2-12',
+      cellRef: itemCellRef(index + 1),
+    })
+    const name = String(attachment.file_name || options.file?.name || '附件')
+    if (steps.value[index]) {
+      steps.value[index].attachmentId = String(attachment.id)
       steps.value[index].attachmentName = name
       saveSteps()
       ElMessage.success('附件已上传')
     }
-  } catch {
-    ElMessage.error('附件上传失败')
+  } catch (e: unknown) {
+    handleApiError(e, '附件上传')
   }
 }
-function stepAttachmentUrl(index: number): string {
-  const id = steps.value[index]?.attachmentId
-  return id ? `/api/attachments/${id}/preview` : ''
+/** 打开步骤附件：经已鉴权的下载（`<a href>` 原生跳转带不上令牌，恒 401）。 */
+function openStepAttachment(index: number) {
+  const step = steps.value[index]
+  if (step?.attachmentId) void downloadAttachment(step.attachmentId, step.attachmentName)
 }
 function removeStepAttachment(index: number) {
   if (props.readonly || !steps.value[index]) return
@@ -351,7 +358,7 @@ onMounted(load)
         <el-table-column label="附件" width="130" align="center">
           <template #default="{ row }">
             <div v-if="steps[row.seq - 1].attachmentId" class="gt-b212__att">
-              <a :href="stepAttachmentUrl(row.seq - 1)" target="_blank" :title="steps[row.seq - 1].attachmentName">
+              <a href="#" :title="steps[row.seq - 1].attachmentName" @click.prevent="openStepAttachment(row.seq - 1)">
                 📎 {{ steps[row.seq - 1].attachmentName }}
               </a>
               <el-button v-if="!readonly" link size="small" @click="removeStepAttachment(row.seq - 1)">移除</el-button>

@@ -8,9 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,14 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.attachment_ocr_writeback import (
-    finalize_linked_ocr_writeback,
-    load_reusable_ocr,
-    parse_optional_uuid,
-)
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["f4-ai"])
@@ -258,12 +257,11 @@ async def f4_contract_ocr(
     document_type: str = Form("long-outstanding"),
     attachment_id: str | None = Form(None),
     force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F4EvidenceOcrResponse:
     """识别F4-5/F4-7/F4-8/F4-9附件并返回待用户预览、编辑和确认的字段。"""
-    del current_user
-    linked_att_id = parse_optional_uuid(attachment_id)
     wp_uuid = parse_workpaper_id(wp_id)
     schema = DOCUMENT_SCHEMAS.get(document_type)
     if schema is None:
@@ -271,44 +269,47 @@ async def f4_contract_ocr(
 
     empty_fields = _empty_fields(schema)
 
-    if linked_att_id is not None and not force_reocr:
-        reused = await load_reusable_ocr(db, linked_att_id)
-        if reused is not None:
-            fields = reused["extracted_fields"] or {}
-            merged = dict(empty_fields)
-            merged.update({k: fields[k] for k in schema if k in fields})
-            return _resp(
-                str(linked_att_id),
-                reused["ocr_text"],
-                merged,
-                float(reused.get("confidence") or 0),
-                reused=True,
-                written_back=False,
-            )
-
     allowed_types = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed_types:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed_types:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed_types}")
 
-    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    storage_dir = side_storage_dir(wp_id, "accounts-payable")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{temp_id}{suffix}"
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as target:
-        await target.write(content)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=current_user, native_type="evidence", native_prefix="F4", options=options,
+    )
+    if src.reused is not None:
+        fields = src.reused["extracted_fields"] or {}
+        merged = dict(empty_fields)
+        merged.update({k: fields[k] for k in schema if k in fields})
+        return _resp(
+            str(src.attachment_id),
+            src.reused["ocr_text"],
+            merged,
+            float(src.reused.get("confidence") or 0),
+            reused=True,
+            written_back=False,
+        )
+
+    linked_att_id = src.attachment_id
+    temp_id = str(linked_att_id)
+    file_path = src.path
 
     try:
         ocr_result = await UnifiedOCRService().recognize(str(file_path))
         ocr_text = ocr_result.get("text", "")
     except Exception as exc:
         logger.warning("F4 evidence OCR failed for %s/%s: %s", wp_id, document_type, exc)
-        return _resp(temp_id, "", empty_fields, 0.0)
+        ocr_text = ""
 
     if not ocr_text.strip():
-        return _resp(temp_id, "", empty_fields, 0.0)
+        # 识别失败也写回附件（状态 failed），不让附件停在「识别中」
+        out_id, written = await finalize_linked_ocr_writeback(
+            db, wp_id=wp_uuid, linked_att_id=linked_att_id, temp_id=temp_id,
+            ocr_text="", extracted_fields=empty_fields, confidence=0.0,
+        )
+        return _resp(out_id, "", empty_fields, 0.0, written_back=written)
 
     extracted = dict(empty_fields)
     confidence = 0.0

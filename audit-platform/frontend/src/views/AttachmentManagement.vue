@@ -158,11 +158,11 @@
             :loading="wpSearchLoading"
             placeholder="输入底稿编号或名称搜索"
             style="width: 100%"
-            value-key="id"
           >
-            <el-option v-for="wp in wpSearchResults" :key="wp.id" :label="`${wp.wp_code} ${wp.wp_name}`" :value="wp.id">
-              <span style="float: left; font-weight: 600">{{ wp.wp_code }}</span>
-              <span style="float: right; color: var(--gt-color-text-secondary); font-size: 12px">{{ wp.wp_name }}</span>
+            <!-- 值是底稿 id（不是索引 id），见 associateCandidates -->
+            <el-option v-for="wp in wpSearchResults" :key="wp.wpId" :label="`${wp.wpCode} ${wp.wpName}`" :value="wp.wpId">
+              <span style="float: left; font-weight: 600">{{ wp.wpCode }}</span>
+              <span style="float: right; color: var(--gt-color-text-secondary); font-size: 12px">{{ wp.wpName }}</span>
             </el-option>
           </el-select>
         </el-form-item>
@@ -221,6 +221,7 @@ import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
+import { associateCandidates, type AssociateCandidate } from '@/components/attachment/workpaperEvidence'
 import { handleApiError } from '@/utils/errorHandler'
 import { rules } from '@/utils/formRules'
 
@@ -260,10 +261,13 @@ const ACCEPT_TYPES = [
   '.eml', '.msg',
   // CAD/签章（dxf 可预览；dwg 仅下载提示）
   '.dxf', '.dwg', '.ofd',
+  // 音频 / 视频（访谈录音、监盘录像；仅下载）
+  '.mp3', '.m4a', '.wav', '.aac', '.amr',
+  '.mp4', '.mov', '.avi', '.wmv', '.mkv', '.flv',
 ].join(',')
 
 /** 支持的文件类型说明（用于拖拽区提示） */
-const SUPPORTED_TYPES_DESC = 'PDF / Word / Excel / PPT / 图片 / 文本 / 扫描件 / 压缩包 / 邮件 / DXF / OFD'
+const SUPPORTED_TYPES_DESC = 'PDF / Word / Excel / PPT / 图片 / 文本 / 扫描件 / 压缩包 / 邮件 / DXF / OFD / 音视频'
 
 // 统计 computed
 const totalSizeFormatted = computed(() => {
@@ -276,8 +280,10 @@ const ocrCompletedPct = computed(() => {
   const done = attachments.value.filter(a => a.ocr_status === 'completed').length
   return Math.round((done / total) * 100)
 })
+// 列表项不带 wp_code / wp_id（原先按它们统计恒为 0）；后端逐项给出现的底稿数
+// （整稿关联 ∪ 行级证据链接 ∪ reference，spec attachment-evidence-intake 需求 4.5）
 const linkedCount = computed(() =>
-  attachments.value.filter(a => a.wp_code || a.wp_id).length
+  attachments.value.filter(a => Number(a.linked_wp_count || 0) > 0).length
 )
 const filteredAttachments = computed(() => {
   if (!searchQuery.value) return attachments.value
@@ -308,7 +314,7 @@ const associateWpId = ref('')
 const associateType = ref('evidence')
 const associateNotes = ref('')
 const wpSearchLoading = ref(false)
-const wpSearchResults = ref<any[]>([])
+const wpSearchResults = ref<AssociateCandidate[]>([])
 const assocFormRef = ref<FormInstance>()
 const assocForm = computed(() => ({ associateWpId: associateWpId.value }))
 const assocRules: FormRules = {
@@ -433,12 +439,7 @@ async function searchWorkpapers(query: string) {
   wpSearchLoading.value = true
   try {
     const data = await api.get(P_wp.wpIndex(projectId.value))
-    const items = Array.isArray(data) ? data : data ?? []
-    const q = query.toLowerCase()
-    wpSearchResults.value = items.filter((w: any) =>
-      (w.wp_code || '').toLowerCase().includes(q) ||
-      (w.wp_name || '').toLowerCase().includes(q)
-    ).slice(0, 20)
+    wpSearchResults.value = associateCandidates(Array.isArray(data) ? data : [], query)
   } catch { wpSearchResults.value = [] }
   finally { wpSearchLoading.value = false }
 }

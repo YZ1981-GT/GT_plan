@@ -137,6 +137,7 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 
 interface LedgerItem {
   id: string
@@ -258,18 +259,17 @@ async function onExportToAttachment() {
     const csvContent = buildCsvContent(resultData.value)
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' })
 
-    // 创建 FormData 上传
-    const formData = new FormData()
+    // 经底稿证据入口保存（原先发的 wp_id / type 被旧上传端点忽略，并未关联当前底稿）；
+    // 有单元格时挂到该单元格，否则整稿关联（spec attachment-evidence-intake 需求 5.4）
     const fileName = `穿透结果_${queryParams.value?.cellRef || ''}_${queryParams.value?.amount || ''}.csv`
-    formData.append('file', blob, fileName)
-    formData.append('wp_id', props.wpId)
-    formData.append('type', 'evidence')
-    formData.append('description', `序时账穿透结果 - 金额 ${queryParams.value?.amount}，单元格 ${queryParams.value?.cellRef}`)
-
-    await api.post(
-      `/api/projects/${props.projectId}/attachments/upload`,
-      formData,
-    )
+    await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file: blob,
+      fileName,
+      evidenceType: 'support',
+      cellRef: queryParams.value?.cellRef || null,
+    })
 
     ElMessage.success('穿透结果已导出为附件并关联到当前底稿')
   } catch (err: any) {

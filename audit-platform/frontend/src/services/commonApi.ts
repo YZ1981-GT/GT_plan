@@ -1597,10 +1597,6 @@ export async function getAttachmentWorkpapers(attachmentId: string): Promise<any
   return Array.isArray(data) ? data : []
 }
 
-export async function linkAttachment(attachmentId: string, wpId: string): Promise<void> {
-  await http.post(P_pr.linkAttachment, { attachment_id: attachmentId, wp_id: wpId })
-}
-
 export async function getPendingAIContent(projectId: string, workpaperId?: string): Promise<any[]> {
   const params: Record<string, string> = {}
   if (workpaperId) params.workpaper_id = workpaperId

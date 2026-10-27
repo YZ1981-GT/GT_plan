@@ -2,7 +2,9 @@
   AttachmentTabPanel — 底稿右栏「附件」Tab 内容容器 [AT-2 实时预览接入]
 
   职责：
-    - 列出当前底稿关联的附件（process_record.attachments 端点）
+    - 列出当前底稿关联的附件：读统一视图（整稿关联 ∪ reference ∪ 函证挂载 ∪ 行级证据链接，
+      spec attachment-evidence-intake 需求 4.3；原先只读 reference_type='working_paper'，行级证据看不到）
+    - 关联底稿数取视图里的 linked_wp_count；具体底稿清单悬停时再取（原先每个附件加载时一个请求）
     - 行内点击 → AttachmentPreviewDrawer（PDF/图片/Office 转 PDF iframe）
     - 顶部 AttachmentDropZone 包装一层，支持拖拽上传
     - link-created 事件触发后刷新列表
@@ -36,18 +38,27 @@
             <div class="gt-attach-tab__name" :title="att.file_name">{{ att.file_name }}</div>
             <div class="gt-attach-tab__meta">
               {{ humanSize(att.file_size) }} · {{ shortTime(att.created_at) }}
-              <!-- 关联底稿计数 badge -->
+              <span v-if="isRowOnly(att)" class="gt-attach-tab__row-tag" data-testid="row-evidence-tag">行级证据</span>
+              <!-- 关联底稿计数 badge：数量取统一视图，清单悬停时再取 -->
               <el-popover
-                v-if="att._linked_wps && att._linked_wps.length > 1"
+                v-if="(att.linked_wp_count || 0) > 1"
                 placement="bottom"
                 trigger="hover"
-                :width="200"
+                :width="220"
+                @show="loadLinkedWps(att.id)"
               >
                 <template #reference>
-                  <span class="gt-attach-tab__link-badge">📋 ×{{ att._linked_wps.length }}</span>
+                  <span class="gt-attach-tab__link-badge" :data-attachment="att.id">📋 ×{{ att.linked_wp_count }}</span>
                 </template>
                 <div class="gt-attach-tab__link-list">
-                  <div v-for="wp in att._linked_wps" :key="wp.wp_id" class="gt-attach-tab__link-item" @click.stop="jumpToWp(wp.wp_id)">
+                  <div v-if="linkedWps[att.id] === undefined" class="gt-attach-tab__link-hint">加载中…</div>
+                  <div v-else-if="linkedWps[att.id] === null" class="gt-attach-tab__link-hint">关联底稿加载失败</div>
+                  <div
+                    v-for="wp in linkedWps[att.id] || []"
+                    :key="wp.wp_id"
+                    class="gt-attach-tab__link-item"
+                    @click.stop="jumpToWp(wp.wp_id)"
+                  >
                     <span class="gt-attach-tab__link-code">{{ wp.wp_code }}</span>
                     <span class="gt-attach-tab__link-name">{{ wp.wp_name }}</span>
                   </div>
@@ -73,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
+import { reactive, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Paperclip } from '@element-plus/icons-vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
@@ -96,6 +107,14 @@ interface AttachmentRow {
   created_at: string | null
   ocr_status?: 'ok' | 'processing' | 'failed' | 'pending' | null
   ocr_text?: string | null
+  sources?: string[]
+  linked_wp_count?: number
+}
+
+interface LinkedWp {
+  wp_id: string
+  wp_code?: string
+  wp_name?: string
 }
 
 const props = defineProps<{
@@ -143,6 +162,12 @@ function shortTime(iso: string | null): string {
   return iso.slice(0, 16).replace('T', ' ')
 }
 
+/** 只挂在某一行 / 单元格上的证据（没有整稿关联与 reference）。 */
+function isRowOnly(att: AttachmentRow): boolean {
+  const sources = att.sources || []
+  return sources.includes('evidence_link') && !sources.includes('associated') && !sources.includes('referenced')
+}
+
 async function loadList() {
   if (!props.projectId || !props.wpId) {
     list.value = []
@@ -150,21 +175,25 @@ async function loadList() {
   }
   loading.value = true
   try {
-    const data: any = await httpApi.get(P_pr.attachments(props.projectId, props.wpId))
-    const items = Array.isArray(data) ? data : data?.items || []
-    // 加载每个附件的关联底稿列表（批量）
-    for (const att of items) {
-      att._linked_wps = []
-      try {
-        const linked: any = await httpApi.get(P_pr.attachmentWorkpapers(att.id))
-        att._linked_wps = Array.isArray(linked) ? linked : linked?.items || []
-      } catch { /* 单个失败不阻塞 */ }
-    }
-    list.value = items
+    const data: any = await httpApi.get(P_att.wpView(props.wpId))
+    list.value = Array.isArray(data) ? data : data?.items || []
   } catch {
     list.value = []
   } finally {
     loading.value = false
+  }
+}
+
+/** 附件 id → 关联底稿清单；undefined = 未取，null = 取失败（悬停时取一次，之后复用）。 */
+const linkedWps = reactive<Record<string, LinkedWp[] | null | undefined>>({})
+
+async function loadLinkedWps(attachmentId: string) {
+  if (linkedWps[attachmentId]) return
+  try {
+    const linked: any = await httpApi.get(P_pr.attachmentWorkpapers(attachmentId), { _silent: true } as any)
+    linkedWps[attachmentId] = Array.isArray(linked) ? linked : linked?.items || []
+  } catch {
+    linkedWps[attachmentId] = null
   }
 }
 
@@ -317,6 +346,14 @@ watch(list, () => _startOcrPolling(), { deep: false })
   color: #fff;
 }
 .gt-attach-tab__link-list { display: flex; flex-direction: column; gap: 4px; }
+.gt-attach-tab__link-hint { font-size: 12px; color: var(--gt-color-text-tertiary); padding: 4px 8px; }
+.gt-attach-tab__row-tag {
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--gt-color-fill-light, #f2f3f5);
+  color: var(--gt-color-text-secondary, #606266);
+  font-size: 11px;
+}
 .gt-attach-tab__link-item {
   display: flex;
   justify-content: space-between;

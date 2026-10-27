@@ -2,18 +2,31 @@
   <div class="gt-item-attach">
     <div class="gt-item-attach-list">
       <div
-        v-for="att in attachments"
-        :key="att.id"
+        v-for="row in rows"
+        :key="row.id"
         class="gt-item-attach-row"
       >
         <el-icon><Document /></el-icon>
-        <a href="#" class="gt-item-attach-link" @click.prevent="downloadAttachment(att.id, att.filename)">{{ att.filename }}</a>
-        <span class="gt-item-attach-size">{{ formatSize(att.file_size) }}</span>
-        <el-button text size="small" type="danger" @click="onDelete(att.id)">×</el-button>
+        <a
+          href="#"
+          class="gt-item-attach-link"
+          @click.prevent="downloadAttachment(row.attachment_id, row.attachment.file_name)"
+        >{{ row.attachment.file_name }}</a>
+        <span class="gt-item-attach-size">{{ formatSize(row.attachment.file_size) }}</span>
+        <el-button
+          v-if="!readonly"
+          text
+          size="small"
+          type="danger"
+          :loading="removingId === row.id"
+          :aria-label="`移除本行证据 ${row.attachment.file_name}`"
+          @click="onRemove(row)"
+        >×</el-button>
       </div>
     </div>
 
     <el-upload
+      v-if="!readonly"
       :auto-upload="true"
       :show-file-list="false"
       :http-request="onUpload"
@@ -27,137 +40,107 @@
 
 <script setup lang="ts">
 /**
- * ItemAttachment — 逐项附件组件
+ * ItemAttachment — 逐项附件（行级证据）
  *
- * 关联键：title = `{wp_id}:{sheet_key}:{item_index}`（上传时写入）
- * 列表：GET /api/projects/{project_id}/attachments，再按 title 过滤
+ * 位置键：表页 = sheetKey，单元格 = `item:{itemIndex}`（spec attachment-evidence-intake ADR-AEI-08）。
+ * - 上传走底稿证据入口，只写行级证据链接（不再按 title 打标、不再挂整稿关联）；
+ * - 列表读本底稿共享链接仓（同一底稿的所有实例只发一次请求），按位置过滤；
+ * - 移除 = 删除本行的证据链接（附件本身保留在项目附件里）。
  */
-import { ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
 import { confirmDelete } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import {
+  EVIDENCE_MAX_UPLOAD_BYTES,
+  itemCellRef,
+  uploadWorkpaperEvidence,
+} from '@/components/attachment/workpaperEvidence'
+import {
+  removeWpEvidenceLink,
+  useWpEvidenceLinks,
+  type WpEvidenceLink,
+} from '@/composables/useWpEvidenceLinks'
 
-interface AttItem {
-  id: string
-  filename: string
-  file_size: number
-  created_at?: string
-  title?: string
-}
 interface Props {
   projectId: string
   wpId: string
   sheetKey: string
-  itemIndex: number
+  itemIndex: number | string
   accept?: string
+  /** 证据类型；不传由后端按底稿编码的证据声明取缺省 */
+  evidenceType?: string
+  /** 只读：隐藏上传与移除 */
+  readonly?: boolean
 }
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  accept: undefined,
+  evidenceType: undefined,
+  readonly: false,
+})
 
-const attachments = ref<AttItem[]>([])
 const uploading = ref(false)
+const removingId = ref('')
 
-const ATTACHMENT_TYPE = 'workpaper_item'
-const objectId = () => `${props.wpId}:${props.sheetKey}:${props.itemIndex}`
-
-function normalizeList(raw: any): AttItem[] {
-  const rows = Array.isArray(raw) ? raw : (raw?.items || raw?.data || [])
-  if (!Array.isArray(rows)) return []
-  const key = objectId()
-  return rows
-    .filter((a: any) => {
-      const title = String(a?.title || '')
-      const docType = String(a?.document_type || '')
-      return title === key || docType === key
-    })
-    .map((a: any) => ({
-      id: a.id,
-      filename: a.filename || a.original_name || a.file_name || '附件',
-      file_size: a.file_size || 0,
-      created_at: a.created_at,
-      title: a.title,
-    }))
-}
-
-async function loadList() {
-  if (!props.projectId || !props.wpId) {
-    attachments.value = []
-    return
-  }
-  try {
-    const data: any = await api.get(`/api/projects/${props.projectId}/attachments`, {
-      params: { attachment_type: ATTACHMENT_TYPE },
-      _silent: true,
-    } as any)
-    attachments.value = normalizeList(data)
-    // 兼容历史未打 attachment_type 的附件：若过滤为空则拉全量再按 title 过滤
-    if (attachments.value.length === 0) {
-      const all: any = await api.get(`/api/projects/${props.projectId}/attachments`, {
-        _silent: true,
-      } as any)
-      attachments.value = normalizeList(all)
-    }
-  } catch {
-    attachments.value = []
-  }
-}
+const store = useWpEvidenceLinks(() => props.projectId, () => props.wpId)
+const cellRef = computed(() => itemCellRef(props.itemIndex))
+const rows = computed(() => store.linksAt(props.sheetKey, cellRef.value))
 
 function beforeUpload(file: File): boolean {
-  if (file.size > 50 * 1024 * 1024) {
+  if (file.size > EVIDENCE_MAX_UPLOAD_BYTES) {
     ElMessage.error('文件大小不能超过 50MB')
     return false
   }
   return true
 }
 
-async function onUpload(req: any) {
+async function onUpload(req: { file: File }) {
   uploading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', req.file)
-    formData.append('attachment_type', ATTACHMENT_TYPE)
-    formData.append('reference_type', ATTACHMENT_TYPE)
-    formData.append('title', objectId())
-    formData.append('document_type', objectId())
-    await api.post(`/api/projects/${props.projectId}/attachments/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      _silent: true,
-    } as any)
+    await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file: req.file,
+      evidenceType: props.evidenceType,
+      sheetName: props.sheetKey,
+      cellRef: cellRef.value,
+    })
     ElMessage.success('附件已上传')
-    await loadList()
-  } catch (err: any) {
-    handleApiError(err, '上传')
+  } catch (err: unknown) {
+    handleApiError(err, '上传附件')
   } finally {
     uploading.value = false
   }
 }
 
-async function onDelete(id: string) {
-  const att = attachments.value.find((a) => a.id === id)
+async function onRemove(row: WpEvidenceLink) {
   try {
-    await confirmDelete(att?.filename ? `附件「${att.filename}」` : '该附件')
+    await confirmDelete({
+      name: `本行证据「${row.attachment.file_name}」的链接`,
+      impact: '只移除与本行的链接，附件本身仍保留在项目附件中',
+    })
   } catch {
     return
   }
-  // 后端暂无通用 DELETE；先本地移除，避免误报 404
-  attachments.value = attachments.value.filter((a) => a.id !== id)
-  ElMessage.info('已从本页移除显示（服务端删除接口待接入）')
+  removingId.value = row.id
+  try {
+    await removeWpEvidenceLink(props.projectId, props.wpId, row.id)
+    ElMessage.success('已移除本行证据')
+  } catch (err: unknown) {
+    handleApiError(err, '移除本行证据')
+  } finally {
+    removingId.value = ''
+  }
 }
 
-function formatSize(bytes: number): string {
+function formatSize(bytes: number | null | undefined): string {
   if (!bytes) return ''
   if (bytes < 1024) return bytes + 'B'
   if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'KB'
   return (bytes / 1024 / 1024).toFixed(1) + 'MB'
 }
-
-watch(
-  () => [props.projectId, props.wpId, props.sheetKey, props.itemIndex] as const,
-  () => { void loadList() },
-  { immediate: true },
-)
 </script>
 
 <style scoped>

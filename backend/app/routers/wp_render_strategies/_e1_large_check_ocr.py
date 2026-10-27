@@ -14,7 +14,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -23,9 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +68,7 @@ class LargeCheckOcrResponse(BaseModel):
     confidence: float | None = None
     preview: str | None = None
     file_name: str = ""
+    attachment_id: str | None = None  # 证据附件 id（spec attachment-evidence-intake 需求 2.1）
 
 
 def _parse_llm_json(raw: str) -> dict:
@@ -109,44 +115,54 @@ async def e1_large_check_ocr(
     wp_id: str,
     file: UploadFile = File(...),
     side: str = Form("debit"),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> LargeCheckOcrResponse:
-    """上传收支单据/审批影像，OCR + AI 提取大额收支检查所需字段。"""
-    try:
-        UUID(wp_id)
-    except ValueError:
-        raise HTTPException(400, "无效的 wp_id")
-
+    """上传收支单据/审批影像，OCR + AI 提取大额收支检查所需字段；文件先入附件表并关联本底稿，识别结果写回附件。"""
+    wp_uuid = parse_workpaper_id(wp_id)
     if side not in ("debit", "credit"):
         raise HTTPException(400, f"side 必须为 debit 或 credit，收到: {side}")
 
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
     filename = file.filename or "large-check-doc.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    content = await file.read()
-    tmp_dir = side_storage_dir(wp_id, "large-check-ocr")
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    tmp_path = tmp_dir / f"{uuid4()}{suffix}"
-    tmp_path.write_bytes(content)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=_user, native_type="voucher", native_prefix="E1", options=options,
+    )
+    att_id = str(src.attachment_id)
+    if src.reused is not None:
+        return LargeCheckOcrResponse(
+            fields=_normalize_fields(src.reused["extracted_fields"] or {}),
+            confidence=float(src.reused.get("confidence") or 0),
+            preview=(src.reused["ocr_text"] or "")[:500], file_name=filename, attachment_id=att_id,
+        )
+
+    async def _record(text: str, extracted: dict, conf: float) -> None:
+        await finalize_linked_ocr_writeback(
+            db, wp_id=wp_uuid, linked_att_id=src.attachment_id, temp_id=att_id,
+            ocr_text=text, extracted_fields=extracted, confidence=conf,
+        )
 
     # OCR
     ocr_text = ""
     try:
-        ocr_result = await UnifiedOCRService().recognize(str(tmp_path))
+        ocr_result = await UnifiedOCRService().recognize(src.path)
         ocr_text = ocr_result.get("text", "") or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 large-check OCR failed for %s: %s", wp_id, e)
-        return LargeCheckOcrResponse(
-            fields=dict(_EMPTY_FIELDS), confidence=0, preview="", file_name=filename
-        )
+        ocr_text = ""
 
     if not ocr_text.strip():
+        await _record("", dict(_EMPTY_FIELDS), 0.0)
         return LargeCheckOcrResponse(
-            fields=dict(_EMPTY_FIELDS), confidence=0, preview="", file_name=filename
+            fields=dict(_EMPTY_FIELDS), confidence=0, preview="", file_name=filename, attachment_id=att_id
         )
 
     # LLM extraction
@@ -166,9 +182,11 @@ async def e1_large_check_ocr(
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 large-check LLM extraction failed for %s: %s", wp_id, e)
 
+    await _record(ocr_text, fields, confidence)
     return LargeCheckOcrResponse(
         fields=fields,
         confidence=confidence,
         preview=ocr_text[:500] if ocr_text else "",
         file_name=filename,
+        attachment_id=att_id,
     )

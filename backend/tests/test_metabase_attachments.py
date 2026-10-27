@@ -14,6 +14,7 @@ from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.workpaper_models import WpIndex, WpStatus, WpSourceType, WpFileStatus, WorkingPaper
+from app.models.wp_optimization_models import EvidenceLink
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -34,6 +35,7 @@ async def db_session() -> AsyncSession:
             WorkingPaper.__table__,
             Attachment.__table__,
             AttachmentWorkingPaper.__table__,
+            EvidenceLink.__table__,  # 统一视图 / 列表计数 / 可见性隔离都读行级证据链接
         ]
         await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables))
         await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables))

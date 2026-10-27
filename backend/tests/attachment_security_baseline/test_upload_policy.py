@@ -110,6 +110,10 @@ async def test_actor_and_audit_year_written(world, storage_root, monkeypatch):
     ("a.pdf", b"#!/bin/sh\nrm -rf /\n", "evidence", 422, "UNSAFE_CONTENT"),
     ("回函.eml", b"From: a@b.c\r\nSubject: x\r\n\r\nbody", "confirmation", 200, None),
     ("凭证.pdf", PDF, "evidence", 200, None),
+    # 访谈录音 / 监盘录像（spec attachment-evidence-intake 需求 6.1：白名单原先漏了音视频，弹窗上传恒 422）
+    ("访谈录音.m4a", b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00", "evidence", 200, None),
+    ("监盘录像.mp4", b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00", "stocktake", 200, None),
+    ("伪装录音.mp3", b"MZ\x90\x00\x03\x00\x00\x00", "evidence", 422, "UNSAFE_CONTENT"),
 ])
 async def test_upload_endpoint_policy(world, storage_root, tmp_path, file_name, content, attachment_type, status, error_code):
     identity = await world.member("edit", "auditor")
@@ -148,6 +152,8 @@ _FRONT_TYPE_PATTERNS = (
 _BACK_TYPE_PATTERNS = (
     re.compile(r"attachment_type\s*=\s*\"([a-z_]+)\""),
     re.compile(r"[\"']attachment_type[\"']\s*:\s*\"([a-z_]+)\""),
+    # 识别端点经证据入口建附件：native_type 即落库的附件类型（spec attachment-evidence-intake ADR-AEI-06）
+    re.compile(r"native_type\s*=\s*\"([a-z_]+)\""),
 )
 
 
@@ -161,13 +167,16 @@ def test_frontend_and_backend_attachment_type_literals_are_registered():
                     found.setdefault(m.group(1), set()).add(f.name)
     for f in (REPO / "backend" / "app").rglob("*.py"):
         text = f.read_bytes().decode("utf-8", errors="replace")
-        if "attachment_type" not in text:
+        if "attachment_type" not in text and "native_type" not in text:
             continue
         for p in _BACK_TYPE_PATTERNS:
             for m in p.finditer(text):
                 found.setdefault(m.group(1), set()).add(f.name)
-    assert {"evidence", "workpaper_item", "confirmation", "bank_statement", "support"} <= set(found), \
-        f"扫描器漏掉了已知写入方：{sorted(found)}"
+    # workpaper_item 自 spec attachment-evidence-intake 起已无写入方（行级上传改写证据链接 + 证据类型），
+    # 仍在登记表里供历史数据筛选
+    known = {"evidence", "confirmation", "bank_statement", "support",
+             "voucher", "contract", "stocktake", "note"}
+    assert known <= set(found), f"扫描器漏掉了已知写入方：{sorted(known - set(found))}"
     unregistered = {k: sorted(v) for k, v in found.items() if k not in ATTACHMENT_TYPES}
     assert unregistered == {}
 

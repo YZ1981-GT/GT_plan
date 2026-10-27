@@ -29,6 +29,7 @@ from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User
 from app.models.evidence_governance_models import ServiceIdentity
+from app.models.wp_optimization_models import EvidenceLink
 from app.services.attachment_locator import project_attachment_locator
 from app.services.attachment_service import AttachmentService
 
@@ -67,6 +68,7 @@ async def db_session():
             ServiceIdentity.__table__,  # Attachment.actor_service_identity_id FK 目标
             Attachment.__table__,
             AttachmentWorkingPaper.__table__,
+            EvidenceLink.__table__,  # 附件列表的「出现的底稿数」含行级证据链接
         ]
         await conn.run_sync(lambda c: Base.metadata.drop_all(c, tables=tables))
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))

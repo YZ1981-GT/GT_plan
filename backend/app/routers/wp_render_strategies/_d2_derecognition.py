@@ -12,19 +12,23 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
 
-import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,35 +53,46 @@ class DerecognitionOcrResponse(BaseModel):
 async def d2_derecognition_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DerecognitionOcrResponse:
-    """上传保理合同/协议附件 → OCR 识别文本（供 AI 判断与人工核对）。"""
+    """上传保理合同/协议附件 → OCR 识别文本（供 AI 判断与人工核对）；文件先入附件表并关联本底稿，识别结果写回附件。"""
+    wp_uuid = parse_workpaper_id(wp_id)
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}（支持 PDF/PNG/JPG）")
 
-    attachment_id = str(uuid4())
-    storage_dir = side_storage_dir(wp_id, "derecognition")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
-
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=current_user, native_type="contract", native_prefix="D2", options=options,
+    )
+    att_id = str(src.attachment_id)
+    if src.reused is not None:
+        text = src.reused["ocr_text"] or ""
+        return DerecognitionOcrResponse(
+            attachment_id=att_id, ocr_text=text, summary=text[:300].replace("\n", " ").strip(),
+            confidence=float(src.reused.get("confidence") or 0),
+        )
 
     ocr_text = ""
     try:
-        ocr_result = await UnifiedOCRService().recognize(str(file_path))
+        ocr_result = await UnifiedOCRService().recognize(src.path)
         ocr_text = ocr_result.get("text", "") if isinstance(ocr_result, dict) else str(ocr_result or "")
     except Exception as e:  # noqa: BLE001
         logger.warning("D2 derecognition OCR failed: %s", e)
-        return DerecognitionOcrResponse(attachment_id=attachment_id, ocr_text="", summary="", confidence=0)
+        ocr_text = ""
 
     summary = ocr_text[:300].replace("\n", " ").strip()
     confidence = round(min(len(ocr_text) / 500.0, 1.0), 2) if ocr_text.strip() else 0
+    attachment_id, _written = await finalize_linked_ocr_writeback(
+        db, wp_id=wp_uuid, linked_att_id=src.attachment_id, temp_id=att_id,
+        ocr_text=ocr_text, extracted_fields={}, confidence=float(confidence),
+    )
     return DerecognitionOcrResponse(
         attachment_id=attachment_id,
         ocr_text=ocr_text,

@@ -1,7 +1,10 @@
-"""Tests for F2 stocktake OCR and AI endpoints."""
+"""Tests for F2 stocktake OCR and AI endpoints.
+
+识别端点自 spec attachment-evidence-intake 起先建附件并关联底稿：识别用例跑在 SQLite 世界（真实底稿行、附件存储在
+临时目录），只挂本路由、不挂统一门；生成用例仍挂完整应用。
+"""
 from __future__ import annotations
 
-import io
 import json
 from unittest.mock import AsyncMock, patch
 
@@ -13,10 +16,8 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
 from app.routers._wp_gate import dedicated_wp_gate
-from app.services import workpaper_side_storage
-
-# 识别端点的底稿 ID 必须是合法 UUID：非 UUID 直接 400（spec attachment-security-baseline 需求 1.6）
-_WP_ID = "7d4c0a1e-3b2f-4c5d-9e8f-0a1b2c3d4e25"
+from app.routers.wp_render_strategies._f2_stocktake_contract_ocr import router as f2_st_router
+from tests.attachment_evidence_intake._helpers import ocr_world, pdf, unwrap
 
 
 class _FakeUser:
@@ -27,7 +28,7 @@ class _FakeUser:
 
 
 @pytest.fixture(autouse=True)
-def override_deps(monkeypatch, tmp_path):
+def override_deps():
     async def _override_db():
         yield AsyncMock()
 
@@ -38,13 +39,12 @@ def override_deps(monkeypatch, tmp_path):
     app.dependency_overrides[get_current_user] = lambda: _FakeUser()
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[dedicated_wp_gate] = _skip_wp_gate
-    monkeypatch.setattr(workpaper_side_storage, "SIDE_STORAGE_ROOT", tmp_path / "workpapers")
     yield
     app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
-async def test_f2_st_contract_ocr_f2_25():
+async def test_f2_st_contract_ocr_f2_25(monkeypatch, tmp_path):
     llm_json = json.dumps({
         "itemName": "原材料A",
         "spec": "10mm",
@@ -53,23 +53,19 @@ async def test_f2_st_contract_ocr_f2_25():
         "sampleQty": 98,
         "varianceReason": "计量误差",
     }, ensure_ascii=False)
-    with (
-        patch("app.routers.wp_render_strategies._f2_stocktake_contract_ocr.UnifiedOCRService") as MockOCR,
-        patch("app.routers.wp_render_strategies._f2_stocktake_contract_ocr.chat_completion", new_callable=AsyncMock) as mock_llm,
-    ):
-        MockOCR.return_value.recognize = AsyncMock(return_value={"text": "抽盘记录 原材料A 账面100 实盘98"})
-        mock_llm.return_value = llm_json
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post(
-                f"/api/workpapers/{_WP_ID}/f2-st/contract-ocr?sheet=F2-25",
-                files={"file": ("count.pdf", io.BytesIO(b"%PDF-1.4 test"), "application/pdf")},
-            )
-        assert response.status_code == 200
-        data = response.json().get("data", response.json())
-        assert data["sheet"] == "F2-25"
-        assert data["extracted_fields"].get("itemName") == "原材料A"
-        assert data["confidence"] > 0
+    async with ocr_world(monkeypatch, tmp_path, f2_st_router, wp_code="F2-25") as w:
+        with (
+            patch("app.routers.wp_render_strategies._f2_stocktake_contract_ocr.UnifiedOCRService") as MockOCR,
+            patch("app.routers.wp_render_strategies._f2_stocktake_contract_ocr.chat_completion", new_callable=AsyncMock) as mock_llm,
+        ):
+            MockOCR.return_value.recognize = AsyncMock(return_value={"text": "抽盘记录 原材料A 账面100 实盘98"})
+            mock_llm.return_value = llm_json
+            response = await w.client.post(f"/api/workpapers/{w.wp.id}/f2-st/contract-ocr?sheet=F2-25", files=pdf("count.pdf"))
+    assert response.status_code == 200, response.text
+    data = unwrap(response.json())
+    assert data["sheet"] == "F2-25"
+    assert data["extracted_fields"].get("itemName") == "原材料A"
+    assert data["confidence"] > 0
 
 
 @pytest.mark.asyncio
@@ -121,12 +117,8 @@ async def test_f2_st_ai_generate_questionnaire_field():
 
 
 @pytest.mark.asyncio
-async def test_f2_st_ocr_rejects_invalid_sheet():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            f"/api/workpapers/{_WP_ID}/f2-st/contract-ocr?sheet=F2-22",
-            files={"file": ("x.pdf", io.BytesIO(b"%PDF"), "application/pdf")},
-        )
+async def test_f2_st_ocr_rejects_invalid_sheet(monkeypatch, tmp_path):
+    async with ocr_world(monkeypatch, tmp_path, f2_st_router, wp_code="F2-25") as w:
+        response = await w.client.post(f"/api/workpapers/{w.wp.id}/f2-st/contract-ocr?sheet=F2-22", files=pdf("x.pdf"))
     assert response.status_code == 400
     assert "不支持的 sheet" in json.dumps(response.json(), ensure_ascii=False)

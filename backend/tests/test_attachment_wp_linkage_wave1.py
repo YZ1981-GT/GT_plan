@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User
+from app.models.wp_optimization_models import EvidenceLink
 from app.services.attachment_service import AttachmentService
 from app.services.process_record_service import AttachmentLinkService
 
@@ -36,6 +37,7 @@ _CORE_TABLES = [
     Project.__table__,
     Attachment.__table__,
     AttachmentWorkingPaper.__table__,
+    EvidenceLink.__table__,
 ]
 
 

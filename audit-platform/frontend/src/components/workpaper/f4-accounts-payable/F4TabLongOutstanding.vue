@@ -7,7 +7,8 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import {
   F4_YES_NO_OPTIONS,
   useF4LongOutstanding,
@@ -163,36 +164,23 @@ async function uploadAndRecognize(file: File): Promise<void> {
   evidenceUploading.value = true
   let attachmentSaved = false
   try {
-    // 先保存关联附件；即使OCR失败，审计证据仍保留在当前债权人名下。
-    const attachmentForm = new FormData()
-    attachmentForm.append('file', file)
-    attachmentForm.append('attachment_type', 'workpaper_item')
-    attachmentForm.append('reference_type', 'working_paper')
-    attachmentForm.append('reference_id', props.wpId)
-    const objectId = `${props.wpId}:F4-5:${row.attSlot}`
-    attachmentForm.append('title', objectId)
-    attachmentForm.append('document_type', objectId)
-    const uploadRes = await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      _silent: true,
-    } as any)
+    // 先经底稿证据入口存为本行的行级证据（F4-5 · 第 n 项，与下方逐项附件同一位置）；
+    // 即使OCR失败，审计证据仍保留在当前债权人名下（spec attachment-evidence-intake 需求 5.4）
+    const { attachment } = await uploadWorkpaperEvidence({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      file,
+      sheetName: 'F4-5',
+      cellRef: itemCellRef(row.attSlot),
+    })
     attachmentSaved = true
     attachmentRefresh.value += 1
-    const uploaded = uploadRes?.data?.data ?? uploadRes?.data ?? uploadRes
-    const attId = String(uploaded?.id || uploaded?.attachment_id || '')
-    if (attId) {
-      try {
-        await api.post(`/api/attachments/${attId}/associate`, {
-          wp_id: props.wpId,
-          association_type: 'evidence',
-        }, { _silent: true } as any)
-      } catch { /* fail-open */ }
-    }
+    const attId = String(attachment.id)
 
     const ocrForm = new FormData()
     ocrForm.append('file', file)
     ocrForm.append('document_type', 'long-outstanding')
-    if (attId) ocrForm.append('attachment_id', attId)
+    ocrForm.append('attachment_id', attId)
     const response = await http.post(
       `/api/workpapers/${props.wpId}/f4/contract-ocr`,
       ocrForm,
@@ -230,7 +218,7 @@ async function uploadAndRecognize(file: File): Promise<void> {
     } else if (attachmentSaved) {
       ElMessage.warning('附件已保存，但OCR识别失败，请手工填写或重新识别')
     } else {
-      ElMessage.error('附件上传失败')
+      handleApiError(error, '上传附件')
     }
   } finally {
     evidenceUploading.value = false

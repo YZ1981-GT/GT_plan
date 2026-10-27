@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,14 +17,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.attachment_ocr_writeback import (
-    finalize_linked_ocr_writeback,
-    load_reusable_ocr,
-    parse_optional_uuid,
-)
+from app.services.attachment_ocr_writeback import finalize_linked_ocr_writeback, parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
-from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
+from app.services.workpaper_evidence_intake import (
+    OcrIntakeOptions,
+    intake_ocr_upload,
+    ocr_intake_options,
+    parse_workpaper_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,47 +85,44 @@ async def g8_contract_ocr(
     file: UploadFile = File(...),
     attachment_id: str | None = Form(None),
     force_reocr: bool = Form(False),
+    options: OcrIntakeOptions = Depends(ocr_intake_options),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> G8VoucherOcrResponse:
-    linked_att_id = parse_optional_uuid(attachment_id)
     wp_uuid = parse_workpaper_id(wp_id)
-
-    if linked_att_id is not None and not force_reocr:
-        reused = await load_reusable_ocr(db, linked_att_id)
-        if reused is not None:
-            fields = reused["extracted_fields"] or {}
-            merged = dict(_EMPTY)
-            merged.update({k: fields[k] for k in _VOUCHER_FIELDS if k in fields})
-            summary = str(
-                merged.get("summary")
-                or merged.get("businessContent")
-                or (reused["ocr_text"] or "")[:200].replace("\n", " ")
-            )
-            return _resp(
-                str(linked_att_id),
-                reused["ocr_text"],
-                merged,
-                summary,
-                float(reused.get("confidence") or 0),
-                reused=True,
-                written_back=False,
-            )
 
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
-    if suffix not in allowed:
+    if parse_optional_uuid(attachment_id) is None and suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    storage_dir = side_storage_dir(wp_id, "vouchers")
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{temp_id}{suffix}"
+    src = await intake_ocr_upload(
+        db, wp_id=wp_uuid, file=file, attachment_id=attachment_id, force_reocr=force_reocr,
+        user=_user, native_type="voucher", native_prefix="G8", options=options,
+    )
+    if src.reused is not None:
+        fields = src.reused["extracted_fields"] or {}
+        merged = dict(_EMPTY)
+        merged.update({k: fields[k] for k in _VOUCHER_FIELDS if k in fields})
+        summary = str(
+            merged.get("summary")
+            or merged.get("businessContent")
+            or (src.reused["ocr_text"] or "")[:200].replace("\n", " ")
+        )
+        return _resp(
+            str(src.attachment_id),
+            src.reused["ocr_text"],
+            merged,
+            summary,
+            float(src.reused.get("confidence") or 0),
+            reused=True,
+            written_back=False,
+        )
 
-    content = await file.read()
-    async with aiofiles.open(str(file_path), "wb") as f:
-        await f.write(content)
+    linked_att_id = src.attachment_id
+    temp_id = str(linked_att_id)
+    file_path = src.path
 
     ocr_text = ""
     try:
@@ -134,10 +130,18 @@ async def g8_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:  # noqa: BLE001
         logger.warning("G8 voucher OCR failed: %s", e)
-        return _resp(temp_id, "", dict(_EMPTY), "", 0.0)
+        _out, _written = await finalize_linked_ocr_writeback(
+            db, wp_id=wp_uuid, linked_att_id=linked_att_id, temp_id=temp_id,
+            ocr_text="", extracted_fields=dict(_EMPTY), confidence=0.0,
+        )
+        return _resp(_out, "", dict(_EMPTY), "", 0.0, written_back=_written)
 
     if not ocr_text.strip():
-        return _resp(temp_id, "", dict(_EMPTY), "", 0.0)
+        _out, _written = await finalize_linked_ocr_writeback(
+            db, wp_id=wp_uuid, linked_att_id=linked_att_id, temp_id=temp_id,
+            ocr_text="", extracted_fields=dict(_EMPTY), confidence=0.0,
+        )
+        return _resp(_out, "", dict(_EMPTY), "", 0.0, written_back=_written)
 
     extracted = dict(_EMPTY)
     summary = ocr_text[:200].replace("\n", " ")

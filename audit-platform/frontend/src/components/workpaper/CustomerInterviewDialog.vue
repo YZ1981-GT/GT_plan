@@ -46,10 +46,10 @@
 
       <el-form-item label="录音附件">
         <el-upload
-          :action="uploadAction"
-          :headers="uploadHeaders"
+          :http-request="uploadAudio"
           accept="audio/*"
           :on-success="onUploadSuccess"
+          :on-error="onUploadError"
           :on-remove="onUploadRemove"
           :file-list="fileList"
           :limit="5"
@@ -119,9 +119,9 @@
  */
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'element-plus'
+import type { FormInstance, FormRules, UploadFile, UploadRequestOptions, UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { getAuthHeaders } from '@/utils/authToken'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import AuditContextHeader from './dialogs/AuditContextHeader.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
@@ -173,21 +173,36 @@ const formRules: FormRules = {
   reviewer: [{ required: true, message: '请填写复核人', trigger: 'blur' }],
 }
 
-const uploadAction = computed(() =>
-  `/api/projects/${props.projectId}/attachments/upload`
-)
-// el-upload 原生上传不经 http 拦截器：鉴权头必须走 authToken 单一入口（旧读 localStorage 恒空 → 401）
-const uploadHeaders = computed(() => getAuthHeaders())
-
-function onUploadSuccess(response: any, _file: UploadFile) {
-  if (response?.id) {
-    form.value.audio_attachments.push(response.id)
-  }
+// 录音经底稿证据入口上传，挂到本访谈表页（spec attachment-evidence-intake 需求 5.4）。
+// 原先 el-upload 原生上传：回执被 {code,message,data} 信封包着，按 response.id 取恒空 ⇒ 附件编号从未记进表单，也不关联底稿。
+function uploadAudio(options: UploadRequestOptions) {
+  return uploadWorkpaperEvidence({
+    projectId: props.projectId,
+    wpId: props.wpId,
+    file: options.file,
+    evidenceType: 'evidence',
+    sheetName: props.itemId || `interview_${props.wpCode}`,
+  })
 }
 
-function onUploadRemove(_file: UploadFile) {
-  // Simplified: remove last added attachment
-  form.value.audio_attachments.pop()
+function uploadedId(response: unknown): string {
+  const id = (response as { attachment?: { id?: string } } | null)?.attachment?.id
+  return id ? String(id) : ''
+}
+
+function onUploadSuccess(response: unknown, _file: UploadFile) {
+  const id = uploadedId(response)
+  if (id && !form.value.audio_attachments.includes(id)) form.value.audio_attachments.push(id)
+}
+
+function onUploadError(error: unknown) {
+  handleApiError(error, '上传录音')
+}
+
+function onUploadRemove(file: UploadFile) {
+  // 按这条文件的回执移除（原先一律弹出最后一个，删错附件）
+  const id = uploadedId(file.response)
+  if (id) form.value.audio_attachments = form.value.audio_attachments.filter((x) => x !== id)
 }
 
 async function loadData() {

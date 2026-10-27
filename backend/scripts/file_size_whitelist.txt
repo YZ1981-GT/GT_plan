@@ -1689,4 +1689,5 @@ backend/app/services/ledger_import/identifier.py  1164
 #   本 spec 只加入口校验、落盘根校验、actor / 审计年度与 OCR 确认字段（新逻辑放 attachment_upload_policy /
 #   attachment_ocr_text 两个新模块），基线取 HEAD 值。拆分方向：版本链（_lock_version_chain 起至文件尾）、
 #   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
-backend/app/services/attachment_service.py  1391
+# attachment-evidence-intake（2026-10-27）：底稿统一视图组装挪到 attachment_wp_view.py，1391 → 1309，基线随之下调。
+backend/app/services/attachment_service.py  1309

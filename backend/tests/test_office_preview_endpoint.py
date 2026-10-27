@@ -31,6 +31,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.base import Base
+from app.models.wp_optimization_models import EvidenceLink
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.routers.office_preview import router as office_preview_router
@@ -62,6 +63,7 @@ async def db_session() -> AsyncSession:
             WorkingPaper.__table__,
             Attachment.__table__,
             AttachmentWorkingPaper.__table__,
+            EvidenceLink.__table__,  # 附件可见性门按整稿关联 ∪ 行级证据链接判关联底稿
         ]
         await conn.run_sync(lambda c: Base.metadata.drop_all(c, tables=tables))
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))

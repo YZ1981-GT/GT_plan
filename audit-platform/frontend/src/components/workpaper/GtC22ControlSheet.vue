@@ -24,8 +24,7 @@ import { ref, reactive, computed, watch, onMounted, onScopeDispose, defineAsyncC
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { uploadAttachment } from '@/services/commonApi'
-import { attachments as P_att } from '@/services/apiPaths'
+import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import {
   itgcItemId,
@@ -389,26 +388,14 @@ async function onUploadEvidence(rawFile: File): Promise<void> {
 
   uploading.value = true
   try {
-    // 1. 上传附件到服务端
-    const fd = new FormData()
-    fd.append('file', rawFile)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${rawFile.name} [${controlId.value}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 2. 创建底稿关联
-    try {
-      await api.post(P_att.associate(attachmentId), {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `sheet:${controlId.value}`,
-      })
-    } catch { /* 关联失败不阻断主流程 */ }
+    // 1-2. 经底稿证据入口上传：只写本控制点的证据链接（表页 = 控制点，spec attachment-evidence-intake 需求 5.4）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file: rawFile,
+      sheetName: controlId.value,
+    })
+    const attachmentId = String(uploaded.id)
 
     // 3. 自动建议证据索引号（Req 11.2: C22.{控制点}-{序号}）
     const seq = evidenceAttachments.value.length + 1
@@ -446,25 +433,15 @@ async function onUploadSampleAttachment(rowIdx: number, rawFile: File): Promise<
 
   uploading.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', rawFile)
-    fd.append('attachment_type', 'evidence')
-    fd.append('reference_type', 'workpaper')
-    fd.append('reference_id', props.wpId)
-    fd.append('title', `${rawFile.name} [${controlId.value} 样本${row.seq}]`)
-
-    const uploadResp = await uploadAttachment(props.projectId || '', fd)
-    const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-    if (!attachmentId) throw new Error('上传响应缺少 attachment_id')
-
-    // 关联
-    try {
-      await api.post(P_att.associate(attachmentId), {
-        wp_id: props.wpId,
-        association_type: 'evidence',
-        notes: `sheet:${controlId.value}:sample:${row.seq}`,
-      })
-    } catch { /* 关联失败不阻断 */ }
+    // 经底稿证据入口上传：只写本样本行的证据链接（控制点 · 第 n 项）
+    const { attachment: uploaded } = await uploadWorkpaperEvidence({
+      projectId: props.projectId || '',
+      wpId: props.wpId,
+      file: rawFile,
+      sheetName: controlId.value,
+      cellRef: itemCellRef(row.seq),
+    })
+    const attachmentId = String(uploaded.id)
 
     // 建议索引号
     const totalAttach = evidenceAttachments.value.length
@@ -496,6 +473,8 @@ async function onUploadSampleAttachment(rowIdx: number, rawFile: File): Promise<
 async function doOcrMerge(file: File, attachment: EvidenceAttachment): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  formData.append('attachment_id', attachment.id)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(
@@ -552,6 +531,8 @@ async function doOcrMerge(file: File, attachment: EvidenceAttachment): Promise<v
 async function doOcrMergeSample(file: File, row: SampleRecord): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  // 带上刚建的附件：识别结果写回这一个附件（不带 id 时识别端点会再建一份）
+  if (row.attachment?.id) formData.append('attachment_id', row.attachment.id)
   let ocrFields: Record<string, any>
   try {
     const res = await http.post(

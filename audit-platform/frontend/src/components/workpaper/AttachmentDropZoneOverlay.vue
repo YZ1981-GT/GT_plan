@@ -38,9 +38,7 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
-import { uploadAttachment } from '@/services/commonApi'
-import { api as httpApi } from '@/services/apiProxy'
-import { attachments as P_att } from '@/services/apiPaths'
+import { uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 
 interface AttachmentUploadedPayload {
   attachment_id: string
@@ -166,35 +164,16 @@ async function uploadFiles(files: File[]) {
     }
 
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('attachment_type', 'evidence')
-      fd.append('reference_type', 'workpaper')
-      fd.append('reference_id', props.wpId)
-      // metadata 透传到后端 metadata.title / 落到 paperless 元数据
-      const sheetTag = props.sheetName ? ` [${props.sheetName}]` : ''
-      fd.append('title', `${file.name}${sheetTag}`)
-
-      const uploadResp = await uploadAttachment(props.projectId, fd)
-      const attachmentId: string | undefined = uploadResp?.id || uploadResp?.attachment_id
-      if (!attachmentId) {
-        throw new Error('上传响应缺少 attachment_id')
-      }
-
-      // 创建底稿关联（notes 携带 sheet_name 元数据）
+      // 经底稿证据入口上传并关联：有当前表页 ⇒ 挂到该表页（行级证据链接），否则整稿关联
+      // （spec attachment-evidence-intake 需求 5.4；原先先建项目附件再调 associate，编制人调 associate 恒 404）
       const sheetName = props.sheetName || ''
-      const notes = sheetName ? `sheet:${sheetName}` : null
-      try {
-        await httpApi.post(P_att.associate(attachmentId), {
-          wp_id: props.wpId,
-          association_type: 'evidence',
-          notes,
-        })
-      } catch (associateErr: any) {
-        // 关联失败不阻断主流程：附件已上传，仅记录错误
-        const detail = associateErr?.response?.data?.detail || associateErr?.message || '关联失败'
-        errorList.push(`附件 ${file.name} 已上传但关联失败: ${detail}`)
-      }
+      const { attachment } = await uploadWorkpaperEvidence({
+        projectId: props.projectId,
+        wpId: props.wpId,
+        file,
+        sheetName: sheetName || null,
+      })
+      const attachmentId = String(attachment.id)
 
       successList.push({
         attachment_id: attachmentId,
