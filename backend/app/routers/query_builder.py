@@ -2,7 +2,7 @@
 
 POST /api/query/preview      预览生成的 SQL（不执行）
 POST /api/query/execute      执行查询，返回结构化结果
-POST /api/query/export-excel 执行查询并导出 Excel
+POST /api/query/export-excel 导出全部（服务端流式、不分页；> 1,000,000 行 400，不截断）
 GET  /api/query/schema       返回白名单表/字段元信息（前端用于构造可视化选择器）
 GET  /api/query/access       当前用户能否使用构建器、作用域内项目数与置灰原因（前端入口与后端判定同源）
 
@@ -24,12 +24,10 @@ Validates: requirements §三 · S-3 高级查询构建器
 
 from __future__ import annotations
 
-import io
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +48,6 @@ from app.services.custom_query.builder_scope import (
     scope_signature,
 )
 from app.services.custom_query.execution_guard import (
-    EXPORT_TIMEOUT_MS,
     QUERY_TIMEOUT_MS,
     cancellable_query,
 )
@@ -119,6 +116,7 @@ async def require_query_builder_access(
 # _build_select` 等既有导入与测试不变。
 # ─────────────────────────────────────────────────────────────────────────────
 from app.services.custom_query.builder_dsl import (  # noqa: E402
+    ExportDSL,
     FilterCond,
     OrderBy,
     QueryDSL,
@@ -369,97 +367,39 @@ async def execute_query(
     return query_result
 
 
-_EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数，避免全量加载
-
-# 导出行数硬上限复用 export_service 既有常量（R6.7：不在 router 层另写一套阈值）
-from app.services.custom_query.export_service import EXPORT_ROW_HARD_LIMIT  # noqa: E402
+_EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数（服务端游标），避免全量加载
 
 
 @router.post("/export-excel")
 async def export_excel(
-    body: QueryDSL,
+    body: ExportDSL,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_query_builder_access),
 ):
-    """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
+    """导出全部（advanced-query-linkage-closure R8，ADR-AQL-14）：与 execute 同一作用域与语句（不分页），经
+    ``export_service.stream_xlsx`` 流式写出。
+
+    改造前复用分页语句（``limit ≤ 1000``）、表头写列键、文件名 ASCII，结果最多 1,000 行（AQ-20）。现在：与业务视图导出共用
+    导出闸（本人 1 个、全进程 4 个，超出 429）；先 COUNT，超过 1,000,000 行 400、不产生文件（不再截断）；表头取请求的
+    ``headers``，附「查询说明」sheet；每次导出记审计（流程在 ``services/custom_query/query_export``）。
+    """
+    from app.services.custom_query.query_export import export_builder_query
+
+    warnings: list[str] = []
     scope = await _builder_scope(
         body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
-    stmt, column_names = _build_select(
-        body, scope=scope, role=_get_role_value(current_user)
-    )
     try:
-        async with cancellable_query(db, EXPORT_TIMEOUT_MS):
-            result = await db.execute(stmt)
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        try:
-            await db.rollback()
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "QUERY_EXECUTION_FAILED",
-                    "message": f"查询执行失败：{exc}"},
+        stmt, column_names = _build_select(
+            body, scope=scope, role=_get_role_value(current_user), warnings=warnings, for_export=True
         )
-
-    from openpyxl import Workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
-
-    wb = Workbook(write_only=True)
-    table_label = TABLE_WHITELIST[body.table]["label"]
-    ws = wb.create_sheet(title=table_label[:31])
-
-    # 表头（write_only 模式通过 WriteOnlyCell 设置样式）
-    header_font = Font(bold=True)
-    header_fill = PatternFill(start_color="F0EDF5", end_color="F0EDF5", fill_type="solid")
-    header_alignment = Alignment(horizontal="center")
-    header_cells = []
-    for name in column_names:
-        cell = WriteOnlyCell(ws, value=name)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        header_cells.append(cell)
-    ws.append(header_cells)
-
-    # 分页读取数据行并逐批写入（避免全量加载到内存）
-    # 行数硬上限（R6.6）：改造前 fetchmany 无上限，笛卡尔积 JOIN 下会把百万行全部
-    # 拉完。达上限时**在文件内显式标注**被截断 —— 静默产出不完整文件最危险，
-    # 审计师会把它当完整证据留档。
-    written = 0
-    truncated = False
-    while True:
-        batch = result.fetchmany(_EXPORT_FETCH_SIZE)
-        if not batch:
-            break
-        for row in batch:
-            if written >= EXPORT_ROW_HARD_LIMIT:
-                truncated = True
-                break
-            ws.append([_excel_cell_value(row[i] if i < len(row) else None)
-                       for i in range(len(column_names))])
-            written += 1
-        if truncated:
-            break
-
-    if truncated:
-        ws.append([])
-        ws.append([
-            f"※ 结果已达导出上限 {EXPORT_ROW_HARD_LIMIT} 行并被截断，"
-            "本文件不是完整结果集；请补充筛选条件后重新导出"
-        ])
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    filename = f"query_{body.table}.xlsx"
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    except HTTPException as http_exc:
+        # 预算超限 / PII 越权发生在 SQL 构建期，也要留痕（同 execute）
+        await _audit_query_rejection(http_exc, user=current_user, table=body.table)
+        raise
+    return await export_builder_query(
+        body, stmt=stmt, column_names=column_names, scope=scope, warnings=warnings,
+        table_label=TABLE_WHITELIST[body.table]["label"], user=current_user, db=db, batch=_EXPORT_FETCH_SIZE,
     )
 
 

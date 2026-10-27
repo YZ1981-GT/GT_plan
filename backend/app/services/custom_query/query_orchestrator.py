@@ -423,6 +423,10 @@ class QueryOrchestrator:
         payload = await self._cache.get_or_compute(key, _compute, ttl=ttl)
         return QueryResult.from_payload(payload, cache_hit=not executed["ran"])
 
+    async def resolve_targets(self, req: QueryRequest, db: AsyncSession) -> list[ResolvedTarget]:
+        """step2 的公开入口：服务端导出与 execute 同一目标解析（任一不可解析 → 400，advanced-query-linkage-closure §3.5）。"""
+        return await self._resolve_targets(req, db)
+
     # ── step2 内部：目标解析 ──────────────────────────────────────────────
     async def _resolve_targets(
         self, req: QueryRequest, db: AsyncSession

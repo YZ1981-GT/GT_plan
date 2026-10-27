@@ -6,6 +6,8 @@
   ``NULLS LAST``；offset > :data:`MAX_SQL_OFFSET` → 422 ``OFFSET_TOO_DEEP``（深翻页请改用导出）。
 - ``all_rows``：分组 / 透视要全量参与计算，先 COUNT，> ``FETCH_HARD_CAP`` → 400 ``AGGREGATION_TOO_LARGE``，
   不再在截断样本上算出「看起来对」的合计（AQ-03）。
+- 导出（R8，design §3.5）：``prepare_stream`` 与 ``page`` 同一语句与排序（不带 LIMIT），``count_plan`` 预检行数，
+  ``stream_rows`` / ``stream_statement`` 经服务端游标逐批取数。
 
 谓词一律经 ``param_sql_builder``（``build_portable_filter`` / ``ParamSQLBuilder.build_where``）生成，用户值只进绑定参数。
 """
@@ -13,15 +15,18 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
+from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from app.services.custom_query.builder_dsl import _serialize_cell
-from app.services.custom_query.execution_guard import QUERY_TIMEOUT_MS, cancellable_query
+from app.services.custom_query.execution_guard import EXPORT_TIMEOUT_MS, QUERY_TIMEOUT_MS, cancellable_query
 from app.services.custom_query.pagination import FETCH_HARD_CAP, _reject_sort_direction, _reject_sort_field
 from app.services.custom_query.param_sql_builder import ParamSQLBuilder, build_portable_filter
 from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage
@@ -38,6 +43,8 @@ from app.services.custom_query.table_whitelist import OPERATOR_WHITELIST
 MAX_SQL_OFFSET = 100_000
 #: in / not_in 条件值数组上限（design §6）
 MAX_IN_VALUES = 500
+#: 导出逐批取数的批大小（服务端游标，design §3.1 ``stream``）
+STREAM_BATCH = 2000
 _DIRECTIONS = ("asc", "desc")
 
 
@@ -255,6 +262,68 @@ async def all_rows(
         warnings = await spec.warn(ctx) if spec.warn else []
         meta = {"ref_context": await ref_context(ctx)}
     return FetchPage(rows=rows, columns=_column_meta(display), total=len(rows), paged=False, meta=meta, warnings=warnings)
+
+
+# ─── 导出（advanced-query-linkage-closure R8，design §3.5）───────────────────────
+
+
+@dataclass
+class StreamPlan:
+    """导出用的语句：与 :func:`page` 同一 ``build_statement``（同样的校验与口径）、同一排序，不带 LIMIT / OFFSET。"""
+
+    spec: SourceSpec
+    ctx: FetchContext
+    stmt: Select  # 不带 ORDER BY（计数用）
+    order: list[Any]
+    columns: list[ColumnMeta]
+    warnings: list[str]
+
+
+async def prepare_stream(
+    spec: SourceSpec,
+    ctx: FetchContext,
+    *,
+    conditions: Sequence[Mapping[str, Any]] = (),
+    logic: str = "and",
+    columns: Iterable[str] = (),
+    sort: Sequence[Mapping[str, Any]] = (),
+) -> StreamPlan:
+    """校验并构造导出语句（400 / 422 与 execute 相同，都发生在取导出名额之前）；不计数、不取数。"""
+    order = _order_by(spec, sort)
+    async with cancellable_query(ctx.db, EXPORT_TIMEOUT_MS):
+        stmt, display = await build_statement(spec, ctx, conditions=conditions, logic=logic, columns=columns)
+        warnings = await spec.warn(ctx) if spec.warn else []
+    return StreamPlan(spec=spec, ctx=ctx, stmt=stmt, order=order, columns=_column_meta(display), warnings=warnings)
+
+
+async def count_plan(plan: StreamPlan) -> int:
+    """导出前的行数预检用：同一 WHERE 的 COUNT。"""
+    async with cancellable_query(plan.ctx.db, EXPORT_TIMEOUT_MS):
+        return await _count(plan.ctx, plan.stmt)
+
+
+async def stream_statement(db: AsyncSession, stmt: Select, *, batch: int = STREAM_BATCH) -> AsyncIterator[list[Any]]:
+    """服务端游标逐批取数（导出用，design §3.1 ``stream``）：每批 ``batch`` 行，结束或中途关闭都释放游标。
+
+    业务视图（:func:`stream_rows`）与构建器导出共用；语句由调用方给，整段在 ``EXPORT_TIMEOUT_MS`` 语句超时内。
+    """
+    async with cancellable_query(db, EXPORT_TIMEOUT_MS):
+        result = await db.stream(stmt.execution_options(yield_per=batch))
+        try:
+            async for part in result.partitions(batch):
+                yield part
+        finally:
+            await result.close()
+
+
+async def stream_rows(plan: StreamPlan, *, batch: int = STREAM_BATCH) -> AsyncIterator[list[dict]]:
+    """按 execute 的排序逐批产出整行（键 = 列键）。值保持数据库原类型（金额 Decimal、日期 date），由导出写成 Excel 数值与日期。
+
+    ``aclosing``：本生成器被提前关闭时同时关闭内层游标生成器（``async for`` 遇异常不会替内层收尾）。
+    """
+    async with aclosing(stream_statement(plan.ctx.db, plan.stmt.order_by(*plan.order), batch=batch)) as parts:
+        async for part in parts:
+            yield [dict(row._mapping) for row in part]
 
 
 def project_uuid(project_id: Any) -> uuid.UUID:

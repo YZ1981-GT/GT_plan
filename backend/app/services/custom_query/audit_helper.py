@@ -188,6 +188,29 @@ async def record_cross_sheet_trace(
     )
 
 
+# ─── 导出审计（不节流，advanced-query-linkage-closure R8.4）─────────────────────
+
+#: 业务视图与构建器的「导出全部」共用的审计动作名
+ACTION_EXPORT = "custom_query.export"
+
+
+async def record_export(
+    *,
+    user_id: UUID | str,
+    project_id: UUID | str | None,
+    details: dict[str, Any],
+) -> bool:
+    """每次导出记一条审计（操作者、项目、数据源、行数，R8.4；**不节流**）。审计失败只记 WARNING，不影响下载。"""
+    return await _log_unthrottled(
+        user_id=user_id,
+        action=ACTION_EXPORT,
+        object_type="custom_query",
+        object_id=None,
+        project_id=project_id,
+        details={"operation": ACTION_EXPORT, "occurred_at": _utc_second_timestamp(), **details},
+    )
+
+
 # ─── 查询执行审计（60s 窗口节流，R14.4）──────────────────────────────────────
 
 

@@ -166,7 +166,11 @@ async def test_streaming_export_exceeds_fetch_size(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_streaming_export_empty_result(db_session: AsyncSession):
-    """空结果集仍返回有效 xlsx（仅表头）。"""
+    """空结果集仍返回有效 xlsx（表头 + 空提示行）。
+
+    advanced-query-linkage-closure 任务 26 起构建器导出改走 ``export_service.stream_xlsx``（与业务视图同一路径），
+    空结果按 advanced-query-module R7.5 写一行「（查询结果为空）」，不再只有表头（旧断言固化的是 router 自写 Workbook 的形态）。
+    """
     # 只建 project 不建 trial_balance
     db_session.add(Project(
         id=PROJECT_ID,
@@ -195,7 +199,7 @@ async def test_streaming_export_empty_result(db_session: AsyncSession):
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     assert rows[0] == ("standard_account_code",)
-    assert len(rows) == 1  # 仅表头
+    assert rows[1:] == [("（查询结果为空）",)]  # 表头 + 空提示行，没有数据行
 
 
 @pytest.mark.asyncio
@@ -351,8 +355,11 @@ async def test_pbt_streaming_export_equivalence(count, fields):
         # 表头一致
         assert excel_rows[0] == tuple(fields), f"Header mismatch: {excel_rows[0]} vs {fields}"
 
-        # 数据行数一致
+        # 数据行数一致（空结果：stream_xlsx 写一行空提示，见 test_streaming_export_empty_result）
         data_rows = excel_rows[1:]
+        if not expected_rows:
+            assert [tuple(v for v in r if v is not None) for r in data_rows] == [("（查询结果为空）",)], data_rows
+            data_rows = []
         assert len(data_rows) == len(expected_rows), (
             f"Row count mismatch: excel={len(data_rows)} vs execute={len(expected_rows)}"
         )

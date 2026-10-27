@@ -224,6 +224,16 @@ def _rows_only(*keys: str, column: str = "project_id") -> Expect:
     return Expect(200, check)
 
 
+def _x_export() -> Expect:
+    """业务视图导出 X 的试算表（任务 26）：文件的数据行非空，且只有 X 的那一行（科目 1001）。"""
+    def check(response: Response, ctx: Ctx) -> None:
+        sheet = load_workbook(io.BytesIO(response.content), read_only=True).worksheets[0]
+        rows = [list(r) for r in sheet.iter_rows(values_only=True)][1:]
+        values = [set(map(str, r)) for r in rows]
+        assert rows and all("1001" in v for v in values) and not any("1002" in v for v in values), rows
+    return Expect(200, check)
+
+
 def _export_only(*keys: str) -> Expect:
     want = {str(_PROJECT_KEYS[key]) for key in keys}
 
@@ -349,7 +359,7 @@ ROWS: tuple[Row, ...] = (
         codes(401, 403, *([_x_trial_balance()] * 3), 403, *([_x_trial_balance()] * 2)),
         (custom_query.router,), _TB, ("tb_xy",)),
     Row("5", "P", (Call("POST", f"{CQ}/export", f"{CQ}/export", _body(_EXECUTE_X)),),
-        codes(401, 403, 200, 200, 200, 403, 200, 200), (custom_query.router,), _TB, ("tb_xy",)),
+        codes(401, 403, *([_x_export()] * 3), 403, *([_x_export()] * 2)), (custom_query.router,), _TB, ("tb_xy",)),
     Row("6", "P", (Call("GET", f"{CQ}/templates", f"{CQ}/templates"),),
         codes(401, _sees(True, False, False), _sees(True, True, False), _sees(True, True, False),
               _sees(True, True, False), _sees(True, False, False), _sees(True, True, False), _sees(True, True, True)),
@@ -461,7 +471,6 @@ def _each(columns: tuple[str, ...], reason: str) -> dict[str, str]:
 
 
 PENDING: dict[str, dict[str, str]] = {
-    "5": {"*": "任务 26（AQ-20）：POST /api/custom-query/export 尚未实现（404）"},
     "6": _each(_LOGGED_IN, "任务 24（AQ-16）：列表以 scope == 'global' 判公开（入库值是 public），不认 project 共享"),
     "7": _each(_LOGGED_IN, "任务 24（AQ-16）：save_template 不认 private，TemplateInvalidError 未捕获（500）"),
     "8": _each(("E", "PM", "AD"), "任务 24（AQ-16）：save_template 不认 project，TemplateInvalidError 未捕获（500）"),

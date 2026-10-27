@@ -90,9 +90,8 @@ def _too_large(req: QueryRequest, row_count: int) -> HTTPException:
     )
 
 
-async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchPage:
-    assert target.spec is not None
-    ctx = FetchContext(
+def _sql_context(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchContext:
+    return FetchContext(
         db=db,
         user=None,
         project_id=paged_fetch.project_uuid(req.project_id),
@@ -100,6 +99,11 @@ async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any) -> Fetc
         filters={**dict(req.filters or {}), **dict(target.fixed_filters)},
         company_code=target.company_code,
     )
+
+
+async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchPage:
+    assert target.spec is not None
+    ctx = _sql_context(req, target, db)
     common = {"conditions": list(req.conditions), "logic": req.condition_logic, "columns": list(req.columns)}
     if req.group_by or req.pivot is not None:
         # 分组 / 透视要全量参与计算：> FETCH_HARD_CAP 行即 400，不在截断样本上聚合（ADR-AQL-07）
@@ -160,3 +164,23 @@ async def business_fetcher(
     if target.spec is not None:
         return await _fetch_sql(req, target, db)
     return await _fetch_json(req, target, db)
+
+
+async def prepare_export(req: QueryRequest, db: Any) -> "paged_fetch.StreamPlan | None":
+    """服务端完整导出的取数准备（R8，design §3.5），与 :func:`business_fetcher` 同一分派与校验。
+
+    注册表 SQL 源 → ``paged_fetch.StreamPlan``（与 ``page`` 同一语句、同一排序，不带 LIMIT；400 / 422 在这一步）；其余源
+    （JSON 内存源、跨模块单元格源）→ None：调用方取导出名额后经 :func:`business_fetcher` 取全部行（≤ 5,000，同 execute 的
+    内存路径）。带结构化条件的非 SQL 源在这里就 400 ``CONDITIONS_UNSUPPORTED``。
+    """
+    from app.services.custom_query.module_cell_resolver import is_module_cell_source
+
+    source = (req.source or "").strip()
+    target = None if is_module_cell_source(source) else resolve_source(source, dict(req.filters or {}))
+    if target is None or target.spec is None:
+        _reject_conditions(req)
+        return None
+    return await paged_fetch.prepare_stream(
+        target.spec, _sql_context(req, target, db), conditions=list(req.conditions), logic=req.condition_logic,
+        columns=list(req.columns), sort=list(req.sort),
+    )

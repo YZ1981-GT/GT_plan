@@ -88,6 +88,14 @@ class QueryDSL(BaseModel):
     year: int | None = Field(default=None, ge=2000, le=2100)
 
 
+class ExportDSL(QueryDSL):
+    """构建器「导出全部」请求（advanced-query-linkage-closure R8.1）：查询同 ``QueryDSL``（``limit`` / ``offset`` 不参与导出），
+    另带界面所见列名 ``headers``（键为结果列名）与下载文件名。"""
+
+    headers: dict[str, str] = Field(default_factory=dict, max_length=200)
+    file_name: str | None = Field(default=None, max_length=200)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 核心：DSL → SQLAlchemy core `select()`（白名单+绑定参数；无字符串拼接）
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,11 +191,13 @@ def _build_select(
     scope: "BuilderScope | None" = None,
     role: str | None = None,
     warnings: list[str] | None = None,
+    for_export: bool = False,
 ) -> tuple[Select, list[str]]:
     """根据 DSL 构造 `select()` 与列名列表。
 
     ``scope`` 非空时在 WHERE 组装的最后一步追加项目作用域约束（R2.1）；
     ``role`` 用于 PII 字段准入（R7.4）；``warnings`` 收集非致命提示。
+    ``for_export``：导出全部（advanced-query-linkage-closure R8.1）——不加 LIMIT / OFFSET，行数由导出前的 COUNT 预检限定。
     """
     table_meta = _resolve_table(dsl.table)
     model = table_meta["model"]
@@ -390,8 +400,9 @@ def _build_select(
     for col in order_cols:
         stmt = stmt.order_by(col)
 
-    # ── LIMIT / OFFSET ──
-    stmt = stmt.limit(min(dsl.limit, 1000)).offset(dsl.offset)
+    # ── LIMIT / OFFSET（导出全部不分页）──
+    if not for_export:
+        stmt = stmt.limit(min(dsl.limit, 1000)).offset(dsl.offset)
 
     return stmt, column_names
 

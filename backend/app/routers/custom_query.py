@@ -22,6 +22,7 @@
 
 API:
   POST   /api/custom-query/execute              — 执行查询
+  POST   /api/custom-query/export               — 导出全部（服务端流式，> 1,000,000 行 400）
   GET    /api/custom-query/indicators           — 获取可查询指标库（树形）
   GET    /api/custom-query/templates            — 列出查询模板（私有 + 全局）
   POST   /api/custom-query/templates            — 创建查询模板
@@ -946,6 +947,32 @@ async def execute_query(
             logger.warning("audit_log enqueue failed for custom_query: %s", audit_e)
 
     return result
+
+
+class QueryExportRequest(QueryRequest):
+    """「导出全部」请求（advanced-query-linkage-closure R8.1）：查询同 execute（``limit`` / ``offset`` 不参与导出），另带
+    界面所见列名 ``headers``（键为列键；标签真源是前端 queryColumnLabels）与下载文件名。"""
+
+    headers: dict[str, str] = Field(default_factory=dict, max_length=200)
+    file_name: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/export")
+async def export_query(
+    body: QueryExportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务视图「导出全部」：按当前查询（条件、列、排序）服务端流式导出全量结果（R8，ADR-AQL-14，design §3.5）。
+
+    项目归属在本函数体内直接校验（端点鉴权基线按函数体识别项目级判定，第 4 轮评审 #5）；解析校验与 execute 相同，分组 400、
+    导出闸 429、COUNT 预检 400、首块预取与审计在 ``services/custom_query/query_export``。
+    """
+    from app.services.custom_query.ownership_guard import ownership_guard
+    from app.services.custom_query.query_export import export_business_query
+
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
+    return await export_business_query(body, user=current_user, db=db)
 
 
 async def _legacy_business_fetcher(req, resolved, db):

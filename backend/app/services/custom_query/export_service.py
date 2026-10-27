@@ -21,6 +21,10 @@
   守卫；任一步失败即 ``raise`` 中断（此时尚未 yield 任何字节，不产生可被误认为
   完整的部分文件），由 router 层置 ``X-Export-Incomplete: 1`` 头（R7.7/R8.6）。
 
+advanced-query-linkage-closure（R8，ADR-AQL-14）起业务视图与构建器的「导出全部」都经 ``stream_xlsx``（流程在
+``query_export``）：可带「查询说明」sheet（``info_rows``）；数据、表头与查询说明里以 ``= + - @`` 开头的文本按文本写入
+（``_text_safe_cell``，防公式注入）。
+
 openpyxl ``write_only`` 模式的取舍：``ws.append`` 会将行增量写入磁盘临时文件（lxml
 ``xmlfile`` 流式），不在内存驻留全部行；本实现进一步以 ≤ ``memory_row_cap`` 的缓冲
 批量 append，显式约束单次行驻留。最终 ``wb.save`` 落临时文件后，按字节块流式读出
@@ -50,7 +54,7 @@ import io
 import logging
 import os
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -93,6 +97,32 @@ _EMPTY_NOTICE = "（查询结果为空）"
 # ASCII 回退文件名（RFC 5987，供不支持 filename* 的老客户端；R7.3）
 _ASCII_FALLBACK_FILENAME = "query.xlsx"
 
+#: 数据 sheet 的缺省名与「查询说明」sheet 名（advanced-query-linkage-closure R8.1）
+DATA_SHEET_TITLE = "高级查询结果"
+INFO_SHEET_TITLE = "查询说明"
+#: 以这些字符开头的文本在 Excel 里可能被当成公式（公式注入，R8.5）：一律按文本写入
+FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def _formula_like(value: Any) -> bool:
+    """是否为可能被 Excel 当成公式的文本（数据行、表头、「查询说明」共用这一判定）。"""
+    return isinstance(value, str) and value.startswith(FORMULA_PREFIXES)
+
+
+def _text_safe_cell(ws: Any, value: Any) -> Any:
+    """以 ``= + - @`` 开头的字符串 → 文本单元格（``data_type = "s"``），其余原值返回（advanced-query-linkage-closure R8.5）。
+
+    openpyxl 把以 ``=`` 开头的字符串写成公式；``+`` / ``-`` / ``@`` 开头的在 Excel 里重新编辑后同样会被当成公式。数据行与
+    「查询说明」经本函数，表头单元格自带样式、按同一判定 :func:`_formula_like` 置文本；数值（如 -1）不受影响。
+    """
+    if _formula_like(value):
+        from openpyxl.cell import WriteOnlyCell
+
+        cell = WriteOnlyCell(ws, value=value)
+        cell.data_type = "s"
+        return cell
+    return value
+
 
 def _excel_cell_value(v: Any) -> Any:
     """Excel cell 接受 str/number/datetime；UUID/Decimal/枚举要转换。
@@ -128,15 +158,24 @@ def _row_export_values(
     row: dict,
     columns: list["ColumnMeta"],
     source_cols: list["ColumnMeta"],
+    *,
+    ws: Any,
 ) -> list[Any]:
-    """按列顺序取一行的显示值 + 追加数据来源标识值（R7.2/R7.4）。
+    """按列顺序取一行的显示值 + 追加数据来源标识值（R7.2/R7.4）；文本经 :func:`_text_safe_cell`（R8.5）。
 
     与非流式 ``export_xlsx`` 数据行构造同源，保证流式与非流式对同一结果集的行内容
     完全一致（R8.5 model-based）。
     """
-    values = [_excel_cell_value(row.get(c.key)) for c in columns]
-    values += [_source_identity_value(c) for c in source_cols]
+    values = [_text_safe_cell(ws, _excel_cell_value(row.get(c.key))) for c in columns]
+    values += [_text_safe_cell(ws, _source_identity_value(c)) for c in source_cols]
     return values
+
+
+def _append_info_sheet(wb: Any, info_rows: list[tuple[str, Any]]) -> None:
+    """数据 sheet 之后追加「查询说明」：每行一项（说明项、内容），文本经 :func:`_text_safe_cell`（R8.1 / R8.5）。"""
+    ws = wb.create_sheet(title=INFO_SHEET_TITLE)
+    for label, value in info_rows:
+        ws.append([_text_safe_cell(ws, str(label)), _text_safe_cell(ws, _excel_cell_value(value))])
 
 
 class ExportService:
@@ -257,6 +296,8 @@ class ExportService:
         memory_row_cap: int = STREAM_MEMORY_ROW_CAP,
         row_hard_limit: int = EXPORT_ROW_HARD_LIMIT,
         byte_chunk: int = _STREAM_BYTE_CHUNK,
+        info_rows: Sequence[tuple[str, Any]] | Callable[[int], Sequence[tuple[str, Any]]] | None = None,
+        sheet_title: str | None = None,
     ) -> AsyncIterator[bytes]:
         """流式导出平铺明细结果集为 ``.xlsx`` 字节块（异步生成器，R8）。
 
@@ -264,6 +305,11 @@ class ExportService:
         ``dict``（键为 ``ColumnMeta.key``），或一批行的 ``list[dict]``；由
         :meth:`_aiter_rows` 归一为逐行异步流。**不接受**分组/透视结果（那些走物化
         ``export_xlsx``，见 :meth:`resolve_export_mode`）。
+
+        ``info_rows``：给出时在数据 sheet 之后追加「查询说明」sheet（项目、年度、数据源、条件、行数、导出时间、导出人，
+        advanced-query-linkage-closure R8.1）；可为接收**实际写入行数**的函数，说明里的行数就与文件里的数据行一致；
+        ``sheet_title``：数据 sheet 名（缺省「高级查询结果」，构建器用表名）。
+        表头、数据与查询说明里以 ``= + - @`` 开头的文本一律按文本写入（R8.5）。
 
         流程（R8.1/R8.2/R8.3/R8.4/R8.6/R7.7）：
         1. 容量守卫：含来源列的总列数 > 16,384 → ``EXPORT_CAPACITY``（首字节前）。
@@ -303,7 +349,7 @@ class ExportService:
             )
 
         wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title="高级查询结果"[:31])
+        ws = wb.create_sheet(title=(sheet_title or DATA_SHEET_TITLE)[:31])
 
         # ── step2–4: 构建并落临时文件（首字节 yield 之前完成，中途错误在此 raise）──
         # 任一步失败（容量守卫 / 行迭代 / 硬上限 / 落盘）都在产出任何字节前发生，直接
@@ -344,7 +390,7 @@ class ExportService:
                             "max_rows": XLSX_MAX_ROWS,
                         },
                     )
-                buffer.append(_row_export_values(row, columns, source_cols))
+                buffer.append(_row_export_values(row, columns, source_cols, ws=ws))
                 if len(buffer) >= cap:
                     for values in buffer:
                         ws.append(values)
@@ -358,6 +404,11 @@ class ExportService:
             # 空结果 → 仅标题行 + 空提示行（R7.5，防御式；流式通常不用于空集）
             if row_count == 0:
                 ws.append([_EMPTY_NOTICE])
+
+            if info_rows is not None:
+                items = info_rows(row_count) if callable(info_rows) else info_rows
+                if items:
+                    _append_info_sheet(wb, list(items))
 
             # step4: 落临时文件（executor 内执行 openpyxl 保存）
             loop = asyncio.get_event_loop()
@@ -420,6 +471,8 @@ class ExportService:
 
         def _header_cell(text: str) -> Any:
             cell = WriteOnlyCell(ws, value=text)
+            if _formula_like(text):
+                cell.data_type = "s"  # 表头同样按文本写入（R8.5，表头文字来自请求的 headers）
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
@@ -439,7 +492,7 @@ class ExportService:
         from openpyxl import Workbook
 
         wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title="高级查询结果"[:31])
+        ws = wb.create_sheet(title=DATA_SHEET_TITLE[:31])
 
         # ── step2: 表头（write_only 模式通过 WriteOnlyCell 设置样式）──
         ws.append(self._header_cells(ws, columns, source_cols))
@@ -456,7 +509,7 @@ class ExportService:
         for start in range(0, n, _EXPORT_APPEND_BATCH):
             batch = rows[start : start + _EXPORT_APPEND_BATCH]
             for row in batch:
-                ws.append(_row_export_values(row, columns, source_cols))
+                ws.append(_row_export_values(row, columns, source_cols, ws=ws))
 
         return self._save_bytes(wb)
 
