@@ -1,20 +1,24 @@
-"""ACNR Catalog Generator — 唯一生成入口。
+"""ACNR Catalog Generator — 目录唯一写出方（design §5.3，T07）。
 
-合并 6 类输入为 SheetCatalogEntry/CellCatalogEntry，确定性输出（同输入 → 字节一致）。
+`generate_catalog()` 合并基础输入（classification 骨架、I/E manifest、渲染注册、标签别名、坐标种子、overrides）；
+写出走 `main()`：`app.services.acnr.catalog_build.build_release` 在基础产物上叠加判定记录与名称规则、跑发布门禁，
+门禁通过后同批写出 快照 → schema → 报告（含 release 段）→ 目录，每个文件先写临时文件再 `os.replace`。
 
 Usage:
-    python backend/scripts/acnr/generate_catalog.py [--offline] [--cycle D]
+    python backend/scripts/acnr/generate_catalog.py            # 写出（内容不变则不写，幂等）
+    python backend/scripts/acnr/generate_catalog.py --check    # 结构化比对：漂移退出 2、门禁违规退出 1
+    python backend/scripts/acnr/generate_catalog.py --registry-version 20261027120000
 
-Requirements: 1.3, 1.4, 3.3, 3.4, 3.5, 18.1
+函数参数 `offline`（接受但忽略，恒读离线缓存）与 `cycle`（只供单测，非 "all" 时拒绝写出）保留（R2-N3）。
+
+Requirements: 1.3, 1.4, 3.3, 3.4, 3.5, 18.1；本 spec 需求 4（D4）
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,7 +32,6 @@ _BACKEND_ROOT = _REPO_ROOT / "backend"
 _DATA_DIR = _BACKEND_ROOT / "data"
 _ACNR_DATA_DIR = _DATA_DIR / "acnr"
 _SOURCES_DIR = _ACNR_DATA_DIR / "sources"
-_SHARDS_DIR = _ACNR_DATA_DIR / "shards"
 
 # 确保 backend 在 sys.path 以便 import loaders
 sys.path.insert(0, str(_BACKEND_ROOT))
@@ -365,21 +368,10 @@ def generate_catalog(
 
 
 def _sheet_to_dict(entry: SheetCatalogEntry) -> dict[str, Any]:
-    """将 SheetCatalogEntry 转为 dict（排除 None/空值保持简洁）。"""
-    d = asdict(entry)
-    # 清理空列表和 None 值使输出简洁
-    result: dict[str, Any] = {}
-    for key, value in sorted(d.items()):
-        if value is None:
-            continue
-        if isinstance(value, list) and not value:
-            continue
-        if isinstance(value, str) and not value and key not in (
-            "addr_id", "domain", "sheet_code", "sheet_name"
-        ):
-            continue
-        result[key] = value
-    return result
+    """将 SheetCatalogEntry 转为 dict（口径唯一来源 catalog_build.sheet_dict）。"""
+    from app.services.acnr.catalog_build import sheet_dict
+
+    return sheet_dict(entry)
 
 
 def _cell_to_dict(entry: CellCatalogEntry) -> dict[str, Any]:
@@ -402,17 +394,9 @@ def _build_catalog_output(
     cells: list[CellCatalogEntry],
     registry_version: str,
 ) -> dict[str, Any]:
-    """构建确定性 catalog JSON 结构。
-
-    确定性保证：
-    - sheets 按 addr_id 排序
-    - cells 按 addr_id 排序
-    - 每个 dict 的 key 按 sort_keys 排序（json.dumps 时）
-    """
-    # 排序保证确定性
+    """构建确定性 catalog JSON 结构（sheets / cells 按 addr_id 排序）。"""
     sorted_sheets = sorted(sheets, key=lambda s: s.addr_id)
     sorted_cells = sorted(cells, key=lambda c: c.addr_id)
-
     return {
         "version": CATALOG_VERSION,
         "registry_version": registry_version,
@@ -421,146 +405,211 @@ def _build_catalog_output(
     }
 
 
-# ---------------------------------------------------------------------------
-# 确定性 JSON 序列化
-# ---------------------------------------------------------------------------
-
-
 def _deterministic_json(data: Any) -> str:
-    """确定性 JSON 输出（同输入 → 字节一致）。
+    """确定性 JSON 输出（口径唯一来源 catalog_build.deterministic_json）。"""
+    from app.services.acnr.catalog_build import deterministic_json
 
-    - sort_keys=True 保证 key 排序
-    - indent=2 保证可读
-    - ensure_ascii=False 保留中文
-    - 尾部换行
-    """
-    return json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    return deterministic_json(data)
 
 
 # ---------------------------------------------------------------------------
-# 文件写入
+# 发布：构建候选、写出、--check（design §5.3）
 # ---------------------------------------------------------------------------
 
-
-def _archive_catalog_snapshot(catalog_data: dict[str, Any]) -> Path | None:
-    """归档当前版本 catalog 为不可变快照（append-only）。
-
-    在写入新版本之前，将当前 catalog 按 registry_version 归档到
-    data/acnr/catalog_snapshots/{version}.json。
-
-    Requirements: Req-9.4 — Catalog 新版本发布时自动归档当前版本为不可变快照。
-
-    Returns:
-        归档文件路径，若已存在则返回 None（append-only 不覆盖）。
-    """
-    snapshots_dir = _ACNR_DATA_DIR / "catalog_snapshots"
-    snapshots_dir.mkdir(parents=True, exist_ok=True)
-
-    version = catalog_data.get("registry_version", "")
-    if not version:
-        return None
-
-    snapshot_path = snapshots_dir / f"{version}.json"
-
-    # append-only：已存在的快照不覆盖
-    if snapshot_path.exists():
-        return None
-
-    snapshot_json = _deterministic_json(catalog_data)
-    snapshot_path.write_text(snapshot_json, encoding="utf-8")
-    return snapshot_path
+_CATALOG_PATH = _ACNR_DATA_DIR / "global_catalog.json"
+_REPORT_PATH = _ACNR_DATA_DIR / "catalog_report.json"
+_SNAPSHOTS_DIR = _ACNR_DATA_DIR / "catalog_snapshots"
+_SCHEMA_PATH = _REPO_ROOT / "docs" / "acnr" / "schemas" / "global_catalog.schema.json"
+_MAX_DRIFT_LINES = 50
 
 
-def write_catalog(
-    catalog_data: dict[str, Any],
-    report_data: dict[str, Any],
-    *,
-    output_dir: Path | None = None,
-    write_shards: bool = True,
-    cycle: str = "d",
-) -> tuple[Path, Path]:
-    """写入 catalog 与 report 文件。
-
-    Returns
-    -------
-    (catalog_path, report_path)
-    """
-    out = output_dir or _ACNR_DATA_DIR
-
-    # ─── Req-9.4: 归档当前版本快照（在写入新版本之前）───────────────────
-    existing_catalog_path = out / "global_catalog.json"
-    if existing_catalog_path.exists():
-        try:
-            existing_data = json.loads(existing_catalog_path.read_text(encoding="utf-8"))
-            snapshot_path = _archive_catalog_snapshot(existing_data)
-            if snapshot_path:
-                print(f"  Snapshot archived: {snapshot_path}")
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"  WARNING: Failed to archive snapshot: {e}", file=sys.stderr)
-
-    # 主 catalog
-    catalog_path = out / "global_catalog.json"
-    catalog_json = _deterministic_json(catalog_data)
-    catalog_path.write_text(catalog_json, encoding="utf-8")
-
-    # catalog report
-    report_path = out / "catalog_report.json"
-    report_json = _deterministic_json(report_data)
-    report_path.write_text(report_json, encoding="utf-8")
-
-    # 可选分片
-    if write_shards:
-        _SHARDS_DIR.mkdir(parents=True, exist_ok=True)
-        shard_path = _SHARDS_DIR / f"catalog_{cycle.upper()}.json"
-        # 分片只包含对应循环的 sheets 和 cells
-        cycle_upper = cycle.upper()
-        shard_sheets = [
-            s for s in catalog_data["sheets"]
-            if s.get("cycle", "").upper() == cycle_upper
-        ]
-        shard_cells = [
-            c for c in catalog_data["cells"]
-            if _cell_belongs_to_cycle(c, cycle_upper, catalog_data["sheets"])
-        ]
-        shard_data = {
-            "version": CATALOG_VERSION,
-            "registry_version": catalog_data["registry_version"],
-            "cycle": cycle_upper,
-            "sheets": shard_sheets,
-            "cells": shard_cells,
-        }
-        shard_json = _deterministic_json(shard_data)
-        shard_path.write_text(shard_json, encoding="utf-8")
-
-    return catalog_path, report_path
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
-def _cell_belongs_to_cycle(
-    cell: dict[str, Any],
-    cycle: str,
-    sheets: list[dict[str, Any]],
-) -> bool:
-    """判断 cell 是否属于指定循环。
+def _build_candidate(registry_version: str, previous: Any):
+    from app.services.acnr.catalog_build import build_release
 
-    策略：
-    1. 若 parent_addr_id 精确匹配某 sheet 的 addr_id 且该 sheet 的 cycle == target → True
-    2. 若 parent_addr_id 的前缀字母（如 D1/D1-2 → 'D'）匹配 cycle → True
-       （覆盖 tab 级坐标种子，其 parent 不在 catalog 但循环可由首字母推断）
-    """
-    parent = cell.get("parent_addr_id", "")
+    return build_release(
+        registry_version=registry_version,
+        previous=previous,
+        backend_root=_BACKEND_ROOT,
+        generate_base=lambda **kw: generate_catalog(**kw),
+        render_data=load_render_registry_edges(),
+        today=datetime.now(timezone.utc).date(),
+    )
 
-    # 精确匹配已有 sheet
-    for sheet in sheets:
-        if sheet.get("addr_id") == parent and sheet.get("cycle", "").upper() == cycle:
-            return True
 
-    # 前缀字母推断循环（如 D1/D1-2 → 首字母 'D'）
-    if parent:
-        first_char = parent[0].upper()
-        if first_char == cycle:
-            return True
+def _print_violations(violations: list[Any]) -> None:
+    from app.services.acnr.catalog_release import group_by_check
 
-    return False
+    groups = group_by_check(violations)
+    print(f"[ACNR] 发布门禁违规 {len(violations)} 条（按检查分组）：", file=sys.stderr)
+    for check, items in sorted(groups.items()):
+        print(f"  ── {check}：{len(items)} 条", file=sys.stderr)
+        for v in items[:20]:
+            aid = f" [{v.addr_id}]" if v.addr_id else ""
+            print(f"     ·{aid} {v.detail}", file=sys.stderr)
+        if len(items) > 20:
+            print(f"     … 另有 {len(items) - 20} 条", file=sys.stderr)
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """先写同目录临时文件再 os.replace（中途失败由加载期互校拒绝不一致批次，重跑即恢复）。"""
+    import os
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+def _strip_generated_at(report: Any) -> Any:
+    if isinstance(report, dict):
+        report = dict(report)
+        report.pop("generated_at", None)
+    return report
+
+
+def _structural_drift(committed: dict[str, Any], rebuilt: dict[str, Any]) -> list[str]:
+    """目录逐 addr_id 逐字段比对：返回「addr_id: 字段」形式的漂移行。"""
+    lines: list[str] = []
+    for key in sorted(set(committed) | set(rebuilt)):
+        if key in ("sheets", "cells"):
+            continue
+        if committed.get(key) != rebuilt.get(key):
+            lines.append(f"(顶层): {key}")
+    for kind in ("sheets", "cells"):
+        a = {e.get("addr_id"): e for e in committed.get(kind, [])}
+        b = {e.get("addr_id"): e for e in rebuilt.get(kind, [])}
+        for aid in sorted(set(a) - set(b)):
+            lines.append(f"{aid}: 已提交目录有、重算没有")
+        for aid in sorted(set(b) - set(a)):
+            lines.append(f"{aid}: 重算有、已提交目录没有")
+        for aid in sorted(set(a) & set(b)):
+            for field in sorted(set(a[aid]) | set(b[aid])):
+                if a[aid].get(field) != b[aid].get(field):
+                    lines.append(f"{aid}: {field}")
+    return lines
+
+
+def run_check() -> int:
+    """--check：以已提交版本号重算并结构化比对（漂移退出 2），再对已提交产物跑门禁（违规退出 1）。"""
+    from app.services.acnr.catalog_build import ReleaseInputError, locate_previous
+    from app.services.acnr.catalog_contract import schema_json
+    from app.services.acnr.catalog_release import run_release_gates
+
+    committed = _read_json(_CATALOG_PATH)
+    report = _read_json(_REPORT_PATH)
+    if not isinstance(committed, dict) or not isinstance(report, dict):
+        print("[ACNR check] 漂移：global_catalog.json 或 catalog_report.json 缺失 / 无法解析", file=sys.stderr)
+        return 2
+    release = report.get("release")
+    if not isinstance(release, dict) or release.get("registry_version") != committed.get("registry_version"):
+        print("[ACNR check] 漂移：报告缺 release 段或其版本号与目录不一致（目录未经生成器发布）", file=sys.stderr)
+        return 2
+    try:
+        previous = locate_previous(report, _ACNR_DATA_DIR, for_check=True)
+        cand = _build_candidate(committed["registry_version"], previous)
+    except (ReleaseInputError, ValueError) as exc:
+        print(f"[ACNR check] 无法重算：{exc}", file=sys.stderr)
+        return 2
+
+    drift = _structural_drift(committed, cand.catalog)
+    if _strip_generated_at(report) != cand.report:
+        rk = sorted(k for k in set(_strip_generated_at(report)) | set(cand.report)
+                    if _strip_generated_at(report).get(k) != cand.report.get(k))
+        drift += [f"(报告): {k}" for k in rk]
+    schema_text = _SCHEMA_PATH.read_text(encoding="utf-8") if _SCHEMA_PATH.exists() else ""
+    if schema_text != schema_json():
+        drift.append("(schema): global_catalog.schema.json 与 build_schema() 不一致")
+    snap = _SNAPSHOTS_DIR / f"{committed['registry_version']}.json"
+    if not snap.exists() or snap.read_text(encoding="utf-8") != _CATALOG_PATH.read_text(encoding="utf-8"):
+        drift.append(f"(快照): {snap.name} 缺失或与目录不同")
+    if drift:
+        print(f"[ACNR check] 漂移 {len(drift)} 处（绕过生成器改了产物，或输入变了未重新发布）：", file=sys.stderr)
+        for line in drift[:_MAX_DRIFT_LINES]:
+            print(f"  {line}", file=sys.stderr)
+        if len(drift) > _MAX_DRIFT_LINES:
+            print(f"  … 共 {len(drift)} 处", file=sys.stderr)
+        return 2
+
+    sv = _read_json(_SOURCES_DIR / "sheet_verdicts.json")
+    violations = run_release_gates(
+        committed, previous.catalog if previous else None, report,
+        today=datetime.now(timezone.utc).date(), sheet_verdicts=sv,
+        alias_policy=_read_json(_SOURCES_DIR / "alias_policy.json"),
+        acknowledgements=_read_json(_SOURCES_DIR / "acknowledgements.json"),
+        overrides=_read_json(_OVERRIDES_PATH),
+    )
+    if violations:
+        _print_violations(violations)
+        return 1
+    print(f"[ACNR check] OK — 目录 {committed['registry_version']} 与生成器重算一致，发布门禁 0 违规")
+    return 0
+
+
+def run_write(registry_version: str | None) -> int:
+    """写出：内容不变不写（幂等）；门禁违规退出 1 且不写任何文件。"""
+    from app.services.acnr.catalog_build import ReleaseInputError, load_release_exceptions, locate_previous
+    from app.services.acnr.catalog_contract import schema_json
+    from app.services.acnr.catalog_integrity import content_sha256
+
+    committed = _read_json(_CATALOG_PATH)
+    report = _read_json(_REPORT_PATH)
+    try:
+        if isinstance(report, dict) and isinstance(report.get("release"), dict) and isinstance(committed, dict):
+            same = _build_candidate(committed["registry_version"], locate_previous(report, _ACNR_DATA_DIR, for_check=True))
+            if (not same.violations and same.catalog == committed
+                    and same.report == _strip_generated_at(report)):
+                print(f"[ACNR] 内容未变化，目录仍为 {committed['registry_version']}，不写任何文件")
+                return 0
+        previous = locate_previous(report, _ACNR_DATA_DIR, for_check=False)
+        version = registry_version or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        cand = _build_candidate(version, previous)
+    except (ReleaseInputError, ValueError) as exc:
+        print(f"[ACNR] 发布输入不成立：{exc}", file=sys.stderr)
+        return 1
+    if cand.violations:
+        _print_violations(cand.violations)
+        return 1
+
+    catalog_text = _deterministic_json(cand.catalog)
+    snap = _SNAPSHOTS_DIR / f"{version}.json"
+    if snap.exists() and content_sha256(snap.read_bytes()) != content_sha256(catalog_text.encode("utf-8")):
+        registered = any(e.get("registry_version") == version
+                         for e in load_release_exceptions(_ACNR_DATA_DIR).get("exceptions", []))
+        if not registered:
+            print(f"[ACNR] 失败：快照 {snap.name} 已存在且内容不同（快照不可变）", file=sys.stderr)
+            return 1
+    out_report = dict(cand.report)
+    out_report["generated_at"] = datetime.now(timezone.utc).isoformat()
+    _atomic_write(snap, catalog_text)
+    _atomic_write(_SCHEMA_PATH, schema_json())
+    _atomic_write(_REPORT_PATH, _deterministic_json(out_report))
+    _atomic_write(_CATALOG_PATH, catalog_text)
+    summary = cand.report.get("summary", {})
+    print(f"[ACNR] 已发布 {version}（上一批次 {cand.report['release']['previous_version']}）")
+    print(f"  sheets {summary.get('total_sheets')} / cells {summary.get('total_cells')} / "
+          f"停用 sheet {summary.get('deprecated_sheets')} / 停用 cell {summary.get('deprecated_cells')}")
+    print(f"  目录 sha256 {cand.report['release']['catalog_sha256'][:16]}… 输入指纹 {cand.report['release']['inputs_fingerprint'][:16]}…")
+    _run_offline_gc()
+    return 0
+
+
+def _run_offline_gc() -> None:
+    """离线快照清理：无 DB 会话无法验证引用 ⇒ referenced_versions=None ⇒ fail-closed 不删（Req-16.3）。"""
+    try:
+        from app.services.acnr.catalog_snapshot_gc import cleanup_stale_snapshots
+
+        gc_result = cleanup_stale_snapshots(keep_recent=10, referenced_versions=None)
+        if gc_result.get("reference_status") == "unverifiable":
+            print("  快照清理：引用集合不可验证 → fail-closed，未删除任何快照")
+        elif gc_result["deleted"]:
+            print(f"  快照清理：删除 {len(gc_result['deleted'])} 份过期快照")
+    except Exception as e:  # noqa: BLE001 — 清理失败不影响已完成的发布
+        print(f"  WARNING: 快照清理失败（不影响发布）：{e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -568,99 +617,17 @@ def _cell_belongs_to_cycle(
 # ---------------------------------------------------------------------------
 
 
-def main() -> int:
-    """CLI 入口。"""
-    parser = argparse.ArgumentParser(
-        description="ACNR Catalog Generator — 生成 global_catalog.json"
-    )
-    parser.add_argument(
-        "--offline",
-        action="store_true",
-        help="使用离线缓存（不连接 DB）",
-    )
-    parser.add_argument(
-        "--cycle",
-        default="all",
-        help="循环码（默认 all，加载所有可用 manifest；或指定如 d/k/f/g/h/l/m/n）",
-    )
-    parser.add_argument(
-        "--registry-version",
-        default=None,
-        help="指定 registry_version（默认自动生成时间戳）",
-    )
-    parser.add_argument(
-        "--no-shards",
-        action="store_true",
-        help="不生成分片文件",
-    )
-    args = parser.parse_args()
-
-    print(f"[ACNR] Generating catalog (cycle={args.cycle}, offline={args.offline})")
-
-    try:
-        catalog_data, report_data, manifest_blocked = generate_catalog(
-            cycle=args.cycle,
-            offline=args.offline,
-            registry_version=args.registry_version,
-        )
-    except FileNotFoundError as e:
-        print(f"[ACNR] ERROR: {e}", file=sys.stderr)
-        return 1
-
-    # 写入文件
-    catalog_path, report_path = write_catalog(
-        catalog_data,
-        report_data,
-        write_shards=not args.no_shards,
-        cycle=args.cycle,
-    )
-
-    # ─── Req-16: 生成新版本后自动清理过期快照 ─────────────────────────────
-    # ⚠️ fail-closed（Req-16.3）：本离线脚本无 DB 会话，无法验证哪些历史版本
-    # 被项目锁定引用；传 referenced_versions=None → GC 判定为「不可验证」→
-    # 不删除任何快照。绝不传空集 set()（空集=断言无引用→会误删项目锁定版本）。
-    # 真正的过期清理应由能查询 projects.registry_version 的 DB-aware GC 作业执行
-    # （查得引用集合后经 referenced_versions= 传入）。
-    try:
-        from app.services.acnr.catalog_snapshot_gc import cleanup_stale_snapshots
-
-        gc_result = cleanup_stale_snapshots(keep_recent=10, referenced_versions=None)
-        if gc_result.get("reference_status") == "unverifiable":
-            print(
-                "  Snapshot GC: skipped (引用集合不可验证 → fail-closed，未删除任何快照；"
-                "如需清理请运行 DB-aware GC 作业)"
-            )
-        elif gc_result["deleted"]:
-            print(f"  Snapshot GC: deleted {len(gc_result['deleted'])} stale snapshot(s)")
-        else:
-            print(f"  Snapshot GC: no stale snapshots to clean")
-    except Exception as e:
-        print(f"  WARNING: Snapshot GC failed (non-fatal): {e}", file=sys.stderr)
-
-    # 输出摘要
-    summary = report_data.get("summary", {})
-    print(f"[ACNR] Done.")
-    print(f"  Catalog: {catalog_path}")
-    print(f"  Report:  {report_path}")
-    print(f"  Sheets:  {summary.get('total_sheets', 0)}")
-    print(f"  Cells:   {summary.get('total_cells', 0)}")
-    print(f"  Alias conflicts: {summary.get('alias_conflict_count', 0)}")
-    print(f"  Gaps:    {summary.get('gap_count', 0)}")
-    print(f"  Unregistered aliases: {summary.get('unregistered_alias_count', 0)}")
-    print(f"  Manifest blocked: {manifest_blocked}")
-
-    if manifest_blocked:
-        print(
-            "[ACNR] WARNING: manifest_blocked=true — "
-            "bulk manifest generation is completely blocked due to skip_reason entries."
-        )
-
-    # 确定性校验：计算 hash 供 CI 比对
-    catalog_json = _deterministic_json(catalog_data)
-    digest = hashlib.sha256(catalog_json.encode("utf-8")).hexdigest()[:16]
-    print(f"  SHA256 prefix: {digest}")
-
-    return 0
+def main(argv: list[str] | None = None) -> int:
+    """CLI 入口：只保留 --write（缺省）/ --check / --registry-version。"""
+    parser = argparse.ArgumentParser(description="ACNR 目录生成器（唯一写出方）")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true", help="写出（缺省）")
+    mode.add_argument("--check", action="store_true", help="结构化比对：漂移退出 2，门禁违规退出 1")
+    parser.add_argument("--registry-version", default=None, help="指定新版本号（14 位 UTC 时间戳，缺省取当前时间）")
+    args = parser.parse_args(argv)
+    if args.check:
+        return run_check()
+    return run_write(args.registry_version)
 
 
 if __name__ == "__main__":

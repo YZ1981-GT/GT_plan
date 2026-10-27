@@ -39,7 +39,7 @@ from tests.acnr._status_doc_checks import (
     RESOLVER_DOC_OK,
     SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, V1_BYPASS, Check, Unit,
     _component_tests_present, _exact_identity_is_pure, _exact_identity_only_release_imports,
-    _generator_assigns_utc_timestamp, _orphans_have_deprecate_verdicts, _parsed, _resolve_instance_binds_wp_code,
+    _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
     _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, has_tests,
     in_planned, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open,
@@ -82,6 +82,8 @@ def L(tasks: str) -> Stmt:
 
 _A = "backend/app/services/acnr/"
 _T = "backend/tests/acnr/"
+_BUILD_REL = _A + "catalog_build.py"
+_NAMES_REL = _A + "catalog_names.py"
 _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_INTRO: {
         "本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**": P(
@@ -108,9 +110,14 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_FACTS: {
         "说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果": P(
             *SCHEMA_FOLLOWS_CONTRACT, fact_eq("catalog.schema_errors", "0")),
-        "孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25），待 T07 按判定记录停用（见下表）": P(
-            fact_ne("catalog.orphan_cells", "0"), fact_eq("catalog.deprecated_entries", "0"), task_open("T07"),
-            in_planned("T07"), claim("sheet_verdicts.json 对每个孤儿 cell 都有 deprecate 判定", _orphans_have_deprecate_verdicts)),
+        "孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 44）": P(
+            fact_eq("catalog.orphan_cells", "0"), fact_eq("catalog.deprecated_entries", "44"),
+            claim("sheet_verdicts 里 kind=orphan 的 cell 全部仍在目录、已停用、父 sheet 已补登", _orphan_verdicts_released)),
+        "生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）": P(
+            fact_eq("generator.runs_release_gates", "是"), calls(_GEN_REL, "run_write", "_build_candidate"),
+            calls(_BUILD_REL, "build_release", "run_release_gates"), fact_eq("report.has_release", "是"),
+            claim("过渡期旧报告登记已删除（LEGACY_REPORT_WITHOUT_RELEASE 为 None）", lambda: ci.LEGACY_REPORT_WITHOUT_RELEASE is None),
+            has_tests(_T + "test_catalog_index_fail_closed.py", "test_production_report_release_or_registered_legacy")),
         "本子节表格以外的数字都写明复算键，守卫逐个比对现算值": P(
             has_tests(_STATUS_GUARD_REL, "test_landed_numbers_bound_to_fact_keys")),
         "目录版本号": F("catalog.registry_version"),
@@ -134,21 +141,21 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——生成器 `--check` 与发布门禁（T07）、报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
-            task_open("T07", "T09", "T10", "T22", "T24", "T29", "T30"),
-            in_planned("T07", "T09", "T10", "T22", "T24", "T29", "T30")),
+        "随本 spec 后续任务加入的门禁见下表——报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
+            task_open("T09", "T10", "T22", "T24", "T29", "T30"),
+            in_planned("T09", "T10", "T22", "T24", "T29", "T30")),
         "L1 目录加载与内存索引": CB(
             _A + "catalog.py", ("CatalogIndex", "get_catalog", "list_sheets", "list_cells"),
             _T + "test_catalog_index_fail_closed.py"),
-        "加载期完整性：重复 addr_id fail-closed、LF 内容哈希口径、报告 release 段互校（旧格式报告过渡期跳过）": CB(
+        "加载期完整性：重复 addr_id fail-closed、LF 内容哈希口径、报告 release 段互校（缺 release 段即拒绝）": CB(
             _A + "catalog_integrity.py", ("duplicate_addr_id_problems", "content_sha256", "check_release_report"),
             _T + "test_catalog_index_fail_closed.py",
             has_tests(_T + "test_catalog_index_fail_closed.py", "test_duplicate_sheet_addr_id_fail_closed",
                       "test_content_sha256_is_lf_normalized",
-                      "test_cross_check_no_release_segment_skipped_while_legacy_registered"),
-            claim("旧格式报告的过渡期登记仍在（LEGACY_REPORT_WITHOUT_RELEASE 非空）",
-                  lambda: ci.LEGACY_REPORT_WITHOUT_RELEASE is not None),
-            fact_eq("report.has_release", "否")),
+                      "test_cross_check_no_release_segment_rejected_after_legacy_removed"),
+            claim("旧格式报告的过渡期登记已删除（LEGACY_REPORT_WITHOUT_RELEASE 为 None）",
+                  lambda: ci.LEGACY_REPORT_WITHOUT_RELEASE is None),
+            fact_eq("report.has_release", "是")),
         "底稿域 canonical resolver（非底稿域委托 V1）": CB(
             _A + "resolver.py", ("full_resolve", "resolve_instance"), _T + "test_full_resolve.py",
             RESOLVER_DOC_OK, NON_WP_TO_V1),
@@ -162,24 +169,37 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             _A + "exact_identity.py", ("sheet_of", "cell_of", "name_owner"), _T + "test_exact_identity.py",
             claim("exact_identity 只导入标准库与本包 reasons / catalog_contract / catalog、不做文件或数据库读写（AST）",
                   _exact_identity_is_pure),
-            claim("生产代码里只有 catalog_release 导入 exact_identity（AST）", _exact_identity_only_release_imports)),
+            claim("生产代码里导入 exact_identity 的恰为 catalog_release 与 catalog_names（运行时解析未接入，AST）",
+                  _exact_identity_only_release_imports)),
         "目录契约单一来源，schema 由它生成": CB(
             _A + "catalog_contract.py", ("build_schema", "REGISTRY_VERSION_PATTERN", "FUNCTIONAL_TYPES"),
             _T + "test_catalog_schema_single_source.py",
             claim("schema 文件与 catalog_contract.schema_json() 逐字相同（LF）", _schema_file_is_generated)),
-        "发布门禁模块（尚未接入生成器）": CB(
+        "发布门禁模块（生成器写出与 `--check` 都调用）": CB(
             _A + "catalog_release.py", ("run_release_gates", "GateViolation"), _T + "test_catalog_release_gates.py",
-            not_imports(_GEN_REL, "catalog_release"), fact_eq("catalog_release.production_importers", "0")),
-        "孤儿与历史移除判定记录的 loader（尚未被生成器消费）": CB(
+            calls(_BUILD_REL, "build_release", "run_release_gates"), calls(_GEN_REL, "run_check", "run_release_gates"),
+            fact_eq("catalog_release.production_importers", "2"),
+            has_tests(_T + "test_catalog_release_gates.py", "test_real_catalog_release_gates_blocking_zero")),
+        "孤儿与历史移除判定记录的 loader（发布候选构建读取）": CB(
             _A + "loaders/from_sheet_verdicts.py", ("load_sheet_verdicts",), _T + "test_sheet_verdicts.py",
-            not_imports(_GEN_REL, "from_sheet_verdicts"), not_calls(_GEN_REL, "load_sheet_verdicts")),
-        "平台底稿索引名 loader（尚未被生成器调用）": CB(
+            calls(_BUILD_REL, "build_release", "load_sheet_verdicts")),
+        "平台底稿索引名 loader（名称规则模块调用）": CB(
             _A + "loaders/from_wp_account_mapping.py", ("load_wp_account_mapping_aliases",), _T + "test_name_system.py",
-            not_imports(_GEN_REL, "from_wp_account_mapping"), not_calls(_GEN_REL, "load_wp_account_mapping_aliases")),
-        "目录生成器（旧流程：无门禁、无结构化比对）": CB(
-            _GEN_REL, ("generate_catalog", "write_catalog"), _T + "test_generate_catalog.py",
-            not_imports(_GEN_REL, "catalog_release"),
-            claim("生成器命令行没有 --check（AST）", lambda: "--check" not in _facts()["generator.cli_flags"].split("、"))),
+            calls(_NAMES_REL, "merge_platform_names", "load_wp_account_mapping_aliases")),
+        "生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码": CB(
+            _NAMES_REL, ("merge_platform_names", "apply_cell_names", "apply_cell_verdicts"), _T + "test_name_system.py",
+            calls(_BUILD_REL, "build_release", "merge_platform_names", "apply_cell_names", "apply_cell_verdicts"),
+            has_tests(_T + "test_name_system.py", "test_generator_name_rules_roundtrip_all_non_orphan_cells",
+                      "test_generator_writes_forbidden_alias_policy_nine_groups")),
+        "发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段": CB(
+            _BUILD_REL, ("build_release", "locate_previous", "inputs_fingerprint"), _T + "test_generator_release_flow.py",
+            has_tests(_T + "test_generator_release_flow.py", "test_release_section_is_consistent_with_artifacts")),
+        "目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对）": CB(
+            _GEN_REL, ("generate_catalog", "run_write", "run_check", "main"), _T + "test_generator_release_flow.py",
+            claim("生成器命令行有 --check（AST）", lambda: "--check" in _facts()["generator.cli_flags"].split("、")),
+            has_tests(_T + "test_generator_release_flow.py", "test_second_write_is_idempotent",
+                      "test_gate_violation_writes_nothing_and_names_addr_id", "test_alias_added_only_in_catalog_is_drift"),
+            has_tests(_T + "test_only_generator_writes_catalog.py", "test_catalog_writers_subset_of_generator_and_registered_pending")),
         "写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等）": CB(
             _LINKAGE_REL, ("stale_impact", "stale_impact_by_addr"), _T + "test_stale_write_endpoint_authz.py",
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz),
@@ -193,10 +213,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "生成器名称规则：cell 的 formula_ref / uri 按名称归属选模板名或 sheet_code，449 个非孤儿 cell 全部往返；13 张种子名不一致 sheet 的 47 格三路判定写入 cell_verdicts": L("T06"),
-        "生成器流程重写：目录只由生成器写出，写出前跑 catalog_release 门禁；`--check` 结构化比对（漂移退出 2、门禁违规退出 1）；幂等；快照、schema、带 release 段的报告与目录同批写出；删分片；迁回 57 张外科补丁；首个合规发布批次": L("T07"),
-        "判定记录落进目录：补登 5 张父 sheet、K14~K18 停用、25 个孤儿 cell 停用。设计预演的发布后规模为 sheet 1225 / 有效 cell 449 / 孤儿 0，这是预演值，不是现状": L("T05、T07"),
-        "加载期 release 互校在生产目录上生效（删除旧格式报告的过渡期登记）": L("T07"),
+        "删除 `fix_x3_adjustment_ie_registration` 的目录写入分支、改为核对生成后的目录（「目录只由生成器写出」的严格判据现以 xfail 钉住）": L("T07"),
         "报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单": L("T09"),
         "exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返": L("T10"),
         "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T11、T12、T13、T14、T15、T16"),

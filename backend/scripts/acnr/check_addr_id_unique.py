@@ -72,14 +72,9 @@ def collect_addr_ids(catalog: dict, overrides: dict | None) -> tuple[list[str], 
                 cell_ids.append(addr_id)
             elif entry_type == "sheet":
                 sheet_ids.append(addr_id)
-            # 没有 entry_type 的 override 按 addr_id 段数判断：
-            # 2 段 = sheet（如 D2/D2-2），3 段 = cell（如 D2/D2-2/E100）
-            elif "/" in addr_id:
-                segments = addr_id.split("/")
-                if len(segments) >= 3:
-                    cell_ids.append(addr_id)
-                else:
-                    sheet_ids.append(addr_id)
+            # 没有 entry_type 的 override 是对已有条目的字段补丁（生成器 Step 6 只按 addr_id 改字段、
+            # 不新增条目），不计入 addr_id 集合（acnr-foundation-defect-closure T07：38 条 SAFE 档补丁迁入后，
+            # 旧版按段数把它们当新增条目，必然误报 38 处重复）。
 
     return sheet_ids, cell_ids
 

@@ -870,3 +870,16 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 - §16 Q0（跨 spec 冲突）：以本 spec D1「实现、不下线」为准；`acnr_targets` 字段只在本 spec 定义一次；对方撤回下线计划；不改对方 spec 文件，只在本 spec design 记录裁决、INDEX 登记注明以本 spec 为准（§1.4、§2.6、§16 Q0）。
 
 **本轮未能自行判定、仍登记待拍板**：无新增阻塞级分歧。R2 全部 HIGH/MEDIUM/NIT 均已在设计内落实或给出可执行的实施期现算口径；原 §16 的 Q1~Q14 维持（均为本 spec 范围外、已有建议归属）。
+
+## 21. 段六补记：T06 后半与 T07 主体的实施口径（2026-10-27）
+
+只记与上文不同或上文未写明的实现决定；数字均为现算。
+
+- **首个合规批次的「上一批次」**：§5.3 第 1 条写「首个合规批次无上一批次时 previous_version=null」，§5.4 / §6.3 又要求 G1 四张旧别名由上一批次快照沿用、重算值为已提交值的超集。二者对首批只能满足其一。实现取后者：旧报告没有 release 段时，`catalog_build.locate_previous` 取报告 `registry_version`（20260727115337）的快照，前提是 `release_exceptions.json` 登记了该快照的全长内容哈希（即 §5.3 第 5 条那条唯一例外，内容哈希不符即拒绝）。首批 `release.previous_version` 因此是 20260727115337 而不是 null；该快照同时作为不可变门禁的比对基准。G1 四张现为「旧别名（快照）+ 新别名（标签源）」并存。
+- **release 段多两个字段**：`previous_catalog_sha256`（`--check` 以已提交版本重算时，沿用来源是 `previous_version` 的快照，用它校验快照未被改动）与 `inputs`（逐文件路径与 LF 内容哈希，`inputs_fingerprint` 可由它复算）。上一批次快照在 `inputs` 里记规范相对路径。
+- **报告分组仍是旧形态**：T07 只给报告加 release 段与 `open_problems.unregistered_alias_keys`（门禁 alias / ack 判失效条目的问题清单，28 条）；四组分组与 `gap_count` 删除属 T09。`summary.total_sheets` / `total_cells` 改为发布后规模，并加停用条目数等计数。
+- **「有效 cell 449」口径更正**：§3.2 把「474 − 25 孤儿」记为 449 个有效 cell，同时又说另有 14 个 §6.4 超范围停用条目；这 14 格本在 449 之内。发布后现算：cell 474 = 停用 39（孤儿 25 + 超范围 14）+ 非停用 435，其中语义待核对 33。往返判据（`test_generator_name_rules_roundtrip_all_non_orphan_cells`）覆盖发布后全部 474 格的 formula_ref 与 uri（含停用格），门禁 roundtrip 只核非停用格。
+- **47 格的识别以输入为准**：§1.2 的 47 格是「cell 自带 formula_ref 往返失败且第二参不是平台名」，目录重生成后 formula_ref 已改写、这个口径会变成 0。守卫改为从地址种子识别（种子名与模板名、sheet_code、平台名都不同，且不能经编码词元回到本 sheet），与 HEAD 口径逐个相等（47 = 31 + 2 + 14，13 张 sheet）。
+- **sheet_verdicts 证据键改名**：`in_catalog_as_sheet` → `in_classification_skeleton`。发布后这 10 张都在目录里（由判定记录写入），判定前提是「classification 骨架没有它」，守卫按骨架现算。
+- **`fix_x3_adjustment_ie_registration` 的目录写入分支未删**（T07 未完成项）：它的 `patch_catalog` 被 x3 的四个测试文件在临时副本上直接调用，删分支须同步重写这些测试。`test_only_generator_writes_catalog` 用 AST 污点分析（写入目标由目录字面量派生）现算出写入方恰为生成器与这一个脚本，严格判据以 `xfail(strict=True)` 钉住，删分支后 XPASS 即逼迫去掉标记与登记。
+- **`check_ie_catalog_sync` 在本轮之前的 HEAD（`347cf5a7d`）上退出 1、报 19 处**：D1 / G 共 15 张目录 api_prefix 与 manifest 不一致，H 4 张「manifest 未登记」（都是目录外科补丁）。本轮 manifest 改为已核验前缀、按 §5.4 加「经 overrides 登记」来源后退出 0。

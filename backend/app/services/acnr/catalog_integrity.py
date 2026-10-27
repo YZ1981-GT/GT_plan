@@ -32,21 +32,11 @@ from typing import Any, Iterator
 REPORT_RELEASE_KEY = "release"
 REPORT_RELEASE_REQUIRED_FIELDS = ("registry_version", "catalog_sha256")
 
-#: 过渡期登记：T07 首个合规发布批次之前的旧格式报告（无 release 段）。
-#: design §18 发布顺序①要求加载器与带 release 段的新报告同提交上线，T08 先行入库，
-#: 过渡期内对无 release 段的报告跳过互校（运行时行为不变）。守卫
+#: 过渡期登记：T07 首个合规发布批次之前的旧格式报告（无 release 段）。T07 首个合规发布批次
+#: （20261027124444）已写出带 release 段的报告，登记按退出条件删除（None）；守卫
 #: test_catalog_index_fail_closed::test_production_report_release_or_registered_legacy 钉住：
-#: 生产报告无 release 段时其内容哈希必须等于 report_sha256 且未过期；生产报告出现 release 段时
-#: 本登记必须删除（改为 None）——删除后无 release 段的报告一律被加载器拒绝。
-LEGACY_REPORT_WITHOUT_RELEASE: dict[str, str] | None = {
-    "report_sha256": "71084363f411854a5ee99adcbe47482ecd03c84269d8fc12c6d35972d6ffd09b",
-    "registry_version": "20260727115337",
-    "owner": "acnr-foundation-defect-closure",
-    "reason": "T07 首个合规发布批次之前的旧格式报告没有 release 段；加载器先于生成器重写入库，"
-              "过渡期内只对这一份报告跳过 release 互校",
-    "expires_on": "2027-01-31",
-    "retire_when": "T07 用生成器重生成目录与带 release 段的报告并提交",
-}
+#: 生产报告有 release 段 ⇒ 互校状态 checked 且本登记为 None；此后无 release 段的报告一律被加载器拒绝。
+LEGACY_REPORT_WITHOUT_RELEASE: dict[str, str] | None = None
 
 
 def content_sha256(raw: str | bytes) -> str:
@@ -59,7 +49,7 @@ def content_sha256(raw: str | bytes) -> str:
 # ─── use_catalog 覆盖（只供发布门禁与测试） ─────────────────────────────────────
 # 发布门禁的往返检查要用「待发布的新目录」解析，而不是磁盘上的已提交目录：
 # `with use_catalog(index):` 作用域内 `catalog.get_catalog()` 返回传入的索引。
-# 现状：只有 catalog_release 与测试调用；「生产代码不调用」的 AST 守卫随 T07 落地。
+# 只有 catalog_release 与测试调用；守卫 test_use_catalog_not_called_in_production 用 AST 钉住。
 _catalog_override: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "_acnr_catalog_override", default=None
 )

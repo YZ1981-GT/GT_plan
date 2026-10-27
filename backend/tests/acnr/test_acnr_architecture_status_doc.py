@@ -66,11 +66,8 @@ _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "display.py": ("T29", ("file", "backend/app/services/acnr/display.py")),
     "AcnrTargetResults": ("T16", ("file", "audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue")),
     "AcnrCandidatesHint": ("T31", ("file", "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue")),
-    "--check": ("T07", ("cli_flag", "--check")),
-    "release_exceptions": ("T07", ("file", "backend/data/acnr/release_exceptions.json")),
     "reconcile_v2_canonical": ("T22", ("file", "backend/scripts/acnr/reconcile_v2_canonical.py")),
     "acnr_bypass_scan": ("T24", ("file", "backend/scripts/check/acnr_bypass_scan.py")),
-    "test_only_generator_writes_catalog": ("T07", ("file", "backend/tests/acnr/test_only_generator_writes_catalog.py")),
 }
 
 #: py_ident 探测扫描的目录（AST：def / class / 赋值目标 / 注解字段 / 字符串常量）。
@@ -214,7 +211,7 @@ def _facts() -> dict[str, str]:
         "catalog.cells": str(len(cells)),
         "catalog.cells_with_parent": str(len(cells) - len(orphans)),
         "catalog.orphan_cells": str(len(orphans)),
-        "catalog.orphan_parent_sheet_codes": "、".join(orphan_codes),
+        "catalog.orphan_parent_sheet_codes": "、".join(orphan_codes) if orphan_codes else "无",
         "catalog.deprecated_entries": str(deprecated),
         "catalog.domains": "、".join(domains),
         "catalog.parent_cycles": "、".join(cycles),
@@ -519,9 +516,10 @@ def test_landed_numbers_bound_to_fact_keys():
 
 
 @pytest.mark.parametrize("text,expect_red", [
-    ("孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25）", False),
+    # T07 首个合规发布批次后现算 orphan_cells 为 0（此前为 25，两条自检随之对调）
+    ("孤儿 cell 已停用（`catalog.orphan_cells` 为 0）", False),
     ("25 个孤儿 cell 已全部停用、孤儿计数已清零", True),            # 复审 R-G3e：数字没有绑定复算键
-    ("孤儿 cell 已停用（`catalog.orphan_cells` 为 0）", True),      # 绑定了键但数字与现算不符
+    ("孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25）", True),  # 绑定了键但数字与现算不符
     ("生成器（写出前跑门禁；--check 结构化比对，漂移退出 2）", True),  # 复审 R-G3d：退出码数字没有复算键
 ])
 def test_number_rule_self_check(text, expect_red):
@@ -586,7 +584,6 @@ _COMPLETION_CLAIMS: list[tuple[str, re.Pattern, object]] = [
     ("孤儿 cell 清零 / 停用", re.compile(r"孤儿[^。；]*?(?:已[^，。；、（）()]{0,8}?停用|清零)"),
      lambda: _facts()["catalog.orphan_cells"] == "0"),
     ("目录条目已停用", re.compile(r"已[^，。；、（）()]{0,8}?停用"), lambda: _facts()["catalog.deprecated_entries"] != "0"),
-    ("生成器 --check 退出码", re.compile(r"退出\s*[12]"), lambda: "--check" in _facts()["generator.cli_flags"].split("、")),
     ("版本锁持久化", re.compile(r"已[^，。；、（）()]{0,8}?(?:持久化|落库)"),
      lambda: (_REPO / "backend" / "app" / "services" / "acnr" / "project_registry_lock.py").is_file()),
     ("加载期 release 互校生效", re.compile(r"已[^，。；、（）()]{0,8}?生效"), lambda: _facts()["report.has_release"] == "是"),
@@ -646,12 +643,14 @@ def test_true_completion_claims_are_in_use():
 
 
 @pytest.mark.parametrize("line,landed,expect_red", [
+    # T07 首个合规发布批次后「写出前跑门禁」「孤儿已停用」为真；退出码说法的判据已删（现状节不写退出码），写了即未登记
     ("| 目录生成器（写出前跑 catalog_release 门禁；`--check` 结构化比对，漂移退出 2） | 后端 |", True, True),  # R-G3d
-    ("| 发布门禁模块（已接入生成器，目录写出前运行） | 后端 |", True, True),                              # R-G3f
-    ("25 个孤儿 cell 已全部停用、孤儿计数已清零。", True, True),                                          # R-G3e
+    ("| 发布门禁模块（已接入生成器，目录写出前运行） | 后端 |", True, False),                             # R-G3f 现为真
+    ("25 个孤儿 cell 已全部停用、孤儿计数已清零。", True, False),                                         # R-G3e 现为真（数字另由数字规则拦）
+    ("| 版本锁（已持久化到项目表） | 后端 |", True, True),                                               # T17 未落地
     ("| 发布门禁模块（尚未接入生成器） | 后端 |", True, False),
-    ("生成器写出前跑门禁、`--check` 退出 2（T07）。", False, False),
-    ("生成器写出前跑门禁（T07）。", True, True),  # 「已落地」子节不接受任务号豁免
+    ("版本锁已持久化（T17）。", False, False),
+    ("版本锁已持久化（T17）。", True, True),  # 「已落地」子节不接受任务号豁免
     ("| 发布门禁模块（已在生成器中启用） | 后端 |", True, True),  # 未登记的完成态动词也红
     ("门禁清单：已经在跑的守卫见上表「测试」列。", True, False),  # 「已经在跑」不是完成态动词
 ])

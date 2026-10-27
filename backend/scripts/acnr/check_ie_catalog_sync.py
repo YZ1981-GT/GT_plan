@@ -141,6 +141,19 @@ def _config_contradictions() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _safe_override_segments() -> dict[str, dict]:
+    """global_catalog.overrides.json 中 source 以 `fix_acnr_catalog_ie_gap:SAFE:` 开头的条目：sheet_code → import_export。"""
+    path = _ACNR_DATA_DIR / "global_catalog.overrides.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        str(e.get("addr_id", "")).split("/", 1)[-1]: (e.get("fields") or {}).get("import_export")
+        for e in data.get("overrides", [])
+        if str(e.get("source") or "").startswith("fix_acnr_catalog_ie_gap:SAFE:")
+    }
+
+
 def main() -> int:
     """执行 IE ↔ Catalog sync 检查。"""
     errors: list[str] = []
@@ -289,7 +302,13 @@ def main() -> int:
                 )
             continue
 
+        safe_overrides = _safe_override_segments()
         for sheet_code in uncovered:
+            # 另一种登记来源（acnr-foundation-defect-closure T07，design §5.4）：目录 import_export 与一条
+            # SAFE 档 override 逐字段相等 ⇒ 视为已登记（override 值由 fix_acnr_catalog_ie_gap --check 现算复核）
+            if safe_overrides.get(sheet_code) is not None and safe_overrides[sheet_code] == cycle_catalog_sheets[sheet_code]:
+                print(f"  · [{cycle}] '{sheet_code}' 经 overrides 登记（fix_acnr_catalog_ie_gap:SAFE）")
+                continue
             errors.append(
                 f"[{cycle}] Catalog 中 '{sheet_code}' 有 import_export"
                 f"（enabled=true）但 manifest 中未登记"

@@ -37,17 +37,20 @@ spec: workpaper-import-export-lifecycle-closure（Wave 1 收口期发现的真�
 
 `--check` 会重跑这三条，任一不成立即拒绝写盘。
 
+## 现状（acnr-foundation-defect-closure T07，design §5.4）
+
+修复已迁回生成器输入：`d_cycle_ie_manifest.yaml` / `g_cycle_ie_manifest.yaml` 里这 15 个 sheet 的
+`api_prefix` 已改为 FIX_MAP 目标前缀，目录由 `generate_catalog.py` 写出。本脚本不再写目录，
+`--check` 核对三件事：E1/E2/E3 证据仍成立、manifest 是目标前缀、已发布目录也是目标前缀。
+
 ## 用法
 
     python backend/scripts/fix/fix_acnr_dangling_api_prefix.py --check
-    python backend/scripts/fix/fix_acnr_dangling_api_prefix.py --dry-run
-    python backend/scripts/fix/fix_acnr_dangling_api_prefix.py --apply
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -73,10 +76,6 @@ FIX_MAP: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 
 _EXPECTED_TOTAL = 15  # 全部受影响 sheet 数（守卫与本脚本共用的基线）
-
-
-def _md5(p: Path) -> str:
-    return hashlib.md5(p.read_bytes()).hexdigest()
 
 
 def _load() -> tuple[dict, str]:
@@ -178,49 +177,45 @@ def _verify_targets(cat: dict) -> list[str]:
     return problems
 
 
+def _manifest_prefixes() -> dict[str, str]:
+    """D / G manifest 中 sheet_code → api_prefix（生成器的 I/E 真源）。"""
+    from app.services.acnr.loaders.from_ie_manifest import load_ie_manifest
+
+    out: dict[str, str] = {}
+    for cycle in ("d", "g"):
+        for code, seg in load_ie_manifest(cycle).items():
+            out[code] = (seg or {}).get("api_prefix", "")
+    return out
+
+
 def _pending(cat: dict) -> list[tuple[str, str, str]]:
-    """返回待改条目 (sheet_code, 现值, 目标值)。已改过的不再返回（幂等）。"""
+    """返回未归位条目 (位置:sheet_code, 现值, 目标值)：manifest 与已发布目录各核一次。"""
     out: list[tuple[str, str, str]] = []
     by_code = {s.get("sheet_code"): s for s in cat.get("sheets", [])}
-    for wrong, (target, codes) in FIX_MAP.items():
+    manifest = _manifest_prefixes()
+    for _wrong, (target, codes) in FIX_MAP.items():
         for code in codes:
-            s = by_code.get(code)
-            if not s:
-                continue
-            cur = (s.get("import_export") or {}).get("api_prefix")
-            if cur == wrong:
-                out.append((code, cur, target))
+            if manifest.get(code) != target:
+                out.append((f"manifest:{code}", manifest.get(code, ""), target))
+            cur = ((by_code.get(code) or {}).get("import_export") or {}).get("api_prefix")
+            if cur != target:
+                out.append((f"catalog:{code}", cur or "", target))
     return out
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--check", action="store_true", help="仅校验，有待改项则 exit 2")
-    g.add_argument("--dry-run", action="store_true", help="打印将改动的条目")
-    g.add_argument("--apply", action="store_true", help="写盘")
-    args = ap.parse_args()
+    ap.add_argument("--check", action="store_true", required=True, help="仅校验，有未归位项则 exit 2")
+    ap.parse_args()
 
     if not CATALOG.is_file():
         print(f"[FAIL] catalog 不存在: {CATALOG}")
         return 1
-
-    cat, raw = _load()
-
-    # ─── round-trip 自检：不能逐字复现原文就拒绝写盘 ────────────────────────
-    # 🔴 catalog 有 1215 个 sheet / 1MB+，若 json.dumps 的格式与原文不同，
-    #    写盘会重排整个文件 ⇒ 与并发会话互相回退（memory 已记这类事故）。
-    round_trip = json.dumps(cat, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    if round_trip != raw:
-        if args.apply:
-            print("[FAIL] round-trip 不一致（json.dumps 无法逐字复现原文），拒绝写盘")
-            print(f"       原文 {len(raw)} 字符 / 复现 {len(round_trip)} 字符")
-            return 2
-        print("[WARN] round-trip 不一致 —— apply 前必须先对齐序列化参数")
+    cat, _raw = _load()
 
     problems = _verify_targets(cat)
     if problems:
-        print(f"[FAIL] 目标前缀验证不通过（{len(problems)} 项），拒绝任何改动：")
+        print(f"[FAIL] 目标前缀验证不通过（{len(problems)} 项）：")
         for p in problems:
             print(f"  · {p}")
         return 2
@@ -231,45 +226,12 @@ def main() -> int:
         return 2
 
     pending = _pending(cat)
-
-    if args.check:
-        if pending:
-            print(f"[FAIL] 仍有 {len(pending)} 个 sheet 的 api_prefix 无适配器：")
-            for code, cur, target in pending:
-                print(f"  · {code}: {cur} → {target}")
-            return 2
-        print(f"[OK] 全部 {total_declared} 个 sheet 的 api_prefix 均已归位")
-        return 0
-
-    if not pending:
-        print("[OK] 无待改项（幂等）")
-        return 0
-
-    print(f"待改 {len(pending)} 个 sheet：")
-    for code, cur, target in pending:
-        print(f"  · {code}: {cur} → {target}")
-
-    if args.dry_run:
-        print("[DRY-RUN] 未写盘")
-        return 0
-
-    by_code = {s.get("sheet_code"): s for s in cat.get("sheets", [])}
-    for code, _cur, target in pending:
-        by_code[code]["import_export"]["api_prefix"] = target
-
-    before = _md5(CATALOG)
-    out = json.dumps(cat, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    CATALOG.write_text(out, encoding="utf-8")  # 🔴 必须显式 utf-8（PS 会腌坏中文）
-    after = _md5(CATALOG)
-
-    print(f"[APPLIED] {len(pending)} 项；md5 {before[:8]} → {after[:8]}")
-
-    cat2, _ = _load()
-    left = _pending(cat2)
-    if left:
-        print(f"[FAIL] 写盘后仍有 {len(left)} 项未生效")
+    if pending:
+        print(f"[FAIL] 仍有 {len(pending)} 处 api_prefix 未归位（改 manifest 后运行 generate_catalog.py 发布）：")
+        for where, cur, target in pending:
+            print(f"  · {where}: {cur} → {target}")
         return 2
-    print("[OK] 写盘后复查归零")
+    print(f"[OK] 全部 {total_declared} 个 sheet 的 api_prefix 在 manifest 与已发布目录中均已归位")
     return 0
 
 

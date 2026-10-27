@@ -1,0 +1,14 @@
+{
+  "_doc": "同名快照与目录内容不同的唯一例外登记（design §5.3 第 5 条）。哈希口径为 LF 规范内容 sha256（catalog_integrity.content_sha256）；任一哈希与磁盘现算不符即失效。首个合规发布批次以该快照为上一批次（别名沿用来源与不可变门禁的比对基准），见 catalog_build.locate_previous。",
+  "exceptions": [
+    {
+      "registry_version": "20260727115337",
+      "snapshot_content_sha256": "e98a127ed7c4f275b41c0e3315585479e0d1f36b122a2cded1fc1abdade3126e",
+      "committed_catalog_content_sha256": "b3a988ed2dc63e67fd902b47cfd1ad1694a1a650e1e1336112b7c7148827005b",
+      "authoritative": "snapshot",
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "该版本快照写出后，已提交目录又被 fix 脚本直接改写（外科补丁）：与快照相比 70 张 sheet 的 import_export 不同，其余逐字段相同。快照是生成器当时的产物；T07 把补丁迁回输入后，以快照为此版本的权威内容（没有项目锁定任何版本）",
+      "decided_on": "2026-10-27"
+    }
+  ]
+}

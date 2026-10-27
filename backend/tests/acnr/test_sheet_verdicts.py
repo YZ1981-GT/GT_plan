@@ -183,7 +183,8 @@ def offline_sheet_evidence(sheet_code: str, parent_wp_code: str, addr_id: str) -
     seed_name = seed["sheet_name"] if seed else None
     return {
         "classification_count": sum(1 for r in _classification() if r.get("wp_code") == sheet_code),
-        "in_catalog_as_sheet": addr_id in {s.get("addr_id") for s in _catalog().get("sheets", [])},
+        # classification 骨架（生成器 Step 1）里是否已有该 sheet；发布后这 10 张都由 sheet_verdicts 写进目录
+        "in_classification_skeleton": addr_id in _skeleton_addr_ids(),
         "template_tabs": ev_template_tabs(parent_wp_code, sheet_code, seed_name),
         "renderer_tabs": ev_renderer_tabs(sheet_code, seed_name),
         "renderer_cross_refs": ev_renderer_cross_refs(sheet_code),
@@ -193,7 +194,14 @@ def offline_sheet_evidence(sheet_code: str, parent_wp_code: str, addr_id: str) -
     }
 
 
-_OFFLINE_KEYS = ("classification_count", "in_catalog_as_sheet", "template_tabs", "renderer_tabs",
+@lru_cache(maxsize=1)
+def _skeleton_addr_ids() -> frozenset[str]:
+    from app.services.acnr.loaders.from_classification import load_sheet_skeletons_from_classification
+
+    return frozenset(s.addr_id for s in load_sheet_skeletons_from_classification(_classification()))
+
+
+_OFFLINE_KEYS = ("classification_count", "in_classification_skeleton", "template_tabs", "renderer_tabs",
                  "renderer_cross_refs", "seeds", "ie_manifest", "wp_account_mapping")
 
 
@@ -296,13 +304,23 @@ def test_orphan_cells_all_deprecate(verdicts):
     )
 
 
-def test_orphan_cells_currently_in_catalog_as_orphans():
-    """25 格当前在目录 cells，但父 sheet 不在 sheets ⇒ 孤儿（这正是 T05 要处置的对象）。"""
-    cell_addrs = {c.get("addr_id") for c in _catalog().get("cells", [])}
-    sheet_addrs = {s.get("addr_id") for s in _catalog().get("sheets", [])}
-    for addr in _ORPHAN_CELLS:
-        assert addr in cell_addrs, f"孤儿 cell {addr} 现不在目录 cells，判定过期"
-        assert addr.rsplit("/", 1)[0] not in sheet_addrs, f"{addr} 的父 sheet 已在目录，非孤儿"
+def test_orphan_cells_released_as_deprecated_under_added_parents():
+    """T07 首个合规发布批次之后：25 格仍在目录（不静默消失），父 sheet 由判定补登（source_of_truth=sheet_verdicts、
+    不在 classification 骨架），cell 停用且 replaced_by 指父 sheet；K14~K18 停用并指向替代审定表。"""
+    cells = {c.get("addr_id"): c for c in _catalog().get("cells", [])}
+    sheets = {s.get("addr_id"): s for s in _catalog().get("sheets", [])}
+    for addr in sorted(_ORPHAN_CELLS):
+        parent = addr.rsplit("/", 1)[0]
+        assert addr in cells, f"孤儿 cell {addr} 从目录消失（被引用的 addr_id 不得静默消失）"
+        assert parent not in _skeleton_addr_ids(), f"{parent} 已进 classification 骨架，判定记录过期"
+        assert sheets.get(parent, {}).get("source_of_truth") == "sheet_verdicts", f"{parent} 未由判定补登"
+        c = cells[addr]
+        assert c.get("deprecated") is True and c.get("replaced_by") == parent, (addr, c)
+    old = [s for s in _catalog()["sheets"] if s.get("addr_id") in {f"K{n}/K{n}" for n in range(14, 19)}]
+    assert len(old) == 5
+    for v in old:
+        assert v.get("source_of_truth") == "sheet_verdicts" and v.get("deprecated") is True, v
+        assert v.get("replaced_by") in sheets and v.get("deprecated_at_version"), v
 
 
 # ── 3. 离线证据逐项现算 ──────────────────────────────────────────────────────
@@ -323,7 +341,7 @@ def test_add_platform_sheets_have_no_physical_tab(verdicts):
     """补登父 sheet 的判定前提：模板册与渲染组件都没有这张 tab、classification 0、不在 I/E manifest，但种子与映射有它。"""
     for v in verdicts.add_platform_sheets():
         live = offline_sheet_evidence(v.sheet_code, v.parent_wp_code, v.addr_id)
-        assert live["classification_count"] == 0 and live["in_catalog_as_sheet"] is False, v.addr_id
+        assert live["classification_count"] == 0 and live["in_classification_skeleton"] is False, v.addr_id
         assert live["template_tabs"]["file"] and live["template_tabs"]["has_tab"] is False, v.addr_id
         assert live["renderer_tabs"]["has_tab"] is False, v.addr_id
         assert live["ie_manifest"] is False, v.addr_id

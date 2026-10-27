@@ -15,7 +15,7 @@
     "design_ref": "design §C7（十一组 G1~G11）+ §用户裁决 2",
     "generated_by": "python backend/scripts/check/check_x3_deviation_registry.py --emit",
     "checked_by": "python backend/scripts/check/check_x3_deviation_registry.py --check",
-    "written_at": "2026-10-20T22:31:50+08:00",
+    "written_at": "2026-10-27T21:17:01+08:00",
     "column_contract": "每条恒带三列 catalog_value / contract_value / frontend_observed（R8.4）；某列不适用时值为 null 且必须在 na_reasons 里给出理由 —— `--check` 强制。",
     "verdict_values": [
       "real_drift",
@@ -37,9 +37,9 @@
     },
     "totals": {
       "groups": 11,
-      "baseline_sum": 89,
-      "measured_sum": 89,
-      "entries_landed": 89,
+      "baseline_sum": 74,
+      "measured_sum": 74,
+      "entries_landed": 74,
       "pending_groups": []
     }
   },
@@ -272,9 +272,11 @@
         "id": "g2_ie_enabled_without_manifest_backing",
         "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
         "selfcheck_ok": true,
-        "selfcheck_notes": [],
+        "selfcheck_notes": [
+          "overrides 段已非空（38 条）—— 部分条目可能已有第二兜底，须重核本组口径"
+        ],
         "diagnostics": {
-          "catalog_sheets": 1215,
+          "catalog_sheets": 1225,
           "catalog_ie_enabled": 353,
           "manifest_files": [
             "d_cycle_ie_manifest.yaml",
@@ -297,7 +299,7 @@
             "m",
             "n"
           ],
-          "overrides_entries": 0,
+          "overrides_entries": 38,
           "by_cycle": {
             "H5": 2,
             "H7": 2,
@@ -347,7 +349,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -385,7 +387,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -423,7 +425,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -461,7 +463,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -499,7 +501,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -537,7 +539,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -575,7 +577,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -613,7 +615,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -651,7 +653,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -689,7 +691,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -727,7 +729,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -765,7 +767,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -803,7 +805,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -841,7 +843,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -879,7 +881,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -917,7 +919,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -955,7 +957,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -993,7 +995,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1031,7 +1033,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1069,7 +1071,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1107,7 +1109,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1145,7 +1147,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1183,7 +1185,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1221,7 +1223,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           }
         },
@@ -1256,7 +1258,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1294,7 +1296,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           }
         },
@@ -1329,7 +1331,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1367,7 +1369,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1405,7 +1407,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1443,7 +1445,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1481,7 +1483,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1519,7 +1521,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1557,7 +1559,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1595,7 +1597,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1633,7 +1635,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1671,7 +1673,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1709,7 +1711,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1747,7 +1749,7 @@
               "m",
               "n"
             ],
-            "overrides_entries": 0,
+            "overrides_entries": 38,
             "loss_on_regeneration": true
           },
           "na_reasons": {
@@ -1758,20 +1760,20 @@
       "ci_job": {
         "job": "acnr-ie-catalog-sync",
         "reproduce_cmd": "python backend/scripts/acnr/check_ie_catalog_sync.py",
-        "observed_exit_code": 1,
-        "observed_at": "2026-08-16T00:14:42+08:00",
+        "observed_exit_code": 0,
+        "observed_at": "2026-10-27T21:16:58+08:00",
         "observed_tail": [
-          "✗ [H] Catalog 中 'H7-2' 有 import_export（enabled=true）但 manifest 中未登记",
-          "✗ [H] Catalog 中 'H7-3' 有 import_export（enabled=true）但 manifest 中未登记",
-          "修复方式：更新 manifest YAML 或重新运行 generate_catalog.py 使二者同步。"
+          "合计未被 manifest 覆盖 10 条（基线合计 10，只许下调）。",
+          "[ACNR ie-sync] OK — manifest 与 catalog import_export 段一致（5 全量登记循环 + 3 部分登记循环, 329 条 I/E sheet）。",
+          "ℹ 43 条 manifest 条目在 catalog 中无对应 sheet（classification 粒度不足，首期可接受）。"
         ]
       }
     },
     {
       "group": "G3",
       "title": "manifest 与 catalog `api_prefix` 反向不一致（重生成会把 catalog 现值覆盖回 manifest 值）",
-      "baseline_count": 15,
-      "measured_count": 15,
+      "baseline_count": 0,
+      "measured_count": 0,
       "status": "measured",
       "owner_spec": "g7-column-alignment-and-extraction-closure 等（裁决 2：本 spec 不修，只登记）",
       "verdict_default": "real_drift",
@@ -1789,296 +1791,19 @@
         "diagnostics": {
           "compared_entries": 315,
           "generated_registry_prefixes": 78,
-          "affected_prefix_pairs": [
-            "d1-ecl → d1",
-            "g4 → g4-main",
-            "g6 → g6-main",
-            "g7 → g7-main",
-            "g7-method → g7-equity-method"
-          ]
+          "affected_prefix_pairs": []
         }
       },
-      "entries": [
-        {
-          "group": "G3",
-          "key": "D1-15",
-          "sheet_code": "D1-15",
-          "catalog_value": "d1",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "d_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "d1-ecl",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G4-1",
-          "sheet_code": "G4-1",
-          "catalog_value": "g4-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g4",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G4-2",
-          "sheet_code": "G4-2",
-          "catalog_value": "g4-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g4",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G4-3",
-          "sheet_code": "G4-3",
-          "catalog_value": "g4-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g4",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=exempt.G4-3(kind=not_cycle_ie_factory_key_shared)"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G6-2",
-          "sheet_code": "G6-2",
-          "catalog_value": "g6-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g6",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G6-3",
-          "sheet_code": "G6-3",
-          "catalog_value": "g6-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g6",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-2",
-          "sheet_code": "G7-2",
-          "catalog_value": "g7-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-3",
-          "sheet_code": "G7-3",
-          "catalog_value": "g7-main",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=exempt.G7-3(kind=no_backend_spec)"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-4",
-          "sheet_code": "G7-4",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-5",
-          "sheet_code": "G7-5",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-13",
-          "sheet_code": "G7-13",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-14",
-          "sheet_code": "G7-14",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-15",
-          "sheet_code": "G7-15",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-16",
-          "sheet_code": "G7-16",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        },
-        {
-          "group": "G3",
-          "key": "G7-17",
-          "sheet_code": "G7-17",
-          "catalog_value": "g7-equity-method",
-          "contract_value": null,
-          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G3.method",
-          "evidence": {
-            "manifest_file": "g_cycle_ie_manifest.yaml",
-            "manifest_api_prefix": "g7-method",
-            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
-          },
-          "na_reasons": {
-            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
-          }
-        }
-      ],
+      "entries": [],
+      "baseline_lowered_from": 15,
+      "lowered_by_task": "7",
       "ci_job": {
         "job": "check-acnr-catalog-drift",
         "reproduce_cmd": "python backend/scripts/acnr/check_catalog_drift.py",
-        "observed_exit_code": 1,
-        "observed_at": "2026-08-16T00:14:42+08:00",
+        "observed_exit_code": 0,
+        "observed_at": "2026-10-27T21:16:59+08:00",
         "observed_tail": [
-          "-        \"api_prefix\": \"g7-equity-method\",",
-          "+        \"api_prefix\": \"g7-method\",",
-          "... (551 more lines omitted)"
+          "[ACNR check] OK — 目录 20261027130014 与生成器重算一致，发布门禁 0 违规"
         ]
       }
     },

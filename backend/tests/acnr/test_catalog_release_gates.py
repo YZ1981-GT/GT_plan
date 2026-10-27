@@ -639,27 +639,35 @@ def test_verdict_add_platform_sheet_not_written_blocked():
 # ─── 真实目录：现在报出已知阻断项（审计 A8：对真实数据报 0 即门禁有问题） ─────
 
 
-def test_real_catalog_reports_current_blockers():
-    """T07 发布前的真实目录：门禁必须报出 25 个孤儿与 formula_ref / uri 往返失败。
+def test_real_catalog_release_gates_blocking_zero():
+    """T07 首个合规发布批次之后的真实目录：发布门禁 blocking == 0（对照上一批次快照、带真实报告与全部输入）。
 
-    往返失败集合与 T01 冻结夹具交叉核对（夹具按 HEAD 目录独立导出）：失败数 = 索引名 372 + 三名都不同 47，
-    且包含夹具里 372 条平台索引名写法的全部 addr_id。T07 首个合规批次重生成目录后，本用例须改为 blocking == 0。
+    发布前（T01 冻结夹具 `head_catalog_identity` 那一版）门禁报 orphan 25、formula_ref / uri 往返失败各 419
+    （= 索引名 372 + 三名都不同 47）；这里交叉核对：那 419 + 25 个 addr_id 仍全部在目录里（不静默消失），
+    且 25 个原孤儿已是停用条目、父 sheet 已补登。
     """
-    from app.services.acnr.catalog_integrity import content_sha256
+    from app.services.acnr.catalog_build import locate_previous
 
-    raw = _CATALOG_PATH.read_bytes()
+    data = json.loads(_CATALOG_PATH.read_bytes().decode("utf-8"))
+    acnr = _CATALOG_PATH.parent
+    report = json.loads((acnr / "catalog_report.json").read_text(encoding="utf-8"))
+    previous = locate_previous(report, acnr, for_check=True)
+    assert previous is not None and previous.version == report["release"]["previous_version"]
+    load = lambda name: json.loads((acnr / name).read_text(encoding="utf-8")) if (acnr / name).exists() else None  # noqa: E731
+    violations = run_release_gates(
+        data, previous.catalog, report, today=_TODAY, sheet_verdicts=load("sources/sheet_verdicts.json"),
+        alias_policy=load("sources/alias_policy.json"), acknowledgements=load("sources/acknowledgements.json"),
+        overrides=load("global_catalog.overrides.json"),
+    )
+    assert violations == [], group_by_check(violations)
     fixture = json.loads((Path(__file__).parent / "fixtures" / "platform_name_writings.json").read_text(encoding="utf-8"))
-    assert content_sha256(raw) == fixture["catalog_content_sha256"], (
-        "真实目录已重生成：本用例须由 T07 改为「发布门禁 blocking == 0」验收")
-    data = json.loads(raw.decode("utf-8"))
-    g = group_by_check(run_release_gates(data, previous=None, report=None, today=_TODAY))
     sheet_ids = {s["addr_id"] for s in data["sheets"]}
-    orphans = {c["addr_id"] for c in data["cells"] if c["parent_addr_id"] not in sheet_ids}
-    assert _ids(g, "orphan") == orphans and len(orphans) == fixture["breakdown"]["orphan"]
-    fr_fail = {x.addr_id for x in g["roundtrip"] if x.detail.startswith("formula_ref 往返")}
-    uri_fail = {x.addr_id for x in g["roundtrip"] if x.detail.startswith("uri 往返")}
-    bd = fixture["breakdown"]
-    assert len(fr_fail) == bd["index_name"] + bd["three_names_differ"]
-    assert {w["addr_id"] for w in fixture["writings"]} <= fr_fail
-    assert uri_fail == fr_fail
-    assert not (fr_fail & orphans), "孤儿 cell 只由 orphan 门禁报告"
+    cells = {c["addr_id"]: c for c in data["cells"]}
+    assert {w["addr_id"] for w in fixture["writings"]} <= set(cells)
+    assert all(c["parent_addr_id"] in sheet_ids for c in cells.values()), "发布后孤儿应为 0"
+    orphan_before = [c for c in json.loads((Path(__file__).parent / "fixtures" / "head_catalog_identity.json")
+                                           .read_text(encoding="utf-8"))["cells"]
+                     if c["parent_addr_id"] not in {s["addr_id"] for s in json.loads(
+                         (Path(__file__).parent / "fixtures" / "head_catalog_identity.json").read_text(encoding="utf-8"))["sheets"]}]
+    assert len(orphan_before) == fixture["breakdown"]["orphan"] == 25
+    assert all(cells[c["addr_id"]].get("deprecated") for c in orphan_before)

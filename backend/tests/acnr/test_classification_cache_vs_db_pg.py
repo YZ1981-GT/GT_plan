@@ -109,6 +109,24 @@ def test_reconcile_matches_cache_sha256_and_counts():
         assert rec[sect]["count"] == len(rec[sect]["items"]), f"{sect} count != len(items)"
 
 
+def test_report_release_classification_matches_reconcile_and_cache():
+    """T04 原文验收（段四返工核实 RV-01）：生成器写进报告 release.classification 的模板版本 / 记录数 / sha256
+    与 reconcile 的 cache 段及缓存文件现算值逐值相等。"""
+    from app.services.acnr.catalog_integrity import content_sha256
+
+    report = json.loads((_SRC.parent / "catalog_report.json").read_text(encoding="utf-8"))
+    cls = report["release"]["classification"]
+    rec = _load_reconcile()["cache"]
+    cache = _load_cache()
+    live_tv = sorted({str(r.get("template_version_id") or "") for r in cache})
+    live_sha = content_sha256(_CACHE.read_bytes())
+    assert live_sha == hashlib.sha256(_CACHE.read_bytes()).hexdigest(), "缓存含 CR：LF 内容哈希与字节哈希口径不同，须统一"
+    assert cls["template_version_id"] == rec["template_version_id"] == live_tv
+    assert cls["record_count"] == rec["records"] == len(cache)
+    assert cls["sha256"] == rec["sha256"] == live_sha
+    assert cls["path"] == rec["path"]
+
+
 def test_no_basis_list_is_design_thirteen_records():
     items = _load_reconcile()["cache_only_without_db_basis"]["items"]
     got = {(i["wp_code"], i["sheet_name"]) for i in items}

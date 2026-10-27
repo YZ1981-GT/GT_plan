@@ -16,55 +16,54 @@
 
 | 事实 | 值 | 复算键 |
 |---|---|---|
-| 目录版本号 | `20260727115337` | `catalog.registry_version` |
-| 目录 sheet 条目数 | `1215` | `catalog.sheets` |
+| 目录版本号 | `20261027130014` | `catalog.registry_version` |
+| 目录 sheet 条目数 | `1225` | `catalog.sheets` |
 | 目录 cell 条目数 | `474` | `catalog.cells` |
-| 父 sheet 在目录内的 cell | `449` | `catalog.cells_with_parent` |
-| 孤儿 cell（父 sheet 不在目录） | `25` | `catalog.orphan_cells` |
-| 孤儿 cell 所属 sheet 编码 | `I6-7、J2-5、J3-4、J3-5、M6-5` | `catalog.orphan_parent_sheet_codes` |
-| 停用（deprecated）条目数 | `0` | `catalog.deprecated_entries` |
+| 父 sheet 在目录内的 cell | `474` | `catalog.cells_with_parent` |
+| 孤儿 cell（父 sheet 不在目录） | `0` | `catalog.orphan_cells` |
+| 孤儿 cell 所属 sheet 编码 | `无` | `catalog.orphan_parent_sheet_codes` |
+| 停用（deprecated）条目数 | `44` | `catalog.deprecated_entries` |
 | 条目所属域 | `wp` | `catalog.domains` |
 | 父级编码覆盖的循环 | `A、B、C、D、E、F、G、H、I、J、K、L、M、N、S` | `catalog.parent_cycles` |
-| cell 自带 formula_ref 能解析回本身的条目 | `30` | `catalog.formula_ref_roundtrip_ok` |
+| cell 自带 formula_ref 能解析回本身的条目 | `474` | `catalog.formula_ref_roundtrip_ok` |
 | 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
-| 报告是否带 release 段 | `否` | `report.has_release` |
-| 历史快照份数 | `4` | `snapshots.count` |
-| 仍在仓库的分片文件 | `catalog_ALL.json、catalog_D.json` | `shards.files` |
-| 生成器命令行参数 | `--offline、--cycle、--registry-version、--no-shards` | `generator.cli_flags` |
-| 生成器写出前是否跑发布门禁 | `否` | `generator.runs_release_gates` |
-| 生产代码中导入发布门禁模块的文件数 | `0` | `catalog_release.production_importers` |
+| 报告是否带 release 段 | `是` | `report.has_release` |
+| 历史快照份数 | `5` | `snapshots.count` |
+| 仍在仓库的分片文件 | `无` | `shards.files` |
+| 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
+| 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
+| 生产代码中导入发布门禁模块的文件数 | `2` | `catalog_release.production_importers` |
 
-说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 仍在目录里（`catalog.orphan_cells` 为 25），待 T07 按判定记录停用（见下表）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
+说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 44）；生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
 
 ### 已落地：组件
 
 | 组件 | 类型 | 模块 | 符号 | 测试 |
 |---|---|---|---|---|
 | L1 目录加载与内存索引 | 后端 | `backend/app/services/acnr/catalog.py` | `CatalogIndex`、`get_catalog`、`list_sheets`、`list_cells` | `backend/tests/acnr/test_catalog_index_fail_closed.py` |
-| 加载期完整性：重复 addr_id fail-closed、LF 内容哈希口径、报告 release 段互校（旧格式报告过渡期跳过） | 后端 | `backend/app/services/acnr/catalog_integrity.py` | `duplicate_addr_id_problems`、`content_sha256`、`check_release_report` | `backend/tests/acnr/test_catalog_index_fail_closed.py` |
+| 加载期完整性：重复 addr_id fail-closed、LF 内容哈希口径、报告 release 段互校（缺 release 段即拒绝） | 后端 | `backend/app/services/acnr/catalog_integrity.py` | `duplicate_addr_id_problems`、`content_sha256`、`check_release_report` | `backend/tests/acnr/test_catalog_index_fail_closed.py` |
 | 底稿域 canonical resolver（非底稿域委托 V1） | 后端 | `backend/app/services/acnr/resolver.py` | `full_resolve`、`resolve_instance` | `backend/tests/acnr/test_full_resolve.py` |
 | L2 项目 overlay | 后端 | `backend/app/services/acnr/overlay.py` | `get_project_overlay`、`ProjectOverlay` | `backend/tests/acnr/test_overlay.py` |
 | L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
 | 唯一精确身份判定（纯函数；尚未接入运行时解析） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
 | 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
-| 发布门禁模块（尚未接入生成器） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |
-| 孤儿与历史移除判定记录的 loader（尚未被生成器消费） | 后端 | `backend/app/services/acnr/loaders/from_sheet_verdicts.py` | `load_sheet_verdicts` | `backend/tests/acnr/test_sheet_verdicts.py` |
-| 平台底稿索引名 loader（尚未被生成器调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
-| 目录生成器（旧流程：无门禁、无结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`write_catalog` | `backend/tests/acnr/test_generate_catalog.py` |
+| 发布门禁模块（生成器写出与 `--check` 都调用） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |
+| 孤儿与历史移除判定记录的 loader（发布候选构建读取） | 后端 | `backend/app/services/acnr/loaders/from_sheet_verdicts.py` | `load_sheet_verdicts` | `backend/tests/acnr/test_sheet_verdicts.py` |
+| 平台底稿索引名 loader（名称规则模块调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
+| 生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码 | 后端 | `backend/app/services/acnr/catalog_names.py` | `merge_platform_names`、`apply_cell_names`、`apply_cell_verdicts` | `backend/tests/acnr/test_name_system.py` |
+| 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——生成器 `--check` 与发布门禁（T07）、报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
+门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——报告分组（T09）、往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
-| 生成器名称规则：cell 的 formula_ref / uri 按名称归属选模板名或 sheet_code，449 个非孤儿 cell 全部往返；13 张种子名不一致 sheet 的 47 格三路判定写入 cell_verdicts | T06 |
-| 生成器流程重写：目录只由生成器写出，写出前跑 catalog_release 门禁；`--check` 结构化比对（漂移退出 2、门禁违规退出 1）；幂等；快照、schema、带 release 段的报告与目录同批写出；删分片；迁回 57 张外科补丁；首个合规发布批次 | T07 |
-| 判定记录落进目录：补登 5 张父 sheet、K14~K18 停用、25 个孤儿 cell 停用。设计预演的发布后规模为 sheet 1225 / 有效 cell 449 / 孤儿 0，这是预演值，不是现状 | T05、T07 |
-| 加载期 release 互校在生产目录上生效（删除旧格式报告的过渡期登记） | T07 |
+| 删除 `fix_x3_adjustment_ie_registration` 的目录写入分支、改为核对生成后的目录（「目录只由生成器写出」的严格判据现以 xfail 钉住） | T07 |
 | 报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单 | T09 |
 | exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返 | T10 |
 | 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T11、T12、T13、T14、T15、T16 |

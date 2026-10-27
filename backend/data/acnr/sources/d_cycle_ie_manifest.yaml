@@ -145,7 +145,7 @@ entries:
     import_order: 150
     depends_on_sheets: [D1-1]
   - sheet_code: D1-15
-    api_prefix: d1-ecl
+    api_prefix: d1  # 已核验 bulk 适配器前缀（fix_acnr_dangling_api_prefix.FIX_MAP，原 d1-ecl；T07 迁回外科补丁）
     item_id: [D1-ecl-portfolio-rows, D1-ecl-individual-rows]
     storage_field: remark
     storage_mode: row_json

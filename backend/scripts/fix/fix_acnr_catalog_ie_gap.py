@@ -35,6 +35,12 @@ catalog 的 `item_id` 决定 bulk 从哪个 `checklist_responses.item_id` 读写
 猜错 ⇒ 导出读空、导入写进别的键（数据错位，比"不可用"更糟且更难发现）。
 故本脚本只补能从**后端 specs 字典 AST 直取**的那 13 个前缀，其余显式登记。
 
+## 现状（acnr-foundation-defect-closure T07，design §5.4）
+
+本脚本不再写目录：`--apply` 把 SAFE 档条目写进 `global_catalog.overrides.json`（每条带 owner / reason /
+`source="fix_acnr_catalog_ie_gap:SAFE:{前缀}"`），目录由 `generate_catalog.py` 发布；`--check` 除缺口判定外，
+对 overrides 里每条 SAFE 来源条目用同一 AST 抽取现算 api_prefix / item_id / storage_field 并逐字段比对。
+
 ## 用法
 
     python backend/scripts/fix/fix_acnr_catalog_ie_gap.py --check
@@ -46,7 +52,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
 import re
 import sys
@@ -56,7 +61,8 @@ _BACKEND = Path(__file__).resolve().parents[2]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-CATALOG = _BACKEND / "data" / "acnr" / "global_catalog.json"
+OVERRIDES = _BACKEND / "data" / "acnr" / "global_catalog.overrides.json"
+SAFE_SOURCE_PREFIX = "fix_acnr_catalog_ie_gap:SAFE:"
 WPRS = _BACKEND / "app" / "routers" / "wp_render_strategies"
 
 _THREE = ("export-template", "export-data", "import-data")
@@ -258,6 +264,44 @@ def plan_additions() -> tuple[dict[str, dict[str, dict]], list[str], list[str]]:
     return additions, safe, blocked
 
 
+def _prefix_modules() -> dict[str, Path]:
+    prefix_to_mod: dict[str, Path] = {}
+    for f in WPRS.glob("*_import_export.py"):
+        for p in _module_prefixes(f):
+            prefix_to_mod.setdefault(p, f)
+    return prefix_to_mod
+
+
+def safe_segment(prefix: str, sheet_code: str) -> dict | None:
+    """SAFE 档同一 AST 抽取口径现算某前缀下某 sheet 的 import_export 段；抽不出返回 None。"""
+    mod = _prefix_modules().get(prefix)
+    specs = _factory_specs(mod) if mod else None
+    entry = (specs or {}).get(sheet_code) or {}
+    if not entry.get("item_id"):
+        return None
+    return {"enabled": True, "api_prefix": prefix, "item_id": entry["item_id"],
+            "storage_field": entry.get("storage_field", "remark")}
+
+
+def verify_overrides(overrides: dict | None = None) -> list[str]:
+    """overrides 里每条 SAFE 来源条目与现算逐字段相等（可伪证）；返回问题描述。"""
+    data = overrides if overrides is not None else json.loads(OVERRIDES.read_text(encoding="utf-8"))
+    problems: list[str] = []
+    for e in data.get("overrides", []):
+        src = str(e.get("source") or "")
+        if not src.startswith(SAFE_SOURCE_PREFIX):
+            continue
+        prefix = src[len(SAFE_SOURCE_PREFIX):]
+        code = str(e.get("addr_id", "")).split("/", 1)[-1]
+        want = safe_segment(prefix, code)
+        got = (e.get("fields") or {}).get("import_export")
+        if want is None:
+            problems.append(f"{e.get('addr_id')}: 前缀 {prefix} 的 specs 抽不出该 sheet（来源不可复算）")
+        elif got != want:
+            problems.append(f"{e.get('addr_id')}: overrides 值 {got} ≠ 现算 {want}")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     g = ap.add_mutually_exclusive_group(required=True)
@@ -281,12 +325,18 @@ def main() -> int:
     print(f"已登记不补: {len(blocked)} 条")
 
     if args.check:
+        problems = verify_overrides()
+        if problems:
+            print(f"[FAIL] overrides 的 SAFE 条目与现算不符 {len(problems)} 条：")
+            for x in problems:
+                print(f"  · {x}")
+            return 2
         if additions:
-            print("[FAIL] 仍有可补但未补的条目，请跑 --apply")
+            print("[FAIL] 仍有可补但未补的条目，请跑 --apply（写 overrides）后运行 generate_catalog.py 发布")
             for p in safe:
                 print(f"  · {p}: {sorted(additions[p])}")
             return 2
-        print("[OK] catalog I/E 缺口已按登记表收口")
+        print("[OK] catalog I/E 缺口已按登记表收口；overrides 的 SAFE 条目与现算一致")
         return 0
 
     if args.dry_run:
@@ -300,36 +350,29 @@ def main() -> int:
         print("[OK] 无待补项（幂等）")
         return 0
 
-    raw = CATALOG.read_text(encoding="utf-8")
-    data = json.loads(raw)
-    round_trip = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    if round_trip != raw:
-        print("[FAIL] round-trip 不一致，拒绝写盘（防重排整个文件与并发会话互相回退）")
-        return 2
+    from app.services.acnr.catalog import list_sheets
 
-    by_code = {s.get("sheet_code"): s for s in data.get("sheets", [])}
-    applied = 0
-    missing_sheet: list[str] = []
-    for prefix, per_sheet in additions.items():
-        for code, seg in per_sheet.items():
-            sheet = by_code.get(code)
-            if sheet is None:
-                # catalog 里没有这个 sheet 条目 —— 不新建 sheet（那属 ACNR 目录维护
-                # 半径，需 addr_id / domain / cycle 等一整套元数据），只登记
+    addr_of = {s.get("sheet_code"): s.get("addr_id") for s in list_sheets()}
+    data = json.loads(OVERRIDES.read_text(encoding="utf-8"))
+    existing = {e.get("addr_id") for e in data.get("overrides", [])}
+    applied, missing_sheet = 0, []
+    for prefix, per_sheet in sorted(additions.items()):
+        for code, seg in sorted(per_sheet.items()):
+            aid = addr_of.get(code)
+            if aid is None:
                 missing_sheet.append(f"{prefix}/{code}")
                 continue
-            sheet["import_export"] = seg
+            if aid in existing:
+                continue
+            data.setdefault("overrides", []).append({
+                "addr_id": aid, "fields": {"import_export": seg}, "owner": "workpaper-import-export-lifecycle-closure",
+                "reason": "SAFE 档：specs 字典 AST 抽取且有 bulk 适配器", "source": f"{SAFE_SOURCE_PREFIX}{prefix}",
+            })
             applied += 1
-
-    before = hashlib.md5(CATALOG.read_bytes()).hexdigest()[:8]
-    CATALOG.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    after = hashlib.md5(CATALOG.read_bytes()).hexdigest()[:8]
-    print(f"[APPLIED] {applied} 个 sheet 的 import_export 段；md5 {before} → {after}")
+    OVERRIDES.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[APPLIED] overrides 新增 {applied} 条；请运行 generate_catalog.py 发布目录")
     if missing_sheet:
-        print(f"[NOTE] {len(missing_sheet)} 个 sheet 在 catalog 无条目，未新建（属 ACNR 目录维护半径）:")
+        print(f"[NOTE] {len(missing_sheet)} 个 sheet 在 catalog 无条目，未登记（属 ACNR 目录维护半径）:")
         for x in missing_sheet[:20]:
             print(f"  · {x}")
     return 0

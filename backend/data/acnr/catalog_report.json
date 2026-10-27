@@ -13,18 +13,10 @@
     },
     {
       "action": "blocked",
-      "alias": "附注披露信息（国有企业）",
-      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
-      "sheet_codes": [
-        "D4-附注国企",
-        "附注国企"
-      ]
-    },
-    {
-      "action": "blocked",
       "alias": "附注披露信息（国企）",
       "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
       "sheet_codes": [
+        "D4-附注国企",
         "D5-附注国企",
         "附注国企"
       ]
@@ -69,16 +61,257 @@
     }
   ],
   "gaps": [],
-  "generated_at": "2026-08-01T01:48:23.805345+00:00",
+  "generated_at": "2026-10-27T13:00:15.366215+00:00",
   "manifest_blocked": false,
-  "registry_version": "20260727115337",
+  "open_problems": {
+    "unregistered_alias_keys": [
+      "D4-22A",
+      "D4-31T",
+      "D4-目录",
+      "D4-访谈模板",
+      "D4-附注上市",
+      "D4-附注国企",
+      "D4A",
+      "D5-1",
+      "D5-目录",
+      "D5-附注上市",
+      "D5-附注国企",
+      "D6-目录",
+      "D6-附注上市",
+      "D6-附注国企",
+      "D7-目录",
+      "D7-附注上市",
+      "D7-附注国企",
+      "G10-目录",
+      "G11-目录",
+      "G12-目录",
+      "G13-目录",
+      "G14-目录",
+      "G8-目录",
+      "G9-目录",
+      "H10-目录",
+      "参考中证协",
+      "附注上市",
+      "附注国企"
+    ]
+  },
+  "registry_version": "20261027130014",
+  "release": {
+    "catalog_sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd",
+    "classification": {
+      "path": "backend/data/acnr/sources/classification_cache.json",
+      "record_count": 4640,
+      "sha256": "50454cd67467d294ae13375f360ac9694e7fdb6596fee6fdc3dd2e757b50fdc3",
+      "template_version_id": [
+        "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+      ]
+    },
+    "inputs": [
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d1SheetLabels.ts",
+        "sha256": "b8e29e352efa975f0803985194289a2fd566c8e4622f012aae05f952462de00c"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d3SheetLabels.ts",
+        "sha256": "ec759cf725ae2078eb4e18dc620f7b04015dc70df18d9fee915765fc4e0e67e6"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d4SheetLabels.ts",
+        "sha256": "2766580132eb0661254c57a1f90c082be62719af288fc9f69f0ae5b326a71a7c"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d5SheetLabels.ts",
+        "sha256": "074c2fc7e2dd0b1fe000ff426a4631fba87073c5eb2c12334bf7d149e7b53db9"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d6SheetLabels.ts",
+        "sha256": "dfccd03282c9d8c3b39d7868378a35be01d49dcac002788875a1d0f19b444fc5"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/d7SheetLabels.ts",
+        "sha256": "a9d374076f54152b847973afab61a9df22528533cb9137a32f71303996f14172"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g10SheetLabels.ts",
+        "sha256": "e69afa98c0a626fc2ab93f3e09b9a70780e34ffe2afdef81669a9fda3286854e"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g11SheetLabels.ts",
+        "sha256": "b77efe54d0cfcf30e030bac66d7cee60ec5b4f01099438a0cbfb2823af317579"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g12SheetLabels.ts",
+        "sha256": "b435d0b5b9d213d24598f38d8521f77b2f2670bc0f37bfd935f0409a989465b2"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g13SheetLabels.ts",
+        "sha256": "fd5974c7a6350aca5f53834c34a39455ebd660f41a0056b168adb8f1edf11139"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g14SheetLabels.ts",
+        "sha256": "4de45eaf481c2ee2e23eccd13df30e546b5300d32bec35cfa38d5589fce9fae6"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g1SheetLabels.ts",
+        "sha256": "468704c0c08a2a9cffd096855f3f64d3c4315995a557f7ee3eeb2ec10ae3a4b4"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g2SheetLabels.ts",
+        "sha256": "c20f9d98761bef73b9bcbda57091b7f652834730e5cb38f62006693857083f32"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g5SheetLabels.ts",
+        "sha256": "01f4cc28427f5667e5f21632407c2fae4e307442772241d551e99e26fe02ac95"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g8SheetLabels.ts",
+        "sha256": "a65787fbd3ff1ecc991a965c21a58bba38fc42e217fcb994810e1b076f910a59"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/g9SheetLabels.ts",
+        "sha256": "958566ea093b10f2d63c0396224e8ccc7218a4192c0a076c50b6f6c9fe1e5790"
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/h10SheetLabels.ts",
+        "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
+      },
+      {
+        "path": "backend/data/acnr/catalog_snapshots/20260727115337.json",
+        "sha256": "e98a127ed7c4f275b41c0e3315585479e0d1f36b122a2cded1fc1abdade3126e"
+      },
+      {
+        "path": "backend/data/acnr/global_catalog.overrides.json",
+        "sha256": "e3749fd3ae05e91f069f613cd41a992b2b6a73ccf36aad107950cc528521482d"
+      },
+      {
+        "path": "backend/data/acnr/release_exceptions.json",
+        "sha256": "a590dffde161b1da3816a2e6ecafa981fcbe557fa48d54dfbb8c2d5b4f4aefba"
+      },
+      {
+        "path": "backend/data/acnr/sheet_display_names.json",
+        "sha256": "ff5ea15465896a046eaaa94ed9b7cb203e51c403a07587c601608e003c03fe84"
+      },
+      {
+        "path": "backend/data/acnr/sources/classification_cache.json",
+        "sha256": "50454cd67467d294ae13375f360ac9694e7fdb6596fee6fdc3dd2e757b50fdc3"
+      },
+      {
+        "path": "backend/data/acnr/sources/d_cycle_ie_manifest.yaml",
+        "sha256": "82aa9211a8fb9fb2dfaf500559ac0cfffb7d1c5e3ba637c15d1af051f8ed42db"
+      },
+      {
+        "path": "backend/data/acnr/sources/f_cycle_ie_manifest.yaml",
+        "sha256": "af6625fe5c1855d5f45664aa2a077e06f902d8d4c56c7da489b84be56a7192f5"
+      },
+      {
+        "path": "backend/data/acnr/sources/g_cycle_ie_manifest.yaml",
+        "sha256": "22aa2dac42d8b96c22355f42c70e8f554e86c290372ccea862078d02544946e3"
+      },
+      {
+        "path": "backend/data/acnr/sources/h_cycle_ie_manifest.yaml",
+        "sha256": "f6e17dda30b546464e74d51f6abce3902bcb417b01707a021553d58a7bffd763"
+      },
+      {
+        "path": "backend/data/acnr/sources/k_cycle_ie_manifest.yaml",
+        "sha256": "7884bab97fb4e735e19e0e68eb1f5d7be64d926d6abe4633f8a52dd717965e33"
+      },
+      {
+        "path": "backend/data/acnr/sources/l_cycle_ie_manifest.yaml",
+        "sha256": "30dc34dcdc30d90ebc9208d12772cbdb7d9c68f459a269a7a097e0ab13e6e6ea"
+      },
+      {
+        "path": "backend/data/acnr/sources/m_cycle_ie_manifest.yaml",
+        "sha256": "9106ee2f99e0fe38bfc3c4809b08b25b9b21c0020a76403dba91c9a1cd16597e"
+      },
+      {
+        "path": "backend/data/acnr/sources/n_cycle_ie_manifest.yaml",
+        "sha256": "390d61f145df32c05517520276e5c2c56665ff51c14b7da0b3d9044a5502911f"
+      },
+      {
+        "path": "backend/data/acnr/sources/sheet_verdicts.json",
+        "sha256": "5c7588ecf41e540035d9147913bc8a1152faed4eae045ebb64c073d1f0b875bc"
+      },
+      {
+        "path": "backend/data/c22_address_registry_seed.json",
+        "sha256": "02c74532c77c78667957813380863334fdd9cc5751a25f7766cb2e3814d6e3de"
+      },
+      {
+        "path": "backend/data/d_address_registry_seed.json",
+        "sha256": "3110dc63031cadc0818b57a73f6884487319f6ce1e51d9dd1d2832ac97cb9a33"
+      },
+      {
+        "path": "backend/data/e_address_registry_seed.json",
+        "sha256": "5663fcfbbd87b2e82d0301fb9f7197e55f8f894458593584f8a26340764b2957"
+      },
+      {
+        "path": "backend/data/f_address_registry_seed.json",
+        "sha256": "b634b1fc3eb4ce2b7758f290bccfbc7b2c23fcb4f4ddb39498d51e97a889a590"
+      },
+      {
+        "path": "backend/data/g_address_registry_seed.json",
+        "sha256": "7fa60e9371dddd247f3c34eb6176596518b77cea40489a5311fa4c3ed43efa1b"
+      },
+      {
+        "path": "backend/data/h_address_registry_seed.json",
+        "sha256": "27438031c90c39ee90995ff9f02cba17174a88ca342891a83e6c58f929dbb53b"
+      },
+      {
+        "path": "backend/data/i_address_registry_seed.json",
+        "sha256": "6f6bdd45ae52771855499c42df803db5632ed3c51a41f6624d2806cb524c1d94"
+      },
+      {
+        "path": "backend/data/j_address_registry_seed.json",
+        "sha256": "92c74486fa0c815b92204c5ea089cad5e59a64b71de13cf04c71b75eb8585102"
+      },
+      {
+        "path": "backend/data/k_address_registry_seed.json",
+        "sha256": "b1a55b22b30c10d2db9e80d8a22d53e0c6561390914fe25b8642839a380dafda"
+      },
+      {
+        "path": "backend/data/l_address_registry_seed.json",
+        "sha256": "e272c1f5264303f1396ed4e8eb65222bee20cee2d354458c804277232a5fb2ba"
+      },
+      {
+        "path": "backend/data/m_address_registry_seed.json",
+        "sha256": "63a0fd646c5333334bf7edebed1987953611bb64c923d1a5c03ea22fd031cfb7"
+      },
+      {
+        "path": "backend/data/n_address_registry_seed.json",
+        "sha256": "cc84276ded0bfe7fa7971b6bffea7891aa57acd895a52bfc43c8692f353f7947"
+      },
+      {
+        "path": "backend/data/s_address_registry_seed.json",
+        "sha256": "a8987e0ae4c4df887fbc7c5453c8ec6fd95b87cf8b5a1f55f288e41aa5954c5a"
+      },
+      {
+        "path": "backend/data/workpaper_render_registry.json",
+        "sha256": "598ad417fad693785e6a11d9deb7ca80fe5eaee8323375123567854b9d67bc70"
+      },
+      {
+        "path": "backend/data/wp_account_mapping.json",
+        "sha256": "082b8a081990db1618e28abdaa2059460d16d293283cccb6e90d7856af5acfa3"
+      }
+    ],
+    "inputs_fingerprint": "4e6b3f8b49815db541cdbe50c7a04c015ebe6682db4d252dd76c41f8da5b53c7",
+    "previous_catalog_sha256": "e98a127ed7c4f275b41c0e3315585479e0d1f36b122a2cded1fc1abdade3126e",
+    "previous_version": "20260727115337",
+    "registry_version": "20261027130014",
+    "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
+  },
   "summary": {
     "acknowledged_conflict_count": 0,
-    "alias_conflict_count": 5,
-    "gap_count": 33,
+    "alias_conflict_count": 4,
+    "carried_over_alias_sheets": 4,
+    "deprecated_cells": 39,
+    "deprecated_sheets": 5,
+    "formula_ref_by_sheet_code": 4,
+    "formula_ref_by_template_name": 470,
+    "gap_count": 32,
+    "platform_alias_codes": 833,
+    "semantic_unverified_cells": 33,
     "sheets_with_skip_reason": 0,
     "total_cells": 474,
-    "total_sheets": 1215,
+    "total_sheets": 1225,
     "unregistered_alias_count": 28
   },
   "unregistered_aliases": [
@@ -141,7 +374,7 @@
     },
     {
       "aliases": [
-        "附注披露信息（国有企业）"
+        "附注披露信息（国企）"
       ],
       "reason": "sheet_code not found in classification catalog",
       "sheet_code": "D4-附注国企"

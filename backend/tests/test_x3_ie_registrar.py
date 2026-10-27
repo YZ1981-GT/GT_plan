@@ -429,16 +429,18 @@ def test_apply_preserves_every_previously_enabled_ie_entry(reg, tmp_path: Path) 
     assert len(enabled_after) == len(enabled_before) + 16
     assert enabled_after - enabled_before == set(_TARGET_ADDR_IDS), "新增的已启用集 != 目标集"
 
-    # 对照组：整体重生成会让 38 条掉出 —— 这条差分证明本脚本走的不是重生成
+    # 对照组：整体重生成的杀伤面。原基线 38 = H4/I24/L8/N2 这 38 条 SAFE 档外科补丁只在目录里、没有生成器输入；
+    # acnr-foundation-defect-closure T07（design §5.4）把它们迁进 global_catalog.overrides.json 后，
+    # 整体重生成不再掉任何已启用条目 ⇒ 基线现算为 0（再出现非 0 即又有补丁绕过了生成器输入）。
     from generate_catalog import generate_catalog  # noqa: PLC0415
 
     fresh, _r, _b = generate_catalog(
         offline=True, registry_version=str(before.get("registry_version") or "")
     )
     lost_by_regeneration = enabled_before - reg._enabled_addr_ids(fresh)
-    assert len(lost_by_regeneration) == 38, (
-        f"整体重生成的杀伤面实测 {len(lost_by_regeneration)} 条（基线 38）"
-        " —— 变了就说明 catalog / manifest 侧另有改动，须重新评估禁区"
+    assert len(lost_by_regeneration) == 0, (
+        f"整体重生成的杀伤面实测 {len(lost_by_regeneration)} 条（基线 0，T07 迁回 overrides 前为 38）："
+        f"{sorted(lost_by_regeneration)[:10]} —— 有已启用条目没有生成器输入，须迁回 overrides / manifest"
     )
 
 

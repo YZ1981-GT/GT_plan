@@ -140,7 +140,12 @@ _SNAPSHOT_CONTENT_SHA256 = {
 
 def test_snapshot_content_hashes_pinned():
     got = {fp.name: ci.content_sha256(fp.read_bytes()) for fp in sorted(_SNAPSHOT_DIR.glob("*.json"))}
-    assert got == _SNAPSHOT_CONTENT_SHA256, "既有快照内容被改动（需求 4.5：只能新增快照，不能改旧快照）"
+    pinned = {k: got.get(k) for k in _SNAPSHOT_CONTENT_SHA256}
+    assert pinned == _SNAPSHOT_CONTENT_SHA256, "既有快照内容被改动或被删（需求 4.5：只能新增快照，不能改旧快照）"
+    # 新增快照只能是生成器发布批次：当前 release 版本的快照，内容与报告 release.catalog_sha256 相同（T07）
+    release = json.loads((_SNAPSHOT_DIR.parent / "catalog_report.json").read_text(encoding="utf-8"))["release"]
+    extra = {k: v for k, v in got.items() if k not in _SNAPSHOT_CONTENT_SHA256}
+    assert extra == {f"{release['registry_version']}.json": release["catalog_sha256"]}, extra
 
 
 def test_all_snapshots_load():
@@ -212,11 +217,12 @@ def _fresh_load(monkeypatch, fp: Path | None):
 
 def test_cross_check_no_release_segment_skipped_while_legacy_registered(tmp_path, monkeypatch):
     fp, _ = _write_valid_catalog(tmp_path)
-    # 旧格式报告：无 release 段；过渡期登记存在 → 跳过互校（运行时行为与 T07 之前一致）
+    # 旧格式报告：无 release 段；过渡期登记存在 → 跳过互校。T07 首个合规发布批次后生产登记已删除（None），
+    # 这里注入一条登记只为覆盖 legacy_skip 分支本身（生产登记为 None 由 test_production_report_release_or_registered_legacy 钉住）
     (tmp_path / "catalog_report.json").write_text(
         json.dumps({"registry_version": "20261027000000", "summary": {}}), encoding="utf-8"
     )
-    assert ci.LEGACY_REPORT_WITHOUT_RELEASE is not None
+    monkeypatch.setattr(ci, "LEGACY_REPORT_WITHOUT_RELEASE", {"report_sha256": "x", "registry_version": "20261027000000"})
     idx = _fresh_load(monkeypatch, fp)
     assert idx.registry_version == "20261027000000"
     assert idx.release_check_status == "legacy_skip"

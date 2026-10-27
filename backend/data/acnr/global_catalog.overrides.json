@@ -1,4 +1,537 @@
 {
   "description": "人工补丁（最高优先级覆盖生成器输出）。修改本文件须注明 reason + owner。",
-  "overrides": []
+  "overrides": [
+    {
+      "addr_id": "H5/H5-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "h5",
+          "item_id": "H5-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:h5"
+    },
+    {
+      "addr_id": "H5/H5-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "h5",
+          "item_id": "H5-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:h5"
+    },
+    {
+      "addr_id": "H7/H7-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "h7",
+          "item_id": "H7-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:h7"
+    },
+    {
+      "addr_id": "H7/H7-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "h7",
+          "item_id": "H7-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:h7"
+    },
+    {
+      "addr_id": "I1/I1",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-adj-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I1/I1-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-3-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I1/I1-5",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-5-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I1/I1-6",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-6-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I1/I1-8",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-8-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I1/I1-9",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i1",
+          "item_id": "I1-9-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i1"
+    },
+    {
+      "addr_id": "I2/I2-1",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i2",
+          "item_id": "I2-1-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+    },
+    {
+      "addr_id": "I2/I2-13",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i2",
+          "item_id": "I2-13-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+    },
+    {
+      "addr_id": "I2/I2-14",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i2",
+          "item_id": "I2-14-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+    },
+    {
+      "addr_id": "I2/I2-7",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i2",
+          "item_id": "I2-7-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i2"
+    },
+    {
+      "addr_id": "I3/I3-1",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-adj-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I3/I3-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I3/I3-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-3-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I3/I3-4",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-4-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I3/I3-6",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-6-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I3/I3-7",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i3",
+          "item_id": "I3-7-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i3"
+    },
+    {
+      "addr_id": "I4/I4-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i4",
+          "item_id": "I4-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i4"
+    },
+    {
+      "addr_id": "I4/I4-6",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i4",
+          "item_id": "I4-6-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i4"
+    },
+    {
+      "addr_id": "I5/I5-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i5",
+          "item_id": "I5-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i5"
+    },
+    {
+      "addr_id": "I5/I5-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i5",
+          "item_id": "I5-3-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i5"
+    },
+    {
+      "addr_id": "I6/I6-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i6",
+          "item_id": "I6-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+    },
+    {
+      "addr_id": "I6/I6-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i6",
+          "item_id": "I6-3-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+    },
+    {
+      "addr_id": "I6/I6-5",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i6",
+          "item_id": "I6-5-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+    },
+    {
+      "addr_id": "I6/I6-6",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "i6",
+          "item_id": "I6-6-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:i6"
+    },
+    {
+      "addr_id": "L1/L1-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l1",
+          "item_id": "L1-L1-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l1"
+    },
+    {
+      "addr_id": "L1/L1-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l1",
+          "item_id": "L1-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l1"
+    },
+    {
+      "addr_id": "L3/L3-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l3",
+          "item_id": "L3-L3-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l3"
+    },
+    {
+      "addr_id": "L3/L3-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l3",
+          "item_id": "L3-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l3"
+    },
+    {
+      "addr_id": "L4/L4-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l4",
+          "item_id": "L4-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l4"
+    },
+    {
+      "addr_id": "L4/L4-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l4",
+          "item_id": "L4-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l4"
+    },
+    {
+      "addr_id": "L5/L5-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l5",
+          "item_id": "L5-L5-2-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l5"
+    },
+    {
+      "addr_id": "L5/L5-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "l5",
+          "item_id": "L5-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:l5"
+    },
+    {
+      "addr_id": "N4/N4-2",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "n4",
+          "item_id": "N4-2-detail-rows",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:n4"
+    },
+    {
+      "addr_id": "N4/N4-3",
+      "fields": {
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "n4",
+          "item_id": "N4-3-adj-entries",
+          "storage_field": "remark"
+        }
+      },
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "workpaper-import-export-lifecycle-closure Task 14 的 SAFE 档补丁（原直接写进目录），T07 迁回生成器输入；值由 specs 字典 AST 抽取可复算",
+      "source": "fix_acnr_catalog_ie_gap:SAFE:n4"
+    }
+  ]
 }

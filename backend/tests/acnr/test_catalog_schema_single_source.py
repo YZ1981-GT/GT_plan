@@ -87,7 +87,10 @@ def test_real_catalog_zero_errors():
 def test_four_snapshots_load_and_validate():
     v = Draft7Validator(cc.build_schema())
     snaps = sorted((_ACNR / "catalog_snapshots").glob("*.json"))
-    assert len(snaps) == 4
+    legacy = {"20260710000000.json", "20260727114611.json", "20260727114738.json", "20260727115337.json"}
+    release = json.loads((_ACNR / "catalog_report.json").read_text(encoding="utf-8"))["release"]["registry_version"]
+    # 4 份既有快照 + T07 起生成器发布批次的当前版本快照
+    assert {s.name for s in snaps} == legacy | {f"{release}.json"}
     for s in snaps:
         data = json.loads(s.read_text(encoding="utf-8"))
         assert isinstance(data, dict)

@@ -372,8 +372,21 @@ def _exact_identity_is_pure() -> bool:
 
 
 def _exact_identity_only_release_imports() -> bool:
+    """生产导入方恰为发布门禁与生成器名称规则（T06）——运行时解析（catalog / resolver）尚未接入（T10）。"""
     exclude = _BACKEND / "app" / "services" / "acnr" / "exact_identity.py"
-    return _production_importers("exact_identity", exclude) == ["backend/app/services/acnr/catalog_release.py"]
+    return _production_importers("exact_identity", exclude) == [
+        "backend/app/services/acnr/catalog_names.py", "backend/app/services/acnr/catalog_release.py"]
+
+
+def _orphan_verdicts_released() -> bool:
+    """sheet_verdicts 里 kind=orphan 的 cell 全部仍在目录、已停用、父 sheet 已补登（首个合规发布批次）。"""
+    sv = json.loads((_BACKEND / "data" / "acnr" / "sources" / "sheet_verdicts.json").read_text(encoding="utf-8"))
+    ids = {c.get("addr_id") for c in sv.get("cell_verdicts", []) if c.get("kind") == "orphan"}
+    data = _catalog_data()
+    sheets = {s.get("addr_id") for s in data.get("sheets", [])}
+    cells = {c.get("addr_id"): c for c in data.get("cells", [])}
+    return bool(ids) and all(i in cells and cells[i].get("deprecated") and cells[i].get("parent_addr_id") in sheets
+                             for i in ids)
 
 
 def _non_wp_delegated_to_v1() -> bool:
