@@ -12,6 +12,11 @@ from app.main import app
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
+from app.routers._wp_gate import dedicated_wp_gate
+from app.services import workpaper_side_storage
+
+# 识别端点的底稿 ID 必须是合法 UUID：非 UUID 直接 400（spec attachment-security-baseline 需求 1.6）
+_WP_ID = "7d4c0a1e-3b2f-4c5d-9e8f-0a1b2c3d4e25"
 
 
 class _FakeUser:
@@ -22,12 +27,18 @@ class _FakeUser:
 
 
 @pytest.fixture(autouse=True)
-def override_deps():
+def override_deps(monkeypatch, tmp_path):
     async def _override_db():
         yield AsyncMock()
 
+    async def _skip_wp_gate():
+        # 本文件测识别与生成；可见性门另有 procedure_delegation_visibility 套件覆盖
+        return None
+
     app.dependency_overrides[get_current_user] = lambda: _FakeUser()
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[dedicated_wp_gate] = _skip_wp_gate
+    monkeypatch.setattr(workpaper_side_storage, "SIDE_STORAGE_ROOT", tmp_path / "workpapers")
     yield
     app.dependency_overrides.clear()
 
@@ -51,7 +62,7 @@ async def test_f2_st_contract_ocr_f2_25():
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
-                "/api/workpapers/test-wp/f2-st/contract-ocr?sheet=F2-25",
+                f"/api/workpapers/{_WP_ID}/f2-st/contract-ocr?sheet=F2-25",
                 files={"file": ("count.pdf", io.BytesIO(b"%PDF-1.4 test"), "application/pdf")},
             )
         assert response.status_code == 200
@@ -114,7 +125,8 @@ async def test_f2_st_ocr_rejects_invalid_sheet():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
-            "/api/workpapers/test-wp/f2-st/contract-ocr?sheet=F2-22",
+            f"/api/workpapers/{_WP_ID}/f2-st/contract-ocr?sheet=F2-22",
             files={"file": ("x.pdf", io.BytesIO(b"%PDF"), "application/pdf")},
         )
     assert response.status_code == 400
+    assert "不支持的 sheet" in json.dumps(response.json(), ensure_ascii=False)

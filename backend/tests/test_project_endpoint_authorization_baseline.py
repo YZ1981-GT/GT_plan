@@ -81,6 +81,10 @@ _PROJECT_LEVEL_TOKENS = (
     "require_note_edit_access",
     "assert_note_edit_access",
     "assert_note_role_access",
+    # 2026-10-27 补（spec attachment-security-baseline 需求 2.1）：函证路由的路由级门 services/confirmation_scope_gate.py
+    # —— 先 assert_project_permission（GET readonly / 其余 edit），再核对路径与请求体对象属于路径项目。
+    # 可伪证：test_confirmation_project_gate_is_really_project_level
+    "confirmation_project_gate",
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -583,8 +587,9 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
 _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
-#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
-_PREFIXED_IDENTITY_ONLY_BASELINE = 270
+#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277。
+#: 2026-10-27 spec attachment-security-baseline：函证路由 17 个端点挂路由级项目门，现算 260 → 243
+_PREFIXED_IDENTITY_ONLY_BASELINE = 243
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:
@@ -726,6 +731,35 @@ def test_guard_action_token_is_really_project_level():
     ]
     assert not eqcr_literals, f"_guard_action 含与字面量 'eqcr' 的比较（{len(eqcr_literals)} 处），应通过 is_project_eqcr 判定"
     assert users and all(users.values()), f"复用方必须从 app.routers.deliverable 导入：{users}"
+
+
+def test_confirmation_project_gate_is_really_project_level():
+    """``confirmation_project_gate`` 记作项目级的前提（可伪证）：
+
+    ① 只在 services/confirmation_scope_gate.py 定义一份，函数体真的 await ``assert_project_permission``、
+       并按请求方法定级（``required_level``）、核对路径与请求体对象（``require_*``）；
+    ② 路由里用到它必须是从该模块导入的那一个，且挂在 ``APIRouter(dependencies=[...])`` 上。
+    """
+    gate_src = (_ROOT / "backend/app/services/confirmation_scope_gate.py").read_text(encoding="utf-8")
+    gate = next(n for n in ast.walk(ast.parse(gate_src))
+                if isinstance(n, ast.AsyncFunctionDef) and n.name == "confirmation_project_gate")
+    awaited = {
+        (n.value.func.id if isinstance(n.value.func, ast.Name) else n.value.func.attr)
+        for n in ast.walk(gate) if isinstance(n, ast.Await) and isinstance(n.value, ast.Call)
+    }
+    assert "assert_project_permission" in awaited, "函证门不再 await assert_project_permission"
+    assert {"require_confirmations", "require_attachments", "require_link", "require_workpapers"} <= awaited, awaited
+    assert "required_level" in _auth_names_in_node(gate), "函证门不再按请求方法定级"
+    users = {}
+    for f in sorted(_ROUTERS.rglob("*.py")):
+        tree = ast.parse(f.read_text(encoding="utf-8-sig", errors="replace"))
+        if any(isinstance(n, ast.Name) and n.id == "confirmation_project_gate" for n in ast.walk(tree)):
+            users[f.relative_to(_ROUTERS).as_posix()] = (
+                any(isinstance(n, ast.ImportFrom) and n.module == "app.services.confirmation_scope_gate"
+                    and any(a.name == "confirmation_project_gate" for a in n.names) for n in ast.walk(tree)),
+                "confirmation_project_gate" in _router_vars(tree).get("router", ("", set()))[1],
+            )
+    assert users == {"confirmations.py": (True, True)}, users
 
 
 def test_g_class_word_exports_use_only_guard_action():

@@ -15,9 +15,16 @@ from app.main import app
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
+from app.routers._wp_gate import dedicated_wp_gate
+from app.services import workpaper_side_storage
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+# 底稿 ID 必须是合法 UUID：非 UUID 直接 400、不写盘不识别（spec attachment-security-baseline 需求 1.6）。
+# 原来用 "test-wp-id" 能跑通，靠的正是路由级可见性门对非 UUID 不判定的那个缺口。
+_WP_ID = "7d4c0a1e-3b2f-4c5d-9e8f-0a1b2c3d4e5f"
+
 
 class _FakeUser:
     id = "test-user-id"
@@ -27,13 +34,20 @@ class _FakeUser:
 
 
 @pytest.fixture(autouse=True)
-def override_deps():
+def override_deps(monkeypatch, tmp_path):
     """Override auth and DB dependencies for all tests."""
     async def _override_db():
         yield AsyncMock()
 
+    async def _skip_wp_gate():
+        # 本文件测识别与字段提取；可见性门另有 procedure_delegation_visibility 套件覆盖
+        return None
+
     app.dependency_overrides[get_current_user] = lambda: _FakeUser()
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[dedicated_wp_gate] = _skip_wp_gate
+    # 旁路文件写到临时目录，不在 backend/storage 下留文件
+    monkeypatch.setattr(workpaper_side_storage, "SIDE_STORAGE_ROOT", tmp_path / "workpapers")
 
     yield
 
@@ -102,7 +116,7 @@ async def test_contract_ocr_returns_200_with_valid_upload(
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
-                "/api/workpapers/test-wp-id/d4/contract-ocr",
+                f"/api/workpapers/{_WP_ID}/d4/contract-ocr",
                 files={"file": ("contract.pdf", io.BytesIO(sample_pdf_content), "application/pdf")},
             )
 
@@ -135,7 +149,7 @@ async def test_contract_ocr_returns_correct_schema_keys(
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
-                "/api/workpapers/test-wp-id/d4/contract-ocr",
+                f"/api/workpapers/{_WP_ID}/d4/contract-ocr",
                 files={"file": ("contract.pdf", io.BytesIO(sample_pdf_content), "application/pdf")},
             )
 
@@ -167,7 +181,7 @@ async def test_ocr_failure_returns_empty_fields(sample_pdf_content):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
-                "/api/workpapers/test-wp-id/d4/contract-ocr",
+                f"/api/workpapers/{_WP_ID}/d4/contract-ocr",
                 files={"file": ("contract.png", io.BytesIO(sample_pdf_content), "image/png")},
             )
 
@@ -203,7 +217,7 @@ async def test_llm_failure_returns_empty_fields_with_ocr_text(
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
-                "/api/workpapers/test-wp-id/d4/contract-ocr",
+                f"/api/workpapers/{_WP_ID}/d4/contract-ocr",
                 files={"file": ("contract.jpg", io.BytesIO(sample_pdf_content), "image/jpeg")},
             )
 
@@ -231,9 +245,10 @@ async def test_invalid_file_type_returns_400():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
-            "/api/workpapers/test-wp-id/d4/contract-ocr",
+            f"/api/workpapers/{_WP_ID}/d4/contract-ocr",
             files={"file": ("contract.docx", io.BytesIO(b"fake"), "application/vnd.openxmlformats")},
         )
 
-    # Should reject unsupported file type
-    assert response.status_code in (400, 422)
+    # Should reject unsupported file type（且是因为扩展名，不是因为底稿 ID）
+    assert response.status_code == 400
+    assert "不支持的文件类型" in json.dumps(response.json(), ensure_ascii=False)

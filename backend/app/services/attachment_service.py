@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import logging
 import os
-
-logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -27,6 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.services.attachment_locator import project_attachment_locator
+from app.services.attachment_ocr_text import OCR_PREVIEW_CHARS, ocr_summary
+
+logger = logging.getLogger(__name__)
 
 
 class AttachmentService:
@@ -64,7 +65,16 @@ class AttachmentService:
 
         同 (project_id, reference_id, reference_type, file_name) 第二次调用时
         新行 version=N+1，previous_version_id 指向当前最新版本。
+
+        ``attachment_type`` 必须在登记表内（spec attachment-security-baseline 需求 1.1）；
+        有 ``created_by`` 时写 actor 列，``audit_year`` 未给时取项目审计年度（需求 1.5）。
         """
+        from app.services.attachment_upload_policy import validate_attachment_type
+
+        attachment_type = validate_attachment_type(data.get("attachment_type"))
+        audit_year = data.get("audit_year")
+        if audit_year is None:
+            audit_year = await self._lookup_audit_year(project_id)
         paperless_document_id = data.get("paperless_document_id")
         storage_type = data.get("storage_type")
         if not storage_type:
@@ -93,7 +103,7 @@ class AttachmentService:
             file_path=file_path,
             file_type=data.get("file_type") or self._guess_file_type(data["file_name"]),
             file_size=data.get("file_size", 0),
-            attachment_type=data.get("attachment_type", "general"),
+            attachment_type=attachment_type,
             reference_id=ref_id,
             reference_type=data.get("reference_type"),
             storage_type=storage_type,
@@ -103,6 +113,9 @@ class AttachmentService:
             created_by=created_by,
             version=version,
             previous_version_id=prev_id,
+            audit_year=audit_year,
+            actor_type="user" if created_by is not None else None,
+            actor_user_id=created_by,
         )
         self.db.add(attachment)
         await self.db.flush()
@@ -126,8 +139,17 @@ class AttachmentService:
         metadata: dict[str, Any] | None = None,
         created_by: UUID | None = None,
     ) -> dict:
-        """上传附件，优先存储到 Paperless-ngx，失败时回退到本地存储"""
-        metadata = metadata or {}
+        """上传附件，优先存储到 Paperless-ngx，失败时回退到本地存储
+
+        落盘前先过上传策略（附件类型、扩展名、恶意内容；spec attachment-security-baseline
+        需求 1.1–1.4），不通过抛 ``UploadRejected``，不写任何文件、不建行。
+        """
+        from app.services.attachment_upload_policy import validate_upload
+
+        metadata = dict(metadata or {})
+        metadata["attachment_type"] = await validate_upload(
+            file_name, metadata.get("attachment_type"), content,
+        )
         temp_path = self._write_temp_file(file_name, content)
 
         # 创建异步任务跟踪
@@ -914,6 +936,17 @@ class AttachmentService:
     # 辅助
     # ------------------------------------------------------------------
 
+    async def _lookup_audit_year(self, project_id: UUID) -> int | None:
+        """项目审计年度；取不到返回 None（列可空）。查询放在保存点里，失败不污染调用方事务。"""
+        try:
+            from app.services.project_audit_year import fetch_project_audit_year
+
+            async with self.db.begin_nested():
+                return await fetch_project_audit_year(self.db, project_id)
+        except Exception:
+            logger.debug("attachment audit_year lookup skipped: project=%s", project_id, exc_info=True)
+            return None
+
     def _paperless_uri(self, document_id: int) -> str:
         return f"paperless://documents/{document_id}"
 
@@ -945,8 +978,13 @@ class AttachmentService:
         content: bytes,
         attachment_type: str,
     ) -> str:
+        from app.services.attachment_upload_policy import ensure_within_root, validate_attachment_type
+
         safe_name = Path(file_name).name or "attachment.bin"
+        # 纵深防御（需求 1.2）：入口已校验类型，这里再按登记表校验并确认 resolve 后仍在存储根内。
+        attachment_type = validate_attachment_type(attachment_type)
         target_dir = self.local_storage_root / str(project_id) / attachment_type
+        ensure_within_root(target_dir, self.local_storage_root)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         stem = Path(safe_name).stem
@@ -1010,8 +1048,11 @@ class AttachmentService:
             "storage_type": a.storage_type,
             "paperless_document_id": a.paperless_document_id,
             "ocr_status": a.ocr_status,
-            "ocr_text": a.ocr_text[:200] if a.ocr_text else None,  # 截断预览
+            # 预览（兼容旧消费者）；全文与确认走 ocr-text / ocr-confirm（spec attachment-security-baseline 需求 3.4）
+            "ocr_text": a.ocr_text[:OCR_PREVIEW_CHARS] if a.ocr_text else None,
+            **ocr_summary(a),
             "is_deleted": a.is_deleted,
+            "created_by": str(a.created_by) if a.created_by else None,
             "created_at": a.created_at.isoformat() if a.created_at else None,
             # AT-3 版本字段
             "version": getattr(a, "version", 1),

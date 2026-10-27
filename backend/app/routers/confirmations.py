@@ -3,6 +3,10 @@
 能力域 D — global-refinement-v5-closure：
 完整 CRUD + 状态机推进端点。
 router 统一 commit（项目铁律）。
+
+鉴权：路由级 ``confirmation_project_gate``（spec attachment-security-baseline 需求 2.1、2.2）——
+GET 要求本项目 readonly、其余方法 edit；路径与请求体里的函证 / 附件 / 挂载记录 / 底稿须属于路径项目。
+回填结论与撤回终态另要求系统角色为经理及以上（``_MANAGER_PLUS_ROLES``）。
 """
 
 import uuid
@@ -15,8 +19,16 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_role
 from app.services import confirmation_service
 from app.services import confirmation_evidence_service
+from app.services.confirmation_scope_gate import confirmation_project_gate
 
-router = APIRouter(prefix="/projects/{project_id}/confirmations", tags=["函证管理"])
+router = APIRouter(
+    prefix="/projects/{project_id}/confirmations",
+    tags=["函证管理"],
+    dependencies=[Depends(confirmation_project_gate)],
+)
+
+# 现场经理及以上（撤回终态 / 改结论）；signing_partner 不是系统角色取值，保留只为兼容旧数据
+_MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
 
 
 # ─── Request / Response schemas ────────────────────────────────────────────
@@ -156,11 +168,8 @@ async def assign_match(
 
     注意：本路由须在 ``/{confirmation_id}`` 之前注册，避免路径冲突。
 
-    权限：编辑权（运行时按角色守卫）
+    权限：本项目 edit；回函件、函证、配对发函件须属于本项目（路由级门）
     """
-    from app.deps import require_role as _require_role
-    _ASSIGN_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
-    # 运行时角色检查（不能在 Depends 层因为路由已提前注册到此位置）
     aid = uuid.UUID(attachment_id)
     cid = uuid.UUID(body.confirmation_id)
     paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
@@ -538,12 +547,7 @@ async def batch_sync_confirmations(
 
 
 # ─── M2 附件链端点（confirmation-attachment-ocr-linkage）──────────────────────
-
-# 编辑权：沿用平台既有编辑角色集
-_EDIT_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
-
-# 现场经理及以上（撤回终态/改结论）
-_MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
+# 挂载 / 解绑 / 识别比对 / 自动匹配：本项目 edit 即可（路由级门）。原先的角色集不含审计员，审计员一律 403。
 
 
 class ApplyReplyRequest(BaseModel):
@@ -570,7 +574,7 @@ async def link_attachment(
     confirmation_id: str,
     body: LinkAttachmentRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """挂附件到函证记录。
 
@@ -582,7 +586,7 @@ async def link_attachment(
     paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
     actor_user_id = getattr(user, "id", None)
 
-    # 权限校验在 require_role（置于 try 外），业务校验在 service
+    # 权限与对象归属在路由级门（confirmation_project_gate），业务校验在 service
     try:
         link = await confirmation_evidence_service.link_attachment(
             db,
@@ -618,7 +622,7 @@ async def unlink_attachment(
     confirmation_id: str,
     link_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """解绑附件（清 reference/删 link，不物理删附件，留痕）。"""
     lid = uuid.UUID(link_id)
@@ -663,7 +667,7 @@ async def extract_and_compare(
     project_id: str,
     attachment_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """OCR 识别回函件 + 与所属函证 book_amount 比对。
 
@@ -672,9 +676,8 @@ async def extract_and_compare(
     - 主体名称不符 → counterparty_mismatch 预警
     - 结果仅写 attachment.ocr_fields_cache（governed=False），不落库 confirmations
 
-    权限：编辑权
+    权限：本项目 edit；回函件须属于本项目（路由级门）
     """
-    # 权限校验置于 try 外（require_role 已完成），下面是业务逻辑
     aid = uuid.UUID(attachment_id)
 
     try:
@@ -751,7 +754,7 @@ async def auto_match(
     project_id: str,
     body: AutoMatchRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
+    user=Depends(get_current_user),
 ):
     """批量/单件自动匹配回函件到函证记录。
 

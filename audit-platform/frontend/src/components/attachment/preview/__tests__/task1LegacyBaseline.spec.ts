@@ -217,6 +217,7 @@ describe('Task1/14 Drawer_Host matrix', () => {
   it.each(drawerMatrix.cases)(
     'name=$name type_hint=$type_hint → $branch',
     async ({ name, type_hint, branch, previewSrcKind }) => {
+      vi.mocked(api.get).mockClear() // 只看本例的取数请求（保留实现）
       const wrapper = mount(AttachmentPreviewDrawer, {
         global: { stubs: drawerStubs },
         props: {
@@ -237,13 +238,16 @@ describe('Task1/14 Drawer_Host matrix', () => {
       } else if (branch === 'office' || branch === 'pdf') {
         const iframe = wrapper.find('iframe')
         expect(iframe.exists()).toBe(true)
-        if (previewSrcKind === 'preview-pdf') {
-          expect(iframe.attributes('src')).toBe('/api/attachments/att-drawer-1/preview-pdf')
-        } else {
-          expect(iframe.attributes('src')).toBe('/api/attachments/att-drawer-1/preview')
-        }
+        // 2026-10-27（spec attachment-security-baseline 任务 12）：原断言 src 等于 /api 路径，
+        // 钉住的是缺陷（iframe 原生加载带不上 Bearer 头，恒 401）。现断言同一路由经已鉴权请求取数、
+        // iframe 用 blob: 地址。
+        const expected = previewSrcKind === 'preview-pdf'
+          ? '/api/attachments/att-drawer-1/preview-pdf'
+          : '/api/attachments/att-drawer-1/preview'
+        expect(api.get).toHaveBeenCalledWith(expected, expect.objectContaining({ responseType: 'blob' }))
+        expect(iframe.attributes('src')).toMatch(/^blob:/)
       } else if (branch === 'image') {
-        expect(wrapper.find('img').exists()).toBe(true)
+        expect(wrapper.find('img').attributes('src')).toMatch(/^blob:/)
       } else {
         expect(wrapper.find('.el-empty').exists()).toBe(true)
       }

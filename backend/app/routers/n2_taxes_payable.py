@@ -46,6 +46,7 @@ from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
     attach_shape_a_routes,
 )
+from app.services.workpaper_side_storage import side_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -451,7 +452,7 @@ async def n2_contract_ocr(
         raise HTTPException(400, f"不支持的文件类型: {suffix}，支持: {', '.join(allowed)}")
 
     attachment_id = str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "vouchers"
+    storage_dir = side_storage_dir(wp_id, "vouchers")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{attachment_id}{suffix}"
 

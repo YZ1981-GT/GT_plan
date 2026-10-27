@@ -181,10 +181,10 @@
                 placement="top"
               >
                 <a
-                  :href="`/api/attachments/${evidenceAttachments[$index]!.id}/download`"
-                  target="_blank"
+                  href="#"
                   class="attach-link"
-                  @click.stop
+                  :aria-label="`下载 ${evidenceAttachments[$index]!.fileName}`"
+                  @click.stop.prevent="downloadAttachment(evidenceAttachments[$index]!.id, evidenceAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
               <!-- 上传按钮 (非只读) -->
@@ -239,6 +239,7 @@
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadAttachment } from '@/components/attachment/downloadAttachment'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { uploadAttachment } from '@/services/commonApi'

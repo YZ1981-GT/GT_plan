@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -25,6 +25,7 @@ from app.services.attachment_ocr_writeback import (
 )
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
+from app.services.workpaper_side_storage import parse_workpaper_id, side_storage_dir
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["f4-ai"])
@@ -263,12 +264,7 @@ async def f4_contract_ocr(
     """识别F4-5/F4-7/F4-8/F4-9附件并返回待用户预览、编辑和确认的字段。"""
     del current_user
     linked_att_id = parse_optional_uuid(attachment_id)
-    try:
-        wp_uuid = UUID(wp_id)
-    except ValueError:
-        if linked_att_id is not None:
-            raise HTTPException(400, "无效的 wp_id")
-        wp_uuid = UUID(int=0)
+    wp_uuid = parse_workpaper_id(wp_id)
     schema = DOCUMENT_SCHEMAS.get(document_type)
     if schema is None:
         raise HTTPException(400, f"不支持的F4文档类型: {document_type}")
@@ -297,7 +293,7 @@ async def f4_contract_ocr(
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed_types}")
 
     temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "accounts-payable"
+    storage_dir = side_storage_dir(wp_id, "accounts-payable")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{temp_id}{suffix}"
     content = await file.read()

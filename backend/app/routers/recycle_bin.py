@@ -33,6 +33,8 @@ RECYCLE_BIN_LIMIT = 500
 
 #: 底稿：两层软删，不支持彻底删除
 WORKPAPER_TYPE = "working_paper"
+#: 附件：永久删除前过归档 / 法定保全 / 引用守卫（spec attachment-security-baseline 需求 4.3）
+ATTACHMENT_TYPE = "attachment"
 WORKPAPER_PURGE_FORBIDDEN = {
     "error": "workpaper_purge_forbidden",
     "message": "底稿不支持彻底删除：移入回收站的底稿保留编制内容与审计轨迹，需要时可随时恢复",
@@ -381,6 +383,11 @@ async def permanently_delete(
     if not row:
         raise HTTPException(status_code=404, detail="记录不存在或未被删除")
     await _authorize_row(db, user, item_type, row)
+    if item_type == ATTACHMENT_TYPE:
+        # 归档 423 / 法定保全 423 / 仍被引用 409，对管理员同样生效（spec attachment-security-baseline 需求 4.3）
+        from app.services.attachment_destructive_guard import assert_destructible
+
+        await assert_destructible(db, user, row, operation="purge")
 
     # 项目类型需要级联删除子表
     if item_type == "project":
@@ -412,9 +419,40 @@ async def batch_permanently_delete(
     )).scalars().all()
     for row in rows:
         await _authorize_row(db, user, item_type, row)
+    if item_type == ATTACHMENT_TYPE:
+        return await _batch_purge_attachments(db, user, rows, body.ids)
     result = await bulk_hard_delete(db, model, body.ids, filter_deleted=True)
     await db.commit()
     return result
+
+
+async def _batch_purge_attachments(db: AsyncSession, user: User, rows, ids: list[UUID]) -> dict:
+    """批量永久删除附件：归档 / 保全 / 仍被引用的跳过，回执按原因计数（需求 4.3）。"""
+    from app.services.attachment_destructive_guard import SKIP_REASONS, partition_purgeable, skipped_summary
+
+    _purgeable, skipped = await partition_purgeable(db, user, rows)
+    skipped_ids = {row.id for skipped_rows in skipped.values() for row in skipped_rows}
+    model = _get_recyclable_tables()[ATTACHMENT_TYPE][0]
+    result = await bulk_hard_delete(db, model, [i for i in ids if i not in skipped_ids], filter_deleted=True)
+    for reason, skipped_rows in skipped.items():
+        result["failed"].extend({"id": str(row.id), "error": SKIP_REASONS[reason]} for row in skipped_rows)
+    result["fail_count"] = len(result["failed"])
+    result["total"] = len(ids)
+    result["skipped"] = skipped_summary(skipped)
+    await db.commit()
+    return result
+
+
+async def _purge_deleted_attachments(db: AsyncSession, user: User) -> tuple[int, dict[str, int]]:
+    """清空回收站里的附件：只删可删的，返回（删除数，按原因的跳过数）（需求 4.3）。"""
+    from app.models.attachment_models import Attachment
+    from app.services.attachment_destructive_guard import partition_purgeable, skipped_summary
+
+    rows = (await db.execute(select(Attachment).where(Attachment.is_deleted == True))).scalars().all()  # noqa: E712
+    purgeable, skipped = await partition_purgeable(db, user, rows)
+    if purgeable:
+        await db.execute(delete(Attachment).where(Attachment.id.in_([row.id for row in purgeable])))
+    return len(purgeable), skipped_summary(skipped)
 
 
 @router.post("/empty")
@@ -434,6 +472,12 @@ async def empty_recycle_bin(
 
     tables = _get_recyclable_tables()
 
+    if item_type == ATTACHMENT_TYPE:
+        count, skipped = await _purge_deleted_attachments(db, user)
+        await db.commit()
+        return {"message": f"已永久删除 {count} 条记录" + _skipped_message(skipped),
+                "deleted_count": count, "skipped": skipped}
+
     # 如果指定了非 project 类型，直接删
     if item_type and item_type != "project" and item_type in tables:
         model = tables[item_type][0]
@@ -449,12 +493,18 @@ async def empty_recycle_bin(
     deleted_pids = [row[0] for row in result.fetchall()]
 
     deleted_count = 0
+    skipped: dict[str, int] = {}
 
     # 1. 先删非 project 类型的软删除记录（这些通常没有复杂 FK）；底稿两层软删保留，不清除
     for tbl_key, (model, label, _) in tables.items():
         if tbl_key in ("project", WORKPAPER_TYPE):
             continue
         if not hasattr(model, "is_deleted"):
+            continue
+        if tbl_key == ATTACHMENT_TYPE:
+            # 附件只删可删的（归档 / 保全 / 仍被引用的保留）；判定失败整体保留，不吞成「已删」
+            count, skipped = await _purge_deleted_attachments(db, user)
+            deleted_count += count
             continue
         try:
             r = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
@@ -472,8 +522,17 @@ async def empty_recycle_bin(
         deleted_count += len(deleted_pids)
 
     await db.commit()
-    return {"message": f"已永久删除 {deleted_count} 条记录（底稿不支持彻底删除，仍保留在回收站）",
-            "deleted_count": deleted_count}
+    return {"message": f"已永久删除 {deleted_count} 条记录（底稿不支持彻底删除，仍保留在回收站）"
+                       + _skipped_message(skipped),
+            "deleted_count": deleted_count, "skipped": skipped}
+
+
+def _skipped_message(skipped: dict[str, int]) -> str:
+    from app.services.attachment_destructive_guard import SKIP_REASONS
+
+    if not skipped:
+        return ""
+    return "；以下附件未删除：" + "、".join(f"{SKIP_REASONS[k]} {v} 个" for k, v in skipped.items())
 
 
 @router.get("/stats")

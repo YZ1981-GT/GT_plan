@@ -31,6 +31,7 @@ from app.services.attachment_ocr_writeback import (
 from app.services.attachment_service import AttachmentService
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
+from app.services.workpaper_side_storage import side_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +214,7 @@ async def e1_statement_ocr(
             created_by=getattr(_user, "id", None),
         )
 
-    storage_dir = Path("storage/workpapers") / wp_id / "bank-statements"
+    storage_dir = side_storage_dir(wp_id, "bank-statements")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{out_attachment_id}{suffix}"
 

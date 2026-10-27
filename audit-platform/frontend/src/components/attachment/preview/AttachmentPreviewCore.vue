@@ -66,18 +66,24 @@
       <!-- ── legacy: 服务端 preview-pdf iframe（原 Drawer_Host 抽屉）── -->
       <template v-else>
         <iframe
-          v-if="isPdfServer || (isOfficeServer && officeAvailable !== false)"
-          :src="serverPreviewUrl"
+          v-if="(isPdfServer || (isOfficeServer && officeAvailable !== false)) && serverObjectUrl"
+          :src="serverObjectUrl"
           class="gt-attach-preview__frame"
+          title="原件"
         />
         <img
-          v-else-if="isImageServer"
-          :src="serverPreviewUrl"
+          v-else-if="isImageServer && serverObjectUrl"
+          :src="serverObjectUrl"
           class="gt-attach-preview__img"
           :alt="attachment?.name"
         />
         <div v-else-if="isOfficeServer && officeAvailable === false" class="gt-attach-preview__fallback">
           <el-empty description="服务器未安装 LibreOffice，Office 在线预览不可用">
+            <el-button type="primary" @click="onDownload">下载查看</el-button>
+          </el-empty>
+        </div>
+        <div v-else-if="serverWantsInline" v-loading="serverState === 'loading'" class="gt-attach-preview__fallback">
+          <el-empty :description="serverStateText">
             <el-button type="primary" @click="onDownload">下载查看</el-button>
           </el-empty>
         </div>
@@ -113,6 +119,7 @@ import {
 import { attachments as P_att, officePreview as P_office } from '@/services/apiPaths'
 import { api } from '@/services/apiProxy'
 import { downloadFile } from '@/utils/http'
+import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
 
 /** 单一预览宿主统一附件描述 */
 export interface AttachmentForPreview {
@@ -232,6 +239,16 @@ async function probeOfficeHealth() {
     officeAvailable.value = false
   }
 }
+
+// ── server variant：原件经已鉴权请求换成 blob: 地址（iframe / img 直接用 /api 路径带不上令牌，恒 401）──
+const serverWantsInline = computed(
+  () => isPdfServer.value || isImageServer.value || (isOfficeServer.value && officeAvailable.value !== false),
+)
+const { url: serverObjectUrl, state: serverState } = useAuthedObjectUrl(
+  () => (props.variant === 'server' && props.active && serverWantsInline.value ? serverPreviewUrl.value : ''),
+  { type: () => (isImageServer.value ? undefined : 'application/pdf') },
+)
+const serverStateText = computed(() => authedObjectUrlFailureText(serverState.value) || '原件加载中…')
 
 // ── client variant 的 blob 加载 ──
 function revokePreviewSrc() {

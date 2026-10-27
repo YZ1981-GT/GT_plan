@@ -264,6 +264,12 @@ export const attachments = {
   download: (id: string) => `/api/attachments/${id}/download`,
   associate: (id: string) => `/api/attachments/${id}/associate`,
   ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
+  /** 识别全文 + sha256 + 确认状态（列表里的 ocr_text 只是 200 字预览） */
+  ocrText: (id: string) => `/api/attachments/${id}/ocr-text`,
+  /** 核对后确认识别结果（带打开核对时全文的 sha256，不一致 409） */
+  ocrConfirm: (id: string) => `/api/attachments/${id}/ocr-confirm`,
+  /** 重新识别（重置状态并调度识别任务） */
+  retryOcr: (id: string) => `/api/attachments/${id}/retry-ocr`,
   /** 附件版本列表（AttachmentVersionsDialog 加载用） */
   versions: (id: string) => `/api/attachments/${id}/versions`,
   /** 回滚附件到指定版本（创建新版本复制旧版本内容） */

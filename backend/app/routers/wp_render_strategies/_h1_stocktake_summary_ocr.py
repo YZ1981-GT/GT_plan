@@ -24,6 +24,7 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
+from app.services.workpaper_side_storage import side_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ async def h1_stocktake_summary_ocr(
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
     attachment_id = str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "h1-stocktake-summary"
+    storage_dir = side_storage_dir(wp_id, "h1-stocktake-summary")
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / f"{attachment_id}{suffix}"
 

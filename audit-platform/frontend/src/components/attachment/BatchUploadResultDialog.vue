@@ -72,21 +72,21 @@
             </div>
             <div class="gt-batch-detail-split">
               <!-- 预览 -->
-              <div class="gt-batch-detail-preview">
-                <img v-if="isImage(selectedItem)" :src="selectedItem.previewUrl" class="gt-batch-preview-img" />
-                <iframe v-else-if="isPdf(selectedItem)" :src="selectedItem.previewUrl" class="gt-batch-preview-iframe" frameborder="0" />
+              <div class="gt-batch-detail-preview" v-loading="previewState === 'loading'">
+                <img v-if="isImage(selectedItem) && previewSrc" :src="previewSrc" class="gt-batch-preview-img" alt="原件" />
+                <iframe v-else-if="isPdf(selectedItem) && previewSrc" :src="previewSrc" class="gt-batch-preview-iframe" frameborder="0" title="原件" />
                 <div v-else class="gt-batch-preview-fallback">
                   <div style="font-size:36px">{{ getEmoji(selectedItem) }}</div>
-                  <div style="margin-top:8px;font-size:12px;color:var(--gt-color-text-tertiary)">暂不可预览</div>
+                  <div style="margin-top:8px;font-size:12px;color:var(--gt-color-text-tertiary)">{{ previewHint }}</div>
                 </div>
               </div>
               <!-- OCR 文本 -->
-              <div class="gt-batch-detail-ocr">
+              <div class="gt-batch-detail-ocr" v-loading="loadingIdx === selectedIdx">
                 <el-input
                   v-model="selectedItem.ocrText"
                   type="textarea"
                   :autosize="{ minRows: 8, maxRows: 20 }"
-                  :disabled="selectedItem.status === 'ocr_confirmed'"
+                  :disabled="selectedItem.status === 'ocr_confirmed' || !selectedItem.ocrBaseSha256"
                   class="gt-batch-ocr-textarea"
                 />
                 <el-button
@@ -95,6 +95,7 @@
                   size="small"
                   style="margin-top: 8px"
                   :loading="confirming"
+                  :disabled="!selectedItem.ocrBaseSha256"
                   @click="confirmSingleOcr(selectedIdx)"
                 >
                   确认此文件
@@ -130,10 +131,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
-import { attachments as P_att } from '@/services/apiPaths'
+import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import { OCR_TEXT_CHANGED_TIP, confirmOcrText, isOcrTextChanged, loadOcrText } from './ocrTextApi'
 
 export interface BatchUploadItem {
   fileName: string
@@ -141,7 +142,11 @@ export interface BatchUploadItem {
   fileType: string
   attachmentId?: string
   previewUrl?: string
+  /** 上传回执里是 200 字预览；选中待确认文件时换成全文（loadFullText） */
   ocrText?: string
+  /** 取全文时的原文与 sha256：确认时作 base（spec attachment-security-baseline 需求 3.5） */
+  ocrOriginalText?: string
+  ocrBaseSha256?: string
   confidence?: number
   status: 'success' | 'ocr_pending' | 'ocr_confirmed' | 'failed'
   error?: string
@@ -185,6 +190,21 @@ function isPdf(item: BatchUploadItem): boolean {
   return (item.fileType || '').toLowerCase().includes('pdf')
 }
 
+// 原件经已鉴权请求换成 blob: 地址：iframe / img 直接用 /api 路径带不上令牌，恒 401
+const canPreview = computed(() => {
+  const item = selectedItem.value
+  return !!item?.previewUrl
+    && (item.status === 'ocr_pending' || item.status === 'ocr_confirmed')
+    && (isImage(item) || isPdf(item))
+})
+const { url: previewSrc, state: previewState } = useAuthedObjectUrl(
+  () => (visible.value && canPreview.value ? selectedItem.value?.previewUrl : ''),
+  { type: () => (selectedItem.value && isPdf(selectedItem.value) ? 'application/pdf' : undefined) },
+)
+const previewHint = computed(() =>
+  canPreview.value ? authedObjectUrlFailureText(previewState.value) || '原件加载中…' : '暂不可预览',
+)
+
 function getEmoji(item: BatchUploadItem): string {
   const t = (item.fileType || item.fileName || '').toLowerCase()
   if (t.includes('pdf')) return '📕'
@@ -204,19 +224,56 @@ function formatSize(bytes: number): string {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB'
 }
 
+const loadingIdx = ref<number | null>(null)
+
+/** 取全文与 sha256（原先确认写回的是上传回执里的 200 字预览，全文被截断）。 */
+async function loadFullText(item: BatchUploadItem, force = false): Promise<void> {
+  if (!item.attachmentId || (item.ocrBaseSha256 && !force)) return
+  const snap = await loadOcrText(item.attachmentId)
+  item.ocrText = snap.text
+  item.ocrOriginalText = snap.text
+  item.ocrBaseSha256 = snap.sha256
+}
+
+watch(() => [visible.value, selectedIdx.value] as const, async ([show, idx]) => {
+  const item = props.items[idx]
+  if (!show || !item || item.status !== 'ocr_pending' || item.ocrBaseSha256) return
+  loadingIdx.value = idx
+  try {
+    await loadFullText(item)
+  } catch {
+    ElMessage.error(`"${item.fileName}" 识别全文加载失败`)
+  } finally {
+    if (loadingIdx.value === idx) loadingIdx.value = null
+  }
+}, { immediate: true })
+
+/** 确认一个文件：未取过全文的先取（批量确认时未打开过的文件按原文确认）；返回是否成功。 */
+async function confirmItem(item: BatchUploadItem): Promise<boolean> {
+  if (!item.attachmentId) return false
+  try {
+    await loadFullText(item)
+    const revised = item.ocrText !== item.ocrOriginalText ? item.ocrText : undefined
+    await confirmOcrText(item.attachmentId, item.ocrBaseSha256 || '', revised)
+    item.status = 'ocr_confirmed'
+    return true
+  } catch (e: any) {
+    if (isOcrTextChanged(e)) {
+      ElMessage.warning(`"${item.fileName}"：${OCR_TEXT_CHANGED_TIP}`)
+      await loadFullText(item, true).catch(() => undefined)
+    } else {
+      ElMessage.error(`"${item.fileName}" 确认失败`)
+    }
+    return false
+  }
+}
+
 async function confirmSingleOcr(idx: number) {
   const item = props.items[idx]
   if (!item || !item.attachmentId) return
   confirming.value = true
   try {
-    await api.put(P_att.ocrStatus(item.attachmentId), {
-      status: 'completed',
-      ocr_text: item.ocrText || '',
-    })
-    item.status = 'ocr_confirmed'
-    ElMessage.success(`"${item.fileName}" OCR 已确认`)
-  } catch {
-    ElMessage.error(`"${item.fileName}" 确认失败`)
+    if (await confirmItem(item)) ElMessage.success(`"${item.fileName}" OCR 已确认`)
   } finally {
     confirming.value = false
   }
@@ -226,16 +283,7 @@ async function confirmAllOcr() {
   confirmingAll.value = true
   let count = 0
   for (const item of props.items) {
-    if (item.status === 'ocr_pending' && item.attachmentId) {
-      try {
-        await api.put(P_att.ocrStatus(item.attachmentId), {
-          status: 'completed',
-          ocr_text: item.ocrText || '',
-        })
-        item.status = 'ocr_confirmed'
-        count++
-      } catch { /* 单个失败继续 */ }
-    }
+    if (item.status === 'ocr_pending' && item.attachmentId && await confirmItem(item)) count++
   }
   confirmingAll.value = false
   ElMessage.success(`已确认 ${count} 个文件的 OCR 结果`)
@@ -361,9 +409,12 @@ async function confirmAllOcr() {
 .gt-batch-preview-iframe { width: 100%; height: 100%; min-height: 300px; }
 .gt-batch-preview-fallback { text-align: center; padding: 40px; }
 
-.gt-batch-detail-ocr { flex: 1; display: flex; flex-direction: column; }
+.gt-batch-detail-ocr { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
+/* 全文封顶、内部滚动，不得溢出盖住「确认此文件」与底部按钮（同 OcrConfirmDialog） */
 .gt-batch-ocr-textarea :deep(.el-textarea__inner) {
+  max-height: calc(65vh - 110px);
+  overflow-y: auto;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 1.6;

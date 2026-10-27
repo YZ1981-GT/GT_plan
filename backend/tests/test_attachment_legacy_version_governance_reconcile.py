@@ -70,7 +70,9 @@ CREATE TABLE attachments (
     state varchar(20) DEFAULT 'available',
     current_version_id uuid,
     actor_type varchar(20), actor_user_id uuid, actor_service_identity_id uuid,
-    original_creator_unknown boolean DEFAULT false
+    original_creator_unknown boolean DEFAULT false,
+    -- V209 识别文本确认留痕（ORM Attachment 映射列）
+    ocr_confirmed_sha256 varchar(64), ocr_confirmed_by uuid, ocr_confirmed_at timestamptz, ocr_confirmed_edited boolean
 );
 CREATE TABLE attachment_versions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

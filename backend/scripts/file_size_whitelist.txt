@@ -1617,3 +1617,8 @@ backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
 backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
 backend/scripts/fix/fix_note_i_cycle_structure.py  1259
 backend/tests/test_note_expandable_rows.py  986
+# attachment-security-baseline（2026-10-27）：附件服务 HEAD 即 1391 行超限（历史大文件，此前从未改动、未登记）。
+#   本 spec 只加入口校验、落盘根校验、actor / 审计年度与 OCR 确认字段（新逻辑放 attachment_upload_policy /
+#   attachment_ocr_text 两个新模块），基线取 HEAD 值。拆分方向：版本链（_lock_version_chain 起至文件尾）、
+#   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
+backend/app/services/attachment_service.py  1391

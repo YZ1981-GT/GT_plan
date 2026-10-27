@@ -3,6 +3,7 @@
  * Phase 11 Task 22.1 — 完整重建
  */
 import { api } from '@/services/apiProxy'
+import { downloadFile } from '@/utils/http'
 import {
   consolidation as P,
   consolNoteFormulas as P_cnf,
@@ -1115,15 +1116,18 @@ export async function executePivotQuery(projectId: string, year: number, params:
 }
 
 export async function exportPivotExcel(projectId: string, year: number, params: any): Promise<void> {
-  const qs = new URLSearchParams({
-    project_id: projectId, year: String(year),
-    row_dimension: params.row_dimension || 'account',
-    col_dimension: params.col_dimension || 'company',
-    value_field: params.value_field || 'consolidated_amount',
-    transpose: String(params.transpose || false),
-    aggregation_mode: params.aggregation_mode || 'self',
+  // 经 http 取 blob 再保存：原先 window.open 新标签页带不上 Bearer 头，恒 401
+  await downloadFile(P.worksheet.pivotExport, {
+    params: {
+      project_id: projectId, year: String(year),
+      row_dimension: params.row_dimension || 'account',
+      col_dimension: params.col_dimension || 'company',
+      value_field: params.value_field || 'consolidated_amount',
+      transpose: String(params.transpose || false),
+      aggregation_mode: params.aggregation_mode || 'self',
+    },
+    fileName: `合并透视_${year}.xlsx`,
   })
-  window.open(`${P.worksheet.pivotExport}?${qs}`, '_blank')
 }
 
 export async function saveQueryTemplate(projectId: string, name: string, params: any): Promise<QueryTemplate> {
