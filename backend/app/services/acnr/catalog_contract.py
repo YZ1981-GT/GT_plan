@@ -1,9 +1,10 @@
 """ACNR 目录契约——单一机器可读来源（design §4.2 / D3）。
 
-`global_catalog.schema.json` 不再手写：由本模块 `build_schema()` 生成，
-生成器同批写出并用 `--check` 逐字节比对。四类受控常量（functional_type /
-purpose 模式 / registry_version 模式 / 枚举集合）只在这里定义一次，schema、
-生成器、门禁、测试都从这里取。
+`global_catalog.schema.json` 不再手写：由本模块 `build_schema()` 生成。四类受控常量
+（functional_type / purpose 模式 / registry_version 模式 / 枚举集合）只在这里定义一次，
+schema、门禁、测试从这里取。现状（段四审计 F4-13 更正）：已提交的 schema 文件由
+`tests/acnr/test_catalog_schema_single_source.py` 与 `build_schema()` 逐字节比对；
+生成器同批写出 schema 并在 `--check` 里比对随 T07 落地，目前生成器还不读本模块。
 
 只依赖标准库（CI 无需新增依赖）。校验用 `jsonschema==4.26.0`（见 requirements.txt）。
 """

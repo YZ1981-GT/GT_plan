@@ -1,5 +1,12 @@
 # ACNR 地址坐标名称库底座缺陷收口 — 统一验证与收尾报告
 
+> **段四修订（2026-10-27）**：本报告 2026-10-26 版的若干结论已被段四独立审计（`tmp_acnr_foundation/out/段四_审计报告.md`）推翻或补正，以下各处已就地标注「段四更正」。要点：
+> - 进度：此后又勾选了 T01/T04/T05/T08/T32，审计复核后这 5 个连同 T23、T27 判不成立并改回 `[ ]`；当前 tasks.md 勾选 4/33（T02、T03、T25、T28），其余以评审写入的 `段四_进度.json` 为准。
+> - T27 引入 21 条前端新增失败（本报告「26 passed 无回归」只覆盖 4 个 spec），段四已修（提交 `af975cc1e`，172 个相关 spec 相对 b5fc200e0 新增失败 0）。
+> - 架构提案现状节（`96fba2c49`）把未落地内容写成现状，T32 守卫不复算；段四已按「只写 HEAD 可验证事实 + 计划中标任务号」重写并改为逐项复算守卫。
+> - INDEX 本 spec 行此前只在工作区、未提交；段四用私有索引只提交本行（`2d9b7db3a`）。
+> - 最终的 33 个任务状态由段四第 6 阶段统一更新本报告。
+
 - 日期：2026-10-26（验证收尾）
 - Spec：`acnr-foundation-defect-closure`（design.md 修订轮 2，共 33 任务分四批）
 - 验证时主树 HEAD：`140121ee6`（并发会话 advanced-query-linkage-closure 第 2 轮评审修订，基于 ACNR 收尾提交 `96fba2c49` 之上）
@@ -83,11 +90,11 @@
 | ACNR-P1-03 / D4 | 9 | ✗ 未实施 | 报告分组/别名处置未建 |
 | ACNR-P1-04 / D6 | 20 | ✗ 未实施 | 异步追溯身份改造未建 |
 | ACNR-P1-05 / D7 | 21,22 | ✗ 未实施 | v2_canonical/对账产物未建 |
-| ACNR-P2-01 / D9 | 27,28 | ✓ 已交付 | T27 守卫+订阅 3+9，T28 隔离单测；代码+提交 64eade2e1 |
-| ACNR-P2-02 / D8 | 23,25 | ✓ 已交付 | test_stale_write_endpoint_authz 16 passed + 基线下调；提交 60168a027/841308327 |
+| ACNR-P2-01 / D9 | 27,28 | ✓ 已交付 | T27 守卫+订阅 3+9，T28 隔离单测；代码+提交 64eade2e1。**段四更正**：T27 使两个导航 spec 新增 21 条失败、两个 composable 吞全部异常，改回 `[ ]` 并已修（af975cc1e）；T28 复核通过 |
+| ACNR-P2-02 / D8 | 23,25 | ✓ 已交付 | test_stale_write_endpoint_authz 16 passed + 基线下调；提交 60168a027/841308327。**段四更正**：T23 缺原文验收的前端 useStaleImpact.spec.ts，改回 `[ ]` 并已补（af975cc1e）；T25 复核通过 |
 | D10（统一显示/外部命名空间中文提示） | 29,30,31 | ✗ 未实施 | display.py/AcnrCandidatesHint.vue 未建 |
 | D11（消费方台账与 AST 棘轮） | 24 | ✗ 未实施 | acnr_bypass_scan.py 未建 |
-| D12（架构提案现状节 + 勘误 + INDEX） | 32,33 | ◑ 部分 | 现状节已入库（96fba2c49）、勘误在 design §15.2、INDEX 已登记；**守卫 test_acnr_architecture_status_doc.py 未建** |
+| D12（架构提案现状节 + 勘误 + INDEX） | 32,33 | ◑ 部分 | 现状节已入库（96fba2c49）、勘误在 design §15.2、INDEX 已登记；**守卫 test_acnr_architecture_status_doc.py 未建**。**段四更正**：现状节内容大面积失实（sheet 1225 / 孤儿 0 / `--check` / 版本锁持久化 / acnr_targets 等均未落地），后建的守卫不复算；「INDEX 已登记」与 HEAD 不符（只在工作区）。段四已重写现状节与守卫，INDEX 行已提交（2d9b7db3a） |
 | 多项目 SSE / 缓存验收 | 28 | ◑ 代码级+单测 ✓ / 浏览器 [ ]* | 隔离逻辑既有+补测；浏览器段依赖未入库管线 |
 | 公式管理评估勘误 | 33（design §15.2） | ✓ 勘误节就位 | design §15.2 七条 |
 | 可观测（非功能） | 26 | ✗ 未实施 | acnr_targets/版本锁指标未接 |
@@ -106,7 +113,7 @@
 | `96fba2c49` | D12 架构提案现状节 + 公式管理评估勘误 |
 
 本步新增本地改动（若提交）：
-- `.kiro/specs/INDEX.md`：本 spec 登记行 `0/33` → `6/33` 并指向本报告（CRLF 完整、无裸竖线，校验 CRLF=1100/LoneLF=0）。
+- `.kiro/specs/INDEX.md`：本 spec 登记行 `0/33` → `6/33` 并指向本报告（CRLF 完整、无裸竖线，校验 CRLF=1100/LoneLF=0）。（**段四更正**：该行当时并未提交，只在工作区与他人 INDEX 改动混在一起；段四用私有索引只提交本 spec 一行，见 2d9b7db3a。）
 - `.agents/tasks/acnr-foundation-defect-closure-2026-10-26.md`：本报告。
 
 > 按任务约束：报告与 tasks 状态同步产生的文件改动只提交本 spec 文件与报告，不 amend、不推送、不碰 main，不碰他人脏文件。
@@ -114,7 +121,7 @@
 ## 4. 未完成 / 待拍板
 
 1. **本 spec 27 个任务未实施**（P0 的 T01/T04~T10 除 T02/T03、全部 P1 的 T17~T22/T26、D10 的 T29~T31、D11 的 T24、D12 的 T32 守卫）。这些是底座的生成器/发布门禁、取值管线、版本锁、依赖图规范化、统一显示等核心能力，尚未落地。后续须按 tasks.md 逐任务实施（每任务配磁盘变异证明），再做真库/浏览器验收。
-2. **T32 守卫缺失**：架构提案「现状（2026-10-26）」节已入库，但一致性守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 未建，当前无门禁钉住该节版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致。
+2. **T32 守卫缺失**：架构提案「现状（2026-10-26）」节已入库，但一致性守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 未建，当前无门禁钉住该节版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致。（**段四更正**：守卫后来建了但只查节存在与版本正则，不复算任何数字；段四已改为逐项复算——事实表对产物现算、组件表 AST 核对、计划表任务号须未勾选。）
 3. **`test_lazy_import_resolvability` 2 项预存红**：根因是并发 spec（procedure-chain / consol / disclosure-note / M7-M9）的 5 个模块未入库。非本 spec 引入，待那些 spec 入库后自动转绿；在此之前 CI 若跑 `pytest -x` 会在此 halt（属并发会话，非本 spec）。
 4. **浏览器收尾（④）与多项目 SSE 浏览器段**：依赖未入库的取数/显示管线，无法执行；验证办法见 §1.④。
 5. **任务前提与实际不符**：建议上游明确本 spec 是否按 33 任务全量实施，还是仅保留已交付的 6 个最小闭环；若全量实施需另行排期（工作量远超本收尾步范围）。

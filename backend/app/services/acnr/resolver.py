@@ -1,6 +1,8 @@
 """ACNR Resolver — 统一 resolve 决策树 + resolve_instance + ProjectBinding
 
-resolve() 是平台四大消费库的唯一解析入口（R5），执行完整决策树。
+full_resolve() 是底稿域（wp）的 canonical resolver，执行完整决策树；非底稿域
+（tb/report/note/aux）委托 V1。定位是「canonical resolver + legacy 委托」，并非全平台
+唯一入口——仍有绕过点（acnr-foundation-defect-closure design §14.1、§15.2 第 2 条）。
 resolve_instance(project_id, parent_wp_code, sheet_code) 是平台唯一的 wp_id
 解析出口 (R13.1)。通过运行时查询 WpIndex → WorkingPaper 链实现 ProjectBinding。
 

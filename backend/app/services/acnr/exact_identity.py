@@ -3,10 +3,11 @@
 纯函数模块：输入一个 `CatalogIndex`（缺省 `get_catalog()`，门禁/测试可传任意索引），
 提供 sheet / cell / 名称归属的唯一判定。文本逐字比较，不做空白或全半角归一。
 
-全平台的「名称/编码 → sheet 身份」只有这一处实现：
-`catalog._formula_ref_to_addr_id` / `_uri_to_addr_id`、`full_resolve`、
-`acnr.wp_cell_target`、`check_ccr_resolve`、V2 规范化、stale 引擎、
-发布门禁往返与生成器名称规则都调用它。
+目标（design §6.2）：全平台「名称/编码 → sheet 身份」只留这一处实现。
+现状（段四审计 F4-13 更正）：生产代码里只有发布门禁 `catalog_release` 导入它，而门禁本身
+尚未接入生成器；`catalog._formula_ref_to_addr_id` / `_uri_to_addr_id`、`full_resolve` 仍用
+旧启发式。计划接入：catalog / full_resolve（T10）、`acnr.wp_cell_target`（T12）、
+V2 规范化与 stale 引擎（T21）、`check_ccr_resolve`（T22）、生成器名称规则（T06 / T07）。
 
 只依赖标准库与本包的 `catalog` / `reasons`（CI 无需新增依赖）。
 """
@@ -256,7 +257,8 @@ def cell_of(wp_code: str, sheet_text: str, a1: str,
 def name_owner(parent: str, name: str, *, index: "CatalogIndex | None" = None) -> dict | None:
     """该名在父级内按第 4~7 步裁出的唯一 sheet；无唯一归属返回 None。
 
-    用于生成器的 cell formula_ref 归属选择、wp_cell_target 的 sheet_key 归一。
+    计划用于生成器的 cell formula_ref 归属选择（T06）、wp_cell_target 的 sheet_key 归一（T12）；
+    现状只被测试与门禁往返使用。
     """
     sm = sheet_of(parent, name, index=index)
     if sm.ok and sm.match_kind in ("sheet_name", "alias", "code_token"):

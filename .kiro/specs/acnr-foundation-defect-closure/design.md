@@ -698,6 +698,8 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 
 在 `docs/proposals/address-coordinate-name-registry-architecture.md`（1829 行）标题信息表之后插入新节，原有段落一字不改：已落地组件（生成器与 L1 目录、L2 overlay、L3 运行时、`full_resolve` 与非底稿域 V1 委托、前端 SDK）；发布后的目录规模；版本格式为 14 位 UTC 时间戳；L1 只覆盖底稿域；V1、V2、legacy 导航的并行关系；本 spec 完成后的门禁清单；定位「canonical resolver + legacy 委托」。逐条指出过时陈述：第 18 行「实施 spec 尚未创建」、第 543 / 562 行 `registry_version: "2026.07.10"` 示例、首期仅 D 循环等（行号为现读值，守卫按标题与关键词定位）。守卫 `test_acnr_architecture_status_doc.py`：该节存在，节内版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致；变异（删节、改回 `YYYY.N.N`）即红。
 
+段四审计 F4-01 / F4-02 修订（2026-10-27，取代上段中「发布后的目录规模」写成现状的做法）：现状节**只写当前 HEAD 可验证的事实**，结构固定为三张表——「已落地：目录与代码现算事实」（每行带复算键）、「已落地：组件」（模块 / 符号 / 测试）、「计划中（未落地）」（每行带任务号）；发布后规模（1225 / 449 / 0）等预演值只能出现在「计划中」并注明是预演值；节末用固定结束行与提案原文分界。守卫逐项复算：事实表每个值从 `global_catalog.json`、`catalog_report.json`、快照与生成器源码 AST 现算并逐字比对，守卫认识的复算键必须全部在表里；组件表后端行用 AST 确认模块定义了所列符号、测试文件有 `test_` 函数，前端行由 vitest 守卫 `acnrArchitectureStatusDoc.spec.ts` 用 TS 编译器 API 核对导出符号；计划表的任务号必须在 tasks.md 里仍为 `[ ]`；节内表格之外提到登记的计划中符号（`lock_project_registry`、`v2_canonical`、`--check` 等）而代码里还没有时，同一行必须带仍未勾选的任务号；resolver 模块文档须含「canonical resolver + legacy 委托」且不得再称「唯一解析入口」。每条判据配一条磁盘变异（见 tasks T32）。
+
 ### 15.2 勘误（不改历史报告原文；本 spec 提交不含 `.agents/tasks/` 下任何文件）
 
 | # | 出处与原表述 | 勘误 |
@@ -711,6 +713,8 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 | 7 | 本轮新发现 | 同父同名 78 组被任选其一（26 处真实写法因此解析到借名的父级）；CCR 检查器自带第二套判定，94 个源配错 sheet；stale 图正则身份 813 组错并；K14~K18 未经停用即移除而 4 个项目在用；同一版本两份内容；选址器插入的写法被保存校验拒绝；classification 缓存与本地库表是两个模板版本、库表缺 771 个拆分编码；acnr_targets 依赖的 `parsed_data` 在 1738 份底稿中只有 1 份含单元格数据；业务视图同会话并发解析；下钻 `noopener` 丢登录；显示名有 4 套写法 |
 
 ### 15.3 D12 文档批次交付记录（2026-10-26）
+
+> **段四审计勘误（2026-10-27，F4-01 / F4-10）**：下面第一条所述现状节内容在 HEAD 上大面积不成立——「发布后目录规模（sheet 1225 / 有效 cell 449 / 孤儿 0）」「schema 单一契约与发布门禁」（门禁未接入生成器、无 `--check`）、「版本锁持久化」「acnr_targets 跨模块单元格取值」都尚未实施，「实施 spec 已完成 P0/P1/P2」不实；「`resolver.py` 模块注释更正随 T32」在 T32 勾选时并未兑现。现状节已按 §15.1 段四修订口径重写（HEAD 现算：sheet 1215、cell 474、孤儿 25、报告无 release 段），resolver 模块注释已改为「canonical resolver + legacy 委托」。下文保留为当时的交付记录原文，不作为现状依据。
 
 本批次（P0/P1/P2 评审通过后的文档收口）落地两项，无新开文件：
 

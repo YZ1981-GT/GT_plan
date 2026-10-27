@@ -1,7 +1,8 @@
 """ACNR 身份判定与取值的错误码 → 中文文案集中表（唯一来源）。
 
-`exact_identity`、`wp_cell_target`、acnr_targets 编排、V2 规范化、stale 引擎、
-CCR 检查器都从这里取中文原因，避免各处散落、口径漂移。
+目标：`exact_identity`、`wp_cell_target`、acnr_targets 编排、V2 规范化、stale 引擎、
+CCR 检查器都从这里取中文原因，避免各处散落、口径漂移。现状（段四审计 F4-13 更正）：
+只有 `exact_identity` 使用；其余随 T12 / T14 / T21 / T22 接入。
 
 只依赖标准库（供 `check_ccr_resolve` 等仅标准库的脚本复用，CI 无需新增依赖）。
 

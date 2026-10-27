@@ -8,8 +8,9 @@ alias / ack / verdict / override。
 
 往返检查（roundtrip）用「待发布的新目录」解析而不是磁盘上的已提交目录：
 构造一个临时 `CatalogIndex(new)` 并经 `catalog.use_catalog(index)` 作用域让
-`exact_identity` / `full_resolve` 解析到新目录。生产代码不调用 `use_catalog`
-（守卫 test_only_generator_writes_catalog 断言只有门禁模块与测试引用它）。
+`exact_identity` / `full_resolve` 解析到新目录。现状：只有本模块与测试调用 `use_catalog`；
+「生产代码不调用 use_catalog」的 AST 守卫随 T07 落地（段四审计 F4-13：此前这里引用的守卫并不存在）。
+现状：本模块尚未接入生成器，生产代码中导入它的文件数为 0（T07 接入）。
 
 本模块只依赖标准库 + 本包（exact_identity / catalog / catalog_contract）；
 `jsonschema` 为可选依赖，缺失时 schema 检查退化为「跳过并记一条 info 违规」，
