@@ -1,0 +1,32 @@
+{
+  "verdict": "APPROVED",
+  "round": 3,
+  "summary": {"HIGH": 0, "MEDIUM": 0, "NIT": 3},
+  "reviewDoc": "d:\\GT_plan\\.kiro\\specs\\acnr-foundation-defect-closure\\design-review.md",
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "NIT",
+      "location": "design.md §2.3（resolve_builder_scope 登记为 body-carried 项目级校验函数的可伪证条目）",
+      "title": "resolve_builder_scope 的 body-carried 扫描器登记项字段形状未定",
+      "problem": "R2-F5 已把构建器鉴权正确收敛到 resolve_builder_scope（与业务视图同一 ownership_guard），但 body-carried 扫描器识别「首句无条件调 assert_project_permission」的旧判据对它不成立。设计说仿 check_project_access 登记，但未给字段形状，实施时口径不吻合会误报/漏报。",
+      "fix": "实施期按扫描器真实读取的字段落登记项，补「登记项真的对应一个生效的项目级校验」的反向断言（可伪证），与 test_project_endpoint_authz_body_carried.py 现有条目同构；tasks 写明字段形状。"
+    },
+    {
+      "id": "N2",
+      "severity": "NIT",
+      "location": "design.md §2.4（J1 回退流程 B 对 test_wp_cell_reader.py 整对象相等断言的改动清单）",
+      "title": "J1 回退流程 B 的受影响断言清单待实施期按任务 22 实际形状确认",
+      "problem": "回退流程 B 正确（两字段默认 None、不改对方三态语义），但要改哪些整对象相等断言依赖 formula-hub 任务 22 入库时的实际测试形状，当前只能预判，形状不同可能触发对方测试红。",
+      "fix": "动手前 git log -S reason_code 与 git log -p test_wp_cell_reader* 核对任务 22 实际形状，再据实列改动清单并在 formula-hub 任务 22 下登记；设计已承诺该核对，属实施期确认项。"
+    },
+    {
+      "id": "N3",
+      "severity": "NIT",
+      "location": "design.md §2.4 R2-F7 effective_catalog、§8.3 get_locked_version 的 db.info 请求级记忆",
+      "title": "effective_catalog/get_locked_version 记忆的失效边界未显式声明",
+      "problem": "记忆口径（请求级、不跨请求）正确；但同一请求内若先取值后又触发归档/解锁改 acnr_registry_version，记忆值会滞后。现算中取值请求与归档请求互斥（应为 0 冲突），设计未显式声明该边界。",
+      "fix": "实施期在守卫或注释中声明「取值请求与归档/解锁请求互斥，db.info 记忆只在只读取值请求内有效」，或在归档/解锁写入后清掉 db.info['acnr_lock']；属防御性补强，不影响当前正确性。"
+    }
+  ]
+}
