@@ -163,6 +163,7 @@
 - [ ] 22. V2 双读对账产物与 CCR 不可解析源处置（需求 9.4~9.5 / D7，R2-F3）
       `scripts/acnr/reconcile_v2_canonical.py --write|--check` 生成 `data/acnr/v2_canonical_reconcile.json`（按来源文件 × 分类计数、每类中文原因 + 前 20 样本、不含时间戳），CI 跑 `--check`。CCR 检查器 `check_ccr_resolve._find_sheet` 改委托 exact_identity 删私有匹配；统一判定重算 425 源（R2-F3：改写须两项证据 = 模板 tab 存在 + 字段文字在该 tab，B60×6/S14×1 不能改写入 ccr_unresolved，预计修 ≤4、豁免 ≥48，实施以当时现算逐条列证据）；`ccr_unresolved` 条目带 owner / 到期 2027-04-30 / 「缺哪项证据」理由，不整类豁免；`check_ccr_resolve --blocking` 清单外与「已可解析仍在清单」都失败。
       Files: `scripts/acnr/reconcile_v2_canonical.py`、`scripts/acnr/check_ccr_resolve.py`、`backend/data/acnr/sources/acknowledgements.json`（追加 ccr_unresolved）、`backend/data/acnr/v2_canonical_reconcile.json`
+      承接登记（段七复审 RV7-03，不改原文范围）：design §3.3「CCR 检查器：解析为停用条目计入报告 `deprecated` 组」由本任务落地；改委托 exact_identity 后停用计数须仍正确（变异：D4 子表与 G14-2 标停用应由 0 变 30）。
       Verify: `python scripts/acnr/reconcile_v2_canonical.py --check`（0 漂移）；`python scripts/acnr/check_ccr_resolve.py --blocking`（清单外 0、作业转绿）；`python -m pytest backend/tests/acnr/test_ccr_resolve.py -p no:playwright`。变异：把 B60 一条改写到工时预算看板 → 两项证据校验红；删一条已失效仍在清单的 ccr_unresolved → 清单失效条目红。
 
 - [x] 23. 写 stale 端点项目鉴权（需求 10 / D8，先复现）
@@ -214,11 +215,13 @@
 - [ ] 30. 前端显示统一到 display_label 并上守卫（需求 12.1 / D10）
       `sheetDisplayName.ts` 保留 wpCodeNaturalCompare、新增 groupHeaderLabel 与 sortSheetsForGroup，删 composeSheetLabelsForGroup 与 cleanSheetLabelName；三棵树改调 sortSheetsForGroup。9 处拼接改读 display_label/cell_label（FormulaRefPicker 列为「单元格」+「引用」、CustomQueryFieldPicker 已选标签存 display_label、GtIndexChip 提示首行 display_label、AcnrTargetResults 显示 display_label）。
       Files: `audit-platform/frontend/src/components/.../sheetDisplayName.ts`、`useAcnr.ts`、`FormulaManagerDialog.vue`、`FormulaEditDialog.vue`、`FormulaRefPicker.vue`、`CellSelector.vue`、`FormulaBar.vue`、`leftPanelAnchors.ts`、`stores/addressRegistry.ts`、`CustomQueryFieldPicker.vue`、`GtIndexChip.vue`、`AcnrTargetResults.vue`
+      承接登记（段七复审 RV7-02）：`FormulaRefPicker.vue`（`acnr.listCells`）与 `stores/addressRegistry.ts` 搜索改为与 `useAcnr.loadCellNodes` 同口径不列停用 cell，并补用例。
       Verify: `rtk npx vitest run src/acnrDisplaySingleSource.spec.ts`（TS 编译器 API + @vue/compiler-sfc 取模板表达式：登记文件中不出现 `.sheet_name`/`.semantic_label`/`.mapped_sheet_name` 属性读取、`.account_name` 只在 groupHeaderLabel、全仓无 composeSheetLabelsForGroup/cleanSheetLabelName）；vitest 用 display_contract 夹具挂载树 / 选址器 / 结果区 / chip 断言渲染文本逐字包含夹具值。变异：某组件改回读 `sheet_name` 拼显示名 → 守卫红。
 
 - [ ] 31. 歧义候选、可解释原因与外部命名空间中文提示（需求 12.2~12.5 / D10）
       `ResolveResult` 增 reason（中文）/required_context/next_step/deprecated/replaced_by，候选增 display_label（≤5）；中文文案集中在 `reasons.py`。新组件 `AcnrCandidatesHint.vue`（显示原因 + 所需上下文 + 候选，选中候选按 addr_id 重解析）用于选址器 / 地址树 / GtIndexChip。`grammar_v1.json` 6 个外部命名空间各增 label_zh/next_step_zh，resolver 外部分支返回 external_module_not_resolved + 「「{label_zh}」类引用暂不支持定位到物理地址」+ next_step；GtIndexChip 显示原因与下一步、不显示英文错误码。
       Files: `backend/app/services/acnr/{resolver.py,reasons.py}`、`backend/data/acnr/grammar_v1.json`；`audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue`、`GtIndexChip.vue`
+      承接登记（段七复审 RV7-03）：design §3.3 的「GtIndexChip 提示附停用原因」与「`GtFormulaSourceTooltip` 显示停用原因」由本任务落地（读 `ResolveResult.deprecated` / `reason`）。
       Verify: `python -m pytest backend/tests/acnr/test_external_namespace_reasons.py -p no:playwright`（遍历全部外部命名空间、缺文案即红）；`rtk npx vitest run src/components/acnr`（AcnrCandidatesHint 歧义候选、chip 外部命名空间中文原因与下一步、界面无英文错误码）。变异：删一个命名空间的 label_zh → 遍历用例红；某组件改回只显示「跳转 → ns:target」→ chip 用例红。
 
 ## 批次 文档与勘误（T32~T33）

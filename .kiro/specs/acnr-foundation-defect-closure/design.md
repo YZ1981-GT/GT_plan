@@ -290,6 +290,8 @@ D5-1 不在本节：它是 D5 册审定表 tab 的平台编号（§1.2），按�
 | CCR 检查器 | 解析为停用条目计入报告 `deprecated` 组的引用清单，不阻断（现算 0 条） |
 | `/api/acnr/entries`、`/tree` | 默认不列出，`include_deprecated=true` 时列出；`/anchors` 不受影响 |
 
+承接登记（段七复审 RV7-03，2026-10-28）：上表各行由哪个任务落地——`full_resolve` / 保存校验接受与指标 / `/entries` 默认不列已随 T10；acnr_targets 422 `deprecated` 随 T14；CCR 检查器「计入报告 `deprecated` 组」随 T22（T10 时只在 `check_ccr_resolve` 输出里计数，T22 重写检查器时把这份清单写进其报告并钉住计数）；chip 提示附停用原因与 `GtFormulaSourceTooltip` 显示停用原因随 T31（同属「可解释原因」的前端展示）。前端另有两处按 sheet 列单元格的入口（`FormulaRefPicker.vue` 的 `acnr.listCells`、`stores/addressRegistry.ts` 的搜索）仍列出停用 cell（RV7-02），随 T30 改为与 `useAcnr.loadCellNodes` 同口径。
+
 ### 3.4 验证
 
 - `test_sheet_verdicts.py`：`sheet_verdicts` 与 `cell_verdicts` 两段结构；sheet 结论在三种内、cell 结论为 `deprecate`；离线证据现算（openpyxl 读模板 tab、渲染 schema `renderer_tabs`、缓存、种子、manifest、映射、K14 的 6115 依据，以及 25 个孤儿 cell 的 `static_refs=0` / `pg_formula_refs=0` 现算）与记录逐项相等，变了即红；`pg_only` 断言「在用」记录的 wp_index 计数仍 > 0，且 25 个孤儿 cell 的 `project_files.parsed_data_null` 为真。

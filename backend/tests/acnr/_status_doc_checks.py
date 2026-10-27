@@ -411,20 +411,49 @@ def _production_importers_of(module: str) -> list[str]:
 
 def _full_resolve_step1_uses_exact_identity() -> bool:
     """full_resolve 第 1 步调 step1_identity，后者经 catalog 的结构化判定调 exact_identity.sheet_of（AST）；
-    catalog 里已不存在按 sheet_code 子串取最长的旧启发式（`code in sheet_name` 形态）。"""
+    catalog 里已不存在子串启发式：全部 in / not in 比较恰为登记清单 ``_CATALOG_IN_COMPARES_ALLOWED``（不论变量名）。"""
     def _calls(rel: str, func: str, name: str) -> bool:
         f = _func(rel, func)
         return f is not None and any(isinstance(n, ast.Call) and (getattr(n.func, "id", None) == name
                                      or getattr(n.func, "attr", None) == name) for n in ast.walk(f))
     cat_rel = "backend/app/services/acnr/catalog.py"
     rid_rel = "backend/app/services/acnr/resolve_identity.py"
-    substring = any(isinstance(n, ast.Compare) and any(isinstance(op, ast.In) for op in n.ops)
-                    and isinstance(n.left, ast.Name) and n.left.id == "code"
-                    for n in ast.walk(_tree(cat_rel)))
     return (_calls(_RESOLVER_REL, "full_resolve", "step1_identity")
             and _calls(rid_rel, "step1_identity", "_formula_ref_to_sheet_match")
             and _calls(rid_rel, "step1_identity", "_uri_to_sheet_match")
-            and _calls(cat_rel, "_sheet_match", "sheet_of") and not substring)
+            and _calls(cat_rel, "_sheet_match", "sheet_of")
+            and _catalog_in_compares(cat_rel) == sorted(_CATALOG_IN_COMPARES_ALLOWED))
+
+
+#: catalog.py 里允许出现的 in / not in 比较（所在函数, 源码），段七复审 RV7-05：子串启发式不论变量名叫什么
+#: 都是一个 ``Compare(In)``，所以判据是「全部 in 比较恰为本清单」，新增任何一处都要在这里登记并写明不是 sheet 判名。
+_CATALOG_IN_COMPARES_ALLOWED: tuple[tuple[str, str], ...] = (
+    # cell 语义名包含匹配（单元格层，不参与 sheet 身份判定）
+    ("_lookup_cell_in_sheet", "cell_desc in (c.get('semantic_label') or '')"),
+    ("blocked", "self.match.state in ('ambiguous', 'alias_forbidden')"),  # 枚举成员判断
+    ("_uri_to_sheet_match", "'#' in body"),  # 定界符判断 ×3
+    ("_uri_to_sheet_match", "'#' in body"),
+    ("_uri_to_sheet_match", "'#' in body"),
+    ("_formula_ref_to_sheet_match", "len(args) not in (2, 3)"),  # 参数个数
+    ("_index_ref_to_addr_id", "':' not in index_ref"),  # 定界符
+    ("_index_ref_to_addr_id", "'!' in target"),  # 定界符
+    ("_index_ref_to_addr_id", "ns_lower in ('wp', 'sheet')"),  # 命名空间枚举
+)
+
+
+def _catalog_in_compares(rel: str) -> list[tuple[str, str]]:
+    """``rel`` 里全部 in / not in 比较的（最内层所在函数名, ast.unparse 源码），排序后返回（AST）。"""
+    found: list[tuple[str, str]] = []
+
+    def walk(node: ast.AST, func: str) -> None:
+        for ch in ast.iter_child_nodes(node):
+            f = ch.name if isinstance(ch, (ast.FunctionDef, ast.AsyncFunctionDef)) else func
+            if isinstance(ch, ast.Compare) and any(isinstance(o, (ast.In, ast.NotIn)) for o in ch.ops):
+                found.append((f, ast.unparse(ch)))
+            walk(ch, f)
+
+    walk(_tree(rel), "<module>")
+    return sorted(found)
 
 
 def _orphan_verdicts_released() -> bool:

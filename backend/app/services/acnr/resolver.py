@@ -498,7 +498,7 @@ async def full_resolve(
     # ─── Step 3: L1 CellCatalogEntry 精确 match ─────────────────────────
     cell_entry = cat.cells_by_addr_id.get(resolved_addr_id)
     if cell_entry:
-        result = _build_cell_resolve_result(cell_entry, project_id, overlay)
+        result = _build_cell_resolve_result(cell_entry, project_id, overlay, cat)
         # R5.4: 带 project_id 时附 wp_id
         if project_id and db:
             result = await _attach_wp_id(result, project_id, db, _instance_memo)
@@ -520,7 +520,7 @@ async def full_resolve(
         # 如果 project_id 存在，应用单条目 overlay
         if project_id:
             sheet_entry = overlay.apply_to_single(project_id, sheet_entry)
-        result = _build_sheet_resolve_result(sheet_entry, project_id, overlay)
+        result = _build_sheet_resolve_result(sheet_entry, project_id, overlay, cat)
         if project_id and db:
             result = await _attach_wp_id(result, project_id, db, _instance_memo)
         _resolve_metrics["hit"] += 1
@@ -541,7 +541,7 @@ async def full_resolve(
             # 精确 cell_address 匹配
             exact = [c for c in cells if c.get("cell_address") == cell_desc]
             if len(exact) == 1:
-                result = _build_cell_resolve_result(exact[0], project_id, overlay)
+                result = _build_cell_resolve_result(exact[0], project_id, overlay, cat)
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
@@ -570,7 +570,7 @@ async def full_resolve(
                 if cell_desc and cell_desc in (c.get("semantic_label") or "")
             ]
             if len(semantic) == 1:
-                result = _build_cell_resolve_result(semantic[0], project_id, overlay)
+                result = _build_cell_resolve_result(semantic[0], project_id, overlay, cat)
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
@@ -598,7 +598,7 @@ async def full_resolve(
         if project_id:
             code_matches = overlay.apply(project_id, code_matches) if code_matches else code_matches
         if len(code_matches) == 1:
-            result = _build_sheet_resolve_result(code_matches[0], project_id, overlay)
+            result = _build_sheet_resolve_result(code_matches[0], project_id, overlay, cat)
             if project_id and db:
                 result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
@@ -644,7 +644,7 @@ async def full_resolve(
             cells = cat.cells_by_parent.get(alias_matches[0].get("addr_id", ""), [])
             exact = [c for c in cells if c.get("cell_address") == cell_desc]
             if len(exact) == 1:
-                result = _build_cell_resolve_result(exact[0], project_id, overlay)
+                result = _build_cell_resolve_result(exact[0], project_id, overlay, cat)
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
@@ -652,14 +652,14 @@ async def full_resolve(
             # semantic 包含
             semantic = [c for c in cells if cell_desc in (c.get("semantic_label") or "")]
             if len(semantic) == 1:
-                result = _build_cell_resolve_result(semantic[0], project_id, overlay)
+                result = _build_cell_resolve_result(semantic[0], project_id, overlay, cat)
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
                 return result
 
         elif len(alias_matches) == 1:
-            result = _build_sheet_resolve_result(alias_matches[0], project_id, overlay)
+            result = _build_sheet_resolve_result(alias_matches[0], project_id, overlay, cat)
             if project_id and db:
                 result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
@@ -750,9 +750,10 @@ def _build_cell_resolve_result(
     cell: dict,
     project_id: str | None,
     overlay: ProjectOverlay,
+    cat: CatalogIndex | None = None,
 ) -> ResolveResult:
-    """从 L1 CellCatalogEntry 构建命中响应（R5.3）。"""
-    cat = get_catalog()
+    """从 L1 CellCatalogEntry 构建命中响应（R5.3）；cat 为本次解析所用目录（锁定项目即锁定快照）。"""
+    cat = cat if cat is not None else get_catalog()
     parent_id = cell.get("parent_addr_id", "")
     parent = cat.sheets_by_addr_id.get(parent_id)
 
@@ -779,15 +780,16 @@ def _build_sheet_resolve_result(
     sheet: dict,
     project_id: str | None,
     overlay: ProjectOverlay,
+    cat: CatalogIndex | None = None,
 ) -> ResolveResult:
-    """从 L1 SheetCatalogEntry 构建命中响应。"""
+    """从 L1 SheetCatalogEntry 构建命中响应；停用替代地址的显示名取本次解析所用目录（RV7-04）。"""
     return ResolveResult(
         found=True,
         addr_id=sheet.get("addr_id"),
         entry_type="sheet",
         jump_route=sheet.get("jump_route_template"),
         source_layer="L1_sheet",
-        **deprecation_fields(sheet, get_catalog()),
+        **deprecation_fields(sheet, cat if cat is not None else get_catalog()),
     )
 
 
