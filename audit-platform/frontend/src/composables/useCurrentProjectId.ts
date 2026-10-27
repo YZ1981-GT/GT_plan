@@ -6,16 +6,24 @@
  * `useAcnr(useCurrentProjectId())` 按项目订阅 SSE 失效并隔离解析缓存。
  *
  * 口径：路由参数 `projectId` 优先，其次项目 store；都没有返回空串（useAcnr 空值不建连接）。
- * 只能在组件 setup / 其它 composable 的 setup 作用域内调用（内部用 useRoute）。
+ *
+ * 取值上下文（段四审计 F4-03 / F4-16）：
+ * - 路由只在有注入上下文时读取（`hasInjectionContext()`：组件 setup、`app.runWithContext`）；
+ * - 项目 store 只在已有活动 Pinia 时读取（`getActivePinia()`）。
+ * 两者都没有（在普通函数或纯函数单测里直接调用）时返回空串，不订阅、不影响 resolve。
+ * 这是显式的条件分支，不吞异常：上下文存在时 useRoute / useProjectStore 抛出的错误照常抛出。
  */
-import { computed, type ComputedRef } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, hasInjectionContext, type ComputedRef } from 'vue'
+import { getActivePinia } from 'pinia'
+import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 
 export function useCurrentProjectId(): ComputedRef<string> {
-  const route = useRoute()
-  const projectStore = useProjectStore()
+  const route: RouteLocationNormalizedLoaded | undefined = hasInjectionContext()
+    ? useRoute()
+    : undefined
+  const projectStore = getActivePinia() ? useProjectStore() : undefined
   return computed(
-    () => (route.params.projectId as string) || projectStore.projectId || '',
+    () => (route?.params?.projectId as string) || projectStore?.projectId || '',
   )
 }

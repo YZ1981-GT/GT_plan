@@ -10,6 +10,10 @@
     "src/services/acnr/useAcnr.ts",
     "src/services/acnr/acnrCatalogOnlyCallers.ts",
     "src/composables/useCurrentProjectId.ts",
+    "src/composables/useWorkpaperNavigation.ts",
+    "src/composables/useFormulaScopeCatalog.ts",
+    "src/composables/useStaleImpact.ts",
+    "src/components/consolidation/composables/useConsolReportAddress.ts",
     "src/env.d.ts"
   ]
 }

@@ -28,7 +28,6 @@ import http from '@/utils/http'
 import { formulaScope as formulaScopePaths } from '@/services/apiPaths/formula'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
-import type { ComputedRef } from 'vue'
 
 // ── Formula_Scope 7 类（与后端 FORMULA_SCOPES / 组件 FormulaManagerScope 对齐）──
 export const FORMULA_SCOPES = [
@@ -129,15 +128,9 @@ function mapItem(raw: Record<string, unknown>, scope: FormulaScope): ScopeFormul
 }
 
 export function useFormulaScopeCatalog() {
-  // D9（需求 11.1）：按当前项目订阅 ACNR 失效。本 composable 在纯函数单测里被直接调用（无
-  // router/pinia），此时 useCurrentProjectId 会抛 ⇒ 降级为无项目（不订阅、不影响 resolve）。
-  let currentPid: ComputedRef<string> | null = null
-  try {
-    currentPid = useCurrentProjectId()
-  } catch {
-    currentPid = null
-  }
-  const acnr = useAcnr(() => currentPid?.value || '')
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效。纯函数单测里直接调用（无注入上下文 / 无活动
+  // Pinia）时 useCurrentProjectId 按显式条件返回空串，不在此吞异常（段四 F4-16）。
+  const acnr = useAcnr(useCurrentProjectId())
 
   // (scope, addrKey) 隔离缓存：每个作用域一个 Map，键为 addrKey。
   const scopeCache: Record<string, Map<string, ScopeFormulaRow>> = {}
