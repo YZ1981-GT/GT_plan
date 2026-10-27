@@ -10,6 +10,8 @@
   "include": [
     "src/components/custom-query/__tests__/advancedQueryFrontend-p7.spec.ts",
     "src/views/__tests__/AdvancedQueryBuilder.spec.ts",
+    "src/components/query/queryColumnLabels.ts",
+    "src/components/query/__tests__/queryColumnLabels.spec.ts",
     "src/env.d.ts"
   ]
 }

@@ -15,7 +15,7 @@ COUNT、ORDER BY、LIMIT / OFFSET 与条件全部交给 ``paged_fetch`` 在数�
 - 未登记的筛选键 / 条件字段 / 列 → 400（``paged_fetch``）。
 
 登记的 SQL 源：试算表、科目余额、序时账、底稿清单、工时、合并单位前缀（实施计划 B2），报表、报表行次、调整分录
-（B5 任务 17 / 18；router 内的旧取数器随之删除）；JSON 内存源在 ``fetchers/``。
+（B5 任务 17 / 18；router 内的旧取数器随之删除），辅助余额、辅助明细（任务 21）；JSON 内存源在 ``fetchers/``。
 
 - 报表源（AQ-01）：结构 = 项目适用准则的行 ∪ 本项目独有的 ``project:{项目}`` 行（准则取报表生成用的
   ``ReportConfigService.resolve_applicable_standard``，覆盖行的结构仍取准则行，与 ``load_effective_report_configs``
@@ -27,129 +27,46 @@ COUNT、ORDER BY、LIMIT / OFFSET 与条件全部交给 ``paged_fetch`` 在数�
 from __future__ import annotations
 
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 import sqlalchemy as sa
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.elements import Cast, ColumnElement, Label
+from sqlalchemy.sql.elements import ColumnElement
 
-from app.models.audit_platform_models import Adjustment, TbBalance, TbLedger, TrialBalance
+from app.models.audit_platform_models import (
+    Adjustment,
+    TbAuxBalance,
+    TbAuxLedger,
+    TbBalance,
+    TbLedger,
+    TrialBalance,
+)
 from app.models.core import Project
 from app.models.report_models import FinancialReport, FinancialReportType, ReportConfig
 from app.models.staff_models import WorkHour
 from app.models.workpaper_models import WorkingPaper, WpIndex
+# 声明类型在 source_types（B5 拆出，本模块登记源与口径）；这里再导出，既有导入不变
+from app.services.custom_query.source_types import (  # noqa: F401
+    NARROWING_CONDITION_OPS,
+    Dtype,
+    FetchContext,
+    FilterKey,
+    FilterOp,
+    SourceColumn,
+    SourceSpec,
+    WarnBuilder,
+    WhereBuilder,
+    _base_column,
+    _blank,
+    filtered_by,
+)
 from app.services.dataset_query import get_active_dataset_id_or_none, get_active_filter
 from app.services.report_config_service import ReportConfigService
 
-Dtype = Literal["number", "text", "date", "bool"]
-#: 旧筛选键的谓词形态；``code_family`` = 编码精确或其子编码（``E1`` 带出 ``E1-1``），即底稿树叶子的口径
-FilterOp = Literal["eq", "like", "prefix", "gte", "lte", "nonempty", "code_family"]
-
 #: 四表无生效数据集时的提示（R1.3）
 NO_ACTIVE_DATASET_WARNING = "该项目年度没有生效数据集，按未删除行返回"
-
-
-def _base_column(expr: Any) -> Any:
-    """剥掉 ``Label`` / ``Cast`` 取到底层列，用于读取列定义的可空性。"""
-    while True:
-        if isinstance(expr, Label):
-            expr = expr.element
-        elif isinstance(expr, Cast):
-            expr = expr.clause
-        else:
-            return expr
-
-
-@dataclass(frozen=True)
-class SourceColumn:
-    """源的一列：响应列键（英文契约）+ 列表达式（取自 ORM ``__table__``）。
-
-    可空性由列定义读出（:attr:`nullable`）：排序时只对可空列加 ``NULLS LAST``——非空列加了语义相同却会让
-    索引用不上（ADR-AQL-06 N1 预案②）。
-    """
-
-    key: str
-    expr: Any
-    dtype: Dtype
-    conditionable: bool = True
-    sortable: bool = True
-    #: 来自 LEFT JOIN 的被连接一侧：没有匹配行时为空，排序按可空列处理（NULLS LAST）
-    outer: bool = False
-    #: 排序用的表达式（缺省 = ``expr``）：如报表类型显示与条件按文本、排序仍按枚举声明顺序
-    sort_expr: Any = None
-
-    @property
-    def nullable(self) -> bool:
-        return self.outer or bool(getattr(_base_column(self.expr), "nullable", True))
-
-    @property
-    def order_expr(self) -> Any:
-        return self.expr if self.sort_expr is None else self.sort_expr
-
-
-@dataclass(frozen=True)
-class FilterKey:
-    """旧 ``filters`` 字典允许的一个键（未登记即 400 ``UNKNOWN_FILTER_KEY``）。"""
-
-    key: str
-    column: str  # 对应 SourceColumn.key（显示列或隐藏列）
-    op: FilterOp
-    #: 取值归一（如调整类型 AJE / RCL → 枚举小写值）；取值非法时抛 400
-    normalize: Callable[[Any], Any] | None = None
-
-
-@dataclass
-class FetchContext:
-    """一次取数的上下文；``cycle`` 由任务 23（循环范围）接入，本批恒为 None。"""
-
-    db: AsyncSession
-    user: Any
-    project_id: uuid.UUID
-    year: int
-    filters: dict[str, Any]
-    company_code: str | None = None
-    cycle: Any = None
-    #: 同一请求内的记忆（如生效数据集 id），避免谓词与 warnings 重复查库
-    memo: dict[str, Any] = field(default_factory=dict)
-
-
-WhereBuilder = Callable[[FetchContext], Awaitable[list[ColumnElement]]]
-WarnBuilder = Callable[[FetchContext], Awaitable[list[str]]]
-
-
-@dataclass(frozen=True)
-class SourceSpec:
-    key: str
-    label: str  # 指标树叶子中文名，也用于 400 提示
-    from_clause: Callable[[FetchContext], Any]
-    columns: tuple[SourceColumn, ...]  # 显示列，顺序即默认列序
-    hidden: tuple[SourceColumn, ...]  # 下钻 / 排序 / 唯一键：随行返回，不进 columns
-    base_where: WhereBuilder
-    filter_keys: tuple[FilterKey, ...]
-    default_sort: tuple[tuple[str, str], ...]
-    unique_key: str  # hidden 中的唯一列
-    required_filters: tuple[frozenset[str], ...] = ()
-    tree_scope: Literal["any", "standalone", "consolidated"] = "any"
-    warn: WarnBuilder | None = None
-    #: 只回显、不筛选的键（如底稿叶子 ``workpaper:{code}|{sheet}`` 的 sheet 名），以隐藏列随行返回
-    echo_filters: tuple[str, ...] = ()
-    #: 由本源口径谓词 / 提示自己消费的键（如报表类型、准则）：不生成通用谓词，取值在 ``base_where`` 里校验
-    context_filters: tuple[str, ...] = ()
-    #: 源键自带、覆盖请求同名键的筛选（如 adj_aje ⇒ 调整类型 aje）
-    fixed_filters: tuple[tuple[str, Any], ...] = ()
-
-    def column(self, key: str) -> SourceColumn | None:
-        for col in (*self.columns, *self.hidden):
-            if col.key == key:
-                return col
-        return None
-
-    @property
-    def display_keys(self) -> list[str]:
-        return [c.key for c in self.columns]
 
 
 # ─── 口径谓词 ────────────────────────────────────────────────────────────────
@@ -179,6 +96,17 @@ async def _warn_no_active_dataset(ctx: FetchContext) -> list[str]:
     return [] if await _active_dataset_id(ctx) is not None else [NO_ACTIVE_DATASET_WARNING]
 
 
+#: 辅助余额未按辅助类型收窄到一个维度时的提示（R5.6）：同一笔余额在每个辅助维度各存一行
+AUX_CROSS_DIMENSION_WARNING = "辅助核算按维度冗余存储，跨维度合计会重复"
+
+
+async def _warn_aux_balance(ctx: FetchContext) -> list[str]:
+    warnings = await _warn_no_active_dataset(ctx)
+    if not filtered_by(ctx, "aux_type", single_value=True):
+        warnings.append(AUX_CROSS_DIMENSION_WARNING)
+    return warnings
+
+
 async def _trial_balance_where(ctx: FetchContext) -> list[ColumnElement]:
     t = TrialBalance.__table__
     clauses: list[ColumnElement] = [t.c.project_id == ctx.project_id, t.c.year == ctx.year, t.c.is_deleted == sa.false()]
@@ -195,10 +123,6 @@ async def _workpaper_where(ctx: FetchContext) -> list[ColumnElement]:
 async def _workhours_where(ctx: FetchContext) -> list[ColumnElement]:
     h = WorkHour.__table__
     return [h.c.project_id == ctx.project_id, sa.extract("year", h.c.work_date) == ctx.year, h.c.is_deleted == sa.false()]
-
-
-def _blank(value: Any) -> bool:
-    return value is None or (isinstance(value, str) and not value.strip())
 
 
 def _invalid_filter(key: str, message: str, allowed: list[str]) -> HTTPException:
@@ -325,6 +249,8 @@ async def _adjustment_where(ctx: FetchContext) -> list[ColumnElement]:
 _TB = TrialBalance.__table__
 _BAL = TbBalance.__table__
 _LED = TbLedger.__table__
+_AUX_BAL = TbAuxBalance.__table__
+_AUX_LED = TbAuxLedger.__table__
 _WP = WorkingPaper.__table__
 _WI = WpIndex.__table__
 _WH = WorkHour.__table__
@@ -347,6 +273,7 @@ TRIAL_BALANCE = SourceSpec(
         _c(_TB, "account_name", "text"),
         _c(_TB, "opening_balance", "number"),
         _c(_TB, "unadjusted_amount", "number"),
+        _c(_TB, "rje_adjustment", "number"),  # 期初、未审、重分类调整、审计调整、审定五列（R5.7）
         _c(_TB, "aje_adjustment", "number"),
         _c(_TB, "audited_amount", "number"),
     ),
@@ -364,10 +291,13 @@ ACCOUNT_BALANCE = SourceSpec(
     columns=(
         _c(_BAL, "account_code", "text"),
         _c(_BAL, "account_name", "text"),
+        # 期初 / 期末方向列（R5.7）：余额表里正负口径因科目方向而异，没有方向列时 −100 读不出是借是贷
+        _c(_BAL, "opening_direction", "text"),
         _c(_BAL, "opening_balance", "number"),
-        _c(_BAL, "closing_balance", "number"),
         _c(_BAL, "debit_amount", "number"),
         _c(_BAL, "credit_amount", "number"),
+        _c(_BAL, "closing_direction", "text"),
+        _c(_BAL, "closing_balance", "number"),
         _c(_BAL, "currency_code", "text"),
     ),
     hidden=(_id(_BAL), _c(_BAL, "company_code", "text", conditionable=False)),
@@ -412,6 +342,69 @@ LEDGER_ENTRIES = SourceSpec(
     ),
     default_sort=(("voucher_date", "desc"), ("voucher_no", "asc"), ("entry_seq", "asc")),
     unique_key="id",
+    warn=_warn_no_active_dataset,
+)
+
+# ── 辅助核算（任务 21；四表口径同 R1：只经 get_active_filter）──
+_AUX_FILTERS = (
+    FilterKey("account_code", "account_code", "prefix"),
+    FilterKey("aux_type", "aux_type", "eq"),
+    FilterKey("aux_code", "aux_code", "eq"),
+    FilterKey("aux_name", "aux_name", "like"),
+)
+
+AUX_BALANCE = SourceSpec(
+    key="aux_balance",
+    label="辅助余额",
+    from_clause=lambda ctx: _AUX_BAL,
+    columns=(
+        _c(_AUX_BAL, "account_code", "text"),
+        _c(_AUX_BAL, "account_name", "text"),
+        _c(_AUX_BAL, "aux_type", "text"),
+        _c(_AUX_BAL, "aux_code", "text"),
+        _c(_AUX_BAL, "aux_name", "text"),
+        _c(_AUX_BAL, "opening_direction", "text"),
+        _c(_AUX_BAL, "opening_balance", "number"),
+        _c(_AUX_BAL, "debit_amount", "number"),
+        _c(_AUX_BAL, "credit_amount", "number"),
+        _c(_AUX_BAL, "closing_direction", "text"),
+        _c(_AUX_BAL, "closing_balance", "number"),
+    ),
+    hidden=(_id(_AUX_BAL), _c(_AUX_BAL, "company_code", "text", conditionable=False)),
+    base_where=_four_table_where(_AUX_BAL),
+    filter_keys=_AUX_FILTERS,
+    default_sort=(("account_code", "asc"), ("aux_type", "asc"), ("aux_code", "asc")),
+    unique_key="id",
+    warn=_warn_aux_balance,
+)
+
+AUX_LEDGER = SourceSpec(
+    key="aux_ledger",
+    label="辅助明细",
+    from_clause=lambda ctx: _AUX_LED,
+    columns=(
+        _c(_AUX_LED, "voucher_date", "date"),
+        _c(_AUX_LED, "voucher_no", "text"),
+        _c(_AUX_LED, "account_code", "text"),
+        _c(_AUX_LED, "aux_type", "text"),
+        _c(_AUX_LED, "aux_code", "text"),
+        _c(_AUX_LED, "aux_name", "text"),
+        _c(_AUX_LED, "debit_amount", "number"),
+        _c(_AUX_LED, "credit_amount", "number"),
+        _c(_AUX_LED, "summary", "text"),
+    ),
+    hidden=(_id(_AUX_LED), _c(_AUX_LED, "company_code", "text", conditionable=False)),
+    base_where=_four_table_where(_AUX_LED),
+    filter_keys=(
+        *_AUX_FILTERS,
+        FilterKey("voucher_no", "voucher_no", "like"),
+        FilterKey("date_from", "voucher_date", "gte"),
+        FilterKey("date_to", "voucher_date", "lte"),
+    ),
+    default_sort=(("voucher_date", "desc"), ("voucher_no", "asc")),
+    unique_key="id",
+    # 辅助明细动辄数百万行：至少按科目或辅助类型之一收窄（R5.6，AUX_FILTER_REQUIRED）
+    required_filters=(frozenset({"account_code"}), frozenset({"aux_type"})),
     warn=_warn_no_active_dataset,
 )
 
@@ -576,8 +569,8 @@ ADJUSTMENT_RJE = _typed_adjustment("adj_rje", "重分类调整分录(RJE)", "rje
 
 #: 注册表：源键 → 定义（别名见 SOURCE_ALIASES；``report_{类型}`` 前缀见 resolve_source）
 SOURCE_REGISTRY: dict[str, SourceSpec] = {
-    spec.key: spec for spec in (TRIAL_BALANCE, ACCOUNT_BALANCE, LEDGER_ENTRIES, WORKPAPER, WORKHOURS, REPORT,
-                                REPORT_LINES, ADJUSTMENT, ADJUSTMENT_AJE, ADJUSTMENT_RJE)
+    spec.key: spec for spec in (TRIAL_BALANCE, ACCOUNT_BALANCE, LEDGER_ENTRIES, AUX_BALANCE, AUX_LEDGER, WORKPAPER,
+                                WORKHOURS, REPORT, REPORT_LINES, ADJUSTMENT, ADJUSTMENT_AJE, ADJUSTMENT_RJE)
 }
 #: 别名 → 源键（tb_detail 是指标树叶子键；adj_rcl 是「重分类调整」旧叶子键）
 SOURCE_ALIASES: dict[str, str] = {"tb_detail": "trial_balance", "adj_rcl": "adj_rje"}

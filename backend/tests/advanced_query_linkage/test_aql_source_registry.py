@@ -258,6 +258,60 @@ def test_unknown_adjustment_type_is_400(raw: str) -> None:
     assert _detail(exc)["error_code"] == "INVALID_FILTER_VALUE" and "AJE" in _detail(exc)["message"]
 
 
+@pytest.mark.parametrize(("filters", "conditions", "logic", "single", "expected"), [
+    ({"aux_type": "银行账户"}, [], "and", True, True),
+    ({"aux_type": " "}, [], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "银行账户"}], "and", True, True),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户"]}], "and", True, True),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户", "金融机构"]}], "and", True, False),
+    ({}, [{"field": "aux_type", "op": "in", "value": ["银行账户", "金融机构"]}], "and", False, True),
+    ({}, [{"field": "aux_type", "op": "between", "value": ["A", "B"]}], "and", False, True),
+    ({}, [{"field": "aux_type", "op": "like", "value": "银行"}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": ""}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "in", "value": []}], "and", False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "X"}, {"field": "summary", "op": "like", "value": "y"}], "or",
+     False, False),
+    ({}, [{"field": "aux_type", "op": "eq", "value": "X"}], "or", False, True),
+    ({}, [{"field": "account_code", "op": "eq", "value": "1002"}], "and", False, False),
+], ids=["filter", "blank-filter", "eq", "in-one", "in-two-single", "in-two", "between", "like", "eq-blank", "in-empty",
+        "or-two", "or-one", "other-field"])
+def test_filtered_by_semantics(filters, conditions, logic, single, expected) -> None:
+    ctx = _ctx(filters=filters, conditions=tuple(conditions), condition_logic=logic)
+    assert sr.filtered_by(ctx, "aux_type", single_value=single) is expected
+
+
+async def test_aux_ledger_requires_account_or_type(fixed_active_dataset) -> None:
+    with pytest.raises(HTTPException) as exc:
+        await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx())
+    assert _detail(exc)["error_code"] == "AUX_FILTER_REQUIRED"
+    assert _detail(exc)["message"] == "辅助明细请先按科目或辅助类型筛选"
+    stmt, _ = await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(filters={"account_code": "1002"}))
+    sql = _pg(stmt)
+    for clause in ("tb_aux_ledger.project_id = %(", "tb_aux_ledger.year = %(", "tb_aux_ledger.dataset_id = %(",
+                   "tb_aux_ledger.is_deleted = false", "tb_aux_ledger.account_code LIKE %("):
+        assert clause in sql, sql
+    await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(), conditions=[
+        {"field": "aux_type", "op": "eq", "value": "银行账户"}])
+    with pytest.raises(HTTPException) as either:
+        await paged_fetch.build_statement(sr.AUX_LEDGER, _ctx(), logic="or", conditions=[
+            {"field": "aux_type", "op": "eq", "value": "银行账户"}, {"field": "summary", "op": "like", "value": "x"}])
+    assert _detail(either)["error_code"] == "AUX_FILTER_REQUIRED"
+
+
+async def test_aux_balance_warns_about_cross_dimension_sums(fixed_active_dataset) -> None:
+    class _DB:
+        async def get(self, model, pk):
+            return None
+
+    ctx = _ctx(_DB(), filters={"account_code": "1002"})
+    await paged_fetch.build_statement(sr.AUX_BALANCE, ctx)
+    assert sr.AUX_CROSS_DIMENSION_WARNING in await sr.AUX_BALANCE.warn(ctx)
+    narrowed = _ctx(_DB(), filters={"account_code": "1002"})
+    await paged_fetch.build_statement(sr.AUX_BALANCE, narrowed, conditions=[
+        {"field": "aux_type", "op": "eq", "value": "银行账户"}])
+    assert sr.AUX_CROSS_DIMENSION_WARNING not in await sr.AUX_BALANCE.warn(narrowed)
+
+
 async def test_adjustment_statement_compares_type_as_text() -> None:
     stmt, display = await paged_fetch.build_statement(sr.ADJUSTMENT, _ctx(filters={"adjustment_type": "RCL"},
                                                                             company_code="C01"))

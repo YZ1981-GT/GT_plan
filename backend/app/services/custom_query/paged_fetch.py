@@ -29,6 +29,7 @@ from app.services.custom_query.source_registry import (
     FetchContext,
     SourceColumn,
     SourceSpec,
+    filtered_by,
     ref_context,
 )
 from app.services.custom_query.table_whitelist import OPERATOR_WHITELIST
@@ -137,9 +138,12 @@ async def build_statement(
 ) -> tuple[Select, list[SourceColumn]]:
     """不带 ORDER BY / LIMIT 的语句 + 显示列。先校验输入（全部 400），再查口径（可能触库）。"""
     filters = dict(ctx.filters)
-    # required_filters：至少满足其中一组（组内各键都有值）
+    # 条件记在上下文里：必填筛选与源级提示据此判断「是否已按某列收窄」（谓词仍只在下面生成）
+    ctx.conditions = tuple(conditions)
+    ctx.condition_logic = logic
+    # required_filters：至少满足其中一组（组内各键都已收窄：旧筛选键有值，或有该字段的 eq / in / between 条件）
     if spec.required_filters and not any(
-        all(not _is_blank(filters.get(k)) for k in group) for group in spec.required_filters
+        all(filtered_by(ctx, k) for k in group) for group in spec.required_filters
     ):
         raise _bad_request("AUX_FILTER_REQUIRED", "辅助明细请先按科目或辅助类型筛选")
     display, hidden = _select_columns(spec, columns)

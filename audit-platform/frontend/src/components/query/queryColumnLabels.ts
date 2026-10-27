@@ -16,6 +16,9 @@ export const QUERY_COLUMN_LABELS: Record<string, string> = {
   // 试算 / 科目余额 / 序时账
   account_code: '科目编码', account_name: '科目名称', standard_account_code: '标准科目编码',
   opening_balance: '期初余额', closing_balance: '期末余额', debit_amount: '借方发生额', credit_amount: '贷方发生额',
+  opening_direction: '期初方向', closing_direction: '期末方向',
+  // 辅助余额 / 辅助明细（advanced-query-linkage-closure 任务 21 / 22）
+  aux_type: '辅助类型', aux_type_name: '辅助类型名称', aux_code: '辅助编码', aux_name: '辅助名称',
   unadjusted: '未审数', audited: '审定数', unadjusted_amount: '未审数', aje_adjustment: '审计调整', audited_amount: '审定数',
   // 2026-08-23 浏览器实测补：构建器默认列集里这三列仍显示英文（UI 全中文化缺口）
   account_category: '科目类别', rje_adjustment: '重分类调整', currency_code: '币种',
@@ -27,11 +30,15 @@ export const QUERY_COLUMN_LABELS: Record<string, string> = {
   year: '年度',
   // 调整分录
   entry_number: '分录号', adjustment_no: '分录号', description: '说明', review_status: '复核状态',
+  entry_group_id: '分录组',
+  // 已生成的报表（构建器 financial_report）
+  blank_reason: '留空原因', generated_at: '生成时间',
   // 附注
   section_id: '章节ID', note_section: '附注章节', section_title: '章节标题', table_name: '表名', headers: '表头',
   // 合并 / 工作底稿
   company_name: '企业名称', company_code: '企业代码', holding_type: '持股类型', non_common_ratio: '持股比例',
-  direction: '借贷', subject: '科目', amount: '金额', desc: '说明', summary: '审定汇总',
+  // summary：序时账 / 辅助明细的「摘要」；合并试算平衡表的同名列是「汇总数」，见 QUERY_SOURCE_LABEL_OVERRIDES（R6.6）
+  direction: '借贷', subject: '科目', amount: '金额', desc: '说明', summary: '摘要',
   equity_dr: '权益抵消借', equity_cr: '权益抵消贷',
   // 底稿单元格 / 通用
   wp_code: '底稿编码', wp_name: '底稿名称', audit_cycle: '审计循环', sheet_name: 'sheet 名',
@@ -86,12 +93,23 @@ export const QUERY_COLUMN_LABELS: Record<string, string> = {
 }
 
 /**
- * 列标签三级兜底：共享映射 → 后端下发的 title（若存在且 ≠ key）→ key 原样。
+ * 按数据源覆盖的列标签：同一个列键在不同源里含义不同（R6.6）。
+ * 合并试算平衡表（ws_consol_tb）的 summary 是各单位个别报表的「汇总数」，序时账 / 辅助明细的 summary 是「摘要」。
+ */
+export const QUERY_SOURCE_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
+  ws_consol_tb: { summary: '汇总数' },
+}
+
+/**
+ * 列标签四级兜底：按数据源覆盖 → 共享映射 → 后端下发的 title（若存在且 ≠ key）→ key 原样。
  * @param key 列 key（英文）
  * @param title 后端 ColumnMeta.title（当前 execute 返回 string[] 时无此值）
+ * @param source 数据源键（如 ws_consol_tb）；不传时只按共享映射
  */
-export function resolveColumnLabel(key: string, title?: string): string {
+export function resolveColumnLabel(key: string, title?: string, source?: string): string {
   if (!key) return title || ''
+  const overridden = source ? QUERY_SOURCE_LABEL_OVERRIDES[source]?.[key] : undefined
+  if (overridden) return overridden
   const mapped = QUERY_COLUMN_LABELS[key]
   if (mapped) return mapped
   if (title && title !== key) return title

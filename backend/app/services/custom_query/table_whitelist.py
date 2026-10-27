@@ -33,13 +33,15 @@ from app.models.audit_platform_models import (
     Adjustment,
     Materiality,
     ReportLineMapping,
+    TbAuxBalance,
+    TbAuxLedger,
     TbBalance,
     TbLedger,
     TrialBalance,
     UnadjustedMisstatement,
 )
 from app.models.core import Project
-from app.models.report_models import DisclosureNote, ReportConfig
+from app.models.report_models import DisclosureNote, FinancialReport, ReportConfig
 from app.models.staff_models import StaffMember, WorkHour
 from app.models.workpaper_models import WorkingPaper, WpIndex
 
@@ -126,8 +128,40 @@ TABLE_WHITELIST: dict[str, dict[str, Any]] = {
         "fields": [
             "id", "project_id", "year", "company_code",
             "account_code", "account_name", "level",
-            "opening_balance", "closing_balance",
+            "opening_direction", "opening_balance", "closing_direction", "closing_balance",
             "debit_amount", "credit_amount", "currency_code",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    # 辅助余额 / 辅助明细 / 生成的报表（advanced-query-linkage-closure 任务 21，R5.6）：四表口径同 R1（DATASET_SCOPED_TABLES）
+    "tb_aux_balance": {
+        "model": TbAuxBalance,
+        "label": "辅助余额表",
+        "fields": [
+            "id", "project_id", "year", "company_code", "account_code", "account_name",
+            "aux_type", "aux_type_name", "aux_code", "aux_name",
+            "opening_direction", "opening_balance", "debit_amount", "credit_amount",
+            "closing_direction", "closing_balance", "currency_code",
+            "is_deleted", "created_at", "updated_at",
+        ],
+    },
+    "tb_aux_ledger": {
+        "model": TbAuxLedger,
+        "label": "辅助明细账",
+        "fields": [
+            "id", "project_id", "year", "company_code", "voucher_date", "voucher_no",
+            "account_code", "account_name", "aux_type", "aux_type_name", "aux_code", "aux_name",
+            "accounting_period", "voucher_type", "debit_amount", "credit_amount", "summary",
+            "currency_code", "is_deleted", "created_at",
+        ],
+    },
+    "financial_report": {
+        "model": FinancialReport,
+        "label": "报表（已生成）",
+        "fields": [
+            "id", "project_id", "year", "report_type", "row_code", "row_name",
+            "current_period_amount", "prior_period_amount", "indent_level", "is_total_row",
+            "is_stale", "blank_reason", "generated_at",
             "is_deleted", "created_at", "updated_at",
         ],
     },
@@ -260,7 +294,7 @@ JOIN_WHITELIST: dict[str, dict[str, dict[str, Any]]] = {
 }
 
 #: 按生效数据集取数的四表（构建器作用域注入 ``dataset_query.active_rows_predicate``，R1.2）；
-#: 辅助余额 / 辅助明细在登记进 TABLE_WHITELIST 后自动生效（任务 21）
+#: 辅助余额 / 辅助明细随任务 21 登记进 TABLE_WHITELIST 即生效
 DATASET_SCOPED_TABLES: frozenset[str] = frozenset({"tb_balance", "tb_ledger", "tb_aux_balance", "tb_aux_ledger"})
 
 

@@ -288,7 +288,7 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 #      execute 起对未登记列返回 400 UNKNOWN_COLUMN，旧缓存里「科目明细」的 account_code / closing_balance 等
 #      试算表没有的列必须失效
 # v12：报表、报表行次、调整分录（含合并单位）切到注册表，叶子 columns 同样由它生成（任务 17 / 18：调整分录旧叶子声明
-#      表里没有的 entry_number，页面版按叶子列发 columns 会 400）
+#      表里没有的 entry_number，页面版按叶子列发 columns 会 400）；同批任务 22 的试算表重分类列、余额方向列共用 v12
 _INDICATORS_SCHEMA_VERSION = 12
 
 
