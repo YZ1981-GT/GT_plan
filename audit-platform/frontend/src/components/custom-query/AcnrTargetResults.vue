@@ -33,7 +33,7 @@
       <el-table-column label="原因" min-width="180">
         <template #default="{ row }"><span data-testid="acnr-reason">{{ row.reason || '' }}</span></template>
       </el-table-column>
-      <el-table-column label="下钻" width="120">
+      <el-table-column label="下钻" width="120" fixed="right">
         <template #default="{ row }">
           <GtIndexChip
             v-if="row.addr_id"
