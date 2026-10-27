@@ -26,6 +26,7 @@ from app.services.acnr.catalog import (
     list_sheets,
     lookup,
 )
+from app.services.acnr.limits import ACNR_BATCH_LIMIT
 from app.services.acnr.resolver import full_resolve, resolve_instance
 from app.services.acnr.overlay import (
     apply_project_overlay,
@@ -212,11 +213,11 @@ async def acnr_resolve_batch(
 
     Requirements: Req-15.3, Req-15.4
     """
-    # 防滥用：限制 items ≤ 50
-    if len(body.items) > 50:
+    # 防滥用：限制 items ≤ ACNR_BATCH_LIMIT（与 acnr_targets 共用，services/acnr/limits.py）
+    if len(body.items) > ACNR_BATCH_LIMIT:
         raise HTTPException(
             status_code=422,
-            detail="items 数量不得超过 50",
+            detail=f"items 数量不得超过 {ACNR_BATCH_LIMIT}",
         )
 
     if len(body.items) == 0:

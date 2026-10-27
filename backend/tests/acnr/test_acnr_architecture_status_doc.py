@@ -57,7 +57,6 @@ H_PLANNED = "### 计划中（未落地）"
 #: 计划中符号 → (任务号, 落地探测方式)。节内提到它而代码里还没有时，同一行必须带仍未勾选的任务号。
 _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "lock_project_registry": ("T17", ("py_ident", "lock_project_registry")),
-    "effective_catalog": ("T12", ("py_ident", "effective_catalog")),
     "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
     "v2_canonical": ("T21", ("file", "backend/app/services/acnr/v2_canonical.py")),
     "acnr_results": ("T15", ("py_ident", "acnr_results")),

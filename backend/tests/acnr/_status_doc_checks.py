@@ -395,12 +395,18 @@ def _exact_identity_is_pure() -> bool:
 
 
 def _exact_identity_only_release_imports() -> bool:
-    """生产导入方恰为目录写法解析（catalog，T10）、发布门禁与生成器名称规则（T06）；
-    wp_cell_target（T12）、V2 / stale（T21）、CCR 检查器（T22）尚未接入。"""
-    exclude = _BACKEND / "app" / "services" / "acnr" / "exact_identity.py"
-    return _production_importers("exact_identity", exclude) == [
+    """生产导入方恰为目录写法解析（catalog，T10）、发布门禁与生成器名称规则（T06）、单元格取值接线（T12）；
+    V2 / stale（T21）、CCR 检查器（T22）尚未接入。"""
+    return _production_importers_of("exact_identity") == [
         "backend/app/services/acnr/catalog.py", "backend/app/services/acnr/catalog_names.py",
-        "backend/app/services/acnr/catalog_release.py"]
+        "backend/app/services/acnr/catalog_release.py", "backend/app/services/acnr/wp_cell_target.py"]
+
+
+def _production_importers_of(module: str) -> list[str]:
+    """backend/app 与 backend/scripts 里 import 了 ``module`` 的生产文件（排除同名模块自身；AST）。"""
+    own = [p for p in (_BACKEND / "app").rglob(f"{module}.py")]
+    exclude = own[0] if len(own) == 1 else _BACKEND / "__no_such_file__.py"
+    return _production_importers(module, exclude)
 
 
 def _full_resolve_step1_uses_exact_identity() -> bool:

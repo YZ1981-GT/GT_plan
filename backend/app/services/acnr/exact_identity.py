@@ -6,8 +6,8 @@
 目标（design §6.2）：全平台「名称/编码 → sheet 身份」只留这一处实现。
 现状：生产代码里调用它的是目录写法解析 `catalog._formula_ref_to_sheet_match` / `_uri_to_sheet_match`
 （`full_resolve` 首步经 `resolve_identity.step1_identity` 调它，T10）、发布门禁 `catalog_release` 与生成器名称规则
-`catalog_names`（T06）。计划接入：`acnr.wp_cell_target`（T12）、V2 规范化与 stale 引擎（T21）、
-`check_ccr_resolve`（T22）。
+`catalog_names`（T06），以及单元格取值接线 `acnr.wp_cell_target`（T12；它本身尚无生产调用方，高级查询接线随 T14）。
+计划接入：V2 规范化与 stale 引擎（T21）、`check_ccr_resolve`（T22）。
 
 只依赖标准库与本包的 `catalog` / `reasons` / `catalog_contract`（CI 无需新增依赖）。
 """
@@ -258,8 +258,9 @@ def cell_of(wp_code: str, sheet_text: str, a1: str,
 def name_owner(parent: str, name: str, *, index: "CatalogIndex | None" = None) -> dict | None:
     """该名在父级内按第 4~7 步裁出的唯一 sheet；无唯一归属返回 None。
 
-    生成器 cell formula_ref / uri 的归属选择用它（`catalog_names.apply_cell_names`，T06）；
-    计划用于 wp_cell_target 的 sheet_key 归一（T12）。
+    生成器 cell formula_ref / uri 的归属选择用它（`catalog_names.apply_cell_names`，T06）。
+    `wp_cell_target.sheet_key_for` 不用它而直接用 `sheet_of`：本函数不认编码命中，名称恰等于自身编码的
+    sheet（如 S17/S17）会被当成无归属。
     """
     sm = sheet_of(parent, name, index=index)
     if sm.ok and sm.match_kind in ("sheet_name", "alias", "code_token"):

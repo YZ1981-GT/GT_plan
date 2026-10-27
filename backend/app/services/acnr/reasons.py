@@ -2,7 +2,8 @@
 
 目标：`exact_identity`、`wp_cell_target`、acnr_targets 编排、V2 规范化、stale 引擎、
 CCR 检查器都从这里取中文原因，避免各处散落、口径漂移。现状（段四审计 F4-13 更正）：
-`exact_identity` 与 `resolve_identity`（停用条目原因，T10）使用；其余随 T12 / T14 / T21 / T22 接入。
+`exact_identity`、`resolve_identity`（停用条目原因，T10）与 `wp_cell_target`（取值原因细化与借名，T12）使用；
+其余随 T14 / T21 / T22 接入。
 
 只依赖标准库（供 `check_ccr_resolve` 等仅标准库的脚本复用，CI 无需新增依赖）。
 
