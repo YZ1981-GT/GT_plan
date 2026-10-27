@@ -1,5 +1,5 @@
 {
-  "_doc": "ACNR 底座缺陷收口 T05/T06：孤儿 sheet 与历史移除判定（生成器权威输入）。sheet_verdicts 三种结论 add_platform_sheet/fix_parent/deprecate（design §3.2）；cell_verdicts 为孤儿 cell（R2-F1，25 格）与 §6.4 种子名不一致超范围 cell（T06 追加）。每条带现算证据。数值证据（classification_count/replaced_by_in_catalog/static_refs/pg_formula_refs）由 test_sheet_verdicts.py 现算核对，变了即红。",
+  "_doc": "ACNR 底座缺陷收口 T05/T06：孤儿 sheet 与历史移除判定（生成器权威输入）。sheet_verdicts 三种结论 add_platform_sheet/fix_parent/deprecate（design §3.2）；cell_verdicts 为孤儿 cell（R2-F1，25 格）与 §6.4 种子名不一致超范围 cell（T06 追加）。离线证据（classification_count / in_catalog_as_sheet / template_tabs / renderer_tabs / renderer_cross_refs / seeds / ie_manifest / wp_account_mapping / static_refs）由 test_sheet_verdicts.py 逐项现算比对；数据库证据（wp_index / project_files / pg_formula_refs）记 as_of，pg_only 用例核对在用、无数据与无公式引用三条判定前提。",
   "version": "1",
   "owner": "acnr-foundation-defect-closure",
   "decided_on": "2026-10-27",
@@ -15,9 +15,45 @@
       "evidence": {
         "classification_count": 0,
         "in_catalog_as_sheet": false,
-        "renderer_tabs": [],
-        "project_files": "父 sheet 导航落点由 wp_index I6 实例提供（pg_only 现算）",
-        "extra": "渲染组件 i6-research-development-expense.yaml 不含 I6-7 tab / 不含 研发加计扣除测算"
+        "renderer_tabs": {
+          "component_type": "i6-research-development-expense",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/i6-research-development-expense.yaml"
+          ],
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "extra": "渲染组件 i6-research-development-expense.yaml 不含 I6-7 tab / 不含 研发加计扣除测算",
+        "template_tabs": {
+          "file": "backend/wp_templates/I/I6 研发费用.xlsx",
+          "tab_count": 11,
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": {
+          "file": "backend/data/i_address_registry_seed.json",
+          "sheet_name": "研发加计扣除测算",
+          "cells": [
+            "B25",
+            "C5",
+            "E20",
+            "F20",
+            "G20"
+          ]
+        },
+        "ie_manifest": false,
+        "wp_account_mapping": [
+          "研发加计扣除测算"
+        ],
+        "wp_index": {
+          "projects": 1,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -31,9 +67,46 @@
       "evidence": {
         "classification_count": 0,
         "in_catalog_as_sheet": false,
-        "renderer_tabs": [],
-        "project_files": "wp_index J2 实例（pg_only 现算）",
-        "extra": "种子名出现在 J2-1/J2-3 渲染 schema 的 cross_refs.target_wp（数据流声明，不带本 sheet 的有效 cell）"
+        "renderer_tabs": {
+          "component_type": null,
+          "schema_files": [],
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "extra": "种子名出现在 J2-1/J2-3 渲染 schema 的 cross_refs.target_wp（数据流声明，不带本 sheet 的有效 cell）",
+        "template_tabs": {
+          "file": "backend/wp_templates/J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+          "tab_count": 9,
+          "has_tab": false
+        },
+        "renderer_cross_refs": [
+          "backend/data/ledger_adapters/wp_render_schema/J2-1.yaml",
+          "backend/data/ledger_adapters/wp_render_schema/J2-3.yaml"
+        ],
+        "seeds": {
+          "file": "backend/data/j_address_registry_seed.json",
+          "sheet_name": "精算重新计算",
+          "cells": [
+            "E10",
+            "E20",
+            "F10",
+            "F20",
+            "G10"
+          ]
+        },
+        "ie_manifest": false,
+        "wp_account_mapping": [
+          "精算重新计算"
+        ],
+        "wp_index": {
+          "projects": 1,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -47,9 +120,46 @@
       "evidence": {
         "classification_count": 0,
         "in_catalog_as_sheet": false,
-        "renderer_tabs": [],
-        "project_files": "wp_index J3 实例（pg_only 现算）",
-        "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）"
+        "renderer_tabs": {
+          "component_type": null,
+          "schema_files": [],
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）",
+        "template_tabs": {
+          "file": "backend/wp_templates/J/J3 股份支付.xlsx",
+          "tab_count": 6,
+          "has_tab": false
+        },
+        "renderer_cross_refs": [
+          "backend/data/ledger_adapters/wp_render_schema/J3-1.yaml"
+        ],
+        "seeds": {
+          "file": "backend/data/j_address_registry_seed.json",
+          "sheet_name": "期权公允价值测算",
+          "cells": [
+            "C10",
+            "C5",
+            "C6",
+            "C7",
+            "C8",
+            "C9"
+          ]
+        },
+        "ie_manifest": false,
+        "wp_account_mapping": [
+          "期权公允价值测算"
+        ],
+        "wp_index": {
+          "projects": 1,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -63,9 +173,44 @@
       "evidence": {
         "classification_count": 0,
         "in_catalog_as_sheet": false,
-        "renderer_tabs": [],
-        "project_files": "wp_index J3 实例（pg_only 现算）",
-        "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）"
+        "renderer_tabs": {
+          "component_type": null,
+          "schema_files": [],
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）",
+        "template_tabs": {
+          "file": "backend/wp_templates/J/J3 股份支付.xlsx",
+          "tab_count": 6,
+          "has_tab": false
+        },
+        "renderer_cross_refs": [
+          "backend/data/ledger_adapters/wp_render_schema/J3-1.yaml"
+        ],
+        "seeds": {
+          "file": "backend/data/j_address_registry_seed.json",
+          "sheet_name": "等待期费用分摊",
+          "cells": [
+            "E10",
+            "F10",
+            "G10",
+            "H10"
+          ]
+        },
+        "ie_manifest": false,
+        "wp_account_mapping": [
+          "等待期费用分摊"
+        ],
+        "wp_index": {
+          "projects": 1,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -79,9 +224,45 @@
       "evidence": {
         "classification_count": 0,
         "in_catalog_as_sheet": false,
-        "renderer_tabs": [],
-        "project_files": "wp_index M6 实例（pg_only 现算）",
-        "extra": "渲染组件 M6-1.yaml 的 cross_refs.target_wp 含 损益联动验证（数据流声明，不带本 sheet 的有效 cell）"
+        "renderer_tabs": {
+          "component_type": "m6-retained-earnings",
+          "schema_files": [],
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "extra": "渲染组件 M6-1.yaml 的 cross_refs.target_wp 含 损益联动验证（数据流声明，不带本 sheet 的有效 cell）",
+        "template_tabs": {
+          "file": "backend/wp_templates/M/M6 未分配利润.xlsx",
+          "tab_count": 10,
+          "has_tab": false
+        },
+        "renderer_cross_refs": [
+          "backend/data/ledger_adapters/wp_render_schema/M6-1.yaml"
+        ],
+        "seeds": {
+          "file": "backend/data/m_address_registry_seed.json",
+          "sheet_name": "损益联动验证",
+          "cells": [
+            "C5",
+            "C6",
+            "C7",
+            "D7",
+            "E7"
+          ]
+        },
+        "ie_manifest": false,
+        "wp_account_mapping": [
+          "损益联动验证"
+        ],
+        "wp_index": {
+          "projects": 1,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -91,14 +272,41 @@
       "verdict": "deprecate",
       "sheet_name": "资产处置收益审定表",
       "replaced_by": "H10/H10-1",
-      "reason": "K14「资产处置收益审定表」与 H10-1「资产处置损益审定表」业务名不同但同一科目 6115：wp_account_mapping 的 H10/H10-1 account_codes=6115、prefill_formula_mapping H10 中「资产处置收益」=TB('6115','本期发生额')，是该科目的利润表项目名（IS-032）。",
+      "reason": "K14「资产处置收益审定表」与 H10-1「资产处置损益审定表」业务名不同但同一科目 6115：wp_account_mapping 的 H10/H10-1 account_codes=6115、prefill_formula_mapping H10 中「资产处置收益」=TB('6115','本期发生额')，是该科目的利润表项目名（report_config_seed：国企版 IS-039、上市版 IS-018）。",
       "evidence": {
         "classification_count": 0,
-        "self_in_catalog_as_sheet": false,
         "replaced_by_in_catalog": true,
         "replaced_by_sheet_name": "审定表H10-1",
         "account_code": "6115",
-        "mapping_basis": "wp_account_mapping H10/H10-1 account_codes=['6115']；prefill H10 cell_ref=资产处置收益 formula=TB('6115','本期发生额')"
+        "mapping_basis": "wp_account_mapping H10/H10-1 account_codes=['6115']；prefill H10 cell_ref=资产处置收益 formula=TB('6115','本期发生额')",
+        "in_catalog_as_sheet": false,
+        "template_tabs": {
+          "file": null,
+          "tab_count": 0,
+          "has_tab": false
+        },
+        "renderer_tabs": {
+          "component_type": "audit-sheet",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-22.yaml",
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-23.yaml"
+          ],
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": null,
+        "ie_manifest": false,
+        "wp_account_mapping": [],
+        "wp_index": {
+          "projects": 4,
+          "as_of": "2026-10-27"
+        },
+        "project_files": {
+          "sheet_level_workpapers": 4,
+          "with_file": 4,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -111,11 +319,38 @@
       "reason": "K15 与 K10-1「其他收益审定表」同名、同科目 6117。",
       "evidence": {
         "classification_count": 0,
-        "self_in_catalog_as_sheet": false,
         "replaced_by_in_catalog": true,
         "replaced_by_sheet_name": "审定表K10-1",
         "account_code": "6117",
-        "mapping_basis": "wp_account_mapping K10/K10-1 account_codes=['6117']；wp_name 同为 其他收益审定表"
+        "mapping_basis": "wp_account_mapping K10/K10-1 account_codes=['6117']；wp_name 同为 其他收益审定表",
+        "in_catalog_as_sheet": false,
+        "template_tabs": {
+          "file": null,
+          "tab_count": 0,
+          "has_tab": false
+        },
+        "renderer_tabs": {
+          "component_type": "audit-sheet",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-22.yaml",
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-23.yaml"
+          ],
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": null,
+        "ie_manifest": false,
+        "wp_account_mapping": [],
+        "wp_index": {
+          "projects": 4,
+          "as_of": "2026-10-27"
+        },
+        "project_files": {
+          "sheet_level_workpapers": 4,
+          "with_file": 4,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -128,11 +363,38 @@
       "reason": "K16 与 G11-1「投资收益审定表」同名、同科目 6111。",
       "evidence": {
         "classification_count": 0,
-        "self_in_catalog_as_sheet": false,
         "replaced_by_in_catalog": true,
         "replaced_by_sheet_name": "审定表G11-1",
         "account_code": "6111",
-        "mapping_basis": "wp_account_mapping G11/G11-1 account_codes=['6111']；wp_name 同为 投资收益审定表"
+        "mapping_basis": "wp_account_mapping G11/G11-1 account_codes=['6111']；wp_name 同为 投资收益审定表",
+        "in_catalog_as_sheet": false,
+        "template_tabs": {
+          "file": null,
+          "tab_count": 0,
+          "has_tab": false
+        },
+        "renderer_tabs": {
+          "component_type": "audit-sheet",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-22.yaml",
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-23.yaml"
+          ],
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": null,
+        "ie_manifest": false,
+        "wp_account_mapping": [],
+        "wp_index": {
+          "projects": 4,
+          "as_of": "2026-10-27"
+        },
+        "project_files": {
+          "sheet_level_workpapers": 4,
+          "with_file": 4,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -145,11 +407,38 @@
       "reason": "K17 与 G13-1「公允价值变动收益审定表」同名、同科目 6101。",
       "evidence": {
         "classification_count": 0,
-        "self_in_catalog_as_sheet": false,
         "replaced_by_in_catalog": true,
         "replaced_by_sheet_name": "审定表G13-1",
         "account_code": "6101",
-        "mapping_basis": "wp_account_mapping G13/G13-1 account_codes=['6101']；wp_name 同为 公允价值变动收益审定表"
+        "mapping_basis": "wp_account_mapping G13/G13-1 account_codes=['6101']；wp_name 同为 公允价值变动收益审定表",
+        "in_catalog_as_sheet": false,
+        "template_tabs": {
+          "file": null,
+          "tab_count": 0,
+          "has_tab": false
+        },
+        "renderer_tabs": {
+          "component_type": "audit-sheet",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-22.yaml",
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-23.yaml"
+          ],
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": null,
+        "ie_manifest": false,
+        "wp_account_mapping": [],
+        "wp_index": {
+          "projects": 3,
+          "as_of": "2026-10-27"
+        },
+        "project_files": {
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        }
       }
     },
     {
@@ -162,11 +451,38 @@
       "reason": "K18 与 K7-1「递延收益审定表」同名、同科目 2401。",
       "evidence": {
         "classification_count": 0,
-        "self_in_catalog_as_sheet": false,
         "replaced_by_in_catalog": true,
         "replaced_by_sheet_name": "审定表K7-1",
         "account_code": "2401",
-        "mapping_basis": "wp_account_mapping K7/K7-1 account_codes=['2401']；wp_name 同为 递延收益审定表"
+        "mapping_basis": "wp_account_mapping K7/K7-1 account_codes=['2401']；wp_name 同为 递延收益审定表",
+        "in_catalog_as_sheet": false,
+        "template_tabs": {
+          "file": null,
+          "tab_count": 0,
+          "has_tab": false
+        },
+        "renderer_tabs": {
+          "component_type": "audit-sheet",
+          "schema_files": [
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-22.yaml",
+            "backend/data/ledger_adapters/wp_render_schema/generated/F2-23.yaml"
+          ],
+          "has_tab": false
+        },
+        "renderer_cross_refs": [],
+        "seeds": null,
+        "ie_manifest": false,
+        "wp_account_mapping": [],
+        "wp_index": {
+          "projects": 4,
+          "as_of": "2026-10-27"
+        },
+        "project_files": {
+          "sheet_level_workpapers": 4,
+          "with_file": 4,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        }
       }
     }
   ],
@@ -178,8 +494,15 @@
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
       "evidence": {
-        "renderer_tabs": [],
-        "project_files": {"file_path": null, "parsed_data_null": true},
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
         "static_refs": 0,
         "pg_formula_refs": 0,
         "formula_ref": "WP('I6','研发加计扣除测算','B25')"
@@ -191,7 +514,20 @@
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('I6','研发加计扣除测算','C5')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('I6','研发加计扣除测算','C5')"
+      }
     },
     {
       "addr_id": "I6/I6-7/E20",
@@ -199,7 +535,20 @@
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('I6','研发加计扣除测算','E20')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('I6','研发加计扣除测算','E20')"
+      }
     },
     {
       "addr_id": "I6/I6-7/F20",
@@ -207,7 +556,20 @@
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('I6','研发加计扣除测算','F20')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('I6','研发加计扣除测算','F20')"
+      }
     },
     {
       "addr_id": "I6/I6-7/G20",
@@ -215,7 +577,20 @@
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('I6','研发加计扣除测算','G20')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('I6','研发加计扣除测算','G20')"
+      }
     },
     {
       "addr_id": "J2/J2-5/E10",
@@ -223,7 +598,20 @@
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J2','精算重新计算','E10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J2','精算重新计算','E10')"
+      }
     },
     {
       "addr_id": "J2/J2-5/E20",
@@ -231,7 +619,20 @@
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J2','精算重新计算','E20')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J2','精算重新计算','E20')"
+      }
     },
     {
       "addr_id": "J2/J2-5/F10",
@@ -239,7 +640,20 @@
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J2','精算重新计算','F10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J2','精算重新计算','F10')"
+      }
     },
     {
       "addr_id": "J2/J2-5/F20",
@@ -247,7 +661,20 @@
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J2','精算重新计算','F20')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J2','精算重新计算','F20')"
+      }
     },
     {
       "addr_id": "J2/J2-5/G10",
@@ -255,7 +682,20 @@
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J2','精算重新计算','G10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J2','精算重新计算','G10')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C10",
@@ -263,7 +703,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C10')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C5",
@@ -271,7 +724,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C5')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C5')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C6",
@@ -279,7 +745,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C6')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C6')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C7",
@@ -287,7 +766,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C7')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C7')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C8",
@@ -295,7 +787,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C8')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C8')"
+      }
     },
     {
       "addr_id": "J3/J3-4/C9",
@@ -303,7 +808,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','期权公允价值测算','C9')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','期权公允价值测算','C9')"
+      }
     },
     {
       "addr_id": "J3/J3-5/E10",
@@ -311,7 +829,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','等待期费用分摊','E10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','等待期费用分摊','E10')"
+      }
     },
     {
       "addr_id": "J3/J3-5/F10",
@@ -319,7 +850,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','等待期费用分摊','F10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','等待期费用分摊','F10')"
+      }
     },
     {
       "addr_id": "J3/J3-5/G10",
@@ -327,7 +871,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','等待期费用分摊','G10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','等待期费用分摊','G10')"
+      }
     },
     {
       "addr_id": "J3/J3-5/H10",
@@ -335,7 +892,20 @@
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('J3','等待期费用分摊','H10')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('J3','等待期费用分摊','H10')"
+      }
     },
     {
       "addr_id": "M6/M6-5/C5",
@@ -343,7 +913,20 @@
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('M6','损益联动验证','C5')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('M6','损益联动验证','C5')"
+      }
     },
     {
       "addr_id": "M6/M6-5/C6",
@@ -351,7 +934,20 @@
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('M6','损益联动验证','C6')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('M6','损益联动验证','C6')"
+      }
     },
     {
       "addr_id": "M6/M6-5/C7",
@@ -359,7 +955,20 @@
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('M6','损益联动验证','C7')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('M6','损益联动验证','C7')"
+      }
     },
     {
       "addr_id": "M6/M6-5/D7",
@@ -367,7 +976,20 @@
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('M6','损益联动验证','D7')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('M6','损益联动验证','D7')"
+      }
     },
     {
       "addr_id": "M6/M6-5/E7",
@@ -375,7 +997,20 @@
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
-      "evidence": {"renderer_tabs": [], "project_files": {"file_path": null, "parsed_data_null": true}, "static_refs": 0, "pg_formula_refs": 0, "formula_ref": "WP('M6','损益联动验证','E7')"}
+      "evidence": {
+        "renderer_tabs": {
+          "has_tab": false
+        },
+        "project_files": {
+          "sheet_level_workpapers": 1,
+          "with_file": 1,
+          "parsed_data_null": true,
+          "as_of": "2026-10-27"
+        },
+        "static_refs": 0,
+        "pg_formula_refs": 0,
+        "formula_ref": "WP('M6','损益联动验证','E7')"
+      }
     }
   ]
 }
