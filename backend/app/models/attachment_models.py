@@ -69,7 +69,7 @@ class Attachment(Base):
     original_creator_unknown: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
-    # V209 识别文本确认留痕（spec attachment-security-baseline ADR-ASB-04）：
+    # V211 识别文本确认留痕（spec attachment-security-baseline ADR-ASB-04）：
     # 确认有效 = ocr_confirmed_sha256 等于当前全文 sha256（判定在 services/attachment_ocr_text.py）
     ocr_confirmed_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ocr_confirmed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

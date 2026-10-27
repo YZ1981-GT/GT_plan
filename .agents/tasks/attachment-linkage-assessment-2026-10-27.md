@@ -248,7 +248,7 @@
 4. 3.5「版本」更正：前端回滚按钮请求的 `POST /api/attachments/{id}/versions/{version_id}/rollback` 从未注册，按钮恒 404；路由里的 `POST /api/attachments/{id}/rollback` 零调用方。
 5. 4-3 的范围更大：批量上传结果弹窗是同一种截断（「确认此文件 / 全部确认入库」同样把 200 字预览写回）。
 
-**Spec A 已修**：上述 1–5；第四节 4 项；14 个 `UUID(int=0)` 兜底与 26 个旁路目录写法（`services/workpaper_side_storage.py`）；`retry-ocr` 引用不存在的 `TaskType.ocr_upload`（改走 `OcrFieldsService`）；OCR 确认落库（V209 四列）；上传写 `created_by` / `audit_year`。
+**Spec A 已修**：上述 1–5；第四节 4 项；14 个 `UUID(int=0)` 兜底与 26 个旁路目录写法（`services/workpaper_side_storage.py`）；`retry-ocr` 引用不存在的 `TaskType.ocr_upload`（改走 `OcrFieldsService`）；OCR 确认落库（V211 四列）；上传写 `created_by` / `audit_year`。
 
 **实施中新发现、已在 Spec A 修**
 

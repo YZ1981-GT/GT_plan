@@ -25,7 +25,7 @@
   - 测试 `test_ocr_fields_authz.py`：非成员 403；readonly 读缓存 200、触发识别 403；edit 触发 202；任务查询非成员 403
 
 - [x] 5. OCR 文本完整性（需求 3.1–3.4、3.6 后端，ADR-ASB-04）
-  - 迁移 V209 + R209；模型四列；新建 `services/attachment_ocr_text.py`；`routers/attachments.py` 新增 `ocr-text` / `ocr-confirm`，`ocr-status` 加 base 校验，`retry-ocr` 改为触发识别；`_to_dict` 加字段
+  - 迁移 V211 + R211（原 V209，撞号改号，见 design ADR-08）；模型四列；新建 `services/attachment_ocr_text.py`；`routers/attachments.py` 新增 `ocr-text` / `ocr-confirm`，`ocr-status` 加 base 校验，`retry-ocr` 改为触发识别；`_to_dict` 加字段
   - 测试 `test_ocr_text_integrity.py`：全文与 sha256；截断文本或旧 base 确认 ⇒ 409 且库内不变；确认后 `ocr_confirmed` 为真、文本改写后为假；`ocr-status` 带文本无 base ⇒ 409；重试识别会调度识别；迁移 SQL 可重放
   - 记录：base 校验放在路由（design §3）；`retry-ocr` 改经 `OcrFieldsService`（原引用不存在的 `TaskType.ocr_upload`，异常被吞）；5 个手写 `attachments` 镜像 DDL 的 PG 用例补四列；变异 #4 红
 
@@ -48,7 +48,7 @@
   - 记录：前缀维基线 `_PREFIXED_IDENTITY_ONLY_BASELINE` 270 → 243；`routers/attachments.py::_ensure_project_access` 的请求体维证明链改为要求 `assert_project_permission`；`test_project_endpoint_authorization_baseline.py` 现 857 行（白名单 821 未改，门限 862）；锚点「均无需平移」；扩大回归 856 passed，失败与错误在纯 HEAD 上逐条复现（design §8）
 
 - [x] 10. 共享库迁移与走查（需求 5.4）
-  - `MigrationRunner(...).run_pending()` 应用 V209；【测试】项目上接口走查 + 浏览器走查（附件管理页上传、写入长识别文本、弹窗全文、确认、刷新）；走查数据走平台路径清理并逐表对账
+  - `MigrationRunner(...).run_pending()` 应用本 spec 迁移（V211）；【测试】项目上接口走查 + 浏览器走查（附件管理页上传、写入长识别文本、弹窗全文、确认、刷新）；走查数据走平台路径清理并逐表对账
   - 记录：私有实例 9987 / 3037，未动共享 9980 / 3030；走查发现原件区 401 与文本框盖住按钮 ⇒ 新增任务 12；修复后全流程通过，库内全文 3607 字、确认 sha256 与全文一致；清理后附件 / 版本 / 关联 0 行，项目软删（design §8）
 
 - [x] 11. 收尾

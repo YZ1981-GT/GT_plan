@@ -14,7 +14,7 @@
 | `ocr_fields_cache` | 三个写入方整体覆盖（OCR 写回、OCR 字段服务、函证比对 `_write_ocr_cache`） | 确认状态不能放这里（需求 3） |
 | 行数门 | `attachment_service.py` 1391 行、`confirmation_evidence_service.py` 972 行，均超 800 且未登记白名单 | 前者登记白名单后小改；后者不改 |
 | 并发 spec | `formula-hub-integrity-closure` 任务 3/4 已在其 worktree 改附件溯源三端点、模型与 V206 | 本 spec 不碰附件溯源 |
-| 迁移号 | V206 已有两处占用（formula-hub WIP、另一分支 `V206__consol_scope_version_auto_record.sql`），formula-hub 设计预留 V206~V208 | 本 spec 用 V209 |
+| 迁移号 | V206 已有两处占用（formula-hub WIP、另一分支 `V206__consol_scope_version_auto_record.sql`），formula-hub 设计预留 V206~V208 | 本 spec 原定 V209；实施时与远端已推送的 V209 撞号，改为 V211（design ADR-ASB-08） |
 
 ## 需求 1　上传落盘安全
 
@@ -52,4 +52,4 @@
 5.1 端点级测试真发请求（只替换 `get_current_user` 与 `get_db`，判定链真实执行），按 design §5 权限表逐格断言，含「该放行的角色真能用」。
 5.2 每类守卫至少一条磁盘变异打红，红在预期断言上；恢复后 sha256 核对。
 5.3 鉴权与行数等全仓守卫跑通；棘轮常量按现算调整并写明。
-5.4 共享库按启动同一路径执行 V209；在【测试】项目上经接口与浏览器走查：上传 → 写入长识别文本 → 弹窗显示全文 → 确认 → 刷新后不再「待确认」且库内全文未被截断。走查数据走平台路径清理并对账。
+5.4 共享库按启动同一路径执行本 spec 的迁移（V211）；在【测试】项目上经接口与浏览器走查：上传 → 写入长识别文本 → 弹窗显示全文 → 确认 → 刷新后不再「待确认」且库内全文未被截断。走查数据走平台路径清理并对账。

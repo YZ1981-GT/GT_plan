@@ -16,12 +16,12 @@
 - **ADR-ASB-01 上传白名单以前端为单一事实。** 治理侧 `ATTACHMENT_ALLOWED_MEDIA_TYPES` 比平台实际支持的格式窄（缺 eml / msg / ofd / dwg / dxf / rar / 7z / heic / webp / md），套用会让现有格式上传失败。后端新增 `ALLOWED_EXTENSIONS`，守卫逐项比对 `AttachmentManagement.vue` 的 `ACCEPT_TYPES`；恶意内容门直接复用 `build_malware_scanner()`（尊重 `ATTACHMENT_SIGNATURE_SCAN_ENABLED` / `CLAMAV_ENABLED`）。
 - **ADR-ASB-02 `attachment_type` 枚举 + 落盘根校验。** 枚举放 `services/attachment_upload_policy.py`；`upload_attachment_file` 与 `create_attachment` 入口校验，`_write_local_file` 再做 resolve-in-root（两层，任一被绕过另一层仍拦）。守卫：前端写入的 `attachment_type` 字面量、证据声明 JSON 的 `type` 都必须在枚举内。
 - **ADR-ASB-03 函证路由用路由级门。** `confirmations.py` 已 788 行，逐端点加校验会超行数门，也容易漏。新增 `services/confirmation_scope_gate.py::confirmation_project_gate`，挂在 `APIRouter(dependencies=[...])`：按方法定级（GET readonly，其余 edit），再核对路径参数（`confirmation_id`、`attachment_id`、`link_id`）与 JSON 请求体字段（`attachment_id`、`confirmation_id`、`paired_outbound_id`、`wp_id`、`items[*].wp_id`）都属于路径项目。FastAPI 在解依赖前已读过请求体，门里 `await request.json()` 取的是缓存。删除不含审计员的 `_EDIT_ROLES`（改由门判 edit）；`_MANAGER_PLUS_ROLES` 两处保留。
-- **ADR-ASB-04 OCR 确认状态存 `attachments` 列（V209）。** 新增 `ocr_confirmed_sha256`、`ocr_confirmed_by`、`ocr_confirmed_at`、`ocr_confirmed_edited`。有效性 = `ocr_confirmed_sha256 == sha256(ocr_text)`，写入方改写文本时无需清理（不依赖所有写入方记得清）。不放 `ocr_fields_cache`：它被三个写入方整体覆盖。历史由 `AuditLogMiddleware` 的请求审计留存。
+- **ADR-ASB-04 OCR 确认状态存 `attachments` 列（V211）。** 新增 `ocr_confirmed_sha256`、`ocr_confirmed_by`、`ocr_confirmed_at`、`ocr_confirmed_edited`。有效性 = `ocr_confirmed_sha256 == sha256(ocr_text)`，写入方改写文本时无需清理（不依赖所有写入方记得清）。不放 `ocr_fields_cache`：它被三个写入方整体覆盖。历史由 `AuditLogMiddleware` 的请求审计留存。
 - **ADR-ASB-05 破坏性操作一个守卫模块。** `services/attachment_destructive_guard.py`：`assert_not_under_legal_hold`（节点 `attachment` + 该附件全部 `attachment_version`，复用 `RetentionLegalHoldService.authorize_destructive`，423 文案中文）、`count_references`（`attachment_working_paper`、`confirmation_attachment_link`、`evidence_links`、`attachment_lineage`、reference 指向底稿或函证）、`filter_purgeable`（批量 / 清空用，返回可删 id 与按原因计数）。归档判定复用 `deps._check_project_not_archived`（与项目权限同一实现）。
 - **ADR-ASB-06 版本端点委托服务层。** 路由里的版本列表按「文件名 + reference_id（非空时）」归链、不区分 reference 类型与空值；回滚另写一份、不取链锁、不发失效信号。改为调用 `AttachmentService.list_versions(attachment_id)` / `rollback_to_version(attachment_id, version_id, created_by=…)`（服务层的「契约 1」：按附件 id 定位链）。
   - 实施勘误：前端回滚按钮请求 `POST /api/attachments/{id}/versions/{version_id}/rollback`，这条路由从未注册，按钮恒 404；路由里另有 `POST /api/attachments/{id}/rollback`，全仓零调用方。处置：删掉零调用方的旧路由，按前端路径注册新路由并委托服务层；版本列表补 `uploaded_at` / `uploaded_by` / `is_current`（弹窗读这三个字段）。
 - **ADR-ASB-07 旁路目录统一函数。** 新增 `services/workpaper_side_storage.py`：`parse_workpaper_id(wp_id) -> UUID`（非法 400）、`side_storage_dir(wp_id, subdir) -> Path`（`storage/workpapers/{UUID}/{subdir}`，subdir 只许小写字母数字与连字符）。26 个端点逐个替换（codemod 后人工核对），14 处 `UUID(int=0)` 兜底改为 `parse_workpaper_id`。Spec B 把这些端点改成先建附件时继续复用。
-- **ADR-ASB-08 迁移号 V209。** 现扫：主树最高 V205；`git log --all` 有两个 V206；formula-hub 设计预留 V206~V208。（实施时 V210 已被并发会话的 `voucher_identity` 占用，未冲突。）
+- **ADR-ASB-08 迁移号 V211（原 V209）。** 写设计时现扫：主树最高 V205；`git log --all` 有两个 V206；formula-hub 设计预留 V206~V208 ⇒ 取 V209。提交前 fetch 发现远端已推送 `V209__widen_business_category_varchar20.sql`（s-cycle），本地 V210 已被 `voucher_identity` 占用 ⇒ 改为 V211 / R211（全部 ref 与各 worktree 现扫无 V211）。共享库此前已按 V209 应用：删掉本 spec 那条 `schema_version` 记录（version 209）后经 `run_pending()` 以 V211 重新登记（DDL 全是 `IF NOT EXISTS`，四列不重建），远端的 V209 合入后可正常执行。
 - **ADR-ASB-09 浏览器原生加载一律不指向 /api（任务 12，走查中发现）。** 平台鉴权只认 Authorization 头（`deps.HTTPBearer`，没有 cookie / 查询串令牌）；iframe / img 的 src、a / el-link 的 href、`window.open` 都不经 axios ⇒ 指向 /api 恒 401。走查实测：OCR 确认弹窗原件区显示 `{"code":401,"message":"Not authenticated"}`，核对时看不到原件。
   - 全仓同类 18 处：附件模块 12 处（确认弹窗 ×2、批量结果 ×2、预览抽屉 server 分支 ×2、`ItemAttachment`、C24 / C25 / C26 / 控制测试的 📎 ×4、函证附件抽屉——它 `window.open` 的还是一条不存在的路由）；其他模块 6 处（模板详情预览、模板下载、合并透视导出、批量导出 ZIP、交付件预览「下载」、上年底稿文件）。交付件预览的「下载」是 `<el-button :href>`，el-button 渲染 `<button>`，href 不生效，原本就是点了没反应。
   - 内嵌预览用新组合函数 `composables/useAuthedObjectUrl.ts`：`api.get` 取 blob 换成 `blob:` 地址；源变化 / 作用域销毁时中止请求并释放；晚到的旧响应不覆盖；JSON 响应按失败处理；iframe 显示 PDF 时强制 `application/pdf`。下载用 `utils/http.downloadFile`，附件下载收口到 `components/attachment/downloadAttachment.ts`。
@@ -45,7 +45,7 @@
 | `routers/ocr_fields.py` | 两个端点项目校验 |
 | `routers/recycle_bin.py` | 附件的永久删除三路径接守卫 |
 | 26 个底稿 OCR 端点（22 个文件） | 旁路目录与 wp_id 校验 |
-| `models/attachment_models.py` + `migrations/V209__attachment_ocr_confirmation.sql` / `R209__…` | 四列 |
+| `models/attachment_models.py` + `migrations/V211__attachment_ocr_confirmation.sql` / `R211__…` | 四列 |
 | 前端 `OcrConfirmDialog.vue`、`BatchUploadResultDialog.vue`、`ocrTextApi.ts`（新）、`AttachmentManagement.vue`、`apiPaths/system.ts` | 取全文、确认新接口、重试识别。批量上传结果弹窗是同类截断（「确认此文件 / 全部确认」原也写回 200 字预览），同法修 |
 | 任务 12（ADR-09）：`composables/useAuthedObjectUrl.ts`（新）、`components/attachment/downloadAttachment.ts`（新）、`AttachmentPreviewCore.vue`、`ItemAttachment.vue`、`C24AnomalyEntrySheet.vue`、`CControlTestSubPage.vue`、`GtC25InternalAudit.vue`、`GtC26InfoControl.vue`、`ConfirmationAttachmentDrawer.vue`、`WpTemplateDetail.vue`、`consolidationApi.ts`、`ExportProgressBar.vue`、`DeliverablePreview.vue`、`PriorYearCompareDrawer.vue` | 内嵌预览走 blob: 地址、下载走 `downloadFile`；守卫 `NativeLoadBearerGuard.spec.ts`；更新钉住旧行为的两个用例（`AttachmentPreviewOfficeIframe.spec.ts`、`task1LegacyBaseline.spec.ts` 原断言 iframe src 就是 /api 路径） |
 
@@ -94,7 +94,7 @@
 
 - 新测试 + 受影响既有测试（附件、函证、回收站、OCR 字段、底稿关联波次、证据边界、鉴权三维守卫、行数门、lazy import、函数全局名棘轮、line anchor 校验）。
 - 前端：vitest（弹窗）、单区域 vue-tsc（改动文件）。
-- 共享库：`MigrationRunner(...).run_pending()` 应用 V209（与启动同一路径）；开发服 9980 上用【测试】项目走查接口与页面，数据走平台路径清理并对账。
+- 共享库：`MigrationRunner(...).run_pending()` 应用本 spec 迁移（与启动同一路径）；开发服 9980 上用【测试】项目走查接口与页面，数据走平台路径清理并对账。
 
 ## 8. 实施记录（2026-10-27）
 
@@ -114,7 +114,7 @@
 
 **共享库与走查**
 
-- V209 经 `MigrationRunner(...).run_pending()` 落到 `audit_platform`（待应用清单只有 V209），四列已在库。
+- 迁移经 `MigrationRunner(...).run_pending()` 落到 `audit_platform`：先按 V209 应用（待应用清单只有它），改号后删掉 version 209 记录、再以 V211 登记（ADR-08），四列已在库。
 - 私有实例：后端 9987（验证 worktree 代码，`--lifespan off`）、前端 3037（独立 cacheDir、关 HMR）；没有重启共享 9980 / 3030。
 - 接口走查（新建【测试】项目）：穿越类型上传 422 `ATTACHMENT_TYPE_NOT_ALLOWED`；`ocr-status` 无 base 409、带 base 200；列表预览 200 字、`ocr_text_length` 3607、`truncated` 为真；`ocr-text` 返回全文且 sha256 正确；`created_by` 为上传人；匿名请求预览 401、带令牌 200 `application/pdf`。
 - 浏览器走查：修复前原件区显示 401 JSON、「确认入库」被文本框盖住点不到（截图 01）；修复后原件区显示 PDF（blob: 地址）、右栏全文 3607 字、按钮可点（截图 03）；确认后提示「识别结果已确认入库」，列表刷新后徽标消失，整页刷新后仍为「已完成」。库内 `ocr_text` 仍是 3607 字，`ocr_confirmed_sha256` 等于全文 sha256，`ocr_confirmed_by` 为 admin，`ocr_confirmed_edited` 为假。

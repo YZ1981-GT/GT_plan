@@ -210,9 +210,9 @@ def test_retry_ocr_no_longer_references_missing_task_type():
 # ── 迁移 ──
 
 
-def test_v209_is_additive_and_replayable_by_construction():
-    v = (MIGRATIONS / "V209__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
-    r = (MIGRATIONS / "R209__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
+def test_v211_is_additive_and_replayable_by_construction():
+    v = (MIGRATIONS / "V211__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
+    r = (MIGRATIONS / "R211__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
     statements = [s.strip() for s in re.sub(r"--[^\n]*", "", v).split(";") if s.strip()]
     assert len(statements) == 4 and all("ADD COLUMN IF NOT EXISTS" in s for s in statements)
     dropped = re.findall(r"DROP COLUMN IF EXISTS (\w+)", r)
@@ -222,10 +222,10 @@ def test_v209_is_additive_and_replayable_by_construction():
 
 
 @pytest.mark.pg_only
-async def test_v209_and_r209_replay_on_real_pg(monkeypatch):
-    """真 PG 临时 schema 内：R209 → V209 → V209（重放无错）后四列齐全；再 R209 两次后四列消失。"""
-    v = (MIGRATIONS / "V209__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
-    r = (MIGRATIONS / "R209__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
+async def test_v211_and_r211_replay_on_real_pg(monkeypatch):
+    """真 PG 临时 schema 内：R211 → V211 → V211（重放无错）后四列齐全；再 R211 两次后四列消失。"""
+    v = (MIGRATIONS / "V211__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
+    r = (MIGRATIONS / "R211__attachment_ocr_confirmation.sql").read_text(encoding="utf-8")
     async with pg_attachment_world(monkeypatch) as w:
         conn = await w.db.connection()
 
