@@ -59,7 +59,7 @@
   - 再进在线编辑往 Q 敲数字保存 → 受保护冲突；console error 0
   - 结束经平台删除项目，库里残留对账
 
-- [ ] 11. 收尾
+- [x] 11. 收尾
   - design §13 记录、INDEX.md 本 spec 行（字节保留 CRLF）、memory
   - 删 `C:\Users\Administrator\ofr_probe` 与临时 worktree
   - 只提交本 spec 的文件与改动块，fetch 后从分离头 worktree 推送到当前分支，中文汇报（含 R4 口径确认与 §11 待拍板）
