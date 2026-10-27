@@ -110,22 +110,23 @@ async def get_workpaper_xlsx(
     # Only prefill xlsx files (not xlsm/docx)
     if result.suffix.lower() == '.xlsx':
         tb_data = await _get_tb_data_for_prefill(db, pid)
-        if tb_data:
-            try:
-                # formula-global-settings-sync：本项目 > 全局 > 预设映射（读失败按预设）
-                from app.services.formula_settings.wp_effective import init_prefill_overrides
+        try:
+            # formula-global-settings-sync：本项目 > 全局 > 预设映射（读失败按预设）
+            from app.services.formula_settings.wp_effective import init_prefill_overrides
 
-                user_formulas, overrides = await init_prefill_overrides(db, pid, wid)
-                # 三参 PREV：上年同底稿取数（与重新预填 / 公式运行时同一来源），按定位表落格
-                from app.services.prev3_prefill_locator import resolve_prev_prefill
+            user_formulas, overrides = await init_prefill_overrides(db, pid, wid)
+            # 三参 PREV：上年同底稿取数（与重新预填 / 公式运行时同一来源），按定位表落格。
+            # 🔴 三参 PREV 不依赖当年试算表（读的是上年数据），即使试算表为空也能批注核对值，
+            # 故独立于 tb_data 前提（spec formula-fetch-followup-defect-closure A2）。
+            from app.services.prev3_prefill_locator import resolve_prev_prefill
 
-                prev_values = await resolve_prev_prefill(db, pid, wp_code, overrides)
-                filled = prefill_workpaper_xlsx(result, wp_code, tb_data, user_formulas=user_formulas,
-                                                mapping_overrides=overrides, prev_values=prev_values)
-                if filled > 0:
-                    logger.info("Auto-prefill on init: wp_code=%s, filled=%d cells", wp_code, filled)
-            except Exception as e:
-                logger.warning("Auto-prefill failed (non-blocking): wp_code=%s, error=%s", wp_code, e)
+            prev_values = await resolve_prev_prefill(db, pid, wp_code, overrides)
+            filled = prefill_workpaper_xlsx(result, wp_code, tb_data or {}, user_formulas=user_formulas,
+                                            mapping_overrides=overrides, prev_values=prev_values)
+            if filled > 0:
+                logger.info("Auto-prefill on init: wp_code=%s, filled=%d cells", wp_code, filled)
+        except Exception as e:
+            logger.warning("Auto-prefill failed (non-blocking): wp_code=%s, error=%s", wp_code, e)
 
     # 读完再记账：回写 file_path 会提交本请求的事务（预填用到的读取都在这之前）
     await _bind_file_path(db, wid, result)

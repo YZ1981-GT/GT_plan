@@ -1612,6 +1612,11 @@ backend/app/services/acnr/resolver.py  1086
 #     拆分方向：公式生成（generate_*）、执行（execute_note_formulas + _exec_*）、跨表取数（_load_cross_table_data +
 #     _resolve_single_cross_ref）三块各自成模块。
 backend/app/services/note_formula_generator.py  1483
+#   test_projection_first_publication.py / test_single_pass_verify_not_relaxed.py —— 历史大文件（HEAD 已 2273 / 1532 行且未登记）。
+#     2026-10-24 writeback-followup-issue-closure R12：纯静态 entry 不派生行身份表、行集合权威用例改名（+16）；D4 常量单一来源（+4）。
+#     拆分方向：首版发布链按 Property 分组（36 宿主真源 / 各环准入 / 静态臂）各成模块；verify 判据按「未放宽 / 变异反证」两组拆。
+backend/tests/workpaper_sync/test_projection_first_publication.py  2289
+backend/tests/workpaper_sync/test_single_pass_verify_not_relaxed.py  1536
 #   ProcedureTrimming.vue / GtAProgramConsole.vue / procedure_trim_service.py —— 历史大文件（HEAD 已 4012 / 1889 / 1086 行且未登记）。
 #     2026-10-24 procedure-trim-generation-delegation-chain 批 3：粗裁保存前回收站确认（+16）、被委派人看不到目标循环时带理由扩权重试与
 #     预览缺口提示（+38 / +11）、apply_scheme 回收站联动与级联按底稿归属（+44；新逻辑放伴生模块 procedure_trim_recycle）。
@@ -1669,14 +1674,14 @@ backend/app/services/qc_engine.py  974
 #     3 个夹具补项目审计年度、加「项目未设置审计年度不写字段覆盖」用例（+27）。
 #     拆分方向：按 A16 模式 / 通用模式 / 签字与字段覆盖三组拆文件，共享桩抽到 __tests__ 辅助模块。
 audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.spec.ts  1956
-#   n_cycle_scanner.py —— 2026-10-26 从 work/2026-10-01-n-cycle-sync-three-specs 移植（原样 965 行 + 模块说明 12 行）。
-#     三份 N spec tasks.md 点名的守卫（test_n_cycle_foundation_canary / test_n_lane2_host_inline_router /
-#     test_n_lane3_json_table_identity）只认这一份口径；当前分支此前同名文件是并行会话的另一份扫描器
-#     （已改名 n_cycle_scanner_summary.py），三份守卫因 AttributeError 整体不可跑。
-#     入册而不拆：拆分会动判据实现本身，变异证明要重做。拆分方向：模板层（openpyxl 事实）/
-#     源码层（域文件、行身份、import 图）两个模块，入口模块保留 re-export。
-backend/scripts/analyze/n_cycle_scanner.py  977
 #   procedure_task_transition_service.py —— 历史大文件（HEAD 已 918 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-27 procedure-chain-hardening-and-java-contracts R22：转派的任务历史 / outbox 改记转派前的真实状态（+1）。
 #     拆分方向：状态转换（assign / reassign / submit …）与写入（任务历史 + 有序 outbox + 精确投影）两块，写入块抽成独立模块。
 backend/app/services/procedure_task_transition_service.py  919
+
+#   excel_html.py — spec formula-fetch-followup-defect-closure A4：鉴权升级 + docstring 增 30 行。
+#     HEAD 775 行已接近限值，拆分方向：公式执行 / 模块互转 / 版本管理分三个 router。
+backend/app/routers/excel_html.py  805
+#   identifier.py — 并发会话扩展（本 spec 只改 2 行：路径 parents[4]→[3] + 内置别名补「核算类型」）。
+#     HEAD 1062 行已超限但此前未登记。拆分方向：规则加载 / Level 1~3 识别 / 别名管理分三个模块。
+backend/app/services/ledger_import/identifier.py  1164

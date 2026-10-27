@@ -820,5 +820,8 @@ async def publish_determination_to_tb(
         published=True,
         wp_code=det_code,
         publish_token=token,
-        message=f"已发布 {len(writeback_rows)} 个科目的审定数到试算表",
+        # 🔴 回执说"已提交"而非"已发布"：实际回写由事件处理器异步完成，
+        # 科目在试算表中不存在时会被跳过（如 L7 用 BS-071 报表行码当科目码），
+        # 跳过详情记在 tb_publish_ack.accounts_updated 与日志。
+        message=f"已提交 {len(writeback_rows)} 个科目的审定数发布请求",
     )

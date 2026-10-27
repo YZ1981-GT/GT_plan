@@ -355,6 +355,14 @@ _FIXED_ENDPOINTS: frozenset[str] = frozenset({
     "formula_audit_log.py::rollback_formula",
     "t_accounts.py::list_t_accounts",
     "metabase.py::clear_cache",
+    # spec formula-fetch-followup-defect-closure R4.2/R4.3 + procedure-chain-hardening：
+    # 生成底稿五端点（edit×4 + readonly×1）与模板清单（readonly）
+    "wp_template.py::generate_project_workpapers",
+    "wp_template.py::generate_from_codes",
+    "wp_template.py::create_custom_workpaper",
+    "wp_template.py::create_custom_workpaper_batch",
+    "wp_template.py::preview_custom_workpaper_batch",
+    "wp_template_list.py::get_template_list",
 })
 
 
@@ -425,7 +433,8 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
 #: 2026-10-27 现算 169（改前 189）：spec consol-autotree-residual-closure R1.1 / R1.3 给报表页 / 报表行次映射 / 报表行关联
 #: 底稿 / 试算分析四个 router 共 20 个端点改挂 ``require_project_access``（readonly / edit）后降 20。
-_IDENTITY_ONLY_BASELINE = 169
+#: 2026-10-27 现算 166：审计报告 3 个端点（generate/update_paragraph/update_status）加 assert_project_permission 后降 3。
+_IDENTITY_ONLY_BASELINE = 166
 
 
 def test_identity_only_endpoints_do_not_grow():

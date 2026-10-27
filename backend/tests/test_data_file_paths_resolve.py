@@ -23,9 +23,7 @@ KNOWN_MISSING: dict[tuple[str, str], str] = {
     ("services/workpaper_sync/capacity_profile.py",
      ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md"):
         "先找在用路径、找不到再找归档目录（_requirements_path）；spec 已归档",
-    ("services/ledger_import/identifier.py", "data/ledger_recognition_rules.json"):
-        "🔴 已登记未修（design §10.3）：parents[4] 多上了一层，账套识别规则 JSON 从未加载、一直用内置默认；"
-        "且该 JSON 已比内置旧（缺 aux_dimensions 别名），直接改路径会让辅助核算列识别退化 —— 需先同步 JSON 或删掉 JSON 改内置为唯一来源",
+    # 已修（spec formula-fetch-followup-defect-closure A3）：parents[4]→parents[3] + JSON column_aliases 删除 + 内置补「核算类型」
 }
 
 
