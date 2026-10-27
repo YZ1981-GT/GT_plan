@@ -136,6 +136,24 @@ def _spec_of_store_item(store_item_id: str) -> Any:
     )
 
 
+#: dict store 的行数组键 —— 逐字取前端（`ObsoleteInventorySheet` / `ImpairmentTestSheet` /
+#: `ImpairmentReversalSheet` 都是 `products`）。
+_ROWS_KEY_BY_STORE_ITEM: Final[Mapping[str, str]] = {
+    "F2-48-rows": "products",
+    "F2-47-rows": "products",
+    "F2-49-rows": "products",
+}
+
+
+def _rows_key_of(store_item_id: str) -> str:
+    try:
+        return _ROWS_KEY_BY_STORE_ITEM[store_item_id]
+    except KeyError:
+        raise EntrySelectionError(
+            f"store item {store_item_id!r} 没有登记 dict 行数组键（_ROWS_KEY_BY_STORE_ITEM）"
+        ) from None
+
+
 def build_store_projection(
     payload: str | bytes | Sequence[Any],
     *,
@@ -147,22 +165,18 @@ def build_store_projection(
         build_store_projection as _engine,
     )
     import json as _json
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    # dict 形态（StoreKind.dict）：载荷是 {"products": [...]} 或 "{}"
-    # 引擎期望纯数组 → 提取子数组，空 dict 时给空数组
+    sid = store_item_id or STORE_ITEM_ID
+    spec = _spec_of_store_item(sid)
+    # dict 形态（StoreKind.dict）：载荷是 {"products": [...], …其他键} 或 "{}"，引擎期望纯数组
     if isinstance(payload, (str, bytes, bytearray)):
         text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
         parsed = _json.loads(text) if text.strip() else {}
     else:
         parsed = payload
-    if isinstance(parsed, dict):
-        # 从 dict 中找第一个值为 list 的键作为行数组
-        rows = []
-        for v in parsed.values():
-            if isinstance(v, list):
-                rows = v
-                break
-        payload = rows
+    if isinstance(parsed, Mapping):
+        # 按名取行数组（不猜「第一个列表值」：F2-47 的 dict 里还有 auditProcedure / sampling）；
+        # 键缺失 = 空表；值不是数组时原样交给引擎 fail closed
+        payload = parsed.get(_rows_key_of(sid), [])
     return _engine(spec, payload, contract=contract, limits=limits)
 
 
@@ -179,6 +193,31 @@ def merge_projection_into_store_rows(
     return _engine_merge(
         spec, projection=projection, base_rows=base_rows
     )
+
+
+def merge_projection_into_store_state(
+    *,
+    projection: Any,
+    base_state: Mapping[str, Any] | None,
+    store_item_id: str | None = None,
+) -> tuple[dict[str, Any], int, int]:
+    """回写门面（`store_mirror` 的 state 分支按名调用）：只换 dict 里的行数组，其余键原样保留。
+
+    🔴 spec oo-writeback-template-parity-closure R3：store 是 `{products: [...]}`，原先走 rows 分支
+    ⇒ 基线永远是 `[]`（载荷是 dict 不是数组）、写回的是裸数组 —— 外层键丢失、每行的非受管字段
+    （前端独有字段）被清掉；前端读到裸数组还会按旧版数组形态迁移，行身份重新生成。
+    """
+    sid = store_item_id or STORE_ITEM_ID
+    key = _rows_key_of(sid)
+    state: dict[str, Any] = dict(base_state or {})
+    base_rows = state.get(key)
+    rows, applied, visited, _touched = merge_projection_into_store_rows(
+        projection=projection,
+        base_rows=list(base_rows) if isinstance(base_rows, list) else [],
+        store_item_id=sid,
+    )
+    state[key] = rows
+    return state, applied, visited
 
 
 # ═══════════════════════════════════════════════════════════════════════════

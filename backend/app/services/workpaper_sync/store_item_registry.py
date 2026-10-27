@@ -249,9 +249,12 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
             StoreItemSpec(item_id="F2-25-floor-rows", kind=StoreKind.rows),
         ),
     ),
+    # 🔴 F2-48 / F2-57 的 store 是 dict（`{products}` / `{projects}`）⇒ 回写走 state 分支，
+    #    只换行数组、保留外层键与非受管字段（rows 分支基线恒 `[]`、写回裸数组）。
     "f2.inventory_valuation": StoreMergePlan(
         adapter_id="f2.inventory_valuation",
         provider_module="phase5_f2_inventory_valuation",
+        merge_state_fn="merge_projection_into_store_state",
         items=(
             StoreItemSpec(item_id="F2-48-rows", kind=StoreKind.dict),
         ),
@@ -259,6 +262,7 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
     "f2.inventory_special": StoreMergePlan(
         adapter_id="f2.inventory_special",
         provider_module="phase5_f2_inventory_special",
+        merge_state_fn="merge_projection_into_store_state",
         items=(
             StoreItemSpec(item_id="F2-57-rows", kind=StoreKind.dict),
         ),

@@ -530,6 +530,11 @@ import {
   type StocktakeSampleRow,
   type StocktakeSectionField,
 } from './f2StocktakeConfigs'
+import {
+  emptyStocktakeSampleRow,
+  enrichStocktakeSampleRow,
+  type StocktakeSampleEnrichedRow,
+} from './f2StocktakeRowCalc'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -551,12 +556,7 @@ const smpNav = [
 ]
 const { activeId, scrollTo } = useStickySectionNav(smpNav)
 
-type Enriched = StocktakeSampleRow & {
-  sampleVsBook: number
-  sampleVsClient: number
-  clientVsBook: number
-  hasVariance: boolean
-}
+type Enriched = StocktakeSampleEnrichedRow
 
 const QUALITY_OPTS = ['正常', '毁损', '呆滞', '过期', '其他']
 
@@ -580,35 +580,8 @@ const meta = useF2StocktakeFields({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-function emptyRow(): StocktakeSampleRow {
-  return {
-    id: `st-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    itemCode: '',
-    itemName: '',
-    spec: '',
-    unit: '',
-    unitPrice: 0,
-    bookQty: 0,
-    bookAmount: 0,
-    clientCountQty: 0,
-    sampleQty: 0,
-    qualityStatus: '',
-    varianceReason: '',
-    remark: '',
-  }
-}
-
-function normalizeRow(r: Partial<StocktakeSampleRow> & { id: string }): StocktakeSampleRow {
-  return {
-    ...emptyRow(),
-    ...r,
-    itemCode: r.itemCode ?? '',
-    unitPrice: Number(r.unitPrice ?? 0),
-    bookAmount: Number(r.bookAmount ?? 0),
-    clientCountQty: Number(r.clientCountQty ?? 0),
-    qualityStatus: r.qualityStatus ?? '',
-  }
-}
+// 行归一 / 差异列是纯函数（f2StocktakeRowCalc，与对拍守卫共用）
+const emptyRow = emptyStocktakeSampleRow
 
 const existSheet = useF2StocktakeRows<StocktakeSampleRow>({
   rowsKey: 'F2-25-rows',
@@ -627,22 +600,7 @@ const floorSheet = useF2StocktakeRows<StocktakeSampleRow>({
 })
 
 function enrich(rows: StocktakeSampleRow[]): Enriched[] {
-  return rows.map((raw) => {
-    const r = normalizeRow(raw)
-    const sampleVsBook = r.sampleQty - r.bookQty
-    const sampleVsClient = r.sampleQty - r.clientCountQty
-    const clientVsBook = r.clientCountQty - r.bookQty
-    return {
-      ...r,
-      sampleVsBook,
-      sampleVsClient,
-      clientVsBook,
-      hasVariance:
-        Math.abs(sampleVsBook) > 0.001
-        || Math.abs(sampleVsClient) > 0.001
-        || Math.abs(clientVsBook) > 0.001,
-    }
-  })
+  return rows.map(enrichStocktakeSampleRow)
 }
 
 const existEnriched = computed(() => enrich(existSheet.rows.value))

@@ -77,6 +77,15 @@ describe('useF2ContractCostImpairmentFormulas', () => {
     expect(enriched.measuredProvision).toBe(-100)
   })
 
+  it('measured provision follows template J (reversal capped by accumulated provision)', () => {
+    // 模板 J = IF(H>E, IF((H−E)>D, −D, −(H−E)), E−H)，E = C − D
+    expect(calcMeasuredProvision(1000, 1300, 200)).toBe(-200) // H−E = 500 > D ⇒ 全额转回
+    expect(calcMeasuredProvision(1000, 850, 200)).toBe(-50) // H−E = 50 ≤ D ⇒ 转回 50
+    expect(calcMeasuredProvision(1000, 700, 200)).toBe(100) // H ≤ E ⇒ 补提 E − H
+    // 已计提准备为负（冲回过头）：模板取 E − H，旧式 max(0, C − H) − D 会得 50
+    expect(calcMeasuredProvision(1000, 1030, -50)).toBe(20)
+  })
+
   it('column totals aggregate', () => {
     const rows = enrichImpairmentProjects([
       { ...emptyImpairmentProject(), bookBalance: 500, accumulatedProvision: 0 },

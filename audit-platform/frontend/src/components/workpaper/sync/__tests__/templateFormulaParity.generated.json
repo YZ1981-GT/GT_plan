@@ -1115,24 +1115,24 @@
     "抽盘结果汇总表F2-25!stocktake_sample_floor_rows@31"
    ],
    "inputs": [
-    "bookAmt",
+    "bookAmount",
     "bookQty",
-    "countAmt",
-    "countQty"
+    "clientCountQty",
+    "sampleQty",
+    "unitPrice"
    ],
    "input_types": {
-    "bookAmt": "amount",
+    "bookAmount": "amount",
     "bookQty": "amount",
-    "countAmt": "amount",
-    "countQty": "amount"
+    "clientCountQty": "amount",
+    "sampleQty": "amount",
+    "unitPrice": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "conclusion",
     "itemCode",
     "itemName",
-    "location",
-    "reason",
+    "qualityStatus",
     "spec",
     "unit"
    ],
@@ -1145,24 +1145,24 @@
     "抽盘结果汇总表F2-25!stocktake_sample_exist_rows@16"
    ],
    "inputs": [
-    "bookAmt",
+    "bookAmount",
     "bookQty",
-    "countAmt",
-    "countQty"
+    "clientCountQty",
+    "sampleQty",
+    "unitPrice"
    ],
    "input_types": {
-    "bookAmt": "amount",
+    "bookAmount": "amount",
     "bookQty": "amount",
-    "countAmt": "amount",
-    "countQty": "amount"
+    "clientCountQty": "amount",
+    "sampleQty": "amount",
+    "unitPrice": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "conclusion",
     "itemCode",
     "itemName",
-    "location",
-    "reason",
+    "qualityStatus",
     "spec",
     "unit"
    ],
@@ -1175,28 +1175,28 @@
     "盘点倒轧表F2-26!stocktake_rollforward_after_rows@8"
    ],
    "inputs": [
-    "bookAmt",
     "bookQty",
-    "countDateQty",
-    "inQty",
-    "outQty",
-    "unitCost"
+    "countDayQty",
+    "inboundQty",
+    "outboundQty",
+    "unitPrice"
    ],
    "input_types": {
-    "bookAmt": "amount",
     "bookQty": "amount",
-    "countDateQty": "amount",
-    "inQty": "amount",
-    "outQty": "amount",
-    "unitCost": "amount"
+    "countDayQty": "amount",
+    "inboundQty": "amount",
+    "outboundQty": "amount",
+    "unitPrice": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
+    "category",
     "itemCode",
     "itemName",
-    "reason",
-    "spec",
-    "unit"
+    "needAdjust",
+    "unit",
+    "varianceReason",
+    "warehouse"
    ],
    "auto_fields": [],
    "literals": []
@@ -1244,25 +1244,30 @@
     "长库龄 呆滞 超过保质期存货明细表F2-48!aging_stale_detail_rows@7"
    ],
    "inputs": [
-    "bookAmt",
+    "aging/over3y",
+    "aging/within1y",
+    "aging/y1to2",
+    "aging/y2to3",
+    "provisionAmount",
     "qty",
-    "unitCost"
+    "unitPrice"
    ],
    "input_types": {
-    "bookAmt": "amount",
+    "aging/over3y": "amount",
+    "aging/within1y": "amount",
+    "aging/y1to2": "amount",
+    "aging/y2to3": "amount",
+    "provisionAmount": "amount",
     "qty": "amount",
-    "unitCost": "amount"
+    "unitPrice": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
-    "agingDesc",
+    "category",
+    "impairmentSigns",
     "itemCode",
     "itemName",
-    "plan",
-    "reason",
-    "remark",
-    "spec",
-    "status",
+    "specification",
     "unit"
    ],
    "auto_fields": [],
@@ -1274,24 +1279,23 @@
     "合同履约成本减值准备测算表F2-57!contract_impairment_rows@6"
    ],
    "inputs": [
-    "auditClose",
-    "bookInc",
-    "bookOpen",
-    "cost",
-    "revenue"
+    "accumulatedProvision",
+    "bookBalance",
+    "companyRecordedProvision",
+    "estimatedFutureCosts",
+    "remainingConsideration"
    ],
    "input_types": {
-    "auditClose": "amount",
-    "bookInc": "amount",
-    "bookOpen": "amount",
-    "cost": "amount",
-    "revenue": "amount"
+    "accumulatedProvision": "amount",
+    "bookBalance": "amount",
+    "companyRecordedProvision": "amount",
+    "estimatedFutureCosts": "amount",
+    "remainingConsideration": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
     "projectCode",
-    "projectName",
-    "remark"
+    "projectName"
    ],
    "auto_fields": [],
    "literals": [
@@ -3911,11 +3915,11 @@
    "store_item": "F2-25-floor-rows",
    "contract": "f2.stocktake_bundle",
    "sheet": "抽盘结果汇总表F2-25",
-   "cell": "K31",
-   "field": "diffAmt",
-   "header": "差异金额",
-   "formula": "=I31-H31",
-   "expr": "countAmt - countQty",
+   "cell": "L31",
+   "field": "clientVsBook",
+   "header": "企业盘点与账面差异",
+   "formula": "=H31-F31",
+   "expr": "clientCountQty - bookQty",
    "skip": null
   },
   {
@@ -3923,43 +3927,21 @@
    "contract": "f2.stocktake_bundle",
    "sheet": "抽盘结果汇总表F2-25",
    "cell": "J31",
-   "field": "diffQty",
-   "header": "差异数量",
+   "field": "sampleVsBook",
+   "header": "抽盘与账面差异（+盈-亏）",
    "formula": "=I31-F31",
-   "expr": "countAmt - bookQty",
+   "expr": "sampleQty - bookQty",
    "skip": null
   },
   {
    "store_item": "F2-25-floor-rows",
    "contract": "f2.stocktake_bundle",
    "sheet": "抽盘结果汇总表F2-25",
-   "cell": "L31",
-   "field": "diffRate",
-   "header": "差异率",
-   "formula": "=H31-F31",
-   "expr": "countQty - bookQty",
-   "skip": null
-  },
-  {
-   "store_item": "F2-25-rows",
-   "contract": "f2.stocktake_bundle",
-   "sheet": "抽盘结果汇总表F2-25",
-   "cell": "K16",
-   "field": "diffAmt",
-   "header": "差异金额",
-   "formula": "=I16-H16",
-   "expr": "countAmt - countQty",
-   "skip": null
-  },
-  {
-   "store_item": "F2-25-rows",
-   "contract": "f2.stocktake_bundle",
-   "sheet": "抽盘结果汇总表F2-25",
-   "cell": "J16",
-   "field": "diffQty",
-   "header": "差异数量",
-   "formula": "=I16-F16",
-   "expr": "countAmt - bookQty",
+   "cell": "K31",
+   "field": "sampleVsClient",
+   "header": "抽盘与企业盘点差异",
+   "formula": "=I31-H31",
+   "expr": "sampleQty - clientCountQty",
    "skip": null
   },
   {
@@ -3967,32 +3949,32 @@
    "contract": "f2.stocktake_bundle",
    "sheet": "抽盘结果汇总表F2-25",
    "cell": "L16",
-   "field": "diffRate",
-   "header": "差异率",
+   "field": "clientVsBook",
+   "header": "企业盘点与账面差异",
    "formula": "=H16-F16",
-   "expr": "countQty - bookQty",
+   "expr": "clientCountQty - bookQty",
    "skip": null
   },
   {
-   "store_item": "F2-26-after-rows",
+   "store_item": "F2-25-rows",
    "contract": "f2.stocktake_bundle",
-   "sheet": "盘点倒轧表F2-26",
-   "cell": "L8",
-   "field": "bsDateAmt",
-   "header": "资产负债表日实存金额",
-   "formula": "=J8-K8",
-   "expr": "bsDateQty - unitCost",
+   "sheet": "抽盘结果汇总表F2-25",
+   "cell": "J16",
+   "field": "sampleVsBook",
+   "header": "抽盘与账面差异（+盈-亏）",
+   "formula": "=I16-F16",
+   "expr": "sampleQty - bookQty",
    "skip": null
   },
   {
-   "store_item": "F2-26-after-rows",
+   "store_item": "F2-25-rows",
    "contract": "f2.stocktake_bundle",
-   "sheet": "盘点倒轧表F2-26",
-   "cell": "J8",
-   "field": "bsDateQty",
-   "header": "资产负债表日实存数量",
-   "formula": "=G8+H8-I8",
-   "expr": "countDateQty + inQty - outQty",
+   "sheet": "抽盘结果汇总表F2-25",
+   "cell": "K16",
+   "field": "sampleVsClient",
+   "header": "抽盘与企业盘点差异",
+   "formula": "=I16-H16",
+   "expr": "sampleQty - clientCountQty",
    "skip": null
   },
   {
@@ -4000,10 +3982,32 @@
    "contract": "f2.stocktake_bundle",
    "sheet": "盘点倒轧表F2-26",
    "cell": "M8",
-   "field": "diffAmt",
-   "header": "差异金额",
+   "field": "amtDiff",
+   "header": "金额差异",
    "formula": "=L8*E8",
-   "expr": "bsDateAmt * bookQty",
+   "expr": "qtyDiff * unitPrice",
+   "skip": null
+  },
+  {
+   "store_item": "F2-26-after-rows",
+   "contract": "f2.stocktake_bundle",
+   "sheet": "盘点倒轧表F2-26",
+   "cell": "J8",
+   "field": "calcBsQty",
+   "header": "资产负债表日实存数量",
+   "formula": "=G8+H8-I8",
+   "expr": "countDayQty + outboundQty - inboundQty",
+   "skip": null
+  },
+  {
+   "store_item": "F2-26-after-rows",
+   "contract": "f2.stocktake_bundle",
+   "sheet": "盘点倒轧表F2-26",
+   "cell": "L8",
+   "field": "qtyDiff",
+   "header": "数量差异",
+   "formula": "=J8-K8",
+   "expr": "calcBsQty - bookQty",
    "skip": null
   },
   {
@@ -4099,54 +4103,10 @@
    "contract": "f2.inventory_valuation",
    "sheet": "长库龄 呆滞 超过保质期存货明细表F2-48",
    "cell": "H7",
-   "field": "agingAmt",
-   "header": "库龄金额",
+   "field": "endingAmount",
+   "header": "结存金额",
    "formula": "=F7*G7",
-   "expr": "unitCost * bookAmt",
-   "skip": null
-  },
-  {
-   "store_item": "F2-57-rows",
-   "contract": "f2.inventory_special",
-   "sheet": "合同履约成本减值准备测算表F2-57",
-   "cell": "L6",
-   "field": "adjAmt",
-   "header": "调整金额",
-   "formula": "=J6-K6",
-   "expr": "auditInc - auditClose",
-   "skip": null
-  },
-  {
-   "store_item": "F2-57-rows",
-   "contract": "f2.inventory_special",
-   "sheet": "合同履约成本减值准备测算表F2-57",
-   "cell": "J6",
-   "field": "auditInc",
-   "header": "审定增加",
-   "formula": "=IF(H6>E6,IF((H6-E6)>D6,-D6,-(H6-E6)),E6-H6)",
-   "expr": "IF( bookClose > diff , IF( ( bookClose - diff ) > cost , - cost , - ( bookClose - diff ) ) , diff - bookClose )",
-   "skip": null
-  },
-  {
-   "store_item": "F2-57-rows",
-   "contract": "f2.inventory_special",
-   "sheet": "合同履约成本减值准备测算表F2-57",
-   "cell": "I6",
-   "field": "auditOpen",
-   "header": "审定期初",
-   "formula": "=IF(E6>H6,\"是\",\"否\")",
-   "expr": "IF( diff > bookClose , \"是\" , \"否\" )",
-   "skip": null
-  },
-  {
-   "store_item": "F2-57-rows",
-   "contract": "f2.inventory_special",
-   "sheet": "合同履约成本减值准备测算表F2-57",
-   "cell": "H6",
-   "field": "bookClose",
-   "header": "期末账面",
-   "formula": "=F6-G6",
-   "expr": "bookOpen - bookInc",
+   "expr": "qty * unitPrice",
    "skip": null
   },
   {
@@ -4154,10 +4114,54 @@
    "contract": "f2.inventory_special",
    "sheet": "合同履约成本减值准备测算表F2-57",
    "cell": "E6",
-   "field": "diff",
-   "header": "差额",
+   "field": "bookValue",
+   "header": "账面价值",
    "formula": "=C6-D6",
-   "expr": "revenue - cost",
+   "expr": "bookBalance - accumulatedProvision",
+   "skip": null
+  },
+  {
+   "store_item": "F2-57-rows",
+   "contract": "f2.inventory_special",
+   "sheet": "合同履约成本减值准备测算表F2-57",
+   "cell": "L6",
+   "field": "difference",
+   "header": "差异金额",
+   "formula": "=J6-K6",
+   "expr": "measuredProvision - companyRecordedProvision",
+   "skip": null
+  },
+  {
+   "store_item": "F2-57-rows",
+   "contract": "f2.inventory_special",
+   "sheet": "合同履约成本减值准备测算表F2-57",
+   "cell": "I6",
+   "field": "isImpaired",
+   "header": "是否发生减值",
+   "formula": "=IF(E6>H6,\"是\",\"否\")",
+   "expr": "IF( bookValue > netRealizableValue , \"是\" , \"否\" )",
+   "skip": null
+  },
+  {
+   "store_item": "F2-57-rows",
+   "contract": "f2.inventory_special",
+   "sheet": "合同履约成本减值准备测算表F2-57",
+   "cell": "J6",
+   "field": "measuredProvision",
+   "header": "测算减值准备计提或转回金额",
+   "formula": "=IF(H6>E6,IF((H6-E6)>D6,-D6,-(H6-E6)),E6-H6)",
+   "expr": "IF( netRealizableValue > bookValue , IF( ( netRealizableValue - bookValue ) > accumulatedProvision , - accumulatedProvision , - ( netRealizableValue - bookValue ) ) , bookValue - netRealizableValue )",
+   "skip": null
+  },
+  {
+   "store_item": "F2-57-rows",
+   "contract": "f2.inventory_special",
+   "sheet": "合同履约成本减值准备测算表F2-57",
+   "cell": "H6",
+   "field": "netRealizableValue",
+   "header": "预期取得转让对价净额",
+   "formula": "=F6-G6",
+   "expr": "remainingConsideration - estimatedFutureCosts",
    "skip": null
   },
   {

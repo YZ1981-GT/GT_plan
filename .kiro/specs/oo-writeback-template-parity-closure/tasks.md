@@ -41,6 +41,8 @@
   - [ ] 9.2 L4-3 与 M 循环（含 `placeholder` store item）
   - [ ] 9.3 G5-2 / G6-5 / G7 / H 循环
   - [ ] 9.4 E1 / F2 / D 循环零散字段
+    - [x] 9.4a F2-25 / F2-26 / F2-48 / F2-57 按模板表头接前端字段，F2-48 / F2-57 dict store 走 state 合并；回写合并只合本表的键（平台，8 家串表 + G9 / L5 落错区），守卫 `test_store_merge_table_isolation.py` 与三条磁盘变异；对拍适配器 +5、未覆盖 25 → 20（design §4.1）
+    - [ ] 9.4b E1-2 / E1-4、D3-rp、D6-3（两区）、D7-4 贷方区、F3-1 / F3-4、F4-1
   - [ ] 9.5 守卫 `test_contract_field_names_in_frontend.py` + 例外表只许减少；变异必须打红
 
 - [x] 10. 删除死代码（R8）：`usePeriodAdjudication.ts` / `CycleTabAdjudication.vue` 零挂载（全前端无模板标签、无 import），连同只喂给它们的 `cycleAdjudicationConfigs.ts` 删除；6 份 G 复盘守卫里核这份配置的用例随之删除；`components.d.ts` 同步

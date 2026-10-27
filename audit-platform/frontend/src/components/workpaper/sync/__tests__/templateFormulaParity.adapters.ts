@@ -28,7 +28,10 @@ import * as d6RelatedParty from '../../composables/useD6RelatedParty'
 import * as d7Detail from '../../composables/useD7Detail'
 import * as d7RelatedParty from '../../composables/useD7RelatedParty'
 import * as f1RelatedParty from '../../composables/useF1RelatedParty'
+import * as f2Impairment from '../../composables/useF2ContractCostImpairmentFormulas'
 import * as f2Detail from '../../composables/useF2DetailSheet'
+import * as f2Obsolete from '../../composables/useF2ObsoleteInventoryFormulas'
+import * as f2Stocktake from '../../f2/stocktake/f2StocktakeRowCalc'
 import * as f4RelatedParty from '../../composables/useF4RelatedParty'
 import * as f5Rollforward from '../../composables/useF5CostRollforward'
 import { buildG13CategorySkeleton } from '../../composables/g13CategorySkeleton'
@@ -229,6 +232,28 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
   'F2-6-rows': {
     source: 'useF2DetailSheet.enrichRow',
     compute: (raw) => asRow(f2Detail.enrichRow(merged(f2Detail.emptyRow('parity', []), raw), true, [])),
+  },
+  'F2-25-floor-rows': {
+    source: 'f2StocktakeRowCalc.enrichStocktakeSampleRow',
+    compute: (raw) => asRow(f2Stocktake.enrichStocktakeSampleRow(merged(f2Stocktake.emptyStocktakeSampleRow(), raw))),
+  },
+  'F2-25-rows': {
+    source: 'f2StocktakeRowCalc.enrichStocktakeSampleRow',
+    compute: (raw) => asRow(f2Stocktake.enrichStocktakeSampleRow(merged(f2Stocktake.emptyStocktakeSampleRow(), raw))),
+  },
+  'F2-26-after-rows': {
+    source: 'f2StocktakeRowCalc.enrichStocktakeRollforwardRow（日后表）',
+    compute: (raw) => asRow(f2Stocktake.enrichStocktakeRollforwardRow(
+      merged(f2Stocktake.emptyStocktakeRollforwardRow(), raw), 'after',
+    )),
+  },
+  'F2-48-rows': {
+    source: 'useF2ObsoleteInventoryFormulas.enrichObsoleteItem',
+    compute: (raw) => asRow(f2Obsolete.enrichObsoleteItem(merged(f2Obsolete.emptyObsoleteItem(), raw))),
+  },
+  'F2-57-rows': {
+    source: 'useF2ContractCostImpairmentFormulas.enrichImpairmentProject',
+    compute: (raw) => asRow(f2Impairment.enrichImpairmentProject(merged(f2Impairment.emptyImpairmentProject(), raw))),
   },
   'F4-6-rows': {
     source: 'useF4RelatedParty.migrateF4RelatedPartyRows + computeRow',

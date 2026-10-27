@@ -714,7 +714,15 @@ def merge_projection_into_store_rows(
     applied = 0
     visited = 0
     touched_rows: set[str] = set()
+    # 🔴 只合本表的键（spec oo-writeback-template-parity-closure R3，普查实证）：单 item 回写路径
+    #    把**整份契约**的 merged projection 交进来，而别表的列名常与本表重名（F2-47 / F2-48 的
+    #    category·item_code·qty、F2-25 两区同列、E1 现金 / 数字货币、F3 六张表 …）。原先只按
+    #    column_key 过滤 ⇒ 别表在 OO 里新增的行被建进本表 store；多区共用一个 store item 的门面
+    #    逐段穿线时，区②/③ 的新增行在区① 那一趟就被建出、带上区① 的归属（G9 / L5 实测）。
+    table_prefix = f"{spec.table_key}/"
     for key in projection.stable_keys():
+        if not str(key).startswith(table_prefix):
+            continue
         fv = projection.get(key)
         if fv is None or getattr(fv, "is_protected", False):
             continue

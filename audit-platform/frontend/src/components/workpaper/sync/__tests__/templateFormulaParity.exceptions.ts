@@ -19,12 +19,7 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'D7-4-credit-rows': 'R3 任务 9：契约把「期末主要债权人余额分析」接到前端存「贷方发生额分析」的 item，前端该 item 只有 item / amount 两列、不算变动额',
   'E1-cash-detail-rows': `${R3_FIELD_NAMES}（契约 closingOriginal / closingRmb / adjustmentOriginal / closingAudited，前端 endingFc / endingRmb / adjustment / auditedRmb）`,
   'E1-digital-rows': `${R3_FIELD_NAMES}（契约 *Original / *Local，前端 opening / endingFc / auditedFc …；行计算还在 E1TabDigitalCurrency.vue 内）`,
-  'F2-25-floor-rows': 'R3 任务 9：契约列名与模板表头整体错位（diffAmt = countAmt − countQty 这类表达式说明接错列）',
-  'F2-25-rows': 'R3 任务 9：契约列名与模板表头整体错位（同 F2-25-floor-rows）',
-  'F2-26-after-rows': 'R3 任务 9：契约列名与模板表头整体错位（bsDateAmt = bsDateQty − unitCost）',
-  'F2-47-rows': 'R3 任务 9：契约列名与模板表头整体错位（bookAmt = unitCost / qty、impairmentEnd = nrvTotal − remark）',
-  'F2-48-rows': 'R3 任务 9：契约列名与模板表头整体错位（agingAmt = unitCost × bookAmt）',
-  'F2-57-rows': 'R3 任务 9：契约列名与模板表头整体错位（auditOpen 是「是 / 否」判断列）',
+  'F2-47-rows': 'R3 任务 9：契约列名仍与模板表头错位，且前端行模型与模板不同构（双价 pricePreContract / priceContract 对模板单价 P；销售费用 / 税费前端可手改，模板 T = N × Q、U = O × Q；应补提前端截 0，模板 Z = W − Y 可为负），回写未接通，先不改契约',
   'F3-1-adj-seed-rows': 'R3 任务 9：契约 store item 前端不存在（前端审定表存 F3-1-adj-rows）',
   'F3-1-adj-slot-rows': 'R3 任务 9：契约 store item 前端不存在（前端审定表存 F3-1-adj-rows）',
   'F3-4-rows': `${R3_FIELD_NAMES}（契约 faceAmount / accruedInterest / diff，前端 faceValue / payableInterest / variance）；另有待用户确认的计息口径（模板 ROUND(F*G,2) 不含天数）`,
@@ -40,7 +35,7 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'N4-2-detail-rows': 'R3 任务 9：前端 N4-2 存「计税依据 × 税率」，不是模板的 未审 + 调整 = 审定',
 }
 
-export const UNCOVERED_BASELINE = 25
+export const UNCOVERED_BASELINE = 20
 
 export interface ParityException {
   storeItem: string
