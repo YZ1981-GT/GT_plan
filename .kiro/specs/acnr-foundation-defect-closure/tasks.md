@@ -172,7 +172,8 @@
 
 ## 批次 文档与勘误（T32~T33）
 
-- [ ] 32. 架构提案「现状（2026-10-26）」节与一致性守卫（需求 14.1 / 14.4 / D12）
+- [x] 32. 架构提案「现状（2026-10-26）」节与一致性守卫（需求 14.1 / 14.4 / D12）
+      已交付（本轮）。现状节已入库（commit 96fba2c49，`docs/proposals/address-coordinate-name-registry-architecture.md` 第 8 行 `## 现状（2026-10-26）`，含版本格式 `^\d{14}$`/14 位 UTC、门禁清单、V1/V2/legacy 并行、第 55/56 行逐条勘误），resolver 模块注释已声明「平台四大消费库的唯一解析入口」。本任务补一致性守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py`（6 passed）：按标题定位现状节（不写死行号，节范围 = 标题行到下一个顶层 `##`）、断言节内版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN`（`^\d{14}$`）逐字一致、旧 `YYYY.N.N`/`2026.07.10` 须与「过时/勘误」同现、节内含门禁与 V1/V2/legacy、resolver 注释含「唯一解析入口」。变异（tmp_acnr_foundation/mutations/arch_doc_T32.md.bak，sha256 `7bf2280d…acc0`）：mut1 节内 `^\d{14}$`→`^\d+\.\d+\.\d+$` → `test_status_section_version_format_matches_contract` 红；mut2 删现状节标题 → `test_status_section_present_and_nonempty` 红（「节缺失」）；两次逐字节还原后 sha256 核对一致、全测试复绿。
       在 `docs/proposals/address-coordinate-name-registry-architecture.md` 标题信息表后插入新节（原有段落一字不改）：已落地组件、发布后目录规模、版本格式 14 位 UTC 时间戳、L1 只覆盖底稿域、V1/V2/legacy 并行关系、本 spec 完成后门禁清单、定位「canonical resolver + legacy 委托」；逐条指出过时陈述（第 18 行「实施 spec 尚未创建」、第 543/562 行 `2026.07.10` 示例、首期仅 D 循环，行号按守卫标题与关键词定位）；同步改 `resolver.py` 模块注释「四大消费库的唯一解析入口」。
       Files: `docs/proposals/address-coordinate-name-registry-architecture.md`、`backend/app/services/acnr/resolver.py`（注释）；`backend/tests/acnr/test_acnr_architecture_status_doc.py`
       Verify: `python -m pytest backend/tests/acnr/test_acnr_architecture_status_doc.py -p no:playwright`（该节存在、节内版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致）。变异：把该节版本格式改回 `YYYY.N.N` 或删该节 → 守卫红。
