@@ -662,10 +662,11 @@ def _frontend_production_hits(literal: str, limit: int = 5) -> list[str]:
 def probe_g2() -> Probe:
     manifest = _manifest_entries()
     enabled = _catalog_enabled()
-    uncovered = [s for s in enabled if s.get("sheet_code") not in manifest]
-
     overrides_doc = json.loads(_read(OVERRIDES_PATH)) if OVERRIDES_PATH.exists() else {}
     overrides_payload = overrides_doc.get("overrides") or overrides_doc.get("sheets") or {}
+    overridden = {str(o.get("addr_id") or "") for o in (overrides_payload if isinstance(overrides_payload, list) else []) if "import_export" in (o.get("fields") or {})}  # 第二兜底：生成器合入目录（acnr T07），重生成不丢
+    no_manifest = [s for s in enabled if s.get("sheet_code") not in manifest]
+    uncovered = [s for s in no_manifest if str(s.get("addr_id") or "") not in overridden]
 
     entries: list[dict[str, Any]] = []
     for s in sorted(uncovered, key=lambda x: _natural(x.get("sheet_code", ""))):
@@ -734,10 +735,9 @@ def probe_g2() -> Probe:
             f"manifest 文件循环集 {man_cycles} != 生成器 _ALL_CYCLES {gen_cycles}"
             " —— 新增 manifest 未挂进生成器（或反之），本组判据的前提不成立"
         )
-    if overrides_payload:
-        notes.append(
-            f"overrides 段已非空（{len(overrides_payload)} 条）—— 部分条目可能已有第二兜底，须重核本组口径"
-        )
+    if overrides_payload and not overridden:
+        ok = False
+        notes.append("overrides 段非空却解析出 0 条 import_export 兜底 —— 读法与文件结构不符，本组判据失效")
 
     return Probe(
         measured=len(entries),
@@ -750,7 +750,7 @@ def probe_g2() -> Probe:
             "manifest_files": _manifest_files(),
             "manifest_entries": len(manifest),
             "generator_all_cycles": gen_cycles,
-            "overrides_entries": len(overrides_payload),
+            "overrides_entries": len(overrides_payload), "no_manifest_covered_by_overrides": len(no_manifest) - len(uncovered),
             "by_cycle": _count_by_cycle(e["key"] for e in entries),
         },
     )
@@ -1807,16 +1807,16 @@ _GROUPS: dict[str, dict[str, Any]] = {
         ],
     },
     "G2": {
-        "title": "无 manifest 兜底的启用 IE 条目（`generate_catalog.py` 重生成即丢）",
+        "title": "无生成器输入兜底的启用 IE 条目（manifest 与 overrides 都没有，`generate_catalog.py` 重生成即丢）",
         "status": _MEASURED_STATUS,
         "owner_spec": "acnr 生成链（裁决 2：本 spec 不修，只登记且不让红的规模变大）",
         "verdict_default": "real_drift",
         "probe_id": "g2_ie_enabled_without_manifest_backing",
         "method": [
-            "① 取 catalog 全部 `import_export.enabled` 条目（实测 337）",
-            "② 取 `backend/data/acnr/sources/*_cycle_ie_manifest.yaml` 的全部 `entries[].sheet_code`（实测 5 文件 / 332 条）",
-            "③ 差集即本组：这些条目在 catalog 里有值、在生成源里没有 ⇒ 跑一次生成器就消失",
-            "④ 复核第二兜底：`backend/data/acnr/global_catalog.overrides.json` 的 `overrides` 段实测为空 ⇒ 无其他存活路径",
+            "① 取 catalog 全部 `import_export.enabled` 条目（实测数见 diagnostics.catalog_ie_enabled）",
+            "② 取 `backend/data/acnr/sources/*_cycle_ie_manifest.yaml` 的全部 `entries[].sheet_code`（实测数见 diagnostics.manifest_entries）",
+            "③ 第二兜底：`backend/data/acnr/global_catalog.overrides.json` 里给 `import_export` 的条目由生成器合入目录（acnr-foundation-defect-closure T07 迁入 38 条），重生成不丢 ⇒ 不计入",
+            "④ ① 减 ② 再减 ③ 即本组：在 catalog 里有值、生成器输入里都没有 ⇒ 跑一次生成器就消失（T07 后现算 0，基线按 `--set-baselines --lowered-by-task 7` 下调）",
             "⑤ 复算命令：`" + _REPO_CMD + "`；CI 侧退出码见本组 `ci_job.reproduce_cmd`",
         ],
         "ci_job": {

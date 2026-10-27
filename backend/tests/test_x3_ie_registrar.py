@@ -11,8 +11,12 @@
 |---|---|---|
 | Preflight 行为 | 6 | 真实 16/16 通过 + 逐门在受控夹具下**必须挡下**（不是警告） |
 | 零写盘 | 3 | `Path.write_text` 被换成"一写就炸"，`--check` / `--dry-run` 仍全程跑完 |
-| 外科补丁 | 6 | 在**临时 catalog 副本**上真跑 `--apply`：差异集 == 目标集 / 第 17 条必拒 / round-trip 必拒 / 38 条已启用不掉 |
-| 幂等与真源 | 5 | 二次 `--apply` 两文件 md5 不变；manifest ↔ Key_Ledger 双向锁死；R5.8 登记表完整性 |
+| 核对生成后的目录 | 5 | 未收口副本 `--check` 退出 2 并点名生成器命令 / committed 目录 16 段 == Key_Ledger 且重生成不丢已启用条目 / 目录写入分支已删 / 缺条目与异值必拒 |
+| 退出码与真源 | 5 | `--check` 0/2 表达收口；manifest ↔ Key_Ledger 双向锁死；R5.8 登记表完整性；Step 4 可复现性 |
+
+🔴 **目录只由生成器写出**（acnr-foundation-defect-closure T07，design §5.4）：原「外科补丁」类用例守的是
+任务 9.1 的 `--apply`（就地改目录），该写入分支已删除，`--check` 改为核对生成后的目录；目录写出方由
+`backend/tests/acnr/test_only_generator_writes_catalog.py` 的 AST 污点分析钉住只有生成器。
 
 🔴 **不碰真实 catalog**：所有写盘用例都在 `tmp_path` 的副本上跑，真实
 `backend/data/acnr/global_catalog.json` 在本文件里只被读取（并有一条用例逐字节复核它未变）。
@@ -26,9 +30,8 @@
 
 修法：凡是需要「未收口」前提的用例，一律用 `_catalog_copy_unapplied(tmp_path)` 在
 副本上**主动造出**该前提（剥掉 16 段 `import_export` 并用生成器的确定性序列化重写），
-判据落在**机制**上 —— 给一个未收口 catalog，登记器必须：pending 16 → `--check` 2 →
-补完 diff 恰 16 → 已启用集恰 +16 且旧集合一条不掉。故本文件在
-**「9.1 未施加」与「9.1 已施加」两种仓库状态下都必须全绿**，这是修法有效的唯一判据。
+判据落在**机制**上 —— 给一个未收口 catalog，登记器必须：pending 16 → `--check` 2 并点名生成器命令；
+给生成后的目录，`--check` 0。判据不依赖 committed catalog 当刻处于哪一态。
 
 Requirements: 5.1, 5.3, 5.4, 5.5, 5.6, 5.8
 """
@@ -92,7 +95,7 @@ def _real_files_are_never_written(reg, real_file_baseline: dict[str, str]):
     """每条用例前后都复量真实文件 —— 任何一条用例写到真实文件即当场判红。"""
     yield
     assert _real_file_md5s(reg) == real_file_baseline, (
-        "本用例改到了真实文件（catalog / manifest）—— 任务 8.3 禁止 --apply 真实面"
+        "本用例改到了真实文件（catalog / manifest）—— 本文件的写盘只许落在 tmp 副本"
     )
 
 
@@ -312,7 +315,7 @@ def test_real_files_untouched_by_this_module(reg, real_file_baseline: dict[str, 
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ③ 外科补丁（R5.2 / R5.4 / R5.5 + 禁区「绝不整体重生成」）
+# ③ 核对生成后的目录（R5.2 / R5.5 + 目录只由生成器写出）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -345,8 +348,7 @@ def _catalog_copy_unapplied(tmp_path: Path) -> Path:
     而生产行为一个字节都没退化。这里主动把副本推回未收口态，判据就只依赖登记器的机制，
     与仓库处于「未施加」还是「已施加」无关。
 
-    重写走生成器自己的 `_deterministic_json` ⇒ 副本仍满足登记器的 round-trip 自检
-    （R5.5），不会因为"我自己 `json.dumps` 拼的格式"把 `--apply` 挡在 round-trip 门外。
+    重写走生成器自己的 `_deterministic_json`（与生成器写出的目录同一序列化）。
 
     **反向自检（防 helper 静默造出「空差异」副本，使下游"必须 diff 16"变成假绿）**：
     ①目标 `addr_id` 必须**恰好定位到 16 个**（每个恰 1 条）—— catalog 结构变了 / sheet
@@ -381,129 +383,58 @@ def _catalog_copy_unapplied(tmp_path: Path) -> Path:
     return dst
 
 
-def test_apply_on_copy_diffs_exactly_the_16_target_addr_ids(reg, tmp_path: Path) -> None:
-    """在**未收口副本**上真跑 `--apply`：差异集恰好 16 个目标 `addr_id`，每处只改 `import_export`。"""
+def test_check_on_unapplied_copy_names_the_16_missing_segments(
+    reg, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """未收口副本：pending 恰为 16 个目标，`--check` 退出 2 并点名生成器命令，副本逐字节不变。"""
     cat = _catalog_copy_unapplied(tmp_path)
-    before = json.loads(cat.read_text(encoding="utf-8"))
-    # 机制前提：未收口副本必须让登记器判出 16 张待补（剥段失效 ⇒ 这里就红，不留到 diff）
-    plan, _data, _raw = reg.build_plan(catalog_path=cat)
-    assert len(plan.pending) == 16, f"未收口副本上 pending {len(plan.pending)} != 16"
+    md5_before = _md5(cat)
+    plan, data, _raw = reg.build_plan(catalog_path=cat)
+    assert {reg._addr_of(data, t.sheet_code) for t in plan.pending} == set(_TARGET_ADDR_IDS)
     assert plan.already == []
-
-    assert reg.run("apply", catalog_path=cat) == 0
-    after = json.loads(cat.read_text(encoding="utf-8"))
-
-    diff = reg._structural_diff(before, after)
-    assert len(diff) == 16, f"差异集 {len(diff)} 个：{sorted(diff)}"
-    assert all(keys == ["import_export"] for keys in diff.values()), diff
-    expected_addrs = set(_TARGET_ADDR_IDS)
-    assert set(diff) == expected_addrs
-    # 值 == Key_Ledger 派生值（R5.3）
-    ledger = reg._ledger_x3()
-    by_addr = {s["addr_id"]: s for s in after["sheets"]}
-    for addr in expected_addrs:
-        code = addr.split("/")[1]
-        assert by_addr[addr]["import_export"] == ledger[code], f"{addr} 的段非 Key_Ledger 派生值"
+    capsys.readouterr()
+    assert reg.run("check", catalog_path=cat) == 2
+    out = capsys.readouterr().out
+    assert "目录缺 16 张的 import_export 段" in out, out
+    assert "generate_catalog.py --write" in out, out
+    assert _md5(cat) == md5_before, "--check 改了目录副本"
 
 
-def test_apply_preserves_every_previously_enabled_ie_entry(reg, tmp_path: Path) -> None:
-    """禁区实证：38 条无 manifest 兜底的已启用条目**一条不掉**（整体重生成会杀掉它们）。
+def test_committed_catalog_segments_match_ledger_and_regeneration_keeps_enabled(reg) -> None:
+    """生成后的 committed 目录：16 段逐字段 == Key_Ledger 派生值；整体重生成不丢任何已启用 I/E 条目。
 
-    在**未收口副本**上跑 ⇒ `enabled_before` 恒为「16 张未启用时」的那 337 条，
-    与仓库是否已施加 9.1 无关（施加后直接拷会得 353，`+16` 断言必红）。
+    杀伤面基线：原 38 = H4/I24/L8/N2 这 38 条 SAFE 档外科补丁只在目录里、没有生成器输入；T07 把它们迁进
+    `global_catalog.overrides.json` 后现算为 0（再出现非 0 即又有条目绕过了生成器输入）。
     """
-    cat = _catalog_copy_unapplied(tmp_path)
-    before = json.loads(cat.read_text(encoding="utf-8"))
-    enabled_before = reg._enabled_addr_ids(before)
-    assert enabled_before.isdisjoint(_TARGET_ADDR_IDS), (
-        "未收口副本里目标条目仍是已启用态 ⇒ 剥段失效，下游 +16 断言会变成假绿"
-    )
+    data = json.loads(reg.CATALOG.read_text(encoding="utf-8"))
+    ledger = reg._ledger_x3()
+    by_addr = {s["addr_id"]: s for s in data["sheets"]}
+    for addr in sorted(_TARGET_ADDR_IDS):
+        assert by_addr[addr].get("import_export") == ledger[addr.split("/")[1]], f"{addr} 的段非 Key_Ledger 派生值"
 
-    assert reg.run("apply", catalog_path=cat) == 0
-    after = json.loads(cat.read_text(encoding="utf-8"))
-    enabled_after = reg._enabled_addr_ids(after)
-
-    assert enabled_before <= enabled_after, (
-        f"{len(enabled_before - enabled_after)} 条已启用 I/E 掉出集合"
-    )
-    assert len(enabled_after) == len(enabled_before) + 16
-    assert enabled_after - enabled_before == set(_TARGET_ADDR_IDS), "新增的已启用集 != 目标集"
-
-    # 对照组：整体重生成的杀伤面。原基线 38 = H4/I24/L8/N2 这 38 条 SAFE 档外科补丁只在目录里、没有生成器输入；
-    # acnr-foundation-defect-closure T07（design §5.4）把它们迁进 global_catalog.overrides.json 后，
-    # 整体重生成不再掉任何已启用条目 ⇒ 基线现算为 0（再出现非 0 即又有补丁绕过了生成器输入）。
     from generate_catalog import generate_catalog  # noqa: PLC0415
 
-    fresh, _r, _b = generate_catalog(
-        offline=True, registry_version=str(before.get("registry_version") or "")
-    )
-    lost_by_regeneration = enabled_before - reg._enabled_addr_ids(fresh)
-    assert len(lost_by_regeneration) == 0, (
-        f"整体重生成的杀伤面实测 {len(lost_by_regeneration)} 条（基线 0，T07 迁回 overrides 前为 38）："
-        f"{sorted(lost_by_regeneration)[:10]} —— 有已启用条目没有生成器输入，须迁回 overrides / manifest"
-    )
+    fresh, _r, _b = generate_catalog(offline=True, registry_version=str(data.get("registry_version") or ""))
+    lost = reg._enabled_addr_ids(data) - reg._enabled_addr_ids(fresh)
+    assert lost == set(), f"整体重生成会丢 {len(lost)} 条已启用 I/E：{sorted(lost)[:10]}"
+    assert set(_TARGET_ADDR_IDS) <= reg._enabled_addr_ids(fresh)
 
 
-def test_surgical_assert_refuses_a_17th_addr_id(reg, tmp_path: Path) -> None:
-    """差异集里混进第 17 个 `addr_id` ⇒ 拒绝写盘（不是记一条警告）。
-
-    必须在**未收口副本**上跑：`target_addrs` 取自 `plan.pending`，已收口的 catalog 上
-    它是空集，"第 17 个"就无从构造（断言退化为在空集上恒真）。
-    """
-    cat = _catalog_copy_unapplied(tmp_path)
-    plan, data, raw = reg.build_plan(catalog_path=cat)
-    target_addrs = {reg._addr_of(data, t.sheet_code) for t in plan.pending}
-    assert len(target_addrs) == 16
-
-    before = json.loads(raw)
-    after = json.loads(raw)
-    for t in plan.pending:
-        reg._catalog_index(after)[t.sheet_code][0]["import_export"] = dict(t.expected_segment)
-    # 第 17 处改动：随便挑一个非目标条目动一个字段
-    victim = next(s for s in after["sheets"] if s["addr_id"] not in target_addrs)
-    victim["sheet_name"] = str(victim.get("sheet_name", "")) + "（被顺手改了）"
-
-    with pytest.raises(reg.RegistrarRefusal, match="非目标 addr_id"):
-        reg._assert_surgical(before, after, target_addrs)
-
-
-def test_surgical_assert_refuses_dropping_enabled_entries(reg, tmp_path: Path) -> None:
-    """模拟"整体重生成"的后果（已启用条目掉出）⇒ 拒绝写盘。"""
+def test_registrar_has_no_catalog_write_branch(reg, tmp_path: Path) -> None:
+    """目录写入分支已删除：`--apply` 不再是合法 CLI 参数（argparse 退出 2），`run("apply")` 抛 ValueError。"""
+    assert not hasattr(reg, "patch_catalog")
+    with pytest.raises(SystemExit) as exc:
+        reg.main(["--apply"])
+    assert exc.value.code == 2
     cat = _catalog_copy(tmp_path)
-    raw = cat.read_text(encoding="utf-8")
-    before = json.loads(raw)
-    after = json.loads(raw)
-    victim = next(s for s in after["sheets"] if (s.get("import_export") or {}).get("enabled"))
-    victim.pop("import_export")
-
-    with pytest.raises(reg.RegistrarRefusal):
-        reg._assert_surgical(before, after, {victim["addr_id"]})
-
-
-def test_round_trip_mismatch_refuses_write(reg, tmp_path: Path) -> None:
-    """R5.5：磁盘内容与 `json.loads` 重序列化不一致 ⇒ 拒绝写盘，文件逐字节不变。
-
-    必须在**未收口副本**上跑：已收口时 `--apply` 走「无待补项」早退返 0，根本走不到
-    round-trip 校验 —— 那时断言 `== 2` 是拿仓库状态当基线。
-    """
-    cat = _catalog_copy_unapplied(tmp_path)
-    raw = cat.read_text(encoding="utf-8")
-    # 制造"被重排/被手改格式"的磁盘态：缩进从 2 改成 4（语义相同、字节不同）
-    reformatted = json.dumps(json.loads(raw), ensure_ascii=False, sort_keys=True, indent=4) + "\n"
-    cat.write_text(reformatted, encoding="utf-8")
     md5_before = _md5(cat)
-
-    plan, data, raw2 = reg.build_plan(catalog_path=cat)
-    with pytest.raises(reg.RegistrarRefusal, match="round-trip"):
-        reg.patch_catalog(data, raw2, plan, write=True, catalog_path=cat)
-    assert _md5(cat) == md5_before, "拒绝写盘后文件仍被改动了"
-    # 走 CLI 同样以 exit 2 表达，且不写盘
-    assert reg.run("apply", catalog_path=cat) == 2
+    with pytest.raises(ValueError, match="未知模式"):
+        reg.run("apply", catalog_path=cat)
     assert _md5(cat) == md5_before
 
 
-def test_apply_refuses_when_catalog_entry_missing(reg, tmp_path: Path) -> None:
-    """R5.2：目标 sheet 在 catalog 无条目 ⇒ 拒绝（不新建条目）。"""
+def test_check_refuses_when_catalog_entry_missing(reg, tmp_path: Path) -> None:
+    """R5.2：目标 sheet 在 catalog 无条目 ⇒ 拒绝（退出码 2）。"""
     cat = _catalog_copy(tmp_path)
     data = json.loads(cat.read_text(encoding="utf-8"))
     data["sheets"] = [s for s in data["sheets"] if s.get("sheet_code") != "M4-3"]
@@ -511,13 +442,14 @@ def test_apply_refuses_when_catalog_entry_missing(reg, tmp_path: Path) -> None:
 
     cat.write_text(_deterministic_json(data), encoding="utf-8")
     md5_before = _md5(cat)
-
-    assert reg.run("apply", catalog_path=cat) == 2
+    plan, _data, _raw = reg.build_plan(catalog_path=cat)
+    assert any("'M4-3' 有 0 个条目" in r for r in plan.refusals), plan.refusals
+    assert reg.run("check", catalog_path=cat) == 2
     assert _md5(cat) == md5_before
 
 
-def test_apply_refuses_to_overwrite_a_different_existing_segment(reg, tmp_path: Path) -> None:
-    """已有值且与目标段不同 ⇒ 拒绝覆盖（防把别人的登记值改掉）。"""
+def test_check_refuses_a_different_existing_segment(reg, tmp_path: Path) -> None:
+    """目录里已有值且与目标段不同 ⇒ 拒绝（不认作已收口）。"""
     cat = _catalog_copy(tmp_path)
     data = json.loads(cat.read_text(encoding="utf-8"))
     for s in data["sheets"]:
@@ -534,8 +466,10 @@ def test_apply_refuses_to_overwrite_a_different_existing_segment(reg, tmp_path: 
 
     cat.write_text(_deterministic_json(data), encoding="utf-8")
     md5_before = _md5(cat)
-
-    assert reg.run("apply", catalog_path=cat) == 2
+    plan, _data, _raw = reg.build_plan(catalog_path=cat)
+    assert any("'N2-3'.import_export 已有值且与目标段不同" in r for r in plan.refusals), plan.refusals
+    assert "N2-3" not in plan.already
+    assert reg.run("check", catalog_path=cat) == 2
     assert _md5(cat) == md5_before
 
 
@@ -544,44 +478,15 @@ def test_apply_refuses_to_overwrite_a_different_existing_segment(reg, tmp_path: 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def test_second_apply_changes_nothing(
-    reg, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """R5.4 + Step 6：二次 `--apply` 后 catalog 与三份 manifest 的 md5 全部不变。
-
-    首次 `--apply` 必须**真写**（未收口副本），否则"二次不变"在已收口 catalog 上
-    退化为「两次都走幂等早退」的空转。
-    """
-    cat = _catalog_copy_unapplied(tmp_path)
-    manifests = sorted(reg.SOURCES.glob("*_cycle_ie_manifest.yaml"))
-    assert manifests, "manifest 一个都没找到 —— 路径变了"
-
-    md5_unapplied = _md5(cat)
-    assert reg.run("apply", catalog_path=cat) == 0
-    first = _md5(cat)
-    assert first != md5_unapplied, "首次 --apply 一个字节都没写 ⇒ 后面的幂等断言是空转"
-    man_first = {p.name: _md5(p) for p in manifests}
-
-    assert reg.run("apply", catalog_path=cat) == 0
-    assert _md5(cat) == first, "二次 --apply 改了 catalog（非幂等）"
-    assert {p.name: _md5(p) for p in manifests} == man_first, "二次 --apply 改了 manifest"
-
-    # 三次执行走的是"无待补项"分支：即便把写盘出口炸掉也应跑完（= 零字节写入）
-    hits = _explode_on_write(monkeypatch)
-    assert reg.run("apply", catalog_path=cat) == 0
-    assert hits == [], f"幂等分支仍触发写盘：{hits}"
-
-
 def test_check_exit_codes_express_closure(reg, tmp_path: Path) -> None:
     """R5.6：`--check` 未收口 = 2、收口 = 0（退出码是 CI 的唯一判据）。
 
-    两态都在同一个副本上**先造后验**：未收口 → 2，`--apply` 之后 → 0。这是机制判据，
-    不依赖 committed catalog 当刻处于哪一态。
+    两态都是机制判据：未收口副本 → 2；生成后的 committed 目录副本 → 0。
     """
-    cat = _catalog_copy_unapplied(tmp_path)
+    (tmp_path / "unapplied").mkdir()
+    cat = _catalog_copy_unapplied(tmp_path / "unapplied")
     assert reg.run("check", catalog_path=cat) == 2, "未收口副本应判未收口"
-    assert reg.run("apply", catalog_path=cat) == 0
-    assert reg.run("check", catalog_path=cat) == 0, "施加后应判收口"
+    assert reg.run("check", catalog_path=_catalog_copy(tmp_path)) == 0, "生成后的目录应判收口"
 
     # 默认 catalog_path 必须真的指向 committed catalog（**接线**判据，不锁仓库当刻状态）：
     # 由 committed 现值独立算出闭合谓词再推导期望退出码，两种调用形式必须一致。
@@ -637,7 +542,7 @@ def test_extra_manifest_entry_is_refused_not_silently_registered(reg, tmp_path: 
     assert any("不在 Key_Ledger" in r for r in refusals), refusals
     cat = _catalog_copy(tmp_path)
     md5_before = _md5(cat)
-    assert reg.run("apply", catalog_path=cat, sources_dir=src) == 2
+    assert reg.run("check", catalog_path=cat, sources_dir=src) == 2
     assert _md5(cat) == md5_before
 
 

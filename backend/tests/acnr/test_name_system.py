@@ -208,6 +208,7 @@ def _named_copy() -> tuple[dict, object, object]:
     from app.services.acnr import catalog_names
 
     cat = copy.deepcopy(_load_catalog())
+    cat.pop("alias_policy", None)  # 已发布目录自带 alias_policy；去掉它才能证明是名称规则写出来的（段六复审 M5）
     merged = catalog_names.merge_platform_names(cat)
     named = catalog_names.apply_cell_names(cat)
     return cat, merged, named

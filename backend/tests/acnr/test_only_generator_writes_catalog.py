@@ -12,12 +12,8 @@ import ast
 from functools import lru_cache
 from pathlib import Path
 
-import pytest
-
 _BACKEND = Path(__file__).resolve().parents[2]
 _GENERATOR = "scripts/acnr/generate_catalog.py"
-#: 段六续做时仍有目录写入分支、尚未按 design §5.4 改成 --check 的脚本（T07 未完成项，删分支后必须删除本条）
-_PENDING_WRITERS = {"scripts/fix/fix_x3_adjustment_ie_registration.py"}
 _LITERAL = "global_catalog.json"
 
 
@@ -112,7 +108,10 @@ def _writes_catalog(tree: ast.AST) -> bool:
         local = _propagate(params, fn, set()) - (module_taint - params)
         if any(_mentions(t, local, set()) for c in ast.walk(fn) if isinstance(c, ast.Call) for t in _write_targets(c)):
             helpers.add(fn.name)
-    for scope in [*funcs, tree]:
+    # 模块级作用域只含函数 / 类定义之外的语句：把函数体也并进来会让不同函数里的同名局部变量互相串污点（误报）
+    module_scope = ast.Module(body=[s for s in tree.body if not isinstance(
+        s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))], type_ignores=[])
+    for scope in [*funcs, module_scope]:
         taint = _propagate(module_taint, scope, docs)
         for c in (n for n in ast.walk(scope) if isinstance(n, ast.Call)):
             if any(_mentions(t, taint, docs) for t in _write_targets(c)):
@@ -139,16 +138,10 @@ def use_catalog_callers(modules=None) -> set[str]:
     return hits
 
 
-def test_catalog_writers_subset_of_generator_and_registered_pending():
+def test_only_generator_writes_catalog():
     writers = catalog_writers()
     assert _GENERATOR in writers, "防空转：生成器本身必须被识别为写出方"
-    assert writers <= {_GENERATOR} | _PENDING_WRITERS, f"出现新的目录写入方：{sorted(writers - {_GENERATOR} - _PENDING_WRITERS)}"
-    assert _PENDING_WRITERS <= writers, f"登记的待改脚本已不写目录，请删除登记：{sorted(_PENDING_WRITERS - writers)}"
-
-
-@pytest.mark.xfail(strict=True, reason="design §5.4：fix_x3_adjustment_ie_registration 的目录写入分支尚未删除（T07 未完成项）")
-def test_only_generator_writes_catalog():
-    assert catalog_writers() == {_GENERATOR}
+    assert writers == {_GENERATOR}, f"出现生成器以外的目录写入方：{sorted(writers - {_GENERATOR})}"
 
 
 def test_use_catalog_not_called_in_production():
@@ -165,6 +158,12 @@ def test_scanner_self_check_on_synthetic_modules():
     h = ast.parse("P='global_catalog.json'\ndef _w(path, t):\n    tmp = path.with_name('x')\n    open(tmp,'w')\n"
                   "def run(p=None):\n    cat = p or P\n    _w(cat, 'x')\n")
     u = ast.parse("from x import use_catalog\nwith use_catalog(1):\n    pass\n")
-    mods = (("w.py", w), ("r.py", r), ("d.py", d), ("o.py", o), ("h.py", h))
-    assert catalog_writers(mods) == {"w.py", "h.py"}
+    # 同名局部变量不串污点：读目录的函数里叫 doc，写侧车的函数里也叫 doc（只写侧车）→ 不命中；
+    # 模块级（if __name__ 块）直接写目录 → 命中
+    n = ast.parse("P='global_catalog.json'\nS='side.json'\ndef _w(path, t):\n    open(path,'w')\n"
+                  "def read():\n    doc = open(P).read()\n    return doc\n"
+                  "def side():\n    doc = {'k': 1}\n    _w(S, doc)\n")
+    m = ast.parse("P='global_catalog.json'\nif __name__ == '__main__':\n    open(P, 'w').write('x')\n")
+    mods = (("w.py", w), ("r.py", r), ("d.py", d), ("o.py", o), ("h.py", h), ("n.py", n), ("m.py", m))
+    assert catalog_writers(mods) == {"w.py", "h.py", "m.py"}
     assert use_catalog_callers((("u.py", u), ("r.py", r))) == {"u.py"}

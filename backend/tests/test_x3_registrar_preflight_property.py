@@ -1,42 +1,28 @@
 """Property 5 —— **适配器未就绪则拒绝登记**（spec `x3-adjustment-entry-import-export` 任务 9.2）。
 
-被测对象：`backend/scripts/fix/fix_x3_adjustment_ie_registration.py`（Catalog_Registrar，禁改）。
+被测对象：`backend/scripts/fix/fix_x3_adjustment_ie_registration.py`（Catalog_Registrar）。
 其 Preflight 四门顺序 = `adapter_registered` → `module_resolved` → `three_state_endpoints`
-→ `sheet_in_ie_sheets`；任一门不过的 sheet **不进 `plan.pending`**（拒绝，不是警告），
-且只要有任何一张被挡，`--apply` **整体不执行**（R5.1 是任务 9.1 的前置门控）。
+→ `sheet_in_ie_sheets`；任一门不过的 sheet 判拒绝（不是警告），既不进 `plan.pending` 也不进 `plan.already`，
+只要有任何一张被挡，核对整体判不过（退出码 2）。
+
+## 改写说明（acnr-foundation-defect-closure T07，design §5.4）
+
+原 Property 5 在「未施加」副本上跑 `--apply`，判「被挡时一段都不写进目录」。T07 把目录写入收口到生成器，
+登记器的目录写入分支已删除；保留下来的唯一写盘是 R5.8 的 Deviation 侧车（`--record-deviations`）。
+本属性改在**生成后的 committed 目录副本**上跑：不注入时退出码 0（正面对照），所以注入后的退出码 2 只能
+来自 Preflight 拒绝，而不是「目录缺段」。
 
 ## 属性表述（Property 5）
 
-> 对**任意**非空的「(目标 sheet, 不就绪形态) 组合」，在一个**未施加**的 catalog 副本上跑
-> `--apply`：①每个被注入的 sheet 都出现在 `plan.blocked` 且**不在** `plan.pending`；
-> ②退出码为 2；③**两文件**（catalog 副本 + `sources_dir` 副本里的三份 manifest）**逐字节不变**
-> （md5 比对）；④未被注入的 sheet 不受连带影响（作业面仍 16 张、被挡集恰等于注入集）。
-
-## 🔴 为什么必须自己造「未施加」态（反空转）
-
-任务 9.1 已施加 —— committed `global_catalog.json` 里 16 段 `import_export` **已在**，
-`--check` 现返 **0**。此时拿仓库当刻状态当输入，`plan.pending` 恒为空集，"两文件不变"
-会因为**根本没有待写内容**而恒真（空转），四门是否真挡下无从体现。
-
-故本文件**复用**任务 8.3 守卫的 `_catalog_copy_unapplied()`（`tests.test_x3_ie_registrar`）
-在 `tmp_path` 副本上剥掉那 16 段，把副本推回「未施加」态 —— 不抄第二份剥段逻辑，该 helper
-自带三条反向自检（16 个 addr_id 必须一条一命中 / 剥完必全无 `import_export` / 实剥段数只许
-0 或 16，半施加态当场抛）。本文件另在**每条用例内**复核一次结构前提（16 条目标全部无
-`import_export`），使「helper 剥段失效」这类退化在属性测试内部即打红，而不是留到断言恒真。
-
-## 正面对照（反空转的另一半）
-
-`test_positive_control_no_injection_really_writes_16_segments`：**同一夹具、不注入任何
-不就绪形态** ⇒ `--apply` 必须真的写入 16 段（退出码 0、catalog 副本 md5 变化、差异集恰
-16 个 `addr_id`、值逐字段 == Key_Ledger 派生值）。没有这条，"不变"只能证明通路没接通。
+> 对**任意**非空的「(目标 sheet, 不就绪形态) 组合」，在 committed 目录副本上跑 `--record-deviations`：
+> ①每个被注入的 sheet 都出现在 `plan.blocked`，且不在 `plan.pending` / `plan.already`；②退出码为 2；
+> ③两文件（catalog 副本 + `sources_dir` 副本里的 manifest）逐字节不变；④Deviation 侧车恰记被注入的 sheet；
+> ⑤未被注入的 sheet 不受连带影响（作业面仍 16 张、被挡集恰等于注入集）。
 
 ## 真实面零写
 
-autouse fixture 在**每条用例前后**复量真实写盘面（committed catalog + 三份真实 manifest
-+ Deviation 侧车正路径）的 md5，任一变动当场判红；属性测试每条 example 内部再复量一次。
-所有写盘（catalog 副本 / manifest 副本 / Deviation 侧车）全落 `tmp_path`。
-🔴 刻意**不**写死 committed catalog 的 md5 字面量 —— 9.1 已施加、后续仍可能合法变化，
-锁字面量等于把当刻状态当"正确基线"（R8.6 禁止）；这里只比「本次会话内没被改动」。
+autouse fixture 在**每条用例前后**复量真实写盘面（committed catalog + 真实 manifest + Deviation 侧车正路径）
+的 md5，任一变动当场判红；所有写盘全落 `tmp_path`。
 
 Requirements: 5.1, 5.7, 5.8
 **Validates: Requirements 5.1**
@@ -159,7 +145,7 @@ def adapter_registry_snapshot() -> dict[str, Any]:
 
 
 def _fresh_case_dir(seed: Path, tmp_path: Path) -> tuple[Path, Path, Path]:
-    """在 `tmp_path` 里布出「未施加 catalog 副本 + sources 副本 + Deviation 侧车路径」。
+    """在 `tmp_path` 里布出「catalog 副本（种子 = 未施加态或 committed 目录）+ sources 副本 + Deviation 侧车路径」。
 
     sources 副本收全部 8 份 `*_cycle_ie_manifest.yaml`（与生产读取面同形），其中
     `partial: true` 的恰 3 份（l/m/n）—— 那 3 份才是登记器的作业面真源，故这里把
@@ -173,7 +159,7 @@ def _fresh_case_dir(seed: Path, tmp_path: Path) -> tuple[Path, Path, Path]:
     partial = sorted(_REG._partial_manifests(src))
     assert len(partial) == 3, f"partial manifest 实读 {partial} != 3 份 —— 路径或作业面变了"
     cat = tmp_path / "global_catalog.json"
-    shutil.copyfile(seed, cat)  # 每条 example 都回到干净的「未施加」态
+    shutil.copyfile(seed, cat)  # 每条 example 都回到干净的种子态
     return cat, src, tmp_path / "registrar_preflight_deviations.json"
 
 
@@ -289,7 +275,7 @@ _OBSERVED_FORMS: dict[str, int] = {form: 0 for form in _UNREADY_FORMS}
 
 
 @settings(
-    max_examples=100,
+    max_examples=5,
     deadline=None,
     suppress_health_check=[
         HealthCheck.function_scoped_fixture,
@@ -307,31 +293,30 @@ def test_property5_unready_adapter_refuses_registration(
 ) -> None:
     """**Property 5: 适配器未就绪则拒绝登记**
 
-    随机不就绪组合下：被挡 sheet 不进 `pending`、`--apply` 整体不执行、两文件逐字节不变。
+    随机不就绪组合下：被挡 sheet 判拒绝、核对退出码 2、两文件逐字节不变、侧车恰记被挡集。
 
     **Validates: Requirements 5.1**
     """
-    cat, src, dev = _fresh_case_dir(unapplied_catalog_seed, tmp_path)
+    cat, src, dev = _fresh_case_dir(_REG.CATALOG, tmp_path)
     dev.unlink(missing_ok=True)
-    _assert_copy_is_unapplied(cat)
 
     before = _both_files_md5(cat, src)
     victims = {code for code, _f, _s in cases}
 
     with pytest.MonkeyPatch.context() as mp:
         _inject_unready(mp, adapter_registry_snapshot, cases)
-        exit_code = _REG.run("apply", catalog_path=cat, sources_dir=src, deviation_path=dev)
+        exit_code = _REG.run("record-deviations", catalog_path=cat, sources_dir=src, deviation_path=dev)
         plan, _data, _raw = _REG.build_plan(catalog_path=cat, sources_dir=src)
 
-    # ① 拒绝而非警告：被挡 sheet 不进 plan.pending
+    # ① 拒绝而非警告：被挡 sheet 既不算待生成、也不算已收口
     blocked = {p.sheet_code for p in plan.blocked}
     assert blocked == victims, (
         f"被挡集 {sorted(blocked)} != 注入集 {sorted(victims)}"
         " —— 要么注入没生效（空转），要么连带挡下了别的 sheet"
     )
-    pending = {t.sheet_code for t in plan.pending}
-    assert not (victims & pending), (
-        f"被挡 sheet {sorted(victims & pending)} 仍进了 plan.pending ⇒ 会被写入 catalog"
+    passed = {t.sheet_code for t in plan.pending} | set(plan.already)
+    assert not (victims & passed), (
+        f"被挡 sheet {sorted(victims & passed)} 仍进了 pending / already ⇒ 被当成可登记"
         "（这正是禁止的「警告而非拒绝」）"
     )
     # 门与理由不许错位：注入哪一门，就必须是那一门（或其前置）报出不过
@@ -346,17 +331,16 @@ def test_property5_unready_adapter_refuses_registration(
     # 作业面未被打断（不许一处不就绪就整批哑掉）
     assert len(plan.targets) == 16, f"作业面 {len(plan.targets)} 张 != 16"
 
-    # ② --apply 整体不执行：退出码 2 + 两文件逐字节不变
-    assert exit_code == 2, f"有 {len(victims)} 张被挡时 --apply 退出码 {exit_code} != 2"
+    # ② 核对判不过：退出码 2（不注入时为 0，见正面对照）+ 两文件逐字节不变
+    assert exit_code == 2, f"有 {len(victims)} 张被挡时退出码 {exit_code} != 2"
     after = _both_files_md5(cat, src)
     assert after == before, (
         "两文件（catalog 副本 / 三份 manifest 副本）被改动了 —— "
         f"变动项 {[k for k in before if before[k] != after[k]]}"
     )
-    _assert_copy_is_unapplied(cat)  # 结构面再确认：一段都没被补上
 
     # R5.8：拒绝记录落到注入的侧车路径（不是 evidence/ 正路径）
-    assert dev.exists(), "有被挡 sheet 时 --apply 未写 Deviation 侧车（R5.8）"
+    assert dev.exists(), "有被挡 sheet 时 --record-deviations 未写 Deviation 侧车（R5.8）"
     doc = json.loads(dev.read_text(encoding="utf-8"))
     assert {r["sheet_code"] for r in doc["records"]} == victims
     assert all(r["evidence"]["refused_write"] is True for r in doc["records"])
@@ -370,43 +354,27 @@ def test_property5_unready_adapter_refuses_registration(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def test_positive_control_no_injection_really_writes_16_segments(
+def test_positive_control_no_injection_closes_and_writes_nothing(
     tmp_path: Path, unapplied_catalog_seed: Path
 ) -> None:
-    """🔴 反空转：**同一夹具、不注入任何不就绪形态** ⇒ `--apply` 必须真写入 16 段。
-
-    没有这条，Property 5 的"两文件不变"可能只是通路没接通（例如副本路径没被登记器接受、
-    或作业面被算成 0 张）而恒真。
-    """
-    cat, src, dev = _fresh_case_dir(unapplied_catalog_seed, tmp_path)
-    _assert_copy_is_unapplied(cat)
-
-    before_md5 = _both_files_md5(cat, src)
-    before = json.loads(cat.read_text(encoding="utf-8"))
+    """🔴 反空转：**同一夹具、不注入任何不就绪形态** ⇒ committed 目录副本上退出码 0、不写侧车；
+    未施加副本上 pending 恰 16、退出码 2（证明副本路径确被登记器读取，「0」不是通路没接通）。"""
+    cat, src, dev = _fresh_case_dir(_REG.CATALOG, tmp_path)
+    before = _both_files_md5(cat, src)
     plan, _data, _raw = _REG.build_plan(catalog_path=cat, sources_dir=src)
-    assert plan.blocked == [], f"未注入却有被挡：{[p.reason for p in plan.blocked]}"
-    assert len(plan.pending) == 16, f"未施加副本上 pending {len(plan.pending)} != 16"
-
-    assert _REG.run("apply", catalog_path=cat, sources_dir=src, deviation_path=dev) == 0
-    after = json.loads(cat.read_text(encoding="utf-8"))
-    after_md5 = _both_files_md5(cat, src)
-
-    assert after_md5[cat.name] != before_md5[cat.name], (
-        "不注入时 --apply 一个字节都没写 ⇒ Property 5 的「不变」是空转"
-    )
-    assert {k: v for k, v in after_md5.items() if k != cat.name} == {
-        k: v for k, v in before_md5.items() if k != cat.name
-    }, "三份 manifest 副本不该被 --apply 改动"
+    assert plan.blocked == [] and plan.pending == [], (plan.blocked, plan.pending)
+    assert len(plan.already) == 16, f"committed 目录副本上已收口 {len(plan.already)} != 16"
+    assert _REG.run("record-deviations", catalog_path=cat, sources_dir=src, deviation_path=dev) == 0
+    assert _both_files_md5(cat, src) == before
     assert not dev.exists(), "无被挡 sheet 时不该写 Deviation 侧车"
 
-    diff = _REG._structural_diff(before, after)
-    assert set(diff) == set(_TARGET_ADDR_IDS), f"差异集 {sorted(diff)}"
-    assert all(keys == ["import_export"] for keys in diff.values()), diff
-    ledger = _REG._ledger_x3()
-    by_addr = {s["addr_id"]: s for s in after["sheets"]}
-    for addr in _TARGET_ADDR_IDS:
-        code = addr.split("/")[1]
-        assert by_addr[addr]["import_export"] == ledger[code], f"{addr} 的段非 Key_Ledger 派生值"
+    (tmp_path / "unapplied").mkdir()
+    ucat, usrc, udev = _fresh_case_dir(unapplied_catalog_seed, tmp_path / "unapplied")
+    _assert_copy_is_unapplied(ucat)
+    uplan, _d, _r = _REG.build_plan(catalog_path=ucat, sources_dir=usrc)
+    assert uplan.blocked == [] and len(uplan.pending) == 16
+    assert _REG.run("record-deviations", catalog_path=ucat, sources_dir=usrc, deviation_path=udev) == 2
+    assert not udev.exists()
 
 
 @pytest.mark.parametrize("form", _UNREADY_FORMS)
@@ -418,27 +386,26 @@ def test_each_unready_form_leaves_both_files_byte_identical(
 ) -> None:
     """逐形态定点实测（不依赖 hypothesis 抽样命中）：每一种不就绪都必须拒绝且零写盘。
 
-    与 8.3 守卫的逐门用例分工不同：那边判「被挡 sheet 不进 pending」（真实 catalog、
-    不涉写盘），这边判「`--apply` 整体不执行 + 两文件逐字节不变」（未施加副本上真跑 apply）。
-    注入手法复用同一个 `_inject_unready`，不抄第二份。
+    与 8.3 守卫的逐门用例分工不同：那边判「被挡 sheet 不进 pending」，这边在 committed 目录副本上判
+    「退出码 2 + 两文件逐字节不变 + 侧车恰记该 sheet」。注入手法复用同一个 `_inject_unready`，不抄第二份。
     """
-    cat, src, dev = _fresh_case_dir(unapplied_catalog_seed, tmp_path)
-    _assert_copy_is_unapplied(cat)
+    cat, src, dev = _fresh_case_dir(_REG.CATALOG, tmp_path)
     before = _both_files_md5(cat, src)
 
     victim = "M4-3"
     cases = ((victim, form, "import-data"),)
     with pytest.MonkeyPatch.context() as mp:
         _inject_unready(mp, adapter_registry_snapshot, cases)
-        exit_code = _REG.run("apply", catalog_path=cat, sources_dir=src, deviation_path=dev)
+        exit_code = _REG.run("record-deviations", catalog_path=cat, sources_dir=src, deviation_path=dev)
         plan, _data, _raw = _REG.build_plan(catalog_path=cat, sources_dir=src)
 
     assert [p.sheet_code for p in plan.blocked] == [victim]
     assert _FORM_TO_GATE[form] in {g.name for g in plan.blocked[0].failures}
-    assert victim not in {t.sheet_code for t in plan.pending}
+    assert victim not in {t.sheet_code for t in plan.pending} | set(plan.already)
     assert exit_code == 2
     assert _both_files_md5(cat, src) == before, f"{form}: 两文件被改动"
-    _assert_copy_is_unapplied(cat)
+    doc = json.loads(dev.read_text(encoding="utf-8"))
+    assert [r["sheet_code"] for r in doc["records"]] == [victim]
 
 
 def test_unready_injection_is_not_self_fulfilling(

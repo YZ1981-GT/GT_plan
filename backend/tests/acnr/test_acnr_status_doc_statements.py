@@ -199,7 +199,10 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             claim("生成器命令行有 --check（AST）", lambda: "--check" in _facts()["generator.cli_flags"].split("、")),
             has_tests(_T + "test_generator_release_flow.py", "test_second_write_is_idempotent",
                       "test_gate_violation_writes_nothing_and_names_addr_id", "test_alias_added_only_in_catalog_is_drift"),
-            has_tests(_T + "test_only_generator_writes_catalog.py", "test_catalog_writers_subset_of_generator_and_registered_pending")),
+            has_tests(_T + "test_only_generator_writes_catalog.py", "test_only_generator_writes_catalog"),
+            claim("目录写出方现算恰为生成器（AST 污点分析）", lambda: __import__(
+                "tests.acnr.test_only_generator_writes_catalog", fromlist=["catalog_writers"]
+            ).catalog_writers() == {"scripts/acnr/generate_catalog.py"})),
         "写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等）": CB(
             _LINKAGE_REL, ("stale_impact", "stale_impact_by_addr"), _T + "test_stale_write_endpoint_authz.py",
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz),
@@ -213,7 +216,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "删除 `fix_x3_adjustment_ie_registration` 的目录写入分支、改为核对生成后的目录（「目录只由生成器写出」的严格判据现以 xfail 钉住）": L("T07"),
         "报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单": L("T09"),
         "exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返": L("T10"),
         "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T11、T12、T13、T14、T15、T16"),

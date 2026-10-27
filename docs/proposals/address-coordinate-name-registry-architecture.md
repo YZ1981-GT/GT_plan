@@ -63,7 +63,6 @@
 
 | 事项 | 任务 |
 |---|---|
-| 删除 `fix_x3_adjustment_ie_registration` 的目录写入分支、改为核对生成后的目录（「目录只由生成器写出」的严格判据现以 xfail 钉住） | T07 |
 | 报告四组分组（blocking / acknowledged / deprecated / info）、别名三类处置与豁免清单 | T09 |
 | exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返 | T10 |
 | 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T11、T12、T13、T14、T15、T16 |
