@@ -1,12 +1,21 @@
-"""底稿单元格区域取数与 sheet 选区器预览辅助（从 ``routers/custom_query`` 原样迁入）。
+"""底稿单元格区域取数与 sheet 选区器预览（从 ``routers/custom_query`` 迁入；查询路径只读，design §3.7 / R4.4）。
 
-只读改造（写盘只在临时副本、无文件不从模板生成、重算失败给 warning）在任务 16（design §3.7）。
+结构写死（AST 守卫 ``tests/advanced_query_linkage/test_aql_query_path_readonly.py``）：
+
+- 写盘只出现在 ``_temp_copy(src, tmpdir)``，调用方只传 ``tempfile.TemporaryDirectory()`` 的目录；
+- ``recompute_with_libreoffice(src) -> bytes | None`` 在临时副本上转换、读回字节，不写回 storage；
+- 底稿没有 storage 文件时不从模板生成（原先调 ``init_workpaper_from_template`` 写文件）：预览返回
+  ``available: false`` + ``NO_FILE_REASON``，区域取数 400 同文案；查找文件也不建目录；
+- 公式未求值且重算失败（LibreOffice 不可用 / 转换失败）时 warnings 写明 ``RECOMPUTE_FAILED_WARNING``。
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
+import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
@@ -14,6 +23,29 @@ from typing import Any
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+NO_FILE_REASON = "该底稿尚未生成文件，请先在底稿编辑器中打开一次"
+RECOMPUTE_FAILED_WARNING = "公式未能重算，显示的是文件缓存值"
+
+
+def _temp_copy(src: Path, tmpdir: Path) -> Path:
+    """查询路径唯一的写盘点：把底稿文件复制进临时目录（调用方只传 ``tempfile.TemporaryDirectory()`` 的目录）。"""
+    target = tmpdir / src.name
+    shutil.copy2(src, target)
+    return target
+
+
+def existing_workpaper_file(project_id: uuid.UUID, wp_id: Any) -> Path | None:
+    """只读查找底稿的 storage 文件，没有返回 None。
+
+    项目目录不存在时直接返回 None，不调 ``get_workpaper_file``——它经 ``get_workpaper_storage_path`` 会 ``mkdir``
+    项目目录（查询路径不得在 storage 里留下任何东西）。路径规则仍以 ``wp_template_init_service`` 为唯一来源。
+    """
+    from app.services import wp_template_init_service as storage
+
+    if not (storage.STORAGE_DIR / str(project_id)).is_dir():
+        return None
+    return storage.get_workpaper_file(project_id, wp_id)
 
 
 def _sync_parse_sheet_preview(content: bytes, sheet_name: str | None) -> dict:
@@ -177,51 +209,41 @@ _LIBREOFFICE_PATHS = (
 
 def _find_soffice() -> str | None:
     """检测 LibreOffice 可执行路径（4 路径 fallback，与 archive_pdf_generators 对齐）"""
-    import shutil as _shutil
     for cmd in _LIBREOFFICE_PATHS:
-        path = _shutil.which(cmd) if not Path(cmd).is_absolute() else (cmd if Path(cmd).exists() else None)
+        path = shutil.which(cmd) if not Path(cmd).is_absolute() else (cmd if Path(cmd).exists() else None)
         if path:
             return path
     return None
 
 
-def _sync_recompute_xlsx_with_libreoffice(xlsx_path: Path) -> bool:
-    """用 LibreOffice headless 重算 xlsx 公式 + 回写缓存（覆盖原文件）
+def recompute_with_libreoffice(src: Path) -> bytes | None:
+    """用 LibreOffice headless 在**临时副本**上重算 xlsx 公式，返回重算后的文件字节；不可用 / 失败返回 None。
 
-    仅在 _sync_extract_cell_range 返回 has_unresolved_formula=True 时按需触发。
-    成功返回 True，LibreOffice 不可用 / 转换失败返回 False。
-    Windows 用户文件锁场景：通过 --convert-to xlsx --outdir 转换到临时目录再 copy 覆盖避免。
+    仅在 ``_sync_extract_cell_range`` 返回 ``has_unresolved_formula=True`` 时按需触发（run_in_executor 调用）。
+    原文件只读：先 ``_temp_copy`` 进临时输入目录，再转换到另一个临时输出目录、读回字节；两个目录随 ``with`` 删除，
+    函数体内没有任何写调用（原实现把转换结果 ``shutil.copy`` 回 storage 覆盖原文件，AQ-23）。
     """
-    import subprocess
-    import tempfile
-    import shutil as _shutil
-
     soffice = _find_soffice()
     if soffice is None:
         logger.warning("LibreOffice 未找到，公式无法重算（请装 LibreOffice 或在 PATH 中加 soffice）")
-        return False
+        return None
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            # --calc 强制用 Calc 打开（默认会用 Writer 打开 xlsx 失败）
-            # --convert-to xlsx 触发重算 + 回写 cache
+        with tempfile.TemporaryDirectory() as in_dir, tempfile.TemporaryDirectory() as out_dir:
+            work = _temp_copy(src, Path(in_dir))
+            # --calc 强制用 Calc 打开（默认会用 Writer 打开 xlsx 失败）；--convert-to xlsx 触发重算 + 写 cache
             result = subprocess.run(
-                [soffice, "--headless", "--calc", "--convert-to", "xlsx", "--outdir", str(tmpdir_path), str(xlsx_path)],
+                [soffice, "--headless", "--calc", "--convert-to", "xlsx", "--outdir", str(out_dir), str(work)],
                 capture_output=True,
                 timeout=60,
             )
-            if result.returncode != 0:
+            converted = Path(out_dir) / f"{work.stem}.xlsx"
+            if result.returncode != 0 or not converted.is_file():
                 logger.warning("LibreOffice 转换失败 rc=%d stderr=%s", result.returncode, result.stderr[:200])
-                return False
-            converted = tmpdir_path / f"{xlsx_path.stem}.xlsx"
-            if not converted.exists():
-                logger.warning("LibreOffice 转换后文件不存在: %s", converted)
-                return False
-            _shutil.copy(converted, xlsx_path)
-            return True
+                return None
+            return converted.read_bytes()
     except Exception as e:
         logger.warning("LibreOffice 重算异常: %s", e)
-        return False
+        return None
 
 
 def _try_render_preview_from_snapshot(parsed_data: dict, sheet_name: str | None) -> dict | None:
@@ -287,13 +309,44 @@ def _try_render_preview_from_snapshot(parsed_data: dict, sheet_name: str | None)
     }
 
 
+async def render_sheet_preview(
+    project_id: uuid.UUID, wp_id: Any, wp_code: str, parsed_data: dict, sheet_name: str | None,
+) -> dict:
+    """sheet 选区器预览（``GET /wp-sheet-preview`` 的取数；只读）。
+
+    数据源优先级：①``parsed_data['univer_snapshot']``（零计算）②storage xlsx 的缓存值（openpyxl 只读解析）。
+    没有 storage 文件 ⇒ ``available: false`` + ``NO_FILE_REASON``，不从模板生成文件。
+    """
+    snap_view = _try_render_preview_from_snapshot(parsed_data, sheet_name)
+    if snap_view is not None:
+        return {"available": True, "wp_code": wp_code, "wp_id": str(wp_id), "source": "univer_snapshot", **snap_view}
+
+    storage_path = existing_workpaper_file(project_id, wp_id)
+    if storage_path is None:
+        return {"available": False, "reason": NO_FILE_REASON, "wp_code": wp_code}
+    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
+        return {"available": False, "reason": "非 xlsx 类底稿", "wp_code": wp_code}
+    try:
+        content = storage_path.read_bytes()
+        loop = asyncio.get_running_loop()
+        parsed = await loop.run_in_executor(None, _sync_parse_sheet_preview, content, sheet_name)
+        if "error" in parsed:
+            return {"available": False, "reason": parsed["error"], "wp_code": wp_code}
+        return {"available": True, "wp_code": wp_code, "wp_id": str(wp_id), "source": "xlsx_cache", **parsed}
+    except Exception as e:
+        logger.warning("wp-sheet-preview parse failed for %s: %s", wp_code, e)
+        return {"available": False, "reason": f"解析失败: {e}", "wp_code": wp_code}
+
+
 async def _query_workpaper_cell_range(db, pid: str, filters: dict):
-    """按 cell_range 提取真实单元格值
+    """按 cell_range 提取真实单元格值（只读）
 
     数据源优先级（零计算路径优先）：
       1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库的 Univer 计算后值（首选，零计算）
-      2. storage xlsx 的 cache（data_only=True 读，模板从未保存过时为 None）
-      3. LibreOffice headless 重算（仅前两路径都拿不到值时按需触发，重算后回写 cache）
+      2. storage xlsx 的 cache（data_only=True 读，模板从未保存过时为 None）；没有文件 ⇒ 错误 ``NO_FILE_REASON``
+         （分派层转 400 ``QUERY_FAILED``），不从模板生成
+      3. LibreOffice headless 重算（仅前两路径都拿不到值时按需触发）：只在临时副本上重算、读回字节，不写回 storage；
+         重算失败 ⇒ 仍返回缓存值并在 warnings 写明 ``RECOMPUTE_FAILED_WARNING``
 
     支持语法：'A1:C3' / 'B5' / 'A1:A10,C1:C5' / 'A:A' / 'A:C'
     """
@@ -341,14 +394,10 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
     from app.services.custom_query.metrics import inc_snapshot_missing
     inc_snapshot_missing(wp_code)
 
-    # 4. 降级：storage xlsx 路径（含 LibreOffice 按需重算）
-    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
-    storage_path = get_workpaper_file(proj_uuid, wp_id)
-    if not storage_path:
-        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
-        if not init_result:
-            return {"rows": [], "columns": [], "total": 0, "error": f"模板文件不存在: {wp_code}"}
-        storage_path = init_result
+    # 4. 降级：storage xlsx 路径（含 LibreOffice 按需重算，只在临时副本上）；没有文件不从模板生成
+    storage_path = existing_workpaper_file(proj_uuid, wp_id)
+    if storage_path is None:
+        return {"rows": [], "columns": [], "total": 0, "error": NO_FILE_REASON}
 
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         return {"rows": [], "columns": [], "total": 0, "error": "非 xlsx 类底稿"}
@@ -388,13 +437,15 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
                 if idx >= MAX_TOTAL:
                     break
 
-        # 公式还原：检测到未求值公式 → 调 LibreOffice 重算后再读一次
+        # 公式还原：检测到未求值公式 → 在临时副本上调 LibreOffice 重算，读回字节再取一次（原文件不动）
         recomputed = False
+        warnings: list[str] = []
         if any_unresolved:
-            ok = await loop.run_in_executor(None, _sync_recompute_xlsx_with_libreoffice, storage_path)
-            if ok:
+            new_content = await loop.run_in_executor(None, recompute_with_libreoffice, storage_path)
+            if new_content is None:
+                warnings.append(RECOMPUTE_FAILED_WARNING)
+            else:
                 recomputed = True
-                new_content = storage_path.read_bytes()
                 value_map: dict[str, Any] = {}
                 for (r1, c1, r2, c2) in ranges:
                     parsed2 = await loop.run_in_executor(
@@ -420,6 +471,7 @@ async def _query_workpaper_cell_range(db, pid: str, filters: dict):
             "total": len(all_rows),
             "source": "xlsx_recomputed" if recomputed else "xlsx_cache",
             "formula_recomputed": recomputed,
+            "warnings": warnings,
         }
     except Exception as e:
         logger.warning("cell_range extract failed for %s/%s: %s", wp_code, cell_range, e)

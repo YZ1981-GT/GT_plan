@@ -135,6 +135,8 @@ class TestSnapshotWriterOrchestratorIntegration:
                     cell_ref="B7",
                     new_value=200.0,
                     opened_at=now,
+                    # 取行带请求项目（advanced-query-linkage-closure 任务 14，R4.2）：缺项目即 ValueError
+                    project_id=project_id,
                 )
 
         assert result["success"] is True
@@ -215,6 +217,7 @@ class TestSnapshotWriterOrchestratorIntegration:
                     cell_ref="B7",
                     new_value=200.0,
                     opened_at=now,
+                    project_id=project_id,  # 取行带请求项目（任务 14，R4.2）
                 )
 
         assert result["success"] is True, "数据已写回，不应因联动失败而报失败"

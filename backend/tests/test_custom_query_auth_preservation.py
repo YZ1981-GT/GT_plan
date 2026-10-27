@@ -312,16 +312,17 @@ async def test_removed_writeback_modules_rejected_with_422(module, monkeypatch):
     from app.core.database import get_db
     from app.deps import get_current_user
     from app.routers import custom_query
-    from app.services.custom_query.snapshot_writer import snapshot_writer
+    from app.services.custom_query.snapshot_writer import SnapshotWriter
     from tests.authz_world import build_app
 
     calls: list[dict] = []
 
-    async def _spy(**kwargs):
+    async def _spy(self, **kwargs):
         calls.append(kwargs)
         return {"success": True, "updated_at": None, "old_value": None}
 
-    monkeypatch.setattr(snapshot_writer, "write_cell", _spy)
+    # 在类上替换（单例实例上替换，撤销时会把原方法写成实例属性，挡住之后的类级替换）
+    monkeypatch.setattr(SnapshotWriter, "write_cell", _spy)
     api = build_app(custom_query.router)
     user = _make_user(role="admin")
 
@@ -346,3 +347,48 @@ async def test_removed_writeback_modules_rejected_with_422(module, monkeypatch):
     errors = response.json()["detail"]
     assert any(err.get("loc", [None])[-1] == "module" for err in errors), errors
     assert calls == [], f"module={module} 被拒收前不应调用写入方：{calls}"
+
+
+# ---------------------------------------------------------------------------
+# Property 2f: 目标不在请求项目 → 404 WRITEBACK_TARGET_NOT_FOUND（advanced-query-linkage-closure 任务 14，R4.2）
+# 两条来路同一错误码：router 按 (wp_code, 请求项目) 查不到底稿；写入方取行带项目条件查不到（WritebackTargetNotFound）
+# ---------------------------------------------------------------------------
+
+def _writeback_body(project_id: str):
+    body = MagicMock()
+    body.wp_code, body.sheet_name, body.cell_ref, body.new_value = "D2", "审定表", "B7", 1
+    body.module, body.project_id = "workpaper", project_id
+    body.note_record_id = body.note_section_id = body.note_year = body.note_node_key = None
+    return body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["router_lookup", "writer_lookup"])
+async def test_cell_writeback_target_not_in_project_maps_to_404(source):
+    from fastapi import HTTPException
+
+    from app.routers.custom_query import cell_writeback
+    from app.services.custom_query.snapshot_writer import WritebackTargetNotFound
+
+    project_id = str(uuid.uuid4())
+    request = MagicMock()
+    request.headers = {"X-File-Opened-At": "2024-01-01T00:00:00Z"}
+    visibility = MagicMock()
+    visibility.all.return_value = [(uuid.UUID(project_id),)]
+    lookup = MagicMock()
+    lookup.first.return_value = None if source == "router_lookup" else (uuid.uuid4(),)
+    db = AsyncMock()
+    db.execute.side_effect = [visibility, lookup]
+
+    with patch("app.services.custom_query.snapshot_writer.snapshot_writer") as mock_sw:
+        mock_sw.write_cell = AsyncMock(side_effect=WritebackTargetNotFound("wp"))
+        with pytest.raises(HTTPException) as exc_info:
+            await cell_writeback(body=_writeback_body(project_id), response=MagicMock(headers={}), request=request,
+                                 db=db, current_user=_make_user(role="admin"))
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == {"error_code": "WRITEBACK_TARGET_NOT_FOUND", "message": "目标不存在或不属于本项目"}
+    if source == "writer_lookup":
+        db.rollback.assert_awaited()
+    else:
+        mock_sw.write_cell.assert_not_called()

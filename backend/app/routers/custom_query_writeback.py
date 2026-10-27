@@ -102,6 +102,44 @@ def _validate_note_writeback_targets(raw_targets: Any) -> None:
             )
 
 
+def _writer_http_error(exc: Exception) -> HTTPException | None:
+    """写入方抛出的已知异常 → HTTP 错误（与 cell-writeback 同口径，design §3.7）；未知异常返回 None 由调用方原样上抛。
+
+    目标不属于请求项目（取行带项目条件查不到）→ 404，不读、不锁他项目行（R4.2）；附注只剩同项目内的年度 / 章节 / 节点
+    不一致走 403。
+    """
+    from app.services.custom_query.snapshot_writer import (
+        AuditWriteFailed,
+        WritebackConflict,
+        WritebackPermissionDenied,
+        WritebackResolveUnavailable,
+        WritebackTargetNotFound,
+        WritebackTargetUnresolvable,
+    )
+    from app.services.custom_query.snapshot_writer_modules import NoteOwnershipMismatch, NoteRecordNotFound
+
+    if isinstance(exc, WritebackTargetNotFound):
+        return HTTPException(status_code=404, detail={"error_code": exc.error_code, "message": exc.message})
+    if isinstance(exc, NoteRecordNotFound):
+        return HTTPException(status_code=404, detail={"error_code": "NOTE_RECORD_NOT_FOUND", "message": str(exc)})
+    if isinstance(exc, NoteOwnershipMismatch):
+        return HTTPException(status_code=403, detail={"error_code": "NOTE_OWNERSHIP_MISMATCH", "message": str(exc)})
+    if isinstance(exc, WritebackConflict):
+        return HTTPException(status_code=409, detail={
+            "error_code": "WRITEBACK_CONFLICT", "message": str(exc),
+            "latest_updated_at": exc.latest_updated_at.isoformat() if exc.latest_updated_at else None,
+            "latest_editor": exc.latest_editor,
+        })
+    if isinstance(exc, WritebackPermissionDenied):
+        return HTTPException(status_code=403, detail={"error": exc.reason})
+    for kind, status in ((WritebackTargetUnresolvable, 400), (WritebackResolveUnavailable, 503), (AuditWriteFailed, 500)):
+        if isinstance(exc, kind):
+            return HTTPException(status_code=status, detail={"error_code": exc.error_code, "message": exc.message})
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=400, detail=str(exc))
+    return None
+
+
 def _to_writeback_targets(
     raw_targets: Any, *, default_project_id: str | None = None
 ) -> list[Any]:
@@ -244,28 +282,37 @@ async def writeback_confirm(
     from app.services.custom_query.snapshot_writer import snapshot_writer
 
     written: list[dict] = []
-    for target in targets:
-        result = await snapshot_writer.write_cell(
-            db=db,
-            user=current_user,
-            wp_id=target.wp_id or target.wp_code,
-            sheet_name=target.sheet_name,
-            cell_ref=target.cell_ref,
-            new_value=target.new_value,
-            opened_at=opened_at,
-            module=target.module,
-            project_id=body.project_id,
-            # 附注归属必须随批量目标贯穿到 writer；仅按 record id 写入会绕过
-            # project/year/section/node_key 的行锁后复验。
-            note_record_id=target.note_record_id,
-            note_section_id=target.note_section_id,
-            note_year=target.note_year,
-            note_node_key=target.note_node_key,
-            note_project_id=(
-                body.project_id if target.module == "note" else None
-            ),
-        )
-        written.append(result if isinstance(result, dict) else {"result": "ok"})
+    try:
+        for target in targets:
+            result = await snapshot_writer.write_cell(
+                db=db,
+                user=current_user,
+                wp_id=target.wp_id or target.wp_code,
+                sheet_name=target.sheet_name,
+                cell_ref=target.cell_ref,
+                new_value=target.new_value,
+                opened_at=opened_at,
+                module=target.module,
+                project_id=body.project_id,
+                # 附注归属必须随批量目标贯穿到 writer；仅按 record id 写入会绕过
+                # project/year/section/node_key 的行锁后复验。
+                note_record_id=target.note_record_id,
+                note_section_id=target.note_section_id,
+                note_year=target.note_year,
+                note_node_key=target.note_node_key,
+                note_project_id=(
+                    body.project_id if target.module == "note" else None
+                ),
+            )
+            written.append(result if isinstance(result, dict) else {"result": "ok"})
+    except Exception as exc:
+        # 任一目标写入失败 ⇒ 整批回滚（一个都不写），已知异常按 cell-writeback 同口径映射（design §3.7），
+        # 不再以未捕获异常变 500
+        await db.rollback()
+        mapped = _writer_http_error(exc)
+        if mapped is None:
+            raise
+        raise mapped from exc
     await db.commit()
 
     # Task 16 / Requirement 13.1 / Property 52：snapshot_writer 在事务内只把

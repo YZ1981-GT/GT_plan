@@ -11,6 +11,7 @@
 """
 
 import asyncio
+import uuid
 
 import pytest
 
@@ -157,6 +158,9 @@ async def test_generate_unresolved_target_surfaced():
     assert it.found is False
     assert it.addr_id is None
     assert it.error == "unresolvable"
+    # 预览门（R4.5）：有无法定位的目标即不进入确认，并提示数目
+    assert preview.enter_confirmation is False
+    assert preview.notice == "有 1 个目标无法定位，请修正后重新预览"
 
 
 @pytest.mark.asyncio
@@ -247,6 +251,95 @@ async def test_empty_preview_to_dict_notice():
 
 
 # ─── raw 兜底构造（wp_code/sheet_name/cell_ref）──────────────────────────────
+
+
+# ─── 预览门：目标归属（advanced-query-linkage-closure R4.5，任务 14）──────────────
+
+_REQ = "00000000-0000-0000-0000-0000000000a1"  # 请求项目
+_OTHER = "00000000-0000-0000-0000-0000000000b2"  # 他项目
+_WP_IN = "00000000-0000-0000-0000-00000000c001"
+_WP_OUT = "00000000-0000-0000-0000-00000000c002"
+_NOTE_IN = "00000000-0000-0000-0000-00000000d001"
+_NOTE_OUT = "00000000-0000-0000-0000-00000000d002"
+
+
+class _OwnerDb:
+    """只读归属查询的替身：按（表, id）返回所属项目；记录每次查询，供断言「只读、按 id 查」。"""
+
+    owners = {("working_paper", _WP_IN): _REQ, ("working_paper", _WP_OUT): _OTHER,
+              ("consol_note_data", _NOTE_IN): _REQ, ("consol_note_data", _NOTE_OUT): _OTHER}
+
+    def __init__(self) -> None:
+        self.queries: list[tuple[str, str]] = []
+
+    async def execute(self, stmt, params=None):
+        table = "consol_note_data" if "consol_note_data" in str(stmt) else "working_paper"
+        ident = str(next(iter(stmt.compile().params.values())))
+        self.queries.append((table, ident))
+        owner = self.owners.get((table, ident))
+
+        class _Result:
+            def scalar_one_or_none(self):
+                return uuid.UUID(owner) if owner else None
+
+        return _Result()
+
+
+class _SpyAddressing(_StubAddressing):
+    def __init__(self) -> None:
+        super().__init__()
+        self.raws: list[str] = []
+
+    async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+        self.raws.append(raw)
+        return await super().resolve_target(raw, project_id=project_id, db=db, timeout_s=timeout_s)
+
+
+def _wp(wp_id: str, cell: str) -> WritebackTarget:
+    return WritebackTarget(new_value=2, old_value=1, module="workpaper", wp_id=wp_id, raw=f"D2/S/{cell}")
+
+
+@pytest.mark.asyncio
+async def test_preview_gate_all_targets_in_project_enter_confirmation():
+    db, addressing = _OwnerDb(), _SpyAddressing()
+    note = WritebackTarget(new_value=2, old_value=1, module="note", note_record_id=_NOTE_IN, raw="note:五-1/C2")
+    preview = await WritebackPreviewService(addressing=addressing).generate(
+        db, [_wp(_WP_IN, "E1"), note], project_id=_REQ)
+    assert [it.found for it in preview.items] == [True, True]
+    assert preview.enter_confirmation is True and preview.notice is None
+    assert db.queries == [("working_paper", _WP_IN), ("consol_note_data", _NOTE_IN)]
+
+
+@pytest.mark.asyncio
+async def test_preview_gate_one_target_of_other_project_blocks_confirmation():
+    db, addressing = _OwnerDb(), _SpyAddressing()
+    note_out = WritebackTarget(new_value=2, old_value=7, module="note", note_record_id=_NOTE_OUT, raw="note:五-1/C3")
+    preview = await WritebackPreviewService(addressing=addressing).generate(
+        db, [_wp(_WP_IN, "E1"), _wp(_WP_OUT, "E2"), note_out], project_id=_REQ)
+    by_raw = {it.raw: it for it in preview.items}
+    for raw in ("D2/S/E2", "note:五-1/C3"):
+        item = by_raw[raw]
+        # 不属于请求项目：不解析地址、不读（也不回显）旧值
+        assert (item.found, item.error, item.addr_id, item.old_value) == (False, "target_not_in_project", None, None)
+    assert by_raw["D2/S/E1"].found is True
+    assert addressing.raws == ["D2/S/E1"], "他项目目标不应进入地址解析"
+    assert preview.enter_confirmation is False
+    assert preview.notice == "有 2 个目标无法定位，请修正后重新预览"
+    assert preview.to_dict()["enter_confirmation"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", [
+    WritebackTarget(new_value=2, old_value=1, module="workpaper", wp_id="not-a-uuid", raw="D2/S/E1"),
+    WritebackTarget(new_value=2, old_value=1, module="workpaper", wp_id="00000000-0000-0000-0000-00000000ffff",
+                    raw="D2/S/E1"),
+    WritebackTarget(new_value=2, old_value=1, module="tb", wp_id=_WP_IN, raw="D2/S/E1"),
+], ids=["invalid-id", "missing-row", "unsupported-module"])
+async def test_preview_gate_unlocatable_target_is_not_in_project(target):
+    preview = await WritebackPreviewService(addressing=_SpyAddressing()).generate(
+        _OwnerDb(), [target], project_id=_REQ)
+    assert [(it.found, it.error) for it in preview.items] == [(False, "target_not_in_project")]
+    assert preview.enter_confirmation is False
 
 
 @pytest.mark.asyncio

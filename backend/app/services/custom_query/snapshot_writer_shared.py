@@ -23,6 +23,8 @@ ERR_CODE_TARGET_UNRESOLVABLE = "TARGET_UNRESOLVABLE"
 ERR_CODE_RESOLVE_UNAVAILABLE = "RESOLVE_UNAVAILABLE"
 # 审计写入失败 → 回滚回写改动（R14.8「无审计不回写」）
 ERR_CODE_AUDIT_WRITE_FAILED = "AUDIT_WRITE_FAILED"
+# 回写目标在请求项目里不存在（取行带项目条件、查不到）→ 404，不锁任何行（advanced-query-linkage-closure R4.2）
+ERR_CODE_WRITEBACK_TARGET_NOT_FOUND = "WRITEBACK_TARGET_NOT_FOUND"
 
 
 # ─── Exceptions ──────────────────────────────────────────────────────────────
@@ -73,6 +75,21 @@ class WritebackResolveUnavailable(Exception):
     def __init__(self, target_hint: str, message: str | None = None):
         self.target_hint = target_hint
         self.message = message or f"解析服务不可用或超时，回写已中止：{target_hint}"
+        super().__init__(self.message)
+
+
+class WritebackTargetNotFound(Exception):
+    """回写目标在请求项目里不存在（advanced-query-linkage-closure R4.2，design §3.7）。
+
+    底稿取行是 ``WHERE wp.id = :wp_id AND wp.project_id = :pid FOR UPDATE OF wp``：他项目的底稿与不存在的 id
+    一样查不到，既不读取也不加锁。携带 ``error_code=WRITEBACK_TARGET_NOT_FOUND`` 供 router 转 HTTP 404。
+    """
+
+    error_code = ERR_CODE_WRITEBACK_TARGET_NOT_FOUND
+
+    def __init__(self, target_hint: str, message: str | None = None):
+        self.target_hint = target_hint
+        self.message = message or "目标不存在或不属于本项目"
         super().__init__(self.message)
 
 

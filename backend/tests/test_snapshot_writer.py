@@ -24,6 +24,7 @@ from app.services.custom_query.snapshot_writer import (
     WritebackConflict,
     WritebackPermissionDenied,
     WritebackResolveUnavailable,
+    WritebackTargetNotFound,
     WritebackTargetUnresolvable,
     _parse_cell_ref,
     snapshot_writer,
@@ -65,6 +66,10 @@ def _resolve_found_fake(
 _RESOLVE_TARGET_PATH = (
     "app.services.custom_query.addressing_service.addressing_service.resolve_target"
 )
+
+# 回写取行带请求项目（advanced-query-linkage-closure 任务 14，R4.2）：底稿用例一律带合法项目 UUID，
+# mock 行的 project_id 列与之相同（缺项目即 ValueError、他项目即 WritebackTargetNotFound）
+_PID = "00000000-0000-0000-0000-00000000a001"
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -183,7 +188,7 @@ class TestProperty3WriteTransactionalConsistency:
 
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             elif "UPDATE working_paper" in stmt_str:
                 if params:
@@ -211,7 +216,7 @@ class TestProperty3WriteTransactionalConsistency:
                 cell_ref=cell_ref,
                 new_value=new_value,
                 opened_at=now,  # same as updated_at → no conflict
-                module="workpaper",
+                module="workpaper", project_id=_PID,
             )
 
         # Verify success
@@ -241,7 +246,7 @@ class TestProperty3WriteTransactionalConsistency:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             elif "UPDATE working_paper" in stmt_str:
                 if params:
@@ -263,7 +268,7 @@ class TestProperty3WriteTransactionalConsistency:
                 sheet_name=sheet_name,
                 cell_ref="B7",
                 new_value=42,
-                opened_at=now,
+                opened_at=now, project_id=_PID,
             )
 
         assert result["success"] is True
@@ -303,7 +308,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (updated_at, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (updated_at, parsed_data, "D2", "", _PID)
                 return mock_result
             return MagicMock(first=MagicMock(return_value=None))
 
@@ -320,7 +325,7 @@ class TestProperty4OptimisticLockConflict:
                 sheet_name=sheet_name,
                 cell_ref="A1",
                 new_value="new",
-                opened_at=opened_at,
+                opened_at=opened_at, project_id=_PID,
             )
 
         # Verify conflict details
@@ -337,7 +342,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             elif "UPDATE" in stmt_str:
                 return MagicMock()
@@ -357,7 +362,7 @@ class TestProperty4OptimisticLockConflict:
                 sheet_name=sheet_name,
                 cell_ref="A1",
                 new_value="new",
-                opened_at=now,
+                opened_at=now, project_id=_PID,
             )
 
         assert result["success"] is True
@@ -375,7 +380,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             return MagicMock(first=MagicMock(return_value=None))
 
@@ -390,7 +395,7 @@ class TestProperty4OptimisticLockConflict:
                 sheet_name=sheet_name,
                 cell_ref="A1",
                 new_value="new",
-                opened_at=opened_at,
+                opened_at=opened_at, project_id=_PID,
             )
 
         assert exc_info.value.latest_editor == "other_user"
@@ -525,7 +530,7 @@ class TestProperty26CrossModuleWriteRouting:
             written_sql.append(stmt_str)
             if "SELECT" in stmt_str and "working_paper" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             return MagicMock()
 
@@ -539,7 +544,7 @@ class TestProperty26CrossModuleWriteRouting:
             await snapshot_writer.write_cell(
                 db=mock_db, user=_make_mock_user(), wp_id="wp-001",
                 sheet_name=sheet_name, cell_ref="A1", new_value="new",
-                opened_at=now, module="workpaper",
+                opened_at=now, module="workpaper", project_id=_PID,
             )
 
         # Verify UPDATE was on working_paper table
@@ -554,6 +559,7 @@ class TestProperty26CrossModuleWriteRouting:
         import uuid as _uuid_mod
         now = datetime.now(timezone.utc)
         note_id = _uuid_mod.uuid4()
+        note_project = _uuid_mod.uuid4()  # 取行带请求项目（任务 14，R4.2）：请求项目与记录所属项目一致
         note_data = {
             "rows": [
                 {"code": "1001", "name": "现金", "year_end": 100, "year_begin": 90, "formula": None}
@@ -565,7 +571,7 @@ class TestProperty26CrossModuleWriteRouting:
         class _FakeNoteRecord:
             def __init__(self):
                 self.id = note_id
-                self.project_id = _uuid_mod.uuid4()
+                self.project_id = note_project
                 self.year = 2025
                 self.section_id = "五-1-1"
                 self.node_key = None
@@ -605,10 +611,55 @@ class TestProperty26CrossModuleWriteRouting:
         await snapshot_writer.write_cell(
             db=_SimpleMockDb(), user=_make_mock_user(), wp_id=str(note_id),
             sheet_name="note_五-1-1", cell_ref="C2", new_value=150,
-            opened_at=now, module="note",
+            opened_at=now, module="note", note_project_id=str(note_project),
         )
 
         assert any("UPDATE consol_note_data" in s for s in written_sql)
+        # 取行带请求项目（R4.2）：选记录的语句同时按 id 与 project_id 过滤
+        select_sql = next(s for s in written_sql if "consol_note_data" in s and "SELECT" in s.upper())
+        assert "consol_note_data.project_id" in select_sql, select_sql
+
+
+class TestWritebackRowLookupCarriesProject:
+    """R4.2（advanced-query-linkage-closure 任务 14）：取行带请求项目——缺项目即拒绝（不发任何语句），
+    他项目 / 不存在的底稿查不到即 ``WritebackTargetNotFound``（真库不加锁的证明在 ``test_aql_writeback_isolation_pg``）。"""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("module, extra", [
+        ("workpaper", {}),
+        ("note", {"note_record_id": "00000000-0000-0000-0000-00000000b001"}),
+    ])
+    async def test_missing_project_is_rejected_before_any_query(self, module, extra):
+        mock_db = AsyncMock()
+        with pytest.raises(ValueError, match="缺少项目"):
+            await snapshot_writer.write_cell(
+                db=mock_db, user=_make_mock_user(), wp_id="00000000-0000-0000-0000-00000000c001", sheet_name="S",
+                cell_ref="A1", new_value=1, opened_at=datetime.now(timezone.utc), module=module, **extra,
+            )
+        mock_db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_workpaper_lookup_filters_by_project_and_stops_when_not_found(self):
+        seen: list[tuple[str, dict]] = []
+
+        async def mock_execute(stmt, params=None):
+            seen.append((" ".join(str(getattr(stmt, "text", stmt)).split()), dict(params or {})))
+            result = MagicMock()
+            result.first.return_value = None
+            return result
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+        with pytest.raises(WritebackTargetNotFound) as exc:
+            await snapshot_writer.write_cell(
+                db=mock_db, user=_make_mock_user(), wp_id="00000000-0000-0000-0000-00000000c001", sheet_name="S",
+                cell_ref="A1", new_value=1, opened_at=datetime.now(timezone.utc), project_id=_PID,
+            )
+        assert (exc.value.error_code, exc.value.message) == ("WRITEBACK_TARGET_NOT_FOUND", "目标不存在或不属于本项目")
+        assert len(seen) == 1, f"查不到即止，不应再发语句：{seen}"
+        sql, params = seen[0]
+        assert "WHERE wp.id = :wp_id AND wp.project_id = :pid FOR UPDATE OF wp" in sql, sql
+        assert params == {"wp_id": "00000000-0000-0000-0000-00000000c001", "pid": _PID}
 
 
 # ---------------------------------------------------------------------------
@@ -630,7 +681,7 @@ class TestCellWritebackE2E:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "/path/to/file.xlsx", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "/path/to/file.xlsx", _PID)
                 return mock_result
             return MagicMock()
 
@@ -651,7 +702,7 @@ class TestCellWritebackE2E:
                     sheet_name=sheet_name,
                     cell_ref="B7",
                     new_value=99999.99,
-                    opened_at=now,
+                    opened_at=now, project_id=_PID,
                 )
 
         assert result["success"] is True
@@ -675,7 +726,7 @@ class TestCellWritebackE2E:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", _PID)
                 return mock_result
             return MagicMock()
 
@@ -690,7 +741,7 @@ class TestCellWritebackE2E:
                 sheet_name=sheet_name,
                 cell_ref="A1",
                 new_value="new",
-                opened_at=stale_opened_at,
+                opened_at=stale_opened_at, project_id=_PID,
             )
 
         assert exc_info.value.latest_updated_at == now

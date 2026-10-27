@@ -79,7 +79,7 @@ def current_values(monkeypatch):
     """
     store: dict[str, object] = {}
 
-    async def _fake_read(db, wp_id, sheet_name, cell_ref):
+    async def _fake_read(db, wp_id, sheet_name, cell_ref, *, project_id=None):
         return store.get(cell_ref)
 
     monkeypatch.setattr(
@@ -217,9 +217,9 @@ async def test_confirm_rejects_all_unchanged_preview(current_values):
 
 @pytest.mark.asyncio
 async def test_confirm_defers_non_workpaper_module(current_values):
-    # report 模块无法门内只读复核 → deferred，交由写回乐观锁
+    # 附注模块无法门内只读复核 → deferred，交由写回乐观锁（tb / adj / report 写入已删，任务 13）
     t = WritebackTarget(
-        new_value=2, old_value=1, module="report", raw="report:X/A1"
+        new_value=2, old_value=1, module="note", raw="note:X/A1"
     )
     preview = await _make_preview([t])
     check = await WritebackConfirmationGate().validate(_DB, preview)
@@ -238,20 +238,26 @@ async def test_confirm_defers_when_db_none(current_values):
 
 
 @pytest.mark.asyncio
-async def test_confirm_defers_unresolved_target(current_values):
-    # 解析失败条目非本门 stale 范畴（15.3 写回以 TARGET_UNRESOLVABLE 中止）→ deferred
-    preview = await _make_preview([_wp_target("E100", old=10, new=20)], missing={"wp1/S/E100"})
-    assert preview.items[0].found is False
-    check = await WritebackConfirmationGate().validate(_DB, preview)
-    assert check.ok is True
-    assert check.deferred_items == 1
+async def test_confirm_rejects_preview_with_unresolved_target(current_values):
+    # 预览门（advanced-query-linkage-closure R4.5，任务 14）：有任一目标无法定位 ⇒ 不进入确认，确认门拒绝（409）。
+    # 原用例断言「含解析失败条目仍可确认（deferred）」——那正是缺陷形态：确认后写入循环才对该目标失败。
+    preview = await _make_preview(
+        [_wp_target("E100", old=10, new=20), _wp_target("E101", old=1, new=2)], missing={"wp1/S/E100"},
+    )
+    assert [it.found for it in preview.items] == [False, True]
+    assert preview.enter_confirmation is False
+    assert preview.notice == "有 1 个目标无法定位，请修正后重新预览"
+    current_values["E101"] = 1
+    with pytest.raises(WritebackConfirmationConflict) as exc:
+        await WritebackConfirmationGate().validate(_DB, preview)
+    assert exc.value.error_code == ERR_CODE_WRITEBACK_CONFLICT
 
 
 @pytest.mark.asyncio
 async def test_confirm_mixed_verified_and_deferred(current_values):
     wp_t = _wp_target("E1", old=1, new=2)
-    report_t = WritebackTarget(new_value=9, old_value=8, module="report", raw="report:Y/B2")
-    preview = await _make_preview([wp_t, report_t])
+    note_t = WritebackTarget(new_value=9, old_value=8, module="note", raw="note:Y/B2")
+    preview = await _make_preview([wp_t, note_t])
     current_values["E1"] = 1  # workpaper 一致
     check = await WritebackConfirmationGate().validate(_DB, preview)
     assert check.ok is True

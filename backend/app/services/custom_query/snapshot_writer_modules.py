@@ -80,18 +80,31 @@ async def write_note_cell(
     虚拟 sheet 列映射：A=code, B=name, C=year_end, D=year_begin, E=formula
 
     设计 §五.2 归属校验流程：
-    1. SELECT ... FOR UPDATE（PG）或普通 SELECT（SQLite）锁定记录
+    1. SELECT ... FOR UPDATE（PG）或普通 SELECT（SQLite）锁定记录——取行带请求项目（advanced-query-linkage-closure
+       R4.2）：他项目的记录与不存在的 id 一样查不到，既不读取也不加锁；缺项目 → ValueError
     2. 逐项比较 project_id/year/section_id/node_key 与请求字段
-    3. 不匹配 → NoteOwnershipMismatch → 路由回滚事务
+    3. 不匹配 → NoteOwnershipMismatch → 路由回滚事务（project_id 已在取行条件里，这里只剩同项目内的
+       年度 / 章节 / 节点不一致）
     4. 记录不存在 → NoteRecordNotFound → 不 fallback 到 legacy NULL 行
     """
     from app.services.custom_query.module_cell_resolver import _NOTE_COLUMNS
+
+    import uuid as _uuid_mod
+
+    # ── 请求项目：取行条件（R4.2），缺失即拒绝，不退回「只按记录 id 加锁」───────────
+    if note_project_id is None or note_project_id == "":
+        raise ValueError("附注回写缺少项目（note_project_id），不能只按记录 id 定位")
+    try:
+        project_uuid = (
+            note_project_id if isinstance(note_project_id, _uuid_mod.UUID) else _uuid_mod.UUID(str(note_project_id))
+        )
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ValueError(f"项目标识非法：{note_project_id!r}") from exc
 
     # ── 确定查询目标 ID ──────────────────────────────────────────────────────
     # 新版请求通过 note_record_id 传入精确记录 ID；
     # 旧版兼容路径用 wp_id（= body.wp_code）。
     target_id_str = note_record_id or wp_id
-    import uuid as _uuid_mod
     try:
         target_id = _uuid_mod.UUID(target_id_str) if isinstance(target_id_str, str) else target_id_str
     except (ValueError, AttributeError):
@@ -103,7 +116,9 @@ async def write_note_cell(
     from app.models.consol_note_data_models import ConsolNoteData
     from sqlalchemy import select as sa_select
 
-    stmt = sa_select(ConsolNoteData).where(ConsolNoteData.id == target_id)
+    stmt = sa_select(ConsolNoteData).where(
+        ConsolNoteData.id == target_id, ConsolNoteData.project_id == project_uuid,
+    )
     try:
         stmt = stmt.with_for_update()
     except Exception:
@@ -125,10 +140,11 @@ async def write_note_cell(
         or note_node_key is not _UNSET
     )
     if _has_ownership:
-        # project_id 比较：统一为字符串比较（UUID 与 str 混用）
+        # project_id 比较：取行已带项目条件，这里再核一次（取行语句被改坏时不静默跨项目写）；
+        # 统一为规范 UUID 字符串比较（UUID 与 str 混用、大小写不同都不误判）
         if note_project_id is not None:
             db_pid = str(record.project_id)
-            req_pid = str(note_project_id)
+            req_pid = str(project_uuid)
             if db_pid != req_pid:
                 raise NoteOwnershipMismatch("project_id", req_pid, db_pid)
 

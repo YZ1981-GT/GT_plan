@@ -43,6 +43,7 @@ from sqlalchemy import Table, select
 
 import app.services.wp_template_init_service as wp_template_init_service
 from app.models.audit_platform_models import AccountCategory, TrialBalance
+from app.services.custom_query.fetchers import workpaper_cells
 from app.models.base import UserRole
 from app.models.core import User
 from app.models.custom_query_models import CustomQueryTemplate
@@ -262,9 +263,12 @@ def _access(allowed: bool, all_projects: bool, count: int | None, reason: str | 
 
 def _preview_unavailable() -> Expect:
     def check(response: Response, ctx: Ctx) -> None:
-        assert response.json().get("available") is False, response.json()
-        written = [p for p in (ctx.storage.rglob("*") if ctx.storage and ctx.storage.exists() else []) if p.is_file()]
-        assert not written, f"只读预览不应生成文件：{written}"
+        data = response.json()
+        assert data.get("available") is False, data
+        assert data.get("reason") == workpaper_cells.NO_FILE_REASON, data
+        created = sorted(str(p) for p in ctx.storage.rglob("*")) if ctx.storage and ctx.storage.exists() else []
+        # 只读预览不生成文件，也不建目录（查找文件不经会 mkdir 的 get_workpaper_storage_path）
+        assert ctx.storage is not None and not ctx.storage.exists(), f"只读预览不应在 storage 留下任何东西：{created}"
     return Expect(200, check)
 
 
@@ -457,7 +461,6 @@ def _each(columns: tuple[str, ...], reason: str) -> dict[str, str]:
 
 
 PENDING: dict[str, dict[str, str]] = {
-    "3": _each(("R", "E", "PM", "P", "AD"), "任务 16（AQ-23）：无文件时预览从模板生成文件并返回 available=true"),
     "5": {"*": "任务 26（AQ-20）：POST /api/custom-query/export 尚未实现（404）"},
     "6": _each(_LOGGED_IN, "任务 24（AQ-16）：列表以 scope == 'global' 判公开（入库值是 public），不认 project 共享"),
     "7": _each(_LOGGED_IN, "任务 24（AQ-16）：save_template 不认 private，TemplateInvalidError 未捕获（500）"),
@@ -470,9 +473,6 @@ PENDING: dict[str, dict[str, str]] = {
                 "app.services.user_display_names（远端已有，BM 合入后补齐）"},
     "15": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
     "16": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
-    "19": _each(("E", "PM", "P", "AD"), "任务 14（AQ-04）：预览不核对目标归属，含他项目目标仍 enter_confirmation=true"),
-    "20": _each(("E", "PM", "P", "AD"),
-                "任务 14（AQ-04）：确认先按 wp_id 锁他项目行再比项目，WritebackPermissionDenied 未映射（500）"),
     "22": _each(_LOGGED_IN, "任务 32（AQ-17）：wp_template_registry 表不存在时 address-resolve 500"),
     # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表等任务 23（B6，须合入远端后）：B3 起 CR 已有构建器准入，
     # 但循环受限项目尚未排除（access 计数 1、执行返回 X 的行、指定 X 得 200）

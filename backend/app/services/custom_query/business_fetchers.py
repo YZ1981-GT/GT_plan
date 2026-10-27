@@ -153,7 +153,9 @@ async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any) -> Fet
     # 隐藏列 _row_index = 取数顺序（不进 columns、不导出）：内存分页默认保持原表行序（R2.8）
     indexed = [{**row, "_row_index": i} if isinstance(row, dict) else row for i, row in enumerate(rows)]
     meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
-    return FetchPage(rows=indexed, columns=columns, total=len(indexed), paged=False, meta=dict(meta))
+    # 取数器给的提示原样带出（如底稿选区「公式未能重算，显示的是文件缓存值」，design §3.7）
+    warnings = [str(w) for w in result.get("warnings") or []]
+    return FetchPage(rows=indexed, columns=columns, total=len(indexed), paged=False, meta=dict(meta), warnings=warnings)
 
 
 async def _fetch_legacy(req: QueryRequest, target: ResolvedSource, db: Any) -> tuple[list[dict], list[ColumnMeta]]:

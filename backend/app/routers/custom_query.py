@@ -30,7 +30,6 @@ API:
   DELETE /api/custom-query/templates/{id}       — 删除模板（仅创建者或 admin）
 """
 
-import asyncio
 import json
 import logging
 import uuid
@@ -61,13 +60,10 @@ from app.services.custom_query.pagination import (
 )
 # 取数器下沉（advanced-query-linkage-closure 任务 7）：SQL 源由 source_registry + paged_fetch 在数据库内
 # 计数 / 排序 / 分页，JSON 内存源与底稿选区辅助在 fetchers/；这里只留暂未切换的报表 / 报表行次 / 调整分录
-# 取数器（任务 17 / 18 切换后删除）与 wp-sheet-preview 端点要用的两个辅助。
+# 取数器（任务 17 / 18 切换后删除）；wp-sheet-preview 的只读取数在 fetchers/workpaper_cells（任务 16）。
 from app.services.custom_query.fetchers import effective_fetch_limit as _effective_limit
 from app.services.custom_query.fetchers.disclosure import _query_disclosure  # noqa: F401 — 再导出（test_note_table_payload_readers_pg）
-from app.services.custom_query.fetchers.workpaper_cells import (
-    _sync_parse_sheet_preview,
-    _try_render_preview_from_snapshot,
-)
+from app.services.custom_query.fetchers.workpaper_cells import render_sheet_preview
 from app.services.custom_query.source_registry import CONSOL_UNIT_KINDS, SOURCE_ALIASES, SOURCE_REGISTRY
 from app.services.wp_template_registry import wp_template_registry_service
 
@@ -800,11 +796,11 @@ async def wp_sheet_preview(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览。
+    """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览（只读，R4.4）。
 
     数据源优先级：
       1. `working_paper.parsed_data['univer_snapshot']` — 用户保存底稿时已落库（首选，零计算）
-      2. storage xlsx → openpyxl 解析（首次未保存的模板）
+      2. storage xlsx → openpyxl 解析缓存值；没有文件返回 `available: false`，不从模板生成
     """
     try:
         proj_uuid = uuid.UUID(project_id)
@@ -813,8 +809,8 @@ async def wp_sheet_preview(
 
     # ─── 认证 + 归属校验（R1.1 / R1.2 / R1.4）─────────────────────────────
     # 本端点直接返回底稿单元格值（含公式），改造前无任何认证 —— 实测未认证直连
-    # 返回 200。更严重的是下方降级分支会调 `init_workpaper_from_template`
-    # **写文件**，即无认证端点触发副作用；故守卫必须在此、先于一切读写。
+    # 返回 200。改造前下方降级分支还会从模板生成文件（写 storage，AQ-23，任务 16 已改为只读）；
+    # 守卫仍须在此、先于一切读取。
     from app.services.custom_query.ownership_guard import ownership_guard
 
     await ownership_guard.assert_target_accessible(
@@ -830,50 +826,10 @@ async def wp_sheet_preview(
     """), {"pid": str(proj_uuid), "wpc": wp_code})).first()
     if not row:
         return {"available": False, "reason": "底稿在当前项目中不存在", "wp_code": wp_code}
-    wp_id = row[0]
+
+    # 2. 预览只读（R4.4）：snapshot 优先、其次 storage xlsx 缓存值；没有文件不从模板生成（fetchers/workpaper_cells）
     parsed_data = row[1] if isinstance(row[1], dict) else {}
-
-    # 2. 优先从 parsed_data['univer_snapshot'] 渲染
-    snap_view = _try_render_preview_from_snapshot(parsed_data, sheet_name)
-    if snap_view is not None:
-        return {
-            "available": True,
-            "wp_code": wp_code,
-            "wp_id": str(wp_id),
-            "source": "univer_snapshot",
-            **snap_view,
-        }
-
-    # 3. 降级 storage xlsx 解析（异步化）
-    from app.services.wp_template_init_service import get_workpaper_file, init_workpaper_from_template
-    storage_path = get_workpaper_file(proj_uuid, wp_id)
-    if not storage_path:
-        # 从模板初始化
-        init_result = init_workpaper_from_template(proj_uuid, wp_id, wp_code)
-        if not init_result:
-            return {"available": False, "reason": f"模板文件不存在: {wp_code}", "wp_code": wp_code}
-        storage_path = init_result
-
-    if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
-        return {"available": False, "reason": "非 xlsx 类底稿", "wp_code": wp_code}
-
-    # 3. openpyxl 解析（异步化：放线程池避免阻塞 event loop）
-    try:
-        content = storage_path.read_bytes()
-        loop = asyncio.get_running_loop()
-        parsed = await loop.run_in_executor(None, _sync_parse_sheet_preview, content, sheet_name)
-        if "error" in parsed:
-            return {"available": False, "reason": parsed["error"], "wp_code": wp_code}
-        return {
-            "available": True,
-            "wp_code": wp_code,
-            "wp_id": str(wp_id),
-            "source": "xlsx_cache",
-            **parsed,
-        }
-    except Exception as e:
-        logger.warning("wp-sheet-preview parse failed for %s: %s", wp_code, e)
-        return {"available": False, "reason": f"解析失败: {e}", "wp_code": wp_code}
+    return await render_sheet_preview(proj_uuid, row[0], wp_code, parsed_data, sheet_name)
 
 
 @router.post("/execute")
@@ -1611,6 +1567,7 @@ async def cell_writeback(
         WritebackConflict,
         WritebackPermissionDenied,
         WritebackResolveUnavailable,
+        WritebackTargetNotFound,
         WritebackTargetUnresolvable,
         snapshot_writer,
     )
@@ -1663,7 +1620,8 @@ async def cell_writeback(
         )
         wp_row = result.first()
         if not wp_row:
-            raise HTTPException(status_code=404, detail="Working paper not found in this project")
+            not_found = WritebackTargetNotFound(body.wp_code)
+            raise HTTPException(status_code=404, detail={"error_code": not_found.error_code, "message": not_found.message})
         wp_id = str(wp_row[0])
     else:
         # 附注模块：记录以 note_record_id 定位，wp_code 只作兼容标识传递
@@ -1705,6 +1663,10 @@ async def cell_writeback(
             status_code=403,
             detail={"error": e.reason},
         )
+    except WritebackTargetNotFound as e:
+        # R4.2：取行带请求项目，他项目底稿查不到即 404（不读、不锁）
+        await db.rollback()
+        raise HTTPException(status_code=404, detail={"error_code": e.error_code, "message": e.message})
     except WritebackTargetUnresolvable as e:
         # R3.4：回写目标无法解析为有效 addr_id → 中止、数据不变
         await db.rollback()

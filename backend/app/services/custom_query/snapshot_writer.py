@@ -11,7 +11,9 @@ ACNR 集成 (M2, R15.1, R15.2, R15.4):
   - resolve 携带 project context（project_id）保证 wp_id 正确解析
 
 11 步事务算法（design.md §11 WritebackPreview + SnapshotWriter，advanced-query Task 15.3）:
-  1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id FOR UPDATE
+  1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id AND project_id = pid FOR UPDATE OF wp
+     （取行带请求项目：他项目的底稿查不到、不加锁 → WritebackTargetNotFound；缺项目 → ValueError，
+     advanced-query-linkage-closure R4.2 / design §3.7）
   2. Belt+suspenders project_id 归属校验
   3. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)（乐观锁）
   4. **写回前解析 addr_id 身份**：经 full_resolve（AddressingService，5s 超时）解析目标为
@@ -53,10 +55,12 @@ from app.services.custom_query.snapshot_writer_shared import (  # noqa: F401  (r
     ERR_CODE_AUDIT_WRITE_FAILED,
     ERR_CODE_RESOLVE_UNAVAILABLE,
     ERR_CODE_TARGET_UNRESOLVABLE,
+    ERR_CODE_WRITEBACK_TARGET_NOT_FOUND,
     AuditWriteFailed,
     WritebackConflict,
     WritebackPermissionDenied,
     WritebackResolveUnavailable,
+    WritebackTargetNotFound,
     WritebackTargetUnresolvable,
     parse_cell_ref as _parse_cell_ref,
 )
@@ -118,7 +122,9 @@ class SnapshotWriter:
         Raises:
             WritebackConflict: 乐观锁冲突
             WritebackPermissionDenied: 无写权限
-            ValueError: 不支持的模块（请求层已是 422，这里防直接调用）
+            WritebackTargetNotFound: 底稿在请求项目里不存在（取行带项目条件，不锁他项目行）
+            NoteRecordNotFound: 附注记录在请求项目里不存在（同上）
+            ValueError: 不支持的模块（请求层已是 422，这里防直接调用）；缺项目
         """
         if module == "workpaper":
             return await self._write_workpaper_cell(
@@ -163,7 +169,9 @@ class SnapshotWriter:
          10. 审计 log_action 纳入事务成功判定（失败 → 回滚 + AUDIT_WRITE_FAILED）
          11. 组装 addr_id + column_metadata 返回
         """
-        # Step 1: SELECT FOR UPDATE
+        # Step 1: SELECT FOR UPDATE —— 取行带请求项目（R4.2）：他项目的底稿与不存在的 id 一样查不到，
+        # 既不读取也不加锁。缺项目即拒绝（两个回写端点恒传请求项目；直接调用不得退回「只按 id 加锁」）。
+        pid = _require_project_uuid(project_id)
         result = await db.execute(
             text("""
                 -- working_paper 无 wp_code 列（在 wp_index 上）。
@@ -173,14 +181,14 @@ class SnapshotWriter:
                        wp.file_path, wp.project_id
                 FROM working_paper wp
                 LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
-                WHERE wp.id = :wp_id
+                WHERE wp.id = :wp_id AND wp.project_id = :pid
                 FOR UPDATE OF wp
             """),
-            {"wp_id": wp_id},
+            {"wp_id": wp_id, "pid": str(pid)},
         )
         row = result.first()
         if not row:
-            raise ValueError(f"Working paper not found: {wp_id}")
+            raise WritebackTargetNotFound(str(wp_id))
 
         current_updated_at = row[0]
         parsed_data = row[1] or {}
@@ -188,11 +196,10 @@ class SnapshotWriter:
         file_path = row[3] or ""
         row_project_id = row[4]
 
-        # Step 2: Belt+suspenders — verify project_id matches
-        if project_id and row_project_id:
-            expected_pid = UUID(project_id) if isinstance(project_id, str) else project_id
+        # Step 2: Belt+suspenders — 取行已带项目条件，这里再核一次（取行语句被改坏时不静默跨项目写）
+        if row_project_id:
             actual_pid = UUID(str(row_project_id)) if not isinstance(row_project_id, UUID) else row_project_id
-            if expected_pid != actual_pid:
+            if pid != actual_pid:
                 raise WritebackPermissionDenied("Project mismatch")
 
         # Step 3: 乐观锁比对
@@ -675,6 +682,16 @@ class SnapshotWriter:
 
 
 # ─── 模块级辅助 ──────────────────────────────────────────────────────────────
+
+
+def _require_project_uuid(project_id: Any) -> UUID:
+    """回写取行的项目条件（R4.2）：缺失或不是合法 UUID → ValueError（router 转 400），不退回只按 id 取行。"""
+    if project_id is None or project_id == "":
+        raise ValueError("底稿回写缺少项目（project_id），不能只按底稿 id 定位")
+    try:
+        return project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ValueError(f"项目标识非法：{project_id!r}") from exc
 
 
 def _as_uuid(value: Any) -> UUID | None:

@@ -36,6 +36,7 @@ from app.services.custom_query.snapshot_writer import (
     WritebackConflict,
     WritebackPermissionDenied,
     WritebackResolveUnavailable,
+    WritebackTargetNotFound,
     WritebackTargetUnresolvable,
 )
 from app.services.custom_query.writeback_preview import (
@@ -99,8 +100,8 @@ async def test_p29_optimistic_lock_stale_rejection(
     预览之后确认之前：预览过期 或 目标 cell 当前旧值与预览时不一致 → 拒绝回写、
     数据不变、提示重新预览；仅当窗口内且旧值一致时通过。
     """
-    # monkeypatch 确认门只读复核读取的「当前旧值」
-    async def _fake_read(db, wp_id, sheet_name, cell_ref):
+    # monkeypatch 确认门只读复核读取的「当前旧值」（取行带请求项目：任务 14 起多一个关键字参数）
+    async def _fake_read(db, wp_id, sheet_name, cell_ref, *, project_id=None):
         return current_value
 
     monkeypatch.setattr(
@@ -156,8 +157,9 @@ _PID_B = "22222222-2222-2222-2222-222222222222"
 
 # 可注入失败的步骤 → 期望异常类型（含跨 sheet 归属校验 / 数据步 / 审计写入失败）
 _FATAL_STEPS = {
-    "select_not_found": ValueError,               # step1 记录不存在
-    "project_mismatch": WritebackPermissionDenied,  # step2 归属校验失败（R9.4）
+    "missing_project": ValueError,                # step1 前：缺请求项目即拒绝（取行带项目，linkage-closure R4.2）
+    "select_not_found": WritebackTargetNotFound,  # step1 请求项目里查不到（含他项目的底稿）
+    "project_mismatch": WritebackPermissionDenied,  # step2 归属校验失败（R9.4；取行语句被改坏时的兜底）
     "optimistic_conflict": WritebackConflict,     # step3 乐观锁
     "resolve_unresolvable": WritebackTargetUnresolvable,  # step4 addr_id 无法解析（R3.4）
     "resolve_unavailable": WritebackResolveUnavailable,   # step4 resolve 不可用（R3.5）
@@ -168,6 +170,7 @@ _FATAL_STEPS = {
 
 # 失败于写入前（step≤4）→ UPDATE 从不触达
 _PRE_WRITE_STEPS = {
+    "missing_project",
     "select_not_found",
     "project_mismatch",
     "optimistic_conflict",
@@ -213,12 +216,16 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
     sheet_name = "S"
     parsed_data = _snapshot_with_cell(sheet_name, 0, 0, "old")
 
-    # 归属：project_mismatch 场景 row/passed 不同；其余 passed=None（跳过 step2）
+    # 归属：取行恒带请求项目（任务 14）。project_mismatch 场景 mock 无视取行条件返回他项目的行（模拟取行语句被改坏），
+    # 由 step2 兜底；missing_project 不传项目；其余请求项目与行一致
     if inject == "project_mismatch":
         passed_project_id = _PID_A
         row_project_id = _PID_B
-    else:
+    elif inject == "missing_project":
         passed_project_id = None
+        row_project_id = _PID_A
+    else:
+        passed_project_id = _PID_A
         row_project_id = _PID_A
 
     # 乐观锁：optimistic_conflict 场景 opened_at < updated_at

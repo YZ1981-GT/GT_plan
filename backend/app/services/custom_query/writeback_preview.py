@@ -39,11 +39,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.custom_query.addressing_service import (
@@ -80,6 +81,11 @@ ERR_CODE_WRITEBACK_CONFLICT = "WRITEBACK_CONFLICT"
 
 # 重新预览提示（R14.7：预览过期或旧值不一致时提示重新预览）
 RE_PREVIEW_NOTICE = "回写预览已失效（已过期或目标单元格旧值已变化），请重新预览后再确认。"
+
+# 预览门（advanced-query-linkage-closure R4.5，design §3.7）：目标不属于请求项目（或查不到）时的条目原因；
+# 只要有无法定位的条目（found=False）就不进入确认，并提示无法定位的目标数
+ERR_TARGET_NOT_IN_PROJECT = "target_not_in_project"
+UNLOCATABLE_NOTICE = "有 {n} 个目标无法定位，请修正后重新预览"
 
 # ``old_value`` 未提供的哨兵（区分「显式 None」与「未提供需读取」）
 _UNSET: Any = object()
@@ -141,7 +147,8 @@ class WritebackTarget:
       raw:        寻址输入（addr_id / URI / 公式引用），用于解析 canonical addr_id；
                   通常即用户在 ACNR 选字段树选中的 ``node.addrId``（Req 2/4）。
                   为空时以 ``{wp_code}/{sheet_name}/{cell_ref}`` 兜底构造。
-      module:     回写落点模块（workpaper / report / note / adj / tb），默认 workpaper。
+      module:     回写落点模块（workpaper / note），默认 workpaper；tb / adj / report 写入实现已删除
+                  （advanced-query-linkage-closure 任务 13），请求层即 422。
       wp_id:      物理记录 ID（workpaper 模块为 working_paper.id），用于只读捕获旧值。
       wp_code:    底稿编码（兜底构造 raw 用）。
       sheet_name: sheet 名称（定位 cell 用）。
@@ -200,9 +207,10 @@ class WritebackPreview:
       items:              将被修改的目标 cell 列表（≤ MAX_PREVIEW_ITEMS）。
       item_count:         ``len(items)``。
       is_empty:           无任何 cell 将被修改（R14.6）。
-      enter_confirmation: 是否进入确认流程（空预览为 False，R14.6）。
+      enter_confirmation: 是否进入确认流程（空预览、或有任一目标无法定位时为 False，R14.6 / R4.5）。
       truncated:          目标数超过硬上限被截断。
-      notice:             空预览时的提示文案。
+      notice:             空预览 / 有无法定位目标时的提示文案。
+      project_id:         请求项目（确认门只读复核旧值时同样带项目条件；不序列化）。
     """
 
     items: list[WritebackPreviewItem] = field(default_factory=list)
@@ -214,6 +222,7 @@ class WritebackPreview:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     # 确认有效窗口（秒），默认 600（R14.2）。
     confirmation_window_s: float = DEFAULT_CONFIRMATION_WINDOW_S
+    project_id: str | None = field(default=None, repr=False)
 
     @property
     def item_count(self) -> int:
@@ -379,13 +388,16 @@ class WritebackPreviewService:
                 truncated=truncated, confirmation_window_s=confirmation_window_s
             )
 
+        # 预览门（R4.5）：有任一目标无法定位（含不属于请求项目）就不进入确认；条目照常返回供用户修正
+        unlocatable = sum(1 for it in items if not it.found)
         return WritebackPreview(
             items=items,
             is_empty=False,
-            enter_confirmation=True,
+            enter_confirmation=unlocatable == 0,
             truncated=truncated,
-            notice=None,
+            notice=UNLOCATABLE_NOTICE.format(n=unlocatable) if unlocatable else None,
             confirmation_window_s=confirmation_window_s,
+            project_id=None if project_id is None else str(project_id),
         )
 
     # ─── 内部：单条目构建 ────────────────────────────────────────────────
@@ -396,8 +408,16 @@ class WritebackPreviewService:
         target: WritebackTarget,
         project_id: str | None,
     ) -> WritebackPreviewItem:
-        """解析 addr_id + 捕获旧值，构建单个预览条目。"""
+        """解析 addr_id + 捕获旧值，构建单个预览条目。
+
+        先只读核对目标归属（R4.5）：不属于请求项目或查不到 → ``found=False``、``error=target_not_in_project``，
+        不解析地址、不读旧值。无会话（``db is None``）只出现在纯逻辑单测里，此时无从核对、跳过；两个回写端点恒传会话。
+        """
         raw = self._resolve_raw(target)
+
+        if db is not None and not await self._target_in_project(db, target, project_id):
+            return WritebackPreviewItem(addr_id=None, old_value=None, new_value=target.new_value, raw=raw, found=False,
+                                        error=ERR_TARGET_NOT_IN_PROJECT, changed=True, source=target)
 
         # 解析 canonical addr_id（消费 ACNR full_resolve 出口）
         addr_id: str | None = None
@@ -413,11 +433,11 @@ class WritebackPreviewService:
         else:
             error = "missing_target"
 
-        # 捕获旧值：目标已带 old_value 直接用；否则只读读取
+        # 捕获旧值：目标已带 old_value 直接用；否则只读读取（带请求项目条件）
         if target.old_value is not _UNSET:
             old_value = target.old_value
         else:
-            old_value = await self._read_current_value(db, target)
+            old_value = await self._read_current_value(db, target, project_id)
 
         changed = not _values_equal(old_value, target.new_value)
 
@@ -446,10 +466,32 @@ class WritebackPreviewService:
             return "/".join(str(p) for p in parts)
         return None
 
+    @staticmethod
+    async def _target_in_project(db: AsyncSession, target: WritebackTarget, project_id: str | None) -> bool:
+        """目标是否属于请求项目（R4.5）：只读、不加锁；查不到、标识非法、模块不支持一律视为不属于。
+
+        定位用写入方实际使用的同一标识：底稿 ``wp_id or wp_code``、附注 ``note_record_id or wp_id or wp_code``。
+        """
+        from app.models.consol_note_data_models import ConsolNoteData
+        from app.models.workpaper_models import WorkingPaper
+
+        if target.module == "workpaper":
+            model, ident = WorkingPaper, target.wp_id or target.wp_code
+        elif target.module == "note":
+            model, ident = ConsolNoteData, target.note_record_id or target.wp_id or target.wp_code
+        else:
+            return False
+        try:
+            expected, target_id = uuid.UUID(str(project_id)), uuid.UUID(str(ident))
+        except (ValueError, TypeError, AttributeError):
+            return False
+        owner = (await db.execute(select(model.project_id).where(model.id == target_id))).scalar_one_or_none()
+        return owner is not None and uuid.UUID(str(owner)) == expected
+
     async def _read_current_value(
-        self, db: AsyncSession | None, target: WritebackTarget
+        self, db: AsyncSession | None, target: WritebackTarget, project_id: str | None = None
     ) -> Any:
-        """只读捕获目标格当前旧值。
+        """只读捕获目标格当前旧值（取行带请求项目条件）。
 
         目前完整实现 workpaper 模块（ACNR 身份升级的主回写路径）：从
         ``working_paper.parsed_data['univer_snapshot']`` 定位 cell 取值。非 workpaper
@@ -464,7 +506,7 @@ class WritebackPreviewService:
             return None
         try:
             return await self._read_workpaper_value(
-                db, target.wp_id, target.sheet_name, target.cell_ref
+                db, target.wp_id, target.sheet_name, target.cell_ref, project_id=project_id
             )
         except Exception as exc:  # 只读取值失败不阻塞预览（降级为 None）
             logger.warning(
@@ -477,16 +519,17 @@ class WritebackPreviewService:
 
     @staticmethod
     async def _read_workpaper_value(
-        db: AsyncSession, wp_id: str, sheet_name: str, cell_ref: str
+        db: AsyncSession, wp_id: str, sheet_name: str, cell_ref: str, *, project_id: str | None = None
     ) -> Any:
         """从 working_paper.parsed_data['univer_snapshot'] 只读定位 cell 取旧值。
 
         定位逻辑与 ``snapshot_writer`` 保持一致（按 sheet name 匹配 →
-        ``cellData[str(row)][str(col)].get('v')``），但**不加行锁、不写回**。
+        ``cellData[str(row)][str(col)].get('v')``），但**不加行锁、不写回**。取行带请求项目条件（R4.2 / R4.5）：
+        他项目的底稿读不到（返回 None），缺项目同样读不到。
         """
         result = await db.execute(
-            text("SELECT parsed_data FROM working_paper WHERE id = :wp_id"),
-            {"wp_id": wp_id},
+            text("SELECT parsed_data FROM working_paper WHERE id = :wp_id AND project_id = :pid"),
+            {"wp_id": wp_id, "pid": None if project_id is None else str(project_id)},
         )
         row = result.first()
         if not row or not row[0]:
@@ -635,7 +678,7 @@ class WritebackConfirmationGate:
                 # 解析失败条目非本门 stale 范畴（15.3 写回时以 TARGET_UNRESOLVABLE 中止）
                 deferred += 1
                 return
-            current = await self._reread_current_value(db, item)
+            current = await self._reread_current_value(db, item, preview.project_id)
             if current is _UNREADABLE:
                 deferred += 1
                 return
@@ -678,9 +721,9 @@ class WritebackConfirmationGate:
         )
 
     async def _reread_current_value(
-        self, db: AsyncSession | None, item: WritebackPreviewItem
+        self, db: AsyncSession | None, item: WritebackPreviewItem, project_id: str | None = None
     ) -> Any:
-        """只读复核目标格当前旧值（用于 stale 检测）。
+        """只读复核目标格当前旧值（用于 stale 检测；与预览同一请求项目条件）。
 
         仅 workpaper 模块 + 完整定位（wp_id/sheet_name/cell_ref）可在门内独立复核；
         其余返回 ``_UNREADABLE`` 表示延后至写回乐观锁把关（不在此误判 stale）。
@@ -694,7 +737,7 @@ class WritebackConfirmationGate:
             return _UNREADABLE
         try:
             return await WritebackPreviewService._read_workpaper_value(
-                db, src.wp_id, src.sheet_name, src.cell_ref
+                db, src.wp_id, src.sheet_name, src.cell_ref, project_id=project_id
             )
         except Exception as exc:  # 只读复核失败 → 延后，不误判
             logger.warning(
