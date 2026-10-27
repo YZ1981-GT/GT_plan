@@ -312,6 +312,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.4（源模板对齐增强）
  * Requirements: 6.1-6.4
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, toRef, computed, onMounted } from 'vue'
 import { Plus, Delete, MagicStick, Download, ArrowDown, WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -393,27 +394,9 @@ function applyHistoryRateToCalc(): void {
 async function pullD4Revenue(): Promise<void> {
   try {
     // 经 custom-query 端点取 D4 收入审定数
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6001' },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let totalRevenue = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('6001')) {
-        // 损益类取发生额：贷方-借方（收入正数）
-        const creditAmt = Number(item.credit_amount ?? 0)
-        const debitAmt = Number(item.debit_amount ?? 0)
-        totalRevenue += (creditAmt - debitAmt)
-      }
-    }
-    if (totalRevenue <= 0) {
-      // 回退取 audited_amount
-      totalRevenue = list
-        .filter((item: any) => String(item.standard_account_code ?? '').startsWith('6001'))
-        .reduce((s: number, item: any) => s + Math.abs(Number(item.audited_amount ?? 0)), 0)
-    }
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { accountPrefix: '6001' })
+    // 损益类审定数即本期收入发生额（科目及其明细之和）；原先读端点不返回的 credit_amount / debit_amount
+    const totalRevenue = Math.abs(tbSumUnder(rows, '6001', 'audited_amount') ?? 0)
     if (totalRevenue <= 0) {
       ElMessage.warning('未取到D4营业收入数据（科目6001）')
       return

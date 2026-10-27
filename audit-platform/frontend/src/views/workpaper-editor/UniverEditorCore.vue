@@ -51,6 +51,8 @@ const props = defineProps<{
   mCycle: any
   nCycle: any
   fCycle: any
+  /** 项目审计年度（保存后的下游影响分析按它算；项目没填为 null ⇒ 不分析） */
+  projectYear?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -133,6 +135,7 @@ const {
   initUniver,
   loading,
   showStaleImpactPanel,
+  year: computed(() => props.projectYear ?? null),
 })
 
 const autoSaveMsg = computed(() => {

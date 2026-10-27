@@ -2,6 +2,7 @@ import { ref, computed, type ComputedRef, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 import { projects as P_proj, reportConfig as P_rc } from '@/services/apiPaths'
 import {
   generateReports, getReport, getReportConsistencyCheck,
@@ -9,12 +10,39 @@ import {
 } from '@/services/auditPlatformApi'
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+
+/**
+ * 附注里有内容的章节编号（报表行「附注」列标就绪用；best-effort）。
+ * 项目没填审计年度（null）不请求、取数失败不影响报表渲染 —— 两种情况都返回 null（调用方保留原值）。
+ * 从 ReportView 抽出（行数上限 1950）。
+ */
+export async function fetchNoteSectionsWithData(projectId: string, year: number | null): Promise<Set<string> | null> {
+  if (year == null) return null // 不拼 /null/ 路径
+  try {
+    const { data } = await http.get(
+      `/api/disclosure-notes/${projectId}/${year}/notes-tree`,
+      { _silent: true } as any
+    )
+    const sections = data?.data || data || []
+    const set = new Set<string>()
+    for (const node of (Array.isArray(sections) ? sections : [])) {
+      if (node.has_data && node.note_section) set.add(node.note_section)
+      // 子节点
+      for (const child of (Array.isArray(node.children) ? node.children : [])) {
+        if (child.has_data && child.note_section) set.add(child.note_section)
+      }
+    }
+    return set
+  } catch { return null /* fail-open: 拿不到附注数据不影响报表渲染 */ }
+}
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
 export interface UseReportDataOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null ⇒ 取数静默跳过、生成 / 审核提示去填（不按今年兜底） */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   reportMode: Ref<'audited' | 'unadjusted' | 'compare'>
   currentApplicableStandard: ComputedRef<string>
@@ -144,6 +172,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   async function runBalanceCheck() {
+    if (year.value == null) return
     try {
       const res = await api.get(`/api/projects/${projectId.value}/data-quality/check?checks=report_balance&year=${year.value}`)
       const rb = res?.results?.report_balance
@@ -221,6 +250,13 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   const fetchReport = withLoading(loading, async () => {
     // 非报表 tab 不调后端
     if (!VALID_REPORT_TYPES.has(activeTab.value)) return
+    if (year.value == null) {
+      rows.value = []
+      compareRows.value = []
+      equityCompareAudited.value = []
+      equityCompareUnadjusted.value = []
+      return
+    }
     const std = currentApplicableStandard.value
     try {
       if (reportMode.value === 'compare') {
@@ -323,6 +359,11 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   }
 
   async function onGenerate() {
+    const y = year.value
+    if (y == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     const { showGuide } = await import('@/composables/useWorkflowGuide')
     const ok = await showGuide(
       'report_generate',
@@ -342,7 +383,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     if (!ok) return
     await withLoading(genLoading, async () => {
       try {
-        const result = await generateReports(projectId.value, year.value)
+        const result = await generateReports(projectId.value, y)
         const summary = result?.summary
         if (summary && summary.total_rows > 0) {
           ElMessage.success(`报表生成完成：${summary.total_rows} 行，${summary.non_zero_rows} 行有数据`)
@@ -366,6 +407,11 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
   }
 
   async function onConsistencyCheck() {
+    const y = year.value
+    if (y == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     const { showGuide } = await import('@/composables/useWorkflowGuide')
     const ok = await showGuide(
       'report_audit',
@@ -381,7 +427,7 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     )
     if (!ok) return
     await withLoading(checkLoading, async () => {
-      consistencyResult.value = await getReportConsistencyCheck(projectId.value, year.value)
+      consistencyResult.value = await getReportConsistencyCheck(projectId.value, y)
     })()
   }
 

@@ -324,7 +324,7 @@
       v-model="showFormulaManager"
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
-      :year="formulaContext?.year ?? currentYear"
+      :year="formulaContext?.year ?? currentYear ?? undefined"
       :scope="formulaContext?.scope ?? 'report'"
       :wp-id="formulaContext?.wpId"
       :wp-code="formulaContext?.wpCode"
@@ -370,6 +370,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import { useTheme } from '@/composables/useTheme'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -587,7 +589,16 @@ const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const customQueryInitialSource = ref<string | undefined>(undefined)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
-const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+// 全局弹窗（公式管理 / 一键刷新 / 自定义查询）的年度：路由 → 项目 store；都没有为 null（原先兜底去年）
+const currentYear = computed<number | null>(() => {
+  const routeYear = parseAuditYear(route.query.year)
+  if (routeYear != null) return routeYear
+  try {
+    return useProjectStore().year
+  } catch {
+    return null // 无 pinia 上下文
+  }
+})
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {

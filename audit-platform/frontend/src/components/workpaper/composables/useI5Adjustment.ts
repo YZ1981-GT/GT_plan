@@ -739,7 +739,7 @@ export function useI5Adjustment(params: {
   /** 从 I5-2 明细按到期日/剩余月数筛选一年内到期候选并生成 RJE 草稿 */
   function seedCurrentPortionFromDetail(
     detailRows: any[],
-    asOfYear?: number,
+    asOfYear?: number | null,
   ): number {
     if (isReadonly.value) return 0
     const candidates = extractI5CurrentPortionCandidates(detailRows, asOfYear)

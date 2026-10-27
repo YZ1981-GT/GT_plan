@@ -12,7 +12,10 @@
       </el-button>
     </div>
 
+    <!-- 项目没填审计年度：交付件按年度生成 / 审批 / 打包，不按今年兜底 -->
+    <el-alert v-if="year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 12px" />
     <CompletenessBanner
+      v-else
       :project-id="projectId"
       :year="year"
       @regenerate="onRegenerateTrio"
@@ -107,7 +110,7 @@
     </template>
 
     <DeliverableExportDialog
-      v-if="showExportDialog"
+      v-if="showExportDialog && year != null"
       :project-id="projectId"
       :year="year"
       doc-type="audit_report"
@@ -116,6 +119,7 @@
     />
 
     <DisclosureNotesSelectionDialog
+      v-if="year != null"
       v-model:visible="notesDialogVisible"
       :project-id="projectId"
       :year="year"
@@ -134,7 +138,7 @@
     />
 
     <OnlyOfficeEditor
-      v-if="editorVisible && editorItem"
+      v-if="editorVisible && editorItem && year != null"
       :project-id="projectId"
       :task-id="editorItem.task_id"
       :version-no="editorItem.version_no"
@@ -239,6 +243,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { FolderOpened, Reading } from '@element-plus/icons-vue'
 import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
@@ -391,7 +396,8 @@ const trioAttemptHistoryRef = ref<InstanceType<typeof TrioAttemptHistory> | null
 /** P1 fix: 页面加载时拉取最近的 trio job 状态 */
 async function loadTrioState() {
   try {
-    const jobs = await getTrioHistory(projectId.value, year.value)
+    // 项目没填审计年度：不查（页头已提示）
+    const jobs = year.value == null ? [] : await getTrioHistory(projectId.value, year.value)
     // 取最近一个非 succeeded 的 job（需要重试入口的）
     const active = jobs.find(j => j.status !== 'succeeded')
     if (active) {
@@ -406,7 +412,7 @@ async function loadTrioState() {
 
   // 刷新快照有效性
   try {
-    const readinessData = await checkTrioReadiness(projectId.value, year.value)
+    const readinessData = year.value == null ? null : await checkTrioReadiness(projectId.value, year.value)
     trioSnapshotValid.value = (readinessData as any)?.status !== 'blocked'
   } catch {
     trioSnapshotValid.value = true // 查不到默认有效
@@ -479,6 +485,7 @@ async function loadList() {
 
 // 拉取完整性状态，推导生成入口前置就绪标志（需求 21.4）
 async function refreshReadiness() {
+  if (year.value == null) return
   try {
     const c = await fetchCompleteness(projectId.value, year.value)
     readiness.value = {
@@ -544,6 +551,10 @@ function selectItem(item: DeliverableItem) {
 }
 
 function openEditor(item: DeliverableItem) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   editorItem.value = item
   editorUrl.value = deliverableDownloadUrl(projectId.value, item.task_id, item.version_no)
   editorVisible.value = true
@@ -566,6 +577,10 @@ async function openPreview(item: DeliverableItem) {
 
   // xlsx 走 OnlyOffice 编辑器（只读预览），不可用时自动降级
   if (suffix === 'xlsx' || suffix === 'xls') {
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     editorItem.value = item
     editorUrl.value = previewUrl.value
     editorVisible.value = true
@@ -574,6 +589,10 @@ async function openPreview(item: DeliverableItem) {
 
   // docx 也走 OnlyOffice（高保真），不可用时 OnlyOfficeEditor 内部降级到 @vue-office/docx
   if (suffix === 'docx') {
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     editorItem.value = item
     editorUrl.value = previewUrl.value
     editorVisible.value = true
@@ -609,6 +628,10 @@ async function goGenerateReports() {
 }
 
 async function confirmGenerateReports() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   generating.value = true
   showGenerateReports.value = false
   try {
@@ -655,6 +678,10 @@ function showDeliveryWarnings(warnings: string[] | undefined, title: string) {
 
 function goGenerateNotes() {
   // 权限门控保留在打开前；不再直接调渲染接口，改为弹出章节选择对话框
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   if (!guardGenerate('notes')) return
   notesDialogVisible.value = true
 }
@@ -667,6 +694,10 @@ function goGenerateNotes() {
  * 两处都提示就是同一问题确认两次。
  */
 async function onNotesSelectionConfirm({ selectedSections }: { selectedSections: string[] }) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // P2-10: 质量预检——调 readiness 获取统计，有问题时提示确认（未同步 / 过期交给导出闸门）
   try {
     const readiness = await getDisclosureReadiness(projectId.value, year.value)
@@ -706,6 +737,10 @@ async function onNotesSelectionConfirm({ selectedSections }: { selectedSections:
  * 让用户选「返回同步」（放弃本次导出，回底稿改）或「仍要导出」（带 confirm_inconsistent=true 重发）。
  */
 async function doRenderNotes(selectedSections: string[], confirmInconsistent: boolean) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   const res = await renderDisclosureNotes(projectId.value, {
     year: year.value,
     selected_sections: selectedSections,
@@ -746,6 +781,10 @@ async function doRenderNotes(selectedSections: string[], confirmInconsistent: bo
 }
 
 async function runGenerateReport() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 两阶段第一步：preview（不落库），走真实 Word 模板，返回可选段落
   generating.value = true
   try {
@@ -771,6 +810,10 @@ async function runGenerateReport() {
 
 /** OPT 弹窗确认 → 两阶段第二步：confirm（入库，版本递增，真实 Word 模板填充） */
 async function onReportOptConfirm(selections: Record<string, boolean>) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   confirmReportLoading.value = true
   try {
     const res = await confirmReportBody(projectId.value, {
@@ -804,6 +847,10 @@ function onExportConfirm(_sections: string[]) {
  * 「仍要导出」带 confirm_inconsistent=true 重发，「返回同步」不生成。
  */
 async function runGenerateFull() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 前端先做依赖链根节点提示（报表就绪即视为试算表就绪），服务端再做权威校验
   if (!guardGenerate('reports')) return
   const pending = await startFullDeliverables(false)
@@ -823,6 +870,10 @@ async function runGenerateFull() {
 
 /** 发起一键全套；命中附注一致性闸门时返回待确认清单（未建任务），其余情况返回 null。 */
 async function startFullDeliverables(confirmInconsistent: boolean): Promise<NoteConsistency | null> {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return null
+  }
   fullGenerating.value = true
   try {
     const job = await createFullDeliverables(projectId.value, {
@@ -897,6 +948,10 @@ async function onSubmitApproval() {
 
 async function onApprove() {
   if (!selectedItem.value) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   approvalLoading.value = true
   try {
     await approveDeliverable(projectId.value, selectedItem.value.task_id, year.value)
@@ -927,7 +982,12 @@ async function onReject() {
   }
 }
 
-async function runPackageDownload() {  packaging.value = true
+async function runPackageDownload() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  packaging.value = true
   try {
     const res = await createPackage(projectId.value, { year: year.value, ignore_incomplete: true })
     if (res.warnings?.length) {
@@ -945,6 +1005,10 @@ async function runPackageDownload() {  packaging.value = true
 }
 
 async function runArchive() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   try {
     await ElMessageBox.confirm('确认归档本项目全部已确认/已签章交付物？', '项目归档')
     const res = await archiveDeliverables(projectId.value, { year: year.value, force: false })

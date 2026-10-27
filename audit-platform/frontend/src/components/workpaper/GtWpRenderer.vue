@@ -894,7 +894,7 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
 /**
  * 公式校验/注册表用年度：只认本底稿所属项目的年度。
  *
- * `useProjectStore().year` 是可切换的 UI 年度且初始化为当前年 - 1；它不是
+ * `useProjectStore().year` 是可切换的 UI 年度（原先初值去年，现为 null 直到取到项目年度）；它不是
  * 项目 `audit_year`，缺年度项目若用它兜底就会静默按 2025 读取调整/试算表。
  * render-config 的 `audit_year` 是后端项目年度权威值，父 Shell 的 auditYear
  * 仅在配置尚未带该字段时作为同一项目的回退；缺失时必须保持 null。
@@ -922,6 +922,7 @@ const runtime = useWorkpaperScaffold({
   wpId: wpIdRef,
   projectId: runtimeProjectId,
   wpCode: runtimeWpCode,
+  // 项目没填审计年度为 null（不按今年兜底；运行时上下文按 number | null | undefined 声明）
   year: preparationYear,
   readonly: effectiveReadonly,
   onJumpToSection: onChildNavigateSheet,

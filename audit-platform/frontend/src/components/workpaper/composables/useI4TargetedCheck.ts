@@ -148,7 +148,7 @@ export function useI4TargetedCheck(
   options?: {
     /** I4 父组件契约：逐 item_id 持久化 */
     onSave?: (itemId: string, value: any) => void | Promise<void>
-    asOfYear?: Ref<number> | (() => number)
+    asOfYear?: Ref<number | null> | (() => number | null)
   },
 ) {
   const getMap = typeof allResponses === 'function'

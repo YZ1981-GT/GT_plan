@@ -39,8 +39,12 @@ const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|<!--)/
  * 任务 2.2 CALENDAR 日历用途 21 处移入豁免表 → 305。
  * 任务 3.1 SINGLE_SOURCE 三处去年兜底改返回 null → 301。
  * 任务 3.2 WRITE 20 处日历兜底修掉 → 281。
+ * 之后各任务修到基线只剩 15 处但上限未跟着收；spec post-push-residual-defect-closure R1 去掉
+ * useAuditData 的日历兜底（试算表取数改走唯一入口，年度缺省由后端按项目审计年度取）→ 按现算收到 14。
+ * 同 spec 6.5：项目 store 年度初值去年改 null 后，下游 13 处兜底（布局待重算 / 重算、穿透、三栏布局弹窗、F2 计价抽样、
+ * 保存后影响分析、穿透 store、两个无调用方函数、底稿列表测试桩）一并修掉，store 的年度下拉选项移入豁免表 → 0。
  */
-const FROZEN_TOTAL_CAP = 281
+const FROZEN_TOTAL_CAP = 0
 
 /**
  * 日历用途豁免表（spec 任务 2.2）：年度选择器上限、年度声明、EQCR 趋势终点等本就该取今年，
@@ -57,6 +61,7 @@ const CALENDAR_YEAR_EXEMPT: Record<string, { count: number; reason: string }> = 
   'components/template-library/CustomQueryTab.vue': { count: 1, reason: '自定义查询年度下拉默认值' },
   'components/wizard/MaterialityStep.vue': { count: 1, reason: '向导重要性步骤年度初始值' },
   'composables/useProjectSelector.ts': { count: 1, reason: 'yearOptions 年度下拉选项（[cur-2, cur-1, cur, cur+1]）上限' },
+  'stores/project.ts': { count: 1, reason: '项目 store 的 yearOptions 年度下拉选项（今年前后 + 有数据的年度）；年度本身初值 null' },
   'views/ConsolidationIndex.vue': { count: 1, reason: 'const currentYear 用于年度选择器选项生成' },
   'views/LedgerImportHistory.vue': { count: 1, reason: 'yearOptions 数组生成（年度下拉上限）' },
   'views/LedgerPenetration.vue': { count: 1, reason: 'yearOptions 计算（年度下拉上限）' },

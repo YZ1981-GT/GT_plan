@@ -120,11 +120,11 @@
       <!-- Tab 0: 合并工作底稿 -->
       <el-tab-pane label="合并工作底稿" name="worksheets">
         <ConsolWorksheetTabs
-          v-if="worksheetContextReady"
+          v-if="worksheetContextReady && consolYear != null"
           :key="worksheetContextKey"
           ref="consolWorksheetTabsRef"
           :project-id="projectId"
-          :year="effectiveConsolYear()"
+          :year="consolYear"
           :consol-mode="treeMode"
           :is-root-selection="currentConsolEntity.nodeKey === groupTree[0]?.node_key"
         />
@@ -407,9 +407,10 @@
         <!-- v-show 放在包裹元素上：ConsolNoteTab 有多个根节点（弹窗），组件上的 v-show 不生效（浏览器实测两块同时显示） -->
         <div v-show="!currentStandalone" class="gt-consol-note-host">
           <ConsolNoteTab
+            v-if="consolYear != null"
             ref="consolNoteTabRef"
             :project-id="projectId"
-            :year="effectiveConsolYear()"
+            :year="consolYear"
             :standard="consolNoteTemplateType"
             :current-entity="noteEntity"
             :group-tree="groupTree"
@@ -617,6 +618,7 @@
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { exportMultiSheetData } from '@/composables/useExcelIO'
 import {
   getConsolPushStatus,
@@ -740,9 +742,12 @@ const consolPushQueuing = ref(false)
 const consolPushFailure = ref('')
 let consolPushSubs: ProjectEventSubscription[] = []
 
-function effectiveConsolYear(): number {
+/** 合并口径年度：企业树年度 → 信息栏年度 → 路由 / 项目年度；都没有为 null（不按今年兜底） */
+function effectiveConsolYear(): number | null {
   return treeYear.value ?? projectInfo.year ?? year.value
 }
+/** 模板用：函数调用结果在模板里收窄不了，v-if 判非空后再传给只收 number 的子组件 */
+const consolYear = computed<number | null>(() => effectiveConsolYear())
 
 async function loadConsolPushStatus() {
   const effectiveYear = effectiveConsolYear()
@@ -758,9 +763,11 @@ async function loadConsolPushStatus() {
 
 async function queueConsolPush() {
   if (consolPushQueuing.value) return
+  const pushYear = effectiveConsolYear()
+  if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
   consolPushQueuing.value = true
   try {
-    const ack = await pushConsolidation(projectId.value, effectiveConsolYear(), 'manual')
+    const ack = await pushConsolidation(projectId.value, pushYear, 'manual')
     if (ack.queued) ElMessage.success(ack.message || '已开始推送，完成后自动刷新')
     else ElMessage.info(ack.message || '已有推送在排队，本次请求已并入')
     // 不能提前清过期：等 pushed 后查权威 push-status，确认 stale 已归零再清
@@ -780,7 +787,8 @@ async function refreshCurrentAfterConsolPush() {
 async function onConsolPushEvent(raw: unknown, eventName: string) {
   if (!raw || typeof raw !== 'object') return
   const payload = raw as ConsolPushEventPayload
-  if (!isCurrentConsolPushEvent(payload, projectId.value, effectiveConsolYear())) return
+  const eventYear = effectiveConsolYear()
+  if (eventYear == null || !isCurrentConsolPushEvent(payload, projectId.value, eventYear)) return
   if (eventName === CONSOL_PUSH_EVENTS.stale) {
     await loadConsolPushStatus()
     return
@@ -841,14 +849,19 @@ const refreshProgress = refreshTracking.progress
  */
 async function onRefreshAll() {
   if (refreshAllLoading.value) return
-  const effectiveYear = effectiveConsolYear()
-  if (!projectId.value || !effectiveYear) {
+  if (!projectId.value) {
     refreshAllLoading.value = false
     refreshProgress.visible = false
     return
   }
-  // 冻结刷新上下文：完成回调只向该快照提交（设计 §六 / 需求 6.1）
+  // 冻结刷新上下文：完成回调只向该快照提交（设计 §六 / 需求 6.1）；年度未就绪不发起
   const context = captureRefreshContext()
+  if (!context) {
+    refreshAllLoading.value = false
+    refreshProgress.visible = false
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   refreshAllLoading.value = true
   refreshProgress.visible = true
   refreshProgress.step = ''
@@ -891,8 +904,9 @@ async function onRefreshAll() {
  */
 async function onReaggregateNotes() {
   if (reaggregateLoading.value) return
-  reaggregateLoading.value = true
   const context = captureRefreshContext()
+  if (!context) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
+  reaggregateLoading.value = true
   try {
     const body: Record<string, unknown> = {
       section_ids: context.sectionId ? [context.sectionId] : [],
@@ -947,7 +961,8 @@ const visibleDiagnostics = computed(() => {
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
   clientName: '',
-  year: null,
+  // 原先 `year: null` 推断成 null 字面类型：信息栏切年度的赋值与年度显示都是类型错
+  year: null as number | null,
   standard: 'soe' as 'soe' | 'listed',
 })
 
@@ -979,7 +994,8 @@ function onStandardChange() {
 }
 
 function onOpenFormula() {
-  const effectiveYear = effectiveConsolYear()
+  // 年度未就绪时公式管理按项目口径打开（不传 null）
+  const effectiveYear = effectiveConsolYear() ?? undefined
   if (activeTab.value === 'consol_note') {
     const section = consolNoteTabRef.value?.selectedNoteSection
     eventBus.emit('open-formula-manager', {
@@ -1402,7 +1418,9 @@ function canOpenSubConsol(node: ConsolTreeNode | null): boolean {
 
 function goToProject(node: ConsolTreeNode | null) {
   if (!canOpenSubConsol(node)) return
-  router.push({ path: `/projects/${node!.project_id}/consolidation`, query: { year: String(effectiveConsolYear()) } })
+  // 年度为空不带 year（原先 String(null) 带成 year=null）：目标页按项目审计年度口径
+  const y = effectiveConsolYear()
+  router.push({ path: `/projects/${node!.project_id}/consolidation`, query: y == null ? {} : { year: String(y) } })
 }
 
 /**
@@ -1475,7 +1493,7 @@ const consolReportLoading = ref(false)
 const ROOT_CONSOL_NODE_KEY = 'root:consol'
 const currentConsolEntity = ref<CurrentConsolEntity>({ code: '', name: '', nodeKey: ROOT_CONSOL_NODE_KEY })
 
-function effectiveEntityYear(): number {
+function effectiveEntityYear(): number | null {
   return treeYear.value ?? projectInfo.year ?? year.value
 }
 
@@ -1536,10 +1554,13 @@ function broadcastCurrentNode() {
 }
 watch(currentEntityNodeKey, broadcastCurrentNode)
 
-function captureRefreshContext(): RefreshContext {
+/** 冻结刷新上下文；年度未就绪为 null（调用方提示后不发起） */
+function captureRefreshContext(): RefreshContext | null {
+  const contextYear = effectiveConsolYear()
+  if (!contextYear) return null
   return {
     projectId: String(projectId.value || ''),
-    year: effectiveConsolYear(),
+    year: contextYear,
     nodeKey: currentEntityNodeKey.value,
     sectionId: String(consolNoteTabRef.value?.selectedNoteSection?.section_id || ''),
   }
@@ -1791,7 +1812,8 @@ function onConsolCtxCompare() {
 
 async function loadConsolReport(forceRefresh = false) {
   // 年度未就绪不发请求（R7.4）；数据节点显示单体项目报表面板，不取合并口径（R6）
-  if (!effectiveEntityYear() || currentStandalone.value) return
+  const reportYear = effectiveEntityYear()
+  if (!reportYear || currentStandalone.value) return
   const cacheKey = reportCacheKey()
   // 优先读缓存
   if (!forceRefresh && reportCache.has(cacheKey)) {
@@ -1804,7 +1826,7 @@ async function loadConsolReport(forceRefresh = false) {
   try {
     const nodeKey = currentEntityNodeKey.value
     const rows = await api.get(
-      P_consol.reports.list(projectId.value, effectiveEntityYear()),
+      P_consol.reports.list(projectId.value, reportYear),
       { params: { report_type: consolReportType.value, node_key: nodeKey } },
     )
     // 响应到达：上下文或序号已变则丢弃（切换节点后旧请求先返回的场景）
@@ -1871,6 +1893,7 @@ async function applyConsolConversion() {
 async function exportConsolReport() {
   const reportType = consolReportType.value
   const exportYear = effectiveEntityYear()
+  if (exportYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
   const mainReportTypes = ['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement']
   try {
     if (mainReportTypes.includes(reportType)) {

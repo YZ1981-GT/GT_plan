@@ -100,13 +100,18 @@ describe('H3-14 buildRentalDisplayRows', () => {
   })
 })
 
-describe('H3-14 parseTb6051Amount', () => {
-  it('贷方-借方 = 收入发生额', () => {
-    expect(parseTb6051Amount({ credit_amount: 500_000, debit_amount: 20_000 })).toBe(480_000)
+describe('H3-14 parseTb6051Amount（试算表行：损益类金额即本期单边发生额）', () => {
+  it('没有审定数取未审数（收入即贷方发生额）', () => {
+    expect(parseTb6051Amount({ audited_amount: null, unadjusted_amount: '480000' })).toBe(480_000)
   })
 
   it('优先取 audited_amount', () => {
-    expect(parseTb6051Amount({ audited_amount: 123_456, credit_amount: 1 })).toBe(123_456)
+    expect(parseTb6051Amount({ audited_amount: '123456', unadjusted_amount: '1' })).toBe(123_456)
+  })
+
+  it('没有行 / 金额都为空 ⇒ 0（调用方按「有没有行」区分待取数）', () => {
+    expect(parseTb6051Amount(null)).toBe(0)
+    expect(parseTb6051Amount({ audited_amount: null, unadjusted_amount: null })).toBe(0)
   })
 })
 

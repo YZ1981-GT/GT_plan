@@ -149,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, toRef, computed, onMounted, inject, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH10Check, H10_CHECK_MIN_SAMPLE_RATIO, type H10CheckRow } from '../../composables/useH10Check'
@@ -187,7 +188,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  year?: number
+  year?: number | null
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
@@ -255,6 +256,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

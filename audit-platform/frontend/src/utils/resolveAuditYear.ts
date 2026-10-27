@@ -23,6 +23,15 @@ export function parseAuditYear(value: unknown): number | null {
   return Number.isFinite(n) && n > MIN_YEAR ? n : null
 }
 
+/**
+ * 跳转查询串里的年度：有效才带。年度缺失时不带（`String(null)` 会写成 `year=null`），
+ * 目标页按项目审计年度取 —— 不拿去年兜底（spec post-push-residual-defect-closure 6.5）。
+ */
+export function yearQuery(year: unknown): { year?: string } {
+  const y = parseAuditYear(year)
+  return y != null ? { year: String(y) } : {}
+}
+
 export function yearFromIsoDate(iso?: string | null): number | null {
   if (!iso || iso.length < 4) return null
   const y = parseInt(iso.slice(0, 4), 10)

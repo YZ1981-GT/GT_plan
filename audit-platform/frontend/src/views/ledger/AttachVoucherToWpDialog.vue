@@ -15,6 +15,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listWorkpapersPaged } from '@/services/workpaperApi'
 import { attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { findAllRecommendedWpCodes } from './accountToWpMapping'
 
 interface VoucherTarget {
@@ -27,7 +28,8 @@ interface VoucherTarget {
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 挂入提示去填年度、不发请求 */
+  year: number | null
   /** 待挂入的凭证清单（去重后） */
   vouchers: VoucherTarget[]
   /**
@@ -290,6 +292,11 @@ async function confirm(): Promise<void> {
     ElMessage.warning('无可挂入的凭证')
     return
   }
+  const year = props.year
+  if (year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   submitting.value = true
   try {
     let ok = 0
@@ -297,7 +304,7 @@ async function confirm(): Promise<void> {
       if (!v.voucherNo) continue
       try {
         await attachVoucher(props.projectId, {
-          year: props.year,
+          year,
           voucherNo: v.voucherNo,
           voucherDate: v.voucherDate ?? null,
           accountCode: v.accountCode ?? null,

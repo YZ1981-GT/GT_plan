@@ -222,7 +222,8 @@ describe('Property 5: 年度切换响应不变量', () => {
           mockRoute.params.projectId = 'proj-fresh'
           mockRoute.query.year = '2024'
 
-          const received: number[] = []
+          // 上下文年度可为 null（项目没填审计年度）；本例两处都设了年度，断言照旧比具体年份
+          const received: Array<number | null> = []
           const { wrapper } = withSetup(() => {
             const ctx = useAuditContext()
             ctx.onContextChange((c) => { received.push(c.year) })

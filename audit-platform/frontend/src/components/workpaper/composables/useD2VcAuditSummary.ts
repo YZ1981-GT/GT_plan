@@ -17,6 +17,7 @@
 import { ref, watch, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { D2_SAVE_ITEMS_KEY } from './d2InjectionKeys'
 import type { VoucherCheckRow } from './useD2VoucherCheckEnhanced'
 
@@ -143,14 +144,11 @@ export function useD2VcAuditSummary(options: UseD2VcAuditSummaryOptions) {
       } catch { /* 项目年度读取失败时保持空态 */ }
       if (year == null) return
 
-      const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { year },
-      })
-      const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
-      const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
+      const { rows: tbData } = await fetchTrialBalanceRows(projectId.value, { year, accountPrefix: '1122', includeMovement: true })
+      // 本期借方发生额 = 余额表叶子汇总（includeMovement）；端点没有 debit_occurrence 字段（原先恒 0）
+      const debitOccurrence = tbSumUnder(tbData, '1122', 'period_debit')
 
-      if (tbRow) {
-        const debitOccurrence = Number(tbRow.debit_occurrence ?? tbRow.debitOccurrence ?? 0)
+      if (debitOccurrence != null) {
         stats.value = {
           ...stats.value,
           occurrenceAmount: debitOccurrence,

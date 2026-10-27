@@ -21,6 +21,7 @@
  * item_id 命名规则：前缀 "H5-{sheet编号}-{field}"
  * 例：H5-1-audited-cost, H5-2-detail-row-1, H5-12-depletion-total
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import {
   registerHPendingFlusher,
@@ -337,11 +338,7 @@ export function useH5FormData(opts: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1631,1632' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1631,1632' })).rows
 
       let costUnadj = 0
       let deplUnadj = 0

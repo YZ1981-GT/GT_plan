@@ -290,7 +290,8 @@ const basicInfo = ref({
 
 // ─── Tab 2: 年度准则 ───
 const standardInfo = ref({
-  year: 0,
+  // 项目没填审计年度为 null（下拉显示「选择年度」，不再先显示 0 / 去年）
+  year: null as number | null,
   standard: 'soe',
   scope: 'standalone' as 'standalone' | 'consolidated',
 })

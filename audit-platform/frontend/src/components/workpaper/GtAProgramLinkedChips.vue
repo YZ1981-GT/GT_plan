@@ -226,8 +226,8 @@ const props = defineProps<{
   chipCompletionKey: (ref: string) => string
   /** 仅 S34/S35 传入；其他循环保持原有 GtIndexChip 行为 */
   cycleCode?: CycleCode
-  /** S34/S35 外部 chip 查询使用的审计年度 */
-  cycleAuditYear?: number
+  /** S34/S35 外部 chip 查询使用的审计年度；项目没填为 null ⇒ chip 不取审定数 */
+  cycleAuditYear?: number | null
   /** 当前项目 ID，作为 auto-data resolver 路径参数 */
   projectId?: string
 }>()

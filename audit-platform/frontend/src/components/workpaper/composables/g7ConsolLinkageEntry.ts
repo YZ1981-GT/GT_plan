@@ -13,6 +13,7 @@ import { ref, computed, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import {
   previewG7Linkage,
   importG7Linkage,
@@ -52,7 +53,8 @@ export interface G7ConsolLinkageEntry {
 
 export function useG7ConsolLinkageEntry(
   projectId: Ref<string>,
-  year: Ref<number>,
+  /** 审计年度；项目没填为 null ⇒ 预览 / 导入都不发请求，并说明去填年度 */
+  year: Ref<number | null>,
 ): G7ConsolLinkageEntry {
   const router = useRouter()
   const preview = ref<G7LinkagePreview | null>(null)
@@ -66,14 +68,15 @@ export function useG7ConsolLinkageEntry(
   const unresolvedCount = computed(() => preview.value?.unresolved_companies?.length ?? 0)
 
   async function openPreview(): Promise<boolean> {
-    if (!projectId.value || !year.value) {
-      configError.value = '缺少项目或年度上下文'
+    const y = year.value
+    if (!projectId.value || !y) {
+      configError.value = projectId.value ? MISSING_AUDIT_YEAR_MESSAGE : '缺少项目上下文'
       return false
     }
     loading.value = true
     configError.value = ''
     try {
-      const data = await previewG7Linkage(projectId.value, year.value)
+      const data = await previewG7Linkage(projectId.value, y)
       preview.value = data
       stale.value = !!data.linkage_stale
       staleSheets.value = data.stale_sheets ?? []
@@ -96,6 +99,11 @@ export function useG7ConsolLinkageEntry(
   async function confirmImport(opts?: { overwrite?: boolean }): Promise<boolean> {
     const pv = preview.value
     if (!pv) return false
+    const y = year.value
+    if (y == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return false
+    }
     importing.value = true
     try {
       // 默认导入全部可映射主体（未匹配主体由后端跳过）
@@ -106,7 +114,7 @@ export function useG7ConsolLinkageEntry(
       const applyIds = (pv.suggestions ?? [])
         .filter((s) => s.selected_default)
         .map((s) => s.id)
-      const result = await importG7Linkage(projectId.value, year.value, {
+      const result = await importG7Linkage(projectId.value, y, {
         company_mappings: companyMappings,
         overwrite: !!opts?.overwrite,
         // 透传最近一次 preview 的版本号作为乐观锁
@@ -142,7 +150,7 @@ export function useG7ConsolLinkageEntry(
   }
 
   async function refreshStale(): Promise<void> {
-    if (!projectId.value || !year.value) return
+    if (!projectId.value || year.value == null) return
     try {
       const { data } = await http.get(
         `/api/consol-worksheet-data/g7-linkage/${projectId.value}/${year.value}/stale`,
@@ -158,13 +166,15 @@ export function useG7ConsolLinkageEntry(
 
   function gotoConsolidation(): void {
     if (!projectId.value) return
+    // 年度为空不带 year 参数（原先 String(null) 带成 year=null）：合并页按项目年度口径自行解析
+    const y = year.value
     router.push({
       name: 'ConsolidationIndex',
       params: { projectId: projectId.value },
-      query: { year: String(year.value) },
+      query: y == null ? {} : { year: String(y) },
     }).catch(() => {
       // 路由名不同环境可能不同，兜底跳 URL
-      window.location.href = `/projects/${projectId.value}/consolidation?year=${year.value}`
+      window.location.href = `/projects/${projectId.value}/consolidation${y == null ? '' : `?year=${y}`}`
     })
   }
 

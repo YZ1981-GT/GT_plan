@@ -143,7 +143,7 @@ router.beforeEach(async (to) => {
   //    DefaultLayout 的 watch 仍保留作为备份，此处提前触发确保数据就绪
   if (to.params.projectId && authStore.isAuthenticated) {
     const projectStore = useProjectStore()
-    // 非阻塞：先渲染页面，数据异步更新，避免路由切换等待 API
+    // 非阻塞：路由切换不等 API；换项目且没带年度时，页面由 DefaultLayout 的 ProjectContextGate 挡到年度定下来
     projectStore.syncFromRoute(to as any)
   }
 })

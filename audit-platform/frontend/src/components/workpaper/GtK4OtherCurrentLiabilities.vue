@@ -166,9 +166,9 @@
  * Spec: .kiro/specs/k4-other-current-liabilities/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { k4QueryCodes } from './composables/k4AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -410,11 +410,7 @@ async function _loadTbData(): Promise<void> {
     // 科目码单一真源 = k4AccountScope.k4QueryCodes（运行态取 render 下发的 tb_source_codes）。
     // 提成局部常量：既给下面的过滤用同一份码集，也避免同一次取数调两遍。
     const k4Codes = k4QueryCodes((props.htmlData as any)?.tb_source_codes)
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k4Codes[0] || '', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: k4Codes })).rows
     let uVal = 0, aVal = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

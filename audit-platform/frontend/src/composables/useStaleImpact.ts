@@ -55,10 +55,12 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     cell?: string
     max_depth?: number
     project_id?: string
-    year?: number
+    /** 项目审计年度；缺失 ⇒ 不分析（端点 year 必填；原先兜底今年 ⇒ 标的是别的年度的下游） */
+    year?: number | null
   }) {
     const code = wpCode.value
     if (!code) return
+    if (payload.year == null) return null
     loading.value = true
     try {
       // 构建统一 URI: WP:{wp_code}:{sheet}:{cell_or_label}
@@ -67,7 +69,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
       const res: any = await http.post(linkageBus.impact, {
         source_uri: sourceUri,
         project_id: payload.project_id || '',
-        year: payload.year || new Date().getFullYear(),
+        year: payload.year,
       })
 
       // 将 affected URIs 转换为 StaleAffectedItem 格式

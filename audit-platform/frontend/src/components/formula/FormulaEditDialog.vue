@@ -437,6 +437,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
 import {
@@ -764,16 +765,12 @@ async function openSourceBrowserForTB(fn: string) {
     const pid = resolveProjectId()
     const yr = resolveYear()
     if (!pid) throw new Error('缺少项目ID')
-    const resp = await api.get(`/api/projects/${pid}/trial-balance`, {
-      params: { year: yr },
-      _silent: true,
-      validateStatus: (s: number) => s < 600,
-    } as any)
-    const rows = resp?.items ?? resp?.data ?? resp ?? []
-    sourceBrowserRows.value = (Array.isArray(rows) ? rows : []).map((r: any) => ({
-      row_code: r.standard_account_code || r.account_code || '',
-      row_name: r.account_name || r.standard_account_name || '',
-      indent_level: (r.level || 1) - 1,
+    const { rows } = await fetchTrialBalanceRows(pid, { year: yr })
+    sourceBrowserRows.value = rows.map((r) => ({
+      row_code: r.standard_account_code || '',
+      row_name: r.account_name || '',
+      // 试算表行没有层级字段（原先读不存在的 level 恒 0）：按标准科目码位数缩进（4 位一级、每多 2 位深一级）
+      indent_level: Math.max(0, Math.floor((r.standard_account_code.replace(/[^0-9]/g, '').length - 4) / 2)),
       formula: '',
       _ref: sourceBrowserRefBuilder.value(r),
     }))

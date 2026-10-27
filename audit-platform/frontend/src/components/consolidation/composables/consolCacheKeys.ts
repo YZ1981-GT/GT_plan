@@ -3,15 +3,16 @@
  *
  * 缓存必须同时绑定项目、有效年度和企业树 node_key；同一企业出现在
  * 合并户、母公司户等不同角色时，不能因为 company_code 相同而共享结果。
+ * 年度未就绪（null）时键里写 null：缓存只在取到数之后写入，这样的键命中不了任何结果。
  */
 
-export function cacheScopeKey(projectId: string, year: number, nodeKey: string): string {
+export function cacheScopeKey(projectId: string, year: number | null, nodeKey: string): string {
   return `${projectId}|${year}|${nodeKey}`
 }
 
 export function reportCacheKey(
   projectId: string,
-  year: number,
+  year: number | null,
   nodeKey: string,
   reportType: string,
   templateType: string,
@@ -21,7 +22,7 @@ export function reportCacheKey(
 
 export function noteCacheKey(
   projectId: string,
-  year: number,
+  year: number | null,
   nodeKey: string,
   templateType: string,
 ): string {
@@ -39,7 +40,7 @@ export function clearEntityCache(
   reportCache: Map<string, unknown>,
   noteCache: Map<string, unknown>,
   projectId: string,
-  year: number,
+  year: number | null,
   nodeKey: string,
   types?: string[],
 ): void {

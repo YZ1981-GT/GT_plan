@@ -364,100 +364,85 @@ describe('useAuditData - composable 骨架与错误降级', () => {
     expect(entries[0].accountCode).toBe('6001')
   })
 
-  it('should call correct endpoint for asset accounts (v1)', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '1122', audited_amount: 50000, unadjusted_amount: 48000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
+  it('取数走试算表唯一入口：带年度与科目前缀，不再分 tb-balance / trial-balance 两个端点', async () => {
+    mockedGet.mockResolvedValue([{ standard_account_code: '1122', audited_amount: '50000', unadjusted_amount: '48000' }])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
 
     await sdk.getTbAmount('1122')
     expect(mockedGet).toHaveBeenCalledWith(
-      '/api/projects/proj-1/tb-balance',
-      expect.objectContaining({ params: { year: 2025, account_code: '1122' } }),
-    )
-  })
-
-  it('should call correct endpoint for liability accounts (v2)', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '2202', audited_amount: 70000, unadjusted_amount: 68000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
-
-    await sdk.getTbAmount('2202')
-    expect(mockedGet).toHaveBeenCalledWith(
       '/api/projects/proj-1/trial-balance',
-      expect.objectContaining({ params: { year: 2025, account_code: '2202' } }),
+      expect.objectContaining({ params: { year: 2025, account_prefix: '1122' } }),
     )
   })
 
-  it('should return audited amount by default', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '1122', audited_amount: 50000, unadjusted_amount: 48000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
+  it('should return audited amount by default（科目及其明细科目之和，与报表 TB() 同口径）', async () => {
+    mockedGet.mockResolvedValue([
+      { standard_account_code: '1122', audited_amount: '50000', unadjusted_amount: '48000' },
+      { standard_account_code: '112201', audited_amount: '100', unadjusted_amount: '100' },
+    ])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
 
-    const result = await sdk.getTbAmount('1122')
-    expect(result).toBe(50000)
+    expect(await sdk.getTbAmount('1122')).toBe(50100)
   })
 
   it('should return unadjusted amount when basis is unadjusted', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '1122', audited_amount: 50000, unadjusted_amount: 48000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
+    mockedGet.mockResolvedValue([{ standard_account_code: '1122', audited_amount: '50000', unadjusted_amount: '48000' }])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
 
-    const result = await sdk.getTbAmount('1122', { basis: 'unadjusted' })
-    expect(result).toBe(48000)
+    expect(await sdk.getTbAmount('1122', { basis: 'unadjusted' })).toBe(48000)
   })
 
-  it('should return debit-credit difference for PL accounts', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '6001', debit_amount: 10000, credit_amount: 150000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
+  it('损益类取试算表单边发生额（收入贷方），不再用端点不返回的借 / 贷字段算「借 − 贷」', async () => {
+    mockedGet.mockResolvedValue([
+      { standard_account_code: '6001', direction: 'credit', audited_amount: '150000', unadjusted_amount: '140000' },
+    ])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
 
-    const result = await sdk.getTbAmount('6001')
-    // 6001 收入类: 贷方为正常方向 → 发生额 = 借-贷 = 10000-150000 = -140000
-    expect(result).toBe(-140000)
+    expect(await sdk.getTbAmount('6001')).toBe(150000)
+    expect(await sdk.getTbAmount('6001', { basis: 'unadjusted' })).toBe(140000)
   })
 
-  it('should use prev year for getPrevYear', async () => {
-    mockedGet.mockResolvedValue({
-      items: [{ account_code: '1122', audited_amount: 45000 }],
-    })
-    const projectId = ref('proj-1')
-    const year = ref(2025)
-    const sdk = useAuditData(projectId, year)
+  it('科目不在试算表：返回 0 并写明原因（不静默）', async () => {
+    mockedGet.mockResolvedValue([])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
 
-    await sdk.getPrevYear('1122')
+    expect(await sdk.getTbAmount('1122')).toBe(0)
+    expect(sdk.error.value).toContain('1122')
+  })
+
+  it('getPrevYear 取上年审定数（include_prior，来源同报表上期），不拿「年度 − 1」去取本项目', async () => {
+    mockedGet.mockResolvedValue([{ standard_account_code: '1122', audited_amount: '50000', prior_audited_amount: '45000' }])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
+
+    expect(await sdk.getPrevYear('1122')).toBe(45000)
     expect(mockedGet).toHaveBeenCalledWith(
-      '/api/projects/proj-1/tb-balance',
-      expect.objectContaining({ params: { year: 2024, account_code: '1122' } }),
+      '/api/projects/proj-1/trial-balance',
+      expect.objectContaining({ params: { year: 2025, account_prefix: '1122', include_prior: true } }),
     )
   })
 
-  it('should fallback year to current-1 when year ref is invalid', async () => {
-    mockedGet.mockResolvedValue({ items: [] })
-    const projectId = ref('proj-1')
-    const year = ref(NaN)
-    const sdk = useAuditData(projectId, year)
+  it('getPrevYear 上年没有该科目：返回 0 并写明原因', async () => {
+    mockedGet.mockResolvedValue([{ standard_account_code: '1122', audited_amount: '50000', prior_audited_amount: null }])
+    const sdk = useAuditData(ref('proj-1'), ref(2025))
+
+    expect(await sdk.getPrevYear('1122')).toBe(0)
+    expect(sdk.error.value).toContain('上年审定数')
+  })
+
+  it('年度不合法 / 未传：不带 year，由后端按项目审计年度取（不按日历猜）', async () => {
+    mockedGet.mockResolvedValue([])
+    const sdk = useAuditData(ref('proj-1'), ref(NaN))
 
     await sdk.getTbAmount('1122')
-    const expectedYear = new Date().getFullYear() - 1
-    expect(mockedGet).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ params: expect.objectContaining({ year: expectedYear }) }),
-    )
+    const params = (mockedGet.mock.calls[0][1] as any).params
+    expect(params).toEqual({ account_prefix: '1122' })
+    expect(params.year).toBeUndefined()
+  })
+
+  it('序时账没有年度：不取、写明原因', async () => {
+    const sdk = useAuditData(ref('proj-1'))
+    expect(await sdk.getLedgerEntries()).toEqual([])
+    expect(sdk.error.value).toContain('未设置审计年度')
   })
 
   it('should never throw uncaught exception (error degradation)', async () => {

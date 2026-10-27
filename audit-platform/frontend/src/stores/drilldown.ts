@@ -82,7 +82,8 @@ export interface LedgerFilter {
 
 export const useDrilldownStore = defineStore('drilldown', () => {
   const projectId = ref<string>('')
-  const year = ref<number>(new Date().getFullYear())
+  // 不给初值：原先初值是今年 ⇒ 页面没解析出年度时，翻页 / 筛选照样按今年取数
+  const year = ref<number | null>(null)
 
   // 当前层级
   const currentLevel = ref<DrilldownLevel>('balance')
@@ -120,12 +121,18 @@ export const useDrilldownStore = defineStore('drilldown', () => {
 
   const loading = ref(false)
 
-  function setProject(pid: string, y: number) {
+  function setProject(pid: string, y: number | null) {
     projectId.value = pid
     year.value = y
   }
 
+  /** 项目与年度都齐了才取数（四个取数端点 year 必填） */
+  function ready(): boolean {
+    return !!projectId.value && year.value != null
+  }
+
   async function fetchBalance() {
+    if (!ready()) return
     loading.value = true
     try {
       const f = balanceFilter.value
@@ -164,6 +171,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
   }
 
   async function fetchLedger() {
+    if (!ready()) return
     loading.value = true
     try {
       const f = ledgerFilter.value
@@ -202,6 +210,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
   }
 
   async function fetchAuxBalance() {
+    if (!ready()) return
     loading.value = true
     try {
       const { data } = await http.get(
@@ -229,6 +238,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
   }
 
   async function fetchAuxLedger() {
+    if (!ready()) return
     loading.value = true
     try {
       const { data } = await http.get(

@@ -410,6 +410,7 @@
 </template>
 
 <script setup lang="ts">
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabAdjudication.vue — H2-1 审定表
@@ -418,7 +419,6 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, defineComponent, h, onMounted } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButton } from 'element-plus'
-import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import {
   buildHSeedCells,
@@ -479,27 +479,12 @@ const tbData = ref(parseTbFromHtml(props.htmlData))
 async function refreshTbFromApi() {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '160' },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data ?? res)
-      ? (res?.data ?? res)
-      : (res?.data?.items ?? [])
-    let unadjusted = 0
-    let audited = 0
-    let matUnadj = 0
-    let matAud = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code === '1604' || code.startsWith('1604')) {
-        unadjusted += Number(item.unadjusted_amount ?? 0)
-        audited += Number(item.audited_amount ?? 0)
-      } else if (code === '1605' || code.startsWith('1605')) {
-        matUnadj += Number(item.unadjusted_amount ?? 0)
-        matAud += Number(item.audited_amount ?? 0)
-      }
-    }
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { accountPrefix: ['1604', '1605'] })
+    // 科目及其明细之和（与报表 TB('1604') 同口径）
+    const unadjusted = tbSumUnder(rows, '1604', 'unadjusted_amount') ?? 0
+    const audited = tbSumUnder(rows, '1604', 'audited_amount') ?? 0
+    const matUnadj = tbSumUnder(rows, '1605', 'unadjusted_amount') ?? 0
+    const matAud = tbSumUnder(rows, '1605', 'audited_amount') ?? 0
     // htmlData 有种子时优先保留非零种子，API 覆盖
     const seeded = parseTbFromHtml(props.htmlData)
     tbData.value = {

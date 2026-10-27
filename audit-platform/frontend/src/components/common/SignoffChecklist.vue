@@ -186,7 +186,8 @@ import type { CheckItem } from '@/composables/useSignoffChecklist'
 
 export interface SignoffChecklistProps {
   projectId: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 由后端按项目审计年度取 */
+  year?: number | null
   userId?: string
   autoLoad?: boolean
 }

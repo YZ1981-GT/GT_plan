@@ -8,15 +8,10 @@ import {
 export interface G9TbRowLike {
   standard_account_code?: string
   account_code?: string
-  account_name?: string
+  account_name?: string | null
   standard_account_name?: string
-  debit_amount?: number | string
-  credit_amount?: number | string
-  period_debit?: number | string
-  period_credit?: number | string
-  unadjusted_amount?: number | string
-  closing_balance?: number | string
-  ending_balance?: number | string
+  unadjusted_amount?: number | string | null
+  audited_amount?: number | string | null
 }
 
 function rowCode(r: G9TbRowLike): string {
@@ -44,17 +39,11 @@ export function resolveG9TbRow(rows: G9TbRowLike[]): G9TbRowLike | null {
   return null
 }
 
-/** 资产方向余额：优先未审/期末余额字段，否则借−贷 */
+/** 资产类期末未审数（试算表正数口径）。端点没有期末余额 / 借贷字段，不再按「借 − 贷」兜底 */
 export function g9TbRowBalance(row: G9TbRowLike | null | undefined): number {
-  if (!row) return 0
-  const direct = row.unadjusted_amount ?? row.closing_balance ?? row.ending_balance
-  if (direct != null && direct !== '') {
-    const n = Number(direct)
-    if (Number.isFinite(n)) return n
-  }
-  const debit = Number(row.debit_amount ?? row.period_debit ?? 0) || 0
-  const credit = Number(row.credit_amount ?? row.period_credit ?? 0) || 0
-  return debit - credit
+  if (!row || row.unadjusted_amount == null || row.unadjusted_amount === '') return 0
+  const n = Number(row.unadjusted_amount)
+  return Number.isFinite(n) ? n : 0
 }
 
 export function g9TbResolvedCode(row: G9TbRowLike | null | undefined): string {

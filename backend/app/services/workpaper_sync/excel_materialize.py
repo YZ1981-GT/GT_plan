@@ -1086,7 +1086,9 @@ def _replace_cached_value(view: _CellView, value: Any, formula_text: str = "") -
     属性保留是刻意的：共享公式的 `ref`/`si` 决定整组成员的翻译关系，换掉它们会让 H9..H25
     全组失效，而那是「写坏 18 行公式」而不是「还原一格」。
     """
-    rendered = f"<v>{_render_number(value)}</v>"
+    # 文本结果（项目名「A&B有限公司」）必须转义：原先原样拼进 `<v>`，含 `&` / `<` 即整份 sheet XML 非法
+    # （spec post-push-residual-defect-closure R4，表头填写复用本函数时发现；数值转义前后相同）
+    rendered = f"<v>{_xml_escape(_render_number(value))}</v>"
     body = view.body
     if formula_text:
         replacement = f"<f{view.formula_attrs}>{_xml_escape(formula_text)}</f>"

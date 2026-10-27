@@ -671,7 +671,7 @@
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
         phase="final"
-        :year="year"
+        :year="samplingYear"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -683,6 +683,7 @@
  * I1TabAdditionCheck.vue — I1-5 无形资产增加检查表
  * 对齐源表：取得方式分段列 + 检查比例防 DIV/0 + I1-2 联动
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, toRef, inject, watch, defineComponent, h } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
@@ -747,7 +748,7 @@ const YnSelect = defineComponent({
 const props = defineProps<{
   wpId: string
   projectId: string
-  year?: number
+  year?: number | null
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
@@ -878,6 +879,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

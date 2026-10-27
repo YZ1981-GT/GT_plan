@@ -114,7 +114,7 @@ const props = defineProps<{
   projectId: string
   wpId: string
   /** 保存/求值悬空校验所需年度；缺省回退当前年度 */
-  year?: number
+  year?: number | null
 }>()
 
 const { canDo } = usePermissionMatrix(props.projectId)

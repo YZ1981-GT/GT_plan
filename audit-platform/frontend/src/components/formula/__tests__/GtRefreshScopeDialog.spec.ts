@@ -171,6 +171,15 @@ describe('GtRefreshScopeDialog — Task 16 production host + contract', () => {
     wrapper.unmount()
   })
 
+  it('项目没填审计年度（year=null）：不打开、不取刷新范围，提示先填年度（6.5：原先宿主兜底去年）', async () => {
+    const wrapper = mountDialog({ projectId: 'p-123', year: null })
+    await openDialog(wrapper)
+    expect(mockGet).not.toHaveBeenCalled()
+    expect((wrapper.vm as any).visible).toBe(false)
+    expect(mockMsgWarning).toHaveBeenCalledWith(expect.stringContaining('未设置审计年度'))
+    wrapper.unmount()
+  })
+
   it('props projectId/year 透传到 POST draft-refresh', async () => {
     mockPost.mockResolvedValue({
       data: {

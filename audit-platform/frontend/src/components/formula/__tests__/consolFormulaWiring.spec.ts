@@ -51,7 +51,9 @@ describe('合并推送 raw SSE 接线', () => {
     }
     expect(index).toContain('for (const eventName of Object.values(CONSOL_PUSH_EVENTS))')
     expect(index).toContain('subscribeProjectEvent(projectId.value, eventName, onConsolPushEvent)')
-    expect(index).toContain('if (!isCurrentConsolPushEvent(payload, projectId.value, effectiveConsolYear())) return')
+    // 年度未就绪（null）时不认任何推送事件
+    expect(index).toContain('const eventYear = effectiveConsolYear()')
+    expect(index).toContain('if (eventYear == null || !isCurrentConsolPushEvent(payload, projectId.value, eventYear)) return')
   })
 
   it('推送成功按当前视图强制刷新；失败只提示不伪装成功；过期只重查状态', () => {
@@ -72,8 +74,10 @@ describe('合并推送 raw SSE 接线', () => {
 
   it('页面过期横幅直接 manual 推送，排队回执后不提前清除权威 stale', () => {
     expect(index).toContain('data-testid="consol-push-stale-banner"')
-    expect(index).toContain("pushConsolidation(projectId.value, effectiveConsolYear(), 'manual')")
     const queue = index.slice(index.indexOf('async function queueConsolPush'), index.indexOf('async function refreshCurrentAfterConsolPush'))
+    // 年度未就绪提示后不发 push/{pid}/null
+    expect(queue).toContain('if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }')
+    expect(queue).toContain("pushConsolidation(projectId.value, pushYear, 'manual')")
     expect(queue).not.toContain('consolPushStatus.value = null')
     expect(index).toContain('stopConsolPushEvents()')
   })

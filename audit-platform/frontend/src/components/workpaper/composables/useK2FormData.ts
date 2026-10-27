@@ -18,6 +18,7 @@
  * 覆盖 D1/D2/K1 的口径；`loadTbData` 的 seed 键 `other_current_1231_unadjusted`
  * 在 render 输出里**根本不存在**（真实键是 `other_current_unadjusted`）→ seed 从未生效。
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -214,11 +215,7 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
 
     const codes = _queryCodes()
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: codes[0] },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: codes })).rows
 
       const rows = list.map((item) => ({
         code: String(item.standard_account_code ?? item.account_code ?? ''),

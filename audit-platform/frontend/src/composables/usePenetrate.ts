@@ -12,6 +12,8 @@
  */
 import { useRouter, useRoute } from 'vue-router'
 import { useNavigationStack, type NavigationEntry } from './useNavigationStack'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
 
 export function usePenetrate() {
   const router = useRouter()
@@ -22,8 +24,15 @@ export function usePenetrate() {
     return (route.params.projectId as string) || ''
   }
 
-  function year(): number {
-    return Number(route.query.year) || new Date().getFullYear() - 1
+  /** 当前年度：路由 → 项目 store；都没有为 null（跳转不带 year，目标页按项目审计年度取；原先兜底去年） */
+  function year(): number | null {
+    const routeYear = parseAuditYear(route.query.year)
+    if (routeYear != null) return routeYear
+    try {
+      return useProjectStore().year
+    } catch {
+      return null // 无 pinia 上下文
+    }
   }
 
   /**
@@ -47,7 +56,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/ledger`,
-        query: { code: accountCode, year: String(year()) },
+        query: { code: accountCode, ...yearQuery(year()) },
       })
     },
 
@@ -55,7 +64,7 @@ export function usePenetrate() {
     toTB(accountCode: string) {
       router.push({
         path: `/projects/${pid()}/trial-balance`,
-        query: { code: accountCode, year: String(year()) },
+        query: { code: accountCode, ...yearQuery(year()) },
       })
     },
 
@@ -73,7 +82,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'up')
       router.push({
         path: `/projects/${pid()}/reports`,
-        query: { tab: reportType, row: rowCode, year: String(year()) },
+        query: { tab: reportType, row: rowCode, ...yearQuery(year()) },
       })
     },
 
@@ -82,7 +91,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/adjustments`,
-        query: { account: accountOrGroupId, year: String(year()) },
+        query: { account: accountOrGroupId, ...yearQuery(year()) },
       })
     },
 
@@ -91,7 +100,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/misstatements`,
-        query: { id, year: String(year()) },
+        query: { id, ...yearQuery(year()) },
       })
     },
 
@@ -100,7 +109,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/disclosure-notes`,
-        query: { section: sectionId, year: String(year()) },
+        query: { section: sectionId, ...yearQuery(year()) },
       })
     },
 
@@ -123,7 +132,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/disclosure-notes`,
-        query: { fromReport: rowCode, year: String(year()) },
+        query: { fromReport: rowCode, ...yearQuery(year()) },
       })
     },
 
@@ -132,7 +141,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'up')
       router.push({
         path: `/projects/${pid()}/reports`,
-        query: { fromNote: sectionCode, year: String(year()) },
+        query: { fromNote: sectionCode, ...yearQuery(year()) },
       })
     },
 
@@ -141,7 +150,7 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/workpapers`,
-        query: { fromReport: rowCode, year: String(year()) },
+        query: { fromReport: rowCode, ...yearQuery(year()) },
       })
     },
 
@@ -150,14 +159,14 @@ export function usePenetrate() {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/adjustments`,
-        query: { impact: adjustmentId, year: String(year()) },
+        query: { impact: adjustmentId, ...yearQuery(year()) },
       })
     },
 
     /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1） */
     toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
       _pushCurrentRoute(undefined, 'up')
-      const query: Record<string, string> = { code: wpCode, year: String(year()) }
+      const query: Record<string, string> = { code: wpCode, ...yearQuery(year()) }
       if (locate?.sheet) query.sheet = locate.sheet
       if (locate?.cell) query.cell = locate.cell
       router.push({

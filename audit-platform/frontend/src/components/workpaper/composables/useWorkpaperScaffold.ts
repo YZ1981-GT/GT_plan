@@ -48,7 +48,8 @@ export interface UseWorkpaperScaffoldOptions {
   wpCode: string | Ref<string>
   wpId: string | Ref<string>
   projectId: string | Ref<string>
-  year?: number | Ref<number | undefined>
+  /** 审计年度；项目没填为 null（不按今年兜底），未传为 undefined */
+  year?: number | null | Ref<number | null | undefined>
   agingSubject?: string
   readonly?: boolean | Ref<boolean>
   onJumpToSection?: (sheetLabel: string) => void
@@ -71,7 +72,8 @@ export interface WorkpaperRuntimeContext {
   wpId: Ref<string>
   projectId: Ref<string>
   wpCode: Ref<string>
-  year: Ref<number | undefined>
+  /** 审计年度；项目没填为 null、宿主未传为 undefined —— 消费方一律按「取不到」处理，不按今年兜底 */
+  year: Ref<number | null | undefined>
   /**
    * 项目适用准则（归一后的 `string[]`，缺省 `[]` 而非 undefined）。
    *
@@ -143,7 +145,7 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
   const wpCodeRef = normalizeRef(opts.wpCode)
   const wpIdRef = normalizeRef(opts.wpId)
   const projectIdRef = normalizeRef(opts.projectId)
-  const yearRef = normalizeRef<number | undefined>(opts.year)
+  const yearRef = normalizeRef<number | null | undefined>(opts.year)
   const contextReadyRef = normalizeRef(opts.contextReady ?? true)
   const applicableStandardsSource = normalizeRef<unknown>(opts.applicableStandards)
   // 响应式：render-config 到达后自动更新（不是一次性快照）；未传时恒 []。

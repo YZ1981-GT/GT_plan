@@ -444,6 +444,7 @@ import {
   executeFormulas,
 } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
@@ -1179,13 +1180,14 @@ async function applyLocalFormulas() {
 // ═══ 加载 CellSelector 所需数据 ═══
 
 async function loadSelectorData() {
-  const yr = props.moduleParams?.year || props.year || 2025
   try {
-    const tbData = await api.get('/api/trial-balance', {
-      params: { project_id: props.projectId, year: yr },
-      validateStatus: (s: number) => s < 600,
+    // 原先请求 `/api/trial-balance?project_id=`（后端没有该路由，404 被 validateStatus 放行 ⇒ 恒空），
+    // 年度缺省还写死 2025；现经试算表唯一入口取，年度缺省时后端按项目审计年度取
+    const { rows } = await fetchTrialBalanceRows(props.projectId, {
+      year: Number(props.moduleParams?.year || props.year) || null,
     })
-    trialBalanceData.value = Array.isArray(tbData) ? tbData : (tbData || [])
+    // CellSelector 的回退表格按 account_code 列显示
+    trialBalanceData.value = rows.map((r) => ({ ...r, account_code: r.standard_account_code }))
   } catch { trialBalanceData.value = [] }
 
   try {

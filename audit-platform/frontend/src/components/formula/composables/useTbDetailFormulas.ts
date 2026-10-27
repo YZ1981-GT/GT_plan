@@ -5,6 +5,7 @@
  * 响应带 layers / loaded / pending；保存后弹应用范围（changed_slot_keys）。
  */
 import { ref, type Ref } from 'vue'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { layerLabel } from '@/composables/formula/useFormulaSettings'
 
 export interface TbDetailDeps {
@@ -39,14 +40,14 @@ export function useTbDetailFormulas(deps: TbDetailDeps) {
         && !(deps.rows.value && deps.rows.value.length > 0)
         && !fallbackAccounts.value.length) {
       try {
-        const tbData: any = await deps.api.get(`/api/projects/${deps.projectId.value}/trial-balance`, {
-          params: { year: deps.year.value },
-          _silent: true, validateStatus: (s: number) => s < 600,
-        } as any)
-        const items = Array.isArray(tbData) ? tbData : (tbData?.items || tbData?.data || [])
-        if (Array.isArray(items) && items.length) {
-          fallbackAccounts.value = items.map((r: any) => ({
-            code: r.standard_account_code || r.account_code || '',
+        // 年度取不到就不带：后端按项目审计年度取（原先缺年度直接 422、被吞成空列表）
+        const year = Number(deps.year.value)
+        const { rows: items } = await fetchTrialBalanceRows(deps.projectId.value, {
+          year: Number.isInteger(year) && year > 2000 ? year : null,
+        })
+        if (items.length) {
+          fallbackAccounts.value = items.map((r) => ({
+            code: r.standard_account_code || '',
             name: r.account_name || '',
           })).filter((r: { code: string }) => r.code)
         }

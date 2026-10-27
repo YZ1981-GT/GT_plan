@@ -3,12 +3,14 @@ import { ElMessage } from 'element-plus'
 import { getReportExcelUrl, type ReportRow } from '@/services/auditPlatformApi'
 import { reports as reportPaths } from '@/services/apiPaths/report'
 import { downloadFile } from '@/utils/http'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
 export interface UseReportExportOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null ⇒ 导出提示去填年度、不发请求 */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   rows: Ref<ReportRow[]>
   activeTabLabel: ComputedRef<string>
@@ -36,32 +38,45 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
     fetchReport()
   }
 
+  /** 导出按年度出：项目没填审计年度时提示去填，返回 null */
+  function exportYear(): number | null {
+    const y = year.value
+    if (y == null) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return y
+  }
+
   function onExportExcel() {
+    const y = exportYear()
+    if (y == null) return
     import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-      const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
-      downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)
+      const url = getReportExcelUrl(projectId.value, y, activeTab.value)
+      downloadFileAsBlob(url, `报表_${activeTab.value}_${y}.xlsx`)
     })
   }
 
   function onExportAllExcel() {
+    const y = exportYear()
+    if (y == null) return
     void downloadFile(reportPaths.exportAllExcel(projectId.value), {
       method: 'post',
       data: {
-        year: year.value,
+        year: y,
         mode: 'audited',
       },
-      fileName: `全部报表_已审_${year.value}.xlsx`,
+      fileName: `全部报表_已审_${y}.xlsx`,
     })
   }
 
   function onExportAllUnadjusted() {
+    const y = exportYear()
+    if (y == null) return
     void downloadFile(reportPaths.exportAllExcel(projectId.value), {
       method: 'post',
       data: {
-        year: year.value,
+        year: y,
         mode: 'unadjusted',
       },
-      fileName: `全部报表_未审_${year.value}.xlsx`,
+      fileName: `全部报表_未审_${y}.xlsx`,
     })
   }
 

@@ -13,6 +13,7 @@
  * - TB自动取数 unadjusted_amount → 审定表未审数（仅1911）
  * - setTbValues → 从render策略seed或TB手动设置未审数
  */
+import { fetchTrialBalanceRows, tbSumUnder, type TrialBalanceRow } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -224,25 +225,12 @@ export function useI5FormData(
    * 当 htmlData prop 为 null 时（bundle内嵌场景）自行调用。
    * 404 静默处理（_silent:true）。
    */
-  function _applyTbFromList(list: any[]): void {
-    let u1911 = 0
-    let a1911 = 0
-    let p1911 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith(ACCOUNT_CODE_1911)) {
-        u1911 += Number(item.unadjusted_amount ?? 0)
-        a1911 += Number(item.audited_amount ?? 0)
-        p1911 += Number(
-          item.prior_amount
-          ?? item.prior_audited_amount
-          ?? item.prior_period_amount
-          ?? item.last_year_amount
-          ?? item.opening_audited_amount
-          ?? 0,
-        )
-      }
-    }
+  function _applyTbFromList(list: readonly TrialBalanceRow[]): void {
+    const code = ACCOUNT_CODE_1911
+    const u1911 = tbSumUnder(list, code, 'unadjusted_amount') ?? 0
+    const a1911 = tbSumUnder(list, code, 'audited_amount') ?? 0
+    // 资产负债类上年审定数 = 本年期初余额（端点没有 prior_* 字段，原先上年数恒 0）
+    const p1911 = tbSumUnder(list, code, 'opening_balance') ?? 0
     tbData.value = { unadjusted1911: u1911, audited1911: a1911, priorAudited1911: p1911 }
     tbUnadjusted.value = { otherNoncurrent1911: u1911 }
   }
@@ -336,14 +324,8 @@ export function useI5FormData(
     }
 
     try {
-      const res = await http.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1911' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data?.data ?? res?.data)
-        ? (res?.data?.data ?? res?.data)
-        : []
-      _applyTbFromList(list)
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { accountPrefix: ACCOUNT_CODE_1911 })
+      _applyTbFromList(rows)
     } catch {
       tbData.value = { unadjusted1911: 0, audited1911: 0, priorAudited1911: 0 }
       tbUnadjusted.value = { otherNoncurrent1911: 0 }

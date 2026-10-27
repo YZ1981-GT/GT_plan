@@ -39,6 +39,9 @@
       </div>
     </div>
 
+    <!-- 项目没填审计年度、路由也没带：不按今年查，提示去填（也可在上方选年度查看） -->
+    <el-alert v-if="yearResolved && selectedYear == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 12px" />
+
     <!-- 错误提示 -->
     <el-alert v-if="loadError" type="error" :closable="true" style="margin-bottom: 12px" show-icon>
       <template #title>加载失败</template>
@@ -138,6 +141,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE, useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import { confirmDangerous } from '@/utils/confirm'
 import {
   cancelImportJob,
@@ -157,6 +161,10 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const selectedYear = ref<number | null>(Number(route.query.year) || null)
+// 路由没带年度时按项目审计年度取（不按今年兜底）
+const { ensureAuditYear } = useProjectAuditYear(projectId)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 const yearOptions = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i)
 const loading = ref(false)
 const loadError = ref('')
@@ -169,7 +177,8 @@ const records = ref<any[]>([])
 const latestJob = computed(() => jobs.value[0] || null)
 
 function goBack() {
-  router.push({ path: `/projects/${projectId.value}/ledger`, query: { year: String(selectedYear.value) } })
+  // 年度为空不带 year（原先 String(null) 带成 year=null）
+  router.push({ path: `/projects/${projectId.value}/ledger`, query: selectedYear.value == null ? {} : { year: String(selectedYear.value) } })
 }
 
 function fmtTime(v: string | null | undefined) {
@@ -203,7 +212,7 @@ function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'dang
 }
 
 async function loadAll() {
-  if (!projectId.value) return
+  if (!projectId.value || selectedYear.value == null) return
   loading.value = true
   loadError.value = ''
   try {
@@ -237,6 +246,10 @@ async function loadAll() {
 }
 
 async function rollback(row: LedgerDataset) {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   await confirmDangerous('确认回滚到上一版本？回滚后依赖该数据的底稿/报表将标记为"数据过期"。', '回滚确认')
   try {
     await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史发起回滚')
@@ -265,7 +278,18 @@ async function cancel(row: ImportJob) {
 }
 
 watch(selectedYear, loadAll)
-onMounted(loadAll)
+onMounted(async () => {
+  if (selectedYear.value == null) {
+    const y = await ensureAuditYear()
+    yearResolved.value = true
+    if (y != null) {
+      selectedYear.value = y // 由上面的 watch 加载
+      return
+    }
+  }
+  yearResolved.value = true
+  loadAll()
+})
 </script>
 
 <style scoped>

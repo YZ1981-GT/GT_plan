@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG10Adjudication — G10-1 审定表（对齐 Excel：三部分结构 + 期初/期末未审·调整·审定）
@@ -440,11 +441,8 @@ export function useG10Adjudication(opts: {
       return false
     }
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      // 不按前缀筛：resolveG10TbRow 还要按科目名称回退找行
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       const hit = resolveG10TbRow(list)
       if (hit) {
         tbResolvedCode.value = g10TbResolvedCode(hit)

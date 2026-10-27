@@ -438,7 +438,7 @@ import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate
 const props = defineProps<{
   wpId?: string
   projectId?: string
-  auditYear?: number
+  auditYear?: number | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()

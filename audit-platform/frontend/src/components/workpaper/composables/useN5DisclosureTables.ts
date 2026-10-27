@@ -280,7 +280,7 @@ export function useN5DisclosureTables(opts: UseN5DisclosureTablesOptions) {
     }
   }
 
-  function buildPayload(ctx: { wpId: string; year: number }) {
+  function buildPayload(ctx: { wpId: string; year: number | null }) {
     return buildN5SyncPayload(variant, buildSnapshot(), ctx)
   }
 

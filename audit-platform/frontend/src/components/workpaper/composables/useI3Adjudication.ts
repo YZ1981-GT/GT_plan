@@ -63,7 +63,7 @@ export function useI3Adjudication(
     tbUnadjusted1711?: Ref<number>
     tbAudited1711?: Ref<number>
     crossSheetImpairment?: Ref<number>
-    asOfYear?: Ref<number> | (() => number)
+    asOfYear?: Ref<number | null> | (() => number | null)
     onSave?: (itemId: string, value: any) => void
   },
 ) {

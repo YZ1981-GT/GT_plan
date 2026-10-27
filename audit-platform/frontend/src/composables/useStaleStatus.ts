@@ -14,9 +14,11 @@
  * ```
  */
 import { ref, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import { useProjectStore } from '@/stores/project'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface StaleItem {
   id: string
@@ -34,7 +36,7 @@ export interface StaleResolution {
 
 export function useStaleStatus(
   projectId: Ref<string>,
-  year?: Ref<number> | ComputedRef<number>,
+  year?: Ref<number | null> | ComputedRef<number | null>,
 ) {
   const isStale = ref(false)
   const staleCount = ref(0)
@@ -66,14 +68,17 @@ export function useStaleStatus(
     }
   }
 
-  /** 解析重算年度：显式入参 > projectStore.year > 上一自然年（store 惰性读取，避免脱离 pinia 报错） */
-  function resolveYear(): number {
+  /**
+   * 解析重算年度：显式入参 > projectStore.year（store 惰性读取，避免脱离 pinia 报错）；都没有为 null。
+   * 原先最后兜底去年 ⇒ 项目没填年度时重算的是别的年度。
+   */
+  function resolveYear(): number | null {
     if (year?.value) return year.value
     try {
       const storeYear = useProjectStore().year
       if (storeYear) return storeYear
-    } catch { /* 无 pinia 上下文时降级 */ }
-    return new Date().getFullYear() - 1
+    } catch { /* 无 pinia 上下文 */ }
+    return null
   }
 
   /**
@@ -85,12 +90,17 @@ export function useStaleStatus(
    */
   async function recalc(): Promise<StaleResolution | null> {
     if (!projectId.value) return null
+    const recalcYear = resolveYear()
+    if (recalcYear == null) {
+      ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（本次重算未执行）`)
+      return null
+    }
     loading.value = true
     try {
       const resp: any = await api.post(
         `/api/projects/${projectId.value}/trial-balance/recalc`,
         {},
-        { params: { year: resolveYear() } },
+        { params: { year: recalcYear } },
       )
       // 重算完成后重新查 stale 状态
       await check()

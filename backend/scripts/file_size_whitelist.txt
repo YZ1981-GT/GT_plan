@@ -1058,7 +1058,8 @@ backend/tests/workpaper_sync/test_g_foundation_p10_p16_g2_canary.py  892
 #   test_g_foundation_p4_p8_p17_p18_red_baselines.py —— 四组红基线（BP-5 / 裸 IF / prefill / TB 缺口），
 #     每组含「现状必红断言 + 修复后转绿检查 + 反向自检」。拆分会让 BP-5 的 5 条错名
 #     与裸 IF 的 13 册计数分属两个文件——而 BP-5 的修复（Task 5）正好在裸 IF 的上游。
-backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  847
+#     2026-10-27：HEAD 已 952 行（此前的提交没同步基线）；post-push-residual-defect-closure 只改 G4 / G6 两家计数、行数不变
+backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  952
 
 #   F 循环 provider / 判据 / 工具链——结构上必须单文件的理由同上：
 #   phase5_f4_accounts_payable.py —— F4 provider（808 行），docstring + 常量声明 + 灰度开关 +

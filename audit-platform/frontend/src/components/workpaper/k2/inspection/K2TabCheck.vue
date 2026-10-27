@@ -242,6 +242,7 @@
  * 科目由报表行 BS-014 解析（实证 1901 其他流动资产，借方/资产类）。
  * 源模板无"期后检查"段，但保留完整样本选取功能、抽凭引擎、核对内容、结论模板。
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -326,6 +327,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

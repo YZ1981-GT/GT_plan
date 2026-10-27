@@ -78,10 +78,12 @@ export async function attachVoucher(
  */
 export async function listAttachedVouchers(
   projectId: string,
-  year: number,
+  /** 审计年度；项目没填为 null ⇒ 不发请求、按「没有挂凭」处理（只读计数 / 角标） */
+  year: number | null,
   workpaperId?: string,
   manualOnly = false,
 ): Promise<AttachedVoucherRecord[]> {
+  if (year == null) return []
   const params: Record<string, unknown> = { year }
   if (workpaperId) params.working_paper_id = workpaperId
   if (manualOnly) params.manual_only = true

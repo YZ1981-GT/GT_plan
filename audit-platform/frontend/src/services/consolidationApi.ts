@@ -3,6 +3,7 @@
  * Phase 11 Task 22.1 — 完整重建
  */
 import { api } from '@/services/apiProxy'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import {
   consolidation as P,
   consolNoteFormulas as P_cnf,
@@ -963,9 +964,9 @@ export interface QueryTemplate {
 
 // ─── 合并范围 API ─────────────────────────────────────────────────────────────
 
-export async function getConsolScope(projectId: string, year?: number): Promise<ConsolScopeItem[]> {
-  const y = year ?? new Date().getFullYear() - 1
-  return api.get(`${P.scope.list}?project_id=${projectId}&year=${y}`)
+/** 年度必填（端点 year 必填；原先缺省时兜底去年） */
+export async function getConsolScope(projectId: string, year: number): Promise<ConsolScopeItem[]> {
+  return api.get(`${P.scope.list}?project_id=${projectId}&year=${year}`)
 }
 
 export async function createConsolScope(projectId: string, data: Partial<ConsolScopeItem>): Promise<ConsolScopeItem> {
@@ -1179,7 +1180,9 @@ export async function getConsolReports(projectId: string, year: number): Promise
 export async function getConsolReport(
   projectId: string, reportType: string, period: string, nodeKey?: string | null,
 ): Promise<ConsolReportData> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
+  // period 解析不出年度 ⇒ 不请求（原先兜底去年，取的是别的年度的合并报表）
+  const year = parseAuditYear(parseInt(period))
+  if (year == null) return { rows: [], report_type: reportType }
   const params: Record<string, string | number> = { report_type: reportType }
   if (nodeKey) params.node_key = nodeKey
   const rows = await api.get(`${P.reports.list(projectId, year)}`, { params })

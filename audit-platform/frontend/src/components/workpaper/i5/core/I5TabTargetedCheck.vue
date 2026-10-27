@@ -710,6 +710,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 // 科目码单一真源 + 空科目降级门（禁硬编码、禁以不存在的科目发起抽样）
@@ -797,6 +798,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

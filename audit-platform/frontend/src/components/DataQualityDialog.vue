@@ -151,11 +151,13 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import BalanceDiagnosticsDialog from '@/components/diagnostics/BalanceDiagnosticsDialog.vue'
 import type { BalanceDiagnosticsResult, Caliber } from '@/types/balance-diagnostics'
 import { CALIBER_LABELS } from '@/types/balance-diagnostics'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 不检查，弹窗里写明去填年度 */
+  year: number | null
 }>()
 
 const emit = defineEmits<{
@@ -187,6 +189,10 @@ function onClose() {
 }
 
 async function runCheck() {
+  if (props.year == null) {
+    error.value = MISSING_AUDIT_YEAR_MESSAGE
+    return
+  }
   loading.value = true
   error.value = ''
   try {

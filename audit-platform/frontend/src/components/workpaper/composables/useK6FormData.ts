@@ -20,6 +20,7 @@
  * - 1481 持有待售资产（**借方/资产类**）：期末=期初+增加-减少-减值
  * - 2605 持有待售负债（**贷方/负债类**）：期末=期初+增加-减少
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -161,21 +162,13 @@ export function useK6FormData(params: {
 
     // 分别拉取 1481 和 2605
     try {
-      const [assetRes, liabRes] = await Promise.all([
-        api.get(`/api/projects/${projectId.value}/trial-balance`, {
-          params: { account_prefix: ACCOUNT_CODE_ASSET },
-          _silent: true,
-        } as any),
-        api.get(`/api/projects/${projectId.value}/trial-balance`, {
-          params: { account_prefix: ACCOUNT_CODE_LIABILITY },
-          _silent: true,
-        } as any),
-      ])
+      // 一次取回资产 / 负债两组（下面各自按科目前缀过滤）
+      const { rows: tbRows } = await fetchTrialBalanceRows(projectId.value, {
+        accountPrefix: [ACCOUNT_CODE_ASSET, ACCOUNT_CODE_LIABILITY],
+      })
 
       // 解析资产1481
-      const assetList: any[] = Array.isArray(assetRes?.data ?? assetRes)
-        ? (assetRes?.data ?? assetRes)
-        : (assetRes?.data?.items ?? [])
+      const assetList: any[] = tbRows
       let assetUnadj = 0
       let assetAudited = 0
       let assetFound = false
@@ -190,9 +183,7 @@ export function useK6FormData(params: {
       }
 
       // 解析负债2605
-      const liabList: any[] = Array.isArray(liabRes?.data ?? liabRes)
-        ? (liabRes?.data ?? liabRes)
-        : (liabRes?.data?.items ?? [])
+      const liabList: any[] = tbRows
       let liabUnadj = 0
       let liabAudited = 0
       let liabFound = false

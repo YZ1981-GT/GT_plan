@@ -136,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, reactive, watch, computed, onUnmounted } from 'vue'
 import { DataLine, Notebook, Document, TrendCharts, FolderOpened, Connection } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
@@ -369,12 +370,8 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载试算表分类（静默失败）
   try {
-    const data = await api.get(P.trialBalance.get(pid), {
-      params: { year: currentYear.value },
-      validateStatus: (s: number) => s < 600,
-    })
-    if (data && Array.isArray(data)) {
-      const rows = data ?? []
+    // 年度不传：后端按项目审计年度取（currentYear 在项目没填年度时退回日历年，不能拿来取试算表）
+    const { rows } = await fetchTrialBalanceRows(pid)
     const catMap: Record<string, any[]> = {}
     for (const r of rows) {
       const cat = r.account_category || 'other'
@@ -388,7 +385,6 @@ watch(() => props.project?.id, async (pid) => {
     tbCategories.value = Object.entries(catMap).map(([k, items]) => ({
       key: k, label: catLabels[k] || k, count: items.length, items,
     }))
-    }
   } catch { tbCategories.value = [] }
 
   // 加载底稿列表（按审计循环分组）

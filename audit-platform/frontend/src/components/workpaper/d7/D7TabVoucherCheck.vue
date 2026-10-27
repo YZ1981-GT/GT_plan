@@ -365,7 +365,8 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: any
-  year?: number
+  /** 审计年度；项目没填为 null（父级按项目口径取，不按今年兜底） */
+  year?: number | null
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>

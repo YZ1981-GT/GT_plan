@@ -11,6 +11,7 @@
  *
  * Requirements: 10.6
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, inject, toRef, onMounted, computed, type Ref } from 'vue'
 import {
   useE1IpoSpecial,
@@ -240,6 +241,10 @@ async function refreshAttachedCount(): Promise<void> {
 /** 拉取挂到本底稿的序时账凭证 → 映射为样本 → 复用 onSampleFilled 导入检查行 */
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

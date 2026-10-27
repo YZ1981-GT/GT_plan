@@ -106,6 +106,7 @@ import { api } from '@/services/apiProxy'
 import { formulaAuditLog } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 const authStore = useAuthStore()
 
@@ -125,7 +126,8 @@ interface HistoryEntry {
 
 const props = defineProps<{
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null / 未传 ⇒ 不加载历史、回滚提示去填年度 */
+  year?: number | null
   readOnly?: boolean
 }>()
 
@@ -194,6 +196,12 @@ function canRollback(entry: HistoryEntry): boolean {
 
 async function onRollback(entry: HistoryEntry) {
   if (!entry.old_formula) return
+  // 项目没填审计年度：先说明，不让用户确认一个发不出去的回滚
+  const year = props.year
+  if (year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `确认将行次 "${entry.row_code}" 的公式回滚为：\n\n${entry.old_formula}\n\n此操作将覆盖当前公式。`,
@@ -206,7 +214,7 @@ async function onRollback(entry: HistoryEntry) {
 
   rollingBack.value = entry.id
   try {
-    await api.post(formulaAuditLog.rollback(props.projectId, props.year), {
+    await api.post(formulaAuditLog.rollback(props.projectId, year), {
       row_code: entry.row_code,
       module: entry.module,
       target_formula: entry.old_formula,

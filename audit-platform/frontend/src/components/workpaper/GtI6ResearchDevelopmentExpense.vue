@@ -187,6 +187,7 @@
  * Spec: .kiro/specs/i6-research-development-expense/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -325,26 +326,12 @@ async function saveResponse(_sheetCode: string, data: Record<string, any>): Prom
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
-      params: { account_prefix: '6604', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u6602 = 0, a6602 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('6604')) {
-        const debit = Number(item.borrowing_amount ?? item.period_debit ?? item.debit_amount ?? 0)
-        const credit = Number(item.lending_amount ?? item.period_credit ?? item.credit_amount ?? 0)
-        const net = item.unadjusted_amount != null && item.unadjusted_amount !== ''
-          ? Number(item.unadjusted_amount)
-          : (debit - credit)
-        u6602 += Number.isFinite(net) ? net : 0
-        a6602 += Number(item.audited_amount ?? 0)
-      }
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取）；损益类未审数即本期发生额
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6604' })
+    tbData.value = {
+      unadjusted6602: tbSumUnder(rows, '6604', 'unadjusted_amount') ?? 0,
+      audited6602: tbSumUnder(rows, '6604', 'audited_amount') ?? 0,
     }
-    tbData.value = { unadjusted6602: u6602, audited6602: a6602 }
   } catch {
     // TB取数失败静默处理
   }

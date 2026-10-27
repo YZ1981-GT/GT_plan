@@ -359,7 +359,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
-  year?: number
+  year?: number | null
   isReadonly: boolean
 }>()
 

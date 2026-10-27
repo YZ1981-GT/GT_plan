@@ -36,6 +36,7 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { parseNum } from '../../composables/useD4FormulaEngine'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_MAIN_COST_STANDARD, D4_OTHER_COST_STANDARD } from '../../composables/d4AccountScope'
 import {
@@ -338,12 +339,19 @@ function buildSnapshot(): D4DisclosureSnapshot {
       return row
     }),
     timingCategories: section4Categories.value.map((c: any) => ({ key: c.key, label: c.label })),
+    // （6）剩余履约义务：原先没带 ⇒ 附注（6）表恒推空行、表头按 2025 派生成 2026年 / 2027年
+    section6Rows: section6Rows.value,
+    auditYear: auditYear.value,
     notes: { ...noteTexts.value },
   }
 }
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   isSyncing.value = true
   try {
     const payload = buildD4SyncPayload(VARIANT, props.wpId || '', null, buildSnapshot())
@@ -375,9 +383,15 @@ const noteCheckState = ref<{ status: 'idle' | 'loading' | 'ok' | 'diff' | 'missi
 
 async function checkNoteConsistency(silent = false): Promise<void> {
   if (!props.projectId) return
+  const year = auditYear.value
+  if (year == null) {
+    noteCheckState.value = { status: 'error', message: MISSING_AUDIT_YEAR_MESSAGE }
+    if (!silent) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
   try {
-    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D4_NOTE_SECTION[VARIANT])
+    const detail = await getDisclosureNoteDetail(props.projectId, year, D4_NOTE_SECTION[VARIANT])
     const td = detail?.table_data
     const tables: any[] = Array.isArray(td?._tables) ? td._tables : []
     const candidates = tables.length > 0 ? tables : (Array.isArray(td?.rows) ? [{ rows: td.rows }] : [])

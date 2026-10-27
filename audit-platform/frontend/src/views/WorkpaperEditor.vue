@@ -241,7 +241,7 @@
     <UniverEditorCore
       v-if="modeResolved"
       ref="univerEditorCoreRef"
-      :project-id="projectId"
+      :project-id="projectId" :project-year="projectYear"
       :wp-id="wpId"
       :wp-detail="wpDetail!"
       :can-edit="effectiveCanEdit"
@@ -678,7 +678,7 @@ const { cycleDialogs, fCycle, iCycle, gCycle, kCycle, lCycle, mCycle, nCycle } =
   wpId,
   sheetNavActiveId,
   sheetNavFacade,
-  cycleType,
+  cycleType, projectYear,
 })
 
 // ─── 编辑锁 ─────────────────────────────────────────────────────────────────
@@ -1155,9 +1155,9 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
-// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）；年度 = 本底稿所属项目的审计年度，没有就不带（查账窗口按项目审计年度取）
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, projectStore.year)
+  openLedgerWindow(projectId.value, projectYear.value ?? undefined)
 }
 
 function goBack() {

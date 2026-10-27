@@ -267,6 +267,7 @@
  * Spec: .kiro/specs/k1-other-receivables/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows, tbNumber } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -594,26 +595,22 @@ async function _loadTbData(): Promise<void> {
 
   if (!props.projectId) return
 
-  /** 拉某科目前缀的试算平衡表行 → 归一为 `TbCodedAmountRow[]` */
-  async function _fetchTbRows(prefix: string) {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: prefix, year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data)
-      ? (res?.data?.data ?? res?.data)
-      : []
-    return list.map((item) => ({
-      code: String(item.standard_account_code ?? item.account_code ?? ''),
-      unadjusted: Number(item.unadjusted_amount ?? 0),
-      audited: Number(item.audited_amount ?? 0),
+  /** 拉一组科目码（按各码根前缀，后端筛）的试算平衡表行 → 归一为 `TbCodedAmountRow[]` */
+  async function _fetchTbRows(codes: readonly string[]) {
+    // 原先只传首码的根（`codes[0].split('-')[0]`）：后端现按前缀真筛，其余码的行会被筛掉
+    const prefixes = codes.map((c) => c.split('-')[0])
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: prefixes })
+    return rows.map((item) => ({
+      code: item.standard_account_code,
+      unadjusted: tbNumber(item.unadjusted_amount) ?? 0,
+      audited: tbNumber(item.audited_amount) ?? 0,
     }))
   }
 
   // 原值：口径取自 render 溯源（缺省 1221）；只累加叶子（最长前缀）防父子双计
   try {
     const codes = k1GrossQueryCodes(tbSourceCodes.value)
-    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const rows = await _fetchTbRows(codes)
     const sum = sumLongestPrefixOnly(rows, codes)
     tbData.value.unadjusted1221 = sum.unadjusted
     tbData.value.audited1221 = sum.audited
@@ -626,7 +623,7 @@ async function _loadTbData(): Promise<void> {
   // 且 trial_balance 里父码 1231 与子码 1231-0x 并存会双计。
   try {
     const codes = k1ProvisionQueryCodes(tbSourceCodes.value)
-    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const rows = await _fetchTbRows(codes)
     const sum = sumLongestPrefixOnly(rows, codes)
     tbData.value.unadjustedBadDebt = Math.abs(sum.unadjusted)
     tbData.value.auditedBadDebt = Math.abs(sum.audited)

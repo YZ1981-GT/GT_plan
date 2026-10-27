@@ -496,7 +496,7 @@ export async function assignWorkpaper(projectId: string, wpId: string, body: {
   return data
 }
 
-export async function prefillWorkpaper(projectId: string, wpId: string, year: number = 2025) {
+export async function prefillWorkpaper(projectId: string, wpId: string, year: number) {
   const { data } = await http.post(
     P_wp.prefill(projectId, wpId),
     null,

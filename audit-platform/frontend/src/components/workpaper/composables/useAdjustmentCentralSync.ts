@@ -25,6 +25,7 @@ import {
   getAdjustmentBySourceRef,
 } from '@/services/auditPlatformApi'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface CentralSyncLineItem {
   standard_account_code?: string
@@ -52,7 +53,8 @@ export const COLLAB_STATUS_LABELS_MIN: Record<string, string> = {
 
 export interface UseAdjustmentCentralSyncOptions {
   projectId: Ref<string> | (() => string)
-  year: Ref<number> | (() => number)
+  /** 审计年度；项目没填为 null ⇒ 手动同步提示去填、自动同步静默跳过（不按今年写集中登记） */
+  year: Ref<number | null> | (() => number | null)
   wpId: Ref<string> | (() => string)
   wpCode: Ref<string> | (() => string) | string
   /** 该 tab 分录组的 checklist item_id（幂等键构成）；可为 getter 以支持随类型切换的动态 itemId */
@@ -139,6 +141,10 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) {
       ElMessage.warning('缺少项目/底稿上下文，无法同步到集中登记')
+      return
+    }
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return
     }
     const lineItems = opts.buildLineItems().filter(
@@ -272,6 +278,9 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const projectId = unwrap(opts.projectId)
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) return
+    // 项目没填审计年度：自动同步静默跳过（手动同步会提示去填）
+    const year = unwrap(opts.year)
+    if (year == null) return
 
     const lineItems = opts.buildLineItems().filter(
       (li) => (Number(li.debit_amount) || 0) !== 0 || (Number(li.credit_amount) || 0) !== 0,
@@ -306,7 +315,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     syncing.value = true
     try {
       await syncAdjustmentFromWorkpaper(projectId, {
-        year: unwrap(opts.year),
+        year,
         wp_id: wpId,
         item_id: resolveItemId(),
         source_wp_code: String(unwrap(opts.wpCode) || ''),

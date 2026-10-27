@@ -349,7 +349,8 @@ async function refresh() {
     const [wp, od, con, wh] = await Promise.all([
       getWorkpaperProgress(projectId.value).catch(() => null),
       getOverdueWorkpapers(projectId.value).catch(() => []),
-      apiRunConsistencyCheck(projectId.value).catch(() => null),
+      // 原先不传年度 ⇒ 服务层缺省 2025：任何项目的看板都按 2025 年度跑一致性校验；项目没填年度时不跑
+      projectYear.value == null ? Promise.resolve(null) : apiRunConsistencyCheck(projectId.value, projectYear.value).catch(() => null),
       getProjectWorkHours(projectId.value).catch(() => []),
     ])
     wpProgress.value = wp

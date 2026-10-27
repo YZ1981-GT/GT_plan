@@ -15,7 +15,7 @@
           { label: '金额单位', value: noteUnitSuffix },
         ]"
         @unit-change="onProjectChange"
-        @year-change="(v: number) => { selectedYear = v; onYearChange() }"
+        @year-change="(v: number) => { selectedYear = v; onYearChange(v) }"
         @template-change="handleTemplateChange"
       />
       <template #actions>
@@ -1452,10 +1452,10 @@ async function onAiContentResolved() {
   await fetchDetailFresh(section)
 }
 
-const year = computed(() => {
-  const qy = Number(route.query.year)
-  return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
-})
+// 年度：路由 → 项目 store（原口径、同步读，信息栏切年度后立即生效）；路由壳 DisclosureEditorRoute 只在年度定下来后挂本页，传入的年度只作离开项目那一刻的兜底（6.5）
+const props = defineProps<{ auditYear: number }>()
+const year = computed(() => { const qy = Number(route.query.year); return (Number.isFinite(qy) && qy > 2000 ? qy : null) ?? projectStore.year ?? props.auditYear })
+//（原先 store 初值去年 ⇒ 没填年度的项目也按去年取附注；现由路由壳拦在页外）
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchTree())
@@ -1522,8 +1522,8 @@ function onProjectChange(newId: string) {
 // 年度切换
 const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
-function onYearChange() {
-  projectStore.changeYear(selectedYear.value)
+function onYearChange(y: number) {
+  projectStore.changeYear(y) // 按信息栏选中的年度切（selectedYear 是 number | null；行数已到上限，注释写在行尾）
   fetchTree().then(async () => {
     await noteEdit.ready()  // 切年度后等判定结论
     if (noteList.value.length === 0 && noteEdit.canWrite.value) onGenerate()

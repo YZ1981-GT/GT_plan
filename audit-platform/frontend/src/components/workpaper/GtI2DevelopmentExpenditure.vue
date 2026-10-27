@@ -531,7 +531,7 @@ async function selfLoad(): Promise<void> {
   // 预热 TB(1717) 数据：I2-1 打开前已就位，避免首次进入审定表时的空白闪烁
   if (!allResponses.value.get('I2-tb-data')) {
     try {
-      const tb = await fetchI2TbData(http, props.projectId)
+      const tb = await fetchI2TbData(props.projectId)
       await persistI2TbData(saveResponse, tb)
     } catch {
       // 静默：I2-1 自身 onMounted 会重试

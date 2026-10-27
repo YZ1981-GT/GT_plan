@@ -41,7 +41,7 @@ const DEFAULT_OBJECTIVE =
 const props = defineProps<{
   wpId?: string
   projectId?: string
-  auditYear?: number
+  auditYear?: number | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()

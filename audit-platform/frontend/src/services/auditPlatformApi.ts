@@ -12,6 +12,8 @@
    cfsWorksheet as P_cfs, disclosureNotes as P_dn, auditReport as P_ar,
    exportTask as P_exp, workpaperSummary as P_ws,
  } from '@/services/apiPaths'
+ import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
+ import type { TrialBalanceRow } from '@/services/trialBalanceRows'
 
  export interface ProjectListItem {
    id: string
@@ -28,8 +30,9 @@
  }
 
 /** 项目详情：经 apiProxy 共享同址在途请求（R16：编辑器打开时项目 store / 页面各取一次，原先各发一条）。 */
- export async function getProject(projectId: string): Promise<ProjectListItem> {
-  return api.get<ProjectListItem>(P_proj.detail(projectId))
+ export async function getProject(projectId: string, opts: { dedupe?: boolean } = {}): Promise<ProjectListItem> {
+  // dedupe:false：不进 http 层 GET 去重（项目 store 换项目时用：被同址 GET 取消会把年度误判成取失败）
+  return api.get<ProjectListItem>(P_proj.detail(projectId), opts.dedupe === false ? ({ _dedupe: false } as any) : undefined)
 }
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {
@@ -39,32 +42,14 @@ export async function getProjectAuditYear(projectId: string): Promise<number | n
 
 // ─── Trial Balance ───
 
-export interface TrialBalanceRow {
-  standard_account_code: string
-  account_name: string | null
-  account_category: string | null
-  unadjusted_amount: string | null
-  rje_adjustment: string
-  aje_adjustment: string
-  wp_adjustment: string | null
-  audited_amount: string | null
-  opening_balance: string | null
-  exceeds_materiality: boolean
-  below_trivial: boolean
-  updated_at?: string | null
-  wp_publish_base: string | null
-  wp_published_at: string | null
-}
+export type { TrialBalanceRow }
 
 export async function getTrialBalance(projectId: string, year: number, companyCode?: string): Promise<TrialBalanceRow[]> {
-  const params: Record<string, any> = { year }
-  if (companyCode) params.company_code = companyCode
-  const { data } = await http.get(P_tb.get(projectId), { params })
-  // 后端过渡期语义（sign_convention readiness）返回 {data, warning} 对象而非纯数组
-  if (data && !Array.isArray(data) && Array.isArray(data.data)) {
-    return data.data
-  }
-  return Array.isArray(data) ? data : []
+  const result = await fetchTrialBalanceRows(projectId, {
+    year,
+    companyCode,
+  })
+  return result.rows
 }
 
 export async function recalcTrialBalance(projectId: string, year: number) {

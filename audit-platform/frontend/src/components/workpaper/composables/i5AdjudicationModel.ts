@@ -762,7 +762,7 @@ export function buildI5ThreeLayerLeadFromDetail(detailRows: any[]): I5ThreeLayer
 /** 自到期日推算距审计截止日（默认当年12/31）的剩余月数 */
 export function calcI5RemainingMonths(
   maturityDate: string,
-  asOfYear?: number,
+  asOfYear?: number | null,
 ): number | null {
   const s = _str(maturityDate).trim()
   if (!s) return null
@@ -783,7 +783,7 @@ export function calcI5RemainingMonths(
  */
 export function extractI5CurrentPortionCandidates(
   detailRows: any[],
-  asOfYear?: number,
+  asOfYear?: number | null,
 ): Array<{
   projectName: string
   amount: number

@@ -13,6 +13,7 @@
  * - checklist_responses 前缀 "I2-{sheet}-{field}"
  * - useVersionTrail auto-snapshot 由主入口集成（本composable不直接引入）
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -357,11 +358,7 @@ export function useI2FormData(params: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1717' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1717' })).rows
 
       let unadjusted1717 = 0
       let audited1717 = 0
@@ -454,38 +451,20 @@ export function useI2FormData(params: {
 }
 
 // ─── fetchI2TbData / persistI2TbData（独立轻量版，供 I2TabAdjudication / GtI2 selfLoad 复用） ──
-// 与 _loadTbData 同一 API 模式；不依赖完整 composable 实例，兼容 http(axios) 与 api(已解包) 两种客户端。
+// 经试算表唯一入口取数；取不到抛错，调用方不落库。原先传入的客户端拼 `/projects/...`（缺 `/api` 前缀）
+// 且失败返回全零 ⇒ 全零被写进 I2-tb-data、还提示「已带入」。
 
-/** 从 trial-balance 端点取科目 1717 未审/审定/AJE/RJE（纯函数，便于测试） */
-export async function fetchI2TbData(
-  httpClient: { get: (url: string, config?: any) => Promise<any> },
-  projectId: string,
-): Promise<I2TbData> {
+/** 从试算表取科目 1717 未审 / 审定 / AJE / RJE（科目及其明细之和） */
+export async function fetchI2TbData(projectId: string): Promise<I2TbData> {
   const empty: I2TbData = { unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 }
   if (!projectId) return empty
-  try {
-    const res = await httpClient.get(`/projects/${projectId}/trial-balance`, {
-      params: { account_prefix: ACCOUNT_CODE_1717 },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-
-    let unadjusted1717 = 0
-    let audited1717 = 0
-    let aje1717 = 0
-    let rje1717 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith(ACCOUNT_CODE_1717)) {
-        unadjusted1717 += Number(item.unadjusted_amount ?? 0)
-        audited1717 += Number(item.audited_amount ?? 0)
-        aje1717 += Number(item.aje_adjustment ?? 0)
-        rje1717 += Number(item.rje_adjustment ?? 0)
-      }
-    }
-    return { unadjusted1717, audited1717, aje1717, rje1717 }
-  } catch {
-    return empty
+  const code = ACCOUNT_CODE_1717
+  const { rows } = await fetchTrialBalanceRows(projectId, { accountPrefix: code })
+  return {
+    unadjusted1717: tbSumUnder(rows, code, 'unadjusted_amount') ?? 0,
+    audited1717: tbSumUnder(rows, code, 'audited_amount') ?? 0,
+    aje1717: tbSumUnder(rows, code, 'aje_adjustment') ?? 0,
+    rje1717: tbSumUnder(rows, code, 'rje_adjustment') ?? 0,
   }
 }
 

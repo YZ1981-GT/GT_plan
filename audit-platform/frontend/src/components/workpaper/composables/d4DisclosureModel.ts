@@ -199,9 +199,16 @@ export const D4_TRANSPOSE_CHECK_ITEMS = [
  *
  * 零入参调用使用默认审计年度 2025（供 disclosureColumnsCoverage sweep）。
  *
- * @param auditYear - 审计年度（如 2025），年度列为 `{auditYear+1}年`/`{auditYear+2}年`
+ * @param auditYear - 审计年度（如 2025），年度列为 `{auditYear+1}年`/`{auditYear+2}年`；
+ *   项目没填审计年度传 null ⇒ 年度列无从派生，只回标签列与合计列（不按今年 / 2025 兜底）
  */
-export function buildD4ObligationColumns(auditYear: number = 2025): ColumnDef[] {
+export function buildD4ObligationColumns(auditYear: number | null = 2025): ColumnDef[] {
+  if (auditYear == null) {
+    return [
+      { key: 'label', label: '年度', is_label: true, flat: true },
+      { key: 'total', label: '合计', format: 'amount', flat: true },
+    ]
+  }
   const year1 = auditYear + 1
   const year2 = auditYear + 2
 
@@ -217,13 +224,14 @@ export function buildD4ObligationColumns(auditYear: number = 2025): ColumnDef[] 
  * 派生合计列值（各年度列之和）。
  *
  * @param row - 行数据对象
- * @param auditYear - 审计年度
+ * @param auditYear - 审计年度（项目没填为 null ⇒ 年度列 key 无从确定，返回 null）
  * @returns 合计值（全 null 时返回 null）
  */
 export function deriveObligationTotal(
   row: Record<string, unknown>,
-  auditYear: number,
+  auditYear: number | null,
 ): number | null {
+  if (auditYear == null) return null
   const year1Key = `year_${auditYear + 1}`
   const year2Key = `year_${auditYear + 2}`
   const v1 = typeof row[year1Key] === 'number' ? (row[year1Key] as number) : null
@@ -244,6 +252,7 @@ export interface D4ObligationRow {
  * 获取（6）表的年度列 key 列表（不含 label 和 total）。
  * 用于前端遍历年度列做合计派生。
  */
-export function getObligationYearKeys(auditYear: number): string[] {
+export function getObligationYearKeys(auditYear: number | null): string[] {
+  if (auditYear == null) return [] // 项目没填审计年度：没有可派生的年度列
   return [`year_${auditYear + 1}`, `year_${auditYear + 2}`]
 }

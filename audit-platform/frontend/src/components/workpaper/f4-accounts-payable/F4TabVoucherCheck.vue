@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** F4TabVoucherCheck — F4-8 应付账款检查表（借/贷两区 + 弹窗逐单据核对） */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, toRef, type Ref } from 'vue'
 import {
   useF4VoucherCheck,
@@ -66,7 +67,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  year?: number
+  year?: number | null
 }>()
 
 const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
@@ -169,6 +170,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

@@ -608,6 +608,7 @@
  * K1TabReceivableCheck.vue — K1-12 其他应收款检查表（凭证级测试）
  * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.6 | Requirements: 8.4-8.6
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, inject, toRef, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -826,7 +827,7 @@ const K1_ACCOUNT_PREFIXES = computed(() => k1GrossQueryCodes(_injectedTbSrc?.val
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -834,10 +835,14 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K1_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, K1_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

@@ -68,13 +68,15 @@ import Decimal from 'decimal.js'
 import { getConsolRowBreakdown, type ConsolRowBreakdown, type ConsolRowBreakdownItem } from '@/services/consolidationApi'
 import { useNavigationStack, type NavigationEntry } from '@/composables/useNavigationStack'
 import { useProjectStore } from '@/stores/project'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { projectVisibleInOptions } from '@/components/consolidation/composables/consolEntityView'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 不读穿透明细，弹窗里写明去填年度 */
+  year: number | null
   /** 报表行次（报表页右键传的就是行次；纯数字按科目码走已落库的穿透明细） */
   accountCode?: string
   /** 汇总节点；省略 = 根合并节点 */
@@ -132,8 +134,10 @@ function pctText(row: ConsolRowBreakdownItem): string {
 function jumpTarget(row: ConsolRowBreakdownItem): { path: string; query: Record<string, string> } | null {
   const pid = row.source_project_id
   if (!pid || row.kind === 'elim') return null
-  if (row.kind === 'aggregate') return { path: `/projects/${pid}/consolidation`, query: { year: String(props.year), tab: 'report' } }
-  return { path: `/projects/${pid}/reports`, query: { year: String(props.year) } }
+  // 年度为空不带 year（原先 String(null) 带成 year=null）：目标页按项目审计年度口径
+  const yq: Record<string, string> = props.year == null ? {} : { year: String(props.year) }
+  if (row.kind === 'aggregate') return { path: `/projects/${pid}/consolidation`, query: { ...yq, tab: 'report' } }
+  return { path: `/projects/${pid}/reports`, query: yq }
 }
 
 watch(
@@ -144,11 +148,17 @@ watch(
 
 async function fetchBreakdown() {
   const my = ++seq
-  loading.value = true
   data.value = null
   failMessage.value = ''
+  const year = props.year
+  if (year == null) {
+    loading.value = false
+    failMessage.value = MISSING_AUDIT_YEAR_MESSAGE
+    return
+  }
+  loading.value = true
   try {
-    const res = await getConsolRowBreakdown(props.projectId, props.year, props.accountCode ?? '', props.nodeKey)
+    const res = await getConsolRowBreakdown(props.projectId, year, props.accountCode ?? '', props.nodeKey)
     if (my === seq) data.value = res
   } catch (e: any) {
     if (my !== seq) return

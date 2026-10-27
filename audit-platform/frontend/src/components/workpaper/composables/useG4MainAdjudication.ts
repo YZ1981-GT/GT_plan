@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG4MainAdjudication — G4-1 审定表（对齐 Excel 模板）
@@ -567,14 +568,10 @@ export function useG4MainAdjudication(options: UseG4MainAdjudicationOptions) {
     if (_year == null) return null
     if (!projectId.value) return
     try {
-      const resp = await (await import('@/services/apiProxy')).api.get(
-        `/api/projects/${projectId.value}/trial-balance`,
-        { params: { year: _year, account_code: G4_ACCOUNT_CODE  }, _silent: true } as any,
-      )
-      const data = resp?.data?.data ?? resp?.data
-      if (data) {
-        setTrialBalance(parseNum(data.audited_amount ?? data.unadjusted_amount ?? 0))
-      }
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { year: _year, accountPrefix: G4_ACCOUNT_CODE })
+      // 端点回的是行列表（原先当成单个对象读、恒取不到）；审定优先、其次未审
+      const amount = tbSumUnder(rows, G4_ACCOUNT_CODE, 'audited_amount') ?? tbSumUnder(rows, G4_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount != null) setTrialBalance(amount)
     } catch { /* silent */ }
   }
 

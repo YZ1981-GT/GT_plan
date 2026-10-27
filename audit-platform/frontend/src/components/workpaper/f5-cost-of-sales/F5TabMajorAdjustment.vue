@@ -292,11 +292,12 @@ const props = withDefaults(defineProps<{
   projectId: string
   isReadonly: boolean
   materiality?: number
-  /** 审计年度（供抽凭引擎按年度查询序时账），由父入口从 project_context 派生 */
-  year?: number
+  /** 审计年度（供抽凭引擎按年度查询序时账），由父入口从 project_context 派生；项目没填为 null */
+  year?: number | null
 }>(), {
   materiality: 0,
-  year: undefined,
+  // 缺省 null（原为 undefined：withDefaults 让类型显示成 number，引擎的必填 year 实际收到 undefined）
+  year: null,
 })
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>

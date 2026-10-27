@@ -2,6 +2,7 @@
  * G11 跨底稿取数（G7-14 权益法 → G11-2 明细）+ 序时账预填 + 勾稽校验
  */
 import http from '@/utils/http'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { parseNum, calcAdjustedAmount, calcSubtotal } from './useG11FormulaEngine'
 import {
   flattenG714Rows,
@@ -261,13 +262,7 @@ export async function fetchG11LedgerIncomeSeeds(opts: {
 
   // 1) 试算表子科目
   try {
-    const { data } = await http.get(`/api/projects/${opts.projectId}/trial-balance`, {
-      params: { year: y, account_prefix: G11_ACCOUNT_CODE },
-      _silent: true,
-    } as any)
-    const rows: G11TbRowLike[] = Array.isArray(data)
-      ? data
-      : (data?.data ?? data?.items ?? data?.rows ?? [])
+    const { rows } = await fetchTrialBalanceRows(opts.projectId, { year: y, accountPrefix: G11_ACCOUNT_CODE })
     const childRows = resolveG11TbChildRows(rows)
     if (childRows.length) {
       const seeds = childRows

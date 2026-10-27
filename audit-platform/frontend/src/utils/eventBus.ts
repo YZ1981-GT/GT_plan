@@ -157,10 +157,10 @@ export interface ConsolRefreshEntityPayload {
   types: string[]
 }
 
-/** 合并一键刷新完成（通知各 tab 刷新缓存） */
+/** 合并一键刷新完成 / 企业树变化（通知各 tab 刷新缓存）；中栏重读企业树不依赖年度 ⇒ 年度未就绪时为 null */
 export interface ConsolRefreshDonePayload {
   projectId: string
-  year: number
+  year: number | null
 }
 
 /**

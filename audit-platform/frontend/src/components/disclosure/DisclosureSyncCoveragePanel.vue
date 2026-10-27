@@ -71,7 +71,8 @@ import { useAcnr } from '@/services/acnr'
 
 const props = defineProps<{
   projectId?: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 不请求（与未传同） */
+  year?: number | null
 }>()
 
 /**

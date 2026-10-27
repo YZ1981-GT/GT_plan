@@ -124,7 +124,8 @@ interface LineItem { standard_account_code?: string; account_name?: string; debi
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null ⇒ 转派提示去填年度 */
+  year: number | null
   entryGroupId: string
   adjustmentNo?: string
   accountOptions?: AccountOption[]

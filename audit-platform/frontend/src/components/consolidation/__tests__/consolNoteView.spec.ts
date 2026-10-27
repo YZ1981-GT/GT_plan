@@ -257,7 +257,11 @@ describe('ConsolNoteTab 生产接线守卫', () => {
   })
 
   it('合并页按企业树年度传给附注，并让顶部“查看”调用新附注差额而非旧汇总估算', () => {
-    expect(index).toContain(':year="effectiveConsolYear()"')
+    expect(index).toContain('const consolYear = computed<number | null>(() => effectiveConsolYear())')
+    // 附注组件在合并口径年度就绪后才挂载（年度为 null 不发 notes/{pid}/null）
+    const noteTabTag = index.slice(index.indexOf('<ConsolNoteTab'), index.indexOf('/>', index.indexOf('<ConsolNoteTab')))
+    expect(noteTabTag).toContain('v-if="consolYear != null"')
+    expect(noteTabTag).toContain(':year="consolYear"')
     expect(index).toContain("if (activeTab.value === 'consol_note')")
     expect(index).toContain('noteTab.openNoteBreakdownForSelection()')
     expect(index).toContain('<ConsolReportBreakdownView')

@@ -15,7 +15,8 @@ import { customQuery } from '@/services/apiPaths'
 export interface BatchQueryParams {
   wpCodes: string[]
   projectId: string
-  year?: number
+  /** 项目审计年度（查询端点 year 必填；原先缺省时兜底今年，必须由调用方给出） */
+  year: number
   filters?: Record<string, any>
   cellRange?: string
   sheetName?: string
@@ -90,7 +91,7 @@ export function useBatchQuery() {
 
           const requestBody: Record<string, any> = {
             project_id: projectId,
-            year: year ?? new Date().getFullYear(),
+            year,
             source,
             filters: { ...filters, wp_code: wpCode },
           }

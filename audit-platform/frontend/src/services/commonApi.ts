@@ -846,12 +846,13 @@ export async function getDashboardAvailableStaff(maxHours: number): Promise<any>
 
 // ── 一致性检查 ──
 
-export async function runConsistencyCheck(projectId: string, year = 2025): Promise<any> {
+// 年度必传：原先缺省 2025，一致性看板两处调用都没传 ⇒ 任何项目都按 2025 年度校验 / 读结果
+export async function runConsistencyCheck(projectId: string, year: number): Promise<any> {
   const { data } = await http.post(P_proj.consistencyCheck.run(projectId), null, { params: { year } })
   return data
 }
 
-export async function getConsistencyCheck(projectId: string, year = 2025): Promise<any> {
+export async function getConsistencyCheck(projectId: string, year: number): Promise<any> {
   const { data } = await http.get(P_proj.consistencyCheck.get(projectId), { params: { year } })
   return data
 }
@@ -1781,7 +1782,8 @@ export async function listSnapshots(projectId: string): Promise<any[]> {
   return Array.isArray(data) ? data : []
 }
 
-export async function createSnapshot(projectId: string, year: number = 2025): Promise<void> {
+// 年度必传：原先缺省 2025，合并快照页调用没传 ⇒ 快照恒建在 2025 年度
+export async function createSnapshot(projectId: string, year: number): Promise<void> {
   await http.post(`${P_consol.snapshots(projectId)}?year=${year}`)
 }
 
@@ -2029,19 +2031,19 @@ export async function enhanceColumnMapping(projectId: string, headers: string[],
   return data
 }
 
-export async function getImportQualityCheck(projectId: string, year = 2025): Promise<{
+export async function getImportQualityCheck(projectId: string, year: number): Promise<{
   score: number; grade: string; findings: any[]; summary: string
 }> {
   const { data } = await http.get(P_ii.qualityCheck(projectId), { params: { year } })
   return data
 }
 
-export async function prepareIncrementalImport(projectId: string, mode: string, period?: string, year = 2025): Promise<any> {
+export async function prepareIncrementalImport(projectId: string, mode: string, period: string | undefined, year: number): Promise<any> {
   const { data } = await http.post(P_ii.prepareIncremental(projectId), { mode, period }, { params: { year } })
   return data
 }
 
-export async function getImportOverview(projectId: string, year = 2025): Promise<any> {
+export async function getImportOverview(projectId: string, year: number): Promise<any> {
   const { data } = await http.get(P_ii.overview(projectId), { params: { year } })
   return data
 }

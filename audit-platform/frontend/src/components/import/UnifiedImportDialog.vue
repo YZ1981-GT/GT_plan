@@ -200,7 +200,7 @@ const props = defineProps<{
   modelValue: boolean
   importType: string
   projectId?: string
-  year?: number
+  year?: number | null
   subType?: string
 }>()
 

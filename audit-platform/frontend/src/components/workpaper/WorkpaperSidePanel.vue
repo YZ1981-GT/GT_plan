@@ -72,7 +72,9 @@
             </div>
           </el-tab-pane>
           <el-tab-pane label="一致性" name="consistency" lazy>
-            <CrossCheckPanel v-if="wpId" :project-id="projectId" :year="currentYear" />
+            <!-- 项目没填审计年度：跨科目校验按年度取 / 执行，不按今年兜底 -->
+            <div v-if="wpId && currentYear == null" class="gt-wp-side-placeholder">{{ MISSING_AUDIT_YEAR_MESSAGE }}</div>
+            <CrossCheckPanel v-else-if="wpId && currentYear != null" :project-id="projectId" :year="currentYear" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
           <el-tab-pane label="公式" name="formulas" lazy>
@@ -181,6 +183,7 @@ import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
 import WpDecisionTracePanel from '@/components/workpaper/WpDecisionTracePanel.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import type { RenderDecisionWire } from '@/types/renderConfig'
 
 interface FineCheckResult {

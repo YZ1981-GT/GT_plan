@@ -243,7 +243,8 @@ import SheetCellRangePicker from '@/components/query/SheetCellRangePicker.vue'
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
+  /** 项目年度；项目没填审计年度为 null（弹窗里由用户指定，不按日历猜） */
+  year: number | null
   /** 初始 tab：'basic'（默认业务视图）/ 'advanced'（高级构建器） */
   initialTab?: 'basic' | 'advanced'
   /** 初始 source（从模板页跳入时预填） */
@@ -313,7 +314,8 @@ const resultTruncated = ref(false)
 
 // 查询历史（最近 10 次，localStorage 持久，点击回填并重查）
 interface QueryHistoryItem {
-  projectId: string; projectLabel: string; year: number
+  // 年度：查询时用的是什么就记什么（模板浏览 / 项目没填年度时为 null，回填后照样不带年度查）
+  projectId: string; projectLabel: string; year: number | null
   source: string; sourceLabel: string; filterText: string; cellRange: string; ts: number
 }
 const QUERY_HISTORY_KEY = 'gt:cq:history'
@@ -803,6 +805,11 @@ async function onTraceToTemplate() {
 async function executeQuery() {
   if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) {
     ElMessage.warning('该数据源需先选择项目（模板浏览模式仅支持报表/附注/底稿模板）')
+    return
+  }
+  // 查询端点 year 必填：项目没填审计年度时先在上面指定年度（原先由三栏布局兜底去年，静默查了别的年度）
+  if (localProjectId.value && localYear.value == null) {
+    ElMessage.warning('该项目未设置审计年度，请先在上方填写要查询的年度')
     return
   }
   hasQueried.value = true

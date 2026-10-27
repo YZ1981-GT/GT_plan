@@ -138,6 +138,18 @@ describe('useEditorSave — onSave 主要行为', () => {
     vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
   })
 
+  it('保存后的影响分析按项目年度（spec post-push-residual-defect-closure 6.5.3：原先兜底今年）', async () => {
+    const opts = makeOptions({ year: computed(() => 2025) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: 2025, project_id: 'proj-1' }))
+  })
+
+  it('项目没填年度、底稿详情也没有 year：影响分析传 null（由 useStaleImpact 跳过），不拿今年', async () => {
+    const opts = makeOptions({ year: computed(() => null) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: null }))
+  })
+
   it('onSave 调用 httpApi.post 并在成功后将 dirty 设为 false', async () => {
     const opts = makeOptions({ dirty: ref(true) })
     const result = useEditorSave(opts)

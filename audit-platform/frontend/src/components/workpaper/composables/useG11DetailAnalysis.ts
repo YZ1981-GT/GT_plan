@@ -452,11 +452,11 @@ export function useG11DetailAnalysis(opts: {
       const year = resolveAuditYear()
       if (year == null) {
         ledgerImportMsg.value = '未设置审计年度，无法读取序时账'
-        return
+        return 0
       }
       const { seeds, source, error } = await fetchG11LedgerIncomeSeeds({
         projectId,
-        year: resolveAuditYear(),
+        year,
       })
       if (!seeds.length) {
         ledgerImportMsg.value = error || '未找到 6111 分项发生额'

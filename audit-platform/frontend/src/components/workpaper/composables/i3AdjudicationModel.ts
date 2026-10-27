@@ -211,7 +211,7 @@ export function parseI32DetailRows(raw: unknown): any[] {
  */
 export function seedI3AdjudicationFromDetail(
   detailRaw: unknown,
-  asOfYear?: number,
+  asOfYear?: number | null,
   existing?: I3AdjudicationRowModel[],
 ): I3AdjudicationRowModel[] {
   if (asOfYear == null) return existing?.length ? existing.map(normalizeI3AdjudicationRow) : []

@@ -343,65 +343,85 @@ def _merge_sheets_dedup(
     """
     from openpyxl import load_workbook
 
+    from app.services.xlsx_cell_patch import ValueSheet, XlsxPatchError, append_value_sheets, workbook_sheet_names
+
     stats = {"merged": 0, "skipped_dup": 0, "skipped_historical": 0}
 
-    target_wb = load_workbook(str(target_path))
     # 用归一化名集合去重（含 target 自身已有 sheet）
     existing_normalized: set[str] = {
-        _normalize_sheet_name(s) for s in target_wb.sheetnames
+        _normalize_sheet_name(s) for s in workbook_sheet_names(target_path)
     }
+    pending: list[ValueSheet] = []
 
-    try:
-        for other_file in other_files:
+    for other_file in other_files:
+        try:
+            src_wb = load_workbook(str(other_file), read_only=True, data_only=True)
             try:
-                src_wb = load_workbook(str(other_file), read_only=True, data_only=True)
-                try:
-                    for sheet_name in src_wb.sheetnames:
-                        # 1. 历史遗留 sheet 过滤（修订前 / （原））
-                        if _should_skip_historical_sheet(sheet_name):
-                            stats["skipped_historical"] += 1
-                            logger.debug(
-                                "merge_sheets_dedup: 跳过历史遗留 sheet '%s' from %s",
-                                sheet_name, other_file.name,
-                            )
-                            continue
+                collected: list[tuple[str, ValueSheet]] = []
+                for sheet_name in src_wb.sheetnames:
+                    # 1. 历史遗留 sheet 过滤（修订前 / （原））
+                    if _should_skip_historical_sheet(sheet_name):
+                        stats["skipped_historical"] += 1
+                        logger.debug(
+                            "merge_sheets_dedup: 跳过历史遗留 sheet '%s' from %s",
+                            sheet_name, other_file.name,
+                        )
+                        continue
 
-                        # 2. 归一化去重（覆盖 GT_Custom / 底稿目录 / 中英文圆括号变体）
-                        normalized = _normalize_sheet_name(sheet_name)
-                        if normalized in existing_normalized:
-                            stats["skipped_dup"] += 1
-                            logger.debug(
-                                "merge_sheets_dedup: 跳过重复 sheet '%s' (normalized='%s') from %s",
-                                sheet_name, normalized, other_file.name,
-                            )
-                            continue
+                    # 2. 归一化去重（覆盖 GT_Custom / 底稿目录 / 中英文圆括号变体）
+                    normalized = _normalize_sheet_name(sheet_name)
+                    if normalized in existing_normalized or any(n == normalized for n, _ in collected):
+                        stats["skipped_dup"] += 1
+                        logger.debug(
+                            "merge_sheets_dedup: 跳过重复 sheet '%s' (normalized='%s') from %s",
+                            sheet_name, normalized, other_file.name,
+                        )
+                        continue
 
-                        # 3. 创建新 sheet（Excel sheet 名最长 31 字符）
-                        new_ws = target_wb.create_sheet(title=sheet_name[:31])
-                        existing_normalized.add(normalized)
-                        src_ws = src_wb[sheet_name]
-                        for row in src_ws.iter_rows():
-                            for cell in row:
-                                if cell.value is not None:
-                                    new_ws.cell(
-                                        row=cell.row,
-                                        column=cell.column,
-                                        value=cell.value,
-                                    )
-                        stats["merged"] += 1
-                finally:
-                    src_wb.close()
-            except Exception as e:
-                logger.debug(
-                    "merge_sheets_dedup: 合并失败 %s (%s)",
-                    other_file.name, e,
-                )
+                    # 3. 只取值（公式取缓存结果，与原先一致）；Excel sheet 名最长 31 字符
+                    cells = [(cell.row, cell.column, cell.value)
+                             for row in src_wb[sheet_name].iter_rows() for cell in row if cell.value is not None]
+                    collected.append((normalized, ValueSheet(title=sheet_name[:31], cells=cells)))
+            finally:
+                src_wb.close()
+        except Exception as e:
+            logger.debug(
+                "merge_sheets_dedup: 合并失败 %s (%s)",
+                other_file.name, e,
+            )
+            continue
+        # 一个源文件整份读完才计入（读到一半出错不留半个文件的页）
+        for normalized, sheet in collected:
+            existing_normalized.add(normalized)
+            pending.append(sheet)
+            stats["merged"] += 1
 
+    if not pending:
+        return stats
+    # 追加到主文件末尾：主文件原有部件逐字节不动（原先 openpyxl 整册重存，主文件的 x14 数据验证、公式缓存值等全丢；
+    # spec post-push-residual-defect-closure R4.5）
+    try:
+        append_value_sheets(target_path, pending)
+    except XlsxPatchError:
+        logger.warning("merge_sheets_dedup: %s 结构不认识，改用 openpyxl 整册重存合并（会丢数据验证扩展等）",
+                       target_path.name, exc_info=True)
+        _append_value_sheets_openpyxl(target_path, pending)
+    return stats
+
+
+def _append_value_sheets_openpyxl(target_path: Path, sheets: list) -> None:
+    """``append_value_sheets`` 认不出工作簿结构时的退路（原先的合并写法：openpyxl 建页写值后整册重存）。"""
+    from openpyxl import load_workbook
+
+    target_wb = load_workbook(str(target_path))
+    try:
+        for sheet in sheets:
+            new_ws = target_wb.create_sheet(title=sheet.title)
+            for r, c, v in sheet.cells:
+                new_ws.cell(row=r, column=c, value=v)
         target_wb.save(str(target_path))
     finally:
         target_wb.close()
-
-    return stats
 
 
 def get_workpaper_storage_path(project_id: UUID, wp_id: UUID) -> Path:

@@ -69,6 +69,7 @@ import {
   type PopulationReconcileInfo,
 } from './samplingPopulationReconcile'
 import { useVersionTrail } from './useVersionTrail'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -91,7 +92,8 @@ export type DuplicateDecision = 'keep_all' | 'removed' | 'none'
 
 export interface VoucherSamplingOptions {
   projectId: Ref<string>
-  year: Ref<number>
+  /** 审计年度；项目没填为 null（读请求不发，执行抽样提示补填） */
+  year: Ref<number | null>
   workpaperId: Ref<string>
   accountCode: string
   /**
@@ -552,7 +554,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    */
   async function loadTolerableMisstatement(pid?: string): Promise<string | null> {
     const targetPid = pid ?? projectId.value
-    if (!targetPid) return null
+    // 年度未设置：不取重要性（允许手工录入，与取数失败同口径）
+    if (!targetPid || year.value == null) return null
     try {
       const res = await http.get(`/api/projects/${targetPid}/materiality`, {
         params: { year: year.value },
@@ -772,6 +775,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    */
   async function triggerSampling(): Promise<void> {
     if (!validateConfig()) return
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
 
     loading.value = true
     try {

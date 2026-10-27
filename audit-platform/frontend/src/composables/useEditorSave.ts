@@ -41,6 +41,8 @@ export interface UseEditorSaveOptions {
   initUniver?: () => Promise<void>
   loading?: Ref<boolean>
   showStaleImpactPanel?: Ref<boolean>
+  /** 项目审计年度（保存后的下游影响分析按它算；没有再看底稿详情的 year，都没有不分析） */
+  year?: Readonly<Ref<number | null>>
 }
 export function useEditorSave(opts: UseEditorSaveOptions) {
   const router = useRouter()
@@ -117,7 +119,8 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
           sheet: sheetName,
           max_depth: 3,
           project_id: opts.projectId.value,
-          year: opts.wpDetail.value?.year || new Date().getFullYear(),
+          // 原先兜底今年：2025 年度项目在 2026 年保存，标的是 2026 的下游
+          year: opts.year?.value ?? opts.wpDetail.value?.year ?? null,
         })
         if (impactResp && (impactResp.total || impactResp.total_affected) > 0) {
           const total = impactResp.total || impactResp.total_affected

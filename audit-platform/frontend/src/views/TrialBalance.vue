@@ -454,6 +454,8 @@
     <!-- 归档横幅 -->
     <ArchivedBanner />
     <ConsolLockedBanner />
+    <!-- 项目没填审计年度：试算表按年度取数 / 重算，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
     <!-- 折叠/展开按钮 -->
     <div class="gt-header-toggle" @click="headerCollapsed = !headerCollapsed">
@@ -1050,7 +1052,7 @@
 
     <!-- #10: 对比视图（激活时替代主表） -->
     <TbComparisonView
-      v-if="comparisonActive"
+      v-if="comparisonActive && year != null"
       :project-id="projectId"
       :year="year"
       :current-rows="rows"
@@ -1167,7 +1169,7 @@
       :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
       :rows="rows"
       :project-id="projectId"
-      :year="year"
+      :year="year ?? undefined"
       :template-type="selectedTemplateType"
       @applied="fetchData"
     />
@@ -1399,6 +1401,7 @@ import * as P from '@/services/apiPaths'
 import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 
@@ -1416,7 +1419,7 @@ const { can: canOp, whyCannot } = usePermissionMatrix()
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
-const selectedYear = ref(projectStore.year)
+const selectedYear = ref<number | null>(projectStore.year)
 const yearOptions = computed(() => projectStore.yearOptions)
 
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
@@ -1433,13 +1436,15 @@ const staleRefresh = useStaleRefresh(projectId, {
 
 // ─── 联动徽章 [enterprise-linkage 3.6] ─────────────────────────────────────────
 const linkageProjectId = projectId
-const linkageYear = computed(() => selectedYear.value ?? 2025)
+// 原先 `selectedYear ?? 2025`：信息栏没选年度时徽章按 2025 取数
+const linkageYear = computed<number | null>(() => selectedYear.value ?? year.value)
 const { getAdjustments, getWorkpapers } = useLinkageIndicator(linkageProjectId, linkageYear)
 
 function onProjectChange(pid: string) {
   router.push({
     path: `/projects/${pid}/trial-balance`,
-    query: { year: String(selectedYear.value) },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: selectedYear.value == null ? {} : { year: String(selectedYear.value) },
   })
 }
 
@@ -1592,6 +1597,13 @@ function getFreezeKey() {
 }
 
 async function loadFreezeState() {
+  // 项目没填审计年度：没有该年度试算表，不查锁定状态（按年度取，缺年度 422）
+  if (year.value == null) {
+    isFrozen.value = false
+    frozenBy.value = null
+    frozenAt.value = null
+    return
+  }
   // 优先从后端读取锁定状态（跨设备/团队可见）
   try {
     const res = await api.get(`/api/projects/${projectId.value}/trial-balance/freeze-status`, { params: { year: year.value }, _silent: true } as any)
@@ -1666,6 +1678,8 @@ const routeYear = computed(() => {
 })
 const projectYear = ref<number | null>(null)
 const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 
 const loading = ref(false)
 const showTbImport = ref(false)
@@ -2033,6 +2047,7 @@ async function loadBalanceCheck() {
 // P1-8: 重要性水平（PM/TE/SAT）
 const materialityLevels = ref<{ pm: number; te: number; sat: number }>({ pm: 0, te: 0, sat: 0 })
 async function loadMaterialityLevels() {
+  if (year.value == null) return // 项目没填审计年度：不拼 year=null
   try {
     const mat = await api.get(`${P.materiality.get(projectId.value)}?year=${year.value}`)
     if (mat) {
@@ -2076,8 +2091,10 @@ const freshnessText = computed(() => {
 })
 
 async function loadLatestAdjustmentTime() {
+  const y = year.value
+  if (y == null) { latestAdjustmentAt.value = null; return }
   try {
-    const adjs = await listAdjustments(projectId.value, year.value)
+    const adjs = await listAdjustments(projectId.value, y)
     if (adjs && adjs.length > 0) {
       const times = adjs.map((a: any) => a.updated_at).filter(Boolean).sort().reverse()
       latestAdjustmentAt.value = times[0] || null
@@ -2184,6 +2201,7 @@ const autoMapNeedsAttention = computed(
 )
 
 async function loadAutoMapOutcome() {
+  if (selectedYear.value == null) { autoMapOutcome.value = null; return }
   try {
     const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
     autoMapOutcome.value = ds?.auto_map ?? null
@@ -2194,6 +2212,12 @@ async function loadAutoMapOutcome() {
 
 /** 检测当前数据状态（用于自动推进步骤） */
 async function detectDataState() {
+  // 项目没填审计年度：余额表 / 映射完成率都按年度取（缺年度 422），不发，步骤停在「导入」
+  if (selectedYear.value == null) {
+    dataState.value = { hasBalance: false, mappingRate: 0, hasTb: rows.value.length > 0 }
+    await loadAutoMapOutcome()
+    return
+  }
   try {
     const [balance, mapping] = await Promise.allSettled([
       api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } }),
@@ -2226,10 +2250,12 @@ watch(tbImportVisible, async (visible) => {
   checkingData.value = true
   existingDataSummary.value = null
   try {
+    // 年度未设置：不查余额表（按年度取，缺年度 422），弹窗照常打开、不显示「已有数据」摘要
+    if (selectedYear.value == null) return
     // 从余额表查询是否有数据
     const balance = await api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } })
     const balanceRows = balance ?? []
-    if (balanceRows.length > 0) {
+    if (balanceRows.length > 0 && selectedYear.value != null) {
       // 有数据，获取数据集信息
       const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
       existingDataSummary.value = {
@@ -2256,7 +2282,8 @@ function goToLedgerImport() {
 
 // 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）
 function onOpenLedgerWindow() {
-  openLedgerWindow(projectId.value, year.value)
+  // 年度为空不带（查账页按项目审计年度口径）
+  openLedgerWindow(projectId.value, year.value ?? undefined)
 }
 
 function onImportDone() {
@@ -2352,24 +2379,36 @@ function rowClassName({ row }: { row: DisplayRow }) {
 
 
 async function ensureProjectYear() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
-  }
   try {
-    projectYear.value = await getProjectAuditYear(projectId.value)
-  } catch {
-    projectYear.value = null
+    if (routeYear.value !== null) {
+      projectYear.value = null
+      return
+    }
+    try {
+      projectYear.value = await getProjectAuditYear(projectId.value)
+    } catch {
+      projectYear.value = null
+    }
+  } finally {
+    yearResolved.value = true
   }
 }
 
 const fetchData = withLoading(loading, async () => {
-  const result = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
+  const y = year.value
+  // 项目没填审计年度：页头横幅已说明，不发请求（原先把 null 发给后端）
+  if (y == null) { rows.value = []; return }
+  const result = await getTrialBalance(projectId.value, y, hasMultipleCompanies.value ? companyCode.value : undefined)
   rows.value = Array.isArray(result) ? result : []
   await loadBalanceCheck()
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 重算前确认弹窗（含上下文提示）
   const rowCount = rows.value.length
   const lastTime = lastRecalcAt.value ? displayPrefs.fmtDateTime(lastRecalcAt.value) : '从未重算'
@@ -2393,7 +2432,7 @@ const onRecalc = withLoading(recalcLoading, async () => {
     }
   }
 
-  await recalcTrialBalance(projectId.value, year.value)
+  await recalcTrialBalance(projectId.value, y)
   await fetchData()
   await loadLatestAdjustmentTime()
 
@@ -2435,7 +2474,12 @@ const onRecalc = withLoading(recalcLoading, async () => {
 })
 
 const onConsistencyCheck = withLoading(checkLoading, async () => {
-  consistencyResult.value = await checkConsistency(projectId.value, year.value)
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  consistencyResult.value = await checkConsistency(projectId.value, y)
   // 持久化校验时间到本地（用于显示"最近校验时间"）
   try {
     localStorage.setItem(`tb_last_check_${projectId.value}_${year.value}`, new Date().toISOString())
@@ -2460,6 +2504,10 @@ function onTbImported() {
 }
 
 async function onExport() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // 导出前自动检查：若有未通过的质量问题则弹提示
   if (dataQualityIssueCount.value > 0) {
     try {
@@ -2500,16 +2548,22 @@ function onUnadjustedClick(row: TrialBalanceRow) {
   if (!row.standard_account_code) return
   router.push({
     path: `/projects/${projectId.value}/ledger`,
-    query: { year: String(year.value), account: row.standard_account_code },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
   })
 }
 
 async function onAdjClick(row: TrialBalanceRow, type: string) {
   adjDialogType.value = type.toUpperCase()
   adjDialogAccount.value = `${row.standard_account_code} ${row.account_name || ''}`
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   adjDialogVisible.value = true
   try {
-    const result = await listAdjustments(projectId.value, year.value, {
+    const result = await listAdjustments(projectId.value, y, {
       adjustment_type: type, page_size: 200,
     })
     // Filter by account code from line_items
@@ -2533,7 +2587,7 @@ async function reloadTrialBalanceContext() {
   loadFreezeState()  // Task 4: 加载冻结状态
   loadMaterialityLevels()  // P1-8: 加载重要性水平
   // P1-1: 自动执行一次数据质量检查（best-effort 填充 badge）
-  if (rows.value.length > 0) {
+  if (rows.value.length > 0 && year.value != null) {
     checkConsistency(projectId.value, year.value)
       .then(r => { consistencyResult.value = r })
       .catch(() => { /* 静默 */ })
@@ -2612,6 +2666,10 @@ function onVersionRestored() {
 
 // #10: 对比模式切换
 function onComparisonMode(cmd: string) {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   comparisonMode.value = cmd as 'cross_year' | 'cross_project'
   comparisonActive.value = true
 }
@@ -3300,7 +3358,8 @@ async function onTbCtxTrace() {
   // 跳转到查账页面，带上科目编码参数，查账页面会自动定位
   router.push({
     path: `/projects/${projectId.value}/ledger`,
-    query: { year: String(year.value), account: row.standard_account_code },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
   })
 }
 
@@ -3446,7 +3505,8 @@ function onTbCtxViewAdj() {
   }
   router.push({
     path: `/projects/${projectId.value}/adjustments`,
-    query: { year: String(year.value), account: row.standard_account_code },
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
   })
 }
 
@@ -3675,6 +3735,7 @@ async function _loadOpeningTbSummary() {
  * 用之前手动保存的值覆盖（典型场景：现金流量表无公式，全靠手动填写）
  */
 async function _mergeSavedTbSummary(periodOverride?: string) {
+  if (selectedYear.value == null) return // 项目没填审计年度：没有可读的已存汇总
   try {
     const period = periodOverride || tbSumPeriod.value
     const sheetKey = period === 'opening'
@@ -3718,6 +3779,10 @@ async function _mergeSavedTbSummary(periodOverride?: string) {
 }
 
 async function saveTbSummary() {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   try {
     const saveRows = tbSummaryRows.value.map((r: any) => ({
       row_code: r.row_code, row_name: r.row_name,

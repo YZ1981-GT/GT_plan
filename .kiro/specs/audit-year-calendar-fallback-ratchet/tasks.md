@@ -84,5 +84,6 @@
 - [x] 8.4 浏览器复测（chrome-devtools 隔离上下文；真实项目只读、不写数据）
   - 证据：无审计年度的项目整页「未设置审计年度」+ 返回、不发写请求；重药安徽 H1-2 取数正常，H1-18 / 宜宾 N2-11 请求带 `year=2025`（HEAD 为 2026），A16 字段覆盖读 `year=2025`，J1A 关联底稿 chip 正常；合并附注下推模板未绑定明细模板时只提示、不发写请求
   - 🔴 复测抓到本 spec 引入的回归：底稿编辑页取项目信息与同页其他组件同址 GET，被 GET 去重取消后落进 catch，只给场景默认值、年度留空 ⇒ 后端稍慢就整页「未设置审计年度」（重药安徽已填 2025，打开 J1A 复现）；4xx / 5xx 因 `validateStatus: s < 600` 也当成功解析，同样落成「未设置」。已抽出 `views/workpaper-editor/useWorkpaperProjectMeta.ts`（`_dedupe: false`、不吞非 2xx、失败与重试单独显示、只认最后一次请求），`AuditYearMissingResult` 加读取失败态；单测 9 + 4 例，变异 5 条全部打红；浏览器注入请求失败后显示「读取项目信息失败」，点重试后底稿正常打开；`SHELL_RATCHET` 1472→1456
-- [ ] 8.5 类型债：`number | null` 与 `number` 不符约 443 条（运行时已按 null 分支处理，只是声明没跟上）；按组件族分批收紧，不在本次推送内
+- [x] 8.5 类型债：`number | null` 与 `number` 不符约 443 条（运行时已按 null 分支处理，只是声明没跟上）；按组件族分批收紧，不在本次推送内
+  - 由 `post-push-residual-defect-closure` R2（其 tasks 6.1~6.4）收口：候选树（HEAD `709b21275` + 该 spec）全量 vue-tsc 相对 HEAD 减少 447 条，年度相关新增清零。勘误：「运行时已按 null 分支处理」不成立 —— 集中调整同步年度为空仍发请求、抽凭 / 截止测试默认截止日拼成 `null-12-31`、挂凭计数与导入照发请求、七个底稿把 ComputedRef 对象当年度传。遗留：store 年度初值去年致无年度项目仍按 2025 取数，见该 spec tasks 6.5
 - 范围外发现（登记，不在本 spec 修）：前端 37 处 `GET /api/projects/{id}/trial-balance` 不带 `year`（端点 `year` 必填，且不认 `account_prefix`）⇒ 恒 422、被 catch 吞成「待取数」（H1 / H3 / H4 / H5 / H10 / I1~I6 / K2~K13 / N4 / G7 / H2 / K5 / M2 的试算表勾稽；浏览器实测 H3-14 6051 勾稽即此）；HEAD 同数，与日历兜底无关，宜另立 spec

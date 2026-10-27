@@ -6,6 +6,7 @@ import { reports as P_reports } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { fmtAmount } from '@/utils/formatters'
 import type { ReportRow } from '@/services/auditPlatformApi'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import type { useCellSelection } from '@/composables/useCellSelection'
 import type { usePenetrate } from '@/composables/usePenetrate'
 
@@ -13,7 +14,8 @@ import type { usePenetrate } from '@/composables/usePenetrate'
 
 export interface UseReportContextMenuOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null ⇒ 改单元格 / 查关联底稿提示去填年度，跳转不带 year */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   rows: Ref<ReportRow[]>
   reportMode: Ref<string>
@@ -185,6 +187,10 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
         value: null as number | null,
       }
       if (eqTarget) payload.year_key = eqTarget.yearKey
+      if (year.value == null) {
+        ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+        return
+      }
       ElMessageBox.prompt(`编辑「${row.row_name}」的「${column.label}」`, '编辑单元格', {
         inputValue: equityCellDisplayValue(row, column),
         inputPattern: /^-?\d*\.?\d*$/,
@@ -256,6 +262,10 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
     rvCtx.closeContextMenu()
     const row = rvCtx.contextMenu.rowData
     if (!row?.row_code) return
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     try {
       const data = await api.get(P_reports.relatedWorkpapers(projectId.value, year.value, activeTab.value, row.row_code))
       const wps = (data as any)?.workpapers || []
@@ -278,7 +288,8 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
     }
     router.push({
       path: `/projects/${projectId.value}/trial-balance`,
-      query: { highlight_row: row.row_code, year: String(year.value) },
+      // 年度为空不带 year（原先 String(null) 带成 year=null）
+      query: { highlight_row: row.row_code, ...(year.value != null ? { year: String(year.value) } : {}) },
     })
   }
 
@@ -301,7 +312,8 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
     if (!row.row_code || row.is_total_row || getRowType(row) === 'header') return
     router.push({
       path: `/projects/${projectId.value}/trial-balance`,
-      query: { highlight_row: row.row_code, year: String(year.value) },
+      // 年度为空不带 year（原先 String(null) 带成 year=null）
+      query: { highlight_row: row.row_code, ...(year.value != null ? { year: String(year.value) } : {}) },
     })
   }
 

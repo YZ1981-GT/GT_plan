@@ -21,6 +21,7 @@
  * - TB回写发生额，非期末余额（期末结转本年利润后为0）
  * - ⚠️ 方向与K8(6601)/K11(6701)相反！K8/K11: debit-credit，K12: credit-debit
  */
+import { fetchTrialBalanceRows, tbProfitLossUnder } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -297,27 +298,13 @@ export function useK12FormData(opts: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_6301 },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-
-      let totalCredit = 0
-      let totalDebit = 0
-      let auditedAmount = 0
-      let found = false
-
-      for (const item of list) {
-        const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_6301)) {
-          // 损益类：取发生额字段
-          totalCredit += parseNum(item.lending_amount ?? item.period_credit ?? item.credit_amount ?? 0)
-          totalDebit += parseNum(item.borrowing_amount ?? item.period_debit ?? item.debit_amount ?? 0)
-          auditedAmount += parseNum(item.audited_amount ?? 0)
-          found = true
-        }
-      }
+      const { rows } = await fetchTrialBalanceRows(projectId.value, { accountPrefix: ACCOUNT_CODE_6301 })
+      // 损益类本期借 / 贷按试算表单边口径拆，科目及其明细之和（端点没有 borrowing / lending / debit_amount，原先恒 0）
+      const pl = tbProfitLossUnder(rows, ACCOUNT_CODE_6301)
+      const totalDebit = pl.debit
+      const totalCredit = pl.credit
+      const auditedAmount = pl.audited ?? 0
+      const found = pl.found
 
       tbData.value = {
         unadjustedCredit: totalCredit,

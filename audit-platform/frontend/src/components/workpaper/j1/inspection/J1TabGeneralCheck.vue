@@ -289,6 +289,8 @@
  * 复用 useK1VoucherCheck composable + useJ1VoucherOcr 行级 OCR。
  * 自持久化模式（J1 composable-internal persist pattern）。
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { fetchTrialBalanceRows, tbRowsUnder, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, reactive, computed, onMounted, defineAsyncComponent, inject } from 'vue'
 import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -517,6 +519,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (isReadonly.value) return
+  if (yearNum.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
@@ -560,24 +566,17 @@ async function autoFetchPopulation() {
   if (isReadonly.value) return
   autoFetchLoading.value = true
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { year: yearNum.value }, _silent: true,
-    } as any)
-    const items = res.data?.data || res.data || []
-    const allRows = Array.isArray(items) ? items : []
-    const matched = allRows.filter((r: any) => {
-      const code = r.standard_account_code || r.account_code || ''
-      return code === '2211' || code.startsWith('2211')
+    const { rows } = await fetchTrialBalanceRows(props.projectId, {
+      year: yearNum.value,
+      accountPrefix: '2211',
+      includeMovement: true,
     })
+    const matched = tbRowsUnder(rows, '2211')
     if (matched.length > 0) {
-      let creditTotal = 0, debitTotal = 0
-      for (const tb of matched) {
-        creditTotal += Math.abs(tb.credit_amount || tb.period_credit || 0)
-        debitTotal += Math.abs(tb.debit_amount || tb.period_debit || 0)
-      }
-      if (creditTotal === 0 && debitTotal === 0 && matched[0].unadjusted_amount) {
-        creditTotal = Math.abs(matched[0].unadjusted_amount)
-      }
+      // 本期贷 / 借方发生额 = 余额表叶子汇总（includeMovement）；原先读端点不返回的 credit_amount 等 ⇒ 恒 0，
+      // 再把第一行的期末未审数当成贷方总体
+      const creditTotal = Math.abs(tbSumUnder(matched, '2211', 'period_credit') ?? 0)
+      const debitTotal = Math.abs(tbSumUnder(matched, '2211', 'period_debit') ?? 0)
       if (creditTotal > 0) criteria.value.populationCreditAmount = creditTotal
       if (debitTotal > 0) criteria.value.populationDebitAmount = debitTotal
       persist()

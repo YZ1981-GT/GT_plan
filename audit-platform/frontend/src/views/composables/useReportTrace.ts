@@ -15,7 +15,8 @@ export interface TraceLocation {
 
 export interface UseReportTraceOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null（仅用于导出文件名） */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   activeTabLabel: ComputedRef<string>
   consistencyResult: Ref<any>
@@ -133,7 +134,7 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `审核报告_${activeTabLabel.value}_${year.value}.csv`
+    a.download = `审核报告_${activeTabLabel.value}${year.value != null ? `_${year.value}` : ''}.csv`
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('审核报告已导出')

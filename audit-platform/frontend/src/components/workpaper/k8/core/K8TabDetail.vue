@@ -361,6 +361,7 @@
  */
 import { computed, inject, reactive, onMounted, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
 import { defineAsyncComponent } from 'vue'
 import { useK8Detail, DETAIL_TABS, type K8DetailTabKey } from '../../composables/useK8Detail'
@@ -417,9 +418,14 @@ const pullingLedger = ref(false)
 const detailYear = computed<number | null>(() => props.year ?? null)
 async function handlePullLedgerMonthly() {
   if (props.isReadonly) return
+  const year = detailYear.value
+  if (year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   pullingLedger.value = true
   try {
-    const res = await pullExpenseLedgerMonthly(props.projectId, '6601', detailYear.value)
+    const res = await pullExpenseLedgerMonthly(props.projectId, '6601', year)
     if (!res.ok) { ElMessage.warning(res.message); return }
     await ElMessageBox.confirm(
       `将从序时账聚合 ${res.rows.length} 个明细科目的月度发生额（合计 ${res.total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}）回填明细表（同名覆盖月度、缺失新增行）。是否继续？`,

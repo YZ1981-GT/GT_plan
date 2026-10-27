@@ -291,6 +291,7 @@ import { ref, computed, toRef, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Setting, Reading } from '@element-plus/icons-vue'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WorkpaperModuleHandbookDialog from './WorkpaperModuleHandbookDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
@@ -481,7 +482,13 @@ async function loadRecommendations() {
 
 const chainLoading = chainExec.executing
 async function onGenerateChain() {
-  await chainExec.executeFullChain(projectStore.year, undefined, true)
+  // 项目没填审计年度：提示后不执行（store 年度原先初值去年，会按去年生成）
+  const chainYear = projectStore.year
+  if (chainYear == null) {
+    ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（本次未生成）`)
+    return
+  }
+  await chainExec.executeFullChain(chainYear, undefined, true)
   // composable 内部已处理成功/失败/冲突消息，执行后刷新列表以反映最新状态
   emit('refresh')
 }
