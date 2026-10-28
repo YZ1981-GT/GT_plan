@@ -30,7 +30,7 @@
     </div>
 
     <div class="confirmation-full-grid__scroll">
-      <table class="confirmation-full-grid__table">
+      <GtGridTable class="confirmation-full-grid__table">
         <colgroup>
           <col v-for="col in visibleColumns" :key="col.key" :style="colStyle(col)" />
         </colgroup>
@@ -115,7 +115,7 @@
             <td :colspan="visibleColumns.length" class="confirmation-full-grid__empty">暂无数据</td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
   </div>
 </template>
@@ -132,6 +132,7 @@ import {
   type ColumnGroup,
   type ConfirmCycle,
 } from './confirmationColumnSpec'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = withDefaults(
   defineProps<{ rows: ConfirmationRow[]; readonly: boolean; cycle?: ConfirmCycle }>(),

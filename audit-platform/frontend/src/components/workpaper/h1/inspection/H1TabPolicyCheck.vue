@@ -560,7 +560,8 @@
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch, defineComponent, h } from 'vue'
 import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox, ElSelect, ElOption, ElTag } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption, ElTag } from 'element-plus'
+import { ElSelect } from '@/components/grid/adapters'
 import {
   useH1PolicyCheck,
   type PolicySection,

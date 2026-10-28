@@ -52,7 +52,7 @@
       @saved="onAgingSegmentsSaved"
     />
 
-    <table class="gbds-table">
+    <GtGridTable class="gbds-table">
       <thead>
         <tr class="gbds-head-group">
           <th rowspan="2" class="gbds-col-label">项目</th>
@@ -155,7 +155,7 @@
           >{{ fmt(tree.summary?.amounts?.[c.key]) }}</td>
         </tr>
       </tbody>
-    </table>
+    </GtGridTable>
 
     <!-- 右键上下文菜单 -->
     <ul
@@ -181,6 +181,7 @@ import { api } from '@/services/apiProxy'
 import ImportPreviewDialog from './ImportPreviewDialog.vue'
 import AgingDictionaryDialog from './AgingDictionaryDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 interface RowAmounts {
   [key: string]: string | null

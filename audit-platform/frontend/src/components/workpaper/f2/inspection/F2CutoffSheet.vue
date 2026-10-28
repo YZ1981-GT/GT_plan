@@ -443,21 +443,8 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, defineComponent, h, inject, onMounted, ref, toRef, watch, type PropType, type Ref, type VNode } from 'vue'
-import {
-  ElButton,
-  ElDatePicker,
-  ElInput,
-  ElInputNumber,
-  ElOption,
-  ElPagination,
-  ElSelect,
-  ElSwitch,
-  ElTable,
-  ElTableColumn,
-  ElTooltip,
-  ElTag,
-  ElAlert,
-} from 'element-plus'
+import { ElButton, ElOption, ElPagination, ElTable, ElTableColumn, ElTooltip, ElTag, ElAlert } from 'element-plus'
+import { ElDatePicker, ElInput, ElInputNumber, ElSelect, ElSwitch } from '@/components/grid/adapters'
 import { useF2CutoffSheet, type F2CutoffRow } from '../../composables/useF2CutoffSheet'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import { timingKindLabel } from '../../composables/f2CutoffJudgment'

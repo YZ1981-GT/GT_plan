@@ -724,7 +724,8 @@
  * H8TabDetail.vue — H8-2 明细表（源模板58列 → 4区段Tab）
  */
 import { ref, toRef, watch, computed, defineComponent, h, inject } from 'vue'
-import { ElMessageBox, ElInputNumber, ElMessage } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElInputNumber } from '@/components/grid/adapters'
 import {
   useH8Detail,
   H8_2_CATEGORY_OPTIONS,

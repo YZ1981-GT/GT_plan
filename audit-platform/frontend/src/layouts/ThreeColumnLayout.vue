@@ -28,7 +28,7 @@
         <slot name="nav-notifications" />
 
         <!-- 显示设置 Aa -->
-        <el-popover placement="bottom" :width="240" trigger="click" :teleported="true">
+        <el-popover placement="bottom" :width="300" trigger="click" :teleported="true">
           <template #reference>
             <div class="gt-topbar-btn" title="显示设置">
               <span class="gt-topbar-text-icon">Aa</span>
@@ -72,6 +72,14 @@
                 <el-radio-button :value="0.5">50%</el-radio-button>
               </el-radio-group>
             </div>
+            <!-- 表格编辑方式（spec excel-style-table-editing R1） -->
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格编辑</span>
+              <el-radio-group :model-value="displayPrefs.gridEditMode" size="small" data-testid="grid-edit-mode" @change="(v: any) => displayPrefs.setGridEditMode(v)">
+                <el-radio-button v-for="opt in displayPrefs.gridEditModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-hint">{{ gridEditModeHint }}</div>
           </div>
         </el-popover>
 
@@ -409,6 +417,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
+const gridEditModeHint = computed(() => displayPrefs.gridEditModeOptions.find((o) => o.value === displayPrefs.gridEditMode)?.hint ?? '')
 const { isDark, toggle: toggleTheme } = useTheme()
 
 /** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
@@ -1526,6 +1535,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.gt-dp-hint {
+  margin-top: -6px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.5;
+  color: var(--gt-color-text-tertiary);
 }
 .gt-dp-label {
   font-size: var(--gt-font-size-xs);

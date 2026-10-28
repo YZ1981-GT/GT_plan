@@ -549,7 +549,7 @@
           :eq-cell-val="eqCellVal"
           :is-consolidated="isConsolidated"
           @cell-click="onRvCellClick"
-          @cell-dblclick="onRvCellDblClick"
+          @cell-dblclick="onRvCellDblClick" editable @cell-edit="onRvCellEdit"
           @cell-contextmenu="onRvCellContextMenu"
         />
       </div>
@@ -571,7 +571,7 @@
         :eq-cell-val="eqCellVal"
         :is-consolidated="isConsolidated"
         @cell-click="onRvCellClick"
-        @cell-dblclick="onRvCellDblClick"
+        @cell-dblclick="onRvCellDblClick" :editable="reportMode !== 'unadjusted'" @cell-edit="onRvCellEdit"
         @cell-contextmenu="onRvCellContextMenu"
       />
     </div>
@@ -588,7 +588,7 @@
         :font-size="displayPrefs.fontConfig.tableFont"
         :imp-row-class-name="impRowClassName"
         @cell-click="onRvCellClick"
-        @cell-dblclick="onRvCellDblClick"
+        @cell-dblclick="onRvCellDblClick" :editable="reportMode !== 'unadjusted'" @cell-edit="onRvCellEdit"
         @cell-contextmenu="onRvCellContextMenu"
       />
     </div>
@@ -1431,7 +1431,7 @@ const {
   onRvCtxViewFormulaSource,
   onCellDetailNavigate,
   onRvCellClick,
-  onRvCellDblClick,
+  onRvCellDblClick, onRvCellEdit,
   onRvCellContextMenu,
   onRvCtxCopy,
   onRvCtxDrillDown,
@@ -1544,6 +1544,8 @@ function getAnyCellValue(rowIdx: number, colIdx: number): any {
 }
 
 rvCtx.setupTableDrag(rvTableRef, getAnyCellValue)
+// 表格按 Excel 方式工作时，权益表 / 减值表 / 对比表的选区同样进右键菜单与状态栏（spec excel-style-table-editing 5.1）
+rvCtx.followTables(() => [eqTableRef.value?.tableRef, impTableRef.value?.tableRef, compareTableRef.value])
 
 // 权益表/减值表/对比表的拖拽支持（tab/mode 切换后动态绑定）
 watch([activeTab, () => reportMode.value], () => {

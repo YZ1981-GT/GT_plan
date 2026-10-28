@@ -287,7 +287,8 @@
  * 持久化 G7-12-rows；六区段+各次交易；版本链 onAfterSave。
  */
 import { computed, defineComponent, h, inject, onMounted, ref } from 'vue'
-import { ElInputNumber, ElMessage, ElOption, ElSelect } from 'element-plus'
+import { ElMessage, ElOption } from 'element-plus'
+import { ElInputNumber, ElSelect } from '@/components/grid/adapters'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'

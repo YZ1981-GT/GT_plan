@@ -1,6 +1,6 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { reports as P_reports } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
@@ -47,6 +47,8 @@ export interface UseReportContextMenuReturn {
 
   onRvCellClick: (row: any, column: any, _cell: HTMLElement, event: MouseEvent) => void
   onRvCellDblClick: (row: any, column: any) => void
+  /** 权益表 / 减值表格内编辑提交（ReportEquityTable / ReportImpairmentTable 的 cell-edit） */
+  onRvCellEdit: (row: any, columnKey: string, value: number | null, yearKey?: 'current_year' | 'prior_year') => void
   onRvCellContextMenu: (row: any, column: any, _cell: HTMLElement, event: MouseEvent) => void
   onRvCtxCopy: () => void
   onRvCtxDrillDown: () => void
@@ -65,7 +67,7 @@ export interface UseReportContextMenuReturn {
 
 export function useReportContextMenu(options: UseReportContextMenuOptions): UseReportContextMenuReturn {
   const {
-    projectId, year, activeTab, rows, reportMode,
+    projectId, year, activeTab, rows, reportMode: _reportMode,
     isConsolidated: _isConsolidated, fetchReport, getRowType,
     goToNote, showFormulaManager, openTrustScore,
     rvCtx, rvPenetrate, onDrilldown, eqCellVal,
@@ -86,22 +88,6 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
       return { columnKey: raw, yearKey: 'prior_year', uiColKey: raw.slice(3) }
     }
     return null
-  }
-
-  function equityCellDisplayValue(row: any, column: any): string {
-    const target = parseEquityEditTarget(column)
-    if (target && eqCellVal) {
-      const v = eqCellVal(row, target.uiColKey, target.yearKey)
-      if (v != null && v !== '') return String(v)
-      if (target.yearKey === 'current_year' && target.uiColKey === 'total') {
-        return String(row.current_period_amount || 0)
-      }
-      if (target.yearKey === 'prior_year' && target.uiColKey === 'total') {
-        return String(row.prior_period_amount || 0)
-      }
-      return '0'
-    }
-    return String(row.current_period_amount || 0)
   }
 
   // ─── Consol Breakdown ─────────────────────────────────────────────────────
@@ -172,47 +158,43 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
   }
 
   function onRvCellDblClick(row: any, column: any) {
-    // 权益表/减值表：双击编辑单元格
-    if (activeTab.value === 'equity_statement' || activeTab.value === 'impairment_provision') {
-      if (activeTab.value === 'equity_statement' && reportMode.value === 'unadjusted') {
-        ElMessage.info('未审报表为动态计算，不支持单元格编辑；请切换至审定数模式')
-        return
-      }
-      if (column.label === '项目' || column.property === 'row_name') return
-      const eqTarget = activeTab.value === 'equity_statement' ? parseEquityEditTarget(column) : null
-      const colKey = eqTarget?.columnKey || column.property || column.label
-      const payload: Record<string, unknown> = {
-        row_code: row.row_code || '',
-        column_key: colKey,
-        value: null as number | null,
-      }
-      if (eqTarget) payload.year_key = eqTarget.yearKey
-      if (year.value == null) {
-        ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
-        return
-      }
-      ElMessageBox.prompt(`编辑「${row.row_name}」的「${column.label}」`, '编辑单元格', {
-        inputValue: equityCellDisplayValue(row, column),
-        inputPattern: /^-?\d*\.?\d*$/,
-        inputErrorMessage: '请输入数字',
-        confirmButtonText: '保存',
-        cancelButtonText: '取消',
-      }).then(({ value }) => {
-        const numVal = value ? parseFloat(value) : null
-        payload.value = numVal
-        api.put(`/api/projects/${projectId.value}/reports/cell`, payload, {
-          params: { year: year.value, report_type: activeTab.value },
-        })
-          .then(() => { ElMessage.success('已保存'); fetchReport() })
-          .catch((e: any) => handleApiError(e, '保存'))
-      }).catch(() => { /* 取消 */ })
-      return
-    }
+    // 权益表 / 减值表：格内编辑（ReportMatrixCell，提交走 onRvCellEdit），双击不再弹输入框（spec excel-style-table-editing 5.4）
+    if (activeTab.value === 'equity_statement' || activeTab.value === 'impairment_provision') return
     // 主表：双击金额穿透
     const amountCols = ['本期金额', '上期金额']
     if (amountCols.includes(column.label) && row.row_code) {
       rvPenetrate.toReportRow(activeTab.value, row.row_code)
     }
+  }
+
+  // ─── 格内编辑提交（权益表 / 减值表 → PUT /reports/cell）─────────────────────
+  // 粘贴 / 清空一个区域会连发多格：逐格保存，攒到同一批后只重新取数一次（原先每存一格整表重取一次）
+  const cellSaves: Promise<boolean>[] = []
+  let cellSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+  function onRvCellEdit(row: any, columnKey: string, value: number | null, yearKey?: 'current_year' | 'prior_year') {
+    if (!row?.row_code) return
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
+    const payload: Record<string, unknown> = { row_code: row.row_code, column_key: columnKey, value }
+    if (yearKey) payload.year_key = yearKey
+    cellSaves.push(
+      api.put(`/api/projects/${projectId.value}/reports/cell`, payload, {
+        params: { year: year.value, report_type: activeTab.value },
+      }).then(() => true, (e: any) => { handleApiError(e, '保存'); return false }),
+    )
+    if (cellSaveTimer) clearTimeout(cellSaveTimer)
+    cellSaveTimer = setTimeout(() => { void flushCellSaves() }, 200)
+  }
+
+  async function flushCellSaves() {
+    cellSaveTimer = null
+    const batch = cellSaves.splice(0)
+    const saved = (await Promise.all(batch)).filter(Boolean).length
+    if (saved) ElMessage.success(saved > 1 ? `已保存 ${saved} 格` : '已保存')
+    await fetchReport() // 失败的格随重新取数恢复成服务器上的值
   }
 
   function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
@@ -335,6 +317,7 @@ export function useReportContextMenu(options: UseReportContextMenuOptions): UseR
 
     onRvCellClick,
     onRvCellDblClick,
+    onRvCellEdit,
     onRvCellContextMenu,
     onRvCtxCopy,
     onRvCtxDrillDown,

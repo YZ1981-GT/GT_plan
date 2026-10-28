@@ -40,6 +40,7 @@ import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -616,7 +617,7 @@ const GUIDANCE_TEXTS = [
 
       <!-- 核对区 A25-N25 -->
       <div class="section-title">核对区</div>
-      <table class="recon-table">
+      <GtGridTable class="recon-table">
         <thead>
           <tr>
             <th>监盘日结存合计</th>
@@ -697,7 +698,7 @@ const GUIDANCE_TEXTS = [
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
 
       <!-- 审计说明 -->
       <div class="section-title">审计说明</div>

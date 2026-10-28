@@ -68,7 +68,10 @@
       </div>
 
       <div class="gt-cgs__scroll">
-        <table class="gt-cgs__table">
+        <!-- 表格交互走内核（spec excel-style-table-editing 5.5）：单击选中，双击 / F2 / 直接输入编辑，
+             Enter / Tab 提交并移动、Esc 取消、Delete 清空、Ctrl+C / V / Z 与其他表格同一套；
+             原先的自建双击编辑（editingRef + 回车 / Esc 按键监听）删掉 -->
+        <GtGridTable ref="gridRef" class="gt-cgs__table">
           <colgroup>
             <col v-for="c in maxCol" :key="c" :style="colStyle(c)" />
           </colgroup>
@@ -86,28 +89,23 @@
                   @click="onCellClick(r, c)"
                   @dblclick="onCellDblClick(r, c)"
                 >
-                  <!-- 编辑态 -->
-                  <el-input
-                    v-if="isEditing(r, c)"
-                    ref="editorRef"
-                    :model-value="editingText"
-                    size="small"
-                    class="gt-cgs__editor"
-                    @input="onEditorInput"
-                    @blur="commitEdit"
-                    @keyup.enter="commitEdit"
-                    @keyup.esc="cancelEdit"
-                  />
-                  <!-- 只读态 -->
-                  <template v-else>
-                    <span v-if="isFormulaCell(r, c)" class="gt-cgs__fx">ƒ</span>
-                    {{ cellText(r, c) }}
-                  </template>
+                  <GtGridCell :editable="canEdit(r, c)" :value="rawValue(r, c)" :text="cellText(r, c)">
+                    <template #display>
+                      <span v-if="isFormulaCell(r, c)" class="gt-cgs__fx">ƒ</span>
+                      {{ cellText(r, c) }}
+                    </template>
+                    <ElInput
+                      :model-value="editorText(r, c)"
+                      size="small"
+                      class="gt-cgs__editor"
+                      @change="(v: unknown) => onCellCommit(r, c, v)"
+                    />
+                  </GtGridCell>
                 </td>
               </template>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
 
       <div class="gt-cgs__legend">
@@ -117,7 +115,7 @@
         <span class="gt-cgs__legend-item gt-cgs__legend-item--dirty">
           <span class="gt-cgs__legend-dot"></span>待保存
         </span>
-        <span v-if="!readonly" class="gt-cgs__legend-hint">双击单元格编辑，Enter 确认 / Esc 取消</span>
+        <span v-if="!readonly" class="gt-cgs__legend-hint">双击或直接输入编辑，Enter 确认 / Esc 取消</span>
         <span v-else class="gt-cgs__legend-hint">当前为只读模式</span>
       </div>
     </div>
@@ -125,9 +123,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { ElInput } from '@/components/grid/adapters'
 // 🔴 `DisplayPrefs_Key` 的真源是 `composables/displayPrefsKey.ts`，**不是** stores/displayPrefs。
 // 从后者连带 import 会让整页崩成「页面渲染出错：does not provide an export named
 // 'DisplayPrefs_Key'」，而 get_diagnostics / vitest / Vite transform 四层全绿。
@@ -317,13 +318,13 @@ function spanOf(r: number, c: number): { colspan: number; rowspan: number } {
   return { colspan: 1, rowspan: 1 }
 }
 
-// ─── 编辑态 ───
-const editingRef = ref<string | null>(null)
-const editingText = ref('')
-const editorRef = ref<unknown>(null)
+// ─── 编辑（格内编辑器由表格内核打开 / 提交 / 取消，见模板 GtGridCell） ───
+const gridRef = ref<InstanceType<typeof GtGridTable> | null>(null)
 
-function isEditing(r: number, c: number): boolean {
-  return editingRef.value === coord(r, c)
+/** 编辑框里的文字（脏格优先；数值格给原数，不带千分位） */
+function editorText(r: number, c: number): string {
+  const v = rawValue(r, c)
+  return v == null ? '' : String(v)
 }
 
 /** 该格是否允许进入编辑态（数据驱动三闸） */
@@ -334,52 +335,47 @@ function canEdit(r: number, c: number): boolean {
   return true
 }
 
+// 选中格（单击、方向键、Tab、Enter 都会变）→ 宿主作公式目标格；同一格不重复发
+let lastSelected = ''
+function emitSelect(ref: string) {
+  if (!ref || ref === lastSelected) return
+  lastSelected = ref
+  emit('select-cell', ref)
+}
+
 function onCellClick(r: number, c: number) {
-  emit('select-cell', coord(r, c))
+  emitSelect(coord(r, c))
 }
 
-async function onCellDblClick(r: number, c: number) {
-  if (!canEdit(r, c)) {
-    if (isFormulaCell(r, c)) {
-      ElMessage.info('该单元格由公式计算，如需手工填写请先删除该公式')
-    }
-    return
+watch(gridRef, (g, _old, onCleanup) => {
+  const k = g?.kernel
+  if (!k) return
+  onCleanup(k.onChange(() => {
+    const ref = k.activeTd()?.dataset.cell
+    if (ref) emitSelect(ref)
+  }))
+})
+
+/** 双击可编辑格由内核进编辑；公式格（只读）给出原因 */
+function onCellDblClick(r: number, c: number) {
+  if (!props.readonly && isFormulaCell(r, c)) {
+    ElMessage.info('该单元格由公式计算，如需手工填写请先删除该公式')
   }
+}
+
+/** 格内编辑提交（Enter / Tab / 失焦 / 粘贴 / Delete 清空 / 撤销）→ 脏格，防抖批量写回 */
+function onCellCommit(r: number, c: number, v: unknown) {
   const ref = coord(r, c)
-  const v = rawValue(r, c)
-  editingText.value = v == null ? '' : String(v)
-  editingRef.value = ref
-  await nextTick()
-  const el = editorRef.value as { focus?: () => void; select?: () => void } | null
-  el?.focus?.()
-  el?.select?.()
-}
-
-// 🔴 必须绑 @input：只绑 @change 会被 EP 在 nextTick 重置回 modelValue，抹掉用户键入
-function onEditorInput(val: string) {
-  editingText.value = val
-}
-
-function commitEdit() {
-  const ref = editingRef.value
-  if (!ref) return
-  editingRef.value = null
   const original = baseCells.value[ref]?.v ?? ''
-  const next = editingText.value
+  const next = v == null ? '' : String(v)
   // 值未变则不产生脏格（避免无意义写盘 + file_version 空转递增）
   if (String(original) === next) {
-    dirty.value.delete(ref)
-    dirty.value = new Map(dirty.value)
+    if (dirty.value.delete(ref)) dirty.value = new Map(dirty.value)
     return
   }
   dirty.value.set(ref, next)
   dirty.value = new Map(dirty.value)
   scheduleFlush()
-}
-
-function cancelEdit() {
-  editingRef.value = null
-  editingText.value = ''
 }
 
 // ─── 防抖批量提交 ───
@@ -447,7 +443,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.readonly,
   (ro) => {
-    if (ro) cancelEdit()
+    if (ro) gridRef.value?.kernel.cancelEdit()
   },
 )
 

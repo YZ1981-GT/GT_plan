@@ -42,7 +42,7 @@
 
     <!-- 编辑模式提示条 -->
     <div v-if="isEditing" class="rce-edit-ribbon">
-      <span>✏️ 编辑模式 · 双击项目名称可直接修改，完成后点击"保存"。这里改的是全局报表公式：保存即发布到使用该准则的全部项目，本项目改过且不同的项目会收到待确认提醒；想先看影响请到「全局公式设置」预览后再发布。</span>
+      <span>✏️ 编辑模式 · 项目名称、缩进、合计行直接在表格里改（双击或直接输入），完成后点击"保存"。这里改的是全局报表公式：保存即发布到使用该准则的全部项目，本项目改过且不同的项目会收到待确认提醒；想先看影响请到「全局公式设置」预览后再发布。</span>
     </div>
 
     <!-- 数据表格 -->
@@ -69,16 +69,10 @@
         <template #default="{ row }">
           <div class="rce-name-cell" :style="{ paddingLeft: (row.indent_level || 0) * 20 + 'px' }">
             <el-tag v-if="row.is_total_row" size="small" type="warning" effect="plain">合计</el-tag>
-            <el-input
-              v-if="row._editing"
-              v-model="row.row_name"
-              size="small"
-              style="flex: 1"
-              @blur="row._editing = false"
-            />
-            <span v-else class="rce-name-text" @dblclick="isEditing && (row._editing = true)">
-              {{ row.row_name }}
-            </span>
+            <!-- 编辑模式下名称格直接放编辑器（spec excel-style-table-editing 5.5）：Excel / 单击编辑方式平时显示文字，
+                 双击 / F2 / 直接输入才挂输入框；原先「双击 / 操作列编辑 → 失焦收起」的自建开关删掉 -->
+            <el-input v-if="isEditing" v-model="row.row_name" size="small" style="flex: 1" />
+            <span v-else class="rce-name-text">{{ row.row_name }}</span>
           </div>
         </template>
       </el-table-column>
@@ -101,24 +95,6 @@
           <el-checkbox v-if="isEditing" v-model="row.is_total_row" />
           <span v-else-if="row.is_total_row" style="color: var(--gt-color-success);">✓</span>
           <span v-else style="color: var(--gt-color-border);">—</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="isEditing" label="操作" width="80" align="center">
-        <template #default="{ row }">
-          <el-button
-            v-if="!row._editing"
-            size="small"
-            link
-            type="primary"
-            @click="row._editing = true"
-          >编辑</el-button>
-          <el-button
-            v-else
-            size="small"
-            link
-            type="success"
-            @click="row._editing = false"
-          >完成</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -160,7 +136,7 @@ async function loadConfig() {
       },
     })
     const items = Array.isArray(data) ? data : (data || [])
-    rows.value = items.map((r: any) => ({ ...r, _editing: false }))
+    rows.value = items.map((r: any) => ({ ...r }))
   } catch {
     rows.value = []
     ElMessage.warning('加载报表配置失败')
@@ -211,7 +187,6 @@ function _makeNewRow(number: number) {
     formula: null,
     is_total_row: false,
     parent_row_code: null,
-    _editing: true,
     _isNew: true,
   }
 }
@@ -297,7 +272,6 @@ async function onSaveAll() {
       }
     }
     ElMessage.success(`已保存 ${savedCount} 行`)
-    rows.value.forEach(r => { r._editing = false })
   } catch (e: any) {
     handleApiError(e, '保存')
   } finally {

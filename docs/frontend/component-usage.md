@@ -1,7 +1,7 @@
 # GT 平台组件选型指南
 
-**版本**：v1.0（R10 Spec B / Sprint 3.1.7）
-**最后更新**：2026-05-16
+**版本**：v1.1（R10 Spec B / Sprint 3.1.7；§6 表格编辑约定）
+**最后更新**：2026-10-28
 
 ---
 
@@ -158,8 +158,31 @@ const adjColumns: GtColumn[] = [
 
 ---
 
-## 6. 关联文档
+## 6. 表格编辑约定（Excel 方式，2026-10 spec excel-style-table-editing）
 
+个人设置「Aa 显示设置 → 表格编辑」三选一：**Excel**（默认：单击选中，双击 / F2 / 直接输入编辑，Enter / Tab 提交并移动，Esc 取消）、**单击编辑**（单击可编辑格即编辑，键盘同 Excel）、**经典**（输入框常驻、不启用选中框与表格键盘，回退用）。
+
+| 场景 | 写法 |
+|------|------|
+| el-table / GtTable* 单元格里的 `el-input` / `el-input-number` / `el-select` / `el-date-picker` / `el-checkbox` / `el-switch` / `el-radio-group` | 照常写模板：组件解析器自动换成适配组件，平时显示文字、编辑时才挂输入框 |
+| 渲染函数、`<script setup>` 显式导入编辑控件 | 从 `@/components/grid/adapters` 导入（不是 `element-plus`） |
+| 格里要自定义显示（金额单位、图标、来源标记、断开公式标记） | `GtGridCell`：`#display` 放显示，默认插槽放编辑器；`:editable` 控制能否编辑 |
+| 原生 `<table>` 里有编辑控件 | 换成 `GtGridTable`（渲染出来就是那张 table，class / scoped 样式不变），`<script setup>` 显式 import |
+| v-html 渲染、格子 `contenteditable` 的表 | `bindContentEditableCells(table, …)` + `kernelForRawTable`（见表样编辑器） |
+| 页面要读选区 / 复制 / 求和 | `useCellSelection`（内核方式下读内核选区；对 `selectedCells` 赋值无效） |
+| 页面级快捷键要判「是不是在输入框里」 | `isTextEntryTarget`（`@/utils/shortcuts`：承接框不算输入框） |
+
+- 编辑器在**提交时**发 `change`（打字过程中不发）；单向 `:model-value` + `@change` 可用（适配组件保留打字草稿）。
+- 整张表没有可编辑格时，Enter / Backspace / Delete 交还页面（返回上级等快捷键照常）。
+- ❌ 不要再写「点了才渲染输入框」（`useLazyEdit` / `editingId` / `row._editing` / `@click` 切换），也不要在 keydown 里自己做 Tab / Enter / 方向键导航。
+- 退出开关 `data-gt-grid="off"`（整张表不接表格交互）须在 `components/grid/__tests__/gridOptOut.spec.ts` 登记理由。
+
+---
+
+## 7. 关联文档
+
+- `audit-platform/frontend/src/components/grid/`（表格内核、适配组件、GtGridCell / GtGridTable）
+- `.kiro/specs/excel-style-table-editing/design.md`
 - `audit-platform/frontend/src/components/common/GtTableExtended.vue`
 - `audit-platform/frontend/src/components/common/GtFormTable.vue`
 - `audit-platform/frontend/src/components/common/GtEditableTable.vue`

@@ -129,6 +129,7 @@ import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
@@ -267,9 +268,8 @@ onBeforeUnmount(() => {
 
 function onGlobalSearchShortcut(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    // 不拦截输入框/textarea/contentEditable 内的 Ctrl+K
-    const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+    // 不拦截输入框/textarea/contentEditable 内的 Ctrl+K（表格承接框不算输入框：选中单元格时照常打开搜索）
+    if (isTextEntryTarget(e.target)) return
     e.preventDefault()
     showGlobalSearch.value = true
   }

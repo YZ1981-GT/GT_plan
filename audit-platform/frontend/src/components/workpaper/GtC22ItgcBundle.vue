@@ -38,6 +38,7 @@ import {
   type TabDef,
   type CompletionStatus,
 } from './composables/useC22BundleState'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtC22ControlSheet = defineAsyncComponent(() => import('./GtC22ControlSheet.vue'))
@@ -512,7 +513,7 @@ onMounted(async () => {
         </div>
 
         <!-- ITGC 控制矩阵表（Req 3.2 + Req 10.1/10.2/10.5 交互增强） -->
-        <table class="c22-matrix-table">
+        <GtGridTable class="c22-matrix-table">
           <thead>
             <tr>
               <th style="width: 40px">状态</th>
@@ -667,7 +668,7 @@ onMounted(async () => {
               <td colspan="10" class="c22-empty-row">暂无控制点数据</td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
     </div>
 
     <!-- ═══ 4 大类分组：二级可滚动页签 + IT 控制域子页（Req 4.2/4.3/4.4） ═══ -->

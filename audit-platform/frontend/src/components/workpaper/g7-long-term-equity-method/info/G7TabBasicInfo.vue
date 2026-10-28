@@ -357,7 +357,8 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, inject, onMounted, reactive, ref } from 'vue'
-import { ElInput, ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'

@@ -142,7 +142,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="matrix-table">
+      <GtGridTable class="matrix-table">
         <thead>
           <tr>
             <th rowspan="2" class="col-cat">存货类别</th>
@@ -338,7 +338,7 @@
             <td colspan="2" />
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <div class="section-label">四、审计说明（按类别汇总）</div>
@@ -430,6 +430,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

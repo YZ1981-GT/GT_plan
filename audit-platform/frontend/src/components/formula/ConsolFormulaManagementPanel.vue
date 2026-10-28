@@ -16,43 +16,44 @@
       <el-tab-pane name="formulas" :label="mode === 'report' ? '合并报表公式' : '合并附注公式'">
         <template v-if="mode === 'report'">
           <div class="gt-cfmp-toolbar">
-            <span><b>{{ reportTypeLabel(reportType) }}</b> · {{ consolidatedStandard }} · {{ reportRows.length }} 行</span>
+            <span><b>{{ reportTypeLabel(reportType) }}</b> · {{ consolidatedStandard }} · {{ reportRows.length }} 行 · {{ EDIT_HINT }}</span>
             <el-button size="small" :loading="loading" data-testid="consol-report-formula-refresh" @click="load">🔄 刷新</el-button>
           </div>
+          <!-- 公式 / 分类 / 说明格内编辑（spec excel-style-table-editing 5.5，替换「编辑 → 行内输入框 → 保存 / 取消」）：
+               平时显示文字，双击 / F2 / 直接输入才挂编辑器；提交后攒成一批，确认一次模板级影响再逐行保存、推送一次 -->
           <el-table v-loading="loading" :data="reportRows" border size="small" max-height="calc(100vh - 300px)"
             empty-text="当前模板没有该报表行" data-testid="consol-report-formulas">
             <el-table-column prop="row_code" label="行次" width="90" />
             <el-table-column prop="row_name" label="项目" min-width="190" show-overflow-tooltip />
             <el-table-column label="公式" min-width="330">
               <template #default="{ row }">
-                <el-input v-if="editingId === row.id" v-model="editFormula" size="small"
-                  placeholder="如 TB('1001','期末余额') 或 ROW('BS-001')" />
-                <code v-else>{{ row.formula || '—' }}</code>
+                <GtGridCell :editable="!!row.id" :value="cellValue(row, 'formula')">
+                  <template #display><code>{{ cellValue(row, 'formula') || '—' }}</code></template>
+                  <ElInput :model-value="String(cellValue(row, 'formula') ?? '')" size="small"
+                    placeholder="如 TB('1001','期末余额') 或 ROW('BS-001')" @change="(v: unknown) => onCellEdit(row, 'formula', v)" />
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column label="分类" width="130">
               <template #default="{ row }">
-                <el-select v-if="editingId === row.id" v-model="editCategory" size="small">
-                  <el-option label="自动运算" value="auto_calc" />
-                  <el-option label="逻辑审核" value="logic_check" />
-                  <el-option label="合理性" value="reasonability" />
-                </el-select>
-                <span v-else>{{ categoryLabel(row.formula_category) }}</span>
+                <GtGridCell :editable="!!row.id" :value="cellValue(row, 'formula_category')" kind="select">
+                  <template #display>{{ categoryLabel(cellValue(row, 'formula_category') as string | null) }}</template>
+                  <ElSelect :model-value="cellValue(row, 'formula_category') || 'auto_calc'" size="small"
+                    @change="(v: unknown) => onCellEdit(row, 'formula_category', v)">
+                    <el-option label="自动运算" value="auto_calc" />
+                    <el-option label="逻辑审核" value="logic_check" />
+                    <el-option label="合理性" value="reasonability" />
+                  </ElSelect>
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column label="说明" min-width="180">
               <template #default="{ row }">
-                <el-input v-if="editingId === row.id" v-model="editDescription" size="small" />
-                <span v-else>{{ row.formula_description || '' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="130" fixed="right">
-              <template #default="{ row }">
-                <template v-if="editingId === row.id">
-                  <el-button link type="primary" size="small" data-testid="consol-report-formula-save" @click="saveReportRow(row)">保存</el-button>
-                  <el-button link size="small" @click="cancelEdit">取消</el-button>
-                </template>
-                <el-button v-else link type="primary" size="small" @click="startReportEdit(row)">编辑</el-button>
+                <GtGridCell :editable="!!row.id" :value="cellValue(row, 'formula_description')">
+                  <template #display>{{ cellValue(row, 'formula_description') || '' }}</template>
+                  <ElInput :model-value="String(cellValue(row, 'formula_description') ?? '')" size="small"
+                    @change="(v: unknown) => onCellEdit(row, 'formula_description', v)" />
+                </GtGridCell>
               </template>
             </el-table-column>
           </el-table>
@@ -71,11 +72,11 @@
             <div class="gt-cfmp-note-select">
               <span>章节</span>
               <el-select v-model="selectedSectionId" filterable size="small" style="width:320px"
-                placeholder="选择附注章节" data-testid="consol-note-formula-section" @change="cancelEdit">
+                placeholder="选择附注章节" data-testid="consol-note-formula-section" @change="discardPendingEdits">
                 <el-option v-for="section in noteSectionOptions" :key="section.section_id"
                   :label="`${section.section_id} ${section.title || ''}`" :value="section.section_id" />
               </el-select>
-              <span>{{ noteRows.length }} 条公式</span>
+              <span>{{ noteRows.length }} 条公式<template v-if="canManage"> · {{ EDIT_HINT }}</template></span>
             </div>
             <div class="gt-cfmp-actions">
               <el-button size="small" :loading="loading" @click="load">🔄 刷新</el-button>
@@ -90,30 +91,29 @@
             <el-table-column prop="position" label="单元格" min-width="220" show-overflow-tooltip />
             <el-table-column label="公式" min-width="330">
               <template #default="{ row }">
-                <el-input v-if="editingId === row.id" v-model="editFormula" size="small" />
-                <code v-else>{{ row.formula }}</code>
+                <GtGridCell :editable="canManage" :value="cellValue(row, 'formula')">
+                  <template #display><code>{{ cellValue(row, 'formula') }}</code></template>
+                  <ElInput :model-value="String(cellValue(row, 'formula') ?? '')" size="small"
+                    @change="(v: unknown) => onCellEdit(row, 'formula', v)" />
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column prop="source_label" label="来源" width="100" />
             <el-table-column label="说明" min-width="180">
               <template #default="{ row }">
-                <el-input v-if="editingId === row.id" v-model="editDescription" size="small" />
-                <span v-else>{{ row.description || '' }}</span>
+                <GtGridCell :editable="canManage" :value="cellValue(row, 'description')">
+                  <template #display>{{ cellValue(row, 'description') || '' }}</template>
+                  <ElInput :model-value="String(cellValue(row, 'description') ?? '')" size="small"
+                    @change="(v: unknown) => onCellEdit(row, 'description', v)" />
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column label="更新时间" min-width="165">
               <template #default="{ row }">{{ formatTime(row.updated_at) || '—' }}</template>
             </el-table-column>
-            <el-table-column v-if="canManage" label="操作" width="150" fixed="right">
+            <el-table-column v-if="canManage" label="操作" width="80" fixed="right">
               <template #default="{ row }">
-                <template v-if="editingId === row.id">
-                  <el-button link type="primary" size="small" data-testid="consol-note-formula-save" @click="saveNoteRow(row)">保存</el-button>
-                  <el-button link size="small" @click="cancelEdit">取消</el-button>
-                </template>
-                <template v-else>
-                  <el-button link type="primary" size="small" @click="startNoteEdit(row)">编辑</el-button>
-                  <el-button link type="danger" size="small" @click="removeNoteRow(row)">删除</el-button>
-                </template>
+                <el-button link type="danger" size="small" @click="removeNoteRow(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -174,6 +174,8 @@ import { confirmDangerous } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
 import { formatTime, reportTypeLabel } from '@/components/consolidation/composables/consolTrialView'
 import ConsolPushPanel from '@/components/consolidation/ConsolPushPanel.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { ElInput, ElSelect } from '@/components/grid/adapters'
 import { useAuthStore } from '@/stores/auth'
 import { useRoleContextStore } from '@/stores/roleContext'
 
@@ -270,34 +272,130 @@ async function load() {
   }
 }
 
-const editingId = ref<string | null>(null)
-const editFormula = ref('')
-const editCategory = ref('auto_calc')
-const editDescription = ref('')
+const EDIT_HINT = '双击单元格修改，提交后确认保存'
 
 function categoryLabel(value: string | null): string {
   return ({ auto_calc: '自动运算', logic_check: '逻辑审核', reasonability: '合理性' } as Record<string, string>)[value || ''] || value || '未分类'
 }
 
-function cancelEdit() {
-  editingId.value = null
-  editFormula.value = ''
-  editDescription.value = ''
+// ── 格内编辑（spec excel-style-table-editing 5.5）─────────────────────────────
+// 每格提交先记下（界面立即显示新值），攒 200ms 成一批：确认一次模板级影响 → 逐行保存（同一行的几格合并成一次请求）
+// → 有保存成功的才推送一次。取消确认 / 保存失败的格退回服务器上的值（行对象只在保存成功后才改）。
+type EditField = 'formula' | 'formula_category' | 'formula_description' | 'description'
+type AnyRow = ReportFormulaRow | ConsolNoteFormula
+const pending = reactive<Record<string, Partial<Record<EditField, string | null>>>>({})
+const inflight = reactive<Record<string, Partial<Record<EditField, string | null>>>>({})
+const pendingRows = new Map<string, AnyRow>()
+let editTimer: ReturnType<typeof setTimeout> | null = null
+const EDIT_BATCH_MS = 200
+
+/** 格子当前显示 / 编辑的值：待保存 > 保存中 > 行上的值 */
+function cellValue(row: AnyRow, field: EditField): string | null {
+  const id = row.id
+  if (pending[id] && field in pending[id]) return pending[id][field] ?? null
+  if (inflight[id] && field in inflight[id]) return inflight[id][field] ?? null
+  return ((row as unknown as Record<string, unknown>)[field] as string | null | undefined) ?? null
 }
 
-function startReportEdit(row: ReportFormulaRow) {
-  editingId.value = row.id
-  editFormula.value = row.formula || ''
-  editCategory.value = row.formula_category || 'auto_calc'
-  editDescription.value = row.formula_description || ''
+function normalizeEdit(field: EditField, value: unknown): string | null {
+  const text = value == null ? '' : String(value)
+  if (field === 'formula_category') return text || 'auto_calc'
+  // 报表行的公式 / 说明清空存 null（与原保存一致）；附注公式原样（后端校验非空）
+  if (field === 'formula' && props.mode === 'note') return text
+  return text || null
 }
 
-function startNoteEdit(row: ConsolNoteFormula) {
-  if (!canManage.value) return
-  editingId.value = row.id
-  editFormula.value = row.formula
-  editDescription.value = row.description || ''
+function onCellEdit(row: AnyRow, field: EditField, value: unknown) {
+  if (!row?.id) return
+  if (props.mode === 'note' && !canManage.value) return
+  const next = normalizeEdit(field, value)
+  const current = normalizeEdit(field, (row as unknown as Record<string, unknown>)[field])
+  const slot = (pending[row.id] ||= {})
+  // 改回行上的值（且这一格没有正在保存的新值）：不算修改
+  if (next === current && !(inflight[row.id] && field in inflight[row.id])) {
+    delete slot[field]
+    if (!Object.keys(slot).length) { delete pending[row.id]; pendingRows.delete(row.id) }
+    return
+  }
+  slot[field] = next
+  pendingRows.set(row.id, row)
+  if (editTimer) clearTimeout(editTimer)
+  editTimer = setTimeout(() => { void flushCellEdits() }, EDIT_BATCH_MS)
 }
+
+function discardPendingEdits() {
+  if (editTimer) { clearTimeout(editTimer); editTimer = null }
+  for (const id of Object.keys(pending)) delete pending[id]
+  pendingRows.clear()
+}
+
+async function saveRowFields(row: AnyRow, fields: Partial<Record<EditField, string | null>>) {
+  if (props.mode === 'report') {
+    const r = row as ReportFormulaRow
+    const merged = {
+      formula: 'formula' in fields ? fields.formula ?? null : r.formula,
+      formula_category: 'formula_category' in fields ? fields.formula_category ?? 'auto_calc' : (r.formula_category || 'auto_calc'),
+      formula_description: 'formula_description' in fields ? fields.formula_description ?? null : (r.formula_description || null),
+    }
+    const saved = await api.put<Partial<ReportFormulaRow>>(P_rc.detail(r.id), {
+      ...merged,
+      expected_version: r.formula_version ?? 1,
+      project_id: props.projectId,
+      year: props.year,
+      template_type: templateType.value,
+    })
+    Object.assign(r, merged)
+    if (saved?.formula_version != null) r.formula_version = saved.formula_version
+    return
+  }
+  const n = row as ConsolNoteFormula
+  const updated = await updateConsolNoteFormula(n.id, {
+    formula: 'formula' in fields ? String(fields.formula ?? '') : n.formula,
+    description: 'description' in fields ? fields.description ?? null : (n.description || null),
+    expected_version: n.version ?? 1,
+  })
+  const section = formulaSections.value.find((item) => item.section_id === n.section_id)
+  if (section) {
+    const index = section.formulas.findIndex((item) => item.id === n.id)
+    if (index >= 0) section.formulas[index] = updated
+  }
+}
+
+/** 保存攒下的格（测试与「保存中又有新提交」时直接调用） */
+async function flushCellEdits(): Promise<void> {
+  if (editTimer) { clearTimeout(editTimer); editTimer = null }
+  if (saving.value) { // 上一批还在保存：等它结束再发
+    editTimer = setTimeout(() => { void flushCellEdits() }, EDIT_BATCH_MS)
+    return
+  }
+  const ids = Object.keys(pending)
+  if (!ids.length) return
+  const batch = ids.map((id) => ({ row: pendingRows.get(id)!, fields: { ...pending[id] } }))
+  for (const id of ids) { inflight[id] = pending[id]; delete pending[id]; pendingRows.delete(id) }
+  const release = (id: string) => { delete inflight[id] }
+  try {
+    await confirmTemplateChange(props.mode === 'report' ? '修改合并报表公式' : '修改合并附注公式')
+  } catch {
+    ids.forEach(release)
+    return
+  }
+  saving.value = true
+  let saved = 0
+  try {
+    for (const { row, fields } of batch) {
+      try {
+        await saveRowFields(row, fields)
+        saved++
+      } catch (err) {
+        handleApiError(err, props.mode === 'report' ? '保存合并报表公式' : '保存合并附注公式')
+      } finally {
+        release(row.id)
+      }
+    }
+  } finally { saving.value = false }
+  if (saved) await pushAfterChange()
+}
+
 async function confirmTemplateChange(action: string) {
   await confirmDangerous({
     title: `${action}确认`,
@@ -316,56 +414,6 @@ async function pushAfterChange() {
   pushPanelRef.value?.load()
 }
 
-async function saveReportRow(row: ReportFormulaRow) {
-  if (!row.id || saving.value) return
-  try {
-    await confirmTemplateChange('修改合并报表公式')
-  } catch { return }
-  saving.value = true
-  try {
-    const saved = await api.put<Partial<ReportFormulaRow>>(P_rc.detail(row.id), {
-      formula: editFormula.value || null,
-      formula_category: editCategory.value,
-      formula_description: editDescription.value || null,
-      expected_version: row.formula_version ?? 1,
-      project_id: props.projectId,
-      year: props.year,
-      template_type: templateType.value,
-    })
-    row.formula = editFormula.value || null
-    row.formula_category = editCategory.value
-    row.formula_description = editDescription.value || null
-    if (saved?.formula_version != null) row.formula_version = saved.formula_version
-    cancelEdit()
-    await pushAfterChange()
-  } catch (err) {
-    handleApiError(err, '保存合并报表公式')
-  } finally { saving.value = false }
-}
-
-async function saveNoteRow(row: ConsolNoteFormula) {
-  if (!canManage.value || saving.value) return
-  try {
-    await confirmTemplateChange('修改合并附注公式')
-  } catch { return }
-  saving.value = true
-  try {
-    const updated = await updateConsolNoteFormula(row.id, {
-      formula: editFormula.value,
-      description: editDescription.value || null,
-      expected_version: row.version ?? 1,
-    })
-    const section = formulaSections.value.find((item) => item.section_id === row.section_id)
-    if (section) {
-      const index = section.formulas.findIndex((item) => item.id === row.id)
-      if (index >= 0) section.formulas[index] = updated
-    }
-    cancelEdit()
-    await pushAfterChange()
-  } catch (err) {
-    handleApiError(err, '保存合并附注公式')
-  } finally { saving.value = false }
-}
 const showCreateDialog = ref(false)
 const createFormRef = ref<FormInstance>()
 const createForm = reactive({ rowNumber: 1, colIndex: 1, formula: '', description: '' })
@@ -446,7 +494,7 @@ async function reseed() {
 watch(
   () => [props.mode, props.projectId, props.year, props.templateType, props.reportType, props.noteSection] as const,
   () => {
-    cancelEdit()
+    discardPendingEdits()
     if (props.noteSection) selectedSectionId.value = props.noteSection
     load()
   },

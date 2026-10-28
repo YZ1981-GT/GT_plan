@@ -16,6 +16,7 @@
  */
 import { ref, computed } from 'vue'
 import { useRouter, type Router } from 'vue-router'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 
 export interface NavigationEntry {
   source_view: string
@@ -44,8 +45,8 @@ export function initGlobalBackspace(router: Router) {
     if (e.key !== 'Backspace') return
 
     const target = e.target as HTMLElement
-    const tagName = target.tagName.toLowerCase()
-    if (tagName === 'input' || tagName === 'textarea' || target.isContentEditable) return
+    // 输入框里不拦截（表格承接框不算输入框：选中只读表格的单元格时照常返回）
+    if (isTextEntryTarget(target)) return
 
     // el-select dropdown 等弹出层内不拦截
     if (target.closest('.el-select-dropdown, .el-picker-panel, .el-dialog')) return

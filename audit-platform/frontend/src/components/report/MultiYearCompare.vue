@@ -69,7 +69,7 @@
         <!-- 金额列 -->
         <el-table-column :label="`${yr}年`" align="right" min-width="140" :resizable="true">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.values[String(yr)]) }}</span>
+            <span class="gt-amt" :data-gt-value="row.values[String(yr)] ?? ''">{{ formatAmount(row.values[String(yr)]) }}</span>
           </template>
         </el-table-column>
         <!-- YoY 变动列（第一年无变动率） -->

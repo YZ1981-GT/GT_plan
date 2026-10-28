@@ -103,7 +103,7 @@
       </div>
 
       <div class="table-scroll">
-        <table class="std-table">
+        <GtGridTable class="std-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-month">月份</th>
@@ -255,7 +255,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -311,6 +311,7 @@ import type {
 import { useF2ValuationAiGenerate } from '../../composables/useF2ValuationAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   title: string

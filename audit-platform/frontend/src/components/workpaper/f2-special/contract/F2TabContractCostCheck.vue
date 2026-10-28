@@ -154,7 +154,7 @@
       </div>
 
       <div class="table-scroll">
-        <table class="matrix-table">
+        <GtGridTable class="matrix-table">
           <thead>
             <tr>
               <th rowspan="2" class="sticky col-project">项目名称</th>
@@ -334,7 +334,7 @@
               <td />
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </div>
 
@@ -439,6 +439,7 @@ import {
   f2ContractCostQueryCodes,
 } from '../../composables/f2ContractCostAccountScope'
 import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

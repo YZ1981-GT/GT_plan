@@ -462,7 +462,8 @@
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, defineComponent, h } from 'vue'
 import type { Ref } from 'vue'
-import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
+import { ElSelect } from '@/components/grid/adapters'
 import {
   useI1DisposalCheck,
   I1_DISPOSAL_METHODS,

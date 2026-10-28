@@ -653,10 +653,12 @@ async def update_report_cell(
             row.source_accounts = sa_data
         await db.flush()
     else:
-        sa: dict | None = None
+        # 🔴 别叫 sa：函数里给 sa 赋值会让整个函数的 sa 变成局部变量，开头的 sa.select 恒抛
+        # UnboundLocalError（2026-06-12 起本端点每次调用都 500；spec excel-style-table-editing 5.4）
+        new_sa: dict | None = None
         cp_amount: str | None = None
         if rt_enum == FinancialReportType.equity_statement:
-            sa = apply_equity_cell_edit_to_source_accounts(
+            new_sa = apply_equity_cell_edit_to_source_accounts(
                 None, body.column_key, body.value, year_key=effective_year_key,
             )
             if ui_col in ("current_period_amount", "total") and effective_year_key == "current_year":
@@ -664,7 +666,7 @@ async def update_report_cell(
         elif body.column_key in ("current_period_amount", "total"):
             cp_amount = str(body.value) if body.value is not None else None
         else:
-            sa = {body.column_key: body.value}
+            new_sa = {body.column_key: body.value}
 
         new_row = FinancialReport(
             project_id=project_id,
@@ -673,7 +675,7 @@ async def update_report_cell(
             row_code=body.row_code,
             row_name=body.row_code,
             current_period_amount=cp_amount,
-            source_accounts=sa,
+            source_accounts=new_sa,
         )
         db.add(new_row)
         await db.flush()

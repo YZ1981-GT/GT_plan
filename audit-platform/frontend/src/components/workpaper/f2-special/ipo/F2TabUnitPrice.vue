@@ -93,7 +93,7 @@
         </template>
 
         <div class="table-scroll">
-          <table class="compare-table" :style="{ minWidth: `${120 + group.items.length * 260}px` }">
+          <GtGridTable class="compare-table" :style="{ minWidth: `${120 + group.items.length * 260}px` }">
             <thead>
               <tr>
                 <th rowspan="2" class="sticky col-month">月份</th>
@@ -155,7 +155,7 @@
                 </template>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </div>
       </el-card>
     </section>
@@ -198,7 +198,7 @@
         </template>
 
         <div class="table-scroll">
-          <table class="compare-table spec-table">
+          <GtGridTable class="compare-table spec-table">
             <thead>
               <tr>
                 <th rowspan="2" class="sticky col-spec">规格</th>
@@ -245,7 +245,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </div>
       </el-card>
     </section>
@@ -302,6 +302,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

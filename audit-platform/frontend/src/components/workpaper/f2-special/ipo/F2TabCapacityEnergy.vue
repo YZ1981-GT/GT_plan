@@ -50,7 +50,7 @@
         <el-button size="small" link type="primary" :disabled="isReadonly" @click="ce.addCapacityRow()">新增行</el-button>
       </div>
       <div class="table-scroll">
-        <table class="matrix-table capacity-table">
+        <GtGridTable class="matrix-table capacity-table">
           <thead>
             <tr>
               <th class="col-name">存货名称</th>
@@ -90,7 +90,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -101,7 +101,7 @@
         <el-button size="small" link type="primary" :disabled="isReadonly" @click="ce.addStorageRow()">新增行</el-button>
       </div>
       <div class="table-scroll">
-        <table class="matrix-table storage-table">
+        <GtGridTable class="matrix-table storage-table">
           <thead>
             <tr>
               <th class="col-name">仓库名称</th>
@@ -164,7 +164,7 @@
               </tr>
             </template>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -177,7 +177,7 @@
 
       <div class="sub-title">（一）能源采购本期与上期对比</div>
       <div class="table-scroll">
-        <table class="matrix-table energy-table">
+        <GtGridTable class="matrix-table energy-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-name">采购项目</th>
@@ -242,7 +242,7 @@
               <td class="col-act" />
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
 
       <div class="sub-title with-action">
@@ -250,7 +250,7 @@
         <el-button size="small" link type="primary" :disabled="isReadonly" @click="ce.addProductEnergyRow()">新增产品</el-button>
       </div>
       <div class="table-scroll">
-        <table class="matrix-table product-energy-table">
+        <GtGridTable class="matrix-table product-energy-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-name">产品</th>
@@ -294,7 +294,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -368,6 +368,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

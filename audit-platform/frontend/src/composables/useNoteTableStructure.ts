@@ -9,6 +9,7 @@
  * Validates: Requirements 38.1, 38.2, 38.3, 38.4, 38.5, 38.6
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -307,9 +308,8 @@ export function useNoteTableStructure(options: {
   // ─── Keyboard Shortcuts ──────────────────────────────────────────────────
 
   function handleKeydown(e: KeyboardEvent) {
-    // Only handle when not in an input/textarea
-    const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
-    if (tag === 'input' || tag === 'textarea') return
+    // Only handle when not in an input/textarea（表格承接框不算输入框：选中单元格时 Ctrl+Z 照常撤销结构改动）
+    if (isTextEntryTarget(e.target)) return
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()

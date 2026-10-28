@@ -8,8 +8,18 @@
  * - 鼠标拖拽框选（mousedown → mousemove → mouseup 连续区域）
  * - 右键菜单定位
  * - 复制选中值、求和、对比差异
+ *
+ * ── 表格内核门面（spec excel-style-table-editing 5.1 / R10.2）──
+ * 表格按 Excel 方式（含「单击编辑」）工作时，选中、框选、键盘、复制都由表格内核负责（components/grid），
+ * 这里只读内核的选区：`selectedCells` / 统计 / 复制 / 是否选中 都以内核为准，`cellClassName` 不再画选区，
+ * `selectCell` / 拖拽系列不再改选区（页面 cell-click 里照常调用即可）。坐标为内核坐标：
+ * 行 = 可见数据行序号，列 = 叶子列序号（与表头从左到右一致）。值取编辑器的模型值、`data-gt-value`
+ * （GtAmountCell 的原始金额，不受显示单位影响）或显示文字。
+ * 经典方式（以及没装表格插件的单测）走下面原有的实现，行为与改造前一致。
  */
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { customRef, getCurrentInstance, onMounted, onUnmounted, reactive, ref, watch, type ComponentInternalInstance } from 'vue'
+import { isGridInstalled, kernelForElement, onAnyKernelChange, type GridKernel } from '@/components/grid/GridKernel'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export interface SelectedCell {
   row: number
@@ -52,8 +62,92 @@ function _releaseDocListeners() {
   }
 }
 
+/** el-table 组件 ref / DOM ref → 表格根元素 */
+function domOfRef(v: unknown): HTMLElement | null {
+  if (!v) return null
+  if (v instanceof HTMLElement) return v
+  const el = (v as { $el?: unknown }).$el
+  return el instanceof HTMLElement ? el : null
+}
+
+function ownedBy(k: GridKernel, instance: ComponentInternalInstance | null): boolean {
+  if (!instance) return false
+  for (let p = k.owner; p; p = p.parent) if (p === instance) return true
+  return false
+}
+
 export function useCellSelection() {
-  const selectedCells = ref<SelectedCell[]>([])
+  // ── 门面状态 ──
+  let prefs: ReturnType<typeof useDisplayPrefsStore> | null = null
+  try { prefs = useDisplayPrefsStore() } catch { prefs = null }
+  const instance = getCurrentInstance()
+  /** 表格内核接管选区（Excel / 单击编辑方式，且应用装了表格插件） */
+  const gridMode = (): boolean => isGridInstalled() && (prefs?.gridEditMode ?? 'excel') !== 'classic'
+  /** setupTableDrag / followTables 指定的表格（组件 ref 或 DOM）；没指定时跟随本组件里的任一表格 */
+  const boundTables: Array<() => unknown[]> = []
+  let kernel: GridKernel | null = null
+  let kernelDirty = true
+  let kernelCache: SelectedCell[] = []
+  let triggerCells: () => void = () => {}
+  let pendingTrigger: number | ReturnType<typeof setTimeout> | 0 = 0
+
+  const legacyCells = ref<SelectedCell[]>([])
+  const selectedCells = customRef<SelectedCell[]>((track, trigger) => {
+    triggerCells = trigger
+    return {
+      get() {
+        track()
+        if (!gridMode()) return legacyCells.value
+        if (kernelDirty) {
+          kernelCache = readKernel()
+          kernelDirty = false
+        }
+        return kernelCache
+      },
+      set(v: SelectedCell[]) {
+        if (!gridMode()) legacyCells.value = v
+        trigger()
+      },
+    }
+  })
+
+  function inScope(k: GridKernel): boolean {
+    if (!k.root) return k === kernel
+    if (boundTables.length) return boundTables.some((get) => get().some((t) => domOfRef(t) === k.root))
+    return ownedBy(k, instance)
+  }
+
+  function currentKernel(): GridKernel | null {
+    if (kernel?.root) return kernel
+    for (const get of boundTables) {
+      for (const t of get()) {
+        const k = kernelForElement(domOfRef(t))
+        if (k) return k
+      }
+    }
+    return null
+  }
+
+  function readKernel(): SelectedCell[] {
+    const k = currentKernel()
+    if (!k) return []
+    return k.selectedCells().map((info) => ({ row: info.r, col: info.c, value: info.value }))
+  }
+
+  /** 选区变化合并到一帧通知一次（键盘连续移动时页面不必每次重渲染） */
+  function scheduleTrigger() {
+    if (pendingTrigger) return
+    const run = () => { pendingTrigger = 0; triggerCells() }
+    pendingTrigger = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : setTimeout(run, 16)
+  }
+
+  function onKernelChange(k: GridKernel) {
+    if (!inScope(k)) return
+    kernel = k.root ? k : null
+    kernelDirty = true
+    scheduleTrigger()
+  }
+
   const contextMenu = reactive<CellContextMenuState>({
     visible: false, x: 0, y: 0, itemName: '', rowData: null,
   })
@@ -69,15 +163,24 @@ export function useCellSelection() {
   /** 外部提供的取值函数（拖拽框选时需要获取单元格值） */
   let _getCellValue: ((row: number, col: number) => any) | null = null
 
+  watch(gridMode, () => {
+    legacyCells.value = []
+    anchorRow = -1
+    anchorCol = -1
+    kernelDirty = true
+    triggerCells()
+  })
+
   /**
    * 注册取值函数（在组件 setup 中调用一次）
-   * 用于拖拽框选时自动获取矩形区域内每个单元格的值
+   * 用于拖拽框选时自动获取矩形区域内每个单元格的值（经典方式）
    */
   function registerCellValueGetter(fn: (row: number, col: number) => any) {
     _getCellValue = fn
   }
 
   function cellClassName({ rowIndex, columnIndex }: { rowIndex: number; columnIndex: number }): string {
+    if (gridMode()) return '' // 选区由表格内核画（data-gt-sel），不再出第二套选中框
     const isSelected = selectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)
     if (!isSelected) return ''
     // 单选时加额外样式（Excel 风格的填充柄）
@@ -87,6 +190,7 @@ export function useCellSelection() {
 
   /** 判断某单元格是否已在选区内 */
   function isCellSelected(rowIdx: number, colIdx: number): boolean {
+    if (gridMode()) return !!currentKernel()?.isInSelection({ r: rowIdx, c: colIdx })
     return selectedCells.value.some(c => c.row === rowIdx && c.col === colIdx)
   }
 
@@ -99,6 +203,7 @@ export function useCellSelection() {
    * @param range Shift 键按下（范围选中）
    */
   function selectCell(rowIdx: number, colIdx: number, value: any, multi: boolean, range = false) {
+    if (gridMode()) return // 鼠标按下时表格内核已经选好
     // 如果 setupTableDrag 已经处理了这次点击（Shift/拖拽），跳过
     if (_skipNextCellClick) {
       _skipNextCellClick = false
@@ -133,6 +238,10 @@ export function useCellSelection() {
    * 选中矩形区域（从 r1,c1 到 r2,c2）
    */
   function selectRange(r1: number, c1: number, r2: number, c2: number) {
+    if (gridMode()) {
+      currentKernel()?.selectRect(r1, c1, r2, c2)
+      return
+    }
     const minR = Math.min(r1, r2)
     const maxR = Math.max(r1, r2)
     const minC = Math.min(c1, c2)
@@ -152,6 +261,7 @@ export function useCellSelection() {
    * 开始拖拽（mousedown 时调用）
    */
   function startDrag(rowIdx: number, colIdx: number, value: any) {
+    if (gridMode()) return
     isDragging = true
     anchorRow = rowIdx
     anchorCol = colIdx
@@ -163,7 +273,7 @@ export function useCellSelection() {
    * 拖拽中（mousemove 时调用）
    */
   function updateDrag(rowIdx: number, colIdx: number) {
-    if (!isDragging || anchorRow < 0) return
+    if (!isDragging || anchorRow < 0 || gridMode()) return
     selectRange(anchorRow, anchorCol, rowIdx, colIdx)
   }
 
@@ -177,7 +287,8 @@ export function useCellSelection() {
 
   /** 清空选中 */
   function clearSelection() {
-    selectedCells.value = []
+    if (gridMode()) currentKernel()?.clearSelection()
+    legacyCells.value = []
     anchorRow = -1
     anchorCol = -1
   }
@@ -204,6 +315,11 @@ export function useCellSelection() {
       contextMenu.itemName = itemName
       contextMenu.rowData = rowData || null
       contextMenu.visible = true
+      if (gridMode()) {
+        // 右键时表格内核已把点到的格并入选区：菜单打开即按最新选区显示「复制 n 格 / 求和」
+        kernelDirty = true
+        triggerCells()
+      }
     }, 0)
   }
 
@@ -216,8 +332,13 @@ export function useCellSelection() {
    * - 单行：制表符分隔
    * - 多行矩形：按行列排列，行间换行，列间制表符
    * - HTML 格式兼容 Excel/Word 粘贴
+   * 表格内核接管时按显示文字复制（与 Ctrl+C 同口径）
    */
   function copySelectedValues() {
+    if (gridMode()) {
+      void currentKernel()?.copySelectionToClipboard()
+      return
+    }
     const cells = selectedCells.value
     if (!cells.length) return
 
@@ -302,16 +423,16 @@ export function useCellSelection() {
    * el-table 原生不支持 cell-mousedown/cell-mouseenter，
    * 通过在 table 容器上监听原生 mousedown/mouseover 事件，
    * 从 DOM 中解析出行列索引来实现拖拽框选。
+   * 表格内核接管时只登记表格（门面跟随它的选区）与取值函数，拖拽由内核负责。
    *
    * @param tableRef el-table 的 ref 或包含表格的 DOM 元素 ref
-   * @param getRowData 根据行索引获取行数据的函数
-   * @param getColIndex 根据列 DOM 元素获取列索引的函数
-   * @param getCellVal 根据行索引和列索引获取单元格值的函数
+   * @param getCellVal 根据行索引和列索引获取单元格值的函数（经典方式用）
    */
   function setupTableDrag(
     tableRef: { value: HTMLElement | { $el: HTMLElement } | null },
     getCellVal: (rowIdx: number, colIdx: number) => any,
   ) {
+    boundTables.push(() => [tableRef.value])
     // 从 td 元素解析行列索引
     function parseCellPosition(target: HTMLElement): { row: number; col: number } | null {
       const td = target.closest('td.el-table__cell') as HTMLElement | null
@@ -329,6 +450,7 @@ export function useCellSelection() {
     }
 
     function onTableMouseDown(e: MouseEvent) {
+      if (gridMode()) return
       // 只响应左键，忽略右键和中键
       if (e.button !== 0) return
       // 忽略在 input/button 等交互元素上的点击
@@ -357,7 +479,7 @@ export function useCellSelection() {
     }
 
     function onTableMouseOver(e: MouseEvent) {
-      if (!isDragging) return
+      if (!isDragging || gridMode()) return
       const pos = parseCellPosition(e.target as HTMLElement)
       if (!pos) return
       updateDrag(pos.row, pos.col)
@@ -388,15 +510,32 @@ export function useCellSelection() {
     })
   }
 
+  /**
+   * 门面另外跟随的表格（同一实例服务多张表时，如报表页的权益表 / 减值表 / 对比表）。
+   * 只影响表格内核接管时的选区来源；经典方式下这些表的拖拽仍由页面自己绑定。
+   */
+  function followTables(getTables: () => unknown[]) {
+    boundTables.push(getTables)
+  }
+
+  let offKernel: (() => void) | null = null
   onMounted(() => {
     _ensureDocListeners()
     _docClickCallbacks.add(onDocClick)
     _docMouseUpCallbacks.add(onDocMouseUp)
+    offKernel = onAnyKernelChange(onKernelChange)
   })
   onUnmounted(() => {
     _docClickCallbacks.delete(onDocClick)
     _docMouseUpCallbacks.delete(onDocMouseUp)
     _releaseDocListeners()
+    offKernel?.()
+    offKernel = null
+    if (pendingTrigger) {
+      if (typeof cancelAnimationFrame === 'function' && typeof pendingTrigger === 'number') cancelAnimationFrame(pendingTrigger)
+      else clearTimeout(pendingTrigger as ReturnType<typeof setTimeout>)
+      pendingTrigger = 0
+    }
   })
 
   // ── R7-S3-08：行选/列选/全选 ──
@@ -407,6 +546,10 @@ export function useCellSelection() {
    * @param totalCols 总列数
    */
   function selectRow(rowIdx: number, totalCols: number) {
+    if (gridMode()) {
+      currentKernel()?.selectRect(rowIdx, 0, rowIdx, Number.MAX_SAFE_INTEGER)
+      return
+    }
     const cells: SelectedCell[] = []
     for (let c = 0; c < totalCols; c++) {
       const val = _getCellValue ? _getCellValue(rowIdx, c) : null
@@ -423,6 +566,10 @@ export function useCellSelection() {
    * @param totalRows 总行数
    */
   function selectColumn(colIdx: number, totalRows: number) {
+    if (gridMode()) {
+      currentKernel()?.selectRect(0, colIdx, Number.MAX_SAFE_INTEGER, colIdx)
+      return
+    }
     const cells: SelectedCell[] = []
     for (let r = 0; r < totalRows; r++) {
       const val = _getCellValue ? _getCellValue(r, colIdx) : null
@@ -439,6 +586,10 @@ export function useCellSelection() {
    * @param totalCols 总列数
    */
   function selectAll(totalRows: number, totalCols: number) {
+    if (gridMode()) {
+      currentKernel()?.selectAll()
+      return
+    }
     const cells: SelectedCell[] = []
     for (let r = 0; r < totalRows; r++) {
       for (let c = 0; c < totalCols; c++) {
@@ -452,6 +603,8 @@ export function useCellSelection() {
   }
 
   return {
+    /** 当前由表格内核接管（Excel / 单击编辑方式）：页面自己的键盘 / 粘贴 / 懒编辑应让开 */
+    kernelActive: gridMode,
     selectedCells,
     contextMenu,
     cellClassName,
@@ -468,6 +621,7 @@ export function useCellSelection() {
     getSelectionBounds,
     registerCellValueGetter,
     setupTableDrag,
+    followTables,
     openContextMenu,
     closeContextMenu,
     copySelectedValues,

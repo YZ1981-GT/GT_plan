@@ -77,7 +77,7 @@
 
     <!-- 本期发生成本 -->
     <div class="section-label">本期发生成本</div>
-    <table class="pool-table">
+    <GtGridTable class="pool-table">
       <thead>
         <tr>
           <th>直接材料</th>
@@ -132,7 +132,7 @@
           <td class="auto pool-total">{{ fmt(ca.poolTotal.value) }}</td>
         </tr>
       </tbody>
-    </table>
+    </GtGridTable>
 
     <div class="tab-toolbar">
       <div class="toolbar-left">
@@ -153,7 +153,7 @@
 
     <!-- 产品分配宽表 -->
     <div class="table-scroll">
-      <table class="matrix-table alloc-table">
+      <GtGridTable class="matrix-table alloc-table">
         <thead>
           <tr>
             <th rowspan="2" class="col-name">产品品名</th>
@@ -277,7 +277,7 @@
             <td />
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <el-card class="opinion-card" shadow="never">
@@ -337,6 +337,7 @@ import { F2_44_DEFAULT_OBJECTIVE, isBlankAllocationProduct } from '../../composa
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

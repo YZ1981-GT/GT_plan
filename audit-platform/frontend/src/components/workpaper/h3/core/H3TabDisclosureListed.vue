@@ -61,7 +61,7 @@
             <el-button size="small" plain @click="generateAI('cost-original')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -92,7 +92,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['cost-original']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明本期增加/减少的主要原因（如外购、自用转入、在建工程转入、处置等）" :disabled="isReadonly"
@@ -109,7 +109,7 @@
             <el-button size="small" plain @click="generateAI('cost-dep')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -140,7 +140,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['cost-dep']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明本期折旧/摊销政策、折旧方法、使用年限等" :disabled="isReadonly"
@@ -157,7 +157,7 @@
             <el-button size="small" plain @click="generateAI('cost-impair')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -188,7 +188,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['cost-impair']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明本期减值测试情况；如无减值，请在文字框注明。" :disabled="isReadonly"
@@ -246,7 +246,7 @@
             <el-button size="small" plain @click="generateAI('fair-change')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -280,7 +280,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['fair-change']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明公允价值确定依据、评估机构、评估方法及关键假设。" :disabled="isReadonly"
@@ -298,7 +298,7 @@
             <el-button size="small" plain @click="generateAI('fair-hierarchy')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -374,7 +374,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['fair-hierarchy']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="披露：公允价值层次的确定依据；第三层次采用的估值技术及关键不可观察输入值（如市场租金、折现率、资本化率）；层次间转换情况及原因。" :disabled="isReadonly"
@@ -395,7 +395,7 @@
       <div class="src-hint">
         <p>（披露未办妥产权证书的投资性房地产账面价值及原因。）行可无限量添加。</p>
       </div>
-      <table class="disc-table">
+      <GtGridTable class="disc-table">
         <thead>
           <tr>
             <th class="col-item">项 目</th>
@@ -420,7 +420,7 @@
             <td v-if="!isReadonly"></td>
           </tr>
         </tfoot>
-      </table>
+      </GtGridTable>
     </div>
 
     <!-- ⑤ 共用块：补充说明 / 受限及担保 -->
@@ -500,6 +500,7 @@ import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJum
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId: string

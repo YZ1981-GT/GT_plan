@@ -62,7 +62,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="match-table">
+      <GtGridTable class="match-table">
         <thead>
           <tr>
             <th class="sticky seq">序号</th>
@@ -175,7 +175,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <el-card class="opinion-card" shadow="never">
@@ -242,6 +242,7 @@ import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/u
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

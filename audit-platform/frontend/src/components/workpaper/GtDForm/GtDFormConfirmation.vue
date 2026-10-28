@@ -154,7 +154,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ElInput, ElInputNumber, ElDatePicker, ElSelect } from 'element-plus'
+import { ElInput, ElInputNumber, ElDatePicker, ElSelect } from '@/components/grid/adapters'
 import { InfoFilled, CircleCheck, CircleCheckFilled, WarningFilled, CircleCloseFilled, Plus as PlusIcon, DocumentAdd as DocumentAddIcon, Paperclip as PaperclipIcon } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import type { DFormSchema, DFormData, FieldChangePayload } from './GtDForm.vue'

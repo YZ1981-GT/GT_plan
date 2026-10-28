@@ -205,7 +205,7 @@
           </div>
         </template>
         <!-- 各段结论 -->
-        <table class="c1-grid-table c1-conclusion-table">
+        <GtGridTable class="c1-grid-table c1-conclusion-table">
           <thead>
             <tr>
               <th style="min-width: 200px">要素 / 段</th>
@@ -241,7 +241,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
         <!-- 整体结论 -->
         <div class="c1-overall-row">
           <span class="c1-overall-label">企业层面控制整体结论</span>
@@ -276,7 +276,7 @@
             </div>
           </div>
         </template>
-        <table class="c1-grid-table c1-defect-table">
+        <GtGridTable class="c1-grid-table c1-defect-table">
           <thead>
             <tr>
               <th style="width: 32px">#</th>
@@ -312,7 +312,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </el-card>
 
       <!-- 右下角浮动按钮: 查看示例 -->
@@ -718,7 +718,7 @@
               </el-tooltip>
             </div>
           </template>
-          <table class="c1-grid-table">
+          <GtGridTable class="c1-grid-table">
             <thead>
               <tr>
                 <th style="width: 32px">#</th>
@@ -787,7 +787,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
         </el-card>
       </el-dialog>
 
@@ -835,7 +835,7 @@
           </details>
 
           <!-- 过程记录字段区 -->
-          <table class="c1-grid-table c1-proc-table">
+          <GtGridTable class="c1-grid-table c1-proc-table">
             <tbody>
               <tr v-for="f in processFieldsForActive" :key="f.key">
                 <td class="c1-proc-label">{{ f.label }}</td>
@@ -890,7 +890,7 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+          </GtGridTable>
 
           <!-- 📎 附件区 -->
           <div class="c1-ref-row" style="margin-top: 12px">
@@ -984,7 +984,7 @@
         </details>
 
         <!-- 过程记录字段区（C1-4-4） -->
-        <table class="c1-grid-table c1-proc-table">
+        <GtGridTable class="c1-grid-table c1-proc-table">
           <tbody>
             <tr v-for="f in processFieldsForSample" :key="f.key">
               <td class="c1-proc-label">{{ f.label }}</td>
@@ -1025,7 +1025,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
 
         <el-divider />
 
@@ -1043,7 +1043,7 @@
           </div>
         </div>
 
-        <table class="c1-grid-table c1-sample-table">
+        <GtGridTable class="c1-grid-table c1-sample-table">
           <thead>
             <tr>
               <th style="width: 32px">#</th>
@@ -1161,7 +1161,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
 
         <template #footer>
           <el-button @click="sampleDialogVisible = false">关闭</el-button>
@@ -1216,6 +1216,7 @@ import {
 
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))

@@ -74,7 +74,6 @@
           ref="tableContainer"
           v-html="htmlContent"
           @click="onCellClick"
-          @dblclick="onCellDblClick"
           @focusout="onCellBlur"
         />
 
@@ -304,30 +303,30 @@
             </el-table-column>
             <el-table-column label="公式" min-width="260">
               <template #default="{ row }">
-                <el-input v-if="row._editing" v-model="row.formula" size="small" />
-                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); cursor: pointer;" @dblclick="row._editing = true">{{ row.formula || '（双击编辑）' }}</code>
+                <!-- 格内编辑（spec excel-style-table-editing 5.5）：平时显示文字，双击 / F2 / 直接输入才挂编辑器；
+                     原先「编辑 / 完成」按钮 + 双击切换的自建开关删掉 -->
+                <el-input v-model="row.formula" size="small" placeholder="（双击编辑）" />
               </template>
             </el-table-column>
             <el-table-column label="分类" width="90">
               <template #default="{ row }">
-                <el-select v-if="row._editing" v-model="row.category" size="small" style="width: 80px;">
-                  <el-option label="自动" value="auto_calc" />
-                  <el-option label="逻辑" value="logic_check" />
-                  <el-option label="合理" value="reasonability" />
-                </el-select>
-                <span v-else style="font-size: var(--gt-font-size-xs);">{{ ({ auto_calc: '⚡', logic_check: '🔍', reasonability: '💡' } as Record<string,string>)[row.category] || '' }}{{ ({ auto_calc: '自动', logic_check: '逻辑', reasonability: '合理' } as Record<string,string>)[row.category] || row.category }}</span>
+                <GtGridCell :value="row.category" kind="select">
+                  <template #display><span style="font-size: var(--gt-font-size-xs);">{{ ({ auto_calc: '⚡', logic_check: '🔍', reasonability: '💡' } as Record<string,string>)[row.category] || '' }}{{ ({ auto_calc: '自动', logic_check: '逻辑', reasonability: '合理' } as Record<string,string>)[row.category] || row.category }}</span></template>
+                  <el-select v-model="row.category" size="small" style="width: 80px;">
+                    <el-option label="自动" value="auto_calc" />
+                    <el-option label="逻辑" value="logic_check" />
+                    <el-option label="合理" value="reasonability" />
+                  </el-select>
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column label="说明" min-width="140">
               <template #default="{ row }">
-                <el-input v-if="row._editing" v-model="row.description" size="small" />
-                <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row.description }}</span>
+                <el-input v-model="row.description" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="90" align="center">
-              <template #default="{ row, $index }">
-                <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
-                <el-button v-else size="small" link style="color: var(--gt-color-success);" @click="row._editing = false">完成</el-button>
+            <el-table-column label="操作" width="60" align="center">
+              <template #default="{ $index }">
                 <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="localFormulas.splice($index, 1)">删除</el-button>
               </template>
             </el-table-column>
@@ -421,8 +420,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { kernelForRawTable } from '@/components/grid/gridRegistry'
+import { isGridSink, isInsideGridEditor } from '@/components/grid/GridKernel'
+import { bindContentEditableCells } from '@/components/grid/contentEditableCells'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmRollback } from '@/utils/confirm'
 import {
@@ -586,6 +590,57 @@ function onAddColumnConfirm() {
 }
 const pendingEdits = ref<any[]>([])
 const tableContainer = ref<HTMLElement>()
+
+// ── 表格交互（spec excel-style-table-editing 5.5）──────────────────────────────
+// Excel / 单击编辑方式：单击只选中，双击 / F2 / 直接输入才编辑；键位、选区、复制粘贴、撤销与其他表格同一套（内核），
+// 可编辑格由 bindContentEditableCells 接成单元格编辑器。经典方式保持原来的「一点就编辑」（onCellClick / onCellBlur）。
+let displayPrefs: ReturnType<typeof useDisplayPrefsStore> | null = null
+try { displayPrefs = useDisplayPrefsStore() } catch { displayPrefs = null } // 单测不装 Pinia：按经典方式
+const gridMode = computed(() => !!displayPrefs && displayPrefs.gridEditMode !== 'classic')
+let gridTable: HTMLTableElement | null = null
+const gridKernel = kernelForRawTable(getCurrentInstance()!, () => gridTable)
+let unbindCells: (() => void) | null = null
+let offKernelChange: (() => void) | null = null
+
+function detachGrid() {
+  offKernelChange?.()
+  offKernelChange = null
+  gridKernel.detach()
+  unbindCells?.()
+  unbindCells = null
+  gridTable = null
+}
+
+function attachGrid() {
+  detachGrid()
+  if (!gridMode.value) return
+  const table = tableContainer.value?.querySelector<HTMLTableElement>('table.gt-excel-table') ?? null
+  if (!table) return
+  gridTable = table
+  table.classList.add('gt-grid-raw')
+  // 承接框放零高 caption（与 GtGridTable 相同：直接放进 table 会被当成匿名行组）
+  let host = table.querySelector<HTMLElement>(':scope > caption.gt-grid-raw__host')
+  if (!host) {
+    host = document.createElement('caption')
+    host.className = 'gt-grid-raw__host'
+    table.insertBefore(host, table.firstChild)
+  }
+  unbindCells = bindContentEditableCells(table, {
+    cellSelector: 'td[data-cell][contenteditable="true"]',
+    ignoreSelector: '.gt-cell-coord',
+    onChange: (td, text, before) => recordCellEdit(td.dataset.cell || '', text, before),
+  })
+  gridKernel.attach(table, { sinkHost: host })
+  // 公式栏 / 插入行列 / 绑定取数跟着内核的当前格走（单击、方向键、Tab、Enter 都会变）
+  offKernelChange = gridKernel.onChange(() => {
+    const td = gridKernel.activeTd()
+    if (td?.dataset.cell) showCellInfo(td)
+  })
+}
+
+watch([htmlContent, gridMode], () => { void nextTick(attachGrid) })
+onBeforeUnmount(detachGrid)
+
 const currentPage = ref(1)
 const pageSize = ref(500)
 const totalRows = ref(0)
@@ -652,21 +707,16 @@ async function onPageChange(page: number) {
   }
 }
 
-function onCellClick(e: MouseEvent) {
-  const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
-  if (!td) return
-
-  // 高亮选中
-  tableContainer.value?.querySelectorAll('td.gt-selected').forEach(el => el.classList.remove('gt-selected'))
-  td.classList.add('gt-selected')
-
-  selectedCell.value = td.dataset.cell || ''
-
-  // 更新公式栏信息
+/** 当前格 → 公式栏信息、插入行列 / 绑定取数的目标格、公式依赖高亮 */
+function showCellInfo(td: HTMLElement) {
+  const cell = td.dataset.cell || ''
+  const value = td.textContent?.replace(/[A-Z]\d+$/g, '').trim()
+  if (selectedCell.value === cell && currentCellInfo.value?.cell === cell && currentCellInfo.value?.value === value) return
+  selectedCell.value = cell
   currentCellInfo.value = {
     cell: td.dataset.cell,
     address: td.dataset.addr || '',
-    value: td.textContent?.replace(/[A-Z]\d+$/g, '').trim(),
+    value,
     formula: td.dataset.formula || null,
     formula_type: td.dataset.formulaType || null,
     formula_desc: null,
@@ -674,8 +724,23 @@ function onCellClick(e: MouseEvent) {
     merge: td.dataset.mergeRange ? { range: td.dataset.mergeRange } : null,
     is_merged: td.dataset.merged === 'true',
   }
+  // 可视化维度：高亮公式依赖的单元格
+  if (showFormulas.value && td.dataset.formula) {
+    _highlightFormulaDeps(td.dataset.formula)
+  }
+}
 
-  // 单击即进入编辑模式（contenteditable 聚焦）
+function onCellClick(e: MouseEvent) {
+  if (gridMode.value) return // 选中 / 编辑归内核（见 attachGrid）
+  const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
+  if (!td) return
+
+  // 高亮选中
+  tableContainer.value?.querySelectorAll('td.gt-selected').forEach(el => el.classList.remove('gt-selected'))
+  td.classList.add('gt-selected')
+  showCellInfo(td)
+
+  // 经典方式：单击即进入编辑模式（contenteditable 聚焦）
   if (td.isContentEditable) {
     td.focus()
     // 将光标移到末尾
@@ -687,11 +752,6 @@ function onCellClick(e: MouseEvent) {
       sel.removeAllRanges()
       sel.addRange(range)
     }
-  }
-
-  // 可视化维度：高亮公式依赖的单元格
-  if (showFormulas.value && td.dataset.formula) {
-    _highlightFormulaDeps(td.dataset.formula)
   }
 }
 
@@ -721,16 +781,24 @@ function formatValue(val: any): string {
   return String(val)
 }
 
-function onCellDblClick(e: MouseEvent) {
-  const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
-  if (!td || !td.isContentEditable) return
-  // 双击进入编辑模式，浏览器原生 contenteditable 处理
-}
-
 // 自动保存定时器
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
+/** 记一条格值修改（经典方式失焦时 / 内核提交、粘贴、清空、撤销时），5 秒无操作后自动保存 */
+function recordCellEdit(cellKey: string, newValue: string, oldValue: string) {
+  const value = newValue.trim()
+  if (!cellKey || value === oldValue.trim()) return
+  pendingEdits.value.push({ action: 'edit', cell: cellKey, value })
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => {
+    if (pendingEdits.value.length > 0 && props.fileStem) {
+      saveEdits()
+    }
+  }, 5000)
+}
+
 function onCellBlur(e: FocusEvent) {
+  if (gridMode.value) return // 内核方式：提交时由 bindContentEditableCells 回调 recordCellEdit
   const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
   if (!td || !td.isContentEditable) return
 
@@ -739,18 +807,7 @@ function onCellBlur(e: FocusEvent) {
 
   // 检查值是否变化（与 currentCellInfo 对比）
   if (cellKey && currentCellInfo.value?.cell === cellKey) {
-    const oldValue = String(currentCellInfo.value.value || '').trim()
-    if (newValue !== oldValue) {
-      pendingEdits.value.push({ action: 'edit', cell: cellKey, value: newValue })
-
-      // 自动保存（5秒无操作后）
-      if (autoSaveTimer) clearTimeout(autoSaveTimer)
-      autoSaveTimer = setTimeout(() => {
-        if (pendingEdits.value.length > 0 && props.fileStem) {
-          saveEdits()
-        }
-      }, 5000)
-    }
+    recordCellEdit(cellKey, newValue, String(currentCellInfo.value.value || ''))
   }
 }
 
@@ -991,9 +1048,13 @@ function onKeyDown(e: KeyboardEvent) {
   // Ctrl+S 保存
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault()
+    gridKernel.commitEdit({ refocus: false }) // 正在编辑的格先提交
     saveEdits()
     return
   }
+  // 内核方式：表格里的按键（选区 / 编辑 / 撤销）归内核；内核没接的（如撤销栈空时的 Ctrl+Z）也不在这里撤
+  // 「插入行 / 删除列」等待保存的操作 —— 那样会和格里显示的值对不上
+  if (gridMode.value && (isGridSink(e.target) || isInsideGridEditor(e.target))) return
   // Ctrl+Z 撤销最后一条编辑
   if (e.ctrlKey && e.key === 'z') {
     e.preventDefault()
@@ -1003,6 +1064,8 @@ function onKeyDown(e: KeyboardEvent) {
     }
     return
   }
+  // 以下是经典方式自带的选中 / 导航（内核方式由内核处理）
+  if (gridMode.value) return
   // Escape 取消选中
   if (e.key === 'Escape') {
     tableContainer.value?.querySelectorAll('td.gt-selected').forEach(el => el.classList.remove('gt-selected'))
@@ -1055,7 +1118,6 @@ interface LocalFormula {
   formula: string
   category: string
   description: string
-  _editing: boolean
 }
 const localFormulas = ref<LocalFormula[]>([])
 const fmSelectedRows = ref<any[]>([])
@@ -1096,7 +1158,6 @@ function extractFormulasFromStructure() {
         formula,
         category: 'auto_calc',
         description: '',
-        _editing: false,
       })
     }
   })
@@ -1110,7 +1171,6 @@ function _addLocalFormula() {
     formula: '',
     category: 'auto_calc',
     description: '',
-    _editing: true,
   })
 }
 
@@ -1164,7 +1224,6 @@ function addEditedFormula() {
     formula: editFormula.value.trim(),
     category: editCategory.value,
     description: editDescription.value,
-    _editing: false,
   })
   ElMessage.success('已添加到公式列表')
   fmTab.value = 'list'  // 切回列表Tab查看

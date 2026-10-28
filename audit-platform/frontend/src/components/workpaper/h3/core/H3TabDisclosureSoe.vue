@@ -61,7 +61,7 @@
             <el-button size="small" plain @click="generateAI('soe-cost')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-item">项 目</th>
@@ -105,7 +105,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-cost']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明本期增加/减少主要原因（外购、自用房地产或存货转入、转出、处置等）" :disabled="isReadonly"
@@ -122,7 +122,7 @@
             <el-button size="small" plain @click="generateAI('soe-cost-dep')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-item">项 目</th>
@@ -166,7 +166,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-cost-dep']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明折旧方法、使用年限、残值率等计量政策。" :disabled="isReadonly"
@@ -220,7 +220,7 @@
             <el-button size="small" plain @click="generateAI('soe-impair')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-item">项 目</th>
@@ -261,7 +261,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-impair']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明本期减值迹象、测试情况及结论；如无减值，请注明。" :disabled="isReadonly"
@@ -283,7 +283,7 @@
             <el-button size="small" plain @click="generateAI('soe-fair-value')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -320,7 +320,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-fair-value']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明公允价值确定依据、评估机构、评估方法及关键假设。" :disabled="isReadonly"
@@ -337,7 +337,7 @@
             <el-button size="small" plain @click="generateAI('soe-fair-change')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-item">项 目</th>
@@ -381,7 +381,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-fair-change']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="说明公允价值变动与 H3-8 复核表及审定表勾稽情况。" :disabled="isReadonly"
@@ -399,7 +399,7 @@
             <el-button size="small" plain @click="generateAI('soe-fair-hierarchy')">AI</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -467,7 +467,7 @@
               <td colspan="3"></td><td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
         <div class="block-note">
           <el-input v-model="sectionTexts['soe-fair-hierarchy']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="披露公允价值层次确定依据；第三层次采用的估值技术及关键不可观察输入值（市场租金/折现率/资本化率）；层次间转换情况。" :disabled="isReadonly"
@@ -483,7 +483,7 @@
             <el-button v-if="!isReadonly" size="small" @click="addRow('soe-unlicensed')">＋ 插行</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -508,7 +508,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
       </div>
 
     </template>
@@ -522,7 +522,7 @@
             <el-button v-if="!isReadonly" size="small" @click="addRow('soe-unlicensed')">＋ 插行</el-button>
           </div>
         </div>
-        <table class="disc-table">
+        <GtGridTable class="disc-table">
           <thead>
             <tr>
               <th class="col-item">项 目</th>
@@ -547,7 +547,7 @@
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
-        </table>
+        </GtGridTable>
       </div>
     </template>
 
@@ -622,6 +622,7 @@ import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJum
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId: string

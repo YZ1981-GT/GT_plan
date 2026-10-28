@@ -121,7 +121,7 @@
       </div>
 
       <div class="table-scroll">
-        <table class="date-table">
+        <GtGridTable class="date-table">
           <thead>
             <tr>
               <th rowspan="2" class="col-date">日期</th>
@@ -269,7 +269,7 @@
               <td />
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 
@@ -318,6 +318,7 @@ import {
 } from '../../composables/useF2ValuationDateFormulas'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   title: string
