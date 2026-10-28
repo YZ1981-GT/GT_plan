@@ -863,7 +863,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-28T13:05:08.482784+00:00",
+  "generated_at": "2026-10-28T15:10:46.930742+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -1683,9 +1683,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261028130507",
+  "registry_version": "20261028151046",
   "release": {
-    "catalog_sha256": "7d8477ceeec4a997bde230787f5240af1cf8c6c74d5d81aaa84b402f5cbd18bd",
+    "catalog_sha256": "36f8fe261a86b2e4dc8f3065a3b86dfabc3b83b3898139c8b4138dc6f23e4a47",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -1764,8 +1764,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261028075152.json",
-        "sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755"
+        "path": "backend/data/acnr/catalog_snapshots/20261028130507.json",
+        "sha256": "7d8477ceeec4a997bde230787f5240af1cf8c6c74d5d81aaa84b402f5cbd18bd"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -1825,7 +1825,7 @@
       },
       {
         "path": "backend/data/acnr/sources/sheet_verdicts.json",
-        "sha256": "5c7588ecf41e540035d9147913bc8a1152faed4eae045ebb64c073d1f0b875bc"
+        "sha256": "4b0b9dc3cc67f3b4711305d6f80c52e81365a2376962ef0810d186fc8e9f6b0f"
       },
       {
         "path": "backend/data/c22_address_registry_seed.json",
@@ -1892,10 +1892,10 @@
         "sha256": "74c881dccc7799f8b27e4bf8e7591e01704e3ff9810c72a0c65585307261e620"
       }
     ],
-    "inputs_fingerprint": "9c7456adf272810dc6964a32cd04070b9589be508209a568f2e63e18c807ae81",
-    "previous_catalog_sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755",
-    "previous_version": "20261028075152",
-    "registry_version": "20261028130507",
+    "inputs_fingerprint": "e92c737e8fcd99acc3877b267011b06ce4e7448950fcf6f1497e77543a98da3a",
+    "previous_catalog_sha256": "7d8477ceeec4a997bde230787f5240af1cf8c6c74d5d81aaa84b402f5cbd18bd",
+    "previous_version": "20261028130507",
+    "registry_version": "20261028151046",
     "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
   },
   "summary": {

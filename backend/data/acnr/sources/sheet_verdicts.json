@@ -1242,7 +1242,7 @@
         "seed_name": "信用减值损失ECL计算明细",
         "seed_semantic": "阶段1-12个月ECL",
         "seed_tab_exists": false,
-        "row_text": "债权投资减值损失 | =B15+C15 | 债权投资减值准备 | =F15+G15-H15-I15 | =G15+H15 | =D15=K15",
+        "row_text": "债权投资减值损失 | =B15+C15 | 债权投资减值准备 | =F15+G15-H15-I15 | =G15-H15 | =D15=K15",
         "cell_value": "债权投资减值准备",
         "class": "in_range_row_text"
       }
@@ -1683,7 +1683,7 @@
         "seed_name": "其他应付款明细",
         "seed_semantic": "其他应付款明细合计",
         "seed_tab_exists": false,
-        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =Q25+R25+S25",
         "cell_value": null,
         "class": "in_range_row_text"
       }
@@ -1704,7 +1704,7 @@
         "seed_name": "其他应付款明细",
         "seed_semantic": "账面余额合计",
         "seed_tab_exists": false,
-        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =Q25+R25+S25",
         "cell_value": null,
         "class": "in_range_row_text"
       }
@@ -1725,7 +1725,7 @@
         "seed_name": "其他应付款明细",
         "seed_semantic": "本期增加合计",
         "seed_tab_exists": false,
-        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =Q25+R25+S25",
         "cell_value": "=E25+F25+G25",
         "class": "in_range_row_text"
       }
@@ -1746,7 +1746,7 @@
         "seed_name": "其他应付款明细",
         "seed_semantic": "本期减少合计",
         "seed_tab_exists": false,
-        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =Q25+R25+S25",
         "cell_value": null,
         "class": "in_range_row_text"
       }
