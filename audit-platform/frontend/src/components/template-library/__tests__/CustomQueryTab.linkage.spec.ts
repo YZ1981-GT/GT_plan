@@ -41,6 +41,7 @@ vi.mock('element-plus', async () => {
 import ElementPlus from 'element-plus'
 import CustomQueryTab from '@/components/template-library/CustomQueryTab.vue'
 import QueryConditionEditor from '@/components/query/QueryConditionEditor.vue'
+import QueryResultPager from '@/components/query/QueryResultPager.vue'
 import QueryTemplateSaveDialog from '@/components/query/QueryTemplateSaveDialog.vue'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 
@@ -270,6 +271,10 @@ describe('结果、导出与入口', () => {
       conditions: [{ field: 'debit_amount', op: 'gt', value: '100000000' }], condition_logic: 'and' })
     expect(opts.data.headers).toMatchObject({ debit_amount: '借方发生额', summary: '摘要' })
     expect(opts.data).not.toHaveProperty('offset')
+    // N5（与弹窗、构建器同口径）：导出按钮带 aria-label；翻页与行操作是与弹窗共用的组件（其 aria-label 在弹窗用例里全量挂载断言）
+    expect(wrapper.find('[aria-label="导出查询结果"]').exists()).toBe(true)
+    expect(wrapper.findComponent(QueryResultPager).exists()).toBe(true)
+    expect(wrapper.find('[aria-label="执行查询"]').exists()).toBe(true)
   })
 
   it('点表头排序（R2.2）：请求带 sort 并回到第 1 页，导出全部与保存模板带同一排序；换数据源即清除', async () => {
