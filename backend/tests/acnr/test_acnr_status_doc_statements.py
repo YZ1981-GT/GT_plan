@@ -165,6 +165,28 @@ def _template_configs_are_checked() -> bool:
     return all("TemplateConfig" in found.get(c, set()) for c in ("TemplateCreateRequest", "TemplateUpdateRequest"))
 
 
+
+def _locate_gate_ok() -> bool:
+    """底稿短链定位端点：路由 GET /api/acnr/workpapers/{wp_id}/locate，函数体调用 assert_project_permission(…, "readonly")（AST）。"""
+    import ast as _ast
+
+    rel = "backend/app/routers/acnr.py"
+    node = _fn_node(rel, "acnr_locate_workpaper")
+    routes = [d for d in node.decorator_list if isinstance(d, _ast.Call) and getattr(d.func, "attr", "") == "get"
+              and d.args and getattr(d.args[0], "value", None) == "/workpapers/{wp_id}/locate"]
+    calls = [c for c in _ast.walk(node) if isinstance(c, _ast.Call)
+             and getattr(c.func, "id", getattr(c.func, "attr", None)) == "assert_project_permission"
+             and any(getattr(a, "value", None) == "readonly" for a in c.args)]
+    return bool(routes) and bool(calls)
+
+
+def _short_link_route_ok() -> bool:
+    """前端底稿域路由表登记了短链 workpapers/:wpId → WorkpaperShortLink.vue（TS 源码里的路由对象）。"""
+    src = _read(_REPO / "audit-platform/frontend/src/router/domains/workpapers.ts")
+    return ("path: 'workpapers/:wpId'" in src and "name: 'WorkpaperShortLink'" in src
+            and "@/views/WorkpaperShortLink.vue" in src)
+
+
 _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_INTRO: {
         "本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**": P(
@@ -384,6 +406,17 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts", exists(_FE_GUARD_REL),
             exists("audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue"),
             has_tests(_T + "test_query_request_fields_fixture.py", "test_fixture_holds_for_backend_models")),
+        "底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，回收站给中文原因）": CB(
+            "backend/app/routers/acnr.py", ("acnr_locate_workpaper",), _T + "test_workpaper_locate_endpoint.py",
+            claim("定位端点路由与只读项目鉴权（AST）", _locate_gate_ok),
+            has_tests(_T + "test_workpaper_locate_endpoint.py", "test_non_member_is_403_without_project_id",
+                      "test_wp_index_id_is_not_a_workpaper_id", "test_recycle_bin_is_410_with_chinese_reason")),
+        "底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约": CF(
+            "audit-platform/frontend/src/views/composables/workpaperShortLink.ts", ("resolveShortLink", "shortLinkQuery"),
+            "audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts",
+            claim("底稿域路由表登记短链 workpapers/:wpId", _short_link_route_ok),
+            exists("audit-platform/frontend/src/router/__tests__/backendRouteShapes.contract.spec.ts"),
+            has_tests(_T + "test_frontend_route_shapes_fixture.py", "test_fixture_matches_backend_sources")),
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),

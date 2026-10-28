@@ -174,6 +174,20 @@ const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
     }
     return problems
   },
+  '底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约': (sf) => {
+    const problems: string[] = []
+    const fn = exportedFunction(sf, 'resolveShortLink')
+    if (!fn) return ['未导出函数 resolveShortLink']
+    if (!callsIdentifier(fn, 'workpaperEditorRoute')) problems.push('resolveShortLink 须用 workpaperEditorRoute 生成编辑器路由（不手拼路径）')
+    if (!callsIdentifier(fn, 'shortLinkQuery')) problems.push('resolveShortLink 须经 shortLinkQuery 把查询串带过去')
+    if (!/\/api\/acnr\/workpapers\/\$\{/.test(fn.getText(sf))) problems.push('resolveShortLink 须调定位端点 /api/acnr/workpapers/{id}/locate')
+    const routeFile = join(REPO, 'audit-platform/frontend/src/router/domains/workpapers.ts')
+    if (!readFileSync(routeFile, 'utf-8').includes("path: 'workpapers/:wpId'")) problems.push('底稿域路由表未登记短链 workpapers/:wpId')
+    if (!existsSync(join(REPO, 'audit-platform/frontend/src/router/__tests__/backendRouteShapes.contract.spec.ts'))) {
+      problems.push('缺后端跳转路由形态契约 backendRouteShapes.contract.spec.ts')
+    }
+    return problems
+  },
 }
 
 describe('架构提案现状节：前端组件行（TS 编译器 API）', () => {

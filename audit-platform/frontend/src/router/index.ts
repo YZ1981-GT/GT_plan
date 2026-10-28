@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
@@ -24,28 +24,31 @@ NProgress.configure({ showSpinner: false })
 // routeDomainProjection.spec.ts 断言：每个域导出在 layoutChildren /
 // top-level routes 中各展开恰好一次，域内 path 全部进入声明集合，跨域 name 不重复。
 
+// 路由表单独导出：backendRouteShapes.contract.spec.ts 用同一份表建 memory history router 核对后端跳转路由能命中
+export const routes: RouteRecordRaw[] = [
+  ...authRoutes,
+  {
+    path: '/',
+    component: () => import('@/layouts/DefaultLayout.vue'),
+    meta: { requireAuth: true },
+    children: [
+      ...dashboardRoutes,     // 首页与仪表盘
+      ...projectsRoutes,      // 项目与项目内工作台
+      ...workpapersRoutes,    // 底稿
+      ...reportsRoutes,       // 报表
+      ...notesRoutes,         // 附注
+      ...confirmationsRoutes, // 函证
+      ...qcRoutes,            // 质量复核
+      ...extensionRoutes,     // 扩展与模板
+      ...systemRoutes,        // 系统管理与运维
+    ],
+  },
+  ...standaloneRoutes,
+]
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    ...authRoutes,
-    {
-      path: '/',
-      component: () => import('@/layouts/DefaultLayout.vue'),
-      meta: { requireAuth: true },
-      children: [
-        ...dashboardRoutes,     // 首页与仪表盘
-        ...projectsRoutes,      // 项目与项目内工作台
-        ...workpapersRoutes,    // 底稿
-        ...reportsRoutes,       // 报表
-        ...notesRoutes,         // 附注
-        ...confirmationsRoutes, // 函证
-        ...qcRoutes,            // 质量复核
-        ...extensionRoutes,     // 扩展与模板
-        ...systemRoutes,        // 系统管理与运维
-      ],
-    },
-    ...standaloneRoutes,
-  ],
+  routes,
 })
 
 // ─── 统一路由守卫 [R7.1] ───

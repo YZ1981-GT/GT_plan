@@ -34,6 +34,13 @@ const A16_VIRTUAL_RE = /^A16-[1-7]$/
 
 // ─── Route resolvers by render_type ──────────────────────────────────────────
 
+/** 底稿编辑器路由的唯一构造处（下方各 render_type 分支与短链页 `/workpapers/:wpId` 共用）。 */
+export function workpaperEditorRoute(
+  projectId: string, wpId: string, query?: Record<string, string>,
+): { name: string; params: Record<string, string>; query?: Record<string, string> } {
+  return query ? { name: 'WorkpaperEditor', params: { projectId, wpId }, query } : { name: 'WorkpaperEditor', params: { projectId, wpId } }
+}
+
 function resolveRoute(
   wpCode: string,
   entry: RegistryEntry,
@@ -45,7 +52,7 @@ function resolveRoute(
   if (rt === 'html_procedure' || rt === 'html_review') {
     // HTML 程序表/复核表 → 底稿编辑器（后续由编辑器按 render_type 切换渲染）
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
@@ -60,21 +67,21 @@ function resolveRoute(
     }
     // fallback
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
 
   if (rt === 'univer' || rt === 'word_template') {
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }
 
   if (rt === 'readonly_reference' || rt === 'signing') {
     if (wpId) {
-      return { name: 'WorkpaperEditor', params: { projectId, wpId } }
+      return workpaperEditorRoute(projectId, wpId)
     }
     return { name: 'WorkpaperList', params: { projectId }, query: { highlight: wpCode } }
   }

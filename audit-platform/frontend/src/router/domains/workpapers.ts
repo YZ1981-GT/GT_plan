@@ -16,6 +16,12 @@ export const workpapersRoutes: RouteRecordRaw[] = [
           component: () => import('@/views/WorkpaperEditor.vue'),
         },
 {
+          // 底稿短链（ACNR jump_route / AI 提及 / 证据治理产出 /workpapers/{id}?sheet=…）：按底稿 id 查项目后重定向到编辑器
+          path: 'workpapers/:wpId',
+          name: 'WorkpaperShortLink',
+          component: () => import('@/views/WorkpaperShortLink.vue'),
+        },
+{
           path: 'projects/:projectId/account-packages/:packageId',
           name: 'AccountPackage',
           component: () => import('@/views/AccountPackageView.vue'),

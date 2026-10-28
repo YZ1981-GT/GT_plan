@@ -13,12 +13,15 @@ from dataclasses import asdict
 from typing import Optional
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import assert_project_permission, get_current_user, require_role
+from app.models.core import User
+from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.acnr.auth import check_project_access, verify_wp_binding
 from app.services.acnr.catalog import (
     get_catalog,
@@ -396,6 +399,34 @@ async def acnr_resolve_instance(
         response["wp_index_id"] = str(result.wp_index_id)
 
     return response
+
+
+@router.get("/workpapers/{wp_id}/locate")
+async def acnr_locate_workpaper(
+    wp_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """短链 ``/workpapers/{wp_id}`` 的定位：底稿 id → 所属项目（T16 / RV7.5-01）。
+
+    ACNR 跳转路由是 ``/workpapers/{wp_id}?sheet=…``（目录模板 / resolver 缺省 / acnr_targets 回落父底稿），前端只有
+    ``/projects/{pid}/workpapers/{wp_id}/edit``，短链页凭本端点查出项目后重定向。键是 ``working_paper.id``，
+    不是 ``wp_index.id``（传后者 = 不存在 404）。先查行、再按所属项目做 readonly 鉴权（非成员 403），
+    鉴权通过后才区分回收站（410 + 中文原因）。
+    """
+    row = (await db.execute(
+        sa.select(WorkingPaper.project_id, WorkingPaper.is_deleted, WpIndex.wp_code)
+        .outerjoin(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+        .where(WorkingPaper.id == wp_id)
+    )).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail={"error_code": "WORKPAPER_NOT_FOUND", "message": "底稿不存在"})
+    await assert_project_permission(db, current_user, row.project_id, "readonly")
+    if row.is_deleted:
+        raise HTTPException(status_code=410, detail={
+            "error_code": "WORKPAPER_IN_RECYCLE_BIN", "message": "底稿已移入回收站",
+            "project_id": str(row.project_id)})
+    return {"wp_id": str(wp_id), "project_id": str(row.project_id), "wp_code": row.wp_code}
 
 
 @router.get("/coverage")
