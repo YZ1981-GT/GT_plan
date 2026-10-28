@@ -15,6 +15,18 @@
     "src/components/query/querySourceUri.ts",
     "src/components/query/__tests__/querySourceUri.spec.ts",
     "src/components/query/CustomQueryDialog.vue",
+    "src/components/query/queryResultLinks.ts",
+    "src/components/query/__tests__/queryResultLinks.spec.ts",
+    "src/components/query/queryErrorText.ts",
+    "src/components/query/__tests__/queryErrorText.spec.ts",
+    "src/components/query/queryEntryContext.ts",
+    "src/components/query/__tests__/queryEntryContext.spec.ts",
+    "src/components/query/queryTemplateCache.ts",
+    "src/components/query/__tests__/queryTemplateCache.spec.ts",
+    "src/components/query/queryIndicatorCache.ts",
+    "src/components/query/__tests__/queryIndicatorCache.spec.ts",
+    "src/composables/useLedgerUrlSync.ts",
+    "src/composables/__tests__/useLedgerUrlSync.spec.ts",
     "src/env.d.ts"
   ]
 }

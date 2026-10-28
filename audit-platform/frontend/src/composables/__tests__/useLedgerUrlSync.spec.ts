@@ -14,7 +14,27 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ query: mockQuery }),
 }))
 
-import { useLedgerUrlSync } from '../useLedgerUrlSync'
+import { buildLedgerQuery, useLedgerUrlSync } from '../useLedgerUrlSync'
+
+describe('buildLedgerQuery（页内同步与站外深链共用，advanced-query-linkage-closure 任务 27）', () => {
+  it('凭证层级：year 在前，只写非空值', () => {
+    expect(buildLedgerQuery({ level: 'voucher', account: '1002', voucherNo: '记-0223', voucherDate: '2025-03-31' }, 2025))
+      .toEqual({ year: '2025', level: 'voucher', account: '1002', voucher: '记-0223', voucherDate: '2025-03-31' })
+  })
+
+  it('默认值不写（level=balance、balanceTab=account），年度缺省不写', () => {
+    expect(buildLedgerQuery({ level: 'balance', account: '1001', balanceTab: 'account' })).toEqual({ account: '1001' })
+    expect(buildLedgerQuery({ level: 'ledger', account: '1001' }, null)).toEqual({ level: 'ledger', account: '1001' })
+  })
+
+  it('写出的键都能被 readFromUrl 读回同一状态（往返一致）', () => {
+    const state = { level: 'aux_ledger', account: '1122', auxType: '客户', auxCode: 'C001', balanceTab: 'aux' }
+    Object.assign(mockQuery, buildLedgerQuery(state, '2025'))
+    const back = useLedgerUrlSync().readFromUrl()
+    expect(back).toMatchObject(state)
+    expect(mockQuery.year).toBe('2025')
+  })
+})
 
 describe('useLedgerUrlSync', () => {
   beforeEach(() => {

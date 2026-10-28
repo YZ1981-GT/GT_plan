@@ -23,6 +23,28 @@ export interface LedgerUrlState {
 }
 
 /**
+ * 穿透状态 → 账簿查询页的 URL query（纯函数，唯一实现）。
+ *
+ * 页内同步（`syncToUrl`）与站外深链（高级查询结果行「打开」，`components/query/queryResultLinks.ts`）共用，
+ * 两处写出的键与 `readFromUrl` 读回的键因此始终一致（advanced-query-linkage-closure 任务 27，ADR-AQL-01）。
+ * 只写入非空值；`level = balance`、`balanceTab = account` 是默认值，不写。
+ */
+export function buildLedgerQuery(state: Partial<LedgerUrlState>, year?: string | number | null): Record<string, string> {
+  const query: Record<string, string> = {}
+  if (year !== undefined && year !== null && String(year)) query.year = String(year)
+  if (state.level && state.level !== 'balance') query.level = state.level
+  if (state.account) query.account = state.account
+  if (state.voucherNo) query.voucher = state.voucherNo
+  if (state.voucherDate) query.voucherDate = state.voucherDate
+  if (state.dateFrom) query.dateFrom = state.dateFrom
+  if (state.dateTo) query.dateTo = state.dateTo
+  if (state.auxType) query.auxType = state.auxType
+  if (state.auxCode) query.auxCode = state.auxCode
+  if (state.balanceTab && state.balanceTab !== 'account') query.balanceTab = state.balanceTab
+  return query
+}
+
+/**
  * 将穿透状态写入 URL query（不产生历史记录堆积）
  */
 export function useLedgerUrlSync() {
@@ -30,23 +52,8 @@ export function useLedgerUrlSync() {
   const route = useRoute()
 
   function syncToUrl(state: Partial<LedgerUrlState>) {
-    const query: Record<string, string> = {}
-
-    // 保留现有的 year/import 等 query
-    if (route.query.year) query.year = String(route.query.year)
-
-    // 只写入非空值
-    if (state.level && state.level !== 'balance') query.level = state.level
-    if (state.account) query.account = state.account
-    if (state.voucherNo) query.voucher = state.voucherNo
-    if (state.voucherDate) query.voucherDate = state.voucherDate
-    if (state.dateFrom) query.dateFrom = state.dateFrom
-    if (state.dateTo) query.dateTo = state.dateTo
-    if (state.auxType) query.auxType = state.auxType
-    if (state.auxCode) query.auxCode = state.auxCode
-    if (state.balanceTab && state.balanceTab !== 'account') query.balanceTab = state.balanceTab
-
-    router.replace({ query })
+    // 保留现有的 year query；其余键只写入非空值
+    router.replace({ query: buildLedgerQuery(state, route.query.year ? String(route.query.year) : undefined) })
   }
 
   function readFromUrl(): LedgerUrlState {

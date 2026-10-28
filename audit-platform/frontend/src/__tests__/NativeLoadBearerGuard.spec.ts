@@ -67,6 +67,7 @@ const SCRIPT_NAVIGATIONS: Entry[] = [
   { file: 'components/common/GtPrintPreview.vue', expr: "''", kind: 'blank-window', why: '打印预览自己写入内容' },
   { file: 'components/ledger-import/DiagnosticPanel.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },
   { file: 'components/ledger-import/ErrorDialog.vue', expr: 'route.href', kind: 'frontend-route', why: 'router.resolve 结果' },
+  { file: 'components/query/queryResultLinks.ts', expr: 'router.resolve(resolved.location).href', kind: 'frontend-route', why: '高级查询结果行下钻：router.resolve 结果（账簿 / 报表 / 附注 / 调整分录 / 底稿页，advanced-query-linkage-closure 任务 27）' },
   { file: 'components/workpaper/composables/g7ConsolLinkageEntry.ts', expr: '`/projects/${projectId.value}/consolidation*', kind: 'frontend-route', why: '合并页（查询串写法随审计年度改动，前缀匹配）' },
   { file: 'composables/useAcnrDrill.ts', expr: 'route', kind: 'frontend-route', why: '地址穿透的站内路由' },
   { file: 'stores/auth.ts', expr: "'/login'", kind: 'frontend-route', why: '登录页' },
