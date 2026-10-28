@@ -12,6 +12,16 @@ full_resolve 每次调用结束记录：
 
 提供 /api/acnr/metrics 端点返回近期聚合指标。
 
+计数段 ``counters``（spec acnr-foundation-defect-closure T26，非功能·可观测；键恒在，未发生为 0 / 空）：
+  - ``version_lock_hit``：有锁定版本的项目按锁定目录解析（锁定版本等于当前版本也算）；
+  - ``version_lock_snapshot_missing``：锁定版本的目录快照缺失（同时记 version_mismatch 告警，拒绝解析）；
+  - ``version_lock_unchecked``：带项目但没有数据库会话，无法核对落库的版本锁（落库的锁随 T17 / T18；
+    此前锁定来源是进程内登记，这类调用仍会读进程内登记）；
+  - ``acnr_targets_rejected{error_code}``：acnr_targets 分类表逐项拒绝（422，按拒绝码）；
+  - ``deprecated_ref_saved``：公式保存了指向停用条目的引用（接受保存，同时记 silent 告警）；
+  - ``stale_start_unresolved{code}``：stale 写入口的起点身份算不出、不写 stale（按原因码）。
+  带原因码的两项只收已登记的码（``TARGET_REJECT_REASONS`` / ``NODE_UNRESOLVED_REASONS``），其余记 ``other``。
+
 Requirements: Req-12.1, Req-12.2, Req-12.3, Req-12.4, Req-12.5
 """
 from __future__ import annotations
@@ -61,6 +71,19 @@ class AlertEvent:
 MAX_RECENT_RECORDS = 500
 MAX_RECENT_ALERTS = 200
 
+#: 版本锁计数的三种结果 → counters 里的键（T26）
+VERSION_LOCK_COUNTERS: dict[str, str] = {
+    "hit": "version_lock_hit",
+    "snapshot_missing": "version_lock_snapshot_missing",
+    "unchecked": "version_lock_unchecked",
+}
+#: 带原因码的计数里，未登记的码一律记这个标签（防高基数）
+OTHER_LABEL = "other"
+
+
+def _bounded(code: Optional[str], known: Any) -> str:
+    return code if code in known else OTHER_LABEL
+
 
 class AcnrMetricsCollector:
     """ACNR 结构化指标收集器 — 进程内单例 (Req-12)。
@@ -80,6 +103,52 @@ class AcnrMetricsCollector:
         self._alert_type_counts: dict[str, int] = defaultdict(int)
         self._total_calls: int = 0
         self._total_latency_ms: float = 0.0
+        # T26 计数段
+        self._counts: dict[str, int] = defaultdict(int)
+        self._rejected_by_code: dict[str, int] = defaultdict(int)
+        self._stale_unresolved_by_code: dict[str, int] = defaultdict(int)
+
+    # ─── T26 计数（版本锁 / acnr_targets 拒绝 / 停用引用保存 / stale 起点）──
+
+    def record_version_lock(self, outcome: str, version: Optional[str] = None) -> None:
+        """版本锁结果计数：``hit`` / ``snapshot_missing`` / ``unchecked``。
+
+        ``snapshot_missing`` 同时记 version_mismatch 告警（原有告警保留，error 级）。
+        """
+        key = VERSION_LOCK_COUNTERS[outcome]  # 未知结果直接 KeyError：调用方写错不得静默
+        with self._lock:
+            self._counts[key] += 1
+        if outcome == "snapshot_missing":
+            self.record_version_mismatch(version or "", f"Catalog snapshot missing for version={version}")
+
+    def record_acnr_target_rejected(self, error_code: Optional[str]) -> None:
+        """acnr_targets 分类表拒绝一项（按拒绝码；未登记的码记 other）。"""
+        from app.services.acnr.reasons import TARGET_REJECT_REASONS
+
+        with self._lock:
+            self._rejected_by_code[_bounded(error_code, TARGET_REJECT_REASONS)] += 1
+
+    def record_deprecated_ref_saved(self, *, addr_id: Optional[str], replaced_by: Optional[str],
+                                    reason: str = "") -> None:
+        """公式保存了指向停用条目的引用：计数并记 silent 告警（不打日志，调用方另记 INFO）。"""
+        with self._lock:
+            self._counts["deprecated_ref_saved"] += 1
+        self.record_alert(event_type="deprecated_ref_saved", reason=reason,
+                          metadata={"addr_id": addr_id, "replaced_by": replaced_by}, silent=True)
+
+    def record_stale_start_unresolved(self, code: Optional[str]) -> None:
+        """stale 写入口起点身份算不出（按原因码；未登记的码记 other）。"""
+        from app.services.acnr.reasons import NODE_UNRESOLVED_REASONS
+
+        with self._lock:
+            self._stale_unresolved_by_code[_bounded(code, NODE_UNRESOLVED_REASONS)] += 1
+
+    def _counters_snapshot(self) -> dict[str, Any]:
+        out: dict[str, Any] = {key: self._counts.get(key, 0) for key in VERSION_LOCK_COUNTERS.values()}
+        out["deprecated_ref_saved"] = self._counts.get("deprecated_ref_saved", 0)
+        out["acnr_targets_rejected"] = dict(self._rejected_by_code)
+        out["stale_start_unresolved"] = dict(self._stale_unresolved_by_code)
+        return out
 
     # ─── Record a resolve call (Req-12.1) ────────────────────────────────
 
@@ -221,6 +290,7 @@ class AcnrMetricsCollector:
                 "recent_records": [
                     asdict(r) for r in list(self._recent_records)[-50:]
                 ],
+                "counters": self._counters_snapshot(),
             }
 
     # ─── Reset (for testing) ─────────────────────────────────────────────
@@ -236,6 +306,9 @@ class AcnrMetricsCollector:
             self._alert_type_counts.clear()
             self._total_calls = 0
             self._total_latency_ms = 0.0
+            self._counts.clear()
+            self._rejected_by_code.clear()
+            self._stale_unresolved_by_code.clear()
 
 
 # ─── Module-level singleton ──────────────────────────────────────────────────

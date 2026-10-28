@@ -27,6 +27,7 @@ from app.services.acnr import exact_identity
 from app.services.acnr.catalog import get_catalog
 from app.services.acnr.reasons import CELL_VALUE_REASONS
 from app.services.acnr.immutability import get_project_registry_version
+from app.services.acnr.metrics import get_acnr_metrics
 from app.services.formula_management.stable_key import normalize_sheet_key
 from app.services.wp_cell_reader import WpCellRead, resolve_wp_cell
 
@@ -71,11 +72,21 @@ async def effective_catalog(db, project_id) -> "CatalogIndex":
     cat = get_catalog()
     if not project_id:
         return cat
+    metrics = get_acnr_metrics()
+    if db is None:  # T26：与 full_resolve 同口径计 version_lock_unchecked
+        metrics.record_version_lock("unchecked")
     locked = await _locked_version(db, project_id)
-    if locked and locked != cat.registry_version:
-        from app.services.acnr.resolver import load_versioned_catalog
+    if not locked:
+        return cat
+    if locked != cat.registry_version:
+        from app.services.acnr.resolver import VersionNotFoundError, load_versioned_catalog
 
-        return load_versioned_catalog(locked)
+        try:
+            cat = load_versioned_catalog(locked)
+        except VersionNotFoundError:
+            metrics.record_version_lock("snapshot_missing", locked)
+            raise
+    metrics.record_version_lock("hit", locked)
     return cat
 
 

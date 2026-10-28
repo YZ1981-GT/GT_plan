@@ -514,6 +514,14 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             claim("目录写出方现算恰为生成器（AST 污点分析）", lambda: __import__(
                 "tests.acnr.test_only_generator_writes_catalog", fromlist=["catalog_writers"]
             ).catalog_writers() == {"scripts/acnr/generate_catalog.py"})),
+        "ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源暂为进程内登记；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other）": CB(
+            _A + "metrics.py", ("AcnrMetricsCollector", "get_acnr_metrics", "VERSION_LOCK_COUNTERS"), _T + "test_acnr_metrics.py",
+            calls(_RESOLVER_REL, "full_resolve", "record_version_lock"), calls(_A + "wp_cell_target.py", "effective_catalog", "record_version_lock"),
+            calls(_CQ + "acnr_target_values.py", "resolve_acnr_targets", "record_acnr_target_rejected"),
+            calls(_A + "formula_validation.py", "_record_deprecated_ref_saved", "record_deprecated_ref_saved"),
+            calls(_STALE_REL, "on_change", "record_stale_start_unresolved"),
+            has_tests(_T + "test_acnr_metrics.py", "test_fresh_counters_have_all_keys_zero", "test_rejected_targets_counted_per_error_code",
+                      "test_labelled_counters_bound_unknown_codes_to_other", "test_metrics_endpoint_returns_counters")),
         "写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等）": CB(
             _LINKAGE_REL, ("stale_impact", "stale_impact_by_addr"), _T + "test_stale_write_endpoint_authz.py",
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz),
@@ -544,7 +552,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "版本锁 / acnr_targets / 拒绝计入 ACNR 指标": L("T26"),
         "统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示": L("T29、T30、T31"),
         "INDEX 登记与提交边界核对": L("T33"),
     },

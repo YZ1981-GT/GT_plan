@@ -64,6 +64,7 @@
 | 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
+| ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源暂为进程内登记；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other） | 后端 | `backend/app/services/acnr/metrics.py` | `AcnrMetricsCollector`、`get_acnr_metrics`、`VERSION_LOCK_COUNTERS` | `backend/tests/acnr/test_acnr_metrics.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
@@ -78,7 +79,6 @@
 | 事项 | 任务 |
 |---|---|
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
-| 版本锁 / acnr_targets / 拒绝计入 ACNR 指标 | T26 |
 | 统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示 | T29、T30、T31 |
 | INDEX 登记与提交边界核对 | T33 |
 

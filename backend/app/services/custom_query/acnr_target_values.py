@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import HTTPException
 
 from app.services.acnr.limits import ACNR_BATCH_DEADLINE_S
+from app.services.acnr.metrics import get_acnr_metrics
 from app.services.acnr.reasons import TARGET_REJECT_REASONS
 from app.services.acnr.wp_cell_target import effective_catalog, read_entry_cell
 from app.services.custom_query.addressing_service import (
@@ -144,6 +145,9 @@ async def resolve_acnr_targets(
                                         message=TARGET_REJECT_REASONS["resolve_unavailable"])]) from None
     issues = [issue for issue in (classify_target(t) for t in resolved) if issue is not None]
     if issues:
+        metrics = get_acnr_metrics()
+        for issue in issues:  # T26：逐项按拒绝码计 acnr_targets_rejected
+            metrics.record_acnr_target_rejected(issue.error_code)
         raise HTTPException(status_code=422, detail={
             "error_code": ACNR_TARGETS_REJECTED,
             "message": f"所选单元格中有 {len(issues)} 项无法取值，未执行查询",

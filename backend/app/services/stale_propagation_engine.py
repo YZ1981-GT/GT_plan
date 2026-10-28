@@ -454,6 +454,9 @@ class StalePropagationEngine:
         if unresolved is not None:
             logger.info("[StalePropagation] 起点无法确定身份，不写 stale：%s（%s）",
                         source_uri, unresolved.unresolved_code)
+            from app.services.acnr.metrics import get_acnr_metrics
+
+            get_acnr_metrics().record_stale_start_unresolved(unresolved.unresolved_code)  # T26
             return self._unresolved_response(unresolved)
 
         # BFS 遍历

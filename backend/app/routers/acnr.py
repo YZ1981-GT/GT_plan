@@ -548,7 +548,12 @@ async def acnr_metrics(
             "by_type": {"fallback": N, "auth_reject": N, ...},
             "recent": [AlertEvent, ...]
         },
-        "recent_records": [ResolveMetricRecord, ...]
+        "recent_records": [ResolveMetricRecord, ...],
+        "counters": {   # T26，键恒在（含义见 services/acnr/metrics.py 模块文档）
+            "version_lock_hit": N, "version_lock_snapshot_missing": N, "version_lock_unchecked": N,
+            "deprecated_ref_saved": N,
+            "acnr_targets_rejected": {"<拒绝码>": N, ...}, "stale_start_unresolved": {"<原因码>": N, ...}
+        }
     }
 
     Requirements: Req-12.4

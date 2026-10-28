@@ -375,6 +375,8 @@ async def full_resolve(
     #   - locked_version != current → 加载对应版本快照
     #   - 快照缺失 → 抛出 VersionNotFoundError（明确治理错误）
     if project_id:
+        if db is None:  # T26：无会话即无法核对落库的版本锁（落库随 T17 / T18；此前仍读进程内登记）
+            _metrics.record_version_lock("unchecked")
         locked_version = get_project_registry_version(project_id)
         if locked_version:
             current_version = cat.registry_version
@@ -383,11 +385,8 @@ async def full_resolve(
                 try:
                     cat = load_versioned_catalog(locked_version)
                 except VersionNotFoundError:
-                    # Req-12.5: version mismatch 告警
-                    _metrics.record_version_mismatch(
-                        locked_version,
-                        f"Catalog snapshot missing for version={locked_version}",
-                    )
+                    # T26 计 version_lock_snapshot_missing，并记 version_mismatch 告警（Req-12.5）
+                    _metrics.record_version_lock("snapshot_missing", locked_version)
                     # Req-9.3: 版本缺失 → fail-closed 拒绝解析（绝不静默回退当前 catalog，
                     # 否则会用错误版本的地址映射解析归档项目）。不记 fallback 指标
                     # （未发生 fallback），仅上抛明确治理错误 VersionNotFoundError。
@@ -398,6 +397,7 @@ async def full_resolve(
                         project_id, locked_version, current_version,
                     )
                     raise
+            _metrics.record_version_lock("hit", locked_version)  # T26：按锁定目录解析（含版本相同）
 
     # ─── Step 7 (前置判断): 非 wp 域检测 → 委托 V1（R5.7）──────────────
     non_wp_domain = _detect_non_wp_domain(uri, formula_ref, index_ref)

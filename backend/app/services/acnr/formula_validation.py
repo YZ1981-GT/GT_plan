@@ -83,9 +83,8 @@ def _record_deprecated_ref_saved(pid: str, ref_text: str, result: Any) -> None:
 
     logger.info("公式引用指向停用地址（已接受保存）：project=%s ref=%s replaced_by=%s",
                 pid, ref_text, result.replaced_by)
-    get_acnr_metrics().record_alert(
-        event_type="deprecated_ref_saved", reason=result.reason or "",
-        metadata={"addr_id": result.addr_id, "replaced_by": result.replaced_by}, silent=True,
+    get_acnr_metrics().record_deprecated_ref_saved(  # counters 计数 + silent 告警（T26）
+        addr_id=result.addr_id, replaced_by=result.replaced_by, reason=result.reason or "",
     )
 
 
