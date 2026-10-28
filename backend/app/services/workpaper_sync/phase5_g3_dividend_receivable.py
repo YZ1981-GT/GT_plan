@@ -82,9 +82,10 @@ TEMPLATE_SHA256: Final[str] = (
 #: 受管 store item（明细表G9-2 的三区共用）—— 按值取自 `useG9Detail.ts` 的 `ITEM_ID_ROWS`
 STORE_ITEM_ID: Final[str] = "G3-2-detail-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
-ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
+#: 行身份键（与受管 spec 的 row_identity_key、前端行 id 同；原照抄 G9 写成 "rowId"）
+ROW_IDENTITY_STORE_KEY: Final[str] = "id"
 
-#: 🔴 FD-1：payload 落 `remark`（真库实证 remark 605 B / conclusion 0 B）。
+#: 🔴 FD-1：payload 落 `conclusion`（`useG3Detail` 读写 conclusion）。
 PAYLOAD_COLUMN: Final[str] = "conclusion"
 PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
 
@@ -307,24 +308,16 @@ def instrumentation_definition_payload() -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _HTML_STORE_NOTE: Final[str] = (
-    "G9 其他非流动金融资产的明细行存成 checklist_responses 的 **remark** JSON 数组"
-    "（真库实证 remark 605 B / conclusion 0 B）。"
-    "🔴 三个受管区（其他非流动金融资产 / 划分为FVTPL / 指定为FVTPL）共用**同一个** "
-    f"`{STORE_ITEM_ID}` 数组，行的区归属由 `section` 字段表达 —— 契约里对应三条 "
-    "`tables[]`（逐段不同 uuid_col 与行区间），但 `html_store.item_ids` 只有一条。"
+    "G3-2 明细行存成 checklist_responses 的 **conclusion** JSON 数组（`useG3Detail` 读写 conclusion）。两个受管区"
+    "（一年以内 / 一年以上）共用**同一个** `G3-2-detail-rows` 数组，行的区归属由 `agingCategory` 字段表达 —— 契约里对应两条 `table"
+    "s[]`（逐区不同 uuid_col 与行区间），`html_store.item_ids` 只有一条。"
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 逐格实测 G/G3 应收股利.xlsx 的 `明细表G9-2`"
-    "（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / "
-    "区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 "
-    "=SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / "
-    "有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF)"
-    " + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / "
-    "G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段）"
-    " + 模板编制思路见 spec evidence/task8-template-design-logic.md"
-    "（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / "
-    "四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+    "受管表 `明细表G3-2` 两区 R13-20 / R23-28（footer R21 / R29），区字段 `agingCategory`（within_one_year / o"
+    "ver_one_year），行身份 `id`，隐藏身份列 AH / AI；几何以 `phase5_g3_02_detail` 为准。前端 `useG3Detail.ts`（DATA"
+    "_KEY = G3-2-detail-rows）。（原文整段照抄 G9 的 `明细表G9-2` 三区几何与 `useG9Detail.ts`，spec oo-writeback-t"
+    "emplate-parity-closure R3 批 B3 改正。）"
 )
 
 
@@ -400,11 +393,10 @@ def build_contract_payload() -> dict[str, Any]:
                 "payload_column": PAYLOAD_COLUMN,
                 "payload_column_mode": PAYLOAD_COLUMN_MODE,
                 "payload_column_source": (
-                    "audit-platform/frontend/src/components/workpaper/composables/"
-                    "useG9Detail.ts —— 写入点为 "
-                    "debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })"
+                    "audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts —— 写入点为 opts.d"
+                    "ebouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })"
                 ),
-                "row_section_field": "section",
+                "row_section_field": next((s.row_section_field for s in section_specs()), ""),
                 "row_section_values": [
                     s.row_section_value for s in section_specs()
                 ],
@@ -443,7 +435,7 @@ def assert_contract_file_matches_source() -> SyncContract:
 #
 # 🔴 四个 store 门面（uild_store_projection / merge_projection_into_store_rows /
 #    iter_store_rows / split_store_payload_by_section）实现在
-#    phase5_g9_store_facade.py，本模块在**文件末尾**重导出，调用方按名取属性时零改动。
+#    phase5_section_store_facade.py（按本 provider 绑定），本模块在**文件末尾**绑定，调用方按名取属性时零改动。
 #    抽出原因与先例（pilot_h1_store_merge）见伴生模块 docstring。
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -621,20 +613,23 @@ async def attach_pilot_adapters(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. store 门面重导出（伴生模块 `phase5_g9_store_facade`）
+# 9. store 门面（按本 provider 绑定的多区门面 `phase5_section_store_facade`）
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # 🔴 放在**文件末尾**：伴生模块对本模块的引用是函数体内惰性 import，这里正向 import
 #    才不会构成循环。重导出使 `getattr(provider, "build_store_projection")` 一类
 #    按名取属性的调用点（store_projection_response / projection_first_publication /
 #    oo_to_html / 零回归门）零改动。
-from app.services.workpaper_sync.phase5_g9_store_facade import (  # noqa: E402
-    build_store_projection,
-    iter_store_rows,
-    merge_projection_into_store_rows,
-    specs_for as _specs_for,
-    split_store_payload_by_section,
-)
+# 🔴 原先原样重导出 G9 的门面 ⇒ spec 取的是 G9 的（出方向恒空、回写按 G9 的表键合并）
+#    —— spec oo-writeback-template-parity-closure R3 批 B3 改为按本 provider 绑定。
+from app.services.workpaper_sync.phase5_section_store_facade import SectionStoreFacade  # noqa: E402
+
+_STORE_FACADE: Final[SectionStoreFacade] = SectionStoreFacade("phase5_g3_dividend_receivable")
+build_store_projection = _STORE_FACADE.build_store_projection
+iter_store_rows = _STORE_FACADE.iter_store_rows
+merge_projection_into_store_rows = _STORE_FACADE.merge_projection_into_store_rows
+_specs_for = _STORE_FACADE.specs_for
+split_store_payload_by_section = _STORE_FACADE.split_store_payload_by_section
 
 __all__ = [
     "ENTRY_ID",

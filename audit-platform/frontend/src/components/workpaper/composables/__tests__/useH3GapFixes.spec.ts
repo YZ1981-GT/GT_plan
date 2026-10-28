@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ref, computed } from 'vue'
 
-import { useH3AdditionCheck } from '../useH3AdditionCheck'
 import { useH3Depreciation } from '../useH3Depreciation'
 import { useH3Disclosure } from '../useH3Disclosure'
 
@@ -14,54 +13,7 @@ function makeStore(initial: Record<string, any> = {}) {
   return { store, allResponses, getValue, setValue, saveImmediate }
 }
 
-// ─── #2 抽凭引擎回填 ──────────────────────────────────────────────────────────
-describe('useH3AdditionCheck.fillFromSampledVouchers', () => {
-  it('成本模式回填增减检查行，按凭证号去重', () => {
-    const { allResponses, getValue, setValue, saveImmediate } = makeStore()
-    const measurementModel = ref<'cost' | 'fair_value'>('cost')
-    const api = useH3AdditionCheck({
-      allResponses: computed(() => allResponses.value) as any,
-      wpId: ref('wp'), projectId: ref('p'),
-      getValue, setValue, saveImmediate, measurementModel,
-    })
-    const samples = [
-      { voucherNo: 'V1', voucherDate: '2025-03-01', counterpartName: 'ABC置业', counterpartAccount: '1002', debitAmount: 500000, abnormal: false, selectionReason: '大额' },
-      { voucherNo: 'V2', voucherDate: '2025-06-01', counterpartName: 'XYZ', counterpartAccount: '1122', creditAmount: 200000, abnormal: true, selectionReason: '关联方' },
-    ]
-    const added = api.fillFromSampledVouchers(samples)
-    expect(added).toBe(2)
-    expect(api.costRows.value.length).toBe(2)
-    const r1 = api.costRows.value[0]
-    expect(r1.assetName).toBe('ABC置业')
-    expect(r1.originalCost).toBe(500000)
-    expect(r1.voucherNo).toBe('V1')
-    expect(r1.creditAccount).toBe('1002')
-    const r2 = api.costRows.value[1]
-    expect(r2.originalCost).toBe(200000) // 无借方时取贷方
-    expect(r2.isAbnormal).toBe('Y')
-    // 去重：相同凭证号不重复追加
-    const again = api.fillFromSampledVouchers(samples)
-    expect(again).toBe(0)
-    expect(api.costRows.value.length).toBe(2)
-  })
-
-  it('公允价值模式回填 fairRows', () => {
-    const { allResponses, getValue, setValue, saveImmediate } = makeStore()
-    const measurementModel = ref<'cost' | 'fair_value'>('fair_value')
-    const api = useH3AdditionCheck({
-      allResponses: computed(() => allResponses.value) as any,
-      wpId: ref('wp'), projectId: ref('p'),
-      getValue, setValue, saveImmediate, measurementModel,
-    })
-    const added = api.fillFromSampledVouchers([
-      { voucherNo: 'F1', voucherDate: '2025-05-01', counterpartName: '公允资产', debitAmount: 800000 },
-    ])
-    expect(added).toBe(1)
-    expect(api.fairRows.value.length).toBe(1)
-    expect(api.fairRows.value[0].fairValue).toBe(800000)
-    expect(api.fairRows.value[0].endBalance).toBe(800000)
-  })
-})
+// ─── #2 抽凭引擎回填：改走共享回填函数，用例在 h3VoucherFill.spec.ts ─────────────────
 
 // ─── #3 折旧整体重算 ──────────────────────────────────────────────────────────
 describe('useH3Depreciation.depreciationRecalc', () => {

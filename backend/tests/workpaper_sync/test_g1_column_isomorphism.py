@@ -175,10 +175,13 @@ class TestJsonKeysMatchFrontendRowInterface:
         )
 
     def test_row_identity_and_section_are_not_managed_columns(self) -> None:
-        """`id` / `seq` / `acctClass` 中只有 `acctClass` 是受管列（模板 A 列），
-        `id`/`seq` 不占模板的任何一列。"""
+        """`id` / `seq` / `acctClass` 都不占模板的列：A 列「类别」是投资品种 `investType`。
+
+        批 B3 改绑：原先 A 列绑区归属 `acctClass`，OO 侧在 A 列填「债务工具投资」一类文字回写就把行改到三区之外。
+        """
         declared = {f[4] for f in FIELD_SPECS_G102}
-        assert "acctClass" in declared, "acctClass 映射模板 A 列，必须是受管列"
+        assert FIELD_SPECS_G102[0][1] == "A" and FIELD_SPECS_G102[0][4] == "investType"
+        assert "acctClass" not in declared, "区归属字段受管 ⇒ OO 侧改 A 列会把行改到区外"
         assert "id" not in declared
         assert "seq" not in declared
 

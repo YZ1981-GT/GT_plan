@@ -41,6 +41,7 @@ from app.services.voucher_identity import (
     voucher_keys_in,
     voucher_keys_not_in,
 )
+from app.services.voucher_pairing import LINE_LIMIT, counterpart_label, pair_voucher
 
 
 def derive_idempotency_key(
@@ -251,11 +252,10 @@ async def enrich_voucher_context(
     按样本的**凭证键**取整张凭证（键里有日期，不再按凭证号取全年，也不把同日同号的别种
     凭证字并进来），在 Python 端给整张凭证编分录指纹，样本行按行 id 认领自己的指纹。
     每条样本行补：``voucher_key`` / ``side`` / ``line_fp`` / ``voucher_entries``（每条分录带
-    ``side`` 与 ``line_fp``）。
+    ``side`` 与 ``line_fp``）/ ``pairing``（多借多贷精确配对，见 voucher_pairing，需求 3）。
 
-    对方科目按借贷栏判（红字借方仍在借方栏，不看正负号）：对方栏只有一个科目时直填，
-    多个科目时填「多科目」并附整张凭证分录；精确配对见 voucher_pairing（任务 7）。
-    源数据已带对方科目的不改。
+    旧字段 ``counterpart_account`` 由配对结果给出：对方只有一个科目时填该科目，否则填
+    「多科目」（详情看 ``pairing``，整张凭证在 ``voucher_entries``）。源数据已带对方科目的不改。
 
     与 enrich_items_with_aux_party 同范式：fail-open，补全失败不阻断抽样。
     """
@@ -302,25 +302,22 @@ async def enrich_voucher_context(
                     "line_fp": fp,
                 })
 
-        opposite = {"D": "C", "C": "D"}
+        pairing_by_key = {key: pair_voucher(entries) for key, entries in entries_by_key.items()}
         for it in items:
             if not it.get("voucher_key"):
                 continue
             entries = entries_by_key.get(it["voucher_key"], [])
-            it["voucher_entries"] = entries
+            # 超过配对上限的大凭证（华氏一张 19,546 行）不随样本带整张分录：同一凭证抽中几笔就重复几份，
+            # 响应成倍膨胀；底稿行只挂对侧汇总（pairing.counterpart_summary）与查看入口（需求 4.8）
+            it["voucher_entries"] = entries if len(entries) <= LINE_LIMIT else []
+            if len(entries) > LINE_LIMIT:
+                it["voucher_entries_omitted"] = True
+                it["voucher_line_count"] = len(entries)
             it["line_fp"] = fp_by_id.get(str(it.get("id") or ""))
-            if it.get("counterpart_account"):
-                continue  # 源数据已带对方科目代码
-            other = opposite.get(it["side"])
-            counterparts = {
-                (e["account_code"], e["account_name"])
-                for e in entries
-                if other and e["side"] == other and e["account_code"]
-            }
-            if len(counterparts) == 1:
-                it["counterpart_account"], it["counterpart_account_name"] = next(iter(counterparts))
-            elif counterparts:
-                it["counterpart_account"] = it["counterpart_account_name"] = "多科目"
+            it["pairing"] = pairing_by_key.get(it["voucher_key"], {}).get(it["line_fp"] or "")
+            label = counterpart_label(it["pairing"])
+            if label and not it.get("counterpart_account"):  # 源数据已带对方科目代码的不改
+                it["counterpart_account"], it["counterpart_account_name"] = label
     except Exception as exc:  # noqa: BLE001 — 补全是增强，绝不阻断抽样
         logger.warning(
             "凭证上下文补全失败（不影响抽样）：project=%s year=%s err=%s",

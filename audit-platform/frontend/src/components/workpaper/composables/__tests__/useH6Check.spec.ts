@@ -145,7 +145,7 @@ describe('useH6Check updateCell', () => {
   })
 })
 
-describe('draft helpers / OCR / fillFromSampledVouchers', () => {
+describe('draft helpers / OCR（抽凭回填改走共享回填函数，用例在 h6VoucherFill.spec.ts）', () => {
   it('draftH6AuditNote 含检查比例与挂账提示', () => {
     const text = draftH6AuditNote({
       summary: {
@@ -221,38 +221,5 @@ describe('draft helpers / OCR / fillFromSampledVouchers', () => {
     expect(api.rows.value[0].checks).toEqual([true, true, true, false, true])
     expect(api.rows.value[0].isAbnormal).toBe(true)
     expect(api.rows.value[0].netValue).toBe(800)
-  })
-
-  it('fillFromSampledVouchers 按借贷方向填入', () => {
-    const onSave = vi.fn()
-    const api = useH6Check({
-      wpId: ref('wp'),
-      projectId: ref('p'),
-      allResponses: makeMap({}),
-      onSave,
-    })
-    const n = api.fillFromSampledVouchers([
-      {
-        voucherNo: 'V1',
-        voucherDate: '2025-03-01',
-        summary: '转入清理',
-        debitAmount: '50000',
-        creditAmount: '0',
-        counterpartAccount: '1601',
-      },
-      {
-        voucherNo: 'V2',
-        voucherDate: '2025-04-01',
-        summary: '结转处置收益',
-        debitAmount: '0',
-        creditAmount: '12000',
-        counterpartAccount: '6115',
-      },
-    ])
-    expect(n).toBe(2)
-    expect(api.rows.value[0].originalCost).toBe(50000)
-    expect(api.rows.value[0].counterpartAccount).toBe('1601')
-    expect(api.rows.value[1].toDisposalGain).toBe(12000)
-    expect(api.rows.value[1].endingBalance).toBe(0)
   })
 })

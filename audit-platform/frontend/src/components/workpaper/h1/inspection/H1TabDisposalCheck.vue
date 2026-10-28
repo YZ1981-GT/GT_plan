@@ -160,9 +160,14 @@
         size="small"
         max-height="520"
         class="check-table"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <!-- 基础信息 -->
         <el-table-column label="基础信息" align="center">
@@ -536,7 +541,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 固定资产-减少）"
+      :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 固定资产-减少）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -546,9 +551,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -566,6 +571,8 @@ import {
   type DisposalRow,
 } from '../../composables/useH1DisposalCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -620,6 +627,7 @@ function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
 function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
 
 onMounted(() => {
+  void state.voucherFillReady()
   const n = props.allResponses.get(NOTE_KEY)
   if (n?.remark) auditNoteText.value = n.remark
   const c = props.allResponses.get(CONCLUSION_KEY)
@@ -634,6 +642,7 @@ const state = useH1DisposalCheck(
   allResponsesRef as any,
   {
     onSave: (itemId, value) => saveResponse(itemId, value),
+    isReadonly: computed(() => props.isReadonly === true),
     onPublishEvent(event: string, payload: any) {
       if (event === 'h1:disposal-completed') {
         // 仅 eventBus：crossWpEventBridge 会转发到 window，避免 H6 双次入库
@@ -736,49 +745,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/** 抽凭回填走共享函数：一个样本一行（对方科目按配对拼接），按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  showSamplingDialog.value = false
-  // 引擎 emit('filled', { samples, phase, fillMode, ... })；兼容旧数组形态
-  const samples: any[] = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!samples.length) return
-  for (const s of samples) {
-    state.addRow(s.summary || '处置项')
-    const lastRow = state.rows.value[state.rows.value.length - 1]
-    if (!lastRow) continue
-    // 固定资产减少：原值转出在贷方；无贷方额时回退借方
-    lastRow.originalCost = Math.abs(Number(s.creditAmount ?? s.debitAmount ?? 0) || 0)
-    lastRow.voucherNo = s.voucherNo || ''
-    lastRow.disposalDate = s.voucherDate || ''
-    // 多科目时拼接所有对方科目代码和名称
-    const entries = s.voucherEntries || []
-    if ((s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0) {
-      const sCredit = Number(s.creditAmount ?? 0)
-      const counterEntries = entries.filter((e: any) =>
-        sCredit > 0 ? (e.debit_amount && Number(e.debit_amount) > 0) : (e.credit_amount && Number(e.credit_amount) > 0)
-      )
-      const toShow = counterEntries.length > 0 ? counterEntries : entries
-      lastRow.counterpartAccount = toShow.map((e: any) => e.account_code).filter(Boolean).join('/')
-      lastRow.counterpartAccountName = toShow.map((e: any) => e.account_name).filter(Boolean).join('/')
-    } else {
-      lastRow.counterpartAccount = s.counterpartAccount || ''
-      lastRow.counterpartAccountName = s.counterpartAccountName || ''
-    }
-    lastRow.voucherSampleId = s.voucherNo || ''
-    lastRow.isAbnormal = s.abnormal ? 'Y' : 'N'
-    lastRow.checkResult = s.abnormal ? 'ERR' : ''
-    lastRow.remark = s.selectionReason || s.remark || (s.isHighValue ? 'MUS高值必选' : '')
-    state.updateCell(lastRow.rowId, 'originalCost', lastRow.originalCost)
-  }
-  ElMessage.success(`已回填 ${samples.length} 笔抽样凭证`)
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 /** 行级 OCR：上传 → contract-ocr → 确认 → merge */
@@ -888,6 +866,9 @@ function rowClassName({ row }: { row: DisposalRow }) {
   if (state.needsScrapResidualWarning(row)) return 'row-scrap-warn'
   return ''
 }
+
+/** 行样式：异常 / 金额不符提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, state.voucherRowClass)
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

@@ -9,7 +9,7 @@
  * - 校验逻辑：各方法缺必填参数
  * - updateField：字段更新 + trail 追加
  * - batchMarkChecked：批量标记 + trail
- * - fill mode 逻辑：含阶段约束（applyFillMode 纯函数）
+ * - confirmFill：只记日志、返回本次样本（合并归共享回填函数）；撤销返回成败；历史带批次号
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
@@ -30,7 +30,7 @@ vi.mock('element-plus', () => ({
 import http from '@/utils/http'
 import {
   useVoucherSampling,
-  applyFillMode,
+  undoFailureReason,
   type VoucherSamplingOptions,
 } from '../composables/useVoucherSampling'
 import type { SampledVoucher, Phase } from '../composables/useSamplingAlgorithms'
@@ -61,6 +61,9 @@ function makeVoucher(partial: Partial<SampledVoucher> = {}): SampledVoucher {
     accountCode: '1122',
     accountName: '应收账款',
     counterpartAccount: '6001',
+    counterpartAccountName: null,
+    isMultiAccount: false,
+    voucherEntries: [],
     voucherType: '记',
     accountingPeriod: 6,
     checkResult: '',
@@ -252,118 +255,87 @@ describe('useVoucherSampling - batchMarkChecked', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 5. applyFillMode 纯函数（含阶段约束）
+// 5. confirmFill / 撤销 / 历史批次号（voucher-identity-writeback-and-audit-phase 任务 9）
+//    合并进底稿归宿主的共享回填函数（ADR-VK-07），撤销按批次删行（ADR-VK-08）
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('applyFillMode - 填充策略含阶段约束', () => {
-  const preliminaryRows: SampledVoucher[] = [
-    makeVoucher({ voucherNo: 'P-001', phase: 'preliminary' }),
-    makeVoucher({ voucherNo: 'P-002', phase: 'preliminary' }),
-  ]
-
-  const finalRows: SampledVoucher[] = [
-    makeVoucher({ voucherNo: 'F-001', phase: 'final' }),
-  ]
-
-  const existing = [...preliminaryRows, ...finalRows]
-
-  const newSelected: SampledVoucher[] = [
-    makeVoucher({ voucherNo: 'N-001', phase: 'final' }),
-    makeVoucher({ voucherNo: 'N-002', phase: 'final' }),
-  ]
-
-  describe('append 模式', () => {
-    it('追加到末尾，保留所有 existing', () => {
-      const result = applyFillMode(existing, newSelected, 'append', 'final')
-      expect(result).toHaveLength(5) // 2 preliminary + 1 final + 2 new
-      expect(result[0].voucherNo).toBe('P-001')
-      expect(result[3].voucherNo).toBe('N-001')
-    })
-
-    it('年审 append 不影响预审行', () => {
-      const result = applyFillMode(existing, newSelected, 'append', 'final')
-      const prelimRows = result.filter(v => v.phase === 'preliminary')
-      expect(prelimRows).toHaveLength(2)
-      expect(prelimRows[0].voucherNo).toBe('P-001')
-      expect(prelimRows[1].voucherNo).toBe('P-002')
-    })
+describe('confirmFill 只记日志、返回本次勾选的样本', () => {
+  beforeEach(() => {
+    mockHttp.post.mockReset()
+    mockHttp.get.mockReset()
   })
 
-  describe('replace 模式', () => {
-    it('仅清除当前 phase 行，保留其他 phase', () => {
-      const result = applyFillMode(existing, newSelected, 'replace', 'final')
-      // preliminary 2 行保留 + new final 2 行（旧 final 1 行被替换）
-      expect(result).toHaveLength(4)
-      const prelimRows = result.filter(v => v.phase === 'preliminary')
-      expect(prelimRows).toHaveLength(2)
-    })
-
-    it('replace 时预审行完整保留', () => {
-      const result = applyFillMode(existing, newSelected, 'replace', 'final')
-      const prelimRows = result.filter(v => v.phase === 'preliminary')
-      expect(prelimRows[0].voucherNo).toBe('P-001')
-      expect(prelimRows[1].voucherNo).toBe('P-002')
-    })
-
-    it('replace 当前 phase 行变为 selected', () => {
-      const result = applyFillMode(existing, newSelected, 'replace', 'final')
-      const finalResult = result.filter(v => v.phase === 'final')
-      expect(finalResult).toHaveLength(2)
-      expect(finalResult[0].voucherNo).toBe('N-001')
-      expect(finalResult[1].voucherNo).toBe('N-002')
-    })
+  it('返回勾选的样本（不与任何已有行合并），日志不带 before_data，旧「合并」按追加记', async () => {
+    mockHttp.post.mockResolvedValue({ data: { data: { batch_id: 'b-1' } } })
+    const s = useVoucherSampling(makeOptions())
+    s.fillMode.value = 'merge'
+    const a = makeVoucher({ voucherNo: 'V1', lineFp: 'fp-1', voucherKey: 'vk-1' })
+    const b = makeVoucher({ voucherNo: 'V2', lineFp: 'fp-2', voucherKey: 'vk-1', selected: false })
+    s.sampledVouchers.value = [a, b]
+    const result = await s.confirmFill()
+    expect(result.map(v => v.voucherNo)).toEqual(['V1'])
+    const body = mockHttp.post.mock.calls.find(c => String(c[0]).includes('/sampling/cutoff-fill'))![1] as any
+    expect(body.fill_mode).toBe('append')
+    expect('before_data' in body).toBe(false)
+    expect(body.extraction_criteria.filled_line_fps).toEqual(['fp-1'])
+    expect(s.filledBatchId.value).toBe('b-1')
   })
 
-  describe('merge 模式', () => {
-    it('按 voucher_no 去重，仅添加新凭证', () => {
-      const existingWithFinal = [
-        ...preliminaryRows,
-        makeVoucher({ voucherNo: 'N-001', phase: 'final' }), // 与 selected 重复
-      ]
-      const result = applyFillMode(existingWithFinal, newSelected, 'merge', 'final')
-      // P-001, P-002, N-001（existing）, N-002（新增）
-      expect(result).toHaveLength(4)
-      const nos = result.map(v => v.voucherNo)
-      expect(nos.filter(n => n === 'N-001')).toHaveLength(1) // 不重复
-    })
+  it('「替换本阶段抽凭行」记 replace', async () => {
+    mockHttp.post.mockResolvedValue({ data: {} })
+    const s = useVoucherSampling(makeOptions())
+    s.fillMode.value = 'replace'
+    s.sampledVouchers.value = [makeVoucher()]
+    await s.confirmFill()
+    const body = mockHttp.post.mock.calls.find(c => String(c[0]).includes('/sampling/cutoff-fill'))![1] as any
+    expect(body.fill_mode).toBe('replace')
+  })
+})
 
-    it('merge 无重复时等同 append', () => {
-      const result = applyFillMode(existing, newSelected, 'merge', 'final')
-      expect(result).toHaveLength(5) // no overlap
-    })
-
-    it('merge 保留预审行不动', () => {
-      const result = applyFillMode(existing, newSelected, 'merge', 'final')
-      const prelimRows = result.filter(v => v.phase === 'preliminary')
-      expect(prelimRows).toHaveLength(2)
-    })
+describe('undoLastExtraction 返回成败、不谎称底稿已恢复', () => {
+  beforeEach(() => {
+    mockHttp.post.mockReset()
+    mockHttp.get.mockReset()
   })
 
-  describe('阶段约束', () => {
-    it('预审阶段 replace 仅清预审行，保留年审行', () => {
-      const newPrelim: SampledVoucher[] = [
-        makeVoucher({ voucherNo: 'NP-001', phase: 'preliminary' }),
-      ]
-      const result = applyFillMode(existing, newPrelim, 'replace', 'preliminary')
-      // 年审 F-001 保留 + new preliminary 1 行
-      expect(result).toHaveLength(2)
-      const finalResult = result.filter(v => v.phase === 'final')
-      expect(finalResult).toHaveLength(1)
-      expect(finalResult[0].voucherNo).toBe('F-001')
-    })
+  it('成功：返回 true，静默请求（提示由删行方按实际行数写），并刷新历史', async () => {
+    const { ElMessage } = await import('element-plus')
+    vi.mocked(ElMessage.success).mockClear()
+    mockHttp.post.mockResolvedValue({ data: { success: true } })
+    mockHttp.get.mockResolvedValue({ data: [] })
+    const s = useVoucherSampling(makeOptions())
+    expect(await s.undoLastExtraction('log-1')).toBe(true)
+    const call = mockHttp.post.mock.calls[0]
+    expect(String(call[0])).toContain('/sampling/voucher-undo')
+    expect(call[2]).toMatchObject({ params: { log_id: 'log-1' }, _silent: true })
+    expect(mockHttp.get).toHaveBeenCalled()
+    expect(ElMessage.success).not.toHaveBeenCalled()
+  })
 
-    it('空 existing + append → 结果等于 selected', () => {
-      const result = applyFillMode([], newSelected, 'append', 'final')
-      expect(result).toHaveLength(2)
-      expect(result[0].voucherNo).toBe('N-001')
+  it('失败：返回 false，提示后端给的原因与「底稿未改动」', async () => {
+    const { ElMessage } = await import('element-plus')
+    vi.mocked(ElMessage.error).mockClear()
+    mockHttp.post.mockRejectedValue({
+      response: { status: 409, data: { detail: { error_code: 'PRELIMINARY_BATCH_LOCKED', message: '预审批次只读' } } },
     })
+    const s = useVoucherSampling(makeOptions())
+    expect(await s.undoLastExtraction('log-1')).toBe(false)
+    expect(ElMessage.error).toHaveBeenCalledWith('撤销失败：预审批次只读，底稿未改动')
+    expect(mockHttp.get).not.toHaveBeenCalled()
+  })
 
-    it('空 selected + replace → 当前 phase 被清空', () => {
-      const result = applyFillMode(existing, [], 'replace', 'final')
-      // preliminary 2 行保留，final 0 行
-      expect(result).toHaveLength(2)
-      expect(result.every(v => v.phase === 'preliminary')).toBe(true)
-    })
+  it('撤销失败原因：403 / 404 / 字符串详情 / 其他', () => {
+    expect(undoFailureReason({ response: { status: 403, data: {} } })).toBe('没有本底稿的编辑权限')
+    expect(undoFailureReason({ response: { status: 404, data: {} } })).toBe('抽凭记录不存在')
+    expect(undoFailureReason({ response: { status: 400, data: { detail: '仅可撤销最近一次操作' } } })).toBe('仅可撤销最近一次操作')
+    expect(undoFailureReason(new Error('x'))).toBe('请稍后重试')
+  })
+
+  it('历史条目带批次号（宿主撤销时按它删行）', async () => {
+    mockHttp.get.mockResolvedValue({ data: [{ id: 'log-1', batch_id: 'b-9', extraction_criteria: { phase: 'final' } }] })
+    const s = useVoucherSampling(makeOptions())
+    await s.loadHistory()
+    expect(s.historyList.value[0]).toMatchObject({ id: 'log-1', batchId: 'b-9', phase: 'final' })
   })
 })
 
@@ -592,7 +564,7 @@ describe('useVoucherSampling - 方法学增强', () => {
       s.sampledVouchers.value = [makeVoucher({ voucherNo: 'V1', selected: true })]
 
       // 无 Pinia 环境下版本快照会静默失败，不应阻断回填
-      const result = await s.confirmFill([])
+      const result = await s.confirmFill()
       expect(result.length).toBeGreaterThan(0)
 
       // 找到 cutoff-fill 调用

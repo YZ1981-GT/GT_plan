@@ -772,6 +772,7 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ voucherLabel(currentVoucherType, currentVoucher) }}</el-tag>
+        <VoucherLinkTags v-if="!voucherAmbiguity && voucherItems.length" :links="voucherLinks.linksOfKey(voucherItems.find((r: any) => r.voucher_key)?.voucher_key)" />
         <el-button size="small" plain :disabled="!!voucherAmbiguity" @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
         <el-button size="small" type="primary" plain :disabled="!!voucherAmbiguity" @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
         <el-button size="small" type="warning" plain :disabled="!!voucherAmbiguity" @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表（同号多张凭证时先在下方选定一张）">挂凭到底稿</el-button>
@@ -991,6 +992,7 @@
     :year="year"
     :vouchers="attachVouchers"
     :all-account-codes="attachAllAccountCodes"
+    @attached="onVouchersAttached"
     @navigate-to-wp="onNavigateToWp"
   />
 
@@ -1387,6 +1389,8 @@ import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
 import { attachFailureReason, attachVoucher } from '@/components/workpaper/composables/useAttachedVouchers'
 import VoucherKeyCandidates from '@/views/ledger/VoucherKeyCandidates.vue'
+import VoucherLinkTags from '@/views/ledger/VoucherLinkTags.vue'
+import { useVoucherLinkTags } from '@/views/ledger/useVoucherLinkTags'
 import { voucherKeyAmbiguityOf, voucherLabel, type VoucherKeyAmbiguity, type VoucherKeyCandidate } from '@/utils/voucherIdentity'
 // Domain-split composables (platform-global-hardening Req 6.1/6.3)
 import { useLedgerImport } from '@/views/composables/useLedgerImport'
@@ -1410,6 +1414,7 @@ const year = computed(() => {
   if (q && q > 2000) return q
   return null
 })
+const voucherLinks = useVoucherLinkTags(projectId, year) // 已挂 / 已抽于哪些底稿（任务 14，需求 5.2）
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
 const amountUnit = ref<string>('')
@@ -2471,7 +2476,7 @@ function onContextAction(action: string) {
 
 // ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
 const attachDialogVisible = ref(false)
-const attachVouchers = ref<Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; accountCode?: string | null }>>([])
+const attachVouchers = ref<Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; companyCode?: string | null; accountCode?: string | null }>>([])
 /** 当前凭证所有分录涉及的科目编码（去重），供弹窗推荐底稿 */
 const attachAllAccountCodes = ref<string[]>([])
 
@@ -2483,21 +2488,22 @@ function openAttachToWorkpaper(fallbackRow?: any) {
     : (fallbackRow ? [fallbackRow] : [])
 
   const seen = new Set<string>()
-  const list: Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; accountCode?: string | null }> = []
+  const list: Array<{ voucherNo: string; voucherDate?: string | null; voucherType?: string | null; companyCode?: string | null; accountCode?: string | null }> = []
   for (const r of pool) {
     const vno = String(r?.voucher_no || '').trim()
     if (!vno) continue
-    // 🔴 去重键 = 日期 + 凭证字 + 号：凭证号跨日重复（单号最多对应 83 个日期），同日同号也可能是
-    //    多张凭证（FY-0003 / ZZ-0003）。少一样就会把两张凭证并成一条，只挂进去一张。
+    // 🔴 去重键 = 主体 + 日期 + 凭证字 + 号：凭证号跨日重复（单号最多对应 83 个日期），同日同号也可能是
+    //    多张凭证（FY-0003 / ZZ-0003），一套账还可能有两个主体。少一样就会把两张凭证并成一条，只挂进去一张。
     const vdate = normalizeVoucherDate(r?.voucher_date)
     const vtype = rowVoucherType(r)
-    const key = `${vno}@${vdate || ''}@${vtype ?? '?'}`
+    const key = `${vno}@${vdate || ''}@${vtype ?? '?'}@${r?.company_code ?? '?'}`
     if (seen.has(key)) continue
     seen.add(key)
     list.push({
       voucherNo: vno,
       voucherDate: vdate,
       voucherType: vtype,
+      companyCode: r?.company_code ?? null,
       accountCode: r?.account_code || currentAccount.value || null,
     })
   }
@@ -2507,6 +2513,7 @@ function openAttachToWorkpaper(fallbackRow?: any) {
       voucherNo: currentVoucher.value,
       voucherDate: currentVoucherDate.value || null,
       voucherType: currentVoucherType.value,
+      companyCode: currentVoucherCompany.value,
       accountCode: currentAccount.value || null,
     })
   }
@@ -2549,6 +2556,7 @@ function attachCurrentVoucher() {
     voucherNo: currentVoucher.value,
     voucherDate: currentVoucherDate.value || null,
     voucherType: currentVoucherType.value,
+    companyCode: currentVoucherCompany.value,
     accountCode: currentAccount.value || null,
   }]
   // 从当前凭证所有分录提取涉及的科目（多对多凭证推荐所有相关底稿）
@@ -2556,6 +2564,8 @@ function attachCurrentVoucher() {
   attachDialogVisible.value = true
 }
 
+/** 挂凭后只重查这几张凭证的已挂标识 */
+const onVouchersAttached = (p: { voucherKeys: string[] }) => void voucherLinks.refresh(p.voucherKeys)
 /** 挂凭成功后用户选择跳转到目标底稿 */
 function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: string }) {
   router.push({
@@ -2601,6 +2611,7 @@ async function sampleCurrentVoucher() {
       voucherNo: currentVoucher.value,
       voucherDate: currentVoucherDate.value || null,
       voucherType: currentVoucherType.value,
+      companyCode: currentVoucherCompany.value,
       accountCode: currentAccount.value || null,
     })
     ElMessage.success(`已将凭证 ${voucherLabel(currentVoucherType.value, currentVoucher.value)} 加入抽样`)
@@ -2621,6 +2632,8 @@ const currentVoucherDate = ref<string>('')
 // 凭证字：同日同号也可能是多张凭证（四川物流 2025-01-07 的 FY-0003 与 ZZ-0003）。null = 不知道，
 // 交给后端判断；命中多张时后端回 409 + 候选（voucherCandidates），用户选一张再穿透，不合并分录。
 const currentVoucherType = ref<string | null>(null)
+// 主体：一套账两个主体同日同号同凭证字时（真库 3 个已软删的性能测试项目各 92 组），选候选不带主体会再次 409、永远打不开
+const currentVoucherCompany = ref<string | null>(null)
 const voucherAmbiguity = ref<VoucherKeyAmbiguity | null>(null)
 const currentAuxType = ref('')
 const currentAuxCode = ref('')
@@ -2637,7 +2650,7 @@ const dateRange = ref<string[] | null>(null)
 
 interface Crumb {
   label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string
-  voucherDate?: string; voucherType?: string | null; voucherMonth?: number | null
+  voucherDate?: string; voucherType?: string | null; voucherCompany?: string | null; voucherMonth?: number | null
 }
 const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 
@@ -3257,7 +3270,8 @@ function ledgerRowFlags(row: any): { icon: string; tip: string }[] {
       flags.push({ icon: '📅', tip: `凭证日期在审计期末最后 6 天内（${row.voucher_date}），属于截止测试关注范围` })
     }
   }
-  return flags
+  const linked = voucherLinks.flagOfRow(row) // 📎 已挂 / 已抽于哪些底稿
+  return linked ? [...flags, linked] : flags
 }
 
 function balanceRowStyle({ row }: { row: any }) {
@@ -3411,6 +3425,7 @@ async function loadVoucher() {
     if (currentVoucherDate.value) params.voucher_date = currentVoucherDate.value
     else if (currentVoucherMonth.value != null) params.month = currentVoucherMonth.value
     if (currentVoucherType.value != null) params.voucher_type = currentVoucherType.value
+    if (currentVoucherCompany.value) params.company_code = currentVoucherCompany.value
     // _silent：409（命中多张凭证）由本处列候选，其余错误由 handleApiError 提示一次
     const data = await api.get(
       P_ledger.voucher(projectId.value, currentVoucher.value),
@@ -3429,15 +3444,18 @@ async function loadVoucher() {
 function pickVoucherCandidate(c: VoucherKeyCandidate) {
   currentVoucherDate.value = c.voucher_date
   currentVoucherType.value = c.voucher_type
+  currentVoucherCompany.value = c.company_code || null
   currentVoucherMonth.value = Number(c.voucher_date.slice(5, 7)) || null
   const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
   if (crumb?.level === 'voucher') {
     Object.assign(crumb, {
       label: `凭证 ${voucherLabel(c.voucher_type, c.voucher_no)}（${c.voucher_date}）`,
-      voucherDate: c.voucher_date, voucherType: c.voucher_type, voucherMonth: currentVoucherMonth.value,
+      voucherDate: c.voucher_date, voucherType: c.voucher_type, voucherCompany: currentVoucherCompany.value,
+      voucherMonth: currentVoucherMonth.value,
     })
   }
   loadVoucher()
+  _syncLedgerToUrl() // 选定的凭证写进 URL：刷新 / 新窗口打开回到这张凭证，不再列候选
 }
 
 async function loadAuxBalance() {
@@ -4213,6 +4231,8 @@ const tabAuxLedgerDisplay = computed(() =>
     syntheticExtra: { aux_name: '', account_code: '' },
   }),
 )
+// 明细表 / 凭证层读入后按行上凭证键补查已挂标识（查过的键不再查）
+watch([ledgerItems, auxLedgerItems, tabLedgerItems, tabAuxLedgerItems, voucherItems], lists => lists.forEach(l => void voucherLinks.loadForRows(l)))
 
 // 缓存：key = `${account}|${auxType}|${auxCode}` → { items, opening }
 const _tabAuxLedgerCache = new Map<string, { items: any[]; opening: number }>()
@@ -4319,6 +4339,7 @@ function drillToVoucherFromTab(row: any) {
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
   currentVoucherType.value = rowVoucherType(row)
+  currentVoucherCompany.value = rowVoucherCompany(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
@@ -4330,7 +4351,7 @@ function drillToVoucherFromTab(row: any) {
         ? `凭证 ${voucherLabel(currentVoucherType.value, row.voucher_no)}（${currentVoucherDate.value}）`
         : `凭证 ${row.voucher_no}`,
       level: 'voucher', voucher: row.voucher_no, voucherDate: currentVoucherDate.value,
-      voucherType: currentVoucherType.value,
+      voucherType: currentVoucherType.value, voucherCompany: currentVoucherCompany.value,
     },
   ]
   loadVoucher()
@@ -4564,7 +4585,8 @@ function _syncLedgerToUrl() {
     level: currentLevel.value,
     account: currentAccount.value,
     voucherNo: currentVoucher.value,
-    voucherDate: currentVoucherDate.value,
+    voucherDate: currentVoucherDate.value, voucherType: currentVoucherType.value,
+    voucherCompany: currentVoucherCompany.value ?? '',
     dateFrom: dateRange.value?.[0] || '',
     dateTo: dateRange.value?.[1] || '',
     auxType: currentAuxType.value,
@@ -4621,12 +4643,17 @@ function normalizeVoucherDate(raw: unknown): string {
 function rowVoucherType(row: any): string | null {
   return row && 'voucher_type' in row ? String(row.voucher_type ?? '').trim() : null
 }
+/** 行上的主体编码；没有这一列或为空返回 null（= 不限主体，交给后端判歧义）。 */
+function rowVoucherCompany(row: any): string | null {
+  return String(row?.company_code ?? '').trim() || null
+}
 
 function drillToVoucher(row: any) {
   if (!row.voucher_no) return
   currentVoucher.value = row.voucher_no
   currentVoucherDate.value = normalizeVoucherDate(row.voucher_date)
   currentVoucherType.value = rowVoucherType(row)
+  currentVoucherCompany.value = rowVoucherCompany(row)
   const m = currentVoucherDate.value ? Number(currentVoucherDate.value.slice(5, 7)) : null
   currentVoucherMonth.value = (m && m >= 1 && m <= 12) ? m : null
   currentLevel.value = 'voucher'
@@ -4638,6 +4665,7 @@ function drillToVoucher(row: any) {
     voucher: row.voucher_no,
     voucherDate: currentVoucherDate.value,
     voucherType: currentVoucherType.value,
+    voucherCompany: currentVoucherCompany.value,
     voucherMonth: currentVoucherMonth.value,
   })
   loadVoucher()
@@ -4678,7 +4706,10 @@ function navigateTo(index: number) {
   currentLevel.value = crumb.level
   if (crumb.level === 'balance') loadBalance()
   else if (crumb.level === 'ledger') { currentAccount.value = crumb.account || ''; loadLedger() }
-  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherType.value = crumb.voucherType ?? null; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher() }
+  else if (crumb.level === 'voucher') {
+    currentVoucher.value = crumb.voucher || ''; currentVoucherDate.value = crumb.voucherDate || ''; currentVoucherType.value = crumb.voucherType ?? null
+    currentVoucherCompany.value = crumb.voucherCompany ?? null; currentVoucherMonth.value = crumb.voucherMonth ?? null; loadVoucher()
+  }
   else if (crumb.level === 'aux_balance') { currentAccount.value = crumb.account || ''; loadAuxBalance() }
   else if (crumb.level === 'aux_ledger') {
     currentAccount.value = crumb.account || currentAccount.value
@@ -4742,10 +4773,12 @@ onMounted(async () => {
     if (urlState.level === 'voucher' && urlState.voucherNo) {
       currentVoucher.value = urlState.voucherNo
       currentVoucherDate.value = urlState.voucherDate
+      currentVoucherType.value = urlState.voucherType ?? null // 现场带凭证字 / 主体：同日同号多张时不再先弹候选
+      currentVoucherCompany.value = urlState.voucherCompany || null
       breadcrumbs.value = [
         { label: '账簿查询', level: 'balance' },
         { label: `${urlState.account} 序时账`, level: 'ledger', account: urlState.account },
-        { label: `凭证 ${urlState.voucherNo}`, level: 'voucher', voucher: urlState.voucherNo, voucherDate: urlState.voucherDate },
+        { label: `凭证 ${voucherLabel(currentVoucherType.value, urlState.voucherNo)}`, level: 'voucher', voucher: urlState.voucherNo, voucherDate: urlState.voucherDate, voucherType: currentVoucherType.value, voucherCompany: currentVoucherCompany.value },
       ]
       loadVoucher()
     } else if (urlState.level === 'ledger') {

@@ -260,6 +260,27 @@
 - 顺带（R9 一条）：`test_adjustment_ie_characterization` 的 export-summary 列头断言过期 —— 07-27 调整分录集中登记（f3354f539）起导出末尾加了「所属循环」「协作状态」两列只读信息，中央导入按列头取值不受影响；改钉当前 10 列，HEAD 同红。
 - 真实项目：和平药房 2025 已发布 `xlsx/gt-k5-provisions`（1 代，10-07），本批改了该契约 G / H 两个字段，要重发布；K2 / K3 / K4 / K6 / K7 契约没变（前端补列后两侧自然接通）。只做测试项目，未重发布（列入重发布清单）。
 
+### §4.9 批 B3a：G1 / G3 / G4 / G5 / G6 多区 store 门面与载荷列（2026-10-28）
+
+原状四处叠加，这五张表两个方向都不通（出方向空、回写合不进或写进前端不读的列）：
+
+| 缺陷 | 原状 | 处置 |
+|---|---|---|
+| 门面借别家 | G3 / G4 / G5 / G6 原样重导出 G9 的门面（`_provider()` 写死 G9）⇒ 投影 / 合并用 G9 的 spec：G3 行没有 G9 的 `section` ⇒ 出方向恒空，回写按 G9 的表键一格都合不进，带 store item 调用直接抛「不在 G9 受管清单里」。G1 自己的门面按 store item 取**第一条** spec ⇒ 三区只通区① | 新模块 `phase5_section_store_facade.SectionStoreFacade(provider_module, rows_key)`：spec / 错误类型 / STORE_ITEM_ID 从绑定的 provider 现取，投影 / 合并逐区穿线（上一区的合并结果喂下一区）；六家各自绑定，`phase5_g9_store_facade` 只剩 G9 的绑定（G9 golden digest 不变） |
+| 载荷列 | 回写镜像 / 出方向投影 / 采纳覆盖一律读写 `remark`；G1-2 / G3-2 / G6-5 前端只写 `conclusion`，G4-7 / G5-2 两列同写、读 conclusion 优先 | 新模块 `store_payload_columns`：按 provider `PAYLOAD_COLUMN` / `PAYLOAD_COLUMN_MODE` 推口径（conclusion / 两列同写读 conclusion 优先 / 其余 remark），remark 口径 SQL 与原调用点逐字相同；接到单 item 回写、多 item 行数组循环、出方向读取、采纳覆盖的两次快照 / 删除侧 / 回滚审计（非 remark 口径记 `rollback_snapshot_columns`，恢复时知道写回哪一列） |
+| 单数 store item 与外壳 | G4 / G6 的 STORE_ITEM_ID 照抄成 G4-2-rows / G6-2-rows；G6-5 前端存 `{rows, conclusion}` 对象 | 改为受管的 G4-7-items / G6-5-fair-value-data；G6 门面 `rows_key="rows"`（投影取 rows、回写只换 rows 其余键原样），注册表 `merge_state_fn` + `kind=dict`；`iter_store_rows` 不拆外壳（采纳覆盖按行数组枚举，对象载荷照旧 fail visible，不会把外壳写丢）。`KNOWN_UNWIRED` 15 → 13 |
+| G1 A 列 | 模板 A 列「类别」数据行预填「债务工具投资」一类（投资品种），契约绑的是区归属 `acctClass` ⇒ 区②③ 接通后，OO 侧在 A 列填文字（含新增行）回写就把行改到三区之外（三区都投不出它，前端按未知分类单独成组） | A 列改绑 `investType`（与 G2 / G4 / G6 的 A 列「投资种类」同口径），`acctClass` 不受管：已有行不被改，OO 侧新增行由引擎补所在区的值。新守卫：区归属字段不得是受管列（全仓现算只 G1 一处） |
+
+- 契约声明：G4 `PAYLOAD_COLUMN_MODE` remark_only → dual_write（`useG4SppiInventory` 两列同写、读 conclusion 优先）、G6 `PAYLOAD_COLUMN` remark → conclusion（原「真库 remark 605 B」是照抄 G9 的）；五家 `ROW_IDENTITY_STORE_KEY` 原照抄 G9 写成 "rowId"，改为与 spec / 前端一致的 "id"；`_HTML_STORE_NOTE` / `payload_column_source` / `_REVIEWED_BASIS` 原是从 G9 整段抄来的，按各自实际改写；html_store 的 `row_section_field` 由 `section_specs()` 现算。
+- golden digest：五家的基线原来都是**空投影**的 digest（G1 区字段受管被合成占位值盖掉 ⇒ 三区都过滤空；G3 ~ G6 按 G9 的 spec 投影）。门禁加一条：合成 payload 投影为空即判 skip ⇒ 打红；基线只更新这五家（instrumentation 不变）。
+- AOS（采纳覆盖）：`_facade_module_name` 认绑定式门面绑定的 provider（`__module__` 恒为实现模块）；原先钉住「门面借给 G9」「G1 只覆盖 1/3」的断言改成正面断言（① 级可枚举、两路对账 `ReconcilingRowReader`），判据本身用合成门面守住（G3 外壳 + 绑 G9 的门面、只 yield 区① 的门面）；OO 路径门面体 sha 基线按 J2 规定登记新旧两值（旧 `41acda28…` / 112 行 → 新 `bb42107a…` / 101 行，只改了三条 SQL 的列口径，条件② 零命中）。同文件里 G5「12 段」的两处期望 2026-10-08 起就过期（G5 只受管主区 s1r1），改为现读。
+- 多 item 回写里 D4 的专用块 / dedicated dict store 仍写死 remark：守卫钉住走到它们的 provider 只能是 remark 口径（现算 d1 / d2 / d4）。
+- 变异 20 条各自打红、逐字节复原（门面借别家 / 只取首区 / 不穿线 / 外壳丢键 / 迭代拆外壳 / 口径恒 remark / 两列同写读序与写列 / 回写与出方向不认声明 / 采纳覆盖三处 / 基线回填 / 单数 store item / G1 A 列 / golden 空投影 / AOS 不认绑定 / G6 外壳 / 前端列序）。
+- 顺带（R9）：`test_check_store_item_two_way_parity::test_baseline_is_exactly_thirteen…` 因 8edf1d45a 加 F2/F4 后基线 15 条一直红（登记在预存失败清册），G4 / G6 接通后回到 13，清册删该条。未修：AOS 跳过清单棘轮（现算 92 > 62，absent 37 / item_blind 55 来自别 lane 新增 adapter）与白名单分母棘轮、golden 分派判据（清册已登记），HEAD 同红。
+- 待裁：G1 A 列在 OO 侧显示投资品种代码（bond / stock …，前端下拉存代码），与 G2 / G4 / G6 同；要显示中文类别需值编码换算，未做。
+- 回归（对 dbd010b28）：后端 528 个文件新增失败只有「已提交代码 import 未提交模块」（两个新模块入库即消），另 10 条由红转绿；PG 11 个文件新增 0；前端 244 个文件新增 1 条 `useG5FormulaEngine.pbt` P15 —— 6 个 1e9 量级正数正反序求和、按 1e-6 比较，浮点尾差超容差；失败种子 -1895920294 在 base 上复跑同样红，与本批无关（R9 登记）；vue-tsc 单区域（useG1Detail.ts）无新增。
+- 真实项目：和平药房 2025 的 G1 / G3 / G4 主表 / G6 主表与重药安徽的 G5 已发布，五份契约都变了（列口径、复核文字、G1 A 列键），在线编辑会报「冻结身份与生产契约脱钩」，要重发布；只做测试项目，未重发布（列入重发布清单）。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。

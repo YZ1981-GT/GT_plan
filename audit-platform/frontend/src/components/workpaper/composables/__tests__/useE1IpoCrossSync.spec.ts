@@ -1,5 +1,7 @@
 /**
- * E1 IPO 横切：E1-15→30 / E1-31→32 / 日记账合并 — 纯函数单元测试
+ * E1 IPO 横切：E1-15→30 / E1-31→32 — 纯函数单元测试
+ * （日记账三模式合并 mergeJournalLineLists 已删除：抽凭回填改走共享回填函数，
+ *  spec voucher-identity-writeback-and-audit-phase 任务 10，见 e1VoucherFill.spec.ts）
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -12,10 +14,6 @@ import {
   mergeE15GroupsIntoExisting,
 } from '../useE1DepositDailyMatch'
 import { collectE31SuspectCandidates } from '../useE1KeyPersonFlow'
-import {
-  mergeJournalLineLists,
-  createEmptyJournalLine,
-} from '../useE1BankFlowReconcile'
 
 describe('E1-15 → E1-30 sync helpers', () => {
   it('parseE15AccountList accepts array / accounts / rows', () => {
@@ -126,25 +124,5 @@ describe('E1-31 → E1-32 seed helpers', () => {
       ],
     })
     expect(r.candidates).toHaveLength(1)
-  })
-})
-
-describe('mergeJournalLineLists', () => {
-  const a = { ...createEmptyJournalLine(), id: '1', voucherNo: 'V1', date: '2024-01-01', debit: 10, credit: 0 }
-  const b = { ...createEmptyJournalLine(), id: '2', voucherNo: 'V2', date: '2024-01-02', debit: 0, credit: 20 }
-  const b2 = { ...createEmptyJournalLine(), id: '3', voucherNo: 'V2', date: '2024-01-02', debit: 0, credit: 20, businessContent: '更新' }
-
-  it('append concatenates', () => {
-    expect(mergeJournalLineLists([a], [b], 'append')).toHaveLength(2)
-  })
-
-  it('replace overwrites', () => {
-    expect(mergeJournalLineLists([a], [b], 'replace')).toEqual([b])
-  })
-
-  it('merge dedupes by voucher+date+amt', () => {
-    const out = mergeJournalLineLists([a, b], [b2], 'merge')
-    expect(out).toHaveLength(2)
-    expect(out.find(j => j.voucherNo === 'V2')?.businessContent).toBe('更新')
   })
 })

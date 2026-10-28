@@ -35,7 +35,7 @@ function labels(block: 'period' | 'post'): string[] {
     global: {
       stubs: {
         ElTable: TableStub, ElTableColumn: ColStub, ElInput: true, ElCheckbox: true, ElButton: true,
-        WpAmountInput: true, GtIndexChip: true,
+        WpAmountInput: true, WpCommitInput: true, GtIndexChip: true, VoucherRowMetaCell: true,
       },
     },
   })
@@ -43,13 +43,39 @@ function labels(block: 'period' | 'post'): string[] {
 }
 
 describe('D7-7 表单列与模板一致', () => {
+  // 「来源」是平台列不是模板列：抽凭 / 挂凭写的行元数据（阶段 / 来源 / 配对），全部凭证检查宿主同一列
+  // （spec voucher-identity-writeback-and-audit-phase 任务 10，拆表后随表搬进本组件）
+  const meta = ['来源']
   const common = ['客户名称', '日期', '凭证编号', '业务内容', '对方科目', '对方明细科目']
   const tail = ['支持性文件', '核对内容', '1', '2', '3', '4', '5', '索引号', '是否异常', '备注说明', '']
   it('本期增减变动区：借方 + 贷方两列金额', () => {
-    expect(labels('period')).toEqual([...common, '借方金额', '贷方金额', ...tail])
+    expect(labels('period')).toEqual([...meta, ...common, '借方金额', '贷方金额', ...tail])
   })
   it('期后结转区：只有借方金额（模板 G34）', () => {
-    expect(labels('post')).toEqual([...common, '借方金额', ...tail])
+    expect(labels('post')).toEqual([...meta, ...common, '借方金额', ...tail])
+  })
+})
+
+describe('D7-7 年审阶段的预审行只读（拆表后由宿主传 isRowLocked）', () => {
+  function mountLocked(locked: boolean) {
+    return mount(D7VoucherCheckTable, {
+      props: { rows: [SAMPLE as any], block: 'period', isReadonly: false, projectId: 'p1', isRowLocked: () => locked },
+      global: {
+        stubs: {
+          ElTable: TableStub, ElTableColumn: ColStub, ElCheckbox: true, WpAmountInput: true, WpCommitInput: true,
+          GtIndexChip: true, VoucherRowMetaCell: true,
+          ElButton: { props: ['disabled'], template: '<button :disabled="disabled"><slot /></button>' },
+        },
+      },
+    })
+  }
+  it('锁定行不出输入框、删除按钮禁用；未锁定行照常可录', () => {
+    const locked = mountLocked(true)
+    expect(locked.findAll('wp-commit-input-stub')).toHaveLength(0)
+    expect(locked.find('button').attributes('disabled')).toBeDefined()
+    const open = mountLocked(false)
+    expect(open.findAll('wp-commit-input-stub').length).toBeGreaterThan(0)
+    expect(open.find('button').attributes('disabled')).toBeUndefined()
   })
 })
 

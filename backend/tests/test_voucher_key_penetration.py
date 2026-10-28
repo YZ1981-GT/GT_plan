@@ -4,7 +4,8 @@ SQLite 真 ORM 行 + 端点级请求（httpx ASGI，覆盖内层 get_db / get_cu
 - 只给日期与号、同日同号两种凭证字 → 409 VOUCHER_KEY_AMBIGUOUS + 2 个候选，不合并分录；
 - 带凭证字 → 只返回本凭证分录，每行带 voucher_key / side / line_fp；
 - 只给号、跨日期 → 409 + 全部候选（按凭证键排序）；空凭证字匹配 NULL；
-- 下钻 /drilldown/voucher/{no} 同口径，is_balanced 只对单张凭证计算。
+- 下钻 /drilldown/voucher/{no} 同口径，is_balanced 只对单张凭证计算；
+- 一套账两个主体同日同号同凭证字：不带主体 409、带候选的主体 200（任务 14 实测补）。
 """
 
 from __future__ import annotations
@@ -136,6 +137,32 @@ async def test_drilldown_same_rules(db):
     assert empty["entries"] == [] and empty["voucher_key"] is None
 
 
+async def _add_second_company(db) -> str:
+    """同一套账第二个主体，同日同号同凭证字（真库 3 个已软删的 B2Perf 性能测试项目各 92 组，任务 14 实测补）。"""
+    other = "C2-第二主体"
+    db.add_all([_row(x, company_code=other) for x in FY])
+    await db.commit()
+    return other
+
+
+async def test_company_code_picks_one_of_two_companies(db):
+    other = await _add_second_company(db)
+    svc = LedgerPenetrationService(db)
+    with pytest.raises(VoucherKeyAmbiguous) as ei:
+        await svc.get_voucher_entries(PROJECT_ID, YEAR, "0003", voucher_date="2025-01-07", voucher_type="FY")
+    assert sorted(c["company_code"] for c in ei.value.candidates) == sorted([COMPANY, other])
+    rows = await svc.get_voucher_entries(
+        PROJECT_ID, YEAR, "0003", voucher_date="2025-01-07", voucher_type="FY", company_code=other)
+    assert len(rows) == 2 and {r["company_code"] for r in rows} == {other}
+    # 空串 = 不限主体：四表主体非空（没映射记 default），空串只表示「不知道」
+    with pytest.raises(VoucherKeyAmbiguous):
+        await svc.get_voucher_entries(
+            PROJECT_ID, YEAR, "0003", voucher_date="2025-01-07", voucher_type="FY", company_code="")
+    got = await DrilldownService(db).get_voucher_detail(
+        PROJECT_ID, YEAR, "0003", voucher_date="2025-01-07", voucher_type="FY", company_code=COMPANY)
+    assert got["company_code"] == COMPANY and got["is_balanced"] is True and len(got["entries"]) == 2
+
+
 def test_candidate_list_is_capped():
     rows = [{"year": 2025, "company_code": "001", "voucher_date": f"2025-{1 + i // 28:02d}-{1 + i % 28:02d}",
              "voucher_type": "记", "voucher_no": "7", "debit_amount": "1", "credit_amount": None} for i in range(60)]
@@ -202,6 +229,26 @@ async def test_endpoint_409_then_200_with_voucher_type(client, path):
     data = resp.json().get("data", resp.json())
     lines = data if isinstance(data, list) else data["entries"]
     assert len(lines) == 2 and all(x["line_fp"] for x in lines)
+
+
+@pytest.mark.parametrize("path", ["ledger/voucher/0003", "drilldown/voucher/0003"])
+async def test_endpoint_company_code_resolves_candidate(client, db, path):
+    """候选只差主体时，带上候选的主体必须能打开那一张（不带会再次 409，选了等于没选）。"""
+    other = await _add_second_company(db)
+    url = f"/api/projects/{PROJECT_ID}/{path}"
+    params = {"year": YEAR, "voucher_date": "2025-01-07", "voucher_type": "FY"}
+    resp = await client.get(url, params=params)
+    assert resp.status_code == 409
+    cands = resp.json()["message"]["candidates"]
+    assert sorted(c["company_code"] for c in cands) == sorted([COMPANY, other])
+    resp = await client.get(url, params={**params, "company_code": other})
+    assert resp.status_code == 200
+    data = resp.json().get("data", resp.json())
+    lines = data if isinstance(data, list) else data["entries"]
+    assert len(lines) == 2
+    keys = {x["voucher_key"] for x in lines} if isinstance(data, list) else {data["voucher_key"]}
+    assert keys == {VoucherKey.of(year=YEAR, company_code=other, voucher_date="2025-01-07", voucher_type="FY",
+                                  voucher_no="0003").to_str()}
 
 
 async def test_endpoint_requires_project_membership(client, db):

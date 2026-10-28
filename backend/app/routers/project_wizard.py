@@ -61,6 +61,8 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         consol_lock=bool(project.consol_lock),
         created_at=project.created_at,
         notices=list(getattr(project, "_group_notices", None) or []),
+        current_audit_phase=project.current_audit_phase or "final",
+        interim_cutoff_date=project.interim_cutoff_date,
     )
 
 

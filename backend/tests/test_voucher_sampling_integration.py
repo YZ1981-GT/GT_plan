@@ -52,6 +52,13 @@ def _bypass_extract_auth():
 
 
 @pytest.fixture(autouse=True)
+def _bypass_undo_auth():
+    """撤销端点的鉴权与阶段规则在这些流程测试中放行；规则本身由 test_voucher_undo_authz 用真 ORM 行覆盖。"""
+    with patch("app.routers.voucher_sampling._authorize_undo", new=AsyncMock(return_value=None)):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _stub_population_reconcile():
     """总体完整性核对取数在这些流程测试中显式打桩为「不可用」。
 

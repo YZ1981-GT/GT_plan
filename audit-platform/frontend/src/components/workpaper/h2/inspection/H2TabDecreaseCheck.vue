@@ -181,7 +181,7 @@
       </el-descriptions>
       <div class="specific-sample" v-if="!isReadonly || state.samplingParams.value.specificSampleNote">
         <span class="param-label">特定样本：</span>
-        <el-input
+        <WpCommitInput
           v-if="!isReadonly"
           :model-value="state.samplingParams.value.specificSampleNote"
           size="small"
@@ -228,9 +228,14 @@
         size="small"
         max-height="520"
         class="check-table"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <el-table-column prop="name" label="工程项目名称" min-width="120" fixed>
           <template #default="{ row }">
@@ -583,7 +588,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎（科目 ${samplingAccountCode} 在建工程-减少）"
+      :title="`抽凭引擎（科目 ${samplingAccountCode} 在建工程-减少）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -593,9 +598,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -608,10 +613,12 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * H2TabDecreaseCheck.vue — H2-9 在建工程减少检查
  * 对齐致同：目标 → 抽样 → 转入固定资产/其他减少 + 审批验收证据 → 检查比例 → 说明/结论 → 提示
  */
-import { ref, inject, toRef, computed, type Ref } from 'vue'
+import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH2DecreaseCheck } from '../../composables/useH2DecreaseCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
@@ -629,6 +636,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -659,6 +667,8 @@ const state = useH2DecreaseCheck({
 })
 
 const isReadonly = computed(() => props.isReadonly)
+
+onMounted(() => { void state.voucherFillReady() })
 
 const coverageTagType = computed(() => {
   const rate = state.summary.value.coverageRate
@@ -775,42 +785,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  showSamplingDialog.value = false
-  // 引擎 emit('filled', { samples, phase, fillMode, ... })；兼容旧数组形态
-  const samples: any[] = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!samples.length) return
-  for (const s of samples) {
-    state.addRow()
-    const lastRow = state.rows.value[state.rows.value.length - 1]
-    if (lastRow) {
-      // 减少=贷方(资产1604)；SampledVoucher 字段 creditAmount/voucherDate/voucherNo/summary
-      const amt = Number(s.creditAmount ?? s.amount ?? s.debitAmount) || 0
-      if (s.summary || s.description) lastRow.name = s.summary || s.description
-      const d = s.voucherDate ?? s.date
-      if (d) lastRow.decreaseDate = d
-      if (s.voucherNo || s.voucher_no) lastRow.voucherNo = s.voucherNo || s.voucher_no
-      // 默认记入转入固定资产；用户可改到其他减少
-      lastRow.transferToFaAmount = amt
-      lastRow.decreaseType = '转入固定资产'
-      lastRow.samplingStatus = '待检查'
-    }
-  }
-  state.fillSamplingResults(
-    samples.map((_s, i) => ({
-      rowId: state.rows.value[state.rows.value.length - samples.length + i]?.rowId ?? '',
-      status: '待检查',
-    })),
-  )
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 function handleAddRow() {
@@ -831,6 +817,9 @@ function rowClassName({ row }: { row: any }) {
   if (row.isProvisional === '是' || f?.missingApproval || f?.missingStamps) return 'row-provisional'
   return ''
 }
+
+/** 行样式：异常提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, state.voucherRowClass)
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

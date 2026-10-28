@@ -2,7 +2,7 @@
  * useI2OutsourceCheck — I2-11 委外研发检查表
  * 测试原因 + 合同/受托方/凭证/验收核对 + 检查比例（可联动 I2-7 委外金额）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import {
   type I2OutsourceCheckRow,
   type I2OutsourceSampleMeta,
@@ -16,6 +16,12 @@ import {
   formatCoverageLabel,
   suggestOutsourceAbnormal,
 } from './i2OutsourceCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf, type AssetSample } from './assetVoucherFill'
+import { partyNameForColumn } from './shared/samplingPartyTarget'
 
 export {
   type I2OutsourceCheckRow,
@@ -61,10 +67,38 @@ function _readText(raw: unknown): string {
   return ''
 }
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：委外原因、合同与受托方资料、验收、异常、索引号、结论、备注 */
+export function hasI2OutsourceContent(r: I2OutsourceCheckRow): boolean {
+  return [r.outsourceReason, r.contractDate, r.contractNo, r.rdContent, r.ipOwnership, r.qualification,
+    r.registeredCapital, r.insuredCount, r.acceptanceDate, r.acceptanceResult, r.isAbnormal, r.indexRef,
+    r.conclusion, r.remark].some(v => String(v ?? '').trim() !== '')
+    || Number(r.acceptanceAmount) !== 0
+}
+
+/**
+ * 共享回填函数的待写入项 → 委外研发检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：凭证号与日期、
+ * 业务内容、记账金额（样本自己那一栏，红字带符号照记）、研发项目（样本科目名，与原实现相同）、受托方取辅助核算往来单位
+ * （唯一命中才填，`partyNameForColumn`）。原实现把对方科目编码写进「受托方」
+ */
+function rowFromPrepared(item: PreparedItem): I2OutsourceCheckRow {
+  const s = sampleOf(item) as AssetSample & { accountName?: string | null }
+  return emptyI2OutsourceRow({
+    entrustedParty: partyNameForColumn(item.sample, 'supplier'),
+    amount: assetAmount(item, 'debit'),
+    voucherNo: String(s.voucherNo ?? ''),
+    voucherDate: String(s.voucherDate ?? ''),
+    businessDesc: String(s.summary ?? ''),
+    projectName: String(s.accountName ?? ''),
+  })
+}
+
 export function useI2OutsourceCheck(
   allResponses: Ref<Map<string, any>> | (() => Map<string, any>),
   options?: {
     saveResponse?: (sheetCode: string, data: Record<string, any>) => Promise<void>
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -78,7 +112,8 @@ export function useI2OutsourceCheck(
 
   function load() {
     const map = getMap()
-    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(normalizeI2OutsourceRow)
+    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(r => withRowMeta(normalizeI2OutsourceRow(r), r))
+    voucherFill.markLoaded()
 
     const sampleRaw = map.get(STORAGE_SAMPLE)
     let parsedMeta: any = null
@@ -102,6 +137,23 @@ export function useI2OutsourceCheck(
       if (linked > 0) sampleMeta.value.populationAmount = linked
     }
   }
+
+  /**
+   * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）。改完整页保存（与「保存」同一次写入）：
+   * 父组件存一项就改一项 allResponses、本函数的 watch 随即整页重读，只存行会把未保存的抽样说明读回旧值。
+   * 原实现回填只改内存，不点保存就丢（抽凭登记里却记着本底稿抽了这些凭证），也不去重
+   */
+  const voucherFill = useVoucherCheckFill<I2OutsourceCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => rowFromPrepared(item),
+    persist: () => persistAll(),
+    hasUserContent: hasI2OutsourceContent,
+    // 旧行（没有 `_gt`）身份：凭证号 + 凭证日期 + 记账金额
+    legacy: r => assetLegacyKey(r.voucherNo, r.voucherDate, r.amount),
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
 
   watch(() => {
     const m = getMap()
@@ -144,7 +196,7 @@ export function useI2OutsourceCheck(
   }
 
   function removeRow(rowId: string) {
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    rows.value = rows.value.filter((r) => r.rowId !== rowId || voucherFill.isRowLocked(r))
   }
 
   function applySuggestAbnormal(row: I2OutsourceCheckRow) {
@@ -168,7 +220,7 @@ export function useI2OutsourceCheck(
     const save = options?.saveResponse
     if (!save) return
     await save('I2-11', {
-      [STORAGE_ROWS]: JSON.stringify(rows.value),
+      [STORAGE_ROWS]: JSON.stringify(voucherFill.guardPersist(rows.value)),
       [STORAGE_SAMPLE]: JSON.stringify(sampleMeta.value),
       [STORAGE_NOTE]: auditNote.value,
       [STORAGE_CONCLUSION]: auditConclusion.value,
@@ -205,5 +257,11 @@ export function useI2OutsourceCheck(
     persistAll,
     saveAuditNote,
     saveAuditConclusion,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }

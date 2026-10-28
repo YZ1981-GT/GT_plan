@@ -8,7 +8,7 @@
  *
  * Spec: .kiro/specs/d4-14-walkthrough-test/ Phase 4
  */
-import { ref, computed, inject, onBeforeUnmount, defineAsyncComponent, toRef, watch, type Ref } from 'vue'
+import { ref, computed, inject, onBeforeUnmount, onMounted, defineAsyncComponent, toRef, watch, type Ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import useD4WalkthroughTest, {
   type TransactionItem,
@@ -36,6 +36,8 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import { dSlotQueryCodes, pickDTbSourceCodes } from '../../composables/dCycleAccountScope'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
 
 // 抽凭引擎（懒加载，避免首屏体积）
 const GtVoucherSamplingEngine = defineAsyncComponent(
@@ -74,6 +76,11 @@ const {
   updateSamplingParams,
   reindexItems,
   flushSave,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useD4WalkthroughTest({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
@@ -157,6 +164,11 @@ const activeTab = ref<string>('')
 
 function handleTabRemove(tabId: string | number) {
   if (props.isReadonly) return
+  const target = transactions.value.find(t => t.id === String(tabId))
+  if (target && isVoucherRowLocked(target)) {
+    ElMessage.warning('年审阶段预审抽凭的事项只读，不能删除')
+    return
+  }
   removeTransaction(String(tabId))
   if (activeTab.value === String(tabId)) {
     activeTab.value = transactions.value[0]?.id ?? ''
@@ -267,62 +279,31 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, year, props.wpId, D4_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) {
+      await onAttachImported(samples)
+      ensureActiveTab()
+    }
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-/** 安全数值解析（SampledVoucher 金额为 string | null） */
-function toAmount(v: string | null | undefined): number {
-  const n = parseFloat(String(v ?? ''))
-  return Number.isFinite(n) ? n : 0
-}
-
 /**
- * 抽凭引擎回填：payload 是对象，需解构 payload.samples（SampledVoucher[]）。
- * 每笔样本映射为 D4-14 发生测试行（记账凭证维度 + 异常标记），
- * 通过 composable 既有 addTransaction/updateDimension 追加并持久化。
- * 收入类以 creditAmount（贷方发生额）为发生额优先。
+ * 抽凭引擎回填：共享回填函数一个样本一个事项（记账凭证维度编号 / 日期 / 金额 + 对方科目说明 + 异常标记），
+ * 按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入、尚未录入核对内容（或确认后）的事项。
+ * 收入类以贷方发生额为发生额优先（映射在 useD4WalkthroughTest.mapSampleToTransaction）。
  */
-function onSampleFilled(payload: {
-  samples?: Array<{
-    voucherNo?: string
-    voucherDate?: string
-    summary?: string | null
-    debitAmount?: string | null
-    creditAmount?: string | null
-    counterpartAccount?: string | null
-    abnormal?: boolean
-  }>
-}) {
-  const samples = payload?.samples ?? []
-  if (!samples.length) {
+async function onSampleFilled(payload: EngineFilledPayload) {
+  if (!(payload?.samples ?? []).length) {
     ElMessage.info('未选择任何凭证')
     return
   }
-  let added = 0
-  for (const s of samples) {
-    const amount = toAmount(s.creditAmount) || toAmount(s.debitAmount)
-    const label = s.voucherNo || s.summary || '抽样凭证'
-    // addTransaction 创建空行并持久化，返回行引用
-    const item = addTransaction(label)
-    // isAnomalous 非维度字段，直接置于行引用（后续 updateDimension 的 persistAll 会一并序列化）
-    item.isAnomalous = !!s.abnormal
-    // 回填「记账凭证」维度（updateDimension 内部触发一致性重算 + 持久化）
-    updateDimension(item.id, 'voucher', 'number', s.voucherNo || '')
-    updateDimension(item.id, 'voucher', 'date', s.voucherDate || '')
-    if (s.counterpartAccount) {
-      const cpName = s.counterpartAccountName ? ` ${s.counterpartAccountName}` : ''
-      updateDimension(item.id, 'other', 'description', `对方科目：${s.counterpartAccount}${cpName}`)
-    }
-    // 金额放到最后，确保这次 persistAll 序列化包含 isAnomalous 等直接改动
-    updateDimension(item.id, 'voucher', 'amount', amount)
-    added++
-  }
+  const out = await onEngineFilled(payload)
   samplingDialogVisible.value = false
-  activeTab.value = transactions.value[transactions.value.length - 1]?.id ?? activeTab.value
-  ElMessage.success(`已从抽凭引擎回填 ${added} 笔凭证`)
+  if (out.cancelled) return
+  if (out.added > 0) activeTab.value = transactions.value[transactions.value.length - 1]?.id ?? activeTab.value
+  ensureActiveTab()
+  // 填入几个事项（含已存在 / 被替换）由共享回填函数按实际行数提示
 }
 
 // ─── OCR handling ────────────────────────────────────────────────────
@@ -467,6 +448,7 @@ async function handleImportClick() {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────
 ensureActiveTab()
+onMounted(() => { void voucherFillReady() })
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
@@ -649,9 +631,13 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
             v-for="item in transactions" :key="item.id"
             :name="item.id" :label="`${item.indexNo} ${item.label}`"
           >
+            <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据）；年审阶段的预审事项只读 -->
+            <div class="d4-row-meta">
+              <VoucherRowMetaCell :row="item" :locked="isVoucherRowLocked(item)" :project-id="projectId" :year="samplingYear" />
+            </div>
             <D4WalkthroughCard
               :item="item"
-              :is-readonly="isReadonly"
+              :is-readonly="isReadonly || isVoucherRowLocked(item)"
               :wp-id="wpId"
               :project-id="projectId"
               :d4-contracts="d4Contracts"
@@ -812,11 +798,11 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
       <GtVoucherSamplingEngine
         v-if="samplingDialogVisible"
         :account-code="D4_MAIN_REVENUE_STANDARD"
-        phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -909,6 +895,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 /* ─── 空状态 ─── */
 .empty-hint { padding: 20px 0; }
+.d4-row-meta { margin-bottom: 8px; }
 
 /* ─── 审计意见区 ─── */
 .audit-opinion-card { margin-bottom: 24px; border-radius: 8px; }

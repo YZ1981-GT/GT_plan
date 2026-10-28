@@ -77,6 +77,31 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+describe('对方科目取后端配对结果（voucher-identity-writeback-and-audit-phase 任务 9，需求 3）', () => {
+  it('样本带穿透给的 pairing；配上一个对方科目填该科目，配不上填「多科目」，不在前端按借贷分桶推断', async () => {
+    const pairedOne = { status: 'paired', basis: 'one_to_one', counterparts: [{ account_code: '2202', account_name: '应付账款', amount: '100.00', line_fp: 'x' }], counterpart_summary: [] }
+    const multi = { status: 'multi', basis: null, counterparts: [], counterpart_summary: [{ account_code: '2202', account_name: '应付账款', amount: '60.00' }] }
+    mockHttp([rec()], [
+      line('1002', { line_fp: 'fp-a', pairing: pairedOne }),
+      line('1002.001', { line_fp: 'fp-b', pairing: multi }),
+      // 两个贷方科目：旧前端推断会填「多科目」，但后端没给配对结果时不再猜
+      line('2202', { debit_amount: null, credit_amount: '60' }),
+      line('2241', { debit_amount: null, credit_amount: '40' }),
+    ])
+    const r = await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect(r.samples.map(s => [s.lineFp, s.counterpartAccount, s.pairing?.status])).toEqual([
+      ['fp-a', '2202', 'paired'],
+      ['fp-b', '多科目', 'multi'],
+    ])
+  })
+
+  it('穿透没给配对结果：对方科目留空，不猜', async () => {
+    mockHttp([rec()], [line('1002'), line('2202', { debit_amount: null, credit_amount: '100' })])
+    const r = await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect([r.samples[0].counterpartAccount, r.samples[0].pairing]).toEqual([null, null])
+  })
+})
+
 describe('① 命中底稿科目前缀（正常路径）', () => {
   it('只回填命中前缀的分录，不带歧义标注', async () => {
     mockHttp([rec()], [line('1002'), line('6602'), line('2202')])
@@ -284,6 +309,15 @@ describe('凭证键：同日同号多凭证字（spec voucher-identity-writeback
     get = mockHttp([rec()], [line('1002')])
     await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
     expect((lineCallOf(get)![1] as { params: Record<string, unknown> }).params).not.toHaveProperty('voucher_type')
+  })
+
+  it('挂凭记录带主体时分录请求带 company_code（一套账两个主体同日同号同凭证字），未记主体的旧行不传', async () => {
+    let get = mockHttp([rec({ voucher_type: 'FY', company_code: 'C2' })], [line('1002', { voucher_type: 'FY' })])
+    await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect((lineCallOf(get)![1] as { params: Record<string, unknown> }).params).toMatchObject({ voucher_type: 'FY', company_code: 'C2' })
+    get = mockHttp([rec({ voucher_type: 'FY' })], [line('1002', { voucher_type: 'FY' })])
+    await pullSamplesForWorkpaper(PID, YEAR, WP, ['1002'])
+    expect((lineCallOf(get)![1] as { params: Record<string, unknown> }).params).not.toHaveProperty('company_code')
   })
 
   it('后端 409 命中多张凭证 → 占位样本列出候选、提示重新挂凭，不并入任何分录', async () => {

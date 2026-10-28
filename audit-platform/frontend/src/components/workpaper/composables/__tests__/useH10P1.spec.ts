@@ -1,10 +1,9 @@
 /**
- * H10 P1 — 跨 WP H6 勾稽 / 抽凭回填 / 调整 eventBus
+ * H10 P1 — 跨 WP H6 勾稽 / 调整 eventBus（抽凭回填改走共享回填函数，用例在 h10VoucherFill.spec.ts）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import { useH10CrossSheet } from '../useH10CrossSheet'
-import { useH10Check, H10_CHECK_MIN_SAMPLE_RATIO } from '../useH10Check'
 import { useH10Adjustment } from '../useH10Adjustment'
 import { pullH6ClearingNetForH10 } from '../h10RelatedH6Pull'
 import { eventBus } from '@/utils/eventBus'
@@ -88,41 +87,6 @@ describe('useH10CrossSheet remote H6', () => {
     expect(result.h6Source).toBe('remote')
     expect(result.h6NetGainLoss).toBe(200)
     expect(result.isMatch).toBe(true)
-  })
-})
-
-describe('useH10Check fillFromSampledVouchers', () => {
-  it('回填凭证索引并计算抽查比例', () => {
-    const allResponses = ref(new Map<string, any>([
-      ['H10-detail-rows', {
-        item_id: 'H10-detail-rows',
-        remark: JSON.stringify([
-          { id: 'd1', assetName: '设备A' },
-          { id: 'd2', assetName: '设备B' },
-          { id: 'd3', assetName: '设备C' },
-          { id: 'd4', assetName: '设备D' },
-          { id: 'd5', assetName: '设备E' },
-        ]),
-      }],
-    ]))
-    const saves: Array<{ id: string; remark?: string }> = []
-    const api = useH10Check({
-      allResponses,
-      debouncedSave: (id, d) => { saves.push({ id, remark: d.remark ?? undefined }) },
-      isReadonly: ref(false),
-    })
-
-    expect(api.detailPopulation.value).toBe(5)
-    expect(api.sampleRatioLow.value).toBe(true)
-
-    const n = api.fillFromSampledVouchers([
-      { voucherNo: 'V001', date: '2025-01-01', summary: '处置1' },
-    ])
-    expect(n).toBe(1)
-    expect(api.rows.value[0].voucherRef).toContain('V001')
-    expect(api.sampleRatio.value).toBeCloseTo(0.2, 5)
-    expect(api.sampleRatioLow.value).toBe(false)
-    expect(H10_CHECK_MIN_SAMPLE_RATIO).toBe(0.2)
   })
 })
 

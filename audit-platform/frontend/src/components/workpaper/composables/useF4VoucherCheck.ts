@@ -5,11 +5,16 @@
  *  1. 本期借方金额检查：记账凭证 + 付款审批单 + 银行回单
  *  2. 本期贷方金额检查：记账凭证 + 入库单/验收单 + 采购发票（可结合 F2-33）
  * 每笔通过弹窗逐单据上传 OCR 核对，并与 F4-2 账面发生额计算检查比例。
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
+ * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef, type Ref } from 'vue'
 import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
-import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
+import {
+  metaOf, sideTableOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 export type F4VoucherSection = 'debit' | 'credit'
 export type F4EvidenceKind = 'payment' | 'purchase'
@@ -235,7 +240,7 @@ function migrateRow(raw: any, i: number, section: F4VoucherSection): F4VoucherCh
     || (raw?.checkResult && raw.checkResult !== '无异常' && raw.checkResult !== '正常' ? '是' : '')
     || (raw?.auditConclusion && raw.auditConclusion !== '无异常' ? '是' : '')
 
-  return {
+  return withRowMeta({
     ...base,
     rowId: String(raw?.rowId || raw?.id || generateRowId()),
     seq: Number(raw?.seq) || i + 1,
@@ -263,7 +268,7 @@ function migrateRow(raw: any, i: number, section: F4VoucherSection): F4VoucherCh
     isAbnormal: String(legacyAbnormal || ''),
     issueDesc: String(raw?.issueDesc || legacyIssue),
     sampleSource: String(raw?.sampleSource || ''),
-  }
+  }, raw)
 }
 
 export function migrateF4VoucherRows(
@@ -281,6 +286,39 @@ export function migrateF4VoucherRows(
   } catch {
     return []
   }
+}
+
+/** 待写入项进哪区：按分录自己的借贷栏（`sideTableOf`，贷方红字进本期贷方区、带符号照记） */
+export function f4SectionOf(item: Pick<PreparedItem, 'debitAmount' | 'creditAmount'>): F4VoucherSection {
+  return sideTableOf(item)
+}
+
+/** 共享回填函数的待写入项 → 检查行：金额取样本自己那一栏，对方科目 = 编码、明细科目 = 名称（配不上写「多科目」） */
+export function mapPreparedToF4Row(item: PreparedItem): F4VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const amount = f4SectionOf(item) === 'credit'
+    ? parseNum(item.creditAmount)
+    : (parseNum(item.debitAmount) || parseNum(item.creditAmount))
+  return {
+    ...emptyF4VoucherRow(0, 0),
+    voucherDate: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    counterAccount: code,
+    detailAccount: name && name !== code ? name : '',
+    amount,
+    sampleSource: item.meta.src.includes('attach') ? '挂凭' : '抽凭引擎',
+  }
+}
+
+/** 行上已填供应商、审批 / 回单 / 入库 / 发票、其他证据、索引、异常判断或说明（替换与撤销抽凭时据此先确认） */
+export function hasF4VoucherContent(r: F4VoucherCheckRow): boolean {
+  return [r.supplierName, r.approvalDateNo, r.approvalProper, r.bankReceiptDate, r.bankPayee, r.receiptDateNo,
+    r.receiptProduct, r.receiptUnit, r.invoiceDateNo, r.invoiceCounterparty, r.otherEvidence, r.indexNo,
+    r.isAbnormal, r.issueDesc].some((v) => String(v ?? '').trim() !== '')
+    || [r.bankAmount, r.receiptQty, r.invoiceAmount].some((n) => Number(n) !== 0)
 }
 
 /** 检查比例：账面金额取自 F4-2 明细表借贷发生合计 */
@@ -316,6 +354,49 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
   const auditConclusion = ref('')
   const sampleBasis = ref('')
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（两区各一张表）
+  /** 已在某区的分录（按指纹）：再次回填 / 挂凭导入仍进那区 */
+  function sectionHolding(lfp: string | null): F4VoucherSection | null {
+    if (!lfp) return null
+    if (stored.debit.value.some((r) => metaOf(r)?.lfp === lfp)) return 'debit'
+    if (stored.credit.value.some((r) => metaOf(r)?.lfp === lfp)) return 'credit'
+    return null
+  }
+  /**
+   * 一区一张表：写入时去掉空白占位行（区里没有行时补的那行空行，原实现回填前也去掉），区空了补一行空白行；
+   * 序号重排，新行的附件位按区内现有最大位顺延
+   */
+  const sectionTable = (section: F4VoucherSection) => computed<F4VoucherCheckRow[]>({
+    get: () => stored[section].value,
+    set: (list) => {
+      const kept = list.filter((r) => !!metaOf(r) || !isBlankF4VoucherRow(r))
+      const next = kept.length ? kept : [emptyF4VoucherRow(1)]
+      let slot = Math.max(0, ...next.map((r) => Number(r.attSlot) || 0))
+      next.forEach((r, i) => {
+        r.seq = i + 1
+        if (!r.attSlot) r.attSlot = ++slot
+      })
+      stored[section].value = next
+    },
+  })
+  const voucherFill = useVoucherCheckFill<F4VoucherCheckRow>({
+    projectId: () => options.projectId?.value,
+    tables: { debit: sectionTable('debit'), credit: sectionTable('credit') },
+    tableOf: (item) => sectionHolding(item.meta.lfp) ?? f4SectionOf(item),
+    mapSampleToRow: (item) => mapPreparedToF4Row(item),
+    persist: () => {
+      persistSection('debit')
+      persistSection('credit')
+    },
+    hasUserContent: hasF4VoucherContent,
+    readonly: () => readonly.value,
+  })
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedIn(section: F4VoucherSection, rowId: string): boolean {
+    const row = stored[section].value.find((r) => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   function rawForSection(section: F4VoucherSection): string | null | undefined {
     const current = readRowJson(allResponses.value.get(ITEM_KEYS[section]))
     if (current) return current
@@ -329,6 +410,7 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
   function loadSection(section: F4VoucherSection): void {
     stored[section].value = migrateF4VoucherRows(rawForSection(section), section)
     if (!stored[section].value.length) stored[section].value = [emptyF4VoucherRow(1)]
+    voucherFill.markLoaded()
   }
 
   for (const section of ['debit', 'credit'] as F4VoucherSection[]) {
@@ -391,7 +473,7 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
   }
 
   function removeRow(section: F4VoucherSection, rowId: string): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, rowId)) return
     const rows = stored[section].value
     if (rows.length <= 1) return
     const idx = rows.findIndex((r) => r.rowId === rowId)
@@ -402,7 +484,7 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
   }
 
   function updateCell(section: F4VoucherSection, rowId: string, field: string, value: unknown): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, rowId)) return
     const row = stored[section].value.find((r) => r.rowId === rowId)
     if (!row) return
     const numericFields = ['amount', 'bankAmount', 'receiptQty', 'invoiceAmount']
@@ -413,60 +495,28 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
   }
 
   function saveRow(section: F4VoucherSection, patch: F4VoucherCheckRow): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, patch.rowId)) return
     const idx = stored[section].value.findIndex((r) => r.rowId === patch.rowId)
     if (idx === -1) return
-    stored[section].value[idx] = { ...patch }
+    stored[section].value[idx] = withRowMeta({ ...patch }, stored[section].value[idx])
     persistSection(section)
   }
 
-  function applySamplingResults(samples: SampledVoucher[], fillMode: FillMode = 'append'): void {
-    if (readonly.value || !samples.length) return
-    if (fillMode === 'replace') {
-      stored.debit.value = []
-      stored.credit.value = []
-    }
+  /**
+   * 抽凭引擎回填：分录按借贷方向进本期借方 / 贷方区（贷方有正数且借方没有正数进贷方区，其余进借方区），
+   * 一个对方科目一行（后端配对），按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行（原实现两区整表清空）。
+   */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload)
+  }
 
-    for (const sample of samples) {
-      const debit = sample.debitAmount ? parseFloat(sample.debitAmount) : 0
-      const credit = sample.creditAmount ? parseFloat(sample.creditAmount) : 0
-      const base = {
-        voucherDate: sample.voucherDate || '',
-        voucherNo: sample.voucherNo || '',
-        businessContent: sample.summary || '',
-        counterAccount: sample.counterpartAccount || '',
-        supplierName: '',
-        sampleSource: '抽凭引擎',
-      }
-      if (debit > 0) {
-        if (stored.debit.value.length === 1 && isBlankF4VoucherRow(stored.debit.value[0])) {
-          stored.debit.value = []
-        }
-        stored.debit.value.push({
-          ...emptyF4VoucherRow(stored.debit.value.length + 1, nextAttSlot('debit')),
-          ...base,
-          amount: debit,
-        })
-      }
-      if (credit > 0) {
-        if (stored.credit.value.length === 1 && isBlankF4VoucherRow(stored.credit.value[0])) {
-          stored.credit.value = []
-        }
-        stored.credit.value.push({
-          ...emptyF4VoucherRow(stored.credit.value.length + 1, nextAttSlot('credit')),
-          ...base,
-          amount: credit,
-        })
-      }
-    }
-    stored.debit.value.forEach((r, i) => { r.seq = i + 1 })
-    stored.credit.value.forEach((r, i) => { r.seq = i + 1 })
-    persistSection('debit')
-    persistSection('credit')
+  /** 从序时账挂入导入：幂等追加，与抽凭命中同一分录只留一行 */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples)
   }
 
   function persistSection(section: F4VoucherSection): void {
-    const json = JSON.stringify(stored[section].value)
+    const json = JSON.stringify(voucherFill.guardPersist(stored[section].value, section))
     lastPersisted.set(section, json)
     allResponses.value.set(ITEM_KEYS[section], {
       item_id: ITEM_KEYS[section],
@@ -543,7 +593,13 @@ export function useF4VoucherCheck(options: UseF4VoucherCheckOptions) {
     removeRow,
     updateCell,
     saveRow,
-    applySamplingResults,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     saveAuditNote,
     saveAuditConclusion,
     saveSampleBasis,

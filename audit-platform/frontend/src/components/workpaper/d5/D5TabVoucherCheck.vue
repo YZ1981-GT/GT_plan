@@ -89,11 +89,11 @@
     <GtVoucherSamplingEngine
       v-if="showSamplingDialog"
       :account-code="samplingAccountCode"
-      phase="final"
       :workpaper-id="props.wpId"
       :project-id="props.projectId"
       :year="samplingYear"
       @filled="onSampleFilled"
+      @undo-request="onUndoRequest"
       @close="showSamplingDialog = false"
     />
 
@@ -136,6 +136,7 @@
       stripe
       :max-height="rows.length > 30 ? 600 : undefined"
       style="width: 100%"
+      :row-class-name="voucherRowClass"
     >
       <!-- A: 类别 (固定) -->
       <el-table-column label="类别" width="120" fixed>
@@ -144,7 +145,7 @@
             <span class="subtotal-label">{{ row.category }}</span>
           </template>
           <el-select
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.category"
             size="small"
             placeholder="选择类别"
@@ -167,13 +168,23 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-label">{{ row.itemName || '' }}</span>
           </template>
-          <el-input
-            v-else-if="!isReadonly"
+          <WpCommitInput
+            v-else-if="!rowReadonly(row)"
             :model-value="row.itemName"
             size="small"
             @change="(val: string) => updateCell(row.rowId, 'itemName', val)"
           />
           <span v-else>{{ row.itemName }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 阶段 / 来源 / 配对（抽凭 / 挂凭写入的行；共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell
+            v-if="!row._isSubtotal && !row._isTotal && hasVoucherMeta(row)"
+            :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear"
+          />
         </template>
       </el-table-column>
 
@@ -184,7 +195,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.priorUnadjusted) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.priorUnadjusted"
             size="small"
             style="width:100%"
@@ -201,7 +212,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.priorAje) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.priorAje"
             size="small"
             style="width:100%"
@@ -218,7 +229,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.priorRje) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.priorRje"
             size="small"
             style="width:100%"
@@ -242,7 +253,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.ociImpairment) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.ociImpairment"
             size="small"
             style="width:100%"
@@ -259,7 +270,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.periodIncrease) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.periodIncrease"
             size="small"
             style="width:100%"
@@ -276,7 +287,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.periodDecrease) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.periodDecrease"
             size="small"
             style="width:100%"
@@ -300,7 +311,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.entityReclass) }}</span>
           </template>
           <el-input-number
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.entityReclass"
             :controls="false"
             size="small"
@@ -325,7 +336,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.endAje) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.endAje"
             size="small"
             style="width:100%"
@@ -342,7 +353,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.endRje) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.endRje"
             size="small"
             style="width:100%"
@@ -366,7 +377,7 @@
             <span class="subtotal-amount">{{ fmtAmount(row.endOciImpairment) }}</span>
           </template>
           <WpAmountInput
-            v-else-if="!isReadonly"
+            v-else-if="!rowReadonly(row)"
             :model-value="row.endOciImpairment"
             size="small"
             style="width:100%"
@@ -379,8 +390,8 @@
       <!-- Q: 备注 -->
       <el-table-column label="备注" min-width="120">
         <template #default="{ row }">
-          <el-input
-            v-if="!row._isSubtotal && !row._isTotal && !isReadonly"
+          <WpCommitInput
+            v-if="!row._isSubtotal && !row._isTotal && !rowReadonly(row)"
             :model-value="row.remark"
             size="small"
             @change="(val: string) => updateCell(row.rowId, 'remark', val)"
@@ -393,7 +404,7 @@
       <el-table-column label="操作" width="60" align="center" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="!row._isSubtotal && !row._isTotal && !isReadonly"
+            v-if="!row._isSubtotal && !row._isTotal && !rowReadonly(row)"
             type="danger"
             text
             size="small"
@@ -475,14 +486,13 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * Task: 14.1
  * Requirements: 4.1-4.9, 5.1-5.7, 10.9
  */
-import { ref, computed, inject, watch, toRef, type Ref } from 'vue'
+import { ref, computed, inject, watch, toRef, onMounted, type Ref } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
-import { useD5Detail, createEmptyRow, recalcRow } from '../composables/useD5Detail'
+import { useD5Detail } from '../composables/useD5Detail'
 import { useD5DetailColumnPrefs } from '../composables/useD5DetailColumnPrefs'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 import { useD5ImportExport } from '../composables/useD5ImportExport'
 import { useD5AiGenerate } from '../composables/useD5AiGenerate'
-import { parseNum } from '../composables/useD5FormulaEngine'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -492,6 +502,8 @@ import GtIndexChip from '../GtIndexChip.vue'
 // @ts-ignore
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
@@ -508,6 +520,7 @@ import {
 import { dSlotQueryCodes, pickDTbSourceCodes } from '../composables/dCycleAccountScope'
 import { ElMessage } from 'element-plus'
 import { dCycleScope } from '../composables/dCycleAccountScope'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = dCycleScope('D5')?.queryCodes().join(',') ?? ''
@@ -570,6 +583,13 @@ const {
   importFromD2,
   importFromAuxBalance,
   importPostRealizedFromLedger,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
+  hasVoucherMeta,
 } = useD5Detail({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
@@ -579,6 +599,12 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
 })
+onMounted(() => { void voucherFillReady() })
+
+/** 本行只读：整张底稿只读，或年审阶段的预审行 */
+function rowReadonly(row: unknown): boolean {
+  return props.isReadonly || isVoucherRowLocked(row as never)
+}
 
 // ─── 抽凭引擎 ───────────────────────────────────────────────────────────────
 
@@ -622,32 +648,22 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, D5_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/**
+ * 抽凭引擎回填：共享回填函数一个样本一行（类别应收票据、明细项目 = 对方科目、借方记本期增加 / 贷方记本期减少、
+ * 备注「抽凭: 凭证号」），按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const samples = payload?.samples
-  if (!Array.isArray(samples) || samples.length === 0) return
-
-  const imported = samples.map((s: any) => {
-    const row = createEmptyRow()
-    row.category = '应收票据'
-    row.itemName = s.counterpartAccountName || s.counterpartAccount || s.summary || ''
-    row.periodIncrease = parseNum(s.debitAmount)
-    row.periodDecrease = parseNum(s.creditAmount)
-    row.remark = `抽凭: ${s.voucherNo || ''}`
-    return recalcRow(row)
-  })
-
-  rows.value = [...rows.value, ...imported]
-  props.debouncedSave('D5-2-rows', { remark: JSON.stringify(rows.value) })
-  showSamplingDialog.value = false
+  void persistMethodology(payload?.methodology)
+  if (!Array.isArray(payload?.samples) || payload.samples.length === 0) return
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ─── 期后兑现取数 ────────────────────────────────────────────────────────────

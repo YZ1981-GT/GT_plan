@@ -2,7 +2,7 @@
  * useI3TargetedCheck — I3-5 商誉针对性检查表
  * 样本选取 + 凭证核对 1~5 + 检查比例（可联动 I3-2 本期发生额）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import {
   type I3TargetedCheckRow,
   type I3TargetedSampleMeta,
@@ -25,6 +25,11 @@ import {
   hasFailedCheck,
   I3_5_DEFAULT_COVERAGE_THRESHOLD,
 } from './i3TargetedCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillOutcome, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { hasTargetedCheckContent, preparedAsSample } from './assetVoucherFill'
 
 export {
   type I3TargetedCheckRow,
@@ -100,6 +105,9 @@ export function useI3TargetedCheck(
     /** I3 父组件契约：逐 item_id 持久化 */
     onSave?: (itemId: string, value: any) => void | Promise<void>
     asOfYear?: Ref<number | null> | (() => number | null)
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -121,7 +129,8 @@ export function useI3TargetedCheck(
 
   function load() {
     const map = getMap()
-    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(normalizeI3TargetedRow)
+    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(r => withRowMeta(normalizeI3TargetedRow(r), r))
+    voucherFill.markLoaded()
 
     sampleMeta.value = normalizeI3TargetedSampleMeta(_parseObject(map.get(STORAGE_SAMPLE)))
 
@@ -145,6 +154,42 @@ export function useI3TargetedCheck(
   function _strFromLegacy(raw: any, key: string): string {
     if (!raw || typeof raw !== 'object') return ''
     return raw[key] ? String(raw[key]) : ''
+  }
+
+  /** 待写入项 → I3-5 行（原映射函数，样本换成本行的对方科目与金额） */
+  function _rowFromPrepared(item: PreparedItem): I3TargetedCheckRow {
+    return mapSampledToI3TargetedRow(preparedAsSample(item))
+  }
+
+  /** 回填期间先不保存：回填后宿主还要记抽样说明，改完一并保存一次（`onEngineFilled`） */
+  let holdPersist = false
+  /**
+   * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（凭证检查表，一行一个对方科目）。改完整页保存
+   * （与「保存」同一次写入，先全部序列化再逐项存，见 persistAll）。原实现回填只改内存（I6-4 回填后才保存），
+   * 按「日期 + 凭证号」去重（同一凭证的其他分录被丢掉）
+   */
+  const voucherFill = useVoucherCheckFill<I3TargetedCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => (holdPersist ? undefined : persistAll()),
+    hasUserContent: hasTargetedCheckContent,
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
+
+  /** 抽凭引擎回填：`onFilled` 收到底稿实际填入的行数（宿主记抽样说明），之后整页保存一次 */
+  async function onEngineFilled(payload: EngineFilledPayload, onFilled?: (added: number) => void): Promise<FillOutcome> {
+    holdPersist = true
+    let out: FillOutcome
+    try {
+      out = await voucherFill.onEngineFilled(payload)
+    } finally {
+      holdPersist = false
+    }
+    if (out.cancelled) return out
+    onFilled?.(out.added)
+    await persistAll()
+    return out
   }
 
   watch(() => {
@@ -202,37 +247,17 @@ export function useI3TargetedCheck(
   }
 
   function removeRow(rowId: string) {
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    rows.value = rows.value.filter((r) => r.rowId !== rowId || voucherFill.isRowLocked(r))
   }
 
   function updateRow(rowId: string, field: keyof I3TargetedCheckRow, value: string | number | boolean) {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     if ((field === 'check1' || field === 'check2' || field === 'check3' || field === 'check4' || field === 'check5')
       && value === '×' && !isAbnormalFlag(row.isAbnormal)) {
       row.isAbnormal = '是'
     }
-  }
-
-  function fillFromSampledVouchers(samples: any[]): number {
-    if (!Array.isArray(samples) || !samples.length) return 0
-    const existing = new Set(
-      rows.value.map((r) => `${r.voucherDate}|${r.voucherNo}`).filter((k) => k !== '|'),
-    )
-    let n = 0
-    for (const s of samples) {
-      const mapped = mapSampledToI3TargetedRow(s)
-      const key = `${mapped.voucherDate}|${mapped.voucherNo}`
-      if (key !== '|' && existing.has(key)) continue
-      rows.value.push(mapped)
-      if (key !== '|') existing.add(key)
-      n++
-    }
-    if (n > 0 && !sampleMeta.value.sampleSize) {
-      sampleMeta.value.sampleSize = rows.value.length
-    }
-    return n
   }
 
   function setPopulationAmount(amount: number, manual: boolean) {
@@ -294,11 +319,16 @@ export function useI3TargetedCheck(
     if (!sampleMeta.value.sampleSize && rows.value.length) {
       sampleMeta.value.sampleSize = rows.value.length
     }
-    await options.onSave(STORAGE_ROWS, JSON.stringify(rows.value))
-    await options.onSave(STORAGE_SAMPLE, JSON.stringify(sampleMeta.value))
-    await options.onSave(STORAGE_RISK, JSON.stringify(riskFocus.value))
-    await options.onSave(STORAGE_NOTE, auditNote.value)
-    await options.onSave(STORAGE_CONCLUSION, auditConclusion.value)
+    // 先全部序列化再逐项保存：父组件每存一项就改 allResponses，本函数的 watch 随即整页重读 ——
+    // 原实现存完行再序列化抽样说明 / 风险关注，存进去的是重读出的旧值（未保存的修改丢失）
+    const items: Array<[string, string]> = [
+      [STORAGE_ROWS, JSON.stringify(voucherFill.guardPersist(rows.value))],
+      [STORAGE_SAMPLE, JSON.stringify(sampleMeta.value)],
+      [STORAGE_RISK, JSON.stringify(riskFocus.value)],
+      [STORAGE_NOTE, auditNote.value],
+      [STORAGE_CONCLUSION, auditConclusion.value],
+    ]
+    for (const [itemId, value] of items) await options.onSave(itemId, value)
   }
 
   async function saveNote(val: string) {
@@ -327,7 +357,6 @@ export function useI3TargetedCheck(
     addRow,
     removeRow,
     updateRow,
-    fillFromSampledVouchers,
     setPopulationAmount,
     syncPopulationFromI32,
     appendAdjDraftsToNote,
@@ -336,6 +365,12 @@ export function useI3TargetedCheck(
     saveNote,
     saveConclusion,
     load,
+    onEngineFilled,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

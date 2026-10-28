@@ -100,6 +100,9 @@ export const ledger = {
   sampleVoucher: (pid: string) => `/api/projects/${pid}/ledger/sample-voucher`,
   sampledVouchers: (pid: string) => `/api/projects/${pid}/ledger/sampled-vouchers`,
   sampledVoucherDelete: (pid: string, id: string) => `/api/projects/${pid}/ledger/sampled-vouchers/${encodeURIComponent(id)}`,
+  // 一张凭证挂多张底稿（逐条返回）与已挂 / 已抽标识（凭证键 → 底稿）
+  sampleVouchersBatch: (pid: string) => `/api/projects/${pid}/ledger/sample-vouchers/batch`,
+  voucherLinksQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-links/query`,
   years: (pid: string) => `/api/projects/${pid}/ledger/years`,
   validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
   smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,

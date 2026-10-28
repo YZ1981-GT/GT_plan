@@ -98,9 +98,15 @@
       size="small"
       style="width: 100%"
       empty-text="暂无其他收益检查项目"
-      :row-class-name="incomeCheckRowClass"
+      :row-class-name="incomeCheckRowClassName"
       class="check-table"
     >
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="checks.isVoucherRowLocked(row)" :project-id="props.projectId" :year="currentYear" />
+        </template>
+      </el-table-column>
       <el-table-column prop="checkItem" label="检查项目" min-width="140">
         <template #default="{ row }">
           <span class="project-name">{{ row.checkItem || '—' }}</span>
@@ -191,7 +197,7 @@
 
       <el-table-column label="备注" min-width="140">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="!props.isReadonly && row.isEditable"
             :model-value="row.remark"
             size="small"
@@ -289,7 +295,7 @@
     <!-- ═══ 抽凭引擎Dialog（科目 6117，wrap el-dialog + @filled 范式，对齐 K4/K8/G6） ═══ -->
     <el-dialog
       v-model="voucherDialogVisible"
-      title="⚡ 抽凭引擎（科目 6117 其他收益）"
+      :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 其他收益）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -299,9 +305,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleSampleFilled"
+        @undo-request="checks.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -329,6 +335,9 @@ import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Tickets, Download } from '@element-plus/icons-vue'
 import { useK10Checks, deriveOverallStatus, type CheckStatus } from '../../composables/useK10Checks'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 /**
  * 科目码单一真源（原硬编码 `"6117"`）。
  *
@@ -421,6 +430,8 @@ function incomeCheckRowClass({ row }: { row: any }): string {
   if (row.overallStatus === '不合规') return 'non-compliant-row'
   return ''
 }
+/** 不合规行样式 + 年审阶段预审行只读样式 */
+const incomeCheckRowClassName = combineRowClass(incomeCheckRowClass, checks.voucherRowClass)
 
 /** ① 从 K10-2 明细带入检查项 */
 function handleImportFromDetail(): void {
@@ -501,30 +512,12 @@ function handleVoucherSampling(): void {
 }
 
 /**
- * 抽凭引擎 @filled 回调（payload: { samples, phase, fillMode, method }）。
- * K10-6 抽凭为整表级（工具栏按钮），选样后将凭证号回填到第一检查行的备注；
- * 若尚无检查行则提示用户先新增检查项。
+ * 抽凭引擎 @filled 回调：K10-6 抽凭为整表级（工具栏按钮），每笔样本生成一条检查行（检查金额计入覆盖率）。
  */
-function handleSampleFilled(payload: { samples?: any[] } | any): void {
-  voucherDialogVisible.value = false
-  const samples: any[] = payload?.samples ?? []
-  if (samples.length === 0) return
-  // ② 每笔抽样凭证生成一条检查行（贡献覆盖率），checkItem=业务内容/对方，checkAmount=贷方(收益增加)
-  let created = 0
-  for (const s of samples) {
-    const ref = s.voucherNo || s.voucher_no || s.ref || ''
-    const summary = s.summary || s.business || s.abstract || s.counterpartAccount || s.counterparty || ''
-    const amount = Number(s.creditAmount ?? s.credit_amount ?? s.amount ?? s.debitAmount ?? 0)
-    const checkItem = summary || (ref ? `凭证 ${ref}` : `抽样凭证`)
-    checks.addIncomeCheckRowFull({
-      checkItem,
-      checkAmount: Math.abs(amount),
-      classification: '其他收益',
-      remark: ref ? `抽凭：${ref}` : '',
-    })
-    created++
-  }
-  ElMessage.success(`已选取 ${created} 笔凭证并生成检查行（计入覆盖率）`)
+async function handleSampleFilled(payload: EngineFilledPayload): Promise<void> {
+  // 共享回填函数：一笔样本一条检查行（贡献覆盖率），按分录指纹去重（原实现不去重），填完由它保存并提示填入几行
+  const out = await checks.onEngineFilled(payload)
+  if (!out.cancelled) voucherDialogVisible.value = false
 }
 
 // ─── 检查说明 + AI ───────────────────────────────────────────────────────────
@@ -568,6 +561,7 @@ async function handleAI(): Promise<void> {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
+  void checks.voucherFillReady()
   checks.initFromResponses()
   loadNote()
 })

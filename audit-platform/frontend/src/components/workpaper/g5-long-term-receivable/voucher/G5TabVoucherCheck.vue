@@ -152,8 +152,14 @@
       </template>
       <p class="check-desc">测试内容：{{ checkLabels.map((l, i) => `${i + 1}.${l}`).join('；') }}</p>
       <el-table :data="occurrenceRows" border size="small" :max-height="380" class="voucher-table"
-        :row-class-name="abnormalRowClass">
+        :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" fixed />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="auditYear" />
+          </template>
+        </el-table-column>
         <el-table-column label="日期" width="118">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" />
@@ -262,8 +268,14 @@
         </div>
       </template>
       <el-table :data="postPeriodRows" border size="small" :max-height="300" class="voucher-table"
-        :row-class-name="abnormalRowClass">
+        :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" fixed />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="auditYear" />
+          </template>
+        </el-table-column>
         <el-table-column label="日期" width="118">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" />
@@ -413,11 +425,11 @@
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
         :account-code="G5_SAMPLING_ACCOUNT_CODE"
-        :phase="samplingTarget === 'occurrence' ? 'current' : 'post'"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="auditYear"
         @filled="onSamplesFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -481,6 +493,8 @@ import { createEmptyEntry } from '../../composables/useG5Adjustment'
 import { G5_ITEM_IDS, readCanonicalRaw } from '../../composables/g5StorageContract'
 import { parseRowsRemark } from '../../composables/g5CrossHelpers'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { ElMessage } from 'element-plus'
@@ -525,8 +539,15 @@ const {
   checkRatios, lowRatioWarnings, abnormalRows,
   occurrenceDebitChecked, occurrenceCreditChecked, postDebitChecked, postCreditChecked,
   loadFromMap, addOccurrenceRow, addPostPeriodRow, removeOccurrenceRow, removePostPeriodRow,
-  fillFromSamples, applyConclusionTemplate, applyFromBalanceRows, buildAbnormalAdjDrafts, serialize,
-} = useG5VoucherCheck({ allResponses: g5Notes.allResponses as any })
+  applyConclusionTemplate, applyFromBalanceRows, buildAbnormalAdjDrafts, serialize,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
+} = useG5VoucherCheck({
+  allResponses: g5Notes.allResponses as any,
+  projectId: () => props.projectId,
+  readonly: () => isReadonly.value,
+  persist: () => persist(),
+  periodEnd: () => `${auditYear.value}-12-31`,
+})
 
 const G5_4_KEY = 'G5-4-rows'
 const PUSH_MARK = '来自G5-12凭证检查'
@@ -536,6 +557,7 @@ const samplingTarget = ref<'occurrence' | 'post'>('occurrence')
 const showSamplingGuide = ref(false)
 
 onMounted(async () => {
+  void voucherFillReady()
   try { await g5Notes.loadAll() } catch { /* ignore */ }
   loadFromMap(g5Notes.allResponses.value)
 })
@@ -615,19 +637,21 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, auditYear.value, props.wpId, G5_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }): void {
+/**
+ * 抽凭引擎回填进所选的表（samplingTarget：本期发生额 / 期后，宿主自己的状态，不再经引擎的 phase 传）：
+ * 共享回填函数一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行。
+ */
+async function onSamplesFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  fillFromSamples(samplingTarget.value, payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
+  void persistMethodology(payload?.methodology)
+  const out = await onEngineFilled(payload, samplingTarget.value)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 function onConclusionOption(val: string): void {
@@ -696,6 +720,8 @@ function fmtAmt(val: number | null | undefined): string {
 function abnormalRowClass({ row }: { row: G5VoucherRow }): string {
   return row.abnormal ? 'abnormal-row' : ''
 }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(abnormalRowClass, voucherRowClass)
 </script>
 
 <style scoped>

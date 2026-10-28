@@ -5,11 +5,18 @@
  * 目标 → 样本选取 → 本期发生额(借方利息确认) / 期后回笼(贷方) → 五项核对 → 检查比例 → 说明/结论 A/B/C
  *
  * 借方保留利息测算：测算利息 = 面值 × 利率/100 × 天数/365；差异 = 测算 − 凭证金额
+ *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：借方区、贷方区各算一张表，
+ * 分录按借贷栏进区（沿用原规则），一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库
+ * （spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcInterest365, calcOverdueDays } from './useG2IntRecFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
-import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
+import {
+  counterpartText, legacyIdentity, metaOf, sideTableOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 import { G2_ITEM_IDS } from './g2StorageContract'
 
 /** Excel 红色测试提示 1–5（应收利息） */
@@ -139,6 +146,11 @@ export interface CreditCheckTotals {
   amount: number
   overdueCount: number
 }
+
+/** 凭证检查的两个区：借方（利息确认）、贷方（期后回笼） */
+export type G2VoucherZone = 'debit' | 'credit'
+/** 两个区的落库行（共享回填函数按区各算一张表） */
+export type G2StoredVoucherRow = StoredDebitCheckRow | StoredCreditCheckRow
 
 const DEBIT_STORAGE_KEY = 'G2-8-debit-check-rows'
 const CREDIT_STORAGE_KEY = 'G2-8-credit-check-rows'
@@ -279,6 +291,57 @@ function createEmptyCreditRow(seq: number): StoredCreditCheckRow {
   }
 }
 
+/**
+ * 共享回填函数的待写入项进哪个区：按分录自己的借贷栏（`sideTableOf`）——贷方红字进贷方区、带符号照记，借贷栏不明
+ * 进借方区。原规则（贷方有正数才进贷方）把贷方红字写成借方负数；真库 G2-8 两区 0 行旧数据，改规则不产生重复
+ */
+export function g2ZoneOf(item: Pick<PreparedItem, 'debitAmount' | 'creditAmount'>): G2VoucherZone {
+  return sideTableOf(item)
+}
+
+/** 共享回填函数的待写入项 → 借方区 / 贷方区的检查行：金额取样本自己那一栏，对方科目取后端配对（配不上写「多科目」） */
+export function mapPreparedToG2Row(item: PreparedItem, zone: G2VoucherZone, seq: number): G2StoredVoucherRow {
+  const s = item.sample as PreparedItem['sample'] & {
+    summary?: string | null; abnormal?: boolean; remark?: string | null; selectionReason?: string | null
+  }
+  const common = {
+    summary: s.summary || '',
+    voucherDate: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    counterAccount: counterpartText(item),
+    source: `${item.meta.src.includes('attach') ? '挂凭' : '抽凭'}${s.selectionReason ? ` · ${s.selectionReason}` : ''}`,
+    isAbnormal: !!s.abnormal,
+    abnormalDesc: s.abnormal ? (s.remark || '抽凭标记异常') : '',
+    remark: s.remark || '',
+  }
+  if (zone === 'credit') return { ...createEmptyCreditRow(seq), ...common, amount: parseNum(item.creditAmount) }
+  return { ...createEmptyDebitRow(seq), ...common, amount: parseNum(item.debitAmount) || parseNum(item.creditAmount) }
+}
+
+/** 行上已填核对结果、支持性文件、索引、审计结论或测算 / 回笼信息（替换与撤销抽凭时据此先确认） */
+export function hasG2VoucherContent(r: G2StoredVoucherRow): boolean {
+  if (G2_VOUCHER_CHECK_ITEMS.some((c) => r[c.key] !== null)) return true
+  const texts: unknown[] = [r.supportingDocs, r.indexRef, r.auditConclusion]
+  if ('investTarget' in r) texts.push(r.investTarget)
+  if ('receivingBank' in r) texts.push(r.receivingBank, r.receiptDate, r.isOnTimeRecovery)
+  if (texts.some((v) => String(v ?? '').trim() !== '')) return true
+  return 'faceValue' in r && [r.faceValue, r.rate, r.accruedDays].some((n) => Number(n) !== 0)
+}
+
+/** 导入的行（Excel 不带 `_gt`）沿用导入前同一分录行的 `_gt`：凭证号 + 日期 + 金额相同即同一分录，每行旧行只用一次 */
+function carryRowMeta<T extends object>(rows: T[], before: readonly object[]): T[] {
+  const pool = new Map<string, object[]>()
+  for (const b of before) {
+    const key = metaOf(b) ? legacyIdentity(b) : null
+    if (key) pool.set(key, [...(pool.get(key) ?? []), b])
+  }
+  return rows.map((r) => {
+    const key = metaOf(r) ? null : legacyIdentity(r)
+    const hit = key ? pool.get(key)?.shift() : undefined
+    return hit ? withRowMeta(r, hit) : r
+  })
+}
+
 /** 检查比例 = 样本金额合计 / 总体金额；总体为 0 返回 null */
 export function calcInspectionRatio(sampleAmount: number, populationAmount: number): number | null {
   if (!populationAmount || populationAmount === 0) return null
@@ -349,8 +412,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
   })
 
   function persistDebitRows(rows: StoredDebitCheckRow[]): void {
-    const json = JSON.stringify(rows)
-    allResponses.value.set(DEBIT_STORAGE_KEY, { item_id: DEBIT_STORAGE_KEY, conclusion: null, remark: json })
+    writeZone('debit', rows)
     persistFlatExport()
     debounceSave()
   }
@@ -366,6 +428,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
   function removeDebitRow(id: string): void {
     if (readonly.value) return
     const current = safeParseDebitRows(allResponses.value.get(DEBIT_STORAGE_KEY)?.remark)
+    if (current.some((r) => r.id === id && voucherFill.isRowLocked(r))) return
     const filtered = current.filter((r) => r.id !== id)
     filtered.forEach((r, i) => { r.seq = i + 1 })
     persistDebitRows(filtered)
@@ -375,7 +438,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     if (readonly.value) return
     const current = safeParseDebitRows(allResponses.value.get(DEBIT_STORAGE_KEY)?.remark)
     const idx = current.findIndex((r) => r.id === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(current[idx])) return
     const numericFields = ['amount', 'faceValue', 'rate', 'accruedDays'] as const
     if ((numericFields as readonly string[]).includes(field as string)) {
       ;(current[idx] as any)[field] = typeof value === 'number' ? value : parseNum(value)
@@ -426,9 +489,46 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     }
   })
 
+  // ─── 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数 ─────────────
+
+  /** 一个区算一张表：读即该区的行 JSON，写即写回该区（保存由 persist 统一做） */
+  const zoneTable = (zone: G2VoucherZone, stored: () => G2StoredVoucherRow[]) => computed<G2StoredVoucherRow[]>({
+    get: stored,
+    set: (list) => writeZone(zone, list),
+  })
+  const voucherFill = useVoucherCheckFill<G2StoredVoucherRow>({
+    projectId: () => options.projectId.value,
+    // 一次抽凭两区都填：「替换本阶段抽凭行」两区都动
+    tables: {
+      debit: zoneTable('debit', () => storedDebitRows.value),
+      credit: zoneTable('credit', () => storedCreditRows.value),
+    },
+    // 进区是分录借贷栏的纯函数：同一分录总进同一区
+    tableOf: (item) => g2ZoneOf(item),
+    mapSampleToRow: (item, zone) => mapPreparedToG2Row(item, zone as G2VoucherZone, 0),
+    persist: () => {
+      persistFlatExport()
+      debounceSave()
+    },
+    hasUserContent: hasG2VoucherContent,
+    readonly: () => readonly.value,
+  })
+  // 两区的 JSON 读入 / 被导入改写后，记预审行读入版本（年审阶段保存时据此写回）
+  watch(
+    [() => allResponses.value.get(DEBIT_STORAGE_KEY)?.remark, () => allResponses.value.get(CREDIT_STORAGE_KEY)?.remark],
+    () => voucherFill.markLoaded(),
+    { immediate: true },
+  )
+
+  /** 写一个区的行 JSON：年审阶段预审行按读入版本写回（删了的补在末尾），序号按写回后的顺序重排 */
+  function writeZone(zone: G2VoucherZone, rows: G2StoredVoucherRow[]): void {
+    const key = zone === 'credit' ? CREDIT_STORAGE_KEY : DEBIT_STORAGE_KEY
+    const guarded = voucherFill.guardPersist(rows, zone).map((r, i) => ({ ...r, seq: i + 1 }))
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark: JSON.stringify(guarded) })
+  }
+
   function persistCreditRows(rows: StoredCreditCheckRow[]): void {
-    const json = JSON.stringify(rows)
-    allResponses.value.set(CREDIT_STORAGE_KEY, { item_id: CREDIT_STORAGE_KEY, conclusion: null, remark: json })
+    writeZone('credit', rows)
     persistFlatExport()
     debounceSave()
   }
@@ -444,6 +544,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
   function removeCreditRow(id: string): void {
     if (readonly.value) return
     const current = safeParseCreditRows(allResponses.value.get(CREDIT_STORAGE_KEY)?.remark)
+    if (current.some((r) => r.id === id && voucherFill.isRowLocked(r))) return
     const filtered = current.filter((r) => r.id !== id)
     filtered.forEach((r, i) => { r.seq = i + 1 })
     persistCreditRows(filtered)
@@ -453,7 +554,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     if (readonly.value) return
     const current = safeParseCreditRows(allResponses.value.get(CREDIT_STORAGE_KEY)?.remark)
     const idx = current.findIndex((r) => r.id === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(current[idx])) return
     if (field === 'amount') {
       current[idx].amount = typeof value === 'number' ? value : parseNum(value)
     } else {
@@ -566,7 +667,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     const debit = safeParseDebitRows(allResponses.value.get(DEBIT_STORAGE_KEY)?.remark)
     for (const r of debit) {
       const row = computeDebitRow(r)
-      if (!row.isAbnormal) continue
+      if (!row.isAbnormal || voucherFill.isRowLocked(r)) continue
       if (!force && r.indexRef) continue
       r.indexRef = G2_ABNORMAL_INDEX_DEFAULT
       n++
@@ -577,7 +678,7 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     const credit = safeParseCreditRows(allResponses.value.get(CREDIT_STORAGE_KEY)?.remark)
     for (const r of credit) {
       const row = computeCreditRow(r)
-      if (!row.isAbnormal) continue
+      if (!row.isAbnormal || voucherFill.isRowLocked(r)) continue
       if (!force && r.indexRef) continue
       r.indexRef = G2_ABNORMAL_INDEX_DEFAULT
       m++
@@ -586,43 +687,17 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     return n + m
   }
 
-  /** 抽凭引擎样本按借贷方向分配 */
-  function applySamplingResults(samples: SampledVoucher[], fillMode: FillMode = 'append'): void {
-    if (readonly.value) return
-    const debitSamples: Partial<StoredDebitCheckRow>[] = []
-    const creditSamples: Partial<StoredCreditCheckRow>[] = []
-    for (const s of samples) {
-      const debitAmt = parseNum(s.debitAmount)
-      const creditAmt = parseNum(s.creditAmount)
-      const common = {
-        summary: s.summary || '',
-        voucherDate: s.voucherDate || '',
-        voucherNo: s.voucherNo || '',
-        source: `抽凭${s.selectionReason ? ` · ${s.selectionReason}` : ''}`,
-        isAbnormal: !!s.abnormal,
-        abnormalDesc: s.abnormal ? (s.remark || '抽凭标记异常') : '',
-        remark: s.remark || '',
-      }
-      if (creditAmt > 0 && debitAmt <= 0) {
-        creditSamples.push({
-          ...common,
-          amount: creditAmt,
-          counterAccount: s.counterpartAccount || '',
-        })
-      } else {
-        debitSamples.push({
-          ...common,
-          amount: debitAmt || creditAmt,
-          counterAccount: s.counterpartAccount || '',
-        })
-      }
-    }
-    if (fillMode === 'replace') {
-      persistDebitRows([])
-      persistCreditRows([])
-    }
-    if (debitSamples.length) insertDebitSamples(debitSamples)
-    if (creditSamples.length) insertCreditSamples(creditSamples)
+  /**
+   * 抽凭引擎回填：分录按自己所在的借贷栏进区，一个对方科目一行，按分录指纹去重；
+   * 「替换本阶段抽凭行」两区都只删本阶段抽凭填入的行（原实现两区整表清空）
+   */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload)
+  }
+
+  /** 从序时账挂入导入：幂等追加，与抽凭命中同一分录只留一行 */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples)
   }
 
   // ─── Persist batch ─────────────────────────────────────────────────────────
@@ -766,16 +841,10 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
       }
       debit.forEach((r, i) => { r.seq = i + 1 })
       credit.forEach((r, i) => { r.seq = i + 1 })
-      allResponses.value.set(DEBIT_STORAGE_KEY, {
-        item_id: DEBIT_STORAGE_KEY,
-        conclusion: null,
-        remark: JSON.stringify(debit),
-      })
-      allResponses.value.set(CREDIT_STORAGE_KEY, {
-        item_id: CREDIT_STORAGE_KEY,
-        conclusion: null,
-        remark: JSON.stringify(credit),
-      })
+      // Excel 不带行元数据 `_gt`：凭证号 + 日期 + 金额与导入前同一区的行相同的沿用那行的；
+      // 年审阶段预审行按读入版本写回（导入改了的改回、删了的补回）
+      writeZone('debit', carryRowMeta(debit, storedDebitRows.value))
+      writeZone('credit', carryRowMeta(credit, storedCreditRows.value))
       allResponses.value.set(FLAT_STORAGE_KEY, {
         item_id: FLAT_STORAGE_KEY,
         conclusion: null,
@@ -846,7 +915,13 @@ export function useG2VoucherCheck(options: UseG2VoucherCheckOptions) {
     updateCreditCell,
     setCreditCheck,
     insertCreditSamples,
-    applySamplingResults,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     hydrateFromFlat,
     persistFlatExport,
     FLAT_STORAGE_KEY,

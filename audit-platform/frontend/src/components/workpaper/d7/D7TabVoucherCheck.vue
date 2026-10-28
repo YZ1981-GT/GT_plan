@@ -130,6 +130,7 @@
       <h4 class="card-title">(1) 本期增减变动检查</h4>
       <el-button v-if="!isReadonly" size="small" style="margin-bottom:8px" @click="addSample('period')">添加样本</el-button>
       <D7VoucherCheckTable :rows="periodChangeRows" block="period" :is-readonly="isReadonly" :project-id="projectId"
+        :year="samplingYear" :row-class-name="voucherRowClass" :is-row-locked="isVoucherRowLocked"
         @update="(rowId: string, field: string, v: unknown) => updateCell('period', rowId, field, v)"
         @toggle="(rowId: string, idx: number, v: boolean) => toggleCheck('period', rowId, idx, v)"
         @remove="(rowId: string) => removeSample('period', rowId)" />
@@ -140,6 +141,7 @@
       <h4 class="card-title">(2) 期后结转检查</h4>
       <el-button v-if="!isReadonly" size="small" style="margin-bottom:8px" @click="addSample('post')">添加样本</el-button>
       <D7VoucherCheckTable :rows="postTransferRows" block="post" :is-readonly="isReadonly" :project-id="projectId"
+        :year="samplingYear" :row-class-name="voucherRowClass" :is-row-locked="isVoucherRowLocked"
         @update="(rowId: string, field: string, v: unknown) => updateCell('post', rowId, field, v)"
         @toggle="(rowId: string, idx: number, v: boolean) => toggleCheck('post', rowId, idx, v)"
         @remove="(rowId: string) => removeSample('post', rowId)" />
@@ -208,11 +210,11 @@
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 </div>
@@ -225,7 +227,7 @@
  * Task: 22.1
  * Requirements: 12.1-12.9, 18.5, 19.4, 20.1, 21.1-21.3
  */
-import { computed, inject, ref, toRef, defineAsyncComponent, type Ref } from 'vue'
+import { computed, inject, ref, toRef, defineAsyncComponent, onMounted, type Ref } from 'vue'
 import { useD7VoucherCheck } from '../composables/useD7VoucherCheck'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -239,6 +241,7 @@ import D7VoucherCheckTable from './D7VoucherCheckTable.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 
 /**
  * 抽凭科目码取自单一真源 `dCycleAccountScope`（D7 合同负债）。
@@ -293,13 +296,18 @@ const {
   samplingParams, periodChangeRows, postTransferRows,
   checkedCount, abnormalCount, abnormalRate,
   addSample, removeSample, updateCell, auditNotes,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
 } = useD7VoucherCheck({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+  isReadonly: () => props.isReadonly,
+  // 挂凭导入按凭证日期分区：晚于资产负债表日进期后结转
+  bsDate: () => (props.year ? `${props.year}-12-31` : null),
 })
+onMounted(() => { void voucherFillReady() })
 
 const CONCLUSION_TEMPLATES = [
   { value: 'no-issue', label: '经抽查，所选样本凭证与合同/收款记录一致，合同负债增减变动真实准确。' },
@@ -350,54 +358,22 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, D7_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any): void {
+/**
+ * 抽凭引擎回填：共享回填函数写进本期增减变动（已在期后结转的分录不重复插入），按分录指纹去重；
+ * 对方科目只按后端配对结果（配不上的整张凭证标「多科目」），客户名称取辅助明细账往来单位。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const samples = payload?.samples
-  if (!Array.isArray(samples) || samples.length === 0) return
-  // Map SampledVoucher → period change rows
-  for (const s of samples) {
-    const entries = s.voucherEntries || []
-    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
-    if (isMulti) {
-      const sDebit = Number(s.debitAmount ?? 0)
-      const counterEntries = entries.filter((e: any) =>
-        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-      )
-      const toWrite = counterEntries.length > 0 ? counterEntries : entries
-      for (const e of toWrite) {
-        addSample('period')
-        const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
-        if (newRow) {
-          updateCell('period', newRow.rowId, 'customerName', e.account_code || '')
-          updateCell('period', newRow.rowId, 'counterAccountName', e.account_name || '')
-          updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
-          updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
-          updateCell('period', newRow.rowId, 'debitAmount', Number(e.debit_amount) || 0)
-          updateCell('period', newRow.rowId, 'creditAmount', Number(e.credit_amount) || 0)
-        }
-      }
-    } else {
-      addSample('period')
-      const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
-      if (newRow) {
-        updateCell('period', newRow.rowId, 'customerName', s.counterpartAccount || '')
-        updateCell('period', newRow.rowId, 'counterAccountName', s.counterpartAccountName || '')
-        updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
-        updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
-        updateCell('period', newRow.rowId, 'debitAmount', s.debitAmount || 0)
-        updateCell('period', newRow.rowId, 'creditAmount', s.creditAmount || 0)
-      }
-    }
-  }
-  samplingVisible.value = false
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) return
+  const out = await onEngineFilled(payload, { tables: ['period'] })
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 function onConclusionTemplateSelect(val: string) {

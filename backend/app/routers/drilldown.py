@@ -124,16 +124,18 @@ async def get_voucher_detail(
     month: int | None = Query(None, ge=1, le=12, description="凭证月份（1~12）；粗粒度，同月内仍可能多张同号凭证"),
     voucher_date: str | None = Query(None, description="凭证日期 YYYY-MM-DD；与凭证号组合唯一定位一张凭证（推荐）"),
     voucher_type: str | None = Query(None, description="凭证字；空串 = 凭证字为空。同日同号多凭证字时必传"),
+    company_code: str | None = Query(None, description="主体编码；一套账两个主体同日同号同凭证字时必传，不给 = 不限"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
-    """一张凭证的完整分录（借贷明细 + 合计 + 平衡状态），凭证键 = 日期 + 凭证字 + 号。
+    """一张凭证的完整分录（借贷明细 + 合计 + 平衡状态），凭证键 = 主体 + 日期 + 凭证字 + 号。
 
     只给号（或日期 + 号）却命中多张凭证时返回 409 VOUCHER_KEY_AMBIGUOUS + 候选，不合并分录。
     """
     svc = DrilldownService(db)
     return await svc.get_voucher_detail(
         project_id, year, voucher_no, month=month, voucher_date=voucher_date, voucher_type=voucher_type,
+        company_code=company_code,
     )
 
 

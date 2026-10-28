@@ -30,6 +30,7 @@ export function normalizeWidth(text: string): string {
 /** 值本身的小数位（最多 10 位，去掉浮点尾差）。 */
 function ownDecimals(n: number): number {
   if (!Number.isFinite(n) || Number.isInteger(n)) return 0
+  // eslint-disable-next-line gt-audit/no-amount-toFixed -- 只数小数位（定显示位数用），不产出显示文本
   const s = n.toFixed(10).replace(/0+$/, '')
   const dot = s.indexOf('.')
   return dot < 0 ? 0 : s.length - dot - 1

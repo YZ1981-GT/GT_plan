@@ -55,8 +55,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.continuous_audit import router as continuous_audit_router
     from app.routers.ledger_datasets import router as ledger_datasets_router
     from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
+    # 项目当前审计阶段与预审截止日（凭证身份 spec 任务 8）
+    from app.routers.project_audit_phase import router as project_audit_phase_router
 
-    for r in [batch_project_router, project_wizard_router, account_chart_router,
+    for r in [batch_project_router, project_wizard_router, project_audit_phase_router, account_chart_router,
               mapping_router, rlm_router, data_import_router, data_lifecycle_router,
               continuous_audit_router, ledger_datasets_router,
               dataset_force_unbind_router]:

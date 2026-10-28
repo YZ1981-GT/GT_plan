@@ -25,6 +25,11 @@ import {
   normalizeDisposalMethod,
 } from './h4DisposalCheckModel'
 import { H45_AJE_MARKER, pushDraftPairsToH43 } from './h4AdjustmentDraftPush'
+import {
+  counterpartText, metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, fillIntoSelectedRow, sampleOf } from './assetVoucherFill'
 
 export type {
   H4DisposalCheckRow,
@@ -55,11 +60,47 @@ const CONCLUSION_KEY = 'H4-5-conclusion'
 const DETAIL_ROWS_KEY = 'H4-2-rows'
 const POP_MANUAL_KEY = 'H4-5-population-manual'
 
+/**
+ * 共享回填函数的待写入项 → H4-5 行（spec voucher-identity-writeback-and-audit-phase 任务 12）：凭证号、减少日期、
+ * 对方科目（编码 名称，按后端配对，配不上「多科目」）、原值（样本自己那一栏的金额，减少在贷方，红字带符号照记），
+ * 名称缺省取摘要。原实现名称取本科目名称（每行都是「工程物资」）、原值取绝对值、不写对方科目与日期，
+ * 逐行抽凭还把摘要写进支持性文件。keepFilled：逐行抽凭写进已有行时，已填的名称 / 备注保留。
+ */
+export function applyDisposalSample(row: H4DisposalCheckRow, item: PreparedItem, keepFilled = false): void {
+  const s = sampleOf(item)
+  row.voucherNo = String(s.voucherNo ?? '')
+  row.disposalDate = String(s.voucherDate ?? '')
+  row.oppositeAccount = counterpartText(item)
+  row.originalCost = assetAmount(item, 'credit')
+  row.amount = row.originalCost
+  row.voucherResult = '已抽凭'
+  if (s.abnormal === true) row.isAbnormal = '是'
+  const summary = String(s.summary ?? '').trim()
+  if (!(keepFilled && row.name.trim())) row.name = (summary || '抽凭样本').slice(0, 40)
+  const reason = String(s.selectionReason ?? s.remark ?? '').trim()
+  if (reason && !(keepFilled && row.remark.trim())) row.remark = reason
+  recalcDisposalRow(row)
+}
+
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：减少方式、支持性文件、领料与 H2 编号、核对勾选、清理收支等 */
+export function hasH4DisposalContent(r: H4DisposalCheckRow): boolean {
+  return [r.category, r.disposalMethod, r.supportingDocs, r.pickingNo, r.department, r.projectName, r.approver,
+    r.h2Ref, r.indexRef, r.conclusion, r.relatedPartyName, r.relationship].some(v => String(v ?? '').trim() !== '')
+    || Object.values(r.checks ?? {}).some(Boolean)
+    || [r.quantity, r.impairment, r.disposalCost, r.disposalIncome].some(v => Number(v) !== 0)
+    || r.isRelatedParty === '是'
+}
+
+/** 旧行（没有 `_gt`）身份：凭证号 + 原值（原实现回填不写减少日期、原值取绝对值） */
+const disposalLegacy = (r: H4DisposalCheckRow) => assetLegacyKey(r.voucherNo, '', r.originalCost)
+
 export function useH4DisposalCheck(params: {
   wpId: Ref<string>
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
+  /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+  isReadonly?: Ref<boolean>
 }) {
   const { allResponses, onSave } = params
 
@@ -96,8 +137,9 @@ export function useH4DisposalCheck(params: {
   function load(): void {
     const data = _getJson(ROWS_KEY)
     rows.value = Array.isArray(data) && data.length > 0
-      ? data.map((r, i) => normalizeDisposalRow(r, i))
+      ? data.map((r, i) => withRowMeta(normalizeDisposalRow(r, i), r))
       : []
+    voucherFill.markLoaded()
 
     const sp = _getJson(PARAMS_KEY)
     samplingParams.value = normalizeSamplingParams(sp)
@@ -108,6 +150,23 @@ export function useH4DisposalCheck(params: {
     auditNote.value = _getString(NOTE_KEY)
     auditConclusion.value = _getString(CONCLUSION_KEY)
   }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行，对方科目按配对拼接）
+  const voucherFill = useVoucherCheckFill<H4DisposalCheckRow>({
+    projectId: () => params.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: (item) => {
+      const row = normalizeDisposalRow({ seq: 0 }, 0)
+      applyDisposalSample(row, item)
+      return row
+    },
+    persist: () => _persistRows(),
+    hasUserContent: hasH4DisposalContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    legacy: disposalLegacy,
+    readonly: () => params.isReadonly?.value === true,
+  })
 
   watch(allResponses, () => load(), { immediate: true })
 
@@ -135,9 +194,9 @@ export function useH4DisposalCheck(params: {
 
   function _persistRows(): void {
     if (!onSave) return
-    const toPersist = rows.value.map(r => {
+    const toPersist = voucherFill.guardPersist(rows.value).map(r => {
       recalcDisposalRow(r)
-      return {
+      return withRowMeta({
         rowId: r.rowId,
         seq: r.seq,
         category: r.category,
@@ -177,7 +236,7 @@ export function useH4DisposalCheck(params: {
         relatedPartyName: r.relatedPartyName,
         relationship: r.relationship,
         voucherResult: r.voucherResult,
-      }
+      }, r)
     })
     onSave(ROWS_KEY, toPersist)
     onSave(DISPOSAL_TOTAL_KEY, disposalTotal.value)
@@ -196,7 +255,7 @@ export function useH4DisposalCheck(params: {
 
   function deleteRow(rowId: string): void {
     const idx = rows.value.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(rows.value[idx])) return
     rows.value.splice(idx, 1)
     rows.value.forEach((r, i) => { r.seq = i + 1 })
     _persistRows()
@@ -204,7 +263,7 @@ export function useH4DisposalCheck(params: {
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
 
     if (field.startsWith('checks.')) {
       const key = field.split('.')[1] as keyof typeof row.checks
@@ -329,10 +388,31 @@ export function useH4DisposalCheck(params: {
     })
   }
 
+  /** 行样式：缺 H2 编号 / 异常 / 核对未完 + 年审阶段预审行只读 */
   function rowClassName({ row }: { row: H4DisposalCheckRow }): string {
-    if (needsH2Ref(row) || row.isAbnormal === '是' || row.isAbnormal === 'Y') return 'row-anomaly'
-    if (isCheckIncompleteSafe(row)) return 'row-warn'
-    return ''
+    const flag = needsH2Ref(row) || row.isAbnormal === '是' || row.isAbnormal === 'Y'
+      ? 'row-anomaly' : (isCheckIncompleteSafe(row) ? 'row-warn' : '')
+    return [flag, voucherFill.rowClass({ row })].filter(Boolean).join(' ')
+  }
+
+  /** 抽凭引擎回填（整表）：一个样本一行，按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行 */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload)
+  }
+
+  /** 逐行抽凭（「抽凭」列）：第一笔写进所选行（已填的名称 / 备注保留），其余样本并入（assetVoucherFill） */
+  function onEngineFilledIntoRow(payload: EngineFilledPayload, rowId: string) {
+    return fillIntoSelectedRow({
+      fill: voucherFill,
+      rows,
+      rowId,
+      idOf: r => r.rowId,
+      payload,
+      apply: (row, item) => applyDisposalSample(row, item, true),
+      persist: () => _persistRows(),
+      legacy: disposalLegacy,
+      readonly: () => params.isReadonly?.value === true,
+    })
   }
 
   function save(): void {
@@ -364,6 +444,14 @@ export function useH4DisposalCheck(params: {
     rowClassName,
     save,
     load,
+    onEngineFilled,
+    onEngineFilledIntoRow,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    /** 行已关联凭证（有 `_gt`）：逐行抽凭只写未关联凭证的行 */
+    rowHasVoucher: (row: H4DisposalCheckRow) => !!metaOf(row),
   }
 }
 

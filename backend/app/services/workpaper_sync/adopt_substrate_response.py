@@ -308,8 +308,12 @@ async def compute_adopt_substrate(
     # 🔴 `store_payloads` 与下方 `before_snapshot` 是**同一次**读取 ⇒ 计划算在哪份 store 状态
     #    上、回滚快照存的就是哪份，两者天然一致；分两次读会留下「计划与快照错版」的窗口。
     plan_inputs = census_plan_inputs(registration)
+    from app.services.workpaper_sync.store_payload_columns import payload_columns_for_adapter
+
+    # 快照 / 删除侧 / 回写镜像同一载荷列口径（G1 / G3 / G6-5 在 conclusion）
+    columns = payload_columns_for_adapter(adapter_id)
     store_payloads = await _snapshot_store(
-        session, wp_id=wp_id, item_ids=plan_inputs.item_ids
+        session, wp_id=wp_id, item_ids=plan_inputs.item_ids, columns=columns
     )
     plan = compute_plan_for_adopt(
         baseline=baseline, store_payloads=store_payloads, plan_inputs=plan_inputs
@@ -359,12 +363,13 @@ async def compute_adopt_substrate(
             store_payloads=store_payloads,
             plan_inputs=plan_inputs,
             plan=plan,
+            columns=columns,
         )
 
         # 🔴 这次读取必须在删除侧**之后**：它是复读比对（Req 3.5）的输入，也是 `rollback_snapshot`
         #    覆盖面里「字节差集」那一半的来源 —— 早读两者都看不见删除侧改动（Req 6.9）。
         after_snapshot = await _snapshot_store(
-            session, wp_id=wp_id, item_ids=plan_inputs.item_ids
+            session, wp_id=wp_id, item_ids=plan_inputs.item_ids, columns=columns
         )
         # ── ★ 提交前复读比对（Requirement 3.5）：逐 item / 逐分区比**身份集合** ──────
         # 🔴 不比计数：删错行但删对个数两侧计数一模一样。不符即抛 ⇒ 下方 except 回滚整个事务
@@ -408,6 +413,7 @@ async def compute_adopt_substrate(
             changed_items=changed,
             rollback_items=rollback_items,
             applied=applied,
+            columns=columns,
         )
         await session.commit()
     except Exception:
@@ -698,26 +704,24 @@ def verify_plan_digest(plan: OverwritePlan, *, expected: str | None) -> None:
 
 
 async def _snapshot_store(
-    session: Any, *, wp_id: Any, item_ids: tuple[str, ...]
+    session: Any, *, wp_id: Any, item_ids: tuple[str, ...], columns: Any = None
 ) -> dict[str, str | None]:
-    """取给定 store item 的当前 remark（覆盖前后各一次，用于 diff 与回滚）。
+    """取给定 store item 的当前载荷（覆盖前后各一次，用于 diff 与回滚）。
 
     🔴 item 分母由调用方传入（`AdoptPlanInputs.item_ids`），**不在本函数再解析一次** ——
     计划与回滚快照必须建立在同一份 item 清单上，否则「计划报了 5 个 item、快照只存了 4 个」
     这种漏存没人能发现。
+
+    :param columns: 载荷列口径（`store_payload_columns.PayloadColumns`，与回写镜像同一口径）；
+        缺省 remark（原行为，SQL 逐字不变）。G1 / G3 / G6-5 的载荷在 conclusion，按 remark 取会让
+        计划、复读、回滚快照全部建立在一列空值上（spec oo-writeback-template-parity-closure R3 批 B3）。
     """
+    from app.services.workpaper_sync.store_payload_columns import REMARK_ONLY, read_payload
+
+    cols = columns or REMARK_ONLY
     snap: dict[str, str | None] = {}
     for item in item_ids:
-        row = (
-            await session.execute(
-                sa.text(
-                    "SELECT remark FROM checklist_responses "
-                    "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-                ),
-                {"wp": str(wp_id), "item": item},
-            )
-        ).scalar_one_or_none()
-        snap[item] = str(row) if row is not None else None
+        snap[item] = await read_payload(session, wp_id=wp_id, item_id=item, columns=cols, limit=True)
     return snap
 
 
@@ -740,8 +744,13 @@ async def _record_rollback_and_audit(
     changed_items: list[str],
     rollback_items: list[str],
     applied: Any,
+    columns: Any = None,
 ) -> None:
     """留存被覆盖的原值（可回滚）+ 写审计日志。复用既有 hash-chain 审计留痕，不新造表。
+
+    :param columns: 快照所取的载荷列口径（`store_payload_columns`）。非 remark 口径时记进
+        `rollback_snapshot_columns`（恢复要写回哪一列；G1 / G3 / G6-5 在 conclusion、G4-7 / G5-2 两列同写）；
+        remark 口径不记，details 与原先逐字相同。
 
     :param changed_items: **plan 口径**的有变更 item（Task 6.4 / Requirement 3.6）。
     :param rollback_items: 回滚快照要留原值的 item = plan 口径 ∪ 字节差集（Task 6.5 /
@@ -778,6 +787,11 @@ async def _record_rollback_and_audit(
                 "changed_item_count": len(changed_items),
                 "changed_items": changed_items,
                 "rollback_snapshot": json.dumps(rollback_payload, ensure_ascii=False),
+                **(
+                    {"rollback_snapshot_columns": list(columns.write)}
+                    if columns is not None and tuple(columns.write) != ("remark",)
+                    else {}
+                ),
             },
         },
     )

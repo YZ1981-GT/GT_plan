@@ -162,15 +162,15 @@
     </section>
 
     <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 ${samplingAccountCode}）— 按借贷方向填入借方/贷方区" name="sampling">
+      <el-collapse-item :title="`⚡ 自动抽凭（科目 ${samplingAccountCode}）— 按借贷方向填入借方/贷方区`" name="sampling">
         <GtVoucherSamplingEngine
           :account-code="samplingAccountCode"
-          phase="final"
           default-method="random"
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="year"
           @filled="handleSamplingFilled"
+          @undo-request="vc.onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
@@ -231,7 +231,7 @@
         border
         size="small"
         max-height="420"
-        :row-class-name="({ row }) => row.isAbnormal ? 'abnormal-row' : ''"
+        :row-class-name="voucherRowClassName"
       >
         <el-table-column label="#" width="52" fixed>
           <template #default="{ row }">
@@ -239,6 +239,12 @@
             <el-tooltip v-if="row.source" :content="row.source" placement="top">
               <span class="sample-flag">📌</span>
             </el-tooltip>
+          </template>
+        </el-table-column>
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="year" />
           </template>
         </el-table-column>
 
@@ -258,19 +264,19 @@
           </el-table-column>
           <el-table-column label="凭证号" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.voucherNo" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.voucherNo" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'voucherNo', v)" />
             </template>
           </el-table-column>
           <el-table-column label="业务内容" min-width="120">
             <template #default="{ row }">
-              <el-input :model-value="row.summary" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.summary" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'summary', v)" />
             </template>
           </el-table-column>
           <el-table-column label="对方科目" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.counterAccount" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.counterAccount" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'counterAccount', v)" />
             </template>
           </el-table-column>
@@ -283,7 +289,7 @@
           </el-table-column>
           <el-table-column label="投资标的" width="110">
             <template #default="{ row }">
-              <el-input :model-value="row.investTarget" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.investTarget" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'investTarget', v)" />
             </template>
           </el-table-column>
@@ -336,7 +342,7 @@
           </el-table-column>
           <el-table-column label="支持性文件" min-width="130">
             <template #default="{ row }">
-              <el-input :model-value="row.supportingDocs" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.supportingDocs" size="small" :disabled="isReadonly"
                 placeholder="合同/对账单/回单…"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'supportingDocs', v)" />
             </template>
@@ -367,7 +373,7 @@
         <template v-else>
           <el-table-column label="索引" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.indexRef" size="small" :disabled="isReadonly" placeholder="G2-4…"
+              <WpCommitInput :model-value="row.indexRef" size="small" :disabled="isReadonly" placeholder="G2-4…"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'indexRef', v)" />
             </template>
           </el-table-column>
@@ -380,13 +386,13 @@
           </el-table-column>
           <el-table-column label="异常说明" min-width="140">
             <template #default="{ row }">
-              <el-input :model-value="row.abnormalDesc" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.abnormalDesc" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'abnormalDesc', v)" />
             </template>
           </el-table-column>
           <el-table-column label="备注" min-width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.remark" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.remark" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateDebitCell(row.id, 'remark', v)" />
             </template>
           </el-table-column>
@@ -420,7 +426,7 @@
         border
         size="small"
         max-height="420"
-        :row-class-name="({ row }) => row.isAbnormal ? 'abnormal-row' : ''"
+        :row-class-name="voucherRowClassName"
       >
         <el-table-column label="#" width="52" fixed>
           <template #default="{ row }">
@@ -428,6 +434,12 @@
             <el-tooltip v-if="row.source" :content="row.source" placement="top">
               <span class="sample-flag">📌</span>
             </el-tooltip>
+          </template>
+        </el-table-column>
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="year" />
           </template>
         </el-table-column>
 
@@ -447,19 +459,19 @@
           </el-table-column>
           <el-table-column label="凭证号" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.voucherNo" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.voucherNo" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'voucherNo', v)" />
             </template>
           </el-table-column>
           <el-table-column label="业务内容" min-width="120">
             <template #default="{ row }">
-              <el-input :model-value="row.summary" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.summary" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'summary', v)" />
             </template>
           </el-table-column>
           <el-table-column label="对方科目" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.counterAccount" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.counterAccount" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'counterAccount', v)" />
             </template>
           </el-table-column>
@@ -472,7 +484,7 @@
           </el-table-column>
           <el-table-column label="收款银行" width="110">
             <template #default="{ row }">
-              <el-input :model-value="row.receivingBank" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.receivingBank" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'receivingBank', v)" />
             </template>
           </el-table-column>
@@ -521,7 +533,7 @@
           </el-table-column>
           <el-table-column label="支持性文件" min-width="130">
             <template #default="{ row }">
-              <el-input :model-value="row.supportingDocs" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.supportingDocs" size="small" :disabled="isReadonly"
                 placeholder="银行回单/核销审批…"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'supportingDocs', v)" />
             </template>
@@ -552,7 +564,7 @@
         <template v-else>
           <el-table-column label="索引" width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.indexRef" size="small" :disabled="isReadonly" placeholder="G2-4/G2-6…"
+              <WpCommitInput :model-value="row.indexRef" size="small" :disabled="isReadonly" placeholder="G2-4/G2-6…"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'indexRef', v)" />
             </template>
           </el-table-column>
@@ -565,13 +577,13 @@
           </el-table-column>
           <el-table-column label="异常说明" min-width="140">
             <template #default="{ row }">
-              <el-input :model-value="row.abnormalDesc" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.abnormalDesc" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'abnormalDesc', v)" />
             </template>
           </el-table-column>
           <el-table-column label="备注" min-width="100">
             <template #default="{ row }">
-              <el-input :model-value="row.remark" size="small" :disabled="isReadonly"
+              <WpCommitInput :model-value="row.remark" size="small" :disabled="isReadonly"
                 @change="(v: string) => vc.updateCreditCell(row.id, 'remark', v)" />
             </template>
           </el-table-column>
@@ -661,6 +673,7 @@ import {
   G2_EXPANSION_FACTORS,
   G2_CONCLUSION_TEMPLATES,
   calcInspectionRatio,
+  type G2StoredVoucherRow,
 } from '../composables/useG2VoucherCheck'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
@@ -668,7 +681,8 @@ import G2ImportExportDropdown from './G2ImportExportDropdown.vue'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G2AuditTextCards from './G2AuditTextCards.vue'
-import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
@@ -685,6 +699,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -722,6 +737,12 @@ async function onImported() {
   const ok = vc.hydrateFromFlat(props.allResponses.get('G2-8-rows')?.remark)
   if (ok) ElMessage.success('已从导入数据还原借/贷检查区')
 }
+
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(
+  ({ row }: { row: G2StoredVoucherRow }) => (row.isAbnormal ? 'abnormal-row' : ''),
+  vc.voucherRowClass,
+)
 
 const activeBlock = ref<'debit' | 'credit'>('debit')
 const activeTab = ref<'basic' | 'check' | 'result'>('basic')
@@ -795,18 +816,20 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId!, year.value, props.wpId!, G2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填：共享回填函数按分录自己的借贷栏进借方区 / 贷方区，一个对方科目一行（后端配对），按分录指纹去重，
+ * 填入几行由共享函数提示；「替换本阶段抽凭行」只删本阶段抽凭填入的行（原实现两区整表清空）。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  vc.applySamplingResults(payload.samples, payload.fillMode)
-  ElMessage.success(`已按借贷方向填入 ${payload.samples.length} 笔抽凭样本`)
+  void persistMethodology(payload?.methodology)
+  await vc.onEngineFilled(payload)
 }
 
 function applyConclusion(key: keyof typeof G2_CONCLUSION_TEMPLATES): void {
@@ -900,6 +923,7 @@ watch(auditConclusion, (v) => {
 })
 
 onMounted(() => {
+  void vc.voucherFillReady()
   vc.seedPopulationFromDetail(false)
 })
 </script>

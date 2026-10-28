@@ -299,9 +299,13 @@ MIRROR_FACADE = "mirror_projection_into_store"
 #: `store_mirror.py` 是 **untracked**，`git diff` 对它恒空 ⇒ 那条判据恒真。
 #: 🔴 一旦本函数确有合法改动（非本 spec 所致），**先查改了什么**，确认与删除侧无关后再更新此值，
 #: 并在 tasks.md 登记新旧两值 —— 不得在不看 diff 的情况下顺手改成实测值。
-MIRROR_FACADE_BODY_SHA256 = "41acda282f40a382b5eff29366b9b18be766ac1400f1a497a883599cc5e65364"
+#:
+#: 2026-10-28 更新（spec oo-writeback-template-parity-closure R3 批 B3，tasks 9.3b 登记新旧两值）：读 / 改 / 插三条 SQL
+#: 改为按 provider 声明的载荷列（`store_payload_columns`；remark 口径 SQL 与原文逐字相同），与删除侧无关、条件② 照旧
+#: 零命中。旧值 41acda282f40a382b5eff29366b9b18be766ac1400f1a497a883599cc5e65364 / 112 行。
+MIRROR_FACADE_BODY_SHA256 = "bb42107a77dd2908155a51797e776b9b64472e12515dd6f4a7573305a45c0af1"
 #: 同上口径的行数（`splitlines()`），与 sha 一起给，便于人工快速判断改动量级。
-MIRROR_FACADE_BODY_LINES = 112
+MIRROR_FACADE_BODY_LINES = 101
 
 
 def _facade_segment() -> str:

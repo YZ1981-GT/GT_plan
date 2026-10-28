@@ -219,6 +219,9 @@
             <span class="k1vc-vcard-title">{{ row.debtorName || row.voucherNo || '未命名' }}</span>
             <el-tag size="small" :type="cardStatus(row).type">{{ cardStatus(row).label }}</el-tag>
           </div>
+          <div class="k1vc-vcard-source" @click.stop>
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </div>
           <div class="k1vc-vcard-meta">{{ row.voucherNo || '无凭证号' }} · {{ row.date || '无日期' }}</div>
           <div class="k1vc-vcard-amt">借 {{ fmtAmt(row.debitAmount) }} / 贷 {{ fmtAmt(row.creditAmount) }}</div>
         </div>
@@ -226,8 +229,14 @@
 
       <el-table v-else ref="occurrenceTableRef" :data="filteredOccurrenceRows" border size="small" :max-height="360" class="voucher-table"
         row-key="id"
-        :row-class-name="voucherRowClass">
+        :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </template>
+        </el-table-column>
         <el-table-column label="债务人名称" min-width="130">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" />
@@ -376,6 +385,9 @@
             <span class="k1vc-vcard-title">{{ row.debtorName || row.voucherNo || '未命名' }}</span>
             <el-tag size="small" :type="cardStatus(row).type">{{ cardStatus(row).label }}</el-tag>
           </div>
+          <div class="k1vc-vcard-source" @click.stop>
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </div>
           <div class="k1vc-vcard-meta">{{ row.voucherNo || '无凭证号' }} · {{ row.date || '无日期' }}</div>
           <div class="k1vc-vcard-amt">收款 {{ fmtAmt(row.creditAmount) }}</div>
         </div>
@@ -383,8 +395,14 @@
 
       <el-table v-else ref="postTableRef" :data="filteredPostCollectionRows" border size="small" :max-height="300" class="voucher-table"
         row-key="id"
-        :row-class-name="voucherRowClass">
+        :row-class-name="voucherRowClassName">
         <el-table-column label="#" type="index" width="42" align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="year" />
+          </template>
+        </el-table-column>
         <el-table-column label="债务人名称" min-width="130">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" />
@@ -585,15 +603,15 @@
     </details>
 
     <!-- 抽凭引擎对话框 -->
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他应收款(1221)" width="90%" top="5vh" destroy-on-close>
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 其他应收款(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
         :account-code="samplingAccountCode"
-        :phase="samplingTarget === 'occurrence' ? 'current' : 'post'"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="year"
         @filled="onSamplesFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -601,7 +619,7 @@
       v-model="voucherDialogVisible"
       :row="voucherDialogRow"
       :mode="voucherDialogMode"
-      :readonly="isReadonly"
+      :readonly="isReadonly || (!!voucherDialogRow && isVoucherRowLocked(voucherDialogRow))"
       :wp-id="wpId"
       :project-id="projectId"
       @save="handleSaveVoucher"
@@ -621,6 +639,8 @@ import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import type { ElTable } from 'element-plus'
 import { useK1VoucherCheck, k1VoucherCardStatus, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { useK1VoucherOcr, voucherEvidenceCell } from '../../composables/useK1VoucherOcr'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import {
@@ -695,9 +715,17 @@ const {
   occurrenceDebitChecked, occurrenceCreditChecked, postCollectionChecked,
   load, addOccurrenceRow, addPostCollectionRow, removeOccurrenceRow, removePostCollectionRow,
   updateVoucherRow,
-  fillFromSamples, applyFromK1Sheets, applyFromK1LargeAmount, recalcSamplingPopulation,
+  applyFromK1Sheets, applyFromK1LargeAmount, recalcSamplingPopulation,
   buildAbnormalAdjDrafts, serialize,
-} = useK1VoucherCheck({ allResponses: allResponsesRef as any })
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass: lockedRowClass, isVoucherRowLocked, voucherFillReady,
+} = useK1VoucherCheck({
+  allResponses: allResponsesRef as any,
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly,
+  persist: () => persist(),
+  // 挂凭导入：凭证日期在期末之后的进期后收款检查
+  periodEnd: () => `${year.value}-12-31`,
+})
 
 const { ocrLoading, runOcr } = useK1VoucherOcr(() => props.wpId, () => props.projectId)
 /** 行内识别附件挂到本行（K1-12 + `row:{本期/期后}-{行 id}`），📎 旁与逐笔核对弹窗里的小眼睛按同一位置读取 */
@@ -740,6 +768,7 @@ function onRowOcr(row: K1VoucherRow, target: 'occurrence' | 'post', file?: File)
 }
 
 onMounted(() => {
+  void voucherFillReady()
   load()
   applyIncomingFocus()
 })
@@ -853,19 +882,21 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, year.value, props.wpId, K1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }) {
+/**
+ * 抽凭引擎回填进所选的表（samplingTarget：本期发生额 / 期后收款，宿主自己的状态，不再经引擎的 phase 传）：
+ * 共享回填函数一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行。
+ */
+async function onSamplesFilled(payload: EngineFilledPayload) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
   void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  fillFromSamples(samplingTarget.value, payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
+  const out = await onEngineFilled(payload, samplingTarget.value)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 function importFromK1() {
@@ -946,6 +977,8 @@ function voucherRowClass({ row }: { row: K1VoucherRow }): string {
   if (row.abnormal) parts.push('abnormal-row')
   return parts.join(' ')
 }
+/** 导航高亮 / 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(voucherRowClass, lockedRowClass)
 
 // ─── AI / 复核 ───────────────────────────────────────────────────────────────
 async function handleAiGenerate() {

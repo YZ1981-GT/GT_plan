@@ -36,7 +36,9 @@ R3 已把它救回可枚举」的条目蒙过去（M-A2 证明 —— 那正是 
 
 🔴 **三个空桶是 ADR-AOS-005 采纳 R3 的直接后果，不是判据失效**：`item_unresolvable` 与
 `row_reader_bound_to_other_entry` 原有的 4 条（`G3-2-detail-rows` / `G4-7-items` /
-`G5-2-rows` / `G6-5-fair-value-data`）已由第 ② 级 R3 接住 ⇒ 它们现在**不该**在跳过清单里。
+`G5-2-rows` / `G6-5-fair-value-data`）已由第 ② 级 R3 接住 ⇒ 它们现在**不该**在跳过清单里；
+批 B3（spec oo-writeback-template-parity-closure R3）又在门面侧修好了这 4 条（门面按本 provider 绑定），
+真实数据里 `row_reader_bound_to_other_entry` 现算 0 条，变异对照改用合成的借别家门面。
 故本文件对空桶的处置是**如实登记 + 配变异对照**（同一判据在非空场景须命中非零），
 而**不是**断言它非空 —— 见 :class:`TestEmptyBucketsAreRegisteredHonestly`。
 """
@@ -111,7 +113,14 @@ def _accepts_item(fn: Any) -> bool:
 
 
 def _facade_module(fn: Any) -> str:
-    """门面的**定义**模块。G3~G6 的门面 re-export 自 `phase5_g9_store_facade` 即靠它识别。"""
+    """门面的**定义**模块；绑定式门面（`SectionStoreFacade` 的方法）取它绑定的 provider 模块。
+
+    原先 G3~G6 的门面 re-export 自 `phase5_g9_store_facade` 即靠 `__module__` 识别；批 B3 起多区门面是绑定方法，
+    `__module__` 恒为实现模块 ⇒ 现读 `__self__.provider_module`。
+    """
+    owner = getattr(getattr(fn, "__self__", None), "provider_module", None)
+    if isinstance(owner, str) and owner:
+        return f"app.services.workpaper_sync.{owner}"
     return str(getattr(fn, "__module__", "") or "")
 
 
@@ -400,6 +409,18 @@ def _bogus_loader(_adapter_id: str) -> Any:
     return importlib.import_module("app.services.workpaper_sync._aos48_not_a_real_module")
 
 
+def _borrowed_g3_provider() -> Any:
+    """合成「门面借别家」：G3 的 provider 外壳 + 绑到 G9 的多区门面（批 B3 前 G3 的真实形态）。"""
+    from app.services.workpaper_sync.phase5_section_store_facade import SectionStoreFacade
+
+    g3 = importlib.import_module("app.services.workpaper_sync.phase5_g3_dividend_receivable")
+    return SimpleNamespace(
+        __name__=g3.__name__,
+        iter_store_rows=SectionStoreFacade("phase5_g9_other_noncurrent").iter_store_rows,
+        managed_row_table_specs=g3.managed_row_table_specs,
+    )
+
+
 class TestEmptyBucketsAreRegisteredHonestly:
     """🔴 三个空桶**如实登记** + 逐个配变异对照（结构性零必配变异证明）。
 
@@ -412,7 +433,7 @@ class TestEmptyBucketsAreRegisteredHonestly:
     EXPECTED_EMPTY = (
         SkipReason.import_failed.value,  # L1，本层收到的已是 import 好的模块
         SkipReason.item_unresolvable.value,  # 4 条已由 R3 救回
-        SkipReason.row_reader_bound_to_other_entry.value,  # 同上（G3/G4/G5/G6）
+        SkipReason.row_reader_bound_to_other_entry.value,  # 同上（G3/G4/G5/G6；批 B3 起门面侧也修好了）
     )
 
     def test_empty_buckets_are_exactly_the_expected_three(self) -> None:
@@ -446,11 +467,20 @@ class TestEmptyBucketsAreRegisteredHonestly:
         production = _diagnose_via_facade(provider=synthetic, store_item_id="SYNTH-ITEM")
         assert production.skip_reason is SkipReason.item_unresolvable
 
-    def test_control_bound_to_other_entry_still_detects_the_four_g_items(self) -> None:
-        """空桶对照 ③：**真实数据** —— 4 条 G 的门面路至今仍是「被借给别家」。
+    def test_control_bound_to_other_entry_still_detects_a_borrowed_facade(self) -> None:
+        """空桶对照 ③：借别家的门面必须判 `row_reader_bound_to_other_entry`（两份实现给同一成员）。
 
-        它们不在白名单里正是因为第 ② 级 R3 把它们救回了可枚举（ADR §2(b)）。
+        原先拿 4 条 G 的**真实数据**做对照；批 B3 在门面侧修好了它们（现在判「无成员适用」，见下方正面断言），
+        对照改用合成的借别家门面 —— G3 的 provider 外壳 + 绑到 G9 的 `SectionStoreFacade`（= 当年的真实形态）。
         """
+        borrowed = _borrowed_g3_provider()
+        got, why = _classify_skip_reason(
+            adapter_id="任意", item_id="G3-2-detail-rows", loader=lambda _a: borrowed
+        )
+        assert got == SkipReason.row_reader_bound_to_other_entry.value, (got, why)
+        assert "phase5_g9_other_noncurrent" in why, why
+        production = _diagnose_via_facade(provider=borrowed, store_item_id="G3-2-detail-rows")
+        assert production.skip_reason is SkipReason.row_reader_bound_to_other_entry
         four = (
             ("g3.dividend_receivable_detail", "G3-2-detail-rows"),
             ("g4.bond_main", "G4-7-items"),
@@ -459,10 +489,9 @@ class TestEmptyBucketsAreRegisteredHonestly:
         )
         for adapter_id, item_id in four:
             got, why = _classify_skip_reason(adapter_id=adapter_id, item_id=item_id)
-            assert got == SkipReason.row_reader_bound_to_other_entry.value, (item_id, got, why)
-            assert "phase5_g9_store_facade" in why, why
+            assert got == _NO_SKIP_APPLIES, (item_id, got, why)
         whitelisted = {(a, i) for a, i, _r in _whitelist()}
-        assert not (set(four) & whitelisted), "这 4 条已被 R3 救回，不该再出现在跳过清单里"
+        assert not (set(four) & whitelisted), "这 4 条可枚举，不该出现在跳过清单里"
 
     def test_classifier_can_emit_every_member_of_the_closed_domain(self) -> None:
         """🔴 无后门：六成员**每一个**都有可验证条件能把它产出来。
@@ -485,7 +514,7 @@ class TestEmptyBucketsAreRegisteredHonestly:
         )
         emitted.add(
             _classify_skip_reason(
-                adapter_id="g5.long_term_receivable_detail", item_id="G5-2-rows"
+                adapter_id="任意", item_id="G3-2-detail-rows", loader=lambda _a: _borrowed_g3_provider()
             )[0]
         )
         assert emitted == {m.value for m in SkipReason}, (

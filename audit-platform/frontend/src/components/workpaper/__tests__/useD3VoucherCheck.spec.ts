@@ -14,7 +14,7 @@ import {
   mapOcrToVoucherFields,
   isAllowedAttachment,
   mapSampledToVoucherRow,
-  applyVoucherFillMode,
+  mapPreparedToVoucherRow,
   summarizeAnomalies,
   computeCoverageFeedback,
   CONFIDENCE_THRESHOLD,
@@ -242,56 +242,25 @@ describe('mapSampledToVoucherRow - 抽样样本 → 检查表行', () => {
   })
 })
 
-describe('applyVoucherFillMode - 抽凭回填三模式', () => {
-  const mk = (no: string): VoucherCheckRow => mapSampledToVoucherRow({ voucherNo: no })
-
-  it('append: 追加到末尾，长度 = 原 + 新', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.string({ minLength: 1, maxLength: 6 }), { maxLength: 10 }),
-        fc.array(fc.string({ minLength: 1, maxLength: 6 }), { maxLength: 10 }),
-        (a, b) => {
-          const existing = a.map(mk)
-          const incoming = b.map(mk)
-          const result = applyVoucherFillMode(existing, incoming, 'append')
-          expect(result.length).toBe(existing.length + incoming.length)
-        },
-      ),
-      { numRuns: 50 },
-    )
+// 回填三模式（按凭证号去重的 applyVoucherFillMode）已由共享回填函数按分录指纹去重取代
+// （spec voucher-identity-writeback-and-audit-phase 任务 10；回填 / 挂凭 / 撤销 / 只读见 composables/__tests__/d3VoucherFill.spec.ts）
+describe('mapPreparedToVoucherRow - 共享回填待写入项 → 检查表行', () => {
+  const item = (over: Record<string, unknown>) => ({
+    sample: { voucherNo: 'JZ-7', voucherDate: '2025-06-15', summary: '预收货款', debitAmount: null, creditAmount: '300.00' },
+    meta: { vk: null, lfp: 'fp', ph: 'final' as const, b: null, src: ['engine' as const], pr: 'paired' as const, cp: null },
+    counterpartAccount: '1002', counterpartAccountName: '银行存款', debitAmount: null, creditAmount: '300.00',
+    isMultiAccount: false, ...over,
   })
 
-  it('replace: 以新集合替换现有行', () => {
-    const existing = ['A', 'B'].map(mk)
-    const incoming = ['C', 'D', 'E'].map(mk)
-    const result = applyVoucherFillMode(existing, incoming, 'replace')
-    expect(result.map(r => r.voucherNo)).toEqual(['C', 'D', 'E'])
+  it('对方科目取后端配对结果、对方明细写名称，金额落在样本自己的借贷栏', () => {
+    const row = mapPreparedToVoucherRow(item({}))
+    expect([row.voucherNo, row.date, row.counterAccount, row.counterDetailAccount, row.debitAmount, row.creditAmount, row.source])
+      .toEqual(['JZ-7', '2025-06-15', '1002', '银行存款', undefined, 300, '抽凭'])
   })
 
-  it('merge: 按 voucherNo 去重，不重复添加已存在项', () => {
-    const existing = ['A', 'B'].map(mk)
-    const incoming = ['B', 'C'].map(mk)
-    const result = applyVoucherFillMode(existing, incoming, 'merge')
-    expect(result.map(r => r.voucherNo)).toEqual(['A', 'B', 'C'])
-  })
-
-  it('merge: 结果中非空 voucherNo 唯一', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 12 }),
-        fc.array(fc.string({ minLength: 1, maxLength: 4 }), { maxLength: 12 }),
-        (a, b) => {
-          // merge 契约：仅阻止「新增」重复，不对既有行做破坏性去重（既有行可能含
-          // 用户手工录入的重复凭证号，静默删除即数据丢失）。故约束既有行 voucherNo
-          // 唯一（与 canonical Property 8 的 uniqueVouchersArb 前置一致），验证 merge 后仍唯一。
-          const uniqExisting = Array.from(new Set(a))
-          const result = applyVoucherFillMode(uniqExisting.map(mk), b.map(mk), 'merge')
-          const nos = result.map(r => r.voucherNo).filter(Boolean)
-          expect(new Set(nos).size).toBe(nos.length)
-        },
-      ),
-      { numRuns: 50 },
-    )
+  it('配不上：对方科目「多科目」，对方明细留空', () => {
+    const row = mapPreparedToVoucherRow(item({ counterpartAccount: '多科目', counterpartAccountName: '多科目', isMultiAccount: true }))
+    expect([row.counterAccount, row.counterDetailAccount]).toEqual(['多科目', ''])
   })
 })
 

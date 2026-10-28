@@ -3,10 +3,16 @@
  *
  * G7-10/G7-11/G7-12 是处置与后续计量的**测算表**（无凭证明细行），故抽凭引擎
  * 回填目标是本模块定义的独立「凭证抽查」行模型（而非把凭证号/借贷映射到测算字段，
- * 避免臆造死接线）。抽凭样本按 `voucherNo` 去重（Property 14）。
+ * 避免臆造死接线）。抽凭回填 / 撤销走共享回填函数（spec voucher-identity-writeback-and-audit-phase 任务 11）：
+ * 一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库；原来按 `voucherNo` 去重
+ * （Property 14，同号不同分录被当重复丢掉）、经 expandMultiAccountVouchers 展开，已删除。
  */
 
-import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
+import { ref, toValue, type MaybeRefOrGetter } from 'vue'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta,
+  type PreparedItem, type SamplePairing,
+} from './shared/voucherCheckFill'
 
 export interface G7VoucherSampleRow {
   id: string
@@ -34,6 +40,8 @@ export interface G7VoucherSample {
   counterpartAccount?: string
   counterpartAccountName?: string
   voucherEntries?: Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null; summary: string }>
+  /** 后端多借多贷配对结果（voucher-identity-writeback-and-audit-phase 需求 3）：展开按它 */
+  pairing?: SamplePairing | null
 }
 
 function num(v: unknown): number {
@@ -72,66 +80,86 @@ export function parseG7VoucherSampleRows(payload: unknown): G7VoucherSampleRow[]
     : Array.isArray((payload as any)?.rows)
       ? (payload as any).rows
       : []
-  return arr.map((raw: Record<string, unknown>, i: number) => ({
+  return arr.map((raw: Record<string, unknown>, i: number) => withRowMeta({
     ...createG7VoucherSampleRow(i + 1),
     ...raw,
     id: String(raw?.id || uid()),
     seq: i + 1,
     debitAmount: num(raw?.debitAmount),
     creditAmount: num(raw?.creditAmount),
-  }))
+  }, raw))
+}
+
+/** 共享回填函数的待写入项 → 凭证抽查行：金额在样本自己的借贷栏，对方科目取后端配对（编码 + 名称，配不上写「多科目」） */
+export function mapPreparedToG7VoucherSampleRow(item: PreparedItem, seq: number): G7VoucherSampleRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  const row = createG7VoucherSampleRow(seq)
+  row.voucherDate = s.voucherDate || ''
+  row.voucherNo = s.voucherNo || ''
+  row.businessContent = s.summary || ''
+  row.counterAccount = counterpartText(item)
+  row.debitAmount = num(item.debitAmount)
+  row.creditAmount = num(item.creditAmount)
+  row.source = item.meta.src.includes('attach') ? '挂凭' : '抽凭'
+  return row
+}
+
+/** 行上已填检查结论或备注（替换与撤销抽凭时据此先确认） */
+export function hasG7VoucherSampleContent(r: G7VoucherSampleRow): boolean {
+  return [r.conclusion, r.remark].some(v => String(v ?? '').trim() !== '')
 }
 
 /**
- * 纯函数：把抽凭样本映射为凭证抽查行并按 `voucherNo` 去重后追加到既有行（Property 14）。
- *
- * - 已存在的 `voucherNo`（既有行或本批已加）跳过（skipped，按样本计）；
- * - 空 `voucherNo` 的样本无法去重，一律追加（added，不进去重集）；
- * - 多科目凭证按对方分录展开为多行（added 按行计）。🔴 去重必须在**展开前**按样本做：
- *   展开后同一张凭证的多行凭证号相同，若逐行去重会把第 2 行起全部当重复丢掉；
- * - 借方优先取 `debitAmount ?? amount`；有 `creditAmount` 则贷方独立取。
- *
- * @returns 追加后的新行数组 + 统计（不改传入的 existing）。
+ * 凭证抽查区块的行与回填（G7VoucherSampleSection 用）：读入、增删、保存，抽凭回填 / 挂凭导入 / 撤销走共享回填函数
+ * （一个对方科目一行，按分录指纹去重；年审阶段预审行只读，保存时按读入版本写回）。
  */
-export function mergeVoucherSamples(
-  existing: G7VoucherSampleRow[],
-  samples: G7VoucherSample[],
-): { rows: G7VoucherSampleRow[]; added: number; skipped: number } {
-  const seen = new Set<string>()
-  for (const r of existing) {
-    const no = String(r.voucherNo || '').trim()
-    if (no) seen.add(no)
+export function useG7VoucherSampleRows(opts: {
+  projectId: MaybeRefOrGetter<string | null | undefined>
+  readonly?: MaybeRefOrGetter<boolean>
+  /** 保存行 JSON（宿主写进 checklist_responses） */
+  save: (json: string) => void
+}) {
+  const rows = ref<G7VoucherSampleRow[]>([])
+  const voucherFill = useVoucherCheckFill<G7VoucherSampleRow>({
+    projectId: opts.projectId,
+    tables: rows,
+    mapSampleToRow: item => mapPreparedToG7VoucherSampleRow(item, rows.value.length + 1),
+    persist: () => persist(),
+    hasUserContent: hasG7VoucherSampleContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: opts.readonly,
+  })
+  function load(payload: unknown): void {
+    rows.value = parseG7VoucherSampleRows(payload)
+    voucherFill.markLoaded()
   }
-  const out = [...existing]
-  let added = 0
-  let skipped = 0
-  for (const sample of samples) {
-    const no = String(sample.voucherNo || '').trim()
-    if (no && seen.has(no)) {
-      skipped += 1
-      continue
-    }
-    for (const s of expandMultiAccountVouchers([sample] as any[])) {
-      const row = createG7VoucherSampleRow(out.length + 1)
-      row.voucherDate = (s as any).voucherDate || ''
-      row.voucherNo = no
-      row.businessContent = (s as any).summary || ''
-      row.counterAccount = (s as any).counterpartAccount ?? (s as any).counterAccount ?? ''
-      const debit = num((s as any).debitAmount ?? (s as any).amount)
-      const credit = num((s as any).creditAmount)
-      if (credit) {
-        row.creditAmount = credit
-        row.debitAmount = num((s as any).debitAmount)
-      } else {
-        row.debitAmount = debit
-        row.creditAmount = 0
-      }
-      row.source = '抽凭'
-      out.push(row)
-      added += 1
-    }
-    if (no) seen.add(no)
+  function persist(): void {
+    if (toValue(opts.readonly)) return
+    opts.save(JSON.stringify(voucherFill.guardPersist(rows.value)))
   }
-  out.forEach((r, i) => { r.seq = i + 1 })
-  return { rows: out, added, skipped }
+  function addRow(): void {
+    if (toValue(opts.readonly)) return
+    rows.value.push(createG7VoucherSampleRow(rows.value.length + 1))
+    persist()
+  }
+  function removeRow(index: number): void {
+    const row = rows.value[index]
+    if (toValue(opts.readonly) || !row || voucherFill.isRowLocked(row)) return
+    rows.value.splice(index, 1)
+    rows.value.forEach((r, i) => { r.seq = i + 1 })
+    persist()
+  }
+  return {
+    rows,
+    load,
+    persist,
+    addRow,
+    removeRow,
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+  }
 }

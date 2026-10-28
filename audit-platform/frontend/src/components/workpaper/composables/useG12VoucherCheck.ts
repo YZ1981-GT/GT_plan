@@ -3,12 +3,16 @@
  *
  * 核对项三态：null=未测 / true=通过 / false=不通过
  * 异常判定：任一核对项 false 或 forceAbnormal → 异常；未测不计入
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行（后端配对），
+ * 按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal } from './useG12FormulaEngine'
 import { mapCutoffToG12Voucher, mergeByFillMode } from './gCycleCutoffFill'
-import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta, type EngineFilledPayload, type PreparedItem,
+} from './shared/voucherCheckFill'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import type { ChecklistResponse } from './useF1FormData'
 import { G12_ACCOUNT_CODE, G12_RISK_LEVELS } from './g12Constants'
@@ -135,9 +139,9 @@ function parseRows(json: string | null | undefined): G12VoucherRow[] {
   if (!json) return []
   try {
     const parsed = JSON.parse(json)
-    if (Array.isArray(parsed)) return parsed.map((r, i) => enrichG12VoucherRow(r, i + 1))
+    if (Array.isArray(parsed)) return parsed.map((r, i) => withRowMeta(enrichG12VoucherRow(r, i + 1), r))
     const rows = Array.isArray(parsed?.rows) ? parsed.rows : []
-    return rows.map((r: Partial<G12VoucherRow>, i: number) => enrichG12VoucherRow(r, i + 1))
+    return rows.map((r: Partial<G12VoucherRow>, i: number) => withRowMeta(enrichG12VoucherRow(r, i + 1), r))
   } catch {
     return []
   }
@@ -202,6 +206,32 @@ export function buildG12VoucherSamplingMemo(input: {
   return lines.join('\n')
 }
 
+/** 共享回填函数的待写入项 → G12-6 凭证检查行：金额在样本自己的借贷栏，对方科目取后端配对（配不上写「多科目」） */
+export function mapPreparedToG12VoucherRow(item: PreparedItem, seq: number): G12VoucherRow {
+  const s = item.sample as PreparedItem['sample'] & {
+    summary?: string | null; abnormal?: boolean; isHighValue?: boolean; selectionReason?: string
+  }
+  return enrichG12VoucherRow({
+    voucherDate: s.voucherDate ?? '',
+    voucherNo: s.voucherNo ?? '',
+    businessContent: s.summary ?? '',
+    counterAccount: counterpartText(item),
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+    forceAbnormal: !!s.abnormal,
+    abnormalDesc: s.abnormal ? (s.selectionReason || '抽凭标记异常') : '',
+    riskLevel: s.abnormal ? 'high' : (s.isHighValue ? 'medium' : 'low'),
+    remark: s.isHighValue ? '高值必选' : (s.selectionReason ?? ''),
+    source: '抽凭',
+  }, seq)
+}
+
+/** 行上已填核对结果、附件、支持性文件、套期关系或索引（替换与撤销抽凭时据此先确认） */
+export function hasG12VoucherContent(r: G12VoucherRow): boolean {
+  return CHECK_KEYS.some((k) => r[k] !== null)
+    || [r.attachment, r.supportingDocDesc, r.hedgeRelationId, r.indexNo].some((v) => String(v ?? '').trim() !== '')
+}
+
 export function useG12VoucherCheck(opts: {
   wpId?: Ref<string>
   projectId?: Ref<string> | ComputedRef<string>
@@ -220,9 +250,23 @@ export function useG12VoucherCheck(opts: {
   const procedureMarking = ref(false)
   const a13Pushing = ref(false)
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G12VoucherRow>({
+    projectId: () => opts.projectId?.value,
+    tables: rows,
+    mapSampleToRow: (item) => mapPreparedToG12VoucherRow(item, rows.value.length + 1),
+    persist: () => persist(),
+    hasUserContent: hasG12VoucherContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: () => opts.isReadonly.value,
+  })
+
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (json) => { rows.value = parseRows(json) },
+    (json) => {
+      rows.value = parseRows(json)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
   watch(
@@ -278,7 +322,7 @@ export function useG12VoucherCheck(opts: {
   }
 
   function persist(): void {
-    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
+    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(rows.value)) })
   }
 
   const filteredRows = computed(() => {
@@ -333,8 +377,10 @@ export function useG12VoucherCheck(opts: {
 
   function updateRow(rowId: string, patch: Partial<G12VoucherRow>): void {
     if (opts.isReadonly.value) return
+    const current = rows.value.find((r) => r.rowId === rowId)
+    if (current && voucherFill.isRowLocked(current)) return
     rows.value = rows.value.map((r) =>
-      (r.rowId === rowId ? recalcG12VoucherAbnormal(enrichG12VoucherRow({ ...r, ...patch }, r.seq)) : r),
+      (r.rowId === rowId ? withRowMeta(recalcG12VoucherAbnormal(enrichG12VoucherRow({ ...r, ...patch }, r.seq)), r) : r),
     )
     persist()
   }
@@ -351,6 +397,8 @@ export function useG12VoucherCheck(opts: {
 
   function removeRow(rowId: string): void {
     if (opts.isReadonly.value) return
+    const current = rows.value.find((r) => r.rowId === rowId)
+    if (current && voucherFill.isRowLocked(current)) return
     rows.value = rows.value.filter((r) => r.rowId !== rowId).map((r, i) => ({ ...r, seq: i + 1 }))
     persist()
   }
@@ -366,7 +414,7 @@ export function useG12VoucherCheck(opts: {
     const base = rows.value.length
     const mapped = samples.map((v, i) => mapCutoffToG12Voucher(v, base + i + 1))
     rows.value = mergeByFillMode(rows.value, mapped, fillMode, (r) => r.voucherNo)
-      .map((r, i) => enrichG12VoucherRow(r, i + 1))
+      .map((r, i) => withRowMeta(enrichG12VoucherRow(r, i + 1), r))
     persist()
   }
 
@@ -482,25 +530,13 @@ export function useG12VoucherCheck(opts: {
     }
   }
 
-  /** 抽凭引擎回填：样本行 + 方法学 → 抽样方法/目标量/抽样过程 */
-  function applySamplingFill(optsFill: {
-    samples: Array<Partial<G12VoucherRow> & {
-      summary?: string
-      amount?: number
-      counterpartAccount?: string
-      counterpartAccountName?: string
-      voucherEntries?: Array<{ account_code: string; account_name: string; debit_amount: string | null; credit_amount: string | null; summary: string }>
-      abnormal?: boolean
-      isHighValue?: boolean
-      selectionReason?: string
-    }>
+  /** 抽凭方法学 → 抽样方法 / 目标量 / 抽样过程（回填之后调；样本量取本次样本数） */
+  function applySamplingMethodology(optsFill: {
+    sampleCount: number
     method?: string
-    fillMode?: 'append' | 'merge' | 'replace'
     methodology?: G12SamplingMethodologyLike
-  }): number {
-    if (opts.isReadonly.value) return 0
-    const samples = expandMultiAccountVouchers(optsFill.samples ?? [] as any[])
-    if (!samples.length) return 0
+  }): void {
+    if (opts.isReadonly.value || !optsFill.sampleCount) return
 
     if (optsFill.method) {
       updateSampling('samplingMethod', optsFill.method === 'mus' ? 'mus' : optsFill.method)
@@ -509,7 +545,7 @@ export function useG12VoucherCheck(opts: {
       const process = formatG12SamplingProcessFromMethodology({
         ...optsFill.methodology,
         samplingMethod: optsFill.methodology.samplingMethod || optsFill.method,
-        sampleSize: optsFill.methodology.sampleSize ?? samples.length,
+        sampleSize: optsFill.methodology.sampleSize ?? optsFill.sampleCount,
       })
       updateSampling('samplingProcess', process)
       if (optsFill.methodology.suggestedSampleSize && !samplingParams.value.targetSampleSize) {
@@ -531,53 +567,27 @@ export function useG12VoucherCheck(opts: {
         'samplingProcess',
         formatG12SamplingProcessFromMethodology({
           samplingMethod: optsFill.method,
-          sampleSize: samples.length,
+          sampleSize: optsFill.sampleCount,
         }),
       )
     }
     if (!samplingParams.value.targetSampleSize) {
-      updateSampling('targetSampleSize', samples.length)
+      updateSampling('targetSampleSize', optsFill.sampleCount)
     }
+  }
 
-    const mode = optsFill.fillMode ?? 'append'
-    if (mode === 'replace') {
-      rows.value = samples.map((s, i) => enrichG12VoucherRow({
-        voucherDate: s.voucherDate,
-        voucherNo: s.voucherNo,
-        businessContent: s.businessContent ?? s.summary,
-        counterAccount: s.counterAccount ?? s.counterpartAccount,
-        debitAmount: s.debitAmount ?? s.amount,
-        creditAmount: s.creditAmount,
-        forceAbnormal: !!s.abnormal,
-        abnormalDesc: s.abnormal ? (s.selectionReason || '抽凭标记异常') : '',
-        riskLevel: s.abnormal ? 'high' : (s.isHighValue ? 'medium' : 'low'),
-        remark: s.isHighValue ? '高值必选' : (s.selectionReason ?? ''),
-        source: '抽凭',
-      }, i + 1))
-      persist()
-      return samples.length
-    }
-
-    let added = 0
-    for (const s of samples) {
-      const no = String(s.voucherNo || '').trim()
-      if (mode === 'merge' && no && rows.value.some((r) => r.voucherNo === no)) continue
-      mergeSample({
-        voucherDate: s.voucherDate,
-        voucherNo: s.voucherNo,
-        businessContent: s.businessContent ?? s.summary,
-        counterAccount: s.counterAccount ?? s.counterpartAccount,
-        debitAmount: s.debitAmount ?? s.amount,
-        creditAmount: s.creditAmount,
-        forceAbnormal: !!s.abnormal,
-        abnormalDesc: s.abnormal ? (s.selectionReason || '抽凭标记异常') : '',
-        riskLevel: s.abnormal ? 'high' : (s.isHighValue ? 'medium' : ''),
-        remark: s.isHighValue ? '高值必选' : (s.selectionReason ?? ''),
-        source: '抽凭',
+  /**
+   * 抽凭引擎回填：一个对方科目一行（后端配对），按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行；
+   * 回填后按方法学写抽样方法 / 目标量 / 抽样过程。原实现经 expandMultiAccountVouchers 展开、按凭证号去重，已删除。
+   */
+  async function onEngineFilled(payload: EngineFilledPayload & { method?: string; methodology?: G12SamplingMethodologyLike | null }) {
+    const out = await voucherFill.onEngineFilled(payload)
+    if (!out.cancelled) {
+      applySamplingMethodology({
+        sampleCount: payload.samples?.length ?? 0, method: payload.method, methodology: payload.methodology ?? undefined,
       })
-      added += 1
     }
-    return added
+    return out
   }
 
   const netExposureHints = computed(() =>
@@ -591,7 +601,7 @@ export function useG12VoucherCheck(opts: {
     const hints = buildG12NetExposureLinkHints(rows.value, opts.allResponses.value)
     const { updated, rows: next } = applyG12NetExposureLinkHints(rows.value, hints)
     if (updated) {
-      rows.value = next.map((r, i) => enrichG12VoucherRow(r, i + 1))
+      rows.value = next.map((r, i) => withRowMeta(enrichG12VoucherRow(r, i + 1), r))
       persist()
     }
     return updated
@@ -614,7 +624,7 @@ export function useG12VoucherCheck(opts: {
     if (opts.isReadonly.value) return 0
     const { cited, rows: next } = batchCiteG12FvValuation(rows.value, opts.allResponses.value)
     if (cited) {
-      rows.value = next.map((r, i) => enrichG12VoucherRow(r, i + 1))
+      rows.value = next.map((r, i) => withRowMeta(enrichG12VoucherRow(r, i + 1), r))
       persist()
     }
     return cited
@@ -660,7 +670,13 @@ export function useG12VoucherCheck(opts: {
     removeRow,
     mergeSample,
     applyCutoffResults,
-    applySamplingFill,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     syncFromNetExposure,
     citeFvForRow,
     batchCiteFv,

@@ -74,8 +74,14 @@
     <el-alert v-if="check.nonCompliantSummary.value" type="warning" :closable="false" class="summary-alert">
       {{ check.nonCompliantSummary.value }}
     </el-alert>
-    <el-table :data="check.rows.value" border size="small" style="font-size:13px" max-height="560">
+    <el-table :data="check.rows.value" border size="small" style="font-size:13px" max-height="560"
+      :row-class-name="check.voucherRowClass">
       <el-table-column prop="seq" label="序号" width="48" align="center" fixed />
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="check.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="资产名称" min-width="120" fixed>
         <template #default="{ row }">
           <span>{{ row.assetName || `行${row.seq}` }}</span>
@@ -116,20 +122,20 @@
 
     <el-card shadow="never" class="audit-note-card">
       <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+      <WpCommitInput type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
         placeholder="填写审计说明：概述检查范围与方法、合规性检查结果、不合规项目的原因分析及错报影响评估。"
         @change="saveAuditNote" />
     </el-card>
     <el-card shadow="never" class="audit-note-card">
       <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+      <WpCommitInput type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
         placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。"
         @change="saveAuditConclusion" />
     </el-card>
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎 — 资产处置损益(6115)"
+      :title="`抽凭引擎 — 资产处置损益(${samplingAccountCode})`"
       width="90%"
       top="5vh"
       destroy-on-close
@@ -137,12 +143,12 @@
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         default-method="mus"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="check.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -159,6 +165,8 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 
 /**
  * 抽凭科目码取自单一真源 `hCycleAccountScope`（H10 资产处置损益）。原为模板内字面量；
@@ -172,6 +180,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 // spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
@@ -196,6 +205,7 @@ const check = useH10Check({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+  projectId: toRef(props, 'projectId'),
 })
 
 const NOTE_KEY = 'H10-4-check-audit-note'
@@ -265,27 +275,26 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H10_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await check.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] } | any[]): void {
+/** 抽凭回填走共享函数：样本各成一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSamplesFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
+  void persistMethodology(payload?.methodology)
+  const out = await check.onEngineFilled(payload)
+  if (out.cancelled) return
   showSamplingDialog.value = false
-  const samples = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!Array.isArray(samples) || !samples.length) return
-  const n = check.fillFromSampledVouchers(samples)
-  ElMessage.success(`已填入 ${n} 笔抽凭样本`)
   if (check.sampleRatioLow.value) {
     ElMessage.warning(`抽查比例 ${(check.sampleRatio.value * 100).toFixed(0)}% 仍低于建议门槛`)
   }
 }
 
 onMounted(() => {
+  void check.voucherFillReady()
   const n = props.allResponses.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
   const c = props.allResponses.get(CONCLUSION_KEY)

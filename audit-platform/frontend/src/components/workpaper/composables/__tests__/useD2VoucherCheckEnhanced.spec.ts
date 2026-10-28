@@ -400,16 +400,17 @@ describe('useD2VoucherCheckEnhanced', () => {
     expect(parsedPost[0].customerName).toBe('B')
   })
 
-  it('fillFromSampledVouchers classifies and merges correctly', () => {
-    const { currentRows, postRows, fillFromSampledVouchers } = useD2VoucherCheckEnhanced(options)
+  // 回填走共享回填函数（spec voucher-identity-writeback-and-audit-phase 任务 10；去重 / 撤销 / 只读见 d2VoucherFill.spec.ts）
+  it('onEngineFilled classifies vouchers into zones by date', async () => {
+    const { currentRows, postRows, onEngineFilled } = useD2VoucherCheckEnhanced(options)
 
-    const vouchers: SampledVoucher[] = [
-      { voucherNo: 'PZ-001', voucherDate: '2025-06-15', debitAmount: 1000 },
-      { voucherNo: 'PZ-002', voucherDate: '2025-12-31', debitAmount: 2000 },
-      { voucherNo: 'PZ-003', voucherDate: '2026-01-05', creditAmount: 3000 },
+    const vouchers = [
+      { voucherNo: 'PZ-001', voucherDate: '2025-06-15', debitAmount: '1000.00', creditAmount: null, lineFp: 'f1' },
+      { voucherNo: 'PZ-002', voucherDate: '2025-12-31', debitAmount: '2000.00', creditAmount: null, lineFp: 'f2' },
+      { voucherNo: 'PZ-003', voucherDate: '2026-01-05', debitAmount: null, creditAmount: '3000.00', lineFp: 'f3' },
     ]
 
-    fillFromSampledVouchers(vouchers, 'replace')
+    await onEngineFilled({ samples: vouchers, fillMode: 'replace' })
 
     // PZ-001 and PZ-002 are <= bsDate → current
     expect(currentRows.value).toHaveLength(2)

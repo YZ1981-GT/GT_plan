@@ -1,87 +1,17 @@
 /**
- * H4-4 抽凭回填 / OCR 映射单测
+ * H4-4 抽凭回填补丁 / OCR 映射单测（抽凭样本映射改走共享回填函数，用例在 h4VoucherFill.spec.ts）
  */
 import { describe, it, expect } from 'vitest'
 import {
-  splitCounterpartAccount,
   mergeSupportingDocs,
-  mapVoucherSampleToAdditionPatch,
-  normalizeFilledSamples,
   applyAdditionSamplePatch,
   mapOcrToAdditionPatch,
   extractOcrFields,
   applyOcrPatchToAdditionRow,
-  resolveAdditionDebitAmount,
 } from '../h4AdditionSampleFill'
 import { normalizeAdditionRow } from '../h4AdditionCheckModel'
 
 describe('h4AdditionSampleFill', () => {
-  describe('splitCounterpartAccount', () => {
-    it('拆分 科目/明细', () => {
-      expect(splitCounterpartAccount('应付账款/甲供应商')).toEqual({
-        account: '应付账款',
-        detail: '甲供应商',
-      })
-    })
-
-    it('无分隔符时全部作为科目', () => {
-      expect(splitCounterpartAccount('银行存款')).toEqual({
-        account: '银行存款',
-        detail: '',
-      })
-    })
-  })
-
-  describe('mapVoucherSampleToAdditionPatch', () => {
-    it('业务内容←summary，对方科目←counterpartAccount，不写入支持性文件', () => {
-      const patch = mapVoucherSampleToAdditionPatch({
-        voucherNo: '记-100',
-        voucherDate: '2025-03-01',
-        summary: '购入电缆',
-        counterpartAccount: '应付账款/乙公司',
-        debitAmount: '12000.50',
-      })
-      expect(patch.businessContent).toBe('购入电缆')
-      expect(patch.oppositeAccount).toBe('应付账款')
-      expect(patch.oppositeDetail).toBe('乙公司')
-      expect(patch.amount).toBe(12000.5)
-      expect(patch.voucherNo).toBe('记-100')
-      expect(patch.supportingDocs).toBeUndefined()
-    })
-
-    it('借方优先于贷方/amount', () => {
-      expect(resolveAdditionDebitAmount({
-        debitAmount: '100',
-        creditAmount: '999',
-        amount: '50',
-      })).toBe(100)
-    })
-
-    it('不用 accountName 冒充对方科目', () => {
-      const patch = mapVoucherSampleToAdditionPatch({
-        summary: '入库',
-        accountName: '工程物资',
-        counterpartAccount: null,
-      })
-      expect(patch.oppositeAccount).toBeUndefined()
-      expect(patch.businessContent).toBe('入库')
-    })
-
-    it('abnormal 标记是否异常', () => {
-      const patch = mapVoucherSampleToAdditionPatch({ summary: 'x', abnormal: true })
-      expect(patch.isAbnormal).toBe('是')
-    })
-  })
-
-  describe('normalizeFilledSamples', () => {
-    it('兼容 { samples } / 裸数组 / { rows }', () => {
-      expect(normalizeFilledSamples({ samples: [{ summary: 'a' }] })).toHaveLength(1)
-      expect(normalizeFilledSamples([{ summary: 'b' }])).toHaveLength(1)
-      expect(normalizeFilledSamples({ rows: [{ summary: 'c' }] })).toHaveLength(1)
-      expect(normalizeFilledSamples(null)).toHaveLength(0)
-    })
-  })
-
   describe('applyAdditionSamplePatch', () => {
     it('已有名称时不覆盖；强制回填业务内容', () => {
       const row = normalizeAdditionRow({ name: '已有物资', amount: 1 })

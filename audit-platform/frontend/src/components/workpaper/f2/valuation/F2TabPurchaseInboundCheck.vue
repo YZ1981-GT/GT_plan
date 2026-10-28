@@ -163,11 +163,17 @@
       </div>
 
       <div v-if="viewMode === 'table'" class="ic-table-wrap">
-        <el-table :data="ic.rows.value" border size="small" max-height="520" :row-class-name="rowClass">
+        <el-table :data="ic.rows.value" border size="small" max-height="520" :row-class-name="voucherRowClassName">
           <el-table-column prop="seq" label="序号" width="52" fixed />
+          <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+          <el-table-column label="来源" width="150">
+            <template #default="{ row }">
+              <VoucherRowMetaCell :row="row" :locked="ic.isVoucherRowLocked(row)" :project-id="projectId ?? ''" :year="auditYear ?? 0" />
+            </template>
+          </el-table-column>
           <el-table-column label="供应商名称" width="130" fixed>
             <template #default="{ row }">
-              <el-input :model-value="row.party" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { party: v })" />
+              <WpCommitInput :model-value="row.party" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { party: v })" />
             </template>
           </el-table-column>
           <el-table-column label="存货类别" width="110">
@@ -180,22 +186,22 @@
           <el-table-column label="记账凭证">
             <el-table-column label="凭证编号" width="110">
               <template #default="{ row }">
-                <el-input :model-value="row.voucherNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { voucherNo: v })" />
+                <WpCommitInput :model-value="row.voucherNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { voucherNo: v })" />
               </template>
             </el-table-column>
             <el-table-column label="业务内容" min-width="140">
               <template #default="{ row }">
-                <el-input :model-value="row.businessContent" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { businessContent: v })" />
+                <WpCommitInput :model-value="row.businessContent" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { businessContent: v })" />
               </template>
             </el-table-column>
             <el-table-column label="存货名称" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.itemName" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { itemName: v })" />
+                <WpCommitInput :model-value="row.itemName" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { itemName: v })" />
               </template>
             </el-table-column>
             <el-table-column label="单位" width="64">
               <template #default="{ row }">
-                <el-input :model-value="row.unit" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { unit: v })" />
+                <WpCommitInput :model-value="row.unit" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { unit: v })" />
               </template>
             </el-table-column>
             <el-table-column label="数量" width="88">
@@ -210,19 +216,19 @@
             </el-table-column>
             <el-table-column label="对方科目" width="110">
               <template #default="{ row }">
-                <el-input :model-value="row.counterpartAccount" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { counterpartAccount: v })" />
+                <WpCommitInput :model-value="row.counterpartAccount" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { counterpartAccount: v })" />
               </template>
             </el-table-column>
             <el-table-column label="对方明细科目" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.counterpartDetail" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { counterpartDetail: v })" />
+                <WpCommitInput :model-value="row.counterpartDetail" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { counterpartDetail: v })" />
               </template>
             </el-table-column>
           </el-table-column>
           <el-table-column label="入库单/验收单">
             <el-table-column label="日期/编号" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.recvDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { recvDateNo: v })" />
+                <WpCommitInput :model-value="row.recvDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { recvDateNo: v })" />
               </template>
             </el-table-column>
             <el-table-column label="数量" width="88">
@@ -234,19 +240,19 @@
           <el-table-column label="质检报告" class-name="optional-col">
             <el-table-column label="日期/编号" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.inspectDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { inspectDateNo: v })" />
+                <WpCommitInput :model-value="row.inspectDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { inspectDateNo: v })" />
               </template>
             </el-table-column>
           </el-table-column>
           <el-table-column label="物流单（运输单）" class-name="optional-col">
             <el-table-column label="日期/编号" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.logisticsDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { logisticsDateNo: v })" />
+                <WpCommitInput :model-value="row.logisticsDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { logisticsDateNo: v })" />
               </template>
             </el-table-column>
             <el-table-column label="物流单位" width="110">
               <template #default="{ row }">
-                <el-input :model-value="row.logisticsProvider" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { logisticsProvider: v })" />
+                <WpCommitInput :model-value="row.logisticsProvider" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { logisticsProvider: v })" />
               </template>
             </el-table-column>
           </el-table-column>
@@ -258,12 +264,12 @@
             </el-table-column>
             <el-table-column label="日期/编号" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.invoiceDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { invoiceDateNo: v })" />
+                <WpCommitInput :model-value="row.invoiceDateNo" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { invoiceDateNo: v })" />
               </template>
             </el-table-column>
             <el-table-column label="对手方名称" width="120">
               <template #default="{ row }">
-                <el-input :model-value="row.invoiceParty" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { invoiceParty: v })" />
+                <WpCommitInput :model-value="row.invoiceParty" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { invoiceParty: v })" />
               </template>
             </el-table-column>
             <el-table-column label="金额" width="110">
@@ -274,7 +280,7 @@
           </el-table-column>
           <el-table-column label="索引号" width="96">
             <template #default="{ row }">
-              <el-input :model-value="row.indexRef" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { indexRef: v })" />
+              <WpCommitInput :model-value="row.indexRef" size="small" :disabled="isReadonly" @change="(v: string) => ic.updateRow(row.id, { indexRef: v })" />
             </template>
           </el-table-column>
           <el-table-column label="是否异常" width="96">
@@ -320,6 +326,7 @@
         >
           <div class="ic-vcard-head">
             <span class="ic-vcard-title">{{ row.party || row.voucherNo || `第 ${row.seq} 笔` }}</span>
+            <VoucherRowMetaTag :row="row" :locked="ic.isVoucherRowLocked(row)" />
             <el-tag v-if="rowCheckSummary(row).bad" size="small" type="danger">{{ rowCheckSummary(row).bad }} 项不符</el-tag>
             <el-tag v-else-if="rowCheckSummary(row).pending" size="small" type="info">待补 {{ rowCheckSummary(row).pending }}</el-tag>
             <el-tag v-else size="small" type="success">核对通过</el-tag>
@@ -410,7 +417,7 @@
           </el-tooltip>
         </div>
       </header>
-      <el-input
+      <WpCommitInput
         :model-value="auditConclusion"
         type="textarea"
         :rows="3"
@@ -432,12 +439,12 @@
       <GtVoucherSamplingEngine
         v-if="samplingVisible && wpId && projectId"
         :account-code="F2_ACCOUNT_PREFIXES.join(',')"
-        phase="final"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="auditYear ?? null"
         @filled="handleSamplingFilled"
+        @undo-request="ic.onUndoRequest"
       />
     </el-dialog>
 
@@ -469,7 +476,10 @@ import {
 import { f2InventoryQueryCodes } from '../../composables/f2InventoryAccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
-import type { SampledVoucher, FillMode, SamplingMethod } from '../../composables/useSamplingAlgorithms'
+import type { SamplingMethod } from '../../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import VoucherRowMetaTag from '../../voucher-sampling/VoucherRowMetaTag.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
@@ -478,6 +488,7 @@ import F2PurchaseVoucherDialog from './F2PurchaseVoucherDialog.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -490,6 +501,7 @@ const props = defineProps<{
 const ic = useF2PurchaseInboundCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+  projectId: () => props.projectId,
 })
 
 // spec: voucher-attach-account-mapping-closure（批次 3，任务 10）
@@ -508,6 +520,7 @@ function saveAuditConclusion(val: string): void {
   window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
 }
 onMounted(() => {
+  void ic.voucherFillReady()
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
@@ -583,11 +596,17 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode; method?: SamplingMethod }) {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。
+ */
+async function handleSamplingFilled(
+  payload: EngineFilledPayload & { method?: SamplingMethod; methodology?: SamplingMethodologySnapshot },
+): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  ic.fillFromSampling(payload.samples, payload.fillMode, payload.method)
+  void persistMethodology(payload?.methodology)
+  const out = await ic.onEngineFilled(payload)
+  if (out.cancelled) return
   samplingVisible.value = false
   samplingInfo.value = {
     method: METHOD_LABELS[payload.method || 'random'] || payload.method || '随机抽样',
@@ -605,6 +624,8 @@ function handleOcrUpload(rowId: string, file?: File) {
 function rowClass({ row }: { row: { isAbnormal?: boolean } }) {
   return row.isAbnormal ? 'error-row' : ''
 }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClass, ic.voucherRowClass as (a: { row: { isAbnormal?: boolean } }) => string)
 
 // ─── 视图切换 + 逐笔核对弹窗（引导式，宽表核对主路径）────────────────────────
 const viewMode = ref<'table' | 'card'>('table')

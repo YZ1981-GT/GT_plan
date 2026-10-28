@@ -65,14 +65,16 @@
 
     <!-- ═══ 资产负债表日前 段 ═══ -->
     <div class="seg-title">资产负债表日<strong>前</strong>（截止日期 {{ periodEnd }} 之前，应记入本期）</div>
-    <K8CutoffS2VTable :rows="preCutoffSamples" :is-readonly="isReadonly" :fmt-amt="fmtAmt" @update="onCellUpdate" @remove="onRemove" />
+    <K8CutoffS2VTable :rows="preCutoffSamples" :is-readonly="isReadonly" :fmt-amt="fmtAmt" :is-row-locked="isVoucherRowLocked"
+      :project-id="props.projectId" :year="currentYear" @update="onCellUpdate" @remove="onRemove" />
 
     <!-- ═══ 截止日期分隔线 ═══ -->
     <div class="cutoff-divider">—————— 截止日期：{{ periodEnd }} ——————</div>
 
     <!-- ═══ 资产负债表日后 段 ═══ -->
     <div class="seg-title">资产负债表日<strong>后</strong>（截止日期 {{ periodEnd }} 之后，应记入下期）</div>
-    <K8CutoffS2VTable :rows="postCutoffSamples" :is-readonly="isReadonly" :fmt-amt="fmtAmt" @update="onCellUpdate" @remove="onRemove" />
+    <K8CutoffS2VTable :rows="postCutoffSamples" :is-readonly="isReadonly" :fmt-amt="fmtAmt" :is-row-locked="isVoucherRowLocked"
+      :project-id="props.projectId" :year="currentYear" @update="onCellUpdate" @remove="onRemove" />
 
     <!-- ═══ useCutoffAutoSampling 面板 ═══ -->
     <GtCutoffAutoSampling
@@ -93,9 +95,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -141,6 +143,7 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useK8Cutoff } from '@/components/workpaper/composables/useK8Cutoff'
+import type { EngineFilledPayload } from '@/components/workpaper/composables/shared/voucherCheckFill'
 import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import type { Ref } from 'vue'
 import type { ExtractedVoucher, FillMode } from '@/components/workpaper/composables/useCutoffAutoSampling'
@@ -206,6 +209,7 @@ const {
   removeSample,
   updateCell,
   saveConclusion,
+  onEngineFilled, onUndoRequest, isVoucherRowLocked, voucherFillReady,
 } = useK8Cutoff({
   direction: 'S2V',
   allResponses: toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>,
@@ -215,6 +219,8 @@ const {
   isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId, value) => emit('save', itemId, typeof value === 'string' ? { remark: value } : { remark: JSON.stringify(value) }),
 })
+
+onMounted(() => { void voucherFillReady() })
 
 function onCellUpdate(rowKey: string, field: string, value: any): void {
   updateCell(rowKey, field, value)
@@ -301,27 +307,14 @@ function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: Fi
 
 // ═══ 抽凭引擎 ═══
 const showSamplingDialog = ref(false)
-function handleVoucherFilled(payload: any): void {
-  const vouchers = payload?.samples ?? []
-  for (const v of vouchers) {
-    const amt = v.debitAmount ? parseFloat(v.debitAmount) : (v.creditAmount ? parseFloat(v.creditAmount) : 0)
-    addSample({
-      sourceVoucherNo: v.voucherNo || v.voucher_no || '',
-      sourceDate: v.voucherDate || v.voucher_date || '',
-      sourceAmount: amt,
-      voucherNo: v.voucherNo || v.voucher_no || '',
-      bookDate: v.voucherDate || v.voucher_date || '',
-      summary: v.summary || '',
-      businessContent: v.summary || '',
-      offsetAccount: v.counterpartAccount || v.offsetAccount || '',
-      offsetSubAccount: v.counterpartAccountName || v.offsetSubAccount || '',
-      amount: amt,
-    })
-  }
-  showSamplingDialog.value = false
-  if (vouchers.length) ElMessage.success(`已填入${vouchers.length}笔凭证`)
-}
-</script>
+/**
+ * 抽凭引擎回填：共享回填函数一个样本一行（记账凭证一侧），按分录指纹去重，填完由它保存并提示填入几行；
+ * 支出凭单一侧留空，查原件后补填（原实现把记账凭证的号、日期、金额同时抄进支出凭单三列，截止结论恒为正常）。
+ */
+async function handleVoucherFilled(payload: EngineFilledPayload): Promise<void> {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
+}</script>
 
 <style scoped>
 .k8-cutoff-s2v { font-size: var(--wp-font-size, 13px); padding: 16px; }

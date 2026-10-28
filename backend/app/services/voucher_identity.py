@@ -312,6 +312,20 @@ def voucher_type_condition(table: Any, voucher_type: Any) -> sa.ColumnElement:
     return sa.func.coalesce(c.voucher_type, sa.literal_column("''")) == norm_text(voucher_type)
 
 
+def company_code_condition(table: Any, company_code: Any) -> sa.ColumnElement | None:
+    """主体条件；没给（None / 空串）返回 None = 不限主体。
+
+    四表的 ``company_code`` 非空（导入没映射主体时记 ``default``），空串因此只表示「不知道」，不像凭证字那样
+    表示「为空的那张」。一套账两个主体同日同号同凭证字时（真库现扫：3 个已软删的 B2Perf 性能测试项目各 92 组，
+    在用项目 0 组），只给日期 + 凭证字 + 号会命中两张凭证（409 + 候选），选候选时必须带主体才能取到其中一张。
+    """
+    code = norm_text(company_code)
+    if not code:
+        return None
+    c = table.c if hasattr(table, "c") else table.__table__.c
+    return c.company_code == code
+
+
 def voucher_key_sql(table: Any, *, with_company: bool = True) -> tuple:
     """凭证键在 SQL 里的列表达式：(主体, 日期, COALESCE(凭证字, ''), 凭证号)，供 group by / 行值 IN。
 

@@ -111,9 +111,10 @@ TEMPLATE_SHA256: Final[str] = (
 #: 受管 store item —— 按值取自 `useG1Detail.ts` 的 `ITEM_ID`
 STORE_ITEM_ID: Final[str] = "G1-2-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
-ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
+#: 行身份键（与受管 spec 的 row_identity_key、前端行 id 同；原照抄 G9 写成 "rowId"）
+ROW_IDENTITY_STORE_KEY: Final[str] = "id"
 
-#: 🔴 FD-1：payload 落 `remark`（真库实证 remark 2 B / conclusion 0 B）。
+#: 🔴 FD-1：payload 落 `conclusion`（`useG1Detail` 读写 conclusion；真库曾见 remark 2 B 是旧镜像写的 `[]`）。
 PAYLOAD_COLUMN: Final[str] = "conclusion"
 PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
 
@@ -444,7 +445,7 @@ def build_contract_payload() -> dict[str, Any]:
                 "payload_column_source": (
                     "audit-platform/frontend/src/components/workpaper/composables/"
                     "useG1Detail.ts —— 写入点为 "
-                    "debouncedSave(ITEM_ID, { remark: JSON.stringify(list) })"
+                    "opts.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })"
                 ),
                 "note": _HTML_STORE_NOTE,
             },
@@ -476,69 +477,20 @@ def assert_contract_file_matches_source() -> SyncContract:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. store 投影/合并（**薄转发**框架层，≤3 行 —— 单区，不需伴生模块）
+# 6. store 投影/合并（三区穿线，按本 provider 绑定的 `phase5_section_store_facade`）
 # ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 三区（trading / classified_fvpl / designated_fvpl）共用 `G1-2-rows`，区归属在行的 `acctClass`。
+#    原门面按 store item 取**第一条** spec ⇒ 只投 / 只合区①，区②③ 两个方向都不通
+#    （spec oo-writeback-template-parity-closure R3 批 B3）。
+from app.services.workpaper_sync.phase5_section_store_facade import SectionStoreFacade  # noqa: E402
 
-
-def _spec_of_store_item(store_item_id: str) -> Any:
-    """store item → 受管 spec。未登记即抛（不静默跳过）。"""
-    for spec in managed_row_table_specs():
-        if spec.store_item_id == store_item_id:
-            return spec
-    raise EntrySelectionError(
-        f"store item {store_item_id!r} 不在 G1 受管清单里；"
-        f"已受管：{sorted(all_store_item_ids())}"
-    )
-
-
-def build_store_projection(
-    payload: str | bytes | Sequence[Any],
-    *,
-    contract: SyncContract,
-    limits: Any | None = None,
-    store_item_id: str | None = None,
-) -> Any:
-    """HTML store 载荷 → `Projection`（薄转发框架层引擎）。
-
-    :param store_item_id: 指定按哪个受管区投影；缺省用 :data:`STORE_ITEM_ID`。
-
-    🔴 **签名形态是刚性的**：`payload` 必须是**第一个位置参数**、其余走关键字。零回归门
-    `scripts/check/check_sync_provider_golden_digest.py` 按
-    `mod.build_store_projection(rows, contract=contract)` 调用 —— 写成
-    `(store_item_id, payload, *, contract)` 两位置参的 F1/F2 在该门上直接
-    `TypeError`（G2 初版照抄 F1 也踩过）。
-    """
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        build_store_projection as _engine,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine(spec, payload, contract=contract, limits=limits)
-
-
-def merge_projection_into_store_rows(
-    *,
-    projection: Any,
-    base_rows: list[Mapping[str, Any]],
-    store_item_id: str | None = None,
-) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """projection → HTML store 行（薄转发框架层引擎，含幽灵行防护）。"""
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        merge_projection_into_store_rows as _engine_merge,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine_merge(spec, projection=projection, base_rows=base_rows)
-
-
-def iter_store_rows(payload: Any, *, store_item_id: str | None = None):
-    """流式 `(row_identity, row)`（薄转发框架层引擎）。"""
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        iter_store_rows as _engine_iter,
-    )
-
-    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
-    return _engine_iter(spec, payload)
+_STORE_FACADE: Final[SectionStoreFacade] = SectionStoreFacade("phase5_g1_trading_financial_assets")
+build_store_projection = _STORE_FACADE.build_store_projection
+merge_projection_into_store_rows = _STORE_FACADE.merge_projection_into_store_rows
+iter_store_rows = _STORE_FACADE.iter_store_rows
+_specs_for = _STORE_FACADE.specs_for
+split_store_payload_by_section = _STORE_FACADE.split_store_payload_by_section
 
 
 # ═══════════════════════════════════════════════════════════════════════════

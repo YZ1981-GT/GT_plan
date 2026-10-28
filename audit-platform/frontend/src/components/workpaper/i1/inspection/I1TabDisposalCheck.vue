@@ -71,13 +71,13 @@
         row-key="rowId"
         show-summary
         :summary-method="getSummary"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
       >
         <el-table-column type="index" label="#" width="44" align="center" fixed />
 
         <el-table-column prop="name" label="资产名称" min-width="110" fixed>
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.name"
               size="small"
@@ -87,9 +87,15 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
+
         <el-table-column prop="counterpartAccount" label="对方科目" width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.counterpartAccount"
               size="small"
@@ -180,7 +186,7 @@
         <el-table-column label="其他减少" align="center">
           <el-table-column prop="otherMethodDesc" label="方式说明" min-width="90">
             <template #default="{ row }">
-              <el-input
+              <WpCommitInput
                 v-if="!isReadonly"
                 :model-value="row.otherMethodDesc"
                 size="small"
@@ -221,7 +227,7 @@
 
         <el-table-column prop="voucherNo" label="凭证编号" width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.voucherNo"
               size="small"
@@ -233,7 +239,7 @@
 
         <el-table-column prop="attachmentIndex" label="附件索引" width="90">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!isReadonly"
               :model-value="row.attachmentIndex"
               size="small"
@@ -392,7 +398,7 @@
 
     <el-card shadow="never" class="note-card">
       <template #header><div class="section-title"><span>三、审计说明</span></div></template>
-      <el-input
+      <WpCommitInput
         :model-value="state.auditNote.value"
         type="textarea"
         :autosize="{ minRows: 4 }"
@@ -412,7 +418,7 @@
           </el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="state.auditConclusion.value"
         type="textarea"
         :autosize="{ minRows: 3 }"
@@ -436,7 +442,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎（科目 ${samplingAccountCode} 无形资产-减少）"
+      :title="`抽凭引擎（科目 ${samplingAccountCode} 无形资产-减少）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -446,9 +452,9 @@
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -460,7 +466,7 @@
  * 对齐 Excel：定性合规 + 定量金额；净损益 = 收入 − 费用 − 净值
  */
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { computed, inject, ref, defineComponent, h } from 'vue'
+import { computed, inject, ref, defineComponent, h, onMounted } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
 import { ElSelect } from '@/components/grid/adapters'
@@ -470,6 +476,8 @@ import {
   type I1DisposalCheckRow,
 } from '../../composables/useI1DisposalCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { eventBus } from '@/utils/eventBus'
 
@@ -485,6 +493,7 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -515,7 +524,10 @@ const state = useI1DisposalCheck({
     // 仅 eventBus：crossWpEventBridge 转发到 window，避免 H10 双次入库
     eventBus.emit(event as any, payload)
   },
+  projectId: () => props.projectId,
+  isReadonly: () => props.isReadonly,
 })
+onMounted(() => { void state.voucherFillReady() })
 
 /** 紧凑 Y/N 下拉 */
 const YnSelect = defineComponent({
@@ -610,16 +622,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, I1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled(samples)
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(samples: any[]) {
-  showSamplingDialog.value = false
-  const n = state.appendFromSamples(samples)
-  if (n) ElMessage.success(`已从抽凭加入 ${n} 行`)
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload) {
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 function openReview(id: string) {
@@ -630,6 +642,9 @@ function rowClassName({ row }: { row: I1DisposalCheckRow }): string {
   if (row.conclusion === '有异常' || row.reconciled === 'N') return 'row-anomaly'
   return ''
 }
+
+/** 行样式：异常提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, state.voucherRowClass)
 
 function getSummary({ columns }: { columns: any[] }) {
   const sums: string[] = []
