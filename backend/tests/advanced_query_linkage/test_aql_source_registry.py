@@ -343,9 +343,11 @@ async def test_adjustment_statement_compares_type_as_text() -> None:
         "column"])
 async def test_unregistered_inputs_are_400(kwargs: dict, code: str, fixed_active_dataset) -> None:
     # 口径谓词不触库（生效数据集 id 固定）：校验若被跳过，语句照常建出 ⇒ 形态是 DID NOT RAISE，而不是别的报错
-    ctx = _ctx(filters=kwargs.pop("filters", {}))
+    # 不改参数化的 dict（原先 pop 掉 filters：同一会话里再收集到一次时第二次 filters 为空 ⇒ DID NOT RAISE）
+    rest = {key: value for key, value in kwargs.items() if key != "filters"}
+    ctx = _ctx(filters=kwargs.get("filters", {}))
     with pytest.raises(HTTPException) as exc:
-        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, ctx, **kwargs)
+        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, ctx, **rest)
     assert exc.value.status_code == 400 and _detail(exc)["error_code"] == code, _detail(exc)
     assert _detail(exc)["message"], "400 须带中文原因"
 
