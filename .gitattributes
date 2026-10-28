@@ -48,3 +48,8 @@ docs/acnr/schemas/global_catalog.schema.json text eol=lf
 backend/data/acnr/global_catalog.json text eol=lf
 backend/data/acnr/catalog_report.json text eol=lf
 backend/data/acnr/catalog_snapshots/*.json text eol=lf
+
+# 鉴权清册（附注写端点清册 / edit 级影响清单 / 目标门禁声明，2026-10-27 spec note-pull-followup-closure R21）。
+# 生成器恒写 LF、`--check` 原来比原始字节 ⇒ 干净检出（autocrlf 转成 CRLF）上检查模式与双生成判据恒红，
+# 「红成常态」后真实漂移也没人看。检查模式已改为按换行归一比较；这里再固定检出为 LF。index 里本就是 LF，不产生行尾 churn。
+backend/data/authz/*.json text eol=lf

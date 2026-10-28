@@ -474,6 +474,8 @@ export const archive = {
   orchestrate: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
   job: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}`,
   retry: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}/retry`,
+  /** 解除归档（admin / 合伙人）：项目与底稿恢复归档前状态 */
+  unarchive: (pid: string) => `/api/projects/${pid}/unarchive`,
   exportPdf: (pid: string) => `/api/projects/${pid}/archive/export-pdf`,
   modifications: {
     request: (pid: string) => `/api/projects/${pid}/archive/modifications`,

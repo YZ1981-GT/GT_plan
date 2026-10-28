@@ -50,6 +50,13 @@ def _project_row(audit_year: int | None, standard: dict | None) -> MagicMock:
     return row
 
 
+def _no_push_states() -> MagicMock:
+    """公式推送状态查询（spec note-pull-followup-closure R3：更新已有章节时查推送写过的格）：没有推送过。"""
+    res = MagicMock()
+    res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    return res
+
+
 def _make_db(
     *,
     active=None,
@@ -57,7 +64,7 @@ def _make_db(
     audit_year: int | None = 2025,
     standard: dict | None = None,
 ) -> MagicMock:
-    """按调用顺序返回：项目行（audit_year + 准则）→ active note → (可选) deleted note。"""
+    """按调用顺序返回：项目行（audit_year + 准则）→ active note → (可选) deleted note → (有章节时) 推送状态。"""
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
     db.flush = AsyncMock()
@@ -70,6 +77,8 @@ def _make_db(
     ]
     if active is None:
         sequence.append(_scalar_result(deleted))
+    if active is not None or deleted is not None:
+        sequence.append(_no_push_states())
     db.execute = AsyncMock(side_effect=sequence)
     return db
 
@@ -163,5 +172,6 @@ async def test_active_note_path_unchanged():
     assert result["created"] is False
     assert result["revived"] is False
     db.add.assert_not_called()
-    # audit_year + active 查询共 2 次；没有第 3 次（软删分支未触达）
-    assert db.execute.await_count == 2
+    # audit_year + active + 推送状态查询共 3 次；没有软删查询（软删分支未触达）
+    assert db.execute.await_count == 3
+    assert "formula_push_state" in str(db.execute.await_args_list[2].args[0]), "第 3 次是推送状态查询，不是软删查询"

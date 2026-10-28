@@ -11,6 +11,7 @@ import {
   num,
   setCell,
   type H8ListedCategory,
+  type H8ListedSyncSnapshot,
   type MovementCellMap,
 } from './h8ListedDisclosureModel'
 import {
@@ -20,6 +21,7 @@ import {
   mapToSoeCategoryKey,
   recomputeDerivedLayers,
   type H8SoeLayerBlock,
+  type H8SoeSyncSnapshot,
 } from './h8SoeDisclosureModel'
 import { H810_ROWS_KEY } from './useH8Impairment'
 
@@ -451,5 +453,27 @@ export function useH8SoeDisclosure(params: {
     persist,
     updateCell,
     pullFromSources,
+  }
+}
+
+/** 上市「同步到附注」快照（底稿披露 Tab 与附注页离屏同步共用，spec note-pull-followup-closure R1；字段同 Tab 原内联对象） */
+export function h8ListedSyncSnapshot(
+  note: Pick<ReturnType<typeof useH8ListedDisclosure>, 'categories' | 'movement' | 'noteShortLow' | 'noteImpairment'>,
+): H8ListedSyncSnapshot {
+  return {
+    categories: note.categories.value,
+    movement: note.movement.value,
+    noteShortLow: note.noteShortLow.value,
+    noteImpairment: note.noteImpairment.value,
+  }
+}
+
+/** 国企「同步到附注」快照（同上） */
+export function h8SoeSyncSnapshot(
+  note: Pick<ReturnType<typeof useH8SoeDisclosure>, 'layers' | 'noteImpairment'>,
+): H8SoeSyncSnapshot {
+  return {
+    layers: note.layers.value,
+    noteImpairment: note.noteImpairment.value,
   }
 }

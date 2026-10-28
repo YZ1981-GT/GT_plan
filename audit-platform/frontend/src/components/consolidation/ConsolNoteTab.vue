@@ -47,7 +47,10 @@
               <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping"
                 :disabled="!selectedNoteSection?.section_id">📋 明细映射</el-button>
             </el-tooltip>
-            <el-tooltip content="下推集团模板到子企业：在子企业附注中预生成行骨架" placement="bottom">
+            <el-tooltip content="自动映射：未绑定模板的章节按子企业附注建模板，行名能确定对上的企业直接确认映射（其余在「📋 明细映射」确认）" placement="bottom">
+              <el-button size="small" @click="handleAutoMap" :loading="autoMapping" data-testid="consol-note-auto-map">⚡ 自动映射</el-button>
+            </el-tooltip>
+            <el-tooltip content="下推集团模板到子企业：子企业附注对应表上打集团行标识、补上缺的行（不改已有行名与数据）" placement="bottom">
               <el-button size="small" @click="handlePushTemplate" :loading="pushingTemplate"
                 :disabled="!selectedNoteSection?.section_id" data-testid="consol-note-push-template">📤 下推模板</el-button>
             </el-tooltip>
@@ -57,6 +60,7 @@
             </el-tooltip>
           </div>
         </div>
+        <ConsolNoteTopnNotice :data="selectedNoteSection.savedData" />
 
         <!-- 跨表勾稽校验结果 -->
         <!-- P2：映射变更通知横幅（集团侧确认映射 / 提升模板后 SSE 推送） -->
@@ -312,6 +316,7 @@
             <el-button size="small" type="danger" @click="toggleNoteFullscreen">✕ 退出全屏</el-button>
           </div>
         </div>
+        <ConsolNoteTopnNotice :data="selectedNoteSection.savedData" />
         <div v-if="selectedNoteSection.headers?.length" style="flex:1;min-height:0">
           <el-table :data="noteEditMode ? selectedNoteSection.editRows : trimTrailingEmptyRows(selectedNoteSection.editRows || [])" border size="small"
             max-height="calc(100vh - 100px)" style="width:100%" class="gt-note-compact-table"
@@ -767,6 +772,7 @@ import {
 import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
 import { createConsolRequestGuard, isAborted } from '@/components/consolidation/composables/consolRequestGuard'
 import { pushConsolNoteTemplate } from '@/components/consolidation/composables/consolNoteTemplatePush'
+import { runConsolNoteAutoMap } from '@/components/consolidation/composables/consolNoteAutoMap'
 import {
   cellAggregateSummary,
   clearManual,
@@ -789,10 +795,12 @@ import {
   type FillDetailRow,
   type NoteEditRow,
 } from '@/components/consolidation/composables/consolNoteView'
+import { recalcConsolTotalRows } from '@/views/composables/noteTotalTerms'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import ConsolNoteMappingDialog from '@/components/consolidation/ConsolNoteMappingDialog.vue'
 import ConsolNoteTemplateManagerDialog from '@/components/consolidation/ConsolNoteTemplateManagerDialog.vue'
 import ConsolNoteAutoRefreshSwitch from '@/components/consolidation/ConsolNoteAutoRefreshSwitch.vue'
+import ConsolNoteTopnNotice from '@/components/consolidation/ConsolNoteTopnNotice.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -1138,6 +1146,7 @@ const showMappingDialog = ref(false)
 const showTemplateManager = ref(false)
 const mappingChangedBanner = ref(false)
 const pushingTemplate = ref(false)
+const autoMapping = ref(false)
 
 /** SSE → eventBus 回调：集团侧映射确认或模板提升 → 显示横幅 */
 function onMappingChangedEvent() {
@@ -1628,58 +1637,16 @@ function onNoteCellInput(row: NoteEditRow, col: number) {
   recalcTotalRows()
 }
 
-/** 重算合计行：遍历 editRows，对 total/subtotal 行的空值列自动求和 */
+/** 重算合计 / 小计行：按合计构成（noteTotalTerms，与后端拉数 / 汇总 / 单体同一判定）——小计 = 本组明细、合计 = 各小计
+ *  ± 减项 / 加项、「其中」不重复加；判不准的不动、手工格不动、只写金额列（旧算法合计只加到上一个小计为止：
+ *  「小计 / 减：坏账准备 / 合计」的合计 = 坏账准备） */
 function recalcTotalRows() {
   const sec = selectedNoteSection.value
   if (!sec?.editRows?.length) return
   const rows = sec.editRows as NoteEditRow[]
-  const types: string[] | null = sec.rowTypes
-  const width = sec.headers?.length || 0
-
-  for (let ri = 0; ri < rows.length; ri++) {
-    const rtype = types && ri < types.length
-      ? types[ri]
-      : _inferRowType(rows[ri])
-    if (rtype !== 'total' && rtype !== 'subtotal') continue
-
-    // 向上找数据行范围
-    let dataStart = ri
-    for (let j = ri - 1; j >= 0; j--) {
-      const jtype = types && j < types.length
-        ? types[j]
-        : _inferRowType(rows[j])
-      if (jtype === 'total' || jtype === 'subtotal') break
-      dataStart = j
-    }
-
-    // 对每个数值列求和回填
-    for (let ci = 1; ci < width; ci++) {
-      let sum = 0
-      let hasData = false
-      for (let j = dataStart; j < ri; j++) {
-        const v = _parseNum(rows[j]?.[ci])
-        if (v !== null) { sum += v; hasData = true }
-      }
-      if (hasData) {
-        rows[ri][ci] = sum === Math.floor(sum) ? String(sum) : String(sum)
-      }
-    }
-  }
-}
-
-function _inferRowType(row: NoteEditRow): string {
-  const label = String(row?.[0] || '').trim().replace(/\s+/g, '')
-  if (label === '合计') return 'total'
-  if (label === '小计') return 'subtotal'
-  return 'data'
-}
-
-function _parseNum(val: any): number | null {
-  if (val == null || val === '') return null
-  const s = String(val).trim().replace(/,/g, '').replace(/，/g, '')
-  if (!s) return null
-  const n = Number(s)
-  return isNaN(n) ? null : n
+  recalcConsolTotalRows(rows, sec.rowTypes,
+    { headers: sec.headers, multi_header: sec.multiHeader, _column_groups: sec.columnGroups },
+    (r, c) => isManual(rows[r], c))
 }
 
 /** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化。
@@ -2216,6 +2183,11 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
 // 下推集团模板到子企业（spec: consol-note-template-push-to-subsidiaries；实现见 consolNoteTemplatePush）
 function handlePushTemplate() {
   return pushConsolNoteTemplate(props.projectId, props.year, selectedNoteSection.value?.section_id, pushingTemplate)
+}
+
+// ⚡ 自动映射：建模板 + 确认能确定的映射（note-pull-header-formula-closure R6.3；实现见 consolNoteAutoMap）
+function handleAutoMap() {
+  return runConsolNoteAutoMap(props.projectId, props.year, selectedNoteSection.value?.section_id, autoMapping)
 }
 
 // 重新汇总 = 本节点子树逐节点更新（叶子按已确认映射从单体附注拉数、差额节点按抵销分录算差额）

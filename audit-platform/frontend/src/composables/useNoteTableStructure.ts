@@ -2,7 +2,7 @@
  * useNoteTableStructure - 附注表格结构手动编辑
  *
  * 支持：新增行/删除行/新增列/删除列/修改列名/调整列顺序
- * 结构编辑后自动重新计算合计行
+ * 结构编辑后按合计构成重算合计 / 小计行（`noteTotalTerms`，与后端同一判定；判不准的不动、手工格不动）
  * 支持撤销/重做（Ctrl+Z / Ctrl+Y）
  * 支持"恢复模板结构"操作
  *
@@ -10,6 +10,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { isTextEntryTarget } from '@/utils/shortcuts'
+import { isTotalRow, recalcNoteTableTotals, rowKind } from '@/views/composables/noteTotalTerms'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,95 @@ interface StructureCommand {
   description: string
   undo: () => void
   redo: () => void
+}
+
+/**
+ * 集团下推的固定行（合并附注「📤 下推模板」打的行身份）：子企业不可删除、不可改名（后端保存时同口径拒绝，
+ * `note_pushed_row_guard`：有行身份、类别缺省按固定行算）。
+ */
+export function isPushedFixedRow(row: unknown): boolean {
+  const r = row as { _pushed_row_id?: unknown; _pushed_category?: unknown } | null
+  return !!r && !!r._pushed_row_id && (r._pushed_category ?? 'required') === 'required'
+}
+
+/** 下推行身份字段：恢复模板结构时按行名带回，合并拉数仍按它精确对应。 */
+const PUSHED_KEYS = ['_pushed_row_id', '_pushed_category', '_pushed_optional_active'] as const
+/** 按数值列序号存的逐格元数据（取数 / 手工模式）：恢复模板结构时按列映射搬 */
+const CELL_KEYS = ['_cell_meta', '_cell_modes'] as const
+/** 随表头一起恢复的表结构键（多级表头与列身份）；`_row_types` 只在表里原本有时按新行重算 */
+const STRUCTURE_KEYS = ['columns', '_column_groups'] as const
+const RESTORE_KEYS = [...STRUCTURE_KEYS, '_row_types'] as const
+
+const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)))
+const squash = (s: unknown): string => String(s ?? '').replace(/\s+/g, '')
+
+/** 逐数值列身份：列定义的 key（end_amount / prior_amount）、「分组/列名#同名第几列」、列名 */
+function valueColumnIds(table: Record<string, any>): { key: string | null; text: string; leaf: string }[] {
+  const headers: unknown[] = Array.isArray(table.headers) ? table.headers : []
+  const cols: any[] | null = Array.isArray(table.columns) && table.columns.length === headers.length ? table.columns : null
+  const groups: any[] = Array.isArray(table._column_groups) ? table._column_groups : []
+  const seen = new Map<string, number>()
+  const out: { key: string | null; text: string; leaf: string }[] = []
+  for (let c = 1; c < headers.length; c++) {
+    const g = groups.find(x => Number(x?.start) <= c && c < Number(x?.start) + Number(x?.span || 1))
+    const leaf = squash(headers[c])
+    const base = `${squash(g?.group ?? cols?.[c]?.group ?? '')}/${leaf}`
+    const n = seen.get(base) ?? 0
+    seen.set(base, n + 1)
+    out.push({ key: cols?.[c]?.key ? String(cols[c].key) : null, text: `${base}#${n}`, leaf })
+  }
+  return out
+}
+
+type ColumnId = ReturnType<typeof valueColumnIds>[number]
+/** 对应规则由强到弱，逐轮做完一轮再下一轮（弱规则不抢强规则能对上的列） */
+const COLUMN_TIERS: ((s: ColumnId, d: ColumnId) => boolean)[] = [
+  (s, d) => !!d.key && s.key === d.key,
+  (s, d) => s.text === d.text,
+  (s, d) => s.leaf === d.leaf, // 兜底：旧表没有分组信息 / 分组改过名 ⇒ 同名列按出现顺序取还没用过的
+]
+
+/** 模板数值列 → 当前表数值列（每列只用一次）：列定义 key 相同优先，其次分组 / 列名 / 第几次出现相同，最后同列名。
+ * 原先只按列名找第一列：期末、上年年末下的同名列都取第一列 */
+export function mapValueColumns(current: Record<string, any>, template: Record<string, any>): (number | null)[] {
+  const src = valueColumnIds(current)
+  const dst = valueColumnIds(template)
+  const out: (number | null)[] = dst.map(() => null)
+  const used = new Set<number>()
+  for (const same of COLUMN_TIERS) {
+    dst.forEach((d, j) => {
+      if (out[j] != null) return
+      const i = src.findIndex((s, k) => !used.has(k) && same(s, d))
+      if (i >= 0) { out[j] = i; used.add(i) }
+    })
+  }
+  return out
+}
+
+/**
+ * 「➕ 行 / ➖ 行」的位置：新行插在第一个上方有明细的合计 / 小计行之前（标题式小计表插进第一组，没有合计行放末尾）；
+ * 删最后一个可删的明细行（合计 / 小计、「其中：」标记、减项 / 加项、占位行、集团下推的固定行都不删），
+ * 明细行不足两行时不删（`deleteAt = -1`）。
+ */
+export function structureRowTargets(rows: readonly unknown[]): { insertAt: number; deleteAt: number } {
+  let firstTotal = -1
+  let insertAt = -1
+  let seenDetail = false
+  rows.forEach((row, i) => {
+    const kind = rowKind(row)
+    if (kind === 'total' || kind === 'subtotal') {
+      if (firstTotal < 0) firstTotal = i
+      if (seenDetail && insertAt < 0) insertAt = i
+    } else if (kind === 'data' || kind === 'marker' || kind === 'sub') {
+      seenDetail = true
+    }
+  })
+  const details = rows.flatMap((row, i) => (rowKind(row) === 'data' ? [i] : []))
+  const deletable = details.filter(i => !isPushedFixedRow(rows[i]))
+  return {
+    insertAt: insertAt >= 0 ? insertAt : firstTotal >= 0 ? firstTotal : rows.length,
+    deleteAt: details.length > 1 && deletable.length ? deletable[deletable.length - 1] : -1,
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -101,7 +191,7 @@ export function useNoteTableStructure(options: {
     if (!table) return
     const row = table.rows[index]
     if (!row) return
-    if (row.is_total) return // protect total rows from deletion
+    if (isTotalRow(row) || isPushedFixedRow(row)) return // 合计 / 小计行、集团下推的固定行不删
     const removedRow = { ...row, values: [...row.values] }
     const cmd: StructureCommand = {
       type: 'deleteRow',
@@ -226,79 +316,82 @@ export function useNoteTableStructure(options: {
 
   // ─── Auto-recalculate Totals ─────────────────────────────────────────────
 
-  /** Recalculate all total rows (sum of non-total rows) */
+  /** 按合计构成重算合计 / 小计行（多段小计各算各的、「其中」不重复加、「小计 / 减：X / 合计」= 小计 − X） */
   function recalcTotals() {
     const table = getActiveTable()
-    if (!table) return
-    for (const row of table.rows) {
-      if (!row.is_total) continue
-      const colCount = row.values.length
-      for (let c = 0; c < colCount; c++) {
-        let sum = 0
-        let hasValue = false
-        for (const r of table.rows) {
-          if (r.is_total) continue
-          const v = r.values[c]
-          if (v != null && typeof v === 'number') {
-            sum += v
-            hasValue = true
-          }
-        }
-        row.values[c] = hasValue ? sum : null
-      }
-    }
+    if (table) recalcNoteTableTotals(table)
   }
 
   // ─── Restore Template Structure ──────────────────────────────────────────
 
   /**
-   * Restore the table to its original template structure.
-   * templateTable: the original template table data (headers + rows structure)
-   * Preserves data in columns that match by name.
+   * 恢复为模板结构（`templateTable` = 后端按当前表的表名 / 序号取的同一张模板表）：
+   * 表头与逐列定义（`columns` / `_column_groups`，多级表头）一起换；金额按列身份搬（列定义 key 优先，其次「分组/列名」，
+   * 同名列按第几次出现 —— 期末、上年年末下各有一列「应收账款」，只按列名会把期末数搬进上年年末）；行按行名对应
+   * （同名多行依次对应），带回行类型、集团下推行身份与单元格模式（按列映射搬）。
    */
   function restoreTemplateStructure(templateTable: TableData) {
-    const table = getActiveTable()
+    const table = getActiveTable() as (TableData & Record<string, any>) | null
     if (!table) return
+    const template = templateTable as TableData & Record<string, any>
 
     // Snapshot current state for undo
     const oldHeaders = [...table.headers]
     const oldRows = table.rows.map(r => ({ ...r, values: [...r.values] }))
+    const oldStructure = Object.fromEntries(RESTORE_KEYS.map(k => [k, clone(table[k])]))
 
     const cmd: StructureCommand = {
       type: 'restoreTemplate',
       description: '恢复模板结构',
       redo: () => {
-        // Restore headers from template
-        const newHeaders = [...templateTable.headers]
-        // Build column mapping: for each template value column, find matching current column by name
-        const colMapping: (number | null)[] = [] // template value col index → current value col index
-        for (let ti = 1; ti < newHeaders.length; ti++) {
-          const tName = newHeaders[ti]
-          const currentIdx = table.headers.indexOf(tName)
-          colMapping.push(currentIdx > 0 ? currentIdx - 1 : null)
+        const colMap = mapValueColumns(table, template) // 模板数值列 → 当前数值列
+        const taken = new Set<number>()
+        const findRow = (label: string): TableRow | null => {
+          let i = oldRows.findIndex((r, k) => !taken.has(k) && r.label === label)
+          if (i < 0) i = oldRows.findIndex((r, k) => !taken.has(k) && squash(r.label) === squash(label))
+          if (i < 0) return null
+          taken.add(i)
+          return oldRows[i]
         }
-
-        // Build new rows from template structure, preserving data where columns match
-        const newRows: TableRow[] = templateTable.rows.map(templateRow => {
-          // Try to find matching row by label
-          const existingRow = table.rows.find(r => r.label === templateRow.label)
-          const newValues: (number | null)[] = colMapping.map((srcIdx) => {
-            if (srcIdx == null || !existingRow) return null
-            return existingRow.values[srcIdx] ?? null
-          })
-          return {
+        const newRows: TableRow[] = template.rows.map(templateRow => {
+          const existing = findRow(templateRow.label)
+          const restored: TableRow = {
             label: templateRow.label,
-            values: newValues,
+            values: colMap.map(src => (src == null || !existing ? null : existing.values[src] ?? null)),
             is_total: templateRow.is_total || false,
           }
+          if (templateRow.row_type) restored.row_type = templateRow.row_type
+          if (!existing) return restored
+          for (const key of PUSHED_KEYS) {
+            if (existing[key] !== undefined) restored[key] = existing[key]
+          }
+          for (const key of CELL_KEYS) {
+            const meta = existing[key]
+            if (!meta || typeof meta !== 'object') continue
+            const moved: Record<string, unknown> = {}
+            colMap.forEach((src, j) => { if (src != null && meta[String(src)] !== undefined) moved[String(j)] = clone(meta[String(src)]) })
+            restored[key] = moved
+          }
+          return restored
         })
 
-        table.headers.splice(0, table.headers.length, ...newHeaders)
+        table.headers.splice(0, table.headers.length, ...template.headers)
         table.rows.splice(0, table.rows.length, ...newRows)
+        for (const key of STRUCTURE_KEYS) {
+          if (template[key] !== undefined) table[key] = clone(template[key])
+          else delete table[key]
+        }
+        if (Array.isArray(oldStructure._row_types)) {
+          table._row_types = newRows.map(r => r.row_type || (r.is_total ? 'total' : 'data'))
+        }
       },
       undo: () => {
         table.headers.splice(0, table.headers.length, ...oldHeaders)
         table.rows.splice(0, table.rows.length, ...oldRows)
+        for (const key of RESTORE_KEYS) {
+          if (oldStructure[key] !== undefined) table[key] = clone(oldStructure[key])
+          else delete table[key]
+        }
       },
     }
     pushCommand(cmd)

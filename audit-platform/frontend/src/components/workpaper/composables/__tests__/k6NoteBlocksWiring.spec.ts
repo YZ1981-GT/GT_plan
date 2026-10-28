@@ -29,6 +29,26 @@ const TABS = {
   soe: 'k6/core/K6TabDisclosureSoe.vue',
 } as const
 
+/**
+ * 载荷组装从 Tab 抽到共用模块（Tab 与附注页离屏同步调同一个函数，spec note-pull-followup-closure R1）：
+ * Tab 把 `noteBlocks` 交给 `k6DisclosurePayloads`，4 个区块在这里喂进 `buildK6SyncPayload`。
+ */
+const STATE_MODULE = 'composables/k6DisclosureTabState.ts'
+
+/** `k6DisclosurePayloads` 里本变体那一支（上市 `if (variant === 'listed') {…}`，国企是其后的 return） */
+function payloadBranch(variant: keyof typeof TABS): string {
+  const src = stripComments(readFileSync(resolve(WP_ROOT, STATE_MODULE), 'utf-8'))
+  const start = src.indexOf('export function k6DisclosurePayloads(')
+  expect(start, `${STATE_MODULE} 里没有 k6DisclosurePayloads`).toBeGreaterThanOrEqual(0)
+  const body = src.slice(start)
+  const end = body.indexOf('\n}\n')
+  const fn = end > 0 ? body.slice(0, end) : body
+  const split = fn.indexOf("if (variant === 'listed') {")
+  expect(split, 'k6DisclosurePayloads 没有按变体分支').toBeGreaterThanOrEqual(0)
+  const listedEnd = fn.indexOf('\n  }\n', split)
+  return variant === 'listed' ? fn.slice(split, listedEnd) : fn.slice(listedEnd)
+}
+
 /** 去注释：守卫注释里会写反例，不剥离会误报（J1 接线守卫首版即因此） */
 function stripComments(src: string): string {
   return src
@@ -55,24 +75,29 @@ describe('K6 披露 Tab 接线：附注 4 张表已有录入位置', () => {
   it.each(Object.keys(TABS) as Array<keyof typeof TABS>)(
     '%s Tab 把 4 个区块喂进 buildK6SyncPayload（不再只推主表）',
     (variant) => {
-      const src = readTab(variant)
+      // Tab 把本变体与 noteBlocks 交给共用的载荷组装
+      expect(
+        new RegExp(`k6DisclosurePayloads\\(\\s*'${variant}'[^)]*\\bnoteBlocks\\b`).test(readTab(variant)),
+        '同步没把 noteBlocks 交给 k6DisclosurePayloads',
+      ).toBe(true)
+      const branch = payloadBranch(variant)
+      expect(branch.includes(`buildK6SyncPayload('${variant}'`), `${variant} 分支没调 buildK6SyncPayload`).toBe(true)
       for (const key of ['impairment', 'nonCurrent', 'disposalGroup']) {
         expect(
-          new RegExp(`${key}:\\s*noteBlocks\\.${key}\\.value`).test(src),
+          new RegExp(`${key}:\\s*blocks\\.${key}\\.value`).test(branch),
           `载荷缺 ${key} 区块`,
         ).toBe(true)
       }
-      const liabField = variant === 'listed' ? 'listedLiabilities' : 'liabilities'
-      expect(
-        src.includes(`noteBlocks.${liabField}.value`),
-        `载荷缺 ${liabField} 区块`,
-      ).toBe(true)
+      const liab = variant === 'listed' ? /listedLiabilities:\s*blocks\.listedLiabilities\.value/ : /blocks\.liabilities\.value/
+      expect(liab.test(branch), `载荷缺${variant === 'listed' ? ' listedLiabilities' : ' liabilities'} 区块`).toBe(true)
     },
   )
 
   it('国企 Tab 单独 POST §八、43（一个 payload 只能写一节）', () => {
+    expect(/buildK6SoeLiabilityPayload\(/.test(payloadBranch('soe')), '未构建负债章节载荷').toBe(true)
+    expect(/buildK6SoeLiabilityPayload\(/.test(payloadBranch('listed')), '上市分支不该构建负债章节载荷').toBe(false)
     const src = readTab('soe')
-    expect(/buildK6SoeLiabilityPayload\(/.test(src), '未构建负债章节载荷').toBe(true)
+    expect(/\bliability:\s*liabPayload\b/.test(src), 'Tab 没取负债章节载荷').toBe(true)
     expect(/K6_SOE_LIABILITY_NOTE_SECTION/.test(src), '未登记负债章节号').toBe(true)
     // 两次 POST（主表章节 + 负债章节）
     expect((src.match(/http\.post\(url/g) ?? []).length).toBeGreaterThanOrEqual(2)

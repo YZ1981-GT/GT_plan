@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Exact domain-boundary debt identities. Checker fails on NEW identities only; shrink -> update this file.",
-    "count": 898
+    "count": 897
   },
   "entries": [
     {
@@ -2123,11 +2123,6 @@
       "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteSectionLockBadge.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteSectionLockBadge.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteTableEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteTableEditor.vue)"
     },
     {
       "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteTemplateSwitch.vue",

@@ -1,10 +1,9 @@
-"""私人库 + 归档 + 存储统计 API — Phase 10 Task 3.1-3.3
+"""私人库 + 存储统计 API — Phase 10 Task 3.1-3.3
 
 - GET    /api/users/{id}/private-storage         文件列表
 - POST   /api/users/{id}/private-storage/upload  上传
 - DELETE /api/users/{id}/private-storage/{name}   删除
 - GET    /api/users/{id}/private-storage/quota   容量
-- POST   /api/projects/{id}/archive              归档
 - GET    /api/admin/storage-stats                统计
 """
 
@@ -12,14 +11,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
-from app.core.database import get_db
 from app.deps import assert_self_or_admin, get_current_user, require_role
 from app.models.core import User
 from app.services.private_storage_service import (
-    InvalidPrivateFileName, PrivateStorageService, ProjectArchiveService, StorageStatsService,
+    InvalidPrivateFileName, PrivateStorageService, StorageStatsService,
 )
 
 router = APIRouter(tags=["private-storage"])
@@ -67,36 +64,6 @@ async def get_quota(user_id: UUID, current_user: User = Depends(get_current_user
     assert_self_or_admin(current_user, user_id)
     svc = PrivateStorageService()
     return await svc.check_quota(user_id)
-
-
-# ── 归档 ──────────────────────────────────────────────────
-
-@router.post("/api/projects/{project_id}/archive", deprecated=True)
-async def archive_project(
-    project_id: UUID,
-    response: Response,
-    push_to_cloud: bool = True,
-    cleanup_local: bool = False,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """[Deprecated] 项目归档：请使用 POST /api/projects/{id}/archive/orchestrate"""
-    import logging as _logging
-
-    _logging.getLogger(__name__).warning(
-        "[DEPRECATED] private_storage.archive_project called for project=%s, "
-        "use /api/projects/{id}/archive/orchestrate instead",
-        project_id,
-    )
-    response.headers["Deprecation"] = 'version="R6"'
-    svc = ProjectArchiveService()
-    result = await svc.archive_project(
-        db, project_id,
-        push_to_cloud=push_to_cloud,
-        cleanup_local=cleanup_local,
-    )
-    await db.commit()
-    return result
 
 
 # ── 存储统计 ──────────────────────────────────────────────

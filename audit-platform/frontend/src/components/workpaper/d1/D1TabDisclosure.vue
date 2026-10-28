@@ -24,8 +24,17 @@ import {
   D1_DISCLOSURE_SHEET_NAME,
   D1_NOTE_SECTION,
   D1_MAIN_SUBTABLE,
-  type D1DisclosureSnapshot,
 } from '../composables/d1NoteSectionMap'
+// 展开行 / 说明加载 / 同步快照：与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import {
+  buildD1BadDebtDisplayRows,
+  buildD1DisclosureSnapshot,
+  buildD1SoeAgingRows,
+  buildD1SoeClassRows,
+  buildD1SoeMovementDisplayRows,
+  d1ListedMovementRow,
+  readD1SectionNotes,
+} from '../composables/d1DisclosureSnapshot'
 import {
   buildRestrictedAssetsPayloads,
   RESTRICTED_ASSETS_NOTE_SECTION,
@@ -95,13 +104,7 @@ const openReviewDialog = inject<any>('openReviewDialog', null)
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 function loadSectionNotes() {
-  const prefix = `D1-disc-${props.variant}-note-`
-  const next: Record<string, string> = {}
-  for (const key of NOTE_SECTION_KEYS) {
-    const resp = props.allResponses.get(`${prefix}${key}`)
-    if (resp?.remark) next[key] = resp.remark
-  }
-  sectionNotes.value = next
+  sectionNotes.value = readD1SectionNotes(props.allResponses, props.variant, NOTE_SECTION_KEYS)
 }
 
 watch(() => props.allResponses, loadSectionNotes, { immediate: true, deep: true })
@@ -179,26 +182,7 @@ const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
 const projectIdRef = computed(() => props.projectId) as unknown as Ref<string>
 const isReadonlyRef = computed(() => props.isReadonly) as unknown as Ref<boolean>
 
-const {
-  sectionOrder, isLoading, crossSheetData, crossSheetStatus,
-  pledgedRows, pledgedTotal, addPledgedRow, removePledgedRow,
-  endorsedRows, endorsedTotal, addEndorsedRow, removeEndorsedRow,
-  transferRows, transferTotal, addTransferRow, removeTransferRow,
-  classEndRows, classEndTotal, classPriorRows, classPriorTotal,
-  individualEndRows, individualPriorRows, addIndividualRow, removeIndividualRow,
-  bankPortfolioEndRows, bankPortfolioPriorRows,
-  commercialPortfolioEndRows, commercialPortfolioPriorRows,
-  addPortfolioRow, removePortfolioRow, fillPortfolioAgingBands,
-  addPortfolioPairRow, renamePortfolioPair, fillPortfolioAgingBandsPair, removePortfolioPairRow,
-  movementRows, movementTotal, reversalDetailRows, reversalDetailTotal,
-  addReversalRow, removeReversalRow,
-  movementDetailRows, movementDetailTotal, hasMovementDetail,
-  addMovementDetailRow, removeMovementDetailRow,
-  writeOffAmount, writeOffDetailRows, writeOffDetailTotal,
-  addWriteOffRow, removeWriteOffRow,
-  categorySummaryRows, categorySummaryTotal, canEditCategorySummary,
-  updateCell,
-} = useD1Disclosure({
+const d1 = useD1Disclosure({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
   projectId: projectIdRef,
@@ -206,6 +190,26 @@ const {
   saveImmediate: saveWithDebounce,
   isReadonly: isReadonlyRef,
 })
+const {
+  sectionOrder, isLoading, crossSheetData, crossSheetStatus,
+  pledgedRows, pledgedTotal, addPledgedRow, removePledgedRow,
+  endorsedRows, endorsedTotal, addEndorsedRow, removeEndorsedRow,
+  transferRows, transferTotal, addTransferRow, removeTransferRow,
+  classEndRows, classEndTotal, classPriorRows, classPriorTotal,
+  individualEndRows, addIndividualRow, removeIndividualRow,
+  bankPortfolioEndRows, bankPortfolioPriorRows,
+  commercialPortfolioEndRows, commercialPortfolioPriorRows,
+  addPortfolioRow, removePortfolioRow, fillPortfolioAgingBands,
+  addPortfolioPairRow, renamePortfolioPair, fillPortfolioAgingBandsPair, removePortfolioPairRow,
+  movementRows, movementTotal, reversalDetailRows, reversalDetailTotal,
+  addReversalRow, removeReversalRow,
+  movementDetailRows, hasMovementDetail,
+  addMovementDetailRow, removeMovementDetailRow,
+  writeOffAmount, writeOffDetailRows, writeOffDetailTotal,
+  addWriteOffRow, removeWriteOffRow,
+  categorySummaryRows, categorySummaryTotal, canEditCategorySummary,
+  updateCell,
+} = d1
 
 // ─── 账龄枚举（3年段 / 5年段 / 自定义，项目账龄配置为唯一真源）────────────────
 // 国企版组合计提分表行本就是账龄段（附注模板 八、4「按组合计提坏账准备的应收票据」），
@@ -345,258 +349,15 @@ function fmtPct(val: number): string {
   return (val * 100).toFixed(2) + '%'
 }
 
-type BadDebtDisplayRow = {
-  rowKind: 'fixed' | 'hint' | 'individual' | 'summary'
-  rowId: string
-  label: string
-  source?: 'single' | 'bank' | 'commercial'
-  balance: number
-  ratio: number
-  provision: number
-  lossRate: number
-  bookValue: number
-  basis?: string
-}
-
-function buildBadDebtRows(period: 'end' | 'prior'): BadDebtDisplayRow[] {
-  const classRows = period === 'end' ? classEndRows.value : classPriorRows.value
-  const total = period === 'end' ? classEndTotal.value : classPriorTotal.value
-  const individuals = period === 'end' ? individualEndRows.value : individualPriorRows.value
-  const single = classRows.find(r => r.rowId === `class-${period}-individual`)
-  const bank = classRows.find(r => r.rowId === `class-${period}-portfolio-bank`)
-  const commercial = classRows.find(r => r.rowId === `class-${period}-portfolio-commercial`)
-  const comboBalance = (bank?.balance || 0) + (commercial?.balance || 0)
-  const comboProvision = (bank?.provision || 0) + (commercial?.provision || 0)
-  const comboBookValue = comboBalance - comboProvision
-  const comboRatio = ratioOf(comboBalance, total.balance)
-  const comboLossRate = ratioOf(comboProvision, comboBalance)
-
-  return [
-    {
-      rowKind: 'fixed',
-      rowId: `single-${period}`,
-      label: '按单项计提坏账准备',
-      source: 'single',
-      balance: single?.balance || 0,
-      // 比率按当前合计现算（F4-25 / F4-12），不透传可能过期的持久化值
-      ratio: ratioOf(single?.balance || 0, total.balance),
-      provision: single?.provision || 0,
-      lossRate: ratioOf(single?.provision || 0, single?.balance || 0),
-      bookValue: (single?.balance || 0) - (single?.provision || 0),
-    },
-    { rowKind: 'hint', rowId: `single-hint-${period}`, label: '其中：', balance: 0, ratio: 0, provision: 0, lossRate: 0, bookValue: 0 },
-    ...individuals.map(row => ({
-      rowKind: 'individual' as const,
-      rowId: row.rowId,
-      label: row.name || '',
-      balance: row.balance,
-      ratio: ratioOf(row.balance, total.balance),
-      provision: row.provision,
-      lossRate: row.lossRate,
-      bookValue: row.balance - row.provision,
-      basis: row.basis,
-    })),
-    {
-      rowKind: 'fixed',
-      rowId: `combo-${period}`,
-      label: '按组合计提坏账准备',
-      balance: comboBalance,
-      ratio: comboRatio,
-      provision: comboProvision,
-      lossRate: comboLossRate,
-      bookValue: comboBookValue,
-    },
-    { rowKind: 'hint', rowId: `combo-hint-${period}`, label: '其中：', balance: 0, ratio: 0, provision: 0, lossRate: 0, bookValue: 0 },
-    {
-      rowKind: 'fixed',
-      rowId: `bank-${period}`,
-      label: '银行承兑汇票',
-      source: 'bank',
-      balance: bank?.balance || 0,
-      ratio: ratioOf(bank?.balance || 0, total.balance),
-      provision: bank?.provision || 0,
-      lossRate: ratioOf(bank?.provision || 0, bank?.balance || 0),
-      bookValue: (bank?.balance || 0) - (bank?.provision || 0),
-    },
-    {
-      rowKind: 'fixed',
-      rowId: `commercial-${period}`,
-      label: '商业承兑汇票',
-      source: 'commercial',
-      balance: commercial?.balance || 0,
-      ratio: ratioOf(commercial?.balance || 0, total.balance),
-      provision: commercial?.provision || 0,
-      lossRate: ratioOf(commercial?.provision || 0, commercial?.balance || 0),
-      bookValue: (commercial?.balance || 0) - (commercial?.provision || 0),
-    },
-    {
-      rowKind: 'summary',
-      rowId: `total-${period}`,
-      label: '合计',
-      balance: total.balance,
-      ratio: total.ratio,
-      provision: total.provision,
-      lossRate: total.lossRate,
-      bookValue: total.bookValue,
-    },
-  ]
-}
-
-const badDebtEndRowsForDisplay = computed(() => buildBadDebtRows('end'))
-const badDebtPriorRowsForDisplay = computed(() => buildBadDebtRows('prior'))
-const listedMovementRow = computed(() => movementRows.value[0] ?? {
-  rowId: 'mv-total',
-  priorBalance: 0,
-  provision: 0,
-  reversal: 0,
-  writeOff: 0,
-  transfer: 0,
-  other: 0,
-  endBalance: 0,
-})
-/**
- * 国企分类表三行（单项 / 组合 / 合计）。
- *
- * 🔴 聚合行的比率必须按**聚合后的金额**重算：
- * 旧实现把银承与商承的 `ratio` 直接相加（两者分母是各自录入时点的合计）→ 实测
- * 「按组合计提坏账准备」行显示 162.50%（应 100.00%）；`lossRate` 还被硬编码为 0，
- * 附注里显示成 `-`。口径见预设 F4-25 / F4-12 / F4-11。
- */
-function buildSoeClassRows(period: 'end' | 'prior') {
-  const rows = period === 'end' ? classEndRows.value : classPriorRows.value
-  const total = period === 'end' ? classEndTotal.value : classPriorTotal.value
-  const single = rows.find(r => r.rowId === `class-${period}-individual`)
-  const bank = rows.find(r => r.rowId === `class-${period}-portfolio-bank`)
-  const commercial = rows.find(r => r.rowId === `class-${period}-portfolio-commercial`)
-  const comboBalance = (bank?.balance || 0) + (commercial?.balance || 0)
-  const comboProvision = (bank?.provision || 0) + (commercial?.provision || 0)
-  return [
-    {
-      rowId: `soe-${period}-single`, label: '按单项计提坏账准备',
-      balance: single?.balance || 0,
-      ratio: ratioOf(single?.balance || 0, total.balance),
-      provision: single?.provision || 0,
-      lossRate: ratioOf(single?.provision || 0, single?.balance || 0),
-      bookValue: (single?.balance || 0) - (single?.provision || 0),
-    },
-    {
-      rowId: `soe-${period}-portfolio`, label: '按组合计提坏账准备',
-      balance: comboBalance,
-      ratio: ratioOf(comboBalance, total.balance),
-      provision: comboProvision,
-      lossRate: ratioOf(comboProvision, comboBalance),
-      bookValue: comboBalance - comboProvision,
-    },
-    {
-      rowId: `soe-${period}-total`, label: '合计',
-      balance: total.balance, ratio: total.ratio,
-      provision: total.provision, lossRate: total.lossRate, bookValue: total.bookValue,
-    },
-  ]
-}
-const soeClassEndRows = computed(() => buildSoeClassRows('end'))
-const soeClassPriorRows = computed(() => buildSoeClassRows('prior'))
-// 国企组合计提表小计行名逐字取自源模板 A36/A39 与附注模板 八、4[4] 的 rows
-// （带「小计：」后缀），改字面量会让同步后的附注行名与模板骨架不匹配。
-const SOE_PORTFOLIO_SUBTOTAL = {
-  commercial: '商业承兑汇票小计：',
-  bank: '银行承兑汇票小计：',
-} as const
-
-/**
- * 国企「按组合计提坏账准备的应收票据」行集：商承小计 + 商承账龄明细 +
- * 银承小计 + 银承账龄明细 + 合计（顺序同源模板 A36~A42）。
- *
- * 小计取值口径：有账龄明细时用明细汇总，无明细时回落到分类表对应组合行（可直接录入）。
- * 所有损失率一律 `ratioOf(provision, balance)` 现算 —— 合计行原先硬编码 0。
- */
-const soeAgingRows = computed(() => {
-  const classRowBalance = (kind: 'bank' | 'commercial', field: 'balance' | 'provision') =>
-    classEndRows.value.find(r => r.rowId === `class-end-portfolio-${kind}`)?.[field] || 0
-
-  const build = (kind: 'bank' | 'commercial') => {
-    const detail = (kind === 'bank' ? bankPortfolioEndRows.value : commercialPortfolioEndRows.value)
-      .map(r => ({ ...r, sourceType: kind }))
-    const hasDetail = detail.length > 0
-    const balance = hasDetail
-      ? detail.reduce((s, r) => s + (r.balance || 0), 0)
-      : classRowBalance(kind, 'balance')
-    const provision = hasDetail
-      ? detail.reduce((s, r) => s + (r.provision || 0), 0)
-      : classRowBalance(kind, 'provision')
-    return { detail, hasDetail, balance, provision }
-  }
-
-  const c = build('commercial')
-  const b = build('bank')
-  const detailRows = (g: ReturnType<typeof build>) => g.detail.map(r => ({
-    rowKind: 'detail',
-    rowId: r.rowId,
-    sourceType: r.sourceType,
-    name: r.drawerTypeOrAging || '',
-    balance: r.balance || 0,
-    provision: r.provision || 0,
-    lossRate: ratioOf(r.provision || 0, r.balance || 0),
-  }))
-  const totalBalance = c.balance + b.balance
-  const totalProvision = c.provision + b.provision
-
-  return [
-    {
-      rowKind: 'subtotal', rowId: 'soe-commercial-subtotal', sourceType: 'commercial' as const,
-      hasDetail: c.hasDetail, name: SOE_PORTFOLIO_SUBTOTAL.commercial,
-      balance: c.balance, provision: c.provision, lossRate: ratioOf(c.provision, c.balance),
-    },
-    ...detailRows(c),
-    {
-      rowKind: 'subtotal', rowId: 'soe-bank-subtotal', sourceType: 'bank' as const,
-      hasDetail: b.hasDetail, name: SOE_PORTFOLIO_SUBTOTAL.bank,
-      balance: b.balance, provision: b.provision, lossRate: ratioOf(b.provision, b.balance),
-    },
-    ...detailRows(b),
-    {
-      rowKind: 'summary', rowId: 'soe-aging-total', sourceType: 'commercial' as const,
-      name: '合计', balance: totalBalance, provision: totalProvision,
-      lossRate: ratioOf(totalProvision, totalBalance),
-    },
-  ]
-})
-/**
- * 国企坏账变动表行集：单项 / 按组合 / 其中： / 明细… / 合计（顺序同源模板 A48~A52）。
- *
- * 预设 F4-20 要求「其中：」下方所有明细行之和 = 按组合计提行 → 有明细时按组合计提行
- * 改为**明细汇总（只读）**，从结构上保证勾稽成立；无明细时保持可直接录入。
- */
-const soeMovementRowsForDisplay = computed(() => {
-  const individual = movementRows.value.find(r => r.label === '按单项计提') || movementRows.value[0]
-  const portfolioRaw = movementRows.value.find(r => r.label === '按组合计提') || movementRows.value[1]
-  const portfolio = hasMovementDetail.value
-    ? { ...movementDetailTotal.value, rowId: portfolioRaw?.rowId || 'mv-portfolio' }
-    : portfolioRaw
-  // 合计行 = 单项 + 组合（F4-19），组合侧取上面已按明细汇总后的口径
-  const sumCol = (k: 'priorBalance' | 'provision' | 'reversal' | 'writeOff' | 'transfer' | 'other' | 'endBalance') =>
-    (individual?.[k] ?? 0) + (portfolio?.[k] ?? 0)
-  const total = {
-    rowId: 'mv-total',
-    label: '合计',
-    priorBalance: sumCol('priorBalance'),
-    provision: sumCol('provision'),
-    reversal: sumCol('reversal'),
-    writeOff: sumCol('writeOff'),
-    transfer: sumCol('transfer'),
-    other: sumCol('other'),
-    endBalance: sumCol('endBalance'),
-  }
-  return [
-    { rowKind: 'data', rowId: individual?.rowId || 'mv-individual', label: '单项计提预期信用损失的应收票据', sourceRow: individual, readonlyRow: false },
-    { rowKind: 'data', rowId: portfolio?.rowId || 'mv-portfolio', label: '按组合计提预期信用损失的应收票据', sourceRow: portfolio, readonlyRow: hasMovementDetail.value },
-    { rowKind: 'hint', rowId: 'mv-hint', label: '其中：', sourceRow: null, readonlyRow: true },
-    ...movementDetailRows.value.map(r => ({
-      rowKind: 'detail' as const, rowId: r.rowId, label: r.label, sourceRow: r, readonlyRow: false,
-    })),
-    { rowKind: 'summary', rowId: total.rowId, label: '合计', sourceRow: total, readonlyRow: true },
-  ]
-})
+// 分类展开行 / 国企分类三行 / 国企组合账龄行 / 变动表行：与同步快照、附注页离屏同步共用同一组纯函数
+// （`d1DisclosureSnapshot`，spec note-pull-followup-closure R1）。
+const badDebtEndRowsForDisplay = computed(() => buildD1BadDebtDisplayRows(d1, 'end'))
+const badDebtPriorRowsForDisplay = computed(() => buildD1BadDebtDisplayRows(d1, 'prior'))
+const listedMovementRow = computed(() => d1ListedMovementRow(d1))
+const soeClassEndRows = computed(() => buildD1SoeClassRows(d1, 'end'))
+const soeClassPriorRows = computed(() => buildD1SoeClassRows(d1, 'prior'))
+const soeAgingRows = computed(() => buildD1SoeAgingRows(d1))
+const soeMovementRowsForDisplay = computed(() => buildD1SoeMovementDisplayRows(d1))
 
 // ─── 披露内部勾稽校验（F4-1~F4-30）─────────────────────────────────────────────
 // 入参与 buildD1SyncPayload 的 snapshot 同源，保证「面板显示的」= 「推给附注的」。
@@ -1005,52 +766,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
-    const snapshot: D1DisclosureSnapshot = {
-      summaryRows: categorySummaryRows.value as any,
-      summaryTotal: categorySummaryTotal.value as any,
-      pledgedRows: pledgedRows.value as any,
-      pledgedTotal: pledgedTotal.value as any,
-      endorsedRows: endorsedRows.value as any,
-      endorsedTotal: endorsedTotal.value as any,
-      transferRows: transferRows.value as any,
-      transferTotal: transferTotal.value as any,
-      classEndRows: classEndRows.value as any,
-      classPriorRows: classPriorRows.value as any,
-      // 披露表实际渲染的分类展开行（上市版含「其中：」与单项明细行，与附注模板行结构一致）
-      classDisplayEndRows: badDebtEndRowsForDisplay.value as any,
-      classDisplayPriorRows: badDebtPriorRowsForDisplay.value as any,
-      soeClassEndRows: soeClassEndRows.value as any,
-      soeClassPriorRows: soeClassPriorRows.value as any,
-      individualEndRows: individualEndRows.value as any,
-      individualPriorRows: individualPriorRows.value as any,
-      bankPortfolioEndRows: bankPortfolioEndRows.value as any,
-      bankPortfolioPriorRows: bankPortfolioPriorRows.value as any,
-      commercialPortfolioEndRows: commercialPortfolioEndRows.value as any,
-      commercialPortfolioPriorRows: commercialPortfolioPriorRows.value as any,
-      soePortfolioRows: soeAgingRows.value.map((r: any) => ({
-        name: r.name,
-        balance: r.balance,
-        provision: r.provision,
-        lossRate: r.lossRate,
-        isTotal: r.rowKind === 'summary',
-      })),
-      movementTotal: (props.variant === 'listed' ? listedMovementRow.value : movementTotal.value) as any,
-      soeMovementRows: soeMovementRowsForDisplay.value.map((r: any) => ({
-        label: r.label,
-        priorBalance: r.sourceRow?.priorBalance ?? 0,
-        provision: r.sourceRow?.provision ?? 0,
-        reversal: r.sourceRow?.reversal ?? 0,
-        writeOff: r.sourceRow?.writeOff ?? 0,
-        transfer: r.sourceRow?.transfer ?? 0,
-        other: r.sourceRow?.other ?? 0,
-        endBalance: r.sourceRow?.endBalance ?? 0,
-      })),
-      reversalRows: reversalDetailRows.value as any,
-      reversalTotal: reversalDetailTotal.value as any,
-      writeOffAmount: writeOffAmount.value,
-      writeOffDetailRows: writeOffDetailRows.value as any,
-      notes: { ...sectionNotes.value },
-    }
+    const snapshot = buildD1DisclosureSnapshot(props.variant, d1, sectionNotes.value)
     // 🔴 适用准则必须取宿主真源，不能传 null：`resolveD1CurrentStandard` 会据此产出
     // `current_standard`，传 null 时 consolidated 项目也会被写成 `*_standalone`。
     // 平台单一真源 = `useHostApplicableStandards`（本 Tab 无 htmlData prop，

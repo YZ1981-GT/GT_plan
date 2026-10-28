@@ -1897,7 +1897,7 @@
           "audit-platform/frontend/src/components/workpaper/composables/h2ListedDisclosureModel.ts#L331",
           "audit-platform/frontend/src/components/workpaper/composables/h2SoeDisclosureModel.ts#L160",
           "audit-platform/frontend/src/components/workpaper/composables/h6DisclosureModel.ts#L223",
-          "audit-platform/frontend/src/components/workpaper/h2/core/H2TabDisclosureListed.vue#L686"
+          "audit-platform/frontend/src/components/workpaper/composables/h2DisclosureTabState.ts#L156"
         ],
         "registered_as": "BP-6（同一条阻断项的第二档，must_fix_before 不同：这一族只在把附注披露表纳入 projection 契约时才必须修）"
       },
@@ -1908,7 +1908,7 @@
           "audit-platform/frontend/src/components/workpaper/composables/h4StocktakePlanModel.ts#L100",
           "audit-platform/frontend/src/components/workpaper/composables/useH2Impairment.ts#L692",
           "audit-platform/frontend/src/components/workpaper/composables/useH2InterestCap.ts#L145",
-          "audit-platform/frontend/src/components/workpaper/composables/useH3AdditionCheck.ts#L181",
+          "audit-platform/frontend/src/components/workpaper/composables/useH3AdditionCheck.ts#L199",
           "audit-platform/frontend/src/components/workpaper/composables/useH3Disclosure.ts#L118",
           "audit-platform/frontend/src/components/workpaper/composables/useH3Disclosure.ts#L202",
           "audit-platform/frontend/src/components/workpaper/composables/useH4Recoverable.ts#L314",

@@ -51,8 +51,6 @@ CLOUD_SMB_PASSWORD = os.environ.get("CLOUD_SMB_PASSWORD", "")
 # 本地目录（测试用）
 CLOUD_LOCAL_PATH = os.environ.get("CLOUD_LOCAL_PATH", "archive_cloud")
 
-STORAGE_ROOT = Path(os.environ.get("STORAGE_ROOT", "storage"))
-
 # 是否启用上传时双写（默认开启，有云端服务器时自动同步）
 CLOUD_SYNC_ON_UPLOAD = os.environ.get("CLOUD_SYNC_ON_UPLOAD", "true").lower() == "true"
 
@@ -155,110 +153,41 @@ class CloudStorageService:
         else:
             return f"file:///{CLOUD_LOCAL_PATH}/{remote_key}"
 
-    async def upload_project_archive(
+    async def upload_archive_package(
         self,
         project_id: UUID,
         project_name: str,
         year: int,
+        package_path: Path,
     ) -> dict[str, Any]:
-        """将项目底稿归档推送到云端
+        """上传归档包（spec attachment-archive-and-a-class-evidence ADR-AE-05）：任何失败都抛错。
 
-        目录结构：{base}/{year}/{project_name}_{project_id[:8]}/
+        目录：``{base}/{year}/{项目名}_{project_id[:8]}/archive/{包文件名}``（与上传双写同一前缀）。
+        配置了 sftp / s3 却没装对应库 ⇒ 直接报错（``_sync_file_*`` 缺库时会退回本地复制，归档不接受这种假成功）。
         """
-        local_dir = STORAGE_ROOT / "projects" / str(project_id)
-        if not local_dir.exists():
-            raise ValueError(f"项目本地目录不存在: {local_dir}")
+        if not package_path.is_file():
+            raise FileNotFoundError(f"归档包文件不存在：{package_path.name}")
+        safe_project = "".join("_" if ch in '\\/:*?"<>|' else ch for ch in (project_name or "unknown")).strip()
+        remote_key = f"{year}/{safe_project or 'unknown'}_{str(project_id)[:8]}/archive/{package_path.name}"
+        required = {"sftp": "paramiko", "s3": "boto3"}.get(CLOUD_STORAGE_TYPE)
+        if required:
+            import importlib.util
 
-        # 统计本地文件
-        files = list(local_dir.rglob("*"))
-        file_list = [f for f in files if f.is_file()]
-        total_size = sum(f.stat().st_size for f in file_list)
-
-        remote_prefix = f"{year}/{project_name}_{str(project_id)[:8]}"
-
-        logger.info(
-            "cloud_upload: project=%s files=%d size=%.1fMB type=%s",
-            project_id, len(file_list), total_size / 1024 / 1024, CLOUD_STORAGE_TYPE,
-        )
-
+            if importlib.util.find_spec(required) is None:
+                raise RuntimeError(f"云端存储类型为 {CLOUD_STORAGE_TYPE}，但服务器未安装 {required}，无法推送归档包")
         if CLOUD_STORAGE_TYPE == "sftp":
-            result = await self._upload_sftp(local_dir, remote_prefix, file_list)
+            result = await self._sync_file_sftp(package_path, remote_key)
         elif CLOUD_STORAGE_TYPE == "s3":
-            result = await self._upload_s3(local_dir, remote_prefix, file_list)
+            result = await self._sync_file_s3(package_path, remote_key)
         elif CLOUD_STORAGE_TYPE == "smb":
-            result = await self._upload_smb(local_dir, remote_prefix, file_list)
+            result = await self._sync_file_smb(package_path, remote_key)
         else:
-            result = await self._upload_local(local_dir, remote_prefix, file_list)
-
-        result.update({
-            "project_id": str(project_id),
-            "remote_prefix": remote_prefix,
-            "file_count": len(file_list),
-            "total_size": total_size,
-            "storage_type": CLOUD_STORAGE_TYPE,
-            "uploaded_at": datetime.now(timezone.utc).isoformat(),
-        })
-        return result
-
-    async def _upload_local(self, local_dir: Path, remote_prefix: str, files: list) -> dict:
-        """本地目录复制（测试/开发用）"""
-        dest = Path(CLOUD_LOCAL_PATH) / remote_prefix
-        dest.mkdir(parents=True, exist_ok=True)
-        copied = 0
-        for f in files:
-            rel = f.relative_to(local_dir)
-            target = dest / rel
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, target)
-            copied += 1
-        return {"status": "success", "method": "local_copy", "copied": copied}
-
-    async def _upload_sftp(self, local_dir: Path, remote_prefix: str, files: list) -> dict:
-        """SFTP 上传到内部服务器"""
-        try:
-            import paramiko
-        except ImportError:
-            logger.warning("paramiko not installed, falling back to local copy")
-            return await self._upload_local(local_dir, remote_prefix, files)
-
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            connect_kwargs: dict[str, Any] = {
-                "hostname": CLOUD_SFTP_HOST,
-                "port": CLOUD_SFTP_PORT,
-                "username": CLOUD_SFTP_USER,
-            }
-            if CLOUD_SFTP_KEY_PATH:
-                connect_kwargs["key_filename"] = CLOUD_SFTP_KEY_PATH
-            elif CLOUD_SFTP_PASSWORD:
-                connect_kwargs["password"] = CLOUD_SFTP_PASSWORD
-
-            ssh.connect(**connect_kwargs)
-            sftp = ssh.open_sftp()
-
-            remote_base = f"{CLOUD_SFTP_BASE_PATH}/{remote_prefix}"
-            uploaded = 0
-            for f in files:
-                rel = str(f.relative_to(local_dir)).replace("\\", "/")
-                remote_path = f"{remote_base}/{rel}"
-                # 创建远程目录
-                remote_dir = "/".join(remote_path.split("/")[:-1])
-                try:
-                    sftp.stat(remote_dir)
-                except FileNotFoundError:
-                    self._sftp_makedirs(sftp, remote_dir)
-                sftp.put(str(f), remote_path)
-                uploaded += 1
-
-            sftp.close()
-            return {"status": "success", "method": "sftp", "uploaded": uploaded,
-                    "host": CLOUD_SFTP_HOST}
-        except Exception as e:
-            logger.error("SFTP upload failed: %s", e)
-            return {"status": "failed", "method": "sftp", "error": str(e)}
-        finally:
-            ssh.close()
+            result = await self._sync_file_local(package_path, remote_key)
+        if (result or {}).get("status") != "success":
+            raise RuntimeError(f"归档包上传失败：{(result or {}).get('error') or result}")
+        logger.info("archive_package_pushed: project=%s key=%s method=%s",
+                    project_id, remote_key, result.get("method"))
+        return {**result, "uploaded_at": datetime.now(timezone.utc).isoformat()}
 
     @staticmethod
     def _sftp_makedirs(sftp, remote_dir: str):
@@ -274,70 +203,3 @@ class CloudStorageService:
                 sftp.stat(current)
             except FileNotFoundError:
                 sftp.mkdir(current)
-
-    async def _upload_s3(self, local_dir: Path, remote_prefix: str, files: list) -> dict:
-        """S3 兼容协议上传（MinIO / 阿里云 OSS）"""
-        try:
-            import boto3
-            from botocore.config import Config as BotoConfig
-        except ImportError:
-            logger.warning("boto3 not installed, falling back to local copy")
-            return await self._upload_local(local_dir, remote_prefix, files)
-
-        try:
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=CLOUD_S3_ENDPOINT,
-                aws_access_key_id=CLOUD_S3_ACCESS_KEY,
-                aws_secret_access_key=CLOUD_S3_SECRET_KEY,
-                region_name=CLOUD_S3_REGION or None,
-                config=BotoConfig(signature_version="s3v4"),
-            )
-            uploaded = 0
-            for f in files:
-                rel = str(f.relative_to(local_dir)).replace("\\", "/")
-                key = f"{remote_prefix}/{rel}"
-                s3.upload_file(str(f), CLOUD_S3_BUCKET, key)
-                uploaded += 1
-            return {"status": "success", "method": "s3", "uploaded": uploaded,
-                    "bucket": CLOUD_S3_BUCKET}
-        except Exception as e:
-            logger.error("S3 upload failed: %s", e)
-            return {"status": "failed", "method": "s3", "error": str(e)}
-
-    async def _upload_smb(self, local_dir: Path, remote_prefix: str, files: list) -> dict:
-        """SMB/CIFS 共享文件夹复制"""
-        dest = Path(CLOUD_SMB_SERVER) / remote_prefix
-        try:
-            dest.mkdir(parents=True, exist_ok=True)
-            copied = 0
-            for f in files:
-                rel = f.relative_to(local_dir)
-                target = dest / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(f, target)
-                copied += 1
-            return {"status": "success", "method": "smb", "copied": copied}
-        except Exception as e:
-            logger.error("SMB copy failed: %s", e)
-            return {"status": "failed", "method": "smb", "error": str(e)}
-
-    async def cleanup_local_after_archive(
-        self, project_id: UUID, keep_metadata: bool = True,
-    ) -> dict:
-        """归档推送成功后清理本地文件（可选）"""
-        local_dir = STORAGE_ROOT / "projects" / str(project_id)
-        if not local_dir.exists():
-            return {"status": "skipped", "reason": "目录不存在"}
-
-        if keep_metadata:
-            # 只删除底稿文件，保留目录结构
-            removed = 0
-            for f in local_dir.rglob("*"):
-                if f.is_file() and f.suffix in (".xlsx", ".xls", ".docx", ".doc", ".pdf"):
-                    f.unlink()
-                    removed += 1
-            return {"status": "success", "removed_files": removed, "kept_metadata": True}
-        else:
-            shutil.rmtree(local_dir)
-            return {"status": "success", "removed_dir": str(local_dir)}

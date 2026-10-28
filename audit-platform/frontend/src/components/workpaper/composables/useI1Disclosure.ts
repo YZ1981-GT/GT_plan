@@ -15,6 +15,7 @@ import {
   setCell,
   type I1ImportantItemRow,
   type I1ListedCategory,
+  type I1ListedSyncSnapshot,
   type I1TitleCertRow,
   type MovementCellMap,
 } from './i1ListedDisclosureModel'
@@ -32,6 +33,7 @@ import {
   removeI1SoeCategory,
   type I1SoeCategoryMove,
   type I1SoeLayerBlock,
+  type I1SoeSyncSnapshot,
 } from './i1SoeDisclosureModel'
 import {
   I1_LISTED_COMPACT_CATEGORIES,
@@ -174,6 +176,25 @@ export function useI1ListedDisclosure(params: {
       cross: crossCheck.value,
     }),
   )
+
+  /** 同步快照（披露 Tab 同步与附注页离屏同步共用，spec note-pull-followup-closure R1） */
+  function buildSyncSnapshot(): I1ListedSyncSnapshot {
+    return {
+      categories: categories.value,
+      movement: movement.value,
+      noteRdRatio: noteRdRatio.value,
+      noteIndefinite: noteIndefinite.value,
+      noteMortgage: noteMortgage.value,
+      noteImpairment: noteImpairment.value,
+      noteSale: noteSale.value,
+      noteImportant: noteImportant.value,
+      titleCertRows: titleCertRows.value,
+      importantRows: importantRows.value,
+      dataResource: dataResource.value,
+      noteDataResource: noteDataResource.value,
+      amortAlloc: amortAlloc.value,
+    }
+  }
 
   function updateMovement(rowKey: string, catKey: string, value: number): void {
     movement.value = setCell(movement.value, rowKey, catKey, value)
@@ -442,6 +463,7 @@ export function useI1ListedDisclosure(params: {
     auditConclusion,
     crossCheck,
     prepValidation,
+    buildSyncSnapshot,
     persist,
     updateMovement,
     addCategory,
@@ -532,6 +554,21 @@ export function useI1SoeDisclosure(params: {
   const prepValidation = computed(() =>
     validateI1SoePrep({ layers: layers.value, cross: crossCheck.value }),
   )
+
+  /** 同步快照（披露 Tab 同步与附注页离屏同步共用，spec note-pull-followup-closure R1） */
+  function buildSyncSnapshot(): I1SoeSyncSnapshot {
+    return {
+      layers: layers.value,
+      noteIndefinite: noteIndefinite.value,
+      noteMortgage: noteMortgage.value,
+      noteValuation: noteValuation.value,
+      noteImpairment: noteImpairment.value,
+      noteNotReady: noteNotReady.value,
+      noteSale: noteSale.value,
+      noteTitle: noteTitle.value,
+      amortAlloc: amortAlloc.value,
+    }
+  }
 
   function updateCategory(
     layer: I1SoeLayerBlock['layer'],
@@ -702,6 +739,7 @@ export function useI1SoeDisclosure(params: {
     auditConclusion,
     crossCheck,
     prepValidation,
+    buildSyncSnapshot,
     persist,
     updateCategory,
     addCategory,

@@ -31,6 +31,7 @@ ATTACHMENT_TYPES: frozenset[str] = frozenset({
     "contract",
     "stocktake",
     "note",
+    "signed",           # A 类签字件（管理层声明书、沟通函、独立性声明等签字回执），spec attachment-archive-and-a-class-evidence
 })
 
 #: 允许上传的扩展名（小写、含点）。与 ``AttachmentManagement.vue`` 的 ``ACCEPT_TYPES`` 逐项一致。
@@ -112,3 +113,17 @@ def ensure_within_root(target: Path, root: Path) -> Path:
     if resolved_target != resolved_root and not resolved_target.is_relative_to(resolved_root):
         raise UploadRejected("STORAGE_PATH_REJECTED", "附件存储路径不合法")
     return resolved_target
+
+
+def resolve_local_attachment_file(raw: str | None) -> Path | None:
+    """本地附件文件：记录的路径；读不到再按 ``storage/`` 相对路径找（与附件下载同口径）；只认文件，不认目录。
+
+    ``paperless://`` 不是本地文件，返回 None。归档清单、孤儿文件扫描、回收站物理删除与回函识别共用
+    （spec attachment-archive-and-a-class-evidence）。
+    """
+    if not raw or raw.startswith("paperless://"):
+        return None
+    for candidate in (Path(raw), Path("storage") / raw.lstrip("/")):
+        if candidate.is_file():
+            return candidate
+    return None

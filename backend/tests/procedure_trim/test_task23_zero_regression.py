@@ -608,6 +608,26 @@ class TestNoteChainUnchanged:
     `TOC \\o "1-3" \\u` 为空，上年附注导入 / 上传附注文档认不出标题。只加段落属性 `w:outlineLvl`，
     文字、表格、书签不变；与程序裁剪联动无关，既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。
     行为测试见 ``tests/test_note_prior_year_plan.py::TestPlatformExportRoundTrip``。
+
+    ─── 并发 spec 改动登记（2026-10-26，spec note-pull-header-formula-closure R4 / R5 / 任务 20）───
+    该 spec 有意改了既有链路的 4 个文件，提交前下面的字节判据对这 4 个文件恒红、提交后自愈：
+    - `disclosure_engine.py`：`_backfill_totals` 改按合计构成（`note_formula_tables.recalc_table_totals`，
+      与刷新 / 前端同一判定）只写判得准的合计行与金额列、不盖手工格；`get_template_structure` 按表名 /
+      序号取模板里的同一张表（`note_template_structure`），找不到返回 None、不再拿章节第一张表顶。
+    - `note_empty_table_detector.py` / `note_is_empty_calc.py`：合计 / 小计行改为「只看数」——
+      公式推送找不到明细行时把审定数写在合计行，原规则「合计行一律不看」让这些表显示「本期无此情形」、
+      Word 导出整表省略。
+    - `note_word_exporter.py`：期间层（`note_period_layout`：底稿按期间并列的表合成、≥3 层表头按 N 行渲染）。
+    四处都不碰程序裁剪联动，既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。行为测试见
+    ``tests/services/test_disclosure_note_formula_baseline.py``（合计回填）、
+    ``tests/services/test_note_empty_table_detector.py``、``tests/services/test_note_is_empty_calc.py``、
+    ``tests/test_note_template_structure.py``、``tests/test_note_period_layout.py``。
+    ─── 并发 spec 改动登记（2026-10-28，spec note-pull-followup-closure R5，与上一条同一提交）───
+    `disclosure_engine.py` 再改一处：生成附注时没有 binding、或 binding 为 manual 且没有预填值的格不再标
+    `manual`，只在 `_cell_meta` 记 `unbound`（新增 `binding_cell_unbound`；原先标 manual ⇒ 公式推送 keep_manual、
+    附注公式与合计回填只写自动格，这些格永远进不来数）；刷新时这类格不拿空值覆盖已写入的值。不碰程序裁剪联动，
+    既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。字节判据同样提交前恒红、提交后自愈。行为测试见
+    ``tests/test_note_unbound_cells.py``。
     """
 
     def test_existing_chain_never_imports_linkage_module(self):

@@ -189,6 +189,15 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { K12_NOTE_SECTION, buildK12SyncPayload } from '../../composables/k12NoteSectionMap'
+import {
+  K12_DISCLOSURE_CATEGORIES as CATEGORIES,
+  K12_DISCLOSURE_NARRATIVE_ITEM,
+  applyK12AutoFill,
+  k12DefaultDisclosureRows,
+  k12DisclosureSyncRows,
+  loadK12DisclosureState,
+  type K12DisclosureTabRow,
+} from '../../composables/k12DisclosureTabState'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -212,29 +221,10 @@ onBeforeUnmount(() => autoSync.cancelPending())
 const ACCOUNT_CODE = '6301'
 const ABNORMAL_THRESHOLD = 0.5
 
-/**
- * 营业外收入标准来源分类（国企版）
- * P0-6 修复：删除臆造的「国有资产处置收益」—— 源模板国企版分类与上市版相同，
- * 无此项目（违「禁止自造披露内容」铁律）。
- */
-const CATEGORIES = [
-  '与日常活动无关的政府补助',
-  '捐赠利得',
-  '盘盈利得（不包括存货盘盈及固定资产盘盈）',
-  '碳排放配额出售利得',
-  '其他',
-]
-
 // ─── Types ───────────────────────────────────────────────────────────────────
+// 来源分类（国企版同上市版）、披露行、读回与审定表取数与附注页离屏同步共用（k12DisclosureTabState，spec note-pull-followup-closure R1）
 
-interface DisclosureRow {
-  category: string
-  currentAmount: number
-  priorAmount: number
-  /** 计入当期非经常性损益的金额（源模板必填列） */
-  nonRecurringAmount: number
-  remark: string
-}
+type DisclosureRow = K12DisclosureTabRow
 
 /** 与企业日常活动无关的政府补助明细行（源模板国企版子表） */
 interface GovGrantRow {
@@ -246,9 +236,7 @@ interface GovGrantRow {
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, nonRecurringAmount: 0, remark: '' }))
-)
+const disclosureRows = ref<DisclosureRow[]>(k12DefaultDisclosureRows())
 const govGrantRows = ref<GovGrantRow[]>([])
 const narrativeText = ref('')
 const totalAdjudicated = ref(0)
@@ -256,31 +244,11 @@ const totalAdjudicated = ref(0)
 // ─── Load saved data from allResponses ───────────────────────────────────────
 
 function loadSavedData(): void {
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const key = `K12-disc-soe-row-${i}`
-    const saved = props.allResponses.get(key)
-    if (saved) {
-      try {
-        const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-        if (parsed) {
-          disclosureRows.value[i] = {
-            category: CATEGORIES[i],
-            currentAmount: Number(parsed.currentAmount || 0),
-            priorAmount: Number(parsed.priorAmount || 0),
-            nonRecurringAmount: Number(parsed.nonRecurringAmount || 0),
-            remark: parsed.remark || '',
-          }
-        }
-      } catch { /* ignore parse errors */ }
-    }
-  }
+  const saved = loadK12DisclosureState(props.allResponses, 'soe')
+  disclosureRows.value = saved.rows
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 
-  const narrativeSaved = props.allResponses.get('K12-disclosure-soe-narrative')
-  if (narrativeSaved) {
-    narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
-  }
-
-  // 政府补助明细子表
+  // 政府补助明细子表（附注 §八、76 没有对应表，不进同步载荷）
   const ggSaved = props.allResponses.get('K12-disc-soe-govgrant-rows')
   if (ggSaved) {
     try {
@@ -294,46 +262,18 @@ function loadSavedData(): void {
 // ─── Auto-fill from K12-1 adjudicated data ───────────────────────────────────
 
 /**
- * 从 K12-1 审定表取数（P0 修复：原读 `K12-1-row-${i}-audited` 死键，
- * useK12Adjudication 从不写 → 恒 no-op；改读 `K12-1-rows` 按 name 匹配）。
+ * 从 K12-1 审定表取数（读 `K12-1-rows` 按 name 匹配），命中的行逐行保存。
  * @param silent true 时不弹提示（EventBus 自动刷新用）
  */
 function applyAutoFill(silent = false): void {
-  const saved = props.allResponses.get('K12-1-rows')
-  if (!saved) {
+  const res = applyK12AutoFill(disclosureRows.value, props.allResponses, handleRowChange)
+  if (res === 'missing') {
     if (!silent) ElMessage.warning('未找到 K12-1 审定表数据，请先编制审定表')
     return
   }
-  let k12Rows: any[] = []
-  try {
-    const raw = saved.remark ?? saved.conclusion ?? saved
-    k12Rows = typeof raw === 'string' ? JSON.parse(raw) : raw
-  } catch { return }
-  if (!Array.isArray(k12Rows)) return
-
-  const byName = new Map<string, { audited: number; prior: number }>()
-  for (const r of k12Rows) {
-    const audited = Number(
-      r.audited ?? (Number(r.unadjusted || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
-    )
-    const prior = Number(
-      r.priorAudited ?? (Number(r.priorUnadj || 0) + Number(r.priorAje || 0) + Number(r.priorRje || 0)),
-    )
-    byName.set(String(r.name || '').trim(), { audited, prior })
-  }
-
-  let matched = 0
-  for (const row of disclosureRows.value) {
-    const hit = byName.get(row.category.trim())
-    if (hit) {
-      row.currentAmount = hit.audited
-      row.priorAmount = hit.prior
-      handleRowChange(row)
-      matched++
-    }
-  }
-  totalAdjudicated.value = k12Rows.reduce((s, r) => s + Number(r.audited ?? 0), 0)
-  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${matched} 项`)
+  if (res === 'invalid') return
+  totalAdjudicated.value = res.totalAudited
+  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${res.matched} 项`)
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' ───────────────────────────
@@ -391,7 +331,7 @@ const govGrantTotalCurrent = computed(() => govGrantRows.value.reduce((s, r) => 
 const govGrantTotalPrior = computed(() => govGrantRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
 
 function handleNarrativeSave(): void {
-  emit('save', 'K12-disclosure-soe-narrative', { remark: narrativeText.value })
+  emit('save', K12_DISCLOSURE_NARRATIVE_ITEM.soe, { remark: narrativeText.value })
   eventBus.emit('disclosure:note-text-updated' as any, {
     noteId: 'non_operating_income',
     wpCode: 'K12',
@@ -403,15 +343,8 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK12SyncPayload('soe', props.wpId || '',
-    // 第 4 列「计入当期非经常性损益的金额」是源模板必填列，旧载荷从未推送
-    disclosureRows.value.map(r => ({
-      project: r.category,
-      currentAmount: r.currentAmount,
-      priorAmount: r.priorAmount,
-      nonRecurringAmount: r.nonRecurringAmount,
-    })),
-    narrativeText.value)
+  // 含第 4 列「计入当期非经常性损益的金额」（源模板必填列）
+  const payload = buildK12SyncPayload('soe', props.wpId || '', k12DisclosureSyncRows(disclosureRows.value), narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

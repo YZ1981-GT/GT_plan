@@ -133,7 +133,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * H4TabDisclosureListed — 附注披露信息（上市公司）
  * 对齐源 xlsx：（2）工程物资分类表
  */
-import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -145,12 +145,11 @@ import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections
 import {
   H4_LISTED_ITEM,
   buildH4ListedMaterialsDisplay,
-  createDefaultH4ListedMaterials,
   num,
   type H4ListedMaterialKey,
-  type H4ListedMaterialRow,
 } from '../../composables/h4ListedDisclosureModel'
 import { useH4Disclosure } from '../../composables/useH4Disclosure'
+import { useH4ListedDisclosureForm } from '../../composables/h4DisclosureForm'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH4ListedSyncPayloads } from '../../composables/h4DisclosureSyncPayload'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -171,10 +170,11 @@ const isReadonly = computed(() => props.isReadonly)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-const { pullListedMaterials, listedCrossCheck, significantNoteDraft } = useH4Disclosure(allResponsesRef as any)
-
-const materials = reactive<H4ListedMaterialRow[]>(createDefaultH4ListedMaterials())
-const noteText = ref('')
+const disclosure = useH4Disclosure(allResponsesRef as any)
+const { listedCrossCheck, significantNoteDraft } = disclosure
+// 表单状态 / 读回 / 取数 / 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+const form = useH4ListedDisclosureForm({ disclosure, onChange: () => scheduleSave() })
+const { materials, noteText } = form
 
 // ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
 const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
@@ -208,10 +208,7 @@ async function syncToNotes() {
   if (isSyncing.value || isReadonly.value) return
   isSyncing.value = true
   try {
-    const payloads = buildH4ListedSyncPayloads(props.wpId, null, {
-      materials: [...materials],
-      noteText: noteText.value,
-    })
+    const payloads = buildH4ListedSyncPayloads(props.wpId, null, form.snapshot())
     if (!payloads.length) {
       ElMessage.warning('不适用同步（当前变体非上市）')
       return
@@ -249,38 +246,6 @@ function formatDeduction(val: number): string {
   return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
 }
 
-function parseJson(itemId: string): any {
-  const raw = props.allResponses.get(itemId)?.remark
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-
-function applyMaterials(src: H4ListedMaterialRow[]) {
-  const byKey = new Map(src.map((r) => [r.key, r]))
-  for (const row of materials) {
-    const s = byKey.get(row.key)
-    if (!s) continue
-    row.endBalance = num(s.endBalance)
-    row.priorBalance = num(s.priorBalance)
-  }
-}
-
-function load() {
-  const saved = parseJson(H4_LISTED_ITEM.materials)
-  if (Array.isArray(saved) && saved.length) {
-    applyMaterials(saved.map((r: any) => ({
-      key: r.key,
-      label: r.label,
-      endBalance: num(r.endBalance),
-      priorBalance: num(r.priorBalance),
-      isDeduction: !!r.isDeduction,
-    })))
-  }
-  noteText.value = String(props.allResponses.get(H4_LISTED_ITEM.noteText)?.remark ?? '')
-  const hasData = materials.some((r) => r.endBalance || r.priorBalance)
-  if (!hasData) pullFromSources(false)
-}
-
 function persistAll() {
   if (isReadonly.value) return
   props.allResponses.set(H4_LISTED_ITEM.materials, {
@@ -312,12 +277,7 @@ function updateMaterial(key: string, field: 'endBalance' | 'priorBalance', value
 }
 
 function pullFromSources(notify = true) {
-  applyMaterials(pullListedMaterials())
-  // 附注说明为空时自动带入重大变动摘要
-  if (!noteText.value.trim() && significantNoteDraft.value) {
-    noteText.value = significantNoteDraft.value
-  }
-  scheduleSave()
+  form.pullFromSources()
   if (notify) ElMessage.success('已从 H4-2 分类明细及 H4-7 减值同步')
 }
 
@@ -337,7 +297,7 @@ function applySignificantNote() {
 }
 
 onMounted(() => {
-  load()
+  form.load(props.allResponses)
   const handler = (e: Event) => {
     const detail = (e as CustomEvent).detail
     if (detail?.wpCode === 'H4' || detail?.accountCode === '1605') {

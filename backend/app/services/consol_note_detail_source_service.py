@@ -26,6 +26,8 @@ from app.models.consol_note_mapping_models import (
 from app.models.report_models import DisclosureNote
 from app.services.consol_note_detail_suggest import (  # 建议算法拆出；本模块重新导出以兼容原导入路径
     _label_key,
+    is_auto_confirmable,
+    is_placeholder_label,
     suggest_template_rows,
 )
 from app.services.consol_note_standalone_reader import SourceTable
@@ -47,7 +49,16 @@ def _first_cell(row: Any) -> str:
     return ""
 
 
+def source_occurrence(row: Any, fallback: int) -> int:
+    """来源行的同名出现序号：读取层带出的 ``_occurrence``（R11）；没有（旧调用方 / 测试构造的行）⇒ 调用方按顺序数的值。"""
+    value = row.get("_occurrence") if isinstance(row, dict) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else fallback
+
+
 def _row_type(row: Any) -> str:
+    """行类型：声明了合计 / 小计用声明，只有行名时按 ``note_total_terms.label_row_type``（以「小计」结尾 = 小计）。"""
+    from app.services.note_total_terms import label_row_type
+
     if isinstance(row, dict):
         rt = str(row.get("row_type", "data")).strip()
         if rt in ("total", "subtotal"):
@@ -55,18 +66,9 @@ def _row_type(row: Any) -> str:
         if rt not in ("data", ""):
             # 非标准类型（如 header）——不做标签推导，直接归为 data
             return "data"
-        label = str(row.get("label") or "").strip().replace("\u3000", "").replace(" ", "")
-        if label in ("合计", "合\u3000计"):
-            return "total"
-        if label == "小计":
-            return "subtotal"
-        return "data"
+        return label_row_type(row.get("label"))
     if isinstance(row, (list, tuple)) and row:
-        label = str(row[0] or "").strip().replace("\u3000", "").replace(" ", "")
-        if label in ("合计", "合\u3000计"):
-            return "total"
-        if label == "小计":
-            return "subtotal"
+        return label_row_type(row[0])
     return "data"
 
 
@@ -108,10 +110,12 @@ def _stable_key(row: Any) -> str:
 def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
     """从 table_data.rows 提取结构信息（不含金额）。
 
-    返回 ``[{label, row_type, key}]``。
+    返回 ``[{label, row_type, key, occurrence}]``（``occurrence`` = 同名行出现序号，从 0 起；不进结构指纹）；
+    集团下推的行另带 ``_pushed_row_id``。
     """
-    items: list[dict[str, str]] = []
+    items: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
+    occurrences: dict[str, int] = {}
     for row in rows:
         label = _first_cell(row).strip()
         rt = _row_type(row)
@@ -120,7 +124,13 @@ def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
             count = seen.get(label, 0)
             seen[label] = count + 1
             sk = f"{label}#{count}"
-        items.append({"label": label, "row_type": rt, "key": sk})
+        occurrence = source_occurrence(row, occurrences.get(label, 0))
+        occurrences[label] = occurrences.get(label, 0) + 1
+        item = {"label": label, "row_type": rt, "key": sk, "occurrence": occurrence}
+        pushed = row.get("_pushed_row_id") if isinstance(row, dict) else None
+        if pushed:  # 集团下推的行：带行身份进指纹与建议（exact_id）
+            item["_pushed_row_id"] = str(pushed)
+        items.append(item)
     return items
 
 
@@ -130,7 +140,11 @@ def compute_source_structure_hash(section_id: str, rows: list[Any]) -> str:
     数据行排序后再算（行顺序不同但行名集合相同的子企业共用一条映射规则），
     合计/小计行不参与排序（位置固定）。
     """
-    items = extract_source_rows(rows)
+    # 下推行身份（_pushed_row_id）只给建议做 exact_id，不进指纹：下推不改行名 / 行类型，映射照旧有效 ——
+    # 进指纹的话每次「📤 下推模板」都让已确认的企业变成「结构已变化」，重新汇总跳过它（2026-10-26 浏览器实测）
+    # 同名行出现序号（occurrence）同理不进指纹：它由行名与顺序决定，key 已含同名序号，加进来只会让已确认的企业全部失效
+    items = [{k: v for k, v in it.items() if k not in ("_pushed_row_id", "occurrence")}
+             for it in extract_source_rows(rows)]
     # 分离数据行和合计/小计行——合计行位置不参与指纹
     data_items = [it for it in items if it.get("row_type") == "data"]
     other_items = [it for it in items if it.get("row_type") != "data"]
@@ -183,6 +197,49 @@ async def resolve_section_template_type(db: AsyncSession, consol_project_id: UUI
     return await resolve_note_template_type(db, consol_project_id)
 
 
+def standalone_note_filter(standalone_section: str, standalone_title: str) -> Any:
+    """单体附注里与合并章节对应的章节：按章节号，取不到按章节标题。
+
+    子企业附注模板可能与合并口径不同（国企集团含上市子公司：上市版货币资金是「五、1」不是「八、1」）。
+    """
+    conditions = [DisclosureNote.note_section == standalone_section]
+    if standalone_title:
+        conditions.append(DisclosureNote.section_title == standalone_title)
+    return sa.or_(*conditions)
+
+
+#: 同一企业命中多节时逐行喂给 ``prefer_standalone_note`` 的次序（后写覆盖先写）
+_STANDALONE_NOTE_ORDER = (DisclosureNote.sort_order.desc().nullsfirst(), DisclosureNote.updated_at)
+
+
+def prefer_standalone_note(held: Any, row: Any, standalone_section: str) -> Any:
+    """同一企业命中多节时留哪一节：按号命中优先于按标题命中，同号以最近更新为准；同标题多节取文档里靠前的。
+
+    拉数（``load_source_tables``）与下推（``load_standalone_note``）共用 —— 读的与写的是同一节。
+    """
+    if held is None or row.note_section == standalone_section or held.note_section != standalone_section:
+        return row
+    return held
+
+
+async def load_standalone_note(
+    db: AsyncSession, project_id: UUID, year: int, standalone_section: str, standalone_title: str,
+) -> DisclosureNote | None:
+    """一家企业单体附注里与合并章节对应的那一节（ORM 对象，下推写入用；取舍与拉数相同）。"""
+    notes = (await db.execute(
+        sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            standalone_note_filter(standalone_section, standalone_title),
+            DisclosureNote.is_deleted == sa.false(),
+        ).order_by(*_STANDALONE_NOTE_ORDER)
+    )).scalars().all()
+    held = None
+    for note in notes:
+        held = prefer_standalone_note(held, note, standalone_section)
+    return held
+
+
 async def load_source_tables(
     db: AsyncSession,
     project_ids: Sequence[UUID],
@@ -211,11 +268,6 @@ async def load_source_tables(
         return {pid: SourceTable(reason=reason, status="no_source") for pid in ids}
     standalone_title = str(entry.get("standalone_section_title") or "").strip()
 
-    # 子企业附注模板可能与合并口径不同（国企集团含上市子公司：上市版货币资金是「五、1」不是
-    # 「八、1」）——按章节号取不到时按章节标题取，同标题多节取文档里靠前的（报表项目注释）
-    conditions = [DisclosureNote.note_section == standalone_section]
-    if standalone_title:
-        conditions.append(DisclosureNote.section_title == standalone_title)
     notes = (await db.execute(
         sa.select(
             DisclosureNote.project_id, DisclosureNote.note_section, DisclosureNote.table_data,
@@ -224,16 +276,14 @@ async def load_source_tables(
         .where(
             DisclosureNote.project_id.in_(ids),
             DisclosureNote.year == year,
-            sa.or_(*conditions),
+            standalone_note_filter(standalone_section, standalone_title),
             DisclosureNote.is_deleted == sa.false(),
         )
-        .order_by(DisclosureNote.sort_order.desc().nullsfirst(), DisclosureNote.updated_at)
+        .order_by(*_STANDALONE_NOTE_ORDER)
     )).all()
     by_project: dict[UUID, Any] = {}
-    for row in notes:  # 后写覆盖先写：同号以最近更新为准；按号命中优先于按标题命中
-        held = by_project.get(row.project_id)
-        if held is None or row.note_section == standalone_section or held.note_section != standalone_section:
-            by_project[row.project_id] = row
+    for row in notes:
+        by_project[row.project_id] = prefer_standalone_note(by_project.get(row.project_id), row, standalone_section)
 
     consol_table = find_table(template_type, section_id)
     out: dict[UUID, SourceTable] = {}
@@ -257,22 +307,6 @@ async def load_source_tables(
     return out
 
 
-async def load_entity_source_rows(
-    db: AsyncSession,
-    entity_project_id: UUID,
-    section_id: str,
-    year: int,
-    *,
-    template_type: str,
-) -> list[Any]:
-    """单个企业的标准来源行（``load_source_tables`` 的单企业便捷形式）。"""
-    tables = await load_source_tables(
-        db, [entity_project_id], section_id, year, template_type=template_type,
-    )
-    source = tables.get(entity_project_id)
-    return source.rows if source is not None else []
-
-
 async def scan_all_entities(
     db: AsyncSession,
     *,
@@ -280,8 +314,9 @@ async def scan_all_entities(
     section_id: str,
     year: int,
     template_type: str | None = None,
+    tree: Any = None,
 ) -> list[dict[str, Any]]:
-    """扫描企业树全部数据叶子的来源，返回含 hash 与读取状态的实体列表。
+    """扫描企业树全部数据叶子的来源，返回含 hash 与读取状态的实体列表（``tree`` 传入已建好的企业树可省一次重建）。
 
     没读到来源行的企业（未生成 / 本期无此情形 / 读不出表）``rows`` 为空，由调用方
     决定是否参与分组；读取状态在 ``source_status``。
@@ -289,7 +324,8 @@ async def scan_all_entities(
     from app.services.consol_calc_basis import data_leaves
     from app.services.consol_tree_service import build_tree
 
-    tree = await build_tree(db, consol_project_id)
+    if tree is None:
+        tree = await build_tree(db, consol_project_id)
     if tree is None:
         return []
     if template_type is None:
@@ -326,6 +362,7 @@ async def preview_detail_refresh(
     project_id: UUID,
     section_id: str,
     year: int,
+    tree: Any = None,
 ) -> dict[str, Any]:
     """预览明细刷新——只读，不写数据，生成 preview_token。
 
@@ -333,7 +370,7 @@ async def preview_detail_refresh(
     """
     # 1. 扫描来源（只有读到来源行的企业参与分组与映射；其余在 entity_sources 里说明原因）
     scanned = await scan_all_entities(
-        db, consol_project_id=project_id, section_id=section_id, year=year,
+        db, consol_project_id=project_id, section_id=section_id, year=year, tree=tree,
     )
     entities = [e for e in scanned if e["rows"]]
     entity_sources = _entity_source_report(scanned)
@@ -405,20 +442,11 @@ async def preview_detail_refresh(
         history_mappings=history,
     )
 
-    # 5.5 标记可自动确认的建议（confidence ≥ 0.93 且有明确目标行）
-    auto_confirm_threshold = 0.93
-    auto_confirmable_count = 0
-    needs_review_count = 0
+    # 5.5 标记可自动确认的建议（下推行 / 精确 / 别名 / 通用别名 / 历史，且有目标行）；其余都要人工看一眼
     for s in suggestions:
-        if (s.get("confidence", 0) >= auto_confirm_threshold
-                and s.get("suggested_target") is not None
-                and s.get("match_type") in ("exact", "alias", "global_alias")):
-            s["auto_confirmable"] = True
-            auto_confirmable_count += 1
-        else:
-            s["auto_confirmable"] = False
-            if s.get("match_type") == "manual":
-                needs_review_count += 1
+        s["auto_confirmable"] = is_auto_confirmable(s)
+    auto_confirmable_count = sum(1 for s in suggestions if s["auto_confirmable"])
+    needs_review_count = len(suggestions) - auto_confirmable_count
 
     # 6. 为每组标注映射状态
     for group in groups:
@@ -493,9 +521,11 @@ async def suggest_template_for_section(
     project_id: UUID,
     section_id: str,
     year: int,
+    tree: Any = None,
 ) -> dict[str, Any]:
     """模板行建议：以合并附注模板该表的行（顺序 / 行类型）为骨架，标出每行在子企业来源里
-    出现的频率与金额；来源里有而模板没有的行插在首个合计行之前，由用户取舍。
+    出现的频率与金额；来源里有而模板没有的明细行按来源出现顺序替换模板的「……」占位行（没有占位行插在
+    首个合计行之前），全局别名库认得的写法并进模板行别名。
 
     明细模板与合并附注模板同行序，「按公式填入」与明细映射写的才是同一批行。
     合并模板缺该表时退回按来源频率排序。
@@ -505,7 +535,7 @@ async def suggest_template_for_section(
     template_type = await resolve_section_template_type(db, project_id)
     scanned = await scan_all_entities(
         db, consol_project_id=project_id, section_id=section_id, year=year,
-        template_type=template_type,
+        template_type=template_type, tree=tree,
     )
     entities = [e for e in scanned if e["rows"]]
     groups = group_entities_by_structure(entities)
@@ -542,9 +572,22 @@ async def suggest_template_for_section(
             "row_type": rt,
             "origin": "template",
             "_key": key,
+            # 「……」可扩位占位：动态行区（下推不写进子企业附注；有来源独有行时由它们替换）
+            **({"category": "dynamic_zone"} if is_placeholder_label(label) else {}),
         })
 
     template_keys = {r["_key"] for r in skeleton}
+    # 全局别名库认得的写法（「现金」→「库存现金」）并进模板行别名，不单列一行（否则合并附注两行各算一半）
+    from app.services.consol_note_detail_suggest import _load_global_aliases
+
+    variants = _load_global_aliases()
+    by_key = {r["_key"]: r for r in skeleton}
+    for key, stats in label_stats.items():
+        target = by_key.get(variants.get(key, "")) if key not in template_keys else None
+        if target is not None:
+            if stats["label"] not in target["aliases"]:
+                target["aliases"].append(stats["label"])
+            template_keys.add(key)
     extras = [
         {
             "canonical_name": stats["label"],
@@ -553,10 +596,13 @@ async def suggest_template_for_section(
             "origin": "source",
             "_key": key,
         }
-        for key, stats in sorted(label_stats.items(), key=lambda kv: (-kv[1]["count"], -kv[1]["total_amount"]))
+        for key, stats in label_stats.items()  # 来源出现顺序（企业树先序、表内行序）
         if key not in template_keys and stats["row_type"] == "data"
     ]
-    if skeleton:
+    holder = next((i for i, r in enumerate(skeleton) if r.get("category") == "dynamic_zone"), None) if extras else None
+    if holder is not None:  # 来源独有的明细行替换模板的「……」占位行（模板的意思是「此处按实际列示」）
+        ordered = skeleton[:holder] + extras + skeleton[holder + 1:]
+    elif skeleton:
         cut = next((i for i, r in enumerate(skeleton) if r["row_type"] == "total"), len(skeleton))
         ordered = skeleton[:cut] + extras + skeleton[cut:]
     else:  # 合并模板缺该表：按来源频率，合计行放最后

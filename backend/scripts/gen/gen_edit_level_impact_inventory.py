@@ -520,6 +520,22 @@ def _assign_ordinals(points: list[dict[str, Any]]) -> None:
 
 
 _POINT_SORT = ("file", "function", "form")
+#: 检查模式的比对键。同一函数里同一种门禁可以有好几处（不同级别、条件分支、不同辅助链）⇒ 只按 ``_POINT_SORT``
+#: 比对会报「已提交的产物里有重复的条目键」、盖住真实差异（HEAD 实测 6 组）；``_assign_ordinals`` 按
+#: (file, function, form, level) 编号，故加上 level 与 ordinal 即唯一。产物排序仍用 ``_POINT_SORT``（字节不变）。
+#: spec note-pull-followup-closure R20
+_POINT_KEY = ("file", "function", "form", "level", "ordinal")
+
+
+def _duplicate_point_keys(points: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    seen: set[tuple[Any, ...]] = set()
+    dups: list[tuple[Any, ...]] = []
+    for point in points:
+        key = tuple(point.get(f) for f in _POINT_KEY)
+        if key in seen:
+            dups.append(key)
+        seen.add(key)
+    return dups
 
 
 def _build_payload(points: list[dict[str, Any]], comparisons: list[dict[str, Any]],
@@ -771,6 +787,30 @@ async def s11_endpoint(project_id: str, db: AsyncSession = Depends(get_db), user
 '''
 
 
+# 样例 12：同一函数里同一种门禁两处（条件分支一处 + 无条件一处）→ 两个门禁调用点、比对键不重复
+# （spec note-pull-followup-closure R20：原比对键只有 (file, function, form)，这种函数在检查模式里报「重复的条目键」）
+_S12 = '''
+@router.post("/{project_id}/s12")
+async def s12_endpoint(project_id: str, flag: bool, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    if flag:
+        await assert_project_permission(db, user, project_id, "edit")
+    await assert_project_permission(db, user, project_id, "edit")
+    return None
+'''
+
+
+def _s12_view():
+    """同函数同门禁两处：识别出两处，编号后（file, function, form, level, ordinal）唯一。"""
+    result = _impact_recognize(_S12, "s12_endpoint")
+    points = [{"file": "s12.py", "function": "s12_endpoint", "form": u.name, "level": u.level,
+               "conditional": u.conditional}
+              for u in result.uses if u.category != "neutral" and u.category in gates.LEVELLED]
+    _assign_ordinals(points)
+    return {"edit_uses": tuple((p["form"], p["level"], p["conditional"]) for p in points),
+            "ordinals": tuple(p["ordinal"] for p in points),
+            "duplicate_keys": tuple(_duplicate_point_keys(points))}
+
+
 def _impact_view(source: str, function: str):
     """合成源码 → 影响清单的比对视图：edit 级的 (form, level, conditional) 列表与问题。"""
     def run():
@@ -870,6 +910,12 @@ IMPACT_INVENTORY_SAMPLES = (
         {"appendix_functions": ("get_project_role",), "purposes": ("展示",)},
         _s10_view,
     ),
+    selfcheck.Sample(
+        '同一函数里 assert_project_permission(..., "edit") 两处（条件 + 无条件）→ 两个门禁调用点、比对键不重复',
+        {"edit_uses": (("assert_project_permission", "edit", True), ("assert_project_permission", "edit", False)),
+         "ordinals": (1, 2), "duplicate_keys": ()},
+        _s12_view,
+    ),
 )
 
 
@@ -919,6 +965,9 @@ def build(root: Path) -> Built:
     appendix = _scan_all_appendix(root, infos)
 
     payload = _build_payload(gate_points, comparisons, appendix)
+    dups = _duplicate_point_keys(payload["gate_points"])
+    if dups:
+        raise InventoryFailure([f"门禁调用点比对键重复（{', '.join(_POINT_KEY)}）：{d}" for d in dups])
     try:
         text = render.dumps(payload, roots=(root, SCRIPT_REPO))
     except render.RenderError as exc:
@@ -942,7 +991,7 @@ def _drift(committed: Any, payload: Mapping[str, Any]) -> list[str]:
         old = committed.get(key) if isinstance(committed, dict) else None
         new = payload.get(key, [])
         if isinstance(old, list) and all(isinstance(e, dict) for e in old):
-            sort_fields = _POINT_SORT if key == "gate_points" else ("file", "function")
+            sort_fields = _POINT_KEY if key == "gate_points" else ("file", "function")
             try:
                 diff = render.diff_entries(old, new, sort_fields)
                 lines += [f"[{key}] {line}" for line in render.describe_diff(diff, sort_fields)]
@@ -964,7 +1013,8 @@ def check_against(out: Path, built: Built) -> int:
     if not out.is_file():
         print(f"edit 级影响清单与仓库现状不一致：已提交的清单不存在（{out}）", file=sys.stderr)
         return EXIT_DRIFT
-    raw = out.read_bytes()
+    # 换行归一：index 是 LF，Windows 检出（autocrlf）是 CRLF —— 只差换行不算漂移（spec note-pull-followup-closure R21）
+    raw = render.normalize_newlines(out.read_bytes())
     if raw == built.text.encode("utf-8"):
         print(CONSISTENT)
         return EXIT_OK

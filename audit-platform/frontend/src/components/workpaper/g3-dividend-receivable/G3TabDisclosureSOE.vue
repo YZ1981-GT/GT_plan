@@ -159,7 +159,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
-import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject, toRef } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
@@ -174,6 +174,12 @@ import {
 } from '../composables/g3AdjudicationItems'
 import { G3_ADJ_STORAGE_KEY } from '../composables/g3Constants'
 import { buildG3SoeSyncPayloads } from '../composables/g3DisclosureSyncPayload'
+import {
+  G3_DISCLOSURE_ITEM_KEYS,
+  emptyG3SoeDisclosureRow,
+  useG3DisclosureState,
+  type G3SoeDisclosureRow,
+} from '../composables/g3DisclosureTabState'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   G3_ACCOUNT_CODE,
@@ -183,14 +189,6 @@ import {
 } from '../composables/g3NoteSectionMap'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
-
-interface DisclosureSOERow {
-  id: string
-  investeeName: string
-  openingBalance: number
-  currentChange: number
-  remark: string
-}
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -214,14 +212,10 @@ const noteChip = computed(() => noteTarget.value?.chipValue ?? `Note:${G3_NOTE_S
 const combinedWpChip = computed(() => noteTarget.value?.combinedWpChip ?? `wp:${G3_COMBINED_DISCLOSURE_INDEX.wpCode}`)
 const combinedNoteChip = computed(() => noteTarget.value?.combinedNoteChip ?? `Note:${G3_NOTE_SECTION.soe}`)
 
-const TEXT_KEY = 'G3-disclosure-soe-text'
-const TABLE_KEY = 'G3-disclosure-soe-table'
+const { text: TEXT_KEY, table: TABLE_KEY } = G3_DISCLOSURE_ITEM_KEYS.soe
 
-const noteText = ref('')
-
-watch(() => props.allResponses.get(TEXT_KEY)?.remark, (v) => {
-  if (v && v !== noteText.value) noteText.value = v
-}, { immediate: true })
+// 表格行 + 审计说明（读取与重读）：与附注页离屏同步共用同一份实现（g3DisclosureTabState）
+const { noteText, tableRows } = useG3DisclosureState('soe', toRef(props, 'allResponses'))
 
 watch(noteText, (val) => {
   if (props.isReadonly) return
@@ -235,37 +229,13 @@ watch(noteText, (val) => {
   } catch { /* silent */ }
 })
 
-function generateId(): string {
-  return `ds-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function emptyTableRow(): DisclosureSOERow {
-  return { id: generateId(), investeeName: '', openingBalance: 0, currentChange: 0, remark: '' }
-}
-
-function loadTableRows(): DisclosureSOERow[] {
-  const raw = props.allResponses.get(TABLE_KEY)?.conclusion
-  if (!raw) return [emptyTableRow()]
-  try {
-    const parsed = JSON.parse(raw) as Partial<DisclosureSOERow>[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return [emptyTableRow()]
-    return parsed.map((p) => ({ ...emptyTableRow(), ...p, id: p.id ?? generateId() }))
-  } catch { return [emptyTableRow()] }
-}
-
-const tableRows = ref<DisclosureSOERow[]>(loadTableRows())
-
-watch(() => props.allResponses.get(TABLE_KEY)?.conclusion, (raw) => {
-  if (raw) tableRows.value = loadTableRows()
-}, { immediate: false })
-
 function persistTable() {
   if (!props.isReadonly) {
     props.debouncedSave(TABLE_KEY, { conclusion: JSON.stringify(tableRows.value) })
   }
 }
 
-function updateTableRow(id: string, field: keyof DisclosureSOERow, value: string | number) {
+function updateTableRow(id: string, field: keyof G3SoeDisclosureRow, value: string | number) {
   if (props.isReadonly) return
   tableRows.value = tableRows.value.map((r) => (r.id === id ? { ...r, [field]: value } : r))
   persistTable()
@@ -273,7 +243,7 @@ function updateTableRow(id: string, field: keyof DisclosureSOERow, value: string
 
 function addTableRow() {
   if (props.isReadonly) return
-  tableRows.value = [...tableRows.value, emptyTableRow()]
+  tableRows.value = [...tableRows.value, emptyG3SoeDisclosureRow()]
   persistTable()
 }
 

@@ -24,12 +24,17 @@ import vTabWheel from './directives/vTabWheel'
 import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
 import { clearOnUpgrade } from './utils/aiChatCacheCleanup'
 import { gridPlugin } from './components/grid/plugin'
+import http from './utils/http'
+import { installPushKeptNotice } from './utils/disclosureSyncPushNotice'
 import { startSessionHandoff } from './utils/crossWindowAuth'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
 // 必须在任何组件挂载前安装，确保所有生产者/消费者互通。
 installCrossWpEventBridge()
+
+// 底稿披露同步：公式推送写过的格保持试算表审定数时提示一次（spec note-pull-followup-closure R3）
+installPushKeptNotice(http)
 
 // Task 10: 首次升级时清理遗留 AI 聊天敏感缓存（doc_ai_chat_*）
 clearOnUpgrade()

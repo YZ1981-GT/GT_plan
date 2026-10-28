@@ -1003,6 +1003,16 @@ async def sync_from_workpaper(
     new_table_data["_last_sync_sheet"] = sheet_name
     new_table_data["_last_sync_at"] = now.isoformat()
 
+    # ── 公式推送写过的主表格保持推送值、逐格回报（ADR-3；spec note-pull-followup-closure R3） ──
+    push_kept: list[dict[str, Any]] = []
+    if note is not None and clean_sub_table_data:
+        from app.services.note_push_ownership import reapply_pushed_cells
+
+        push_kept = await reapply_pushed_cells(
+            db, project_id=project_id, year=target_year, section=section_id,
+            table_data=new_table_data, touched=clean_sub_table_data.keys(),
+        )
+
     # ── 叙述段按 `section` 浅合并（原实现是整列表替换）──────────────────────
     #   多循环共用同一附注章节时（G2/G3/K1 共用 五、8/八、9），整替换会让
     #   K1 录的 10 段说明被 G2 的一段整体覆盖。删除走显式 `_removed_text_sections`。
@@ -1109,6 +1119,7 @@ async def sync_from_workpaper(
                     "row_scoped_tables": [],
                     "row_scope_unresolved": [],
                     "row_scope_unresolved_reasons": {},
+                    "push_kept": [],
                 }
             # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
@@ -1175,6 +1186,8 @@ async def sync_from_workpaper(
         #    （准则未设 / 表名不一致 / 模板缺段首码），只报「解析失败」等于把三条
         #    岔路合成一条死胡同。审计师看不到后端日志。
         "row_scope_unresolved_reasons": row_scope_reasons,
+        # additive：公式推送写过、本次同步来的值与之不同而保持推送值的格（以试算表审定数为准；R3）
+        "push_kept": push_kept,
     }
 
 
@@ -1220,6 +1233,11 @@ async def sync_batch_from_workpaper(
                 propagation_origin=propagation_origin,
                 commit=False,
             )
+            if "skipped_reason" in result:
+                # 项目没有审计年度、载荷也没带年度：单章节端点回 422（R3）；批量原先把它当成功汇总 ⇒ 读 results[-1]["synced_at"]
+                # KeyError、对外 500（L3 国企 / G7 走批量）。抛 ValueError ⇒ 整批回滚、路由回 422 中文原因
+                # （spec note-pull-followup-closure R1 实施中发现，与 R3 同口径）
+                raise ValueError(f"附注未同步：{result['skipped_reason']}")
             results.append(result)
         await db.commit()
     except Exception:
@@ -1420,7 +1438,11 @@ class WpDisclosureSyncService:
         html_row_scope_unresolved: list[str] = []
         html_row_scope_reasons: dict[str, str] = {}
         if incoming_sub:
-            merged_html_sub = dict(incoming_sub)
+            # 按表名浅合并（与 sync_from_workpaper 同口径）：原先整体替换 sub_table_data，本次没推的子表（别的底稿同步
+            # 来的、公式推送建的）全部丢失（spec note-pull-followup-closure R3.3）
+            prev_html_sub = existing_table_data.get("sub_table_data")
+            merged_html_sub = dict(prev_html_sub) if isinstance(prev_html_sub, dict) else {}
+            merged_html_sub.update(incoming_sub)
             if html_row_scopes:
                 prev_sub_for_scope = existing_table_data.get("sub_table_data")
                 prev_sub_for_scope = (
@@ -1468,6 +1490,14 @@ class WpDisclosureSyncService:
         existing_table_data["_last_sync_wp_id"] = str(wp_id)
         existing_table_data["_last_sync_sheet"] = sheet_name
         existing_table_data["_last_sync_at"] = now.isoformat()
+        html_push_kept: list[dict[str, Any]] = []
+        if incoming_sub:  # 公式推送写过的主表格保持推送值（与 sync_from_workpaper 同口径，R3）
+            from app.services.note_push_ownership import reapply_pushed_cells
+
+            html_push_kept = await reapply_pushed_cells(
+                db, project_id=project_id, year=target_year, section=section_id,
+                table_data=existing_table_data, touched=incoming_sub.keys(),
+            )
 
         note.table_data = existing_table_data
         note.is_stale = False
@@ -1499,6 +1529,7 @@ class WpDisclosureSyncService:
             "row_scoped_tables": html_row_scoped,
             "row_scope_unresolved": html_row_scope_unresolved,
             "row_scope_unresolved_reasons": html_row_scope_reasons,
+            "push_kept": html_push_kept,
         }
 
     async def _get_section_mapping(

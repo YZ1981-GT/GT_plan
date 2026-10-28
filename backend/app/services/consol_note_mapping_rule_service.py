@@ -449,6 +449,10 @@ def _validate_mappings(mappings: list[dict[str, Any]]) -> None:
             raise MappingRuleError(400, "MISSING_IGNORE_REASON", f"第 {i+1} 条映射 action=ignore 必须提供 ignore_reason")
         if action in ("map", "map_merge") and not m.get("target_row_id"):
             raise MappingRuleError(400, "MISSING_TARGET", f"第 {i+1} 条映射 action={action} 必须提供 target_row_id")
+        occurrence = m.get("source_occurrence")
+        if occurrence is not None and (not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 0):
+            raise MappingRuleError(400, "INVALID_OCCURRENCE",
+                                   f"第 {i+1} 条映射 source_occurrence 必须是从 0 起的整数（同名行的第几次出现）")
 
 
 async def _verify_template_version(db: AsyncSession, vid: UUID) -> None:

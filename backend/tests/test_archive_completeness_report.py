@@ -47,7 +47,7 @@ class TestCompletenessReportStructure:
 
     @pytest.mark.asyncio
     async def test_report_always_has_5_categories(self):
-        """报告始终包含固定 5 类。
+        """报告始终包含固定 10 类（函数名沿用旧称）。
 
         第 5 类 `sampling_records`（抽样记录不完整）由
         sampling-evaluation-and-governance-closure R8.4 加入：改造前归档包完全不感知
@@ -65,7 +65,8 @@ class TestCompletenessReportStructure:
 
         result = await get_archive_completeness_report(db=mock_db, project_id=project_id)
 
-        assert len(result.categories) == 5
+        # spec attachment-archive-and-a-class-evidence 需求 5 再加 5 类（文件缺失阻断，其余提示）
+        assert len(result.categories) == 10
         category_names = {cat.category for cat in result.categories}
         assert category_names == {
             "missing",
@@ -73,10 +74,15 @@ class TestCompletenessReportStructure:
             "unresolved_reviews",
             "stale",
             "sampling_records",
+            "missing_files",
+            "evidence_gaps",
+            "unreplied_confirmations",
+            "unconfirmed_ocr",
+            "orphan_files",
         }
-        # 抽样记录类别非阻断：其余四类保持阻断语义不变
+        # 抽样记录与证据类提示非阻断；文件缺失与原四类阻断
         blocking = {cat.category for cat in result.categories if cat.is_blocking}
-        assert blocking == {"missing", "unsigned", "unresolved_reviews", "stale"}
+        assert blocking == {"missing", "unsigned", "unresolved_reviews", "stale", "missing_files"}
 
     @pytest.mark.asyncio
     async def test_can_proceed_true_when_all_empty(self):

@@ -9,7 +9,7 @@
  *
  * Spec: .kiro/specs/i4-long-term-prepaid/
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -211,6 +211,22 @@ export function useI4Disclosure(
     if (keys.portion) _persistField(keys.portion, val)
   }
 
+  /**
+   * 同步载荷 = 快照 + 本版本 builder（`syncToNotes` 与附注页离屏同步共用，spec note-pull-followup-closure R1）；
+   * 当前报告准则不适用本版本时回空数组。
+   */
+  function buildSyncPayloads() {
+    const state = {
+      rows: rows.value,
+      currentPortion: currentPortion.value,
+      otherNote: otherNote.value,
+      footnote: footnote.value,
+    }
+    return isListed.value
+      ? buildI4ListedSyncPayloads(wpId.value, _standards(), state)
+      : buildI4SoeSyncPayloads(wpId.value, _standards(), state)
+  }
+
   /** 同步到附注模块 */
   async function syncToNotes(): Promise<void> {
     if (isSyncing.value || !projectId.value || !wpId.value) return
@@ -227,15 +243,7 @@ export function useI4Disclosure(
       }
     }
 
-    const state = {
-      rows: rows.value,
-      currentPortion: currentPortion.value,
-      otherNote: otherNote.value,
-      footnote: footnote.value,
-    }
-    const payloads = isListed.value
-      ? buildI4ListedSyncPayloads(wpId.value, _standards(), state)
-      : buildI4SoeSyncPayloads(wpId.value, _standards(), state)
+    const payloads = buildSyncPayloads()
 
     if (!payloads.length) {
       ElMessage.warning('当前报告准则不适用本披露版本同步')
@@ -323,12 +331,16 @@ export function useI4Disclosure(
   watch(allResponses, () => _load(), { immediate: true })
   watch(variant, () => _load())
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
-  onUnmounted(() => {
-    window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
+    onUnmounted(() => {
+      window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
+  }
 
   return {
     variant,
@@ -353,6 +365,7 @@ export function useI4Disclosure(
     saveAuditNote,
     saveAuditConclusion,
     saveCurrentPortion,
+    buildSyncPayloads,
     syncToNotes,
     generateNoteText,
   }

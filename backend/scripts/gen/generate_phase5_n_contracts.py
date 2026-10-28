@@ -22,13 +22,21 @@ _BACKEND = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_BACKEND))
 
 from app.services.workpaper_sync import (  # noqa: E402
+    phase5_n1_deferred_tax_assets as _n1,
+    phase5_n2_taxes_payable as _n2,
+    phase5_n3_deferred_tax_liabilities as _n3,
     phase5_n4_taxes_and_surcharges as _n4,
+    phase5_n5_income_tax_expense as _n5,
 )
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 
-#: adapter_id → provider 模块。N1/N2/N3/N5 接线时在此追加。
+#: adapter_id → provider 模块（N1~N5 全五条）。
 _PROVIDERS = {
+    _n1.ADAPTER_ID: _n1,
+    _n2.ADAPTER_ID: _n2,
+    _n3.ADAPTER_ID: _n3,
     _n4.ADAPTER_ID: _n4,
+    _n5.ADAPTER_ID: _n5,
 }
 
 

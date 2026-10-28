@@ -17,7 +17,7 @@
  * Task: 13.1
  * Requirements: 15.1-15.9, 16.1-16.7, 17.1-17.7
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcPercentage, calcSubtotal } from './useD6FormulaEngine'
 import type { ChecklistResponse } from './useD6FormData'
@@ -541,14 +541,18 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
   )
 
   // Listen for external note updates
-  eventBus.on('note:section-updated' as any, (payload: any) => {
-    if (payload?.wpCode === 'D6' && payload?.section && payload?.text != null) {
-      const key = payload.section
-      if (NOTE_TEXT_KEYS.includes(key)) {
-        noteTexts.value[key] = payload.text
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不订阅：订阅不会退订，
+  // 每次刷新都会多留一个（spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    eventBus.on('note:section-updated' as any, (payload: any) => {
+      if (payload?.wpCode === 'D6' && payload?.section && payload?.text != null) {
+        const key = payload.section
+        if (NOTE_TEXT_KEYS.includes(key)) {
+          noteTexts.value[key] = payload.text
+        }
       }
-    }
-  })
+    })
+  }
 
   // ─── Return ──────────────────────────────────────────────────────────
 

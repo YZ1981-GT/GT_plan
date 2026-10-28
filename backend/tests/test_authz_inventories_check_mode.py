@@ -97,7 +97,8 @@ class TestDoubleGenerateIdentical:
     """两脚本各以 ``--out`` 写两次临时文件，与已提交产物逐字节相同。"""
 
     def test_note_write_inventory_double_generate(self, tmp_path: Path) -> None:
-        committed = NOTE_PRODUCT.read_bytes()
+        # 已提交产物按 LF 归一后比（index 是 LF，Windows 检出是 CRLF；spec note-pull-followup-closure R21）
+        committed = NOTE_PRODUCT.read_bytes().replace(b"\r\n", b"\n")
         out1 = tmp_path / "note_1.json"
         out2 = tmp_path / "note_2.json"
 
@@ -117,13 +118,14 @@ class TestDoubleGenerateIdentical:
         gen2 = out2.read_bytes()
 
         assert gen1 == gen2, "附注写端点清册两次生成结果不逐字节相同"
+        assert b"\r\n" not in gen1, "生成结果应恒为 LF"
         assert gen1 == committed, (
             f"附注写端点清册生成结果与已提交产物不逐字节相同"
             f"（生成 {len(gen1)} 字节，已提交 {len(committed)} 字节）"
         )
 
     def test_edit_level_impact_inventory_double_generate(self, tmp_path: Path) -> None:
-        committed = IMPACT_PRODUCT.read_bytes()
+        committed = IMPACT_PRODUCT.read_bytes().replace(b"\r\n", b"\n")
         out1 = tmp_path / "impact_1.json"
         out2 = tmp_path / "impact_2.json"
 
@@ -143,6 +145,7 @@ class TestDoubleGenerateIdentical:
         gen2 = out2.read_bytes()
 
         assert gen1 == gen2, "edit 级影响清单两次生成结果不逐字节相同"
+        assert b"\r\n" not in gen1, "生成结果应恒为 LF"
         assert gen1 == committed, (
             f"edit 级影响清单生成结果与已提交产物不逐字节相同"
             f"（生成 {len(gen1)} 字节，已提交 {len(committed)} 字节）"

@@ -41,7 +41,10 @@ _PROJECT_NAME = "重药控股安徽有限公司_2025"
 #: 🔴 2026-10-17 由 80 上调为 85：实测 82 = 66 + 10（L 类）+ 6（M 类），新增的 16 个原来都是「写成功」的假象 ——
 #: L 类是旧兜底把期初数写进「减值准备」列（见 _MIN_COVERAGE 说明），M 类是 H1 的 固定资产_1601 / _1602 / _1603
 #: 三条取数行都对上附注「固定资产」行、逐条覆盖写，留下的是 1603 的 0。今后只许下调。
-_MAX_SKIPPED = 85
+#: 🔴 2026-10-27 重定为 99（spec note-pull-followup-closure R2.5）：HEAD 现算 196 —— 2026-10-24~25 程序裁剪把本项目 131 张
+#: 已裁底稿移入回收站（procedure-trim-generation-delegation-chain），20 个 binding 的分册不在了（P 类，新增分类），子表规则
+#: 105 处跳过（取不到值 / 表名错版 / 章节标题不是子表名）；删 104 条子表规则与 3 条错挂主表规则后现算 99，sub 跳过 0。
+_MAX_SKIPPED = 99
 #: 覆盖率下限（written + unchanged + kept）：实测 327，棘轮只许增不许减
 #:
 #: 🔴 2026-10-17 由 320 下调为 295 —— 不是回归，是旧口径虚高（spec disclosure-note-template-word-realignment Task 26）：
@@ -54,18 +57,26 @@ _MAX_SKIPPED = 85
 #: 减值准备」（期末 500,000.00 写进减值准备列）、其他非流动金融资产 → 「其他」、长期借款 / 应付债券 → 「减：一年内到期的…」、
 #: 所得税费用 → 「当期所得税费用」；现在改走合计行兜底（这 10 格记 fallback_to_total、不计覆盖，兜底写的小计 / 合计格原本就计）。
 #: 今后只许上调。
-_MIN_COVERAGE = 295
+#: 🔴 2026-10-27 重定为 231（spec note-pull-followup-closure R2.5）：HEAD 现算 227 —— 不是推送回归，是本项目 131 张已裁底稿
+#: 移入回收站后（见 _MAX_SKIPPED），那些底稿的取数格不再参与（覆盖分母没了）；本 spec 子表规则按表名精确定位后
+#: 「短期借款分类」等表的合计兜底写得进去了，现算 231（written 2 + unchanged 221 + kept 8）。
+_MIN_COVERAGE = 231
 
 # ── 分类别棘轮（spec: formula-push-note-row-matching · 需求 3） ────────
 _SKIP_CATEGORIES: dict[str, re.Pattern[str]] = {
+    # 子表规则只按表名精确定位：章节里没有这张表（2026-10-27 起，spec note-pull-followup-closure R2.3）；排在 A 前 ——
+    # 表名里可能带「行」（银行承兑汇票…），按 A 的「没有.*行」会认错类
+    "S": re.compile(r"子表规则只按表名精确定位"),
+    # binding 声明的分册在本项目不存在（底稿被裁剪 / 未创建）
+    "P": re.compile(r"binding 声明的分册 .* 在本项目不存在"),
     "A": re.compile(r"没有.*行"),
     "C": re.compile(r"银行明细|银行存款明细|现金明细|取数.*未完成|明细尚未建立|财务公司分组"),
     "D": re.compile(r"不是「.*」|章节号"),
     "G": re.compile(r"没有.*表定义|无法建骨架|没有对应的附注章节|附注尚未生成"),
     "I": re.compile(r"本项目无此科目"),
     "K": re.compile(r"明细数据缺失"),
-    # 旧格式表头认不出唯一的期末 / 期初金额列（不按位置猜；2026-10-17 起，见 _MIN_COVERAGE 说明）
-    "L": re.compile(r"找不到唯一"),
+    # 旧格式表头认不出唯一的期末 / 期初金额列（不按位置猜；2026-10-17 起，见 _MIN_COVERAGE 说明）；表有表头但缺该期间列
+    "L": re.compile(r"找不到唯一|附注表缺少「"),
     # 多条取数行对上附注同一行（撞行，2026-10-17 起不再逐条覆盖写）
     "M": re.compile(r"同一格不能由多条取数"),
 }
@@ -80,15 +91,18 @@ def _categorize(reason: str) -> str:
 
 
 #: 分类别棘轮基线（真库实测 2026-10-13；实测值 + ~50% 余量取整）
+#: 2026-10-27 按现算重定（spec note-pull-followup-closure R2.5）：S=0 / P=20 / A=4 / C=32 / D=9 / G=6 / I=2 / K=8 / L=18 / M=0
 _MAX_SKIPPED_BY_CATEGORY: dict[str, int] = {
-    "A": 12,     # real=8，行匹配失败
+    "S": 4,      # real=0，子表规则：章节里没有这张表
+    "P": 22,     # real=20，binding 分册在本项目不存在（131 张已裁底稿移入回收站）
+    "A": 6,      # real=4（2026-10-13 为 8），行匹配失败
     "C": 36,     # real=32，银行/现金明细未建立 + 财务公司分组
-    "D": 16,     # real=13，章节号不匹配
-    "G": 5,      # real=3，模板缺定义 / 附注未生成
+    "D": 12,     # real=9（原 13；子表规则不再按章节标题判），章节号不匹配
+    "G": 8,      # real=6（原 3），模板缺定义 / 附注未生成
     "I": 5,      # real=2，项目无此科目
     "K": 12,     # real=8，K1 明细数据缺失
-    "L": 15,     # real=10（2026-10-17），三列组表不知道推哪列
-    "M": 9,      # real=6（2026-10-17），H1 三条取数行撞附注「固定资产」行
+    "L": 20,     # real=18（2026-10-17 为 10），三列组表不知道推哪列 / 缺期间列
+    "M": 9,      # real=0（2026-10-17 为 6），H1 三条取数行撞附注「固定资产」行
     "other": 2,  # real=0，其余
 }
 
@@ -278,6 +292,12 @@ def test_categorize_known_patterns():
     # M: 撞行
     assert _categorize("取数行「固定资产_1601」「固定资产_1602」都对上附注「固定资产」行，同一格不能由多条取数覆盖写，"
                        "附注保持原值") == "M"
+    # S: 子表规则章节里没有这张表（表名带「行」也不归 A）
+    assert _categorize("附注 八、4「应收票据」里没有「银行承兑汇票按行业划分」表（子表规则只按表名精确定位），未推送") == "S"
+    # P: binding 分册在本项目不存在
+    assert _categorize("binding 声明的分册 D6 在本项目不存在，未推送（项目创建该底稿后下次推送纳入）") == "P"
+    # L: 表有表头但缺该期间列（无表头说明时只有这一句）
+    assert _categorize("附注表缺少「期初」列") == "L"
     # other: 未知模式
     assert _categorize("附注章节已确认，公式推送不改写") == "other"
     assert _categorize("something completely unknown") == "other"

@@ -85,7 +85,9 @@ HARD_CAPS = {
     #   编辑器只留 1 个挂载 + 1 个回调；按「每完成一批瘦身必须同步下调」不留余量）。
     # 2026-10-26：3281→3265（HEAD 已是 3265 —— 之前那批瘦身没同步下调，test_hard_cap_ratchet 在 HEAD 上就红；
     #   本次 audit-year-calendar-fallback-ratchet 只改年度初值一行，行数不变）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3265,
+    # 2026-10-28：3265→3228（note-pull-header-formula-closure R4 表格列改由递归列组件 NoteTableColumnNode
+    #   渲染、note-pull-followup-closure 固定行保护接线，同一提交入库，净减 37 行；按「每完成一批瘦身必须同步下调」不留余量）。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3228,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：

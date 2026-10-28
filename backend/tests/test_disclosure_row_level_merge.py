@@ -116,6 +116,13 @@ def _note(table_data: dict, *, section: str = FX_SECTION_SOE) -> DisclosureNote:
     return n
 
 
+def _no_push_states() -> MagicMock:
+    """公式推送状态查询（spec note-pull-followup-closure R3：更新已有章节时查推送写过的格）：没有推送过。"""
+    res = MagicMock()
+    res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    return res
+
+
 def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
@@ -128,6 +135,8 @@ def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicM
     ]
     if note is None:
         sequence.append(_scalar_result(None))
+    else:
+        sequence.append(_no_push_states())
     db.execute = AsyncMock(side_effect=sequence)
     return db
 
@@ -658,6 +667,7 @@ def _make_html_db(note: DisclosureNote) -> MagicMock:
             mapping_res,             # _get_section_mapping
             _scalar_result(2025),    # _resolve_project_audit_year
             _scalar_result(note),    # _get_note
+            _no_push_states(),       # 推送状态（R3：推送写过的格保持推送值）
         ]
     )
     return db

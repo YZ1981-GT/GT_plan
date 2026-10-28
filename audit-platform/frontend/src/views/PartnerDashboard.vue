@@ -361,6 +361,7 @@ import {
   getPartnerOverview, getTeamEfficiency,
   type PartnerOverview, type TeamEfficiency,
 } from '@/services/partnerApi'
+import { requestConfirmationToken } from '@/utils/passwordConfirm'
 import {
   getSignatureWorkflow, signDocument, getSignReadinessV2,
   type WorkflowStep,
@@ -601,6 +602,8 @@ async function handleSign() {
 
   signing.value = true
   try {
+    const confirmationToken = await requestConfirmationToken('签字确认')
+    if (!confirmationToken) return
     await signDocument({
       object_type: 'audit_report',
       object_id: currentSignProjectId.value,
@@ -612,7 +615,7 @@ async function handleSign() {
       required_order: step.order,
       required_role: step.role,
       prerequisite_signature_ids: prerequisiteIds.length ? prerequisiteIds : undefined,
-    })
+    }, confirmationToken)
 
     ElMessage.success('签字成功')
     showSignDialog.value = false

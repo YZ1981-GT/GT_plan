@@ -5,7 +5,7 @@
  * 「其中」挂靠主行，主行不存在时子行一并省略。
  * 与附注模块：EventBus sectionId + sync-from-workpaper 结构化子表（空行不推送）。
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { parseNum, calcChangeAmount, calcChangeRate } from './useG13FormulaEngine'
 import {
   G13_ACCOUNT_CODE,
@@ -280,9 +280,17 @@ export function useG13Disclosure(options: {
     }
   }
 
+  /** 「从明细同步」：G13-2 明细回填本期发生额后保存 */
   function syncFromDetail(): void {
+    try {
+      if (applyDetailPatch()) persist()
+    } catch { /* ignore */ }
+  }
+
+  /** 由 G13-2 明细按来源汇总本期发生额（只改内存）；没有明细或解析失败返回 false、不动行 */
+  function applyDetailPatch(): boolean {
     const detailJson = options.allResponses.value.get('G13-detail-rows')?.remark
-    if (!detailJson) return
+    if (!detailJson) return false
     try {
       const detailRows = JSON.parse(detailJson) as any[]
       const sums = new Map<string, number>()
@@ -328,8 +336,10 @@ export function useG13Disclosure(options: {
         }
         return r
       })
-      persist()
-    } catch { /* ignore */ }
+      return true
+    } catch {
+      return false
+    }
   }
 
   function handleAdjudicated(e: Event): void {
@@ -340,10 +350,15 @@ export function useG13Disclosure(options: {
     }
   }
 
-  function pullLatestAdjudicated(): void {
+  /**
+   * 审定数 → G13-2 明细本期 → G13-1 上期审定。Tab 挂载与「刷新」调它（明细回填后保存）；附注页离屏同步在 prepare 里调
+   * `pullLatestAdjudicated({ persist: false })`：同一回填只改内存、不保存（spec note-pull-followup-closure R1）。
+   */
+  function pullLatestAdjudicated(opts: { persist?: boolean } = {}): void {
     const amt = options.allResponses.value.get('G13-1-adjudicated-amount')?.conclusion
     if (amt != null) adjudicatedAmount.value = parseNum(amt)
-    syncFromDetail()
+    if (opts.persist === false) applyDetailPatch()
+    else syncFromDetail()
     const prior = options.allResponses.value.get('G13-adj-prior')?.remark
     if (prior) {
       try {
@@ -409,15 +424,19 @@ export function useG13Disclosure(options: {
     variant === 'listed' ? '附注披露（上市公司）' : '附注披露（国企）',
   )
 
-  onMounted(() => {
-    pullLatestAdjudicated()
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    publishNoteUpdate()
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-    if (noteTimer) clearTimeout(noteTimer)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件、不广播说明；挂载时的回填
+  // 由调用方显式调 `pullLatestAdjudicated({ persist: false })`（spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      pullLatestAdjudicated()
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      publishNoteUpdate()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+      if (noteTimer) clearTimeout(noteTimer)
+    })
+  }
 
   return {
     rows,

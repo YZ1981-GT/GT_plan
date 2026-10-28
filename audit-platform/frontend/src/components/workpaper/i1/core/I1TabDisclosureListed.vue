@@ -329,6 +329,7 @@ const {
   auditConclusion,
   crossCheck,
   prepValidation,
+  buildSyncSnapshot,
   persist,
   updateMovement,
   addCategory,
@@ -457,21 +458,8 @@ async function syncToNotes() {
     }
   }
   persist()
-  const payloads = buildI1ListedSyncPayloads(props.wpId, props.applicableStandards || [], {
-    categories: categories.value,
-    movement: movement.value,
-    noteRdRatio: noteRdRatio.value,
-    noteIndefinite: noteIndefinite.value,
-    noteMortgage: noteMortgage.value,
-    noteImpairment: noteImpairment.value,
-    noteSale: noteSale.value,
-    noteImportant: noteImportant.value,
-    titleCertRows: titleCertRows.value,
-    importantRows: importantRows.value,
-    dataResource: dataResource.value,
-    noteDataResource: noteDataResource.value,
-    amortAlloc: amortAlloc.value,
-  })
+  // 快照与附注页离屏同步共用（useI1Disclosure.buildSyncSnapshot，同一载荷）
+  const payloads = buildI1ListedSyncPayloads(props.wpId, props.applicableStandards || [], buildSyncSnapshot())
   if (!payloads.length) {
     ElMessage.warning('当前不适用上市附注同步')
     return

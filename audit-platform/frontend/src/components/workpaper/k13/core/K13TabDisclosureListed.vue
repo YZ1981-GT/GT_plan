@@ -156,6 +156,17 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { K13_NOTE_SECTION, buildK13SyncPayload } from '../../composables/k13NoteSectionMap'
+import {
+  K13_DISCLOSURE_CATEGORIES,
+  K13_DISCLOSURE_DYN_PREFIX,
+  K13_DISCLOSURE_NARRATIVE_ITEM,
+  applyK13AutoFill,
+  k13DefaultDisclosureRows,
+  k13DisclosureSyncRows,
+  loadK13DisclosureState,
+  loadK13DynamicRows,
+  type K13DisclosureTabRow,
+} from '../../composables/k13DisclosureTabState'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -188,114 +199,32 @@ function jumpToNote(target: DisclosureVariant): void {
 
 const ACCOUNT_CODE = '6711'
 const ABNORMAL_THRESHOLD = 0.5 // 同比变动超50%标异常
-const DYN_PREFIX = 'K13-disc-listed-dyn-'
+const VARIANT = 'listed'
+const DYN_PREFIX = K13_DISCLOSURE_DYN_PREFIX[VARIANT]
 
 /** 营业外支出标准去向分类（与K13-1审定表行对应） */
-const CATEGORIES = [
-  '非流动资产毁损报废损失',
-  '其中：固定资产处置损失',
-  '其中：无形资产处置损失',
-  '捐赠支出',
-  '其中：公益性捐赠支出',
-  '其中：非公益性捐赠支出',
-  '债务重组损失',
-  '罚款滞纳金支出',
-  '其中：税务罚款',
-  '其中：工商罚款',
-  '其中：其他行政罚款',
-  '资产盘亏损失',
-  '非常损失',
-  '其他',
-]
+const CATEGORIES = K13_DISCLOSURE_CATEGORIES[VARIANT]
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types / State ───────────────────────────────────────────────────────────
+// 去向分类、披露行、读回 / 动态行 / 审定表取数与附注页离屏同步共用（k13DisclosureTabState，spec note-pull-followup-closure R1）
 
-interface DisclosureRow {
-  category: string
-  currentAmount: number
-  priorAmount: number
-  nonRecurring: number
-  remark: string
-}
+type DisclosureRow = K13DisclosureTabRow
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, nonRecurring: 0, remark: '' }))
-)
+const disclosureRows = ref<DisclosureRow[]>(k13DefaultDisclosureRows(VARIANT))
 const narrativeText = ref('')
 const totalAdjudicated = ref(0)
 
 // ─── Load saved data from allResponses ───────────────────────────────────────
 
 function loadSavedData(): void {
-  // 加载各行数据
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const key = `K13-disc-listed-row-${i}`
-    const saved = props.allResponses.get(key)
-    if (saved) {
-      try {
-        const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-        if (parsed) {
-          disclosureRows.value[i] = {
-            category: CATEGORIES[i],
-            currentAmount: Number(parsed.currentAmount || 0),
-            priorAmount: Number(parsed.priorAmount || 0),
-            nonRecurring: Number(parsed.nonRecurring || 0),
-            remark: parsed.remark || '',
-          }
-        }
-      } catch { /* ignore parse errors */ }
-    }
-  }
-
-  // 加载叙述文本
-  const narrativeSaved = props.allResponses.get('K13-disclosure-listed-narrative')
-  if (narrativeSaved) {
-    narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
-  }
-}
-
-// ─── Auto-fill from K13-1（P0 修复：原读 `K13-1-row-${i}-audited` 死键，
-//     useK13Adjudication 从不写 → 恒 no-op；改读 `K13-1-rows` 按 name 匹配） ─────
-
-/** 从审定表 K13-1-rows 构建 名称→审定数 映射 */
-function buildAdjAuditedMap(): Map<string, number> {
-  const map = new Map<string, number>()
-  const raw = props.allResponses.get('K13-1-rows')
-  if (!raw) return map
-  try {
-    const parsed = typeof raw.remark === 'string' ? JSON.parse(raw.remark) : (raw.remark ?? raw.conclusion)
-    if (Array.isArray(parsed)) {
-      for (const r of parsed) {
-        const name = String(r?.name ?? '').trim()
-        if (!name) continue
-        const audited = Number(r?.audited ?? 0)
-          || (Number(r?.unadjusted ?? 0) + Number(r?.aje ?? 0) + Number(r?.rje ?? 0))
-        map.set(name, audited)
-      }
-    }
-  } catch { /* ignore */ }
-  return map
+  const saved = loadK13DisclosureState(props.allResponses, VARIANT)
+  disclosureRows.value = saved.rows
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 }
 
 /** 加载动态追加披露行（K13-1 中未匹配固定分类的去向） */
 function loadDynamicRows(): void {
-  for (const [key, val] of props.allResponses) {
-    if (!key.startsWith(DYN_PREFIX)) continue
-    try {
-      const parsed = typeof val.remark === 'string' ? JSON.parse(val.remark) : val.remark
-      if (parsed && parsed.category && !disclosureRows.value.some(r => r.category === parsed.category)) {
-        disclosureRows.value.push({
-          category: parsed.category,
-          currentAmount: Number(parsed.currentAmount || 0),
-          priorAmount: Number(parsed.priorAmount || 0),
-          nonRecurring: Number(parsed.nonRecurring || 0),
-          remark: parsed.remark || '',
-        })
-      }
-    } catch { /* ignore */ }
-  }
+  loadK13DynamicRows(disclosureRows.value, props.allResponses, VARIANT)
 }
 
 function persistDynamicRow(row: DisclosureRow): void {
@@ -309,47 +238,21 @@ function persistDynamicRow(row: DisclosureRow): void {
   }))
 }
 
+/**
+ * 从 K13-1 审定表取数（读 `K13-1-rows` 按 name 匹配）：固定分类命中的行逐行保存，未匹配的去向追加 / 更新为动态行并保存。
+ * @param silent true 时不弹提示（EventBus 自动刷新用）
+ */
 function applyAutoFill(silent = false): void {
-  const adjMap = buildAdjAuditedMap()
-  if (adjMap.size === 0) {
+  const res = applyK13AutoFill(disclosureRows.value, props.allResponses, VARIANT, {
+    onFixedFilled: handleRowChange,
+    onDynamicFilled: persistDynamicRow,
+  })
+  if (!res) {
     if (!silent) ElMessage.warning('未找到 K13-1 审定表数据，请先编制审定表')
     return
   }
-  const matchedNames = new Set<string>()
-  let matched = 0
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    let val = adjMap.get(CATEGORIES[i])
-    let hitName = CATEGORIES[i]
-    if (val == null) {
-      for (const [name, amt] of adjMap) {
-        if (CATEGORIES[i].includes(name) || name.includes(CATEGORIES[i])) { val = amt; hitName = name; break }
-      }
-    }
-    if (val != null && val !== 0) {
-      disclosureRows.value[i].currentAmount = val
-      handleRowChange(disclosureRows.value[i])
-      matchedNames.add(hitName)
-      matched++
-    }
-  }
-  totalAdjudicated.value = Array.from(adjMap.values()).reduce((s, v) => s + v, 0)
-
-  // 追加：K13-1 中未匹配任何固定分类的去向 → 动态披露行
-  loadDynamicRows()
-  for (const [name, amt] of adjMap) {
-    if (matchedNames.has(name) || amt === 0) continue
-    const existing = disclosureRows.value.find(r => r.category === name)
-    if (existing) {
-      existing.currentAmount = amt
-      persistDynamicRow(existing)
-    } else {
-      const row: DisclosureRow = { category: name, currentAmount: amt, priorAmount: 0, nonRecurring: 0, remark: '' }
-      disclosureRows.value.push(row)
-      persistDynamicRow(row)
-    }
-    matched++
-  }
-  if (!silent) ElMessage.success(matched > 0 ? `已从审定表取数（匹配 ${matched} 项）` : '审定表暂无可匹配去向金额')
+  totalAdjudicated.value = res.totalAudited
+  if (!silent) ElMessage.success(res.matched > 0 ? `已从审定表取数（匹配 ${res.matched} 项）` : '审定表暂无可匹配去向金额')
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ────
@@ -391,7 +294,7 @@ function handleRowChange(row: DisclosureRow): void {
 }
 
 function handleNarrativeSave(): void {
-  emit('save', 'K13-disclosure-listed-narrative', { remark: narrativeText.value })
+  emit('save', K13_DISCLOSURE_NARRATIVE_ITEM[VARIANT], { remark: narrativeText.value })
   // Publish disclosure note text updated event（补 accountCode/projectId/sectionIds 供附注模块匹配刷新）
   eventBus.emit('disclosure:note-text-updated' as any, {
     noteId: 'non_operating_expense',
@@ -407,15 +310,8 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK13SyncPayload('listed', props.wpId || '',
-    // 第 4 列「计入当期非经常性损益的金额」是源模板必填列，旧载荷从未推送
-    disclosureRows.value.map(r => ({
-      project: r.category,
-      currentAmount: r.currentAmount,
-      priorAmount: r.priorAmount,
-      nonRecurringAmount: r.nonRecurring,
-    })),
-    narrativeText.value)
+  // 含第 4 列「计入当期非经常性损益的金额」（源模板必填列）
+  const payload = buildK13SyncPayload(VARIANT, props.wpId || '', k13DisclosureSyncRows(disclosureRows.value), narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {

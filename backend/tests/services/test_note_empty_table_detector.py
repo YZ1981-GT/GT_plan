@@ -17,8 +17,10 @@ from hypothesis import strategies as st
 from app.services.note_empty_table_detector import (
     AMOUNT_FORMATS,
     SKIP_ROW_TYPES,
+    TOTAL_ROW_TYPES,
     empty_table_names,
     is_empty_table,
+    total_row_has_amount,
 )
 
 # ─── 固定夹具：模仿 F2 存货「开发成本」（单级 7 列，4 个数值列）─────────────
@@ -88,12 +90,12 @@ def test_one_cent_is_not_empty():
 
 
 # ════════════════════════════════════════════════════════════════════
-# 派生行 / 结构行不参与判定
+# 合计 / 小计行只看数；结构行不参与判定（spec note-pull-header-formula-closure R5）
 # ════════════════════════════════════════════════════════════════════
 
 
 def test_total_row_alone_is_empty():
-    """只有合计行（派生值）→ 仍是空表，不能因合计有数就说有业务。"""
+    """合计行全零 / 空 → 空表。"""
     rows = [
         _row("原材料", [None] * 6),
         {"label": "合计", "values": ["", "", 0, 0, 0, 0], "is_total": True},
@@ -101,12 +103,33 @@ def test_total_row_alone_is_empty():
     assert is_empty_table(rows, DEV_COST_COLUMNS) is True
 
 
-def test_total_row_with_value_does_not_make_table_nonempty():
+def test_total_row_with_value_makes_table_nonempty():
+    """公式推送找不到明细时把审定数写在合计行：合计有数 ⇒ 有业务（原规则判空、编辑器显示「本期无此情形」）。"""
     rows = [
         _row("原材料", [None] * 6),
         {"label": "合计", "values": ["", "", 0, 999, 0, 0], "is_total": True},
     ]
+    assert is_empty_table(rows, DEV_COST_COLUMNS) is False
+
+
+def test_subtotal_row_type_counts_like_total():
+    rows = [{"label": "小计", "values": ["", "", 0, 5, 0, 0], "row_type": "subtotal"}]
+    assert is_empty_table(rows, DEV_COST_COLUMNS) is False
+
+
+def test_total_row_text_does_not_count():
+    """合计行只看数：金额列的「—」「不适用」、文本列的内容都不算；文本列里的数也不看。"""
+    rows = [{"label": "合计", "values": ["说明", 7, "—", "不适用", "", None], "is_total": True}]
     assert is_empty_table(rows, DEV_COST_COLUMNS) is True
+
+
+def test_total_row_without_columns_counts_numbers_only():
+    total = {"label": "合计", "values": ["0", "—", "(0)"], "is_total": True}
+    assert is_empty_table([total], None) is True
+    assert is_empty_table([{**total, "values": ["1,234.50"]}], None) is False
+    assert is_empty_table([{**total, "values": [-0.01]}], None) is False
+    assert total_row_has_amount({**total, "values": ["(500)"]}) is True
+    assert total_row_has_amount(_row("原材料", [5])) is False, "只回答合计行"
 
 
 @pytest.mark.parametrize("row_type", sorted(SKIP_ROW_TYPES))
@@ -269,10 +292,26 @@ def test_pbt_any_nonblank_text_means_not_empty(texts: list[str]) -> None:
 
 @settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 @given(st.lists(st.floats(min_value=-1e6, max_value=1e6, allow_nan=False), min_size=1, max_size=5))
-def test_pbt_total_rows_never_affect_result(vals: list[float]) -> None:
-    """合计行无论填什么都不改变判定（Property 8 的推论）。"""
+def test_pbt_total_rows_count_only_nonzero_numbers(vals: list[float]) -> None:
+    """明细全零时：合计行有非零数 ⇒ 非空，全零 ⇒ 与没有合计行一样（空）。"""
     base = [_row("r0", [0.0, 0.0])]
     with_total = base + [
         {"label": "合计", "values": [v, v], "is_total": True} for v in vals
     ]
-    assert is_empty_table(with_total, _AMOUNT_COLS) is is_empty_table(base, _AMOUNT_COLS)
+    has_amount = any(abs(v) >= 0.005 for v in vals)
+    assert is_empty_table(with_total, _AMOUNT_COLS) is (not has_amount)
+
+
+def test_frontend_total_row_types_mirror_backend():
+    """跨前后端交叉锁死：前端 disclosureEmptyTable.TOTAL_ROW_TYPES 与后端逐项一致。"""
+    import re
+    from pathlib import Path
+
+    path = (Path(__file__).resolve().parents[3] / "audit-platform" / "frontend" / "src" / "views"
+            / "composables" / "disclosureEmptyTable.ts")
+    src = path.read_text(encoding="utf-8")
+    m = re.search(r"TOTAL_ROW_TYPES:\s*ReadonlySet<string>\s*=\s*new Set\(\[(.*?)\]\)", src, re.S)
+    assert m, "未能解析前端 TOTAL_ROW_TYPES"
+    fe = set(re.findall(r"'([^']+)'", m.group(1)))
+    assert fe and fe == set(TOTAL_ROW_TYPES), (sorted(fe), sorted(TOTAL_ROW_TYPES))
+    assert not fe & set(SKIP_ROW_TYPES), "合计行只看数，不能同时在跳过集合里"

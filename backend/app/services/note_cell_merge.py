@@ -183,6 +183,13 @@ def merge_row_preserving_cell_modes(
         if mode == _MODE_AUTO:
             # 用新值（已在 out_values 中），同时更新 binding_id（如果 new 提供了）
             new_slot = new_cell_meta.get(str(i))
+            if isinstance(new_slot, dict) and new_slot.get("unbound") and new_values[i] is None:
+                # 生成没有值给这一格（没有 binding / manual 无预填，spec note-pull-followup-closure R5）：
+                # 保留旧值（推送 / 公式 / 人工写入的），不拿空值覆盖
+                out_values[i] = old_values[i] if i < len(old_values) else None
+                slot["unbound"] = True
+            else:
+                slot.pop("unbound", None)
             if isinstance(new_slot, dict):
                 # 仅更新 binding_id 字段（语义来自 new；manual_value 不动）
                 new_binding_id = new_slot.get("binding_id")

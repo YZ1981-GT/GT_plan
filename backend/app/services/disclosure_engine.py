@@ -54,6 +54,7 @@ from app.services.parent_company_values import load_parent_company_values
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
+from app.services.note_validation_engine import PRESET_TO_RULE
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,20 @@ def _get_binding_row(binding_rows: dict[str, Any], label: str) -> dict | None:
     return None
 
 
+def binding_cell_unbound(cell: Any) -> bool:
+    """单元格没有自动取数来源：没有 binding，或 binding 为 manual 且没有预填值（ADR-5，spec note-pull-followup-closure R5）。
+
+    生成附注时这类格不标 manual、只在 ``_cell_meta`` 记 ``unbound`` —— manual 只表示「用户改过」（编辑器标）；原先标
+    manual ⇒ 推送 keep_manual、附注公式与合计回填只写自动格，这些格永远进不来数。重新生成 / 刷新也没有值给它们，
+    不拿空值覆盖推送 / 公式 / 人工写入的值（``note_cell_merge`` 与 ``refill_sections`` 按此跳过）。
+    """
+    if not isinstance(cell, dict) or not cell.get("source"):
+        return True
+    if (cell.get("mode") or "auto") == "manual" or cell.get("source") == "manual":
+        return cell.get("manual_value") in (None, "")
+    return False
+
+
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
 
@@ -105,10 +120,8 @@ _CHECK_ROLE_TO_VALIDATION_PRESET = {
     "sub_item": "其中项",
     "movement": "宽表",
 }
-_VALID_VALIDATION_PRESETS = frozenset(
-    {"余额", "宽表", "纵向", "交叉", "跨科目", "其中项",
-     "二级明细", "完整性", "账龄衔接", "LLM审核", "描述"}
-)
+# 白名单 = 校验引擎认得的中文枚举（单一来源 PRESET_TO_RULE；原先另写一份 11 项，缺「期间衔接」，注入时静默丢弃）
+_VALID_VALIDATION_PRESETS = frozenset(PRESET_TO_RULE)
 
 
 def _resolve_check_roles(tmpl: dict) -> list[str]:
@@ -1331,21 +1344,8 @@ class DisclosureEngine:
             for _ in range(3):
                 rows.insert(first_total_idx, {"label": "", "values": [None] * num_value_cols, "is_total": False})
 
-        # 回填合计行
-        for i, row in enumerate(rows):
-            if row.get("is_total") and i > 0:
-                for ci in range(num_value_cols):
-                    # 合计行 = 上方所有非合计行之和（到上一个合计行为止）
-                    start = 0
-                    for j in range(i - 1, -1, -1):
-                        if rows[j].get("is_total"):
-                            start = j + 1
-                            break
-                    total = sum(
-                        (r["values"][ci] or 0) for r in rows[start:i]
-                        if not r.get("is_total") and r["values"][ci] is not None
-                    )
-                    row["values"][ci] = total
+        # 回填合计行（与 binding 路径、刷新同一合计构成）
+        self._backfill_totals(rows, num_value_cols, table_template)
 
         return self._attach_parent_source_meta(
             {"headers": headers, "rows": rows}, parent_ctx
@@ -1355,41 +1355,19 @@ class DisclosureEngine:
     # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
     # ------------------------------------------------------------------
     @staticmethod
-    def _backfill_totals(rows: list[dict], num_value_cols: int) -> None:
-        """合计/小计行回填：取上一个合计行之后到本行之前的非合计行 sum.
+    def _backfill_totals(rows: list[dict], num_value_cols: int, table: dict | None = None) -> None:
+        """合计 / 小计行回填：按合计构成（``note_total_terms``，单体 / 合并 / 前端同一判定）只写判得准的合计行、
+        金额列（标题行库判为比例 / 说明的列不加）、自动格；构成里的格全空不写。
 
-        与 legacy `_build_table_data` 末尾的回填算法等价（抽取为公共逻辑），
-        新 binding 路径与老路径共用同一规则避免行为分裂。
+        ``table`` = 这张表（判金额列用表头）；不给 / 没有表头时按 ``num_value_cols`` 列全算。旧口径「上一个合计行之后到
+        本行之前的非合计行」把「小计 / 减：坏账准备 / 合计」的合计算成坏账准备、在「其中：」表上重复加明细、把比例列也
+        加总、盖掉手工格（spec note-pull-header-formula-closure R5）。
         """
-        for i, row in enumerate(rows):
-            if not row.get("is_total"):
-                continue
-            if i == 0:
-                continue
-            for ci in range(num_value_cols):
-                # 起点：上一个合计行之后；初始 0
-                start = 0
-                for j in range(i - 1, -1, -1):
-                    if rows[j].get("is_total"):
-                        start = j + 1
-                        break
-                total: float = 0.0
-                has_val = False
-                for r in rows[start:i]:
-                    if r.get("is_total"):
-                        continue
-                    vals = r.get("values") or []
-                    if ci < len(vals) and vals[ci] is not None:
-                        try:
-                            total += float(vals[ci])
-                            has_val = True
-                        except (TypeError, ValueError):
-                            continue
-                if has_val:
-                    cur_vals = row.get("values") or []
-                    if ci < len(cur_vals):
-                        cur_vals[ci] = total
-                        row["values"] = cur_vals
+        from app.services.note_formula_tables import recalc_table_totals
+
+        info = dict(table) if isinstance(table, dict) else {}
+        info["rows"] = rows
+        recalc_table_totals(info, value_columns=num_value_cols)
 
     async def _build_with_binding(
         self,
@@ -1485,14 +1463,14 @@ class DisclosureEngine:
                     header_normalize[actual_col], dict
                 ):
                     semantic = header_normalize[actual_col].get("semantic")
-                # header_normalize 缺位 → 兜底 manual
+                # header_normalize 缺位 → 留空、不标 manual（没有绑定 ≠ 人工，R5）
                 if not semantic:
                     values.append(None)
-                    cell_modes[str(col_index)] = "manual"
                     cell_meta[str(col_index)] = {
                         "manual_value": None,
                         "semantic": None,
                         "binding_id": None,
+                        "unbound": True,
                     }
                     continue
 
@@ -1505,19 +1483,29 @@ class DisclosureEngine:
                             cell = v
                             break
                 if not isinstance(cell, dict):
-                    # 缺 binding → values=None + manual placeholder
+                    # 缺 binding → 留空、不标 manual（R5）
                     values.append(None)
-                    cell_modes[str(col_index)] = "manual"
                     cell_meta[str(col_index)] = {
                         "manual_value": None,
                         "semantic": semantic,
                         "binding_id": None,
+                        "unbound": True,
                     }
                     continue
 
                 mode = cell.get("mode") or "auto"
                 if mode not in {"auto", "manual", "locked"}:
                     mode = "auto"
+                if mode != "locked" and binding_cell_unbound(cell):
+                    # binding 为 manual 且没有预填值（「待审计师手工填…」占位）/ 没有取数来源 → 同上，留空不标 manual（R5）
+                    values.append(None)
+                    cell_meta[str(col_index)] = {
+                        "manual_value": None,
+                        "semantic": semantic,
+                        "binding_id": f"{section_number}.{label}.{semantic}",
+                        "unbound": True,
+                    }
+                    continue
 
                 # 调 resolver — locked / manual 不走自动取数（值留 None 由后续合并接管）
                 if mode == "locked":
@@ -1549,7 +1537,7 @@ class DisclosureEngine:
             })
 
         # 回填合计行
-        self._backfill_totals(output_rows, num_value_cols)
+        self._backfill_totals(output_rows, num_value_cols, table_template)
 
         out: dict = {"headers": list(headers), "rows": output_rows}
         # Task 13：母公司章取数溯源随表落库（前端溯源面板 / 「本项目未建母公司单体」灰态）
@@ -2238,8 +2226,8 @@ class DisclosureEngine:
                                 label, col_idx, binding_rows, header_normalize,
                                 cell_meta,
                             )
-                            if cell_binding is None:
-                                # 无 binding → 无法重算，跳过
+                            if binding_cell_unbound(cell_binding):
+                                # 无 binding / manual 无预填值 → 没有值可算，不拿空值覆盖已写入的值（R5）
                                 continue
 
                             # skip_manual: 仅处理 auto 单元格；但兼容 legacy——老生成器把
@@ -2305,7 +2293,7 @@ class DisclosureEngine:
 
                     # 重算合计行（逐表）
                     if table_touched:
-                        self._backfill_totals(rows, num_value_cols)
+                        self._backfill_totals(rows, num_value_cols, table_obj)
                         if table_index == 0:
                             table0_touched = True
 
@@ -2574,77 +2562,30 @@ class DisclosureEngine:
         project_id: UUID,
         year: int,
         note_section: str,
+        *,
+        table_name: str | None = None,
+        table_index: int | None = None,
     ) -> dict | None:
-        """获取附注章节的原始模板表格结构。
+        """获取附注章节某张表的原始模板结构（「🔄 恢复模板结构」用，Requirements 38.5 / 38.6）。
 
-        返回模板定义的 headers 和 rows（仅结构，不含项目实际数据），
-        用于前端"恢复模板结构"操作。
-
-        Validates: Requirements 38.5, 38.6
+        多表章节按当前表的表名 / 序号找模板里的同一张表，找不到返回 None（不拿章节第一张表顶，
+        见 ``note_template_structure``）；返回表头、逐列定义与行（仅结构，不含项目数据）。
         """
-        # 确定模板类型
-        template_type = await self._get_active_template_type(project_id)
+        from app.services.note_template_structure import pick_template_table, template_structure
 
-        # 加载模板
+        template_type = await self._get_active_template_type(project_id)
         templates = await self._load_templates(project_id, template_type)
         tmpl = next((t for t in templates if t.get("note_section") == note_section), None)
         if not tmpl:
             return None
-
-        # 从模板提取表格结构
         tables_list = tmpl.get("tables", [])
         if tables_list:
-            # 多表格模板：返回第一个表格的结构（与 get_note_detail 一致）
-            tbl = tables_list[0]
-            headers = tbl.get("headers", [])
-            template_rows = tbl.get("rows", [])
-            # 构建标准化行结构
-            rows = []
-            for row_def in template_rows:
-                if isinstance(row_def, dict):
-                    rows.append({
-                        "label": row_def.get("label", ""),
-                        "values": [None] * max(0, len(headers) - 1),
-                        "is_total": row_def.get("is_total", False),
-                    })
-                elif isinstance(row_def, list) and len(row_def) > 0:
-                    rows.append({
-                        "label": str(row_def[0]),
-                        "values": [None] * max(0, len(headers) - 1),
-                        "is_total": False,
-                    })
-            return {
-                "headers": headers,
-                "rows": rows,
-                "name": tbl.get("name", ""),
-            }
-
-        # 单表格模板（旧格式）
-        table_template = tmpl.get("table_template", {})
-        if table_template:
-            headers = table_template.get("headers", [])
-            template_rows = table_template.get("rows", [])
-            rows = []
-            for row_def in template_rows:
-                if isinstance(row_def, dict):
-                    rows.append({
-                        "label": row_def.get("label", ""),
-                        "values": [None] * max(0, len(headers) - 1),
-                        "is_total": row_def.get("is_total", False),
-                    })
-                elif isinstance(row_def, list) and len(row_def) > 0:
-                    rows.append({
-                        "label": str(row_def[0]),
-                        "values": [None] * max(0, len(headers) - 1),
-                        "is_total": False,
-                    })
-            if headers:
-                return {
-                    "headers": headers,
-                    "rows": rows,
-                    "name": "",
-                }
-
+            tbl = pick_template_table(tables_list, table_name=table_name, table_index=table_index)
+            return template_structure(tbl) if tbl is not None else None
+        # 单表格模板（旧格式）：只有一张表，表名没有意义
+        table_template = tmpl.get("table_template") or {}
+        if isinstance(table_template, dict) and table_template:
+            return template_structure({**table_template, "name": ""})
         return None
 
     async def update_note(
@@ -2672,6 +2613,14 @@ class DisclosureEngine:
         note = result.scalar_one_or_none()
         if note is None:
             return None
+        if table_data is not None:  # 集团下推的固定行不能删 / 改名 / 去标记（R13）
+            from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
+
+            if bad := pushed_row_violations(note.table_data, table_data):
+                raise HTTPException(status_code=409, detail={
+                    "error_code": PUSHED_ROW_PROTECTED, "rows": bad,
+                    "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
+                        f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
 
         if any(v is not None for v in (table_data, text_content, guidance_text, status)):
             stamp_note_edit(note, user_id)

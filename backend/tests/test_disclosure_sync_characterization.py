@@ -69,6 +69,13 @@ def _project_row(audit_year: int, standard: dict) -> MagicMock:
     return row
 
 
+def _no_push_states() -> MagicMock:
+    """公式推送状态查询（spec note-pull-followup-closure R3：更新已有章节时查推送写过的格）：没有推送过 ⇒ golden 不变。"""
+    res = MagicMock()
+    res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    return res
+
+
 def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicMock:
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
@@ -81,6 +88,8 @@ def _make_db(note: DisclosureNote | None, *, entity_type: str = "soe") -> MagicM
     ]
     if note is None:
         sequence.append(_scalar_result(None))
+    else:
+        sequence.append(_no_push_states())
     db.execute = AsyncMock(side_effect=sequence)
     return db
 
@@ -284,16 +293,20 @@ class TestCharacterizationMetadataKeys:
         # Requirement 11.3）：只给表名说不出**为什么**。三种成因修法完全不同
         # —— 准则未设 / 表名与模板不一致 / 模板缺段首码 —— 只报「解析失败」
         # 等于把三条岔路合成一条死胡同，而审计师看不到后端日志。
+        #
+        # 2026-10-27 再 additive 加 `push_kept`（spec note-pull-followup-closure R3）：公式推送写过、本次同步来的值与之
+        # 不同而保持推送值的格（以试算表审定数为准），前端据此提示；没推送过的章节恒为空、table_data 与原实现逐字节相同。
         assert set(result) == {
             "success", "section_id", "synced_at", "rows_synced",
             "created", "revived", "blocked_by_manual_override", "texts_synced",
             "row_scoped_tables", "row_scope_unresolved",
-            "row_scope_unresolved_reasons",
+            "row_scope_unresolved_reasons", "push_kept",
         }
         # 无 `_row_scope` 的载荷三者恒为空（Property 1 的另一面）
         assert result["row_scoped_tables"] == []
         assert result["row_scope_unresolved"] == []
         assert result["row_scope_unresolved_reasons"] == {}
+        assert result["push_kept"] == []
 
     async def test_metadata_keys_never_counted_as_rows(self):
         """`_` 前缀元数据键不计入 `rows_synced`。"""

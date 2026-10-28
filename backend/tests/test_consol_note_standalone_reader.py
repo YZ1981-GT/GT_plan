@@ -85,7 +85,7 @@ class TestReadSourceTable:
         st = _read({"_tables": [ANHUI_CASH, ANHUI_RESTRICTED]}, "五-1-1")
         assert st.table_name == "货币资金"
         assert st.unmatched_columns == [] and st.ratio_columns == []
-        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73]}
+        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0}
         assert st.rows[2]["values"] == [None, None]
         assert st.rows[3]["row_type"] == "total"
 
@@ -93,7 +93,7 @@ class TestReadSourceTable:
         """五-1-2 与 五-1-1 同属单体「八、1」，按子表名取第二张表。"""
         st = _read({"_tables": [ANHUI_CASH, ANHUI_RESTRICTED]}, "五-1-2")
         assert st.table_name == "受限制的货币资金明细"
-        assert st.rows == [{"label": "银行承兑汇票保证金", "row_type": "data", "values": [5000.0, None]}]
+        assert st.rows == [{"label": "银行承兑汇票保证金", "row_type": "data", "values": [5000.0, None], "_occurrence": 0}]
 
     def test_workpaper_source_is_read_through_projection(self):
         """宜宾形态：workpaper 来源读 sub_table_data 投影（编辑器显示的就是它），不读模板 _tables。"""
@@ -156,7 +156,7 @@ class TestReadSourceTable:
             {"label": "", "values": [1, 2]},
         ]}]}
         st = _read(td, "五-1-1")
-        assert st.rows == [{"label": "库存现金", "row_type": "data", "values": [1234.5, None]}]
+        assert st.rows == [{"label": "库存现金", "row_type": "data", "values": [1234.5, None], "_occurrence": 0}]
 
     def test_prior_continuation_chosen_by_headers(self):
         """国企 五-4-3（期初数续表）：映射子表名精确命中的「（续）」是单项计提表，按表头读「（续：期初数）」。"""
@@ -176,7 +176,8 @@ class TestReadSourceTable:
         )
         assert st.table_name == "按坏账准备计提方法分类披露应收票据（续：期初数）"
         assert st.table_choice == "structure"
-        assert st.rows == [{"label": "按组合计提坏账准备", "row_type": "data", "values": [700, None, 35, None, 665]}]
+        assert st.rows == [{"label": "按组合计提坏账准备", "row_type": "data", "values": [700, None, 35, None, 665],
+                            "_occurrence": 0}]
         assert st.to_status()["table_choice"] == "structure"
 
     def test_row_continuation_rows_are_appended(self):
@@ -215,3 +216,52 @@ class TestReadSourceTable:
     def test_empty_inputs_have_reason(self, td):
         st = read_source_table(td, consol_table=find_table("soe", "五-1-1"), table_name="货币资金")
         assert st.rows == [] and st.reason
+
+
+def _standalone_template_table(std: str, section: str, name: str) -> dict:
+    """单体种子里的一张表（真模板表头 / 列分组，不手写）。"""
+    import copy
+    import json
+
+    from app.services.note_section_catalog import section_applies_to_scope, template_json_path
+
+    seed = json.loads(template_json_path(std).read_text(encoding="utf-8"))
+    sec = next(s for s in seed["sections"]
+               if s["section_number"] == section and section_applies_to_scope(s, "standalone"))
+    return copy.deepcopy(next(t for t in sec["tables"] if t.get("name") == name))
+
+
+@pytest.mark.parametrize("sid,name", [
+    ("五-5-6", "组合计提项目：应收中央企业客户"),
+    ("五-5-7", "组合计提项目：应收地方国有企业客户"),
+    ("五-5-10", "组合计提项目：组合5"),
+])
+def test_listed_portfolio_table_reads_carrying_amount_written_as_receivable(sid, name):
+    """上市 五-5-6~10：单体按底稿写「期末余额/应收账款」、合并按 Word 写「期末余额/账面余额」，是同一列
+    （词表同义计量词）；账面余额两列都要拉到，比例列不取（2026-10-26 浏览器实测：自动映射后提示两列未对上）。"""
+    table = _standalone_template_table("listed", "五、5", name)
+    for row, vals in zip(table["rows"], ([100, 10, 10, 80, 8, 10], [50, 5, 10, 40, 4, 10])):
+        row["values"] = vals
+    entry = resolve_mapping_entry("listed", sid) or {}
+    st = read_source_table(
+        {"_tables": [table]}, consol_table=find_table("listed", sid), table_name=entry.get("standalone_table_name"),
+        title=entry.get("consol_title"), section_title="应收账款", std="listed", consol_section_id=sid,
+        standalone_section="五、5",
+    )
+    assert st.unmatched_columns == [] and st.matched_columns == [1, 2, 4, 5]
+    assert st.rows[0]["values"] == [100, 10, None, 80, 8, None]
+    assert st.rows[1]["values"] == [50, 5, None, 40, 4, None]
+
+
+def test_listed_deferred_tax_offset_prior_column_reads_opening_offset():
+    """上市 五-30-2：合并「递延所得税资产和负债上年年末互抵金额」（期间词在计量词中间，认不出期间）↔ 单体
+    「…期初互抵金额」按词表计量词别名对上（上年年末 ≡ 期初），四列都拉到。"""
+    table = _standalone_template_table("listed", "五、30", "以抵销后净额列示的递延所得税资产或负债")
+    table["rows"][0]["values"] = [10, 90, 7, 70]
+    entry = resolve_mapping_entry("listed", "五-30-2") or {}
+    st = read_source_table(
+        {"_tables": [table]}, consol_table=find_table("listed", "五-30-2"), table_name=entry.get("standalone_table_name"),
+        title=entry.get("consol_title"), std="listed", consol_section_id="五-30-2", standalone_section="五、30",
+    )
+    assert st.unmatched_columns == [] and st.matched_columns == [1, 2, 3, 4]
+    assert st.rows[0]["values"] == [10, 90, 7, 70]

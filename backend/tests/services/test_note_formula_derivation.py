@@ -137,7 +137,11 @@ def test_value_col_semantics_robust_to_bad_input():
 
 
 def test_sum_range_matches_backfill_totals_semantics():
-    """求和范围 = 上一合计行之后的所有非合计行（含 header_label 行）—— §V8。"""
+    """求和范围 = 合计构成展开到明细行（与 _backfill_totals 同一判定 note_total_terms）。
+
+    spec note-pull-header-formula-closure R5 改正旧口径「上一合计行之后的所有非合计行」：合计漏掉小计那一组、
+    header_label 结构行也被算进范围。
+    """
     tpl = {
         "name": "分组表",
         "headers": ["项目", "期末余额"],
@@ -160,10 +164,10 @@ def test_sum_range_matches_backfill_totals_semantics():
     specs, _skipped = derive_sum_formula(tpl, tb, section_number="八、99", variant="soe")
     by_target = {s.target_cell: s for s in specs}
 
-    # 小计一（R4）= 分组一(R1) + 甲(R2) + 乙(R3)
-    assert [c for c, _ in by_target["R4C1"].signed_cells] == ["R1C1", "R2C1", "R3C1"]
-    # 合计（R6）= 上一合计行之后的 丙(R5) —— 不含 R1..R3
-    assert [c for c, _ in by_target["R6C1"].signed_cells] == ["R5C1"]
+    # 小计一（R4）= 甲(R2) + 乙(R3)（分组一是 header_label 结构行）
+    assert [c for c, _ in by_target["R4C1"].signed_cells] == ["R2C1", "R3C1"]
+    # 合计（R6）= 小计一 + 丙，展开到明细 = 甲 + 乙 + 丙（求和项里没有合计行）
+    assert [c for c, _ in by_target["R6C1"].signed_cells] == ["R2C1", "R3C1", "R5C1"]
     # 全部为加项
     assert all(sign == "+" for s in specs for _c, sign in s.signed_cells)
 
@@ -251,7 +255,8 @@ def test_sum_first_row_total_and_empty_range_are_skipped():
     specs, skipped = derive_sum_formula(tpl, tb)
     assert specs == []
     reasons = {s.reason for s in skipped}
-    assert reasons == {"total_at_first_row", "empty_sum_range"}
+    # 合计在首行；合计之后又有小计 ⇒ 合计构成判不准（note_total_terms）
+    assert reasons == {"total_at_first_row", "ambiguous_sum_range"}
 
 
 # ---------------------------------------------------------------------------

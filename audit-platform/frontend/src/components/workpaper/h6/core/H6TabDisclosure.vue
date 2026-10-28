@@ -222,12 +222,12 @@ import {
   createDefaultState,
   emptyClearingRow,
   fmtAmt,
-  hydrateClearingRows,
-  parsePack,
+  h6DisclosureSyncSnapshot,
+  hydrateH6DisclosureState,
   serializePack,
   type H6ClearingRow,
 } from '../../composables/h6DisclosureModel'
-import { useH6Disclosure } from '../../composables/useH6Disclosure'
+import { seedH6ClearingFromLocal, useH6Disclosure } from '../../composables/useH6Disclosure'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
@@ -334,29 +334,14 @@ const clearingDisplay = computed(() => buildClearingDisplay(state.clearingRows))
 const warnings = computed(() => crossWarnings(state))
 const transitZero = computed(() => autoFill.value.transitZero)
 
-function hydrate() {
-  const k = keys.value
-  const pack = parsePack(props.allResponses.get(k.pack)?.remark)
-  if (pack) {
-    state.faEnd = pack.faEnd ?? 0
-    state.faPrior = pack.faPrior ?? 0
-    if (pack.clearingRows?.length) state.clearingRows = pack.clearingRows
-    if (typeof pack.clearingNote === 'string') state.clearingNote = pack.clearingNote
-  }
-  if (!state.clearingRows.length) {
-    const raw = props.allResponses.get(k.clearingRows)?.remark
-    let parsed: unknown = null
-    if (raw) {
-      try { parsed = JSON.parse(raw) } catch { parsed = null }
-    }
-    const rows = hydrateClearingRows(parsed)
-    if (rows.length) state.clearingRows = rows
-  }
-  const note = props.allResponses.get(k.clearingNote)?.remark
-  if (typeof note === 'string' && note && !state.clearingNote) state.clearingNote = note
+/** 编辑后的保存：存完排一次自动同步 */
+function persistAll() {
+  saveAll()
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
-function persistAll() {
+/** 只存不排同步（同步前先存用这个；用 persistAll 会每 800ms 再同步一次，直到卸载） */
+function saveAll() {
   const k = keys.value
   saveResponse(k.pack, serializePack(state))
   saveResponse(k.clearingRows, JSON.stringify(state.clearingRows))
@@ -367,7 +352,6 @@ function persistAll() {
   } else {
     saveResponse(H6_SOE_KEYS.faBegin, state.faPrior)
   }
-  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function scheduleSave() {
@@ -427,13 +411,8 @@ async function pullFa() {
 
 async function syncToNotes() {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  persistAll()
-  const payloadState = {
-    faEnd: state.faEnd,
-    faPrior: state.faPrior,
-    clearingRows: state.clearingRows,
-    clearingNote: state.clearingNote,
-  }
+  saveAll()
+  const payloadState = h6DisclosureSyncSnapshot(state)
   const payloads = isListed.value
     ? buildH6ListedSyncPayloads(props.wpId, [], payloadState)
     : buildH6SoeSyncPayloads(props.wpId, [], payloadState)
@@ -475,15 +454,9 @@ function onAdjudicated(e: Event) {
 }
 
 onMounted(() => {
-  hydrate()
-  if (!state.clearingRows.length) {
-    const r = pullFromLocalSources({ overwriteNote: !state.clearingNote.trim(), existingNote: state.clearingNote })
-    if (r.status === 'ok') {
-      state.clearingRows = r.clearingRows.map((x) => ({ ...x }))
-      if (r.clearingNoteDraft && !state.clearingNote.trim()) state.clearingNote = r.clearingNoteDraft
-      persistAll()
-    }
-  }
+  // 读回 + 清理明细为空时从 H6-1/H6-2 带入：与附注页离屏同步共用（spec note-pull-followup-closure R1）
+  hydrateH6DisclosureState(state, props.allResponses, keys.value)
+  if (seedH6ClearingFromLocal(state, pullFromLocalSources)) persistAll()
   window.addEventListener('substantive:adjudicated', onAdjudicated)
   unsubAdj = () => window.removeEventListener('substantive:adjudicated', onAdjudicated)
 })

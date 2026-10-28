@@ -220,6 +220,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import { getSignReadinessV2, signDocument } from '@/services/signatureApi'
+import { requestConfirmationToken } from '@/utils/passwordConfirm'
 import { api } from '@/services/apiProxy'
 import { REPORT_STATUS } from '@/constants/statusEnum'
 import { confirmSignature, confirmSign } from '@/utils/confirm'
@@ -421,6 +422,8 @@ async function onSign() {
       ElMessage.warning('用户未登录')
       return
     }
+    const confirmationToken = await requestConfirmationToken('签字确认')
+    if (!confirmationToken) return
     await signDocument({
       object_type: 'audit_report',
       object_id: reportData.id,
@@ -429,7 +432,7 @@ async function onSign() {
       project_id: projectId.value,
       required_role: 'signing_partner',
       required_order: 3,
-    })
+    }, confirmationToken)
     feedback.success(`✍️ 已签字 · ${clientName.value} ${year.value} 年度审计报告`)
     // 刷新状态
     await Promise.all([loadReadiness(), loadReport()])

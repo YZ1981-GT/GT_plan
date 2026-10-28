@@ -10,6 +10,9 @@ Requirements: 3.2, 3.3, 3.4, 3.5
 
 每类计算 count + items 列表 + is_blocking 标记。
 can_proceed = True 当且仅当无 blocking 类别有 count > 0。
+
+另有抽样记录（非阻断）与 spec attachment-archive-and-a-class-evidence 的 5 类（文件缺失阻断；证据缺口 /
+未回函 / 识别未确认 / 孤儿文件提示），判据见 ``archive_completeness_evidence``。
 """
 
 from __future__ import annotations
@@ -125,6 +128,12 @@ class CheckCategory(BaseModel):
         # 抽样记录不完整（sampling-evaluation-and-governance-closure R8.4）。
         # 非阻断，理由见 get_archive_completeness_report 内注释。
         "sampling_records",
+        # spec attachment-archive-and-a-class-evidence 需求 5（archive_completeness_evidence）
+        "missing_files",
+        "evidence_gaps",
+        "unreplied_confirmations",
+        "unconfirmed_ocr",
+        "orphan_files",
     ]
     count: int
     items: list[CheckItem]
@@ -132,7 +141,7 @@ class CheckCategory(BaseModel):
 
 
 class CompletenessReportResponse(BaseModel):
-    categories: list[CheckCategory]  # 固定 5 类
+    categories: list[CheckCategory]  # 固定 10 类
     can_proceed: bool  # 无 blocking 项时 True
     generated_at: datetime
 
@@ -143,7 +152,15 @@ class CompletenessReportResponse(BaseModel):
 
 # missing 和 unsigned 是 blocking（阻断归档）
 # unresolved_reviews 和 stale 是 blocking（阻断归档）
-BLOCKING_CATEGORIES: set[str] = {"missing", "unsigned", "unresolved_reviews", "stale"}
+# missing_files：底稿 / 附件 / 交付件被引用但读不到 ⇒ 打包必失败，阻断（与打包同一份清单）
+BLOCKING_CATEGORIES: set[str] = {"missing", "unsigned", "unresolved_reviews", "stale", "missing_files"}
+
+#: 类别中文名（与前端 ``constants/archiveLabels.ts`` 同一张表，契约测试比对；归档门禁失败原因用）
+CATEGORY_LABELS: dict[str, str] = {
+    "missing": "缺失底稿", "unsigned": "未签字底稿", "unresolved_reviews": "未解决复核意见", "stale": "过期底稿",
+    "sampling_records": "抽样记录不完整", "missing_files": "文件缺失", "evidence_gaps": "证据缺口",
+    "unreplied_confirmations": "函证未回函", "unconfirmed_ocr": "识别结果未确认", "orphan_files": "孤儿文件",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +193,14 @@ async def get_archive_completeness_report(
     # --- 5. 抽样记录不完整（sampling-evaluation-and-governance-closure R8.4）---
     sampling_items = await _check_sampling_records(db, project_id)
 
+    # --- 6~10. 文件缺失 / 证据缺口 / 未回函 / 识别未确认 / 孤儿文件（attachment-archive-and-a-class-evidence）---
+    from app.services import archive_completeness_evidence as ace
+
+    missing_file_items = await ace.check_missing_files(db, project_id)
+    evidence_gap_items, unreplied_items = await ace.check_evidence(db, project_id)
+    ocr_items = await ace.check_unconfirmed_ocr(db, project_id)
+    orphan_items = await ace.check_orphan_files(db, project_id)
+
     # 底稿编号自然排序（A1→A2→...→A10，按字母前缀+数字，不跳号）
     for _items in (missing_items, unsigned_items, unresolved_items, stale_items):
         _items.sort(key=lambda it: _wp_sort_key(it.wp_code))
@@ -183,7 +208,8 @@ async def get_archive_completeness_report(
     # 责任人 UUID → 中文姓名（staff_members.name 优先，降级 users.username）
     await _resolve_assignee_names(
         db,
-        [*missing_items, *unsigned_items, *unresolved_items, *stale_items, *sampling_items],
+        [*missing_items, *unsigned_items, *unresolved_items, *stale_items, *sampling_items,
+         *evidence_gap_items, *unreplied_items],
     )
 
     # Build categories
@@ -221,6 +247,16 @@ async def get_archive_completeness_report(
             count=len(sampling_items),
             items=sampling_items,
             is_blocking=False,
+        ),
+        *(
+            CheckCategory(category=name, count=len(items), items=items, is_blocking=name in BLOCKING_CATEGORIES)
+            for name, items in (
+                ("missing_files", missing_file_items),
+                ("evidence_gaps", evidence_gap_items),
+                ("unreplied_confirmations", unreplied_items),
+                ("unconfirmed_ocr", ocr_items),
+                ("orphan_files", orphan_items),
+            )
         ),
     ]
 

@@ -64,12 +64,22 @@ def matches_wp_code_prefix(wp_code: str, prefix: str) -> bool:
     return False
 
 
+#: 精确匹配键前缀：``"=A16"`` 只匹配 A16 本身，不被 A16-1 / A16A 继承（spec attachment-archive-and-a-class-evidence ADR-AE-10）。
+EXACT_KEY_PREFIX = "="
+
+
 def resolve_requirements_for_wp_code(wp_code: str | None) -> list[dict[str, str]]:
-    """返回该 wp_code 的声明清单；无匹配返回 []。多前缀命中时取最长前缀。"""
+    """返回该 wp_code 的声明清单；无匹配返回 []。
+
+    ``=编码`` 精确键命中即返回（优先于任何前缀键）；否则在前缀键里取最长前缀。
+    """
     if not wp_code:
         return []
     cfg = load_evidence_requirements_config()
-    hits = [p for p in cfg if matches_wp_code_prefix(wp_code, p)]
+    exact = cfg.get(EXACT_KEY_PREFIX + wp_code)
+    if exact:
+        return list(exact)
+    hits = [p for p in cfg if not p.startswith(EXACT_KEY_PREFIX) and matches_wp_code_prefix(wp_code, p)]
     if not hits:
         return []
     best = max(hits, key=len)

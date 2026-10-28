@@ -185,7 +185,14 @@ import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM2SoeSyncPayload, type M2SoeRow } from '../../composables/m2NoteSectionMap'
+import {
+  buildM2SoeTabSyncPayload,
+  createM2SoeCapitalRows,
+  recalcM2SoeRows,
+  restoreM2SoeDisclosure,
+  type M2SoeCapitalRow,
+  type M2SoeDisclosureState,
+} from '../../composables/m2DisclosureForm'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import http from '@/utils/http'
 
@@ -211,23 +218,10 @@ const formData = useM2FormData({
   projectId: computed(() => props.projectId),
 })
 
-// ─── 同步链路 ───────────────────────────────────────────────────────────────
+// ─── 同步链路（行 / 重算 / 读回 / 快照在 m2DisclosureForm，与附注页离屏同步共用） ──────
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M2SoeRow[] = capitalChangeRows.value
-    .filter((r) => r.item !== '合计') // 合计行由载荷构建
-    .map((r) => ({
-      label: r.item,
-      beginAmount: r.beginAmount,
-      beginRatio: r.ratio ? (r.ratio * 100).toFixed(2) : '',
-      increase: r.increaseAmount,
-      decrease: r.decreaseAmount,
-    }))
-  const payload = buildM2SoeSyncPayload(props.wpId, rows, {
-    stateCapital: stateCapitalNote.value,
-    method: methodNote.value,
-    registration: registrationNote.value,
-  })
+  const payload = buildM2SoeTabSyncPayload(props.wpId, disclosureState())
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -238,45 +232,25 @@ const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface SoeCapitalRow {
-  item: string
-  beginAmount: number
-  increaseAmount: number
-  decreaseAmount: number
-  endAmount: number
-  ratio: number
-}
-
-const capitalChangeRows = ref<SoeCapitalRow[]>([
-  { item: '一、国家资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '  中央国有资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '  地方国有资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '二、集体资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '三、法人资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '  国有法人资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '  民营法人资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '  外商法人资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '四、个人资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '五、外商资本', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-  { item: '合计', beginAmount: 0, increaseAmount: 0, decreaseAmount: 0, endAmount: 0, ratio: 0 },
-])
+const capitalChangeRows = ref<M2SoeCapitalRow[]>(createM2SoeCapitalRows())
 
 const stateCapitalNote = ref('')
 const methodNote = ref('')
 const registrationNote = ref('')
 
+function disclosureState(): M2SoeDisclosureState {
+  return {
+    rows: capitalChangeRows.value,
+    stateCapital: stateCapitalNote.value,
+    method: methodNote.value,
+    registration: registrationNote.value,
+  }
+}
+
 // ─── Computed: 期末 = 期初+增-减, 占比 ──────────────────────────────────────
 
 function recalcEndAndRatio(): void {
-  const totalEnd = capitalChangeRows.value.reduce((sum, row) => {
-    const end = row.beginAmount + row.increaseAmount - row.decreaseAmount
-    return sum + end
-  }, 0)
-
-  capitalChangeRows.value.forEach(row => {
-    row.endAmount = row.beginAmount + row.increaseAmount - row.decreaseAmount
-    row.ratio = totalEnd > 0 ? row.endAmount / totalEnd : 0
-  })
+  recalcM2SoeRows(capitalChangeRows.value)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -347,25 +321,11 @@ function fmtAmount(val: number): string {
 // ─── Restore state ──────────────────────────────────────────────────────────
 
 function _restoreFromResponses(): void {
-  const rowData = formData.allResponses.value.get('M2-disclosure-soe-capital-rows')
-  if (rowData?.remark) {
-    try {
-      const parsed = JSON.parse(rowData.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        capitalChangeRows.value = parsed
-        recalcEndAndRatio()
-      }
-    } catch { /* ignore */ }
-  }
-
-  const sc = formData.allResponses.value.get('M2-disclosure-soe-state-capital')
-  if (sc?.remark) stateCapitalNote.value = sc.remark
-
-  const method = formData.allResponses.value.get('M2-disclosure-soe-method')
-  if (method?.remark) methodNote.value = method.remark
-
-  const reg = formData.allResponses.value.get('M2-disclosure-soe-registration')
-  if (reg?.remark) registrationNote.value = reg.remark
+  const next = restoreM2SoeDisclosure(formData.allResponses.value, disclosureState())
+  capitalChangeRows.value = next.rows
+  stateCapitalNote.value = next.stateCapital
+  methodNote.value = next.method
+  registrationNote.value = next.registration
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

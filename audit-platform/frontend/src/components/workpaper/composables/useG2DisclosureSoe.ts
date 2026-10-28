@@ -6,7 +6,7 @@
  * - 从 G2-1 / G2-2 自动取数；表③期末合计应与表①「减：坏账准备」勾稽
  * - 发布 disclosure:note-text-updated；支持 sync-from-workpaper 写入附注模块
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import type { ChecklistResponse } from './useF1FormData'
 import { G2_ACCOUNT_CODE } from './g2NoteSectionMap'
 import {
@@ -293,15 +293,23 @@ export function useG2DisclosureSoe(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    // 首次若无持久化数据，尝试从审定/明细灌数
+  /** 首次进入的初始化（Tab 挂载与附注页离屏同步共用，spec note-pull-followup-closure R1）：若无持久化数据，尝试从审定/明细灌数 */
+  function initFromResponses() {
     const hasRows = !!allResponses.value.get(ITEM_ROWS)?.remark
     if (!hasRows) refreshFromSources(true)
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  })
+  }
+
+  // 离屏实例化（effectScope 里、没有组件实例）不挂生命周期钩子、不监听审定事件：初始化由离屏同步
+  // 自己调 initFromResponses。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      initFromResponses()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+  }
 
   return {
     classRows,
@@ -323,6 +331,7 @@ export function useG2DisclosureSoe(opts: {
     updateOverdueField,
     pullOverdueFromG26,
     refreshFromSources,
+    initFromResponses,
     getSyncSnapshot,
     eclRowTotal,
   }

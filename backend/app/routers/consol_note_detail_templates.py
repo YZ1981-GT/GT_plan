@@ -20,6 +20,7 @@ spec: consol-note-detail-template-and-mapping Phase 1 Task 4 + Phase 2 Task 12~1
 刷新预览与建议（Phase 2）：
   POST   /api/projects/{pid}/consol-note-detail-refresh/preview           — 预览
   POST   /api/projects/{pid}/consol-note-detail-refresh/suggest-template  — 模板建议
+  POST   /api/projects/{pid}/consol-note-detail-refresh/auto-map          — ⚡ 自动映射（建模板 + 确认可自动确认的组）
 """
 from __future__ import annotations
 
@@ -332,6 +333,37 @@ async def api_suggest_template(
         section_id=body.section_id,
         year=body.year,
     )
+
+
+class AutoMapRequest(BaseModel):
+    year: int
+    section_ids: list[str] | None = None  # 空 = 合并附注模板里有单体对应的全部章节
+
+
+@router.post("/api/projects/{project_id}/consol-note-detail-refresh/auto-map")
+async def api_auto_map(
+    project_id: UUID,
+    body: AutoMapRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """⚡ 自动映射：未绑定的章节按来源建议建模板并绑定，能自动确认的结构组确认映射；其余组回报待人工确认
+    （note-pull-header-formula-closure R6.3）。不写合并附注数据。"""
+    from app.services.consol_note_auto_mapping import AutoMapError, auto_map_sections
+
+    try:
+        result = await auto_map_sections(
+            db, project_id=project_id, year=body.year, section_ids=body.section_ids, user_id=user.id,
+        )
+        await db.commit()
+    except AutoMapError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    return result
 
 
 # ─── 映射规则 CRUD + confirm_mapping（Phase 3） ──────────────────────────────

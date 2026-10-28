@@ -81,6 +81,35 @@ describe('useNoteTableInteraction', () => {
     expect(context.openContextMenu).toHaveBeenCalledWith(event, '固定资产')
   })
 
+  it('同名叶子列按 column-key 定位：点上年年末「应收账款」不会选中期末那一格（浏览器实测）', () => {
+    const context = createContext()
+    const activateCell = vi.fn()
+    const row = { label: '1年以内', values: [100, 10, 80, 8], is_total: false }
+    const api = useNoteTableInteraction({
+      activeTableData: ref({ headers: ['账龄', '应收账款', '坏账准备', '应收账款', '坏账准备'], rows: [row] }),
+      currentNote: ref({}),
+      editMode: ref(true),
+      showNoteFormulaManager: ref(false),
+      deCtx: context,
+      deComments: { commentCellClass: () => '' },
+      activateCell,
+      fmtAmount: String,
+    })
+
+    api.onDeCellClick(reactive(row), { label: '应收账款', columnKey: 'h3' }, document.createElement('td'), new MouseEvent('click'))
+    expect(context.selectCell).toHaveBeenCalledWith(0, 3, 80, false, false)
+    expect(activateCell).toHaveBeenCalledWith(0, 2)
+
+    const event = new MouseEvent('contextmenu')
+    api.onDeCellContextMenu(reactive(row), { label: '坏账准备', columnKey: 'h4' }, document.createElement('td'), event)
+    expect(context.selectCell).toHaveBeenLastCalledWith(0, 4, 8, false)
+
+    // 越界的 key 不定位（不落到别的列）
+    activateCell.mockClear()
+    api.onDeCellClick(reactive(row), { label: '应收账款', columnKey: 'h9' }, document.createElement('td'), new MouseEvent('click'))
+    expect(activateCell).not.toHaveBeenCalled()
+  })
+
   it('does not activate a row that is not part of the active projection', () => {
     const activateCell = vi.fn()
     const api = useNoteTableInteraction({

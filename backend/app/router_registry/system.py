@@ -121,13 +121,13 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.consol_scope_confirmation import router as csc_router
     from app.routers.share_change_events import router as sce_router
     from app.routers.consol_note_detail_templates import router as cndt_router
-    from app.routers.consol_note_mapping_templates import router as cnmt_router
+    # consol_note_mapping_templates（V202 规则模板库 / 值确认 / 结构锁）已退役（spec note-pull-followup-closure R16）
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
               crf_router, crb_router, cpush_router, cnf_router, csc_router, sce_router,
-              cndt_router, cnmt_router]:
+              cndt_router]:
         app.include_router(r, tags=["合并报表"])
 
     # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══

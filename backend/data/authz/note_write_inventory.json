@@ -1,10 +1,10 @@
 {
   "counts": {
-    "C": 31,
-    "E": 53,
+    "C": 27,
+    "E": 52,
     "G": 2,
     "I": 5,
-    "R": 13,
+    "R": 14,
     "S": 1,
     "X": 0
   },
@@ -355,6 +355,52 @@
       "function": "api_apply_detail_refresh",
       "method": "POST",
       "path": "/api/projects/{project_id}/consol-note-detail-refresh/apply",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": true,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "check_consol_lock",
+            "params": {},
+            "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "edit",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "edit",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_detail_templates.py",
+      "function": "api_auto_map",
+      "method": "POST",
+      "path": "/api/projects/{project_id}/consol-note-detail-refresh/auto-map",
       "registered": true,
       "registry_group": "system",
       "target_gate": {
@@ -829,196 +875,6 @@
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_note_mapping_templates.py",
-      "function": "deactivate_mapping_template",
-      "method": "DELETE",
-      "path": "/api/consol-note-mapping-templates/{template_id}",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "review",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "review",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_note_mapping_templates.py",
-      "function": "promote_rule",
-      "method": "POST",
-      "path": "/api/projects/{project_id}/consol-note-mapping/rules/{rule_id}/promote",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "review",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "review",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_note_mapping_templates.py",
-      "function": "activate_structure_lock",
-      "method": "POST",
-      "path": "/api/projects/{project_id}/consol-note-structure-lock",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "review",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "review",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_note_mapping_templates.py",
-      "function": "release_structure_lock",
-      "method": "DELETE",
-      "path": "/api/projects/{project_id}/consol-note-structure-lock/{section_id}",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "review",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "review",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_note_mapping_templates.py",
-      "function": "confirm_value",
-      "method": "POST",
-      "path": "/api/projects/{project_id}/consol-note-value/confirm",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
             "level": "readonly",
             "name": "require_project_access",
             "params": {},
@@ -1349,9 +1205,17 @@
       "category": "C",
       "current_equals_target": true,
       "current_gate": {
-        "consol_lock": false,
+        "consol_lock": true,
         "eqcr_exclusion": false,
         "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "check_consol_lock",
+            "params": {},
+            "via": "signature"
+          },
           {
             "conditional": false,
             "helper": null,
@@ -1587,7 +1451,7 @@
     },
     {
       "category": "E",
-      "current_equals_target": false,
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
@@ -1636,13 +1500,13 @@
       "registered": true,
       "registry_group": "report",
       "target_gate": {
-        "declared": false,
+        "declared": true,
         "eqcr": null,
         "gate": null,
-        "kind": "note_edit_gate",
+        "kind": "keep_current",
         "params": null,
         "project_from": null,
-        "reason": null
+        "reason": "spec note-pull-followup-closure R22：写 projects.wizard_state 的项目级附注公式灰度开关，不写附注数据；门禁 = 角色门（经理及以上）+ 本项目 edit 成员（formula-governance-coverage-closure R1.7，tests/formula_settings/test_formula_endpoint_authz.py 钉住），不改挂附注编辑门禁"
       }
     },
     {
@@ -1807,36 +1671,30 @@
       }
     },
     {
-      "category": "E",
+      "category": "R",
       "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": true,
+        "eqcr_exclusion": false,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": "review",
-            "name": "require_note_edit_access",
-            "params": {
-              "consol_lock": false
-            },
+            "level": "readonly",
+            "name": "require_project_access",
+            "params": {},
             "via": "signature"
           }
         ],
         "global_roles": [],
         "identity_only": false,
-        "max_level": "review",
-        "operations": [
-          "note:edit"
-        ],
+        "max_level": "readonly",
+        "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "disclosure_notes.py",
       "function": "refresh_from_disclosure",
       "method": "POST",
-      "outside_editor_files": null,
       "path": "/api/disclosure-notes/{project_id}/{year}/refresh-from-disclosure",
       "registered": true,
       "registry_group": "report",
@@ -1844,7 +1702,7 @@
         "declared": false,
         "eqcr": null,
         "gate": null,
-        "kind": "note_edit_gate",
+        "kind": "keep_current",
         "params": null,
         "project_from": null,
         "reason": null
@@ -4692,7 +4550,6 @@
       "account_note_mapping.py",
       "consol_note_detail_templates.py",
       "consol_note_formulas.py",
-      "consol_note_mapping_templates.py",
       "consol_note_sections.py",
       "consol_notes.py",
       "disclosure_notes.py",
@@ -4719,7 +4576,7 @@
       "report_note_references.py"
     ],
     "frontend": "待接入（任务 8.3）",
-    "write_endpoint_total": 105
+    "write_endpoint_total": 101
   },
   "schema": "note_write_inventory/v1"
 }

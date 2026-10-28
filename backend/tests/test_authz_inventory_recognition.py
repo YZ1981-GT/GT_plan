@@ -438,7 +438,7 @@ class TestSelfCheckSamplesBaseline:
         assert not failures, "\n".join(f.message() for f in failures)
 
     def test_impact_inventory_selfcheck_passes(self) -> None:
-        """影响清单 10 个自检样例全部通过。"""
+        """影响清单全部自检样例通过（含 note-pull-followup-closure R20 的「同函数同门禁两处」）。"""
         from gen_edit_level_impact_inventory import IMPACT_INVENTORY_SAMPLES as samples
         failures = selfcheck.run_samples(samples)
         assert not failures, "\n".join(f.message() for f in failures)

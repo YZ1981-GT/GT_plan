@@ -898,11 +898,7 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="I6-2-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
-    # ── K2~K7 调整分录汇总（与 K8~K13 同构，共享内核 phase5_k_adjustment_summary）──
-    #
-    # K2~K7 的调整分录汇总 sheet 结构与 K8~K13 完全同构（R5 十列 A..J、json_keys 相同），
-    # 差异仅在科目名/行数。6 册**全部零裸 IF** ⇒ 不需要 oo_crash_neutralization_fn。
-    # K5 的 store_item_id 是 `K5-3-entries`（不是 `K5-3-adj-entries`），与前端 K5TabAdjustment.vue 一致。
+    # ── K2~K7 调整分录汇总（与 K8~K13 同构，零裸 IF ⇒ 无中性化；K5 item 是 K5-3-entries）──
     "k2.other_current_assets_adjustment": StoreMergePlan(
         adapter_id="k2.other_current_assets_adjustment",
         provider_module="phase5_k2_other_current_assets",
@@ -932,6 +928,37 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         adapter_id="k7.deferred_income_adjustment",
         provider_module="phase5_k7_deferred_income",
         items=(StoreItemSpec(item_id="K7-3-adj-entries", kind=StoreKind.rows),),
+    ),
+    # ── N 循环五条（spec oo-writeback-template-parity-closure R3 批 C，per-file 中性化照挂）──
+    "n1.deferred_tax_assets": StoreMergePlan(
+        adapter_id="n1.deferred_tax_assets",
+        provider_module="phase5_n1_deferred_tax_assets",
+        items=(StoreItemSpec(item_id="N1-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "n2.taxes_payable": StoreMergePlan(
+        adapter_id="n2.taxes_payable",
+        provider_module="phase5_n2_taxes_payable",
+        items=(StoreItemSpec(item_id="N2-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "n3.deferred_tax_liabilities": StoreMergePlan(
+        adapter_id="n3.deferred_tax_liabilities",
+        provider_module="phase5_n3_deferred_tax_liabilities",
+        items=(StoreItemSpec(item_id="N3-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "n4.taxes_and_surcharges": StoreMergePlan(
+        adapter_id="n4.taxes_and_surcharges",
+        provider_module="phase5_n4_taxes_and_surcharges",
+        items=(StoreItemSpec(item_id="N4-2-detail-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
+    ),
+    "n5.income_tax_expense": StoreMergePlan(
+        adapter_id="n5.income_tax_expense",
+        provider_module="phase5_n5_income_tax_expense",
+        items=(StoreItemSpec(item_id="N5-2-rows", kind=StoreKind.rows),),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
 }
 

@@ -32,6 +32,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote
+from app.services.note_formula_tables import formula_key, parse_formula_key
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ def _preview_from_formulas_dict(formulas: dict) -> list[dict]:
             continue
         rec = _normalize_record(
             {
-                "target": cell_key,
+                "target": formula_key(*parsed) if (parsed := parse_formula_key(cell_key)) else cell_key,
                 "formula": fdef.get("expression"),
                 "description": fdef.get("description"),
                 "category": fdef.get("category"),
@@ -102,24 +103,28 @@ def _preview_from_formulas_dict(formulas: dict) -> list[dict]:
         )
         if rec is not None:
             out.append(rec)
-    # 稳定排序：按 target 单元格坐标（row:col）排序，便于前端展示一致
-    out.sort(key=lambda r: r.get("target") or "")
+    out.sort(key=target_sort_key)
     return out
 
 
+def target_sort_key(rec: dict) -> tuple:
+    """按（表, 行, 列）排序（字符串排序会把 ``10:0`` 排在 ``2:0`` 前）；认不出的目标排最后。"""
+    parsed = parse_formula_key(rec.get("target"))
+    return (0, *parsed) if parsed else (1, 0, 0, 0, str(rec.get("target") or ""))
+
+
 def preview_records(td: dict | None, note_section: str) -> list[dict]:
-    """该附注表自带的模板公式（generator 预览）：已有 ``_formulas`` 直接归一化，否则按
-    ``_check_presets`` + 表结构现算；现算失败返回空（不阻断弹窗）。"""
+    """该附注表自带的模板公式（generator 预览）：已存 ``_formulas`` 直接归一化（旧数据），否则按每张表当前结构现算
+    （与执行器同一份 ``section_preset_formulas``）；现算失败返回空（不阻断弹窗）。"""
     if not isinstance(td, dict) or not td:
         return []
     existing = td.get("_formulas")
     if isinstance(existing, dict) and existing:
         return _preview_from_formulas_dict(existing)
-    from app.services.note_formula_generator import generate_formulas_for_table
+    from app.services.note_formula_tables import section_preset_formulas
 
-    table_template = {"headers": td.get("headers", []), "rows": td.get("rows", [])}
     try:
-        generated = generate_formulas_for_table(table_template, td.get("_check_presets") or [])
+        generated, _notes = section_preset_formulas(td)
     except Exception as e:  # generator 现算失败不阻断弹窗
         logger.warning("[NOTE_FORMULA] preview generate 失败 section=%s: %s", note_section, e)
         return []

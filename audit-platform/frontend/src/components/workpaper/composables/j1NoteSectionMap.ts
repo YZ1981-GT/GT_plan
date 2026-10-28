@@ -247,6 +247,24 @@ export interface J1DisclosureSnapshot {
   notes: Record<string, string>
 }
 
+/**
+ * 披露 Tab 的同步快照 = `useJ1DisclosureSections` 的四份状态（不含合计行，合计由载荷层补）。
+ * Tab「同步到附注」与附注页离屏同步共用（spec note-pull-followup-closure R1）。
+ */
+export function j1DisclosureSnapshotOf(sections: {
+  summaryData: { readonly value: J1DisclosureRow[] }
+  shortTermData: { readonly value: J1DisclosureRow[] }
+  postEmploymentData: { readonly value: J1DisclosureRow[] }
+  notes: { readonly value: Record<string, string> }
+}): J1DisclosureSnapshot {
+  return {
+    summary: sections.summaryData.value,
+    shortTerm: sections.shortTermData.value,
+    postEmployment: sections.postEmploymentData.value,
+    notes: sections.notes.value as Record<string, string>,
+  }
+}
+
 export function buildJ1SyncPayload(args: {
   variant: J1DisclosureVariant
   wpId: string
@@ -254,7 +272,7 @@ export function buildJ1SyncPayload(args: {
   year: number | string | null
   snapshot: J1DisclosureSnapshot
   applicableStandards?: readonly string[] | null
-}): { section: string; body: Record<string, unknown> } {
+}): { section: string; body: Record<string, unknown> & { section_id: string } } {
   const { variant, wpId, year, snapshot, applicableStandards } = args
   const keys = J1_SUB_TABLE_KEYS[variant]
   const cols = j1ColumnsFor(variant)

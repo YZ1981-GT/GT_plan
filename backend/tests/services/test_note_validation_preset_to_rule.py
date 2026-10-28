@@ -34,6 +34,7 @@ from app.services.note_validation_engine import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+#: 2026-10-27 补「期间衔接」（spec note-pull-followup-closure R8：两版未分配利润章节的模板预设名，原先注入时被丢弃）
 ALL_11_PRESETS: list[str] = [
     "余额",
     "宽表",
@@ -46,6 +47,7 @@ ALL_11_PRESETS: list[str] = [
     "账龄衔接",
     "LLM审核",
     "描述",
+    "期间衔接",
 ]
 
 
@@ -55,12 +57,15 @@ ALL_11_PRESETS: list[str] = [
 
 
 class TestPresetToRuleDictCoverage:
-    """PRESET_TO_RULE 必须严格覆盖 11 个枚举（CI 卡点）."""
+    """PRESET_TO_RULE 必须严格覆盖 12 个枚举（CI 卡点）."""
 
-    def test_dict_has_exactly_11_entries(self):
-        assert len(PRESET_TO_RULE) == 11, (
-            f"PRESET_TO_RULE 必须严格 11 项，当前 {len(PRESET_TO_RULE)} 项"
+    def test_dict_has_exactly_12_entries(self):
+        assert len(PRESET_TO_RULE) == 12, (
+            f"PRESET_TO_RULE 必须严格 12 项，当前 {len(PRESET_TO_RULE)} 项"
         )
+
+    def test_period_continuity_code(self):
+        assert PRESET_TO_RULE["期间衔接"] == "PERIOD_CONTINUITY"
 
     def test_all_11_keys_present(self):
         missing = [k for k in ALL_11_PRESETS if k not in PRESET_TO_RULE]

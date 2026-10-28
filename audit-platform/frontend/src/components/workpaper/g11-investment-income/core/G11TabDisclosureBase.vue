@@ -271,7 +271,11 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useG11Disclosure } from '../../composables/useG11Disclosure'
 import { isG11DisclosureLeaf } from '../../composables/g11SchemaRows'
-import { buildG11SyncPayloads } from '../../composables/g11DisclosureSyncPayload'
+import {
+  buildG11TabSyncPayloads,
+  g11DisclosureAuditTextKeys,
+  readG11DisclosureAuditTexts,
+} from '../../composables/g11DisclosureTabSync'
 import { G11_NOTE_SECTION } from '../../composables/g11NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
@@ -304,8 +308,7 @@ function onDisclosureImported(): void {
   emit('imported')
   dis.pullLatestAdjudicated(false)
 }
-const NOTE_KEY = `G11-disclosure-audit-note-${props.variant}`
-const CONCLUSION_KEY = `G11-disclosure-audit-conclusion-${props.variant}`
+const { note: NOTE_KEY, conclusion: CONCLUSION_KEY } = g11DisclosureAuditTextKeys(props.variant)
 const auditNote = ref('')
 const auditConclusion = ref('')
 const isSyncing = ref(false)
@@ -324,12 +327,8 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
-  const snap = dis.getSyncSnapshot(auditNote.value, auditConclusion.value)
-  const payloads = buildG11SyncPayloads(
-    props.wpId,
-    props.variant,
-    props.applicableStandards ?? [],
-    snap,
+  const payloads = buildG11TabSyncPayloads(
+    props.wpId, props.variant, props.applicableStandards, dis, auditNote.value, auditConclusion.value,
   )
   if (!payloads.length) {
     ElMessage.warning('当前项目准则不适用附注同步')
@@ -369,10 +368,9 @@ function saveAuditConclusion(val: string): void {
 }
 
 onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.conclusion || c?.remark) auditConclusion.value = String(c.conclusion ?? c.remark ?? '')
+  const texts = readG11DisclosureAuditTexts(props.allResponses, props.variant)
+  if (texts.note) auditNote.value = texts.note
+  if (texts.conclusion) auditConclusion.value = texts.conclusion
 })
 
 // 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）

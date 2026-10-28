@@ -171,6 +171,13 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
+import {
+  L7_DISCLOSURE_ROWS_ITEM_ID,
+  buildL7SoeDisclosureSnapshot,
+  createL7SoeDisclosureRows,
+  restoreL7SoeDisclosure,
+  type L7SoeDisclosureRow,
+} from '../../composables/l7DisclosureTabState'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -198,20 +205,10 @@ const formData = useL7FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface L7SoeRow { item: string; beginBalance: number; endBalance: number }
+const ROWS_ITEM_ID = L7_DISCLOSURE_ROWS_ITEM_ID.soe
 
-const ROWS_ITEM_ID = 'L7-disclosure-soe-rows'
-
-/** 源模板 八、57 数据行取模板 seed（待转销项税额 / 合同负债），行名可编辑可增删 */
-function defaultRows(): L7SoeRow[] {
-  return [
-    { item: '待转销项税额', beginBalance: 0, endBalance: 0 },
-    { item: '合同负债', beginBalance: 0, endBalance: 0 },
-    { item: '', beginBalance: 0, endBalance: 0 },
-  ]
-}
-
-const disclosureRows = ref<L7SoeRow[]>(defaultRows())
+/** 默认行（源模板 八、57 seed）与读回、同步快照见 l7DisclosureTabState（离屏同步共用） */
+const disclosureRows = ref<L7SoeDisclosureRow[]>(createL7SoeDisclosureRows())
 
 /** 合计行读时派生 */
 const displayRows = computed(() => [
@@ -270,16 +267,7 @@ const isSyncing = ref(false)
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   // 投影：底稿列序（年初/期末）→ 附注交付物口径（期末/期初）
-  const payload = buildL7SyncPayload(props.wpId, {
-    variant: 'soe',
-    rows: disclosureRows.value
-      .filter((r) => String(r.item ?? '').trim())
-      .map((r) => ({
-        label: r.item,
-        endAmount: Number(r.endBalance) || 0,
-        priorAmount: Number(r.beginBalance) || 0,
-      })),
-  })
+  const payload = buildL7SyncPayload(props.wpId, buildL7SoeDisclosureSnapshot(disclosureRows.value))
   if (!payload) {
     ElMessage.warning('当前项目准则不适用国企附注同步')
     return
@@ -327,41 +315,13 @@ function handleReview() { openReviewDialog?.('L7-disclosure-soe', '附注披露�
 /** 只读金额走平台单一真源 */
 const fmtAmt = (val: number) => fmtAmount(val)
 
-// ─── 反序列化（含旧版逐格 key 兼容） ────────────────────────────────────────
+// ─── 反序列化（含旧版逐格 key 兼容，见 restoreL7SoeDisclosure） ──────────────
 
 function restoreRows() {
-  const packed = formData.allResponses.value.get(ROWS_ITEM_ID)?.remark
-  if (packed) {
-    try {
-      const parsed = JSON.parse(packed)
-      if (Array.isArray(parsed) && parsed.length) {
-        disclosureRows.value = parsed.map((r: any) => ({
-          item: String(r?.item ?? ''),
-          beginBalance: Number(r?.beginBalance) || 0,
-          endBalance: Number(r?.endBalance) || 0,
-        }))
-        return
-      }
-    } catch { /* 落到旧格式兼容 */ }
-  }
-  // 旧格式：逐格 `L7-disclosure-soe-{index}-{field}`（旧默认 5 行 + 第 6 行合计，合计丢弃）
-  const legacyDefaults = ['递延收益', '长期保证金/押金', '政府补助（非流动）', '预收款项（非流动）', '其他']
-  const rows: L7SoeRow[] = legacyDefaults.map((item) => ({ item, beginBalance: 0, endBalance: 0 }))
-  let touched = false
-  rows.forEach((row, i) => {
-    for (const field of ['beginBalance', 'endBalance'] as const) {
-      const raw = formData.allResponses.value.get(`L7-disclosure-soe-${i}-${field}`)?.remark
-      if (raw != null && raw !== '') {
-        const n = Number(raw)
-        if (Number.isFinite(n)) { row[field] = n; touched = true }
-      }
-    }
-  })
-  if (touched) disclosureRows.value = rows
-  const special = formData.allResponses.value.get('L7-disclosure-soe-special')?.remark
-  if (special) soeSpecialNote.value = String(special)
-  const savedConclusion = formData.allResponses.value.get('L7-disc-soe-conclusion')?.remark
-  if (savedConclusion) conclusion.value = String(savedConclusion)
+  const restored = restoreL7SoeDisclosure(formData.allResponses.value)
+  if (restored.rows) disclosureRows.value = restored.rows
+  if (restored.special) soeSpecialNote.value = restored.special
+  if (restored.conclusion) conclusion.value = restored.conclusion
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

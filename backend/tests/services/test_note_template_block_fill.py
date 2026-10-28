@@ -243,6 +243,53 @@ def test_literal_subheading_numbers_are_renumbered_in_kept_order():
     assert not [t for t in texts if "按账龄披露" in t]
 
 
+def _literal_block(code: str, subs: list[str], *, auto_first: bool = False):
+    """块内字面编号子标题（取消自动编号）各带一个表位；``auto_first`` = 第一个子标题靠样式自动编号。"""
+    doc = Document()
+    _style_numbering(doc, "Heading 4", "4", "3")
+    doc.add_paragraph(f"##SECTION:{code}##")
+    doc.add_paragraph("标题", style="Heading 3")
+    for i, text in enumerate(subs):
+        p = doc.add_paragraph(text, style="Heading 4")
+        if not (auto_first and i == 0):
+            _num(p, "0", "3")
+        doc.add_paragraph(f"{{{{table:{code}:{i}}}}}")
+        _sample_table(doc, ["项目", "期末"])
+    doc.add_paragraph(f"##/SECTION:{code}##")
+    return doc
+
+
+def test_continuation_caption_strips_guidance_and_follows_its_subheading_number():
+    """续表表题按表名补：剔除编制指引括注；所属子标题「（2）」重排成「（1）」时表题编号跟着改（spec
+    note-pull-header-formula-closure R5.4）。"""
+    doc = _literal_block("八、5", ["（1）按账龄披露", "（2）按坏账准备计提方法分类", "（3）本期计提坏账准备情况"])
+    note = _note("八、5", "应收账款", tables=[
+        _table("（2）按坏账准备计提方法分类", "组合", 1.0),
+        _table("（2）按坏账准备计提方法分类（续：期初数）（注意：是报表项目）", "组合", 3.0),
+        _table("（3）本期计提坏账准备情况", "坏账准备", 2.0),
+    ])
+    _rebuild(doc, "八、5", note)
+    texts = _block_texts(doc, "八、5")
+    assert "（1）按坏账准备计提方法分类" in texts and "（2）本期计提坏账准备情况" in texts
+    assert "（1）按坏账准备计提方法分类（续：期初数）" in texts, texts
+    assert not [t for t in texts if "注意" in t or "按账龄披露" in t]
+
+
+def test_literal_numbers_not_consecutive_from_one_in_template_are_kept():
+    """上市 五、71「（7）供应商融资安排」接在自动编号子标题后：模板里该组不是从 1 连续 ⇒ 不重排（原先成了「（1）」）。"""
+    doc = _literal_block("五、71", ["现金流量表补充资料", "（7）供应商融资安排"], auto_first=True)
+    note = _note("五、71", "现金流量表补充资料", tables=[_table("供应商融资安排", "应付账款", 1.0)])
+    _rebuild(doc, "五、71", note)
+    assert "（7）供应商融资安排" in _block_texts(doc, "五、71")
+
+
+def test_caption_text_strips_only_guidance():
+    assert tbf.caption_text("应收关联方款项（注意：是报表项目）") == "应收关联方款项"
+    assert tbf.caption_text("资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）") == "资产负债表日后利润分配情况"
+    assert tbf.caption_text("营业外收入（损失以“—”号填列）") == "营业外收入（损失以“—”号填列）"
+    assert tbf.caption_text("（参考格式同上）") == "（参考格式同上）"  # 只剩指引时原样（不写空表题）
+
+
 def test_template_table_look_header_repeat_min_height_and_total_bold():
     doc = _block_doc()
     note = _note("八、1", "货币资金", tables=[_table("货币资金", "银行存款", 100.0)])

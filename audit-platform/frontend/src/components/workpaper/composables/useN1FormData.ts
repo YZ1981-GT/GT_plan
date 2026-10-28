@@ -63,6 +63,77 @@ const ACCOUNT_CODE = '1811' // 递延所得税资产（借方/资产类！取期
 /** 审定表 sheet 名（含子码 N1-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表N1-1'
 
+// ─── render-config 种子（纯函数；selfLoad 与附注页离屏同步共用） ───────────────
+
+/** `{槽: {opening, closing}}` 归一（NaN / 缺字段 → 0） */
+function normPrefill(raw: unknown): Record<string, { opening: number; closing: number }> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, { opening: number; closing: number }> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+    out[k] = { opening: Number(v?.opening) || 0, closing: Number(v?.closing) || 0 }
+  }
+  return out
+}
+
+function normTb(raw: any): TbSeedData {
+  return {
+    beginBalance: Number(raw?.begin_balance) || 0,
+    debitAmount: Number(raw?.debit_amount) || 0,
+    creditAmount: Number(raw?.credit_amount) || 0,
+    endBalance: Number(raw?.end_balance) || 0,
+  }
+}
+
+export interface N1RenderSeeds {
+  tbSeed: TbSeedData
+  /** 本 sheet 没有 `trial_balance_liability` ⇒ null（不覆盖既有值） */
+  tbLiabilitySeed: TbSeedData | null
+  adjudicationPrefill: Record<string, { opening: number; closing: number }>
+  liabilityPrefill: Record<string, { opening: number; closing: number }>
+  tbSourceCodes: {
+    asset: { row_code: string; codes: string[] }
+    liability: { row_code: string; codes: string[] }
+  } | null
+}
+
+/**
+ * 从 render-config 响应提取四表取数种子；没有任何 sheet 带 `trial_balance` ⇒ null。
+ *
+ * 🔴 以「首个含 `trial_balance` 的 sheet」为锚点，同一 `html_data` 的兄弟键
+ * （`trial_balance_liability` / `adjudication_prefill` / `liability_prefill` /
+ * `tb_source_codes`）一并抽取；后端未重启导致新键缺失时逐个静默跳过，
+ * 不能让披露表报错。
+ */
+export function extractN1RenderSeeds(res: any): N1RenderSeeds | null {
+  const cfg = res?.data ?? res
+  const sheets: any[] = cfg?.sheets ?? []
+  for (const s of sheets) {
+    const h = s?.html_data
+    const tb = h?.trial_balance
+    if (!tb) continue
+    const src = h?.tb_source_codes
+    return {
+      tbSeed: normTb(tb),
+      tbLiabilitySeed: h?.trial_balance_liability ? normTb(h.trial_balance_liability) : null,
+      adjudicationPrefill: normPrefill(h?.adjudication_prefill),
+      liabilityPrefill: normPrefill(h?.liability_prefill),
+      tbSourceCodes: src && typeof src === 'object'
+        ? {
+            asset: {
+              row_code: String(src.asset?.row_code ?? ''),
+              codes: Array.isArray(src.asset?.codes) ? src.asset.codes.map(String) : [],
+            },
+            liability: {
+              row_code: String(src.liability?.row_code ?? ''),
+              codes: Array.isArray(src.liability?.codes) ? src.liability.codes.map(String) : [],
+            },
+          }
+        : null,
+    }
+  }
+  return null
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useN1FormData(options: UseN1FormDataOptions) {
@@ -137,62 +208,16 @@ export function useN1FormData(options: UseN1FormDataOptions) {
     }
   }
 
-  /** `{槽: {opening, closing}}` 归一（NaN / 缺字段 → 0） */
-  function _normPrefill(raw: unknown): Record<string, { opening: number; closing: number }> {
-    if (!raw || typeof raw !== 'object') return {}
-    const out: Record<string, { opening: number; closing: number }> = {}
-    for (const [k, v] of Object.entries(raw as Record<string, any>)) {
-      out[k] = { opening: Number(v?.opening) || 0, closing: Number(v?.closing) || 0 }
-    }
-    return out
-  }
-
-  function _normTb(raw: any): TbSeedData {
-    return {
-      beginBalance: Number(raw?.begin_balance) || 0,
-      debitAmount: Number(raw?.debit_amount) || 0,
-      creditAmount: Number(raw?.credit_amount) || 0,
-      endBalance: Number(raw?.end_balance) || 0,
-    }
-  }
-
-  /**
-   * 从 render-config 响应提取四表取数种子。
-   *
-   * 🔴 以「首个含 `trial_balance` 的 sheet」为锚点，同一 `html_data` 的兄弟键
-   * （`trial_balance_liability` / `adjudication_prefill` / `liability_prefill` /
-   * `tb_source_codes`）一并抽取；后端未重启导致新键缺失时逐个静默跳过，
-   * 不能让披露表报错。
-   */
+  /** render-config 种子写进本实例（取值见 `extractN1RenderSeeds`；新键缺失时逐个跳过，不清已有值） */
   function _applyTbSeedFromRenderConfig(res: any): boolean {
-    const cfg = res?.data ?? res
-    const sheets: any[] = cfg?.sheets ?? []
-    for (const s of sheets) {
-      const h = s?.html_data
-      const tb = h?.trial_balance
-      if (!tb) continue
-      tbSeed.value = _normTb(tb)
-      if (h?.trial_balance_liability) tbLiabilitySeed.value = _normTb(h.trial_balance_liability)
-      const prefill = _normPrefill(h?.adjudication_prefill)
-      if (Object.keys(prefill).length > 0) adjudicationPrefill.value = prefill
-      const liabPrefill = _normPrefill(h?.liability_prefill)
-      if (Object.keys(liabPrefill).length > 0) liabilityPrefill.value = liabPrefill
-      const src = h?.tb_source_codes
-      if (src && typeof src === 'object') {
-        tbSourceCodes.value = {
-          asset: {
-            row_code: String(src.asset?.row_code ?? ''),
-            codes: Array.isArray(src.asset?.codes) ? src.asset.codes.map(String) : [],
-          },
-          liability: {
-            row_code: String(src.liability?.row_code ?? ''),
-            codes: Array.isArray(src.liability?.codes) ? src.liability.codes.map(String) : [],
-          },
-        }
-      }
-      return true
-    }
-    return false
+    const seeds = extractN1RenderSeeds(res)
+    if (!seeds) return false
+    tbSeed.value = seeds.tbSeed
+    if (seeds.tbLiabilitySeed) tbLiabilitySeed.value = seeds.tbLiabilitySeed
+    if (Object.keys(seeds.adjudicationPrefill).length > 0) adjudicationPrefill.value = seeds.adjudicationPrefill
+    if (Object.keys(seeds.liabilityPrefill).length > 0) liabilityPrefill.value = seeds.liabilityPrefill
+    if (seeds.tbSourceCodes) tbSourceCodes.value = seeds.tbSourceCodes
+    return true
   }
 
   // ─── Load responses ────────────────────────────────────────────────────────

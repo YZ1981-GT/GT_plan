@@ -13,6 +13,13 @@ describe('resolveNoteStructureEditState', () => {
     expect(result.reason).toBeNull()
   })
 
+  it('给出源表序号（「恢复模板结构」按表名 + 序号找模板里的同一张表）', () => {
+    const tables = [{ name: '按账龄披露', headers: ['账龄', '期末'], rows: [] }, { name: '组合计提', headers: ['账龄', '期末'], rows: [] }]
+    const result = resolveNoteStructureEditState({ _tables: tables }, { ...tables[1], _sourceTableIndexes: [1] })
+    expect(result.table).toBe(tables[1])
+    expect(result.index).toBe(1)
+  })
+
   it('允许编辑 legacy 单表原件', () => {
     const source = { headers: ['项目', '金额'], rows: [] }
     const result = resolveNoteStructureEditState(source, {

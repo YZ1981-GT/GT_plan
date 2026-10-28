@@ -142,20 +142,15 @@ def multi_header_to_column_groups(
     return groups if groups else None
 
 
-_TOTAL_PATTERN = re.compile(r"^(合\s*计|小\s*计|合\s+计|小\s+计)$")
-_SUBTOTAL_KEYWORDS = {"小  计", "小 计", "小计"}
-
-
 def _infer_row_type(label: str) -> str:
-    """从行首列文本推导 row_type（data/total/subtotal）。"""
-    text = (label or "").strip()
-    if not text:
-        return "data"
-    if _TOTAL_PATTERN.match(text):
-        return "total"
-    if text in _SUBTOTAL_KEYWORDS or text.startswith("小计"):
-        return "subtotal"
-    return "data"
+    """从行首列文本推导 row_type（data/total/subtotal）。
+
+    与单体 / 来源行同一口径（``note_total_terms.label_row_type``）：以「小计」结尾 = subtotal（先判；旧正则把「小计」
+    当合计 ⇒ 多段小计全按合计加总）、「合计」「总计」= total。
+    """
+    from app.services.note_total_terms import label_row_type
+
+    return label_row_type(label)
 
 
 def _ensure_columns(section: dict) -> None:
@@ -237,58 +232,45 @@ def backfill_total_rows(
     rows: list[list],
     row_types: list[str] | None = None,
 ) -> bool:
-    """对合计行（total/subtotal）自动按同列数据行求和回填。
+    """保存时合计 / 小计空格回填：按合计构成（``note_total_terms``，与单体 / 拉数 / 汇总同一判定）只填判得准的合计行，
+    已有值的单元格不覆盖；构成里的格全空不填。
 
-    row_types 与 rows 等长，标识每行类型。未提供时从行首列文本推导。
-    返回是否有值被回填。
-
-    算法：遇到 total/subtotal 行时，向上搜索该行之前的连续 data 行（遇到
-    上一个 total/subtotal 停止），对每列求和写入合计行。
-    只回填空值（空串或 None），已有值的单元格不覆盖。
+    row_types 与 rows 等长，标识每行类型（未提供时从行首列文本推导）。返回是否有值被回填。旧算法「向上到上一个
+    合计 / 小计为止」把「小计 / 减：坏账准备 / 合计」的合计填成坏账准备、在「其中：」表上重复加明细。
     """
+    from decimal import Decimal
+
+    from app.services.note_total_terms import sum_terms, total_order, total_terms
+
     if not rows:
         return False
     if not row_types:
         row_types = [_infer_row_type(str(r[0]) if r else "") for r in rows]
+    shaped = [
+        {"label": str(r[0]) if isinstance(r, (list, tuple)) and r else "",
+         "row_type": row_types[i] if i < len(row_types) else "data"}
+        for i, r in enumerate(rows)
+    ]
+    plans, _reasons = total_terms(shaped)
+
+    def cell(j: int, ci: int) -> Decimal | None:
+        dr = rows[j] if 0 <= j < len(rows) else None
+        v = _safe_float(dr[ci]) if isinstance(dr, (list, tuple)) and ci < len(dr) else None
+        return Decimal(str(v)) if v is not None else None
 
     changed = False
-    for ri, rtype in enumerate(row_types):
-        if rtype not in ("total", "subtotal"):
-            continue
+    for ri in total_order(shaped, plans):
         row = rows[ri]
-        # 向上收集数据行范围（从 ri-1 向上到上一个 total/subtotal 或行首）
-        data_start = ri
-        for j in range(ri - 1, -1, -1):
-            if row_types[j] in ("total", "subtotal"):
-                break
-            data_start = j
-
-        # 对每个数值列（跳过首列标签）求和
-        num_cols = len(row)
-        for ci in range(1, num_cols):
-            # 只回填空值单元格
-            existing = row[ci] if ci < len(row) else ""
-            if _safe_float(existing) is not None:
+        if not isinstance(row, list):
+            continue
+        for ci in range(1, len(row)):
+            if _safe_float(row[ci]) is not None:
                 continue  # 已有值，不覆盖
-            col_sum = 0.0
-            has_data = False
-            for j in range(data_start, ri):
-                if j >= len(rows):
-                    break
-                dr = rows[j]
-                if ci >= len(dr):
-                    continue
-                v = _safe_float(dr[ci])
-                if v is not None:
-                    col_sum += v
-                    has_data = True
-            if has_data:
-                # 写入合计值（格式化为字符串，与模板格式一致）
-                while len(row) <= ci:
-                    row.append("")
-                row[ci] = str(col_sum) if col_sum != int(col_sum) else str(int(col_sum))
-                changed = True
-
+            total = sum_terms(plans[ri], lambda j, ci=ci: cell(j, ci))
+            if total is None:
+                continue
+            row[ci] = str(int(total)) if total == total.to_integral_value() else str(total.normalize())
+            changed = True
     return changed
 
 

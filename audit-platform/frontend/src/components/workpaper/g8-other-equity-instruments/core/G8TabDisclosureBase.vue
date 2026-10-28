@@ -322,7 +322,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useG8Disclosure } from '../../composables/useG8Disclosure'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildG8SyncPayload } from '../../composables/g8DisclosureSyncPayload'
+import { buildG8SyncPayload, g8DisclosureSyncSnapshot, g8SyncDetailRows } from '../../composables/g8DisclosureSyncPayload'
 import { G8_NOTE_SECTION } from '../../composables/g8NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
@@ -349,29 +349,12 @@ const disc = useG8Disclosure({
 const isSyncing = ref(false)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
-/** 逐项目明细行：上市取 OCI 变动表，国企取期末明细表（合计行由载荷侧重算，故剔除） */
-const syncDetailRows = computed(() => {
-  const src = props.variant === 'listed' ? disc.ociRows.value : disc.detailRows.value
-  return src
-    .filter((r: any) => !r.isTotal)
-    .map((r: any) => ({
-      label: r.label,
-      ociPeriod: r.ociPeriod,
-      ociCumulative: r.ociCumulative,
-      dividend: r.dividend,
-      transferAmount: props.variant === 'listed' ? r.transferToRE : r.transferAmt,
-      transferReason: props.variant === 'listed' ? r.derecogReason : r.transferReason,
-    }))
-})
+/** 逐项目明细行（自动同步监听用；快照与附注页离屏同步共用 `g8DisclosureSyncSnapshot`） */
+const syncDetailRows = computed(() => g8SyncDetailRows(props.variant, disc))
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
-  const payload = buildG8SyncPayload(props.wpId, props.variant, props.applicableStandards, {
-    balanceRows: disc.store.value.balanceRows,
-    detailRows: syncDetailRows.value,
-    designationText: disc.designationText.value,
-    noteText: disc.noteText.value,
-  })
+  const payload = buildG8SyncPayload(props.wpId, props.variant, props.applicableStandards, g8DisclosureSyncSnapshot(props.variant, disc))
   if (!payload) return
   isSyncing.value = true
   try {

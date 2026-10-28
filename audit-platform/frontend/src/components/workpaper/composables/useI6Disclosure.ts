@@ -5,7 +5,7 @@
  * - 订阅 substantive:adjudicated 刷新
  * - sync-from-workpaper → 附注模块（上市五、66 / 国企八、67）
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -264,6 +264,22 @@ export function useI6Disclosure(
     _persistField(_keys().auditConclusion, val)
   }
 
+  /**
+   * 同步载荷 = 快照 + 本版本 builder（`syncToNotes` 与附注页离屏同步共用，spec note-pull-followup-closure R1）；
+   * 当前报告准则不适用本版本时回空数组。
+   */
+  function buildSyncPayloads() {
+    const snap = {
+      rows: rows.value,
+      capitalizationNote: capitalizationNote.value,
+      projectsNote: projectsNote.value,
+      supplementNote: supplementNote.value,
+    }
+    return isListed.value
+      ? buildI6ListedSyncPayloads(wpId.value, _standards(), snap)
+      : buildI6SoeSyncPayloads(wpId.value, _standards(), snap)
+  }
+
   async function syncToNotes(): Promise<void> {
     if (isSyncing.value || !projectId.value || !wpId.value) return
 
@@ -286,15 +302,7 @@ export function useI6Disclosure(
       } catch { return }
     }
 
-    const snap = {
-      rows: rows.value,
-      capitalizationNote: capitalizationNote.value,
-      projectsNote: projectsNote.value,
-      supplementNote: supplementNote.value,
-    }
-    const payloads = isListed.value
-      ? buildI6ListedSyncPayloads(wpId.value, _standards(), snap)
-      : buildI6SoeSyncPayloads(wpId.value, _standards(), snap)
+    const payloads = buildSyncPayloads()
 
     if (!payloads.length) {
       ElMessage.warning('当前报告准则不适用本披露版本同步')
@@ -395,16 +403,20 @@ export function useI6Disclosure(
     },
   )
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-    window.addEventListener('i6:adjustment-writeback', _onAdjustmentWriteback)
-  })
-  onUnmounted(() => {
-    window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-    window.removeEventListener('i6:adjustment-writeback', _onAdjustmentWriteback)
-    if (publishTimer) clearTimeout(publishTimer)
-    if (autoRefreshTimer) clearTimeout(autoRefreshTimer)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定 / 调整回写事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+      window.addEventListener('i6:adjustment-writeback', _onAdjustmentWriteback)
+    })
+    onUnmounted(() => {
+      window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+      window.removeEventListener('i6:adjustment-writeback', _onAdjustmentWriteback)
+      if (publishTimer) clearTimeout(publishTimer)
+      if (autoRefreshTimer) clearTimeout(autoRefreshTimer)
+    })
+  }
 
   return {
     variant,
@@ -433,6 +445,7 @@ export function useI6Disclosure(
     saveSupplementNote,
     saveAuditNote,
     saveAuditConclusion,
+    buildSyncPayloads,
     syncToNotes,
     generateNoteText,
   }

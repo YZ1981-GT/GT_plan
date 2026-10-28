@@ -281,28 +281,28 @@ export function useL1FormData(
     try {
       const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
       const responses: ChecklistItem[] = Array.isArray(res) ? res : (res?.data ?? [])
-
-      // 存储原始 responses
-      const map = new Map<string, ChecklistItem>()
-      for (const r of responses) {
-        if (r.item_id?.startsWith('L1-')) {
-          map.set(r.item_id, r)
-        }
-      }
-      _allResponses.value = map
-
-      // 解析到各 sheet state
-      _parseAdjudication(map)
-      _parseDetailRows(map)
-      _parseInterestCalcRows(map)
-      _parseCreditCheckRows(map)
-      _parseOverdueCheckRows(map)
-      _parsePledgeCheckRows(map)
+      applyResponses(responses)
     } catch {
       ElMessage.warning('L1数据加载失败，可手动填写')
     } finally {
       isLoading.value = false
     }
+  }
+
+  // 回复 → 结构化 state（只留 L1- 条目，解析到各 sheet）：selfLoad 拉到回复后调；附注页离屏同步把框架已读的同一批回复直接
+  // 交给它（不发请求、不弹提示，spec note-pull-followup-closure R1）。🔴 本段与 selfLoad 合计行数不变：GET / PUT 行号被数据锚点引用
+  function applyResponses(responses: readonly ChecklistItem[]): void {
+    const map = new Map<string, ChecklistItem>()
+    for (const r of responses) {
+      if (r.item_id?.startsWith('L1-')) map.set(r.item_id, r)
+    }
+    _allResponses.value = map
+    _parseAdjudication(map)
+    _parseDetailRows(map)
+    _parseInterestCalcRows(map)
+    _parseCreditCheckRows(map)
+    _parseOverdueCheckRows(map)
+    _parsePledgeCheckRows(map)
   }
 
   // ─── Parse helpers ─────────────────────────────────────────────────────────
@@ -703,6 +703,7 @@ export function useL1FormData(
     pledgeCheckRows,
     // Actions
     selfLoad,
+    applyResponses,
     saveImmediate,
     debounceSave,
     writebackTB,

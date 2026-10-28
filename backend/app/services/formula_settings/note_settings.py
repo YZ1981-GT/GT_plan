@@ -40,7 +40,12 @@ def note_slot(section: str, target: str) -> str:
 
 
 def _target(rec: Mapping[str, Any]) -> str:
-    return str(rec.get("target") or rec.get("target_cell") or "").strip()
+    """目标单元格统一成 ``formula_key`` 写法（``t0:1:2`` ≡ ``1:2``），同一格不会因写法不同成两个公式位。"""
+    from app.services.note_formula_tables import formula_key, parse_formula_key
+
+    raw = str(rec.get("target") or rec.get("target_cell") or "").strip()
+    parsed = parse_formula_key(raw)
+    return formula_key(*parsed) if parsed else raw
 
 
 def definition_of(rec: Mapping[str, Any]) -> dict[str, Any]:
@@ -152,7 +157,13 @@ async def materialize_quietly(db: AsyncSession, project_id: uuid.UUID, sections:
 
 
 async def list_section(db: AsyncSession, project_id: uuid.UUID, year: int, section: str) -> dict[str, Any]:
-    """章节有效公式集（本项目 > 全局 > 该表模板公式）+ 载入版本令牌。"""
+    """章节有效公式集（本项目 > 全局 > 该表模板公式）+ 载入版本令牌 + 目标清单（逐表行 / 列名，弹窗选目标用）。
+
+    每条带 ``target_label``「表名 · 行名 · 列名」；按（表, 行, 列）排序。
+    """
+    from app.services.note_formula_service import target_sort_key
+    from app.services.note_formula_tables import describe_target, formula_targets
+
     note = next(iter(await _notes(db, project_id, [section], year)), None)
     presets = _presets(note)
     out = {t: {**_record(t, r, "preset"), "slot_key": note_slot(section, t), "pending": False}
@@ -163,11 +174,26 @@ async def list_section(db: AsyncSession, project_id: uuid.UUID, year: int, secti
         if e.definition is None or is_effectively_disabled(DOMAIN, e.definition):
             continue  # 停用 ⇒ 执行器按模板公式算（若有），列表如实显示模板公式
         out[target] = {**_record(target, e.definition, e.layer), "slot_key": key, "pending": e.pending}
+    catalog = formula_targets(note.table_data) if note is not None else []
     for rec in out.values():
         rec["layer_label"] = LAYER_LABELS.get(rec["layer"], rec["layer"])
+        rec["target_label"] = describe_target(None, rec["target"], catalog)
     loaded = {note_slot(section, t): None for t in presets}
     loaded.update({k: version_token(e) for k, e in eff.items()})
-    return {"formulas": [out[t] for t in sorted(out)], "loaded": loaded}
+    return {"formulas": sorted(out.values(), key=target_sort_key), "loaded": loaded, "targets": catalog}
+
+
+async def target_problems(db: AsyncSession, project_id: uuid.UUID, year: int, section: str,
+                          formulas: list[dict]) -> list[dict[str, str]]:
+    """保存前校验目标单元格（有公式却没选目标 / 不是单元格 / 超出表格）→ ``[{target, message}]``。
+
+    原先没有目标的公式被当空行静默丢掉、弹窗照样提示「已保存」（spec note-pull-header-formula-closure F7）。
+    章节不存在时不在这里报（保存时 404）。
+    """
+    from app.services.note_formula_tables import target_issues
+
+    note = next(iter(await _notes(db, project_id, [section], year)), None)
+    return target_issues(note.table_data, formulas) if note is not None else []
 
 
 async def save_section(db: AsyncSession, project_id: uuid.UUID, year: int, section: str, formulas: list[dict], *,

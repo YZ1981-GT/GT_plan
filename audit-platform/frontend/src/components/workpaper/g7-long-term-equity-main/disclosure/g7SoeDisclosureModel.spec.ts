@@ -305,11 +305,12 @@ describe('G7 SOE `_removed_table_keys` 逐章节差集', () => {
       /state\.previouslySyncedTables\s*=\s*markG7SoeSynced\(/.test(host),
       '宿主未在同步成功后调用 markG7SoeSynced ⇒ 基线恒为 {} ⇒ 差集恒空',
     ).toBe(true)
-    // ② 回写后必须落库（否则刷新即丢）
+    // ② 回写后必须落库（否则刷新即丢）。同步链路里用只存不排同步的 saveState（persist 存完会再排一次同步 ⇒
+    //    每 800ms 重复同步直到卸载，守卫 disclosureSyncIndirectSelfSchedule.spec.ts）
     const afterMark = host.slice(host.indexOf('markG7SoeSynced('))
     expect(
-      /await persist\(\)/.test(afterMark.slice(0, 600)),
-      'markG7SoeSynced 之后未 persist ⇒ 基线不落库',
+      /await saveState\(\)/.test(afterMark.slice(0, 600)),
+      'markG7SoeSynced 之后未落库 ⇒ 基线不落库',
     ).toBe(true)
     // ③ 载入时恢复（listed 有、改造前 soe 没有 ⇒ 每次打开都退回 {}）
     //

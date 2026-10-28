@@ -460,98 +460,25 @@ async def pull_from_workpapers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
-    """附注主动从底稿拉取最新数据（刷新/生成时调用）。
+    """附注从底稿取数（「🔄 刷新 / 🔁 全部刷新 / 📝 生成附注」前调用；spec note-pull-header-formula-closure R2）。
 
-    对有底稿映射（registry）的章节：
-    - 表格确由底稿同步过（`table_data._last_sync_wp_id` 存在）：刷新 `_last_sync_at` +
-      确保 refill 跳过表格（底稿是这些章节表格的唯一真源）
-    - 从未同步过：**不改动**，仍由模板取数刷新（计入 `skipped_never_synced`）
+    按项目准则（国企 / 上市）找到章节对应的底稿，执行公式推送：试算表审定数（过完调整分录）→ 底稿披露项 → 附注
+    主表（规则 = 公式管理「📤 公式推送」页的有效规则；人工 / 锁定格保留，已确认附注不改写）。已由底稿同步过的章节补
+    ``_source=workpaper``。传 ``note_section`` 只处理该章节，不传处理本准则全部有底稿映射的章节。
 
-    如果传 note_section：只处理该章节（单页刷新）；不传：处理全部有映射的章节（全部刷新）。
-
-    返回 { synced: int, skipped: int, skipped_never_synced: int }
+    返回 ``{synced, skipped, skipped_never_synced, push: {ran, error, written, kept, skipped, warnings},
+    sections: [{section, wp_codes, written, kept, skipped, reasons}]}``。
     """
-    from datetime import datetime, timezone
+    from app.services.note_workpaper_pull_service import pull_sections
 
-    # Project 此前漏导入 —— 下面 db.get(Project, ...) 一调即 NameError → 该端点自写成
-    # 起就是 500，从未成功执行过（ruff F821 可查，但本文件此前未纳入 lint 门禁）。
-    from app.models.core import Project
-    from app.services.note_readiness_service import _load_registry_entries
-
-    # 确定项目变体
-    project = await db.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-    variant = project.template_type or "soe"  # listed/soe
-
-    # 从 registry 获取有映射的章节
-    entries = _load_registry_entries()
-    target_sections: list[str] = []
-    if note_section:
-        target_sections = [note_section]
-    else:
-        for e in entries:
-            sec = e.get(variant) or e.get("listed") or e.get("soe")
-            if isinstance(sec, str) and sec.strip():
-                target_sections.append(sec.strip())
-
-    if not target_sections:
-        return {"synced": 0, "skipped": 0, "message": "无底稿映射章节"}
-
-    now = datetime.now(timezone.utc)
-    synced = 0
-    skipped = 0
-    skipped_never_synced = 0
-
-    for section in target_sections:
-        # 查该章节是否存在
-        note = (
-            await db.execute(
-                sa.select(DisclosureNote).where(
-                    DisclosureNote.project_id == project_id,
-                    DisclosureNote.year == year,
-                    DisclosureNote.note_section == section,
-                    DisclosureNote.is_deleted == False,
-                )
-            )
-        ).scalar_one_or_none()
-
-        if not note:
-            skipped += 1
-            continue
-
-        # 更新 table_data：标记 _source=workpaper + 刷新 _last_sync_at
-        td = note.table_data or {}
-        if not isinstance(td, dict):
-            td = {}
-
-        # 🔴 只标记「表格内容确实来自底稿同步」的章节。
-        #    判据 = table_data 带同步指纹 `_last_sync_wp_id`（sync_from_workpaper /
-        #    sync_from_html 写表格时必写；仅写列 last_sync_wp_id 的「被人工覆盖拦截」
-        #    路径不改表格，不算）。
-        #    修复前从未同步的章节也被打上 `_source=workpaper` ⇒ 模板刷新（refill /
-        #    update_note_values）从此永久跳过它 —— 而它的数据本来就来自模板取数，
-        #    底稿侧根本没有要保护的内容。本端点在附注生成 / 刷新前**每次**都调，
-        #    且 HEAD 之前一直 500 未生效过，不修则一上线就批量扩大死区。
-        if not td.get("_last_sync_wp_id"):
-            skipped_never_synced += 1
-            continue
-
-        td["_source"] = "workpaper"
-        td["_last_sync_at"] = now.isoformat()
-        note.table_data = td
-        # 强制 ORM 脏标记（JSONB 就地改不触发）
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(note, "table_data")
-        synced += 1
-
+    try:
+        result = await pull_sections(
+            db, project_id, year, sections=[note_section] if note_section else None, user_id=current_user.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     await db.commit()
-    return {
-        "synced": synced,
-        "skipped": skipped,
-        # 从未由底稿同步过的章节保持原样（仍由模板取数刷新）
-        "skipped_never_synced": skipped_never_synced,
-    }
+    return result
 
 
 @router.post("/{project_id}/{year}/refresh-from-disclosure")
@@ -560,16 +487,16 @@ async def refresh_from_disclosure(
     year: int,
     wp_code: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """从披露表（disclosure builder）刷新附注数据。
+    """底稿披露表 → 附注的同步状态（只读）。
 
-    - 传 wp_code：只刷新该科目对应的附注章节（单科目）
-    - 不传：刷新全部有映射的章节（全量）
+    - 传 wp_code：该底稿对应章节；不传：全部有映射的章节
+    - 按项目 template_type 只看本准则（国企 / 上市）的章节
 
-    按项目 template_type 自动过滤准则变体（listed/soe），只刷新匹配的章节。
-
-    spec: note-data-from-disclosure-table Phase 1 Task 4
+    逐章节回 ``synced``（已从披露表同步，行数 + 时间）/ ``not_synced``（尚未同步：数据来自模板取数或公式推送）/
+    ``not_found``。2026-10-26 起不再先跑后端 builder 写附注：builder 与前端披露 Tab 不是同一口径（D2 账龄期末恒 0、
+    标准 builder 只产出一张两行表），写进去的是错数（spec note-pull-header-formula-closure R1）。
     """
     from app.models.core import Project
     from app.services.note_disclosure_refresh_service import (
@@ -577,39 +504,11 @@ async def refresh_from_disclosure(
         refresh_note_from_disclosure,
     )
 
-    # 取项目准则变体，只刷新匹配的章节（国企项目不去查上市章节，反之亦然）
     project = await db.get(Project, project_id)
     variant = (project.template_type if project else None) or None
-
-    # 先用 builder 从 checklist_responses 构建 sub_table_data（如果该科目有 builder）
-    from app.services.disclosure_payload_builder_service import build_and_sync, get_builder
-
     if wp_code:
-        if get_builder(wp_code) is not None:
-            try:
-                await build_and_sync(db, project_id, year, wp_code, triggered_by=current_user.id)
-                await db.flush()
-            except Exception as e:
-                logger.warning("build_and_sync failed for %s: %s", wp_code, e)
-                await db.rollback()
-        result = await refresh_note_from_disclosure(db, project_id, year, wp_code, variant=variant)
-    else:
-        # 全量：逐科目 build 再统一 refresh
-        from app.services.note_disclosure_refresh_service import all_wp_codes
-        for code in all_wp_codes():
-            if get_builder(code) is not None:
-                try:
-                    await build_and_sync(db, project_id, year, code, triggered_by=current_user.id)
-                    await db.flush()
-                except Exception as e:
-                    logger.warning("build_and_sync failed for %s: %s", code, e)
-                    try:
-                        await db.rollback()
-                    except Exception:
-                        pass
-        result = await refresh_all_notes(db, project_id, year, variant=variant)
-
-    return result
+        return await refresh_note_from_disclosure(db, project_id, year, wp_code, variant=variant)
+    return await refresh_all_notes(db, project_id, year, variant=variant)
 
 
 @router.get("/{project_id}/{year}/wp-sync-status")
@@ -1333,22 +1232,24 @@ async def get_template_structure(
     project_id: UUID,
     year: int,
     note_section: str,
+    table_name: str | None = Query(None, max_length=200, description="当前表的表名（多表章节按它找模板里的同一张表）"),
+    table_index: int | None = Query(None, ge=0, description="当前表在章节里的序号（当前表没有表名时用）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取附注章节的原始模板表格结构（用于"恢复模板结构"操作）。
+    """获取附注章节某张表的原始模板结构（用于"恢复模板结构"操作）。
 
-    从附注模板种子数据中获取该章节的默认表格结构（headers + rows），
-    不包含项目实际数据，仅返回模板定义的列名和行标签。
+    从附注模板种子数据中取当前表对应的模板表（表头、逐列定义、行标签与行类型），不含项目实际数据；
+    多表章节找不到同一张表时 404，不拿章节第一张表顶。
     Requirements: 38.5, 38.6
     """
     engine = DisclosureEngine(db)
-    template = await engine.get_template_structure(project_id, year, note_section)
+    template = await engine.get_template_structure(
+        project_id, year, note_section, table_name=table_name, table_index=table_index,
+    )
     if template is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"未找到章节 {note_section} 的模板结构"
-        )
+        target = f"中「{table_name}」" if table_name else ""
+        raise HTTPException(status_code=404, detail=f"未找到章节 {note_section}{target}的模板结构")
     return template
 
 
@@ -1467,20 +1368,21 @@ async def apply_formulas(
     project_id: UUID,
     year: int,
     note_section: str,
+    regenerate: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
-    """执行附注表格中的自动运算公式，回填计算结果。
+    """执行附注表格中的自动运算公式（逐表），回填计算结果。
 
-    只更新 mode=auto 的单元格，manual 单元格不受影响。
-    公式从 check_presets 自动生成（纵向合计/横向平衡/账面价值）。
+    只更新 mode=auto 的单元格，manual / locked 单元格不受影响。预设公式按每张表当前结构现算（合计 = 明细之和、
+    账面价值 = 余额 − 准备）；``regenerate=true`` 丢掉章节里存过的旧公式改用现算预设（公式弹窗「重新生成」）。
     """
     from app.services.formula_settings.note_settings import materialize_quietly
     from app.services.note_formula_generator import execute_note_formulas
 
     try:
         await materialize_quietly(db, project_id, [note_section])  # 全局 / 本项目公式设置（新建附注还没物化）
-        result = await execute_note_formulas(db, project_id, year, note_section)
+        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate)
         if result.get("updated"):
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                      user_id=current_user.id)
@@ -1561,6 +1463,10 @@ async def upsert_note_formulas(
     formulas = body.get("formulas")
     if not isinstance(formulas, list):
         raise HTTPException(status_code=400, detail="formulas 必须是列表")
+    targets = await note_settings.target_problems(db, project_id, year, note_section, formulas)
+    if targets:  # 没选目标的公式原先被当空行丢掉、仍回「已保存」（spec note-pull-header-formula-closure F7）
+        raise HTTPException(status_code=422, detail={
+            "error_code": "FORMULA_TARGET_INVALID", "message": "公式目标单元格无效，未保存", "issues": targets})
 
     # 跨表引用保存前校验（与报表 / 底稿公式保存同一 helper、同一 422 契约；spec formula-fetch-followup-defect-closure R5.3）。
     # 原先附注公式保存不校验，悬空引用照常入库，执行时取不到数也不报

@@ -1266,7 +1266,12 @@ async function loadProjectInfo() {
     if (p) {
       projectInfo.clientName = p.client_name || p.name || ''
       projectInfo.year = p.audit_year || year.value
-      projectInfo.standard = (p.applicable_standard || '').includes('listed') ? 'listed' : 'soe'
+      // 合并报表 / 附注模板随项目口径（与后端 resolve_consol_standard 同读 template_type；详情接口没有 applicable_standard）
+      projectInfo.standard = p.template_type === 'listed' || p.template_type === 'soe'
+        ? p.template_type : ((p.applicable_standard || '').includes('listed') ? 'listed' : 'soe')
+      consolReportTemplateType.value = projectInfo.standard
+      consolNoteTemplateType.value = projectInfo.standard
+      eventBus.emit('standard-change', { standard: projectInfo.standard })
       // 非合并项目不应进入合并模块，弹提示并跳回
       const scope = p.report_scope || p.scope || ''
       if (scope && scope !== 'consolidated') {
@@ -1336,8 +1341,8 @@ function onConsolScopeChanged(evt: { event_type: string }) {
   } else if (evt.event_type === 'consol.note_stale') {
     // F5：子公司数据变更导致母项目 stale → 提示重新汇总
     consolStale.value = true
-  } else if (evt.event_type === 'consol.note_mapping_confirmed' || evt.event_type === 'consol.note_mapping_template_promoted') {
-    // P2：映射确认/模板提升 → 通知合并附注 Tab 刷新（供其他在线用户实时看到变更）
+  } else if (evt.event_type === 'consol.note_mapping_confirmed') {
+    // P2：映射确认 → 通知合并附注 Tab 刷新（供其他在线用户实时看到变更）
     eventBus.emit('consol-note-mapping-changed' as any)
   }
 }

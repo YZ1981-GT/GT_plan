@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -287,6 +288,35 @@ class TestRetentionCheck:
         result = await svc.purge_project_data(FAKE_PROJECT_ID)
         assert "purged" in result
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("hours, blocked", [(1, True), (-1, False)])
+    async def test_tz_aware_value_compared_in_utc(self, hours: int, blocked: bool):
+        """PG 的 timestamptz 读回带时区（SQLite 造不出来，按库的返回值回放）：按 UTC 换算后比较。
+
+        值用 +08:00 表示：一小时前过期的值若直接去掉时区会变成七小时后，误判为仍在保留期。
+        """
+        from fastapi import HTTPException
+
+        value = (datetime.now(timezone.utc) + timedelta(hours=hours)).astimezone(timezone(timedelta(hours=8)))
+        committed: list[bool] = []
+
+        async def execute(*_args, **_kwargs):
+            return SimpleNamespace(scalar_one_or_none=lambda: value, rowcount=0)
+
+        async def commit():
+            committed.append(True)
+
+        svc = DataLifecycleService(SimpleNamespace(execute=execute, commit=commit))
+        if blocked:
+            with pytest.raises(HTTPException) as exc_info:
+                await svc.purge_project_data(FAKE_PROJECT_ID)
+            assert exc_info.value.status_code == 403
+            assert exc_info.value.detail["error_code"] == "RETENTION_LOCKED"
+            assert committed == []
+        else:
+            result = await svc.purge_project_data(FAKE_PROJECT_ID)
+            assert "purged" in result and committed == [True]
+
 
 # ---------------------------------------------------------------------------
 # ArchiveOrchestrator retention writing tests
@@ -313,10 +343,9 @@ class TestArchiveRetentionWriting:
 
         orchestrator = ArchiveOrchestrator(db_session)
 
-        # Mock 所有步骤
-        with patch.object(orchestrator, "_step_gate", new_callable=AsyncMock), \
-             patch.object(orchestrator, "_step_wp_storage", new_callable=AsyncMock), \
-             patch.object(orchestrator, "_persist_integrity_hashes", new_callable=AsyncMock), \
+        # 门禁 / 打包另有专测；保留期由锁定步骤写入（spec attachment-archive-and-a-class-evidence ADR-AE-04）
+        with patch.object(orchestrator, "_step_gate", new_callable=AsyncMock, return_value=None), \
+             patch.object(orchestrator, "_step_package", new_callable=AsyncMock, return_value={}), \
              patch.object(orchestrator, "_notify_project_members", new_callable=AsyncMock):
 
             job = await orchestrator.orchestrate(

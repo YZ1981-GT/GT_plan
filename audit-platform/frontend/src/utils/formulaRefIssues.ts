@@ -7,8 +7,13 @@
  * 全局提示与 `handleApiError` 只取 `detail.message`（底稿公式 422 没有 message ⇒ 整段 JSON 或「请求参数有误」）。
  */
 
-/** 422 detail 带逐引用问题清单的错误码（报表 / 附注 / 底稿用户公式 = DANGLING_REFS，底稿公式 = REF_NOT_FOUND） */
-export const REF_ISSUE_ERROR_CODES: ReadonlySet<string> = new Set(['FORMULA_DANGLING_REFS', 'FORMULA_REF_NOT_FOUND'])
+/**
+ * 422 detail 带逐条问题清单的错误码（报表 / 附注 / 底稿用户公式 = DANGLING_REFS，底稿公式 = REF_NOT_FOUND，
+ * 附注公式目标单元格无效 = TARGET_INVALID：问题 `{target, message}`，显示「【目标】原因」）
+ */
+export const REF_ISSUE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'FORMULA_DANGLING_REFS', 'FORMULA_REF_NOT_FOUND', 'FORMULA_TARGET_INVALID',
+])
 
 /** 一条引用问题 → 「引用：原因」；带目标单元格时前缀「【单元格】」。取不到任何内容返回空串。 */
 export function formatRefIssue(issue: unknown): string {

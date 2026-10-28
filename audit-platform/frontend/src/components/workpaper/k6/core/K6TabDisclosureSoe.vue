@@ -215,11 +215,15 @@ import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import K6NoteBlockTables from './K6NoteBlockTables.vue'
 import {
-  buildK6SoeLiabilityPayload,
-  buildK6SyncPayload,
   K6_NOTE_SECTION,
   K6_SOE_LIABILITY_NOTE_SECTION,
 } from '../../composables/k6NoteSectionMap'
+import {
+  applyK6AssetAutoFill,
+  k6DisclosurePayloads,
+  loadK6DisclosureState,
+  type K6SoeAssetRow,
+} from '../../composables/k6DisclosureTabState'
 import { useK6NoteBlocks } from '../../composables/useK6NoteBlocks'
 import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
@@ -254,19 +258,8 @@ const noteBlocks = useK6NoteBlocks({
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
-interface AssetSoeRow {
-  id: string
-  category: string
-  bookValue: number
-  impairment: number
-  fairValueNet: number
-  openingBalance: number
-  closingBalance: number
-  disposalProgress: string
-  approvalStatus: string
-  isTotal: boolean
-  isAutoFill: boolean
-}
+// 资产汇总表的行结构、默认分类、读回、自动取数与载荷组装与附注页离屏同步共用（k6DisclosureTabState，spec note-pull-followup-closure R1）
+type AssetSoeRow = K6SoeAssetRow
 
 interface LiabSoeRow {
   id: string
@@ -293,38 +286,6 @@ const impairmentAutoFilled = ref(false)
 const aiLoading = ref(false)
 
 // ─── Init ────────────────────────────────────────────────────────────────────
-
-function initDefaultAssetTable(): void {
-  const categories = ['固定资产', '在建工程', '无形资产', '长期股权投资', '其他']
-  assetSummary.value = [
-    ...categories.map((cat, idx) => ({
-      id: newRowIdentity('soe-asset'),
-      category: cat,
-      bookValue: 0,
-      impairment: 0,
-      fairValueNet: 0,
-      openingBalance: 0,
-      closingBalance: 0,
-      disposalProgress: '',
-      approvalStatus: '',
-      isTotal: false,
-      isAutoFill: false,
-    })),
-    {
-      id: 'soe-asset-total',
-      category: '合计',
-      bookValue: 0,
-      impairment: 0,
-      fairValueNet: 0,
-      openingBalance: 0,
-      closingBalance: 0,
-      disposalProgress: '',
-      approvalStatus: '',
-      isTotal: true,
-      isAutoFill: false,
-    },
-  ]
-}
 
 function initDefaultLiabTable(): void {
   const categories = ['应付账款', '其他应付款', '应付职工薪酬', '其他']
@@ -355,13 +316,8 @@ function initDefaultLiabTable(): void {
 // ─── Load ────────────────────────────────────────────────────────────────────
 
 function loadSavedData(): void {
-  const savedAssets = props.allResponses.get('K6-disclosure-soe-asset-table')
-  if (savedAssets?.remark) {
-    try { assetSummary.value = JSON.parse(savedAssets.remark) }
-    catch { initDefaultAssetTable() }
-  } else {
-    initDefaultAssetTable()
-  }
+  const saved = loadK6DisclosureState(props.allResponses, 'soe', () => newRowIdentity('soe-asset'))
+  assetSummary.value = saved.assets
 
   const savedLiab = props.allResponses.get('K6-disclosure-soe-liab-table')
   if (savedLiab?.remark) {
@@ -371,41 +327,15 @@ function loadSavedData(): void {
     initDefaultLiabTable()
   }
 
-  const savedNarrative = props.allResponses.get('K6-disclosure-soe-narrative')
-  if (savedNarrative?.remark) narrativeText.value = savedNarrative.remark
+  if (saved.narrative != null) narrativeText.value = saved.narrative
 
   noteBlocks.load()
   _loadCas42()
 }
 
 function applyAutoFill(): void {
-  // 从K6-2明细表按类别聚合（K6-2 持久化键为 K6-2-rows）
-  const k6_2 = props.allResponses.get('K6-2-rows')
-  const raw = k6_2?.remark ?? (typeof k6_2 === 'string' ? k6_2 : null)
-  if (raw) {
-    try {
-      const rows = JSON.parse(raw)
-      if (Array.isArray(rows) && rows.length > 0) {
-        hasAutoData.value = true
-        for (const row of assetSummary.value) {
-          if (row.isTotal) continue
-          row.bookValue = 0; row.impairment = 0; row.fairValueNet = 0; row.closingBalance = 0; row.isAutoFill = false
-        }
-        for (const r of rows) {
-          const cat = r.category || '其他'
-          let target = assetSummary.value.find(x => !x.isTotal && x.category === cat)
-          if (!target) target = assetSummary.value.find(x => !x.isTotal && x.category === '其他')
-          if (!target) continue
-          target.bookValue += Number(r.bookValue) || 0
-          target.impairment += Number(r.impairmentProvision) || 0
-          target.fairValueNet += Number(r.fairValueNet) || 0
-          target.closingBalance += Number(r.bookValue) || 0
-          target.isAutoFill = true
-        }
-        recalcAssetTotals()
-      }
-    } catch { /* silent */ }
-  }
+  // 从K6-2明细表按类别聚合（先清零非合计行的取数字段，找不到类别归「其他」，重算合计行）
+  if (applyK6AssetAutoFill(assetSummary.value, props.allResponses, 'soe')) hasAutoData.value = true
 
   // 减值损失从K6-1/K6-5带入（仅未手工录入时）
   if (impairmentLoss.value === 0) {
@@ -416,18 +346,6 @@ function applyAutoFill(): void {
       impairmentLoss.value = impVal
       impairmentAutoFilled.value = true
     }
-  }
-}
-
-function recalcAssetTotals(): void {
-  const totalRow = assetSummary.value.find(r => r.isTotal)
-  if (totalRow) {
-    const dataRows = assetSummary.value.filter(r => !r.isTotal)
-    totalRow.bookValue = dataRows.reduce((s, r) => s + r.bookValue, 0)
-    totalRow.impairment = dataRows.reduce((s, r) => s + r.impairment, 0)
-    totalRow.fairValueNet = dataRows.reduce((s, r) => s + r.fairValueNet, 0)
-    totalRow.openingBalance = dataRows.reduce((s, r) => s + r.openingBalance, 0)
-    totalRow.closingBalance = dataRows.reduce((s, r) => s + r.closingBalance, 0)
   }
 }
 
@@ -532,27 +450,12 @@ async function syncToDisclosureNotes(): Promise<void> {
   // 附注 八、12 主表是两行表头 7 列：期末数/期初数 各 [账面余额, 减值准备, 账面价值]。
   // `end_book` 取 `bookValue`（与 `impairment` 同源，满足 F11-4 勾稽），不取 `closingBalance`。
   // 期初仅 `openingBalance`（账面价值）有来源，账面余额/减值准备推 null（禁造数）。
-  const rows = assetSummary.value.filter(r => !r.isTotal).map(r => ({
-    project: r.category,
-    bookValue: r.bookValue ?? 0,
-    impairment: r.impairment ?? 0,
-    openingBalance: r.openingBalance ?? 0,
-  }))
-  const payload = buildK6SyncPayload('soe', props.wpId || '', {
-    assets: rows,
-    impairment: noteBlocks.impairment.value,
-    nonCurrent: noteBlocks.nonCurrent.value,
-    disposalGroup: noteBlocks.disposalGroup.value,
-    narrativeText: narrativeText.value,
-  })
   // 🔴 持有待售负债是**独立章节 八、43** —— `sync_from_workpaper` 的定位键是
   // `(project_id, year, note_section)`，一个 payload 只能写一节 → 必须单独再 POST 一次。
   // 空行时也要发（`clearWhenEmpty` 默认 true）：用户填过再清空后若不发清理载荷，
   // 附注 §八、43 会永久残留上次推送的过时负债明细（2026-07-31 浏览器实测踩中）。
-  const liabPayload = buildK6SoeLiabilityPayload(
-    props.wpId || '',
-    noteBlocks.liabilities.value,
-    narrativeText.value,
+  const { main: payload, liability: liabPayload } = k6DisclosurePayloads(
+    'soe', props.wpId || '', assetSummary.value, noteBlocks, narrativeText.value,
   )
   try {
     const url = `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`
