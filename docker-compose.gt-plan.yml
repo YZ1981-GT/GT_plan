@@ -1,0 +1,54 @@
+# ============================================================
+# gt-plan 独立 compose 项目 override
+# 目的：让后端容器在 Docker Desktop 中以独立项目「gt-plan」与
+#       「gt-new-plan」平级展示，而不是嵌套在 gt-new-plan 组内。
+#
+# 用法（必须在 GT_plan 目录下执行）：
+#   docker compose -p gt-plan -f docker-compose.yml -f docker-compose.gt-plan.yml --profile docker-backend up -d --no-build --no-deps backend
+#
+# 说明：
+# - postgres/redis/onlyoffice 等基础设施仍属 gt-new-plan 项目，本容器通过
+#   外部网络 gt-new-plan_default 接入（用户自定义网络内可用容器名 DNS 解析）。
+# - 跨项目无法用服务名（postgres/redis）解析，改用容器名 audit-*。
+# - 在 gt-new-plan_default 上保留别名 backend，OnlyOffice 的
+#   WOPI_BASE_URL=http://backend:8000/wopi 回调不受影响。
+# ============================================================
+
+services:
+  backend:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@audit-postgres:5432/${PG_DB:-audit_platform}
+      REDIS_URL: redis://audit-redis:6379/0
+      ONLYOFFICE_URL: http://audit-onlyoffice:80
+      # workpaper-sync 的 room contents URL / OO Command Service 调用必须有 JWT secret
+      #（room_launch / _onlyoffice_secret fail closed）。宿主机 start-dev 从 backend/.env
+      # 读到它，容器无 .env 文件 ⇒ 必须显式注入。值须与 audit-onlyoffice 的 JWT_SECRET 一致。
+      ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-onlyoffice-dev-secret-2026}
+    networks:
+      default:
+        aliases:
+          - backend
+      gt-shared:
+        aliases:
+          - backend
+    volumes:
+      # 容器内 _REPO_ROOT=/（镜像只含 backend/），而 workpaper-sync 的 evidence /
+      # entry_source_facts 按仓库根相对路径（audit-platform/...、backend/...、
+      # .kiro/...）访问宿主机文件。只读挂载补齐仓库根布局，缺任一目录即
+      # `entry_source_fact_unavailable` / `ProbeEvidenceStaleError` fail closed。
+      - ./audit-platform:/audit-platform:ro
+      - ./.kiro:/.kiro:ro
+      - ./backend:/backend:ro
+      # wp_templates / workpaper_sync_contracts / instrumentation gate 基线不在
+      # backend/app 挂载内：镜像层是构建时快照，模板修复（2026-10-28 D4 序号列文本化）
+      # 必须以宿主机为准，否则 ContractDriftError（模板 digest 漂移）。
+      - ./backend/wp_templates:/app/wp_templates:ro
+      - ./backend/data:/app/data:ro
+      # definition_store 是 provisioning 的写入目标（内容寻址 blob），必须真实可写
+      # 且与宿主一致：镜像层旧快照缺新发布的 definition（published_identity 读不到）。
+      - ./backend/definition_store:/app/definition_store
+
+networks:
+  gt-shared:
+    external: true
+    name: gt-new-plan_default

@@ -27,7 +27,7 @@ from typing import Any, Final, Mapping
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
 )
 
 MANAGED_SHEET_D43: Final[str] = "其他业务收入明细表D4-3"
@@ -55,7 +55,7 @@ ROW_IDENTITY_STORE_KEY_D43: Final[str] = "rowId"
 
 #: T01 冻结（evidence/T01-d43-column-field-mapping.json）。
 EXPECTED_MAPPING_DIGEST_D43: Final[str] = (
-    "fa1819f814e118eb74fdafd45a339c7c71726444c7e48a8f3bc658c1f9395022"
+    "012db03b3c17bce129f31a23b0c49964b0923cee0918ba30213a3186f37c7e15"
 )
 
 #: 6 个契约字段：`(column_key, 列标, mode, value_type, store json 路径, 表头文本)`。

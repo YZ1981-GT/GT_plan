@@ -368,6 +368,7 @@ services:
     profiles:
       - docker-backend
 
+    image: gt_plan-backend:latest
     build:
 
       context: ./backend
@@ -384,8 +385,16 @@ services:
 
         HTTPS_PROXY: ""
 
-    # container_name 已移除：固定名无法多副本（zero-downtime-deployment 组件 6a）
+    # 容器名固定为 gt-plan（用户要求，docker ps 可直接识别）。
+    # 注意：固定名无法多副本（zero-downtime-deployment 组件 6a 的权衡），
+    # 单实例开发/部署场景无影响；服务间仍按 compose 服务名 backend 互访。
+    container_name: gt-plan
     restart: unless-stopped
+
+    ports:
+      # 宿主机 9980 → 容器 8000：保持本地开发端口契约（前端 Vite 代理
+      # 与 OnlyOffice 回调统一指向 9980，见 vite.config.ts / backend/.env）
+      - "9980:8000"
 
     expose:
       - "8000"
@@ -400,7 +409,13 @@ services:
 
       REDIS_URL: redis://redis:6379/0
 
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-abc123456abc}
+
+      # AI 模型 API Key 加密密钥（Fernet）；未配置时保存外部模型 Key 会被拒绝
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+
+      # 底稿 AI 引擎总开关（D4 ai-generate 等 stub 引擎的真实 LLM 路径）
+      WP_AI_SERVICE_ENABLED: ${WP_AI_SERVICE_ENABLED:-false}
 
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
 

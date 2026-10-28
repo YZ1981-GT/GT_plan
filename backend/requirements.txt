@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy[asyncio]
-asyncpg
+asyncpg==0.30.0  # 0.32.0 的 pgproto .pyd 被公司 WDAC 企业签名策略拦截（CodeIntegrity 3033）；0.30.0 经 ISG 云信誉放行
 pydantic-settings
 email-validator
 redis
@@ -11,6 +11,7 @@ passlib[bcrypt]
 httpx
 python-multipart
 openpyxl
+python-calamine  # ledger_import_use_calamine flag（B3，xlsx 3× 加速）的解析引擎；曾漏声明→镜像内 ModuleNotFoundError→账套导入 500
 xlrd==2.0.2  # legacy .xls reader used by the S17 classification dry-run
 PyYAML
 boto3

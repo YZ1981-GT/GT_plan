@@ -287,6 +287,21 @@ async def execute_pipeline(
     _CALAMINE_PARSE_MAX_ROWS = 500_000
     use_calamine_global = is_enabled("ledger_import_use_calamine", project_id)
 
+    # 依赖可用性守卫（与 xlsx_read_adapter._calamine_available 同范式）：
+    # flag 默认 True 但 python-calamine 曾漏出 requirements.txt → 镜像内
+    # ModuleNotFoundError → 账套导入「解析并写入数据」阶段直接 failed。
+    # 缺包时静默回退 openpyxl（正确但慢），不再让导入整体失败。
+    if use_calamine_global:
+        try:
+            import python_calamine  # noqa: F401
+        except ImportError:
+            logger.warning(
+                "Pipeline %s calamine flag=on but python_calamine not installed; "
+                "falling back to openpyxl (install python-calamine to restore 3x speedup)",
+                job_id,
+            )
+            use_calamine_global = False
+
     # F51 / Sprint 8.31: 内存降级
     # 启动时读 psutil.virtual_memory().percent > 80% → 强制走 openpyxl 流式
     # + 降低 chunk_size 到 10k（默认 50k），减少内存峰值。

@@ -221,10 +221,24 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
       } as any)
       const data = res.data?.data ?? res.data
       if (data?.balances) {
-        tbBalances.value.revenue_6001 = parseNum(data.balances.revenue_6001)
-        tbBalances.value.revenue_6051 = parseNum(data.balances.revenue_6051)
-        tbBalances.value.cost_6401 = parseNum(data.balances.cost_6401)
-        tbBalances.value.cost_6402 = parseNum(data.balances.cost_6402)
+        // 🔴 后端 balances 自 2026-08-03 起为聚合结构 {revenue, cost, ar_1122}，
+        // 分项键 revenue_6001 等于 2026-10-27 补齐。优先读分项，缺失回退聚合
+        // （revenue_6001+revenue_6051 不可从聚合 revenue 拆分，仅在无分项时以
+        // 聚合值填充主营项避免整块为 0；分项存在时二者恒一致）。
+        const b = data.balances as Record<string, number | null | undefined>
+        const hasDetail = b.revenue_6001 != null || b.revenue_6051 != null
+          || b.cost_6401 != null || b.cost_6402 != null
+        if (hasDetail) {
+          tbBalances.value.revenue_6001 = parseNum(b.revenue_6001)
+          tbBalances.value.revenue_6051 = parseNum(b.revenue_6051)
+          tbBalances.value.cost_6401 = parseNum(b.cost_6401)
+          tbBalances.value.cost_6402 = parseNum(b.cost_6402)
+        } else {
+          tbBalances.value.revenue_6001 = parseNum(b.revenue)
+          tbBalances.value.revenue_6051 = 0
+          tbBalances.value.cost_6401 = parseNum(b.cost)
+          tbBalances.value.cost_6402 = 0
+        }
       }
       // 上期
       const priorRes = await http.get(`/api/projects/${projectId.value}/auto-data/d4_analysis_indicators`, {
@@ -233,10 +247,20 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
       } as any)
       const priorData = priorRes.data?.data ?? priorRes.data
       if (priorData?.balances) {
-        tbBalances.value.prior_revenue_6001 = parseNum(priorData.balances.revenue_6001)
-        tbBalances.value.prior_revenue_6051 = parseNum(priorData.balances.revenue_6051)
-        tbBalances.value.prior_cost_6401 = parseNum(priorData.balances.cost_6401)
-        tbBalances.value.prior_cost_6402 = parseNum(priorData.balances.cost_6402)
+        const pb = priorData.balances as Record<string, number | null | undefined>
+        const hasDetail = pb.revenue_6001 != null || pb.revenue_6051 != null
+          || pb.cost_6401 != null || pb.cost_6402 != null
+        if (hasDetail) {
+          tbBalances.value.prior_revenue_6001 = parseNum(pb.revenue_6001)
+          tbBalances.value.prior_revenue_6051 = parseNum(pb.revenue_6051)
+          tbBalances.value.prior_cost_6401 = parseNum(pb.cost_6401)
+          tbBalances.value.prior_cost_6402 = parseNum(pb.cost_6402)
+        } else {
+          tbBalances.value.prior_revenue_6001 = parseNum(pb.revenue)
+          tbBalances.value.prior_revenue_6051 = 0
+          tbBalances.value.prior_cost_6401 = parseNum(pb.cost)
+          tbBalances.value.prior_cost_6402 = 0
+        }
       }
 
       // 2. 从D4-2明细表按产品汇总 → 填充Section 2(按产品类型)

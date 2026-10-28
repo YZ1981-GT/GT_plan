@@ -103,6 +103,9 @@ export const useWizardStore = defineStore('wizard', {
     loading: false,
     /** 最近一次建项/保存基本信息时后端给出的说明（如「已同步集团关系到同企业的合并项目」） */
     lastNotices: [] as string[],
+    /** 用户 UUID → 用户名映射（BasicInfoStep 加载 /api/users/ 时写入），
+     *  供 ConfirmationStep 等处把 signing_partner_id / manager_id 显示成人名 */
+    teamUserNames: {} as Record<string, string>,
   }),
 
   getters: {

@@ -43,7 +43,7 @@ from typing import Any, Final, Iterator, Mapping, Sequence
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
 )
 
 MANAGED_SHEET_D41: Final[str] = "营业收入审定表D4-1"
@@ -96,7 +96,7 @@ TB_CHECK_KEYS_D41: Final[tuple[str, ...]] = ("D4-1-adj-tb-6001", "D4-1-adj-tb-60
 
 #: Task 1 冻结的 mapping_digest（evidence/d41-geometry.json）。
 EXPECTED_MAPPING_DIGEST_D41: Final[str] = (
-    "b13fa643b9bd0127372d27632d3055edc53d376718144cac53a47fa08b3dd5e0"
+    "58e49a470be6deef120cbecf690f177e75d9552dd99e6ec766d67d195a22ff23"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════

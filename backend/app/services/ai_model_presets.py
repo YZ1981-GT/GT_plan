@@ -67,6 +67,24 @@ GT_QWEN38 = AIModelPreset(
     performance_notes="致同企业 OpenAI-compatible 预设；只需录入 API Key",
 )
 
+# Qwen 3.7 Max（2026-10-27 用户要求接入）：同一企业网关，OpenAI-compatible，
+# 端点走 BUILTIN_TRUSTED_ENDPOINTS 精确放行（llm_endpoint_policy），只需录入 API Key。
+# 网关实测思考强度档位与 qwen3.8 相同（low/medium/xhigh，默认 xhigh）。
+GT_QWEN37_MAX = AIModelPreset(
+    "gt_qwen37_max",
+    UUID("71d00d01-a5b3-4ad7-9f2a-000000000004"),
+    "致同企业 Qwen 3.7 Max",
+    "qwen3.7-max",
+    AIModelType.chat,
+    AIProvider.custom,
+    "https://ai.gt-china.com.cn:10010/v1",
+    context_window=262144,
+    reasoning_effort=None,
+    reasoning_effort_options=("low", "medium", "xhigh"),
+    reasoning_effort_server_default="xhigh",
+    performance_notes="致同企业 OpenAI-compatible 预设；只需录入 API Key",
+)
+
 # 预设除 API Key 外唯一允许用户调整的参数；端点/模型名/鉴权等目的地字段保持锁定。
 PRESET_USER_EDITABLE_FIELDS = frozenset({"api_key", "clear_api_key", "reasoning_effort"})
 GT_PADDLEOCR_VL16 = AIModelPreset(
@@ -100,6 +118,6 @@ GT_PADDLEOCR_V6 = AIModelPreset(
     performance_notes="致同企业文字识别预设；只需录入 API Key",
 )
 
-ENTERPRISE_MODEL_PRESETS = (GT_QWEN38, GT_PADDLEOCR_VL16, GT_PADDLEOCR_V6)
+ENTERPRISE_MODEL_PRESETS = (GT_QWEN38, GT_QWEN37_MAX, GT_PADDLEOCR_VL16, GT_PADDLEOCR_V6)
 BUILTIN_TRUSTED_ENDPOINTS = frozenset(p.endpoint_url for p in ENTERPRISE_MODEL_PRESETS)
 PRESET_BY_KEY = {p.preset_key: p for p in ENTERPRISE_MODEL_PRESETS}

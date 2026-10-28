@@ -1173,6 +1173,21 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     const mainSub = sections.value[0]?.subtotalRow
     const otherSub = sections.value[1]?.subtotalRow
 
+    // 🔴 防呆（2026-10-27 实测事故）：D4-2/D4-3 明细尚未加载（allResponses 为空）时
+    // 点击发布 → 两个小计全 0 → `wp_adjustment = -未审数` 把试算表收入审定数清零，
+    // 披露表「全量刷新取数」从此恒空。明细源为空且两个小计都为 0 时阻止发布。
+    const hasDetailRows =
+      safeParseRows<unknown>(allResponses.value.get('D4-2-rows')?.remark).length > 0 ||
+      safeParseRows<unknown>(allResponses.value.get('D4-3-rows')?.remark).length > 0
+    if (
+      !hasDetailRows
+      && (mainSub?.currentAudited ?? 0) === 0
+      && (otherSub?.currentAudited ?? 0) === 0
+    ) {
+      ElMessage.warning('审定表无明细数据（D4-2/D4-3 尚未加载或为空），已阻止发布 0 值。请先在明细表加载数据后再发布')
+      return
+    }
+
     // 二次确认（中文，危险操作提示）
     try {
       await ElMessageBox.confirm(

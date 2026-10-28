@@ -141,11 +141,39 @@
           <div class="gt-form-section-title">项目团队</div>
 
           <el-form-item label="签字合伙人">
-            <el-input v-model="form.signing_partner_id" placeholder="请输入签字合伙人" />
+            <el-select
+              v-model="form.signing_partner_id"
+              placeholder="请选择签字合伙人"
+              style="width: 100%"
+              filterable
+              clearable
+              :loading="teamLoading"
+            >
+              <el-option
+                v-for="u in partnerOptions"
+                :key="u.id"
+                :label="u.username"
+                :value="u.id"
+              />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="项目经理">
-            <el-input v-model="form.manager_id" placeholder="请输入项目经理" />
+            <el-select
+              v-model="form.manager_id"
+              placeholder="请选择项目经理"
+              style="width: 100%"
+              filterable
+              clearable
+              :loading="teamLoading"
+            >
+              <el-option
+                v-for="u in managerOptions"
+                :key="u.id"
+                :label="u.username"
+                :value="u.id"
+              />
+            </el-select>
           </el-form-item>
 
           <div class="gt-form-section-title" style="margin-top: 20px">预算与合同</div>
@@ -267,6 +295,34 @@ const auditYearDate = ref<string>('')
 const customTemplateLoading = ref(false)
 const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
 const recommendation = ref<TemplateRecommendation | null>(null)
+
+// ─── 项目团队下拉（签字合伙人 / 项目经理）──────────────────────────────────
+// 后端 ProjectCreate 要求 signing_partner_id / manager_id 为 UUID，
+// 原先的 el-input 让用户手输姓名 → 422 uuid_parsing。
+// 数据源 /api/users/（须登录），按角色过滤：partner → 签字合伙人，manager → 项目经理。
+interface TeamUserOption { id: string; username: string; role: string; is_active: boolean }
+const teamLoading = ref(false)
+const teamUsers = ref<TeamUserOption[]>([])
+const partnerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'partner'))
+const managerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'manager'))
+
+async function loadTeamUsers() {
+  if (teamUsers.value.length > 0) return
+  teamLoading.value = true
+  try {
+    const list = await api.get('/api/users/')
+    teamUsers.value = (Array.isArray(list) ? list : (list as any)?.data ?? []) as TeamUserOption[]
+    // UUID → 用户名映射写入 store，ConfirmationStep 显示人名用
+    const map: Record<string, string> = {}
+    for (const u of teamUsers.value) map[u.id] = u.username
+    wizardStore.teamUserNames = map
+  } catch {
+    // 拉取失败不阻断向导；下拉为空时用户仍可跳过这两个可空字段
+    teamUsers.value = []
+  } finally {
+    teamLoading.value = false
+  }
+}
 
 const SUBTYPE_DESC: Record<string, string> = {
   type_a: '上市公司、三板创新层及公开发债',
@@ -572,6 +628,8 @@ onMounted(async () => {
   if (saved) {
     applySaved(saved)
   }
+  // 项目团队下拉数据（签字合伙人/项目经理）
+  loadTeamUsers()
   if (form.template_type === 'custom') {
     await loadCustomTemplates()
     if (form.custom_template_id) {

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "d98483416b1764e9940592eeb969a330b1ba3c476850ffafc76cef87074c7e4c",
+  "instrumentation_definition_sha256": "508f2ab35e0847bc8a9623cc57830b25bc0585d409438357a1be81dab4086f1f",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -213,13 +213,13 @@
       "D416"
     ],
     "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
-    "mapping_digest_d41": "b13fa643b9bd0127372d27632d3055edc53d376718144cac53a47fa08b3dd5e0",
+    "mapping_digest_d41": "58e49a470be6deef120cbecf690f177e75d9552dd99e6ec766d67d195a22ff23",
     "mapping_digest_d412": "2d3a1c5f77f198283603ac42b4eb54f5d67ef2f4dfa7aa57a2673a023c689e9a",
     "mapping_digest_d429": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
-    "mapping_digest_d43": "fa1819f814e118eb74fdafd45a339c7c71726444c7e48a8f3bc658c1f9395022",
-    "mapping_digest_d435": "2e87471ada6a3dcda4a8025e56fd4274d07a297fd6b8f08f1762f2a274ca36b4",
+    "mapping_digest_d43": "012db03b3c17bce129f31a23b0c49964b0923cee0918ba30213a3186f37c7e15",
+    "mapping_digest_d435": "0dda0e3b12e7952bd33408d98b1f58eb724bd7cdd8bcfa2be7c9133d15bee201",
     "mapping_digest_d45": "5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee",
-    "mapping_digest_d49": "148f5f85728e0d18d9965cf19d3e8decf49c5ba330bb32f9c7dfaf4908340de5",
+    "mapping_digest_d49": "1e88ac7e5bd1e16d1ea797013c5894e31ec3bbb2fd1385b2f5865cba2166f1b8",
     "mapping_digest_inspection": {
       "D4-15": "418b36299710ecd74b6268412aec0fe576156d378286137d19746dd3ee3d715b",
       "D4-16": "ca12093d0ca7065dbd2647f1f7732f6f54e8fd7efda903e246847aa8961aa51c"
@@ -231,7 +231,7 @@
       "D4-28": "19690f3494679a9427defda3f92e4f0380bb273b7f9773c4beff66604535a6fe"
     },
     "pilot_class": "phase5_revenue_detail",
-    "reviewed_basis": "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62），三受管 sheet：（1）主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 （A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior + V remark）；P/S/T/U 仅 formula_mask。mapping_digest=6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8（T01 D4-2）。（2）其他业务收入明细表D4-3：两级表头 11+12，受管区 13-18（A19「……」BP-21 排除），A20「合计」；6 契约字段 item/current*/prior*/remark；D/E/F/I/J/K/L/M mask。mapping_digest=fa1819f814e118eb74fdafd45a339c7c71726444c7e48a8f3bc658c1f9395022（T01 D4-3）。（3）营业收入会计政策检查D4-5：分组紧凑表 d45_policy_groups（A–D+Z，footer=信用政策）+ fixed B11-B16/信用/说明/结论；mapping_digest=5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee（T09）。宿主：D4-2/3 走统一 WorkpaperSyncEditorHost；D4-5 由 D4TabPolicyCheck 自管路径。wp_code 模块侧 D4O（manifest 幻影码）；裁决落点 D4。"
+    "reviewed_basis": "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2），三受管 sheet：（1）主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 （A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior + V remark）；P/S/T/U 仅 formula_mask。mapping_digest=6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8（T01 D4-2）。（2）其他业务收入明细表D4-3：两级表头 11+12，受管区 13-18（A19「……」BP-21 排除），A20「合计」；6 契约字段 item/current*/prior*/remark；D/E/F/I/J/K/L/M mask。mapping_digest=012db03b3c17bce129f31a23b0c49964b0923cee0918ba30213a3186f37c7e15（T01 D4-3）。（3）营业收入会计政策检查D4-5：分组紧凑表 d45_policy_groups（A–D+Z，footer=信用政策）+ fixed B11-B16/信用/说明/结论；mapping_digest=5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee（T09）。宿主：D4-2/3 走统一 WorkpaperSyncEditorHost；D4-5 由 D4TabPolicyCheck 自管路径。wp_code 模块侧 D4O（manifest 幻影码）；裁决落点 D4。"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -13920,9 +13920,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "e903a11a041eed1fda8715d42ff1110cc1998f0f73d371c28b063a5993e4f26d",
+    "normalized_structure_hash": "38dcc7361761e1c525c3608383c4a945510b97752553c0e56459308292befa91",
     "relative_path": "D/D4 收入底稿.xlsx",
-    "template_sha256": "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "template_sha256": "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
   },
-  "template_definition_sha256": "be57607430eca7d13f39be0e9373d68314be2531804105a02653fac4f2466935"
+  "template_definition_sha256": "57aa25c6ccff0a6c3b1afb77fb194c663d9cb7b0bb54b892dd3d2a3b2a27c700"
 }

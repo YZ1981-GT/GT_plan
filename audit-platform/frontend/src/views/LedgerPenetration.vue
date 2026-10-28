@@ -1461,6 +1461,13 @@ async function loadAvailableYears() {
     const result = data
     availableYears.value = result?.years ?? []
     siblingYears.value = result?.sibling_years ?? []
+    // URL 无 ?year= 时（如导入完成跳转），用最新可用年份回填路由，
+    // 避免 loadBalance 以 year=null 发请求 → 后端 422（year 必填）。
+    if (!year.value && availableYears.value.length > 0) {
+      const latest = Math.max(...availableYears.value)
+      router.replace({ query: { ...route.query, year: latest } })
+      selectedYear.value = latest
+    }
     // 把同客户其他项目的年份也加入 yearOptions（通过合并进 availableYears 的计算）
   } catch {
     availableYears.value = []
@@ -2373,6 +2380,13 @@ let _initialized = false
 // V3 Req 5.1：上下文（projectId/year）变化时自动重载（替代原 watch）
 onContextChange(() => {
   if (!_initialized) return
+  // 上下文去重（2026-10-27）：URL 年度回填（loadAvailableYears 的 router.replace）
+  // 会再次触发本回调，若不拦截会与 switchToAuxTab 首次加载竞态——
+  // 先发的辅助余额请求返回后被这里的重置逻辑清掉 → 需点两次 tab 才有数据。
+  // 同一 pid+year 不重复清缓存/重载；项目或年度真的变了才走完整重置。
+  const ctxKey = `${projectId.value}_${year.value ?? selectedYear.value}`
+  if (ctxKey === _lastAuxCtx) return
+  _lastAuxCtx = ctxKey
   if (projectId.value) {
     _auxBalanceLoadedKey.value = ''  // 清除辅助余额表缓存
     _tabLedgerCache.clear()          // 清除序时账 Tab 缓存
@@ -3247,10 +3261,17 @@ async function loadBalance() {
     logger.warn('[Ledger] projectId is empty, skip loading')
     return
   }
+  // year 必填守卫：URL 无 ?year= 且可用年份未加载完时，回落到 selectedYear
+  // （默认 2025 并由 loadAvailableYears 回填）。仍为空则跳过本次请求，
+  // 等年度就绪后由 watch(onContextChange) 重新触发，绝不发 year=null → 422。
+  if (!year.value && !selectedYear.value) {
+    logger.warn('[Ledger] year not resolved yet, skip loadBalance')
+    return
+  }
   loading.value = true
   try {
     const data = await api.get(P_ledger.balance(projectId.value), {
-      params: { year: year.value },
+      params: { year: year.value ?? selectedYear.value },
       validateStatus: (s: number) => s === 200 || s === 404,
     })
     // 404 = 新项目无账套数据，静默处理（不弹 toast）
@@ -3784,12 +3805,20 @@ const auxFlatDisplayRows = computed(() => {
 
 async function loadAllAuxBalance() {
   if (!projectId.value) return
+  // 年度兜底：URL year 未解析时用 selectedYear（2026-10-27 修复：
+  // 导入完成跳转后直接点辅助余额表 → year=null → 两个接口 422 → 空态，
+  // 点「刷新」才恢复的时序竞态）
+  const effectiveYear = year.value ?? selectedYear.value
+  if (!effectiveYear) return
+  // in-flight 去重：防止 URL 回填触发的 contextChange 并发发起第二趟加载
+  if (_auxLoadInflight) return
+  _auxLoadInflight = true
   loading.value = true
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
     const summaryData = await api.get(
       P_ledger.auxBalanceSummary(projectId.value),
-      { params: { year: year.value, dim_type: '__types_only__' }, validateStatus: (s: number) => s === 200 || s === 404 }
+      { params: { year: effectiveYear, dim_type: '__types_only__' }, validateStatus: (s: number) => s === 200 || s === 404 }
     )
     // 404 = 新项目无数据，静默处理
     if (!summaryData || summaryData?.detail) {
@@ -3804,7 +3833,10 @@ async function loadAllAuxBalance() {
     if (!auxSelectedDimType.value || auxSelectedDimType.value === '') {
       auxSelectedDimType.value = '全部'
     }
-    _auxBalanceLoadedKey.value = `${projectId.value}_${year.value}`
+    // 🔴 缓存键必须用 effectiveYear（与 switchToAuxTab 的计算口径一致）：
+    // 用 year.value 时 URL 回填前是 null，键变成 pid_null，下次点击算出
+    // pid_2025 ≠ pid_null 会再触发一次加载——这就是「要点两次才有数据」。
+    _auxBalanceLoadedKey.value = `${projectId.value}_${effectiveYear}`
 
     // 加载当前维度的汇总数据（用于树形视图）
     await loadAuxSummaryForDim()
@@ -3820,6 +3852,7 @@ async function loadAllAuxBalance() {
     auxSummaryData.value = []; auxPagedRows.value = []
   }
   finally {
+    _auxLoadInflight = false
     loading.value = false
     // 数据为空时检测是否有正在进行的导入
     if (auxSummaryData.value.length === 0 && auxPagedRows.value.length === 0) {
@@ -3834,7 +3867,7 @@ async function loadAuxSummaryForDim() {
   if (!dimType || (!auxTreeMode.value && !auxSummaryOnly.value)) {
     return
   }
-  const params: any = { year: year.value }
+  const params: any = { year: year.value ?? selectedYear.value }
   if (dimType !== '全部') {
     params.dim_type = dimType
   }
@@ -3869,7 +3902,7 @@ const auxPagedTotal = ref(0)
 
 async function loadAuxBalancePage() {
   try {
-    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize.value }
+    const params: any = { year: year.value ?? selectedYear.value, page: auxPage.value, page_size: auxPageSize.value }
     if (auxSelectedDimType.value && auxSelectedDimType.value !== '全部') {
       params.dim_type = auxSelectedDimType.value
     }
@@ -3903,6 +3936,12 @@ function onAuxPageSizeChange(size: number) {
 
 // 缓存标记：project_id + year 组合，避免重复加载
 const _auxBalanceLoadedKey = ref('')
+// 辅助余额 in-flight 去重（2026-10-27）：URL 年度回填触发 onContextChange 与
+// switchToAuxTab 首次加载竞态——先发的请求返回后被 context 回调清空，
+// 用户需点两次 tab 才有数据。in-flight 期间不重复发起、context 去重不误清。
+let _auxLoadInflight = false
+// 记录上一次已处理的项目/年度上下文，onContextChange 用于去重
+let _lastAuxCtx = ''
 
 function switchToAccountTab() {
   balanceTab.value = 'account'
@@ -3911,7 +3950,13 @@ function switchToAccountTab() {
 
 function switchToAuxTab() {
   balanceTab.value = 'aux'
-  const key = `${projectId.value}_${year.value}`
+  // in-flight 去重：正在加载时不重复发起（首次点击的请求已在路上）
+  if (_auxLoadInflight) return
+  // 年度守卫：year 未解析（URL 无 ?year= 且可用年份未回填）时先回落 selectedYear，
+  // 避免 loadAllAuxBalance 发 year=null → aux-balance-summary/aux-balance-paged 422
+  // → catch 清空数据 → 空态；点「刷新」时年度已就绪才显示数据的竞态。
+  const effectiveYear = year.value ?? selectedYear.value
+  const key = `${projectId.value}_${effectiveYear}`
   if (_auxBalanceLoadedKey.value !== key) {
     loadAllAuxBalance()
   }
@@ -4710,7 +4755,19 @@ onMounted(async () => {
     _scrollToAccount(route.query.account as string)
   }
   if (urlState.balanceTab !== 'account') {
-    balanceTab.value = urlState.balanceTab as any
+    // URL 恢复现场（?balanceTab=aux 等）：只赋值不会触发数据加载——
+    // 数据加载全挂在 tab 点击事件（switchToAuxTab 等）上。
+    // 🔴 2026-10-27：此前这里缺数据加载 → 打开查账/刷新恢复到辅助余额表 tab 时
+    // 一直空态，要手动点一次别的 tab 再点回来（或点「刷新」）才有数据。
+    const restoredTab = urlState.balanceTab
+    balanceTab.value = restoredTab as any
+    if (restoredTab === 'aux' && !_auxLoadInflight) {
+      loadAllAuxBalance()
+    } else if (restoredTab === 'ledger' && !tabLedgerAccount.value) {
+      // 序时账 tab 恢复：无指定科目时由用户自行选择，避免误加载全量
+    } else if (restoredTab === 'aux_detail' && !tabAuxCode.value) {
+      // 辅助明细 tab 恢复：同上
+    }
   }
 })
 onUnmounted(() => {

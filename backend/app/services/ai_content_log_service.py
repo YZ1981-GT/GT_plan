@@ -361,3 +361,22 @@ async def count_pending_by_project(
     result = await db.execute(stmt)
     count = result.scalar_one()
     return int(count or 0)
+
+
+async def get_by_id(
+    *,
+    db: AsyncSession,
+    log_id: uuid.UUID,
+) -> AiContentLog:
+    """按 ID 加载 AI 内容日志（不做状态校验）。
+
+    routers/ai_content.py 的 `_load_log_or_404` 依赖此函数；缺失时任何
+    confirm/revise/reject 请求都会 AttributeError → 500（2026-10-28 实测）。
+    """
+    result = await db.execute(
+        select(AiContentLog).where(AiContentLog.id == log_id)
+    )
+    ai_log = result.scalar_one_or_none()
+    if ai_log is None:
+        raise AiContentLogNotFoundError("AI 内容记录不存在")
+    return ai_log

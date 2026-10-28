@@ -39,11 +39,11 @@
           </div>
           <div class="info-row">
             <span class="info-label">签字合伙人</span>
-            <span class="info-value">{{ basicInfo.signing_partner_id || '—' }}</span>
+            <span class="info-value">{{ teamNameById(basicInfo.signing_partner_id) }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">项目经理</span>
-            <span class="info-value">{{ basicInfo.manager_id || '—' }}</span>
+            <span class="info-value">{{ teamNameById(basicInfo.manager_id) }}</span>
           </div>
         </div>
       </div>
@@ -133,6 +133,13 @@ import { computed } from 'vue'
 import { CONFIRMATION_REQUIRED_STEPS, STEP_LABELS, useWizardStore, type BasicInfo, type StepKey } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
+
+// 签字合伙人/项目经理：BasicInfo 存的是用户 UUID，确认页显示用户名。
+// 名称映射由 BasicInfoStep 加载团队用户时写入 wizardStore.teamUserNames（同源 /api/users/）。
+function teamNameById(id: string | null): string {
+  if (!id) return '—'
+  return (wizardStore.teamUserNames as Record<string, string>)[id] ?? id
+}
 
 const PROJECT_TYPE_MAP: Record<string, string> = {
   annual: '年度审计',

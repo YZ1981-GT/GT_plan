@@ -23,6 +23,10 @@ class UserRole(str, enum.Enum):
     qc = "qc"
     eqcr = "eqcr"  # EQCR 技术复核人（DB userrole 枚举已含此值，此处对齐消除 schema 漂移）
     readonly = "readonly"
+    # 与 PG enum userrole 对齐（库为准）：gt-new-plan 血统的 V206 给库加了该值，
+    # 且 users 表有 1 行 role='site_lead' 在用；代码缺此值会让 /api/users 全表
+    # 反序列化抛 LookupError 500。
+    site_lead = "site_lead"
 
 
 class ProjectType(str, enum.Enum):
@@ -34,6 +38,10 @@ class ProjectType(str, enum.Enum):
     internal_control = "internal_control"
     capital_verification = "capital_verification"
     tax_audit = "tax_audit"
+    # 与 PG enum projecttype 对齐（V053 同精神：库为准，代码补齐）。
+    # 2026-10-22 起库中已有项目行使用该值（如「辽宁卫生服务有限公司_2025」），
+    # ORM 反序列化整表时缺此值会抛 LookupError 使 GET /api/projects 500。
+    enterprise_income_tax_settlement = "enterprise_income_tax_settlement"
 
 
 class ProjectStatus(str, enum.Enum):

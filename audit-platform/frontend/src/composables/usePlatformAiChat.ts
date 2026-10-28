@@ -305,6 +305,10 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
           runId: run_id,
           status: 'completed',
         })
+        // 防御性兜底：dispatch('done') 已清流式缓冲，这里再兜一次 ——
+        // 终态 guard 下 done 事件不会二次 dispatch，双保险保证
+        // 模板底部 v-if="streamingDelta" 的占位块不残留同一全文。
+        runStore.streamingDelta = ''
       } else if (status === 'failed') {
         messages.value.push({
           id: `err_${Date.now()}`,
@@ -406,6 +410,11 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
       return
     }
 
+    // 🔴 2026-10-28 顺序修复：先 reset 再 push 用户消息（用户消息只 push 一次）。
+    // reset 会 abort 上一轮 SSE、清 eventHandlers 与 streamingDelta；
+    // 若放在 push 之后，残留的事件 handler 仍可能向 messages 追加旧轮内容。
+    runStore.reset()
+
     // 添加用户消息
     messages.value.push({
       id: `user_${Date.now()}`,
@@ -414,7 +423,6 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
     })
     draft.value = ''
     loading.value = true
-    runStore.reset()
 
     try {
       if (USE_LEGACY_STREAMING) {

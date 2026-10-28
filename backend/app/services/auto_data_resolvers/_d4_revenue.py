@@ -232,6 +232,10 @@ async def _resolve_d4_analysis_indicators(
     cost_amount: float | None = None
     ar_amount: float = 0.0
     scope_dict: dict = {}
+    # 分项审定数（6001/6051/6401/6402 逐码）——披露表 Section 1 契约键。
+    # 🔴 2026-08-03 balances 改聚合 {revenue, cost} 后前端 useD4Disclosure 仍按
+    # revenue_6001 等分项键读取 → 全部 undefined→0，"全量刷新取数"恒空。
+    detail_amounts: dict[str, float | None] = {}
 
     try:
         # 动态科目定位（报表行驱动，不再硬编码）
@@ -283,6 +287,22 @@ async def _resolve_d4_analysis_indicators(
         if ar_row:
             ar_amount = float(ar_row.amt)
 
+        # 分项审定数：披露表按科目码分项展示（主营/其他收入、主营/其他成本）。
+        # 固定四码逐码 GROUP BY（前端契约键固定，不走动态展开的区间码）。
+        detail_result = await db.execute(
+            sa.select(
+                TrialBalance.standard_account_code,
+                sa.func.sum(TrialBalance.audited_amount).label("amt"),
+            ).where(
+                active_filter,
+                TrialBalance.standard_account_code.in_(["6001", "6051", "6401", "6402"]),
+            ).group_by(TrialBalance.standard_account_code)
+        )
+        detail_amounts = {
+            row.standard_account_code: normalize_trial_balance_pl(row.amt)
+            for row in detail_result.fetchall()
+        }
+
     except Exception as e:  # noqa: BLE001 — fail-open
         logger.warning("d4_analysis_indicators 查询失败: %s", e)
 
@@ -319,6 +339,11 @@ async def _resolve_d4_analysis_indicators(
             "revenue": revenue_amount,
             "cost": cost_amount,
             "ar_1122": ar_amount,
+            # 分项审定数（缺失科目为 None，前端 parseNum 归 0 展示）
+            "revenue_6001": detail_amounts.get("6001"),
+            "revenue_6051": detail_amounts.get("6051"),
+            "cost_6401": detail_amounts.get("6401"),
+            "cost_6402": detail_amounts.get("6402"),
         },
         "scope": scope_dict,
     }
