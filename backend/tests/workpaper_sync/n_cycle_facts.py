@@ -599,7 +599,13 @@ NOTICE_MOUNTED_ENTRIES: frozenset[str] = frozenset({N4, N5})
 #:    仍逐值走旧判据，N4 走翻转后判据。
 MANIFEST_FLIPPED_ENTRIES: frozenset[str] = frozenset({N4})
 #: N4 已交付 reviewed 生产契约的 adapter_id（契约目录归属豁免，仅此一条）。
-DELIVERED_CONTRACT_ADAPTER_IDS: frozenset[str] = frozenset({"n4.taxes_and_surcharges"})
+DELIVERED_CONTRACT_ADAPTER_IDS: frozenset[str] = frozenset({
+    "n1.deferred_tax_assets",
+    "n2.taxes_payable",
+    "n3.deferred_tax_liabilities",
+    "n4.taxes_and_surcharges",
+    "n5.income_tax_expense",
+})
 #: N4 已注册 adapter 的 entry_id（registry 字面量 / bidirectional 豁免，仅此一条）。
 REGISTERED_ADAPTER_ENTRY_IDS: frozenset[str] = frozenset({N4})
 #: N4 权威模板已净化（Task 7a：删 2 外链部件 + 中性化隐藏「原底稿」册 5 个外部引用公式）。
