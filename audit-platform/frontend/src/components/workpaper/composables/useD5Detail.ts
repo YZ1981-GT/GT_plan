@@ -14,6 +14,8 @@
  * - importFromD2（EventBus请求D2出售模式账款）
  * - importFromAuxBalance（调后端API从tb_aux_balance科目1124导入）
  * - 对"类别"列应用下拉选择（应收票据/应收账款）
+ * - 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数 `useVoucherCheckFill`（一个样本一行，
+ *   按分录指纹去重，行元数据 `_gt` 随行 JSON 落库；spec voucher-identity-writeback-and-audit-phase 任务 10）
  *
  * Requirements: 4.1-4.9, 5.1-5.7
  */
@@ -35,6 +37,7 @@ import {
   AUX_IMPORT_NETWORK_ERROR_PROMPT,
 } from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD5FormData'
+import { legacyIdentity, metaOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,7 +104,7 @@ function safeParseRows(jsonStr: string | null | undefined): DetailRow[] {
 
 /** 规范化行数据，确保所有字段存在且类型正确 */
 function normalizeRow(raw: any): DetailRow {
-  return {
+  return withRowMeta<DetailRow>({
     rowId: raw.rowId || generateRowId(),
     category: raw.category || '',
     itemName: raw.itemName || '',
@@ -122,7 +125,7 @@ function normalizeRow(raw: any): DetailRow {
     postRealized: parseNum(raw.postRealized),
     eclStage: raw.eclStage || '',
     remark: raw.remark || '',
-  }
+  }, raw)
 }
 
 /**
@@ -206,6 +209,37 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
   }
 }
 
+// ─── 抽凭回填 / 挂凭导入（共享回填函数，spec voucher-identity-writeback-and-audit-phase 任务 10） ───
+
+const SAMPLED_REMARK = /^抽凭:\s*(.+)$/
+
+/** 共享回填函数的待写入项 → 明细行：一个样本一行（对方科目按后端配对拼接），借方记本期增加、贷方记本期减少 */
+export function mapSampleToDetailRow(item: PreparedItem): DetailRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  const row = createEmptyRow()
+  row.category = '应收票据'
+  row.itemName = (item.counterpartAccountName && item.counterpartAccountName !== item.counterpartAccount
+    ? item.counterpartAccountName : item.counterpartAccount) || s.summary || ''
+  row.periodIncrease = parseNum(item.debitAmount)
+  row.periodDecrease = parseNum(item.creditAmount)
+  row.remark = `抽凭: ${s.voucherNo || ''}`
+  return recalcRow(row)
+}
+
+/** 旧行（没有 `_gt`）的身份：备注「抽凭: 凭证号」里的凭证号 + 本期增减金额（明细行不记凭证日期）；非抽凭行不参与 */
+export function detailLegacyKey(r: DetailRow): string | null {
+  const no = SAMPLED_REMARK.exec(String(r.remark ?? '').trim())?.[1]
+  return no ? legacyIdentity({ voucherNo: no, voucherDate: '', debitAmount: r.periodIncrease, creditAmount: r.periodDecrease }) : null
+}
+
+/** 明细行上是否已录入了余额 / 调整 / ECL 等（替换 / 撤销前先确认）；回填只写类别、明细项目、本期增减与备注 */
+export function hasDetailContent(r: DetailRow): boolean {
+  const own = ['priorUnadjusted', 'priorAje', 'priorRje', 'ociImpairment', 'entityReclass', 'endAje', 'endRje',
+    'endOciImpairment', 'postRealized'] as const
+  return own.some(k => parseNum(r[k]) !== 0) || !!String(r.eclStage ?? '').trim()
+    || (!!r.remark && !SAMPLED_REMARK.test(String(r.remark).trim()))
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD5Detail(options: UseD5DetailOptions) {
@@ -217,6 +251,18 @@ export function useD5Detail(options: UseD5DetailOptions) {
 
   const rows = ref<DetailRow[]>([])
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）
+  const voucherFill = useVoucherCheckFill<DetailRow>({
+    projectId,
+    tables: rows,
+    policy: 'join',
+    readonly: isReadonly,
+    mapSampleToRow: item => mapSampleToDetailRow(item),
+    persist: () => options.saveImmediate(ITEM_ID_ROWS, { remark: rowsJson() }),
+    hasUserContent: hasDetailContent,
+    legacy: detailLegacyKey,
+  })
+
   // Load rows from allResponses
   watch(
     () => allResponses.value.get(ITEM_ID_ROWS)?.remark,
@@ -224,14 +270,26 @@ export function useD5Detail(options: UseD5DetailOptions) {
       const parsed = safeParseRows(jsonStr)
       // Recalculate formula chain for each row
       rows.value = parsed.map(recalcRow)
+      voucherFill.markLoaded()
     },
     { immediate: true },
   )
 
   // ─── Persist ─────────────────────────────────────────────────────────
 
+  /** 行 JSON（年审阶段预审行按读入版本写回，防绕过） */
+  function rowsJson(): string {
+    return JSON.stringify(voucherFill.guardPersist(rows.value))
+  }
+
   function persistRows(): void {
-    debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
+    debouncedSave(ITEM_ID_ROWS, { remark: rowsJson() })
+  }
+
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedRow(rowId: string): boolean {
+    const row = rows.value.find(r => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
   }
 
   // ─── subtotalByCategory computed ─────────────────────────────────────
@@ -271,7 +329,7 @@ export function useD5Detail(options: UseD5DetailOptions) {
   // ─── removeRow ───────────────────────────────────────────────────────
 
   function removeRow(rowId: string): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedRow(rowId)) return
     rows.value = rows.value.filter(r => r.rowId !== rowId)
     persistRows()
   }
@@ -279,7 +337,7 @@ export function useD5Detail(options: UseD5DetailOptions) {
   // ─── updateCell ──────────────────────────────────────────────────────
 
   function updateCell(rowId: string, field: string, value: any): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedRow(rowId)) return
 
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
@@ -544,6 +602,14 @@ export function useD5Detail(options: UseD5DetailOptions) {
 
   return {
     rows,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    hasVoucherMeta: (row: unknown) => metaOf(row) !== null,
     subtotalByCategory,
     totalRow,
     // 操作

@@ -77,12 +77,18 @@
       size="small"
       style="width: 100%; font-size: 13px"
       max-height="480"
-      :row-class-name="getRowClassName"
+      :row-class-name="voucherRowClassName"
     >
       <el-table-column type="index" label="#" width="42" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="voucherFill.isRowLocked(row)" :project-id="props.projectId" :year="currentYear" />
+        </template>
+      </el-table-column>
       <el-table-column prop="incomeSource" label="明细项目" min-width="130" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.incomeSource" size="small" placeholder="明细项目" @change="(v: string) => updateCell(row.rowKey, 'incomeSource', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.incomeSource" size="small" placeholder="明细项目" @change="(v: string) => updateCell(row.rowKey, 'incomeSource', v)" />
           <span v-else>{{ row.incomeSource || '—' }}</span>
         </template>
       </el-table-column>
@@ -96,25 +102,25 @@
       </el-table-column>
       <el-table-column prop="voucherNo" label="凭证编号" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherNo', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherNo', v)" />
           <span v-else>{{ row.voucherNo || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="businessContent" label="业务内容" min-width="150">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'businessContent', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.businessContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'businessContent', v)" />
           <span v-else>{{ row.businessContent || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="offsetAccount" label="对方科目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.offsetAccount" size="small" @change="(v: string) => updateCell(row.rowKey, 'offsetAccount', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.offsetAccount" size="small" @change="(v: string) => updateCell(row.rowKey, 'offsetAccount', v)" />
           <span v-else>{{ row.offsetAccount || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="offsetSubAccount" label="对方明细科目" width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.offsetSubAccount" size="small" @change="(v: string) => updateCell(row.rowKey, 'offsetSubAccount', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.offsetSubAccount" size="small" @change="(v: string) => updateCell(row.rowKey, 'offsetSubAccount', v)" />
           <span v-else>{{ row.offsetSubAccount || '—' }}</span>
         </template>
       </el-table-column>
@@ -162,13 +168,13 @@
       </el-table-column>
       <el-table-column prop="indexNo" label="索引号" width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.indexNo" size="small" @change="(v: string) => updateCell(row.rowKey, 'indexNo', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.indexNo" size="small" @change="(v: string) => updateCell(row.rowKey, 'indexNo', v)" />
           <span v-else>{{ row.indexNo || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="remark" label="备注说明" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注/异常说明" @change="(v: string) => updateCell(row.rowKey, 'remark', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注/异常说明" @change="(v: string) => updateCell(row.rowKey, 'remark', v)" />
           <span v-else>{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
@@ -223,7 +229,7 @@
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
     <el-dialog
       v-model="showSamplingDialog"
-      title="⚡ 抽凭引擎（科目 6301 营业外收入 — 检查表）"
+      :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 营业外收入 — 检查表）`"
       width="720px"
       :close-on-click-modal="false"
       destroy-on-close
@@ -233,9 +239,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
+        @undo-request="voucherFill.onUndoRequest"
       />
     </el-dialog>
 
@@ -295,7 +301,13 @@
  * 功能：抽凭引擎（phase=final，year 来自 props.year）/ 行级OCR / 异常摘要 / AI辅助结论。
  * 自包含持久化（无新后端）：K12-4-check-rows / K12-4-criteria / K12-4-note / K12-4-conclusion。
  */
-import { ref, computed, defineAsyncComponent, watch, inject } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, inject, onMounted } from 'vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
+import {
+  combineRowClass, useVoucherCheckFill, withRowMeta, type EngineFilledPayload, type PreparedItem,
+} from '../../composables/shared/voucherCheckFill'
+import { assetAmount, sampleOf, sampleRemark } from '../../composables/assetVoucherFill'
 import type { Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -374,6 +386,41 @@ const NOTE_KEY = 'K12-4-note'
 const CONCLUSION_KEY = 'K12-4-conclusion'
 
 const checkRows = ref<VoucherRow[]>([])
+// 行号计数器须在读入侦听之前声明：侦听立即执行时 normalizeRow → createRow 就要用它（原来声明在后，暂时性死区）
+let rowIdCounter = Date.now()
+
+/**
+ * 共享回填函数的待写入项 → 检查行（spec voucher-identity-writeback-and-audit-phase 任务 13）：一个对方科目一行（后端配对，
+ * 配不上写「多科目」），金额取样本自己那一栏（贷方优先，红字带符号照记）。原实现在宿主里按 voucherEntries
+ * 自拼多科目凭证的对方分录（金额写成对方分录的金额）、按凭证号去重，已删除。
+ */
+function rowFromPrepared(item: PreparedItem): VoucherRow {
+  const s = sampleOf(item) as ReturnType<typeof sampleOf> & { supportingDoc?: string | null }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  return createRow({
+    incomeSource: String(s.summary || '抽凭样本'),
+    date: String(s.voucherDate ?? ''),
+    voucherNo: String(s.voucherNo ?? ''),
+    businessContent: String(s.summary ?? ''),
+    offsetAccount: code,
+    offsetSubAccount: name && name !== code ? name : '',
+    creditAmount: assetAmount(item, 'credit'),
+    abnormal: !!s.abnormal,
+    remark: sampleRemark(item, ''),
+  })
+}
+
+// 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数（一个对方科目一行，按分录指纹去重）
+const voucherFill = useVoucherCheckFill<VoucherRow>({
+  projectId: () => props.projectId,
+  tables: checkRows,
+  mapSampleToRow: (item) => rowFromPrepared(item),
+  persist: () => persistRows(),
+  hasUserContent: (r) => r.checks.some(Boolean) || [r.indexNo, r.ocrAttachment].some(v => String(v ?? '').trim() !== ''),
+  readonly: () => props.isReadonly,
+})
+onMounted(() => { void voucherFill.ready() })
 const bookOccurrence = ref(0)
 const testReasons = ref<string[]>([])
 const auditNote = ref('')
@@ -413,11 +460,13 @@ function restoreFromResponses(): void {
   if (conclusionData) checkConclusion.value = conclusionData.remark || conclusionData.conclusion || ''
 }
 
-watch(() => props.allResponses, restoreFromResponses, { immediate: true })
+watch(() => props.allResponses, () => {
+  restoreFromResponses()
+  // 记下预审行的读入版本（年审阶段保存时据此写回）
+  voucherFill.markLoaded()
+}, { immediate: true })
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
-
-let rowIdCounter = Date.now()
 
 function createRow(overrides?: Partial<VoucherRow>): VoucherRow {
   return {
@@ -440,17 +489,17 @@ function createRow(overrides?: Partial<VoucherRow>): VoucherRow {
 
 function normalizeRow(r: any): VoucherRow {
   const base = createRow()
-  return {
+  return withRowMeta({
     ...base,
     ...r,
     checks: Array.isArray(r?.checks) && r.checks.length === 5 ? r.checks.map((x: any) => !!x) : [false, false, false, false, false],
     creditAmount: Number(r?.creditAmount ?? r?.amount ?? 0),
-  }
+  }, r)
 }
 
 function updateCell(rowKey: string, field: keyof VoucherRow, value: any): void {
   const row = checkRows.value.find(r => r.rowKey === rowKey)
-  if (row) {
+  if (row && !voucherFill.isRowLocked(row)) {
     ;(row as any)[field] = value
     persistRows()
   }
@@ -458,14 +507,14 @@ function updateCell(rowKey: string, field: keyof VoucherRow, value: any): void {
 
 function updateCheck(rowKey: string, idx: number, value: boolean): void {
   const row = checkRows.value.find(r => r.rowKey === rowKey)
-  if (row) {
+  if (row && !voucherFill.isRowLocked(row)) {
     row.checks[idx] = value
     persistRows()
   }
 }
 
 function removeRow(rowKey: string): void {
-  checkRows.value = checkRows.value.filter(r => r.rowKey !== rowKey)
+  checkRows.value = checkRows.value.filter(r => r.rowKey !== rowKey || voucherFill.isRowLocked(r))
   persistRows()
 }
 
@@ -484,7 +533,7 @@ async function handleAddRow(): Promise<void> {
 }
 
 function persistRows(): void {
-  emit('save', ROWS_KEY, JSON.stringify(checkRows.value))
+  emit('save', ROWS_KEY, JSON.stringify(voucherFill.guardPersist(checkRows.value)))
 }
 
 function persistCriteria(): void {
@@ -555,6 +604,8 @@ function getRowClassName({ row }: { row: VoucherRow }): string {
   if (row.abnormal) return 'non-compliance-row'
   return ''
 }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(getRowClassName, voucherFill.rowClass)
 
 // ─── UI Helpers ──────────────────────────────────────────────────────────────
 
@@ -600,53 +651,10 @@ async function handleAiAssist(): Promise<void> {
 const showSamplingDialog = ref(false)
 const currentYear = computed<number | null>(() => props.year ?? null)
 
-function handleVoucherFilled(payload: any): void {
-  const vouchers = payload?.samples ?? []
-  const existing = new Set(checkRows.value.map(r => r.voucherNo).filter(Boolean))
-  for (const v of vouchers) {
-    const voucherNo = v.voucherNo || ''
-    if (voucherNo && existing.has(voucherNo)) continue
-    const entries = v.voucherEntries || []
-    const isMulti = (v.isMultiAccount || v.counterpartAccount === '多科目') && entries.length > 0
-    if (isMulti) {
-      const vCredit = Number(v.creditAmount ?? 0)
-      const counterEntries = entries.filter((e: any) =>
-        vCredit > 0 ? (e.debit_amount && Number(e.debit_amount) > 0) : (e.credit_amount && Number(e.credit_amount) > 0)
-      )
-      const toWrite = counterEntries.length > 0 ? counterEntries : entries
-      for (const e of toWrite) {
-        checkRows.value.push(createRow({
-          incomeSource: e.summary || v.summary || v.businessContent || '抽凭样本',
-          date: v.voucherDate || v.date || '',
-          voucherNo,
-          businessContent: e.summary || v.summary || v.businessContent || '',
-          offsetAccount: e.account_code || '',
-          offsetSubAccount: e.account_name || '',
-          creditAmount: Number(e.credit_amount ?? e.debit_amount ?? 0),
-          abnormal: !!v.abnormal,
-          remark: v.selectionReason || v.remark || '',
-        }))
-      }
-    } else {
-      checkRows.value.push(createRow({
-        incomeSource: v.summary || v.businessContent || '抽凭样本',
-        date: v.voucherDate || v.date || '',
-        voucherNo,
-        businessContent: v.summary || v.businessContent || '',
-        offsetAccount: v.counterpartAccount || v.offsetAccount || '',
-        offsetSubAccount: v.counterpartAccountName || v.counterpartSubAccount || v.offsetSubAccount || '',
-        creditAmount: Number(v.creditAmount ?? v.amount ?? 0),
-        abnormal: !!v.abnormal,
-        remark: v.selectionReason || v.remark || '',
-      }))
-    }
-    if (voucherNo) existing.add(voucherNo)
-  }
-  showSamplingDialog.value = false
-  if (vouchers.length) {
-    persistRows()
-    ElMessage.success(`已填入 ${vouchers.length} 笔凭证样本`)
-  }
+/** 抽凭引擎回填：共享回填函数一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行 */
+async function handleVoucherFilled(payload: EngineFilledPayload): Promise<void> {
+  const out = await voucherFill.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ─── 行级OCR（📎附件列 → POST /api/workpapers/{wpId}/d4/contract-ocr → ElMessageBox确认 → merge） ─

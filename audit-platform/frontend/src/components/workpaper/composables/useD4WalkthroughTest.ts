@@ -5,9 +5,13 @@
  * 支持维度级OCR、自动一致性校验、D4-12联动、序时账导入、AI穿行分析
  *
  * Spec: .kiro/specs/d4-14-walkthrough-test/
+ *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个样本一个事项，
+ * 按分录指纹去重，行元数据 `_gt` 随事项 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 10）。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum } from './useD4FormulaEngine'
+import { legacyIdentity, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1.1.1 — Types
@@ -596,6 +600,83 @@ export function collectAiContext(item: TransactionItem): Record<string, any> {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 抽凭回填 / 挂凭导入（共享回填函数，spec voucher-identity-writeback-and-audit-phase 任务 10）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 空事项（新增事项与抽凭回填共用） */
+function emptyTransaction(label: string): TransactionItem {
+  return {
+      id: `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      indexNo: '',
+      label,
+      voucher: { month: '', customerName: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
+      contract: { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '' },
+      delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
+      shipping: { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '' },
+      receipt: { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '' },
+      invoice: { date: '', number: '', productName: '', quantity: '', amount: 0 },
+      other: { description: '', indexNo: '', anomalyNote: '' },
+      consistencyScore: 0,
+      consistencyDetails: null,
+      conclusion: '',
+      isAnomalous: false,
+  }
+}
+
+/** 旧事项（没有 `_gt`）的身份：记账凭证维度的编号 + 日期 + 金额 */
+export function transactionLegacyKey(t: TransactionItem): string | null {
+  return legacyIdentity({ voucherNo: t.voucher?.number, voucherDate: t.voucher?.date, amount: t.voucher?.amount })
+}
+
+function dimensionFilled(dim: unknown, skip: readonly string[] = []): boolean {
+  if (!dim || typeof dim !== 'object') return false
+  return Object.entries(dim as Record<string, unknown>)
+    .some(([k, v]) => !skip.includes(k) && v !== '' && v !== 0 && v != null && v !== 'none')
+}
+
+/** 事项上是否已填了核对内容（替换 / 撤销前先确认）；回填只写记账凭证的编号 / 日期 / 金额与对方科目说明 */
+export function hasWalkthroughContent(t: TransactionItem): boolean {
+  return !!String(t.conclusion ?? '').trim()
+    || (['contract', 'delivery', 'shipping', 'receipt', 'invoice'] as const).some(k => dimensionFilled(t[k]))
+    || dimensionFilled(t.voucher, ['number', 'date', 'amount'])
+    || dimensionFilled(t.other, ['description'])
+}
+
+/**
+ * 共享回填函数的待写入项 → 穿行测试事项：一个样本一个事项（对方科目按后端配对拼接，policy=join），
+ * 收入类以贷方发生额为发生额优先；引擎标异常 → 事项异常。
+ */
+export function mapSampleToTransaction(item: PreparedItem): TransactionItem {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null; abnormal?: boolean }
+  const t = emptyTransaction(String(s.voucherNo || s.summary || '抽样凭证'))
+  t.isAnomalous = !!s.abnormal
+  t.voucher.number = String(s.voucherNo ?? '')
+  t.voucher.date = String(s.voucherDate ?? '')
+  t.voucher.amount = parseNum(item.creditAmount) || parseNum(item.debitAmount)
+  if (item.counterpartAccount) {
+    const name = item.counterpartAccountName && item.counterpartAccountName !== item.counterpartAccount
+      ? ` ${item.counterpartAccountName}` : ''
+    t.other.description = `对方科目：${item.counterpartAccount}${name}`
+  }
+  const result = computeConsistency(t)
+  t.consistencyScore = result.score
+  t.consistencyDetails = result
+  return t
+}
+
+/** 读入事项列表：行元数据 `_gt` 按共享回填函数的形状透传（不合法的丢弃） */
+function parseTransactions(remark: string | null | undefined): TransactionItem[] {
+  if (!remark) return []
+  try {
+    const parsed = JSON.parse(remark)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map(({ _gt, ...rest }: any) => withRowMeta(rest as TransactionItem, { _gt }))
+  } catch {
+    return []
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Composable 主体
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -615,20 +696,24 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一个事项）
+  const voucherFill = useVoucherCheckFill<TransactionItem>({
+    projectId,
+    tables: transactions,
+    policy: 'join',
+    readonly: isReadonly,
+    mapSampleToRow: item => mapSampleToTransaction(item),
+    persist: () => persistNow(),
+    hasUserContent: hasWalkthroughContent,
+    afterChange: (_key, rows) => rows.forEach((t, i) => { t.indexNo = `D4-14-${i + 1}` }),
+    legacy: transactionLegacyKey,
+  })
+
   // ─── 1.1.3 Load ────────────────────────────────────────────────────────
 
   function loadTransactions() {
-    const resp = allResponses.value.get('D4-14-transactions')
-    if (resp?.remark) {
-      try {
-        const parsed = JSON.parse(resp.remark)
-        if (Array.isArray(parsed) && parsed.length) {
-          transactions.value = parsed
-          return
-        }
-      } catch { /* ignore parse errors, fallback to empty */ }
-    }
-    transactions.value = []
+    transactions.value = parseTransactions(allResponses.value.get('D4-14-transactions')?.remark)
+    voucherFill.markLoaded()
   }
 
   function loadSampling() {
@@ -667,22 +752,7 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
   // ─── 1.1.3 CRUD ────────────────────────────────────────────────────────
 
   function addTransaction(label: string): TransactionItem {
-    const item: TransactionItem = {
-      id: `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      indexNo: '',
-      label,
-      voucher: { month: '', customerName: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
-      contract: { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '' },
-      delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
-      shipping: { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '' },
-      receipt: { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '' },
-      invoice: { date: '', number: '', productName: '', quantity: '', amount: 0 },
-      other: { description: '', indexNo: '', anomalyNote: '' },
-      consistencyScore: 0,
-      consistencyDetails: null,
-      conclusion: '',
-      isAnomalous: false,
-    }
+    const item = emptyTransaction(label)
     transactions.value.push(item)
     reindexItems()
     persistAll()
@@ -691,6 +761,9 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
 
   function removeTransaction(id: string) {
     if (isReadonly.value) return
+    // 年审阶段的预审事项只读（不可删）
+    const target = transactions.value.find(t => t.id === id)
+    if (target && voucherFill.isRowLocked(target)) return
     transactions.value = transactions.value.filter(t => t.id !== id)
     reindexItems()
     persistAll()
@@ -699,7 +772,8 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
   function updateDimension(id: string, dimKey: string, field: string, value: any) {
     if (isReadonly.value) return
     const item = transactions.value.find(t => t.id === id)
-    if (!item) return
+    // 年审阶段的预审事项只读（不可改）
+    if (!item || voucherFill.isRowLocked(item)) return
     const dim = item[dimKey as keyof TransactionItem] as any
     if (!dim) return
     dim[field] = value
@@ -766,7 +840,7 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     allResponses.value.set('D4-14-transactions', {
       item_id: 'D4-14-transactions',
       conclusion: null,
-      remark: JSON.stringify(transactions.value),
+      remark: JSON.stringify(voucherFill.guardPersist(transactions.value)),
     })
     allResponses.value.set('D4-14-sampling', {
       item_id: 'D4-14-sampling',
@@ -801,6 +875,13 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
   }
 
+  /** 立即落库（抽凭回填 / 挂凭导入 / 撤销这类一次性操作，不等防抖） */
+  function persistNow() {
+    persistAll()
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    flushSave()
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
   })
@@ -825,6 +906,12 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     reindexItems,
     loadTransactions,
     flushSave,  // D4-14 双向回写：sync bridge flushHtml 需先 flush 待存的 debounce 保存再读 store-projection
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

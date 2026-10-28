@@ -22,6 +22,11 @@ import {
 } from './i2EnhancementHelpers'
 import { buildCutoffCrossCheck, type CutoffCrossCheckSummary } from './cutoffCrossCheck'
 import { amountMismatch, priorPeriodCutoffDate } from './cutoffRowHelpers'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillOutcome, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 
 export type CutoffDirection = 'forward' | 'backward'
 
@@ -131,6 +136,11 @@ export function useCycleCutoff(params: {
   persistCompletion: (direction: CutoffDirection) => Promise<void>
   needsExpandHint: ComputedRef<boolean>
   flushAutoSave: () => Promise<void>
+  /** 抽凭引擎回填进本方向的表（共享回填函数：一个样本一行，按分录指纹去重；替换只动本方向的表） */
+  onEngineFilled: (direction: CutoffDirection, payload: EngineFilledPayload) => Promise<FillOutcome>
+  onUndoRequest: (payload: UndoRequestPayload) => Promise<boolean>
+  isVoucherRowLocked: (row: CutoffRow) => boolean
+  voucherFillReady: () => Promise<unknown>
 } {
   const {
     config,
@@ -343,7 +353,7 @@ export function useCycleCutoff(params: {
         conclusion: '正常',
       }
       _recalcFormulas(row, direction, criteria)
-      return row
+      return withRowMeta(row, raw)
     })
   }
 
@@ -406,7 +416,37 @@ export function useCycleCutoff(params: {
     backwardRows.value = Array.isArray(backwardData) && backwardData.length > 0
       ? _deserializeRows(backwardData, 'backward', bc)
       : []
+    voucherFill.markLoaded()
   }
+
+  /**
+   * 共享回填函数的待写入项 → 截止测试行（spec voucher-identity-writeback-and-audit-phase 任务 12）：记账日期、
+   * 凭证号、账面金额（样本自己那一栏，借方优先，红字带符号照记）、摘要；单据日期 / 金额留空，查原件后补填。
+   * 原实现只取借方金额，贷方样本金额为 0
+   */
+  function _rowFromPrepared(item: PreparedItem, direction: CutoffDirection): CutoffRow {
+    const s = sampleOf(item)
+    const date = String(s.voucherDate ?? '')
+    return _createEmptyRow(direction, direction === 'forward' ? forwardCriteria.value : backwardCriteria.value, {
+      recordDate: date,
+      voucherNo: String(s.voucherNo ?? ''),
+      amount: assetAmount(item, 'debit'),
+      recordPeriod: _extractPeriod(date),
+      description: String(s.summary ?? ''),
+    })
+  }
+
+  // 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数（两张表：账→单据、单据→账，各宿主只回填自己那张）
+  const voucherFill = useVoucherCheckFill<CutoffRow>({
+    projectId: () => projectId.value,
+    tables: { forward: forwardRows, backward: backwardRows },
+    policy: 'join',
+    mapSampleToRow: (item, key) => _rowFromPrepared(item, key as CutoffDirection),
+    persist: () => { _scheduleAutoSave() },
+    hasUserContent: r => !!(r.documentNo || r.documentDate || r.documentAmount || r.belongPeriod),
+    // 旧行（没有 `_gt`）身份：凭证号 + 记账日期 + 账面金额（原实现只取借方金额）
+    legacy: r => assetLegacyKey(r.voucherNo, r.recordDate, r.amount),
+  })
 
   watch(allResponses, () => _loadFromResponses(), { immediate: true })
 
@@ -455,12 +495,14 @@ export function useCycleCutoff(params: {
 
   function removeForwardRow(index: number): void {
     if (index < 0 || index >= forwardRows.value.length) return
+    if (voucherFill.isRowLocked(forwardRows.value[index])) return
     forwardRows.value.splice(index, 1)
     _scheduleAutoSave('forward')
   }
 
   function removeBackwardRow(index: number): void {
     if (index < 0 || index >= backwardRows.value.length) return
+    if (voucherFill.isRowLocked(backwardRows.value[index])) return
     backwardRows.value.splice(index, 1)
     _scheduleAutoSave('backward')
   }
@@ -472,6 +514,7 @@ export function useCycleCutoff(params: {
     direction: CutoffDirection,
     criteria: CutoffSampleCriteria,
   ): void {
+    if (voucherFill.isRowLocked(row)) return
     switch (field) {
       case 'recordDate':
         row.recordDate = String(value ?? '')
@@ -675,14 +718,14 @@ export function useCycleCutoff(params: {
 
     if (saveForward) {
       await saveResponses(config.forwardSheetCode, {
-        [config.forwardRowsKey]: forwardRows.value.map(_persistShape),
+        [config.forwardRowsKey]: voucherFill.guardPersist(forwardRows.value, 'forward').map(r => withRowMeta(_persistShape(r), r)),
         [config.forwardCriteriaKey]: { ...forwardCriteria.value },
         ...(config.sharedCriteriaKey ? { [config.sharedCriteriaKey]: { ...forwardCriteria.value } } : {}),
       })
     }
     if (saveBackward) {
       await saveResponses(config.backwardSheetCode, {
-        [config.backwardRowsKey]: backwardRows.value.map(_persistShape),
+        [config.backwardRowsKey]: voucherFill.guardPersist(backwardRows.value, 'backward').map(r => withRowMeta(_persistShape(r), r)),
         [config.backwardCriteriaKey]: { ...backwardCriteria.value },
         ...(config.sharedCriteriaKey ? { [config.sharedCriteriaKey]: { ...backwardCriteria.value } } : {}),
       })
@@ -879,6 +922,10 @@ export function useCycleCutoff(params: {
     persistCompletion,
     needsExpandHint,
     flushAutoSave,
+    onEngineFilled: (direction, payload) => voucherFill.onEngineFilled(payload, { tables: [direction] }),
+    onUndoRequest: payload => voucherFill.onUndoRequest(payload),
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

@@ -8,8 +8,13 @@
  *
  * 实现上合并为一行模型，避免双表同名不同步。
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import { calcNetValue } from './useI1FormulaEngine'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf, sampleRemark } from './assetVoucherFill'
 
 const ITEM_ID_ROWS = 'I1-6-rows'
 const ITEM_ID_NOTE = 'I1-6-audit-note'
@@ -299,10 +304,43 @@ export function buildI1DisposalConclusionDraft(rows: I1DisposalCheckRow[]): stri
   ].join('')
 }
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：减少方式、核销 / 出售 / 其他检查、附件、摊销减值与清理金额、勾稽、结论 */
+export function hasI1DisposalContent(r: I1DisposalCheckRow): boolean {
+  const texts = [
+    r.disposalMethod, r.writeOffApproved, r.writeOffAmountCorrect, r.writeOffEntryCorrect, r.saleApproved,
+    r.saleProceduresComplete, r.salePriceFair, r.otherMethodDesc, r.otherCompliant, r.attachmentIndex,
+    r.reconciled, r.conclusion,
+  ]
+  return texts.some(v => String(v ?? '').trim() !== '')
+    || [r.accAmort, r.impairment, r.disposalCost, r.disposalIncome].some(v => Number(v) !== 0)
+}
+
+/**
+ * 共享回填函数的待写入项 → 减少检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：名称取摘要，
+ * 对方科目（按后端配对，配不上写「多科目」）、凭证号与日期、原值（样本自己那一栏，减少在贷方，红字带符号照记）。
+ * 原实现把引擎回填载荷当样本数组遍历（载荷是对象 ⇒ 抛 TypeError，一行不填），挂凭导入读不存在的 `amount`（原值为 0）
+ */
+function rowFromPrepared(item: PreparedItem): I1DisposalCheckRow {
+  const s = sampleOf(item)
+  const date = String(s.voucherDate ?? '')
+  return emptyI1DisposalRow({
+    name: String(s.summary || '处置项').trim().slice(0, 80) || '处置项',
+    counterpartAccount: counterpartText(item),
+    voucherNo: String(s.voucherNo ?? ''),
+    voucherDate: date,
+    disposalDate: date,
+    originalCost: assetAmount(item, 'credit'),
+    remark: sampleRemark(item),
+  })
+}
+
 export function useI1DisposalCheck(options: {
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
   onPublishEvent?: (event: string, payload: any) => void
+  projectId?: MaybeRefOrGetter<string | null | undefined>
+  /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+  isReadonly?: MaybeRefOrGetter<boolean | undefined>
 }) {
   const rows = ref<I1DisposalCheckRow[]>([])
   const auditNote = ref('')
@@ -311,7 +349,8 @@ export function useI1DisposalCheck(options: {
   function _load() {
     const map = options.allResponses.value
     const raw = map.get(ITEM_ID_ROWS)
-    rows.value = _safeParse(raw?.remark ?? raw?.conclusion ?? raw).map(normalizeI1DisposalRow)
+    rows.value = _safeParse(raw?.remark ?? raw?.conclusion ?? raw).map(r => withRowMeta(normalizeI1DisposalRow(r), r))
+    voucherFill.markLoaded()
     const n = map.get(ITEM_ID_NOTE)
     auditNote.value = String(n?.remark ?? n?.conclusion ?? n?.value ?? '')
     const c = map.get(ITEM_ID_CONCLUSION)
@@ -319,8 +358,21 @@ export function useI1DisposalCheck(options: {
   }
 
   function _persist() {
-    options.onSave?.(ITEM_ID_ROWS, rows.value)
+    options.onSave?.(ITEM_ID_ROWS, voucherFill.guardPersist(rows.value))
   }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）
+  const voucherFill = useVoucherCheckFill<I1DisposalCheckRow>({
+    projectId: () => toValue(options.projectId),
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => rowFromPrepared(item),
+    persist: () => _persist(),
+    hasUserContent: hasI1DisposalContent,
+    // 旧行（没有 `_gt`）身份：凭证号 + 凭证日期 + 原值
+    legacy: r => assetLegacyKey(r.voucherNo, r.voucherDate, r.originalCost),
+    readonly: () => toValue(options.isReadonly) === true,
+  })
 
   watch(options.allResponses, () => _load(), { immediate: true, deep: true })
 
@@ -345,14 +397,14 @@ export function useI1DisposalCheck(options: {
 
   function removeRow(rowId: string): void {
     const i = rows.value.findIndex((r) => r.rowId === rowId)
-    if (i < 0) return
+    if (i < 0 || voucherFill.isRowLocked(rows.value[i])) return
     rows.value.splice(i, 1)
     _persist()
   }
 
   function updateField(rowId: string, field: keyof I1DisposalCheckRow, value: any): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     Object.assign(row, recomputeI1DisposalRow(row))
     _persist()
@@ -386,6 +438,8 @@ export function useI1DisposalCheck(options: {
     let count = 0
     for (const s of seeded) {
       const prev = byName.get(s.name.trim())
+      // 年审阶段预审行只读：同名带入不改它
+      if (prev && voucherFill.isRowLocked(prev)) continue
       if (prev) {
         prev.originalCost = s.originalCost
         prev.accAmort = s.accAmort
@@ -402,25 +456,6 @@ export function useI1DisposalCheck(options: {
     }
     if (count) _persist()
     return { ok: count > 0, count, message: `已从 I1-2 带入/更新 ${count} 行减少` }
-  }
-
-  function appendFromSamples(samples: any[]): number {
-    let n = 0
-    for (const s of samples ?? []) {
-      const row = emptyI1DisposalRow({
-        name: String(s.summary || s.description || '处置项').trim() || '处置项',
-        originalCost: _n(s.amount),
-        disposalIncome: _n(s.disposalIncome),
-        voucherNo: String(s.voucherNo || s.voucher_no || ''),
-        voucherDate: String(s.voucherDate || s.voucher_date || ''),
-        disposalDate: String(s.voucherDate || s.voucher_date || ''),
-        counterpartAccount: String(s.counterpartAccountName ? `${s.counterpartAccount || ''} ${s.counterpartAccountName}` : (s.counterpartAccount || '')),
-      })
-      rows.value.push(row)
-      n++
-    }
-    if (n) _persist()
-    return n
   }
 
   /**
@@ -483,8 +518,13 @@ export function useI1DisposalCheck(options: {
     saveConclusion,
     fillConclusionDraft,
     seedFromDetail,
-    appendFromSamples,
     publishDisposalToH10,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

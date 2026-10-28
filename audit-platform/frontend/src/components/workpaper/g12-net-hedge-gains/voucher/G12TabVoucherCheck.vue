@@ -78,7 +78,7 @@
       <div class="params-grid">
         <div class="param-item param-item-wide">
           <span class="param-label">测试总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.testPopulation"
             size="small"
             :disabled="isReadonly"
@@ -88,7 +88,7 @@
         </div>
         <div class="param-item param-item-wide">
           <span class="param-label">特定样本</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.specificSamples"
             size="small"
             :disabled="isReadonly"
@@ -98,7 +98,7 @@
         </div>
         <div class="param-item param-item-wide">
           <span class="param-label">抽样总体</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.samplingPopulation"
             size="small"
             :disabled="isReadonly"
@@ -171,7 +171,7 @@
         </div>
         <div class="param-item param-item-wide">
           <span class="param-label">抽样过程</span>
-          <el-input
+          <WpCommitInput
             :model-value="vc.samplingParams.value.samplingProcess"
             size="small"
             :disabled="isReadonly"
@@ -271,9 +271,15 @@
       size="small"
       style="width:100%;font-size:13px"
       max-height="480"
-      :row-class-name="({ row }) => row.isAbnormal ? 'g12-vc-abnormal' : ''"
+      :row-class-name="voucherRowClassName"
     >
       <el-table-column prop="seq" label="序号" width="52" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="engineYear" />
+        </template>
+      </el-table-column>
       <template v-if="vc.activeTab.value === 'basic'">
         <el-table-column label="日期" width="110">
           <template #default="{ row }">
@@ -430,7 +436,7 @@
 
     <el-card shadow="never" class="audit-note-card">
       <template #header><div class="card-header"><span>四、审计说明</span></div></template>
-      <el-input
+      <WpCommitInput
         :model-value="vc.auditNote.value"
         type="textarea"
         :autosize="{ minRows: 5 }"
@@ -447,7 +453,7 @@
           <el-button size="small" :loading="vc.aiLoading.value" :disabled="isReadonly" @click="vc.generateAiConclusion()">🤖 AI</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="vc.auditConclusion.value"
         type="textarea"
         :autosize="{ minRows: 3 }"
@@ -477,12 +483,12 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :account-code="G12_SAMPLING_ACCOUNT_CODE"
-        phase="final"
         default-method="mus"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="engineYear"
         @filled="onSampleFilled"
+        @undo-request="vc.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -520,12 +526,15 @@ import { GCYCLE_CUTOFF_EVENT, type GCycleCutoffFilledDetail } from '../../compos
 import { useWorkpaperAuditYear } from '../../composables/workpaperAuditYear'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass } from '../../composables/shared/voucherCheckFill'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GCycleProcedureCutoffPanel from '../../shared/GCycleProcedureCutoffPanel.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -575,7 +584,11 @@ function onCutoffFilled(e: Event) {
   vc.applyCutoffResults(detail.samples, detail.fillMode ?? 'append')
 }
 
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass<{ row: G12VoucherRow }>(({ row }) => (row.isAbnormal ? 'g12-vc-abnormal' : ''), vc.voucherRowClass)
+
 onMounted(() => {
+  void vc.voucherFillReady()
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g12, onCutoffFilled as EventListener)
 })
 
@@ -615,66 +628,22 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, engineYear.value, props.wpId, G12_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: {
-  samples?: Array<{
-    summary?: string
-    amount?: number
-    debitAmount?: number | string
-    creditAmount?: number | string
-    voucherDate?: string
-    voucherNo?: string
-    counterpartAccount?: string
-    abnormal?: boolean
-    isHighValue?: boolean
-    selectionReason?: string
-  }>
-  method?: string
-  fillMode?: 'append' | 'merge' | 'replace'
-  methodology?: {
-    samplingMethod?: string
-    samplingInterval?: string | null
-    sampleSize?: number
-    suggestedSampleSize?: number | null
-    tolerableMisstatement?: number | null
-    expectedMisstatement?: number | null
-    confidenceLevel?: number | null
-    accountCodes?: string[]
-    randomSeed?: string | null
-  }
-}) {
-  const samples = payload.samples ?? []
-  if (!samples.length) return
-  const n = vc.applySamplingFill({
-    samples: samples.map((s) => ({
-      summary: s.summary,
-      debitAmount: typeof s.debitAmount === 'string' ? Number(s.debitAmount) : s.debitAmount,
-      creditAmount: typeof s.creditAmount === 'string' ? Number(s.creditAmount) : s.creditAmount,
-      amount: s.amount,
-      voucherDate: s.voucherDate,
-      voucherNo: s.voucherNo,
-      counterpartAccount: s.counterpartAccount,
-      counterpartAccountName: s.counterpartAccountName,
-      voucherEntries: (s as any).voucherEntries,
-      abnormal: s.abnormal,
-      isHighValue: s.isHighValue,
-      selectionReason: s.selectionReason,
-    })),
-    method: payload.method,
-    fillMode: payload.fillMode ?? 'append',
-    methodology: payload.methodology,
-  })
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 回填后按方法学写抽样方法 / 目标量 / 抽样过程。原实现经 expandMultiAccountVouchers 展开、按凭证号去重，已删除。
+ */
+async function onSampleFilled(payload: Parameters<typeof vc.onEngineFilled>[0]) {
+  if (!(payload?.samples ?? []).length) return
+  const out = await vc.onEngineFilled(payload)
+  if (out.cancelled) return
   showSampling.value = false
-  if (n > 0) {
-    ElMessage.success(`已回填 ${n} 笔抽凭样本${payload.methodology?.samplingInterval ? '，MUS 参数已写入抽样过程' : ''}`)
-  } else {
-    ElMessage.info('未回填任何样本（可能已存在相同凭证号）')
-  }
+  if (out.added > 0 && payload.methodology?.samplingInterval) ElMessage.info('MUS 参数已写入抽样过程')
 }
 
 function onApplySuggested() {

@@ -140,7 +140,7 @@
         size="small"
         max-height="520"
         class="check-table"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
         show-summary
         :summary-method="getSummary"
       >
@@ -149,6 +149,11 @@
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="onField(row, 'name')" />
             <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
           </template>
         </el-table-column>
         <el-table-column prop="entryAmount" label="入账金额" width="110" align="right">
@@ -665,15 +670,15 @@
       </ol>
     </details>
 
-    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（科目 ${samplingAccountCode} 增加）" width="720px" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`抽凭引擎（科目 ${samplingAccountCode} 增加）`" width="720px" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -685,7 +690,7 @@
  * 对齐源表：取得方式分段列 + 检查比例防 DIV/0 + I1-2 联动
  */
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { ref, computed, toRef, inject, watch, defineComponent, h } from 'vue'
+import { ref, computed, toRef, inject, watch, defineComponent, h, onMounted } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
 import { ElSelect } from '@/components/grid/adapters'
@@ -702,6 +707,8 @@ import {
 import { isI1VatMismatch } from '../../composables/i1AdditionCheckModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import http from '@/utils/http'
 
 /**
@@ -793,9 +800,18 @@ const {
   flushPersist,
   exportXlsx,
   importXlsx,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useI1AdditionCheck(toRef(props, 'wpId'), allResponsesRef as any, {
   onSave: (itemId, value) => emit('save', itemId, value),
+  projectId: () => props.projectId,
+  isReadonly: () => props.isReadonly,
 })
+onMounted(() => { void voucherFillReady() })
 
 const auditNote = ref('')
 const conclusion = ref('')
@@ -895,26 +911,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, I1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled(samples)
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(samples: any[]) {
-  showSamplingDialog.value = false
-  if (!samples?.length) return
-  for (const s of samples) {
-    addRow({
-      name: s.summary || s.description || s.accountName || '抽样项',
-      entryDate: s.date ?? s.entryDate ?? '',
-      entryAmount: Number(s.amount) || 0,
-      voucherNo: s.voucherNo ?? '',
-      voucherSampleId: s.sampleId ?? '',
-      acquisitionMethod: '购买',
-    })
-  }
-  ElMessage.success(`已添加 ${samples.length} 个抽样项`)
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 async function handleOcr(row: I1AdditionCheckRow) {
@@ -983,6 +989,9 @@ function rowClassName({ row }: { row: I1AdditionCheckRow }) {
   if (row.isRelatedParty === 'Y' || isI1VatMismatch(row)) return 'risk-row'
   return ''
 }
+
+/** 行样式：异常 / 风险提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, voucherRowClass)
 
 function traceRowClassName({ row }: { row: I1TraceRow }) {
   if (row.recordedInBooks === 'N' || row.checkResult === 'ERR' || Math.abs(row.amountDiff) > 1) {

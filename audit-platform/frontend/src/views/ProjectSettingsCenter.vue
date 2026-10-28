@@ -73,6 +73,7 @@
                 </el-radio-group>
               </el-form-item>
             </el-form>
+            <ProjectAuditPhaseSection v-if="projectId" :project-id="projectId" :readonly="isReadonly" />
           </div>
         </el-tab-pane>
 
@@ -233,6 +234,7 @@ import { useRoute, useRouter } from 'vue-router'
 import GtPageShell from '@/components/common/GtPageShell.vue'
 import ProjectContextBar from '@/components/common/ProjectContextBar.vue'
 import AgingConfigDialog from '@/components/workpaper/AgingConfigDialog.vue'
+import ProjectAuditPhaseSection from '@/components/project/ProjectAuditPhaseSection.vue'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'

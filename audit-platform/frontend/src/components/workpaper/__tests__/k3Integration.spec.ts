@@ -168,7 +168,12 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
     expect(rpSource).toContain('k3QueryCodes(')
     // 标题里的插值必须是绑定属性（静态属性会把 `${...}` 原样显示）
     expect(rpSource).not.toMatch(/\stitle="[^"]*\$\{/)
-    expect(rpSource).toContain('phase="final"')
+    // 阶段取项目当前阶段（不再写死 phase="final"），抽凭撤销按批次删明细行（spec voucher-identity 任务 13）
+    expect(rpSource).not.toMatch(/\sphase="/)
+    expect(rpSource).toContain('@undo-request="onUndoRequest"')
+    // 行级抽凭不再读不存在的 payload.voucherNo（原空操作），样本记进行级抽凭明细
+    expect(rpSource).not.toContain('payload?.voucherNo')
+    expect(rpSource).toContain('useK3RowVoucherFill(')
     // OCR 走按底稿挂载的识别端点（无底稿 id 的 `/api/d4/contract-ocr` 后端没有路由，恒 404），识别附件挂到本行
     expect(rpSource).toContain('`/api/workpapers/${props.wpId}/d4/contract-ocr`')
     expect(rpSource).not.toContain("'/api/d4/contract-ocr'")
@@ -195,8 +200,11 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
     expect(loSource).toContain('k3QueryCodes(')
     expect(loSource).not.toMatch(/\stitle="[^"]*\$\{/)
     expect(loSource).toContain('onSampleFilled')
-    // 抽凭引擎必填 props（phase/year/workpaper-id）已补全
-    expect(loSource).toContain('phase="final"')
+    // 抽凭引擎必填 props（year/workpaper-id）已补全；阶段取项目当前阶段，不再写死 phase
+    expect(loSource).not.toMatch(/\sphase="/)
+    expect(loSource).toContain('@undo-request="onUndoRequest"')
+    expect(loSource).not.toContain('payload?.voucherNo')
+    expect(loSource).toContain('useK3RowVoucherFill(')
     // No console.log stub
     expect(loSource).not.toContain("console.log('[K3-5] Voucher sampling")
   })

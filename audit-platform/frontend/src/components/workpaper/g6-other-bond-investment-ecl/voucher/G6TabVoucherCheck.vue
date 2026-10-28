@@ -164,9 +164,15 @@
         size="small"
         row-key="id"
         :max-height="460"
-        :row-class-name="rowClassName"
+        :row-class-name="voucherRowClassName"
       >
         <el-table-column label="#" prop="seq" width="46" fixed align="center" />
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <template v-if="vc.activeTab.value === 'base'">
           <el-table-column label="日期" width="122">
@@ -374,13 +380,13 @@
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
         :account-code="G6_SAMPLING_ACCOUNT_CODE"
-        phase="final"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         :initial-period-range="vc.activePeriod.value === 'post' ? [1, 2, 3] : undefined"
         @filled="onSamplesFilled"
+        @undo-request="vc.onUndoRequest"
       />
     </el-dialog>
 
@@ -417,6 +423,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { useG6EclFormData } from '../../composables/useG6EclFormData'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import {
@@ -454,7 +462,7 @@ const G6_SAMPLING_ACCOUNT_CODE = computed(() =>
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG6EclFormData({ wpId: wpIdRef, projectId: projectIdRef })
-const vc = useG6EclVoucherCheck(wpIdRef, projectIdRef, computed(() => props.htmlData))
+const vc = useG6EclVoucherCheck(wpIdRef, projectIdRef, computed(() => props.htmlData), { readonly: () => props.isReadonly })
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 const loaded = ref(false)
 const auditNote = ref('')
@@ -539,6 +547,8 @@ function ratioType(value: number | null): 'info' | 'warning' | 'success' {
   if (value < 0.3) return 'warning'
   return 'success'
 }
+/** 异常 / 未完成行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClassName, vc.voucherRowClass)
 function rowClassName({ row }: { row: any }): string {
   if (row.isAbnormal) return 'row-abnormal'
   if (!vc.isAllChecked(row)) return 'row-incomplete'
@@ -595,26 +605,25 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, G6_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples, fillMode: 'append' })
+    if (samples.length > 0) {
+      await vc.onAttachImported(samples, vc.activePeriod.value)
+      refreshCrossCoverage()
+    }
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[]; fillMode?: 'append' | 'replace' | 'merge'; method?: string }): void {
+/**
+ * 抽凭引擎回填进当前期间表：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 期后表剔除资产负债表日前的凭证（组合式函数提示剔除数）。
+ */
+async function onSamplesFilled(payload: EngineFilledPayload & { method?: string; methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const result = vc.fillVoucherSamples(vc.activePeriod.value, payload.samples, {
-    mode: payload.fillMode === 'merge' ? 'append' : payload.fillMode,
-    method: payload.method,
-    bsDate: String(props.htmlData?.bsDate || ''),
-  })
+  void persistMethodology(payload?.methodology)
+  const out = await vc.onEngineFilled(payload, vc.activePeriod.value)
+  if (out.cancelled) return
   samplingVisible.value = false
-  const parts = [`已填入 ${result.added} 笔`]
-  if (result.skipped) parts.push(`跳过重复 ${result.skipped} 笔`)
-  if (result.rejectedPostDated) parts.push(`剔除截止日前 ${result.rejectedPostDated} 笔`)
-  ElMessage.success(parts.join('，'))
   refreshCrossCoverage()
 }
 async function applyConclusion(option: string): Promise<void> {
@@ -682,8 +691,8 @@ async function refreshCrossCoverage(): Promise<void> {
   vc.evaluateCrossCoverage({ impairmentRows, reversals, writeOffs })
 }
 
-watch(vc.rows, rows => {
-  if (loaded.value && !props.isReadonly) saveJson(G6_VOUCHER_ROW_KEY, rows)
+watch(vc.rows, () => {
+  if (loaded.value && !props.isReadonly) saveJson(G6_VOUCHER_ROW_KEY, vc.rowsToPersist())
 }, { deep: true })
 watch(vc.criteria, value => {
   if (loaded.value && !props.isReadonly) saveJson(G6_VOUCHER_CRITERIA_KEY, value)
@@ -721,13 +730,14 @@ async function onImported(): Promise<void> {
 }
 
 onMounted(async () => {
+  void vc.voucherFillReady()
   await loadStoredData()
   loaded.value = true
 })
 
 function flushPersist(): void {
   if (props.isReadonly || !loaded.value) return
-  saveJson(G6_VOUCHER_ROW_KEY, vc.rows.value)
+  saveJson(G6_VOUCHER_ROW_KEY, vc.rowsToPersist())
   saveJson(G6_VOUCHER_CRITERIA_KEY, vc.criteria.value)
   formData.debouncedSave(G6_VOUCHER_NOTE_KEY, { conclusion: null, remark: auditNote.value })
   saveJson(G6_VOUCHER_CONCLUSION_KEY, { text: conclusion.value, option: conclusionOption.value })

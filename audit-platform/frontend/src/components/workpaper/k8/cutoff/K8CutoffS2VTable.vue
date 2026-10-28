@@ -1,12 +1,18 @@
 <template>
   <el-table :data="rows" border size="small" class="cutoff-s2v-table" :row-class-name="rowClass">
     <el-table-column type="index" label="#" width="42" align="center" fixed />
+    <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+    <el-table-column label="来源" width="150">
+      <template #default="{ row }">
+        <VoucherRowMetaCell :row="row" :locked="isRowLocked?.(row) ?? false" :project-id="projectId" :year="year" />
+      </template>
+    </el-table-column>
 
     <!-- 支出凭单组（源 B/C/D 列） -->
     <el-table-column label="支出凭单/原始凭证" align="center">
       <el-table-column label="凭单编号" min-width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.sourceVoucherNo" size="small" @change="(v: string) => emit('update', row.rowKey, 'sourceVoucherNo', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.sourceVoucherNo" size="small" @change="(v: string) => emit('update', row.rowKey, 'sourceVoucherNo', v)" />
           <span v-else>{{ row.sourceVoucherNo || '-' }}</span>
         </template>
       </el-table-column>
@@ -34,19 +40,19 @@
       </el-table-column>
       <el-table-column label="凭证编号" min-width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => emit('update', row.rowKey, 'voucherNo', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => emit('update', row.rowKey, 'voucherNo', v)" />
           <span v-else>{{ row.voucherNo || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="业务内容" min-width="140">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small" @change="(v: string) => emit('update', row.rowKey, 'businessContent', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.businessContent" size="small" @change="(v: string) => emit('update', row.rowKey, 'businessContent', v)" />
           <span v-else>{{ row.businessContent || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方科目" min-width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.offsetAccount" size="small" @change="(v: string) => emit('update', row.rowKey, 'offsetAccount', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.offsetAccount" size="small" @change="(v: string) => emit('update', row.rowKey, 'offsetAccount', v)" />
           <span v-else>{{ row.offsetAccount || '-' }}</span>
         </template>
       </el-table-column>
@@ -80,7 +86,7 @@
     </el-table-column>
     <el-table-column label="备注" min-width="100">
       <template #default="{ row }">
-        <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => emit('update', row.rowKey, 'remark', v)" />
+        <WpCommitInput v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => emit('update', row.rowKey, 'remark', v)" />
         <span v-else>{{ row.remark || '-' }}</span>
       </template>
     </el-table-column>
@@ -102,10 +108,16 @@
  * 供 K8TabCutoffS2V 的「资产负债表日前 / 日后」两段复用，避免列定义重复。
  */
 import type { K8CutoffRow } from '@/components/workpaper/composables/useK8Cutoff'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
-defineProps<{
+const props = defineProps<{
   rows: K8CutoffRow[]
   isReadonly: boolean
+  /** 年审阶段的预审行只读（共享回填函数 isRowLocked）；行样式加 gt-row-locked */
+  isRowLocked?: (row: K8CutoffRow) => boolean
+  projectId: string
+  year: number
   fmtAmt: (v: number | null | undefined) => string
 }>()
 
@@ -115,9 +127,8 @@ const emit = defineEmits<{
 }>()
 
 function rowClass({ row }: { row: K8CutoffRow }): string {
-  if (row.isCross) return 'cross-period-row'
-  if (row.amountMismatch) return 'mismatch-row'
-  return ''
+  const flag = row.isCross ? 'cross-period-row' : row.amountMismatch ? 'mismatch-row' : ''
+  return [flag, props.isRowLocked?.(row) ? 'gt-row-locked' : ''].filter(Boolean).join(' ')
 }
 </script>
 

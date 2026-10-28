@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -41,6 +41,7 @@ from app.services.ledger_sampling_service import (
     enrich_items_with_aux_party,
     enrich_voucher_context,
 )
+from app.services.project_audit_phase import project_phase
 from app.services.sampling_methodology import build_methodology_snapshot
 from app.services.sampled_voucher_queries import cross_workpaper_duplicate_vouchers, project_sampling_coverage
 from app.services.sampling_registry_service import (
@@ -80,7 +81,8 @@ class VoucherExtractRequest(BaseModel):
     sampling_method: SamplingMethod
     sampling_params: dict = Field(default_factory=dict)
     random_seed: Optional[int] = None
-    phase: str = "preliminary"  # "preliminary" | "final"
+    # 审计阶段只有预审 / 年审两个值（其他 422，需求 6.5）；不给按项目当前阶段（V212，需求 6.2）
+    phase: Optional[Literal["preliminary", "final"]] = None
     filters: dict = Field(default_factory=dict)
     workpaper_id: UUID
     year: int
@@ -123,6 +125,7 @@ async def voucher_extract(
     await _authorize_and_validate_extract(
         db, current_user, pid, req.workpaper_id, req.year
     )
+    phase = req.phase or await project_phase(db, pid)
 
     try:
         # ── 版本链：抽凭前自动快照 ──
@@ -132,7 +135,7 @@ async def voucher_extract(
             workpaper_id=req.workpaper_id,
             user_id=current_user.id,
             snapshot_type="auto_sampling",
-            description=f"抽凭执行: {req.sampling_method}, phase={req.phase}",
+            description=f"抽凭执行: {req.sampling_method}, phase={phase}",
         )
 
         # 1. 解析过滤条件
@@ -209,7 +212,7 @@ async def voucher_extract(
         exclusions = await collect_exclusions(
             db, project_id=pid, year=req.year, workpaper_id=req.workpaper_id,
             extraction_type="voucher_sampling", sampling_unit=sampling_unit,
-            exclude_extracted=exclude_extracted, phase=req.phase, exclude_scope=exclude_scope,
+            exclude_extracted=exclude_extracted, phase=phase, exclude_scope=exclude_scope,
         )
 
         # 4. 科目映射反查：标准编码 → 企业原始编码（无映射退回标准编码）
@@ -650,7 +653,7 @@ async def voucher_undo(
     """撤销指定抽凭操作
 
     仅允许撤销最近一次非撤销记录（extraction_type='voucher_sampling'）。
-    标记 is_undone=True 并返回 before_data。
+    标记 is_undone=True，回报批次号（宿主按批次删行，ADR-VK-08）；`before_data` 只为旧调用方保留。
     """
     try:
         # 1. 加载记录
@@ -666,6 +669,8 @@ async def voucher_undo(
         # 2. 验证 extraction_type
         if record.extraction_type != "voucher_sampling":
             raise ValueError("该记录不属于抽凭引擎")
+
+        await _authorize_undo(db, current_user, pid, record)
 
         # 3. 验证是最新非撤销记录
         latest_stmt = (
@@ -699,16 +704,38 @@ async def voucher_undo(
 
         await db.commit()
 
-        # 6. 返回 before_data
+        # 6. 回报批次号（before_data 只为旧调用方保留，新回填不再写快照）
         before_data = record.before_data if record.before_data is not None else []
         return {
             "success": True,
+            "batch_id": str(record.batch_id) if record.batch_id is not None else None,
             "before_data": before_data,
             "undone_registration": undone_projection,
         }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def _authorize_undo(db: AsyncSession, current_user: User, pid: UUID, record: Any) -> None:
+    """撤销的鉴权与阶段规则（撤销会让宿主删底稿行，ADR-VK-08）。
+
+    1. 记录须属于 URL 项目：别的项目的记录按不存在处理（404），不暴露它是否存在；
+    2. 底稿编辑权，与抽凭同口径（authorize_wp_edit：角色 + 项目成员 edit 级）；
+    3. 年审阶段不撤销预审批次（需求 6.3「年审阶段预审行只读，不可删」）：撤销会软删登记表里的
+       预审样本，年审口径 b 扣除预审分录就少了这一批，同一分录会被年审再抽一次。
+    """
+    if str(getattr(record, "project_id", "")) != str(pid):
+        raise HTTPException(status_code=404, detail="提取记录不存在")
+    wp_project_id = await authorize_wp_edit(db, current_user, record.workpaper_id)
+    if str(wp_project_id) != str(pid):
+        raise HTTPException(status_code=403, detail="底稿不属于该项目，禁止跨项目撤销")
+    log_phase = (record.extraction_criteria or {}).get("phase")
+    if log_phase == "preliminary" and await project_phase(db, pid) == "final":
+        raise HTTPException(status_code=409, detail={
+            "error_code": "PRELIMINARY_BATCH_LOCKED",
+            "message": "项目已进入年审阶段，预审抽凭批次只读，不能撤销；确需撤销请先由项目经理把审计阶段改回预审",
+        })
 
 
 # ─── POST /voucher-compare ───────────────────────────────────────────────────

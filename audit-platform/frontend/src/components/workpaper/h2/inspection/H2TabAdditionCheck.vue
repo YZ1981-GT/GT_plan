@@ -79,9 +79,14 @@
         </div>
       </template>
 
-      <el-table :data="state.rows.value" border stripe size="small" class="check-table">
+      <el-table :data="state.rows.value" border stripe size="small" class="check-table" :row-class-name="state.voucherRowClass">
         <el-table-column prop="seq" label="序号" width="50" align="center" fixed>
           <template #default="{ $index }">{{ $index + 1 }}</template>
+        </el-table-column>
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
         </el-table-column>
         <el-table-column prop="name" label="工程项目" min-width="120" fixed>
           <template #default="{ row }">
@@ -95,6 +100,13 @@
             <el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD"
               @change="onCellChange(row.rowId, 'date', $event)" />
             <span v-else>{{ row.date || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="voucherNo" label="凭证号" width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.voucherNo" size="small"
+              @change="onCellChange(row.rowId, 'voucherNo', $event)" />
+            <span v-else>{{ row.voucherNo || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="additionMethod" label="增加方式" width="110">
@@ -348,15 +360,15 @@
     </details>
 
     <!-- 抽凭引擎 dialog -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 在建工程-增加）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 在建工程-增加）`" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -370,11 +382,13 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双区域(抽样参数+明细) + 固定列+滚动列 + OCR📎 + 抽凭
  * Spec: Task 4.10 + 6.4 + 6.5 | Requirements: 9.1-9.2, 9.5-9.8
  */
-import { ref, inject, toRef, computed, type Ref } from 'vue'
+import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2AdditionCheck, isEvidenceApplicable, type H2AdditionRow, type H2AdditionEvidenceField } from '../../composables/useH2AdditionCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
@@ -428,6 +442,8 @@ const state = useH2AdditionCheck({
 })
 
 const isReadonly = computed(() => props.isReadonly)
+
+onMounted(() => { void state.voucherFillReady() })
 
 function onParamChange(field: string, value: any) {
   state.updateSamplingParams({ [field]: value } as any)
@@ -493,40 +509,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any) {
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  showSamplingDialog.value = false
-  // 引擎 emit('filled', { samples, phase, fillMode, ... })；兼容旧数组形态
-  const samples: any[] = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!samples.length) return
-  for (const s of samples) {
-    state.addRow()
-    const lastRow = state.rows.value[state.rows.value.length - 1]
-    if (lastRow) {
-      // 增加=借方(资产1604)；SampledVoucher 字段 debitAmount/voucherDate/voucherNo/summary
-      const amt = s.debitAmount ?? s.amount ?? s.creditAmount
-      if (amt != null) lastRow.amount = Number(amt) || 0
-      if (s.summary || s.description) lastRow.name = s.summary || s.description
-      if (s.voucherNo) lastRow.contractNo = s.voucherNo
-      const d = s.voucherDate ?? s.date
-      if (d) lastRow.date = d
-      lastRow.samplingStatus = '待检查'
-    }
-  }
-  state.fillSamplingResults(
-    samples.map((s, i) => ({
-      rowId: state.rows.value[state.rows.value.length - samples.length + i]?.rowId ?? '',
-      status: '待检查',
-    })),
-  )
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 /** 行级 OCR：📎上传→POST contract-ocr→ElMessageBox确认→merge字段 */

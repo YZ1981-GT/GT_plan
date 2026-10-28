@@ -187,6 +187,9 @@ class ProjectCreateResponse(BaseModel):
     created_at: datetime
     # 本次请求产生的说明（仅创建/保存时非空），如「已从同企业的合并项目带入集团关系」
     notices: list[str] = []
+    # V212 当前审计阶段与预审截止日（改动走 PUT /api/projects/{id}/audit-phase）
+    current_audit_phase: str = "final"
+    interim_cutoff_date: date | None = None
 
 
 # ===================================================================

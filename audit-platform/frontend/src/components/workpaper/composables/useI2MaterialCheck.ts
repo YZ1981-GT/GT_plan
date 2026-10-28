@@ -2,7 +2,7 @@
  * useI2MaterialCheck — I2-8 研发材料投入检查表
  * 样本选取 + 账证双栏 + 检查比例（联动 I2-7 材料费）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import {
   type I2MaterialCheckRow,
   type I2MaterialSampleMeta,
@@ -16,6 +16,11 @@ import {
   formatCoverageLabel,
   suggestAbnormal,
 } from './i2MaterialCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf } from './assetVoucherFill'
 
 export {
   type I2MaterialCheckRow,
@@ -60,10 +65,37 @@ function _readText(raw: unknown): string {
   return ''
 }
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：项目、存货、数量、领料单各栏、索引号、异常与结论 */
+export function hasI2MaterialContent(r: I2MaterialCheckRow): boolean {
+  return [r.projectName, r.inventoryName, r.unit, r.slipDateNo, r.recipient, r.recipientDept, r.slipProject,
+    r.indexRef, r.isAbnormal, r.conclusion].some(v => String(v ?? '').trim() !== '')
+    || Number(r.quantity) !== 0 || Number(r.slipQty) !== 0
+}
+
+/**
+ * 共享回填函数的待写入项 → 材料投入检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：凭证号、业务内容、
+ * 借方金额（样本自己那一栏，红字带符号照记）、对方科目与对方明细（按后端配对，配不上写「多科目」）
+ */
+function rowFromPrepared(item: PreparedItem): I2MaterialCheckRow {
+  const s = sampleOf(item)
+  const name = item.counterpartAccountName
+  return emptyI2MaterialRow({
+    voucherNo: String(s.voucherNo ?? ''),
+    debitAmount: assetAmount(item, 'debit'),
+    businessDesc: String(s.summary ?? ''),
+    counterpartAccount: item.counterpartAccount,
+    counterpartDetail: name && name !== item.counterpartAccount ? name : '',
+    projectName: '',
+  })
+}
+
 export function useI2MaterialCheck(
   allResponses: Ref<Map<string, any>> | (() => Map<string, any>),
   options?: {
     saveResponse?: (sheetCode: string, data: Record<string, any>) => Promise<void>
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -77,7 +109,8 @@ export function useI2MaterialCheck(
 
   function load() {
     const map = getMap()
-    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(normalizeI2MaterialRow)
+    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(r => withRowMeta(normalizeI2MaterialRow(r), r))
+    voucherFill.markLoaded()
 
     const sampleRaw = map.get(STORAGE_SAMPLE)
     let parsedMeta: any = null
@@ -102,6 +135,23 @@ export function useI2MaterialCheck(
       if (linked > 0) sampleMeta.value.populationAmount = linked
     }
   }
+
+  /**
+   * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行）。改完整页保存（与「保存」同一次写入）：
+   * 父组件存一项就改一项 allResponses、本函数的 watch 随即整页重读，只存行会把未保存的抽样说明读回旧值。
+   * 原实现回填只改内存，不点保存就丢（抽凭登记里却记着本底稿抽了这些凭证），也不去重
+   */
+  const voucherFill = useVoucherCheckFill<I2MaterialCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => rowFromPrepared(item),
+    persist: () => persistAll(),
+    hasUserContent: hasI2MaterialContent,
+    // 旧行（没有 `_gt`）身份：凭证号 + 借方金额（表里没有凭证日期）
+    legacy: r => assetLegacyKey(r.voucherNo, '', r.debitAmount),
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
 
   watch(() => {
     const m = getMap()
@@ -144,7 +194,7 @@ export function useI2MaterialCheck(
   }
 
   function removeRow(rowId: string) {
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    rows.value = rows.value.filter((r) => r.rowId !== rowId || voucherFill.isRowLocked(r))
   }
 
   function applySuggestAbnormal(row: I2MaterialCheckRow) {
@@ -168,7 +218,7 @@ export function useI2MaterialCheck(
     const save = options?.saveResponse
     if (!save) return
     await save('I2-8', {
-      [STORAGE_ROWS]: JSON.stringify(rows.value),
+      [STORAGE_ROWS]: JSON.stringify(voucherFill.guardPersist(rows.value)),
       [STORAGE_SAMPLE]: JSON.stringify(sampleMeta.value),
       [STORAGE_NOTE]: auditNote.value,
       [STORAGE_CONCLUSION]: auditConclusion.value,
@@ -205,5 +255,11 @@ export function useI2MaterialCheck(
     persistAll,
     saveAuditNote,
     saveAuditConclusion,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }

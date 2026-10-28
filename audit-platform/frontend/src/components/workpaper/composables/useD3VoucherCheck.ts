@@ -11,16 +11,18 @@
  * - totalChecked/anomalyCount/anomalyRate computed
  * - addSample/removeSample/updateCell
  * - autoMarkCrossPeriod（日期<收入确认日→标"跨期疑点"）
+ * - 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数 `useVoucherCheckFill`
+ *   （按分录指纹去重，行元数据 `_gt` 随行 JSON 落库；spec voucher-identity-writeback-and-audit-phase 任务 10）
  *
  * Requirements: 11.1-11.9
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type Ref, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { parseNum, calcAnomalyRate } from './useD3FormulaEngine'
 import { partyNameForColumn } from './shared/samplingPartyTarget'
 import type { ChecklistResponse } from './useD3FormData'
-import type { FillMode } from './useSamplingAlgorithms'
+import { metaOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,8 @@ export interface UseD3VoucherCheckOptions {
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
+  /** 资产负债表日（挂凭导入按凭证日期分区：晚于它的进期后结转）；缺省全进本期增减 */
+  bsDate?: MaybeRefOrGetter<string | null | undefined>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -375,39 +379,20 @@ export function mapSampledToVoucherRow(s: SampledVoucherLike): VoucherCheckRow {
 }
 
 /**
- * 抽样回填三模式（复用 applyFillMode 语义，keyed by voucherNo）。纯函数，方便 PBT/单测。
- *
- * - append: 将 incoming 追加到 existing 末尾（Req 7.5）
- * - replace: 以 incoming 替换目标区块现有行（Req 7.3）
- * - merge: 按 voucherNo 去重后追加 incoming 中的新增项（Req 7.4）
- *
- * 空 voucherNo 的行不参与去重，一律保留（merge 时始终追加）。
+ * 共享回填函数的待写入项 → 检查表行（spec voucher-identity-writeback-and-audit-phase 任务 10）：
+ * 对方科目取后端配对结果（配不上写「多科目」），对方明细写对方科目名称，金额落在样本自己的借贷栏。
+ * 原来按凭证号去重的三模式（applyVoucherFillMode）已由共享回填函数按分录指纹去重取代。
  */
-export function applyVoucherFillMode(
-  existing: VoucherCheckRow[],
-  incoming: VoucherCheckRow[],
-  mode: FillMode,
-): VoucherCheckRow[] {
-  switch (mode) {
-    case 'replace':
-      return [...incoming]
-    case 'merge': {
-      // 去重集合含既有行 voucherNo，并随处理逐步纳入 incoming 已接受的 voucherNo，
-      // 保证 merge 后同区块内非空 voucherNo 唯一（design Property 8）。
-      const seenNos = new Set(existing.map(r => r.voucherNo).filter(Boolean))
-      const newItems: VoucherCheckRow[] = []
-      for (const r of incoming) {
-        if (!r.voucherNo) { newItems.push(r); continue }  // 空号不去重
-        if (seenNos.has(r.voucherNo)) continue
-        seenNos.add(r.voucherNo)
-        newItems.push(r)
-      }
-      return [...existing, ...newItems]
-    }
-    case 'append':
-    default:
-      return [...existing, ...incoming]
-  }
+export function mapPreparedToVoucherRow(item: PreparedItem): VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & SampledVoucherLike
+  const row = mapSampledToVoucherRow({
+    ...s,
+    counterpartAccount: item.counterpartAccount,
+    debitAmount: item.debitAmount,
+    creditAmount: item.creditAmount,
+  })
+  row.counterDetailAccount = item.counterpartAccountName === item.counterpartAccount ? '' : item.counterpartAccountName
+  return row
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -427,7 +412,7 @@ function safeParseRows(jsonStr: string | null | undefined): VoucherCheckRow[] {
 }
 
 function normalizeRow(raw: any): VoucherCheckRow {
-  return {
+  return withRowMeta<VoucherCheckRow>({
     rowId: raw.rowId || generateRowId(),
     customerName: raw.customerName || '',
     date: raw.date || '',
@@ -449,7 +434,7 @@ function normalizeRow(raw: any): VoucherCheckRow {
     actualMisstatement: raw.actualMisstatement !== undefined && raw.actualMisstatement !== null
       ? parseNum(raw.actualMisstatement)
       : undefined,
-  }
+  }, raw)
 }
 
 function createEmptyRow(section: 'current' | 'postPeriod'): VoucherCheckRow {
@@ -531,34 +516,80 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     debouncedSave(ITEM_ID_CONCLUSION, { remark: text })
   }
 
-  // ─── Current Change Rows (1)本期增减 ─────────────────────────────────
+  // ─── Rows：(1)本期增减 / (2)期后结转 ─────────────────────────────────
 
   const currentChangeRows = ref<VoucherCheckRow[]>([])
+  const postPeriodRows = ref<VoucherCheckRow[]>([])
+
+  /** 已在某区块的分录（按指纹）：再次回填 / 挂凭导入仍进那一区块，不在另一区块重复插入 */
+  function sectionHolding(lfp: string | null): 'current' | 'postPeriod' | null {
+    if (!lfp) return null
+    if (currentChangeRows.value.some(r => metaOf(r)?.lfp === lfp)) return 'current'
+    if (postPeriodRows.value.some(r => metaOf(r)?.lfp === lfp)) return 'postPeriod'
+    return null
+  }
+
+  /** 挂凭导入按凭证日期分区：晚于资产负债表日进期后结转 */
+  function sectionByDate(date: string): 'current' | 'postPeriod' {
+    const bs = toValue(options.bsDate) || ''
+    return date && bs && date > bs ? 'postPeriod' : 'current'
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（行元数据 `_gt` 随行 JSON 落库）。
+  // 抽凭进用户在抽凭弹窗里选的区块（宿主传 scope），挂凭导入按凭证日期分区
+  const voucherFill = useVoucherCheckFill<VoucherCheckRow>({
+    projectId: options.projectId,
+    tables: { current: currentChangeRows, postPeriod: postPeriodRows },
+    tableOf: item => sectionHolding(item.meta.lfp)
+      ?? (item.meta.src.includes('attach') ? sectionByDate(String(item.sample.voucherDate ?? '')) : null),
+    mapSampleToRow: item => mapPreparedToVoucherRow(item),
+    persist: () => persistRowsImmediate(),
+    hasUserContent: r => r.checkItems.some(Boolean) || r.actualMisstatement != null
+      || [r.supportingDoc, r.indexRef, r.isAbnormal, r.remark, r.attachment].some(v => String(v ?? '').trim() !== ''),
+    readonly: isReadonly,
+  })
 
   watch(
     () => allResponses.value.get(ITEM_ID_CURRENT_ROWS)?.remark,
-    (jsonStr) => { currentChangeRows.value = safeParseRows(jsonStr) },
+    (jsonStr) => { currentChangeRows.value = safeParseRows(jsonStr); voucherFill.markLoaded() },
     { immediate: true },
   )
-
-  // ─── Post Period Rows (2)期后结转 ────────────────────────────────────
-
-  const postPeriodRows = ref<VoucherCheckRow[]>([])
 
   watch(
     () => allResponses.value.get(ITEM_ID_POST_ROWS)?.remark,
-    (jsonStr) => { postPeriodRows.value = safeParseRows(jsonStr) },
+    (jsonStr) => { postPeriodRows.value = safeParseRows(jsonStr); voucherFill.markLoaded() },
     { immediate: true },
   )
 
+  /** 年审阶段的预审行只读（不可改、不可删、不填 OCR） */
+  function lockedRow(section: 'current' | 'postPeriod', rowId: string): boolean {
+    const row = (section === 'current' ? currentChangeRows.value : postPeriodRows.value).find(r => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   // ─── Persist ─────────────────────────────────────────────────────────
 
+  /** 一区块的行 JSON（年审阶段预审行按读入版本写回，防绕过） */
+  function rowsJson(section: 'current' | 'postPeriod'): string {
+    return section === 'current'
+      ? JSON.stringify(voucherFill.guardPersist(currentChangeRows.value, 'current'))
+      : JSON.stringify(voucherFill.guardPersist(postPeriodRows.value, 'postPeriod'))
+  }
+
   function persistCurrentRows(): void {
-    debouncedSave(ITEM_ID_CURRENT_ROWS, { remark: JSON.stringify(currentChangeRows.value) })
+    debouncedSave(ITEM_ID_CURRENT_ROWS, { remark: rowsJson('current') })
   }
 
   function persistPostRows(): void {
-    debouncedSave(ITEM_ID_POST_ROWS, { remark: JSON.stringify(postPeriodRows.value) })
+    debouncedSave(ITEM_ID_POST_ROWS, { remark: rowsJson('postPeriod') })
+  }
+
+  /** 回填 / 挂凭导入 / 撤销后两区块立即落库（一次性操作，不走防抖） */
+  async function persistRowsImmediate(): Promise<void> {
+    await Promise.all([
+      options.saveImmediate(ITEM_ID_CURRENT_ROWS, { remark: rowsJson('current') }),
+      options.saveImmediate(ITEM_ID_POST_ROWS, { remark: rowsJson('postPeriod') }),
+    ])
   }
 
   // ─── Computed: totals ────────────────────────────────────────────────
@@ -609,7 +640,7 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
   }
 
   function removeSample(section: 'current' | 'postPeriod', rowId: string): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedRow(section, rowId)) return
     if (section === 'current') {
       currentChangeRows.value = currentChangeRows.value.filter(r => r.rowId !== rowId)
       persistCurrentRows()
@@ -620,7 +651,7 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
   }
 
   function updateCell(section: 'current' | 'postPeriod', rowId: string, field: string, value: any): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedRow(section, rowId)) return
 
     const rows = section === 'current' ? currentChangeRows.value : postPeriodRows.value
     const idx = rows.findIndex(r => r.rowId === rowId)
@@ -663,7 +694,7 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     rowId: string,
     patch: Partial<VoucherCheckRow>,
   ): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedRow(section, rowId)) return
     const list = section === 'current' ? currentChangeRows.value : postPeriodRows.value
     const idx = list.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
@@ -678,39 +709,6 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     }
   }
 
-  // ─── 抽凭回填（Req 4/7/24：抽样弹窗结果 → 检查表行，来源=抽凭） ──────────
-
-  /**
-   * 将抽样引擎回传的样本按填充模式回写到指定区块，行来源标注为「抽凭」。
-   *
-   * - 复用 applyFillMode 的 append/replace/merge 语义（keyed by voucherNo）。
-   * - 只读状态禁用回填（Req 12.3）。
-   *
-   * @param samples  抽样引擎 @filled 回调的样本集合
-   * @param fillMode 填充模式（append/replace/merge）
-   * @param section  目标区块（本期增减 / 期后结转）
-   * @returns 实际回填的样本数量
-   */
-  function fillFromSampling(
-    samples: SampledVoucherLike[],
-    fillMode: FillMode,
-    section: 'current' | 'postPeriod',
-  ): number {
-    if (isReadonly.value) return 0
-    if (!Array.isArray(samples) || samples.length === 0) return 0
-
-    const incoming = samples.map(mapSampledToVoucherRow)
-
-    if (section === 'current') {
-      currentChangeRows.value = applyVoucherFillMode(currentChangeRows.value, incoming, fillMode)
-      persistCurrentRows()
-    } else {
-      postPeriodRows.value = applyVoucherFillMode(postPeriodRows.value, incoming, fillMode)
-      persistPostRows()
-    }
-    return incoming.length
-  }
-
   // ─── 行级 OCR（复用 /d4/contract-ocr 范式，参照 G4/G6） ────────────────
 
   /** 正在执行 OCR 的行 rowId（用于 loading 态） */
@@ -723,7 +721,7 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
    * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 1.5
    */
   async function handleRowOcr(section: 'current' | 'postPeriod', rowId: string, file: File): Promise<boolean> {
-    if (isReadonly.value) return false
+    if (isReadonly.value || lockedRow(section, rowId)) return false
     if (!options.wpId.value) return false
 
     // 文件类型校验（Req 1.5）
@@ -819,7 +817,8 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
 
     let changed = false
     const newRows = postPeriodRows.value.map(row => {
-      if (!row.date) return row
+      // 年审阶段的预审行只读，不改标记
+      if (!row.date || voucherFill.isRowLocked(row)) return row
       const voucherDate = new Date(row.date)
       if (isNaN(voucherDate.getTime())) return row
 
@@ -857,8 +856,13 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     // 检查结论（AI 辅助）
     conclusion,
     updateConclusion,
-    // 抽凭回填
-    fillFromSampling,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     // OCR
     ocrLoadingRowId,
     handleRowOcr,

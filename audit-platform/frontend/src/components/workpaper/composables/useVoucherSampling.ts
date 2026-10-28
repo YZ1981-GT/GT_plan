@@ -10,10 +10,10 @@
  * - validateConfig() — 委托 validateSamplingConfig
  * - triggerSampling() — POST /voucher-extract → 填充 sampledVouchers → 打开预览
  * - 选中统计 computed：selectedVouchers、selectedCount、selectedDebitTotal、selectedCreditTotal
- * - confirmFill(mode) — 按 phase 约束 mode → 生成 before_data 快照 → 按 mode 合并 → POST /cutoff-fill 记录日志
- * - fill mode 逻辑：append/replace/merge（replace 时仅清当前 phase 行）
+ * - confirmFill() — POST /cutoff-fill 记录日志，返回本次样本；合并进底稿归宿主的共享回填函数（ADR-VK-07）
+ * - 回填模式：追加 / 替换本阶段抽凭行（旧「合并」按追加）
  * - loadHistory() — GET /voucher-history
- * - undoLastExtraction(logId) — POST /voucher-undo
+ * - undoLastExtraction(logId) — POST /voucher-undo（宿主按批次删行，ADR-VK-08）
  * - compareVersions(logIdA, logIdB) — POST /voucher-compare
  * - updateField(index, field, value) — 更新字段 + 追加 edit_trail entry
  * - batchMarkChecked(indices) — 批量设 checkResult='Y' + 追加 trail
@@ -112,7 +112,8 @@ export interface VoucherSamplingOptions {
    * 静态快照会把它固化成空串。
    */
   wpCode?: string | Ref<string> | (() => string)
-  phase: Ref<Phase>
+  /** 项目当前审计阶段（引擎从项目读，需求 6.2） */
+  phase: Ref<Phase> | ComputedRef<Phase>
   defaultMethod?: SamplingMethod
   /** 初始期间月份 1-12（如期后默认 [1,2,3]） */
   initialPeriodRange?: number[]
@@ -143,6 +144,8 @@ export interface ExtractionLogEntry {
   phase: Phase
   fillMode: FillMode
   isUndone: boolean
+  /** 抽凭批次号（撤销时宿主按它删本批次填入的行） */
+  batchId: string | null
   extractionCriteria: Record<string, unknown>
   // ─── 方法学增强回显（R22 重抽治理/可复现；后端未就绪时兜底为 null）─────────
   /** 本次抽样使用的随机种子（R22.2 可复现，在历史与版本链展示） */
@@ -163,48 +166,15 @@ export interface CompareResult {
   retained: SampledVoucher[]
 }
 
-// ─── Pure Function: applyFillMode（独立导出供 PBT 测试） ─────────────────────
-
-/**
- * 填充策略纯函数
- *
- * - append: 将 selected 追加到 existing（当前 phase 行）末尾
- * - replace: 仅清空当前 phase 行，替换为 selected（保留其他 phase 行不动）
- * - merge: 按 voucher_no 去重，已存在于同 phase 的不重复添加
- *
- * @param existing 全量已有 samples（含所有 phase）
- * @param selected 本次要填充的凭证（已含正确 phase）
- * @param mode 填充策略
- * @param currentPhase 当前操作阶段
- */
-export function applyFillMode(
-  existing: SampledVoucher[],
-  selected: SampledVoucher[],
-  mode: FillMode,
-  currentPhase: Phase,
-): SampledVoucher[] {
-  switch (mode) {
-    case 'append':
-      return [...existing, ...selected]
-
-    case 'replace': {
-      // 仅清除当前 phase 行，保留其他 phase 行
-      const otherPhaseRows = existing.filter(v => v.phase !== currentPhase)
-      return [...otherPhaseRows, ...selected]
-    }
-
-    case 'merge': {
-      // 获取当前 phase 已有的 voucher_no 集合
-      const existingPhaseNos = new Set(
-        existing.filter(v => v.phase === currentPhase).map(v => v.voucherNo),
-      )
-      const newItems = selected.filter(v => !existingPhaseNos.has(v.voucherNo))
-      return [...existing, ...newItems]
-    }
-
-    default:
-      return [...existing, ...selected]
-  }
+/** 撤销失败的原因（给用户看的中文）；后端业务详情在信封 message 里，http 拦截器会补成 detail */
+export function undoFailureReason(err: unknown): string {
+  const res = (err as { response?: { status?: number; data?: Record<string, unknown> } } | null)?.response
+  const raw = res?.data?.detail ?? res?.data?.message
+  const detail = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).message : raw
+  if (res?.status === 403) return '没有本底稿的编辑权限'
+  if (res?.status === 404) return '抽凭记录不存在'
+  if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  return '请稍后重试'
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -802,7 +772,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           expected_misstatement: config.value.expectedMisstatement ?? null,
         },
         random_seed: config.value.randomSeed ?? null,
-        phase: phase.value,
+        // 后端只收预审 / 年审（其他 422）；宿主借 phase 传「本期 / 期后」的不发，由后端按项目阶段取
+        phase: phase.value === 'preliminary' || phase.value === 'final' ? phase.value : undefined,
         workpaper_id: workpaperId.value,
         year: year.value,
         filters: {
@@ -853,6 +824,9 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         id: item.id != null ? String(item.id) : undefined,  // 序时账行 id（P3 行级排除）
         voucherKey: item.voucher_key ?? null,
         lineFp: item.line_fp ?? null,
+        pairing: item.pairing ?? null,
+        voucherEntriesOmitted: item.voucher_entries_omitted === true,
+        voucherLineCount: item.voucher_line_count ?? null,
         voucherNo: item.voucher_no ?? item.voucherNo ?? '',
         voucherDate: item.voucher_date ?? item.voucherDate ?? '',
         summary: item.summary ?? null,
@@ -1103,28 +1077,20 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   // ─── confirmFill ────────────────────────────────────────────────────────
 
   /**
-   * 确认填充：按 phase 约束 mode → 生成 before_data 快照 → 按 mode 合并 → POST 记录日志
+   * 确认填充：POST /cutoff-fill 记录日志，返回本次勾选的样本（带凭证键、分录指纹、配对结果）。
    *
-   * 返回合并后的全量 samples，由父组件决定如何集成
-   *
-   * @param existingSamples 当前已有的全量 samples（由父组件传入）
+   * 合并进底稿由宿主经共享回填函数做（shared/voucherCheckFill，ADR-VK-07）：「追加」按分录指纹去重，
+   * 「替换本阶段抽凭行」只删同阶段、来源只有抽凭的行。引擎不再计算合并结果、不写 before_data 快照
+   * （撤销按批次删行，ADR-VK-08）。旧的「合并」按「追加」记。
    */
-  async function confirmFill(existingSamples?: SampledVoucher[]): Promise<SampledVoucher[]> {
+  async function confirmFill(): Promise<SampledVoucher[]> {
     const selected = selectedVouchers.value
     if (selected.length === 0) {
       ElMessage.warning('请至少勾选一条凭证')
       return []
     }
 
-    const existing = existingSamples ?? []
-    // 年审阶段强制 append
-    const effectiveMode: FillMode = phase.value === 'final' ? 'append' : fillMode.value
-
-    // 生成 before_data 快照（当前 phase 的行）
-    const beforeData = existing.filter(v => v.phase === phase.value)
-
-    // 应用填充策略
-    const result = applyFillMode(existing, selected, effectiveMode, phase.value)
+    const effectiveMode: FillMode = fillMode.value === 'replace' ? 'replace' : 'append'
 
     // R9.1 创建版本链快照（经 useVersionTrail；含方法/间隔/样本量/seed，
     // 执行人与时间由后端补全）。fire-and-forget，失败不阻塞主流程。
@@ -1146,7 +1112,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 版本链实例化失败（如无 Pinia 环境）不影响回填主流程
     }
 
-    // 记录填充日志（含 before_data 快照 — 向后兼容）
+    // 记录填充日志
     try {
       const fillRes = await http.post(
         `/api/projects/${projectId.value}/sampling/cutoff-fill`,
@@ -1224,7 +1190,6 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           total_matched: coverageStats.value?.populationCount ?? selected.length,
           filled_count: selected.length,
           fill_mode: effectiveMode,
-          before_data: beforeData,
         },
       )
       // R6.2 批次留痕：`cutoff-fill` 回报本次批次号，供底稿方法学 bar 渲染。
@@ -1238,11 +1203,11 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       return []
     }
 
-    // 关闭预览
+    // 关闭预览。底稿填入几行由宿主的共享回填函数报（去重 / 多科目展开后行数与样本数不同），这里只报样本数
     previewVisible.value = false
-    ElMessage.success(`成功填充${selected.length}笔凭证`)
+    ElMessage.success(`已确认 ${selected.length} 笔抽凭样本`)
 
-    return result
+    return [...selected]
   }
 
   // ─── toggleSelectAll ────────────────────────────────────────────────────
@@ -1278,6 +1243,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           phase: criteria.phase ?? item.phase ?? 'preliminary',
           fillMode: item.fill_mode ?? item.fillMode ?? 'append',
           isUndone: item.is_undone ?? item.isUndone ?? false,
+          batchId: item.batch_id != null ? String(item.batch_id) : null,
           extractionCriteria: criteria,
           // ─── 方法学增强回显（R22 seed/重抽原因；R17 间隔；R18 结论）兜底 null ──
           randomSeed: item.random_seed ?? item.randomSeed ?? criteria.random_seed ?? null,
@@ -1315,32 +1281,26 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   // ─── undoLastExtraction ─────────────────────────────────────────────────
 
   /**
-   * 撤销最近一次抽凭操作 — POST /voucher-undo
+   * 撤销最近一次抽凭操作 — POST /voucher-undo（只标记日志、撤销登记；底稿行由宿主按批次删，ADR-VK-08）
+   *
+   * 成功返回 true（不提示，提示语由删行的一方按实际删除行数写）；失败提示原因并返回 false。
    *
    * @param logId 要撤销的日志记录 ID
-   * @returns before_data（撤销前的快照数据）
    */
-  async function undoLastExtraction(logId: string): Promise<SampledVoucher[]> {
+  async function undoLastExtraction(logId: string): Promise<boolean> {
     try {
-      const res = await http.post(
+      await http.post(
         `/api/projects/${projectId.value}/sampling/voucher-undo`,
         null,
-        { params: { log_id: logId } },
+        { params: { log_id: logId }, _silent: true } as any,
       )
-
-      const data = res.data as any
-      const beforeData: SampledVoucher[] = data?.before_data ?? data?.beforeData ?? []
-
-      ElMessage.success('已撤销，底稿数据已恢复')
-
-      // 刷新历史列表
-      await loadHistory()
-
-      return beforeData
-    } catch {
-      ElMessage.error('撤销失败，请稍后重试')
-      return []
+    } catch (err) {
+      ElMessage.error(`撤销失败：${undoFailureReason(err)}，底稿未改动`)
+      return false
     }
+    // 刷新历史列表
+    await loadHistory()
+    return true
   }
 
   // ─── compareVersions ────────────────────────────────────────────────────

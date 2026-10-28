@@ -155,7 +155,7 @@
 
       <div class="specific-sample" v-if="!isReadonly || samplingParams.specificSampleNote">
         <span class="param-label">特定样本：</span>
-        <el-input
+        <WpCommitInput
           v-if="!isReadonly"
           :model-value="samplingParams.specificSampleNote"
           size="small"
@@ -225,6 +225,11 @@
         :summary-method="getTableSummary"
       >
         <el-table-column prop="seq" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <el-table-column label="使用权资产" align="center">
           <el-table-column label="类别" min-width="80">
@@ -523,7 +528,7 @@
           </div>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="auditNote"
         type="textarea"
         :autosize="{ minRows: 4, maxRows: 10 }"
@@ -544,7 +549,7 @@
           </div>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
@@ -576,12 +581,12 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :account-code="ROU_COST_CODE"
-        phase="final"
         default-method="mus"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -595,7 +600,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐致同五段式：目标 → 样本选取 → 测试（原值/折旧/减值/净值 + 终止损益 + 核对1–5）
  * → 检查比例 → 说明/结论；平台增强 CAS21 终止损益 + H9 同步
  */
-import { computed, ref, toRef, inject, type Ref } from 'vue'
+import { computed, ref, toRef, inject, onMounted, type Ref } from 'vue'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -614,10 +619,12 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { SampledVoucher } from '../../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 // spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
@@ -670,12 +677,20 @@ const {
   draftConclusion,
   rowClassName,
   load,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  isVoucherRowLocked,
+  voucherFillReady,
 } = useH8DisposalCheck({
   wpId,
   projectId,
   allResponses: toRef(props, 'allResponses'),
   onSave: (itemId, value) => emit('save', itemId, value),
+  isReadonly,
 })
+
+onMounted(() => { void voucherFillReady() })
 
 const h8ReloadAll = inject<() => Promise<void>>('h8ReloadAll', async () => {})
 const { isExporting, isImporting, exportTemplate, exportData, importData } = useH8ImportExport({
@@ -798,29 +813,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H8_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: { samples?: SampledVoucher[] }) {
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  showSampling.value = false
-  const items = payload?.samples || []
-  if (!items.length) return
-  for (const item of items) {
-    addRow(String(item.summary || item.voucherNo || ''))
-    const last = rows.value[rows.value.length - 1]
-    if (!last) continue
-    if (item.voucherNo) updateCell(last.rowId, 'voucherNo', item.voucherNo)
-    const amt = Math.abs(Number(item.creditAmount ?? item.debitAmount) || 0)
-    if (amt) updateCell(last.rowId, 'rouCost', amt)
-    if (item.voucherDate) updateCell(last.rowId, 'reductionDate', item.voucherDate)
-    if (item.counterpartAccount) updateCell(last.rowId, 'oppositeAccount', item.counterpartAccount)
-  }
+  void persistMethodology(payload?.methodology)
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSampling.value = false
 }
 
 function getTableSummary({ columns }: { columns: any[] }) {

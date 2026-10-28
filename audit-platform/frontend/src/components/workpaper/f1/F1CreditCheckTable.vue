@@ -10,7 +10,7 @@
     <el-table-column label="供应商名称" width="120" fixed>
       <template #default="{ row }">
         <span v-if="row.rowId === '__subtotal__'" class="subtotal-label">合计</span>
-        <el-input
+        <WpCommitInput
           v-else
           :model-value="row.supplierName"
           size="small"
@@ -19,9 +19,18 @@
         />
       </template>
     </el-table-column>
+    <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+    <el-table-column label="来源" width="150">
+      <template #default="{ row }">
+        <VoucherRowMetaCell
+          v-if="row.rowId !== '__subtotal__'"
+          :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId ?? ''" :year="year ?? 0"
+        />
+      </template>
+    </el-table-column>
     <el-table-column label="日期" width="100">
       <template #default="{ row }">
-        <el-input
+        <WpCommitInput
           v-if="row.rowId !== '__subtotal__'"
           :model-value="row.date"
           size="small"
@@ -33,7 +42,7 @@
     </el-table-column>
     <el-table-column label="凭证编号" width="90">
       <template #default="{ row }">
-        <el-input
+        <WpCommitInput
           v-if="row.rowId !== '__subtotal__'"
           :model-value="row.voucherNo"
           size="small"
@@ -45,7 +54,7 @@
     <el-table-column label="记账凭证" align="center">
       <el-table-column label="业务内容" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.businessContent"
             size="small"
@@ -56,7 +65,7 @@
       </el-table-column>
       <el-table-column label="对方科目" width="90">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.counterAccount"
             size="small"
@@ -67,7 +76,7 @@
       </el-table-column>
       <el-table-column label="对方明细科目" width="100">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.counterDetailAccount"
             size="small"
@@ -79,7 +88,7 @@
       <el-table-column label="贷方金额" width="100" align="right">
         <template #default="{ row }">
           <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(checkedTotal) }}</span>
-          <el-input
+          <WpCommitInput
             v-else
             :model-value="row.creditAmount"
             size="small"
@@ -92,7 +101,7 @@
     <el-table-column label="入库单/签收单" align="center">
       <el-table-column label="日期/编号" width="100">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.recvDateNo"
             size="small"
@@ -103,7 +112,7 @@
       </el-table-column>
       <el-table-column label="品名" width="90">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.recvItemName"
             size="small"
@@ -114,7 +123,7 @@
       </el-table-column>
       <el-table-column label="单位" width="60">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.recvUnit"
             size="small"
@@ -125,7 +134,7 @@
       </el-table-column>
       <el-table-column label="数量" width="70">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.recvQty"
             size="small"
@@ -138,7 +147,7 @@
     <el-table-column label="发票" align="center">
       <el-table-column label="日期/编号" width="100">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.invoiceDateNo"
             size="small"
@@ -149,7 +158,7 @@
       </el-table-column>
       <el-table-column label="对方单位名称" width="110">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.invoiceCounterparty"
             size="small"
@@ -160,7 +169,7 @@
       </el-table-column>
       <el-table-column label="金额" width="90" align="right">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.invoiceAmount"
             size="small"
@@ -172,7 +181,7 @@
     </el-table-column>
     <el-table-column label="索引号" width="70">
       <template #default="{ row }">
-        <el-input
+        <WpCommitInput
           v-if="row.rowId !== '__subtotal__'"
           :model-value="row.indexRef"
           size="small"
@@ -243,6 +252,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import { f1VoucherEvidence } from './f1VoucherEvidence'
 import {
   F1_ABNORMAL_OPTIONS,
@@ -252,6 +262,7 @@ import {
   type F1CreditCheckRow,
   type F1VoucherSection,
 } from '../composables/useF1ComprehensiveCheck'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   rows: F1CreditCheckRow[]
@@ -262,6 +273,10 @@ const props = defineProps<{
   wpId?: string
   projectId?: string
   evidenceSection?: F1VoucherSection
+  /** 年审阶段的预审行只读（父组件的共享回填函数判定）：来源列加「只读」、行置灰点不进 */
+  isRowLocked?: (row: F1CreditCheckRow) => boolean
+  /** 审计年度（来源列「多科目」看整张凭证用） */
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -299,8 +314,9 @@ const tableData = computed(() => [
   } as F1CreditCheckRow,
 ])
 
-function rowClassName({ row }: { row: { rowId: string } }) {
-  return row.rowId === '__subtotal__' ? 'subtotal-row' : ''
+function rowClassName({ row }: { row: F1CreditCheckRow }) {
+  if (row.rowId === '__subtotal__') return 'subtotal-row'
+  return props.isRowLocked?.(row) ? 'gt-row-locked' : ''
 }
 
 function fmtAmount(val: number | null | undefined): string {

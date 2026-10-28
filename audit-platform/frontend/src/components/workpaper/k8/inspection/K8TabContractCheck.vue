@@ -44,21 +44,27 @@
     <!-- ═══ 合同摊销核对表格 ═══ -->
     <el-table :data="rows" border size="small" style="width:100%;font-size:13px" max-height="480" :row-class-name="rowClassName">
       <el-table-column type="index" label="#" width="42" align="center" fixed />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="currentYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="项目" min-width="110" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="如 律师费" @change="(v: string) => updateCell(row.rowKey, 'projectName', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="如 律师费" @change="(v: string) => updateCell(row.rowKey, 'projectName', v)" />
           <span v-else>{{ row.projectName || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="对方单位" min-width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCell(row.rowKey, 'counterparty', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCell(row.rowKey, 'counterparty', v)" />
           <span v-else>{{ row.counterparty || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="合同内容" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.contractContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractContent', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.contractContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractContent', v)" />
           <span v-else>{{ row.contractContent || '-' }}</span>
         </template>
       </el-table-column>
@@ -70,13 +76,13 @@
       </el-table-column>
       <el-table-column label="实际开票方" min-width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.invoiceParty" size="small" @change="(v: string) => updateCell(row.rowKey, 'invoiceParty', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.invoiceParty" size="small" @change="(v: string) => updateCell(row.rowKey, 'invoiceParty', v)" />
           <span v-else>{{ row.invoiceParty || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="支付条件" min-width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.paymentTerm" size="small" @change="(v: string) => updateCell(row.rowKey, 'paymentTerm', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.paymentTerm" size="small" @change="(v: string) => updateCell(row.rowKey, 'paymentTerm', v)" />
           <span v-else>{{ row.paymentTerm || '-' }}</span>
         </template>
       </el-table-column>
@@ -129,19 +135,19 @@
       </el-table-column>
       <el-table-column label="合同索引" min-width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.contractIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractIndex', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.contractIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractIndex', v)" />
           <span v-else>{{ row.contractIndex || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="凭证索引" min-width="90">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherIndex', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.voucherIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherIndex', v)" />
           <span v-else>{{ row.voucherIndex || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="审计结论" min-width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small" @change="(v: string) => updateCell(row.rowKey, 'conclusion', v)" />
+          <WpCommitInput v-if="!isReadonly" :model-value="row.conclusion" size="small" @change="(v: string) => updateCell(row.rowKey, 'conclusion', v)" />
           <span v-else>{{ row.conclusion || '-' }}</span>
         </template>
       </el-table-column>
@@ -180,9 +186,9 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         :account-code="samplingAccountCode"
-        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -234,10 +240,13 @@
  * 源模板 K8-5 为合同费用摊销核对表（合同总月份/本期应计月份/应计损益 vs 已计/差异）。
  * 复用 useK8ContractAmortization（纯摊销计算）。
  */
-import { ref, toRef, inject, computed, defineAsyncComponent } from 'vue'
+import { ref, toRef, inject, computed, defineAsyncComponent, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK8ContractAmortization, type K8AmortRow } from '@/components/workpaper/composables/useK8ContractAmortization'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
+import { combineRowClass, type EngineFilledPayload } from '@/components/workpaper/composables/shared/voucherCheckFill'
 import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
@@ -295,6 +304,7 @@ const {
   updateCell,
   setAmortPeriod,
   saveConclusion,
+  onEngineFilled, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
 } = useK8ContractAmortization({
   allResponses: toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>,
   projectId: toRef(props, 'projectId'),
@@ -389,9 +399,12 @@ function pushDiffToK83(): void {
 }
 
 // ═══ UI Helpers ═══
-function rowClassName({ row }: { row: K8AmortRow }): string {
+function diffRowClass({ row }: { row: K8AmortRow }): string {
   return Math.abs(row.diff) > 1 ? 'diff-row' : ''
 }
+/** 差异行样式 + 年审阶段预审行只读样式 */
+const rowClassName = combineRowClass(diffRowClass, voucherRowClass)
+onMounted(() => { void voucherFillReady() })
 
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || Math.abs(v) < 0.005) return '-'
@@ -400,13 +413,10 @@ function fmtAmt(v: number | null | undefined): string {
 
 // ═══ 抽凭引擎 ═══
 const showSamplingDialog = ref(false)
-function handleVoucherFilled(payload: any): void {
-  const vouchers = payload?.samples ?? []
-  for (const v of vouchers) {
-    addRow(v.summary || v.voucherNo || '抽凭样本')
-  }
-  showSamplingDialog.value = false
-  if (vouchers.length) ElMessage.success(`已填入${vouchers.length}笔凭证样本`)
+/** 抽凭引擎回填：共享回填函数一笔样本一个合同行，按分录指纹去重，填完由它保存并提示填入几行 */
+async function handleVoucherFilled(payload: EngineFilledPayload): Promise<void> {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 // ═══ 行级OCR ═══

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** F4TabVoucherCheck — F4-8 应付账款检查表（借/贷两区 + 弹窗逐单据核对） */
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import {
   useF4VoucherCheck,
   F4_VOUCHER_SECTION_LABELS,
@@ -11,7 +11,7 @@ import {
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import { useStickySectionNav } from '../composables/useStickySectionNav'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import F4VoucherCheckTable from './F4VoucherCheckTable.vue'
 import F4VoucherCheckDialog from './F4VoucherCheckDialog.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
@@ -34,6 +34,7 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // ─── 科目映射码注入（provide/inject，与 D/E 循环同模式）────────────────────────
 // GtF4.vue provide('tbSourceCodes', ...) → 本组件 inject → f4GrossQueryCodes(src) 三层降级
@@ -89,7 +90,11 @@ const {
   removeRow,
   updateCell,
   saveRow,
-  applySamplingResults,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  isVoucherRowLocked,
+  voucherFillReady,
   saveAuditNote,
   saveAuditConclusion,
   saveSampleBasis,
@@ -105,7 +110,6 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
 )
 
 const auditYear = computed<number | null>(() => props.year ?? null)
-const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value)
 
@@ -167,6 +171,7 @@ async function refreshAttachedCount(): Promise<void> {
   } catch { attachedCount.value = 0 }
 }
 void refreshAttachedCount()
+onMounted(() => { void voucherFillReady() })
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
@@ -179,17 +184,20 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, auditYear.value, props.wpId, F4_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填：按借贷方向进本期借方 / 贷方区，共享回填函数一个对方科目一行（后端配对），按分录指纹去重，
+ * 填入几行由共享函数提示；「替换本阶段抽凭行」只删本阶段抽凭填入的行。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  applySamplingResults(payload.samples, payload.fillMode)
+  void persistMethodology(payload?.methodology)
+  await onEngineFilled(payload)
 }
 
 function aiContext() {
@@ -271,7 +279,7 @@ async function generateAiConclusion() {
           <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="sampleBasis"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
@@ -310,15 +318,15 @@ async function generateAiConclusion() {
     </nav>
 
     <el-collapse id="f4-8-sampling" class="sampling-engine-collapse">
-      <el-collapse-item title="自动抽凭（科目 ${samplingAccountCode} 应付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+      <el-collapse-item :title="`自动抽凭（科目 ${samplingAccountCode} 应付账款 · 样本按借贷方向自动分配）`" name="auto-sampling">
         <GtVoucherSamplingEngine
           :account-code="samplingAccountCode"
-          :phase="currentPhase"
           default-method="random"
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="auditYear"
           @filled="handleSamplingFilled"
+          @undo-request="onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
@@ -334,6 +342,8 @@ async function generateAiConclusion() {
         :is-readonly="isReadonly"
         :wp-id="wpId"
         :project-id="projectId"
+        :year="auditYear"
+        :is-row-locked="isVoucherRowLocked"
         :all-responses="allResponses"
         @add-row="addRow('debit')"
         @remove-row="(rowId) => removeRow('debit', rowId)"
@@ -350,6 +360,8 @@ async function generateAiConclusion() {
         :is-readonly="isReadonly"
         :wp-id="wpId"
         :project-id="projectId"
+        :year="auditYear"
+        :is-row-locked="isVoucherRowLocked"
         :all-responses="allResponses"
         @add-row="addRow('credit')"
         @remove-row="(rowId) => removeRow('credit', rowId)"
@@ -393,7 +405,7 @@ async function generateAiConclusion() {
             @click="generateAiNote"
           >🤖 AI生成说明</el-button>
         </div>
-        <el-input
+        <WpCommitInput
           :model-value="auditNote"
           type="textarea"
           :autosize="{ minRows: 4, maxRows: 10 }"
@@ -418,7 +430,7 @@ async function generateAiConclusion() {
           >🤖 AI生成结论</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"

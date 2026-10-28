@@ -95,7 +95,7 @@
 
       <el-table-column label="被投资方" width="150" fixed>
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.investeeName"
             size="small"
             :disabled="isReadonly"
@@ -151,7 +151,7 @@
             </el-select>
           </template>
           <template v-else>
-            <el-input
+            <WpCommitInput
               :model-value="row[col.prop] as string"
               size="small"
               :disabled="isReadonly"
@@ -180,7 +180,7 @@
         border
         size="small"
         max-height="480"
-        :row-class-name="subsequentRowClassName"
+        :row-class-name="subsequentRowClassNameWithLock"
         class="calc-check-table"
       >
         <el-table-column label="序号" width="55" align="center" fixed>
@@ -189,6 +189,13 @@
             <el-tooltip v-if="calcCheck.isSamplingRow(row)" content="来源: 抽凭引擎" placement="top">
               <span class="sample-flag">📌</span>
             </el-tooltip>
+          </template>
+        </el-table-column>
+
+        <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="calcCheck.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear ?? 0" />
           </template>
         </el-table-column>
 
@@ -208,7 +215,7 @@
                 :model-value="row[col.prop]"
                 type="date"
                 size="small"
-                :disabled="isReadonly"
+                :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 value-format="YYYY-MM-DD"
                 style="width:100%"
                 @update:model-value="(v: string) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? '' })"
@@ -219,7 +226,7 @@
                 :model-value="row[col.prop] as number"
                 size="small"
                 :controls="false"
-                :disabled="isReadonly"
+                :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 style="width:100%"
                 @update:model-value="(v: number) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? 0 })"
               />
@@ -228,7 +235,7 @@
               <el-select
                 :model-value="row[col.prop]"
                 size="small"
-                :disabled="isReadonly"
+                :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 clearable
                 style="width:100%"
                 @change="(v: string) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? '' })"
@@ -240,7 +247,7 @@
               <el-select
                 :model-value="row[col.prop]"
                 size="small"
-                :disabled="isReadonly"
+                :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 clearable
                 style="width:100%"
                 @change="(v: string) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? '' })"
@@ -249,10 +256,10 @@
               </el-select>
             </template>
             <template v-else>
-              <el-input
+              <WpCommitInput
                 :model-value="row[col.prop] as string"
                 size="small"
-                :disabled="isReadonly"
+                :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 @change="(v: string) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v })"
               />
             </template>
@@ -261,7 +268,7 @@
 
         <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
           <template #default="{ row }">
-            <el-icon class="delete-icon" @click="calcCheck.removeRow(row.id)"><Delete /></el-icon>
+            <el-icon v-if="!calcCheck.isVoucherRowLocked(row)" class="delete-icon" @click="calcCheck.removeRow(row.id)"><Delete /></el-icon>
           </template>
         </el-table-column>
       </el-table>
@@ -340,7 +347,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎 - 科目 ${samplingAccountCode}应收股利（期后收回）"
+      :title="`抽凭引擎 - 科目 ${samplingAccountCode}应收股利（期后收回）`"
       width="860px"
       destroy-on-close
       append-to-body
@@ -356,13 +363,13 @@
       <SamplingEngine
         v-if="showSamplingDialog && samplingYear != null"
         :account-code="samplingAccountCode"
-        phase="final"
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         :initial-period-range="[1, 2, 3]"
         @filled="handleSamplingFilled"
+        @undo-request="calcCheck.onUndoRequest"
       />
       <el-empty v-else-if="showSamplingDialog" description="未配置审计年度，无法确定期后抽凭年度。请在项目上下文设置审计年度/资产负债表日。" />
       <template #footer>
@@ -398,7 +405,8 @@ import {
 import type { CalcCheckRow, CalcCheckColumn, SubsequentColumn, SubsequentRow } from '../composables/useG3CalcCheck'
 import type { G3ImportableSheet } from '../composables/useG3ImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
-import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 
 /**
  * 抽凭科目码 —— inject 驱动。
@@ -406,6 +414,7 @@ import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
  */
 import { gCycleScope } from '../composables/gCycleAccountScope'
 import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -451,6 +460,7 @@ const calcCheck = useG3CalcCheck({
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
   cutoffDate: cutoffDateRef,
+  projectId: () => props.projectId,
 })
 
 /** G3-2 变更后进入本页：若已有测算行则静默重同步 */
@@ -464,7 +474,10 @@ function softSyncFromDetailIfNeeded() {
   calcCheck.syncFromDetail({ quiet: true })
 }
 
-onMounted(() => softSyncFromDetailIfNeeded())
+onMounted(() => {
+  softSyncFromDetailIfNeeded()
+  void calcCheck.voucherFillReady()
+})
 if (detailRevision) watch(detailRevision, () => softSyncFromDetailIfNeeded())
 
 const importSheet = computed<G3ImportableSheet>(() =>
@@ -527,6 +540,9 @@ function subsequentRowClassName({ row }: { row: SubsequentRow }): string {
   return classes.join(' ')
 }
 
+/** 期后区行样式：异常 / 非期后 + 年审阶段预审行只读 */
+const subsequentRowClassNameWithLock = combineRowClass(subsequentRowClassName, calcCheck.voucherRowClass)
+
 function isReasonFieldMissing(row: CalcCheckRow, prop: keyof CalcCheckRow): boolean {
   if (prop === 'varianceReason' || prop === 'indexNo') return needsVarianceReason(row)
   if (prop === 'decreaseIndexNo' || prop === 'decreaseRemark') return needsDecreaseExplain(row)
@@ -575,46 +591,13 @@ async function onPushToG33() {
   calcCheck.pushVariancesToAdjustment()
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[] } | SampledVoucher[]) {
-  const samples = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!samples.length) return
-  const mapped = samples.flatMap((s) => {
-    const debit = parseFloat(s.debitAmount ?? '0') || 0
-    const credit = parseFloat(s.creditAmount ?? '0') || 0
-    const entries = s.voucherEntries || []
-    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
-    if (isMulti) {
-      const counterEntries = entries.filter((e: any) =>
-        debit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-      )
-      const toWrite = counterEntries.length > 0 ? counterEntries : entries
-      return toWrite.map((e: any) => ({
-        voucherDate: s.voucherDate ?? '',
-        voucherNo: s.voucherNo ?? '',
-        summary: e.summary || s.summary || '',
-        counterAccount: e.account_code || '',
-        counterAccountName: e.account_name || '',
-        debitAmount: Number(e.debit_amount) || 0,
-        creditAmount: Number(e.credit_amount) || 0,
-        amount: Number(e.debit_amount) || Number(e.credit_amount) || 0,
-        investeeName: s.accountName ?? '',
-      }))
-    }
-    return [{
-      voucherDate: s.voucherDate ?? '',
-      voucherNo: s.voucherNo ?? '',
-      summary: s.summary ?? '',
-      counterAccount: s.counterpartAccount ?? '',
-      counterAccountName: s.counterpartAccountName ?? '',
-      debitAmount: debit,
-      creditAmount: credit,
-      amount: debit || credit,
-      investeeName: s.accountName ?? '',
-    }]
-  })
-  const { filled } = calcCheck.fillFromSamples(mapped, { cutoffDate: cutoffDate.value })
-  showSamplingDialog.value = false
-  if (filled > 0) ElMessage.success(`已填入 ${filled} 条期后抽凭样本`)
+/**
+ * 抽凭引擎回填期后收回区：截止日及以前的凭证剔除，一个对方科目一行（后端配对）、按分录指纹去重，
+ * 填入几行由共享函数提示。原实现按对方分录展开多科目凭证（行金额取对方分录的金额）、不去重，已删除。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload) {
+  const outcome = await calcCheck.onEngineFilled(payload)
+  if (!outcome.cancelled) showSamplingDialog.value = false
 }
 
 function onImported() {

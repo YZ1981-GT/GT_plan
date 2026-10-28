@@ -8,6 +8,8 @@ export const projects = {
   list: '/api/projects',
   listWithProgress: '/api/projects/list-with-progress',
   detail: (id: string) => `/api/projects/${id}`,
+  // 当前审计阶段与预审截止日（GET 读 / PUT 改，凭证身份 spec 任务 8）
+  auditPhase: (id: string) => `/api/projects/${id}/audit-phase`,
   wizard: (id: string) => `/api/projects/${id}/wizard`,
   // audit-report-template-integration 需求 7.6：企业子类型推荐
   templateRecommendation: (id: string) => `/api/projects/${id}/template-recommendation`,

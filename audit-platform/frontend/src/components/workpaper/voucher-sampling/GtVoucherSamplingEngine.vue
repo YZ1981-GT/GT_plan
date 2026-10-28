@@ -8,11 +8,13 @@
  * 通用组件：通过 props 配置适配 D2-7/D4-14/D4-15/E2-7 等所有抽凭底稿
  * Requirements: 5.4, 8.3, 9.1, 9.3, 10.1, 10.3, 10.4, 10.5, 12.3
  */
-import { defineAsyncComponent, toRef, computed, inject, ref, onMounted } from 'vue'
+import { defineAsyncComponent, getCurrentInstance, toRef, computed, inject, ref, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
-import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
+import { useProjectAuditPhase } from '@/composables/useProjectAuditPhase'
+import { useEngineUndo } from './useEngineUndo'
+import { warnDeprecatedEnginePhase, type UndoRequestPayload } from '../composables/shared/voucherCheckFill'
 import { buildSamplingMemo } from '../composables/useSamplingAlgorithms'
 import {
   resolvePopulationReconcile as resolveReconcile,
@@ -47,6 +49,7 @@ import type {
   CheckResult,
   SamplingConfig,
 } from '../composables/useSamplingAlgorithms'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // ─── 异步加载子组件（后续任务实现） ──────────────────────────────────────────
 
@@ -67,7 +70,11 @@ const SamplingComparePanel = defineAsyncComponent(() =>
 
 interface Props {
   accountCode: string
-  phase: Phase
+  /**
+   * @deprecated 阶段取项目当前审计阶段（需求 6.2，项目设置里改），宿主传入的值被忽略；
+   * 「本期 / 期后」等宿主自己的区分不要借这个 prop。接入守卫要求删除。
+   */
+  phase?: string
   defaultMethod?: SamplingMethod
   workpaperId: string
   projectId: string
@@ -79,11 +86,6 @@ interface Props {
   initialConfigPatch?: Partial<SamplingConfig>
   /** 顶部提示（如「已按测试原因预填：大额」） */
   configHint?: string
-  /**
-   * 父底稿当前已有的全量样本（含所有 phase）。用于生成 before_data 快照与
-   * append/replace/merge 的真实前态；不传则视为空前态（向后兼容）。
-   */
-  existingSamples?: SampledVoucher[]
   /**
    * 宿主底稿编码（如 'D2' / 'K8'），用于推断错报推送 A13 时的 source_wp_code 溯源。
    *
@@ -113,7 +115,7 @@ const props = withDefaults(defineProps<Props>(), {
   initialPeriodRange: undefined,
   initialConfigPatch: undefined,
   configHint: '',
-  existingSamples: undefined,
+  phase: undefined,
   wpCode: '',
 })
 
@@ -149,9 +151,22 @@ const emit = defineEmits<{
     fillMode: FillMode
     method?: SamplingMethod
     methodology?: SamplingFilledMethodology
+    /** 抽凭批次号（cutoff-fill 回报）：宿主写进行元数据，撤销时按它删行 */
+    batchId?: string | null
   }): void
   (e: 'phase-changed', payload: { phase: Phase }): void
+  /** 撤销请求：宿主删本批次的行（有已填内容先确认），确认后调 performUndo 才真正撤销（ADR-VK-08） */
+  (e: 'undo-request', payload: UndoRequestPayload): void
 }>()
+
+// ─── 审计阶段：取项目当前阶段（需求 6.2），不再由宿主传 ────────────────────────
+const auditPhase = useProjectAuditPhase(toRef(props, 'projectId'))
+void auditPhase.load()
+const projectPhase = computed<Phase>(() => auditPhase.phase.value)
+/** 「年审（预审截止 2025-09-30）」 */
+const auditPhaseText = auditPhase.text
+warnDeprecatedEnginePhase(props.phase)
+const engineInstance = getCurrentInstance()
 
 // ─── 宿主底稿编码：prop 优先，回落 WorkpaperRuntimeContext ────────────────────
 // 🔴 `inject` 必须在 setup 顶层（写进函数体会静默拿不到，平台已记该踩坑）。
@@ -238,24 +253,12 @@ const {
   year: toRef(props, 'year'),
   workpaperId: toRef(props, 'workpaperId'),
   accountCode: props.accountCode,
-  phase: toRef(props, 'phase'),
+  phase: projectPhase,
   defaultMethod: props.defaultMethod,
   initialPeriodRange: props.initialPeriodRange,
   initialConfigPatch: props.initialConfigPatch,
   // getter 而非静态字符串：runtime.wpCode 在本组件 setup 时未必已就位
   wpCode: () => effectiveWpCode.value,
-})
-
-// ─── Composable: useSamplingPhase ─────────────────────────────────────────────
-
-const {
-  viewMode,
-  visibleSamples,
-  isRowEditable,
-  isFillModeRestricted,
-} = useSamplingPhase({
-  phase: toRef(props, 'phase'),
-  samples: sampledVouchers,
 })
 
 // ─── 已填充 samples（由父组件外部管理，本组件内展示 sampledVouchers） ──────────
@@ -302,14 +305,11 @@ function handleReopenPreview() {
   previewVisible.value = true
 }
 
-/** 批量标记已核查：标记当前可见行 */
+/** 批量标记已核查：标记全部可编辑行 */
 function handleBatchMarkChecked() {
   const indices: number[] = []
-  visibleSamples.value.forEach((row) => {
-    if (canEditRow(row)) {
-      const idx = sampledVouchers.value.indexOf(row)
-      if (idx >= 0) indices.push(idx)
-    }
+  sampledVouchers.value.forEach((row, idx) => {
+    if (canEditRow(row)) indices.push(idx)
   })
   if (indices.length > 0) {
     batchMarkChecked(indices)
@@ -406,8 +406,8 @@ async function handleConfirmFill() {
     })
     return
   }
-  // 传入父底稿真实前态，供 before_data 快照与 append/replace/merge 基于真实底稿状态
-  const result = await confirmFill(props.existingSamples)
+  // 合并进底稿归宿主的共享回填函数（追加按分录指纹去重；替换只动本阶段抽凭行，ADR-VK-07）
+  const result = await confirmFill()
   if (result.length > 0) {
     const methodology: SamplingFilledMethodology = {
       samplingMethod: config.value.samplingMethod,
@@ -427,20 +427,22 @@ async function handleConfirmFill() {
     }
     emit('filled', {
       samples: result,
-      phase: props.phase,
-      fillMode: isFillModeRestricted.value ? 'append' : fillMode.value,
+      phase: projectPhase.value,
+      fillMode: fillMode.value === 'replace' ? 'replace' : 'append',
       method: config.value.samplingMethod,
       methodology,
+      batchId: filledBatchId.value,
     })
     // 检查合规性
     checkCompliance()
   }
 }
 
-/** 视图模式切换 */
-function handleViewModeChange(val: ViewMode) {
-  viewMode.value = val
-}
+// ─── 撤销抽凭：宿主按批次删行（ADR-VK-08），年审阶段不撤销预审批次（需求 6.3）──────
+const { handleUndo } = useEngineUndo({
+  instance: engineInstance, historyList, projectPhase, undoLastExtraction,
+  emitUndoRequest: payload => emit('undo-request', payload),
+})
 
 // ─── 版本对比 ─────────────────────────────────────────────────────────────────
 
@@ -606,13 +608,11 @@ function handleActualMisstatementChange(row: SampledVoucher, val: string) {
 // （78 个宿主都没传 prop ⇒ 该前缀从未真正产生过带编码的 key）。
 
 /**
- * R10.3 行可编辑判定 = phase 约束 **且** 非只读态。
- *
- * `isRowEditable`（来自 useSamplingPhase）只判「年审阶段不可改预审行」，
- * 不含底稿归档/锁定态。此处合并，模板一律走 `canEditRow` 而不再直接用 `isRowEditable`。
+ * R10.3 行可编辑判定：非只读态。引擎表里只有本次抽出的样本（都是项目当前阶段），
+ * 「年审阶段预审行只读」在宿主的底稿行上做（shared/voucherCheckFill 的 rowClass / guardPersist）。
  */
-function canEditRow(row: SampledVoucher): boolean {
-  return !props.readonly && isRowEditable(row)
+function canEditRow(_row: SampledVoucher): boolean {
+  return !props.readonly
 }
 
 const samplingSectionPrefix = computed(() =>
@@ -961,18 +961,8 @@ async function handleResample() {
       </div>
     </el-card>
 
-    <!-- ═══ 视图模式切换 ═══ -->
-    <div class="view-mode-bar">
-      <el-radio-group
-        :model-value="viewMode"
-        size="small"
-        @change="handleViewModeChange"
-      >
-        <el-radio-button value="all">全量</el-radio-button>
-        <el-radio-button value="preliminary">仅预审</el-radio-button>
-        <el-radio-button value="final">仅年审</el-radio-button>
-      </el-radio-group>
-    </div>
+    <!-- ═══ 当前审计阶段（项目设置里改，需求 6.2）═══ -->
+    <div class="audit-phase-bar" data-testid="sampling-audit-phase">当前阶段：{{ auditPhaseText }}</div>
 
     <!-- ═══ CAS 1314 合规警告区 ═══ -->
     <div v-if="complianceWarnings.length > 0" class="compliance-warnings">
@@ -1064,7 +1054,7 @@ async function handleResample() {
 
     <!-- ═══ 主体表格 ═══ -->
     <el-table
-      :data="visibleSamples"
+      :data="sampledVouchers"
       :row-class-name="getRowClassName"
       border
       stripe
@@ -1141,7 +1131,7 @@ async function handleResample() {
       <!-- 实际错报（inline input，R18.1） -->
       <el-table-column label="实际错报(元)" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.actualMisstatement"
             size="small"
             :disabled="!canEditRow(row)"
@@ -1175,7 +1165,7 @@ async function handleResample() {
                 </el-tooltip>
               </el-option>
             </el-select>
-            <el-input
+            <WpCommitInput
               v-if="uncheckedDisposition[row.voucherNo]?.mode === 'alternative_performed'"
               :model-value="uncheckedDisposition[row.voucherNo]?.note ?? ''"
               size="small"
@@ -1214,14 +1204,14 @@ async function handleResample() {
                 deviationAnnotations[row.voucherNo]?.nature === 'human'
               "
             >
-              <el-input
+              <WpCommitInput
                 :model-value="deviationAnnotations[row.voucherNo]?.cause ?? ''"
                 size="small"
                 :disabled="!canEditRow(row)"
                 placeholder="偏差原因（必填）"
                 @change="(val: string) => handleDeviationTextChange(row, 'cause', val)"
               />
-              <el-input
+              <WpCommitInput
                 :model-value="deviationAnnotations[row.voucherNo]?.impact ?? ''"
                 size="small"
                 :disabled="!canEditRow(row)"
@@ -1237,7 +1227,7 @@ async function handleResample() {
       <!-- 备注（inline input） -->
       <el-table-column label="备注" min-width="140">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.remark"
             size="small"
             :disabled="!canEditRow(row)"
@@ -1496,11 +1486,10 @@ async function handleResample() {
       :vouchers="sampledVouchers"
       :coverage-stats="coverageStats"
       :fill-mode="fillMode"
-      :is-fill-mode-restricted="isFillModeRestricted"
       :selected-count="selectedCount"
       :selected-debit-total="selectedDebitTotal"
       :selected-credit-total="selectedCreditTotal"
-      :phase="props.phase"
+      :phase="projectPhase"
       :confirm-blocked-reason="confirmBlockedReason"
       :reconcile-issue="reconcileIssue"
       :reconcile-override-reason="reconcileOverrideReason"
@@ -1515,7 +1504,7 @@ async function handleResample() {
       v-if="historyVisible"
       v-model:visible="historyVisible"
       :history-list="historyList"
-      @undo="undoLastExtraction"
+      @undo="handleUndo"
       @compare="handleCompare"
     />
 
@@ -1753,9 +1742,11 @@ async function handleResample() {
   color: var(--el-text-color-placeholder);
 }
 
-/* ── 视图模式切换 ── */
-.view-mode-bar {
+/* ── 当前审计阶段（原「全量 / 仅预审 / 仅年审」视图条已删） ── */
+.audit-phase-bar {
   margin-bottom: 12px;
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
 }
 
 /* ── CAS 1314 合规警告 ── */

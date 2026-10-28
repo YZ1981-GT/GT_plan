@@ -131,36 +131,20 @@ describe('Feature: cutoff-test-auto-sampling, Property 8: 填充策略正确性'
     )
   })
 
-  it('merge: no duplicate voucherNo, length = N + (M - overlap)', () => {
+  // voucher-identity-writeback-and-audit-phase 任务 9：同一笔按分录指纹认，没有指纹按凭证号 + 日期 + 金额
+  // （与底稿回填 shared/voucherCheckFill.newEntriesOnly 同口径）；以前按凭证号，同号别日的别的凭证会被丢掉
+  it('merge: 同一笔不重复填入，同号别日的照样并入，已有条目原样在前', () => {
     fc.assert(
       fc.property(
         arbUniqueVouchers('V', 0, 10),
-        arbUniqueVouchers('V', 0, 10),
-        (existing, selected) => {
-          const result = applyFillMode(existing, selected, 'merge')
-
-          // Calculate overlap count
-          const existingNos = new Set(existing.map(v => v.voucherNo))
-          const overlapCount = selected.filter(v => existingNos.has(v.voucherNo)).length
-
-          // Length = N + (M - overlap)
-          expect(result.length).toBe(existing.length + (selected.length - overlapCount))
-
-          // No duplicate voucherNo in result
-          const resultNos = result.map(v => v.voucherNo)
-          expect(new Set(resultNos).size).toBe(resultNos.length)
-
-          // All existing items are preserved
-          for (const ex of existing) {
-            expect(resultNos).toContain(ex.voucherNo)
-          }
-
-          // All non-overlapping selected items are present
-          for (const sel of selected) {
-            if (!existingNos.has(sel.voucherNo)) {
-              expect(resultNos).toContain(sel.voucherNo)
-            }
-          }
+        arbUniqueVouchers('S', 0, 10),
+        fc.integer({ min: 0, max: 3 }),
+        (existing, fresh, k) => {
+          const again = existing.slice(0, k).map(v => ({ ...v }))
+          const sameNoOtherDay = existing.slice(0, 1).map(v => ({ ...v, voucherDate: '2031-01-01' }))
+          const result = applyFillMode(existing, [...fresh, ...again, ...sameNoOtherDay], 'merge')
+          expect(result.length).toBe(existing.length + fresh.length + sameNoOtherDay.length)
+          expect(result.slice(0, existing.length)).toEqual(existing)
         },
       ),
       { numRuns: 20 },

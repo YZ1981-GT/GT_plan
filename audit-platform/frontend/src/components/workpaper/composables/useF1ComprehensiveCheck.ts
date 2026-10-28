@@ -10,10 +10,17 @@
  *
  * 借方证据：付款审批单 + 银行回单 + 合同/订单
  * 贷方/期后证据：入库单/验收单 + 发票
+ *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
+ * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcAnomalyRate } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  metaOf, sideTableOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -431,7 +438,7 @@ export function createEmptyCreditRow(): F1CreditCheckRow {
 }
 
 export function normalizeDebitRow(raw: any): F1DebitCheckRow {
-  return {
+  return withRowMeta({
     ...createEmptyDebitRow(),
     rowId: raw.rowId || generateRowId(),
     supplierName: raw.supplierName || raw.customerName || '',
@@ -452,11 +459,11 @@ export function normalizeDebitRow(raw: any): F1DebitCheckRow {
     indexRef: raw.indexRef || '',
     isAbnormal: raw.isAbnormal || '',
     remark: raw.remark || '',
-  }
+  }, raw)
 }
 
 export function normalizeCreditRow(raw: any): F1CreditCheckRow {
-  return {
+  return withRowMeta({
     ...createEmptyCreditRow(),
     rowId: raw.rowId || generateRowId(),
     supplierName: raw.supplierName || raw.customerName || '',
@@ -476,7 +483,43 @@ export function normalizeCreditRow(raw: any): F1CreditCheckRow {
     indexRef: raw.indexRef || '',
     isAbnormal: raw.isAbnormal || '',
     remark: raw.remark || raw.supportingDoc || '',
+  }, raw)
+}
+
+/** 待写入项进哪张表：按分录自己的借贷栏（`sideTableOf`，贷方红字进贷方表、带符号照记） */
+export function f1SectionOf(item: Pick<PreparedItem, 'debitAmount' | 'creditAmount'>): F1VoucherSection {
+  return sideTableOf(item)
+}
+
+/** 共享回填函数的待写入项 → 检查行：金额在样本自己的借贷栏，对方科目 = 编码、对方明细科目 = 名称（配不上写「多科目」） */
+export function mapPreparedToF1Row(item: PreparedItem, section: F1VoucherSection): F1DebitCheckRow | F1CreditCheckRow {
+  const s = item.sample as PreparedItem['sample'] & {
+    summary?: string | null; counterpartName?: string; customerName?: string; supplierName?: string
   }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const base = {
+    supplierName: s.counterpartName || s.customerName || s.supplierName || '',
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    counterAccount: code,
+    counterDetailAccount: name && name !== code ? name : '',
+  }
+  if (section === 'debit') {
+    return normalizeDebitRow({ ...base, debitAmount: parseNum(item.debitAmount) || parseNum(item.creditAmount) })
+  }
+  return normalizeCreditRow({ ...base, creditAmount: parseNum(item.creditAmount) })
+}
+
+/** 行上已填审批 / 回单 / 合同 / 入库 / 发票、索引、异常或备注（替换与撤销抽凭时据此先确认） */
+export function hasF1VoucherContent(r: F1DebitCheckRow | F1CreditCheckRow): boolean {
+  const own = 'approvalDateNo' in r
+    ? [r.approvalDateNo, r.approvalOk, r.bankPayment, r.bankPayee, r.contractName, r.receiptDoc]
+    : [r.recvDateNo, r.recvItemName, r.recvUnit, r.recvQty, r.invoiceDateNo, r.invoiceCounterparty]
+  const amounts = 'approvalDateNo' in r ? [r.bankAmount, r.contractAmount] : [r.invoiceAmount]
+  return [...own, r.indexRef, r.isAbnormal, r.remark].some(v => String(v ?? '').trim() !== '')
+    || amounts.some(n => parseNum(n) !== 0)
 }
 
 /**
@@ -599,6 +642,35 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
   const conclusion = ref('')
   let migratedLegacy = false
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（本期借方、本期贷方、期后贷方各一张表）
+  const sectionTables = { debit: debitRows, credit: creditRows, postPeriod: postPeriodRows }
+  /** 已在某张表的分录（按指纹）：再次回填 / 挂凭导入仍进那张表 */
+  function sectionHolding(lfp: string | null): F1VoucherSection | null {
+    if (!lfp) return null
+    for (const [key, table] of Object.entries(sectionTables)) {
+      if ((table.value as unknown[]).some(r => metaOf(r)?.lfp === lfp)) return key as F1VoucherSection
+    }
+    return null
+  }
+  const voucherFill = useVoucherCheckFill<F1DebitCheckRow | F1CreditCheckRow>({
+    projectId: () => options.projectId.value,
+    tables: sectionTables as Record<string, Ref<Array<F1DebitCheckRow | F1CreditCheckRow>>>,
+    tableOf: item => sectionHolding(item.meta.lfp) ?? f1SectionOf(item),
+    mapSampleToRow: (item, key) => mapPreparedToF1Row(item, key as F1VoucherSection),
+    persist: () => {
+      persistDebit()
+      persistCredit()
+      persistPost()
+    },
+    hasUserContent: hasF1VoucherContent,
+    readonly: () => isReadonly.value,
+  })
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedIn(section: F1VoucherSection, rowId: string): boolean {
+    const row = (sectionTables[section].value as Array<F1DebitCheckRow | F1CreditCheckRow>).find(r => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   watch(
     () => allResponses.value.get(ITEM_ID_PARAMS)?.remark,
     (jsonStr) => { samplingParams.value = safeParseParams(jsonStr) },
@@ -622,6 +694,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
           debitRows.value = debit
           creditRows.value = credit
           migratedLegacy = true
+          voucherFill.markLoaded()
           if (!isReadonly.value) {
             debouncedSave(ITEM_ID_DEBIT_ROWS, { remark: JSON.stringify(debit) })
             if (credit.length) {
@@ -632,6 +705,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
         }
       } catch { /* fall through */ }
       debitRows.value = safeParseDebitRows(jsonStr)
+      voucherFill.markLoaded()
     },
     { immediate: true },
   )
@@ -641,13 +715,17 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
     (jsonStr) => {
       if (migratedLegacy && !jsonStr) return
       creditRows.value = safeParseCreditRows(jsonStr)
+      voucherFill.markLoaded()
     },
     { immediate: true },
   )
 
   watch(
     () => allResponses.value.get(ITEM_ID_POST_ROWS)?.remark,
-    (jsonStr) => { postPeriodRows.value = safeParseCreditRows(jsonStr) },
+    (jsonStr) => {
+      postPeriodRows.value = safeParseCreditRows(jsonStr)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
 
@@ -669,13 +747,13 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
   })
 
   function persistDebit(): void {
-    debouncedSave(ITEM_ID_DEBIT_ROWS, { remark: JSON.stringify(debitRows.value) })
+    debouncedSave(ITEM_ID_DEBIT_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(debitRows.value, 'debit')) })
   }
   function persistCredit(): void {
-    debouncedSave(ITEM_ID_CREDIT_ROWS, { remark: JSON.stringify(creditRows.value) })
+    debouncedSave(ITEM_ID_CREDIT_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(creditRows.value, 'credit')) })
   }
   function persistPost(): void {
-    debouncedSave(ITEM_ID_POST_ROWS, { remark: JSON.stringify(postPeriodRows.value) })
+    debouncedSave(ITEM_ID_POST_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(postPeriodRows.value, 'postPeriod')) })
   }
 
   function updateSamplingParams(field: string, value: any): void {
@@ -800,6 +878,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
   function removeSample(section: Section, rowId: string): void {
     if (isReadonly.value) return
     const s = resolveSection(section)
+    if (lockedIn(s, rowId)) return
     if (s === 'debit') {
       debitRows.value = debitRows.value.filter(r => r.rowId !== rowId)
       persistDebit()
@@ -818,6 +897,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
   function updateCell(section: Section, rowId: string, field: string, value: any): void {
     if (isReadonly.value) return
     const s = resolveSection(section)
+    if (lockedIn(s, rowId)) return
 
     if (s === 'debit') {
       const idx = debitRows.value.findIndex(r => r.rowId === rowId)
@@ -851,7 +931,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
     section: F1VoucherSection,
     patch: F1DebitCheckRow | F1CreditCheckRow,
   ): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || lockedIn(section, patch.rowId)) return
     if (section === 'debit') {
       const idx = debitRows.value.findIndex(r => r.rowId === patch.rowId)
       if (idx === -1) return
@@ -882,7 +962,7 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
     if (isNaN(cutoff.getTime())) return 0
     let changed = 0
     const newRows = postPeriodRows.value.map(row => {
-      if (!row.date) return row
+      if (!row.date || voucherFill.isRowLocked(row)) return row
       const voucherDate = new Date(row.date)
       if (isNaN(voucherDate.getTime())) return row
       if (shouldMarkCrossPeriod(voucherDate, cutoff) && row.isAbnormal !== '跨期疑点') {
@@ -898,40 +978,36 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
     return changed
   }
 
-  /** 抽凭回填：按借贷分配到借方/贷方表 */
-  function distributeSamples(samples: Array<Record<string, any>>): void {
-    if (isReadonly.value || !samples.length) return
-    const debitAdd: F1DebitCheckRow[] = []
-    const creditAdd: F1CreditCheckRow[] = []
-    for (const s of samples) {
-      const debitAmt = parseNum(s.debitAmount ?? s.amount)
-      const creditAmt = parseNum(s.creditAmount)
-      const base = {
-        supplierName: s.counterpartName || s.customerName || s.supplierName || '',
-        date: s.voucherDate || s.date || '',
-        voucherNo: s.voucherNo || '',
-        businessContent: s.summary || s.businessContent || '',
-        counterAccount: s.counterpartAccount || s.counterAccount || '',
-        counterDetailAccount: s.counterDetailAccount || '',
-      }
-      if (creditAmt > 0 && debitAmt === 0) {
-        creditAdd.push(normalizeCreditRow({ ...base, creditAmount: creditAmt }))
-      } else {
-        debitAdd.push(normalizeDebitRow({ ...base, debitAmount: debitAmt || creditAmt }))
-      }
-    }
-    if (debitAdd.length) {
-      debitRows.value = [...debitRows.value, ...debitAdd]
-      persistDebit()
-    }
-    if (creditAdd.length) {
-      creditRows.value = [...creditRows.value, ...creditAdd]
-      persistCredit()
-    }
+  /** 回填 / 挂凭导入 / 撤销之后同步本次样本量（三张表的行数） */
+  function syncSampleSize(): void {
     updateSamplingParams(
       'currentSampleSize',
       debitRows.value.length + creditRows.value.length + postPeriodRows.value.length,
     )
+  }
+
+  /**
+   * 抽凭引擎回填：分录按借贷方向进本期借方 / 本期贷方表（沿用原规则），一个对方科目一行，按分录指纹去重；
+   * 「替换本阶段抽凭行」只动这两张表。原实现不去重、对方科目照样本，已删除。
+   */
+  async function onEngineFilled(payload: EngineFilledPayload) {
+    const out = await voucherFill.onEngineFilled(payload, { tables: ['debit', 'credit'] })
+    if (!out.cancelled) syncSampleSize()
+    return out
+  }
+
+  /** 从序时账挂入导入：幂等追加，与抽凭命中同一分录只留一行 */
+  async function onAttachImported(samples: FillSample[]) {
+    const out = await voucherFill.onAttachImported(samples, { tables: ['debit', 'credit'] })
+    if (!out.cancelled) syncSampleSize()
+    return out
+  }
+
+  /** 撤销抽凭批次：按批次删行（同时来自挂凭的保留） */
+  async function onUndoRequest(payload: UndoRequestPayload): Promise<boolean> {
+    const ok = await voucherFill.onUndoRequest(payload)
+    if (ok) syncSampleSize()
+    return ok
   }
 
   return {
@@ -957,7 +1033,13 @@ export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
     fillBookFromDetail,
     importPrioritySamples,
     autoMarkCrossPeriod,
-    distributeSamples,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

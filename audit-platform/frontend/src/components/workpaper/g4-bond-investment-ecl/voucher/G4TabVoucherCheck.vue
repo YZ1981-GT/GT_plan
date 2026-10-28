@@ -148,15 +148,15 @@
 
     <!-- 抽凭引擎 -->
     <el-collapse v-if="showSampling && props.wpId && props.projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 ${samplingAccountCode} 债权投资）" name="sampling">
+      <el-collapse-item :title="`⚡ 自动抽凭（科目 ${samplingAccountCode} 债权投资）`" name="sampling">
         <GtVoucherSamplingEngine
           :account-code="samplingAccountCode"
-          phase="final"
           default-method="random"
           :workpaper-id="props.wpId"
           :project-id="props.projectId"
           :year="currentYear"
           @filled="handleSamplingFilled"
+          @undo-request="vc.onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
@@ -195,13 +195,19 @@
         max-height="320"
         highlight-current-row
         row-key="id"
-        :row-class-name="getRowClassName"
+        :row-class-name="voucherRowClassName"
         class="voucher-table"
         @current-change="onCurrentChange"
       >
         <template v-if="vc.activeTab.value === 'tab1'">
           <el-table-column label="序号" width="50" align="center" fixed>
             <template #default="{ row }">{{ row.seq }}</template>
+          </el-table-column>
+          <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+          <el-table-column label="来源" width="150">
+            <template #default="{ row }">
+              <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="currentYear" />
+            </template>
           </el-table-column>
           <el-table-column label="日期" min-width="110">
             <template #default="{ row }">
@@ -382,13 +388,19 @@
         max-height="320"
         highlight-current-row
         row-key="id"
-        :row-class-name="getRowClassName"
+        :row-class-name="voucherRowClassName"
         class="voucher-table"
         @current-change="onCurrentChange"
       >
         <template v-if="vc.activeTab.value === 'tab1'">
           <el-table-column label="序号" width="50" align="center" fixed>
             <template #default="{ row }">{{ row.seq }}</template>
+          </el-table-column>
+          <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+          <el-table-column label="来源" width="150">
+            <template #default="{ row }">
+              <VoucherRowMetaCell :row="row" :locked="vc.isVoucherRowLocked(row)" :project-id="projectId" :year="currentYear" />
+            </template>
           </el-table-column>
           <el-table-column label="日期" min-width="110">
             <template #default="{ row }">
@@ -651,7 +663,8 @@ import G4AuditTextCards from '../../g4-bond-investment-main/G4AuditTextCards.vue
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import G4EclImportExportDropdown from '../G4EclImportExportDropdown.vue'
 import type { VoucherCheckRow } from '../../composables/useG4EclFormData'
-import type { SampledVoucher, FillMode, Phase } from '../../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { useG4EclAiGenerate } from '../../composables/useG4EclAiGenerate'
 import {
   buildG413AbnormalMemos,
@@ -700,7 +713,7 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4EclAiGenerate(wpIdRef)
 
-const vc = useG4EclVoucherCheck()
+const vc = useG4EclVoucherCheck({ projectId: () => props.projectId, readonly: () => props.isReadonly })
 const conclusion = ref('')
 const conclusionOption = ref('')
 const showSampling = ref(false)
@@ -782,9 +795,9 @@ watch(conclusion, (val) => {
 
 watch(
   vc.rows,
-  (rows) => {
+  () => {
     if (!rowsLoaded.value || props.isReadonly) return
-    const payload = buildCanonicalPayload(G4_ITEM_IDS.G4_13_ROWS, rows)
+    const payload = buildCanonicalPayload(G4_ITEM_IDS.G4_13_ROWS, vc.rowsToPersist())
     formData.debouncedSave(payload.item_id, payload)
   },
   { deep: true },
@@ -821,6 +834,9 @@ function onCurrentChange(row: VoucherCheckRow | null) {
 }
 
 // ─── 行样式（Tab3异常行红色高亮） ───────────────────────────────────────────
+
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(getRowClassName, vc.voucherRowClass)
 
 function getRowClassName({ row }: { row: VoucherCheckRow }): string {
   if (row.isAbnormal) return 'row-abnormal'
@@ -903,51 +919,20 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, currentYear.value, props.wpId, G4_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await vc.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证分录展开多科目凭证（行金额取对方分录），已删除。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  // 将抽样结果映射为 fillVoucherSamples 所需格式
-  const mappedSamples = payload.samples.flatMap(s => {
-    const entries = s.voucherEntries || []
-    const isMulti = (s.isMultiAccount || s.counterpartAccount === '多科目') && entries.length > 0
-    const section = (s.debitAmount && parseFloat(s.debitAmount) > 0 ? 'debit' : 'credit') as 'debit' | 'credit'
-    if (isMulti) {
-      const sDebit = s.debitAmount ? parseFloat(s.debitAmount) : 0
-      const counterEntries = entries.filter((e: any) =>
-        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-      )
-      const toWrite = counterEntries.length > 0 ? counterEntries : entries
-      return toWrite.map((e: any) => ({
-        voucherNo: s.voucherNo,
-        date: s.voucherDate || '',
-        businessContent: e.summary || s.summary || '',
-        counterAccount: e.account_code || '',
-        detailAccount: e.account_name || '',
-        debitAmount: Number(e.debit_amount) || 0,
-        creditAmount: Number(e.credit_amount) || 0,
-        section,
-      }))
-    }
-    return [{
-      voucherNo: s.voucherNo,
-      date: s.voucherDate || '',
-      businessContent: s.summary || '',
-      counterAccount: s.counterpartAccount || '',
-      detailAccount: s.counterpartAccountName || s.accountName || '',
-      debitAmount: s.debitAmount ? parseFloat(s.debitAmount) : 0,
-      creditAmount: s.creditAmount ? parseFloat(s.creditAmount) : 0,
-      section,
-    }]
-  })
-  vc.fillVoucherSamples(mappedSamples)
-  ElMessage.success(`已填入 ${mappedSamples.length} 条抽凭样本`)
+  void persistMethodology(payload?.methodology)
+  await vc.onEngineFilled(payload)
 }
 
 // ─── 行级OCR（Requirements: 6.4, 9.3） ──────────────────────────────────────
@@ -1098,6 +1083,7 @@ function fmtNum(v: unknown): string {
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
+  void vc.voucherFillReady()
   await formData.loadAll()
 
   const storedRows = formData.allResponses.value.get(G4_ITEM_IDS.G4_13_ROWS)

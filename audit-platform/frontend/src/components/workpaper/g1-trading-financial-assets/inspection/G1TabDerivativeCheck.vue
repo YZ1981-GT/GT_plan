@@ -48,7 +48,7 @@
     <!-- 工具名称 -->
     <div class="meta-row">
       <label class="field-label">工具名称</label>
-      <el-input
+      <WpCommitInput
         :model-value="dc.instrumentName.value"
         size="small"
         placeholder="填写拟核查的合同 / 工具名称"
@@ -103,7 +103,7 @@
             <el-radio :value="false">否</el-radio>
           </el-radio-group>
         </div>
-        <el-input
+        <WpCommitInput
           :model-value="item.remark"
           size="small"
           placeholder="说明（选填）"
@@ -149,7 +149,7 @@
               <el-radio :value="false">否</el-radio>
             </el-radio-group>
           </div>
-          <el-input
+          <WpCommitInput
             :model-value="item.explanation"
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 3 }"
@@ -190,7 +190,7 @@
     <div class="meta-grid">
       <div class="meta-field">
         <label class="field-label">衍生工具性质说明</label>
-        <el-input
+        <WpCommitInput
           :model-value="dc.natureDesc.value"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 4 }"
@@ -201,7 +201,7 @@
       </div>
       <div class="meta-field">
         <label class="field-label">科目编码</label>
-        <el-input
+        <WpCommitInput
           :model-value="dc.accountCode.value"
           size="small"
           :disabled="isReadonly"
@@ -211,7 +211,7 @@
       </div>
       <div class="meta-field">
         <label class="field-label">会计政策 / 处理</label>
-        <el-input
+        <WpCommitInput
           :model-value="dc.accountingPolicy.value"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 4 }"
@@ -244,18 +244,24 @@
       <el-collapse-item :title="`⚡ 自动抽凭（科目 ${samplingAccountCode}，与 G1-13 同源引擎）`" name="sampling">
         <GtVoucherSamplingEngine
           :account-code="samplingAccountCode"
-          phase="final"
           default-method="random"
           :workpaper-id="wpId"
           :project-id="projectId"
           @filled="onSamplingFilled"
+          @undo-request="dc.onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
-    <el-table :data="dc.vouchers.value" border size="small" max-height="320" empty-text="暂无抽查记录">
+    <el-table :data="dc.vouchers.value" border size="small" max-height="320" empty-text="暂无抽查记录" :row-class-name="dc.voucherRowClass">
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="dc.isVoucherRowLocked(row)" :project-id="projectId" />
+        </template>
+      </el-table-column>
       <el-table-column label="日期" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.date"
             size="small"
             :disabled="isReadonly"
@@ -266,7 +272,7 @@
       </el-table-column>
       <el-table-column label="凭证号" width="110">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.voucherNo"
             size="small"
             :disabled="isReadonly"
@@ -276,7 +282,7 @@
       </el-table-column>
       <el-table-column label="业务内容" min-width="140">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.businessContent"
             size="small"
             :disabled="isReadonly"
@@ -286,7 +292,7 @@
       </el-table-column>
       <el-table-column label="明细科目" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.detailAccount"
             size="small"
             :disabled="isReadonly"
@@ -296,7 +302,7 @@
       </el-table-column>
       <el-table-column label="对方科目" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.counterAccount"
             size="small"
             :disabled="isReadonly"
@@ -328,7 +334,7 @@
       </el-table-column>
       <el-table-column label="结论" min-width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.conclusion"
             size="small"
             :disabled="isReadonly"
@@ -363,7 +369,7 @@
       <el-table-column label="索引号" width="160">
         <template #default="{ row }">
           <div class="expert-index">
-            <el-input
+            <WpCommitInput
               :model-value="row.indexRef"
               size="small"
               :disabled="isReadonly"
@@ -378,7 +384,7 @@
       </el-table-column>
       <el-table-column label="备注" min-width="160">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             :model-value="row.remark"
             size="small"
             :disabled="isReadonly"
@@ -417,16 +423,18 @@
 
 <script setup lang="ts">
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, toRef, computed, inject, watch, type Ref } from 'vue'
+import { ref, toRef, computed, inject, watch, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useG1DerivativeCheck } from '../../composables/useG1DerivativeCheck'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
-import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
+import type { SampledVoucher } from '../../composables/useSamplingAlgorithms'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
 import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
@@ -438,6 +446,7 @@ import { useRowEvidence } from '@/components/attachment/rowEvidence'
  */
 import { g1DerivativeCode } from '../../composables/g1AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -466,7 +475,9 @@ const dc = useG1DerivativeCheck({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+  projectId: computed(() => props.projectId),
 })
+onMounted(() => { void dc.voucherFillReady() })
 
 const AUDIT_NOTE_KEY = 'G1-14-audit-note'
 const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
@@ -501,17 +512,18 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly === true),
 })
 
-function onSamplingFilled(payload: {
-  samples: SampledVoucher[]
-  fillMode?: FillMode
-}) {
+/**
+ * 抽凭引擎回填凭证抽查：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填入几行由共享函数提示；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证号去重、替换整表，已删除。
+ */
+async function onSamplingFilled(payload: EngineFilledPayload<SampledVoucher> & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const mode = payload.fillMode === 'replace' ? 'replace' : 'append'
-  const n = dc.applySamplingResults(payload.samples || [], mode)
-  if (n > 0) ElMessage.success(`已从抽凭引擎填入 ${n} 行`)
-  else ElMessage.info('无样本可填入')
+  void persistMethodology(payload?.methodology)
+  if (!(payload?.samples ?? []).length) {
+    ElMessage.info('无样本可填入')
+    return
+  }
+  await dc.onEngineFilled(payload)
 }
 
 function onSyncFromG113() {

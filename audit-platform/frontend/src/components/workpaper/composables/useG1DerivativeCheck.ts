@@ -8,12 +8,15 @@
  *  (4) 专家资质及利用估值专家工作
  *
  * 逻辑修正：Excel 原文「B 任一为否即无衍生」有误 → 改为「B 全部为否才判定无衍生」。
+ * 凭证抽查的抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
+ * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { parseNum } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { SampledVoucher } from './useSamplingAlgorithms'
+import { counterpartText, metaOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 export type G1DerivativeIdResult = 'NONE' | 'STANDALONE' | 'EMBEDDED' | 'INCOMPLETE'
 
@@ -228,10 +231,43 @@ function isLegacyInventory(raw: unknown): boolean {
   return 'instrumentName' in first || 'notionalAmount' in first || 'instrumentType' in first
 }
 
+/** 引擎按核对结果给的缺省结论（不算人工内容） */
+const ENGINE_CONCLUSIONS = new Set(['', '异常待查', '未见异常'])
+
+/** 共享回填函数的待写入项 → 凭证抽查行：金额在样本自己的借贷栏，明细科目取样本科目，对方科目取后端配对 */
+export function mapPreparedToG1DerivativeVoucherRow(item: PreparedItem, seq: number): G1DerivativeVoucherRow {
+  const s = item.sample as PreparedItem['sample'] & Partial<Pick<SampledVoucher, 'summary' | 'accountCode' | 'accountName' | 'abnormal' | 'checkResult'>>
+  return {
+    ...createEmptyVoucherRow(seq),
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    detailAccount: [s.accountCode, s.accountName].filter(Boolean).join(' '),
+    counterAccount: counterpartText(item),
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+    // 引擎的核对结果是 Y / N / 异常 / ''（「已核查」= Y）
+    conclusion: s.abnormal ? '异常待查' : (s.checkResult === 'Y' ? '未见异常' : ''),
+  }
+}
+
+/** 结论是人工写的（不是引擎缺省的「异常待查 / 未见异常」）：替换与撤销抽凭时据此先确认 */
+export function hasG1DerivativeVoucherContent(r: G1DerivativeVoucherRow): boolean {
+  return !ENGINE_CONCLUSIONS.has(String(r.conclusion ?? '').trim())
+}
+
+/** 占位空行（新建表时的那一行） */
+function isBlankDerivativeVoucher(r: G1DerivativeVoucherRow): boolean {
+  return !r.voucherNo && !r.businessContent && !r.date && !parseNum(r.debitAmount) && !parseNum(r.creditAmount)
+    && !String(r.conclusion ?? '').trim()
+}
+
 export function useG1DerivativeCheck(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: Ref<string | undefined> | ComputedRef<string | undefined>
 }) {
   const instrumentName = ref('')
   const natureDesc = ref('')
@@ -245,6 +281,28 @@ export function useG1DerivativeCheck(opts: {
   const experts = ref<G1DerivativeExpertRow[]>(createDefaultExpertRows())
   const legacyRows = ref<G1DerivativeLegacyRow[]>([])
   const auditConclusion = ref('')
+
+  // 凭证抽查的抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G1DerivativeVoucherRow>({
+    projectId: () => opts.projectId?.value,
+    tables: vouchers,
+    mapSampleToRow: (item) => mapPreparedToG1DerivativeVoucherRow(item, vouchers.value.length + 1),
+    persist: () => persistVouchers(),
+    hasUserContent: hasG1DerivativeVoucherContent,
+    // 回填后去掉占位空行（原实现同），重排序号
+    afterChange: (_key, list) => {
+      const kept = list.filter((r) => metaOf(r) || !isBlankDerivativeVoucher(r))
+      if (kept.length && kept.length !== list.length) vouchers.value = kept
+      vouchers.value.forEach((r, i) => { r.seq = i + 1 })
+    },
+    readonly: () => opts.isReadonly.value,
+  })
+
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedVoucher(id: string): boolean {
+    const row = vouchers.value.find((r) => r.id === id)
+    return !!row && voucherFill.isRowLocked(row)
+  }
 
   const idResult = computed(() =>
     determineG1DerivativeId(bQuestions.value, cQuestions.value),
@@ -281,7 +339,8 @@ export function useG1DerivativeCheck(opts: {
     cQuestions.value = mergeC(safeParse(opts.allResponses.value.get(KEY_C)?.remark))
 
     const v = safeParse<G1DerivativeVoucherRow[]>(opts.allResponses.value.get(KEY_VOUCHER)?.remark)
-    vouchers.value = Array.isArray(v) && v.length ? v : [createEmptyVoucherRow(1)]
+    vouchers.value = Array.isArray(v) && v.length ? v.map((r) => withRowMeta({ ...r }, r)) : [createEmptyVoucherRow(1)]
+    voucherFill.markLoaded()
 
     const e = safeParse<G1DerivativeExpertRow[]>(opts.allResponses.value.get(KEY_EXPERT)?.remark)
     experts.value = Array.isArray(e) && e.length ? e : createDefaultExpertRows()
@@ -453,7 +512,7 @@ export function useG1DerivativeCheck(opts: {
 
   function persistVouchers() {
     if (opts.isReadonly.value) return
-    opts.debouncedSave(KEY_VOUCHER, { remark: JSON.stringify(vouchers.value) })
+    opts.debouncedSave(KEY_VOUCHER, { remark: JSON.stringify(voucherFill.guardPersist(vouchers.value)) })
   }
 
   function addVoucher() {
@@ -466,7 +525,7 @@ export function useG1DerivativeCheck(opts: {
   }
 
   function updateVoucher(id: string, patch: Partial<G1DerivativeVoucherRow>) {
-    if (opts.isReadonly.value) return
+    if (opts.isReadonly.value || lockedVoucher(id)) return
     vouchers.value = vouchers.value.map((r) => {
       if (r.id !== id) return r
       const next = { ...r, ...patch }
@@ -478,41 +537,13 @@ export function useG1DerivativeCheck(opts: {
   }
 
   function removeVoucher(id: string) {
-    if (opts.isReadonly.value || vouchers.value.length <= 1) return
+    if (opts.isReadonly.value || vouchers.value.length <= 1 || lockedVoucher(id)) return
     vouchers.value = vouchers.value
       .filter((r) => r.id !== id)
       .map((r, i) => ({ ...r, seq: i + 1 }))
     persistVouchers()
   }
 
-  /** 抽凭引擎回填（对齐 G1-13） */
-  function applySamplingResults(samples: SampledVoucher[], mode: 'append' | 'replace' = 'append') {
-    if (opts.isReadonly.value || !samples?.length) return 0
-    const mapped = samples.map((v, i) => ({
-      ...createEmptyVoucherRow(i + 1),
-      date: v.voucherDate || '',
-      voucherNo: v.voucherNo || '',
-      businessContent: v.summary || '',
-      detailAccount: [v.accountCode, v.accountName].filter(Boolean).join(' '),
-      counterAccount: v.counterpartAccount || '',
-      debitAmount: parseNum(v.debitAmount),
-      creditAmount: parseNum(v.creditAmount),
-      conclusion: v.abnormal ? '异常待查' : (v.checkResult === 'pass' ? '未见异常' : ''),
-    }))
-    if (mode === 'replace') {
-      vouchers.value = mapped
-    } else {
-      const existing = new Set(vouchers.value.map((r) => r.voucherNo).filter(Boolean))
-      const blankOnly = vouchers.value.length === 1
-        && !vouchers.value[0].voucherNo
-        && !vouchers.value[0].businessContent
-      const base = blankOnly ? [] : vouchers.value
-      const add = mapped.filter((r) => !r.voucherNo || !existing.has(r.voucherNo))
-      vouchers.value = [...base, ...add].map((r, i) => ({ ...r, seq: i + 1 }))
-    }
-    persistVouchers()
-    return mapped.length
-  }
 
   /** 从 G1-13 检查表带入抽查凭证 */
   function syncVouchersFromG113(): number {
@@ -616,8 +647,14 @@ export function useG1DerivativeCheck(opts: {
     addVoucher,
     updateVoucher,
     removeVoucher,
-    applySamplingResults,
     syncVouchersFromG113,
+    // 凭证抽查：抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     updateExpert,
     setAuditConclusion,
     applyEmbeddedDemo,

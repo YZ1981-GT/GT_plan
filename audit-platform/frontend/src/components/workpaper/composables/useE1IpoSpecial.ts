@@ -12,12 +12,15 @@
  * - 适用性开关：reads 'E1-ipo-applicable' (Y/N) from allResponses
  * - 序列化/反序列化 → checklist_responses (item_id: 'E1-ipo-{sheetCode}-rows')
  * - Debounce 2s 自动保存
+ * - 可选 `voucherFill`（E1-23 收支检查传入）：抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数，
+ *   行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 10）
  *
  * Requirements: 11.1-11.9
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
+import { useVoucherCheckFill, withRowMeta, type VoucherCheckFillOptions } from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +37,9 @@ export interface ColumnDef {
 }
 
 export type IpoRow = Record<string, unknown> & { id: string }
+
+/** 接入共享回填函数的选项（表、落库、只读由本 composable 提供） */
+export type E1VoucherFillOptions = Omit<VoucherCheckFillOptions<IpoRow>, 'tables' | 'persist' | 'readonly'>
 
 // ─── Column Configurations ───────────────────────────────────────────────────
 
@@ -157,7 +163,7 @@ function getStorageKey(sheetCode: string): string {
   return `E1-ipo-${sheetCode}-rows`
 }
 
-function createEmptyRow(sheetCode: IpoSheetCode): IpoRow {
+export function createEmptyRow(sheetCode: IpoSheetCode): IpoRow {
   const columns = COLUMN_CONFIG[sheetCode]
   const row: IpoRow = { id: generateRowId(sheetCode) }
   for (const col of columns) {
@@ -183,7 +189,7 @@ function recalcRow(row: IpoRow, columns: ColumnDef[]): IpoRow {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoSheetCode }) {
+export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoSheetCode; voucherFill?: E1VoucherFillOptions }) {
   const { allResponses, saveImmediate, isReadonly, sheetCode } = options
   const storageKey = getStorageKey(sheetCode)
   const columns = COLUMN_CONFIG[sheetCode]
@@ -192,6 +198,11 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
 
   const rows = ref<IpoRow[]>([createEmptyRow(sheetCode)])
   const isLoading = ref(false)
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（E1-23 收支检查接入；其余 IPO 表不传 voucherFill）
+  const voucherFill = options.voucherFill
+    ? useVoucherCheckFill<IpoRow>({ ...options.voucherFill, tables: rows, persist: () => persistNow(), readonly: isReadonly })
+    : null
 
   // ─── Applicability Switch ──────────────────────────────────────────────
 
@@ -203,20 +214,13 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
 
   // ─── Deserialization ───────────────────────────────────────────────────
 
-  function loadFromResponses(): void {
-    const response = allResponses.value.get(storageKey)
-    const raw = response?.remark
-    if (!raw) {
-      rows.value = [createEmptyRow(sheetCode)]
-      return
-    }
+  function readRows(): IpoRow[] {
+    const raw = allResponses.value.get(storageKey)?.remark
+    if (!raw) return [createEmptyRow(sheetCode)]
     try {
       const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        rows.value = [createEmptyRow(sheetCode)]
-        return
-      }
-      rows.value = parsed.map((r: Record<string, unknown>) => {
+      if (!Array.isArray(parsed) || parsed.length === 0) return [createEmptyRow(sheetCode)]
+      return parsed.map((r: Record<string, unknown>) => {
         const row: IpoRow = { id: String(r.id || generateRowId(sheetCode)) }
         for (const col of columns) {
           if (col.type === 'computed') continue
@@ -226,12 +230,18 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
             default: row[col.key] = String(r[col.key] ?? ''); break
           }
         }
-        return recalcRow(row, columns)
+        // 行元数据 `_gt`（抽凭 / 挂凭写入的凭证键、分录指纹、阶段、来源）随行透传
+        return withRowMeta(recalcRow(row, columns), r)
       })
     } catch {
       console.warn(`[useE1IpoSpecial:${sheetCode}] JSON parse failed, fallback to empty`)
-      rows.value = [createEmptyRow(sheetCode)]
+      return [createEmptyRow(sheetCode)]
     }
+  }
+
+  function loadFromResponses(): void {
+    rows.value = readRows()
+    voucherFill?.markLoaded()
   }
 
   loadFromResponses()
@@ -249,12 +259,14 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
 
   function serializeRows(): string {
     const userFields = columns.filter(c => c.type !== 'computed').map(c => c.key)
-    const data = rows.value.map(row => {
+    // 年审阶段预审行按读入版本写回（防绕过）
+    const source = voucherFill ? voucherFill.guardPersist(rows.value) : rows.value
+    const data = source.map(row => {
       const obj: Record<string, unknown> = { id: row.id }
       for (const field of userFields) {
         obj[field] = row[field]
       }
-      return obj
+      return withRowMeta(obj, row)
     })
     return JSON.stringify(data)
   }
@@ -271,13 +283,22 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
     }, 2000)
   }
 
-  function persistToResponses(): void {
+  function persistToResponses(): Promise<void> {
     const serialized = serializeRows()
     const items: ChecklistItem[] = [
       { item_id: storageKey, conclusion: null, remark: serialized },
     ]
     allResponses.value.set(storageKey, { item_id: storageKey, conclusion: null, remark: serialized })
-    saveImmediate(items).catch(() => { /* silent */ })
+    return saveImmediate(items).catch(() => { /* silent */ })
+  }
+
+  /** 立即落库（抽凭回填 / 挂凭导入 / 撤销这类一次性操作，不等防抖） */
+  function persistNow(): Promise<void> {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    return persistToResponses()
   }
 
   // ─── Row CRUD ──────────────────────────────────────────────────────────
@@ -291,7 +312,8 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
   function removeRow(rowId: string): void {
     if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.id === rowId)
-    if (idx === -1) return
+    // 年审阶段的预审行只读（不可删）
+    if (idx === -1 || voucherFill?.isRowLocked(rows.value[idx])) return
     rows.value = rows.value.filter(r => r.id !== rowId)
     scheduleSave()
   }
@@ -299,7 +321,8 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
   function updateCell(rowId: string, field: string, value: unknown): void {
     if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.id === rowId)
-    if (idx === -1) return
+    // 年审阶段的预审行只读（不可改）
+    if (idx === -1 || voucherFill?.isRowLocked(rows.value[idx])) return
 
     const row = { ...rows.value[idx] }
     const colDef = columns.find(c => c.key === field)
@@ -350,5 +373,7 @@ export function useE1IpoSpecial(options: UseE1BaseOptions & { sheetCode: IpoShee
     removeRow,
     updateCell,
     hydrate,
+    /** 共享回填函数（只有传了 voucherFill 的表才有） */
+    voucherFill,
   }
 }

@@ -10,6 +10,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
+import { useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 export const E1_BANK_FLOW_PACK_KEY = 'E1-bank-flow-pack'
 export const E1_BANK_FLOW_NOTE_KEY = 'E1-bank-flow-audit-note'
@@ -237,7 +238,7 @@ function normalizeStatement(raw: Record<string, unknown>): StatementLine {
 }
 
 function normalizeJournal(raw: Record<string, unknown>): JournalLine {
-  return {
+  return withRowMeta<JournalLine>({
     id: String(raw.id || uid('jl')),
     date: String(raw.date || raw.vDate || ''),
     voucherNo: String(raw.voucherNo || ''),
@@ -247,6 +248,24 @@ function normalizeJournal(raw: Record<string, unknown>): JournalLine {
     debit: parseNum(raw.debit),
     credit: parseNum(raw.credit),
     source: String(raw.source || 'manual'),
+  }, raw)
+}
+
+/**
+ * 共享回填函数的待写入项 → 日记账行（spec voucher-identity-writeback-and-audit-phase 任务 10）：
+ * 一个样本一行（与对账单逐笔匹配要整笔银行分录的金额，policy=join），对方科目按后端配对拼接。
+ */
+export function mapSampleToJournalLine(item: PreparedItem): JournalLine {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  return {
+    ...createEmptyJournalLine(),
+    date: String(s.voucherDate ?? ''),
+    voucherNo: String(s.voucherNo ?? ''),
+    businessContent: String(s.summary ?? ''),
+    counterAccount: item.counterpartAccount,
+    debit: parseNum(item.debitAmount),
+    credit: parseNum(item.creditAmount),
+    source: item.meta.src.includes('attach') ? '挂凭' : '抽凭',
   }
 }
 
@@ -305,24 +324,6 @@ export function diffPair(stmt: number, journal: number): { amount: number; rate:
   return { amount, rate: amount / parseNum(stmt) }
 }
 
-/** 日记账列表合并（纯函数）：append | replace | merge(凭证号+日期+借贷) */
-export function mergeJournalLineLists(
-  existing: JournalLine[],
-  incoming: JournalLine[],
-  fillMode: 'append' | 'replace' | 'merge',
-): JournalLine[] {
-  if (!incoming.length) return existing
-  if (fillMode === 'replace') return [...incoming]
-  if (fillMode === 'merge') {
-    const keyOf = (j: JournalLine) =>
-      `${j.voucherNo}|${j.date}|${j.debit}|${j.credit}`
-    const map = new Map(existing.map(j => [keyOf(j), j]))
-    for (const j of incoming) map.set(keyOf(j), j)
-    return Array.from(map.values())
-  }
-  return [...existing, ...incoming]
-}
-
 export type AutoMatchMode = 'replace' | 'merge'
 
 export interface AutoMatchResult {
@@ -343,6 +344,24 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const isLoading = ref(false)
+
+  /** 日记账明细（pack 里的一张表）：共享回填函数按它读写 */
+  const journalLines = computed<JournalLine[]>({
+    get: () => pack.value.journalLines,
+    set: (rows) => { pack.value = { ...pack.value, journalLines: rows } },
+  })
+
+  // 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数（行元数据 `_gt` 随日记账行落库，按分录指纹去重；
+  // 原来的「追加 / 替换整表 / 按凭证号 + 日期 + 借贷合并」三模式已删除）
+  const voucherFill = useVoucherCheckFill<JournalLine>({
+    projectId: options.projectId,
+    tables: journalLines,
+    policy: 'join',
+    readonly: isReadonly,
+    mapSampleToRow: item => mapSampleToJournalLine(item),
+    persist: () => persistNow(),
+    hasUserContent: r => String(r.counterparty ?? '').trim() !== '',
+  })
 
   const isApplicable = computed(() => {
     const v = allResponses.value.get(E1_IPO_APPLICABLE_KEY)?.conclusion
@@ -506,6 +525,7 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
       auditConclusion.value = allResponses.value.get(E1_BANK_FLOW_CONCLUSION_KEY)?.remark
         || allResponses.value.get('E1-ipo-audit-conclusion-E1-31')?.remark
         || ''
+      voucherFill.markLoaded()
     } finally {
       isLoading.value = false
     }
@@ -527,14 +547,24 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
     }, 2000)
   }
 
-  function persist(): void {
+  function persist(): Promise<void> {
+    // 年审阶段预审日记账行按读入版本写回（防绕过）
     const item: ChecklistItem = {
       item_id: E1_BANK_FLOW_PACK_KEY,
       conclusion: null,
-      remark: JSON.stringify(pack.value),
+      remark: JSON.stringify({ ...pack.value, journalLines: voucherFill.guardPersist(pack.value.journalLines) }),
     }
     allResponses.value.set(E1_BANK_FLOW_PACK_KEY, item)
-    saveImmediate([item]).catch(() => {})
+    return saveImmediate([item]).catch(() => {})
+  }
+
+  /** 立即落库（抽凭回填 / 撤销这类一次性操作，不等防抖） */
+  function persistNow(): Promise<void> {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    return persist()
   }
 
   function setApplicable(val: boolean): void {
@@ -690,27 +720,14 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
     scheduleSave()
   }
 
-  /** 抽凭/导入日记账：append 追加；replace 整表替换；merge 按凭证号+日期去重合并 */
-  function mergeJournalLines(
-    rows: Array<Partial<JournalLine>>,
-    fillMode: 'append' | 'replace' | 'merge' = 'append',
-  ): number {
-    if (isReadonly.value) return 0
-    const mapped = rows
-      .map(r => normalizeJournal({ ...r, source: r.source || '抽凭' }))
-      .filter(r => r.date || r.voucherNo || r.debit || r.credit)
-    if (!mapped.length) return 0
-
-    pack.value = {
-      ...pack.value,
-      journalLines: mergeJournalLineLists(pack.value.journalLines, mapped, fillMode),
-    }
-    scheduleSave()
-    return mapped.length
+  /** 年审阶段的预审日记账行只读（不可改、不可删） */
+  function journalLocked(id: string): boolean {
+    const row = pack.value.journalLines.find(r => r.id === id)
+    return !!row && voucherFill.isRowLocked(row)
   }
 
   function removeJournalLine(id: string): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || journalLocked(id)) return
     pack.value = {
       ...pack.value,
       journalLines: pack.value.journalLines.filter(r => r.id !== id),
@@ -719,7 +736,7 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
   }
 
   function updateJournalLine(id: string, field: keyof JournalLine, value: unknown): void {
-    if (isReadonly.value) return
+    if (isReadonly.value || journalLocked(id)) return
     pack.value = {
       ...pack.value,
       journalLines: pack.value.journalLines.map(r =>
@@ -1034,8 +1051,13 @@ export function useE1BankFlowReconcile(options: UseE1BaseOptions) {
     updateCheckRow,
     addCheckRow,
     removeCheckRow,
-    mergeJournalLines,
     previewMatch,
+    // 抽凭回填 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onUndoRequest: voucherFill.onUndoRequest,
+    journalRowClass: voucherFill.rowClass,
+    isJournalLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     autoMatchBoth,
     updateTip,
     setCoverageLowReason,

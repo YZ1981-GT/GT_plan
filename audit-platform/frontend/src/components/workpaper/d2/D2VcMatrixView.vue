@@ -9,17 +9,28 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  *
  * Spec: .kiro/specs/d2-7-voucher-check-enhancement/
  * Task: 7.2 (改进)
+ *
+ * 「来源」列：阶段 / 来源 / 配对（共享回填函数写的行元数据 `_gt`）；年审阶段的预审行只读
+ * （spec voucher-identity-writeback-and-audit-phase 任务 10）。
  */
 import { ref, computed, toRef } from 'vue'
 import type { VoucherCheckRow } from '../composables/useD2VoucherCheckEnhanced'
 import { useD2VcOcrCheck } from '../composables/useD2VcOcrCheck'
 import GtReviewDot from '../GtReviewDot.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 const props = defineProps<{
   rows: VoucherCheckRow[]
   isReadonly: boolean
   wpId: string
   projectId: string
+  /** 审计年度（「来源」列里「多科目」看整张凭证用） */
+  year?: number
+  /** 年审阶段的预审行只读（共享回填函数 isRowLocked）：不出编辑控件、不能删 */
+  isRowLocked?: (row: VoucherCheckRow) => boolean
+  /** 行样式（共享回填函数 rowClass：年审阶段的预审行 gt-row-locked） */
+  rowClassName?: (arg: { row: VoucherCheckRow; rowIndex: number }) => string
 }>()
 
 const emit = defineEmits<{
@@ -106,6 +117,11 @@ async function handleOcrFileChange(event: Event) {
   await uploadAndOcr(currentOcrRowId.value, file)
 }
 
+/** 本行只读：整张底稿只读，或年审阶段的预审行 */
+function rowReadonly(row: VoucherCheckRow): boolean {
+  return props.isReadonly || !!props.isRowLocked?.(row)
+}
+
 // ─── Cell Update ─────────────────────────────────────────────────────────────
 
 function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
@@ -155,6 +171,7 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       stripe
       size="small"
       class="vc-matrix-table"
+      :row-class-name="rowClassName"
       :header-cell-style="{ fontSize: '13px', background: '#f5f7fa' }"
       :cell-style="{ fontSize: '13px' }"
       max-height="500"
@@ -171,43 +188,50 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
 
       <el-table-column label="凭证编号" width="110" fixed="left">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" placeholder="凭证号" @change="(val: string) => onCellChange(row.rowId, 'voucherNo', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.voucherNo" size="small" placeholder="凭证号" @change="(val: string) => onCellChange(row.rowId, 'voucherNo', val)" />
           <span v-else>{{ row.voucherNo || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column label="日期" width="120" fixed="left">
         <template #default="{ row }">
-          <el-date-picker v-if="!isReadonly" :model-value="row.voucherDate" type="date" value-format="YYYY-MM-DD" size="small" placeholder="日期" style="width: 100%" @change="(val: string) => onCellChange(row.rowId, 'voucherDate', val || '')" />
+          <el-date-picker v-if="!rowReadonly(row)" :model-value="row.voucherDate" type="date" value-format="YYYY-MM-DD" size="small" placeholder="日期" style="width: 100%" @change="(val: string) => onCellChange(row.rowId, 'voucherDate', val || '')" />
           <span v-else>{{ row.voucherDate || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column label="借方" width="100" align="right" fixed="left">
         <template #default="{ row }">
-          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'debitAmount', val ?? 0)" />
+          <WpAmountInput v-if="!rowReadonly(row)" :model-value="row.debitAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'debitAmount', val ?? 0)" />
           <span v-else class="amount-cell">{{ row.debitAmount ? row.debitAmount.toFixed(2) : '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column label="贷方" width="100" align="right" fixed="left">
         <template #default="{ row }">
-          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'creditAmount', val ?? 0)" />
+          <WpAmountInput v-if="!rowReadonly(row)" :model-value="row.creditAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'creditAmount', val ?? 0)" />
           <span v-else class="amount-cell">{{ row.creditAmount ? row.creditAmount.toFixed(2) : '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- ═══ 阶段 / 来源 / 配对（共享回填函数写的行元数据） ═══ -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId" :year="year ?? 0" />
         </template>
       </el-table-column>
 
       <!-- ═══ 基础信息组（可折叠） ═══ -->
       <el-table-column v-if="isColVisible('customerName')" label="客户名称" width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.customerName" size="small" placeholder="客户" @change="(val: string) => onCellChange(row.rowId, 'customerName', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.customerName" size="small" placeholder="客户" @change="(val: string) => onCellChange(row.rowId, 'customerName', val)" />
           <span v-else>{{ row.customerName || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('businessContent')" label="业务内容" width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small" placeholder="业务内容" @change="(val: string) => onCellChange(row.rowId, 'businessContent', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.businessContent" size="small" placeholder="业务内容" @change="(val: string) => onCellChange(row.rowId, 'businessContent', val)" />
           <span v-else>{{ row.businessContent || '-' }}</span>
         </template>
       </el-table-column>
@@ -215,14 +239,14 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       <!-- ═══ 科目信息组（默认折叠，有数据时显示） ═══ -->
       <el-table-column v-if="isColVisible('counterpartAccount')" label="对方科目" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterpartAccount" size="small" placeholder="科目" @change="(val: string) => onCellChange(row.rowId, 'counterpartAccount', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.counterpartAccount" size="small" placeholder="科目" @change="(val: string) => onCellChange(row.rowId, 'counterpartAccount', val)" />
           <span v-else>{{ row.counterpartAccount || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('counterpartDetail')" label="明细科目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterpartDetail" size="small" placeholder="明细" @change="(val: string) => onCellChange(row.rowId, 'counterpartDetail', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.counterpartDetail" size="small" placeholder="明细" @change="(val: string) => onCellChange(row.rowId, 'counterpartDetail', val)" />
           <span v-else>{{ row.counterpartDetail || '-' }}</span>
         </template>
       </el-table-column>
@@ -230,35 +254,35 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       <!-- ═══ 核对结果组（5列） ═══ -->
       <el-table-column v-if="isColVisible('check1')" label="金额" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.check1" size="small" placeholder="-" :class="{ 'ai-backfill': row.check1 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check1', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.check1" size="small" placeholder="-" :class="{ 'ai-backfill': row.check1 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check1', val)" />
           <span v-else :class="{ 'ai-text': row.ocrResult }">{{ row.check1 || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('check2')" label="日期" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.check2" size="small" placeholder="-" :class="{ 'ai-backfill': row.check2 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check2', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.check2" size="small" placeholder="-" :class="{ 'ai-backfill': row.check2 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check2', val)" />
           <span v-else :class="{ 'ai-text': row.ocrResult }">{{ row.check2 || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('check3')" label="科目" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.check3" size="small" placeholder="-" :class="{ 'ai-backfill': row.check3 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check3', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.check3" size="small" placeholder="-" :class="{ 'ai-backfill': row.check3 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check3', val)" />
           <span v-else :class="{ 'ai-text': row.ocrResult }">{{ row.check3 || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('check4')" label="业务" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.check4" size="small" placeholder="-" :class="{ 'ai-backfill': row.check4 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check4', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.check4" size="small" placeholder="-" :class="{ 'ai-backfill': row.check4 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check4', val)" />
           <span v-else :class="{ 'ai-text': row.ocrResult }">{{ row.check4 || '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column v-if="isColVisible('check5')" label="附件" width="70">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.check5" size="small" placeholder="-" :class="{ 'ai-backfill': row.check5 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check5', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.check5" size="small" placeholder="-" :class="{ 'ai-backfill': row.check5 && row.ocrResult }" @change="(val: string) => onCellChange(row.rowId, 'check5', val)" />
           <span v-else :class="{ 'ai-text': row.ocrResult }">{{ row.check5 || '-' }}</span>
         </template>
       </el-table-column>
@@ -267,9 +291,9 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       <el-table-column v-if="isColVisible('supportingDoc')" label="📎 附件" width="100">
         <template #default="{ row }">
           <div class="supporting-doc-cell">
-            <el-button v-if="!isReadonly" size="small" text :loading="isProcessing && currentOcrRowId === row.rowId" title="上传附件并OCR识别" @click="triggerOcrUpload(row.rowId)">📎</el-button>
+            <el-button v-if="!rowReadonly(row)" size="small" text :loading="isProcessing && currentOcrRowId === row.rowId" title="上传附件并OCR识别" @click="triggerOcrUpload(row.rowId)">📎</el-button>
             <span v-if="row.supportingDoc" class="doc-name" :title="row.supportingDoc">{{ row.supportingDoc }}</span>
-            <span v-else-if="isReadonly">-</span>
+            <span v-else-if="rowReadonly(row)">-</span>
           </div>
         </template>
       </el-table-column>
@@ -277,7 +301,7 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       <!-- ═══ 检查结论组 ═══ -->
       <el-table-column v-if="isColVisible('isAbnormal')" label="异常" width="110">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.isAbnormal" filterable allow-create clearable size="small" placeholder="正常" style="width: 100%" @change="(val: string) => onCellChange(row.rowId, 'isAbnormal', val || '')">
+          <el-select v-if="!rowReadonly(row)" :model-value="row.isAbnormal" filterable allow-create clearable size="small" placeholder="正常" style="width: 100%" @change="(val: string) => onCellChange(row.rowId, 'isAbnormal', val || '')">
             <el-option v-for="opt in abnormalOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
           <el-tag v-else-if="row.isAbnormal" type="danger" size="small">{{ row.isAbnormal }}</el-tag>
@@ -287,7 +311,7 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
 
       <el-table-column v-if="isColVisible('remark')" label="备注" min-width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.remark" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" placeholder="备注" @change="(val: string) => onCellChange(row.rowId, 'remark', val)" />
+          <WpCommitInput v-if="!rowReadonly(row)" :model-value="row.remark" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" placeholder="备注" @change="(val: string) => onCellChange(row.rowId, 'remark', val)" />
           <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
@@ -295,7 +319,7 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       <!-- ═══ 操作列（固定右侧） ═══ -->
       <el-table-column v-if="!isReadonly" label="" width="40" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button type="danger" text size="small" title="删除" @click="emit('remove-row', row.rowId)">✕</el-button>
+          <el-button v-if="!rowReadonly(row)" type="danger" text size="small" title="删除" @click="emit('remove-row', row.rowId)">✕</el-button>
         </template>
       </el-table-column>
     </el-table>

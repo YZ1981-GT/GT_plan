@@ -48,8 +48,14 @@
     </div>
 
     <!-- ═══ 主表 ═══ -->
-    <el-table :data="litigationRows" border size="small" style="width: 100%" max-height="520">
+    <el-table :data="litigationRows" border size="small" style="width: 100%" max-height="520" :row-class-name="voucherRowClass">
       <el-table-column type="index" label="序" width="48" align="center" />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="samplingYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="案件名称" min-width="150">
         <template #default="{ row }">
           <el-input v-model="row.caseName" :disabled="isReadonly" size="small" @blur="save(row.rowId, 'caseName', row.caseName)" />
@@ -171,11 +177,11 @@
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
 
@@ -257,6 +263,8 @@ import { ref, toRef, computed, defineAsyncComponent, onMounted, inject } from 'v
 import { Plus, Delete, MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Litigation } from '../../composables/useK5Litigation'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 // 🔴 科目码走单一真源 k5AccountScope，禁硬编码。
 //    本文件原写 account-code="2701" —— `2701` 在全部项目中一律是**长期应付款**
 //    （L5 循环，带 .01 应付融资租赁款 等四个子科目），预计负债是 `2801`
@@ -264,7 +272,7 @@ import { useK5Litigation } from '../../composables/useK5Litigation'
 //    抽错科目 ⇒ 抽回来的凭证与未决诉讼毫无关系，回填进底稿即错误样本。
 //    平台在修 K5TabAdjudication 时已确立该真源（注释原文「禁硬编码 2701 防污染
 //    L5 长期应付款」），但当时只改了那一个文件，本处属同类未清。
-import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
+import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD, k5QueryCodes } from '../../composables/k5AccountScope'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
@@ -318,8 +326,11 @@ const {
   addRow,
   removeRow,
   setLawyerLetterRef,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass, isVoucherRowLocked, voucherFillReady,
 } = useK5Litigation({
   allResponses: allResponsesRef,
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly,
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)
   },
@@ -501,7 +512,7 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, [samplingAccountCode.value],
     )
-    if (samples.length > 0) await onSampleFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
@@ -557,68 +568,15 @@ async function suggestAjeFromVariance(): Promise<void> {
  * 现走 composable 既有 `addRow(caseName)` + `updateCell` 通路（与 E1/D4 同款），
  * 每笔样本落一行并由 `_persist()` 写入 `checklist_responses` 的 `K5-6-rows`。
  */
-async function onSampleFilled(payload: any) {
+/**
+ * 抽凭引擎回填：共享回填函数一笔样本一个案件行，按分录指纹去重（原实现按凭证号 + 日期），填完由它保存并提示填入几行。
+ * 败诉可能性 / 预计损失属专业判断，不由抽凭代填。
+ */
+async function onSampleFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (out.cancelled) return
   showSamplingDialog.value = false
-  const samples = Array.isArray(payload?.samples) ? payload.samples : []
-  if (samples.length === 0) {
-    ElMessage.info('未获取到样本数据')
-    return
-  }
-
-  /** 行的凭证身份：号+日期。🔴 只用号会把同号跨日的不同凭证误判为重复。 */
-  const identityOf = (no: unknown, date: unknown) =>
-    `${String(no ?? '').trim()}@${String(date ?? '').trim()}`
-
-  const existing = new Set(
-    litigationRows.value.map((r: any) => identityOf(r.voucherRef, r.voucherDate)),
-  )
-
-  let added = 0
-  let skipped = 0
-  for (const s of samples) {
-    const voucherNo = String(s?.voucherNo ?? '').trim()
-    const voucherDate = String(s?.voucherDate ?? '').trim().slice(0, 10)
-    const identity = identityOf(voucherNo, voucherDate)
-    if (voucherNo && existing.has(identity)) {
-      skipped += 1
-      continue
-    }
-
-    // 案件名称取摘要（诉讼类凭证摘要通常含案由）；缺失时用凭证号占位，由审计师改写
-    const caseName = String(s?.summary ?? '').trim() || (voucherNo ? `抽凭 ${voucherNo}` : '抽凭样本')
-    // 传 caseName → addRow 不弹 prompt；返回 null 表示未建行，必须跳过（不可假设成功）
-    const row = await addRow(caseName)
-    if (!row) continue
-
-    // 涉案金额：取借贷绝对值较大者作为金额线索（诉讼赔付方向因案而异）
-    const amount = Math.max(
-      Math.abs(Number(s?.debitAmount) || 0),
-      Math.abs(Number(s?.creditAmount) || 0),
-    )
-
-    updateCell(row.rowId, 'voucherRef', voucherNo)
-    updateCell(row.rowId, 'voucherDate', voucherDate)
-    if (amount > 0) updateCell(row.rowId, 'amount', amount)
-    // 败诉可能性/预计损失属专业判断（CAS13 三级），不由抽凭代填 —— 留空待审计师
-    // 结合律师意见填写，备注里明确写出这一待办，避免误以为已评估完毕。
-    const noteParts = ['抽凭引擎回填，待结合律师意见判断败诉可能性']
-    if (s?.accountName) noteParts.push(`科目：${s.accountName}`)
-    if (s?.abnormal) noteParts.push('引擎标记异常，待核查')
-    updateCell(row.rowId, 'remark', noteParts.join('；'))
-
-    existing.add(identity)
-    added += 1
-  }
-
-  if (added > 0) {
-    ElMessage.success(
-      skipped > 0
-        ? `已回填 ${added} 笔诉讼检查行（${skipped} 笔重复已跳过），请补充律师意见与败诉可能性`
-        : `已回填 ${added} 笔诉讼检查行，请补充律师意见与败诉可能性`,
-    )
-  } else {
-    ElMessage.info(`未新增（${skipped} 笔重复已跳过）`)
-  }
+  if (out.added > 0) ElMessage.info('请补充律师意见与败诉可能性')
 }
 
 function fmtNum(v: number): string {
@@ -627,7 +585,10 @@ function fmtNum(v: number): string {
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
-onMounted(() => { loadNote() })
+onMounted(() => {
+  void voucherFillReady()
+  loadNote()
+})
 </script>
 
 <style scoped>

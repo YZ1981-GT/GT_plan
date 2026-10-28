@@ -17,6 +17,9 @@
  * 纯计算函数导出供单测。Item IDs: K8-5-amort-rows / K8-5-amort-period / K8-5-conclusion
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { useVoucherCheckFill, withRowMeta, type EngineFilledPayload, type FillSample, type PreparedItem } from './shared/voucherCheckFill'
+import { partyNameForColumn } from './shared/samplingPartyTarget'
+import { sampleOf } from './assetVoucherFill'
 
 // ─── 纯计算函数（可单测）────────────────────────────────────────────────────
 
@@ -119,6 +122,31 @@ export interface K8AmortRow {
   ocrAttachment: string
 }
 
+/**
+ * 共享回填函数的待写入项 → 合同行（spec voucher-identity-writeback-and-audit-phase 任务 13）：项目与合同内容取摘要，
+ * 对方单位取辅助核算往来单位（唯一命中才填），凭证索引记「凭证 X / 日期」；合同金额、期间、已计损益查合同后填
+ * （原实现只写项目名，凭证是哪一张记不下来，也不去重）。
+ */
+export function mapPreparedToK8AmortRow(item: PreparedItem, normalize: (raw: any) => K8AmortRow): K8AmortRow {
+  const s = sampleOf(item)
+  const summary = String(s.summary ?? '').trim()
+  const no = String(s.voucherNo ?? '')
+  return normalize({
+    rowKey: `amort-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    projectName: summary || (no ? `凭证 ${no}` : '抽凭样本'),
+    counterparty: partyNameForColumn(s, 'supplier') || '',
+    contractContent: summary,
+    voucherIndex: [no ? `凭证 ${no}` : '', s.voucherDate || ''].filter(Boolean).join(' / '),
+  })
+}
+
+/** 行上已填合同信息或结论（替换与撤销抽凭时据此先确认；项目 / 合同内容 / 凭证索引是回填写的，不算） */
+export function hasK8AmortContent(r: K8AmortRow): boolean {
+  return [r.invoiceParty, r.paymentTerm, r.paymentTime, r.startDate, r.endDate, r.contractIndex, r.conclusion, r.ocrAttachment]
+    .some(v => String(v ?? '').trim() !== '')
+    || !!Number(r.contractAmount) || !!Number(r.bookedPL)
+}
+
 export interface UseK8ContractAmortizationParams {
   allResponses: Ref<Map<string, any>>
   projectId: Ref<string>
@@ -139,6 +167,19 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   const { allResponses, year, isReadonly, onSave } = params
 
   const rows = ref<K8AmortRow[]>([])
+
+  // 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数（一笔样本一个合同行，按分录指纹去重）
+  const voucherFill = useVoucherCheckFill<K8AmortRow>({
+    projectId: params.projectId,
+    tables: rows,
+    mapSampleToRow: (item) => mapPreparedToK8AmortRow(item, _normalizeRow),
+    persist: () => _persist(),
+    hasUserContent: hasK8AmortContent,
+    policy: 'join',
+    // 旧行（没有 `_gt`）认不出是哪张凭证（原实现只写项目名）
+    legacy: () => null,
+    readonly: isReadonly,
+  })
   const conclusion = ref('')
   const amortStart = ref('')
   const amortEnd = ref('')
@@ -163,6 +204,8 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   function initFromResponses(): void {
     const raw = _getJson(ROWS_KEY)
     rows.value = Array.isArray(raw) ? raw.map(_normalizeRow) : []
+    // 记下预审行的读入版本（年审阶段保存时据此写回）
+    voucherFill.markLoaded()
     conclusion.value = _getString(CONCLUSION_KEY)
     const period = _getJson(PERIOD_KEY)
     if (period && typeof period === 'object') {
@@ -175,7 +218,7 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   }
 
   function _normalizeRow(raw: any): K8AmortRow {
-    return {
+    return withRowMeta({
       rowKey: raw.rowKey ?? `amort-${Math.random().toString(36).slice(2, 10)}`,
       projectName: raw.projectName ?? '',
       counterparty: raw.counterparty ?? '',
@@ -197,7 +240,7 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
       ocrAttachment: raw.ocrAttachment ?? '',
       // 应计月份是否手工覆盖标记（用 __manualAccrual 隐藏字段）
       ...(raw.__manualAccrual ? { __manualAccrual: true } : {}),
-    } as K8AmortRow
+    } as K8AmortRow, raw)
   }
 
   /** 带公式列的完整行 */
@@ -248,7 +291,7 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
 
   function _persist(): void {
     if (!onSave) return
-    onSave(ROWS_KEY, rows.value)
+    onSave(ROWS_KEY, voucherFill.guardPersist(rows.value))
   }
 
   function addRow(projectName: string): void {
@@ -270,7 +313,7 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   function applyRowPatch(rowKey: string, patch: Partial<K8AmortRow> & { __manualAccrual?: boolean }): boolean {
     if (isReadonly?.value) return false
     const row = rows.value.find((r) => r.rowKey === rowKey)
-    if (!row) return false
+    if (!row || voucherFill.isRowLocked(row)) return false
     for (const [k, v] of Object.entries(patch)) {
       if (k === 'rowKey') continue
       if (k === '__manualAccrual') { (row as any).__manualAccrual = !!v; continue }
@@ -291,13 +334,14 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   function removeRow(rowKey: string): void {
     if (isReadonly?.value) return
     const idx = rows.value.findIndex((r) => r.rowKey === rowKey)
-    if (idx >= 0) { rows.value.splice(idx, 1); _persist() }
+    // 年审阶段的预审行不删
+    if (idx >= 0 && !voucherFill.isRowLocked(rows.value[idx])) { rows.value.splice(idx, 1); _persist() }
   }
 
   function updateCell(rowKey: string, field: keyof K8AmortRow, value: unknown): void {
     if (isReadonly?.value) return
     const row = rows.value.find((r) => r.rowKey === rowKey)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     if (field === 'accrualMonths') {
       ;(row as any).__manualAccrual = true
       ;(row as any).accrualMonths = parseNum(value)
@@ -325,6 +369,13 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
 
   return {
     rows: computedRows,
+    // 抽凭回填 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     conclusion,
     amortStart,
     amortEnd,

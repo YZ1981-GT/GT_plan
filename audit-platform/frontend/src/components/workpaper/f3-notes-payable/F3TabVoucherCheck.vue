@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** F3TabVoucherCheck — F3-7 应付票据检查表（三检查区 + 弹窗逐单据核对，参照 F2-56 模式） */
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { ref, computed, watch, toRef, inject, type Ref } from 'vue'
+import { ref, computed, watch, toRef, inject, onMounted, type Ref } from 'vue'
 import {
   useF3VoucherCheck,
   F3_VOUCHER_SECTION_LABELS,
@@ -11,7 +11,7 @@ import {
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import { useStickySectionNav } from '../composables/useStickySectionNav'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 import type { F3ImportableSheet } from '../composables/useF3ImportExport'
@@ -85,7 +85,8 @@ const {
   debitTotal, creditTotal, subsequentTotal,
   debitAbnormal, creditAbnormal, subsequentAbnormal,
   checkRatios, auditConclusion,
-  addRow, removeRow, updateCell, saveRow, applySamplingResults,
+  addRow, removeRow, updateCell, saveRow,
+  onEngineFilled, onAttachImported, onUndoRequest, isVoucherRowLocked, voucherFillReady,
 } = useF3VoucherCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -108,7 +109,6 @@ const sections: Array<{
 ]
 
 const auditYear = computed<number | null>(() => props.year ?? null)
-const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length + subsequentRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value + subsequentAbnormal.value)
 
@@ -200,6 +200,7 @@ async function refreshAttachedCount(): Promise<void> {
   } catch { attachedCount.value = 0 }
 }
 void refreshAttachedCount()
+onMounted(() => { void voucherFillReady() })
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
@@ -212,17 +213,20 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, auditYear.value, props.wpId, F3_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+/**
+ * 抽凭引擎回填：按借贷方向进本期借方 / 贷方区，共享回填函数一个对方科目一行（后端配对），按分录指纹去重，
+ * 填入几行由共享函数提示；「替换本阶段抽凭行」只动这两区。
+ */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  applySamplingResults(payload.samples, payload.fillMode)
+  void persistMethodology(payload?.methodology)
+  await onEngineFilled(payload)
 }
 
 function ratioClass(ratio: number): string {
@@ -280,15 +284,15 @@ function ratioClass(ratio: number): string {
     </nav>
 
     <el-collapse id="f3-7-sampling" class="sampling-engine-collapse">
-      <el-collapse-item title="自动抽凭（科目 ${samplingAccountCode} 应付票据 · 样本按借贷方向自动分配）" name="auto-sampling">
+      <el-collapse-item :title="`自动抽凭（科目 ${samplingAccountCode} 应付票据 · 样本按借贷方向自动分配）`" name="auto-sampling">
         <GtVoucherSamplingEngine
           :account-code="samplingAccountCode"
-          :phase="currentPhase"
           default-method="random"
           :workpaper-id="wpId"
           :project-id="projectId"
           :year="auditYear"
           @filled="handleSamplingFilled"
+          @undo-request="onUndoRequest"
         />
       </el-collapse-item>
     </el-collapse>
@@ -315,6 +319,8 @@ function ratioClass(ratio: number): string {
           :is-readonly="isReadonly"
           :wp-id="wpId"
           :project-id="projectId"
+          :year="auditYear"
+          :is-row-locked="isVoucherRowLocked"
           :all-responses="allResponses"
           @update-cell="(id, f, v) => updateCell(section.key, id, f, v)"
           @remove-row="(id) => removeRow(section.key, id)"

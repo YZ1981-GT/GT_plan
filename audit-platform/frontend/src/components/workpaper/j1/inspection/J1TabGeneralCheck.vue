@@ -149,28 +149,38 @@
 
         <!-- 卡片视图 -->
         <div v-if="viewMode === 'card'">
-          <J1VoucherCard
-            v-for="(row, idx) in grp.rows.value"
-            :key="row.id"
-            :row="row"
-            :seq="idx + 1"
-            :direction="grp.key"
-            :check-labels="grp.key === 'debit' ? debitCheckLabels : checkLabels"
-            :is-readonly="isReadonly"
-            :ocr-loading-id="ocrLoadingId"
-            :wp-id="wpId"
-            :project-id="projectId"
-            :evidence-sheet="EVIDENCE_SHEET"
-            @change="persist"
-            @remove="(id) => removeRow(grp.key, id)"
-            @upload="onCardUpload"
-          />
+          <div v-for="(row, idx) in grp.rows.value" :key="row.id" class="j1-card-item">
+            <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据）；年审阶段的预审行卡片只读 -->
+            <div class="j1-card-source">
+              <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="yearNum" />
+            </div>
+            <J1VoucherCard
+              :row="row"
+              :seq="idx + 1"
+              :direction="grp.key"
+              :check-labels="grp.key === 'debit' ? debitCheckLabels : checkLabels"
+              :is-readonly="isReadonly || isVoucherRowLocked(row)"
+              :ocr-loading-id="ocrLoadingId"
+              :wp-id="wpId"
+              :project-id="projectId"
+              :evidence-sheet="EVIDENCE_SHEET"
+              @change="persist"
+              @remove="(id) => removeRow(grp.key, id)"
+              @upload="onCardUpload"
+            />
+          </div>
           <el-empty v-if="grp.rows.value.length === 0" description="暂无凭证，点击「＋新增凭证」或「抽凭」" :image-size="60" />
         </div>
 
         <!-- 矩阵视图 -->
-        <el-table v-else :data="grp.rows.value" border size="small" :max-height="400" class="matrix-table" :row-class-name="abnormalRowClass">
+        <el-table v-else :data="grp.rows.value" border size="small" :max-height="400" class="matrix-table" :row-class-name="voucherRowClassName">
           <el-table-column label="#" type="index" width="42" align="center" />
+          <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+          <el-table-column label="来源" width="150">
+            <template #default="{ row }">
+              <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="yearNum" />
+            </template>
+          </el-table-column>
           <el-table-column label="薪酬项目" min-width="120">
             <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
           </el-table-column>
@@ -280,8 +290,8 @@
     </details>
 
     <!-- 抽凭引擎 -->
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应付职工薪酬(2211)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" :phase="samplingPhase" :workpaper-id="props.wpId" :project-id="props.projectId" :year="yearNum" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 应付职工薪酬(${samplingAccountCode})`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" :workpaper-id="props.wpId" :project-id="props.projectId" :year="yearNum" @filled="onSamplesFilled" @undo-request="onUndoRequest" />
     </el-dialog>
   </div>
 </template>
@@ -301,11 +311,17 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import {
+  combineRowClass, sideTableOf, type EngineFilledPayload, type PreparedItem,
+} from '../../composables/shared/voucherCheckFill'
 import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import J1VoucherCard from './J1VoucherCard.vue'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { useProjectStore } from '@/stores/project'
+import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 
 /**
  * 抽凭科目码取自单一真源 `jAccountScope`（J1 应付职工薪酬）。原为模板内字面量；
@@ -335,9 +351,18 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => false)
+const projectStore = useProjectStore()
+/**
+ * 审计年度：底稿数据带的年度 → 本项目的审计年度。原先取不到就用今年：按编码新生成的底稿数据里没有年度，
+ * 挂凭导入、已挂计数、抽凭、试算表取数都去查下一年（spec voucher-identity-writeback-and-audit-phase 任务 14 实测）。
+ */
 const yearNum = computed(() => {
-  const d = props.htmlData as any
-  return d?.year ?? null
+  const same = projectStore.projectId === props.projectId
+  return resolveEffectiveAuditYear({
+    propYear: (props.htmlData as any)?.year,
+    storeAuditYear: same ? projectStore.auditYear : null,
+    storeYear: same ? projectStore.year : null,
+  })
 })
 
 // 视图模式
@@ -353,6 +378,15 @@ const localAllResponses = ref(new Map<string, any>())
 const allResponsesRef = computed(() => localAllResponses.value)
 const ITEM_ID = 'J1-8-voucher-check'
 
+// 期后支付区（独立存 J1-8-post-period；与贷方 / 借方两区一起交给共享回填函数去重、撤销、年审阶段只读）
+const postPeriodRows = ref<K1VoucherRow[]>([])
+
+/** 挂凭导入的分区（没有所选的区）：凭证日期在期末之后进期后支付，其余按分录借贷栏 —— 贷方进三-A 计提，借方进三-B 发放 */
+function j1AttachTable(item: PreparedItem): string {
+  if (String(item.sample.voucherDate ?? '') > `${yearNum.value}-12-31`) return 'postPeriod'
+  return sideTableOf(item) === 'credit' ? 'occurrence' : 'post'
+}
+
 const {
   checkLabels,
   criteria, occurrenceRows, postCollectionRows, auditNote, conclusion, conclusionOption,
@@ -360,8 +394,18 @@ const {
   occurrenceCreditChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
   addPostCollectionRow, removePostCollectionRow,
-  fillFromSamples, serialize,
-} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: ITEM_ID })
+  serialize,
+  onEngineFilled, onAttachImported, onUndoRequest, voucherRowClass: lockedRowClass, isVoucherRowLocked, voucherFillReady,
+  guardPersist,
+} = useK1VoucherCheck({
+  allResponses: allResponsesRef as any,
+  itemId: ITEM_ID,
+  projectId: () => props.projectId,
+  readonly: () => isReadonly.value,
+  persist: () => persist(),
+  extraTables: { postPeriod: postPeriodRows },
+  attachTableOf: j1AttachTable,
+})
 
 const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId), computed(() => props.projectId))
 /** 卡片三类单据（薪酬计算表 / 付款审批单 / 银行回单）的识别附件都挂到本笔凭证行（J1-8 + `row:{行 id}`） */
@@ -375,8 +419,6 @@ const debitCheckLabels = [
 
 const j1CheckRatios = computed(() => checkRatios.value)
 
-// 期后支付区（独立管理）
-const postPeriodRows = ref<K1VoucherRow[]>([])
 const postDebitChecked = computed(() => postCollectionRows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
 const postPeriodTotal = computed(() => postPeriodRows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
 
@@ -402,7 +444,7 @@ function addRow(key: 'credit' | 'debit' | 'post') {
 function removeRow(key: 'credit' | 'debit' | 'post', id: string) {
   if (key === 'credit') removeOccurrenceRow(id)
   else if (key === 'debit') removePostCollectionRow(id)
-  else postPeriodRows.value = postPeriodRows.value.filter(r => r.id !== id)
+  else postPeriodRows.value = postPeriodRows.value.filter(r => r.id !== id || isVoucherRowLocked(r))
   persist()
 }
 
@@ -468,7 +510,10 @@ async function reloadFromServer() {
     console.warn('[J1-8] selfLoad failed:', e)
   }
 }
-onMounted(reloadFromServer)
+onMounted(() => {
+  void voucherFillReady()
+  void reloadFromServer()
+})
 
 // 导入数据（xlsx）→ 成功后从服务端重载三区
 function triggerImport() {
@@ -496,7 +541,7 @@ async function doPersist() {
     localAllResponses.value.set(ITEM_ID, { item_id: ITEM_ID, remark: data, conclusion: null })
     const items = [
       { item_id: ITEM_ID, remark: data, conclusion: conclusion.value || null },
-      { item_id: 'J1-8-post-period', remark: JSON.stringify(postPeriodRows.value), conclusion: null },
+      { item_id: 'J1-8-post-period', remark: JSON.stringify(guardPersist(postPeriodRows.value, 'postPeriod')), conclusion: null },
     ]
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
   } catch (e) {
@@ -506,9 +551,10 @@ async function doPersist() {
 
 // ─── 抽凭 ────────────────────────────────────────────────────────────────────
 const samplingVisible = ref(false)
-const samplingPhase = ref<'current' | 'post'>('current')
+/** 抽凭回填进哪个区（宿主自己的状态，不再借引擎的 phase 传）：三-A 贷方 → occurrence，三-B 借方 → post，三-C 期后 → postPeriod */
+const samplingTable = ref<'occurrence' | 'post' | 'postPeriod'>('occurrence')
 function openSampling(direction: 'credit' | 'debit' | 'post') {
-  samplingPhase.value = direction === 'credit' ? 'current' : 'post'
+  samplingTable.value = direction === 'credit' ? 'occurrence' : direction === 'debit' ? 'post' : 'postPeriod'
   samplingVisible.value = true
 }
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
@@ -536,17 +582,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, yearNum.value, props.wpId, J1_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples: any[] }) {
-  const target = samplingPhase.value === 'current' ? 'occurrence' : 'post'
-  fillFromSamples(target, payload?.samples ?? [])
-  samplingVisible.value = false
-  persist()
+/** 抽凭引擎回填进所选的区：共享回填函数一个对方科目一行，按分录指纹去重，填完由它保存并提示填入几行 */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload, samplingTable.value)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 function onConclusionOption(val: string) {
@@ -564,6 +609,8 @@ function fmtAmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
+/** 异常行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(abnormalRowClass, lockedRowClass)
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
 const aiSamplingLoading = ref(false)

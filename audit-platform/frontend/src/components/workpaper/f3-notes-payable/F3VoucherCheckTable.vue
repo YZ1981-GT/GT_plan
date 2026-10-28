@@ -10,7 +10,9 @@ import {
 } from '../composables/useF3VoucherCheck'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import { itemCellRef } from '@/components/attachment/workpaperEvidence'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 const SCROLL_THRESHOLD = 50
 const TABLE_MAX_HEIGHT = 480
@@ -22,6 +24,10 @@ const props = defineProps<{
   wpId?: string
   projectId?: string
   allResponses?: Map<string, any>
+  /** 年审阶段的预审行只读（父组件的共享回填函数判定）：来源列加「只读」、行置灰点不进 */
+  isRowLocked?: (row: F3VoucherCheckRow) => boolean
+  /** 审计年度（来源列「多科目」看整张凭证用） */
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +46,11 @@ const evidenceLabel = computed(() =>
 
 function fmt(v: number): string {
   return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/** 年审阶段预审行只读样式 */
+function rowClassName({ row }: { row: F3VoucherCheckRow }): string {
+  return props.isRowLocked?.(row) ? 'gt-row-locked' : ''
 }
 
 function onUpdate(field: string, rowId: string, value: unknown): void {
@@ -127,11 +138,18 @@ async function generateNoteAi(): Promise<void> {
       show-summary
       :summary-method="summaryMethod"
       :max-height="useScroll ? TABLE_MAX_HEIGHT : undefined"
+      :row-class-name="rowClassName"
     >
       <el-table-column prop="seq" label="序号" width="50" fixed align="center" />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId ?? ''" :year="year ?? 0" />
+        </template>
+      </el-table-column>
       <el-table-column prop="voucherDate" label="日期" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherDate" size="small" placeholder="YYYY-MM-DD"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.voucherDate" size="small" placeholder="YYYY-MM-DD"
             @change="(v: string) => onUpdate('voucherDate', row.rowId, v)" />
           <span v-else>{{ row.voucherDate }}</span>
         </template>
@@ -139,12 +157,12 @@ async function generateNoteAi(): Promise<void> {
       <el-table-column prop="voucherNo" label="凭证编号" width="110">
         <template #default="{ row }">
           <el-tooltip v-if="row.sampleSource" :content="`来自${row.sampleSource}`" placement="top">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small"
+            <WpCommitInput v-if="!isReadonly" :model-value="row.voucherNo" size="small"
               @change="(v: string) => onUpdate('voucherNo', row.rowId, v)" />
             <span v-else>{{ row.voucherNo }}</span>
           </el-tooltip>
           <template v-else>
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small"
+            <WpCommitInput v-if="!isReadonly" :model-value="row.voucherNo" size="small"
               @change="(v: string) => onUpdate('voucherNo', row.rowId, v)" />
             <span v-else>{{ row.voucherNo }}</span>
           </template>
@@ -152,21 +170,21 @@ async function generateNoteAi(): Promise<void> {
       </el-table-column>
       <el-table-column prop="businessContent" label="业务内容" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.businessContent" size="small"
             @change="(v: string) => onUpdate('businessContent', row.rowId, v)" />
           <span v-else>{{ row.businessContent }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="counterAccount" label="对方科目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.counterAccount" size="small"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.counterAccount" size="small"
             @change="(v: string) => onUpdate('counterAccount', row.rowId, v)" />
           <span v-else>{{ row.counterAccount }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="detailAccount" label="明细科目" width="105">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.detailAccount" size="small"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.detailAccount" size="small"
             @change="(v: string) => onUpdate('detailAccount', row.rowId, v)" />
           <span v-else>{{ row.detailAccount }}</span>
         </template>
@@ -180,7 +198,7 @@ async function generateNoteAi(): Promise<void> {
       </el-table-column>
       <el-table-column prop="noteType" label="票据类别" width="120">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.noteType" size="small"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.noteType" size="small"
             @change="(v: string) => onUpdate('noteType', row.rowId, v)" />
           <span v-else>{{ row.noteType }}</span>
         </template>
@@ -192,7 +210,7 @@ async function generateNoteAi(): Promise<void> {
       </el-table-column>
       <el-table-column prop="indexNo" label="索引号" width="95">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.indexNo" size="small"
+          <WpCommitInput v-if="!isReadonly" :model-value="row.indexNo" size="small"
             @change="(v: string) => onUpdate('indexNo', row.rowId, v)" />
           <span v-else>{{ row.indexNo }}</span>
         </template>
@@ -229,7 +247,7 @@ async function generateNoteAi(): Promise<void> {
             @click="generateNoteAi">🤖 AI 生成说明</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"

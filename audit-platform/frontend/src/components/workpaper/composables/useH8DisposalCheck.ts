@@ -26,6 +26,11 @@ import {
   buildConclusionDraft,
   isCheckIncomplete,
 } from './h8DisposalCheckModel'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf, sampleRemark } from './assetVoucherFill'
 
 export type {
   H8DisposalCheckRow,
@@ -57,12 +62,44 @@ const COST_CREDIT_KEY = 'H8-1-cost-credit-total'
 const H9_ROWS_KEY = 'H9-2-rows'
 const POP_MANUAL_KEY = 'H8-12-population-manual'
 
+/**
+ * 共享回填函数的待写入项 → H8-12 行（spec voucher-identity-writeback-and-audit-phase 任务 12）：资产名称取摘要，
+ * 凭证号、减少日期、对方科目（编码 名称，按后端配对）、原值（样本自己那一栏，减少在贷方，红字带符号照记）。
+ * 原实现把摘要写进合同号（H8-2 带入、同步 H9 都按合同号匹配）、原值取绝对值、对方科目只写编码。
+ */
+export function applyH8DisposalSample(row: H8DisposalCheckRow, item: PreparedItem): void {
+  const s = sampleOf(item)
+  row.assetName = String(s.summary ?? '').trim().slice(0, 80) || '抽凭样本'
+  row.voucherNo = String(s.voucherNo ?? '')
+  row.reductionDate = String(s.voucherDate ?? '')
+  row.oppositeAccount = counterpartText(item)
+  row.rouCost = assetAmount(item, 'credit')
+  if (s.abnormal === true) row.isAbnormal = '是'
+  const reason = sampleRemark(item, '')
+  if (reason) row.remark = reason
+  recalcDisposalRow(row)
+}
+
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：类别、合同号、减少方式、折旧减值、负债余额、核对勾选、审批等 */
+export function hasH8DisposalContent(r: H8DisposalCheckRow): boolean {
+  return [r.assetCategory, r.contractNo, r.reductionMethod, r.supportingDocs, r.indexRef, r.relatedPartyName,
+    r.approvalStatus, r.approver].some(v => String(v ?? '').trim() !== '')
+    || [r.quantity, r.accDepreciation, r.impairmentProvision, r.liabilityBalance, r.remainingMonths, r.earlyTermPenalty]
+      .some(v => Number(v) !== 0)
+    || Object.values(r.checks ?? {}).some(Boolean) || r.h9Synced || r.isRelatedParty === '是'
+}
+
+/** 旧行（没有 `_gt`）身份：凭证号 + 减少日期 + 原值（原实现取绝对值） */
+const h8Legacy = (r: H8DisposalCheckRow) => assetLegacyKey(r.voucherNo, r.reductionDate, r.rouCost)
+
 export function useH8DisposalCheck(params: {
   wpId: Ref<string>
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
   onSyncH9?: (contractNo: string, liabilityBalance: number) => void
+  /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+  isReadonly?: Ref<boolean>
 }) {
   const { allResponses, onSave, onSyncH9 } = params
 
@@ -107,8 +144,9 @@ export function useH8DisposalCheck(params: {
   function load(): void {
     const data = _getJson(ROWS_KEY)
     rows.value = Array.isArray(data) && data.length > 0
-      ? data.map((r, i) => normalizeDisposalRow(r, i))
+      ? data.map((r, i) => withRowMeta(normalizeDisposalRow(r, i), r))
       : []
+    voucherFill.markLoaded()
 
     samplingParams.value = normalizeSamplingParams(_getJson(PARAMS_KEY))
     const manual = _getJson(POP_MANUAL_KEY)
@@ -129,13 +167,38 @@ export function useH8DisposalCheck(params: {
     }
   }
 
-  watch(allResponses, () => load(), { immediate: true })
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（一个样本一行，对方科目按配对拼接）
+  const voucherFill = useVoucherCheckFill<H8DisposalCheckRow>({
+    projectId: () => params.projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: (item) => {
+      const row = normalizeDisposalRow({ seq: 0 }, 0)
+      applyH8DisposalSample(row, item)
+      return row
+    },
+    persist: () => _persistRows(),
+    hasUserContent: hasH8DisposalContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    legacy: h8Legacy,
+    readonly: () => params.isReadonly?.value === true,
+  })
+
+  /** 年审阶段预审行只读：批量带入 / 填充之后把预审行换回原样 */
+  function keepLockedRows(next: H8DisposalCheckRow[]): H8DisposalCheckRow[] {
+    const locked = new Map(rows.value.filter(voucherFill.isRowLocked).map(r => [r.rowId, r]))
+    return locked.size ? next.map(r => locked.get(r.rowId) ?? r) : next
+  }
 
   const linkedDecrease: ComputedRef<LinkedRouDecrease> = computed(() => {
     const detail = _getJson(DETAIL_ROWS_KEY)
     const credit = _getNum(COST_CREDIT_KEY)
     return sumLinkedRouDecrease(credit, Array.isArray(detail) ? detail : [])
   })
+
+  // 读入放在 linkedDecrease 之后：load 按它自动带入总体。原来侦听在它之前、立即执行时读到暂时性死区
+  // （ReferenceError，被 Vue 的错误处理吞掉），打开底稿时总体自动带入从未生效
+  watch(allResponses, () => load(), { immediate: true })
 
   const summary: ComputedRef<H8DisposalSummary> = computed(() =>
     calcDisposalSummary(
@@ -162,7 +225,7 @@ export function useH8DisposalCheck(params: {
 
   function _persistRows(): void {
     if (!onSave) return
-    onSave(ROWS_KEY, rows.value.map((r, i) => ({
+    onSave(ROWS_KEY, voucherFill.guardPersist(rows.value).map((r, i) => withRowMeta({
       rowId: r.rowId,
       seq: i + 1,
       assetCategory: r.assetCategory,
@@ -193,7 +256,7 @@ export function useH8DisposalCheck(params: {
       approvalStatus: r.approvalStatus,
       approver: r.approver,
       remark: r.remark,
-    })))
+    }, r)))
     onSave(GAIN_LOSS_TOTAL_KEY, summary.value.gainLossTotal)
     onSave(CHECKED_AMOUNT_KEY, summary.value.checkedAmount)
   }
@@ -213,7 +276,7 @@ export function useH8DisposalCheck(params: {
 
   function deleteRow(rowId: string): void {
     const idx = rows.value.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
+    if (idx === -1 || voucherFill.isRowLocked(rows.value[idx])) return
     rows.value.splice(idx, 1)
     rows.value.forEach((r, i) => { r.seq = i + 1 })
     _persistRows()
@@ -221,7 +284,7 @@ export function useH8DisposalCheck(params: {
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
 
     if (field.startsWith('checks.')) {
       const key = field.slice(7) as keyof typeof row.checks
@@ -287,7 +350,7 @@ export function useH8DisposalCheck(params: {
     const detail = _getJson(DETAIL_ROWS_KEY)
     const seeded = seedDisposalRowsFromH82(Array.isArray(detail) ? detail : [])
     if (seeded.length === 0) return { imported: 0, totalTerminated: 0 }
-    rows.value = mergeSeededDisposalRows(rows.value, seeded)
+    rows.value = keepLockedRows(mergeSeededDisposalRows(rows.value, seeded))
     _persistRows()
     // 同步刷新总体（未手工锁定时）
     if (!populationManual.value) {
@@ -311,7 +374,7 @@ export function useH8DisposalCheck(params: {
       Array.isArray(h9) ? h9 : [],
     )
     if (matched > 0) {
-      rows.value = next
+      rows.value = keepLockedRows(next)
       _persistRows()
     }
     return { matched }
@@ -320,7 +383,7 @@ export function useH8DisposalCheck(params: {
   /** 同步终止到 H9（通知租赁负债也应终止确认） */
   function syncToH9(rowId: string): void {
     const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     row.h9Synced = true
     if (!row.checks.check5) row.checks.check5 = true
     onSyncH9?.(row.contractNo, row.liabilityBalance)
@@ -340,7 +403,7 @@ export function useH8DisposalCheck(params: {
 
   /** 批量同步尚未标记的样本到 H9 */
   function syncAllToH9(): number {
-    const targets = rows.value.filter(r => !r.h9Synced && r.contractNo.trim())
+    const targets = rows.value.filter(r => !r.h9Synced && r.contractNo.trim() && !voucherFill.isRowLocked(r))
     for (const row of targets) {
       syncToH9(row.rowId)
     }
@@ -370,6 +433,8 @@ export function useH8DisposalCheck(params: {
     if (row.isAbnormal === '是' || row.isAbnormal === 'Y') classes.push('row-abnormal')
     if (!row.h9Synced) classes.push('row-unsynced')
     if (isCheckIncomplete(row)) classes.push('row-incomplete')
+    const locked = voucherFill.rowClass({ row })
+    if (locked) classes.push(locked)
     return classes.join(' ')
   }
 
@@ -408,6 +473,11 @@ export function useH8DisposalCheck(params: {
     rowClassName,
     save,
     load,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 
