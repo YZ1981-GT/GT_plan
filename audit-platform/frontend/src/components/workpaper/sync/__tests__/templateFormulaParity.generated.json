@@ -1557,8 +1557,8 @@
    },
    "date_inputs": [],
    "text_inputs": [
-    "acctClass",
     "confirmationRequested",
+    "investType",
     "realizationRestricted",
     "securityName"
    ],

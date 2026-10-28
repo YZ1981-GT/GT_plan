@@ -76,14 +76,16 @@ TEMPLATE_SHA256: Final[str] = (
     "63bf38c797d4612e71eeea6fad9dd049765399663af56bc95f235023d2df8f34"
 )
 
-#: 受管 store item（明细表G9-2 的三区共用）—— 按值取自 `useG9Detail.ts` 的 `ITEM_ID_ROWS`
-STORE_ITEM_ID: Final[str] = "G6-2-rows"
+#: 受管 store item（公允价值测试表G6-5）—— 按值取自 `G6TabFairValueTest.vue` 的 `DATA_KEY`
+STORE_ITEM_ID: Final[str] = "G6-5-fair-value-data"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
-ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
+#: 行身份键（与受管 spec 的 row_identity_key、前端行 id 同；原照抄 G9 写成 "rowId"）
+ROW_IDENTITY_STORE_KEY: Final[str] = "id"
 
-#: 🔴 FD-1：payload 落 `remark`（真库实证 remark 605 B / conclusion 0 B）。
-PAYLOAD_COLUMN: Final[str] = "remark"
-PAYLOAD_COLUMN_MODE: Final[str] = "remark_only"
+#: 🔴 FD-1：payload 落 `conclusion`（`G6TabFairValueTest` 写 conclusion，读 conclusion 优先、remark 兜底）；
+#:    store 是 `{rows, conclusion}` 对象（门面 rows_key="rows"，回写走 state 分支只换行数组）。
+PAYLOAD_COLUMN: Final[str] = "conclusion"
+PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
 
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
@@ -304,24 +306,14 @@ def instrumentation_definition_payload() -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _HTML_STORE_NOTE: Final[str] = (
-    "G9 其他非流动金融资产的明细行存成 checklist_responses 的 **remark** JSON 数组"
-    "（真库实证 remark 605 B / conclusion 0 B）。"
-    "🔴 三个受管区（其他非流动金融资产 / 划分为FVTPL / 指定为FVTPL）共用**同一个** "
-    f"`{STORE_ITEM_ID}` 数组，行的区归属由 `section` 字段表达 —— 契约里对应三条 "
-    "`tables[]`（逐段不同 uuid_col 与行区间），但 `html_store.item_ids` 只有一条。"
+    "G6-5 公允价值测试存成 checklist_responses 的 **conclusion** JSON 对象 `{rows, conclusion}`（`G6TabFair"
+    "ValueTest` 写 conclusion）；行数组在 `rows` 键下，回写只换行数组、`conclusion` 等其余键原样保留。单区，行身份 `id`。"
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 逐格实测 G/G6 其他债权投资.xlsx 的 `明细表G9-2`"
-    "（两级表头 R9 组 / R10 叶子 / 三个受管区 R12-16·R19-23·R26-28 / "
-    "区标题行 R11·R18·R25 无公式 / 小计 R17·R24·R29 / 合计 R30 枚举相加 "
-    "=SUM(C17,C24,C29) / 12 个公式列 E·H·I·J·L·P·Q·R·U·V·W·Y 共 156 格 / "
-    "有效内容列 28 即 A-AB / 0 个 definedName / 受管表零裸 IF)"
-    " + 前端 `useG9Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / "
-    "G9DetailRow 28 字段与模板列序 A..AB 逐列对应 / G9_SECTIONS 三段）"
-    " + 模板编制思路见 spec evidence/task8-template-design-logic.md"
-    "（CAS22 FVTPL 口径 / 三分量恒等式 成本+累计公允价值变动=公允价值 / "
-    "四阶段 未审→账项调整→审定→重分类报表 / P=C+M 与 Q=D+N 走未审线）"
+    "受管表 `公允价值测试表G6-5` 单区 R9-18（footer R19），行身份 `id`，隐藏身份列 S；几何以 `phase5_g6_05_sppi_fair_value`"
+    " 为准。前端 `G6TabFairValueTest.vue`（DATA_KEY = G6-5-fair-value-data）。（原文整段照抄 G9 的 `明细表G9-2` 三区"
+    "几何与 `useG9Detail.ts`，spec oo-writeback-template-parity-closure R3 批 B3 改正。）"
 )
 
 
@@ -393,15 +385,15 @@ def build_contract_payload() -> dict[str, Any]:
             "html_store": {
                 "table": "checklist_responses",
                 "item_ids": list(all_store_item_ids()),
-                "shape": "json_array_of_row_objects",
+                "shape": "json_object_with_rows_array",
                 "payload_column": PAYLOAD_COLUMN,
                 "payload_column_mode": PAYLOAD_COLUMN_MODE,
                 "payload_column_source": (
-                    "audit-platform/frontend/src/components/workpaper/composables/"
-                    "useG9Detail.ts —— 写入点为 "
-                    "debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(list) })"
+                    "audit-platform/frontend/src/components/workpaper/g6-other-bond-investment-sppi/fair-value/"
+                    "G6TabFairValueTest.vue —— 写入点为 formData.debouncedSave(DATA_KEY, { conclusion: JSON.stringi"
+                    "fy(fairValue.toJSON()) })"
                 ),
-                "row_section_field": "section",
+                "row_section_field": next((s.row_section_field for s in section_specs()), ""),
                 "row_section_values": [
                     s.row_section_value for s in section_specs()
                 ],
@@ -440,7 +432,7 @@ def assert_contract_file_matches_source() -> SyncContract:
 #
 # 🔴 四个 store 门面（uild_store_projection / merge_projection_into_store_rows /
 #    iter_store_rows / split_store_payload_by_section）实现在
-#    phase5_g9_store_facade.py，本模块在**文件末尾**重导出，调用方按名取属性时零改动。
+#    phase5_section_store_facade.py（按本 provider 绑定），本模块在**文件末尾**绑定，调用方按名取属性时零改动。
 #    抽出原因与先例（pilot_h1_store_merge）见伴生模块 docstring。
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -623,20 +615,24 @@ async def attach_pilot_adapters(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. store 门面重导出（伴生模块 `phase5_g9_store_facade`）
+# 9. store 门面（按本 provider 绑定的多区门面 `phase5_section_store_facade`）
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # 🔴 放在**文件末尾**：伴生模块对本模块的引用是函数体内惰性 import，这里正向 import
 #    才不会构成循环。重导出使 `getattr(provider, "build_store_projection")` 一类
 #    按名取属性的调用点（store_projection_response / projection_first_publication /
 #    oo_to_html / 零回归门）零改动。
-from app.services.workpaper_sync.phase5_g9_store_facade import (  # noqa: E402
-    build_store_projection,
-    iter_store_rows,
-    merge_projection_into_store_rows,
-    specs_for as _specs_for,
-    split_store_payload_by_section,
-)
+# 🔴 原先原样重导出 G9 的门面 ⇒ spec 取的是 G9 的（出方向恒空、回写按 G9 的表键合并）
+#    —— spec oo-writeback-template-parity-closure R3 批 B3 改为按本 provider 绑定。
+from app.services.workpaper_sync.phase5_section_store_facade import SectionStoreFacade  # noqa: E402
+
+_STORE_FACADE: Final[SectionStoreFacade] = SectionStoreFacade("phase5_g6_other_bond", rows_key="rows")
+build_store_projection = _STORE_FACADE.build_store_projection
+iter_store_rows = _STORE_FACADE.iter_store_rows
+merge_projection_into_store_rows = _STORE_FACADE.merge_projection_into_store_rows
+_specs_for = _STORE_FACADE.specs_for
+split_store_payload_by_section = _STORE_FACADE.split_store_payload_by_section
+merge_projection_into_store_state = _STORE_FACADE.merge_projection_into_store_state
 
 __all__ = [
     "ENTRY_ID",

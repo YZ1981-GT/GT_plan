@@ -77,15 +77,11 @@ async def mirror_projection_into_store(
 
     import json
 
-    raw = (
-        await session.execute(
-            sa.text(
-                "SELECT remark FROM checklist_responses "
-                "WHERE wp_id = :wp AND item_id = :item"
-            ),
-            {"wp": str(wp_id), "item": store_item_id},
-        )
-    ).scalar_one_or_none()
+    from app.services.workpaper_sync.store_payload_columns import payload_columns_of, read_payload
+
+    # 载荷列按 provider 声明（G1 / G3 / G6-5 只写 conclusion、G4-7 / G5-2 两列同写）；remark 口径 SQL 逐字不变
+    columns = payload_columns_of(bridge)
+    raw = await read_payload(session, wp_id=wp_id, item_id=store_item_id, columns=columns)
     if merge_kind == "state":
         base_state: dict | None = None
         if raw:
@@ -119,10 +115,7 @@ async def mirror_projection_into_store(
         payload = json.dumps(merged_rows, ensure_ascii=False)
     updated = (
         await session.execute(
-            sa.text(
-                "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                "WHERE wp_id = :wp AND item_id = :item"
-            ),
+            sa.text(columns.update_sql),
             {
                 "val": payload,
                 "wp": str(wp_id),
@@ -132,11 +125,7 @@ async def mirror_projection_into_store(
     ).rowcount
     if not updated:
         await session.execute(
-            sa.text(
-                "INSERT INTO checklist_responses "
-                "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-            ),
+            sa.text(columns.insert_sql),
             {
                 "pid": str(project_id),
                 "wp": str(wp_id),
@@ -278,19 +267,15 @@ async def _mirror_dual_stores(
     _rows_loop_item_ids = (
         tuple(_all_ids_fn()) if callable(_all_ids_fn) else tuple(bridge.STORE_ITEM_IDS)
     )
+    from app.services.workpaper_sync.store_payload_columns import payload_columns_of, read_payload
+
+    # 行数组 item 的载荷列按 provider 声明（同单 item 路径；D1 / D2 / D4 都是 remark，SQL 逐字不变）
+    columns = payload_columns_of(bridge)
     base_by_item: dict[str, Any] = {}
     for item_id in _rows_loop_item_ids:
         if item_id in _dict_store_items:
             continue
-        raw = (
-            await session.execute(
-                sa.text(
-                    "SELECT remark FROM checklist_responses "
-                    "WHERE wp_id = :wp AND item_id = :item"
-                ),
-                {"wp": str(wp_id), "item": item_id},
-            )
-        ).scalar_one_or_none()
+        raw = await read_payload(session, wp_id=wp_id, item_id=item_id, columns=columns)
         # 🔴 base 可能是 list（rows-store）或 dict（D4-10 {rows,...} / D4-30
         # {customers,customDimensions} / D4-31 singleton）——两者都要透传给
         # merge，否则 dict-store 的表级标量（totalAmount 等）会因基线被降为 [] 而丢失。
@@ -320,10 +305,7 @@ async def _mirror_dual_stores(
         payload = json.dumps(merged_rows, ensure_ascii=False)
         updated = (
             await session.execute(
-                sa.text(
-                    "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                    "WHERE wp_id = :wp AND item_id = :item"
-                ),
+                sa.text(columns.update_sql),
                 {
                     "val": payload,
                     "wp": str(wp_id),
@@ -333,11 +315,7 @@ async def _mirror_dual_stores(
         ).rowcount
         if not updated:
             await session.execute(
-                sa.text(
-                    "INSERT INTO checklist_responses "
-                    "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                    "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                ),
+                sa.text(columns.insert_sql),
                 {
                     "pid": str(project_id),
                     "wp": str(wp_id),

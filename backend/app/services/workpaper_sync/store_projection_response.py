@@ -105,6 +105,10 @@ async def read_store_payload(*, session: Any, wp_id: Any, provider: Any) -> Stor
             f"provider {getattr(provider, '__name__', provider)!r} 未声明 STORE_ITEM_ID / "
             "build_store_projection —— 该 entry 不是 store-backed，不能走本端点"
         )
+    from app.services.workpaper_sync.store_payload_columns import payload_columns_of, read_payload
+
+    # 载荷列按 provider 声明（与回写镜像同一口径，见 store_payload_columns）
+    columns = payload_columns_of(provider)
     store_item_ids = tuple(getattr(provider, "STORE_ITEM_IDS", ()) or ())
     if len(store_item_ids) > 1 and hasattr(provider, "build_combined_store_projection"):
         # 🔴 payload 装配的**唯一**来源：provider 若暴露 `all_store_item_ids()`（Task 4），
@@ -128,15 +132,7 @@ async def read_store_payload(*, session: Any, wp_id: Any, provider: Any) -> Stor
         payloads: dict[str, str] = {}
         any_content = False
         for item in combined_item_ids:
-            row = (
-                await session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-                    ),
-                    {"wp": str(wp_id), "item": item},
-                )
-            ).scalar_one_or_none()
+            row = await read_payload(session, wp_id=wp_id, item_id=item, columns=columns, limit=True)
             has_content = row is not None and bool(str(row).strip())
             any_content = any_content or has_content
             if item in fixed_text_ids:
@@ -152,15 +148,7 @@ async def read_store_payload(*, session: Any, wp_id: Any, provider: Any) -> Stor
                 #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复。
                 payloads[item] = str(row)
         return StorePayloadRead(payload=payloads, multi=True, empty=not any_content)
-    row = (
-        await session.execute(
-            sa.text(
-                "SELECT remark FROM checklist_responses "
-                "WHERE wp_id = :wp AND item_id = :item LIMIT 1"
-            ),
-            {"wp": str(wp_id), "item": store_item_id},
-        )
-    ).scalar_one_or_none()
+    row = await read_payload(session, wp_id=wp_id, item_id=store_item_id, columns=columns, limit=True)
     if row is not None and str(row).strip():
         return StorePayloadRead(payload=str(row), multi=False, empty=False)
     empty = str(getattr(provider, "EMPTY_STORE_PAYLOAD", "[]"))

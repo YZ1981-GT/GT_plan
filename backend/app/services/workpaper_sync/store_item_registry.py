@@ -478,10 +478,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── G6-sppi（spec: g4-g6-shared-workbook-three-entry-lanes · Task 14）──
+    # 🔴 G6-5 前端 store 是 `{rows, conclusion}` 对象（存 conclusion 列）⇒ 回写走 state 分支只换行数组，
+    #    外壳与 conclusion 键原样保留（spec oo-writeback-template-parity-closure R3 批 B3；原按行数组登记、
+    #    provider 的 STORE_ITEM_ID 还写成 G6-2-rows ⇒ 两个方向都没接上）。
     "g6.other_bond_main": StoreMergePlan(
         adapter_id="g6.other_bond_main",
         provider_module="phase5_g6_other_bond",
-        items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.rows),),
+        merge_state_fn="merge_projection_into_store_state",
+        items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.dict),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── G5（spec: g5-nested-sections-and-template-defects · Task 8）──
