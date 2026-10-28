@@ -426,6 +426,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabVoucherCheck — G7-18 凭证检查表
@@ -467,14 +468,13 @@ const isReadonly = computed(() => !!props.readonly)
 /** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
 const EVIDENCE_SHEET = 'G7-18'
 const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
-/** 审计年度：从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年），供抽凭引擎按年度查询序时账 */
-const auditYear = computed<number>(() => {
+const auditYear = computed<number | null>(() => {
   const ctx = (props.htmlData?.project_context ?? {}) as Record<string, any>
   const y = ctx.audit_year ?? ctx.auditYear
   if (y) return Number(y)
   const bs = ctx.bs_date ?? ctx.bsDate
   if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
-  return new Date().getFullYear()
+  return null
 })
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -765,6 +765,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (isReadonly.value) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

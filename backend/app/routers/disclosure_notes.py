@@ -305,13 +305,13 @@ async def get_notes_tree(
     if not tree:
         raise HTTPException(status_code=404, detail="附注数据不存在，请先生成附注")
 
-    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的附注章节
+    # scope_cycles 过滤：受限成员只看有效范围内循环对应的附注章节；范围为空或对不上任何章节 ⇒ 空
+    # （原先对不上章节时不过滤 = 全部放行；spec procedure-trim-generation-delegation-chain 需求 5）
     scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
     if scope_cycles is not None:
         from app.services.mapping_service import get_sections_by_cycles
         allowed_sections = await get_sections_by_cycles(project_id, scope_cycles)
-        if allowed_sections:
-            tree = [n for n in tree if n.get("note_section") in allowed_sections]
+        tree = [n for n in tree if n.get("note_section") in allowed_sections]
 
     # P0-4（附注联动复盘）：树节点携带最新一次校验的 findings 计数（additive），
     # 使 error/warning 能直接打点在左侧章节树上，而不必点进右侧面板才看到。fail-open。
@@ -353,16 +353,15 @@ async def get_notes_readiness(
 
     data = await build_readiness(db, project_id, year)
 
-    # scope_cycles 过滤（与目录树一致：非 admin/partner 只看被分配循环的章节）
+    # scope_cycles 过滤（与目录树一致：受限成员只看有效范围内循环的章节，空范围 ⇒ 空）
     scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
     if scope_cycles is not None:
         from app.services.mapping_service import get_sections_by_cycles
 
         allowed_sections = await get_sections_by_cycles(project_id, scope_cycles)
-        if allowed_sections:
-            data["sections"] = [
-                s for s in data["sections"] if s.get("note_section") in allowed_sections
-            ]
+        data["sections"] = [
+            s for s in data["sections"] if s.get("note_section") in allowed_sections
+        ]
     return data
 
 
@@ -1291,7 +1290,7 @@ async def export_word(
 @router.post("/{project_id}/upload-history")
 async def upload_history(
     project_id: UUID,
-    year: int = 2025,
+    year: int,
 ):
     """历史附注文件（Word/PDF）上传与解析 —— **尚未实现**，恒返回机器可读 501。
 

@@ -701,6 +701,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, watch, toRef, h, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import type { Column } from 'element-plus'
@@ -850,7 +851,7 @@ watch(auditConclusion, (v) => {
 })
 
 const tableWidth = 1000
-const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
+const engineYear = computed<number | null>(() => props.year ?? null)
 
 const showSampling = ref(false)
 const showReview = ref(false)
@@ -975,6 +976,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (engineYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

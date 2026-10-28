@@ -52,7 +52,8 @@ import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
 
 const props = defineProps<{
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null / 未传 ⇒ 不加载 */
+  year?: number | null
 }>()
 
 const events = ref<any[]>([])

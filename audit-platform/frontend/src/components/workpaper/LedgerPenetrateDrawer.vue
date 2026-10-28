@@ -186,6 +186,7 @@ interface QueryParams {
 const props = defineProps<{
   projectId: string
   wpId: string
+  year?: number | null
 }>()
 
 const visible = ref(false)
@@ -203,8 +204,12 @@ async function open(amount: number, cellRef: string) {
   error.value = null
   resultData.value = null
 
-  // 默认使用当前年度
-  const currentYear = new Date().getFullYear()
+  const currentYear = props.year
+  if (currentYear == null) {
+    ElMessage.warning('未设置审计年度，无法进行穿透查询')
+    loading.value = false
+    return
+  }
 
   queryParams.value = {
     amount,

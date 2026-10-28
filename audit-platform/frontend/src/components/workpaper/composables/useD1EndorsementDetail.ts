@@ -6,12 +6,13 @@
  *
  * 职责：
  * - 管理"已贴现尚未到期票据检查表"(discountRows) 与"已背书尚未到期票据检查表"(endorseRows)
- *   两张 16 列检查表的动态行数据
+ *   两张 16 列检查表的动态行数据（两表 F / K / L / M 列不同：贴现表 已计利息 / 贴现银行 / 贴现金额 / 贴现息，
+ *   背书表 前手 / 背书转让单位 / 背书转让日期 / 说明，与模板 D1-8 一致）
  * - 合计行 computed（discountTotal / endorseTotal，SUM 各数值列，rowType='summary'）
  * - 动态行 CRUD（addDiscountRow / removeDiscountRow / addEndorseRow / removeEndorseRow）
  * - 编辑单元格（updateCell，数值字段 parseNum、其余 String）
  * - 从备查簿 D1-7 按状态筛选导入（importFromMemo）——
- *   discount 表取 status==='已贴现'、endorse 表取 status==='已背书'，
+ *   discount 表取票据状态「贴现」、endorse 表取「背书」（模板 K 列值，旧值归一后同样命中），
  *   映射 MemoRow → EndorsementRow，替换目标表全部行（导入后可编辑，见 Req 17.5）
  * - 审计说明 / 审计结论（auditNote / auditConclusion）双向绑定 + 保存
  * - 序列化/反序列化（JSON ↔ checklist_responses remark），debounce 2s 自动保存
@@ -21,7 +22,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
-import { parseNum, calcSubtotal } from './useD1FormulaEngine'
+import { parseNum, calcSubtotal, normalizeMemoStatus } from './useD1FormulaEngine'
 import type { MemoRow } from './useD1MemoReconciliation'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -47,6 +48,12 @@ export interface EndorsementRow {
   isDerecognized: string  // 是否终止确认
   isCorrect: string       // 会计处理是否正确
   indexRef: string        // 索引号
+  // ── 背书表专有（模板 D1-8（二）F / K / L / M；贴现表不用）──
+  // spec oo-writeback-template-parity-closure R3 批 B2b：原背书表沿用贴现表 16 列，没有这 4 列
+  endorser: string        // 前手
+  endorsedTo: string      // 背书转让单位
+  endorsedDate: string    // 背书转让日期
+  description: string     // 说明
 }
 
 export interface UseD1EndorsementDetailOptions {
@@ -86,6 +93,10 @@ const STRING_FIELDS: Array<keyof EndorsementRow> = [
   'isDerecognized',
   'isCorrect',
   'indexRef',
+  'endorser',
+  'endorsedTo',
+  'endorsedDate',
+  'description',
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -119,6 +130,10 @@ export function emptyEndorsementRow(): EndorsementRow {
     isDerecognized: '',
     isCorrect: '',
     indexRef: '',
+    endorser: '',
+    endorsedTo: '',
+    endorsedDate: '',
+    description: '',
   }
 }
 
@@ -170,13 +185,17 @@ function mapMemoRow(memo: MemoRow, table: 'discount' | 'endorse'): EndorsementRo
   row.maturityDate = memo.maturityDate ?? ''
   row.acceptorBank = memo.acceptor ?? ''
   row.creditRating = memo.creditRating ?? ''
-  row.discountBank = memo.discountBank ?? ''
-  row.discountInterest = parseNum(memo.discountInterest)
-  // 贴现表贴现金额取备查簿本期贴现额，无则回退汇票金额；背书表取汇票金额
-  row.discountAmount =
-    table === 'discount'
-      ? parseNum(memo.currentDiscounted) || parseNum(memo.amount)
-      : parseNum(memo.amount)
+  if (table === 'discount') {
+    row.discountBank = memo.discountBank ?? ''
+    row.discountInterest = parseNum(memo.discountInterest)
+    // 贴现金额取备查簿本期贴现额，无则回退汇票金额
+    row.discountAmount = parseNum(memo.currentDiscounted) || parseNum(memo.amount)
+  } else {
+    // 背书表按模板（二）F / K / L：前手 / 背书转让单位（备查簿被背书人）/ 背书转让日期（备查簿流转日）
+    row.endorser = memo.endorser ?? ''
+    row.endorsedTo = memo.endorsee ?? ''
+    row.endorsedDate = memo.transferDate ?? ''
+  }
   row.isDerecognized = memo.isDerecognized ?? ''
   // 导入后由用户填写的字段
   row.accruedInterest = 0
@@ -347,15 +366,16 @@ export function useD1EndorsementDetail(options: UseD1EndorsementDetailOptions) {
 
   /**
    * 从备查簿按状态筛选导入并替换目标表全部行（Req 17.1/17.2/17.5）：
-   * - table='discount' 保留 status==='已贴现'
-   * - table='endorse'  保留 status==='已背书'
+   * - table='discount' 保留票据状态「贴现」
+   * - table='endorse'  保留票据状态「背书」
+   * 状态取权威模板 D1-7 K 列下拉值；存量旧值（已贴现 / 已背书）经 normalizeMemoStatus 归一后同样命中。
    * 导入后为可编辑动态行（rowType='dynamic'，新 rowId）。
    */
   function importFromMemo(table: 'discount' | 'endorse', memoRows: MemoRow[]): void {
     if (isReadonly.value) return
-    const targetStatus = table === 'discount' ? '已贴现' : '已背书'
+    const targetStatus = table === 'discount' ? '贴现' : '背书'
     const mapped = (memoRows ?? [])
-      .filter((m) => m.status === targetStatus)
+      .filter((m) => normalizeMemoStatus(m.status) === targetStatus)
       .map((m) => mapMemoRow(m, table))
 
     if (table === 'discount') {

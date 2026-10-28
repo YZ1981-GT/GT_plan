@@ -15,7 +15,7 @@ config / WOPI contents / OO 降级 grid / callback 四个点上消费本模块�
 
 D4 目录同时存在净化前后两份整册本，sheet 名序列完全相同、只差有无外部引用：
 
-* ``D4 收入底稿.xlsx``（199176 B, sha ``b8fb92d4…``）= sync 契约 ``d4.revenue_detail``
+* ``D4 收入底稿.xlsx``（199204 B, sha ``2765d199…``）= sync 契约 ``d4.revenue_detail``
   的 ``TemplateRef`` 钉住的那份，``xl/workbook.xml`` **无** ``<externalReference>``
   （``scripts/fix/sanitize_d4_template_external_links.py`` 净化的就是它）；
 * ``D4收入底稿.xlsx``（352950 B）未净化，带 36 个 ``xl/externalLinks/`` 部件 —— 给 OO 打开

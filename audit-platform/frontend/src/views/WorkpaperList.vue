@@ -305,9 +305,8 @@ const { can: canOp, whyCannot } = usePermissionMatrix()
 const projectId = computed(() => route.params.projectId as string)
 /** 本项目的审计年度（挂载时随项目信息读取） */
 const projectAuditYear = ref<number | null>(null)
-// 审计年度：路由 ?year= > 本项目审计年度 > 去年（全平台同一解析）。原先缺省取今年：从编辑器「返回」等不带 ?year= 的
-// 入口进来，生成底稿 / 刷新全部公式都按今年发请求（2025 年度项目在 2026 年 → 2026：公式推送直接拒绝、生成的底稿绑不上数据集）
-const currentYear = computed(() => resolveEffectiveAuditYear({ routeYear: route.query.year, storeAuditYear: projectAuditYear.value }))
+// 审计年度：路由 ?year= > 本项目审计年度 > null（全平台同一解析，不按日历猜）
+const currentYear = computed<number | null>(() => resolveEffectiveAuditYear({ routeYear: route.query.year, storeAuditYear: projectAuditYear.value }))
 const projectName = ref('')
 
 // ─── 核心数据 ─────────────────────────────────────────────────────────────────
@@ -626,6 +625,10 @@ function onBatchAssigned() {
 
 /** 刷新全部公式：调 formula-push/run 全量推送（不打开底稿也能刷新审定表/明细表/附注） */
 async function onFormulaRefreshAll() {
+  if (currentYear.value == null) {
+    ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
+    return
+  }
   formulaRefreshLoading.value = true
   try {
     const res: any = await api.post(
@@ -644,6 +647,10 @@ async function onFormulaRefreshAll() {
 }
 
 async function onGenerateWorkpapers() {
+  if (currentYear.value == null) {
+    ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
+    return
+  }
   generateLoading.value = true
   try {
     // 0. 确保模板集编码是最新的（幂等 seed，会自动更新旧的占位编码）

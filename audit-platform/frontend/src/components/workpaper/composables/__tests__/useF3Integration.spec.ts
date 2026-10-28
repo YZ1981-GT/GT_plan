@@ -58,11 +58,11 @@ describe('F3 formula chains', () => {
     expect(calcInterest(100000, 5, 180)).toBeCloseTo(100000 * 0.05 * 180 / 360, 5)
   })
 
-  it('credit balance chain through adjudication', () => {
-    const openingAdj = calcAdjustedAmount(5000, 100, -50)
-    const closingUnadj = calcCreditBalance(openingAdj, 2000, 800)
+  it('credit balance chain through adjudication（期末未审从期初未审起算）', () => {
+    const openingUnadj = 5000
+    const closingUnadj = calcCreditBalance(openingUnadj, 2000, 800)
     const closingAdj = calcAdjustedAmount(closingUnadj, 50, -20)
-    expect(closingAdj).toBeCloseTo(openingAdj + 2000 - 800 + 50 - 20, 5)
+    expect(closingAdj).toBeCloseTo(openingUnadj + 2000 - 800 + 50 - 20, 5)
   })
 
   it('overdue days is non-negative', () => {

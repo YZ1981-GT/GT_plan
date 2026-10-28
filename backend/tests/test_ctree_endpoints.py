@@ -8,7 +8,7 @@
 - ``GET /api/projects/tree``：P14（非 admin/partner 只见参与的项目、上级不可见不标脱挂）；admin/partner 全部可见；
   企业实体合并两口径；只填审计年度的项目按年度能查到；
 - 分录审批流：提交审批 → 审批；审批前重新校验归属（树变化后不能审批找不到归属的分录）；
-- 合并范围校对取合并企业树的子公司类企业（分公司、母公司不算合并范围成员，需求 11.3）。
+- 合并范围成员取合并企业树的子公司类企业（分公司、母公司不算合并范围成员，需求 11.3）。
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ class TestWorksheetTree:
         assert (body["mode"], body["mode_label"], body["year"]) == ("mixed", "母子合并＋总分汇总", Y)
         tree = body["tree"]
         assert (tree["node_key"], tree["role"], tree["kind"], tree["display_name"]) == (
-            "G:consol", "consol", "aggregate", "某集团（合并）",
+            "G:consol", "consol", "aggregate", "某集团（合并户）",
         )
         assert tree["project_id"] == str(group["G"].id) and tree["company_code"] == "G"  # 旧字段保留
         keys = [n["node_key"] for n in _walk(tree)]
@@ -297,7 +297,7 @@ class TestNodeAmounts:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert (body["year"], body["node_key"], body["kind"], body["display_name"]) == (
-            Y, "G:consol_elim", "elim", "某集团（合并差额）",
+            Y, "G:consol_elim", "elim", "某集团（差额户）",
         )
         rows = {r["account_code"]: r for r in body["rows"]}
         assert list(rows) == ["1122", "2202"]
@@ -482,12 +482,14 @@ class TestReviewFlow:
 
 
 @pytest.mark.asyncio
-async def test_scope_diff_uses_consolidation_tree_members(db, group):
-    """T = 合并企业树中的子公司类企业：分公司 GB 与母公司 G 不是合并范围成员；按控制方挂靠的也算。"""
-    from app.services.scope_diff_service import compute_scope_diff
+async def test_scope_members_are_consolidation_tree_subsidiaries(db, group):
+    """合并范围成员 = 合并企业树中的子公司类企业：分公司 GB 与母公司 G 不是成员；按控制方挂靠的也算。
+
+    原由已删的范围校对服务计算（spec consol-autotree-residual-closure R5：附注变量、程序表取数改读同一函数）。
+    """
+    from app.services.consol_scope_members import tree_subsidiaries
 
     db.add(_p("X", "丙公司", "standalone", ultimate="G"))  # 没有上级 ⇒ 按控制方挂到 G（合并）下
     await db.commit()
-    diff = await compute_scope_diff(db, group["G"].id)
-    assert [d["company_code"] for d in diff["in_tree_not_scope"]] == ["A", "X"]
-    assert diff["in_scope_not_tree"] == []
+    members = await tree_subsidiaries(db, group["G"].id)
+    assert sorted(m.company_code for m in members) == ["A", "X"]

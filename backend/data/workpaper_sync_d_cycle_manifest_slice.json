@@ -836,15 +836,15 @@
       },
       {
         "name": "D1 应收票据.xlsx",
-        "size": 120156,
-        "sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef",
+        "size": 120144,
+        "sha256": "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d5",
         "belongs_to_entry": "xlsx/gt-d1-notes-receivable",
         "read_with": "openpyxl data_only"
       },
       {
         "name": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-        "size": 123162,
-        "sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+        "size": 105569,
+        "sha256": "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044",
         "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
         "read_with": "openpyxl data_only"
       },
@@ -857,15 +857,15 @@
       },
       {
         "name": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
-        "size": 357051,
-        "sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f",
+        "size": 96262,
+        "sha256": "d0e27f6fbff3ff6e7db05ce4a42796f94a3e253dabfaf49761b97400ad23bed2",
         "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
         "read_with": "openpyxl data_only"
       },
       {
         "name": "D3 预收账款.xlsx",
-        "size": 133116,
-        "sha256": "8a27614bd761c1a8a2d3c6bb2a6f1264138881f86bfd59a99309207cf8d1e5ae",
+        "size": 74402,
+        "sha256": "699a9be0e7da639f3e5cd3a2d3bfdf38f7e777b330f9ec6959f5cc390fb6c2d2",
         "belongs_to_entry": "xlsx/gt-d3-prepaid-accounts",
         "read_with": "openpyxl data_only"
       },
@@ -899,8 +899,8 @@
       },
       {
         "name": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
-        "size": 152077,
-        "sha256": "3058be79f74fd0ce8ff82ac15c0f65c0a8a64d583a74def23444a3f4c6c85c07",
+        "size": 137725,
+        "sha256": "56e6e965298744c0d7e86d7f23fbb9dd2786ef551b138d5fa4d12060f2d83218",
         "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
         "read_with": "openpyxl data_only"
       },
@@ -926,31 +926,31 @@
         "read_with": "openpyxl data_only"
       },
       {
-        "name": "D4收入底稿.xlsx",
-        "size": 352950,
-        "sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155",
+        "name": "D4 收入底稿.xlsx",
+        "size": 199204,
+        "sha256": "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62",
         "belongs_to_entry": null,
         "read_with": "openpyxl data_only",
-        "excluded_reason": "🔴 不在 backend/wp_templates/_index.json 里（D 循环 17 条索引全部指向按程序拆分的文件），故 wp_template_finder.find_template_file_any() 对任何 D4 码都**永不返回**它 ⇒ 运行时不可达，不是任何 entry 的权威模板。Task 46 首轮把 D4 的 template_ref 写成它，是照文件名猜的。"
+        "excluded_reason": "🔴 不在 backend/wp_templates/_index.json 里（D 循环 17 条索引全部指向按程序拆分的文件），故 wp_template_finder.find_template_file_any() 对任何 D4 码都**永不返回**它 ⇒ 运行时不可达，不是任何 entry 的权威模板。Task 46 首轮把 D4 的 template_ref 写成它，是照文件名猜的。（2026-09-30 这份无空格的重复入库副本已删除，现存同一底稿 `D4 收入底稿.xlsx`：它是 sync 契约 d4.revenue_detail 的模板，但同样不在 _index.json 里；spec oo-writeback-template-parity-closure 改名登记）"
       },
       {
         "name": "D5 应收款项融资.xlsx",
-        "size": 113287,
-        "sha256": "53cd7518f45072b405e0c96cf5508749299db0b90e94b77a2c20dbcc9a25f70e",
+        "size": 53897,
+        "sha256": "ff0342f180a03c1a5803f71beba800c1285a3871206ad9ab4a7f32c1b4ad69ea",
         "belongs_to_entry": "xlsx/gt-d5-receivables-financing",
         "read_with": "openpyxl data_only"
       },
       {
         "name": "D6 合同资产.xlsx",
-        "size": 421708,
-        "sha256": "591d4c682a420820e80d6597c75dc0ddf6a82b4f3bce184ebc76fd4cbef7f996",
+        "size": 125596,
+        "sha256": "a349f632451064feb1f573d0e867a4b4b66c6369846766458462a34f25f3d4f5",
         "belongs_to_entry": "xlsx/gt-d6-contract-assets",
         "read_with": "openpyxl data_only"
       },
       {
         "name": "D7 合同负债.xlsx",
-        "size": 379551,
-        "sha256": "d522ac9fc60d12fb665335f4df9518cc4edf4886bb4c3b46819e08a177e221df",
+        "size": 88776,
+        "sha256": "9c047a2a5d6f3241eb0110655cdd3612b4ac6e06a917ac775a4ca80ae37101ec",
         "belongs_to_entry": "xlsx/gt-d7-contract-liabilities",
         "read_with": "openpyxl data_only"
       }

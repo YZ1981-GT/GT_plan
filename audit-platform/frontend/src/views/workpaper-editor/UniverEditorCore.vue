@@ -51,12 +51,16 @@ const props = defineProps<{
   mCycle: any
   nCycle: any
   fCycle: any
+  /** 项目审计年度（保存后的下游影响分析按它算；项目没填为 null ⇒ 不分析） */
+  projectYear?: number | null
 }>()
 
 const emit = defineEmits<{
   'saved': []
   'dirty-change': [dirty: boolean]
   'sheet-switch': [sheetId: string]
+  /** 本组件取到 / 保存后重取的底稿详情交回 Shell（props.wpDetail 只读，不能在这里写） */
+  'update:wpDetail': [detail: WorkpaperDetail]
 }>()
 
 const router = useRouter()
@@ -81,7 +85,8 @@ const {
   containerRef: univerContainer,
   projectId: projectIdComputed,
   wpId: wpIdComputed,
-  wpDetail: wpDetailRef as any,
+  wpDetail: wpDetailRef,
+  onDetailLoaded: (detail) => emit('update:wpDetail', detail),
   sheetNavFacade: props.sheetNavFacade,
 })
 
@@ -119,7 +124,8 @@ const {
 } = useEditorSave({
   projectId: projectIdComputed,
   wpId: wpIdComputed,
-  wpDetail: wpDetailRef as any,
+  wpDetail: wpDetailRef,
+  setWpDetail: (detail) => emit('update:wpDetail', detail),
   univerAPI,
   dirty,
   userOverrides,
@@ -129,6 +135,7 @@ const {
   initUniver,
   loading,
   showStaleImpactPanel,
+  year: computed(() => props.projectYear ?? null),
 })
 
 const autoSaveMsg = computed(() => {
@@ -153,11 +160,19 @@ watch(dirty, (val) => {
 
 // 监听 eventBus 的 workpaper:saved 事件（由 useEditorSave 内部触发）
 // 转发为 emit('saved') 通知 Shell
-eventBus.on('workpaper:saved', (payload: any) => {
-  if (payload?.wpId === props.wpId) {
+// 🔴 Shell 的 onChildSaved 收到 saved 后会再广播一次 workpaper:saved；mitt 同步派发 ⇒ 不加防重入就无限递归
+//    （直到栈溢出，每层还发一次详情 GET）。转发期间收到的同一事件不再转发。
+let forwardingSaved = false
+function onBusSaved(payload: any) {
+  if (payload?.wpId !== props.wpId || forwardingSaved) return
+  forwardingSaved = true
+  try {
     emit('saved')
+  } finally {
+    forwardingSaved = false
   }
-})
+}
+eventBus.on('workpaper:saved', onBusSaved)
 
 // ─── Sheet 导航 ─────────────────────────────────────────────────────────────
 
@@ -215,7 +230,7 @@ function onRetryLoad() {
 
 // ─── locate-cell 事件监听 ───────────────────────────────────────────────────
 
-eventBus.on('workpaper:locate-cell', (payload: any) => {
+function onBusLocateCell(payload: any) {
   if (payload?.wpId !== props.wpId || !payload.sheetName || !univerAPI.value) return
   const workbook = univerAPI.value.getActiveWorkbook?.()
   if (!workbook) return
@@ -230,7 +245,8 @@ eventBus.on('workpaper:locate-cell', (payload: any) => {
   )
   const targetId = target?.getSheetId?.() || target?.getId?.()
   if (targetId) onSwitchSheet(targetId)
-})
+}
+eventBus.on('workpaper:locate-cell', onBusLocateCell)
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -240,8 +256,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   dispose()
-  eventBus.off('workpaper:saved')
-  eventBus.off('workpaper:locate-cell')
+  // 🔴 只摘本组件自己的监听：mitt 的 off(type) 不带 handler 会清掉该事件的全部监听（含其他组件的）
+  eventBus.off('workpaper:saved', onBusSaved)
+  eventBus.off('workpaper:locate-cell', onBusLocateCell)
 })
 
 // ─── Expose for Shell (toolbar actions) ─────────────────────────────────────
@@ -285,7 +302,7 @@ defineExpose({
         </div>
         <div class="gt-wp-editor-error-title">
           <template v-if="loadErrorState === 'no_file'">底稿文件尚未生成</template>
-          <template v-else-if="loadErrorState === 'no_index'">底稿不存在</template>
+          <template v-else-if="loadErrorState === 'no_index'">无法打开底稿</template>
           <template v-else-if="loadErrorState === 'invalid_id'">底稿 ID 不合法</template>
           <template v-else>加载底稿失败</template>
         </div>
@@ -308,8 +325,8 @@ defineExpose({
       </div>
     </div>
 
-    <!-- 左侧 Sheet 导航 -->
-    <div v-show="!loading" class="gt-wp-editor-left-col">
+    <!-- 左侧 Sheet 导航（打不开底稿时不显示，只留中性提示，R10） -->
+    <div v-show="!loading && !loadErrorState" class="gt-wp-editor-left-col">
       <UniverSheetNav
         :groups="sheetNavFacade.groups.value"
         :active-sheet-id="sheetNavFacade.activeSheetId.value"

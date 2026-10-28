@@ -137,7 +137,7 @@ _D34_TEMPLATE_NAMES: tuple[tuple[str, str], ...] = (
     ("GT_MANAGED_REGION_D34DEBIT", f"{_Q}$A$13:$D$15"),
     ("GT_FOOTER_ANCHOR_D34DEBIT", f"{_Q}$A$17"),
     ("GT_ROW_UUID_RANGE_D34DEBIT", f"{_Q}$J$13:$J$15"),
-    ("GT_MANAGED_REGION_D34CREDIT", f"{_Q}$A$22:$D$23"),
+    ("GT_MANAGED_REGION_D34CREDIT", f"{_Q}$A$22:$E$23"),  # 段②贷方受管到 E「说明」（R20 表头，9.4c）
     ("GT_FOOTER_ANCHOR_D34CREDIT", f"{_Q}$A$25"),
     ("GT_ROW_UUID_RANGE_D34CREDIT", f"{_Q}$K$22:$K$23"),
 )
@@ -162,7 +162,7 @@ def _d34_case(case_id: str, k: int, *, apos: bool, legacy_red: bool) -> _Case:
         for value, row in (
             (f"{_Q}$A$1:$H$39", 39),
             (f"{_Q}$A$17", 17),
-            (f"{_Q}$A$22:$D$23", 22),
+            (f"{_Q}$A$22:$E$23", 22),  # 段②贷方受管到 E（同 _D34_TEMPLATE_NAMES）
             (f"{_Q}$A$25", 25),
             (f"{_Q}$K$22:$K$23", 22),
         )
@@ -406,8 +406,9 @@ class _D34World:
         from app.services.workpaper_sync.phase5_row_table_sheet import build_store_projection
 
         def rows(prefix: str, n: int, amount: float) -> list[dict[str, Any]]:
+            # D3-4 两区行身份键是 rowKey（前端 / 导入只写 rowKey；spec oo-writeback-template-parity-closure 9.4c）
             return [
-                {"rowId": f"{prefix}{i}", "label": f"{prefix}{i}", "amount": amount + i,
+                {"rowKey": f"{prefix}{i}", "label": f"{prefix}{i}", "amount": amount + i,
                  "source": "tb", "remark": ""}
                 for i in range(n)
             ]

@@ -126,6 +126,9 @@ class SaveHtmlDataResponse(BaseModel):
         description="本次业务内容的 immutable content version id（opaque 路由键）",
     )
     stale_impact: list[StaleImpactItem] = []
+    ignored_program_nos: list[str] = Field(
+        default_factory=list, description="程序表里本次没有生效的程序号（不是派给本人的行等）",
+    )
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────
@@ -239,6 +242,14 @@ async def save_html_data(
     # ─── Step 5: 保存前获取旧数据（用于变更检测）──────────────────────────
     html_data_all = parsed_data.get("html_data", {})
     old_sheet_data = html_data_all.get(body.sheet_name)
+
+    # ─── Step 5b: 程序表行级编辑隔离（spec procedure-trim-generation-delegation-chain 需求 7.2）
+    # 受限用户只有派给本人的程序行生效，其余保留服务端已存内容；「不适用」的进出只归委派人
+    from app.services.wp_visibility.program_row_guard import guard_program_sheet_save
+
+    body.html_data, ignored_program_nos = await guard_program_sheet_save(
+        db, current_user, working_paper, body.sheet_name, old_sheet_data, body.html_data,
+    )
 
     # ─── Step 6: Merge html_data 到 parsed_data['html_data'][sheet_name] ──
     if "html_data" not in parsed_data:
@@ -454,6 +465,7 @@ async def save_html_data(
         data_version=receipt.revision,
         content_version_id=str(receipt.content_version_id),
         stale_impact=stale_impact,
+        ignored_program_nos=ignored_program_nos,
     )
 
 
@@ -808,5 +820,8 @@ async def publish_determination_to_tb(
         published=True,
         wp_code=det_code,
         publish_token=token,
-        message=f"已发布 {len(writeback_rows)} 个科目的审定数到试算表",
+        # 🔴 回执说"已提交"而非"已发布"：实际回写由事件处理器异步完成，
+        # 科目在试算表中不存在时会被跳过（如 L7 用 BS-071 报表行码当科目码），
+        # 跳过详情记在 tb_publish_ack.accounts_updated 与日志。
+        message=f"已提交 {len(writeback_rows)} 个科目的审定数发布请求",
     )

@@ -26,6 +26,7 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
 # 确保所有模型注册（含 users 等被 FK 引用的表）
 import app.models  # noqa: F401
+from tests._editing_lock_helpers import lock_error_detail, lock_targets_visible  # noqa: F401  锁语义用例：资源判定放行（鉴权另见 test_editing_lock_authz_pg.py）
 from app.models.base import Base
 from app.models.editing_lock_models import EditingLock
 
@@ -125,7 +126,7 @@ async def test_acquire_conflict_returns_409_with_holder_info(
         resp_b = await client_b.post(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp_b.status_code == 409
         # 409 detail contains holder info
-        detail = resp_b.json().get("detail", resp_b.json())
+        detail = lock_error_detail(resp_b.json())
         assert detail["locked_by"] == str(holder_a_id)
         assert detail["locked_by_name"] == "holder_a"
         assert "acquired_at" in detail

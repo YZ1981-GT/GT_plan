@@ -20,8 +20,11 @@ spec: g-cycle-adjudication-sheets-coverage · Task 2
   E  未审数-期末（部分手工，部分SUM）
   F  AJE-期末（同E口径）
   G  审定数-期末（=E+F，formula）
-  H  变动额（=D-G，formula）
+  H  变动额（=G-D，formula）
   I  变动率（=IF(...)，formula）
+
+🔴 模板原 H9 / I9 取了上一行小计 G8、G29 也取了 G8（同行其余列与其他行都取本行），
+   2026-10-26 已改为 G9（spec oo-writeback-template-parity-closure R1）；本声明只有逐格 mask，不受影响。
   J-L  空
 
 🔴 三区结构特殊：每区内部含 SUM 汇总行（小计性质）。

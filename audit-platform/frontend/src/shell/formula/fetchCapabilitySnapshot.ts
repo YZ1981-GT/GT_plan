@@ -70,6 +70,7 @@ export async function fetchWorkpaperCapabilitySnapshot(input: {
   })
   if (input.sheetUid) params.set('sheetUid', input.sheetUid)
   const url = `${CAPABILITY_SNAPSHOT_PATH.get(input.wpId)}?${params.toString()}`
-  const raw = await httpApi.get(url)
+  // 静默：调用方（useShellCapability）按状态码决定是否提示；底稿打不开时编辑器已经给了一句中性提示（R10）
+  const raw = await httpApi.get(url, { _silent: true } as any)
   return parseCapabilitySnapshotPayload(raw, input.ownerEpoch)
 }

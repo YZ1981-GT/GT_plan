@@ -499,6 +499,7 @@
 <script setup lang="ts">
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, defineAsyncComponent, inject, ref, toRef } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -559,7 +560,7 @@ const openReviewDialog = inject<(section: string) => void>('openReviewDialog', (
 
 const columnViewMode = ref<'compact' | 'full'>('compact')
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const {
   rows,
@@ -640,6 +641,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

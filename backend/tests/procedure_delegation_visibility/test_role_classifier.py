@@ -10,7 +10,8 @@ Task 3 / Requirements 1.1–1.11 / Design "Role Classification" / Property 1
   （角色权威，role ∈ partner/signing_partner/manager/qc/eqcr）+ 唯一 active ProjectUser
   （scope 权威）→ Supervisor。
 - Req 1.4/1.5：缺失/重复/inactive/角色不足/查询异常 → Restricted（fail-closed，不 500）。
-- Req 1.6/1.7/1.9/1.10：Non_Admin scope 上界；scope 缺失/失败解释为空集。
+- Req 1.6/1.7/1.9/1.10：Non_Admin scope 上界；scope 缺失/失败解释为空集。2026-10-24 用户裁决后主管上界
+  = 全部循环、受限上界 = 团队分配勾选 ∪ scope_cycles（spec procedure-trim-generation-delegation-chain 需求 5）。
 - Req 1.1/1.11：输出恰为三分类之一且唯一。
 - 角色来源单一：Supervisor 角色只认 ProjectAssignment.role（非 ProjectUser.role）。
 
@@ -26,6 +27,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.services.wp_visibility.contracts import VisibilityRole
+from app.services.wp_visibility.effective_scope import STANDARD_CYCLES
 from app.services.wp_visibility.role_classifier import (
     SUPERVISOR_ASSIGNMENT_ROLES,
     VisibilityRoleClassifier,
@@ -116,7 +118,9 @@ class TestClassificationExamples:
         ctx = await VisibilityRoleClassifier(session).classify(user, proj.id)
         assert ctx.role is VisibilityRole.supervisor
         assert ctx.is_admin is False
-        assert ctx.scope_cycles == frozenset({"现金", "收入"})
+        # 2026-10-24 用户裁决（spec procedure-trim-generation-delegation-chain 需求 5）：经理、合伙人、质控、EQCR
+        # 默认看全部循环 —— 原断言 scope == {"现金","收入"}（主管也被 project_users.scope_cycles 截断）
+        assert ctx.scope_cycles == STANDARD_CYCLES
 
     async def test_assignment_role_not_in_allowed_set_is_restricted(self, session):
         """角色权威=ProjectAssignment：auditor 不在 Supervisor 允许集 → Restricted。"""
@@ -241,8 +245,12 @@ class TestProperty1ClassificationUniqueFailClosed:
                 if expected_supervisor
                 else VisibilityRole.restricted
             )
-            # Req 1.6/1.7/1.9/1.10：scope 上界；缺失/空白 → 空集
-            expected_scope = _parse_scope(scope_str) if has_project_user else frozenset()
+            # Req 1.6/1.7/1.9/1.10：scope 上界；缺失/空白 → 空集。主管 = 全部循环（2026-10-24 用户裁决，
+            # 原先主管也按 scope_cycles 截断）；受限 = 团队分配勾选（本矩阵不勾选）∪ scope_cycles
+            if expected_supervisor:
+                expected_scope = STANDARD_CYCLES
+            else:
+                expected_scope = _parse_scope(scope_str) if has_project_user else frozenset()
             assert ctx.scope_cycles == expected_scope
 
         run_isolated(scenario)

@@ -1064,7 +1064,8 @@ backend/tests/workpaper_sync/test_g_foundation_p10_p16_g2_canary.py  892
 #   test_g_foundation_p4_p8_p17_p18_red_baselines.py —— 四组红基线（BP-5 / 裸 IF / prefill / TB 缺口），
 #     每组含「现状必红断言 + 修复后转绿检查 + 反向自检」。拆分会让 BP-5 的 5 条错名
 #     与裸 IF 的 13 册计数分属两个文件——而 BP-5 的修复（Task 5）正好在裸 IF 的上游。
-backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  847
+#     2026-10-27：HEAD 已 952 行（此前的提交没同步基线）；post-push-residual-defect-closure 只改 G4 / G6 两家计数、行数不变
+backend/tests/workpaper_sync/test_g_foundation_p4_p8_p17_p18_red_baselines.py  952
 
 #   F 循环 provider / 判据 / 工具链——结构上必须单文件的理由同上：
 #   phase5_f4_accounts_payable.py —— F4 provider（808 行），docstring + 常量声明 + 灰度开关 +
@@ -1410,6 +1411,19 @@ backend/tests/workpaper_sync/test_a_entry_connection_blockers.py  1167
 #     801 = 800+1（仅超 1 行），拆分收益极低。归档完毕后可在下一轮拆伴生模块。
 backend/app/services/workpaper_sync/phase5_g5_long_term_receivable.py 801
 
+#   phase5_d4_ipo_related_sheets.py / wp_template_finder.py —— 历史大文件（HEAD 已 968 / 810 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-26 oo-writeback-template-parity-closure R1：D4 权威模板改公式后，前者只改模板 sha 常量一行，
+#     后者只改考证注释里的 sha 与字节数一行（行数都不变）。
+#     拆分方向：phase5_d4_ipo_related_sheets 按 D4-21 / D4-22 / D4-23 / D4-24 每张 sheet 一个模块（映射摘要 / 行表 /
+#     拆合 / 埋点），共用的 _digest / 身份编码 / _merge_flat_rows / _build_projection 抽一个公共模块；
+#     wp_template_finder 按「整册查找（含合并册）/ 单文件分档查找 / docx 查找 / 目录列举」拆，override-first 包装留在入口。
+backend/app/services/workpaper_sync/phase5_d4_ipo_related_sheets.py  968
+backend/app/services/wp_template_finder.py  810
+#   wp_surfaced_g.py —— 历史大文件（HEAD 已 994 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-26 oo-writeback-template-parity-closure R2：G3-1 / G10-1 期末未审改从期初未审起算，只改两条公式说明文案（行数不变）。
+#     拆分方向：同 wp_surfaced_k.py，按底稿编码拆成 G1~G14 各自的目录模块，入口只做合并（同 wp_surfaced_formulas）。
+backend/app/routers/wp_surfaced_g.py  994
+
 #   test_render_pipeline_e2e.py —— 集成测试含 A/B/E 三类端到端导出 + schema 冒烟 +
 #     componentType 白名单覆盖。本轮仅加 pytest.skip 保护（3 行），已接近上限。
 #     拆分轴：按 TestClass 拆成 schema_smoke / export_e2e / whitelist 三个文件。
@@ -1604,6 +1618,26 @@ backend/app/services/acnr/resolver.py  1086
 #     拆分方向：公式生成（generate_*）、执行（execute_note_formulas + _exec_*）、跨表取数（_load_cross_table_data +
 #     _resolve_single_cross_ref）三块各自成模块。
 backend/app/services/note_formula_generator.py  1483
+#   test_projection_first_publication.py / test_single_pass_verify_not_relaxed.py —— 历史大文件（HEAD 已 2273 / 1532 行且未登记）。
+#     2026-10-24 writeback-followup-issue-closure R12：纯静态 entry 不派生行身份表、行集合权威用例改名（+16）；D4 常量单一来源（+4）。
+#     拆分方向：首版发布链按 Property 分组（36 宿主真源 / 各环准入 / 静态臂）各成模块；verify 判据按「未放宽 / 变异反证」两组拆。
+backend/tests/workpaper_sync/test_projection_first_publication.py  2289
+backend/tests/workpaper_sync/test_single_pass_verify_not_relaxed.py  1536
+#   ProcedureTrimming.vue / GtAProgramConsole.vue / procedure_trim_service.py —— 历史大文件（HEAD 已 4012 / 1889 / 1086 行且未登记）。
+#     2026-10-24 procedure-trim-generation-delegation-chain 批 3：粗裁保存前回收站确认（+16）、被委派人看不到目标循环时带理由扩权重试与
+#     预览缺口提示（+38 / +11）、apply_scheme 回收站联动与级联按底稿归属（+44；新逻辑放伴生模块 procedure_trim_recycle）。
+#     拆分方向：ProcedureTrimming 委派向导 / 建议分配 / 智能裁剪三块各成子组件；控制台行委派弹窗抽组件；
+#     procedure_trim_service 方案 preview / apply 与级联按职责拆模块。
+audit-platform/frontend/src/views/ProcedureTrimming.vue  4012
+audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue  1889
+backend/app/services/procedure_trim_service.py  1086
+#   test_task1_resource_access.py / test_task15_integration_explain.py / test_ai_chat_mcp_tools_data.py —— 历史大文件
+#     （HEAD 已 1104 / 863 / 972 行且未登记）。2026-10-25 procedure-trim-generation-delegation-chain 批 3 / 批 4：
+#     按「主管看全部循环」裁决改写的既有用例（+5 / +2 / +2，样本换成受限审计员、夹具角色改审计员）。
+#     拆分方向：DSH 资源访问按宿主类型分文件；MCP 工具数据按工具分文件。
+backend/tests/dsh_agent_panel/test_task1_resource_access.py  1104
+backend/tests/procedure_delegation_visibility/test_task15_integration_explain.py  863
+backend/tests/test_ai_chat_mcp_tools_data.py  972
 #   diagnose_g7_column_alignment.py —— 历史大文件（HEAD 已 1600 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-24 consol-note-header-library-and-node-reaggregate R8.4 批 9b-2：清空单槽占位豁免登记（4 张合营表改两层，净 −24）。
 #     拆分方向：openpyxl 读取（read_source_facts）/ 六维比对（build_alignment_report）/ 自检（_sc_*）/ 报告与 facts 投影各成模块。
@@ -1623,17 +1657,65 @@ backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
 backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
 backend/scripts/fix/fix_note_i_cycle_structure.py  1259
 backend/tests/test_note_expandable_rows.py  986
+#   GtC24JournalDetail.vue / GtWpRenderer.vue / useH1LeaseCheck.ts / N1TabCalcTable.vue / audit_check.py /
+#   account_chart_service.py / qc_engine.py —— 历史大文件（HEAD 已 2049 / 1502 / 1562 / 1522 / 888 / 1521 / 974 行且未登记，
+#     任何改动都会被门禁拒）。2026-10-26 audit-year-calendar-fallback-ratchet：拿不到审计年度不再用今年 / 写死年度 ——
+#     GtWpRenderer 缺年度时显示「未设置审计年度」、不挂载读年度数据的组件（+7）；N1 计算表在两条取数路径前统一取年度、
+#     缺失提示（+6）；useH1LeaseCheck（+2）/ audit_check（+4）改取项目审计年度；account_chart_service 净 −6；
+#     GtC24JournalDetail / qc_engine 行数不变。
+#     拆分方向：GtWpRenderer 把运行时边界与 sheet 分发拆子组件；GtC24 明细表 / 抽凭区各成子组件；useH1LeaseCheck 按
+#     租赁负债测算 / 检查表持久化两块拆；N1 计算表把取数拆 composable；audit_check 与 qc_engine 按检查类别拆模块；
+#     account_chart_service 按导入 / 映射 / 查询拆。
+#   🔴 `excel_html.py` / `report_config.py` **不登记**：HEAD 上 796 / 800 行在限内，本次加年度解析后越线 ——
+#     删掉函数体内重复的 `from uuid import UUID`、压掉 E303 多余空行，现 799 / 800。
+audit-platform/frontend/src/components/workpaper/GtC24JournalDetail.vue  2049
+audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue  1509
+audit-platform/frontend/src/components/workpaper/composables/useH1LeaseCheck.ts  1564
+audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue  1528
+backend/app/routers/audit_check.py  892
+backend/app/services/account_chart_service.py  1515
+backend/app/services/qc_engine.py  974
+#   WorkpaperWordEditor.spec.ts —— 历史大文件（HEAD 已 1929 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-26 audit-year-calendar-fallback-ratchet 任务 8.2：组件年度改为宿主 > 路由 > 项目信息后，
+#     3 个夹具补项目审计年度、加「项目未设置审计年度不写字段覆盖」用例（+27）。
+#     拆分方向：按 A16 模式 / 通用模式 / 签字与字段覆盖三组拆文件，共享桩抽到 __tests__ 辅助模块。
+audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.spec.ts  1956
+#   procedure_task_transition_service.py —— 历史大文件（HEAD 已 918 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-27 procedure-chain-hardening-and-java-contracts R22：转派的任务历史 / outbox 改记转派前的真实状态（+1）。
+#     拆分方向：状态转换（assign / reassign / submit …）与写入（任务历史 + 有序 outbox + 精确投影）两块，写入块抽成独立模块。
+backend/app/services/procedure_task_transition_service.py  919
+
+#   excel_html.py — spec formula-fetch-followup-defect-closure A4：鉴权升级 + docstring 增 30 行。
+#     HEAD 775 行已接近限值，拆分方向：公式执行 / 模块互转 / 版本管理分三个 router。
+backend/app/routers/excel_html.py  805
+#   identifier.py — 并发会话扩展（本 spec 只改 2 行：路径 parents[4]→[3] + 内置别名补「核算类型」）。
+#     HEAD 1062 行已超限但此前未登记。拆分方向：规则加载 / Level 1~3 识别 / 别名管理分三个模块。
+backend/app/services/ledger_import/identifier.py  1164
 # attachment-security-baseline（2026-10-27）：附件服务 HEAD 即 1391 行超限（历史大文件，此前从未改动、未登记）。
 #   本 spec 只加入口校验、落盘根校验、actor / 审计年度与 OCR 确认字段（新逻辑放 attachment_upload_policy /
 #   attachment_ocr_text 两个新模块），基线取 HEAD 值。拆分方向：版本链（_lock_version_chain 起至文件尾）、
 #   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
 # attachment-evidence-intake（2026-10-27）：底稿统一视图组装挪到 attachment_wp_view.py，1391 → 1309，基线随之下调。
 backend/app/services/attachment_service.py  1309
+#   test_workbook_propagation_ref_collision.py —— 历史大文件（HEAD 已 901 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-27 oo-writeback-template-parity-closure 任务 9.4c：D3-4 区②贷方受管到 E 列（definedName 与计划期声明值随改）、
+#     D3-4 两区行身份键改 rowKey（+1）。
+#     拆分方向：碰撞判据纯函数用例（_CASES）/ D3-4 真实 adapter 用例（_D34World）/ 多趟归一化用例三组拆文件。
+backend/tests/workpaper_sync/test_workbook_propagation_ref_collision.py  902
 # attachment-inline-preview（2026-10-27）：GtC1EntityControl.vue —— 历史大文件（HEAD 已 3154 行且未登记，任何改动都会被门禁拒）。
 #   本 spec 只给样本行与过程记录的识别附件挂小眼睛（2 处挂载 + 引入 + 表页键 + 4 处上传 / 刷新，+13 行），
 #   位置写入与读取都在 components/attachment/rowEvidence.ts。拆分方向：示例抽屉（C1-1 ~ C1-3）、
 #   过程记录（C1-4-1 ~ C1-4-6）、样本测试表与识别上传三块各成子组件。
 audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue  3167
+# oo-writeback-template-parity-closure 批 B2b（2026-10-28）：两份历史大文件（HEAD 已超限且此前未登记，任何改动都会被门禁拒），
+#   基线取 HEAD 值（splitlines 口径）。
+#   _d1_import_export/_impl.py —— HEAD 3643 行。本批 D1-8T 背书表按模板改列，新逻辑放 _d1_8t_endorse.py，
+#     本文件只改登记表、导入校验与 import（+7 行）。拆分方向：包 __init__ 已规划的 _config / _helpers / _template /
+#     _parsers / _exporters / _export / _import 七段（现全在 _impl 里），按段抽出后逐段下调基线。
+backend/app/routers/wp_render_strategies/_d1_import_export/_impl.py  3643
+#   useD2DisclosureNote.ts —— HEAD 1752 行。本批只让「从 D2-11 带入」带上 D2-11 按模板补的列（行数不变）。
+#     拆分方向：按附注章节（账龄 / 坏账准备 / 转回 / 核销 / 前五名 …）拆成章节组合式函数，本文件只留编排与持久化。
+audit-platform/frontend/src/components/workpaper/composables/useD2DisclosureNote.ts  1752
 # acnr-foundation-defect-closure T15（2026-10-28）：test_advanced_query_hardening_wave012.py —— 历史大文件（HEAD 已 2222 行且未登记，
 #   任何改动都会被门禁拒）。本 spec 按 tasks.md T15 同步改两条既有断言（不可解析目标 400 → 422 ACNR_TARGETS_REJECTED、
 #   多目标替身补 L1_cell 结果），净增 0 行，基线取 HEAD 值。拆分方向：编排器 / 适配器、鉴权收口、模板执行三组各成文件。

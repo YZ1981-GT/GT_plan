@@ -296,8 +296,8 @@ export function useA177IndependenceDeclaration(
   }
 
   // ─── Batch signing (independence_signing_service) ───
-  function _signingYear(): string {
-    return metaInfo.value.audit_year || projectContext.value.audit_year || String(new Date().getFullYear())
+  function _signingYear(): string | null {
+    return metaInfo.value.audit_year || projectContext.value.audit_year || null
   }
 
   function _templateCode(): string {
@@ -307,9 +307,11 @@ export function useA177IndependenceDeclaration(
   async function initiateSigningBatch(): Promise<void> {
     const pid = opts?.projectId?.value || projectContext.value.project_id
     if (!pid) { ElMessage.warning('缺少项目信息，无法发起签署'); return }
+    const signingYear = _signingYear()
+    if (!signingYear) { ElMessage.warning('未设置审计年度，无法发起签署'); return }
     try {
       await api.post(
-        `/api/projects/${pid}/signing/${_signingYear()}/initiate?template_code=${_templateCode()}`,
+        `/api/projects/${pid}/signing/${signingYear}/initiate?template_code=${_templateCode()}`,
       )
       ElMessage.success('已向项目组成员发送签署确认')
       await refreshSigningProgress()

@@ -167,7 +167,9 @@ REAL_D2_ITEM_COUNT = 24
 
 #: 39 = 21 个标量列 + 3 组 × 6 段账龄列（源 xlsx 的真实列数，`max_column == 39`）。
 EXPECTED_FIELD_COUNT = 39
-EXPECTED_PROTECTED_COUNT = 3
+#: 4 = H/Q/S/AB 四个公式列（H 是 oo-writeback-template-parity-closure 第三批补的模板公式）。
+EXPECTED_PROTECTED_COUNT = 4
+EXPECTED_EDITABLE_COUNT = EXPECTED_FIELD_COUNT - EXPECTED_PROTECTED_COUNT  # 35
 #: 权威模板的**物理**骨架行数（`A13..A24` 字面量 1..12 + `A25` 占位 `……`）= 13。
 #:
 #: 🔴 BP-21 起它**不再等于**受管行数：`A25` 是排版占位行（续行省略号），不是业务行。
@@ -290,7 +292,7 @@ BOOLEAN_COLUMN = "AK"
 
 @pytest.fixture(scope="module")
 def base_bytes(instrumented: EI.InstrumentedWorkbook, sheet_part: str) -> bytes:
-    """把 36 个 editable 列逐行写满业务值（公式列不写，留模板公式）。
+    """把 35 个 editable 列逐行写满业务值（公式列不写，留模板公式）。
 
     🔴 BP-22：boolean 列写成**真布尔格**（生产形态），于是基线 extract 的 schema 异常
     从「每行一条」变成 **0 条**。
@@ -310,7 +312,7 @@ def base_bytes(instrumented: EI.InstrumentedWorkbook, sheet_part: str) -> bytes:
                 cells[f"{column}{row}"] = row
             else:
                 cells[f"{column}{row}"] = f"值{column}{row}"
-    assert len(written_columns) == 36, sorted(written_columns)
+    assert len(written_columns) == EXPECTED_EDITABLE_COUNT == 35, sorted(written_columns)
     assert BOOLEAN_COLUMN in written_columns
     return _promote_boolean_cells(
         patch_cells(instrumented.instrumented_bytes, sheet_part, cells), sheet_part
@@ -682,7 +684,7 @@ class TestAuthoritativeTemplate:
         """跑完本文件 `backend/wp_templates/` 必须原样（Requirement 9.9）。"""
         data = P.read_authoritative_template()
         assert hashlib.sha256(data).hexdigest() == P.TEMPLATE_SHA256
-        assert len(data) == 123_162
+        assert len(data) == 105_569  # oo-writeback-template-parity-closure 第三批补 D2-2 H 列公式后重存（解压内容仅 sheet8 变）
 
     def test_template_lives_under_the_authority_root(self) -> None:
         path = P.authoritative_template_path()
@@ -773,9 +775,9 @@ class TestContractIsGroundedInTheTemplate:
         assert len(P.SCALAR_FIELD_SPECS) == 21
         assert len(P.AGING_GROUPS) * len(P.AGING_SEGMENTS) == 18
         d22_protected = [f for f in d22_fields if f.mode.value == "formula"]
-        assert len(d22_protected) == EXPECTED_PROTECTED_COUNT == 3
+        assert len(d22_protected) == EXPECTED_PROTECTED_COUNT == 4
         d22_editable = [f for f in d22_fields if f.mode.value == "editable"]
-        assert len(d22_editable) == 36
+        assert len(d22_editable) == EXPECTED_EDITABLE_COUNT == 35
 
     def test_column_letters_cover_a_to_am_without_gap(self, worksheet: Any) -> None:
         """39 列必须**连续**覆盖 A..AM，且与 sheet 的 `max_column` 一致。"""
@@ -838,10 +840,10 @@ class TestContractIsGroundedInTheTemplate:
         ]
         assert scalar_with_group == [], scalar_with_group
 
-    def test_three_formula_columns_are_really_formulas_in_the_template(
+    def test_formula_columns_are_really_formulas_in_the_template(
         self, worksheet: Any
     ) -> None:
-        """39 次比对（3 列 × **13 行物理骨架**）：逐格公式文本必须与登记模板逐字相等。
+        """52 次比对（4 列 × **13 行物理骨架**）：逐格公式文本必须与登记模板逐字相等。
 
         🔴 BP-21：逐行公式是**物理**模板事实，覆盖整个骨架（含 `A25` 那行排版占位）——
         所以按 `TEMPLATE_PHYSICAL_LAST_ROW` 迭代。第二段单独断言「受管区内那 12 行也全都
@@ -854,7 +856,7 @@ class TestContractIsGroundedInTheTemplate:
                     f"{column}{row}"
                 )
                 seen += 1
-        assert seen == 3 * EXPECTED_PHYSICAL_SKELETON_ROWS == 39, seen
+        assert seen == EXPECTED_PROTECTED_COUNT * EXPECTED_PHYSICAL_SKELETON_ROWS == 52, seen
 
         managed = sum(
             1
@@ -862,34 +864,34 @@ class TestContractIsGroundedInTheTemplate:
             for row in range(P.FIRST_DATA_ROW, P.LAST_DATA_ROW + 1)
             if worksheet[f"{column}{row}"].value == template.format(r=row)
         )
-        assert managed == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 36, managed
+        assert managed == EXPECTED_PROTECTED_COUNT * EXPECTED_TEMPLATE_ROW_COUNT == 48, managed
         assert managed < seen, "受管区必须是物理骨架的真子集（否则 BP-21 没有生效）"
         declared = {
             spec[0]: spec[2] for spec in P.MANAGED_FIELD_SPECS if spec[1] in P.FORMULA_TEMPLATES
         }
         assert set(declared.values()) == {"formula"}, declared
-        assert len(declared) == 3, declared
+        assert len(declared) == EXPECTED_PROTECTED_COUNT == 4, declared
 
-    def test_column_h_has_no_formula_in_the_template(self, worksheet: Any) -> None:
-        """`H 期初审定余额` 在模板里没有公式 ⇒ 契约判 editable（以源 xlsx 为准）。
+    def test_column_h_is_a_formula_in_the_template(self, worksheet: Any) -> None:
+        """`H 期初审定余额` = `E+F+G` 逐行在模板里 ⇒ 契约判 formula、进 formula_mask。
 
-        前端 `useD2Detail.recalcRow()` 把它算成 `priorUnadjusted+priorAje+priorRje`。
-        两侧口径不同是**存量**差异，这里把它钉住：模板哪天真加了公式，本条打红，
-        必须重新审核 mode 而不是让 OO 侧覆盖服务端算出来的值。
+        模板原先 H 列没有公式，前端 `useD2Detail.recalcRow()` 却把它算成
+        `priorUnadjusted+priorAje+priorRje`，契约只能判 editable（OO 侧录入值会盖掉平台算的值）。
+        spec oo-writeback-template-parity-closure 第三批按前端口径补齐 `H13:H25`（#32）。
         """
         checked = 0
-        for row in range(P.FIRST_DATA_ROW, P.LAST_DATA_ROW + 1):
-            value = worksheet[f"H{row}"].value
-            assert not (isinstance(value, str) and value.startswith("=")), (row, value)
+        for row in range(P.FIRST_DATA_ROW, P.TEMPLATE_PHYSICAL_LAST_ROW + 1):
+            assert worksheet[f"H{row}"].value == f"=E{row}+F{row}+G{row}", row
             checked += 1
-        assert checked == EXPECTED_TEMPLATE_ROW_COUNT == 12
+        assert checked == EXPECTED_PHYSICAL_SKELETON_ROWS == 13
         mode = next(spec[2] for spec in P.MANAGED_FIELD_SPECS if spec[1] == "H")
-        assert mode == "editable"
+        assert mode == "formula"
+        assert f"H{P.FIRST_DATA_ROW}:H{P.LAST_DATA_ROW}" in P.FORMULA_MASK
 
-    def test_formula_mask_covers_all_three_formula_columns(self, contract: Any) -> None:
+    def test_formula_mask_covers_every_formula_column(self, contract: Any) -> None:
         table = contract.sheets[0].tables[0]
         assert set(table.formula_mask) == set(P.FORMULA_MASK)
-        assert len(table.formula_mask) == 3
+        assert len(table.formula_mask) == EXPECTED_PROTECTED_COUNT == 4
         assert table.two_level_header is True and table.header_rows == 2
 
     def test_footer_marker_is_the_real_cell_text(
@@ -1214,8 +1216,8 @@ class TestStorePayloadSplit:
             assert stable_key.startswith(f"{P.ROWS_TABLE_KEY}/{identity}/")
             assert spec.mode in tuple(FieldMode)
         modes = [spec.mode for _k, _v, spec in emitted]
-        assert modes.count(FieldMode.formula) == 3
-        assert modes.count(FieldMode.editable) == 36
+        assert modes.count(FieldMode.formula) == EXPECTED_PROTECTED_COUNT == 4
+        assert modes.count(FieldMode.editable) == EXPECTED_EDITABLE_COUNT == 35
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1410,9 +1412,9 @@ class TestChunkedSidecarAndRoundtrip:
                 key = P.stable_key_for(column_key, identity)
                 assert base_outcome.formula_inventory[key] == template.format(r=row)
                 seen += 1
-        # 🔴 BP-21：36 = 3 列 × **12 受管行**。模板物理上有 39 个，第 13 行是 `A25`
+        # 🔴 BP-21：48 = 4 列 × **12 受管行**。模板物理上有 52 个，第 13 行是 `A25`
         #    那行排版占位 —— 它已不在受管区，其公式属未管理区域，不进 formula_inventory。
-        assert seen == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 36, seen
+        assert seen == EXPECTED_PROTECTED_COUNT * EXPECTED_TEMPLATE_ROW_COUNT == 48, seen
 
     def test_unmanaged_region_coverage_is_not_empty(
         self, base_outcome: X.ExcelExtractOutcome
@@ -1515,7 +1517,8 @@ class TestChunkedSidecarAndRoundtrip:
             contract=contract,
         )
         assert report.equivalent is True
-        assert len(report.compared_keys) == EXPECTED_TEMPLATE_ROW_COUNT * 36 == 432
+        # 只比 editable：35 列（H 第三批起是公式列，不进逐值比对）× 12 受管行
+        assert len(report.compared_keys) == EXPECTED_TEMPLATE_ROW_COUNT * EXPECTED_EDITABLE_COUNT == 420
         assert report.missing_keys == () and report.unexpected_keys == ()
 
     def test_roundtrip_verifier_catches_a_single_changed_field(

@@ -24,11 +24,13 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import get_current_user, require_project_access, require_project_audit_year, require_role
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper, WpStatus, WpSourceType
 from app.models.workpaper_schemas import TemplateResponse, TemplateSetResponse
+from app.services.procedure_scope_retention import TrimScopeUnavailable, load_trimmed_scope, plan_generation
 from app.services.template_engine import TemplateEngine
+from app.services.wp_header_service import describe_header_failures
 import sqlalchemy as sa
 
 router = APIRouter(tags=["templates"])
@@ -74,7 +76,7 @@ class GenerateWorkpapersRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     template_set_id: UUID
-    year: int = 2025
+    year: int | None = None
     # 生成前裁剪弹窗确认的编码；不传 = 整套生成（兼容旧调用方），空列表 = 一个都不生成
     selected_templates: list[str] | None = None
 
@@ -269,50 +271,51 @@ async def generate_project_workpapers(
     project_id: UUID,
     data: GenerateWorkpapersRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """从模板集生成项目底稿
 
     如果请求体已携带 template_set_id（用户在前端弹窗选择了模板集），
     跳过 wizard_state 的前置检查——因为用户已做出选择，不强制要求走向导步骤。
+
+    已在程序裁剪中标为不执行的编码与底稿在回收站中的编码不生成，回执 ``skipped_trimmed_codes`` /
+    ``in_recycle_codes`` 列出；读不到裁剪结果返回 503、不生成。表头不在请求内填（性能约束），回执
+    ``header_unfilled`` 写明份数（spec procedure-chain-hardening-and-java-contracts R11.6）。
     """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
+    year = await require_project_audit_year(db, project_id, data.year)
+
     # 仅在请求未携带 template_set_id 时检查 wizard 前置条件
     if not data.template_set_id:
-        check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_workpapers")
+        check = await PrerequisiteChecker().check(db, project_id, year, "generate_workpapers")
         if not check["ok"]:
             raise HTTPException(status_code=400, detail=check)
 
     engine = TemplateEngine()
     try:
-        workpapers, ignored_codes = await engine.generate_project_workpapers_detailed(
+        outcome = await engine.generate_project_workpapers_detailed(
             db=db,
             project_id=project_id,
             template_set_id=data.template_set_id,
-            year=data.year,
+            year=year,
+            created_by=current_user.id,
             selected_codes=data.selected_templates,
         )
-        await db.commit()
-        message = f"已生成 {len(workpapers)} 个底稿"
-        if ignored_codes:
-            shown = "、".join(ignored_codes[:10]) + (" 等" if len(ignored_codes) > 10 else "")
-            message += f"；{len(ignored_codes)} 个选中的编码不在所选模板集里，未生成：{shown}"
-        return {
-            "message": message,
-            "created": len(workpapers),
-            "count": len(workpapers),
-            "ignored_codes": ignored_codes,
-        }
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await db.commit()
+    # 统一回执（wp_generation_receipt）：已存在 / 已裁 / 在回收站 / 空白册 / 请求内未填表头的份数
+    return {**outcome.receipt.to_payload(), "count": len(outcome.workpapers)}
 
 
 class GenerateFromCodesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")  # 同上：前后端字段漂移时报错而不是静默丢弃
 
     wp_codes: list[str]
-    year: int = 2025
+    year: int | None = None
 
 
 @router.post("/api/projects/{project_id}/working-papers/generate-from-codes")
@@ -320,9 +323,12 @@ async def generate_from_codes(
     project_id: UUID,
     data: GenerateFromCodesRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """从推荐的底稿编码列表直接生成底稿文件（不需要模板集）
+
+    保留范围与模板集生成同一判定（``plan_generation``）：已裁 / 在回收站的编码不建，回执列出；
+    在回收站的编码此前会撞 ``uq_wp_index_project_code``（不含 is_deleted）落进 failures。
 
     改造要点（wp-generation-pipeline spec）：
     - 前置门禁：trial_balance > 0 行
@@ -352,8 +358,10 @@ async def generate_from_codes(
 
     _logger = logging.getLogger(__name__)
 
+    year = await require_project_audit_year(db, project_id, data.year)
+
     # [新增] 前置门禁
-    check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_from_codes")
+    check = await PrerequisiteChecker().check(db, project_id, year, "generate_from_codes")
     if not check["ok"]:
         raise HTTPException(status_code=422, detail=check)
 
@@ -369,30 +377,19 @@ async def generate_from_codes(
         except Exception as e:
             _logger.warning("加载模板库 JSON 失败: %s", e)
 
+    try:
+        plan = await plan_generation(db, project_id, list(dict.fromkeys(data.wp_codes)))
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
+
+    from app.services.wp_generation_receipt import GenerationReceipt
+
     scenario, has_foreign_currency = await load_generation_scenario(db, project_id)
-    created = 0
-    skipped = 0
-    failures: list[dict] = []
-    created_codes: list[str] = []
-    skipped_codes: list[str] = []
-    blank_codes: list[str] = []
-
-    for code in data.wp_codes:
-        # 检查是否已存在
-        existing = await db.execute(
-            sa.select(WpIndex).where(
-                WpIndex.project_id == project_id,
-                WpIndex.wp_code == code,
-                WpIndex.is_deleted == sa.false(),
-            )
-        )
-        if existing.scalar_one_or_none():
-            skipped += 1
-            skipped_codes.append(code)
-            continue
-
+    receipt = GenerationReceipt.from_plan(plan)
+    for code in plan.to_create:
         # [新增] savepoint 隔离单条处理
         generated = None
+        header_issue: str | None = None
         try:
             async with db.begin_nested():
                 lib_entry = template_lib.get(code, {})
@@ -430,55 +427,36 @@ async def generate_from_codes(
                 # 底稿快照绑定
                 try:
                     from app.services.dataset_query import bind_to_active_dataset
-                    await bind_to_active_dataset(db, wp, project_id, data.year)
+                    await bind_to_active_dataset(db, wp, project_id, year)
                 except Exception as _bind_err:
                     _logger.warning("dataset binding failed for wp %s: %s", code, _bind_err)
 
-                # 填充底稿表头（只动 xlsx：openpyxl 存 xlsm 会丢宏，docx 不是工作簿）
-                if generated.path.suffix.lower() == ".xlsx":
-                    try:
-                        from app.services.wp_header_service import fill_workpaper_header
-                        await fill_workpaper_header(
-                            db=db, project_id=project_id, wp_id=wp.id,
-                            file_path=str(generated.path), wp_code=code, wp_name=wp_name,
-                            cycle=cycle,
-                        )
-                    except Exception as _e:
-                        _logger.warning("fill header failed for %s: %s", code, _e)
+                # 填充底稿表头：没填上不阻断生成，原因写进回执 header_failures（原先只记 warning ⇒ 静默缺表头）
+                from app.services.wp_header_service import fill_generated_workpaper_header
+                header_issue = await fill_generated_workpaper_header(
+                    db, project_id=project_id, wp_id=wp.id, path=generated.path, wp_code=code,
+                    wp_name=wp_name, cycle=cycle, from_template=generated.from_template,
+                )
 
                 # 填充 parsed_data（核心产物；为空时写最小非空占位）
                 ensure_parsed_data_placeholder(wp, wp_code=code, created_by="generate_from_codes")
 
-            created += 1
-            created_codes.append(code)
-            if not generated.from_template:
-                blank_codes.append(code)
+            receipt.add_created(code, generated, header_issue=header_issue)
         except Exception as e:
             discard_generated_file(generated)
-            failures.append({"wp_code": code, "error": str(e)})
+            receipt.add_failure(code, e)
             _logger.warning("generate failed for %s: %s", code, e)
 
     await db.commit()
-    message = f"已生成 {created} 个底稿，跳过 {skipped} 个，失败 {len(failures)} 个"
-    if blank_codes:
-        shown = "、".join(blank_codes[:10]) + (" 等" if len(blank_codes) > 10 else "")
-        message += f"；{len(blank_codes)} 个编码没有找到底稿模板，已建空白底稿：{shown}"
-    return {
-        "created": created,
-        "skipped": skipped,
-        "created_codes": created_codes,
-        "skipped_codes": skipped_codes,
-        "blank_codes": blank_codes,
-        "failures": failures,
-        "message": message,
-    }
+    # 统一回执（wp_generation_receipt）；skipped / skipped_codes 是原有字段（= 已存在）
+    return {**receipt.to_payload(), "skipped": len(plan.existing_codes), "skipped_codes": list(plan.existing_codes)}
 
 
 class CreateCustomWorkpaperRequest(BaseModel):
     wp_code: str
     wp_name: str
     audit_cycle: str | None = None
-    year: int = 2025
+    year: int | None = None
 
 
 class CustomBatchItem(BaseModel):
@@ -489,7 +467,7 @@ class CustomBatchItem(BaseModel):
 
 class CreateCustomBatchRequest(BaseModel):
     items: list[CustomBatchItem] = []
-    year: int = 2025
+    year: int | None = None
 
 
 class CustomBatchPreviewRequest(BaseModel):
@@ -531,8 +509,12 @@ async def _create_one_custom_workpaper(
     audit_cycle: str | None,
     year: int,
     created_by: UUID | None,
+    trim_scope=None,
 ) -> dict:
     """创建**一个**自定义底稿（单条端点与批量端点的唯一实现）。
+
+    已在程序裁剪中标为不执行的编码（如裁掉 H3 后的 ``H3-7``）与底稿在回收站中的编码不新建，与生成入口
+    同一判定；``trim_scope`` 由批量端点预读一次传入，不传时现读（读不到抛 ``TrimScopeUnavailable``）。
 
     🔴 抽出这个共享函数是为了满足 R8.7/R8.9：批量与单条**必须共用同一份创建逻辑**。
     两份实现会漂移 —— 平台已有多起「同一语义两处各写一份，修一处另一处不动」的实证
@@ -549,6 +531,11 @@ async def _create_one_custom_workpaper(
 
     if await _custom_code_exists(db, project_id, wp_code):
         raise ValueError(f"底稿编号 {wp_code} 已存在")
+    retention = await plan_generation(db, project_id, [wp_code], scope=trim_scope)
+    if retention.skipped_trimmed_codes:
+        raise ValueError(f"底稿编号 {wp_code} 已在程序裁剪中标为不执行，如需编制请先在程序裁剪中恢复执行")
+    if retention.in_recycle_codes:
+        raise ValueError(f"底稿编号 {wp_code} 的底稿在回收站中，请从回收站恢复")
 
     cycle = audit_cycle or (wp_code[0] if wp_code else "X")
 
@@ -602,26 +589,22 @@ async def _create_one_custom_workpaper(
             "dataset binding failed for custom wp %s: %s", wp_code, _bind_err
         )
 
-    # 自定义底稿强制写入标准表头（is_custom=True）
+    # 自定义底稿强制写入标准表头（is_custom=True）；没填上写进回执 header_issue（原先结果没人看，提示照报「已自动填充」）
+    header_issue: str | None = None
     try:
         from app.services.wp_header_service import fill_workpaper_header
 
-        await fill_workpaper_header(
-            db=db,
-            project_id=project_id,
-            wp_id=wp.id,
-            file_path=str(dest_file),
-            wp_code=wp_code,
-            wp_name=wp_name,
-            cycle=cycle,
-            is_custom=True,
+        header = await fill_workpaper_header(
+            db=db, project_id=project_id, wp_id=wp.id, file_path=str(dest_file),
+            wp_code=wp_code, wp_name=wp_name, cycle=cycle, is_custom=True,
         )
+        if (header or {}).get("status") != "ok":
+            header_issue = (header or {}).get("message") or "原因未知"
     except Exception as _e:
         import logging
 
-        logging.getLogger(__name__).warning(
-            "fill custom header failed for %s: %s", wp_code, _e
-        )
+        logging.getLogger(__name__).warning("fill custom header failed for %s: %s", wp_code, _e, exc_info=True)
+        header_issue = "填写表头时出错，详见服务日志"
 
     # 🔴 投影 parsed_data（必须在 fill_workpaper_header 之后、commit 之前）
     #
@@ -647,6 +630,7 @@ async def _create_one_custom_workpaper(
         "wp_code": wp_code,
         "wp_name": wp_name,
         "file_path": str(dest_file),
+        "header_issue": header_issue,
     }
 
 
@@ -655,7 +639,7 @@ async def create_custom_workpaper(
     project_id: UUID,
     data: CreateCustomWorkpaperRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """创建自定义底稿（用户自建，非模板生成）
 
@@ -665,23 +649,28 @@ async def create_custom_workpaper(
     `_create_one_custom_workpaper`，与批量端点共用同一份实现。
     """
     try:
+        year = await require_project_audit_year(db, project_id, data.year)
         result = await _create_one_custom_workpaper(
             db,
             project_id=project_id,
             wp_code=data.wp_code,
             wp_name=data.wp_name,
             audit_cycle=data.audit_cycle,
-            year=data.year,
+            year=year,
             created_by=current_user.id,
         )
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
     except ValueError as e:
         # 单条端点沿用既有 409 语义（批量端点则映射成 skipped）
         raise HTTPException(status_code=409, detail=str(e))
 
     await db.commit()
+    issue = result["header_issue"]
     return {
         **result,
-        "message": "自定义底稿创建成功，表头已自动填充",
+        "header_failures": [{"wp_code": data.wp_code, "reason": issue}] if issue else [],
+        "message": f"自定义底稿已创建，表头未填上：{issue}" if issue else "自定义底稿创建成功，表头已自动填充",
     }
 
 
@@ -690,7 +679,7 @@ async def preview_custom_workpaper_batch(
     project_id: UUID,
     data: CustomBatchPreviewRequest,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user: User = Depends(require_project_access("readonly")),
 ):
     """批量创建**预览**（只读）。
 
@@ -770,7 +759,7 @@ async def create_custom_workpaper_batch(
     project_id: UUID,
     data: CreateCustomBatchRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """批量创建自定义底稿。
 
@@ -793,6 +782,13 @@ async def create_custom_workpaper_batch(
                 "max_items": MAX_BATCH_ITEMS,
             },
         )
+
+    try:
+        trim_scope = await load_trimmed_scope(db, project_id)
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
+
+    year = await require_project_audit_year(db, project_id, data.year)
 
     created: list[dict] = []
     skipped: list[dict] = []
@@ -830,8 +826,9 @@ async def create_custom_workpaper_batch(
                     wp_code=code,
                     wp_name=name,
                     audit_cycle=item.audit_cycle,
-                    year=data.year,
+                    year=year,
                     created_by=current_user.id,
+                    trim_scope=trim_scope,
                 )
             created.append(one)
             results.append({"wp_code": code, "status": "created", "reason": None})
@@ -849,6 +846,8 @@ async def create_custom_workpaper_batch(
             results.append({"wp_code": code, "status": "failed", "reason": str(e)})
 
     await db.commit()
+    header_failures = [{"wp_code": c["wp_code"], "reason": c["header_issue"]} for c in created if c.get("header_issue")]
+    message = f"已创建 {len(created)} 个，跳过 {len(skipped)} 个，失败 {len(failed)} 个"
     return {
         "created": len(created),
         "skipped": len(skipped),
@@ -856,8 +855,7 @@ async def create_custom_workpaper_batch(
         "created_items": created,
         "skipped_items": skipped,
         "failed_items": failed,
+        "header_failures": header_failures,
         "results": results,
-        "message": (
-            f"已创建 {len(created)} 个，跳过 {len(skipped)} 个，失败 {len(failed)} 个"
-        ),
+        "message": message + (f"；{describe_header_failures(header_failures)}" if header_failures else ""),
     }

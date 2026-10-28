@@ -52,9 +52,13 @@ export function calculateProvision(balance: number, lossRate: number): number {
   return balance * lossRate
 }
 
-/** @deprecated Use calcDifference from useD1FormulaEngine */
+/**
+ * @deprecated Use calcDifference from useD1FormulaEngine
+ *
+ * 差异 = 应计提 - 账面坏账准备（模板 D1-15 ⑤=③-④；原为 实际 - 应计，方向相反）。
+ */
 export function calculateDifference(actualProvision: number, shouldProvision: number): number {
-  return actualProvision - shouldProvision
+  return shouldProvision - actualProvision
 }
 
 /** 贴息 = P × R × D / 360 */

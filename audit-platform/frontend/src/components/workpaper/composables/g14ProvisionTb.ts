@@ -20,21 +20,12 @@ export interface G14TbRowLike {
   name?: string
   audited_amount?: unknown
   unadjusted_amount?: unknown
-  ending_balance?: unknown
-  closing_balance?: unknown
-  debit_amount?: unknown
-  credit_amount?: unknown
 }
 
 /** 准备类科目多为贷方余额：取绝对值便于与明细「期末余额」勾稽 */
 export function pickProvisionTbClosing(hit: G14TbRowLike | null | undefined): number {
   if (!hit) return 0
-  const raw = pickTbAmount(hit)
-  // closing_balance 若存在且 pick 未覆盖，补一层
-  if (raw === 0 && hit.closing_balance != null) {
-    return Math.abs(parseNum(hit.closing_balance))
-  }
-  return Math.abs(raw)
+  return Math.abs(pickTbAmount(hit))
 }
 
 function accountCodeOf(row: G14TbRowLike): string {

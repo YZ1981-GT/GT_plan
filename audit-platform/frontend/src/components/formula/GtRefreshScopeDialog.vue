@@ -216,6 +216,7 @@ import http from '@/utils/http'
 // spec: formula-management-runtime-closure Task 14/16 - 端点收敛进 apiPaths（纯搬迁）
 import { draftRefresh } from '@/services/apiPaths/formula'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useRoleContextStore } from '@/stores/roleContext'
 import {
   parseDraftRefreshResponse,
@@ -241,7 +242,8 @@ interface ScopeTreeNode {
 
 const props = defineProps<{
   projectId: string
-  year: number
+  /** 项目年度；项目没填审计年度为 null ⇒ 不打开（原先宿主兜底去年，刷新的是别的年度） */
+  year: number | null
 }>()
 
 const emit = defineEmits<{
@@ -301,6 +303,10 @@ const presetSummary = computed<string>(() => {
 
 // ─── 打开弹窗 ─────────────────────────────────────────────────────────────────
 async function openDialog() {
+  if (props.year == null) {
+    ElMessage.warning(`${MISSING_AUDIT_YEAR_MESSAGE}（一键刷新按项目年度执行）`)
+    return
+  }
   visible.value = true
   parsedResult.value = null
   await loadScopes()
@@ -359,6 +365,10 @@ function onCheck() {
 async function onConfirm() {
   if (checkedScopes.value.length === 0) {
     ElMessage.warning('请至少勾选一项刷新内容')
+    return
+  }
+  if (props.year == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
     return
   }
   submitting.value = true

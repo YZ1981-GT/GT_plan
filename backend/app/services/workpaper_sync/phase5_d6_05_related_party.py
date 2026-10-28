@@ -4,8 +4,13 @@
 spec: d567-sync-coverage-via-row-table-engine · Task 9 · Requirements 2.2
 
 几何（openpyxl 直读 2026-09-26）：30r × 14c(N) / 19f。
-单级表头 R9。数据区 R10-R12（3 行模板占位）。footer R13「合计」。
+单级表头 R9（12 列 A..L）。数据区 R10-R12（3 行模板占位）。footer R13「合计」。
 公式列 F(=C+D-E 期末余额) + H(=F-G 账面价值)。
+
+🔴 spec oo-writeback-template-parity-closure R3 批 B2 逐格复核：模板 R9 的 I..L 是「发生时间及账龄 / 发生原因（款项性质）/
+索引号 / 备注」。原声明照另一种关联方表写了 14 列（J 未结转原因 / K 至审计日结转金额 / L 处理计划 / M 索引号 / N 备注），
+J~L 三列与模板错位、M / N 落在模板空列上。前端随本批补 `transactionReason`（发生原因）；「未结转原因 / 至审计日结转
+金额 / 处理计划」三列模板没有，留在 HTML 侧、不进 OO。
 """
 from __future__ import annotations
 from typing import Final
@@ -25,10 +30,10 @@ FIRST_DATA_ROW_D605: Final[int] = 10
 LAST_DATA_ROW_D605: Final[int] = 12
 FOOTER_ROW_D605: Final[int] = 13
 FOOTER_MARKER_D605: Final[str] = "合计"
-MANAGED_LAST_COL_D605: Final[str] = "N"
-UUID_COL_D605: Final[str] = "O"  # 必须在受管最后列 N 之后
+MANAGED_LAST_COL_D605: Final[str] = "L"
+UUID_COL_D605: Final[str] = "O"  # 在模板已用列（max_column = N）之后
 
-#: 14 列。F(endBalance=formula) H(bookValue=formula)，其余 editable。
+#: 12 列（= 模板 R9）。F(endBalance=formula) H(bookValue=formula)，其余 editable。
 FIELD_SPECS_D605: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("party_name", "A", "editable", "text", "partyName", "关联方名称", ""),
     ("relationship", "B", "editable", "text", "relationship", "关联关系", ""),
@@ -36,14 +41,12 @@ FIELD_SPECS_D605: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = 
     ("debit_amount", "D", "editable", "amount", "debitAmount", "借方发生", ""),
     ("credit_amount", "E", "editable", "amount", "creditAmount", "贷方发生", ""),
     ("end_balance", "F", "formula", "amount", "endBalance", "期末余额", ""),
-    ("impairment", "G", "editable", "amount", "impairment", "坏账准备", ""),
+    ("impairment", "G", "editable", "amount", "impairment", "减：坏账准备", ""),
     ("book_value", "H", "formula", "amount", "bookValue", "账面价值", ""),
     ("aging_and_timing", "I", "editable", "text", "agingAndTiming", "发生时间及账龄", ""),
-    ("unsettled_reason", "J", "editable", "text", "unsettledReason", "未结转原因", ""),
-    ("post_settlement", "K", "editable", "amount", "postSettlement", "至审计日结转金额", ""),
-    ("plan", "L", "editable", "text", "plan", "处理计划", ""),
-    ("index_ref", "M", "editable", "text", "indexRef", "索引号", ""),
-    ("remark", "N", "editable", "text", "remark", "备注", ""),
+    ("transaction_reason", "J", "editable", "text", "transactionReason", "发生原因（款项性质）", ""),
+    ("index_ref", "K", "editable", "text", "indexRef", "索引号", ""),
+    ("remark", "L", "editable", "text", "remark", "备注", ""),
 )
 
 SPEC_D605: Final[RowTableSheetSpec] = RowTableSheetSpec(

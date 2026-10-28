@@ -131,7 +131,7 @@ async function onSave() {
   try {
     await api.post('/api/workpapers/field-overrides', {
       project_id: props.projectId,
-      year: props.year || new Date().getFullYear(),
+      year: props.year,
       scope: 'audit_legend',
       item_key: 'custom_items',
       field: 'value',
@@ -146,7 +146,7 @@ async function loadCustom() {
     const data: any = await api.get('/api/workpapers/field-overrides', {
       params: {
         project_id: props.projectId,
-        year: props.year || new Date().getFullYear(),
+        year: props.year,
         scope: 'audit_legend',
       },
     })

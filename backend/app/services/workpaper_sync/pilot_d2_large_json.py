@@ -65,13 +65,13 @@ Task 39 的 :func:`~app.services.workpaper_sync.pilot_harness.assess_pilot_class
   其余 21 列都是 `X11:X12` 纵向合并的单级列。故 `header_rows = 2`，
   **21 + 3×6 = 39 列**（A..AM），与 `max_column = 39` 一致。
 * **行 13..25 是数据区**（`A25` 是模板占位 `……`）。
-* **`Q/S/AB` 三列在数据行里逐行有真公式**：``=E{r}+O{r}-P{r}`` / ``=Q{r}+R{r}`` /
-  ``=S{r}+Z{r}+AA{r}`` ⇒ 契约里 `mode=formula` + `formula_mask` 三段区域。
-  🔴 `H`（期初审定余额）在模板里**没有**公式（逐格实测），尽管前端
-  `useD2Detail.recalcRow()` 把它算成 `priorUnadjusted+priorAje+priorRje` ——
-  契约以**源 xlsx** 为准判定 `editable`，并由
-  `test_column_h_has_no_formula_in_the_template` 把这条差异钉住：模板哪天真加了公式，
-  守卫立刻打红，而不是悄悄让 OO 侧覆盖服务端算的值。
+* **`H/Q/S/AB` 四列在数据行里逐行有真公式**：``=E{r}+F{r}+G{r}`` / ``=E{r}+O{r}-P{r}`` /
+  ``=Q{r}+R{r}`` / ``=S{r}+Z{r}+AA{r}`` ⇒ 契约里 `mode=formula` + `formula_mask` 四段区域。
+  🔴 `H`（期初审定余额）原先在模板里**没有**公式，前端 `useD2Detail.recalcRow()` 却把它
+  算成 `priorUnadjusted+priorAje+priorRje`，契约只能判 `editable`（OO 侧录入值会盖掉平台
+  算的值）。spec `oo-writeback-template-parity-closure` 第三批按前端口径给模板补齐
+  `H13:H25`（`scripts/fix/fix_template_formula_defects.py` #32），契约随之改判 `formula`，
+  由 `test_column_h_is_a_formula_in_the_template` 钉住。
 * **`A26 合计` 是 footer**（`E26..AH26` 全是 `SUM(x13:x25)`）⇒
   `footer_anchor = {marker: 合计, search_column: A}`，不写死行号。
 * 行 27 `账龄占比` / 行 28 `账龄逻辑校验` / 行 29 `三、审计说明：` / 行 33 `四、审计结论：`
@@ -351,7 +351,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
 
 #: 权威模板字节哨兵（Requirement 9.9：`backend/wp_templates/` 运行时只读）。
 TEMPLATE_SHA256: Final[str] = (
-    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"
+    "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"
 )
 
 #: 声明权威模板的**配置真源**（`wp_code: D2A` ↔ `template_path` 一一对应）。
@@ -395,7 +395,7 @@ LAST_DATA_ROW: Final[int] = 24
 #: * :data:`LAST_DATA_ROW` = 受管业务行区间末行 ⇒ Table ref、row UUID、projection、
 #:   `formula_mask`（受管的只读区）都按它算；
 #: * 本常量 = 模板**物理**结构的末行 ⇒ 模板自带的、覆盖整个骨架的事实按它算：
-#:   footer 的合计区间（`SUM(x13:x25)`，30 条逐格实测）、以及 `Q`/`S`/`AB` 三列**逐行**
+#:   footer 的合计区间（`SUM(x13:x25)`，30 条逐格实测）、以及 `H`/`Q`/`S`/`AB` 四列**逐行**
 #:   公式（占位行 25 上也有）。
 #:
 #: 本常量只进守卫与文档，**不进** `build_contract_payload()` ⇒ 引入它不改契约 digest。
@@ -421,8 +421,9 @@ TABLE_NAME: Final[str] = f"GT_{TEMPLATE_ID}_ROWS"
 #: 本 pilot 是 projection-based ⇒ 三个 typed child 全部必须是 approved definition。
 AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 
-#: 三个公式列的只读区域（逐格实测 `=E+O-P` / `=Q+R` / `=S+Z+AA`）。
+#: 四个公式列的只读区域（逐格实测 `=E+F+G` / `=E+O-P` / `=Q+R` / `=S+Z+AA`）。
 FORMULA_MASK: Final[tuple[str, ...]] = (
+    f"H{FIRST_DATA_ROW}:H{LAST_DATA_ROW}",
     f"Q{FIRST_DATA_ROW}:Q{LAST_DATA_ROW}",
     f"S{FIRST_DATA_ROW}:S{LAST_DATA_ROW}",
     f"AB{FIRST_DATA_ROW}:AB{LAST_DATA_ROW}",
@@ -430,6 +431,7 @@ FORMULA_MASK: Final[tuple[str, ...]] = (
 
 #: 公式列 → 数据行公式模板（`{r}` 为行号）。守卫逐行与权威模板比对。
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {
+    "H": "=E{r}+F{r}+G{r}",
     "Q": "=E{r}+O{r}-P{r}",
     "S": "=Q{r}+R{r}",
     "AB": "=S{r}+Z{r}+AA{r}",
@@ -520,7 +522,7 @@ SCALAR_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("prior_unadjusted", "E", "editable", "amount", "priorUnadjusted", "期初未审余额"),
     ("prior_aje", "F", "editable", "amount", "priorAje", "期初账项调整"),
     ("prior_rje", "G", "editable", "amount", "priorRje", "期初重分类调整"),
-    ("prior_audited", "H", "editable", "amount", "priorAudited", "期初审定余额"),
+    ("prior_audited", "H", "formula", "amount", "priorAudited", "期初审定余额"),
     ("debit_occurrence", "O", "editable", "amount", "debitOccurrence", "借方发生"),
     ("credit_occurrence", "P", "editable", "amount", "creditOccurrence", "贷方发生"),
     ("end_balance", "Q", "formula", "amount", "endBalance", "期末余额"),
@@ -1120,8 +1122,8 @@ def build_contract_payload() -> dict[str, Any]:
                 "openpyxl 逐 sheet 直读权威模板 "
                 "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx 的 11 张 sheet，"
                 "只取受管 sheet 明细表D2-2：两级表头 11/12 行（三个账龄组各横跨 6 列、"
-                "其余 21 列纵向合并）、数据区 13..25 行、Q/S/AB 三列逐行公式 "
-                "=E+O-P / =Q+R / =S+Z+AA、H 列模板内无公式故判 editable、A26 合计 footer；"
+                "其余 21 列纵向合并）、数据区 13..25 行、H/Q/S/AB 四列逐行公式 "
+                "=E+F+G / =E+O-P / =Q+R / =S+Z+AA（H 为第三批补的模板公式）、A26 合计 footer；"
                 "39 个字段的 source_ref / header_source_ref / group_source_ref 均指向上述"
                 "真实单元格，字段键集合与前端 useD2DetailColumnPrefs.FIXED_COLUMNS 及 "
                 "useAgingConfig.PRESET_SEGMENTS.FIVE_YEAR 三源锁死"

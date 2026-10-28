@@ -6,6 +6,7 @@
  */
 import { ElMessage } from 'element-plus'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 /**
  * 从附注详情的 table_data 中取第一个合计行的第一个非零数值。
@@ -38,18 +39,23 @@ export interface NoteCheckResult {
 /**
  * 静默校对附注合计 vs 本页合计。
  * @param projectId - 项目 ID
- * @param year - 审计年度
+ * @param year - 审计年度（项目没填为 null ⇒ 不读附注，回 error 并写明去填年度）
  * @param noteSection - 附注章节号（如 五、4）
  * @param pageTotal - 本页期末合计（由各组件提供）
  * @param silent - true=仅返回结果不弹消息；false=弹 ElMessage
  */
 export async function checkNoteConsistencyGeneric(
   projectId: string,
-  year: number,
+  year: number | null,
   noteSection: string,
   pageTotal: number,
   silent = true,
 ): Promise<NoteCheckResult> {
+  if (year == null) {
+    const r: NoteCheckResult = { status: 'error', message: MISSING_AUDIT_YEAR_MESSAGE }
+    if (!silent) ElMessage.warning(r.message)
+    return r
+  }
   try {
     const detail = await getDisclosureNoteDetail(projectId, year, noteSection)
     const noteTotal = pickNoteTotal(detail)

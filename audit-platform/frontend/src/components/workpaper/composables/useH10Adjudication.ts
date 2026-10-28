@@ -1,6 +1,7 @@
 /**
  * useH10Adjudication — H10-1 审定表（损益类/AJE+RJE）
  */
+import { fetchTrialBalanceRows, tbProfitLossUnder } from '@/services/trialBalanceRows'
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
   H10_ACCOUNT_CODE,
@@ -371,19 +372,11 @@ export function useH10Adjudication(opts: {
   async function loadTrialBalanceFromApi(): Promise<void> {
     if (!opts.projectId.value) return
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: H10_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(H10_ACCOUNT_CODE),
-      )
-      if (hit) {
-        const credit = parseNum(hit.credit_amount ?? hit.period_credit)
-        const debit = parseNum(hit.debit_amount ?? hit.period_debit)
-        updateTrialBalance(credit - debit)
-      }
+      const { rows } = await fetchTrialBalanceRows(opts.projectId.value, { accountPrefix: H10_ACCOUNT_CODE })
+      // 损益类本期贷 − 借按试算表单边口径拆，科目及其明细之和
+      // （端点没有 credit_amount / debit_amount，原先恒 0；原先也只取第一行）
+      const pl = tbProfitLossUnder(rows, H10_ACCOUNT_CODE)
+      if (pl.found) updateTrialBalance(pl.credit - pl.debit)
     } catch { /* optional */ }
   }
 

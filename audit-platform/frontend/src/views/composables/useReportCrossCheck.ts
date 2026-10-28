@@ -38,7 +38,8 @@ interface BackendCrossCheckPayload {
 
 export interface UseReportCrossCheckOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null ⇒ 跨表核对不取数（页头已提示去填） */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   currentApplicableStandard: ComputedRef<string>
 }
@@ -252,7 +253,7 @@ export function useReportCrossCheck(options: UseReportCrossCheckOptions): UseRep
   }
 
   async function loadCrossCheckData() {
-    if (crossCheckLoading.value) return
+    if (crossCheckLoading.value || year.value == null) return
     crossCheckLoading.value = true
     try {
       const std = currentApplicableStandard.value

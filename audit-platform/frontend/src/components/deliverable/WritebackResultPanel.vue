@@ -128,6 +128,7 @@ import { ref, computed } from 'vue'
 import { CircleCheck, CircleClose, Warning, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface WritebackResultItem {
   section_code: string
@@ -191,7 +192,13 @@ async function onWriteback(): Promise<void> {
 
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/writeback`
-    const data = await api.post<any>(url, { year: props.year || new Date().getFullYear() })
+    const year = props.year || null
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      loading.value = false
+      return
+    }
+    const data = await api.post<any>(url, { year })
 
     // 异步 job 返回
     if (data.job_id) {

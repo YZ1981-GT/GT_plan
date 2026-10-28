@@ -30,6 +30,7 @@
  */
 import { G13_ADJUDICATION_ITEMS } from './g13Constants'
 import type { G13CategorySkeletonRow } from './g13CategorySkeleton'
+import { isPlReconciled } from './useG13FormulaEngine'
 
 /** 落库行：只存可填列 + 覆盖标记。缺字段读作「未覆盖」。 */
 export interface G13SkeletonStoredRow {
@@ -199,9 +200,9 @@ export function mergeSkeletonOverrides(
       cumulativeFvChange,
       fairValue,
       amountInPl,
-      // K 核对 = J=D；BS 侧 I=F+H 在覆盖后恒成立
+      // K 核对 = J=D（按分相等，同 isPlReconciled）；BS 侧 I=F+H 在覆盖后恒成立
       bsReconciled: true,
-      plReconciled: Math.abs(amountInPl - currentAudited) <= 0.01,
+      plReconciled: isPlReconciled(amountInPl, currentAudited),
       belongLabel: hit.belongLabel ?? fallbackBelong,
       sourceIndex: hit.sourceIndex ?? agg.sourceIndex,
       manualOverride: true,

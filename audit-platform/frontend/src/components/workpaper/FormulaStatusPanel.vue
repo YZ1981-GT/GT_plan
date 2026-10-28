@@ -114,14 +114,14 @@ const props = defineProps<{
   projectId: string
   wpId: string
   /** 保存/求值悬空校验所需年度；缺省回退当前年度 */
-  year?: number
+  year?: number | null
 }>()
 
 const { canDo } = usePermissionMatrix(props.projectId)
 /** 仅编辑角色可变更 Tier A（只读用户仅查看 / R5.7）。 */
 const canEdit = computed(() => canDo('edit', 'workpaper'))
 
-const effYear = computed(() => props.year ?? new Date().getFullYear())
+const effYear = computed<number | null>(() => props.year ?? null)
 
 const loading = ref(false)
 const rawItems = ref<RawFormulaItem[]>([])

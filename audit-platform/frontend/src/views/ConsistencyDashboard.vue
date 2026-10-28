@@ -101,6 +101,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { runConsistencyCheck, getConsistencyCheck } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,12 +109,16 @@ const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const result = ref<any>(null)
 const activeTab = ref('consistency')
+// 审计年度按项目取（原先不传 ⇒ 服务层缺省 2025）；取不到时执行提示去填，进页只读不发请求
+const { ensureAuditYear, requireAuditYear } = useProjectAuditYear(projectId)
 
 // ── 一致性校验 ──
 async function runCheck() {
+  const year = await requireAuditYear('一致性校验')
+  if (year == null) return
   loading.value = true
   try {
-    result.value = await runConsistencyCheck(projectId.value)
+    result.value = await runConsistencyCheck(projectId.value, year)
   } finally { loading.value = false }
 }
 
@@ -184,7 +189,8 @@ watch(activeTab, (tab) => {
 onMounted(async () => {
   loading.value = true
   try {
-    result.value = await getConsistencyCheck(projectId.value)
+    const year = await ensureAuditYear()
+    if (year != null) result.value = await getConsistencyCheck(projectId.value, year)
   } catch { /* first time, no data */ }
   finally { loading.value = false }
 })

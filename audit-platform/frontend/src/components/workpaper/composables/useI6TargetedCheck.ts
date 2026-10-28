@@ -140,7 +140,7 @@ export function useI6TargetedCheck(
   allResponses: Ref<Map<string, any>> | (() => Map<string, any>),
   options?: {
     onSave?: (itemId: string, value: any) => void | Promise<void>
-    asOfYear?: Ref<number> | (() => number)
+    asOfYear?: Ref<number | null> | (() => number | null)
   },
 ) {
   const getMap = typeof allResponses === 'function'

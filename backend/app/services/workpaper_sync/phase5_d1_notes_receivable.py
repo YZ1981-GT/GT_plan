@@ -123,8 +123,11 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "D/D1 应收票据.xlsx"
 #: 修复走 zip 级精修（`backend/scripts/fix/fix_d1_template_amount_number_format.py`），
 #: 只动 `xl/styles.xml` 与该 sheet 的 XML，新建一个「只换 numFmtId」的 cellXfs 条目 ——
 #: 全簿其余 number_format 与全部单元格值逐项不变（脚本内三道前置校验钉死）。
+#: 🔴 2026-10-26 再更新两次（`efa8e23d…` → `2e75538c…` → 本值，spec oo-writeback-template-parity-closure R1，
+#: 逐格清单 `scripts/fix/fix_template_formula_defects.py`）：D1-7 Q23 年初余额改取 C 列收票日期；
+#: D1-1 B8:D8 改取 D1-2 银行承兑汇票行 R11（原取合计行 R14）；D1-15 ④「期末坏账准备账面余额」改为录入格。
 TEMPLATE_SHA256: Final[str] = (
-    "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef"
+    "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d5"
 )
 
 #: 受管 sheet 的真实 tab 名（构建期选择器；运行时定位一律走 identity 锚点）。

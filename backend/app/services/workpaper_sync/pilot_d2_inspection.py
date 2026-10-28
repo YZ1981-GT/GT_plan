@@ -83,7 +83,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
+    "d0e27f6fbff3ff6e7db05ce4a42796f94a3e253dabfaf49761b97400ad23bed2"
 )
 
 #: 主受管 sheet（D2-6，Phase 2 首个）—— orchestration config 要求一个 primary。

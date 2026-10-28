@@ -31,8 +31,8 @@ async def render(ctx: RenderContext) -> dict | None:
         ar_scope = "consolidated" if wp_code == "A1-14" else "standalone"
         ar_year = await fetch_project_audit_year(db, project_id)
         if not ar_year:
-            from datetime import datetime
-            ar_year = datetime.now().year - 1
+            # 未设置审计年度：数据无法定位，返回空（不用自然年猜）
+            return {"analytical_review": None}
         ar_data = await get_analytical_review_data(
             db, project_id, ar_year, wp_code, ar_scope
         )

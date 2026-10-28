@@ -614,7 +614,11 @@ async function handleLedgerPull(): Promise<void> {
   if (!props.projectId || !props.config.accountCode) return
   ledgerPulling.value = true
   try {
-    const auditYear = props.year ?? new Date().getFullYear() - 1
+    if (props.year == null) {
+      ElMessage.warning('未设置审计年度，无法读取序时账')
+      return
+    }
+    const auditYear = props.year
     const result = await pullF2DetailFromLedger(
       props.projectId,
       props.config.accountCode,

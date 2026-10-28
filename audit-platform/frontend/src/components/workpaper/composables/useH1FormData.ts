@@ -15,6 +15,7 @@
  * @deprecated 运行时由 GtH1FixedAssets.selfLoad + persistResponse 接管；
  * 本文件仍导出 ChecklistItem 类型供各 H1 composable 使用。请勿在新入口调用 useH1FormData()。
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -280,11 +281,7 @@ export function useH1FormData(wpId: Ref<string>, projectId: Ref<string>) {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1601,1602' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1601,1602' })).rows
 
       let cost1601 = 0
       let dep1602 = 0
@@ -293,11 +290,12 @@ export function useH1FormData(wpId: Ref<string>, projectId: Ref<string>) {
 
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
+        // 科目及其明细之和（原先 `=` 覆盖：有明细科目时只剩最后一行）
         if (code.startsWith(ACCOUNT_CODE_1601)) {
-          cost1601 = Number(item.unadjusted_amount ?? 0)
+          cost1601 += Number(item.unadjusted_amount ?? 0)
           found1601 = true
         } else if (code.startsWith(ACCOUNT_CODE_1602)) {
-          dep1602 = Number(item.unadjusted_amount ?? 0)
+          dep1602 += Number(item.unadjusted_amount ?? 0)
           found1602 = true
         }
       }

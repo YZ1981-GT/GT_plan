@@ -187,9 +187,9 @@
  * Spec: .kiro/specs/k5-provisions/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, inject, onMounted, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { k5QueryCodes } from './composables/k5AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -420,11 +420,7 @@ async function _loadTbData(): Promise<void> {
 
   const codes = k5QueryCodes((props.htmlData as any)?.tb_source_codes)
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: codes[0], year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: codes })).rows
     let uProvision = 0, aProvision = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

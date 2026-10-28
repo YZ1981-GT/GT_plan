@@ -14,14 +14,14 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,7 @@ def _split_balanced_groups(rows: list[dict]) -> tuple[list[list[dict]], list[lis
 @router.get("/template")
 async def export_reclassification_template(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -110,6 +110,7 @@ async def export_reclassification_template(
 
     模板列：科目编码 / 科目名称 / 借方金额 / 贷方金额 / 摘要
     """
+    year = await require_project_audit_year(db, project_id, year)
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
 

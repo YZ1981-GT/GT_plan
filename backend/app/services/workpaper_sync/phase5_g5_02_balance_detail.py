@@ -12,7 +12,8 @@ spec: `g5-nested-sections-and-template-defects` · Task 9~10
   * 段①（一）R12-40：子区1 R13-17/R18 · 子区2 R20-24/R25 · 子区3 R27-31/R32 · 子区4 R34-38/R39 · 合计 R40
   * 段②（二）R41-72：同结构 R45-49/R50 · R52-56/R57 · R59-63/R64 · R66-70/R71 · 合计 R72
   * 段③（三）R73-104：同结构 R77-81/R82 · R84-88/R89 · R91-95/R96 · R98-102/R103 · 合计 R104
-* 🔴 **三处合计漏加小计**：R40 `=G18+G25+G39` 漏 G32 · R72 `=G50+G57+G71` 漏 G64 · R104 `=G82+G89+G103` 漏 G96
+* 三处段合计原漏加小计（R40 漏 R32 · R72 漏 R64 · R104 漏 R96，D..R 全列），已修模板（spec oo-writeback-template-parity-closure R1）：
+  R40 `=G18+G25+G32+G39` · R72 `=G50+G57+G64+G71` · R104 `=G82+G89+G96+G103`
 * **公式列 3 个**：G(`=D+E+F`) J(`=D+H-I`) M(`=J+K+L`)
 * 有效列 22（A..V） ⇒ uuid 取 **W** 列（每子区共用，但 `row_section_field` 过滤）。
 * payload **dual_write**（remark + conclusion 逐字相同）。
@@ -153,7 +154,7 @@ ALL_SPECS_G502: Final[tuple[RowTableSheetSpec, ...]] = tuple(
     _build_spec(s) for s in _SECTIONS
 )
 
-# 段合计行（不受管，但三处漏加小计须在判据里验证）
+# 段合计行（不受管；原先三处漏加小计，已修模板，判据验证四个小计都在）
 SEGMENT_TOTAL_ROWS_G502: Final[tuple[int, ...]] = (40, 72, 104)
-# 🔴 三处漏加的小计行号
+# 原先被段合计漏加的小计行号（已修模板，留作判据：段合计必须引用它们）
 MISSING_SUBTOTAL_IN_TOTALS_G502: Final[tuple[int, ...]] = (32, 64, 96)

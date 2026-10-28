@@ -593,12 +593,13 @@
     </div>
 
     <!-- 人员委派弹窗 -->
-    <el-dialog v-model="showTeamAssign" title="人员委派" width="900px" append-to-body destroy-on-close>
+    <el-dialog v-model="showTeamAssign" title="人员委派" width="900px" append-to-body destroy-on-close
+      :before-close="closeTeamAssign">
       <div style="min-height: 500px;">
-        <TeamAssignmentStep v-if="showTeamAssign" :project-id="project.id" />
+        <TeamAssignmentStep v-if="showTeamAssign" ref="teamAssignRef" :project-id="project.id" />
       </div>
       <template #footer>
-        <el-button @click="showTeamAssign = false">关闭</el-button>
+        <el-button :loading="savingTeamAssign" @click="closeTeamAssign()">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -609,6 +610,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
+import { eventBus } from '@/utils/eventBus'
 import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
@@ -631,12 +634,28 @@ const { push: navPush } = useNavigationStack()
 const prefs = useDisplayPrefsStore()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
+// 人员委派弹窗关闭即保存团队分配（spec procedure-trim-generation-delegation-chain 任务 22 实测：原先关闭只隐藏、从未落库）；
+// 保存失败不关，留在弹窗里改
+const teamAssignRef = ref<{ save: () => Promise<boolean> } | null>(null)
+const savingTeamAssign = ref(false)
+async function closeTeamAssign(done?: () => void) {
+  if (savingTeamAssign.value) return
+  savingTeamAssign.value = true
+  try {
+    if (teamAssignRef.value && !(await teamAssignRef.value.save())) return
+    if (done) done()
+    else showTeamAssign.value = false
+  } finally { savingTeamAssign.value = false }
+}
 const showAttUpload = ref(false)
 const platformGuideRef = ref<InstanceType<typeof PlatformUserGuideDialog> | null>(null)
 const attForm = ref({ wpCode: '', type: 'general' })
 const attFiles = ref<any[]>([])
 const attWpOptions = ref<{ label: string; value: string }[]>([])
-const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
+const projectYear = computed<number | null>(() => {
+  const value = Number(props.project?.audit_year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 function openPlatformGuide() {
   platformGuideRef.value?.open()
@@ -930,13 +949,13 @@ function goTo(page: string, extraQuery?: Record<string, string>) {
   if (!props.project) return
   router.push({
     path: `/projects/${props.project.id}/${page}`,
-    query: { year: String(projectYear.value), ...extraQuery },
+    query: { ...(projectYear.value != null ? { year: String(projectYear.value) } : {}), ...extraQuery },
   })
 }
 
 function onOpenLedgerWindow() {
   if (!props.project) return
-  openLedgerWindow(props.project.id, projectYear.value)
+  openLedgerWindow(props.project.id, projectYear.value ?? undefined)
 }
 
 /**
@@ -1240,7 +1259,6 @@ interface ImportStatusInfo {
   eta: string
 }
 const importStatus = ref<ImportStatusInfo | null>(null)
-let importPollTimer: ReturnType<typeof setInterval> | null = null
 
 const IMPORT_PHASE_LABEL: Record<string, string> = {
   bootstrap: '启动', parsing: '解析', validating: '校验',
@@ -1271,9 +1289,10 @@ const importPhaseTagType = computed<'success' | 'warning' | 'info' | 'danger' | 
   return 'info'
 })
 
-async function pollImportStatus() {
+/** 查一次导入状态；返回「是否有进行中的导入」（决定下一轮 5 秒还是 30 秒，R17） */
+async function pollImportStatus(): Promise<boolean> {
   const pid = props.project?.id
-  if (!pid) { importStatus.value = null; return }
+  if (!pid) { importStatus.value = null; return false }
   try {
     const data: any = await api.get(
       `/api/projects/${pid}/ledger-import/active-job`,
@@ -1288,28 +1307,30 @@ async function pollImportStatus() {
         ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
         : ''
       importStatus.value = { progress: pct, phase, message: msg, eta: etaText }
-    } else {
-      importStatus.value = null
+      return true
     }
+    importStatus.value = null
   } catch {
     importStatus.value = null
   }
+  return false
 }
 
-function startImportPoll() {
-  stopImportPoll()
-  pollImportStatus()
-  importPollTimer = setInterval(pollImportStatus, 5000)
+// R17：有进行中的导入每 5 秒、没有每 30 秒（原先固定每 5 秒）；页面隐藏暂停（原先这里不暂停）
+const importPoll = useAdaptivePoll(pollImportStatus)
+function onImportSubmitted(e: { projectId: string }) {
+  if (e.projectId === props.project?.id) importPoll.poke()
 }
-function stopImportPoll() {
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-}
+eventBus.on('ledger-import:submitted', onImportSubmitted)
 
 watch(() => props.project?.id, (newId) => {
-  if (newId) { startImportPoll() } else { stopImportPoll(); importStatus.value = null }
+  if (newId) { importPoll.start() } else { importPoll.stop(); importStatus.value = null }
 }, { immediate: true })
 
-onUnmounted(() => { stopImportPoll() })
+onUnmounted(() => {
+  importPoll.dispose()
+  eventBus.off('ledger-import:submitted', onImportSubmitted)
+})
 </script>
 
 <style scoped>

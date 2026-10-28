@@ -4,8 +4,10 @@
 spec: f1-sync-coverage-and-first-canary · Task 5
 
 Property 6: F1-2 O/X 与模板数学等价
-  对随机行断言前端 recalcRowFormulas 的 O/X 等于模板 O=E+M-N、X=O+V+W。
-  现状必红（前端 O = calcEndBalance(H, debit, credit) = H+M-N，模板 O=E+M-N）。
+  对随机行断言前端 recalcRowFormulas 的 O/X 等于模板 O=E+M-N、X=Q+V+W。
+  Task 17 时模板 X 列是 =O+V+W（漏了被审计单位重分类 P）；spec
+  oo-writeback-template-parity-closure R1 已把模板修成 =Q+V+W，前端随之回到 Q 起算。
+  模板口径不再写死在本文件：先逐格读权威模板 R14:R34，再按读到的口径做等价判据。
 
 Property 9: prefill 预设 sheet 名与源 tab 逐字一致
   `test_f1_formula_presets.py` 4 条 F1 用例现状红（块[16] 全角国企 vs 半角源 tab）。
@@ -13,6 +15,7 @@ Property 9: prefill 预设 sheet 名与源 tab 逐字一致
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -30,39 +33,47 @@ except ImportError:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+_F1_TEMPLATE = Path(__file__).resolve().parents[2] / "wp_templates" / "F" / "F1 预付账款.xlsx"
+_F1_DETAIL_SHEET = "明细表F1-2"
+#: 数据区 R14:R34 每行的四列公式（{r} = 行号）
+_F1_ROW_FORMULAS = {
+    "H": "=E{r}+F{r}+G{r}",
+    "O": "=E{r}+M{r}-N{r}",
+    "Q": "=O{r}+P{r}",
+    "X": "=Q{r}+V{r}+W{r}",
+}
+
+
+def test_template_detail_formulas_are_the_audited_caliber() -> None:
+    """权威模板 F1-2 数据区四列逐格就是本文件判据用的口径（X 从期末未审 Q 起算）。"""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(_F1_TEMPLATE, data_only=False)
+    try:
+        ws = wb[_F1_DETAIL_SHEET]
+        wrong = [
+            (f"{col}{r}", ws[f"{col}{r}"].value, text.format(r=r))
+            for r in range(14, 35)
+            for col, text in _F1_ROW_FORMULAS.items()
+            if ws[f"{col}{r}"].value != text.format(r=r)
+        ]
+    finally:
+        wb.close()
+    assert not wrong, f"F1-2 模板公式与判据口径不一致（格, 实得, 期望）：{wrong[:5]}"
+
+
 def _template_O(E: float, M: float, N: float) -> float:
     """模板权威公式：O = E + M - N（期初未审 + 借方 - 贷方）。"""
     return E + M - N
 
 
-def _template_X(O: float, V: float, W: float) -> float:
-    """模板权威公式：X = O + V + W（期末余额 + AJE + RJE）。"""
-    return O + V + W
-
-
-def _frontend_H(E: float, F: float, G: float) -> float:
-    """前端 calcPriorAudited：H = E + F + G。"""
-    return E + F + G
-
-
-def _frontend_O_current(H: float, M: float, N: float) -> float:
-    """前端当前 calcEndBalance：O = H + M - N（以期初审定 H 起算）。
-
-    🔴 这与模板 O = E + M - N 在 F≠0 或 G≠0 时不等价。
-    """
-    return H + M - N
-
-
-def _frontend_X_current(Q: float, V: float, W: float) -> float:
-    """前端当前 calcEndAudited：X = Q + V + W（以期末未审 Q 起算）。
-
-    🔴 这与模板 X = O + V + W 在 entityReclass P≠0 时不等价。
-    """
+def _template_X(Q: float, V: float, W: float) -> float:
+    """模板权威公式：X = Q + V + W（期末未审 + AJE + RJE）。"""
     return Q + V + W
 
 
 class TestProperty6FormulaCaliberCurrentState:
-    """现状必红：前端 O/X 与模板 O/X 在 F≠0 或 G≠0 时不等价。"""
+    """前端 O 以期初未审起算（Task 17），与模板一致。"""
 
     def test_o_column_equivalence_with_prior_adjustment(self) -> None:
         """当期初有调整 F≠0 时，修复后前端 O = 模板 O。✅ Task 17 已修复。"""
@@ -97,14 +108,14 @@ class TestProperty6HypothesisPBT:
         self, E: float, F_adj: float, G: float,
         M: float, N: float, P: float, V: float, W: float,
     ) -> None:
-        """随机行：修复后前端 O/X 与模板 O/X 数学等价。✅ Task 17 已修复。"""
+        """随机行：前端 O/X（useF1Detail.recalcRowFormulas 的口径）与模板 O/X 数学等价。"""
         # 模板口径
         template_O = _template_O(E, M, N)
-        template_X = _template_X(template_O, V, W)
+        template_X = _template_X(template_O + P, V, W)
 
-        # 修复后前端口径：O = E + M - N，X = O + V + W
+        # 前端口径：O = E + M - N，Q = O + P，X = Q + V + W
         frontend_O_fixed = E + M - N
-        frontend_X_fixed = frontend_O_fixed + V + W
+        frontend_X_fixed = frontend_O_fixed + P + V + W
 
         assert abs(frontend_O_fixed - template_O) < 0.01, (
             f"O 不等价：frontend={frontend_O_fixed} template={template_O}"

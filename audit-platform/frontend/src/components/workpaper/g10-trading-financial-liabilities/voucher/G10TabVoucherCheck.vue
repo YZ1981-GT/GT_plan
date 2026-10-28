@@ -6,7 +6,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G10-7 交易性金融负债凭证检查表</h3>
       <div class="head-actions">
-        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId" :project-id="projectId" :workpaper-id="wpId" :account-code="G10_SAMPLING_ACCOUNT_CODE" phase="final" :year="auditYear ?? new Date().getFullYear()" @filled="onSampleFilled" />
+        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId && auditYear != null" :project-id="projectId" :workpaper-id="wpId" :account-code="G10_SAMPLING_ACCOUNT_CODE" phase="final" :year="auditYear" @filled="onSampleFilled" />
         <G10ImportExportDropdown :wp-id="wpId" sheet="G10-7" @imported="onImported" />
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button size="small" :disabled="isReadonly" :loading="importingAttached" title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证" @click="importFromAttached">📎 从序时账挂入导入</el-button>
@@ -590,10 +590,10 @@ const importingAttached = ref(false)
 const G10_ACCOUNT_PREFIXES = computed(() =>
   gCycleScope('G10')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross'),
 )
-const attachedYear = computed(() => props.auditYear ?? new Date().getFullYear())
+const attachedYear = computed<number | null>(() => props.auditYear ?? null)
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  if (!props.projectId || !props.wpId || attachedYear.value == null) return
   try {
     const recs = await listAttachedVouchers(props.projectId, attachedYear.value, props.wpId, true)
     attachedCount.value = recs.length
@@ -602,7 +602,10 @@ async function refreshAttachedCount(): Promise<void> {
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  if (props.isReadonly || attachedYear.value == null) {
+    if (attachedYear.value == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

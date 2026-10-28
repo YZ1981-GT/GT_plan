@@ -222,7 +222,8 @@ class WpStandardConversionService(WpConversionGenerateMixin):
             changed_by: 触发切换的用户（用于审计记录，可选）
 
         Returns:
-            ``{"retained": N, "archived": N, "created": N}``
+            ``{"retained", "archived", "created", "restored": N, "restored_codes": [...],
+            "skipped_trimmed_codes": [...], "in_recycle_codes": [...]}``（后两类没有新建，原因见字段名）
         """
         shared_codes = classification.get("shared", []) if classification else []
         source_only_codes = (
@@ -235,33 +236,56 @@ class WpStandardConversionService(WpConversionGenerateMixin):
         # 1. 前置条件检查（任务 3.5）
         await self.check_preconditions(project_id)
 
+        # 1b. 目标独有底稿分流（读不到裁剪结果即抛出，不做任何改动）：已在程序裁剪中标为不执行的不建；
+        #     同码在回收站的不新建（两个唯一索引都不含 is_deleted，新建必撞键）—— 因准则切换移入的恢复原行，
+        #     别的原因移入的（手工删除等）在回执里注明；已存在的跳过
+        from app.services.procedure_scope_retention import load_trimmed_scope, plan_generation
+        from app.services.workpaper_recycle_service import KIND_STANDARD_CONVERSION, restore_from_recycle_bin
+
+        trim_scope = await load_trimmed_scope(self.db, project_id)
+        plan = await plan_generation(self.db, project_id, list(target_only_codes), scope=trim_scope)
+
         # 2. 共有底稿保留（任务 3.2）
         retained = await self._retain_shared_workpapers(
             project_id, shared_codes, new_standard
         )
-        # 3. 源独有底稿归档（任务 3.3）
+        # 3. 源独有底稿归档（任务 3.3；两层移入回收站）
         archived = await self._archive_source_only_workpapers(
-            project_id, source_only_codes, new_standard
+            project_id, source_only_codes, new_standard, changed_by=changed_by
         )
-        # 4. 目标独有底稿创建（任务 3.4）
+        # 4a. 目标独有底稿中因上次准则切换移入回收站的，原样恢复（填写内容随原行回来）
+        restored_codes = await restore_from_recycle_bin(
+            self.db, project_id, plan.in_recycle_codes, kind=KIND_STANDARD_CONVERSION,
+            reason="准则切换后重新适用", actor_user_id=changed_by,
+        ) if plan.in_recycle_codes else []
+        in_recycle_codes = [c for c in plan.in_recycle_codes if c not in set(restored_codes)]
+        # 4b. 目标独有底稿创建（任务 3.4）；逐码结果进统一回执（失败 / 空白册 / 表头没填上）
+        from app.services.wp_generation_receipt import GenerationReceipt
+
+        receipt = GenerationReceipt.from_plan(plan)
+        receipt.in_recycle_codes = list(in_recycle_codes)
         created = await self._create_target_only_workpapers(
-            project_id, target_only_codes, new_standard, changed_by
+            project_id, plan.to_create, new_standard, changed_by, receipt=receipt
         )
 
         # 5. flush（本方法只 flush 不 commit，事务提交由调用方（router）统一管理。）
         await self.db.flush()
 
         logger.info(
-            "convert_workpapers: project=%s retained=%d archived=%d created=%d (changed_by=%s)",
+            "convert_workpapers: project=%s retained=%d archived=%d created=%d restored=%d (changed_by=%s)",
             project_id,
             retained,
             archived,
             created,
+            len(restored_codes),
             changed_by,
         )
 
         # 6. 汇总
-        return {"retained": retained, "archived": archived, "created": created}
+        return {"retained": retained, "archived": archived, "created": created,
+                "restored": len(restored_codes), "restored_codes": restored_codes,
+                **plan.receipt(), "in_recycle_codes": in_recycle_codes,
+                "failures": receipt.failures, "generation_receipt": receipt.to_payload()}
 
     # ------------------------------------------------------------------
     # 内部辅助（分类用，纯查询 / 纯函数）
@@ -377,6 +401,7 @@ class WpStandardConversionService(WpConversionGenerateMixin):
         project_id: UUID,
         source_only_codes: list[str],
         new_standard: dict,
+        changed_by: UUID | None = None,
     ) -> int:
         """源准则独有底稿归档逻辑（soft delete + 记录切换 lineage）。
 
@@ -409,10 +434,11 @@ class WpStandardConversionService(WpConversionGenerateMixin):
         修改，因此本方法在追加 lineage 后对相应字段调用 ``flag_modified`` 显式
         标脏，确保变更被持久化。
 
-        归档语义：
-        - 对每个匹配的 ``WpIndex``（未删除），先归档其名下所有未删除的
-          ``WorkingPaper``（``is_deleted=True`` + 追加 lineage），再归档
-          ``WpIndex`` 本身（``is_deleted=True`` + 追加 lineage）。
+        归档语义（spec procedure-trim-generation-delegation-chain 批 3）：
+        - 对每个匹配的 ``WpIndex``（未删除），给名下未删除的 ``WorkingPaper`` 与索引本身追加上述
+          lineage，再经 ``workpaper_recycle_service.move_to_recycle_bin`` 两层一起移入回收站
+          （``kind=standard_conversion``，记操作人、递增可见性策略纪元）。切回适用该底稿的准则时，
+          ``convert_workpapers`` 只恢复最后一次因准则切换移入的（原行原数据回来）。
         - 不调用 ``db.commit()``（事务提交由编排器 ``convert_workpapers`` 统一
           处理）；仅在写入完成后 ``flush`` 以保证顺序。
 
@@ -421,6 +447,7 @@ class WpStandardConversionService(WpConversionGenerateMixin):
             source_only_codes: 源准则独有底稿的 wp_code 列表
                 （来自 ``classify_workpapers``）
             new_standard: 目标结构化准则（用于派生 conversion_reason 与记录）
+            changed_by: 触发切换的用户（写入回收站去向记录）
 
         Returns:
             实际被归档的 ``WpIndex`` 行数；``source_only_codes`` 为空时返回 0。
@@ -447,9 +474,8 @@ class WpStandardConversionService(WpConversionGenerateMixin):
         )
         wp_indexes = index_result.scalars().all()
 
-        archived_count = 0
         for wp_index in wp_indexes:
-            # 2. 归档该索引名下所有未删除的 WorkingPaper
+            # 2. 该索引名下所有未删除的 WorkingPaper 追加 lineage
             wp_result = await self.db.execute(
                 sa.select(WorkingPaper).where(
                     WorkingPaper.wp_index_id == wp_index.id,
@@ -457,7 +483,6 @@ class WpStandardConversionService(WpConversionGenerateMixin):
                 )
             )
             for wp in wp_result.scalars().all():
-                wp.is_deleted = True
                 parsed_data = dict(wp.parsed_data) if wp.parsed_data else {}
                 lineage = list(parsed_data.get("_conversion_lineage") or [])
                 lineage.append(lineage_entry)
@@ -465,19 +490,25 @@ class WpStandardConversionService(WpConversionGenerateMixin):
                 wp.parsed_data = parsed_data
                 flag_modified(wp, "parsed_data")
 
-            # 3. 归档 WpIndex 本身 + 记录 lineage 到 cross_ref_codes
-            wp_index.is_deleted = True
-            cross_ref = dict(wp_index.cross_ref_codes) if wp_index.cross_ref_codes else {}
+            # 3. WpIndex 本身记录 lineage 到 cross_ref_codes
+            raw = wp_index.cross_ref_codes
+            # 旧形态（交叉引用编码列表）原样保留，与回收站去向记录同一约定
+            cross_ref = dict(raw) if isinstance(raw, dict) else (
+                {"codes": list(raw)} if isinstance(raw, list) and raw else {})
             index_lineage = list(cross_ref.get("_conversion_lineage") or [])
             index_lineage.append(lineage_entry)
             cross_ref["_conversion_lineage"] = index_lineage
             wp_index.cross_ref_codes = cross_ref
             flag_modified(wp_index, "cross_ref_codes")
 
-            archived_count += 1
+        # 4. 两层一起移入回收站（标明因准则切换移入，切回时据此恢复）
+        from app.services.workpaper_recycle_service import KIND_STANDARD_CONVERSION, move_to_recycle_bin
 
-        # 写入完成后 flush 保证顺序（commit 由编排器统一处理）
-        await self.db.flush()
+        moved = await move_to_recycle_bin(
+            self.db, project_id, [x.wp_code for x in wp_indexes], kind=KIND_STANDARD_CONVERSION,
+            reason=f"准则切换为 {new_entity_type}，不适用", actor_user_id=changed_by,
+        ) if wp_indexes else []
+        archived_count = len(moved)
 
         logger.info(
             "_archive_source_only_workpapers: project=%s archived=%d reason=%s",

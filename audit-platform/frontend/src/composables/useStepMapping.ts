@@ -37,7 +37,8 @@ export function useStepMapping(wpId: string) {
     if (!wpId) return
     loading.value = true
     try {
-      const res = await api.get(`/api/workpapers/${wpId}/step-mapping`)
+      // 步骤导航是辅助信息：失败（含无权 / 不存在的底稿 404）只记日志，不弹全局提示（spec procedure-chain-hardening-and-java-contracts R10）
+      const res = await api.get(`/api/workpapers/${wpId}/step-mapping`, { _silent: true } as any)
       data.value = res as StepMappingResponse
     } catch (e) {
       console.warn('Failed to load step mapping:', e)

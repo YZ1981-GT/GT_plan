@@ -96,8 +96,10 @@ async def seeded(db_session: AsyncSession):
     db_session.add_all([
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_A_ID,
                           staff_id=MGR_STAFF_ID, role="manager"),
+        # 团队分配勾选两张底稿的循环：编制人改走底稿主编委派后，被委派人须看得到目标循环
+        # （spec procedure-trim-generation-delegation-chain 任务 12）
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_A_ID,
-                          staff_id=AUD_STAFF_ID, role="auditor"),
+                          staff_id=AUD_STAFF_ID, role="auditor", assigned_cycles=["D循环", "F循环"]),
         # stranger 只在 B 项目
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_B_ID,
                           staff_id=STRANGER_STAFF_ID, role="auditor"),

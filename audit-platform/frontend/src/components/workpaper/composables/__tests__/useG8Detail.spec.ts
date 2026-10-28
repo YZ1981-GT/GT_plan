@@ -57,8 +57,9 @@ describe('C-8 ① 8 条模板公式逐条', () => {
   it('H = E+G（期初审定数）', () => {
     expect(r.openingAdjusted).toBe(125)
   })
-  it('M = I+J+K+L（本期变动合计，🔴 含 OCI 转留存 L）', () => {
-    expect(r.movementTotal).toBe(47)
+  it('M = SUM(I:K)（本期变动合计，不含 OCI 转留存 L），且 E + M = Q', () => {
+    expect(r.movementTotal).toBe(45)
+    expect(r.openingTotal + r.movementTotal).toBe(r.closingTotal)
   })
   it('O = C+I（期末成本，未审线）', () => {
     expect(r.closingCost).toBe(140)
@@ -107,12 +108,24 @@ describe('C-8 ② FVOCI 口径（与 G9/G10 反向）', () => {
     expect(withK.closingOciCumulative).toBe(without.closingOciCumulative)
   })
 
-  it('🔴 OCI 转留存 L 进 M 与 R，但**不**进 P（那是公允价值分量）', () => {
+  it('🔴 OCI 转留存 L 只进 R，不进 M 与 P（权益内部结转，不改变投资账面）', () => {
     const withL = row({ openingFvAccum: 20, openingOciCumulative: 15, ociToRetainedEarnings: -6 })
     const without = row({ openingFvAccum: 20, openingOciCumulative: 15 })
-    expect(withL.movementTotal - without.movementTotal).toBe(-6)
+    expect(withL.movementTotal).toBe(without.movementTotal)
     expect(withL.closingOciCumulative - without.closingOciCumulative).toBe(-6)
     expect(withL.closingFvAccum).toBe(without.closingFvAccum)
+  })
+
+  it('🔴 全额处置：资产侧 I / K 冲减到 0，OCI 侧 L 转出到 0，M 不重复计 L', () => {
+    // 成本 100、累计公允价值变动 20（同额计入 OCI），本期全额处置
+    const r = row({
+      openingCost: 100, openingFvAccum: 20, openingOciCumulative: 20,
+      movementCost: -100, disposalFvTransfer: -20, ociToRetainedEarnings: -20,
+    })
+    expect(r.closingTotal).toBe(0)
+    expect(r.closingOciCumulative).toBe(0)
+    expect(r.movementTotal).toBe(-120)
+    expect(r.openingTotal + r.movementTotal).toBe(r.closingTotal)
   })
 
   it('🔴 股利收入 N 是损益项，不进任何余额', () => {
@@ -267,11 +280,15 @@ describe('C-8 ④ 完整性校验', () => {
     expect(scanG8DetailIntegrity([r]).some((i) => i.field === 'closingOciCumulative')).toBe(true)
   })
 
-  it('🔴 M=I+J+K+L 被破坏时报出，且提示点名「OCI 转入留存收益」', () => {
+  it('🔴 M=I+J+K 被破坏时报出，提示写明不含「OCI 转入留存收益」', () => {
     const r = { ...row({ movementCost: 10, ociToRetainedEarnings: -6 }), movementTotal: 99 }
     const hit = scanG8DetailIntegrity([r]).find((i) => i.field === 'movementTotal')
     expect(hit).toBeTruthy()
-    expect(hit!.message).toContain('OCI')
+    expect(hit!.message).toContain('M=I+J+K')
+    expect(hit!.message).toContain('不含 OCI 转入留存收益')
+    // 按 I+J+K 算出的 M 不报（L 再大也不影响 M）
+    expect(scanG8DetailIntegrity([row({ movementCost: 10, ociToRetainedEarnings: -6 })])
+      .some((i) => i.field === 'movementTotal')).toBe(false)
   })
 
   it('不再产出「Level3 缺估值方法」/「公允合计 ≠ 数量×单价」/「本期OCI≠FV变动」三类', () => {

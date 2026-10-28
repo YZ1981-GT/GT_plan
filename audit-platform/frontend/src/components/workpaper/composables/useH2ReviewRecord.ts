@@ -870,9 +870,10 @@ export function useH2ReviewRecord(options: {
           cipIncrease: _num(r.increaseTotal),
           cipDecrease: _num(r.decrease) + _num(r.transferAmount) + _num(r.transferOut),
           cipEnd: _num(r.cipEnd ?? r.endAudited),
+          // H2-2 存比值（模板 D 列格式 0.00%），核查记录沿用百分数
           completionRate: r.completionRate == null || r.completionRate === ''
             ? null
-            : _num(r.completionRate),
+            : _num(r.completionRate) * 100,
           contractor: String(r.contractor ?? ''),
           supervisor: String(r.supervisor ?? ''),
         }))

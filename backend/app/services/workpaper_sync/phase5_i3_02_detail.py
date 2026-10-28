@@ -3,37 +3,15 @@
 
 spec: `i1-i3-disclosure-positional-identity-and-classification-source` · Task 13 / 15
 
-═══ 🔴 两处模板真实缺陷（两种不同处置）═══
+═══ 两处模板缺陷已修（登记留痕）═══
 
-**缺陷①（IC-14 / ID-3）：`AA23:AD23` 四格引错区间 —— 走覆盖层修**
+**缺陷①（IC-14 / ID-3）**：`AA23:AD23` 四格原为 `=SUM(<列>27:<列>30)`（R27-29 是编制说明
+文本行、R30 超出 max_row）⇒ 减值准备区审定数四列合计恒 0；同行左侧 S23..Z23 都是
+`=SUM(x14:x22)` ⇒ 复制粘贴错误。现已改为 `=SUM(<列>14:<列>22)`。
 
-```
-实际  AA23 = =SUM(AA27:AA30)    AB23/AC23/AD23 同型（各自列）
-应为  AA23 = =SUM(AA14:AA22)    （数据区是 R14-22）
-根因  R27-29 是**编制说明文本行**（B27='编制说明：' / B28 / B29 是说明文字）
-      R30 **超出 max_row(29)**  ⇒ 引用区间完全落在数据区之外
-后果  🔴 **减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0**
-对照  同行左侧 S23..Z23 **全部正确** `=SUM(x14:x22)` ⇒ 四格错法一致 = **复制粘贴错误**
-```
+**缺陷②**：数据区首行 `I14` 原缺公式（I15..I22 都是 `=SUM(Dx:Ex)-Gx`），现已补齐。
 
-🔴 处置 = **模板覆盖层**（FC-5 的**第 5 个**例外；前四个是 `F2-26!J9` / `F5-7!G31` /
-`G5-2` 45 格 / `G5-1!B35`）。`backend/wp_templates/` 字节**不动** ——
-模板是审计准则产物，改字节会破坏与纸质底稿的对应关系，且 sha256 变了会让 6 条 I entry
-的 `source_ref` 全部失效。覆盖层**只替换这 4 格**，R23 其余列一个都不碰。
-
-🔴 **判据载荷必须是「只有减值准备区（R14:R22 的 AA:AD）有数、其他区为 0」** ——
-用「全区都有数」的载荷时修复前后合计都非 0（因 R27:R30 可能被别的公式带出值）⇒ 判据**假绿**；
-用「全区都是 0」则恒真。同时须断言 R23 的**非 AA:AD 列**在覆盖层前后取值**不变**（不误伤）。
-
-**缺陷②（本轮新发现）：`I14` 缺公式 —— 登记不修**
-
-`I15`..`I18` 逐行都是 `=SUM(Dx:Ex)-Gx`，但 **`I14`（数据区首行）是 `None`**
-⇒ 🔴 首行的「商誉原值未审期末」不会自动计算。
-
-处置 = **登记不修**（与缺陷① 的 `overlay_fixed` 是**两种处置**，不得混写）。理由：
-它不是金额算错而是**首行漏公式**，前端 `useI3Detail` 的 `costEnding` 本就按同一套公式重算并落库
-⇒ merge 时该格由 `formula_columns` 的模板重新写入，**实际不影响回写正确性**。
-但仍须登记 —— 否则后来者会以为「I 列公式逐行齐全」。
+两处都改在权威模板字节上（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））—— 原登记的「覆盖层」框架层从未实现。
 
 ═══ 几何（openpyxl 逐格实测）═══
 
@@ -48,12 +26,12 @@ merged **47** / 无 Excel Table / `ws.protection.sheet=False` / 133 公式。
   - 纯 SUM 14 格：E/G/J/K/L/R/S/T/U/V/W/X/Y/Z
   - **套用行公式 5 格**：`I23=SUM(D23:E23)-G23` · `M23=D23+J23` · `N23=E23+K23` ·
     `O23=G23+L23` · `P23=M23+N23-O23`
-  - 🔴 **引错区间 4 格**：AA23/AB23/AC23/AD23（缺陷①）
+  - AA23/AB23/AC23/AD23 原引错区间（缺陷①，已修为 `=SUM(x14:x22)`）
   ⇒ `footer_kind = row_formula_applied` + `footer_convention_split`。
   🔴 照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红**。
 * 🔴 **B 列与 C 列在数据区全空**：`C11='发生日期'` 只是表头、数据区 `C14..C22` 全 None；
   `B` 列**从表头到数据区全空**（间隔列）⇒ 两列都**不进 field_specs**。
-* 公式列（逐行实测 R15 为准，🔴 R14 的 `I` 例外缺失见缺陷②）：
+* 公式列（逐行实测；R14 的 `I` 原缺公式，已修）：
   **I / M / N / O / P / Q / W / AA / AB / AC / AD** 共 11 列
 * `Q` 是**镜像列** `=A{r}`（右表的被投资单位名称镜像左表）⇒ 进 `formula_columns`
   且**不映射 store 字段**（同 I5 区②的 A 列口径）
@@ -109,61 +87,43 @@ ROW_IDENTITY_STORE_KEY_I302: Final[str] = "rowId"
 EMPTY_PAYLOAD_I302: Final[str] = "[]"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. 🔴 两处模板真实缺陷（两种处置，不得混写）
+# 3. 两处模板缺陷（已修模板，登记留痕）
 # ═══════════════════════════════════════════════════════════════════════════
 
-#: 缺陷①：AA23:AD23 四格引错区间 ⇒ **覆盖层修**（FC-5 第 5 个例外）
+#: 缺陷①：AA23:AD23 四格引错区间 ⇒ **已修模板**
 TEMPLATE_DEFECT_AA23_I302: Final[dict[str, object]] = {
     "cells": ["明细表I3-2!AA23", "明细表I3-2!AB23", "明细表I3-2!AC23", "明细表I3-2!AD23"],
-    "actual": "=SUM(<列>27:<列>30)",
+    "was": "=SUM(<列>27:<列>30)",
     "expected": "=SUM(<列>14:<列>22)",
     "root_cause": (
         "R27-29 是**编制说明文本行**（B27='编制说明：' / B28 / B29 是说明文字）；"
         "R30 **超出 max_row(29)** ⇒ 引用区间完全落在数据区（R14-22）之外。"
     ),
-    "effect": "🔴 减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0",
+    "effect": "修复前减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0",
     "evidence_of_copy_paste": "同行左侧 S23..Z23 全部正确 =SUM(x14:x22) ⇒ 四格错法一致",
-    "handling": "overlay_fixed",
-    "handling_note": (
-        "🔴 走**模板覆盖层**（FC-5 的**第 5 个**例外；前四个 F2-26!J9 / F5-7!G31 / "
-        "G5-2 45 格 / G5-1!B35）。`backend/wp_templates/` 字节**不动** —— 模板是审计准则产物，"
-        "改字节会破坏与纸质底稿的对应关系，且 sha256 变了会让 6 条 I entry 的 source_ref 全失效。"
-        "覆盖层**只替换这 4 格**，R23 其余列一个都不碰。"
-    ),
-    "assertion_payload_requirement": (
-        "🔴 判据载荷必须是「**只有减值准备区（R14:R22 的 AA:AD）有数、其他区为 0**」—— "
-        "用「全区都有数」时修复前后合计都非 0（R27:R30 可能被别的公式带出值）⇒ 判据**假绿**；"
-        "用「全区都是 0」则恒真。同时断言 R23 的**非 AA:AD 列**在覆盖层前后取值**不变**（不误伤）。"
-    ),
-    "overlay_formulas": {
-        "AA23": "=SUM(AA14:AA22)",
-        "AB23": "=SUM(AB14:AB22)",
-        "AC23": "=SUM(AC14:AC22)",
-        "AD23": "=SUM(AD14:AD22)",
-    },
+    "handling": "template_fixed",
+    "handling_note": "已改权威模板字节（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。",
 }
 
-#: 缺陷②（本轮新发现）：I14 缺公式 ⇒ **登记不修**
+#: 缺陷②：I14 缺公式 ⇒ **已修模板**
 TEMPLATE_DEFECT_I14_I302: Final[dict[str, object]] = {
     "cells": ["明细表I3-2!I14"],
-    "actual": None,
+    "was": None,
     "expected": "=SUM(D14:E14)-G14",
-    "root_cause": "I15..I18 逐行都有该公式，唯**数据区首行 I14 是 None** ⇒ 首行漏公式",
-    "effect": "首行的「商誉原值未审期末」不会自动计算",
-    "handling": "registered_not_fixed",
-    "handling_note": (
-        "🔴 与缺陷① 的 `overlay_fixed` 是**两种处置，不得混写**。理由：它不是金额算错而是"
-        "**首行漏公式**，前端 `useI3Detail` 的 `costEnding` 本就按同一套公式重算并落库 ⇒ "
-        "merge 时该格由 `formula_columns` 的模板重新写入，**实际不影响回写正确性**。"
-        "但仍须登记 —— 否则后来者会以为「I 列公式逐行齐全」。"
-    ),
+    "root_cause": "I15..I22 逐行都有该公式，唯**数据区首行 I14 是 None** ⇒ 首行漏公式",
+    "effect": "修复前首行的「商誉原值未审期末」不会自动计算",
+    "handling": "template_fixed",
+    "handling_note": "已改权威模板字节（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。",
 }
 
 #: 🔴 footer R23 三种形态混在同一行（照 pure_sum 口径验会假红）
 FOOTER_SHAPE_FACTS_I302: Final[dict[str, object]] = {
     "kind": "row_formula_applied",
     "convention_split": True,
-    "pure_sum_columns": ["E", "G", "J", "K", "L", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+    "pure_sum_columns": [
+        "E", "G", "J", "K", "L", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+        "AA", "AB", "AC", "AD",
+    ],
     "row_formula_applied_columns": ["I", "M", "N", "O", "P"],
     "row_formula_applied_detail": {
         "I23": "=SUM(D23:E23)-G23",
@@ -172,9 +132,9 @@ FOOTER_SHAPE_FACTS_I302: Final[dict[str, object]] = {
         "O23": "=G23+L23",
         "P23": "=M23+N23-O23",
     },
-    "defect_columns": ["AA", "AB", "AC", "AD"],
+    "defect_columns": [],
     "note": (
-        "🔴 **三种形态混在同一 footer 行**：14 格纯 SUM + 5 格套用行公式 + 4 格引错区间（缺陷①）。"
+        "🔴 **两种形态混在同一 footer 行**：18 格纯 SUM + 5 格套用行公式（AA23:AD23 原引错区间，已修）。"
         "照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红**。"
     ),
 }
@@ -194,7 +154,7 @@ CLASSIFICATION_FACTS_I302: Final[dict[str, object]] = {
 
 #: 模板有列、store 侧是前端重算的派生值或镜像 ⇒ 只进 FORMULA_MASK。
 TEMPLATE_ONLY_FORMULA_COLUMNS_I302: Final[tuple[tuple[str, str], ...]] = (
-    ("I", "期末数（原值未审）= SUM(D:E)-G　🔴 R14 缺失见缺陷②"),
+    ("I", "期末数（原值未审）= SUM(D:E)-G"),
     ("M", "期初数（原值审定）= D+J"),
     ("N", "本期增加（原值审定）= E+K"),
     ("O", "本期减少（原值审定）= G+L"),
@@ -272,7 +232,7 @@ FIELD_SPECS_I302: Final[
     ("imp_aje", "X", "editable", "amount", "impAje", "账项调整", "X11"),
 )
 
-#: 公式列 → 数据行公式模板（`{r}` 为行号）。逐字实测自 R15（🔴 R14 的 I 列缺失见缺陷②）。
+#: 公式列 → 数据行公式模板（`{r}` 为行号）。逐字实测自 R14-R22（R14 的 I 列原缺公式，已修模板）。
 #: 🔴 `Q` 是**镜像列** `=A{r}` —— 进 formula_columns 保证 merge 不拿 HTML 的 None 覆盖它。
 #: 🔴 `AB`/`AC` 的口径是**三项相加**（本期增加 = S+Y+T / 本期减少 = U+Z+V），
 #: 抄成两项（S+Y / U+Z）会漏掉「其他增加 T」与「其他减少 V」。

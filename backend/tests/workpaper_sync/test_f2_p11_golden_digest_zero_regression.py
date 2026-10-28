@@ -33,7 +33,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    纯 Excel entry」—— 那描述的是「前端还没有 HTML 面」这个时点事实，
     #    `b60/GtB60HourBudgetPanel.vue` 落地后不再成立。契约是**真的变了**，
     #    不是度量漂移，故更新基线而非改判据形态。
-    "b60.hour_budget.json": "aadb548da7f60e11",
+    # 🔴 2026-10-27 勘误（`aadb548da7f60e11` → 本值，spec oo-writeback-template-parity-closure R3）：
+    #    上一条记的值与任何已提交版本都对不上 —— 加 html_store 的提交 8d7a52059 入库的字节是
+    #    本值，其前一版 42d2f6e6f 是 `91beaa2a…`，之后再无提交改过此文件 ⇒ 当时取样的是未提交草稿，
+    #    本条在 HEAD 上一直是红的。契约内容与上一条描述的变化相同，只改正记录值。
+    "b60.hour_budget.json": "1b100509185361df",
     # 🔴 2026-09-28 更新（`62b589551bd99050` → 本值）：D1-4 三区的 `json_key` 与前端
     #    实际持久化键**不一致**（实测 13 列），契约里的 `json_pointer` 因此全是死指针
     #    —— materialize 取不到值会把 Excel 格写成 `0`/清空，extract 把值写进前端从不读
@@ -62,7 +66,16 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    D1~D7 的契约均因 instrumentation / sheet spec 扩容而变化（各 spec tasks.md
     #    有逐次变更说明），F1 因宿主接桥 + 契约重算而变。这些变化均已由各自 spec
     #    的守卫测试覆盖，此处只同步基线 digest。
-    "d1.notes_receivable_detail.json": "72718e0107925d3e",
+    # 🔴 2026-10-26 更新 d1 / d4 / d5 / d6 / f1 / g7（spec oo-writeback-template-parity-closure R1）：
+    #    这些契约的权威模板按会计口径修了公式（清单 `scripts/fix/fix_template_formula_defects.py`），
+    #    契约里随之变的只有模板 sha / 结构哈希 / 定义哈希与审核依据文本，由各生成器重算。
+    #    d1 / f1 的旧基线在 HEAD 上本就已过期（各自 spec 改契约时未同步本表），一并更新到现值。
+    #    同日第二批：d1 再变（D1-4 G/J 两列改按加减方向对应前端键、D1-15 ④ 改为录入格，
+    #    外加 D1-1 / D1-15 模板公式），d2 / d7 只是模板改公式（`75f1b401…` / `56007587…` /
+    #    `735d194b…` → 现值）。
+    #    同 spec 第三批：d2 的 D2-2 期初审定 H 补模板公式（`prior_audited` 改判 formula、进
+    #    formula_mask）、d6 只是 D6-8 模板改公式（`1d9ff003…` / `eeb454b0…` → 现值）。
+    "d1.notes_receivable_detail.json": "ac919be5ebceffef",
     # 🔴 2026-10-10 更新 d2（`1714d5719d558446` → 本值），两次契约变化一并同步：
     #    ① 299c216a9（10-07）把 `d21-managed` 的 locator 从 TABLE_SHEET_ANCHOR 改为
     #       defined_name_ref，当时未同步本基线（HEAD 上本条已红：`cd80314142ae5bdf`）；
@@ -72,15 +85,34 @@ GOLDEN_BASELINE: dict[str, str] = {
     #       同型。单数 instrumentation 正是 D2 在线编辑失败的根因之一；「契约 sheet 必须被
     #       已发布 instrumentation 覆盖」由 `test_published_instrumentation_covers_contract_sheets.py`
     #       守护。契约是**真的变了**，不是度量漂移，故更新基线。
-    "d2.receivable_detail.json": "56007587080236ac",
-    "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
-    "d4.revenue_detail.json": "58ef8c68b3c74537",
-    "d5.receivables_financing_detail.json": "e2fa67a560a6ac5b",
-    "d6.contract_assets_detail.json": "3e363c45ecf78b8e",
-    "d7.contract_liabilities_detail.json": "735d194bc8072405",
-    "e1.monetary_fund_detail.json": "4a0cf6c928566c96",
-    "f1.prepayment_detail.json": "541bb159890a7e7a",
-    "g7.soe_subsidiary_disclosure.json": "3c992e2f31540f14",
+    "d2.receivable_detail.json": "1943d1d3950f7af0",
+    # 🔴 2026-10-27 更新 d3 / e1（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：
+    #    d3 的旧基线在 HEAD 上本就已过期（c450c3fbf 全循环 provision、1a8f666fe D3-1 审定表进契约
+    #    时未同步本表）；本批又把 D3-6 关联方表的 json_key 改成前端实际存的键（partyName / priorBalance /
+    #    debit / credit / endBalance …），e1 把 E1-2 现金明细与 E1-4 数字货币的 json_key 改成前端键、
+    #    E1-4 序号改 auto_source 并补管 M~Q 五列（模板有表头）。列键（column_key）不变。
+    #    同 spec 批 A2c（`62bb2dd7…` → `04a93e55…`）：D3-4 两区行身份键 rowId → rowKey（前端与导入只写 rowKey），
+    #    区②贷方表头改取 R20、D / E 两列接 counterCheck / remark（原共用区①四列，D 接成备注、E 没管）。
+    #    同 spec 批 B1（→ `6496af76…`）：D3-5 长期挂账表 json 键改前端 customerName / endBalance /
+    #    businessDescription / reason / settlementAmount（字段名守卫报出）。
+    #    同 spec 批 B2a（→ 本值）：D3-7 检查表两区 json 键改前端 date / counterDetailAccount / indexRef，
+    #    核对内容 J..N 改接 checkItems/0..4（boolean，未勾留空）。
+    "d3.prepaid_receipts_detail.json": "eab2db8e3388ddee",
+    "d4.revenue_detail.json": "7b1d6362eeba4a7d",
+    "d5.receivables_financing_detail.json": "b76e345cc29797b5",
+    # 🔴 2026-10-27 同批更新 d6 / d7（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：
+    #    D6-3 由单区改双区（单项 R13-16 / 组合 R18-21，共用 D6-3-rows、按 category 分区），B/C/D 三列
+    #    改接 priorUnadjusted / priorAje / priorRje（原 B 接成 category、priorRje 没接）；
+    #    D7-4 区② 由「期末主要债权人余额分析」R27-36 改接「贷方发生额分析」R21-22（前端 D7-4-credit-rows
+    #    存的是后者），D / E 两列接 counterCheck / remark。
+    #    同 spec 批 B2a（`8d53379f…` / `617ef0d3…` → 现值）：D6-5 按模板 12 列改（J 发生原因 / K 索引号 /
+    #    L 备注，删模板没有的 M / N）；D6-6 区② G 改贷方、H 改支持性文件，两区改两级表头；D7-7 两区按模板
+    #    A..Q 重排（原整表错位）、区② 只有借方金额，核对内容接 checkItems/0..4。
+    "d6.contract_assets_detail.json": "9c03e432e6549433",
+    "d7.contract_liabilities_detail.json": "ce92c2f5a57c8ec1",
+    "e1.monetary_fund_detail.json": "ddfa0e9a7e5379a3",
+    "f1.prepayment_detail.json": "0439591e2e504c74",
+    "g7.soe_subsidiary_disclosure.json": "6fdd12a7e008eb24",
     "h1.disposal_check.json": "e7d6c1b75af2d600",
 }
 

@@ -15,10 +15,13 @@ import type { CategoryRow } from '../useD1DetailCategory'
 
 // ─── Helpers replicating composable logic ────────────────────────────────────
 
-/** Recalculate computed fields for a CategoryRow (mirrors recalcRow in composable) */
+/**
+ * Recalculate computed fields for a CategoryRow (mirrors recalcRow in composable).
+ * 期末未审以期初未审起算（模板 D1-2 的 H = B + F - G，spec oo-formula-recompute-not-tamper R4）。
+ */
 function recalcRow(row: CategoryRow): CategoryRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const currentUnadjusted = calcCurrentUnadjusted(priorAudited, row.currentIncrease, row.currentDecrease)
+  const currentUnadjusted = calcCurrentUnadjusted(row.priorUnadjusted, row.currentIncrease, row.currentDecrease)
   const currentAudited = calcAuditedAmount(currentUnadjusted, row.currentAje, row.currentRje)
   return {
     ...row,

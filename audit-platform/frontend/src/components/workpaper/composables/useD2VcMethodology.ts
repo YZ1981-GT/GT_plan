@@ -20,6 +20,7 @@
 import { ref, computed, watch, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { D2_SAVE_ITEMS_KEY } from './d2InjectionKeys'
 import {
   reliabilityFactor,
@@ -517,31 +518,28 @@ export function useD2VcMethodology(options: UseD2VcMethodologyOptions) {
   async function loadTrialBalanceData(): Promise<void> {
     if (!projectId.value) return
     try {
-      // 获取项目审计年度
-      let year = new Date().getFullYear() - 1
+      // 获取项目审计年度；项目未设置年度时不猜日历年，也不发试算表请求。
+      let year: number | null = null
       try {
         const projRes = await api.get(`/api/projects/${projectId.value}`)
         const proj = projRes?.data ?? projRes
-        if (proj?.audit_year) year = Number(proj.audit_year)
-      } catch { /* fallback */ }
+        const candidate = Number(proj?.audit_year)
+        if (Number.isFinite(candidate) && candidate > 0) year = candidate
+      } catch { /* 项目年度读取失败时保持空态 */ }
+      if (year == null) return
 
-      const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { year },
-      })
-      const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
-      const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
+      const { rows: tbData } = await fetchTrialBalanceRows(projectId.value, { year, accountPrefix: '1122', includeMovement: true })
+      // 本期借方发生额 = 余额表叶子汇总（includeMovement）；端点没有 debit_occurrence / transaction_count（原先恒 0）。
+      // 交易笔数试算表给不出：保留已有笔数（手工录入 / 抽样回填），不覆盖成 0
+      const debitOccurrence = tbSumUnder(tbData, '1122', 'period_debit')
 
-      if (tbRow) {
-        // 本期借方发生额
-        const debitOccurrence = Number(tbRow.debit_occurrence ?? tbRow.debitOccurrence ?? 0)
-        // 交易笔数（如有）
-        const txCount = Number(tbRow.transaction_count ?? tbRow.transactionCount ?? 0)
-
+      if (debitOccurrence != null) {
+        const count = testPopulation.value.count
         testPopulation.value = {
           amount: debitOccurrence,
-          count: txCount || 0,
-          description: txCount > 0
-            ? `本期应收账款借方发生额合计 ${debitOccurrence.toLocaleString()} 元，涉及 ${txCount} 笔交易`
+          count,
+          description: count
+            ? `本期应收账款借方发生额合计 ${debitOccurrence.toLocaleString()} 元，涉及 ${count} 笔交易`
             : `本期应收账款借方发生额合计 ${debitOccurrence.toLocaleString()} 元`,
         }
       }

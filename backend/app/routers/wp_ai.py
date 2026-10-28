@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.services.wp_ai_service import WpAIService
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ async def suggest_fill(
 async def analytical_review(
     wp_id: UUID,
     account_code: str = Query(...),
-    year: int = Query(2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -112,6 +112,7 @@ async def analytical_review(
     if not wp:
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
+    year = await require_project_audit_year(db, wp.project_id, year)
     svc = WpAIService(db)
     return await svc.analytical_review(wp.project_id, account_code, year)
 
@@ -120,7 +121,7 @@ async def analytical_review(
 async def extract_confirmations(
     wp_id: UUID,
     account_code: str = Query(...),
-    year: int = Query(2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -130,6 +131,7 @@ async def extract_confirmations(
     if not wp:
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
+    year = await require_project_audit_year(db, wp.project_id, year)
     svc = WpAIService(db)
     return await svc.extract_confirmations(wp.project_id, account_code, year)
 
@@ -137,7 +139,7 @@ async def extract_confirmations(
 @router.post("/{wp_id}/ai/check-consistency")
 async def check_consistency(
     wp_id: UUID,
-    year: int = Query(2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -147,6 +149,7 @@ async def check_consistency(
     if not wp:
         from fastapi import HTTPException
         raise HTTPException(404, "底稿不存在")
+    year = await require_project_audit_year(db, wp.project_id, year)
     svc = WpAIService(db)
     return await svc.check_wp_report_consistency(wp.project_id, year)
 
@@ -196,7 +199,7 @@ async def ai_audit_conclusion(
     out = await svc.generate_audit_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
         company_name=ctx.get("company_name", ""),
         audited_amount=float(ctx.get("audited_amount") or 0),
         prior_amount=float(ctx.get("prior_amount") or 0),
@@ -234,7 +237,7 @@ async def ai_variance_analysis(
     out = await svc.generate_variance_analysis(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
         company_name=ctx.get("company_name", ""),
         diff_amount=float(ctx.get("diff_amount") or 0),
         diff_direction=str(ctx.get("diff_direction") or ""),
@@ -272,7 +275,7 @@ async def ai_check_conclusion(
     out = await svc.generate_check_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
         check_type=str(ctx.get("check_type") or "检查清单"),
         check_scope=str(ctx.get("check_scope") or ""),
         passed_count=int(ctx.get("passed_count") or passed),
@@ -310,7 +313,7 @@ async def ai_cutoff_conclusion(
     out = await svc.generate_cutoff_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
         cutoff_date=str(ctx.get("cutoff_date") or ""),
         days_before=int(ctx.get("days_before") or 5),
         days_after=int(ctx.get("days_after") or 5),
@@ -364,7 +367,7 @@ async def ai_review_questions(
     base = await svc.generate_audit_conclusion(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
         anomalies="基于风险关注点列出建议",
     )
     text = (base or {}).get("content") or ""
@@ -416,7 +419,7 @@ async def ai_review_reply(
     base = await svc.generate_variance_analysis(
         project_id=wp.project_id,
         wp_code=wp_index.wp_code,
-        year=getattr(wp, "year", None) or 2025,
+        year=await require_project_audit_year(db, wp.project_id, getattr(wp, "year", None)),
     )
     text = (base or {}).get("content") or ""
     return {

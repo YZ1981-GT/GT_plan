@@ -362,10 +362,11 @@
 <script setup lang="ts">
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { fetchTrialBalanceRows, tbRowsUnder, tbNumber } from '@/services/trialBalanceRows'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 import { exportData } from '@/composables/useExcelIO'
 import {
   I2_WORKHOUR_BASIS_OPTIONS,
@@ -452,7 +453,7 @@ const columnViewMode = ref<'compact' | 'full'>('compact')
 const isReadonly = computed(() => Boolean(props.isReadonly))
 const samplingVisible = ref(false)
 const tb6602 = ref<number | null>(null)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const summary = computed(() => summarizeI2WorkHourRows(rows.value))
 const prepValidation = computed(() => validateI2WorkHourPrep(rows.value))
@@ -718,6 +719,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
@@ -752,20 +757,10 @@ function onSamplesFilled(payload: { samples?: any[] }) {
 async function _loadTb6602(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6602' },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let total = 0
-    let hit = false
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (!code.startsWith('6602')) continue
-      hit = true
-      total += Number(item.audited_amount ?? item.unadjusted_amount ?? 0) || 0
-    }
-    tb6602.value = hit ? Math.abs(total) : null
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6602' })
+    const family = tbRowsUnder(rows, '6602')
+    const total = family.reduce((sum, r) => sum + (tbNumber(r.audited_amount) ?? tbNumber(r.unadjusted_amount) ?? 0), 0)
+    tb6602.value = family.length ? Math.abs(total) : null
   } catch {
     tb6602.value = null
   }

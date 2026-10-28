@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 
@@ -467,33 +468,37 @@ class TestMultiItemPartialWriteIsRolledBack:
         for row in obs["store_after"]:
             assert identities_of(row["remark"]) == (KEEP_ID, DROP_ID), row["item_id"]
 
-    def test_registered_why_the_added_row_lands_nowhere_here(
+    def test_registered_added_row_lands_only_in_the_mirrored_item(
         self, snap: dict[str, Any]
     ) -> None:
-        """🔴 **现状登记（两个成因，都已探针实证，都不在本 spec 修复面）**：
+        """🔴 **现状登记**（2026-10-27 spec oo-writeback-template-parity-closure R3 复读重裁）：
 
-        ① **4 / 5 个 item 的追加方向恒空** —— `f3` 声明 5 个 store item，而
-        `store_mirror` 单 item 分支只镜像 `bridge.STORE_ITEM_ID` 那 1 个（`dual_store_fn` 为空）。
-        形态与注册表注释里记的 D4-35 / D1 同族（域外，属 `store_item_registry` 的接线面）。
-        ② **被镜像的那 1 个 item 也没长出新增行** —— 是 **harness 数据**造成的：`F3-5-rows` 的幽灵行
-        锚点字段是 `note_type`，把本 harness 的中文业务名喂进去后经值类型归一变成 `null`
-        （真库实测 remark 为 `[{"rowId": "...", "noteType": null}]`）⇒ 新增行业务名为空 ⇒
-        被幽灵行门正确剔除。这不是缺陷，是「该字段不吃自由文本」。
+        ① **其余 item 的追加方向恒空** —— `f3` 声明的多个 store item 里，`store_mirror` 单 item
+        分支只镜像 `bridge.STORE_ITEM_ID`（`F3-5-rows`）那 1 个（`dual_store_fn` 为空）。
+        形态与注册表注释里记的 D4-35 / D1 同族（域外，属 `store_item_registry` 的接线面，
+        `check_store_item_two_way_parity.KNOWN_UNWIRED` 冻结）。
+        ② **被镜像的 `F3-5-rows` 长出新增行，KEEP 行带上 OO 改过的名称**。原登记把「新增行没长出」
+        归因于 harness 的中文业务名经值类型归一变成 `null` —— 那是误判：真因是回写合并不分表，
+        契约里另外几张表同名的 `note_type` 列（这些表的锚点不是它，值为 null）在本表之后合并，
+        把本表的锚点覆盖成 null（KEEP 行被写成 `{"noteType": null, "ticketNo": null}`，`ticketNo`
+        还是 F3-2 的列），新增行因此被幽灵行门剔除。框架层改为只合本表前缀的键后两处都恢复。
 
-        本条把两件事都钉住：哪天追加方向开始覆盖多 item，或归一口径变了，它会打红并逼迫复读。
+        哪天追加方向开始覆盖其余 item，或本表又被别表覆盖，本条打红并逼迫复读。
         """
         obs = snap["scenarios"]["multi_item_positive_control"]
         with_add = [
             row["item_id"] for row in obs["store_after"] if ADD_ID in identities_of(row["remark"])
         ]
-        assert with_add == [], (
-            "追加方向开始覆盖多 item 了（或幽灵行门 / 值归一口径变了）—— 请复读本条 docstring "
-            f"的两条登记并重裁：{with_add}"
+        assert [item for item in with_add if not item.endswith("F3-5-rows")] == [], (
+            "追加方向开始覆盖多 item 了 —— 请复读本条 docstring 的登记并重裁：" f"{with_add}"
         )
-        # 成因 ② 的直接证据：被镜像的那个 item 的锚点字段在库里就是 null
+        assert len(with_add) == 1, with_add
         mirrored = [row for row in obs["store_after"] if row["item_id"].endswith("F3-5-rows")]
         assert mirrored, [row["item_id"] for row in obs["store_after"]]
-        assert '"noteType": null' in (mirrored[0]["remark"] or ""), mirrored[0]["remark"]
+        rows = {r.get("rowId"): r for r in json.loads(mirrored[0]["remark"] or "[]")}
+        assert rows[KEEP_ID].get("noteType") == "甲公司（在线编辑改过）", rows[KEEP_ID]
+        assert rows[ADD_ID].get("noteType") == "丙公司", rows[ADD_ID]
+        assert "ticketNo" not in rows[KEEP_ID], f"别表（F3-2）的列又被合进 F3-5 了：{rows[KEEP_ID]}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

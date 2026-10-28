@@ -108,11 +108,6 @@ _UNQUALIFIED_BASELINE: dict[str, set[str]] = {
     "workpaper_snapshots.wp_id": {"backend/app/services/wp_version_search_service.py"},
     "workpaper_snapshots.snapshot_data": {"backend/app/services/wp_version_search_service.py"},
     "workpaper_snapshots.trigger_event": {"backend/app/services/wp_version_search_service.py"},
-    # confirmations 无 cycle / year / has_difference（真实列是 confirm_type / diff_amount / status 等）；
-    # confirmation_summary_for_cycle resolver 在 try/except 守卫下降级为「尚未发起函证」。
-    "confirmations.cycle": {"backend/app/services/auto_data_resolvers/_cycle.py"},
-    "confirmations.year": {"backend/app/services/auto_data_resolvers/_cycle.py"},
-    "confirmations.has_difference": {"backend/app/services/auto_data_resolvers/_cycle.py"},
     # knowledge_index 原生 vector 列 `embedding` 仅在 pgvector 扩展 + V043 落地后存在（真库未 CREATE EXTENSION）；
     # PgVectorStore 仅当 VECTOR_STORE_BACKEND 选中且扩展可用时才走此路径，否则降级 PgTextStore（embedding_vector 文本列）。
     "knowledge_index.embedding": {"backend/app/services/vector_store.py"},

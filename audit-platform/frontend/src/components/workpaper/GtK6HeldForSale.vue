@@ -182,9 +182,9 @@
  * Spec: .kiro/specs/k6-held-for-sale/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { k6QueryCodes } from './composables/k6AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
@@ -457,11 +457,10 @@ async function _loadTbData(): Promise<void> {
     // 持有待售资产科目：码集真源 = k6AccountScope.k6QueryCodes（运行态读 render 下发的
     // tb_source_codes）。提成局部常量供 params 与下面的前缀过滤共用，避免调两遍。
     const k6AssetCodes = k6QueryCodes((props.htmlData as any)?.tb_source_codes)
-    const resAsset = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k6AssetCodes[0] || '', year: props.year },
-      _silent: true,
-    } as any)
-    const listAsset: any[] = Array.isArray(resAsset?.data?.data ?? resAsset?.data) ? (resAsset?.data?.data ?? resAsset?.data) : []
+    const listAsset: any[] = (await fetchTrialBalanceRows(props.projectId, {
+      year: props.year,
+      accountPrefix: k6AssetCodes,
+    })).rows
     let uAsset = 0, aAsset = 0
     for (const item of listAsset) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
@@ -475,11 +474,10 @@ async function _loadTbData(): Promise<void> {
 
     // 持有待售负债科目：同上，负债侧走 tb_source_codes.liability
     const k6LiabCodes = k6QueryCodes((props.htmlData as any)?.tb_source_codes?.liability)
-    const resLiab = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k6LiabCodes[0] || '', year: props.year },
-      _silent: true,
-    } as any)
-    const listLiab: any[] = Array.isArray(resLiab?.data?.data ?? resLiab?.data) ? (resLiab?.data?.data ?? resLiab?.data) : []
+    const listLiab: any[] = (await fetchTrialBalanceRows(props.projectId, {
+      year: props.year,
+      accountPrefix: k6LiabCodes,
+    })).rows
     let uLiab = 0, aLiab = 0
     for (const item of listLiab) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

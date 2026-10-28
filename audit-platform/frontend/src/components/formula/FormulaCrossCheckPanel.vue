@@ -184,7 +184,8 @@ const props = withDefaults(defineProps<{
   dialogTitle: string
   form: { label: string; left_ref: string; operator: string; right_ref: string; description: string }
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null / 未传 ⇒ 审核历史不加载 */
+  year?: number | null
   layerTagType: (layer: string) => string
   layerLabel: (layer: string) => string
   /** 当前节点该显示的内置勾稽产出；null = 本节点与内置勾稽无关（formulaIssueHint.issueRunForNode） */

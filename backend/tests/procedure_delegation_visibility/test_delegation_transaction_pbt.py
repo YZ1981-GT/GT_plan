@@ -71,8 +71,12 @@ pytestmark = pytest.mark.skipif(not IS_PG, reason="need PostgreSQL (delegation S
 # ---------------------------------------------------------------------------
 # 局部 setup helpers（复用 _factories；构造一名合法自然人与底稿）
 # ---------------------------------------------------------------------------
-async def _person(s, project, *, scope="D", role="manager"):
-    """项目内唯一 active staff↔user 映射 + scope（合法可委派自然人）。"""
+async def _person(s, project, *, scope="D", role="auditor"):
+    """项目内唯一 active staff↔user 映射 + scope（合法可委派自然人）。
+
+    默认角色由 manager 改为 auditor（spec procedure-trim-generation-delegation-chain 需求 5：主管默认看全部
+    循环、委派不做跨循环校验），跨循环扩权属性要的是受限成员。
+    """
     user = await mk_user(s)
     staff = await mk_staff(s, user_id=user.id)
     await mk_assignment(s, project.id, staff.id, role=role)

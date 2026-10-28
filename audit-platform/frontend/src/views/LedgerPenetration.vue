@@ -1362,6 +1362,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLedgerUrlSync } from '@/composables/useLedgerUrlSync'
 import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
@@ -1406,7 +1407,7 @@ const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
   if (q && q > 2000) return q
-  return new Date().getFullYear() - 1
+  return null
 })
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
@@ -1424,7 +1425,8 @@ interface ProjectInfo { id: string; name: string; client_name?: string; wizard_s
 const projectList = ref<ProjectInfo[]>([])
 const currentProject = ref<ProjectInfo | null>(null)
 const selectedProjectId = ref('')
-const selectedYear = ref(2025)
+// 原先 ref(2025)：下面的 watch(immediate) 立即用路由年度覆盖，路由没带时实际是 null（类型却写成 number）
+const selectedYear = ref<number | null>(null)
 
 // 保持 selectedYear 与路由 query.year 同步（切换年度后选择器显示正确年份）
 watch(year, (newYear) => {
@@ -1525,7 +1527,8 @@ async function loadProjectMaterialityAndPeriod() {
     }
   } catch { /* ignore */ }
   try {
-    // 获取重要性水平（含 performance_materiality）
+    // 获取重要性水平（含 performance_materiality）；项目没填审计年度不拼 year=null
+    if (selectedYear.value == null) return
     const mat = await api.get(
       `${P_mat.get(projectId.value)}?year=${selectedYear.value}`
     )
@@ -1537,7 +1540,8 @@ async function loadProjectMaterialityAndPeriod() {
 
 function onProjectChange(newId: string) {
   if (newId && newId !== projectId.value) {
-    router.push({ path: `/projects/${newId}/ledger`, query: { year: String(selectedYear.value) } })
+    // 年度为空不带 year（原先 String(null) 带成 year=null）
+    router.push({ path: `/projects/${newId}/ledger`, query: selectedYear.value == null ? {} : { year: String(selectedYear.value) } })
   }
 }
 
@@ -1658,6 +1662,10 @@ const validating = ref(false)
 const validateResult = ref<any>(null)
 
 async function runValidation() {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   validating.value = true
   validateDialogVisible.value = true
   validateResult.value = null
@@ -1678,6 +1686,10 @@ const deduping = ref(false)
 
 async function runDedup() {
   if (!projectId.value) return
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   deduping.value = true
   try {
     // 1. 先 dry_run 预览将删除的重复行数
@@ -1953,7 +1965,7 @@ function openImportDialog(options: { autoRecoverActiveJob?: boolean } = {}) {
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
-  importYear.value = selectedYear.value || year.value
+  importYear.value = selectedYear.value || year.value || undefined
   previewResult.value = null
   importedResult.value = null
   uploadToken.value = ''
@@ -3305,6 +3317,7 @@ async function loadBalance() {
 
 /** 从 active dataset 读取金额单位 */
 async function loadAmountUnit() {
+  if (year.value == null) { amountUnit.value = ''; return }
   try {
     const ds = await getActiveLedgerDataset(projectId.value, year.value)
     const unit = ds?.source_summary?.amount_unit || ''

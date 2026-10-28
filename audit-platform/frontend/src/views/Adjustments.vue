@@ -63,6 +63,8 @@
     <!-- 归档横幅 -->
     <ArchivedBanner />
     <ConsolLockedBanner />
+    <!-- 项目没填审计年度：调整分录按年度登记 / 取数，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
     <AiContentPendingBanner :project-id="projectId" />
@@ -654,7 +656,7 @@
     <AdjustmentCollaborationDialog
       v-model="collabDialogVisible"
       :project-id="projectId"
-      :year="selectedYear ?? year ?? 2025"
+      :year="selectedYear ?? year"
       :entry-group-id="collabRow?.entry_group_id || ''"
       :adjustment-no="collabRow?.adjustment_no"
       :account-options="accountOptions"
@@ -689,6 +691,7 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ArrowDown, Reading } from '@element-plus/icons-vue'
 import AdjustmentsHandbookDialog from '@/views/adjustments/AdjustmentsHandbookDialog.vue'
 import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
@@ -785,7 +788,7 @@ const projectId = computed(() => projectStore.projectId)
 const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const yearOptions = computed(() => projectStore.yearOptions)
-const selectedYear = ref(projectStore.year)
+const selectedYear = ref<number | null>(projectStore.year)
 
 // chain-closure-phase3: 复核权限门控
 const { projectCan } = useProjectRole(computed(() => projectId.value || ''))
@@ -836,7 +839,9 @@ const routeYear = computed(() => {
   return Number.isFinite(value) && value > 2000 ? value : null
 })
 const projectYear = ref<number | null>(null)
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
+const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 
 // Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
 const projectIdRef = computed(() => projectId.value || '')
@@ -893,7 +898,8 @@ const impactAccountCount = computed(() => {
 
 // ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
 const impactProjectId = projectId
-const impactYear = computed(() => selectedYear.value ?? 2025)
+// 原先 `selectedYear ?? 2025`：信息栏没选年度时影响预览按 2025 取数
+const impactYear = computed<number | null>(() => selectedYear.value ?? year.value)
 const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpactPreview(impactProjectId, impactYear)
 
 // R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
@@ -1005,6 +1011,10 @@ usePasteImport({
     { key: 'summary', label: '摘要' },
   ],
   onInsert: async (rows) => {
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     // 粘贴的行作为新分录的 line_items 创建
     const lineItems = rows.map(r => ({
       standard_account_code: r.standard_account_code || '',
@@ -1185,14 +1195,18 @@ function formatAdjustmentType(type: string) {
 }
 
 async function ensureProjectYear() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
-  }
   try {
-    projectYear.value = await getProjectAuditYear(projectId.value)
-  } catch {
-    projectYear.value = null
+    if (routeYear.value !== null) {
+      projectYear.value = null
+      return
+    }
+    try {
+      projectYear.value = await getProjectAuditYear(projectId.value)
+    } catch {
+      projectYear.value = null
+    }
+  } finally {
+    yearResolved.value = true
   }
 }
 
@@ -1212,6 +1226,8 @@ async function fetchProjectMeta() {
 }
 
 async function fetchEntries() {
+  // 项目没填审计年度：页头横幅已说明，不发请求（原先把 null 发给后端）
+  if (year.value == null) { entries.value = []; return }
   loading.value = true
   try {
     const opts: any = { page_size: 200 }
@@ -1232,6 +1248,7 @@ async function fetchEntries() {
 }
 
 async function fetchSummary() {
+  if (year.value == null) return
   try {
     summary.value = await getAdjustmentSummary(projectId.value, year.value)
   } catch { /* ignore */ }
@@ -1309,6 +1326,11 @@ function openEditDialog(row: any) {
 }
 
 async function onSubmit() {
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   await submitAdjForm(async () => {
     submitLoading.value = true
     try {
@@ -1322,7 +1344,7 @@ async function onSubmit() {
       } else {
         await createAdjustment(projectId.value, {
           adjustment_type: form.value.adjustment_type,
-          year: year.value,
+          year: y,
           description: form.value.description,
           line_items: form.value.line_items,
         }, { batch_mode: batchMode.value })
@@ -1360,6 +1382,10 @@ function _showImpactFeedback() {
 }
 
 async function onBatchCommit() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   batchCommitting.value = true
   try {
     await batchCommitAdjustments(projectId.value, year.value)
@@ -1376,6 +1402,12 @@ async function onBatchCommit() {
 }
 
 async function onDelete(row: any) {
+  // 撤销删除要按年度重建分录：项目没填审计年度时先说明（此时列表本就取不到分录）
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   await confirmDelete('该分录')
   // 缓存分录数据用于撤销恢复
   const cachedRow = JSON.parse(JSON.stringify(row))
@@ -1389,7 +1421,7 @@ async function onDelete(row: any) {
     undo: async () => {
       await createAdjustment(projectId.value, {
         adjustment_type: normalizeAdjustmentType(cachedRow.adjustment_type),
-        year: year.value,
+        year: y,
         description: cachedRow.description || '',
         line_items: (cachedRow.line_items || []).map((li: any) => ({
           standard_account_code: li.standard_account_code,
@@ -1566,6 +1598,10 @@ function onImported() {
 }
 
 function onExportSummary() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   // P2-9: 导出含协作状态+调整目的列（后端 additive 参数）
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
@@ -1576,6 +1612,10 @@ function onExportSummary() {
 }
 
 async function onExportTemplate(templateType: 'soe' | 'listed' = 'soe') {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   const label = templateType === 'soe' ? '国企版' : '上市版'
 
   // 当前项目版本与所选版本不一致时提醒(避免下错版本)

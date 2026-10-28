@@ -5,10 +5,11 @@ import { describe, it, expect } from 'vitest'
 import { calcCreditBalance, calcAdjustedAmount, calcSubtotal } from '../useF3FormulaEngine'
 
 describe('F3 adjudication formula chain', () => {
-  it('closing unadjusted = opening adjusted + credit - debit', () => {
-    const openingAdj = calcAdjustedAmount(1000, 50, -20) // 1030
-    const closingUnadj = calcCreditBalance(openingAdj, 500, 200)
-    expect(closingUnadj).toBeCloseTo(1030 + 500 - 200, 5)
+  // 模板 F3-2 O = L + M − N：期末未审从期初未审起算，期初调整只进期初审定（生产代码断言见 templateParityDBatch.spec.ts）
+  it('closing unadjusted = opening unadjusted + credit - debit', () => {
+    const openingUnadj = 1000
+    const closingUnadj = calcCreditBalance(openingUnadj, 500, 200)
+    expect(closingUnadj).toBeCloseTo(1000 + 500 - 200, 5)
   })
 
   it('subtotal equals bank + commercial closing adjusted', () => {

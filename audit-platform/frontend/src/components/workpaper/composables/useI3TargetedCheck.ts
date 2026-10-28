@@ -99,7 +99,7 @@ export function useI3TargetedCheck(
   options?: {
     /** I3 父组件契约：逐 item_id 持久化 */
     onSave?: (itemId: string, value: any) => void | Promise<void>
-    asOfYear?: Ref<number> | (() => number)
+    asOfYear?: Ref<number | null> | (() => number | null)
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -107,7 +107,7 @@ export function useI3TargetedCheck(
     : () => allResponses.value
 
   const getYear = () => {
-    if (!options?.asOfYear) return new Date().getFullYear()
+    if (!options?.asOfYear) return null
     return typeof options.asOfYear === 'function'
       ? options.asOfYear()
       : options.asOfYear.value

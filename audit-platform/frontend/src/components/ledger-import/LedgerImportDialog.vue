@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import UploadStep from './UploadStep.vue'
 import DetectionPreview from './DetectionPreview.vue'
 import ColumnMappingEditor from './ColumnMappingEditor.vue'
@@ -252,6 +253,7 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
       }
     )
     jobId.value = (res as { job_id: string }).job_id
+    eventBus.emit('ledger-import:submitted', { projectId: props.projectId })
     currentStep.value = 3
   } catch (err) {
     console.error('提交导入作业失败', err)

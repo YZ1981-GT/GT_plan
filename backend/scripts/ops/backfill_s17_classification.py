@@ -26,7 +26,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.core.config import settings  # noqa: E402
 
 # S9/S10 既有分类的模板版本（保持 S 循环一致）
-_TEMPLATE_VERSION_ID = "d3710183-30cd-44fc-833f-ddc20c5d5606"
+_TEMPLATE_VERSION_ID = "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
 
 # (sheet_name, class_code, class, is_real, is_static, excl_archive, excl_progress)
 _ROWS = [

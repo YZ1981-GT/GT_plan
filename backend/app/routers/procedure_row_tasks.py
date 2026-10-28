@@ -9,8 +9,9 @@ Feature: procedure-delegation-notification / 需求 2.1-2.8, 12.2 / Design C2、
 - ``GET  /api/projects/{project_id}/procedure-row-tasks/materialize-jobs/{job_id}``：查询 job 状态。
 
 约定：service 只 flush；router 显式 commit。这些是**显式 POST 写命令**，非 GET/render 读路径。
-项目级 Delegator 权限守卫（Req 11.4）在 Task 7 统一挂载；本任务先用认证用户 + 项目锚点校验，
-service 已校验 wp_index 属于本项目（拒绝跨项目物化）。
+项目级 Delegator 权限守卫（Req 11.4）：原文说「在 Task 7 统一挂载」，实际一直没挂（只要求登录，任何登录用户都能给任意
+项目物化任务）—— spec procedure-chain-followup-closure R2.3 补上 ``require_project_delegator``；service 另校验
+wp_index 属于本项目（拒绝跨项目物化）。
 """
 
 from __future__ import annotations
@@ -28,10 +29,10 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.procedure_models import ProcedureRowTask
 from app.services.procedure_authorization import (
-    assert_sod_distinct,
     assert_task_in_project,
     ensure_project_delegator,
     normalize_staff_to_user,
+    require_project_delegator,
     require_staff_active_user,
 )
 from app.services.procedure_review_service import ProcedureReviewService
@@ -62,8 +63,9 @@ async def materialize_row_tasks(
     body: MaterializeRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _guard=Depends(require_project_delegator),
 ):
-    """显式物化 ProcedureRowTask（批量 active partial unique upsert）。"""
+    """显式物化 ProcedureRowTask（批量 active partial unique upsert）。只给本项目委派人（原先只要求登录）。"""
     svc = ProcedureTaskMaterializationService(db)
     result = await svc.materialize(
         project_id,
@@ -82,8 +84,9 @@ async def create_materialize_job(
     body: MaterializeRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _guard=Depends(require_project_delegator),
 ):
-    """同步物化（兼容旧 materialize-jobs POST 签名，直接返回 succeeded）。
+    """同步物化（兼容旧 materialize-jobs POST 签名，直接返回 succeeded）。只给本项目委派人（原先只要求登录）。
 
     procedure-mainline-convergence Task 4.2: 不再经进程内 job store 注册/追踪；
     同步执行完毕后返回 ``{status: "succeeded", ...result}``。
@@ -154,6 +157,48 @@ class TransitionRequest(BaseModel):
     evidence_snapshot: list | None = None
     due_at: datetime | None = None
     open_issue_count: int = 0
+    # 分配 / 转派：被委派人可见范围不含该循环（400 out_of_scope）时带理由重试 ⇒ 同事务扩大其可见范围
+    expand_scope: bool = False
+    scope_reason: str | None = Field(default=None, max_length=500)
+
+
+async def _delegate_row_task(db: AsyncSession, project_id: UUID, task: ProcedureRowTask, body, user, action: str) -> dict:
+    """分配 / 转派（spec procedure-trim-generation-delegation-chain 需求 4）：只能委派保留项（已裁 / 在回收站
+    409），被委派人须看得到该循环（400 out_of_scope，可带理由扩权）；经协调器同事务写任务与可见性副作用，
+    与批量委派同一路径（原先直调状态机，不记统一委派历史、不递增可见性策略版本）。"""
+    from app.services.procedure_delegation_scope import ROW_DELEGATION_REJECTED
+    from app.services.procedure_delegation_service import ProcedureDelegationService
+    from app.services.wp_visibility.delegation_guard import DelegationError
+
+    if body.new_assignee_staff_id is None:
+        raise HTTPException(status_code=422, detail=f"{action} 需要 new_assignee_staff_id")
+    svc = ProcedureDelegationService(db)
+    coordinator = svc.coordinator
+    try:
+        wp_index = await coordinator.visibility.assert_row_task_delegable(project_id, task)
+    except DelegationError as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.http_detail(ROW_DELEGATION_REJECTED)) from exc
+    await require_staff_active_user(db, body.new_assignee_staff_id)
+    reviewer = body.new_reviewer_staff_id if action == "assign" else None
+    demands = svc.scope_demands(
+        {action: [task]}, assignee_staff_id=body.new_assignee_staff_id, reviewer_staff_id=reviewer,
+        cycle_of={task.wp_index_id: (wp_index.audit_cycle or "").strip()},
+    )
+    await svc.enforce_scope(
+        project_id, demands, expand_scope=body.expand_scope, scope_reason=body.scope_reason,
+        actor_user_id=user.id, request_id=body.request_id,
+    )
+    if action == "assign":
+        return await coordinator.assign(
+            task, project_id=project_id, new_assignee_staff_id=body.new_assignee_staff_id,
+            actor_user_id=user.id, request_id=body.request_id, new_reviewer_staff_id=body.new_reviewer_staff_id,
+            due_at=body.due_at, reason=body.reason, expected_lock_version=body.expected_lock_version,
+        )
+    return await coordinator.reassign(
+        task, project_id=project_id, new_assignee_staff_id=body.new_assignee_staff_id,
+        actor_user_id=user.id, reason=body.reason or "", request_id=body.request_id,
+        expected_lock_version=body.expected_lock_version,
+    )
 
 
 @router.post("/{project_id}/procedure-row-tasks/{task_id}/transitions")
@@ -209,38 +254,8 @@ async def transition_row_task(
 
     svc = ProcedureTaskTransitionService(db)
 
-    if action == "assign":
-        if body.new_assignee_staff_id is None:
-            raise HTTPException(status_code=422, detail="assign 需要 new_assignee_staff_id")
-        await require_staff_active_user(db, body.new_assignee_staff_id)
-        await assert_sod_distinct(
-            db, body.new_assignee_staff_id, body.new_reviewer_staff_id or task.reviewer_staff_id
-        )
-        result = await svc.assign(
-            task,
-            new_assignee_staff_id=body.new_assignee_staff_id,
-            actor_user_id=user.id,
-            actor_role=actor_role,
-            request_id=body.request_id,
-            new_reviewer_staff_id=body.new_reviewer_staff_id,
-            due_at=body.due_at,
-            expected_lock_version=body.expected_lock_version,
-            reason=body.reason,
-        )
-    elif action == "reassign":
-        if body.new_assignee_staff_id is None:
-            raise HTTPException(status_code=422, detail="reassign 需要 new_assignee_staff_id")
-        await require_staff_active_user(db, body.new_assignee_staff_id)
-        await assert_sod_distinct(db, body.new_assignee_staff_id, task.reviewer_staff_id)
-        result = await svc.reassign(
-            task,
-            new_assignee_staff_id=body.new_assignee_staff_id,
-            actor_user_id=user.id,
-            reason=body.reason or "",
-            actor_role=actor_role,
-            request_id=body.request_id,
-            expected_lock_version=body.expected_lock_version,
-        )
+    if action in ("assign", "reassign"):
+        result = await _delegate_row_task(db, project_id, task, body, user, action)
     elif action == "acknowledge":
         result = await svc.acknowledge(
             task,

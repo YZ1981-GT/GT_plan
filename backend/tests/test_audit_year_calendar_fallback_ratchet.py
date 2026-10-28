@@ -28,83 +28,37 @@ APP = Path(__file__).resolve().parents[1] / "app"
 _TODAY_FUNCS = frozenset({"now", "utcnow", "today"})
 _PARAM_MARKERS = frozenset({"Query", "Field", "Form", "Body", "Path", "Header", "Cookie"})
 
-#: 2026-10-25 冻结时的总数（挪动可以，净增不行）
-FROZEN_TOTAL_CAP = 130
+#: 冻结时的总数（挪动可以，净增不行）。
+#: 2026-10-25 冻结 130；任务 2.2 CALENDAR 日历用途 17 处移入豁免表 → 113。
+#: 任务 5.2 全部 literal 命中清零 + 并发会话已修 → 22。
+#: 任务 6.1：16 处审计年度兜底清零 + 4 处日历移入豁免 → 基线清空。
+FROZEN_TOTAL_CAP = 0
 
-#: 2026-10-25 现算冻结（相对 backend/app）：只许变小
-BASELINE: dict[str, int] = {
-    "routers/account_note_mapping.py": 1,
-    "routers/aging_analysis.py": 1,
-    "routers/analytical_review_save.py": 2,
-    "routers/audit_check.py": 1,
-    "routers/consistency.py": 2,
-    "routers/data_fetch_custom.py": 1,
-    "routers/data_quality.py": 1,
-    "routers/data_validation.py": 1,
-    "routers/deliverable.py": 2,
-    "routers/disclosure_notes.py": 1,
-    "routers/eqcr/independence.py": 1,
-    "routers/eqcr/metrics.py": 1,
-    "routers/eqcr_snapshot.py": 3,
-    "routers/eqcr_trends.py": 1,
-    "routers/excel_html.py": 5,
-    "routers/import_intelligence.py": 3,
-    "routers/import_templates.py": 1,
-    "routers/independence.py": 1,
-    "routers/l8_financial_expenses.py": 1,
-    "routers/ledger_datasets.py": 4,
-    "routers/m1_dividends_payable.py": 1,
-    "routers/m6_retained_earnings.py": 1,
-    "routers/note_ai.py": 4,
-    "routers/note_data_lock.py": 2,
-    "routers/note_section_lock.py": 1,
-    "routers/procedures.py": 1,
-    "routers/project_config.py": 1,
-    "routers/qc_vr_heatmap.py": 1,
-    "routers/reclassification.py": 1,
-    "routers/report_config.py": 2,
-    "routers/report_trace.py": 1,
-    "routers/reports.py": 1,
-    "routers/workflow_status.py": 1,
-    "routers/wp_ai.py": 9,
-    "routers/wp_data_rules.py": 8,
-    "routers/wp_editor_router.py": 3,
-    "routers/wp_explanation.py": 3,
-    "routers/wp_functional_actions.py": 2,
-    "routers/wp_prefill_preview.py": 2,
-    "routers/wp_procedure_tables.py": 4,
-    "routers/wp_render_strategies/_analytical_review.py": 1,
-    "routers/wp_render_strategies/_g10_disclosure_io.py": 2,
-    "routers/wp_render_strategies/_h4_engineering_materials.py": 1,
-    "routers/wp_render_strategies/_l8_financial_expenses.py": 2,
-    "routers/wp_template.py": 4,
-    "services/account_chart_service.py": 1,
-    "services/client_quality_trend_service.py": 1,
-    "services/continuous_audit_service.py": 1,
-    "services/dashboard_aggregator_service.py": 2,
-    "services/data_validation_engine.py": 1,
-    "services/eqcr_independence_service.py": 2,
-    "services/gate_rules_chain.py": 3,
-    "services/group_note_baseline_service.py": 1,
-    "services/ledger_import/pipeline.py": 1,
-    "services/ledger_import/year_detector.py": 1,
-    "services/linkage_facade_service.py": 4,
-    "services/m4_capital_reserve_service.py": 1,
-    "services/m5_surplus_reserve_service.py": 1,
-    "services/m6_retained_earnings_service.py": 1,
-    "services/n1_deferred_tax_assets_service.py": 1,
-    "services/private_storage_service.py": 2,
-    "services/qc_engine.py": 1,
-    "services/risk_summary_service.py": 1,
-    "services/smart_import_engine.py": 2,
-    "services/template_engine.py": 2,
-    "services/wp_conversion/_generate.py": 1,
-    "services/wp_disclosure_sync_service.py": 1,
-    "services/wp_fill/_data_gen.py": 1,
-    "services/wp_fill/_note_draft.py": 1,
-    "services/wp_header_data_service.py": 1,
-    "services/wp_header_service.py": 1,
+#: 日历用途豁免表（spec 任务 2.2 + 6.1）：趋势图终点、EQCR 指标当年、导入年度探测默认值、
+#: 独立性声明当年、递延税计算到期年等，本就该取今天的年份而非审计年度。
+#: 豁免须可证伪：文件仍命中扫描口径。
+CALENDAR_YEAR_EXEMPT: dict[str, tuple[int, str]] = {
+    "routers/eqcr/independence.py": (1, "独立性声明端点年度默认当年"),
+    "routers/eqcr/metrics.py": (1, "EQCR 指标默认年度（当年）"),
+    "routers/eqcr_snapshot.py": (3, "EQCR 快照默认年度（审上年 ×3 端点）"),
+    "routers/eqcr_trends.py": (1, "趋势图终点年度"),
+    "routers/import_intelligence.py": (3, "导入智能分析端点 Query(2025)（年度探测）"),
+    "routers/import_templates.py": (1, "导入模板端点 Query(2025)（年度探测）"),
+    "routers/independence.py": (1, "独立性声明待签项目列表按当年过滤"),
+    "routers/wp_render_strategies/_g10_disclosure_io.py": (2, "G10 披露 IO 空模板工作簿表头年度"),
+    "services/client_quality_trend_service.py": (1, "客户质量趋势终点"),
+    "services/dashboard_aggregator_service.py": (2, "看板审计年度兜底（无 audit_period_end 时）"),
+    "services/eqcr_independence_service.py": (2, "年度独立性声明查询/提交按当年"),
+    "services/ledger_import/pipeline.py": (1, "导入管线年度兜底"),
+    "services/ledger_import/year_detector.py": (1, "导入年度探测 P5 默认值"),
+    "services/n1_deferred_tax_assets_service.py": (1, "可弥补亏损到期计算须用真实当前年度"),
+    "services/smart_import_engine.py": (2, "智能导入年度探测兜底（2 处）"),
 }
+
+#: 现算冻结（相对 backend/app）：只许变小。CALENDAR 类已移入 CALENDAR_YEAR_EXEMPT。
+#: 任务 5.2 清零全部 literal 命中；并发会话已清零的同步下调。
+#: 任务 6.1：16 处审计年度兜底改单一来源（清零），4 处日历用途移入豁免表。基线清空。
+BASELINE: dict[str, int] = {}
 
 
 def _dotted(node: ast.AST) -> str:
@@ -261,13 +215,18 @@ class TestScannerRules:
         assert n_files > 1000, f"backend/app 只扫到 {n_files} 个 .py ⇒ 扫描根写错"
 
 
+def _expected_count(rel: str) -> int:
+    """文件的期望总数 = 基线 + 豁免。"""
+    return BASELINE.get(rel, 0) + (CALENDAR_YEAR_EXEMPT.get(rel, (0,))[0])
+
+
 class TestRatchet:
     def test_no_new_occurrences(self):
         _n, found = scan_app()
         grown = [
-            f"{rel}：基线 {BASELINE.get(rel, 0)} → 现算 {sum(c.values())}（{dict(c)}）"
+            f"{rel}：期望 {_expected_count(rel)}（基线 {BASELINE.get(rel, 0)} + 豁免 {CALENDAR_YEAR_EXEMPT.get(rel, (0,))[0]}）→ 现算 {sum(c.values())}（{dict(c)}）"
             for rel, c in sorted(found.items())
-            if sum(c.values()) > BASELINE.get(rel, 0)
+            if sum(c.values()) > _expected_count(rel)
         ]
         assert not grown, (
             "审计年度请经 app.services.project_audit_year 取，取不到如实报错，不要用今年 / 写死年度兜底；"
@@ -277,9 +236,9 @@ class TestRatchet:
     def test_baseline_only_shrinks(self):
         _n, found = scan_app()
         stale = [
-            f"{rel}：基线 {n} → 现算 {sum(found.get(rel, Counter()).values())}"
+            f"{rel}：期望 {n + CALENDAR_YEAR_EXEMPT.get(rel, (0,))[0]} → 现算 {sum(found.get(rel, Counter()).values())}"
             for rel, n in sorted(BASELINE.items())
-            if sum(found.get(rel, Counter()).values()) < n
+            if sum(found.get(rel, Counter()).values()) < n + CALENDAR_YEAR_EXEMPT.get(rel, (0,))[0]
         ]
         assert not stale, "已修掉的请把基线下调到现算值（为 0 删掉条目）：\n  " + "\n  ".join(stale)
 
@@ -287,3 +246,17 @@ class TestRatchet:
         assert list(BASELINE) == sorted(BASELINE), "基线键须排序"
         assert all(isinstance(n, int) and n > 0 for n in BASELINE.values())
         assert sum(BASELINE.values()) <= FROZEN_TOTAL_CAP, "基线总数超过冻结值（挪动可以，净增不行）"
+
+    def test_exempt_table_falsifiable(self):
+        """豁免的文件仍命中扫描口径（可证伪）。"""
+        _n, found = scan_app()
+        missing = [
+            f"{rel}：豁免了 {cnt} 处但扫描结果为 0（豁免失效）"
+            for rel, (cnt, _reason) in sorted(CALENDAR_YEAR_EXEMPT.items())
+            if not found.get(rel)
+        ]
+        assert not missing, "豁免的文件已不命中扫描口径，请从豁免表中删除：\n  " + "\n  ".join(missing)
+
+    def test_exempt_table_well_formed(self):
+        assert list(CALENDAR_YEAR_EXEMPT) == sorted(CALENDAR_YEAR_EXEMPT), "豁免表键须排序"
+        assert all(isinstance(cnt, int) and cnt > 0 for cnt, _reason in CALENDAR_YEAR_EXEMPT.values())

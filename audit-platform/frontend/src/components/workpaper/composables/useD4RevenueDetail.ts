@@ -46,7 +46,7 @@ export interface RevenueDetailRow {
 }
 
 /** Stored row (without computed fields) */
-interface StoredRevenueRow {
+export interface StoredRevenueRow {
   rowId: string
   product: string
   months: number[]
@@ -102,7 +102,7 @@ function safeParseRows(jsonStr: string | null | undefined): StoredRevenueRow[] {
 /**
  * Compute full RevenueDetailRow from stored data (apply formulas)
  */
-function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
+export function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
   const months = stored.months.length === 12 ? stored.months : [...EMPTY_MONTHS]
   const periodTotal = calcMonthlyTotal(months)
   const audited = calcAuditedWithAdj(periodTotal, stored.auditAdjustment)
@@ -136,11 +136,11 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
   const { allResponses, isReadonly, projectId } = options
   const readonly = isReadonly ?? ref(false)
 
-  // 审计年度（主入口 provide('d4AuditYear')），回退"当前年-1"
-  const injectedAuditYear = inject<Ref<number> | null>('d4AuditYear', null)
-  function resolveAuditYear(): number {
+  // 审计年度由主入口 provide('d4AuditYear') 提供；缺失时保持空态，不猜日历年。
+  const injectedAuditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
+  function resolveAuditYear(): number | null {
     const y = injectedAuditYear?.value
-    return y && y > 0 ? y : new Date().getFullYear() - 1
+    return y && y > 0 ? y : null
   }
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null

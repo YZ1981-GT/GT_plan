@@ -7,8 +7,8 @@
  * 核心特色：
  *   - 三区块审定表：净值 = 原值 - 坏账准备（逐行跨区块联动）
  *   - ECL双组合测算：应计提 = 余额 × 损失率；差异 = 应计提 - 账面余额
- *   - 借方科目：期末未审 = 期初审定 + 借方发生 - 贷方发生
- *   - 减值准备变动：期末未审 = 期初审定 + 计提 + 其他增加 - 转回 - 核销 - 其他减少
+ *   - 借方科目：期末未审 = 期初未审 + 借方发生 - 贷方发生（D6-2 Q 列，调用方传期初未审）
+ *   - 减值准备变动：期末未审 = 期初未审 + 计提 + 其他增加 - 转回 - 核销 - 其他减少（D6-3 K 列）
  *
  * Spec: .kiro/specs/d6-contract-assets/
  * Requirements: 1.4, 2.3, 2.4, 2.5, 5.4, 8.3, 10.3, 13.3
@@ -31,13 +31,13 @@ export function parseNum(val: string | number | null | undefined): number {
 // ─── 审定表基础公式（D6-1 / D6-2 / D6-3 通用）────────────────────────────────
 
 /**
- * 借方科目期末未审 = 期初审定 + 借方发生 - 贷方发生
+ * 借方科目期末未审 = 期初 + 借方发生 - 贷方发生
  *
- * D6核心公式，适用于D6-2明细表第17列、D6-5关联方期末余额等。
+ * D6核心公式，适用于D6-2明细表第17列（Q = G + O - P，调用方传期初未审）、D6-5关联方期末余额等。
  * 借方科目特征：借方增加、贷方减少。
  */
-export function calcEndUnadjustedDebit(priorAudited: number, debit: number, credit: number): number {
-  return priorAudited + debit - credit
+export function calcEndUnadjustedDebit(priorBalance: number, debit: number, credit: number): number {
+  return priorBalance + debit - credit
 }
 
 /**
@@ -150,20 +150,21 @@ export function calcBlockTotal(subtotal: number, nonCurrentDeduction: number): n
 // ─── 减值准备明细公式（D6-3）────────────────────────────────────────────────
 
 /**
- * 减值准备期末未审 = 期初审定 + 计提 + 其他增加 - 转回 - 核销 - 其他减少
+ * 减值准备期末未审 = 期初未审 + 计提 + 其他增加 - 转回 - 核销 - 其他减少
  *
- * D6-3减值准备明细表行内公式（期末未审列）。
- * 完整公式链：期初审定=未审+AJE+RJE → 期末未审=本函数 → 期末审定=期末未审+AJE+RJE
+ * D6-3减值准备明细表行内公式（期末未审列，模板 K = B+SUM(F:G)-SUM(H:J)）。
+ * 第一个参数传**期初未审**（模板从 B 列起算；原先调用方传期初审定，spec
+ * oo-writeback-template-parity-closure R2 改）。期末审定 = 期末未审 + AJE + RJE。
  */
 export function calcImpairmentEndUnadjusted(
-  priorAudited: number,
+  priorUnadjusted: number,
   provision: number,
   otherIncrease: number,
   reversal: number,
   writeOff: number,
   otherDecrease: number
 ): number {
-  return priorAudited + provision + otherIncrease - reversal - writeOff - otherDecrease
+  return priorUnadjusted + provision + otherIncrease - reversal - writeOff - otherDecrease
 }
 
 // ─── 关联方检查公式（D6-5）──────────────────────────────────────────────────

@@ -376,7 +376,13 @@ async function checkNoteConsistency(silent = false) {
   if (!props.projectId) return
   noteCheckState.value = 'loading'
   try {
-    const year = auditYear.value || new Date().getFullYear()
+    const year = auditYear.value
+    if (year == null) {
+      noteCheckState.value = 'missing'
+      noteCheckMessage.value = '未设置审计年度，无法核对附注'
+      if (!silent) ElMessage.warning(noteCheckMessage.value)
+      return
+    }
     const res: any = await api.get(
       `/api/disclosure-notes/${props.projectId}/${year}/${noteSectionId}`,
       { _silent: true } as any,

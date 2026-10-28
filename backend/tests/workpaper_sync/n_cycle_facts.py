@@ -601,7 +601,7 @@ REGISTERED_ADAPTER_ENTRY_IDS: frozenset[str] = frozenset({N4})
 #:    仅 N4 的模板允许「现算 != slice 冻结值」，其余 N 册仍逐值相等。
 SANITIZED_TEMPLATE_WORKBOOKS: frozenset[str] = frozenset({"N4 税金及附加.xlsx"})
 N4_SANITIZED_TEMPLATE_SHA256 = (
-    "2005eada32506e9e2b1b6f68c704ca4f6626b8a78e9e2a3a221ca00602cad638"
+    "28e4b30f1c3f6123860a10989318e40304b7004272e78df835e6029ec39fcc08"
 )
 #: 净化后 N4 模板的现算事实（size 55903→46325；5 个外部引用公式在隐藏「原底稿」册被
 #:    中性化 ⇒ formula_cells 236→231、sheets_with_formula 7→6；sheet_count 9 不变；

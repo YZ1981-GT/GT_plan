@@ -38,7 +38,7 @@ export interface CategoryRow {
   priorAudited: number   // = prior + aje + rje (自动计算)
   currentIncrease: number
   currentDecrease: number
-  currentUnadjusted: number  // 自动计算: = priorAudited + currentIncrease - currentDecrease
+  currentUnadjusted: number  // 自动计算: = priorUnadjusted + currentIncrease - currentDecrease（模板 H = B + F - G）
   currentAje: number
   currentRje: number
   currentAudited: number // = currentUnadjusted + aje + rje (自动计算)
@@ -94,10 +94,14 @@ const DEFAULT_FIXED_ROWS: CategoryRow[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** 重算行内公式字段 */
-function recalcRow(row: CategoryRow): CategoryRow {
+/**
+ * 重算行内公式字段（与权威模板「原值明细表（按类别）D1-2」一致：H = B + F - G）。
+ * 🔴 期末未审以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。同 F1-2 裁决 F1-H3。
+ */
+export function recalcRow(row: CategoryRow): CategoryRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const currentUnadjusted = calcCurrentUnadjusted(priorAudited, row.currentIncrease, row.currentDecrease)
+  const currentUnadjusted = calcCurrentUnadjusted(row.priorUnadjusted, row.currentIncrease, row.currentDecrease)
   const currentAudited = calcAuditedAmount(currentUnadjusted, row.currentAje, row.currentRje)
   return {
     ...row,

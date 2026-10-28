@@ -108,7 +108,7 @@
    "template_ref": {
     "workbook": "M1 应付股利（利润）.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
+    "sha256": "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d",
     "sheet_count": 11,
     "in_runtime_index": true,
     "formula_cells": 338,
@@ -246,7 +246,7 @@
    "template_ref": {
     "workbook": "M2 实收资本（股本）.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
+    "sha256": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",
     "sheet_count": 11,
     "in_runtime_index": true,
     "formula_cells": 574,
@@ -408,7 +408,7 @@
    "template_ref": {
     "workbook": "M3 库存股.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
+    "sha256": "ec8448c9df0fc5ae93f83fd2016e2ab26091e38749397595f66da818e9162115",
     "sheet_count": 10,
     "in_runtime_index": true,
     "formula_cells": 255,
@@ -553,7 +553,7 @@
    "template_ref": {
     "workbook": "M4 资本公积.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
+    "sha256": "40a8fa32902252105c2fe06409f6366a83881c305d97c7a08419f0fc84596a0a",
     "sheet_count": 9,
     "in_runtime_index": true,
     "formula_cells": 193,
@@ -695,7 +695,7 @@
    "template_ref": {
     "workbook": "M5 盈余公积.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
+    "sha256": "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316",
     "sheet_count": 10,
     "in_runtime_index": true,
     "formula_cells": 193,
@@ -830,7 +830,7 @@
    "template_ref": {
     "workbook": "M6 未分配利润.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
+    "sha256": "bedd8b0799b4170b06e0257e9a19e3a5ea5585dae02704231bf93a57cf830bf5",
     "sheet_count": 10,
     "in_runtime_index": true,
     "formula_cells": 175,
@@ -966,7 +966,7 @@
    "template_ref": {
     "workbook": "M7 专项储备.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
+    "sha256": "9604cf8805dbf0446853c3f718bab1f7e0f126002c4df4bf468d04923086dbfc",
     "sheet_count": 10,
     "in_runtime_index": true,
     "formula_cells": 233,
@@ -1109,7 +1109,7 @@
    "template_ref": {
     "workbook": "M8 一般风险准备.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
+    "sha256": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
     "sheet_count": 11,
     "in_runtime_index": true,
     "formula_cells": 227,
@@ -1251,7 +1251,7 @@
    "template_ref": {
     "workbook": "M9 其他综合收益.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+    "sha256": "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66",
     "sheet_count": 9,
     "in_runtime_index": true,
     "formula_cells": 470,
@@ -1396,7 +1396,7 @@
    "template_ref": {
     "workbook": "M10 其他权益工具.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "1047d8edffb5369b83a2b16d2c80fe7b5ae530179a7de80b1005f318eab22499",
+    "sha256": "073d75ae83274d4d54147934b5a4ef2b00d4be5c8a020b7cd074a99613ac8077",
     "sheet_count": 11,
     "in_runtime_index": true,
     "formula_cells": 279,
@@ -1521,80 +1521,80 @@
   "files": [
    {
     "name": "M1 应付股利（利润）.xlsx",
-    "size": 302441,
-    "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
+    "size": 60031,
+    "sha256": "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d",
     "sheet_count": 11,
     "belongs_to_entry": "xlsx/gt-m1-dividends-payable",
     "in_runtime_index": true
    },
    {
     "name": "M10 其他权益工具.xlsx",
-    "size": 115677,
-    "sha256": "1047d8edffb5369b83a2b16d2c80fe7b5ae530179a7de80b1005f318eab22499",
+    "size": 69169,
+    "sha256": "073d75ae83274d4d54147934b5a4ef2b00d4be5c8a020b7cd074a99613ac8077",
     "sheet_count": 11,
     "belongs_to_entry": "xlsx/gt-m10-other-equity-instruments",
     "in_runtime_index": true
    },
    {
     "name": "M2 实收资本（股本）.xlsx",
-    "size": 120532,
-    "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
+    "size": 63112,
+    "sha256": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",
     "sheet_count": 11,
     "belongs_to_entry": "xlsx/gt-m2-paid-in-capital",
     "in_runtime_index": true
    },
    {
     "name": "M3 库存股.xlsx",
-    "size": 109810,
-    "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
+    "size": 53645,
+    "sha256": "ec8448c9df0fc5ae93f83fd2016e2ab26091e38749397595f66da818e9162115",
     "sheet_count": 10,
     "belongs_to_entry": "xlsx/gt-m3-treasury-stock",
     "in_runtime_index": true
    },
    {
     "name": "M4 资本公积.xlsx",
-    "size": 105867,
-    "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
+    "size": 50633,
+    "sha256": "40a8fa32902252105c2fe06409f6366a83881c305d97c7a08419f0fc84596a0a",
     "sheet_count": 9,
     "belongs_to_entry": "xlsx/gt-m4-capital-reserve",
     "in_runtime_index": true
    },
    {
     "name": "M5 盈余公积.xlsx",
-    "size": 109027,
-    "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
+    "size": 53489,
+    "sha256": "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316",
     "sheet_count": 10,
     "belongs_to_entry": "xlsx/gt-m5-surplus-reserve",
     "in_runtime_index": true
    },
    {
     "name": "M6 未分配利润.xlsx",
-    "size": 114625,
-    "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
+    "size": 45696,
+    "sha256": "bedd8b0799b4170b06e0257e9a19e3a5ea5585dae02704231bf93a57cf830bf5",
     "sheet_count": 10,
     "belongs_to_entry": "xlsx/gt-m6-retained-earnings",
     "in_runtime_index": true
    },
    {
     "name": "M7 专项储备.xlsx",
-    "size": 108714,
-    "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
+    "size": 53059,
+    "sha256": "9604cf8805dbf0446853c3f718bab1f7e0f126002c4df4bf468d04923086dbfc",
     "sheet_count": 10,
     "belongs_to_entry": "xlsx/gt-m7-special-reserve",
     "in_runtime_index": true
    },
    {
     "name": "M8 一般风险准备.xlsx",
-    "size": 114420,
-    "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
+    "size": 58891,
+    "sha256": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
     "sheet_count": 11,
     "belongs_to_entry": "xlsx/gt-m8-general-risk-reserve",
     "in_runtime_index": true
    },
    {
     "name": "M9 其他综合收益.xlsx",
-    "size": 453383,
-    "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+    "size": 60847,
+    "sha256": "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66",
     "sheet_count": 9,
     "belongs_to_entry": "xlsx/gt-m9-other-comprehensive-income",
     "in_runtime_index": true

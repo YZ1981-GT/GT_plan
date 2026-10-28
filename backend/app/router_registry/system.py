@@ -96,7 +96,6 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §6. 合并报表 ═══
     from app.routers.consolidation import router as consol_router
     from app.routers.consol_scope import router as cs_router
-    from app.routers.consol_scope_diff import router as csd_router
     from app.routers.consol_trial import router as ct_router
     from app.routers.internal_trade import router as it_router
     from app.routers.component_auditor import router as ca_router
@@ -125,7 +124,7 @@ def register_system_routers(app: FastAPI) -> None:
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
-              crf_router, crb_router, csd_router, cpush_router, cnf_router, csc_router, sce_router,
+              crf_router, crb_router, cpush_router, cnf_router, csc_router, sce_router,
               cndt_router, cnmt_router]:
         app.include_router(r, tags=["合并报表"])
 

@@ -250,6 +250,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.2
  * Requirements: 2.1-2.8
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { k5AccountCode } from '../../composables/k5AccountScope'
 import { computed, ref, toRef } from 'vue'
@@ -260,7 +261,6 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 import type { K5TbData } from '../../composables/useK5FormData'
 import type { Ref } from 'vue'
 
@@ -484,11 +484,7 @@ function classifySubAccount(name: string): number {
 
 async function prefillFromTbSubAccounts(): Promise<void> {
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k5Code.value },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { accountPrefix: k5Code.value })).rows
     if (list.length === 0) {
       ElMessage.warning(`未查到${k5Code.value}子科目数据`)
       return
@@ -500,8 +496,8 @@ async function prefillFromTbSubAccounts(): Promise<void> {
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
       if (!code.startsWith(k5Code.value)) continue
-      const name = String(item.account_name ?? item.standard_account_name ?? code)
-      const amt = Math.abs(Number(item.unadjusted_amount ?? item.closing_balance ?? 0))
+      const name = String(item.account_name ?? code)
+      const amt = Math.abs(Number(item.unadjusted_amount ?? 0))
       if (amt <= 0) continue
       const typeIdx = classifySubAccount(name)
       grouped[typeIdx] = (grouped[typeIdx] || 0) + amt

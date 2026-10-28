@@ -16,14 +16,15 @@ E=B+C+D（本期审定数）/ I=F+G+H（上期审定数）/ K=E-J（与应交税
 
 🔴 差异 3：**单级表头**（N4-2 只 r8 一行表头），L1 是两级表头。
 
-🔴 模板既知缺陷（T-1，记录型锁定，SHALL NOT 改 .xlsx）：`E9='=B9+C9+N4'`（第三加数误写列
-引用，NC-32 A1 族）+ `D19='=SUM(D4:N18)'`（footer 越界）。materialize 不触碰既有公式格文本。
+模板原有缺陷（T-1）`E9='=B9+C9+N4'`（第三加数误写列引用，NC-32 A1 族）与
+`D19='=SUM(D4:N18)'`（footer 越界）已按会计口径修为 `=B9+C9+D9` / `=SUM(D9:D18)`
+（spec oo-writeback-template-parity-closure R1）。materialize 不触碰既有公式格文本。
 
 整册裸 IF 20 格全在派生表 `税金及附加审定表N4-1`（K/M 列变动率），**受管表零命中** ——
 按 GC-2 per-file 策略仍挂中性化。
 
 模板已净化（Task 7a 删 2 外链部件 + 中性化隐藏「原底稿」册 5 个外部引用公式，留 `.preclean.bak`）；
-受管 sheet 逐格 0 diff，`TEMPLATE_SHA256` 取净化后值。
+受管 sheet 逐格 0 diff；`TEMPLATE_SHA256` 取净化 + 公式修正后的值。
 
 HTML store = `checklist_responses` 单条 item `N4-2-detail-rows`（前端 useN4Detail.ts rows 数组
 JSON）。🔴 行身份是**熵键**（同税种可多行），保留 `rowKey` 不改语义键。真库 `N4-2-detail-rows`

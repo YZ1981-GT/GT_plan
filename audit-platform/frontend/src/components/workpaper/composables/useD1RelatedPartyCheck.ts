@@ -124,7 +124,7 @@ export function emptyRelatedPartyRow(): RelatedPartyRow {
 }
 
 /** 反序列化单行（含公式重算） */
-function deserializeRow(raw: any): RelatedPartyRow {
+export function deserializeRow(raw: any): RelatedPartyRow {
   const row = emptyRelatedPartyRow()
   if (raw && typeof raw.id === 'string' && raw.id) row.id = raw.id
   for (const f of STRING_FIELDS) {

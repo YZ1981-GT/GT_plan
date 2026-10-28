@@ -85,14 +85,22 @@ class ConsolContext(BaseModel):
         node_key: str | None = None,
         template_type: str | None = None,
         report_scope: str | None = None,
+        source_version: str | None = None,
     ) -> "ConsolContext":
-        """为旧事件或旧入口构造上下文，不伪造任何版本标识。"""
+        """为旧事件或旧入口构造上下文，不伪造任何版本标识。
+
+        ``source_version`` 只接受调用方手里真实的来源标识（分录 id、数据集 id、触发来源），不传为 None。
+        🔴 2026-10-10 起三处事件发布方（分录审批 / 数据集激活 / 调整审批后的试算表更新）一直传这个参数，
+        而签名不收 ⇒ ``TypeError`` 被发布方的 ``except`` 吞掉 ⇒ 事件从未发出（分录审批从不触发合并推送）。
+        守卫：``tests/test_consol_context_legacy_callers.py`` 按 AST 校验全部调用方的关键字参数。
+        """
         return cls(
             project_id=project_id,
             year=year,
             node_key=node_key,
             template_type=template_type,
             report_scope=report_scope,
+            source_version=source_version,
             is_legacy=True,
         )
 

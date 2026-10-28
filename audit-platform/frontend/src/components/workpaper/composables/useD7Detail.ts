@@ -30,6 +30,7 @@ import {
   AUX_IMPORT_NETWORK_ERROR_PROMPT,
 } from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD7FormData'
+import { postTransferAmount } from './useD7VoucherCheck'
 import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
 import { migrateD7FlatToNested, migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
 
@@ -138,15 +139,18 @@ export function normalizeRow(raw: any, segments: AgingSegment[] = []): DetailRow
 }
 
 /**
- * 贷方科目公式链重算：
+ * 贷方科目公式链重算（与权威模板「明细表D7-2」一致：P = F - N + O）：
  *  priorAudited = priorUnadjusted + priorAje + priorRje
- *  endBalance = priorAudited + creditAmount - debitAmount (贷方科目)
+ *  endBalance = priorUnadjusted + creditAmount - debitAmount (贷方科目)
  *  endUnadjusted = endBalance + entityReclass
  *  endAudited = endUnadjusted + endAje + endRje
+ *
+ * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4，同 F1-H3）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。
  */
 export function recalcRow(row: DetailRow): DetailRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const endBalance = calcCreditEndBalance(priorAudited, row.creditAmount, row.debitAmount)
+  const endBalance = calcCreditEndBalance(row.priorUnadjusted, row.creditAmount, row.debitAmount)
   const endUnadjusted = endBalance + row.entityReclass
   const endAudited = calcAuditedAmount(endUnadjusted, row.endAje, row.endRje)
   return { ...row, priorAudited, endBalance, endUnadjusted, endAudited }
@@ -414,7 +418,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
       for (const pr of postRows) {
         const name = pr.customerName || ''
         if (!name) continue
-        transferMap.set(name, (transferMap.get(name) || 0) + parseNum(pr.creditAmount))
+        transferMap.set(name, (transferMap.get(name) || 0) + postTransferAmount(pr))
       }
 
       let changed = false

@@ -56,7 +56,9 @@ beforeEach(() => {
 
 
 describe('useG3Adjudication — 借方科目审定公式', () => {
-  it('期末未审 = 期初审定 + 本期宣告 - 本期收回（借方科目方向）', () => {
+  // 权威模板 G3-1 期末未审取 G3-2 期末数（= 期初数 + 本期增加 − 本期减少，未审列）：起点是期初未审，
+  // 期初调整经期末账项 / 重分类调整列结转（spec oo-writeback-template-parity-closure R2）
+  it('期末未审 = 期初未审 + 本期宣告 - 本期收回（借方科目方向）', () => {
     const rows = JSON.stringify([
       {
         id: 'inv-1',
@@ -77,10 +79,10 @@ describe('useG3Adjudication — 借方科目审定公式', () => {
     const row = adj.dataRows.value[0]
     // 期初审定 = 1000 + 100 + (-50) = 1050
     expect(row.openingAdjusted).toBe(1050)
-    // 期末未审 = 期初审定(1050) + 宣告(500) - 收回(200) = 1350
-    expect(row.closingUnadjusted).toBe(1350)
-    // 期末审定 = 未审(1350) + AJE(0) + RJE(0) = 1350
-    expect(row.closingAdjusted).toBe(1350)
+    // 期末未审 = 期初未审(1000) + 宣告(500) - 收回(200) = 1300（旧口径从期初审定起算得 1350）
+    expect(row.closingUnadjusted).toBe(1300)
+    // 期末审定 = 未审(1300) + AJE(0) + RJE(0) = 1300
+    expect(row.closingAdjusted).toBe(1300)
   })
 
   it('期末审定 = 期末未审 + AJE + RJE', () => {

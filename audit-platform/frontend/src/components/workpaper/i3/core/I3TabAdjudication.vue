@@ -476,7 +476,7 @@ const isReadonly = computed(() => Boolean(props.isReadonly))
 const sourceConfig = getICycleSourceConfig('I3')
 const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 const projectId = computed(() => props.projectId)
-const asOfYear = computed(() => props.year || new Date().getFullYear())
+const asOfYear = computed<number | null>(() => props.year ?? null)
 const quickConclusion = ref('')
 
 const {

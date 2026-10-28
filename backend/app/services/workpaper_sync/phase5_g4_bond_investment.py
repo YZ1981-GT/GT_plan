@@ -73,7 +73,7 @@ ADAPTER_ID: Final[str] = "g4.bond_main"
 WP_CODES: Final[frozenset[str]] = frozenset({"G4B"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G4 债权投资.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；976,968 B）
 TEMPLATE_SHA256: Final[str] = (
     "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a"
 )

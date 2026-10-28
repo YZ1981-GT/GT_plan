@@ -426,7 +426,11 @@ const ledgerLoading = ref(false)
 
 async function handlePullLedger(): Promise<void> {
   if (ledgerLoading.value) return
-  const year = props.year ?? new Date().getFullYear()
+    const year = props.year
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法读取序时账')
+      return
+    }
   ledgerLoading.value = true
   try {
     const result = await pullExpenseLedgerMonthly(props.projectId, '6711', year)

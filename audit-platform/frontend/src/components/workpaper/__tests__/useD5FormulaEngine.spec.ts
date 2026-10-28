@@ -48,8 +48,8 @@ describe('useD5FormulaEngine - 单元测试', () => {
       expect(calcRemainingDays('', '2026-01-31')).toBe(0)
       expect(calcRemainingDays('2026-01-01', '')).toBe(0)
     })
-    it('returns 0 when maturity before measurement', () => {
-      expect(calcRemainingDays('2026-06-30', '2026-01-01')).toBe(0)
+    it('到期日早于计量日时为负数（与模板 G = F − E 同，不再记 0）', () => {
+      expect(calcRemainingDays('2026-06-30', '2026-01-01')).toBe(-180)
     })
     it('returns 0 for invalid dates', () => {
       expect(calcRemainingDays('invalid', '2026-01-31')).toBe(0)
@@ -94,19 +94,20 @@ describe('useD5FormulaEngine - Property-Based Tests', () => {
    * **Feature: d5-receivables-financing, Property 1: 贴现利息公式正确性**
    *
    * For any 票面金额(face≥0)、市场贴现利率(rate∈[0,1])和剩余天数(days≥0)，
-   * calcDiscountInterest(face, rate, days) 的返回值应等于 face × rate × days / 360。
+   * calcDiscountInterest(face, rate, days) 的返回值应等于 face × rate × days / 365
+   * （与权威模板 D5-4 I 列 =D*H*G/365 同口径，spec oo-writeback-template-parity-closure R2，原为 /360）。
    *
    * **Validates: Requirements 1.4, 6.2**
    */
   describe('Property 1: 贴现利息公式正确性', () => {
-    it('calcDiscountInterest(face, rate, days) === face * rate * days / 360', () => {
+    it('calcDiscountInterest(face, rate, days) === face * rate * days / 365', () => {
       fc.assert(
         fc.property(
           fc.float({ min: 0, max: 1e9, noNaN: true }),
           fc.float({ min: 0, max: 1, noNaN: true }),
           fc.integer({ min: 0, max: 365 }),
           (face, rate, days) => {
-            expect(calcDiscountInterest(face, rate, days)).toBeCloseTo(face * rate * days / 360, 5)
+            expect(calcDiscountInterest(face, rate, days)).toBeCloseTo(face * rate * days / 365, 5)
           }
         ),
         { numRuns: 100 }

@@ -136,10 +136,12 @@ async def update_project_config(
     ):
         try:
             from app.services.report_note_sync_service import ReportNoteSyncService
+            from app.services.project_audit_year import fetch_project_audit_year
             sync_svc = ReportNoteSyncService(db)
-            # Get year from project context (use current year as default)
-            from datetime import datetime
-            year = datetime.now().year
+            year = await fetch_project_audit_year(db, project_id)
+            if year is None:
+                # 未设置审计年度：跳过标记过期（配置变更本身仍保存）
+                year = 0  # mark_notes_stale 会返回 0
             stale_count = await sync_svc.mark_notes_stale_for_report_change(project_id, year)
         except Exception as e:
             logger.warning("Failed to mark stale on config change: %s", e)

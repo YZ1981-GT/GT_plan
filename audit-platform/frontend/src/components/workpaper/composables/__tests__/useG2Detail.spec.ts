@@ -88,7 +88,9 @@ describe('useG2Detail', () => {
       expect(dataRows.value[0].openingAudited).toBe(1050)
     })
 
-    it('期末余额 = 期初审定 + 借方 − 贷方', () => {
+    // 标题原为「期末余额 = 期初审定 + 借方 − 贷方」；模板 H = C + F − G 从期初未审起算
+    // （spec oo-formula-recompute-not-tamper R4，期初调整非 0 的判据见 periodEndFromPriorUnadjusted.spec.ts）
+    it('期末余额 = 期初余额 + 借方 − 贷方', () => {
       const row = createStoredRow({
         openingUnadjusted: 10000,
         openingAdjustment: 0,

@@ -594,8 +594,8 @@ def _resolve_section_meta(
     return _derive_section_title(section_id), None
 
 
-def _derive_year(payload_year: int | None) -> int:
-    """纯兜底：优先使用 payload 中的 year，否则取当前自然年。
+def _derive_year(payload_year: int | None) -> int | None:
+    """纯兜底：优先使用 payload 中的 year；否则返回 None（不猜自然年）。
 
     注意：**不要**在同步路径直接用它推导目标年度——服务器当前自然年
     与项目审计年度通常不同（如 2026 年做 2025 年报审计），会把底稿推送
@@ -604,7 +604,7 @@ def _derive_year(payload_year: int | None) -> int:
     """
     if payload_year and isinstance(payload_year, int):
         return payload_year
-    return datetime.now(timezone.utc).year
+    return None
 
 
 async def _resolve_project_audit_year(
@@ -767,12 +767,13 @@ def _guard_standard_matches_project(
 
 async def _resolve_target_year(
     db: AsyncSession, project_id: UUID, payload_year: int | None
-) -> int:
-    """派生同步目标年度：payload 显式年度 > 项目审计年度 > 当前自然年（兜底）。
+) -> int | None:
+    """派生同步目标年度：payload 显式年度 > 项目审计年度 > None。
 
     前端各披露组件历史上普遍不传 ``year``，此前会 fallback 到服务器当前自然年，
     导致同步落到错误年度的附注（附注模块看不到）。此处以 ``projects.audit_year``
     为权威，一处修复覆盖全部披露组件；前端显式传 year 仍优先。
+    全部来源缺失时返回 None，由调用方决定跳过还是报错。
     """
     if payload_year and isinstance(payload_year, int):
         return payload_year
@@ -849,6 +850,9 @@ async def sync_from_workpaper(
         target_year = audit_year
     else:
         target_year = _derive_year(None)
+    if target_year is None:
+        logger.warning("sync_from_workpaper: 项目 %s 未设置审计年度，跳过同步", project_id)
+        return {"synced": 0, "skipped_reason": "未设置审计年度"}
     now = datetime.now(timezone.utc)
     clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
     clean_sub_table_data, removed_table_keys = _extract_removed_table_keys(clean_sub_table_data)

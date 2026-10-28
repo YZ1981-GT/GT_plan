@@ -23,6 +23,15 @@ export function parseAuditYear(value: unknown): number | null {
   return Number.isFinite(n) && n > MIN_YEAR ? n : null
 }
 
+/**
+ * 跳转查询串里的年度：有效才带。年度缺失时不带（`String(null)` 会写成 `year=null`），
+ * 目标页按项目审计年度取 —— 不拿去年兜底（spec post-push-residual-defect-closure 6.5）。
+ */
+export function yearQuery(year: unknown): { year?: string } {
+  const y = parseAuditYear(year)
+  return y != null ? { year: String(y) } : {}
+}
+
 export function yearFromIsoDate(iso?: string | null): number | null {
   if (!iso || iso.length < 4) return null
   const y = parseInt(iso.slice(0, 4), 10)
@@ -51,8 +60,11 @@ export function resolveAuditYearFromProject(project: {
   )
 }
 
-/** 底稿/序时账等场景：多来源合并为最终查询年度 */
-export function resolveEffectiveAuditYear(sources: AuditYearSources): number {
+/**
+ * 多来源合并为审计年度；全部缺失返回 null（不按日历猜）。
+ * 写请求一律用它（或 `useProjectAuditYear`）：取不到就不发、提示先填年度（spec audit-year-calendar-fallback-ratchet R0 / R3）。
+ */
+export function resolveAuditYearOrNull(sources: AuditYearSources): number | null {
   const candidates: unknown[] = [
     sources.propYear,
     sources.configYear,
@@ -67,5 +79,14 @@ export function resolveEffectiveAuditYear(sources: AuditYearSources): number {
     const y = parseAuditYear(c)
     if (y) return y
   }
-  return new Date().getFullYear() - 1
+  return null
+}
+
+/**
+ * 多来源合并为最终查询年度；全部缺失返回 null。
+ * 调用方须处理 null：写请求不发 + 提示，读请求显示空态。
+ * （spec audit-year-calendar-fallback-ratchet R3.1：删去年兜底，选方案 B）
+ */
+export function resolveEffectiveAuditYear(sources: AuditYearSources): number | null {
+  return resolveAuditYearOrNull(sources)
 }

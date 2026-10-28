@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
 from app.services.field_override_service import FieldOverrideService
+from app.services.wp_visibility.program_row_guard import assert_program_override_allowed
 
 router = APIRouter(prefix="/api/workpapers/field-overrides")
 
@@ -45,6 +46,24 @@ class FieldOverrideSetResponse(BaseModel):
     value: Any
 
 
+#: 单次批量上限（程序表一张表的程序行 × 3 个字段远小于它）
+MAX_BATCH_ITEMS = 200
+
+
+class FieldOverrideItem(BaseModel):
+    scope: str = Field(max_length=50)
+    item_key: str = Field(max_length=100)
+    field: str = Field(max_length=50)
+    value: Any = None
+
+
+class FieldOverrideBatchRequest(BaseModel):
+    """批量设置覆盖值（spec procedure-chain-hardening-and-java-contracts R8：原先前端逐字段单发、失败静默吞掉）"""
+    project_id: UUID
+    year: int
+    items: list[FieldOverrideItem] = Field(max_length=MAX_BATCH_ITEMS)
+
+
 # ─── Endpoints ──────────────────────────────────────────────────────────────
 
 
@@ -56,7 +75,8 @@ async def get_field_overrides(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict[str, dict[str, Any]]:
-    """获取指定 scope 下所有覆盖值"""
+    """获取指定 scope 下所有覆盖值（项目成员可读；原先只校验登录，可读任意项目）"""
+    await assert_project_permission(db, _user, project_id, "readonly")
     svc = FieldOverrideService(db)
     return await svc.get_batch(project_id, year, scope)
 
@@ -67,7 +87,11 @@ async def set_field_override(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> FieldOverrideSetResponse:
-    """Upsert 单个覆盖值"""
+    """Upsert 单个覆盖值（项目 edit 级；程序表行只能写派给本人的，spec procedure-trim-generation-delegation-chain 需求 7.3）"""
+    await assert_project_permission(db, user, body.project_id, "edit")
+    await assert_program_override_allowed(
+        db, user, body.project_id, body.scope, body.item_key, body.field, body.value,
+    )
     svc = FieldOverrideService(db)
     override = await svc.set(
         project_id=body.project_id,
@@ -88,3 +112,36 @@ async def set_field_override(
         field=override.field,
         value=override.value,
     )
+
+
+@router.post("/batch", status_code=200)
+async def set_field_overrides_batch(
+    body: FieldOverrideBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """批量 upsert 覆盖值：一次鉴权、每项一个保存点、一次提交；不能写的项逐条回报原因（不吞错）。
+
+    每项的判定与单条端点相同（``assert_program_override_allowed``：程序表行只能写派给本人的、非委派人不能写不适用）。
+    """
+    from fastapi import HTTPException
+
+    await assert_project_permission(db, user, body.project_id, "edit")
+    svc = FieldOverrideService(db)
+    saved: list[dict] = []
+    failed: list[dict] = []
+    for item in body.items:
+        try:
+            async with db.begin_nested():
+                await assert_program_override_allowed(
+                    db, user, body.project_id, item.scope, item.item_key, item.field, item.value,
+                )
+                await svc.set(project_id=body.project_id, year=body.year, scope=item.scope,
+                              item_key=item.item_key, field=item.field, value=item.value, user_id=user.id)
+            saved.append({"scope": item.scope, "item_key": item.item_key, "field": item.field})
+        except HTTPException as exc:
+            detail = exc.detail.get("message") if isinstance(exc.detail, dict) else exc.detail
+            failed.append({"scope": item.scope, "item_key": item.item_key, "field": item.field,
+                           "status": exc.status_code, "reason": str(detail or "不能写入")})
+    await db.commit()
+    return {"saved": saved, "failed": failed}

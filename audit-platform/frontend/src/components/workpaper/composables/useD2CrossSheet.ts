@@ -19,6 +19,9 @@ import type { ChecklistResponse } from './useD2FormData'
 import type { DetailRow } from './useD2Detail'
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 
+/** D2-1 按「信用风险组合方式」汇总的三类（D2-2 的 SUMIF 判据，严格相等）。 */
+export const D2_CREDIT_RISK_CLASSES: readonly string[] = ['单项计提', '账龄组合', '客户类型组合']
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface UseD2CrossSheetOptions {
@@ -28,6 +31,13 @@ export interface UseD2CrossSheetOptions {
    * 不传则回退 5 年段预设（与 useAgingConfig 对 D2 的默认预设一致）。
    */
   agingSegments?: Ref<AgingSegment[]>
+  /**
+   * 试算表 1122 应收账款**原值**审定额（`null` = 未取到 ⇒ 不做 D2-2↔TB 核对）。
+   *
+   * 🔴 不能用 `D2-adj-tb-amount`：那个锚点是净额（1122 − 1231-02），D2-2 明细是原值，
+   * 拿它比会报出恰好等于坏账准备的假差异（spec writeback-followup-issue-closure R11.2）。
+   */
+  tbGrossAmount?: Readonly<Ref<number | null>>
 }
 
 /** D2-3 坏账准备行原始 JSON 结构 */
@@ -199,7 +209,6 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
   const bdAgingJson = computed(() => getVal('D2-bd-aging-rows').remark)
   const bdCustomerJson = computed(() => getVal('D2-bd-customer-rows').remark)
   const ecl9RowsJson = computed(() => getVal('D2-ecl9-rows').remark)
-  const tbAmountRemark = computed(() => getVal('D2-adj-tb-amount').remark)
 
   // ─── D2-2 明细行 ───────────────────────────────────────────────────────
 
@@ -405,10 +414,31 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     }
   })
 
-  // ─── D2-2 明细表↔TB 余额核对 ──────────────────────────────────────────
+  // ─── D2-2 中不进入 D2-1 任何分类的行（解释 D2-1↔D2-2 差异的来源）─────────
+
+  /**
+   * 「信用风险组合方式」不是三类之一的行（与 SUMIF 同一判据：严格相等）。这些行的金额不会被汇总进
+   * D2-1 —— 重药安徽 / 和平药房 2025 的 D2-2 全部行都未填，D2-1 合计因此为 0（spec
+   * writeback-followup-issue-closure R11.2）。
+   */
+  const unclassifiedDetail = computed(() => {
+    let count = 0
+    let totalAudited = 0
+    for (const row of detailRows.value) {
+      if (D2_CREDIT_RISK_CLASSES.includes(row.creditRiskClassification)) continue
+      count += 1
+      totalAudited += parseNum(row.currentAudited)
+    }
+    return { count, totalAudited }
+  })
+
+  // ─── D2-2 明细表↔TB 余额核对（原值对原值）──────────────────────────────
 
   const detailVsTbDiff = computed(() => {
-    const tbAmount = parseNum(tbAmountRemark.value)
+    const tbGross = options.tbGrossAmount?.value
+    // 原值审定额没取到 ⇒ 不比（宁可不提示，也不拿净额锚点冒充 1122 审定额）
+    if (tbGross == null || !Number.isFinite(tbGross)) return null
+    const tbAmount = tbGross
     const detailTotal = detailTotalAudited.value
     if (tbAmount === 0 && detailTotal === 0) {
       return { diff: 0, isBalanced: true, detailTotal: 0, tbAmount: 0 }
@@ -432,6 +462,7 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     agingSegments: effectiveAgingSegments,
     agingFromDetail,
     reconciliationDiff,
+    unclassifiedDetail,
     eclVsBadDebtDiff,
     detailVsTbDiff,
     crossSheetStatus,

@@ -83,6 +83,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { noteFormula } from '@/services/apiPaths/formula'
 import { useAddressRegistry } from '@/stores/addressRegistry'
@@ -134,7 +135,8 @@ async function openRefPicker(row: any) {
     if (!refPickerData.value.reportRows.length) {
       const [reportData, tbData] = await Promise.all([
         api.get(`/api/reports/${props.projectId}/${props.year}/balance_sheet`).catch(() => []),
-        api.get(`/api/trial-balance/`, { params: { project_id: props.projectId, year: props.year } }).catch(() => []),
+        // 经试算表唯一入口（原先请求后端没有的 `/api/trial-balance/` ⇒ 404 被吞，试算表候选恒空）
+        fetchTrialBalanceRows(props.projectId, { year: props.year }).then((r) => r.rows).catch(() => []),
       ])
       refPickerData.value.reportRows = Array.isArray(reportData) ? reportData : (reportData || [])
       refPickerData.value.tbRows = Array.isArray(tbData) ? tbData : (tbData || [])

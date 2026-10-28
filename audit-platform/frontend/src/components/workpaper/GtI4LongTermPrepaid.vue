@@ -197,6 +197,7 @@
  *
  * 数据加载/保存：本壳层自管 selfLoad + handleChildSave（勿再用孤儿 useI4FormData）。
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, watch, provide, toRef, defineAsyncComponent, inject } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -310,29 +311,14 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
-      params: { account_prefix: '1801', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u1801 = 0, a1801 = 0, p1801 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1801')) {
-        u1801 += Number(item.unadjusted_amount ?? 0)
-        a1801 += Number(item.audited_amount ?? 0)
-        p1801 += Number(
-          item.prior_amount
-          ?? item.prior_audited_amount
-          ?? item.prior_period_amount
-          ?? item.last_year_amount
-          ?? item.opening_audited_amount
-          ?? 0,
-        )
-      }
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取）
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '1801' })
+    tbData.value = {
+      unadjusted1801: tbSumUnder(rows, '1801', 'unadjusted_amount') ?? 0,
+      audited1801: tbSumUnder(rows, '1801', 'audited_amount') ?? 0,
+      // 资产负债类上年审定数 = 本年期初余额（端点没有 prior_* 字段，原先上年数恒 0）
+      priorAudited1801: tbSumUnder(rows, '1801', 'opening_balance') ?? 0,
     }
-    tbData.value = { unadjusted1801: u1801, audited1801: a1801, priorAudited1801: p1801 }
   } catch {
     // TB取数失败静默处理
   }

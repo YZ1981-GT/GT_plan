@@ -52,8 +52,8 @@ export interface RestrictedAssetsSyncOptions {
   responses: () => ResponseMap | undefined
   applicableStandards?: () => readonly string[] | null | undefined
   sheetNames: RestrictedAssetsSheetNames
-  /** 审计年度（不传则由后端按 `projects.audit_year` 定位） */
-  year?: () => number | undefined
+  /** 审计年度（不传 / 项目没填为 null 则由后端按 `projects.audit_year` 定位） */
+  year?: () => number | null | undefined
   /** 只读态跳过推送 */
   isReadonly?: () => boolean
 }

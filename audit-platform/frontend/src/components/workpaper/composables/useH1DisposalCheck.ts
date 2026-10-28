@@ -136,6 +136,61 @@ export function isScrapMethod(method: string): boolean {
   return m === '报废' || m === 'scrap' || m === '损毁' || m === 'damage'
 }
 
+/** 重算行内公式：L 净值 = I − J − K；O 处置损益 = N − M − L（与权威模板 H1-8 同式） */
+export function recalcH1DisposalRow(row: DisposalRow): void {
+  row.netValue = calcNetValue(row.originalCost, row.accDep, row.impairment)
+  row.disposalGainLoss = calcDisposalGainLoss(row.disposalIncome, row.netValue, row.disposalCost)
+}
+
+/** store 行 → 表单行（兼容旧字段名 disposalType；加载时重算公式列）。纯函数，不碰 store。 */
+export function normalizeH1DisposalRow(raw: any, idx: number): DisposalRow {
+  // 兼容旧字段名 disposalType / gainLoss
+  const method = raw.disposalMethod ?? raw.disposalType ?? ''
+  const row: DisposalRow = {
+    rowId: raw.rowId ?? `disp-${Math.random().toString(36).slice(2, 10)}`,
+    seq: raw.seq ?? idx + 1,
+    category: raw.category ?? '',
+    name: raw.name ?? '',
+    assetNo: raw.assetNo ?? '',
+    disposalMethod: method,
+    disposalDate: raw.disposalDate ?? '',
+    voucherNo: raw.voucherNo ?? '',
+    counterpartAccount: raw.counterpartAccount ?? '',
+    originalCost: Number(raw.originalCost) || 0,
+    accDep: Number(raw.accDep) || 0,
+    impairment: Number(raw.impairment) || 0,
+    netValue: 0,
+    disposalCost: Number(raw.disposalCost) || 0,
+    disposalIncome: Number(raw.disposalIncome) || 0,
+    disposalGainLoss: 0,
+    applicationRef: raw.applicationRef ?? '',
+    isApproved: raw.isApproved ?? '',
+    contractRef: raw.contractRef ?? '',
+    contractParty: raw.contractParty ?? '',
+    contractAmount: Number(raw.contractAmount) || 0,
+    invoiceRef: raw.invoiceRef ?? '',
+    invoiceParty: raw.invoiceParty ?? '',
+    invoiceAmount: Number(raw.invoiceAmount) || 0,
+    approvalDoc: raw.approvalDoc ?? '',
+    evaluationReport: raw.evaluationReport ?? '',
+    paymentVoucher: raw.paymentVoucher ?? '',
+    isRelatedParty: raw.isRelatedParty ?? 'N',
+    relatedPartyName: raw.relatedPartyName ?? '',
+    pricingBasis: raw.pricingBasis ?? '',
+    taxTreatment: raw.taxTreatment ?? '',
+    accountEntry: raw.accountEntry ?? '',
+    checkResult: raw.checkResult ?? '',
+    isAbnormal: raw.isAbnormal ?? (raw.checkResult === 'ERR' ? 'Y' : 'N'),
+    conclusion: raw.conclusion ?? '',
+    remark: raw.remark ?? '',
+    indexRef: raw.indexRef ?? '',
+    voucherSampleId: raw.voucherSampleId ?? '',
+    attachmentUrl: raw.attachmentUrl ?? '',
+  }
+  recalcH1DisposalRow(row)
+  return row
+}
+
 export function useH1DisposalCheck(
   wpId: Ref<string>,
   projectId: Ref<string>,
@@ -243,57 +298,13 @@ export function useH1DisposalCheck(
 
   const linkedDecrease = computed<LinkedDecreaseTotal>(() => _calcLinkedDecrease())
 
+  // 行归一 / 重算是模块级纯函数（对拍守卫直接调用）；这里留函数声明（提升，_loadData 先于此行定义）
   function _normalizeRow(raw: any, idx: number): DisposalRow {
-    // 兼容旧字段名 disposalType / gainLoss
-    const method = raw.disposalMethod ?? raw.disposalType ?? ''
-    const row: DisposalRow = {
-      rowId: raw.rowId ?? `disp-${Math.random().toString(36).slice(2, 10)}`,
-      seq: raw.seq ?? idx + 1,
-      category: raw.category ?? '',
-      name: raw.name ?? '',
-      assetNo: raw.assetNo ?? '',
-      disposalMethod: method,
-      disposalDate: raw.disposalDate ?? '',
-      voucherNo: raw.voucherNo ?? '',
-      counterpartAccount: raw.counterpartAccount ?? '',
-      originalCost: Number(raw.originalCost) || 0,
-      accDep: Number(raw.accDep) || 0,
-      impairment: Number(raw.impairment) || 0,
-      netValue: 0,
-      disposalCost: Number(raw.disposalCost) || 0,
-      disposalIncome: Number(raw.disposalIncome) || 0,
-      disposalGainLoss: 0,
-      applicationRef: raw.applicationRef ?? '',
-      isApproved: raw.isApproved ?? '',
-      contractRef: raw.contractRef ?? '',
-      contractParty: raw.contractParty ?? '',
-      contractAmount: Number(raw.contractAmount) || 0,
-      invoiceRef: raw.invoiceRef ?? '',
-      invoiceParty: raw.invoiceParty ?? '',
-      invoiceAmount: Number(raw.invoiceAmount) || 0,
-      approvalDoc: raw.approvalDoc ?? '',
-      evaluationReport: raw.evaluationReport ?? '',
-      paymentVoucher: raw.paymentVoucher ?? '',
-      isRelatedParty: raw.isRelatedParty ?? 'N',
-      relatedPartyName: raw.relatedPartyName ?? '',
-      pricingBasis: raw.pricingBasis ?? '',
-      taxTreatment: raw.taxTreatment ?? '',
-      accountEntry: raw.accountEntry ?? '',
-      checkResult: raw.checkResult ?? '',
-      isAbnormal: raw.isAbnormal ?? (raw.checkResult === 'ERR' ? 'Y' : 'N'),
-      conclusion: raw.conclusion ?? '',
-      remark: raw.remark ?? '',
-      indexRef: raw.indexRef ?? '',
-      voucherSampleId: raw.voucherSampleId ?? '',
-      attachmentUrl: raw.attachmentUrl ?? '',
-    }
-    _recalcRow(row)
-    return row
+    return normalizeH1DisposalRow(raw, idx)
   }
 
   function _recalcRow(row: DisposalRow): void {
-    row.netValue = calcNetValue(row.originalCost, row.accDep, row.impairment)
-    row.disposalGainLoss = calcDisposalGainLoss(row.disposalIncome, row.netValue, row.disposalCost)
+    recalcH1DisposalRow(row)
   }
 
   /** 出售且关联方但缺评估报告 → 需提示 */

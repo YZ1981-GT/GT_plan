@@ -20,7 +20,7 @@
  *                   F 计入其他综合收益的累计利得或损失
  *        G 期初调整数 · H 期初审定数【=E+G】
  * I9:N9  本期变动 : I 成本 · J 本期公允价值变动 · K 处置时公允价值变动结转
- *                   L 其他综合收益转入留存收益 · M 合计【=I+J+K+L】
+ *                   L 其他综合收益转入留存收益 · M 合计【=SUM(I:K)】
  *                   N 本期确认的股利收入
  * O9:R9  期末余额 : O 成本【=C+I】 · P 累计公允价值变动【=D+J+K】 · Q 合计【=O+P】
  *                   R 计入其他综合收益的累计利得或损失【=F+J+L】
@@ -30,25 +30,16 @@
  *
  * `N 本期确认的股利收入`是**损益项**（与 G9 的 O 列股息同理）：不进任何余额公式。
  *
- * ═══ 🔴 模板自身有四处行级缺陷 —— 本模块按**会计正确**口径算，不模仿模板的不一致 ═══
+ * ═══ 模板行级缺陷已修（spec oo-writeback-template-parity-closure R1）═══
  *
- * 逐行实测（`明细表G8-2` R11-R20）：
+ * 修复前逐行实测（`明细表G8-2` R11-R20）：M 在 R11 是 `=SUM(I:L)`、其余 `=SUM(I:K)`；
+ * P 只有 R12 含 K；R 在 R13-R20 无公式；T 在 R12 无公式。现已逐行统一为
+ * `M=SUM(I:K)` / `P=D+J+K` / `R=F+J+L` / `T=Q+S`，合计行补 K / L / R 三列 SUM。
  *
- * | 行 | M 本期变动合计 | P 期末累计FV变动 | R 期末OCI累计 | T 审定数 |
- * |---|---|---|---|---|
- * | R11 | `=SUM(I:L)` ✅含 L | `=D+J` ❌漏 K | ✅ `=F+J+L` | ✅ `=Q+S` |
- * | R12 | `=SUM(I:K)` ❌漏 L | `=D+J+K` ✅含 K | ✅ `=F+J+L` | ❌**无公式** |
- * | R13..R20 | `=SUM(I:K)` ❌漏 L | `=D+J` ❌漏 K | ❌**无公式** | ✅ `=Q+S` |
- *
- * 即 R11 与 R12 各对一半、R13-R20 两处都漏，且 R12 缺 T、R13-R20 缺 R。
- * 会计判读（C-6 §3.3）：M 应含 L · P 应含 K · R 与 T 每行都该有。
- *
- * ⇒ **本模块按会计正确口径算全部四列**（`M=I+J+K+L` / `P=D+J+K` / `R=F+J+L` / `T=Q+S`）。
- * 后端三段 sheet spec 则按**模板实测**声明 `mode`（`g802-r11` / `g802-r12` / `g802-r13plus`），
- * 因此在缺陷行上前端算得出值、模板格却是空的或口径不同 —— 这个差异是**如实登记的欠账**
- * （见 spec evidence `task9b-c8-g8-rootfix.md` §2.3），不是本模块的 bug：
- * 修模板要么改字节（`backend/wp_templates/` 运行时只读 + sha 冻结，禁止）、
- * 要么走覆盖层（框架层尚无该机制）+ 会计专业复核，两者都不在本 lane 范围。
+ * 🔴 M 不含 L（推翻 C-6 §3.3「M 应含 L」的判读）：M 是投资账面本期变动，必须满足
+ * `E + M = Q`（Q = O + P = (C+I) + (D+J+K) = E + I+J+K）。L「其他综合收益转入留存收益」是
+ * 终止确认时权益内部的结转（注3），只减少 R 列 OCI 累计、不改变投资账面；处置同一笔投资时
+ * 资产侧已由 I / K 冲减，再把 L 加进 M 等于重复计算一次。模板 10 行里 9 行本就是 SUM(I:K)。
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
@@ -103,7 +94,7 @@ export interface G8DetailRow {
   disposalFvTransfer: number
   /** L 本期变动 / 其他综合收益转入留存收益 */
   ociToRetainedEarnings: number
-  /** M 本期变动 / 合计　**【公式】** `=I+J+K+L`（🔴 模板仅 R11 含 L，其余漏） */
+  /** M 本期变动 / 合计　**【公式】** `=SUM(I:K)`（= Q − E；L 不改变投资账面） */
   movementTotal: number
   /** N 本期确认的股利收入 —— **损益项**，不进任何余额公式 */
   dividendIncome: number
@@ -210,12 +201,14 @@ function hasValue(v: unknown): boolean {
  * |---|---|---|
  * | E | `=SUM(C:D)` | 期初合计 |
  * | H | `=E+G` | 期初审定数 |
- * | M | `=I+J+K+L` | 本期变动合计（🔴 含 L，模板仅 R11 如此） |
+ * | M | `=SUM(I:K)` | 本期变动合计（= Q − E，不含 L） |
  * | O | `=C+I` | 期末成本 |
- * | P | `=D+J+K` | 期末累计公允价值变动（🔴 含 K，模板仅 R12 如此） |
+ * | P | `=D+J+K` | 期末累计公允价值变动（含处置结转 K） |
  * | Q | `=O+P` | 期末合计 |
- * | R | `=F+J+L` | 期末 OCI 累计（🔴 模板 R13-20 无该公式） |
- * | T | `=Q+S` | 期末审定数（🔴 模板 R12 无该公式） |
+ * | R | `=F+J+L` | 期末 OCI 累计 |
+ * | T | `=Q+S` | 期末审定数 |
+ *
+ * 模板 R11-R20 逐行都是这 8 条（spec oo-writeback-template-parity-closure R1 修复后）。
  *
  * 🔴 **兼容读**（旧载荷 → 模板列）：
  * * `openingBalance` 单值 → 落 E；若未单独给 D，则 `D = openingBalance − C`（反推分量）
@@ -255,8 +248,8 @@ export function enrichG8DetailRow(raw: G8DetailRowInput, seq: number): G8DetailR
   const movementFvChange = parseNum(raw.movementFvChange ?? raw.fvChangeAmount)
   const disposalFvTransfer = parseNum(raw.disposalFvTransfer)
   const ociToRetainedEarnings = parseNum(raw.ociToRetainedEarnings)
-  // M = I+J+K+L（🔴 含 L）
-  const movementTotal = movementCost + movementFvChange + disposalFvTransfer + ociToRetainedEarnings
+  // M = I+J+K（投资账面本期变动 = Q − E）；L 是权益内部 OCI → 留存收益，只进 R
+  const movementTotal = movementCost + movementFvChange + disposalFvTransfer
   const dividendIncome = parseNum(raw.dividendIncome)
 
   // ── 期末三分量（O / P / Q）────────────────────────────────────────────
@@ -426,11 +419,15 @@ export function scanG8DetailIntegrity(rows: G8DetailRow[]): G8DetailRowIssue[] {
         r.closingOciCumulative - ociExpected,
       )
     }
-    // 本期变动合计 M = I+J+K+L（🔴 含 L）
+    // 本期变动合计 M = I+J+K（= 期末合计 − 期初合计；OCI 转入留存收益只影响 R）
     const mvDiff = r.movementTotal
-      - (r.movementCost + r.movementFvChange + r.disposalFvTransfer + r.ociToRetainedEarnings)
+      - (r.movementCost + r.movementFvChange + r.disposalFvTransfer)
     if (Math.abs(mvDiff) > DIFF_TOLERANCE) {
-      push('movementTotal', '本期变动合计应含「OCI 转入留存收益」（M=I+J+K+L）', mvDiff)
+      push(
+        'movementTotal',
+        '本期变动合计应等于「成本 + 本期公允价值变动 + 处置时结转」（M=I+J+K，不含 OCI 转入留存收益）',
+        mvDiff,
+      )
     }
   }
   return issues

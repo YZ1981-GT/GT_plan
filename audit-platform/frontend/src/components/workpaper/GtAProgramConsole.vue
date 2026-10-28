@@ -136,6 +136,12 @@
       @scroll-to-program="scrollToProgramRow"
     />
 
+    <!-- 行级权限读不到：整表只读，给原因与重试（R7；原先读不到按全权放开） -->
+    <el-alert v-if="rowAccessState === 'error'" type="warning" :closable="false" show-icon class="gt-a-program-console__access-error">
+      <span>无法读取本表的行级权限（{{ rowAccessError }}），为避免误改暂时只读</span>
+      <el-button size="small" @click="loadRowAccess()">重试</el-button>
+    </el-alert>
+
     <!-- ─── 程序清单表格 ─── -->
     <el-table
       ref="tableRef"
@@ -367,8 +373,9 @@
       <!-- 状态（legacy：无 task overlay 时保留原有下拉编辑） -->
       <el-table-column v-if="!taskOverlayActive" label="状态" width="120" align="center">
         <template #default="{ row }">
+          <!-- 适用行：待执行 / 执行中 / 已完成（委派人另可裁剪）；不适用行只显示状态，恢复走「恢复执行」（R4） -->
           <el-dropdown
-            v-if="!readonly && canEditRow(row) && (canTrim || row.status !== PROC_STATUS.NOT_APPLICABLE)"
+            v-if="!readonly && canEditRow(row) && row.status !== PROC_STATUS.NOT_APPLICABLE"
             trigger="click"
             @command="(cmd: string) => handleStatusChange(row, cmd)"
           >
@@ -382,6 +389,7 @@
             </el-tag>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item command="pending">待执行</el-dropdown-item>
                 <el-dropdown-item command="in_progress">执行中</el-dropdown-item>
                 <el-dropdown-item command="completed">已完成</el-dropdown-item>
                 <el-dropdown-item v-if="canTrim" command="not_applicable" divided>裁剪</el-dropdown-item>
@@ -423,6 +431,11 @@
           >
             {{ rowApplicabilityHint(row) }}
           </span>
+          <el-button
+            v-if="!readonly && canTrim && row.status === PROC_STATUS.NOT_APPLICABLE"
+            size="small" link type="primary" class="gt-a-program-console__row-restore"
+            @click="restoreProgramRow(row)"
+          >恢复执行</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -687,7 +700,7 @@ import { listAssignments } from '@/services/staffApi'
 import { ElMessage as _ElMsg, ElMessageBox as _ElBox } from 'element-plus'
 import { useProgramRowDelegate } from '@/composables/useProgramRowDelegate'
 // 行归属（只能改派给自己的行）+ 按行裁剪 / 恢复落到程序行任务（同 spec 需求 6 / 7）
-import { useProgramRowControl } from '@/composables/useProgramRowControl'
+import { restoredRowText, useProgramRowControl } from '@/composables/useProgramRowControl'
 import { PROCEDURE_EXECUTION_STATUS as PROC_STATUS } from '@/constants/statusEnum'
 
 // ─── Types ───
@@ -833,6 +846,7 @@ const {
 // 行归属 + 按行裁剪 / 恢复（composable: useProgramRowControl）
 const {
   fullPower: rowFullPower, canTrim, canEditRow, assigneeOf, loadAccess: loadRowAccess, applyRows,
+  accessState: rowAccessState, accessError: rowAccessError,
 } = useProgramRowControl({ projectId: () => projectId.value, wpId: () => props.wpId, sheetName: () => props.sheetName })
 watch(() => [props.wpId, props.sheetName], () => { loadRowAccess() }, { immediate: true })
 
@@ -1252,11 +1266,8 @@ async function handleStatusChange(row: ProgramRow, newStatus: string) {
   // Direct status change (no reason required for non-trim)
   const idx = programs.value.findIndex(p => p.id === row.id)
   if (idx >= 0) {
-    if (programs.value[idx].status === PROC_STATUS.NOT_APPLICABLE) {
-      // 恢复：先落到程序行任务（任务回到待委派、须重新委派），成功才改页面
-      if (!(await applyRows('restore', [row])).size) return
-      programs.value[idx].trim_reason = ''
-    }
+    // 不适用行不经下拉改状态：恢复是独立动作（restoreProgramRow），恢复后待执行、须重新委派（R4）
+    if (programs.value[idx].status === PROC_STATUS.NOT_APPLICABLE) return
     programs.value[idx].status = newStatus
     emit('program-status-change', { programId: row.id, status: newStatus })
     // 持久化到 FieldOverrideService（跨模块可读，如 A1 进度联动）
@@ -1265,19 +1276,35 @@ async function handleStatusChange(row: ProgramRow, newStatus: string) {
   }
 }
 
+/** 恢复执行：先落到程序行任务（任务回到待委派），成功才改页面；状态置待执行并提示重新委派（R4） */
+async function restoreProgramRow(row: ProgramRow) {
+  const res = await applyRows('restore', [row])
+  if (!res.done.size) return
+  row.status = PROC_STATUS.PENDING
+  row.trim_reason = ''
+  emit('program-status-change', { programId: row.id, status: row.status })
+  _ElMsg.success(restoredRowText(res))
+  debounceSave()
+  await refreshRowViews()
+}
+
+/** 裁剪 / 恢复后执行人变了：重读行归属，有任务视图时同步重拉任务字段（不显示过期执行人，R4） */
+const refreshRowViews = async () => { await loadRowAccess(); if (taskOverlayActive.value) await refreshOverlayFromServer() }
+
 async function confirmTrim() {
   const { programId, reason } = trimForm.value
   if (!reason.trim()) return
 
   const idx = programs.value.findIndex(p => p.id === programId)
   // 先落到程序行任务（委派 / 可见性都认它），成功才改页面；失败保持原状（已提示）
-  if (idx < 0 || !(await applyRows('trim', [programs.value[idx]], reason.trim())).size) return
+  if (idx < 0 || !(await applyRows('trim', [programs.value[idx]], reason.trim())).done.size) return
   programs.value[idx].status = 'not_applicable'
   programs.value[idx].trim_reason = reason.trim()
 
   emit('program-trim', { programId, reason: reason.trim() })
   trimDialogVisible.value = false
   debounceSave()
+  await refreshRowViews()
 }
 
 function openBatchTrimDialog() {
@@ -1318,7 +1345,7 @@ async function confirmBatchTrim() {
   if (!reason) return
 
   const rows = programs.value.filter(p => selectedIds.value.includes(p.id))
-  const done = await applyRows('trim', rows, reason) // 逐行落到程序行任务，只改成功的
+  const { done } = await applyRows('trim', rows, reason) // 逐行落到程序行任务，只改成功的
   rows.filter(r => done.has(String(r.program_no))).forEach(r => {
     r.status = 'not_applicable'
     r.trim_reason = reason
@@ -1328,6 +1355,7 @@ async function confirmBatchTrim() {
   selectedIds.value = []
   batchTrimDialogVisible.value = false
   debounceSave()
+  if (done.size) await refreshRowViews()
 }
 
 function handleIndexChipClick(resolved: ResolvedIndexRef) {

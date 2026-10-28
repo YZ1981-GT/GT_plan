@@ -48,18 +48,13 @@ class G14CreditImpairmentLossService:
             + float(other_movement or 0)
         )
 
-    @staticmethod
-    def migrate_reversal_to_positive(reversal: float) -> float:
-        """旧版带符号负数转回 → 正数口径。"""
-        n = float(reversal or 0)
-        return abs(n) if n < 0 else n
-
     def validate_roll_forward_rows(self, rows: list[dict]) -> list[RollForwardError]:
         errors: list[RollForwardError] = []
         for row in rows:
             opening = float(row.get("openingProvision") or 0)
             provision = float(row.get("currentProvision") or 0)
-            reversal = self.migrate_reversal_to_positive(row.get("currentReversal") or 0)
+            # 转回按录入值（与模板 J=F+G-H-I 及前端同）；原先取绝对值，录入负数时与前端算出的期末不同
+            reversal = float(row.get("currentReversal") or 0)
             writeoff = float(row.get("currentWriteoff") or 0)
             other = float(row.get("otherMovement") or 0)
             closing = float(row.get("closingProvision") or 0)

@@ -598,8 +598,7 @@ async function handleAiAssist(): Promise<void> {
 // ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
 
 const showSamplingDialog = ref(false)
-// 优先用项目审计年度（props.year），缺失才回退当前年
-const currentYear = computed(() => props.year ?? new Date().getFullYear())
+const currentYear = computed<number | null>(() => props.year ?? null)
 
 function handleVoucherFilled(payload: any): void {
   const vouchers = payload?.samples ?? []

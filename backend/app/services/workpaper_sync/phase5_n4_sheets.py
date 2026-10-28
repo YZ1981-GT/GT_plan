@@ -14,11 +14,11 @@ spec: n-cycle-sync-foundation-and-first-canary · N4 canary · Task 3
 加总 + 裸 IF 变动率），写它会毁掉整册「审定表取数自明细表」的联动，与 L1 的 `审定表L1-1`
 完全同构。
 
-🔴 模板**既知缺陷**（记录型锁定，SHALL NOT 改 .xlsx）：
-  - `E9 = '=B9+C9+N4'`（r9 消费税）—— 第三加数应为 `D9`，误写 `N4`（被 Excel 当列引用、恒空
-    ⇒ 静默吞第三分量，NC-32 A1 族）。`FORMULA_TEMPLATES['E']` 以正确形态 `=B{row}+C{row}+D{row}`
-    为模板；r9 的异常只在守卫里以记录型断言锁定，不在 materialize 时"修复"（修复属模板修订另案）。
-  - `D19 = '=SUM(D4:N18)'`（footer D 列 SUM 越界到 N 列/从 r4 起）—— 同属模板缺陷，记录型锁定。
+模板原有两处公式缺陷已按会计口径修正（spec oo-writeback-template-parity-closure R1，
+`scripts/fix/fix_template_formula_defects.py`）：
+  - `E9` 原为 `=B9+C9+N4`（r9 消费税第三加数误写 `N4`，被 Excel 当列引用、恒空 ⇒ 静默吞掉
+    重分类调整，NC-32 A1 族），现为 `=B9+C9+D9`，与 r10~r18 同形；
+  - `D19` 原为 `=SUM(D4:N18)`（footer D 列区间越界），现为 `=SUM(D9:D18)`。
 
 模板已净化（Task 7a `sanitize_n4_template_external_links.py` 删 2 外链部件 + 中性化隐藏「原底稿」
 册的 5 个外部引用公式，留 `.preclean.bak`）；受管 sheet 逐格 0 diff，故 `TEMPLATE_SHA256`
@@ -48,9 +48,9 @@ ADAPTER_ID: Final[str] = "n4.taxes_and_surcharges"
 WP_CODES: Final[frozenset[str]] = frozenset({"N4T"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "N/N4 税金及附加.xlsx"
-#: 🔴 净化后 sha256（Task 7a）—— 读模板时 fail-closed 校验。
+#: 🔴 净化（Task 7a）+ 公式修正（oo-writeback-template-parity-closure R1）后的 sha256 —— 读模板时 fail-closed 校验。
 TEMPLATE_SHA256: Final[str] = (
-    "2005eada32506e9e2b1b6f68c704ca4f6626b8a78e9e2a3a221ca00602cad638"
+    "28e4b30f1c3f6123860a10989318e40304b7004272e78df835e6029ec39fcc08"
 )
 MANAGED_SHEET: Final[str] = "税金及附加明细表N4-2"
 #: 🔴 派生只读投影表：r7~r15 全公式（跨表引用 N4-2 + 加总 + 裸 IF），一格不写。
@@ -122,8 +122,7 @@ MANAGED_FIELD_SPECS_7: Final[
 )
 
 #: 三个公式列的模板形态（本期审定数 = 本期未审+账项+重分类；上期同；差异 = 本期审定−应交税费贷方）。
-#: 🔴 r9 消费税的 E 列模板缺陷（`=B9+C9+N4`）不进这里 —— 这里是**正确**形态（以 r10 为模板），
-#:    缺陷只在守卫里记录型锁定。
+#: 模板 r9~r18 逐行就是这三条（r9 的 E 列原为 `=B9+C9+N4`，已修模板）。
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {
     "E": "=B{row}+C{row}+D{row}",
     "I": "=F{row}+G{row}+H{row}",
@@ -159,7 +158,7 @@ SPEC_N42: Final[RowTableSheetSpec] = RowTableSheetSpec(
     aging_layout=None,
     aging_groups=(),
     footer_marker=FOOTER_MARKER,
-    #: footer B19~K19 连续列（除 A 标签）全是 `=SUM(X9:X18)` ⇒ 真有公式（D19 是越界缺陷，记录型锁）。
+    #: footer B19~K19 连续列（除 A 标签）全是 `=SUM(X9:X18)` ⇒ 真有公式（D19 原越界，已修模板）。
     footer_carries_total_formula=True,
     #: 🔴 footer 标签在 A19（引擎默认即 A 列，与 L1 的 C 列不同）。
     footer_search_column=FOOTER_SEARCH_COLUMN,
@@ -193,7 +192,7 @@ _HTML_STORE_NOTE: Final[str] = (
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 逐格实测权威模板 N/N4 税金及附加.xlsx（9 sheet，净化后 sha256 2005eada）的受管 sheet "
+    "openpyxl 逐格实测权威模板 N/N4 税金及附加.xlsx（9 sheet，净化 + 公式修正后 sha256 28e4b30f）的受管 sheet "
     "税金及附加明细表N4-2：单级表头 行 8（项目/本期未审数/账项调整/重分类调整/本期审定数/上期未审数/"
     "账项调整/重分类调整/上期审定数/应交税费贷方金额/与应交税费贷方差异），11 列 A-K，数据区 9-18"
     "（r9~r16 预印 8 税种名 消费税/城市维护建设税/教育费附加/资源税/房产税/土地使用税/车船使用税/"
@@ -202,6 +201,7 @@ _REVIEWED_BASIS: Final[str] = (
     "K=E-J（与应交税费贷方差异）。册内零 Excel Table、零 definedName ⇒ GT_N42_ROWS 为本契约新建、"
     "UUID 列取 max_column+1 = L。整册裸 IF 20 格全在派生表 税金及附加审定表N4-1（K/M 列变动率），"
     "受管表零命中（per-file 策略仍挂中性化）。🔴 canary 不选 税金及附加审定表N4-1：该表 r7~r15 "
-    "无一个可输入格（全是跨表引用 N4-2 + 加总 + 裸 IF 变动率）。🔴 模板既知缺陷 E9=`=B9+C9+N4`"
-    "（第三加数误写列引用）与 D19=`=SUM(D4:N18)`（越界）记录型锁定，不改模板。"
+    "无一个可输入格（全是跨表引用 N4-2 + 加总 + 裸 IF 变动率）。模板原有缺陷 E9=`=B9+C9+N4`"
+    "（第三加数误写列引用）与 D19=`=SUM(D4:N18)`（越界）已修为 `=B9+C9+D9` / `=SUM(D9:D18)`"
+    "（spec oo-writeback-template-parity-closure R1）。"
 )

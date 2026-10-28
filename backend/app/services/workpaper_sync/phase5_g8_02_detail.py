@@ -24,53 +24,22 @@ spec: `g-cycle-single-region-detail-lanes` · Task 9b / C-8
 ⇒ 模板的三个 OCI 列（`F` 期初累计 / `L` 本期转留存 / `R` 期末累计）是 CAS22 要求的。
 G9/G10 删 OCI 的依据是「那两张表全 FVTPL」，对 G8 **反向**成立。同理 G6（其他债权投资）。
 
-═══ 🔴 模板四处行级缺陷 ⇒ `R`/`T` 判 editable、`M`/`P` 不进 formula_templates ═══
+═══ 模板行级缺陷已修（spec oo-writeback-template-parity-closure R1）═══
 
-逐行实测 R11-R20：
+修复前逐行实测 R11-R20：`M` 在 R11 是 `=SUM(I:L)`、其余 `=SUM(I:K)`；`P` 只有 R12 含 K；
+`R` 在 R13-R20 整格无公式；`T` 在 R12 整格无公式；合计行 K / L / R 三列无 SUM。
+当时为避开 `ProtectedRegionWriteError`（`mode=formula` 的格模板里必须真有公式），`R`/`T` 只能判
+editable，OO 侧可填、回到表单又被前端重算覆盖（如实登记的欠账）。
 
-| 行 | `M` 本期变动合计 | `P` 期末累计FV变动 | `R` 期末OCI累计 | `T` 审定数 |
-|---|---|---|---|---|
-| R11 | `=SUM(I:L)` ✅含 L | `=D+J` ❌漏 K | ✅ `=F+J+L` | ✅ `=Q+S` |
-| R12 | `=SUM(I:K)` ❌漏 L | `=D+J+K` ✅含 K | ✅ `=F+J+L` | ❌**无公式** |
-| R13..R20 | `=SUM(I:K)` ❌漏 L | `=D+J` ❌漏 K | ❌**无公式** | ✅ `=Q+S` |
+现已用 `scripts/fix/fix_template_formula_defects.py` 把模板逐行统一为
+`M=SUM(I:K)` / `P=D+J+K` / `R=F+J+L` / `T=Q+S`（合计行补 K / L / R），于是：
 
-会计判读：`M` 应含 L · `P` 应含 K · `R` 与 `T` 每行都该有（都是恒等式）。
-即 **R11 与 R12 各对一半、R13-R20 两处都漏**，且 R12 缺 T、R13-R20 缺 R。
-与 G5「三段合计各漏加一个小计」同族 —— 本 spec 已确立的规则：**模板真实缺陷走覆盖层，
-不改模板字节**（`backend/wp_templates/` 运行时只读 + sha 冻结）。
+* 八个公式列 **E·H·M·O·P·Q·R·T** 逐行同形，全部进 :data:`FORMULA_TEMPLATES_G802`，判据逐格比对；
+* `R`/`T` 改判 **formula**（受保护，OO 侧改不了，与前端只读公式格一致）。
 
-处置由框架层的**两条硬约束**唯一确定，不是风格选择：
-
-1. `contracts._parse_table` 的 **CS-13**：`mode=formula` 的列必须落在 `formula_mask`
-   覆盖的列跨度内（`formula_mask` 由 `formula_columns` 现算）。
-2. `excel_materialize` 写受保护格时的 **`ProtectedRegionWriteError`**：`mode=formula` 的
-   格在模板里**必须真有公式**（`view.has_formula`），否则直接抛。
-
-⇒ 逐列裁决：
-
-* `M`/`P`：模板每行**都有**公式（只是口径逐行不同）⇒ 可判 `formula`，进
-  :data:`FORMULA_COLUMNS_G802`（受保护，OO 侧改不了）。但**不进**
-  :data:`FORMULA_TEMPLATES_G802` —— 它们逐行不同形，单条模板表达不了；逐行实测落
-  :data:`TEMPLATE_ROW_FORMULAS_G802`，由判据按行比对。
-* `R`/`T`：模板在 R13-R20 / R12 **整格无公式** ⇒ 判 `formula` 会让 materialize 抛
-  ⇒ 只能判 **`editable`**。这正是判据 P12 要求证明的「R13 的 `R` 列与 R12 的 `T` 列
-  **不被误标** formula」—— 它的技术根据就是上面第 2 条硬约束。
-
-🔴 **因此 `R`/`T` 两列会双向同步**：OO 侧可以填，回写 store 后前端
-`useG8Detail.enrichG8DetailRow` 按会计恒等式（`R=F+J+L` / `T=Q+S`）**重算覆盖**。
-这个「OO 侧改动被前端重算」是如实登记的欠账（见 spec evidence
-`task9b-c8-g8-rootfix.md` §3.2），根因是模板漏了这两列的公式：修模板要么改字节
-（`backend/wp_templates/` 运行时只读 + sha 冻结，禁止）、要么走覆盖层（框架层尚无该
-机制）+ 会计专业复核，两者都不在本 lane 范围。前端 UI 已把这两列渲染成只读公式格，
-用户在平台侧不会误填。
-
-🔴 **裁决 G1R-H3 的两处措辞需修正**（实测后）：
-① 「拆 `g802-r11` + `g802-r12plus`（或三 spec）」**不可行** —— 引擎只支持
-`row_section_field`（按**字段值**过滤），而 G8 是连续 R11-R20 里逐行公式不同，前端数组
-没有也不该有区归属字段（行的物理位置不是业务属性，那会变成 BP-11 语义耦合行身份的
-同族问题）。单 spec + 逐行实测台账是正解。
-② 「并集取 formula、交集取 editable」若按字面取并集，`R`/`T` 都会标 formula ⇒ 撞
-`ProtectedRegionWriteError`。正确口径是「**模板每行都有公式**才可判 formula」。
+🔴 `M` 不含 L（推翻 C-6 §3.3「M 应含 L」的判读）：`M` 是投资账面的本期变动，必须满足
+`E + M = Q`；`L`「其他综合收益转入留存收益」是终止确认时权益内部的结转（注3），只减少 `R`
+列的 OCI 累计、不改变投资账面。修复前 10 行里 9 行本就是 `SUM(I:K)`，只有 R11 多加了 L。
 
 ═══ 字段键逐字取自前端行接口 ═══
 
@@ -93,9 +62,6 @@ __all__ = [
     "STORE_ITEM_ID_G802",
     "FORMULA_TEMPLATES_G802",
     "FORMULA_COLUMNS_G802",
-    "TEMPLATE_ROW_FORMULAS_G802",
-    "FRONTEND_DERIVED_COLUMNS_G802",
-    "TEMPLATE_ROW_DEFECTS_G802",
     "FIELD_SPECS_G802",
     "FOOTER_ROW_G802",
 ]
@@ -116,51 +82,20 @@ LAST_DATA_ROW_G802: Final[int] = 20
 FOOTER_ROW_G802: Final[int] = 21
 FOOTER_MARKER_G802: Final[str] = "合计"
 
-#: 公式列（受 `formula_mask` 保护，OO 侧改不了）。
-#:
-#: 🔴 判据是「模板 **R11-R20 每行都有公式**」，不是「公式逐行同形」：
-#: * `M`/`P` 每行都有（口径逐行不同，见 :data:`TEMPLATE_ROW_FORMULAS_G802`）⇒ 在此表内；
-#: * `R`/`T` 在 R13-R20 / R12 整格无公式 ⇒ **不在**此表，判 `editable`
-#:   （判 formula 会撞 `excel_materialize` 的 `ProtectedRegionWriteError`）。
-FORMULA_COLUMNS_G802: Final[tuple[str, ...]] = ("E", "H", "M", "O", "P", "Q")
-
-#: 公式列 → 数据行公式模板（`{r}` 为行号）。只放 R11-R20 **逐行同形**的四列，
-#: 判据可逐格比对。`M`/`P` 逐行不同形（单条模板表达不了）⇒ 见
-#: :data:`TEMPLATE_ROW_FORMULAS_G802`。
+#: 公式列 → 数据行公式模板（`{r}` 为行号）。模板 R11-R20 逐行同形，判据逐格比对。
 FORMULA_TEMPLATES_G802: Final[dict[str, str]] = {
     "E": "=SUM(C{r}:D{r})",         # 期初合计 = 成本 + 累计公允价值变动
     "H": "=E{r}+G{r}",              # 期初审定数
+    "M": "=SUM(I{r}:K{r})",         # 本期变动合计 = 成本 + 公允价值变动 + 处置结转（= Q − E）
     "O": "=C{r}+I{r}",              # 期末成本（未审线）
+    "P": "=D{r}+J{r}+K{r}",         # 期末累计公允价值变动（含处置结转）
     "Q": "=SUM(O{r}:P{r})",         # 期末合计 = 期末成本 + 期末累计公允价值变动
+    "R": "=F{r}+J{r}+L{r}",         # 期末 OCI 累计 = 期初累计 + 本期公允价值变动 + 转入留存收益
+    "T": "=Q{r}+S{r}",              # 期末审定数
 }
 
-#: 🔴 `M`/`P` 的**逐行实测**公式（`(column, row) -> 公式`）。判据按它逐格比对 ——
-#: 一旦模板被修复成逐行同形，判据会红并提示把该列提进 `FORMULA_TEMPLATES_G802`
-#: （而不是静默失配）。
-TEMPLATE_ROW_FORMULAS_G802: Final[dict[tuple[str, int], str]] = {
-    **{("M", 11): "=SUM(I11:L11)"},                                  # ✅ 含 L
-    **{("M", r): f"=SUM(I{r}:K{r})" for r in range(12, 21)},          # ❌ 漏 L
-    **{("P", 12): "=D12+J12+K12"},                                   # ✅ 含 K
-    **{("P", r): f"=D{r}+J{r}" for r in (11, *range(13, 21))},        # ❌ 漏 K
-}
-
-#: 🔴 由**前端**按会计恒等式重算的派生列（`mode=editable`，因模板部分行无公式）。
-#: OO 侧可填，但回写 store 后前端 `enrichG8DetailRow` 会重算覆盖 —— 见模块头。
-FRONTEND_DERIVED_COLUMNS_G802: Final[dict[str, str]] = {
-    "R": "F+J+L",       # 期末 OCI 累计（模板 R13-R20 整格无公式）
-    "T": "Q+S",         # 期末审定数（模板 R12 整格无公式）
-}
-
-#: 模板行级缺陷台账（逐格实测）。判据按它断言「缺陷仍在」—— 一旦模板被修复，
-#: 判据会红，提示同步更新本表与 `FORMULA_COLUMNS_G802`（而不是静默失配）。
-TEMPLATE_ROW_DEFECTS_G802: Final[
-    tuple[tuple[str, tuple[int, ...], str], ...]
-] = (
-    ("M", tuple(range(12, 21)), "=SUM(I{r}:K{r}) 漏加 L（其他综合收益转入留存收益）"),
-    ("P", (11, *range(13, 21)), "=D{r}+J{r} 漏加 K（处置时公允价值变动结转）"),
-    ("R", tuple(range(13, 21)), "整格无公式，会计上应为 =F{r}+J{r}+L{r}"),
-    ("T", (12,), "整格无公式，会计上应为 =Q{r}+S{r}"),
-)
+#: 公式列（受 `formula_mask` 保护，OO 侧改不了）：模板 R11-R20 每行都有公式。
+FORMULA_COLUMNS_G802: Final[tuple[str, ...]] = tuple(FORMULA_TEMPLATES_G802)
 
 #: 23 个受管字段（7 元组 `(column_key, column, mode, value_type, json_key, header_text, group_header_cell)`）。
 #:
@@ -194,24 +129,19 @@ FIELD_SPECS_G802: Final[
         "oci_to_retained_earnings", "L", "editable", "amount", "ociToRetainedEarnings",
         "其他综合收益转入留存收益", "I9",
     ),
-    #: 🔴 mode=formula 但不在 FORMULA_COLUMNS（模板 R12-R20 漏加 L）
     ("movement_total", "M", "formula", "amount", "movementTotal", "合计", "I9"),
     ("dividend_income", "N", "editable", "amount", "dividendIncome", "本期确认的股利收入", "I9"),
     # ── O9:R9 期末余额（三分量 + OCI 旁列）────────────────────────────
     ("closing_cost", "O", "formula", "amount", "closingCost", "成本", "O9"),
-    #: 🔴 mode=formula 但不在 FORMULA_COLUMNS（模板仅 R12 含 K）
     ("closing_fv_accum", "P", "formula", "amount", "closingFvAccum", "累计公允价值变动", "O9"),
     ("closing_total", "Q", "formula", "amount", "closingTotal", "合计", "O9"),
-    #: 🔴 判 editable：模板 R13-R20 整格无公式，判 formula 会撞 ProtectedRegionWriteError
-    #:   （判据 P12 要求证明的正是这条）。前端按 `=F+J+L` 重算覆盖。
     (
-        "closing_oci_cumulative", "R", "editable", "amount", "closingOciCumulative",
+        "closing_oci_cumulative", "R", "formula", "amount", "closingOciCumulative",
         "计入其他综合收益的累计利得或损失", "O9",
     ),
     # ── S / T 单列（调整数 / 审定数）──────────────────────────────────
     ("closing_adjustment", "S", "editable", "amount", "closingAdjustment", "调整数", ""),
-    #: 🔴 判 editable：模板 R12 整格无公式（同上）。前端按 `=Q+S` 重算覆盖。
-    ("closing_adjusted", "T", "editable", "amount", "closingAdjusted", "审定数", ""),
+    ("closing_adjusted", "T", "formula", "amount", "closingAdjusted", "审定数", ""),
     # ── U / V / W 单列说明（均跨 R9:R10 合并）─────────────────────────
     (
         "designation_reason", "U", "editable", "text", "designationReason",

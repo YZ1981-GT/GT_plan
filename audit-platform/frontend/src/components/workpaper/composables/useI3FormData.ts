@@ -12,6 +12,7 @@
  * - projectContext加载（含business_category/applicable_standards）
  * - TB自动取数 unadjusted_amount → 审定表未审数（仅1711）
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -272,11 +273,7 @@ export function useI3FormData(wpId: Ref<string>, projectId: Ref<string>) {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1711' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1711' })).rows
 
       let goodwill1711 = 0
       let found1711 = false
@@ -284,7 +281,7 @@ export function useI3FormData(wpId: Ref<string>, projectId: Ref<string>) {
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
         if (code.startsWith(ACCOUNT_CODE_1711)) {
-          goodwill1711 = Number(item.unadjusted_amount ?? 0)
+          goodwill1711 += Number(item.unadjusted_amount ?? 0) // 科目及其明细之和（原先 `=` 覆盖）
           found1711 = true
         }
       }

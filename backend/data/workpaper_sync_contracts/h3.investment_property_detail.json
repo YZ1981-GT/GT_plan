@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "868f045f9ce18da18a58e449089d4d86eb9744587d7faa42803359c0a72b04cf",
+  "instrumentation_definition_sha256": "a347721e3a0dd0978eb0857da5865b7ff8173927e462000f0d60e212a570ec2c",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -220,7 +220,7 @@
         "H3-2-cost-rows",
         "H3-2-fair-rows"
       ],
-      "note": "H3 投资性房地产是 H 循环**首条变体轴 entry**：同一 wp_code 下两套并列明细表（成本模式 / 公允价值模式），源模板 sheet 名不同但 sheet_code 尾码相同，且两套**各有独立持久化键**（H3-2-cost-rows / H3-2-fair-rows）⇒ 两张都进受管面，各自一个 RowTableSheetSpec。计量模式本身持久化在 useH3MeasurementModel.ts。两张 sheet 的行数据都存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 **覆盖率远低于前五条 entry，低不是漏做而是两侧口径正交**：成本模式 17/45（38%）· 公允模式 6/27（22%），对照 H2 34/50、H8 58/58。模板把调整按**作用位置**分段（期初调整 / 账项调整本期增减 / 审定期初·增·减），前端按**调整来源**分档（costAje 审计调整 / costRje 重分类调整）且两档都作用在期末口径上（costAudited = costUnadj + costAje + costRje，costUnadj 默认取期末）。两套分类是正交维度，不存在 1:1 映射 —— 硬凑会产出**不可见错数**（映到期初调整会让审定本期发生额算错），宁可留**可见缺口**。两侧只在**期末**这一点上对齐：O↔costAudited / AB↔depAudited / AO↔impairAudited / AQ↔netAudited。🔴 公允模式更低的额外原因：前端 fairValueBegin/End 是**含累计公允变动的总额**（calcFairEndBalance 把 change 加了进去），而模板把「原值 C..O」与「公允价值变动 P..W」分成两块、净值才是两者之和（X=L+U / Y=O+W）⇒ 原值整块无对端；把总额映进原值列会让 X 把公允变动**重复计一次**。能对上的只有 Q↔fairValueChange、V↔fvChangeAudited（🔴 是 V 不是 W —— 前端 fvChangeUnadj 默认取本年变动，映到审定期末累计会差一个期初）、Y↔fairAudited、AA↔mortgaged。🔴 **八条缺口逐条登记**（见 review.declared_coverage_gaps），各带停下报告点：四段↔四分正交 ×2、增减金额 1 格对 2 字段（transferIn/Out 是活字段不能像 H2-GAP-2 那样折叠）、增减方式两列对一个混装双向的 changeType ×2、「是否有权属证明」≠「是否权属受限」×2（权属核对另有 产权核对表H3-12）、公允总额口径不同源。🔴 **模板真实缺陷一处**（见 review.template_defects）：公允模式 `R` 列（公允价值变动·未审·期末余额）只有首行 R12 有 `=P12+Q12`，R13-R26 共 14 行缺公式；对照 H7 公允同位列 S 满格 25/25 ⇒ H3 独有漏填。后果是同一张表里审定段算得出期末、未审段算不出。走覆盖层不改模板字节（同 F2-26!J9 / F5-7!G31）。🔴 三处不能照抄前五条：**三级**表头 R9/R10/R11（H4/H8/H2 是四级）· 两张 sheet 数据区起始行不同（成本 R13-R27 / 公允 R12-R26，照抄任一张会让另一张 merge 越界）· footer 全是列 SUM（H2 有 4 格行内派生 ⇒ 那条判据在此不适用）。",
+      "note": "H3 投资性房地产是 H 循环**首条变体轴 entry**：同一 wp_code 下两套并列明细表（成本模式 / 公允价值模式），源模板 sheet 名不同但 sheet_code 尾码相同，且两套**各有独立持久化键**（H3-2-cost-rows / H3-2-fair-rows）⇒ 两张都进受管面，各自一个 RowTableSheetSpec。计量模式本身持久化在 useH3MeasurementModel.ts。两张 sheet 的行数据都存成 checklist_responses 的 **remark** JSON 数组，按 stable field + 行身份 `rowId` 拆开。🔴 **覆盖率远低于前五条 entry，低不是漏做而是两侧口径正交**：成本模式 17/45（38%）· 公允模式 6/27（22%），对照 H2 34/50、H8 58/58。模板把调整按**作用位置**分段（期初调整 / 账项调整本期增减 / 审定期初·增·减），前端按**调整来源**分档（costAje 审计调整 / costRje 重分类调整）且两档都作用在期末口径上（costAudited = costUnadj + costAje + costRje，costUnadj 默认取期末）。两套分类是正交维度，不存在 1:1 映射 —— 硬凑会产出**不可见错数**（映到期初调整会让审定本期发生额算错），宁可留**可见缺口**。两侧只在**期末**这一点上对齐：O↔costAudited / AB↔depAudited / AO↔impairAudited / AQ↔netAudited。🔴 公允模式更低的额外原因：前端 fairValueBegin/End 是**含累计公允变动的总额**（calcFairEndBalance 把 change 加了进去），而模板把「原值 C..O」与「公允价值变动 P..W」分成两块、净值才是两者之和（X=L+U / Y=O+W）⇒ 原值整块无对端；把总额映进原值列会让 X 把公允变动**重复计一次**。能对上的只有 Q↔fairValueChange、V↔fvChangeAudited（🔴 是 V 不是 W —— 前端 fvChangeUnadj 默认取本年变动，映到审定期末累计会差一个期初）、Y↔fairAudited、AA↔mortgaged。🔴 **八条缺口逐条登记**（见 review.declared_coverage_gaps），各带停下报告点：四段↔四分正交 ×2、增减金额 1 格对 2 字段（transferIn/Out 是活字段不能像 H2-GAP-2 那样折叠）、增减方式两列对一个混装双向的 changeType ×2、「是否有权属证明」≠「是否权属受限」×2（权属核对另有 产权核对表H3-12）、公允总额口径不同源。模板缺陷一处已修（见 review.template_defects）：公允模式 `R` 列（公允价值变动·未审·期末余额）原先只有首行 R12 有 `=P12+Q12`，R13-R26 共 14 行缺公式，已在权威模板字节上补齐（spec oo-writeback-template-parity-closure R1）。🔴 三处不能照抄前五条：**三级**表头 R9/R10/R11（H4/H8/H2 是四级）· 两张 sheet 数据区起始行不同（成本 R13-R27 / 公允 R12-R26，照抄任一张会让另一张 merge 越界）· footer 全是列 SUM（H2 有 4 格行内派生 ⇒ 那条判据在此不适用）。",
       "payload_column": "remark",
       "payload_column_mode": "dual_write_remark_and_conclusion",
       "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts —— `_persist()` 走 api.put { item_id: 'H3-2-cost-rows' | 'H3-2-fair-rows', remark: JSON.stringify(rows) }",
@@ -289,8 +289,9 @@
         "cells": "R13:R26",
         "consequence": "第 2 行起填 P（期初累计公允变动）与 Q（本年变动）后 R（期末）不自动算 ⇒ 未审期末累计公允变动漏算。审定侧 U/V/W 满格有公式，于是同一张表里审定段算得出期末、未审段算不出（模板内部自相矛盾）。",
         "defect_id": "H3F-TPL-1",
-        "disposition": "走覆盖层补公式，不改模板字节（同 F2-26!J9 / F5-7!G31 两例）。R 本身无前端对端 ⇒ 同时判 template-only，回写不碰它。",
+        "disposition": "已改权威模板字节补齐 R13:R26（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。R 本身无前端对端 ⇒ 仍判 template-only，回写不碰它。",
         "expected": "=P{r}+Q{r}",
+        "handling": "template_fixed",
         "kind": "missing_formula",
         "measured": "仅 R12 有 `=P12+Q12`；R13-R26 共 14 行为空（无公式）。对照组：H7 公允价值模式同位列 S 满格 25/25 有 `=Q+R`。",
         "sheet": "明细表（公允价值模式）H3-2"
@@ -962,9 +963,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "ad8b578375360b55a8c3ecb454448ac36f6b6f12c1a1512d4e8bf801d9922de6",
+    "normalized_structure_hash": "fc074951ce4c1e40672473d8234ba326accf3d91abed82f8910b3a9d9742d889",
     "relative_path": "H/H3 投资性房地产.xlsx",
-    "template_sha256": "ca856caebfc5b09b3ad9fbe3980ccf8e5c46260da9ba1a0ecd8acdb44498bc89"
+    "template_sha256": "a103d407b20608eb349dc1234f440c1e3f158a39913a304e5494f0c0f056013c"
   },
-  "template_definition_sha256": "90ff75ab7dc97e5641313e7947a3761acd3404c2f0966a54f64e3b92ebc68144"
+  "template_definition_sha256": "d9fa6fbaf55825f305d160174c87439d8c054ac68a7df1b041f61fa4e2619716"
 }

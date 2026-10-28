@@ -31,6 +31,7 @@ P2：13 张全命中裸 IF（每张 ≥ 1）—— 这是 G 循环审定表最�
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -277,20 +278,23 @@ class TestP4EngineNowExists:
 
 
 class TestP5G51OutOfBoundDefect:
-    """G5-1!B35 的 `=B9-B225` 越界：B225 超出 max_row ⇒ 恒空 ⇒ B35 恒等于 B9。"""
+    """G5-1!B35 原为 `=B9-B225`（B225 超出 max_row ⇒ 恒空 ⇒ B35 恒等于 B9），已修为 `=B9-B22`。
 
-    def test_b35_formula_references_beyond_max_row(self) -> None:
-        """B35 公式引用 B225 而 max_row 远小于 225。"""
+    `oo-writeback-template-parity-closure` R1：净值行 = 余额行 − 同项目坏账准备行，
+    同行 C..H 列本就是 `X9-X22`，只有 B 列多打了一位。
+    """
+
+    def test_b35_is_balance_minus_allowance_like_the_rest_of_the_row(self) -> None:
         wb = openpyxl.load_workbook(
             TPL_G / "G5 长期应收款.xlsx", read_only=True, data_only=False
         )
-        ws = wb["审定表G5-1"]
-        b35 = ws.cell(row=35, column=2).value
-        assert b35 is not None and isinstance(b35, str), "B35 应是公式"
-        assert "B225" in b35.upper(), (
-            f"B35 公式不再引用 B225（公式={b35!r}）—— 越界已修？请翻面此判据"
-        )
-        assert ws.max_row < 225, (
-            f"max_row={ws.max_row} ≥ 225 —— 模板扩行了？越界缺陷可能已不成立"
-        )
-        wb.close()
+        try:
+            ws = wb["审定表G5-1"]
+            row = {col: ws[f"{col}35"].value for col in "BCDEFGH"}
+            max_row = ws.max_row
+        finally:
+            wb.close()
+        for col, f in row.items():
+            assert f == f"={col}9-{col}22", f"{col}35 实得 {f!r}，应为 ={col}9-{col}22"
+        refs = [int(m) for f in row.values() for m in re.findall(r"[A-Z]+(\d+)", f)]
+        assert max(refs) <= max_row, f"35 行公式引用到 R{max(refs)}，超出 max_row={max_row}"

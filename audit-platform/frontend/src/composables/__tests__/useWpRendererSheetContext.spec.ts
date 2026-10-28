@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PROGRAM_SHEET_ALIAS,
   resolveRenderSheet,
   resolveUniverSheetContext,
   resolveWorkpaperSheetContext,
@@ -46,6 +47,31 @@ describe('render sheet 的 canonical context 纯投影', () => {
     expect(resolveRenderSheet(SHEETS, '附注披露信息(上市公司)D0-8')?.sheet_name)
       .toBe('附注披露信息（上市公司）D0-8')
     expect(resolveRenderSheet(SHEETS, '不存在')).toBeNull()
+  })
+
+  it('程序表别名 @program ⇒ 第一张程序表页签；没有程序表 ⇒ null（调用方回退默认页签，R5）', () => {
+    const withProgram = [
+      sheet('底稿目录', null, 'b-index'),
+      sheet('与治理层沟通程序表A10', 'A10', 'a-program-console'),
+      sheet('另一张程序表', 'A10-2', 'a-program-console'),
+    ]
+    expect(resolveRenderSheet(withProgram, PROGRAM_SHEET_ALIAS)?.sheet_name).toBe('与治理层沟通程序表A10')
+    expect(resolveRenderSheet(SHEETS, PROGRAM_SHEET_ALIAS)).toBeNull()
+    expect(resolveRenderSheet(withProgram, 'program')).toBeNull()
+  })
+
+  it('循环册的程序表页按 sheet_type 认：真实 render-config 里程序表页的 componentType 是循环组件（R5）', () => {
+    // 形状取自 2026-10-26 实测 GET /api/workpapers/{E1}/render-config：32 页全是 e1-monetary-fund
+    const e1 = [
+      sheet('底稿目录', null, 'b-index', {}, { sheet_type: 'control_panel' }),
+      sheet('货币资金实质性程序表E1A', null, 'e1-monetary-fund', {}, { sheet_type: 'procedure' }),
+      sheet('货币资金审定表E1-1', null, 'e1-monetary-fund', {}, { sheet_type: 'audit_sheet' }),
+      sheet('货币资金实质性程序表E26A', null, 'e1-monetary-fund', {}, { sheet_type: 'procedure' }),
+    ]
+    expect(resolveRenderSheet(e1, PROGRAM_SHEET_ALIAS)?.sheet_name).toBe('货币资金实质性程序表E1A')
+    // 后端没给 sheet_type 时按表名启发式（与后端 _infer_sheet_type_by_heuristic 同口径）
+    const untyped = [sheet('底稿目录', null, 'b-index'), sheet('固定资产审计程序表H1A', null, 'h1-fixed-assets')]
+    expect(resolveRenderSheet(untyped, PROGRAM_SHEET_ALIAS)?.sheet_name).toBe('固定资产审计程序表H1A')
   })
 
   it('HTML、OnlyOffice 外层与整册产生互斥且完整的结构化 context（含 sheetUid）', () => {

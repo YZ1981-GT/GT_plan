@@ -885,6 +885,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
@@ -933,14 +934,14 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  year?: number
+  year?: number | null
 }>()
 /** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
 const EVIDENCE_SHEET = 'H1-7'
 const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 /** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
@@ -1125,6 +1126,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

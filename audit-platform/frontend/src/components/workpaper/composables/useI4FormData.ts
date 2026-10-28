@@ -15,6 +15,7 @@
  * - TB自动取数 unadjusted_amount → 审定表未审数（仅1801）
  * - setTbValues → 从render策略seed或TB手动设置未审数
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -295,11 +296,7 @@ export function useI4FormData(wpId: Ref<string>, projectId: Ref<string>) {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1801' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1801' })).rows
 
       let longTermPrepaid1801 = 0
       let found1801 = false
@@ -307,7 +304,7 @@ export function useI4FormData(wpId: Ref<string>, projectId: Ref<string>) {
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
         if (code.startsWith(ACCOUNT_CODE_1801)) {
-          longTermPrepaid1801 = Number(item.unadjusted_amount ?? 0)
+          longTermPrepaid1801 += Number(item.unadjusted_amount ?? 0) // 科目及其明细之和（原先 `=` 覆盖）
           found1801 = true
         }
       }

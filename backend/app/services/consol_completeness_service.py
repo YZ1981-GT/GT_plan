@@ -111,7 +111,7 @@ _KIND_PREFIX = {"branch": "分公司", "subsidiary": "子公司"}
 
 
 def _leaf_label(leaf, kinds: dict[str, str]) -> str:
-    """提示里的节点称呼：母公司数据节点的展示名已带「（母公司）/（本部）」，子公司、分公司加类型前缀。"""
+    """提示里的节点称呼：母公司数据节点的展示名已带「（单体母公司户）/（本部单体户）」，子公司、分公司加类型前缀。"""
     name = getattr(leaf, "display_name", None) or leaf.company_name or leaf.company_code
     prefix = _KIND_PREFIX.get(kinds.get(leaf.company_code, "subsidiary"))
     return f"{prefix} {name}" if prefix else name

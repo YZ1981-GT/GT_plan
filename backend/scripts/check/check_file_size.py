@@ -19,6 +19,7 @@ migration-runner-resilience / 全局改进 #5 落地。
 
 用法：
     python backend/scripts/check_file_size.py [files...]
+    python backend/scripts/check/check_file_size.py --staged --files-from -   # pre-commit：清单从标准输入读
 
 未传 files 则扫描 backend/app + audit-platform/frontend/src
 """
@@ -82,7 +83,9 @@ HARD_CAPS = {
     #   已拆为独立组件 NoteDocUploadDialog/NoteContentTemplatePicker/NoteContentTemplateApplyDialog）。
     # 2026-10-14：3300→3281（第二轮复盘：三个弹窗 + 新增保存弹窗收进 DisclosureNoteContentTools，
     #   编辑器只留 1 个挂载 + 1 个回调；按「每完成一批瘦身必须同步下调」不留余量）。
-    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3281,
+    # 2026-10-26：3281→3265（HEAD 已是 3265 —— 之前那批瘦身没同步下调，test_hard_cap_ratchet 在 HEAD 上就红；
+    #   本次 audit-year-calendar-fallback-ratchet 只改年度初值一行，行数不变）。
+    "audit-platform/frontend/src/views/DisclosureEditor.vue": 3265,
     # ReportView.vue：2026-09-28 由 1110 更正为 1949（= 当前真实行数，splitlines 口径）。
     #
     # 🔴 **1110 是从未成立过的理想值**，不是被违反的有效约束。实证行数史：
@@ -263,10 +266,26 @@ def main(argv: list[str] | None = None) -> int:
         help="按**暂存内容**计数（pre-commit 用）。默认读工作树。见 `_STAGED_MODE` 的说明："
              "hook 选的是暂存文件，量的却是工作树，并发 lane 的未提交改动会误判到你头上。",
     )
+    # 🔴 pre-commit 用：暂存文件多时（实测 503 个、35114 字符）把路径摆在命令行上会超过 Windows
+    #    CreateProcess 的 32767 字符上限，Git Bash 报 `Argument list too long`（exit 126），hook 把它当成
+    #    「行数超限」拒提交 —— 门禁根本没运行。改从文件 / 标准输入读清单就没有这个上限。
+    parser.add_argument(
+        "--files-from", metavar="PATH",
+        help="从文件读要检查的路径（每行一个，空行忽略；`-` = 标准输入）。给出本参数即按显式清单检查，"
+             "清单为空就什么都不查（不会退回全仓扫描）。",
+    )
     args = parser.parse_args(argv)
     if args.staged:
         global _STAGED_MODE
         _STAGED_MODE = True
+    if args.files_from is not None:
+        try:
+            raw = sys.stdin.buffer.read() if args.files_from == "-" else Path(args.files_from).read_bytes()
+        except OSError as exc:
+            print(f"❌ [清单读不出] --files-from {args.files_from}: {exc}", file=sys.stderr)
+            return 2
+        listed = [line.strip() for line in raw.decode("utf-8").splitlines() if line.strip()]
+        args.files = [*args.files, *listed]
 
     whitelist = load_whitelist()
 
@@ -280,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{rel} {lines}")
         return 0
 
-    explicit = bool(args.files)
+    explicit = bool(args.files) or args.files_from is not None
     if explicit:
         files = [ROOT / Path(f) for f in args.files]
     else:

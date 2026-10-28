@@ -6,13 +6,12 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G14_LINE_ITEMS, G14_ACCOUNT_CODE } from '../g14Constants'
+import { G14_ACCOUNT_CODE } from '../g14Constants'
 import { G14_NOTE_SECTION } from '../g14NoteSectionMap'
 import { isG14SheetComplete } from '../g14SheetLabels'
 // G14 导入导出 sheet 清单真源 = registry（原 `useG14ImportExport.ts` 是重复常量，
 // 已随孤儿处置删除 —— spec: workpaper-import-export-lifecycle-closure Task 16）
 import { CYCLE_IMPORT_EXPORT } from '../../shared/cycleImportExportRegistry'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 import { FORMULA_ENGINE_INVENTORY } from '../formulaEngineInventory'
 
 describe('G14 review fixes', () => {
@@ -26,13 +25,6 @@ describe('G14 review fixes', () => {
     expect(G14_ACCOUNT_CODE).toBe('6702')
     expect(G14_NOTE_SECTION.listed).toBe('五、76')
     expect(G14_NOTE_SECTION.soe).toBe('八、73')
-  })
-
-  it('cycleAdjudicationConfigs G14-1 与 G14_LINE_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G14-1']
-    expect(cfg.accountCode).toBe('6702')
-    expect(cfg.rows).toHaveLength(G14_LINE_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G14_LINE_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG14SheetComplete：G14A 不认 G14-proc-*；空数组不算已编制', () => {

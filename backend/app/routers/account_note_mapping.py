@@ -90,7 +90,11 @@ async def delete_mapping(project_id: UUID, mapping_id: str, db: AsyncSession = D
 @router.post("/{project_id}/auto-generate")
 async def auto_generate_mappings(project_id: UUID, body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(require_project_access("edit"))):
     """自动生成映射：从试算表科目名和附注模板行名进行模糊匹配"""
-    year = body.get("year", datetime.now(timezone.utc).year - 1)
+    from app.services.project_audit_year import fetch_project_audit_year
+    year = body.get("year") or await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(status_code=422, detail="未设置审计年度，请先在项目基本信息中填写")
+    year = int(year)
     standard = body.get("standard", "soe")
 
     # 1. 获取试算表所有科目名

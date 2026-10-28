@@ -36,9 +36,20 @@ A32 = `合  计`（两个全角空格），与 F3-2 R31 同型（D6-9 先例）�
 
 ═══ G 列（票面利率）═══
 
-模板 G 列 number_format 含 `%` —— 属 FC-10 候选。但方向③下 H 列不受管，
-G 值不参与 OO→HTML 同步计算（前端有自己的 rate 字段），不阻塞受管。
-G 列声明为 editable（用户在 OO 侧按模板格式输入）。
+模板 G 列 number_format = `0.00%`（Excel 存小数 0.036），前端 `interestRate` 存百分数（3.6）
+⇒ value_type = `percent_points`（FC-10，物化 ÷100 / 回写 ×100，与 F2-47 同）。
+
+═══ 字段名对齐前端（spec oo-writeback-template-parity-closure R3 任务 9.4c）═══
+
+json 键逐字取前端 `useF3InterestCalc.F3InterestCalcRow`：原写 noteNumber / maturityDate / term /
+faceAmount / accruedInterest / diff / remark，前端存 ticketNo / dueDate / termDays / faceValue /
+payableInterest / variance / note ⇒ 整表不通。列键不变。
+C / D 出票日 / 到期日模板是日期格式（`mm-dd-yy`），前端存 'YYYY-MM-DD' ⇒ value_type = date（同册 F3-5）。
+E 期限模板无公式，前端按到期日 − 出票日现算、载入时覆盖存值 ⇒ auto_source（HTML 侧带出，OO 改了报受保护冲突，
+不让两侧来回变值；同 E1-4 序号）。
+
+🔴 H 列计息口径仍待用户确认（前端 票面金额 × 利率% × 期限 / 360，有日期时与模板 ROUND(F*G,2) 不同）：
+H 是 formula 不回写，两侧各按自己的口径显示；对拍守卫逐样本登记（`termDays > 0` 时）。
 
 ═══ UUID 列 ═══
 
@@ -77,24 +88,24 @@ UUID_COL_F304: Final[str] = "N"
 #: 🔴 footer 双空格「合  计」（D6-9 / F3-2 同型先例）
 FOOTER_MARKER_F304: Final[str] = "合  计"
 
-#: editable 字段（H/J 是公式不声明）。
-#: G 列票面利率是 FC-10 百分比候选但方向③下不阻塞。
+#: 11 列受管字段（7 元组）；json 键逐字取前端 F3InterestCalcRow（见模块 docstring）。
 FIELD_SPECS_F304: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
-    ("note_type",         "A", "editable", "text",   "noteType",       "票据类别",       ""),
-    ("note_number",       "B", "editable", "text",   "noteNumber",     "票据号",         ""),
-    ("issue_date",        "C", "editable", "text",   "issueDate",      "出票日",         ""),
-    ("maturity_date",     "D", "editable", "text",   "maturityDate",   "到期日",         ""),
-    ("term",              "E", "editable", "text",   "term",           "期限",           ""),
-    ("face_amount",       "F", "editable", "amount", "faceAmount",     "票面金额",       ""),
-    ("interest_rate",     "G", "editable", "amount", "interestRate",   "票面利率",       ""),
-    # H 列 = 应计利息 = ROUND(F*G,2)，mode=formula（方向③不受管）
-    ("accrued_interest",  "H", "formula",  "amount", "accruedInterest", "应计利息",      ""),
-    ("book_interest",     "I", "editable", "amount", "bookInterest",   "账面已计利息",   ""),
+    ("note_type",         "A", "editable",    "text",           "noteType",        "票据类别",     ""),
+    ("note_number",       "B", "editable",    "text",           "ticketNo",        "票据号",       ""),
+    ("issue_date",        "C", "editable",    "date",           "issueDate",       "出票日",       ""),
+    ("maturity_date",     "D", "editable",    "date",           "dueDate",         "到期日",       ""),
+    # E 期限：前端按到期日 − 出票日现算（载入即覆盖存值）⇒ HTML 侧带出
+    ("term",              "E", "auto_source", "integer",        "termDays",        "期限",         ""),
+    ("face_amount",       "F", "editable",    "amount",         "faceValue",       "票面金额",     ""),
+    ("interest_rate",     "G", "editable",    "percent_points", "interestRate",    "票面利率",     ""),
+    # H 列 = 应计利息 = ROUND(F*G,2)，mode=formula（方向③不受管；计息口径待用户确认）
+    ("accrued_interest",  "H", "formula",     "amount",         "payableInterest", "应计利息",     ""),
+    ("book_interest",     "I", "editable",    "amount",         "bookInterest",    "账面已计利息", ""),
     # J 列 = 差异 = H-I，mode=formula
-    ("diff",              "J", "formula",  "amount", "diff",           "差异",           ""),
-    ("remark",            "K", "editable", "text",   "remark",         "说明",           ""),
+    ("diff",              "J", "formula",     "amount",         "variance",        "差异",         ""),
+    ("remark",            "K", "editable",    "text",           "note",            "说明",         ""),
 )
 
 FORMULA_COLUMNS_F304: Final[tuple[str, ...]] = ("H", "J")

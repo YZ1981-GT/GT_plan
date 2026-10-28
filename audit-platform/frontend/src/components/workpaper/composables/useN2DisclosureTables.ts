@@ -496,7 +496,7 @@ export function useN2DisclosureTables(opts: UseN2DisclosureTablesOptions) {
     }
   }
 
-  function buildPayload(ctx: { wpId: string; year: number }) {
+  function buildPayload(ctx: { wpId: string; year: number | null }) {
     return buildN2SyncPayload(variant, buildSnapshot(), ctx)
   }
 

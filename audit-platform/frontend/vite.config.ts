@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
   const devPort = parseInt(env.VITE_DEV_PORT || '3030', 10)
 
   return {
+    // 依赖预构建缓存放前端根目录 .vite/（.gitignore 已忽略），不放 node_modules/.vite：
+    // 临时 worktree 常以联接（junction）共用 node_modules，删 worktree 时顺着联接把 .vite/deps 一起删掉，
+    // 开发服务器内存里的依赖还能用、懒加载分块（如 @univerjs/engine-render 的 en-gb）就 504 Outdated Optimize Dep。
+    // spec post-push-residual-defect-closure R5
+    cacheDir: '.vite',
     plugins: [
       vue(),
       // 不在 AutoImport 中挂 ElementPlusResolver：

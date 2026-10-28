@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, check_consol_lock
+from app.deps import check_consol_lock, require_project_access
 from app.models.core import User
 from app.services.report_mapping_service import ReportMappingService
 
@@ -29,7 +29,7 @@ async def get_preset_mapping(
     report_type: str = "balance_sheet",
     scope: str = "standalone",
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取预设映射规则（按行名自动匹配）"""
     svc = ReportMappingService(db)
@@ -42,7 +42,7 @@ async def get_saved_mapping(
     report_type: str = "balance_sheet",
     scope: str = "standalone",
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取已保存的映射规则"""
     svc = ReportMappingService(db)
@@ -55,7 +55,7 @@ async def save_mapping(
     project_id: UUID,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """保存映射规则"""

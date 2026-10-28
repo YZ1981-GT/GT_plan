@@ -68,6 +68,10 @@ class DelegationPreviewRequest(BaseModel):
 class DelegationApplyRequest(DelegationPreviewRequest):
     preview_id: UUID
     request_id: str
+    # 被委派人可见范围不含目标循环（400 out_of_scope）时，用户确认后带理由重试 ⇒ 同事务扩大其可见范围
+    # （spec procedure-trim-generation-delegation-chain 需求 4.4；不进 preview 哈希，同一凭证可重试）
+    expand_scope: bool = False
+    scope_reason: str | None = Field(default=None, max_length=500)
 
 
 @router.get("/{pid}/procedure-delegations/member-loads")
@@ -146,6 +150,8 @@ async def delegation_apply(
             reason=body.reason,
             best_effort=body.best_effort,
             due_at=body.due_at,
+            expand_scope=body.expand_scope,
+            scope_reason=body.scope_reason,
         )
     except Exception:
         await db.rollback()

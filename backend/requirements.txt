@@ -30,6 +30,8 @@ fakeredis
 aiosqlite
 hypothesis==6.152.4
 sqlglot>=27  # 裸 SQL 列级契约测试静态解析（test_raw_sql_schema_contract）
+jsonschema==4.26.0  # 程序链契约（docs/contracts/procedure-chain）按 JSON Schema 2020-12 校验；此前只是 schemathesis 的传递依赖
+referencing==0.37.0  # jsonschema 的 $ref 注册表：契约测试按 $id 把各 schema 互相引用解析到本地文件
 ruff==0.11.12
 jsonpath-ng
 pypinyin

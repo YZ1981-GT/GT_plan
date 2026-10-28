@@ -184,11 +184,18 @@ async def get_projects(
 @router.delete("/{staff_id}")
 async def delete_staff(
     staff_id: UUID,
+    revoke_assignments: bool = Query(False, description="确认同时撤销其项目分配与项目成员行"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_role(["admin"])),
 ):
-    """删除人员（仅允许删除 source=custom 的自定义人员）"""
+    """删除人员（仅 admin；仅允许删除 source=custom 的自定义人员）。
+
+    仍有有效项目分配时默认 409 并列出项目；带 ``revoke_assignments=true`` 时同事务撤销分配与项目成员行、
+    递增受影响项目的可见性策略版本（spec procedure-chain-hardening-and-java-contracts R12；原先只要求登录、
+    直接软删人员，分配与成员行原样留下，其账号照样能进这些项目）。
+    """
     from app.models.staff_models import StaffMember
+    from app.services.staff_removal_service import StaffHasAssignments, remove_staff
     import sqlalchemy as sa
 
     result = await db.execute(
@@ -202,9 +209,12 @@ async def delete_staff(
     if source == "seed":
         raise HTTPException(status_code=400, detail="初始导入的人员不允许删除")
 
-    staff.is_deleted = True
+    try:
+        removed = await remove_staff(db, staff, revoke_assignments=revoke_assignments, actor_user_id=user.id)
+    except StaffHasAssignments as exc:
+        raise HTTPException(status_code=409, detail=exc.http_detail())
     await db.commit()
-    return {"message": "已删除", "id": str(staff_id)}
+    return {"message": "已删除", "id": str(staff_id), **removed}
 
 
 @router.get("/me/staff-id")
@@ -374,6 +384,7 @@ async def execute_handover(
     """
     from app.services.handover_service import HandoverService
     from app.services.manager_dashboard_service import ManagerDashboardService
+    from app.services.wp_visibility.delegation_guard import DelegationError
 
     if staff_id == body.target_staff_id:
         raise HTTPException(
@@ -419,6 +430,11 @@ async def execute_handover(
             effective_date=body.effective_date,
             executed_by=user.id,
         )
+    except DelegationError as e:
+        # 编制人走底稿主编委派事务（spec procedure-trim-generation-delegation-chain 任务 12）：
+        # 接收人不是项目成员等 ⇒ 整次交接回滚，错误体带原因
+        await db.rollback()
+        raise HTTPException(status_code=e.http_status, detail=e.http_detail()) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

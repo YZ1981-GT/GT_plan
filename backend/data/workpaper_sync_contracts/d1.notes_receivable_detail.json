@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "22ec4123c55474b3dd7cd5fea59a9bd9771cdc3b0eb03dc8550bacbd0674b2c4",
+  "instrumentation_definition_sha256": "5d079845690ccccfebd782bb7a56b12cf64906b26d1dd0e0ea11ad7489364c5b",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d1-notes-receivable",
@@ -589,7 +589,7 @@
               "column_key": "other_increase",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!G11",
               "header_text": "其他增加",
-              "json_pointer": "/rows/{row_uuid}/currentRecovery",
+              "json_pointer": "/rows/{row_uuid}/currentOther",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!G13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/other_increase",
@@ -634,7 +634,7 @@
               "column_key": "other_decrease",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!J11",
               "header_text": "其他减少",
-              "json_pointer": "/rows/{row_uuid}/currentOther",
+              "json_pointer": "/rows/{row_uuid}/currentRecovery",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!J13",
               "stable_field_key": "bad_debt_individual_rows/{row_uuid}/other_decrease",
@@ -822,7 +822,7 @@
               "column_key": "other_increase",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!G11",
               "header_text": "其他增加",
-              "json_pointer": "/rows/{row_uuid}/currentRecovery",
+              "json_pointer": "/rows/{row_uuid}/currentOther",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!G18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/other_increase",
@@ -867,7 +867,7 @@
               "column_key": "other_decrease",
               "header_source_ref": "源xlsx!坏账准备明细表D1-4!J11",
               "header_text": "其他减少",
-              "json_pointer": "/rows/{row_uuid}/currentOther",
+              "json_pointer": "/rows/{row_uuid}/currentRecovery",
               "mode": "editable",
               "source_ref": "源xlsx!坏账准备明细表D1-4!J18",
               "stable_field_key": "bad_debt_portfolio_rows/{row_uuid}/other_decrease",
@@ -2824,7 +2824,7 @@
               "header_source_ref": "源xlsx!应收票据坏账准备测试表D1-15!E13",
               "header_text": "期末坏账准备账面余额",
               "json_pointer": "/rows/{row_uuid}/actualProvision",
-              "mode": "formula",
+              "mode": "editable",
               "source_ref": "源xlsx!应收票据坏账准备测试表D1-15!E14",
               "stable_field_key": "ecl_individual_rows/{row_uuid}/actual_provision",
               "store_item_id": "D1-ecl-individual-rows",
@@ -2883,7 +2883,6 @@
           },
           "formula_mask": [
             "D14:D17",
-            "E14:E17",
             "F14:F17"
           ],
           "header_rows": 2,
@@ -2967,7 +2966,7 @@
               "header_source_ref": "源xlsx!应收票据坏账准备测试表D1-15!E21",
               "header_text": "期末坏账准备账面余额",
               "json_pointer": "/rows/{row_uuid}/actualProvision",
-              "mode": "formula",
+              "mode": "editable",
               "source_ref": "源xlsx!应收票据坏账准备测试表D1-15!E22",
               "stable_field_key": "ecl_portfolio_rows/{row_uuid}/actual_provision",
               "store_item_id": "D1-ecl-portfolio-rows",
@@ -3026,7 +3025,6 @@
           },
           "formula_mask": [
             "D22:D24",
-            "E22:E24",
             "F22:F24"
           ],
           "header_rows": 2,
@@ -4954,9 +4952,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "c2da03893080de01ad3e5205e7befd2b3be0cee73b1bfc1769c688f5c50e628d",
+    "normalized_structure_hash": "84819887b6322b28b19b6ef8d2d0b259553337011544e1299b1c5434c4b7569b",
     "relative_path": "D/D1 应收票据.xlsx",
-    "template_sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef"
+    "template_sha256": "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d5"
   },
-  "template_definition_sha256": "9d0211a1623530fc41f16861aa94b3f025732edad40654fb1d36697d429fca57"
+  "template_definition_sha256": "7b5889c616fec991698767065aeadfa365a44a99d82deffb615af72153097557"
 }

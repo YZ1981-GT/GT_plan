@@ -8,6 +8,8 @@ import Decimal from 'decimal.js'
 import type {
   ConsolPushStatus,
   ConsolReportTrialRow,
+  ConsolTrialBalanceCheck,
+  ConsolTrialColumnKey,
   ConsolTrialMeasure,
 } from '@/services/consolidationApi'
 
@@ -38,10 +40,47 @@ export function reportTypeLabel(key: string): string {
 
 /** 单元格显示值：无公式的行（标题行）不显示 0，免得像算出来的结果 */
 export function cellValue(
-  row: Pick<ConsolReportTrialRow, 'has_formula' | ConsolTrialMeasure>, measure: ConsolTrialMeasure,
+  row: Pick<ConsolReportTrialRow, 'has_formula' | ConsolTrialMeasure> & { consolidated_with_drafts?: string | null },
+  measure: ConsolTrialColumnKey,
 ): string | null {
   if (!row.has_formula) return null
   return row[measure] ?? null
+}
+
+/** 「含草稿预览」列的键：只作对照，不可穿透到分录（穿透只计已审批） */
+export const DRAFT_COLUMN: ConsolTrialColumnKey = 'consolidated_with_drafts'
+
+/** 含草稿预览 ≠ 合并审定数（差额来自未审批分录）⇒ 该格高亮并说明（spec consol-autotree-linkage-closure R5.1） */
+export function draftDiffers(row: Pick<ConsolReportTrialRow, 'has_formula' | 'consolidated' | 'consolidated_with_drafts'>): boolean {
+  if (!row.has_formula || row.consolidated_with_drafts === undefined) return false
+  const a = dec(row.consolidated)
+  const b = dec(row.consolidated_with_drafts)
+  if (a === null || b === null) return a !== b
+  return !a.equals(b)
+}
+
+/** 列口径说明按节点类型（R10.1）：汇总节点 / 差额户 / 单体数据 */
+export function trialBasisNote(kind: string | null | undefined): string {
+  if (kind === 'elim') {
+    return '差额户：只列本级调整与抵销（审定汇总为 0）；合并审定数 = 本级权益抵销 + 往来交易抵销 + 报表调整（只计已审批分录）'
+  }
+  if (kind === 'data') {
+    return '单体数据：审定汇总 = 该企业单体项目的审定数；单体节点没有抵销与调整'
+  }
+  return '合并审定数 = 审定汇总 + 权益抵销 + 往来交易抵销 + 报表调整（按科目自然方向的净额；只计已审批分录）'
+}
+
+/** 借贷平衡提示（R8.5）：不平时给出两边合计与差额，平衡返回空串 */
+export function balanceHint(balance: ConsolTrialBalanceCheck | null | undefined): string {
+  if (!balance || balance.balanced) return ''
+  return `按科目自然方向：借方性质合计 ${balance.debit_total}，贷方性质合计 ${balance.credit_total}，相差 ${balance.difference}`
+}
+
+/** 穿透弹窗里 0 与空值分开显示（R10.3）：空值 = 取不到数，0 = 算出来就是 0 */
+export function amountKind(value: string | number | null | undefined): 'blank' | 'zero' | 'value' {
+  const d = dec(value)
+  if (d === null) return 'blank'
+  return d.isZero() ? 'zero' : 'value'
 }
 
 /** 可穿透：有公式的行（取不到数的也可点开看原因） */
@@ -129,7 +168,7 @@ export function trialAuditResults(rows: ReadonlyArray<ConsolReportTrialRow>, sec
 /** 导出：行次、项目、五列（数字，便于 Excel 求和）、说明 */
 export function trialExportAoa(
   rows: ReadonlyArray<ConsolReportTrialRow>,
-  columns: ReadonlyArray<{ key: ConsolTrialMeasure; label: string }>,
+  columns: ReadonlyArray<{ key: ConsolTrialColumnKey; label: string }>,
 ): (string | number | null)[][] {
   const header = ['行次', '项目', ...columns.map((c) => c.label), '说明']
   const body = rows.map((r) => [

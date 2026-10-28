@@ -298,6 +298,7 @@ import {
   type StocktakeSectionField,
 } from './f2StocktakeConfigs'
 import F2RollTable, { type F2RollEnrichedRow } from './F2RollTable.vue'
+import { emptyStocktakeRollforwardRow, enrichStocktakeRollforwardRow } from './f2StocktakeRowCalc'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -338,25 +339,7 @@ const meta = useF2StocktakeFields({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-function emptyRow(): StocktakeRollforwardRow {
-  return {
-    id: `st-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    category: '',
-    itemCode: '',
-    itemName: '',
-    spec: '',
-    unit: '',
-    unitPrice: 0,
-    warehouse: '',
-    countDayQty: 0,
-    inboundQty: 0,
-    outboundQty: 0,
-    bookQty: 0,
-    varianceReason: '',
-    needAdjust: '',
-    remark: '',
-  }
-}
+const emptyRow = emptyStocktakeRollforwardRow
 
 /** 日前顺推（与旧版 F2-26-rows 公式一致，保留兼容） */
 const beforeSheet = useF2StocktakeRows<StocktakeRollforwardRow>({
@@ -376,30 +359,9 @@ const afterSheet = useF2StocktakeRows<StocktakeRollforwardRow>({
   emptyRow,
 })
 
+// 倒轧行计算是纯函数（f2StocktakeRowCalc，与对拍守卫共用）
 function enrich(rows: StocktakeRollforwardRow[], mode: StocktakeRollMode): F2RollEnrichedRow[] {
-  return rows.map((r) => {
-    const calcBsQty =
-      mode === 'after'
-        ? r.countDayQty + r.outboundQty - r.inboundQty
-        : r.countDayQty + r.inboundQty - r.outboundQty
-    const qtyDiff = calcBsQty - r.bookQty
-    const amtDiff = qtyDiff * (r.unitPrice || 0)
-    return {
-      ...r,
-      category: r.category || '',
-      itemCode: r.itemCode || '',
-      spec: r.spec || '',
-      unit: r.unit || '',
-      unitPrice: r.unitPrice || 0,
-      warehouse: r.warehouse || '',
-      varianceReason: r.varianceReason || '',
-      needAdjust: r.needAdjust || '',
-      calcBsQty,
-      qtyDiff,
-      amtDiff,
-      hasVariance: Math.abs(qtyDiff) > 0.001,
-    }
-  })
+  return rows.map((r) => enrichStocktakeRollforwardRow(r, mode))
 }
 
 const afterEnriched = computed(() => enrich(afterSheet.rows.value, 'after'))

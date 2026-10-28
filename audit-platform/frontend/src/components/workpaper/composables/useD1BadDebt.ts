@@ -177,11 +177,14 @@ function recalcNoteTypeRow(row: BadDebtNoteTypeRow): BadDebtNoteTypeRow {
   }
 }
 
-/** 重算行内公式字段 */
-function recalcRow(row: BadDebtRow): BadDebtRow {
+/**
+ * 重算行内公式字段（与模板 D1-4 同口径：E = B + C + D、K = B + SUM(F:G) − SUM(H:J)、N = K + L + M）。
+ * 期末未审从**期初未审**滚动（模板 B 列），期初调整只进期初审定。
+ */
+export function recalcRow(row: BadDebtRow): BadDebtRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const currentUnadjusted = calcBadDebtEndBalance(
-    priorAudited,
+    row.priorUnadjusted,
     row.currentProvision,
     row.currentRecovery,
     row.currentReversal,

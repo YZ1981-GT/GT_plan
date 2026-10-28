@@ -155,6 +155,7 @@
  *
  * Spec: .kiro/specs/h7-biological-assets/  Requirements: 双计量·公允价值模式审定
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
@@ -244,14 +245,11 @@ async function loadOwn() {
 async function loadTb() {
   if (!props.projectId) return
   try {
-    const _year = projectStore.year ?? projectStore.auditYear ?? new Date().getFullYear()
-    const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?year=${_year}&account_prefix=1621`)
-    const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? [])
-    let unadj = 0
-    for (const it of list) {
-      const code = String(it.standard_account_code ?? it.account_code ?? '')
-      if (code.startsWith('1621')) unadj += num(it.unadjusted_amount)
-    }
+    const _year = projectStore.year ?? projectStore.auditYear
+    if (_year == null) return
+    const { rows } = await fetchTrialBalanceRows(props.projectId, { year: _year, accountPrefix: '1621' })
+    // 科目及其明细之和
+    const unadj = tbSumUnder(rows, '1621', 'unadjusted_amount') ?? 0
     if (unadj) fairRow.value.unadjusted = unadj
   } catch { /* TB 未导入 */ }
 }

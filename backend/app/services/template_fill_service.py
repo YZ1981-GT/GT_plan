@@ -237,7 +237,8 @@ class TemplateFillService:
     async def _resolve_report_scope(self, project_id: UUID) -> str:
         """解析项目报表口径（consolidated/standalone），默认 consolidated。
 
-        权威源 project.report_scope；wizard_state.basic_info 回退；缺失默认合并。
+        权威源 project.report_scope；回退到向导「基本信息」数据（``wizard_basic_info_data``：
+        ``steps.basic_info`` 优先、旧平铺 ``basic_info`` 兜底）；缺失默认合并。
         """
         from app.models.core import Project
 
@@ -246,7 +247,9 @@ class TemplateFillService:
             return "consolidated"
         raw = (getattr(project, "report_scope", None) or "").strip().lower()
         if raw not in ("consolidated", "standalone"):
-            basic = (project.wizard_state or {}).get("basic_info", {}).get("data", {})
+            from app.services.standard_unification_service import wizard_basic_info_data
+
+            basic = wizard_basic_info_data(project.wizard_state)
             raw = str(basic.get("report_scope") or "").strip().lower()
         return raw if raw in ("consolidated", "standalone") else "consolidated"
 

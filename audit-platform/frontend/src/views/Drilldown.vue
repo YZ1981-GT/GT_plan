@@ -256,11 +256,14 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useDrilldownStore } from '@/stores/drilldown'
 import type { BalanceRow, AuxBalanceRow } from '@/stores/drilldown'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import { fmtAmount } from '@/utils/formatters'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const route = useRoute()
 const store = useDrilldownStore()
+const projectStore = useProjectStore()
 
 const ledgerDateRange = ref<[string, string] | null>(null)
 
@@ -276,7 +279,13 @@ watch(ledgerDateRange, (val) => {
 
 onMounted(async () => {
   const pid = route.params.projectId as string
-  const y = Number(route.query.year) || new Date().getFullYear()
+  // 年度：路由 → 项目 store（项目审计年度）；都没有 ⇒ 提示，并清掉穿透 store 里上次的年度（免得翻页 / 筛选按旧年度取数）
+  const y = parseAuditYear(route.query.year) ?? projectStore.year
+  if (y == null) {
+    store.setProject(pid, null)
+    ElMessage.warning('未设置审计年度，无法加载余额数据')
+    return
+  }
   store.setProject(pid, y)
   store.reset()
   try {

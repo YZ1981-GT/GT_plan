@@ -1,0 +1,30 @@
+{
+  "contract": "generation-plan.schema.json",
+  "description": "保留范围分流共享用例。scope_rows = procedure_instances 的 (编码, 状态)；index = 本项目 wp_index 已有行（编码 → 是否已软删）；codes = 调用方去重后的待生成编码（按输入顺序分流）。",
+  "cases": [
+    {
+      "name": "四类分流；已裁优先于在回收站；子表跟随母码",
+      "scope_rows": [["H3", "not_applicable"], ["E1", "execute"]],
+      "index": { "E1": false, "E2": true, "H3": true },
+      "codes": ["H3", "H3-1", "E1", "E2", "Z9", "E1-1"],
+      "expected": {
+        "to_create": ["Z9", "E1-1"],
+        "skipped_trimmed_codes": ["H3", "H3-1"],
+        "in_recycle_codes": ["E2"],
+        "existing_codes": ["E1"]
+      }
+    },
+    {
+      "name": "区间程序行裁掉成员，成员自带的执行行保留",
+      "scope_rows": [["D2-6至D2-13", "skip"], ["D2-8", "execute"]],
+      "index": {},
+      "codes": ["D2-6", "D2-8", "D2-8-1", "D2-14"],
+      "expected": {
+        "to_create": ["D2-8", "D2-8-1", "D2-14"],
+        "skipped_trimmed_codes": ["D2-6"],
+        "in_recycle_codes": [],
+        "existing_codes": []
+      }
+    }
+  ]
+}

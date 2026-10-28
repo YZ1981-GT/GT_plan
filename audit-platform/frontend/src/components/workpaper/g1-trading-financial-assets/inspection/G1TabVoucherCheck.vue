@@ -365,6 +365,7 @@
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { toRef, computed, ref, inject, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import http from '@/utils/http'
 import {
   useG1VoucherCheck,
@@ -450,9 +451,12 @@ const conclusionProxy = computed({
 
 const ratioPct = computed(() => vc.inspectionRatio.value)
 
-const year = computed(() => {
+// 资产负债表日的年度优先，其次项目审计年度（原先兜底去年）；都没有时为 null，取数前判空
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(() => props.projectId ?? '')
+void ensureAuditYear()
+const year = computed<number | null>(() => {
   if (props.bsDate && props.bsDate.length >= 4) return parseInt(props.bsDate.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return projectAuditYear.value
 })
 
 function fmt(n: number): string {
@@ -477,8 +481,10 @@ const G1_ACCOUNT_PREFIXES = computed(() => gCycleScope('G1')!.queryCodes(_inject
 
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
+  const y = year.value ?? await ensureAuditYear()
+  if (y == null) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, y, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -486,10 +492,15 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  const y = year.value ?? await ensureAuditYear()
+  if (y == null) {
+    ElMessage.warning('未设置审计年度，无法读取挂入本底稿的凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId!, year.value, props.wpId!, G1_ACCOUNT_PREFIXES.value,
+      props.projectId!, y, props.wpId!, G1_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) handleSamplingFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

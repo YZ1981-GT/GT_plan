@@ -159,8 +159,7 @@ export function resolveDefaultCutoffDate(opts?: {
 
   const y = Number(opts?.year)
   if (Number.isFinite(y) && y >= 2000 && y <= 2100) return `${y}-12-31`
-  const nowY = new Date().getFullYear()
-  return `${nowY - 1}-12-31`
+  return ''
 }
 
 /** I2-4 同业行业模板 */

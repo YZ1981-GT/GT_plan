@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.wp_data_rules import (
     extract_wp_data,
@@ -77,7 +77,7 @@ async def get_mapping_by_note(
 async def extract_data_for_wp(
     project_id: UUID,
     wp_code: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -89,6 +89,7 @@ async def extract_data_for_wp(
     - 变动额 = 审定 - 期初
     - 调整分录明细
     """
+    year = await require_project_audit_year(db, project_id, year)
     return await extract_wp_data(db, project_id, year, wp_code)
 
 
@@ -96,11 +97,12 @@ async def extract_data_for_wp(
 async def extract_data_for_note(
     project_id: UUID,
     note_section: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """提取附注章节关联的数据（从底稿/试算表）"""
+    year = await require_project_audit_year(db, project_id, year)
     return await extract_note_data(db, project_id, year, note_section)
 
 
@@ -108,18 +110,19 @@ async def extract_data_for_note(
 async def check_consistency(
     project_id: UUID,
     wp_code: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """校验底稿审定数与附注合计的一致性"""
+    year = await require_project_audit_year(db, project_id, year)
     return await check_wp_note_consistency(db, project_id, year, wp_code)
 
 
 @router.get("/projects/{project_id}/batch-extract")
 async def batch_extract(
     project_id: UUID,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     cycle: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -128,6 +131,7 @@ async def batch_extract(
 
     用于底稿工作台一次性加载所有关联数据。
     """
+    year = await require_project_audit_year(db, project_id, year)
     mappings = _load_mapping()
     if cycle:
         mappings = [m for m in mappings if m.get("cycle") == cycle]
@@ -162,12 +166,13 @@ async def note_cell(
     note_section: str,
     row_label: str = Query(...),
     col_header: str = Query(...),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """固定单元格取数：NOTE_CELL(section, row_label, col_header)"""
     from app.services.note_data_extractor import note_cell_fetch
+    year = await require_project_audit_year(db, project_id, year)
     val = await note_cell_fetch(db, project_id, year, note_section, row_label, col_header)
     return {"note_section": note_section, "row": row_label, "col": col_header, "value": str(val) if val is not None else None}
 
@@ -177,12 +182,13 @@ async def note_column(
     project_id: UUID,
     note_section: str,
     col_header: str = Query(...),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """整列取数：NOTE_COL(section, col_header) → 支持浮动行填充"""
     from app.services.note_data_extractor import note_column_fetch
+    year = await require_project_audit_year(db, project_id, year)
     rows = await note_column_fetch(db, project_id, year, note_section, col_header)
     return {"note_section": note_section, "col": col_header, "rows": rows}
 
@@ -192,12 +198,13 @@ async def note_row(
     project_id: UUID,
     note_section: str,
     row_label: str = Query(...),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """整行取数：NOTE_ROW(section, row_label) → 支持变动表多列"""
     from app.services.note_data_extractor import note_row_fetch
+    year = await require_project_audit_year(db, project_id, year)
     data = await note_row_fetch(db, project_id, year, note_section, row_label)
     return {"note_section": note_section, **data}
 
@@ -206,7 +213,7 @@ async def note_row(
 async def note_dynamic_rows(
     project_id: UUID,
     note_section: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     top_n: int = Query(default=20, ge=5, le=100),
     min_amount: float = Query(default=0),
     db: AsyncSession = Depends(get_db),
@@ -219,6 +226,7 @@ async def note_dynamic_rows(
     - min_amount: 最小金额阈值（默认0，低于此值合并为"其他"）
     """
     from app.services.note_data_extractor import generate_dynamic_rows
+    year = await require_project_audit_year(db, project_id, year)
     rows = await generate_dynamic_rows(db, project_id, year, note_section, top_n, min_amount)
     return {"note_section": note_section, "rows": rows, "count": len(rows)}
 

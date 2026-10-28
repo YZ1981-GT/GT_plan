@@ -164,6 +164,10 @@ export function useA13MisstatementBridge(): void {
     const pid = projectId.value
     if (!pid) return
 
+    // 年度取不到时不推送（spec audit-year-calendar-fallback-ratchet R3.1）
+    const yr = year.value
+    if (yr == null) return
+
     const drafts = normalizeMisstatementPushPayload(payload)
     if (!drafts.length) return
 
@@ -185,7 +189,7 @@ export function useA13MisstatementBridge(): void {
     for (const d of fresh) {
       try {
         await createMisstatement(pid, {
-          year: year.value,
+          year: yr,
           misstatement_description: d.description,
           affected_account_code: d.accountCode || null,
           affected_account_name: d.accountName || null,

@@ -18,6 +18,7 @@
  */
 import { ref, computed, type Ref, isRef } from 'vue'
 import { api } from '@/services/apiProxy'
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useLedgerCache, type LedgerCacheEntry } from '@/composables/useLedgerCache'
 import type { AgingBand } from '@/composables/useAgingConfig'
 
@@ -201,82 +202,64 @@ export function useAuditData(
   const loading = ref(false)
   const error = ref('')
 
-  // ─── year 自动解析（Req 5.2）─────────────────────────────────
-  // year 未传时从 route query 或默认值解析，杜绝漏 year → 422
-  const resolvedYear = computed<number>(() => {
+  // ─── year ───────────────────────────────────────────────────────
+  // 传了合法年度就带上；没传 / 不合法 ⇒ 不带，后端按项目审计年度取（项目没填 ⇒ 422，按失败处理）。
+  // 不按日历猜（原先兜底「今年 − 1」，2025 年度项目在 2027 年取的是 2026 的数）。
+  const resolvedYear = computed<number | null>(() => {
     if (year && isRef(year)) {
-      const v = year.value
-      if (Number.isFinite(v) && v > 2000) return v
+      const v = Number(year.value)
+      if (Number.isInteger(v) && v > 2000 && v <= 2100) return v
     }
-    // fallback: 当前年 - 1（审计年度惯例）
-    return new Date().getFullYear() - 1
+    return null
   })
 
   // ─── 缓存复用（Req 5.5）─────────────────────────────────────
   const ledgerCache = useLedgerCache()
 
+  /** 试算表某科目（含其下明细科目）金额；取不到 ⇒ 置 error 并返回 0。 */
+  async function tbAmount(
+    accountCode: string,
+    field: 'audited_amount' | 'unadjusted_amount' | 'prior_audited_amount',
+    failMessage: string,
+  ): Promise<number> {
+    loading.value = true
+    error.value = ''
+    try {
+      const pid = projectId.value
+      if (!pid) return 0
+      const { rows } = await fetchTrialBalanceRows(pid, {
+        year: resolvedYear.value,
+        accountPrefix: accountCode,
+        includePrior: field === 'prior_audited_amount',
+      })
+      // 与报表 TB('1002') 同口径：科目及其下明细科目之和（试算表每个余额表叶子只归一个标准科目，不重复）
+      const amount = tbSumUnder(rows, accountCode, field)
+      if (amount == null) {
+        error.value = `试算表没有科目 ${accountCode} 的${field === 'prior_audited_amount' ? '上年审定数' : '金额'}`
+        return 0
+      }
+      return amount
+    } catch (err: any) {
+      // 错误降级（Req 5.6）: 返回 0，置 error，不抛异常
+      error.value = err?.message || failMessage
+      return 0
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ─── getTbAmount ─────────────────────────────────────────────
   /**
-   * 获取科目试算表金额。
-   * 按口径决策选择正确端点和字段。
+   * 获取科目试算表金额（正数口径，方向见试算表 direction）。
+   * 损益类是单边发生额（收入取贷方、费用取借方，与试算表 / 报表同口径）；不再用「借 − 贷」——
+   * 含年末结转分录时两侧相等，恒为 0（见 `services/trialBalanceRows.ts`）。
    */
   async function getTbAmount(
     accountCode: string,
     opts?: { basis?: AmountBasis },
   ): Promise<number> {
     const basis = opts?.basis ?? 'audited'
-    loading.value = true
-    error.value = ''
-
-    try {
-      const pid = projectId.value
-      const yr = resolvedYear.value
-      if (!pid) return 0
-
-      const koujing = resolveKoujing(accountCode)
-
-      let endpoint: string
-      if (koujing === 'v1_debit_positive') {
-        // v1 口径: tb-balance 端点
-        endpoint = `/api/projects/${pid}/tb-balance`
-      } else {
-        // v2/损益: trial-balance 端点
-        endpoint = `/api/projects/${pid}/trial-balance`
-      }
-
-      const res = await api.get<any>(endpoint, {
-        params: { year: yr, account_code: accountCode },
-        _silent: true,
-      } as any)
-
-      // 从响应中提取行
-      const items: any[] = res?.items ?? res?.data ?? (Array.isArray(res) ? res : [])
-      const row = items.find((r: any) =>
-        (r.account_code ?? r.accountCode ?? r.standard_account_code) === accountCode,
-      )
-
-      if (!row) return 0
-
-      const normalized = normalizeTbRow(row)
-
-      if (koujing === 'pl_occurrence') {
-        // 损益类: 发生额 = 借方 - 贷方（收入为贷-借，费用为借-贷）
-        // 统一返回发生额绝对值由调用方判断方向
-        return normalized.debitAmount - normalized.creditAmount
-      }
-
-      // 资产/负债/权益: 按 basis 返回
-      if (basis === 'audited') {
-        return normalized.auditedAmount
-      }
-      return normalized.unadjustedAmount
-    } catch (err: any) {
-      // 错误降级（Req 5.6）: 返回 0，置 error，不抛异常
-      error.value = err?.message || '获取试算表金额失败'
-      return 0
-    } finally {
-      loading.value = false
-    }
+    return tbAmount(accountCode, basis === 'audited' ? 'audited_amount' : 'unadjusted_amount', '获取试算表金额失败')
   }
 
   // ─── getAging ────────────────────────────────────────────────
@@ -331,6 +314,11 @@ export function useAuditData(
       const pid = projectId.value
       const yr = resolvedYear.value
       if (!pid) return []
+      if (yr == null) {
+        // 序时账按年度取，没有年度不猜（原先兜底「今年 − 1」）
+        error.value = '未设置审计年度，请先在项目基本信息中填写'
+        return []
+      }
 
       // 委托 useLedgerCache，命中缓存不重复拉取
       const entries = await ledgerCache.getEntries(pid, yr)
@@ -350,59 +338,15 @@ export function useAuditData(
 
   // ─── getPrevYear ─────────────────────────────────────────────
   /**
-   * 获取上年同科目金额。
+   * 获取上年同科目审定数。上年来源与报表上期同一（同项目上年试算表，否则唯一认定的上年项目；
+   * 后端 `prior_year_context`）——不再拿本项目的「年度 − 1」去取（每个项目只有本年试算表，恒取不到）。
+   * 上年只有审定数，`basis` 不区分。
    */
   async function getPrevYear(
     accountCode: string,
-    opts?: { basis?: AmountBasis },
+    _opts?: { basis?: AmountBasis },
   ): Promise<number> {
-    const basis = opts?.basis ?? 'audited'
-    loading.value = true
-    error.value = ''
-
-    try {
-      const pid = projectId.value
-      const yr = resolvedYear.value
-      if (!pid) return 0
-
-      const prevYear = yr - 1
-      const koujing = resolveKoujing(accountCode)
-
-      let endpoint: string
-      if (koujing === 'v1_debit_positive') {
-        endpoint = `/api/projects/${pid}/tb-balance`
-      } else {
-        endpoint = `/api/projects/${pid}/trial-balance`
-      }
-
-      const res = await api.get<any>(endpoint, {
-        params: { year: prevYear, account_code: accountCode },
-        _silent: true,
-      } as any)
-
-      const items: any[] = res?.items ?? res?.data ?? (Array.isArray(res) ? res : [])
-      const row = items.find((r: any) =>
-        (r.account_code ?? r.accountCode ?? r.standard_account_code) === accountCode,
-      )
-
-      if (!row) return 0
-
-      const normalized = normalizeTbRow(row)
-
-      if (koujing === 'pl_occurrence') {
-        return normalized.debitAmount - normalized.creditAmount
-      }
-
-      if (basis === 'audited') {
-        return normalized.auditedAmount
-      }
-      return normalized.unadjustedAmount
-    } catch (err: any) {
-      error.value = err?.message || '获取上年金额失败'
-      return 0
-    } finally {
-      loading.value = false
-    }
+    return tbAmount(accountCode, 'prior_audited_amount', '获取上年金额失败')
   }
 
   return {

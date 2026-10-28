@@ -2,12 +2,14 @@
 
 from datetime import date
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from app.services.project_audit_year import (
     extract_audit_year_from_wizard_state,
     resolve_project_audit_year,
+    resolve_project_audit_year_for_request,
     _year_from_name,
 )
 
@@ -67,3 +69,52 @@ class TestYearFromName:
 
     def test_no_suffix(self):
         assert _year_from_name("客户公司") is None
+
+
+class _FakeDb:
+    def __init__(self, project):
+        self.project = project
+
+    async def get(self, _model, _project_id):
+        return self.project
+
+
+@pytest.mark.asyncio
+async def test_resolve_project_audit_year_for_request_prefers_explicit_year():
+    project = _project(audit_year=2024)
+    db = _FakeDb(project)
+    pid = uuid4()
+
+    assert await resolve_project_audit_year_for_request(db, str(pid), 2025) == 2025
+    # 缺省年度只从项目上下文取：字符串与 UUID 两种项目 id 写法同口径
+    assert await resolve_project_audit_year_for_request(db, str(pid)) == 2024
+    assert await resolve_project_audit_year_for_request(db, pid) == 2024
+
+
+@pytest.mark.asyncio
+async def test_resolve_project_audit_year_for_request_returns_none_when_missing():
+    assert await resolve_project_audit_year_for_request(_FakeDb(_project()), uuid4()) is None
+    assert await resolve_project_audit_year_for_request(_FakeDb(None), uuid4()) is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_project_audit_year_for_request_invalid_project_id_is_missing():
+    """项目 id 不是 UUID ⇒ 不可能对应项目，按「年度缺失」返回 None，且不查库。"""
+
+    class _NoQueryDb:
+        async def get(self, _model, _project_id):  # pragma: no cover - 被调用即失败
+            raise AssertionError("非 UUID 的项目 id 不应查库")
+
+    assert await resolve_project_audit_year_for_request(_NoQueryDb(), "project-id") is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_project_audit_year_for_request_db_error_propagates():
+    """查库失败不得伪装成「未设置审计年度」（PG 上事务已中止，吞掉会让调用方继续用坏事务）。"""
+
+    class _BrokenDb:
+        async def get(self, _model, _project_id):
+            raise RuntimeError("connection lost")
+
+    with pytest.raises(RuntimeError, match="connection lost"):
+        await resolve_project_audit_year_for_request(_BrokenDb(), uuid4())

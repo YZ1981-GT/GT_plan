@@ -43,7 +43,8 @@ export interface ImpactPreviewResult {
 
 const DEBOUNCE_MS = 300
 
-export function useImpactPreview(projectId: Ref<string>, year: Ref<number>) {
+/** year：审计年度；项目没填为 null ⇒ 不取影响预览 */
+export function useImpactPreview(projectId: Ref<string>, year: Ref<number | null>) {
   const preview = ref<ImpactPreviewResult | null>(null)
   const loading = ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -55,7 +56,7 @@ export function useImpactPreview(projectId: Ref<string>, year: Ref<number>) {
       debounceTimer = null
     }
 
-    if (!accountCode) {
+    if (!accountCode || year.value == null) {
       preview.value = null
       return
     }

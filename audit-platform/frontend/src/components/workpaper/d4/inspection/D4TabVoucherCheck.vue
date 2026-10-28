@@ -52,9 +52,9 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// 审计年度（D4 主入口 provide）→ 抽凭引擎所需 year
-const auditYear = inject<Ref<number> | null>('d4AuditYear', null)
-const samplingYear = computed(() => auditYear?.value ?? new Date().getFullYear() - 1)
+// 审计年度由 D4 主入口 provide；缺失时保持空态，不猜日历年。
+const auditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
+const samplingYear = computed<number | null>(() => auditYear?.value ?? null)
 
 // ─── Composables ─────────────────────────────────────────────────────
 const {
@@ -247,20 +247,25 @@ const _injectedTbSrc = inject<Ref<any> | null>('tbSourceCodes', null)
 const D4_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D4', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  const year = samplingYear.value
+  if (!props.projectId || !props.wpId || year == null) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, auditYear.value, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  const year = samplingYear.value
+  if (props.isReadonly || year == null) {
+    if (year == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, auditYear.value, props.wpId, D4_ACCOUNT_PREFIXES.value,
+      props.projectId, year, props.wpId, D4_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

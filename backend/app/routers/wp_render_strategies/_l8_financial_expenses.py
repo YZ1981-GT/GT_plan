@@ -171,7 +171,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "audit_year": "",
         "business_category": ctx.business_category or "",
     }
-    audit_year: int = 2025
+    audit_year: int | None = None
     try:
         proj_row = (
             await db.execute(
@@ -188,9 +188,13 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["business_category"] = (
                 proj_row.business_category or ctx.business_category or ""
             )
-            audit_year = int(proj_row.audit_year or 2025)
+            audit_year = int(proj_row.audit_year) if proj_row.audit_year else None
     except Exception as e:  # noqa: BLE001
         logger.warning("L8 render: project context 查询失败: %s", e)
+
+    if audit_year is None:
+        from app.services.project_audit_year import resolve_project_audit_year_for_request
+        audit_year = await resolve_project_audit_year_for_request(db, ctx.project_id)
 
     # ─── 从 tb_ledger 取损益类发生额（6603财务费用）──────────────────────
     occurrence_data = await _get_occurrence_from_ledger(

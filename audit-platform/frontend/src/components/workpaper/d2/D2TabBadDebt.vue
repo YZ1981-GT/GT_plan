@@ -191,20 +191,18 @@ const GUIDANCE_TEXTS = [
             <span v-else>{{ displayPrefs.fmtAmount(row.currentProvision) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="转入" width="100" align="right">
+        <!-- 🔴 原「转入 / 收回」两列绑的是 currentTransferIn / currentRecovery，而 useD2BadDebt 的行模型
+             与持久化只有 currentOtherIncrease / currentOtherDecrease（旧键只在载入时迁移）⇒ 两列恒空、录入被丢弃，
+             「其他减少」根本没有入口。改为与权威模板 D2-3 同列序：F 计提 | G 其他增加 | H 转回 | I 核销 | J 其他减少
+             （spec oo-writeback-template-parity-closure R2）。 -->
+        <el-table-column label="其他增加" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentTransferIn" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentTransferIn', v || 0)" />
-            <span v-else>{{ displayPrefs.fmtAmount(row.currentTransferIn) }}</span>
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentOtherIncrease" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentOtherIncrease', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.currentOtherIncrease) }}</span>
           </template>
         </el-table-column>
 
         <!-- 本期减少 -->
-        <el-table-column label="收回" width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentRecovery" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentRecovery', v || 0)" />
-            <span v-else>{{ displayPrefs.fmtAmount(row.currentRecovery) }}</span>
-          </template>
-        </el-table-column>
         <el-table-column label="转回" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentReversal" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentReversal', v || 0)" />
@@ -217,11 +215,17 @@ const GUIDANCE_TEXTS = [
             <span v-else>{{ displayPrefs.fmtAmount(row.currentWriteOff) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="其他减少" width="100" align="right">
+          <template #default="{ row }">
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentOtherDecrease" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentOtherDecrease', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.currentOtherDecrease) }}</span>
+          </template>
+        </el-table-column>
 
         <!-- 期末 -->
         <el-table-column label="期末未审" width="110" align="right">
           <template #default="{ row }">
-            <el-tooltip content="= 期初审定 + 计提 + 转入 − 收回 − 转回 − 核销（自动计算）" placement="top">
+            <el-tooltip content="= 期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少（自动计算，与模板 K 列一致）" placement="top">
               <span class="calc-cell">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
             </el-tooltip>
           </template>

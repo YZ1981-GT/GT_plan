@@ -653,6 +653,7 @@
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch, inject, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import http from '@/utils/http'
 import {
   useG2VoucherCheck,
@@ -736,7 +737,7 @@ const tabOptions = [
 
 const year = computed(() => {
   if (props.bsDate && props.bsDate.length >= 4) return parseInt(props.bsDate.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return props.bsDate && props.bsDate.length >= 4 ? parseInt(props.bsDate.slice(0, 4), 10) : null
 })
 
 const ratioPct = computed(() => vc.inspectionRatio.value)
@@ -785,6 +786,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

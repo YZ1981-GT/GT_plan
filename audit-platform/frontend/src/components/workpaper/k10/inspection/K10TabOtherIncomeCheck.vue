@@ -359,7 +359,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
-  year?: number
+  year?: number | null
   isReadonly: boolean
 }>()
 
@@ -385,7 +385,7 @@ const checkOptions: CheckStatus[] = ['合规', '不合规', '不适用']
 // ─── UI State ────────────────────────────────────────────────────────────────
 
 const voucherDialogVisible = ref(false)
-const currentYear = computed<number>(() => props.year && props.year > 0 ? props.year : new Date().getFullYear())
+const currentYear = computed<number | null>(() => props.year ?? null)
 
 // ─── Computed: 覆盖率 ────────────────────────────────────────────────────────
 

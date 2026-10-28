@@ -18,9 +18,10 @@
       class="wp-capability-shell__error"
       role="alert"
       :aria-label="shellError.zhMessage"
+      :data-reason-code="shellError.reasonCode"
     >
+      <!-- 原因码只留在属性里供排查，不进正文（R10：用户看到英文码没有意义） -->
       <strong>{{ shellError.zhMessage }}</strong>
-      <span class="wp-capability-shell__error-code">{{ shellError.reasonCode }}</span>
     </div>
 
     <div class="wp-capability-shell__main">
@@ -316,12 +317,6 @@ defineExpose({
   background: #fef0f0;
   color: #c45656;
   font-size: 13px;
-}
-
-.wp-capability-shell__error-code {
-  margin-left: auto;
-  font-size: 11px;
-  opacity: 0.8;
 }
 
 .wp-capability-shell__main {

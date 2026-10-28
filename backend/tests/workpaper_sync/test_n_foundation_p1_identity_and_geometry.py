@@ -33,7 +33,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -333,10 +333,19 @@ class TestTemplateGeometryDirtyForms:
         assert len(n3_entries[0]["sheets"]) == 6
 
     def test_n3_formulas_fewest_162(self, templates: dict):
-        """N3 公式格最少 = 162。"""
+        """N3 公式格 = 164（仍是 N 域最少）。
+
+        原为 162；`oo-writeback-template-parity-closure` R1 给 N3-2 合计行补了 G23 / M23 两个 SUM
+        （重分类调整列原无合计），公式格 +2。函数名保留旧数字便于对照历史。
+        """
         n3_entries = [v for k, v in templates["entries"].items() if "N3" in k]
         total_fx = sum(s["formula_count"] for s in n3_entries[0]["sheets"])
-        assert total_fx == 162
+        assert total_fx == 164
+        others = [
+            sum(s["formula_count"] for s in v["sheets"])
+            for k, v in templates["entries"].items() if "N3" not in k
+        ]
+        assert all(n > total_fx for n in others), others
 
 
 # ════════════════════════════════════════════════════════════════════════════

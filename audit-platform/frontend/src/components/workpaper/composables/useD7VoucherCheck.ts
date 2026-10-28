@@ -19,8 +19,8 @@ export interface VoucherCheckRow {
   businessContent: string  // 业务内容
   counterAccount: string   // 对方科目
   counterDetail: string    // 对方明细
-  debitAmount?: number     // 借方金额（仅本期变动区块）
-  creditAmount: number     // 贷方金额
+  debitAmount?: number     // 借方金额（两区都有：模板区② G34 只有「借方金额」——合同负债期后结转是借方）
+  creditAmount?: number    // 贷方金额（仅本期变动区块）
   supportDocs: string      // 支持文件
   checkItems: boolean[]    // 核对内容(1-5)
   indexRef: string         // 索引号
@@ -67,7 +67,15 @@ function safeParseArray(jsonStr: string | null | undefined): any[] {
   }
 }
 
-function normalizeVoucherRow(raw: any, hasDebit: boolean): VoucherCheckRow {
+/**
+ * 期后结转区一行的金额。区② 原按贷方存 `creditAmount`，spec oo-writeback-template-parity-closure R3 批 B2 起
+ * 按模板改存 `debitAmount`；没重新保存过的旧行仍只有 `creditAmount` ⇒ 跨表消费方一律经本函数读。
+ */
+export function postTransferAmount(raw: any): number {
+  return parseNum(raw?.debitAmount ?? raw?.creditAmount)
+}
+
+function normalizeVoucherRow(raw: any, isPeriod: boolean): VoucherCheckRow {
   return {
     rowId: raw.rowId || generateRowId(),
     customerName: raw.customerName || '',
@@ -76,8 +84,8 @@ function normalizeVoucherRow(raw: any, hasDebit: boolean): VoucherCheckRow {
     businessContent: raw.businessContent || '',
     counterAccount: raw.counterAccount || '',
     counterDetail: raw.counterDetail || '',
-    debitAmount: hasDebit ? parseNum(raw.debitAmount) : undefined,
-    creditAmount: parseNum(raw.creditAmount),
+    debitAmount: isPeriod ? parseNum(raw.debitAmount) : postTransferAmount(raw),
+    creditAmount: isPeriod ? parseNum(raw.creditAmount) : undefined,
     supportDocs: raw.supportDocs || '',
     checkItems: Array.isArray(raw.checkItems) ? raw.checkItems : [false, false, false, false, false],
     indexRef: raw.indexRef || '',
@@ -86,13 +94,13 @@ function normalizeVoucherRow(raw: any, hasDebit: boolean): VoucherCheckRow {
   }
 }
 
-function createEmptyRow(hasDebit: boolean): VoucherCheckRow {
+function createEmptyRow(isPeriod: boolean): VoucherCheckRow {
   return {
     rowId: generateRowId(),
     customerName: '', date: '', voucherNo: '',
     businessContent: '', counterAccount: '', counterDetail: '',
-    debitAmount: hasDebit ? 0 : undefined,
-    creditAmount: 0, supportDocs: '',
+    debitAmount: 0,
+    creditAmount: isPeriod ? 0 : undefined, supportDocs: '',
     checkItems: [false, false, false, false, false],
     indexRef: '', isAbnormal: false, remark: '',
   }
@@ -150,7 +158,7 @@ export function useD7VoucherCheck(options: UseD7VoucherCheckOptions) {
     debouncedSave(ITEM_PERIOD_ROWS, { remark: JSON.stringify(periodChangeRows.value) })
   }
 
-  // ─── Post Transfer Rows (期后结转, 无借方金额列) ─────────────────────
+  // ─── Post Transfer Rows (期后结转：只有借方金额) ───────────────────
 
   const postTransferRows = ref<VoucherCheckRow[]>([])
 
@@ -183,9 +191,9 @@ export function useD7VoucherCheck(options: UseD7VoucherCheckOptions) {
     return abnormalCount.value / checkedCount.value
   })
 
-  /** 期后结转贷方合计 → 供crossSheet联动D7-2 */
-  const postTransferCreditTotal: ComputedRef<number> = computed(() =>
-    calcSubtotal(postTransferRows.value.map(r => r.creditAmount)),
+  /** 期后结转借方合计 → 供crossSheet联动D7-2 */
+  const postTransferDebitTotal: ComputedRef<number> = computed(() =>
+    calcSubtotal(postTransferRows.value.map(r => postTransferAmount(r))),
   )
 
   // ─── Add/Remove/Update ───────────────────────────────────────────────
@@ -259,7 +267,7 @@ export function useD7VoucherCheck(options: UseD7VoucherCheckOptions) {
     checkedCount,
     abnormalCount,
     abnormalRate,
-    postTransferCreditTotal,
+    postTransferDebitTotal,
     addSample,
     removeSample,
     updateCell,

@@ -5,9 +5,9 @@
       <div class="guidance-content">
         <p><b>定位</b>：本表是科目 1503 其他权益工具投资（<b>FVOCI</b>）的被投资单位明细锚点，向上勾稽 G8-1 审定，向下供 G8-4 / G8-5 / G8-6 取数。</p>
         <p><b>编制顺序</b>：①「辅助核算取数」或手工录入被投资单位 → ②「期初余额」填成本与累计公允价值变动两分量 → ③「本期变动」填成本净额 / 公允价值变动 / 处置结转 / OCI 转留存 → ④ 填指定 OCI 原因 →「回写 G8-1」。</p>
-        <p><b>模板公式</b>（8 列自动重算，UI 只读）：期初合计 <code>E=C+D</code>；期初审定 <code>H=E+G</code>；本期变动合计 <code>M=I+J+K+L</code>；期末成本 <code>O=C+I</code>；期末累计公允价值变动 <code>P=D+J+K</code>；期末合计 <code>Q=O+P</code>；期末 OCI 累计 <code>R=F+J+L</code>；期末审定 <code>T=Q+S</code>。</p>
+        <p><b>模板公式</b>（8 列自动重算，UI 只读）：期初合计 <code>E=C+D</code>；期初审定 <code>H=E+G</code>；本期变动合计 <code>M=I+J+K</code>（不含 OCI 转留存，期初合计 + M = 期末合计）；期末成本 <code>O=C+I</code>；期末累计公允价值变动 <code>P=D+J+K</code>；期末合计 <code>Q=O+P</code>；期末 OCI 累计 <code>R=F+J+L</code>；期末审定 <code>T=Q+S</code>。</p>
         <p><b>口径要点</b>：本期变动的「成本」是<b>净额</b>列（增加为正、减少为负，模板无单独减少列）；FVOCI 下<b>本期公允价值变动就是本期 OCI</b>（不另设一列）；「本期确认的股利收入」是损益项，不进任何余额；层次 / 估值方法 / 持股数 / 每股公允价值在 <b>G8-4</b> 填报。</p>
-        <p><b>与 Excel 联动</b>：期末的「计入 OCI 的累计利得或损失」与「审定数」两列，权威模板在部分行漏写了公式，因此在 Excel 在线编辑里是<b>可填</b>的 —— 但回到本页会按恒等式 <code>R=F+J+L</code> / <code>T=Q+S</code> 重算覆盖。请在本页填写分量，不要在 Excel 侧直接改这两列。</p>
+        <p><b>与 Excel 联动</b>：上述 8 列在权威模板里逐行都是公式（模板缺漏已补齐），Excel 在线编辑里同样按公式计算、不能直接改；请填写分量列。</p>
       </div>
     </details>
 
@@ -280,7 +280,7 @@
           </el-table-column>
           <el-table-column label="合计" :render-header="th('合计')" width="110" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="M = I+J+K+L">{{ fmt(row.movementTotal) }}</span>
+              <span class="formula-cell" title="M = I+J+K">{{ fmt(row.movementTotal) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期确认的股利收入" :render-header="th('本期确认的股利收入（损益项，不进余额）')" width="140" align="right">

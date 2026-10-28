@@ -588,6 +588,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabDisposalCheck.vue — H8-12 使用权资产/租赁负债减少检查表
@@ -595,6 +596,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * → 检查比例 → 说明/结论；平台增强 CAS21 终止损益 + H9 同步
  */
 import { computed, ref, toRef, inject, type Ref } from 'vue'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useH8DisposalCheck,
@@ -641,7 +643,8 @@ const showSampling = ref(false)
 const isReadonly = toRef(props, 'isReadonly')
 const projectId = toRef(props, 'projectId')
 const wpId = toRef(props, 'wpId')
-const samplingYear = computed(() => new Date().getFullYear())
+const { year: auditYear } = useAuditContext()
+const samplingYear = computed<number | null>(() => auditYear.value ?? null)
 
 const {
   rows,
@@ -786,6 +789,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

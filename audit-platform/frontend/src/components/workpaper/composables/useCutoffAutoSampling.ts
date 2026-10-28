@@ -18,11 +18,12 @@
  *
  * Requirements: 1.2, 1.3, 1.5, 3.3, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.3, 5.6, 5.8, 7.5, 8.4, 9.1, 9.5
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 // 说明：readonly 支持 Ref 或 ComputedRef（组件侧多以 computed 传入）
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { exclusionCaveats } from '@/utils/voucherIdentity'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { determineCutoffStatus, computeDateRange, type CutoffDirection, type CutoffStatus } from './cutoffJudgment'
 import { inWindow as canonicalInWindow, judgeCrossPeriod as canonicalJudge } from './cutoffCanonical'
 
@@ -81,7 +82,8 @@ export interface ExtractionLogEntry {
 
 export interface CutoffAutoSamplingOptions {
   projectId: Ref<string>
-  year: Ref<number>
+  /** 审计年度；项目没填为 null（默认截止日留空、一键取数提示补填） */
+  year: Ref<number | null>
   workpaperId: Ref<string>
   accountCode: string                       // 关联科目编码
   cutoffDirection: CutoffDirection           // 截止判定方向
@@ -195,8 +197,8 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
       ? accountCode.split(',').map(c => c.trim()).filter(Boolean)
       : []
 
-    // 默认截止日 = 项目年度12月31日
-    const defaultCutoffDate = `${year.value}-12-31`
+    // 默认截止日 = 项目年度12月31日；年度未设置时留空（由校验提示填写，不拼出「null-12-31」）
+    const defaultCutoffDate = year.value == null ? '' : `${year.value}-12-31`
 
     return {
       cutoffDate: defaultConditions?.cutoffDate ?? defaultCutoffDate,
@@ -214,6 +216,10 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
   // ─── Reactive State ─────────────────────────────────────────────────────
 
   const config = ref<CutoffConfig>(buildDefaultConfig())
+  // 年度常在挂载后才取到：取到时补上留空的默认截止日（用户已填的不动）
+  watch(year, (y) => {
+    if (y != null && !config.value.cutoffDate) config.value.cutoffDate = `${y}-12-31`
+  })
   const extractedVouchers = ref<ExtractedVoucher[]>([])
   const stats = ref<ExtractStats | null>(null)
   const loading = ref(false)
@@ -383,6 +389,10 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
     }
     // 校验：基准日 + 科目范围（R25.1/R25.2）
     if (!validateConfig()) return
+    if (year.value == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
 
     loading.value = true
     try {

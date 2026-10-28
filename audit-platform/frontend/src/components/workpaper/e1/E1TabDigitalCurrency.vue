@@ -18,7 +18,13 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, inject, toRef, computed, onMounted, onBeforeUnmount, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ChecklistItem } from '../composables/useE1Adjudication'
-import { parseNum, calcCashBalance, calcFxConvert, sumField } from '../composables/useE1FormulaEngine'
+import { parseNum, sumField } from '../composables/useE1FormulaEngine'
+import {
+  createEmptyE1DigitalRow,
+  normalizeE1DigitalRow,
+  recalcE1DigitalRow,
+  type E1DigitalRow,
+} from './e1DigitalRowCalc'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -29,27 +35,8 @@ import { Setting } from '@element-plus/icons-vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface DigitalRow {
-  id: string
-  seq: number
-  bankName: string
-  currency: string
-  fxRate: number
-  opening: number
-  increase: number
-  decrease: number
-  endingFc: number       // readonly: opening+increase-decrease
-  endingRmb: number      // readonly: endingFc×fxRate
-  adjustment: number     // 账项调整(原币)
-  auditedFc: number      // readonly: endingFc+adjustment
-  auditedRmb: number     // readonly: auditedFc×fxRate
-  queryBalance: number   // 查询余额
-  diff: number           // readonly: queryBalance-auditedFc
-  diffReason: string     // 差异非零时必填
-  indexNo: string        // 银行余额索引号
-  confirmationIndexNo: string // 银行询证函索引号
-  note: string
-}
+// 行模型与行计算是纯函数（e1DigitalRowCalc，与对拍守卫共用）
+type DigitalRow = E1DigitalRow
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -88,27 +75,8 @@ const auditConclusion = ref('')
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function generateId(): string {
-  return `digi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function recalcRow(row: DigitalRow): DigitalRow {
-  const endingFc = calcCashBalance(row.opening, row.increase, row.decrease)
-  const endingRmb = calcFxConvert(endingFc, row.fxRate)
-  const auditedFc = endingFc + row.adjustment
-  const auditedRmb = calcFxConvert(auditedFc, row.fxRate)
-  const diff = row.queryBalance - auditedFc
-  return { ...row, endingFc, endingRmb, auditedFc, auditedRmb, diff }
-}
-
-function createEmptyRow(seq: number): DigitalRow {
-  return recalcRow({
-    id: generateId(), seq, bankName: '', currency: '人民币', fxRate: 1,
-    opening: 0, increase: 0, decrease: 0, endingFc: 0, endingRmb: 0,
-    adjustment: 0, auditedFc: 0, auditedRmb: 0, queryBalance: 0, diff: 0,
-    diffReason: '', indexNo: '', confirmationIndexNo: '', note: '',
-  })
-}
+const recalcRow = recalcE1DigitalRow
+const createEmptyRow = createEmptyE1DigitalRow
 
 // ─── Load/Save ───────────────────────────────────────────────────────────────
 
@@ -120,15 +88,7 @@ function loadFromResponses(): void {
     try {
       const parsed = JSON.parse(raw)
       rows.value = Array.isArray(parsed) && parsed.length
-        ? parsed.map((r: any, i: number) => recalcRow({
-          id: String(r.id || generateId()), seq: i + 1, bankName: String(r.bankName || ''),
-          currency: String(r.currency || ''), fxRate: parseNum(r.fxRate) || 1,
-          opening: parseNum(r.opening), increase: parseNum(r.increase), decrease: parseNum(r.decrease),
-          endingFc: 0, endingRmb: 0, adjustment: parseNum(r.adjustment),
-          auditedFc: 0, auditedRmb: 0, queryBalance: parseNum(r.queryBalance), diff: 0,
-          diffReason: String(r.diffReason || ''), indexNo: String(r.indexNo || ''),
-          confirmationIndexNo: String(r.confirmationIndexNo || ''), note: String(r.note || ''),
-        }))
+        ? parsed.map((r: Record<string, unknown>, i: number) => normalizeE1DigitalRow(r, i))
         : [createEmptyRow(1)]
     } catch { rows.value = [createEmptyRow(1)] }
   }

@@ -463,6 +463,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, onMounted, defineAsyncComponent, inject, type Ref } from 'vue'
 import {
@@ -507,12 +508,11 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 
 const isReadonly = computed(() => !!props.readonly)
-const auditYear = computed(() => {
+const auditYear = computed<number | null>(() => {
   const raw = props.htmlData?.project_context?.audit_year
     ?? props.htmlData?.projectContext?.audit_year
     ?? props.htmlData?.audit_year
-  if (raw) return Number(raw) || new Date().getFullYear()
-  return new Date().getFullYear()
+  return raw == null || raw === '' ? null : Number(raw) || null
 })
 const g5Notes = useInjectedG5FormData({
   wpId: toRef(props, 'wpId'),
@@ -606,6 +606,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (isReadonly.value) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

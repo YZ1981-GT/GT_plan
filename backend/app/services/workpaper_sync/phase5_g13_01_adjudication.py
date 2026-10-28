@@ -9,7 +9,9 @@ spec: g-cycle-adjudication-sheets-coverage · Task 3
 单区 R7-R16（10 行数据）。合计 R17 / 试算平衡表数 R18 / 差异 R19。两级表头 R5-R6。
 
 🔴 B/C 数据行是跨 sheet 引用（`='明细表G13-2'!...`）—— 与 G12 不同。
-🔴 R7 的 B/C 是 SUM 汇总行（=B8+B9），I7 引用 G9 而非 G7（模板原文，不修）。
+🔴 R7 的 B/C 是 SUM 汇总行（=B8+B9）。模板原 I7 变动率分母、G17 合计都取了「衍生金融资产」G9
+   而非小计 G7，2026-10-26 已改为 G7（spec oo-writeback-template-parity-closure R1，
+   `scripts/fix/fix_template_formula_defects.py`）；本声明只有逐格 mask，不受影响。
 """
 from __future__ import annotations
 

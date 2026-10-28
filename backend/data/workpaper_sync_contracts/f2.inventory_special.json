@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "c1411a261218f33cbb8dbba30e843cfeb45eb202afddc9921e297712c371c3b8",
+  "instrumentation_definition_sha256": "5b2fbc27a155ad2578daca2f4174bfde9fb9cef533589904a68b4a3ad3b69ae2",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f2-inventory-special",
@@ -70,13 +70,13 @@
                 "column": "C",
                 "row_from": "row_identity"
               },
-              "column_key": "revenue",
+              "column_key": "book_balance",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!C5",
-              "header_text": "合同收入",
-              "json_pointer": "/rows/{row_uuid}/revenue",
+              "header_text": "账面余额",
+              "json_pointer": "/rows/{row_uuid}/bookBalance",
               "mode": "editable",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!C6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/revenue",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/book_balance",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -85,13 +85,13 @@
                 "column": "D",
                 "row_from": "row_identity"
               },
-              "column_key": "cost",
+              "column_key": "accumulated_provision",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!D5",
-              "header_text": "合同成本",
-              "json_pointer": "/rows/{row_uuid}/cost",
+              "header_text": "已计提减值准备",
+              "json_pointer": "/rows/{row_uuid}/accumulatedProvision",
               "mode": "editable",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!D6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/cost",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/accumulated_provision",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -100,13 +100,13 @@
                 "column": "E",
                 "row_from": "row_identity"
               },
-              "column_key": "diff",
+              "column_key": "book_value",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!E5",
-              "header_text": "差额",
-              "json_pointer": "/rows/{row_uuid}/diff",
+              "header_text": "账面价值",
+              "json_pointer": "/rows/{row_uuid}/bookValue",
               "mode": "formula",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!E6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/diff",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/book_value",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -115,13 +115,13 @@
                 "column": "F",
                 "row_from": "row_identity"
               },
-              "column_key": "book_open",
+              "column_key": "remaining_consideration",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!F5",
-              "header_text": "期初账面",
-              "json_pointer": "/rows/{row_uuid}/bookOpen",
+              "header_text": "转让与该资产相关的商品预期能够取得的剩余对价",
+              "json_pointer": "/rows/{row_uuid}/remainingConsideration",
               "mode": "editable",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!F6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/book_open",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/remaining_consideration",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -130,13 +130,13 @@
                 "column": "G",
                 "row_from": "row_identity"
               },
-              "column_key": "book_inc",
+              "column_key": "estimated_future_costs",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!G5",
-              "header_text": "本期增加",
-              "json_pointer": "/rows/{row_uuid}/bookInc",
+              "header_text": "转让该相关商品估计将要发生的成本",
+              "json_pointer": "/rows/{row_uuid}/estimatedFutureCosts",
               "mode": "editable",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!G6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/book_inc",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/estimated_future_costs",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -145,13 +145,13 @@
                 "column": "H",
                 "row_from": "row_identity"
               },
-              "column_key": "book_close",
+              "column_key": "net_realizable_value",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!H5",
-              "header_text": "期末账面",
-              "json_pointer": "/rows/{row_uuid}/bookClose",
+              "header_text": "预期取得转让对价净额",
+              "json_pointer": "/rows/{row_uuid}/netRealizableValue",
               "mode": "formula",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!H6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/book_close",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/net_realizable_value",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -160,28 +160,28 @@
                 "column": "I",
                 "row_from": "row_identity"
               },
-              "column_key": "audit_open",
+              "column_key": "is_impaired",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!I5",
-              "header_text": "审定期初",
-              "json_pointer": "/rows/{row_uuid}/auditOpen",
+              "header_text": "是否发生减值",
+              "json_pointer": "/rows/{row_uuid}/isImpaired",
               "mode": "formula",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!I6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/audit_open",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/is_impaired",
               "store_item_id": "F2-57-rows",
-              "value_type": "amount"
+              "value_type": "text"
             },
             {
               "cell": {
                 "column": "J",
                 "row_from": "row_identity"
               },
-              "column_key": "audit_inc",
+              "column_key": "measured_provision",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!J5",
-              "header_text": "审定增加",
-              "json_pointer": "/rows/{row_uuid}/auditInc",
+              "header_text": "测算减值准备计提或转回金额",
+              "json_pointer": "/rows/{row_uuid}/measuredProvision",
               "mode": "formula",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!J6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/audit_inc",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/measured_provision",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -190,13 +190,13 @@
                 "column": "K",
                 "row_from": "row_identity"
               },
-              "column_key": "audit_close",
+              "column_key": "company_recorded_provision",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!K5",
-              "header_text": "审定期末",
-              "json_pointer": "/rows/{row_uuid}/auditClose",
+              "header_text": "企业账面记录的减值准备金额",
+              "json_pointer": "/rows/{row_uuid}/companyRecordedProvision",
               "mode": "editable",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!K6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/audit_close",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/company_recorded_provision",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
             },
@@ -205,30 +205,15 @@
                 "column": "L",
                 "row_from": "row_identity"
               },
-              "column_key": "adj_amt",
+              "column_key": "difference",
               "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!L5",
-              "header_text": "调整金额",
-              "json_pointer": "/rows/{row_uuid}/adjAmt",
+              "header_text": "差异金额",
+              "json_pointer": "/rows/{row_uuid}/difference",
               "mode": "formula",
               "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!L6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/adj_amt",
+              "stable_field_key": "contract_impairment_rows/{row_uuid}/difference",
               "store_item_id": "F2-57-rows",
               "value_type": "amount"
-            },
-            {
-              "cell": {
-                "column": "M",
-                "row_from": "row_identity"
-              },
-              "column_key": "remark",
-              "header_source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!M5",
-              "header_text": "备注",
-              "json_pointer": "/rows/{row_uuid}/remark",
-              "mode": "editable",
-              "source_ref": "源xlsx!合同履约成本减值准备测算表F2-57!M6",
-              "stable_field_key": "contract_impairment_rows/{row_uuid}/remark",
-              "store_item_id": "F2-57-rows",
-              "value_type": "text"
             }
           ],
           "footer_anchor": {

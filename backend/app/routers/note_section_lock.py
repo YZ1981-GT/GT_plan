@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.services.note_edit_gate import (
     assert_note_role_access,
@@ -131,10 +131,11 @@ async def heartbeat(
 @router.get("/active")
 async def get_active_locks(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取项目所有活跃锁"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = NoteSectionLockService(db)
     return await svc.get_active_locks(project_id, year)

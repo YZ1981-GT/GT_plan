@@ -740,9 +740,10 @@ export function extractBadDebtForDisclosure(badRaw: string | null | undefined): 
         || 'provisionIncrease' in (r || {})
         || 'closingAdjustment' in (r || {})
       const openingAudited = Number(r.openingAudited) || round2(openingUnadj + openingAdj)
+      // 期末审定 = 期末未审 + 期末账项调整，期末未审从期初未审滚动（与 G5-3 表单 / 模板 J、L 列同口径）
       const closingFromMovement = hasMovement
         ? round2(
-          openingAudited
+          openingUnadj
           + (Number(r.provisionIncrease) || 0)
           + (Number(r.otherIncrease) || 0)
           - (Number(r.reversal) || 0)

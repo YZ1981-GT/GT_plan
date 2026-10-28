@@ -20,10 +20,11 @@ import {
   parseNum,
   calcAuditedAmount,
   calcChangeAmount,
-  calcChangeRate,
   calcSubtotal,
   calcContractLiabilityTotal,
 } from './useD7FormulaEngine'
+// 审定表变动率按模板 D7-1 K 列（期初为 0、期末为正 → 100%，原先记 N/A）；分析表 D7 仍用 calcChangeRate
+import { calcTemplateChangeRate } from './templateChangeRate'
 import { eventBus } from '@/utils/eventBus'
 // 🔴 逐格四态覆盖状态机（spec d567-sync-coverage Task 20）——**共享一份**，绝不在 D7 侧另写。
 //    D7-1 双区块（nature / aging）的 `priorUnadjusted` + `currentUnadjusted` 四列都是派生格。
@@ -193,7 +194,7 @@ function buildRow(params: {
     priorAudited,
     currentAudited,
     changeAmount: calcChangeAmount(priorAudited, currentAudited),
-    changeRate: calcChangeRate(priorAudited, currentAudited),
+    changeRate: calcTemplateChangeRate(priorAudited, currentAudited),
   }
 }
 

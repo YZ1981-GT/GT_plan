@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
-"""G8-2 列同构判据 —— 堵住「猜测映射」+ 钉住模板四处行级缺陷（含判据 P12）。
+"""G8-2 列同构判据 —— 堵住「猜测映射」+ 模板行级缺陷已修后的公式列判据（含判据 P12）。
 
 spec: `g-cycle-single-region-detail-lanes` · Task 9b / C-8
 　　　设计依据 `evidence/task8-c6-remaining-eight-template-logic.md` §3 + §12
+　　　模板修正：`oo-writeback-template-parity-closure` R1（design §2 第 8 组）
 
 ═══ 四层闭环 ═══
   ① `header_text` 逐列 == **模板逐格实测**（模板是权威）
   ② `json_key` 集合/顺序 == **前端行接口**（双向相等）
   ③ 🔴 FVOCI 口径：OCI 三列必须在受管面内（**与 G9/G10 反向**）
-  ④ 🔴 模板四处行级缺陷 + 判据 **P12**（R13 的 R 列与 R12 的 T 列不被误标 formula）
+  ④ 模板行级缺陷已修：八个公式列逐行同形 + 判据 **P12**（R/T 判 formula 时模板每行都有公式）
 
-═══ 🔴 P12 的技术根据（本轮实测才定下来）═══
+═══ P12 的技术根据 ═══
 
 `excel_materialize` 写受保护格时要求 `view.has_formula`，否则抛
-`ProtectedRegionWriteError`。而模板 R13-R20 的 `R`、R12 的 `T` **整格无公式** ⇒
-判 `mode=formula` 会在 materialize 阶段直接炸。这就是 P12「不得误标」的硬根据，
-不是风格偏好。本文件把它写成可复核的判据。
+`ProtectedRegionWriteError`。修模板前 R13-R20 的 `R`、R12 的 `T` 整格无公式，只能判
+editable；修模板后 R11-R20 每行都有 `R=F+J+L` / `T=Q+S`，于是改判 formula。
+判据因此从「R/T 不得误标 formula」翻成「R/T 判 formula 且模板每个数据行都有公式」：
+任一行公式丢失（模板回退），materialize 会炸，这里先红。
 """
 from __future__ import annotations
 
@@ -38,12 +40,9 @@ from app.services.workpaper_sync.phase5_g8_02_detail import (  # noqa: E402
     FOOTER_ROW_G802,
     FORMULA_COLUMNS_G802,
     FORMULA_TEMPLATES_G802,
-    FRONTEND_DERIVED_COLUMNS_G802,
     MANAGED_SHEET_G802,
     SPEC_G802,
     STORE_ITEM_ID_G802,
-    TEMPLATE_ROW_DEFECTS_G802,
-    TEMPLATE_ROW_FORMULAS_G802,
 )
 from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
     iter_store_rows,
@@ -288,13 +287,13 @@ class TestFvociColumnsAreRequiredNotRemovable:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# ④ 🔴 模板四处行级缺陷 + 判据 P12
+# ④ 模板行级缺陷已修：八个公式列逐行同形 + 判据 P12
 # ════════════════════════════════════════════════════════════════════════════
-class TestTemplateRowLevelDefectsAndP12:
+class TestTemplateRowLevelFormulasAndP12:
     def test_formula_columns_are_exactly_the_columns_with_formula_on_every_row(
         self, ws
     ) -> None:
-        """🔴 判据是「模板 R11-R20 **每行都有**公式」，不是「公式逐行同形」。"""
+        """判据是「模板 R11-R20 **每行都有**公式」的列集合，与声明逐值相等。"""
         from openpyxl.utils import get_column_letter
 
         every_row = tuple(
@@ -310,13 +309,13 @@ class TestTemplateRowLevelDefectsAndP12:
             f"formula_columns 声明 {FORMULA_COLUMNS_G802} 与「每行都有公式」的实测 "
             f"{every_row} 不一致"
         )
-        assert len(FORMULA_COLUMNS_G802) == 6
+        assert FORMULA_COLUMNS_G802 == ("E", "H", "M", "O", "P", "Q", "R", "T")
 
     @pytest.mark.parametrize("col", sorted(FORMULA_TEMPLATES_G802))
     def test_uniform_formula_template_renders_to_every_data_row(
         self, col: str, ws
     ) -> None:
-        """`FORMULA_TEMPLATES_G802` 只放逐行同形的列 ⇒ 逐格可比。"""
+        """八个公式列逐行同形 ⇒ 每个数据行逐格等于声明模板渲染结果。"""
         from openpyxl.utils import column_index_from_string
 
         ci = column_index_from_string(col)
@@ -326,79 +325,88 @@ class TestTemplateRowLevelDefectsAndP12:
                 f"{col}{r} 模板实得 {got!r}，声明渲染为 "
                 f"{FORMULA_TEMPLATES_G802[col].format(r=r)!r}"
             )
-        assert sorted(FORMULA_TEMPLATES_G802) == ["E", "H", "O", "Q"]
 
-    def test_m_and_p_are_in_formula_columns_but_not_in_uniform_templates(self) -> None:
-        """M/P 每行都有公式（可判 formula）但逐行不同形（进不了统一模板表）。"""
-        for col in ("M", "P"):
-            assert col in FORMULA_COLUMNS_G802
-            assert col not in FORMULA_TEMPLATES_G802
+    def test_every_formula_column_is_in_the_uniform_template_table(self) -> None:
+        """修模板前 M/P 逐行不同形、只能记逐行台账；修后八列全进统一模板表，台账删除。"""
+        assert set(FORMULA_COLUMNS_G802) == set(FORMULA_TEMPLATES_G802)
+        from app.services.workpaper_sync import phase5_g8_02_detail as detail
 
-    @pytest.mark.parametrize(
-        ("col", "row"), sorted(TEMPLATE_ROW_FORMULAS_G802), ids=lambda v: str(v)
-    )
-    def test_per_row_formula_ledger_matches_template_cell_by_cell(
-        self, col: str, row: int, ws
-    ) -> None:
-        """M/P 的逐行实测台账逐格比对 —— 模板一旦被修成同形，这里会红并提示提列。"""
-        from openpyxl.utils import column_index_from_string
+        for stale in (
+            "TEMPLATE_ROW_FORMULAS_G802",
+            "TEMPLATE_ROW_DEFECTS_G802",
+            "FRONTEND_DERIVED_COLUMNS_G802",
+        ):
+            assert not hasattr(detail, stale), (
+                f"{stale} 是修模板前的缺陷台账，模板已逐行同形，不应再导出"
+            )
 
-        got = ws.cell(row=row, column=column_index_from_string(col)).value
-        assert got == TEMPLATE_ROW_FORMULAS_G802[(col, row)], (
-            f"{col}{row} 模板实得 {got!r}，台账记 "
-            f"{TEMPLATE_ROW_FORMULAS_G802[(col, row)]!r}"
+    def test_movement_total_excludes_oci_transfer_and_closes_the_balance(self, ws) -> None:
+        """🔴 M = SUM(I:K)，不含 L：E + M 必须等于 Q（L 是权益内部结转，只动 R 列 OCI 累计）。
+
+        修模板前只有 R11 是 `SUM(I11:L11)`，其余 9 行本就是 `SUM(I:K)`。逐行核两条：
+        M 的区间止于 K；按模板公式代数展开 `E + M == Q`（C+D + I+J+K == C+I + D+J+K）。
+        """
+        import re
+        from collections import Counter
+
+        def leaves(col: str) -> Counter:
+            """把公式列按声明模板递归展开到可编辑列（模板只有加法与同行 SUM 区间）。"""
+            tpl = FORMULA_TEMPLATES_G802.get(col)
+            if tpl is None:
+                return Counter({col: 1})
+            body = tpl.format(r=1)[1:]
+            out: Counter = Counter()
+            for a, b in re.findall(r"SUM\(([A-Z])1:([A-Z])1\)", body):
+                for code in range(ord(a), ord(b) + 1):
+                    out += leaves(chr(code))
+            for c in re.findall(r"([A-Z])1", re.sub(r"SUM\([A-Z]1:[A-Z]1\)", "", body)):
+                out += leaves(c)
+            return out
+
+        for r in _DATA_ROWS:
+            assert ws[f"M{r}"].value == f"=SUM(I{r}:K{r})", f"M{r} 实得 {ws[f'M{r}'].value!r}"
+        assert leaves("E") + leaves("M") == leaves("Q"), (
+            f"E+M 展开 {sorted((leaves('E') + leaves('M')).elements())} ≠ "
+            f"Q 展开 {sorted(leaves('Q').elements())}"
         )
+        assert "L" not in leaves("M") and "L" in leaves("R")
 
-    def test_per_row_ledger_covers_every_data_row_for_m_and_p(self) -> None:
-        for col in ("M", "P"):
-            rows = sorted(r for c, r in TEMPLATE_ROW_FORMULAS_G802 if c == col)
-            assert rows == list(_DATA_ROWS), f"{col} 台账覆盖 {rows}，应为 {list(_DATA_ROWS)}"
-
-    def test_defect_ledger_matches_template_exactly(self, ws) -> None:
-        """四处缺陷逐格复核：M 漏 L / P 漏 K / R 与 T 整格无公式。"""
-        from openpyxl.utils import column_index_from_string
-
-        by_col = {c: (rows, note) for c, rows, note in TEMPLATE_ROW_DEFECTS_G802}
-        assert sorted(by_col) == ["M", "P", "R", "T"]
-
-        # M：声明的缺陷行不含 L，其余行（R11）含 L
-        for r in _DATA_ROWS:
-            got = str(ws[f"M{r}"].value or "")
-            if r in by_col["M"][0]:
-                assert "L" not in got, f"M{r} 台账记「漏 L」但实得 {got!r}"
-            else:
-                assert "L" in got, f"M{r} 不在缺陷清单却也漏 L：{got!r}"
-        # P：声明的缺陷行不含 K
-        for r in _DATA_ROWS:
-            got = str(ws[f"P{r}"].value or "")
-            if r in by_col["P"][0]:
-                assert "K" not in got, f"P{r} 台账记「漏 K」但实得 {got!r}"
-            else:
-                assert "K" in got, f"P{r} 不在缺陷清单却也漏 K：{got!r}"
-        # R / T：声明的缺陷行整格无公式
-        for col in ("R", "T"):
-            ci = column_index_from_string(col)
-            for r in _DATA_ROWS:
-                v = ws.cell(row=r, column=ci).value
-                has_formula = isinstance(v, str) and v.startswith("=")
-                if r in by_col[col][0]:
-                    assert not has_formula, f"{col}{r} 台账记「整格无公式」但实得 {v!r}"
-                else:
-                    assert has_formula, f"{col}{r} 不在缺陷清单却也无公式"
-
-    def test_p12_r_and_t_are_not_mislabeled_as_formula(self) -> None:
-        """🔴 **判据 P12**：R13 的 `R` 列与 R12 的 `T` 列不被误标 formula。
+    def test_p12_r_and_t_are_formula_and_backed_on_every_data_row(self, ws) -> None:
+        """🔴 **判据 P12**：R/T 判 formula 的前提是模板每个数据行那格都有公式。
 
         技术根据：`excel_materialize` 写受保护格时要求 `view.has_formula`，
-        模板那几格没有公式 ⇒ 判 formula 会抛 `ProtectedRegionWriteError`。
+        缺一行公式就会抛 `ProtectedRegionWriteError`。
         """
         by_col = {f[1]: f for f in FIELD_SPECS_G802}
-        assert by_col["R"][2] == "editable", "R 列被误标 formula（模板 R13-R20 无公式）"
-        assert by_col["T"][2] == "editable", "T 列被误标 formula（模板 R12 无公式）"
-        assert "R" not in FORMULA_COLUMNS_G802
-        assert "T" not in FORMULA_COLUMNS_G802
-        # 这两列改由前端按恒等式重算 —— 必须在登记表里说得出公式
-        assert FRONTEND_DERIVED_COLUMNS_G802 == {"R": "F+J+L", "T": "Q+S"}
+        assert by_col["R"][2] == "formula"
+        assert by_col["T"][2] == "formula"
+        for r in _DATA_ROWS:
+            assert ws[f"R{r}"].value == f"=F{r}+J{r}+L{r}", f"R{r} 实得 {ws[f'R{r}'].value!r}"
+            assert ws[f"T{r}"].value == f"=Q{r}+S{r}", f"T{r} 实得 {ws[f'T{r}'].value!r}"
+
+    def test_judgement_is_discriminative_on_a_reverted_template(self, ws) -> None:
+        """变异自检：把模板回退到修复前的形态（R13 的 R、R12 的 T 清空），「每行都有公式」的判据必须丢列。"""
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        mut = wb.active
+        for r in _DATA_ROWS:
+            for c in range(1, 24):
+                mut.cell(row=r, column=c, value=ws.cell(row=r, column=c).value)
+        mut["R13"] = None
+        mut["T12"] = None
+        every_row = tuple(
+            get_column_letter(c)
+            for c in range(1, 24)
+            if all(
+                isinstance(mut.cell(row=r, column=c).value, str)
+                and str(mut.cell(row=r, column=c).value).startswith("=")
+                for r in _DATA_ROWS
+            )
+        )
+        assert every_row == ("E", "H", "M", "O", "P", "Q"), every_row
+        assert every_row != FORMULA_COLUMNS_G802
 
     def test_every_formula_mode_field_is_covered_by_formula_mask(self) -> None:
         """契约层 CS-13 的本地复核（提前于 parse_contract 打红，定位更快）。"""
@@ -425,8 +433,12 @@ class TestSingleRegionGeometryAndStore:
         assert SPEC_G802.store_item_id == STORE_ITEM_ID_G802 == "G8-detail-rows"
 
     def test_footer_is_column_wise_sum(self, ws) -> None:
-        """footer R21 逐列 `=SUM(x11:x20)`（G8 无 G10 那样的 O21 例外）。"""
-        for col in ("C", "D", "E", "F", "G", "H", "I", "J", "M", "N", "O", "P", "Q", "S", "T"):
+        """footer R21 逐列 `=SUM(x11:x20)`（G8 无 G10 那样的 O21 例外）。
+
+        修模板前 K / L / R 三列合计格是空的（`oo-writeback-template-parity-closure` R1 补上），
+        现在 C..T 十八列都必须是同形 SUM。
+        """
+        for col in "CDEFGHIJKLMNOPQRST":
             assert ws[f"{col}21"].value == f"=SUM({col}11:{col}20)", (
                 f"{col}21 实得 {ws[f'{col}21'].value!r}"
             )

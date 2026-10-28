@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.services.excel_html_converter import (
     excel_to_structure,
@@ -212,10 +212,11 @@ async def save_edits(
     # 5. 如果是附注模块，同步回 DisclosureNote.table_data（双路径一致性）
     module = structure.get("metadata", {}).get("module")
     if module == "disclosure_note" and db:
+        requested_year = structure["metadata"].get("year")
+        year = await require_project_audit_year(db, project_id, requested_year)
         try:
             from app.services.triple_format_adapter import DisclosureNoteAdapter
             note_section = structure["metadata"].get("note_section", "")
-            year = structure["metadata"].get("year", 2025)
             await DisclosureNoteAdapter.update_note_from_structure(
                 db, project_id, year, note_section, structure, user_id=current_user.id,
             )
@@ -377,14 +378,13 @@ async def download_file(
     )
 
 
-
 # ═══ 统一模块接口：任意模块 → 三形式 ═══
 
 @router.get("/module/{module}/structure")
 async def get_module_structure(
     project_id: UUID,
     module: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     wp_code: str | None = Query(None),
     note_section: str | None = Query(None),
     report_type: str | None = Query(None),
@@ -399,6 +399,7 @@ async def get_module_structure(
     """
     from app.services.triple_format_adapter import module_to_structure
 
+    year = await require_project_audit_year(db, project_id, year)
     kwargs = {}
     if wp_code:
         kwargs["wp_code"] = wp_code
@@ -417,7 +418,7 @@ async def get_module_structure(
 async def get_module_html(
     project_id: UUID,
     module: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     editable: bool = Query(default=True),
     wp_code: str | None = Query(None),
     note_section: str | None = Query(None),
@@ -429,6 +430,7 @@ async def get_module_html(
     """统一接口：获取任意模块的 HTML 渲染"""
     from app.services.triple_format_adapter import module_to_html
 
+    year = await require_project_audit_year(db, project_id, year)
     kwargs = {}
     if wp_code:
         kwargs["wp_code"] = wp_code
@@ -447,7 +449,7 @@ async def get_module_html(
 async def export_module_excel(
     project_id: UUID,
     module: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     wp_code: str | None = Query(None),
     note_section: str | None = Query(None),
     report_type: str | None = Query(None),
@@ -459,6 +461,7 @@ async def export_module_excel(
     from fastapi.responses import FileResponse
     from app.services.triple_format_adapter import module_to_excel
 
+    year = await require_project_audit_year(db, project_id, year)
     kwargs = {}
     if wp_code:
         kwargs["wp_code"] = wp_code
@@ -489,12 +492,11 @@ async def export_module_excel(
     )
 
 
-
 @router.post("/module/{module}/export-word")
 async def export_module_word(
     project_id: UUID,
     module: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     wp_code: str | None = Query(None),
     note_section: str | None = Query(None),
     report_type: str | None = Query(None),
@@ -507,6 +509,7 @@ async def export_module_word(
     from app.services.triple_format_adapter import module_to_word
     import time
 
+    year = await require_project_audit_year(db, project_id, year)
     kwargs = {}
     if wp_code:
         kwargs["wp_code"] = wp_code
@@ -533,7 +536,6 @@ async def export_module_word(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=filename,
     )
-
 
 
 @router.get("/cell-info/{file_stem}")
@@ -595,7 +597,6 @@ async def get_cell_info(
         "merge": merge_info,
         "is_merged": merge_info is not None,
     }
-
 
 
 # ═══ 版本管理 ═══
@@ -693,7 +694,6 @@ async def refresh_lock(
     return {"refreshed": True}
 
 
-
 # ═══ 公式执行 ═══
 
 @router.post("/execute-formulas/{file_stem}")
@@ -701,16 +701,23 @@ async def execute_formulas(
     project_id: UUID,
     file_stem: str,
     sheet_index: int = Query(default=0),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """执行 structure.json 中所有公式并回填计算结果
 
     遍历所有含 formula 的单元格，调用 execute_formula 计算值并写回。
+
+    🔴 鉴权升级（spec formula-fetch-followup-defect-closure A4）：原仅 get_current_user，
+    任何登录用户可对任意项目执行公式并写回结果。改为 require_project_access("edit")——
+    该端点写回 structure.json / xlsx / html 三份文件，属编辑类操作。
     """
     from app.services.cell_formula_evaluator import execute_formula
     from app.services.excel_html_converter import save_version_snapshot
+
+    # 缺省年度取项目审计年度；取不到 422 —— 按 year=None 查试算表必为空，公式会把 0 写回单元格
+    year = await require_project_audit_year(db, project_id, year)
 
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     structure_path = project_dir / f"{file_stem}.structure.json"
@@ -732,6 +739,8 @@ async def execute_formulas(
         return {"executed": 0, "message": "无公式需要执行"}
 
     # 预加载 trial_balance 全量数据（避免N+1查询）
+    import sqlalchemy as sa
+
     from app.models.audit_platform_models import TrialBalance
     tb_result = await db.execute(
         sa.select(TrialBalance).where(

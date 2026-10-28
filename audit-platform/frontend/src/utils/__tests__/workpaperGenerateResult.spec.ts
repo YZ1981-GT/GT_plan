@@ -35,4 +35,52 @@ describe('summarizeWorkpaperGenerateResult', () => {
     expect(n.message).not.toContain('B11')
     expect(n.message).toContain('1 个编码生成失败：H1')
   })
+
+  it('因程序裁剪跳过 / 底稿在回收站：警告并分别列出（spec procedure-trim-generation-delegation-chain 需求 2）', () => {
+    const n = summarizeWorkpaperGenerateResult({
+      created: 1,
+      skipped_trimmed_codes: ['H3', 'H3-1', 'M4A'],
+      in_recycle_codes: ['E2'],
+    })
+    expect(n.level).toBe('warning')
+    expect(n.message).toContain('3 个编码已在程序裁剪中标为不执行，未生成：H3、H3-1、M4A')
+    expect(n.message).toContain('1 个编码的底稿在回收站中，请从回收站恢复：E2')
+    expect(summarizeWorkpaperGenerateResult({ created: 2, skipped_trimmed_codes: [], in_recycle_codes: [] }).level)
+      .toBe('success')
+  })
+
+  it('按编码生成回报表头未填上：警告并列出编码与原因（原先只记服务日志、界面照报生成完成）', () => {
+    const n = summarizeWorkpaperGenerateResult({
+      created: 3,
+      header_failures: [
+        { wp_code: 'J2A', reason: '打开底稿文件失败' },
+        { wp_code: 'K11-4' },
+      ],
+    })
+    expect(n.level).toBe('warning')
+    expect(n.message).toContain('共创建 3 份底稿')
+    expect(n.message).toContain('2 个底稿表头未填上：J2A（打开底稿文件失败）、K11-4')
+    expect(summarizeWorkpaperGenerateResult({ created: 3, header_failures: [] })).toEqual({
+      level: 'success',
+      message: '底稿生成完成，共创建 3 份底稿',
+    })
+  })
+
+  it('统一回执（spec procedure-chain-hardening-and-java-contracts R11）：已有底稿与请求内未填表头只作说明，失败带原因', () => {
+    const info = summarizeWorkpaperGenerateResult({
+      created: 2,
+      existing_codes: ['E1', 'H1'],
+      header_unfilled: 2,
+    })
+    expect(info.level).toBe('success')
+    expect(info.message).toContain('2 个编码已有底稿，未重复生成：E1、H1')
+    expect(info.message).toContain('2 份底稿生成时未写入表头（编制单位、审计期间等），需在底稿文件中另行填写')
+    const failed = summarizeWorkpaperGenerateResult({
+      created: 1,
+      failures: [{ wp_code: 'A1', error: '模板文件被占用' }, { wp_code: 'B60A' }],
+    })
+    expect(failed.level).toBe('warning')
+    expect(failed.message).toContain('2 个编码生成失败：A1（模板文件被占用）、B60A')
+    expect(summarizeWorkpaperGenerateResult({ created: 1, header_unfilled: 0 }).message).not.toContain('表头')
+  })
 })

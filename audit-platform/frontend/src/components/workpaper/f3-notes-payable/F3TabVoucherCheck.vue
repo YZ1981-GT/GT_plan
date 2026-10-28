@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** F3TabVoucherCheck — F3-7 应付票据检查表（三检查区 + 弹窗逐单据核对，参照 F2-56 模式） */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, watch, toRef, inject, type Ref } from 'vue'
 import {
   useF3VoucherCheck,
@@ -68,7 +69,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  year?: number
+  year?: number | null
 }>()
 
 const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
@@ -106,7 +107,7 @@ const sections: Array<{
   { key: 'subsequent', rows: subsequentRows, total: subsequentTotal, abnormal: subsequentAbnormal, sheet: 'F3-7-subsequent' },
 ]
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.year ?? null)
 const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length + subsequentRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value + subsequentAbnormal.value)
@@ -202,6 +203,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

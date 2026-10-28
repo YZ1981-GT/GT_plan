@@ -6,10 +6,9 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G13_ADJUDICATION_ITEMS, G13_ACCOUNT_CODE } from '../g13Constants'
+import { G13_ACCOUNT_CODE } from '../g13Constants'
 import { G13_NOTE_SECTION } from '../g13NoteSectionMap'
 import { isG13SheetComplete } from '../g13SheetLabels'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 import { FORMULA_ENGINE_INVENTORY } from '../formulaEngineInventory'
 
 describe('G13 review fixes', () => {
@@ -23,13 +22,6 @@ describe('G13 review fixes', () => {
     expect(G13_ACCOUNT_CODE).toBe('6101')
     expect(G13_NOTE_SECTION.listed).toBe('五、75')
     expect(G13_NOTE_SECTION.soe).toBe('八、72')
-  })
-
-  it('cycleAdjudicationConfigs G13-1 与 G13_ADJUDICATION_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G13-1']
-    expect(cfg.accountCode).toBe('6101')
-    expect(cfg.rows).toHaveLength(G13_ADJUDICATION_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G13_ADJUDICATION_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG13SheetComplete：G13A 不认 G13-proc-*；空数组不算已编制', () => {

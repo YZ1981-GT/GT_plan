@@ -296,8 +296,8 @@ export async function fetchAuxBalances(
   try {
     const { resolveAuditYearNumber } = await import('../../composables/workpaperAuditYear')
     const y = year
-      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
-      ?? (new Date().getFullYear() - 1)
+      ?? resolveAuditYearNumber(undefined, undefined)
+    if (y == null) return [] // 年度不可用时返回空（fail-open，不阻断主流程）
 
     // 🔴 `api.get` 返回业务数据本体（此处为数组），禁写 `const { data } = ...`
     const payload = await api.get<any>(

@@ -339,6 +339,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import { calcStraightLineAmortTest } from '../../composables/useI4AmortizationEngine'
 import { calcSubtotal } from '../../composables/useI4FormulaEngine'
 import { useI4ImportExport } from '../../composables/useI4ImportExport'
@@ -400,10 +401,19 @@ const importExport = useI4ImportExport({
   onImported: () => _load(),
 })
 
+// 默认期间取项目审计年度（原先取今年）；还没取到 / 未设置时留空，取到后补上（已存的期间不动）
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(() => props.projectId)
+void ensureAuditYear()
 function _defaultPeriodYear(): { begin: string; end: string } {
-  const y = new Date().getFullYear()
-  return { begin: `${y}-01-01`, end: `${y}-12-31` }
+  const y = projectAuditYear.value
+  return y == null ? { begin: '', end: '' } : { begin: `${y}-01-01`, end: `${y}-12-31` }
 }
+watch(projectAuditYear, () => {
+  if (periodBegin.value || periodEnd.value) return
+  const d = _defaultPeriodYear()
+  periodBegin.value = d.begin
+  periodEnd.value = d.end
+})
 
 function _loadMeta(): void {
   const item = props.allResponses.get(META_KEY)

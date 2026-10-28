@@ -78,8 +78,8 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # audit-report-template-integration V066: 企业子类型 type_a/type_b/type_c/type_d
     company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    # V077: 业务分类 A/B/C
-    business_category: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # V077→V209: 业务分类（加宽到 20 以容纳 refinancing 等 11 字符值）
+    business_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # V087: A21~A25 复核底稿模板选择
     audit_type: Mapped[str | None] = mapped_column(
         String(32), nullable=True, server_default=text("'financial'")

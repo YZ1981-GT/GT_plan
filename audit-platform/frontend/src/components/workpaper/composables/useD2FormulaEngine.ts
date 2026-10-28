@@ -7,6 +7,7 @@
  * Spec: .kiro/specs/d2-accounts-receivable-refactor/
  * Requirements: 1.2, 1.4, 1.6, 2.7, 3.4, 5.2, 7.5, 9.2, 10.3, 10.5, 12.4, 12.5, 14.2, 22.1
  */
+import { calcTemplateChangeRate, type TemplateChangeRate } from './templateChangeRate'
 
 // ─── 数值解析 ─────────────────────────────────────────────────────────────────
 
@@ -37,15 +38,14 @@ export function getAuditedAmount(
 }
 
 /**
- * 变动率计算，含期初=0特殊处理：
- * - 期初=0 且 审定=0 → ''（无意义）
- * - 期初=0 且 审定≠0 → 1（100%新增）
+ * 变动率，与权威模板 D2-1 K 列 `IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))` 同式：
+ * - 期初=0 且 审定=0 → ''（不显示）
+ * - 期初=0 且 审定>0 → 1（100%新增）
+ * - 期初=0 且 审定<0 → 'N/A'（模板除零 #DIV/0!；原先也记 100%）
  * - 其他 → (审定-期初)/期初
  */
-export function getChangeRate(prior: number, audited: number): number | '' {
-  if (prior === 0 && audited === 0) return ''
-  if (prior === 0) return 1
-  return (audited - prior) / prior
+export function getChangeRate(prior: number, audited: number): TemplateChangeRate {
+  return calcTemplateChangeRate(prior, audited)
 }
 
 // ─── 坏账准备公式 ────────────────────────────────────────────────────────────
@@ -60,12 +60,14 @@ export function calculateProvision(balance: number, lossRate: number): number {
 }
 
 /**
- * 差异 = 实际账面余额 - 应计提
+ * 差异 = 应计提 - 期末坏账准备账面余额（权威模板 D2-9 表头 ⑤=③-④）
  *
- * 用于 D2-9 差异列计算。正值表示多提，负值表示少提。
+ * 用于 D2-9 差异列计算。正值表示少提（应补提），负值表示多提。原为 实际 - 应计（方向与模板
+ * 相反；模板单项段数据行也写错成 B-E，spec oo-writeback-template-parity-closure R1 已改成 D-E）。
+ * 参数顺序不变。
  */
 export function calculateDifference(actual: number, should: number): number {
-  return actual - should
+  return should - actual
 }
 
 // ─── 质押比例公式 ────────────────────────────────────────────────────────────

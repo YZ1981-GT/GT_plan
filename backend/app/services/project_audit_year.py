@@ -107,6 +107,34 @@ async def fetch_project_audit_year(
     return _valid_year(row[0])
 
 
+async def resolve_project_audit_year_for_request(
+    db: AsyncSession,
+    project_id: UUID | str,
+    requested_year: int | None = None,
+) -> int | None:
+    """解析请求年度：显式年度优先，否则只从项目上下文取值。
+
+    端点不得用自然年或固定 ``2025`` 作为项目年度默认值。调用方可以保留显式
+    ``year``（例如用户正在查看上一年度数据）；只有缺省时才走项目年度五级解析，
+    解析不到返回 ``None``，由路由返回 422 或跳过请求。
+
+    这里使用 ORM 解析而不是直接复用 PostgreSQL 专用的
+    :data:`PROJECT_AUDIT_YEAR_SQL`，因此也覆盖向导状态/项目名后缀，并能在 SQLite
+    契约测试中复用同一口径。
+    """
+    if requested_year is not None:
+        return _valid_year(requested_year)
+    try:
+        pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+    except (TypeError, ValueError, AttributeError):
+        # 项目 id 不是 UUID ⇒ 不可能对应项目 ⇒ 按年度缺失处理，由调用方转为可见业务错误
+        return None
+    # 查库失败照常抛出：吞掉会把连接 / 事务故障伪装成「未设置审计年度」，
+    # PG 上事务已中止时调用方还会继续用这个坏事务
+    project = await db.get(Project, pid)
+    return resolve_project_audit_year(project) if project is not None else None
+
+
 async def fetch_project_audit_year_standalone(project_id: UUID | str) -> int | None:
     """同 :func:`fetch_project_audit_year`，但自开短会话 —— 供没有 db 句柄的调用方用。
 

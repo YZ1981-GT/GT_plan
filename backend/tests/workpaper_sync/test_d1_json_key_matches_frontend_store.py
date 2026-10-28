@@ -56,6 +56,9 @@ _FRONTEND = (
 #        D1-bd-notetype-rows 1 列：item→noteType（该区前端用票据种类名，不是 label）
 #      定位依据：Excel F/H/I 列头「计提/转回/核销」与前端 UI「本期计提/本期转回/本期核销」
 #      逐字相同作三个锚，五列顺序一致 ⇒ G/J 的对应在位置上无歧义。
+#      🔴 2026-10-26 更正 G/J（spec oo-writeback-template-parity-closure R2）：位置对上了、加减方向没对上
+#      （前端收回是减项、其他是加项；模板 G 其他增加是加项、J 其他减少是减项）⇒ 改为
+#      otherIncrease(G)→currentOther · otherDecrease(J)→currentRecovery。本文件只比键集合，集合不变。
 #
 # 类 ②「HTML 无字段」13 列 —— **Excel 有这一列且列头语义明确，而前端根本没有对应字段**。
 #      改 json_key 解决不了（改了只会把别的语义的值写进这一列）⇒ **不属 B1 范围**，

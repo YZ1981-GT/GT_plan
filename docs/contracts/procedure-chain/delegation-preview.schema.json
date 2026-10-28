@@ -1,0 +1,115 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/delegation-preview.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_delegation_service.py（preview）、procedure_delegation_prepare.py、procedure_delegation_scope.py；接口：POST /api/projects/{pid}/procedure-delegations/preview",
+  "title": "DelegationPreview（程序行委派预览）",
+  "description": "同步前置（导入当前版本定义 → 物化缺的行任务 → 绑定已生成底稿，在一个保存点里；失败只回滚前置、preparation_ready=false、计数清零）→ 解析目标（已裁 / 在回收站的底稿不进目标）→ 分类 → 建一次性预览凭证（TTL 600 秒，绑定请求哈希、目标版本、成员快照）。status 恒为 ready（文档里的 materialization_pending 已不再产生）。守卫：项目委派人（admin，或唯一人员档案 + 团队分配角色 ∈ 合伙人 / 签字合伙人 / 经理）。顶层 = 响应；请求见 $defs/request。",
+  "type": "object",
+  "required": [
+    "status", "preview_id", "expires_at", "materialization", "preparation_ready", "hint", "summary",
+    "scope_gaps", "conflict_task_ids", "membership_load", "affected_workpapers", "target_versions"
+  ],
+  "properties": {
+    "status": { "const": "ready" },
+    "preview_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "expires_at": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "materialization": {
+      "description": "前置回执；选择器是按任务（row）时为 null。",
+      "anyOf": [{ "$ref": "#/$defs/materialization" }, { "type": "null" }]
+    },
+    "preparation_ready": { "type": "boolean" },
+    "hint": { "description": "目标为 0 时的原因（中文），有目标时为 null。", "type": ["string", "null"] },
+    "summary": {
+      "type": "object",
+      "required": [
+        "targets", "would_assign", "would_reassign", "would_reviewer_update", "unchanged", "conflict",
+        "terminal", "skipped_assigned", "already_assigned", "in_progress", "submitted", "trimmed_excluded"
+      ],
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/count" }
+    },
+    "scope_gaps": {
+      "description": "被委派人看不到的循环（apply 时不带 expand_scope + scope_reason 即 400 out_of_scope）。主管 / 管理员不缺。",
+      "type": "array",
+      "items": { "$ref": "#/$defs/scopeGap" }
+    },
+    "conflict_task_ids": { "$ref": "common.schema.json#/$defs/uuidList" },
+    "membership_load": {
+      "type": "object",
+      "required": ["assignee_staff_id", "active_task_count"],
+      "properties": {
+        "assignee_staff_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "active_task_count": { "$ref": "common.schema.json#/$defs/count" }
+      }
+    },
+    "affected_workpapers": {
+      "type": "object",
+      "required": ["wp_index_ids", "wp_ids"],
+      "properties": {
+        "wp_index_ids": { "$ref": "common.schema.json#/$defs/uuidList" },
+        "wp_ids": { "$ref": "common.schema.json#/$defs/uuidList" }
+      }
+    },
+    "target_versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "lock_version", "assignment_version"],
+        "properties": {
+          "task_id": { "$ref": "common.schema.json#/$defs/uuid" },
+          "lock_version": { "$ref": "common.schema.json#/$defs/count" },
+          "assignment_version": { "$ref": "common.schema.json#/$defs/count" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["cycle", "workpaper", "row"] },
+        "cycle": { "type": ["string", "null"] },
+        "wp_index_ids": { "$ref": "common.schema.json#/$defs/uuidList" },
+        "task_ids": { "$ref": "common.schema.json#/$defs/uuidList" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["selector", "assignee_staff_id"],
+      "properties": {
+        "selector": { "$ref": "#/$defs/selector" },
+        "assignee_staff_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "reviewer_staff_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "unassigned_only": { "type": "boolean" },
+        "conflict_policy": { "enum": ["reject_on_conflict", "replace_with_reason"] },
+        "reason": { "type": ["string", "null"] },
+        "best_effort": { "type": "boolean" },
+        "due_at": { "anyOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] }
+      }
+    },
+    "materialization": {
+      "type": "object",
+      "required": ["definitions_created", "tasks_created", "tasks_bound", "with_program_table", "ready", "error"],
+      "additionalProperties": false,
+      "properties": {
+        "definitions_created": { "$ref": "common.schema.json#/$defs/count" },
+        "tasks_created": { "$ref": "common.schema.json#/$defs/count" },
+        "tasks_bound": { "$ref": "common.schema.json#/$defs/count" },
+        "with_program_table": { "$ref": "common.schema.json#/$defs/count" },
+        "ready": { "type": "boolean" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "scopeGap": {
+      "type": "object",
+      "required": ["role", "staff_id", "name", "cycles", "is_member"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "enum": ["assignee", "reviewer"] },
+        "staff_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "name": { "type": "string" },
+        "cycles": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/cycle" }, "minItems": 1 },
+        "is_member": { "type": "boolean" }
+      }
+    }
+  }
+}

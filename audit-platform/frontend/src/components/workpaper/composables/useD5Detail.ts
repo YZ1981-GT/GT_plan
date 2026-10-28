@@ -126,15 +126,20 @@ function normalizeRow(raw: any): DetailRow {
 }
 
 /**
- * 对单行重新计算公式链：
+ * 对单行重新计算公式链（与权威模板「应收款项融资明细表D5-2」逐列一致）：
  * F = C + D + E（期初审定 = 期初未审 + AJE + RJE）
- * J = F + H - I（期末余额 = 期初审定 + 本期增加 - 本期减少）
+ * J = C + H - I（期末余额 = 期初未审 + 本期增加 - 本期减少）
  * L = J + K（期末未审余额 = 期末余额 + 重分类）
  * O = L + M + N（期末审定余额 = 期末未审 + 账项调整 + 重分类调整）
+ *
+ * 🔴 J 以期初未审起算（spec oo-formula-recompute-not-tamper R4，同 F1-2 裁决 F1-H3「以模板为准」）。
+ * O 以期末未审 L 起算、含被审计单位重分类 K：权威模板 O 列原为 =J+N+M（漏了 K），
+ * spec oo-writeback-template-parity-closure R1 已把模板改成 =L+M+N（用户 2026-10-26 确认），
+ * 表单与 OnlyOffice 两侧同口径。
  */
 export function recalcRow(row: DetailRow): DetailRow {
   const F = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const J = calcEndBalance(F, row.periodIncrease, row.periodDecrease)
+  const J = calcEndBalance(row.priorUnadjusted, row.periodIncrease, row.periodDecrease)
   const L = calcEndUnadjusted(J, row.entityReclass)
   const O = calcEndAudited(L, row.endAje, row.endRje)
 
@@ -455,7 +460,11 @@ export function useD5Detail(options: UseD5DetailOptions) {
   async function importPostRealizedFromLedger(bsDate: string): Promise<void> {
     if (isReadonly.value || !projectId.value) return
 
-    const bsYear = bsDate ? parseInt(bsDate.substring(0, 4)) : new Date().getFullYear()
+    const bsYear = bsDate ? parseInt(bsDate.substring(0, 4)) : null
+    if (bsYear == null || !Number.isFinite(bsYear)) {
+      ElMessage.warning('未设置审计年度，无法读取期后序时账')
+      return
+    }
     const nextYear = bsYear + 1
     const dateFrom = `${nextYear}-01-01`
     const dateTo = `${nextYear}-06-30` // 默认期后窗口6个月

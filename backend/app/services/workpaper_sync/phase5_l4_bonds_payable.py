@@ -143,8 +143,8 @@ IDENTITY: Final[_L.LEntryIdentity] = _L.LEntryIdentity(
             ),
         },
         "template_defects_registered": [
-            "footer r18 的 T18~W18 为错位交叉公式（如 T18 `=N18+P18-R18`），期初调整列本应 SUM；"
-            "只登记不改（模板运行时只读）",
+            "footer r18 的 T18~W18 原为错位交叉公式（如 T18 `=N18+P18-R18`），期初调整列应逐列 SUM；"
+            "已修模板（spec oo-writeback-template-parity-closure R1，与同行 X18~AK18 同形 `=SUM(x13:x17)`）",
         ],
     },
 )

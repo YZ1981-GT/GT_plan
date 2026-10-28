@@ -72,6 +72,18 @@ describe('i3TargetedCheckModel', () => {
     expect(mv.originalTotal).toBe(800)
   })
 
+  // post-push-residual-defect-closure R2：原先 null 当「不过滤」，把全部商誉原值都算成本期新增
+  it('审计年度未知（项目没填）：按并购日年份的代理不计入本期借方，滚动发生额与减值照常', () => {
+    const mv = extractI3PeriodMovement([
+      { investee: 'A', goodwillOriginal: 1000, currentImpairment: 100, mergerDate: '2026-03-01' },
+      { investee: '旧商誉', goodwillOriginal: 800, currentImpairment: 0 },
+      { investee: 'C', goodwillOriginal: 5000, costIncrease: 1200, periodDebit: 1200, periodCredit: 30 },
+    ], null)
+    expect(mv.debitTotal).toBe(1200)
+    expect(mv.creditTotal).toBe(130)
+    expect(mv.originalTotal).toBe(6800)
+  })
+
   it('优先使用 I3-2 原生 periodDebit/periodCredit（滚动发生额）', () => {
     const mv = extractI3PeriodMovement([
       {

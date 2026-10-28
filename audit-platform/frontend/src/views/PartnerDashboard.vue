@@ -509,7 +509,11 @@ function goToReport(pid: string) {
 // R8-S2-06：跳转签字决策面板
 function goToSignDecision(pid: string, year?: number) {
   recordOrigin()
-  const y = year || new Date().getFullYear() - 1
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法打开签字决策')
+    return
+  }
+  const y = year
   router.push(`/partner/sign-decision/${pid}/${y}`)
 }
 function onProjectClick(row: any) {

@@ -252,6 +252,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3
  * Requirements: 8.1-8.4
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, toRef, computed, defineAsyncComponent, onMounted, inject } from 'vue'
 import { Plus, Delete, MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -297,7 +298,7 @@ const emit = defineEmits<{
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 /**
  * 抽凭科目码。本组件无 `tbSourceCodes` prop（不接 render 解析结果），
@@ -491,6 +492,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

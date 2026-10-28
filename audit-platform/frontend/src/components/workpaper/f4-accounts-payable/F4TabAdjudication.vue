@@ -4,6 +4,7 @@ import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import {
+  formatF4ChangeRate,
   useF4Adjudication,
   type F4AdjudicationRow,
   type F4AdjudicationSection,
@@ -120,8 +121,8 @@ function amount(value: number): string {
   return value < 0 ? `(${formatted})` : formatted
 }
 
-function rate(value: number): string {
-  return `${(value * 100).toFixed(2)}%`
+function rate(value: number | 'N/A'): string {
+  return formatF4ChangeRate(value)
 }
 
 function handleUpdate(

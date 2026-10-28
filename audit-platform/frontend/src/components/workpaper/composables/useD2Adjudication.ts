@@ -23,6 +23,7 @@ import {
   getChangeRate,
   sumif,
 } from './useD2FormulaEngine'
+import type { TemplateChangeRate } from './templateChangeRate'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
@@ -76,7 +77,7 @@ export interface AdjudicationRow {
   currentAudited: number      // = 未审 + AJE + RJE
   // 变动
   change: number              // = 期末审定 - 期初审定
-  changeRate: number | ''     // = (期末-期初)/期初
+  changeRate: TemplateChangeRate // = (期末-期初)/期初，期初为 0 按模板（templateChangeRate）
   reasonAnalysis: string
   /**
    * 取数来源（归一自旧 isFromSumif 布尔标记 —— spec d2-sync-coverage Q9）。
@@ -365,10 +366,34 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     resolveTbAmountWithSeed(getVal('D2-adj-tb-amount').remark, options.tbSeedAmount?.value),
   )
 
-  /** 试算平衡表差异 = 审定数 - 试算表数 */
+  /** D2-3 坏账准备期末审定合计（三区固定合计行之和，与 D2-1「二、坏账准备」同一来源）。 */
+  const provisionTotalAudited: ComputedRef<number> = computed(() => {
+    let total = 0
+    for (const key of ['D2-bd-individual-rows', 'D2-bd-aging-rows', 'D2-bd-customer-rows']) {
+      const rows = safeParseRows<{ isFixed?: boolean; currentAudited?: number }>(
+        allResponses.value.get(key)?.remark,
+      )
+      const fixed = rows.find(r => r.isFixed)
+      if (fixed) total += parseNum(fixed.currentAudited)
+    }
+    return total
+  })
+
+  /** 三、应收账款净值 期末审定合计 = 原值合计 − 坏账准备合计。 */
+  const netTotalAudited: ComputedRef<number> = computed(
+    () => totalRow.value.currentAudited - provisionTotalAudited.value,
+  )
+
+  /**
+   * 试算平衡表差异 = 净值审定合计 − 试算表数。
+   *
+   * 🔴 比的是**净值**：锚点 `D2-adj-tb-amount` 自 2026-08-01 起是净额口径
+   * （TB('1122') − TB('1231-02')，源模板 D2-1 被比较项是「三、应收账款净值」合计 A27），
+   * 原先这里拿原值合计去比 ⇒ 差异恰好等于坏账准备（与 D1 修过的同款缺陷，spec
+   * writeback-followup-issue-closure R11.2）。
+   */
   const trialBalanceDiff: ComputedRef<{ amount: number; isZero: boolean }> = computed(() => {
-    const auditedTotal = totalRow.value.currentAudited
-    const diff = auditedTotal - trialBalanceAmount.value
+    const diff = netTotalAudited.value - trialBalanceAmount.value
     return { amount: diff, isZero: Math.abs(diff) < 0.005 }
   })
 
@@ -590,8 +615,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
   /**
    * 判断变动率是否超过阈值需高亮
    */
-  function isChangeRateWarning(changeRate: number | ''): boolean {
-    if (changeRate === '') return false
+  function isChangeRateWarning(changeRate: TemplateChangeRate): boolean {
+    if (changeRate === '' || changeRate === 'N/A') return false
     return Math.abs(changeRate) > 0.3
   }
 
@@ -611,14 +636,7 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
 
   /** D2-3 坏账准备 vs D2-9 ECL 应计提合计 */
   const eclCrossValidation = computed((): string | null => {
-    let bdTotal = 0
-    for (const key of ['D2-bd-individual-rows', 'D2-bd-aging-rows', 'D2-bd-customer-rows']) {
-      const rows = safeParseRows<{ isFixed?: boolean; currentAudited?: number }>(
-        allResponses.value.get(key)?.remark,
-      )
-      const fixed = rows.find(r => r.isFixed)
-      if (fixed) bdTotal += parseNum(fixed.currentAudited)
-    }
+    const bdTotal = provisionTotalAudited.value
     if (bdTotal === 0) return null
     const eclRows = safeParseRows<{ shouldProvision?: number }>(
       allResponses.value.get('D2-ecl-single-rows')?.remark,
@@ -684,6 +702,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     // 审定表行数据
     adjudicationRows,
     totalRow,
+    provisionTotalAudited,
+    netTotalAudited,
     trialBalanceAmount,
     trialBalanceDiff,
 

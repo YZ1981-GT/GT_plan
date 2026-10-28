@@ -72,6 +72,9 @@ FROM_STAFF_ID = uuid.uuid4()
 TO_STAFF_ID = uuid.uuid4()
 PROJECT_A_ID = uuid.uuid4()
 PROJECT_B_ID = uuid.uuid4()
+# 生效日期须在今天 ±30 天内（路由校验）；原写死 2026-05 的日期过期后，执行类用例全部在日期校验处 400，
+# 从未走到交接逻辑（2026-10-24 HEAD 同红）—— 改为当天
+_TODAY = str(date.today())
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +215,15 @@ async def seeded_db(db_session: AsyncSession):
     )
     db_session.add_all([assign_a, assign_b])
 
+    # 接收人是两个项目的成员：编制人交接走底稿主编委派事务（spec procedure-trim-generation-delegation-chain
+    # 任务 12），接收人须有项目成员行才能带交接理由扩大可见范围
+    from app.models.base import ProjectUserRole
+    from app.models.core import ProjectUser
+    db_session.add_all([
+        ProjectUser(project_id=PROJECT_A_ID, user_id=TO_STAFF_ID, role=ProjectUserRole.auditor),
+        ProjectUser(project_id=PROJECT_B_ID, user_id=TO_STAFF_ID, role=ProjectUserRole.auditor),
+    ])
+
     # IndependenceDeclaration for from_staff (draft status)
     decl = IndependenceDeclaration(
         id=uuid.uuid4(),
@@ -264,7 +276,7 @@ async def test_handover_all_scope(mock_log_action, client: AsyncClient, seeded_d
             "target_staff_id": str(TO_STAFF_ID),
             "reason_code": "rotation",
             "reason_detail": "岗位轮换",
-            "effective_date": "2026-05-10",
+            "effective_date": _TODAY,
         },
     )
     assert resp.status_code == 200, resp.text
@@ -318,7 +330,7 @@ async def test_handover_by_project(mock_log_action, client: AsyncClient, seeded_
             "target_staff_id": str(TO_STAFF_ID),
             "reason_code": "long_leave",
             "reason_detail": "产假",
-            "effective_date": "2026-06-01",
+            "effective_date": _TODAY,
         },
     )
     assert resp.status_code == 200, resp.text
@@ -348,7 +360,7 @@ async def test_handover_resignation_supersedes_independence(
             "target_staff_id": str(TO_STAFF_ID),
             "reason_code": "resignation",
             "reason_detail": "离职",
-            "effective_date": "2026-05-15",
+            "effective_date": _TODAY,
         },
     )
     assert resp.status_code == 200, resp.text
@@ -374,7 +386,7 @@ async def test_handover_same_person_rejected(client: AsyncClient):
             "scope": "all",
             "target_staff_id": str(FROM_STAFF_ID),
             "reason_code": "rotation",
-            "effective_date": "2026-05-10",
+            "effective_date": _TODAY,
         },
     )
     assert resp.status_code == 400
@@ -410,7 +422,7 @@ async def test_handover_by_project_missing_ids(client: AsyncClient):
             "scope": "by_project",
             "target_staff_id": str(TO_STAFF_ID),
             "reason_code": "other",
-            "effective_date": "2026-05-10",
+            "effective_date": _TODAY,
         },
     )
     assert resp.status_code == 400
@@ -449,7 +461,7 @@ async def test_handover_auditor_blocked(seeded_db: AsyncSession):
                 "scope": "all",
                 "target_staff_id": str(TO_STAFF_ID),
                 "reason_code": "rotation",
-                "effective_date": "2026-05-10",
+                "effective_date": _TODAY,
             },
         )
     assert resp.status_code == 403
@@ -465,7 +477,7 @@ async def test_handover_manager_cannot_use_all_scope(seeded_db: AsyncSession):
                 "scope": "all",
                 "target_staff_id": str(TO_STAFF_ID),
                 "reason_code": "rotation",
-                "effective_date": "2026-05-10",
+                "effective_date": _TODAY,
             },
         )
     assert resp.status_code == 403

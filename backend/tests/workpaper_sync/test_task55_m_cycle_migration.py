@@ -2116,7 +2116,9 @@ class TestProperty24ProtectedFormulaAndSummary:
         # 不再是只看列的 `column_in_ranges` —— 后者会把逐格式 mask 的数据区外行整列
         # 误判成只读（d4-html-to-oo-store-contract-alignment 真栈②实测修复）。
         assert "cell_in_ranges" in src and "formula_mask" in src
-        assert "FieldMode.formula" in src and "FieldMode.auto_source" in src
+        # 公式字段判定收口到 `contracts.FORMULA_MODES`（本表公式 + 跨表公式，spec
+        # oo-writeback-template-parity-closure R7 单一来源；原写法 `FieldMode.formula`）
+        assert "spec.mode in FORMULA_MODES" in src and "FieldMode.auto_source" in src
 
     def test_conflict_emitter_really_wraps_the_task37_function(self, manifest_slice: dict) -> None:
         """结构判据：包装函数**体内**必须真的调用被包装者（不是同名新实现）。"""

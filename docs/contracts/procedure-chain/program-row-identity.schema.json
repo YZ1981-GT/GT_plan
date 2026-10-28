@@ -1,0 +1,63 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/program-row-identity.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_definition_importer.py（compute_definition_key / normalize_text / canonical_json）、procedure_row_trim_service.normalize_program_no、wp_visibility/program_row_guard.py（RowAccess.to_dict）",
+  "title": "ProgramRowIdentity（程序表行身份）",
+  "description": "程序行身份是内容寻址的 definition_key = {template_code}::{sheet_key}::{digest16}，digest16 = sha256(canonical_json(semantic_content)) 的前 16 位小写十六进制；semantic_content = {template_code, sheet_key, source_locator_stable: {template_code, sheet_key}, program_no, procedure_text, refs: sorted(ref_snapshot)}。canonical_json = 键排序、分隔符 \",\" \":\"、非 ASCII 原样（等价 Python json.dumps(ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"))）。procedure_text 经 NFKC、\\r\\n / \\r → \\n、去首尾空白。不含 project_id / wp_id / 数组位置 / 路径 / 时间。程序号两种规范：定义里的 program_no 保留模板文字（NFKC + 去空白，浮点整数转整数）；任务 / 覆盖值匹配用 normalize_program_no（能解析成整数的都转成整数文字：\"05\" → \"5\"）。用例：cases/program-row-identity.cases.json。顶层 = 身份四元组；$defs 给定义、任务与「本人能改哪些行」接口响应。",
+  "type": "object",
+  "required": ["definition_key", "template_code", "sheet_key", "program_no"],
+  "properties": {
+    "definition_key": { "$ref": "#/$defs/definitionKey" },
+    "template_code": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "sheet_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "program_no": { "type": "string", "maxLength": 80 }
+  },
+  "$defs": {
+    "definitionKey": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^[^:]+::[^:]+::[0-9a-f]{16}$"
+    },
+    "definition": {
+      "description": "procedure_row_definitions 一行（跨项目共享，按 definition_key 唯一）。",
+      "type": "object",
+      "required": ["definition_key", "template_code", "template_revision_hash", "sheet_key", "program_no", "procedure_text", "ref_snapshot", "legacy_aliases"],
+      "properties": {
+        "definition_key": { "$ref": "#/$defs/definitionKey" },
+        "template_code": { "type": "string" },
+        "template_revision_hash": { "$ref": "common.schema.json#/$defs/sha256Hex" },
+        "sheet_key": { "type": "string" },
+        "program_no": { "type": ["string", "null"] },
+        "procedure_text": { "type": "string" },
+        "ref_snapshot": { "description": "引用：ref_index 按 / 拆开 + auto:{自动取数源}，去重保序。", "type": "array", "items": { "type": "string" } },
+        "legacy_aliases": { "description": "旧行号别名（row-{程序号}、index-{数组序号}）只作别名，不作身份。", "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "taskIdentity": {
+      "description": "procedure_row_tasks 一行的定位字段（一项目一底稿一定义一任务）。",
+      "type": "object",
+      "required": ["project_id", "wp_index_id", "wp_id", "definition_key", "sheet_key", "program_no"],
+      "properties": {
+        "project_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "wp_index_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "wp_id": { "$ref": "common.schema.json#/$defs/nullableUuid" },
+        "definition_key": { "$ref": "#/$defs/definitionKey" },
+        "sheet_key": { "type": "string" },
+        "program_no": { "type": ["string", "null"] },
+        "wp_code": { "type": ["string", "null"] }
+      }
+    },
+    "rowAccess": {
+      "description": "GET /api/workpapers/{wp_id}/program-row-access?sheet_name=…（路由自带底稿门：看不见 404）。full_power = 管理员 / 主管 / 主编（可改全部行）；can_trim = 项目委派人（经理 / 合伙人 / 管理员，细裁与恢复只归他们）；own_program_nos = 派给本人的有效（适用、未取消）程序行；assignees = 程序号 → 执行人姓名。",
+      "type": "object",
+      "required": ["full_power", "can_trim", "own_program_nos", "assignees", "template_code"],
+      "additionalProperties": false,
+      "properties": {
+        "full_power": { "type": "boolean" },
+        "can_trim": { "type": "boolean" },
+        "own_program_nos": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "assignees": { "type": "object", "additionalProperties": { "type": "string" } },
+        "template_code": { "type": "string" }
+      }
+    }
+  }
+}

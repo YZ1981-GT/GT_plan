@@ -20,11 +20,13 @@
  */
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
 import {
   syncAdjustmentFromWorkpaper,
   getAdjustmentBySourceRef,
 } from '@/services/auditPlatformApi'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface CentralSyncLineItem {
   standard_account_code?: string
@@ -52,7 +54,8 @@ export const COLLAB_STATUS_LABELS_MIN: Record<string, string> = {
 
 export interface UseAdjustmentCentralSyncOptions {
   projectId: Ref<string> | (() => string)
-  year: Ref<number> | (() => number)
+  /** 审计年度；项目没填为 null ⇒ 手动同步提示去填、自动同步静默跳过（不按今年写集中登记） */
+  year: Ref<number | null> | (() => number | null)
   wpId: Ref<string> | (() => string)
   wpCode: Ref<string> | (() => string) | string
   /** 该 tab 分录组的 checklist item_id（幂等键构成）；可为 getter 以支持随类型切换的动态 itemId */
@@ -74,13 +77,13 @@ function unwrap<T>(v: Ref<T> | (() => T) | T): T {
   return v as T
 }
 
-/** 复核状态中文标签 */
-export const CENTRAL_STATUS_LABELS: Record<string, string> = {
-  draft: '草稿',
-  pending_review: '待复核',
-  approved: '已通过',
-  rejected: '已驳回',
-}
+/**
+ * 复核状态中文标签：取调整分录页同一常量（系统字典「调整分录状态」）。原先这里单写一份，
+ * 「已批准」写成了「已通过」，底稿侧与调整分录页对同一条分录叫法不同（spec consol-autotree-residual-closure R4）。
+ */
+export const CENTRAL_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(ADJUSTMENT_STATUS_LABELS).map(([status, entry]) => [status, entry.label]),
+)
 
 /**
  * 计算分录组内容签名（简单哈希，用于变化检测）。
@@ -139,6 +142,10 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) {
       ElMessage.warning('缺少项目/底稿上下文，无法同步到集中登记')
+      return
+    }
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return
     }
     const lineItems = opts.buildLineItems().filter(
@@ -272,6 +279,9 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const projectId = unwrap(opts.projectId)
     const wpId = unwrap(opts.wpId)
     if (!projectId || !wpId) return
+    // 项目没填审计年度：自动同步静默跳过（手动同步会提示去填）
+    const year = unwrap(opts.year)
+    if (year == null) return
 
     const lineItems = opts.buildLineItems().filter(
       (li) => (Number(li.debit_amount) || 0) !== 0 || (Number(li.credit_amount) || 0) !== 0,
@@ -306,7 +316,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     syncing.value = true
     try {
       await syncAdjustmentFromWorkpaper(projectId, {
-        year: unwrap(opts.year),
+        year,
         wp_id: wpId,
         item_id: resolveItemId(),
         source_wp_code: String(unwrap(opts.wpCode) || ''),

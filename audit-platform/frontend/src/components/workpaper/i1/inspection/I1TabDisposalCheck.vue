@@ -447,7 +447,7 @@
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
         phase="final"
-        :year="year ?? new Date().getFullYear()"
+        :year="samplingYear"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -459,6 +459,7 @@
  * I1TabDisposalCheck.vue — I1-6 无形资产减少检查表
  * 对齐 Excel：定性合规 + 定量金额；净损益 = 收入 − 费用 − 净值
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, defineComponent, h } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
@@ -492,7 +493,7 @@ const samplingAccountCode = computed(() => i1GrossQueryCodes(_injectedTbSrc?.val
 const props = defineProps<{
   wpId: string
   projectId: string
-  year?: number
+  year?: number | null
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
@@ -583,7 +584,7 @@ function fillDraft() {
 }
 
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 const attachedCount = ref(0)
 const importingAttached = ref(false)
 const I1_ACCOUNT_PREFIXES = computed(() => i1GrossQueryCodes(_injectedTbSrc?.value ?? null))
@@ -599,6 +600,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

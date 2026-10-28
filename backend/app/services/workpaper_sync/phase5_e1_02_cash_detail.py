@@ -113,17 +113,21 @@ HTML_ONLY_ROWS_E102: Final[tuple[tuple[int, str, str], ...]] = (
 #: 10 个受管字段（7 元组）。顺序即 Excel 列序 A→J。
 #: 表头文本：A/H/I/J 取 R13 组标题，B..G 取 R14 叶子（两级表头，逐格实测）。
 #: E/G/I 三列模板内逐行有真公式 ⇒ formula；其余 7 列 editable。
+#: 🔴 json 键逐字取前端 `useE1CashDetail.CashDetailRow`（spec oo-writeback-template-parity-closure R3）：
+#:    原写 closingOriginal / closingRmb / adjustmentOriginal / closingAudited / remark，前端存的是
+#:    endingFc / endingRmb / adjustment / auditedRmb / note ⇒ OO 改的调整额、备注写进前端不读的键。
+#:    列键（column_key）语义本就对，不改。
 FIELD_SPECS_E102: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("currency", "A", "editable", "text", "currency", "币种", ""),
     ("opening", "B", "editable", "amount", "opening", "期初余额", f"B{HEADER_GROUP_ROW_E102}"),
     ("increase", "C", "editable", "amount", "increase", "本期增加", f"B{HEADER_GROUP_ROW_E102}"),
     ("decrease", "D", "editable", "amount", "decrease", "本期减少", f"B{HEADER_GROUP_ROW_E102}"),
-    ("closing_original", "E", "formula", "amount", "closingOriginal", "期末余额（原币）", f"B{HEADER_GROUP_ROW_E102}"),
+    ("closing_original", "E", "formula", "amount", "endingFc", "期末余额（原币）", f"B{HEADER_GROUP_ROW_E102}"),
     ("fx_rate", "F", "editable", "amount", "fxRate", "期末折算汇率", f"B{HEADER_GROUP_ROW_E102}"),
-    ("closing_rmb", "G", "formula", "amount", "closingRmb", "期末折算人民币金额", f"B{HEADER_GROUP_ROW_E102}"),
-    ("adjustment_original", "H", "editable", "amount", "adjustmentOriginal", "审计调整-原币（调减为负数）", ""),
-    ("closing_audited", "I", "formula", "amount", "closingAudited", "期末审定数（人民币金额）", ""),
-    ("remark", "J", "editable", "text", "remark", "备注", ""),
+    ("closing_rmb", "G", "formula", "amount", "endingRmb", "期末折算人民币金额", f"B{HEADER_GROUP_ROW_E102}"),
+    ("adjustment_original", "H", "editable", "amount", "adjustment", "审计调整-原币（调减为负数）", ""),
+    ("closing_audited", "I", "formula", "amount", "auditedRmb", "期末审定数（人民币金额）", ""),
+    ("remark", "J", "editable", "text", "note", "备注", ""),
 )
 
 #: 公式模板（逐格实测）。

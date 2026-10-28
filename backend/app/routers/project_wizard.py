@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.routers.password_confirm import require_confirmation_token
 from app.models.audit_platform_schemas import (
     BasicInfoSchema,
@@ -432,14 +432,19 @@ class UpdateParentCodeRequest(BaseModel):
     """调整 parent_company_code 请求。
 
     parent_company_code 为 None 或空串 → 脱挂到顶层（指向最终控制方根或独立）。
+    parent_company_name：新上级本年度没有建项时用作上级企业名称（建了项以项目上的名称为准）。
     """
     parent_company_code: str | None = None
+    parent_company_name: str | None = None
 
 
 class UpdateParentCodeResponse(BaseModel):
     id: str
     parent_company_code: str | None
     parent_project_id: str | None
+    parent_company_name: str | None = None
+    synced: list[dict] = []
+    notices: list[str] = []
 
 
 # 旧 _would_form_cycle（跨年度、按项目而非企业、把「上级=本企业」判成环）已由
@@ -451,27 +456,15 @@ async def update_parent_code(
     project_id: UUID,
     body: UpdateParentCodeRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> UpdateParentCodeResponse:
-    """调整项目的上级企业代码（parent_company_code）。
+    """调整项目的上级企业（「合并」总览页拖拽调层级，spec consol-autotree-linkage-closure R3）。
 
-    用于树形拖拽调整层级（Task 15）。后端二次校验循环引用（Task 15.2），
-    并将变更写入 app_audit_log（who/when/old/new，Task 16.1）。
-
-    consol-tree-three-code-autobuild（需求 1.5 / 8.5 / 7.2）：
-    - 同企业同年度的合并项目与单户项目**两口径同写**（集团关系属于企业，不属于某个项目）；
-    - 上级代码非空须通过统一社会信用代码校验（422）；
-    - 上级代码 = 本企业代码 ⇒ 本企业就是上级企业（顶层），接受；空 ⇒ 脱挂到顶层；
-    - 形成循环（同年度）⇒ 400；
-    - 与上级关系：有有效上级时保留原值、缺省按名称；否则清空；
-    - 不再自行解析 parent_project_id，改为按三码重算整年派生链接（sync_group_links）；
-    - 审计日志放进 SAVEPOINT：写失败只回滚这一步，不毒化主事务。
+    两口径同写（代码、名称、关系、控制方补齐、向导回填数据）、校验（USCC 422 / 成环 400）与整年派生链接重算
+    都在 ``group_links.reparent_project``；本路由只做鉴权（本项目 edit 级成员或管理员，原来只要求登录）、
+    审计日志（app_audit_log，SAVEPOINT：写失败只回滚这一步）与提交。返回同步了哪些项目与字段。
     """
-    from app.services.consol_group_tree import load_year_records, would_form_cycle
-    from app.services.group_links import apply_group_values, find_counterpart, sync_group_links
-    from app.services.group_relation import resolve_relation
-    from app.services.project_audit_year import resolve_project_audit_year
-    from app.services.uscc_validator import validate_uscc
+    from app.services.group_links import reparent_project
 
     project = await db.get(Project, project_id)
     if project is None or project.is_deleted:
@@ -479,39 +472,14 @@ async def update_parent_code(
 
     old_value = project.parent_company_code
     new_value = (body.parent_company_code or "").strip() or None
-    own_code = (project.company_code or "").strip()
-    year = resolve_project_audit_year(project)
-
-    if new_value is not None:
-        ok, err = validate_uscc(new_value)
-        if not ok:
-            raise HTTPException(status_code=422, detail=f"上级企业代码：{err}")
-        if own_code and year is not None and would_form_cycle(
-            await load_year_records(db, year), year, own_code, new_value,
-        ):
-            raise HTTPException(
-                status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）"
-            )
-
-    counterpart = await find_counterpart(
-        db, project_id=project.id, company_code=own_code or None,
-        audit_year=year, report_scope=project.report_scope,
-    )
-    for target in (project, counterpart):
-        if target is None:
-            continue
-        apply_group_values(target, {
-            "parent_company_code": new_value,
-            "relation_to_parent": resolve_relation(
-                target.relation_to_parent, new_value, target.client_name, target.company_code
-            ),
-        })
+    result = await reparent_project(db, project, new_value, name_hint=body.parent_company_name)
 
     # Task 16.1：写 app_audit_log（who/when/old/new）。失败不阻断主更新。
     try:
         from sqlalchemy import text
 
-        details = {"old": old_value, "new": new_value}
+        details = {"old": old_value, "new": new_value, "parent_company_name": result["parent_company_name"],
+                   "synced": [s["id"] for s in result["synced"]]}
         async with db.begin_nested():
             await db.execute(
                 text(
@@ -534,7 +502,6 @@ async def update_parent_code(
         # 审计日志写入失败不应阻断主更新（SAVEPOINT 已回滚这一步）。
         logger.warning("parent_company_code 变更审计日志写入失败: %s", exc)
 
-    await sync_group_links(db, year)
     await db.commit()
     await db.refresh(project)
 
@@ -542,6 +509,9 @@ async def update_parent_code(
         id=str(project.id),
         parent_company_code=project.parent_company_code,
         parent_project_id=str(project.parent_project_id) if project.parent_project_id else None,
+        parent_company_name=result["parent_company_name"],
+        synced=result["synced"],
+        notices=result["notices"],
     )
 
 
@@ -556,11 +526,12 @@ class ParentCodeHistoryEntry(BaseModel):
 async def get_parent_code_history(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[ParentCodeHistoryEntry]:
     """查询项目的上级企业代码变更历史（读 app_audit_log，Task 16.1 读侧）。
 
     供前端"查看层级变更历史"右键菜单接入。表/数据缺失时返回空列表（容错）。
+    鉴权：本项目成员（只读即可）或管理员（与改上级同一处收紧，原来只要求登录 ⇒ 可读任意项目的历史）。
     """
     entries: list[ParentCodeHistoryEntry] = []
     try:
@@ -752,7 +723,9 @@ async def delete_project(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    project.is_deleted = True
+    # 记下删除人与删除时间（回收站「删除人 / 删除时间」读它们；原先只置 is_deleted，两列恒空）
+    project.soft_delete()
+    project.updated_by = current_user.id
     # 需求 7.2：删除后按三码重算本年度派生链接（下级不再指向已删的合并项目）
     from app.services.group_links import sync_group_links_for
 
@@ -782,7 +755,8 @@ async def batch_delete_projects(
         )
         p = result.scalar_one_or_none()
         if p:
-            p.is_deleted = True
+            p.soft_delete()  # 同时记删除时间
+            p.updated_by = current_user.id  # 删除人（回收站读它）
             deleted.append(p)
     # 需求 7.2：整批删除后按涉及的年度各重算一次派生链接
     await sync_group_links_for(db, *deleted)

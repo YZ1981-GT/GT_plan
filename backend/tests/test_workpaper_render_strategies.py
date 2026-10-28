@@ -218,9 +218,8 @@ async def test_a_program_render_normal_path():
 
         result = await render(ctx)
 
-    assert result is None or isinstance(result, dict)
-    if result is not None:
-        assert "programs" in result
+    assert isinstance(result, dict) and "programs" in result
+    assert result["override_scope"] == "procedure_table:D1A", "生成分支同样回传字段覆盖 scope"
 
 
 @pytest.mark.asyncio
@@ -251,20 +250,24 @@ async def test_a_program_render_degraded_path():
 
 
 @pytest.mark.asyncio
-async def test_a_program_existing_programs_returns_none():
-    """A-Program 策略：已有持久化 programs 返回 None"""
+async def test_a_program_existing_programs_returns_copy_with_override_scope():
+    """A-Program 策略：已有持久化 programs ⇒ 返回已存数据的副本 + override_scope（不再返回 None：
+    前端写字段覆盖要用它，spec audit-year-calendar-fallback-ratchet R0），已存数据不被改写。"""
+    stored = {"programs": [{"id": "row-1", "status": "done"}]}
     ctx = _make_ctx(
         component_type="a-program-console",
         wp_code="D1A",
         sheet_name="审计程序表D1A",
-        sheet_html_data={"programs": [{"id": "row-1", "status": "done"}]},
+        sheet_html_data=stored,
     )
 
     from app.routers.wp_render_strategies._a_program import render
 
     result = await render(ctx)
 
-    assert result is None
+    assert result is not stored and result["programs"] == stored["programs"]
+    assert result["override_scope"] == "procedure_table:D1A"
+    assert "override_scope" not in stored
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -422,10 +425,14 @@ async def test_analytical_review_render_normal_path():
     mock_ar_data = {"ratios": [], "trends": []}
 
     with patch(
+        "app.routers.wp_render_strategies._analytical_review.fetch_project_audit_year",
+        new_callable=AsyncMock,
+        return_value=2025,
+    ), patch(
         "app.services.analytical_review_service.get_analytical_review_data",
         new_callable=AsyncMock,
         return_value=mock_ar_data,
-    ):
+    ) as get_data:
         from app.routers.wp_render_strategies._analytical_review import render
 
         result = await render(ctx)
@@ -433,6 +440,34 @@ async def test_analytical_review_render_normal_path():
     assert isinstance(result, dict)
     assert "analytical_review" in result
     assert result["analytical_review"] == mock_ar_data
+    # 取数年度 = 项目审计年度（A1-13 母公司口径）
+    get_data.assert_awaited_once_with(ctx.db, ctx.project_id, 2025, "A1-13", "standalone")
+
+
+@pytest.mark.asyncio
+async def test_analytical_review_render_missing_year_returns_empty():
+    """Analytical-Review 策略：项目未设置审计年度 ⇒ 不取数、返回空（不用自然年猜）。"""
+    ctx = _make_ctx(
+        component_type="analytical-review",
+        wp_code="A1-13",
+        sheet_name="分析性复核A1-13",
+        sheet_html_data=None,
+    )
+
+    with patch(
+        "app.routers.wp_render_strategies._analytical_review.fetch_project_audit_year",
+        new_callable=AsyncMock,
+        return_value=None,
+    ), patch(
+        "app.services.analytical_review_service.get_analytical_review_data",
+        new_callable=AsyncMock,
+    ) as get_data:
+        from app.routers.wp_render_strategies._analytical_review import render
+
+        result = await render(ctx)
+
+    assert result == {"analytical_review": None}
+    get_data.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -447,17 +482,23 @@ async def test_analytical_review_render_degraded_path():
         template_file_path=None,
     )
 
+    # 年度要能取到，否则在取数之前就返回空、根本走不到异常分支
     with patch(
+        "app.routers.wp_render_strategies._analytical_review.fetch_project_audit_year",
+        new_callable=AsyncMock,
+        return_value=2025,
+    ), patch(
         "app.services.analytical_review_service.get_analytical_review_data",
         new_callable=AsyncMock,
         side_effect=Exception("DB connection failed"),
-    ):
+    ) as get_data:
         from app.routers.wp_render_strategies._analytical_review import render
 
         result = await render(ctx)
 
     assert isinstance(result, dict)
     assert result["analytical_review"] is None
+    get_data.assert_awaited_once()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

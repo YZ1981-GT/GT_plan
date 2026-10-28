@@ -165,9 +165,11 @@ def _d1_note_rows_from_entries(entries: Mapping[str, Any]) -> list[dict]:
     读 ``D1-cat-rows``（分类明细 → 余额/balance）和 ``D1-bd-notetype-rows``
     （坏账按票据种类 → 坏账准备/provision），按 slug 聚合后计算六字段。
 
-    分类快照公式（与前端 ``recalcRow`` + ``readD1CategoryAmounts`` 同口径）：
+    分类快照公式（与前端 ``recalcRow`` + ``readD1CategoryAmounts`` 同口径，即模板 D1-2 ``H = B + F - G``）：
     - ``priorAudited = priorUnadjusted + priorAje + priorRje``
-    - ``currentUnadjusted = priorAudited + currentIncrease - currentDecrease``
+    - ``currentUnadjusted = priorUnadjusted + currentIncrease - currentDecrease``
+      （期初**未审**起算；原用期初审定，有期初调整时附注期末余额多一个期初调整额 ——
+      spec oo-writeback-template-parity-closure R2）
     - ``currentAudited = currentUnadjusted + currentAje + currentRje``
     → ``end_balance = currentAudited``，``prior_balance = priorAudited``
 
@@ -210,7 +212,7 @@ def _d1_note_rows_from_entries(entries: Mapping[str, Any]) -> list[dict]:
 
         cur_increase = _safe_float(row.get("currentIncrease"))
         cur_decrease = _safe_float(row.get("currentDecrease"))
-        cur_unadj = prior_audited + cur_increase - cur_decrease
+        cur_unadj = prior_unadj + cur_increase - cur_decrease
         cur_aje = _safe_float(row.get("currentAje"))
         cur_rje = _safe_float(row.get("currentRje"))
         cur_audited = cur_unadj + cur_aje + cur_rje

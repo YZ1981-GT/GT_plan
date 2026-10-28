@@ -201,31 +201,42 @@
       <template v-if="activeSegment === 'usage-check'">
         <el-table-column v-if="isColVisible('auditedBegin')" label="审定期初" min-width="120" align="right">
           <template #header>
-            <el-tooltip content="审定期初=期初+期初AJE+期初RJE" placement="top">
+            <el-tooltip content="审定期初 = 期初 + 期初AJE + 期初RJE（模板 P 列）" placement="top">
               <span class="formula-col-header">审定期初</span>
             </el-tooltip>
           </template>
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.auditedBegin" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedBegin', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.auditedBegin) }}</span>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.auditedBegin) }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('auditedCredit')" label="审定拨入" min-width="120" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.auditedCredit" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedCredit', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.auditedCredit) }}</span>
+          <template #header>
+            <el-tooltip content="审定拨入 = 本期拨入 + 拨入AJE + 拨入RJE（模板 Q 列）" placement="top">
+              <span class="formula-col-header">审定拨入</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.auditedCredit) }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('auditedCarryFwd')" label="审定结转" min-width="120" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.auditedCarryFwd" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedCarryFwd', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.auditedCarryFwd) }}</span>
+          <template #header>
+            <el-tooltip content="审定结转 = 本期结转 + 结转AJE + 结转RJE（模板 R 列）" placement="top">
+              <span class="formula-col-header">审定结转</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.auditedCarryFwd) }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('auditedRefund')" label="审定返还" min-width="120" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" :model-value="row.auditedRefund" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedRefund', val ?? 0)" />
-            <span v-else>{{ fmtAmount(row.auditedRefund) }}</span>
+          <template #header>
+            <el-tooltip content="审定返还 = 本期返还 + 返还AJE + 返还RJE（模板 S 列）" placement="top">
+              <span class="formula-col-header">审定返还</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.auditedRefund) }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('auditedEnd')" label="审定期末" min-width="130" align="right">

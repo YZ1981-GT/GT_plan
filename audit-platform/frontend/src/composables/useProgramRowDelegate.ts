@@ -94,13 +94,18 @@ export function useProgramRowDelegate(ctx: {
     }
     delegateDialog.value.loading = true
     try {
-      const res = await previewProcedureDelegation(ctx.projectId(), delegationBody(o.task_id))
+      const res = await previewProcedureDelegation(ctx.projectId(), delegationBody(o.task_id), { silent: true })
       delegateDialog.value.previewStats = res
       delegateDialog.value.previewId = res?.preview_id || res?.preview?.id || ''
       delegateDialog.value.reqId = newRequestId()
       delegateDialog.value.ttl = res?.expires_at || res?.preview?.expires_at || null
+      // 前置（导入程序行定义 / 生成行任务 / 绑定底稿）没成功：预览照常返回，但目标数可能不全（spec procedure-chain-hardening R13）
+      if (res?.preparation_ready === false) {
+        ElMessage.warning(`${res?.materialization?.error || '程序行任务没有准备好'}，预览的目标数可能不全，请稍后重新预览`)
+      }
     } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '预览失败')
+      // 请求静默、这里提示一次：422 写明原因与处理办法（如所选人员没有关联登录账号，spec procedure-chain-hardening R12.3）
+      handleApiError(e, '委派预览')
     } finally {
       delegateDialog.value.loading = false
     }

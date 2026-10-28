@@ -28,6 +28,7 @@ import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useD2DisclosureImportExport } from '../composables/useD2DisclosureImportExport'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -460,11 +461,13 @@ async function syncToDisclosureNotes(): Promise<void> {
     // R7.5 基线播种：首次同步（尚无「上次已同步表名」持久化）时读一次附注现存表名，
     // 按 D2 命名空间过滤后写入基线 → 让上线前就残留的孤儿表在本轮一次性被清掉。
     // 读取失败（附注尚未生成）不阻断同步，下次同步再试。
-    if (syncedTableNames.value.length === 0) {
+    // 年度未设置：跳过播种（同步本身不带年度；播种本就是尽力而为，下次同步再试）
+    const seedYear = auditYear.value
+    if (syncedTableNames.value.length === 0 && seedYear != null) {
       try {
         const detail: any = await getDisclosureNoteDetail(
           props.projectId,
-          auditYear.value,
+          seedYear,
           D2_NOTE_SECTION[props.variant],
         )
         seedSyncedTablesFromNote(detail?.table_data)
@@ -537,9 +540,15 @@ function pickNoteTotal(detail: any): number | null {
 
 async function checkNoteConsistency(silent = false): Promise<void> {
   if (!props.projectId) return
+  const year = auditYear.value
+  if (year == null) {
+    noteCheckState.value = { status: 'error', message: MISSING_AUDIT_YEAR_MESSAGE }
+    if (!silent) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
   try {
-    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D2_NOTE_SECTION[props.variant])
+    const detail = await getDisclosureNoteDetail(props.projectId, year, D2_NOTE_SECTION[props.variant])
     const noteTotal = pickNoteTotal(detail)
     const pageTotal = classRows.value.find((r) => r.kind === 'total')?.endAmount ?? 0
     if (noteTotal === null) {

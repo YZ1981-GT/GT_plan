@@ -25,14 +25,9 @@ import pytest
 
 #: (模块, 作用域名, 名字) → 说明。🔴 修复前先读说明：有的修了 NameError 就会把另一个缺陷放出来。
 KNOWN_UNRESOLVED: dict[tuple[str, str, str], str] = {
-    ("app.routers.excel_html", "execute_formulas", "sa"):
-        "POST /execute-formulas 有公式时必 500；且只校验登录、不校验项目权限，年度缺省写死 2025",
-    ("app.routers.security", "lock_account", "db"):
-        "🔴 POST /security/lock-account 只校验登录：修好 NameError 前必须先加管理员鉴权，否则任何用户都能锁任何账号",
-    ("app.routers.security", "lock_account", "HTTPException"): "同上",
+    # 已修（spec formula-fetch-followup-defect-closure A4）：sa 导入 + require_project_access("edit")
     ("app.routers.time_machine", "_load_instance_data", "logger"): "只在异常分支用到：读失败时再抛 NameError",
     ("app.routers.time_machine", "_save_instance_data", "logger"): "同上（写失败分支）",
-    ("app.routers.wp_explanation", "generate_explanation", "sa"): "底稿说明生成端点调用即 500",
     ("app.routers.wp_render_strategies._h4_engineering_materials", "_build_h4_detail_prefill", "_is_leaf"):
         "H4 工程物资明细预填调用即 NameError",
     ("app.services.excel_html_converter", "_add_page_number", "Pt"): "Word 页码（python-docx 的 Pt 未导入）",

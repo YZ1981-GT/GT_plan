@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
@@ -38,6 +38,9 @@ class BatchAssignRequest(BaseModel):
     wp_ids: list[str]
     assigned_to: UUID | None = None
     reviewer: UUID | None = None
+    # 被委派人可见范围不含目标循环（400 out_of_scope）时带理由重试 ⇒ 同事务扩大其可见范围
+    expand_scope: bool = False
+    scope_reason: str | None = Field(default=None, max_length=500)
 
 
 class BatchSubmitRequest(BaseModel):
@@ -57,43 +60,10 @@ def _kanban_column_for(status: str) -> str:
 
 
 async def _resolve_user_names(db: AsyncSession, user_ids: set[str]) -> dict[str, str]:
-    """批量解析 user_id → 显示名（StaffMember.staff_name 优先，回退 User.username）。
+    """批量解析 user_id → 显示名（人员档案姓名优先，回退用户名）；与底稿列表 / 回收站共用一份。"""
+    from app.services.user_display_names import resolve_user_display_names
 
-    fail-open：任一查询异常返回已解析部分，不阻断看板。
-    """
-    from app.models.staff_models import StaffMember
-
-    def _as_uuid(v):
-        try:
-            return UUID(str(v))
-        except Exception:
-            return None
-
-    ids = [g for g in (_as_uuid(u) for u in user_ids) if g]
-    name_map: dict[str, str] = {}
-    if not ids:
-        return name_map
-    # StaffMember.name 优先（人员库显示名）；两条查询各自 fail-open，互不影响
-    try:
-        sr = await db.execute(
-            sa.select(StaffMember.user_id, StaffMember.name).where(
-                StaffMember.user_id.in_(ids),
-                StaffMember.is_deleted == sa.false(),
-            )
-        )
-        for uid, sname in sr.all():
-            if uid and sname:
-                name_map[str(uid)] = sname
-    except Exception:  # noqa: BLE001 — 人员库解析失败不影响看板主体
-        pass
-    try:
-        ur = await db.execute(sa.select(User.id, User.username).where(User.id.in_(ids)))
-        for uid, uname in ur.all():
-            if uname:
-                name_map.setdefault(str(uid), uname)
-    except Exception:  # noqa: BLE001
-        pass
-    return name_map
+    return await resolve_user_display_names(db, user_ids)
 
 
 async def _resolve_step_progress(
@@ -289,25 +259,56 @@ async def batch_assign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """批量分配底稿（编制人/复核人）"""
-    updated = 0
-    for wp_id_str in data.wp_ids:
-        wp_id = UUID(wp_id_str)
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-        )
-        wp = result.scalar_one_or_none()
-        if not wp:
-            continue
+    """批量分配底稿（编制人/复核人）。
+
+    spec procedure-trim-generation-delegation-chain 任务 12：只改本项目的底稿（原先按 id 改任意项目）；编制人
+    走底稿主编委派事务（已裁 / 在回收站拒绝、被委派人须看得到该循环、委派历史与可见性策略版本）；复核人仍直写
+    但须是本项目成员；与 ``PUT /workpaper-leads`` 一样只给项目委派人（经理 / 合伙人 / admin）。
+    """
+    from app.services.procedure_authorization import ensure_project_delegator
+    from app.services.wp_visibility.delegation_guard import DelegationError
+    from app.services.wp_visibility.lead_delegation_entry import (
+        delegate_workpaper_leads,
+        resolve_project_member_user,
+    )
+
+    await ensure_project_delegator(db, current_user, project_id)
+    try:
+        wp_ids = [UUID(str(x)) for x in data.wp_ids]
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="wp_ids 格式错误") from exc
+
+    updated: set[UUID] = set()
+    try:
         if data.assigned_to is not None:
-            wp.assigned_to = data.assigned_to
+            outcome = await delegate_workpaper_leads(
+                db, project_id, [(w, data.assigned_to) for w in wp_ids], actor_user_id=current_user.id,
+                expand_scope=data.expand_scope, scope_reason=data.scope_reason,
+            )
+            updated.update(outcome.updated)
         if data.reviewer is not None:
-            wp.reviewer = data.reviewer
-        updated += 1
+            reviewer_user = await resolve_project_member_user(db, project_id, data.reviewer)
+            if reviewer_user is None:
+                raise HTTPException(status_code=400, detail={
+                    "error": "reviewer_not_member", "message": "复核人不是本项目成员，请先在团队分配中加入"})
+            rows = (await db.execute(sa.select(WorkingPaper).where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.id.in_(wp_ids),
+                WorkingPaper.is_deleted == sa.false(),
+            ))).scalars().all()
+            for wp in rows:
+                wp.reviewer = reviewer_user
+                updated.add(wp.id)
+    except DelegationError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.http_status, detail=exc.http_detail()) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
     await db.flush()
     await db.commit()
-    return {"updated": updated, "message": f"已批量分配 {updated} 个底稿"}
+    return {"updated": len(updated), "message": f"已批量分配 {len(updated)} 个底稿"}
 
 
 @router.post("/working-papers/batch-submit")

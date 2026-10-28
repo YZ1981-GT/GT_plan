@@ -8,6 +8,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- 项目没填审计年度（路由也没带）：现金流量表按年度生成 / 取数，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 12px" />
+
     <!-- 平衡状态 -->
     <el-alert v-if="reconciliation" :type="reconciliation.balanced ? 'success' : 'warning'"
       :title="reconciliation.balanced ? '✓ 工作底稿已平衡' : '✗ 工作底稿未平衡'" :closable="false"
@@ -153,17 +156,27 @@ import {
   type CFSWorksheetRow, type CFSReconciliation, type CFSIndirectMethod,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { MISSING_AUDIT_YEAR_MESSAGE, useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import { useEditMode } from '@/composables/useEditMode'
 import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const routeYear = computed<number | null>(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('cfs-worksheet')
+
+// 路由没带年度时按项目审计年度取（原先只认路由 ⇒ 从别处进来全页取不到数）；都没有为 null，不按今年兜底
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(projectId)
+const year = computed<number | null>(() => routeYear.value ?? projectAuditYear.value)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 
 const loading = ref(false)
 const genLoading = ref(false)
@@ -199,6 +212,7 @@ function categoryTagType(c: string): '' | 'success' | 'warning' | 'info' | 'dang
 }
 
 async function fetchAll() {
+  if (year.value == null) return // 项目没填审计年度：页头已提示，不发请求
   loading.value = true
   try {
     const wsData = await getCFSWorksheet(projectId.value, year.value) as any
@@ -216,6 +230,10 @@ async function fetchAll() {
 }
 
 async function onGenerate() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   genLoading.value = true
   try {
     await generateCFSWorksheet(projectId.value, year.value)
@@ -225,6 +243,10 @@ async function onGenerate() {
 }
 
 async function onAutoGenerate() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   autoLoading.value = true
   try {
     await autoGenerateCFSAdjustments(projectId.value, year.value)
@@ -234,6 +256,10 @@ async function onAutoGenerate() {
 }
 
 async function onVerify() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   verifyLoading.value = true
   try { verifyResult.value = await getCFSVerify(projectId.value, year.value) }
   finally { verifyLoading.value = false }
@@ -260,6 +286,10 @@ async function deleteAdj(row: any) {
 }
 
 async function submitAdj() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   adjSubmitting.value = true
   try {
     const body = { ...adjForm.value, project_id: projectId.value, year: year.value }
@@ -276,9 +306,11 @@ async function submitAdj() {
   } finally { adjSubmitting.value = false }
 }
 
-onMounted(() => {
+onMounted(async () => {
   syncFromRoute()
   loadProjectOptions()
+  if (routeYear.value == null) await ensureAuditYear()
+  yearResolved.value = true
   fetchAll()
 })
 </script>

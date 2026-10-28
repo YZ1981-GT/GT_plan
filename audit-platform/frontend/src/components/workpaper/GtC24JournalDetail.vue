@@ -663,8 +663,8 @@ const route = useRoute()
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
 
-/** 序时账查询年度：props > 路由 > 项目 store > 通用兜底 */
-const effectiveYear = computed(() => {
+/** 序时账查询年度：props > 路由 > 项目 store > null */
+const effectiveYear = computed<number | null>(() => {
   try {
     const store = useProjectStore()
     return resolveEffectiveAuditYear({

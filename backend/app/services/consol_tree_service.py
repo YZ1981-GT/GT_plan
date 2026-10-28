@@ -55,7 +55,7 @@ class TreeNode:
     node_key: str = ""                   # {企业代码}:{角色}，树内唯一
     role: str = ""                       # consol/consol_elim/parent/hq/branch_elim/subsidiary/branch
     kind: str = "data"                   # aggregate（Σ子节点）/ elim（归属分录）/ data（单体审定数）
-    display_name: str = ""               # 带角色后缀的展示名，如「某集团（合并差额）」
+    display_name: str = ""               # 带角色后缀的展示名，如「某集团（差额户）」（consol_node_naming）
     relation: str | None = None          # 与上级关系 subsidiary/branch（信息展示，不决定金额）
     host_project_id: UUID | None = None  # 差额节点：承载其分录的合并项目
     flags: list[str] = field(default_factory=list)  # detached/cycle_break/relation_defaulted/...
@@ -188,7 +188,27 @@ async def build_tree_view(db: AsyncSession, root_project_id: UUID) -> dict | Non
         "mode_label": MODE_LABELS.get(mode, MODE_LABELS[MODE_NONE]),
         "diagnostics": [d.to_dict() for d in sort_diagnostics(diagnostics)],
         "year": result.year,
+        "scope_version": await _scope_version(db, root_project_id, result),
     }
+
+
+async def _scope_version(db: AsyncSession, project_id: UUID, result) -> dict | None:
+    """企业树版本信息（spec consol-autotree-linkage-closure R1.3）：取不到不影响取树（只记日志）。"""
+    from app.services.consol_group_tree import ROLE_CONSOL
+
+    if result.year is None or result.root.role != ROLE_CONSOL:
+        return None
+    try:
+        from app.services.consol_scope_confirmation_service import scope_version_info
+
+        # SAVEPOINT：版本表查询失败（如测试库没建这张表）不能让本请求的事务进入 aborted
+        async with db.begin_nested():
+            return await scope_version_info(db, project_id, result=result)
+    except Exception as exc:  # noqa: BLE001 —— 版本信息是附加信息
+        import logging
+
+        logging.getLogger(__name__).warning("企业树版本信息读取失败：项目=%s：%s", project_id, exc)
+        return None
 
 
 def build_group_trees_from_projects(

@@ -619,6 +619,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabVoucherCheck.vue — G4-13 凭证检查表（97行×19列→3区段Tab）
@@ -794,7 +795,7 @@ watch(
 const currentYear = computed(() => {
   const bsDate = props.htmlData?.bsDate as string | undefined
   if (bsDate && bsDate.length >= 4) return parseInt(bsDate.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return null
 })
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
@@ -893,6 +894,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (currentYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

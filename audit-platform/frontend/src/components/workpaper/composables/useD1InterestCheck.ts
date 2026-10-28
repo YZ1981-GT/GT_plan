@@ -152,7 +152,7 @@ function recalcRow(row: InterestCheckRow): InterestCheckRow {
 }
 
 /** 反序列化单行：仅读取可编辑字段，派生字段随后由 recalcRow 重算 */
-function deserializeRow(raw: any): InterestCheckRow {
+export function deserializeRow(raw: any): InterestCheckRow {
   const row = emptyInterestRow()
   if (raw && typeof raw.rowId === 'string' && raw.rowId) row.rowId = raw.rowId
   for (const f of STRING_EDITABLE_FIELDS) {

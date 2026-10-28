@@ -380,6 +380,7 @@
 <script setup lang="ts">
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -458,7 +459,7 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 const columnViewMode = ref<'compact' | 'full'>('compact')
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const summary = computed(() => summarizeI2StaffRows(rows.value))
 
@@ -626,6 +627,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

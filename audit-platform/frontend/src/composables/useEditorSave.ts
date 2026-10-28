@@ -29,7 +29,9 @@ type WorkpaperAutoSaveAPI = ReturnType<typeof useWorkpaperAutoSave>
 export interface UseEditorSaveOptions {
   projectId: ComputedRef<string>
   wpId: ComputedRef<string>
-  wpDetail: Ref<WorkpaperDetail | null>
+  /** 只读：保存后的最新详情经 setWpDetail 交回持有者（UniverEditorCore 传的是 props 的只读 computed）。 */
+  wpDetail: Readonly<Ref<WorkpaperDetail | null>>
+  setWpDetail: (detail: WorkpaperDetail) => void
   univerAPI: Ref<any>
   dirty: Ref<boolean>
   userOverrides: UserOverridesAPI
@@ -39,6 +41,8 @@ export interface UseEditorSaveOptions {
   initUniver?: () => Promise<void>
   loading?: Ref<boolean>
   showStaleImpactPanel?: Ref<boolean>
+  /** 项目审计年度（保存后的下游影响分析按它算；没有再看底稿详情的 year，都没有不分析） */
+  year?: Readonly<Ref<number | null>>
 }
 export function useEditorSave(opts: UseEditorSaveOptions) {
   const router = useRouter()
@@ -47,6 +51,11 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
   const syncLoading = ref(false)
   const prefillLoading = ref(false)
   const exportingPdf = ref(false)
+
+  /** 重取详情交回持有者（🔴 原先直接写只读 computed，写入被丢弃 ⇒ 版本号停在旧值，下次保存误报版本冲突）。 */
+  async function refreshDetail(): Promise<void> {
+    opts.setWpDetail(await getWorkpaper(opts.projectId.value, opts.wpId.value))
+  }
 
   async function onSave(): Promise<boolean> {
     const api = opts.univerAPI.value
@@ -90,7 +99,7 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
             opts.autoSave.clearDirty()
             ElMessage.success(retryData?.message || '已强制覆盖保存')
             eventBus.emit('workpaper:saved', { projectId: opts.projectId.value, wpId: opts.wpId.value } as WorkpaperSavedPayload)
-            opts.wpDetail.value = await getWorkpaper(opts.projectId.value, opts.wpId.value)
+            await refreshDetail()
             return true
           }
           return false
@@ -110,9 +119,10 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
           sheet: sheetName,
           max_depth: 3,
           project_id: opts.projectId.value,
-          // 年度未知不兜底日历年：由后端按项目审计年度补齐
-          // （spec acnr-foundation-defect-closure D8 / 需求 10）
-          year: opts.wpDetail.value?.year,
+          // 年度：项目审计年度 → 底稿详情的年度；都没有时传 null（由 useStaleImpact 跳过，不兜底日历年）
+          // （post-push-residual-defect-closure 6.5.3：原先兜底今年，2025 年度项目在 2026 年保存标的是 2026 的下游；
+          //  acnr-foundation-defect-closure D8 / 需求 10 同一意图）
+          year: opts.year?.value ?? opts.wpDetail.value?.year ?? null,
         })
         if (impactResp && (impactResp.total || impactResp.total_affected) > 0) {
           const total = impactResp.total || impactResp.total_affected
@@ -123,7 +133,7 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
         logger.warn('[stale-impact] notify failed (non-blocking):', e)
       }
 
-      opts.wpDetail.value = await getWorkpaper(opts.projectId.value, opts.wpId.value)
+      await refreshDetail()
       return true
     } catch (err: any) {
       handleApiError(err, '保存底稿')
@@ -147,7 +157,7 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
     try {
       await httpApi.put(P_wp.status(opts.projectId.value, opts.wpId.value), { status: 'pending_review' })
       ElMessage.success('已提交复核，等待复核人审阅')
-      opts.wpDetail.value = await getWorkpaper(opts.projectId.value, opts.wpId.value)
+      await refreshDetail()
     } catch (err: any) {
       handleApiError(err, '提交复核')
     } finally {
@@ -163,7 +173,7 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
         if (!saveOk) return
       }
       await rebuildWorkpaperStructure(opts.projectId.value, opts.wpId.value)
-      opts.wpDetail.value = await getWorkpaper(opts.projectId.value, opts.wpId.value)
+      await refreshDetail()
       ElMessage.success('公式坐标已同步')
     } catch (e: any) {
       handleApiError(e, '同步')

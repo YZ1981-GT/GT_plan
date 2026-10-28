@@ -60,20 +60,11 @@ class ProcedureService:
         LEAP 合并程序把多张连号底稿并成一行（编码用 ``起至终`` 表示），该区间串在
         ``wp_index`` 中无对应单一底稿 → wp_id 回填失败 → 前端显示"未生成"。展开后可回退到
         首张已生成底稿（控制台实际入口位置）。非区间码返回 ``[]``。
+        展开规则与生成时的保留范围判定同一实现（``procedure_scope_retention.expand_range_code``）。
         """
-        import re
-        if "至" not in code:
-            return []
-        left, _, right = code.partition("至")
-        m1 = re.match(r"^(.*-)(\d+)$", left.strip())
-        m2 = re.match(r"^(.*-)(\d+)$", right.strip())
-        if not m1 or not m2:
-            return []
-        prefix, start = m1.group(1), int(m1.group(2))
-        prefix2, end = m2.group(1), int(m2.group(2))
-        if prefix != prefix2 or end < start:
-            return []
-        return [f"{prefix}{n}" for n in range(start, end + 1)]
+        from app.services.procedure_scope_retention import expand_range_code
+
+        return expand_range_code(code)
 
     @staticmethod
     def _parent_subject_code(code: str) -> str | None:
@@ -390,8 +381,14 @@ class ProcedureService:
         project_id: UUID,
         assignments: list[dict],
         actor_user_id: UUID | None = None,
+        *,
+        expand_scope: bool = False,
+        scope_reason: str | None = None,
     ) -> int:
         """批量委派（走底稿主编两层原子事务 · procedure-delegation-visibility-isolation Task 7）。
+
+        ``expand_scope`` + ``scope_reason``：被委派人的可见范围不含目标循环时，用户确认后带理由重试，
+        同事务把该循环加进其可见范围（spec procedure-trim-generation-delegation-chain 需求 4.4）。
 
         每个 assignment 经 ``DelegationTransactionService.delegate_lead`` 落地：
           - 唯一解析 wp_index（由 procedure_instance_id / wp_code 联合解析，fail-closed）；
@@ -412,6 +409,8 @@ class ProcedureService:
         )
 
         deleg = DelegationTransactionService(self.db)
+        # 缺少的循环先收集、整批处理完一次报全（用户一次看全再决定是否扩大可见范围）
+        deleg.defer_scope_gaps()
         updated = 0
         for a in assignments:
             proc_id = a["procedure_id"]
@@ -472,10 +471,13 @@ class ProcedureService:
                 procedure_instance_id=proc.id,
                 wp_code=proc.wp_code,
                 request_id=str(request_id) if request_id else None,
+                expand_scope=expand_scope,
+                scope_reason=scope_reason,
             )
             await deleg.delegate_lead(req)
             updated += 1
 
+        deleg.raise_deferred_scope_gaps()
         await self.db.flush()
         return updated
 

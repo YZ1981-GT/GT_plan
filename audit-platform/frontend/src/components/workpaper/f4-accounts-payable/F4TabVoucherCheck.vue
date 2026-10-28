@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** F4TabVoucherCheck — F4-8 应付账款检查表（借/贷两区 + 弹窗逐单据核对） */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, toRef, type Ref } from 'vue'
 import {
   useF4VoucherCheck,
@@ -66,7 +67,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  year?: number
+  year?: number | null
 }>()
 
 const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
@@ -103,7 +104,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
 )
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.year ?? null)
 const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value)
@@ -169,6 +170,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

@@ -158,6 +158,23 @@ describe('useAdjustmentCentralSync', () => {
     expect(s.centralStatus.value?.review_status).toBe('approved')
   })
 
+  // post-push-residual-defect-closure R2：项目没填审计年度不按今年写集中登记
+  it('审计年度为空：手动同步提示去填年度、不调用后端', async () => {
+    statusMock.mockResolvedValue(null)
+    const s = useAdjustmentCentralSync({
+      projectId: ref('proj-1'),
+      year: ref<number | null>(null),
+      wpId: ref('wp-1'),
+      wpCode: 'D4',
+      itemId: 'D4-4-rows',
+      buildLineItems: () => BALANCED_ITEMS,
+      buildMeta: () => ({ description: '收入调整', adjustmentType: 'aje' }),
+    })
+    await s.syncToCentral()
+    expect(syncMock).not.toHaveBeenCalled()
+    expect(msg.warning).toHaveBeenCalledWith('未设置审计年度，请先在项目基本信息中填写')
+  })
+
   // ─── Phase 3：computeContentSignature ──────────────────────────────────
 
   describe('computeContentSignature', () => {
@@ -269,6 +286,20 @@ describe('useAdjustmentCentralSync', () => {
       s.scheduleAutoSync()
       await vi.advanceTimersByTimeAsync(5000)
       expect(syncMock).not.toHaveBeenCalled()
+      expect(msg.error).not.toHaveBeenCalled()
+    })
+
+    it('审计年度为空时自动同步静默跳过（不弹消息、不调用后端）', async () => {
+      statusMock.mockResolvedValue(null)
+      const items = ref(BALANCED_ITEMS)
+      const { sync: s, wrapper: w } = mountSync(items, { year: ref<number | null>(null) })
+      wrapper = w
+      await vi.advanceTimersByTimeAsync(0)
+
+      s.scheduleAutoSync()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(syncMock).not.toHaveBeenCalled()
+      expect(msg.warning).not.toHaveBeenCalled()
       expect(msg.error).not.toHaveBeenCalled()
     })
 

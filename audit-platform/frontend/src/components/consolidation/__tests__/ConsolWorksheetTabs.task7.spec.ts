@@ -165,13 +165,19 @@ beforeEach(() => {
 })
 
 describe('ConsolWorksheetTabs 任务7：年度、状态和页签上下文', () => {
-  it('成功空响应显示中文 empty 状态，并保留可编辑默认数据', async () => {
+  it('成功空响应显示中文 empty 状态，基本信息表按企业树带出可编辑的企业清单', async () => {
+    scopeApi.getWorksheetTree.mockResolvedValueOnce({
+      mode: 'subsidiary',
+      tree: { company_code: 'G', company_name: '某集团', children: [
+        { company_code: 'S1', company_name: '子公司一', role: 'subsidiary', parent_company_code: 'G', ultimate_company_code: 'G', via: [], children: [] },
+      ] },
+    })
     const wrapper = mountTabs()
     await flushPromises()
 
     expect(wrapper.find('[data-testid="cw-empty-state"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="cw-load-error"]').exists()).toBe(false)
-    expect(setupData(wrapper).subsidiaryInfo.length).toBeGreaterThan(0)
+    expect(setupData(wrapper).subsidiaryInfo.map((r) => r.company_code)).toEqual(['S1'])
     expect(worksheetApi.loadAllWorksheetData).toHaveBeenCalledWith('project-7', 2025)
   })
 

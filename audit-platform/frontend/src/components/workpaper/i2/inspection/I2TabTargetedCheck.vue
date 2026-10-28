@@ -632,6 +632,7 @@
  * I2TabTargetedCheck.vue — I2-12 针对性检查表
  * 对齐致同 Excel：一目标 / 二抽样 / 三凭证核对 / 四说明 / 五结论
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, ref, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -687,7 +688,7 @@ const isReadonly = computed(() => Boolean(props.isReadonly))
 const projectId = computed(() => props.projectId)
 const checkOpts = I2_12_CHECK_OPTIONS.filter((o) => o !== '') as string[]
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const allResponsesRef = toRef(props, 'allResponses')
 
@@ -778,6 +779,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

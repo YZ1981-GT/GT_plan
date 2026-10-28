@@ -14,9 +14,9 @@ Properties：P11（selector 展开等价）、P12（preview token 防篡改与�
   “当前粗裁保留（scope 非 skip/not_applicable）且 applicability=execute” 的 ProcedureRowTask 集合
   （Req 4.1 / P11）。三种 selector 统一走同一谓词，故 cycle/workpaper 展开集合 ==
   对全项目 tasks 应用范围+粗裁+applicability 谓词后的 row 集合。
-- **materialize 前置**：preview 若发现目标 wp_index 存在未物化 definition 行，先经 Task 4 的
-  ``materialize_job_store`` + ``ProcedureTaskMaterializationService.materialize`` 物化并返回
-  ``status=materialization_pending``（不产生可消费 preview）；客户端 job 成功后重新请求 preview（Req 4.2 / 2.8）。
+- **materialize 前置**：preview 同步完成前置（``procedure_delegation_prepare.prepare_row_tasks``：导入当前版本定义 →
+  物化缺的行任务 → 绑定已生成底稿，一个保存点；失败 ``preparation_ready=False``、计数清零），``status`` 恒为 ``ready``。
+  （原设计的 ``status=materialization_pending`` 异步 job 已不再产生，见 docs/contracts/procedure-chain/。）
 - **preview**：解析目标 + 分类（assign/reassign/unchanged/conflict/terminal），创建一次性
   ``ProcedureOperationPreview``（复用 Task 5 的 create_preview）；返回目标数 / 已分配 / 执行中 /
   已提交 / 冲突数 / 成员负载 / 受影响底稿 / 逐项双版本（lock+assignment）（Req 4.3）。
@@ -28,6 +28,11 @@ Properties：P11（selector 展开等价）、P12（preview token 防篡改与�
   **共享 delegation_batch_id**（Req 10.7 / D8）。
 - **owner 隔离**：**绝不** 修改 ``WorkingPaper.assigned_to`` 或 ``ProjectAssignment.assigned_cycles``
   （Req 4.10 / P14）—— 本服务只经 TransitionService 写 ProcedureRowTask，不触碰底稿主编/循环责任范围。
+- **只能委派保留项、被委派人须看得到**（spec procedure-trim-generation-delegation-chain 需求 4）：目标只取
+  所在底稿未进回收站且按 ``procedure_scope_retention`` 判定未被粗裁的任务（读不到裁剪结果 503）；
+  preview 返回 ``scope_gaps``（执行人 / 复核人有效循环范围缺少的循环），apply 缺循环且未带
+  ``expand_scope + scope_reason`` ⇒ 400 ``out_of_scope`` 零写，带了则同事务只把缺少的循环写进
+  ``project_users.scope_cycles`` 并递增可见性策略版本（扩权参数不进 preview 哈希，同一凭证可带理由重试）。
 
 约定：service 只 flush 不 commit；router 显式 commit。
 """
@@ -43,7 +48,7 @@ import sqlalchemy as sa
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.procedure_models import ProcedureInstance, ProcedureRowTask
+from app.models.procedure_models import ProcedureRowTask
 from app.models.staff_models import ProjectAssignment
 from app.models.workpaper_models import WpIndex
 from app.services.procedure_authorization import (
@@ -52,6 +57,11 @@ from app.services.procedure_authorization import (
 )
 from app.services.procedure_definition_importer import canonical_json
 from app.services.procedure_operation_preview import consume_and_apply, create_preview
+from app.services.procedure_delegation_scope import (  # noqa: F401 — ROW_DELEGATION_REJECTED 对外导出
+    ROW_DELEGATION_REJECTED,
+    DelegationTargetScopeMixin,
+)
+from app.services.procedure_scope_retention import TrimmedScope
 from app.services.procedure_task_materialization_service import (
     ProcedureTaskMaterializationService,
 )
@@ -77,8 +87,6 @@ SELECTOR_ROW = "row"
 CONFLICT_REJECT = "reject_on_conflict"  # default
 CONFLICT_REPLACE = "replace_with_reason"
 
-_TRIMMED_STATUSES = ("skip", "not_applicable")
-
 
 class DelegationConflictError(HTTPException):
     """默认原子模式下存在冲突目标 → 409 零写（Req 4.9 / P14）。"""
@@ -94,7 +102,7 @@ class DelegationConflictError(HTTPException):
         )
 
 
-class ProcedureDelegationService:
+class ProcedureDelegationService(DelegationTargetScopeMixin):
     """三粒度委派：DelegationResolver + 安全 preview/apply。"""
 
     def __init__(self, db: AsyncSession):
@@ -107,6 +115,8 @@ class ProcedureDelegationService:
             ProcedureRowDelegationCoordinator,
         )
         self.coordinator = ProcedureRowDelegationCoordinator(db)
+        # 同一次 preview / apply 内粗裁结果不变：每个项目只读一次
+        self._trim_scopes: dict[UUID, TrimmedScope] = {}
 
     # ======================================================================
     # DelegationResolver（确定性展开，Req 4.1 / P11）
@@ -133,19 +143,6 @@ class ProcedureDelegationService:
             return {"kind": SELECTOR_ROW, "task_ids": ids}
         raise HTTPException(status_code=422, detail=f"非法 selector kind: {kind}")
 
-    async def _trimmed_scopes(self, project_id: UUID) -> set[tuple[str, str]]:
-        """粗裁为 skip/not_applicable 的范围集合 {(audit_cycle, wp_code)}（Req 4.1 粗裁保留过滤）。"""
-        rows = (
-            await self.db.execute(
-                sa.select(ProcedureInstance.audit_cycle, ProcedureInstance.wp_code).where(
-                    ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.is_deleted == sa.false(),
-                    ProcedureInstance.status.in_(_TRIMMED_STATUSES),
-                )
-            )
-        ).all()
-        return {(r[0], r[1]) for r in rows}
-
     async def _candidate_tasks(
         self, project_id: UUID, canonical: dict, *, for_update: bool
     ) -> list[ProcedureRowTask]:
@@ -156,7 +153,15 @@ class ProcedureDelegationService:
         ]
         kind = canonical["kind"]
         if kind == SELECTOR_CYCLE:
-            conds.append(ProcedureRowTask.audit_cycle_snapshot == canonical["cycle"])
+            # 按所在底稿的循环（与物化目标 _candidate_wp_index_ids 同口径）：任务上的循环快照在物化时
+            # 可能兜底成 'A'，按快照取会漏掉这些任务（I2 / I3 实测）
+            conds.append(
+                ProcedureRowTask.wp_index_id.in_(
+                    sa.select(WpIndex.id).where(
+                        WpIndex.project_id == project_id, WpIndex.audit_cycle == canonical["cycle"]
+                    )
+                )
+            )
         elif kind == SELECTOR_WORKPAPER:
             conds.append(
                 ProcedureRowTask.wp_index_id.in_(
@@ -174,22 +179,40 @@ class ProcedureDelegationService:
         return rows
 
     async def resolve_targets(
-        self, project_id: UUID, canonical: dict, *, for_update: bool = False
+        self,
+        project_id: UUID,
+        canonical: dict,
+        *,
+        for_update: bool = False,
+        stats: dict | None = None,
     ) -> list[ProcedureRowTask]:
-        """确定性展开为“粗裁保留且 applicability=execute”的目标任务集合（Req 4.1 / P11）。
+        """确定性展开为“保留项且 applicability=execute”的目标任务集合（Req 4.1 / P11）。
 
-        三种 selector 统一走同一谓词：applicability=execute + scope 非 skip/not_applicable。
+        三种 selector 统一走同一谓词：applicability=execute + 所在底稿是保留项（未进回收站、按
+        ``procedure_scope_retention`` 判定未被粗裁 —— 按底稿编码，含跟随科目的子表 / 程序表与区间行；
+        原先按 ``(audit_cycle_snapshot, wp_code)`` 精确匹配粗裁行，子表与循环快照兜底为 'A' 的任务都漏判）。
         结果按 task id 稳定排序，保证 cycle/workpaper/row 展开等价可比较。
+
+        ``stats``（可选）回填 ``trimmed_excluded``（适用但因裁剪 / 回收站排除的任务数）与 ``cycle_of``
+        （``{wp_index_id: 循环}``，供跨循环校验）。
         """
         candidates = await self._candidate_tasks(project_id, canonical, for_update=for_update)
-        trimmed = await self._trimmed_scopes(project_id)
-        targets = [
-            t
-            for t in candidates
-            if t.applicability_status == APPLICABILITY_EXECUTE
-            and (t.audit_cycle_snapshot, t.wp_code) not in trimmed
-        ]
+        meta = await self._live_wp_index_meta(project_id, [t.wp_index_id for t in candidates])
+        scope = await self._trim_scope(project_id)
+        targets: list[ProcedureRowTask] = []
+        excluded = 0
+        for t in candidates:
+            if t.applicability_status != APPLICABILITY_EXECUTE:
+                continue
+            m = meta.get(t.wp_index_id)
+            if m is None or scope.is_trimmed(m[0]):
+                excluded += 1
+                continue
+            targets.append(t)
         targets.sort(key=lambda t: str(t.id))
+        if stats is not None:
+            stats["trimmed_excluded"] = excluded
+            stats["cycle_of"] = {t.wp_index_id: meta[t.wp_index_id][1] for t in targets}
         return targets
 
     # ======================================================================
@@ -358,16 +381,6 @@ class ProcedureDelegationService:
             return list(rows)
         return None
 
-    async def _count_unmaterialized(
-        self, project_id: UUID, wp_index_ids: list[UUID]
-    ) -> int:
-        """统计目标 wp_index 中尚未物化（definition 存在但无 task）的行数（纯读）。"""
-        total = 0
-        for wp_index_id in wp_index_ids:
-            overlay = await self.materialization.build_row_overlay(project_id, wp_index_id)
-            total += sum(1 for r in overlay if r.get("materialization_required"))
-        return total
-
     @staticmethod
     def _validate_reason_if_replace(conflict_policy: str, reason: str | None) -> None:
         """replace_with_reason 时转派理由须 5–500 字符（Req 4.7）。"""
@@ -396,9 +409,8 @@ class ProcedureDelegationService:
     ) -> dict:
         """委派预览：materialize 前置 + 解析目标 + 分类 + 创建一次性 preview（只 flush）。
 
-        - selector 目标存在未物化行 → 触发前置 materialize job 并返回 ``status=materialization_pending``，
-          不产生 preview；客户端 job 成功后重新请求（Req 2.8 / 4.2）。
-        - 否则返回 ``status=ready`` + preview_id + 统计（Req 4.3）。
+        - cycle / workpaper selector 先同步完成前置（导入定义 / 物化 / 绑定底稿），再解析目标；
+          恒返回 ``status=ready`` + preview_id + 统计（Req 4.3；前置失败见 ``preparation_ready``）。
         """
         if conflict_policy not in (CONFLICT_REJECT, CONFLICT_REPLACE):
             raise HTTPException(status_code=422, detail=f"非法 conflict_policy: {conflict_policy}")
@@ -410,29 +422,39 @@ class ProcedureDelegationService:
             await require_staff_active_user(self.db, reviewer_staff_id)
             await assert_sod_distinct(self.db, assignee_staff_id, reviewer_staff_id)
 
-        # -- materialize 前置：cycle/workpaper 存在未物化行 → 同步物化后直接返回 ready --
-        # (procedure-mainline-convergence Task 4.1: 不再返回 materialization_pending，
-        #  直接同步完成物化并继续构建 ready preview)
-        wp_index_ids = await self._candidate_wp_index_ids(project_id, canonical)
+        # -- 前置：cycle/workpaper 先导入当前版本定义、物化缺的行任务、绑定已生成的底稿，再解析目标 --
+        # (procedure-mainline-convergence Task 4.1 起同步完成；spec procedure-chain-followup-closure R2.1 起导入定义 +
+        #  只用当前版本 + 绑定底稿，原先新项目恒 0 个目标、任务 wp_id 为空)
+        from app.services.procedure_delegation_prepare import empty_target_hint, prepare_row_tasks
+
+        candidate_ids = await self._candidate_wp_index_ids(project_id, canonical)
+        wp_index_ids = candidate_ids
         if wp_index_ids:
-            pending = await self._count_unmaterialized(project_id, wp_index_ids)
-            if pending > 0:
-                await self.materialization.materialize(
-                    project_id, wp_index_ids, actor_user_id=actor_user_id
-                )
-                logger.info(
-                    "delegation preview 同步前置 materialize project=%s pending=%d",
-                    project_id, pending,
-                )
+            # 已裁 / 在回收站的底稿不物化（它们的任务反正不会成为目标）
+            wp_index_ids = await self._retained_wp_index_ids(project_id, wp_index_ids)
+        prep = None
+        if candidate_ids is not None:
+            prep = await prepare_row_tasks(
+                self.db, self.materialization, project_id, list(wp_index_ids or []), actor_user_id=actor_user_id,
+            )
 
         # -- 解析目标 + 分类 --
-        targets = await self.resolve_targets(project_id, canonical)
+        stats: dict = {}
+        targets = await self.resolve_targets(project_id, canonical, stats=stats)
         plan = self._classify(
             targets,
             assignee_staff_id=assignee_staff_id,
             reviewer_staff_id=reviewer_staff_id,
             unassigned_only=unassigned_only,
             conflict_policy=conflict_policy,
+        )
+        # 被委派人看不到的循环：预览先告诉用户，apply 时须带理由扩大可见范围
+        scope_gaps = await self.scope_gaps(
+            project_id,
+            self.scope_demands(
+                plan, assignee_staff_id=assignee_staff_id, reviewer_staff_id=reviewer_staff_id,
+                cycle_of=stats.get("cycle_of") or {},
+            ),
         )
         target_versions = {str(t.id): t.lock_version for t in targets}
         workload = await self._assignee_workload(project_id, assignee_staff_id)
@@ -464,11 +486,19 @@ class ProcedureDelegationService:
         already_assigned = sum(1 for t in targets if t.assignee_staff_id is not None)
         in_progress = sum(1 for t in targets if t.workflow_status == WORKFLOW_IN_PROGRESS)
         submitted = sum(1 for t in targets if t.workflow_status == WORKFLOW_SUBMITTED)
+        hint = None if targets else empty_target_hint(
+            candidate_ids=candidate_ids, retained_ids=wp_index_ids, prep=prep,
+            trimmed_excluded=int(stats.get("trimmed_excluded") or 0), unassigned_only=unassigned_only,
+        )
 
         return {
             "status": "ready",
             "preview_id": str(preview.id),
             "expires_at": preview.expires_at.isoformat(),
+            "materialization": prep,
+            # 前置（导入定义 / 物化 / 绑定底稿）失败 ⇒ False，目标数可能不全（spec procedure-chain-hardening R13）
+            "preparation_ready": prep is None or bool(prep.get("ready")),
+            "hint": hint,
             "summary": {
                 "targets": len(targets),
                 "would_assign": len(plan["assign"]),
@@ -481,7 +511,9 @@ class ProcedureDelegationService:
                 "already_assigned": already_assigned,
                 "in_progress": in_progress,
                 "submitted": submitted,
+                "trimmed_excluded": int(stats.get("trimmed_excluded") or 0),
             },
+            "scope_gaps": scope_gaps,
             "conflict_task_ids": [str(t.id) for t in plan["conflict"]],
             "membership_load": {
                 "assignee_staff_id": str(assignee_staff_id),
@@ -520,9 +552,13 @@ class ProcedureDelegationService:
         reason: str | None = None,
         best_effort: bool = False,
         due_at: datetime | None = None,
+        expand_scope: bool = False,
+        scope_reason: str | None = None,
     ) -> dict:
         """委派应用：一次消费 preview，经 TransitionService 真实 assign/reassign（只 flush）。
 
+        - 被委派人看不到目标循环 ⇒ 400 ``out_of_scope`` 零写（preview 未消费）；``expand_scope`` +
+          ``scope_reason`` ⇒ 同事务扩大其可见范围（两参数不进 preview 哈希，同一凭证可带理由重试）。
         - 默认整批原子：任一冲突 → 409 零写；best_effort → 逐任务结果（Req 4.9 / P14）。
         - 同人重复分配为 no-op（不递增 version / 无 history/outbox，Req 4.8 / P15）。
         - 每 task 独立 history/outbox，共享 delegation_batch_id（Req 10.7）。
@@ -547,7 +583,8 @@ class ProcedureDelegationService:
 
         async def _apply_fn(db: AsyncSession, preview) -> dict:
             # 行锁复取目标，版本自 preview 后变化 → 409
-            targets = await self.resolve_targets(project_id, canonical, for_update=True)
+            stats: dict = {}
+            targets = await self.resolve_targets(project_id, canonical, for_update=True, stats=stats)
             current_versions = {str(t.id): t.lock_version for t in targets}
             if current_versions != dict(preview.target_versions or {}):
                 raise HTTPException(status_code=409, detail="目标任务版本已变化，请重新预览")
@@ -563,6 +600,17 @@ class ProcedureDelegationService:
             # 默认原子：任一冲突 → 409 零写（在任何写入前判定，Req 4.9 / P14）
             if plan["conflict"] and not best_effort:
                 raise DelegationConflictError([str(t.id) for t in plan["conflict"]])
+
+            # 跨循环：被委派人看不到 ⇒ 400 零写；带理由 ⇒ 先扩大可见范围再写任务（同事务）
+            scope_expanded = await self.enforce_scope(
+                project_id,
+                self.scope_demands(
+                    plan, assignee_staff_id=assignee_staff_id, reviewer_staff_id=reviewer_staff_id,
+                    cycle_of=stats.get("cycle_of") or {},
+                ),
+                expand_scope=expand_scope, scope_reason=scope_reason,
+                actor_user_id=actor_user_id, request_id=request_id,
+            )
 
             batch_id = uuid.uuid4()
             applied = 0
@@ -658,6 +706,8 @@ class ProcedureDelegationService:
                 "conflict": len(plan["conflict"]),
                 "terminal": len(plan["terminal"]),
                 "skipped_assigned": len(plan["skipped_assigned"]),
+                "trimmed_excluded": int(stats.get("trimmed_excluded") or 0),
+                "scope_expanded": scope_expanded,
                 "best_effort": bool(best_effort),
                 "per_task": per_task if best_effort else None,
             }

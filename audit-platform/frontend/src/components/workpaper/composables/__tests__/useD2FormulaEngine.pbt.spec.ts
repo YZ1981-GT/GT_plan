@@ -41,13 +41,16 @@ describe('Feature: d2-accounts-receivable, Property 1: 审定数公式链', () =
     )
   })
 
+  // 模板 D2-1 K 列 IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))：期末为负时除零（#DIV/0!）记 N/A
   it('getChangeRate handles zero prior consistently', () => {
     fc.assert(
       fc.property(valArb, (audited) => {
         if (audited === 0) {
           expect(getChangeRate(0, 0)).toBe('')
-        } else {
+        } else if (audited > 0) {
           expect(getChangeRate(0, audited)).toBe(1)
+        } else {
+          expect(getChangeRate(0, audited)).toBe('N/A')
         }
       }),
       { numRuns: 100 },
@@ -154,7 +157,7 @@ describe('Feature: d2-accounts-receivable, Property 6: 周转率/周转天数', 
   it('calculateDifference equals actual - should', () => {
     fc.assert(
       fc.property(valArb, valArb, (actual, should) => {
-        expect(calculateDifference(actual, should)).toBeCloseTo(actual - should, 5)
+        expect(calculateDifference(actual, should)).toBeCloseTo(should - actual, 5)
       }),
       { numRuns: 100 },
     )

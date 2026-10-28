@@ -28,6 +28,7 @@ import { S34_TAB_DEFS, S34_GROUP_NAMES, type TabDef } from './S34_TAB_CONFIG'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 import GtS34ChecklistOverview from './GtS34ChecklistOverview.vue'
 import GtS34SubCheckTable from './GtS34SubCheckTable.vue'
+import { listAssignments } from '@/services/staffApi'
 
 // ─── Props (Req 1.3) ───
 const props = withDefaults(defineProps<{
@@ -44,6 +45,7 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 
 const {
   wpIdMap,
+  assigneeMap,
   checklist,
   applicableCodes,
   completionMap,
@@ -54,6 +56,29 @@ const {
   refreshCompletion,
   loadChecklist,
 } = useS34BundleState({ projectId })
+
+// ─── P2.3 bundle tab 负责人展示 ───
+/** staff_id/user_id → 显示名映射 */
+const staffNameMap = ref<Record<string, string>>({})
+
+async function loadStaffNames(): Promise<void> {
+  if (!projectId.value) return
+  try {
+    const list = await listAssignments(projectId.value)
+    const map: Record<string, string> = {}
+    for (const a of (Array.isArray(list) ? list : [])) {
+      if (a.staff_id) map[a.staff_id] = a.staff_name || a.staff_id.slice(0, 8)
+    }
+    staffNameMap.value = map
+  } catch { /* 静默 */ }
+}
+
+/** 按 wpCode 获取负责人显示名（P2.3: staff name 回退 username/id 前 8 位） */
+function tabAssigneeName(wpCode: string): string {
+  const staffId = assigneeMap.value[wpCode]
+  if (!staffId) return ''
+  return staffNameMap.value[staffId] || staffId.slice(0, 8)
+}
 
 // ─── Visible Tabs (Property 3: Tab 可见性由 wp_index 存在性驱动) ───
 const visibleTabs = computed<TabDef[]>(() => {
@@ -150,6 +175,7 @@ function barPercent(key: 'completed' | 'inProgress' | 'notStarted'): string {
 onMounted(async () => {
   await loadWpIndex()
   await loadChecklist()
+  await loadStaffNames()
 
   // Resolve initial active tab from props or query (Req 7.1, 7.2)
   const qs = route.query.sheet as string | undefined
@@ -277,10 +303,20 @@ onMounted(async () => {
         <el-tab-pane
           v-for="tab in visibleTabs"
           :key="tab.id"
-          :label="tab.label"
           :name="tab.id"
           lazy
         >
+          <!-- P2.3: tab label + 负责人 -->
+          <template #label>
+            <span>{{ tab.label }}</span>
+            <span
+              v-if="tab.wpCode && tabAssigneeName(tab.wpCode)"
+              class="gt-s34-bundle__tab-assignee"
+              :title="'负责人：' + tabAssigneeName(tab.wpCode)"
+            >
+              {{ tabAssigneeName(tab.wpCode) }}
+            </span>
+          </template>
           <!-- Overview: 核查清单总览面板 (Req 3.1, 3.2, 12.3) -->
           <template v-if="tab.id === 'overview'">
             <GtS34ChecklistOverview
@@ -516,5 +552,17 @@ onMounted(async () => {
 .gt-s34-bundle__empty {
   padding: 60px 20px;
   text-align: center;
+}
+
+/* P2.3 bundle tab 负责人标签 */
+.gt-s34-bundle__tab-assignee {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  font-weight: normal;
+}
+.gt-s34-bundle__tab-assignee::before {
+  content: '·';
+  margin-right: 2px;
 }
 </style>

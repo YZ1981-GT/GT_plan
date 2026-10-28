@@ -279,6 +279,16 @@ async def list_recycle_bin(
     # 分页
     start = pagination.offset
     paged_items = items[start:start + pagination.page_size]
+    # 底稿删除人：先读生命周期事件（spec procedure-chain-hardening-and-java-contracts R18），没有事件的旧数据沿用去向记录
+    from app.services.workpaper_recycle_service import latest_recycle_actors
+
+    wp_items = [i for i in paged_items if i["type"] == WORKPAPER_TYPE]
+    if wp_items:
+        actors = await latest_recycle_actors(db, [UUID(i["id"]) for i in wp_items])
+        for item in wp_items:
+            wid = UUID(item["id"])
+            if wid in actors:
+                item["deleted_by"] = actors[wid]
     # 删除人显示名（原先列表项没有删除人，回收站「删除人」恒空，spec procedure-chain-followup-closure R3.2）
     from app.services.user_display_names import resolve_user_display_names
 

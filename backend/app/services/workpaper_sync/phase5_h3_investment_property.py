@@ -31,13 +31,10 @@ H9/H6/H4/H8/H2 各只有一张受管 sheet。H3 是 slice 登记的**变体轴**
 （`calcFairEndBalance` 把 change 加了进去），模板把「原值」与「公允价值变动」分成两块
 （净值才是两者之和）⇒ 原值整块 C..O 无对端。
 
-═══ 🔴 模板真实缺陷一处（走覆盖层，不改字节）═══
-
-公允价值模式的 `R` 列（公允价值变动·未审·期末余额）**只有首行 R12 有 `=P12+Q12`，
-R13-R26 共 14 行缺公式**；对照 H7 公允同位列 S 满格 25/25。详见
-`phase5_h3_02_fair_detail.TEMPLATE_DEFECTS_H302_FAIR`。这是本循环第三例
-（前两例 F2-26!J9 / F5-7!G31），处置沿用既有规则。
-
+═══ 模板缺陷一处（已修模板）═══
+公允价值模式的 `R` 列（公允价值变动·未审·期末余额）原先只有首行 R12 有 `=P12+Q12`，
+R13-R26 共 14 行缺公式；已在权威模板字节上补齐（spec oo-writeback-template-parity-closure R1），
+登记留在 `phase5_h3_02_fair_detail.TEMPLATE_DEFECTS_H302_FAIR`。
 ═══ 三处不能照抄前五条的地方 ═══
 
 1. 🔴 **三级表头**（R9/R10/R11），H4/H8/H2 是四级 ⇒ `header_group_row` 不同。
@@ -92,7 +89,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "H/H3 投资性房地产.xlsx"
 #: 2026-10-01 安全净化后实测（122,537 B）：Equation.3 OLE 已转静态预览。
 TEMPLATE_SHA256: Final[str] = (
-    "ca856caebfc5b09b3ad9fbe3980ccf8e5c46260da9ba1a0ecd8acdb44498bc89"
+    "a103d407b20608eb349dc1234f440c1e3f158a39913a304e5494f0c0f056013c"
 )
 
 #: 🔴 **两个** store item（变体轴）。`primary_store_item_id` 取成本模式那张 ——
@@ -155,7 +152,7 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
     ],
     "resolved_coverage_gaps": [],
     "legacy_folded_fields": {},
-    # 🔴 模板真实缺陷（走覆盖层，不改 wp_templates 字节）
+    # 模板缺陷（已修模板，登记留痕）
     "template_defects": [
         dict(d) | {"sheet": _h302f.MANAGED_SHEET_H302_FAIR}
         for d in _h302f.TEMPLATE_DEFECTS_H302_FAIR
@@ -288,10 +285,9 @@ _HTML_STORE_NOTE: Final[str] = (
     "那样折叠）、增减方式两列对一个混装双向的 changeType ×2、"
     "「是否有权属证明」≠「是否权属受限」×2（权属核对另有 产权核对表H3-12）、"
     "公允总额口径不同源。"
-    "🔴 **模板真实缺陷一处**（见 review.template_defects）：公允模式 `R` 列"
-    "（公允价值变动·未审·期末余额）只有首行 R12 有 `=P12+Q12`，R13-R26 共 14 行缺公式；"
-    "对照 H7 公允同位列 S 满格 25/25 ⇒ H3 独有漏填。后果是同一张表里审定段算得出期末、"
-    "未审段算不出。走覆盖层不改模板字节（同 F2-26!J9 / F5-7!G31）。"
+    "模板缺陷一处已修（见 review.template_defects）：公允模式 `R` 列（公允价值变动·未审·"
+    "期末余额）原先只有首行 R12 有 `=P12+Q12`，R13-R26 共 14 行缺公式，已在权威模板字节上补齐"
+    "（spec oo-writeback-template-parity-closure R1）。"
     "🔴 三处不能照抄前五条：**三级**表头 R9/R10/R11（H4/H8/H2 是四级）· "
     "两张 sheet 数据区起始行不同（成本 R13-R27 / 公允 R12-R26，照抄任一张会让另一张 "
     "merge 越界）· footer 全是列 SUM（H2 有 4 格行内派生 ⇒ 那条判据在此不适用）。"

@@ -470,6 +470,9 @@ class ConsolNoteTemplatePushLog(Base):
     # `unrecognized token: ":"`，任何走 `Base.metadata.create_all(sqlite)` 的测试都在 setup
     # 阶段报错（2026-10-27 实测 117 例）。真实表由 V204 创建，PG 对 jsonb 列的 `DEFAULT '[]'`
     # 隐式转型，两种写法在真实库上等价。守卫：tests/test_orm_server_default_dialect_neutral.py
+    # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`，整批 create_all 报
+    # "unrecognized token"（回收站 / WOPI 等 SQLite 用例因此全挂）。`'[]'` 在 PG/SQLite 双方言下都能解析为
+    # 合法空 JSON 数组（同 workpaper_models / custom_query_models 约定；守卫 test_model_server_default_portability）。
     failures: Mapped[dict | None] = mapped_column(
         JSONB, server_default=text("'[]'"), nullable=True
     )

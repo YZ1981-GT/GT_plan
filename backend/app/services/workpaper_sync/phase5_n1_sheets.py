@@ -3,7 +3,9 @@
 
 受管 sheet = `递延所得税资产明细表N1-2`：两级表头 R9/R10、14列 A-N、
 数据区 R11-R29（19行固定项）、无 footer 标签行（R30+ 是说明区）。
-公式列 E=ROUND(C*D,2) / H=F+E / K=ROUND(I*J,2) / N=L+K。
+公式列 E=ROUND(C*D,2) / H=E+F+G / K=ROUND(I*J,2) / N=K+L+M。
+（模板 H / N 原为 =F+E / =L+K，漏了重分类调整 G / M；spec oo-writeback-template-parity-closure R1
+按会计口径修模板，并给合计行补了 G / M 两列 SUM。）
 """
 from __future__ import annotations
 from typing import Any, Final, Mapping
@@ -21,7 +23,7 @@ ADAPTER_ID: Final[str] = "n1.deferred_tax_assets"
 WP_CODES: Final[frozenset[str]] = frozenset({"N1D"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "N/N1 递延所得税资产.xlsx"
-TEMPLATE_SHA256: Final[str] = "25cefe2f4e1d8cbb47b6b54b4ac5cd50f9f34016962aa2f8ec0dad16d449dea3"
+TEMPLATE_SHA256: Final[str] = "892aaa102c6a330872713a4561dfed2859ff4b5301fe38076c9934250b7d9d12"
 MANAGED_SHEET: Final[str] = "递延所得税资产明细表N1-2"
 DERIVED_SHEET: Final[str] = "递延所得税资产审定表N1-1"
 TEMPLATE_ID: Final[str] = "N12"
@@ -61,9 +63,9 @@ MANAGED_FIELD_SPECS_7: Final[tuple[tuple[str, str, str, str, str, str, str], ...
 )
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {
     "E": "=ROUND(C{row}*D{row},2)",
-    "H": "=F{row}+E{row}",
+    "H": "=E{row}+F{row}+G{row}",
     "K": "=ROUND(I{row}*J{row},2)",
-    "N": "=L{row}+K{row}",
+    "N": "=K{row}+L{row}+M{row}",
 }
 FORMULA_COLUMNS: Final[tuple[str, ...]] = tuple(FORMULA_TEMPLATES)
 

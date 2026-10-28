@@ -135,7 +135,7 @@ export interface ReportEquityTableProps {
   rows: any[]
   eqColumns: { key: string; label: string }[]
   eqTotalCols: number
-  year: number
+  year?: number | null
   tableMaxHeight: number
   cellClassName: (params: any) => string
   fontSize: string

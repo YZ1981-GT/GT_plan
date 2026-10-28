@@ -325,9 +325,9 @@ defineEmits<{
 const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 
 // ─── 报告期截止日（优先取项目审计年度，回退当前年） ──────────────────────────
-const auditYear = computed(() => props.year || new Date().getFullYear())
-const reportDate = computed<Date>(() => new Date(auditYear.value, 11, 31))
-const reportDateStr = computed(() => `${auditYear.value}-12-31`)
+const auditYear = computed<number | null>(() => props.year ?? null)
+const reportDate = computed<Date>(() => new Date(auditYear.value ?? 0, 11, 31))
+const reportDateStr = computed(() => auditYear.value == null ? '' : `${auditYear.value}-12-31`)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 

@@ -297,6 +297,8 @@ import { formatAmount } from '@/utils/formatAmount'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { fetchNoteAutoPull } from '@/services/commonApi'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import type {
   SubClass,
   ColumnDefWithKey,
@@ -430,12 +432,16 @@ const { initData, buildSavePayload, debounceSave } = useCNotePersist({ props, su
 const autoPullData = ref<Record<string, { value: any; source_label: string; available: boolean; reason: string }>>({})
 const isAutoPullLoading = ref(false)
 
+const { ensureAuditYear: ensureProjectAuditYear } = useProjectAuditYear(() => (route.params?.projectId as string) || '')
+
 async function loadAutoPullValues() {
   const projectId = route.params?.projectId as string | undefined
-  const yearRaw = Number(route.query?.year)
-  const yearVal = Number.isFinite(yearRaw) && yearRaw > 2000 ? yearRaw : new Date().getFullYear()
   const section = sectionId.value
   if (!projectId || !section || autoPullRefs.value.length === 0) return
+  // 路由带年度用路由的，否则取项目审计年度（底稿编辑页的路由通常不带 year）；
+  // 都取不到就静默跳过（取数而非写入，不弹提示），不按今年猜
+  const yearVal = parseAuditYear(route.query?.year) ?? await ensureProjectAuditYear()
+  if (yearVal == null) return
   isAutoPullLoading.value = true
   try {
     const refs = await fetchNoteAutoPull(projectId, yearVal, section)

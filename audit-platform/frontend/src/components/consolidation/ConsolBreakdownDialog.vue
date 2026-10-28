@@ -1,55 +1,55 @@
 <template>
   <!--
-    ConsolBreakdownDialog — 合并报表行穿透弹窗（ADR-CONSOL-301）
-    调 report/{account_code}/consol-breakdown，列：子公司名称 / 金额 / 占比 / 抵销额，底部合并数。
-    附注模式（读 V2 汇总器写的 disclosure_notes.consolidation_breakdown）已随 V2 于 2026-10-22 下线
-    （spec consol-note-header-library-and-node-reaggregate R6.1）。
-    所有文本中文；金额统一走 GtAmountCell；行点击跳转纳入 Backspace 返回栈（T3）。
+    ConsolBreakdownDialog — 报表页右键「查看合并明细」（spec consol-autotree-linkage-closure R8.2）
+    报表行次走读时计算（与合并报表差额表同一求值）：列 下级节点 / 来源 / 金额 / 占比，底部合并数取后端合计，
+    不在前端求和；纯数字科目码沿用已落库的穿透明细。差额户（本级抵销与调整）高亮；单体项目与下级合并项目可进入。
+    所有文本中文；金额统一走 GtAmountCell；进入项目纳入 Backspace 返回栈。
   -->
   <el-dialog
     :model-value="modelValue"
-    title="查看合并明细"
-    width="720px"
+    :title="title"
+    width="760px"
     append-to-body
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
-    @open="handleOpen"
   >
     <div v-loading="loading">
-      <!-- 空态：无 breakdown / 报表端点未就绪 -->
+      <div v-if="data?.node_label" class="cbd-meta" data-testid="cbd-node">汇总节点：{{ data.node_label }}</div>
+      <el-alert v-if="!loading && rows.length && data?.message" type="info" :closable="false" show-icon
+        class="cbd-note" data-testid="cbd-message" :title="data.message" />
+
+      <!-- 空态：无明细 / 留空 / 读取失败 -->
       <el-empty v-if="!loading && rows.length === 0" :description="emptyMessage" />
 
-      <template v-else>
-        <el-table :data="rows" border size="small" class="consol-breakdown-table">
-          <el-table-column label="子公司名称" min-width="180">
+      <template v-else-if="rows.length">
+        <el-table :data="rows" border size="small" class="consol-breakdown-table" :row-class-name="rowClass">
+          <el-table-column label="下级节点" min-width="200">
             <template #default="{ row }">
-              {{ row.company_name || row.company_code }}
+              <a v-if="jumpTarget(row)" class="cbd-link" data-testid="cbd-enter" @click="handleJump(row)">{{ rowLabel(row) }}</a>
+              <span v-else>{{ rowLabel(row) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="金额" min-width="140" align="right">
+          <el-table-column label="来源" width="110">
+            <template #default="{ row }">{{ row.source || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="金额" min-width="150" align="right">
             <template #default="{ row }">
-              <GtAmountCell :value="row.amount" clickable @click="handleJump(row)" />
+              <span v-if="isBlank(row.amount)" class="cbd-blank" :title="row.reason || ''">留空</span>
+              <GtAmountCell v-else :value="row.amount" :clickable="!!jumpTarget(row)" @click="handleJump(row)" />
             </template>
           </el-table-column>
-          <el-table-column label="占比" min-width="100" align="right">
-            <template #default="{ row }">
-              {{ formatPercentRow(row) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="抵销额" min-width="140" align="right">
-            <template #default="{ row }">
-              <GtAmountCell
-                v-if="row.elimination_amount !== undefined && row.elimination_amount !== null"
-                :value="row.elimination_amount"
-              />
-              <span v-else>-</span>
-            </template>
+          <el-table-column label="占比" width="100" align="right">
+            <template #default="{ row }">{{ pctText(row) }}</template>
           </el-table-column>
         </el-table>
 
-        <!-- 底部合并数 -->
-        <div class="consol-breakdown-footer">
+        <!-- 底部：合并数 = 后端合计（含本级抵销与调整） -->
+        <div class="consol-breakdown-footer" data-testid="cbd-footer">
+          <span v-if="!isBlank(data?.elimination)" class="cbd-elim">
+            其中本级抵销与调整 <GtAmountCell :value="data?.elimination ?? null" />
+          </span>
           <span class="consol-breakdown-footer__label">合并数</span>
-          <GtAmountCell :value="footerAmount" />
+          <span v-if="isBlank(data?.consolidated)" class="cbd-blank">留空</span>
+          <GtAmountCell v-else :value="data?.consolidated ?? null" />
         </div>
       </template>
     </div>
@@ -65,45 +65,27 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import Decimal from 'decimal.js'
-import { api } from '@/services/apiProxy'
-import { consolidation as P_consol } from '@/services/apiPaths'
+import { getConsolRowBreakdown, type ConsolRowBreakdown, type ConsolRowBreakdownItem } from '@/services/consolidationApi'
 import { useNavigationStack, type NavigationEntry } from '@/composables/useNavigationStack'
 import { useProjectStore } from '@/stores/project'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { projectVisibleInOptions } from '@/components/consolidation/composables/consolEntityView'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
-
-interface BreakdownRow {
-  company_code: string
-  company_name?: string
-  section_title?: string
-  amount: number | string | null
-  /** 抵销额（后端若提供则展示，否则 '-'） */
-  elimination_amount?: number | string | null
-  /** 来源单体项目标识（后端若提供才能跨项目跳转，缺失则不跳） */
-  source_project_id?: string
-}
-
-interface BreakdownResponse {
-  section_id?: string
-  section_title?: string
-  by_company?: BreakdownRow[]
-  computed_at?: string
-  has_breakdown?: boolean
-  message?: string
-}
 
 const props = defineProps<{
   modelValue: boolean
   projectId: string
-  year: number
-  /** 报表行科目（行码） */
+  /** 审计年度；项目没填为 null ⇒ 不读穿透明细，弹窗里写明去填年度 */
+  year: number | null
+  /** 报表行次（报表页右键传的就是行次；纯数字按科目码走已落库的穿透明细） */
   accountCode?: string
-  /** 合并数（父传入用于底部显示，可选；不传则用 Σamount） */
-  consolAmount?: number | string | null
+  /** 汇总节点；省略 = 根合并节点 */
+  nodeKey?: string | null
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  jump: [payload: { source_project_id: string; row: BreakdownRow }]
+  jump: [payload: { source_project_id: string; row: ConsolRowBreakdownItem }]
 }>()
 
 const router = useRouter()
@@ -112,168 +94,129 @@ const { push: navPush } = useNavigationStack()
 const projectStore = useProjectStore()
 
 const loading = ref(false)
-const rows = ref<BreakdownRow[]>([])
-const respMessage = ref('')
-const hasBreakdown = ref(true)
+const data = ref<ConsolRowBreakdown | null>(null)
+const failMessage = ref('')
+let seq = 0
 
-const endpoint = computed(() =>
-  P_consol.reports.consolBreakdown(props.projectId, props.year, props.accountCode ?? ''),
+const rows = computed<ConsolRowBreakdownItem[]>(() =>
+  data.value?.has_breakdown !== false && Array.isArray(data.value?.by_company) ? data.value!.by_company : [],
 )
+const title = computed(() => (data.value?.row_name ? `查看合并明细 · ${data.value.row_name}` : '查看合并明细'))
 
-/** Σamount（Decimal 累加避免浮点误差） */
-const totalAmount = computed<Decimal>(() => {
-  let sum = new Decimal(0)
-  for (const r of rows.value) {
-    const v = safeDecimal(r.amount)
-    if (v) sum = sum.plus(v)
-  }
-  return sum
-})
+/** 空态文案：读取失败原因 > 后端说明（如「该行合并数留空：…」）> 默认 */
+const emptyMessage = computed(() => failMessage.value || data.value?.message || '该报表行暂无合并明细')
 
-/** 底部合并数：父传入优先，否则 Σamount */
-const footerAmount = computed<number | string | null>(() => {
-  if (props.consolAmount !== undefined && props.consolAmount !== null) return props.consolAmount
-  return totalAmount.value.toString()
-})
+function isBlank(v: unknown): boolean {
+  return v === null || v === undefined || v === ''
+}
 
-/** 空态文案（中文）：优先用后端 message，其次默认提示 */
-const emptyMessage = computed(() => {
-  if (respMessage.value) return respMessage.value
-  return '该报表行暂无合并明细'
-})
+function rowLabel(row: ConsolRowBreakdownItem): string {
+  return row.display_name || row.company_name || row.company_code
+}
 
-function safeDecimal(v: unknown): Decimal | null {
-  if (v === null || v === undefined) return null
-  if (typeof v === 'string' && v.trim() === '') return null
+/** 差额户（本级抵销与调整）整行高亮 */
+function rowClass({ row }: { row: ConsolRowBreakdownItem }): string {
+  return row.kind === 'elim' ? 'cbd-row-elim' : ''
+}
+
+/** 占比：读时路径用后端百分数；已落库路径用 4 位小数比例换算；留空 / 合并数为 0 ⇒「—」 */
+function pctText(row: ConsolRowBreakdownItem): string {
+  if (!isBlank(row.pct)) return `${row.pct}%`
+  if (isBlank(row.ratio) || isBlank(row.amount)) return '—'
   try {
-    return new Decimal(v as Decimal.Value)
+    return `${new Decimal(row.ratio as string).times(100).toFixed(2)}%`
   } catch {
-    return null
+    return '—'
   }
 }
 
-/** 占比：amount / Σamount * 100，格式 xx.x%；Σ=0 → '-' */
-function formatPercentRow(row: BreakdownRow): string {
-  const total = totalAmount.value
-  if (total.isZero()) return '-'
-  const v = safeDecimal(row.amount)
-  if (!v) return '-'
-  const pct = v.dividedBy(total).times(100)
-  return `${pct.toFixed(1)}%`
+/** 可进入的项目：单体数据节点 → 单体报表；下级合并节点 → 其合并报表；差额户没有项目 */
+function jumpTarget(row: ConsolRowBreakdownItem): { path: string; query: Record<string, string> } | null {
+  const pid = row.source_project_id
+  if (!pid || row.kind === 'elim') return null
+  // 年度为空不带 year（原先 String(null) 带成 year=null）：目标页按项目审计年度口径
+  const yq: Record<string, string> = props.year == null ? {} : { year: String(props.year) }
+  if (row.kind === 'aggregate') return { path: `/projects/${pid}/consolidation`, query: { ...yq, tab: 'report' } }
+  return { path: `/projects/${pid}/reports`, query: yq }
 }
 
-async function handleOpen() {
-  await fetchBreakdown()
-}
-
-// 打开弹窗即拉取（watch modelValue=true 与 @open 双触发兜底）
 watch(
-  () => props.modelValue,
-  (open) => {
-    if (open) fetchBreakdown()
-  },
+  () => [props.modelValue, props.projectId, props.year, props.accountCode, props.nodeKey] as const,
+  ([open]) => { if (open) void fetchBreakdown() },
   { immediate: true },
 )
 
 async function fetchBreakdown() {
-  loading.value = true
-  rows.value = []
-  respMessage.value = ''
-  hasBreakdown.value = true
-  try {
-    const data = await api.get<BreakdownResponse>(endpoint.value)
-    hasBreakdown.value = data?.has_breakdown !== false
-    respMessage.value = data?.message ?? ''
-    if (hasBreakdown.value && Array.isArray(data?.by_company)) {
-      rows.value = data.by_company
-    }
-  } catch (e) {
-    // 报表级穿透依赖 Phase 2 端点：未就绪时（404 等）降级为友好空态，不崩溃
-    rows.value = []
-    respMessage.value = '报表合并明细端点尚未就绪（依赖 Phase 2）'
-  } finally {
+  const my = ++seq
+  data.value = null
+  failMessage.value = ''
+  const year = props.year
+  if (year == null) {
     loading.value = false
+    failMessage.value = MISSING_AUDIT_YEAR_MESSAGE
+    return
+  }
+  loading.value = true
+  try {
+    const res = await getConsolRowBreakdown(props.projectId, year, props.accountCode ?? '', props.nodeKey)
+    if (my === seq) data.value = res
+  } catch (e: any) {
+    if (my !== seq) return
+    const body = e?.response?.data
+    const detail = body?.detail ?? body?.message
+    failMessage.value = typeof detail === 'string' && detail ? `读取合并明细失败：${detail}` : '读取合并明细失败，请稍后重试'
+  } finally {
+    if (my === seq) loading.value = false
   }
 }
 
-/**
- * 行点击 → 跳转子公司单体报表，并纳入 Backspace 返回栈（T3）。
- * EH2（2.4）：跳转前做项目访问权限预检——子公司单体项目必须在当前用户可见的项目列表
- *   （后端 /api/projects 已按 require_project_access 过滤）内才允许跳转；无权则 ElMessage 提示不跳。
- *   projectStore.loadProjectOptions() 拉取的 projectOptions 即用户有权访问的项目集合，
- *   作为客户端预检数据源（无专用 canAccessProject helper，避免臆造不存在的 API）。
- */
-async function handleJump(row: BreakdownRow) {
-  // Task 1 by_company 行当前携带 company_code/company_name/amount，未必有 source_project_id。
-  const targetProjectId = row.source_project_id
-  emit('jump', {
-    source_project_id: targetProjectId ?? row.company_code,
-    row,
-  })
-
-  if (!targetProjectId) {
-    // 缺来源项目标识 → 无法定位子公司单体项目，仅 emit 不跳转
-    ElMessage.info('无法定位子公司项目（缺来源项目标识）')
+/** 进入下级项目（单体报表 / 下级合并报表），纳入 Backspace 返回栈；前端预检只用于提示，权限由目标页接口判定 */
+async function handleJump(row: ConsolRowBreakdownItem) {
+  emit('jump', { source_project_id: row.source_project_id ?? row.company_code, row })
+  const target = jumpTarget(row)
+  if (!target) {
+    ElMessage.info(row.kind === 'elim'
+      ? '差额户没有对应项目，本级抵销与调整分录请在合并页「差额分录」中查看'
+      : '该企业本年度没有对应项目，无法进入')
     return
   }
-
-  // EH2 权限预检：目标子公司项目须在当前用户可访问项目列表内
-  const canAccess = await checkProjectAccess(targetProjectId)
-  if (!canAccess) {
-    ElMessage.warning('无权访问该子公司项目')
+  if (!(await checkProjectAccess(row.source_project_id as string))) {
+    ElMessage.warning('无权访问该企业项目')
     return
   }
-
-  // 跳转前 push 当前路由到返回栈（镜像 usePenetrate._pushCurrentRoute，支持 Backspace 返回）
   const entry: NavigationEntry = {
     source_view: route.fullPath,
-    label: `合并明细 → ${row.company_name || row.company_code}`,
+    label: `合并明细 → ${rowLabel(row)}`,
     direction: 'down',
     scroll_position: window.scrollY,
   }
   navPush(entry)
-
-  router.push({ path: `/projects/${targetProjectId}/reports`, query: { year: String(props.year) } })
-
-  // 跳转后关闭弹窗
+  router.push(target)
   emit('update:modelValue', false)
 }
 
-/**
- * EH2 客户端权限预检：目标项目是否在当前用户可访问项目列表内。
- * - 先确保 projectOptions 已加载（loadProjectOptions 幂等，已加载则直接返回）
- * - 命中列表 → 有权；列表为空（加载失败/未就绪）时不误拦，交由后端路由层 require_project_access 兜底
- */
 async function checkProjectAccess(targetProjectId: string): Promise<boolean> {
   try {
     await projectStore.loadProjectOptions()
   } catch {
-    // 项目列表拉取失败：不做前端硬拦截，放行交后端权限兜底（避免误伤）
     return true
   }
-  const options = projectStore.projectOptions
-  if (!Array.isArray(options) || options.length === 0) return true
-  return options.some((p) => p.id === targetProjectId)
+  return projectVisibleInOptions(projectStore.projectOptions, targetProjectId)
 }
 </script>
 
 <style scoped>
-.consol-breakdown-table {
-  width: 100%;
-}
-
+.consol-breakdown-table { width: 100%; }
+.consol-breakdown-table :deep(.cbd-row-elim td) { background: var(--el-color-warning-light-9); }
+.cbd-meta { margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
+.cbd-note { margin-bottom: 8px; }
+.cbd-link { color: var(--gt-color-primary); cursor: pointer; }
+.cbd-link:hover { text-decoration: underline; }
+.cbd-blank { color: var(--gt-color-text-placeholder); cursor: help; }
+.cbd-elim { margin-right: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 400; color: var(--gt-color-text-secondary); }
 .consol-breakdown-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--gt-color-border, #ebeef5);
-  font-weight: 600;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gt-color-border, #ebeef5); font-weight: 600;
 }
-
-.consol-breakdown-footer__label {
-  color: var(--gt-color-text-regular, #606266);
-}
+.consol-breakdown-footer__label { color: var(--gt-color-text-regular, #606266); }
 </style>

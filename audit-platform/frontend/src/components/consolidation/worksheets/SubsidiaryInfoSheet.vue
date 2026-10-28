@@ -15,8 +15,8 @@
         <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="triggerImport">📤 导入Excel</el-button>
         <span class="ws-btn-sep"></span>
-        <el-button size="small" type="primary" @click="addRow">+ 新增子企业</el-button>
-        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
+        <el-button v-if="!locked" size="small" type="primary" data-testid="info-add-row" @click="addRow">+ 新增子企业</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" data-testid="info-batch-delete" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
         <span class="ws-btn-sep"></span>
@@ -25,29 +25,36 @@
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
       <el-icon :size="14" style="color: var(--gt-color-wheat);flex-shrink:0;margin-top:1px"><WarningFilled /></el-icon>
-      <span>填写"持股比例变动"为<b>是</b>并设置<b>变动次数（1~3）</b>后，将自动弹出对应的股比变动明细表。核算科目决定投资明细归属哪张表。支持导出模板填写后导入，导入时自动读取<b>"数据填写"</b>工作表，请勿修改sheet名称。</span>
+      <span v-if="locked" data-testid="info-tree-tip">企业清单按<b>企业树</b>自动带出：企业名称、企业代码、上级单位代码、最终控制方取自各项目的三个企业代码，这里只读（要调整请改项目的上级单位或在「合并」总览拖拽）；持股类型、间接持股方按企业树预填，可改；其余字段按企业代码保留填写值。企业树里已没有的企业标「已不在企业树中」，可勾选删除。导入 Excel 按企业代码只更新可编辑字段。</span>
+      <span v-else>填写"持股比例变动"为<b>是</b>并设置<b>变动次数（1~3）</b>后，将自动弹出对应的股比变动明细表。核算科目决定投资明细归属哪张表。支持导出模板填写后导入，导入时自动读取<b>"数据填写"</b>工作表，请勿修改sheet名称。</span>
     </div>
 
     <el-table ref="tableRef" :data="rows" border size="small" class="ws-table"
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       @selection-change="onSelectionChange">
-      <!-- 多选 -->
-      <el-table-column type="selection" width="36" fixed align="center" />
+      <!-- 多选（企业树锁定时只能勾选已不在企业树中的行） -->
+      <el-table-column type="selection" width="36" fixed align="center" :selectable="canSelect" />
       <!-- 序号 -->
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
 
       <!-- 企业名称 -->
       <el-table-column prop="company_name" label="子企业名称" min-width="160" fixed>
         <template #default="{ row }">
-          <el-input v-model="row.company_name" size="small" placeholder="输入企业名称" />
+          <template v-if="locked">
+            <span class="ws-tree-text">{{ row.company_name || '—' }}</span>
+            <el-tag v-if="!inTree(row)" size="small" type="warning" effect="plain" class="ws-not-in-tree"
+              data-testid="info-not-in-tree">已不在企业树中</el-tag>
+          </template>
+          <el-input v-else v-model="row.company_name" size="small" placeholder="输入企业名称" />
         </template>
       </el-table-column>
 
       <!-- 企业代码 -->
       <el-table-column prop="company_code" label="企业代码" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.company_code" size="small" />
+          <span v-if="locked" class="ws-tree-text">{{ row.company_code || '—' }}</span>
+          <el-input v-else v-model="row.company_code" size="small" />
         </template>
       </el-table-column>
 
@@ -57,7 +64,8 @@
           <span>上级单位代码<br/><small style="color: var(--gt-color-text-tertiary)">（构建树形）</small></span>
         </template>
         <template #default="{ row }">
-          <div @click.stop @mousedown.stop>
+          <span v-if="locked" class="ws-tree-text">{{ row.parent_code || '—' }}</span>
+          <div v-else @click.stop @mousedown.stop>
             <el-select v-model="row.parent_code" size="small" style="width:100%" placeholder="选择上级" filterable clearable>
               <el-option v-for="c in getOtherCompaniesWithCode(row)" :key="c.code" :label="`${c.name} (${c.code})`" :value="c.code" />
             </el-select>
@@ -68,14 +76,16 @@
       <!-- 最终控制方 -->
       <el-table-column prop="ultimate_controller" label="最终控制方" width="130">
         <template #default="{ row }">
-          <el-input v-model="row.ultimate_controller" size="small" placeholder="如 集团公司" />
+          <span v-if="locked" class="ws-tree-text">{{ row.ultimate_controller || '—' }}</span>
+          <el-input v-else v-model="row.ultimate_controller" size="small" placeholder="如 集团公司" />
         </template>
       </el-table-column>
 
       <!-- 最终控制方代码 -->
       <el-table-column prop="ultimate_controller_code" label="控制方代码" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.ultimate_controller_code" size="small" placeholder="如 ROOT" />
+          <span v-if="locked" class="ws-tree-text">{{ row.ultimate_controller_code || '—' }}</span>
+          <el-input v-else v-model="row.ultimate_controller_code" size="small" placeholder="如 ROOT" />
         </template>
       </el-table-column>
 
@@ -319,7 +329,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
@@ -327,6 +337,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { fmtAmount, fmtPercent } from '@/utils/formatters'
 import { useExcelIO } from '@/composables/useExcelIO'
 import ExcelImportPreviewDialog from '@/components/common/ExcelImportPreviewDialog.vue'
+import { mergeImportedInfoRows } from '@/components/consolidation/composables/consolSubsidiaryInfo'
 
 interface SubsidiaryInfoRow {
   company_name: string
@@ -358,9 +369,24 @@ interface SubsidiaryInfoRow {
   post_disposal_times: number | null
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: SubsidiaryInfoRow[]
-}>()
+  /**
+   * 企业树中的企业代码（spec consol-autotree-linkage-closure R4）：传入即锁定模式 ——
+   * 名称 / 代码 / 上级 / 最终控制方只读、不能新增、只能删已不在企业树中的行、导入按企业代码只更新可编辑字段；
+   * null = 企业树不可用，保持手工维护。
+   */
+  treeCodes?: string[] | null
+}>(), { treeCodes: null })
+
+const locked = computed(() => Array.isArray(props.treeCodes))
+const treeCodeSet = computed(() => new Set((props.treeCodes || []).map((c) => String(c).trim())))
+function inTree(row: SubsidiaryInfoRow): boolean {
+  return treeCodeSet.value.has(String(row.company_code || '').trim())
+}
+function canSelect(row: SubsidiaryInfoRow): boolean {
+  return !locked.value || !inTree(row)
+}
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: SubsidiaryInfoRow[]): void
@@ -433,7 +459,8 @@ async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
     await confirmBatch('删除', selectedRows.value.length)
-    const toDelete = new Set(selectedRows.value)
+    // 企业树锁定时只删已不在企业树中的行（勾选框已限制，这里再兜一次）
+    const toDelete = new Set(selectedRows.value.filter(canSelect))
     rows.value = rows.value.filter(r => !toDelete.has(r))
     selectedRows.value = []
   } catch { /* cancelled */ }
@@ -486,7 +513,11 @@ const TEMPLATE_COLS = [
 const EXPECTED_IMPORT_COLS = TEMPLATE_COLS.map(c => c.header)
 
 // 导入提示文字
-const importAlertText = '请使用\u201c导出模板\u201d下载的模板填写数据。系统将自动读取<b>\u201c数据填写\u201d</b>工作表（请勿修改sheet名称），数据从第4行开始。导入将<b>追加</b>到现有数据后面，示例行自动跳过。'
+const importAlertText = computed(() => (locked.value
+  ? '请使用\u201c导出模板\u201d下载的模板填写数据。系统将自动读取<b>\u201c数据填写\u201d</b>工作表（请勿修改sheet名称），数据从第4行开始。导入按<b>企业代码</b>只更新企业树中已有企业的可编辑字段，企业名称、代码、上级与最终控制方以企业树为准；表中找不到的企业代码会列出并跳过，示例行自动跳过。'
+  : '请使用\u201c导出模板\u201d下载的模板填写数据。系统将自动读取<b>\u201c数据填写\u201d</b>工作表（请勿修改sheet名称），数据从第4行开始。导入将<b>追加</b>到现有数据后面，示例行自动跳过。'))
+/** 锁定模式导入时更新的字段：模板里有的列（树带出的五列由合并函数排除） */
+const IMPORT_KEYS = TEMPLATE_COLS.map(c => c.key)
 
 const { exportTemplate: _exportTemplate, exportData: _exportData } = useExcelIO()
 
@@ -571,6 +602,27 @@ function onImportConfirm(data: Record<string, any>[]) {
     post_disposal_times: null,
   }))
 
+  if (locked.value) {
+    // 企业树锁定：按企业代码只更新可编辑字段、只更新 Excel 里填了的格，不新增行（R4.3）
+    const provided = data.map((raw, i) => {
+      const out: Record<string, unknown> = { company_code: parsed[i].company_code, company_name: parsed[i].company_name }
+      for (const c of TEMPLATE_COLS) {
+        const cell = raw[c.header]
+        if (cell !== undefined && cell !== null && String(cell).trim() !== '') out[c.key] = (parsed[i] as unknown as Record<string, unknown>)[c.key]
+      }
+      return out
+    })
+    const merged = mergeImportedInfoRows(rows.value, provided, IMPORT_KEYS)
+    rows.value = merged.rows
+    if (merged.unmatched.length) {
+      const shown = merged.unmatched.slice(0, 10).join('、')
+      const more = merged.unmatched.length > 10 ? ` 等 ${merged.unmatched.length} 行` : ''
+      ElMessage.warning(`已按企业代码更新 ${merged.updated} 家；以下行在表中找不到对应企业，已跳过：${shown}${more}`)
+    } else {
+      ElMessage.success(`已按企业代码更新 ${merged.updated} 家`)
+    }
+    return
+  }
   // 追加到现有数据（去掉空行）
   const nonEmpty = rows.value.filter(r => r.company_name)
   rows.value = [...nonEmpty, ...parsed]
@@ -604,4 +656,6 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
 .ws-table :deep(.el-input-number .el-input__inner) { text-align: right; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-btn-sep { width: 1px; height: 18px; background: var(--gt-color-border-light); margin: 0 2px; flex-shrink: 0; }
+.ws-tree-text { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-primary); }
+.ws-not-in-tree { margin-left: 4px; }
 </style>

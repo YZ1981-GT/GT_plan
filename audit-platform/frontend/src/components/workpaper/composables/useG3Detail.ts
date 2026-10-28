@@ -298,7 +298,7 @@ export type G3DetailTotals = Record<(typeof SUM_FIELDS)[number], number>
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function emptyRow(id: string, seq: number): DividendDetailRow {
+export function emptyRow(id: string, seq: number): DividendDetailRow {
   return {
     id,
     seq,
@@ -350,7 +350,7 @@ function emptyRow(id: string, seq: number): DividendDetailRow {
  *   AA = Q+U+V      AB = R+W+Y      AC = S+X+Z
  *   AE = M-AA       AF = P-AD
  */
-function enrich(r: DividendDetailRow): DividendDetailRow {
+export function enrich(r: DividendDetailRow): DividendDetailRow {
   // ── 受管公式列 ──
   const C = parseNum(r.bvUnauditedOpening)
   const D = parseNum(r.bvUnauditedIncrease)

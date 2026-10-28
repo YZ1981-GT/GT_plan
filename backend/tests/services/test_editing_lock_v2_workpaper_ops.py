@@ -27,6 +27,7 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
 # 确保所有模型注册（含 users 等被 FK 引用的表）
 import app.models  # noqa: F401
+from tests._editing_lock_helpers import lock_targets_visible  # noqa: F401  锁语义用例：资源判定放行（鉴权另见 test_editing_lock_authz_pg.py）
 from app.models.base import Base
 from app.models.editing_lock_models import EditingLock
 

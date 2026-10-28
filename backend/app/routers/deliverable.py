@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import async_session, get_db
 import sqlalchemy as sa
-from app.deps import assert_project_permission, get_current_user
+from app.deps import assert_project_permission, get_current_user, require_project_audit_year
 from app.services.eqcr_resolver import is_project_eqcr
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus, ExportJobItem
@@ -1235,7 +1235,7 @@ async def retry_trio_job(
     # 获取当前 readiness snapshot digest 用于一致性校验
     readiness_svc = DeliverableReadinessService()
     readiness = await readiness_svc.check(
-        db, project_id, job.year or 2024, include_file_checks=False,
+        db, project_id, await require_project_audit_year(db, project_id, job.year), include_file_checks=False,
     )
     current_digest = readiness.snapshot.get("digest")
 
@@ -1267,7 +1267,7 @@ async def retry_trio_job(
                 return task_id
             raise ValueError(f"未知步骤: {step_key}")
 
-    runner = _RetryStepRunner(executor, project_id, job.year or 2024, current_user.id)
+    runner = _RetryStepRunner(executor, project_id, await require_project_audit_year(db, project_id, job.year), current_user.id)
 
     try:
         result = await job_svc.retry_failed_trio(

@@ -396,7 +396,7 @@
         "transport_key_shape": "H4-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L186",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": true,
         "row_identity_positional_defect": "🔴 与 H2 同型：载入/新增路径的身份是生成串，但四表种子是位置化的 —— `composables/h4DetailPrefill.ts#L50` 的 `buildH4DetailSeedRows()` 把 `detail_prefill` 逐项映射成 `rowId: \\`seed-${idx}\\``，宿主 `GtH4EngineeringMaterials.vue#L384` 把它写进 primary managed table 的真实键 `H4-2-rows`。已登记 BP-6，本任务不改。",
@@ -539,14 +539,14 @@
         "shape": "json_array_of_row_objects",
         "transport_key_kind": "composite_prefix_plus_table_role",
         "transport_key_shape": "`${ITEM_PREFIX}-rows` ⇒ H5-2-rows（同族还有 `${ITEM_PREFIX}-audit-note` / `-audit-conclusion`）",
-        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53(ITEM_PREFIX) / #L90(读) / #L190(写)",
+        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53(ITEM_PREFIX) / #L130(读) / #L205(写)",
         "transport_key_composition_note": "🔴 本 entry 的键不是字面量常量，而是由模块级前缀常量 `ITEM_PREFIX = 'H5-2'` 拼出 `${ITEM_PREFIX}-rows`。契约里若按字面量 'H5-2-rows' 声明也对，但守卫必须去源码里找**拼接式**（`${ITEM_PREFIX}-rows`），按字面量 grep 会在 useH5Detail.ts 里找不到而假红。",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L181",
         "row_identity_generator_form": "`row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`（新增）/ `row-${Math.random().toString(36).slice(2, 10)}`（载入回填，#L108）",
         "row_identity_is_positional": false,
-        "row_identity_note": "另有一个**固定**身份 `rowId: 'subtotal'`（useH5Detail.ts#L139，合计行，派生只读不落库）。契约里必须把它排除在业务行之外，否则 roundtrip 会把合计行当成一条可编辑明细行推回 OO。",
+        "row_identity_note": "另有一个**固定**身份 `rowId: 'subtotal'`（useH5Detail.ts#L154，合计行，派生只读不落库）。契约里必须把它排除在业务行之外，否则 roundtrip 会把合计行当成一条可编辑明细行推回 OO。",
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -687,10 +687,10 @@
         "transport_key_shape": "H6-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L266",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
-        "row_identity_note": "载入路径同行还有 `seq: raw.seq ?? idx + 1`（useH6Detail.ts#L295），那是展示序号不是身份 —— 与 H3 同型，判据只取 `rowId:` 自己的值表达式。",
+        "row_identity_note": "载入路径同行还有 `seq: raw.seq ?? idx + 1`（useH6Detail.ts#L267），那是展示序号不是身份 —— 与 H3 同型，判据只取 `rowId:` 自己的值表达式。",
         "forbidden_row_identity_kinds": [
           "array_index",
           "ordinal",
@@ -1197,7 +1197,7 @@
         "transport_key_shape": "H9-2-rows",
         "row_identity_key": "rowId",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L149",
         "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -1470,32 +1470,32 @@
       },
       {
         "name": "H2 在建工程.xlsx",
-        "size": 162616,
-        "sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe",
-        "normalized_structure_hash": "15f530571527da67d6770cb838536866840ca329d59427ce0995542afa04ebdb",
+        "size": 135886,
+        "sha256": "789aa85c2bef4ba201aa1d11a2c014029658ac492619dbd5ea26a1774212e6f5",
+        "normalized_structure_hash": "3ee3bcc817b0a6dc036a66176bfdf9a3e4eb4f176493f44e038a25af7df25465",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h2-construction-in-progress"
       },
       {
         "name": "H3 投资性房地产.xlsx",
-        "size": 146096,
-        "sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038",
-        "normalized_structure_hash": "ec73d52b8f62ca399cf0d6da77003f15016807aee5af5c10ea711d6fe071934a",
+        "size": 122614,
+        "sha256": "a103d407b20608eb349dc1234f440c1e3f158a39913a304e5494f0c0f056013c",
+        "normalized_structure_hash": "fc074951ce4c1e40672473d8234ba326accf3d91abed82f8910b3a9d9742d889",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h3-investment-property"
       },
       {
         "name": "H4 工程物资.xlsx",
-        "size": 112937,
-        "sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc",
+        "size": 97345,
+        "sha256": "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84",
         "normalized_structure_hash": "b13f5dffb20cf69c448d972ce4b3ee8b86b11963a8945585209ce38dd7ffde41",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h4-engineering-materials"
       },
       {
         "name": "H5 油气资产.xlsx",
-        "size": 195306,
-        "sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905",
+        "size": 169576,
+        "sha256": "4fc5ec55eba9418d5651398da617fa666f0b0719799cf1e802f52c55a62e5612",
         "normalized_structure_hash": "71b583cfa669b39eb083660ce3a1320c798c9ef70f9ce6932d0dcc1803d8b238",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h5-oil-gas-assets"
@@ -1510,17 +1510,17 @@
       },
       {
         "name": "H7 生产性生物资产.xlsx",
-        "size": 225641,
-        "sha256": "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5",
+        "size": 194163,
+        "sha256": "109a0e4ba6d08da93fc727adac7473c4047f588253fd62c955db67804bf151ec",
         "normalized_structure_hash": "b145772e0d8c030ee96f0be215ba4d633636ff2948e5ce008cbad455ebfefb12",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h7-biological-assets"
       },
       {
         "name": "H8 使用权资产.xlsx",
-        "size": 465476,
-        "sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782",
-        "normalized_structure_hash": "84604d74008be9037587a8601410ef67f1576473545cad279408464edaa1add7",
+        "size": 419735,
+        "sha256": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9",
+        "normalized_structure_hash": "0bda5f024b5430ee84783d9a5264beb0603e123d90cc05af8073965c860f3012",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h8-right-of-use-assets"
       },
@@ -1789,7 +1789,7 @@
         "row_identity": {
           "kind": "generated_opaque_string_with_prefill_array_index_seed",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L186"
         }
       },
       {
@@ -1799,7 +1799,7 @@
         "row_identity": {
           "kind": "generated_opaque_string_with_fixed_subtotal_row",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L181"
         }
       },
       {
@@ -1809,7 +1809,7 @@
         "row_identity": {
           "kind": "generated_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L266"
         }
       },
       {
@@ -1839,7 +1839,7 @@
         "row_identity": {
           "kind": "generated_opaque_string",
           "identity_field": "rowId",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L149"
         }
       },
       {
@@ -1922,7 +1922,7 @@
         "must_not_be_flagged": [
           "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L142(seq: raw.seq ?? idx + 1)",
           "audit-platform/frontend/src/components/workpaper/composables/useH3DetailFair.ts#L111(seq: raw.seq ?? idx + 1)",
-          "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L295(seq: raw.seq ?? idx + 1)"
+          "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L267(seq: raw.seq ?? idx + 1)"
         ],
         "how": "判据只取身份字段自己的值表达式（到同层逗号止），不看整行。"
       }

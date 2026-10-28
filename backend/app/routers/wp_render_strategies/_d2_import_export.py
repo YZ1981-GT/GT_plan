@@ -97,10 +97,13 @@ SHEET_COLUMNS: dict[str, list[str]] = {
     'D2-5': [
         'item_id', '值',
     ],
+    # D2-6 / D2-11 / D2-12 / D2-13：表单按模板补的列（spec oo-writeback-template-parity-closure R3 批 B2b）
+    # 一并进导入导出；导入只拒未知列、不要求列齐 ⇒ 旧文件缺这些列照常导入
     'D2-6': [
         '序号', '关联方名称', '关系', '期初余额',
         '借方发生', '贷方发生', '期末余额', '坏账准备',
-        '账面价值', '交易内容', '定价政策', '备注',
+        '账面价值', '交易内容', '定价政策',
+        '发生时间及账龄', '期后回款', '索引号', '备注',
     ],
     'D2-7': [
         '序号', '客户名称', '日期', '凭证编号', '业务内容',
@@ -125,16 +128,18 @@ SHEET_COLUMNS: dict[str, list[str]] = {
     ],
     'D2-11': [
         '序号', '类别', '单位名称', '原因', '方式',
-        '金额', '原累计已计提', '合理性分析', '备注',
+        '金额', '原累计已计提',
+        '收回方式', '原确定坏账准备的依据', '应收账款性质', '是否由关联交易产生',
+        '合理性分析', '备注',
     ],
     'D2-12': [
-        '序号', '类别', '客户名称', '金额', '对手方',
+        '序号', '类别', '客户名称', '期末余额', '金额', '对手方',
         '合同编号', '起始日期', '到期日期', '风险转移',
-        '控制保留', '终止确认', '备注',
+        '控制保留', '终止确认', '质押条件', '质押协议', '备注',
     ],
     'D2-13': [
         '记录类型', '问题ID/行ID', '问题', '回答', '说明',
-        '组合名称', '业务模式', 'SPPI结果', '计量基础', '备注',
+        '组合名称', '业务模式', '具体依据', '索引号', 'SPPI结果', '计量基础', '备注',
     ],
 }
 
@@ -781,6 +786,9 @@ def _parse_d2_6_rows(rows: list[dict]) -> list[dict]:
             'endBalance': end_bal,
             'badDebtProvision': bad_debt,
             'bookValue': book_val,
+            'agingPeriod': safe_str(r.get('发生时间及账龄')),
+            'postPayment': safe_float(r.get('期后回款')),
+            'indexRef': safe_str(r.get('索引号')),
             'isArmsLength': safe_str(r.get('定价政策')),
             'remark': safe_str(r.get('备注')),
         })
@@ -805,6 +813,11 @@ def _parse_d2_11_by_section(rows: list[dict]) -> dict[str, list[dict]]:
             'isReasonable': safe_str(r.get('合理性分析')),
             'auditorComment': safe_str(r.get('备注')),
             'indexRef': safe_str(r.get('序号')) or str(i),
+            'cumulativeProvision': safe_float(r.get('原累计已计提')),
+            'recoveryMethod': safe_str(r.get('收回方式')),
+            'originalBasis': safe_str(r.get('原确定坏账准备的依据')),
+            'receivableType': safe_str(r.get('应收账款性质')),
+            'isRelatedParty': safe_str(r.get('是否由关联交易产生')),
         })
     return {
         D2_11_ITEM_IDS['reversal']: buckets['reversal'],
@@ -822,11 +835,14 @@ def _parse_d2_12_by_type(rows: list[dict]) -> dict[str, list[dict]]:
             pledge_rows.append({
                 'rowId': str(uuid4()),
                 'debtorName': safe_str(r.get('客户名称')),
+                'endBalance': safe_float(r.get('期末余额')),
                 'pledgeAmount': safe_float(r.get('金额')),
                 'pledgeDate': safe_str(r.get('起始日期')),
                 'pledgee': safe_str(r.get('对手方')),
                 'pledgePurpose': safe_str(r.get('合同编号')),
+                'pledgeCondition': safe_str(r.get('质押条件')),
                 'expiryDate': safe_str(r.get('到期日期')),
+                'pledgeAgreement': safe_str(r.get('质押协议')),
                 'status': '有效',
                 'remark': safe_str(r.get('备注')),
                 'indexRef': safe_str(r.get('序号')) or str(i),
@@ -1047,6 +1063,8 @@ def _parse_d2_13_rows(rows: list[dict]) -> dict[str, list[dict]]:
                 'rowId': key or str(uuid4()),
                 'groupName': safe_str(r.get('组合名称')),
                 'bizModel': safe_str(r.get('业务模式')),
+                'basis': safe_str(r.get('具体依据')),
+                'indexRef': safe_str(r.get('索引号')),
                 'sppiResult': safe_str(r.get('SPPI结果')),
                 'measurementBasis': safe_str(r.get('计量基础')),
                 'remark': safe_str(r.get('备注')),
@@ -1215,6 +1233,7 @@ def _export_row_values(sheet: str, row: dict) -> list[Any]:
             row.get('creditAmount', ''), row.get('endBalance', ''),
             row.get('badDebtProvision', ''), row.get('bookValue', ''),
             row.get('transactionType', ''), row.get('isArmsLength', ''),
+            row.get('agingPeriod', ''), row.get('postPayment', ''), row.get('indexRef', ''),
             row.get('remark', ''),
         ]
     if sheet == 'D2-11':
@@ -1222,23 +1241,27 @@ def _export_row_values(sheet: str, row: dict) -> list[Any]:
             row.get('indexRef', ''), row.get('_exportSection', ''),
             row.get('debtorName', ''), row.get('reason', ''),
             row.get('approvalDoc', ''), row.get('amount', ''),
-            '', row.get('isReasonable', ''), row.get('auditorComment', ''),
+            row.get('cumulativeProvision', ''),
+            row.get('recoveryMethod', ''), row.get('originalBasis', ''),
+            row.get('receivableType', ''), row.get('isRelatedParty', ''),
+            row.get('isReasonable', ''), row.get('auditorComment', ''),
         ]
     if sheet == 'D2-12':
         if row.get('_exportType') == '保理' or row.get('factoringAmount') is not None:
             return [
-                row.get('indexRef', ''), '保理', row.get('debtorName', ''),
+                row.get('indexRef', ''), '保理', row.get('debtorName', ''), '',
                 row.get('factoringAmount', ''), row.get('factor', ''),
                 '', row.get('factoringDate', ''), row.get('expiryDate', ''),
                 '是' if row.get('riskTransferred') else '否',
                 '是' if row.get('controlRetained') else '否',
-                row.get('derecognition', ''), row.get('remark', ''),
+                row.get('derecognition', ''), '', '', row.get('remark', ''),
             ]
         return [
-            row.get('indexRef', ''), '质押', row.get('debtorName', ''),
+            row.get('indexRef', ''), '质押', row.get('debtorName', ''), row.get('endBalance', ''),
             row.get('pledgeAmount', ''), row.get('pledgee', ''),
             row.get('pledgePurpose', ''), row.get('pledgeDate', ''),
-            row.get('expiryDate', ''), '', '', '', row.get('remark', ''),
+            row.get('expiryDate', ''), '', '', '',
+            row.get('pledgeCondition', ''), row.get('pledgeAgreement', ''), row.get('remark', ''),
         ]
     if sheet == 'D2-8':
         t = row.get('_exportType', '')
@@ -1265,11 +1288,12 @@ def _export_row_values(sheet: str, row: dict) -> list[Any]:
         if t == 'judgment':
             return [
                 'judgment', row.get('questionId', ''), row.get('question', ''), row.get('answer', ''),
-                row.get('explanation', ''), '', '', '', '', '',
+                row.get('explanation', ''), '', '', '', '', '', '', '',
             ]
         return [
             'group', row.get('rowId', ''), '', '', '',
-            row.get('groupName', ''), row.get('bizModel', ''), row.get('sppiResult', ''),
+            row.get('groupName', ''), row.get('bizModel', ''),
+            row.get('basis', ''), row.get('indexRef', ''), row.get('sppiResult', ''),
             row.get('measurementBasis', ''), row.get('remark', ''),
         ]
     return list(row.values())

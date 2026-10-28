@@ -251,7 +251,9 @@ export function buildFinanceLeaseAmortization(opts: {
   const rent = Number(opts.annualRent) || 0
   const residual = Number(opts.unguaranteedResidual) || 0
   const n = Math.max(0, Math.min(40, Math.floor(Number(opts.periodCount) || 0)))
-  const startYear = opts.startYear ?? new Date().getFullYear()
+  // 起始年度只用来标「日期」列：起租日没填时日期留空、金额照算 —— 不按今年猜，也不能丢掉整张分配表
+  // （调用方用首期 / 末期取本期融资收入、本金收回、期末余额）
+  const startYear = opts.startYear
   let balance = Number(opts.openingNetInvestment) || 0
   const rows: FinanceLeaseAmortPeriod[] = []
   for (let i = 0; i < n; i++) {
@@ -261,7 +263,7 @@ export function buildFinanceLeaseAmortization(opts: {
     const netBalance = Math.round((balance - netDecrease) * 100) / 100
     rows.push({
       periodNo: i + 1,
-      date: `${startYear + i}-12-31`,
+      date: startYear != null ? `${startYear + i}-12-31` : '',
       rent: cashIn,
       financeIncome,
       netDecrease,

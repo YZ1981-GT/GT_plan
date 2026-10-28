@@ -192,92 +192,82 @@ class TestG1rP9BooleanCheckColumns:
 #   Validates: Requirements 3.5
 # ════════════════════════════════════════════════════════════════════════════
 class TestG1rP12G8RowLevelMask:
-    def test_g8_is_three_segments_not_two(self) -> None:
-        """🔴 发现 B：spec 裁决 G1R-H3 默认拆两段（`r11` + `r12plus`=R12-20），实测**三段**。
+    """G8-2 行级 mask：修模板前三段（R11 / R12 / R13+），修后逐行同形只剩一段。
 
-        R12 与 R13-20 在三处不同（`R`/`T` 列归属 · `M` 区间 · `P` 公式）⇒ 不能同段。
-        """
+    修模板前（发现 B）三处逐行差异：`R` 只在 R11/R12 有公式 · `T` 在 R12 无公式 ·
+    `M` 只有 R11 含 L · `P` 只有 R12 含 K。`oo-writeback-template-parity-closure` R1 按同表
+    其余行把模板统一为 `M=SUM(I:K)` / `P=D+J+K` / `R=F+J+L` / `T=Q+S`。判据随之翻面：
+    逐行同形 + 回退变异必须被识别出来。
+    """
+
+    def test_g8_is_a_single_segment_after_the_template_fix(self) -> None:
         segs = EXPECTED["G8"]["row_segments"]
-        assert [n for n, _r, _c in segs] == ["r11", "r12", "r13plus"], (
-            f"G8 分段实得 {[n for n, _r, _c in segs]}"
-        )
-        by = {n: (rows, cols) for n, rows, cols in segs}
-        assert by["r11"][0] == (11,)
-        assert by["r12"][0] == (12,)
-        assert by["r13plus"][0] == tuple(range(13, 21))
+        assert [n for n, _r, _c in segs] == ["main"], f"G8 分段实得 {[n for n, _r, _c in segs]}"
+        assert segs[0][1] == tuple(range(11, 21))
 
-    def test_g8_three_segments_column_sets_are_pairwise_distinct(self, sheets) -> None:
-        """A 类：三段列集两两不等，且与模板逐行实测一致（R13~R20 八行同型是三段论的关键）。"""
+    def test_g8_every_data_row_has_the_same_formula_columns(self, sheets) -> None:
+        """A 类：R11~R20 十行公式列集合逐行等于声明（任何一行回退都会在这里红）。"""
         ws = sheets["G8"]
-        by = {n: (rows, cols) for n, rows, cols in EXPECTED["G8"]["row_segments"]}
-        assert set(by["r11"][1]) != set(by["r12"][1])
-        assert set(by["r12"][1]) != set(by["r13plus"][1])
-        assert set(by["r11"][1]) != set(by["r13plus"][1])
-        for name, (rows, cols) in by.items():
+        (_name, rows, cols), = EXPECTED["G8"]["row_segments"]
+        for r in rows:
+            assert _formula_cols(ws, r) == cols, (
+                f"G8 R{r} 公式列实得 {_formula_cols(ws, r)}，期望 {cols}"
+            )
+
+    #: 修正后逐行公式（`{r}` 为行号）：M 不含 L（OCI 转留存收益是权益内部结转，不进投资账面）、
+    #: P 含 K（处置结转从累计公允价值变动转出）、R / T 每行都有公式（判 formula 的前提）。
+    _FIXED_ROW_FORMULAS = {
+        "M": "=SUM(I{r}:K{r})",
+        "P": "=D{r}+J{r}+K{r}",
+        "R": "=F{r}+J{r}+L{r}",
+        "T": "=Q{r}+S{r}",
+    }
+
+    @classmethod
+    def _cells_off_template(cls, ws, row: int) -> list[str]:
+        """该行与修正后公式不符的格（空列表 = 全符）。"""
+        return [
+            f"{col}{row}={ws[f'{col}{row}'].value!r}"
+            for col, tpl in cls._FIXED_ROW_FORMULAS.items()
+            if ws[f"{col}{row}"].value != tpl.format(r=row)
+        ]
+
+    def test_g8_m_p_r_t_formula_text_is_uniform_on_every_row(self, sheets) -> None:
+        """A 类：M / P / R / T 四列逐行等于修正后的同形公式。"""
+        ws = sheets["G8"]
+        off = [c for r in range(11, 21) for c in self._cells_off_template(ws, r)]
+        assert not off, f"与修正后模板不符：{off}"
+
+    def test_mutation_reverting_one_row_is_detected(self, sheets) -> None:
+        """🔴 变异自检：把任一处改回修复前的形态，两条判据（公式列集合 / 公式文本）至少一条要报出。
+
+        R13 清空 R、R12 清空 T ⇒ 公式列集合变；R11 的 M 改回含 L、R11 的 P 改回漏 K ⇒ 公式列集合不变，
+        只能靠公式文本判据报出（所以两条判据缺一不可）。
+        """
+        from openpyxl import Workbook
+
+        src = sheets["G8"]
+        (_name, rows, cols), = EXPECTED["G8"]["row_segments"]
+
+        def mutated(cell: str, value):  # noqa: ANN001, ANN202
+            ws = Workbook().active
             for r in rows:
-                assert _formula_cols(ws, r) == cols, (
-                    f"G8 段 {name} 的 R{r} 公式列实得 {_formula_cols(ws, r)}，期望 {cols}"
-                )
+                for c in range(1, 24):
+                    ws.cell(row=r, column=c, value=src.cell(row=r, column=c).value)
+            ws[cell] = value
+            return ws
 
-    def test_g8_r_and_t_column_ownership_is_row_specific(self, sheets) -> None:
-        """A 类：`R` 列属 R11/R12（不属 R13+）· `T` 列属 R11/R13+（不属 R12）。
-
-        这两条是「不得用并集套全区」的直接理由：并集会把手填格标成 formula 并在 merge 时覆盖。
-        """
-        ws = sheets["G8"]
-        assert ws["R11"].value == "=F11+J11+L11"
-        assert ws["R12"].value == "=F12+J12+L12"
-        assert ws["R13"].value is None, "R13 的 R 列应无公式（手填）"
-        assert ws["T11"].value == "=Q11+S11"
-        assert ws["T12"].value is None, "R12 的 T 列应无公式（手填）"
-        assert ws["T13"].value == "=Q13+S13"
-
-    def test_g8_m_column_ranges_differ_by_row(self, sheets) -> None:
-        """A 类：`M` 列区间逐行不同 —— R11 含 L、R12/R13 不含。"""
-        ws = sheets["G8"]
-        assert ws["M11"].value == "=SUM(I11:L11)"
-        assert ws["M12"].value == "=SUM(I12:K12)"
-        assert ws["M13"].value == "=SUM(I13:K13)"
-
-    def test_g8_p_column_has_an_extra_term_only_on_r12(self, sheets) -> None:
-        """🔴 spec 未记的第三处差异：`P12` 多一项 `K12`（spec 只记了 M 区间与 R/T）。"""
-        ws = sheets["G8"]
-        assert ws["P11"].value == "=D11+J11"
-        assert ws["P12"].value == "=D12+J12+K12"
-        assert ws["P13"].value == "=D13+J13"
-
-    def test_mutation_union_of_all_rows_mislabels_手填格(self, sheets) -> None:
-        """🔴 变异自检①（并集）：用三段并集套全区 ⇒ R12 的 T、R13+ 的 R 被误标 formula。"""
-        by = {n: set(cols) for n, _r, cols in EXPECTED["G8"]["row_segments"]}
-        union = by["r11"] | by["r12"] | by["r13plus"]
-        assert union == {"E", "H", "M", "O", "P", "Q", "R", "T"}
-        mislabeled_on_r12 = union - by["r12"]
-        mislabeled_on_r13 = union - by["r13plus"]
-        assert mislabeled_on_r12 == {"T"}, f"并集在 R12 上多标的实得 {sorted(mislabeled_on_r12)}"
-        assert mislabeled_on_r13 == {"R"}, f"并集在 R13+ 上多标的实得 {sorted(mislabeled_on_r13)}"
-
-    def test_mutation_intersection_shrinks_the_editable_surface(self) -> None:
-        """🔴 变异自检②（交集）：取交集则 R12 的 R、R13+ 的 T 都不受管 ⇒ 可编辑面缩小。
-
-        两个变异一起证明：**只有三段拆分**能既不误标也不缩面（裁决 G1R-H3 的备选分支）。
-        """
-        by = {n: set(cols) for n, _r, cols in EXPECTED["G8"]["row_segments"]}
-        inter = by["r11"] & by["r12"] & by["r13plus"]
-        assert inter == {"E", "H", "M", "O", "P", "Q"}
-        assert by["r12"] - inter == {"R"}
-        assert by["r13plus"] - inter == {"T"}
-
-    def test_mutation_using_r11_columns_for_the_whole_region_breaks_m_range(self, sheets) -> None:
-        """🔴 变异自检③（spec 原文指定的那个变异）：用 R11 列集套全区 ⇒ R12 的 `M` 区间被误声明。
-
-        R11 的 M 含 L 列，若把 R11 的 mask 套到 R12，R12 的 `SUM(I12:K12)` 会被按 `SUM(I12:L12)`
-        归一 ⇒ 多加一列。本判据断言两式**确实不同**（即变异确实有害）。
-        """
-        ws = sheets["G8"]
-        assert ws["M11"].value != ws["M12"].value.replace("12", "11"), (
-            "R11 与 R12 的 M 公式在行号归一后必须仍不同（区间宽度差一列）"
-        )
-        assert "L11" in str(ws["M11"].value) and "L12" not in str(ws["M12"].value)
+        for cell in ("R13", "T12"):
+            row = int(cell[1:])
+            ws = mutated(cell, None)
+            assert _formula_cols(ws, row) != cols, f"清空 {cell} 后公式列集合仍等于声明 ⇒ 判据空转"
+            assert self._cells_off_template(ws, row), f"清空 {cell} 后公式文本判据未报出"
+        for cell, old in (("M11", "=SUM(I11:L11)"), ("P11", "=D11+J11")):
+            ws = mutated(cell, old)
+            assert _formula_cols(ws, 11) == cols
+            assert self._cells_off_template(ws, 11) == [f"{cell}={old!r}"], (
+                f"{cell} 改回 {old!r} 后公式文本判据未报出"
+            )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -300,9 +290,11 @@ class TestBClassG8AndBooleanDeclarationsNotYetDelivered:
            而 `excel_materialize` 写受保护格时要求 `view.has_formula` —— 判
            `mode=formula` 会抛 `ProtectedRegionWriteError`。这正是 P12 的硬根据。
 
-        ⇒ 正确形态 = **单 spec** + 逐行实测台账（`TEMPLATE_ROW_FORMULAS_G802` /
-        `TEMPLATE_ROW_DEFECTS_G802`）+ `R`/`T` 判 `editable`。
-        逐格复核在 `test_g8_column_isomorphism.py`（含 P12 专条）。
+        ⇒ 当时的正确形态 = **单 spec** + 逐行实测台账 + `R`/`T` 判 `editable`。
+
+        🔴 **2026-10-26 再改写**（`oo-writeback-template-parity-closure` R1）：模板已按同表其余行
+        逐行统一，行级差异不复存在 ⇒ 仍是单 spec、不伪造分段；逐行台账删除；`R`/`T` 改判
+        `formula`（模板每行都有公式，P12 的前提由 `test_g8_column_isomorphism.py` 逐格复核）。
         """
         import importlib
 
@@ -323,17 +315,14 @@ class TestBClassG8AndBooleanDeclarationsNotYetDelivered:
         assert spec.sheet_key == "g802-managed"
         # ① 不得靠伪造分段表达
         assert not spec.row_section_field, "G8 不得声明 row_section_field（伪造分段）"
-        # ② 行级差异必须以逐行台账的形式被表达出来（不是靠注释)
-        per_row = detail.TEMPLATE_ROW_FORMULAS_G802
-        assert {c for c, _r in per_row} == {"M", "P"}, "逐行台账应恰覆盖 M/P 两列"
-        assert len(per_row) == 20, f"M/P × 10 行 = 20 格，实得 {len(per_row)}"
-        defects = {c for c, _rows, _note in detail.TEMPLATE_ROW_DEFECTS_G802}
-        assert defects == {"M", "P", "R", "T"}, f"缺陷台账应覆盖四列，实得 {sorted(defects)}"
-        # ③ P12：R/T 不被误标 formula
+        # ② 模板逐行同形 ⇒ 每个公式列都由统一模板表表达，不再有逐行台账
+        assert set(spec.formula_columns) == set(detail.FORMULA_TEMPLATES_G802)
+        assert not hasattr(detail, "TEMPLATE_ROW_FORMULAS_G802")
+        assert not hasattr(detail, "TEMPLATE_ROW_DEFECTS_G802")
+        # ③ P12：R/T 判 formula（模板每行都有公式）
         modes = {f[1]: f[2] for f in detail.FIELD_SPECS_G802}
-        assert modes["R"] == "editable" and modes["T"] == "editable", (
-            "R/T 被误标 formula —— 模板那几格无公式，materialize 会抛 "
-            "ProtectedRegionWriteError（判据 P12）"
+        assert modes["R"] == "formula" and modes["T"] == "formula", (
+            f"R/T 应判 formula（模板 R11-R20 每行都有公式），实得 R={modes['R']} T={modes['T']}"
         )
 
     @pytest.mark.parametrize("code,col", [("G12", "G"), ("G13", "K"), ("G14", "L")])

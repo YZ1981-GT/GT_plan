@@ -75,7 +75,8 @@ const props = withDefaults(defineProps<{
   title?: string
   cycleCode?: CycleCode
   projectId?: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 不显示审定数悬浮（与未传同） */
+  year?: number | null
 }>(), { validate: true, preventNavigate: false, disabled: false })
 
 const emit = defineEmits<{ click: [resolved: ResolvedIndexRef] }>()

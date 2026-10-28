@@ -80,12 +80,14 @@ import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { formulaDebug } from '@/services/apiPaths/formula'
 import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 const props = defineProps<{
   /** 外部传入的公式文本（来自 FormulaEditDialog 的编辑区） */
   formula?: string
   projectId?: string
-  year?: number
+  /** 审计年度；项目没填为 null ⇒ 运行时在面板里提示去填 */
+  year?: number | null
   scope?: string
   /** 是否显示内置输入框（嵌入 FormulaEditDialog 时 = false，独立使用时 = true） */
   showInput?: boolean
@@ -108,7 +110,12 @@ const formula = computed(() => props.formula ?? localFormula.value)
 
 async function onRun() {
   const f = formula.value?.trim()
-  if (!f || !props.projectId || !props.year) return
+  if (!f || !props.projectId) return
+  if (props.year == null) {
+    // 项目没填审计年度：在面板里说明原因（原先静默不动，按钮像坏了）
+    result.value = { ok: false, state: 'error', errors: [MISSING_AUDIT_YEAR_MESSAGE], trace: [] }
+    return
+  }
 
   running.value = true
   result.value = null

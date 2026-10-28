@@ -32,6 +32,11 @@ export interface StandardChangePayload {
 /** 四栏切换 */
 export interface FourColSwitchPayload {
   tab?: string
+  /**
+   * 布局延迟转发给目录的那一次（目录可能刚随四栏模式挂载，第一次没收到）。
+   * 布局自己不再处理带此标记的事件 —— 否则它收到自己转发的事件又转发一次，每 150 ms 重发、永不停止。
+   */
+  _relayed?: boolean
 }
 
 /** 打开公式管理器 */
@@ -152,10 +157,19 @@ export interface ConsolRefreshEntityPayload {
   types: string[]
 }
 
-/** 合并一键刷新完成（通知各 tab 刷新缓存） */
+/** 合并一键刷新完成 / 企业树变化（通知各 tab 刷新缓存）；中栏重读企业树不依赖年度 ⇒ 年度未就绪时为 null */
 export interface ConsolRefreshDonePayload {
   projectId: string
-  year: number
+  year: number | null
+}
+
+/**
+ * 合并页当前节点（spec consol-autotree-linkage-closure R7.1）：合并页只保留布局中栏一棵企业树，
+ * 组织图 / 树形列表 / 试算页 / 差额表切换节点后由合并页广播，中栏据此同步高亮。
+ */
+export interface ConsolCurrentNodePayload {
+  projectId: string
+  nodeKey: string | null
 }
 
 /** 合并树汇总 */
@@ -407,6 +421,15 @@ export type Events = {
   'consol-note-audit-all': ConsolNoteAuditAllPayload
   /** 他人确认了合并附注明细映射 / 提升了映射模板（ConsolidationIndex 收 SSE 后转发，ConsolNoteTab 显示横幅） */
   'consol-note-mapping-changed': void
+  /** 合并页当前节点变化（中栏企业树同步高亮）；中栏挂载时发 request，合并页回一次当前值 */
+  'consol-current-node': ConsolCurrentNodePayload
+  'consol-current-node-request': void
+  /** 打开差额户的差额分录面板（中栏右键 / 上下文条「📝 差额分录」，差额户点击不再自动弹出） */
+  'consol-open-elim-panel': { nodeKey: string }
+  /** 中栏「重新推送」：由合并页统一排队推送（与过期横幅同一入口） */
+  'consol-request-push': void
+  /** 打开「企业树版本」弹窗 */
+  'consol-open-scope-confirm': void
 
   // 模板 & 地址注册表
   'template-applied': TemplateAppliedPayload
@@ -422,6 +445,8 @@ export type Events = {
   'sse:disconnect': { reason: string }
   /** 年度切换后重建 SSE 订阅。 */
   'sse:reconnect': { projectId: string; year: number }
+  /** 账表导入已提交：导入进度轮询立即查一次（没有任务时轮询降到 30 秒，见 useAdaptivePoll） */
+  'ledger-import:submitted': { projectId: string }
 
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload
@@ -700,13 +725,24 @@ export type Events = {
     timestamp: number
   }
 
-  // N5 所得税费用更新（当期/递延/有效税率）
+  // N4 税金及附加审定 → A 类利润表勾稽（发布方：useN4CrossSheet / useN4FormData）
+  'expense:taxes-surcharges-updated': {
+    wpCode: string
+    amount: number
+    details: Array<{ tax: string; amount: number }>
+    /** 旧发布方兼容字段；新消费方以 amount/details 为准 */
+    accountCode?: string
+    auditedAmount?: number
+    timestamp: number
+  }
+
+  // N5 所得税费用更新（当期/递延/有效税率；算不出有限值（如利润总额为 0）时为 null）
   'income-tax:updated': {
     wpCode: string
     currentTax: number
     deferredTax: number
     totalIncomeTax: number
-    effectiveTaxRate: number
+    effectiveTaxRate: number | null
     timestamp: number
   }
 
@@ -765,7 +801,9 @@ export type Events = {
   // D~N 附注刷新通知（主入口订阅 → selfLoad 重新加载数据）
   'disclosure:refresh': {
     wpCode?: string
-    timestamp: number
+    /** 触发来源（如 N3 调整分录页发 `adjustment`） */
+    source?: string
+    timestamp?: number
   } | void
 
   // 快捷键（shortcuts.ts 发出）

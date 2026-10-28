@@ -15,7 +15,8 @@ import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 interface ReviewPanelProps {
   projectId: string
   wpCodePrefix: string
-  year: number
+  /** 审计年度；项目没填为 null（批量复核时提示去填） */
+  year: number | null
 }
 
 const props = defineProps<ReviewPanelProps>()

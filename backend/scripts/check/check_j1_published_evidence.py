@@ -20,7 +20,14 @@ if str(BACKEND) not in sys.path:
 
 # spec 归档后仍能定位（active 优先、回退 _archive/**）。见 _spec_dir.py。
 # 本门要的是 evidence 产物（evidence/oo94.json），故 require 该子路径而非三件套。
-from _spec_dir import resolve_spec_dir  # noqa: E402
+# 直接跑脚本时 sys.path[0] 是本目录；被测试按包路径 import（scripts.check.*）时不是，
+# 原写法在收集期即 ModuleNotFoundError（整文件守卫一条不跑）⇒ 回退包路径，只吞「_spec_dir 本身找不到」。
+try:
+    from _spec_dir import resolve_spec_dir  # noqa: E402
+except ModuleNotFoundError as exc:
+    if exc.name != "_spec_dir":
+        raise
+    from scripts.check._spec_dir import resolve_spec_dir  # noqa: E402
 
 _J1_SPEC_DIR = resolve_spec_dir(
     "j1-post-publish-semantic-and-evidence-closure",

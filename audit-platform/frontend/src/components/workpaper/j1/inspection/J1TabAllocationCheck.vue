@@ -330,7 +330,11 @@ function mergePulledRows(pulled: J1AllocPullRow[]): { updated: number; added: nu
 
 async function pullFromLedger() {
   if (isReadonly.value) return
-  const year = Number(auditCtx.year?.value || new Date().getFullYear())
+  const year = auditCtx.year?.value
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法读取序时账')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `将从序时账拉取 ${year} 年度科目 2211（应付职工薪酬）的贷方发生额，按「薪酬项目 × 对方科目」聚合填入分配列与本期实际计提数。同名项目行的分配列会被覆盖，是否继续？`,

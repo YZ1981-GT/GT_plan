@@ -143,10 +143,10 @@ async def get_node_amounts(
     return payload
 
 
-async def _view_context(db: AsyncSession, project_id: UUID, year: int | None):
+async def _view_context(db: AsyncSession, project_id: UUID, year: int | None, *, include_drafts: bool = False):
     from app.services.consol_report_view_service import load_view_context
 
-    ctx = await load_view_context(db, project_id, year)
+    ctx = await load_view_context(db, project_id, year, include_drafts=include_drafts)
     if ctx is None:
         raise HTTPException(status_code=404, detail="项目不存在、不是合并项目，或无法确定审计年度")
     return ctx
@@ -160,7 +160,7 @@ def _view_error(err) -> HTTPException:
 async def get_report_trial(
     project_id: UUID = Query(...),
     report_type: str = Query("balance_sheet", description="报表类型"),
-    node_key: str | None = Query(None, description="汇总节点；不传取根合并节点"),
+    node_key: str | None = Query(None, description="企业树节点；不传取根合并节点"),
     year: int | None = Query(None, description="年度；不传取本项目审计年度"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
@@ -168,13 +168,16 @@ async def get_report_trial(
     """合并试算平衡表页（spec consol-elimination-single-source-push §五）：按报表行次的五列净额。
 
     审定汇总 / 权益抵销 / 往来交易抵销 / 报表调整 / 合并审定数，均为按科目自然方向归一后的净额；
-    与合并报表、报表差额表同一个求值函数，读时计算不写库。
+    与合并报表、报表差额表同一个求值函数，读时计算不写库。``node_key`` 可以是企业树任一节点。
+    另附「含草稿预览」列（已审批 + 草稿 + 待审批分录，不含已驳回；合并审定数仍只认已审批）、
+    节点类型（``node_kind / node_role``）与借贷平衡检查（``balance``，spec consol-autotree-linkage-closure R5 / R8.5 / R10）。
     """
     from app.services.consol_report_view_service import ViewError, trial_view
 
-    ctx = await _view_context(db, project_id, year)
+    ctx = await _view_context(db, project_id, year, include_drafts=True)
     try:
-        view = await trial_view(ctx.basis, ctx.rows, report_type=report_type, node_key=node_key)
+        view = await trial_view(ctx.basis, ctx.rows, report_type=report_type, node_key=node_key,
+                                draft_basis=ctx.draft_basis)
     except ViewError as e:
         raise _view_error(e) from e
     return {"year": ctx.year, "applicable_standard": ctx.standard, **view}
@@ -407,9 +410,10 @@ async def get_entry_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """D-1：合并抵销分录汇总表 — 按分录类型分类汇总借方/贷方/净额。
+    """合并抵销分录汇总表（spec consol-autotree-linkage-closure R9）：与合并试算同一计算口径。
 
-    返回 {types: [{type, type_label, debit_total, credit_total, net, count}], totals: {...}, year}
+    差额节点 × 科目 × 分录类型的原始借贷、按科目方向归一的净额、含草稿净额与笔数；按类型合计；
+    与合并试算逐科目对账（含已落库是否过期）；未归属分录；方向提示。见 ``consol_entry_summary_service``。
     """
     from app.services.consol_entry_summary_service import entry_summary
 

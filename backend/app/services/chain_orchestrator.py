@@ -19,6 +19,7 @@ from typing import Any, Callable, Coroutine
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chain_execution import ChainExecution
@@ -431,21 +432,21 @@ class ChainOrchestrator:
         except Exception as e:
             return {"created": 0, "skipped_reason": f"加载科目映射失败: {e}"}
 
-        # 2. Get project info for audit stage flags
+        # 2. Get project info for audit stage flags（读失败只回滚这次读：原先整会话 rollback，连试算表重算一起丢）
         try:
-            proj_result = await db.execute(
-                sa.select(
-                    Project.template_type,
-                    Project.report_scope,
-                    Project.scenario,
-                    Project.has_foreign_currency,
-                    Project.audit_type,
-                    Project.is_large_soe,
-                    Project.wizard_state,
-                    Project.business_category,
-                ).where(Project.id == project_id)
-            )
-            proj_row = proj_result.first()
+            async with db.begin_nested():
+                proj_row = (await db.execute(
+                    sa.select(
+                        Project.template_type,
+                        Project.report_scope,
+                        Project.scenario,
+                        Project.has_foreign_currency,
+                        Project.audit_type,
+                        Project.is_large_soe,
+                        Project.wizard_state,
+                        Project.business_category,
+                    ).where(Project.id == project_id)
+                )).first()
             template_type = (proj_row[0] if proj_row else None) or "soe"
             report_scope = (proj_row[1] if proj_row else None) or "standalone"
             scenario = (proj_row[2] if proj_row else None) or "normal"
@@ -454,11 +455,8 @@ class ChainOrchestrator:
             is_large_soe = bool(proj_row[5]) if proj_row else False
             wizard_state = (proj_row[6] if proj_row else None) or {}
             business_category = (proj_row[7] if proj_row else None) or ""
-        except Exception:
-            try:
-                await db.rollback()
-            except Exception:
-                pass
+        except SQLAlchemyError:
+            logger.warning("chain_orchestrator: 读取项目信息失败，按默认口径匹配底稿", exc_info=True)
             template_type, report_scope = "soe", "standalone"
             scenario, has_foreign_currency = "normal", False
             audit_type, is_large_soe, wizard_state = "financial", False, {}
@@ -524,21 +522,19 @@ class ChainOrchestrator:
 
         # 3. Query TB to get actual account codes
         try:
-            tb_result = await db.execute(
-                sa.select(TrialBalance.standard_account_code)
-                .where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.is_deleted == sa.false(),
+            async with db.begin_nested():
+                tb_result = await db.execute(
+                    sa.select(TrialBalance.standard_account_code)
+                    .where(
+                        TrialBalance.project_id == project_id,
+                        TrialBalance.year == year,
+                        TrialBalance.is_deleted == sa.false(),
+                    )
+                    .distinct()
                 )
-                .distinct()
-            )
-            tb_accounts = {r[0] for r in tb_result.all() if r[0]}
-        except Exception:
-            try:
-                await db.rollback()
-            except Exception:
-                pass
+                tb_accounts = {r[0] for r in tb_result.all() if r[0]}
+        except SQLAlchemyError:
+            logger.warning("chain_orchestrator: 读取试算表科目失败，只按审计阶段匹配底稿", exc_info=True)
             tb_accounts = set()
 
         # 4. Determine cycle-specific flags from TB accounts（码表与改正说明见 wp_generation_matching.TB_ACCOUNT_FLAGS）
@@ -560,159 +556,65 @@ class ChainOrchestrator:
         # 主编码集合（实际生成的 wp_index）+ primary → [subtables matched]；规则见 wp_generation_matching.match_workpapers
         matched_primary, matched_subtable_info = match_workpapers(mappings, tb_accounts, project_flags)
 
-        if not matched_primary:
-            return {"created": 0, "skipped_reason": "无匹配的底稿模板"}
-
-        # 5b. 尊重程序裁剪结果：从 ProcedureInstance 查询已裁剪的 wp_code，排除
+        # 5b. 执行中的自定义程序（is_custom、有 wp_code）与科目匹配结果合并后一起经保留范围判定
+        #     （spec procedure-chain-hardening-and-java-contracts R11.1：原先自定义程序在裁剪过滤之后追加，绕过了保留范围）。
+        #     读不到程序 / 裁剪结果即抛出、本步失败 —— 不按「无裁剪」继续。
         from app.models.procedure_models import ProcedureInstance
-        try:
-            trimmed_q = await db.execute(
-                sa.select(ProcedureInstance.wp_code).where(
-                    ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.is_deleted == sa.false(),
-                    ProcedureInstance.status.in_(["skip", "not_applicable"]),
-                    ProcedureInstance.wp_code.isnot(None),
-                )
-            )
-            trimmed_codes = {r[0] for r in trimmed_q.all() if r[0]}
-            if trimmed_codes:
-                # 从 matched_primary 中移除被裁剪的主编码
-                before_count = len(matched_primary)
-                matched_primary -= trimmed_codes
-                # 也移除主编码被裁剪的子表（如 D2 被裁剪则 D2-1/D2-2 也跳过）
-                trimmed_prefixes = {c + '-' for c in trimmed_codes}
-                matched_primary = {c for c in matched_primary if not any(c.startswith(p) for p in trimmed_prefixes)}
-                logger.info(
-                    "chain_orchestrator: 程序裁剪过滤 %d → %d（裁剪 %d 个 wp_code）",
-                    before_count, len(matched_primary), len(trimmed_codes),
-                )
-        except Exception as trim_err:
-            logger.warning("chain_orchestrator: 查询程序裁剪状态失败，跳过过滤: %s", trim_err)
-
-        if not matched_primary:
-            return {"created": 0, "skipped_reason": "所有匹配底稿均已被裁剪"}
-
-        # 5c. 加入自定义程序（is_custom=True 且 status=execute 且有 wp_code）
-        try:
-            custom_q = await db.execute(
-                sa.select(ProcedureInstance.wp_code, ProcedureInstance.procedure_name).where(
-                    ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.is_deleted == sa.false(),
-                    ProcedureInstance.is_custom == sa.true(),
-                    ProcedureInstance.status == "execute",
-                    ProcedureInstance.wp_code.isnot(None),
-                )
-            )
-            for wp_code, proc_name in custom_q.all():
-                if wp_code and wp_code not in matched_primary:
-                    matched_primary.add(wp_code)
-                    logger.info("chain_orchestrator: 加入自定义程序 %s (%s)", wp_code, proc_name)
-        except Exception as custom_err:
-            logger.warning("chain_orchestrator: 查询自定义程序失败: %s", custom_err)
-
-        matched_codes = matched_primary  # for downstream code compatibility
-
-        # 6. Build wp_code → name lookup (also build subtable name list per primary)
+        from app.services.procedure_scope_retention import TrimScopeUnavailable, plan_generation
+        from app.services.wp_generate_file import create_template_workpaper
+        from app.services.wp_generation_receipt import GenerationReceipt
         from app.services.wp_name_source import resolve_wp_name
+
+        try:
+            async with db.begin_nested():
+                custom_rows = (await db.execute(
+                    sa.select(ProcedureInstance.wp_code, ProcedureInstance.procedure_name).where(
+                        ProcedureInstance.project_id == project_id,
+                        ProcedureInstance.is_deleted == sa.false(),
+                        ProcedureInstance.is_custom == sa.true(),
+                        ProcedureInstance.status == "execute",
+                        ProcedureInstance.wp_code.isnot(None),
+                    )
+                )).all()
+        except SQLAlchemyError as exc:
+            raise TrimScopeUnavailable(f"读取自定义程序失败：{exc}") from exc
+        custom_names = {code: name for code, name in custom_rows if code}
+        if not matched_primary and not custom_names:
+            return {**GenerationReceipt().to_payload(), "skipped_reason": "无匹配的底稿模板"}
+
+        plan = await plan_generation(db, project_id, sorted(set(matched_primary) | set(custom_names)))
+        receipt = GenerationReceipt.from_plan(plan)
+        if plan.skipped_trimmed_codes:
+            logger.info("chain_orchestrator: 程序裁剪过滤 %d 个主编码：%s",
+                        len(plan.skipped_trimmed_codes), plan.skipped_trimmed_codes)
+        matched_codes = set(plan.to_create) | set(plan.existing_codes) | set(plan.in_recycle_codes)
+        if not matched_codes:
+            return {**receipt.to_payload(), "skipped_reason": "所有匹配底稿均已被裁剪"}
+
+        # 6. 名称 / 循环：wp_account_mapping → 自定义程序名；循环优先取模板元数据
         code_name_map = {m["wp_code"]: m.get("wp_name", "") for m in mappings}
-
-        # 7. Generate workpapers (with template file copy + metadata link)
-        from app.services.wp_template_init_service import init_workpaper_from_template
-
-        # Pre-load wp_template_metadata for matched codes (for audit_cycle/component_type)
         meta_map: dict[str, dict] = {}
-        if matched_codes:
+        if plan.to_create:
             try:
-                meta_result = await db.execute(
-                    sa.text("""
-                        SELECT wp_code, audit_stage, cycle, component_type, file_format
-                        FROM wp_template_metadata
-                        WHERE wp_code = ANY(:codes)
-                    """),
-                    {"codes": list(matched_codes)},
-                )
-                for row in meta_result.mappings().all():
-                    meta_map[row["wp_code"]] = dict(row)
-            except Exception:
-                try:
-                    await db.rollback()
-                except Exception:
-                    pass
-
-        created_count = 0
-        copied_count = 0
-        for code in sorted(matched_codes):
-            try:
-                # Idempotent check
-                existing = await db.execute(
-                    sa.select(WpIndex.id).where(
-                        WpIndex.project_id == project_id,
-                        WpIndex.wp_code == code,
+                async with db.begin_nested():
+                    meta_result = await db.execute(
+                        sa.text("SELECT wp_code, cycle FROM wp_template_metadata WHERE wp_code IN :codes")
+                        .bindparams(sa.bindparam("codes", expanding=True)),
+                        {"codes": list(plan.to_create)},
                     )
-                )
-                existing_id = existing.scalar_one_or_none()
-                if existing_id:
-                    continue
+                    meta_map = {row["wp_code"]: dict(row) for row in meta_result.mappings().all()}
+            except SQLAlchemyError:
+                logger.warning("chain_orchestrator: 读取底稿模板元数据失败，循环按编码首字母", exc_info=True)
 
-                wp_name = resolve_wp_name(code, code_name_map.get(code))
-
-                # Resolve cycle: prefer metadata's cycle, fallback to first letter of code
-                meta = meta_map.get(code, {})
-                cycle = meta.get("cycle") or (code[0] if code and code[0].isalpha() else None)
-
-                # Create WpIndex
-                wp_index = WpIndex(
-                    project_id=project_id,
-                    wp_code=code,
-                    wp_name=wp_name,
-                    audit_cycle=cycle,
-                    status=WpStatus.not_started,
-                )
-                db.add(wp_index)
-                await db.flush()
-
-                # Create WorkingPaper record (file_path will be updated by init_workpaper_from_template)
-                wp = WorkingPaper(
-                    wp_index_id=wp_index.id,
-                    project_id=project_id,
-                    source_type=WpSourceType.template,
-                    file_path=f"storage/projects/{project_id}/workpapers/{code}.xlsx",
-                    parsed_data={},
-                )
-                db.add(wp)
-                await db.flush()
-                created_count += 1
-
-                # Copy template file from wp_templates/ to project storage
-                try:
-                    actual_path = init_workpaper_from_template(
-                        project_id=project_id,
-                        wp_id=wp.id,
-                        wp_code=code,
-                        scenario=scenario,
-                        has_foreign_currency=has_foreign_currency,
-                    )
-                    if actual_path:
-                        # Update file_path to match actual extension (xlsx vs docx vs xlsm)
-                        wp.file_path = str(actual_path)
-                        copied_count += 1
-                        # E1 spec Sprint 1 Task 1.18: 自动填充表头 R3/R4
-                        try:
-                            from app.services.prefill_engine import fill_header_cells
-                            await fill_header_cells(db, wp.id)
-                        except Exception as he:
-                            logger.warning(
-                                "fill_header_cells failed for wp=%s code=%s: %s",
-                                wp.id, code, he,
-                            )
-                except Exception as ce:
-                    logger.warning("Template file copy failed for %s: %s", code, ce)
-            except Exception as e:
-                logger.warning("Failed to create workpaper for %s: %s", code, e)
-                try:
-                    await db.rollback()
-                except Exception:
-                    pass
+        # 7. 逐码建底稿（单码保存点：失败只回滚该码、删掉已落文件、进回执 failures，不计入新建；
+        #    原先先计数再复制、复制失败只记日志，单码失败还整会话 rollback）。表头不在本步填（计入 header_unfilled）。
+        for code in plan.to_create:
+            await create_template_workpaper(
+                db, receipt, project_id=project_id, wp_code=code,
+                wp_name=resolve_wp_name(code, code_name_map.get(code), custom_names.get(code)),
+                audit_cycle=meta_map.get(code, {}).get("cycle") or (code[0] if code[0].isalpha() else None),
+                scenario=scenario, has_foreign_currency=has_foreign_currency,
+            )
 
         # Stats by cycle
         from collections import Counter
@@ -728,75 +630,57 @@ class ChainOrchestrator:
         # ─── 8. 为 skip 子底稿创建独立 wp_index（聚合组件内嵌 Tab 需要） ───────
         # 当主底稿(如 A1)已创建，其子表(如 A1-11~A1-16)在 wp_code_overrides 中标为 skip
         # 时，前端聚合组件(GtA1Dashboard/GtA17Bundle 等)需要通过 wp_index 查找这些子底稿
-        # 的 wp_id 来渲染内嵌 Tab。此处为这些 skip 子表创建独立的 wp_index + working_paper。
+        # 的 wp_id 来渲染内嵌 Tab。只给本步之后在库里的主底稿建（新建成功 / 原已有；在回收站或建失败的不建），
+        # 子底稿同样经保留范围判定（主底稿保留、子表自己被裁，如 A1-11 不适用）、逐码保存点。
         from app.services.wp_code_override_loader import load_wp_code_overrides
         _skip_overrides = load_wp_code_overrides()
-        skip_sub_created = 0
-        for primary_code in sorted(matched_codes):
-            # 查找该主底稿下所有被标为 skip 的子表
-            skip_prefix = primary_code + "-"
-            skip_subs = [
-                code for code, ct in _skip_overrides.items()
-                if ct == "skip" and code.startswith(skip_prefix)
-            ]
-            for sub_code in sorted(skip_subs):
-                try:
-                    # Idempotent check
-                    existing = await db.execute(
-                        sa.select(WpIndex.id).where(
-                            WpIndex.project_id == project_id,
-                            WpIndex.wp_code == sub_code,
-                        )
-                    )
-                    if existing.scalar_one_or_none():
-                        continue
-
-                    sub_name = resolve_wp_name(sub_code, code_name_map.get(sub_code))
-                    cycle = primary_code[0] if primary_code and primary_code[0].isalpha() else None
-
+        live_primary = sorted(set(receipt.created_codes) | set(plan.existing_codes))
+        sub_codes = [
+            code
+            for primary_code in live_primary
+            for code in sorted(c for c, ct in _skip_overrides.items() if ct == "skip" and c.startswith(primary_code + "-"))
+        ]
+        sub_plan = await plan_generation(db, project_id, list(dict.fromkeys(sub_codes)), scope=plan.scope)
+        receipt.add_plan(sub_plan)
+        sub_created: list[str] = []
+        for sub_code in sub_plan.to_create:
+            try:
+                async with db.begin_nested():
                     sub_wp_index = WpIndex(
                         project_id=project_id,
                         wp_code=sub_code,
-                        wp_name=sub_name,
-                        audit_cycle=cycle,
+                        wp_name=resolve_wp_name(sub_code, code_name_map.get(sub_code)),
+                        audit_cycle=sub_code[0] if sub_code[0].isalpha() else None,
                         status=WpStatus.not_started,
                     )
                     db.add(sub_wp_index)
                     await db.flush()
-
-                    sub_wp = WorkingPaper(
+                    # 子底稿不落文件（内嵌在主底稿聚合组件里，打开时懒加载落文件并回写 file_path）
+                    db.add(WorkingPaper(
                         wp_index_id=sub_wp_index.id,
                         project_id=project_id,
                         source_type=WpSourceType.template,
                         file_path=f"storage/projects/{project_id}/workpapers/{sub_code}.xlsx",
                         parsed_data={},
-                    )
-                    db.add(sub_wp)
+                    ))
                     await db.flush()
-                    skip_sub_created += 1
-                except Exception as sub_err:
-                    logger.warning(
-                        "chain_orchestrator: skip sub-workpaper %s creation failed: %s",
-                        sub_code, sub_err,
-                    )
-
-        if skip_sub_created:
-            logger.info(
-                "chain_orchestrator: created %d skip sub-workpaper wp_index records",
-                skip_sub_created,
-            )
+                sub_created.append(sub_code)
+            except Exception as sub_err:  # noqa: BLE001 — 单码失败不影响其余，如实进回执
+                receipt.add_failure(sub_code, sub_err)
+                logger.warning("chain_orchestrator: skip sub-workpaper %s creation failed: %s", sub_code, sub_err)
         # ─── END skip 子底稿创建 ─────────────────────────────────────────────────
 
         return {
-            "created": created_count,  # 主底稿数（实际生成的 wp_index 文件）
-            "files_copied": copied_count,
-            "primary_workpapers": len(matched_codes),  # = created
+            **receipt.to_payload(),  # created = 新建的主底稿数（失败不计）；回执字段见 wp_generation_receipt
+            "files_copied": len(receipt.created_codes) - len(receipt.blank_codes),
+            "primary_workpapers": len(matched_codes),
             "subtables_merged_as_sheets": total_subtables,  # 子表合并为 sheet
             "subtable_breakdown": {
                 primary: subs
                 for primary, subs in sorted(matched_subtable_info.items())
                 if subs  # only show primaries with subtables
             },
+            "sub_workpapers_created": sub_created,
             "matched_accounts": len(tb_accounts),
             "metadata_loaded": len(meta_map),
             "by_cycle": matched_details,

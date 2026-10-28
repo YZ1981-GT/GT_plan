@@ -34,6 +34,14 @@ FAKE_USER_ID = uuid.uuid4()
 FAKE_PROJECT_ID = uuid.uuid4()
 
 
+@pytest.fixture(autouse=True)
+def _wp_storage_in_tmp(tmp_path, monkeypatch):
+    """模板集生成会按底稿 id 落文件（spec procedure-chain-followup-closure R3.3）：存储目录指到临时目录，不往 backend/wp_storage 写。"""
+    from app.services import wp_template_init_service
+
+    monkeypatch.setattr(wp_template_init_service, "STORAGE_DIR", tmp_path / "wp_storage")
+
+
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
     async with test_engine_db.begin() as conn:

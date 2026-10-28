@@ -233,9 +233,8 @@ export async function fetchG10AuxLiabilitySeeds(
   try {
     const http = (await import('@/utils/http')).default
     const { resolveAuditYearNumber } = await import('./workpaperAuditYear')
-    const y = year
-      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
-      ?? (new Date().getFullYear() - 1)
+    const y = year ?? resolveAuditYearNumber(undefined)
+    if (y == null) return { seeds: [], dimType: '', error: '未设置审计年度' }
 
     let rows: any[] = []
     let usedCode = G10_ACCOUNT_CODE

@@ -15,7 +15,7 @@ D1-15特殊：双section格式（按组合计提 + 按单项计提），D列(应
 D1-7特殊：备查簿存储为dict {bankRows, commercialRows}（31列宽表），导出时拼接两组行，
         导入时按"票据类型"列拆分回 bank/commercial 两组，写回 D1-memo-rows
 D1-8特殊：贴现背书双表——'D1-8'→D1-endorse-discount-rows（已贴现），
-        'D1-8T'→D1-endorse-transfer-rows（已背书），两者共用同一套16列表头与转换函数
+        'D1-8T'→D1-endorse-transfer-rows（已背书），D1-8T 列按模板（二）（见 _d1_8t_endorse）
 D1-9特殊：贴息表含派生列（贴息天数/应计贴现利息/差异），导出时计算供参考，导入时忽略
 D1-6特殊：仅处理业务模式依据表（D1-bm-basis-rows）；QA矩阵不适合表格导入导出，跳过
 D1-13特殊：多section格式（抽样总体标量 + 特定样本 + 凭证核对 + 测试结论），
@@ -46,6 +46,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.routers.wp_render_strategies._d1_import_export._d1_8t_endorse import (
+    D1_8T_HEADERS,
+    D1_8T_OPTIONAL_HEADERS,
+    export_d1_8t_row,
+    parse_d1_8t_row,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +114,7 @@ _D1_7_HEADERS: list[str] = [
     "关联关系", "是否逾期", "逾期转应收金额", "备注",
 ]
 
-# D1-8 贴现背书 16列表头（贴现表与背书表共用）
+# D1-8 贴现表 16列表头（背书表 D1-8T 见 _d1_8t_endorse.D1_8T_HEADERS）
 _D1_8_HEADERS: list[str] = [
     "票据种类", "收到日期", "出票人", "票据号", "汇票金额", "已计利息",
     "出票日", "到期日", "承兑银行", "信用等级", "贴现银行", "贴现金额",
@@ -151,7 +157,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "D1-6": _D1_6_HEADERS,
     "D1-7": _D1_7_HEADERS,
     "D1-8": _D1_8_HEADERS,
-    "D1-8T": _D1_8_HEADERS,
+    "D1-8T": D1_8T_HEADERS,  # 背书表按模板（二）F/K/L/M 列，见 _d1_8t_endorse
     "D1-9": _D1_9_HEADERS,
     "D1-10": [
         "票据类型", "票据号", "出票日", "出票人", "承兑人", "金额",
@@ -750,7 +756,8 @@ def _validate_columns_against(
     if sheet_code == "D1-15" and len(actual) != 8:
         return [f"列数应为8，实际为{len(actual)}"]
 
-    return [h for h in expected if h not in actual]
+    optional = D1_8T_OPTIONAL_HEADERS if sheet_code == "D1-8T" else frozenset()
+    return [h for h in expected if h not in actual and h not in optional]
 
 
 def _validate_columns(ws: Any, sheet_code: str) -> list[str]:
@@ -864,7 +871,7 @@ def _export_d1_7_row(data: dict) -> list:
 
 
 def _export_d1_8_row(data: dict) -> list:
-    """D1-8 贴现/背书检查表行导出（16列 EndorsementRow，贴现表与背书表共用）"""
+    """D1-8 贴现检查表行导出（16列 EndorsementRow；背书表见 _d1_8t_endorse）"""
     return [
         _safe_str(data.get("noteType", "")),
         _safe_str(data.get("receivedDate", "")),
@@ -1198,7 +1205,7 @@ def _parse_d1_7_row(row: tuple, actual_headers: list[str]) -> dict:
 
 
 def _parse_d1_8_row(row: tuple, actual_headers: list[str]) -> dict:
-    """D1-8 贴现/背书检查表行解析（16字段 EndorsementRow）"""
+    """D1-8 贴现检查表行解析（16字段 EndorsementRow；背书表见 _d1_8t_endorse）"""
     return {
         "rowId": str(uuid4()),
         "rowType": "dynamic",
@@ -2504,7 +2511,7 @@ async def d1_export_data(
             "D1-4": _export_d1_4_row,
             "D1-6": _export_d1_6_row,
             "D1-8": _export_d1_8_row,
-            "D1-8T": _export_d1_8_row,
+            "D1-8T": export_d1_8t_row,
             "D1-9": _export_d1_9_row,
             "D1-10": _export_d1_10_row,
             "D1-11": _export_d1_11_row,
@@ -2769,7 +2776,7 @@ async def d1_import_data(
         "D1-3": _parse_d1_3_row,
         "D1-6": _parse_d1_6_row,
         "D1-8": _parse_d1_8_row,
-        "D1-8T": _parse_d1_8_row,
+        "D1-8T": parse_d1_8t_row,
         "D1-9": _parse_d1_9_row,
         "D1-10": _parse_d1_10_row,
         "D1-11": _parse_d1_11_row,

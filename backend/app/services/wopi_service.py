@@ -31,10 +31,14 @@ from app.models.workpaper_models import WorkingPaper
 # 路径边界（Requirement 9.6 / Property 42）。
 from app.services.workpaper_sync.canonical_paths import (
     BACKEND_ROOT as _BACKEND_ROOT,
+    TEMPLATE_ROOT as _TEMPLATE_ROOT,
     is_within_any_legacy_root,
+    is_within_root,
     legacy_project_storage_root,
 )
 from app.services.wp_export.wp_file_resolver import resolve_wp_file
+
+from app.services.project_audit_year import resolve_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +351,11 @@ class WOPIHostService:
         #    `../../` 或项目外绝对路径会直接 `mkdir` + `write_bytes`，把 OO 回传
         #    的字节写到存储根之外（Property 42 的写侧反例）。
         fp = _resolve_put_target(file_id, wp.file_path)
+        # 共享模板目录永不写：先复制到本底稿存储再保存（见 wp_generate_file.detach_from_shared_template）
+        if is_within_root(_TEMPLATE_ROOT, fp):
+            from app.services.wp_generate_file import detach_from_shared_template
+
+            fp = detach_from_shared_template(wp, fp)
         fp.parent.mkdir(parents=True, exist_ok=True)
 
         # 2. 版本快照（保存前备份当前版本）
@@ -601,8 +610,9 @@ class WOPIHostService:
                 if proj:
                     cloud_svc = CloudStorageService()
                     pname = proj.client_name or "unknown"
-                    ws = proj.wizard_state or {}
-                    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+                    yr = resolve_project_audit_year(proj)
+                    if yr is None:
+                        raise ValueError("未设置审计年度，请先在项目基本信息中填写")
                     # 🔴 Task 12：`fp` 现在是**绝对**路径（统一 resolver 的后置条件），
                     #    改造前是 `Path(wp.file_path)` 的相对路径。故基准也必须换成
                     #    绝对的 `BACKEND_ROOT/storage/projects/{pid}`，否则

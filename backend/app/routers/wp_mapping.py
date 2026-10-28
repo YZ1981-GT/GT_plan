@@ -216,36 +216,23 @@ async def get_progress_overview(
 
 # ─── 项目经理：底稿分配 ───
 
-@router.post("/assign/{wp_code}")
-async def assign_workpaper(
-    project_id: UUID,
-    wp_code: str,
-    staff_name: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    """将底稿分配给指定人员"""
-    from app.models.workpaper_models import WorkingPaper, WpIndex
+@router.post("/assign/{wp_code}", status_code=410)
+async def assign_workpaper_gone(project_id: UUID, wp_code: str):
+    """已下线（410）：按姓名写 ``working_paper.assigned_to``（用户 id 外键列写进姓名字符串，且只 flush 不提交），
+    不看裁剪、不校验可见范围、不记委派历史。底稿主编统一走 ``PUT /api/projects/{pid}/workpaper-leads``
+    （spec procedure-trim-generation-delegation-chain 任务 12）。
 
-    # 查找底稿
-    q = (
-        sa.select(WorkingPaper)
-        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(
-            WorkingPaper.project_id == project_id,
-            WpIndex.wp_code == wp_code,
-            WorkingPaper.is_deleted == sa.false(),
-        )
+    与 ``procedures.py`` 的已下线端点同一约定：不声明数据库 / 鉴权依赖、不触达数据（鉴权基线登记为桩端点）。"""
+    from fastapi import HTTPException
+
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "wp_mapping_assign_removed",
+            "message": "该端点已下线，请改用底稿主编委派",
+            "replacement": "PUT /api/projects/{pid}/workpaper-leads",
+        },
     )
-    result = await db.execute(q)
-    wp = result.scalar_one_or_none()
-    if not wp:
-        from fastapi import HTTPException
-        raise HTTPException(404, f"底稿 {wp_code} 不存在")
-
-    wp.assigned_to = staff_name
-    await db.flush()
-    return {"message": f"已将 {wp_code} 分配给 {staff_name}", "wp_id": str(wp.id)}
 
 
 # ─── 项目经理：进度简报AI生成 ───

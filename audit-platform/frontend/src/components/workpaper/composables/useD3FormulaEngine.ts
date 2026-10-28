@@ -11,6 +11,7 @@
  * Spec: .kiro/specs/d3-prepaid-accounts/
  * Requirements: 1.3, 1.4, 1.5, 1.6, 4.4, 10.3, 11.5
  */
+import { calcTemplateChangeRate, type TemplateChangeRate } from './templateChangeRate'
 
 // ─── 最小 DetailRow 接口（仅公式引擎需要的字段）────────────────────────────
 
@@ -65,6 +66,20 @@ export function calcChangeRate(prior: number, current: number): number | '' | 'N
   if (prior === 0 && current === 0) return ''
   if (prior === 0) return 'N/A'
   return (current - prior) / prior
+}
+
+/**
+ * 审定表 D3-1 K 列变动率，与权威模板 `IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))` 同式：
+ * - 期初=0 且 期末=0 → ''（不显示）
+ * - 期初=0 且 期末>0 → 1（100%）
+ * - 期初=0 且 期末<0 → 'N/A'（模板此时 J/E 除零，显示 #DIV/0!）
+ * - 其他 → (期末 - 期初) / 期初
+ *
+ * 分析表 D3-4 的变动比例是 `=D/C` 直接相除，仍用 calcChangeRate。审定表原先也用它，
+ * 期初为 0、期末为正时显示 N/A，模板是 100%（spec oo-writeback-template-parity-closure R2）。
+ */
+export function calcAdjudicationChangeRate(prior: number, current: number): TemplateChangeRate {
+  return calcTemplateChangeRate(prior, current)
 }
 
 // ─── 合计/小计公式 ──────────────────────────────────────────────────────────

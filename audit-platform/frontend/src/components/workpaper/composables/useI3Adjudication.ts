@@ -63,7 +63,7 @@ export function useI3Adjudication(
     tbUnadjusted1711?: Ref<number>
     tbAudited1711?: Ref<number>
     crossSheetImpairment?: Ref<number>
-    asOfYear?: Ref<number> | (() => number)
+    asOfYear?: Ref<number | null> | (() => number | null)
     onSave?: (itemId: string, value: any) => void
   },
 ) {
@@ -77,8 +77,8 @@ export function useI3Adjudication(
     adjustmentSync,
   } = useI3CrossSheet(allResponses as Ref<Map<string, any>>)
 
-  function getYear(): number {
-    if (!options?.asOfYear) return new Date().getFullYear()
+  function getYear(): number | null {
+    if (!options?.asOfYear) return null
     return typeof options.asOfYear === 'function'
       ? options.asOfYear()
       : options.asOfYear.value

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "bceed86f081fce1eebd95de31d9c3fe1995e50f402b8cb221cd92d8d47905536",
+  "instrumentation_definition_sha256": "beb6fff4811d95d6c3b8ccd7f6038ad23fba0276ca6d498716fd94614db27601",
   "review": {
     "authority_root": "backend/wp_templates",
     "cross_sheet_read_fields": {
@@ -361,9 +361,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "faee412ccf3324dac30c5faa2b4c67bf4d74f84402565e2475267bfb4b6d1461",
+    "normalized_structure_hash": "87bfaec0d88fbe97b77591abb8f8f2ae3e5cef9f4fdbcc313b5950f36eaeb391",
     "relative_path": "K/K1 其他应收款.xlsx",
-    "template_sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab"
+    "template_sha256": "c071af1bd56b7e3be5dc36b9882732bb8acab9b4950abbf656d5a367f2353b92"
   },
-  "template_definition_sha256": "806f2991ac5a434b56c77f09bc887aa4be2b79acc58d76a0af0d9c29cc652924"
+  "template_definition_sha256": "d8815c056369b3517b6a03abd3f418fca2c6915a9c038a59d77cd9061f0e86ed"
 }

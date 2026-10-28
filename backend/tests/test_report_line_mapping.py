@@ -274,10 +274,11 @@ class TestReferenceCopy:
         await _setup_standard_and_mappings(db_session, target.id)
 
         result = await svc.reference_copy(
-            "报表行次测试客户", target.id, db_session
+            "报表行次测试客户", target.id, db_session, readable_project_ids=None
         )
 
         assert result.copied_count > 0
+        assert result.source_found is True
 
         # Verify copied mappings are reference_copied and unconfirmed
         target_mappings = await svc.get_mappings(target.id, db_session)
@@ -291,8 +292,11 @@ class TestReferenceCopy:
         from app.services import report_line_mapping_service as svc
 
         project = await _create_test_project(db_session)
-        result = await svc.reference_copy("不存在的企业", project.id, db_session)
+        result = await svc.reference_copy(
+            "不存在的企业", project.id, db_session, readable_project_ids=None
+        )
         assert result.copied_count == 0
+        assert result.source_found is False
 
     @pytest.mark.asyncio
     async def test_unmatched_accounts_reported(self, db_session: AsyncSession):
@@ -323,10 +327,83 @@ class TestReferenceCopy:
         await _setup_standard_and_mappings(db_session, target.id)
 
         result = await svc.reference_copy(
-            "报表行次测试客户", target.id, db_session
+            "报表行次测试客户", target.id, db_session, readable_project_ids=None
         )
 
         assert "9999" in result.unmatched_accounts
+
+    @pytest.mark.asyncio
+    async def test_name_mismatch_copies_nothing_even_if_other_projects_have_mappings(
+        self, db_session: AsyncSession
+    ):
+        """名称对不上 ⇒ 一条不复制：不再「随便找一个有已确认映射的其他项目」（R2.3）。"""
+        from app.services import report_line_mapping_service as svc
+
+        source = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, source.id)
+        await svc.ai_suggest_mappings(source.id, db_session)
+        ids = [m.id for m in await svc.get_mappings(source.id, db_session)]
+        assert ids, "来源项目须先有映射，本例才证明得了「有映射也不复制」"
+        await svc.batch_confirm(source.id, ids, db_session)
+
+        target = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, target.id)
+
+        result = await svc.reference_copy(
+            "另一家企业", target.id, db_session, readable_project_ids=None
+        )
+        assert (result.copied_count, result.source_found) == (0, False)
+        assert await svc.get_mappings(target.id, db_session) == []
+
+    @pytest.mark.asyncio
+    async def test_unreadable_source_is_not_a_candidate(self, db_session: AsyncSession):
+        """名称对得上、但来源项目不在可读集合里 ⇒ 不作来源（R2.3）。"""
+        from app.services import report_line_mapping_service as svc
+
+        source = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, source.id)
+        await svc.ai_suggest_mappings(source.id, db_session)
+        ids = [m.id for m in await svc.get_mappings(source.id, db_session)]
+        await svc.batch_confirm(source.id, ids, db_session)
+
+        target = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, target.id)
+
+        denied = await svc.reference_copy(
+            "报表行次测试客户", target.id, db_session, readable_project_ids={target.id}
+        )
+        assert (denied.copied_count, denied.source_found) == (0, False)
+        assert await svc.get_mappings(target.id, db_session) == []
+
+        allowed = await svc.reference_copy(
+            "报表行次测试客户", target.id, db_session, readable_project_ids={source.id, target.id}
+        )
+        assert allowed.copied_count > 0 and allowed.source_found is True
+
+    @pytest.mark.asyncio
+    async def test_copy_from_project_by_id(self, db_session: AsyncSession):
+        """按来源项目 id 复制；来源已删除 / 就是本项目 ⇒ source_found=False（R2.3）。"""
+        from app.services import report_line_mapping_service as svc
+
+        source = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, source.id)
+        await svc.ai_suggest_mappings(source.id, db_session)
+        ids = [m.id for m in await svc.get_mappings(source.id, db_session)]
+        await svc.batch_confirm(source.id, ids, db_session)
+
+        target = await _create_test_project(db_session)
+        await _setup_standard_and_mappings(db_session, target.id)
+
+        same = await svc.reference_copy_from_project(target.id, target.id, db_session)
+        assert (same.copied_count, same.source_found) == (0, False)
+
+        result = await svc.reference_copy_from_project(source.id, target.id, db_session)
+        assert result.copied_count == len(ids) and result.source_found is True
+
+        source.is_deleted = True
+        await db_session.flush()
+        gone = await svc.reference_copy_from_project(source.id, target.id, db_session)
+        assert (gone.copied_count, gone.source_found) == (0, False)
 
 
 # ===================================================================

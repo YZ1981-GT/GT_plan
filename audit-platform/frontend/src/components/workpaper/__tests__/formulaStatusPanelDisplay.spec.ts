@@ -382,7 +382,7 @@ describe('R10.4 可达性: FormulaStatusPanel 的宿主链必须完整（缺口�
   // 旧版本把「HTML 路径无面板入口」登记为已知缺口，并用 stale 检测断言
   // `📋 面板` 按钮**只在非 HTML 分支**、`onOpenAttachment` 是 HTML 路径唯一 setter。
   // 现状（HEAD 实测）：`WorkpaperEditor.vue` 的 HTML 渲染器工具栏
-  // （`v-if="useHtmlRenderer && wpDetail"` 的 `gt-wp-io-toolbar`）里**已显式新增**
+  // （`v-if="useHtmlRenderer && wpDetail…"` 的 `gt-wp-io-toolbar`）里**已显式新增**
   //   `<el-button … @click="showSidePanel = !showSidePanel">📋 面板</el-button>`
   // （源码注释亦记「HTML 路径此前无面板入口」= 事后补入的入口）。
   // ⇒ FormulaStatusPanel 在 HTML 路径下已**可直接从工具栏打开**，不再依赖
@@ -390,7 +390,12 @@ describe('R10.4 可达性: FormulaStatusPanel 的宿主链必须完整（缺口�
   // 故把判据从「缺口仍在」翻转为「HTML 面板已有入口按钮」，并保持非空转：
   // 删掉 HTML 分支那枚按钮会使本断言打红（见本文件配套变异反证）。
   it('HTML 路径已有「📋 面板」入口按钮 → FormulaStatusPanel 可达（缺口已闭合）', () => {
-    const htmlBranchStart = editorSrc.indexOf('v-if="useHtmlRenderer && wpDetail"')
+    // 锚点 = HTML 渲染器工具栏的开标签（`gt-wp-io-toolbar`）；渲染条件允许再带守卫
+    // （spec audit-year-calendar-fallback-ratchet 加了 `&& projectYear != null`：未设置审计年度时整页
+    // 显示「未设置审计年度」，不渲染底稿与工具栏），但必须仍以 `useHtmlRenderer && wpDetail` 开头。
+    const toolbarOpen = /<div v-if="useHtmlRenderer && wpDetail(?: && [^"]+)?" class="gt-wp-io-toolbar">/.exec(editorSrc)
+    expect(toolbarOpen, 'HTML 渲染器工具栏（gt-wp-io-toolbar）的渲染条件变了：找不到锚点').not.toBeNull()
+    const htmlBranchStart = toolbarOpen!.index
     const nonHtmlBranchStart = editorSrc.indexOf('toolbarButtons.filter')
     expect(htmlBranchStart).toBeGreaterThan(-1)
     expect(nonHtmlBranchStart).toBeGreaterThan(htmlBranchStart)

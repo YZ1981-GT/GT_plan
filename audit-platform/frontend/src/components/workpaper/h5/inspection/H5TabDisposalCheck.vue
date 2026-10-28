@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, defineAsyncComponent, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -168,7 +169,7 @@ const state = useH5DisposalCheck({
 // ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
 const samplingVisible = ref(false)
 const { year: auditYear } = useAuditContext()
-const samplingYear = computed(() => props.year || auditYear.value || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? auditYear.value ?? null)
 
 const rawMethodologyPersist = buildChecklistDirectPersist({
   wpId: computed(() => props.wpId),
@@ -202,6 +203,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

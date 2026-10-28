@@ -97,14 +97,16 @@
               </div>
               <el-tag size="small" effect="light" round class="ch-tree-root-tag">最终控制方</el-tag>
               <el-tag
-                v-if="hasScopeDiff(tree)"
+                v-if="treeChanged(tree)"
                 type="warning"
                 size="small"
                 effect="light"
                 round
-                class="ch-scope-diff-tag"
-                @click.stop="openScopeDiffDialog(tree)"
-              >⚠️ 合并范围差异</el-tag>
+                class="ch-tree-change-tag"
+                title="与最近记录的企业树版本相比，企业构成或上下级关系有变化，点开查看差异"
+                data-testid="tree-change-tag"
+                @click.stop="openTreeVersionDialog(tree)"
+              >⚠️ 企业树有变化</el-tag>
             </div>
 
             <!-- 合并方式统计（Task 14.2，无持股/合并方式数据时不显示） -->
@@ -193,81 +195,12 @@
       </template>
     </div>
 
-    <!-- 合并范围差异明细弹窗 -->
-    <el-dialog
-      v-model="scopeDiffDialogVisible"
-      title="合并范围差异明细"
-      width="640px"
-      class="ch-scope-diff-dialog"
-      append-to-body
-    >
-      <div v-if="activeDiffTree" class="ch-diff-body">
-        <p class="ch-diff-intro">
-          以集团树形结构（企业代码）为权威源，与合并模块已配置的合并范围进行校对。
-        </p>
-
-        <!-- 待纳入：树形有、合并范围无 -->
-        <div class="ch-diff-section">
-          <div class="ch-diff-section-head">
-            <el-tag type="warning" size="small" effect="light" round>待纳入</el-tag>
-            <span class="ch-diff-section-desc">树形结构中存在、但合并范围中尚未配置（可一键同步）</span>
-          </div>
-          <el-table
-            v-if="activeDiff.in_tree_not_scope.length > 0"
-            :data="activeDiff.in_tree_not_scope"
-            size="small"
-            class="gt-compact-table"
-          >
-            <el-table-column prop="company_code" label="企业代码" min-width="200" />
-            <el-table-column prop="company_name" label="企业名称" min-width="180">
-              <template #default="{ row }">{{ row.company_name || '—' }}</template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="无待纳入企业" :image-size="60" />
-        </div>
-
-        <!-- 待移除：合并范围有、树形无 -->
-        <div class="ch-diff-section">
-          <div class="ch-diff-section-head">
-            <el-tag type="info" size="small" effect="light" round>待移除</el-tag>
-            <span class="ch-diff-section-desc">合并范围中存在、但树形结构中没有（需手动确认移除，系统不自动删除）</span>
-          </div>
-          <el-table
-            v-if="activeDiff.in_scope_not_tree.length > 0"
-            :data="activeDiff.in_scope_not_tree"
-            size="small"
-            class="gt-compact-table"
-          >
-            <el-table-column prop="company_code" label="企业代码" min-width="200" />
-            <el-table-column prop="company_name" label="企业名称" min-width="180">
-              <template #default="{ row }">{{ row.company_name || '—' }}</template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="无待移除企业" :image-size="60" />
-        </div>
-
-        <el-alert
-          type="info"
-          :closable="false"
-          show-icon
-          class="ch-diff-tip"
-        >
-          <template #title>
-            「一键同步到合并范围」仅会<strong>增量添加</strong>上方「待纳入」企业，不会删除「待移除」企业。移除合并范围请前往合并详情页手动确认。
-          </template>
-        </el-alert>
-      </div>
-
-      <template #footer>
-        <el-button @click="scopeDiffDialogVisible = false">关闭</el-button>
-        <el-button
-          type="primary"
-          :loading="syncing"
-          :disabled="!activeDiff.in_tree_not_scope.length"
-          @click="confirmSyncScope"
-        >一键同步到合并范围</el-button>
-      </template>
-    </el-dialog>
+    <!-- 企业树版本（spec consol-autotree-residual-closure R5.2）：树卡片上「企业树有变化」点开即此弹窗 -->
+    <ConsolScopeConfigDialog
+      v-model="versionDialogVisible"
+      :project-id="versionDialogProjectId"
+      @recorded="onTreeVersionRecorded"
+    />
 
     <!-- 节点右键菜单（Task 16.1）—— 查看层级变更历史 -->
     <div
@@ -320,11 +253,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Connection, OfficeBuilding, Plus, Refresh, Search, Document, Upload, Clock } from '@element-plus/icons-vue'
 import { useGroupTree, highlightSegments, consolMethodLabel, formatShareholding, countConsolMethods, type TreeNode, type GroupTree } from '@/composables/useGroupTree'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
+import { reparentSummary, type ReparentResult } from '@/components/consolidation/composables/consolReparent'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
+import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
+import { previewScopeConfirmation, type ScopeConfirmationPreview } from '@/services/consolScopeConfirmationApi'
 
 const router = useRouter()
 const showBatchImport = ref(false)
@@ -436,11 +373,11 @@ function onNodeClick(data: TreeNode) {
 
 // ─── 加载 ────────────────────────────────────────────────────────────────────
 function reload() {
-  fetchTree('consolidated').then(loadAllScopeDiffs)
+  fetchTree('consolidated').then(loadAllTreeChanges)
 }
 
 onMounted(() => {
-  fetchTree('consolidated').then(loadAllScopeDiffs)
+  fetchTree('consolidated').then(loadAllTreeChanges)
 })
 
 // ─── Task 15: 树形拖拽调整层级 ────────────────────────────────────────────────
@@ -536,14 +473,21 @@ async function onNodeDrop(
   }
 
   try {
-    await api.patch(`/api/projects/${dragData.id}/parent-code`, {
+    // 合并项目与单户项目同改（上级代码 / 名称 / 关系 / 控制方补齐 / 向导数据），回执说明同步了哪些项目（R3.3）
+    const result = await api.patch<ReparentResult>(`/api/projects/${dragData.id}/parent-code`, {
       parent_company_code: newParentCode,
+      parent_company_name: dropData.companyName || null,
+    }, { _silent: true } as any)
+    ElNotification({
+      title: '层级调整成功',
+      message: reparentSummary(result),
+      type: result?.notices?.length ? 'warning' : 'success',
+      duration: 8000,
     })
-    ElMessage.success('层级调整成功')
     reload()
   } catch (e: any) {
-    // 400（循环引用等）→ 显示后端 detail；其余 → 通用错误。无论如何重建树恢复
-    ElMessage.error(e?.message || '层级调整失败')
+    // 400 成环 / 422 代码不合法 → 后端说明；403 无权；其余通用。无论如何重建树恢复原位
+    handleApiError(e, '层级调整')
     reload()
   }
 }
@@ -622,112 +566,46 @@ onUnmounted(() => {
   window.removeEventListener('click', hideContextMenu)
 })
 
-// ─── 合并范围校对（Req 9.2~9.5）────────────────────────────────────────────────
+// ─── 企业树版本提示（spec consol-autotree-residual-closure R5.2）──────────────────
+// 合并范围以企业树为准：总览不再拿合并范围表比对（真库该表 0 行，每棵树都会显示「合并范围差异」、
+// 诱导同步到一张不影响合并数的表）。改为读每棵树合并根项目的企业树版本预览：与最近记录的版本相比
+// 有结构变化（改名不算）时提示「企业树有变化」，点开即企业树版本弹窗。读失败静默，不阻塞树形。
 
-/** scope-diff 响应结构（后端 ScopeDiffResponse） */
-interface ScopeDiffEntry {
-  company_code: string
-  company_name: string | null
-}
-interface ScopeDiff {
-  in_tree_not_scope: ScopeDiffEntry[]
-  in_scope_not_tree: ScopeDiffEntry[]
-}
+/** 合并根项目 id → 当前树与最近记录的版本相比有结构变化 */
+const treeChangedMap = ref<Record<string, boolean>>({})
+const versionDialogVisible = ref(false)
+const versionDialogProjectId = ref('')
 
-const EMPTY_DIFF: ScopeDiff = { in_tree_not_scope: [], in_scope_not_tree: [] }
-
-/** 按 rootProjectId 存放差异结果（不污染 composable 数据） */
-const scopeDiffMap = ref<Record<string, ScopeDiff>>({})
-
-const scopeDiffDialogVisible = ref(false)
-const activeDiffTree = ref<GroupTree | null>(null)
-const syncing = ref(false)
-
-/** 拉取单个合并项目的范围差异（失败静默降级，不抛出、不阻塞树形）。Req 9.5 */
-async function loadScopeDiff(projectId: string): Promise<void> {
+async function loadTreeChange(projectId: string): Promise<void> {
   try {
-    const data = await api.get<ScopeDiff>(`/api/consolidation/${projectId}/scope-diff`)
-    scopeDiffMap.value = {
-      ...scopeDiffMap.value,
-      [projectId]: {
-        in_tree_not_scope: Array.isArray(data?.in_tree_not_scope) ? data.in_tree_not_scope : [],
-        in_scope_not_tree: Array.isArray(data?.in_scope_not_tree) ? data.in_scope_not_tree : [],
-      },
-    }
+    const preview = await previewScopeConfirmation(projectId, { silent: true })
+    treeChangedMap.value = { ...treeChangedMap.value, [projectId]: preview?.structural_change === true }
   } catch {
-    /* Req 9.5：差异查询失败静默降级——不显示警示标签、不阻塞树形展示 */
+    /* 读失败静默：不显示提示、不阻塞树形展示 */
   }
 }
 
-/** 树形渲染完成后，并行为每棵有合并根项目的树查询范围差异 */
-async function loadAllScopeDiffs(): Promise<void> {
-  scopeDiffMap.value = {}
+/** 树形渲染完成后，并行为每棵有合并根项目的树读企业树版本预览 */
+async function loadAllTreeChanges(): Promise<void> {
+  treeChangedMap.value = {}
   const ids = trees.value.map((t) => t.rootProjectId).filter((id): id is string => !!id)
-  if (ids.length === 0) return
-  await Promise.allSettled(ids.map((id) => loadScopeDiff(id)))
+  await Promise.allSettled(ids.map((id) => loadTreeChange(id)))
 }
 
-/** 该集团树是否存在合并范围差异（任一方向有条目即视为有差异） */
-function hasScopeDiff(tree: GroupTree): boolean {
-  if (!tree.rootProjectId) return false
-  const diff = scopeDiffMap.value[tree.rootProjectId]
-  if (!diff) return false
-  return diff.in_tree_not_scope.length > 0 || diff.in_scope_not_tree.length > 0
+function treeChanged(tree: GroupTree): boolean {
+  return !!tree.rootProjectId && treeChangedMap.value[tree.rootProjectId] === true
 }
 
-/** 当前弹窗展示的差异（无则返回空差异，避免模板空引用） */
-const activeDiff = computed<ScopeDiff>(() => {
-  const pid = activeDiffTree.value?.rootProjectId
-  if (!pid) return EMPTY_DIFF
-  return scopeDiffMap.value[pid] || EMPTY_DIFF
-})
-
-/** 点击警示标签 → 打开差异明细弹窗 */
-function openScopeDiffDialog(tree: GroupTree) {
-  activeDiffTree.value = tree
-  scopeDiffDialogVisible.value = true
+function openTreeVersionDialog(tree: GroupTree) {
+  if (!tree.rootProjectId) return
+  versionDialogProjectId.value = tree.rootProjectId
+  versionDialogVisible.value = true
 }
 
-/** 一键同步到合并范围（仅增量添加待纳入企业，用户确认后执行）。Req 9.4 */
-async function confirmSyncScope() {
-  const tree = activeDiffTree.value
-  const pid = tree?.rootProjectId
-  if (!pid) return
-
-  const codes = activeDiff.value.in_tree_not_scope.map((e) => e.company_code).filter(Boolean)
-  if (codes.length === 0) {
-    ElMessage.info('没有需要同步的企业')
-    return
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      `将把 ${codes.length} 家「待纳入」企业增量添加到「${tree?.ultimateName || '该集团'}」的合并范围，不会删除已有配置。是否继续？`,
-      '确认同步合并范围',
-      { confirmButtonText: '确认同步', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
-    return // 用户取消
-  }
-
-  syncing.value = true
-  try {
-    const res = await api.post<{ added: number }>(
-      `/api/consolidation/${pid}/sync-scope`,
-      { company_codes: codes },
-    )
-    ElMessage.success(`已同步 ${res?.added ?? 0} 家企业`)
-    // 重新查询该项目差异以刷新警示标签
-    await loadScopeDiff(pid)
-    // 若差异已消除则关闭弹窗
-    if (!hasScopeDiff(tree as GroupTree)) {
-      scopeDiffDialogVisible.value = false
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '同步合并范围失败')
-  } finally {
-    syncing.value = false
-  }
+/** 弹窗里「记录为新版本」后，用回执更新该树的提示 */
+function onTreeVersionRecorded(preview: ScopeConfirmationPreview) {
+  const pid = versionDialogProjectId.value
+  if (pid) treeChangedMap.value = { ...treeChangedMap.value, [pid]: preview?.structural_change === true }
 }
 </script>
 
@@ -895,21 +773,9 @@ async function confirmSyncScope() {
 :deep(.el-tree-node__content:hover) { background-color: var(--gt-color-primary-bg); }
 :deep(.el-tree-node:focus > .el-tree-node__content) { background-color: var(--gt-color-primary-bg); }
 
-/* 合并范围差异警示标签可点击 */
-.ch-scope-diff-tag { cursor: pointer; transition: opacity 0.15s; }
-.ch-scope-diff-tag:hover { opacity: 0.8; }
-
-/* ── 差异明细弹窗 ── */
-.ch-diff-intro {
-  margin: 0 0 16px; font-size: var(--gt-font-size-sm);
-  color: var(--gt-color-text-tertiary); line-height: 1.6;
-}
-.ch-diff-section { margin-bottom: 18px; }
-.ch-diff-section-head {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
-}
-.ch-diff-section-desc { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
-.ch-diff-tip { margin-top: 4px; }
+/* 企业树有变化：提示标签可点击 */
+.ch-tree-change-tag { cursor: pointer; transition: opacity 0.15s; }
+.ch-tree-change-tag:hover { opacity: 0.8; }
 
 /* 右键上下文菜单（Task 16.1）—— 紫色描边浮层 */
 .ch-context-menu {

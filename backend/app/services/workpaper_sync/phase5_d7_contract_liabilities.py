@@ -87,7 +87,7 @@ WP_CODES: Final[frozenset[str]] = frozenset({"D7C"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D7 合同负债.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a"
+    "9c047a2a5d6f3241eb0110655cdd3612b4ac6e06a917ac775a4ca80ae37101ec"
 )
 MANAGED_SHEET: Final[str] = "明细表D7-2"
 TEMPLATE_ID: Final[str] = "D72"

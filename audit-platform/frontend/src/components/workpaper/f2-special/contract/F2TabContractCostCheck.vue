@@ -443,7 +443,7 @@ import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate
 const props = defineProps<{
   wpId?: string
   projectId?: string
-  auditYear?: number
+  auditYear?: number | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -560,7 +560,7 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
 })
 
-const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.auditYear ?? null)
 
 /**
  * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，

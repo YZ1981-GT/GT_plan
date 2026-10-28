@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG10FormData — G10 交易性金融负债底稿数据层
@@ -130,11 +131,8 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      // 不按前缀筛：resolveG10TbRow 还要按科目名称回退找行
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       return resolveG10TbBalanceFromList(list)
     } catch {
       return null

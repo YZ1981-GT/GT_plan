@@ -9,12 +9,14 @@
  * - 23列按区段Tab管理（费用项目/月度金额/期末汇总+审定，行同步）
  * - 行结构：利息费用总额/减利息资本化/利息费用/减利息收入/利息净支出
  *   /未确认融资费用/减未实现融资收益/.../合计
- * - 公式：
+ * - 公式（与权威模板 明细表L8-2 逐格同式）：
  *   N=SUM(B:M)（本期未审合计=1月~12月之和）
  *   Q=N+O+P（本期审定=未审合计+AJE+RJE）
- *   R=Q/Q合计（占比）
+ *   R=IF(Q=0,0,Q/Q22)（占比，比值；Q22 = 合计行）
  *   W=T+U+V（上期审定=上期未审+上期AJE+上期RJE）
- * - 自动计算净财务费用（calcNetFinanceExpense）
+ *   派生行 R11 / R13 / R20 的月度与调整列跨行算（L82_DERIVED_ROW_SOURCES / L82_DERIVED_AMOUNT_FIELDS）
+ * - 合计 = 净财务费用（模板 R22：利息净支出 + 未确认融资费用 − 未实现融资收益 + 承兑汇票贴息
+ *   + 汇兑净损失 + 手续费及其他，L82_TOTAL_TERMS）；新增行不在模板合计里
  * - 变动率计算 + 异常高亮
  * - 与审定表L8-1交叉验证
  *
@@ -26,9 +28,12 @@ import { newRowIdentity } from './shared/rowIdentity'
 import {
   L82_SKELETON_ITEMS,
   L82_DERIVED_ROW_SOURCES,
+  L82_DERIVED_AMOUNT_FIELDS,
+  L82_TOTAL_TERMS,
   l82TemplateRowId,
   isL82TemplateRowId,
   isL82DerivedRowKey,
+  isL82DerivedAmountField,
   rowsForStore,
 } from '../l8/core/l8DetailRowIdentity'
 import {
@@ -36,7 +41,6 @@ import {
   calcSubtotal,
   calcChangeRate,
   calcChangeAmount,
-  calcNetFinanceExpense,
   isChangeRateExceeding,
 } from './useL8FormulaEngine'
 import type { useL8FormData } from './useL8FormData'
@@ -59,7 +63,7 @@ export interface L8DetailRow {
   rje: number
   /** 本期审定（Q列，公式=N+O+P） */
   periodAudited: number
-  /** 占比（R列，公式=Q/Q合计行×100） */
+  /** 占比（R列，公式=IF(Q=0,0,Q/Q22)，比值；显示时 ×100%） */
   ratio: number
   /** 与相关科目勾稽（S列，备注文本） */
   crossRef: string
@@ -174,6 +178,75 @@ export function restoreL8RowsForDisplay(stored: L8DetailRow[]): L8DetailRow[] {
   return [...skeleton.map(r => byKey.get(r.key)!), ...userRows]
 }
 
+/** 合计行 R22：本期审定 Q22、上期审定 W22 */
+export interface L82Totals {
+  periodAudited: number
+  priorAudited: number
+}
+
+/**
+ * 按模板合计行 R22 求合计（`Q22 = Q13 + Q14 − Q15 + Q16 + Q20 + Q21`，W 同）。
+ * rows 是已算好公式列的行；只取 `L82_TOTAL_TERMS` 六个骨架行，新增行不计入（模板合计公式里没有它们）。
+ * 原先把全部行相加：利息费用总额 / 利息费用 / 利息净支出三层重复计入、各「减：」行反当加项。
+ */
+export function calcL82Totals(rows: readonly L8DetailRow[]): L82Totals {
+  const byKey = new Map(rows.map(r => [r.key, r]))
+  let periodAudited = 0
+  let priorAudited = 0
+  for (const [idx, sign] of L82_TOTAL_TERMS) {
+    const row = byKey.get(l82TemplateRowId(idx))
+    if (!row) continue
+    periodAudited += sign * (Number(row.periodAudited) || 0)
+    priorAudited += sign * (Number(row.priorAudited) || 0)
+  }
+  return { periodAudited, priorAudited }
+}
+
+/**
+ * 各行公式列（纯函数，不碰 store）：派生行跨行算、N=SUM(B:M)、Q=N+O+P、W=T+U+V、
+ * 占比 R = IF(Q=0, 0, Q / Q22)（比值，模板格式 0.00%）。
+ */
+export function computeL8DetailRows(base: readonly L8DetailRow[]): L8DetailRow[] {
+  // 🔴 方案 D1：派生行（利息费用 R11 / 利息净支出 R13 / 汇兑净损失 R20）按模板跨行减法由上方科目算出
+  //   （只读显示，不持久化）：1~12 月，加上 L82_DERIVED_AMOUNT_FIELDS 列出的调整 / 上期列。
+  //   按下标从小到大算 ⇒ R13 取的是已算好的 R11（原先读 base 里未计算的 R11，R13 恒为「−利息收入」）。
+  const resolved: L8DetailRow[] = base.map(row => ({ ...row }))
+  const derivedIndices = Object.keys(L82_DERIVED_ROW_SOURCES).map(Number).sort((a, b) => a - b)
+  for (const idx of derivedIndices) {
+    const row = resolved[idx]
+    if (!row || !isL82DerivedRowKey(row.key)) continue
+    const sources = L82_DERIVED_ROW_SOURCES[idx]
+    const combine = (read: (src: L8DetailRow) => unknown): number =>
+      sources.reduce((sum, [srcIdx, sign]) => {
+        const src = resolved[srcIdx]
+        return src ? sum + sign * (Number(read(src)) || 0) : sum
+      }, 0)
+    const next: L8DetailRow = {
+      ...row,
+      monthly: Array.from({ length: 12 }, (_, m) => combine(src => src.monthly?.[m])) as L8DetailRow['monthly'],
+    }
+    for (const field of L82_DERIVED_AMOUNT_FIELDS[idx] ?? []) next[field] = combine(src => src[field])
+    resolved[idx] = next
+  }
+
+  const rowsWithFormulas = resolved.map(row => {
+    // N=SUM(B:M) 本期未审合计
+    const periodUnadjusted = calcSubtotal(row.monthly as unknown as number[])
+    // Q=N+O+P 本期审定
+    const periodAudited = calcAuditedAmount(periodUnadjusted, row.aje, row.rje)
+    // W=T+U+V 上期审定
+    const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
+    return { ...row, periodUnadjusted, periodAudited, priorAudited }
+  })
+
+  // R = IF(Q=0,0,Q/$Q$22)：合计为 0 时模板是 #DIV/0!，表单记 0
+  const total = calcL82Totals(rowsWithFormulas).periodAudited
+  return rowsWithFormulas.map(row => ({
+    ...row,
+    ratio: row.periodAudited === 0 || total === 0 ? 0 : row.periodAudited / total,
+  }))
+}
+
 /** 变动率异常阈值（20%） */
 const CHANGE_RATE_THRESHOLD = 20
 
@@ -201,60 +274,23 @@ export function useL8Detail(
 
   // ─── 2. 计算属性：公式列自动计算 ─────────────────────────────────────────
 
-  /** 各行公式列自动计算 */
-  const computedRows: ComputedRef<L8DetailRow[]> = computed(() => {
-    // 🔴 方案 D1：派生行（利息费用/利息净支出/汇兑净损失）的月度金额按模板跨行减法由上方科目算出
-    //   （只读显示，不持久化）。先按下标把派生行的 monthly 覆盖为跨行结果，再走统一公式列计算。
-    const base = detailRows.value
-    const derivedMonthly = (sources: ReadonlyArray<readonly [number, 1 | -1]>): number[] => {
-      const out = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-      for (const [srcIdx, sign] of sources) {
-        const src = base[srcIdx]
-        if (!src) continue
-        for (let m = 0; m < 12; m++) out[m] += sign * (Number(src.monthly?.[m]) || 0)
-      }
-      return out
-    }
-    const resolved = base.map((row, idx) => {
-      const sources = L82_DERIVED_ROW_SOURCES[idx]
-      if (sources && isL82DerivedRowKey(row.key)) {
-        return { ...row, monthly: derivedMonthly(sources) as L8DetailRow['monthly'] }
-      }
-      return row
-    })
-
-    // 先计算各行审定数以确定合计行审定值（用于占比计算）
-    const rowsWithFormulas = resolved.map(row => {
-      // N=SUM(B:M) 本期未审合计
-      const periodUnadjusted = calcSubtotal(row.monthly as unknown as number[])
-      // Q=N+O+P 本期审定
-      const periodAudited = calcAuditedAmount(periodUnadjusted, row.aje, row.rje)
-      // W=T+U+V 上期审定
-      const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-      return { ...row, periodUnadjusted, periodAudited, priorAudited }
-    })
-
-    // 计算合计行的审定数（用于占比）
-    const totalAudited = calcSubtotal(rowsWithFormulas.map(r => r.periodAudited))
-
-    // 添加占比列
-    return rowsWithFormulas.map(row => ({
-      ...row,
-      ratio: totalAudited !== 0 ? (row.periodAudited / totalAudited) * 100 : 0,
-    }))
-  })
+  /** 各行公式列自动计算（纯函数 computeL8DetailRows） */
+  const computedRows: ComputedRef<L8DetailRow[]> = computed(() => computeL8DetailRows(detailRows.value))
 
   // ─── 3. 合计行 ────────────────────────────────────────────────────────
 
-  /** 本期审定合计（供L8-1交叉验证） */
-  const totalPeriodAudited: ComputedRef<number> = computed(() => {
-    return calcSubtotal(computedRows.value.map(r => r.periodAudited))
-  })
+  const totals: ComputedRef<L82Totals> = computed(() => calcL82Totals(computedRows.value))
 
-  /** 上期审定合计 */
-  const totalPriorAudited: ComputedRef<number> = computed(() => {
-    return calcSubtotal(computedRows.value.map(r => r.priorAudited))
-  })
+  /** 本期审定合计 = 模板合计行 Q22（净财务费用，供L8-1交叉验证） */
+  const totalPeriodAudited: ComputedRef<number> = computed(() => totals.value.periodAudited)
+
+  /** 上期审定合计 = 模板合计行 W22 */
+  const totalPriorAudited: ComputedRef<number> = computed(() => totals.value.priorAudited)
+
+  /** 是否有新增行（不在模板合计行里，界面提示用户并入相应项目） */
+  const hasRowsOutsideTotal: ComputedRef<boolean> = computed(() =>
+    computedRows.value.some(r => !isL82TemplateRowId(r.key)),
+  )
 
   /** 变动率（合计行） */
   const totalChangeRate: ComputedRef<number | 'N/A'> = computed(() => {
@@ -334,6 +370,8 @@ export function useL8Detail(
   /** 更新某行某字段 */
   function updateRow(index: number, field: keyof L8DetailRow, value: any): void {
     if (index < 0 || index >= detailRows.value.length) return
+    // 派生行的调整 / 上期列是模板跨行公式（只读，UI 已禁用，这里兜底）
+    if (isL82DerivedAmountField(detailRows.value[index].key, field)) return
     const row = detailRows.value[index] as any
     row[field] = value
     _triggerSave(index)
@@ -382,8 +420,10 @@ export function useL8Detail(
     // 🔴 修复：保存完整行到 L8-2-full-data（组件 _restoreRows 读此键；此前从不写 → 刷新数据全丢）
     // 🔴 方案 D1：只存 10 输入骨架行 + 用户新增行；3 个派生行（模板计算只读）不进 store，
     //   真 OO 往返时不在 projection ⇒ 模板跨行公式幸存。
+    // 🔴 存**算好公式列**的行：R 列占比是 auto_source（模板裸 IF 中性化后是字面量，由表单写入），
+    //   原先存 detailRows（占比恒 0）⇒ OnlyOffice 侧各项目占比全是 0.00%。
     debouncedSave('L8-2-full-data', {
-      remark: JSON.stringify(rowsForStore(detailRows.value)),
+      remark: JSON.stringify(rowsForStore(computedRows.value)),
     })
   }
 
@@ -407,6 +447,7 @@ export function useL8Detail(
     totalChangeRate,
     totalChangeAmount,
     abnormalRows,
+    hasRowsOutsideTotal,
 
     // 行操作
     addRow,

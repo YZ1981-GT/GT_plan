@@ -67,6 +67,7 @@ from app.services.workpaper_sync.excel_materialize import (
     ExcelWriteCapability,
     materialize_projection,
 )
+from app.services.workpaper_sync.formula_recompute_evidence import union_formula_signatures
 from app.services.workpaper_sync.incoming_view_reuse import take_incoming_views
 from app.services.workpaper_sync.published_extract_cache import begin_extract
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
@@ -265,6 +266,8 @@ class ExcelSyncAdapter:
             document_type=head.document_type,
             values=values,
             row_keys=row_keys,
+            # 各 binding（主表 + 兄弟表）的公式证据并集（spec oo-formula-recompute-not-tamper R2.2）
+            formula_signatures=union_formula_signatures(parts),
         )
 
     def _baseline_pair(self) -> tuple[Projection | None, Mapping[str, str] | None]:
@@ -356,7 +359,10 @@ class ExcelSyncAdapter:
         # 因此不存在「读到上一趟旧字节」的可能。
         # 🔴 下面每一处 `unlink` 之前都必须 `release_scoped_workbooks`，否则缓存里的
         # zip 句柄会让 Windows 删不掉临时文件。
-        with workbook_read_scope():
+        from app.services.workpaper_sync.formula_restore import restore_scope_for
+
+        # OO→HTML：受保护公式格按已发布形态的公式写回（R4，见 formula_restore）。
+        with workbook_read_scope(), restore_scope_for(self, substrate, contract):
             return self._materialize_within_scope(
                 substrate=substrate,
                 projection=projection,

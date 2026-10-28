@@ -20,7 +20,7 @@ import {
   calcExpectedProvision,
   calcEclDifference,
 } from '../composables/useD6FormulaEngine'
-import { createEmptyRow } from '../composables/useD6Detail'
+import { createEmptyRow, recalcRow } from '../composables/useD6Detail'
 
 // ─── Shared generator config ────────────────────────────────────────────────
 
@@ -36,10 +36,15 @@ describe('Property 10: D6-2行公式链（借方科目完整链）', () => {
   /**
    * **Feature: d6-contract-assets, Property 10**
    *
-   * 完整公式链验证：
+   * 完整公式链验证（与权威模板「明细表D6-2」一致）：
    *   priorAudited = priorUnadjusted + priorAje + priorRje
-   *   endUnadjusted = priorAudited + debit - credit (借方科目!)
+   *   endUnadjusted = priorUnadjusted + debit - credit (借方科目!)
    *   endAudited = endUnadjusted + endAje + endRje
+   *
+   * 🔴 期末未审以期初未审起算（原为期初审定）：模板 D6-2 的期末未审列公式是
+   * 期初未审+借方-贷方，表单与 OnlyOffice 两侧算法必须一致，否则在线编辑保存时公式格
+   * 被 OO 重算后的值与表单值不同（spec oo-formula-recompute-not-tamper R4，先例
+   * useF1Detail.recalcRowFormulas 的 O = E + M - N）。Step 4 直接断言生产 recalcRow。
    *
    * **Validates: Requirements 5.4**
    */
@@ -55,15 +60,26 @@ describe('Property 10: D6-2行公式链（借方科目完整链）', () => {
           const expectedPriorAudited = priorUnadjusted + priorAje + priorRje
           expect(Math.abs(priorAudited - expectedPriorAudited)).toBeLessThan(1e-6)
 
-          // Step 2: 期末未审 = 期初审定 + 借方 - 贷方（借方科目）
-          const endUnadjusted = calcEndUnadjustedDebit(priorAudited, debit, credit)
-          const expectedEndUnadjusted = priorAudited + debit - credit
+          // Step 2: 期末未审 = 期初未审 + 借方 - 贷方（借方科目，与模板 D6-2 一致）
+          const endUnadjusted = calcEndUnadjustedDebit(priorUnadjusted, debit, credit)
+          const expectedEndUnadjusted = priorUnadjusted + debit - credit
           expect(Math.abs(endUnadjusted - expectedEndUnadjusted)).toBeLessThan(1e-6)
 
           // Step 3: 期末审定 = 期末未审 + AJE + RJE
           const endAudited = calcEndAudited(endUnadjusted, endAje, endRje)
           const expectedEndAudited = endUnadjusted + endAje + endRje
           expect(Math.abs(endAudited - expectedEndAudited)).toBeLessThan(1e-6)
+
+          // Step 4: 生产 recalcRow 走的就是这条链
+          const row = recalcRow({
+            ...createEmptyRow(1),
+            priorUnadjusted, priorAje, priorRje,
+            debitAmount: debit, creditAmount: credit,
+            endAje, endRje,
+          })
+          expect(Math.abs(row.priorAudited - expectedPriorAudited)).toBeLessThan(1e-6)
+          expect(Math.abs(row.endUnadjusted - expectedEndUnadjusted)).toBeLessThan(1e-6)
+          expect(Math.abs(row.endAudited - expectedEndAudited)).toBeLessThan(1e-6)
         }
       ),
       { numRuns: 100 }

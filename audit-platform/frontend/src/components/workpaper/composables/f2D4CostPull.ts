@@ -6,14 +6,13 @@
  * 差异（超存货账面 × 容差）需查明：出库未结转成本、成本多结转、跨期错配、
  * 委托加工 / 生产领用未纳入等。
  *
- * 数据源（稳健口径）：试算表 trial-balance 6401 主营业务成本审定发生额
- *   GET /api/projects/{pid}/trial-balance?year=&account_code=6401
- *   —— 6401 为损益成本类，审定数取本期发生额（优先 audited_amount，回退 借-贷）。
+ * 数据源（稳健口径）：试算表唯一入口 `fetchTrialBalanceRows`（6401 及其明细科目）
+ *   —— 6401 为损益成本类，试算表金额即本期单边发生额（借方）：优先审定数，没有则未审数
+ *   （不用余额表借贷：含年末结转分录时两侧相等）。
  *
  * 优雅降级：科目缺失 / 无数据 → status='empty'；请求失败 → status='error'。
  */
-import { api } from '@/services/apiProxy'
-
+import { fetchTrialBalanceRows, tbSumUnder, type TrialBalanceRow } from '@/services/trialBalanceRows'
 /** 主营业务成本科目（默认 6401） */
 export const OPERATING_COST_ACCOUNT = '6401'
 
@@ -30,26 +29,13 @@ function parseNum(v: unknown): number {
 }
 
 /**
- * 纯函数：从 trial-balance 行数组提取指定科目的审定发生额。
- * 损益成本类发生额 = 审定数（优先 audited_amount / auditedAmount），
- * 若无审定字段则回退 借方发生额 - 贷方发生额（成本为借正）。
+ * 纯函数：从试算表行提取指定科目（及其明细科目）的本期发生额，与报表 TB('6401') 同口径。
+ * 损益类试算表金额是单边发生额（成本取借方）：优先审定数之和，没有审定数时回退未审数之和。
+ * 原先读端点不返回的 account_code / debit_amount / credit_amount ⇒ 恒 0。
  */
 export function extractOperatingCost(rowsRaw: unknown, accountCode = OPERATING_COST_ACCOUNT): number {
-  const list = Array.isArray(rowsRaw) ? rowsRaw : []
-  const row = list.find((r: any) => {
-    const code = String(r?.account_code ?? r?.accountCode ?? r?.standard_account_code ?? r?.code ?? '')
-    return code === accountCode
-  })
-  if (!row) return 0
-
-  const audited = row.audited_amount ?? row.auditedAmount ?? row.audited
-  if (audited != null && Number.isFinite(Number(audited))) {
-    return parseNum(audited)
-  }
-  // 回退：借方发生额 - 贷方发生额
-  const debit = parseNum(row.debit_amount ?? row.debitAmount ?? row.debit)
-  const credit = parseNum(row.credit_amount ?? row.creditAmount ?? row.credit)
-  return debit - credit
+  const list = (Array.isArray(rowsRaw) ? rowsRaw : []) as TrialBalanceRow[]
+  return tbSumUnder(list, accountCode, 'audited_amount') ?? tbSumUnder(list, accountCode, 'unadjusted_amount') ?? 0
 }
 
 /**
@@ -68,15 +54,9 @@ export async function pullOperatingCost(
   if (!year || !Number.isFinite(Number(year))) return { ...base, message: '缺少有效审计年度' }
 
   try {
-    const res = await api.get<any>(`/api/projects/${projectId}/trial-balance`, {
-      params: { year, account_code: accountCode },
-      _silent: true,
-    } as any)
-    const items: any[] = Array.isArray(res)
-      ? res
-      : (res?.items ?? res?.data?.items ?? res?.data ?? [])
+    const { rows: items } = await fetchTrialBalanceRows(projectId, { year, accountPrefix: accountCode })
     const operatingCost = extractOperatingCost(items, accountCode)
-    if (!Array.isArray(items) || items.length === 0) {
+    if (items.length === 0) {
       return { status: 'empty', message: `试算表暂无 ${accountCode} 主营业务成本数据`, operatingCost: 0 }
     }
     if (operatingCost === 0) {

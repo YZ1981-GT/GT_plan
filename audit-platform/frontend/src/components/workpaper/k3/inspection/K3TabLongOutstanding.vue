@@ -269,6 +269,7 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.4
  * Requirements: 5.1-5.4
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -317,7 +318,7 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 
 // ─── Year ────────────────────────────────────────────────────────────────────
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -467,7 +468,7 @@ const K3_ACCOUNT_PREFIXES = computed(() => k3QueryCodes(_injectedTbSrc?.value ??
 async function refreshAttachedCount(): Promise<void> {
   if (!props.projectId || !props.wpId) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year.value, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
@@ -475,10 +476,14 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, year, props.wpId, K3_ACCOUNT_PREFIXES.value,
+      props.projectId, year.value, props.wpId, K3_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

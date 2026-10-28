@@ -1,6 +1,6 @@
 # 需求文档：合并节点隔离、共享上下文与工作底稿联动
 
-> 工作流：Design-First。验收标准采用 EARS 风格；正确性属性见设计 §六。
+> 工作流：Design-First。验收标准采用 EARS 风格；正确性属性见设计 §八。
 > 上游：`consol-tree-three-code-autobuild`（node_key 树身份）与 `consol-elimination-single-source-push`（统一合并计算内核）。
 > 数据层前提：当前工作树已有 V177 `consol_note_data.node_key` 与两套部分唯一索引；本 spec 消费该变更，不重复创建同一迁移。
 > 工作底稿边界：合并工作底稿当前仍按 `(project_id, year, sheet_key)` 持久化，不属于附注的 `node_key` 隔离范围。第一批修复只统一父页有效年度和错误语义，不在前端伪造 `node_key`；若未来需要按合并节点保存工作底稿，必须另提 schema/迁移和兼容设计。

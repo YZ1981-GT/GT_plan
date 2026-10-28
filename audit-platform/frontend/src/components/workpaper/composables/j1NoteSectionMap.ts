@@ -250,7 +250,8 @@ export interface J1DisclosureSnapshot {
 export function buildJ1SyncPayload(args: {
   variant: J1DisclosureVariant
   wpId: string
-  year: number | string
+  /** 审计年度；项目没填为 null ⇒ 载荷不带 year，由后端按项目审计年度定位 */
+  year: number | string | null
   snapshot: J1DisclosureSnapshot
   applicableStandards?: readonly string[] | null
 }): { section: string; body: Record<string, unknown> } {

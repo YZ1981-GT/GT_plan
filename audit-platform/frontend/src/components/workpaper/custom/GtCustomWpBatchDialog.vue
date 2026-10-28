@@ -109,7 +109,7 @@
         style="width: 100%"
       >
         <el-table-column prop="wp_code" label="编号" width="130" />
-        <el-table-column prop="reason" label="失败原因" min-width="260" show-overflow-tooltip />
+        <el-table-column prop="reason" label="说明" min-width="260" show-overflow-tooltip />
       </el-table>
     </template>
 
@@ -136,6 +136,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { readWorkbookAoa } from '@/composables/useExcelIO'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
@@ -145,7 +146,9 @@ import {
   parseExcelRows,
   parseTextList,
   submitBlockedReason,
+  summarizeBatchCreate,
   validateItems,
+  type BatchCreateResponse,
   type ParsedItem,
   type PreviewRow,
   type PreviewStatus,
@@ -276,30 +279,22 @@ async function doCreate() {
       .filter((it) => okCodes.has(it.wp_code))
       .map(toPayloadItem)
 
+    const batchYear = props.year ?? null
+    if (batchYear == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      creating.value = false
+      return
+    }
+
     const res = (await api.post(
       `/api/projects/${props.projectId}/working-papers/create-custom-batch`,
-      { items, year: props.year ?? new Date().getFullYear() }
-    )) as {
-      created?: number
-      skipped?: number
-      failed?: number
-      failed_items?: Array<{ wp_code: string; reason: string }>
-    }
-    result.value = {
-      created: res?.created ?? 0,
-      skipped: res?.skipped ?? 0,
-      failed: res?.failed ?? 0,
-    }
-    failedItems.value = Array.isArray(res?.failed_items) ? res.failed_items : []
-    if (result.value.failed > 0) {
-      ElMessage.warning(
-        `已创建 ${result.value.created} 个，${result.value.failed} 个失败（见下方明细）`
-      )
-    } else {
-      ElMessage.success(
-        `已创建 ${result.value.created} 个，跳过 ${result.value.skipped} 个`
-      )
-    }
+      { items, year: batchYear }
+    )) as BatchCreateResponse
+    // 失败的与已创建但表头没填上的都进明细（原先不看表头结果，界面照报成功）
+    const summary = summarizeBatchCreate(res)
+    result.value = summary.counts
+    failedItems.value = summary.items
+    ElMessage[summary.level](summary.message)
     emit('created', result.value)
     // 创建后作废预览，避免重复提交同一批
     previewRows.value = []

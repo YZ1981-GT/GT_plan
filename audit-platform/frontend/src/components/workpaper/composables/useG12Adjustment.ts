@@ -618,7 +618,11 @@ export function useG12Adjustment(opts: {
 
     try {
 
-      const year = auditYearRef.value ?? new Date().getFullYear()
+      const year = auditYearRef.value
+      if (year == null) {
+        lastSyncMsg.value = '未设置审计年度，无法读取调整分录'
+        return 0
+      }
 
       const res: any = await api.get(adjPaths.list(projectId), {
 

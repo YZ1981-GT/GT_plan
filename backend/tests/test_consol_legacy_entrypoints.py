@@ -113,7 +113,7 @@ class TestEndpoints:
             assert sum(D(r["amount"]) for r in body["rows"]) == D(body["total"]), "直接下级之和 = 合并数"
             leaves = {r["node_key"]: r for r in body["leaf_rows"]}
             assert {"A:consol_elim", "A1:subsidiary"} <= set(leaves) and "A:consol" not in leaves
-            assert leaves["A:consol_elim"]["parent_name"] == "甲公司（合并）"
+            assert leaves["A:consol_elim"]["parent_name"] == "甲公司（合并户）"
             assert sum(D(r["amount"]) for r in body["leaf_rows"]) == D(body["total"]), "末级之和 = 合并数"
             assert direct["G:parent"]["pct"] == str((D("320") / D("343") * 100).quantize(D("0.01")))
 

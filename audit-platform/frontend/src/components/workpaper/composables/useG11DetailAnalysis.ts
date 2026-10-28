@@ -106,7 +106,7 @@ function buildSkeletonRows(): G11DetailRow[] {
   )
 }
 
-function enrichRow(
+export function enrichRow(
   raw: Partial<G11DetailRow> & { id?: string },
   seq: number,
   totals?: { current: number; prior: number },
@@ -188,13 +188,13 @@ export function useG11DetailAnalysis(opts: {
   const g714ImportMsg = ref('')
   const ledgerImportMsg = ref('')
 
-  function resolveAuditYear(): number {
+  function resolveAuditYear(): number | null {
     const raw =
       opts.htmlData?.value?.project_context
       ?? opts.htmlData?.value?.projectContext
     const y = (raw as any)?.audit_year ?? (raw as any)?.auditYear ?? opts.htmlData?.value?.audit_year
     const n = Number(y)
-    return Number.isFinite(n) && n > 0 ? n : new Date().getFullYear() - 1
+    return Number.isFinite(n) && n > 0 ? n : null
   }
 
   function recomputeAll(): void {
@@ -449,9 +449,14 @@ export function useG11DetailAnalysis(opts: {
     }
     ledgerImportMsg.value = '正在读取 TB/序时账…'
     try {
+      const year = resolveAuditYear()
+      if (year == null) {
+        ledgerImportMsg.value = '未设置审计年度，无法读取序时账'
+        return 0
+      }
       const { seeds, source, error } = await fetchG11LedgerIncomeSeeds({
         projectId,
-        year: resolveAuditYear(),
+        year,
       })
       if (!seeds.length) {
         ledgerImportMsg.value = error || '未找到 6111 分项发生额'

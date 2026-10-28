@@ -177,9 +177,9 @@ const scopeHint = computed(() => {
   const n = props.node
   if (!n) return ''
   if (n.role === 'branch_elim') {
-    return `母分差额：${n.company_name}本部与其分公司之间的内部抵销及调整，只计入${n.company_name}的汇总数。`
+    return `母分差额户：${n.company_name}本部与其分公司之间的内部抵销及调整，只计入「${n.company_name}（母公司户）」。`
   }
-  return `合并差额：${n.company_name}合并层面的抵销及调整，计入「${n.company_name}（合并）」。`
+  return `差额户：${n.company_name}合并层面的抵销及调整，计入「${n.company_name}（合并户）」。`
 })
 
 let accountsFor = ''

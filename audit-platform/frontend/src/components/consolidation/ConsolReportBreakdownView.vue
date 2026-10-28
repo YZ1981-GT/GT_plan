@@ -10,7 +10,7 @@
       <div class="gt-crb-toolbar-left">
         <span class="gt-crb-label">汇总节点</span>
         <el-select v-model="nodeKey" size="small" style="width:240px" placeholder="根合并节点" data-testid="crb-node"
-          @change="() => load()">
+          @change="onNodeChange">
           <el-option v-for="n in nodeOptions" :key="n.node_key" :label="n.label" :value="n.node_key" />
         </el-select>
         <span class="gt-crb-check" :class="{ 'gt-crb-check--bad': check.mismatched.length }" data-testid="crb-check">
@@ -29,6 +29,9 @@
 
     <div class="gt-crb-info">
       <span>{{ nodeLabel || '—' }} · {{ rows.length }} 行 · {{ columns.length }} 个下级</span>
+      <span v-if="highlightLabel" class="gt-crb-highlight-note" data-testid="crb-highlight-note">
+        所选「{{ highlightLabel }}」不是汇总节点，按其上级汇总节点展示，该列已高亮
+      </span>
       <span class="gt-crb-legend"><i class="gt-crb-swatch" />差额列 = 归属该差额节点的已审批调整 / 抵销分录（只计已审批）</span>
     </div>
 
@@ -45,10 +48,11 @@
           </template>
         </el-table-column>
         <el-table-column v-for="col in columns" :key="col.node_key" :label="col.label" min-width="132" align="right"
-          :class-name="isElimColumn(col) ? 'gt-crb-elim-col' : ''"
-          :label-class-name="isElimColumn(col) ? 'gt-crb-elim-col' : ''">
+          :class-name="columnClass(col)"
+          :label-class-name="columnClass(col)">
           <template #header>
-            <span class="gt-crb-head" :data-testid="`crb-head-${col.node_key}`">
+            <span class="gt-crb-head" :class="{ 'gt-crb-head--highlight': col.node_key === highlightKey }"
+              :data-testid="`crb-head-${col.node_key}`">
               {{ col.label }}<small class="gt-crb-kind" :class="`gt-crb-kind--${col.kind}`">{{ columnKindLabel(col.kind) }}</small>
               <a v-if="col.kind === 'aggregate'" class="gt-crb-dive" :data-testid="`crb-dive-${col.node_key}`"
                 @click.stop="diveInto(col)">展开</a>
@@ -125,7 +129,12 @@ import {
   type ConsolReportBreakdownRow,
   type ConsolTreeNode,
 } from '@/services/consolidationApi'
-import { nodeLabel as nodeLabelOf, walkTree } from '@/components/consolidation/composables/consolTreeView'
+import {
+  findNodeByKey,
+  nearestAggregateAncestor,
+  nodeLabel as nodeLabelOf,
+  walkTree,
+} from '@/components/consolidation/composables/consolTreeView'
 import { reportTypeLabel } from '@/components/consolidation/composables/consolTrialView'
 import {
   breakdownCell,
@@ -151,7 +160,36 @@ const props = defineProps<{
   selectedNodeKey?: string | null
 }>()
 
+const emit = defineEmits<{
+  /** 本视图切换了汇总节点（下拉 / 表头「展开」）⇒ 回写合并页当前节点（R7.1） */
+  (e: 'node-change', nodeKey: string): void
+}>()
+
 const nodeKey = ref<string | null>(null)
+/** 选中的是数据 / 差额节点时：按最近的上级汇总节点展示，并高亮该节点所在列（R7.6） */
+const highlightKey = ref<string | null>(null)
+const highlightLabel = computed(() => {
+  const node = findNodeByKey(props.tree, highlightKey.value)
+  return node ? nodeLabelOf(node) : ''
+})
+
+function columnClass(col: ConsolBreakdownColumn): string {
+  return [isElimColumn(col) ? 'gt-crb-elim-col' : '', col.node_key === highlightKey.value ? 'gt-crb-highlight-col' : '']
+    .filter(Boolean).join(' ')
+}
+
+/** 选中节点 → （展示的汇总节点, 高亮列）；树里没有该节点 ⇒ 交给后端取根节点 */
+function resolveSelection(key: string): { nodeKey: string | null; highlight: string | null } {
+  const agg = nearestAggregateAncestor(props.tree, key)
+  if (!agg) return { nodeKey: null, highlight: null }
+  return { nodeKey: agg.node_key, highlight: agg.node_key === key ? null : key }
+}
+
+function onNodeChange(key: string) {
+  highlightKey.value = null
+  load()
+  if (key) emit('node-change', key)
+}
 const loading = ref(false)
 const loadError = ref('')
 const rows = ref<ConsolReportBreakdownRow[]>([])
@@ -209,7 +247,9 @@ async function load() {
 function diveInto(col: ConsolBreakdownColumn) {
   if (col.kind !== 'aggregate') return
   nodeKey.value = col.node_key
+  highlightKey.value = null
   load()
+  emit('node-change', col.node_key)
 }
 
 // 报表类型切换（顶部标签） ⇒ 已打开过则按新类型重读
@@ -230,13 +270,17 @@ watch(() => [props.projectId, props.year] as const, ([pid, y], old) => {
   if (loaded) load()
 })
 
-// CP-01：父级选中节点变化时同步到内部 nodeKey 并刷新（左树点击传播）
+// CP-01：父级选中节点同步到内部 nodeKey 并刷新（左树点击传播）。immediate：从合并报表切到差额表时
+// 组件刚挂载，也要按当前节点展示（原先只认之后的变化 ⇒ 恒显示根节点）。非汇总节点按最近的上级汇总节点展示并高亮该列。
 watch(() => props.selectedNodeKey, (newKey) => {
-  if (newKey != null && newKey !== nodeKey.value) {
-    nodeKey.value = newKey
+  if (newKey == null) return
+  const sel = resolveSelection(newKey)
+  highlightKey.value = sel.highlight
+  if (sel.nodeKey !== null && sel.nodeKey !== nodeKey.value) {
+    nodeKey.value = sel.nodeKey
     if (loaded) load()
   }
-})
+}, { immediate: true })
 
 // ─── 差额列穿透 ──────────────────────────────────────────────────────────────
 const drill = reactive({
@@ -333,6 +377,12 @@ defineExpose({ load, rows, columns, nodeKey, loading })
 .gt-crb-drill-total { margin-top: 8px; text-align: right; font-size: var(--gt-font-size-sm); font-weight: 600; }
 /* 差额列：浅黄底（表头与单元格） */
 :deep(td.gt-crb-elim-col), :deep(th.gt-crb-elim-col) { background: var(--gt-color-wheat-light) !important; }
+/* 当前节点所在列（选中非汇总节点时）：主色描边 */
+:deep(td.gt-crb-highlight-col), :deep(th.gt-crb-highlight-col) {
+  box-shadow: inset 2px 0 0 var(--gt-color-primary), inset -2px 0 0 var(--gt-color-primary);
+}
+.gt-crb-head--highlight { color: var(--gt-color-primary); font-weight: 700; }
+.gt-crb-highlight-note { color: var(--gt-color-primary); }
 :deep(.gt-cm-total-row td) { font-weight: 700; }
 :deep(.gt-cm-category td) { font-weight: 600; color: var(--gt-color-primary); }
 </style>

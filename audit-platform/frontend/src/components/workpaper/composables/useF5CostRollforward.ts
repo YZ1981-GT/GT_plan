@@ -60,7 +60,7 @@ export interface F57RowView extends F57RowDef {
   indexRef: string
 }
 
-interface StoredAmount {
+export interface StoredAmount {
   unadjusted: number
   aje: number
   prior: number
@@ -276,7 +276,7 @@ function emptyAmount(): StoredAmount {
   return { unadjusted: 0, aje: 0, prior: 0, indexRef: '' }
 }
 
-function migrateStored(raw: unknown): Record<string, StoredAmount> {
+export function migrateStored(raw: unknown): Record<string, StoredAmount> {
   const out: Record<string, StoredAmount> = {}
   for (const def of F57_ROW_DEFS) {
     if (def.rowType === 'formula') continue
@@ -343,6 +343,76 @@ function rollCol(
   return fn(...keys.map((k) => amt(stored, k, field)))
 }
 
+/** 倒轧链：未审 / 调整 / 上期各口径分别从录入行算出四个公式行的金额 */
+function computeF57AmountSet(stored: Record<string, StoredAmount>, field: 'unadjusted' | 'aje' | 'prior') {
+  const dm = rollCol(stored, field, calcF57DirectMaterial, [
+    'openingMaterial', 'materialPurchaseNet', 'materialOtherIncrease', 'closingMaterial', 'materialOtherIssue',
+  ])
+  const pc = calcF57ProductionCost(
+    dm,
+    amt(stored, 'directLabor', field),
+    amt(stored, 'manufacturingOverhead', field),
+    amt(stored, 'specialTooling', field),
+  )
+  const fg = calcF57FinishedGoodsCost(
+    pc,
+    amt(stored, 'openingWIP', field),
+    amt(stored, 'closingWIP', field),
+  )
+  const cogs = calcF57MainBusinessCOGS(
+    fg,
+    amt(stored, 'openingFG', field),
+    amt(stored, 'fgOtherIncrease', field),
+    amt(stored, 'closingFG', field),
+    amt(stored, 'selfUseProductCost', field),
+    amt(stored, 'internalUseProductCost', field),
+    amt(stored, 'fgOtherIssue', field),
+  )
+  return { dm, pc, fg, cogs }
+}
+
+/** F5-7 成本倒轧表各行（纯函数，不碰 store）：录入行 审定 = 未审 + 调整；公式行按倒轧链。 */
+export function computeF57RowViews(stored: Record<string, StoredAmount>): F57RowView[] {
+  const u = computeF57AmountSet(stored, 'unadjusted')
+  const a = computeF57AmountSet(stored, 'aje')
+  const p = computeF57AmountSet(stored, 'prior')
+  const formulaMap: Record<string, { unadjusted: number; aje: number; prior: number }> = {
+    directMaterialCost: { unadjusted: u.dm, aje: a.dm, prior: p.dm },
+    productProductionCost: { unadjusted: u.pc, aje: a.pc, prior: p.pc },
+    finishedGoodsCost: { unadjusted: u.fg, aje: a.fg, prior: p.fg },
+    mainBusinessCOGS: { unadjusted: u.cogs, aje: a.cogs, prior: p.cogs },
+  }
+
+  return F57_ROW_DEFS.map((def) => {
+    if (def.rowType === 'formula') {
+      const f = formulaMap[def.rowKey]
+      const unadjusted = f.unadjusted
+      const aje = f.aje
+      // 审定列：对公式行按各输入行审定轧差（= 未审轧差 + 调整轧差），与源表 G=SUM(G) 一致
+      const audited = unadjusted + aje
+      return {
+        ...def,
+        unadjusted,
+        aje,
+        audited,
+        prior: f.prior,
+        indexRef: def.defaultIndexRef,
+      }
+    }
+    const s = stored[def.rowKey] ?? emptyAmount()
+    const unadjusted = parseNum(s.unadjusted)
+    const ajeVal = parseNum(s.aje)
+    return {
+      ...def,
+      unadjusted,
+      aje: ajeVal,
+      audited: calcAdjustedAmount(unadjusted, ajeVal, 0),
+      prior: parseNum(s.prior),
+      indexRef: (s.indexRef && String(s.indexRef)) || def.defaultIndexRef,
+    }
+  })
+}
+
 export function useF5CostRollforward(options: UseF5CostRollforwardOptions) {
   const { allResponses, isReadonly, materiality, adjudicatedCOGS } = options
   const readonly = isReadonly ?? ref(false)
@@ -387,73 +457,7 @@ export function useF5CostRollforward(options: UseF5CostRollforwardOptions) {
     { immediate: true },
   )
 
-  function computeAmountSet(field: 'unadjusted' | 'aje' | 'prior') {
-    const dm = rollCol(storedRows.value, field, calcF57DirectMaterial, [
-      'openingMaterial', 'materialPurchaseNet', 'materialOtherIncrease', 'closingMaterial', 'materialOtherIssue',
-    ])
-    const pc = calcF57ProductionCost(
-      dm,
-      amt(storedRows.value, 'directLabor', field),
-      amt(storedRows.value, 'manufacturingOverhead', field),
-      amt(storedRows.value, 'specialTooling', field),
-    )
-    const fg = calcF57FinishedGoodsCost(
-      pc,
-      amt(storedRows.value, 'openingWIP', field),
-      amt(storedRows.value, 'closingWIP', field),
-    )
-    const cogs = calcF57MainBusinessCOGS(
-      fg,
-      amt(storedRows.value, 'openingFG', field),
-      amt(storedRows.value, 'fgOtherIncrease', field),
-      amt(storedRows.value, 'closingFG', field),
-      amt(storedRows.value, 'selfUseProductCost', field),
-      amt(storedRows.value, 'internalUseProductCost', field),
-      amt(storedRows.value, 'fgOtherIssue', field),
-    )
-    return { dm, pc, fg, cogs }
-  }
-
-  const rows: ComputedRef<F57RowView[]> = computed(() => {
-    const u = computeAmountSet('unadjusted')
-    const a = computeAmountSet('aje')
-    const p = computeAmountSet('prior')
-    const formulaMap: Record<string, { unadjusted: number; aje: number; prior: number }> = {
-      directMaterialCost: { unadjusted: u.dm, aje: a.dm, prior: p.dm },
-      productProductionCost: { unadjusted: u.pc, aje: a.pc, prior: p.pc },
-      finishedGoodsCost: { unadjusted: u.fg, aje: a.fg, prior: p.fg },
-      mainBusinessCOGS: { unadjusted: u.cogs, aje: a.cogs, prior: p.cogs },
-    }
-
-    return F57_ROW_DEFS.map((def) => {
-      if (def.rowType === 'formula') {
-        const f = formulaMap[def.rowKey]
-        const unadjusted = f.unadjusted
-        const aje = f.aje
-        // 审定列：对公式行按各输入行审定轧差（= 未审轧差 + 调整轧差），与源表 G=SUM(G) 一致
-        const audited = unadjusted + aje
-        return {
-          ...def,
-          unadjusted,
-          aje,
-          audited,
-          prior: f.prior,
-          indexRef: def.defaultIndexRef,
-        }
-      }
-      const s = storedRows.value[def.rowKey] ?? emptyAmount()
-      const unadjusted = parseNum(s.unadjusted)
-      const ajeVal = parseNum(s.aje)
-      return {
-        ...def,
-        unadjusted,
-        aje: ajeVal,
-        audited: calcAdjustedAmount(unadjusted, ajeVal, 0),
-        prior: parseNum(s.prior),
-        indexRef: (s.indexRef && String(s.indexRef)) || def.defaultIndexRef,
-      }
-    })
-  })
+  const rows: ComputedRef<F57RowView[]> = computed(() => computeF57RowViews(storedRows.value))
 
   const mainCogsRow = computed(() => rows.value.find((r) => r.rowKey === 'mainBusinessCOGS')!)
 

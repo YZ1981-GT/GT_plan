@@ -91,8 +91,11 @@ describe('useD1DetailCustomer', () => {
       expect(rows.value[0].companyCode).toBe('A001')
       // Verify computed fields are recalculated
       expect(rows.value[0].priorAudited).toBe(115) // 100 + 10 + 5
-      expect(rows.value[0].currentUnadjusted).toBe(145) // 115 + 50 - 20 + 0
-      expect(rows.value[0].currentAudited).toBe(145) // 145 + 0 + 0
+      // 期末余额以期初未审起算（模板 D1-3 的 J = D + H - I，spec oo-formula-recompute-not-tamper R4）：
+      // 100 + 50 - 20 = 130，期初调整 10 + 5 不进期末余额（原先按期初审定算出 145）
+      expect(rows.value[0].currentBalance).toBe(130)
+      expect(rows.value[0].currentUnadjusted).toBe(130) // 130 + 0
+      expect(rows.value[0].currentAudited).toBe(130) // 130 + 0 + 0
     })
 
     it('JSON解析失败时回退为空数组', () => {

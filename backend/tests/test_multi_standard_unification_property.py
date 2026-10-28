@@ -361,6 +361,47 @@ class TestUnitDeriveFromWizard:
             "stage": "ipo",
         }
 
+    # ── 真实向导形状（spec consol-autotree-residual-closure R6）──
+    # 上面几例用的平铺 ``basic_info.data`` 只有 set_standard 写过；向导自己存在 ``steps.basic_info.data``。
+    # 原实现只读平铺位置，上面几例全绿而真实向导一确认就被派生成国企单户。
+
+    @staticmethod
+    def _wizard(data: dict, *, flat: dict | None = None) -> dict:
+        state = {
+            "project_id": "00000000-0000-0000-0000-000000000001",
+            "current_step": "basic_info",
+            "steps": {"basic_info": {"step": "basic_info", "data": data, "completed": True}},
+            "completed": False,
+        }
+        if flat is not None:
+            state["basic_info"] = {"data": flat}
+        return state
+
+    def test_real_wizard_shape_extracts_correctly(self):
+        service = StandardUnificationService(AsyncMock())
+        wizard = self._wizard({"template_type": "listed", "report_scope": "consolidated"})
+        assert service.derive_from_wizard(wizard) == {
+            "entity_type": "listed",
+            "scope": "consolidated",
+            "stage": "normal",
+        }
+
+    def test_steps_win_over_stale_flat_copy(self):
+        """确认后再改基本信息：steps 是新值，平铺副本还是确认时的旧值 ⇒ 取 steps。"""
+        service = StandardUnificationService(AsyncMock())
+        wizard = self._wizard(
+            {"template_type": "listed", "report_scope": "consolidated"},
+            flat={"template_type": "soe", "report_scope": "standalone"},
+        )
+        result = service.derive_from_wizard(wizard)
+        assert (result["entity_type"], result["scope"]) == ("listed", "consolidated")
+
+    def test_empty_steps_data_falls_back_to_flat(self):
+        service = StandardUnificationService(AsyncMock())
+        wizard = self._wizard({}, flat={"template_type": "listed", "report_scope": "consolidated"})
+        result = service.derive_from_wizard(wizard)
+        assert (result["entity_type"], result["scope"]) == ("listed", "consolidated")
+
 
 class TestUnitClassify:
     """**Validates: Requirements 2.1**
@@ -561,7 +602,11 @@ class TestIntegrationConvertWorkpapers:
         service = WpStandardConversionService(mock_db)
 
         # Patch preconditions to pass, and patch the three helpers
+        # （切换前现读程序裁剪结果判定目标独有底稿保留范围 —— mock 库给一个空裁剪结果）
+        from app.services import procedure_scope_retention
         with patch.object(service, 'check_preconditions', new_callable=AsyncMock) as mock_pre, \
+             patch.object(procedure_scope_retention, 'load_trimmed_scope', new_callable=AsyncMock,
+                          return_value=procedure_scope_retention.TrimmedScope()), \
              patch.object(service, '_archive_source_only_workpapers', new_callable=AsyncMock, return_value=1) as mock_archive, \
              patch.object(service, '_create_target_only_workpapers', new_callable=AsyncMock, return_value=1) as mock_create:
 

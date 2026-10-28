@@ -127,6 +127,13 @@ async def assign_workpaper(
     """
     svc = WorkingPaperService()
 
+    # 改编制人 = 底稿主编委派，与 PUT /workpaper-leads 一样只给项目委派人（经理 / 合伙人 / admin）；
+    # 只改复核人仍按 review 权限（spec procedure-trim-generation-delegation-chain 任务 12）
+    if data.assigned_to is not None:
+        from app.services.procedure_authorization import ensure_project_delegator
+
+        await ensure_project_delegator(db, current_user, project_id)
+
     # ── 记录原编制人（用于重新分配通知） ──
     old_assigned_to: UUID | None = None
     if data.assigned_to is not None:
@@ -139,21 +146,33 @@ async def assign_workpaper(
         )).scalar_one_or_none()
         old_assigned_to = wp_row  # 可能为 None（首次分配）
 
+    from app.services.wp_visibility.delegation_guard import DelegationError
+
     try:
         result = await svc.assign_workpaper(
             db=db, wp_id=wp_id, project_id=project_id,
             assigned_to=data.assigned_to,
             reviewer=data.reviewer,
+            actor_user_id=current_user.id,
+            expand_scope=data.expand_scope,
+            scope_reason=data.scope_reason,
         )
         await db.commit()
+    except DelegationError as e:
+        # 编制人走底稿主编委派事务：已裁 / 在回收站 409，被委派人看不到该循环 400（带理由 expand_scope 重试）
+        await db.rollback()
+        raise HTTPException(status_code=e.http_status, detail=e.http_detail()) from e
     except ValueError as e:
+        await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-    # ── 重新分配通知（仅当 assigned_to 变更且原编制人存在时） ──
+    # ── 重新分配通知（仅当 assigned_to 变更且原编制人存在时；新编制人用解析出的用户 id，入参可能是人员 id） ──
+    new_assigned_to = UUID(result["assigned_to"]) if result.get("assigned_to") else None
     if (
         data.assigned_to is not None
         and old_assigned_to is not None
-        and old_assigned_to != data.assigned_to
+        and new_assigned_to is not None
+        and old_assigned_to != new_assigned_to
     ):
         try:
             await _send_reassignment_notifications(
@@ -161,7 +180,7 @@ async def assign_workpaper(
                 project_id=project_id,
                 wp_id=wp_id,
                 old_assignee_id=old_assigned_to,
-                new_assignee_id=data.assigned_to,
+                new_assignee_id=new_assigned_to,
             )
             await db.commit()
         except Exception as e:

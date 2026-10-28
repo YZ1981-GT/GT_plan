@@ -271,7 +271,8 @@ export function defaultGroups(): DailyBankGroup[] {
 
 /** 从报表截止日或年份得到自然年日期列表（含闰年） */
 export function buildYearDates(year: number): string[] {
-  const y = year > 1900 && year < 2200 ? year : new Date().getFullYear() - 1
+  const y = year > 1900 && year < 2200 ? year : 0
+  if (y === 0) return [] // 年度不可用时返回空
   const dates: string[] = []
   const d = new Date(Date.UTC(y, 0, 1))
   const end = Date.UTC(y, 11, 31)
@@ -289,7 +290,7 @@ export function yearFromBsDate(bsDate?: string): number {
     const y = parseInt(bsDate.slice(0, 4), 10)
     if (Number.isFinite(y) && y > 1900) return y
   }
-  return new Date().getFullYear() - 1
+  return 0
 }
 
 /** 单日：组利息 */

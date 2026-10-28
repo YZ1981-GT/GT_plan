@@ -74,6 +74,7 @@ function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSa
     projectId: computed(() => 'proj-1'),
     wpId: computed(() => 'wp-1'),
     wpDetail: ref({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 1 } as any),
+    setWpDetail: vi.fn(),
     univerAPI: ref({
       getActiveWorkbook: () => ({
         getSnapshot: () => ({ id: 'wb1', sheets: { s1: {} } }),
@@ -137,6 +138,18 @@ describe('useEditorSave — onSave 主要行为', () => {
     vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
   })
 
+  it('保存后的影响分析按项目年度（spec post-push-residual-defect-closure 6.5.3：原先兜底今年）', async () => {
+    const opts = makeOptions({ year: computed(() => 2025) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: 2025, project_id: 'proj-1' }))
+  })
+
+  it('项目没填年度、底稿详情也没有 year：影响分析传 null（由 useStaleImpact 跳过），不拿今年', async () => {
+    const opts = makeOptions({ year: computed(() => null) })
+    await useEditorSave(opts).onSave()
+    expect(opts.staleImpact.notify).toHaveBeenCalledWith(expect.objectContaining({ year: null }))
+  })
+
   it('onSave 调用 httpApi.post 并在成功后将 dirty 设为 false', async () => {
     const opts = makeOptions({ dirty: ref(true) })
     const result = useEditorSave(opts)
@@ -189,6 +202,16 @@ describe('useEditorSave — onSave 主要行为', () => {
     } finally {
       globalThis.fetch = origFetch
     }
+  })
+
+  it('保存后的最新详情经 setWpDetail 交回持有者，不写只读详情（R1：版本号不再停在旧值）', async () => {
+    const wpDetail = computed(() => ({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 1 } as any))
+    const setWpDetail = vi.fn()
+    const success = await useEditorSave(makeOptions({ wpDetail, setWpDetail })).onSave()
+
+    expect(success).toBe(true)
+    expect(setWpDetail).toHaveBeenCalledTimes(1)
+    expect(setWpDetail).toHaveBeenCalledWith({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 })
   })
 
   it('onSave 在 univerAPI 为 null 时返回 false 且不调用 httpApi', async () => {

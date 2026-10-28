@@ -259,6 +259,7 @@
  * Requirements: 3.1-3.4
  * 18列2区段Tab + 动态行 + 公式列 + 导入导出 + 统计
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -360,11 +361,7 @@ async function handleImportFromLedger() {
   const codes = k2GrossQueryCodes(props.tbSourceCodes)
   const codeText = codes.join('、')
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: codes[0], year: undefined },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { accountPrefix: codes })).rows
     if (list.length === 0) {
       ElMessage.warning(`未找到 ${codeText} 子科目余额数据`)
       return
@@ -376,9 +373,10 @@ async function handleImportFromLedger() {
         return codes.some((c) => code.startsWith(`${c}-`) || code.startsWith(`${c}.`))
       })
       .map((item: any) => ({
-        name: String(item.account_name ?? item.standard_account_name ?? '未知'),
+        name: String(item.account_name ?? '未知'),
         beginBalance: Number(item.opening_balance ?? 0),
-        increase: Math.max(0, Number(item.closing_balance ?? item.unadjusted_amount ?? 0) - Number(item.opening_balance ?? 0)),
+        // 期末未审数 − 期初（端点没有 closing_balance）
+        increase: Math.max(0, Number(item.unadjusted_amount ?? 0) - Number(item.opening_balance ?? 0)),
       }))
     if (items.length === 0) {
       ElMessage.warning(`未找到 ${codeText} 明细子科目`)

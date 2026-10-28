@@ -20,18 +20,34 @@ import { registerPendingFlusher } from '../sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * 两区列与模板 D2-11 一致（spec oo-writeback-template-parity-closure R3 批 B2b）：
+ * - 转回区 A~H：单位名称 / 转回原因 / 收回方式 / 原确定坏账准备的依据 / 收回或转回金额 /
+ *   收回或转回前累计已计提坏账准备金额 / 合理性分析 / 索引号
+ * - 核销区 A~H：单位名称 / 应收账款性质 / 核销金额 / 核销原因 / 履行的核销程序（approvalDoc）/
+ *   是否由关联交易产生 / 合理性分析 / 索引号
+ * 合理性分析 = auditorComment（文本，带 AI）；originalDate / isReasonable 模板没有，只在 HTML 侧。
+ */
 export interface WriteoffRow {
   rowId: string
   section: 'reversal' | 'writeoff'  // 转回 or 核销
-  debtorName: string           // 债务人名称
-  amount: number               // 金额
+  debtorName: string           // 单位名称
+  amount: number               // 收回或转回金额 / 核销金额
   originalDate: string         // 原确认日期
   reason: string               // 转回/核销原因
-  approvalDoc: string          // 审批文件
-  isReasonable: string         // 是否合理 (Y/N/'')
-  auditorComment: string       // 审计师意见
+  approvalDoc: string          // 审批文件（核销区 = 履行的核销程序）
+  isReasonable: string         // 合理性判断（合理 / 不合理 / 待核实）
+  auditorComment: string       // 合理性分析
   indexRef: string             // 索引号
+  recoveryMethod: string       // 收回方式（转回区 C）
+  originalBasis: string        // 原确定坏账准备的依据（转回区 D）
+  cumulativeProvision: number  // 收回或转回前累计已计提坏账准备金额（转回区 F）
+  receivableType: string       // 应收账款性质（核销区 B）
+  isRelatedParty: string       // 是否由关联交易产生（核销区 F）
 }
+
+/** 金额字段（录入按数值解析） */
+const NUMERIC_FIELDS: (keyof WriteoffRow)[] = ['amount', 'cumulativeProvision']
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -56,6 +72,11 @@ function createEmptyRow(section: 'reversal' | 'writeoff'): WriteoffRow {
     isReasonable: '',
     auditorComment: '',
     indexRef: '',
+    recoveryMethod: '',
+    originalBasis: '',
+    cumulativeProvision: 0,
+    receivableType: '',
+    isRelatedParty: '',
   }
 }
 
@@ -75,6 +96,11 @@ function parseRows(jsonStr: string | null | undefined, section: 'reversal' | 'wr
       isReasonable: raw.isReasonable || '',
       auditorComment: raw.auditorComment || '',
       indexRef: raw.indexRef || '',
+      recoveryMethod: raw.recoveryMethod || '',
+      originalBasis: raw.originalBasis || '',
+      cumulativeProvision: parseNum(raw.cumulativeProvision),
+      receivableType: raw.receivableType || '',
+      isRelatedParty: raw.isRelatedParty || '',
     }))
   } catch {
     return []
@@ -123,6 +149,11 @@ export function useD2WriteoffCheck(options: UseD2BaseOptions) {
 
   const writeoffTotal: ComputedRef<number> = computed(() => {
     return writeoffRows.value.reduce((sum, r) => sum + r.amount, 0)
+  })
+
+  /** 转回区「收回或转回前累计已计提」合计（模板 F16 = SUM(F13:F15)） */
+  const reversalProvisionTotal: ComputedRef<number> = computed(() => {
+    return reversalRows.value.reduce((sum, r) => sum + r.cumulativeProvision, 0)
   })
 
   // ─── Consistency Warning ───────────────────────────────────────────────
@@ -201,8 +232,8 @@ export function useD2WriteoffCheck(options: UseD2BaseOptions) {
     const key = field as keyof WriteoffRow
     if (key === 'rowId' || key === 'section') return
 
-    if (key === 'amount') {
-      row.amount = parseNum(value)
+    if (NUMERIC_FIELDS.includes(key)) {
+      ;(row as any)[key] = parseNum(value)
     } else {
       ;(row as any)[key] = String(value)
     }
@@ -266,6 +297,7 @@ export function useD2WriteoffCheck(options: UseD2BaseOptions) {
     reversalRows,
     writeoffRows,
     reversalTotal,
+    reversalProvisionTotal,
     writeoffTotal,
     reversalConsistencyWarning,
     addRow,

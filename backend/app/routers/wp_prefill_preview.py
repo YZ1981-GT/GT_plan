@@ -23,6 +23,7 @@ from app.deps import require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper
 from app.schemas._common import OptionalAmountDecimal
+from app.services.project_audit_year import fetch_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,22 @@ def _calc_change_pct(old_val: float | None, new_val: float | None) -> float | No
     return abs((new_val - old_val) / old_val) * 100
 
 
+
+
+async def _require_project_audit_year(
+    db: AsyncSession,
+    project_id: UUID,
+) -> int:
+    """返回项目审计年度；缺失时在进入预填充业务前明确失败。"""
+    year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        raise HTTPException(
+            status_code=422,
+            detail="未设置审计年度，请先在项目基本信息中填写",
+        )
+    return year
+
+
 @router.post("/preview")
 async def prefill_preview(
     project_id: UUID,
@@ -84,12 +101,8 @@ async def prefill_preview(
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    # 获取项目年度
-    from app.models.core import Project
-    proj = (await db.execute(sa.select(Project).where(Project.id == project_id))).scalar_one_or_none()
-    year = 2025
-    if proj and proj.audit_period_end:
-        year = proj.audit_period_end.year
+    # 获取项目审计年度；缺失时不能猜测年份，否则会把预填结果写入错误年度。
+    year = await _require_project_audit_year(db, project_id)
 
     # 执行 prefill（不写入 — 我们只需要计算结果）
     result = await prefill_workpaper_real(db, project_id, year, wp_id)
@@ -133,7 +146,6 @@ async def prefill_apply(
     后续迭代将支持选择性写入。
     """
     from app.services.prefill_engine import prefill_workpaper_real
-    from app.models.core import Project
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(
@@ -145,10 +157,7 @@ async def prefill_apply(
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    proj = (await db.execute(sa.select(Project).where(Project.id == project_id))).scalar_one_or_none()
-    year = 2025
-    if proj and proj.audit_period_end:
-        year = proj.audit_period_end.year
+    year = await _require_project_audit_year(db, project_id)
 
     result = await prefill_workpaper_real(db, project_id, year, wp_id)
 

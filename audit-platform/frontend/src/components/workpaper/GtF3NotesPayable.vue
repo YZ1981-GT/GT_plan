@@ -619,7 +619,7 @@ const auditYear = computed(() => {
 
   if (bs && String(bs).length >= 4) return parseInt(String(bs).slice(0, 4), 10)
 
-  return new Date().getFullYear() - 1
+  return null
 
 })
 

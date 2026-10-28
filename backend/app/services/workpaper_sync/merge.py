@@ -112,6 +112,7 @@ from app.services.workpaper_sync.conflicts import (
     resolved_value_for,
 )
 from app.services.workpaper_sync.contracts import (
+    FORMULA_MODES,
     PROTECTED_MODES,
     ROW_UUID_PLACEHOLDER,
     FieldMode,
@@ -121,6 +122,7 @@ from app.services.workpaper_sync.contracts import (
     cell_in_ranges,
 )
 from app.services.workpaper_sync.definitions import canonical_json_bytes
+from app.services.workpaper_sync import formula_recompute_evidence as FRE
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 0. 未接线消费方登记（Task 13 的 protocol-type 延后同款）
@@ -409,8 +411,10 @@ RETIRED_DEFERRALS: Final[tuple[Mapping[str, Any], ...]] = (
         # spec d2-online-edit-platform-closure 的 Task 8（验收期发现的 R17）。
         "retired_by_task": "8",
         "consumer": (
-            "cleared_field_view.store_view_with_cleared_fields(...) —— OO→HTML 协调器把它产出的"
-            "视图交给 store 镜像，发布出去的 projection 不变"
+            "cleared_field_view.store_view_with_cleared_fields(...) 与 "
+            "store_view_with_recomputed_formulas(...)（spec oo-formula-recompute-not-tamper R3：读同一份 "
+            "`verdicts`，把 took_recomputed 的公式值放行进 store）—— OO→HTML 协调器把两层视图交给 "
+            "store 镜像，发布出去的 projection 不变"
         ),
         "expected_consumer_module": "app/services/workpaper_sync/cleared_field_view.py",
         # 🔴 无 `commits_through`：纯函数（final projection + MergeOutcome + 契约 → 镜像视图），
@@ -893,7 +897,8 @@ class ContractIndex:
         真正整列是公式的动态行字段，CS-13 要求它声明 ``mode=formula``，走第一类判定。
         """
         spec = template.spec
-        if spec.mode is FieldMode.formula:
+        # 本表公式与跨表公式同为公式字段（`contracts.FORMULA_MODES`，R7）。
+        if spec.mode in FORMULA_MODES:
             return ProtectionPolicy.read_only_formula
         if spec.mode is FieldMode.auto_source:
             return ProtectionPolicy.read_only_auto_source
@@ -919,7 +924,7 @@ class ContractIndex:
 
     @staticmethod
     def _field_source(spec: FieldSpec, document_type: str) -> FieldSource:
-        if spec.mode is FieldMode.formula:
+        if spec.mode in FORMULA_MODES:
             return FieldSource.server_formula
         if spec.mode is FieldMode.auto_source:
             return FieldSource.auto_data_source
@@ -1103,6 +1108,8 @@ class FieldVerdict(str, Enum):
 
     kept_current = "kept_current"
     took_incoming = "took_incoming"
+    #: 受保护公式 / 遮罩格：公式完好且输入一致 ⇒ 采纳 OO 的重算结果（spec oo-formula-recompute-not-tamper R1）。
+    took_recomputed = "took_recomputed"
     both_sides_agree = "both_sides_agree"
     row_deleted = "row_deleted"
     word_only = "word_only"
@@ -1166,7 +1173,8 @@ class MergeOutcome:
         return tuple(
             key
             for key, verdict in sorted(self.verdicts.items())
-            if verdict in (FieldVerdict.took_incoming, FieldVerdict.both_sides_agree)
+            if verdict
+            in (FieldVerdict.took_incoming, FieldVerdict.took_recomputed, FieldVerdict.both_sides_agree)
         )
 
     def value_of(self, stable_key: str) -> ValueEnvelope:
@@ -1422,6 +1430,13 @@ def merge_projections(
     # ── 8.5 逐字段真值表 ──────────────────────────────────────────────
     merged_values: dict[str, FieldValue] = {}
     word_only_keys: list[str] = []
+    # OO 重算候选（spec oo-formula-recompute-not-tamper R1）：公式完好的先采纳，循环后复核输入一致。
+    base_formulas, incoming_formulas = base.formula_signatures, incoming.formula_signatures
+    recomputed: list[str] = []
+    recomputed_new_rows: list[str] = []
+    current_only: list[str] = []  # merged 取 current 且 current ≠ base ⇒ 与 OO 一侧不同
+    added_rows = {(d.table_key, d.row_key) for d in row_decisions if d.lifecycle is RowLifecycle.added_by_incoming}
+    families: Mapping[str, frozenset[str]] | None = None
     for key in all_keys:
         locator = locators[key]
         row_id = (locator.table_key, locator.row_key)
@@ -1504,36 +1519,55 @@ def merge_projections(
             and i.present
             and not same_incoming_base
         ):
-            if (
-                locator.protection_policy in _SPREADSHEET_RECOMPUTED_POLICIES
-                and recomputed_values_equal(i.value, b.value, locator.value_type)
-            ):
+            recomputed_policy = locator.protection_policy in _SPREADSHEET_RECOMPUTED_POLICIES
+            if recomputed_policy and recomputed_values_equal(i.value, b.value, locator.value_type):
                 # OO 重算公式得到的是**同一个数**（按分取整后相等），只差两边浮点累加的
                 # 尾差 ⇒ OO 侧没改它，按「i == b」处理：保留 current（公式结果仍由服务端
                 # 定）。把它当篡改会让 D2 每次保存都报上百条 protected 冲突（真栈实测
                 # 108 条），双向回写整条不可用。
                 verdicts[key] = FieldVerdict.kept_current
+                if not same_current_base:
+                    current_only.append(key)
                 _put(merged_values, locator, c)
                 continue
-            # Property 24：current 公式与值不变，只生成 protected 冲突。
-            verdicts[key] = FieldVerdict.conflict_protected
-            conflicts.append(
-                ConflictRecord(
-                    locator=locator,
-                    kind=ConflictKind.protected,
-                    base=b,
-                    current=c,
-                    incoming=i,
-                    suggested_action=SuggestedAction.keep_current,
-                    reason=(
-                        f"受保护字段（{locator.protection_policy.value}）在 OO 侧被改动 —— "
-                        "公式/auto-source 结果不得被覆盖（AC 6.6），"
-                        "incoming 值只用于篡改检测"
-                    ),
-                )
+            evidence = (
+                FRE.classify_formula_evidence(base_formulas, incoming_formulas, key)
+                if recomputed_policy
+                else FRE.FormulaEvidence.unobserved
             )
+            if evidence is FRE.FormulaEvidence.intact:
+                # 公式没动过 ⇒ 值的变化是 OO 重算（R1.1）；输入一致与否在循环后复核。
+                verdicts[key] = FieldVerdict.took_recomputed
+                recomputed.append(key)
+                _put(merged_values, locator, i)
+                continue
+            # Property 24（R1.3 / R1.4）：公式被动过、无证据或自动取数 ⇒ protected 冲突、保留 current。
+            verdicts[key] = FieldVerdict.conflict_protected
+            reason = FRE.protected_conflict_reason(
+                locator.protection_policy.value, evidence,
+                base_signature=(base_formulas or {}).get(key),
+                incoming_signature=(incoming_formulas or {}).get(key),
+            )
+            conflicts.append(ConflictRecord(
+                locator=locator, kind=ConflictKind.protected, base=b, current=c, incoming=i,
+                suggested_action=SuggestedAction.keep_current, reason=reason,
+            ))
             _put(merged_values, locator, c)
             continue
+
+        if (
+            row_id in added_rows and i.present and not b.present and not c.present
+            and locator.mode in FORMULA_MODES
+            and locator.protection_policy in _SPREADSHEET_RECOMPUTED_POLICIES
+        ):
+            if families is None:
+                families = FRE.formula_families(base_formulas, base)
+            if FRE.signature_in_family(incoming_formulas, key, locator.row_key, families):
+                # OO 新增行的公式就是本列已有公式 ⇒ 值是重算结果（R1.6）；merged 与现状同为 i。
+                verdicts[key] = FieldVerdict.took_recomputed
+                recomputed_new_rows.append(key)
+                _put(merged_values, locator, i)
+                continue
 
         if same_incoming_base:
             verdicts[key] = (
@@ -1541,6 +1575,8 @@ def merge_projections(
                 if row_id in accepted_row_deletions and not c.present
                 else FieldVerdict.kept_current
             )
+            if verdicts[key] is FieldVerdict.kept_current and not same_current_base:
+                current_only.append(key)
             _put(merged_values, locator, c)
             continue
         if same_current_base:
@@ -1587,6 +1623,22 @@ def merge_projections(
         )
         _put(merged_values, locator, c)
 
+    # ── 8.6 重算候选的输入一致复核（R1.2 / R1.6）：OO 按自己一侧的输入算，合并结果的输入
+    #    与之不同（current 独有改动 / 任何冲突 / 搁置）时 OO 算出的值不能采用。
+    has_candidates = bool(recomputed or recomputed_new_rows)
+    drift = _first_input_drift(current_only, conflicts, verdicts) if has_candidates else None
+    if drift is not None:
+        for key in recomputed:
+            locator, (b, c, i) = locators[key], envs[key]
+            verdicts[key] = FieldVerdict.conflict_protected
+            conflicts.append(ConflictRecord(
+                locator=locator, kind=ConflictKind.protected, base=b, current=c, incoming=i,
+                suggested_action=SuggestedAction.keep_current, reason=FRE.recompute_drift_reason(drift),
+            ))
+            _put(merged_values, locator, c)
+        for key in recomputed_new_rows:
+            verdicts[key] = FieldVerdict.took_incoming  # merged 本就是 incoming（现状）
+
     merged = Projection(
         contract_id=contract.contract_id,
         semantic_version=contract.semantic_version,
@@ -1626,6 +1678,22 @@ def _comparable(
         except ValueNormalizationError:
             return False
     return True
+
+
+def _first_input_drift(
+    current_only: Sequence[str],
+    conflicts: Sequence[ConflictRecord],
+    verdicts: Mapping[str, "FieldVerdict"],
+) -> str | None:
+    """合并结果里第一处与 OO 一侧读到的不同的地方；None = 输入一致（R1.2）。took_incoming /
+    both_sides_agree / row_deleted 按构造与 incoming 相同；不同只来自 kept_current 而 current ≠ base、
+    任何冲突（裁决可能取 current）、搁置。"""
+    if current_only:
+        return current_only[0]
+    if conflicts:
+        return conflicts[0].locator.stable_field_key
+    held = (FieldVerdict.held_by_row_conflict, FieldVerdict.held_by_schema_conflict)
+    return next((key for key, verdict in verdicts.items() if verdict in held), None)
 
 
 def _classify_row(

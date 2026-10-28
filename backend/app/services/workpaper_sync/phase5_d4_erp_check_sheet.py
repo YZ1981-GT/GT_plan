@@ -33,7 +33,7 @@ from typing import Any, Final, Mapping
 
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
 )
 
 MANAGED_SHEET_D413: Final[str] = "营业收入账面金额与ERP系统核对记录D4-13"

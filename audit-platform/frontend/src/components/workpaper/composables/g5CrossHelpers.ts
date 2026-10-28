@@ -134,10 +134,9 @@ export function aggregateProvisionFromG53(
 /** 无 closingAudited 时按滚动态公式推算 */
 function computeClosingAuditedFallback(r: any): number {
   if (r?.openingUnadjusted == null && r?.provisionIncrease == null) return 0
-  const openingAudited =
-    parseNum(r.openingUnadjusted) + parseNum(r.openingAdjustment)
+  // 与 G5-3 表单同一口径（模板 J = B + SUM(E:F) − SUM(G:I)：从期初未审滚动，期初调整不进期末）
   const closingUnadjusted =
-    openingAudited
+    parseNum(r.openingUnadjusted)
     + parseNum(r.provisionIncrease)
     + parseNum(r.otherIncrease)
     - parseNum(r.reversal)
@@ -244,9 +243,8 @@ export async function fetchTb1531AuxByCustomer(
   try {
     const http = (await import('@/utils/http')).default
     const { resolveAuditYearNumber } = await import('./workpaperAuditYear')
-    const y = year
-      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
-      ?? (new Date().getFullYear() - 1)
+    const y = year ?? resolveAuditYearNumber(undefined)
+    if (y == null) return out
     const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance-detail`, {
       params: {
         account_code: G5_ACCOUNT_CODE,

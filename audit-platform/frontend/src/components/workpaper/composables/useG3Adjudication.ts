@@ -13,6 +13,7 @@
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 4.1
  * Requirements: 3.1~3.10
  */
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -65,7 +66,7 @@ export interface G3AdjudicationRow {
   openingAJE: number
   openingRJE: number
   openingAdjusted: number       // 公式：期初未审 + AJE + RJE
-  closingUnadjusted: number     // 借方公式：期初审定 + 本期宣告 - 本期收回
+  closingUnadjusted: number     // 借方公式：期初未审 + 本期宣告 - 本期收回
   closingAJE: number
   closingRJE: number
   closingAdjusted: number       // 公式：期末未审 + AJE + RJE
@@ -94,8 +95,11 @@ const CONCLUSION_KEY = G3_ADJ_CONCLUSION_KEY
 /** 从存储行计算展示行（含公式字段） */
 function computeRow(stored: StoredG3AdjRow): G3AdjudicationRow {
   const openingAdjusted = calcAdjustedAmount(stored.openingUnadjusted, stored.openingAJE, stored.openingRJE)
-  // 借方科目：期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)
-  const closingUnadjusted = calcDebitBalance(openingAdjusted, stored.currentDeclared, stored.currentReceived)
+  // 借方科目：期末未审 = 期初未审 + 本期宣告(借方) - 本期收回(贷方)。权威模板 G3-1 期末未审 F 取 G3-2
+  // 期末数 F = 期初数 + 本期增加 − 本期减少（未审列），期初调整经 G3-1 期末账项 / 重分类调整列（G3-2
+  // 「期初调整」G / H + 本期 I−J / K−L）结转，不进期末未审。原先从期初审定起算
+  // （spec oo-writeback-template-parity-closure R2）
+  const closingUnadjusted = calcDebitBalance(stored.openingUnadjusted, stored.currentDeclared, stored.currentReceived)
   const closingAdjusted = calcAdjustedAmount(closingUnadjusted, stored.closingAJE, stored.closingRJE)
   const changeAmount = calcChangeAmount(closingAdjusted, openingAdjusted)
   const changeRate = calcChangeRate(openingAdjusted, closingAdjusted)
@@ -382,21 +386,10 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     const year = resolveAuditYear()
     if (!pid || year == null) return null
     try {
-      const res = await api.get(`/api/projects/${pid}/trial-balance`, {
-        params: { year, account_prefix: G3_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res)
-        ? (res?.data ?? res)
-        : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G3_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      const amount = parseNum(
-        hit.audited_amount ?? hit.unadjusted_amount ?? hit.ending_balance
-          ?? ((Number(hit.debit_amount ?? 0) - Number(hit.credit_amount ?? 0))),
-      )
+      const { rows: list } = await fetchTrialBalanceRows(pid, { year, accountPrefix: G3_ACCOUNT_CODE })
+      // 审定优先、其次未审（科目及其明细科目之和）；端点没有 ending_balance / 借贷字段
+      const amount = tbSumUnder(list, G3_ACCOUNT_CODE, 'audited_amount') ?? tbSumUnder(list, G3_ACCOUNT_CODE, 'unadjusted_amount')
+      if (amount == null) return null
       setTrialBalance(amount)
       return amount
     } catch {

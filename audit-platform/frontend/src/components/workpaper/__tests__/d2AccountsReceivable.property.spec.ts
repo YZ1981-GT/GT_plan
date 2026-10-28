@@ -76,7 +76,8 @@ describe('Feature: d2-accounts-receivable, Property 1: 审定表公式计算不�
           if (priorPeriod === 0 && audited === 0) {
             expect(rate).toBe('')
           } else if (priorPeriod === 0) {
-            expect(rate).toBe(1)
+            // 模板 IF(AND(E=0,I>0),1,J/E)：期末为负时除零，记 N/A
+            expect(rate).toBe(audited > 0 ? 1 : 'N/A')
           } else {
             expect(rate).toBeCloseTo((audited - priorPeriod) / priorPeriod, 5)
           }
@@ -151,10 +152,10 @@ describe('Feature: d2-accounts-receivable, Property 3: ECL 迁徙率法计算正
           const provision = calculateProvision(balance, lossRate)
           expect(provision).toBeCloseTo(balance * lossRate, 5)
 
-          // Assert: difference = actual - should
+          // Assert: difference = should - actual（模板 ⑤=③-④：应计 − 实际，spec oo-writeback-template-parity-closure R2）
           const shouldProvision = provision
           const difference = calculateDifference(actualProvision, shouldProvision)
-          expect(difference).toBeCloseTo(actualProvision - shouldProvision, 5)
+          expect(difference).toBeCloseTo(shouldProvision - actualProvision, 5)
         },
       ),
       { numRuns: 100 },

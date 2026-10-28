@@ -27,7 +27,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -133,8 +133,11 @@ class TestN5InertRepair:
         assert "onModeChange: () => {}" not in stripped
 
     def test_health_check_exists(self):
+        """健康探针走统一能力层 `sync/onlyOfficeHealth.ts`，宿主里不再直调端点（BP-4 同源纪律）。"""
         src = (WP_COMPONENTS / "GtN5IncomeTaxExpense.vue").read_text("utf-8", errors="replace")
-        assert "onlyoffice/health" in src
+        stripped = scanner.strip_comments(src)
+        assert "fetchOnlyOfficeHealthy" in stripped
+        assert "onlyoffice/health" not in stripped
 
     def test_explicit_feedback(self):
         src = (WP_COMPONENTS / "GtN5IncomeTaxExpense.vue").read_text("utf-8", errors="replace")
@@ -144,7 +147,11 @@ class TestN5InertRepair:
     def test_mode_options_plain_array(self):
         """NB-P14：modeOptions 为普通数组（不带 .value）。"""
         src = (WP_COMPONENTS / "GtN5IncomeTaxExpense.vue").read_text("utf-8", errors="replace")
-        assert "modeOptions: [" in src or "modeOptions:" in src
+        stripped = scanner.strip_comments(src)
+        # 对象属性写法 `modeOptions: [` 与独立常量 `const modeOptions = [` 都是普通数组字面量；
+        # 判据要排除的是 computed / ref 包装（那样模板里就得写 `.value`）。
+        assert re.search(r"\bmodeOptions\s*(?::|=)\s*\[", stripped), "N5 modeOptions 不是普通数组字面量"
+        assert not re.search(r"\bmodeOptions\s*=\s*(?:computed|ref)\s*\(", stripped)
 
 
 # ════════════════════════════════════════════════════════════════════════════

@@ -41,7 +41,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type CrossRefUpdatedPayload } from '@/utils/eventBus'
-import { resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
+import { PROGRAM_SHEET_ALIAS, resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
 import type { SheetContentType } from '@/types/workpaperSemanticContract'
 import type { WpComponentType } from '@/types/componentCapabilities.generated'
 import type { RenderConfig, SheetRenderConfig } from '@/types/renderConfig'
@@ -77,14 +77,22 @@ export interface EngineSheetIdentity {
   name: string
 }
 
+export { PROGRAM_SHEET_ALIAS }
+
 /**
  * 从 render-config 的可见 sheet 中解析定位器。
- * 初始 deep-link、页签、导航和 locate 共用同一名称归一化规则。
+ * 初始 deep-link、页签、导航和 locate 共用同一名称归一化规则；
+ * 别名 `PROGRAM_SHEET_ALIAS` 认第一张程序表页签（没有程序表 ⇒ null，调用方回退默认页签）。
  */
 export function resolveRenderSheet(
   sheets: readonly SheetRenderConfig[],
   locator: string | null | undefined,
 ): SheetRenderConfig | null {
+  if (locator === PROGRAM_SHEET_ALIAS) {
+    // 循环册里的程序表页 componentType 是循环组件（e1-monetary-fund / h1-fixed-assets / d2-accounts-receivable …），
+    // 只有 sheet_type = procedure 认得出来；a-program-console 只出现在独立程序表册（2026-10-26 浏览器实测 E1 / H1 / D2-1 / I1A）
+    return sheets.find((sheet) => sheet.componentType === 'a-program-console' || resolveSheetType(sheet) === 'procedure') ?? null
+  }
   const resolvedName = resolveSheetNameByDeepLink(
     sheets.map((sheet) => sheet.sheet_name),
     locator,
@@ -222,7 +230,18 @@ function _detectSheetTypeByName(name: string): SheetContentType | null {
   return null
 }
 
-export function useWpRenderer(wpId: Ref<string>) {
+/** 只取附带信息的调用方（壳的侧栏 decision_trace）传 `silent`：失败不弹全局提示（spec procedure-chain-hardening-and-java-contracts R10）。 */
+export interface WpRendererOptions {
+  silent?: boolean
+}
+
+/**
+ * 带配置的 GET 不再走 apiProxy 的在途共享，同 URL 并发时会撞上 http 的 GET 去重（后发取消先发），
+ * 与 GtWpRenderer 自己那一发互相取消 ⇒ silent 这一发同时关掉去重。
+ */
+const SILENT_AUX_GET = { _silent: true, _dedupe: false } as any
+
+export function useWpRenderer(wpId: Ref<string>, options: WpRendererOptions = {}) {
   const renderConfig = ref<RenderConfig | null>(null)
   const loading = ref(true)
   const error = ref<Error | null>(null)
@@ -248,7 +267,9 @@ export function useWpRenderer(wpId: Ref<string>) {
     loading.value = true
     error.value = null
     try {
-      const res = await api.get<RenderConfig>(`/api/workpapers/${id}/render-config`)
+      const res = await api.get<RenderConfig>(
+        `/api/workpapers/${id}/render-config`, options.silent ? SILENT_AUX_GET : undefined,
+      )
       renderConfig.value = res
     } catch (e) {
       error.value = e as Error

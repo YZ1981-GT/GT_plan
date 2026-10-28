@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG10Adjudication — G10-1 审定表（对齐 Excel：三部分结构 + 期初/期末未审·调整·审定）
@@ -62,16 +63,23 @@ const ITEM_ID_CONCLUSION = 'G10-adj-conclusion'
 
 type RowStore = ReturnType<typeof parseG10AdjStore>
 
+/**
+ * 期末未审：有录入值用录入值；没有而存量行带本期贷 / 借方时倒推 = 期初未审 + 贷方 − 借方。
+ *
+ * 权威模板 G10-1 期末未审 E 是录入列，对应 G10-2 期末余额 M = K + L = (C + H) + (D + I + J)，起点是
+ * 期初未审（C / D），期初调整 F 只进期初审定 G。存储层 parseG10AdjStore 倒推时也从期初未审起算；
+ * 这里的回退原先从期初审定起算，两处口径不一（spec oo-writeback-template-parity-closure R2）。
+ */
 function resolveClosingUnadjusted(
   raw: RowStore[string],
-  openingAdjusted: number,
+  openingUnadjusted: number,
 ): number {
   const direct = parseNum(raw?.closingUnadjusted)
   if (Math.abs(direct) >= 0.005) return direct
   const credit = parseNum(raw?.periodCredit)
   const debit = parseNum(raw?.periodDebit)
   if (Math.abs(credit) >= 0.005 || Math.abs(debit) >= 0.005) {
-    return calcCreditBalance(openingAdjusted, credit, debit)
+    return calcCreditBalance(openingUnadjusted, credit, debit)
   }
   return direct
 }
@@ -114,7 +122,7 @@ export function useG10Adjudication(opts: {
     const openingAJE = parseNum(raw.openingAJE)
     const openingRJE = parseNum(raw.openingRJE)
     const openingAdjusted = calcAdjustedAmount(openingUnadjusted, openingAJE, openingRJE)
-    const closingUnadjusted = resolveClosingUnadjusted(raw, openingAdjusted)
+    const closingUnadjusted = resolveClosingUnadjusted(raw, openingUnadjusted)
     const closingAJE = parseNum(raw.closingAJE)
     const closingRJE = parseNum(raw.closingRJE)
     const closingAdjusted = calcAdjustedAmount(closingUnadjusted, closingAJE, closingRJE)
@@ -433,11 +441,8 @@ export function useG10Adjudication(opts: {
       return false
     }
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      // 不按前缀筛：resolveG10TbRow 还要按科目名称回退找行
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       const hit = resolveG10TbRow(list)
       if (hit) {
         tbResolvedCode.value = g10TbResolvedCode(hit)

@@ -15,7 +15,8 @@ export type { TraceLocation } from './useReportTrace'
 
 export interface UseReportCellActionsOptions {
   projectId: ComputedRef<string>
-  year: ComputedRef<number>
+  /** 审计年度；项目没填为 null（各子组合式函数在取数 / 写入处判空） */
+  year: ComputedRef<number | null>
   activeTab: Ref<string>
   rows: Ref<ReportRow[]>
   reportMode: Ref<string>

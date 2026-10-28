@@ -113,9 +113,9 @@ ADAPTER_ID: Final[str] = "g13.fair_value_changes_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G13F"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G13 公允价值变动收益.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；实测 58,717 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；实测 50,413 B）
 TEMPLATE_SHA256: Final[str] = (
-    "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099"
+    "2848d2a2bf53704b5fc0e9acc7618d5b3e3e1f0c1d05e459929db802a746fae0"
 )
 
 #: 受管 store item —— 按值取自 `useG13Detail.ts` 的 `ITEM_ID_SKELETON`

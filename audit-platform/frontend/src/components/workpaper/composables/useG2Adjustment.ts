@@ -258,7 +258,11 @@ export function useG2Adjustment(opts: {
     lastSyncMsg.value = ''
     try {
       const yearRaw = opts.auditYear?.value
-      const year = Number(yearRaw) || new Date().getFullYear()
+      const year = Number(yearRaw)
+      if (!Number.isFinite(year) || year <= 0) {
+        lastSyncMsg.value = '未设置审计年度，无法读取调整分录'
+        return 0
+      }
       const res: any = await api.get(adjPaths.list(opts.projectId.value), {
         params: { year, page: 1, page_size: 200 },
         _silent: true,

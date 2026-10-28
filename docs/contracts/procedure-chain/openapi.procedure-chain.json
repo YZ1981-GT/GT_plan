@@ -1,0 +1,1274 @@
+{
+  "components": {
+    "schemas": {
+      "DelegationApplyRequest": {
+        "properties": {
+          "assignee_staff_id": {
+            "format": "uuid",
+            "title": "Assignee Staff Id",
+            "type": "string"
+          },
+          "best_effort": {
+            "default": false,
+            "title": "Best Effort",
+            "type": "boolean"
+          },
+          "conflict_policy": {
+            "default": "reject_on_conflict",
+            "title": "Conflict Policy",
+            "type": "string"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "expand_scope": {
+            "default": false,
+            "title": "Expand Scope",
+            "type": "boolean"
+          },
+          "preview_id": {
+            "format": "uuid",
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "reviewer_staff_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Staff Id"
+          },
+          "scope_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Reason"
+          },
+          "selector": {
+            "$ref": "#/components/schemas/DelegationSelector"
+          },
+          "unassigned_only": {
+            "default": false,
+            "title": "Unassigned Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selector",
+          "assignee_staff_id",
+          "preview_id",
+          "request_id"
+        ],
+        "title": "DelegationApplyRequest",
+        "type": "object"
+      },
+      "DelegationPreviewRequest": {
+        "properties": {
+          "assignee_staff_id": {
+            "format": "uuid",
+            "title": "Assignee Staff Id",
+            "type": "string"
+          },
+          "best_effort": {
+            "default": false,
+            "title": "Best Effort",
+            "type": "boolean"
+          },
+          "conflict_policy": {
+            "default": "reject_on_conflict",
+            "title": "Conflict Policy",
+            "type": "string"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reviewer_staff_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Staff Id"
+          },
+          "selector": {
+            "$ref": "#/components/schemas/DelegationSelector"
+          },
+          "unassigned_only": {
+            "default": false,
+            "title": "Unassigned Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selector",
+          "assignee_staff_id"
+        ],
+        "title": "DelegationPreviewRequest",
+        "type": "object"
+      },
+      "DelegationSelector": {
+        "properties": {
+          "cycle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "task_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          },
+          "wp_index_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Wp Index Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DelegationSelector",
+        "type": "object"
+      },
+      "FieldOverrideBatchRequest": {
+        "description": "批量设置覆盖值（spec procedure-chain-hardening-and-java-contracts R8：原先前端逐字段单发、失败静默吞掉）",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FieldOverrideItem"
+            },
+            "maxItems": 200,
+            "title": "Items",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "year",
+          "items"
+        ],
+        "title": "FieldOverrideBatchRequest",
+        "type": "object"
+      },
+      "FieldOverrideItem": {
+        "properties": {
+          "field": {
+            "maxLength": 50,
+            "title": "Field",
+            "type": "string"
+          },
+          "item_key": {
+            "maxLength": 100,
+            "title": "Item Key",
+            "type": "string"
+          },
+          "scope": {
+            "maxLength": 50,
+            "title": "Scope",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "scope",
+          "item_key",
+          "field"
+        ],
+        "title": "FieldOverrideItem",
+        "type": "object"
+      },
+      "GenerateFromCodesRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "wp_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Wp Codes",
+            "type": "array"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "wp_codes"
+        ],
+        "title": "GenerateFromCodesRequest",
+        "type": "object"
+      },
+      "GenerateWorkpapersRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "selected_templates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Templates"
+          },
+          "template_set_id": {
+            "format": "uuid",
+            "title": "Template Set Id",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "template_set_id"
+        ],
+        "title": "GenerateWorkpapersRequest",
+        "type": "object"
+      },
+      "TrimApplyRequest": {
+        "properties": {
+          "confirm_substantive_recycle": {
+            "default": false,
+            "title": "Confirm Substantive Recycle",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/TrimSchemeEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "preview_id": {
+            "format": "uuid",
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "scheme_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheme Id"
+          }
+        },
+        "required": [
+          "preview_id",
+          "request_id"
+        ],
+        "title": "TrimApplyRequest",
+        "type": "object"
+      },
+      "TrimPreviewRequest": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/TrimSchemeEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "scheme_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheme Id"
+          }
+        },
+        "title": "TrimPreviewRequest",
+        "type": "object"
+      },
+      "TrimSchemeEntry": {
+        "properties": {
+          "cycle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
+          },
+          "definition_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Key"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "sheet_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Key"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "target_applicability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Applicability"
+          },
+          "target_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Status"
+          },
+          "template_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Code"
+          },
+          "wp_index_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wp Index Code"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "TrimSchemeEntry",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "生成物，勿手改：backend/scripts/gen/export_procedure_chain_openapi.py。请求体取自真实应用；响应 data 与错误详情见同目录的 JSON Schema 契约（各接口 x-contract），外层信封见 common.schema.json。说明见 README.md。",
+    "title": "程序链接口子集（程序裁剪 → 底稿生成 → 委派 → 可见性）",
+    "version": "v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/projects/{pid}/procedure-delegations/apply": {
+      "post": {
+        "operationId": "delegation_apply_api_projects__pid__procedure_delegations_apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegationApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "delegation-apply.schema.json"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "anyOf": [
+                        {
+                          "$ref": "delegation-apply.schema.json#/$defs/rejection"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "请求被拒（委派被拒时 message 带 reason / cycles）"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "anyOf": [
+                        {
+                          "$ref": "delegation-apply.schema.json#/$defs/conflictError"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "冲突：已被他人分配、凭证已消费 / 过期 / 被篡改、目标版本已变化"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delegation Apply",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "400": [
+              "delegation-apply.schema.json#/$defs/rejection",
+              "string"
+            ],
+            "409": [
+              "delegation-apply.schema.json#/$defs/conflictError",
+              "string"
+            ],
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "request": "delegation-apply.schema.json#/$defs/request",
+          "response": "delegation-apply.schema.json"
+        }
+      }
+    },
+    "/api/projects/{pid}/procedure-delegations/preview": {
+      "post": {
+        "operationId": "delegation_preview_api_projects__pid__procedure_delegations_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "delegation-preview.schema.json"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delegation Preview",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "request": "delegation-preview.schema.json#/$defs/request",
+          "response": "delegation-preview.schema.json"
+        }
+      }
+    },
+    "/api/projects/{pid}/procedure-trim/apply": {
+      "post": {
+        "operationId": "trim_apply_api_projects__pid__procedure_trim_apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrimApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/applyResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trim Apply",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "request": "trimmed-scope.schema.json#/$defs/applyRequest",
+          "response": "trimmed-scope.schema.json#/$defs/applyResponse"
+        }
+      }
+    },
+    "/api/projects/{pid}/procedure-trim/preview": {
+      "post": {
+        "operationId": "trim_preview_api_projects__pid__procedure_trim_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrimPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/previewResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trim Preview",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "request": "trimmed-scope.schema.json#/$defs/previewRequest",
+          "response": "trimmed-scope.schema.json#/$defs/previewResponse"
+        }
+      }
+    },
+    "/api/projects/{project_id}/working-papers/generate": {
+      "post": {
+        "operationId": "generate_project_workpapers_api_projects__project_id__working_papers_generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateWorkpapersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-receipt.schema.json#/$defs/templateSetGenerateResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generate Project Workpapers",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "request": "generation-receipt.schema.json#/$defs/templateSetGenerateRequest",
+          "response": "generation-receipt.schema.json#/$defs/templateSetGenerateResponse"
+        }
+      }
+    },
+    "/api/projects/{project_id}/working-papers/generate-from-codes": {
+      "post": {
+        "operationId": "generate_from_codes_api_projects__project_id__working_papers_generate_from_codes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateFromCodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-receipt.schema.json#/$defs/generateFromCodesResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generate From Codes",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "request": "generation-receipt.schema.json#/$defs/generateFromCodesRequest",
+          "response": "generation-receipt.schema.json#/$defs/generateFromCodesResponse"
+        }
+      }
+    },
+    "/api/workpapers/field-overrides/batch": {
+      "post": {
+        "operationId": "set_field_overrides_batch_api_workpapers_field_overrides_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOverrideBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "program-row-patch.schema.json"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Field Overrides Batch",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "request": "program-row-patch.schema.json#/$defs/request",
+          "response": "program-row-patch.schema.json"
+        }
+      }
+    },
+    "/api/workpapers/{wp_id}/program-row-access": {
+      "get": {
+        "operationId": "get_program_row_access_api_workpapers__wp_id__program_row_access_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Wp Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sheet_name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Sheet Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "program-row-identity.schema.json#/$defs/rowAccess"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Program Row Access",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "response": "program-row-identity.schema.json#/$defs/rowAccess"
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "程序链：粗裁、生成、委派、程序行归属与覆盖值",
+      "name": "procedure-chain"
+    }
+  ]
+}

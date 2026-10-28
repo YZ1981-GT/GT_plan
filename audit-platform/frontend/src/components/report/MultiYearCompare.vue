@@ -132,7 +132,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 /* ── Props ── */
 const props = defineProps<{
   projectId: string
-  currentYear: number
+  currentYear?: number | null
 }>()
 
 const emit = defineEmits<{

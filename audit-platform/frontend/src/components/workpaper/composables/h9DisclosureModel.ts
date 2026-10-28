@@ -109,7 +109,7 @@ export function createDefaultListedState(): H9ListedDisclosureState {
   return {
     rows: H9_LISTED_DEFAULT_ROWS.map((r) => ({ ...r })),
     withinOneYear: { end: null, last: null },
-    interest: { total: null, financeExpense: null, capitalized: null, year: String(new Date().getFullYear()) },
+    interest: { total: null, financeExpense: null, capitalized: null, year: '' },
     interestNoteOverride: '',
     auditNote: '',
     auditConclusion: '',
@@ -132,7 +132,7 @@ export function toWan(yuan: number | null | undefined): string {
 }
 
 export function formatListedInterestNote(interest: H9InterestBreakdown): string {
-  const y = interest.year || String(new Date().getFullYear())
+  const y = interest.year || ''
   return `${y}年计提的租赁负债利息费用金额为${toWan(interest.total)}万元，计入财务费用-利息支出金额为${toWan(interest.financeExpense)}万元，计入固定资产金额为${toWan(interest.capitalized)}万元。`
 }
 

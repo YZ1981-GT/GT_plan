@@ -220,10 +220,14 @@ const props = defineProps<{
   a17_5Badge: (ref: string) => string
   a17_5DisabledReason?: (ref: string) => string
   reviewChipBadge: (ref: string) => string
+  /** 弹窗完成状态的查表键（复核角色引用解析为真实 wp_code）。
+   *  🔴 a8bc2c83e 加 S34/S35 三个 prop 时把这一行替换掉了 ⇒ 模板里 `chipCompletionKey(ref)` 成了
+   *  undefined，弹窗式子底稿 chip 一渲染就 TypeError（整行关联底稿列空白）。 */
+  chipCompletionKey: (ref: string) => string
   /** 仅 S34/S35 传入；其他循环保持原有 GtIndexChip 行为 */
   cycleCode?: CycleCode
-  /** S34/S35 外部 chip 查询使用的审计年度 */
-  cycleAuditYear?: number
+  /** S34/S35 外部 chip 查询使用的审计年度；项目没填为 null ⇒ chip 不取审定数 */
+  cycleAuditYear?: number | null
   /** 当前项目 ID，作为 auto-data resolver 路径参数 */
   projectId?: string
 }>()

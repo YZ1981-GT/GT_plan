@@ -1,0 +1,15 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/generation-plan.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_scope_retention.py（plan_generation / GenerationPlan.to_payload）",
+  "title": "GenerationPlan（一次生成的保留范围分流）",
+  "description": "把待生成编码分成四类，各列表保持输入顺序、两两不相交、并集 = 输入（去重后）。判定顺序：先按 TrimmedScope 判已裁（已裁的不再查库、也不报「在回收站」）；其余按本项目 wp_index 行：没有行 ⇒ to_create，行已软删 ⇒ in_recycle_codes（只能从回收站恢复，uq_wp_index_project_code 不含 is_deleted，不能再建同码），行在用 ⇒ existing_codes。读不到裁剪结果 ⇒ trimmed-scope.schema.json#/$defs/unavailable（503），整次生成停止。",
+  "type": "object",
+  "required": ["to_create", "skipped_trimmed_codes", "in_recycle_codes", "existing_codes"],
+  "additionalProperties": false,
+  "properties": {
+    "to_create": { "$ref": "common.schema.json#/$defs/codeList" },
+    "skipped_trimmed_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "in_recycle_codes": { "$ref": "common.schema.json#/$defs/codeList" },
+    "existing_codes": { "$ref": "common.schema.json#/$defs/codeList" }
+  }
+}

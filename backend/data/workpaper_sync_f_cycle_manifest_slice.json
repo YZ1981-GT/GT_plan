@@ -213,7 +213,7 @@
         ],
         "row_identity_key": "id",
         "row_identity_generator": "inline String(Date.now())",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L461",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L467",
         "row_identity_generator_form": "const id = String(Date.now())",
         "row_identity_is_positional": true,
         "row_identity_positional_defect": "🔴 载入路径 useF2DetailSheet.ts#L235 写的是 `...emptyRow(String(r.id || i + 1), segments)` —— 持久化行缺 id 时用**数组下标 i+1** 补，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改（改法会动 11 张表的既存持久化数据）。",
@@ -1087,9 +1087,9 @@
       },
       {
         "name": "F1 预付账款.xlsx",
-        "size": 261608,
-        "sha256": "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd",
-        "normalized_structure_hash": "f1457eb9334a3b97229643079b9c1fe0d1c277622d872d8f9f5afa8342ffc0a1",
+        "size": 96285,
+        "sha256": "16d5729db13e071590be8f1ef86c1d781014b0bb610a9e85329f76b3f4071449",
+        "normalized_structure_hash": "2dd37a38a5a2d5cf2207f0b767b1a6614a9585e6611deaf47b6cf3d46d07a7ee",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-f1-prepayment"
       },
@@ -1119,9 +1119,9 @@
       },
       {
         "name": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
-        "size": 81418,
-        "sha256": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7",
-        "normalized_structure_hash": "3a4fcf12672810d78f24d6f3f84bb2912de15530c52efffcb66e77fc9b880070",
+        "size": 47525,
+        "sha256": "da258bbc2e9813885afee3eeca90d1531599b8def14aa8d9635a86227fdb3e72",
+        "normalized_structure_hash": "cdc0441ff25f381894ca3a42fd43ed71d1490cfc796f1c52b1abe1b12d57da1d",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-f2-stocktake-bundle"
       },
@@ -1159,9 +1159,9 @@
       },
       {
         "name": "F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
-        "size": 443368,
-        "sha256": "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5",
-        "normalized_structure_hash": "6d476123b9f891d3f5ec56ac33bd6da2254a66810e3dd15a06e16ed187d6b567",
+        "size": 47678,
+        "sha256": "f6c03d09605da7e9e9457a0d2219530e4e761d7abfbbe849867f5569dc5e97cb",
+        "normalized_structure_hash": "adfe5e0a99528b53e67fa76a481d3810a1eff67e10a3a434c0af6751f83c10cc",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-f2-inventory-valuation"
       },
@@ -1175,9 +1175,9 @@
       },
       {
         "name": "F2-55至F2-58 合同履约成本.xlsx",
-        "size": 100429,
-        "sha256": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21",
-        "normalized_structure_hash": "8750eee8f4efcf805fb07e4f3f6d49befe5a4639639fd65d5ea15edba2e770a1",
+        "size": 43662,
+        "sha256": "9d9348fa69acdff3f96d8171efe8b3177a11e0e7f9ed9f20ec242c69b1074b36",
+        "normalized_structure_hash": "279f424438b3109ff338e2622294634ac2999d5a0a4c6af31ec9929f75880442",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-f2-inventory-special"
       },
@@ -1215,9 +1215,9 @@
       },
       {
         "name": "F5 营业成本.xlsx",
-        "size": 187721,
-        "sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7",
-        "normalized_structure_hash": "d8b13c774513ecdb505cb3837c76a6ff11a94e1ab42b2dfa187cf479cc78988d",
+        "size": 63586,
+        "sha256": "daca3810d6ae20aa37f36fed6638bd293abd50dc5b14cea30458eb96d5fbc6f1",
+        "normalized_structure_hash": "639a4d2a5b72f1dbddb366c8050235da3a02aa57a9605129faab71a0b061276b",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-f5-cost-of-sales"
       }
@@ -1334,7 +1334,7 @@
         "row_identity": {
           "kind": "generated_timestamp_string_with_array_index_fallback",
           "identity_field": "id",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L235"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L241"
         }
       },
       {

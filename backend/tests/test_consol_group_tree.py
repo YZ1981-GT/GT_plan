@@ -103,18 +103,18 @@ class TestExamples:
         root = tree_of([g_c, g_s, a, b], g_c)
 
         assert root.node_key == "G:consol" and root.kind == KIND_AGGREGATE
-        assert root.display_name == "某集团（合并）"
+        assert root.display_name == "某集团（合并户）"
         assert child_keys(root) == ["G:consol_elim", "G:parent", "A:subsidiary"]
         elim, parent, sub_a = root.children
         assert elim.kind == KIND_ELIM and elim.host_project_id == g_c.id and elim.project_id is None
-        assert elim.display_name == "某集团（合并差额）"
+        assert elim.display_name == "某集团（差额户）"
         # 母公司有分公司 ⇒ 母公司节点是汇总：母分差额 + 本部 + 分公司
         assert parent.kind == KIND_AGGREGATE and parent.project_id is None
-        assert parent.display_name == "某集团（母公司）"
+        assert parent.display_name == "某集团（母公司户）"
         assert child_keys(parent) == ["G:branch_elim", "G:hq", "B:branch"]
         assert parent.children[0].host_project_id == g_c.id
-        assert parent.children[0].display_name == "某集团（母分差额）"
-        assert parent.children[1].project_id == g_s.id and parent.children[1].display_name == "某集团（本部）"
+        assert parent.children[0].display_name == "某集团（母分差额户）"
+        assert parent.children[1].project_id == g_s.id and parent.children[1].display_name == "某集团（本部单体户）"
         assert parent.children[2].project_id == b.id and parent.children[2].relation == "branch"
         assert sub_a.project_id == a.id and sub_a.relation == "subsidiary" and sub_a.kind == KIND_DATA
         assert root.mode == MODE_MIXED
@@ -180,7 +180,7 @@ class TestExamples:
         s = rec("S", "丁公司", parent="B", relation="subsidiary")
         root = tree_of([g_c, g_s, b, c, s], g_c)
         b_node = find_node_by_key(root, "B:branch")
-        assert b_node.kind == KIND_AGGREGATE and b_node.display_name == "上海分公司（汇总）"
+        assert b_node.kind == KIND_AGGREGATE and b_node.display_name == "上海分公司（汇总户）"
         assert child_keys(b_node) == ["B:branch_elim", "B:hq", "C:branch"]
         assert b_node.children[0].host_project_id == g_c.id, "母分差额由最近的外层合并项目承载"
         # 分公司名下的子公司是集团的合并成员（挂在合并节点下）
@@ -317,7 +317,7 @@ class TestExamples:
         assert legacy <= set(d)
         elim = d["children"][0]
         assert elim["project_id"] is None and elim["host_project_id"] == str(g_c.id)
-        assert elim["display_name"] == "某集团（合并差额）" and elim["kind"] == "elim"
+        assert elim["display_name"] == "某集团（差额户）" and elim["kind"] == "elim"
 
     def test_links_follow_tree(self):
         g_c, g_s = consol("G", "某集团"), rec("G", "某集团")

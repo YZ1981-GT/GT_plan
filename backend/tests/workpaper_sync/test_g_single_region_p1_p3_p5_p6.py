@@ -90,11 +90,10 @@ EXPECTED: dict[str, dict] = {
         "row_identity_key": "rowId",
         "payload_json_key": "remark",
         "header": (9, 10),
-        # 🔴 发现 B：三段不是两段。R12 独立（M 区间 / P 公式 / 无 T 三处都不同于 R11 与 R13+）
+        # 修模板前（发现 B）是三段：R11 / R12 / R13+ 在 M 区间、P 公式、R/T 有无公式三处不同。
+        # `oo-writeback-template-parity-closure` R1 把模板逐行统一后只剩一段。
         "row_segments": (
-            ("r11", (11,), ("E", "H", "M", "O", "P", "Q", "R", "T")),
-            ("r12", (12,), ("E", "H", "M", "O", "P", "Q", "R")),
-            ("r13plus", tuple(range(13, 21)), ("E", "H", "M", "O", "P", "Q", "T")),
+            ("main", tuple(range(11, 21)), ("E", "H", "M", "O", "P", "Q", "R", "T")),
         ),
         "footer_rows": (21,),
         "effective_cols": 23,

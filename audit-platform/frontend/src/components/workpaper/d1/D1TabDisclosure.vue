@@ -43,6 +43,7 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant as NoteVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useHostApplicableStandards } from '../composables/hostApplicableStandards'
 // 披露内部勾稽校验（规则源 = 应收票据校验预设 F4-1~F4-30）
@@ -953,9 +954,15 @@ function pickNoteMainBookValue(detail: any): number | null {
 
 async function checkNoteConsistency(silent = false): Promise<void> {
   if (!props.projectId) return
+  const year = auditYear.value
+  if (year == null) {
+    noteCheckState.value = { status: 'error', message: MISSING_AUDIT_YEAR_MESSAGE }
+    if (!silent) ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
   try {
-    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D1_NOTE_SECTION[props.variant])
+    const detail = await getDisclosureNoteDetail(props.projectId, year, D1_NOTE_SECTION[props.variant])
     const mainName = D1_MAIN_SUBTABLE[props.variant]
     const noteValue = pickNoteMainBookValue(detail)
     const pageValue = categorySummaryTotal.value?.endBookValue ?? 0

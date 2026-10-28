@@ -181,9 +181,10 @@ describe('ConsolReportBreakdownView', () => {
 
   it('默认根节点；按树列出汇总节点；差额列浅黄标识；显示各子节点与合计', async () => {
     const wrapper = await loaded()
-    expect(api.getConsolReportBreakdown).toHaveBeenCalledWith('p-g', {
+    // 请求另带 AbortSignal（切换节点时取消上一请求），这里只核对业务参数
+    expect(api.getConsolReportBreakdown).toHaveBeenCalledWith('p-g', expect.objectContaining({
       reportType: 'balance_sheet', nodeKey: null, year: 2025,
-    })
+    }))
     expect(wrapper.findAll('[data-testid="crb-node"] i').map((n) => n.attributes('data-value'))).toEqual(['G:consol', 'A:consol'])
     expect(wrapper.find('[data-testid="crb-head-G:consol_elim"]').text()).toContain('差额')
     expect(wrapper.find('[data-testid="crb-cell-BS-002-G:consol_elim"]').text()).toBe('-20.00')
@@ -204,24 +205,56 @@ describe('ConsolReportBreakdownView', () => {
 
     await wrapper.find('[data-testid="crb-dive-A:consol"]').trigger('click')
     await flushPromises()
-    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', {
+    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', expect.objectContaining({
       reportType: 'balance_sheet', nodeKey: 'A:consol', year: 2025,
-    })
+    }))
+    // 展开下级汇总节点 ⇒ 回写合并页当前节点（中栏同步高亮）
+    expect(wrapper.emitted('node-change')).toEqual([['A:consol']])
   })
 
   it('已打开后切换报表类型自动重读；导出使用当前节点和报表类型', async () => {
     const wrapper = await loaded()
     await wrapper.setProps({ reportType: 'income_statement' })
     await flushPromises()
-    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', {
+    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', expect.objectContaining({
       reportType: 'income_statement', nodeKey: 'G:consol', year: 2025,
-    })
+    }))
     await wrapper.find('[data-testid="crb-export"]').trigger('click')
     await flushPromises()
     expect(exportMultiSheetData).toHaveBeenCalledWith(expect.objectContaining({
       fileName: expect.stringContaining('利润表'), applyStyles: false, successMessage: false,
     }))
     expect(message.success).toHaveBeenCalledWith('已导出')
+  })
+
+  it('选中非汇总节点：按最近的上级汇总节点展示并高亮该列，不报错（spec consol-autotree-linkage-closure R7.6）', async () => {
+    // 挂载时就按当前节点展示（原先只认之后的变化 ⇒ 从合并报表切到差额表恒显示根节点）
+    const wrapper = mountView({ selectedNodeKey: 'A:parent' })
+    ;(wrapper.vm as any).load()
+    await flushPromises()
+    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', expect.objectContaining({ nodeKey: 'A:consol' }))
+    expect(wrapper.find('[data-testid="crb-highlight-note"]').text()).toContain('A（parent）')
+
+    await wrapper.setProps({ selectedNodeKey: 'G:consol_elim' })
+    await flushPromises()
+    expect(api.getConsolReportBreakdown).toHaveBeenLastCalledWith('p-g', expect.objectContaining({ nodeKey: 'G:consol' }))
+    expect(wrapper.find('[data-testid="crb-head-G:consol_elim"]').classes()).toContain('gt-crb-head--highlight')
+    const col = wrapper.findAll('section').find((s) => s.attributes('data-label') === '合并差额')!
+    expect(col.classes()).toEqual(expect.arrayContaining(['gt-crb-elim-col', 'gt-crb-highlight-col']))
+
+    // 汇总节点本身：不高亮任何列；树里没有的节点交给后端取根节点
+    await wrapper.setProps({ selectedNodeKey: 'G:consol' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="crb-highlight-note"]').exists()).toBe(false)
+    const calls = api.getConsolReportBreakdown.mock.calls.length
+    await wrapper.setProps({ selectedNodeKey: 'NOPE:x' })
+    await flushPromises()
+    expect(api.getConsolReportBreakdown.mock.calls.length).toBe(calls)
+
+    // 下拉切换 ⇒ 回写合并页当前节点
+    wrapper.findComponent(Select).vm.$emit('change', 'A:consol')
+    await flushPromises()
+    expect(wrapper.emitted('node-change')!.at(-1)).toEqual(['A:consol'])
   })
 
   it('未打开过不请求；加载失败显示后端原因', async () => {

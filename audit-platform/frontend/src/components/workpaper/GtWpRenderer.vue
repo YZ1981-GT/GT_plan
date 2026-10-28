@@ -167,7 +167,7 @@
             📋 批量刷新
           </el-button>
         </template>
-        <template v-if="activeSheetName" #center>
+        <template v-if="activeSheetName && preparationYear != null" #center>
           <GtWpAiReviewToolbar
             :wp-id="wpId"
             :project-id="renderConfig?.project_id ?? ''"
@@ -187,7 +187,7 @@
         解决"46 个 sync builder 就绪但生产零同步记录"的可见性缺口。只读，不代替页内同步按钮。
       -->
       <GtWpDisclosureSyncBar
-        v-if="isDisclosureSheet"
+        v-if="isDisclosureSheet && preparationYear != null"
         :project-id="renderConfig?.project_id ?? ''"
         :year="preparationYear"
         :wp-code="renderConfig?.wp_code ?? ''"
@@ -195,7 +195,7 @@
       />
       <!-- 注册表分发：HTML 类组件（A/B/C/D 5 种/E/H 共 10 种 componentType） -->
       <component
-        v-if="rendererEntry"
+        v-if="preparationYear != null && rendererEntry"
         ref="activeComponentRef"
         :is="rendererEntry.component"
         :key="htmlRendererKey"
@@ -222,6 +222,13 @@
         @restore="reload"
         @navigate-sheet="onChildNavigateSheet"
       />
+
+      <!-- 缺少项目审计年度时不挂载任何会读取年度数据的底稿组件。 -->
+      <el-result v-else-if="preparationYear == null" icon="info" title="未设置审计年度">
+        <template #sub-title>
+          <span>请先在项目基本信息中填写审计年度，再打开底稿读取数据。</span>
+        </template>
+      </el-result>
 
       <!-- Univer 类（F/G）有模板网格数据时只读展示；C-附注披露无 schema 时也走只读网格兜底；无注册表 renderer 但有 grid cells 时兜底 -->
       <!-- OnlyOffice 渲染（非 HTML 白名单 sheet，后端标记 onlyoffice:true） -->
@@ -424,6 +431,8 @@ const props = defineProps<{
   initialSheet?: string
   initialCell?: string
   readonly?: boolean
+  /** 项目 API 返回的审计年度；仅作为 render-config 缺省时的同项目回退。 */
+  auditYear?: number | null
 }>()
 // 在线编辑的改动在后台合并期间整张底稿只读（spec oo-return-to-form-dead-end-and-save-speed R4.4）
 const effectiveReadonly = computed(() => !!props.readonly || isBackgroundMerging(props.wpId))
@@ -882,22 +891,20 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
   }
 })
 
-/** 公式校验/注册表用年度：render-config > 路由 > 项目 store > 通用兜底 */
-const preparationYear = computed(() => {
-  try {
-    const store = useProjectStore()
-    return resolveEffectiveAuditYear({
-      configYear: renderConfig.value?.audit_year,
-      routeYear: route.query.year,
-      storeAuditYear: store.auditYear,
-      storeYear: store.year,
-    })
-  } catch {
-    return resolveEffectiveAuditYear({
-      configYear: renderConfig.value?.audit_year,
-      routeYear: route.query.year,
-    })
-  }
+/**
+ * 公式校验/注册表用年度：只认本底稿所属项目的年度。
+ *
+ * `useProjectStore().year` 是可切换的 UI 年度（原先初值去年，现为 null 直到取到项目年度）；它不是
+ * 项目 `audit_year`，缺年度项目若用它兜底就会静默按 2025 读取调整/试算表。
+ * render-config 的 `audit_year` 是后端项目年度权威值，父 Shell 的 auditYear
+ * 仅在配置尚未带该字段时作为同一项目的回退；缺失时必须保持 null。
+ */
+const preparationYear = computed<number | null>(() => {
+  const configYear = resolveEffectiveAuditYear({
+    configYear: renderConfig.value?.audit_year,
+  })
+  if (configYear != null) return configYear
+  return resolveEffectiveAuditYear({ propYear: props.auditYear })
 })
 
 // ─── Runtime Boundary ──────────────────────────────────────────────────────────
@@ -915,6 +922,7 @@ const runtime = useWorkpaperScaffold({
   wpId: wpIdRef,
   projectId: runtimeProjectId,
   wpCode: runtimeWpCode,
+  // 项目没填审计年度为 null（不按今年兜底；运行时上下文按 number | null | undefined 声明）
   year: preparationYear,
   readonly: effectiveReadonly,
   onJumpToSection: onChildNavigateSheet,

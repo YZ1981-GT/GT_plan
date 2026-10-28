@@ -24,6 +24,8 @@
     <!-- 归档横幅 -->
     <ArchivedBanner />
     <ConsolLockedBanner />
+    <!-- 项目没填审计年度（路由也没带）：错报按年度登记 / 取数，不按今年兜底 -->
+    <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
     <!-- useStaleRefresh：上游变更事件横幅 -->
     <div v-if="msStaleRefresh.isStale.value" class="gt-stale-banner">
@@ -274,6 +276,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE, useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import { confirmDelete } from '@/utils/confirm'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePenetrate } from '@/composables/usePenetrate'
@@ -316,7 +319,10 @@ const router = useRouter()
 const penetrate = usePenetrate()
 const { canEdit, onContextChange } = useAuditContext()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const routeYear = computed<number | null>(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 // R10 Spec B / F7：错报单元格选中 + 右键菜单
 const msCtx = useCellSelection()
@@ -404,6 +410,12 @@ const {
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('misstatements')
 
+// 路由没带年度时按项目审计年度取（原先只认路由 ⇒ 从别处进来全页取不到数）；都没有为 null，不按今年兜底
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(projectId)
+const year = computed<number | null>(() => routeYear.value ?? projectAuditYear.value)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
+
 // ─── useStaleRefresh：上游变更后提示刷新错报列表 ──────────────────────────────
 const msStaleRefresh = useStaleRefresh(projectId, {
   mode: 'prompt',
@@ -452,6 +464,11 @@ usePasteImport({
     { key: 'misstatement_amount', label: '金额' },
   ],
   onInsert: async (rows) => {
+    const y = year.value
+    if (y == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     for (const r of rows) {
       await createMisstatement(projectId.value, {
         misstatement_type: r.misstatement_type || 'factual',
@@ -459,7 +476,7 @@ usePasteImport({
         affected_account_code: r.affected_account_code || '',
         affected_account_name: '',
         misstatement_amount: String(parseFloat(r.misstatement_amount) || 0),
-        year: year.value,
+        year: y,
       })
     }
     fetchItems()
@@ -516,6 +533,8 @@ function typeTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' 
 }
 
 async function fetchItems() {
+  // 项目没填审计年度：页头横幅已说明，不发请求（原先把 null 发给后端）
+  if (year.value == null) { items.value = []; return }
   loading.value = true
   try {
     items.value = await listMisstatements(projectId.value, year.value)
@@ -525,6 +544,7 @@ async function fetchItems() {
 }
 
 async function fetchSummary() {
+  if (year.value == null) return
   try {
     summary.value = await getMisstatementSummary(projectId.value, year.value)
   } catch { /* ignore */ }
@@ -561,6 +581,11 @@ function openEditDialog(row: MisstatementItem) {
 }
 
 async function onSubmit() {
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   await submitMissForm(async () => {
     submitLoading.value = true
     try {
@@ -572,7 +597,7 @@ async function onSubmit() {
         await updateMisstatement(projectId.value, editingId.value, body)
         ElMessage.success('保存成功')
       } else {
-        await createMisstatement(projectId.value, { ...body, year: year.value })
+        await createMisstatement(projectId.value, { ...body, year: y })
         ElMessage.success('创建成功')
       }
       formVisible.value = false
@@ -592,8 +617,10 @@ async function onDelete(row: MisstatementItem) {
   fetchSummary()
 }
 
-onMounted(() => {
+onMounted(async () => {
   syncFromRoute()
+  if (routeYear.value == null) await ensureAuditYear()
+  yearResolved.value = true
   fetchItems()
   fetchSummary()
   loadProjectOptions()
@@ -616,7 +643,7 @@ async function onMaterialityChanged(payload: { projectId: string; year?: number 
   // R8 复盘修正：除了重新拉列表，还要调后端 recheck-threshold 触发重新评估
   try {
     const { misstatements: P_ms } = await import('@/services/apiPaths')
-    await api.post(P_ms.recheckThreshold(projectId.value) + `?year=${year.value}`)
+    if (year.value != null) await api.post(P_ms.recheckThreshold(projectId.value) + `?year=${year.value}`)
   } catch { /* 后端端点异常不阻塞 UI 刷新 */ }
   await Promise.all([fetchItems(), fetchSummary()])
   ElMessage.info('重要性水平已变更，错报阈值已重新评估')

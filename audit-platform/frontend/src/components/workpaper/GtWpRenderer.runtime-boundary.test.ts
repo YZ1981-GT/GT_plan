@@ -145,7 +145,7 @@ describe('GtWpRenderer Runtime Boundary', () => {
             name: 'ElResultStub',
             props: { title: { type: String, default: '' } },
             template:
-              '<div class="el-result-stub">' +
+              '<div class="el-result-stub" data-test="result">' +
               '<div class="el-result-stub__title">{{ title }}</div>' +
               '<div class="el-result-stub__sub"><slot name="sub-title" /></div>' +
               '<slot name="extra" />' +
@@ -200,6 +200,19 @@ describe('GtWpRenderer Runtime Boundary', () => {
     expect(options.wpCode.value).toBe('K5')
     expect(options.year.value).toBe(2026)
     expect(scaffoldSpy).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('缺少项目审计年度时不使用全局年度，也不挂载年度依赖组件', async () => {
+    renderConfig.value = makeConfig({ audit_year: null })
+    const wrapper = mountRenderer()
+    await nextTick()
+
+    const options = scaffoldSpy.mock.calls[0][0]
+    expect(options.year.value).toBeNull()
+    expect(wrapper.findComponent(TestRenderer).exists()).toBe(false)
+    expect(wrapper.get('[data-test="result"]').text()).toContain('未设置审计年度')
+    expect(wrapper.text()).toContain('请先在项目基本信息中填写审计年度')
     wrapper.unmount()
   })
 

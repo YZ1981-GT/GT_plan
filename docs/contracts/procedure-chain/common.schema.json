@@ -1,0 +1,95 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/common.schema.json",
+  "$comment": "JSON Schema 2020-12（方言由校验器指定，见 README「校验方式」）",
+  "title": "程序链契约公共定义",
+  "description": "各契约共用的基本类型。UUID 一律小写带连字符（Python str(uuid) / Java UUID.toString() 同形）；时间为带时区偏移的 ISO 8601。",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "nullableUuid": {
+      "anyOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+    },
+    "uuidList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/uuid" }
+    },
+    "dateTime": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "wpCode": {
+      "description": "底稿编码（如 D2、H3-1、M4A、区间码 D2-6至D2-13）。判定前统一去首尾空白、英文字母转大写。",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "codeList": {
+      "description": "编码列表，保持处理顺序（不排序）。",
+      "type": "array",
+      "items": { "$ref": "#/$defs/wpCode" }
+    },
+    "cycle": {
+      "description": "审计循环代号：A~N、S，或项目底稿索引里出现的其他代号。",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "sortedCycleList": {
+      "description": "循环集合，升序、不重复。",
+      "type": "array",
+      "items": { "$ref": "#/$defs/cycle" },
+      "uniqueItems": true
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "responseEnvelope": {
+      "description": "所有 2xx JSON 响应外层包装（ResponseWrapperMiddleware）：业务数据在 data；错误响应为 {code, message}，message 即 HTTPException.detail（字符串或对象）。各契约描述的是 data 本身。",
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "integer" },
+        "message": {},
+        "data": {}
+      }
+    },
+    "errorDetail": {
+      "description": "结构化错误详情（HTTPException.detail 为对象时）：error 是机器可读错误码，message 是给用户看的中文。",
+      "type": "object",
+      "required": ["error", "message"],
+      "properties": {
+        "error": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" }
+      }
+    },
+    "validationErrorBody": {
+      "description": "422 请求体 / 参数校验失败的整个响应体（validation_exception_handler；不是 FastAPI 默认的 {detail}）：detail 为逐字段错误。",
+      "type": "object",
+      "required": ["code", "message", "detail"],
+      "properties": {
+        "code": { "const": 422 },
+        "message": { "type": "string", "minLength": 1 },
+        "detail": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["loc", "msg", "type"],
+            "properties": {
+              "loc": { "type": "array", "items": { "type": ["string", "integer"] } },
+              "msg": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

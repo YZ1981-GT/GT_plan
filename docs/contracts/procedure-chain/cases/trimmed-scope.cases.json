@@ -1,0 +1,63 @@
+{
+  "contract": "trimmed-scope.schema.json",
+  "description": "粗裁判定共享用例：rows = procedure_instances 的 (coalesce(wp_code, procedure_code), status)；payload = 快照规范形（TrimmedScope.to_payload）；decisions = 逐个底稿编码的判定（wp_code 原样回填）。Python：backend/tests/contracts/test_procedure_chain_contracts.py；Java 版按同一文件断言。",
+  "groups": [
+    {
+      "name": "编码谱系、区间成员、自带程序行",
+      "rows": [
+        ["H3", "not_applicable"], ["A1", "not_applicable"], ["A1-11", "execute"], ["D2-6至D2-13", "not_applicable"],
+        ["D2-8", "execute"], ["M4", "skip"], ["G1", "execute"], ["G10", "not_applicable"]
+      ],
+      "payload": {
+        "exact": { "A1": true, "A1-11": false, "D2-8": false, "G1": false, "G10": true, "H3": true, "M4": true },
+        "ranges": { "D2-6至D2-13": true }
+      },
+      "decisions": [
+        { "wp_code": "H3", "decided_by": "H3", "trimmed": true },
+        { "wp_code": "h3-1", "decided_by": "H3", "trimmed": true },
+        { "wp_code": "H3A", "decided_by": "H3", "trimmed": true },
+        { "wp_code": "A1-11", "decided_by": "A1-11", "trimmed": false },
+        { "wp_code": "A1-12", "decided_by": "A1", "trimmed": true },
+        { "wp_code": "A1-11-1", "decided_by": "A1-11", "trimmed": false },
+        { "wp_code": "D2-7", "decided_by": "D2-6至D2-13", "trimmed": true },
+        { "wp_code": "D2-8", "decided_by": "D2-8", "trimmed": false },
+        { "wp_code": "D2-8A", "decided_by": "D2-8", "trimmed": false },
+        { "wp_code": "D2-14", "decided_by": null, "trimmed": false },
+        { "wp_code": "M4A", "decided_by": "M4", "trimmed": true },
+        { "wp_code": " m4 ", "decided_by": "M4", "trimmed": true },
+        { "wp_code": "G10-1", "decided_by": "G10", "trimmed": true },
+        { "wp_code": "G1-1", "decided_by": "G1", "trimmed": false },
+        { "wp_code": "Z9", "decided_by": null, "trimmed": false },
+        { "wp_code": "D2-6至D2-13", "decided_by": "D2-6至D2-13", "trimmed": true },
+        { "wp_code": "D2-9至D2-10", "decided_by": "D2-6至D2-13", "trimmed": true },
+        { "wp_code": "D2-7至D2-8", "decided_by": "D2-7至D2-8", "trimmed": false },
+        { "wp_code": "D2-14至D2-15", "decided_by": null, "trimmed": false }
+      ]
+    },
+    {
+      "name": "同码多行：任一执行即保留；编码规范化",
+      "rows": [["E1", "not_applicable"], ["E1", "execute"], ["e2 ", "skip"]],
+      "payload": { "exact": { "E1": false, "E2": true }, "ranges": {} },
+      "decisions": [
+        { "wp_code": "E1", "decided_by": "E1", "trimmed": false },
+        { "wp_code": "E1-3", "decided_by": "E1", "trimmed": false },
+        { "wp_code": "E2-1", "decided_by": "E2", "trimmed": true }
+      ]
+    },
+    {
+      "name": "区间右侧省前缀；非法区间按普通编码处理",
+      "rows": [["D2-6至13", "not_applicable"], ["F1-5至F2-9", "not_applicable"], ["K3-9至K3-2", "not_applicable"]],
+      "payload": {
+        "exact": { "F1-5至F2-9": true, "K3-9至K3-2": true },
+        "ranges": { "D2-6至13": true }
+      },
+      "decisions": [
+        { "wp_code": "D2-13", "decided_by": "D2-6至13", "trimmed": true },
+        { "wp_code": "D2-5", "decided_by": null, "trimmed": false },
+        { "wp_code": "F1-5", "decided_by": null, "trimmed": false },
+        { "wp_code": "F1-5至F2-9", "decided_by": "F1-5至F2-9", "trimmed": true },
+        { "wp_code": "K3-5", "decided_by": null, "trimmed": false }
+      ]
+    }
+  ]
+}

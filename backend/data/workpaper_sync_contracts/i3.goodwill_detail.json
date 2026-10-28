@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "aa6fec6ea9b75f087af4d268f57f1566e487980541e11bf1284f5e4e8bce263d",
+  "instrumentation_definition_sha256": "455a5bb5aa77dfb5d2482e508654c651272b12af4c766620803d25e4d0090641",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -54,17 +54,12 @@
     },
     "footer_convention_split": true,
     "footer_kind": "row_formula_applied",
-    "footer_kind_note": "🔴 照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红** —— 同一 footer 行混了三种形态（14 格纯 SUM + 5 格套用行公式 + 4 格引错区间）。",
+    "footer_kind_note": "🔴 照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红** —— 同一 footer 行混了两种形态（18 格纯 SUM + 5 格套用行公式；AA23:AD23 原引错区间已修）。",
     "footer_shape_facts": {
       "convention_split": true,
-      "defect_columns": [
-        "AA",
-        "AB",
-        "AC",
-        "AD"
-      ],
+      "defect_columns": [],
       "kind": "row_formula_applied",
-      "note": "🔴 **三种形态混在同一 footer 行**：14 格纯 SUM + 5 格套用行公式 + 4 格引错区间（缺陷①）。照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红**。",
+      "note": "🔴 **两种形态混在同一 footer 行**：18 格纯 SUM + 5 格套用行公式（AA23:AD23 原引错区间，已修）。照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红**。",
       "pure_sum_columns": [
         "E",
         "G",
@@ -79,7 +74,11 @@
         "W",
         "X",
         "Y",
-        "Z"
+        "Z",
+        "AA",
+        "AB",
+        "AC",
+        "AD"
       ],
       "row_formula_applied_columns": [
         "I",
@@ -109,40 +108,33 @@
     },
     "known_template_quirks": [
       {
-        "actual": "=SUM(<列>27:<列>30)",
-        "assertion_payload_requirement": "🔴 判据载荷必须是「**只有减值准备区（R14:R22 的 AA:AD）有数、其他区为 0**」—— 用「全区都有数」时修复前后合计都非 0（R27:R30 可能被别的公式带出值）⇒ 判据**假绿**；用「全区都是 0」则恒真。同时断言 R23 的**非 AA:AD 列**在覆盖层前后取值**不变**（不误伤）。",
         "cells": [
           "明细表I3-2!AA23",
           "明细表I3-2!AB23",
           "明细表I3-2!AC23",
           "明细表I3-2!AD23"
         ],
-        "effect": "🔴 减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0",
+        "effect": "修复前减值准备区审定数四列（期初数/本期增加/本期减少/期末数）合计恒 0",
         "evidence_of_copy_paste": "同行左侧 S23..Z23 全部正确 =SUM(x14:x22) ⇒ 四格错法一致",
         "expected": "=SUM(<列>14:<列>22)",
-        "handling": "overlay_fixed",
-        "handling_note": "🔴 走**模板覆盖层**（FC-5 的**第 5 个**例外；前四个 F2-26!J9 / F5-7!G31 / G5-2 45 格 / G5-1!B35）。`backend/wp_templates/` 字节**不动** —— 模板是审计准则产物，改字节会破坏与纸质底稿的对应关系，且 sha256 变了会让 6 条 I entry 的 source_ref 全失效。覆盖层**只替换这 4 格**，R23 其余列一个都不碰。",
-        "overlay_formulas": {
-          "AA23": "=SUM(AA14:AA22)",
-          "AB23": "=SUM(AB14:AB22)",
-          "AC23": "=SUM(AC14:AC22)",
-          "AD23": "=SUM(AD14:AD22)"
-        },
-        "root_cause": "R27-29 是**编制说明文本行**（B27='编制说明：' / B28 / B29 是说明文字）；R30 **超出 max_row(29)** ⇒ 引用区间完全落在数据区（R14-22）之外。"
+        "handling": "template_fixed",
+        "handling_note": "已改权威模板字节（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。",
+        "root_cause": "R27-29 是**编制说明文本行**（B27='编制说明：' / B28 / B29 是说明文字）；R30 **超出 max_row(29)** ⇒ 引用区间完全落在数据区（R14-22）之外。",
+        "was": "=SUM(<列>27:<列>30)"
       },
       {
-        "actual": null,
         "cells": [
           "明细表I3-2!I14"
         ],
-        "effect": "首行的「商誉原值未审期末」不会自动计算",
+        "effect": "修复前首行的「商誉原值未审期末」不会自动计算",
         "expected": "=SUM(D14:E14)-G14",
-        "handling": "registered_not_fixed",
-        "handling_note": "🔴 与缺陷① 的 `overlay_fixed` 是**两种处置，不得混写**。理由：它不是金额算错而是**首行漏公式**，前端 `useI3Detail` 的 `costEnding` 本就按同一套公式重算并落库 ⇒ merge 时该格由 `formula_columns` 的模板重新写入，**实际不影响回写正确性**。但仍须登记 —— 否则后来者会以为「I 列公式逐行齐全」。",
-        "root_cause": "I15..I18 逐行都有该公式，唯**数据区首行 I14 是 None** ⇒ 首行漏公式"
+        "handling": "template_fixed",
+        "handling_note": "已改权威模板字节（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。",
+        "root_cause": "I15..I22 逐行都有该公式，唯**数据区首行 I14 是 None** ⇒ 首行漏公式",
+        "was": null
       }
     ],
-    "known_template_quirks_note": "🔴 **两处缺陷两种处置**：①`AA23:AD23` 四格引错区间 ⇒ `overlay_fixed`（FC-5 第 **5** 个例外；减值准备区审定数四列合计恒 0，是真金额错误）②`I14` 缺公式 ⇒ `registered_not_fixed`（首行漏公式；前端 costEnding 本就重算并落库，merge 时由 formula_columns 重新写入 ⇒ 不影响回写正确性，但须登记）。**不得混写** —— 把②也标 overlay_fixed 会开一个不必要的覆盖层例外。",
+    "known_template_quirks_note": "两处缺陷都已改权威模板字节：①`AA23:AD23` 四格引错区间（减值准备区审定数四列合计恒 0）②`I14` 首行缺公式（spec oo-writeback-template-parity-closure R1）。",
     "legacy_positional_id_pattern": "^(cgu|bv|imp|perf|ap|tc-i18)-\\d+$",
     "legacy_positional_ids_grandfathered": true,
     "max_column": 30,
@@ -159,7 +151,7 @@
     "positional_identity_note": "🔴 全 I 8 处位置化 site 里 **I3 占 7**，但全在 `useI3Disclosure.ts`（族 A′ #L488 `cgu-${i}` 1 + 族 B #L441/#L463/#L503 3 + 族 D #L665/#L725 2）与 `i3/impairment/I3TabRecoverableTest.vue#L686`（族 B 1）—— **披露层 / 减值测试层**。本 sheet（明细表I3-2）的行身份是 `useI3Detail.ts` 的 rowId（`row-${Date.now()}-${random}` 族 A 安全生成）⇒ 本契约 sites 为空，🔴 但**不得**据此推断「I3 无位置化问题」—— 那 7 处的修复归 lane 1 的 Task 3~9。",
     "positional_identity_persist_chain": "useI3Disclosure pullFromDetailRows → _persistSection('cgu_allocation') → options.onSave(`${prefix}-cgu_allocation-rows`) → GtI3Goodwill.vue http.put；键 I3-disc-{listed|soe}-cgu_allocation-rows（修复未改键名）",
     "positional_identity_sites": [],
-    "reviewed_basis": "openpyxl 逐格实测 I/I3 商誉.xlsx 的 `明细表I3-2`（🔴 **四级**表头 R10/R11/R12/R13 ⇒ header_rows=**4**（平台上界，H9 那轮从 3 扩来，结清 Task 42 的 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）/ 数据 R14-22 九行 / footer R23 🔴 **三形态混行**（14 格纯 SUM E·G·J·K·L·R..Z + **5 格套用行公式** I23=SUM(D23:E23)-G23 · M23=D23+J23 · N23=E23+K23 · O23=G23+L23 · P23=M23+N23-O23 + **4 格引错区间** AA23:AD23）/ 公式列 11 个 I·M·N·O·P·Q·W·AA·AB·AC·AD（Q 是镜像 =A{r}；AB/AC 是**三项相加**口径）/ 🔴 **B/C 两列数据区全空** / 有效内容列 30 == max_column 30（无空列间隙）⇒ UUID 放 AE / 133 公式 / merged 47 / definedName 0 / 裸 IF 63 / 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 🔴 **两处模板真实缺陷逐格实证**：①`AA23:AD23` 四格 =SUM(<列>27:<列>30) 应为 =SUM(<列>14:<列>22)（R27-29 是编制说明文本行 B27='编制说明：'、R30 超 max_row(29)）⇒ 减值准备区审定数四列合计恒 0，同行左侧 S23..Z23 全部正确 ⇒ 复制粘贴错误 ⇒ **overlay_fixed** ②**本轮新发现** `I14` 是 None 而 I15..I18 逐行都有 =SUM(Dx:Ex)-Gx ⇒ 数据区首行漏公式 ⇒ **registered_not_fixed**（前端 costEnding 本就重算落库，merge 时由 formula_columns 重写） + 前端 `useI3Detail.ts` 按值 grep（ITEM_ID_ROWS='I3-2-rows' / 身份 rowId 族 A 安全生成 / 🔴 removeRow(rowIndex: number) 属**下标族** / I3DetailRow 的核心 12 字段 + Section 2/3 的 30+ 字段属后置 sheet） + 宿主 `GtI3Goodwill.vue` 按值 grep（🔴 **mount=4 全 I 唯一**、legacyOO=6 全 I 最多、checklist GET=0） + 真库现算（checklist_responses.item_id='I3-2-rows' **无行** ⇒ roundtrip 只能合成载荷）",
+    "reviewed_basis": "openpyxl 逐格实测 I/I3 商誉.xlsx 的 `明细表I3-2`（🔴 **四级**表头 R10/R11/R12/R13 ⇒ header_rows=**4**（平台上界，H9 那轮从 3 扩来，结清 Task 42 的 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）/ 数据 R14-22 九行 / footer R23 🔴 **两形态混行**（18 格纯 SUM E·G·J·K·L·R..AD + **5 格套用行公式** I23=SUM(D23:E23)-G23 · M23=D23+J23 · N23=E23+K23 · O23=G23+L23 · P23=M23+N23-O23；AA23:AD23 原引错区间已修）/ 公式列 11 个 I·M·N·O·P·Q·W·AA·AB·AC·AD（Q 是镜像 =A{r}；AB/AC 是**三项相加**口径）/ 🔴 **B/C 两列数据区全空** / 有效内容列 30 == max_column 30（无空列间隙）⇒ UUID 放 AE / 133 公式 / merged 47 / definedName 0 / 裸 IF 63 / 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 两处模板缺陷已修：①`AA23:AD23` 原为 =SUM(<列>27:<列>30)（引到编制说明文本行），现为 =SUM(<列>14:<列>22) ②`I14` 原缺 =SUM(D14:E14)-G14，已补齐（spec oo-writeback-template-parity-closure R1） + 前端 `useI3Detail.ts` 按值 grep（ITEM_ID_ROWS='I3-2-rows' / 身份 rowId 族 A 安全生成 / 🔴 removeRow(rowIndex: number) 属**下标族** / I3DetailRow 的核心 12 字段 + Section 2/3 的 30+ 字段属后置 sheet） + 宿主 `GtI3Goodwill.vue` 按值 grep（🔴 **mount=4 全 I 唯一**、legacyOO=6 全 I 最多、checklist GET=0） + 真库现算（checklist_responses.item_id='I3-2-rows' **无行** ⇒ roundtrip 只能合成载荷）",
     "row_delete_api": {
       "kind": "index",
       "note": "🔴 **lane 1 两条 entry 100% 下标族**（I1 `removeRow(rowIndex)` / I3 同），而 lane 2 是 1:2 跨两族（I2 index / I4+I5 identity）⇒ 两 lane **不得复用同一签名断言**。🔴 **本 lane 是唯一「下标族删行 × 位置化行身份」双重叠** ⇒ lane 1 有一条组合判据「删中间一行后剩余行 rowId 集合不变」，两个单独判据都抓不到。",
@@ -176,7 +168,7 @@
     "template_only_columns": [
       {
         "column": "I",
-        "header_text": "期末数（原值未审）= SUM(D:E)-G　🔴 R14 缺失见缺陷②"
+        "header_text": "期末数（原值未审）= SUM(D:E)-G"
       },
       {
         "column": "M",
@@ -464,9 +456,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "30d8ec32aab6a3a9bac8dc3a23fabfaffb4d44bbf856d7d273e0c2219ace4589",
+    "normalized_structure_hash": "17a4542e6b3fe00b67f538de2def137cdfd2fbf96416843aab340477ef0b4807",
     "relative_path": "I/I3 商誉.xlsx",
-    "template_sha256": "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085"
+    "template_sha256": "5f0d1be518a0c57694c4112e62d30c5c9d80f68ca4ae570ff83b32d2e12d84dc"
   },
-  "template_definition_sha256": "60fb5dbe87ad4c73fa7805069c041ce83add30b2140abc75fc76adf30da5f9b4"
+  "template_definition_sha256": "0303a2c0d9d5d76e44922e71590bc34ac4890dd6d86af3f2fba98a490b355186"
 }

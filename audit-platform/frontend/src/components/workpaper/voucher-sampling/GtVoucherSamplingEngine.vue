@@ -71,7 +71,8 @@ interface Props {
   defaultMethod?: SamplingMethod
   workpaperId: string
   projectId: string
-  year: number
+  /** 审计年度；项目没填为 null（引擎内执行抽样时提示补填，不发请求） */
+  year: number | null
   /** 初始期间月份（1-12），用于期后抽凭默认 Q1 等 */
   initialPeriodRange?: number[]
   /** 合并进默认抽样配置（如底稿按测试原因预填关键词/方向/方法） */

@@ -15,22 +15,22 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.formula_management.function_support_matrix import (
-    Executor,
-    FormulaSupportViolation,
-    require_expression_support,
-)
-
 from app.core.database import get_db
 from app.deps import (
     assert_project_permission,
     get_current_user,
     require_project_access,
+    require_project_audit_year,
     require_role,
 )
 from app.models.core import User
 from app.models.report_models import FinancialReportType, ReportConfig
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
+from app.services.formula_management.function_support_matrix import (
+    Executor,
+    FormulaSupportViolation,
+    require_expression_support,
+)
 from app.services.formula_settings import legacy_report
 from app.services.formula_settings.errors import FormulaSettingError
 from app.services.formula_settings.propagation import publish_events
@@ -497,14 +497,13 @@ async def execute_formula(
     Validates: Requirements 1.1, 1.3, 7.3
     """
     from decimal import Decimal
-    from uuid import UUID
 
     from app.services.formula_engine import execute as fe_execute, FormulaContext, FormulaResult
     from app.services.amount_resolver import TrialBalanceResolver
     from app.services.report_engine import evaluate_formula as re_evaluate
 
     project_id_str = body.get("project_id", "")
-    year_val = body.get("year", 2024)
+    year_val = body.get("year")
     formula = body.get("formula", "")
     row_values_raw = body.get("row_values", {})
 
@@ -524,6 +523,7 @@ async def execute_formula(
                 detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
             ) from exc
         await assert_project_permission(db, current_user, pid, "readonly")
+        year_val = await require_project_audit_year(db, pid, year_val)
 
     try:
         require_expression_support(formula, Executor.REPORT_PATH)
@@ -607,10 +607,9 @@ async def execute_formulas_batch(
     from app.services.amount_resolver import TrialBalanceResolver
     from app.services.report_engine import evaluate_formula as re_evaluate
     from decimal import Decimal
-    from uuid import UUID
 
     project_id_str = body.get("project_id", "")
-    year_val = body.get("year", 2024)
+    year_val = body.get("year")
     formulas = body.get("formulas", [])
 
     pid: UUID | None = None
@@ -623,6 +622,7 @@ async def execute_formulas_batch(
                 detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
             ) from exc
         await assert_project_permission(db, current_user, pid, "readonly")
+        year_val = await require_project_audit_year(db, pid, year_val)
 
     support_errors: list[dict] = []
     for index, item in enumerate(formulas):

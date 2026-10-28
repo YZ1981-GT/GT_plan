@@ -175,9 +175,9 @@
  * Spec: .kiro/specs/k2-other-current-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
@@ -454,11 +454,7 @@ async function _loadTbData(): Promise<void> {
   // selfLoad 路径（htmlData 为 null）兜底请求：按解析出的标准码取，最长前缀求和防父子双计
   try {
     const codes = tbQueryStandardCodes.value
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: codes[0], year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: codes })).rows
     const sum = sumLongestPrefixOnly(
       list.map((item) => ({
         code: String(item.standard_account_code ?? item.account_code ?? ''),

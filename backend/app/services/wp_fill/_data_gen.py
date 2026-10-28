@@ -59,7 +59,9 @@ class DataGenMixin:
         Returns:
             list[AIContent]: 生成的AI内容列表
         """
-        year_int = int(year) if year else datetime.now().year
+        year_int = int(year) if year else None
+        if year_int is None:
+            raise ValueError("未指定审计年度，无法生成底稿数据")
 
         # 根据模板类型选择处理逻辑
         handlers = {

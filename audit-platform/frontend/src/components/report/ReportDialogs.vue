@@ -153,8 +153,8 @@ const props = defineProps<{
   consolBreakdownVisible: boolean
   consolBreakdownAccountCode: string
   projectId: string
-  year: number
-
+  /** 审计年度；项目没填为 null（合并穿透弹窗里写明去填年度） */
+  year: number | null
   // Formula detail
   showCellFormulaDetail: boolean
   cellDetailWpCode: string

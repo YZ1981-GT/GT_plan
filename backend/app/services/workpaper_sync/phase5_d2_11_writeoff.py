@@ -82,14 +82,17 @@ ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 # ═══════════════════════════════════════════════════════════════════════════
 
 #: 转回区 8 字段（全 editable，无公式列）。
+#: 🔴 G「合理性分析」两区同接前端 ``auditorComment``（表单「合理性分析」文本列）；原声明
+#:    ``reasonableness`` 前端没有，转回区 G 列两个方向都不通（spec oo-writeback-template-parity-closure
+#:    R3 批 B2b）。C / D / F 与核销区 B / F 前端随本批补列。
 REVERSAL_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("debtor_name", "A", "editable", "text", "debtorName", "单位名称"),
     ("reversal_reason", "B", "editable", "text", "reason", "转回原因"),
     ("recovery_method", "C", "editable", "text", "recoveryMethod", "收回方式"),
     ("original_basis", "D", "editable", "text", "originalBasis", "原确定坏账准备的依据"),
     ("recovery_amount", "E", "editable", "amount", "amount", "收回或转回金额"),
-    ("cumulative_provision", "F", "editable", "amount", "cumulativeProvision", "收回前累计已计提"),
-    ("reasonableness", "G", "editable", "text", "reasonableness", "合理性分析"),
+    ("cumulative_provision", "F", "editable", "amount", "cumulativeProvision", "收回或转回前累计已计提坏账准备金额"),
+    ("reasonableness", "G", "editable", "text", "auditorComment", "合理性分析"),
     ("index_ref", "H", "editable", "text", "indexRef", "索引号"),
 )
 
@@ -267,7 +270,8 @@ def compute_mapping_digest() -> str:
     ).hexdigest()
 
 
-_FROZEN_MAPPING_DIGEST: Final[str] = "72364e49bb12196dcccebbab9c50331d8f39018ec6d06d1e4d5ccb4604bd3649"
+#: 2026-10-28 批 B2b：转回区 G 改接 auditorComment（原 72364e49…）。
+_FROZEN_MAPPING_DIGEST: Final[str] = "ad8144c23a8e8ba14df51254e47d22dae0c1498912ef2be9af9e00579e9c55dd"
 
 
 def assert_mapping_digest_d211() -> str:

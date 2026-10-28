@@ -438,7 +438,11 @@ async function handleLedgerPull() {
   if (props.isReadonly || !props.projectId) return
   ledgerPulling.value = true
   try {
-    const year = props.year || new Date().getFullYear()
+    const year = props.year
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法读取序时账')
+      return
+    }
     const ledgerRows = await fetchH9LedgerByLessor(props.projectId, year)
     if (!ledgerRows.length) {
       ElMessage.info(

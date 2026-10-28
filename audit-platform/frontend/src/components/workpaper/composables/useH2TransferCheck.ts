@@ -190,7 +190,8 @@ function _nameMatch(a: string, b: string): boolean {
 
 /** 报表截止日默认：指定年 12-31；无年则当年 */
 export function defaultPeriodEndDate(year?: number): string {
-  const y = year && year > 1900 ? year : new Date().getFullYear()
+  if (!year || year <= 1900) return ''
+  const y = year
   return `${y}-12-31`
 }
 

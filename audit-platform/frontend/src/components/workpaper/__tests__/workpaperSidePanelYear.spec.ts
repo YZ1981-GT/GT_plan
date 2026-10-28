@@ -63,11 +63,11 @@ describe('底稿面板按项目审计年度传年度', () => {
     wrapper.unmount()
   })
 
-  it('取不到项目年度：与编辑器其余子组件同一兜底（上一日历年）', () => {
+  it('取不到项目年度：保持空年度，不猜上一日历年', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     const wrapper = mountPanel({ year: null })
-    expect(yearOf(wrapper, 'FormulaStatusPanel')).toBe(2025)
+    expect(yearOf(wrapper, 'FormulaStatusPanel')).toBeNull()
     wrapper.unmount()
   })
 

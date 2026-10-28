@@ -11,6 +11,9 @@
 -->
 <template>
   <div class="misstatement-summary">
+    <!-- 项目没填审计年度：错报汇总按年度取，不发请求（原先拼出 /null/ 路径、静默失败后显示「暂无未更正错报」） -->
+    <el-empty v-if="resolvedProjectId && resolvedYear == null" :description="MISSING_AUDIT_YEAR_MESSAGE" />
+
     <!-- Materiality_Indicator: 三色预警区 (Task 10.1) -->
     <MaterialityIndicator
       v-if="summaryLoaded"
@@ -66,7 +69,7 @@
 
     <!-- A13-1: 未更正错报汇总表 -->
     <WorkpaperHtmlTable
-      v-if="allRows.length > 0"
+      v-if="allRows.length > 0 && resolvedYear != null"
       title="A13-1 未更正错报汇总表"
       :header="header"
       :columns="columns"
@@ -89,13 +92,14 @@ import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import WorkpaperHtmlTable, { type ColumnDef, type RowData, type StandardHeader } from './WorkpaperHtmlTable.vue'
 import MaterialityIndicator from './MaterialityIndicator.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 const props = defineProps<{
   /** 底稿 ID（GtMisstatementWorkpaper / GtWpRenderer 传入） */
   wpId?: string
   /** 可选直传（用于独立渲染场景） */
   projectId?: string
-  year?: number
+  year?: number | null
   header?: StandardHeader | null
 }>()
 
@@ -107,9 +111,7 @@ const resolvedProjectId = computed(
   () => props.projectId || (route.params.projectId as string) || '',
 )
 /** 从路由或 prop 取 year */
-const resolvedYear = computed(
-  () => props.year || parseInt(route.query.year as string) || projectStore.year || new Date().getFullYear() - 1,
-)
+const resolvedYear = computed<number | null>(() => props.year || parseInt(route.query.year as string) || projectStore.year || null)
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -235,7 +237,7 @@ function checkThresholdCrossing(newCumulative: number, pm: number | null | undef
 // ─── 数据加载 ──────────────────────────────────────────────────────────────
 
 async function loadData() {
-  if (!resolvedProjectId.value) return
+  if (!resolvedProjectId.value || resolvedYear.value == null) return
   try {
     const [summary, eval_] = await Promise.all([
       api.get<typeof summaryData.value>(
@@ -256,7 +258,7 @@ async function loadData() {
 
 /** 加载 a13-summary-v1 聚合结果 */
 async function loadSummaryResult() {
-  if (!resolvedProjectId.value) return
+  if (!resolvedProjectId.value || resolvedYear.value == null) return
   try {
     const result = await api.get<A13Summary>(
       `/api/workpapers/${resolvedProjectId.value}/${resolvedYear.value}/misstatement-evaluation`,
@@ -308,6 +310,14 @@ function onVisibilityChange() {
     void loadSummaryResult()
   }
 }
+
+// 年度后到（项目信息异步加载 / 项目刚补填年度）时补一次加载
+watch(resolvedYear, (y, old) => {
+  if (y != null && y !== old) {
+    void loadData()
+    void loadSummaryResult()
+  }
+})
 
 // ─── Lifecycle ─────────────────────────────────────────────────────────────
 

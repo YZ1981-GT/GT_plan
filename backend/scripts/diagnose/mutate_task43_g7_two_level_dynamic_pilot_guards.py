@@ -177,8 +177,8 @@ MUTATIONS: list[Mutation] = [
     # ── ① 权威模板哨兵（Requirement 9.9）─────────────────────────────
     Mutation(
         id="M01", side="be", path=PG7, kind="replace",
-        anchor='    "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335"',
-        new='    "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3336"',
+        anchor='    "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1"',
+        new='    "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a2"',
         want=f"{_TPL}::test_template_bytes_are_unchanged",
         wants=(
             f"{_GROUND}::test_disk_contract_matches_the_source_of_truth",

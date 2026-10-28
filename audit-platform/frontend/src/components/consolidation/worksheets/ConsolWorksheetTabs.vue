@@ -104,7 +104,7 @@
         </el-dropdown>
         <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
       </div>
-      <SubsidiaryInfoSheet v-if="activeSheet === 'info'" v-model="data.subsidiaryInfo"
+      <SubsidiaryInfoSheet v-if="activeSheet === 'info'" v-model="data.subsidiaryInfo" :tree-codes="treeInfoCodes"
         @save="onSave('基本信息表', $event)" @open-share-change="onOpenShareChange" @open-formula="onOpenFormula" />
       <InvestmentCostSheet v-else-if="activeSheet === 'cost'" v-model="data.investmentCost"
         @save="onSave('投资明细-成本法', $event)" @open-formula="onOpenFormula" />
@@ -166,30 +166,9 @@
         :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
         :imported-at="g7SuggestionDraft.importedAt"
         @goto-sheet="onGotoSheet" @refresh="loadAllData" />
-      <!-- D-1：分录汇总表（只读，从 entry-summary 端点读取） -->
-      <div v-else-if="activeSheet === 'entry_summary'" class="cw-entry-summary">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <span style="font-weight:600">抵销分录汇总表（仅已审批分录）</span>
-          <el-button size="small" :loading="entrySummaryLoading" @click="loadEntrySummary">🔄 刷新</el-button>
-        </div>
-        <el-table :data="entrySummaryTypes" border size="small" show-summary :summary-method="entrySummaryMethod"
-          empty-text="暂无已审批的抵销分录">
-          <el-table-column prop="type_label" label="分录类型" min-width="180" />
-          <el-table-column prop="count" label="笔数" width="80" align="center" />
-          <el-table-column label="借方合计" width="150" align="right">
-            <template #default="{ row }"><span>{{ fmtAmt(row.debit_total) }}</span></template>
-          </el-table-column>
-          <el-table-column label="贷方合计" width="150" align="right">
-            <template #default="{ row }"><span>{{ fmtAmt(row.credit_total) }}</span></template>
-          </el-table-column>
-          <el-table-column label="净额" width="150" align="right">
-            <template #default="{ row }"><span :style="{ color: Number(row.net) !== 0 ? 'var(--el-color-danger)' : '' }">{{ fmtAmt(row.net) }}</span></template>
-          </el-table-column>
-        </el-table>
-        <el-alert v-if="entrySummaryTotals && Number(entrySummaryTotals.net) !== 0"
-          type="warning" show-icon :closable="false" style="margin-top:12px"
-          :title="`借贷不平衡：净额 ${fmtAmt(entrySummaryTotals.net)}（应为 0）`" />
-      </div>
+      <!-- 分录汇总表（只读；与合并试算同一计算口径，每次进入都重读） -->
+      <EntrySummarySheet v-else-if="activeSheet === 'entry_summary'" ref="entrySummarySheetRef"
+        :project-id="projectId" :year="year" @goto-sheet="onGotoSheet" />
     </main>
 
     <el-dialog v-model="g7LinkageVisible" title="G7 → 合并工作底稿联动" width="920px" destroy-on-close>
@@ -418,9 +397,14 @@
 import { ref, computed, reactive, markRaw, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
-import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
-import { api } from '@/services/apiProxy'
-import { directSubsidiaryMembers } from '@/components/consolidation/composables/consolTreeView'
+import { getWorksheetTree } from '@/services/consolidationApi'
+import {
+  alignInfoRows,
+  mergeImportedInfoRows,
+  treeMemberInfos,
+  worksheetCompanyColumns,
+  type TreeMemberInfo,
+} from '@/components/consolidation/composables/consolSubsidiaryInfo'
 import {
   declaredOrigins,
   sourceGroupsByOrigin,
@@ -453,6 +437,7 @@ import InternalArApSheet from './InternalArApSheet.vue'
 import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 import G7SuggestionDraftSheet from './G7SuggestionDraftSheet.vue'
+import EntrySummarySheet from './EntrySummarySheet.vue'
 import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -741,7 +726,7 @@ const navGroups = computed(() => [
   {
     key: 'g5', label: '合并抵消', step: '5',
     collapsed: groupCollapsed.g5,
-    sheets: sheetList.value.filter(s => ['elimination', 'capital', 'g7_suggestions'].includes(s.key)),
+    sheets: sheetList.value.filter(s => ['elimination', 'entry_summary', 'capital', 'g7_suggestions'].includes(s.key)),
   },
   {
     key: 'g6', label: '汇总核查', step: '✓',
@@ -752,6 +737,7 @@ const navGroups = computed(() => [
 
 const activeSheet = ref('info')
 const eliminationSheetRef = ref<InstanceType<typeof EliminationSheet> | null>(null)
+const entrySummarySheetRef = ref<InstanceType<typeof EntrySummarySheet> | null>(null)
 
 // ─── 从合并范围加载子企业列表 ────────────────────────────────────────────────
 // 项目和年度由父页提供，确保工作底稿与左树/报表使用同一年度上下文。
@@ -759,7 +745,9 @@ const eliminationSheetRef = ref<InstanceType<typeof EliminationSheet> | null>(nu
 // ─── G7 联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） ────────────
 const linkageStale = useG7ConsolLinkageEntry(projectId, year)
 
-const scopeCompanies = ref<{ name: string; code: string; ratio: number }[]>([])
+/** 企业树带出的基本信息表成员（spec consol-autotree-linkage-closure R4）；null = 企业树不可用（手工维护） */
+const treeInfoMembers = ref<TreeMemberInfo[] | null>(null)
+const treeInfoCodes = computed(() => treeInfoMembers.value?.map((m) => m.company_code) ?? null)
 const g7LinkageVisible = ref(false)
 const g7LinkageLoading = ref(false)
 const g7LinkageImporting = ref(false)
@@ -775,47 +763,6 @@ const g7SuggestionDraft = reactive<{
   note: string
   importedAt: string
 }>({ rows: [], note: '', importedAt: '' })
-
-// ─── D-1：分录汇总表 ──────────────────────────────────────────────────────────
-const entrySummaryLoading = ref(false)
-const entrySummaryTypes = ref<any[]>([])
-const entrySummaryTotals = ref<any>(null)
-
-async function loadEntrySummary() {
-  if (!projectId.value || !year.value) return
-  entrySummaryLoading.value = true
-  try {
-    const res = await api.get('/api/consolidation/worksheet/entry-summary', {
-      params: { project_id: projectId.value, year: year.value },
-      _dedupe: false,
-    } as any)
-    entrySummaryTypes.value = (res as any)?.types || []
-    entrySummaryTotals.value = (res as any)?.totals || null
-  } catch {
-    entrySummaryTypes.value = []
-    entrySummaryTotals.value = null
-  } finally {
-    entrySummaryLoading.value = false
-  }
-}
-
-function entrySummaryMethod({ columns }: { columns: any[] }) {
-  return columns.map((col, i) => {
-    if (i === 0) return '合计'
-    if (!entrySummaryTotals.value) return ''
-    const key = ['', 'count', 'debit_total', 'credit_total', 'net'][i]
-    if (!key) return ''
-    const v = entrySummaryTotals.value[key]
-    return key === 'count' ? String(v ?? '') : fmtAmt(v)
-  })
-}
-
-function fmtAmt(v: any): string {
-  if (v == null || v === '') return ''
-  const n = Number(v)
-  if (Number.isNaN(n)) return String(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 /** 从 importable equity_inv 提取 G7-16 结构化备查字段 */
 const g7UnrecognizedMetaRows = computed(() => {
@@ -1013,37 +960,26 @@ async function loadConsolScope() {
   const yearSnapshot = year.value
   if (!projectSnapshot || !yearSnapshot) return
   const ticket = ++scopeRequestSeq
-  // 企业树：合并方式识别 + 企业列回退（合并范围表为空时取根合并节点下的子公司类成员）
-  let treeMembers: { name: string; code: string; ratio: number }[] = []
+  // 企业树：合并方式识别 + 基本信息表企业清单 / 各表企业列（只以企业树为准，不再被合并范围表覆盖，R4.4）
   try {
     const res = await getWorksheetTree(projectSnapshot)
     if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     treeMode.value = res?.mode ?? null
-    treeMembers = directSubsidiaryMembers(res?.tree)
+    treeInfoMembers.value = res?.tree ? treeMemberInfos(res.tree) : null
     // 本合并项目的企业代码：工作底稿里的「母公司」= 它（交易方留痕与归属预填用）
     rootCompanyCode.value = res?.tree?.company_code || ''
   } catch {
     if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
     treeMode.value = null
+    // 企业树读取失败：首次加载保持手工维护（null）；已带出过则沿用上次的企业清单，不因一次失败解锁三码
   }
-  try {
-    // 优先从合并范围获取（持股比例等手工维护信息在这里）
-    const items = await getConsolScope(projectSnapshot, yearSnapshot)
-    if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
-    if (Array.isArray(items) && items.length) {
-      scopeCompanies.value = items
-        .filter((s: any) => s.is_included && s.company_code)
-        .map((s: any) => ({
-          name: s.company_name || s.company_code,
-          code: s.company_code,
-          ratio: Number(s.ownership_ratio) || 0,
-        }))
-      return
-    }
-  } catch { /* ignore */ }
-  if (ticket !== scopeRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
-  // 回退：企业树中的子公司类成员（排除合并差额、母公司与分公司）
-  scopeCompanies.value = treeMembers
+  alignSubsidiaryInfo()
+}
+
+/** 基本信息表按企业树对齐（树或已保存数据先到都行：对齐是幂等的）；企业树不可用时保持手工维护 */
+function alignSubsidiaryInfo() {
+  if (!treeInfoMembers.value) return
+  data.subsidiaryInfo = alignInfoRows(data.subsidiaryInfo, treeInfoMembers.value, mkEmptyRow)
 }
 
 async function loadAllData() {
@@ -1100,6 +1036,7 @@ async function loadAllData() {
       const rows = content?.rows
       if (Array.isArray(rows)) shareChangeData[key] = rows
     }
+    alignSubsidiaryInfo()
   } catch (error: any) {
     if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
       worksheetLoadState.value = 'error'
@@ -1116,6 +1053,7 @@ async function loadAllData() {
 async function reload() {
   await Promise.all([loadConsolScope(), loadAllData()])
   if (activeSheet.value === 'elimination') await eliminationSheetRef.value?.reload()
+  else if (activeSheet.value === 'entry_summary') await entrySummarySheetRef.value?.load()
 }
 
 onMounted(async () => {
@@ -1305,7 +1243,7 @@ function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean
   g7SuggestionDraft.note = ''
   g7SuggestionDraft.importedAt = ''
   if (options.clearScope) {
-    scopeCompanies.value = []
+    treeInfoMembers.value = null
     rootCompanyCode.value = ''
     treeMode.value = null
   }
@@ -1316,16 +1254,8 @@ function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean
   }
 }
 
-// 子企业列：优先从合并范围树获取，降级从基本信息表获取
-const companyColumns = computed(() => {
-  if (scopeCompanies.value.length) return scopeCompanies.value
-  return data.subsidiaryInfo.filter((r: SubsidiaryInfoRow) => r.company_name)
-    .map((r: SubsidiaryInfoRow) => ({
-      name: r.company_name,
-      code: r.company_code,
-      ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
-    }))
-})
+// 子企业列：只以企业树为准（持股比例取基本信息表填写值）；企业树不可用时回退基本信息表的已填企业（R4.4）
+const companyColumns = computed(() => worksheetCompanyColumns(treeInfoMembers.value, data.subsidiaryInfo))
 
 // 间接持股企业列表
 const indirectCompanyList = computed(() => {
@@ -1400,9 +1330,8 @@ async function onSave(sheet: string, payload: any) {
     '内部交易抵消': 'internal_trade', '内部现金流抵消': 'internal_cashflow',
   }
   const key = keyMap[sheet] || sheet
+  // 企业列随基本信息表的持股比例实时变化（computed），保存后无需再读合并范围
   await doSave(key, payload)
-  // 基本信息表保存后刷新合并范围（影响子企业列）
-  if (key === 'info') loadConsolScope()
 }
 async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
@@ -1413,21 +1342,21 @@ async function doSave(sheetKey: string, payload: any) {
       projectId.value, year.value, sheetKey, { rows: payload }, currentVersion,
     )
     if (!result.ok) {
-      ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
+      ElMessage.error(`${sheetLabel(sheetKey)}保存失败，请检查后端服务`)
       return
     }
     // 更新本地版本号，下次保存用新版本做 CAS
     sheetVersions[sheetKey] = result.version
     // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
     savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
-    ElMessage.success(`${sheetKey} 已保存`)
+    ElMessage.success(`${sheetLabel(sheetKey)}已保存`)
   } catch (err: any) {
     if (err instanceof WorksheetVersionConflictError) {
       ElMessage.warning('工作底稿已被其他操作修改，正在重新加载……')
       await loadAllData()
       return
     }
-    handleApiError(err, `${sheetKey} 保存`)
+    handleApiError(err, `${sheetLabel(sheetKey)}保存`)
   }
 }
 
@@ -1443,17 +1372,20 @@ const canImportExport = computed(() => {
   return false
 })
 
+const SHEET_LABELS: Record<string, string> = {
+  info: '基本信息表', cost: '投资明细-成本法', equity_inv: '投资明细-权益法',
+  net_asset: '净资产表', equity_sim: '模拟权益法', capital: '资本公积变动',
+  post_invest: '抵消后长投', post_income: '抵消后投资收益', minority: '少数股东权益损益',
+  internal_arap: '内部往来抵消', internal_trade: '内部交易抵消',
+  internal_cashflow: '内部现金流抵消', elimination: '合并抵消分录', share_change: '股比变动表',
+}
+/** 表的中文名（保存提示、导出文件名用；不把内部键 info / share_change_1 显示给用户） */
+function sheetLabel(key: string): string {
+  const m = key.match(/^share_change_(\d+)$/)
+  return m ? `股比变${m[1]}次` : SHEET_LABELS[key] || key
+}
 /** 当前 sheet 的中文名 */
-const activeSheetLabel = computed(() => {
-  const map: Record<string, string> = {
-    info: '基本信息表', cost: '投资明细-成本法', equity_inv: '投资明细-权益法',
-    net_asset: '净资产表', equity_sim: '模拟权益法', capital: '资本公积变动',
-    post_invest: '抵消后长投', post_income: '抵消后投资收益', minority: '少数股东权益损益',
-    internal_arap: '内部往来抵消', internal_trade: '内部交易抵消',
-    internal_cashflow: '内部现金流抵消', elimination: '合并抵消分录', share_change: '股比变动表',
-  }
-  return map[activeSheet.value] || activeSheet.value
-})
+const activeSheetLabel = computed(() => sheetLabel(activeSheet.value))
 
 async function handleExportTemplate() {
   const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
@@ -1523,6 +1455,18 @@ async function handleImportFile(e: Event) {
       return
     }
 
+    // 基本信息表在企业树锁定时：按企业代码只更新可编辑字段，匹配不上的行列出并跳过（R4.3，与表内导入同一函数）
+    if (activeSheet.value === 'info' && treeInfoMembers.value) {
+      const merged = mergeImportedInfoRows(data.subsidiaryInfo, mapped, cols.map((c) => c.key))
+      if (merged.unmatched.length) {
+        ElMessage.warning(`以下行在表中找不到对应企业，已跳过：${merged.unmatched.slice(0, 10).join('、')}`)
+      }
+      if (!merged.updated) return
+      data.subsidiaryInfo = merged.rows
+      await doSave('info', merged.rows)
+      return
+    }
+
     // 保存到后端
     try {
       const currentVersion = sheetVersions[activeSheet.value] ?? 0
@@ -1584,12 +1528,12 @@ function onGotoSheet(k: string) {
   activeSheet.value = k
 }
 
-// D-1：切到分录汇总表时自动加载
-watch(() => activeSheet.value, (sheet) => {
-  if (sheet === 'entry_summary' && !entrySummaryTypes.value.length) loadEntrySummary()
-})
+/** 分录变化（差额分录抽屉增删改 / 审批）后重读分录汇总表；未打开该表时下次进入会自动重读 */
+async function reloadEntrySummary() {
+  await entrySummarySheetRef.value?.load()
+}
 
-defineExpose({ reload, activeSheet })
+defineExpose({ reload, reloadEntrySummary, activeSheet })
 </script>
 
 <style scoped>

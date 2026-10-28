@@ -86,7 +86,9 @@
       </el-table-column>
       <el-table-column label="剩余" width="70" align="center">
         <template #default="{ row }">
-          <span :class="retentionClass(row.deleted_at)">{{ retentionDays(row.deleted_at) }}</span>
+          <!-- 底稿不支持彻底删除（保留编制内容与审计轨迹），不显示倒计时 -->
+          <span v-if="row.purgeable === false">长期保留</span>
+          <span v-else :class="retentionClass(row.deleted_at)">{{ retentionDays(row.deleted_at) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right" align="center">
@@ -94,7 +96,8 @@
           <el-button type="primary" size="small" link v-permission="'recycle:restore'" @click="restoreItem(row)">
             恢复
           </el-button>
-          <el-button type="danger" size="small" link v-permission="'recycle:purge'" @click="confirmDelete(row)">
+          <el-button v-if="row.purgeable !== false" type="danger" size="small" link v-permission="'recycle:purge'"
+            @click="confirmDelete(row)">
             删除
           </el-button>
         </template>
@@ -259,13 +262,13 @@ function retentionClass(deletedAt: string | undefined): string {
 
 function typeTagColor(type: string): 'success' | 'warning' | 'info' | 'danger' {
   const m: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
-    project: 'info', workpaper: 'success', attachment: 'info', adjustment: 'warning',
+    project: 'info', working_paper: 'success', attachment: 'info', adjustment: 'warning',
   }
   return m[type] || 'info'
 }
 
 function rowClassName({ row }: { row: any }): string {
-  if (!row.deleted_at) return ''
+  if (!row.deleted_at || row.purgeable === false) return ''
   const remaining = 30 - Math.floor((Date.now() - new Date(row.deleted_at).getTime()) / 86400000)
   return remaining <= 3 ? 'gt-rb-row--expiring' : ''
 }

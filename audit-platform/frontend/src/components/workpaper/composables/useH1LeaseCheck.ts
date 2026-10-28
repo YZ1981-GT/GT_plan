@@ -558,9 +558,11 @@ export function recalcOperatingRow(row: OperatingLeaseRow, opts?: { fiscalYear?:
 
   // 本年月份为空时，按租期与会计年度重叠推算
   if (opts?.fillMonthsIfEmpty && !(row.monthsThisYear > 0) && row.leaseStart && row.leaseEnd) {
-    const y = opts.fiscalYear ?? new Date().getFullYear()
-    const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)
-    if (m > 0) row.monthsThisYear = m
+    const y = opts.fiscalYear ?? null
+    if (y != null) {
+      const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)
+      if (m > 0) row.monthsThisYear = m
+    }
   }
 
   // 月折旧（防除零，对齐 Excel #DIV/0! 防护）
@@ -609,7 +611,8 @@ export function mapOperatingToDisclosureRows(rows: OperatingLeaseRow[]) {
 
 /** 根据差异行生成审计说明草稿 */
 export function buildOperatingLeaseNoteDraft(rows: OperatingLeaseRow[], fiscalYear?: number): string {
-  const year = fiscalYear ?? new Date().getFullYear()
+  const year = fiscalYear ?? null
+  if (year == null) return '（未设置审计年度，无法生成说明草稿）'
   const lines: string[] = [
     `检查范围：截至${year}年12月31日，经营租出固定资产共 ${rows.length} 项。`,
     '程序：获取租赁合同/协议，核对重要条款及经营租赁分类；按合同重算本期应计折旧（其他业务支出）与应计租金（其他业务收入），并与账面核对。',
@@ -1076,9 +1079,8 @@ export function useH1LeaseCheck(
     }
     // 起止日变更时按会计年度重叠重算本年月份
     if (field === 'leaseStart' || field === 'leaseEnd') {
-      const y = new Date().getFullYear()
-      const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)
-      if (m > 0) row.monthsThisYear = m
+      // 🔴 审计年度需由调用方传入；此处无年度来源时跳过自动重算
+      // （用户可通过「批量重算本年月份」按钮手动触发，该按钮会传 fiscalYear）
     }
     recalcOperatingRow(row)
     _persistOperating()
@@ -1261,10 +1263,10 @@ export function useH1LeaseCheck(
 
   /** 按租期与会计年度重叠，批量重算「本年月份」并刷新公式 */
   function fillMonthsThisYear(fiscalYear?: number): number {
-    const y = fiscalYear ?? new Date().getFullYear()
+    if (fiscalYear == null) return 0 // 年度不可用时不重算
     let updated = 0
     for (const row of operatingRows.value) {
-      const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)
+      const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, fiscalYear)
       if (m > 0) {
         row.monthsThisYear = m
         recalcOperatingRow(row)

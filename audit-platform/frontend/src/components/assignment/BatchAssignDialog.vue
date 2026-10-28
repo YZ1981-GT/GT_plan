@@ -176,6 +176,8 @@ import { User } from '@element-plus/icons-vue'
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import { listAssignments, type Assignment } from '@/services/staffApi'
+// 被委派人看不到目标循环（400 out_of_scope）⇒ 填写理由后带 expand_scope 重试（spec procedure-trim-generation-delegation-chain 需求 4.4）
+import { withScopeExpansionRetry } from '@/composables/useScopeExpansionRetry'
 import { rules } from '@/utils/formRules'
 
 // ── Props & Emits ──
@@ -448,7 +450,13 @@ async function onSubmit() {
       override_assignments: overrides,
     }
 
-    const { data } = await http.post('/api/workpapers/batch-assign-enhanced', payload)
+    const out = await withScopeExpansionRetry((exp) =>
+      http.post('/api/workpapers/batch-assign-enhanced', { ...payload, ...exp }, { _silent: true } as any))
+    if (out.status === 'cancelled') {
+      ElMessage.info('已取消，未委派')
+      return
+    }
+    const { data } = out.result
 
     const result = {
       updated: data.updated ?? 0,

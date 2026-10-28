@@ -28,18 +28,21 @@ ADJUSTMENT_SM = StateMachine(
             role_required={"manager", "partner", "admin"},
         ),
     ],
+    # 状态与动作用语与系统字典「调整分录状态」、调整分录页同一套（草稿 / 待复核 / 已批准 / 已驳回）。原先这里写
+    # 「待审批 / 已退回」「提交审批 / 退回」，可解释状态机面板与调整分录页对同一条分录叫法不同
+    # （spec consol-autotree-residual-closure R4；守卫 test_adjustment_status_labels.py 直比字典）。
     action_labels_zh={
-        "submit": "提交审批",
+        "submit": "提交复核",
         "approve": "批准",
-        "reject": "退回",
+        "reject": "驳回",
         "resubmit": "重新提交",
         "post": "过账",
     },
     status_labels_zh={
         "draft": "草稿",
-        "pending_review": "待审批",
+        "pending_review": "待复核",
         "approved": "已批准",
-        "rejected": "已退回",
+        "rejected": "已驳回",
         "posted": "已过账",
     },
 )

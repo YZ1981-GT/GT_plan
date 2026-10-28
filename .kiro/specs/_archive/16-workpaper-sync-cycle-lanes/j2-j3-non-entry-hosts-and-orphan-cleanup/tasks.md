@@ -3,7 +3,7 @@
 ## Overview
 
 **spec**：`j2-j3-non-entry-hosts-and-orphan-cleanup`　**创建**：2026-09-26　
-**状态**：**15/18 已真实实施**（2026-09-27），3 条如实留 `[ ]*`
+**状态**：**19/19 已真实实施**（2026-10-01）；definedName 治理裁决为历史保留/不增长，不冒充已清零
 
 🔴 **本文件此前是假绿**：18 个 Task 全标 `[x]` 但本行原写「0/18，Design-First 未实施」，
 且 `evidence/` 目录不存在、OD-1~OD-4 四个待删 orphan 全部还在。
@@ -102,7 +102,12 @@ HC-1~HC-16 · IC-1~IC-20。
     —— 作为「删除动作真做了」的**正例锚点**
   - 🔴 登记 `j3/core/J3TabDetail.vue` **自己也直写** `PUT …/checklist-responses`（slice 未提）
 
-- [ ]* 9. 🔴 删除执行（JN-P15 / JN-P38）
+- [x] 9. 🔴 删除执行（JN-P15 / JN-P38）
+  - ✅ **2026-10-01 二轮完成**：在原 7 文件基础上，现算并删除零入边 J2 barrel + 后挂 8 个 composable，
+    以及 J3 零入边 barrel + 后挂 5 个 composable；同步删除只测试死模块的 6 个测试文件、摘
+    `formulaEngineInventory` 4 条死登记；**保留**有真实生产边的 `useJ3ImportExport`。
+  - ✅ `ieOrphanBaseline` 删除 J2 活样本并把基线 6→5；J3 目录进度删幽灵 `J3-detail/J3-check`，
+    只认真实 `J3-1-*` / `J3-2-*`；新守卫钉死 J3 Tab 无 checklist PUT 旁路。
   - ✅ **已删 7 个文件 ~594 行**：OD-1(41) / OD-2(37) / OD-3(35) / OD-4(39) +
     `useJ3FormData`(151) / `useJ3Detail`(119) / `useJ3Integration`(172)；
     同步摘 barrel re-export（j2 摘 1 条 / j3 摘 4 条）+ 改 `j2Components.spec.ts`
@@ -116,6 +121,13 @@ HC-1~HC-16 · IC-1~IC-20。
     删它等于**额外宣称那 4 个也死** ⇒ 违反本 spec Task 6 的「不得过度宣称」，
     也超出 deletion plan 精确只列 4 条的授权范围；`j3/index.ts` 同理还挂着 5 个未授权处置的
     orphan。⇒ 只摘掉指向已删模块的 re-export 并在 barrel 内留判定依据注释，剩余归下一轮。
+  - 🔴 **2026-10-01 复核仍维持「barrel 不删」，并补两条新事实**（探针现算 import 边，排除测试）：
+    ① `j2/` 下 **8 个**模块的生产入边**全部只来自 `j2/index.ts`**（或经它再转一跳），barrel 自身入边 0
+    ⇒ 整个 J2 composable 层不可达；`j3/` 下除 `useJ3ImportExport`（`J3TabDetail.vue` 深链）外 **5 个**同型
+    ② `components/workpaper/__tests__/ieOrphanBaseline.spec.ts` 把 `j2/index.ts` 当作「孤儿链」**活样本**
+    断言其存在且零消费方 —— 单删 barrel 会打红该守卫且让 8+5 个模块失去唯一入边。
+    ⇒ 正确处置是**整层孤儿清理**（约 13 模块 + 其测试 + 改 ieOrphanBaseline 基线），属删除范围扩大，
+    超出 deletion plan 只列 4 条的授权，**需用户确认后另起一轮**，本 Task 维持 `[ ]*`
   - 🔴 **按已有 `workpaper_sync_j_cycle_deletion_plan.json` 执行，不另起计划**
   - 删除范围：OD-1 ~ OD-4 四个 orphan dual-mode + 两个 orphan barrel +
     `useJ3FormData` 簇（含评估 `useJ3Detail` / `useJ3Integration` 是否同批）
@@ -161,7 +173,12 @@ HC-1~HC-16 · IC-1~IC-20。
   - 只改**回落分支**，保留「上游有 id 时优先用上游 id」语义
   - 判据 SHALL 覆盖真实回落情形：「render-config 种子派生的行尚未保存」「旧数据无 id」
 
-- [ ]* 13. J2 侧披露层同口径复核 + 键 owner 边界（JN-P21 ~ JN-P23）
+- [x] 13. J2/J3 披露层同口径复核 + 键 owner 边界（JN-P21 ~ JN-P23）
+  - ✅ 2026-10-01：Listed 11 键全属 `J2-listed-*`、SOE 9 键全属 `J2-soe-*`，零交叉；
+    J3 Detail/Check/IPO 分别只拥有 `J3-1-*` / `J3-2-*` / `J3-IPO-*`；两个目录页零 KEY 真源。
+  - 动态披露行使用 semantic key + 冲突检查，不沿用 J1 两变体 `st-N` 同码异义，故裁决为无需改业务值。
+  - 守卫 `j2DisclosureOwner.spec.ts` 钉住 owner/count/namespace。
+  - 以下“未完成/业务确认”是 2026-09-27 历史原文，已由本段 supersede：
   - 🔴 **未完成**：本 Task 原文即标「修法标 `[ ]*`」—— J2 披露层 11 键 / J3 9 键的修法
     属**业务确认**（披露口径归会计准则判断），不在本 lane 可自行决定的范围
   - `J2TabDisclosureListed.vue`（**11 键**）与 `J2TabDisclosureSoe.vue`（**9 键**）
@@ -174,7 +191,7 @@ HC-1~HC-16 · IC-1~IC-20。
 
 ### 阶段 3：JN-5 模板层登记
 
-- [x] 14. 🔴 definedName 断链登记 + 不删（JN-P24 / JN-P25 / JN-P26）
+- [x] 14a. 🔴 definedName 断链登记 + 不删（JN-P24 / JN-P25 / JN-P26）
   - ✅ 现算全部与 spec 一致：基线 `{J2: 37, J3: 502}` · 断链 `{30, 479}`（81% / 95%）
   - ✅ spec 列的 6 个跨循环残留样本**全部命中**，另发现 4 个
     （`_3余额表_一级_.dbf` / `fix2000.dbf` / `fixlj2000.dbf` / `zjgch2000.dbf`）
@@ -208,6 +225,13 @@ HC-1~HC-16 · IC-1~IC-20。
   - 干净点四项各 0（越界 / 宽表 / Excel Table / retired）按 JC-20 空分母纪律 + 变异证明
 
 ### 阶段 4：接入清单 + 复盘
+
+- [x] 14b. definedName 断链模板治理裁决
+  - J2 30/37、J3 479/502 已逐项登记为历史复制残留；**裁决保留、不物理删除**：删名会把仍引用它们的
+    `max_column` 内公式从 `#REF!` 变 `#NAME?`，不改善可见值且扩大模板字节爆破面。
+  - 治理状态=`historical_retained_no_growth`：同步不新增、不改写；未来 J2/J3 成 entry 时按 active sheet
+    逐名做公式可达性与可见值等价后再清。现有基线不增长守卫继续生效。
+  - 本项完成的是治理决策，不宣称模板中断链数为 0。
 
 - [x] 16. JN-6 接入前置清单 8 条（登记不执行，JN-P33 ~ JN-P36）
   - 八项逐条给现状与缺口（OO 挂载 0 / segmented + 二级门控 0 / 🔴 4 个 orphan **一个都不能接** /

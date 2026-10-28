@@ -105,8 +105,8 @@ MUTATIONS: list[Mutation] = [
     # ── ① 权威模板哨兵（Requirement 9.9）─────────────────────────────
     Mutation(
         id="M01", side="be", path=PD, kind="replace",
-        anchor='    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"',
-        new='    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afb"',
+        anchor='    "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b044"',
+        new='    "4e747fcb2dacef58f9185dc007170ca0eb6015877735be7aeefc4401aff6b040"',
         want=f"{_TPL}::test_template_bytes_are_unchanged",
         wants=(f"{_GROUND}::test_disk_contract_matches_the_source_of_truth",),
         why="模板字节哨兵改一位后仍绿 ⇒ 「backend/wp_templates 运行时只读」无人把守，"
@@ -271,7 +271,7 @@ MUTATIONS: list[Mutation] = [
         id="M17", side="be", path=PD, kind="replace",
         anchor='    "Q": "=E{r}+O{r}-P{r}",',
         new='    "Q": "=E{r}+O{r}+P{r}",',
-        want=f"{_GROUND}::test_three_formula_columns_are_really_formulas_in_the_template",
+        want=f"{_GROUND}::test_formula_columns_are_really_formulas_in_the_template",
         wants=(f"{_SIDECAR}::test_formula_columns_are_read_as_cached_values_with_formula_inventory",),
         why="登记的公式模板与模板逐格实测不符仍绿 ⇒ 公式篡改检测（Property 24）拿错基线，"
             "OO 侧把 `-P` 改成 `+P` 不会被发现",
@@ -281,7 +281,7 @@ MUTATIONS: list[Mutation] = [
         id="M18", side="be", path=PD, kind="replace",
         anchor='    ("end_balance", "Q", "formula", "amount", "endBalance", "期末余额"),',
         new='    ("end_balance", "Q", "editable", "amount", "endBalance", "期末余额"),',
-        want=f"{_GROUND}::test_three_formula_columns_are_really_formulas_in_the_template",
+        want=f"{_GROUND}::test_formula_columns_are_really_formulas_in_the_template",
         wants=(
             f"{_GROUND}::test_field_counts_are_the_real_template_facts",
             f"{_GROUND}::test_disk_contract_matches_the_source_of_truth",
@@ -315,7 +315,7 @@ MUTATIONS: list[Mutation] = [
         new="LAST_DATA_ROW: Final[int] = 24",
         want=f"{_GROUND}::test_uuid_column_sits_right_of_the_managed_business_columns",
         wants=(
-            f"{_GROUND}::test_three_formula_columns_are_really_formulas_in_the_template",
+            f"{_GROUND}::test_formula_columns_are_really_formulas_in_the_template",
             f"{_GROUND}::test_disk_contract_matches_the_source_of_truth",
         ),
         why="数据区末行少一行仍绿 ⇒ 模板留的可增行（第 25 行 `……` 占位）被排除在受管区域外，"

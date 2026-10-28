@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_audit_year
 from app.models.core import User
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-ai"])
@@ -25,14 +25,14 @@ class PolicyGenerateRequest(BaseModel):
     section_number: str
     template_type: str = "soe"
     industry: str | None = None
-    year: int = 2025
+    year: int | None = None
 
 
 class AnalysisGenerateRequest(BaseModel):
     section_number: str
     current_data: dict | None = None
     prior_data: dict | None = None
-    year: int = 2025
+    year: int | None = None
 
 
 #: 与前端「📚 知识库」选择器的 maxSelect 一致
@@ -44,7 +44,7 @@ class RewriteRequest(BaseModel):
     text: str
     instruction: str = "请改写以下文本，使其更加专业规范"
     section_number: str = ""
-    year: int = 2025
+    year: int | None = None
     #: 用户点选的知识文档 ID（服务端逐篇判权后读正文；不接受前端拼好的正文）
     knowledge_doc_ids: list[UUID] = Field(default_factory=list, max_length=_MAX_KNOWLEDGE_DOCS)
 
@@ -53,7 +53,7 @@ class ContinueWriteRequest(BaseModel):
     """续写请求"""
     text: str
     section_number: str = ""
-    year: int = 2025
+    year: int | None = None
     #: 同 ``RewriteRequest.knowledge_doc_ids``
     knowledge_doc_ids: list[UUID] = Field(default_factory=list, max_length=_MAX_KNOWLEDGE_DOCS)
 
@@ -70,8 +70,9 @@ async def generate_policy(
     from app.services.reference_doc_service import ReferenceDocService
 
     # RAG: 加载上年同章节附注作为参照
+    year = await require_project_audit_year(db, project_id, data.year)
     context_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year,
+        db, project_id, year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )
@@ -103,8 +104,9 @@ async def generate_analysis(
     from app.services.reference_doc_service import ReferenceDocService
     from app.services.export_mask_service import export_mask_service
 
+    year = await require_project_audit_year(db, project_id, data.year)
     context_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year,
+        db, project_id, year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )
@@ -127,6 +129,7 @@ async def generate_analysis(
 @router.post("/{project_id}/ai/check-completeness")
 async def check_completeness(
     project_id: UUID,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
@@ -134,8 +137,9 @@ async def check_completeness(
     from app.services.llm_client import chat_completion
     from app.services.reference_doc_service import ReferenceDocService
 
+    year = await require_project_audit_year(db, project_id, year)
     context_docs = await ReferenceDocService.load_context(
-        db, project_id, 2025,
+        db, project_id, year,
         source_type="knowledge_base",
         knowledge_category="accounting_standards",
         knowledge_keywords=["披露", "附注", "准则"],
@@ -212,9 +216,10 @@ async def ai_complete(
     from app.services.reference_doc_service import ReferenceDocService
     from app.services.export_mask_service import export_mask_service
 
+    year = await require_project_audit_year(db, project_id, data.year)
     knowledge_docs = await _load_selected_knowledge(db, project_id, user, data.knowledge_doc_ids)
     prior_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year,
+        db, project_id, year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )
@@ -257,9 +262,10 @@ async def ai_rewrite(
     from app.services.reference_doc_service import ReferenceDocService
     from app.services.export_mask_service import export_mask_service
 
+    year = await require_project_audit_year(db, project_id, data.year)
     knowledge_docs = await _load_selected_knowledge(db, project_id, user, data.knowledge_doc_ids)
     prior_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year,
+        db, project_id, year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )

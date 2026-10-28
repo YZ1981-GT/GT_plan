@@ -930,7 +930,11 @@ export function useG8VoucherCheck(opts: {
     }
 
     a13Pushing.value = true
-    const year = opts.year?.value || new Date().getFullYear()
+    const year = opts.year?.value
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法创建未更正错报')
+      return 0
+    }
     let created = 0
     try {
       const { createMisstatement } = await import('@/services/auditPlatformApi')

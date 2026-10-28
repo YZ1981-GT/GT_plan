@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F4AdjudicationTable — F4-1 双分类审定表通用宽表。 */
-import type {
-  F4AdjudicationRow,
-  F4AdjudicationSection,
-  StoredF4AdjRow,
+import {
+  formatF4ChangeRate,
+  isF4ChangeRateMaterial,
+  type F4AdjudicationRow,
+  type F4AdjudicationSection,
+  type StoredF4AdjRow,
 } from '../composables/useF4Adjudication'
 
 defineProps<{
@@ -29,8 +31,8 @@ function amount(value: number): string {
   return value < 0 ? `(${formatted})` : formatted
 }
 
-function rate(value: number): string {
-  return `${(value * 100).toFixed(2)}%`
+function rate(value: number | 'N/A'): string {
+  return formatF4ChangeRate(value)
 }
 
 function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): void {
@@ -140,12 +142,12 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
       <el-table-column label="本期审定数与上期审定数比较" align="center">
         <el-table-column prop="changeAmount" label="变动额" width="120" align="right">
           <template #default="{ row }">
-            <span :class="{ material: Math.abs(row.changeRate) > 0.3 }">{{ amount(row.changeAmount) }}</span>
+            <span :class="{ material: isF4ChangeRateMaterial(row.changeRate) }">{{ amount(row.changeAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="changeRate" label="变动率" width="94" align="right">
           <template #default="{ row }">
-            <el-tag v-if="Math.abs(row.changeRate) > 0.3" type="warning" size="small">
+            <el-tag v-if="isF4ChangeRateMaterial(row.changeRate)" type="warning" size="small">
               {{ rate(row.changeRate) }}
             </el-tag>
             <span v-else>{{ rate(row.changeRate) }}</span>

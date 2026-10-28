@@ -695,10 +695,15 @@ class TestProperty3RoleIntersection:
                     AiChatAction.read,
                 )
                 assert decision.allowed is True, f"{actor.label} 应能读 scope 内底稿"
-                assert decision.cycle_scope == frozenset({IN_SCOPE_CYCLE})
                 assert decision.scope_unbounded is False
                 assert decision.project_id == fx.project_a.id
-                assert OUT_OF_SCOPE_CYCLE not in decision.cycle_scope
+                if actor.role == "auditor":  # 受限：上界 = 本人范围
+                    assert decision.cycle_scope == frozenset({IN_SCOPE_CYCLE})
+                    assert OUT_OF_SCOPE_CYCLE not in decision.cycle_scope
+                else:
+                    # 2026-10-24 用户裁决（spec procedure-trim-generation-delegation-chain 需求 5）：经理、合伙人、
+                    # 质控、EQCR 默认看全部循环 —— 原断言主管上界也是 {D}
+                    assert {IN_SCOPE_CYCLE, OUT_OF_SCOPE_CYCLE} <= decision.cycle_scope, actor.label
 
         run_with_fixture(scenario)
 

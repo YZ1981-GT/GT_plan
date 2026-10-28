@@ -221,11 +221,14 @@ _VIEW = [  # 查看 / AI 预览：readonly 及以上
     ("执行历史", "get", f"{_P}/workflow/executions", None, {"get_execution_history": 1}),
     ("一致性检查", "get", f"{_P}/workflow/consistency-check?year=2025", None, {"run_all_checks": 1}),
     ("数据健康度", "get", f"{_P}/workflow/data-health?year=2025", None, {"calculate_health_score": 1}),
-    ("AI 生成会计政策", "post", f"{_N}/ai/generate-policy", {"section_number": "五、1"},
+    # 这三个端点不再按固定 2025 取上年附注 / 知识库：年度取请求里的，缺省取项目审计年度，都没有 ⇒ 422（权限世界的
+    # 目标项目没填年度）。这里与前端一样显式带年度；缺年度的行为见 test_note_ai_without_year_is_422_after_membership
+    ("AI 生成会计政策", "post", f"{_N}/ai/generate-policy", {"section_number": "五、1", "year": 2025},
      {"load_context": 1, "chat_completion": 1}),
-    ("AI 生成变动分析", "post", f"{_N}/ai/generate-analysis", {"section_number": "五、1"},
+    ("AI 生成变动分析", "post", f"{_N}/ai/generate-analysis", {"section_number": "五、1", "year": 2025},
      {"load_context": 1, "chat_completion": 1}),
-    ("AI 披露完整性检查", "post", f"{_N}/ai/check-completeness", None, {"load_context": 1, "chat_completion": 1}),
+    ("AI 披露完整性检查", "post", f"{_N}/ai/check-completeness?year=2025", None,
+     {"load_context": 1, "chat_completion": 1}),
     ("AI 表述规范检查", "post", f"{_N}/ai/check-expression?section_number=x", None, {}),  # 端点本身不调业务
     ("交付件溯源", "get", f"{_P}/deliverables/{TASK}/trace?section_code=x", None, {"trace": 1, "get_section_states": 1}),
     ("交付件章节状态", "get", f"{_P}/deliverables/{TASK}/section-states", None, {"get_section_states": 1}),
@@ -516,4 +519,35 @@ async def test_dependency_blocks_outsider_only_for_missing_membership(world) -> 
         allowed, _ = await _send(world, outsider.user, method, path, body)
         assert allowed.status_code == 200, f"{name}：补成员行后仍 {allowed.status_code}"
         assert _counts(stubs) == calls, name
+        _reset(stubs)
+
+
+_NOTE_AI_WITHOUT_YEAR = [  # 与 _VIEW 里那三条同端点，只是请求不带年度
+    ("AI 生成会计政策", "post", f"{_N}/ai/generate-policy", {"section_number": "五、1"}),
+    ("AI 生成变动分析", "post", f"{_N}/ai/generate-analysis", {"section_number": "五、1"}),
+    ("AI 披露完整性检查", "post", f"{_N}/ai/check-completeness", None),
+]
+_YEAR_MISSING = {"detail": "未设置审计年度，请先在项目基本信息中填写"}
+
+
+async def test_note_ai_without_year_is_422_after_membership(world) -> None:
+    """请求不带年度、项目也没填审计年度：成员得到 422「未设置审计年度」，业务 0 次（此前按固定 2025 取上年附注）；
+    外人照旧 403 —— 年度在成员校验之后才解析。项目填了 2024 后同一请求放行，取数用的是 2024 而不是 2025。"""
+    stubs = _stub_business(world)
+    member = await _delegated(world, UNREGISTERED)
+    outsider = await world.non_member()
+    for name, method, path, body in _NOTE_AI_WITHOUT_YEAR:
+        denied, _ = await _send(world, outsider.user, method, path, body)
+        _assert_denied(denied, name, "项目组外的人")
+        resp, _ = await _send(world, member.user, method, path, body)
+        assert (resp.status_code, resp.json()) == (422, _YEAR_MISSING), (
+            f"{name}：缺年度时 {resp.status_code} {resp.text}")
+        assert _counts(stubs) == {}, name
+    world.target.audit_year = 2024
+    await world.db.flush()
+    for name, method, path, body in _NOTE_AI_WITHOUT_YEAR:
+        resp, _ = await _send(world, member.user, method, path, body)
+        assert resp.status_code == 200, f"{name}：项目已填年度仍 {resp.status_code} {resp.text}"
+        (args, _kwargs), = stubs["load_context"].calls
+        assert args[2] == 2024, f"{name}：取数年度为 {args[2]!r}，应为项目审计年度 2024"
         _reset(stubs)

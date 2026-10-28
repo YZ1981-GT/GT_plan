@@ -72,7 +72,7 @@ const props = defineProps<{
   /** 当前 sheet 名称；有值才显示「本页AI复核」 */
   sheetName?: string
   /** 审计年度 */
-  year?: number
+  year?: number | null
   /** 弹窗标题科目名（可选，如「管理费用」） */
   label?: string
 }>()
@@ -90,7 +90,7 @@ const canStartAiReview = computed(() =>
 const pageReviewA11yName = computed(() => descriptorFor('ai_review_page').a11yName)
 const batchReviewA11yName = computed(() => descriptorFor('ai_review_batch').a11yName)
 
-const resolvedYear = computed(() => props.year || new Date().getFullYear())
+const resolvedYear = computed<number | null>(() => props.year ?? null)
 
 const reviewDialogVisible = ref(false)
 const reviewing = ref(false)

@@ -215,6 +215,7 @@
  * Spec: .kiro/specs/i3-goodwill/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -331,12 +332,8 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
-      params: { account_prefix: '1711', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取）
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '1711' })).rows
     let u1711 = 0, a1711 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

@@ -1,8 +1,9 @@
 /**
  * F2-57 合同履约成本减值准备测算表（对齐致同源模板）
  *
- * 账面价值 E = C − D；转让对价净额 H = F − G
- * 测算计提/转回 J = max(0, C − H) − D；差异 L = J − K
+ * 账面价值 E = C − D；转让对价净额 H = F − G；是否发生减值 I = E > H
+ * 测算计提/转回 J = IF(H > E, IF(H − E > D, −D, −(H − E)), E − H)（逐字按模板：转回以已计提准备为限）
+ * 差异 L = J − K
  */
 import { calcSubtotal } from './useF2SpecialFormulaEngine'
 
@@ -53,7 +54,7 @@ export const F2_57_OBJECTIVE =
 export const F2_57_TIPS = [
   '合同履约成本减值测试：比较账面价值与「预期剩余对价 − 估计将发生成本」之净额。',
   '账面价值 = 账面余额 − 已计提减值准备；转让对价净额 = 剩余对价 − 估计将发生成本。',
-  '是否发生减值：账面价值 > 转让对价净额；测算计提/转回 = max(0, 账面余额 − 净额) − 已计提准备。',
+  '是否发生减值：账面价值 > 转让对价净额；测算计提/转回 = 账面价值 − 净额，净额高于账面价值时为转回、以已计提准备为限。',
   '差异金额 = 测算金额 − 企业账面记录；差异行须在审计说明中解释并考虑调整。',
   '减值合计应与科目 1410 及相关减值损失勾稽一致。',
 ]
@@ -115,12 +116,22 @@ export function calcRequiredProvision(bookBalance: number, netRealizableValue: n
   return Math.max(0, bookBalance - netRealizableValue)
 }
 
+/**
+ * 测算减值准备计提（正）或转回（负）—— 逐字按模板 J 列：
+ * `IF(H>E, IF((H−E)>D, −D, −(H−E)), E−H)`，E = C − D。
+ * 已计提准备非负时与 `max(0, C − H) − D` 相等；原实现用后者，已计提准备为负（冲回过头）时与模板不符。
+ */
 export function calcMeasuredProvision(
   bookBalance: number,
   netRealizableValue: number,
   accumulatedProvision: number,
 ): number {
-  return calcRequiredProvision(bookBalance, netRealizableValue) - accumulatedProvision
+  const bookValue = calcBookValue(bookBalance, accumulatedProvision)
+  if (netRealizableValue > bookValue) {
+    const recovery = netRealizableValue - bookValue
+    return recovery > accumulatedProvision ? -accumulatedProvision : -recovery
+  }
+  return bookValue - netRealizableValue
 }
 
 export function enrichImpairmentProject(
@@ -133,7 +144,11 @@ export function enrichImpairmentProject(
   )
   const isImpaired: YesNo = bookValue > netRealizableValue ? '是' : '否'
   const requiredProvision = calcRequiredProvision(row.bookBalance, netRealizableValue)
-  const measuredProvision = requiredProvision - row.accumulatedProvision
+  const measuredProvision = calcMeasuredProvision(
+    row.bookBalance,
+    netRealizableValue,
+    row.accumulatedProvision,
+  )
   const difference = measuredProvision - row.companyRecordedProvision
   const hasDifference = Math.abs(difference) > 0.01
   return {

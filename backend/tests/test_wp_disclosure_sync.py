@@ -396,7 +396,7 @@ async def test_sync_with_edit_user_succeeds(world):
     role, level = ROLE_MAP["auditor"]
     identity = await world.member(level, role)
 
-    payload = {**_RBAC_PAYLOAD, "sub_table_data": {"st1": [{"v": 1}]}}
+    payload = {**_RBAC_PAYLOAD, "sub_table_data": {"st1": [{"v": 1}]}, "year": 2025}
     fake_result = {
         "success": True,
         "section_id": "五-1-1 应收账款",

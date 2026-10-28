@@ -16,6 +16,7 @@
  * 字面量。改造前写死 `1503`/`1504`（= 可供出售金融资产 G6 域 / 债权投资 G4 域），
  * 且 render seed 读的是 dead key ⇒ 未审数取数与审定数回写双双落在错误科目上。
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -390,11 +391,7 @@ export function useH3FormData(params: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: wanted.join(',') },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: wanted.join(',') })).rows
 
       let grossUnadjusted = 0
       let accumDepUnadjusted = 0

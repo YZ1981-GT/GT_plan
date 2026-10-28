@@ -154,7 +154,8 @@ export interface H88SyncFromH85Result {
 }
 
 function defaultPeriodEnd(year?: number): string {
-  const y = year && year > 1900 ? year : new Date().getFullYear()
+  if (!year || year <= 1900) return ''
+  const y = year
   return `${y}-12-31`
 }
 

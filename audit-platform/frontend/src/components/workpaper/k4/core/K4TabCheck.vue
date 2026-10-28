@@ -327,6 +327,7 @@
  * - 真实 AI 辅助（/ai/generate-text 端点）
  * - 版本快照（scheduleAutoSnapshot）
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { ref, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -359,7 +360,7 @@ const emit = defineEmits<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 const allResponsesRef = computed(() => props.allResponses)
 
 // ═══ K4 专属核对内容标签（覆盖 K1 通用的 5 项）═══
@@ -497,6 +498,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

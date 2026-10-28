@@ -11,6 +11,7 @@
  * - selfLoad逻辑（render-config?force_component_type=i1-intangible-assets）
  * - TB自动取数 unadjusted_amount → 审定表未审数（1701+1702+1703）
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -330,11 +331,7 @@ export function useI1FormData(params: {
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1701,1702,1703' },
-        _silent: true,
-      } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const list: any[] = (await fetchTrialBalanceRows(projectId.value, { accountPrefix: '1701,1702,1703' })).rows
 
       let unadjusted1701 = 0
       let audited1701 = 0

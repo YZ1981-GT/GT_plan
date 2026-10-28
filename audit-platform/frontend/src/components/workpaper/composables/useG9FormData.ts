@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG9FormData — G9 其他非流动金融资产底稿数据层
@@ -160,11 +161,7 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year })
       const hit = resolveG9TbRow(list)
       if (!hit) return null
       return g9TbRowBalance(hit)

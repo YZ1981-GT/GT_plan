@@ -97,6 +97,7 @@
 </template>
 
 <script setup lang="ts">
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
@@ -329,15 +330,13 @@ async function loadTbRows(): Promise<any[]> {
       _ref: `TB('${e.account_code || ''}','期末余额')`,
     }))
   }
-  const data = await api.get('/api/trial-balance', {
-    params: { project_id: props.projectId },
-    validateStatus: (s: number) => s < 600,
-  })
-  const rows = data ?? []
-  return rows.map((r: any) => ({
-    code: r.standard_account_code || r.account_code || '',
-    name: r.account_name || r.standard_account_name || '',
-    _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
+  if (!props.projectId) return []
+  // 原先回退到 `/api/trial-balance?project_id=`（后端没有该路由，404 被 validateStatus 放行后当行列表读 ⇒ 恒空）
+  const { rows } = await fetchTrialBalanceRows(props.projectId, { year: props.year })
+  return rows.map((r) => ({
+    code: r.standard_account_code,
+    name: r.account_name || '',
+    _ref: `TB('${r.standard_account_code}','期末余额')`,
   }))
 }
 

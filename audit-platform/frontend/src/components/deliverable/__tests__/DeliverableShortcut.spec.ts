@@ -10,7 +10,7 @@ vi.mock('vue-router', () => ({
 }))
 
 // Mock apiProxy
-vi.mock('@/utils/apiProxy', () => ({
+vi.mock('@/services/apiProxy', () => ({
   api: {
     get: vi.fn().mockResolvedValue(null),
   },
@@ -52,7 +52,7 @@ describe('DeliverableShortcut', () => {
   })
 
   it('emits status-change when completeness data loads', async () => {
-    const { api } = await import('@/utils/apiProxy')
+    const { api } = await import('@/services/apiProxy')
     ;(api.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       passed: true,
       warnings: [],

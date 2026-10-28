@@ -4,7 +4,7 @@
  * 覆盖 Property 4：
  * - buildCostCarryforwardReconcile：matched ⟺ |diff| ≤ 容差；diff 符号正确；
  *   容差 = operatingCost×tolPct（operatingCost=0 → 绝对容差 1）。
- * - extractOperatingCost：取 6401 审定发生额（优先 audited，回退 借-贷）。
+ * - extractOperatingCost：取 6401 及其明细的本期发生额（优先审定，回退未审；试算表单边口径）。
  * - pullOperatingCost：优雅降级（缺参 / 空数据 / 请求失败均不抛错）。
  *
  * fast-check numRuns=20；api 用 vi.mock。
@@ -27,31 +27,34 @@ import {
 const mockGet = vi.mocked(api.get)
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  // mockReset 才清 mockResolvedValueOnce 队列（clearAllMocks 不清，一例失败会连带下一例）
+  mockGet.mockReset()
 })
 
-describe('extractOperatingCost', () => {
-  it('prefers audited_amount for 6401', () => {
+// 行形状 = 试算表端点真实字段（services/trialBalanceRows.ts 的 TrialBalanceRow）
+describe('extractOperatingCost（科目及其明细之和；损益类试算表金额即本期单边发生额）', () => {
+  it('取 6401 及其明细的审定数之和，不混入其他科目', () => {
     const rows = [
-      { account_code: '6001', audited_amount: 999 },
-      { account_code: '6401', audited_amount: 1_200_000, debit_amount: 1, credit_amount: 2 },
+      { standard_account_code: '6001', audited_amount: '999', unadjusted_amount: '999' },
+      { standard_account_code: '6401', audited_amount: '1200000', unadjusted_amount: '1100000' },
+      { standard_account_code: '640101', audited_amount: '300000', unadjusted_amount: '300000' },
     ]
-    expect(extractOperatingCost(rows)).toBeCloseTo(1_200_000)
+    expect(extractOperatingCost(rows)).toBeCloseTo(1_500_000)
   })
 
-  it('falls back to debit - credit when no audited field', () => {
-    const rows = [{ accountCode: '6401', debit_amount: 800_000, credit_amount: 50_000 }]
+  it('没有审定数时回退未审数（不用余额表借贷：含结转分录时两侧相等）', () => {
+    const rows = [{ standard_account_code: '6401', audited_amount: null, unadjusted_amount: '750000' }]
     expect(extractOperatingCost(rows)).toBeCloseTo(750_000)
   })
 
   it('returns 0 when account missing / non-array', () => {
-    expect(extractOperatingCost([{ account_code: '6001', audited_amount: 5 }])).toBe(0)
+    expect(extractOperatingCost([{ standard_account_code: '6001', audited_amount: '5' }])).toBe(0)
     expect(extractOperatingCost(null)).toBe(0)
     expect(extractOperatingCost('bad')).toBe(0)
   })
 
   it('respects custom account code', () => {
-    expect(extractOperatingCost([{ account_code: '6402', audited_amount: 42 }], '6402')).toBe(42)
+    expect(extractOperatingCost([{ standard_account_code: '6402', audited_amount: '42' }], '6402')).toBe(42)
   })
 })
 
@@ -126,17 +129,21 @@ describe('pullOperatingCost — graceful degradation', () => {
   })
 
   it('returns empty when no rows', async () => {
-    mockGet.mockResolvedValueOnce({ items: [] })
+    mockGet.mockResolvedValueOnce([])
     const r = await pullOperatingCost('p1', 2025)
     expect(r.status).toBe('empty')
     expect(r.operatingCost).toBe(0)
   })
 
-  it('returns ok with audited cost', async () => {
-    mockGet.mockResolvedValueOnce({ items: [{ account_code: OPERATING_COST_ACCOUNT, audited_amount: 3_000_000 }] })
+  it('returns ok with audited cost（经试算表唯一入口，带年度与科目前缀）', async () => {
+    mockGet.mockResolvedValueOnce([{ standard_account_code: OPERATING_COST_ACCOUNT, audited_amount: '3000000' }])
     const r = await pullOperatingCost('p1', 2025)
     expect(r.status).toBe('ok')
     expect(r.operatingCost).toBeCloseTo(3_000_000)
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/projects/p1/trial-balance',
+      expect.objectContaining({ params: { year: 2025, account_prefix: OPERATING_COST_ACCOUNT } }),
+    )
   })
 
   it('returns error on request failure (no throw)', async () => {

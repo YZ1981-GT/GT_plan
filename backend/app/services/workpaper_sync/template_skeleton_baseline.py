@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Sequence, Set
 
 from app.services.workpaper_sync.contracts import (
+    FORMULA_MODES,
     SyncContract,
     ValueType,
     is_template_skeleton_identity,
@@ -169,10 +170,12 @@ def pure_template_skeleton_rows(
 ) -> frozenset[str]:
     """本表里「骨架身份 ∧ base 没有 ∧ 不带用户内容」的行身份 —— 镜像应跳过它们。
 
-    只看**非受保护**字段（受保护字段本就不回写 store，模板公式的缓存值也不算用户内容）。
-    全部字段都受保护的行不会出现在结果里 —— 它们在 merge 循环里本就一个字段都不落。
+    只看**非受保护、非公式**字段是否带用户内容（受保护字段本就不回写 store，模板公式的缓存值 /
+    OO 重算值也不是用户填的）。只有受保护 / 公式字段的骨架行同样算「不带用户内容」：store 镜像
+    视图会把采纳的 OO 重算值放行成不受保护（spec oo-formula-recompute-not-tamper R3.3），这类行
+    若不在结果里，镜像会为它新建一条只有公式值的 store 行 —— 正是 R12 要防的骨架行回流。
 
-    ``baseline`` 可传零参可调用对象：本表没有候选行（最常见）时**不**读模板。
+    ``baseline`` 可传零参可调用对象：没有带可编辑值的候选行（最常见）时**不**读模板。
     """
     prefix = f"{table_key}/"
     per_row: dict[str, list[tuple[str, Any]]] = {}
@@ -181,23 +184,29 @@ def pure_template_skeleton_rows(
         if not stable_key.startswith(prefix):
             continue
         fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
+        if fv is None:
             continue
         rid = str(getattr(fv, "row_key", None) or "")
         if not rid or rid in base_identities or not is_template_skeleton_identity(rid):
             continue
-        per_row.setdefault(rid, []).append(
-            (stable_key.rsplit("/", 1)[-1], getattr(fv, "value", None))
-        )
-    if not per_row:
-        return frozenset()
+        fields = per_row.setdefault(rid, [])
+        if getattr(fv, "is_protected", False) or getattr(fv, "mode", None) in FORMULA_MODES:
+            continue
+        fields.append((stable_key.rsplit("/", 1)[-1], getattr(fv, "value", None)))
+    pure = {rid for rid, fields in per_row.items() if not fields}
+    candidates = {rid: fields for rid, fields in per_row.items() if fields}
+    if not candidates:
+        return frozenset(pure)
     resolved = baseline if isinstance(baseline, SkeletonBaseline) else baseline()
     return frozenset(
-        rid
-        for rid, fields in per_row.items()
-        if not resolved.carries_user_content(
-            table_key=table_key, row_identity=rid, fields=fields
-        )
+        pure
+        | {
+            rid
+            for rid, fields in candidates.items()
+            if not resolved.carries_user_content(
+                table_key=table_key, row_identity=rid, fields=fields
+            )
+        }
     )
 
 

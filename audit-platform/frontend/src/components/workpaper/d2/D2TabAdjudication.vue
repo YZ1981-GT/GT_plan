@@ -11,6 +11,7 @@ import { useD2CrossSheet } from '../composables/useD2CrossSheet'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { getChangeRate } from '../composables/useD2FormulaEngine'
+import { formatTemplateChangeRate, type TemplateChangeRate } from '../composables/templateChangeRate'
 import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
@@ -56,6 +57,8 @@ const baseOpts = {
 const {
   adjudicationRows,
   totalRow,
+  netTotalAudited,
+  trialBalanceAmount,
   trialBalanceDiff,
   updateCell,
   isChangeRateWarning,
@@ -128,7 +131,7 @@ interface SectionRow {
   priorAudited: number
   currentAudited: number
   change: number
-  changeRate: number | ''
+  changeRate: TemplateChangeRate
   isFromCrossSheet?: boolean
   isEditable?: boolean
 }
@@ -146,7 +149,7 @@ interface ExcelMainRow {
   currentRje: number
   currentAudited: number
   change: number
-  changeRate: number | ''
+  changeRate: TemplateChangeRate
   reasonAnalysis: string
 }
 
@@ -398,9 +401,8 @@ const agingTotal = computed(() => ({
   net: agingTableRows.value.reduce((s, r) => s + r.net, 0),
 }))
 
-function fmtRate(rate: number | ''): string {
-  if (rate === '') return '-'
-  return (rate * 100).toFixed(1) + '%'
+function fmtRate(rate: TemplateChangeRate): string {
+  return formatTemplateChangeRate(rate, 1)
 }
 
 function getCellClass(row: SectionRow | AdjudicationRow, field: string): string {
@@ -411,7 +413,7 @@ function getCellClass(row: SectionRow | AdjudicationRow, field: string): string 
   if ('source' in row && row.source === 'tb' && field === 'currentAudited') {
     classes.push('sumif-cell')
   }
-  if (field === 'changeRate' && isChangeRateWarning(row.changeRate as number | '')) {
+  if (field === 'changeRate' && isChangeRateWarning(row.changeRate)) {
     classes.push('rate-warning')
   }
   return classes.join(' ')
@@ -505,7 +507,7 @@ const dSourceHints = [
     </el-alert>
 
     <el-alert v-if="!trialBalanceDiff.isZero" type="error" :closable="false" class="tb-alert">
-      试算平衡表差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}（科目1122）
+      试算平衡表差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}（按应收账款净值 = 原值 − 坏账准备比对）
     </el-alert>
 
     <el-skeleton :loading="loading" :rows="8" animated>
@@ -615,7 +617,8 @@ const dSourceHints = [
 
         <!-- 试算平衡 -->
         <div class="tb-row">
-          <span>试算平衡表数（1122）：{{ displayPrefs.fmtAmount(parseFloat(String(allResponses.get('D2-adj-tb-amount')?.remark || '0')) || 0) }}</span>
+          <span>净值审定合计：{{ displayPrefs.fmtAmount(netTotalAudited) }}</span>
+          <span>试算平衡表数（应收账款净额）：{{ displayPrefs.fmtAmount(trialBalanceAmount) }}</span>
           <span :class="{ 'rate-warning': !trialBalanceDiff.isZero }">
             差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}
           </span>

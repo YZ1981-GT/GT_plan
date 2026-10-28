@@ -152,23 +152,30 @@ describe('useF4RelatedParty — 公式、联动和风险', () => {
     expect(composable.rows.value[0].riskFlags).toContain('长期账龄且无期后付款')
   })
 
-  it('联动行以F4-2审定期末为准，AJE不误报不一致', () => {
+  // 权威模板 F4-6 F = C + E − D；F4-2 K = E + J − I（同式）。联动行期初取 F4-2 期初未审、
+  // 期末与 F4-2 期末余额（K）比对 ⇒ 期初 / 期末审定调整都不进本表，也不会误报不一致
+  it('联动行期末按模板 F = C + E − D，期初取F4-2期初未审，与F4-2期末余额比对', () => {
     const opts = options([['F4-2-rows', [{
       rowId: 'd1',
       creditor: '调整关联方',
       relatedPartyType: '联营企业',
       openingUnadjusted: 100,
+      openingAje: 15,
+      currentDebit: 10,
       currentCredit: 50,
       closingAje: 20,
-      auditedAgingLt1: 170,
+      auditedAgingLt1: 175,
     }]]])
     const composable = useF4RelatedParty(opts)
     composable.syncFromDetail()
     const row = composable.rows.value[0]
-    expect(row.closingBalance).toBe(170)
-    expect(row.sourceClosingBalance).toBe(170)
+    expect(row.openingBalance).toBe(100)
+    expect(row.closingBalance).toBe(100 + 50 - 10)
+    // 旧口径取 F4-2 期末审定（100 + 50 − 10 + 20 = 160），OnlyOffice 按模板重算后两侧不等
+    expect(row.closingBalance).not.toBe(160)
+    expect(row.sourceClosingBalance).toBe(140)
     expect(row.reconciliationDifference).toBe(0)
-    expect(row.riskFlags).not.toContain('与F4-2审定数不一致')
+    expect(row.riskFlags).not.toContain('与F4-2期末余额不一致')
     expect(row.riskLevel).not.toBe('danger')
   })
 })

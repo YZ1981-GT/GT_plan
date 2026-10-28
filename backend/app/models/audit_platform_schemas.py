@@ -366,14 +366,27 @@ class ReportLineMappingConfirm(BaseModel):
 
 
 class ReferenceCopyRequest(BaseModel):
-    """集团参照复制请求"""
-    source_company_code: str
+    """集团参照复制请求：``source_project_id``（选定的来源项目）与 ``source_company_code``（来源企业名称）二选一。
+
+    试算表「参照其他单位」下拉选的是项目 id，原先却塞进 ``source_company_code`` 去比客户名称 —— 恒比不上，
+    于是每次都落到「随便找一个其他项目」（spec consol-autotree-residual-closure R2.3）。
+    """
+    source_company_code: str | None = None
+    source_project_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> "ReferenceCopyRequest":
+        has_name = bool((self.source_company_code or "").strip())
+        if has_name == (self.source_project_id is not None):
+            raise ValueError("来源项目与来源企业名称须且只能给一个")
+        return self
 
 
 class ReferenceCopyResult(BaseModel):
-    """集团参照复制结果"""
+    """集团参照复制结果；``source_found=False`` = 没有找到可参照的来源项目（一条未复制）。"""
     copied_count: int
     unmatched_accounts: list[str] = []
+    source_found: bool = True
 
 
 class ReportLine(BaseModel):

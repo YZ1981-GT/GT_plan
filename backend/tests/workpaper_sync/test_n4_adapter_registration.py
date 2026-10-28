@@ -30,7 +30,7 @@ N4_MANAGED_SHEET = "税金及附加明细表N4-2"
 N4_DERIVED_SHEET = "税金及附加审定表N4-1"
 
 #: 净化后模板 sha256（Task 7a sanitize_n4_template_external_links --apply 之后）。
-N4_TEMPLATE_SHA256 = "2005eada32506e9e2b1b6f68c704ca4f6626b8a78e9e2a3a221ca00602cad638"
+N4_TEMPLATE_SHA256 = "28e4b30f1c3f6123860a10989318e40304b7004272e78df835e6029ec39fcc08"
 
 #: 受管表几何基线（openpyxl 现算，§0.3）。
 MANAGED_GEOMETRY = {
@@ -48,8 +48,12 @@ MANAGED_GEOMETRY = {
 MANAGED_FORMULA_COLUMNS = ("E", "I", "K")
 MANAGED_FORMULA_SHAPES = {"E": "=B9+C9+D9", "I": "=F9+G9+H9", "K": "=E9-J9"}
 #: 🔴 模板既知缺陷（记录型锁定，不改模板）。
-TEMPLATE_DEFECT_E9 = "=B9+C9+N4"      # 第三加数误写列引用（NC-32 A1 族）
-TEMPLATE_DEFECT_D19 = "=SUM(D4:N18)"  # footer D 列 SUM 越界
+#: 两处模板缺陷（修复前 → 修复后，`oo-writeback-template-parity-closure` R1）：
+#: E9 第三加数误写成本册 wp_code（NC-32 A1 族），D19 footer SUM 区间越界。
+TEMPLATE_DEFECT_E9 = "=B9+C9+N4"
+TEMPLATE_FIXED_E9 = "=B9+C9+D9"
+TEMPLATE_DEFECT_D19 = "=SUM(D4:N18)"
+TEMPLATE_FIXED_D19 = "=SUM(D9:D18)"
 BARE_IF_MANAGED = 0
 BARE_IF_DERIVED = 20
 PREPRINTED_TAX_NAMES = (
@@ -223,10 +227,11 @@ class TestManagedSheetGeometry:
         assert tuple(found) == MANAGED_FORMULA_COLUMNS, (
             f"数据区公式列实测 {found}，期望 {list(MANAGED_FORMULA_COLUMNS)}"
         )
-        # 形态以 r10 为正确模板（r9 的 E 列是模板缺陷，另有记录型断言）
-        for col, shape in {"E": "=B10+C10+D10", "I": "=F10+G10+H10", "K": "=E10-J10"}.items():
-            actual = str(ws[f"{col}10"].value).replace(" ", "")
-            assert actual == shape, f"{col}10 形态 {actual!r} != {shape!r}"
+        # 模板已修（E9 原为缺陷），数据区 r9~r18 逐行同形
+        for r in range(9, 19):
+            for col, shape in {"E": "=B{r}+C{r}+D{r}", "I": "=F{r}+G{r}+H{r}", "K": "=E{r}-J{r}"}.items():
+                actual = str(ws[f"{col}{r}"].value).replace(" ", "")
+                assert actual == shape.format(r=r), f"{col}{r} 形态 {actual!r} != {shape.format(r=r)!r}"
 
     def test_footer_sum_columns(self) -> None:
         from openpyxl.utils import get_column_letter
@@ -262,13 +267,17 @@ class TestManagedSheetGeometry:
             "注入含 #REF! 的 defined name 后扫描器未命中 ⇒ 空分母不可信"
         )
 
-    def test_template_known_defects_are_recorded_not_fixed(self) -> None:
-        """🔴 两处模板缺陷记录型锁定：E9 第三加数误写列引用、D19 footer SUM 越界。"""
+    def test_template_known_defects_are_fixed(self) -> None:
+        """🔴 两处模板缺陷已修：E9 与第 10~18 行同形 `=B+C+D`，D19 与同行其余列同形 `=SUM(x9:x18)`。"""
         wb, ws = _managed_ws()
-        assert str(ws["E9"].value).replace(" ", "") == TEMPLATE_DEFECT_E9, (
-            f"E9 实测 {ws['E9'].value!r}，模板缺陷基线 {TEMPLATE_DEFECT_E9}"
-        )
-        assert str(ws["D19"].value).replace(" ", "") == TEMPLATE_DEFECT_D19
+        e9 = str(ws["E9"].value).replace(" ", "")
+        d19 = str(ws["D19"].value).replace(" ", "")
+        assert e9 == TEMPLATE_FIXED_E9 != TEMPLATE_DEFECT_E9, f"E9 实测 {ws['E9'].value!r}"
+        assert d19 == TEMPLATE_FIXED_D19 != TEMPLATE_DEFECT_D19, f"D19 实测 {ws['D19'].value!r}"
+        for col in "BCEFGHIJK":
+            assert str(ws[f"{col}19"].value).replace(" ", "") == f"=SUM({col}9:{col}18)", (
+                f"{col}19 实测 {ws[f'{col}19'].value!r}（D19 的修正口径取自同行其余列）"
+            )
 
     def test_uuid_col_is_max_col_plus_one(self) -> None:
         from openpyxl.utils import get_column_letter

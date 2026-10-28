@@ -65,7 +65,7 @@ async def test_incomplete_data_warns_but_not_blocks():
     assert result["total_count"] == 3
     # 每个数据叶子 2 条 warning（无 TB + 无附注）
     assert len(result["warnings"]) == 6
-    assert "某集团（母公司） 无审定试算数据，合并结果可能不准确" in result["warnings"]
+    assert "某集团（单体母公司户） 无审定试算数据，合并结果可能不准确" in result["warnings"]
     assert "子公司 子公司0 未生成附注" in result["warnings"]
 
 
@@ -107,7 +107,7 @@ async def test_missing_standalone_warns_without_querying():
 
     # 母公司有分公司 ⇒ 数据叶子 = 本部（无单户）+ 分公司 + 子公司
     assert result["total_count"] == 3 and result["checked_count"] == 3
-    assert result["warnings"] == ["某集团（本部） 没有本年度单户项目，合并时金额按 0 计"]
+    assert result["warnings"] == ["某集团（本部单体户） 没有本年度单户项目，合并时金额按 0 计"]
     assert has_tb.await_count == 2
     assert all(call.args[1] is not None for call in has_tb.await_args_list)
 

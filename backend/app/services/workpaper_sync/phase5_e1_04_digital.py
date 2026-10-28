@@ -14,14 +14,20 @@ spec: e1-sync-coverage-and-first-canary · Task 13 · Requirements 2.1
 ═══ 几何（openpyxl 逐格实测，禁推演）═══
 
 单级表头 R9（17 列 A..Q）· 数据区 **R10-16**（7 行，A 列预填序号 1-7、B 列预填「北京」）·
-footer **R17「合计」** = SUM(10:16) · 公式列 **H/I/K/L**：
+footer **R17「合计」** = SUM(10:16) · 公式列 **H/I/K/L/N**：
 
   H = `=E{r}+F{r}-G{r}`   期末余额（原币）
-  I = `=H{r}*D{r}`        期末余额（本币，🔴 乘法）
-  K = `=H{r}+J{r}`        审定后余额（原币）
-  L = `=K{r}*D{r}`        审定后余额（本币，🔴 乘法）
+  I = `=H{r}*D{r}`        期末余额（本位币，🔴 乘法）
+  K = `=H{r}+J{r}`        期末审定数（原币）
+  L = `=K{r}*D{r}`        期末审定数（人民币，🔴 乘法）
+  N = `=M{r}-K{r}`        期末账面余额与银行查询余额的差异
 
 ⇒ 与 E1-2 同属「乘法派生」族（E1-2 的 G=`E*F` / I=`G+H*F`），`mode=formula` 路径不依赖算式形态。
+
+🔴 spec oo-writeback-template-parity-closure R3：json 键逐字取前端 `e1DigitalRowCalc.E1DigitalRow`
+（原写 seqNo / bank / *Original / *Local，前端存 seq / bankName / opening / endingFc / auditedRmb …）；
+A 序号前端按位置编号 ⇒ `auto_source`（同 H1-8）；M~Q 模板 R9 有表头（查询余额 / 差异 / 两个索引号 /
+备注，原注释说「无表头」不实），前端都有对应字段，一并受管。
 """
 from __future__ import annotations
 
@@ -69,23 +75,28 @@ FORMULA_TEMPLATES_E104: Final[dict[str, str]] = {
     "I": "=H{r}*D{r}",
     "K": "=H{r}+J{r}",
     "L": "=K{r}*D{r}",
+    "N": "=M{r}-K{r}",
 }
 
-#: 12 个受管字段（7 元组，单级表头故 group_header_cell 全空）。顺序即 Excel 列序 A→L。
-#: 🔴 M..Q 列在模板 R9 无表头文本（实测），不纳入受管字段 —— 受管列止于 L。
+#: 17 个受管字段（7 元组，单级表头故 group_header_cell 全空）。顺序即 Excel 列序 A→Q，表头逐格取 R9。
 FIELD_SPECS_E104: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("seq_no", "A", "editable", "integer", "seqNo", "序号", ""),
-    ("bank", "B", "editable", "text", "bank", "开户银行", ""),
+    ("seq_no", "A", "auto_source", "integer", "seq", "序号", ""),
+    ("bank", "B", "editable", "text", "bankName", "开户银行", ""),
     ("currency", "C", "editable", "text", "currency", "币种", ""),
     ("fx_rate", "D", "editable", "amount", "fxRate", "汇率", ""),
-    ("opening_original", "E", "editable", "amount", "openingOriginal", "期初余额(原币)", ""),
-    ("increase_original", "F", "editable", "amount", "increaseOriginal", "本期增加(原币)", ""),
-    ("decrease_original", "G", "editable", "amount", "decreaseOriginal", "本期减少(原币)", ""),
-    ("closing_original", "H", "formula", "amount", "closingOriginal", "期末余额(原币)", ""),
-    ("closing_local", "I", "formula", "amount", "closingLocal", "期末余额(本币)", ""),
-    ("adjustment_original", "J", "editable", "amount", "adjustmentOriginal", "审计调整(原币)", ""),
-    ("audited_original", "K", "formula", "amount", "auditedOriginal", "审定后余额(原币)", ""),
-    ("audited_local", "L", "formula", "amount", "auditedLocal", "审定后余额(本币)", ""),
+    ("opening_original", "E", "editable", "amount", "opening", "期初余额(原币)", ""),
+    ("increase_original", "F", "editable", "amount", "increase", "本期增加(原币)", ""),
+    ("decrease_original", "G", "editable", "amount", "decrease", "本期减少(原币)", ""),
+    ("closing_original", "H", "formula", "amount", "endingFc", "期末余额(原币)", ""),
+    ("closing_local", "I", "formula", "amount", "endingRmb", "期末余额(本位币)", ""),
+    ("adjustment_original", "J", "editable", "amount", "adjustment", "账项调整（原币）", ""),
+    ("audited_original", "K", "formula", "amount", "auditedFc", "期末审定数（原币）", ""),
+    ("audited_local", "L", "formula", "amount", "auditedRmb", "期末审定数（人民币）", ""),
+    ("query_balance", "M", "editable", "amount", "queryBalance", "期末银行查询余额", ""),
+    ("balance_diff", "N", "formula", "amount", "diff", "期末账面余额与银行查询余额的差异", ""),
+    ("index_no", "O", "editable", "text", "indexNo", "银行余额索引号", ""),
+    ("confirmation_index_no", "P", "editable", "text", "confirmationIndexNo", "银行询证函索引号", ""),
+    ("note", "Q", "editable", "text", "note", "备注", ""),
 )
 
 SPEC_E104: Final[RowTableSheetSpec] = RowTableSheetSpec(
@@ -104,8 +115,10 @@ SPEC_E104: Final[RowTableSheetSpec] = RowTableSheetSpec(
     row_identity_key=ROW_IDENTITY_STORE_KEY_E104,
     store_kind=StoreKind.rows,
     field_specs=FIELD_SPECS_E104,
-    formula_columns=("H", "I", "K", "L"),
+    formula_columns=("H", "I", "K", "L", "N"),
     formula_templates=FORMULA_TEMPLATES_E104,
+    # A 序号是 auto_source（受保护、回写不合并）⇒ 新增行的锚点必须是 B 开户银行，否则全被当幽灵行剔除
+    ghost_row_anchor_index=1,
     footer_marker=FOOTER_MARKER_E104,
     error_label="E1-4 数字货币明细表",
 )

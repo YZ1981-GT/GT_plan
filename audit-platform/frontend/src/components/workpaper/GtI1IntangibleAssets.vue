@@ -269,6 +269,7 @@
  * Spec: .kiro/specs/i1-intangible-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, watch, onMounted, provide, toRef, defineAsyncComponent, inject } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -394,17 +395,11 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      // 🔴 `year` 是后端 `GET /api/projects/{pid}/trial-balance` 的**必填** Query
-      //    （`trial_balance.py: year: int = Query(...)`）—— 不传直接 422。
-      //    K 循环范式一律 `year: props.year`；I 循环曾整体漏传 ⇒ 叠加缺 `/api` 前缀
-      //    共三层错误，全被 `_silent: true` + catch 吞掉，表现为「TB 取数恒 0」。
-      //    注：`account_prefix` 后端并未声明（FastAPI 静默忽略），实际过滤靠下方
-      //    `code.startsWith(...)` 客户端筛选；保留该参数以便将来后端支持。
-      params: { account_prefix: '1701,1702,1703', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    // 经试算表唯一入口取数（年度为空时后端按项目审计年度取；前缀由后端筛选）
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, {
+      year: props.year,
+      accountPrefix: '1701,1702,1703',
+    })).rows
     let u1701 = 0, a1701 = 0, u1702 = 0, a1702 = 0, u1703 = 0, a1703 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

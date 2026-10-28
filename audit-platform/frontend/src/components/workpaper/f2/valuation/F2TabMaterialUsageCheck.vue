@@ -358,7 +358,7 @@
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
-        :year="auditYear ?? new Date().getFullYear()"
+        :year="auditYear ?? null"
         @filled="handleSamplingFilled"
       />
     </el-dialog>
@@ -397,7 +397,7 @@ import type { SamplingMethodologySnapshot } from '../../composables/shared/sampl
 const props = defineProps<{
   wpId?: string
   projectId?: string
-  auditYear?: number
+  auditYear?: number | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()

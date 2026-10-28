@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "7a7d9b12e000579e22768ca2217a77d1106cc4ce77bb49993828a522db0d5e6f",
+  "instrumentation_definition_sha256": "9e979620c79638f5759f8114bd79817447ede980b9ec3dd0ee4c43c029670f3f",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g5-long-term-receivable",
@@ -397,9 +397,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "def3659b39997d4eef7a9ffb3218a59cdda19ebd93d6cda9096fdea5471bd477",
+    "normalized_structure_hash": "4a181c3602dc701dd5bbae281ada8d96c44e85d2ea5f5d8263dbc7d142db6305",
     "relative_path": "G/G5 长期应收款.xlsx",
-    "template_sha256": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99"
+    "template_sha256": "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c"
   },
-  "template_definition_sha256": "7a2aa304a1877442dac5c6b8938647a2df1d9b504496883f77e043c82917a179"
+  "template_definition_sha256": "0082c6e1c73aede1913309a433324cbc76e3bbf7f2f50d1f90c0ff97a20a801f"
 }

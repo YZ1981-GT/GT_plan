@@ -128,6 +128,16 @@ describe('i4TargetedCheckModel', () => {
     expect(mv.source).toBe('I4-2')
   })
 
+  // post-push-residual-defect-closure R2：原先 null 当「不过滤」，把往年原值也算成本期借方
+  it('审计年度未知（项目没填）：发生日年份代理不计入本期借方', () => {
+    const mv = extractI4PeriodMovement([
+      { projectName: '旧项目', originalAmount: 800, occurDate: '2026-05-01' },
+      { projectName: '往年项目', originalAmount: 300, occurDate: '2024-01-01' },
+    ], null)
+    expect(mv.debitTotal).toBe(0)
+    expect(mv.originalTotal).toBe(1100)
+  })
+
   it('兼容旧段落型分散 key 拼装的迁移对象（大额新增/受益期变更/提前终止）', () => {
     const rf = normalizeI4TargetedRiskFocus({
       majorAddition: '本期新增装修费100万，凭证齐全',

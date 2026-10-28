@@ -17,8 +17,7 @@
  * })
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import { api as httpApi } from '@/services/apiProxy'
-import { workpapers as P_wp } from '@/services/apiPaths'
+import { getWorkpaperSettled } from '@/services/workpaperApi'
 import { useWpClassification } from '@/composables/useWpClassification'
 import { HTML_RENDERER_ROUTE_SET } from '@/components/workpaper/htmlRendererRegistry'
 
@@ -101,7 +100,8 @@ export function useEditorMode(ctx: EditorModeContext): EditorModeReturn {
 
   async function fetchComponentType(): Promise<void> {
     try {
-      const detail = await httpApi.get(P_wp.detail(ctx.projectId.value, ctx.wpId.value))
+      // 与 Univer 核心共用同一个在途请求（getWorkpaperSettled）：两边各发一次会被 GET 去重取消先发的那一发
+      const detail: any = await getWorkpaperSettled(ctx.projectId.value, ctx.wpId.value)
       const ct = detail?.component_type || detail?.template_metadata?.component_type || 'univer'
       componentType.value = ct
       if (detail) ctx.wpDetail.value = detail

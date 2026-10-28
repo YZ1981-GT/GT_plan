@@ -289,8 +289,7 @@ const n2Year = computed(() => {
   // 从 allResponses 解析（后端 render 可能注入）
   const yearItem = allResponses.value.get('N2-project-year')
   if (yearItem?.conclusion) return yearItem.conclusion
-  // 兜底当前年份
-  return String(new Date().getFullYear())
+  return yearItem?.conclusion ?? ''
 })
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───

@@ -37,6 +37,8 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import Project
 from app.services.account_chart_service import _infer_category
+# 集团参照复制原样拆在 report_line_mapping_reference_copy（本文件超行数门）；路由与测试仍按本模块属性调用
+from app.services.report_line_mapping_reference_copy import reference_copy, reference_copy_from_project  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -543,136 +545,6 @@ async def batch_confirm(
     )
     await db.commit()
     return len(mapping_ids)
-
-
-# ---------------------------------------------------------------------------
-# reference_copy (Task 7a.4 — 集团参照复制)
-# ---------------------------------------------------------------------------
-
-
-async def reference_copy(
-    source_company_code: str,
-    target_project_id: UUID,
-    db: AsyncSession,
-) -> ReferenceCopyResult:
-    """从同集团源企业复制已确认的报表行次映射。
-
-    Validates: Requirements 3.12, 3.13
-    """
-    from app.models.core import Project
-
-    # 查找源企业的项目（通过 company_code 匹配，取最新的）
-    source_project_result = await db.execute(
-        select(Project).where(
-            Project.is_deleted == False,  # noqa: E712
-        ).order_by(Project.created_at.desc())
-    )
-    source_projects = source_project_result.scalars().all()
-
-    # 查找有已确认映射的源项目
-    source_project_id: UUID | None = None
-    for proj in source_projects:
-        if proj.id == target_project_id:
-            continue
-        # 检查 wizard_state 中的 company_code 或 client_name
-        ws = proj.wizard_state or {}
-        basic = ws.get("basic_info", {}).get("data", {})
-        if basic.get("client_name", "") == source_company_code:
-            source_project_id = proj.id
-            break
-
-    if source_project_id is None:
-        # 回退：尝试用任何有已确认映射的其他项目
-        for proj in source_projects:
-            if proj.id == target_project_id:
-                continue
-            check = await db.execute(
-                select(ReportLineMapping).where(
-                    ReportLineMapping.project_id == proj.id,
-                    ReportLineMapping.is_confirmed == True,  # noqa: E712
-                    ReportLineMapping.is_deleted == False,  # noqa: E712
-                ).limit(1)
-            )
-            if check.scalar_one_or_none():
-                source_project_id = proj.id
-                break
-
-    if source_project_id is None:
-        return ReferenceCopyResult(copied_count=0, unmatched_accounts=[])
-
-    # 获取源项目已确认映射
-    source_result = await db.execute(
-        select(ReportLineMapping).where(
-            ReportLineMapping.project_id == source_project_id,
-            ReportLineMapping.is_confirmed == True,  # noqa: E712
-            ReportLineMapping.is_deleted == False,  # noqa: E712
-        )
-    )
-    source_mappings = source_result.scalars().all()
-
-    if not source_mappings:
-        return ReferenceCopyResult(copied_count=0, unmatched_accounts=[])
-
-    # 获取目标项目的标准科目编码集合
-    target_std_result = await db.execute(
-        select(AccountChart.account_code).where(
-            AccountChart.project_id == target_project_id,
-            AccountChart.source == AccountSource.standard,
-            AccountChart.is_deleted == False,  # noqa: E712
-        )
-    )
-    target_std_codes = {row[0] for row in target_std_result.all()}
-
-    # 也包含已映射的标准科目
-    target_mapped_result = await db.execute(
-        select(AccountMapping.standard_account_code).where(
-            AccountMapping.project_id == target_project_id,
-            AccountMapping.is_deleted == False,  # noqa: E712
-        ).distinct()
-    )
-    target_std_codes.update(row[0] for row in target_mapped_result.all())
-
-    copied_count = 0
-    unmatched: list[str] = []
-
-    for src in source_mappings:
-        if src.standard_account_code not in target_std_codes:
-            unmatched.append(src.standard_account_code)
-            continue
-
-        # 检查目标项目是否已有该映射
-        existing = await db.execute(
-            select(ReportLineMapping).where(
-                ReportLineMapping.project_id == target_project_id,
-                ReportLineMapping.standard_account_code == src.standard_account_code,
-                ReportLineMapping.report_type == src.report_type,
-                ReportLineMapping.is_deleted == False,  # noqa: E712
-            )
-        )
-        if existing.scalar_one_or_none():
-            continue
-
-        new_mapping = ReportLineMapping(
-            project_id=target_project_id,
-            standard_account_code=src.standard_account_code,
-            report_type=src.report_type,
-            report_line_code=src.report_line_code,
-            report_line_name=src.report_line_name,
-            report_line_level=src.report_line_level,
-            parent_line_code=src.parent_line_code,
-            mapping_type=ReportLineMappingType.reference_copied,
-            is_confirmed=False,
-        )
-        db.add(new_mapping)
-        copied_count += 1
-
-    await db.flush()
-    await db.commit()
-
-    return ReferenceCopyResult(
-        copied_count=copied_count,
-        unmatched_accounts=list(set(unmatched)),
-    )
 
 
 # ---------------------------------------------------------------------------

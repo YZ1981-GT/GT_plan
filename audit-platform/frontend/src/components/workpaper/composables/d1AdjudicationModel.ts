@@ -841,7 +841,7 @@ export function readD1BadDebtByNoteType(map: D1ResponseMap): Record<string, D1Pe
  * `eclVsBadDebtDiff` 把整个 ECL 应计提额当成差异常亮。
  *
  * 口径与 `useD1FormulaEngine.calcBadDebtEndBalance` 逐字一致
- * （期初审定 + 计提 − 收回 − 转回 − 核销 + 其他）。
+ * （期初未审 + 计提 − 收回 − 转回 − 核销 + 其他，即模板 K = B + SUM(F:G) − SUM(H:J)）。
  */
 export function readD1BadDebtTotal(map: D1ResponseMap): D1PeriodAmounts {
   const rows: D1PeriodAmounts[] = []
@@ -851,7 +851,7 @@ export function readD1BadDebtTotal(map: D1ResponseMap): D1PeriodAmounts {
       const priorAje = n(raw?.priorAje)
       const priorRje = n(raw?.priorRje)
       const currentUnadjusted =
-        d1Audited(priorUnadjusted, priorAje, priorRje) +
+        priorUnadjusted +
         n(raw?.currentProvision) -
         n(raw?.currentRecovery) -
         n(raw?.currentReversal) -

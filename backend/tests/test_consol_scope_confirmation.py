@@ -127,59 +127,126 @@ async def _counts(env):
 
 
 @pytest.mark.asyncio
-async def test_preview_is_read_only_and_new_tree_cannot_compute(env):
+async def test_unrecorded_tree_still_computes_and_preview_is_read_only(env):
+    """V206（spec consol-autotree-linkage-closure R1.1）：没有任何版本记录也能算合并数，预览不写库。"""
     preview = await _preview(env)
-    assert preview["revision"] == 0 and not preview["confirmed"]
-    assert not preview["pending_legacy"]
-    assert preview["pending_confirmation"] and preview["can_confirm"]
+    assert preview["revision"] == 0 and not preview["confirmed"] and not preview["matches_recorded"]
+    assert preview["pending_confirmation"] is False and preview["can_confirm"]
+    assert "pending_legacy" not in preview
     assert await _counts(env) == (0, 0)
     async with env["factory"]() as db:
-        with pytest.raises(HTTPException) as error:
-            await calc.load_calc_basis(db, env["ids"]["p"], 2025)
-        assert error.value.status_code == 409
-        assert error.value.detail["error_code"] == "SCOPE_CONFIRMATION_REQUIRED"
-        assert await build_tree_view(db, env["ids"]["p"]) is not None
+        basis = await calc.load_calc_basis(db, env["ids"]["p"], 2025)
+        assert basis is not None
+        assert Decimal(calc.node_amount_rows(basis, "P:consol")[0]["consolidated_amount"]) == Decimal("150")
+        view = await build_tree_view(db, env["ids"]["p"])
+        assert view["scope_version"]["revision"] == 0 and view["scope_version"]["matches"] is False
+    assert await _counts(env) == (0, 0), "读路径不写版本"
 
 
 @pytest.mark.asyncio
-async def test_legacy_boundary_requires_pre183_data_and_explicit_read_switch(env):
-    cutoff = datetime(2026, 10, 8, tzinfo=timezone.utc)  # schema_version applied_at
-    legacy_created = datetime(2026, 9, 1, tzinfo=timezone.utc)
+async def test_auto_record_creates_once_then_is_idempotent(env):
+    """推送写路径自动记录：首次新建（记录方式 auto、无触发人），同一棵树再记录不新建。"""
+    async with env["factory"]() as db:
+        first = await svc.record_scope_version(db, env["ids"]["p"])
+        await db.commit()
+        again = await svc.record_scope_version(db, env["ids"]["p"], recorded_by=env["ids"]["edit"])
+        await db.commit()
+        stored = (await db.execute(sa.select(ConsolScopeConfirmation))).scalars().all()
+    assert first["created"] is True and first["revision"] == 1 and first["mode"] == "auto"
+    assert again["created"] is False and again["revision"] == 1
+    assert len(stored) == 1 and stored[0].confirmation_mode == "auto" and stored[0].confirmed_by is None
+    preview = await _preview(env)
+    assert preview["matches_recorded"] and preview["recorded_mode"] == "auto" and preview["recorded_revision"] == 1
+    assert (await _counts(env))[1] == len(preview["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_tree_change_records_new_version_with_structural_diff(env):
+    async with env["factory"]() as db:
+        await svc.record_scope_version(db, env["ids"]["p"])
+        await db.commit()
+        project = await db.get(Project, env["ids"]["sub"])
+        project.relation_to_parent = "branch"
+        await db.commit()
+        info = await svc.scope_version_info(db, env["ids"]["p"])
+        assert info["revision"] == 1 and info["matches"] is False and info["structural_change"] is True
+        assert [a["node_key"] for a in info["diff"]["added"]] == ["S:branch"]
+        assert [r["node_key"] for r in info["diff"]["removed"]] == ["S:subsidiary"]
+        # 结构变化只提示不拦截：照常按新树计算
+        assert await calc.load_calc_basis(db, env["ids"]["p"], 2025) is not None
+        second = await svc.record_scope_version(db, env["ids"]["p"])
+        await db.commit()
+        rows = (await db.execute(sa.select(ConsolScopeConfirmation).order_by(ConsolScopeConfirmation.revision))).scalars().all()
+    assert second["created"] and second["revision"] == 2 and second["structural_change"] is True
+    assert [row.status for row in rows] == ["superseded", "active"]
+
+
+@pytest.mark.asyncio
+async def test_rename_only_is_not_a_structural_change(env):
+    async with env["factory"]() as db:
+        await svc.record_scope_version(db, env["ids"]["p"])
+        await db.commit()
+        project = await db.get(Project, env["ids"]["sub"])
+        project.client_name = "子公司改名"
+        await db.commit()
+        info = await svc.scope_version_info(db, env["ids"]["p"])
+    assert info["matches"] is False, "名称进指纹：下次推送会记新版本"
+    assert info["structural_change"] is False, "只改名不弹结构变化提示"
+    assert info["diff"]["renamed"] == [{"node_key": "S:subsidiary", "from": "S", "to": "子公司改名"}]
+
+
+@pytest.mark.asyncio
+async def test_locked_project_does_not_auto_record(env):
     async with env["factory"]() as db:
         project = await db.get(Project, env["ids"]["p"])
-        project.created_at = legacy_created
-        db.add_all([
-            ConsolScope(project_id=env["ids"]["p"], year=2025, company_code="S", created_at=legacy_created),
-            ConsolTrial(project_id=env["ids"]["p"], year=2025, standard_account_code="1001", created_at=legacy_created),
-            ConsolWorksheet(project_id=env["ids"]["p"], node_company_code="P:parent",
-                            account_code="1001", year=2025, created_at=legacy_created),
-            ConsolWorksheetData(project_id=env["ids"]["p"], year=2025, sheet_key="legacy", data={},
-                                created_at=legacy_created),
-        ])
+        project.consol_lock = True
         await db.commit()
-
-    preview = await _preview(env)
-    assert preview["pending_legacy"] is True
-    assert preview["confirmed"] is False
-    async with env["factory"]() as db:
-        with pytest.raises(HTTPException) as error:
-            await calc.load_calc_basis(db, env["ids"]["p"], 2025)
-        assert error.value.status_code == 409
-        assert error.value.detail["error_code"] == "SCOPE_CONFIRMATION_REQUIRED"
-        basis = await calc.load_calc_basis(db, env["ids"]["p"], 2025, allow_legacy_read=True)
-        assert basis is not None
+        info = await svc.record_scope_version(db, env["ids"]["p"])
+    assert info["created"] is False and info["skipped"] == "locked"
+    assert await _counts(env) == (0, 0)
 
 
 @pytest.mark.asyncio
-async def test_schema_marker_without_pre183_data_does_not_mark_new_project_as_legacy(env):
-    # env fixture 已建 schema_version 并插入了 V183，项目是新建的（created_at 不早于 applied_at）
-    preview = await _preview(env)
-    assert preview["pending_legacy"] is False
+async def test_push_records_tree_version_and_failure_does_not_poison_session(env, monkeypatch):
+    """推送 worksheet 步骤先记录树版本（R1.2）；记录失败只写警告，会话照常可用。"""
+    from app.services import consol_push_service as push_svc
+
     async with env["factory"]() as db:
-        with pytest.raises(HTTPException) as error:
-            await calc.load_calc_basis(db, env["ids"]["p"], 2025, allow_legacy_read=True)
-        assert error.value.status_code == 409
-        assert error.value.detail["error_code"] == "SCOPE_CONFIRMATION_REQUIRED"
+        warnings: list[str] = []
+        first = await push_svc._record_tree_version(db, env["ids"]["p"], env["ids"]["edit"], "P", warnings)
+        await db.commit()
+        second = await push_svc._record_tree_version(db, env["ids"]["p"], None, "P", warnings)
+        await db.commit()
+        assert first == "树版本第 1 版（本次自动记录）；" and second == "树版本第 1 版；" and warnings == []
+        stored = (await db.execute(sa.select(ConsolScopeConfirmation))).scalar_one()
+        assert stored.confirmed_by == env["ids"]["edit"] and stored.confirmation_mode == "auto"
+
+        async def boom(*_a, **_k):
+            raise RuntimeError("模拟写入失败")
+
+        monkeypatch.setattr("app.services.consol_scope_confirmation_service.record_scope_version", boom)
+        assert await push_svc._record_tree_version(db, env["ids"]["p"], None, "P", warnings) == ""
+        assert warnings == ["「P」企业树版本记录失败：模拟写入失败"]
+        assert await calc.load_calc_basis(db, env["ids"]["p"], 2025) is not None, "失败后会话仍可用"
+
+
+def test_structural_diff_detects_moves_and_kind_changes():
+    old = [
+        {"node_key": "G:consol", "parent_node_key": None, "kind": "aggregate", "relation": None, "company_name": "G"},
+        {"node_key": "A:subsidiary", "parent_node_key": "G:consol", "kind": "data", "relation": "subsidiary", "company_name": "A"},
+        {"node_key": "B:subsidiary", "parent_node_key": "G:consol", "kind": "data", "relation": "subsidiary", "company_name": "B"},
+    ]
+    new = [
+        {"node_key": "G:consol", "parent_node_key": None, "kind": "aggregate", "relation": None, "company_name": "G"},
+        {"node_key": "A:subsidiary", "parent_node_key": "G:consol", "kind": "aggregate", "relation": "subsidiary", "company_name": "A"},
+        {"node_key": "B:subsidiary", "parent_node_key": "A:subsidiary", "kind": "data", "relation": "subsidiary", "company_name": "B"},
+    ]
+    diff = svc.structural_diff(old, new)
+    assert diff["structural"] and not diff["added"] and not diff["removed"]
+    assert diff["moved"] == [{"node_key": "B:subsidiary", "label": "B", "from": "G:consol", "from_label": "G",
+                              "to": "A:subsidiary", "to_label": "A"}]
+    assert diff["changed"][0]["node_key"] == "A:subsidiary" and diff["changed"][0]["fields"] == ["kind"]
+    assert svc.structural_diff(new, new)["structural"] is False
 
 
 @pytest.mark.asyncio
@@ -189,7 +256,7 @@ async def test_confirmation_persists_once_and_parent_branch_amounts_are_not_doub
     assert response.status_code == 200, response.text
     confirmed = response.json()
     assert confirmed["confirmed"] and confirmed["revision"] == 1
-    assert not confirmed["pending_legacy"] and not confirmed["pending_confirmation"]
+    assert not confirmed["pending_confirmation"] and confirmed["recorded_mode"] == "user"
     repeat = await _confirm(env, preview)
     assert repeat.status_code == 200 and repeat.json() == confirmed
     assert await _counts(env) == (1, len(preview["nodes"]))
@@ -201,6 +268,7 @@ async def test_confirmation_persists_once_and_parent_branch_amounts_are_not_doub
     async with env["factory"]() as db:
         stored = (await db.execute(sa.select(ConsolScopeConfirmation))).scalar_one()
         assert stored.confirmed_by == env["ids"]["edit"] and stored.confirmed_at is not None
+        assert stored.confirmation_mode == "user"
         assert svc.fingerprint_payload(stored.canonical_payload) == preview["fingerprint"]
         snapshots = (await db.execute(sa.select(ConsolScopeConfirmationNode))).scalars().all()
         assert {s.node_key for s in snapshots} == {n["node_key"] for n in preview["nodes"]}
@@ -283,9 +351,10 @@ async def test_tree_changes_invalidate_gate_and_reconfirmation_cas_preserves_his
     assert response.status_code == 409 and response.json()["detail"]["latest_preview"] == latest
     response = await _confirm(env, latest, expected_revision=0)
     assert response.status_code == 409 and response.json()["detail"]["error_code"] == "SCOPE_REVISION_CONFLICT"
+    assert latest["structural_change"] is True, "关系变化 ⇒ 结构变化提示"
     async with env["factory"]() as db:
-        with pytest.raises(HTTPException, match="409"):
-            await calc.load_calc_basis(db, env["ids"]["p"], 2025)
+        # V206：树变化不再拦截计算
+        assert await calc.load_calc_basis(db, env["ids"]["p"], 2025) is not None
     assert (await _confirm(env, latest)).json()["revision"] == 2
     async with env["factory"]() as db:
         rows = (await db.execute(sa.select(ConsolScopeConfirmation).order_by(ConsolScopeConfirmation.revision))).scalars().all()
@@ -300,7 +369,7 @@ async def test_tree_changes_invalidate_gate_and_reconfirmation_cas_preserves_his
 
 
 @pytest.mark.asyncio
-async def test_three_equal_codes_deduplicate_identity_but_still_need_confirmation(env):
+async def test_three_equal_codes_deduplicate_identity_and_can_be_recorded(env):
     async with env["factory"]() as db:
         for key in ("branch", "sub"):
             await db.delete(await db.get(TrialBalance, (await db.scalars(sa.select(TrialBalance.id).where(TrialBalance.project_id == env["ids"][key]))).one()))
@@ -315,19 +384,16 @@ async def test_three_equal_codes_deduplicate_identity_but_still_need_confirmatio
 
 
 @pytest.mark.asyncio
-async def test_explicit_tree_and_wrong_year_cannot_bypass_calculation_gate(env):
-    assert (await _confirm(env)).status_code == 200
+async def test_wrong_year_is_still_rejected_without_any_confirmation(env):
+    """年度边界保留：用本年度企业树去算另一年度 ⇒ 409（无论是否记录过版本）。"""
     async with env["factory"]() as db:
         tree = await build_tree(db, env["ids"]["p"])
-        tree.children = []
         with pytest.raises(HTTPException) as error:
-            await calc.load_calc_basis(db, env["ids"]["p"], 2025, tree=tree)
+            await calc.load_calc_basis(db, env["ids"]["p"], 2024, tree=tree)
         assert error.value.status_code == 409
-        assert "待计算树" in error.value.detail["message"]
-        with pytest.raises(HTTPException) as error:
-            await calc.load_calc_basis(db, env["ids"]["p"], 2024)
-        assert error.value.status_code == 409
+        assert error.value.detail["error_code"] == "SCOPE_YEAR_MISMATCH"
         assert "年度" in error.value.detail["message"]
+        assert await calc.load_calc_basis(db, env["ids"]["p"], 2025, tree=tree) is not None
 
 
 @pytest.mark.asyncio
@@ -369,11 +435,17 @@ def test_model_registry_and_migration_are_consistent():
     assert models.ConsolScopeConfirmationNode is ConsolScopeConfirmationNode
     sql = (ROOT / "backend/migrations/V183__consol_scope_confirmation.sql").read_text(encoding="utf-8")
     rollback = (ROOT / "backend/migrations/R183__rollback_consol_scope_confirmation.sql").read_text(encoding="utf-8")
+    # V206：confirmed_by 可空 + confirmation_mode（spec consol-autotree-linkage-closure R1.2）
+    v206 = (ROOT / "backend/migrations/V206__consol_scope_version_auto_record.sql").read_text(encoding="utf-8")
+    r206 = (ROOT / "backend/migrations/R206__rollback_consol_scope_version_auto_record.sql").read_text(encoding="utf-8")
     for model in (ConsolScopeConfirmation, ConsolScopeConfirmationNode):
         assert f"CREATE TABLE IF NOT EXISTS {model.__tablename__}" in sql
         assert f"DROP TABLE IF EXISTS {model.__tablename__}" in rollback
         for column in model.__table__.columns:
-            assert column.name in sql
+            assert column.name in sql or column.name in v206, column.name
+    assert ConsolScopeConfirmation.__table__.c.confirmed_by.nullable
+    assert "confirmed_by DROP NOT NULL" in v206 and "ADD COLUMN IF NOT EXISTS confirmation_mode" in v206
+    assert "DROP COLUMN IF EXISTS confirmation_mode" in r206 and "confirmed_by SET NOT NULL" in r206
     assert rollback.index("DROP TABLE IF EXISTS consol_scope_confirmation_nodes") < rollback.index(
         "DROP TABLE IF EXISTS consol_scope_confirmations"
     )

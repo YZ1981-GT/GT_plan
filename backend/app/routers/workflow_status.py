@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 
 router = APIRouter(
@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("")
 async def get_workflow_status(
     project_id: UUID,
-    year: int = Query(2025, description="年度"),
+    year: int | None = Query(None, description="年度"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -38,6 +38,7 @@ async def get_workflow_status(
     5. 底稿完成: working_papers > 0
     6. 附注完成: disclosure_notes > 0
     """
+    year = await require_project_audit_year(db, project_id, year)
     pid = str(project_id)
 
     # 1. 导入: tb_balance 行数

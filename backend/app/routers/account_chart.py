@@ -3,14 +3,16 @@
 Validates: Requirements 2.2, 2.5, 2.6
 """
 
+import copy
 import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import deps
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import assert_project_permission, readable_project_ids, require_project_access
 from app.models.audit_platform_schemas import (
     AccountChartResponse,
     AccountImportResult,
@@ -293,15 +295,14 @@ async def save_column_mapping(
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="项目不存在")
 
-    # 保存到 wizard_state.column_mappings
-    state = project.wizard_state or {}
-    if "column_mappings" not in state:
-        state["column_mappings"] = {}
+    # 保存到 wizard_state.column_mappings。拷一份再改：原地改 JSONB 再赋回同一个对象，ORM 比不出变化、不发 UPDATE
+    # —— 已有向导状态的项目（向导建的项目都有）保存后读回仍是旧的（真库 114 个项目 0 个存下过列映射）。
+    state = copy.deepcopy(project.wizard_state or {})
 
     key = f"{body.file_type}"
     if body.sheet_name:
         key = f"{body.file_type}:{body.sheet_name}"
-    state["column_mappings"][key] = body.mapping
+    state.setdefault("column_mappings", {})[key] = body.mapping
     project.wizard_state = state
 
     await db.commit()
@@ -343,21 +344,23 @@ async def get_reference_projects(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取可参照的项目列表（有已保存列映射的其他项目）"""
-    from sqlalchemy import select, func, cast, String
+    """获取可参照的项目列表（有已保存列映射、当前用户能读的其他项目）。
+
+    原先列出全平台项目的名称与客户名（spec consol-autotree-residual-closure R2.4）。
+    """
+    from sqlalchemy import select
     from app.models.core import Project
 
-    # 查找所有有 column_mappings 的项目（排除当前项目）
-    result = await db.execute(
-        select(Project.id, Project.name, Project.client_name, Project.wizard_state)
-        .where(
-            Project.id != project_id,
-            Project.is_deleted == False,  # noqa: E712
-            Project.wizard_state.isnot(None),
-        )
-        .order_by(Project.created_at.desc())
-        .limit(20)
+    # 查找有 column_mappings 的项目（排除当前项目；只列当前用户能读的项目，与项目读门禁同一口径）
+    query = select(Project.id, Project.name, Project.client_name, Project.wizard_state).where(
+        Project.id != project_id,
+        Project.is_deleted == False,  # noqa: E712
+        Project.wizard_state.isnot(None),
     )
+    readable = await readable_project_ids(db, current_user)
+    if readable is not None:
+        query = query.where(Project.id.in_(list(readable)))
+    result = await db.execute(query.order_by(Project.created_at.desc()).limit(20))
     projects = []
     for row in result.all():
         ws = row.wizard_state or {}
@@ -380,22 +383,30 @@ async def reference_copy_mappings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """从其他项目参照复制列映射"""
+    """从其他项目参照复制列映射；来源只能是当前用户能读的项目（spec consol-autotree-residual-closure R2.4）。"""
     from sqlalchemy import select
     from app.models.core import Project
 
+    try:
+        source_project_id = UUID(body.source_project_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="来源项目 id 格式不正确") from None
+    if source_project_id == project_id:
+        raise HTTPException(status_code=400, detail="不能参照本项目")
+    await assert_project_permission(db, current_user, source_project_id, "readonly")
+    # 上一句把 RLS 上下文设到了来源项目；写入的是本项目 ⇒ 设回本项目
+    await deps.set_rls_context(db, project_id)
+
     # 获取源项目的映射
     source = await db.execute(
-        select(Project).where(Project.id == UUID(body.source_project_id))
+        select(Project).where(Project.id == source_project_id, Project.is_deleted == False)  # noqa: E712
     )
     source_project = source.scalar_one_or_none()
     if not source_project or not source_project.wizard_state:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="源项目不存在或无映射数据")
 
     source_mappings = (source_project.wizard_state or {}).get("column_mappings", {})
     if not source_mappings:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="源项目无已保存的列映射")
 
     # 复制到目标项目
@@ -404,13 +415,11 @@ async def reference_copy_mappings(
     )
     target_project = target.scalar_one_or_none()
     if not target_project:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="目标项目不存在")
 
-    state = target_project.wizard_state or {}
-    if "column_mappings" not in state:
-        state["column_mappings"] = {}
-    state["column_mappings"].update(source_mappings)
+    # 拷一份再改：原地改 JSONB 再赋回同一个对象，ORM 比不出变化、不发 UPDATE（已有向导状态的项目复制了等于没复制）
+    state = copy.deepcopy(target_project.wizard_state or {})
+    state.setdefault("column_mappings", {}).update(source_mappings)
     target_project.wizard_state = state
 
     await db.commit()

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "ffdf1c6e85fecaac910f99c75e067083936aabd219a77b89f011315f0ef3c6e4",
+  "instrumentation_definition_sha256": "2e0ee180b7a3ea9c225d26e87e4dad0f25d5d81d2e95a2f59ef2de64c3e7a988",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g14-credit-impairment-loss",
@@ -23,7 +23,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_credit_impairment_detail",
-    "reviewed_basis": "openpyxl 逐格实测 G/G14 信用减值损失.xlsx 的 `明细表G14-2`（两级表头 R9 组 / R10 叶子 / R9 横向合并区恰两个 B9:D9 本期数·F9:K9 对应科目-减值准备 / **固定 9 行** R11-R19（行集由模板 A 列写死）/ footer R20 逐列 =SUM(x11:x19) 且 L20 例外是布尔 =D20=K20 / 有效内容列 13 即 A-M **恰等于 max_column**（无空尾列）/ 0 个 definedName / 受管表零裸 IF，整册 11 格裸 IF 全在 审定表G14-1 / 🔴 模板缺陷：K 列 =G+H 把「本期转回」当成增加损益，而同表 J 的 -H 要求 H 填正数 ⇒ 会计正确应为 =G-H（信用减值损失 = 计提 − 转回）) + 前端 `useG14Detail.ts` 按值 grep（ITEM_ID_ROWS / rowKey 不生成也不派生自位置 / G14DetailRow 前 13 字段与模板列序 A..M 逐列对应 / 固定行集 G14_LINE_ITEMS 9 项） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §4（损益表项 + 减值准备滚动表双向勾稽 / 核对列 L 验证 审定数 == 计入损益 / TB 口径是**本期发生额**（科目 6702 损益类）而不是余额）"
+    "reviewed_basis": "openpyxl 逐格实测 G/G14 信用减值损失.xlsx 的 `明细表G14-2`（两级表头 R9 组 / R10 叶子 / R9 横向合并区恰两个 B9:D9 本期数·F9:K9 对应科目-减值准备 / **固定 9 行** R11-R19（行集由模板 A 列写死）/ footer R20 逐列 =SUM(x11:x19) 且 L20 例外是布尔 =D20=K20 / 有效内容列 13 即 A-M **恰等于 max_column**（无空尾列）/ 0 个 definedName / 受管表零裸 IF，整册 11 格裸 IF 全在 审定表G14-1 / 🔴 模板缺陷（已修）：K 列原 =G+H 把「本期转回」当成增加损益，与同表 J 的 -H 矛盾 ⇒ 第三批已改模板为 =G-H（信用减值损失 = 计提 − 转回）) + 前端 `useG14Detail.ts` 按值 grep（ITEM_ID_ROWS / rowKey 不生成也不派生自位置 / G14DetailRow 前 13 字段与模板列序 A..M 逐列对应 / 固定行集 G14_LINE_ITEMS 9 项） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §4（损益表项 + 减值准备滚动表双向勾稽 / 核对列 L 验证 审定数 == 计入损益 / TB 口径是**本期发生额**（科目 6702 损益类）而不是余额）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -496,9 +496,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "2b2f65f65d0ab76c4bc3c275e38015a33f8aacb3b0456694d3947caa3a949c0b",
+    "normalized_structure_hash": "c2ea7ecd4a5de305fd89cb99ae5a7ba5622ee0f48d75b7d2dcb87f1938b53e2e",
     "relative_path": "G/G14 信用减值损失.xlsx",
-    "template_sha256": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6"
+    "template_sha256": "952d7adabd035fedb1bc29267525e6592f8437aba0ff34295ceed9497ea703d9"
   },
-  "template_definition_sha256": "88e8327536231073c1ff7fb364b5fc4ed9f9ef83c26f2d4e2163e243a9b311cd"
+  "template_definition_sha256": "c2370bb5748dd6f3b10a644c6df8530eee2131b443a724ef9a541ab31f8aed97"
 }

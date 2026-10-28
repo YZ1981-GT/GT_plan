@@ -90,6 +90,8 @@
       <!-- 归档横幅 -->
       <ArchivedBanner />
       <ConsolLockedBanner />
+      <!-- 项目没填审计年度：报表按年度生成 / 取数，不按今年兜底 -->
+      <el-alert v-if="yearResolved && year == null" type="warning" :closable="false" show-icon :title="MISSING_AUDIT_YEAR_MESSAGE" style="margin-bottom: 8px" />
 
       <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
       <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
@@ -796,7 +798,7 @@
       v-model="showFormulaManager"
       :rows="rows"
       :project-id="projectId"
-      :year="year"
+      :year="year ?? undefined"
       scope="report"
       :template-type="selectedTemplateType"
       @saved="fetchReport"
@@ -923,6 +925,7 @@
 import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import MultiYearCompare from '@/components/report/MultiYearCompare.vue'
@@ -962,9 +965,8 @@ import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useReportColumns } from './composables/useReportColumns'
-import http from '@/utils/http'
 import { useReportCrossCheck } from './composables/useReportCrossCheck'
-import { useReportData } from './composables/useReportData'
+import { fetchNoteSectionsWithData, useReportData } from './composables/useReportData'
 import { useReportExport } from './composables/useReportExport'
 import { useReportMapping } from './composables/useReportMapping'
 import { useReportCellActions } from './composables/useReportCellActions'
@@ -1078,6 +1080,8 @@ const routeYear = computed(() => {
   return Number.isFinite(value) && value > 2000 ? value : null
 })
 const projectYear = ref<number | null>(null)
+/** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
+const yearResolved = ref(false)
 const _templateTypeLabel = computed(() => reportData.templateType.value === 'listed' ? '上市版' : '国企版')
 const scopeLabel = computed(() => reportData.reportScope.value === 'consolidated' ? '合并' : '单体')
 
@@ -1090,7 +1094,7 @@ function onProjectChange(newId: string) {
 }
 
 // 年度选择器
-const selectedYear = ref(new Date().getFullYear() - 1)
+const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
@@ -1112,7 +1116,7 @@ async function onTemplateTypeChange(val: string) {
 // ─── Other UI state ─────────────────────────────────────────────────────────
 const showDocAiChat = ref(false)
 
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear() - 1)
+const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
 const activeTab = ref('balance_sheet')
 const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
@@ -1246,30 +1250,10 @@ async function loadRowNoteMapping() {
   } catch { /* fail-open: 动态映射加载失败回退硬编码 */ }
 }
 
-// 加载附注各章节是否有内容（best-effort，不阻塞报表渲染）
+// 加载附注各章节是否有内容（best-effort，不阻塞报表渲染；取数在 useReportData，项目没填审计年度不请求）
 async function loadNoteHasData() {
-  try {
-    const { data } = await http.get(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/notes-tree`,
-      { _silent: true } as any
-    )
-    const sections = data?.data || data || []
-    const set = new Set<string>()
-    for (const node of (Array.isArray(sections) ? sections : [])) {
-      if (node.has_data && node.note_section) {
-        set.add(node.note_section)
-      }
-      // 子节点
-      if (Array.isArray(node.children)) {
-        for (const child of node.children) {
-          if (child.has_data && child.note_section) {
-            set.add(child.note_section)
-          }
-        }
-      }
-    }
-    noteHasDataSections.value = set
-  } catch { /* fail-open: 拿不到附注数据不影响报表渲染 */ }
+  const set = await fetchNoteSectionsWithData(projectId.value, year.value)
+  if (set) noteHasDataSections.value = set
 }
 // 报表行数据加载后 best-effort 拉附注就绪状态 + 动态映射
 watch(rows, (newRows) => {
@@ -1465,16 +1449,20 @@ const {
 
 
 async function _ensureProjectYearWrapper() {
-  if (routeYear.value !== null) {
-    projectYear.value = null
-    return
+  try {
+    if (routeYear.value !== null) {
+      projectYear.value = null
+      return
+    }
+    // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
+    await ensureProjectYear()
+    // Sync main-file-owned state from composable results
+    projectYear.value = reportData._fetchedAuditYear.value
+    selectedYear.value = projectYear.value ?? null
+    selectedTemplateType.value = templateType.value
+  } finally {
+    yearResolved.value = true
   }
-  // Delegate to composable (sets projectName, reportScope, templateType, _fetchedAuditYear via API)
-  await ensureProjectYear()
-  // Sync main-file-owned state from composable results
-  projectYear.value = reportData._fetchedAuditYear.value
-  selectedYear.value = projectYear.value || new Date().getFullYear() - 1
-  selectedTemplateType.value = templateType.value
 }
 
 function onTabChange() {
@@ -1483,7 +1471,12 @@ function onTabChange() {
 }
 
 const _onSyncUnadjusted = withLoading(syncLoading, async () => {
-  await recalcTrialBalance(projectId.value, year.value)
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  await recalcTrialBalance(projectId.value, y)
   await fetchReport()
   ElMessage.success('未审数已按四表账套科目重新同步')
 })

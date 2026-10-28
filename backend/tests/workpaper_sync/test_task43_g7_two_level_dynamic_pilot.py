@@ -982,7 +982,7 @@ class TestAuthoritativeTemplate:
     def test_template_bytes_are_unchanged(self) -> None:
         data = P.read_authoritative_template()
         assert hashlib.sha256(data).hexdigest() == P.TEMPLATE_SHA256
-        assert len(data) == 263335
+        assert len(data) == 263364
 
     def test_template_lives_under_the_authority_root(self) -> None:
         path = P.authoritative_template_path()
@@ -3017,7 +3017,9 @@ class TestUpstreamDebtsAreVisibleFacts:
         ).read_text(encoding="utf-8").replace("\n", "").replace(" ", "") or (
             "contract.protected_field_keys()" in Path(X.__file__).read_text(encoding="utf-8")
         )
-        assert "if spec.mode is FieldMode.formula:" in Path(M.__file__).read_text(
+        # 写入侧按 field.mode 判公式格：本表公式与跨表公式同一判定来源 `contracts.FORMULA_MODES`
+        # （spec oo-writeback-template-parity-closure R7，原写法 `spec.mode is FieldMode.formula`）
+        assert "if spec.mode in FORMULA_MODES:" in Path(M.__file__).read_text(
             encoding="utf-8"
         )
         # ④ 本 pilot 的规避办法：矩阵是静态块，mode 精确到格。

@@ -252,17 +252,10 @@ async def _ensure_ipo_loaded(
         wp_code_prefix: IPO 配置 key，必须在 ``_IPO_CONFIG`` 中
 
     Returns:
-        dict 含 ``added_codes`` / ``skipped_existing`` / ``errors`` 三个列表，
+        dict 含 ``added_codes`` / ``skipped_existing`` / ``errors`` / ``skipped_trimmed_codes`` /
+        ``in_recycle_codes`` / ``blank_codes`` 列表、``generation_receipt``（统一回执，见 wp_generation_receipt），
         以及 ``prefix`` 标识本次加载的循环。
     """
-    import sqlalchemy as sa
-    from app.models.workpaper_models import (
-        WorkingPaper,
-        WpIndex,
-        WpSourceType,
-        WpStatus,
-    )
-
     cfg = _IPO_CONFIG.get(wp_code_prefix.upper())
     if not cfg:
         return {
@@ -276,77 +269,36 @@ async def _ensure_ipo_loaded(
     audit_cycle: str = cfg["audit_cycle"]
     name_prefix: str = cfg["name_prefix"]
 
-    result: dict[str, list | str] = {
+    result: dict[str, Any] = {
         "prefix": wp_code_prefix,
         "added_codes": [],
         "skipped_existing": [],
         "errors": [],
+        "skipped_trimmed_codes": [],
+        "in_recycle_codes": [],
+        "blank_codes": [],
     }
 
     # year 参数当前未做按年度筛选（wp_index 不带 year 字段），保留供未来扩展
     _ = year
 
-    for code in codes:
-        try:
-            # 幂等检查：wp_index 已存在则跳过
-            existing = await db.execute(
-                sa.select(WpIndex.id).where(
-                    WpIndex.project_id == project_id,
-                    WpIndex.wp_code == code,
-                )
-            )
-            if existing.scalar_one_or_none():
-                result["skipped_existing"].append(code)  # type: ignore[union-attr]
-                continue
+    if not codes:
+        return result
+    # 保留范围：已裁（科目被裁则 IPO 子表跟随）/ 在回收站的不建；读不到裁剪结果即抛出、不加载
+    from app.services.procedure_scope_retention import plan_generation
+    from app.services.wp_generate_file import create_template_workpaper
+    from app.services.wp_generation_receipt import GenerationReceipt
 
-            # 创建 WpIndex
-            wp_index = WpIndex(
-                project_id=project_id,
-                wp_code=code,
-                wp_name=f"{name_prefix} {code}",
-                audit_cycle=audit_cycle,
-                status=WpStatus.not_started,
-            )
-            db.add(wp_index)
-            await db.flush()
-
-            # 创建 WorkingPaper（file_path 占位，复制模板成功后会被覆盖）
-            wp = WorkingPaper(
-                wp_index_id=wp_index.id,
-                project_id=project_id,
-                source_type=WpSourceType.template,
-                file_path=f"storage/projects/{project_id}/workpapers/{code}.xlsx",
-                parsed_data={},
-            )
-            db.add(wp)
-            await db.flush()
-
-            # 强制 scenario='ipo' 让模板复制绕过 normal 过滤规则
-            try:
-                actual_path = init_workpaper_from_template(
-                    project_id=project_id,
-                    wp_id=wp.id,
-                    wp_code=code,
-                    scenario="ipo",
-                    has_foreign_currency=False,
-                )
-                if actual_path:
-                    wp.file_path = str(actual_path)
-            except Exception as ie:
-                # 模板复制失败不影响数据库记录（占位 file_path 已写入）
-                logger.warning(
-                    "_ensure_ipo_loaded[%s]: 模板复制失败 code=%s err=%s",
-                    wp_code_prefix, code, ie,
-                )
-
-            result["added_codes"].append(code)  # type: ignore[union-attr]
-        except Exception as e:
-            result["errors"].append({"code": code, "error": str(e)})  # type: ignore[union-attr]
-            try:
-                await db.rollback()
-            except Exception as e:
-                logger.debug("模板初始化 rollback 失败 code=%s: %s", code, e)
-
+    plan = await plan_generation(db, project_id, codes)
+    receipt = GenerationReceipt.from_plan(plan)
+    # 单码保存点内建行 + 落文件（强制 scenario='ipo' 绕过 normal 的 IPO 文件过滤）；复制失败回滚该码、进 errors，
+    # 不再计入 added_codes（spec procedure-chain-hardening-and-java-contracts R11.4：原先复制在保存点外、失败照样算新增）
+    for code in plan.to_create:
+        await create_template_workpaper(db, receipt, project_id=project_id, wp_code=code,
+                                        wp_name=f"{name_prefix} {code}", audit_cycle=audit_cycle, scenario="ipo")
+    result.update(plan.receipt(), added_codes=receipt.created_codes, skipped_existing=list(plan.existing_codes),
+                  errors=[{"code": f["wp_code"], "error": f["error"]} for f in receipt.failures],
+                  blank_codes=receipt.blank_codes, generation_receipt=receipt.to_payload())
     return result
 
 
@@ -360,16 +312,13 @@ async def _ensure_d4_ipo_loaded(
     spec workpaper-d-sales-cycle 任务 2.2 / ADR D4。
 
     向后兼容包装：转发到通用 ``_ensure_ipo_loaded(prefix='D4')``。
-    保留独立函数名以避免破坏 D spec 既有调用点；
-    返回值剥离 ``prefix`` 字段以保持原 schema（仅 ``added_codes`` /
-    ``skipped_existing`` / ``errors`` 三键）。
+    保留独立函数名以避免破坏 D spec 既有调用点；返回值剥离 ``prefix`` 与 ``generation_receipt``，
+    透传已裁 / 在回收站 / 空白册（spec procedure-chain-hardening-and-java-contracts R11.4：原先只留三键，
+    被裁剪挡下的编码对调用方不可见）。
     """
     raw = await _ensure_ipo_loaded(db, project_id, year, wp_code_prefix="D4")
-    return {
-        "added_codes": raw.get("added_codes", []),
-        "skipped_existing": raw.get("skipped_existing", []),
-        "errors": raw.get("errors", []),
-    }
+    keys = ("added_codes", "skipped_existing", "errors", "skipped_trimmed_codes", "in_recycle_codes", "blank_codes")
+    return {k: raw.get(k, []) for k in keys}
 
 
 def _merge_sheets_dedup(
@@ -394,65 +343,85 @@ def _merge_sheets_dedup(
     """
     from openpyxl import load_workbook
 
+    from app.services.xlsx_cell_patch import ValueSheet, XlsxPatchError, append_value_sheets, workbook_sheet_names
+
     stats = {"merged": 0, "skipped_dup": 0, "skipped_historical": 0}
 
-    target_wb = load_workbook(str(target_path))
     # 用归一化名集合去重（含 target 自身已有 sheet）
     existing_normalized: set[str] = {
-        _normalize_sheet_name(s) for s in target_wb.sheetnames
+        _normalize_sheet_name(s) for s in workbook_sheet_names(target_path)
     }
+    pending: list[ValueSheet] = []
 
-    try:
-        for other_file in other_files:
+    for other_file in other_files:
+        try:
+            src_wb = load_workbook(str(other_file), read_only=True, data_only=True)
             try:
-                src_wb = load_workbook(str(other_file), read_only=True, data_only=True)
-                try:
-                    for sheet_name in src_wb.sheetnames:
-                        # 1. 历史遗留 sheet 过滤（修订前 / （原））
-                        if _should_skip_historical_sheet(sheet_name):
-                            stats["skipped_historical"] += 1
-                            logger.debug(
-                                "merge_sheets_dedup: 跳过历史遗留 sheet '%s' from %s",
-                                sheet_name, other_file.name,
-                            )
-                            continue
+                collected: list[tuple[str, ValueSheet]] = []
+                for sheet_name in src_wb.sheetnames:
+                    # 1. 历史遗留 sheet 过滤（修订前 / （原））
+                    if _should_skip_historical_sheet(sheet_name):
+                        stats["skipped_historical"] += 1
+                        logger.debug(
+                            "merge_sheets_dedup: 跳过历史遗留 sheet '%s' from %s",
+                            sheet_name, other_file.name,
+                        )
+                        continue
 
-                        # 2. 归一化去重（覆盖 GT_Custom / 底稿目录 / 中英文圆括号变体）
-                        normalized = _normalize_sheet_name(sheet_name)
-                        if normalized in existing_normalized:
-                            stats["skipped_dup"] += 1
-                            logger.debug(
-                                "merge_sheets_dedup: 跳过重复 sheet '%s' (normalized='%s') from %s",
-                                sheet_name, normalized, other_file.name,
-                            )
-                            continue
+                    # 2. 归一化去重（覆盖 GT_Custom / 底稿目录 / 中英文圆括号变体）
+                    normalized = _normalize_sheet_name(sheet_name)
+                    if normalized in existing_normalized or any(n == normalized for n, _ in collected):
+                        stats["skipped_dup"] += 1
+                        logger.debug(
+                            "merge_sheets_dedup: 跳过重复 sheet '%s' (normalized='%s') from %s",
+                            sheet_name, normalized, other_file.name,
+                        )
+                        continue
 
-                        # 3. 创建新 sheet（Excel sheet 名最长 31 字符）
-                        new_ws = target_wb.create_sheet(title=sheet_name[:31])
-                        existing_normalized.add(normalized)
-                        src_ws = src_wb[sheet_name]
-                        for row in src_ws.iter_rows():
-                            for cell in row:
-                                if cell.value is not None:
-                                    new_ws.cell(
-                                        row=cell.row,
-                                        column=cell.column,
-                                        value=cell.value,
-                                    )
-                        stats["merged"] += 1
-                finally:
-                    src_wb.close()
-            except Exception as e:
-                logger.debug(
-                    "merge_sheets_dedup: 合并失败 %s (%s)",
-                    other_file.name, e,
-                )
+                    # 3. 只取值（公式取缓存结果，与原先一致）；Excel sheet 名最长 31 字符
+                    cells = [(cell.row, cell.column, cell.value)
+                             for row in src_wb[sheet_name].iter_rows() for cell in row if cell.value is not None]
+                    collected.append((normalized, ValueSheet(title=sheet_name[:31], cells=cells)))
+            finally:
+                src_wb.close()
+        except Exception as e:
+            logger.debug(
+                "merge_sheets_dedup: 合并失败 %s (%s)",
+                other_file.name, e,
+            )
+            continue
+        # 一个源文件整份读完才计入（读到一半出错不留半个文件的页）
+        for normalized, sheet in collected:
+            existing_normalized.add(normalized)
+            pending.append(sheet)
+            stats["merged"] += 1
 
+    if not pending:
+        return stats
+    # 追加到主文件末尾：主文件原有部件逐字节不动（原先 openpyxl 整册重存，主文件的 x14 数据验证、公式缓存值等全丢；
+    # spec post-push-residual-defect-closure R4.5）
+    try:
+        append_value_sheets(target_path, pending)
+    except XlsxPatchError:
+        logger.warning("merge_sheets_dedup: %s 结构不认识，改用 openpyxl 整册重存合并（会丢数据验证扩展等）",
+                       target_path.name, exc_info=True)
+        _append_value_sheets_openpyxl(target_path, pending)
+    return stats
+
+
+def _append_value_sheets_openpyxl(target_path: Path, sheets: list) -> None:
+    """``append_value_sheets`` 认不出工作簿结构时的退路（原先的合并写法：openpyxl 建页写值后整册重存）。"""
+    from openpyxl import load_workbook
+
+    target_wb = load_workbook(str(target_path))
+    try:
+        for sheet in sheets:
+            new_ws = target_wb.create_sheet(title=sheet.title)
+            for r, c, v in sheet.cells:
+                new_ws.cell(row=r, column=c, value=v)
         target_wb.save(str(target_path))
     finally:
         target_wb.close()
-
-    return stats
 
 
 def get_workpaper_storage_path(project_id: UUID, wp_id: UUID) -> Path:

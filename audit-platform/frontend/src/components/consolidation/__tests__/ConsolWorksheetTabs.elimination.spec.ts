@@ -27,12 +27,15 @@ vi.mock('vue-router', () => ({
 }))
 vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), info: vi.fn(), error: vi.fn() } }))
 vi.mock('@/services/apiProxy', () => ({ api: apiProxy, apiProxy, default: apiProxy }))
+// 企业列只以企业树为准（spec consol-autotree-linkage-closure R4.4：不再读合并范围表）
 vi.mock('@/services/consolidationApi', () => ({
-  getConsolScope: vi.fn().mockResolvedValue([
-    { company_code: 'A', company_name: '甲公司', is_included: true, ownership_ratio: 100 },
-  ]),
   getWorksheetTree: vi.fn().mockResolvedValue({
-    tree: { company_code: 'G', company_name: '某集团', children: [] }, mode: 'subsidiary', diagnostics: [], year: 2025,
+    tree: {
+      company_code: 'G', company_name: '某集团', role: 'consol', children: [
+        { company_code: 'A', company_name: '甲公司', role: 'subsidiary', parent_company_code: 'G', ultimate_company_code: 'G', via: [], children: [] },
+      ],
+    },
+    mode: 'subsidiary', diagnostics: [], year: 2025,
   }),
 }))
 vi.mock('@/services/consolWorksheetDataApi', () => ({

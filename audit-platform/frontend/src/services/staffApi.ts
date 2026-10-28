@@ -106,8 +106,30 @@ export async function getStaffResume(id: string) {
   return data
 }
 
-export async function deleteStaff(id: string) {
-  const { data } = await http.delete(P.detail(id))
+/** 删除人员时其仍在项目团队中（后端 409 `staff_has_assignments`，spec procedure-chain-hardening-and-java-contracts R12） */
+export interface StaffHasAssignmentsDetail {
+  error: 'staff_has_assignments'
+  message: string
+  projects: Array<{ project_id: string; project_name: string; roles: string[] }>
+}
+
+/** 错误是「人员仍在项目团队中」⇒ 返回后端给的项目清单与说明；否则 null（错误信封 `{code, message}` 里 message 是对象）。 */
+export function staffHasAssignments(error: unknown): StaffHasAssignmentsDetail | null {
+  const res = (error as { response?: { status?: number; data?: any } })?.response
+  if (res?.status !== 409) return null
+  const body = res.data?.message ?? res.data?.detail
+  return body && typeof body === 'object' && body.error === 'staff_has_assignments' ? body : null
+}
+
+/**
+ * 删除人员（仅 admin）。仍在项目团队中时后端 409 列出项目；用户确认后带 `revokeAssignments` 重试 ——
+ * 同事务撤销其项目分配与项目成员行。调用方自管错误提示（`_silent`：不让全局拦截器先弹一次笼统提示）。
+ */
+export async function deleteStaff(id: string, opts: { revokeAssignments?: boolean } = {}) {
+  const { data } = await http.delete(P.detail(id), {
+    params: opts.revokeAssignments ? { revoke_assignments: true } : undefined,
+    _silent: true,
+  } as any)
   return data
 }
 

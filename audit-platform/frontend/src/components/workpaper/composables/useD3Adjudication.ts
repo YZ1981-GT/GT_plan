@@ -21,7 +21,7 @@ import {
   parseNum,
   calcAuditedAmount,
   calcChangeAmount,
-  calcChangeRate,
+  calcAdjudicationChangeRate,
   calcSubtotal,
 } from './useD3FormulaEngine'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
@@ -159,7 +159,7 @@ function buildRow(
   const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
   const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
   const changeAmount = calcChangeAmount(currentAudited, priorAudited)
-  const changeRate = calcChangeRate(priorAudited, currentAudited)
+  const changeRate = calcAdjudicationChangeRate(priorAudited, currentAudited)
   const reasonAnalysis = getResponseStr(allResponses, makeItemId(section, rowKey, 'reasonAnalysis'))
 
   const isFromCrossSheet = crossSheetCurrent !== 0 || crossSheetPrior !== 0
@@ -193,7 +193,7 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
   const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
   const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
   const changeAmount = calcChangeAmount(currentAudited, priorAudited)
-  const changeRate = calcChangeRate(priorAudited, currentAudited)
+  const changeRate = calcAdjudicationChangeRate(priorAudited, currentAudited)
 
   return {
     rowKey: 'subtotal',

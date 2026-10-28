@@ -84,7 +84,7 @@
         "payload_column": "conclusion",
         "payload_column_mode": "conclusion_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 conclusion（remark 留给纯文本说明）",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L740",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L735",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -93,7 +93,7 @@
         "row_identity_key": "id",
         "row_identity_kind": "generated_timestamp_string",
         "row_identity_generator": "inline template literal",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L482",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L477",
         "row_identity_generator_form": "`g1d-${mintRowIdSuffix()}`",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -124,7 +124,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG1TraFinFormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L653",
+        "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L648",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G1 交易性金融资产.xlsx!明细表G1-2!A9 = '类别'"
@@ -1459,7 +1459,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L553",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L554",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -1499,7 +1499,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG9FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L322",
+        "audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L323",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G9 其他非流动金融资产.xlsx!明细表G9-2!A9 = '类别'"
@@ -2078,7 +2078,7 @@
         "payload_column": "remark",
         "payload_column_mode": "remark_only",
         "payload_column_mode_meaning": "结构化 JSON 只写 remark，conclusion 置 null",
-        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L295",
+        "payload_column_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L291",
         "shape": "json_array_of_row_objects",
         "http_client_binding": "api",
         "http_client_import": "import { api } from '@/services/apiProxy'",
@@ -2087,7 +2087,7 @@
         "row_identity_key": "rowKey",
         "row_identity_kind": "stable_template_row_key",
         "row_identity_generator": "createDefaultRows() / G14_LINE_ITEMS",
-        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L151",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L149",
         "row_identity_generator_form": "stable_template_row_key（行集由 G14_LINE_ITEMS 固定，rowKey 不生成也不派生自位置；合计行 rowKey='total'）",
         "row_identity_is_positional": false,
         "forbidden_row_identity_kinds": [
@@ -2118,7 +2118,7 @@
         "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
         "audit-platform/frontend/src/components/workpaper/composables/useG14FormData.ts",
         "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts",
-        "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L199",
+        "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L195",
         "backend/app/routers/checklist_responses.py#L84",
         "backend/app/routers/checklist_responses.py#L132",
         "backend/wp_templates/G/G14 信用减值损失.xlsx!明细表G14-2!A9 = '项目'"
@@ -2189,11 +2189,11 @@
       },
       {
         "name": "G10 交易性金融负债.xlsx",
-        "size": 99458,
-        "sha256": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3",
+        "size": 86264,
+        "sha256": "6164bfcbebea63235d0bb0a18d2afe610ae050b19c39f1fef1746fcdab52fa1f",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g10-trading-financial-liabilities",
-        "normalized_structure_hash": "b22d05bc81db21ce8b24b179ee76afa77d2c64e770b394dd674336890d208553"
+        "normalized_structure_hash": "c7cddff30554252d4d7d121a8d0277065d56e415293ded6bafa50641e11a257f"
       },
       {
         "name": "G11 投资收益.xlsx",
@@ -2213,19 +2213,19 @@
       },
       {
         "name": "G13 公允价值变动收益.xlsx",
-        "size": 58717,
-        "sha256": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099",
+        "size": 50413,
+        "sha256": "2848d2a2bf53704b5fc0e9acc7618d5b3e3e1f0c1d05e459929db802a746fae0",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g13-fair-value-changes",
-        "normalized_structure_hash": "6719b934c661f5d19a047690af463a505a822c8c0d2dcf1a48e12bf8881b8ddd"
+        "normalized_structure_hash": "2b685ceb9b31e1d605b167890c3e78a141dd28474a92cf276d98ab285ed6a2ce"
       },
       {
         "name": "G14 信用减值损失.xlsx",
-        "size": 60094,
-        "sha256": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6",
+        "size": 51758,
+        "sha256": "952d7adabd035fedb1bc29267525e6592f8437aba0ff34295ceed9497ea703d9",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g14-credit-impairment-loss",
-        "normalized_structure_hash": "2b2f65f65d0ab76c4bc3c275e38015a33f8aacb3b0456694d3947caa3a949c0b"
+        "normalized_structure_hash": "c2ea7ecd4a5de305fd89cb99ae5a7ba5622ee0f48d75b7d2dcb87f1938b53e2e"
       },
       {
         "name": "G2 应收利息.xlsx",
@@ -2245,8 +2245,8 @@
       },
       {
         "name": "G4 债权投资.xlsx",
-        "size": 999788,
-        "sha256": "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf",
+        "size": 976968,
+        "sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a",
         "in_runtime_index": true,
         "belongs_to_entry": null,
         "belongs_to_entries": [
@@ -2254,16 +2254,16 @@
           "xlsx/gt-g4-bond-investment-sppi",
           "xlsx/gt-g4-bond-investment-ecl"
         ],
-        "normalized_structure_hash": "285ce84b188d7d68b7afb532e15ebd0820df8e4dc24963acac11595a7a0d871e",
+        "normalized_structure_hash": "b6e0c9f90092449dfa4b9abac7d2c4aabd700e1a29ea75810f60769aacc23c5b",
         "excluded_reason": "🔴 这本工作簿**跨 3 个 entry**：G 循环把一本册子按 sheet 段拆给多个宿主（xlsx/gt-g4-bond-investment-main, xlsx/gt-g4-bond-investment-sppi, xlsx/gt-g4-bond-investment-ecl）。belongs_to_entry 是单值字段，无法诚实表达 1:N ⇒ 记 null 并在 belongs_to_entries 列出真实归属，不硬塞给某一方。这与 F 循环 8 个 entry 一一对应 8 本册子的形态不同，也与 Task 48 的 `F2-29至F2-35` 只写 excluded_reason 不写归属列表的做法不同 —— F 那条无法定归属（逐 sheet 4:3 分属），本条可以定，故显式列出。"
       },
       {
         "name": "G5 长期应收款.xlsx",
-        "size": 398912,
-        "sha256": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99",
+        "size": 399066,
+        "sha256": "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g5-long-term-receivable",
-        "normalized_structure_hash": "def3659b39997d4eef7a9ffb3218a59cdda19ebd93d6cda9096fdea5471bd477"
+        "normalized_structure_hash": "4a181c3602dc701dd5bbae281ada8d96c44e85d2ea5f5d8263dbc7d142db6305"
       },
       {
         "name": "G6 其他债权投资.xlsx",
@@ -2281,27 +2281,27 @@
       },
       {
         "name": "G7 长期股权投资.xlsx",
-        "size": 263335,
-        "sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+        "size": 263364,
+        "sha256": "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1",
         "in_runtime_index": true,
         "belongs_to_entry": null,
         "excluded_reason": "G7 长期股权投资的 3 条 entry（equity-method / equity-subsidiary / long-term-equity-main）按任务正文排除在本 slice 之外（归已归档 spec g7-column-alignment-and-extraction-closure 与本 spec 的 G7 pilot 任务）—— 见 slice_scope.excluded_from_slice 第 1 条"
       },
       {
         "name": "G8 其他权益工具投资.xlsx",
-        "size": 450079,
-        "sha256": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6",
+        "size": 438994,
+        "sha256": "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g8-other-equity-instruments",
-        "normalized_structure_hash": "dcd0916fb8ea496a271be22d51115dcb6bf7e94c063eb02ecdad909632f0b787"
+        "normalized_structure_hash": "d35c74717a41bf668798eb5249900af28567cbada5c25023c8728671301d75c3"
       },
       {
         "name": "G9 其他非流动金融资产.xlsx",
-        "size": 88636,
-        "sha256": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379",
+        "size": 76973,
+        "sha256": "8eb68bfc0491c0d92e7820d697e4facfcb109e936347adad4ec35cafaf86b65c",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g9-other-noncurrent-financial",
-        "normalized_structure_hash": "ac654db9baf0c1fc01583995cca0d4f34fea5da313d3b296d535d1ebcec93cf8"
+        "normalized_structure_hash": "feeb5155c4fe931a7e5bd9c62be1647b1b780c506996718241ebdb8493f084a1"
       }
     ]
   },
@@ -2448,7 +2448,7 @@
         "row_identity": {
           "kind": "generated_timestamp_string",
           "identity_field": "id",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L704"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L699"
         }
       },
       {
@@ -2608,7 +2608,7 @@
         "row_identity": {
           "kind": "stable_template_row_key",
           "identity_field": "rowKey",
-          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L61"
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L59"
         }
       }
     ]

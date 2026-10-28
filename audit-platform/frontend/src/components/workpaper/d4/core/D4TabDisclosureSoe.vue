@@ -29,6 +29,7 @@ import { parseNum } from '../../composables/useD4FormulaEngine'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_MAIN_COST_STANDARD, D4_OTHER_COST_STANDARD } from '../../composables/d4AccountScope'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { checkNoteConsistencyGeneric } from '../../composables/noteConsistencyCheck'
 import {
   buildD4ObligationColumns,
@@ -293,12 +294,19 @@ function buildSnapshot(): D4DisclosureSnapshot {
       return row
     }),
     timingCategories: section4Categories.value.map((c: any) => ({ key: c.key, label: c.label })),
+    // （6）剩余履约义务：原先没带 ⇒ 附注（6）表恒推空行、表头按 2025 派生成 2026年 / 2027年
+    section6Rows: section6Rows.value,
+    auditYear: auditYear.value,
     notes: { ...noteTexts.value },
   }
 }
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
+  if (auditYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   isSyncing.value = true
   try {
     const payload = buildD4SyncPayload(VARIANT, props.wpId || '', null, buildSnapshot())

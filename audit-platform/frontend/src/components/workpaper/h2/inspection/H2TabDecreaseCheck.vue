@@ -602,6 +602,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabDecreaseCheck.vue — H2-9 在建工程减少检查
@@ -643,7 +644,7 @@ const props = defineProps<{
 }>()
 
 /** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
@@ -765,6 +766,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

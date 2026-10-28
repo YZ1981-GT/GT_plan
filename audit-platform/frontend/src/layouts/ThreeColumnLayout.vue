@@ -324,7 +324,7 @@
       v-model="showFormulaManager"
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
-      :year="formulaContext?.year ?? currentYear"
+      :year="formulaContext?.year ?? currentYear ?? undefined"
       :scope="formulaContext?.scope ?? 'report'"
       :wp-id="formulaContext?.wpId"
       :wp-code="formulaContext?.wpCode"
@@ -370,6 +370,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 import { useTheme } from '@/composables/useTheme'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -397,7 +399,8 @@ import {
   type FormulaManagerContextOwnerState,
 } from '@/shell/formula/formulaManagerContextOwner'
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
-import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload } from '@/utils/eventBus'
+import { useAdaptivePoll } from '@/composables/useAdaptivePoll'
+import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type FourColSwitchPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
@@ -586,7 +589,16 @@ const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const customQueryInitialSource = ref<string | undefined>(undefined)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
-const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+// 全局弹窗（公式管理 / 一键刷新 / 自定义查询）的年度：路由 → 项目 store；都没有为 null（原先兜底去年）
+const currentYear = computed<number | null>(() => {
+  const routeYear = parseAuditYear(route.query.year)
+  if (routeYear != null) return routeYear
+  try {
+    return useProjectStore().year
+  } catch {
+    return null // 无 pinia 上下文
+  }
+})
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {
@@ -710,10 +722,9 @@ interface BgImportStatus {
   tooltip: string        // 鼠标悬停完整信息
 }
 const bgImportStatus = ref<BgImportStatus | null>(null)
-let importPollTimer: ReturnType<typeof setInterval> | null = null
 /** 当前被追踪的 projectId（独立于路由，支持跨项目保留导入指示） */
 const trackedProjectId = ref<string | null>(null)
-/** 连续轮询错误计数——连续 6 次错误自动释放追踪（30s = 6 × 5s 轮询间隔） */
+/** 连续轮询错误计数——追踪中连续 6 次错误自动释放追踪（30s = 6 × 5s 进行中轮询间隔） */
 let pollErrorCount = 0
 const MAX_POLL_ERRORS = 6
 
@@ -753,12 +764,13 @@ const phaseColor = computed(() => {
   return PHASE_COLORS[bgImportStatus.value.phase] || '#409eff'
 })
 
-async function pollImportQueue() {
+/** 查一次导入状态；返回「是否有进行中的导入」（决定下一轮 5 秒还是 30 秒，R17） */
+async function pollImportQueue(): Promise<boolean> {
   // 优先追踪 trackedProjectId；若无则回退到当前路由项目
   const trackId = trackedProjectId.value || (route.params.projectId as string)
   if (!trackId) {
     bgImportStatus.value = null
-    return
+    return false
   }
   try {
     const statusData: any = await api.get(
@@ -794,6 +806,7 @@ async function pollImportQueue() {
       if (!trackedProjectId.value) {
         trackedProjectId.value = trackId
       }
+      return true
     } else if (bgImportStatus.value) {
       const prev = bgImportStatus.value
       bgImportStatus.value = null
@@ -824,16 +837,22 @@ async function pollImportQueue() {
       // 追踪中的项目已无 job（外部取消或其他原因），释放追踪
       trackedProjectId.value = null
     }
+    return false
   } catch {
-    // P2-1.2: 连续 3 次错误自动释放追踪，避免后端不可达时永久卡死
+    // P2-1.2: 连续 6 次错误自动释放追踪，避免后端不可达时永久卡死
     pollErrorCount++
     if (pollErrorCount >= MAX_POLL_ERRORS) {
       bgImportStatus.value = null
       trackedProjectId.value = null
       pollErrorCount = 0
     }
+    // 追踪中按进行中的节奏重试（30 秒内释放或恢复），没在追踪按空闲节奏
+    return !!trackedProjectId.value
   }
 }
+
+// R17：有进行中的导入每 5 秒、没有每 30 秒（原先固定每 5 秒）；页面隐藏暂停、可见时立即查
+const importPoll = useAdaptivePoll(pollImportQueue)
 
 function navigateToImport() {
   const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
@@ -857,32 +876,14 @@ function navigateToImport() {
   }
 }
 
-watch(() => route.params.projectId, (newId) => {
-  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；
-  // 首次进入路由时主动触发一次轮询
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  if (newId && !trackedProjectId.value) {
-    // 当前没在追踪其他项目 → 轮询新项目
-    pollImportQueue()
-  } else if (trackedProjectId.value) {
-    // 继续追踪旧项目，不切换
-    pollImportQueue()
-  }
-  importPollTimer = setInterval(pollImportQueue, 5000)  // 5s 轮询比 10s 更实时
+watch(() => route.params.projectId, () => {
+  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；立即查一次（追踪中查追踪项目，否则查当前路由项目）
+  importPoll.start()
 }, { immediate: true })
 
-// 页面隐藏时暂停轮询（标签页切走或浏览器后台）节省请求
-function onVisibilityChange() {
-  if (document.hidden) {
-    if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  } else {
-    if (!importPollTimer && (trackedProjectId.value || route.params.projectId)) {
-      pollImportQueue()
-      importPollTimer = setInterval(pollImportQueue, 5000)
-    }
-  }
-}
-document.addEventListener('visibilitychange', onVisibilityChange)
+// 刚提交导入：立即查一次，不等空闲轮询的 30 秒
+function onImportSubmitted() { importPoll.poke() }
+eventBus.on('ledger-import:submitted', onImportSubmitted)
 
 async function handleLogout() {
   await authStore.logout()
@@ -977,13 +978,15 @@ function onRefreshComplete(_result: unknown) {
   eventBus.emit('formula-changed', { action: 'refreshed' })
 }
 
-function onSwitchFourCol(payload: { tab?: string }) {
+function onSwitchFourCol(payload: FourColSwitchPayload) {
+  // 🔴 本函数自己会延迟转发一次给目录：收到的是转发件就不再处理，否则自己收自己转发、每 150 ms 重发永不停止
+  if (payload?._relayed) return
   fourColumnMode.value = true
   catalogCollapsed.value = false
-  // mitt 不需要 _redispatched 补丁：直接延迟通知 catalog 切换 tab
+  // 目录可能随四栏模式刚挂载、没收到第一次：延迟转发一次（只一次）让它切到对应 tab
   if (payload?.tab) {
     setTimeout(() => {
-      eventBus.emit('four-col-switch', payload)
+      eventBus.emit('four-col-switch', { ...payload, _relayed: true })
     }, 150)
   }
 }
@@ -1010,13 +1013,13 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
-  document.removeEventListener('visibilitychange', onVisibilityChange)
+  eventBus.off('ledger-import:submitted', onImportSubmitted)
+  importPoll.dispose()
   eventBus.off('open-formula-manager', onOpenFormulaEvent)
   eventBus.off('open-custom-query', onOpenCustomQueryEvent)
   eventBus.off('four-col-switch', onSwitchFourCol)
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
-  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
   // 关闭 SSE 订阅
   if (sseSub) { sseSub.close(); sseSub = null }
 })

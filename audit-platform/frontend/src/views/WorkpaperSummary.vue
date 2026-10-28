@@ -93,6 +93,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { getChildCompanies, generateWorkpaperSummary, exportWorkpaperSummary } from '@/services/auditPlatformApi'
 import { fmtAmount } from '@/utils/formatters'
 import { useProjectStore } from '@/stores/project'
@@ -102,7 +103,7 @@ import GtAmountCell from '@/components/common/GtAmountCell.vue'
 const route = useRoute()
 const projectId = route.params.projectId as string
 const projectStore = useProjectStore()
-const year = computed(() => projectStore.year || new Date().getFullYear())
+const year = computed<number | null>(() => projectStore.year ?? null)
 
 // ── 科目树 ──
 const accountFilter = ref('')
@@ -229,6 +230,10 @@ const summaryData = ref<any>(null)
 const tableRows = ref<any[]>([])
 
 async function doGenerate() {
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   const checkedAccounts = (accountTreeRef.value?.getCheckedKeys(true) || [])
     .filter((k: string) => !['asset', 'liability', 'equity', 'income_expense'].includes(k))
   const checkedCompanies = (companyTreeRef.value?.getCheckedKeys(true) || [])
@@ -264,6 +269,10 @@ async function doGenerate() {
 
 async function doExport() {
   if (!summaryData.value) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   const checkedAccounts = (accountTreeRef.value?.getCheckedKeys(true) || [])
     .filter((k: string) => !['asset', 'liability', 'equity', 'income_expense'].includes(k))
   const checkedCompanies = (companyTreeRef.value?.getCheckedKeys(true) || [])

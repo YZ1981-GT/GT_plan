@@ -14,7 +14,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
   calcCipEndBalance,
   calcSubtotal,
-  calcCompletionRate,
+  calcBudgetInputRatio,
 } from './useH2FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ export interface H2DetailRow {
   startDate: string
   plannedEndDate: string
   actualEndDate: string
-  /** 完工进度(%) = 累计投入/预算×100 */
+  /** 工程累计投入占预算比例（比值，展示为百分数）= 审定期末余额 / 预算，模板 H2-2 D 列 =IF(B=0,0,AG/B) */
   completionRate: number | null
   accumulatedInput: number
   fundSource: string
@@ -420,10 +420,8 @@ function _recalcFormulas(row: H2DetailRow): void {
   row.netEndAud = row.endAudited - row.impairEndAud
   row.netValue = row.netEndAud
 
-  row.completionRate = calcCompletionRate(
-    _getNum(row.accumulatedInput),
-    _getNum(row.budget),
-  )
+  // D 列与模板同口径（比值）：审定期末余额 / 预算；「累计投入」只用于单位造价
+  row.completionRate = calcBudgetInputRatio(row.endAudited, _getNum(row.budget))
 
   const area = _getNum(row.area)
   row.unitCost = area > 0 ? _getNum(row.accumulatedInput) / area : null
@@ -511,8 +509,10 @@ function _normalizeRow(raw: any): H2DetailRow {
   row.impairIncAdj = _getNum(raw.impairIncAdj)
   row.impairDecAdj = _getNum(raw.impairDecAdj)
 
-  // 旧数据若只存了 beginAudited/endAudited，尽量反推调整额（仅当调整为空）
-  if (!_getNum(raw.adjustBegin) && raw.beginAudited != null) {
+  // 旧数据若只存了 beginAudited、根本没有 adjustBegin 键，反推期初调整额。
+  // 🔴 只认「键不存在」：调整为 0 是合法录入（OO 侧清空调整、而存库的 beginAudited 是上一版
+  //    公式缓存值时，原先的「为 0 就反推」会把用户清掉的调整算回来，表单与模板 Z=J+S 不同）。
+  if (raw.adjustBegin === undefined && raw.beginAudited != null) {
     const implied = _getNum(raw.beginAudited) - row.cipBegin
     if (Math.abs(implied) > 0.005) row.adjustBegin = implied
   }
@@ -629,7 +629,7 @@ export function useH2Detail(options: {
   const overBudgetRowIds: ComputedRef<Set<string>> = computed(() => {
     const ids = new Set<string>()
     for (const row of rows.value) {
-      if (row.completionRate != null && row.completionRate > 100) ids.add(row.rowId)
+      if (row.completionRate != null && row.completionRate > 1) ids.add(row.rowId)
     }
     return ids
   })

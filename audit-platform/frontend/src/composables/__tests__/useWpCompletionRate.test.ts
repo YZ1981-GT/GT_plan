@@ -80,7 +80,7 @@ describe('calcACompletion — A 类程序表', () => {
     expect(r.category).toBe('empty')
   })
 
-  it('部分决策返回正确百分比', () => {
+  it('部分决策返回正确百分比（不适用不计入分子分母）', () => {
     const r = calcACompletion({
       programs: [
         { status: 'completed' },
@@ -89,9 +89,10 @@ describe('calcACompletion — A 类程序表', () => {
         { status: 'in_progress' },
       ],
     })
-    expect(r.filled).toBe(3) // completed + not_applicable + in_progress
-    expect(r.total).toBe(4)
-    expect(r.percentage).toBe(75)
+    // spec procedure-trim-generation-delegation-chain 需求 6.5：原先 3/4（不适用算已决策）
+    expect(r.filled).toBe(2) // completed + in_progress
+    expect(r.total).toBe(3)
+    expect(r.percentage).toBe(67)
     expect(r.category).toBe('partial')
   })
 
@@ -102,8 +103,22 @@ describe('calcACompletion — A 类程序表', () => {
         { status: 'not_applicable' },
       ],
     })
+    expect(r.filled).toBe(1)
+    expect(r.total).toBe(1)
     expect(r.percentage).toBe(100)
     expect(r.category).toBe('complete')
+  })
+
+  it('全部不适用：无须执行，按完成', () => {
+    const r = calcACompletion({ programs: [{ status: 'not_applicable' }, { status: 'not_applicable' }] })
+    expect(r).toEqual({ filled: 0, total: 0, percentage: 100, category: 'complete' })
+  })
+
+  it('不适用行不抬高完成率：一条完成 + 一条待执行 + 一条不适用 = 50%', () => {
+    const r = calcACompletion({
+      programs: [{ status: 'completed' }, { status: 'pending' }, { status: 'not_applicable' }],
+    })
+    expect(r.percentage).toBe(50) // 原先 2/3 = 67
   })
 })
 

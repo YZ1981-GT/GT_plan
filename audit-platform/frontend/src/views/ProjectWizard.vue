@@ -5,11 +5,11 @@
       <BasicInfoStep ref="basicInfoRef" :key="wizardStore.projectId || 'new'" />
     </div>
 
-    <!-- Phase 3 需求 5.1：合并项目创建后配置合并范围（选已有单体挂子公司） -->
+    <!-- 合并项目创建后预览自动生成的企业树（spec consol-autotree-linkage-closure R1：不需要确认，关闭即进入合并模块） -->
     <ConsolScopeConfigDialog
       v-model="showScopeConfig"
       :project-id="scopeConfigProjectId"
-      @attached="onSubsidiariesAttached"
+      mode="created"
       @update:model-value="onScopeConfigClosed"
     />
 
@@ -187,15 +187,7 @@ async function handleConfirm() {
   })
 }
 
-/** 5.1：纳入子公司成功后，结束向导并跳转合并模块 */
-function onSubsidiariesAttached(_count: number) {
-  const pid = scopeConfigProjectId.value
-  scopeConfigProjectId.value = ''
-  wizardStore.reset()
-  router.push(pid ? `/projects/${pid}/consolidation` : '/consolidation')
-}
-
-/** 5.1：关闭"配置合并范围"弹窗（含"暂不配置"）后，跳转合并模块 */
+/** 关闭企业树预览后进入合并模块（原「纳入子公司」入口已随自动建树下线，attached 事件不再存在） */
 function onScopeConfigClosed(visible: boolean) {
   if (!visible && scopeConfigProjectId.value) {
     const pid = scopeConfigProjectId.value

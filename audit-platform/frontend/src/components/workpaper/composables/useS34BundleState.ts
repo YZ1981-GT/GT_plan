@@ -95,6 +95,8 @@ export interface UseS34BundleStateOptions {
 export interface UseS34BundleStateReturn {
   /** S34-x wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
+  /** S34-x wp_code → assigned_to (staff_id/user_id) 映射 (P2.3) */
+  assigneeMap: ComputedRef<Record<string, string>>
   /** S34-0 核查清单结构化数据 */
   checklist: Ref<S34ChecklistItem[]>
   /** wpIdMap 有值的 wp_code 列表（适用底稿编码） */
@@ -118,23 +120,28 @@ export interface UseS34BundleStateReturn {
 // ─── 纯函数（导出供单元/PBT 测试） ───
 
 /**
- * 从 wp_index 条目列表中提取 S34-* 的 wp_code → wp_id 映射。
+ * 从 wp_index 条目列表中提取 S34-* 的 wp_code → wp_id 映射及 wp_code → assigned_to 映射。
  *
  * 🔴 铁律：使用 item.wp_id（非 item.id）。
  * wp_id 为 null/undefined 的条目被忽略（无对应底稿实体）。
  *
  * Property 2: wp_id 解析与传播
+ * P2.3: assigned_to 同步提取用于 bundle tab 负责人展示
  */
 export function buildWpIdMap(
-  items: Array<{ wp_code: string; wp_id?: string | null; id: string }>,
-): Record<string, string> {
-  const map: Record<string, string> = {}
+  items: Array<{ wp_code: string; wp_id?: string | null; id: string; assigned_to?: string | null }>,
+): { wpIdMap: Record<string, string>; assigneeMap: Record<string, string> } {
+  const wpIdMap: Record<string, string> = {}
+  const assigneeMap: Record<string, string> = {}
   for (const item of items) {
     if (item.wp_code && /^S34-\d+/.test(item.wp_code) && item.wp_id) {
-      map[item.wp_code] = item.wp_id
+      wpIdMap[item.wp_code] = item.wp_id
+      if (item.assigned_to) {
+        assigneeMap[item.wp_code] = item.assigned_to
+      }
     }
   }
-  return map
+  return { wpIdMap, assigneeMap }
 }
 
 /**
@@ -271,11 +278,16 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
   const loading = ref(false)
   /** S34-x → wp_id 内部状态 */
   const wpIdMapState = ref<Record<string, string>>({})
+  /** S34-x → assigned_to 内部状态 (P2.3) */
+  const assigneeMapState = ref<Record<string, string>>({})
   /** S34 核查清单（从 API 加载） */
   const checklist = ref<S34ChecklistItem[]>([])
 
   // ─── wpIdMap（Task 4.1, Req 8.1, 8.3）───
   const wpIdMap = computed<Record<string, string>>(() => wpIdMapState.value)
+
+  // ─── assigneeMap (P2.3) ───
+  const assigneeMap = computed<Record<string, string>>(() => assigneeMapState.value)
 
   // ─── applicableCodes（Task 4.1, Req 9.1）───
   const applicableCodes = computed<string[]>(() =>
@@ -311,9 +323,12 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
-      wpIdMapState.value = buildWpIdMap(items)
+      const result = buildWpIdMap(items)
+      wpIdMapState.value = result.wpIdMap
+      assigneeMapState.value = result.assigneeMap
     } catch {
       wpIdMapState.value = {}
+      assigneeMapState.value = {}
     } finally {
       loading.value = false
     }
@@ -352,6 +367,7 @@ export function useS34BundleState(options: UseS34BundleStateOptions): UseS34Bund
 
   return {
     wpIdMap,
+    assigneeMap,
     checklist,
     applicableCodes,
     completionMap,

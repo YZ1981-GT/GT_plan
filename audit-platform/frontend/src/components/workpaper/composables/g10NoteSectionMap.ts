@@ -47,7 +47,8 @@ export const G10_DERIVATIVE_SUBTABLE = {
 
 /** 旧载荷按审计年度拼的公允价值变动表名（两版同一写法）；与现名不同的随 `_removed_table_keys` 清掉 */
 export function g10LegacyFvCreditTableNames(current: string, auditYear: number | null): string[] {
-  const years = new Set([auditYear ?? new Date().getFullYear(), new Date().getFullYear()])
+  const years = new Set<number>()
+  if (auditYear != null) years.add(auditYear)
   return [...years]
     .map((y) => `对于指定为以公允价值计量且其变动计入当期损益的金融负债，${y}年公允价值的变动情况如下表所示：`)
     .filter((name) => name !== current)

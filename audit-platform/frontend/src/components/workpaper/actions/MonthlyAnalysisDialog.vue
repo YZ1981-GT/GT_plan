@@ -72,12 +72,12 @@ const formRef = ref<FormInstance>()
 
 const form = reactive({
   account_code: '',
-  year: new Date().getFullYear() - 1,
+  year: 0 as number,
 })
 
 const rules: FormRules = {
   account_code: [{ required: true, message: '请选择科目编码', trigger: 'change' }],
-  year: [{ required: true, message: '请输入会计年度', trigger: 'blur' }],
+  year: [{ required: true, message: '请输入会计年度', trigger: 'blur' }, { type: 'number', min: 2001, message: '请输入有效会计年度（如 2025）', trigger: 'blur' }],
 }
 
 const commonAccountCodes = [

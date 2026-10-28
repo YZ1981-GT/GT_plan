@@ -169,9 +169,9 @@
  * Spec: .kiro/specs/k10-other-income/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, inject, provide, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
 import {
@@ -245,10 +245,10 @@ const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: numb
 )
 
 // ─── 年度（供 K10-6 抽凭引擎等使用；props.year → sheet/项目回退当前年） ──────
-const k10Year = computed<number>(() => {
+const k10Year = computed<number | null>(() => {
   if (props.year) return props.year
   const y = Number(String(props.sheetName || '').match(/20\d{2}/)?.[0])
-  return Number.isFinite(y) && y > 0 ? y : new Date().getFullYear()
+  return Number.isFinite(y) && y > 0 ? y : null
 })
 
 // ─── 双模式 (OO 健康检查 + config 拉取成功才切；D4 范式) ───────────────────────
@@ -300,11 +300,7 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6117', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6117' })).rows
     let u6117 = 0, a6117 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

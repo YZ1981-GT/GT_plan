@@ -383,18 +383,16 @@ function migratePartial(p: Partial<TradingDetailRow>): Partial<TradingDetailRow>
 }
 
 /**
- * 公式链（Excel 双桶滚动）
- * 期末账面成本 = 期初审定成本 + 本期增加 − 本期减少
- * 期末累计 FV = 期初审定累计 FV + 本期公允变动
- * 若填写单位公允，期末公允价值优先用市价验算，否则用账面双桶合计
+ * 公式链（模板 明细表G1-2 双桶滚动，逐列见下方注释）
+ * E = C + D；P = C + M；Q = D + N；R = P + Q；W = U + V；L = J + K；Y = W + X
+ * D（期初累计 FV）与 N（本期公允变动）都是录入列，空即 0：不按陈旧的期初公允价值反推 D、
+ * 不按市价倒推 N（两种替代都会让用户改成本 / 置 0 后被改回去，与 OO 侧算的不一致）。
+ * 单位公允价值只用于验算（fairValueChange / rollForwardDiff 两个非受管派生列）。
  */
 export function enrichDetailRow(r: TradingDetailRow): TradingDetailRow {
   const openingCost = parseNum(r.openingCost)
-  let openingCumulativeFv = parseNum(r.openingCumulativeFv)
-  // 仅填了期初公允价值时反推累计 FV
-  if (openingCumulativeFv === 0 && parseNum(r.openingFairValue) !== 0 && openingCost !== parseNum(r.openingFairValue)) {
-    openingCumulativeFv = parseNum(r.openingFairValue) - openingCost
-  }
+  // 🔴 D 是录入列：旧载荷缺 D 时由 migratePartial 在载入时补一次，这里不再按陈旧的 E 反推
+  const openingCumulativeFv = parseNum(r.openingCumulativeFv)
   const openingFairValue = openingCost + openingCumulativeFv
 
   const auditedOpeningCost = openingCost + parseNum(r.openingCostAdj)
@@ -414,11 +412,8 @@ export function enrichDetailRow(r: TradingDetailRow): TradingDetailRow {
   const unitFv = parseNum(r.unitFairValue)
   const marketClosingFv = unitFv !== 0 ? calcFairValue(closingQuantity, unitFv) : 0
 
-  // 本期公允变动：优先用户录入；若为 0 且有市价，则用市价变动
-  let periodFvChange = parseNum(r.periodFvChange)
-  if (periodFvChange === 0 && marketClosingFv !== 0) {
-    periodFvChange = calcFairValueChange(marketClosingFv, auditedOpeningFvTotal)
-  }
+  // 🔴 N 是录入列（模板 Q=D+N）：不再用市价倒推，市价只进下方两个验算列
+  const periodFvChange = parseNum(r.periodFvChange)
 
   // 🔴 模板 `Q12=D12+N12` —— 起点是**期初余额累计 FV（D，未审）**，不是期初审定累计 FV
   const cumulativeFVChange = openingCumulativeFv + periodFvChange

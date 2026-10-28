@@ -211,9 +211,9 @@
  * Spec: .kiro/specs/k9-admin-expenses/ Task 1.1
  * Requirements: 1.1-1.10
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
@@ -281,7 +281,7 @@ const tbData = ref({
   audited6602: 0,
 })
 /** 会计期间截止日（按审计年度），供 K9-6/K9-7 截止测试抽样使用 */
-const periodEnd = computed(() => `${props.year ?? new Date().getFullYear()}-12-31`)
+const periodEnd = computed(() => props.year == null ? '' : `${props.year}-12-31`)
 /** K9-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
 const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>(
   () => (Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []),
@@ -351,11 +351,7 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6602', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, { year: props.year, accountPrefix: '6602' })).rows
     let u6602 = 0, a6602 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')

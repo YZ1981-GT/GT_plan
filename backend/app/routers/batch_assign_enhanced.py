@@ -58,6 +58,10 @@ class BatchAssignEnhancedRequest(BaseModel):
     override_assignments: list[OverrideAssignment] | None = Field(
         None, description="手动微调覆盖（可选）"
     )
+    # 被委派人可见范围不含目标循环（400 out_of_scope）时带理由重试 ⇒ 同事务扩大其可见范围
+    # （spec procedure-trim-generation-delegation-chain 需求 4.4）
+    expand_scope: bool = False
+    scope_reason: str | None = Field(None, max_length=500)
 
 
 class AssignmentItem(BaseModel):
@@ -87,8 +91,12 @@ async def batch_assign_enhanced(
 
     权限（Batch 1 P0.3）：
     - 所有 wp_ids 必须属于同一项目
-    - 当前用户对该项目必须有 edit 权限（project_assignment.role IN manager/signing_partner
-      或 role='admin'）
+    - 当前用户须是该项目的委派人（``ensure_project_delegator``：admin，或本项目唯一有效委派角色为
+      合伙人 / 签字合伙人 / 经理；与 ``PUT /workpaper-leads`` 同一判定）
+
+    spec procedure-trim-generation-delegation-chain 任务 12：编制人改走底稿主编委派事务（已裁 / 在回收站
+    拒绝、被委派人须看得到该循环、委派历史与可见性策略版本、投影同步）；复核人仍直写但须是本项目成员；
+    任一失败整批回滚，通知 / 事件 / 审计只在成功后发。
     """
 
     # 1. 查询底稿信息（含 WpIndex 的 audit_cycle）
@@ -120,31 +128,17 @@ async def batch_assign_enhanced(
         )
     target_project_id = project_ids_seen.pop()
 
-    # Batch 1 P0.3: 权限守卫 — 当前用户对该项目有 edit 权限
-    if current_user.role.value != "admin":
-        from app.models.staff_models import ProjectAssignment as _PA, StaffMember as _SM
+    # Batch 1 P0.3: 权限守卫 — 当前用户是该项目的委派人（与底稿主编委派同一判定；原手写查询在同一用户
+    # 有两份人员记录时 scalar_one_or_none 抛 500）
+    from app.services.procedure_authorization import ensure_project_delegator
 
-        staff_id_stmt = sa.select(_SM.id).where(
-            _SM.user_id == current_user.id,
-            _SM.is_deleted == sa.false(),
-        )
-        staff_id = (await db.execute(staff_id_stmt)).scalar_one_or_none()
-
-        allowed = False
-        if staff_id:
-            pa_stmt = sa.select(_PA.id).where(
-                _PA.staff_id == staff_id,
-                _PA.project_id == target_project_id,
-                _PA.role.in_(["manager", "signing_partner"]),
-                _PA.is_deleted == sa.false(),
-            )
-            if (await db.execute(pa_stmt)).scalar_one_or_none():
-                allowed = True
-        if not allowed:
-            raise HTTPException(
-                status_code=403,
-                detail="权限不足：只有项目经理或签字合伙人可以批量委派",
-            )
+    try:
+        await ensure_project_delegator(db, current_user, target_project_id)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=403,
+            detail="权限不足：只有项目经理或合伙人可以批量委派",
+        ) from exc
 
     # 构建 WorkpaperInfo 列表
     workpapers: list[WorkpaperInfo] = []
@@ -210,22 +204,39 @@ async def batch_assign_enhanced(
         override_assignments=override_results,
     )
 
-    # 4. 执行分配（更新数据库）
-    updated = 0
-    for assignment in assignments:
-        result = await db.execute(
-            sa.select(WorkingPaper).where(
-                WorkingPaper.id == assignment.wp_id,
-                WorkingPaper.is_deleted == sa.false(),
-            )
+    # 4. 执行分配：编制人走底稿主编委派事务；复核人直写但须是本项目成员（任一失败整批回滚）
+    from app.services.wp_visibility.delegation_guard import DelegationError
+    from app.services.wp_visibility.lead_delegation_entry import (
+        delegate_workpaper_leads,
+        resolve_project_member_user,
+    )
+
+    try:
+        outcome = await delegate_workpaper_leads(
+            db, target_project_id, [(a.wp_id, a.user_id) for a in assignments],
+            actor_user_id=current_user.id, expand_scope=data.expand_scope, scope_reason=data.scope_reason,
         )
-        wp = result.scalar_one_or_none()
-        if not wp:
-            continue
-        wp.assigned_to = assignment.user_id
         if data.reviewer_id is not None:
-            wp.reviewer = data.reviewer_id
-        updated += 1
+            reviewer_user = await resolve_project_member_user(db, target_project_id, data.reviewer_id)
+            if reviewer_user is None:
+                raise HTTPException(status_code=400, detail={
+                    "error": "reviewer_not_member", "message": "复核人不是本项目成员，请先在团队分配中加入"})
+            for wp in (await db.execute(sa.select(WorkingPaper).where(
+                WorkingPaper.id.in_(outcome.updated)))).scalars().all():
+                wp.reviewer = reviewer_user
+    except DelegationError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.http_status, detail=exc.http_detail()) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    updated = len(outcome.updated)
+    done = set(outcome.updated)
+    # 只对真正委派成功的底稿发通知 / 事件 / 回执；被委派人一律用解析出的用户 id（候选可能传人员 id）
+    assignments = [
+        AssignmentResult(wp_id=a.wp_id, user_id=outcome.assignee_users.get(a.wp_id, a.user_id))
+        for a in assignments if a.wp_id in done
+    ]
 
     await db.flush()
 

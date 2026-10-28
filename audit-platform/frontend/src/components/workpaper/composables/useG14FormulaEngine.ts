@@ -5,8 +5,12 @@
  * 对齐致同 xlsx「明细表G14-2」：
  * - 计入损益 K = 本期计提 G − 本期转回 H（转回按正数录入）
  * - 期末余额 J = 期初 F + 计提 G − 转回 H − 转销 I + 其他变动
- * - 核对：审定数 D = 计入损益 K
+ * - 核对：审定数 D = 计入损益 K（按分相等）
+ *
+ * 「转回按正数录入」是填报口径；录入的值按原样参与计算（与模板同），不在载入时改号。
  */
+import { amountsEqualToCent } from './templateAmountEquals'
+
 export function parseNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
   const n = typeof v === 'number' ? v : Number(v)
@@ -86,19 +90,14 @@ export function isRollForwardBalanced(
   ) <= tolerance
 }
 
-export function isReconciled(audited: number, profitLoss: number, tolerance = 0.01): boolean {
-  return Math.abs(audited - profitLoss) <= tolerance
+/**
+ * 审定数 ↔ 计入损益核对（模板 L = `D=K`）：按分相等。
+ * 原为 `|差| ≤ 0.01`，差一分时会因浮点尾差判成一致，与模板相反。
+ */
+export function isReconciled(audited: number, profitLoss: number): boolean {
+  return amountsEqualToCent(audited, profitLoss)
 }
 
 export function calcSubtotal(values: number[]): number {
   return values.reduce((s, v) => s + parseNum(v), 0)
-}
-
-/**
- * 旧版「转回带符号（负数）」→ 正数口径迁移。
- * 仅当值为负时取绝对值；已为正数的数据不变。
- */
-export function migrateReversalToPositive(reversal: number): number {
-  const n = parseNum(reversal)
-  return n < 0 ? Math.abs(n) : n
 }

@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "623b6eb29ce2e8c712d5e85736257ddac0ef2749c329565f115722314cbf5553",
+  "instrumentation_definition_sha256": "5546daa4292018131f9366536d3d1570284d7eaf12217e8336a55aaf5415c54c",
   "review": {
     "authority_root": "backend/wp_templates",
     "bp8_sheet_granularity_collapse": {
@@ -61,9 +61,9 @@
       "table": "checklist_responses"
     },
     "pilot_class": "l_cycle_bonds_payable",
-    "reviewed_basis": "2026-10-01 openpyxl 逐格实测 `L/L4 应付债券.xlsx`（净化后 sha256 b4ba30cf…，16 sheet；净化前 9df73e02… 因 1 个外部 hyperlink 被 OOXML 门拒）：受管表选型见模块 docstring；L4-3 三级表头 r10/r11/r12、数据 r13~r17、footer A18「合计」、R/S/AF~AM 十列逐行公式；manifest 幻影码 L4B 经 wp_template_finder 单册/sheet 级均零命中；wp_index 中 wp_code=L4 有 3 份带真 file_path 的底稿。",
+    "reviewed_basis": "2026-10-01 openpyxl 逐格实测 `L/L4 应付债券.xlsx`（净化后 sha256 54816781…，16 sheet；净化前 9df73e02… 因 1 个外部 hyperlink 被 OOXML 门拒）：受管表选型见模块 docstring；L4-3 三级表头 r10/r11/r12、数据 r13~r17、footer A18「合计」、R/S/AF~AM 十列逐行公式；manifest 幻影码 L4B 经 wp_template_finder 单册/sheet 级均零命中；wp_index 中 wp_code=L4 有 3 份带真 file_path 的底稿。",
     "template_defects_registered": [
-      "footer r18 的 T18~W18 为错位交叉公式（如 T18 `=N18+P18-R18`），期初调整列本应 SUM；只登记不改（模板运行时只读）"
+      "footer r18 的 T18~W18 原为错位交叉公式（如 T18 `=N18+P18-R18`），期初调整列应逐列 SUM；已修模板（spec oo-writeback-template-parity-closure R1，与同行 X18~AK18 同形 `=SUM(x13:x17)`）"
     ]
   },
   "review_status": "reviewed",
@@ -681,9 +681,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "75e5558c2d29fcf1934c18dbe33db76657ce84a820dc9364d6a3b84646f48bae",
+    "normalized_structure_hash": "5000f9b43086dfcb278eb5706b85658746ed1ee50c2c0154bc1cc13b1d50803b",
     "relative_path": "L/L4 应付债券.xlsx",
-    "template_sha256": "b4ba30cfde3d929908ab4989363c04944ed1134b9c25813370307db54443c255"
+    "template_sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd"
   },
-  "template_definition_sha256": "8579bf853548c4f925fb5ce6b6eef00bbf019c963d6e5659f101728a8264c23f"
+  "template_definition_sha256": "c1492066020898c5acb1fb202eff96837fa7db663f468a62768e830065a33b98"
 }

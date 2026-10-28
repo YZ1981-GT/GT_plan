@@ -72,7 +72,9 @@
             </div>
           </el-tab-pane>
           <el-tab-pane label="一致性" name="consistency" lazy>
-            <CrossCheckPanel v-if="wpId" :project-id="projectId" :year="currentYear" />
+            <!-- 项目没填审计年度：跨科目校验按年度取 / 执行，不按今年兜底 -->
+            <div v-if="wpId && currentYear == null" class="gt-wp-side-placeholder">{{ MISSING_AUDIT_YEAR_MESSAGE }}</div>
+            <CrossCheckPanel v-else-if="wpId && currentYear != null" :project-id="projectId" :year="currentYear" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
           <el-tab-pane label="公式" name="formulas" lazy>
@@ -181,6 +183,7 @@ import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
 import WpDecisionTracePanel from '@/components/workpaper/WpDecisionTracePanel.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import type { RenderDecisionWire } from '@/types/renderConfig'
 
 interface FineCheckResult {
@@ -224,9 +227,8 @@ const qualityTab = ref('finecheck')
 const traceTab = ref('attachments')
 
 // 原先恒取日历年：2025 年度项目在 2026 年打开时，公式面板按 2026 求值、保存时按 2026 校验引用
-// ⇒ 本年试算表科目一律判「引用地址不存在」、提取公式改不了（spec formula-fetch-and-wp-generation-defect-closure 实测发现）。
-// 取不到项目年度时与编辑器其余子组件同一兜底（上一日历年）。
-const currentYear = computed(() => props.year || new Date().getFullYear() - 1)
+// ─── 审计年度：由渲染器 / 项目上下文提供；缺失时不显示年度相关面板 ─────
+const currentYear = computed<number | null>(() => props.year ?? null)
 
 // ─── Badge 汇总 ──────────────────────────────
 const assistBadge = computed(() => 0) // 编制辅助暂无汇总

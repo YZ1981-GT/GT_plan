@@ -75,7 +75,8 @@ export function calcH62EndAudited(
 
 /** 默认报表截止日：指定年（或当年）12-31 */
 export function defaultH6PeriodEnd(year?: number): string {
-  const y = year ?? new Date().getFullYear()
+  if (year == null) return ''
+  const y = year
   return `${y}-12-31`
 }
 

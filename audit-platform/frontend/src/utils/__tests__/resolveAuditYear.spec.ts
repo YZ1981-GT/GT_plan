@@ -4,9 +4,19 @@ import {
   resolveAuditYearFromProject,
   resolveEffectiveAuditYear,
   yearFromProjectName,
+  yearQuery,
 } from '../resolveAuditYear'
 
 describe('resolveAuditYear', () => {
+  it('yearQuery 只带有效年度（缺失不写 year=null、不兜底去年）', () => {
+    expect(yearQuery(2025)).toEqual({ year: '2025' })
+    expect(yearQuery('2024')).toEqual({ year: '2024' })
+    expect(yearQuery(null)).toEqual({})
+    expect(yearQuery(undefined)).toEqual({})
+    expect(yearQuery('null')).toEqual({})
+    expect(yearQuery(0)).toEqual({})
+  })
+
   it('parseAuditYear 过滤无效值', () => {
     expect(parseAuditYear(2025)).toBe(2025)
     expect(parseAuditYear('2025')).toBe(2025)

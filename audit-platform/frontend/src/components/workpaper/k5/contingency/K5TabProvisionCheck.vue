@@ -320,6 +320,9 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3（源模板对齐重建）
  * 科目 2801 预计负债（贷方/负债类）。
  */
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+// ElMessage 不在自动导入里（vite.config AutoImport 只挂 vue / vue-router / pinia）：原先未导入 ⇒ 运行时 ReferenceError
+import { ElMessage } from 'element-plus'
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import { MagicStick, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
@@ -354,7 +357,7 @@ const emit = defineEmits<{
 }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
@@ -418,6 +421,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (year.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

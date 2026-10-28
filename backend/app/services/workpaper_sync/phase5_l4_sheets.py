@@ -17,8 +17,8 @@ spec: l-cycle-true-adapter-registration · Task 12（L4，第二条 L entry）
 数据 r13~r17，footer r18（标签 **A18**「合计」，A18:B18 合并），有效列 A..AM，
 max_column=40（AN，仅 AN2「返回目录」）⇒ 隐藏 UUID 列 AO。册内零 definedName、零 Excel Table。
 
-🔴 footer 行的 T18~W18 写的是 `=N18+P18-R18` 这类**错位交叉公式**（期初调整列本该 SUM），
-属模板缺陷 —— 只登记不改（`backend/wp_templates/` 运行时只读，改模板须另立 spec）。
+footer 行的 T18~W18 原为 `=N18+P18-R18` 这类错位交叉公式（期初调整列本该 SUM），
+已由 spec oo-writeback-template-parity-closure R1 改为与同行其余列同形的 `=SUM(x13:x17)`。
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "L/L4 应付债券.xlsx"
 #:    受管 sheet openpyxl 逐格 0 diff。净化前 `9df73e02…c562b`/122,085 B 被首版发布 OOXML
 #:    `external_relationships` 门拒绝（slice 冻结的是净化前值，append-only）。
 TEMPLATE_SHA256: Final[str] = (
-    "b4ba30cfde3d929908ab4989363c04944ed1134b9c25813370307db54443c255"
+    "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd"
 )
 #: 净化前哨兵。
 PRE_SANITIZE_TEMPLATE_SHA256: Final[str] = (
@@ -195,7 +195,7 @@ _HTML_STORE_NOTE: Final[str] = (
     "initialAmount/endBalance/isFairValue 模板无对应列，保留为 HTML-only 不入契约。"
 )
 _REVIEWED_BASIS: Final[str] = (
-    "2026-10-01 openpyxl 逐格实测 `L/L4 应付债券.xlsx`（净化后 sha256 b4ba30cf…，16 sheet；"
+    "2026-10-01 openpyxl 逐格实测 `L/L4 应付债券.xlsx`（净化后 sha256 54816781…，16 sheet；"
     "净化前 9df73e02… 因 1 个外部 hyperlink 被 OOXML 门拒）："
     "受管表选型见模块 docstring；L4-3 三级表头 r10/r11/r12、数据 r13~r17、footer A18「合计」、"
     "R/S/AF~AM 十列逐行公式；manifest 幻影码 L4B 经 wp_template_finder 单册/sheet 级均零命中；"

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "cb228ac61875d424a85e48c167c6f0452367ea5c6ea39646d645ff3000c3e03a",
+  "instrumentation_definition_sha256": "a835f403f754b5553db387d66143773247d595e8a15d8159eb86ed387c54bf58",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g8-other-equity-instruments",
@@ -23,7 +23,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_other_equity_instruments",
-    "reviewed_basis": "openpyxl 逐格实测 G/G8 其他权益工具投资.xlsx 的 `明细表G8-2`（两级表头 R9 组 / R10 叶子 / R9 横向合并区恰三个 C9:F9·I9:N9·O9:R9 / 单个受管区 R11-R20 / footer R21 逐列 =SUM(x11:x20) / 有效内容列 23 即 A-W 且 X 空 / max_column=24 含空列 / 0 个 definedName / 受管表零裸 IF，整册 12 格裸 IF 全在 审定表G8-1 / 🔴 模板**四处行级缺陷**：M 在 R12-R20 漏加 L、P 在 R11+R13-R20 漏加 K、R 在 R13-R20 整格无公式、T 在 R12 整格无公式 ⇒ formula_columns 只取逐行一致的 E·H·O·Q 四列，M/P/R/T 的 mode 仍判 formula 由前端按会计正确口径算) + 前端 `useG8Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G8DetailRow 23 字段与模板列序 A..W 逐列对应 / 无 section 字段即单区） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §3（🔴 **FVOCI** 口径：受管表注释逐字「指定为以公允价值计量且其变动计入其他综合收益……该指定一经作出不得撤销」⇒ OCI 三列 F/L/R 是 CAS22 要求的，与 G9/G10 的「删 OCI」**反向** / 本期变动的成本 I 是净额列 / 股利收入 N 是损益项不进余额 / O=C+I 走未审线）"
+    "reviewed_basis": "openpyxl 逐格实测 G/G8 其他权益工具投资.xlsx 的 `明细表G8-2`（两级表头 R9 组 / R10 叶子 / R9 横向合并区恰三个 C9:F9·I9:N9·O9:R9 / 单个受管区 R11-R20 / footer R21 逐列 =SUM(x11:x20) / 有效内容列 23 即 A-W 且 X 空 / max_column=24 含空列 / 0 个 definedName / 受管表零裸 IF，整册 12 格裸 IF 全在 审定表G8-1 / 八个公式列 E·H·M·O·P·Q·R·T 逐行同形（M=SUM(I:K) / P=D+J+K / R=F+J+L / T=Q+S；修复前 M11 多加 L、P 只有 R12 含 K、R13-R20 与 T12 无公式、合计行 K/L/R 无 SUM，spec oo-writeback-template-parity-closure R1 已修模板）) + 前端 `useG8Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / G8DetailRow 23 字段与模板列序 A..W 逐列对应 / 无 section 字段即单区） + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §3（🔴 **FVOCI** 口径：受管表注释逐字「指定为以公允价值计量且其变动计入其他综合收益……该指定一经作出不得撤销」⇒ OCI 三列 F/L/R 是 CAS22 要求的，与 G9/G10 的「删 OCI」**反向** / 本期变动的成本 I 是净额列 / 股利收入 N 是损益项不进余额 / O=C+I 走未审线）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -304,7 +304,7 @@
               "header_source_ref": "源xlsx!明细表G8-2!R10",
               "header_text": "计入其他综合收益的累计利得或损失",
               "json_pointer": "/rows/{row_uuid}/closingOciCumulative",
-              "mode": "editable",
+              "mode": "formula",
               "source_ref": "源xlsx!明细表G8-2!R11",
               "stable_field_key": "g8_detail_rows/{row_uuid}/closing_oci_cumulative",
               "store_item_id": "G8-detail-rows",
@@ -334,7 +334,7 @@
               "header_source_ref": "源xlsx!明细表G8-2!T10",
               "header_text": "审定数",
               "json_pointer": "/rows/{row_uuid}/closingAdjusted",
-              "mode": "editable",
+              "mode": "formula",
               "source_ref": "源xlsx!明细表G8-2!T11",
               "stable_field_key": "g8_detail_rows/{row_uuid}/closing_adjusted",
               "store_item_id": "G8-detail-rows",
@@ -397,7 +397,9 @@
             "M11:M20",
             "O11:O20",
             "P11:P20",
-            "Q11:Q20"
+            "Q11:Q20",
+            "R11:R20",
+            "T11:T20"
           ],
           "header_rows": 2,
           "row_identity": {
@@ -636,9 +638,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "dcd0916fb8ea496a271be22d51115dcb6bf7e94c063eb02ecdad909632f0b787",
+    "normalized_structure_hash": "d35c74717a41bf668798eb5249900af28567cbada5c25023c8728671301d75c3",
     "relative_path": "G/G8 其他权益工具投资.xlsx",
-    "template_sha256": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6"
+    "template_sha256": "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b"
   },
-  "template_definition_sha256": "1aa404e22948c9c22cdbe9762132efd67e87540119090a4a7fb6857a91916383"
+  "template_definition_sha256": "d7bfeeedffda1eddcc58cdab35efc62e1bde3030fe3157c1cad835218de35e2f"
 }

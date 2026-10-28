@@ -7,7 +7,7 @@
  * 职责：
  * - 定义 FairValueRow 类型（13列 A~M）
  * - rows reactive（从D5-4-rows加载JSON数组）
- * - 行内公式自动计算（G=F-E天数差, I=D×H×G÷360, J=D-I, K=J）
+ * - 行内公式自动计算（G=F-E天数差, I=D×H×G÷365, J=D-I, K=J，与模板 D5-4 一致）
  * - totalRow computed（票面合计/贴现利息合计/公允价值合计）
  * - ociDiffMessage computed（D5-4 FV合计 vs D5-2期末合计差异提示文案）
  * - addRow/removeRow/updateCell
@@ -41,7 +41,7 @@ export interface FairValueRow {
   maturityDate: string        // F: 到期日
   remainingDays: number       // G: =F-E（自动）
   discountRate: number        // H: 市场贴现利率
-  discountInterest: number    // I: =D×H×G÷360（自动）
+  discountInterest: number    // I: =D×H×G÷365（自动）
   discountAmount: number      // J: =D-I（自动，即贴现金额）
   fairValue: number           // K: =J（自动，期末公允价值）
   fvHierarchy: string         // L: 公允价值层次（第二层次/第三层次）
@@ -115,7 +115,7 @@ function normalizeRow(raw: any): FairValueRow {
 /**
  * 对单行重新计算公式链：
  * G = calcRemainingDays(E, F) — 到期日减去计量日
- * I = calcDiscountInterest(D, H, G) — 票面×利率×天数÷360
+ * I = calcDiscountInterest(D, H, G) — 票面×利率×天数÷365
  * J = calcFairValue(D, I) — 票面 - 贴现利息
  * K = J（期末公允价值 = 贴现金额）
  */

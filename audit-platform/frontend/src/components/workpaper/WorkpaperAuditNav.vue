@@ -270,7 +270,7 @@ const procedureStatus = useProcedureStatus(
   props.wpId,
   resolvedSheetKey,
 )
-const prerequisiteStatus = usePrerequisiteStatus(props.projectId, props.wpCode)
+const prerequisiteStatus = usePrerequisiteStatus(() => props.projectId, () => props.wpCode) // 换底稿即重取（R9）
 
 // 2.4a 5 项认定卡片（按 wp_code cycle 派生科目类型描述 + procedure_status 动态计数）
 const assertionTipsByCycle: Record<string, Record<string, string>> = {

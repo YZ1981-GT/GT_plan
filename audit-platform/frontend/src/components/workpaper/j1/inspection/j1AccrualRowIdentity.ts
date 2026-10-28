@@ -9,20 +9,23 @@
  * 真 OO 往返守卫：backend/scripts/e2e/verify_j1_oo94_roundtrip.py
  * 后端身份真源：phase5_j1_06_accrual_check（TEMPLATE_ID_J106='J16S'，FIRST_DATA_ROW_J106=17）
  */
+import skeleton from './j1AccrualSkeleton.json'
 
-export const SHORT_TERM_TEMPLATE_ID = 'J16S'
-export const SHORT_TERM_TEMPLATE_FIRST_ROW = 17
-const TEMPLATE_ROW_ID_PREFIX = 'GTROW-'
+export const SHORT_TERM_TEMPLATE_ID = skeleton.templateId
+export const SHORT_TERM_TEMPLATE_FIRST_ROW = skeleton.firstRow
+export const SHORT_TERM_SKELETON_ROWS: ReadonlyArray<Readonly<{ label: string; indent: number }>> = skeleton.rows
+const TEMPLATE_ROW_ID_PREFIX = `GTROW-${SHORT_TERM_TEMPLATE_ID}-`
 
 /** 第 index 条骨架行（0 起）对应的模板行身份。 */
 export function shortTermTemplateRowId(index: number): string {
   if (!Number.isInteger(index) || index < 0) throw new RangeError(`非法骨架行下标 ${index}`)
   const row = String(SHORT_TERM_TEMPLATE_FIRST_ROW + index).padStart(4, '0')
-  return `${TEMPLATE_ROW_ID_PREFIX}${SHORT_TERM_TEMPLATE_ID}-${row}`
+  return `${TEMPLATE_ROW_ID_PREFIX}${row}`
 }
 
-export function isTemplateRowId(id: unknown): boolean {
-  return typeof id === 'string' && id.startsWith(TEMPLATE_ROW_ID_PREFIX)
+/** 仅接受本表、本位置的精确模板身份；任意 `GTROW-*` 前缀不构成合法性。 */
+export function isExpectedTemplateRowId(id: unknown, index: number): boolean {
+  return typeof id === 'string' && id === shortTermTemplateRowId(index)
 }
 
 /**
@@ -32,8 +35,10 @@ export function isTemplateRowId(id: unknown): boolean {
  */
 export function bindShortTermTemplateIds<T extends { id: string }>(rows: T[], skeletonCount: number): T[] {
   if (rows.length !== skeletonCount) return rows
-  if (rows.every(r => isTemplateRowId(r.id))) return rows
-  return rows.map((r, i) => (isTemplateRowId(r.id) ? r : { ...r, id: shortTermTemplateRowId(i) }))
+  if (rows.every((r, i) => isExpectedTemplateRowId(r.id, i))) return rows
+  return rows.map((r, i) => (
+    isExpectedTemplateRowId(r.id, i) ? r : { ...r, id: shortTermTemplateRowId(i) }
+  ))
 }
 
 /**
@@ -44,4 +49,11 @@ export function roundHalfAwayFromZero2(x: number): number {
   if (!Number.isFinite(x)) return 0
   const sign = x < 0 ? -1 : 1
   return (sign * Math.round(Math.abs(x) * 100 + 1e-9)) / 100
+}
+
+/** 与模板 G=ROUND(D*F,2)、I=G-H 完全同号。 */
+export function calculateAccrualAmounts(baseAmount: number, rate: number, actual: number) {
+  const estimated = roundHalfAwayFromZero2(baseAmount * rate)
+  const diff = roundHalfAwayFromZero2(estimated - actual)
+  return { estimated, diff }
 }

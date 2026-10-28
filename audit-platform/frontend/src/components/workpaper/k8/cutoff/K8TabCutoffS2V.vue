@@ -174,8 +174,8 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-const currentYear = computed(() => props.year ?? new Date().getFullYear())
-// 🔴 修复：截止日期从 props.year 派生，不再让 composable 回退硬编码 '2025-12-31'
+const currentYear = computed<number | null>(() => props.year ?? null)
+// 缺少年度时不生成虚假截止日，自动取数由 composable 直接跳过。
 const periodEnd = computed(() => `${currentYear.value}-12-31`)
 
 // ═══ 样本选取标准（组件层持久化 K8-7-criteria）═══

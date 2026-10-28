@@ -46,19 +46,24 @@ ROW_IDENTITY_KEY: Final[str] = "rowKey"
 # 性质区（R8-R12）：货款/工程款/设备款/服务费/其他
 # ═══════════════════════════════════════════════════════════════════════════
 
+#: 🔴 json 键逐字取前端 `useF4Adjudication.StoredF4AdjRow / F4AdjudicationRow`（spec oo-writeback-template-parity-
+#:    closure R3 任务 9.4c）：原写 prior* / end* / reason，前端是 opening* / closing* / reasonAnalysis；
+#:    K 变动率是比率（模板 `0.00%`），value_type 由 amount 改 ratio。列键不变。
+#:    账龄两区的 store item（`…-aging-seed-rows` / `…-aging-slot-rows`）前端不存在（前端账龄五行 = 账龄段 + 「其他」
+#:    残差行，共存 `F4-1-adj-aging-rows`），改接需要区分区的判据与多区门面，见 design §4.3，未在本批改。
 _FIELD_SPECS_NATURE: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     # A 列不可受管（SUMIF 匹配键）
-    ("prior_unadjusted",   "B", "editable", "amount", "priorUnadjusted",  "期初未审数",       ""),
-    ("prior_aje",          "C", "editable", "amount", "priorAje",         "期初账项调整",     ""),
-    ("prior_rje",          "D", "editable", "amount", "priorRje",         "期初重分类调整",   ""),
-    ("prior_audited",      "E", "formula",  "amount", "priorAudited",     "期初审定数",       ""),
-    ("end_unadjusted",     "F", "formula",  "amount", "endUnadjusted",    "期末未审数",       ""),
-    ("end_aje",            "G", "formula",  "amount", "endAje",           "期末账项调整",     ""),
-    ("end_rje",            "H", "formula",  "amount", "endRje",           "期末重分类调整",   ""),
-    ("end_audited",        "I", "formula",  "amount", "endAudited",       "期末审定数",       ""),
-    ("change_amount",      "J", "formula",  "amount", "changeAmount",     "变动额",           ""),
-    ("change_rate",        "K", "formula",  "amount", "changeRate",       "变动率",           ""),
-    ("reason",             "L", "editable", "text",   "reason",           "原因分析",         ""),
+    ("prior_unadjusted",   "B", "editable", "amount", "openingUnadjusted", "期初未审数",       ""),
+    ("prior_aje",          "C", "editable", "amount", "openingAje",        "期初账项调整",     ""),
+    ("prior_rje",          "D", "editable", "amount", "openingRje",        "期初重分类调整",   ""),
+    ("prior_audited",      "E", "formula",  "amount", "openingAdjusted",   "期初审定数",       ""),
+    ("end_unadjusted",     "F", "formula",  "amount", "closingUnadjusted", "期末未审数",       ""),
+    ("end_aje",            "G", "formula",  "amount", "closingAje",        "期末账项调整",     ""),
+    ("end_rje",            "H", "formula",  "amount", "closingRje",        "期末重分类调整",   ""),
+    ("end_audited",        "I", "formula",  "amount", "closingAdjusted",   "期末审定数",       ""),
+    ("change_amount",      "J", "formula",  "amount", "changeAmount",      "变动额",           ""),
+    ("change_rate",        "K", "formula",  "ratio",  "changeRate",        "变动率",           ""),
+    ("reason",             "L", "editable", "text",   "reasonAnalysis",    "原因分析",         ""),
 )
 
 SPEC_F401_NATURE: Final[RowTableSheetSpec] = RowTableSheetSpec(
@@ -90,17 +95,17 @@ SPEC_F401_NATURE: Final[RowTableSheetSpec] = RowTableSheetSpec(
 
 _FIELD_SPECS_AGING_SEED: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     # A 列是账龄标签（值，SUMIF 不引用）
-    ("prior_unadjusted",   "B", "editable", "amount", "priorUnadjusted",  "期初未审数",       ""),
-    ("prior_aje",          "C", "editable", "amount", "priorAje",         "期初账项调整",     ""),
-    ("prior_rje",          "D", "editable", "amount", "priorRje",         "期初重分类调整",   ""),
-    ("prior_audited",      "E", "formula",  "amount", "priorAudited",     "期初审定数",       ""),
-    ("end_unadjusted",     "F", "formula",  "amount", "endUnadjusted",    "期末未审数",       ""),
-    ("end_aje",            "G", "formula",  "amount", "endAje",           "期末账项调整",     ""),
-    ("end_rje",            "H", "editable", "amount", "endRje",           "期末重分类调整",   ""),
-    ("end_audited",        "I", "formula",  "amount", "endAudited",       "期末审定数",       ""),
-    ("change_amount",      "J", "formula",  "amount", "changeAmount",     "变动额",           ""),
-    ("change_rate",        "K", "formula",  "amount", "changeRate",       "变动率",           ""),
-    ("reason",             "L", "editable", "text",   "reason",           "原因分析",         ""),
+    ("prior_unadjusted",   "B", "editable", "amount", "openingUnadjusted", "期初未审数",       ""),
+    ("prior_aje",          "C", "editable", "amount", "openingAje",        "期初账项调整",     ""),
+    ("prior_rje",          "D", "editable", "amount", "openingRje",        "期初重分类调整",   ""),
+    ("prior_audited",      "E", "formula",  "amount", "openingAdjusted",   "期初审定数",       ""),
+    ("end_unadjusted",     "F", "formula",  "amount", "closingUnadjusted", "期末未审数",       ""),
+    ("end_aje",            "G", "formula",  "amount", "closingAje",        "期末账项调整",     ""),
+    ("end_rje",            "H", "editable", "amount", "closingRje",        "期末重分类调整",   ""),
+    ("end_audited",        "I", "formula",  "amount", "closingAdjusted",   "期末审定数",       ""),
+    ("change_amount",      "J", "formula",  "amount", "changeAmount",      "变动额",           ""),
+    ("change_rate",        "K", "formula",  "ratio",  "changeRate",        "变动率",           ""),
+    ("reason",             "L", "editable", "text",   "reasonAnalysis",    "原因分析",         ""),
 )
 
 SPEC_F401_AGING_SEED: Final[RowTableSheetSpec] = RowTableSheetSpec(
@@ -131,18 +136,18 @@ SPEC_F401_AGING_SEED: Final[RowTableSheetSpec] = RowTableSheetSpec(
 # ═══════════════════════════════════════════════════════════════════════════
 
 _FIELD_SPECS_AGING_SLOT: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
-    ("category",           "A", "editable", "text",   "category",         "项目",             ""),
-    ("prior_unadjusted",   "B", "editable", "amount", "priorUnadjusted",  "期初未审数",       ""),
-    ("prior_aje",          "C", "editable", "amount", "priorAje",         "期初账项调整",     ""),
-    ("prior_rje",          "D", "editable", "amount", "priorRje",         "期初重分类调整",   ""),
-    ("prior_audited",      "E", "formula",  "amount", "priorAudited",     "期初审定数",       ""),
-    ("end_unadjusted",     "F", "editable", "amount", "endUnadjusted",    "期末未审数",       ""),
-    ("end_aje",            "G", "editable", "amount", "endAje",           "期末账项调整",     ""),
-    ("end_rje",            "H", "editable", "amount", "endRje",           "期末重分类调整",   ""),
-    ("end_audited",        "I", "formula",  "amount", "endAudited",       "期末审定数",       ""),
-    ("change_amount",      "J", "formula",  "amount", "changeAmount",     "变动额",           ""),
-    ("change_rate",        "K", "formula",  "amount", "changeRate",       "变动率",           ""),
-    ("reason",             "L", "editable", "text",   "reason",           "原因分析",         ""),
+    ("category",           "A", "editable", "text",   "label",             "项目",             ""),
+    ("prior_unadjusted",   "B", "editable", "amount", "openingUnadjusted", "期初未审数",       ""),
+    ("prior_aje",          "C", "editable", "amount", "openingAje",        "期初账项调整",     ""),
+    ("prior_rje",          "D", "editable", "amount", "openingRje",        "期初重分类调整",   ""),
+    ("prior_audited",      "E", "formula",  "amount", "openingAdjusted",   "期初审定数",       ""),
+    ("end_unadjusted",     "F", "editable", "amount", "closingUnadjusted", "期末未审数",       ""),
+    ("end_aje",            "G", "editable", "amount", "closingAje",        "期末账项调整",     ""),
+    ("end_rje",            "H", "editable", "amount", "closingRje",        "期末重分类调整",   ""),
+    ("end_audited",        "I", "formula",  "amount", "closingAdjusted",   "期末审定数",       ""),
+    ("change_amount",      "J", "formula",  "amount", "changeAmount",      "变动额",           ""),
+    ("change_rate",        "K", "formula",  "ratio",  "changeRate",        "变动率",           ""),
+    ("reason",             "L", "editable", "text",   "reasonAnalysis",    "原因分析",         ""),
 )
 
 SPEC_F401_AGING_SLOT: Final[RowTableSheetSpec] = RowTableSheetSpec(

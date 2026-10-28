@@ -94,7 +94,7 @@ function generateRowId(): string {
 }
 
 /** 创建空行（使用动态 segments 初始化账龄数据） */
-function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
+export function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
   const agingData = createEmptyAgingData(segments, 'D2')
   return {
     rowId: generateRowId(),
@@ -126,19 +126,22 @@ function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
 }
 
 /**
- * 行公式链自动计算
- * - priorAudited = priorUnadjusted + priorAje + priorRje
- * - endBalance = priorAudited + debitOccurrence - creditOccurrence
- * - currentUnadjusted = endBalance + reclassification
- * - currentAudited = currentUnadjusted + currentAje + currentRje
+ * 行公式链自动计算（与权威模板「明细表D2-2」逐列一致）
+ * - priorAudited = priorUnadjusted + priorAje + priorRje（H）
+ * - endBalance = priorUnadjusted + debitOccurrence - creditOccurrence（Q = E + O - P）
+ * - currentUnadjusted = endBalance + reclassification（S = Q + R）
+ * - currentAudited = currentUnadjusted + currentAje + currentRje（AB = S + Z + AA）
+ *
+ * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值（OO 按模板公式重算）。同 F1-2 裁决 F1-H3。
  */
-function recalcRow(row: DetailRow): DetailRow {
+export function recalcRow(row: DetailRow): DetailRow {
   row.priorAudited = getAuditedAmount(
     parseNum(row.priorUnadjusted),
     parseNum(row.priorAje),
     parseNum(row.priorRje)
   )
-  row.endBalance = row.priorAudited + parseNum(row.debitOccurrence) - parseNum(row.creditOccurrence)
+  row.endBalance = parseNum(row.priorUnadjusted) + parseNum(row.debitOccurrence) - parseNum(row.creditOccurrence)
   row.currentUnadjusted = row.endBalance + parseNum(row.reclassification)
   row.currentAudited = getAuditedAmount(
     row.currentUnadjusted,
@@ -519,8 +522,10 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
    * merge模式：按客户名去重，只填后端返回的录入列，不覆盖已有 AJE/RJE/账龄。
    * @returns { imported, updated, added } 摘要
    */
-  async function importFromAuxBalance(_projectId?: string): Promise<{ imported: number; updated: number; added: number }> {
-    const empty = { imported: 0, updated: 0, added: 0 }
+  async function importFromAuxBalance(
+    _projectId?: string,
+  ): Promise<{ imported: number; updated: number; added: number; truncated: boolean }> {
+    const empty = { imported: 0, updated: 0, added: 0, truncated: false }
     const wid = wpId?.value
     if (!wid) return empty
     try {
@@ -566,8 +571,18 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
 
       const imported = updated + added
       if (imported > 0) debounceSave()
-      ElMessage.success(String(data.message || `从余额表导入完成：更新${updated}行，新增${added}行`))
-      return { imported, updated, added }
+      // 超过单次导入上限：有客户没导入 ⇒ 明细合计必与科目余额不符，必须让人看见（不报成成功）
+      const truncated = data.truncated === true
+      if (truncated) {
+        ElMessage.warning({
+          message: String(data.message || data.warning || '客户数超过单次导入上限，部分客户未导入，请补录'),
+          duration: 10000,
+          showClose: true,
+        })
+      } else {
+        ElMessage.success(String(data.message || `从余额表导入完成：更新${updated}行，新增${added}行`))
+      }
+      return { imported, updated, added, truncated }
     } catch {
       ElMessage.error('从余额表导入失败')
       return empty

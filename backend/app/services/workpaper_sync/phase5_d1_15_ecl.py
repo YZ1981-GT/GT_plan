@@ -13,9 +13,14 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 28 · Requirements 5.1 / 
 两区共 managed_sheet 与 sheet_key，各自独立 UUID 列（I/J，max_col=H=8 后紧跟）。
 
 🔴 **数据区有行级乘法公式** D=B*C（期末应计提 = 余额 × 损失率），这是 D1 首次非加减派生。
-引擎声明为 `formula`，materialize 不覆盖公式格、由 OO 重算。E=B-D（期末坏账余额）、
-F=D-E（差异）也是行级公式。tasks.md 明确标注"确认 `mode=formula` 路径不依赖算式形态"——
+引擎声明为 `formula`，materialize 不覆盖公式格、由 OO 重算。F=D-E（差异）也是行级公式。
+tasks.md 明确标注"确认 `mode=formula` 路径不依赖算式形态"——
 引擎按 `mode=formula` 统一跳过该列的写盘，与算式是乘法还是加减无关。
+
+🔴 E「期末坏账准备账面余额」是**录入格**（2026-10-26，spec oo-writeback-template-parity-closure R1）：
+权威模板原把 E 写成 `=B-D`（账面余额 − 应计提 = 账面价值），表头记号也写成「④=①-③」，
+而本表要做的是「重新计算应计提的坏账准备，与被审计单位已记录的坏账准备进行比较」（模板 A8），
+同结构的 D2-9 ④ 也是录入格 ⇒ 模板已改为 E 无公式、表头「④」，前端本就按录入处理。
 
 🔴 footer marker 是 `小计`（不是 `合计`）—— 与 D1-3/D1-4/D1-8/D1-16 的 `合计` 不同。
 
@@ -54,30 +59,28 @@ FOOTER_ROW_PORTFOLIO: Final[int] = 25
 #: 🔴 footer marker 是「小计」（codepoints 5c0f 8ba1），不是其他 D1 sheet 的「合计」。
 FOOTER_MARKER_D115: Final[str] = "小计"
 
-#: 两区共用字段骨架（8 列 A-H）。D/E/F 三列有行级公式：
-#: D=B*C（乘法！）/ E=B-D / F=D-E —— 声明为 formula。
+#: 两区共用字段骨架（8 列 A-H）。D/F 两列有行级公式：
+#: D=B*C（乘法！）/ F=D-E —— 声明为 formula；E 是录入格（见模块说明）。
 _FIELD_SPECS_D115: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("debtor", "A", "editable", "text", "debtor", "债务人名称", ""),
     ("balance", "B", "editable", "amount", "balance", "审定应收票据账面余额", ""),
     ("loss_rate", "C", "editable", "amount", "lossRate", "预期信用损失率", ""),
     ("should_provision", "D", "formula", "amount", "shouldProvision", "期末应计提坏账准备", ""),
-    ("actual_provision", "E", "formula", "amount", "actualProvision", "期末坏账准备账面余额", ""),
+    ("actual_provision", "E", "editable", "amount", "actualProvision", "期末坏账准备账面余额", ""),
     ("difference", "F", "formula", "amount", "difference", "差异", ""),
     ("basis", "G", "editable", "text", "basis", "坏账准备计提依据及文件", ""),
     ("index_ref", "H", "editable", "text", "indexRef", "索引号", ""),
 )
 
-_FORMULA_COLUMNS_D115: Final[tuple[str, ...]] = ("D", "E", "F")
+_FORMULA_COLUMNS_D115: Final[tuple[str, ...]] = ("D", "F")
 #: 🔴 D 列是**乘法**公式（D=B*C），非加减。引擎按 mode=formula 统一不写该格（算式形态无关），
 #: 但 formula_templates 用于 verify_unmanaged_regions 的区间扩张比对。
 _FORMULA_TEMPLATES_INDIVIDUAL: Final[dict[str, str]] = {
     "D": "=B{r}*C{r}",
-    "E": "=B{r}-D{r}",
     "F": "=D{r}-E{r}",
 }
 _FORMULA_TEMPLATES_PORTFOLIO: Final[dict[str, str]] = {
     "D": "=B{r}*C{r}",
-    "E": "=B{r}-D{r}",
     "F": "=D{r}-E{r}",
 }
 

@@ -202,7 +202,11 @@ async function syncToNote(): Promise<void> {
   }
   syncing.value = true
   try {
-    const year = auditYear.value || (new Date().getFullYear() - 1)
+    const year = auditYear.value
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法同步附注')
+      return
+    }
     // 🔴 按源模板四层结构推送（原实现推自造 4 行 + 位置化 values:[期末,期初]
     //    → 行标签全不匹配模板，且 2 值塞进 4 个数据列、顺序还与模板相反）。
     const payload = buildH5SyncPayload({

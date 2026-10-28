@@ -55,13 +55,16 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     cell?: string
     max_depth?: number
     project_id?: string
-    year?: number
+    /** 项目审计年度；缺失 ⇒ 不分析（端点 year 必填；原先兜底今年 ⇒ 标的是别的年度的下游） */
+    year?: number | null
   }) {
     const code = wpCode.value
     if (!code) return
     // 没有项目上下文就不发请求：后端要求项目鉴权，裸发必 403
     // （spec acnr-foundation-defect-closure D8 / 需求 10）
     if (!payload.project_id) return
+    // 缺年度不分析（post-push-residual-defect-closure 6.5.3，较新一侧）
+    if (payload.year == null) return null
     loading.value = true
     try {
       // 构建统一 URI: WP:{wp_code}:{sheet}:{cell_or_label}

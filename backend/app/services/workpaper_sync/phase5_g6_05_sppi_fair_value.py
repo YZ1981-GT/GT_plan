@@ -16,8 +16,22 @@ spec: `g4-g6-shared-workbook-three-entry-lanes` · Task 14
 * 🔴 D 列在 R9/R10 **两行**有公式 `=B*C`，R11-18 **无公式** ⇒ 行级 mask
   （列级只能 editable 或 auto_source，判 formula 会在 R11-18 抛）。
   但 H 列 R9-18 **全行有公式** `=F*G`，J 列同理 `=H-D` ⇒ H/J 是真公式列。
-  D 判 **editable**（前端按 `=B*C` 重算覆盖）；H/J 判 **formula**。
+  D 原判 editable（前端按 `=B*C` 重算覆盖）；2026-10-28 改 **auto_source**（见下）；H/J 判 **formula**。
 * payload 列：**conclusion_only**（真库 remark 0 B / conclusion 2 B 空数组）。
+
+═══ 字段名对齐前端（spec oo-writeback-template-parity-closure R3 批 B）═══
+
+json 键逐字取前端 `useG6SppiFairValue.FairValueItem`（字段名守卫 `test_contract_field_names_in_frontend.py`
+报出 15 个对不上）：原写 investTarget / unauditedQuantity / unauditedUnitFv / unauditedFv / unauditedFvTier /
+auditedQuantity / auditedUnitFv / auditedFv / auditedFvTier / fvDifference / valuationConsistent / fvSourceMechanism /
+fvInputFactors / unobservableValue / valuationRef，前端存 investProject / unadjQty / unadjPrice / unadjFairValue /
+unadjFairValueLevel / auditedQty / auditedPrice / auditedFairValue / auditedFairValueLevel / difference /
+consistencyWithPrior / sourceInstitution / inputSource / inputValue / valuationFileRef。列键不变。
+D 未审公允价值前端恒按 数量 × 单价 现算（不可手填）⇒ auto_source（HTML 侧带出，OO 改了报受保护冲突）。
+
+🔴 未接通（不在本批）：前端 store 是 `{rows, conclusion}` 对象、存在 conclusion 列，契约按行数组（rows）声明；
+本 provider 的 store 门面还借自 G9（`phase5_g9_store_facade.specs_for` 取 G9 的 spec）⇒ 两方向都没真正接上
+（`check_store_item_two_way_parity.KNOWN_UNWIRED` 冻结），接通要 state 门面 + 门面按本 provider 取 spec（批 B 门面）。
 """
 from __future__ import annotations
 
@@ -54,30 +68,30 @@ FORMULA_TEMPLATES_G605: Final[dict[str, str]] = {
 FIELD_SPECS_G605: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
-    ("invest_target", "A", "editable", "text", "investTarget", "投资项目", ""),
+    ("invest_target", "A", "editable", "text", "investProject", "投资项目", ""),
     # 期末未审数 (B7:E7)
-    ("unaudited_quantity", "B", "editable", "amount", "unauditedQuantity", "数量（张/股）", "B7"),
-    ("unaudited_unit_fv", "C", "editable", "amount", "unauditedUnitFv", "单位公允价值", "B7"),
-    ("unaudited_fv", "D", "editable", "amount", "unauditedFv", "公允价值", "B7"),
-    ("unaudited_fv_tier", "E", "editable", "text", "unauditedFvTier", "公允价值层次", "B7"),
+    ("unaudited_quantity", "B", "editable", "amount", "unadjQty", "数量（张/股）", "B7"),
+    ("unaudited_unit_fv", "C", "editable", "amount", "unadjPrice", "单位公允价值", "B7"),
+    ("unaudited_fv", "D", "auto_source", "amount", "unadjFairValue", "公允价值", "B7"),
+    ("unaudited_fv_tier", "E", "editable", "text", "unadjFairValueLevel", "公允价值层次", "B7"),
     # 期末审定数 (F7:I7)
-    ("audited_quantity", "F", "editable", "amount", "auditedQuantity", "数量（张/股）", "F7"),
-    ("audited_unit_fv", "G", "editable", "amount", "auditedUnitFv", "单位公允价值", "F7"),
-    ("audited_fv", "H", "formula", "amount", "auditedFv", "公允价值", "F7"),
-    ("audited_fv_tier", "I", "editable", "text", "auditedFvTier", "公允价值层次", "F7"),
+    ("audited_quantity", "F", "editable", "amount", "auditedQty", "数量（张/股）", "F7"),
+    ("audited_unit_fv", "G", "editable", "amount", "auditedPrice", "单位公允价值", "F7"),
+    ("audited_fv", "H", "formula", "amount", "auditedFairValue", "公允价值", "F7"),
+    ("audited_fv_tier", "I", "editable", "text", "auditedFairValueLevel", "公允价值层次", "F7"),
     # 差异
-    ("fv_difference", "J", "formula", "amount", "fvDifference", "差异", ""),
+    ("fv_difference", "J", "formula", "amount", "difference", "差异", ""),
     # 估值方法
     ("valuation_method", "K", "editable", "text", "valuationMethod", "估值方法", ""),
-    ("valuation_consistent", "L", "editable", "text", "valuationConsistent", "估值方法与上期是否一致", ""),
+    ("valuation_consistent", "L", "editable", "text", "consistencyWithPrior", "估值方法与上期是否一致", ""),
     # 公允价值来源
-    ("fv_source_mechanism", "M", "editable", "text", "fvSourceMechanism", "公允价值来源机构", "M7"),
-    ("fv_input_factors", "N", "editable", "text", "fvInputFactors", "输入值来源及调整考虑因素", "M7"),
+    ("fv_source_mechanism", "M", "editable", "text", "sourceInstitution", "公允价值来源机构", "M7"),
+    ("fv_input_factors", "N", "editable", "text", "inputSource", "输入值来源及调整考虑因素", "M7"),
     ("valuation_technique", "O", "editable", "text", "valuationTechnique", "估值技术", "M7"),
     ("unobservable_inputs", "P", "editable", "text", "unobservableInputs", "不可观察输入值", "M7"),
-    ("unobservable_value", "Q", "editable", "text", "unobservableValue", "数值", "M7"),
+    ("unobservable_value", "Q", "editable", "text", "inputValue", "数值", "M7"),
     # 估值文件索引号
-    ("valuation_ref", "R", "editable", "text", "valuationRef", "估值文件索引号", ""),
+    ("valuation_ref", "R", "editable", "text", "valuationFileRef", "估值文件索引号", ""),
 )
 
 SPEC_G605: Final[RowTableSheetSpec] = RowTableSheetSpec(

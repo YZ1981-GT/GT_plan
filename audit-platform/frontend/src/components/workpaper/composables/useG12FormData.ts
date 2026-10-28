@@ -1,3 +1,4 @@
+import { fetchTrialBalanceRows, tbSumUnder } from '@/services/trialBalanceRows'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG12FormData — G12 净敞口套期收益底稿数据层
@@ -96,18 +97,9 @@ export function useG12FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G12_ACCOUNT_CODE  },
-        _silent: true,
-      } as any)
-      const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G12_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      const debit = Number(hit.debit_amount ?? hit.period_debit ?? 0)
-      const credit = Number(hit.credit_amount ?? hit.period_credit ?? 0)
-      return credit - debit
+      const { rows: list } = await fetchTrialBalanceRows(opts.projectId.value, { year: _year, accountPrefix: G12_ACCOUNT_CODE })
+      // 本期发生额 = 试算表未审数（单边口径，与报表同）；原先读端点没有的借 / 贷字段算差额，恒 0
+      return tbSumUnder(list, G12_ACCOUNT_CODE, 'unadjusted_amount')
     } catch {
       return null
     }

@@ -154,7 +154,7 @@ const aiLoadingSamplingBasis = ref(false)
 const ocrExtracted = ref<Map<string, Record<string, any>>>(new Map())
 
 // ─── 抽凭引擎（P0-4 联动）───────────────────────────────────────────────────
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 const samplingVisible = ref(false)
 function openSampling(): void {
   if (props.isReadonly) return
@@ -165,7 +165,7 @@ const attachedCount = ref(0)
 const importingAttached = ref(false)
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  if (!props.projectId || !props.wpId || samplingYear.value == null) return
   try {
     const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
     attachedCount.value = recs.length
@@ -174,7 +174,10 @@ async function refreshAttachedCount(): Promise<void> {
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  if (props.isReadonly || samplingYear.value == null) {
+    if (samplingYear.value == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

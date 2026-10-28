@@ -7,7 +7,7 @@
 
 三个映射真源（design §A/B/C 冻结清单，Task 1.2）：
   - A  identifier._MERGED_HEADER_MAPPING（点号合并表头，_match_header 最先命中）
-  - B  data/ledger_recognition_rules.json::column_aliases（单行别名，_rebuild_aliases 读取）
+  - B  identifier._RAW_HEADER_ALIASES（单行别名，内置为唯一来源；JSON column_aliases 已删除）
   - C  smart_import_engine._MERGED_HEADER_MAP（legacy 参照，已正确区分 year_*）
 
 分层期望终态（design §C）：

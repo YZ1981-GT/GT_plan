@@ -76,6 +76,30 @@ export const L82_DERIVED_ROW_SOURCES: Readonly<Record<number, ReadonlyArray<read
   11: [[8, 1], [9, -1], [10, -1]],
 }
 
+/** 派生行除 1~12 月外、模板也按同一组跨行减法算的列 */
+export type L82DerivedAmountField = 'aje' | 'rje' | 'priorUnadjusted' | 'priorAje' | 'priorRje'
+
+/**
+ * 派生行跨行算的金额列（权威模板逐格实测）：
+ *   R11 / R13 的 O、P（`O11=O9-O10`、`O13=O11-O12`，P 同）——上期 T~V 模板留空；
+ *   R20 的 O、P 与 T、U、V（`T20=T17-T18-T19` …）。
+ * 原先前端只算 1~12 月，派生行的账项 / 重分类调整恒 0，有调整时审定数与 OnlyOffice 两侧不同。
+ */
+export const L82_DERIVED_AMOUNT_FIELDS: Readonly<Record<number, readonly L82DerivedAmountField[]>> = {
+  2: ['aje', 'rje'],
+  4: ['aje', 'rje'],
+  11: ['aje', 'rje', 'priorUnadjusted', 'priorAje', 'priorRje'],
+}
+
+/**
+ * 合计行 R22 的取数（模板 `X22 = X13 + X14 − X15 + X16 + X20 + X21`，W22 = T22 + U22 + V22）：
+ * 利息净支出 + 未确认融资费用 − 未实现融资收益 + 承兑汇票贴息 + 汇兑净损失 + 手续费及其他。
+ * 🔴 合计只取这六个骨架行：插在 R21 之后的新增行不在模板合计公式里（OnlyOffice 侧同样不计入）。
+ */
+export const L82_TOTAL_TERMS: ReadonlyArray<readonly [number, 1 | -1]> = [
+  [4, 1], [5, 1], [6, -1], [7, 1], [11, 1], [12, 1],
+]
+
 /** 第 index 条骨架行（0 起）对应的模板行身份 `GTROW-L82-NNNN`。 */
 export function l82TemplateRowId(index: number): string {
   if (!Number.isInteger(index) || index < 0 || index >= L82_SKELETON_ITEMS.length) {
@@ -106,6 +130,13 @@ export const L82_DERIVED_ROW_KEYS: ReadonlySet<string> = new Set(
  */
 export function isL82DerivedRowKey(key: unknown): boolean {
   return typeof key === 'string' && L82_DERIVED_ROW_KEYS.has(key)
+}
+
+/** 派生行的这一列是否由模板跨行算（L82_DERIVED_AMOUNT_FIELDS；只读，供 UI 与编辑兜底） */
+export function isL82DerivedAmountField(key: unknown, field: string): boolean {
+  if (!isL82DerivedRowKey(key)) return false
+  const idx = L82_DERIVED_ROW_INDICES.find(i => l82TemplateRowId(i) === key)
+  return idx !== undefined && (L82_DERIVED_AMOUNT_FIELDS[idx] ?? []).includes(field as L82DerivedAmountField)
 }
 
 /**

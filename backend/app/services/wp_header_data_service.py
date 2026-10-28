@@ -46,7 +46,11 @@ async def get_header_data(
     # 推导审计期间
     period_start = proj.audit_period_start
     period_end = proj.audit_period_end
-    audit_year = proj.audit_year or (period_end.year if period_end else date.today().year)
+    from app.services.project_audit_year import resolve_project_audit_year
+    audit_year = resolve_project_audit_year(proj) or (period_end.year if period_end else None)
+
+    if audit_year is None:
+        return _empty_header(wp_code, wp_name)
 
     if not period_start:
         period_start = date(audit_year, 1, 1)

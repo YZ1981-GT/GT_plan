@@ -459,7 +459,11 @@ async function postRefresh(
   body: Record<string, unknown>,
 ): Promise<DeliverableRefreshResult | null> {
   const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/${endpoint}`
-  const year = props.year || new Date().getFullYear()
+  const year = props.year
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法刷新交付件')
+    return null
+  }
   let res = await api.post<DeliverableRefreshResult>(url, { ...body, year, confirm_overwrite: false }, SILENT)
   if (res?.requires_confirm) {
     const pending = res.pending_confirm_sections || []

@@ -271,7 +271,7 @@ async function saveImmediateWithSnapshot(...args: Parameters<typeof saveImmediat
 
 const currentSheet = computed(() => resolveD7SheetCode(props.sheetName || 'D7'))
 const d7ReviewSection = computed(() => resolveCycleReviewSection('D7', currentSheet.value))
-const d7Year = computed(() => props.year || parseInt(projectContext.value.audit_year || '0') || new Date().getFullYear() - 1)
+const d7Year = computed<number | null>(() => props.year || parseInt(projectContext.value.audit_year || '0') || null)
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

@@ -1,13 +1,22 @@
-"""安全监控 API — Phase 8 Task 10.4"""
+"""安全监控 API — Phase 8 Task 10.4
+
+全部仅 admin（原先只要求登录：任何登录用户都能看登录尝试 / 会话 / 导出审计日志，锁定账户一调即 500）。
+spec procedure-chain-followup-closure R1.3。
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.core.database import get_db
+from app.deps import require_role
 from app.models.core import User
-from app.services.security_monitor import security_monitor
+from app.schemas.auth import UserUpdate
+from app.services import auth_service
 from app.services.audit_logger_enhanced import audit_logger
+from app.services.security_monitor import security_monitor
 
 router = APIRouter(prefix="/api", tags=["security"])
 
@@ -16,7 +25,7 @@ router = APIRouter(prefix="/api", tags=["security"])
 async def get_login_attempts(
     username: str | None = None,
     limit: int = 50,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """获取登录尝试记录。"""
     return {"attempts": security_monitor.get_login_attempts(username, limit)}
@@ -25,57 +34,30 @@ async def get_login_attempts(
 @router.post("/security/lock-account")
 async def lock_account(
     username: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_db),
 ):
-    """锁定账户 — 设置 user.is_active=False + Redis 黑名单"""
-    from sqlalchemy import select, update as sa_update
-    from app.models.core import User as UserModel
+    """锁定账户 = 停用（与用户管理页「停用」同一逻辑：不能锁自己、至少保留一个启用的管理员）。
 
-    # 查找用户
-    result = await db.execute(
-        select(UserModel).where(UserModel.username == username)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
+    被锁用户下一次请求即 401（``get_current_user`` 每次请求校验 ``is_active``），登录也会被拒；
+    原先另写的 Redis ``account_locked:`` 键没有任何读取方，已删除。
+    """
+    user = (await db.execute(
+        select(User).where(User.username == username, User.is_deleted == False)  # noqa: E712
+    )).scalar_one_or_none()
+    if user is None:
         raise HTTPException(status_code=404, detail=f"用户 {username} 不存在")
-
-    # 锁定：设置 is_active=False
-    user.is_active = False
-    await db.flush()
-
-    # 写入 Redis 黑名单使现有 token 立即失效
-    try:
-        from app.core.redis import redis_client
-        if redis_client:
-            await redis_client.setex(f"account_locked:{user.id}", 86400, "1")  # 24h
-    except Exception:
-        pass
-
+    await auth_service.update_user(
+        db, actor_id=current_user.id, user_id=user.id, data=UserUpdate(is_active=False),
+    )
     await db.commit()
-
-    # 写审计日志
-    try:
-        from app.services.trace_event_service import trace_event_service, generate_trace_id
-        await trace_event_service.write(
-            db=db,
-            project_id=user.id,
-            event_type="account_locked",
-            object_type="user",
-            object_id=user.id,
-            actor_id=current_user.id,
-            action=f"lock_account:{username}",
-            trace_id=generate_trace_id(),
-        )
-    except Exception:
-        pass
-
-    return {"username": username, "locked": True, "message": "账户已锁定，现有会话将在刷新时失效"}
+    return {"username": username, "locked": True, "message": "账户已停用，该用户的现有会话下一次请求即失效"}
 
 
 @router.get("/security/sessions")
 async def get_sessions(
     user_id: str | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """获取活跃会话列表。"""
     return {"sessions": security_monitor.get_active_sessions(user_id)}
@@ -87,7 +69,7 @@ async def export_audit_logs(
     user_id: str | None = None,
     action: str | None = None,
     limit: int = 1000,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """导出审计日志。"""
     from fastapi.responses import Response

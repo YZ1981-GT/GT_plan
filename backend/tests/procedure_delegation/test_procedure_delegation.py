@@ -74,10 +74,15 @@ async def _make_sqlite_env():
     return engine, factory, project_id
 
 
-async def _seed_user_staff(factory, *, name="张三"):
-    """在 SQLite 建 user + active staff(user_id) + project_assignment 供委派/SOD 校验。"""
-    from app.models.core import User, UserRole
-    from app.models.staff_models import StaffMember
+async def _seed_user_staff(factory, project_id=None, *, name="张三", cycles=("D",)):
+    """在 SQLite 建 user + active staff(user_id)；给了 ``project_id`` 再建本项目成员（审计员，团队分配勾选 ``cycles``）。
+
+    spec procedure-trim-generation-delegation-chain 需求 4.4：程序行委派要求执行人看得到目标循环，
+    非项目成员不能被委派（原夹具只建人员、不入项目，现在会被 400 not_project_member 拒绝）。
+    """
+    from app.models.base import ProjectUserRole
+    from app.models.core import ProjectUser, User, UserRole
+    from app.models.staff_models import ProjectAssignment, StaffMember
 
     user_id = uuid.uuid4()
     staff_id = uuid.uuid4()
@@ -92,6 +97,10 @@ async def _seed_user_staff(factory, *, name="张三"):
             )
         )
         s.add(StaffMember(id=staff_id, user_id=user_id, name=name, source="custom"))
+        if project_id is not None:
+            s.add(ProjectAssignment(project_id=project_id, staff_id=staff_id, role="auditor",
+                                    assigned_cycles=list(cycles)))
+            s.add(ProjectUser(project_id=project_id, user_id=user_id, role=ProjectUserRole.auditor))
         await s.commit()
     return user_id, staff_id
 
@@ -273,7 +282,7 @@ class TestP15SameAssigneeNoop:
             try:
                 cycle, wp_code = "D", "D2"
                 wp_index_id = await _seed_wp_index(factory, project_id, wp_code, cycle)
-                actor_user, staff_id = await _seed_user_staff(factory)
+                actor_user, staff_id = await _seed_user_staff(factory, project_id)
                 dk = f"{wp_code}A::{wp_code}A::{uuid.uuid4().hex[:12]}"
                 await _seed_definition(factory, f"{wp_code}A", f"{wp_code}A", dk)
                 # 任务已分配给 staff_id（assigned, version=1）
@@ -326,8 +335,8 @@ class TestP15SameAssigneeNoop:
             try:
                 cycle, wp_code = "D", "D2"
                 wp_index_id = await _seed_wp_index(factory, project_id, wp_code, cycle)
-                actor_user, staff_a = await _seed_user_staff(factory, name="甲")
-                _actor_b, staff_b = await _seed_user_staff(factory, name="乙")
+                actor_user, staff_a = await _seed_user_staff(factory, project_id, name="甲")
+                _actor_b, staff_b = await _seed_user_staff(factory, project_id, name="乙")
                 dk = f"{wp_code}A::{wp_code}A::{uuid.uuid4().hex[:12]}"
                 await _seed_definition(factory, f"{wp_code}A", f"{wp_code}A", dk)
                 task_id = await _seed_task(
@@ -379,8 +388,8 @@ class TestP15SameAssigneeNoop:
             try:
                 cycle, wp_code = "D", "D2"
                 wp_index_id = await _seed_wp_index(factory, project_id, wp_code, cycle)
-                actor_user, staff_a = await _seed_user_staff(factory, name="甲")
-                _b, staff_b = await _seed_user_staff(factory, name="乙")
+                actor_user, staff_a = await _seed_user_staff(factory, project_id, name="甲")
+                _b, staff_b = await _seed_user_staff(factory, project_id, name="乙")
                 # 两个任务：t1 未分配、t2 已分配给 staff_a
                 dk1 = f"{wp_code}A::{wp_code}A::{uuid.uuid4().hex[:12]}"
                 dk2 = f"{wp_code}A::{wp_code}A::{uuid.uuid4().hex[:12]}"
@@ -425,7 +434,13 @@ async def _apply_v105(engine) -> None:
 
 
 @pytest_asyncio.fixture
-async def pg_engine():
+async def pg_factory():
+    """真库会话工厂：所有会话共用一条连接上的外层事务（各自 commit = 释放保存点），用例结束整体回滚。
+
+    🔴 原实现每个会话真 commit 进 dev 库、结尾 DELETE 清理 —— 但 ``procedure_row_task_history`` 有 append-only
+    触发器，清理恒失败，每跑一次就在随手取到的真实项目里留下程序行任务与定义（2026-10-24 真库现算残留 349 条，
+    与 test_procedure_trim_service 同源）。spec procedure-trim-generation-delegation-chain 改为事务回滚。
+    """
     if not _IS_PG:
         pytest.skip("need PostgreSQL (delegation apply integration)")
     engine = create_async_engine(app_settings.DATABASE_URL, pool_pre_ping=True, echo=False)
@@ -436,9 +451,13 @@ async def pg_engine():
         await engine.dispose()
         pytest.skip("PG not reachable")
     await _apply_v105(engine)
+    conn = await engine.connect()
+    trans = await conn.begin()
     try:
-        yield engine
+        yield async_sessionmaker(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
     finally:
+        await trans.rollback()
+        await conn.close()
         await engine.dispose()
 
 
@@ -449,7 +468,10 @@ async def _pick_project_wp(factory):
                 sa.text(
                     "SELECT wp.project_id, wp.wp_index_id, wp.id, wi.wp_code, COALESCE(wi.audit_cycle,'A') "
                     "FROM working_paper wp JOIN wp_index wi ON wi.id = wp.wp_index_id "
-                    "WHERE wp.is_deleted=false AND wi.is_deleted=false LIMIT 1"
+                    "WHERE wp.is_deleted=false AND wi.is_deleted=false "
+                    # 只取没有任何粗裁的项目：委派目标只取保留项（spec procedure-trim-generation-delegation-chain）
+                    "AND NOT EXISTS (SELECT 1 FROM procedure_instances pi WHERE pi.project_id = wp.project_id "
+                    "AND pi.is_deleted = false AND pi.status IN ('skip', 'not_applicable')) LIMIT 1"
                 )
             )
         ).first()
@@ -462,7 +484,10 @@ async def _pick_user(factory):
     return row[0] if row else None
 
 
-async def _insert_staff(factory, user_id, name):
+async def _insert_staff(factory, user_id, name, project_id, cycle):
+    """人员 + 本项目团队分配（审计员，勾选目标循环）：程序行委派要求执行人看得到目标循环。"""
+    from app.models.staff_models import ProjectAssignment
+
     staff_id = uuid.uuid4()
     async with factory() as s:
         await s.execute(
@@ -472,6 +497,7 @@ async def _insert_staff(factory, user_id, name):
             ),
             {"id": staff_id, "uid": user_id, "n": name},
         )
+        s.add(ProjectAssignment(project_id=project_id, staff_id=staff_id, role="auditor", assigned_cycles=[cycle]))
         await s.commit()
     return staff_id
 
@@ -545,26 +571,11 @@ async def _pg_outbox_count(factory, batch_or_task):
         ).scalar()
 
 
-async def _pg_cleanup(factory, definition_keys, task_ids, staff_ids, preview_ids=None):
-    async with factory() as s:
-        for tid in task_ids:
-            await s.execute(sa.text("DELETE FROM procedure_row_task_history WHERE task_id=:id"), {"id": tid})
-            await s.execute(sa.text("DELETE FROM task_events WHERE aggregate_id=:id"), {"id": tid})
-            await s.execute(sa.text("DELETE FROM procedure_row_tasks WHERE id=:id"), {"id": tid})
-        for k in definition_keys:
-            await s.execute(sa.text("DELETE FROM procedure_row_definitions WHERE definition_key=:k"), {"k": k})
-        for pid in (preview_ids or []):
-            await s.execute(sa.text("DELETE FROM procedure_operation_previews WHERE id=:id"), {"id": pid})
-        for sid in staff_ids:
-            await s.execute(sa.text("DELETE FROM staff_members WHERE id=:id"), {"id": sid})
-        await s.commit()
-
-
 @pytest.mark.asyncio
 class TestPgDelegation:
-    async def test_one_time_consume_and_idempotent(self, pg_engine):
+    async def test_one_time_consume_and_idempotent(self, pg_factory):
         """P13：一次消费；相同 request_id 幂等；不同 request_id → 409。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -573,46 +584,43 @@ class TestPgDelegation:
         tmpl = f"{wp_code}A"
         dk = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         rev = "a" * 64
-        staff_id = await _insert_staff(factory, user_id, "委派测试甲")
+        staff_id = await _insert_staff(factory, user_id, "委派测试甲", project_id, cycle)
         await _pg_insert_definition(factory, tmpl, tmpl, dk, rev)
         task_id = await _pg_insert_task(factory, project_id, wp_index_id, wp_code, tmpl, dk, rev, cycle)
         selector = {"kind": "row", "task_ids": [str(task_id)]}
         pv_id = None
-        try:
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_id)
-                await s.commit()
-            pv_id = uuid.UUID(pv["preview_id"])
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                r1 = await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-1", selector=selector, assignee_staff_id=staff_id)
-                await s.commit()
-            assert r1["applied"] == 1
-            # 相同 request_id → 幂等旧 result
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                r_replay = await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-1", selector=selector, assignee_staff_id=staff_id)
-                await s.commit()
-            assert r_replay == r1
-            # 不同 request_id → 409 已消费
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-2", selector=selector, assignee_staff_id=staff_id)
-                await s.rollback()
-            assert ei.value.status_code == 409
-            # 真实分配 + 一条 history/outbox
-            row = await _pg_task_row(factory, task_id)
-            assert row[0] == "assigned" and row[1] == staff_id and row[2] == 1
-            assert await _pg_history_count(factory, task_id) == 1
-            assert await _pg_outbox_count(factory, task_id) == 1
-        finally:
-            await _pg_cleanup(factory, [dk], [task_id], [staff_id], [pv_id] if pv_id else [])
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_id)
+            await s.commit()
+        pv_id = uuid.UUID(pv["preview_id"])
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            r1 = await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-1", selector=selector, assignee_staff_id=staff_id)
+            await s.commit()
+        assert r1["applied"] == 1
+        # 相同 request_id → 幂等旧 result
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            r_replay = await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-1", selector=selector, assignee_staff_id=staff_id)
+            await s.commit()
+        assert r_replay == r1
+        # 不同 request_id → 409 已消费
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="one-2", selector=selector, assignee_staff_id=staff_id)
+            await s.rollback()
+        assert ei.value.status_code == 409
+        # 真实分配 + 一条 history/outbox
+        row = await _pg_task_row(factory, task_id)
+        assert row[0] == "assigned" and row[1] == staff_id and row[2] == 1
+        assert await _pg_history_count(factory, task_id) == 1
+        assert await _pg_outbox_count(factory, task_id) == 1
 
-    async def test_tamper_and_version_change_409(self, pg_engine):
+    async def test_tamper_and_version_change_409(self, pg_factory):
         """P12：request payload 篡改 / 目标版本变化 → apply 409 零副作用。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -621,46 +629,43 @@ class TestPgDelegation:
         tmpl = f"{wp_code}A"
         dk = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         rev = "b" * 64
-        staff_a = await _insert_staff(factory, user_id, "委派甲")
-        staff_b = await _insert_staff(factory, user_id, "委派乙")
+        staff_a = await _insert_staff(factory, user_id, "委派甲", project_id, cycle)
+        staff_b = await _insert_staff(factory, user_id, "委派乙", project_id, cycle)
         await _pg_insert_definition(factory, tmpl, tmpl, dk, rev)
         task_id = await _pg_insert_task(factory, project_id, wp_index_id, wp_code, tmpl, dk, rev, cycle)
         selector = {"kind": "row", "task_ids": [str(task_id)]}
         pv_id = None
-        try:
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_a)
-                await s.commit()
-            pv_id = uuid.UUID(pv["preview_id"])
-            # 篡改：apply 用不同 assignee（request hash 不匹配）→ 409
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="tamper-1", selector=selector, assignee_staff_id=staff_b)
-                await s.rollback()
-            assert ei.value.status_code == 409
-            # 未写入
-            row = await _pg_task_row(factory, task_id)
-            assert row[0] == "unassigned"
-            assert await _pg_history_count(factory, task_id) == 0
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_a)
+            await s.commit()
+        pv_id = uuid.UUID(pv["preview_id"])
+        # 篡改：apply 用不同 assignee（request hash 不匹配）→ 409
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="tamper-1", selector=selector, assignee_staff_id=staff_b)
+            await s.rollback()
+        assert ei.value.status_code == 409
+        # 未写入
+        row = await _pg_task_row(factory, task_id)
+        assert row[0] == "unassigned"
+        assert await _pg_history_count(factory, task_id) == 0
 
-            # 版本变化：外部 bump lock_version 后 apply（正确 payload）→ 409
-            async with factory() as s:
-                await s.execute(sa.text("UPDATE procedure_row_tasks SET lock_version=lock_version+1 WHERE id=:id"), {"id": task_id})
-                await s.commit()
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="ver-1", selector=selector, assignee_staff_id=staff_a)
-                await s.rollback()
-            assert ei.value.status_code == 409
-        finally:
-            await _pg_cleanup(factory, [dk], [task_id], [staff_a, staff_b], [pv_id] if pv_id else [])
+        # 版本变化：外部 bump lock_version 后 apply（正确 payload）→ 409
+        async with factory() as s:
+            await s.execute(sa.text("UPDATE procedure_row_tasks SET lock_version=lock_version+1 WHERE id=:id"), {"id": task_id})
+            await s.commit()
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="ver-1", selector=selector, assignee_staff_id=staff_a)
+            await s.rollback()
+        assert ei.value.status_code == 409
 
-    async def test_batch_atomic_conflict_zero_write_and_owner_isolation(self, pg_engine):
+    async def test_batch_atomic_conflict_zero_write_and_owner_isolation(self, pg_factory):
         """P14：默认原子——任一冲突全批零写；委派不改 WorkingPaper.assigned_to。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -670,8 +675,8 @@ class TestPgDelegation:
         dk1 = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         dk2 = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         rev = "c" * 64
-        staff_a = await _insert_staff(factory, user_id, "批量甲")
-        staff_b = await _insert_staff(factory, user_id, "批量乙")
+        staff_a = await _insert_staff(factory, user_id, "批量甲", project_id, cycle)
+        staff_b = await _insert_staff(factory, user_id, "批量乙", project_id, cycle)
         await _pg_insert_definition(factory, tmpl, tmpl, dk1, rev)
         await _pg_insert_definition(factory, tmpl, tmpl, dk2, rev)
         t1 = await _pg_insert_task(factory, project_id, wp_index_id, wp_code, tmpl, dk1, rev, cycle)
@@ -686,36 +691,33 @@ class TestPgDelegation:
             ).scalar()
         selector = {"kind": "row", "task_ids": [str(t1), str(t2)]}
         pv_id = None
-        try:
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_b)
-                await s.commit()
-            pv_id = uuid.UUID(pv["preview_id"])
-            assert pv["summary"]["conflict"] == 1
-            # 默认原子：t2 冲突 → 整批 409 零写
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="batch-1", selector=selector, assignee_staff_id=staff_b)
-                await s.rollback()
-            assert ei.value.status_code == 409
-            # t1 未被分配（零写）
-            r1 = await _pg_task_row(factory, t1)
-            assert r1[0] == "unassigned" and r1[1] is None
-            assert await _pg_history_count(factory, t1) == 0
-            # owner 隔离：WorkingPaper.assigned_to 未变
-            async with factory() as s:
-                wp_assignee_after = (
-                    await s.execute(sa.text("SELECT assigned_to FROM working_paper WHERE id=:id"), {"id": wp_id})
-                ).scalar()
-            assert wp_assignee_after == wp_assignee_before
-        finally:
-            await _pg_cleanup(factory, [dk1, dk2], [t1, t2], [staff_a, staff_b], [pv_id] if pv_id else [])
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            pv = await svc.preview(project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_b)
+            await s.commit()
+        pv_id = uuid.UUID(pv["preview_id"])
+        assert pv["summary"]["conflict"] == 1
+        # 默认原子：t2 冲突 → 整批 409 零写
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply(project_id, actor_user_id=user_id, preview_id=pv_id, request_id="batch-1", selector=selector, assignee_staff_id=staff_b)
+            await s.rollback()
+        assert ei.value.status_code == 409
+        # t1 未被分配（零写）
+        r1 = await _pg_task_row(factory, t1)
+        assert r1[0] == "unassigned" and r1[1] is None
+        assert await _pg_history_count(factory, t1) == 0
+        # owner 隔离：WorkingPaper.assigned_to 未变
+        async with factory() as s:
+            wp_assignee_after = (
+                await s.execute(sa.text("SELECT assigned_to FROM working_paper WHERE id=:id"), {"id": wp_id})
+            ).scalar()
+        assert wp_assignee_after == wp_assignee_before
 
-    async def test_best_effort_partial_and_shared_batch_id(self, pg_engine):
+    async def test_best_effort_partial_and_shared_batch_id(self, pg_factory):
         """best_effort：冲突不阻断整批；成功任务共享 delegation_batch_id（逐任务 history/outbox）。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -725,8 +727,8 @@ class TestPgDelegation:
         dk1 = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         dk2 = f"{tmpl}::{tmpl}::{uuid.uuid4().hex[:12]}"
         rev = "d" * 64
-        staff_a = await _insert_staff(factory, user_id, "尽力甲")
-        staff_b = await _insert_staff(factory, user_id, "尽力乙")
+        staff_a = await _insert_staff(factory, user_id, "尽力甲", project_id, cycle)
+        staff_b = await _insert_staff(factory, user_id, "尽力乙", project_id, cycle)
         await _pg_insert_definition(factory, tmpl, tmpl, dk1, rev)
         await _pg_insert_definition(factory, tmpl, tmpl, dk2, rev)
         t1 = await _pg_insert_task(factory, project_id, wp_index_id, wp_code, tmpl, dk1, rev, cycle)
@@ -736,36 +738,33 @@ class TestPgDelegation:
         )
         selector = {"kind": "row", "task_ids": [str(t1), str(t2)]}
         pv_id = None
-        try:
-            # replace_with_reason + best_effort：t1 assign、t2 reassign 均成功，共享 batch id
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                pv = await svc.preview(
-                    project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_b,
-                    conflict_policy=CONFLICT_REPLACE, reason="尽力交付批量委派", best_effort=True,
+        # replace_with_reason + best_effort：t1 assign、t2 reassign 均成功，共享 batch id
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            pv = await svc.preview(
+                project_id, actor_user_id=user_id, selector=selector, assignee_staff_id=staff_b,
+                conflict_policy=CONFLICT_REPLACE, reason="尽力交付批量委派", best_effort=True,
+            )
+            await s.commit()
+        pv_id = uuid.UUID(pv["preview_id"])
+        async with factory() as s:
+            svc = ProcedureDelegationService(s)
+            res = await svc.apply(
+                project_id, actor_user_id=user_id, preview_id=pv_id, request_id="be-1",
+                selector=selector, assignee_staff_id=staff_b,
+                conflict_policy=CONFLICT_REPLACE, reason="尽力交付批量委派", best_effort=True,
+            )
+            await s.commit()
+        assert res["applied"] == 2
+        batch_id = res["delegation_batch_id"]
+        # 逐任务 history + outbox 且共享 batch id
+        assert await _pg_history_count(factory, t1) == 1
+        assert await _pg_history_count(factory, t2) == 1
+        async with factory() as s:
+            cnt = (
+                await s.execute(
+                    sa.text("SELECT count(*) FROM task_events WHERE delegation_batch_id=:b"),
+                    {"b": batch_id},
                 )
-                await s.commit()
-            pv_id = uuid.UUID(pv["preview_id"])
-            async with factory() as s:
-                svc = ProcedureDelegationService(s)
-                res = await svc.apply(
-                    project_id, actor_user_id=user_id, preview_id=pv_id, request_id="be-1",
-                    selector=selector, assignee_staff_id=staff_b,
-                    conflict_policy=CONFLICT_REPLACE, reason="尽力交付批量委派", best_effort=True,
-                )
-                await s.commit()
-            assert res["applied"] == 2
-            batch_id = res["delegation_batch_id"]
-            # 逐任务 history + outbox 且共享 batch id
-            assert await _pg_history_count(factory, t1) == 1
-            assert await _pg_history_count(factory, t2) == 1
-            async with factory() as s:
-                cnt = (
-                    await s.execute(
-                        sa.text("SELECT count(*) FROM task_events WHERE delegation_batch_id=:b"),
-                        {"b": batch_id},
-                    )
-                ).scalar()
-            assert cnt == 2
-        finally:
-            await _pg_cleanup(factory, [dk1, dk2], [t1, t2], [staff_a, staff_b], [pv_id] if pv_id else [])
+            ).scalar()
+        assert cnt == 2

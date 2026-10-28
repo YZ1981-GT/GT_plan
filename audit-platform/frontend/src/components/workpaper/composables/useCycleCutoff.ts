@@ -587,10 +587,11 @@ export function useCycleCutoff(params: {
     const daysAfter = criteria.daysAfter || defaultDays
     // year 从截止日推导，回退项目年度；截止方向（forward/backward）由客户端分段处理，
     // 后端只需返回窗口内凭证，故不再传 direction。
-    const yr =
-      Number(String(criteria.cutoffDate || '').slice(0, 4)) ||
-      Number(_resolveYear()) ||
-      new Date().getFullYear()
+    const yr = Number(String(criteria.cutoffDate || '').slice(0, 4)) || Number(_resolveYear()) || null
+    if (yr == null) {
+      ElMessage.warning('未设置审计年度，无法自动提取样本')
+      return
+    }
 
     try {
       // 真实端点：POST /sampling/cutoff-test（提取期末±N天序时账交易）。

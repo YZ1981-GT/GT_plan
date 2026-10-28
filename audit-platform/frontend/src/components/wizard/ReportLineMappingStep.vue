@@ -430,6 +430,11 @@ async function handleReferenceCopy() {
       { source_company_code: sourceCompanyCode.value },
     )
     const result = data
+    if (result?.source_found === false) {
+      // 只在你能查看的项目里按客户名称找来源（原先找不到时会随便拿一个其他项目来复制）
+      ElMessage.warning(`没有找到客户名称为「${sourceCompanyCode.value}」的可参照项目`)
+      return
+    }
     ElMessage.success(`已复制 ${result.copied_count} 条映射`)
     if (result.unmatched_accounts?.length > 0) {
       ElMessage.warning(`${result.unmatched_accounts.length} 个科目未匹配: ${result.unmatched_accounts.join(', ')}`)

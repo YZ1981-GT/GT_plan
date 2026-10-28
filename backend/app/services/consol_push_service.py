@@ -322,8 +322,31 @@ async def refresh_notes_exclusive(
         return await _refresh_notes(db, project_id, year, context=context, tree=tree)
 
 
+async def _record_tree_version(
+    db: AsyncSession, project_id: UUID, user_id: UUID | None, name: str, warnings: list[str],
+) -> str:
+    """推送前自动记录企业树版本（spec consol-autotree-linkage-closure R1.2）；返回步骤明细前缀。
+
+    放在 SAVEPOINT 里：记录失败只回滚这一步、写进警告，不挡住合并数重算（版本是溯源信息，不是计算前提）。
+    """
+    from app.services.consol_scope_confirmation_service import record_scope_version
+
+    try:
+        async with db.begin_nested():
+            info = await record_scope_version(db, project_id, recorded_by=user_id, mode="auto")
+    except Exception as exc:  # noqa: BLE001 —— 失败留痕，不阻断推送
+        logger.warning("合并推送记录树版本失败：项目=%s：%s", project_id, exc)
+        warnings.append(f"「{name}」企业树版本记录失败：{exc}")
+        return ""
+    if info.get("skipped") == "locked":
+        return f"树版本第 {info.get('revision', 0)} 版（合并已锁定，不记录新版本）；"
+    if not info.get("revision"):
+        return ""
+    return f"树版本第 {info['revision']} 版{'（本次自动记录）' if info.get('created') else ''}；"
+
+
 async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str],
-                    *, context=None, tree=None) -> bool:
+                    *, context=None, tree=None, user_id: UUID | None = None) -> bool:
     """推送一个合并项目的四步；返回是否全部成功。每步独立事务，失败回滚该步并留痕。"""
     from app.services.consol_report_service import ConsolReportService
     from app.services.consol_trial_service import recalculate_trial
@@ -338,11 +361,12 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         })
 
     async def worksheet() -> str:
+        version = await _record_tree_version(db, project_id, user_id, name, warnings)
         result = await recalc_full(db, project_id, year)
         orphans = result.get("orphan_entries") or []
         if orphans:
             warnings.append(f"「{name}」有 {len(orphans)} 笔已审批分录找不到归属节点，未计入合并")
-        return f"节点 {result.get('node_count', 0)} 个，科目 {result.get('account_count', 0)} 个"
+        return f"{version}节点 {result.get('node_count', 0)} 个，科目 {result.get('account_count', 0)} 个"
 
     async def trial() -> str:
         return f"试算 {len(await recalculate_trial(db, project_id, year))} 行"
@@ -482,7 +506,7 @@ async def push(
 
             if not await _push_one(
                 db, target, year, steps, warnings,
-                context=target_context, tree=target_tree,
+                context=target_context, tree=target_tree, user_id=user_id,
             ):
                 failed_projects += 1
             # 报表已写入（哪怕附注标记失败）⇒ 该项目的页面需要刷新

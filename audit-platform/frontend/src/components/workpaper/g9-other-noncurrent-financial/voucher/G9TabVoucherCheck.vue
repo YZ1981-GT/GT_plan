@@ -603,6 +603,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, h, ref, watch, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
 import type { Column } from 'element-plus'
@@ -677,7 +678,7 @@ const showSampling = ref(false)
 const showReview = ref(false)
 const reviewRows = ref<PostFillReviewRow[]>([])
 const reviewSection = ref<'voucher-review' | 'cutoff-review'>('voucher-review')
-const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
+const engineYear = computed<number | null>(() => props.year ?? null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -795,6 +796,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (engineYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

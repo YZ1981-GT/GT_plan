@@ -37,6 +37,7 @@ from app.services.consol_calc_basis import (
     ZERO,
     CalcBasis,
     load_calc_basis,
+    load_calc_basis_pair,
     node_measures,
     records_from_entries,
     load_tree_entries,
@@ -108,29 +109,68 @@ def _row_meta(row: ReportRow) -> dict:
 # ─────────────────────────────── 试算平衡表页 ───────────────────────────────
 
 
+MEASURE_WITH_DRAFTS = "consolidated_with_drafts"
+_BALANCE_TOLERANCE = Decimal("0.01")
+
+
+def account_balance(basis: CalcBasis, amounts: Mapping[str, Decimal]) -> dict:
+    """科目金额按自然方向分借方性质 / 贷方性质求和判平衡（R8.5；与 ``account_sign`` 同源）。"""
+    debit = credit = ZERO
+    for account, amount in amounts.items():
+        if basis.signs.get(account, ONE) < ZERO:
+            credit += amount
+        else:
+            debit += amount
+    diff = to_cents(debit - credit)
+    return {"debit_total": str(to_cents(debit)), "credit_total": str(to_cents(credit)),
+            "difference": str(diff), "balanced": abs(diff) < _BALANCE_TOLERANCE}
+
+
 async def trial_view(
     basis: CalcBasis, rows: list[ReportRow], *, report_type: str, node_key: str | None = None,
+    draft_basis: CalcBasis | None = None,
 ) -> dict:
-    """某节点按报表行次的五列净额（design §五）。全部报表类型一起求值（跨表 ROW），只返回所请求的类型。"""
+    """某节点按报表行次的五列净额（design §五）。全部报表类型一起求值（跨表 ROW），只返回所请求的类型。
+
+    ``node_kind / node_role`` 供前端按节点类型说明列口径；``balance`` = 该节点合并数按科目自然方向的
+    借贷平衡检查；给了 ``draft_basis`` 时每行加「含草稿预览」列（已审批 + 草稿 + 待审批分录的合并数），
+    ``draft_pending_entries`` = 本节点子树内计入预览的未审批分录笔数。
+    """
     node = find_node(basis.tree, node_key)
     measures = node_measures(basis)[node.node_key]
     report = await node_report(rows, measures, categories=basis.categories)
+    drafts: dict[str, RowValue] | None = None
+    pending = 0
+    if draft_basis is not None:
+        draft_ms = node_measures(draft_basis).get(node.node_key, {})
+        drafts = await report_values(rows, draft_ms.get(MEASURE_CONSOLIDATED, {}), categories=draft_basis.categories)
+        elims = {n.node_key for n in iter_nodes(node) if n.kind == KIND_ELIM}
+        pending = sum(1 for eid, key in draft_basis.attributed.items() if key in elims and eid not in basis.attributed)
     out_rows = []
     for row in _rows_of_type(rows, report_type):
         cells = {m: report[m][row.row_code] for m, _label in TRIAL_COLUMNS}
         reasons = list(dict.fromkeys(v.reason for v in cells.values() if v.reason))
+        extra = {MEASURE_WITH_DRAFTS: _amount(drafts[row.row_code])} if drafts is not None else {}
         out_rows.append({
             **_row_meta(row),
             **{m: _amount(v) for m, v in cells.items()},
+            **extra,
             "linear": cells[MEASURE_CONSOLIDATED].linear,
             "note": "；".join(reasons) or None,
         })
+    columns = [{"key": m, "label": label} for m, label in TRIAL_COLUMNS]
+    if drafts is not None:
+        columns.append({"key": MEASURE_WITH_DRAFTS, "label": "含草稿预览"})
     return {
         "node_key": node.node_key,
         "node_label": node.display_name or node.company_name,
+        "node_kind": node.kind,
+        "node_role": node.role,
         "report_type": report_type,
-        "columns": [{"key": m, "label": label} for m, label in TRIAL_COLUMNS],
+        "columns": columns,
         "rows": out_rows,
+        "balance": account_balance(basis, measures.get(MEASURE_CONSOLIDATED, {})),
+        "draft_pending_entries": pending if draft_basis is not None else None,
     }
 
 
@@ -246,6 +286,8 @@ def entry_drill_rows(
     """
     if measure not in DRILL_MEASURES:
         raise ViewError(f"度量 {measure} 不能穿透到分录（个别数请看各数据节点）", status=400)
+    from app.services.consol_elimination_sheet_service import ENTRY_TYPE_LABELS
+
     node = find_node(basis.tree, node_key)
     by_code = {r.row_code: r for r in rows}
     if row_code not in by_code:
@@ -254,6 +296,8 @@ def entry_drill_rows(
     terms_by_row = row_account_terms(rows)
     terms = terms_by_row.get(row_code)
     labels = {n.node_key: n.display_name or n.company_name for n in iter_nodes(basis.tree)}
+    entries = list(entries)
+    descriptions = {e.id: getattr(e, "description", None) for e in entries}
     records, _invalid = records_from_entries(entries)
     lines: list[DrillLine] = []
     for entry in sorted(records, key=lambda e: (e.entry_no, str(e.id))):
@@ -289,6 +333,8 @@ def entry_drill_rows(
                 "entry_id": str(ln.entry_id),
                 "entry_no": ln.entry_no,
                 "entry_type": ln.entry_type,
+                "entry_type_label": ENTRY_TYPE_LABELS.get(ln.entry_type, ln.entry_type),
+                "description": descriptions.get(ln.entry_id),
                 "node_key": ln.node_key,
                 "node_label": labels.get(ln.node_key, ln.node_key),
                 "account_code": ln.account_code,
@@ -305,16 +351,22 @@ def entry_drill_rows(
 def individual_drill_rows(
     basis: CalcBasis, rows: list[ReportRow], values_by_leaf: Mapping[str, RowValue], *, row_code: str,
 ) -> list[dict]:
-    """审定汇总列穿透：各数据叶子对该行的求值（``values_by_leaf`` 由调用方按叶子求好）。"""
+    """审定汇总列穿透：各数据叶子对该行的求值（``values_by_leaf`` 由调用方按叶子求好）。
+
+    ``parent_label`` = 该叶子在企业树上的直接上级（汇总节点）名称，供明细标明所属。
+    """
     labels = {n.node_key: (n.display_name or n.company_name, n.project_id) for n in iter_nodes(basis.tree)}
+    parent_of = {c.node_key: n for n in iter_nodes(basis.tree) for c in n.children}
     out = []
     for key, value in values_by_leaf.items():
         label, project_id = labels.get(key, (key, None))
         if value.amount is None and value.reason is None:
             continue
+        parent = parent_of.get(key)
         out.append({
             "node_key": key,
             "node_label": label,
+            "parent_label": (parent.display_name or parent.company_name) if parent else None,
             "project_id": str(project_id) if project_id else None,
             "amount": _amount(value),
             "reason": value.reason,
@@ -331,6 +383,8 @@ class ViewContext:
     rows: list[ReportRow]
     standard: str
     year: int
+    # 「含草稿预览」口径（已审批 + 草稿 + 待审批，不含已驳回；同一树与试算表）；只在 include_drafts 时装载
+    draft_basis: CalcBasis | None = None
 
 
 async def load_view_context(
@@ -340,11 +394,13 @@ async def load_view_context(
     *,
     context: "ConsolContext | None" = None,
     tree: TreeNode | None = None,
+    include_drafts: bool = False,
 ) -> ViewContext | None:
     """合并项目的计算口径 + 报表配置（按项目口径）；项目不存在或不是合并项目返回 None。
 
     级联/批量入口传入 ``tree`` 时直接复用该树，避免同一轮计算重新推导企业范围。
     ``context`` 只负责身份边界校验，``ViewContext`` 继续承载计算 basis、报表行、准则和年度。
+    ``include_drafts`` ⇒ 另装载 ``draft_basis``（只供试算页「含草稿预览」列与分录汇总表；合并数仍只认已审批）。
     """
     from app.services.consol_context_service import validate_context
     from app.services.consol_group_tree import ROLE_CONSOL, build_group_tree
@@ -364,7 +420,11 @@ async def load_view_context(
     if resolved_year is None:
         return None
     validate_context(context, project_id, resolved_year, tree=resolved_tree)
-    basis = await load_calc_basis(db, project_id, resolved_year, tree=resolved_tree)
+    draft_basis = None
+    if include_drafts:
+        basis, draft_basis = await load_calc_basis_pair(db, project_id, resolved_year, tree=resolved_tree)
+    else:
+        basis = await load_calc_basis(db, project_id, resolved_year, tree=resolved_tree)
     if basis is None:
         return None
     standard = await resolve_consol_standard(db, project_id)
@@ -373,14 +433,62 @@ async def load_view_context(
         rows=await load_report_rows(db, standard),
         standard=standard,
         year=resolved_year,
+        draft_basis=draft_basis,
     )
+
+
+async def prior_node_values(
+    db: AsyncSession, project_id: UUID, year: int, node_key: str, report_type: str,
+    *, standard: str | None = None,
+) -> tuple[dict[str, RowValue] | None, str | None]:
+    """合并报表「上期」：上年同企业合并项目同一节点的合并数（spec consol-autotree-linkage-closure R8.1）。
+
+    上年项目与报表上期、PREV 共用 ``prior_year_context.find_prior_project``（同企业代码、审计年度 − 1、
+    同为合并口径，唯一才认）。取不到返回 ``(None, 原因)``，调用方留空并把原因给用户，不代入 0。
+    ``standard`` 是本年报表口径：上年口径不同则行次对不上，留空并说明（不按行次硬套）。
+    🔴 旧实现拿本项目算 ``year − 1``：本项目的企业树是本年度的，年度边界拒绝后被吞 ⇒ 上期恒空。
+    """
+    from fastapi import HTTPException
+
+    from app.services.prior_year_context import find_prior_project
+
+    found = await find_prior_project(db, project_id, year)
+    if found.project_id is None:
+        return None, f"合并上期留空：{found.reason}"
+    try:
+        prior_ctx = await load_view_context(db, found.project_id, year - 1)
+    except HTTPException as exc:
+        detail = exc.detail.get("message") if isinstance(exc.detail, dict) else exc.detail
+        return None, f"合并上期留空：上年合并项目无法计算（{detail}）"
+    if prior_ctx is None:
+        return None, "合并上期留空：上年项目不是合并项目，或无法确定其审计年度"
+    if standard is not None and prior_ctx.standard != standard:
+        return None, f"合并上期留空：上年合并项目报表口径（{prior_ctx.standard}）与本年（{standard}）不同"
+    node_ms = node_measures(prior_ctx.basis).get(node_key)
+    if node_ms is None:
+        return None, f"合并上期留空：上年企业树没有节点「{node_key}」"
+    prior_rows = _rows_of_type(prior_ctx.rows, report_type)
+    if not prior_rows:
+        return None, "合并上期留空：上年合并项目没有该报表的配置行"
+    values = await report_values(
+        prior_rows, node_ms.get(MEASURE_CONSOLIDATED, {}),
+        categories=prior_ctx.basis.categories, require_linear=False,
+    )
+    return values, None
 
 
 async def load_entry_drill(
     db: AsyncSession, ctx: ViewContext, *, row_code: str, measure: str, node_key: str | None,
 ) -> dict:
+    """分录穿透；合并审定数列另给完整构成（R10.3）：``individual_total``（审定汇总）+ 分录贡献 = ``consolidated_total``。"""
     entries = await load_tree_entries(db, ctx.basis.tree, ctx.year)
-    return entry_drill_rows(ctx.basis, entries, ctx.rows, row_code=row_code, measure=measure, node_key=node_key)
+    result = entry_drill_rows(ctx.basis, entries, ctx.rows, row_code=row_code, measure=measure, node_key=node_key)
+    if measure == MEASURE_CONSOLIDATED:
+        node = find_node(ctx.basis.tree, node_key)
+        report = await node_report(ctx.rows, node_measures(ctx.basis)[node.node_key], categories=ctx.basis.categories)
+        result["individual_total"] = _amount(report[MEASURE_INDIVIDUAL][row_code])
+        result["consolidated_total"] = _amount(report[MEASURE_CONSOLIDATED][row_code])
+    return result
 
 
 async def load_individual_drill(ctx: ViewContext, *, row_code: str, node_key: str | None) -> list[dict]:

@@ -25,6 +25,7 @@ from app.models.audit_platform_models import (
 from app.models.audit_platform_schemas import EventPayload
 from app.services.dataset_query import get_active_filter
 from app.services.ledger_import.direction_resolver import resolve_account_direction
+from app.services.tb_balance_rollup import leaf_condition, period_movement_query, resolved_standard_code
 
 logger = logging.getLogger(__name__)
 
@@ -85,23 +86,8 @@ class TrialBalanceService:
         # 映射到标准科目，若汇总时父子全加会重复计算（父级被算两遍）→ 试算表翻倍、
         # 资产≠负债+权益。因此只汇总叶子节点（没有被映射子科目的最明细行），
         # 既消除父子双计，又保留二级明细（如坏账准备 1231-01/02/03）的备抵映射。
-        child = bal.alias("tb_child")
-        leaf_cond = ~sa.exists(
-            sa.select(sa.literal(1))
-            .select_from(child)
-            .where(
-                child.c.project_id == bal.c.project_id,
-                child.c.year == bal.c.year,
-                child.c.is_deleted == sa.false(),
-                child.c.account_code != bal.c.account_code,
-                child.c.account_code.like(bal.c.account_code.concat(".%")),
-                # 子级须与父级同数据集才算其子科目（active dataset 已由 balance_filter 锁定 bal）
-                sa.or_(
-                    child.c.dataset_id == bal.c.dataset_id,
-                    sa.and_(child.c.dataset_id.is_(None), bal.c.dataset_id.is_(None)),
-                ),
-            )
-        )
+        # 与试算表端点的本期发生额同一构件（tb_balance_rollup）。
+        leaf_cond = leaf_condition(bal)
 
         # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
         # 🔴 方向符号修复：tb_balance.closing_balance/opening_balance 在部分账套里存的是
@@ -130,24 +116,8 @@ class TrialBalanceService:
         #    修复：按「最长前缀匹配」解析每个叶子的标准码——叶子自身有映射用自身，否则回退到
         #    最近的已映射祖先（1651.02 → 祖先 1651 → 1641）。账户层级下子科目天然属于父科目
         #    同一标准科目，此继承会计正确；无任何已映射祖先的叶子仍返回 NULL（保持原丢弃行为）。
-        mp_anc = AccountMapping.__table__.alias("mp_anc")
-
         def _resolved_std_subq():
-            return (
-                sa.select(mp_anc.c.standard_account_code)
-                .where(
-                    mp_anc.c.project_id == bal.c.project_id,
-                    mp_anc.c.is_deleted == sa.false(),
-                    sa.or_(
-                        bal.c.account_code == mp_anc.c.original_account_code,
-                        bal.c.account_code.like(mp_anc.c.original_account_code.concat(".%")),
-                    ),
-                )
-                .order_by(sa.func.length(mp_anc.c.original_account_code).desc())
-                .limit(1)
-                .correlate(bal)
-                .scalar_subquery()
-            )
+            return resolved_standard_code(bal)
 
         agg_sub = (
             sa.select(
@@ -176,32 +146,9 @@ class TrialBalanceService:
         result = await self.db.execute(agg_q)
         agg_rows = {r.standard_account_code: r for r in result.fetchall()}
 
-        # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
+        # 1b. 损益类科目额外汇总本期发生额（借 / 贷两侧，叶子 + 最长前缀映射）
         # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
-        # 同样只取叶子节点，避免父子科目发生额重复累加。
-        period_sub = (
-            sa.select(
-                _resolved_std_subq().label("std"),
-                bal.c.debit_amount.label("dr"),
-                bal.c.credit_amount.label("cr"),
-            )
-            .select_from(bal)
-            .where(balance_filter)
-            .where(leaf_cond)
-        ).subquery("period_sub")
-
-        period_agg_q = (
-            sa.select(
-                period_sub.c.std.label("standard_account_code"),
-                sa.func.coalesce(sa.func.sum(period_sub.c.dr), 0).label("total_debit"),
-                sa.func.coalesce(sa.func.sum(period_sub.c.cr), 0).label("total_credit"),
-            )
-            .where(period_sub.c.std.isnot(None))
-            .group_by(period_sub.c.std)
-        )
-        if account_codes:
-            period_agg_q = period_agg_q.where(period_sub.c.std.in_(account_codes))
-
+        period_agg_q = period_movement_query(bal, balance_filter, account_codes)
         period_result = await self.db.execute(period_agg_q)
         period_rows = {r.standard_account_code: r for r in period_result.fetchall()}
 
@@ -595,19 +542,12 @@ class TrialBalanceService:
         rc = ReportConfig.__table__
 
         # 1. 从 report_config 加载标准行次模板（所有企业共用）
-        # 确定 applicable_standard（从项目配置推断）
-        from app.models.core import Project
-        proj_result = await self.db.execute(
-            sa.select(Project).where(Project.id == project_id)
-        )
-        proj = proj_result.scalar_one_or_none()
-        template_type = 'soe'
-        report_scope = 'standalone'
-        if proj and proj.wizard_state:
-            basic = (proj.wizard_state or {}).get('basic_info', {}).get('data', {})
-            template_type = basic.get('template_type', 'soe')
-            report_scope = basic.get('report_scope', 'standalone')
-        applicable_standard = f"{template_type}_{report_scope}"
+        # 报表标准与报表页同一个解析（项目两列 template_type + report_scope）。原先读向导
+        # wizard_state["basic_info"]["data"]：向导确认前那里不存在，上市 / 合并项目的汇总一直按国企单户的行次出
+        # （spec consol-autotree-residual-closure R6）。
+        from app.services.report_config_service import ReportConfigService
+
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
 
         rc_q = (
             sa.select(

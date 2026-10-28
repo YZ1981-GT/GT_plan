@@ -62,6 +62,7 @@ function makeCtx(): EditorCyclesContext {
     sheetNavActiveId: computed(() => 'sheet-1'),
     sheetNavFacade: { __tag: 'sheetNavFacade' } as any,
     cycleType: { __tag: 'cycleType' } as any,
+    projectYear: computed(() => 2025),
   }
 }
 
@@ -122,7 +123,7 @@ describe('useEditorCycles — 调用签名', () => {
     )
   })
 
-  it('fCycle 收到 (wpDetail, projectId, wpId, sheetNavFacade, cycleDialogs) — 末位为 cycleDialogs', () => {
+  it('fCycle 收到 (wpDetail, projectId, wpId, sheetNavFacade, cycleDialogs, projectYear) — 项目年度给计价抽样用', () => {
     const ctx = makeCtx()
     useEditorCycles(ctx)
 
@@ -132,6 +133,7 @@ describe('useEditorCycles — 调用签名', () => {
       ctx.wpId,
       ctx.sheetNavFacade,
       cycleDialogsStub,
+      ctx.projectYear,
     )
   })
 

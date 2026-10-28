@@ -18,6 +18,7 @@ import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } fro
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { parseNum, calcChangeRate, calcSubtotal } from './useD1FormulaEngine'
+import type { TemplateChangeRate } from './templateChangeRate'
 import {
   D1_ADJ_CONCLUSION_KEY,
   D1_ADJ_NOTE_KEY,
@@ -58,7 +59,7 @@ export interface AdjudicationDetailRow {
   currentRje: number
   currentAudited: number
   change: number
-  changeRate: number | ''
+  changeRate: TemplateChangeRate
   reasonAnalysis: string
   isFromCrossSheet: boolean
   isEditable: boolean
@@ -382,6 +383,7 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     if (!netSection) return ''
     const rate = netSection.subtotalRow.changeRate
     if (rate === '' || rate === 0) return '公司应收票据期末净值较期初净值无变动。'
+    if (rate === 'N/A') return '公司应收票据期初净值为 0，期末净值为负数，变动率无法计算。'
     const direction = rate > 0 ? '增加' : '减少'
     const pct = (Math.abs(rate) * 100).toFixed(2)
     return `公司应收票据期末净值较期初净值${direction}：${pct}%`

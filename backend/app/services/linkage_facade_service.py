@@ -147,7 +147,7 @@ class LinkageFacadeService:
         """试算表 → 底稿/调整分录联动。"""
         contracts: list[dict[str, Any]] = []
         pid = str(project_id)
-        yr = year or 2025
+        yr = year
 
         # 查关联底稿
         try:
@@ -208,7 +208,7 @@ class LinkageFacadeService:
         """底稿 → 附注联动。"""
         contracts: list[dict[str, Any]] = []
         pid = str(project_id)
-        yr = year or 2025
+        yr = year
 
         # 通过 wp_note_linkage 查附注数据
         try:
@@ -303,7 +303,7 @@ class LinkageFacadeService:
         """报表行 → 试算表/底稿。"""
         contracts: list[dict[str, Any]] = []
         pid = str(project_id)
-        yr = year or 2025
+        yr = year
 
         try:
             impact = await self._linkage_svc.get_impact_preview(
@@ -354,7 +354,7 @@ class LinkageFacadeService:
 
         contracts: list[dict[str, Any]] = []
         pid = str(project_id)
-        yr = year or 2025
+        yr = year
 
         # 1. 拆解 source_id → word_export_task_id + section_code
         parts = source_id.split(":", 1)

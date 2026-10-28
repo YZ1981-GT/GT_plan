@@ -319,6 +319,15 @@ describe('getObligationYearKeys', () => {
   })
 })
 
+// post-push-residual-defect-closure R2：项目没填审计年度（null）不派生年度列、不按 2025 兜底
+describe('（6）剩余履约义务：审计年度未知', () => {
+  it('年度 key 为空，列只剩标签列与合计列，合计为 null', () => {
+    expect(getObligationYearKeys(null)).toEqual([])
+    expect(buildD4ObligationColumns(null).map((c) => c.key)).toEqual(['label', 'total'])
+    expect(deriveObligationTotal({ year_2026: 500, year_2027: 300 }, null)).toBeNull()
+  })
+})
+
 describe('deriveObligationTotal', () => {
   it('两年度列之和', () => {
     expect(deriveObligationTotal({ year_2026: 500, year_2027: 300 }, 2025)).toBe(800)

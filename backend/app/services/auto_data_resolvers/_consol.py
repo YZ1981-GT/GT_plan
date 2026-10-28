@@ -13,17 +13,13 @@ from app.services.auto_data_resolvers import auto_resolver
 async def _resolve_consol_scope(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """合并范围纳入子公司数量统计。
 
-    数据来源: consol_scope 表（is_included=true）
+    数据来源: 合并企业树里的子公司类企业（与合并计算同一棵树）。原先数合并范围表（真库 0 行）⇒
+    程序表「确定合并范围」恒「待确定」（spec consol-autotree-residual-closure R5.1）。
     返回结构: {"summary": str}
     """
-    from app.models.consolidation_models import ConsolScope
-    stmt = sa.select(sa.func.count()).select_from(ConsolScope).where(
-        ConsolScope.project_id == project_id,
-        ConsolScope.is_included == sa.true(),
-        ConsolScope.is_deleted == sa.false(),
-    )
-    r = await db.execute(stmt)
-    count = r.scalar() or 0
+    from app.services.consol_scope_members import tree_subsidiaries
+
+    count = len(await tree_subsidiaries(db, project_id))
     return {"summary": f"已纳入{count}家子公司" if count else "待确定"}
 
 

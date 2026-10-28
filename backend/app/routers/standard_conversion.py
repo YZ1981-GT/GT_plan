@@ -7,7 +7,7 @@ Requirements: 5.1, 5.2, 5.3
 Spec: multi-standard-unification
 
 设计要点：
-- 两个端点均需认证（``get_current_user``），不创建未认证端点。
+- 两个端点均需本项目成员权限（预览 readonly、执行 edit；原先只校验登录，任何人可切换任何项目）。
 - 预览端点完全只读：读当前准则 + 调 ``preview_conversion``（不写库），
   天然满足"用户取消则无变更"（需求 5.3）。
 - 执行端点的关键顺序（见下方 convert 实现）：先 ``convert_workpapers``
@@ -24,8 +24,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
+from app.services.procedure_scope_retention import TrimScopeUnavailable
 from app.services.standard_unification_service import StandardUnificationService
 from app.services.wp_standard_conversion_service import (
     WorkpaperConversionPreconditionError,
@@ -54,7 +55,7 @@ async def preview_standard_conversion(
     project_id: UUID,
     body: StandardConversionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """准则切换影响预览（只读，需求 5.1/5.3）。
 
@@ -140,7 +141,7 @@ async def convert_standard(
     project_id: UUID,
     body: StandardConversionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """执行准则切换（用户确认后执行，需求 5.2）。
 
@@ -193,6 +194,9 @@ async def convert_standard(
     except WorkpaperConversionPreconditionError as exc:
         # 前置条件不满足（未保存底稿 / 归档 / 进行中任务）→ 422
         raise HTTPException(status_code=422, detail=str(exc))
+    except TrimScopeUnavailable as exc:
+        # 读不到程序裁剪结果 → 不切换（否则被裁掉的目标独有底稿会被建出来）
+        raise HTTPException(status_code=503, detail=exc.http_detail())
     except ValueError as exc:
         # 其他业务异常（如项目不存在）→ 422
         raise HTTPException(status_code=422, detail=str(exc))

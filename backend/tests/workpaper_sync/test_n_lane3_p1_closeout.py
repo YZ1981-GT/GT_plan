@@ -29,7 +29,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -258,7 +258,8 @@ class TestLane3DeliveryChecklist:
         src = (WP_COMPONENTS / "GtN5IncomeTaxExpense.vue").read_text("utf-8", errors="replace")
         assert "<template>" in src
         assert "defineProps" in src
-        assert "onlyoffice/health" in src
+        # 健康探针已收敛到统一能力层（宿主里不再有端点字面量）
+        assert "fetchOnlyOfficeHealthy" in src
 
     def test_n2_host_intact(self):
         src = (WP_COMPONENTS / "GtN2TaxesPayable.vue").read_text("utf-8", errors="replace")

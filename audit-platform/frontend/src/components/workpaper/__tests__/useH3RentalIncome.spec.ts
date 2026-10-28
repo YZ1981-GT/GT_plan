@@ -46,6 +46,29 @@ describe('H3-14 recalcRentalRow：应计③=①×②，差异⑤=③−④', () 
     expect(row.monthlyRent).toBe(10_000) // 24个月
     expect(row.expectedRent).toBe(120_000)
   })
+
+  it('没有审计年度：只跳过「本年月份」推算，其余公式列照常重算（不按今年猜）', () => {
+    const row = createEmptyRentalRow({
+      leaseStart: '2024-01-01',
+      leaseEnd: '2025-12-31',
+      contractAmount: 240_000,
+      monthsThisYear: 0,
+      monthlyRent: 0,
+      bookedRent: 5_000,
+      futureY1: 100,
+    })
+    row.futureY2 = 200
+    recalcRentalRow(row, { fillMonthsIfEmpty: true })
+    expect(row.monthsThisYear).toBe(0)
+    expect(row.monthlyRent).toBe(10_000)
+    expect(row.annualRent).toBe(120_000)
+    expect(row.incomeDiff).toBe(-5_000)
+    expect(row.futureTotal).toBe(300)
+    // 有审计年度时照常推算本年月份
+    recalcRentalRow(row, { fillMonthsIfEmpty: true, fiscalYear: 2025 })
+    expect(row.monthsThisYear).toBe(12)
+    expect(row.expectedRent).toBe(120_000)
+  })
 })
 
 describe('H3-14 calcMonthsInFiscalYear', () => {
@@ -77,13 +100,18 @@ describe('H3-14 buildRentalDisplayRows', () => {
   })
 })
 
-describe('H3-14 parseTb6051Amount', () => {
-  it('贷方-借方 = 收入发生额', () => {
-    expect(parseTb6051Amount({ credit_amount: 500_000, debit_amount: 20_000 })).toBe(480_000)
+describe('H3-14 parseTb6051Amount（试算表行：损益类金额即本期单边发生额）', () => {
+  it('没有审定数取未审数（收入即贷方发生额）', () => {
+    expect(parseTb6051Amount({ audited_amount: null, unadjusted_amount: '480000' })).toBe(480_000)
   })
 
   it('优先取 audited_amount', () => {
-    expect(parseTb6051Amount({ audited_amount: 123_456, credit_amount: 1 })).toBe(123_456)
+    expect(parseTb6051Amount({ audited_amount: '123456', unadjusted_amount: '1' })).toBe(123_456)
+  })
+
+  it('没有行 / 金额都为空 ⇒ 0（调用方按「有没有行」区分待取数）', () => {
+    expect(parseTb6051Amount(null)).toBe(0)
+    expect(parseTb6051Amount({ audited_amount: null, unadjusted_amount: null })).toBe(0)
   })
 })
 

@@ -87,7 +87,7 @@ WP_CODES: Final[frozenset[str]] = frozenset({"D6C"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D6 合同资产.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c"
+    "a349f632451064feb1f573d0e867a4b4b66c6369846766458462a34f25f3d4f5"
 )
 MANAGED_SHEET: Final[str] = "明细表D6-2"
 TEMPLATE_ID: Final[str] = "D62"
@@ -336,7 +336,7 @@ _HTML_STORE_NOTE: Final[str] = (
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 逐 sheet 直读净化后权威模板 D/D6 合同资产.xlsx（外链净化后 sha256 88125e42），"
+    "openpyxl 逐 sheet 直读净化后权威模板 D/D6 合同资产.xlsx（外链净化、D6-8 公式修正后 sha256 a349f632），"
     "只取受管 sheet 明细表D6-2：两级表头 行 12（组标题）/ 行 13（账龄子标题 1年以下/1～2/２～3/"
     "3年以上），32 列 A-AF，数据区 14-25，J/Q/T 三列逐行公式 =G+H+I / =G+O-P（借方科目）/ "
     "=Q+R+S，A26「合   计」footer（3 半角空格）；20 标量列 + 两个账龄组各 4 段（K-N 期初 / U-X "
@@ -346,7 +346,7 @@ _REVIEWED_BASIS: Final[str] = (
 
 
 def _d567_expansion_sheets() -> list[dict[str, Any]]:
-    """D6 扩容面 sheets（D6-3/D6-5/D6-8 单区 + D6-6/D6-9 双区 + 审定表D6-1）。
+    """D6 扩容面 sheets（D6-5/D6-8 单区 + D6-3/D6-6/D6-9 双区 + 审定表D6-1）。
 
     spec: d567-sync-coverage-via-row-table-engine · Task 9/10/14/15/18
     """

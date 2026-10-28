@@ -129,118 +129,20 @@
     <div class="check-block">
       <h4 class="card-title">(1) 本期增减变动检查</h4>
       <el-button v-if="!isReadonly" size="small" style="margin-bottom:8px" @click="addSample('period')">添加样本</el-button>
-      <el-table :data="periodChangeRows" size="small" border max-height="400">
-        <el-table-column label="客户名称" width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.customerName" size="small" @change="(v: string) => updateCell('period', row.rowId, 'customerName', v)" />
-            <span v-else>{{ row.customerName }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="日期" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.date" size="small" @change="(v: string) => updateCell('period', row.rowId, 'date', v)" />
-            <span v-else>{{ row.date }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证号" width="90">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell('period', row.rowId, 'voucherNo', v)" />
-            <span v-else>{{ row.voucherNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="业务内容" width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small" @change="(v: string) => updateCell('period', row.rowId, 'businessContent', v)" />
-            <span v-else>{{ row.businessContent }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="对方科目" width="110">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.counterAccount" size="small" @change="(v: string) => updateCell('period', row.rowId, 'counterAccount', v)" />
-            <span v-else>{{ row.counterAccount }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="借方金额" width="110" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell('period', row.rowId, 'debitAmount', v ?? 0)" />
-            <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="贷方金额" width="110" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell('period', row.rowId, 'creditAmount', v ?? 0)" />
-            <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="核对" width="70" align="center">
-          <template #default="{ row }">
-            <el-checkbox :model-value="row.checkItems[0]" :disabled="isReadonly" @change="(v: boolean) => toggleCheck('period', row.rowId, 0, v)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="异常" width="60" align="center">
-          <template #default="{ row }">
-            <el-checkbox :model-value="row.isAbnormal" :disabled="isReadonly" @change="(v: boolean) => updateCell('period', row.rowId, 'isAbnormal', v)" />
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
-          <template #default="{ row }">
-            <el-button type="danger" text size="small" @click="removeSample('period', row.rowId)">删</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <D7VoucherCheckTable :rows="periodChangeRows" block="period" :is-readonly="isReadonly" :project-id="projectId"
+        @update="(rowId: string, field: string, v: unknown) => updateCell('period', rowId, field, v)"
+        @toggle="(rowId: string, idx: number, v: boolean) => toggleCheck('period', rowId, idx, v)"
+        @remove="(rowId: string) => removeSample('period', rowId)" />
     </div>
 
     <!-- (2) 期后结转检查 -->
     <div class="check-block">
       <h4 class="card-title">(2) 期后结转检查</h4>
       <el-button v-if="!isReadonly" size="small" style="margin-bottom:8px" @click="addSample('post')">添加样本</el-button>
-      <el-table :data="postTransferRows" size="small" border max-height="400">
-        <el-table-column label="客户名称" width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.customerName" size="small" @change="(v: string) => updateCell('post', row.rowId, 'customerName', v)" />
-            <span v-else>{{ row.customerName }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="日期" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.date" size="small" @change="(v: string) => updateCell('post', row.rowId, 'date', v)" />
-            <span v-else>{{ row.date }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证号" width="90">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell('post', row.rowId, 'voucherNo', v)" />
-            <span v-else>{{ row.voucherNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="对方科目" width="130">
-          <template #default="{ row }">
-            <span>{{ row.counterAccount }}</span>
-            <GtIndexChip v-if="row.counterAccount && row.counterAccount.includes('主营业务收入')" value="wp:D4" :context-project-id="projectId" style="margin-left:4px" />
-          </template>
-        </el-table-column>
-        <el-table-column label="贷方金额" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell('post', row.rowId, 'creditAmount', v ?? 0)" />
-            <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="核对" width="70" align="center">
-          <template #default="{ row }">
-            <el-checkbox :model-value="row.checkItems[0]" :disabled="isReadonly" @change="(v: boolean) => toggleCheck('post', row.rowId, 0, v)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="异常" width="60" align="center">
-          <template #default="{ row }">
-            <el-checkbox :model-value="row.isAbnormal" :disabled="isReadonly" @change="(v: boolean) => updateCell('post', row.rowId, 'isAbnormal', v)" />
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
-          <template #default="{ row }">
-            <el-button type="danger" text size="small" @click="removeSample('post', row.rowId)">删</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <D7VoucherCheckTable :rows="postTransferRows" block="post" :is-readonly="isReadonly" :project-id="projectId"
+        @update="(rowId: string, field: string, v: unknown) => updateCell('post', rowId, field, v)"
+        @toggle="(rowId: string, idx: number, v: boolean) => toggleCheck('post', rowId, idx, v)"
+        @remove="(rowId: string) => removeSample('post', rowId)" />
     </div>
     </template>
 
@@ -317,7 +219,6 @@
 </template>
 
 <script setup lang="ts">
-import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabVoucherCheck.vue — 凭证检查 D7-7 (~350行)
  * 3区域：抽样参数 + (1)本期增减变动 + (2)期后结转
@@ -334,6 +235,7 @@ import type { ChecklistResponse } from '../composables/useD7FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import D7VoucherCheckTable from './D7VoucherCheckTable.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
@@ -365,7 +267,8 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: any
-  year?: number
+  /** 审计年度；项目没填为 null（父级按项目口径取，不按今年兜底） */
+  year?: number | null
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -408,7 +311,7 @@ const CONCLUSION_TEMPLATES = [
 
 // ─── 抽凭引擎 ──────────────────────────────────────────────────────
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear() - 1)
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 /**
  * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
@@ -429,7 +332,7 @@ const _injectedTbSrc = inject<Ref<any> | null>('tbSourceCodes', null)
 const D7_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D7', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  if (!props.projectId || !props.wpId || samplingYear.value == null) return
   try {
     const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
     attachedCount.value = recs.length
@@ -438,7 +341,10 @@ async function refreshAttachedCount(): Promise<void> {
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  if (props.isReadonly || samplingYear.value == null) {
+    if (samplingYear.value == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

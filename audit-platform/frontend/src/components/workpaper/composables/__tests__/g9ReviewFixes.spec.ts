@@ -6,11 +6,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G9_ADJUDICATION_ITEMS, G9_ACCOUNT_CODE } from '../g9Constants'
+import { G9_ACCOUNT_CODE } from '../g9Constants'
 import { G9_NOTE_SECTION } from '../g9NoteSectionMap'
 import { isG9SheetComplete } from '../g9SheetLabels'
 import { G9_IMPORTABLE_SHEETS } from '../useG9ImportExport'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 
 describe('G9 review fixes', () => {
   it('resolveProcedureSheetKey G9 → g9a', () => {
@@ -23,13 +22,6 @@ describe('G9 review fixes', () => {
     expect(G9_ACCOUNT_CODE).toBe('1519')
     expect(G9_NOTE_SECTION.listed).toBe('五、20')
     expect(G9_NOTE_SECTION.soe).toBe('八、20')
-  })
-
-  it('cycleAdjudicationConfigs G9-1 与 G9_ADJUDICATION_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G9-1']
-    expect(cfg.accountCode).toBe('1519')
-    expect(cfg.rows).toHaveLength(G9_ADJUDICATION_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G9_ADJUDICATION_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG9SheetComplete：G9A 不认 G9-proc-*；空数组不算已编制', () => {

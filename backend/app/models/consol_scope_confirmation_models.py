@@ -16,7 +16,10 @@ from app.models.base import Base
 
 
 class ConsolScopeConfirmation(Base):
-    """合并范围确认版本；当前树变化后旧版本保留为 superseded。"""
+    """合并企业树版本（V183 起名「范围确认」；V206 起推送时自动记录，手动记录仍可）。
+
+    当前树变化后旧版本保留为 superseded。
+    """
 
     __tablename__ = "consol_scope_confirmations"
 
@@ -32,8 +35,13 @@ class ConsolScopeConfirmation(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active", server_default=text("'active'")
     )
-    confirmed_by: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    # V206：自动记录的版本可能没有触发人（系统）⇒ 可空；手动记录（user）仍写记录人
+    confirmed_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    # V206：记录方式 user（手动「记录为新版本」/ 旧确认）/ auto（推送时自动记录）
+    confirmation_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="user", server_default=text("'user'")
     )
     confirmed_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -49,6 +57,7 @@ class ConsolScopeConfirmation(Base):
         CheckConstraint("revision > 0", name="ck_consol_scope_confirmation_revision"),
         CheckConstraint("length(fingerprint) = 64", name="ck_consol_scope_confirmation_fingerprint"),
         CheckConstraint("status IN ('active', 'superseded')", name="ck_consol_scope_confirmation_status"),
+        CheckConstraint("confirmation_mode IN ('user', 'auto')", name="ck_consol_scope_confirmation_mode"),
         sa.UniqueConstraint(
             "project_id", "year", "report_scope", "revision",
             name="uq_consol_scope_confirmation_revision",

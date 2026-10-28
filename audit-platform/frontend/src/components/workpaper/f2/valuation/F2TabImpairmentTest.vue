@@ -472,7 +472,11 @@ const pullPriceLoading = ref(false)
 async function handlePullRecentPrice(): Promise<void> {
   if (props.isReadonly || pullPriceLoading.value) return
   const pid = props.projectId || ''
-  const yr = props.year || new Date().getFullYear() - 1
+  const yr = props.year
+  if (yr == null) {
+    ElMessage.warning('未设置审计年度，无法读取近期售价')
+    return
+  }
   if (!pid) {
     ElMessage.info('无近期售价参考（缺少项目信息）')
     return

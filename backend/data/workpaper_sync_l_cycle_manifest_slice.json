@@ -80,8 +80,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L184",
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L342",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L282",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L467",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -91,7 +91,7 @@
      "L1-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L184）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L342），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L282）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L467），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -460,7 +460,7 @@
    "template_ref": {
     "workbook": "L4 应付债券.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+    "sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd",
     "sheet_count": 16,
     "in_runtime_index": true
    },
@@ -820,7 +820,7 @@
    "template_ref": {
     "workbook": "L7 其他非流动负债.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
+    "sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
     "sheet_count": 8,
     "in_runtime_index": true
    },
@@ -936,7 +936,7 @@
    "template_ref": {
     "workbook": "L8 财务费用.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
+    "sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
     "sheet_count": 10,
     "in_runtime_index": true
    },
@@ -1106,8 +1106,8 @@
    },
    {
     "name": "L4 应付债券.xlsx",
-    "size": 122085,
-    "sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+    "size": 105645,
+    "sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd",
     "sheet_count": 16,
     "sheets": [
      "底稿目录",
@@ -1132,8 +1132,8 @@
    },
    {
     "name": "L5 长期应付款.xlsx",
-    "size": 93254,
-    "sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
+    "size": 67514,
+    "sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
     "sheet_count": 12,
     "sheets": [
      "底稿目录",
@@ -1154,8 +1154,8 @@
    },
    {
     "name": "L6 专项应付款.xlsx",
-    "size": 55523,
-    "sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
+    "size": 37735,
+    "sha256": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
     "sheet_count": 9,
     "sheets": [
      "底稿目录",
@@ -1173,8 +1173,8 @@
    },
    {
     "name": "L7 其他非流动负债.xlsx",
-    "size": 47108,
-    "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
+    "size": 40635,
+    "sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
     "sheet_count": 8,
     "sheets": [
      "底稿目录",
@@ -1191,8 +1191,8 @@
    },
    {
     "name": "L8 财务费用.xlsx",
-    "size": 76069,
-    "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
+    "size": 65929,
+    "sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
     "sheet_count": 10,
     "sheets": [
      "底稿目录",
@@ -2579,7 +2579,7 @@
      "audit-platform/frontend/src/components/workpaper/l3/core/L3TabIndex.vue#L222",
      "audit-platform/frontend/src/components/workpaper/l4/core/L4TabIndex.vue#L222",
      "audit-platform/frontend/src/components/workpaper/l5/core/L5TabIndex.vue#L220",
-     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabDetail.vue#L533",
+     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabDetail.vue#L546",
      "audit-platform/frontend/src/components/workpaper/l6/core/L6TabIndex.vue#L215",
      "audit-platform/frontend/src/components/workpaper/l7/core/L7TabIndex.vue#L215",
      "audit-platform/frontend/src/components/workpaper/l8/core/L8TabIndex.vue#L218"

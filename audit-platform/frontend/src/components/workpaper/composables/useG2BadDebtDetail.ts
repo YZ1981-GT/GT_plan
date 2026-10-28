@@ -4,10 +4,11 @@
  * 结构：按单项评估计提（动态行）+ 信用风险组合计提（账龄段展开）+ 合计
  * 账龄枚举：3年段 / 5年段 / 自定义（跟随项目配置）
  *
- * 公式：
+ * 公式（模板 G2-3：D = B + C、J = B + SUM(E:F) − SUM(G:I)、L = J + K）：
  *   期初审定 = 期初未审 + 期初账项调整
- *   期末未审 = 期初审定 + 计提 + 其他增加 − 转回 − 转销 − 其他减少
+ *   期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 转销 − 其他减少
  *   期末审定 = 期末未审 + 期末账项调整
+ *   期末未审从期初未审滚动，期初调整只进期初审定（spec oo-formula-recompute-not-tamper R4）。
  *
  * 存储：扁平 leaf 数组（含 category），导入导出可 round-trip。
  * ECL 三阶段测算保留在 G2-7。
@@ -128,7 +129,7 @@ function emptyLeaf(
 function computeAmounts(stored: StoredLeafRow) {
   const openingAudited = stored.openingUnadjusted + stored.openingAdjustment
   const closingUnadjusted =
-    openingAudited +
+    stored.openingUnadjusted +
     stored.provisionIncrease +
     stored.otherIncrease -
     stored.reversal -
@@ -185,7 +186,7 @@ function sumLeaves(rows: StoredLeafRow[]): BadDebtTotals {
   const closingAdjustment = calcSubtotal(rows.map((r) => r.closingAdjustment))
   const openingAudited = openingUnadjusted + openingAdjustment
   const closingUnadjusted =
-    openingAudited + provisionIncrease + otherIncrease - reversal - writeOff - otherDecrease
+    openingUnadjusted + provisionIncrease + otherIncrease - reversal - writeOff - otherDecrease
   const closingAudited = closingUnadjusted + closingAdjustment
   const periodChange =
     provisionIncrease + otherIncrease - reversal - writeOff - otherDecrease

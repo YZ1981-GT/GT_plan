@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from app.core.database import get_db
 from app.core.redis import get_redis
-from app.deps import get_current_user, require_project_access, get_user_scope_cycles
+from app.deps import get_current_user, require_project_access, get_user_scope_cycles, require_project_audit_year
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.deps import check_consol_lock
@@ -31,13 +31,42 @@ router = APIRouter(
 @router.get("")
 async def get_trial_balance(
     project_id: UUID,
-    year: int = Query(...),
+    year: int | None = Query(None, description="审计年度；省略时取项目审计年度，项目没填 ⇒ 422"),
     company_code: str = Query("001"),
+    account_prefix: str | None = Query(
+        None, description="逗号分隔的标准科目码前缀（如 6051,6402），只回这些前缀下的行",
+    ),
+    include_movement: bool = Query(
+        False, description="附本期借 / 贷方发生额 period_debit / period_credit（叶子 + 映射口径，同未审数重算）",
+    ),
+    include_prior: bool = Query(
+        False, description="附上年审定数 prior_audited_amount（来源同报表上期，取不到为 null）",
+    ),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取试算表（四列结构），含重要性水平高亮标记"""
+    """获取试算表（四列结构），含重要性水平高亮标记。
+
+    行字段（前端唯一入口 ``services/trialBalanceRows.ts`` 的 ``TrialBalanceRow`` 与之逐键一致，
+    ``test_trial_balance_row_contract.py`` 守）：金额均为字符串、正数口径（方向见 ``direction``）；
+    损益类 ``unadjusted_amount`` 是单边发生额（收入取贷方、费用取借方）。
+    """
+    year = await require_project_audit_year(db, project_id, year)
+    prefixes = [p.strip() for p in (account_prefix or "").split(",") if p.strip()]
+
+    async def _finish(rows: list[dict]) -> list[dict]:
+        """缓存是全量行：读出后按前缀筛，再按需附发生额 / 上年数（不改缓存里的行）。"""
+        if prefixes:
+            rows = [r for r in rows if str(r.get("standard_account_code") or "").startswith(tuple(prefixes))]
+        if include_movement or include_prior:
+            rows = [dict(r) for r in rows]
+        if include_movement:
+            await _attach_movement(db, project_id, year, rows)
+        if include_prior:
+            await _attach_prior(db, project_id, year, company_code, rows)
+        return rows
+
     cache_svc = CacheService(redis)
 
     # 尝试从 Redis 缓存获取（60s TTL）
@@ -48,7 +77,7 @@ async def get_trial_balance(
         if scope_cycles is not None:
             allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
             cached = [r for r in cached if r.get("standard_account_code") in allowed_codes]
-        return cached
+        return await _finish(cached)
 
     svc = TrialBalanceService(db)
     rows = await svc.get_trial_balance(project_id, year, company_code)
@@ -81,6 +110,10 @@ async def get_trial_balance(
             "exceeds_materiality": abs(audited) >= overall_mat if overall_mat else False,
             "below_trivial": abs(audited) < trivial_thr if trivial_thr else False,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            # 底稿审定数发布门（publish-to-tb）写的三列：前端「发布后试算表有变化」提示读它们
+            "wp_adjustment": str(r.wp_adjustment) if r.wp_adjustment is not None else None,
+            "wp_publish_base": str(r.wp_publish_base) if r.wp_publish_base is not None else None,
+            "wp_published_at": r.wp_published_at.isoformat() if r.wp_published_at else None,
         }
         result.append(item)
 
@@ -93,6 +126,8 @@ async def get_trial_balance(
         allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
         result = [r for r in result if r.get("standard_account_code") in allowed_codes]
 
+    result = await _finish(result)
+
     # 过渡期语义（Task 7.1 / 需求 10）：检测 v1 残留，附加 warning 不阻断
     readiness = await check_sign_convention_readiness(db, project_id, year)
     if readiness.has_legacy:
@@ -103,6 +138,41 @@ async def get_trial_balance(
         }
 
     return result
+
+
+async def _attach_movement(db: AsyncSession, project_id: UUID, year: int, rows: list[dict]) -> None:
+    """每行附 ``period_debit`` / ``period_credit``：当前生效余额表叶子汇总到标准科目（与未审数重算同一构件）。
+
+    🔴 损益类含年末结转时借贷两侧相等，「贷 − 借」不是本期净发生额；损益金额用 ``unadjusted_amount`` /
+    ``audited_amount``（单边口径）。
+    """
+    from app.services.tb_balance_rollup import aggregate_period_movement
+
+    codes = [r["standard_account_code"] for r in rows if r.get("standard_account_code")]
+    movement = await aggregate_period_movement(db, project_id, year, codes or None) if codes else {}
+    for r in rows:
+        dr, cr = movement.get(r.get("standard_account_code"), (None, None))
+        r["period_debit"] = str(dr) if dr is not None else "0"
+        r["period_credit"] = str(cr) if cr is not None else "0"
+
+
+async def _attach_prior(db: AsyncSession, project_id: UUID, year: int, company_code: str, rows: list[dict]) -> None:
+    """每行附 ``prior_audited_amount``：上年同标准科目审定数；来源与报表上期 / PREV 同为 ``resolve_prior_source``
+    （同项目上年试算表优先，否则唯一认定的上年项目），取不到为 None（不代入 0）。"""
+    from app.models.audit_platform_models import TrialBalance
+    from app.services.prior_year_context import resolve_prior_source
+
+    source = await resolve_prior_source(db, project_id, year)
+    prior: dict[str, str | None] = {}
+    if source.project_id is not None:
+        stmt = sa.select(TrialBalance.standard_account_code, TrialBalance.audited_amount).where(
+            TrialBalance.project_id == source.project_id, TrialBalance.year == source.year,
+            TrialBalance.company_code == company_code, TrialBalance.is_deleted == sa.false(),
+        )
+        for code, amount in (await db.execute(stmt)).all():
+            prior[code] = str(amount) if amount is not None else None
+    for r in rows:
+        r["prior_audited_amount"] = prior.get(r.get("standard_account_code"))
 
 
 @router.post("/recalc")

@@ -255,7 +255,7 @@
     <!-- 抽凭引擎 -->
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应交税费(2221)" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
-        v-if="samplingVisible"
+        v-if="samplingVisible && samplingYear != null"
         :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
@@ -275,7 +275,7 @@
  * 自持久化（useN2FormData）：item_id N2-11-voucher-check（凭证/说明/结论）+ N2-11-test-meta（测试原因）。
  * 检查比例仅本期借方/本期贷方（过滤期末余额行）。宽表列设置 ⚙。
  */
-import { ref, reactive, computed, inject, onMounted, defineAsyncComponent, type Ref } from 'vue'
+import { ref, reactive, computed, inject, onMounted, watch, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
@@ -327,7 +327,12 @@ const formData = useN2FormData({
 })
 
 const isReadonly = computed(() => props.isReadonly ?? false)
-const samplingYear = computed(() => props.year || String(new Date().getFullYear()))
+// 父组件按字符串传年度（取不到时为空串）；抽凭 / 挂凭接口要数字年度，取不到就是 null
+const samplingYear = computed<number | null>(() => {
+  const y = Number(props.year)
+  return Number.isInteger(y) && y > 2000 ? y : null
+})
+const YEAR_MISSING_TIP = '未设置审计年度，请先在项目基本信息中填写'
 
 // ─── useK1VoucherCheck（N2-11-voucher-check）──────────────────────────────────
 
@@ -402,27 +407,34 @@ function setChecks(row: K1VoucherRow, vals: number[]): void {
 // ─── 抽凭 ────────────────────────────────────────────────────────────────────
 
 const samplingVisible = ref(false)
-function openSampling() { samplingVisible.value = true }
+function openSampling() {
+  if (samplingYear.value == null) { ElMessage.warning(YEAR_MISSING_TIP); return }
+  samplingVisible.value = true
+}
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
 const importingAttached = ref(false)
 const N2_ACCOUNT_PREFIXES = computed(() => n2QueryCodes(_injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  const year = samplingYear.value
+  if (!props.projectId || !props.wpId || year == null) return
   try {
-    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
+    const recs = await listAttachedVouchers(props.projectId, year, props.wpId, true)
     attachedCount.value = recs.length
   } catch { attachedCount.value = 0 }
 }
-void refreshAttachedCount()
+// 年度可能在挂载后才从底稿数据里解析出来 ⇒ 年度到位时再数一次
+watch(samplingYear, () => { void refreshAttachedCount() }, { immediate: true })
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  const year = samplingYear.value
+  if (year == null) { ElMessage.warning(YEAR_MISSING_TIP); return }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(
-      props.projectId, samplingYear.value, props.wpId, N2_ACCOUNT_PREFIXES.value,
+      props.projectId, year, props.wpId, N2_ACCOUNT_PREFIXES.value,
     )
     if (samples.length > 0) onSamplesFilled({ samples })
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)

@@ -726,14 +726,15 @@ class TestRoleMatrixApiLevel:
         assert r_cross[0] == "deny" and r_cross[1].status_code == 404
         outcome["admin"] = {"delegated_allow": True, "cross_project_denied": True}
 
-        # ── Supervisor：scope 内全部放行（含未委派）；scope 外(K)拒绝 ──
+        # ── Supervisor：本项目全部循环放行（含未委派）。2026-10-24 用户裁决（spec procedure-trim-generation-
+        #    delegation-chain 需求 5）：经理、合伙人、质控、EQCR 默认看全部循环 —— 原断言 scope 外(K)拒绝 ──
         r = await _try_gate(s, u["supervisor"], project_id=proj.id, wp_id=env["wpD_und"].id,
                             ep="workpaper.render_config", action="read_render", method="GET")
         assert r[0] == "allow" and "supervisor_scope" in r[1].access_kinds
         r_k = await _try_gate(s, u["supervisor"], project_id=proj.id, wp_id=env["wpK"].id,
                             ep="workpaper.render_config", action="read_render", method="GET")
-        assert r_k[0] == "deny" and r_k[1].status_code == 404
-        outcome["supervisor"] = {"scope_internal_allow": True, "scope_external_denied": True}
+        assert r_k[0] == "allow" and "supervisor_scope" in r_k[1].access_kinds
+        outcome["supervisor"] = {"scope_internal_allow": True, "all_cycles_allow": True}
 
         # ── Lead：委派在 scope 内放行；scope 内未委派拒绝；scope 外被委派拒绝（均 404）──
         r = await _try_gate(s, u["lead"], project_id=proj.id, wp_id=env["wpD_lead"].id,

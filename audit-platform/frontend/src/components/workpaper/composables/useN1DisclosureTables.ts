@@ -328,8 +328,11 @@ function blankNetOffsetRow(item: string, editable = false): NetOffsetRowModel {
  *
  * 🔴 曾实现为 `auditYear+1 … auditYear+5`（5 行）—— 那只覆盖「期末」列的到期区间，
  * 漏掉「上年年末」列最早的那个到期年度（= `auditYear`），导致上年比较数无处填列。
+ *
+ * 项目没填审计年度（null）⇒ 不出骨架（原先会拼成「0年 … 5年」）；N1-5 有数据时仍按其到期年度补行。
  */
-export function defaultLossExpiryRows(auditYear: number): LossExpiryRowModel[] {
+export function defaultLossExpiryRows(auditYear: number | null): LossExpiryRowModel[] {
+  if (auditYear == null) return []
   return Array.from({ length: LOSS_EXPIRY_ROW_COUNT }, (_, i) => ({
     item: `${auditYear + i}年`,
     end: null,
@@ -375,7 +378,8 @@ export type N1PrefillMap = Record<string, { opening: number; closing: number }>
 export interface UseN1DisclosureTablesOptions {
   variant: N1DisclosureVariant
   allResponses: Ref<Map<string, { conclusion?: string | null; remark?: string | null }>>
-  auditYear: Ref<number>
+  /** 审计年度；项目没填为 null（亏损到期表不出年度骨架，年度到位后补出） */
+  auditYear: Ref<number | null>
   /**
    * 资产段四表预填（`{暂时性差异类别: {opening, closing}}`）。
    * 后端 7 类与 `N1_ASSET_ITEMS` 7 项**逐字同构**，故可直接按行名匹配。
@@ -615,6 +619,15 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
     }
   }
 
+  // 审计年度后到（项目信息异步加载 / 刚补填年度）：没有已存行时补出到期年度骨架
+  watch(auditYear, (y, old) => {
+    if (y == null || old != null) return
+    const saved = parseJsonArray<LossExpiryRowModel>(allResponses.value.get(ID.lossExpiry)?.conclusion)
+    if (saved?.length) return
+    lossExpiryRows.value = defaultLossExpiryRows(y)
+    applyLossPrefill()
+  })
+
   /**
    * 表 (2)A 行标签跟随表 (1)（国企；源模板 A36=`=A13` 的运行时等价）。
    *
@@ -839,7 +852,7 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
     }
   }
 
-  function buildPayload(ctx: { wpId: string; year: number }) {
+  function buildPayload(ctx: { wpId: string; year: number | null }) {
     return buildN1SyncPayload(variant, buildSnapshot(), ctx)
   }
 

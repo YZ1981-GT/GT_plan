@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.note_data_lock_service import NoteDataLockService
 from app.services.note_edit_gate import (
@@ -95,11 +95,12 @@ async def create_snapshot(
 @router.get("/snapshots")
 async def get_snapshot_chain(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取版本快照历史链"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = NoteDataLockService(db)
     return await svc.get_snapshot_chain(project_id, year)
 
@@ -107,11 +108,12 @@ async def get_snapshot_chain(
 @router.get("/status")
 async def get_lock_status(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取锁定状态"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = NoteDataLockService(db)
     locked = await svc.is_locked(project_id, year)
     return {"locked": locked, "project_id": str(project_id), "year": year}

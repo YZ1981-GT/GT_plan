@@ -239,9 +239,10 @@ describe('F4-1 source-template aligned adjudication model', () => {
     expect(row.changeRate).toBeCloseTo(400 / 1030)
   })
 
-  it('上期为零时变动率采用正负100%，避免除零', () => {
+  // 模板 F4-1 K 列 IF(AND(E=0,J=0),0,IF(AND(E=0,J>0),1,J/E))：期初为 0、变动为负时除零（#DIV/0!）记 N/A
+  it('上期为零时变动率按模板：增加记100%、减少无法计算、不变记0', () => {
     expect(calcF4ChangeRate(0, 100)).toBe(1)
-    expect(calcF4ChangeRate(0, -100)).toBe(-1)
+    expect(calcF4ChangeRate(0, -100)).toBe('N/A')
     expect(calcF4ChangeRate(0, 0)).toBe(0)
   })
 

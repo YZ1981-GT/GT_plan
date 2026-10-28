@@ -528,6 +528,7 @@
  * - 借贷发生额驱动期末未审；变动原因分析列
  * - 监听 g7:adjustment-writeback 回写期末 AJE/RJE
  */
+import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 import {
   ref,
   reactive,
@@ -1392,7 +1393,7 @@ async function handleSeedFromFourTable(): Promise<void> {
 }
 
 function pickTbAmount(row: any): number {
-  return parseNum(row?.unadjusted_amount ?? row?.audited_amount ?? row?.closing_balance)
+  return parseNum(row?.unadjusted_amount ?? row?.audited_amount)
 }
 
 async function fetchTrialBalance(): Promise<void> {
@@ -1407,13 +1408,9 @@ async function fetchTrialBalance(): Promise<void> {
   try {
     // 前缀由「原值 + 备抵」科目码的最长公共前缀派生（不写死 '151'），
     // 一次拉回两组后在前端按 g7AccountScope 的点号边界谓词分流
-    const res = await api.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: g7TrialBalancePrefix(tbSourceCodes.value) },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data ?? res)
-      ? (res?.data ?? res)
-      : (res?.data?.items ?? [])
+    const list: any[] = (await fetchTrialBalanceRows(props.projectId, {
+      accountPrefix: g7TrialBalancePrefix(tbSourceCodes.value),
+    })).rows
 
     const codeOf = (it: any) => String(it.standard_account_code ?? it.account_code ?? '')
     const src = tbSourceCodes.value
@@ -1436,20 +1433,8 @@ async function fetchTrialBalance(): Promise<void> {
         .reduce((s, it) => s + pickTbAmount(it), 0)
     }
   } catch {
-    try {
-      const res = await api.get('/api/trial-balance/query', {
-        params: { project_id: props.projectId, account_code: accountGross.value },
-        _silent: true,
-      } as any)
-      const items = res?.data?.items ?? res?.data ?? res?.items ?? []
-      if (Array.isArray(items) && items.length > 0) {
-        tbGross.value = items.reduce(
-          (s: number, it: any) => s + parseNum(it.audited_amount ?? it.unadjusted_amount), 0,
-        )
-      }
-    } catch {
-      console.warn('[G7TabAdjudication] fetchTrialBalance failed')
-    }
+    // 原先回退到 `/api/trial-balance/query`（后端没有该路由，恒 404）
+    console.warn('[G7TabAdjudication] fetchTrialBalance failed')
   }
 }
 

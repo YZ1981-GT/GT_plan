@@ -47,11 +47,11 @@ describe('g11ReturnRateBalanceMap', () => {
     expect(agg.closing).toBe(1300)
   })
 
-  it('pickTbOpening/Closing 字段优先级', () => {
+  it('pickTbOpening/Closing 字段优先级（试算表行：期末 = 审定优先、其次未审；端点没有 closing / 借贷字段）', () => {
     expect(pickTbOpening({ opening_balance: '12.5' })).toBe(12.5)
-    expect(pickTbClosing({ closing_balance: 9, audited_amount: 1 })).toBe(9)
-    expect(pickTbClosing({ audited_amount: 8 })).toBe(8)
-    expect(pickTbClosing({ debit_amount: 10, credit_amount: 3 })).toBe(7)
+    expect(pickTbClosing({ audited_amount: 8, unadjusted_amount: 9 })).toBe(8)
+    expect(pickTbClosing({ audited_amount: null, unadjusted_amount: '7' })).toBe(7)
+    expect(pickTbClosing({})).toBe(0)
   })
 
   it('buildBalancePatchFromTb：有上期 TB', () => {

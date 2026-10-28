@@ -191,18 +191,32 @@ async def recalculate_trial(
 
 
 async def check_trial_consistency(db: AsyncSession, project_id: UUID, year: int) -> dict[str, Any]:
-    """一致性校验：借贷平衡检查"""
+    """一致性校验：按科目自然方向汇总借方性质与贷方性质合计判平衡（spec consol-autotree-linkage-closure R8.3）。
+
+    ``consol_amount`` 是自然方向正数口径（资产、负债都记正数），所以不能按正负号分借贷 —— 旧判据把
+    负债、权益、收入全算进「借方」，平衡的试算表也恒报不平。方向与合并计算同源（``account_sign``）。
+    """
+    from app.services.consol_calc_basis import account_sign, to_cents
+
     trials = await get_trial_balance(db, project_id, year)
-
-    total_debit = sum(t.consol_amount for t in trials if t.consol_amount >= 0)
-    total_credit = sum(abs(t.consol_amount) for t in trials if t.consol_amount < 0)
-
+    total_debit = total_credit = Decimal("0")
+    for t in trials:
+        amount = to_cents(t.consol_amount)
+        if account_sign(t.standard_account_code, t.account_name) < 0:
+            total_credit += amount
+        else:
+            total_debit += amount
+    difference = total_debit - total_credit
+    balanced = abs(difference) < Decimal("0.01")
+    errors = [] if balanced else [f"借方性质合计 {total_debit} 与贷方性质合计 {total_credit} 相差 {difference}"]
+    warnings = [] if trials else ["合并试算表为空：请先推送或重算合并数"]
     return {
-        "is_balanced": abs(total_debit - total_credit) < Decimal("0.01"),
+        "is_balanced": balanced,
         "total_debit": total_debit,
         "total_credit": total_credit,
-        "difference": total_debit - total_credit,
-        "row_count": len(trials),
+        "difference": difference,
+        "errors": errors,
+        "warnings": warnings,
     }
 
 

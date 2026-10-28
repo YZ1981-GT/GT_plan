@@ -179,8 +179,9 @@ FIELD_SPECS_G1102: Final[
     tuple[tuple[str, str, str, str, str, str, str], ...]
 ] = (
     #: 🔴 A 列「序号」在 G11 是**真列**（模板 A10-A30 预填 1..21），不像 G9/G10/G8 的
-    #:   `seq` 那样只是显示序号 ⇒ 必须受管。
-    ("seq_no", "A", "editable", "integer", "seq", "序号", ""),
+    #:   `seq` 那样只是显示序号 ⇒ 必须受管。前端按位置编号（`enrichRow(row, index)`）⇒ auto_source
+    #:   （HTML 侧带出，OO 改了报受保护冲突；同 H1-8 / E1-4，spec oo-writeback-template-parity-closure R3 批 B）。
+    ("seq_no", "A", "auto_source", "integer", "seq", "序号", ""),
     ("item_name", "B", "editable", "text", "itemName", "项目", ""),
     ("investee_name", "C", "editable", "text", "investeeName", "被投资单位", ""),
     ("current_unadjusted", "D", "editable", "amount", "currentUnadjusted", "本期未审数", ""),
@@ -221,5 +222,7 @@ SPEC_G1102: Final[RowTableSheetSpec] = RowTableSheetSpec(
     #: footer 的 D/E/F/H/I/J/L 七列带 `=SUM(x10:x30)` ⇒ 需要区间归一化（P10 结论落地）
     footer_carries_total_formula=True,
     error_label="G11-2 投资收益明细分析表",
-    #: 幽灵行锚点用默认 `[0]`（A 列「序号」）—— 模板 A10-A30 预填 1..21，恒非空。
+    #: 幽灵行锚点取 `[1]`（B 列「项目」）：A 序号改 auto_source 后回写不合并，OO 新增行的序号读回为空
+    #: ⇒ 仍用 `[0]` 会把 OO 新增的行全当幽灵行剔除（同 E1-4 改锚 B 开户银行）。
+    ghost_row_anchor_index=1,
 )

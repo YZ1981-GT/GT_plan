@@ -102,11 +102,11 @@ describe('底稿管理页按项目审计年度发请求', () => {
     wrapper.unmount()
   })
 
-  test('项目信息取不到：兜底去年（与全平台同一解析），不是今年', async () => {
+  test('项目信息取不到：保持 null，不猜上一日历年', async () => {
     mockHttpGet.mockRejectedValue(new Error('network'))
     const wrapper = mountList()
     await flushPromises()
-    expect((wrapper.vm as any).currentYear).toBe(2025)
+    expect((wrapper.vm as any).currentYear).toBeNull()
     wrapper.unmount()
   })
 })

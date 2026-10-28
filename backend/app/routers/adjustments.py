@@ -309,22 +309,24 @@ async def list_adjustments(
         page=pagination.page, page_size=pagination.page_size,
     )
 
-    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
-    try:
-        scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
-        if scope_cycles is not None:
+    # scope_cycles 过滤：受限成员只看有效范围内循环对应科目的分录（空范围 ⇒ 空）。读不到循环对应的
+    # 科目时按「一个都不对应」处理 —— 原先异常即整段跳过 = 全部放行（spec procedure-trim-generation-
+    # delegation-chain 需求 5）
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None and isinstance(result, dict) and "items" in result:
+        try:
             allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
-            if isinstance(result, dict) and "items" in result:
-                result["items"] = [
-                    e for e in result["items"]
-                    if any(
-                        li.get("standard_account_code") in allowed_codes
-                        for li in (e.get("line_items") or [])
-                    )
-                ]
-                result["total"] = len(result["items"])
-    except Exception:
-        pass  # scope filtering failure should not block the response
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("调整分录按循环过滤：取循环科目失败 project=%s: %s", project_id, exc)
+            allowed_codes = set()
+        result["items"] = [
+            e for e in result["items"]
+            if any(
+                li.get("standard_account_code") in allowed_codes
+                for li in (e.get("line_items") or [])
+            )
+        ]
+        result["total"] = len(result["items"])
 
     # P2 增强：批量附加 creator_name（按人分组）+ has_active_collaboration（协作中筛选），fail-open
     if isinstance(result, dict) and result.get("items"):

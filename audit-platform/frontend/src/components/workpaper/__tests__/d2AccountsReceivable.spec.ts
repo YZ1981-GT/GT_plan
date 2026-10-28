@@ -251,12 +251,12 @@ describe('9.5 ECL 坏账准备测试', () => {
     expect(calculateProvision(0, 0.5)).toBe(0)
   })
 
-  it('calculateDifference: actual=6000, should=5000 → 1000', () => {
-    expect(calculateDifference(6000, 5000)).toBe(1000)
+  it('calculateDifference: actual=6000, should=5000 → -1000（多提）', () => {
+    expect(calculateDifference(6000, 5000)).toBe(-1000)
   })
 
-  it('calculateDifference: actual=3000, should=5000 → -2000', () => {
-    expect(calculateDifference(3000, 5000)).toBe(-2000)
+  it('calculateDifference: actual=3000, should=5000 → 2000（少提）', () => {
+    expect(calculateDifference(3000, 5000)).toBe(2000)
   })
 })
 

@@ -516,12 +516,12 @@
       destroy-on-close
     >
       <GtVoucherSamplingEngine
-        v-if="showSampling && wpId && projectId"
+        v-if="showSampling && wpId && projectId && year != null"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
         phase="final"
-        :year="year ?? new Date().getFullYear()"
+        :year="year"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -529,6 +529,7 @@
 </template>
 
 <script setup lang="ts">
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabDisposalCheck.vue — H4-5 减少检查表
@@ -583,8 +584,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-/** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 
 const allResponsesRef = computed(() => props.allResponses)
@@ -728,6 +728,10 @@ void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
   if (props.isReadonly) return
+  if (samplingYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

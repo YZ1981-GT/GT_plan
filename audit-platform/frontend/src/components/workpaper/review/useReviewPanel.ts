@@ -8,6 +8,7 @@ import { ref, reactive } from 'vue'
 import http from '@/utils/http'
 import { downloadFile } from '@/utils/http'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
 export interface ReviewFinding {
   id: string
@@ -136,7 +137,8 @@ function upsertSheetCard(cards: SheetReviewCard[], card: SheetReviewCard): void 
   }
 }
 
-export function useReviewPanel(projectId: string, wpCodePrefix: string, year: number) {
+/** year：审计年度；项目没填为 null ⇒ 批量复核提示去填年度、不发请求（不按今年兜底） */
+export function useReviewPanel(projectId: string, wpCodePrefix: string, year: number | null) {
   const sheets = ref<SheetReviewCard[]>([])
   const isReviewing = ref(false)
   const progress = reactive<ReviewProgress>({
@@ -152,6 +154,10 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
   async function startBatchReview(): Promise<BatchReviewResult | null> {
     if (isReviewing.value) {
       ElMessage.warning('复核正在进行中，请稍候')
+      return null
+    }
+    if (year == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return null
     }
 

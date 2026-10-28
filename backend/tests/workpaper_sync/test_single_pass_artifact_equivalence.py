@@ -106,8 +106,9 @@ SILENT_VICTIM_PART = "xl/worksheets/sheet15.xml"
 
 #: 判据覆盖的 `Projection` 字段。`test_comparison_surface_covers_every_dataclass_field`
 #: 拿它与真实 dataclass 比 —— 将来给 Projection 加字段而忘了进判据面，那条会红。
+#: `formula_signatures` 决定 OO 重算能否采纳，两路径反读的签名也须逐键相同（oo-formula-recompute-not-tamper）。
 _PROJECTION_FIELDS = frozenset(
-    {"contract_id", "semantic_version", "document_type", "values", "row_keys"}
+    {"contract_id", "semantic_version", "document_type", "values", "row_keys", "formula_signatures"}
 )
 _FIELD_VALUE_FIELDS = frozenset(
     {"stable_key", "value", "value_type", "mode", "row_key"}
@@ -190,6 +191,12 @@ def projection_differences(
                 f"{right_label}={right_rows.get(table)}"
             )
 
+    sig_l, sig_r = dict(left.formula_signatures or {}), dict(right.formula_signatures or {})
+    if (left.formula_signatures is None) != (right.formula_signatures is None):
+        diffs.append(f"formula_signatures 只有一侧带：{left_label} / {right_label}")
+    for key in sorted(k for k in set(sig_l) | set(sig_r) if sig_l.get(k) != sig_r.get(k)):
+        diffs.append(f"formula_signatures[{key}]：{left_label}={sig_l.get(key)!r} / "
+                     f"{right_label}={sig_r.get(key)!r}")
     left_values = {key: _field_signature(value) for key, value in left.values.items()}
     right_values = {key: _field_signature(value) for key, value in right.values.items()}
     for key in sorted(set(left_values) - set(right_values)):
@@ -422,6 +429,8 @@ def test_extract_of_both_paths_is_equal_field_by_field(both_paths: BothPaths) ->
         f"{EXTRACTED_FIELD_COUNT} —— 契约受管表集合变了是正当变化，但必须同步刷新本常数；"
         "字段数掉到 0 附近则是 extract 本身出了问题，此时「相等」是假绿"
     )
+    # 公式签名同理先钉非空：两侧都不带证据时逐键比较是空转
+    assert chained.formula_signatures and single.formula_signatures, "D4 反读没有公式签名"
     differences = projection_differences(chained, single)
     assert differences == (), (
         f"单趟产物与链式产物反读不等值，共 {len(differences)} 处（完整清单）：\n"

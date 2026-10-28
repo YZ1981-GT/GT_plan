@@ -5,16 +5,31 @@
       <el-tooltip content="重新读取企业树（按各项目的企业代码、上级代码与与上级关系自动生成）" placement="bottom">
         <el-button size="small" :loading="loading" data-testid="cm-reload" @click="loadTree">🔄 刷新</el-button>
       </el-tooltip>
-      <el-tooltip content="确认当前合并范围（确认后才可进行合并计算）" placement="bottom">
-        <el-button size="small" type="warning" data-testid="cm-scope-confirm" @click="eventBus.emit('consol-open-scope-confirm' as any)">📋 确认范围</el-button>
+      <el-tooltip content="查看企业树版本与差异（合并计算不需要确认；推送时自动记录版本）" placement="bottom">
+        <el-button size="small" data-testid="cm-scope-confirm" @click="eventBus.emit('consol-open-scope-confirm')">📋 树版本</el-button>
       </el-tooltip>
     </div>
     <div v-if="modeText" class="cm-nav-mode" data-testid="cm-mode">合并方式：{{ modeText }}</div>
+    <div v-if="versionLabel.text" class="cm-nav-mode">
+      <el-tooltip :content="versionLabel.tip" placement="right">
+        <span class="cm-nav-version" :class="{ 'cm-nav-version--changed': structuralChange }" data-testid="cm-version">{{ versionLabel.text }}</span>
+      </el-tooltip>
+    </div>
+    <!-- 树结构变化只提示、不拦截（spec consol-autotree-linkage-closure R1.4）：读时计算已按当前树，推送后记录新版本 -->
+    <div v-if="structuralChange" class="cm-nav-changed" data-testid="cm-tree-changed">
+      <div class="cm-nav-changed-title">企业树结构已变化</div>
+      <div>{{ diffText }}。页面已按当前树读时计算；重新推送后更新已生成的合并报表与附注，并记录新版本。</div>
+      <el-button size="small" type="warning" data-testid="cm-repush" @click="eventBus.emit('consol-request-push')">重新推送</el-button>
+    </div>
+    <div class="cm-nav-search">
+      <el-input v-model="search" size="small" placeholder="搜索企业名称或代码" clearable data-testid="cm-search" />
+    </div>
 
-    <!-- 企业树：只渲染后端按三码推导的结果，节点键为 node_key -->
+    <!-- 企业树：只渲染后端按三码推导的结果，节点键为 node_key；当前节点由合并页广播同步高亮 -->
     <div class="cm-tree">
-      <el-tree :data="treeData" :props="{ label: 'label', children: 'children' }"
+      <el-tree ref="treeRef" :data="treeData" :props="{ label: 'label', children: 'children' }"
         node-key="key" default-expand-all highlight-current :expand-on-click-node="false"
+        :filter-node-method="filterNode"
         @node-click="onNodeClick" @node-contextmenu="onNodeContextMenu">
         <template #default="{ data }">
           <span class="cm-tree-node" :class="`cm-tree-node--${data.kind}`" :data-node-key="data.key">
@@ -43,12 +58,19 @@
           @contextmenu.prevent>
           <div class="cm-ctx-header">{{ treeContextMenu.nodeName }}</div>
           <div class="cm-ctx-divider" />
-          <div class="cm-ctx-item" @click="treeCtxAggregateDirect"><span class="cm-ctx-icon">Σ</span> 直接下级汇总</div>
-          <div class="cm-ctx-item" @click="treeCtxAggregateCustom"><span class="cm-ctx-icon">📊</span> 自定义汇总</div>
-          <div class="cm-ctx-divider" />
-          <div class="cm-ctx-item" @click="treeCtxRefresh"><span class="cm-ctx-icon">🔄</span> 刷新数据</div>
-          <div class="cm-ctx-item" @click="treeCtxViewReport"><span class="cm-ctx-icon">📋</span> 查看报表</div>
-          <div class="cm-ctx-item" @click="treeCtxViewNote"><span class="cm-ctx-icon">📝</span> 查看附注</div>
+          <!-- 差额户：金额来自归属它的分录（R7.2：点击不自动弹抽屉，这里打开差额分录） -->
+          <template v-if="treeContextMenu.nodeData?.isElim">
+            <div class="cm-ctx-item" data-testid="cm-ctx-elim-entries" @click="treeCtxOpenElim"><span class="cm-ctx-icon">📝</span> 差额分录</div>
+            <div class="cm-ctx-item" @click="treeCtxViewReport"><span class="cm-ctx-icon">📋</span> 查看调整与抵销</div>
+          </template>
+          <template v-else>
+            <div class="cm-ctx-item" @click="treeCtxAggregateDirect"><span class="cm-ctx-icon">Σ</span> 直接下级汇总</div>
+            <div class="cm-ctx-item" @click="treeCtxAggregateCustom"><span class="cm-ctx-icon">📊</span> 自定义汇总</div>
+            <div class="cm-ctx-divider" />
+            <div class="cm-ctx-item" @click="treeCtxRefresh"><span class="cm-ctx-icon">🔄</span> 刷新数据</div>
+            <div class="cm-ctx-item" @click="treeCtxViewReport"><span class="cm-ctx-icon">📋</span> 查看报表</div>
+            <div class="cm-ctx-item" @click="treeCtxViewNote"><span class="cm-ctx-icon">📝</span> 查看附注</div>
+          </template>
         </div>
       </Transition>
     </Teleport>
@@ -80,11 +102,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getWorksheetTree, type ConsolTreeNode, type ConsolTreeResponse } from '@/services/consolidationApi'
-import { eventBus } from '@/utils/eventBus'
+import { eventBus, type ConsolCurrentNodePayload } from '@/utils/eventBus'
 import { relationLabel } from '@/utils/groupRelation'
 import {
   buildNameIndex,
@@ -92,6 +114,8 @@ import {
   modeLabel,
   nodeIcon,
   nodeLabel,
+  scopeVersionLabel,
+  treeDiffSummary,
   viaLabel,
 } from '@/components/consolidation/composables/consolTreeView'
 
@@ -119,6 +143,38 @@ const response = ref<ConsolTreeResponse | null>(null)
 
 const modeText = computed(() => modeLabel(response.value?.mode, response.value?.mode_label))
 const emptyText = computed(() => loadError.value || response.value?.message || '暂无企业树')
+
+// ─── 企业树版本（spec consol-autotree-linkage-closure R1.4~R1.6）──────────────────
+const scopeVersion = computed(() => response.value?.scope_version ?? null)
+const versionLabel = computed(() => scopeVersionLabel(scopeVersion.value))
+/** 与已记录版本相比有结构变化（新增 / 移除 / 上级变化 / 类型或关系变化；改名不算） */
+const structuralChange = computed(() => Boolean(scopeVersion.value?.revision && scopeVersion.value.structural_change))
+const diffText = computed(() => treeDiffSummary(scopeVersion.value?.diff) || '节点有变化')
+
+// ─── 搜索与当前节点高亮（R7.1：合并页只保留这一棵树）──────────────────────────────
+const treeRef = ref<any>(null)
+const search = ref('')
+const currentKey = ref<string | null>(null)
+
+function filterNode(value: string, data: NavNode): boolean {
+  const q = (value || '').trim().toLowerCase()
+  if (!q) return true
+  return data.label.toLowerCase().includes(q) || (data.companyCode || '').toLowerCase().includes(q)
+}
+
+watch(search, (q) => treeRef.value?.filter?.(q))
+
+function applyTreeState() {
+  if (search.value) treeRef.value?.filter?.(search.value)
+  if (currentKey.value) treeRef.value?.setCurrentKey?.(currentKey.value)
+}
+
+/** 合并页广播的当前节点（组织图 / 试算页 / 差额表切换节点也会回写）⇒ 同步高亮 */
+function onCurrentNode(payload: ConsolCurrentNodePayload) {
+  if (!payload || payload.projectId !== projectId.value) return
+  currentKey.value = payload.nodeKey
+  nextTick(applyTreeState)
+}
 
 // 后端树 → 导航节点（键 = node_key；标签 = 带角色后缀的展示名）
 const treeData = computed<NavNode[]>(() => {
@@ -156,6 +212,10 @@ async function loadTree() {
   } finally {
     loading.value = false
   }
+  // 树重建后恢复搜索过滤与当前节点高亮；首次加载向合并页要一次当前节点
+  await nextTick()
+  applyTreeState()
+  if (!currentKey.value) eventBus.emit('consol-current-node-request')
 }
 
 function payloadOf(data: NavNode) {
@@ -174,7 +234,6 @@ function onNodeContextMenu(e: Event, data: NavNode) {
   const me = e as MouseEvent
   me.preventDefault()
   me.stopPropagation()
-  if (data.isElim) return
   treeContextMenu.nodeName = data.label || ''
   treeContextMenu.nodeData = data
   setTimeout(() => {
@@ -203,6 +262,13 @@ function treeCtxAggregateCustom() {
 function treeCtxRefresh() {
   closeTreeCtxMenu()
   if (treeContextMenu.nodeData) openRefreshDialog(treeContextMenu.nodeData)
+}
+
+/** 差额户右键「📝 差额分录」：由合并页打开分录面板 */
+function treeCtxOpenElim() {
+  closeTreeCtxMenu()
+  const data = treeContextMenu.nodeData
+  if (data?.isElim) eventBus.emit('consol-open-elim-panel', { nodeKey: data.key })
 }
 
 function treeCtxViewReport() {
@@ -285,6 +351,7 @@ function onRefreshDone() { loadTree() }
 watch(projectId, (pid, old) => { if (pid && pid !== old) loadTree() })
 
 onMounted(() => {
+  eventBus.on('consol-current-node', onCurrentNode)
   loadTree()
   document.addEventListener('click', onDocClickTree)
   eventBus.on('consol-refresh-done', onRefreshDone)
@@ -293,6 +360,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocClickTree)
   eventBus.off('consol-refresh-done', onRefreshDone)
+  eventBus.off('consol-current-node', onCurrentNode)
 })
 
 defineExpose({ loadTree })
@@ -309,6 +377,15 @@ defineExpose({ loadTree })
   padding: 4px 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);
   border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0);
 }
+.cm-nav-version { cursor: help; }
+.cm-nav-version--changed { color: var(--gt-color-wheat); font-weight: 600; }
+.cm-nav-changed {
+  margin: 6px 8px 0; padding: 6px 8px; border-radius: var(--gt-radius-sm, 4px);
+  background: var(--gt-color-wheat-light); font-size: var(--gt-font-size-xs); color: var(--gt-color-text-primary);
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.cm-nav-changed-title { font-weight: 600; }
+.cm-nav-search { padding: 6px 8px 0; }
 .cm-tree { flex: 1; overflow-y: auto; padding: 6px; }
 .cm-tree-node { display: flex; align-items: center; font-size: var(--gt-font-size-xs); gap: 4px; min-width: 0; }
 .cm-tree-icon { font-size: var(--gt-font-size-sm); }

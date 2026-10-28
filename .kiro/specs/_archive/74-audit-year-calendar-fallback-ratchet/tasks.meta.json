@@ -1,0 +1,462 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0.1 后端 render-config `a-program-console` 两个分支回传 `override_scope`；端点级测试（真库回滚事务：执行人按回传 scope 与项目年度写覆盖 → 再取 render-config 能看到）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047055
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921057865
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921328318
+      }
+    ],
+    "0.2 前端年度单一来源：`resolveAuditYearOrNull` + `useProjectAuditYear` / `fetchProjectAuditYear` / `requireProjectAuditYear`；vitest": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047121
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921333892
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921453172
+      }
+    ],
+    "0.3 写入方改造：程序表控制台、A1 / A2 / A3、G8~G12 回填（`writeProgramStepOverrides`）；配对读请求；vitest + 变异": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047192
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921458432
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921868768
+      }
+    ],
+    "0.4 下调年度棘轮基线与冻结上限；单区域 vue-tsc、ESLint": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047223
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921873544
+      }
+    ],
+    "0.5 存量位置修复工具（dry-run 报告；真实项目 `--apply` 待用户确认）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047259
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792922276995
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792922669324
+      }
+    ],
+    "0.6 浏览器实测：执行人改状态 / 执行说明后刷新仍在；未设置审计年度的项目提示且不发请求": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047292
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792922676551
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792923621285
+      }
+    ],
+    "2.1 前端 340 处、后端 130 处逐处判定写请求 / 读请求 / 日历用途 / 单一来源兜底，产出 `evidence/classification.md`（按 import 闭包追到请求发出点）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047326
+      },
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792923627797
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924777960
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924782612
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924796071
+      }
+    ],
+    "2.2 日历用途进豁免表（前后端各一张，理由 + 可证伪：文件仍命中口径），对应条目从基线移出": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047357
+      },
+      {
+        "executionId": "e69402ad-0856-426b-a775-6ce457788e42",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924365617
+      },
+      {
+        "executionId": "e69402ad-0856-426b-a775-6ce457788e42",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924699923
+      }
+    ],
+    "2.3 盲区补查：先存 `new Date()` / `datetime.now()` 再取年份的写法，按文件人工过一遍并登记": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047409
+      },
+      {
+        "executionId": "e69402ad-0856-426b-a775-6ce457788e42",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792924704702
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792925060779
+      }
+    ],
+    "3.1 `resolveAuditYearOrNull` + `resolveEffectiveAuditYear` / `useAuditContext` / `useProjectSelector` 改为取不到返回 null（调用方同步处理）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047444
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792925092500
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792925789357
+      }
+    ],
+    "3.2 写请求的年度缺失时不发请求、提示「未设置审计年度」；下调基线；vitest + 单区域 vue-tsc": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047476
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792925794211
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792926654666
+      }
+    ],
+    "3.3 浏览器实测（【测试】项目，含未填审计年度与审计期末的项目）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047508
+      },
+      {
+        "executionId": "48bc6821-d042-4f5e-8e62-113abef14c85",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792926661652
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246601
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937256990
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937877165
+      }
+    ],
+    "4.1 按组件族分批（底稿 D~N 循环各一批，其余页面一批）改为空态 + 提示，或不传年度由后端取；每批下调基线、跑该族 vitest": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047542
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926863905
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926871271
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792928507281
+      }
+    ],
+    "4.2 浏览器实测（同 3.3）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047586
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864039
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792928516455
+      },
+      {
+        "executionId": "403f5828-2b86-4ddf-9c25-8ecbfd821c0f",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792929298275
+      },
+      {
+        "executionId": "403f5828-2b86-4ddf-9c25-8ecbfd821c0f",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792929714135
+      }
+    ],
+    "5.1 `routers/wp_prefill_preview.py` 两处改单一来源，取不到 ⇒ 422；端点级测试": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047657
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864094
+      },
+      {
+        "executionId": "77281163-3849-4667-b06d-acf988c45950",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792929792623
+      },
+      {
+        "executionId": "77281163-3849-4667-b06d-acf988c45950",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792930144231
+      }
+    ],
+    "5.2 `year: int = 2025` / `Query(2025)` 等参数默认值逐端点改（改前现查前端调用方是否都传年度）；`x or 2025` / `.get(\"year\", 2025)` 同改": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047694
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864208
+      },
+      {
+        "executionId": "77281163-3849-4667-b06d-acf988c45950",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792930209389
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246634
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937902936
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792939704072
+      }
+    ],
+    "5.3 下调基线；触及的既有测试按新语义改写": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047725
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864242
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246667
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792939717074
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792940409314
+      }
+    ],
+    "6.1 兜底类改单一来源；日历类按 2.2 进豁免表": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047757
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864285
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246699
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792940414724
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792941148131
+      }
+    ],
+    "6.2 下调基线；端点级测试": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047789
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864336
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246732
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792941154726
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792941849834
+      }
+    ],
+    "7.1 基线清零或只剩豁免；变异复跑；回归（改动涉及的测试目录对比改动前）": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047823
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864375
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246765
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792941856939
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792942324505
+      }
+    ],
+    "7.2 INDEX / memory 更新": [
+      {
+        "executionId": "a0d55a56-f528-4546-b924-4937ba58204b",
+        "chatSessionId": "sess_59f61c2d-8589-4348-addc-089a3fcc71ae",
+        "timestamp": 1792921047859
+      },
+      {
+        "executionId": "986f11ce-ea78-4e89-a170-9112afb3aa28",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792926864410
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792937246809
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792942330389
+      },
+      {
+        "executionId": "7eef46a1-a0a4-46e4-931d-8d266ee33535",
+        "chatSessionId": "sess_c92e5618-0926-4340-97b9-7eb5145584c0",
+        "timestamp": 1792942527452
+      }
+    ]
+  }
+}
