@@ -395,11 +395,12 @@ def _exact_identity_is_pure() -> bool:
 
 
 def _exact_identity_only_release_imports() -> bool:
-    """生产导入方恰为目录写法解析（catalog，T10）、发布门禁与生成器名称规则（T06）、单元格取值接线（T12）；
-    V2 / stale（T21）、CCR 检查器（T22）尚未接入。"""
+    """生产导入方恰为目录写法解析（catalog，T10）、发布门禁与生成器名称规则（T06）、单元格取值接线（T12）、
+    跨 sheet 追溯编排器（T20）；V2 / stale（T21）、CCR 检查器（T22）尚未接入。"""
     return _production_importers_of("exact_identity") == [
         "backend/app/services/acnr/catalog.py", "backend/app/services/acnr/catalog_names.py",
-        "backend/app/services/acnr/catalog_release.py", "backend/app/services/acnr/wp_cell_target.py"]
+        "backend/app/services/acnr/catalog_release.py", "backend/app/services/acnr/wp_cell_target.py",
+        "backend/app/services/custom_query/cross_sheet_trace_orchestrator.py"]
 
 
 def _production_importers_of(module: str) -> list[str]:

@@ -54,6 +54,8 @@ class RefChainNode(BaseModel):
     cycle: bool = False  # 检测到循环
     missing: bool = False  # 引用目标缺失
     resolve_missed: bool = False  # ACNR full_resolve 未命中（走 snapshot fallback）
+    sheet: str | None = None  # 本节点的 sheet 名（公式里的写法原样）
+    cell: str | None = None  # 本节点的 A1（大写）
 
 
 class RefChainResponse(BaseModel):
@@ -252,15 +254,20 @@ class CrossSheetResolver:
         self,
         project_id: str | None = None,
         parent_wp_code: str | None = None,
+        resolve_identity: bool = True,
     ) -> None:
         """
         Args:
             project_id: 项目 ID，传递给 ACNR full_resolve 以启用 L2 overlay + wp_id 附加（Req 1.4）
             parent_wp_code: 父底稿码（可选）。已知时构造 grammar_v1 的 3 参
                 `WP(parent, sheet, cell)`；未知时退化为 URI 形态交给 resolver 匹配。
+            resolve_identity: False 时 BFS 不调同步桥接 `_sync_resolve`，节点保持 `{sheet}!{cell}` 与
+                `resolve_missed=True`。生产构造一律传 False（身份由 async 编排器经 exact_identity 判定，
+                acnr-foundation-defect-closure 需求 8.2），守卫 `tests/acnr/test_cross_sheet_identity_paths.py`。
         """
         self._project_id = project_id
         self._parent_wp_code = parent_wp_code
+        self._resolve_identity = resolve_identity
 
     def resolve(
         self,
@@ -297,30 +304,8 @@ class CrossSheetResolver:
             # 命中（found=true）→ 使用 addr_id 作为 node URI；未命中/异常 → 降级
             # 到 snapshot fallback（uri=sheet!cell）并标记 resolve_missed=True。
             acnr_result: "ResolveResult | None" = None
-            try:
-                if self._parent_wp_code:
-                    # grammar_v1 3 参形态：WP(parent, sheet, cell)
-                    formula_ref = (
-                        f"WP('{self._parent_wp_code}','{cur_sheet}','{cur_cell}')"
-                    )
-                    acnr_result = _sync_resolve(
-                        formula_ref=formula_ref,
-                        project_id=self._project_id,
-                    )
-                else:
-                    # 无 parent wp_code → 退化 URI 形态，交由 resolver 的
-                    # sheet-alias / custom_flat 分支去匹配
-                    acnr_result = _sync_resolve(
-                        uri=f"wp://{cur_sheet}/{cur_cell}",
-                        project_id=self._project_id,
-                    )
-            except Exception as exc:  # 防御：_sync_resolve 已吞异常，此处再兜底
-                logger.warning(
-                    "ACNR full_resolve failed for %s!%s: %s",
-                    cur_sheet,
-                    cur_cell,
-                    exc,
-                )
+            if self._resolve_identity:
+                acnr_result = self._bridge_identity(cur_sheet, cur_cell)
 
             if acnr_result and acnr_result.found and acnr_result.addr_id:
                 uri = acnr_result.addr_id
@@ -337,6 +322,8 @@ class CrossSheetResolver:
                         uri=uri,
                         cycle=True,
                         resolve_missed=resolve_missed,
+                        sheet=cur_sheet,
+                        cell=cur_cell,
                     )
                 )
                 has_cycle = True
@@ -359,6 +346,8 @@ class CrossSheetResolver:
                 formula=formula,
                 missing=missing,
                 resolve_missed=resolve_missed,
+                sheet=cur_sheet,
+                cell=cur_cell,
             )
             chain.append(node)
 
@@ -379,6 +368,33 @@ class CrossSheetResolver:
             has_cycle=has_cycle,
             truncated_at_depth=truncated_at_depth,
         )
+
+    def _bridge_identity(self, cur_sheet: str, cur_cell: str) -> "ResolveResult | None":
+        """`resolve_identity=True` 时经同步桥接取身份（脚本 / 无事件循环场景；生产构造不走这里）。"""
+        try:
+            if self._parent_wp_code:
+                # grammar_v1 3 参形态：WP(parent, sheet, cell)
+                formula_ref = (
+                    f"WP('{self._parent_wp_code}','{cur_sheet}','{cur_cell}')"
+                )
+                return _sync_resolve(
+                    formula_ref=formula_ref,
+                    project_id=self._project_id,
+                )
+            # 无 parent wp_code → 退化 URI 形态，交由 resolver 的
+            # sheet-alias / custom_flat 分支去匹配
+            return _sync_resolve(
+                uri=f"wp://{cur_sheet}/{cur_cell}",
+                project_id=self._project_id,
+            )
+        except Exception as exc:  # 防御：_sync_resolve 已吞异常，此处再兜底
+            logger.warning(
+                "ACNR full_resolve failed for %s!%s: %s",
+                cur_sheet,
+                cur_cell,
+                exc,
+            )
+            return None
 
     def _is_missing(
         self, parsed_data: dict | None, sheet_name: str, cell_ref: str
@@ -409,5 +425,5 @@ class CrossSheetResolver:
 
 
 
-# Module-level singleton
-cross_sheet_resolver = CrossSheetResolver()
+# Module-level singleton（编排器缺省值；只做 BFS、不取身份，身份由编排器经 exact_identity 判定）
+cross_sheet_resolver = CrossSheetResolver(resolve_identity=False)

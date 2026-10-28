@@ -7,7 +7,8 @@
 现状：生产代码里调用它的是目录写法解析 `catalog._formula_ref_to_sheet_match` / `_uri_to_sheet_match`
 （`full_resolve` 首步经 `resolve_identity.step1_identity` 调它，T10）、发布门禁 `catalog_release` 与生成器名称规则
 `catalog_names`（T06），以及单元格取值接线 `acnr.wp_cell_target`（T12；它的生产调用方是底稿公式三参 WP 的
-A1 第三参 `WPExecutor.read_sheet_cell`（T13），高级查询接线随 T14）。
+A1 第三参 `WPExecutor.read_sheet_cell`（T13）与高级查询取值编排（T14）），以及跨 sheet 追溯编排器
+`custom_query.cross_sheet_trace_orchestrator`（T20，每个追溯节点经 `cell_of` 取规范身份）。
 计划接入：V2 规范化与 stale 引擎（T21）、`check_ccr_resolve`（T22）。
 
 只依赖标准库与本包的 `catalog` / `reasons` / `catalog_contract`（CI 无需新增依赖）。

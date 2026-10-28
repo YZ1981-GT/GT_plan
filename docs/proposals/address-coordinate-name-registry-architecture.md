@@ -45,12 +45,13 @@
 | 底稿域 canonical resolver（非底稿域委托 V1） | 后端 | `backend/app/services/acnr/resolver.py` | `full_resolve`、`resolve_instance` | `backend/tests/acnr/test_full_resolve.py` |
 | L2 项目 overlay | 后端 | `backend/app/services/acnr/overlay.py` | `get_project_overlay`、`ProjectOverlay` | `backend/tests/acnr/test_overlay.py` |
 | L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
-| 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则与单元格取值接线调用它，V2 / CCR 尚未调用） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
+| 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线与跨 sheet 追溯编排器调用它，V2 / CCR 尚未调用） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
 | 底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它） | 后端 | `backend/app/services/wp_cell_reader.py` | `resolve_wp_cell`、`WpCellRead` | `backend/tests/test_wp_cell_reader_contract.py` |
-| 单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）与高级查询取值编排） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
+| 单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录）） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
 | 高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；后端已接到业务视图 execute、模板执行与构建器预览 / 执行 / 导出，构建器先过与业务视图同一项目守卫，带单元格缺项目或年度补不出即拒绝，取值不进查询缓存） | 后端 | `backend/app/services/custom_query/acnr_target_values.py` | `resolve_acnr_targets`、`read_acnr_target_values`、`classify_target`、`plan_builder_targets`、`complete_year` | `backend/tests/acnr/test_acnr_targets_query_e2e.py` |
 | 高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误） | 后端 | `backend/app/services/custom_query/strict_model.py` | `StrictRequestModel`、`AcnrTargetList`、`TemplateConfig`、`template_config_rejected` | `backend/tests/test_query_dsl_rejects_unknown_fields.py` |
 | `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
+| 跨 sheet 追溯节点规范身份（`/api/custom-query/cross-sheet-trace` 的每个节点按「父底稿 + sheet 名或编码 + A1」经唯一精确身份判定取规范 addr_id：sheet 已识别且 A1 合法即解析成功并标明是否为目录登记格，sheet 不识别、多义、命中禁止别名或 A1 非法给中文原因；同步追溯的生产构造都不经同步桥接取身份） | 后端 | `backend/app/services/custom_query/cross_sheet_trace_orchestrator.py` | `CrossSheetTraceOrchestrator`、`TracedRefNode` | `backend/tests/acnr/test_cross_sheet_trace_async_e2e.py` |
 | 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
 | 发布门禁模块（生成器写出与 `--check` 都调用） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |
 | 孤儿与历史移除判定记录的 loader（发布候选构建读取） | 后端 | `backend/app/services/acnr/loaders/from_sheet_verdicts.py` | `load_sheet_verdicts` | `backend/tests/acnr/test_sheet_verdicts.py` |
@@ -73,7 +74,6 @@
 | 事项 | 任务 |
 |---|---|
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
-| 异步追溯拿到规范 addr_id | T20 |
 | V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置 | T21、T22 |
 | 消费方台账与绕过棘轮、四个 ACNR CI 作业转绿 | T24 |
 | 版本锁 / acnr_targets / 拒绝计入 ACNR 指标 | T26 |

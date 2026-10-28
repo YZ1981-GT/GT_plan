@@ -546,6 +546,14 @@ CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 
 
 `test_cross_sheet_trace_async_e2e.py`：TestClient 调 `GET /api/custom-query/cross-sheet-trace`（不 mock `_sync_resolve` 与 resolver），夹具 `univer_snapshot` 用目录权威名「货币资金分析表E1-14」等。断言：登记格节点 addr_id 规范、`resolved=true`、`in_catalog=true`；**R2-F8 新增一个未登记格（如 `E1-14!Z99`，sheet 已识别、A1 合法但不在目录），期望 `resolved=true`、`in_catalog=false`、addr_id=`E1/E1-14/Z99`、`jump_route` 由 `resolve_instance` 得到**；目录外 sheet / A1 非法 / 多义的节点 `resolved=false` 且有中文原因。既有 `test_cross_sheet_*`、`test_cross_sheet_trace_wiring.py` 全绿，响应只增。变异：编排器退回 `cell:{sheet 名}!{A1}` → e2e 红；把「sheet 已识别、A1 合法」也判 `resolved=false` → 未登记格用例红；某生产构造去掉 `resolve_identity=False` → 守卫红。
 
+**T20 实施记录（段七续做第 8 轮，待评审核实）**：
+
+- 编排器 `trace(..., parent_wp_code=…)`：目录经 `wp_cell_target.effective_catalog(db, project_id)` 取（锁定项目用锁定目录），每个节点 `exact_identity.cell_of(父底稿, 节点 sheet, 节点 A1, index=…)`；`ok` 即 `resolved=true`、`addr_id` 规范、`in_catalog` 取自 `cell_of`；其余状态 `resolved=false`、`unresolved_reason` 用 `cell_of` / `sheet_of` 的中文原因（`reasons` 模块，不另写文案）。`parent_wp_code` 缺省 None 时原因为「缺少父底稿编码，无法确定单元格身份」（路由总会传端点的 `wp_code`）。编排器不再调用 `AddressingService`，构造参数 `addressing` 与 `trace` 的 `timeout_s` 删除（唯一调用方是路由，两项都不传）。
+- `wp_id` / `jump_route`：按 sheet addr_id 记忆。先 `resolve_instance(项目, 父底稿, sheet_code)`，命中用它的结果；**补充（原文未写）**：结果为 `not_found` 且 sheet 不是父底稿本身时，`resolve_instance(项目, 父底稿, 父底稿)` 取父底稿，再 `resolve_instance(项目, 父底稿, sheet_code, explicit_wp_id=父底稿 id)` 生成带 `sheet=` 的路由。理由：真实项目的 `wp_index` 多数只有父级编码（T16 走查项目即如此），只按原文 sheet 级底稿不存在时 `jump_route` 恒空，与需求 8「可以直接跳转」不符；回落口径与 `wp_cell_target.bind_wp_code`（sheet 级底稿优先、仅不存在时回落父底稿）一致，两步都是 `resolve_instance` 公开入口（显式 wp_id 分支校验底稿属于本项目）。查库异常上抛（旧 `_attach_wp_id` 吞异常）。
+- `CrossSheetResolver`：`resolve_identity` 缺省 True（既有 PBT 不改）；同步桥接调用移入 `_bridge_identity`，只在 `if self._resolve_identity` 分支调用。生产构造两处：模块单例 `CrossSheetResolver(resolve_identity=False)`、`wp_formula_eval_service._resolve_cross_sheet_refs`（注明只取值）。`RefChainNode` 增 `sheet` / `cell`，`TracedRefNode` 增 `in_catalog` / `unresolved_reason`，旧字段不变。
+- 既有测试同步改：`test_cross_sheet_trace_orchestrator.py` 第 2 节三例原断言寻址层收到 `["cell:A!A1", "cell:B!B1"]`（即本缺陷的形态），改为新契约（真实目录、权威 sheet 名）+ 寻址层调用 0 次；`test_cross_sheet_trace_wiring.py` 加「把端点 wp_code 作为 parent_wp_code 传下去」；advanced-query-hardening 的 `scripts/check/mutate_cross_sheet_trace_wiring.py` 的 T01 / T06 锚点随之改（`--check-anchors` 6/6 OK）。
+- 前端没有 `cross-sheet-trace` 的调用方（现算全仓前端源码 0 处引用，`CrossSheetTracePopover` 已不存在），响应只增字段，本任务无浏览器实测项。
+
 ## 10. D7　V2 依赖图与 stale 身份规范化（需求 9）
 
 ### 10.1 现状确认

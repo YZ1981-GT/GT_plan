@@ -1724,12 +1724,13 @@ async def cross_sheet_trace(
     # 为什么不能直接调 cross_sheet_resolver.resolve()：本端点是 async，调用时事件循环
     # 正在运行，而同步 BFS 内部的 `_sync_resolve` 一探测到 running loop 就返回 None
     # 降级 → 每个链节点的 addr_id 恒为 None，溯源结果无法跳转、审计日志也拿不到真
-    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数，addr_id 经
-    # AddressingService 一次性并发解析后合并回链。
+    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数、不取身份，节点身份由编排器经
+    # exact_identity 按「父底稿（本端点 wp_code）+ sheet + A1」判定（acnr T20）。
     trace_result = await cross_sheet_trace_orchestrator.trace(
         parsed_data,
         sheet_name,
         cell_ref,
+        parent_wp_code=wp_code,
         project_id=project_id,
         db=db,
         max_depth=max_depth,

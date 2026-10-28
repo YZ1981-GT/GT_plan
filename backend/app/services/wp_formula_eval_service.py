@@ -280,8 +280,9 @@ def _resolve_cross_sheet_refs(
     if not matches:
         return raw, errors
 
+    # 只取值、不取身份：resolve_identity=False（async 上下文里同步桥接只会降级，需求 8.2）
     resolver = CrossSheetResolver(
-        project_id=project_id, parent_wp_code=parent_wp_code
+        project_id=project_id, parent_wp_code=parent_wp_code, resolve_identity=False
     )
     expr = raw
     for match in matches:

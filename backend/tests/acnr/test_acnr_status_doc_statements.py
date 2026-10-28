@@ -107,6 +107,15 @@ def _query_models_are_strict() -> bool:
 
 
 _QB_REL = "backend/app/routers/query_builder.py"
+_ORCH_REL = _CQ + "cross_sheet_trace_orchestrator.py"
+
+
+def _imported_names(rel: str, module_tail: str) -> list[str]:
+    """``rel`` 里 ``from …{module_tail} import …`` 导入的名字（排序，AST）。"""
+    import ast as _ast
+
+    return sorted(a.name for n in _ast.walk(_ast.parse(_read(_REPO / rel)))
+                  if isinstance(n, _ast.ImportFrom) and (n.module or "").endswith(module_tail) for a in n.names)
 
 
 def _acnr_targets_importers_ok() -> bool:
@@ -268,12 +277,13 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "L3 运行时条目": CB(
             _A + "runtime.py", ("get_runtime_entries",), _T + "test_runtime.py",
             calls(_RESOLVER_REL, "full_resolve", "get_runtime_entries")),
-        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则与单元格取值接线调用它，V2 / CCR 尚未调用）": CB(
+        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线与跨 sheet 追溯编排器调用它，V2 / CCR 尚未调用）": CB(
             _A + "exact_identity.py", ("sheet_of", "cell_of", "name_owner"), _T + "test_exact_identity.py",
             claim("exact_identity 只导入标准库与本包 reasons / catalog_contract / catalog、不做文件或数据库读写（AST）",
                   _exact_identity_is_pure),
-            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、wp_cell_target（AST）",
-                  _exact_identity_only_release_imports),
+            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、wp_cell_target 与"
+                  "跨 sheet 追溯编排器（AST）", _exact_identity_only_release_imports),
+            calls(_ORCH_REL, "_identity", "cell_of"),
             claim("full_resolve 第 1 步经 step1_identity → catalog 结构化判定 → sheet_of，catalog 无子串启发式（AST）",
                   _full_resolve_step1_uses_exact_identity),
             calls(_A + "wp_cell_target.py", "sheet_key_for", "sheet_of"),
@@ -287,7 +297,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_database_error_propagates"),
             claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
                   lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
-        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）与高级查询取值编排）": CB(
+        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录））": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",
             calls(_A + "wp_cell_target.py", "read_entry_cell", "resolve_wp_cell", "bind_wp_code", "sheet_key_for"),
@@ -296,10 +306,12 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             not_imports(_A + "wp_cell_target.py", "project_registry_lock"), task_open("T17", "T18"),
             has_tests(_T + "test_wp_cell_target.py", "test_locked_project_judges_identity_by_locked_catalog",
                       "test_sheet_level_paper_preferred_over_parent", "test_borrowed_and_ambiguous_names_block"),
-            claim("生产代码里导入 wp_cell_target 的恰为 formula_engine 与 custom_query/acnr_target_values（AST）",
-                  lambda: sorted(_production_importers_of("wp_cell_target")) == [
-                      "backend/app/services/custom_query/acnr_target_values.py",
+            claim("生产代码里导入 wp_cell_target 的恰为 formula_engine、custom_query/acnr_target_values 与"
+                  "跨 sheet 追溯编排器（AST）", lambda: sorted(_production_importers_of("wp_cell_target")) == [
+                      "backend/app/services/custom_query/acnr_target_values.py", _ORCH_REL,
                       "backend/app/services/formula_engine.py"]),
+            claim("跨 sheet 追溯编排器只从 wp_cell_target 导入 effective_catalog（AST）",
+                  lambda: _imported_names(_ORCH_REL, "wp_cell_target") == ["effective_catalog"]),
             calls("backend/app/services/formula_engine.py", "read_sheet_cell", "effective_catalog", "read_formula_cell"),
             claim("生产代码里导入 acnr_target_values 的恰为编排器与构建器路由（AST）", _acnr_targets_importers_ok)),
         "高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；后端已接到业务视图 execute、模板执行与构建器预览 / 执行 / 导出，构建器先过与业务视图同一项目守卫，带单元格缺项目或年度补不出即拒绝，取值不进查询缓存）": CB(
@@ -341,6 +353,16 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             has_tests("backend/tests/test_query_dsl_rejects_unknown_fields.py",
                       "test_unknown_key_rejected_with_chinese_message", "test_builder_endpoints_reject_unknown_key",
                       "test_business_execute_rejects_unknown_key")),
+        "跨 sheet 追溯节点规范身份（`/api/custom-query/cross-sheet-trace` 的每个节点按「父底稿 + sheet 名或编码 + A1」经唯一精确身份判定取规范 addr_id：sheet 已识别且 A1 合法即解析成功并标明是否为目录登记格，sheet 不识别、多义、命中禁止别名或 A1 非法给中文原因；同步追溯的生产构造都不经同步桥接取身份）": CB(
+            _ORCH_REL, ("CrossSheetTraceOrchestrator", "TracedRefNode"), _T + "test_cross_sheet_trace_async_e2e.py",
+            calls(_ORCH_REL, "_identity", "cell_of"), calls(_ORCH_REL, "trace", "effective_catalog", "_instance_route"),
+            calls(_ORCH_REL, "_instance_route", "resolve_instance"), not_imports(_ORCH_REL, "addressing_service"),
+            calls("backend/app/routers/custom_query.py", "cross_sheet_trace", "trace"),
+            has_tests(_T + "test_cross_sheet_trace_async_e2e.py", "test_registered_unregistered_and_outside_nodes",
+                      "test_unresolvable_root_has_chinese_reason"),
+            has_tests(_T + "test_cross_sheet_identity_paths.py",
+                      "test_every_production_construction_passes_resolve_identity_false",
+                      "test_sync_bridge_only_referenced_inside_guarded_helper")),
         "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
             _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
             calls(_RESOLVER_REL, "full_resolve", "step1_identity"),
@@ -420,7 +442,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "异步追溯拿到规范 addr_id": L("T20"),
         "V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置": L("T21、T22"),
         "消费方台账与绕过棘轮、四个 ACNR CI 作业转绿": L("T24"),
         "版本锁 / acnr_targets / 拒绝计入 ACNR 指标": L("T26"),
