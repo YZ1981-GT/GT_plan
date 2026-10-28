@@ -429,6 +429,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_acks_equal_unresolved_and_generator_report",
                       "test_each_ack_has_owner_expiry_reason_and_recomputed_evidence",
                       "test_rewriting_b60_to_workload_board_is_rejected", "test_stale_ack_and_outside_list_are_reported",
+                      "test_blocking_fails_on_stale_ack_alone",
                       "test_deprecated_group_counts", "test_scripts_run_without_site_packages")),
         "V2 静态数据双读对账产物（L2 语义锚点、resolved refs、L3 依赖、CCR 四个文件的每个节点与边端点，经 V2 读端点同一身份函数按来源文件 × 分类计数，每类附中文原因与样本，不含时间戳；`--check` 比对，CI 运行）": CB(
             _RECON_REL, ("build", "main"), _T + "test_ccr_resolve.py",

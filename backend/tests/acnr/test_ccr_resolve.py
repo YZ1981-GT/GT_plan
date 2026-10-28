@@ -252,6 +252,26 @@ def test_main_exit_codes(chk, real, tmp_path, monkeypatch, capsys):
     assert "CW-422" in out
 
 
+def test_blocking_fails_on_stale_ack_alone(chk, real, tmp_path, monkeypatch, capsys):
+    """只有失效豁免、没有清单外（评审 RV9.3-01）：--blocking 退出 1 并点名该豁免；报告模式仍退出 0。"""
+    acks = copy.deepcopy(real["acks"])
+    template = next(e for e in acks["entries"] if e.get("id") == "ack-ccr-unresolved-CW-60")
+    acks["entries"].append({**copy.deepcopy(template), "id": "ack-ccr-unresolved-CW-01", "covers": {"ccr_ids": ["CW-01"]}})
+    r = chk.run(real["catalog"], real["ccr"], acks)
+    assert r["outside_list"] == []
+    assert [(s["ack_id"], s["detail"]) for s in r["stale_acknowledgements"]] == [
+        ("ack-ccr-unresolved-CW-01", "该 CCR 源已可解析")]
+    p = tmp_path / "acks.json"
+    p.write_text(json.dumps(acks, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(chk, "ACK_PATH", p)
+    capsys.readouterr()
+    assert chk.main(["--blocking"]) == 1
+    out = capsys.readouterr().out
+    assert "[失效豁免] ack-ccr-unresolved-CW-01（CW-01）：该 CCR 源已可解析" in out
+    assert "清单外 0 条、失效豁免 1 条，blocking 模式退出 1" in out
+    assert chk.main([]) == 0  # 报告模式不阻断
+
+
 # ─── 停用条目引用计入 deprecated 组（RV7-03） ─────────────────────────────────────────
 
 
