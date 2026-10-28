@@ -250,7 +250,7 @@ async def _business_export(body: Any, *, user: Any, db: Any) -> GatedStreamingRe
     if req.group_by or req.pivot is not None:
         raise _grouping_unsupported()
     resolved = await query_orchestrator.resolve_targets(req, db)
-    plan = await business_fetchers.prepare_export(req, db)
+    plan = await business_fetchers.prepare_export(req, db, user=user)
     headers = dict(getattr(body, "headers", None) or {})
     slot = acquire_export_slot(user.id)
     try:
@@ -261,7 +261,7 @@ async def _business_export(body: Any, *, user: Any, db: Any) -> GatedStreamingRe
             columns, warnings, label = plan.columns, plan.warnings, plan.spec.label
         else:
             rows, columns, warnings = await _memory_rows(
-                req, await business_fetchers.business_fetcher(req, resolved, db), user=user, db=db)
+                req, await business_fetchers.business_fetcher(req, resolved, db, user=user), user=user, db=db)
             total, label = len(rows), req.source
             _check_row_limit(total)
         source_text = f"{label}（{req.source}）" if label != req.source else req.source

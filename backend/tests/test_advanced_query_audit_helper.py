@@ -48,7 +48,7 @@ def captured_logs(monkeypatch):
         calls.append(kwargs)
         return kwargs
 
-    monkeypatch.setattr(audit_helper.audit_logger, "log_action", _fake_log_action)
+    monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _fake_log_action)
     return calls
 
 
@@ -130,7 +130,7 @@ class TestRecordWriteback:
         async def _boom(**kwargs):
             raise RuntimeError("queue down")
 
-        monkeypatch.setattr(audit_helper.audit_logger, "log_action", _boom)
+        monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _boom)
         ok = await record_writeback(user_id="u", addr_ids="a", old_value=1, new_value=2)
         assert ok is False
 

@@ -33,6 +33,8 @@ ALL_PROJECT_ROLES: tuple[str, ...] = ("admin", "partner")
 FORBIDDEN_REASON = "高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用"
 #: 准入通过但没有任何可访问的未删除项目
 NO_PROJECT_REASON = "您当前没有可访问的项目"
+#: 准入通过、可访问项目都因审计循环范围被排除（ADR-AQL-08 / 19）
+CYCLE_SCOPED_REASON = "您可访问的项目均设有审计循环范围，请在业务视图中查询"
 
 Basis = Literal["system_role", "project_manager"]
 
@@ -104,5 +106,10 @@ async def resolve_builder_access(user: Any, db: AsyncSession) -> BuilderAccess:
     if role_value(user) in ALL_PROJECT_ROLES:
         return BuilderAccess(True, admission.basis, None, True, None)
     scope = await resolve_builder_scope(user=user, dsl_tables=(), db=db)
+    # 计数 = 排除已删与循环受限项目之后（与执行时同一函数）；为 0 时按是否有循环排除给两种原因
     count = len(scope.project_ids or ())
-    return BuilderAccess(True, admission.basis, None if count else NO_PROJECT_REASON, False, count)
+    if count:
+        reason = None
+    else:
+        reason = CYCLE_SCOPED_REASON if scope.excluded_cycle_scoped else NO_PROJECT_REASON
+    return BuilderAccess(True, admission.basis, reason, False, count)

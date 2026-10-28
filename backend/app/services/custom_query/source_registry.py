@@ -107,11 +107,24 @@ async def _warn_aux_balance(ctx: FetchContext) -> list[str]:
     return warnings
 
 
+async def _cycle_codes(ctx: FetchContext) -> frozenset[str] | None:
+    """本人在本项目的循环科目集合（R3.8，``cycle_scope``）：None = 不限；空集 = 无行。
+
+    ``ctx.cycle`` 是请求级 ``CycleScopeCache``（业务视图三个入口都按当前用户带上）；内部调用不带用户时为 None、不限。
+    """
+    if ctx.cycle is None:
+        return None
+    return (await ctx.cycle.scope(ctx.project_id)).codes
+
+
 async def _trial_balance_where(ctx: FetchContext) -> list[ColumnElement]:
     t = TrialBalance.__table__
     clauses: list[ColumnElement] = [t.c.project_id == ctx.project_id, t.c.year == ctx.year, t.c.is_deleted == sa.false()]
     if ctx.company_code:
         clauses.append(t.c.company_code == ctx.company_code)
+    codes = await _cycle_codes(ctx)
+    if codes is not None:  # 与试算表页同口径：标准科目码在本人循环的科目集合内（空集 = 无行）
+        clauses.append(t.c.standard_account_code.in_(sorted(codes)) if codes else sa.false())
     return clauses
 
 
@@ -236,11 +249,24 @@ def normalize_adjustment_type(value: Any) -> str:
     return _ADJUSTMENT_TYPE_VALUES[key]
 
 
+_ADJ_SCOPE = Adjustment.__table__.alias("adj_cycle_scope")
+
+
 async def _adjustment_where(ctx: FetchContext) -> list[ColumnElement]:
     a = Adjustment.__table__
     clauses: list[ColumnElement] = [a.c.project_id == ctx.project_id, a.c.year == ctx.year, a.c.is_deleted == sa.false()]
     if ctx.company_code:
         clauses.append(a.c.company_code == ctx.company_code)
+    codes = await _cycle_codes(ctx)
+    if codes is not None:
+        # 与调整分录页同口径：分录组内任一行科目在本人循环的科目集合内 ⇒ 整组可见（空集 = 无行）
+        s = _ADJ_SCOPE
+        clauses.append(a.c.entry_group_id.in_(
+            sa.select(s.c.entry_group_id).where(
+                s.c.project_id == ctx.project_id, s.c.year == ctx.year, s.c.is_deleted == sa.false(),
+                s.c.account_code.in_(sorted(codes)),
+            )
+        ) if codes else sa.false())
     return clauses
 
 
@@ -590,8 +616,9 @@ REPORT_SOURCE_PREFIX = "report_"
 JSON_SOURCES: dict[str, tuple[str, str]] = {
     "tb_summary": ("worksheet", "_query_tb_summary"),
     "worksheet": ("worksheet", "_query_worksheet"),
-    "disclosure": ("disclosure", "_query_disclosure"),
-    "disclosure_note": ("disclosure", "_query_disclosure"),
+    # 附注（任务 19，ADR-AQL-16）：目录 = 章节 × 表一行；章节 = 按表返回（filters.table_index）。合并项目沿用旧取数
+    "disclosure": ("disclosure", "_query_disclosure_catalog"),
+    "disclosure_note": ("disclosure", "_query_disclosure_section"),
 }
 JSON_PREFIXES: tuple[tuple[str, tuple[str, str]], ...] = (("ws_", ("worksheet", "_query_worksheet")),)
 #: 底稿单元格区域（签名不同：``(db, pid, filters)``）

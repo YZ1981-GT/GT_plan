@@ -272,9 +272,15 @@ def patch_guard(monkeypatch):
         # 已删项目的排除另由 advanced_query_linkage 的真库用例覆盖。
         return frozenset(project_ids)
 
+    async def _unrestricted(self, _project_id):
+        # 循环范围（advanced-query-linkage-closure 任务 23）要查人员与委派；本组不带库，按不受限处理。
+        # 受限项目的排除另由 advanced_query_linkage/test_aql_cycle_scope_pg.py 的真库用例覆盖。
+        return False
+
     def _apply(guard):
         monkeypatch.setattr(bs, "ownership_guard", guard)
         monkeypatch.setattr(bs, "_live_project_ids", _all_live)
+        monkeypatch.setattr(bs.CycleScopeCache, "is_restricted", _unrestricted)
         return guard
 
     return _apply

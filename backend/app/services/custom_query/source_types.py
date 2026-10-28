@@ -75,7 +75,11 @@ class FilterKey:
 
 @dataclass
 class FetchContext:
-    """一次取数的上下文；``cycle`` 由任务 23（循环范围）接入，此前恒为 None。"""
+    """一次取数的上下文。
+
+    ``cycle``：请求级 ``cycle_scope.CycleScopeCache``（任务 23，R3.8）—— 业务视图入口按当前用户带上，试算表 / 调整分录
+    的口径谓词据此按循环过滤；内部调用不带用户时为 None（不限）。
+    """
 
     db: AsyncSession
     user: Any

@@ -109,8 +109,8 @@ def test_nullable_is_read_from_column_definition() -> None:
     ("consol_unit:C01:tb_detail", {}, ("spec", "trial_balance", {}, "C01")),
     # 合并单位下唯一的「调整分录」叶子 = 该单位的全部类型（原写死大写 'AJE'，PG 枚举没有这个值、恒 500）
     ("consol_unit:C01:adjustment", {}, ("spec", "adjustment", {}, "C01")),
-    ("disclosure_note:八、1", {}, ("json", ("disclosure", "_query_disclosure"), {"section_id": "八、1"}, None)),
-    ("disclosure", {}, ("json", ("disclosure", "_query_disclosure"), {}, None)),
+    ("disclosure_note:八、1", {}, ("json", ("disclosure", "_query_disclosure_section"), {"section_id": "八、1"}, None)),
+    ("disclosure", {}, ("json", ("disclosure", "_query_disclosure_catalog"), {}, None)),
     ("tb_summary", {}, ("json", ("worksheet", "_query_tb_summary"), {}, None)),
     ("ws_consol_tb", {}, ("json", ("worksheet", "_query_worksheet"), {}, None)),
     ("report", {}, ("spec", "report", {}, None)),
@@ -493,13 +493,13 @@ async def test_indicator_leaves_of_registry_sources_declare_registry_columns() -
     tree = await router_module.get_indicators(project_id=None, depth=1, branch=None, response=None, db=None,
                                               current_user=None)
     leaves = {leaf["key"]: leaf for group in tree for leaf in group.get("children") or [] if "key" in leaf}
-    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours", "report_lines", "adj_aje", "adj_rcl",
+    for key in ("tb_detail", "account_balance", "ledger_entries", "workhours", "report_lines", "adj_aje", "adj_rje", "aux_balance", "aux_ledger",
                 "report_balance_sheet", "report_income_statement", "report_impairment_provision"):
         assert leaves[key]["columns"] == sr.resolve_source(key).spec.display_keys, key
     assert "entry_number" not in leaves["adj_aje"]["columns"], "旧叶子声明了表里没有的列（页面版按叶子列发 columns ⇒ 400）"
     for kind, canonical in sr.CONSOL_UNIT_KINDS.items():  # 合并单位叶子（_build_consol_units_tree）同一定义
         assert router_module._registry_columns(f"consol_unit:C01:{kind}") == sr.SOURCE_REGISTRY[canonical].display_keys
-    assert router_module._INDICATORS_SCHEMA_VERSION >= 12, "叶子列变了（任务 17 / 18 / 22），旧缓存必须失效"
+    assert router_module._INDICATORS_SCHEMA_VERSION >= 13, "叶子列与树形变了（任务 17 / 18 / 22 / 19 / 20），旧缓存必须失效"
 
 
 async def test_ref_context_follows_project_template_type() -> None:

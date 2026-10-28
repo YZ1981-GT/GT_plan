@@ -26,6 +26,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import HTTPException
 
 from app.services.custom_query import paged_fetch
+from app.services.custom_query.cycle_scope import CycleScopeCache
 from app.services.custom_query.pagination import FETCH_HARD_CAP
 from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage, QueryRequest
 from app.services.custom_query.source_registry import FetchContext, ResolvedSource, resolve_source
@@ -90,20 +91,26 @@ def _too_large(req: QueryRequest, row_count: int) -> HTTPException:
     )
 
 
-def _sql_context(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchContext:
+def _cycle_cache(user: Any, db: Any) -> CycleScopeCache | None:
+    """请求级循环范围缓存（R3.8）：业务视图的 execute / export / 模板执行都按当前用户带上；无用户（内部调用）时不限。"""
+    return CycleScopeCache(user, db) if user is not None else None
+
+
+def _sql_context(req: QueryRequest, target: ResolvedSource, db: Any, cycle: CycleScopeCache | None = None) -> FetchContext:
     return FetchContext(
         db=db,
-        user=None,
+        user=None if cycle is None else cycle.user,
         project_id=paged_fetch.project_uuid(req.project_id),
         year=int(req.year),
         filters={**dict(req.filters or {}), **dict(target.fixed_filters)},
         company_code=target.company_code,
+        cycle=cycle,
     )
 
 
-async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchPage:
+async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any, cycle: CycleScopeCache | None) -> FetchPage:
     assert target.spec is not None
-    ctx = _sql_context(req, target, db)
+    ctx = _sql_context(req, target, db, cycle)
     common = {"conditions": list(req.conditions), "logic": req.condition_logic, "columns": list(req.columns)}
     if req.group_by or req.pivot is not None:
         # 分组 / 透视要全量参与计算：> FETCH_HARD_CAP 行即 400，不在截断样本上聚合（ADR-AQL-07）
@@ -113,13 +120,17 @@ async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any) -> Fetc
     )
 
 
-async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any) -> FetchPage:
+async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any, cycle: CycleScopeCache | None) -> FetchPage:
     assert target.json_fetcher is not None
     _reject_conditions(req)
     filters = {**dict(req.filters or {}), **dict(target.fixed_filters)}
     fetcher = _json_fetcher(target.json_fetcher)
     if target.json_fetcher[1] == "_query_workpaper_cell_range":
         result = await fetcher(db, req.project_id, filters)
+    elif target.json_fetcher[0] == "disclosure":
+        # 附注目录 / 章节按本人循环的章节集合严格过滤（与附注页同，R3.8）；None = 不限
+        sections = None if cycle is None else (await cycle.scope(paged_fetch.project_uuid(req.project_id))).sections
+        result = await fetcher(db, req.project_id, req.year, filters, None, sections=sections)
     else:
         result = await fetcher(db, req.project_id, req.year, filters, None)
     if not isinstance(result, dict):  # pragma: no cover — 取数器契约违约应立刻暴露
@@ -141,9 +152,12 @@ async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any) -> Fet
 
 
 async def business_fetcher(
-    req: QueryRequest, resolved: list[Any], db: Any
+    req: QueryRequest, resolved: list[Any], db: Any, *, user: Any = None
 ) -> "tuple[list[dict], list[ColumnMeta]] | FetchPage":
-    """编排器 step4 的业务视图取数钩子（分派见模块文档）。"""
+    """编排器 step4 的业务视图取数钩子（分派见模块文档）。
+
+    ``user``：当前用户（router 以 ``functools.partial`` 绑定）—— 试算表、调整分录、附注按其循环范围过滤（R3.8）。
+    """
     source = (req.source or "").strip()
     filters = dict(req.filters or {})
 
@@ -161,12 +175,13 @@ async def business_fetcher(
         return rows, _columns_from_result(result, rows)
 
     target = resolve_source(source, filters)
+    cycle = _cycle_cache(user, db)
     if target.spec is not None:
-        return await _fetch_sql(req, target, db)
-    return await _fetch_json(req, target, db)
+        return await _fetch_sql(req, target, db, cycle)
+    return await _fetch_json(req, target, db, cycle)
 
 
-async def prepare_export(req: QueryRequest, db: Any) -> "paged_fetch.StreamPlan | None":
+async def prepare_export(req: QueryRequest, db: Any, *, user: Any = None) -> "paged_fetch.StreamPlan | None":
     """服务端完整导出的取数准备（R8，design §3.5），与 :func:`business_fetcher` 同一分派与校验。
 
     注册表 SQL 源 → ``paged_fetch.StreamPlan``（与 ``page`` 同一语句、同一排序，不带 LIMIT；400 / 422 在这一步）；其余源
@@ -181,6 +196,6 @@ async def prepare_export(req: QueryRequest, db: Any) -> "paged_fetch.StreamPlan 
         _reject_conditions(req)
         return None
     return await paged_fetch.prepare_stream(
-        target.spec, _sql_context(req, target, db), conditions=list(req.conditions), logic=req.condition_logic,
-        columns=list(req.columns), sort=list(req.sort),
+        target.spec, _sql_context(req, target, db, _cycle_cache(user, db)), conditions=list(req.conditions),
+        logic=req.condition_logic, columns=list(req.columns), sort=list(req.sort),
     )

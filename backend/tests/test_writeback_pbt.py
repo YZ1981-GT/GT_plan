@@ -26,10 +26,11 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from app.services.audit_logger_enhanced import AuditLoggerEnhanced
+from app.services.audit_logger_enhanced import audit_logger
 from app.services.custom_query.addressing_service import (
     AddressingService,
     ResolvedTarget,
+    addressing_service,
 )
 from app.services.custom_query.snapshot_writer import (
     AuditWriteFailed,
@@ -147,9 +148,11 @@ async def test_p29_optimistic_lock_stale_rejection(
 # Property 30: 回写事务原子性（Task 15.7, R3.6 / R9.4 / R14.8）
 # ═══════════════════════════════════════════════════════════════════════════
 
-# 🔴 桩一律打在类上（staticmethod 包一层），不打在模块单例 addressing_service / audit_logger 实例上：
-# monkeypatch.setattr 对实例上「来自类」的方法，撤销时把原方法写成实例属性留在单例上，挡住之后用例的类级替换
-# （advanced-query-linkage-closure B6：排在本文件之后的 test_aql_writeback_isolation_pg 4 例因此调到真实 resolve_target）。
+# 🔴 模块单例 addressing_service / audit_logger 的桩用 ``monkeypatch.setitem(vars(单例), 方法名, 桩)``，不用
+# ``monkeypatch.setattr(单例, …)``：后者对「来自类」的方法撤销时把原方法写回成实例属性留在单例上，挡住之后用例的
+# 类级替换（advanced-query-linkage-closure B6：排在本文件之后的 test_aql_writeback_isolation_pg 4 例因此调到真实
+# resolve_target）；setitem 撤销时删键、不留残留，也不受前序用例残留的实例属性影响（类级打桩会被那种残留挡住——
+# B6 全组里 test_advanced_query_audit_helper 等留下的 log_action 残留就让类级版本的 audit_fails 用例不抛异常）。
 
 # 归属校验用的两个合法 UUID（project_mismatch 场景）
 _PID_A = "11111111-1111-1111-1111-111111111111"
@@ -285,7 +288,7 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
                 jump_route="/wp/x", entry_type="cell",
             )
 
-    monkeypatch.setattr(AddressingService, "resolve_target", staticmethod(_fake_resolve))
+    monkeypatch.setitem(vars(addressing_service), "resolve_target", _fake_resolve)
 
     # 审计桩（step10）
     async def _audit_ok(**kwargs):
@@ -294,11 +297,7 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
     async def _audit_boom(**kwargs):
         raise RuntimeError("audit queue down")
 
-    monkeypatch.setattr(
-        AuditLoggerEnhanced,
-        "log_action",
-        staticmethod(_audit_boom if inject == "audit_fails" else _audit_ok),
-    )
+    monkeypatch.setitem(vars(audit_logger), "log_action", _audit_boom if inject == "audit_fails" else _audit_ok)
 
     writer = SnapshotWriter()
 

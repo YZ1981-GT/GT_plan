@@ -859,7 +859,7 @@ class TestWritebackPreviewConfirmPermissions:
             return await original_generate(*args, **kwargs)
 
         monkeypatch.setattr(router_module, "get_visible_project_ids", mock_get_visible_ids)
-        monkeypatch.setattr(writeback_preview_service, "generate", track_generate)
+        monkeypatch.setitem(vars(writeback_preview_service), "generate", track_generate)  # 撤销时删键，不在单例上留实例属性
 
         body = SimpleNamespace(
             project_id="00000000-0000-0000-0000-000000000001",
@@ -904,7 +904,7 @@ class TestWritebackPreviewConfirmPermissions:
 
         monkeypatch.setattr(router_module, "get_visible_project_ids", mock_get_visible_ids)
         monkeypatch.setattr(ownership_guard, "assert_target_accessible", mock_assert_accessible)
-        monkeypatch.setattr(snapshot_writer, "write_cell", mock_write_cell)
+        monkeypatch.setitem(vars(snapshot_writer), "write_cell", mock_write_cell)  # 撤销时删键，不在单例上留实例属性
 
         body = SimpleNamespace(
             project_id="00000000-0000-0000-0000-000000000001",

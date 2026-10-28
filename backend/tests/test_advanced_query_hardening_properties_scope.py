@@ -209,7 +209,7 @@ def test_p24_skeleton_node_count_scales_independently_of_branch_size(
     """骨架节点数恒不随重分支规模增长 —— 这才是懒加载的本质。"""
     import app.routers.custom_query as rm
 
-    async def _disclosure(template_type):
+    async def _disclosure(template_type, **_project_context):  # 任务 19：带项目时多传 db / year / 范围等
         return [{"key": f"s{i}", "label": f"s{i}"} for i in range(n_sections)]
 
     async def _workpaper(db, project_id):
@@ -464,7 +464,7 @@ def test_p2_indicators_gate_precedes_all_domain_reads(project_id):
         calls["template"] += 1
         return "soe"
 
-    async def _disclosure(template_type):
+    async def _disclosure(template_type, **_project_context):  # 任务 19：带项目时多传 db / year / 范围等
         calls["disclosure"] += 1
         return []
 

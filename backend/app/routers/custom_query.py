@@ -35,6 +35,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
@@ -135,6 +136,7 @@ async def get_indicators(
         default=None,
         description="按分支懒加载子节点（disclosure / workpaper），与 depth 配合使用",
     ),
+    year: int | None = Query(default=None, ge=2000, le=2100, description="附注分支的年度；缺省取项目审计年度"),
     response: Response = None,  # type: ignore[assignment]
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -165,6 +167,13 @@ async def get_indicators(
 
     template_type = await _resolve_project_template_type(db, project_id)
     standard_label = _STANDARD_LABEL.get(template_type, "通用")
+    # 附注上下文（任务 19 / 23）：年度缺省取项目审计年度、本人循环章节、X-Notes-Version（骨架 / 分支 / 全量都带）
+    from app.services.custom_query.fetchers.disclosure import resolve_notes_context
+
+    notes = await resolve_notes_context(db, project_id, year if isinstance(year, int) else None, current_user)
+    if response is not None:
+        response.headers["X-Notes-Version"] = notes.version
+    is_consolidated = notes.report_scope == "consolidated"
 
     # ─── 分支懒加载（R12.2）：只构建被展开的那一支 ────────────────────────
     # 🔴 用 isinstance 而非真值判断：本端点也被契约测试**直接调用**（不经 FastAPI
@@ -172,7 +181,7 @@ async def get_indicators(
     # `if branch:` 会恒为真。同理 depth 也必须按真实类型判断。
     branch_key = branch if isinstance(branch, str) and branch else None
     if branch_key:
-        return await _build_indicator_branch(branch_key, db, project_id, template_type)
+        return await _build_indicator_branch(branch_key, db, project_id, template_type, notes=notes)
 
     # depth=1 → 骨架：重分支（附注 / 底稿）子节点留空并标 lazy。
     # 实测全量树约 578KB / 3089 节点 / 2766 叶子、慢请求监控 3391ms，其中绝大部分
@@ -183,21 +192,20 @@ async def get_indicators(
     # ─── 报表树：项目模板类型决定大类标签 + 报表清单 ───────────────
     # 6 张报表：BS / IS / CFS / CFS-补充资料 / 权益变动 / 减值准备表
     # 减值准备表 (impairment_provision) 仅 soe 模板有数据，listed 自动隐藏避免误点
-    report_columns = _registry_columns("report")
     report_children = [
-        {"key": "report_balance_sheet", "label": f"资产负债表（{standard_label}）", "columns": report_columns, "standard": template_type},
-        {"key": "report_income_statement", "label": f"利润表（{standard_label}）", "columns": report_columns, "standard": template_type},
-        {"key": "report_cash_flow_statement", "label": f"现金流量表（{standard_label}）", "columns": report_columns, "standard": template_type},
-        {"key": "report_cash_flow_supplement", "label": f"现金流量表补充资料（{standard_label}）", "columns": report_columns, "standard": template_type},
-        {"key": "report_equity_statement", "label": f"所有者权益变动表（{standard_label}）", "columns": report_columns, "standard": template_type},
+        _leaf("report_balance_sheet", f"资产负债表（{standard_label}）", standard=template_type),
+        _leaf("report_income_statement", f"利润表（{standard_label}）", standard=template_type),
+        _leaf("report_cash_flow_statement", f"现金流量表（{standard_label}）", standard=template_type),
+        _leaf("report_cash_flow_supplement", f"现金流量表补充资料（{standard_label}）", standard=template_type),
+        _leaf("report_equity_statement", f"所有者权益变动表（{standard_label}）", standard=template_type),
     ]
     if template_type == "soe":
         report_children.append(
-            {"key": "report_impairment_provision", "label": f"减值准备表（{standard_label}）", "columns": report_columns, "standard": template_type}
+            _leaf("report_impairment_provision", f"减值准备表（{standard_label}）", standard=template_type)
         )
 
-    # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
-    disclosure_children = [] if skeleton else await _build_disclosure_tree(template_type)
+    # ─── 附注树：单体项目按本项目章节（叠加循环范围），合并项目 / 无项目用模板种子树 ─────────────
+    disclosure_children = [] if skeleton else await _build_disclosure_tree(template_type, **_notes_kwargs(db, project_id, notes))
 
     # ─── 合并范围单位树（仅合并项目可见）────────────────────────
     consol_units_node = await _build_consol_units_tree(db, project_id)
@@ -210,15 +218,20 @@ async def get_indicators(
         "domain": "report",
         "children": report_children,
     })
+    # 单体项目隐藏合并试算平衡表与整组合并工作底稿（ADR-AQL-10：单体项目上恒 0 行）；「科目明细」更名
+    tb_children = [
+        _leaf("tb_detail", "试算平衡表（科目）"),
+        _leaf("account_balance", "科目余额表"),
+        _leaf("ledger_entries", "序时账明细"),
+        _leaf("aux_balance", "辅助余额"),
+        _leaf("aux_ledger", "辅助明细"),
+    ]
+    if is_consolidated:
+        tb_children.insert(1, _leaf("tb_summary", "合并试算平衡表（工作底稿）"))
     base_tree.append({
         "key": "trial_balance", "label": "📑 试算平衡表", "icon": "📑",
         "domain": "tb",
-        "children": [
-            {"key": "tb_detail", "label": "科目明细", "columns": _registry_columns("tb_detail")},
-            {"key": "tb_summary", "label": "试算平衡表", "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"]},
-            {"key": "account_balance", "label": "科目余额表", "columns": _registry_columns("account_balance")},
-            {"key": "ledger_entries", "label": "序时账明细", "columns": _registry_columns("ledger_entries")},
-        ],
+        "children": tb_children,
     })
     base_tree.append({
         "key": "disclosure",
@@ -235,19 +248,20 @@ async def get_indicators(
         "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
         "domain": "wp",
         "children": [
-            {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": _registry_columns("adj_aje")},
-            {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": _registry_columns("adj_rcl")},
+            _leaf("adj_aje", "审计调整分录(AJE)"),
+            _leaf("adj_rje", "重分类调整分录(RJE)"),
         ],
     })
-    base_tree.append({
-        "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
-        "domain": "wp",
-        "children": [
-            {"key": "ws_info", "label": "基本信息表", "columns": ["company_name", "company_code", "holding_type", "non_common_ratio"]},
-            {"key": "ws_elimination", "label": "抵消分录", "columns": ["direction", "subject", "amount", "desc"]},
-            {"key": "ws_consol_tb", "label": "合并试算平衡表", "columns": ["row_code", "row_name", "summary", "equity_dr", "equity_cr", "audited"]},
-        ],
-    })
+    if is_consolidated:
+        base_tree.append({
+            "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
+            "domain": "wp",
+            "children": [
+                _leaf("ws_info", "基本信息表"),
+                _leaf("ws_elimination", "抵消分录"),
+                _leaf("ws_consol_tb", "合并试算平衡表"),
+            ],
+        })
     base_tree.append({
         "key": "workpaper", "label": "📋 底稿", "icon": "📋",
         "domain": "wp",
@@ -257,21 +271,19 @@ async def get_indicators(
     base_tree.append({
         "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
         "domain": "report",
-        "children": [
-            {"key": "report_lines", "label": "报表行次配置", "columns": _registry_columns("report_lines")},
-        ],
+        "children": [_leaf("report_lines", "报表行次配置")],
     })
     base_tree.append({
         "key": "workhours", "label": "⏱️ 工时记录", "icon": "⏱️",
         "domain": "aux",
-        "children": [
-            {"key": "workhours", "label": "工时记录", "columns": _registry_columns("workhours")},
-        ],
+        "children": [_leaf("workhours", "工时记录")],
     })
     if response is not None:
         # version = max(static schema version, DB registry max version)
         try:
-            db_max_version = await wp_template_registry_service.get_max_version(db)
+            # 保存点：表不存在等失败时回滚到这里（PG 上吞掉异常而不回滚会让本请求事务停在 aborted，B6 实测）
+            async with db.begin_nested():
+                db_max_version = await wp_template_registry_service.get_max_version(db)
             effective_version = max(_INDICATORS_SCHEMA_VERSION, db_max_version)
         except Exception:
             effective_version = _INDICATORS_SCHEMA_VERSION
@@ -291,7 +303,9 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 #      试算表没有的列必须失效
 # v12：报表、报表行次、调整分录（含合并单位）切到注册表，叶子 columns 同样由它生成（任务 17 / 18：调整分录旧叶子声明
 #      表里没有的 entry_number，页面版按叶子列发 columns 会 400）；同批任务 22 的试算表重分类列、余额方向列共用 v12
-_INDICATORS_SCHEMA_VERSION = 12
+# v13：树形按项目（任务 19 / 20）——单体项目附注分支按本项目章节（叶子 disclosure_note:八、1 与「附注目录」）、单体隐藏
+#      合并试算平衡表与合并工作底稿组、「科目明细」更名、调整分录叶子 adj_rje、试算组增辅助两叶子、叶子带 supports_conditions
+_INDICATORS_SCHEMA_VERSION = 13
 
 
 def _registry_columns(source: str) -> list[str]:
@@ -300,12 +314,27 @@ def _registry_columns(source: str) -> list[str]:
     assert spec is not None, f"指标树叶子 {source} 不是注册表 SQL 源"
     return list(spec.display_keys)
 
+
+def _leaf(key: str, label: str, **extra: Any) -> dict:
+    """指标树叶子：列与 ``supports_conditions`` 由注册表生成（SQL 源 = 显示列 + 可带条件；JSON 内存源 = [] + 不可带条件）。"""
+    spec = resolve_source(key).spec
+    return {"key": key, "label": label, "columns": list(spec.display_keys) if spec is not None else [],
+            "supports_conditions": spec is not None, **extra}
+
+
+def _notes_kwargs(db: AsyncSession, project_id: str | None, notes: Any) -> dict:
+    """``_build_disclosure_tree`` 的项目上下文参数（无项目时不传，测试替身只收 template_type 也能用）。"""
+    if not project_id:
+        return {}
+    return {"db": db, "project_id": project_id, "year": notes.year, "report_scope": notes.report_scope,
+            "sections": notes.sections}
+
 #: 支持按分支懒加载的大类 key → 子节点构建器名（见 _build_indicator_branch）
 LAZY_INDICATOR_BRANCHES: tuple[str, ...] = ("disclosure", "workpaper")
 
 
 async def _build_indicator_branch(
-    branch: str, db: AsyncSession, project_id: str | None, template_type: str
+    branch: str, db: AsyncSession, project_id: str | None, template_type: str, *, notes: Any = None
 ) -> list[dict]:
     """按分支返回子节点（R12.2）。
 
@@ -313,7 +342,7 @@ async def _build_indicator_branch(
     分不清是「真没有」还是「参数写错了」。
     """
     if branch == "disclosure":
-        return await _build_disclosure_tree(template_type)
+        return await _build_disclosure_tree(template_type, **(_notes_kwargs(db, project_id, notes) if notes else {}))
     if branch == "workpaper":
         return await _build_workpaper_tree(db, project_id)
     raise HTTPException(
@@ -426,10 +455,10 @@ async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> 
             "label": unit_label,
             "company_code": cc,
             "children": [
-                {"key": f"consol_unit:{cc}:account_balance", "label": "科目余额", "columns": _registry_columns("account_balance"), "company_code": cc},
-                {"key": f"consol_unit:{cc}:ledger_entries", "label": "序时账明细", "columns": _registry_columns("ledger_entries"), "company_code": cc},
-                {"key": f"consol_unit:{cc}:tb_detail", "label": "试算表（个体）", "columns": _registry_columns("tb_detail"), "company_code": cc},
-                {"key": f"consol_unit:{cc}:adjustment", "label": "调整分录", "columns": _registry_columns("adjustment"), "company_code": cc},
+                _leaf(f"consol_unit:{cc}:account_balance", "科目余额", company_code=cc),
+                _leaf(f"consol_unit:{cc}:ledger_entries", "序时账明细", company_code=cc),
+                _leaf(f"consol_unit:{cc}:tb_detail", "试算表（个体）", company_code=cc),
+                _leaf(f"consol_unit:{cc}:adjustment", "调整分录", company_code=cc),
             ],
         })
     return {
@@ -440,8 +469,19 @@ async def _build_consol_units_tree(db: AsyncSession, project_id: str | None) -> 
     }
 
 
-async def _build_disclosure_tree(template_type: str) -> list[dict]:
-    """读 consol_note_sections_{template_type}.json，按 parent_section 分组成两层树。
+async def _build_disclosure_tree(
+    template_type: str,
+    *,
+    db: AsyncSession | None = None,
+    project_id: str | None = None,
+    year: int | None = None,
+    report_scope: str = "standalone",
+    sections: frozenset[str] | None = None,
+) -> list[dict]:
+    """附注分支（ADR-AQL-16）：单体项目按本项目本年度章节（``fetchers.disclosure.project_note_tree``，叠加循环范围
+    ``sections``）；取不到年度时不建（空，``X-Notes-Version: no-year``）；合并项目 / 无项目读模板种子树。
+
+    种子树：读 consol_note_sections_{template_type}.json，按 parent_section 分组成两层树。
 
     返回结构：
       [
@@ -452,14 +492,20 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
         ...
       ]
     """
-    sections = _load_disclosure_sections(template_type)
-    if not sections:
+    if db is not None and project_id and report_scope != "consolidated":
+        if year is None:
+            return []
+        from app.services.custom_query.fetchers.disclosure import project_note_tree
+
+        return await project_note_tree(db, project_id, year, sections=sections)
+    seed = _load_disclosure_sections(template_type)
+    if not seed:
         # 降级：未读到 JSON 时返回单一通用入口
-        return [{"key": "disclosure_note", "label": "附注章节数据（通用）", "columns": ["section_id", "headers", "rows"]}]
+        return [{"key": "disclosure_note", "label": "附注章节数据（通用）", "columns": [], "supports_conditions": False}]
 
     # 按 parent_section 分组（按 parent_seq 排序）
     groups: dict[str, dict] = {}
-    for sec in sections:
+    for sec in seed:
         parent = sec.get("parent_section") or sec.get("title") or "其他"
         parent_seq = sec.get("parent_seq", 999)
         if parent not in groups:
@@ -475,7 +521,8 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
             "key": f"disclosure_note:{section_id}",
             "label": f"{section_id} {title}".strip(),
             "section_id": section_id,
-            "columns": ["section_id", "headers", "rows"],
+            "columns": [],  # JSON 内存源：列随所选表（R5.7）
+            "supports_conditions": False,
             "_seq": sec.get("seq", 999),
         })
 
@@ -874,7 +921,8 @@ async def execute_query(
     year = body.year
     filters = body.filters
 
-    adapter = ExecuteCompatibilityAdapter(business_fetcher=business_fetcher)
+    # 当前用户绑进取数钩子：试算表 / 调整分录 / 附注按其循环范围过滤（R3.8）；模板执行也经本函数
+    adapter = ExecuteCompatibilityAdapter(business_fetcher=partial(business_fetcher, user=current_user))
     try:
         result = await adapter.execute(body, user=current_user, db=db)
     except HTTPException as http_exc:

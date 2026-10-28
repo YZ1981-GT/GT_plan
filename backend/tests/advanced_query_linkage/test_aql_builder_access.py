@@ -15,8 +15,10 @@ import pytest
 
 from app.models.base import UserRole
 from app.models.core import User
+from app.models.workpaper_models import WpIndex
 from app.routers import query_builder
 from app.services.custom_query.builder_access import (
+    CYCLE_SCOPED_REASON,
     FORBIDDEN_REASON,
     NO_PROJECT_REASON,
     builder_admission,
@@ -76,16 +78,24 @@ async def _access(world: AuthzWorld, user: User) -> dict:
 
 
 async def test_access_counts_the_builder_scope_and_explains_empty_scope(monkeypatch: pytest.MonkeyPatch) -> None:
-    async with sqlite_world(monkeypatch) as world:
-        # 项目经理：X 上（manager, edit），另在一个未删项目上只读、在一个已删项目上也有成员行 ⇒ 作用域 2（已删不计）
+    # wp_index：本项目主管的范围要读项目循环（effective_scope.project_cycles），缺表即按受限处理
+    async with sqlite_world(monkeypatch, extra_tables=(WpIndex.__table__,)) as world:
+        # 项目经理：X 上（manager, edit）+ X 上经理委派（链路唯一 ⇒ X 主管、不限循环）；另在一个未删项目上只读
+        # （没有委派 ⇒ 受限 ⇒ 排除出作用域，B6 任务 23）、在一个已删项目上也有成员行（已删不计）⇒ 作用域 1
         pm = (await world.member("edit", "manager")).user
+        await world.eqcr_assignment("manager", user=pm)
         other = await world.other_project()
         await world.member("readonly", "readonly", project=other, user=pm)
         deleted = await world.project(name="【测试】已删项目", is_deleted=True)
         await world.member("edit", "manager", project=deleted, user=pm)
         assert await _access(world, pm) == {
             "allowed": True, "basis": "project_manager", "reason": None, "all_projects": False,
-            "accessible_project_count": 2}
+            "accessible_project_count": 1}
+        # 项目经理、可访问项目都设有循环范围（没有委派）：准入但计数 0，原因是循环范围（与「没有项目」区分）
+        restricted_pm = (await world.member("edit", "manager", project=other)).user
+        assert await _access(world, restricted_pm) == {
+            "allowed": True, "basis": "project_manager", "reason": CYCLE_SCOPED_REASON, "all_projects": False,
+            "accessible_project_count": 0}
         # 系统经理、没有任何成员行：准入但作用域为空
         assert await _access(world, await world.user(UserRole.manager)) == {
             "allowed": True, "basis": "system_role", "reason": NO_PROJECT_REASON, "all_projects": False,

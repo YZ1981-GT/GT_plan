@@ -211,6 +211,23 @@ def _x_trial_balance() -> Expect:
     return Expect(200, check)
 
 
+def _x_cycle_empty() -> Expect:
+    """R / E（只有成员行、没有人员记录与委派 ⇒ 循环受限、范围为空，任务 23）：200 且没有行——与试算表页同口径（ADR-AQL-19）。"""
+    def check(response: Response, ctx: Ctx) -> None:
+        body = response.json()
+        assert body["rows"] == [] and body["total"] == 0, body["rows"][:3]
+    return Expect(200, check)
+
+
+def _x_export_cycle_empty() -> Expect:
+    """同 :func:`_x_cycle_empty` 的导出：文件只有「查询结果为空」一行。"""
+    def check(response: Response, ctx: Ctx) -> None:
+        sheet = load_workbook(io.BytesIO(response.content), read_only=True).worksheets[0]
+        rows = [[c for c in r if c is not None] for r in sheet.iter_rows(values_only=True)][1:]
+        assert rows == [["（查询结果为空）"]], rows
+    return Expect(200, check)
+
+
 _PROJECT_KEYS = {"X": X, "Y": Y}
 
 
@@ -355,11 +372,13 @@ ROWS: tuple[Row, ...] = (
     Row("3", "P", (Call("GET", f"{CQ}/wp-sheet-preview", f"{CQ}/wp-sheet-preview?project_id={{X}}&wp_code=D2"),),
         codes(401, 403, *([_preview_unavailable()] * 3), 403, *([_preview_unavailable()] * 2)),
         (custom_query.router,), _WP, ("wp_x", "storage")),
+    # R / E 只有成员行 ⇒ 循环受限、范围为空 ⇒ 200 无行（任务 23）；PM 是 X 主管、P / AD 不限 ⇒ 只有 X 的那一行
     Row("4", "P", (Call("POST", f"{CQ}/execute", f"{CQ}/execute", _body(_EXECUTE_X)),),
-        codes(401, 403, *([_x_trial_balance()] * 3), 403, *([_x_trial_balance()] * 2)),
+        codes(401, 403, _x_cycle_empty(), _x_cycle_empty(), _x_trial_balance(), 403, *([_x_trial_balance()] * 2)),
         (custom_query.router,), _TB, ("tb_xy",)),
     Row("5", "P", (Call("POST", f"{CQ}/export", f"{CQ}/export", _body(_EXECUTE_X)),),
-        codes(401, 403, *([_x_export()] * 3), 403, *([_x_export()] * 2)), (custom_query.router,), _TB, ("tb_xy",)),
+        codes(401, 403, _x_export_cycle_empty(), _x_export_cycle_empty(), _x_export(), 403, *([_x_export()] * 2)),
+        (custom_query.router,), _TB, ("tb_xy",)),
     Row("6", "P", (Call("GET", f"{CQ}/templates", f"{CQ}/templates"),),
         codes(401, _sees(True, False, False), _sees(True, True, False), _sees(True, True, False),
               _sees(True, True, False), _sees(True, False, False), _sees(True, True, False), _sees(True, True, True)),
@@ -383,7 +402,7 @@ ROWS: tuple[Row, ...] = (
         codes(401, 403, 403, 403, 204, 403, 403, 403), (custom_query.router,), _TPL, ("templates",)),
     Row("13", "P", (Call("POST", f"{CQ}/templates/{{template_id}}/execute", f"{CQ}/templates/{{S}}/execute",
                          _body({"project_id": str(X)})),),
-        codes(401, 403, *([_x_trial_balance()] * 3), 403, *([_x_trial_balance()] * 2)),
+        codes(401, 403, _x_cycle_empty(), _x_cycle_empty(), _x_trial_balance(), 403, *([_x_trial_balance()] * 2)),
         (custom_query.router,), (*_TPL, *_TB), ("templates", "tb_xy")),
     Row("14", "P", (Call("GET", "/api/recycle-bin", "/api/recycle-bin?item_type=custom_query_template"),),
         codes(401, *([_recycle(False)] * 3), _recycle(True), _recycle(False), _recycle(False), _recycle(True)),
@@ -483,12 +502,7 @@ PENDING: dict[str, dict[str, str]] = {
     "15": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
     "16": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
     "22": _each(_LOGGED_IN, "任务 32（AQ-17）：wp_template_registry 表不存在时 address-resolve 500"),
-    # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表等任务 23（B6，须合入远端后）：B3 起 CR 已有构建器准入，
-    # 但循环受限项目尚未排除（access 计数 1、执行返回 X 的行、指定 X 得 200）
-    "23c": {"CR": "任务 23（R3.8）：循环受限项目未排除，access 计数为 1、无循环范围原因"},
-    "25c": {"CR": "任务 23（R3.8）：循环受限项目未排除，返回 X 的行、无排除提示"},
-    "26c": {"CR": "任务 23（R3.8）：循环受限项目未排除，返回 X、无排除提示"},
-    "28c": {"CR": "任务 23（R3.8）：指定循环受限项目得 200 而不是 403 CYCLE_SCOPED_PROJECT"},
+    # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表 23c / 25c / 26c / 28c 在任务 23（B6）转正
 }
 
 

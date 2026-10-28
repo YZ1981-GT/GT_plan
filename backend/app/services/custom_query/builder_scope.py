@@ -30,7 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.core import Project
-from app.services.custom_query.builder_access import role_value
+from app.services.custom_query.builder_access import ALL_PROJECT_ROLES, role_value
+from app.services.custom_query.cycle_scope import CycleScopeCache
 from app.services.custom_query.ownership_guard import ownership_guard
 from app.services.custom_query.table_whitelist import (
     DATASET_SCOPED_TABLES,
@@ -52,6 +53,13 @@ SCOPE_COLUMN = "project_id"
 _ROLE_LABELS = {"admin": "管理员", "partner": "合伙人", "manager": "经理"}
 EMPTY_SCOPE_WARNING = "当前账号未被分派任何项目，查询范围为空；请联系项目经理分派后重试"
 ALL_PROJECTS_WARNING = "当前角色可访问全部项目，本次查询未限定项目范围"
+#: 对本人设有审计循环范围的项目不进入构建器作用域（ADR-AQL-19，R3.8）：构建器按表查询、无法按循环过滤
+CYCLE_SCOPED_PROJECT = "CYCLE_SCOPED_PROJECT"
+CYCLE_SCOPED_PROJECT_MESSAGE = "该项目对您设有审计循环范围，构建器无法按循环过滤，请在业务视图中查询"
+
+
+def cycle_excluded_warning(count: int) -> str:
+    return f"已排除 {count} 个对您设有审计循环范围的项目，请在业务视图中查询"
 
 
 @dataclass(frozen=True)
@@ -68,6 +76,8 @@ class BuilderScope:
     warnings: tuple[str, ...] = ()
     requested_project_id: UUID | None = None
     dataset_predicates: Mapping[str, ColumnElement] = field(default_factory=dict)
+    #: 本次因循环范围排除的项目数（warning 与 access 接口的 reason 共用）
+    excluded_cycle_scoped: int = 0
 
     @property
     def is_all_projects(self) -> bool:
@@ -145,6 +155,13 @@ async def _dataset_predicates(
     return found
 
 
+async def _cycle_scoped(user: Any, project_ids: Iterable[UUID], cache: CycleScopeCache) -> frozenset[UUID]:
+    """其中对本人设有循环范围的项目（admin / partner 不限，不调用平台入口）。"""
+    if role_value(user) in ALL_PROJECT_ROLES:  # 与 CycleScopeCache 的快路径同口径；这里先判，省掉逐项目循环
+        return frozenset()
+    return frozenset([pid for pid in sorted(project_ids, key=str) if await cache.is_restricted(pid)])
+
+
 async def resolve_builder_scope(
     *,
     user: Any,
@@ -152,6 +169,7 @@ async def resolve_builder_scope(
     requested_project_id: Any = None,
     year: int | None = None,
     db: AsyncSession,
+    cycle_cache: CycleScopeCache | None = None,
 ) -> BuilderScope:
     """解析本次查询的生效作用域（R1.2、R3.1~R3.3、R3.5）。
 
@@ -166,6 +184,8 @@ async def resolve_builder_scope(
     _enforce_role_restricted_tables((t for t in tables if t in TABLE_WHITELIST), user)
     unscoped = tuple(dict.fromkeys(t for t in tables if t in TABLE_WHITELIST and not table_is_scopable(t)))
     warnings = [_unscoped_warning(t) for t in unscoped]
+    cache = cycle_cache or CycleScopeCache(user, db)
+    excluded = 0
 
     requested: UUID | None = None
     if requested_project_id:
@@ -177,6 +197,11 @@ async def resolve_builder_scope(
                 status_code=403,
                 detail={"error_code": "FORBIDDEN_PROJECT", "message": "目标项目不存在或已删除，拒绝访问"},
             )
+        if await _cycle_scoped(user, (requested,), cache):
+            raise HTTPException(
+                status_code=403,
+                detail={"error_code": CYCLE_SCOPED_PROJECT, "message": CYCLE_SCOPED_PROJECT_MESSAGE},
+            )
         project_ids: frozenset[UUID] | None = frozenset({requested})
     else:
         accessible = await ownership_guard.get_accessible_project_ids(user, db)
@@ -184,8 +209,14 @@ async def resolve_builder_scope(
             warnings.append(ALL_PROJECTS_WARNING)
             project_ids = None
         else:
-            project_ids = await _live_project_ids(db, accessible)
-            if not project_ids:
+            live = await _live_project_ids(db, accessible)
+            # 对本人设有循环范围的项目排除出作用域（fail-closed）：构建器按表取数，无法与试算表页同口径按循环过滤
+            restricted = await _cycle_scoped(user, live, cache)
+            excluded = len(restricted)
+            project_ids = live - restricted
+            if excluded:
+                warnings.append(cycle_excluded_warning(excluded))
+            elif not project_ids:
                 warnings.append(EMPTY_SCOPE_WARNING)
 
     return BuilderScope(
@@ -194,6 +225,7 @@ async def resolve_builder_scope(
         warnings=tuple(warnings),
         requested_project_id=requested,
         dataset_predicates=await _dataset_predicates(db, tables, project_ids, year),
+        excluded_cycle_scoped=excluded,
     )
 
 

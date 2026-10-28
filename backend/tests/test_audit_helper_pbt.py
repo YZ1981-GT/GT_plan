@@ -61,7 +61,7 @@ async def test_p28_audit_throttle_strategy(ops, monkeypatch):
         calls.append(kwargs)
         return kwargs
 
-    monkeypatch.setattr(audit_helper.audit_logger, "log_action", _fake_log_action)
+    monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _fake_log_action)
 
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     try:
@@ -131,7 +131,7 @@ async def test_p28_distinct_query_keys_not_throttled(n, monkeypatch):
         calls.append(kwargs)
         return kwargs
 
-    monkeypatch.setattr(audit_helper.audit_logger, "log_action", _fake_log_action)
+    monkeypatch.setitem(vars(audit_helper.audit_logger), "log_action", _fake_log_action)
 
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     try:

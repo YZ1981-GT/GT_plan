@@ -88,7 +88,7 @@ def stub_trees(monkeypatch):
         for c in ("A", "B", "C")
     ]
 
-    async def _disclosure(template_type):
+    async def _disclosure(template_type, **_project_context):  # 任务 19：带项目时多传 db / year / 范围等
         return [dict(x) for x in disclosure]
 
     async def _workpaper(db, project_id):
@@ -154,7 +154,8 @@ class TestIndicatorsSkeleton:
     async def test_light_categories_stay_inline_in_skeleton(self, stub_trees):
         """轻量大类（试算/调整/工时等）仍内联 —— 为它们再发一次请求不值得。"""
         skeleton = {n["key"]: n for n in await _indicators(depth=1)}
-        for key in ("trial_balance", "adjustment", "worksheet", "workhours"):
+        # 合并工作底稿组只在合并项目出现（advanced-query-linkage-closure ADR-AQL-10）；本替身无项目 = 单体口径
+        for key in ("trial_balance", "adjustment", "workhours"):
             assert skeleton[key]["children"], f"{key} 不应被懒加载"
 
     @pytest.mark.asyncio

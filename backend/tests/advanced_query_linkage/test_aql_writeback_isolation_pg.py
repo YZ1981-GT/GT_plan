@@ -36,7 +36,6 @@ from app.models.base import UserRole
 from app.models.consol_note_data_models import ConsolNoteData
 from app.models.core import User
 from app.routers import custom_query, custom_query_writeback
-from app.services.audit_logger_enhanced import audit_logger
 from app.services.custom_query import addressing_service as addressing_module
 from app.services.custom_query.addressing_service import AddressingService, ResolvedTarget
 from app.services.custom_query.snapshot_writer import (
@@ -68,17 +67,19 @@ def _singletons_have_no_instance_overrides():
     """本文件的桩一律打在类上；模块单例上若残留同名**实例属性**，类级替换会被挡住、调到真实实现。
 
     来源：前序用例对单例实例 ``monkeypatch.setattr``（方法本在类上），撤销时 monkeypatch 把原方法写回成实例属性。
-    BM 时本文件 4 例排在 ``test_writeback_pbt.py`` 之后才红（advanced-query-linkage-closure B6 已在那边改为类级打桩）；
-    这里先拦下并点名，不让它静默变成「调到真实 resolve_target / 真实写审计」。
+    BM 时本文件 4 例排在 ``test_writeback_pbt.py`` 之后才红（advanced-query-linkage-closure B6 已在那边改为
+    ``monkeypatch.setitem(vars(单例), …)``，撤销时删键）；这里先拦下并点名，不让它静默变成「调到真实 resolve_target」。
     """
+    # 只守本文件真正依赖的类级替换（AddressingService.resolve_target、SnapshotWriter.write_cell）；audit_logger.log_action
+    # 的同类残留另有来源（范围外的 ledger_import/test_upload_security.py），本文件不替换它、不受影响，登记在 B6 的 impl-progress
     leaked = [
         f"{type(obj).__name__}.{name}"
-        for obj, name in ((addressing_module.addressing_service, "resolve_target"), (audit_logger, "log_action"))
+        for obj, name in ((addressing_module.addressing_service, "resolve_target"), (snapshot_writer, "write_cell"))
         if name in vars(obj)
     ]
     assert not leaked, (
-        f"模块单例上残留实例属性 {leaked}：前序用例在单例实例上 monkeypatch 了方法、撤销时写回成实例属性，"
-        "会挡住本文件的类级替换（改为在类上打桩）"
+        f"模块单例上残留实例属性 {leaked}：前序用例在单例实例上 monkeypatch.setattr 了方法、撤销时写回成实例属性，"
+        "会挡住本文件的类级替换（单例的桩改用 monkeypatch.setitem(vars(单例), 方法名, 桩)，撤销时删键）"
     )
     yield
 

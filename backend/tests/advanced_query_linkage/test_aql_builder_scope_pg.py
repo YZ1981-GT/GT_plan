@@ -5,8 +5,8 @@
 测试内用独立 SQL 现算（``gold``），数值随真库变化，不写死。写入只在回滚事务里、只写【UAT】项目；报表配置副本行的用例在
 真 PG 临时 schema（``pg_world``）里造身份与数据。
 
-本批（B3，合入远端之前）e2e_manager 的金标准按「OwnershipGuard 可访问 − 已删项目」；循环受限项目的排除在任务 23
-（B6）加上后，本例改为 design §10.2 的金标准（0 行 + 排除提示）。
+e2e_manager / u_011 的金标准按 design §10.2：OwnershipGuard 可访问 − 已删项目 − 对其设有审计循环范围的项目（任务 23，B6；
+现库 e2e_manager 只经委派访问一个项目、没有成员行 ⇒ 链路不唯一 ⇒ 受限 ⇒ 0 行 + 排除提示）。
 """
 from __future__ import annotations
 
@@ -17,8 +17,10 @@ from decimal import Decimal
 
 import pytest
 
+from app import deps
 from app.models.audit_platform_models import AccountCategory, TbBalance, TrialBalance
 from app.models.report_models import ReportConfig
+from app.models.workpaper_models import WpIndex
 from app.routers import query_builder
 from tests.advanced_query_linkage.gold import AUDIT_YEAR, HS, UA, YB, active_sql
 from tests.authz_world import OTHER_PROJECT_ID, TARGET_PROJECT_ID, pg_world
@@ -62,16 +64,23 @@ async def test_admin_rows_exclude_deleted_projects(builder, gold) -> None:
     assert data["rows"][0]["n"] == live, f"应只数未删项目的 {live} 行（含已删项目为 {live + on_deleted}）"
 
 
-@pytest.mark.parametrize("username", ["e2e_manager", "u_011abb97dd2d4101"])
-async def test_scoped_identity_sees_only_accessible_live_projects(builder, gold, username: str) -> None:
-    """e2e_manager（系统经理，只经委派访问一个项目）与 u_011abb97dd2d4101（系统 auditor、项目经理）只见自己的项目。"""
+@pytest.mark.parametrize(("username", "excluded"), [("e2e_manager", True), ("u_011abb97dd2d4101", False)])
+async def test_scoped_identity_sees_only_accessible_live_projects(builder, gold, username: str, excluded: bool) -> None:
+    """e2e_manager（系统经理，只经委派访问一个项目、没有成员行 ⇒ 受限）⇒ 0 行 + 排除提示；u_011abb97dd2d4101（系统 auditor、
+    人员记录 1 + 成员行 manager / edit + 经理委派 ⇒ 本项目主管）⇒ 只见其项目（任务 23，变异 #19 / #36 的构建器侧）。"""
     user = await builder.real_user(username)
-    expected = {r[0] for r in await gold.rows(ACCESSIBLE_LIVE_SQL, uid=user.id)}
-    assert expected, f"前置：{username} 至少能访问一个未删项目（否则「只含 X」对空集恒真）"
+    accessible = {r[0] for r in await gold.rows(ACCESSIBLE_LIVE_SQL, uid=user.id)}
+    assert accessible, f"前置：{username} 至少能访问一个未删项目（否则「只含 X」对空集恒真）"
+    restricted = {pid for pid in accessible
+                  if await deps.get_user_scope_cycles(user, uuid.UUID(pid), builder.session) is not None}
+    assert bool(restricted) is excluded, f"前置（现库身份事实）：{username} 受限 = {excluded}，现算 {sorted(restricted)}"
+    expected = accessible - restricted
     data = await builder.ok(user, _PROJECTS)
     assert _ids(data) == expected and data["total"] == len(expected)
     assert data["scope"] == {"all_projects": False, "project_count": len(expected), "unscoped_tables": [],
                              "requested_project_id": None}
+    exclusion = f"已排除 {len(restricted)} 个对您设有审计循环范围的项目，请在业务视图中查询"
+    assert (exclusion in data["warnings"]) is excluded, data["warnings"]
 
 
 @pytest.mark.parametrize("body", [
@@ -178,7 +187,8 @@ async def test_left_join_without_match_keeps_the_base_row(builder) -> None:
 
 @asynccontextmanager
 async def _report_config_world(monkeypatch):
-    async with pg_world(monkeypatch, extra_tables=(ReportConfig.__table__,)) as world:
+    # wp_index：PM / SM 补经理委派后是各自项目的主管，主管的范围要读项目循环（缺表即按受限处理、作用域被排除）
+    async with pg_world(monkeypatch, extra_tables=(ReportConfig.__table__, WpIndex.__table__)) as world:
         await world.other_project()
         for number, standard in enumerate(("soe_standalone", f"project:{TARGET_PROJECT_ID}",
                                            f"project:{OTHER_PROJECT_ID}"), start=1):
@@ -191,7 +201,11 @@ async def _report_config_world(monkeypatch):
 async def test_report_config_project_copies_only_for_accessible_projects(monkeypatch) -> None:
     async with _report_config_world(monkeypatch) as world:
         pm = (await world.edit_member()).user  # X 上（manager, edit），系统 auditor
-        sm = (await world.non_member_with_other_project(global_role="manager")).user  # 只在 Y 有成员行
+        sm_identity = await world.non_member_with_other_project(global_role="manager")  # 只在 Y 有成员行
+        sm = sm_identity.user
+        # 经理委派 ⇒ 链路唯一的本项目主管、不受循环范围限制（否则作用域被排除，见任务 23 / design §10.3）
+        await world.eqcr_assignment("manager", user=pm)
+        await world.eqcr_assignment("manager", user=sm, project=sm_identity.other_project)
         admin = (await world.admin_non_member()).user
         seen = {}
         for key, user in (("PM", pm), ("SM", sm), ("AD", admin)):
