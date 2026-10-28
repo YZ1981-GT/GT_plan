@@ -509,7 +509,7 @@ import { reportTypeOfSource } from '@/components/query/querySourceUri'
 import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
-import { BUSINESS_NO_PROJECT_HINT, buildBusinessPayload, notifyQueryError } from '@/components/custom-query/queryPayloads'
+import { BUSINESS_NO_PROJECT_HINT, buildBusinessPayload, notifyQueryError, queryFailureText } from '@/components/custom-query/queryPayloads'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useAcnrDrill, normalizeColumns, cellAddrId, addrIdToIndexRef, type QueryColumnMeta } from '@/composables/useAcnrDrill'
@@ -913,7 +913,7 @@ async function onExecute(keepPage = false) {
     }
   } catch (e: any) {
     notifyQueryError(e, '执行查询')
-    result.value = { rows: [], columns: [], total: 0, error: String(e?.message || e) }
+    result.value = { rows: [], columns: [], total: 0, error: queryFailureText(e) }
   } finally {
     executing.value = false
   }

@@ -135,6 +135,37 @@ export function queryErrorText(e: unknown): string | null {
   return null
 }
 
+/** 查询失败、又识别不出拒绝原因时，结果区持久显示的中文兜底（不显示 axios 的英文 message） */
+export const QUERY_FAILED_FALLBACK = '查询失败，请稍后重试'
+
+/** 结果区持久显示的失败原因：能识别的拒绝显示逐项中文原因，其余用中文兜底。 */
+export function queryFailureText(e: unknown): string {
+  return queryErrorText(e) || QUERY_FAILED_FALLBACK
+}
+
+/**
+ * blob 请求（构建器导出）失败时错误体是 Blob：读成 JSON 写回 `response.data`（与 utils/http 信封补齐同口径：
+ * 缺 detail 时用 message），使 `queryErrorText` / `handleApiError` 按 JSON 识别；读不出 JSON 时原样返回。
+ */
+export async function readBlobErrorBody<T>(e: T): Promise<T> {
+  const resp = (e as { response?: { data?: unknown } } | null)?.response
+  if (!resp || !(resp.data instanceof Blob)) return e
+  const blob = resp.data
+  try {
+    const text = typeof blob.text === 'function' ? await blob.text() : await new Promise<string>((ok, fail) => {
+      const reader = new FileReader()
+      reader.onload = () => ok(String(reader.result ?? ''))
+      reader.onerror = () => fail(reader.error)
+      reader.readAsText(blob)
+    })
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      && parsed.detail === undefined && parsed.message !== undefined) parsed.detail = parsed.message
+    resp.data = parsed
+  } catch { /* 不是 JSON：保持原样交给 handleApiError */ }
+  return e
+}
+
 /** 查询失败的统一提示：能识别的拒绝显示中文原因，其余交给 `handleApiError`。 */
 export function notifyQueryError(e: unknown, context: string): void {
   const text = queryErrorText(e)

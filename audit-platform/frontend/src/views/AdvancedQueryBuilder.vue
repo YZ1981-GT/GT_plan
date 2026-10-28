@@ -365,7 +365,7 @@ import {
 } from '@/components/query/queryFieldTiers'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
-import { BUILDER_NO_PROJECT_HINT, buildBuilderPayload, notifyQueryError } from '@/components/custom-query/queryPayloads'
+import { BUILDER_NO_PROJECT_HINT, buildBuilderPayload, notifyQueryError, readBlobErrorBody } from '@/components/custom-query/queryPayloads'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useProjectStore } from '@/stores/project'
 import { useAcnrDrill, normalizeColumns, cellAddrId, addrIdToIndexRef, type QueryColumnMeta } from '@/composables/useAcnrDrill'
@@ -656,9 +656,8 @@ async function doExport() {
   }
   loadingExport.value = true
   try {
-    const response = await http.post('/api/query/export-excel', buildPayload(), {
-      responseType: 'blob',
-    })
+    // 调用方自管错误提示（_silent）：被拒时错误体是 Blob，读成 JSON 后逐项显示原因（T16 / RV7.5-03）
+    const response = await http.post('/api/query/export-excel', buildPayload(), { responseType: 'blob', _silent: true } as any)
     const blob = new Blob([response.data])
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
@@ -669,7 +668,7 @@ async function doExport() {
     URL.revokeObjectURL(link.href)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    handleApiError(e, '导出 Excel')
+    notifyQueryError(await readBlobErrorBody(e), '导出 Excel')
   } finally {
     loadingExport.value = false
   }
