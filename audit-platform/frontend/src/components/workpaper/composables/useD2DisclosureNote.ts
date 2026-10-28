@@ -1132,7 +1132,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     })
     persistJson('reversal-rows', reversalRows.value)
   }
-  /** 从 D2-11 转回明细带入（单位名称/转回原因/金额；收回方式与原依据无数据源需手工） */
+  /** 从 D2-11 转回明细带入（单位名称 / 转回原因 / 收回方式 / 原确定依据 / 累计已计提 / 金额，D2-11 按模板补列后都有来源） */
   function importReversalFromWriteoffCheck(): number {
     if (isReadonly.value) return 0
     const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-writeoff-reversal-rows')?.remark, [])
@@ -1147,9 +1147,9 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         rowId: genId('rv'),
         companyName: name,
         reversalReason: String(raw.reason ?? ''),
-        recoveryMethod: '',
-        originalBasis: '',
-        cumulativeProvision: 0,
+        recoveryMethod: String(raw.recoveryMethod ?? ''),
+        originalBasis: String(raw.originalBasis ?? ''),
+        cumulativeProvision: parseNum(raw.cumulativeProvision),
         amount: parseNum(raw.amount),
       })
       if (name) existing.add(name)
@@ -1184,7 +1184,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     )
     persistJson('writeoff-rows', writeOffRows.value)
   }
-  /** 从 D2-11 核销明细带入（单位名称/核销金额/核销原因；性质、程序、关联交易需手工） */
+  /** 从 D2-11 核销明细带入（单位名称 / 性质 / 核销金额 / 核销原因 / 履行的核销程序 / 是否关联交易） */
   function importWriteOffFromWriteoffCheck(): number {
     if (isReadonly.value) return 0
     const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-writeoff-writeoff-rows')?.remark, [])
@@ -1198,11 +1198,11 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       added.push({
         rowId: genId('wo'),
         companyName: name,
-        nature: '',
+        nature: String(raw.receivableType ?? ''),
         amount: parseNum(raw.amount),
         reason: String(raw.reason ?? ''),
-        procedure: '',
-        relatedParty: '',
+        procedure: String(raw.approvalDoc ?? ''),
+        relatedParty: String(raw.isRelatedParty ?? ''),
       })
       if (name) existing.add(name)
     }

@@ -6,13 +6,6 @@
    "reviewed_on"
   ]
  },
- "d1.notes_receivable_detail|D1-endorse-transfer-rows": {
-  "reason": "D1-8 背书区：前端背书行沿用贴现行字段，没有模板 K 背书转让单位 / L 背书转让日期两列（前端补列，R3.1）",
-  "fields": [
-   "endorsedDate",
-   "endorsedTo"
-  ]
- },
  "d1.notes_receivable_detail|D1-sampling-specific-samples": {
   "reason": "R2 待裁：D1-13 模板区②是「期后贴现\\背书\\调整等检查」凭证表（16 列，同区①），前端 D1-sampling-specific-samples 是「特定样本」清单（只有 项目描述 / 金额 / 原因），两者不是同一张表；前端没有期后检查表，契约把区②接到了特定样本上（只有这 4 个名字对不上是因为其余列名在同文件的区①行模型里出现）",
   "fields": [
@@ -22,46 +15,12 @@
    "counterAccount"
   ]
  },
- "d2.inspection|D2-bizmodel-groups": {
-  "reason": "待核：业务模式组「依据」列前端另名",
-  "fields": [
-   "basis"
-  ]
- },
  "d2.inspection|D2-ecl-discount-rows": {
   "reason": "D2-10：前端嵌套 scenarios[]、单一现值，模板平铺情景行、两年现值（design §3.1）",
   "fields": [
    "cashflowY1",
    "pvY1",
    "pvY2"
-  ]
- },
- "d2.inspection|D2-pledge-rows": {
-  "reason": "待核：质押检查两列（质押协议 / 质押条件）前端另名",
-  "fields": [
-   "pledgeAgreement",
-   "pledgeCondition"
-  ]
- },
- "d2.inspection|D2-related-party-rows": {
-  "reason": "待核：关联方检查账龄 / 期后回款 / 交易原因三列前端另名或缺列",
-  "fields": [
-   "agingPeriod",
-   "postPayment",
-   "transactionReason"
-  ]
- },
- "d2.inspection|D2-writeoff-reversal-rows": {
-  "reason": "待核：坏账转回「合理性」列前端另名",
-  "fields": [
-   "reasonableness"
-  ]
- },
- "d2.inspection|D2-writeoff-writeoff-rows": {
-  "reason": "待核：核销表应收款类型 / 是否关联方两列前端另名或缺列",
-  "fields": [
-   "isRelatedParty",
-   "receivableType"
   ]
  },
  "d4.revenue_detail|D4-31-interview": {

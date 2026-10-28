@@ -45,6 +45,7 @@ const {
   pledgeRows,
   factoringRows,
   pledgeTotal,
+  pledgeEndBalanceTotal,
   pledgeRatio,
   pledgeRatioWarning,
   auditedTotal,
@@ -175,11 +176,18 @@ const GUIDANCE_TEXTS = [
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addPledgeRow">+ 添加质押</el-button>
       </div>
       <el-table :data="pledgeRows" border size="small" max-height="460" style="width: 100%">
-        <el-table-column label="质押债务人" min-width="130" fixed="left">
+        <!-- 列与模板 D2-12（一）质押区 A~I 一致；质押日期 / 状态 / 备注 模板没有，排在后面 -->
+        <el-table-column label="客户名称" min-width="130" fixed="left">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="债务人" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="客户名称" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
             <span v-else>{{ row.debtorName || '-' }}</span>
             <GtReviewDot row-prefix="D2-pledge" :row-key="row.rowId" />
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" width="130" align="right">
+          <template #default="{ row }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.endBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endBalance', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.endBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="质押金额" width="130" align="right">
@@ -188,36 +196,34 @@ const GUIDANCE_TEXTS = [
             <span v-else>{{ displayPrefs.fmtAmount(row.pledgeAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="质押日期" width="140">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" :model-value="row.pledgeDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="质押日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'pledgeDate', v || '')" />
-            <span v-else>{{ row.pledgeDate || '-' }}</span>
-          </template>
-        </el-table-column>
         <el-table-column label="质权人" min-width="110">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.pledgee" size="small" placeholder="质权人" @change="(v: string) => updateCell(row.rowId, 'pledgee', v)" />
             <span v-else>{{ row.pledgee || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="质押目的" min-width="120">
+        <el-table-column label="质押原因" min-width="120">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.pledgePurpose" size="small" placeholder="质押目的" @change="(v: string) => updateCell(row.rowId, 'pledgePurpose', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.pledgePurpose" size="small" placeholder="质押原因" @change="(v: string) => updateCell(row.rowId, 'pledgePurpose', v)" />
             <span v-else>{{ row.pledgePurpose || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="到期日" width="140">
+        <el-table-column label="质押条件" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.pledgeCondition" size="small" placeholder="质押条件" @change="(v: string) => updateCell(row.rowId, 'pledgeCondition', v)" />
+            <span v-else>{{ row.pledgeCondition || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="质押期限" width="140">
           <template #default="{ row }">
             <el-date-picker v-if="!isReadonly" :model-value="row.expiryDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="到期日" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'expiryDate', v || '')" />
             <span v-else>{{ row.expiryDate || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="110">
+        <el-table-column label="质押协议" min-width="120">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.status" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'status', v)">
-              <el-option v-for="o in STATUS_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <el-tag v-else :type="row.status === '有效' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag>
+            <el-input v-if="!isReadonly" :model-value="row.pledgeAgreement" size="small" placeholder="如质押合同编号" @change="(v: string) => updateCell(row.rowId, 'pledgeAgreement', v)" />
+            <span v-else>{{ row.pledgeAgreement || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="索引号" width="150">
@@ -226,6 +232,20 @@ const GUIDANCE_TEXTS = [
               <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="索引号" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
               <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="质押日期" width="140">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" :model-value="row.pledgeDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="质押日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'pledgeDate', v || '')" />
+            <span v-else>{{ row.pledgeDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.status" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'status', v)">
+              <el-option v-for="o in STATUS_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <el-tag v-else :type="row.status === '有效' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="100">
@@ -251,6 +271,7 @@ const GUIDANCE_TEXTS = [
       <table class="recon-table">
         <thead>
           <tr>
+            <th>质押客户期末余额合计</th>
             <th>质押金额合计</th>
             <th>审定表应收账款审定数</th>
             <th>质押比例</th>
@@ -258,6 +279,7 @@ const GUIDANCE_TEXTS = [
         </thead>
         <tbody>
           <tr>
+            <td class="recon-num">{{ displayPrefs.fmtAmount(pledgeEndBalanceTotal) }}</td>
             <td class="recon-num">{{ displayPrefs.fmtAmount(pledgeTotal) }}</td>
             <td class="recon-num">
               <template v-if="adjDataLoaded">{{ displayPrefs.fmtAmount(auditedTotal) }}</template>

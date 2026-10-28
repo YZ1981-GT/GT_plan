@@ -1704,3 +1704,12 @@ backend/tests/workpaper_sync/test_workbook_propagation_ref_collision.py  902
 #   位置写入与读取都在 components/attachment/rowEvidence.ts。拆分方向：示例抽屉（C1-1 ~ C1-3）、
 #   过程记录（C1-4-1 ~ C1-4-6）、样本测试表与识别上传三块各成子组件。
 audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue  3167
+# oo-writeback-template-parity-closure 批 B2b（2026-10-28）：两份历史大文件（HEAD 已超限且此前未登记，任何改动都会被门禁拒），
+#   基线取 HEAD 值（splitlines 口径）。
+#   _d1_import_export/_impl.py —— HEAD 3643 行。本批 D1-8T 背书表按模板改列，新逻辑放 _d1_8t_endorse.py，
+#     本文件只改登记表、导入校验与 import（+7 行）。拆分方向：包 __init__ 已规划的 _config / _helpers / _template /
+#     _parsers / _exporters / _export / _import 七段（现全在 _impl 里），按段抽出后逐段下调基线。
+backend/app/routers/wp_render_strategies/_d1_import_export/_impl.py  3643
+#   useD2DisclosureNote.ts —— HEAD 1752 行。本批只让「从 D2-11 带入」带上 D2-11 按模板补的列（行数不变）。
+#     拆分方向：按附注章节（账龄 / 坏账准备 / 转回 / 核销 / 前五名 …）拆成章节组合式函数，本文件只留编排与持久化。
+audit-platform/frontend/src/components/workpaper/composables/useD2DisclosureNote.ts  1752

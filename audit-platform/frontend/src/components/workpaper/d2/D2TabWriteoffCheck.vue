@@ -3,7 +3,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabWriteoffCheck — 坏账准备转回（收回）、核销检查 D2-11
  *
- * 双段结构：转回区 + 核销区，各区添加/合计，与 D2-3 一致性告警。
+ * 双段结构：转回区 + 核销区（两区列按模板 D2-11 A~H 排，模板没有的列排在后面），各区添加/合计，与 D2-3 一致性告警。
  * 打磨基准：D1 检查型底稿（审计目标 / 全字段可编辑 / 行级复核 /
  *           逐行 AI 意见 / 总体分析+AI / 编制提示）
  */
@@ -35,6 +35,7 @@ const {
   reversalRows,
   writeoffRows,
   reversalTotal,
+  reversalProvisionTotal,
   writeoffTotal,
   reversalConsistencyWarning,
   addRow,
@@ -48,6 +49,7 @@ const {
 })
 
 const REASONABLE_OPTIONS = ['合理', '不合理', '待核实']
+const YES_NO_OPTIONS = ['是', '否']
 
 const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
 const sectionAnalysis = ref('')
@@ -80,7 +82,7 @@ async function onAiRowComment(row: any): Promise<void> {
     debtorName: row.debtorName,
     amount: row.amount,
     reason: row.reason,
-  }, `AI 生成审计意见 — ${row.debtorName || '该行'}`)
+  }, `AI 生成合理性分析 — ${row.debtorName || '该行'}`)
   if (content) updateCell(row.rowId, 'auditorComment', content)
 }
 
@@ -126,30 +128,18 @@ const GUIDANCE_TEXTS = [
       ⚠️ {{ reversalConsistencyWarning }}
     </el-alert>
 
-    <!-- 转回区 -->
+    <!-- 转回区（列与模板 D2-11 区① A~H 一致；原确认日期 / 审批文件 / 合理性判断 模板没有，排在后面） -->
     <div class="section-block">
       <div class="section-header">
-        <span class="section-title">坏账转回（收回）</span>
+        <span class="section-title">（一）本期重要的坏账准备转回或转销</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow('reversal')">+ 添加转回</el-button>
       </div>
       <el-table :data="reversalRows" border size="small" max-height="420" style="width: 100%">
-        <el-table-column label="债务人" min-width="130" fixed="left">
+        <el-table-column label="单位名称" min-width="130" fixed="left">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="债务人" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="单位名称" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
             <span v-else>{{ row.debtorName || '-' }}</span>
             <GtReviewDot row-prefix="D2-writeoff" :row-key="row.rowId" />
-          </template>
-        </el-table-column>
-        <el-table-column label="金额" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
-            <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="原确认日期" width="140">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" :model-value="row.originalDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="原确认日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'originalDate', v || '')" />
-            <span v-else>{{ row.originalDate || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="转回原因" min-width="140">
@@ -158,27 +148,63 @@ const GUIDANCE_TEXTS = [
             <span v-else>{{ row.reason || '-' }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="收回方式" width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.recoveryMethod" size="small" placeholder="如银行转账" @change="(v: string) => updateCell(row.rowId, 'recoveryMethod', v)" />
+            <span v-else>{{ row.recoveryMethod || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="原确定坏账准备的依据" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.originalBasis" size="small" placeholder="如单项计提 / 账龄组合" @change="(v: string) => updateCell(row.rowId, 'originalBasis', v)" />
+            <span v-else>{{ row.originalBasis || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="收回或转回金额" width="130" align="right">
+          <template #default="{ row }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="收回或转回前累计已计提坏账准备金额" width="150" align="right">
+          <template #default="{ row }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.cumulativeProvision" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'cumulativeProvision', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.cumulativeProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合理性分析" min-width="160">
+          <template #default="{ row }">
+            <div class="comment-cell">
+              <el-input v-if="!isReadonly" :model-value="row.auditorComment" size="small" placeholder="合理性分析" @change="(v: string) => updateCell(row.rowId, 'auditorComment', v)" />
+              <span v-else>{{ row.auditorComment || '-' }}</span>
+              <el-button v-if="aiAvailable && !isReadonly" link size="small" type="primary" @click="onAiRowComment(row)">🤖</el-button>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="如 D2-3" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
+            <span v-else>{{ row.indexRef || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="原确认日期" width="140">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" :model-value="row.originalDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="原确认日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'originalDate', v || '')" />
+            <span v-else>{{ row.originalDate || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="审批文件" width="120">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.approvalDoc" size="small" placeholder="审批文件" @change="(v: string) => updateCell(row.rowId, 'approvalDoc', v)" />
             <span v-else>{{ row.approvalDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="合理性" width="110" align="center">
+        <el-table-column label="合理性判断" width="110" align="center">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'isReasonable', v || '')">
               <el-option v-for="o in REASONABLE_OPTIONS" :key="o" :label="o" :value="o" />
             </el-select>
             <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计意见" min-width="160">
-          <template #default="{ row }">
-            <div class="comment-cell">
-              <el-input v-if="!isReadonly" :model-value="row.auditorComment" size="small" placeholder="审计意见" @change="(v: string) => updateCell(row.rowId, 'auditorComment', v)" />
-              <span v-else>{{ row.auditorComment || '-' }}</span>
-              <el-button v-if="aiAvailable && !isReadonly" link size="small" type="primary" @click="onAiRowComment(row)">🤖</el-button>
-            </div>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">
@@ -190,33 +216,35 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <template #empty>暂无转回记录</template>
       </el-table>
-      <div class="total-line">转回合计：{{ displayPrefs.fmtAmount(reversalTotal) }}</div>
+      <div class="total-line">
+        转回合计：{{ displayPrefs.fmtAmount(reversalTotal) }}　累计已计提合计：{{ displayPrefs.fmtAmount(reversalProvisionTotal) }}
+      </div>
     </div>
 
-    <!-- 核销区 -->
+    <!-- 核销区（列与模板 D2-11 区② A~H 一致；原确认日期 / 合理性判断 模板没有，排在后面） -->
     <div class="section-block">
       <div class="section-header">
-        <span class="section-title">坏账核销</span>
+        <span class="section-title">（二）本期重要的核销应收账款</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow('writeoff')">+ 添加核销</el-button>
       </div>
       <el-table :data="writeoffRows" border size="small" max-height="420" style="width: 100%">
-        <el-table-column label="债务人" min-width="130" fixed="left">
+        <el-table-column label="单位名称" min-width="130" fixed="left">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="债务人" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="单位名称" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
             <span v-else>{{ row.debtorName || '-' }}</span>
             <GtReviewDot row-prefix="D2-writeoff" :row-key="row.rowId" />
           </template>
         </el-table-column>
-        <el-table-column label="金额" width="120" align="right">
+        <el-table-column label="应收账款性质" width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.receivableType" size="small" placeholder="如货款" @change="(v: string) => updateCell(row.rowId, 'receivableType', v)" />
+            <span v-else>{{ row.receivableType || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="核销金额" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="原确认日期" width="140">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" :model-value="row.originalDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="原确认日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'originalDate', v || '')" />
-            <span v-else>{{ row.originalDate || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="核销原因" min-width="140">
@@ -225,27 +253,47 @@ const GUIDANCE_TEXTS = [
             <span v-else>{{ row.reason || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审批文件" width="120">
+        <el-table-column label="履行的核销程序" width="140">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.approvalDoc" size="small" placeholder="审批文件" @change="(v: string) => updateCell(row.rowId, 'approvalDoc', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.approvalDoc" size="small" placeholder="如董事会审批" @change="(v: string) => updateCell(row.rowId, 'approvalDoc', v)" />
             <span v-else>{{ row.approvalDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="合理性" width="110" align="center">
+        <el-table-column label="是否由关联交易产生" width="120" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.isRelatedParty" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'isRelatedParty', v || '')">
+              <el-option v-for="o in YES_NO_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.isRelatedParty || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合理性分析" min-width="160">
+          <template #default="{ row }">
+            <div class="comment-cell">
+              <el-input v-if="!isReadonly" :model-value="row.auditorComment" size="small" placeholder="合理性分析" @change="(v: string) => updateCell(row.rowId, 'auditorComment', v)" />
+              <span v-else>{{ row.auditorComment || '-' }}</span>
+              <el-button v-if="aiAvailable && !isReadonly" link size="small" type="primary" @click="onAiRowComment(row)">🤖</el-button>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="如 D2-3" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
+            <span v-else>{{ row.indexRef || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="原确认日期" width="140">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" :model-value="row.originalDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" size="small" placeholder="原确认日期" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'originalDate', v || '')" />
+            <span v-else>{{ row.originalDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合理性判断" width="110" align="center">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'isReasonable', v || '')">
               <el-option v-for="o in REASONABLE_OPTIONS" :key="o" :label="o" :value="o" />
             </el-select>
             <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计意见" min-width="160">
-          <template #default="{ row }">
-            <div class="comment-cell">
-              <el-input v-if="!isReadonly" :model-value="row.auditorComment" size="small" placeholder="审计意见" @change="(v: string) => updateCell(row.rowId, 'auditorComment', v)" />
-              <span v-else>{{ row.auditorComment || '-' }}</span>
-              <el-button v-if="aiAvailable && !isReadonly" link size="small" type="primary" @click="onAiRowComment(row)">🤖</el-button>
-            </div>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">

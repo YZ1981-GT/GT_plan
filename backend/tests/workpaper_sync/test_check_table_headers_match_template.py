@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""D 循环检查表 / 关联方表：契约逐列表头 == 权威模板逐格（spec oo-writeback-template-parity-closure R3 批 B2a）。
+"""D 循环检查表 / 关联方表：契约逐列表头 == 权威模板逐格（spec oo-writeback-template-parity-closure R3 批 B2a；
+批 B2b 补 D1-8 两区与 D2 检查工作簿 D2-6 / D2-11 / D2-12 / D2-13 五个区）。
 
 FC-5「以模板为权威」此前只在各 lane 的同构测试里逐家钉，这几张没有：D7-7 两区整表错位（A..R 而模板 A..Q、
 多出第 6/7 个检查列、索引号错一列）、D6-6 区② 照抄区① 的列（贷方金额写进支持性文件列）、D6-5 J~N 五列与模板
@@ -25,6 +26,11 @@ if str(_BACKEND) not in sys.path:  # pragma: no cover
     sys.path.insert(0, str(_BACKEND))
 os.environ.setdefault("DB_DISABLE_SSL", "True")
 
+from app.services.workpaper_sync import phase5_d2_06_related_party as D26  # noqa: E402
+from app.services.workpaper_sync import phase5_d2_11_writeoff as D211  # noqa: E402
+from app.services.workpaper_sync import phase5_d2_12_pledge as D212  # noqa: E402
+from app.services.workpaper_sync import phase5_d2_13_bizmodel as D213  # noqa: E402
+from app.services.workpaper_sync.phase5_d1_08_endorsement import SPEC_D108_DISCOUNT, SPEC_D108_TRANSFER  # noqa: E402
 from app.services.workpaper_sync.phase5_d1_13_sampling import SPEC_D113_SPECIFIC, SPEC_D113_VOUCHING  # noqa: E402
 from app.services.workpaper_sync.phase5_d3_07_voucher_check import SPEC_D307_CURRENT, SPEC_D307_POST  # noqa: E402
 from app.services.workpaper_sync.phase5_d6_05_related_party import SPEC_D605  # noqa: E402
@@ -34,6 +40,8 @@ from app.services.workpaper_sync.phase5_row_table_sheet import RowTableSheetSpec
 
 _TPL = _BACKEND / "wp_templates" / "D"
 CASES: list[tuple[str, str, RowTableSheetSpec]] = [
+    ("D1-8 区①", "D1 应收票据.xlsx", SPEC_D108_DISCOUNT),
+    ("D1-8 区②", "D1 应收票据.xlsx", SPEC_D108_TRANSFER),
     ("D1-13 区①", "D1 应收票据.xlsx", SPEC_D113_VOUCHING),
     ("D1-13 区②", "D1 应收票据.xlsx", SPEC_D113_SPECIFIC),
     ("D3-7 区①", "D3 预收账款.xlsx", SPEC_D307_CURRENT),
@@ -146,3 +154,51 @@ def test_mutation_single_header_row_and_extra_column_are_reported() -> None:
     ws7 = _sheet("D7 合同负债.xlsx", SPEC_D707_POST.managed_sheet)
     single = dataclasses.replace(SPEC_D707_POST, header_group_row=None, header_leaf_row=None, header_row=33)
     assert any("首个数据行" in b for b in header_problems(ws7, single))
+
+
+# ═══ D2 检查工作簿（D2-6 / D2-11 / D2-12 / D2-13，自写 provider、单级表头；批 B2b）═══
+# 字段元组 (column_key, column, mode, value_type, json_path, header_text)；判据同 ① ③（无组标题）。
+
+_D2_BOOK = Path(D26.INSPECTION_TEMPLATE_RELATIVE_PATH).name
+FLAT_CASES = [
+    ("D2-6", D26.MANAGED_SHEET_D26, D26.HEADER_ROW, D26.FIRST_DATA_ROW, D26.FOOTER_ROW, D26.FOOTER_MARKER,
+     D26.FIELD_SPECS),
+    ("D2-11 区①", D211.MANAGED_SHEET_D211, D211.HEADER_ROW_REVERSAL, D211.FIRST_DATA_ROW_REVERSAL,
+     D211.FOOTER_ROW_REVERSAL, D211.FOOTER_MARKER, D211.REVERSAL_FIELD_SPECS),
+    ("D2-11 区②", D211.MANAGED_SHEET_D211, D211.HEADER_ROW_WRITEOFF, D211.FIRST_DATA_ROW_WRITEOFF,
+     D211.FOOTER_ROW_WRITEOFF, D211.FOOTER_MARKER, D211.WRITEOFF_FIELD_SPECS),
+    ("D2-12 区①", D212.MANAGED_SHEET_D212, D212.HEADER_ROW_PLEDGE, D212.FIRST_DATA_ROW_PLEDGE,
+     D212.FOOTER_ROW_PLEDGE, D212.FOOTER_MARKER, D212.PLEDGE_FIELD_SPECS),
+    ("D2-13 区①", D213.MANAGED_SHEET_D213, D213.HEADER_ROW, D213.FIRST_DATA_ROW, D213.FOOTER_ROW,
+     D213.FOOTER_MARKER, D213.FIELD_SPECS),
+]
+
+
+def flat_header_problems(ws, header_row: int, first: int, footer: int, marker: str, fields) -> list[str]:
+    out: list[str] = []
+    if first != header_row + 1:
+        out.append(f"首个数据行 {first} 不紧接表头 {header_row}")
+    if _norm(ws[f"A{footer}"].value) != _norm(marker):
+        out.append(f"footer {footer} 不是「{marker}」")
+    for _key, col, _mode, _vt, json_path, header_text in fields:
+        cell = _norm(_value(ws, header_row, column_index_from_string(col)))
+        if cell != _norm(header_text):
+            out.append(f"{col}{header_row} 模板「{cell}」≠ 契约「{header_text}」（{json_path}）")
+    return out
+
+
+@pytest.mark.parametrize("case", FLAT_CASES, ids=[c[0] for c in FLAT_CASES])
+def test_d2_inspection_headers_match_template_cell_by_cell(case) -> None:
+    label, sheet, header_row, first, footer, marker, fields = case
+    assert flat_header_problems(_sheet(_D2_BOOK, sheet), header_row, first, footer, marker, fields) == [], label
+
+
+def test_mutation_d2_11_old_header_text_is_reported() -> None:
+    """D2-11 F 原 header_text「收回前累计已计提」（模板是「收回或转回前累计已计提坏账准备金额」）⇒ 必报 F12。"""
+    old = tuple(
+        (k, c, m, vt, jp, "收回前累计已计提" if c == "F" else h) for k, c, m, vt, jp, h in D211.REVERSAL_FIELD_SPECS
+    )
+    ws = _sheet(_D2_BOOK, D211.MANAGED_SHEET_D211)
+    bad = flat_header_problems(ws, D211.HEADER_ROW_REVERSAL, D211.FIRST_DATA_ROW_REVERSAL,
+                               D211.FOOTER_ROW_REVERSAL, D211.FOOTER_MARKER, old)
+    assert any("F12" in b for b in bad), bad

@@ -22,17 +22,25 @@ import { registerPendingFlusher } from '../sync/pendingWrites'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * 列与模板 D2-6 一致（A~L：关联方名称 / 关联关系 / 期初余额 / 借方发生 / 贷方发生 / 期末余额 / 减：坏账准备 /
+ * 账面价值 / 发生时间及账龄 / 发生原因（款项性质） / 期后回款 / 索引号）；isArmsLength / remark 模板没有，只在 HTML 侧。
+ * 发生原因沿用 transactionType（原「交易类型」，同一概念）。spec oo-writeback-template-parity-closure R3 批 B2b。
+ */
 export interface RelatedPartyRow {
   rowId: string
   debtorName: string           // 关联方名称
   relationType: string         // 关联关系类型
-  transactionType: string      // 交易类型
+  transactionType: string      // 发生原因（款项性质），模板 J
   priorBalance: number         // 期初余额
   debitAmount: number          // 本期借方发生额
   creditAmount: number         // 本期贷方发生额
   endBalance: number           // 期末余额 = prior + debit - credit
   badDebtProvision: number     // 坏账准备
   bookValue: number            // 账面价值 = endBalance - badDebt
+  agingPeriod: string          // 发生时间及账龄，模板 I
+  postPayment: number          // 期后回款，模板 K
+  indexRef: string             // 索引号，模板 L
   isArmsLength: string         // 是否公允交易 (Y/N)
   remark: string               // 备注
 }
@@ -43,11 +51,13 @@ const STORAGE_KEY = 'D2-related-party-rows'
 const NOTE_KEY = 'D2-related-party-note'
 const CONCLUSION_KEY = 'D2-related-party-conclusion'
 
-/** 需要SUM求和的金额字段 */
+/** 需要SUM求和的金额字段（模板合计行 C16~H16；期后回款 K 不合计） */
 const NUMERIC_SUM_FIELDS: (keyof RelatedPartyRow)[] = [
   'priorBalance', 'debitAmount', 'creditAmount',
   'endBalance', 'badDebtProvision', 'bookValue',
 ]
+/** 全部金额字段（录入按数值解析） */
+const NUMERIC_FIELDS: (keyof RelatedPartyRow)[] = [...NUMERIC_SUM_FIELDS, 'postPayment']
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +77,9 @@ export function createEmptyRow(): RelatedPartyRow {
     endBalance: 0,
     badDebtProvision: 0,
     bookValue: 0,
+    agingPeriod: '',
+    postPayment: 0,
+    indexRef: '',
     isArmsLength: '',
     remark: '',
   }
@@ -95,6 +108,9 @@ function parseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {
       endBalance: parseNum(raw.endBalance),
       badDebtProvision: parseNum(raw.badDebtProvision),
       bookValue: parseNum(raw.bookValue),
+      agingPeriod: raw.agingPeriod || '',
+      postPayment: parseNum(raw.postPayment),
+      indexRef: raw.indexRef || '',
       isArmsLength: raw.isArmsLength || '',
       remark: raw.remark || '',
     }))
@@ -182,8 +198,12 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
         const newRow = createEmptyRow()
         newRow.debtorName = row.debtorName || row.customerName || row.clientName || ''
         newRow.relationType = row.relationType || ''
+        // 期末余额按模板 F = 期初 + 借方 − 贷方算：借贷取 D2-2 本期发生（D2-2 期末余额同一公式）。
+        // 原先直接写期末、借贷留 0，随即被 recalcRow 改回期初 —— 导入的期末从未生效
         newRow.priorBalance = parseNum(row.priorAudited ?? row.priorUnadjusted)
-        newRow.endBalance = parseNum(row.currentAudited ?? row.endBalance ?? row.auditedBalance)
+        newRow.debitAmount = parseNum(row.debitOccurrence)
+        newRow.creditAmount = parseNum(row.creditOccurrence)
+        newRow.postPayment = parseNum(row.postPayment)
         return recalcRow(newRow)
       })
 
@@ -223,7 +243,7 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
     const key = field as keyof RelatedPartyRow
     if (key === 'rowId') return
 
-    if (NUMERIC_SUM_FIELDS.includes(key) && key !== 'endBalance' && key !== 'bookValue') {
+    if (NUMERIC_FIELDS.includes(key) && key !== 'endBalance' && key !== 'bookValue') {
       ;(row as any)[key] = parseNum(value)
     } else if (key !== 'endBalance' && key !== 'bookValue') {
       ;(row as any)[key] = String(value)

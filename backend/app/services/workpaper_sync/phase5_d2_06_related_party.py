@@ -42,13 +42,12 @@ D2-6 位于 ``D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xl
 
 行身份：``rowId`` 字段，前缀 ``rp-``。
 
-🔴 **前端字段 vs Excel 列的差异**：
-* 前端多了 ``transactionType``（交易类型）和 ``isArmsLength``（是否公允）— Excel 无对应列
-* Excel 多了 I（发生时间及账龄）、J（发生原因）、K（期后回款）— 前端行对象里没有精确对应
-  （这些映射到前端的不同 UI 区域，非行级字段）
-
-本 provider 以 **Excel 模板为权威**，声明 Excel 列的字段映射。前端独有字段（如
-transactionType）不进契约（它们只存在 store JSON 里不回写 Excel）。
+🔴 **按模板接前端字段**（spec oo-writeback-template-parity-closure R3 批 B2b）：
+* J「发生原因（款项性质）」= 前端 ``transactionType``（原「交易类型」，占位「如销售商品」，表单改名）；
+  原声明 ``transactionReason`` 前端没有，J 列两个方向都不通
+* I「发生时间及账龄」/ K「期后回款」/ L「索引号」前端补 ``agingPeriod`` / ``postPayment`` / ``indexRef``；
+  L 原接 ``remark``（前端「备注」）—— 备注写进了索引号列
+* 前端「公允交易」``isArmsLength`` / 「备注」``remark`` 模板没有对应列，只在 HTML 侧
 """
 
 from __future__ import annotations
@@ -124,13 +123,7 @@ ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
 #: 12 个受管字段 = 10 editable + 2 formula。
 #: (column_key, column_letter, mode, value_type, json_path, header_text)
-#:
-#: 🔴 **前端 RelatedPartyRow vs Excel 列的差异**：
-#: - 前端有 ``transactionType`` / ``isArmsLength`` ⇒ Excel 模板无对应列 ⇒ 不进契约
-#: - Excel I（发生时间）/ J（发生原因）/ K（期后回款）⇒ 前端行对象无同名字段
-#:   但 store JSON 里这些列的值可能存在于扩展字段中。
-#:   先声明 json_path 与列的映射，无值时 projection 产出 None（不写 Excel）。
-#: - Excel L（索引号）⇒ 前端 ``remark`` 字段
+#: json_path 一律是前端 ``RelatedPartyRow`` 实际存的键（见模块 docstring「按模板接前端字段」）。
 FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("debtor_name", "A", "editable", "text", "debtorName", "关联方名称"),
     ("relation_type", "B", "editable", "text", "relationType", "关联关系"),
@@ -140,14 +133,10 @@ FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("end_balance", "F", "formula", "amount", "endBalance", "期末余额"),
     ("bad_debt_provision", "G", "editable", "amount", "badDebtProvision", "减：坏账准备"),
     ("book_value", "H", "formula", "amount", "bookValue", "账面价值"),
-    #: I~K 列在前端 RelatedPartyRow 里没有同名字段，但 Excel 需要这些列。
-    #: 如果未来前端扩展了这些字段，json_path 需要同步更新。
-    #: 当前 json_path 取不到值 → projection value=None → materialize 时跳过该列。
     ("aging_period", "I", "editable", "text", "agingPeriod", "发生时间及账龄"),
-    ("transaction_reason", "J", "editable", "text", "transactionReason", "发生原因（款项性质）"),
+    ("transaction_reason", "J", "editable", "text", "transactionType", "发生原因（款项性质）"),
     ("post_payment", "K", "editable", "amount", "postPayment", "期后回款"),
-    #: L 列（索引号）映射到前端 ``remark`` 字段。
-    ("index_ref", "L", "editable", "text", "remark", "索引号"),
+    ("index_ref", "L", "editable", "text", "indexRef", "索引号"),
 )
 
 #: 公式列 → 行公式模板。
@@ -307,8 +296,8 @@ def assert_mapping_digest_d26() -> str:
     return digest
 
 
-#: 首次生成的冻结 digest（需要在首次运行后填入）。
-_FROZEN_MAPPING_DIGEST: Final[str] = "42e593f07dcf246cf662afc4891559ec6e1b14457be1c09f944d634fd462e8f5"
+#: 冻结 digest。2026-10-28 批 B2b：J / L 改接前端 transactionType / indexRef（原 42e593f0…）。
+_FROZEN_MAPPING_DIGEST: Final[str] = "3d5472663f1d69cb443882549e3edbb7ff3a73f72b9f6dfcadea4aeed42b43f9"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
