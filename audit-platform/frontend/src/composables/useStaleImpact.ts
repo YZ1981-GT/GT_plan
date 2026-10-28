@@ -55,7 +55,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     cell?: string
     max_depth?: number
     project_id?: string
-    /** 项目审计年度；缺失 ⇒ 不分析（端点 year 必填；原先兜底今年 ⇒ 标的是别的年度的下游） */
+    /** 项目审计年度：给了但为空（项目没填）⇒ 不分析；不传 ⇒ 由后端按项目审计年度补齐（/impact 的 year 可缺省） */
     year?: number | null
   }) {
     const code = wpCode.value
@@ -63,8 +63,10 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     // 没有项目上下文就不发请求：后端要求项目鉴权，裸发必 403
     // （spec acnr-foundation-defect-closure D8 / 需求 10）
     if (!payload.project_id) return
-    // 缺年度不分析（post-push-residual-defect-closure 6.5.3，较新一侧）
-    if (payload.year == null) return null
+    // 调用方给了年度键但值为空（项目没填年度）⇒ 不分析：原先兜底今年会标别的年度的下游
+    // （post-push-residual-defect-closure 6.5.3）。调用方根本不传年度 ⇒ 照常发、不带 year，由后端按项目审计年度
+    // 补齐（acnr-foundation-defect-closure D8）。两条语义分属合并前的两条线，合并时都保留。
+    if ('year' in payload && payload.year == null) return null
     loading.value = true
     try {
       // 构建统一 URI: WP:{wp_code}:{sheet}:{cell_or_label}
