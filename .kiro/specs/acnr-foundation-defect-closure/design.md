@@ -234,6 +234,7 @@ T13 实施记录（2026-10-28）：三个文件实际在 `backend/app/services/`
   - 不选②（后端模板改成 `/projects/{project_id}/workpapers/{wp_id}/edit`）：要重新发布全部 1225 个模板，影响快照、不可变门禁与依赖现形态的测试和其他会话。不选③（`openRoute` 里改写）：违背「不自行拼底稿路由」，且只修好本 spec 两个入口。
   - 防同类守卫：后端 `test_frontend_route_shapes_fixture.py` 用 AST 扫 `backend/app` 路由位置（`route` / `jump_route` 关键字、`route` 赋值、名含 route 的函数 return）上的站内 `/workpapers` 形态写进夹具 `fixtures/frontend_route_shapes.json`（漏登 / 失效条目都红）；前端 `router/__tests__/backendRouteShapes.contract.spec.ts` 用真实路由表（`router/index.ts` 改为导出 `routes`）建 memory history router，把目录模板与夹具形态逐个 `resolve`，断言不落兜底 `NotFound`。现算夹具 11 条：本 spec 目录 / resolver / acnr_targets 与 AI 提及、证据治理均为 `/workpapers/{…}`（短链后可命中）；联动三处 `/projects/{…}/workpapers/{…}`（`linkage_resolve`、`linkage_contract_builder`、`linkage_facade_service`，缺 `/edit`，后者部分还把 wp_code 当 id）同样落 404、不归本 spec，登记在契约的 `KNOWN_UNROUTABLE`（只许删，并断言它们确实仍落 404），转达对应 spec。
   - 鉴权基线：该端点路径只有 `{wp_id}`、不带 `{project_id}`，两个基线扫描器都不覆盖（请求体维显式排除对象 id 路径），登记进 `_FIXED_ENDPOINTS` 只会得到恒真的钉子，故未登记；改由 `test_workpaper_locate_endpoint.py` 的 AST 用例与现状节判据钉住「函数体调用 `assert_project_permission(…, "readonly")`」。
+- **勘误（第九段第 r5 轮，评审 RV9.3-02）**：T16 实施时构建器的 `project_id` / `year` 只随单元格目标发送（tasks.md T16 差异①）。advanced-query-linkage-closure `22e096366`（其任务 30，R3.5）在 `buildBuilderPayload` 上加了 `scopeToProject`：限定当前项目时不带目标也发送。现行规则以代码为准：构建器在「有项目且（限定当前项目或带单元格目标）」时发送 `project_id`，年度已知（`isKnownYear`）时再发 `year`；`acnr_targets` 在业务视图与构建器都只在有项目且有目标时发送。本节上文的 `project_id` / `year` 取值来源不变。现状节描述与前端登记判据（`acnrArchitectureStatusDoc.spec.ts`，按写入条件真值表判定）已同步。
 
 ### 2.7 错误处理
 

@@ -106,6 +106,127 @@ function callsIdentifier(node: ts.Node, name: string): boolean {
   return hit
 }
 
+/**
+ * 写入条件的布尔式（RV9.3-02）：if / && / || 条件化成布尔式，函数体内 const 中间变量按初值展开（认得出
+ * `withTargets`），子式按角色归成原子——P 有项目（projectId）、S 限定当前项目（scopeToProject）、
+ * T 有单元格目标（acnrTargets.length / > 0 / !== 0 / >= 1）、Y 年度已知（isKnownYear(...)），其余按原文成独立原子。
+ */
+type BoolExpr = { k: 'atom'; key: string } | { k: 'const'; v: boolean } | { k: 'not'; e: BoolExpr }
+  | { k: 'and' | 'or'; l: BoolExpr; r: BoolExpr }
+const B_TRUE: BoolExpr = { k: 'const', v: true }
+const bAnd = (l: BoolExpr, r: BoolExpr): BoolExpr => ({ k: 'and', l, r })
+const bOr = (l: BoolExpr, r: BoolExpr): BoolExpr => ({ k: 'or', l, r })
+const bNot = (e: BoolExpr): BoolExpr => ({ k: 'not', e })
+const atom = (key: string): BoolExpr => ({ k: 'atom', key })
+
+function constLocals(fn: ts.FunctionDeclaration): Map<string, ts.Expression> {
+  const out = new Map<string, ts.Expression>()
+  const visit = (n: ts.Node) => {
+    if (ts.isVariableDeclarationList(n) && (n.flags & ts.NodeFlags.Const)) {
+      for (const d of n.declarations) if (ts.isIdentifier(d.name) && d.initializer) out.set(d.name.text, d.initializer)
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(fn)
+  return out
+}
+
+function atomRole(e: ts.Expression): string | null {
+  const isTargetsLength = (x: ts.Expression) => ts.isPropertyAccessExpression(x) && x.name.text === 'length'
+    && ts.isIdentifier(x.expression) && x.expression.text === 'acnrTargets'
+  if ((ts.isIdentifier(e) && e.text === 'projectId') || (ts.isPropertyAccessExpression(e) && e.name.text === 'projectId')) return 'P'
+  if (ts.isPropertyAccessExpression(e) && e.name.text === 'scopeToProject') return 'S'
+  if (isTargetsLength(e)) return 'T'
+  if (ts.isBinaryExpression(e) && isTargetsLength(e.left) && ts.isNumericLiteral(e.right)) {
+    const op = e.operatorToken.kind
+    const v = e.right.text
+    if ((op === ts.SyntaxKind.GreaterThanToken && v === '0') || (op === ts.SyntaxKind.ExclamationEqualsEqualsToken && v === '0')
+      || (op === ts.SyntaxKind.GreaterThanEqualsToken && v === '1')) return 'T'
+  }
+  if (ts.isCallExpression(e) && ts.isIdentifier(e.expression) && e.expression.text === 'isKnownYear') return 'Y'
+  return null
+}
+
+function toBool(e: ts.Expression, sf: ts.SourceFile, locals: Map<string, ts.Expression>, depth = 0): BoolExpr {
+  if (ts.isParenthesizedExpression(e)) return toBool(e.expression, sf, locals, depth)
+  if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.ExclamationToken) return bNot(toBool(e.operand, sf, locals, depth))
+  if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    return bAnd(toBool(e.left, sf, locals, depth), toBool(e.right, sf, locals, depth))
+  }
+  if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    return bOr(toBool(e.left, sf, locals, depth), toBool(e.right, sf, locals, depth))
+  }
+  if (e.kind === ts.SyntaxKind.TrueKeyword) return B_TRUE
+  if (e.kind === ts.SyntaxKind.FalseKeyword) return { k: 'const', v: false }
+  if (ts.isIdentifier(e) && locals.has(e.text) && depth < 8) return toBool(locals.get(e.text)!, sf, locals, depth + 1)
+  return atom(atomRole(e) ?? `其他:${e.getText(sf)}`)
+}
+
+/** 函数体内对 payload 的 key 的全部写入（属性赋值、字符串下标赋值、对象字面量属性）各自的条件（外层条件的合取）。 */
+function writeGuards(fn: ts.FunctionDeclaration, sf: ts.SourceFile, key: string): BoolExpr[] {
+  const locals = constLocals(fn)
+  const out: BoolExpr[] = []
+  const conj = (conds: BoolExpr[]) => conds.reduce((a, b) => bAnd(a, b), B_TRUE)
+  const isKeyTarget = (n: ts.Expression) => (ts.isPropertyAccessExpression(n) && n.name.text === key)
+    || (ts.isElementAccessExpression(n) && ts.isStringLiteral(n.argumentExpression) && n.argumentExpression.text === key)
+  const visit = (n: ts.Node, conds: BoolExpr[]) => {
+    if (ts.isIfStatement(n)) {
+      const c = toBool(n.expression, sf, locals)
+      visit(n.expression, conds)
+      visit(n.thenStatement, [...conds, c])
+      if (n.elseStatement) visit(n.elseStatement, [...conds, bNot(c)])
+      return
+    }
+    if (ts.isConditionalExpression(n)) {
+      const c = toBool(n.condition, sf, locals)
+      visit(n.condition, conds)
+      visit(n.whenTrue, [...conds, c])
+      visit(n.whenFalse, [...conds, bNot(c)])
+      return
+    }
+    if (ts.isBinaryExpression(n) && (n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      || n.operatorToken.kind === ts.SyntaxKind.BarBarToken)) {
+      const c = toBool(n.left, sf, locals)
+      visit(n.left, conds)
+      visit(n.right, [...conds, n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ? c : bNot(c)])
+      return
+    }
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken && isKeyTarget(n.left)) out.push(conj(conds))
+    if (ts.isPropertyAssignment(n) && (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) && n.name.text === key) out.push(conj(conds))
+    ts.forEachChild(n, (c) => visit(c, conds))
+  }
+  if (fn.body) visit(fn.body, [])
+  return out
+}
+
+function atomsOf(e: BoolExpr, acc = new Set<string>()): Set<string> {
+  if (e.k === 'atom') acc.add(e.key)
+  else if (e.k === 'not') atomsOf(e.e, acc)
+  else if (e.k === 'and' || e.k === 'or') { atomsOf(e.l, acc); atomsOf(e.r, acc) }
+  return acc
+}
+
+function evalBool(e: BoolExpr, env: Record<string, boolean>): boolean {
+  switch (e.k) {
+    case 'atom': return env[e.key]
+    case 'const': return e.v
+    case 'not': return !evalBool(e.e, env)
+    case 'and': return evalBool(e.l, env) && evalBool(e.r, env)
+    default: return evalBool(e.l, env) || evalBool(e.r, env)
+  }
+}
+
+/** 真值表穷举：返回使 pred 不成立的第一组取值（中文描述），全部成立返回 null。 */
+function counterExample(exprs: BoolExpr[], pred: (vals: boolean[]) => boolean): string | null {
+  const keys = [...exprs.reduce((s, e) => atomsOf(e, s), new Set<string>(['P', 'S', 'T', 'Y']))].sort()
+  for (let mask = 0; mask < 1 << keys.length; mask++) {
+    const env: Record<string, boolean> = {}
+    keys.forEach((k, i) => { env[k] = !!(mask & (1 << i)) })
+    if (!pred(exprs.map((e) => evalBool(e, env)))) return keys.map((k) => `${k}=${env[k] ? '真' : '假'}`).join(' ')
+  }
+  return null
+}
+
 /** 前端组件行「组件」描述 → 编译器 API 判据（返回不成立的原因；登记制：未登记的描述即红）。 */
 const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
   '前端 ACNR SDK，按项目订阅失效': (sf) => {
@@ -126,41 +247,31 @@ const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
     if (!callsIdentifier(fn, 'useProjectStore')) problems.push('须读取项目 store（useProjectStore）')
     return problems
   },
-  '高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目才发送单元格目标，构建器的项目与年度只随单元格目标发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）': (sf) => {
+  '高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目且有单元格目标才发送单元格目标；构建器的项目与年度在限定当前项目或带单元格目标时发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）': (sf) => {
     const problems: string[] = []
-    /** 函数体内对 payload.<key> 的赋值，及其外层 if 条件文本（由内到外） */
-    const guardsOf = (fn: ts.FunctionDeclaration, key: string): string[][] => {
-      const out: string[][] = []
-      const visit = (n: ts.Node, conds: string[]) => {
-        if (ts.isIfStatement(n)) {
-          ts.forEachChild(n, (c) => visit(c, c === n.expression ? conds : [n.expression.getText(sf), ...conds]))
-          return
-        }
-        if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
-          && ts.isPropertyAccessExpression(n.left) && n.left.name.text === key) out.push(conds)
-        ts.forEachChild(n, (c) => visit(c, conds))
-      }
-      visit(fn, [])
-      return out
-    }
+    // RV9.3-02：按写入条件的真值表判定（不按条件文本找子串），认得出 withTargets 这类中间变量
     for (const name of ['buildBusinessPayload', 'buildBuilderPayload']) {
       const fn = exportedFunction(sf, name)
       if (!fn) { problems.push(`未导出函数 ${name}`); continue }
-      const g = guardsOf(fn, 'acnr_targets')
-      if (!g.length || !g.every((c) => c.some((t) => t.includes('projectId')))) {
-        problems.push(`${name}：acnr_targets 须只在有项目（条件含 projectId）时写入`)
-      }
+      const g = writeGuards(fn, sf, 'acnr_targets')
+      // 任一写入点条件为真 ⇒ 有项目且有单元格目标
+      const bad = g.length ? counterExample([...g, atom('P'), atom('T')],
+        (v) => v.slice(0, g.length).every((w) => !w) || (v[g.length] && v[g.length + 1])) : '没有写入'
+      if (bad) problems.push(`${name}：acnr_targets 须只在有项目且有单元格目标时写入（反例：${bad}）`)
     }
     const builder = exportedFunction(sf, 'buildBuilderPayload')
     if (builder) {
-      for (const key of ['project_id', 'year']) {
-        const g = guardsOf(builder, key)
-        if (!g.length || !g.every((c) => c.some((t) => t.includes('acnrTargets.length')))) {
-          problems.push(`buildBuilderPayload：${key} 须只随单元格目标（条件含 acnrTargets.length）写入`)
-        }
-      }
-      if (!guardsOf(builder, 'year').every((c) => c.some((t) => t.includes('isKnownYear')))) {
-        problems.push('buildBuilderPayload：year 须只在年度已知（isKnownYear）时写入')
+      // 期望：project_id 恰在 P ∧ (S ∨ T) 时写入；year 恰在 P ∧ (S ∨ T) ∧ Y 时写入（写入条件 = 各写入点条件的析取）
+      const sent = bAnd(atom('P'), bOr(atom('S'), atom('T')))
+      for (const [key, want, label] of [
+        ['project_id', sent, '有项目且（限定当前项目或有单元格目标）'],
+        ['year', bAnd(sent, atom('Y')), '有项目且（限定当前项目或有单元格目标）且年度已知（isKnownYear）'],
+      ] as const) {
+        const g = writeGuards(builder, sf, key)
+        if (!g.length) { problems.push(`buildBuilderPayload：没有写入 ${key}`); continue }
+        const when = g.reduce((a, b) => bOr(a, b))
+        const bad = counterExample([when, want], ([a, b]) => a === b)
+        if (bad) problems.push(`buildBuilderPayload：${key} 的写入条件须恰为「${label}」（反例：${bad}）`)
       }
     }
     const errText = exportedFunction(sf, 'queryErrorText')

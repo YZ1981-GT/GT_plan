@@ -499,7 +499,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "前端当前项目上下文": CF(
             "audit-platform/frontend/src/composables/useCurrentProjectId.ts", "useCurrentProjectId",
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
-        "高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目才发送单元格目标，构建器的项目与年度只随单元格目标发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）": CF(
+        "高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目且有单元格目标才发送单元格目标；构建器的项目与年度在限定当前项目或带单元格目标时发送、年度未知不发；拒绝、无权、解析不可用转成中文提示）": CF(
             "audit-platform/frontend/src/components/custom-query/queryPayloads.ts", ("buildBusinessPayload", "buildBuilderPayload", "queryErrorText"),
             "audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts", exists(_FE_GUARD_REL),
             exists("audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue"),
