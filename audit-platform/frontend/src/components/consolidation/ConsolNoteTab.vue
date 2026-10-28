@@ -129,21 +129,12 @@
                 <!-- 叶子列（独立列，无 children）；:prop=原始叶子列下标，供 @cell-click 列身份与拖选映射 -->
                 <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
-                    <el-input v-if="noteEditMode && lazyEdit.isEditing($index, col.colIndex)" v-model="row[col.colIndex]" size="small" :placeholder="col.label"
-                      :class="{ 'gt-note-cell-manual': isManual(row, col.colIndex) }"
-                      :style="{ textAlign: col.colIndex === 0 ? 'left' : 'right' }"
-                      @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, col.colIndex)" autofocus />
-                    <CommentTooltip v-else-if="col.colIndex > 0" :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, col.colIndex)">
-                    <span class="gt-note-cell-text"
-                      :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, col.colIndex) }"
-                      :title="isManual(row, col.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                      :style="{ textAlign: 'right' }"
-                      @click="noteEditMode && lazyEdit.startEdit($index, col.colIndex)">{{ row[col.colIndex] || '-' }}</span>
-                    </CommentTooltip>
-                    <span v-else class="gt-note-cell-text"
-                      :class="{ 'gt-note-cell-editable': noteEditMode }"
-                      :style="{ textAlign: 'left' }"
-                      @click="noteEditMode && lazyEdit.startEdit($index, col.colIndex)">{{ row[col.colIndex] || '-' }}</span>
+                    <ConsolNoteGridCell
+                      :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
+                      :left="col.colIndex === 0"
+                      :comment="col.colIndex > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, col.colIndex) : undefined"
+                      @commit="onNoteCellCommit(row, col.colIndex, $event)"
+                    />
                   </template>
                 </el-table-column>
                 <!-- 分组列（有 children，el-table-column 嵌套自动生成合并表头） -->
@@ -152,17 +143,11 @@
                     <!-- 二级叶子 -->
                     <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
-                        <el-input v-if="noteEditMode && lazyEdit.isEditing($index, child.colIndex)" v-model="row[child.colIndex]" size="small" :placeholder="child.label"
-                          :class="{ 'gt-note-cell-manual': isManual(row, child.colIndex) }"
-                          style="text-align:right"
-                          @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, child.colIndex)" autofocus />
-                        <CommentTooltip v-else :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, child.colIndex)">
-                        <span class="gt-note-cell-text"
-                          :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, child.colIndex) }"
-                          :title="isManual(row, child.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                          style="text-align:right"
-                          @click="noteEditMode && lazyEdit.startEdit($index, child.colIndex)">{{ row[child.colIndex] || '-' }}</span>
-                        </CommentTooltip>
+                        <ConsolNoteGridCell
+                          :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, child.colIndex)"
+                          @commit="onNoteCellCommit(row, child.colIndex, $event)"
+                        />
                       </template>
                     </el-table-column>
                     <!-- 三级嵌套（3 行表头场景） -->
@@ -170,17 +155,11 @@
                       <el-table-column v-for="(leaf, li) in child.children" :key="'mhl-' + ci + '-' + chi + '-' + li"
                         :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
-                          <el-input v-if="noteEditMode && lazyEdit.isEditing($index, leaf.colIndex)" v-model="row[leaf.colIndex]" size="small" :placeholder="leaf.label"
-                            :class="{ 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
-                            style="text-align:right"
-                            @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, leaf.colIndex)" autofocus />
-                          <CommentTooltip v-else :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, leaf.colIndex)">
-                          <span class="gt-note-cell-text"
-                            :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
-                            :title="isManual(row, leaf.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                            style="text-align:right"
-                            @click="noteEditMode && lazyEdit.startEdit($index, leaf.colIndex)">{{ row[leaf.colIndex] || '-' }}</span>
-                          </CommentTooltip>
+                          <ConsolNoteGridCell
+                            :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, leaf.colIndex)"
+                            @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
+                          />
                         </template>
                       </el-table-column>
                     </el-table-column>
@@ -192,21 +171,11 @@
             <template v-else>
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
-                <el-input v-if="noteEditMode && lazyEdit.isEditing($index, hi)" v-model="row[hi]" size="small" :placeholder="h"
-                  :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, hi)" autofocus />
-                <CommentTooltip v-else-if="hi > 0" :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi)">
-                <span class="gt-note-cell-text"
-                  :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, hi) }"
-                  :title="isManual(row, hi) ? '手工单元格：按公式填入时保留' : ''"
-                  :style="{ textAlign: 'right' }"
-                  @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
-                </CommentTooltip>
-                <span v-else class="gt-note-cell-text"
-                  :class="{ 'gt-note-cell-editable': noteEditMode }"
-                  :style="{ textAlign: 'left' }"
-                  @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
+                <ConsolNoteGridCell
+                  :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  :comment="hi > 0 ? cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi) : undefined"
+                  @commit="onNoteCellCommit(row, hi, $event)"
+                />
               </template>
             </el-table-column>
             </template>
@@ -331,45 +300,30 @@
               <template v-for="(col, ci) in parsedMultiHeader" :key="'fs-mh-' + ci">
                 <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
-                    <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, col.colIndex)" v-model="row[col.colIndex]" size="small" :placeholder="col.label"
-                      :class="{ 'gt-note-cell-manual': isManual(row, col.colIndex) }"
-                      :style="{ textAlign: col.colIndex === 0 ? 'left' : 'right' }"
-                      @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, col.colIndex)" autofocus />
-                    <span v-else class="gt-note-cell-text"
-                      :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, col.colIndex) }"
-                      :title="isManual(row, col.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                      :style="{ textAlign: col.colIndex === 0 ? 'left' : 'right' }"
-                      @click="noteEditMode && lazyEdit.startEdit($index + 10000, col.colIndex)">{{ row[col.colIndex] || '-' }}</span>
+                    <ConsolNoteGridCell
+                      :value="row[col.colIndex]" :label="col.label" :editable="noteEditMode" :manual="isManual(row, col.colIndex)"
+                      :left="col.colIndex === 0" @commit="onNoteCellCommit(row, col.colIndex, $event)"
+                    />
                   </template>
                 </el-table-column>
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'fs-mhc-' + ci + '-' + chi">
                     <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
-                        <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, child.colIndex)" v-model="row[child.colIndex]" size="small" :placeholder="child.label"
-                          :class="{ 'gt-note-cell-manual': isManual(row, child.colIndex) }"
-                          style="text-align:right"
-                          @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, child.colIndex)" autofocus />
-                        <span v-else class="gt-note-cell-text"
-                          :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, child.colIndex) }"
-                          :title="isManual(row, child.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                          style="text-align:right"
-                          @click="noteEditMode && lazyEdit.startEdit($index + 10000, child.colIndex)">{{ row[child.colIndex] || '-' }}</span>
+                        <ConsolNoteGridCell
+                          :value="row[child.colIndex]" :label="child.label" :editable="noteEditMode" :manual="isManual(row, child.colIndex)"
+                          @commit="onNoteCellCommit(row, child.colIndex, $event)"
+                        />
                       </template>
                     </el-table-column>
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'fs-mhl-' + ci + '-' + chi + '-' + li"
                         :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
-                          <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, leaf.colIndex)" v-model="row[leaf.colIndex]" size="small" :placeholder="leaf.label"
-                            :class="{ 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
-                            style="text-align:right"
-                            @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, leaf.colIndex)" autofocus />
-                          <span v-else class="gt-note-cell-text"
-                            :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
-                            :title="isManual(row, leaf.colIndex) ? '手工单元格：按公式填入时保留' : ''"
-                            style="text-align:right"
-                            @click="noteEditMode && lazyEdit.startEdit($index + 10000, leaf.colIndex)">{{ row[leaf.colIndex] || '-' }}</span>
+                          <ConsolNoteGridCell
+                            :value="row[leaf.colIndex]" :label="leaf.label" :editable="noteEditMode" :manual="isManual(row, leaf.colIndex)"
+                            @commit="onNoteCellCommit(row, leaf.colIndex, $event)"
+                          />
                         </template>
                       </el-table-column>
                     </el-table-column>
@@ -381,15 +335,10 @@
             <template v-else>
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
-                <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, hi)" v-model="row[hi]" size="small" :placeholder="h"
-                  :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" @input="onNoteCellInput(row, hi)" autofocus />
-                <span v-else class="gt-note-cell-text"
-                  :class="{ 'gt-note-cell-editable': noteEditMode, 'gt-note-cell-manual': isManual(row, hi) }"
-                  :title="isManual(row, hi) ? '手工单元格：按公式填入时保留' : ''"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @click="noteEditMode && lazyEdit.startEdit($index + 10000, hi)">{{ row[hi] || '-' }}</span>
+                <ConsolNoteGridCell
+                  :value="row[hi]" :label="h" :editable="noteEditMode" :manual="isManual(row, hi)" :left="hi === 0"
+                  @commit="onNoteCellCommit(row, hi, $event)"
+                />
               </template>
             </el-table-column>
             </template>
@@ -803,10 +752,9 @@ import ConsolNoteAutoRefreshSwitch from '@/components/consolidation/ConsolNoteAu
 import ConsolNoteTopnNotice from '@/components/consolidation/ConsolNoteTopnNotice.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
-import CommentTooltip from '@/components/common/CommentTooltip.vue'
+import ConsolNoteGridCell from '@/components/consolidation/ConsolNoteGridCell.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
-import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -1470,8 +1418,7 @@ const noteBatchLoading = ref(false)
 // ─── 批注与复核持久化 ────────────────────────────────────────────────────────
 const cellComments = useCellComments(() => props.projectId, () => props.year, 'consol_note')
 
-// ─── 按需渲染编辑控件（大表格性能优化） ──────────────────────────────────────
-const lazyEdit = useLazyEdit()
+// 单元格编辑由 ConsolNoteGridCell + GridKernel 统一处理；不再维护 useLazyEdit 的第二套状态。
 
 // ─── 自动保存/草稿恢复 [R3.8] ──────────────────────────────────────────────
 const noteDraftContext = computed<DraftContext | null>(() => {
@@ -1536,9 +1483,19 @@ const fmt = (v: any) => displayPrefs.fmt(v)
 
 // 兼容别名
 const selectedCells = noteCtx.selectedCells
+/**
+ * 内核坐标是可见 DOM 列。编辑模式最左侧多一列行勾选框，业务列须减 1；
+ * 经典方式沿用页面原有业务坐标。勾选框列本身不对应附注单元格。
+ */
+function selectedNoteCell() {
+  const cell = selectedCells.value[0]
+  if (!cell) return null
+  const col = cell.col - (noteCtx.kernelActive() && noteEditMode.value ? 1 : 0)
+  return col >= 0 ? { ...cell, col } : null
+}
 const selectedCellIsManual = computed(() => {
   const sec = selectedNoteSection.value
-  const cell = selectedCells.value[0]
+  const cell = selectedNoteCell()
   return !!sec && selectedCells.value.length === 1 && !!cell && isManual(sec.editRows?.[cell.row], cell.col)
 })
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
@@ -1570,7 +1527,7 @@ function noteDataRowStart(sec: any): number {
 
 // ─── 批注 ────────────────────────────────────────────────────────────────────
 const showCommentDialog = ref(false)
-const commentTarget = reactive({ itemName: '', colName: '', value: '', text: '' })
+const commentTarget = reactive({ itemName: '', colName: '', value: '', text: '', rowIdx: -1, colIdx: -1 })
 const editingCommentId = ref('')
 
 // ─── 汇总 ────────────────────────────────────────────────────────────────────
@@ -1630,6 +1587,12 @@ function markNoteDirtyTracked() {
   markNoteDirty()
 }
 
+function onNoteCellCommit(row: NoteEditRow, col: number, value: string) {
+  if (row[col] === value) return
+  row[col] = value
+  onNoteCellInput(row, col)
+}
+
 function onNoteCellInput(row: NoteEditRow, col: number) {
   markManual(row, col)
   markNoteDirtyTracked()
@@ -1676,7 +1639,7 @@ async function deleteNoteRows() {
 function restoreSelectedFormula() {
   noteCtx.closeContextMenu()
   const sec = selectedNoteSection.value
-  const cell = selectedCells.value[0]
+  const cell = selectedNoteCell()
   if (!sec || !cell) return
   clearManual(sec.editRows[cell.row], cell.col)
   markNoteDirtyTracked()
@@ -1729,14 +1692,12 @@ function onNoteCellClick(row: any, column: any, _cell: HTMLElement, event: Mouse
 
   noteCtx.selectCell(rowIdx, colIdx, row[colIdx], event.ctrlKey || event.metaKey, event.shiftKey)
 
-  if (noteCtx.selectedCells.value.length === 1) {
-    const c = noteCtx.selectedCells.value[0]
-    drillDownCell.itemName = sec.editRows[c.row]?.[0] || ''
-    drillDownCell.colName = sec.headers[c.col] || ''
-    drillDownCell.totalValue = Number(c.value) || null
-    drillDownCell.rowIdx = c.row
-    drillDownCell.colIdx = c.col
-  }
+  // 内核在 capture 阶段选格，门面的 selectedCells 到下一帧才刷新；这里以事件实参为准，避免沿用旧格。
+  drillDownCell.itemName = sec.editRows[rowIdx]?.[0] || ''
+  drillDownCell.colName = sec.headers[colIdx] || ''
+  drillDownCell.totalValue = Number(row[colIdx]) || null
+  drillDownCell.rowIdx = rowIdx
+  drillDownCell.colIdx = colIdx
 }
 
 // 从 el-table 列对象解析原始叶子列下标：优先 property（= :prop 绑定的 colIndex），回退按 label 查找
@@ -1801,14 +1762,16 @@ function onNoteCellContextMenu(row: any, column: any, _cell: HTMLElement, event:
   if (colIdx < 0) return
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
-  if (!noteCtx.selectedCells.value.some(c => c.row === rowIdx && c.col === colIdx)) {
-    noteCtx.selectedCells.value = [{ row: rowIdx, col: colIdx, value: row[colIdx] }]
-    drillDownCell.itemName = row[0] || ''
-    drillDownCell.colName = sec.headers[colIdx] || ''
-    drillDownCell.totalValue = Number(row[colIdx]) || null
-    drillDownCell.rowIdx = rowIdx
-    drillDownCell.colIdx = colIdx
+  // 经典方式没有内核的 capture 选格；点到原选区外时才改为单选。
+  if (!noteCtx.kernelActive() && !noteCtx.isCellSelected(rowIdx, colIdx)) {
+    noteCtx.selectCell(rowIdx, colIdx, row[colIdx], false)
   }
+  // 即使右键落在已有选区内，也必须让菜单动作指向这次点到的格。
+  drillDownCell.itemName = row[0] || ''
+  drillDownCell.colName = sec.headers[colIdx] || ''
+  drillDownCell.totalValue = Number(row[colIdx]) || null
+  drillDownCell.rowIdx = rowIdx
+  drillDownCell.colIdx = colIdx
   noteCtx.openContextMenu(event, drillDownCell.itemName)
 }
 
@@ -1862,7 +1825,7 @@ async function openNoteBreakdown(target?: { row: number; col: number }) {
 }
 
 async function openNoteBreakdownForSelection() {
-  const cell = selectedCells.value[0]
+  const cell = selectedNoteCell()
   if (!cell) {
     ElMessage.info('请先选择附注单元格')
     return
@@ -1929,12 +1892,14 @@ function noteBreakdownRowClass({ row }: { row: ReturnType<typeof noteBreakdownRo
 
 function addCellComment() {
   noteCtx.closeContextMenu()
-  if (!noteCtx.selectedCells.value.length) return
-  const c = noteCtx.selectedCells.value[0]
+  const c = selectedNoteCell()
+  if (!c) return
   const sec = selectedNoteSection.value
   commentTarget.itemName = sec?.editRows?.[c.row]?.[0] || ''
   commentTarget.colName = sec?.headers?.[c.col] || ''
-  commentTarget.value = c.value || ''
+  commentTarget.value = String(c.value ?? '')
+  commentTarget.rowIdx = c.row
+  commentTarget.colIdx = c.col
   // 预填已有批注
   const existing = cellComments.getComment(sec?.section_id || '', c.row, c.col)
   commentTarget.text = existing?.comment || ''
@@ -1944,13 +1909,12 @@ function addCellComment() {
 
 async function saveComment() {
   if (!commentTarget.text.trim()) { ElMessage.warning('请输入批注内容'); return }
-  const c = noteCtx.selectedCells.value[0]
   const sec = selectedNoteSection.value
-  if (!c || !sec) return
+  if (!sec || commentTarget.rowIdx < 0 || commentTarget.colIdx < 0) return
   const result = await cellComments.saveComment({
     sheetKey: sec.section_id,
-    rowIdx: c.row,
-    colIdx: c.col,
+    rowIdx: commentTarget.rowIdx,
+    colIdx: commentTarget.colIdx,
     comment: commentTarget.text.trim(),
     rowName: commentTarget.itemName,
     colName: commentTarget.colName,
@@ -2880,7 +2844,9 @@ async function onNoteNodeClick(
   requestedSectionId.value = sectionId
   textAfterExpanded.value = false
   noteSelectedRows.value = []
-  selectedCells.value = []
+  noteCtx.clearSelection()
+  drillDownCell.rowIdx = -1
+  drillDownCell.colIdx = -1
   noteBreakdown.value = null
   // 差额穿透初始节点 = 当前树节点（设计 §七）；用户显式另选只影响穿透视图，不改页面 nodeKey
   noteBreakdownNodeKey.value = currentNodeKey() || null

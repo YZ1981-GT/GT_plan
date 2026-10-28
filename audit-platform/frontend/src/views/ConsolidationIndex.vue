@@ -1043,6 +1043,11 @@ consolCtx.setupTableDrag(consolTableRef, (rowIdx: number, colIdx: number) => {
   if (colIdx === 3) return row.prior_period_amount
   return null
 })
+// 试算平衡表在子组件内；把它的真实 el-table 根登记给同一门面，右键菜单与 SelectionBar 才读取该表内核的选区。
+consolCtx.followTables(() => {
+  const root = (consolTbTabRef.value as any)?.$el as HTMLElement | undefined
+  return [root?.querySelector('[data-testid="ctb-table"]')].filter(Boolean)
+})
 
 // ─── 显示偏好（全局单位/字号） ──────────────────────────────────────────────
 const displayPrefs = useDisplayPrefsStore()
@@ -1726,15 +1731,17 @@ function onReportCellContextMenu(row: any, column: any, _cell: HTMLElement, even
   const rowIdx = consolReportRows.value.indexOf(row)
   const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
   const colIdx = colMap[column.label] ?? -1
-  // 如果右键点击的单元格已在选区内，保持选区不变
-  if (rowIdx >= 0 && colIdx >= 0 && !consolCtx.isCellSelected(rowIdx, colIdx)) {
-    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  if (rowIdx < 0 || colIdx < 0) return
+  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  // 经典方式点到选区外才改为单选；Excel / 单击编辑方式由内核在 contextmenu capture 阶段先选好。
+  if (!consolCtx.kernelActive() && !consolCtx.isCellSelected(rowIdx, colIdx)) {
     consolCtx.selectCell(rowIdx, colIdx, value, false)
-    drillDownCell.itemName = row.row_name || ''
-    drillDownCell.colName = column.label || ''
-    drillDownCell.totalValue = Number(value) || null
   }
-  consolCtx.openContextMenu(event, drillDownCell.itemName || row.row_name, row)
+  // 菜单标题和穿透目标永远取这次右键的格，不能沿用旧选区的 drillDownCell。
+  drillDownCell.itemName = row.row_name || ''
+  drillDownCell.colName = column.label || ''
+  drillDownCell.totalValue = Number(value) || null
+  consolCtx.openContextMenu(event, drillDownCell.itemName, row)
 }
 
 function onConsolCtxCopy() {

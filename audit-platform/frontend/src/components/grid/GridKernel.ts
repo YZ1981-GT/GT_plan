@@ -41,6 +41,26 @@ const INTERACTIVE_SELECTOR = [
 ].join(',')
 const TOGGLE_SELECTOR = '.el-checkbox, .el-switch, .el-radio, .el-radio-button'
 
+/** 常驻的文字输入控件（一格多控件时它们不是单元格编辑器）；下拉的输入框只用于过滤，选中项文字已在格的文本里 */
+const TEXT_CONTROL_SELECTOR = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea'
+
+/** 格的可见文字，常驻输入框按位置换成它的值（复制、统计、读屏用；innerText 不含输入框里的字） */
+function textWithControlValues(root: HTMLElement): string {
+  const parts: string[] = []
+  const walk = (n: Node): void => {
+    if (n.nodeType === Node.TEXT_NODE) { parts.push(n.textContent ?? ''); return }
+    if (!(n instanceof HTMLElement)) return
+    if (n.style.display === 'none' || n.hidden) return
+    if (n.matches(TEXT_CONTROL_SELECTOR)) {
+      if (!n.closest('.el-select')) parts.push(` ${(n as HTMLInputElement).value} `)
+      return
+    }
+    for (const c of Array.from(n.childNodes)) walk(c)
+  }
+  walk(root)
+  return parts.join('').replace(/\s+/g, ' ').trim()
+}
+
 export const liveKernels = new Set<GridKernel>()
 
 // ── 给 useCellSelection 门面用的全局钩子（spec excel-style-table-editing 5.1） ──
@@ -395,6 +415,7 @@ export class GridKernel {
     const h = anyEditor(td)
     if (h) return h.getText()
     const el = td as HTMLElement
+    if (el.querySelector(TEXT_CONTROL_SELECTOR)) return stripDecorations(textWithControlValues(el))
     return stripDecorations(el.innerText ?? el.textContent ?? '')
   }
 

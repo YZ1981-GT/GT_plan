@@ -182,6 +182,7 @@ declare module 'vue' {
     ConsolNodeContextBar: typeof import('./components/consolidation/ConsolNodeContextBar.vue')['default']
     ConsolNoteAutoRefreshSwitch: typeof import('./components/consolidation/ConsolNoteAutoRefreshSwitch.vue')['default']
     ConsolNoteDetailTemplateEditor: typeof import('./components/consolidation/ConsolNoteDetailTemplateEditor.vue')['default']
+    ConsolNoteGridCell: typeof import('./components/consolidation/ConsolNoteGridCell.vue')['default']
     ConsolNoteMappingDialog: typeof import('./components/consolidation/ConsolNoteMappingDialog.vue')['default']
     ConsolNoteTab: typeof import('./components/consolidation/ConsolNoteTab.vue')['default']
     ConsolNoteTemplateManagerDialog: typeof import('./components/consolidation/ConsolNoteTemplateManagerDialog.vue')['default']

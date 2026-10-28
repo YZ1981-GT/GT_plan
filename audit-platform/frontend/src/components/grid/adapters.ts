@@ -13,7 +13,7 @@
 import {
   camelize, computed, defineComponent, Fragment, getCurrentInstance, h, inject, nextTick, onBeforeUnmount,
   onBeforeUpdate, onMounted, ref, shallowRef, toHandlerKey,
-  type Component, type ComponentInternalInstance, type Slots, type VNode,
+  type Component, type ComponentInternalInstance, type Ref, type Slots, type VNode,
 } from 'vue'
 import {
   ElCheckbox as RawElCheckbox, ElDatePicker as RawElDatePicker, ElInput as RawElInput,
@@ -327,6 +327,38 @@ const SPECS = {
   },
 } satisfies Record<string, AdapterSpec>
 
+// ── 一格多控件 ───────────────────────────────────────────────────────────────
+/**
+ * 同一个 <td> 里的输入类适配组件（输入框 / 数字 / 下拉 / 日期 / 单选组；勾选 / 开关本来就常驻，不计）。
+ * 两个及以上时（起止日期、金额 + 说明、下拉 + 条件说明……）都按普通控件常驻显示、不进单元格编辑：
+ * 内核一格只开一个编辑器，其余控件原先到不了（spec excel-style-table-editing 5.6 补）。
+ * 格子仍可选中、复制；点哪个控件就在哪个控件里输入。
+ */
+const cellGroups = new WeakMap<Element, Set<Ref<boolean>>>()
+
+/** 组内成员数变化时同步各成员的「多控件」标记（普通 Set + 每个成员一个 ref：大表里不必每格建响应式集合） */
+function syncCellGroup(group: Set<Ref<boolean>>): void {
+  const multi = group.size > 1
+  for (const flag of group) if (flag.value !== multi) flag.value = multi
+}
+
+/** 加入所在格的组，返回退出函数（卸载时调用） */
+function joinCellGroup(td: Element, flag: Ref<boolean>): () => void {
+  let group = cellGroups.get(td)
+  if (!group) {
+    group = new Set()
+    cellGroups.set(td, group)
+  }
+  group.add(flag)
+  syncCellGroup(group)
+  const g = group
+  return () => {
+    g.delete(flag)
+    flag.value = false
+    syncCellGroup(g)
+  }
+}
+
 // ── 适配组件 ─────────────────────────────────────────────────────────────────
 type Phase = 'idle' | 'open' | 'committing' | 'cancelling'
 
@@ -342,7 +374,10 @@ function defineCellAdapter(spec: AdapterSpec) {
       const hosted = ctx?.kind === 'grid-cell'
       const cellHost = hosted ? inject(GRID_CELL_KEY, null) : null
       const leftCell = ref(false)
-      const inCell = computed(() => !!ctx && !hosted && prefs?.gridEditMode !== 'classic' && !leftCell.value)
+      /** 所在格有两个及以上输入类适配组件（挂载后按 <td> 加入组）⇒ 都按普通控件常驻 */
+      const composite = ref(false)
+      let leaveCellGroup: (() => void) | null = null
+      const inCell = computed(() => !!ctx && !hosted && prefs?.gridEditMode !== 'classic' && !leftCell.value && !composite.value)
       const editing = ref(false)
       const focused = ref(false)
       const typing = ref(false)
@@ -654,6 +689,7 @@ function defineCellAdapter(spec: AdapterSpec) {
         const el = instance.subTree?.el as Element | null
         const td = el instanceof Element ? (el.closest('td, th') as HTMLTableCellElement | null) : null
         if (ctx.kind === 'raw-table' && (!td || td.tagName !== 'TD')) { leftCell.value = true; return }
+        if (!spec.direct && td && td.tagName === 'TD') leaveCellGroup = joinCellGroup(td, composite)
         if (!inCell.value || spec.direct || !td || !editable()) return
         const k = kernelForContext(ctx)
         if (k && (readFlag(attrs, 'autofocus') || k.hadRecentGesture(td))) {
@@ -670,6 +706,7 @@ function defineCellAdapter(spec: AdapterSpec) {
         }
         unregisterEditorHandle(id)
         if (hosted) cellHost?.unregister(id)
+        leaveCellGroup?.()
       })
 
       /** 显示态下的 focus() 等同打开编辑（design §7 规则 2）。 */

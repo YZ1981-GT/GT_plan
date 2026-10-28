@@ -57,3 +57,16 @@ describe('编辑态行名格靠左', () => {
     expect(css).toMatch(/\.gt-cell-editable \{[^}]*justify-content: flex-end;/)
   })
 })
+
+describe('附注表格统一 Excel 编辑', () => {
+  it('行名与金额格都由 GtGridCell 托管，不再维护第二套 activeCellEdit 键盘状态', () => {
+    const editor = readFileSync(resolve(__dirname, '../../DisclosureEditor.vue'), 'utf-8')
+    const table = editor.slice(editor.indexOf('<el-table ref="deTableRef"'), editor.indexOf('</el-table>', editor.indexOf('<el-table ref="deTableRef"')))
+    expect(table.match(/<GtGridCell\b/g)).toHaveLength(2)
+    expect(table).toContain('<ElInput')
+    expect(table).toContain('<ElInputNumber')
+    expect(editor).toContain("import { ElInput, ElInputNumber } from '@/components/grid/adapters'")
+    expect(editor).not.toContain('activeCellEdit')
+    expect(editor).not.toContain('onActiveCellKeydown')
+  })
+})

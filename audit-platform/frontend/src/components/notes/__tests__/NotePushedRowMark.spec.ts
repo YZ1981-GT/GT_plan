@@ -63,8 +63,10 @@ describe('applyProjectedRowFlag', () => {
 describe('接线：附注编辑器', () => {
   const editor = readFileSync(resolve(__dirname, '../../../views/DisclosureEditor.vue'), 'utf-8')
 
-  it('固定行不进行名编辑分支；标记挂在行名格；开关写 _pushed_optional_active', () => {
-    expect(editor).toContain('<template v-if="editMode && !row.is_total && !isPushedFixedRow(row)">')
+  it('固定行的 GtGridCell 不可编辑；标记挂在行名格；开关写 _pushed_optional_active', () => {
+    const labelCell = editor.slice(editor.indexOf('<template v-if="headerIdx === 0">'), editor.indexOf('<template v-else>', editor.indexOf('<template v-if="headerIdx === 0">')))
+    expect(labelCell).toContain(':editable="editMode && !row.is_total && !isPushedFixedRow(row)"')
+    expect(labelCell).toContain('v-if="editMode && !row.is_total && !isPushedFixedRow(row)"')
     expect(editor.match(/<NotePushedRowMark :row="row" :editable="editMode" @toggle="onPushedOptionalToggle\(\$index, \$event\)" \/>/g)?.length).toBe(1)
     const fn = editor.slice(editor.indexOf('function onPushedOptionalToggle('), editor.indexOf('function commitProjectedCellValue('))
     expect(fn).toContain("applyProjectedRowFlag(")
