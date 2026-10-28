@@ -134,10 +134,14 @@
         "seq",
         "entryType",
         "summary",
+        "category",
+        "reportItem",
         "accountCode",
         "accountName",
+        "noteItem",
         "debitAmount",
         "creditAmount",
+        "indexRef",
         "preparedBy",
         "remark"
       ],
@@ -151,7 +155,11 @@
         "creditAmount",
         "summary",
         "preparedBy",
-        "remark"
+        "remark",
+        "category",
+        "reportItem",
+        "noteItem",
+        "indexRef"
       ],
       "frontend_extra_fields": [],
       "backend_current": {
@@ -163,10 +171,14 @@
           "seq",
           "entryType",
           "summary",
+          "category",
+          "reportItem",
           "accountCode",
           "accountName",
+          "noteItem",
           "debitAmount",
           "creditAmount",
+          "indexRef",
           "preparedBy",
           "remark"
         ]
@@ -174,7 +186,7 @@
       "status": "aligned",
       "aligns_in_task": "2.2",
       "drift_dimensions": [],
-      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef（附注说明）/voucherNo（凭证号）两列前端行模型不存在；前端多 preparedBy（编制人）后端缺。"
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef（附注说明）/voucherNo（凭证号）两列前端行模型不存在；前端多 preparedBy（编制人）后端缺。oo-writeback-template-parity-closure 批 B2c（2026-10-28）：模板 B / C / E / I 补 category（类别）/ reportItem（报表项目）/ noteItem（附注项目）/ indexRef（索引），前端行模型、导出列与导入同补；旧版导出文件缺这几列照常导入（Sheet_Spec.optional_headers，缺列不写键，前端按缺键给缺省，类别按分录类型）。"
     },
     "K4-3": {
       "cycle": "K4",
@@ -185,11 +197,15 @@
         "entryNo",
         "entryType",
         "summary",
+        "category",
+        "reportItem",
         "accountCode",
         "accountName",
+        "noteItem",
         "offsetAccount",
         "debitAmount",
         "creditAmount",
+        "indexRef",
         "preparedBy",
         "source",
         "remark"
@@ -207,7 +223,11 @@
         "summary",
         "preparedBy",
         "source",
-        "remark"
+        "remark",
+        "category",
+        "reportItem",
+        "noteItem",
+        "indexRef"
       ],
       "frontend_extra_fields": [],
       "backend_current": {
@@ -220,11 +240,15 @@
           "entryNo",
           "entryType",
           "summary",
+          "category",
+          "reportItem",
           "accountCode",
           "accountName",
+          "noteItem",
           "offsetAccount",
           "debitAmount",
           "creditAmount",
+          "indexRef",
           "preparedBy",
           "source",
           "remark"
@@ -233,7 +257,7 @@
       "status": "aligned",
       "aligns_in_task": "2.2",
       "drift_dimensions": [],
-      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef/voucherNo；前端多 entryNo（编号 K4-AJE-001）/offsetAccount（对方科目）/preparedBy（编制人）/source（来源：手工/K4-4/导入），均为用户可填列，须补导出列并在导入时写回（R5.3）。"
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef/voucherNo；前端多 entryNo（编号 K4-AJE-001）/offsetAccount（对方科目）/preparedBy（编制人）/source（来源：手工/K4-4/导入），均为用户可填列，须补导出列并在导入时写回（R5.3）。oo-writeback-template-parity-closure 批 B2c（2026-10-28）：模板 B / C / E / I 补 category（类别）/ reportItem（报表项目）/ noteItem（附注项目）/ indexRef（索引），前端行模型、导出列与导入同补；旧版导出文件缺这几列照常导入（Sheet_Spec.optional_headers，缺列不写键，前端按缺键给缺省，类别按分录类型）。"
     },
     "K5-3": {
       "cycle": "K5",
@@ -243,11 +267,15 @@
         "seq",
         "entryType",
         "summary",
+        "category",
+        "reportItem",
         "accountCode",
         "accountName",
+        "noteItem",
         "debit",
         "credit",
-        "indexRef"
+        "indexRef",
+        "remark"
       ],
       "frontend_source": "k5/core/K5TabAdjustment.vue: 字面量 'K5-3-entries'（无 adj 段）；persistEntries → emit('save', 'K5-3-entries', { remark: JSON.stringify(entries) })；loadSavedData 读 saved.remark",
       "frontend_row_model": [
@@ -258,7 +286,11 @@
         "summary",
         "debit",
         "credit",
-        "indexRef"
+        "indexRef",
+        "category",
+        "reportItem",
+        "noteItem",
+        "remark"
       ],
       "frontend_extra_fields": [],
       "backend_current": {
@@ -270,17 +302,21 @@
           "seq",
           "entryType",
           "summary",
+          "category",
+          "reportItem",
           "accountCode",
           "accountName",
+          "noteItem",
           "debit",
           "credit",
-          "indexRef"
+          "indexRef",
+          "remark"
         ]
       },
       "status": "aligned",
       "aligns_in_task": "2.2",
       "drift_dimensions": [],
-      "notes": "✅ Wave 1 已对齐（Task 2.2）：item_id 无 adj 段（K5-3-entries 而非 K5-3-adj-entries），是 7 张中唯一命名例外。金额键前端是 debit/credit（非 debitAmount/creditAmount）——若不对齐则导入后借贷金额不参与界面借贷平衡校验（R5.4）。前端行模型无 remark 列；后端多 noteRef/voucherNo。已核实 debit/credit 在 is_numeric_field_key 白名单内。"
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：item_id 无 adj 段（K5-3-entries 而非 K5-3-adj-entries），是 7 张中唯一命名例外。金额键前端是 debit/credit（非 debitAmount/creditAmount）——若不对齐则导入后借贷金额不参与界面借贷平衡校验（R5.4）。前端行模型无 remark 列；后端多 noteRef/voucherNo。已核实 debit/credit 在 is_numeric_field_key 白名单内。oo-writeback-template-parity-closure 批 B2c（2026-10-28）：模板 B / C / E / J 补 category（类别）/ reportItem（报表项目）/ noteItem（附注项目）/ remark（备注）；OO 写回契约金额键改按前端 debit / credit（原 debitAmount / creditAmount，OO 侧填的金额回 HTML 读不到），前端行模型、导出列与导入同补；旧版导出文件缺这几列照常导入（Sheet_Spec.optional_headers，缺列不写键，前端按缺键给缺省，类别按分录类型）。"
     },
     "K6-3": {
       "cycle": "K6",
@@ -290,10 +326,14 @@
         "seq",
         "entryType",
         "summary",
+        "category",
+        "reportItem",
         "accountCode",
         "accountName",
+        "noteItem",
         "debitAmount",
         "creditAmount",
+        "indexRef",
         "preparedBy",
         "remark"
       ],
@@ -307,7 +347,11 @@
         "creditAmount",
         "summary",
         "preparedBy",
-        "remark"
+        "remark",
+        "category",
+        "reportItem",
+        "noteItem",
+        "indexRef"
       ],
       "frontend_extra_fields": [],
       "backend_current": {
@@ -319,10 +363,14 @@
           "seq",
           "entryType",
           "summary",
+          "category",
+          "reportItem",
           "accountCode",
           "accountName",
+          "noteItem",
           "debitAmount",
           "creditAmount",
+          "indexRef",
           "preparedBy",
           "remark"
         ]
@@ -330,7 +378,7 @@
       "status": "aligned",
       "aligns_in_task": "2.7",
       "drift_dimensions": [],
-      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 与 field_keys 已完全一致（field_keys 与前端行模型同集合、仅顺序按 headers 语序）；仅 storage_field 取工厂默认 conclusion 而前端读写 remark（K6TabAdjustment.persistEntries 写 remark，读 remark ?? value）。"
+      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 与 field_keys 已完全一致（field_keys 与前端行模型同集合、仅顺序按 headers 语序）；仅 storage_field 取工厂默认 conclusion 而前端读写 remark（K6TabAdjustment.persistEntries 写 remark，读 remark ?? value）。oo-writeback-template-parity-closure 批 B2c（2026-10-28）：模板 B / C / E / I 补 category（类别）/ reportItem（报表项目）/ noteItem（附注项目）/ indexRef（索引），前端行模型、导出列与导入同补；旧版导出文件缺这几列照常导入（Sheet_Spec.optional_headers，缺列不写键，前端按缺键给缺省，类别按分录类型）。"
     },
     "K7-3": {
       "cycle": "K7",
@@ -340,6 +388,7 @@
         "seq",
         "entryType",
         "summary",
+        "category",
         "reportItem",
         "accountName",
         "noteItem",
@@ -352,6 +401,7 @@
       "frontend_row_model": [
         "seq",
         "entryType",
+        "category",
         "summary",
         "reportItem",
         "accountName",
@@ -371,6 +421,7 @@
           "seq",
           "entryType",
           "summary",
+          "category",
           "reportItem",
           "accountName",
           "noteItem",
@@ -383,7 +434,7 @@
       "status": "aligned",
       "aligns_in_task": "2.2",
       "drift_dimensions": [],
-      "notes": "✅ Wave 1 已对齐（Task 2.2）：列结构不同构：后端 accountCode/noteRef/voucherNo 三列前端不存在，前端用 reportItem（报表项目）/noteItem（附注项目）/indexRef（索引）。前端行模型无 accountCode（K7 只按科目名称+报表项目组织）。"
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：列结构不同构：后端 accountCode/noteRef/voucherNo 三列前端不存在，前端用 reportItem（报表项目）/noteItem（附注项目）/indexRef（索引）。前端行模型无 accountCode（K7 只按科目名称+报表项目组织）。oo-writeback-template-parity-closure 批 B2c（2026-10-28）：模板 B 补 category（类别；原表单「类别」列放的是 AJE / RJE 类型，另起「类型」列），前端行模型、导出列与导入同补；旧版导出文件缺这几列照常导入（Sheet_Spec.optional_headers，缺列不写键，前端按缺键给缺省，类别按分录类型）。"
     },
     "K8-3": {
       "cycle": "K8",

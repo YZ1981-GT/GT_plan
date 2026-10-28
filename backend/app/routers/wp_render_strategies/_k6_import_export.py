@@ -31,15 +31,17 @@ _K6_2_KEYS = [
 ]
 
 # ────────────────────────────────────────────────────────────
-# K6-3 调整分录汇总（10列）
+# K6-3 调整分录汇总（13列）
+#   类别 / 报表项目 / 附注项目 / 索引：模板 B / C / E / I，前端随 oo-writeback-template-parity-closure 批 B2c 补列；
+#   旧版导出文件没有这 4 列 ⇒ optional_headers，缺了照常导入
 # ────────────────────────────────────────────────────────────
 _K6_3_HEADERS = [
-    "序号", "分录类型", "摘要", "科目代码", "科目名称",
-    "借方金额", "贷方金额", "编制人", "备注",
+    "序号", "分录类型", "摘要", "类别", "报表项目", "科目代码", "科目名称", "附注项目",
+    "借方金额", "贷方金额", "索引", "编制人", "备注",
 ]
 _K6_3_KEYS = [
-    "seq", "entryType", "summary", "accountCode", "accountName",
-    "debitAmount", "creditAmount", "preparedBy", "remark",
+    "seq", "entryType", "summary", "category", "reportItem", "accountCode", "accountName", "noteItem",
+    "debitAmount", "creditAmount", "indexRef", "preparedBy", "remark",
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -136,10 +138,12 @@ _K6_SPECS: dict[str, dict[str, Any]] = {
         "title": "K6-3 持有待售调整分录汇总",
         "headers": _K6_3_HEADERS,
         "field_keys": _K6_3_KEYS,
+        "optional_headers": ("类别", "报表项目", "附注项目", "索引"),
         "guidance": [
             "K6-3 调整分录 编制说明",
             "",
-            "10列：序号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/借方金额/贷方金额/编制人/凭证号/备注。",
+            "13列：序号/分录类型(AJE/RJE)/摘要/类别(报表调整/账项调整/其他)/报表项目/科目代码/科目名称/附注项目/"
+            "借方金额/贷方金额/索引/编制人/备注。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",
             "金额单位：元。",

@@ -62,6 +62,72 @@
     >
       <el-table-column prop="seq" label="序号" width="56" align="center" />
 
+      <!-- 列与模板 K3-3 A~J 一致（F「……」是空占位列，不录）；类型 / 科目代码 / 编制人 模板没有，排在后面 -->
+      <el-table-column label="调整事项说明" min-width="150">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateCell(row.id, 'summary', v)" />
+          <span v-else>{{ row.summary || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类别" width="110">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.category" size="small" @change="(v: string) => updateCell(row.id, 'category', v)">
+            <el-option v-for="o in K_ADJ_CATEGORY_OPTIONS" :key="o" :value="o" :label="o" />
+          </el-select>
+          <span v-else>{{ row.category || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="报表项目" width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.reportItem" size="small" placeholder="如其他应付款" @change="(v: string) => updateCell(row.id, 'reportItem', v)" />
+          <span v-else>{{ row.reportItem || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="科目名称" min-width="130">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.accountName" size="small" @change="(v: string) => updateCell(row.id, 'accountName', v)" />
+          <span v-else>{{ row.accountName || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="附注项目" width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.noteItem" size="small" @change="(v: string) => updateCell(row.id, 'noteItem', v)" />
+          <span v-else>{{ row.noteItem || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="借方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)" />
+          <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="贷方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
+          <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="索引" width="100">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="如 K3-2" @change="(v: string) => updateCell(row.id, 'indexRef', v)" />
+          <span v-else>{{ row.indexRef || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="100">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCell(row.id, 'remark', v)" />
+          <span v-else>{{ row.remark || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="类型" width="90">
         <template #default="{ row }">
           <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
@@ -79,45 +145,10 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="科目名称" min-width="130">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountName" size="small" @change="(v: string) => updateCell(row.id, 'accountName', v)" />
-          <span v-else>{{ row.accountName || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="摘要" min-width="150">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateCell(row.id, 'summary', v)" />
-          <span v-else>{{ row.summary || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="借方金额" width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="贷方金额" width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
-        </template>
-      </el-table-column>
-
       <el-table-column label="编制人" width="80">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.preparedBy" size="small" @change="(v: string) => updateCell(row.id, 'preparedBy', v)" />
           <span v-else>{{ row.preparedBy || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="备注" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCell(row.id, 'remark', v)" />
-          <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -174,6 +205,9 @@ import { eventBus } from '@/utils/eventBus'
 import { useK3ImportExport } from '@/components/workpaper/composables/useK3ImportExport'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import {
+  K_ADJ_CATEGORY_OPTIONS, defaultKAdjCategory, followEntryTypeCategory, readKAdjTemplateFields,
+} from '@/components/workpaper/composables/kAdjTemplateFields'
 
 const K3_ACCOUNT_CODE = '2241'
 const ITEM_PREFIX = 'K3-3-adj'
@@ -213,6 +247,11 @@ interface AdjustmentEntry {
   summary: string
   preparedBy: string
   remark: string
+  // 模板 B / C / E / I（见 kAdjTemplateFields）
+  category: string
+  reportItem: string
+  noteItem: string
+  indexRef: string
 }
 
 const entries = ref<AdjustmentEntry[]>([])
@@ -258,7 +297,9 @@ function loadFromResponses(): void {
     try {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) {
+        // `...e` 留着行里的其他键（如 OO 侧填的 F 占位列），否则下一次保存把它们擦掉
         entries.value = parsed.map((e: any, idx: number) => ({
+          ...e,
           id: e.id || `entry-${++nextId}`,
           seq: idx + 1,
           entryType: e.entryType || 'AJE',
@@ -269,6 +310,7 @@ function loadFromResponses(): void {
           summary: e.summary || '',
           preparedBy: e.preparedBy || '',
           remark: e.remark || '',
+          ...readKAdjTemplateFields(e),
         }))
         nextId = entries.value.length + 1
       }
@@ -296,6 +338,10 @@ async function handleAddEntry(): Promise<void> {
         summary: value.trim(),
         preparedBy: '',
         remark: '',
+        category: defaultKAdjCategory('AJE'),
+        reportItem: '其他应付款',
+        noteItem: '',
+        indexRef: '',
       }
       entries.value.push(entry)
       persistEntries()
@@ -319,6 +365,7 @@ async function handleRemoveEntry(id: string): Promise<void> {
 function updateCell(id: string, field: keyof AdjustmentEntry, value: any): void {
   const entry = entries.value.find(e => e.id === id)
   if (entry) {
+    if (field === 'entryType') followEntryTypeCategory(entry, entry.entryType, value)
     ;(entry as any)[field] = value
     persistEntries()
   }

@@ -179,53 +179,12 @@
   ]
  },
  "k2.other_current_assets_adjustment|K2-3-adj-entries": {
-  "reason": "K 循环调整分录表：前端分录行只有 类型 / 科目 / 借贷 / 摘要 / 备注，缺模板的 类别 / 报表项目 / 附注项目 / 索引列（前端补列，R3.1）",
+  "reason": "R2 待裁：K2-3 前端分录行是「借方科目 / 贷方科目」分列（一行两科目，K2-5 / K2-6 推送也按此格式），模板是一行一个科目（科目名称 + 借方 / 贷方调整金额），且有 类别 / 报表项目 / 索引列；改成单科目行要迁移已存分录并改推送格式，先不改契约（K3 ~ K7 已按模板补列，批 B2c）",
   "fields": [
    "accountName",
    "category",
    "indexRef",
    "reportItem"
-  ]
- },
- "k3.other_payables_adjustment|K3-3-adj-entries": {
-  "reason": "同 K2-3-adj-entries（前端 AdjustmentEntry 缺 类别 / 报表项目 / 附注项目 / 索引）",
-  "fields": [
-   "category",
-   "indexRef",
-   "noteItem",
-   "reportItem"
-  ]
- },
- "k4.other_current_liabilities_adjustment|K4-3-adj-entries": {
-  "reason": "同 K2-3-adj-entries",
-  "fields": [
-   "category",
-   "indexRef",
-   "reportItem"
-  ]
- },
- "k5.provisions_adjustment|K5-3-entries": {
-  "reason": "同 K2-3-adj-entries（K5 分录另有借贷两列前端另名）",
-  "fields": [
-   "category",
-   "creditAmount",
-   "debitAmount",
-   "reportItem"
-  ]
- },
- "k6.held_for_sale_adjustment|K6-3-adj-entries": {
-  "reason": "同 K2-3-adj-entries",
-  "fields": [
-   "category",
-   "indexRef",
-   "noteItem",
-   "reportItem"
-  ]
- },
- "k7.deferred_income_adjustment|K7-3-adj-entries": {
-  "reason": "同 K2-3-adj-entries（只差 类别）",
-  "fields": [
-   "category"
   ]
  },
  "l4.bonds_payable|L4-3-rows": {

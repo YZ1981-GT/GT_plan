@@ -76,13 +76,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="类别" width="90">
+      <!-- 模板 B「类别（报表调整/账项调整/其他）」：原把 AJE / RJE 类型放在这一列，类型挪到表尾 -->
+      <el-table-column label="类别" width="110">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
-            <el-option value="AJE" label="AJE" />
-            <el-option value="RJE" label="RJE" />
+          <el-select v-if="!isReadonly" :model-value="row.category" size="small" @change="(v: string) => updateCell(row.id, 'category', v)">
+            <el-option v-for="o in K_ADJ_CATEGORY_OPTIONS" :key="o" :value="o" :label="o" />
           </el-select>
-          <el-tag v-else :type="row.entryType === 'AJE' ? 'danger' : 'warning'" size="small">{{ row.entryType }}</el-tag>
+          <span v-else>{{ row.category || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -107,14 +107,14 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="借方" width="120" align="right">
+      <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="贷方" width="120" align="right">
+      <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
@@ -132,6 +132,16 @@
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCell(row.id, 'remark', v)" />
           <span v-else>{{ row.remark || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类型" width="90">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
+            <el-option value="AJE" label="AJE" />
+            <el-option value="RJE" label="RJE" />
+          </el-select>
+          <el-tag v-else :type="row.entryType === 'AJE' ? 'danger' : 'warning'" size="small">{{ row.entryType }}</el-tag>
         </template>
       </el-table-column>
 
@@ -189,6 +199,9 @@ import { eventBus } from '@/utils/eventBus'
 import { useK7ImportExport } from '@/components/workpaper/composables/useK7ImportExport'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import {
+  K_ADJ_CATEGORY_OPTIONS, defaultKAdjCategory, followEntryTypeCategory, readKAdjTemplateFields,
+} from '@/components/workpaper/composables/kAdjTemplateFields'
 import type { Ref } from 'vue'
 
 const K7_ACCOUNT_CODE = '2401'
@@ -225,6 +238,8 @@ interface AdjustmentEntry {
   id: string
   seq: number
   entryType: 'AJE' | 'RJE'
+  /** 模板 B 类别（报表调整 / 账项调整 / 其他），见 kAdjTemplateFields */
+  category: string
   summary: string
   reportItem: string
   accountName: string
@@ -277,10 +292,13 @@ function loadFromResponses(): void {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed)) {
+      // `...e` 留着行里的其他键（如 OO 侧填的 F 占位列），否则下一次保存把它们擦掉
       entries.value = parsed.map((e: any, idx: number) => ({
+        ...e,
         id: e.id || `entry-${++nextId}`,
         seq: idx + 1,
         entryType: e.entryType || 'AJE',
+        category: readKAdjTemplateFields(e).category,
         summary: e.summary || e.description || '',
         reportItem: e.reportItem || '递延收益',
         accountName: e.accountName || '',
@@ -308,6 +326,7 @@ async function handleAddEntry(): Promise<void> {
         id: `entry-${++nextId}`,
         seq: entries.value.length + 1,
         entryType: 'AJE',
+        category: defaultKAdjCategory('AJE'),
         summary: value.trim(),
         reportItem: '递延收益',
         accountName: '递延收益',
@@ -339,6 +358,7 @@ async function handleRemoveEntry(id: string): Promise<void> {
 function updateCell(id: string, field: keyof AdjustmentEntry, value: any): void {
   const entry = entries.value.find(e => e.id === id)
   if (entry) {
+    if (field === 'entryType') followEntryTypeCategory(entry, entry.entryType, value)
     ;(entry as any)[field] = value
     persistEntries()
   }

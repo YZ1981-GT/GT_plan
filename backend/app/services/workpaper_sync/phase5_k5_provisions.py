@@ -29,8 +29,10 @@ CONFIG: Final[KAdjustmentEntryConfig] = KAdjustmentEntryConfig(
     template_relative_path=TEMPLATE_RELATIVE_PATH, template_sha256=TEMPLATE_SHA256,
     managed_sheet=MANAGED_SHEET, store_item_id=STORE_ITEM_ID,
     last_data_row=LAST_DATA_ROW, footer_row=FOOTER_ROW,
+    # G / H 接前端 K5TabAdjustment 实际存的 debit / credit（六册里唯一不叫 debitAmount / creditAmount 的；
+    # 原声明 debitAmount / creditAmount 前端没有，借贷两列两个方向都不通）—— spec oo-writeback-template-parity-closure R3 批 B2c
     json_keys={"A": "summary", "B": "category", "C": "reportItem", "D": "accountName",
-               "E": "noteItem", "F": "placeholder", "G": "debitAmount", "H": "creditAmount",
+               "E": "noteItem", "F": "placeholder", "G": "debit", "H": "credit",
                "I": "indexRef", "J": "remark"},
     store_only_keys=("seq",),
     reviewed_basis="openpyxl 实测 K5 调整分录 R5 十列、R6:R20 空白、R21 提示行、整册裸 IF 0。",

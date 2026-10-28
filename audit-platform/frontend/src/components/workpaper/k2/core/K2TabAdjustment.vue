@@ -333,7 +333,10 @@ function loadFromResponses(): void {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed)) {
+      // `...e` 留着行里本表不显示的键：模板的 类别 / 报表项目 / 科目名称 / 附注项目 / 索引 / 备注 在 OO 侧填了
+      // 会存进行里，K2 分录行（借方科目 / 贷方科目分列）与模板单科目行不同构、待裁（R2），不留就在下一次保存被擦掉
       entries.value = parsed.map((e: any, idx: number) => ({
+        ...e,
         id: e.id || `entry-${++nextId}`,
         seq: idx + 1,
         entryType: e.entryType || 'AJE',

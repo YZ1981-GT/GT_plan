@@ -1713,3 +1713,9 @@ backend/app/routers/wp_render_strategies/_d1_import_export/_impl.py  3643
 #   useD2DisclosureNote.ts —— HEAD 1752 行。本批只让「从 D2-11 带入」带上 D2-11 按模板补的列（行数不变）。
 #     拆分方向：按附注章节（账龄 / 坏账准备 / 转回 / 核销 / 前五名 …）拆成章节组合式函数，本文件只留编排与持久化。
 audit-platform/frontend/src/components/workpaper/composables/useD2DisclosureNote.ts  1752
+# oo-writeback-template-parity-closure 批 B2c（2026-10-28）：_cycle_import_export_common.py —— HEAD 925 行，
+#   已超限且此前未登记。本批给各循环导入加 optional_headers（K3~K7 调整分录汇总按模板补的列，旧版导出文件没有，
+#   缺了照常导入、不写键），+6 行。拆分方向：字段解析（is_numeric_field_key ~ export_row_by_keys）/
+#   JSON 载荷读写（load_json_payload ~ upsert_json_rows）/ 账龄动态列（subject_aging_periods ~ resolve_aging_segments）/
+#   路由工厂 create_cycle_import_export_router（约 310 行）各成模块，本文件只留 re-export。
+backend/app/routers/wp_render_strategies/_cycle_import_export_common.py  925
