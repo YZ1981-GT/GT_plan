@@ -1,0 +1,1707 @@
+{
+ "base_commit": "b5fc200e0",
+ "base_file_sha256": "457cea4a952f7b53dd28c9ede7e56d528e77b32854e1971891f30719a2351156",
+ "description": "CCR 源字段基线（acnr-foundation-defect-closure T22）：基线提交 b5fc200e0 的 backend/data/cross_wp_references.json 每条引用的 source_wp / source_sheet。之后对 source_sheet 的改写都须两项证据（design §10.3）；由 git show 导出，测试在有 git 时复核。",
+ "sources": {
+  "CW-01": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-02": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-03": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-04": {
+   "source_sheet": "与同行业对比分析表J1-5",
+   "source_wp": "J1"
+  },
+  "CW-05": {
+   "source_sheet": "应付职工薪酬实质性程序表 J1A",
+   "source_wp": "J1"
+  },
+  "CW-06": {
+   "source_sheet": "与同行业对比分析表J1-5",
+   "source_wp": "J1"
+  },
+  "CW-07": {
+   "source_sheet": "附注披露信息(上市公司）D2-1",
+   "source_wp": "D2"
+  },
+  "CW-08": {
+   "source_sheet": "坏账准备明细表K1-3",
+   "source_wp": "K1"
+  },
+  "CW-09": {
+   "source_sheet": "利息测算表L1-5",
+   "source_wp": "L1"
+  },
+  "CW-10": {
+   "source_sheet": "利息测算表L3-5",
+   "source_wp": "L3"
+  },
+  "CW-100": {
+   "source_sheet": "管理费用检查表K9-8",
+   "source_wp": "K9"
+  },
+  "CW-101": {
+   "source_sheet": "审定表L1-1",
+   "source_wp": "L1"
+  },
+  "CW-102": {
+   "source_sheet": "审定表M1-1",
+   "source_wp": "M1"
+  },
+  "CW-103": {
+   "source_sheet": "递延所得税资产审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-104": {
+   "source_sheet": "递延所得税负债明细表N3-2",
+   "source_wp": "N3"
+  },
+  "CW-105": {
+   "source_sheet": "函证汇总表D0-2",
+   "source_wp": "D0"
+  },
+  "CW-106": {
+   "source_sheet": "函证程序表D0A",
+   "source_wp": "D0"
+  },
+  "CW-107": {
+   "source_sheet": "函证汇总表D0-2",
+   "source_wp": "D0"
+  },
+  "CW-108": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-109": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-11": {
+   "source_sheet": "利润表",
+   "source_wp": "IS"
+  },
+  "CW-110": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-111": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-112": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-113": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-114": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-115": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-116": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-117": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-118": {
+   "source_sheet": "银行账户情况承诺E1-11",
+   "source_wp": "E1"
+  },
+  "CW-119": {
+   "source_sheet": "货币资金审定表E1-1",
+   "source_wp": "E1"
+  },
+  "CW-12": {
+   "source_sheet": "无形资产实质性程序 I1A",
+   "source_wp": "I1"
+  },
+  "CW-120": {
+   "source_sheet": "已开立银行账户清单核对表E1-10",
+   "source_wp": "E1"
+  },
+  "CW-121": {
+   "source_sheet": "银行存单盘点表E1-9",
+   "source_wp": "E1"
+  },
+  "CW-122": {
+   "source_sheet": "B23-2 货币资金控制了解",
+   "source_wp": "B23"
+  },
+  "CW-123": {
+   "source_sheet": "货币资金控制测试C3",
+   "source_wp": "C3"
+  },
+  "CW-124": {
+   "source_sheet": "C3-2 控制偏差评价",
+   "source_wp": "C3"
+  },
+  "CW-125": {
+   "source_sheet": "B51-3 舞弊风险评估",
+   "source_wp": "B51"
+  },
+  "CW-126": {
+   "source_sheet": "货币资金审定表E1-1",
+   "source_wp": "E1"
+  },
+  "CW-127": {
+   "source_sheet": "货币资金实质性程序表E1A",
+   "source_wp": "E1"
+  },
+  "CW-128": {
+   "source_sheet": "函证汇总表E0-2",
+   "source_wp": "E0"
+  },
+  "CW-129": {
+   "source_sheet": "函证汇总表E0-2",
+   "source_wp": "E0"
+  },
+  "CW-13": {
+   "source_sheet": "审定表H8-1",
+   "source_wp": "H8"
+  },
+  "CW-130": {
+   "source_sheet": "货币资金审定表E1-1",
+   "source_wp": "E1"
+  },
+  "CW-131": {
+   "source_sheet": "货币资金审定表E1-1",
+   "source_wp": "E1"
+  },
+  "CW-132": {
+   "source_sheet": "银行函证E0",
+   "source_wp": "E0"
+  },
+  "CW-133": {
+   "source_sheet": "收入循环函证D0",
+   "source_wp": "D0"
+  },
+  "CW-134": {
+   "source_sheet": "货币资金实质性程序表E26A",
+   "source_wp": "E1"
+  },
+  "CW-135": {
+   "source_sheet": "货币资金实质性程序表E26A",
+   "source_wp": "E1"
+  },
+  "CW-136": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-137": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-138": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-139": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-14": {
+   "source_sheet": "审定表H9-1",
+   "source_wp": "H9"
+  },
+  "CW-140": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-141": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-142": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-143": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-144": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-145": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-146": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-147": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-148": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-149": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-15": {
+   "source_sheet": "权益法未实现内部交易抵销测算表G7-15",
+   "source_wp": "G7"
+  },
+  "CW-150": {
+   "source_sheet": "合同资产审定表D6-1",
+   "source_wp": "D6"
+  },
+  "CW-151": {
+   "source_sheet": "合同负债审定表D7-1",
+   "source_wp": "D7"
+  },
+  "CW-152": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-153": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-154": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-155": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-156": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-157": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-158": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-159": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-16": {
+   "source_sheet": "递延所得税资产审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-160": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-161": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-162": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-163": {
+   "source_sheet": "ERP销售订单核对D4-13",
+   "source_wp": "D4"
+  },
+  "CW-164": {
+   "source_sheet": "银行流水核对D4-14",
+   "source_wp": "D4"
+  },
+  "CW-165": {
+   "source_sheet": "物流单据核对D4-15",
+   "source_wp": "D4"
+  },
+  "CW-166": {
+   "source_sheet": "电子口岸核对D4-16",
+   "source_wp": "D4"
+  },
+  "CW-167": {
+   "source_sheet": "截止测试D4-17",
+   "source_wp": "D4"
+  },
+  "CW-168": {
+   "source_sheet": "截止测试D4-18",
+   "source_wp": "D4"
+  },
+  "CW-169": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-17": {
+   "source_sheet": "递延所得税负债审定表N3-1",
+   "source_wp": "N3"
+  },
+  "CW-170": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-171": {
+   "source_sheet": "合同资产审定表D6-1",
+   "source_wp": "D6"
+  },
+  "CW-172": {
+   "source_sheet": "合同负债审定表D7-1",
+   "source_wp": "D7"
+  },
+  "CW-173": {
+   "source_sheet": "应收账款审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-174": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-175": {
+   "source_sheet": "合同负债审定表D7-1",
+   "source_wp": "D7"
+  },
+  "CW-176": {
+   "source_sheet": "函证结果汇总表F0-1",
+   "source_wp": "F0"
+  },
+  "CW-177": {
+   "source_sheet": "函证结果汇总表F0-1",
+   "source_wp": "F0"
+  },
+  "CW-178": {
+   "source_sheet": "函证结果汇总表F0-1",
+   "source_wp": "F0"
+  },
+  "CW-179": {
+   "source_sheet": "函证结果汇总表F0-1",
+   "source_wp": "F0"
+  },
+  "CW-18": {
+   "source_sheet": "审定表M5-1",
+   "source_wp": "M5"
+  },
+  "CW-180": {
+   "source_sheet": "函证结果汇总表F0-1",
+   "source_wp": "F0"
+  },
+  "CW-181": {
+   "source_sheet": "明细汇总表F2-2",
+   "source_wp": "F2"
+  },
+  "CW-182": {
+   "source_sheet": "明细汇总表F2-2",
+   "source_wp": "F2"
+  },
+  "CW-183": {
+   "source_sheet": "明细汇总表F2-2",
+   "source_wp": "F2"
+  },
+  "CW-184": {
+   "source_sheet": "明细汇总表F2-2",
+   "source_wp": "F2"
+  },
+  "CW-185": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-186": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-187": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-188": {
+   "source_sheet": "应付账款审定表F4-1",
+   "source_wp": "F4"
+  },
+  "CW-189": {
+   "source_sheet": "应付票据审定表F3-1",
+   "source_wp": "F3"
+  },
+  "CW-19": {
+   "source_sheet": "审定表M1-1",
+   "source_wp": "M1"
+  },
+  "CW-190": {
+   "source_sheet": "预付账款审定表F1-1",
+   "source_wp": "F1"
+  },
+  "CW-191": {
+   "source_sheet": "存货跌价准备测试F2-47",
+   "source_wp": "F2"
+  },
+  "CW-192": {
+   "source_sheet": "应付账款审定表F4-1",
+   "source_wp": "F4"
+  },
+  "CW-193": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-194": {
+   "source_sheet": "应付票据审定表F3-1",
+   "source_wp": "F3"
+  },
+  "CW-195": {
+   "source_sheet": "应付账款审定表F4-1",
+   "source_wp": "F4"
+  },
+  "CW-196": {
+   "source_sheet": "预付账款审定表F1-1",
+   "source_wp": "F1"
+  },
+  "CW-197": {
+   "source_sheet": "审定表F5-1",
+   "source_wp": "F5"
+  },
+  "CW-198": {
+   "source_sheet": "存货跌价准备测试F2-47",
+   "source_wp": "F2"
+  },
+  "CW-199": {
+   "source_sheet": "应付账款审定表F4-1",
+   "source_wp": "F4"
+  },
+  "CW-20": {
+   "source_sheet": "附注披露信息（国企）",
+   "source_wp": "F2"
+  },
+  "CW-200": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-201": {
+   "source_sheet": "存货监盘记录F2-24",
+   "source_wp": "F2"
+  },
+  "CW-202": {
+   "source_sheet": "库龄分析表F2-33",
+   "source_wp": "F2"
+  },
+  "CW-203": {
+   "source_sheet": "计价测试样本F2-34",
+   "source_wp": "F2"
+  },
+  "CW-204": {
+   "source_sheet": "应付明细表F4-3",
+   "source_wp": "F4"
+  },
+  "CW-205": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-206": {
+   "source_sheet": "存货跌价准备测试F2-47",
+   "source_wp": "F2"
+  },
+  "CW-207": {
+   "source_sheet": "应付票据审定表F3-1",
+   "source_wp": "F3"
+  },
+  "CW-208": {
+   "source_sheet": "应付账款审定表F4-1",
+   "source_wp": "F4"
+  },
+  "CW-209": {
+   "source_sheet": "审定表F5-1",
+   "source_wp": "F5"
+  },
+  "CW-21": {
+   "source_sheet": "审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-210": {
+   "source_sheet": "预付账款审定表F1-1",
+   "source_wp": "F1"
+  },
+  "CW-211": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-212": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-213": {
+   "source_sheet": "折旧测算表（不含减值）-直线法H1-12",
+   "source_wp": "H1"
+  },
+  "CW-214": {
+   "source_sheet": "转固时点检查表H2-5",
+   "source_wp": "H2"
+  },
+  "CW-215": {
+   "source_sheet": "审定表H10-1",
+   "source_wp": "H10"
+  },
+  "CW-216": {
+   "source_sheet": "审定表H10-1",
+   "source_wp": "H10"
+  },
+  "CW-217": {
+   "source_sheet": "审定表H9-1",
+   "source_wp": "H9"
+  },
+  "CW-218": {
+   "source_sheet": "增减检查表（成本模式）H3-5",
+   "source_wp": "H3"
+  },
+  "CW-219": {
+   "source_sheet": "减少检查表H1-8",
+   "source_wp": "H1"
+  },
+  "CW-22": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-220": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-221": {
+   "source_sheet": "审定表H2-1",
+   "source_wp": "H2"
+  },
+  "CW-222": {
+   "source_sheet": "审定表（成本模式）H3-1",
+   "source_wp": "H3"
+  },
+  "CW-223": {
+   "source_sheet": "审定表H8-1",
+   "source_wp": "H8"
+  },
+  "CW-224": {
+   "source_sheet": "审定表H9-1",
+   "source_wp": "H9"
+  },
+  "CW-225": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-226": {
+   "source_sheet": "审定表H2-1",
+   "source_wp": "H2"
+  },
+  "CW-227": {
+   "source_sheet": "审定表（成本模式）H3-1",
+   "source_wp": "H3"
+  },
+  "CW-228": {
+   "source_sheet": "审定表H8-1",
+   "source_wp": "H8"
+  },
+  "CW-229": {
+   "source_sheet": "审定表H9-1",
+   "source_wp": "H9"
+  },
+  "CW-23": {
+   "source_sheet": "审定表D3-1",
+   "source_wp": "D3"
+  },
+  "CW-230": {
+   "source_sheet": "审定表H10-1",
+   "source_wp": "H10"
+  },
+  "CW-231": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-232": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-233": {
+   "source_sheet": "审定表H2-1",
+   "source_wp": "H2"
+  },
+  "CW-234": {
+   "source_sheet": "审定表H8-1",
+   "source_wp": "H8"
+  },
+  "CW-235": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-236": {
+   "source_sheet": "审定表H2-1",
+   "source_wp": "H2"
+  },
+  "CW-237": {
+   "source_sheet": "审定表H10-1",
+   "source_wp": "H10"
+  },
+  "CW-238": {
+   "source_sheet": "减值测算表H1-14",
+   "source_wp": "H1"
+  },
+  "CW-239": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-24": {
+   "source_sheet": "坏账准备计算表D2-8",
+   "source_wp": "D2"
+  },
+  "CW-240": {
+   "source_sheet": "折旧测算表（不含减值）-直线法H1-12",
+   "source_wp": "H1"
+  },
+  "CW-241": {
+   "source_sheet": "审定表H9-1",
+   "source_wp": "H9"
+  },
+  "CW-242": {
+   "source_sheet": "租赁变更检查表H8-7",
+   "source_wp": "H8"
+  },
+  "CW-243": {
+   "source_sheet": "研发项目资本化时点判断I2-6",
+   "source_wp": "I2"
+  },
+  "CW-244": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-245": {
+   "source_sheet": "减值测试表I3-6",
+   "source_wp": "I3"
+  },
+  "CW-246": {
+   "source_sheet": "摊销测算表（不含减值）I1-10（剩余年限法）",
+   "source_wp": "I1"
+  },
+  "CW-247": {
+   "source_sheet": "摊销测算表（含减值）I1-11",
+   "source_wp": "I1"
+  },
+  "CW-248": {
+   "source_sheet": "摊销测算I4-6",
+   "source_wp": "I4"
+  },
+  "CW-249": {
+   "source_sheet": "审定表I1-1",
+   "source_wp": "I1"
+  },
+  "CW-25": {
+   "source_sheet": "审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-250": {
+   "source_sheet": "审定表I3-1",
+   "source_wp": "I3"
+  },
+  "CW-251": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-252": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-253": {
+   "source_sheet": "审定表I1-1",
+   "source_wp": "I1"
+  },
+  "CW-254": {
+   "source_sheet": "审定表I3-1",
+   "source_wp": "I3"
+  },
+  "CW-255": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-256": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-257": {
+   "source_sheet": "摊销分配分析表I1-12",
+   "source_wp": "I1"
+  },
+  "CW-258": {
+   "source_sheet": "摊销分配分析表I1-12",
+   "source_wp": "I1"
+  },
+  "CW-259": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-26": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-260": {
+   "source_sheet": "审定表I3-1",
+   "source_wp": "I3"
+  },
+  "CW-261": {
+   "source_sheet": "审定表I1-1",
+   "source_wp": "I1"
+  },
+  "CW-262": {
+   "source_sheet": "审定表I3-1",
+   "source_wp": "I3"
+  },
+  "CW-263": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-264": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-265": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-266": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-267": {
+   "source_sheet": "函证结果汇总表G0-1",
+   "source_wp": "G0"
+  },
+  "CW-268": {
+   "source_sheet": "业务模式分析G1-8",
+   "source_wp": "G1"
+  },
+  "CW-269": {
+   "source_sheet": "SPPI测试表G1-10",
+   "source_wp": "G1"
+  },
+  "CW-27": {
+   "source_sheet": "审定表D1-1",
+   "source_wp": "D1"
+  },
+  "CW-270": {
+   "source_sheet": "权益法未实现内部交易抵销测算表G7-15",
+   "source_wp": "G7"
+  },
+  "CW-271": {
+   "source_sheet": "ECL测试表G4-6",
+   "source_wp": "G4"
+  },
+  "CW-272": {
+   "source_sheet": "ECL测试表G6-6",
+   "source_wp": "G6"
+  },
+  "CW-273": {
+   "source_sheet": "审定表G7-1",
+   "source_wp": "G7"
+  },
+  "CW-274": {
+   "source_sheet": "审定表G13-1",
+   "source_wp": "G13"
+  },
+  "CW-275": {
+   "source_sheet": "审定表G14-1",
+   "source_wp": "G14"
+  },
+  "CW-276": {
+   "source_sheet": "审定表G4-1",
+   "source_wp": "G4"
+  },
+  "CW-277": {
+   "source_sheet": "审定表G1-1",
+   "source_wp": "G1"
+  },
+  "CW-278": {
+   "source_sheet": "审定表G4-1",
+   "source_wp": "G4"
+  },
+  "CW-279": {
+   "source_sheet": "审定表G6-1",
+   "source_wp": "G6"
+  },
+  "CW-28": {
+   "source_sheet": "审定表D3-1",
+   "source_wp": "D3"
+  },
+  "CW-280": {
+   "source_sheet": "审定表G8-1",
+   "source_wp": "G8"
+  },
+  "CW-281": {
+   "source_sheet": "审定表G14-1",
+   "source_wp": "G14"
+  },
+  "CW-282": {
+   "source_sheet": "审定表G1-1",
+   "source_wp": "G1"
+  },
+  "CW-283": {
+   "source_sheet": "审定表G4-1",
+   "source_wp": "G4"
+  },
+  "CW-284": {
+   "source_sheet": "审定表G6-1",
+   "source_wp": "G6"
+  },
+  "CW-285": {
+   "source_sheet": "审定表G8-1",
+   "source_wp": "G8"
+  },
+  "CW-286": {
+   "source_sheet": "收益测算表G1-5",
+   "source_wp": "G1"
+  },
+  "CW-287": {
+   "source_sheet": "审定表G4-1",
+   "source_wp": "G4"
+  },
+  "CW-288": {
+   "source_sheet": "审定表G6-1",
+   "source_wp": "G6"
+  },
+  "CW-289": {
+   "source_sheet": "审定表G8-1",
+   "source_wp": "G8"
+  },
+  "CW-29": {
+   "source_sheet": "审定表D5",
+   "source_wp": "D5"
+  },
+  "CW-290": {
+   "source_sheet": "明细表G1-2",
+   "source_wp": "G1"
+  },
+  "CW-291": {
+   "source_sheet": "明细表G7-2",
+   "source_wp": "G7"
+  },
+  "CW-292": {
+   "source_sheet": "函证结果汇总表G0-1",
+   "source_wp": "G0"
+  },
+  "CW-293": {
+   "source_sheet": "计提情况检查表J1-6",
+   "source_wp": "J1"
+  },
+  "CW-294": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-295": {
+   "source_sheet": "审定表J2-1",
+   "source_wp": "J2"
+  },
+  "CW-296": {
+   "source_sheet": "审定表J3-1",
+   "source_wp": "J3"
+  },
+  "CW-297": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-298": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-299": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-30": {
+   "source_sheet": "审定表D6-1",
+   "source_wp": "D6"
+  },
+  "CW-300": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-301": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-302": {
+   "source_sheet": "审定表J1-1 ",
+   "source_wp": "J1"
+  },
+  "CW-303": {
+   "source_sheet": "审定表J2-1",
+   "source_wp": "J2"
+  },
+  "CW-304": {
+   "source_sheet": "审定表J3-1",
+   "source_wp": "J3"
+  },
+  "CW-305": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-306": {
+   "source_sheet": "审定表J1-1 ",
+   "source_wp": "J1"
+  },
+  "CW-307": {
+   "source_sheet": "审定表J2-1",
+   "source_wp": "J2"
+  },
+  "CW-308": {
+   "source_sheet": "审定表J3-1",
+   "source_wp": "J3"
+  },
+  "CW-309": {
+   "source_sheet": "应付职工薪酬实质性程序表 J1A",
+   "source_wp": "J1"
+  },
+  "CW-31": {
+   "source_sheet": "审定表D7-1",
+   "source_wp": "D7"
+  },
+  "CW-310": {
+   "source_sheet": "计提情况检查表J1-6",
+   "source_wp": "J1"
+  },
+  "CW-311": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-312": {
+   "source_sheet": "计提情况检查表J1-6",
+   "source_wp": "J1"
+  },
+  "CW-313": {
+   "source_sheet": "明细表K8-2",
+   "source_wp": "K8"
+  },
+  "CW-314": {
+   "source_sheet": "明细表K9-2",
+   "source_wp": "K9"
+  },
+  "CW-315": {
+   "source_sheet": "明细表K1-2",
+   "source_wp": "K1"
+  },
+  "CW-316": {
+   "source_sheet": "明细表 K5-2",
+   "source_wp": "K5"
+  },
+  "CW-317": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-318": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-319": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-32": {
+   "source_sheet": "审定表D2-1",
+   "source_wp": "D2"
+  },
+  "CW-320": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-321": {
+   "source_sheet": "存货分类汇总表F2-2",
+   "source_wp": "F2"
+  },
+  "CW-322": {
+   "source_sheet": "审定表K8-1",
+   "source_wp": "K8"
+  },
+  "CW-323": {
+   "source_sheet": "审定表K9-1",
+   "source_wp": "K9"
+  },
+  "CW-324": {
+   "source_sheet": "审定表K11-1",
+   "source_wp": "K11"
+  },
+  "CW-325": {
+   "source_sheet": "审定表K1-1",
+   "source_wp": "K1"
+  },
+  "CW-326": {
+   "source_sheet": "审定表K8-1",
+   "source_wp": "K8"
+  },
+  "CW-327": {
+   "source_sheet": "审定表K9-1",
+   "source_wp": "K9"
+  },
+  "CW-328": {
+   "source_sheet": "审定表K11-1",
+   "source_wp": "K11"
+  },
+  "CW-329": {
+   "source_sheet": "审定表K5-1",
+   "source_wp": "K5"
+  },
+  "CW-33": {
+   "source_sheet": "营业收入审定表D4-1",
+   "source_wp": "D4"
+  },
+  "CW-330": {
+   "source_sheet": "审定表K11-1",
+   "source_wp": "K11"
+  },
+  "CW-331": {
+   "source_sheet": "审定表K11-1",
+   "source_wp": "K11"
+  },
+  "CW-332": {
+   "source_sheet": "审定表K1-1",
+   "source_wp": "K1"
+  },
+  "CW-333": {
+   "source_sheet": "利息测算表L1-5",
+   "source_wp": "L1"
+  },
+  "CW-334": {
+   "source_sheet": "利息测算表L3-5",
+   "source_wp": "L3"
+  },
+  "CW-335": {
+   "source_sheet": "利息测算表L5-3",
+   "source_wp": "L5"
+  },
+  "CW-336": {
+   "source_sheet": "审定表L1-1",
+   "source_wp": "L1"
+  },
+  "CW-337": {
+   "source_sheet": "审定表L3-1",
+   "source_wp": "L3"
+  },
+  "CW-338": {
+   "source_sheet": "审定表L1-1",
+   "source_wp": "L1"
+  },
+  "CW-339": {
+   "source_sheet": "审定表L3-1",
+   "source_wp": "L3"
+  },
+  "CW-34": {
+   "source_sheet": "审定表D1-1",
+   "source_wp": "D1"
+  },
+  "CW-340": {
+   "source_sheet": "审定表L5-1",
+   "source_wp": "L5"
+  },
+  "CW-341": {
+   "source_sheet": "审定表L8-1",
+   "source_wp": "L8"
+  },
+  "CW-342": {
+   "source_sheet": "明细表L1-2",
+   "source_wp": "L1"
+  },
+  "CW-343": {
+   "source_sheet": "明细表L3-2",
+   "source_wp": "L3"
+  },
+  "CW-344": {
+   "source_sheet": "明细表L5-2",
+   "source_wp": "L5"
+  },
+  "CW-345": {
+   "source_sheet": "明细表L8-2",
+   "source_wp": "L8"
+  },
+  "CW-346": {
+   "source_sheet": "审定表L4-1",
+   "source_wp": "L4"
+  },
+  "CW-347": {
+   "source_sheet": "审定表L8-1",
+   "source_wp": "L8"
+  },
+  "CW-348": {
+   "source_sheet": "明细表L3-2",
+   "source_wp": "L3"
+  },
+  "CW-349": {
+   "source_sheet": "明细表L8-2",
+   "source_wp": "L8"
+  },
+  "CW-35": {
+   "source_sheet": "审定表D3-1",
+   "source_wp": "D3"
+  },
+  "CW-350": {
+   "source_sheet": "利息测算表L1-5",
+   "source_wp": "L1"
+  },
+  "CW-351": {
+   "source_sheet": "利息测算表L5-3",
+   "source_wp": "L5"
+  },
+  "CW-352": {
+   "source_sheet": "利息测算表L3-5",
+   "source_wp": "L3"
+  },
+  "CW-353": {
+   "source_sheet": "明细表M6-2",
+   "source_wp": "M6"
+  },
+  "CW-354": {
+   "source_sheet": "明细表M6-2",
+   "source_wp": "M6"
+  },
+  "CW-355": {
+   "source_sheet": "明细表（非上市公司）M2-2",
+   "source_wp": "M2"
+  },
+  "CW-356": {
+   "source_sheet": "明细表M4-2",
+   "source_wp": "M4"
+  },
+  "CW-357": {
+   "source_sheet": "审定表M6-1",
+   "source_wp": "M6"
+  },
+  "CW-358": {
+   "source_sheet": "审定表M2-1",
+   "source_wp": "M2"
+  },
+  "CW-359": {
+   "source_sheet": "审定表M4-1",
+   "source_wp": "M4"
+  },
+  "CW-36": {
+   "source_sheet": "审定表D5",
+   "source_wp": "D5"
+  },
+  "CW-360": {
+   "source_sheet": "审定表M9-1",
+   "source_wp": "M9"
+  },
+  "CW-361": {
+   "source_sheet": "明细表（非上市公司）M2-2",
+   "source_wp": "M2"
+  },
+  "CW-362": {
+   "source_sheet": "明细表M6-2",
+   "source_wp": "M6"
+  },
+  "CW-363": {
+   "source_sheet": "明细表M4-2",
+   "source_wp": "M4"
+  },
+  "CW-364": {
+   "source_sheet": "明细表M5-2",
+   "source_wp": "M5"
+  },
+  "CW-365": {
+   "source_sheet": "明细表M6-2",
+   "source_wp": "M6"
+  },
+  "CW-366": {
+   "source_sheet": "明细表M9-2",
+   "source_wp": "M9"
+  },
+  "CW-367": {
+   "source_sheet": "明细表（非上市公司）M2-2",
+   "source_wp": "M2"
+  },
+  "CW-368": {
+   "source_sheet": "审定表M1-1",
+   "source_wp": "M1"
+  },
+  "CW-369": {
+   "source_sheet": "明细表M5-2",
+   "source_wp": "M5"
+  },
+  "CW-37": {
+   "source_sheet": "审定表D6-1",
+   "source_wp": "D6"
+  },
+  "CW-370": {
+   "source_sheet": "应交税费审定表N2-1",
+   "source_wp": "N2"
+  },
+  "CW-371": {
+   "source_sheet": "所得税费用审定表N5-1",
+   "source_wp": "N5"
+  },
+  "CW-372": {
+   "source_sheet": "所得税费用审定表N5-1",
+   "source_wp": "N5"
+  },
+  "CW-373": {
+   "source_sheet": "应交税费审定表N2-1",
+   "source_wp": "N2"
+  },
+  "CW-374": {
+   "source_sheet": "税金及附加审定表N4-1",
+   "source_wp": "N4"
+  },
+  "CW-375": {
+   "source_sheet": "所得税费用审定表N5-1",
+   "source_wp": "N5"
+  },
+  "CW-376": {
+   "source_sheet": "审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-377": {
+   "source_sheet": "审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-378": {
+   "source_sheet": "税金及附加审定表N4-1",
+   "source_wp": "N4"
+  },
+  "CW-379": {
+   "source_sheet": "审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-38": {
+   "source_sheet": "审定表D7-1",
+   "source_wp": "D7"
+  },
+  "CW-380": {
+   "source_sheet": "应交税费审定表N2-1",
+   "source_wp": "N2"
+  },
+  "CW-381": {
+   "source_sheet": "所得税费用审定表N5-1",
+   "source_wp": "N5"
+  },
+  "CW-382": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-383": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-384": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-385": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-386": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-387": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-388": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-389": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-39": {
+   "source_sheet": "现金明细表E1-2",
+   "source_wp": "E1"
+  },
+  "CW-390": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-391": {
+   "source_sheet": "重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-392": {
+   "source_sheet": "销售循环控制测试",
+   "source_wp": "C2"
+  },
+  "CW-393": {
+   "source_sheet": "货币资金循环业务层面控制测试",
+   "source_wp": "C3"
+  },
+  "CW-394": {
+   "source_sheet": "存货循环控制测试",
+   "source_wp": "C4"
+  },
+  "CW-395": {
+   "source_sheet": "投资循环控制测试",
+   "source_wp": "C5"
+  },
+  "CW-396": {
+   "source_sheet": "固定资产循环控制测试",
+   "source_wp": "C6"
+  },
+  "CW-397": {
+   "source_sheet": "无形资产及其他长期资产循环控制测试",
+   "source_wp": "C8"
+  },
+  "CW-398": {
+   "source_sheet": "职工薪酬循环控制测试",
+   "source_wp": "C10"
+  },
+  "CW-399": {
+   "source_sheet": "管理循环控制测试",
+   "source_wp": "C11"
+  },
+  "CW-40": {
+   "source_sheet": "现金明细表E1-2",
+   "source_wp": "E1"
+  },
+  "CW-400": {
+   "source_sheet": "债务循环业务层面控制测试",
+   "source_wp": "C13"
+  },
+  "CW-401": {
+   "source_sheet": "错报明细A13-2",
+   "source_wp": "A13"
+  },
+  "CW-402": {
+   "source_sheet": "重要性水平",
+   "source_wp": "B15"
+  },
+  "CW-403": {
+   "source_sheet": "审定表G8-1",
+   "source_wp": "G8"
+  },
+  "CW-404": {
+   "source_sheet": "审定表J2-1",
+   "source_wp": "J2"
+  },
+  "CW-405": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-406": {
+   "source_sheet": "摊销分配分析表I1-9",
+   "source_wp": "I1"
+  },
+  "CW-407": {
+   "source_sheet": "摊销分配分析表I1-9",
+   "source_wp": "I1"
+  },
+  "CW-408": {
+   "source_sheet": "摊销分配分析表I1-9",
+   "source_wp": "I1"
+  },
+  "CW-409": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-41": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-410": {
+   "source_sheet": "审定表I6-1",
+   "source_wp": "I6"
+  },
+  "CW-411": {
+   "source_sheet": "审定表I2-1",
+   "source_wp": "I2"
+  },
+  "CW-412": {
+   "source_sheet": "审定表J3-1",
+   "source_wp": "J3"
+  },
+  "CW-413": {
+   "source_sheet": "审定表J3-1",
+   "source_wp": "J3"
+  },
+  "CW-414": {
+   "source_sheet": "计提情况检查表J2-4",
+   "source_wp": "J2"
+  },
+  "CW-415": {
+   "source_sheet": "分配情况检查表J1-7",
+   "source_wp": "J1"
+  },
+  "CW-416": {
+   "source_sheet": "折旧分配分析表H1-13",
+   "source_wp": "H1"
+  },
+  "CW-417": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-418": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-419": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-42": {
+   "source_sheet": "存货审定表F2-1",
+   "source_wp": "F2"
+  },
+  "CW-420": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-421": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-422": {
+   "source_sheet": "报送函",
+   "source_wp": "B60D"
+  },
+  "CW-43": {
+   "source_sheet": "审定表G1-1",
+   "source_wp": "G1"
+  },
+  "CW-44": {
+   "source_sheet": "审定表G1-1",
+   "source_wp": "G1"
+  },
+  "CW-45": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-450": {
+   "source_sheet": "审定表G9-1",
+   "source_wp": "G9"
+  },
+  "CW-46": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-47": {
+   "source_sheet": "明细表I1-2",
+   "source_wp": "I1"
+  },
+  "CW-48": {
+   "source_sheet": "明细表I1-2",
+   "source_wp": "I1"
+  },
+  "CW-49": {
+   "source_sheet": "审定表J1-1 ",
+   "source_wp": "J1"
+  },
+  "CW-50": {
+   "source_sheet": "审定表J1-1 ",
+   "source_wp": "J1"
+  },
+  "CW-51": {
+   "source_sheet": "审定表K8-1",
+   "source_wp": "K8"
+  },
+  "CW-52": {
+   "source_sheet": "审定表K8-1",
+   "source_wp": "K8"
+  },
+  "CW-53": {
+   "source_sheet": "逾期贷款检查表L1-7",
+   "source_wp": "L1"
+  },
+  "CW-54": {
+   "source_sheet": "逾期贷款检查表L1-7",
+   "source_wp": "L1"
+  },
+  "CW-55": {
+   "source_sheet": "审定表M1-1",
+   "source_wp": "M1"
+  },
+  "CW-56": {
+   "source_sheet": "审定表M1-1",
+   "source_wp": "M1"
+  },
+  "CW-57": {
+   "source_sheet": "递延所得税资产审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-58": {
+   "source_sheet": "递延所得税资产审定表N1-1",
+   "source_wp": "N1"
+  },
+  "CW-59": {
+   "source_sheet": "B15 重要性计算表",
+   "source_wp": "B15"
+  },
+  "CW-60": {
+   "source_sheet": "总体审计策略",
+   "source_wp": "B60"
+  },
+  "CW-61": {
+   "source_sheet": "销售循环控制测试",
+   "source_wp": "C2"
+  },
+  "CW-62": {
+   "source_sheet": "货币资金控制测试",
+   "source_wp": "C3"
+  },
+  "CW-63": {
+   "source_sheet": "存货控制测试",
+   "source_wp": "C4"
+  },
+  "CW-64": {
+   "source_sheet": "投资控制测试",
+   "source_wp": "C5"
+  },
+  "CW-65": {
+   "source_sheet": "固定资产控制测试",
+   "source_wp": "C6"
+  },
+  "CW-66": {
+   "source_sheet": "在建工程控制测试",
+   "source_wp": "C7"
+  },
+  "CW-67": {
+   "source_sheet": "无形资产控制测试",
+   "source_wp": "C8"
+  },
+  "CW-68": {
+   "source_sheet": "薪酬控制测试",
+   "source_wp": "C10"
+  },
+  "CW-69": {
+   "source_sheet": "税金控制测试",
+   "source_wp": "C12"
+  },
+  "CW-70": {
+   "source_sheet": "债务控制测试",
+   "source_wp": "C13"
+  },
+  "CW-71": {
+   "source_sheet": "调整分录汇总表",
+   "source_wp": "A2"
+  },
+  "CW-72": {
+   "source_sheet": "期后事项检查表",
+   "source_wp": "A11"
+  },
+  "CW-73": {
+   "source_sheet": "A13-3 评价识别出的错报",
+   "source_wp": "A13"
+  },
+  "CW-74": {
+   "source_sheet": "内控缺陷汇总",
+   "source_wp": "A14"
+  },
+  "CW-75": {
+   "source_sheet": "持续经营评估",
+   "source_wp": "A15"
+  },
+  "CW-76": {
+   "source_sheet": "管理层声明书",
+   "source_wp": "A16"
+  },
+  "CW-77": {
+   "source_sheet": "A17 重大事项概要程序表",
+   "source_wp": "A17"
+  },
+  "CW-78": {
+   "source_sheet": "期初余额审计",
+   "source_wp": "S2"
+  },
+  "CW-79": {
+   "source_sheet": "会计估计审计",
+   "source_wp": "S14"
+  },
+  "CW-80": {
+   "source_sheet": "审定表S15-1",
+   "source_wp": "S15"
+  },
+  "CW-81": {
+   "source_sheet": "B19-1管理层提供的关联方清单",
+   "source_wp": "B19"
+  },
+  "CW-82": {
+   "source_sheet": "关联交易及往来汇总A7-1",
+   "source_wp": "A7"
+  },
+  "CW-83": {
+   "source_sheet": "选项清单列表（不归档） (2)",
+   "source_wp": "C14"
+  },
+  "CW-84": {
+   "source_sheet": "财务报告审阅",
+   "source_wp": "A1"
+  },
+  "CW-85": {
+   "source_sheet": "合并范围判断流程图（举例）",
+   "source_wp": "A3"
+  },
+  "CW-86": {
+   "source_sheet": "经营分部分析",
+   "source_wp": "A4"
+  },
+  "CW-87": {
+   "source_sheet": "违法违规检查",
+   "source_wp": "S1"
+  },
+  "CW-88": {
+   "source_sheet": "会计政策变更分析",
+   "source_wp": "S3"
+  },
+  "CW-89": {
+   "source_sheet": "函证结果汇总表D0-1",
+   "source_wp": "D0"
+  },
+  "CW-90": {
+   "source_sheet": "附注披露信息（国企）D2-1",
+   "source_wp": "D2"
+  },
+  "CW-91": {
+   "source_sheet": "其他业务毛利率分析表D4-33",
+   "source_wp": "D4"
+  },
+  "CW-92": {
+   "source_sheet": "银行存款余额调节表E1-6",
+   "source_wp": "E1"
+  },
+  "CW-93": {
+   "source_sheet": "原材料单价分析F2-62",
+   "source_wp": "F2"
+  },
+  "CW-94": {
+   "source_sheet": "七、发出商品F2-9",
+   "source_wp": "F2"
+  },
+  "CW-95": {
+   "source_sheet": "收益测算表G1-5",
+   "source_wp": "G1"
+  },
+  "CW-96": {
+   "source_sheet": "审定表H1-1",
+   "source_wp": "H1"
+  },
+  "CW-97": {
+   "source_sheet": "审定表I1",
+   "source_wp": "I1"
+  },
+  "CW-98": {
+   "source_sheet": "审定表J1-1 ",
+   "source_wp": "J1"
+  },
+  "CW-99": {
+   "source_sheet": "销售费用检查表K8-8",
+   "source_wp": "K8"
+  },
+  "CW-D424-D27": {
+   "source_sheet": "第三方回款检查D4-24",
+   "source_wp": "D4-24"
+  },
+  "CW-D424-E131": {
+   "source_sheet": "第三方回款检查D4-24",
+   "source_wp": "D4-24"
+  }
+ }
+}

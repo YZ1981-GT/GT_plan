@@ -10,7 +10,8 @@
 3. `build_release`：在基础产物（`generate_catalog()`：classification 骨架 + I/E manifest + 渲染注册 + 标签别名 + 坐标种子
    + overrides）之上叠加 sheet_verdicts（补登 5 张父 sheet、K14~K18 停用）、平台底稿名与禁止别名、标签源别名处置
    （`sources/alias_policy.json`，T09）、上一批次别名沿用、cell_verdicts（孤儿 25 / 超范围 14 停用、范围内 33 语义待核对）、
-   cell 名称规则，再跑发布门禁，产出带 open_problems、release 段与四组分组（`catalog_report_buckets`）的报告。
+   cell 名称规则，再跑发布门禁，产出带 open_problems、release 段与四组分组（`catalog_report_buckets`）的报告；
+   open_problems.ccr_unresolved 按新目录经 `ccr_sources` 现算（T22，与 CI 检查器 `check_ccr_resolve` 同一函数）。
 
 只依赖标准库与本包。
 """
@@ -24,7 +25,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
-from . import catalog_contract, catalog_names, catalog_release, catalog_report_buckets
+from . import catalog_contract, catalog_names, catalog_release, catalog_report_buckets, ccr_sources
 from .catalog_integrity import content_sha256
 from .loaders.from_classification import SheetCatalogEntry, load_sheet_skeletons_from_classification
 from .loaders.from_sheet_verdicts import load_sheet_verdicts
@@ -123,7 +124,8 @@ def input_files(backend_root: Path, previous: PreviousBatch | None) -> list[tupl
     labels = backend_root.parent / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "composables"
     files = [sources / "classification_cache.json", data / "workpaper_render_registry.json", data / "wp_account_mapping.json",
              acnr / "sheet_display_names.json", sources / "sheet_verdicts.json", sources / "alias_policy.json",
-             sources / "acknowledgements.json", acnr / OVERRIDES_NAME, acnr / RELEASE_EXCEPTIONS_NAME]
+             sources / "acknowledgements.json", acnr / OVERRIDES_NAME, acnr / RELEASE_EXCEPTIONS_NAME,
+             data / "cross_wp_references.json"]
     files += sorted(sources.glob("*_cycle_ie_manifest.yaml"))
     files += sorted(p for p in data.glob("*_address_registry_seed.json"))
     files += sorted(labels.glob("*SheetLabels.ts")) if labels.exists() else []
@@ -206,6 +208,16 @@ def _load_optional(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
+def _ccr_unresolved(catalog: dict[str, Any], backend_root: Path) -> list[str] | None:
+    """按新目录现算不可解析的 CCR 源（T22，与 CI 检查器同一函数）；CCR 文件缺失或目录建不了索引返回 None
+    （报告不给该清单，覆盖 ccr_ids 的豁免即按「无法核实」阻断）。"""
+    ccr = _load_optional(backend_root / "data" / "cross_wp_references.json")
+    index = catalog_release._try_index(catalog)
+    if not isinstance(ccr, dict) or index is None:
+        return None
+    return ccr_sources.unresolved_source_ids(ccr.get("references") or [], index)
+
+
 def build_release(
     *,
     registry_version: str,
@@ -244,6 +256,9 @@ def build_release(
         "alias_conflicts": sorted({c.get("alias", "") for c in conflicts}),
         "alias_conflict_members": {c.get("alias", ""): sorted(c.get("sheet_codes") or []) for c in conflicts},
     }
+    ccr_unresolved = _ccr_unresolved(catalog, backend_root)
+    if ccr_unresolved is not None:
+        report["open_problems"]["ccr_unresolved"] = ccr_unresolved
     report["release"] = {
         "registry_version": registry_version,
         "previous_version": previous.version if previous else None,

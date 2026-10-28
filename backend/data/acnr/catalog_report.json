@@ -1,6 +1,6 @@
 {
   "acknowledged": {
-    "count": 5,
+    "count": 54,
     "items": [
       {
         "covers": {
@@ -44,6 +44,545 @@
         "id": "ack-seed-semantic-unverified-2026-10-27",
         "kind": "seed_semantic_unverified",
         "owner": "acnr-foundation-defect-closure"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-108"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-108",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-109"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-109",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-11"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-11",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-110"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-110",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-111"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-111",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-112"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-112",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-113"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-113",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-114"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-114",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-115"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-115",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-116"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-116",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-117"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-117",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-122"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-122",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-127"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-127",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-134"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-134",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-135"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-135",
+        "kind": "ccr_unresolved",
+        "owner": "E 循环（货币资金）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-20"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-20",
+        "kind": "ccr_unresolved",
+        "owner": "F 循环（采购存货）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-246"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-246",
+        "kind": "ccr_unresolved",
+        "owner": "I 循环（无形资产）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-401"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-401",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-402"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-402",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-417"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-417",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-418"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-418",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-419"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-419",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-420"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-420",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-421"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-421",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-422"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-422",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-60"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-60",
+        "kind": "ccr_unresolved",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-62"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-62",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-63"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-63",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-64"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-64",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-65"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-65",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-66"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-66",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-67"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-67",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-68"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-68",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-69"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-69",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-70"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-70",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-71"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-71",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-72"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-72",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-73"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-73",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-74"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-74",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-75"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-75",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-76"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-76",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-78"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-78",
+        "kind": "ccr_unresolved",
+        "owner": "S 循环（专项）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-79"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-79",
+        "kind": "ccr_unresolved",
+        "owner": "S 循环（专项）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-83"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-83",
+        "kind": "ccr_unresolved",
+        "owner": "C 循环（控制测试）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-84"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-84",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-85"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-85",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-86"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-86",
+        "kind": "ccr_unresolved",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-87"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-87",
+        "kind": "ccr_unresolved",
+        "owner": "S 循环（专项）"
+      },
+      {
+        "covers": {
+          "ccr_ids": [
+            "CW-88"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "id": "ack-ccr-unresolved-CW-88",
+        "kind": "ccr_unresolved",
+        "owner": "S 循环（专项）"
       },
       {
         "covers": {
@@ -324,7 +863,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-27T16:18:23.529980+00:00",
+  "generated_at": "2026-10-28T07:51:53.372925+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -1062,6 +1601,57 @@
       "附注披露信息（上市公司）",
       "附注披露信息（国企）"
     ],
+    "ccr_unresolved": [
+      "CW-108",
+      "CW-109",
+      "CW-11",
+      "CW-110",
+      "CW-111",
+      "CW-112",
+      "CW-113",
+      "CW-114",
+      "CW-115",
+      "CW-116",
+      "CW-117",
+      "CW-122",
+      "CW-127",
+      "CW-134",
+      "CW-135",
+      "CW-20",
+      "CW-246",
+      "CW-401",
+      "CW-402",
+      "CW-417",
+      "CW-418",
+      "CW-419",
+      "CW-420",
+      "CW-421",
+      "CW-422",
+      "CW-60",
+      "CW-62",
+      "CW-63",
+      "CW-64",
+      "CW-65",
+      "CW-66",
+      "CW-67",
+      "CW-68",
+      "CW-69",
+      "CW-70",
+      "CW-71",
+      "CW-72",
+      "CW-73",
+      "CW-74",
+      "CW-75",
+      "CW-76",
+      "CW-78",
+      "CW-79",
+      "CW-83",
+      "CW-84",
+      "CW-85",
+      "CW-86",
+      "CW-87",
+      "CW-88"
+    ],
     "unregistered_alias_keys": [
       "D4-22A",
       "D4-31T",
@@ -1093,9 +1683,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261027161822",
+  "registry_version": "20261028075152",
   "release": {
-    "catalog_sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7",
+    "catalog_sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -1174,8 +1764,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261027145857.json",
-        "sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075"
+        "path": "backend/data/acnr/catalog_snapshots/20261027161822.json",
+        "sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -1191,7 +1781,7 @@
       },
       {
         "path": "backend/data/acnr/sources/acknowledgements.json",
-        "sha256": "7ee1f4a4b3bcd07d1002c94f68fcd8c352978acdb39c1ecd07820f0c0844f90f"
+        "sha256": "0912f77c33df9d684bde3261ecf7561de528d8bc6e1532da04b6d3a4ab8ac52f"
       },
       {
         "path": "backend/data/acnr/sources/alias_policy.json",
@@ -1240,6 +1830,10 @@
       {
         "path": "backend/data/c22_address_registry_seed.json",
         "sha256": "02c74532c77c78667957813380863334fdd9cc5751a25f7766cb2e3814d6e3de"
+      },
+      {
+        "path": "backend/data/cross_wp_references.json",
+        "sha256": "457cea4a952f7b53dd28c9ede7e56d528e77b32854e1971891f30719a2351156"
       },
       {
         "path": "backend/data/d_address_registry_seed.json",
@@ -1298,14 +1892,14 @@
         "sha256": "082b8a081990db1618e28abdaa2059460d16d293283cccb6e90d7856af5acfa3"
       }
     ],
-    "inputs_fingerprint": "6db073dd7d3d5be1cf14663b802e90aedc516061d2b0f7d6fce5c57a8ca0f77f",
-    "previous_catalog_sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075",
-    "previous_version": "20261027145857",
-    "registry_version": "20261027161822",
+    "inputs_fingerprint": "e381469a11a6c66014f43b7672fc875d66b7b12e58ca34918e860548e40de3b0",
+    "previous_catalog_sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7",
+    "previous_version": "20261027161822",
+    "registry_version": "20261028075152",
     "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
   },
   "summary": {
-    "acknowledged": 5,
+    "acknowledged": 54,
     "blocking": 0,
     "deprecated": 44,
     "info": 116,

@@ -30,7 +30,7 @@ check ∈ schema / duplicate / sheet_code / orphan / a1 / roundtrip / immutable 
 
 本批次的当前问题清单由生成器（`catalog_build.build_release`）在跑门禁前放进 `report["open_problems"]`：
 `{"unregistered_alias_keys": [...], "alias_conflicts": [...], "alias_conflict_members": {别名: [sheet_code]},
-"ccr_unresolved": [...]}`（ccr_unresolved 由 T22 产出，现未提供）。覆盖这几类问题的处置与豁免，在对应清单缺失时
+"ccr_unresolved": [...]}`（ccr_unresolved 由 T22 经 `ccr_sources` 按新目录现算）。覆盖这几类问题的处置与豁免，在对应清单缺失时
 按「无法核实」阻断（fail-closed），不放行。
 
 往返检查用「待发布的新目录」解析：构造临时 `CatalogIndex(new)` 并经 `catalog.use_catalog(index)` 作用域让

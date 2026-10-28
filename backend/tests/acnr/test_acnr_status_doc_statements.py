@@ -109,6 +109,29 @@ def _query_models_are_strict() -> bool:
 _QB_REL = "backend/app/routers/query_builder.py"
 _ORCH_REL = _CQ + "cross_sheet_trace_orchestrator.py"
 _V2C_REL = _A + "v2_canonical.py"
+_CCR_SRC_REL = _A + "ccr_sources.py"
+_CCR_CHK_REL = "backend/scripts/acnr/check_ccr_resolve.py"
+_RECON_REL = "backend/scripts/acnr/reconcile_v2_canonical.py"
+_RECON_OUT = "backend/data/acnr/v2_canonical_reconcile.json"
+
+
+def _ci_job_runs(job: str, command: str) -> bool:
+    """governance-checks.yml 的 ``job`` 有一步恰好运行 ``command``，且该作业不 continue-on-error（YAML 解析，T22）。"""
+    import yaml
+
+    jobs = yaml.safe_load(_read(_REPO / ".github" / "workflows" / "governance-checks.yml")).get("jobs") or {}
+    body = jobs.get(job) or {}
+    return not body.get("continue-on-error") and any(
+        (s or {}).get("run") == command for s in body.get("steps") or [])
+
+
+def _ccr_checker_has_no_private_matching() -> bool:
+    """CCR 检查器不再定义私有表名匹配（无 _find_sheet / OfflineCatalog / _resolve_3arg / _resolve_2arg，AST）。"""
+    import ast as _ast
+
+    names = {n.name for n in _ast.walk(_ast.parse(_read(_REPO / _CCR_CHK_REL)))
+             if isinstance(n, (_ast.FunctionDef, _ast.ClassDef))}
+    return not names & {"_find_sheet", "OfflineCatalog", "_resolve_3arg", "_resolve_2arg"}
 
 
 def _imported_names(rel: str, module_tail: str) -> list[str]:
@@ -254,9 +277,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
-            task_open("T22", "T24", "T29", "T30"),
-            in_planned("T22", "T24", "T29", "T30")),
+        "随本 spec 后续任务加入的门禁见下表——消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
+            task_open("T24", "T29", "T30"),
+            in_planned("T24", "T29", "T30")),
         "L1 目录加载与内存索引": CB(
             _A + "catalog.py", ("CatalogIndex", "get_catalog", "list_sheets", "list_cells"),
             _T + "test_catalog_index_fail_closed.py"),
@@ -278,19 +301,19 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "L3 运行时条目": CB(
             _A + "runtime.py", ("get_runtime_entries",), _T + "test_runtime.py",
             calls(_RESOLVER_REL, "full_resolve", "get_runtime_entries")),
-        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线、跨 sheet 追溯编排器与 V2 依赖图节点规范身份调用它，CCR 尚未调用）": CB(
+        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线、跨 sheet 追溯编排器、V2 依赖图节点规范身份与 CCR 端点规范身份调用它）": CB(
             _A + "exact_identity.py", ("sheet_of", "cell_of", "name_owner"), _T + "test_exact_identity.py",
             claim("exact_identity 只导入标准库与本包 reasons / catalog_contract / catalog、不做文件或数据库读写（AST）",
                   _exact_identity_is_pure),
-            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、v2_canonical、"
-                  "wp_cell_target 与跨 sheet 追溯编排器（AST）", _exact_identity_only_release_imports),
+            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、ccr_sources、"
+                  "v2_canonical、wp_cell_target 与跨 sheet 追溯编排器（AST）", _exact_identity_only_release_imports),
             calls(_ORCH_REL, "_identity", "cell_of"),
             calls(_V2C_REL, "canonical_node", "sheet_of", "cell_of"),
             claim("full_resolve 第 1 步经 step1_identity → catalog 结构化判定 → sheet_of，catalog 无子串启发式（AST）",
                   _full_resolve_step1_uses_exact_identity),
             calls(_A + "wp_cell_target.py", "sheet_key_for", "sheet_of"),
             calls(_A + "wp_cell_target.py", "read_formula_cell", "sheet_of"),
-            task_open("T22")),
+            calls(_CCR_SRC_REL, "_end", "sheet_of", "cell_of")),
         "底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它）": CB(
             "backend/app/services/wp_cell_reader.py", ("resolve_wp_cell", "WpCellRead"),
             "backend/tests/test_wp_cell_reader_contract.py",
@@ -390,6 +413,32 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_contains_only_input_not_written_and_returns_reason",
                       "test_editor_save_inputs_new_rule_covers_old_correct_hits",
                       "test_write_path_does_not_use_regex_normalizer")),
+        "CCR 端点规范身份与 CI 检查（`cross_wp_references.json` 的源与底稿目标经唯一精确身份判定取身份，检查器无私有匹配、只依赖标准库；不可解析的源须在豁免清单逐条登记，清单外或已失效的豁免即阻断；生成器按新目录把不可解析源写进报告问题清单，供豁免门禁核实；解析到停用条目的引用单列）": CB(
+            _CCR_SRC_REL, ("source_end", "target_ends", "unresolved_source_ids", "is_deprecated"),
+            _T + "test_ccr_resolve.py",
+            calls(_CCR_SRC_REL, "_end", "sheet_of", "cell_of"),
+            calls(_CCR_SRC_REL, "unresolved_source_ids", "source_end"),
+            calls(_CCR_CHK_REL, "run", "source_end", "target_ends", "is_deprecated", "acknowledged_ccr_ids"),
+            calls(_BUILD_REL, "_ccr_unresolved", "unresolved_source_ids"),
+            calls(_BUILD_REL, "build_release", "_ccr_unresolved"),
+            claim("CCR 检查器不定义私有表名匹配（AST）", _ccr_checker_has_no_private_matching),
+            claim("CI 作业 acnr-ccr-resolve-blocking 运行 check_ccr_resolve.py --blocking 且不 continue-on-error（YAML）",
+                  lambda: _ci_job_runs("acnr-ccr-resolve-blocking",
+                                       "python backend/scripts/acnr/check_ccr_resolve.py --blocking")),
+            has_tests(_T + "test_ccr_resolve.py", "test_blocking_green_and_counts_recomputed",
+                      "test_acks_equal_unresolved_and_generator_report",
+                      "test_each_ack_has_owner_expiry_reason_and_recomputed_evidence",
+                      "test_rewriting_b60_to_workload_board_is_rejected", "test_stale_ack_and_outside_list_are_reported",
+                      "test_deprecated_group_counts", "test_scripts_run_without_site_packages")),
+        "V2 静态数据双读对账产物（L2 语义锚点、resolved refs、L3 依赖、CCR 四个文件的每个节点与边端点，经 V2 读端点同一身份函数按来源文件 × 分类计数，每类附中文原因与样本，不含时间戳；`--check` 比对，CI 运行）": CB(
+            _RECON_REL, ("build", "main"), _T + "test_ccr_resolve.py",
+            calls(_RECON_REL, "build", "canonical_node", "non_workpaper_node"), exists(_RECON_OUT),
+            claim("CI 作业 acnr-v2-canonical-reconcile 运行 reconcile_v2_canonical.py --check 且不 continue-on-error（YAML）",
+                  lambda: _ci_job_runs("acnr-v2-canonical-reconcile",
+                                       "python backend/scripts/acnr/reconcile_v2_canonical.py --check")),
+            has_tests(_T + "test_ccr_resolve.py", "test_reconcile_check_passes",
+                      "test_reconcile_counts_self_consistent_and_reasons_chinese",
+                      "test_reconcile_diff_names_changed_bucket")),
         "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
             _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
             calls(_RESOLVER_REL, "full_resolve", "step1_identity"),
@@ -469,7 +518,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "V2 双读对账产物、CCR 不可解析源处置": L("T22"),
         "消费方台账与绕过棘轮、四个 ACNR CI 作业转绿": L("T24"),
         "版本锁 / acnr_targets / 拒绝计入 ACNR 指标": L("T26"),
         "统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示": L("T29、T30、T31"),
@@ -495,14 +543,14 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点（基线待 T24 冻结）": P(V1_BYPASS, task_open("T24")),
         "**V2**（`routers/address_registry_v2.py` 与 stale 传播引擎）：依赖图与 stale 标记": P(
             exists(_V2_REL), defines(_STALE_REL, "StalePropagationEngine")),
-        "读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份（见组件表），双读对账产物与 CCR 处置见上表 T22": P(
+        "读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份，四个静态文件的双读对账产物与 CCR 端点身份检查见组件表": P(
             exists(_V2C_REL), calls(_V2_REL, "resolve_address", "annotate"),
             calls(_V2_REL, "get_dependencies", "_end_identity", "canonical_node"),
             calls(_STALE_REL, "_start_keys", "_identity_of"),
             calls(_STALE_REL, "_identity_of", "canonical_uri", "canonical_addr"),
             not_imports(_STALE_REL, "linkage_graph_builder"),
-            task_open("T22"), in_planned("T22"), absent("backend/scripts/acnr/reconcile_v2_canonical.py"),
-            absent("backend/data/acnr/v2_canonical_reconcile.json")),
+            exists(_RECON_REL), exists(_RECON_OUT), exists(_CCR_SRC_REL),
+            calls(_RECON_REL, "build", "canonical_node", "non_workpaper_node")),
         "写 stale 的端点已加项目鉴权（见组件表）": P(
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz)),
         "**legacy 导航门面**（`wp_index_resolve` 等）：已转发 ACNR，`resolve_instance` 按 `wp_index.wp_code` 绑定项目已有底稿": P(

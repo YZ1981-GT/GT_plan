@@ -218,6 +218,2079 @@
     },
     {
       "covers": {
+        "ccr_ids": [
+          "CW-108"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R38",
+          "source_cell_label": "R38",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-108",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R38」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-109"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R44",
+          "source_cell_label": "R44",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-109",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R44」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-11"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 0,
+        "ccr_source": {
+          "source_cell": "净利润",
+          "source_cell_label": "净利润",
+          "source_sheet": "利润表",
+          "source_wp": "IS"
+        },
+        "field_text": "净利润",
+        "identity": {
+          "reason": "底稿「IS」不在地址目录中，无法定位其子表",
+          "state": "wp_not_in_catalog"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-11",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「IS / 利润表」按统一身份判定不可解析（底稿「IS」不在地址目录中，无法定位其子表）；源底稿 IS 不在目录，没有可改写的目标表：缺证据①（模板册里没有对应的目录表 tab）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-110"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R44",
+          "source_cell_label": "R44",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-110",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R44」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-111"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R29",
+          "source_cell_label": "R29",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-111",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R29」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-112"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R23",
+          "source_cell_label": "R23",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-112",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R23」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-113"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R43",
+          "source_cell_label": "R43",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-113",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R43」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-114"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R17",
+          "source_cell_label": "R17",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-114",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R17」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-115"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R17",
+          "source_cell_label": "R17",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-115",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R17」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-116"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R17",
+          "source_cell_label": "R17",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-116",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R17」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-117"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R17",
+          "source_cell_label": "R17",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-117",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R17」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-122"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制了解结论",
+          "source_cell_label": "控制了解结论",
+          "source_sheet": "B23-2 货币资金控制了解",
+          "source_wp": "B23"
+        },
+        "field_text": "控制了解结论",
+        "identity": {
+          "reason": "在「B23」下找不到名称或编码为「B23-2 货币资金控制了解」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "B23/B23",
+          "B23/B23-15"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-122",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B23 / B23-2 货币资金控制了解」按统一身份判定不可解析（在「B23」下找不到名称或编码为「B23-2 货币资金控制了解」的表）；字段文字「控制了解结论」在目录 B23 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-127"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R45",
+          "source_cell_label": "R45",
+          "source_sheet": "货币资金实质性程序表E1A",
+          "source_wp": "E1"
+        },
+        "field_text": null,
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2_no_field_text",
+        "source_tab_files": [
+          "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-127",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E1A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E1A」的表）；CCR 只给出单元格 / 行号「R45」、没有字段文字，证据②无从核对，不能把它改写到目录里的 26 张有模板 tab 的表；源表在模板册 wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-134"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R10 大额现金应对",
+          "source_cell_label": "R10 大额现金应对",
+          "source_sheet": "货币资金实质性程序表E26A",
+          "source_wp": "E1"
+        },
+        "field_text": "R10 大额现金应对",
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E26A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-134",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E26A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E26A」的表）；字段文字「R10 大额现金应对」在目录 E1 下有模板 tab 的 26 张表里都没有出现：缺证据②；源表在模板册 wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-135"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 26,
+        "ccr_source": {
+          "source_cell": "R12 银行流水异常",
+          "source_cell_label": "R12 银行流水异常",
+          "source_sheet": "货币资金实质性程序表E26A",
+          "source_wp": "E1"
+        },
+        "field_text": "R12 银行流水异常",
+        "identity": {
+          "reason": "在「E1」下找不到名称或编码为「货币资金实质性程序表E26A」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx"
+        ],
+        "tab_found": [
+          "E1/E1-1",
+          "E1/E1-10",
+          "E1/E1-11",
+          "E1/E1-14",
+          "E1/E1-15",
+          "E1/E1-18",
+          "E1/E1-19",
+          "E1/E1-2",
+          "E1/E1-20",
+          "E1/E1-21",
+          "E1/E1-22",
+          "E1/E1-23",
+          "E1/E1-26",
+          "E1/E1-27",
+          "E1/E1-28",
+          "E1/E1-29",
+          "E1/E1-3",
+          "E1/E1-30",
+          "E1/E1-31",
+          "E1/E1-32",
+          "E1/E1-4",
+          "E1/E1-5",
+          "E1/E1-6",
+          "E1/E1-7",
+          "E1/E1-8",
+          "E1/E1-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-135",
+      "kind": "ccr_unresolved",
+      "owner": "E 循环（货币资金）",
+      "reason": "源「E1 / 货币资金实质性程序表E26A」按统一身份判定不可解析（在「E1」下找不到名称或编码为「货币资金实质性程序表E26A」的表）；字段文字「R12 银行流水异常」在目录 E1 下有模板 tab 的 26 张表里都没有出现：缺证据②；源表在模板册 wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-20"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 58,
+        "ccr_source": {
+          "source_cell": "E26",
+          "source_cell_label": "本期计提跌价",
+          "source_sheet": "附注披露信息（国企）",
+          "source_wp": "F2"
+        },
+        "field_text": "本期计提跌价",
+        "identity": {
+          "reason": "在「F2」下找不到名称或编码为「附注披露信息（国企）」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+          "wp_templates/F/F2存货.xlsx"
+        ],
+        "tab_found": [
+          "F2/F2-1",
+          "F2/F2-10",
+          "F2/F2-11",
+          "F2/F2-12",
+          "F2/F2-13",
+          "F2/F2-14",
+          "F2/F2-16",
+          "F2/F2-18",
+          "F2/F2-19",
+          "F2/F2-2",
+          "F2/F2-20",
+          "F2/F2-21",
+          "F2/F2-22",
+          "F2/F2-23",
+          "F2/F2-24",
+          "F2/F2-25",
+          "F2/F2-26",
+          "F2/F2-29",
+          "F2/F2-3",
+          "F2/F2-30",
+          "F2/F2-31",
+          "F2/F2-32",
+          "F2/F2-33",
+          "F2/F2-34",
+          "F2/F2-35",
+          "F2/F2-38",
+          "F2/F2-39",
+          "F2/F2-4",
+          "F2/F2-40",
+          "F2/F2-41",
+          "F2/F2-42",
+          "F2/F2-43",
+          "F2/F2-44",
+          "F2/F2-47",
+          "F2/F2-48",
+          "F2/F2-49",
+          "F2/F2-5",
+          "F2/F2-52",
+          "F2/F2-55",
+          "F2/F2-56",
+          "F2/F2-57",
+          "F2/F2-58",
+          "F2/F2-6",
+          "F2/F2-61",
+          "F2/F2-62",
+          "F2/F2-63",
+          "F2/F2-64",
+          "F2/F2-65",
+          "F2/F2-66",
+          "F2/F2-67",
+          "F2/F2-68",
+          "F2/F2-69",
+          "F2/F2-7",
+          "F2/F2-70",
+          "F2/F2-71",
+          "F2/F2-72",
+          "F2/F2-8",
+          "F2/F2-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-20",
+      "kind": "ccr_unresolved",
+      "owner": "F 循环（采购存货）",
+      "reason": "源「F2 / 附注披露信息（国企）」按统一身份判定不可解析（在「F2」下找不到名称或编码为「附注披露信息（国企）」的表）；字段文字「本期计提跌价」在目录 F2 下有模板 tab 的 58 张表里都没有出现：缺证据②；源表在模板册 wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx、wp_templates/F/F2存货.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-246"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 13,
+        "ccr_source": {
+          "source_cell": "本期摊销合计",
+          "source_cell_label": null,
+          "source_sheet": "摊销测算表（不含减值）I1-10（剩余年限法）",
+          "source_wp": "I1"
+        },
+        "field_text": "本期摊销合计",
+        "identity": {
+          "reason": "在「I1」下找不到名称或编码为「摊销测算表（不含减值）I1-10（剩余年限法）」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx"
+        ],
+        "tab_found": [
+          "I1/I1",
+          "I1/I1-11",
+          "I1/I1-12",
+          "I1/I1-13",
+          "I1/I1-2",
+          "I1/I1-3",
+          "I1/I1-4",
+          "I1/I1-5",
+          "I1/I1-6",
+          "I1/I1-7",
+          "I1/I1-8",
+          "I1/I1-9",
+          "I1/I1A"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-246",
+      "kind": "ccr_unresolved",
+      "owner": "I 循环（无形资产）",
+      "reason": "源「I1 / 摊销测算表（不含减值）I1-10（剩余年限法）」按统一身份判定不可解析（在「I1」下找不到名称或编码为「摊销测算表（不含减值）I1-10（剩余年限法）」的表）；字段文字「本期摊销合计」在目录 I1 下有模板 tab 的 13 张表里都没有出现：缺证据②；源表在模板册 wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-401"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "source_wp_code",
+          "source_cell_label": "来源底稿引用",
+          "source_sheet": "错报明细A13-2",
+          "source_wp": "A13"
+        },
+        "field_text": "来源底稿引用",
+        "identity": {
+          "reason": "在「A13」下找不到名称或编码为「错报明细A13-2」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A13/A13"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-401",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A13 / 错报明细A13-2」按统一身份判定不可解析（在「A13」下找不到名称或编码为「错报明细A13-2」的表）；字段文字「来源底稿引用」在目录 A13 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-402"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "PM",
+          "source_cell_label": "整体重要性水平",
+          "source_sheet": "重要性水平",
+          "source_wp": "B15"
+        },
+        "field_text": "整体重要性水平",
+        "identity": {
+          "reason": "在「B15」下找不到名称或编码为「重要性水平」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "B15/B15"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-402",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B15 / 重要性水平」按统一身份判定不可解析（在「B15」下找不到名称或编码为「重要性水平」的表）；字段文字「整体重要性水平」在目录 B15 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-417"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "重要性水平结论",
+          "source_cell_label": null,
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "重要性水平结论",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-417",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-418"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "重要性水平计算过程",
+          "source_cell_label": null,
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "重要性水平计算过程",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-418",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-419"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "风险ID/B50行号",
+          "source_cell_label": null,
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "风险ID/B50行号",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-419",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-420"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "SCOT+_循环代码_程序索引",
+          "source_cell_label": null,
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "SCOT+_循环代码_程序索引",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-420",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-421"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "计划版本与适用性矩阵",
+          "source_cell_label": null,
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "计划版本与适用性矩阵",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-421",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-422"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 0,
+        "ccr_source": {
+          "source_cell": "对应B60版本日期",
+          "source_cell_label": null,
+          "source_sheet": "报送函",
+          "source_wp": "B60D"
+        },
+        "field_text": "对应B60版本日期",
+        "identity": {
+          "reason": "底稿「B60D」不在地址目录中，无法定位其子表",
+          "state": "wp_not_in_catalog"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-422",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60D / 报送函」按统一身份判定不可解析（底稿「B60D」不在地址目录中，无法定位其子表）；源底稿 B60D 不在目录，没有可改写的目标表：缺证据①（模板册里没有对应的目录表 tab）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-60"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "审计计划摘要",
+          "source_cell_label": "审计计划摘要",
+          "source_sheet": "总体审计策略",
+          "source_wp": "B60"
+        },
+        "field_text": "审计计划摘要",
+        "identity": {
+          "reason": "在「B60」下找不到名称或编码为「总体审计策略」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_1",
+        "source_tab_files": [],
+        "tab_found": [],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-60",
+      "kind": "ccr_unresolved",
+      "owner": "B 循环（控制了解）",
+      "reason": "源「B60 / 总体审计策略」按统一身份判定不可解析（在「B60」下找不到名称或编码为「总体审计策略」的表）；目录里 B60 的 1 张表在该底稿模板册里都找不到同名 tab：缺证据①。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-62"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "货币资金控制测试",
+          "source_wp": "C3"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C3」下找不到名称或编码为「货币资金控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C3/C3",
+          "C3/C3-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-62",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C3 / 货币资金控制测试」按统一身份判定不可解析（在「C3」下找不到名称或编码为「货币资金控制测试」的表）；字段文字「控制有效性结论」在目录 C3 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-63"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "存货控制测试",
+          "source_wp": "C4"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C4」下找不到名称或编码为「存货控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C4/C4",
+          "C4/C4-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-63",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C4 / 存货控制测试」按统一身份判定不可解析（在「C4」下找不到名称或编码为「存货控制测试」的表）；字段文字「控制有效性结论」在目录 C4 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-64"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "投资控制测试",
+          "source_wp": "C5"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C5」下找不到名称或编码为「投资控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C5/C5",
+          "C5/C5-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-64",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C5 / 投资控制测试」按统一身份判定不可解析（在「C5」下找不到名称或编码为「投资控制测试」的表）；字段文字「控制有效性结论」在目录 C5 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-65"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "固定资产控制测试",
+          "source_wp": "C6"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C6」下找不到名称或编码为「固定资产控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C6/C6",
+          "C6/C6-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-65",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C6 / 固定资产控制测试」按统一身份判定不可解析（在「C6」下找不到名称或编码为「固定资产控制测试」的表）；字段文字「控制有效性结论」在目录 C6 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-66"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "在建工程控制测试",
+          "source_wp": "C7"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C7」下找不到名称或编码为「在建工程控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C7/C7",
+          "C7/C7-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-66",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C7 / 在建工程控制测试」按统一身份判定不可解析（在「C7」下找不到名称或编码为「在建工程控制测试」的表）；字段文字「控制有效性结论」在目录 C7 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-67"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "无形资产控制测试",
+          "source_wp": "C8"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C8」下找不到名称或编码为「无形资产控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C8/C8",
+          "C8/C8-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-67",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C8 / 无形资产控制测试」按统一身份判定不可解析（在「C8」下找不到名称或编码为「无形资产控制测试」的表）；字段文字「控制有效性结论」在目录 C8 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-68"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "薪酬控制测试",
+          "source_wp": "C10"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C10」下找不到名称或编码为「薪酬控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C10/C10",
+          "C10/C10-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-68",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C10 / 薪酬控制测试」按统一身份判定不可解析（在「C10」下找不到名称或编码为「薪酬控制测试」的表）；字段文字「控制有效性结论」在目录 C10 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-69"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "税金控制测试",
+          "source_wp": "C12"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C12」下找不到名称或编码为「税金控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C12/C12",
+          "C12/C12-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-69",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C12 / 税金控制测试」按统一身份判定不可解析（在「C12」下找不到名称或编码为「税金控制测试」的表）；字段文字「控制有效性结论」在目录 C12 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-70"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "控制有效性结论",
+          "source_cell_label": "控制有效性结论",
+          "source_sheet": "债务控制测试",
+          "source_wp": "C13"
+        },
+        "field_text": "控制有效性结论",
+        "identity": {
+          "reason": "在「C13」下找不到名称或编码为「债务控制测试」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "C13/C13",
+          "C13/C13-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-70",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C13 / 债务控制测试」按统一身份判定不可解析（在「C13」下找不到名称或编码为「债务控制测试」的表）；字段文字「控制有效性结论」在目录 C13 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-71"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "调整分录合计",
+          "source_cell_label": "调整分录合计",
+          "source_sheet": "调整分录汇总表",
+          "source_wp": "A2"
+        },
+        "field_text": "调整分录合计",
+        "identity": {
+          "reason": "在「A2」下找不到名称或编码为「调整分录汇总表」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A2/A2",
+          "A2/A2-1"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-71",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A2 / 调整分录汇总表」按统一身份判定不可解析（在「A2」下找不到名称或编码为「调整分录汇总表」的表）；字段文字「调整分录合计」在目录 A2 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-72"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 4,
+        "ccr_source": {
+          "source_cell": "期后事项结论",
+          "source_cell_label": "期后事项结论",
+          "source_sheet": "期后事项检查表",
+          "source_wp": "A11"
+        },
+        "field_text": "期后事项结论",
+        "identity": {
+          "reason": "在「A11」下找不到名称或编码为「期后事项检查表」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A11/A11",
+          "A11/A11-1",
+          "A11/A11-2",
+          "A11/A11-3"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-72",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A11 / 期后事项检查表」按统一身份判定不可解析（在「A11」下找不到名称或编码为「期后事项检查表」的表）；字段文字「期后事项结论」在目录 A11 下有模板 tab 的 4 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-73"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "A10",
+          "source_cell_label": "未更正错报合计",
+          "source_sheet": "A13-3 评价识别出的错报",
+          "source_wp": "A13"
+        },
+        "field_text": "未更正错报合计",
+        "identity": {
+          "reason": "在「A13」下找不到名称或编码为「A13-3 评价识别出的错报」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/A/A13 错报（程序表及底稿）.xlsx"
+        ],
+        "tab_found": [
+          "A13/A13"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-73",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A13 / A13-3 评价识别出的错报」按统一身份判定不可解析（在「A13」下找不到名称或编码为「A13-3 评价识别出的错报」的表）；字段文字「未更正错报合计」在目录 A13 下有模板 tab 的 1 张表里都没有出现：缺证据②；源表在模板册 wp_templates/A/A13 错报（程序表及底稿）.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-74"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 7,
+        "ccr_source": {
+          "source_cell": "重大缺陷结论",
+          "source_cell_label": "重大缺陷结论",
+          "source_sheet": "内控缺陷汇总",
+          "source_wp": "A14"
+        },
+        "field_text": "重大缺陷结论",
+        "identity": {
+          "reason": "在「A14」下找不到名称或编码为「内控缺陷汇总」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A14/A14",
+          "A14/A14-1",
+          "A14/A14-2",
+          "A14/A14-3",
+          "A14/A14-4",
+          "A14/A14-5",
+          "A14/A14-6"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-74",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A14 / 内控缺陷汇总」按统一身份判定不可解析（在「A14」下找不到名称或编码为「内控缺陷汇总」的表）；字段文字「重大缺陷结论」在目录 A14 下有模板 tab 的 7 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-75"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "持续经营结论",
+          "source_cell_label": "持续经营结论",
+          "source_sheet": "持续经营评估",
+          "source_wp": "A15"
+        },
+        "field_text": "持续经营结论",
+        "identity": {
+          "reason": "在「A15」下找不到名称或编码为「持续经营评估」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A15/A15",
+          "A15/A15-1"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-75",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A15 / 持续经营评估」按统一身份判定不可解析（在「A15」下找不到名称或编码为「持续经营评估」的表）；字段文字「持续经营结论」在目录 A15 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-76"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "声明书签署日期",
+          "source_cell_label": "声明书签署日期",
+          "source_sheet": "管理层声明书",
+          "source_wp": "A16"
+        },
+        "field_text": "声明书签署日期",
+        "identity": {
+          "reason": "在「A16」下找不到名称或编码为「管理层声明书」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A16/A16"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-76",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A16 / 管理层声明书」按统一身份判定不可解析（在「A16」下找不到名称或编码为「管理层声明书」的表）；字段文字「声明书签署日期」在目录 A16 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-78"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "期初余额确认",
+          "source_cell_label": "期初余额确认",
+          "source_sheet": "期初余额审计",
+          "source_wp": "S2"
+        },
+        "field_text": "期初余额确认",
+        "identity": {
+          "reason": "在「S2」下找不到名称或编码为「期初余额审计」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "S2/S2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-78",
+      "kind": "ccr_unresolved",
+      "owner": "S 循环（专项）",
+      "reason": "源「S2 / 期初余额审计」按统一身份判定不可解析（在「S2」下找不到名称或编码为「期初余额审计」的表）；字段文字「期初余额确认」在目录 S2 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-79"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "估计合理性结论",
+          "source_cell_label": "估计合理性结论",
+          "source_sheet": "会计估计审计",
+          "source_wp": "S14"
+        },
+        "field_text": "估计合理性结论",
+        "identity": {
+          "reason": "在「S14」下找不到名称或编码为「会计估计审计」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "S14/S14"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-79",
+      "kind": "ccr_unresolved",
+      "owner": "S 循环（专项）",
+      "reason": "源「S14 / 会计估计审计」按统一身份判定不可解析（在「S14」下找不到名称或编码为「会计估计审计」的表）；字段文字「估计合理性结论」在目录 S14 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-83"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "B7",
+          "source_cell_label": "租赁分类结论",
+          "source_sheet": "选项清单列表（不归档） (2)",
+          "source_wp": "C14"
+        },
+        "field_text": "租赁分类结论",
+        "identity": {
+          "reason": "在「C14」下找不到名称或编码为「选项清单列表（不归档） (2)」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/C/C14 租赁循环控制测试.xlsx"
+        ],
+        "tab_found": [
+          "C14/C14",
+          "C14/C14-2"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-83",
+      "kind": "ccr_unresolved",
+      "owner": "C 循环（控制测试）",
+      "reason": "源「C14 / 选项清单列表（不归档） (2)」按统一身份判定不可解析（在「C14」下找不到名称或编码为「选项清单列表（不归档） (2)」的表）；字段文字「租赁分类结论」在目录 C14 下有模板 tab 的 2 张表里都没有出现：缺证据②；源表在模板册 wp_templates/C/C14 租赁循环控制测试.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-84"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 6,
+        "ccr_source": {
+          "source_cell": "报告审阅结论",
+          "source_cell_label": "报告审阅结论",
+          "source_sheet": "财务报告审阅",
+          "source_wp": "A1"
+        },
+        "field_text": "报告审阅结论",
+        "identity": {
+          "reason": "在「A1」下找不到名称或编码为「财务报告审阅」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A1/A1",
+          "A1/A1-11",
+          "A1/A1-13",
+          "A1/A1-14",
+          "A1/A1-17",
+          "A1/A1-18"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-84",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A1 / 财务报告审阅」按统一身份判定不可解析（在「A1」下找不到名称或编码为「财务报告审阅」的表）；字段文字「报告审阅结论」在目录 A1 下有模板 tab 的 6 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-85"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 7,
+        "ccr_source": {
+          "source_cell": "E18",
+          "source_cell_label": "合并抵消合计",
+          "source_sheet": "合并范围判断流程图（举例）",
+          "source_wp": "A3"
+        },
+        "field_text": "合并抵消合计",
+        "identity": {
+          "reason": "在「A3」下找不到名称或编码为「合并范围判断流程图（举例）」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [
+          "wp_templates/A/A3-3 结构化主体纳入合并范围的判断.xlsx"
+        ],
+        "tab_found": [
+          "A3/A3",
+          "A3/A3-1",
+          "A3/A3-3",
+          "A3/A3-4",
+          "A3/A3-5",
+          "A3/A3-6",
+          "A3/A3-7"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-85",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A3 / 合并范围判断流程图（举例）」按统一身份判定不可解析（在「A3」下找不到名称或编码为「合并范围判断流程图（举例）」的表）；字段文字「合并抵消合计」在目录 A3 下有模板 tab 的 7 张表里都没有出现：缺证据②；源表在模板册 wp_templates/A/A3-3 结构化主体纳入合并范围的判断.xlsx 里存在，但目录没有登记这张表（design §16 Q4 另立 spec 补齐）。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-86"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 2,
+        "ccr_source": {
+          "source_cell": "分部信息汇总",
+          "source_cell_label": "分部信息汇总",
+          "source_sheet": "经营分部分析",
+          "source_wp": "A4"
+        },
+        "field_text": "分部信息汇总",
+        "identity": {
+          "reason": "在「A4」下找不到名称或编码为「经营分部分析」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "A4/A4",
+          "A4/A4-1"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-86",
+      "kind": "ccr_unresolved",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "源「A4 / 经营分部分析」按统一身份判定不可解析（在「A4」下找不到名称或编码为「经营分部分析」的表）；字段文字「分部信息汇总」在目录 A4 下有模板 tab 的 2 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-87"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 1,
+        "ccr_source": {
+          "source_cell": "违法违规结论",
+          "source_cell_label": "违法违规结论",
+          "source_sheet": "违法违规检查",
+          "source_wp": "S1"
+        },
+        "field_text": "违法违规结论",
+        "identity": {
+          "reason": "在「S1」下找不到名称或编码为「违法违规检查」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "S1/S1"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-87",
+      "kind": "ccr_unresolved",
+      "owner": "S 循环（专项）",
+      "reason": "源「S1 / 违法违规检查」按统一身份判定不可解析（在「S1」下找不到名称或编码为「违法违规检查」的表）；字段文字「违法违规结论」在目录 S1 下有模板 tab 的 1 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
+        "ccr_ids": [
+          "CW-88"
+        ]
+      },
+      "created_on": "2026-10-28",
+      "evidence": {
+        "candidate_sheets": 8,
+        "ccr_source": {
+          "source_cell": "政策变更影响",
+          "source_cell_label": "政策变更影响",
+          "source_sheet": "会计政策变更分析",
+          "source_wp": "S3"
+        },
+        "field_text": "政策变更影响",
+        "identity": {
+          "reason": "在「S3」下找不到名称或编码为「会计政策变更分析」的表",
+          "state": "not_found"
+        },
+        "missing": "evidence_2",
+        "source_tab_files": [],
+        "tab_found": [
+          "S3/S3",
+          "S3/S3-1",
+          "S3/S3-10",
+          "S3/S3-2",
+          "S3/S3-4",
+          "S3/S3-6",
+          "S3/S3-8",
+          "S3/S3-9"
+        ],
+        "text_found": []
+      },
+      "expires_on": "2027-04-30",
+      "id": "ack-ccr-unresolved-CW-88",
+      "kind": "ccr_unresolved",
+      "owner": "S 循环（专项）",
+      "reason": "源「S3 / 会计政策变更分析」按统一身份判定不可解析（在「S3」下找不到名称或编码为「会计政策变更分析」的表）；字段文字「政策变更影响」在目录 S3 下有模板 tab 的 8 张表里都没有出现：缺证据②。不改写 source_sheet（改到无关表会造出错误的 stale / 依赖 / chip 链路，design §10.3）"
+    },
+    {
+      "covers": {
         "sheet_codes": [
           "A13"
         ]

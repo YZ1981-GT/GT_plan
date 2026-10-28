@@ -209,8 +209,9 @@ jobs:
         run: python backend/scripts/acnr/check_ccr_resolve.py
 
   acnr-ccr-resolve-blocking:
-    # ACNR R17.3: CCR resolve blocking 模式（M3）
-    # 所有非 semantic_only 的 CCR source 必须 100% resolve，否则阻断 PR
+    # ACNR R17.3 / acnr-foundation-defect-closure T22（需求 9.5）：CCR 源按统一身份判定解析，
+    # 不可解析的源须在 backend/data/acnr/sources/acknowledgements.json 逐条登记 ccr_unresolved；
+    # 清单外或已失效的豁免即阻断 PR（只依赖标准库，不装依赖）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -219,6 +220,18 @@ jobs:
           python-version: "3.12"
       - name: Check CCR resolve (blocking mode)
         run: python backend/scripts/acnr/check_ccr_resolve.py --blocking
+
+  acnr-v2-canonical-reconcile:
+    # acnr-foundation-defect-closure T22（需求 9.4 / design §10.2）：V2 静态数据双读对账产物
+    # backend/data/acnr/v2_canonical_reconcile.json 与重算一致（只依赖标准库，不装依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check V2 canonical reconcile artifact
+        run: python backend/scripts/acnr/reconcile_v2_canonical.py --check
 
   check-sheet-labels-generated:
     # ACNR R3.2/R18.1: dSheetLabels.ts 生成一致性守卫（禁手改）
