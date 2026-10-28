@@ -413,6 +413,14 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
   - 构建器请求体仍只由 `queryPayloads.buildBuilderPayload` 构造：增可选 `scopeToProject` / `offset` / `headers`，都不传时与 T16 逐键相同；条件序列化、算子下拉、`opLabel`、`needsValue` 未改（ADR-AQL-03）。
   - 构建器的项目上下文：项目取 `props.projectId`，否则路由项目；年度依次取 `props.year`、路由 `?year`、项目 store 的审计年度（项目一致时），都取不到为空（显示「审计年度未确定，不按年度筛选」），不用日历年。两个宿主（弹窗、页面版）现在都不传这两个 prop，传入在任务 28 / 29。
   - 两个宿主都以 `embedded` 嵌入，页头副标题不渲染；不可用原因显示在构建器顶部的提示条（`aqb-access-blocked`），预览 / 执行 / 导出按钮禁用。原「公式引用」列并入操作列的「复制引用」：只在本次结果限定单个项目（`scope.requested_project_id`）时出现，本页引用批量校验通过后才可复制。schema 缓存键加用户 id（字段按角色隐去 PII，换人登录不沿用上一个人的字段表）。
+- B10 实施补记（任务 28 / 29，2026-10-29）：
+  - 弹窗与页面版共用的部件放在 `components/query/`：`QueryErrorAlert`（失败原因 + 可复制追踪号）、`QueryResultPager`（100 / 200 / 500 + total，改每页行数只发一次 change）、`QueryRowActions` + `useQueryRowLinks`（「打开」「复制引用」接到 `queryResultLinks`；附注表格的行标签取该表表头第一列、取值列取第二列）、`QueryTemplateSaveDialog` + `queryTemplateScope`（三档保存，页面版与弹窗 💾 同一个）、`queryCellFormat`（金额按列类型）、`queryIndicatorLoader`（`full` 弹窗全量树 / `page` 页面版骨架 + 附注分支；`queryIndicatorCache` 键的项目段带树形 `{项目}~page`，两种树形互不命中、写入互不清除）、`queryServerExport`（导出全部）、`queryConditions` + `QueryConditionEditor`。两个大文件因此反而变短或持平：`CustomQueryDialog.vue` 1,070 → 1,111、`CustomQueryTab.vue` 1,236 → 1,029（≤ §9 的 1,450）。
+  - 可分享项目的判定（AQ-39）：新增 `GET /api/custom-query/template-share-targets`（只挂 `get_current_user`，返回本人的 `project_ids`）；判定在 `template_scope_guard.template_share_target_ids`，与保存时逐项目的 `require_project_access("edit")` 同一口径（已归档不列，admin 列全部未删未归档项目，其余身份 = 本项目未删成员行级别达到 edit，系统角色 partner / manager 不因角色放行）。不在前端另写角色清单，也不改 `GET /api/projects` 的响应（远端多个会话在改它）。前端规则不变：至少一个可分享项目才开放「指定项目共享」「公开」两档，接口失败时只能存私有并说明原因。配方表加第 8b 行。
+  - execute 响应 `meta` 增 `column_types`（显示列的键 → number / text / date / bool，与 `columns` 同一份显示列）；`columns` 仍是字符串数组（N3 不变）。内存源没有该键时前端按值判定（数字字符串 ≤ 12 位才按金额）。
+  - 指标树 schema v14：底稿组首个叶子「底稿清单」（注册表源 `workpaper`），骨架里也有——页面版只加载「骨架 + 附注分支」，底稿组只留它；sheet 级查询从弹窗发起。
+  - 排序（实施时补，R2.2 的界面部分）：业务视图原先没有任何排序入口，前端从不发 `sort`，R2.2「数据库内对全量排序」在界面上用不到（§10.5 的「借方降序」也无从操作）。弹窗与页面版的结果列改为 `sortable="custom"`：点表头即带 `sort: [{field, direction}]` 重新查询并回到第 1 页（不是只排本页），表格重新挂载时经 `default-sort` 保留箭头；导出全部与保存的模板带同一排序（模板写 `sort_field` / `sort_order`，由 `config_to_request` 译成 `sort`）；换数据源即清除。载入模板时把排序还原到界面留给任务 33（R9.4）。
+  - 弹窗查询失败时的旧路径：原 `validateStatus: s < 600` 让 axios 把 4xx / 5xx 当成功返回，错误体落到「暂无该数据源记录」；测试替身按 axios 同口径实现 `validateStatus`（放行即把错误体当数据），变异 B10-a 因此红在「应显示失败提示」上，而不只是请求配置的断言。
+  - 浏览器验收的两处取舍：①底稿格引用的「已登记坐标」用 E1「货币资金分析表E1-14」的 C10（有底稿文件的项目里，D 循环底稿只登记了表级与 xref 地址、没有单元格级坐标）；②第二套后端以 `--lifespan off` 起（不跑共享库上的启动任务），事件级联 worker 不在 ⇒ 页面顶部「部分功能暂时不可用」横幅是这个验证环境的现象（`DegradedBanner` 读 `event-cascade/health`），与本批无关。
 
 ### 4.3 W3 / W6 前端（ADR-AQL-05 / 20；页面文件只加最小接线，逻辑在新组件与 composable）
 - `QueryConditionEditor.vue`（W3 扩展）：props `fields: {key, dtype}[]`（来自叶子 `condition_fields`，缺省按 `columns` 当文本）、`notices?: string[]`（参数说明，显示在条件区上方）、`disabled?`；算子按 dtype 给：文本 等于 / 包含 / 开头是 / 为空 / 不为空 / 为空或空白，数值 等于 / 大于 / 大于等于 / 小于 / 小于等于 / 介于 / 为空 / 不为空，日期 再加「星期为」（多选 周一…周日 ⇒ 1…6、0）；条件行可带 `params` 标记（服务端解析时标上，表示值取自参数），用户改了该行的值或算子即去掉标记；导出 `incompleteReason`（首个未填值的条件：「条件「{字段}」未填写值」），宿主据此禁用「查询」「💾 保存」；导出纯函数 `toSavedConditions(conditions)`（带 `params` 标记的行把值写回 `{"$param": 名}`，`between` 写回两个占位，其余写字面值；请求体只发 field / op / value，不发标记）与常量 `EDITOR_OPS`（vitest 用它核对预置 JSON 的算子都在编辑器选项内）。
@@ -539,6 +547,7 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
 | 查询路径不写 storage | `fetchers/workpaper_cells.py`（写盘只在 `_temp_copy`）+ AST 守卫 | 预览与区域取数唯一实现处 |
 | 回写不碰他项目行 | `snapshot_writer` 两个取行语句（WHERE 含项目）+ `writeback_preview._build_item` 归属核对 | 加锁发生在取行，项目条件必须在同一语句；预览不读他项目旧值 |
 | 模板可见性 | `TemplateScopeAdapter.is_visible`（template_service 委托，router 不自判） | 列表、详情、执行三处结论一致 |
+| 可分享到的项目（保存对话框三档） | `template_scope_guard.template_share_target_ids`（B10，`GET /template-share-targets`；保存时仍逐项目 `require_project_access("edit")`） | 与保存门禁同一张级别表、同一归档规则；前端不持有角色清单 |
 | 构建器准入与作用域计数 | `builder_access.resolve_builder_access`（依赖与 access 接口共用；计数取 `resolve_builder_scope` 的结果） | 前后端同源；入口显示的项目数与执行时的作用域是同一个函数算的 |
 | 导出并发 | `export_gate`（业务视图与构建器导出共用） | 一处计数才有上限 |
 | 下钻路由与引用语法 | 前端 `queryResultLinks.ts`（账簿 query 由 `buildLedgerQuery` 生成） | 三个结果表共用一处 |
@@ -655,6 +664,7 @@ END $$;
 | 6 | GET /api/custom-query/templates：含 T / S / Q | P | 401 | 是/否/否 | 是/是/否 | 是/是/否 | 是/是/否 | 是/否/否 | 是/是/否 | 是/是/是 |
 | 7 | POST /api/custom-query/templates（scope=private） | S | 401 | 201 | 201 | 201 | 201 | 201 | 201 | 201 |
 | 8 | POST /api/custom-query/templates（scope=project，共享 X） | S | 401 | 403 | 403 | 201 | 201 | 403 | 403 | 201 |
+| 8b | GET /api/custom-query/template-share-targets（B10 新增，AQ-39；200 格断言 X 在不在列表里，与第 8 行放行与否逐列一致） | S | 401 | 不含 X | 不含 X | 含 X | 含 X | 不含 X | 不含 X | 含 X |
 | 9 | GET /api/custom-query/templates/{S} | P | 401 | 403 | 200 | 200 | 200 | 403 | 200 | 200 |
 | 10 | GET /api/custom-query/templates/{Q} | P | 401 | 403 | 403 | 403 | 403 | 403 | 403 | 200 |
 | 11 | PUT /api/custom-query/templates/{S} | P | 401 | 403 | 403 | 403 | 200 | 403 | 403 | 403 |
