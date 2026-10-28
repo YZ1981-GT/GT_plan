@@ -16,7 +16,7 @@
 
 | 事实 | 值 | 复算键 |
 |---|---|---|
-| 目录版本号 | `20261028075152` | `catalog.registry_version` |
+| 目录版本号 | `20261028130507` | `catalog.registry_version` |
 | 目录 sheet 条目数 | `1225` | `catalog.sheets` |
 | 目录 cell 条目数 | `474` | `catalog.cells` |
 | 父 sheet 在目录内的 cell | `474` | `catalog.cells_with_parent` |
@@ -28,7 +28,7 @@
 | cell 自带 formula_ref 能解析回本身的条目 | `474` | `catalog.formula_ref_roundtrip_ok` |
 | 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
 | 报告是否带 release 段 | `是` | `report.has_release` |
-| 历史快照份数 | `8` | `snapshots.count` |
+| 历史快照份数 | `9` | `snapshots.count` |
 | 仍在仓库的分片文件 | `无` | `shards.files` |
 | 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
 | 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
