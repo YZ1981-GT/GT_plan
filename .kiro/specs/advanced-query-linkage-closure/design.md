@@ -262,8 +262,8 @@ B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上�
 
 ### 3.5 导出
 - `export_service`：`stream_xlsx(..., info_rows: list[tuple[str, str]] | None = None)` 在数据 sheet 后追加「查询说明」sheet；新增 `_text_safe_cell(ws, value)`：字符串以 `= + - @` 开头时返回 `WriteOnlyCell(ws, value=value)` 并置 `data_type = "s"`，否则原值；`_row_export_values(row, columns, source_cols, *, ws)`、`_header_cells` 与「查询说明」都经它（`export_xlsx` 同路径）。
-- `services/custom_query/export_gate.py`（新）：进程内 `_GLOBAL = asyncio.Semaphore(4)` 与在途用户集合；`acquire_export_slot(user_id) -> ExportSlot` 非阻塞（本人已有在途或全局已满 → `HTTPException(429, {"error_code": "EXPORT_BUSY", "message": "已有导出在进行，请稍后再试"})`），`ExportSlot.release()` 幂等。
-- `POST /api/custom-query/export`（custom_query router）：请求体 `QueryExportRequest(QueryRequest)` + `headers: dict[str, str]` + `file_name: str | None`。流程：`ownership_guard.assert_target_accessible`（在路由**函数体内直接** `await`，第 4 轮评审 #5：端点鉴权基线按函数体识别项目级判定，挪进辅助函数即落入「仅登录」档、`test_project_endpoint_authz_body_carried.py` 超基线打红，变异 B7-c）→ 与 execute 同一个解析校验函数 → 带分组 / 透视 400 `EXPORT_GROUPING_UNSUPPORTED` → `acquire_export_slot` → SQL 源 `count` 后 `export_service.resolve_export_mode(row_count=…, materialized=False)`（超限 400）→ 行迭代 = `paged_fetch.stream()`（排序同 execute）；JSON 源 = 全部行 → `agen = stream_xlsx(...)`、`first = await agen.__anext__()` → `StreamingResponse`（生成器先产出 first 再续 agen，`finally` 里释放导出槽）；首块之前任何失败先释放槽再抛 → `Content-Disposition` = `export_service.build_content_disposition(清洗后的 file_name)` → 审计 `audit_logger.log_action("custom_query.export", …)`，失败只记 WARNING。
+- `services/custom_query/export_gate.py`（新）：进程内在途用户集合（每人至多 1 个，全进程上限 4 个；实施时不用 `asyncio.Semaphore`，理由见下方「B7 实施补记」）；`acquire_export_slot(user_id) -> ExportSlot` 非阻塞（本人已有在途或全局已满 → `HTTPException(429, {"error_code": "EXPORT_BUSY", "message": "已有导出在进行，请稍后再试"})`），`ExportSlot.release()` 幂等。
+- `POST /api/custom-query/export`（custom_query router）：请求体 `QueryExportRequest(QueryRequest)` + `headers: dict[str, str]` + `file_name: str | None`。流程：`ownership_guard.assert_target_accessible`（在路由**函数体内直接** `await`，第 4 轮评审 #5：端点鉴权基线按函数体识别项目级判定，挪进辅助函数即落入「仅登录」档、`test_project_endpoint_authz_body_carried.py` 超基线打红，变异 B7-c）→ 与 execute 同一个解析校验函数 → 带分组 / 透视 400 `EXPORT_GROUPING_UNSUPPORTED` → `acquire_export_slot` → SQL 源 `count` 后 `export_service.resolve_export_mode(row_count=…, materialized=False)`（超限 400）→ 行迭代 = `paged_fetch.stream()`（排序同 execute）；JSON 源 = 全部行 → `agen = stream_xlsx(...)`、`first = await agen.__anext__()` → `StreamingResponse`（先产出 first 再续 agen；导出槽在响应结束时由响应对象显式释放，见「B7 实施补记」）；首块之前任何失败先释放槽再抛 → `Content-Disposition` = `export_service.build_content_disposition(清洗后的 file_name)` → 审计 `audit_logger.log_action("custom_query.export", …)`，失败只记 WARNING。
 - `query_builder.export_excel`：同一导出闸 + COUNT 预检 + `_build_select(for_export=True)` + `db.stream` 分批 → 同一 `stream_xlsx`，表头取 `headers`；删除 router 内自写 Workbook 段与 1,000 行限制。
 - B7 实施补记（任务 26，2026-10-28）：
   - 流程放在 `services/custom_query/query_export.py`（业务视图 `export_business_query`、构建器 `export_builder_query`），两个路由只留归属校验 / 作用域与一次调用；`paged_fetch.prepare_stream` / `count_plan` / `stream_rows` 与 `page` 同一语句与排序（不带 LIMIT），`business_fetchers.prepare_export` 与 `business_fetcher` 同一分派；内存源（附注、合并工作底稿、底稿选区）同 execute 的内存路径取全部行（≤ 5,000）、按可访问项目过滤、同一排序规则。
@@ -271,6 +271,8 @@ B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上�
   - 名额与临时文件在 `GatedStreamingResponse.__call__` 的 finally 里**显式**释放（`release()`：放名额、关闭字节流与 `stream_xlsx`），不只靠生成器的 finally：客户端在开始发送之前断开时，包装生成器从未启动，`aclose()` 只把它标为已关闭、finally 根本不执行（名额永久占用、临时文件留在磁盘；ASGI < 2.4 的形态，变异 B7-d 证明）。
   - 「查询说明」的行数按实际写入的数据行（`stream_xlsx(info_rows=可调用对象)` 收到写入行数），审计 `row_count` 用同一个数；导出时间写北京时间。
   - 构建器导出保留 `_EXPORT_FETCH_SIZE`（服务端游标每批行数，既有用例替换它验证分批）；空结果与 `stream_xlsx` 同口径写一行「（查询结果为空）」（advanced-query-module R7.5，既有用例「仅表头」随之改写）；sheet 名为表名。
+  - sheet 名清洗（B7 评审 B7-R1，2026-10-28）：`stream_xlsx` 的数据 sheet 与附加 sheet 名都经 `export_service.safe_sheet_title`——Excel 不允许的 `\ / * ? : [ ]` 换成全角同形字符（`／` 等），去掉首尾空白与单引号，截到 31 个字符，清洗后为空用缺省名「高级查询结果」。原因：白名单表名「调整分录（AJE/RJE）」含 `/`，不清洗时 openpyxl `create_sheet` 抛 `ValueError: Invalid character / found in sheet title`，构建器导出调整分录恒为未处理的 500。「查询说明」里的数据源照写原表名（单元格内容不受此限）。
+  - 枚举单元格（B7 修订复测发现，2026-10-28）：构建器按 ORM 列取数，`sa.Enum` 列返回枚举成员；`(str, Enum)` 成员是 str 的子类，原样交给 openpyxl 会被写成「AdjustmentType.aje」「AccountCategory.asset」（execute 与界面显示的是 aje / asset）。`export_service._excel_cell_value` 先判 `Enum` 取 `.value`（`builder_dsl._excel_cell_value` 镜像同步）。现算受影响的白名单表 11 张（试算表、调整分录、未更正错报、报表行映射、报表配置、底稿、底稿索引、财务报表、科目表、项目、附注）；业务视图注册表的列不含 `sa.Enum` 类型（枚举列在注册表里按文本取），不受影响。
   - 错误：参数类 400 / 422 都在取名额之前；领域 4xx 原样上抛；其余异常回滚并 500 `INTERNAL_ERROR` + `X-Correlation-ID`（同 execute）；审计 `custom_query.export` 不节流（`audit_helper.record_export`，失败只记 WARNING）。临时文件仍经 `tempfile`，测试把 `tempfile.tempdir` 指到用例私有目录并核对导出结束后已删。
 
 ### 3.6 模板与回收站
@@ -420,7 +422,7 @@ finally:
 | 导出 | 行数 > 1,000,000 或列超 Excel 上限 | 是 | 400 `EXPORT_ROW_HARD_LIMIT` / `EXPORT_CAPACITY`（首字节前，既有） | 不记 |
 | 导出 | 带分组 / 透视 | 是 | 400 `EXPORT_GROUPING_UNSUPPORTED` | 不记 |
 | 导出 | 本人已有在途导出或全进程已满 4 个 | 是（稍后重试） | 429 `EXPORT_BUSY`「已有导出在进行，请稍后再试」 | 不记 |
-| 导出 | 首块之后读临时文件失败 | 否 | 连接中断，前端提示「导出未完成，请重试」；导出槽在生成器 finally 释放 | ERROR |
+| 导出 | 首块之后读临时文件失败 | 否 | 连接中断，前端提示「导出未完成，请重试」；导出槽在响应结束时由响应对象释放（§3.5「B7 实施补记」） | ERROR |
 | 导出审计 | 审计写入失败 | — | 不影响下载 | WARNING |
 | 构建器 | 准入不足 | 否 | 403 `ROLE_FORBIDDEN`（中文原因含合伙人） | 不记 |
 | 构建器 | staff_members 越权 | 否 | 403 `TABLE_ROLE_FORBIDDEN` | 审计 `custom_query.pii_denied` 同路径 |
