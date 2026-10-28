@@ -257,11 +257,22 @@ def test_no_side_storage_left_in_app():
     assert offenders == []
 
 
+#: 由别的测试文件承担同一组断言（先建附件并写回 / 失败标识别失败 / 行级位置）的识别路由：模块 → 测试文件。
+#: 函证替代程序识别端点的 ``document_type`` 是必填表单字段，不套本文件只传文件的参数化用例。
+COVERED_ELSEWHERE = {
+    "_confirmation_alt_doc_ocr": "tests/attachment_confirmation_loop/test_alt_doc_ocr.py",
+}
+
+
 def test_every_ocr_route_goes_through_intake():
-    """防空转：本文件参数化覆盖的 26 个路由 = 源码里调用 ``intake_ocr_upload`` 的路由。"""
-    calls = 0
+    """防空转：本文件参数化覆盖的 26 个路由 + 别处覆盖的路由 = 源码里调用 ``intake_ocr_upload`` 的路由。"""
+    calls: dict[str, int] = {}
     for py in _route_modules():
         for node in ast.walk(ast.parse(py.read_text(encoding="utf-8-sig"))):
             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "intake_ocr_upload":
-                calls += 1
-    assert calls == len(ROUTES) == 26
+                calls[py.stem] = calls.get(py.stem, 0) + 1
+    assert len(ROUTES) == 26
+    assert sum(calls.values()) == len(ROUTES) + len(COVERED_ELSEWHERE) == 27
+    for stem, test_file in COVERED_ELSEWHERE.items():
+        assert calls.get(stem) == 1, stem
+        assert (APP.parent / test_file).is_file(), test_file

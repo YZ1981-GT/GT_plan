@@ -123,6 +123,11 @@ function tagEnd(tpl: string, from: number): number {
 
 /** 「只编辑态」条件：v-if 里与 !isReadonly / !readonly 相与，或 canOcr / canEdit 这类编辑态开关 */
 const EDIT_ONLY_RE = /(^|&&)\s*!\s*(props\.)?(isReadonly|readonly)\s*(&&|$)|\bcan(Ocr|Edit)\b/
+/**
+ * 判据 C 认的小眼睛：两个小眼睛组件 + 恒带小眼睛的行内附件组件（函证替代程序 / 差异调节，
+ * spec attachment-confirmation-evidence-loop），后者被放进只编辑态的列同样让复核人看不到。
+ */
+const EYE_CARRIERS = new Set(['RowEvidenceEye', 'AttachmentEyeButton', 'AlternativeRowEvidence', 'DiffRowEvidenceCell'])
 const VOID_TAGS = new Set(['input', 'br', 'img', 'hr', 'col', 'meta', 'link'])
 
 /**
@@ -145,7 +150,7 @@ function hiddenEyes(tpl: string): string[] {
     }
     const attrs = tpl.slice(m.index, end)
     const vif = /\sv-if="([^"]*)"/.exec(attrs)?.[1] ?? ''
-    if (name === 'RowEvidenceEye' || name === 'AttachmentEyeButton') {
+    if (EYE_CARRIERS.has(name)) {
       const inUpload = stack.some((s) => s.name === 'el-upload')
       const cond = [...stack.map((s) => s.cond), vif].find((c) => c && EDIT_ONLY_RE.test(c))
       const why = inUpload
@@ -325,6 +330,16 @@ describe('扫描器自检', () => {
     const paired = `<div v-if="!row.isSubtotal && !isReadonly"><el-input />${eye}</div><span v-else>文本${eye}</span>`
     expect(run({ 'components/workpaper/x/G.vue': vue(hidden, '') }).map((v) => v.why)[0]).toContain('只编辑态条件')
     expect(run({ 'components/workpaper/x/G.vue': vue(paired, '') })).toEqual([])
+  })
+
+  it('恒带小眼睛的行内附件组件放进只编辑态列 ⇒ 同样抓到（函证替代程序 / 差异调节）', () => {
+    for (const tag of ['AlternativeRowEvidence', 'DiffRowEvidenceCell']) {
+      const cell = `<${tag} v-if="row._row_id" :wp-id="wpId" :row-id="row._row_id" :readonly="readonly" />`
+      const hidden = `<el-table-column v-if="wpId && evidenceSheet && !readonly" label="附件"><template #default="{ row }">${cell}</template></el-table-column>`
+      const shown = `<el-table-column v-if="wpId && evidenceSheet" label="附件"><template #default="{ row }">${cell}</template></el-table-column>`
+      expect(run({ 'components/workpaper/x/A.vue': vue(hidden, '') }).map((v) => v.why)[0]).toContain('只编辑态条件')
+      expect(run({ 'components/workpaper/x/A.vue': vue(shown, '') })).toEqual([])
+    }
   })
 
   it('小眼睛在上传组件里 ⇒ 抓到；属性里的箭头函数不打断标签解析', () => {

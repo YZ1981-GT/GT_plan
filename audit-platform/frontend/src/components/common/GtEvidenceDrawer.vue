@@ -14,6 +14,7 @@
  */
 import { ref, computed, watch, toRef } from 'vue'
 import { useEvidenceRefs, type EvidenceRefItem, type ImpactNode } from '@/composables/useEvidenceRefs'
+import { parseServerTime } from '@/utils/formatters'
 
 const props = defineProps<{
   visible: boolean
@@ -97,12 +98,8 @@ function truncateHash(hash: string | null): string {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '-'
-  try {
-    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')
-    return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-  } catch {
-    return dateStr
-  }
+  const d = parseServerTime(dateStr)
+  return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
 }
 
 function handleNavigate(item: EvidenceRefItem) {

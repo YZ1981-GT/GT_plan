@@ -3,6 +3,7 @@ import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { ROLE_PERMISSIONS } from '@/composables/usePermission'
+import { awaitSessionHandoff } from '@/utils/crossWindowAuth'
 
 import { authRoutes } from './domains/auth'
 import { dashboardRoutes } from './domains/dashboard'
@@ -68,8 +69,10 @@ router.beforeEach(async (to) => {
   }
 
   // ③ 认证守卫：需要登录但未认证 → 重定向到登录页
+  //    新标签页正在向已登录标签页要会话（最多约 2 秒）：等它结束再判，否则首个导航在回执到达前就被送去登录页
   if (to.matched.some((r) => r.meta.requireAuth) && !authStore.isAuthenticated) {
-    return { path: '/login', query: { redirect: to.fullPath } }
+    await awaitSessionHandoff()
+    if (!authStore.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   // ④ 权限守卫：检查路由级 meta.permission

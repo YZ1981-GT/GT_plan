@@ -148,7 +148,13 @@
             <span class="gt-cp-name">{{ row.counterparty }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="confirm_type" label="类型" width="90">
+        <el-table-column
+          prop="confirm_type"
+          label="类型"
+          width="90"
+          :filters="CONFIRM_TYPE_FILTERS"
+          :filter-method="(value: string, row: ConfirmationItem) => row.confirm_type === value"
+        >
           <template #default="{ row }">
             <el-tag :type="typeTagType(row.confirm_type)" size="small" effect="light" round>
               {{ typeLabel(row.confirm_type) }}
@@ -239,10 +245,7 @@
       <el-form :model="form" label-width="100px">
         <el-form-item label="函证类型" prop="confirm_type" required>
           <el-select v-model="form.confirm_type" placeholder="请选择类型">
-            <el-option label="应收" value="receivable" />
-            <el-option label="应付" value="payable" />
-            <el-option label="银行" value="bank" />
-            <el-option label="借款" value="loan" />
+            <el-option v-for="opt in CONFIRM_TYPE_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="函证对象" prop="counterparty" required>
@@ -280,10 +283,7 @@
       <div class="gt-import-toolbar">
         <span class="gt-import-toolbar__label">函证类型</span>
         <el-select v-model="importType" size="small" style="width:160px" @change="loadCandidates">
-          <el-option label="银行（货币资金）" value="bank" />
-          <el-option label="应收" value="receivable" />
-          <el-option label="应付" value="payable" />
-          <el-option label="借款" value="loan" />
+          <el-option v-for="opt in IMPORTABLE_CONFIRM_TYPES" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
         <span class="gt-import-hint">
           从辅助余额表按核算维度提取候选，勾选后一键批量创建（已存在的自动跳过）
@@ -361,9 +361,19 @@ import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
+import { parseServerTime } from '@/utils/formatters'
 import { useProjectStore } from '@/stores/project'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import ConfirmationAttachmentDrawer from '@/components/workpaper/confirmation/ConfirmationAttachmentDrawer.vue'
+import {
+  CONFIRM_TYPE_FILTERS,
+  CONFIRM_TYPE_OPTIONS,
+  CONFIRMATION_STATUS_LABELS,
+  IMPORTABLE_CONFIRM_TYPES,
+  confirmTypeLabel,
+  confirmTypeTagType,
+  type ConfirmType,
+} from '@/components/workpaper/confirmation/coordination/confirmationTypeLabels'
 
 // ─── 数据 ───
 
@@ -421,7 +431,7 @@ interface CandidateItem {
 }
 
 const showImportDialog = ref(false)
-const importType = ref<'bank' | 'receivable' | 'payable' | 'loan'>('bank')
+const importType = ref<ConfirmType>('bank')
 const candidates = ref<CandidateItem[]>([])
 const candidatesLoading = ref(false)
 const selectedCandidates = ref<CandidateItem[]>([])
@@ -544,13 +554,10 @@ const matchQueueExpanded = ref(true)
 
 function formatTime(dt: string | null): string {
   if (!dt) return '—'
-  try {
-    const d = new Date(dt.endsWith('Z') ? dt : dt + 'Z')
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  } catch {
-    return dt
-  }
+  const d = parseServerTime(dt)
+  if (Number.isNaN(d.getTime())) return dt
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 async function fetchMatchQueue() {
@@ -638,20 +645,8 @@ async function handleAssign(row: MatchQueueItem) {
 
 // ─── 枚举映射 ───
 
-const TYPE_LABELS: Record<string, string> = {
-  receivable: '应收',
-  payable: '应付',
-  bank: '银行',
-  loan: '借款',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: '待发函',
-  sent: '已发函',
-  returned: '已回函',
-  matched: '相符',
-  discrepancy: '差异',
-}
+// 类型中文 / 色与状态中文的单一来源（spec attachment-confirmation-evidence-loop ADR-ACE-05）
+const STATUS_LABELS = CONFIRMATION_STATUS_LABELS
 
 // ─── 撤回常量 ───
 
@@ -671,19 +666,8 @@ const STATUS_CN: Record<string, string> = {
   discrepancy: '差异',
 }
 
-function typeLabel(t: string): string {
-  return TYPE_LABELS[t] || t
-}
-
-function typeTagType(t: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
-  const map: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = {
-    bank: 'primary',
-    receivable: 'success',
-    payable: 'warning',
-    loan: 'danger',
-  }
-  return map[t]
-}
+const typeLabel = confirmTypeLabel
+const typeTagType = confirmTypeTagType
 
 function statusLabel(s: string): string {
   return STATUS_LABELS[s] || s

@@ -14,6 +14,7 @@ import {
   parseNum,
 } from './useG7EquityMethodFormulaEngine'
 import { normalizeG7DetailRows } from './g7DetailModel'
+import { clonePlain } from '@/utils/cloneable'
 
 export const G7_4_ROWS_KEY = 'G7-4-rows'
 export const G7_5_ROWS_KEY = 'G7-5-rows'
@@ -468,7 +469,7 @@ export function applyPolicyAdjToG714Payload(
   }
 
   const payload = g714Payload && typeof g714Payload === 'object'
-    ? structuredClone(g714Payload)
+    ? clonePlain(g714Payload)
     : { rows: [], groups: [], materialityLevel: 0, conclusion: '' }
 
   if (!Array.isArray(payload.rows)) payload.rows = []
@@ -676,7 +677,7 @@ function createStubEquityRow(investeeName: string, accountingPolicyAdj: number):
 
 function clonePayload(g714Payload: any | null): any {
   return g714Payload && typeof g714Payload === 'object'
-    ? structuredClone(g714Payload)
+    ? clonePlain(g714Payload) // 载荷里有响应式行（buildPayload 的 groups.flatMap），裸 structuredClone 抛 DataCloneError
     : { rows: [], groups: [], materialityLevel: 0, conclusion: '', netAssetAdjustments: [], goodwillFvDetails: [] }
 }
 

@@ -222,12 +222,12 @@
               :rows="getBlockRows(selectedCompany, bt)"
               :totals="data.getBlockTotal(selectedCompany, bt)"
               :readonly="readonly"
-              :enable-ocr="true"
-              :ocr-loading-row-id="ocrLoadingRowId"
+              :wp-id="wpId"
+              :project-id="projectId"
+              evidence-sheet="H0-5"
               @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
               @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-              @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
 
             <!-- 2.3 自由记录区（对应源模板 R11:R19 空白自由区） -->
@@ -335,14 +335,14 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, defineAsyncComponent, nextTick, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
-import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import type { ConfirmationUpdatedPayload } from '@/utils/eventBus'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeH05Data } from './composables/useAlternativeH05Data'
+import { defaultUnrepliedFilter } from '../coordination/importFromSummary'
 import { useH0ImportExport } from './composables/useH0ImportExport'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_H05 } from './blockColumnConfigsH05'
@@ -593,9 +593,8 @@ async function handleImportH01() {
       return
     }
 
-    const unreplied = rows.filter(
-      (r) => r.match_status === '未回函' || (r.is_replied === false && r.match_status !== '相符'),
-    )
+    // 与 importFromSummary 同一判据：明细面板写的「否」也算明确未回函（原写法只认布尔 false）
+    const unreplied = rows.filter(defaultUnrepliedFilter)
     if (unreplied.length === 0) {
       ElMessage.info('H0-1 暂无未回函项目')
       return
@@ -966,97 +965,6 @@ async function handleImportViaBackend(file: File) {
     }
   } catch (e: any) {
     ElMessage.error('导入失败：' + (e?.message || '未知错误'))
-  }
-}
-
-// ─── 行级 OCR：上传证据文件 → contract-ocr 识别 → 确认 → merge 填入 ────────
-const ocrLoadingRowId = ref<string | null>(null)
-
-/** OCR 识别字段 → 各区块行字段的映射（固定资产/在建工程证据） */
-const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
-  block1: {
-    date: 'voucher_date', 日期: 'voucher_date',
-    voucher_no: 'voucher_no', 凭证号: 'voucher_no', 凭证编号: 'voucher_no',
-    amount: 'voucher_amount', 金额: 'voucher_amount',
-    asset_name: 'asset_name', 资产名称: 'asset_name',
-    cert_no: 'title_cert_no', 证书编号: 'title_cert_no', 权属证书: 'title_cert_no',
-    owner: 'title_owner', 权属人: 'title_owner',
-  },
-  block2: {
-    date: 'voucher_date', 日期: 'voucher_date',
-    voucher_no: 'voucher_no', 凭证号: 'voucher_no', 凭证编号: 'voucher_no',
-    amount: 'voucher_amount', 金额: 'voucher_amount',
-    contract_no: 'contract_date_no', 合同编号: 'contract_date_no',
-    vendor: 'contract_vendor', 供应商: 'contract_vendor',
-    contract_amount: 'contract_amount', 合同金额: 'contract_amount',
-    invoice_no: 'invoice_date_no', 发票编号: 'invoice_date_no',
-    invoice_amount: 'invoice_amount', 发票金额: 'invoice_amount',
-    payment_amount: 'payment_amount', 付款金额: 'payment_amount',
-  },
-  block3: {
-    date: 'voucher_date', 日期: 'voucher_date',
-    voucher_no: 'voucher_no', 凭证号: 'voucher_no', 凭证编号: 'voucher_no',
-    amount: 'voucher_amount', 金额: 'voucher_amount',
-    asset_name: 'recv_asset_name', 资产名称: 'recv_asset_name',
-    quantity: 'recv_qty', 数量: 'recv_qty',
-    cost: 'cap_cost', 原值: 'cap_cost', 转固原值: 'cap_cost',
-  },
-  block4: {
-    date: 'voucher_date', 日期: 'voucher_date',
-    voucher_no: 'voucher_no', 凭证号: 'voucher_no', 凭证编号: 'voucher_no',
-    amount: 'voucher_amount', 金额: 'voucher_amount',
-    mortgage_contract: 'mortgage_contract', 抵押合同: 'mortgage_contract', 合同编号: 'mortgage_contract',
-    holder: 'mortgage_holder', 抵押权人: 'mortgage_holder',
-    mortgage_amount: 'mortgage_amount', 担保金额: 'mortgage_amount',
-    lease_contract: 'lease_contract', 租赁合同: 'lease_contract',
-    lessor: 'lease_lessor', 出租方: 'lease_lessor',
-  },
-}
-
-async function handleRowOcr(blockType: BlockType, rowId: string, file: File): Promise<void> {
-  if (!selectedCompany.value || !props.wpId) return
-  ocrLoadingRowId.value = rowId
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
-    )
-    const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
-    if (!Object.keys(fields).length) {
-      ElMessage.info('OCR完成，未识别到可填充字段')
-      return
-    }
-    // 映射识别字段 → 当前区块行字段
-    const map = OCR_FIELD_MAP[blockType]
-    const patch: Record<string, any> = {}
-    for (const [ocrKey, val] of Object.entries(fields)) {
-      const target = map[ocrKey]
-      if (target && val != null && String(val).trim() !== '') {
-        patch[target] = val
-      }
-    }
-    if (Object.keys(patch).length === 0) {
-      ElMessage.info('OCR完成，识别字段无法匹配本区块')
-      return
-    }
-    const preview = Object.entries(patch)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('，')
-    await ElMessageBox.confirm(`识别到证据信息：\n${preview}\n是否填入当前行？`, 'OCR识别结果', {
-      confirmButtonText: '填入',
-      cancelButtonText: '取消',
-    })
-    for (const [field, val] of Object.entries(patch)) {
-      data.updateBlockField(selectedCompany.value._company_id!, blockType, rowId, field, val)
-    }
-    ElMessage.success('已填入识别结果')
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.warning('OCR识别失败')
-  } finally {
-    ocrLoadingRowId.value = null
   }
 }
 

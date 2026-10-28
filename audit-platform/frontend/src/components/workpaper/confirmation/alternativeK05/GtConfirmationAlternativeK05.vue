@@ -149,13 +149,13 @@
                 :rows="getBlockRows(selectedCompany, bt)"
                 :totals="data.getBlockTotal(selectedCompany, bt)"
                 :readonly="readonly"
-                :enable-ocr="true"
-                :ocr-loading-row-id="ocrLoadingRowId"
+                :wp-id="wpId"
+                :project-id="projectId"
+                evidence-sheet="K0-5"
                 :formula-fn="bt === 'block4' ? reconcileDiffFn : undefined"
                 @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
                 @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
                 @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-                @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
               />
             </template>
             <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
@@ -181,12 +181,12 @@
                   :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'debit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'debit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="K0-5"
                   @add-row="addDirectionRow('debit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
                 />
               </div>
               <!-- 贷方表 -->
@@ -197,12 +197,12 @@
                   :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'credit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'credit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="K0-5"
                   @add-row="addDirectionRow('credit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
                 />
               </div>
             </div>
@@ -406,47 +406,6 @@ function onConfirmationUpdated(payload: ConfirmationUpdatedPayload) {
 }
 onMounted(() => { eventBus.on('confirmation:updated', onConfirmationUpdated) })
 onUnmounted(() => { eventBus.off('confirmation:updated', onConfirmationUpdated) })
-
-// ─── 行级 OCR ─────────────────────────────────────────────────────────────
-const ocrLoadingRowId = ref<string | null>(null)
-
-const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
-  // 🔴 `付款方` 是源模板 `K0-5!G16` 的正确用词（R7.1）；`收款方` 作 OCR 结果兼容保留 ——
-  //    银行回单实物上印的字样不可控，两个键都映到同一字段，识别到哪个都能落格。
-  block1: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 金额: 'receipt_amount', 付款方: 'receipt_payer', 收款方: 'receipt_payer', 银行回单: 'receipt_date_no' },
-  block2: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 协议编号: 'agreement_no', 对方单位: 'agreement_party', 协议金额: 'agreement_amount' },
-  block3: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 单据编号: 'doc_date_no', 事由: 'doc_reason', 审批人: 'approval_person', 审批金额: 'approval_amount' },
-  block4: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 对方余额: 'other_balance', 本方余额: 'self_balance', 协议编号: 'agreement_no', 签订日期: 'agreement_date' },
-}
-
-async function handleRowOcr(blockType: BlockType, rowId: string, file: File) {
-  if (!selectedCompany.value || !props.wpId) return
-  ocrLoadingRowId.value = rowId
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d4/contract-ocr`, formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
-    )
-    const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
-    if (!Object.keys(fields).length) { ElMessage.info('OCR完成，未识别到可填充字段'); return }
-    const map = OCR_FIELD_MAP[blockType]
-    const patch: Record<string, any> = {}
-    for (const [ocrKey, val] of Object.entries(fields)) {
-      const target = map[ocrKey]
-      if (target && val != null && String(val).trim() !== '') patch[target] = val
-    }
-    if (!Object.keys(patch).length) { ElMessage.info('OCR完成，识别字段无法匹配本区块'); return }
-    const preview = Object.entries(patch).map(([k, v]) => `${k}: ${v}`).join('，')
-    await ElMessageBox.confirm(`识别到信息：\n${preview}\n是否填入当前行？`, 'OCR识别结果', { confirmButtonText: '填入', cancelButtonText: '取消' })
-    for (const [field, val] of Object.entries(patch)) {
-      data.updateBlockField(selectedCompany.value._company_id!, blockType, rowId, field, val)
-    }
-    ElMessage.success('已填入识别结果')
-  } catch (e) { if (e !== 'cancel') ElMessage.warning('OCR识别失败') }
-  finally { ocrLoadingRowId.value = null }
-}
 
 // ─── AI 辅助填充 ──────────────────────────────────────────────────────────
 const aiLoading = ref(false)

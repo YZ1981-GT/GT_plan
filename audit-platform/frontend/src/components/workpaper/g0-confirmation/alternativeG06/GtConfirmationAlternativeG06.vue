@@ -363,12 +363,12 @@
               :rows="getBlockRows(selectedCompany, bt)"
               :totals="data.getBlockTotal(selectedCompany, bt)"
               :readonly="readonly"
-              :enable-ocr="true"
-              :ocr-loading-row-id="ocrLoadingRowId"
+              :wp-id="wpId"
+              :project-id="projectId"
+              evidence-sheet="G0-6"
               @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
               @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-              @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
             <!-- block2 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
             <div class="split-direction-block">
@@ -389,12 +389,12 @@
                   :rows="getBlockRows(selectedCompany, 'block2').filter((r) => r.direction === 'debit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block2', 'debit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="G0-6"
                   @add-row="addDirectionRow('debit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block2', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block2', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block2', rowId, file)"
                 />
               </div>
               <!-- 贷方表 -->
@@ -405,12 +405,12 @@
                   :rows="getBlockRows(selectedCompany, 'block2').filter((r) => r.direction === 'credit')"
                   :totals="data.getBlockTotalByDirection(selectedCompany, 'block2', 'credit')"
                   :readonly="readonly"
-                  :enable-ocr="true"
-                  :ocr-loading-row-id="ocrLoadingRowId"
+                  :wp-id="wpId"
+                  :project-id="projectId"
+                  evidence-sheet="G0-6"
                   @add-row="addDirectionRow('credit')"
                   @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block2', rowId)"
                   @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block2', rowId, field, val)"
-                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block2', rowId, file)"
                 />
               </div>
             </div>
@@ -510,12 +510,12 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, defineAsyncComponent, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
-import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeG06Data } from './composables/useAlternativeG06Data'
+import { defaultUnrepliedFilter } from '../../confirmation/coordination/importFromSummary'
 import type { AlternativeCompany, BlockType, CheckRow } from '../../confirmation/alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_G06, G0_ACCOUNT_SUBJECT_OPTIONS } from './blockColumnConfigsG06'
 // 🔴 段结构与点选项字面**单一真源**（本组件不抄第二份中文，守卫按源码断言）
@@ -667,10 +667,8 @@ async function handleImportG01() {
       return
     }
 
-    // 3. 过滤未回函项目（match_status === '未回函' 或 is_replied === false）
-    const unreplied = rows.filter(
-      (r) => r.match_status === '未回函' || (r.is_replied === false && r.match_status !== '相符'),
-    )
+    // 3. 过滤未回函项目：与 importFromSummary 同一判据（明细面板写的「否」也算，原写法只认布尔 false）
+    const unreplied = rows.filter(defaultUnrepliedFilter)
     if (unreplied.length === 0) {
       ElMessage.info('G0-1 暂无未回函项目')
       return
@@ -961,83 +959,6 @@ function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
   runtime?.version.scheduleAutoSnapshot()
-}
-
-// ─── 行级 OCR：上传证券单据 → contract-ocr 识别 → 确认 → merge 填入当前行 ────
-const ocrLoadingRowId = ref<string | null>(null)
-
-/** OCR 识别字段 → 各区块行字段的映射（证券信息） */
-const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
-  block1: {
-    date: 'stmt_date', 对账单日期: 'stmt_date',
-    holding_variety: 'holding_variety', 持仓品种: 'holding_variety', 品种: 'holding_variety',
-    quantity: 'holding_qty', 数量: 'holding_qty', holding_qty: 'holding_qty',
-    amount: 'market_value', 市值: 'market_value', market_value: 'market_value',
-  },
-  block2: {
-    date: 'dividend_announce_date', 分红公告日期: 'dividend_announce_date',
-    amount: 'received_amount', 到账金额: 'received_amount', received_amount: 'received_amount',
-    dividend_receivable: 'dividend_receivable', 应收股利: 'dividend_receivable',
-  },
-  block3: {
-    date: 'trade_confirm_date', 交易确认单日期: 'trade_confirm_date',
-    quantity: 'sell_qty', 卖出数量: 'sell_qty',
-    price: 'trade_price', 成交价: 'trade_price',
-    amount: 'trade_amount', 成交金额: 'trade_amount', trade_amount: 'trade_amount',
-    fee: 'fee', 手续费: 'fee',
-  },
-  block4: {
-    date: 'quote_date', 报价日期: 'quote_date',
-    amount: 'quote_value', 报价值: 'quote_value', quote_value: 'quote_value',
-    quote_source: 'quote_source', 报价来源: 'quote_source',
-  },
-}
-
-async function handleRowOcr(blockType: BlockType, rowId: string, file: File): Promise<void> {
-  if (!selectedCompany.value || !props.wpId) return
-  ocrLoadingRowId.value = rowId
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
-    )
-    const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
-    if (!Object.keys(fields).length) {
-      ElMessage.info('OCR完成，未识别到可填充字段')
-      return
-    }
-    // 映射识别字段 → 当前区块行字段
-    const map = OCR_FIELD_MAP[blockType]
-    const patch: Record<string, any> = {}
-    for (const [ocrKey, val] of Object.entries(fields)) {
-      const target = map[ocrKey]
-      if (target && val != null && String(val).trim() !== '') {
-        patch[target] = val
-      }
-    }
-    if (Object.keys(patch).length === 0) {
-      ElMessage.info('OCR完成，识别字段无法匹配本区块')
-      return
-    }
-    const preview = Object.entries(patch)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('，')
-    await ElMessageBox.confirm(`识别到证券信息：\n${preview}\n是否填入当前行？`, 'OCR识别结果', {
-      confirmButtonText: '填入',
-      cancelButtonText: '取消',
-    })
-    for (const [field, val] of Object.entries(patch)) {
-      data.updateBlockField(selectedCompany.value._company_id!, blockType, rowId, field, val)
-    }
-    ElMessage.success('已填入识别结果')
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.warning('OCR识别失败')
-  } finally {
-    ocrLoadingRowId.value = null
-  }
 }
 
 function markDirty() {

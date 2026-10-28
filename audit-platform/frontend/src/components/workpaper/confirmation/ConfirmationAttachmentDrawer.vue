@@ -7,8 +7,8 @@
     @close="emit('update:visible', false)"
     append-to-body
   >
-    <!-- 上传区 -->
-    <div class="gt-ca-drawer__upload-section">
+    <!-- 上传区（只读时不显示：复核 / 已归档只能查看，spec attachment-confirmation-evidence-loop 需求 1.3） -->
+    <div v-if="!readonly" class="gt-ca-drawer__upload-section">
       <div class="gt-ca-drawer__upload-row">
         <span class="gt-ca-drawer__upload-label">角色</span>
         <el-select v-model="uploadRole" size="small" style="width:120px">
@@ -27,7 +27,7 @@
           >
             <el-option
               v-for="att in outboundList"
-              :key="att.id"
+              :key="att.link_id"
               :label="att.file_name"
               :value="att.attachment_id"
             />
@@ -54,7 +54,7 @@
       </div>
     </div>
 
-    <el-divider />
+    <el-divider v-if="!readonly" />
 
     <!-- 发函件列表 -->
     <div class="gt-ca-drawer__section">
@@ -63,19 +63,14 @@
         <span class="gt-ca-drawer__count">{{ outboundList.length }} 份</span>
       </h4>
       <div v-if="outboundList.length === 0" class="gt-ca-drawer__empty">暂无发函件</div>
-      <div v-for="att in outboundList" :key="att.id" class="gt-ca-drawer__item">
+      <div v-for="att in outboundList" :key="att.link_id" class="gt-ca-drawer__item">
         <div class="gt-ca-drawer__item-info">
           <span class="gt-ca-drawer__filename" :title="att.file_name">{{ att.file_name }}</span>
-          <span class="gt-ca-drawer__time">{{ formatTime(att.created_at) }}</span>
-        </div>
-        <div class="gt-ca-drawer__item-tags">
-          <el-tag v-if="att.ocr_status" :type="ocrTagType(att.ocr_status)" size="small" effect="plain">
-            {{ ocrLabel(att.ocr_status) }}
-          </el-tag>
+          <span class="gt-ca-drawer__time">{{ formatTime(att.upload_time || att.link_created_at) }}</span>
         </div>
         <div class="gt-ca-drawer__item-actions">
           <el-button link type="primary" size="small" @click="handlePreview(att)">预览</el-button>
-          <el-button link type="danger" size="small" @click="handleUnlink(att)">解绑</el-button>
+          <el-button v-if="!readonly" link type="danger" size="small" @click="handleUnlink(att)">解绑</el-button>
         </div>
       </div>
     </div>
@@ -87,35 +82,37 @@
         <span class="gt-ca-drawer__count">{{ inboundList.length }} 份</span>
       </h4>
       <div v-if="inboundList.length === 0" class="gt-ca-drawer__empty">暂无回函件</div>
-      <div v-for="att in inboundList" :key="att.id" class="gt-ca-drawer__item-wrapper">
+      <div v-for="att in inboundList" :key="att.link_id" class="gt-ca-drawer__item-wrapper">
         <div class="gt-ca-drawer__item">
           <div class="gt-ca-drawer__item-info">
             <span class="gt-ca-drawer__filename" :title="att.file_name">{{ att.file_name }}</span>
-            <span class="gt-ca-drawer__time">{{ formatTime(att.created_at) }}</span>
+            <span class="gt-ca-drawer__time">{{ formatTime(att.upload_time || att.link_created_at) }}</span>
           </div>
           <div class="gt-ca-drawer__item-tags">
-            <el-tag v-if="att.paired_outbound_file_name" type="info" size="small" effect="plain">
-              配对：{{ att.paired_outbound_file_name }}
+            <el-tag v-if="pairedOutboundName(att)" type="info" size="small" effect="plain">
+              配对：{{ pairedOutboundName(att) }}
             </el-tag>
-            <el-tag v-if="att.ocr_status" :type="ocrTagType(att.ocr_status)" size="small" effect="plain">
+            <el-tag :type="ocrTagType(att.ocr_status)" size="small" effect="plain" data-testid="ocr-status">
               {{ ocrLabel(att.ocr_status) }}
             </el-tag>
           </div>
           <div class="gt-ca-drawer__item-actions">
             <el-button link type="primary" size="small" @click="handlePreview(att)">预览</el-button>
             <el-button
+              v-if="!readonly"
               link
               type="warning"
               size="small"
               :loading="ocrLoadingMap[att.attachment_id]"
+              title="没有识别文本时先识别原件，再与账面金额比对（结果需人工确认）"
               @click="handleTriggerOcr(att)"
-            >OCR识别</el-button>
-            <el-button link type="danger" size="small" @click="handleUnlink(att)">解绑</el-button>
+            >识别比对</el-button>
+            <el-button v-if="!readonly" link type="danger" size="small" @click="handleUnlink(att)">解绑</el-button>
           </div>
         </div>
 
         <!-- OCR 比对结果面板 -->
-        <div v-if="ocrResultMap[att.attachment_id]" class="gt-ca-drawer__ocr-panel">
+        <div v-if="!readonly && ocrResultMap[att.attachment_id]" class="gt-ca-drawer__ocr-panel">
           <div class="gt-ca-drawer__ocr-advisory">AI辅助·待人工确认</div>
 
           <!-- 比对结论标签 -->
@@ -193,8 +190,8 @@
                 size="small"
                 style="width: 160px"
               >
-                <el-option label="相符(matched)" value="matched" />
-                <el-option label="不符(discrepancy)" value="discrepancy" />
+                <el-option label="相符" value="matched" />
+                <el-option label="不符" value="discrepancy" />
               </el-select>
             </div>
           </div>
@@ -227,6 +224,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import { parseServerTime } from '@/utils/formatters'
 import AttachmentPreviewDrawer, {
   type AttachmentForPreview,
 } from '@/components/common/AttachmentPreviewDrawer.vue'
@@ -237,10 +235,13 @@ interface Props {
   confirmationId: string
   projectId: string
   counterpartyName?: string
+  /** 只读：只能预览（不显示上传、解绑、识别比对、回填） */
+  readonly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   counterpartyName: '',
+  readonly: false,
 })
 
 const emit = defineEmits<{
@@ -250,15 +251,21 @@ const emit = defineEmits<{
 
 // ─── 附件数据 ───
 
+/**
+ * 挂载列表接口的真实形状（`confirmation_evidence_service.list_attachments`）。
+ * 原先按 `id` / `created_at` / `paired_outbound_file_name` 读：接口没有这三个字段 ⇒ 解绑请求里是 `undefined`、
+ * 时间与配对名恒空（spec attachment-confirmation-evidence-loop 需求 1.4）。
+ */
 interface AttachmentLink {
-  id: string
+  link_id: string
   attachment_id: string
   file_name: string
   role: 'outbound' | 'inbound'
   paired_outbound_attachment_id: string | null
-  paired_outbound_file_name: string | null
+  match_status?: string | null
   ocr_status: string | null
-  created_at: string | null
+  upload_time: string | null
+  link_created_at: string | null
 }
 
 const attachments = ref<AttachmentLink[]>([])
@@ -266,6 +273,12 @@ const loading = ref(false)
 
 const outboundList = computed(() => attachments.value.filter((a) => a.role === 'outbound'))
 const inboundList = computed(() => attachments.value.filter((a) => a.role === 'inbound'))
+
+/** 回函件配对的发函件名（在本笔的发函件里查） */
+function pairedOutboundName(att: AttachmentLink): string {
+  if (!att.paired_outbound_attachment_id) return ''
+  return outboundList.value.find((o) => o.attachment_id === att.paired_outbound_attachment_id)?.file_name || ''
+}
 
 // ─── 上传 ───
 
@@ -344,7 +357,7 @@ async function handleUnlink(att: AttachmentLink) {
 
   try {
     await http.delete(
-      `/api/projects/${props.projectId}/confirmations/${props.confirmationId}/attachments/${att.id}`,
+      `/api/projects/${props.projectId}/confirmations/${props.confirmationId}/attachments/${att.link_id}`,
     )
     ElMessage.success('已解绑')
     await loadAttachments()
@@ -392,11 +405,18 @@ const ocrLoadingMap = reactive<Record<string, boolean>>({})
 const backfillFormMap = reactive<Record<string, BackfillForm>>({})
 const applyLoadingMap = reactive<Record<string, boolean>>({})
 
+/**
+ * 识别比对：后端先补识别（没有全文时识别原件并写回），再与账面金额比对（需求 2.1）。
+ * `_silent`：自己提示错误；不静默的话全局拦截器会先弹一次，5xx 还会自动重发两次（重复识别）。
+ * 成功、失败都重取列表：识别状态（已识别 / 识别失败）以库里为准。
+ */
 async function handleTriggerOcr(att: AttachmentLink) {
   ocrLoadingMap[att.attachment_id] = true
   try {
     const res: any = await http.post(
       `/api/projects/${props.projectId}/confirmations/attachments/${att.attachment_id}/extract-compare`,
+      undefined,
+      { _silent: true } as any,
     )
     const data = res?.data ?? res
     ocrResultMap[att.attachment_id] = data
@@ -411,11 +431,13 @@ async function handleTriggerOcr(att: AttachmentLink) {
       target_status: suggestedStatus,
     }
 
-    ElMessage.success('OCR 识别完成')
+    ElMessage.success('识别比对完成，请核对后确认回填')
   } catch (e) {
-    handleApiError(e, 'OCR 识别')
+    delete ocrResultMap[att.attachment_id]
+    handleApiError(e, '识别比对')
   } finally {
     ocrLoadingMap[att.attachment_id] = false
+    void loadAttachments()
   }
 }
 
@@ -511,24 +533,24 @@ watch(
 
 function formatTime(ts: string | null): string {
   if (!ts) return ''
-  try {
-    const d = new Date(ts.includes('Z') ? ts : ts + 'Z')
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  } catch {
-    return ''
-  }
+  const d = parseServerTime(ts)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function ocrTagType(status: string | null): 'warning' | 'success' | 'info' {
+/** 回函件识别状态（挂载后不自动识别，需求 2.3） */
+function ocrTagType(status: string | null): 'warning' | 'success' | 'info' | 'danger' {
   if (status === 'processing') return 'warning'
   if (status === 'completed') return 'success'
+  if (status === 'failed') return 'danger'
   return 'info'
 }
 
 function ocrLabel(status: string | null): string {
-  if (status === 'processing') return 'OCR识别中'
-  if (status === 'completed') return 'OCR完成'
-  return 'OCR待识别'
+  if (status === 'processing') return '识别中'
+  if (status === 'completed') return '已识别'
+  if (status === 'failed') return '识别失败'
+  return '未识别'
 }
 </script>
 

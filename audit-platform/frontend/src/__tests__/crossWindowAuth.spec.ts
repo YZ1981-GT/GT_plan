@@ -29,10 +29,13 @@ class MockBroadcastChannel {
   }
 
   postMessage(data: any) {
+    // 与真实 BroadcastChannel 一样先结构化克隆：响应式 Proxy 等不可克隆的载荷在这里抛 DataCloneError
+    //（原 mock 直接传引用，测不出会话回执带响应式 user 发不出去的缺陷）
+    const cloned = structuredClone(data)
     const peers = MockBroadcastChannel._channels.get(this.name) ?? new Set()
     for (const peer of peers) {
       if (peer === this) continue
-      const ev = { data }
+      const ev = { data: cloned }
       if (peer.onmessage) peer.onmessage(ev)
       for (const fn of peer._listeners) fn(ev)
     }
@@ -111,6 +114,62 @@ describe('crossWindowAuth', () => {
     expect(result).toBeNull()
 
     vi.useRealTimers()
+  })
+
+  it('新标签页要会话：已登录标签页的 user 是响应式（Pinia state）也能回执', async () => {
+    const mod = await import('@/utils/crossWindowAuth')
+    const { reactive } = await import('vue')
+    const state = reactive({ user: { id: 'u1', username: 'admin', roles: ['admin'] } })
+    mod.listenAuthEvents({ onSessionRequest: () => ({ token: 't', refreshToken: 'r', user: state.user }) })
+
+    const otherTab = new MockBroadcastChannel('gt-auth')
+    const received: any[] = []
+    otherTab.addEventListener('message', (ev: any) => received.push(ev.data))
+    otherTab.postMessage({ type: 'session-request', senderId: 'other-tab' })
+
+    expect(received).toEqual([{
+      type: 'session-response', token: 't', refreshToken: 'r',
+      user: { id: 'u1', username: 'admin', roles: ['admin'] }, senderId: 'test-instance-001',
+    }])
+    otherTab.close()
+  })
+
+  it('新标签页会话接力：已登录标签页回执后才结束，apply 拿到会话', async () => {
+    sessionStorage.removeItem('token')
+    const mod = await import('@/utils/crossWindowAuth')
+    const loggedIn = new MockBroadcastChannel('gt-auth')
+    loggedIn.addEventListener('message', (ev: any) => {
+      if (ev.data.type === 'session-request') {
+        setTimeout(() => loggedIn.postMessage({ type: 'session-response', token: 't', refreshToken: 'r', user: { id: 'u1' }, senderId: 'tab-a' }), 50)
+      }
+    })
+    const applied: any[] = []
+    let settled = false
+    const handoff = mod.startSessionHandoff((s) => { applied.push(s) })
+    void mod.awaitSessionHandoff().then(() => { settled = true })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(settled).toBe(false) // 回执未到：守卫在等，不会先跳登录页
+    await handoff
+    expect(settled).toBe(true)
+    expect(applied).toEqual([{ token: 't', refreshToken: 'r', user: { id: 'u1' } }])
+    loggedIn.close()
+  })
+
+  it('本页已有令牌：不要会话，接力立即结束', async () => {
+    sessionStorage.setItem('token', 'mine')
+    try {
+      const mod = await import('@/utils/crossWindowAuth')
+      const peer = new MockBroadcastChannel('gt-auth')
+      const received: any[] = []
+      peer.addEventListener('message', (ev: any) => received.push(ev.data))
+      const apply = vi.fn()
+      await mod.startSessionHandoff(apply)
+      expect(received).toEqual([])
+      expect(apply).not.toHaveBeenCalled()
+      peer.close()
+    } finally {
+      sessionStorage.removeItem('token')
+    }
   })
 
   it('singleFlightRefresh 无 Web Locks 时降级直接执行', async () => {

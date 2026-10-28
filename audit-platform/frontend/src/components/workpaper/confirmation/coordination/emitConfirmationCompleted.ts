@@ -10,6 +10,7 @@
  * 同时写入 eventBus（新代码可订阅 typed 事件）。
  */
 import { eventBus } from '@/utils/eventBus'
+import { isReplied, isRepliedTrue, type ReplyFlag } from '../replyStatus'
 
 export interface ConfirmationCompletedPayload {
   /** 被询证单位（科目明细匹配键） */
@@ -75,15 +76,18 @@ export function accountTypeToWpHint(accountType?: string, accountCode?: string):
   return undefined
 }
 
-/** 行是否视为「已进入函证程序」（发函或已有回函结果） */
+/**
+ * 行是否视为「已进入函证程序」（发函或已有回函结果）。
+ * 「是否收到回函」填了是 / 否（含明细面板的 '是' / '否'）都说明已发函；未填不算（spec attachment-confirmation-evidence-loop 需求 1.6）。
+ */
 export function isConfirmationInFlight(row: {
   send_date?: string
-  is_replied?: boolean
+  is_replied?: ReplyFlag
   match_status?: string
   confirmation_method?: string
 }): boolean {
   if (row.send_date) return true
-  if (row.is_replied) return true
+  if (isReplied(row) !== undefined) return true
   if (row.match_status && ['相符', '不符', '未回函'].includes(row.match_status)) return true
   if (row.confirmation_method) return true
   return false
@@ -125,7 +129,7 @@ export function emitConfirmationCompletedFromSummary(options: {
     confirm_index?: string
     account_type?: string
     send_date?: string
-    is_replied?: boolean
+    is_replied?: ReplyFlag
     match_status?: string
     confirmation_method?: string
     amount?: number
@@ -153,7 +157,7 @@ export function emitConfirmationCompletedFromSummary(options: {
 
   // 汇总指标（供 D2-1 函证汇总块），customerName 用「__summary__」避免误标明细户
   const sentCount = inFlight.length
-  const receivedCount = rows.filter(r => r.is_replied || r.match_status === '相符' || r.match_status === '不符').length
+  const receivedCount = rows.filter(r => isRepliedTrue(r) || r.match_status === '相符' || r.match_status === '不符').length
   const confirmedAmount = rows.reduce((s, r) => s + (Number(r.confirmed_amount) || 0), 0)
   const differenceAmount = rows.reduce((s, r) => s + (Number(r.difference) || 0), 0)
   if (sentCount > 0) {

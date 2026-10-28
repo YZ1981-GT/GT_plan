@@ -25,7 +25,15 @@ import {
   uploadWorkpaperEvidence,
 } from '@/components/attachment/workpaperEvidence'
 
-type EvidenceRequirement = { type: string; label: string; satisfied: boolean }
+/** 函证声明的逐笔判定（spec attachment-confirmation-evidence-loop 需求 6）：按工作簿登记的函证统计 */
+type ConfirmationBreakdown = {
+  total: number
+  replied: number
+  alternative: number
+  missing: number
+  missing_items?: Array<{ confirmation_id: string; counterparty: string | null; confirm_type?: string; reason: string }>
+}
+type EvidenceRequirement = { type: string; label: string; satisfied: boolean; breakdown?: ConfirmationBreakdown | null }
 type EvidencePosition = { link_id: string; sheet_name: string | null; cell_ref: string | null; page_ref: string | null }
 
 type StaleInfo = {
@@ -83,9 +91,22 @@ const uploadTypeTouched = ref(false)
 const pendingUploadType = ref<string | null>(null)
 const KNOWN_TYPES = new Set<string>(EVIDENCE_TYPE_OPTIONS.map((opt) => opt.value))
 
+/** 缺证据的补救提示：律师函（A12-1）没有替代程序页，回函在本底稿的函证中心卡片上传 */
+function breakdownHint(b: ConfirmationBreakdown): string {
+  const items = b.missing_items ?? []
+  return items.length && items.every((i) => i.confirm_type === 'legal')
+    ? '请在本底稿「函证中心」卡片上传律师回函'
+    : '请在函证中心上传回函，或在替代程序页对应行上传单据'
+}
+
+/** 逐笔判定的声明不能靠整稿上传补齐（缺口在具体哪几笔函证上），不给「上传此类证据」、也不作缺省上传类型 */
+function canQuickUpload(req: EvidenceRequirement): boolean {
+  return !req.satisfied && KNOWN_TYPES.has(req.type) && !req.breakdown
+}
+
 function syncDefaultUploadType() {
   if (uploadTypeTouched.value) return
-  const firstMissing = missingEvidence.value.find((req) => KNOWN_TYPES.has(req.type))
+  const firstMissing = missingEvidence.value.find(canQuickUpload)
   uploadType.value = firstMissing?.type ?? ''
 }
 
@@ -352,8 +373,19 @@ function formatDate(d: string): string {
           >
             <span v-if="req.satisfied" class="wp-att-evidence-req__ok">✓ {{ req.label }}</span>
             <span v-else class="wp-att-evidence-req__miss">⚠ 缺「{{ req.label }}」证据</span>
+            <div v-if="req.breakdown" class="wp-att-breakdown" data-testid="confirmation-breakdown">
+              <div class="wp-att-breakdown__summary">
+                共 {{ req.breakdown.total }} 笔：已回函 {{ req.breakdown.replied }}、替代程序 {{ req.breakdown.alternative }}、缺证据 {{ req.breakdown.missing }}
+              </div>
+              <ul v-if="req.breakdown.missing_items?.length" class="wp-att-breakdown__missing">
+                <li v-for="item in req.breakdown.missing_items" :key="item.confirmation_id">
+                  {{ item.counterparty || '（未填函证对象）' }}：{{ item.reason }}
+                </li>
+              </ul>
+              <div v-if="req.breakdown.missing" class="wp-att-breakdown__hint">{{ breakdownHint(req.breakdown) }}</div>
+            </div>
             <el-button
-              v-if="!req.satisfied && canEdit && KNOWN_TYPES.has(req.type)"
+              v-if="canEdit && canQuickUpload(req)"
               type="primary"
               link
               size="small"
@@ -502,6 +534,15 @@ function formatDate(d: string): string {
 .wp-att-evidence-req__ok { color: var(--el-color-success, #67c23a); }
 .wp-att-evidence-req__miss { color: var(--el-color-warning, #e6a23c); font-weight: 600; }
 .wp-att-evidence-req__alert { margin-top: 8px; }
+.wp-att-breakdown { margin: 2px 0 4px; color: var(--gt-color-text-regular, #606266); }
+.wp-att-breakdown__missing {
+  margin: 2px 0;
+  padding-left: 1.1em;
+  max-height: 160px;
+  overflow-y: auto;
+  color: var(--el-color-warning, #e6a23c);
+}
+.wp-att-breakdown__hint { color: var(--gt-color-text-tertiary, #909399); }
 .wp-att-list { display: flex; flex-direction: column; gap: 8px; }
 .wp-att-item {
   display: flex; align-items: center; gap: 12px;

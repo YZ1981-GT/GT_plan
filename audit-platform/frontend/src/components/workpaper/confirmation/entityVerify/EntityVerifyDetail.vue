@@ -421,6 +421,18 @@
           </el-row>
         </el-form>
       </el-collapse-item>
+
+      <!-- 核实证据（spec attachment-confirmation-evidence-loop 需求 4）：工商查询截图等挂到本行，只读只能查看 -->
+      <el-collapse-item v-if="wpId && projectId && sheetKey && row._row_id" title="核实证据（工商查询截图等）" name="evidence">
+        <ItemAttachment
+          :project-id="projectId"
+          :wp-id="wpId"
+          :sheet-key="sheetKey"
+          :cell-ref="rowEvidenceCell(row._row_id)"
+          evidence-type="support"
+          :readonly="readonly"
+        />
+      </el-collapse-item>
     </el-collapse>
 
     <!--
@@ -468,6 +480,8 @@
 import { ref, computed } from 'vue'
 import type { EntityVerifyRow } from './entityVerifyTypes'
 import FieldHintIcon from './FieldHintIcon.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { CONFIRMATION_DICTS, fallbackOptions } from '../coordination/confirmationDicts'
 // 源模板 X0-2 `A27:A41` 五条编制说明（只读方法论上下文，真源在后端守卫锁死）
 import {
@@ -493,13 +507,17 @@ const props = defineProps<{
   row: EntityVerifyRow | null
   readonly: boolean
   dictData: Record<string, any[]>
+  /** 行级附件位置：表页 = 本循环对象核实表编码（如 `D0-2`），单元格 = `row:{行 id}` */
+  wpId?: string
+  projectId?: string
+  sheetKey?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update', field: string, value: any): void
 }>()
 
-const activeStages = ref<string[]>(['basic', 'qcc', 'send', 'reply', 'reply_verify'])
+const activeStages = ref<string[]>(['basic', 'qcc', 'send', 'reply', 'reply_verify', 'evidence'])
 
 /** 回函核实块三项一致性判定存在「不一致」时要求填说明（Property 7） */
 const hasReplyInconsistency = computed(() => {

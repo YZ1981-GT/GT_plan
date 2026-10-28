@@ -1,5 +1,8 @@
 {
   "_comment": "底稿证据类型声明 — attachment-workpaper-linkage-convergence Req4。wp_code_prefix → 应收集证据类型；宁缺勿造，未列出的底稿不提示。匹配规则：exact / prefix- / prefix+字母后缀（如 E1A）。",
+  "A12-1": [
+    { "type": "confirmation", "label": "律师询证函回函" }
+  ],
   "D0": [
     { "type": "confirmation", "label": "函证回函件" }
   ],

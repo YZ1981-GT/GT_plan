@@ -434,3 +434,99 @@ describe('WorkpaperAttachmentsDrawer — 图标按钮可读名与空态（spec a
     expect(readonly.find('.el-empty').text()).toBe('本底稿暂无关联附件')
   })
 })
+
+describe('WorkpaperAttachmentsDrawer — 函证逐笔判定（spec attachment-confirmation-evidence-loop 需求 6.2）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDelete.mockResolvedValue({ ok: true })
+  })
+
+  const breakdownReq = (missingItems: Array<{ confirmation_id: string; counterparty: string | null; reason: string }>, extra: Record<string, number>) => ({
+    type: 'confirmation',
+    label: '函证回函件',
+    satisfied: missingItems.length === 0,
+    breakdown: { missing: missingItems.length, missing_items: missingItems, ...extra },
+  })
+
+  it('有逐笔判定：显示汇总与缺证据清单，不给整稿「上传此类证据」，也不作缺省上传类型', async () => {
+    mockGet.mockResolvedValue({
+      items: sampleItems,
+      evidence_requirements: [
+        breakdownReq(
+          [
+            { confirmation_id: 'c3', counterparty: '乙公司', reason: '未回函且未做替代程序' },
+            { confirmation_id: 'c4', counterparty: null, reason: '未发函' },
+          ],
+          { total: 4, replied: 1, alternative: 1 },
+        ),
+      ],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', wpCode: 'D0-5', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+
+    const block = wrapper.find('[data-testid="confirmation-breakdown"]')
+    expect(block.exists()).toBe(true)
+    expect(block.find('.wp-att-breakdown__summary').text()).toBe('共 4 笔：已回函 1、替代程序 1、缺证据 2')
+    expect(block.findAll('.wp-att-breakdown__missing li').map((li) => li.text())).toEqual([
+      '乙公司：未回函且未做替代程序',
+      '（未填函证对象）：未发函',
+    ])
+    expect(block.find('.wp-att-breakdown__hint').text()).toBe('请在函证中心上传回函，或在替代程序页对应行上传单据')
+    expect(wrapper.text()).toContain('缺「函证回函件」证据')
+    expect(wrapper.findAll('.wp-att-evidence-req__upload')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="evidence-type-select"]').attributes('data-value')).toBe('')
+  })
+
+  it('逐笔全部有证据：判满足，只显示汇总', async () => {
+    mockGet.mockResolvedValue({
+      items: sampleItems,
+      evidence_requirements: [breakdownReq([], { total: 3, replied: 2, alternative: 1 })],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', wpCode: 'D0-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+
+    const block = wrapper.find('[data-testid="confirmation-breakdown"]')
+    expect(block.find('.wp-att-breakdown__summary').text()).toBe('共 3 笔：已回函 2、替代程序 1、缺证据 0')
+    expect(block.find('.wp-att-breakdown__missing').exists()).toBe(false)
+    expect(block.find('.wp-att-breakdown__hint').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="evidence-requirements"]').text()).toContain('✓ 函证回函件')
+  })
+
+  it('只缺律师函（A12-1）：提示到函证中心卡片上传，不提替代程序页', async () => {
+    mockGet.mockResolvedValue({
+      items: [],
+      evidence_requirements: [{
+        type: 'confirmation', label: '律师询证函回函', satisfied: false,
+        breakdown: { total: 1, replied: 0, alternative: 0, missing: 1,
+          missing_items: [{ confirmation_id: 'L1', counterparty: '某律师事务所', confirm_type: 'legal', reason: '未回函且未做替代程序' }] },
+      }],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', wpCode: 'A12-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.find('.wp-att-breakdown__hint').text()).toBe('请在本底稿「函证中心」卡片上传律师回函')
+  })
+
+  it('没有逐笔判定（工作簿未登记函证）时沿用原显示与整稿上传', async () => {
+    mockGet.mockResolvedValue({
+      items: sampleItems,
+      evidence_requirements: [{ type: 'confirmation', label: '函证回函件', satisfied: false }],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', wpCode: 'D0', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="confirmation-breakdown"]').exists()).toBe(false)
+    expect(wrapper.findAll('.wp-att-evidence-req__upload').map((b) => b.attributes('data-type'))).toEqual(['confirmation'])
+    expect(wrapper.find('[data-testid="evidence-type-select"]').attributes('data-value')).toBe('confirmation')
+  })
+})

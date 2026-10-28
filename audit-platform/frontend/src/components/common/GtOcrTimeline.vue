@@ -5,6 +5,7 @@
  * 显示 OCR Job 的所有状态迁移记录，时间线形式。
  */
 import { computed } from 'vue'
+import { parseServerTime } from '@/utils/formatters'
 
 export interface TimelineTransition {
   id: string
@@ -50,8 +51,8 @@ function stateColor(state: string): string {
 
 function formatTime(iso: string): string {
   if (!iso) return ''
-  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z')
-  return d.toLocaleString('zh-CN', { hour12: false })
+  const d = parseServerTime(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('zh-CN', { hour12: false })
 }
 
 const sortedTransitions = computed(() => {

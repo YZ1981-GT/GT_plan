@@ -20,6 +20,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ExtractionLogEntry } from '../composables/useVoucherSampling'
 import type { SamplingMethod, Phase } from '../composables/useSamplingAlgorithms'
+import { parseServerTime } from '@/utils/formatters'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,8 @@ function getPhaseLabel(phase: Phase): string {
 
 function formatTime(isoStr: string): string {
   if (!isoStr) return '—'
-  const d = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z')
+  const d = parseServerTime(isoStr)
+  if (Number.isNaN(d.getTime())) return isoStr
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

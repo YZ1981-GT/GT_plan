@@ -187,6 +187,19 @@
             </el-form>
           </div>
 
+          <!-- 跟函证据（spec attachment-confirmation-evidence-loop 需求 4）：照片 / 回执挂到本行，只读只能查看 -->
+          <div v-if="wpId && projectId && sheetKey && row._row_id" class="followup-detail__section">
+            <h4 class="followup-detail__section-title">跟函证据（照片 / 回执）</h4>
+            <ItemAttachment
+              :project-id="projectId"
+              :wp-id="wpId"
+              :sheet-key="sheetKey"
+              :cell-ref="rowEvidenceCell(row._row_id)"
+              evidence-type="evidence"
+              :readonly="readonly"
+            />
+          </div>
+
           <!-- Section 6: 签名 -->
           <div class="followup-detail__section">
             <h4 class="followup-detail__section-title">签名</h4>
@@ -256,6 +269,8 @@
 import { ref } from 'vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import ItemAttachment from '../../ItemAttachment.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import type { FollowupRow } from './followupTypes'
 import { FOLLOWUP_CONTROL_CHECKPOINTS as CONTROL_CHECKPOINTS } from './followupEnums'
 
@@ -263,6 +278,10 @@ const props = defineProps<{
   row: FollowupRow | null
   readonly: boolean
   dictData?: Record<string, any[]>
+  /** 行级附件位置：表页 = 本循环跟函表编码（如 `D0-3`），单元格 = `row:{行 id}` */
+  wpId?: string
+  projectId?: string
+  sheetKey?: string
 }>()
 
 const emit = defineEmits<{
