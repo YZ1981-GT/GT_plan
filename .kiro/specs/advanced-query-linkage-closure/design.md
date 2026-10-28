@@ -283,6 +283,15 @@ B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上�
 - `routers/recycle_bin.py`：`_RECYCLABLE_TABLES` 增 `"custom_query_template": (CustomQueryTemplate, "查询模板", "name")`；`_OWNER_SCOPED = {"custom_query_template": lambda m: func.coalesce(m.creator_id, m.created_by)}`（与模型属性 `owner_id` = `creator_id or created_by` 同一口径，router 判 `is_owner` 也用它）；`_visibility_filter(tbl_key, model, visible, user)` 对该类型 = `owner_expr == user.id`（admin 不限）；`_authorize_row` 对该类型 = `row.owner_id == user.id` 或 admin，不走项目成员判定；`_deleted_by` 对该类型返回 `owner_id`；列表项对按作者可见的类型增 `can_restore` / `can_purge`（= 作者或 admin，恒为布尔；其余类型不带这两个键，界面照旧按系统角色权限）。合入后同一列表已有逐行 `purgeable`（底稿不可彻底删除），模板为 true。
 - `views/RecycleBin.vue`（合入后 354 行）：操作列按行分支（+6 行）。`<template v-if="typeof row.can_restore === 'boolean'">` 内放两个不带指令的按钮：`v-if="row.can_restore"` 的「恢复」与 `v-if="row.can_purge && row.purgeable !== false"` 的「删除」（各 1 行）；`<template v-else>` 内原样保留现有两个带 `v-permission` 的按钮（内容不改）。其余类型因此仍由指令判定：`directives/permission.ts` 只查前端常量 `ROLE_PERMISSIONS[authStore.user.role]`。不用 `usePermission().can()` 作兜底：它优先用 `authStore.user.permissions`，而 `fetchUserProfile()`（`App.vue`、`Dashboard.vue`、`PrivateStorage.vue` 在 `user` 缺失时调用）把 `/api/users/me` 下发的后端 `permission_service.ROLE_PERMISSION_MATRIX` 权限码（`project:read` 等 14 种，没有 `recycle:*`）写进 `user`，这类会话里经理、合伙人会看不到其余类型的按钮；该函数还标了 `@deprecated`。也不把指令判定抽成共用纯函数：那要改全平台共用的指令文件，行分支只动本页。理由：权限指令只看系统角色，模板作者多为系统 auditor（库内 auditor 114、manager 1），按钮会被藏起来；模板行的能力由后端按 `_authorize_row` 同一判定逐行给出，前后端不会分叉。审计员也能进回收站页（顶栏「回收站」按钮，路由无权限限制）。
 
+B8 实施补记（2026-10-28，任务 24、25；与上文不同或没写到的以此为准）：
+- 迁移号 **V214**（四处现扫 + 共享库登记表均未占用，§8）。V214 除两列、索引外，scope 检查约束按「存在同名约束但不含 `project` ⇒ 先删再建六值约束」处理：`scripts/_ensure_custom_query_tables.py` 建的旧库带同名四值约束（没有 project / personal），「指定项目共享」一保存就违反约束；共享库本表没有任何检查约束。约束取值三处同一份：ORM `custom_query_models.TEMPLATE_SCOPE_VALUES`（ORM 也声明该约束与 `idx_cqt_live_updated`）、建表脚本 `SCOPE_VALUES`、V214，由 `test_advanced_query_ddl_cross_lock.py` 锁死。
+- V214 只落在验证用库副本 `audit_platform_aql`（brief 2026-10-28 第 4 条：落共享库会让主树 `test_real_db_state_is_consistent`（库里已应用 ⊆ 目录）变红）；推送后须尽快落到共享库，否则他人把远端合进主树、9980 热重载后读 `custom_query_templates.is_deleted` 报 UndefinedColumn（模板端点与回收站列表 / 统计 500）。
+- `template_service.config_to_request` 多一个 `fallback_source`（config 没有 `source` 时用模板的 `data_source`）；参数占位的取值（`template_presets.resolve_config`）在任务 41 接入，此前 config 仍含 `$param` 时执行返回 400 `TEMPLATE_INVALID`「模板条件里的参数「{名}」尚未取值，未执行查询」；模板里存了不合格配置时沿用 acnr T15（0e567e267，先于本任务提交）的 `template_config_rejected` ⇒ 422。
+- 模板执行在函数体内先 `await ownership_guard.assert_target_accessible(...)`、再解析年度（无权用户不从 422 得知项目有没有审计年度）；body_carried 请求体维基线 81 → 80。更新模板的名称与保存同一校验（`validate_name`）。SQLite 测试方言下 `shared_project_ids` 用 `_SqliteUuidList`（存文本读回 UUID）。
+- 已软删的模板对详情 / 更新 / 删除 / 执行一律 404 `TEMPLATE_NOT_FOUND`（`_load_template`），列表候选 SQL 带 `is_deleted = false`；恢复只走回收站。回收站统计与列表同一过滤（按作者可见）；模板行「删除人」= 作者（模板端点只许作者删除，admin 亦然）。
+- 页面版删除确认文案改为「确认删除模板「{名}」？删除后可在回收站恢复。」（原「此操作不可撤销」）；`MyTemplatesDialog.vue` 的同类文案随任务 33 改。
+- 浏览器验收发现（新断点 AQ-39，交任务 29 / 28）：页面版「保存为模板」的「指定项目共享」「公开」两档恒置灰——`canShareTemplates` 取 `GET /api/projects` 的 `can_edit`，该接口从不下发此字段（admin 亦然），R9.1 的三档在页面版只能存「仅我可见」；弹窗 💾 固定存 private。后端三档已通（TestClient 与浏览器会话内 API 保存公开模板 201、审计员列表可见）。
+
 ### 3.7 写入收窄与只读查询
 - 删除 `snapshot_writer_modules.write_report_cell / write_adj_cell / write_tb_cell` 与 `SnapshotWriter` 对应薄委托及 `write_cell` 三个分支（未知 module → ValueError）；`CellWritebackRequest.module` 与 writeback 目标 module 改 `Literal["workpaper", "note"]`。
 - 取行带项目：底稿 `… WHERE wp.id = :wp_id AND wp.project_id = :pid FOR UPDATE OF wp`（缺 pid → ValueError → 400），查不到抛新异常 `WritebackTargetNotFound`；附注 `select(ConsolNoteData).where(ConsolNoteData.id == target_id, ConsolNoteData.project_id == note_project_id).with_for_update()`，查不到 `NoteRecordNotFound`。两者都不会锁他项目行。cell-writeback 与 writeback-confirm 同口径映射：`WritebackTargetNotFound` → 404 `WRITEBACK_TARGET_NOT_FOUND`「目标不存在或不属于本项目」，`NoteRecordNotFound` → 404 `NOTE_RECORD_NOT_FOUND`，`NoteOwnershipMismatch` → 403（只剩同项目内年度 / 章节 / 节点不一致），不再以未捕获异常变 500。
@@ -546,6 +555,7 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
 | 空条件值不执行 | 前端 `QueryConditionEditor.incompleteReason` + 后端 `paged_fetch` 的 `CONDITION_VALUE_REQUIRED` | 前端给即时提示，后端是不可绕过的那一道 |
 
 ## 8. 迁移（实施时现扫 `backend/migrations/V*.sql` 取 MAX+1，现最高 V205）
+B8 实施（2026-10-28）：合并树、主树工作区（含未跟踪）、全部已登记 worktree、远端与共享库登记表现扫最大都是 213 ⇒ n = **214**；约束段与下面草案不同，见 §3.6「B8 实施补记」。
 `V{n}__custom_query_template_soft_delete.sql`：
 ```sql
 ALTER TABLE custom_query_templates ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
