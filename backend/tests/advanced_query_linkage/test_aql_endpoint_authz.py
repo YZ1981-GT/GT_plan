@@ -193,6 +193,14 @@ def _sees(t: bool, s: bool, q: bool) -> Expect:
     return Expect(200, check)
 
 
+def _share_targets(x_in: bool) -> Expect:
+    """分享目标（第 8b 行，AQ-39）：X 在不在其中与第 8 行（共享给 X 的保存）放行与否逐列一致。"""
+    def check(response: Response, ctx: Ctx) -> None:
+        listed = _ids(response.json()["project_ids"])
+        assert (str(X) in listed) is x_in, f"分享目标是否含 X：期望 {x_in}，实得 {sorted(listed)}"
+    return Expect(200, check)
+
+
 def _recycle(contains: bool) -> Expect:
     def check(response: Response, ctx: Ctx) -> None:
         rows = [item for item in response.json()["items"] if item["id"] == ctx.ids["S"]]
@@ -391,6 +399,10 @@ ROWS: tuple[Row, ...] = (
         "name": "【测试】项目共享模板", "data_source": "tb_detail", "config": {"source": "tb_detail", "year": YEAR},
         "scope": "project", "shared_project_ids": [str(X)]})),),
         codes(401, 403, 403, 201, 201, 403, 403, 201), (custom_query.router,), _TPL),
+    # 第 8b 行（任务 29，AQ-39）：「指定项目共享」可选项目 = 第 8 行保存时逐项目 edit 门禁放行的项目
+    Row("8b", "S", (Call("GET", f"{CQ}/template-share-targets", f"{CQ}/template-share-targets"),),
+        codes(401, _share_targets(False), _share_targets(False), _share_targets(True), _share_targets(True),
+              _share_targets(False), _share_targets(False), _share_targets(True)), (custom_query.router,)),
     Row("9", "P", (Call("GET", f"{CQ}/templates/{{template_id}}", f"{CQ}/templates/{{S}}"),),
         codes(401, 403, 200, 200, 200, 403, 200, 200), (custom_query.router,), _TPL, ("templates",)),
     Row("10", "P", (Call("GET", f"{CQ}/templates/{{template_id}}", f"{CQ}/templates/{{Q}}"),),
@@ -570,8 +582,9 @@ def test_every_route_of_the_three_routers_is_in_the_table() -> None:
 def test_table_rows_match_design_shape() -> None:
     main = [row for row in ROWS if set(row.expect) == set(COLUMNS)]
     numbers = [row.no for row in main]
-    expected = [str(n) for n in range(1, 30)] + ["29b"]
-    assert sorted(set(numbers), key=lambda n: (int(n.rstrip("b")), n)) == expected, numbers
+    key = lambda n: (int(n.rstrip("b")), n)  # noqa: E731
+    expected = sorted([str(n) for n in range(1, 30)] + ["8b", "29b"], key=key)
+    assert sorted(set(numbers), key=key) == expected, numbers
     sub = {row.no: set(row.expect) for row in ROWS if set(row.expect) != set(COLUMNS)}
     assert sub == {"23c": {"CR"}, "25c": {"CR"}, "26c": {"CR"}, "28c": {"CR"}, "23n": {"NM"}}, sub
     for no, reasons in PENDING.items():

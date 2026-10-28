@@ -262,10 +262,12 @@ async def get_indicators(
                 _leaf("ws_consol_tb", "合并试算平衡表"),
             ],
         })
+    # 「底稿清单」叶子在骨架与全量树里都有：页面版（骨架 + 附注分支）的底稿组只留它（ADR-AQL-16）
+    workpaper_list_leaf = _leaf("workpaper", "底稿清单")
     base_tree.append({
         "key": "workpaper", "label": "📋 底稿", "icon": "📋",
         "domain": "wp",
-        "children": [] if skeleton else await _build_workpaper_tree(db, project_id),
+        "children": [workpaper_list_leaf] if skeleton else [workpaper_list_leaf, *await _build_workpaper_tree(db, project_id)],
         "lazy": skeleton,
     })
     base_tree.append({
@@ -305,7 +307,9 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 #      表里没有的 entry_number，页面版按叶子列发 columns 会 400）；同批任务 22 的试算表重分类列、余额方向列共用 v12
 # v13：树形按项目（任务 19 / 20）——单体项目附注分支按本项目章节（叶子 disclosure_note:八、1 与「附注目录」）、单体隐藏
 #      合并试算平衡表与合并工作底稿组、「科目明细」更名、调整分录叶子 adj_rje、试算组增辅助两叶子、叶子带 supports_conditions
-_INDICATORS_SCHEMA_VERSION = 13
+# v14：底稿组首个叶子「底稿清单」（注册表源 workpaper，骨架里也有）——页面版只加载「骨架 + 附注分支」、底稿组只留它
+#      （ADR-AQL-16，任务 29）；弹窗全量树同样多这一个叶子
+_INDICATORS_SCHEMA_VERSION = 14
 
 
 def _registry_columns(source: str) -> list[str]:
@@ -1238,6 +1242,20 @@ async def list_templates(
         "templates": [_serialize_template(t, current_user.id) for t in templates],
         "total": len(templates),
     }
+
+
+@router.get("/template-share-targets")
+async def template_share_targets(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """「保存为模板」里「指定项目共享」可选的项目（AQ-39）：与保存时逐项目 edit 鉴权同一口径，只列本人能分享到的项目。
+
+    页面版原先取 ``GET /api/projects`` 的 ``can_edit``，该接口从不下发此字段 ⇒ 分享两档恒置灰。
+    """
+    from app.services.custom_query.template_scope_guard import template_share_target_ids
+
+    return {"project_ids": await template_share_target_ids(db, current_user)}
 
 
 @router.post("/templates", status_code=201)

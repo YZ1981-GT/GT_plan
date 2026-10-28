@@ -58,7 +58,6 @@ const CALENDAR_YEAR_EXEMPT: Record<string, { count: number; reason: string }> = 
   'components/ledger-import/ImportTimeline.vue': { count: 1, reason: '导入时间线年度标签' },
   'components/ledger-import/LedgerDataManager.vue': { count: 1, reason: '数据集管理器年度筛选器' },
   'components/report/MultiYearCompare.vue': { count: 2, reason: '多年对比报表年度范围生成（终点=当年）' },
-  'components/template-library/CustomQueryTab.vue': { count: 1, reason: '自定义查询年度下拉默认值' },
   'components/wizard/MaterialityStep.vue': { count: 1, reason: '向导重要性步骤年度初始值' },
   'composables/useProjectSelector.ts': { count: 1, reason: 'yearOptions 年度下拉选项（[cur-2, cur-1, cur, cur+1]）上限' },
   'stores/project.ts': { count: 1, reason: '项目 store 的 yearOptions 年度下拉选项（今年前后 + 有数据的年度）；年度本身初值 null' },

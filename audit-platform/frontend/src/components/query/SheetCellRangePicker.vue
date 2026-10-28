@@ -99,6 +99,9 @@ import { useRangeMemory, clampRange } from '@/composables/useRangeMemory'
 import { ElMessage } from 'element-plus'
 import { buildBusinessPayload, isKnownYear } from '@/components/custom-query/queryPayloads'
 
+/** 没有审计年度时的提示（预览与选区查询都要年度） */
+const YEAR_REQUIRED_REASON = '请先选择审计年度'
+
 const props = defineProps<{
   modelValue: boolean
   wpCode: string
@@ -106,7 +109,8 @@ const props = defineProps<{
   projectId?: string
   /** 跨模块 source（report:type / note:section / adj:type / tb:dim），传入时走模块 cell 路由 */
   moduleSource?: string
-  year?: number
+  /** 审计年度：由父组件（高级查询弹窗）传入；未传时不预览并提示先选年度（选区查询的年度必填，不按日历年推算） */
+  year?: number | null
 }>()
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
@@ -212,7 +216,7 @@ async function loadSheetData() {
       // 年度只用调用方给的项目年度（T16 去掉日历年兜底：猜错年度会读到别年的数据）
       if (!isKnownYear(props.year)) {
         loadStatus.value = 'unavailable'
-        unavailableReason.value = '项目审计年度未知，请先选择年度'
+        unavailableReason.value = YEAR_REQUIRED_REASON
         return
       }
       const data = await api.post('/api/custom-query/execute', buildBusinessPayload({
@@ -261,6 +265,13 @@ async function loadSheetData() {
   // 原有底稿模式
   if (!props.projectId || !props.wpCode) {
     loadStatus.value = 'idle'
+    return
+  }
+  // 选区确认后要按年度取数（查询端点 year 必填）：父组件没给年度时不预览，提示先选年度（任务 28，R10.2）
+  if (!isKnownYear(props.year)) {
+    loadStatus.value = 'unavailable'
+    unavailableReason.value = YEAR_REQUIRED_REASON
+    allSheets.value = []
     return
   }
   loadStatus.value = 'loading'

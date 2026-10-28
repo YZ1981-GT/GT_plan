@@ -9,7 +9,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { normaliseErrorEnvelope } from '@/utils/http'
 import CustomQueryTab from '@/components/template-library/CustomQueryTab.vue'
-import { QUERY_FAILED_FALLBACK } from '@/components/custom-query/queryPayloads'
 
 vi.mock('@/composables/usePermissionMatrix', () => ({
   usePermissionMatrix: () => ({ currentRole: { value: 'manager' } }),
@@ -59,6 +58,9 @@ async function mountAndExecute(rejection: unknown) {
         'el-row': { template: '<div><slot /></div>' },
         'el-col': { template: '<div><slot /></div>' },
         'el-alert': { template: '<div class="el-alert-stub"><slot name="title" /><slot /></div>' },
+        // 结果区的失败提示自 advanced-query-linkage-closure 任务 29 起是共用组件 QueryErrorAlert（弹窗与页面版同一个），
+        // 浅挂载时不桩掉它，才看得到它渲染的原因文字
+        QueryErrorAlert: false,
       },
     },
   }) as unknown as VueWrapper<any>
@@ -98,7 +100,11 @@ describe('业务视图被拒：结果区持久显示中文原因（RV7.5-02）',
   it('识别不出拒绝形状（500）：结果区显示中文兜底，不显示英文', async () => {
     const wrapper = await mountAndExecute(axiosError(500, { code: 500, message: 'Internal Server Error' }))
     const body = wrapper.find('.gt-cqt-result-body').text()
-    expect(body).toContain(QUERY_FAILED_FALLBACK)
+    // 失败文案的单一实现是 queryErrorText.describeQueryError（advanced-query-linkage-closure 任务 27 / 29，R11.1）：
+    // starlette 的英文缺省文案译成中文，与弹窗、构建器同一口径
+    expect(body).toContain('查询失败')
+    expect(body).toContain('服务器内部错误，请稍后重试')
+    expect(body).not.toContain('Internal Server Error')
     expect(body).not.toContain('Request failed')
   })
 })

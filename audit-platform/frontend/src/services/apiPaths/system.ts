@@ -639,9 +639,13 @@ export const acnr = {
 export const customQuery = {
   indicators: '/api/custom-query/indicators',
   execute: '/api/custom-query/execute',
+  /** 业务视图「导出全部」：按当前查询服务端流式导出全量结果（R8.1，advanced-query-linkage-closure 任务 28 / 29） */
+  export: '/api/custom-query/export',
   cellWriteback: '/api/custom-query/cell-writeback',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
+  /** 「保存为模板」里「指定项目共享」可选的项目（与保存时逐项目 edit 鉴权同一口径，AQ-39） */
+  templateShareTargets: '/api/custom-query/template-share-targets',
 } as const
 
 // ─── 高级查询构建器（advanced-query-linkage-closure 任务 30） ───────────────────────

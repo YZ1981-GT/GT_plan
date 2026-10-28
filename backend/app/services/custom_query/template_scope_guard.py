@@ -17,8 +17,11 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
-from app.deps import require_project_access
+from app.deps import PERMISSION_HIERARCHY, require_project_access
+from app.models.base import PermissionLevel, ProjectStatus
+from app.models.core import Project, ProjectUser
 from app.models.custom_query_models import CustomQueryTemplate
 from app.services.custom_query.template_scope_adapter import (
     NormalizedTemplateScope,
@@ -66,6 +69,29 @@ def _normalize_template_scope(
     return normalized
 
 
+#: 达到「edit」的成员级别（与 ``deps.assert_project_permission`` 比的是同一张级别表）
+_SHAREABLE_LEVELS: tuple[PermissionLevel, ...] = tuple(
+    PermissionLevel(name) for name, rank in PERMISSION_HIERARCHY.items() if rank >= PERMISSION_HIERARCHY["edit"]
+)
+
+
+async def template_share_target_ids(db: Any, user: Any) -> list[str]:
+    """本人可作为「指定项目共享」目标的项目（advanced-query-linkage-closure AQ-39，R9.1 页面版与弹窗 💾 三档）。
+
+    与保存 / 更新时对每个分享目标做的 ``require_project_access("edit")``（``deps.assert_project_permission``）同一口径：
+    已归档项目对任何人都不可编辑（423）⇒ 不列；admin 跳过成员判定 ⇒ 其余项目全列；其他身份 = 本项目未删成员行的级别
+    达到 edit（系统角色 partner / manager 不因角色放行，与门禁一致）。已删项目不列（界面项目下拉不含它们，分享给回收站里
+    的项目也没有意义）。返回项目 id 文本，按文本排序；前端据此决定三档是否可选，后端保存时仍逐项目鉴权。
+    """
+    stmt = select(Project.id).where(Project.is_deleted == False, Project.status != ProjectStatus.archived)  # noqa: E712
+    role = getattr(getattr(user, "role", None), "value", None)
+    if role != "admin":
+        stmt = stmt.join(ProjectUser, ProjectUser.project_id == Project.id).where(
+            ProjectUser.user_id == user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+            ProjectUser.permission_level.in_(_SHAREABLE_LEVELS),
+        )
+    return sorted({str(pid) for pid in (await db.execute(stmt)).scalars().all()})
 
 
 def _template_not_visible() -> HTTPException:

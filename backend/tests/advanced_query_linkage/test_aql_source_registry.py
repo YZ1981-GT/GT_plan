@@ -424,9 +424,18 @@ async def test_count_paging_nulls_last_and_warning(ledger_db) -> None:
     ids = [r["id"] for r in (*first.rows, *second.rows, *third.rows)]
     assert len(set(ids)) == 5, "逐页并集 = 全集且互不重叠"
     assert sr.NO_ACTIVE_DATASET_WARNING in first.warnings, "没有生效数据集时 warnings 写明按未删除行返回"
-    assert first.meta == {"ref_context": {"template_type": "soe", "year": 2025}}
+    # column_types：显示列的类型（任务 28 / 29 的金额格式化按它判定；隐藏列不在其中）
+    assert first.meta == {"ref_context": {"template_type": "soe", "year": 2025},
+                          "column_types": {c.key: c.dtype for c in sr.LEDGER_ENTRIES.columns}}
+    assert first.meta["column_types"]["debit_amount"] == "number" and first.meta["column_types"]["summary"] == "text"
     assert [c.key for c in first.columns] == sr.LEDGER_ENTRIES.display_keys
     assert {"id", "entry_seq", "accounting_period", "company_code"} <= set(first.rows[0]), "隐藏列随行返回"
+
+
+async def test_column_types_follow_the_projection(ledger_db) -> None:
+    """只选部分列时 column_types 只含所选列（与 columns 同一份显示列）。"""
+    page = await _page(ledger_db, columns=["account_name", "debit_amount"])
+    assert page.meta["column_types"] == {"account_name": "text", "debit_amount": "number"}
 
 
 async def test_column_projection_keeps_hidden_keys(ledger_db) -> None:

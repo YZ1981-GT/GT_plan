@@ -143,11 +143,16 @@ class TestIndicatorsSkeleton:
 
     @pytest.mark.asyncio
     async def test_lazy_branches_marked_and_emptied(self, stub_trees):
-        """重分支在骨架中 children 为空且标 lazy=True。"""
+        """重分支在骨架中不带懒加载内容且标 lazy=True。
+
+        底稿组例外地带一个「底稿清单」叶子（注册表源 workpaper，advanced-query-linkage-closure 任务 29 / ADR-AQL-16：
+        页面版只加载「骨架 + 附注分支」，底稿组只留它）；逐底稿 / 逐 sheet 的子树仍按需加载。
+        """
         skeleton = {n["key"]: n for n in await _indicators(depth=1)}
         for key in LAZY_INDICATOR_BRANCHES:
             assert key in skeleton, f"骨架缺大类 {key}"
-            assert skeleton[key]["children"] == []
+            kept = ["workpaper"] if key == "workpaper" else []
+            assert [child["key"] for child in skeleton[key]["children"]] == kept
             assert skeleton[key]["lazy"] is True
 
     @pytest.mark.asyncio
