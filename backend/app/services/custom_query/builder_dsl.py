@@ -459,12 +459,16 @@ def _excel_cell_value(v: Any) -> Any:
 
     openpyxl 不支持 timezone-aware datetime（会抛 TypeError），
     PG ``timestamptz`` 字段会带 tzinfo，必须显式 strip。
+    枚举先取 ``.value``（与 ``export_service._excel_cell_value`` 同步：``(str, Enum)`` 成员否则会被写成「类名.成员」）。
     """
     from datetime import date, datetime
     from decimal import Decimal
+    from enum import Enum
     from uuid import UUID
     if v is None:
         return None
+    if isinstance(v, Enum):
+        return v.value
     if isinstance(v, Decimal):
         return float(v)
     if isinstance(v, datetime):

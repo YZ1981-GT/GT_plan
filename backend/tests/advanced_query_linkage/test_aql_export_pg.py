@@ -9,6 +9,7 @@
 - 分组 400 ``EXPORT_GROUPING_UNSUPPORTED``、未登记筛选键 400（与 execute 同一校验）：都在取名额之前。
 - 回滚事务给【UAT】子公司A 造摘要以 ``= + - @`` 开头的序时账行：导出读回都是文本单元格，数值 −1 仍是数值（变异 #18）。
 - 构建器导出同月：行数 = COUNT（不再受 1,000 行限制）、表头 = 传入的中文、sheet 名为表名。
+- 构建器导出华氏调整分录：表名「调整分录（AJE/RJE）」含 '/'，sheet 名清洗为全角「／」、200、行数 = COUNT（B7 评审 B7-R1）。
 评估批 5 的「和平药房序时账可完整导出 1,147,414 行」按 ADR-AQL-14 / R8.2 调整为「按月完整导出 + 全年超限 400」（W11）。
 """
 from __future__ import annotations
@@ -28,7 +29,7 @@ import app.core.redis as core_redis
 from app.models.audit_platform_models import TbLedger
 from app.services.audit_logger_enhanced import AUDIT_LOG_QUEUE_KEY
 from app.services.custom_query import audit_helper, export_gate, paged_fetch
-from tests.advanced_query_linkage.gold import AUDIT_YEAR, HP, UA, active_sql
+from tests.advanced_query_linkage.gold import AUDIT_YEAR, HP, HS, UA, active_sql
 
 pytestmark = pytest.mark.pg_only
 
@@ -190,3 +191,25 @@ async def test_builder_month_export_rows_equal_count(builder, gold):
     assert header == [headers[f] for f in fields]
     assert sheets == ["序时账（总账明细）", "查询说明"]
     assert notes["行数"] == expected and str(HP) in notes["项目"]
+
+
+async def test_builder_adjustments_export_has_a_valid_sheet_title(builder, gold):
+    """改前 openpyxl ``create_sheet("调整分录（AJE/RJE）")`` 抛 ValueError，构建器导出调整分录恒 500（B7 评审 B7-R1）；
+    枚举列写枚举值（金标准 ``::text``），不是「AdjustmentType.aje」（B7 复测发现）。"""
+    fields = ["adjustment_no", "adjustment_type", "review_status", "account_code"]
+    expected = sorted(tuple(r) for r in await gold.rows(
+        "SELECT adjustment_no, adjustment_type::text, review_status::text, account_code FROM adjustments "
+        "WHERE project_id = :pid AND year = :year AND NOT is_deleted", pid=HS, year=AUDIT_YEAR))
+    assert expected, "前置：华氏 2025 有调整分录（没有就换一个有调整分录的项目年度）"
+    response = await builder.request(builder.admin, "POST", "/export-excel", {
+        "table": "adjustments", "fields": fields, "project_id": str(HS), "year": AUDIT_YEAR, "limit": 100})
+    assert response.status_code == 200, response.text[:800]
+    sheets, header, count, notes = _read(response.content)
+    assert sheets == ["调整分录（AJE／RJE）", "查询说明"]
+    assert header == fields and count == len(expected) and notes["行数"] == len(expected) and str(HS) in notes["项目"]
+    wb = load_workbook(io.BytesIO(response.content), read_only=True)
+    try:
+        exported = sorted(tuple(r) for r in list(wb.worksheets[0].iter_rows(values_only=True))[1:])
+    finally:
+        wb.close()
+    assert exported == expected

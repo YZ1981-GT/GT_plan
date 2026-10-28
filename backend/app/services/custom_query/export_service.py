@@ -53,10 +53,12 @@ import asyncio
 import io
 import logging
 import os
+import re
 import tempfile
 from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import date, datetime
 from decimal import Decimal
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 from uuid import UUID
@@ -102,6 +104,21 @@ DATA_SHEET_TITLE = "高级查询结果"
 INFO_SHEET_TITLE = "查询说明"
 #: 以这些字符开头的文本在 Excel 里可能被当成公式（公式注入，R8.5）：一律按文本写入
 FORMULA_PREFIXES = ("=", "+", "-", "@")
+#: Excel sheet 名不允许的字符 → 同形的全角字符（openpyxl ``create_sheet`` 遇到前者即抛 ValueError）；sheet 名最长 31 个字符
+_SHEET_TITLE_CHARS = str.maketrans({"\\": "＼", "/": "／", "*": "＊", "?": "？", ":": "：", "[": "［", "]": "］"})
+_SHEET_TITLE_EDGES = re.compile(r"^[\s']+|[\s']+$")
+SHEET_TITLE_MAX = 31
+
+
+def safe_sheet_title(title: Any, fallback: str = DATA_SHEET_TITLE) -> str:
+    """把任意文字变成合法的 sheet 名（advanced-query-linkage-closure R8.1；B7 评审 B7-R1）。
+
+    构建器导出用白名单表名作 sheet 名，「调整分录（AJE/RJE）」含 ``/``：不清洗时 ``create_sheet`` 抛 ValueError、导出恒 500。
+    ``\\ / * ? : [ ]`` 换成全角同形字符，去掉首尾空白与单引号（Excel 不许 sheet 名以单引号开头或结尾），截到 31 个字符；
+    清洗后为空用 ``fallback``。
+    """
+    text = _SHEET_TITLE_EDGES.sub("", str(title or "").translate(_SHEET_TITLE_CHARS))
+    return _SHEET_TITLE_EDGES.sub("", text[:SHEET_TITLE_MAX]) or fallback
 
 
 def _formula_like(value: Any) -> bool:
@@ -129,9 +146,14 @@ def _excel_cell_value(v: Any) -> Any:
 
     镜像自 ``query_builder._excel_cell_value``。openpyxl 不支持 timezone-aware
     datetime（会抛 TypeError），PG ``timestamptz`` 字段带 tzinfo，必须显式 strip。
+
+    枚举一律取 ``.value``，且先于其余判定：构建器按 ORM 列取数，``sa.Enum`` 列返回枚举成员；``(str, Enum)`` 成员是 str 的
+    子类，原样交给 openpyxl 会被写成「AdjustmentType.aje」（界面显示的是 aje，B7 复测发现）。
     """
     if v is None:
         return None
+    if isinstance(v, Enum):
+        return v.value
     if isinstance(v, bool):  # bool 是 int 子类，需先于 Decimal/number 判定保留原值
         return v
     if isinstance(v, Decimal):
@@ -311,6 +333,7 @@ class ExportService:
         advanced-query-linkage-closure R8.1）；可为接收**实际写入行数**的函数，说明里的行数就与文件里的数据行一致；
         ``sheet_title``：数据 sheet 名（缺省「高级查询结果」，构建器用表名）。
         ``extra_sheets``：查询说明之后再追加的工作表 ``(名称, 行列表)``（构建器 acnr_targets 的「单元格取值」）。
+        sheet 名都经 :func:`safe_sheet_title` 清洗（表名可含 ``/`` 等 Excel 不允许的字符）。
         表头、数据与查询说明里以 ``= + - @`` 开头的文本一律按文本写入（R8.5）。
 
         流程（R8.1/R8.2/R8.3/R8.4/R8.6/R7.7）：
@@ -351,7 +374,7 @@ class ExportService:
             )
 
         wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title=(sheet_title or DATA_SHEET_TITLE)[:31])
+        ws = wb.create_sheet(title=safe_sheet_title(sheet_title))
 
         # ── step2–4: 构建并落临时文件（首字节 yield 之前完成，中途错误在此 raise）──
         # 任一步失败（容量守卫 / 行迭代 / 硬上限 / 落盘）都在产出任何字节前发生，直接
@@ -412,7 +435,7 @@ class ExportService:
                 if items:
                     _append_info_sheet(wb, list(items))
             for title, table_rows in extra_sheets:
-                extra = wb.create_sheet(title=str(title)[:31])
+                extra = wb.create_sheet(title=safe_sheet_title(title))
                 for values in table_rows:
                     extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
 
