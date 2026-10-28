@@ -108,6 +108,7 @@ def _query_models_are_strict() -> bool:
 
 _QB_REL = "backend/app/routers/query_builder.py"
 _ORCH_REL = _CQ + "cross_sheet_trace_orchestrator.py"
+_V2C_REL = _A + "v2_canonical.py"
 
 
 def _imported_names(rel: str, module_tail: str) -> list[str]:
@@ -277,18 +278,19 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "L3 运行时条目": CB(
             _A + "runtime.py", ("get_runtime_entries",), _T + "test_runtime.py",
             calls(_RESOLVER_REL, "full_resolve", "get_runtime_entries")),
-        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线与跨 sheet 追溯编排器调用它，V2 / CCR 尚未调用）": CB(
+        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线、跨 sheet 追溯编排器与 V2 依赖图节点规范身份调用它，CCR 尚未调用）": CB(
             _A + "exact_identity.py", ("sheet_of", "cell_of", "name_owner"), _T + "test_exact_identity.py",
             claim("exact_identity 只导入标准库与本包 reasons / catalog_contract / catalog、不做文件或数据库读写（AST）",
                   _exact_identity_is_pure),
-            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、wp_cell_target 与"
-                  "跨 sheet 追溯编排器（AST）", _exact_identity_only_release_imports),
+            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release、v2_canonical、"
+                  "wp_cell_target 与跨 sheet 追溯编排器（AST）", _exact_identity_only_release_imports),
             calls(_ORCH_REL, "_identity", "cell_of"),
+            calls(_V2C_REL, "canonical_node", "sheet_of", "cell_of"),
             claim("full_resolve 第 1 步经 step1_identity → catalog 结构化判定 → sheet_of，catalog 无子串启发式（AST）",
                   _full_resolve_step1_uses_exact_identity),
             calls(_A + "wp_cell_target.py", "sheet_key_for", "sheet_of"),
             calls(_A + "wp_cell_target.py", "read_formula_cell", "sheet_of"),
-            task_open("T21", "T22")),
+            task_open("T22")),
         "底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它）": CB(
             "backend/app/services/wp_cell_reader.py", ("resolve_wp_cell", "WpCellRead"),
             "backend/tests/test_wp_cell_reader_contract.py",
@@ -363,6 +365,31 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             has_tests(_T + "test_cross_sheet_identity_paths.py",
                       "test_every_production_construction_passes_resolve_identity_false",
                       "test_sync_bridge_only_referenced_inside_guarded_helper")),
+        "V2 依赖图节点规范身份与 stale 起点身份（V2 `/resolve`、`/anchors`、`/stale-impact`、`/dependencies` 的节点与边端点追加 addr_id、sheet_addr_id、unresolved_code、unresolved_reason，经唯一精确身份判定取得，addr_id 与中文原因恰有其一；`/resolve` 的包含匹配只作候选；stale 写入口与图中底稿键共用同一身份函数，身份算不出不写 stale 并返回原因）": CB(
+            _V2C_REL, ("canonical_node", "canonical_uri", "canonical_addr", "annotate"),
+            _T + "test_v2_canonical_reconcile.py",
+            calls(_V2C_REL, "canonical_node", "sheet_of", "cell_of"),
+            calls(_V2_REL, "resolve_address", "annotate"), calls(_V2_REL, "list_anchors", "annotate"),
+            calls(_V2_REL, "stale_impact", "annotate", "canonical_node", "non_workpaper_node"),
+            calls(_V2_REL, "get_dependencies", "_end_identity", "canonical_node"),
+            calls(_V2_REL, "_end_identity", "annotate", "non_workpaper_node"),
+            calls(_STALE_REL, "_identity_of", "canonical_uri", "canonical_addr"),
+            calls(_STALE_REL, "_ensure_identity_index", "_identity_of"),
+            calls(_STALE_REL, "_start_keys", "_identity_of", "_ensure_identity_index"),
+            calls(_STALE_REL, "on_change", "_start_keys", "_unresolved_response"),
+            calls(_STALE_REL, "preview_impact", "_start_keys", "_unresolved_response"),
+            not_imports(_STALE_REL, "linkage_graph_builder"),
+            not_calls(_STALE_REL, "_normalize_wp_uri_to_addr_id"),
+            has_tests(_T + "test_v2_canonical_reconcile.py",
+                      "test_canonical_node_classes_have_exactly_one_and_chinese_reason",
+                      "test_every_graph_wp_key_classified_with_reason", "test_anchors_nodes",
+                      "test_endpoint_addr_ids_round_trip_non_vacuous", "test_stale_impact_and_dependencies_nodes",
+                      "test_resolve_contains_is_candidate_not_matched", "test_collision_sample_starts_only_from_itself",
+                      "test_real_collision_groups_start_only_from_same_sheet",
+                      "test_multi_writing_same_identity_merged",
+                      "test_contains_only_input_not_written_and_returns_reason",
+                      "test_editor_save_inputs_new_rule_covers_old_correct_hits",
+                      "test_write_path_does_not_use_regex_normalizer")),
         "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
             _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
             calls(_RESOLVER_REL, "full_resolve", "step1_identity"),
@@ -442,7 +469,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置": L("T21、T22"),
+        "V2 双读对账产物、CCR 不可解析源处置": L("T22"),
         "消费方台账与绕过棘轮、四个 ACNR CI 作业转绿": L("T24"),
         "版本锁 / acnr_targets / 拒绝计入 ACNR 指标": L("T26"),
         "统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示": L("T29、T30、T31"),
@@ -468,9 +495,14 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点（基线待 T24 冻结）": P(V1_BYPASS, task_open("T24")),
         "**V2**（`routers/address_registry_v2.py` 与 stale 传播引擎）：依赖图与 stale 标记": P(
             exists(_V2_REL), defines(_STALE_REL, "StalePropagationEngine")),
-        "节点身份仍由旧正则从路径猜编码，规范化见上表 T21": P(
-            task_open("T21"), in_planned("T21"), absent(_A + "v2_canonical.py"),
-            not_imports(_V2_REL, "exact_identity"), not_imports(_STALE_REL, "exact_identity")),
+        "读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份（见组件表），双读对账产物与 CCR 处置见上表 T22": P(
+            exists(_V2C_REL), calls(_V2_REL, "resolve_address", "annotate"),
+            calls(_V2_REL, "get_dependencies", "_end_identity", "canonical_node"),
+            calls(_STALE_REL, "_start_keys", "_identity_of"),
+            calls(_STALE_REL, "_identity_of", "canonical_uri", "canonical_addr"),
+            not_imports(_STALE_REL, "linkage_graph_builder"),
+            task_open("T22"), in_planned("T22"), absent("backend/scripts/acnr/reconcile_v2_canonical.py"),
+            absent("backend/data/acnr/v2_canonical_reconcile.json")),
         "写 stale 的端点已加项目鉴权（见组件表）": P(
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz)),
         "**legacy 导航门面**（`wp_index_resolve` 等）：已转发 ACNR，`resolve_instance` 按 `wp_index.wp_code` 绑定项目已有底稿": P(

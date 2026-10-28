@@ -8,7 +8,7 @@ r"""T32 守卫：架构提案「现状（2026-10-26）」节逐项复算（desig
 2. 「已落地：组件」表：后端行用 AST 确认模块里定义了所列符号、测试文件里有 test_ 函数；
    前端行确认文件存在（TS 符号由 vitest 守卫 acnrArchitectureStatusDoc.spec.ts 用编译器 API 核对）。
 3. 「计划中（未落地）」表：每行至少一个任务号，且这些任务在 tasks.md 里仍是 `[ ]`。
-4. 节内任何一行（含表格单元格与组件描述）提到登记的「计划中符号」（如 lock_project_registry、v2_canonical、
+4. 节内任何一行（含表格单元格与组件描述）提到登记的「计划中符号」（如 lock_project_registry、reconcile_v2_canonical、
    `--check`）时，若该符号在代码里还不存在，同一行必须带一个仍未勾选的任务号——把未落地写成现状即红。
 5. 版本格式与 catalog_contract.REGISTRY_VERSION_PATTERN 逐字一致；旧 YYYY.N.N 只能以勘误出现。
 6. resolver 的模块与函数文档定位为「canonical resolver + legacy 委托」，不得再称「唯一解析入口 / 方法」
@@ -58,7 +58,6 @@ H_PLANNED = "### 计划中（未落地）"
 _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "lock_project_registry": ("T17", ("py_ident", "lock_project_registry")),
     "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
-    "v2_canonical": ("T21", ("file", "backend/app/services/acnr/v2_canonical.py")),
     "display.py": ("T29", ("file", "backend/app/services/acnr/display.py")),
     "AcnrCandidatesHint": ("T31", ("file", "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue")),
     "reconcile_v2_canonical": ("T22", ("file", "backend/scripts/acnr/reconcile_v2_canonical.py")),

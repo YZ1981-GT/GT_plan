@@ -6,7 +6,12 @@
 - GET /api/address-registry/v2/resolve?wp_code=...&sheet=...&cell_desc=...   语义→物理
 - GET /api/address-registry/v2/stale-impact?wp_code=...&sheet=...&cell=...   单元格变更影响范围（BFS下游）
 - GET /api/address-registry/v2/dependencies?wp_code=...                       底稿的全部依赖
-- POST /api/address-registry/v2/notify-cell-change                            通知单元格变更（触发 stale）
+- POST /api/address-registry/v2/notify-cell-change                            已停用（410）
+
+规范身份（spec acnr-foundation-defect-closure T21 / 需求 9.1~9.2）：四个读端点（/resolve、/anchors、
+/stale-impact、/dependencies）的每个节点与边两端追加 addr_id / sheet_addr_id / unresolved_code /
+unresolved_reason（经 ``acnr.v2_canonical``，addr_id 与 unresolved_reason 恰有其一，只增）；/resolve 的
+包含匹配只作候选（matched=false、candidate=true、match_kind="contains"）。
 - GET /api/address-registry/v2/anchors?wp_code=...&sheet=...                  查询某 sheet 的语义锚点
 - GET /api/address-registry/v2/stats                                          全局统计
 
@@ -21,6 +26,7 @@ import json
 from typing import Any, Optional
 
 from app.deps import get_current_user
+from app.services.acnr import v2_canonical
 
 router = APIRouter(prefix="/api/address-registry/v2", tags=["地址坐标-变更影响分析(V2/linkage)"])
 
@@ -43,6 +49,24 @@ def _load() -> tuple[dict, dict, dict, dict]:
     if _CWR_CACHE is None:
         _CWR_CACHE = json.loads((base / "cross_wp_references.json").read_bytes())
     return _L2_CACHE, _RESOLVED_CACHE, _DEPS_CACHE, _CWR_CACHE
+
+
+def _ref_end(end: dict) -> dict:
+    """resolved ref 的一端 → 响应里的端点 dict（旧字段）。"""
+    return {
+        "wp_code": end.get("wp_code"),
+        "sheet": end.get("sheet"),
+        "cell": end.get("cell"),
+        "match_type": end.get("match_type"),
+    }
+
+
+def _end_identity(body: dict, end: dict) -> dict:
+    """边端点追加规范字段：底稿端点经 v2_canonical，附注 / 报表端点给非底稿原因（T21 / 需求 9.1）。"""
+    if end.get("wp_code"):
+        return v2_canonical.annotate(body, end.get("wp_code"), end.get("sheet"), end.get("cell"))
+    body.update(v2_canonical.non_workpaper_node(end.get("target_module")).response_fields())
+    return body
 
 
 @router.get("/stats")
@@ -70,38 +94,55 @@ async def resolve_address(
     cell_desc: str = Query("", description="单元格描述（如'销售费用折旧'或'E10'）"),
     user=Depends(get_current_user),
 ) -> dict:
-    """语义描述 → 物理坐标"""
+    """语义描述 → 物理坐标。
+
+    T21 / 需求 9.2：先找精确命中（sheet 相等或未给、描述相等），返回 ``matched=true``、``match_kind="exact"``；
+    只有包含匹配（sheet 或描述互相包含）时返回 ``matched=false``、``candidate=true``、``match_kind="contains"``。
+    每个结果都带规范字段 addr_id / sheet_addr_id / unresolved_code / unresolved_reason（只增）。
+    """
     l2, resolved, _, _ = _load()
     if wp_code not in l2:
         raise HTTPException(404, f"wp_code {wp_code} not found in registry")
 
+    def _hit(exact: bool, body: dict) -> dict:
+        body.update({"matched": exact, "match_kind": "exact" if exact else "contains"})
+        if not exact:
+            body["candidate"] = True
+        return v2_canonical.annotate(body, wp_code, body.get("sheet"), body.get("cell"))
+
+    candidate: dict | None = None
     # 在 resolved 中查找已解析项（命中 cwr）
     for r in resolved.get("resolved", []):
         src = r.get("source", {})
-        if (src.get("wp_code") == wp_code
-                and (not sheet or sheet in src.get("sheet", "") or src.get("sheet", "") in sheet)
-                and (not cell_desc or cell_desc == src.get("description_cell", ""))):
-            return {
-                "matched": True,
-                "wp_code": wp_code,
-                "file": src.get("file"),
-                "sheet": src.get("sheet"),
-                "cell": src.get("cell"),
-                "matched_anchor": src.get("matched_anchor"),
-                "match_type": src.get("match_type"),
-                "ref_id": r.get("ref_id"),
-            }
+        src_sheet = src.get("sheet", "") or ""
+        if src.get("wp_code") != wp_code or (cell_desc and cell_desc != src.get("description_cell", "")):
+            continue
+        sheet_exact = not sheet or sheet == src_sheet
+        if not sheet_exact and not (sheet in src_sheet or src_sheet in sheet):
+            continue
+        body = {
+            "wp_code": wp_code,
+            "file": src.get("file"),
+            "sheet": src.get("sheet"),
+            "cell": src.get("cell"),
+            "matched_anchor": src.get("matched_anchor"),
+            "match_type": src.get("match_type"),
+            "ref_id": r.get("ref_id"),
+        }
+        if sheet_exact:
+            return _hit(True, body)
+        candidate = candidate or body
 
     # 兜底：直接在 L2 中查找
     files = l2.get(wp_code, {})
     for fname, sheets in files.items():
         for sn, sd in sheets.items():
-            if sheet and sheet not in sn and sn not in sheet:
+            sheet_exact = not sheet or sheet == sn
+            if not sheet_exact and sheet not in sn and sn not in sheet:
                 continue
             anchors = sd.get("anchors", {})
             if cell_desc in anchors:
-                return {
-                    "matched": True,
+                body = {
                     "wp_code": wp_code,
                     "file": fname,
                     "sheet": sn,
@@ -109,11 +150,14 @@ async def resolve_address(
                     "matched_anchor": cell_desc,
                     "match_type": "direct_l2_lookup",
                 }
-            # 包含匹配
+                if sheet_exact:
+                    return _hit(True, body)
+                candidate = candidate or body
+                continue
+            # 包含匹配：只作候选
             for anc, c in anchors.items():
-                if cell_desc and (cell_desc in anc or anc in cell_desc):
-                    return {
-                        "matched": True,
+                if cell_desc and (cell_desc in anc or anc in cell_desc) and candidate is None:
+                    candidate = {
                         "wp_code": wp_code,
                         "file": fname,
                         "sheet": sn,
@@ -121,7 +165,10 @@ async def resolve_address(
                         "matched_anchor": anc,
                         "match_type": "contains_l2_lookup",
                     }
+                    break
 
+    if candidate is not None:
+        return _hit(False, candidate)
     return {"matched": False, "wp_code": wp_code, "sheet_hint": sheet, "cell_desc": cell_desc}
 
 
@@ -143,12 +190,12 @@ async def list_anchors(
                 continue
             anchors = sd.get("anchors", {})
             for anchor, cell in anchors.items():
-                result.append({
+                result.append(v2_canonical.annotate({
                     "file": fname,
                     "sheet": sn,
                     "anchor": anchor,
                     "cell": cell,
-                })
+                }, wp_code, sn, cell))
 
     return {"wp_code": wp_code, "anchors": result, "total": len(result)}
 
@@ -191,7 +238,7 @@ async def stale_impact(
 
             for t in r.get("targets", []):
                 if "wp_code" in t and t.get("match_type") not in ("module", "unmatched"):
-                    tgt = {
+                    tgt = v2_canonical.annotate({
                         "wp_code": t["wp_code"],
                         "file": t.get("file"),
                         "sheet": t.get("sheet"),
@@ -202,7 +249,7 @@ async def stale_impact(
                         "description": r.get("description"),
                         "severity": r.get("severity"),
                         "match_type": t.get("match_type"),
-                    }
+                    }, t["wp_code"], t.get("sheet"), t.get("cell"))
                     affected.append(tgt)
                     queue.append((t["wp_code"], t.get("sheet", ""), t.get("cell", ""), depth + 1, r.get("ref_id", "")))
                 elif "target_module" in t:
@@ -215,6 +262,7 @@ async def stale_impact(
                         "via_ref": r.get("ref_id"),
                         "description": r.get("description"),
                         "severity": r.get("severity"),
+                        **v2_canonical.non_workpaper_node(t["target_module"]).response_fields(),
                     })
 
         # 2) 通过 L3 跨工作表公式依赖
@@ -225,7 +273,7 @@ async def stale_impact(
                 continue
             if cur_cell and d.get("source_cell") != cur_cell:
                 continue
-            affected.append({
+            affected.append(v2_canonical.annotate({
                 "wp_code": cur_wp,  # 同底稿内跨 sheet
                 "sheet": d.get("target_sheet"),
                 "cell": d.get("target_cell"),
@@ -233,9 +281,10 @@ async def stale_impact(
                 "via_formula": d.get("formula"),
                 "description": "跨工作表公式引用",
                 "match_type": "formula_dep",
-            })
+            }, cur_wp, d.get("target_sheet"), d.get("target_cell")))
 
     return {
+        "source": v2_canonical.canonical_node(wp_code, sheet, cell).response_fields(),
         "wp_code": wp_code,
         "sheet": sheet,
         "cell": cell,
@@ -264,12 +313,13 @@ async def get_dependencies(
                     "ref_id": r.get("ref_id"),
                     "description": r.get("description"),
                     "severity": r.get("severity"),
-                    "target": {
+                    "target": _end_identity({
                         "wp_code": t.get("wp_code") or t.get("target_module"),
                         "sheet": t.get("sheet"),
                         "cell": t.get("cell"),
                         "match_type": t.get("match_type"),
-                    },
+                    }, t),
+                    "source": _end_identity(_ref_end(src), src),
                 })
         for t in r.get("targets", []):
             if t.get("wp_code") == wp_code:
@@ -277,18 +327,20 @@ async def get_dependencies(
                     "ref_id": r.get("ref_id"),
                     "description": r.get("description"),
                     "severity": r.get("severity"),
-                    "source": {
-                        "wp_code": src.get("wp_code"),
-                        "sheet": src.get("sheet"),
-                        "cell": src.get("cell"),
-                        "match_type": src.get("match_type"),
-                    },
+                    "source": _end_identity(_ref_end(src), src),
+                    "target": _end_identity(_ref_end(t), t),
                 })
 
     formula_deps = [
-        d for d in deps.get("dependencies", [])
-        if d.get("source_wp") == wp_code
-    ][:50]
+        {
+            **d,
+            "source_identity": v2_canonical.canonical_node(
+                d.get("source_wp"), d.get("source_sheet"), d.get("source_cell")).response_fields(),
+            "target_identity": v2_canonical.canonical_node(
+                d.get("source_wp"), d.get("target_sheet"), d.get("target_cell")).response_fields(),
+        }
+        for d in [x for x in deps.get("dependencies", []) if x.get("source_wp") == wp_code][:50]
+    ]
 
     return {
         "wp_code": wp_code,

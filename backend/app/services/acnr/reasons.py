@@ -3,7 +3,8 @@
 目标：`exact_identity`、`wp_cell_target`、acnr_targets 编排、V2 规范化、stale 引擎、
 CCR 检查器都从这里取中文原因，避免各处散落、口径漂移。现状（段四审计 F4-13 更正）：
 `exact_identity`、`resolve_identity`（停用条目原因，T10）与 `wp_cell_target`（取值原因细化与借名，T12）使用；
-其余随 T14 / T21 / T22 接入。
+acnr_targets 取值编排 `acnr_target_values`（拒绝分类，T14）使用 `TARGET_REJECT_REASONS`；`v2_canonical`
+（V2 节点与 stale 入口，T21）使用 `NODE_UNRESOLVED_REASONS`；CCR 检查器随 T22 接入。
 
 只依赖标准库（供 `check_ccr_resolve` 等仅标准库的脚本复用，CI 无需新增依赖）。
 
@@ -84,6 +85,8 @@ NODE_UNRESOLVED_REASONS: dict[str, str] = {
     "sheet_not_in_catalog": "该表不在地址目录中",
     "wp_not_in_catalog": "该底稿不在地址目录中",
     "not_wellformed": "引用形态不符合「底稿:表:末段」规范",
+    # T21 补充（design §10.2 表外）：V2 读端点里的附注 / 报表目标节点
+    "not_workpaper_node": "该节点不是底稿单元格，地址库不为其分配底稿地址",
 }
 
 

@@ -53,6 +53,10 @@ _SHEET_CODE_PATTERN = re.compile(r"([A-Z]\d+(?:-\d+)?[A-Z]?)")
 def _normalize_wp_uri_to_addr_id(uri: str) -> str:
     """将 WP:{wp_code}:{sheet_display}:{cell} 归一化为 addr_id。
 
+    只供图构建（只读产物）使用：stale 写路径不再调用本函数（acnr-foundation-defect-closure T21 / 需求 9.3），
+    写入口与图键身份统一经 ``app.services.acnr.v2_canonical``；本函数用正则从显示名猜 sheet_code，结果
+    不是可信身份，stale 引擎对这类 addr_id 形态的图键只按字面命中。只读调用方迁到 v2_canonical 见 design §16 Q6。
+
     - WP 域（良构 4 段）: "WP:D2:明细表D2-2:E100" → "D2/D2-2/E100"
     - WP 域（custom/docx，空 sheet 段 + 非空 suffix）:
       "WP:A10-1::docx:上市实体" → "A10-1/A10-1/docx:上市实体"
