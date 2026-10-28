@@ -863,7 +863,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-28T07:51:53.372925+00:00",
+  "generated_at": "2026-10-28T13:05:08.482784+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -1683,9 +1683,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261028075152",
+  "registry_version": "20261028130507",
   "release": {
-    "catalog_sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755",
+    "catalog_sha256": "7d8477ceeec4a997bde230787f5240af1cf8c6c74d5d81aaa84b402f5cbd18bd",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -1764,8 +1764,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261027161822.json",
-        "sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7"
+        "path": "backend/data/acnr/catalog_snapshots/20261028075152.json",
+        "sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -1889,13 +1889,13 @@
       },
       {
         "path": "backend/data/wp_account_mapping.json",
-        "sha256": "082b8a081990db1618e28abdaa2059460d16d293283cccb6e90d7856af5acfa3"
+        "sha256": "74c881dccc7799f8b27e4bf8e7591e01704e3ff9810c72a0c65585307261e620"
       }
     ],
-    "inputs_fingerprint": "e381469a11a6c66014f43b7672fc875d66b7b12e58ca34918e860548e40de3b0",
-    "previous_catalog_sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7",
-    "previous_version": "20261027161822",
-    "registry_version": "20261028075152",
+    "inputs_fingerprint": "9c7456adf272810dc6964a32cd04070b9589be508209a568f2e63e18c807ae81",
+    "previous_catalog_sha256": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755",
+    "previous_version": "20261028075152",
+    "registry_version": "20261028130507",
     "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
   },
   "summary": {
