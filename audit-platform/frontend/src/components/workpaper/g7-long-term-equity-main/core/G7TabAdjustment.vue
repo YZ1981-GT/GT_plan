@@ -354,6 +354,7 @@ import type { G7MainImportableSheet } from '../../composables/useG7ImportExport'
 import { api } from '@/services/apiProxy'
 import { adjustments as adjustmentPaths } from '@/services/apiPaths/accounting'
 import { eventBus } from '@/utils/eventBus'
+import { clonePlain } from '@/utils/cloneable'
 import {
   G7_ADJUSTMENT_PUSHED_EVENT,
   adoptAllSuggestedDrafts,
@@ -708,7 +709,7 @@ async function persistAdjudicationWriteback(
   try {
     data = JSON.parse(stored?.remark || '')
   } catch {
-    data = structuredClone(props.htmlData?.adjudication || { groups: [] })
+    data = clonePlain(props.htmlData?.adjudication || { groups: [] }) // htmlData 可能是响应式：裸 structuredClone 抛 DataCloneError
   }
   const byInvesteeGross = aggregateByInvestee(entries.value, accountGross.value, tbSourceCodes.value)
   const byInvesteeImpair = aggregateByInvestee(entries.value, accountImpairment.value, tbSourceCodes.value)

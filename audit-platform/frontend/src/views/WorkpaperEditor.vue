@@ -76,6 +76,7 @@
         v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
         :audit-year="projectYear"
+        :readonly="editLock.forcedReadonly.value || isArchived"
         :initial-sheet="initialSheetFromQuery"
         @save-success="onChildSaved"
         @saved-notify="onChildSaved"
@@ -470,7 +471,7 @@ import { useShellCapability } from './workpaper-editor/useShellCapability'
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
 const router = useRouter()
-const { canEdit } = useAuditContext()
+const { canEdit, isArchived } = useAuditContext()
 
 // ─── 全局复核对话 provider（驱动右侧面板 + GtWpReviewRail + 子组件 inject） ──
 const { isOpen: reviewPanelOpen, activationParams: reviewActivation, openReviewDialog: openReview, closeReviewDialog: closeReview } = useReviewDialogProvider()
@@ -687,8 +688,7 @@ const editLock = useEditingLock({
   enabled: canEdit, // 只读身份不取锁（取锁被拒会留拒绝记录、还可能把要编辑的人挤成只读，R2）
 })
 
-// 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
-// spec: multi-window-ledger-workbench Phase 3 Task 18
+// 多窗口门禁（spec: multi-window-ledger-workbench Phase 3 Task 18）：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
 const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
 
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────

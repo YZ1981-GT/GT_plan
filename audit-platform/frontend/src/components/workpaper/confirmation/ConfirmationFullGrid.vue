@@ -86,9 +86,10 @@
                 @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               />
               <!-- Boolean -->
+              <!-- 是否类列按三态归一后勾选：明细面板写的 '是' / '否' 原先都显示成未勾（需求 1.6） -->
               <el-checkbox
                 v-else-if="col.kind === 'bool'"
-                :model-value="(row as any)[col.key]"
+                :model-value="normalizeReplyFlag((row as any)[col.key]) === true"
                 @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               />
               <!-- Date -->
@@ -122,6 +123,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { ConfirmationRow } from './confirmationTypes'
+import { normalizeReplyFlag } from './replyStatus'
 import {
   resolveConfirmationColumns,
   COLUMN_GROUP_LABELS,
@@ -264,7 +266,10 @@ function formatCell(row: ConfirmationRow, col: ColumnDef): string {
   if (col.kind === 'amount' || col.kind === 'number') {
     return typeof val === 'number' ? val.toLocaleString() : String(val)
   }
-  if (col.kind === 'bool') return val ? '是' : '否'
+  if (col.kind === 'bool') {
+    const flag = normalizeReplyFlag(val)
+    return flag === undefined ? '' : flag ? '是' : '否'
+  }
   if (col.kind === 'select' && col.key !== 'match_status') return CONSISTENCY_LABEL[val] ?? String(val)
   return String(val)
 }

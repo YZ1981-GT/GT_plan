@@ -42,7 +42,7 @@
             :model-value="row.entity_name"
             size="small"
             :placeholder="labelsResolved.entityPlaceholder"
-            @change="(val: string) => $emit('update-field', row._company_id, 'entity_name', val)"
+            @update:model-value="(val: string) => $emit('update-field', row._company_id, 'entity_name', val)"
           />
           <template v-else>
             <span>{{ row.entity_name || '—' }}</span>
@@ -57,7 +57,7 @@
             :model-value="row.confirm_index"
             size="small"
             :placeholder="labelsResolved.confirmIndexPlaceholder"
-            @change="(val: string) => $emit('update-field', row._company_id, 'confirm_index', val)"
+            @update:model-value="(val: string) => $emit('update-field', row._company_id, 'confirm_index', val)"
           />
           <span v-else>{{ row.confirm_index || '—' }}</span>
         </template>

@@ -57,6 +57,16 @@ export function fmtPercent(v: any, decimals = 2): string {
 // ── 日期格式化 ───────────────────────────────────────────
 
 /**
+ * 解析后端时间串：带时区（`Z` / `±hh:mm`）原样解析；不带的按 UTC 解析（后端裸时间均为 UTC）。
+ *
+ * 原先各处手写 `ts.endsWith('Z') ? ts : ts + 'Z'`：后端返回 `2026-10-28T03:05:05+00:00` 时拼成
+ * `…+00:00Z` ⇒ Invalid Date，界面显示「NaN-NaN-NaN」（函证附件抽屉的上传时间即此）。
+ */
+export function parseServerTime(ts: string): Date {
+  return new Date(/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(ts) ? ts : `${ts}Z`)
+}
+
+/**
  * 格式化日期（仅日期：2025-01-15）
  */
 export function fmtDate(d: string | Date | null | undefined): string {

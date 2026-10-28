@@ -429,9 +429,11 @@ def test_c_export_summary_headers_include_type_column():
     from app.routers import adjustments as adj_router
 
     src = inspect.getsource(adj_router._write_adj_sheet)
+    # 2026-07-27（f3354f539，调整分录集中登记）起末尾另加「所属循环」「协作状态」两列只读信息；
+    # 中央导入按列头取值（import_templates 按名取），尾部多出的列不影响导回 —— 前 8 列契约不变
     assert (
         'headers = ["编号", "类型", "摘要", "科目编码", "科目名称", '
-        '"借方金额", "贷方金额", "来源"]'
+        '"借方金额", "贷方金额", "来源", "所属循环", "协作状态"]'
     ) in src
     assert 'headers = ["编号", "摘要"' not in src, "旧 7 列列头不得回退"
 
@@ -491,8 +493,10 @@ _EXPECTED_EFFECTIVE_STORAGE_FIELD = {
 _EXPECTED_HEADERS = {
     "K1-4": ["调整事项说明", "类别", "报表项目", "科目代码", "科目名称", "附注项目",
              "借方调整金额", "贷方调整金额", "索引", "备注"],
-    "K6-3": ["序号", "分录类型", "摘要", "科目代码", "科目名称", "借方金额", "贷方金额",
-             "编制人", "备注"],
+    # K6-3：spec oo-writeback-template-parity-closure 批 B2c 按模板补 类别 / 报表项目 / 附注项目 / 索引
+    # 四列（前端同批补列；旧文件缺这 4 列走 optional_headers 照常导入）
+    "K6-3": ["序号", "分录类型", "摘要", "类别", "报表项目", "科目代码", "科目名称", "附注项目",
+             "借方金额", "贷方金额", "索引", "编制人", "备注"],
     "K9-3": ["调整事项说明", "类别", "报表项目", "科目名称", "附注项目", "摘要",
              "借方调整金额", "贷方调整金额", "索引", "备注"],
     "K11-3": ["调整事项说明", "类别", "报表项目", "科目名称", "附注项目", "……",
@@ -508,8 +512,8 @@ _EXPECTED_HEADERS = {
 _EXPECTED_FIELD_KEYS = {
     "K1-4": ["description", "category", "reportItem", "accountCode", "accountName",
              "noteItem", "debitAmount", "creditAmount", "indexRef", "remark"],
-    "K6-3": ["seq", "entryType", "summary", "accountCode", "accountName",
-             "debitAmount", "creditAmount", "preparedBy", "remark"],
+    "K6-3": ["seq", "entryType", "summary", "category", "reportItem", "accountCode", "accountName",
+             "noteItem", "debitAmount", "creditAmount", "indexRef", "preparedBy", "remark"],
     "K9-3": ["description", "category", "reportItem", "accountName", "noteItem",
              "summary", "debitAmount", "creditAmount", "indexRef", "remark"],
     "K11-3": ["description", "category", "reportItem", "accountName", "noteItem",

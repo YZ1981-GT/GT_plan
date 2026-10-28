@@ -78,6 +78,72 @@
         </template>
       </el-table-column>
 
+      <!-- 列与模板 K4-3 A~J 一致（F「……」是空占位列，不录）；类型 / 科目代码 / 对方科目 / 来源 模板没有，排在后面 -->
+      <el-table-column label="调整事项说明" min-width="140">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateCell(row.id, 'summary', v)" />
+          <span v-else>{{ row.summary || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类别" width="110">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.category" size="small" @change="(v: string) => updateCell(row.id, 'category', v)">
+            <el-option v-for="o in K_ADJ_CATEGORY_OPTIONS" :key="o" :value="o" :label="o" />
+          </el-select>
+          <span v-else>{{ row.category || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="报表项目" width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.reportItem" size="small" placeholder="如其他流动负债" @change="(v: string) => updateCell(row.id, 'reportItem', v)" />
+          <span v-else>{{ row.reportItem || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="科目名称" min-width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.accountName" size="small" @change="(v: string) => updateCell(row.id, 'accountName', v)" />
+          <span v-else>{{ row.accountName || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="附注项目" width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.noteItem" size="small" @change="(v: string) => updateCell(row.id, 'noteItem', v)" />
+          <span v-else>{{ row.noteItem || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="借方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="贷方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="索引" width="100">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="如 K4-4" @change="(v: string) => updateCell(row.id, 'indexRef', v)" />
+          <span v-else>{{ row.indexRef || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCell(row.id, 'remark', v)" />
+          <span v-else>{{ row.remark || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="类型" width="80">
         <template #default="{ row }">
           <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
@@ -95,38 +161,10 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="科目名称" min-width="120">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountName" size="small" @change="(v: string) => updateCell(row.id, 'accountName', v)" />
-          <span v-else>{{ row.accountName || '-' }}</span>
-        </template>
-      </el-table-column>
-
       <el-table-column label="对方科目" min-width="110">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.offsetAccount" size="small" placeholder="对方科目" @change="(v: string) => updateCell(row.id, 'offsetAccount', v)" />
           <span v-else>{{ row.offsetAccount || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="摘要" min-width="140">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateCell(row.id, 'summary', v)" />
-          <span v-else>{{ row.summary || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="借方金额" width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)" />
-          <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="贷方金额" width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
-          <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
 
@@ -224,6 +262,9 @@ import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffo
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
+import {
+  K_ADJ_CATEGORY_OPTIONS, followEntryTypeCategory, newKAdjTemplateFields, readKAdjTemplateFields,
+} from '../../composables/kAdjTemplateFields'
 
 // 🔴 原写死 '2245' —— 该码不是其他流动负债，新增分录 / 事件 / 推送都带着别的科目码。
 //    现取宿主 provide 的 tb_source_codes 解析结果；解析不出为空串（分录科目代码留空待填，不臆造）。
@@ -272,6 +313,11 @@ interface AdjustmentEntry {
   preparedBy: string
   source: string             // 来源：手工/K4-4/导入
   remark: string
+  // 模板 B / C / E / I（见 kAdjTemplateFields）
+  category: string
+  reportItem: string
+  noteItem: string
+  indexRef: string
 }
 
 const entries = ref<AdjustmentEntry[]>([])
@@ -319,7 +365,10 @@ function loadFromResponses(): void {
     try {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) {
+        // `...e` 留着行里的其他键（如 OO 侧填的 F 占位列），否则下一次保存把它们擦掉
         entries.value = parsed.map((e: any, idx: number) => ({
+          ...e,
+          ...readKAdjTemplateFields(e),
           id: e.id || `entry-${++nextId}`,
           seq: idx + 1,
           entryNo: e.entryNo || `K4-${e.entryType || 'AJE'}-${String(idx + 1).padStart(3, '0')}`,
@@ -368,6 +417,7 @@ async function handleAddEntry(): Promise<void> {
         preparedBy: '',
         source: '手工',
         remark: '',
+        ...newKAdjTemplateFields('AJE', '其他流动负债'),
       }
       entries.value.push(entry)
       persistEntries()
@@ -391,6 +441,7 @@ async function handleRemoveEntry(id: string): Promise<void> {
 function updateCell(id: string, field: keyof AdjustmentEntry, value: any): void {
   const entry = entries.value.find(e => e.id === id)
   if (entry) {
+    if (field === 'entryType') followEntryTypeCategory(entry, entry.entryType, value)
     ;(entry as any)[field] = value
     persistEntries()
   }
@@ -551,6 +602,7 @@ function importFromK44Abnormal(): void {
         preparedBy: '',
         source: 'K4-4',
         remark: `来源K4-4 ${r.voucherNo || ''} ${r.remark || ''}`.trim(),
+        ...newKAdjTemplateFields('AJE', '其他流动负债'),
       })
       imported++
     }
@@ -574,12 +626,14 @@ async function handleAddPairEntry(): Promise<void> {
       entryNo: no, entryType: 'AJE', accountCode: '', accountName: '',
       offsetAccount: k4EntryCode(), debitAmount: 0, creditAmount: 0,
       summary: `${value.trim()}（借方）`, preparedBy: '', source: '手工', remark: '',
+      ...newKAdjTemplateFields('AJE'),
     })
     entries.value.push({
       id: `entry-${Date.now()}-${++nextId}`, seq: entries.value.length + 1,
       entryNo: no, entryType: 'AJE', accountCode: k4EntryCode(), accountName: '其他流动负债',
       offsetAccount: '', debitAmount: 0, creditAmount: 0,
       summary: `${value.trim()}（贷方）`, preparedBy: '', source: '手工', remark: '',
+      ...newKAdjTemplateFields('AJE', '其他流动负债'),
     })
     persistEntries()
     ElMessage.info('已创建借贷对，请填写科目和金额')

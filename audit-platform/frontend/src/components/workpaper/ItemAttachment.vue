@@ -58,7 +58,8 @@
 /**
  * ItemAttachment — 逐项附件（行级证据）
  *
- * 位置键：表页 = sheetKey，单元格 = `item:{itemIndex}`（spec attachment-evidence-intake ADR-AEI-08）。
+ * 位置键：表页 = sheetKey，单元格 = `item:{itemIndex}`（spec attachment-evidence-intake ADR-AEI-08），
+ * 或调用方直接给 `cellRef`（行有稳定 id 的表用 `row:{行 id}`，spec attachment-confirmation-evidence-loop 需求 4）。
  * - 上传走底稿证据入口，只写行级证据链接（不再按 title 打标、不再挂整稿关联）；
  * - 列表读本底稿共享链接仓（同一底稿的所有实例只发一次请求），按位置过滤；
  * - 移除 = 删除本行的证据链接（附件本身保留在项目附件里）；
@@ -86,7 +87,9 @@ interface Props {
   projectId: string
   wpId: string
   sheetKey: string
-  itemIndex: number | string
+  /** 槽位序号 ⇒ 位置 `item:{序号}`；行有稳定 id 时改传 `cellRef`（如 `row:{行 id}`），两者给一个即可 */
+  itemIndex?: number | string
+  cellRef?: string
   accept?: string
   /** 证据类型；不传由后端按底稿编码的证据声明取缺省 */
   evidenceType?: string
@@ -94,6 +97,8 @@ interface Props {
   readonly?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
+  itemIndex: undefined,
+  cellRef: undefined,
   accept: undefined,
   evidenceType: undefined,
   readonly: false,
@@ -103,7 +108,7 @@ const uploading = ref(false)
 const removingId = ref('')
 
 const store = useWpEvidenceLinks(() => props.projectId, () => props.wpId)
-const cellRef = computed(() => itemCellRef(props.itemIndex))
+const cellRef = computed(() => props.cellRef || itemCellRef(props.itemIndex ?? 0))
 const rows = computed(() => store.linksAt(props.sheetKey, cellRef.value))
 
 /** 每行一个小眼睛；点文件名复用同一个（spec attachment-inline-preview ADR-AIP-04） */

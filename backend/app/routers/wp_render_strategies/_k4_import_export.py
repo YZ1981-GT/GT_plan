@@ -36,14 +36,16 @@ _K4_2_KEYS = [
 # 列集合对齐前端 K4TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.2）：
 #   去掉前端不存在的 noteRef/voucherNo，补 entryNo（编号）/offsetAccount（对方科目）/
 #   preparedBy（编制人）/source（来源）
+#   类别 / 报表项目 / 附注项目 / 索引：模板 B / C / E / I，前端随 oo-writeback-template-parity-closure 批 B2c 补列；
+#   旧版导出文件没有这 4 列 ⇒ optional_headers，缺了照常导入
 # ────────────────────────────────────────────────────────────
 _K4_3_HEADERS = [
-    "序号", "编号", "分录类型", "摘要", "科目代码", "科目名称", "对方科目",
-    "借方金额", "贷方金额", "编制人", "来源", "备注",
+    "序号", "编号", "分录类型", "摘要", "类别", "报表项目", "科目代码", "科目名称", "附注项目", "对方科目",
+    "借方金额", "贷方金额", "索引", "编制人", "来源", "备注",
 ]
 _K4_3_KEYS = [
-    "seq", "entryNo", "entryType", "summary", "accountCode", "accountName", "offsetAccount",
-    "debitAmount", "creditAmount", "preparedBy", "source", "remark",
+    "seq", "entryNo", "entryType", "summary", "category", "reportItem", "accountCode", "accountName", "noteItem",
+    "offsetAccount", "debitAmount", "creditAmount", "indexRef", "preparedBy", "source", "remark",
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -74,10 +76,12 @@ _K4_SPECS: dict[str, dict[str, Any]] = {
         "title": "K4-3 其他流动负债调整分录汇总",
         "headers": _K4_3_HEADERS,
         "field_keys": _K4_3_KEYS,
+        "optional_headers": ("类别", "报表项目", "附注项目", "索引"),
         "guidance": [
             "K4-3 调整分录 编制说明",
             "",
-            "12列：序号/编号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/对方科目/借方金额/贷方金额/编制人/来源/备注。",
+            "16列：序号/编号/分录类型(AJE/RJE)/摘要/类别(报表调整/账项调整/其他)/报表项目/科目代码/科目名称/附注项目/"
+            "对方科目/借方金额/贷方金额/索引/编制人/来源/备注。",
             "编号形如 K4-AJE-001；来源填 手工 / K4-4 / 导入。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",

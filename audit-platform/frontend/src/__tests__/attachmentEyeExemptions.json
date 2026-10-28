@@ -36,36 +36,6 @@
     "reason": "并发会话改动中，合入后按行级证据接入"
   },
   {
-    "file": "components/workpaper/confirmation/alternativeH05/GtConfirmationAlternativeH05.vue",
-    "kind": "spec-c",
-    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
-    "reason": "替代程序的附件与函证挂载一并重做"
-  },
-  {
-    "file": "components/workpaper/confirmation/alternativeK05/GtConfirmationAlternativeK05.vue",
-    "kind": "spec-c",
-    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
-    "reason": "替代程序的附件与函证挂载一并重做"
-  },
-  {
-    "file": "components/workpaper/confirmation/alternativeK06/GtConfirmationAlternativeK06.vue",
-    "kind": "spec-c",
-    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
-    "reason": "替代程序的附件与函证挂载一并重做"
-  },
-  {
-    "file": "components/workpaper/confirmation/alternativeL05/GtConfirmationAlternativeL05.vue",
-    "kind": "spec-c",
-    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
-    "reason": "替代程序的附件与函证挂载一并重做（另：识别地址缺底稿 id）"
-  },
-  {
-    "file": "components/workpaper/g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue",
-    "kind": "spec-c",
-    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
-    "reason": "替代程序的附件与函证挂载一并重做"
-  },
-  {
     "file": "composables/useOcrGovernance.ts",
     "kind": "not-workpaper",
     "owner": "证据治理（附件管理页）",

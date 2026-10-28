@@ -48,10 +48,29 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
+      <!-- 三态（需求 1.6）：明细面板写的是 '是' / '否'，'否' 是真值 ⇒ 原先裸判显示成「是」；未填显示 — -->
       <el-table-column prop="is_replied" label="回函" min-width="55" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.is_replied" type="success" size="small">是</el-tag>
-          <el-tag v-else type="info" size="small">否</el-tag>
+          <el-tag v-if="isRepliedTrue(row)" type="success" size="small" data-testid="reply-flag">是</el-tag>
+          <el-tag v-else-if="isNotReplied(row)" type="info" size="small" data-testid="reply-flag">否</el-tag>
+          <span v-else data-testid="reply-flag">—</span>
+        </template>
+      </el-table-column>
+      <!-- 函证附件（spec attachment-confirmation-evidence-loop 需求 1.1）：只读也显示，点开为只读抽屉 -->
+      <el-table-column v-if="attachmentCounts" label="函证附件" min-width="96" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row._hub_confirmation_id"
+            link
+            type="primary"
+            size="small"
+            data-testid="hub-attachment-count"
+            :aria-label="`${row.entity_name || '本行'}的发函件与回函件`"
+            @click.stop="$emit('open-attachments', row)"
+          >发 {{ countOf(row).outbound }} · 回 {{ countOf(row).inbound }}</el-button>
+          <el-tooltip v-else content="尚未同步到函证中心，同步后可挂发函件 / 回函件" placement="top">
+            <span class="confirmation-master__muted">未同步</span>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -61,11 +80,15 @@
 <script setup lang="ts">
 import { Plus } from '@element-plus/icons-vue'
 import type { ConfirmationRow } from './confirmationTypes'
+import type { HubAttachmentCount } from './composables/useHubAttachmentCounts'
+import { isNotReplied, isRepliedTrue } from './replyStatus'
 
-defineProps<{
+const props = defineProps<{
   rows: ConfirmationRow[]
   readonly: boolean
   selectedIds: string[]
+  /** 函证中心附件计数（按 `_hub_confirmation_id`）；不传则不显示「函证附件」列 */
+  attachmentCounts?: Record<string, HubAttachmentCount>
 }>()
 
 const emit = defineEmits<{
@@ -77,7 +100,12 @@ const emit = defineEmits<{
   (e: 'show-formula'): void
   (e: 'row-click', row: ConfirmationRow): void
   (e: 'update:selectedIds', ids: string[]): void
+  (e: 'open-attachments', row: ConfirmationRow): void
 }>()
+
+function countOf(row: ConfirmationRow): HubAttachmentCount {
+  return props.attachmentCounts?.[row._hub_confirmation_id ?? ''] ?? { outbound: 0, inbound: 0 }
+}
 
 function onSelectionChange(selection: ConfirmationRow[]) {
   emit('update:selectedIds', selection.map((r) => r._row_id!))
@@ -111,6 +139,11 @@ function fmtAmount(amount: number | undefined | null): string {
 .confirmation-master__table {
   width: 100%;
   font-size: 13px;
+}
+
+.confirmation-master__muted {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
 }
 
 /* 表头折行显示 */

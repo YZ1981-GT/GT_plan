@@ -92,6 +92,109 @@
         :summary-method="getSummary"
       >
         <el-table-column prop="seq" label="序" width="48" align="center" />
+        <!-- 列与模板 K6-3 A~J 一致（F「……」是空占位列，不录）；类型 / 科目代码 / 编制人 模板没有，排在后面 -->
+        <el-table-column label="调整事项说明" min-width="150">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.summary"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="调整摘要"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'summary', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="类别" width="110">
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.category"
+              :disabled="isReadonly"
+              size="small"
+              @change="(v: string) => updateCell(row.id, 'category', v)"
+            >
+              <el-option v-for="o in K_ADJ_CATEGORY_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="报表项目" width="120">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.reportItem"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="如持有待售资产"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'reportItem', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="科目名称" min-width="120">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.accountName"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="科目名称"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'accountName', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="附注项目" width="110">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.noteItem"
+              :disabled="isReadonly"
+              size="small"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'noteItem', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="debitAmount" label="借方调整金额" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.debitAmount"
+              :disabled="isReadonly"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 100%"
+              @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="creditAmount" label="贷方调整金额" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.creditAmount"
+              :disabled="isReadonly"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 100%"
+              @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" width="100">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.indexRef"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="如 K6-2"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'indexRef', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.remark"
+              :disabled="isReadonly"
+              size="small"
+              @blur="(e: FocusEvent) => updateCell(row.id, 'remark', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="类型" width="90">
           <template #default="{ row }">
             <el-select
@@ -113,54 +216,6 @@
               size="small"
               placeholder="科目"
               @blur="(e: FocusEvent) => updateCell(row.id, 'accountCode', (e.target as HTMLInputElement)?.value ?? '')"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="科目名称" min-width="120">
-          <template #default="{ row }">
-            <el-input
-              :model-value="row.accountName"
-              :disabled="isReadonly"
-              size="small"
-              placeholder="科目名称"
-              @blur="(e: FocusEvent) => updateCell(row.id, 'accountName', (e.target as HTMLInputElement)?.value ?? '')"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="摘要" min-width="150">
-          <template #default="{ row }">
-            <el-input
-              :model-value="row.summary"
-              :disabled="isReadonly"
-              size="small"
-              placeholder="调整摘要"
-              @blur="(e: FocusEvent) => updateCell(row.id, 'summary', (e.target as HTMLInputElement)?.value ?? '')"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="借方" width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              :model-value="row.debitAmount"
-              :disabled="isReadonly"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width: 100%"
-              @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="贷方" width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              :model-value="row.creditAmount"
-              :disabled="isReadonly"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width: 100%"
-              @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -241,6 +296,9 @@ import { eventBus } from '@/utils/eventBus'
 import { useK6ImportExport } from '@/components/workpaper/composables/useK6ImportExport'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import {
+  K_ADJ_CATEGORY_OPTIONS, defaultKAdjCategory, followEntryTypeCategory, readKAdjTemplateFields,
+} from '@/components/workpaper/composables/kAdjTemplateFields'
 
 const K6_ACCOUNT_CODE_ASSET = '1481'  // 持有待售资产
 const K6_ACCOUNT_CODE_LIAB = '2605'   // 持有待售负债
@@ -281,6 +339,11 @@ interface AdjustmentEntry {
   summary: string
   preparedBy: string
   remark: string
+  // 模板 B / C / E / I（见 kAdjTemplateFields）
+  category: string
+  reportItem: string
+  noteItem: string
+  indexRef: string
 }
 
 const entries = ref<AdjustmentEntry[]>([])
@@ -352,6 +415,10 @@ function importSuggestions(): void {
         summary: sug.summary || `${sug.source}建议调整`,
         preparedBy: '',
         remark: `来源:${sug.source}`,
+        category: defaultKAdjCategory(sug.type === 'RJE' ? 'RJE' : 'AJE'),
+        reportItem: '',
+        noteItem: '',
+        indexRef: '',
       }
       entries.value.push(entry)
       added++
@@ -375,7 +442,9 @@ function loadFromResponses(): void {
     try {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) {
+        // `...e` 留着行里的其他键（如 OO 侧填的 F 占位列），否则下一次保存把它们擦掉
         entries.value = parsed.map((e: any, idx: number) => ({
+          ...e,
           id: e.id || `entry-${++nextId}`,
           seq: idx + 1,
           entryType: e.entryType || 'AJE',
@@ -386,6 +455,7 @@ function loadFromResponses(): void {
           summary: e.summary || '',
           preparedBy: e.preparedBy || '',
           remark: e.remark || '',
+          ...readKAdjTemplateFields(e),
         }))
         nextId = entries.value.length + 1
       }
@@ -413,6 +483,10 @@ async function handleAddEntry(): Promise<void> {
         summary: value.trim(),
         preparedBy: '',
         remark: '',
+        category: defaultKAdjCategory('AJE'),
+        reportItem: '持有待售资产',
+        noteItem: '',
+        indexRef: '',
       }
       entries.value.push(entry)
       persistEntries()
@@ -436,6 +510,7 @@ async function handleRemoveEntry(id: string): Promise<void> {
 function updateCell(id: string, field: keyof AdjustmentEntry, value: any): void {
   const entry = entries.value.find(e => e.id === id)
   if (entry) {
+    if (field === 'entryType') followEntryTypeCategory(entry, entry.entryType, value)
     ;(entry as any)[field] = value
     persistEntries()
   }
@@ -536,8 +611,9 @@ async function handleFileSelected(event: Event): Promise<void> {
 function getSummary({ columns }: any): string[] {
   return columns.map((col: any, idx: number) => {
     if (idx === 0) return '合计'
-    if (col.property === 'debitAmount' || idx === 5) return fmtAmt(totalDebits.value)
-    if (col.property === 'creditAmount' || idx === 6) return fmtAmt(totalCredits.value)
+    // 按列 prop 认（列序随模板调整过，原先的位置兜底 idx 5 / 6 会落到别的列上）
+    if (col.property === 'debitAmount') return fmtAmt(totalDebits.value)
+    if (col.property === 'creditAmount') return fmtAmt(totalCredits.value)
     return ''
   })
 }

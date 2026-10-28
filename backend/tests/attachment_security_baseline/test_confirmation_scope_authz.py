@@ -147,9 +147,11 @@ RECIPES: tuple[Recipe, ...] = (
            (evidence_svc, "link_attachment", _LINK), body=lambda o: {"attachment_id": str(o.aid), "role": "outbound"}),
     Recipe("解绑", "DELETE", "/{confirmation_id}/attachments/{link_id}",
            lambda o: f"{_base(o)}/{o.cid}/attachments/{o.lid}", _WRITE, (evidence_svc, "unlink_attachment", None)),
+    # 识别前置（spec attachment-confirmation-evidence-loop 需求 2.1）也是业务步骤：矩阵只测门，一并打桩
     Recipe("识别比对", "POST", "/attachments/{attachment_id}/extract-compare",
            lambda o: f"{_base(o)}/attachments/{o.aid}/extract-compare", _WRITE,
-           (evidence_svc, "extract_and_compare", {"status": "matched"})),
+           (evidence_svc, "extract_and_compare", {"status": "matched"}),
+           extra_stubs=((confirmations_router_module, "ensure_reply_text", "回函全文"),)),
     Recipe("自动匹配", "POST", "/auto-match", lambda o: f"{_base(o)}/auto-match", _WRITE,
            (evidence_svc, "auto_match", {"status": "no_hit"}), body=lambda o: {"attachment_id": str(o.aid)}),
     Recipe("人工指派", "POST", "/match-queue/{attachment_id}/assign",

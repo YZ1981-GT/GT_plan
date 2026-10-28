@@ -38,7 +38,7 @@
                 :model-value="sendSection.recipient.firm_name || ''"
                 size="small"
                 placeholder="律师事务所名称"
-                @change="(v: string) => updateField('send', 'recipient-firm', v)"
+                @update:model-value="(v: string) => updateField('send', 'recipient-firm', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -47,10 +47,18 @@
                 :model-value="sendSection.recipient.lawyer_name || ''"
                 size="small"
                 placeholder="律师姓名"
-                @change="(v: string) => updateField('send', 'recipient-lawyer', v)"
+                @update:model-value="(v: string) => updateField('send', 'recipient-lawyer', v)"
               />
             </div>
           </div>
+          <!-- 本函登记为函证中心的一笔律师函证：状态、发函 / 回函件（spec attachment-confirmation-evidence-loop 需求 5.2） -->
+          <LegalConfirmationHubCard
+            v-if="wpId"
+            :wp-id="wpId"
+            :project-id="projectId"
+            :firm-name="sendSection.recipient.firm_name"
+            :readonly="readonly"
+          />
         </div>
 
         <!-- 说明段 -->
@@ -94,7 +102,7 @@
                   type="textarea"
                   :autosize="{ minRows: 2 }"
                   placeholder="请描述案件事实"
-                  @change="(v: string) => updateLitigation(idx, 'description', v)"
+                  @update:model-value="(v: string) => updateLitigation(idx, 'description', v)"
                 />
               </div>
               <div class="gt-a121__field gt-a121__field--full">
@@ -104,7 +112,7 @@
                   type="textarea"
                   :autosize="{ minRows: 2 }"
                   placeholder="律师对案件的看法"
-                  @change="(v: string) => updateLitigation(idx, 'opinion', v)"
+                  @update:model-value="(v: string) => updateLitigation(idx, 'opinion', v)"
                 />
               </div>
               <div class="gt-a121__field">
@@ -134,7 +142,7 @@
             type="textarea"
             :autosize="{ minRows: 3 }"
             placeholder="请描述其他法律责任事件"
-            @change="(v: string) => updateField('send', 'inquiry2-content', v)"
+            @update:model-value="(v: string) => updateField('send', 'inquiry2-content', v)"
           />
         </div>
 
@@ -146,7 +154,7 @@
             type="textarea"
             :autosize="{ minRows: 3 }"
             placeholder="请描述律师费结算情况"
-            @change="(v: string) => updateField('send', 'inquiry3-content', v)"
+            @update:model-value="(v: string) => updateField('send', 'inquiry3-content', v)"
           />
         </div>
 
@@ -163,7 +171,7 @@
                 :model-value="sendSection.sign_info.company_name || ''"
                 size="small"
                 placeholder="公司名称（自动填充）"
-                @change="(v: string) => updateField('send', 'sign-company', v)"
+                @update:model-value="(v: string) => updateField('send', 'sign-company', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -190,7 +198,7 @@
                 :model-value="sendSection.reply_info_table.address || ''"
                 size="small"
                 placeholder="回函地址"
-                @change="(v: string) => updateField('send', 'reply-address', v)"
+                @update:model-value="(v: string) => updateField('send', 'reply-address', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -199,7 +207,7 @@
                 :model-value="sendSection.reply_info_table.phone || ''"
                 size="small"
                 placeholder="电话"
-                @change="(v: string) => updateField('send', 'reply-phone', v)"
+                @update:model-value="(v: string) => updateField('send', 'reply-phone', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -208,7 +216,7 @@
                 :model-value="sendSection.reply_info_table.contact || ''"
                 size="small"
                 placeholder="联系人"
-                @change="(v: string) => updateField('send', 'reply-contact', v)"
+                @update:model-value="(v: string) => updateField('send', 'reply-contact', v)"
               />
             </div>
           </div>
@@ -238,7 +246,7 @@
             :autosize="{ minRows: 3 }"
             placeholder="请描述诉讼详情"
             class="gt-a121__conditional-textarea"
-            @change="(v: string) => updateField('reply', 'details', v)"
+            @update:model-value="(v: string) => updateField('reply', 'details', v)"
           />
         </div>
 
@@ -276,7 +284,7 @@
                 :model-value="replySection.sign.firm_name || ''"
                 size="small"
                 placeholder="律师事务所名称"
-                @change="(v: string) => updateField('reply', 'sign-firm', v)"
+                @update:model-value="(v: string) => updateField('reply', 'sign-firm', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -285,7 +293,7 @@
                 :model-value="replySection.sign.lawyer_name || ''"
                 size="small"
                 placeholder="律师姓名"
-                @change="(v: string) => updateField('reply', 'sign-lawyer', v)"
+                @update:model-value="(v: string) => updateField('reply', 'sign-lawyer', v)"
               />
             </div>
             <div class="gt-a121__field">
@@ -319,6 +327,7 @@ import { useA121LegalConfirmation } from './composables/useA121LegalConfirmation
 import type { A121RenderData } from './composables/useA121LegalConfirmation'
 
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
+const LegalConfirmationHubCard = defineAsyncComponent(() => import('./confirmation/LegalConfirmationHubCard.vue'))
 
 import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
@@ -333,7 +342,9 @@ const props = withDefaults(defineProps<{
   wpId: string
   projectId?: string
   htmlData?: A121RenderData | null
-}>(), { projectId: '', htmlData: null })
+  /** 只读（复核 / 已归档）：函证中心卡片只显示、附件只能预览 */
+  readonly?: boolean
+}>(), { projectId: '', htmlData: null, readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref<'html' | 'docx'>('html')

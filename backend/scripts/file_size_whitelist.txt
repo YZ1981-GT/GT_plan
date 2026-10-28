@@ -1720,3 +1720,9 @@ audit-platform/frontend/src/components/workpaper/composables/useD2DisclosureNote
 #   任何改动都会被门禁拒）。本 spec 按 tasks.md T15 同步改两条既有断言（不可解析目标 400 → 422 ACNR_TARGETS_REJECTED、
 #   多目标替身补 L1_cell 结果），净增 0 行，基线取 HEAD 值。拆分方向：编排器 / 适配器、鉴权收口、模板执行三组各成文件。
 backend/tests/test_advanced_query_hardening_wave012.py  2222
+# oo-writeback-template-parity-closure 批 B2c（2026-10-28）：_cycle_import_export_common.py —— HEAD 925 行，
+#   已超限且此前未登记。本批给各循环导入加 optional_headers（K3~K7 调整分录汇总按模板补的列，旧版导出文件没有，
+#   缺了照常导入、不写键），+6 行。拆分方向：字段解析（is_numeric_field_key ~ export_row_by_keys）/
+#   JSON 载荷读写（load_json_payload ~ upsert_json_rows）/ 账龄动态列（subject_aging_periods ~ resolve_aging_segments）/
+#   路由工厂 create_cycle_import_export_router（约 310 行）各成模块，本文件只留 re-export。
+backend/app/routers/wp_render_strategies/_cycle_import_export_common.py  925

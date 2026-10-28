@@ -251,6 +251,20 @@
         </template>
       </el-table-column>
 
+      <!-- 调节依据附件（spec attachment-confirmation-evidence-loop 需求 4）：只读也显示小眼睛 -->
+      <el-table-column v-if="wpId && projectId && evidenceSheet" label="附件" min-width="64" align="center">
+        <template #default="{ row }">
+          <DiffRowEvidenceCell
+            v-if="row._row_id"
+            :wp-id="wpId"
+            :project-id="projectId"
+            :sheet-key="evidenceSheet"
+            :row-id="row._row_id"
+            :readonly="readonly"
+          />
+        </template>
+      </el-table-column>
+
       <!-- 来源标识 -->
       <el-table-column label="来源" min-width="50" align="center">
         <template #default="{ row }">
@@ -293,6 +307,7 @@
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed } from 'vue'
 import { Plus, Delete, Download, InfoFilled, WarningFilled, Link } from '@element-plus/icons-vue'
+import DiffRowEvidenceCell from './DiffRowEvidenceCell.vue'
 import type { DiffReconcileRow, DiffSummaryBySubject } from './diffReconcileTypes'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -304,6 +319,10 @@ const props = defineProps<{
   diffTypeOptions: { value: string; label: string }[]
   subjectSummary: DiffSummaryBySubject[]
   isOverMateriality: (row: DiffReconcileRow) => boolean
+  /** 行内调节依据附件（三者齐时显示「附件」列；表页 = 本循环差异调节表编码） */
+  wpId?: string
+  projectId?: string
+  evidenceSheet?: string
 }>()
 
 const emit = defineEmits<{

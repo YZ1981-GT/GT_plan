@@ -93,20 +93,27 @@
     >
       <el-table-column prop="seq" label="序号" width="56" align="center" />
 
-      <el-table-column label="类型" width="90">
+      <!-- 列与模板 K5-3 A~J 一致（F「……」是空占位列，不录）；类型 / 科目代码 模板没有，排在后面 -->
+      <el-table-column label="调整事项说明" min-width="180">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
-            <el-option value="AJE" label="AJE" />
-            <el-option value="RJE" label="RJE" />
-          </el-select>
-          <span v-else>{{ row.entryType }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" placeholder="调整摘要" @change="(v: string) => updateCell(row.id, 'summary', v)" />
+          <span v-else>{{ row.summary }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="科目代码" width="100">
+      <el-table-column label="类别" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="如2801" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
-          <span v-else>{{ row.accountCode }}</span>
+          <el-select v-if="!isReadonly" :model-value="row.category" size="small" @change="(v: string) => updateCell(row.id, 'category', v)">
+            <el-option v-for="o in K_ADJ_CATEGORY_OPTIONS" :key="o" :value="o" :label="o" />
+          </el-select>
+          <span v-else>{{ row.category || '' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="报表项目" width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.reportItem" size="small" placeholder="如预计负债" @change="(v: string) => updateCell(row.id, 'reportItem', v)" />
+          <span v-else>{{ row.reportItem || '' }}</span>
         </template>
       </el-table-column>
 
@@ -117,14 +124,14 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="摘要" min-width="180">
+      <el-table-column label="附注项目" width="110">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.summary" size="small" placeholder="调整摘要" @change="(v: string) => updateCell(row.id, 'summary', v)" />
-          <span v-else>{{ row.summary }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.noteItem" size="small" @change="(v: string) => updateCell(row.id, 'noteItem', v)" />
+          <span v-else>{{ row.noteItem || '' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="借方" width="120" align="right">
+      <el-table-column prop="debit" label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -140,7 +147,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="贷方" width="120" align="right">
+      <el-table-column prop="credit" label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -156,10 +163,34 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="索引号" width="90">
+      <el-table-column label="索引" width="90">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="K5-6" @change="(v: string) => updateCell(row.id, 'indexRef', v)" />
           <span v-else>{{ row.indexRef || '' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="100">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => updateCell(row.id, 'remark', v)" />
+          <span v-else>{{ row.remark || '' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类型" width="90">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
+            <el-option value="AJE" label="AJE" />
+            <el-option value="RJE" label="RJE" />
+          </el-select>
+          <span v-else>{{ row.entryType }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="科目代码" width="100">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="如2801" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
+          <span v-else>{{ row.accountCode }}</span>
         </template>
       </el-table-column>
 
@@ -233,6 +264,9 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import {
+  K_ADJ_CATEGORY_OPTIONS, followEntryTypeCategory, newKAdjTemplateFields, readKAdjTemplateFields,
+} from '../../composables/kAdjTemplateFields'
 // 🔴 科目码走单一真源，原硬编码 '2701'（长期应付款）—— 预计负债是 '2801'。
 //    本文件的 AJE/RJE 会回写 K5-1 并推送 A13 错报，错科目会把调整分录记到 L5 长期应付款上。
 import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
@@ -264,9 +298,14 @@ interface AdjEntry {
   accountCode: string
   accountName: string
   summary: string
-  debit: number
-  credit: number
+  debit: number               // 模板 G 借方调整金额（契约按本键接）
+  credit: number              // 模板 H 贷方调整金额
   indexRef: string
+  // 模板 B / C / E / J（见 kAdjTemplateFields；原缺，OO 侧填了回 HTML 下一次保存就被擦掉）
+  category: string
+  reportItem: string
+  noteItem: string
+  remark: string
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -308,7 +347,10 @@ function loadSavedData(): void {
   if (saved?.remark) {
     try {
       const arr = JSON.parse(saved.remark)
+      // `...e` 留着行里的其他键（如 OO 侧填的 F 占位列），否则下一次保存把它们擦掉
       entries.value = arr.map((e: any, idx: number) => ({
+        ...e,
+        ...readKAdjTemplateFields(e),
         id: e.id || `entry-${_nextId++}`,
         seq: idx + 1,
         entryType: e.entryType || 'AJE',
@@ -318,6 +360,7 @@ function loadSavedData(): void {
         debit: Number(e.debit) || 0,
         credit: Number(e.credit) || 0,
         indexRef: e.indexRef || '',
+        remark: e.remark || '',
       }))
       _nextId = entries.value.length + 1
     } catch {
@@ -351,7 +394,8 @@ async function handleAddEntry(): Promise<void> {
     summary: summary,
     debit: 0,
     credit: 0,
-    indexRef: '',
+    remark: '',
+    ...newKAdjTemplateFields('AJE', '预计负债'),
   })
   persistEntries()
 }
@@ -359,6 +403,7 @@ async function handleAddEntry(): Promise<void> {
 function updateCell(id: string, field: string, value: any): void {
   const entry = entries.value.find(e => e.id === id)
   if (entry) {
+    if (field === 'entryType') followEntryTypeCategory(entry, entry.entryType, value)
     ;(entry as any)[field] = value
     persistEntries()
   }
@@ -451,6 +496,8 @@ async function acceptSuggestedAje(): Promise<void> {
         summary: s.summary || '补提预计负债',
         debit: amt,
         credit: 0,
+        remark: '',
+        ...newKAdjTemplateFields(s.entryType || 'AJE'),
         indexRef: 'K5-6',
       })
       entries.value.push({
@@ -462,6 +509,8 @@ async function acceptSuggestedAje(): Promise<void> {
         summary: s.summary || `补提${K5_ACCOUNT_NAME}`,
         debit: 0,
         credit: amt,
+        remark: '',
+        ...newKAdjTemplateFields(s.entryType || 'AJE', K5_ACCOUNT_NAME),
         indexRef: 'K5-6',
       })
     }
@@ -519,8 +568,9 @@ function persistNote(): void {
 function getSummary({ columns, data }: any): string[] {
   return columns.map((col: any, idx: number) => {
     if (idx === 0) return '合计'
-    if (idx === 4) return fmtAmt(totalDebits.value) // 借方
-    if (idx === 5) return fmtAmt(totalCredits.value) // 贷方
+    // 按列 prop 认：原按位置 idx 4 / 5，实际落在「摘要」「借方」两列（借方合计显示在摘要下、贷方合计显示在借方下）
+    if (col.property === 'debit') return fmtAmt(totalDebits.value)
+    if (col.property === 'credit') return fmtAmt(totalCredits.value)
     return ''
   })
 }

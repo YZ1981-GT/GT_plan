@@ -36,13 +36,15 @@ _K7_2_KEYS = [
 # K7-3 调整分录汇总（10列）
 # 列集合对齐前端 K7TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.2）：
 #   前端无 accountCode/noteRef/voucherNo，改用 reportItem（报表项目）/noteItem（附注项目）/indexRef（索引）
+#   类别：模板 B，前端随 oo-writeback-template-parity-closure 批 B2c 补列（原表单「类别」列放的是 AJE / RJE 类型）；
+#   旧版导出文件没有这一列 ⇒ optional_headers，缺了照常导入
 # ────────────────────────────────────────────────────────────
 _K7_3_HEADERS = [
-    "序号", "分录类型", "摘要", "报表项目", "科目名称", "附注项目",
+    "序号", "分录类型", "摘要", "类别", "报表项目", "科目名称", "附注项目",
     "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _K7_3_KEYS = [
-    "seq", "entryType", "summary", "reportItem", "accountName", "noteItem",
+    "seq", "entryType", "summary", "category", "reportItem", "accountName", "noteItem",
     "debitAmount", "creditAmount", "indexRef", "remark",
 ]
 
@@ -76,10 +78,12 @@ _K7_SPECS: dict[str, dict[str, Any]] = {
         "title": "K7-3 递延收益调整分录汇总",
         "headers": _K7_3_HEADERS,
         "field_keys": _K7_3_KEYS,
+        "optional_headers": ("类别",),
         "guidance": [
             "K7-3 调整分录 编制说明",
             "",
-            "10列：序号/分录类型(AJE/RJE)/摘要/报表项目/科目名称/附注项目/借方调整金额/贷方调整金额/索引/备注。",
+            "11列：序号/分录类型(AJE/RJE)/摘要/类别(报表调整/账项调整/其他)/报表项目/科目名称/附注项目/"
+            "借方调整金额/贷方调整金额/索引/备注。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",
             "金额单位：元。",

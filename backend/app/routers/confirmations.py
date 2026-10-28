@@ -19,7 +19,9 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_role
 from app.services import confirmation_service
 from app.services import confirmation_evidence_service
+from app.services.confirmation_reply_ocr import ReplyOcrFailed, ensure_reply_text
 from app.services.confirmation_scope_gate import confirmation_project_gate
+from app.services.confirmation_types import ConfirmTypeStr
 
 router = APIRouter(
     prefix="/projects/{project_id}/confirmations",
@@ -35,7 +37,7 @@ _MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
 
 
 class ConfirmationCreate(BaseModel):
-    confirm_type: str = Field(..., description="函证类型: receivable/payable/bank/loan")
+    confirm_type: ConfirmTypeStr = Field(..., description="函证类型: receivable/payable/bank/loan/legal/other")
     counterparty: str = Field(..., description="函证对象名称")
     wp_id: str | None = None
     account_code: str | None = None
@@ -46,7 +48,7 @@ class ConfirmationCreate(BaseModel):
 
 
 class ConfirmationUpdate(BaseModel):
-    confirm_type: str | None = None
+    confirm_type: ConfirmTypeStr | None = None
     counterparty: str | None = None
     wp_id: str | None = None
     account_code: str | None = None
@@ -384,7 +386,7 @@ async def reverse_confirmation(
 
 class BatchSyncItem(BaseModel):
     """单条函证同步请求"""
-    confirm_type: str
+    confirm_type: ConfirmTypeStr
     counterparty: str
     wp_id: str | None = None
     account_code: str | None = None
@@ -671,9 +673,8 @@ async def extract_and_compare(
 ):
     """OCR 识别回函件 + 与所属函证 book_amount 比对。
 
-    - 调 extract_confirmation_reply（算法不改）抽取回函金额/日期/主体
-    - 比对：|diff| ≤ 0.01 → matched，否则 discrepancy，任一缺失 → low_confidence
-    - 主体名称不符 → counterparty_mismatch 预警
+    - 回函件没有识别全文时先识别原件并写回（ensure_reply_text），失败如实报错、不出比对结论
+    - 比对：|diff| ≤ 0.01 → matched，否则 discrepancy，任一缺失 → low_confidence；主体不符 → counterparty_mismatch
     - 结果仅写 attachment.ocr_fields_cache（governed=False），不落库 confirmations
 
     权限：本项目 edit；回函件须属于本项目（路由级门）
@@ -681,9 +682,13 @@ async def extract_and_compare(
     aid = uuid.UUID(attachment_id)
 
     try:
+        await ensure_reply_text(db, aid)
         result = await confirmation_evidence_service.extract_and_compare(
             db, attachment_id=aid
         )
+    except ReplyOcrFailed as e:
+        await db.commit()  # 「识别失败」状态留下，抽屉据此提示
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except ValueError as e:
         msg = str(e)
         if "不存在" in msg:

@@ -33,17 +33,19 @@ _K5_2_KEYS = [
 ]
 
 # ────────────────────────────────────────────────────────────
-# K5-3 调整分录汇总（8列）
+# K5-3 调整分录汇总（12列）
 # 列集合对齐前端 K5TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.2）：
-#   金额键是 debit/credit（非 debitAmount/creditAmount）；无 remark 列；索引列为 indexRef
+#   金额键是 debit/credit（非 debitAmount/creditAmount）；索引列为 indexRef
+#   类别 / 报表项目 / 附注项目 / 备注：模板 B / C / E / J，前端随 oo-writeback-template-parity-closure 批 B2c 补列；
+#   旧版导出文件没有这 4 列 ⇒ optional_headers，缺了照常导入
 # ────────────────────────────────────────────────────────────
 _K5_3_HEADERS = [
-    "序号", "分录类型", "摘要", "科目代码", "科目名称",
-    "借方金额", "贷方金额", "索引",
+    "序号", "分录类型", "摘要", "类别", "报表项目", "科目代码", "科目名称", "附注项目",
+    "借方金额", "贷方金额", "索引", "备注",
 ]
 _K5_3_KEYS = [
-    "seq", "entryType", "summary", "accountCode", "accountName",
-    "debit", "credit", "indexRef",
+    "seq", "entryType", "summary", "category", "reportItem", "accountCode", "accountName", "noteItem",
+    "debit", "credit", "indexRef", "remark",
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -116,10 +118,12 @@ _K5_SPECS: dict[str, dict[str, Any]] = {
         "title": "K5-3 预计负债调整分录汇总",
         "headers": _K5_3_HEADERS,
         "field_keys": _K5_3_KEYS,
+        "optional_headers": ("类别", "报表项目", "附注项目", "备注"),
         "guidance": [
             "K5-3 调整分录 编制说明",
             "",
-            "8列：序号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/借方金额/贷方金额/索引。",
+            "12列：序号/分录类型(AJE/RJE)/摘要/类别(报表调整/账项调整/其他)/报表项目/科目代码/科目名称/附注项目/"
+            "借方金额/贷方金额/索引/备注。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",
             "金额单位：元。",

@@ -30,8 +30,13 @@ from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E4
 _MODULES = (
     "app.services.workpaper_sync.phase5_k1_baddebt_reversal_writeoff",
     # K3 / K6 原先不在清单里 ⇒ 模板一变它们的磁盘契约就没有生成器可重算（spec oo-writeback-template-parity-closure）
+    # K2 / K4 / K5 / K7 同（同 spec 批 B2c：K5 借贷列改接前端 debit / credit 时发现）
+    "app.services.workpaper_sync.phase5_k2_other_current_assets",
     "app.services.workpaper_sync.phase5_k3_other_payables",
+    "app.services.workpaper_sync.phase5_k4_other_current_liabilities",
+    "app.services.workpaper_sync.phase5_k5_provisions",
     "app.services.workpaper_sync.phase5_k6_held_for_sale",
+    "app.services.workpaper_sync.phase5_k7_deferred_income",
     "app.services.workpaper_sync.phase5_k8_selling_expenses",
     "app.services.workpaper_sync.phase5_k9_admin_expenses",
     "app.services.workpaper_sync.phase5_k10_other_income",

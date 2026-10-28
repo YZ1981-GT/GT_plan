@@ -12,6 +12,7 @@
 import { ref, type Ref } from 'vue'
 import type { DiffReconcileRow } from '../diffReconcileTypes'
 import type { ConfirmationRow } from '../../confirmationTypes'
+import { isRepliedTrue } from '../../replyStatus'
 
 export interface UseD01DiffImportProps {
   /** 当前 D0-4 已有行的 confirm_index 集合（用于去重） */
@@ -40,8 +41,8 @@ export function useD01DiffImport(props: UseD01DiffImportProps): UseD01DiffImport
    * 仅映射已回函+差异≠0的行；未回函/差异=0 返回 null
    */
   function mapD01Row(row: ConfirmationRow): DiffReconcileRow | null {
-    // 过滤：仅已回函(is_replied=true) + 不符(差异≠0)
-    if (!row.is_replied) return null
+    // 过滤：仅已回函 + 不符(差异≠0)；走归一谓词，'否' 是真值不能裸判（需求 1.6）
+    if (!isRepliedTrue(row)) return null
     const sent = row.amount ?? 0
     const reply = row.reply_amount ?? 0
     const diff = Math.round((sent - reply) * 100) / 100

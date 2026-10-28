@@ -109,6 +109,29 @@ async def annotate_linked_wp_count(db, items: list[dict]) -> list[dict]:
     return items
 
 
+async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None) -> None:
+    """「函证」声明改为按工作簿登记的函证逐笔判定（spec attachment-confirmation-evidence-loop 需求 6）。
+
+    族内没有登记函证时保持原判定；查询放在保存点里，失败不污染本次读取的事务（fail-open）。
+    """
+    targets = [r for r in requirements or [] if r.get("type") == "confirmation"]
+    if not targets or not wp_meta or not wp_meta.get("project_id"):
+        return
+    try:
+        from app.services.confirmation_evidence_status import confirmation_breakdown
+
+        async with db.begin_nested():
+            breakdown = await confirmation_breakdown(db, wp_meta["project_id"], wp_meta.get("wp_code"))
+    except Exception:
+        _fail_open("awp_confirmation_breakdown_fail_open", wp_id=wp_id)
+        return
+    if breakdown is None:
+        return
+    for req in targets:
+        req["breakdown"] = breakdown
+        req["satisfied"] = breakdown["missing"] == 0
+
+
 async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dict:
     """返回 ``{"items": [...], "evidence_requirements"?: [...], "stale_info"?: {...}}``。"""
     db = svc.db
@@ -186,6 +209,8 @@ async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dic
             result["evidence_requirements"] = ev_req
     except Exception:
         _fail_open("awp_evidence_requirements_fail_open", wp_id=wp_id)
+    else:
+        await _apply_confirmation_breakdown(db, wp_id, wp_meta, result.get("evidence_requirements"))
 
     # stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
     try:
