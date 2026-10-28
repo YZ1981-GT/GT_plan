@@ -263,5 +263,8 @@ async def test_target_project_is_checked_before_the_year(world):
         denied = await client.post(url, json={"project_id": str(X)})
     async with world.client(custom_query.router, user=admin) as client:
         no_year = await client.post(url, json={"project_id": str(X)})
-    assert (denied.status_code, denied.json()["detail"]["error_code"]) == (403, "FORBIDDEN_PROJECT")
+    # 先比状态码再取 error_code：变异 B8-g（去掉函数体内归属校验）时无权用户拿到 422（detail 是字符串），
+    # 红在「403 ≠ 422」上，而不是取 detail["error_code"] 时的 TypeError（B8 评审非阻塞 #1）
+    assert denied.status_code == 403, f"无权用户应先被归属校验拒绝（403），实得 {denied.status_code}：{denied.text[:300]}"
+    assert denied.json()["detail"]["error_code"] == "FORBIDDEN_PROJECT"
     assert (no_year.status_code, no_year.json()["detail"]) == (422, NO_YEAR)
