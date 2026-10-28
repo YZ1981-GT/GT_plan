@@ -346,7 +346,10 @@ class TemplateService:
         owner = func.coalesce(CustomQueryTemplate.creator_id, CustomQueryTemplate.created_by)
         stmt = (
             select(CustomQueryTemplate)
-            .where(or_(owner == user_id, CustomQueryTemplate.scope.in_(_SHARED_SCOPES)))
+            .where(
+                CustomQueryTemplate.is_deleted == False,  # noqa: E712 — 软删的在回收站，不进列表（R9.5）
+                or_(owner == user_id, CustomQueryTemplate.scope.in_(_SHARED_SCOPES)),
+            )
             .order_by(CustomQueryTemplate.updated_at.desc(), CustomQueryTemplate.id)
         )
         visible: list[CustomQueryTemplate] = []
@@ -358,6 +361,11 @@ class TemplateService:
                 break
             offset += _CANDIDATE_BATCH
         return visible[:limit]
+
+    async def soft_delete(self, template: CustomQueryTemplate, db: AsyncSession) -> None:
+        """删除模板 = 软删（R9.5，ADR-AQL-11）：进回收站，作者与 admin 可恢复 / 彻底删除。只 flush 不 commit。"""
+        template.soft_delete()
+        await db.flush()
 
     @staticmethod
     def validate_name(name: Any) -> str:

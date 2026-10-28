@@ -1047,7 +1047,7 @@ function onLoadTemplate(tpl: TemplateItem) {
 async function onDeleteTemplate(tpl: TemplateItem) {
   try {
     await ElMessageBox.confirm(
-      `确认删除模板「${tpl.name}」？此操作不可撤销。`,
+      `确认删除模板「${tpl.name}」？删除后可在回收站恢复。`,
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
     )

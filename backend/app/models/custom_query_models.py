@@ -21,7 +21,11 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, SoftDeleteMixin
+
+#: scope 允许的取值（TemplateScopeAdapter 接受的输入：四个规范值 + 历史 global / personal）；与迁移 V214 的检查约束、
+#: scripts/_ensure_custom_query_tables.py 的 SCOPE_VALUES 同一份（test_advanced_query_ddl_cross_lock 交叉锁死）
+TEMPLATE_SCOPE_VALUES = ("private", "team", "project", "public", "global", "personal")
 
 
 class _SqliteUuidList(sa.types.TypeDecorator):
@@ -41,14 +45,16 @@ class _SqliteUuidList(sa.types.TypeDecorator):
         return None if value is None else [uuid.UUID(str(item)) for item in value]
 
 
-class CustomQueryTemplate(Base):
+class CustomQueryTemplate(Base, SoftDeleteMixin):
     """自定义查询模板。
 
     - scope='private'：仅创建者可见
-    - scope='team'：团队可见
+    - scope='team'：团队可见（锚点项目 config.project_id 的成员）
+    - scope='project'：指定项目共享（shared_project_ids 中任一项目有访问权）
     - scope='public'：全员共享
-    - scope='global'：全员共享（legacy alias）
+    - scope='global' / 'personal'：public / private 的历史别名（只作输入与读取兼容）
     - config 含完整查询参数（含 cell_range / sheet_name / page_size / sort）
+    - 删除 = 软删（is_deleted / deleted_at，迁移 V214），进回收站，作者与 admin 可恢复 / 彻底删除
     """
 
     __tablename__ = "custom_query_templates"
@@ -126,6 +132,11 @@ class CustomQueryTemplate(Base):
         sa.Index("idx_cqt_tags", "tags", postgresql_using="gin"),
         sa.Index(
             "idx_cqt_shared_projects", "shared_project_ids", postgresql_using="gin"
+        ),
+        sa.Index("idx_cqt_live_updated", "is_deleted", sa.desc("updated_at")),
+        sa.CheckConstraint(
+            "scope IN (" + ", ".join(f"'{value}'" for value in TEMPLATE_SCOPE_VALUES) + ")",
+            name="ck_custom_query_templates_scope",
         ),
     )
 

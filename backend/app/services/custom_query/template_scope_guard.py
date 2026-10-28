@@ -85,7 +85,8 @@ async def _load_template(db: Any, template_id: Any) -> CustomQueryTemplate:
             status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID", "message": "模板标识非法"}
         ) from None
     tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if tpl is None:
+    # 已软删（在回收站里）的模板对详情 / 更新 / 删除 / 执行一律 404，恢复只走回收站（R9.5）
+    if tpl is None or getattr(tpl, "is_deleted", False):
         raise HTTPException(
             status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND", "message": "模板不存在或已删除"}
         )

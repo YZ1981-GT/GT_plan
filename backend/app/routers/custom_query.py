@@ -1357,7 +1357,7 @@ async def delete_template(
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_DELETE"})
-    await db.delete(tpl)
+    await template_service.soft_delete(tpl, db)  # 进回收站（R9.5）；原先 db.delete 硬删、无法找回（AQ-30）
     await db.commit()
     return None
 

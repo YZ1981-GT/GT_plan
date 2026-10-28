@@ -31,6 +31,8 @@
     "src/composables/__tests__/useLedgerUrlSync.spec.ts",
     "src/composables/useQueryBuilderAccess.ts",
     "src/composables/__tests__/useQueryBuilderAccess.spec.ts",
+    "src/views/RecycleBin.vue",
+    "src/views/__tests__/RecycleBin.rowActions.spec.ts",
     "src/env.d.ts"
   ]
 }
