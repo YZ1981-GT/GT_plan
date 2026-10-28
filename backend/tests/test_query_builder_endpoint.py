@@ -39,6 +39,7 @@ from app.models.audit_platform_models import (
 )
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
 from app.routers.query_builder import router as query_builder_router
+from app.services.custom_query import audit_helper
 from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -46,6 +47,18 @@ SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 PROJECT_ID = uuid.uuid4()
 USER_ID = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _no_shared_audit():
+    """审计写入换成空操作（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
+    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。"""
+    async def _no_audit(**_kwargs):
+        return True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(audit_helper, "_log_unthrottled", _no_audit)
+        yield
 
 
 class _FakeUser:

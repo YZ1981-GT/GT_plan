@@ -29,12 +29,29 @@ from app.deps import get_current_user
 from app.models.audit_platform_models import AccountCategory, TrialBalance
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
 from app.routers.query_builder import router as query_builder_router, _EXPORT_FETCH_SIZE
+from app.services.custom_query import audit_helper
 from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 PROJECT_ID = uuid.uuid4()
 USER_ID = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _audits():
+    """审计写入换成只记录（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
+    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。
+    模块级（不是函数级）：hypothesis 用例不接受函数级夹具。"""
+    recorded: list[dict] = []
+
+    async def _record(**kwargs):
+        recorded.append(kwargs)
+        return True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(audit_helper, "_log_unthrottled", _record)
+        yield recorded
 
 
 class _FakeUser:
@@ -109,8 +126,8 @@ async def _seed_many_rows(db: AsyncSession, count: int) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_streaming_export_basic(db_session: AsyncSession):
-    """流式导出返回有效 xlsx，表头+数据行完整。"""
+async def test_streaming_export_basic(db_session: AsyncSession, _audits: list[dict]):
+    """流式导出返回有效 xlsx，表头+数据行完整；审计经替身记录（没有写到共享 Redis）。"""
     await _seed_many_rows(db_session, 5)
     app = _make_app(db_session)
     payload = {
@@ -118,10 +135,12 @@ async def test_streaming_export_basic(db_session: AsyncSession):
         "fields": ["standard_account_code", "account_name", "audited_amount"],
         "limit": 100,
     }
+    before = len(_audits)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         resp = await ac.post("/api/query/export-excel", json=payload)
 
     assert resp.status_code == 200
+    assert [a["action"] for a in _audits[before:]] == ["custom_query.export"]
     assert "spreadsheetml" in resp.headers["content-type"]
 
     import openpyxl
