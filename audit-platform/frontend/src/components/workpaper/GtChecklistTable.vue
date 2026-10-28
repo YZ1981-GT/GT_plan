@@ -20,6 +20,7 @@ import GtChecklistSection from './GtChecklistSection.vue'
 import GtChecklistNav from './GtChecklistNav.vue'
 import GtChecklistObjectivePanel from './GtChecklistObjectivePanel.vue'
 import { useChecklistResponses } from '@/composables/useChecklistResponses'
+import { useArchiveChecklistSuggest } from '@/composables/useArchiveChecklistSuggest'
 import { useChecklistSearch } from '@/composables/useChecklistSearch'
 import { useChecklistApplicability } from '@/composables/useChecklistApplicability'
 import type {
@@ -27,19 +28,10 @@ import type {
   ChecklistHtmlData,
   ReviewSignHint,
 } from './checklistTypes'
+// 默认值须是导入的常量：defineProps 的默认值不能引用 <script setup> 里声明的变量（编译期报错，组件整页加载失败）
+import { CONCLUSION_MODE_COMPLETION, EMPTY_CHECKLIST_HTML_DATA } from './checklistTypes'
 
 // ─── Props / Emits ───
-const EMPTY_CHECKLIST_HTML_DATA: ChecklistHtmlData = {
-  template: {
-    wp_code: '',
-    title: '',
-    sections: [],
-    toc: [],
-    stats: { total_actionable: 0, total_guidance: 0, total_sections: 0 },
-  },
-  responses: {},
-}
-
 const props = withDefaults(defineProps<{
   wpId: string
   sheetName?: string
@@ -83,6 +75,7 @@ const {
   readonly: () => props.readonly,
   markPending: (itemId: string) => responsesApi.pendingChanges.value.add(itemId),
   scheduleSave: () => responsesApi.scheduleSave(),
+  sectionIds: () => toc.value.map((t) => t.id),
 })
 
 // 响应填写 + 自动保存（debounce 2s）；保存成功 emit('save') 由主组件持有
@@ -109,6 +102,17 @@ const {
   handleReset,
   flushBeacon,
 } = responsesApi
+
+// A30 电子底稿归档检查表：按项目底稿建议（只填空项）
+const archiveSuggest = useArchiveChecklistSuggest({
+  projectId: () => projectId.value,
+  wpId: () => props.wpId,
+  wpCode: () => props.htmlData?.template?.wp_code || '',
+  readonly: () => props.readonly,
+  getResponse,
+  updateConclusion,
+  itemLabel: (id: string) => id.replace(/^A30-/, ''),
+})
 
 // 搜索 / 高亮 / 跳转
 const {
@@ -224,6 +228,9 @@ const OBJECTIVE_PROGRAM_MAP: Record<number, { label: string; programs: number[] 
   },
 }
 const isA17_5 = computed(() => (template.value?.wp_code || '').startsWith('A17-5'))
+/** 结论选项：模板声明优先（A30 = 是 / 否 / 不适用），缺省按编码 */
+const conclusionMode = computed(() => template.value?.conclusion_mode || (isA17_5.value ? 'completion' : 'disclosure'))
+const isCompletionMode = computed(() => conclusionMode.value === CONCLUSION_MODE_COMPLETION)
 
 /** A17-5：「否」且无备注的开放项（签发阻断提示） */
 const openNoItems = computed(() => {
@@ -541,9 +548,9 @@ onMounted(() => {
   initFromProps()
   loadReviewSignHints()
   // Show applicability dialog on first open if no applicability data exists
-  // A17-5 系列只有 2 section（审计目标+核对程序）且都必须适用，不弹窗
+  // A17-5 系列只有 2 section（审计目标+核对程序）且都必须适用，不弹窗；只读（如已归档）存不了，也不弹
   const hasApplicabilityData = Object.keys(sectionApplicability.value).length > 0
-  if (!hasApplicabilityData && toc.value.length > 0 && !isA17_5.value) {
+  if (!hasApplicabilityData && toc.value.length > 0 && !isA17_5.value && !props.readonly) {
     nextTick(() => {
       showApplicabilityDialog.value = true
     })
@@ -612,12 +619,20 @@ onBeforeUnmount(() => {
       >
         章节适用性设置
       </el-button>
+      <el-button
+        v-if="archiveSuggest.available.value"
+        size="small"
+        :loading="archiveSuggest.applying.value"
+        @click="archiveSuggest.applySuggestions"
+      >
+        按项目底稿建议
+      </el-button>
       <el-popover placement="bottom" :width="360" trigger="hover">
         <template #reference>
           <el-button size="small" text>标识说明</el-button>
         </template>
         <div class="legend-content">
-          <template v-if="isA17_5">
+          <template v-if="isCompletionMode">
             <div class="legend-item"><span class="legend-tag tag-y">是</span> 已完成 / 已确认</div>
             <div class="legend-item"><span class="legend-tag tag-xw">否</span> 未完成 — 须备注说明，并可跳转上游底稿补做</div>
             <div class="legend-item"><span class="legend-tag tag-na">不适用</span> 本项目不适用该项</div>
@@ -697,7 +712,12 @@ onBeforeUnmount(() => {
             本章节批量标记 ▾
           </el-button>
           <template #dropdown>
-            <el-dropdown-menu>
+            <!-- 与结论选项同口径：是 / 否 / 不适用 的核对表（A17-5、A30）批量写 Y 会显示成选项外的原值；「否」须逐项备注，不批量 -->
+            <el-dropdown-menu v-if="isCompletionMode">
+              <el-dropdown-item command="是">全部标记「是」（已完成）</el-dropdown-item>
+              <el-dropdown-item command="不适用">全部标记「不适用」</el-dropdown-item>
+            </el-dropdown-menu>
+            <el-dropdown-menu v-else>
               <el-dropdown-item command="Y">全部标记 Y (适用已披露)</el-dropdown-item>
               <el-dropdown-item command="X/I">全部标记 X/I (适用不重大)</el-dropdown-item>
               <el-dropdown-item command="X/W">全部标记 X/W (适用重大未披露)</el-dropdown-item>
@@ -777,7 +797,7 @@ onBeforeUnmount(() => {
         :readonly="readonly"
         :has-standard-ref="template?.has_standard_ref !== false"
         :allow-custom-items="!!template?.allow_custom_items"
-        :conclusion-mode="isA17_5 ? 'completion' : 'disclosure'"
+        :conclusion-mode="conclusionMode"
         :project-id="projectId"
         :get-response="getResponse"
         :get-conclusion-class="getConclusionClass"

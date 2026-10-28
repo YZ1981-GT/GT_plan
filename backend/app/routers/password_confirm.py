@@ -59,7 +59,7 @@ async def verify_password_endpoint(
     """验证密码并返回一次性 confirmation_token。
 
     成功: { confirmation_token, expires_in: 300 }
-    失败: 401 + 失败计数
+    失败: 403 + error_code=PASSWORD_INVALID + 剩余次数
     锁定: 423 + locked_until
     """
     if redis is None:
@@ -99,9 +99,13 @@ async def verify_password_endpoint(
             {"attempts_remaining": attempts_remaining},
         )
 
+        # 403 而非 401（spec attachment-archive-and-a-class-evidence ADR-AE-07）：401 是会话失效语义，
+        # 前端拦截器会刷新令牌后重发（一次输错记两次失败）、仍 401 即登出跳登录页。
         raise HTTPException(
-            status_code=401,
+            status_code=403,
             detail={
+                "error_code": "PASSWORD_INVALID",
+                "message": "密码错误",
                 "detail": "Invalid password",
                 "attempts_remaining": attempts_remaining,
             },

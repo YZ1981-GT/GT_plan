@@ -313,10 +313,9 @@ class TestArchiveRetentionWriting:
 
         orchestrator = ArchiveOrchestrator(db_session)
 
-        # Mock 所有步骤
-        with patch.object(orchestrator, "_step_gate", new_callable=AsyncMock), \
-             patch.object(orchestrator, "_step_wp_storage", new_callable=AsyncMock), \
-             patch.object(orchestrator, "_persist_integrity_hashes", new_callable=AsyncMock), \
+        # 门禁 / 打包另有专测；保留期由锁定步骤写入（spec attachment-archive-and-a-class-evidence ADR-AE-04）
+        with patch.object(orchestrator, "_step_gate", new_callable=AsyncMock, return_value=None), \
+             patch.object(orchestrator, "_step_package", new_callable=AsyncMock, return_value={}), \
              patch.object(orchestrator, "_notify_project_members", new_callable=AsyncMock):
 
             job = await orchestrator.orchestrate(

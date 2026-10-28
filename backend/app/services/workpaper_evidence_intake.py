@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 #: 证据类型登记表（``ATTACHMENT_TYPES`` 的子集：去掉 ``general`` / ``workpaper_item``）；前端选项与之逐项一致。
 EVIDENCE_TYPES: frozenset[str] = frozenset({
-    "evidence", "support", "voucher", "contract", "bank_statement", "stocktake", "note", "confirmation",
+    "evidence", "support", "voucher", "contract", "bank_statement", "stocktake", "note", "confirmation", "signed",
 })
 DEFAULT_EVIDENCE_TYPE = "evidence"
 

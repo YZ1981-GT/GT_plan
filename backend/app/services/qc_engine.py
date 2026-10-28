@@ -581,30 +581,15 @@ class DataReferenceConsistencyRule(QCRule):
 
 
 class AttachmentSufficiencyRule(QCRule):
-    """QC-17: 附件证据充分性 — 底稿至少关联1个附件。"""
+    """QC-17: 证据充分性 — 按底稿证据声明判定，无声明不出结论（见 qc_rule_attachment_sufficiency）。"""
     severity = "blocking"
     rule_id = "QC-17"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        from app.models.attachment_models import AttachmentWorkingPaper
-        try:
-            result = await context.db.execute(
-                sa.select(sa.func.count()).select_from(AttachmentWorkingPaper).where(
-                    AttachmentWorkingPaper.wp_id == context.working_paper.id,
-                )
-            )
-            count = result.scalar() or 0
-        except Exception:
-            logger.warning(
-                "QC-17 AttachmentSufficiencyRule: 查询附件关联失败，底稿 id=%s",
-                context.working_paper.id,
-                exc_info=True,
-            )
-            return []
-        if count == 0:
-            return [QCFindingItem(rule_id=self.rule_id, severity=self.severity,
-                                  message="底稿未关联任何附件证据", actual_value=0, expected_value=1)]
-        return []
+        from app.services.qc_rule_attachment_sufficiency import evidence_sufficiency_findings
+
+        found = await evidence_sufficiency_findings(context.db, context.working_paper.id)
+        return [QCFindingItem(rule_id=self.rule_id, severity=self.severity, **f) for f in found]
 
 
 class CrossRefIntegrityRule(QCRule):

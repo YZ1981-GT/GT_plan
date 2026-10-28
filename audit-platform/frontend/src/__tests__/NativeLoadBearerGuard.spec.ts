@@ -73,7 +73,6 @@ const SCRIPT_NAVIGATIONS: Entry[] = [
   { file: 'stores/auth.ts', expr: "'/login'", kind: 'frontend-route', why: '登录页' },
   { file: 'utils/http.ts', expr: "'/login'", count: 3, kind: 'frontend-route', why: '登录页' },
   { file: 'utils/openLedgerWindow.ts', expr: 'resolved.href', kind: 'frontend-route', why: 'router.resolve 结果' },
-  { file: 'views/ArchiveWizard.vue', expr: 'jobData.value.output_url', kind: 'dormant', why: 'output_url 后端无写入方（归档打包属 Spec E，接线时按 /api 与否选 downloadFile）' },
   { file: 'views/ConsolidationIndex.vue', expr: 'finalRoute', kind: 'frontend-route', why: '地址库跳转路由' },
   { file: 'views/LedgerStandalonePage.vue', expr: '`/projects/${projectId.value}/ledger`', kind: 'frontend-route', why: '账表页' },
   { file: 'views/LedgerStandalonePage.vue', expr: "'/login'", kind: 'frontend-route', why: '登录页' },

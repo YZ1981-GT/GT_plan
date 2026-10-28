@@ -24,6 +24,7 @@ export const EVIDENCE_TYPE_OPTIONS = [
   { value: 'stocktake', label: '盘点 / 监盘记录' },
   { value: 'note', label: '票据影像' },
   { value: 'confirmation', label: '函证回函' },
+  { value: 'signed', label: '签字件' },
 ] as const
 
 export type EvidenceType = (typeof EVIDENCE_TYPE_OPTIONS)[number]['value']

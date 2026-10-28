@@ -1,5 +1,35 @@
 {
-  "_comment": "底稿证据类型声明 — attachment-workpaper-linkage-convergence Req4。wp_code_prefix → 应收集证据类型；宁缺勿造，未列出的底稿不提示。匹配规则：exact / prefix- / prefix+字母后缀（如 E1A）。",
+  "_comment": "底稿证据类型声明 — attachment-workpaper-linkage-convergence Req4。wp_code_prefix → 应收集证据类型；宁缺勿造，未列出的底稿不提示。匹配规则：exact / prefix- / prefix+字母后缀（如 E1A），多键命中取最长；键以 = 开头为精确匹配（如 =A16 只匹配 A16，不被 A16-1 继承），优先于前缀键（attachment-archive-and-a-class-evidence）。",
+  "=A10": [
+    { "type": "signed", "label": "与治理层沟通函签字件" }
+  ],
+  "A10-1": [
+    { "type": "signed", "label": "与治理层沟通函签字件" }
+  ],
+  "=A16": [
+    { "type": "signed", "label": "管理层声明书签字件" }
+  ],
+  "A17-6": [
+    { "type": "signed", "label": "总结会会议纪要签字件" }
+  ],
+  "A17-7": [
+    { "type": "signed", "label": "独立性声明书签字件" }
+  ],
+  "A18-1": [
+    { "type": "signed", "label": "审计小结报送函签字件" }
+  ],
+  "A18-2": [
+    { "type": "signed", "label": "与监管层沟通函签字件" }
+  ],
+  "A8-1": [
+    { "type": "signed", "label": "其他信息书面声明签字件" }
+  ],
+  "A9-1": [
+    { "type": "signed", "label": "内部控制缺陷沟通函（管理层）签字件" }
+  ],
+  "A9-2": [
+    { "type": "signed", "label": "内部控制缺陷沟通函（治理层）签字件" }
+  ],
   "A12-1": [
     { "type": "confirmation", "label": "律师询证函回函" }
   ],
@@ -45,4 +75,3 @@
     { "type": "contract", "label": "产权/权属证明" }
   ]
 }
-

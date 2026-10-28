@@ -489,12 +489,11 @@ class TestQCEngine:
         ("conclusion", "QC-01"),
         ("reviewer", "QC-04"),
         ("audit_explanation", "QC-15"),
-        ("attachment", "QC-17"),
     ])
     async def test_qc_check_blocks_on_each_missing_item(
         self, db_session, seeded_db, missing, rule_id
     ):
-        """只缺一项 ⇒ 恰好它对应的那条阻断规则命中（四条规则各自独立把关）。"""
+        """只缺一项 ⇒ 恰好它对应的那条阻断规则命中（QC-17 按证据声明判定，见 attachment_archive_evidence/test_qc17_evidence）。"""
         from app.services.qc_engine import QCEngine
         wp = await _make_qc_ready(db_session, seeded_db["wp1"], without=missing)
         result = await QCEngine().check(db_session, wp.id)
@@ -504,14 +503,14 @@ class TestQCEngine:
         ]
 
     @pytest.mark.asyncio
-    async def test_qc_check_bare_workpaper_fails_four_blocking_rules(self, db_session, seeded_db):
-        """裸底稿（无结论 / 复核人 / 审计说明 / 附件）⇒ 恰好 QC-01/04/15/17 四条阻断。"""
+    async def test_qc_check_bare_workpaper_fails_three_blocking_rules(self, db_session, seeded_db):
+        """裸底稿（无结论 / 复核人 / 审计说明 / 附件）⇒ 恰好 QC-01/04/15 三条阻断；B1-1 无证据声明，不出 QC-17。"""
         from app.services.qc_engine import QCEngine
         result = await QCEngine().check(db_session, seeded_db["wp1"].id)
         assert result["passed"] is False
-        assert (result["blocking_count"], result["warning_count"], result["info_count"]) == (4, 0, 0)
+        assert (result["blocking_count"], result["warning_count"], result["info_count"]) == (3, 0, 0)
         assert sorted(f["rule_id"] for f in result["findings"]) == [
-            "QC-01", "QC-04", "QC-15", "QC-17"
+            "QC-01", "QC-04", "QC-15"
         ]
 
     @pytest.mark.asyncio

@@ -132,8 +132,8 @@ async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, r
         req["satisfied"] = breakdown["missing"] == 0
 
 
-async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dict:
-    """返回 ``{"items": [...], "evidence_requirements"?: [...], "stale_info"?: {...}}``。"""
+async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
+    """四个来源合并去重后的附件项（不含证据声明与失效信息）。"""
     db = svc.db
     by_id: dict[str, dict] = {}
 
@@ -195,6 +195,36 @@ async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dic
     for item in items:
         item.setdefault("evidence_positions", [])
     await annotate_linked_wp_count(db, items)
+    return items
+
+
+async def evaluate_wp_evidence_requirements(db, wp_id: UUID) -> list[dict] | None:
+    """底稿证据声明的满足情况（与附件抽屉同一判定，含函证逐笔拆分）；无声明 ⇒ None。
+
+    QC-17 与归档完整性检查共用（spec attachment-archive-and-a-class-evidence ADR-AE-09）。
+    """
+    from app.services.attachment_service import AttachmentService
+    from app.services.workpaper_evidence_requirements import (
+        build_evidence_requirements,
+        resolve_requirements_for_wp_code,
+    )
+
+    svc = AttachmentService(db)
+    wp_meta = await svc._resolve_wp_meta(wp_id)
+    wp_code = wp_meta.get("wp_code") if wp_meta else None
+    if not resolve_requirements_for_wp_code(wp_code):
+        return None
+    requirements = build_evidence_requirements(wp_code, await _collect_items(svc, wp_id))
+    if requirements is None:
+        return None
+    await _apply_confirmation_breakdown(db, wp_id, wp_meta, requirements)
+    return requirements
+
+
+async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dict:
+    """返回 ``{"items": [...], "evidence_requirements"?: [...], "stale_info"?: {...}}``。"""
+    db = svc.db
+    items = await _collect_items(svc, wp_id)
     result: dict = {"items": items}
 
     # 一次取 wp 元数据，供证据声明 + stale 共用

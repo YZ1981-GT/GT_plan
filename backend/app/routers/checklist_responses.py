@@ -726,6 +726,11 @@ async def _do_batch_save(
                 # H 固定资产循环（含 H8 使用权资产 / H9 租赁负债）：明细/审定/披露 JSON 与
                 # 审计说明均存 remark，conclusion 常为 null 或审定数字符串，跳过白名单。
                 pass
+            elif item.item_id.startswith(("A30-", "A17-5-")):
+                # 是 / 否 / 不适用 的核对表（A30 归档检查表、A17-5；A17-5 兼容旧值）：原先落到下方默认白名单 ⇒ 恒 422
+                allowed = ("是", "否", "不适用") + (("Y", "N", "X/I", "X/W", "N/A") if item.item_id.startswith("A17-5-") else ())
+                if item.conclusion not in allowed:
+                    raise HTTPException(status_code=422, detail=f"conclusion 值必须为 是/否/不适用，收到: '{item.conclusion}'")
             else:
                 allowed = ("Y", "N", "X/I", "X/W", "N/A")
                 if item.item_id.endswith("-sign-status"):
