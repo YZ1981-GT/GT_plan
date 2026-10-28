@@ -36,6 +36,9 @@ export interface RelatedPartyRow {
   impairment: number       // 坏账准备
   bookValue: number        // 账面价值 = 期末余额-坏账准备（自动）
   agingAndTiming: string   // 发生时间及账龄
+  /** 发生原因（款项性质）—— 模板 D6-5 J 列（spec oo-writeback-template-parity-closure R3 批 B2 补；
+   *  下面「未结转原因 / 至审计日结转金额 / 处理计划」三列模板没有，只在 HTML 侧） */
+  transactionReason: string
   unsettledReason: string  // 未结转原因
   postSettlement: number   // 至审计日结转金额
   plan: string             // 处理计划
@@ -105,6 +108,7 @@ function normalizeRow(raw: any): RelatedPartyRow {
     impairment: parseNum(raw.impairment),
     bookValue: parseNum(raw.bookValue),
     agingAndTiming: raw.agingAndTiming || '',
+    transactionReason: raw.transactionReason || '',
     unsettledReason: raw.unsettledReason || '',
     postSettlement: parseNum(raw.postSettlement),
     plan: raw.plan || '',
@@ -136,6 +140,7 @@ export function createEmptyRow(): RelatedPartyRow {
     impairment: 0,
     bookValue: 0,
     agingAndTiming: '',
+    transactionReason: '',
     unsettledReason: '',
     postSettlement: 0,
     plan: '',
@@ -243,6 +248,7 @@ export function useD6RelatedParty(options: UseD6RelatedPartyOptions) {
           impairment: 0,
           bookValue: 0,
           agingAndTiming: '',
+          transactionReason: '',
           unsettledReason: '',
           postSettlement: parseNum(r.postPeriodSettlement),
           plan: '',

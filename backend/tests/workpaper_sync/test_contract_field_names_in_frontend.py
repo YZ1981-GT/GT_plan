@@ -25,8 +25,8 @@ from tests.workpaper_sync import contract_field_names_scan as S
 REGISTRY = Path(__file__).resolve().parent / "data" / "contract_field_names_frontend_exceptions.json"
 
 #: 登记的组数 / 字段名数（只许减少：接通一组删一组并改小这里；新增要在评审里说明为什么不改契约或前端）
-BASELINE_GROUPS = 46
-BASELINE_NAMES = 445
+BASELINE_GROUPS = 42
+BASELINE_NAMES = 415
 
 
 @pytest.fixture(scope="module")
@@ -78,12 +78,15 @@ def test_extra_scope_entries_exist(corpus: S.Corpus) -> None:
 
 
 def test_wired_table_reports_nothing(misses: dict[str, set[str]]) -> None:
-    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4 / E1-4，批 B 起 D3-5 / F4-2 / G6-5）一个都不报 ——
+    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4 / E1-4，批 B 起 D3-5 / F4-2 / G6-5 / D3-7 / D7-7 / D6-5）一个都不报 ——
     现算不是「什么都报」。"""
     for key in ("d5.receivables_financing_detail|D5-2-rows", "d3.prepaid_receipts_detail|D3-ana-credit-rows",
                 "f3.notes_payable_detail|F3-4-rows", "e1.monetary_fund_detail|E1-digital-rows",
                 "d3.prepaid_receipts_detail|D3-lt-rows", "f4.accounts_payable_detail|F4-2-rows",
-                "g6.other_bond_main|G6-5-fair-value-data", "g4.bond_main|G4-7-items"):
+                "g6.other_bond_main|G6-5-fair-value-data", "g4.bond_main|G4-7-items",
+                "d3.prepaid_receipts_detail|D3-vc-current-rows", "d3.prepaid_receipts_detail|D3-vc-post-rows",
+                "d7.contract_liabilities_detail|D7-7-period-rows", "d7.contract_liabilities_detail|D7-7-post-rows",
+                "d6.contract_assets_detail|D6-5-rows"):
         assert key not in misses, (key, sorted(misses.get(key, ())))
 
 

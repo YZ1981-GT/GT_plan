@@ -1122,7 +1122,7 @@
               },
               "column_key": "impairment",
               "header_source_ref": "源xlsx!关联关系及交易检查D6-5!G9",
-              "header_text": "坏账准备",
+              "header_text": "减：坏账准备",
               "json_pointer": "/rows/{row_uuid}/impairment",
               "mode": "editable",
               "source_ref": "源xlsx!关联关系及交易检查D6-5!G10",
@@ -1165,13 +1165,13 @@
                 "column": "J",
                 "row_from": "row_identity"
               },
-              "column_key": "unsettled_reason",
+              "column_key": "transaction_reason",
               "header_source_ref": "源xlsx!关联关系及交易检查D6-5!J9",
-              "header_text": "未结转原因",
-              "json_pointer": "/rows/{row_uuid}/unsettledReason",
+              "header_text": "发生原因（款项性质）",
+              "json_pointer": "/rows/{row_uuid}/transactionReason",
               "mode": "editable",
               "source_ref": "源xlsx!关联关系及交易检查D6-5!J10",
-              "stable_field_key": "related_party_rows/{row_uuid}/unsettled_reason",
+              "stable_field_key": "related_party_rows/{row_uuid}/transaction_reason",
               "store_item_id": "D6-5-rows",
               "value_type": "text"
             },
@@ -1180,57 +1180,27 @@
                 "column": "K",
                 "row_from": "row_identity"
               },
-              "column_key": "post_settlement",
-              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!K9",
-              "header_text": "至审计日结转金额",
-              "json_pointer": "/rows/{row_uuid}/postSettlement",
-              "mode": "editable",
-              "source_ref": "源xlsx!关联关系及交易检查D6-5!K10",
-              "stable_field_key": "related_party_rows/{row_uuid}/post_settlement",
-              "store_item_id": "D6-5-rows",
-              "value_type": "amount"
-            },
-            {
-              "cell": {
-                "column": "L",
-                "row_from": "row_identity"
-              },
-              "column_key": "plan",
-              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!L9",
-              "header_text": "处理计划",
-              "json_pointer": "/rows/{row_uuid}/plan",
-              "mode": "editable",
-              "source_ref": "源xlsx!关联关系及交易检查D6-5!L10",
-              "stable_field_key": "related_party_rows/{row_uuid}/plan",
-              "store_item_id": "D6-5-rows",
-              "value_type": "text"
-            },
-            {
-              "cell": {
-                "column": "M",
-                "row_from": "row_identity"
-              },
               "column_key": "index_ref",
-              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!M9",
+              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!K9",
               "header_text": "索引号",
               "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
-              "source_ref": "源xlsx!关联关系及交易检查D6-5!M10",
+              "source_ref": "源xlsx!关联关系及交易检查D6-5!K10",
               "stable_field_key": "related_party_rows/{row_uuid}/index_ref",
               "store_item_id": "D6-5-rows",
               "value_type": "text"
             },
             {
               "cell": {
-                "column": "N",
+                "column": "L",
                 "row_from": "row_identity"
               },
               "column_key": "remark",
-              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!N9",
+              "header_source_ref": "源xlsx!关联关系及交易检查D6-5!L9",
               "header_text": "备注",
               "json_pointer": "/rows/{row_uuid}/remark",
               "mode": "editable",
-              "source_ref": "源xlsx!关联关系及交易检查D6-5!N10",
+              "source_ref": "源xlsx!关联关系及交易检查D6-5!L10",
               "stable_field_key": "related_party_rows/{row_uuid}/remark",
               "store_item_id": "D6-5-rows",
               "value_type": "text"
@@ -1412,7 +1382,7 @@
       "sheet_key": "d66-managed",
       "tables": [
         {
-          "anchor": "A16",
+          "anchor": "A17",
           "delete_policy": "tombstone",
           "fields": [
             {
@@ -1421,7 +1391,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "customer_name",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!A16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!A17",
               "header_text": "客户名称",
               "json_pointer": "/rows/{row_uuid}/customerName",
               "mode": "editable",
@@ -1436,7 +1406,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "date",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!B17",
               "header_text": "日期",
               "json_pointer": "/rows/{row_uuid}/date",
               "mode": "editable",
@@ -1451,8 +1422,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "voucher_no",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!C16",
-              "header_text": "凭证号",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!C17",
+              "header_text": "凭证编号",
               "json_pointer": "/rows/{row_uuid}/voucherNo",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!C18",
@@ -1466,8 +1438,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "business_content",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!D16",
-              "header_text": "经济业务内容",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!D17",
+              "header_text": "业务内容",
               "json_pointer": "/rows/{row_uuid}/businessContent",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!D18",
@@ -1481,7 +1454,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "counter_account",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!E16",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!E17",
               "header_text": "对方科目",
               "json_pointer": "/rows/{row_uuid}/counterAccount",
               "mode": "editable",
@@ -1496,8 +1470,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "counter_detail",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!F16",
-              "header_text": "对方明细",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!F17",
+              "header_text": "对方明细科目",
               "json_pointer": "/rows/{row_uuid}/counterDetail",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!F18",
@@ -1511,7 +1486,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "debit_amount",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!G16",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!G17",
               "header_text": "借方金额",
               "json_pointer": "/rows/{row_uuid}/debitAmount",
               "mode": "editable",
@@ -1526,7 +1502,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "credit_amount",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!H16",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!H17",
               "header_text": "贷方金额",
               "json_pointer": "/rows/{row_uuid}/creditAmount",
               "mode": "editable",
@@ -1541,7 +1518,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "support_doc",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!I16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!I17",
               "header_text": "支持性文件",
               "json_pointer": "/rows/{row_uuid}/supportDoc",
               "mode": "editable",
@@ -1556,8 +1533,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check1",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!J16",
-              "header_text": "检查1",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!J17",
+              "header_text": "核对内容1",
               "json_pointer": "/rows/{row_uuid}/check1",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!J18",
@@ -1571,8 +1549,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check2",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!K16",
-              "header_text": "检查2",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!K17",
+              "header_text": "核对内容2",
               "json_pointer": "/rows/{row_uuid}/check2",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!K18",
@@ -1586,8 +1565,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check3",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!L16",
-              "header_text": "检查3",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!L17",
+              "header_text": "核对内容3",
               "json_pointer": "/rows/{row_uuid}/check3",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!L18",
@@ -1601,8 +1581,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check4",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!M16",
-              "header_text": "检查4",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!M17",
+              "header_text": "核对内容4",
               "json_pointer": "/rows/{row_uuid}/check4",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!M18",
@@ -1616,8 +1597,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check5",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!N16",
-              "header_text": "检查5",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!N17",
+              "header_text": "核对内容5",
               "json_pointer": "/rows/{row_uuid}/check5",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!N18",
@@ -1631,7 +1613,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "index_ref",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!O16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!O17",
               "header_text": "索引号",
               "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
@@ -1646,7 +1628,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "is_abnormal",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!P16",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!P17",
               "header_text": "是否异常",
               "json_pointer": "/rows/{row_uuid}/isAbnormal",
               "mode": "editable",
@@ -1661,8 +1643,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "remark",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!Q16",
-              "header_text": "备注",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!Q17",
+              "header_text": "备注说明",
               "json_pointer": "/rows/{row_uuid}/remark",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!Q18",
@@ -1685,7 +1667,7 @@
           "table_key": "inspection_block1_rows"
         },
         {
-          "anchor": "A33",
+          "anchor": "A34",
           "delete_policy": "tombstone",
           "fields": [
             {
@@ -1694,7 +1676,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "customer_name",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!A33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!A34",
               "header_text": "客户名称",
               "json_pointer": "/rows/{row_uuid}/customerName",
               "mode": "editable",
@@ -1709,7 +1691,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "date",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!B34",
               "header_text": "日期",
               "json_pointer": "/rows/{row_uuid}/date",
               "mode": "editable",
@@ -1724,8 +1707,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "voucher_no",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!C33",
-              "header_text": "凭证号",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!C34",
+              "header_text": "凭证编号",
               "json_pointer": "/rows/{row_uuid}/voucherNo",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!C35",
@@ -1739,8 +1723,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "business_content",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!D33",
-              "header_text": "经济业务内容",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!D34",
+              "header_text": "业务内容",
               "json_pointer": "/rows/{row_uuid}/businessContent",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!D35",
@@ -1754,7 +1739,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "counter_account",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!E33",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!E34",
               "header_text": "对方科目",
               "json_pointer": "/rows/{row_uuid}/counterAccount",
               "mode": "editable",
@@ -1769,8 +1755,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "counter_detail",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!F33",
-              "header_text": "对方明细",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!F34",
+              "header_text": "对方明细科目",
               "json_pointer": "/rows/{row_uuid}/counterDetail",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!F35",
@@ -1783,13 +1770,14 @@
                 "column": "G",
                 "row_from": "row_identity"
               },
-              "column_key": "debit_amount",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!G33",
-              "header_text": "借方金额",
-              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "column_key": "credit_amount",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!B33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!G34",
+              "header_text": "贷方金额",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!G35",
-              "stable_field_key": "inspection_block2_rows/{row_uuid}/debit_amount",
+              "stable_field_key": "inspection_block2_rows/{row_uuid}/credit_amount",
               "store_item_id": "D6-6-block2-rows",
               "value_type": "amount"
             },
@@ -1798,27 +1786,12 @@
                 "column": "H",
                 "row_from": "row_identity"
               },
-              "column_key": "credit_amount",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!H33",
-              "header_text": "贷方金额",
-              "json_pointer": "/rows/{row_uuid}/creditAmount",
-              "mode": "editable",
-              "source_ref": "源xlsx!合同资产检查表D6-6!H35",
-              "stable_field_key": "inspection_block2_rows/{row_uuid}/credit_amount",
-              "store_item_id": "D6-6-block2-rows",
-              "value_type": "amount"
-            },
-            {
-              "cell": {
-                "column": "I",
-                "row_from": "row_identity"
-              },
               "column_key": "support_doc",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!I33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!H34",
               "header_text": "支持性文件",
               "json_pointer": "/rows/{row_uuid}/supportDoc",
               "mode": "editable",
-              "source_ref": "源xlsx!合同资产检查表D6-6!I35",
+              "source_ref": "源xlsx!合同资产检查表D6-6!H35",
               "stable_field_key": "inspection_block2_rows/{row_uuid}/support_doc",
               "store_item_id": "D6-6-block2-rows",
               "value_type": "text"
@@ -1829,8 +1802,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check1",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!J33",
-              "header_text": "检查1",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!J34",
+              "header_text": "核对内容1",
               "json_pointer": "/rows/{row_uuid}/check1",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!J35",
@@ -1844,8 +1818,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check2",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!K33",
-              "header_text": "检查2",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!K34",
+              "header_text": "核对内容2",
               "json_pointer": "/rows/{row_uuid}/check2",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!K35",
@@ -1859,8 +1834,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check3",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!L33",
-              "header_text": "检查3",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!L34",
+              "header_text": "核对内容3",
               "json_pointer": "/rows/{row_uuid}/check3",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!L35",
@@ -1874,8 +1850,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check4",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!M33",
-              "header_text": "检查4",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!M34",
+              "header_text": "核对内容4",
               "json_pointer": "/rows/{row_uuid}/check4",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!M35",
@@ -1889,8 +1866,9 @@
                 "row_from": "row_identity"
               },
               "column_key": "check5",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!N33",
-              "header_text": "检查5",
+              "group_source_ref": "源xlsx!合同资产检查表D6-6!J33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!N34",
+              "header_text": "核对内容5",
               "json_pointer": "/rows/{row_uuid}/check5",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!N35",
@@ -1904,7 +1882,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "index_ref",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!O33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!O34",
               "header_text": "索引号",
               "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
@@ -1919,7 +1897,7 @@
                 "row_from": "row_identity"
               },
               "column_key": "is_abnormal",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!P33",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!P34",
               "header_text": "是否异常",
               "json_pointer": "/rows/{row_uuid}/isAbnormal",
               "mode": "editable",
@@ -1934,8 +1912,8 @@
                 "row_from": "row_identity"
               },
               "column_key": "remark",
-              "header_source_ref": "源xlsx!合同资产检查表D6-6!Q33",
-              "header_text": "备注",
+              "header_source_ref": "源xlsx!合同资产检查表D6-6!Q34",
+              "header_text": "备注说明",
               "json_pointer": "/rows/{row_uuid}/remark",
               "mode": "editable",
               "source_ref": "源xlsx!合同资产检查表D6-6!Q35",

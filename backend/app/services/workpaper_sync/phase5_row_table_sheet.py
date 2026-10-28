@@ -39,8 +39,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from app.services.workpaper_sync.contracts import ValueType, is_template_skeleton_identity
+from app.services.workpaper_sync.contracts import is_template_skeleton_identity
 from app.services.workpaper_sync.excel_extract import BindingKind
+from app.services.workpaper_sync.phase5_row_value_codec import (
+    ensure_row_arrays,
+    to_projection_value,
+    to_store_value,
+)
 from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
 __all__ = [
@@ -205,6 +210,12 @@ class RowTableSheetSpec:
     #: 无条件写会让全部既有契约 JSON 的 content-address 一起变，把「一张表开表」变成
     #: 「62 份契约全体变更」，golden digest 门禁届时无法区分「谁真的改了」。
     row_convergence: str = "clear"
+
+    #: 行内数组缺省形态 `((键, 长度, 填充值), …)`，如 `(("checkItems", 5, False),)`：回写写 `checkItems/N`
+    #: 前行里没有该数组就先建好；勾选列未勾在 Excel 里留空（投影 False → None、回写 None → False）。
+    #: 换算与建数组在 `phase5_row_value_codec`（spec oo-writeback-template-parity-closure R3 批 B2）。
+    row_array_defaults: tuple[tuple[str, int, object], ...] = ()
+    boolean_unchecked_as_blank: bool = False
 
     @property
     def formula_mask(self) -> tuple[str, ...]:
@@ -503,18 +514,8 @@ def split_store_row(
     """
     for column_key, _column, _mode, _vt, json_path, _label, _group in managed_field_specs(spec):
         field_spec = contract.field_by_stable_key(stable_key_for(spec, column_key))
-        raw_value = resolve_json_path(row, json_path)
-        # FC-10：percent_points 类型的值在 store 里是百分数（3.5 = 3.5%），
-        # Excel 期望小数（0.035）⇒ 投影时 ÷100。对称的 ×100 在 merge_projection_into_store_rows 里。
-        if (
-            raw_value is not None
-            and field_spec.value_type is ValueType.percent_points
-        ):
-            try:
-                from decimal import Decimal as _D
-                raw_value = _D(str(raw_value)) / _D("100")
-            except Exception:
-                pass  # 非数值保持原值，normalize_value 会拒绝
+        # FC-10 percent_points ÷100、勾选列未勾留空（对称的回写换算在 merge_projection_into_store_rows）
+        raw_value = to_projection_value(spec, field_spec.value_type, resolve_json_path(row, json_path))
         yield (
             stable_key_for(spec, column_key, row_identity),
             raw_value,
@@ -750,19 +751,10 @@ def merge_projection_into_store_rows(
         if not json_path:
             continue
         visited += 1
-        new_val = getattr(fv, "value", None)
-        # FC-10：percent_points 反向换算（Excel 0.035 → store 3.5），与 split_store_row 的 ÷100 对称
-        vtype = getattr(fv, "value_type", None)
-        if (
-            new_val is not None
-            and vtype is not None
-            and str(vtype) == ValueType.percent_points.value
-        ):
-            try:
-                from decimal import Decimal as _D
-                new_val = float(_D(str(new_val)) * _D("100"))
-            except Exception:
-                pass
+        # FC-10 percent_points ×100、勾选列空格 → False（与 split_store_row 对称）。🔴 原写
+        # `str(vtype) == "percent_points"`：FieldValue.value_type 是枚举，str() 得「ValueType.percent_points」恒不等 ⇒ ×100 从未生效。
+        new_val = to_store_value(spec, getattr(fv, "value_type", None), getattr(fv, "value", None))
+        ensure_row_arrays(spec, target, json_path)
         if set_json_path(target, json_path, new_val):
             applied += 1
             touched_rows.add(str(rid))

@@ -71,7 +71,7 @@ from app.services.workpaper_sync.phase5_d6_contract_assets import SPEC_D62  # no
 _NEW_D6_SHEETS = [
     ("D6-3-single", SPEC_D603_SINGLE, "D6-3-rows", 14),
     ("D6-3-group", SPEC_D603_GROUP, "D6-3-rows", 14),
-    ("D6-5", SPEC_D605, "D6-5-rows", 14),
+    ("D6-5", SPEC_D605, "D6-5-rows", 12),  # 模板 R9 的 12 列（spec oo-writeback-template-parity-closure R3 批 B2a）
     ("D6-8", SPEC_D608, "D6-8-single-rows", 8),
 ]
 SPEC_D603 = SPEC_D603_SINGLE  # 下方静默面实验只需任一无账龄的 D6 spec

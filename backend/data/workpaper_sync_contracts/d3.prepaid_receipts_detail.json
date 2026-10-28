@@ -1012,7 +1012,7 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!B15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!B16",
               "header_text": "日期",
-              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "json_pointer": "/rows/{row_uuid}/date",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!B17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/voucher_date",
@@ -1076,7 +1076,7 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!B15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!F16",
               "header_text": "对方明细科目",
-              "json_pointer": "/rows/{row_uuid}/counterSubAccount",
+              "json_pointer": "/rows/{row_uuid}/counterDetailAccount",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!F17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/counter_sub_account",
@@ -1139,12 +1139,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!J16",
               "header_text": "核对内容1",
-              "json_pointer": "/rows/{row_uuid}/check1",
+              "json_pointer": "/rows/{row_uuid}/checkItems/0",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!J17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/check1",
               "store_item_id": "D3-vc-current-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1155,12 +1155,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!K16",
               "header_text": "核对内容2",
-              "json_pointer": "/rows/{row_uuid}/check2",
+              "json_pointer": "/rows/{row_uuid}/checkItems/1",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!K17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/check2",
               "store_item_id": "D3-vc-current-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1171,12 +1171,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!L16",
               "header_text": "核对内容3",
-              "json_pointer": "/rows/{row_uuid}/check3",
+              "json_pointer": "/rows/{row_uuid}/checkItems/2",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!L17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/check3",
               "store_item_id": "D3-vc-current-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1187,12 +1187,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!M16",
               "header_text": "核对内容4",
-              "json_pointer": "/rows/{row_uuid}/check4",
+              "json_pointer": "/rows/{row_uuid}/checkItems/3",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!M17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/check4",
               "store_item_id": "D3-vc-current-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1203,12 +1203,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J15",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!N16",
               "header_text": "核对内容5",
-              "json_pointer": "/rows/{row_uuid}/check5",
+              "json_pointer": "/rows/{row_uuid}/checkItems/4",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!N17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/check5",
               "store_item_id": "D3-vc-current-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1218,7 +1218,7 @@
               "column_key": "index_no",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!O16",
               "header_text": "索引号",
-              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!O17",
               "stable_field_key": "voucher_check_current_rows/{row_uuid}/index_no",
@@ -1297,7 +1297,7 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!B29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!B30",
               "header_text": "日期",
-              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "json_pointer": "/rows/{row_uuid}/date",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!B31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/voucher_date",
@@ -1361,7 +1361,7 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!B29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!F30",
               "header_text": "对方明细科目",
-              "json_pointer": "/rows/{row_uuid}/counterSubAccount",
+              "json_pointer": "/rows/{row_uuid}/counterDetailAccount",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!F31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/counter_sub_account",
@@ -1408,12 +1408,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!J30",
               "header_text": "核对内容1",
-              "json_pointer": "/rows/{row_uuid}/check1",
+              "json_pointer": "/rows/{row_uuid}/checkItems/0",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!J31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/check1",
               "store_item_id": "D3-vc-post-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1424,12 +1424,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!K30",
               "header_text": "核对内容2",
-              "json_pointer": "/rows/{row_uuid}/check2",
+              "json_pointer": "/rows/{row_uuid}/checkItems/1",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!K31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/check2",
               "store_item_id": "D3-vc-post-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1440,12 +1440,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!L30",
               "header_text": "核对内容3",
-              "json_pointer": "/rows/{row_uuid}/check3",
+              "json_pointer": "/rows/{row_uuid}/checkItems/2",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!L31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/check3",
               "store_item_id": "D3-vc-post-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1456,12 +1456,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!M30",
               "header_text": "核对内容4",
-              "json_pointer": "/rows/{row_uuid}/check4",
+              "json_pointer": "/rows/{row_uuid}/checkItems/3",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!M31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/check4",
               "store_item_id": "D3-vc-post-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1472,12 +1472,12 @@
               "group_source_ref": "源xlsx!预收账款检查表D3-7!J29",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!N30",
               "header_text": "核对内容5",
-              "json_pointer": "/rows/{row_uuid}/check5",
+              "json_pointer": "/rows/{row_uuid}/checkItems/4",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!N31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/check5",
               "store_item_id": "D3-vc-post-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -1487,7 +1487,7 @@
               "column_key": "index_no",
               "header_source_ref": "源xlsx!预收账款检查表D3-7!O30",
               "header_text": "索引号",
-              "json_pointer": "/rows/{row_uuid}/indexNo",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
               "mode": "editable",
               "source_ref": "源xlsx!预收账款检查表D3-7!O31",
               "stable_field_key": "voucher_check_post_rows/{row_uuid}/index_no",

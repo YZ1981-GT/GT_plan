@@ -93,9 +93,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    E1-4 序号改 auto_source 并补管 M~Q 五列（模板有表头）。列键（column_key）不变。
     #    同 spec 批 A2c（`62bb2dd7…` → `04a93e55…`）：D3-4 两区行身份键 rowId → rowKey（前端与导入只写 rowKey），
     #    区②贷方表头改取 R20、D / E 两列接 counterCheck / remark（原共用区①四列，D 接成备注、E 没管）。
-    #    同 spec 批 B1（→ 本值）：D3-5 长期挂账表 json 键改前端 customerName / endBalance / businessDescription /
-    #    reason / settlementAmount（字段名守卫报出）。
-    "d3.prepaid_receipts_detail.json": "6496af76ac9f0cb0",
+    #    同 spec 批 B1（→ `6496af76…`）：D3-5 长期挂账表 json 键改前端 customerName / endBalance /
+    #    businessDescription / reason / settlementAmount（字段名守卫报出）。
+    #    同 spec 批 B2a（→ 本值）：D3-7 检查表两区 json 键改前端 date / counterDetailAccount / indexRef，
+    #    核对内容 J..N 改接 checkItems/0..4（boolean，未勾留空）。
+    "d3.prepaid_receipts_detail.json": "eab2db8e3388ddee",
     "d4.revenue_detail.json": "7b1d6362eeba4a7d",
     "d5.receivables_financing_detail.json": "b76e345cc29797b5",
     # 🔴 2026-10-27 同批更新 d6 / d7（spec oo-writeback-template-parity-closure R3 任务 9 批 A2）：
@@ -103,8 +105,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    改接 priorUnadjusted / priorAje / priorRje（原 B 接成 category、priorRje 没接）；
     #    D7-4 区② 由「期末主要债权人余额分析」R27-36 改接「贷方发生额分析」R21-22（前端 D7-4-credit-rows
     #    存的是后者），D / E 两列接 counterCheck / remark。
-    "d6.contract_assets_detail.json": "8d53379f4378d3ba",
-    "d7.contract_liabilities_detail.json": "617ef0d359cd448a",
+    #    同 spec 批 B2a（`8d53379f…` / `617ef0d3…` → 现值）：D6-5 按模板 12 列改（J 发生原因 / K 索引号 /
+    #    L 备注，删模板没有的 M / N）；D6-6 区② G 改贷方、H 改支持性文件，两区改两级表头；D7-7 两区按模板
+    #    A..Q 重排（原整表错位）、区② 只有借方金额，核对内容接 checkItems/0..4。
+    "d6.contract_assets_detail.json": "9c03e432e6549433",
+    "d7.contract_liabilities_detail.json": "ce92c2f5a57c8ec1",
     "e1.monetary_fund_detail.json": "ddfa0e9a7e5379a3",
     "f1.prepayment_detail.json": "0439591e2e504c74",
     "g7.soe_subsidiary_disclosure.json": "6fdd12a7e008eb24",

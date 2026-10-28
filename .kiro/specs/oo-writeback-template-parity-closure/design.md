@@ -206,6 +206,22 @@
 - 变异 5 条各自打红、逐字节复原：G6-5 反推退回「为 0」（显式 0 单测）、G11-2 序号退回 editable（同构测试 + 对拍）、H4-2 J 退回 editable（对拍）、G11-2 锚点退回 A（锚点守卫 + 同构测试）、F4-2 借方发生退回旧键（字段名守卫）；改契约的三条同时打红 golden 摘要门。
 - 同口径子集（57 个文件）对 30849124c：由过转红 1 条，`test_g11_column_isomorphism` 钉着「A 序号 editable」，改为钉 auto_source + 锚点 B + 前端按位置重编的两处源码；由红转过 12 条是 G6 的 AI 端点 503：基线所在的检出没有仓库根 `.env`（AI 服务未配置），提交树在同一检出上同样 12 条 503，非本批。提交树（a39c94827 + 本批）同口径对基线：由过转红 0。
 
+### §4.6 批 B2a：D 循环检查表 / 关联方表与行表引擎值换算（2026-10-28）
+
+| 表 / 面 | 原状 | 处置 |
+|---|---|---|
+| D7-7 检查表（两区） | 契约整表错位：声明 A..R（F 借方 / G 贷方 / H 支持性文件 / I..O 七个检查 / P 索引 / Q 异常 / R 备注），模板 A..Q（F 对方明细科目、G/H 借贷、I 支持性文件、J..N 核对内容 1~5、O 索引号、P 是否异常、Q 备注说明）；区② 照抄区①，模板区② 只有 G「借方金额」、H:I 支持性文件；单级表头让叶子表头行落进数据区 | 两区按模板重排（两级表头 R16/R17、R33/R34），json 键改前端（counterDetail / supportDocs / checkItems/0..4 / indexRef / isAbnormal）。前端期后结转区按模板由贷方改借方：旧行载入即迁移，D7-2 期后结转与交叉核对经 `postTransferAmount` 兼容没重新保存过的旧行；表单补对方明细科目 / 支持性文件 / 核对内容 1~5 / 索引号 / 备注说明（拆出 `D7VoucherCheckTable`）；导入导出期后区改「借方金额」，旧文件按「贷方金额」列读 |
+| D6-6 检查表区② | 「为简化按区①同列声明」：G 接 debitAmount（区② 行没有这个键，恒空）、H 接 creditAmount（贷方金额写进支持性文件列） | G 贷方、H 支持性文件（H:I 合并）；两区改两级表头，表头文字取模板 |
+| D6-5 关联方表 | 照另一种关联方表写了 14 列（J 未结转原因 / K 至审计日结转金额 / L 处理计划 / M 索引号 / N 备注），模板 12 列，I..L = 发生时间及账龄 / 发生原因（款项性质）/ 索引号 / 备注 | 按模板 12 列；前端补 `transactionReason`（表单、导入导出，旧文件缺列照常导入）；「未结转原因 / 至审计日结转金额 / 处理计划」三列模板没有，留在 HTML 侧、不进 OO |
+| D3-7 检查表（两区） | json 键 voucherDate / counterSubAccount / check1..5 / indexNo，前端存 date / counterDetailAccount / checkItems[0..4] / indexRef | 改前端键，核对内容按布尔数组接 |
+| 行表引擎 | ① percent_points 回写判 `str(vtype) == "percent_points"`，`FieldValue.value_type` 是枚举、str() 得「ValueType.percent_points」⇒ ×100 从未生效（F3-4 票面利率、F2-47 费率回写成 0.035，前端按 3.5 读）；② 数组元素路径在 OO 侧新增行上 fail closed（行里还没有数组）；③ 勾选列未勾在 OO 里写成 FALSE | 换算与建数组拆到 `phase5_row_value_codec`（引擎文件逼近 800 行）：比较取枚举值；`row_array_defaults` 声明缺省数组；`boolean_unchecked_as_blank` 让未勾留空、回写空格 → False |
+
+- 新守卫：`test_check_table_headers_match_template.py`（D1-13 / D3-7 / D6-5 / D6-6 / D7-7 九个区逐格对模板叶子表头、组标题合并区、首数据行与 footer，判据自检两条）；`test_phase5_row_value_codec.py`（真 `FieldValue`，不用字符串冒充枚举）；`test_d6_d7_check_tables_import_export.py`；`dCheckTablesTemplateColumns.spec.ts`。
+- 字段名登记 46 组 / 445 → 42 / 415。D1-13 区② 改登记为 R2 待裁：模板区② 是「期后贴现\背书\调整等检查」凭证表（16 列，同区①），前端 `D1-sampling-specific-samples` 是「特定样本」清单（项目描述 / 金额 / 原因），不是同一张表，前端没有期后检查表。守卫只报出 4 个名字，是因为其余列名在同一文件区① 的行模型里出现 —— 按标识符记号比对的盲区（D3-7 的 `voucherDate` 同因漏报，`SampledVoucherLike` 里有这个名字）。
+- 全量表头普查（91 份契约 3750 个字段，1205 个与表头格不逐字相等）多数是组合标签、编号叶子、多级表头重复标签，做不成通用门；本批只把检查表与关联方表钉成逐格判据。
+- 待用户确认：D3-7 区② 模板写「贷方金额」，预收账款期后结转按理是借方（同结构的 D7-7 合同负债写的是借方）。本批没改 D3。
+- D3 / D6 / D7 这几张都还在 `KNOWN_UNWIRED`（扩容面未进已发布 instrumentation），契约改对后接通才生效，不需要重发布。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。

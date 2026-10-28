@@ -140,7 +140,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "D7-7-post": [
         "客户名称", "日期", "凭证号", "业务内容", "对方科目", "对方明细",
-        "贷方金额", "支持性文件",
+        "借方金额", "支持性文件",
         "核对内容1", "核对内容2", "核对内容3", "核对内容4", "核对内容5",
         "索引号", "是否异常", "备注说明",
     ],
@@ -162,7 +162,12 @@ def _get_headers(sheet_code: str) -> list[str]:
 
 
 #: 导入时可缺的列（后加的列；旧版导出文件没有它，缺了照常导入、该字段留空）。
-_OPTIONAL_IMPORT_HEADERS: dict[str, frozenset[str]] = {"D7-4": frozenset({"与对方科目核对"})}
+#: D7-7 期后结转：模板 G34 是「借方金额」，旧版导出写的是「贷方金额」——缺新列时按旧列读（spec
+#: oo-writeback-template-parity-closure R3 批 B2）。
+_OPTIONAL_IMPORT_HEADERS: dict[str, frozenset[str]] = {
+    "D7-4": frozenset({"与对方科目核对"}),
+    "D7-7-post": frozenset({"借方金额"}),
+}
 
 
 def _required_import_headers(sheet_code: str) -> list[str]:
@@ -771,7 +776,9 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_str(data.get("customerName")), _safe_str(data.get("date")),
             _safe_str(data.get("voucherNo")), _safe_str(data.get("businessContent")),
             _safe_str(data.get("counterAccount")), _safe_str(data.get("counterDetail")),
-            _safe_float(data.get("creditAmount")), _safe_str(data.get("supportDocs")),
+            # 区② 金额存 debitAmount；没重新保存过的旧行只有 creditAmount
+            _safe_float(data.get("debitAmount") if data.get("debitAmount") is not None else data.get("creditAmount")),
+            _safe_str(data.get("supportDocs")),
             *["Y" if c else "" for c in (list(check_items) + [False] * 5)[:5]],
             _safe_str(data.get("indexRef")),
             "是" if data.get("isAbnormal") else "",
@@ -927,7 +934,9 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str], segments: list
             "businessContent": _safe_str(_col_val(row, actual_headers, "业务内容")),
             "counterAccount": _safe_str(_col_val(row, actual_headers, "对方科目")),
             "counterDetail": _safe_str(_col_val(row, actual_headers, "对方明细")),
-            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方金额")),
+            "debitAmount": _safe_float(_col_val(
+                row, actual_headers, "借方金额" if "借方金额" in actual_headers else "贷方金额",
+            )),
             "supportDocs": _safe_str(_col_val(row, actual_headers, "支持性文件")),
             "checkItems": check_items,
             "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
@@ -1015,7 +1024,7 @@ _D7_SHEET_GUIDANCE: dict[str, list[str]] = {
         "D7-7 凭证检查 — 期后结转 编制说明",
         "",
         "1. 填写期后结转/冲减合同负债的凭证样本。",
-        "2. 贷方金额为期后结转金额，将联动 D7-2 期后结转列。",
+        "2. 借方金额为期后结转金额（合同负债结转为借方），将联动 D7-2 期后结转列。",
     ],
 }
 

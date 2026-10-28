@@ -14,7 +14,7 @@
   ]
  },
  "d1.notes_receivable_detail|D1-sampling-specific-samples": {
-  "reason": "待核：抽样检查列 check1~3 / 对方科目在前端行模型里另名（同 D7-7 的 checkItems 数组形态）",
+  "reason": "R2 待裁：D1-13 模板区②是「期后贴现\\背书\\调整等检查」凭证表（16 列，同区①），前端 D1-sampling-specific-samples 是「特定样本」清单（只有 项目描述 / 金额 / 原因），两者不是同一张表；前端没有期后检查表，契约把区②接到了特定样本上（只有这 4 个名字对不上是因为其余列名在同文件的区①行模型里出现）",
   "fields": [
    "check1",
    "check2",
@@ -64,60 +64,10 @@
    "receivableType"
   ]
  },
- "d3.prepaid_receipts_detail|D3-vc-current-rows": {
-  "reason": "待核：凭证抽查核对内容 check1~5 / 对方明细科目 / 索引号前端另名（疑同 D7-7 的 checkItems 数组）",
-  "fields": [
-   "check1",
-   "check2",
-   "check3",
-   "check4",
-   "check5",
-   "counterSubAccount",
-   "indexNo"
-  ]
- },
- "d3.prepaid_receipts_detail|D3-vc-post-rows": {
-  "reason": "待核：同 D3-vc-current-rows",
-  "fields": [
-   "check1",
-   "check2",
-   "check3",
-   "check4",
-   "check5",
-   "counterSubAccount",
-   "indexNo"
-  ]
- },
  "d4.revenue_detail|D4-31-interview": {
   "reason": "D4-31 访谈表是单行 dict store，契约行身份写 singleton，前端无此键（行身份口径待定）",
   "fields": [
    "singleton"
-  ]
- },
- "d7.contract_liabilities_detail|D7-7-period-rows": {
-  "reason": "前端核对内容存为 checkItems 布尔数组（5 项，模板 7 项）、支持文件键 supportDocs；契约逐列 check1~7 / supportDoc 对不上",
-  "fields": [
-   "check1",
-   "check2",
-   "check3",
-   "check4",
-   "check5",
-   "check6",
-   "check7",
-   "supportDoc"
-  ]
- },
- "d7.contract_liabilities_detail|D7-7-post-rows": {
-  "reason": "同 D7-7-period-rows",
-  "fields": [
-   "check1",
-   "check2",
-   "check3",
-   "check4",
-   "check5",
-   "check6",
-   "check7",
-   "supportDoc"
   ]
  },
  "f2.inventory_valuation|F2-47-rows": {

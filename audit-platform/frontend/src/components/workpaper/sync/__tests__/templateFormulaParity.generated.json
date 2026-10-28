@@ -871,14 +871,12 @@
     "creditAmount",
     "debitAmount",
     "impairment",
-    "postSettlement",
     "priorBalance"
    ],
    "input_types": {
     "creditAmount": "amount",
     "debitAmount": "amount",
     "impairment": "amount",
-    "postSettlement": "amount",
     "priorBalance": "amount"
    },
    "date_inputs": [],
@@ -886,10 +884,9 @@
     "agingAndTiming",
     "indexRef",
     "partyName",
-    "plan",
     "relationship",
     "remark",
-    "unsettledReason"
+    "transactionReason"
    ],
    "auto_fields": [],
    "literals": []
