@@ -420,24 +420,6 @@ export class GridKernel {
     return { value: parseLooseNumber(text) ?? text, source: 'text' }
   }
 
-  selectionStats(): { count: number; numericCount: number; sum: number; avg: number; min: number; max: number } {
-    const nums: number[] = []
-    const cells = this.selectedCells()
-    for (const cell of cells) {
-      const v = typeof cell.value === 'number' ? cell.value : parseLooseNumber(cell.text)
-      if (typeof v === 'number' && Number.isFinite(v)) nums.push(v)
-    }
-    const sum = nums.reduce((a, b) => a + b, 0)
-    return {
-      count: cells.length,
-      numericCount: nums.length,
-      sum: Math.round(sum * 100) / 100,
-      avg: nums.length ? Math.round((sum / nums.length) * 100) / 100 : 0,
-      min: nums.length ? Math.min(...nums) : 0,
-      max: nums.length ? Math.max(...nums) : 0,
-    }
-  }
-
   // ── 绘制 ──────────────────────────────────────────────────────────────────
   private clearMarks(): void {
     for (const td of this.marked) {

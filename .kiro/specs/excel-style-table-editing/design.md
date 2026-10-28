@@ -178,7 +178,7 @@ interface CellEditorHandle {
 - 表样编辑器：后端 HTML 的 `td[contenteditable]` 不改后端，前端接入时改写为「span 编辑器 + 内核」（`grid/contentEditableCells.ts`），拆除时还原；页面原有的 document 级导航只留给经典方式。
 - 自定义底稿网格：经典方式下可编辑格输入框常驻（与其他表格的经典方式一致；原先只有双击编辑这一种）。
 
-**报表矩阵格内编辑（5.4）**：金额格统一为 `components/report/ReportMatrixCell.vue`（GtGridCell + 数字适配组件），表格组件只发 `cell-edit(行, 列键, 值[, 年度])`，保存在 `useReportContextMenu.onRvCellEdit`（逐格 PUT、同一批合并为一次重新取数）。减值表列键与导出模板 `{{imp:CODE:列键}}`、`report_excel_exporter._resolve_imp_value` 同一套。🔴 待拍板（范围外）：报表重新生成（`report_engine._generate_report`）把每行 `source_accounts` 整列改写为取数科目列表，权益表再由 `_apply_eq_matrix_to_db_row` 按底稿 / 试算表重算矩阵 ⇒ 手工改的格在下一次生成后丢失；要保留须另存「手工覆盖」并在生成后回放（后端设计改动，未做）。
+**报表矩阵格内编辑（5.4）**：金额格统一为 `components/report/ReportMatrixCell.vue`（GtGridCell + 数字适配组件），表格组件只发 `cell-edit(行, 列键, 值[, 年度])`，保存在 `useReportContextMenu.onRvCellEdit`（逐格 PUT、同一批合并为一次重新取数）。减值表列键与导出模板 `{{imp:CODE:列键}}`、`report_excel_exporter._resolve_imp_value` 同一套。🔴 待拍板（范围外）：报表重新生成（`report_engine._generate_report`）把每行 `source_accounts` 整列改写为取数科目列表，权益表再由 `_apply_eq_matrix_to_db_row` 按底稿 / 试算表重算矩阵 ⇒ 手工改的格在下一次生成后丢失；要保留须另存「手工覆盖」并在生成后回放（后端设计改动，未做）。金额列 ESLint 卡点（`gt-audit/no-bare-amount-cell`，ci.yml 只减不增）按「列模板里有没有 `<GtAmountCell>`」判，看不到包装组件内部 ⇒ 规则加 `AMOUNT_CELL_WRAPPERS`（组件名 → 文件）登记 `ReportMatrixCell`，登记是可伪证声明：守卫 `amountCellWrapperRule.spec.ts` 读组件模板核对确有 `<GtAmountCell>`（v1.0.26）。
 
 ## 10 集成点
 
