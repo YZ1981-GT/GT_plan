@@ -96,6 +96,7 @@ export interface UseReportCellActionsReturn {
   // Cell event handlers
   onRvCellClick: (row: any, column: any, _cell: HTMLElement, event: MouseEvent) => void
   onRvCellDblClick: (row: any, column: any) => void
+  onRvCellEdit: (row: any, columnKey: string, value: number | null, yearKey?: 'current_year' | 'prior_year') => void
   onRvCellContextMenu: (row: any, column: any, _cell: HTMLElement, event: MouseEvent) => void
   onRvCtxCopy: () => void
   onRvCtxDrillDown: () => void

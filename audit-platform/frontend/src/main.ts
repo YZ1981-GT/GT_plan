@@ -23,6 +23,7 @@ import { registerServiceWorker } from './composables/useOfflineCache'
 import vTabWheel from './directives/vTabWheel'
 import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
 import { clearOnUpgrade } from './utils/aiChatCacheCleanup'
+import { gridPlugin } from './components/grid/plugin'
 import { startSessionHandoff } from './utils/crossWindowAuth'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
@@ -55,6 +56,8 @@ startSessionHandoff(async (session) => {
 })
 
 app.use(router)
+// 表格按 Excel 方式选中 / 编辑（spec excel-style-table-editing）
+app.use(gridPlugin)
 
 // 注册全局指令
 app.directive('permission', vPermission)

@@ -5,6 +5,20 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
+/**
+ * 表格单元格编辑器适配（spec excel-style-table-editing ADR-1）：模板里的这几个组件解析到
+ * `@/components/grid/adapters` 的同名导出（类型声明为原组件类型）。表格外透传原组件；
+ * 表体单元格里平时只渲染文本，双击 / F2 / 直接输入才挂原组件。名单与 adapters.ts 的
+ * GRID_ADAPTED_COMPONENTS 一致（守卫 gridAdapterResolver.spec.ts 核对）。
+ */
+export const GRID_ADAPTED_COMPONENTS = ['ElInput', 'ElInputNumber', 'ElSelect', 'ElDatePicker', 'ElCheckbox', 'ElSwitch', 'ElRadioGroup']
+export function GridCellAdapterResolver() {
+  return {
+    type: 'component' as const,
+    resolve: (name: string) => (GRID_ADAPTED_COMPONENTS.includes(name) ? { name, from: '@/components/grid/adapters' } : undefined),
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   // 用 127.0.0.1 而非 localhost：后端 uvicorn 仅监听 IPv4（0.0.0.0），
@@ -28,7 +42,8 @@ export default defineConfig(({ mode }) => {
         dts: 'src/auto-imports.d.ts',
       }),
       Components({
-        resolvers: [ElementPlusResolver({ importStyle: false })],
+        // 先于 ElementPlusResolver：第一个返回结果的解析器生效
+        resolvers: [GridCellAdapterResolver(), ElementPlusResolver({ importStyle: false })],
         dts: 'src/components.d.ts',
       }),
     ],

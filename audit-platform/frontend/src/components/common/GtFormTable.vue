@@ -28,6 +28,8 @@
     :max-height="maxHeight"
     :default-sortable="defaultSortable"
     :group-by="groupBy"
+    :summary-method="summaryMethod"
+    :default-row="defaultRow"
     @update:model-value="(v: any[]) => $emit('update:modelValue', v)"
     @save="$emit('save')"
     @ctx-formula="$emit('ctx-formula')"
@@ -66,7 +68,9 @@
  */
 import GtEditableTable, { type GtColumn } from './GtEditableTable.vue'
 
-defineProps<{
+// 布尔默认值与 GtEditableTable 一致（不写默认值时 Vue 把未传的布尔 prop 当 false 传下去，
+// 盖掉 GtEditableTable 的「默认显示工具栏 / 底栏 / 可排序」；spec excel-style-table-editing 5.2）
+withDefaults(defineProps<{
   modelValue: Record<string, any>[]
   columns: GtColumn[]
   showSelection?: boolean
@@ -79,7 +83,10 @@ defineProps<{
   groupBy?: string
   summaryMethod?: (param: { columns: any[]; data: any[] }) => any[]
   defaultRow?: () => Record<string, any>
-}>()
+}>(), {
+  showSelection: false, lazyEdit: true, showToolbar: true, showFooter: true, showSummary: false,
+  maxHeight: 'calc(100vh - 260px)', defaultSortable: true, groupBy: undefined, summaryMethod: undefined, defaultRow: undefined,
+})
 
 defineEmits<{
   (e: 'update:modelValue', data: Record<string, any>[]): void

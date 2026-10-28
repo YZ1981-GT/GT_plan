@@ -137,7 +137,7 @@
 
     <!-- ═══ 矩阵模式 ═══ -->
     <div v-else class="table-scroll">
-      <table class="info-matrix">
+      <GtGridTable class="info-matrix">
         <thead>
           <tr>
             <th class="sticky item-col">项目</th>
@@ -288,7 +288,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </GtGridTable>
     </div>
 
     <!-- 编制示例弹窗 -->
@@ -506,6 +506,7 @@ import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import F2InterviewCheckExample from './F2InterviewCheckExample.vue'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId?: string

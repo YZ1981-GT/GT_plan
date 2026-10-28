@@ -460,6 +460,8 @@ interface FormulaItem {
 const props = defineProps<{
   modelValue: boolean
   row: any
+  /** 打开时预填（公式管理「建议公式」：该行还没有公式，带入上游公式与分类，确认后才保存）；行已有公式时不用 */
+  prefill?: { formula: string; category?: string; description?: string } | null
   sourceRows?: any[]
   applicableStandard?: string
   projectId?: string
@@ -527,9 +529,9 @@ watch(visible, (v) => {
       }
     } else {
       formulas.value = [{
-        expression: '',
-        category: 'auto_calc',
-        description: '',
+        expression: props.prefill?.formula || '',
+        category: props.prefill?.category || 'auto_calc',
+        description: props.prefill?.description || '',
         target_cell: props.row.target_cell || '',
         _checked: false,
       }]

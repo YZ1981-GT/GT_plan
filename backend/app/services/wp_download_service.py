@@ -457,8 +457,8 @@ class WpUploadService:
             from app.services.cloud_storage_service import CloudStorageService, CLOUD_SYNC_ON_UPLOAD
             if CLOUD_SYNC_ON_UPLOAD:
                 cloud_svc = CloudStorageService()
-                # 获取项目信息
-                import sqlalchemy as sa
+                # 获取项目信息（sa 用模块级导入：这里再 import 会让整个函数的 sa 变成局部变量，
+                # 开头的 sa.select 恒抛 UnboundLocalError —— 2026-04-18 起离线上传每次都失败）
                 from app.models.core import Project
                 proj_r = await db.execute(sa.select(Project).where(Project.id == project_id))
                 proj = proj_r.scalar_one_or_none()

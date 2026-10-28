@@ -104,55 +104,136 @@ describe('合并报表公式', () => {
     wrapper.unmount()
   })
 
-  it('模板影响确认后 PUT；写成功才按 formula_changed 推送当前项目', async () => {
+  // 格内编辑（spec excel-style-table-editing 5.5）：每格提交先记下，攒成一批确认一次 → 同一行合并成一次 PUT → 推送一次
+  it('同一行三格提交：界面先显示新值，确认一次、一次 PUT（合并三格）、写成功才推送一次', async () => {
     const wrapper = create({ mode: 'report' })
     await flushPromises()
-    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
-    state(wrapper).editFormula = "TB('1002','期末余额')"
-    state(wrapper).editCategory = 'logic_check'
-    state(wrapper).editDescription = '新说明'
-    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    const s = state(wrapper)
+    const row = s.reportRows[0]
+    s.onCellEdit(row, 'formula', "TB('1002','期末余额')")
+    s.onCellEdit(row, 'formula_category', 'logic_check')
+    s.onCellEdit(row, 'formula_description', '新说明')
+    expect(s.cellValue(row, 'formula')).toBe("TB('1002','期末余额')")
+    expect(row.formula).toBe("TB('1001','期末余额')") // 保存成功前不改行
+    await s.flushCellEdits()
+    expect(confirmDangerous).toHaveBeenCalledTimes(1)
     expect(confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({ title: '修改合并报表公式确认' }))
     // 公式版本原样带回（后端 CAS：缺失 428、已被他人修改 409）
-    expect(api.put).toHaveBeenCalledWith('/api/report-config/bs-1', {
+    expect(api.put.mock.calls).toEqual([['/api/report-config/bs-1', {
       formula: "TB('1002','期末余额')", formula_category: 'logic_check', formula_description: '新说明',
       expected_version: 3, project_id: 'p1', year: 2025, template_type: 'soe',
-    })
-    expect(service.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'formula_changed')
-    expect(state(wrapper).reportRows[0].formula).toBe("TB('1002','期末余额')")
+    }]])
+    expect(service.pushConsolidation.mock.calls).toEqual([['p1', 2025, 'formula_changed']])
+    expect(row).toMatchObject({ formula: "TB('1002','期末余额')", formula_category: 'logic_check', formula_description: '新说明' })
     wrapper.unmount()
+  })
+
+  it('只改一格：其余两格按行上的值带上；清空公式存 null', async () => {
+    const wrapper = create({ mode: 'report' })
+    await flushPromises()
+    const s = state(wrapper)
+    s.onCellEdit(s.reportRows[0], 'formula', '')
+    await s.flushCellEdits()
+    expect(api.put.mock.calls[0][1]).toMatchObject({ formula: null, formula_category: 'auto_calc', formula_description: '原说明' })
+    expect(s.reportRows[0].formula).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('提交 200ms 后自动保存；改回原值不算修改（零确认零请求）', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = create({ mode: 'report' })
+      await flushPromises()
+      const s = state(wrapper)
+      const row = s.reportRows[0]
+      s.onCellEdit(row, 'formula', "TB('1001','期末余额')") // 与行上的值相同
+      s.onCellEdit(row, 'formula_description', '原说明')
+      await vi.advanceTimersByTimeAsync(300)
+      expect(confirmDangerous).not.toHaveBeenCalled()
+      expect(api.put).not.toHaveBeenCalled()
+
+      s.onCellEdit(row, 'formula_description', '改了')
+      await vi.advanceTimersByTimeAsync(199)
+      expect(api.put).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      await flushPromises()
+      expect(api.put).toHaveBeenCalledTimes(1)
+      expect(row.formula_description).toBe('改了')
+      wrapper.unmount()
+    } finally { vi.useRealTimers() }
   })
 
   it('保存后采用响应里的新版本号，连续第二次保存不会带旧版本撞 409', async () => {
     const wrapper = create({ mode: 'report' })
     await flushPromises()
+    const s = state(wrapper)
     api.put.mockResolvedValueOnce({ formula_version: 4 })
-    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
-    state(wrapper).editFormula = "TB('1002','期末余额')"
-    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
-    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
-    state(wrapper).editFormula = "TB('1003','期末余额')"
-    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    s.onCellEdit(s.reportRows[0], 'formula', "TB('1002','期末余额')")
+    await s.flushCellEdits()
+    s.onCellEdit(s.reportRows[0], 'formula', "TB('1003','期末余额')")
+    await s.flushCellEdits()
     expect(api.put.mock.calls.map(([, body]) => body.expected_version)).toEqual([3, 4])
     wrapper.unmount()
   })
 
-  it('取消影响确认时零 PUT/零推送；推送失败不回滚已保存公式并单独提示', async () => {
+  it('取消影响确认时零 PUT/零推送且格子退回原值；推送失败不回滚已保存公式并单独提示', async () => {
     const wrapper = create({ mode: 'report' })
     await flushPromises()
-    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
+    const s = state(wrapper)
+    const row = s.reportRows[0]
+    s.onCellEdit(row, 'formula', "TB('9999','期末余额')")
     confirmDangerous.mockRejectedValueOnce(new Error('cancel'))
-    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    await s.flushCellEdits()
     expect(api.put).not.toHaveBeenCalled()
     expect(service.pushConsolidation).not.toHaveBeenCalled()
+    expect(s.cellValue(row, 'formula')).toBe("TB('1001','期末余额')")
 
-    confirmDangerous.mockResolvedValueOnce(undefined)
     service.pushConsolidation.mockRejectedValueOnce(new Error('push failed'))
-    state(wrapper).editFormula = 'ROW(\'BS-001\')'
-    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    s.onCellEdit(row, 'formula', 'ROW(\'BS-001\')')
+    await s.flushCellEdits()
     expect(api.put).toHaveBeenCalledTimes(1)
-    expect(state(wrapper).reportRows[0].formula).toBe("ROW('BS-001')")
+    expect(row.formula).toBe("ROW('BS-001')")
     expect(messages.warning).toHaveBeenCalledWith(expect.stringContaining('公式已保存，但合并推送启动失败'))
+    wrapper.unmount()
+  })
+
+  it('一批多行：确认一次、各行各一次 PUT、推送一次；保存失败的行退回服务器上的值', async () => {
+    api.get.mockImplementation(async () => [
+      { ...REPORT_ROW },
+      { ...REPORT_ROW, id: 'bs-2', row_code: 'BS-003', row_name: '交易性金融资产', formula: "TB('1101','期末余额')", formula_version: 7 },
+    ])
+    const wrapper = create({ mode: 'report' })
+    await flushPromises()
+    const s = state(wrapper)
+    const [a, b] = s.reportRows
+    api.put.mockImplementation(async (url: string) => {
+      if (url.endsWith('/bs-2')) throw new Error('409')
+      return { formula_version: 4 }
+    })
+    s.onCellEdit(a, 'formula', "TB('1002','期末余额')")
+    s.onCellEdit(b, 'formula', "TB('1102','期末余额')")
+    await s.flushCellEdits()
+    expect(confirmDangerous).toHaveBeenCalledTimes(1)
+    expect(api.put.mock.calls.map(([url, body]) => [url, body.formula, body.expected_version])).toEqual([
+      ['/api/report-config/bs-1', "TB('1002','期末余额')", 3],
+      ['/api/report-config/bs-2', "TB('1102','期末余额')", 7],
+    ])
+    expect(service.pushConsolidation).toHaveBeenCalledTimes(1)
+    expect(a.formula).toBe("TB('1002','期末余额')")
+    expect(s.cellValue(b, 'formula')).toBe("TB('1101','期末余额')")
+    wrapper.unmount()
+  })
+
+  it('整批都保存失败：不推送', async () => {
+    const wrapper = create({ mode: 'report' })
+    await flushPromises()
+    const s = state(wrapper)
+    api.put.mockRejectedValueOnce(new Error('409'))
+    s.onCellEdit(s.reportRows[0], 'formula', "TB('1002','期末余额')")
+    await s.flushCellEdits()
+    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(service.pushConsolidation).not.toHaveBeenCalled()
+    expect(s.cellValue(s.reportRows[0], 'formula')).toBe("TB('1001','期末余额')")
     wrapper.unmount()
   })
 })
@@ -164,13 +245,13 @@ describe('合并附注公式', () => {
     expect(service.listConsolNoteFormulas).toHaveBeenCalledWith('soe')
     expect(state(wrapper).noteSectionOptions.map((item: any) => item.section_id)).toEqual(['五-1-1', '五-2-1'])
     expect(state(wrapper).selectedSectionId).toBe('五-1-1')
-    state(wrapper).startNoteEdit(state(wrapper).noteRows[0])
-    state(wrapper).editFormula = "TB('1002','期末余额')"
-    state(wrapper).editDescription = '人工修订'
-    await state(wrapper).saveNoteRow(state(wrapper).noteRows[0])
-    expect(service.updateConsolNoteFormula).toHaveBeenCalledWith('n1', {
+    state(wrapper).onCellEdit(state(wrapper).noteRows[0], 'formula', "TB('1002','期末余额')")
+    state(wrapper).onCellEdit(state(wrapper).noteRows[0], 'description', '人工修订')
+    await state(wrapper).flushCellEdits()
+    expect(confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({ title: '修改合并附注公式确认' }))
+    expect(service.updateConsolNoteFormula.mock.calls).toEqual([['n1', {
       formula: "TB('1002','期末余额')", description: '人工修订', expected_version: 2,
-    })
+    }]])
     expect(state(wrapper).noteRows[0]).toMatchObject({ source: 'manual', source_label: '人工' })
     expect(service.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'formula_changed')
     wrapper.unmount()
@@ -203,10 +284,13 @@ describe('合并附注公式', () => {
     const wrapper = create({ mode: 'note' })
     await flushPromises()
     expect(state(wrapper).canManage).toBe(false)
-    state(wrapper).startNoteEdit(state(wrapper).noteRows[0])
+    state(wrapper).onCellEdit(state(wrapper).noteRows[0], 'formula', "TB('1002','期末余额')")
+    await state(wrapper).flushCellEdits()
     await state(wrapper).removeNoteRow(state(wrapper).noteRows[0])
     await state(wrapper).reseed()
-    expect(state(wrapper).editingId).toBeNull()
+    expect(Object.keys(state(wrapper).pending)).toEqual([])
+    expect(confirmDangerous).not.toHaveBeenCalled()
+    expect(service.updateConsolNoteFormula).not.toHaveBeenCalled()
     expect(service.deleteConsolNoteFormula).not.toHaveBeenCalled()
     expect(service.reseedConsolNoteFormulas).not.toHaveBeenCalled()
     wrapper.unmount()

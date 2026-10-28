@@ -33,6 +33,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   wpId: string
@@ -489,7 +490,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
       <!-- 月度明细表 -->
       <div class="monthly-table-wrap">
-        <table class="monthly-table" border="1" cellpadding="0" cellspacing="0">
+        <GtGridTable class="monthly-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th rowspan="2" class="col-month">月份</th>
@@ -664,14 +665,14 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               <td class="cell-computed" :class="{ 'val-exceed': Math.abs(totals.chgMargin) > 0.05 }"><span class="has-formula">{{ fmtPercent(totals.chgMargin) }}</span></td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
 
 
       <!-- 同行业对比 -->
       <div class="industry-section">
         <h5 class="sub-title">同行业对比</h5>
-        <table class="industry-table" border="1" cellpadding="0" cellspacing="0">
+        <GtGridTable class="industry-table" border="1" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th class="col-name">企业/水平</th>
@@ -718,7 +719,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
               <td class="cell-computed"><span class="has-formula">{{ fmtPercent(totals.curMargin) }}</span></td>
             </tr>
           </tbody>
-        </table>
+        </GtGridTable>
       </div>
     </section>
 

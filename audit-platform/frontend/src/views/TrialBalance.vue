@@ -723,12 +723,13 @@
       <el-table-column prop="account_name" label="科目名称" min-width="180" />
       <el-table-column label="方向" width="80" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
+          <!-- 单击只选中；双击或右键「切换借贷方向」才改（spec excel-style-table-editing R8.4） -->
           <span
             v-if="!row._isSubtotal && !row._isTotal"
             :class="getDirectionClass(row)"
             class="gt-dir-toggle"
-            @click="toggleDirection(row)"
-            :title="'点击切换借贷方向'"
+            @dblclick="toggleDirection(row)"
+            title="双击切换借贷方向（或右键「切换借贷方向」）"
           >
             {{ getDirection(row) }}
           </span>
@@ -897,24 +898,19 @@
             </template>
           </el-table-column>
           <el-table-column prop="unadjusted" label="未审数" width="140" align="right" class-name="gt-tb-sum-unadj-col">
-            <template #default="{ row, $index }">
-              <template v-if="tbSumUnadjEditable || row.formula_detached">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 0)"
-                  v-model="row.unadjusted"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 0)">
-                  <span v-if="row.formula_detached" class="gt-tb-detached-icon" title="已断开公式（手动值）">✂️</span>
-                  {{ fmt(row.unadjusted) }}
-                </span>
-              </template>
+            <template #default="{ row }">
+              <!-- 格内编辑（spec excel-style-table-editing 5.3）：平时显示文字，双击 / F2 / 直接输入才挂输入框 -->
+              <GtGridCell v-if="tbSumUnadjEditable || row.formula_detached" :value="row.unadjusted">
+                <template #display>
+                  <span class="gt-tb-editable gt-amt" :data-gt-value="row.unadjusted">
+                    <span v-if="row.formula_detached" class="gt-tb-detached-icon" title="已断开公式（手动值）">✂️</span>
+                    {{ fmt(row.unadjusted) }}
+                  </span>
+                </template>
+                <el-input-number v-model="row.unadjusted" size="small" :controls="false" style="width:100%" @change="recalcTbSummaryAudited()" />
+              </GtGridCell>
               <span v-else-if="row.unadjusted == null && !row.is_total && !row.is_category" class="gt-tb-nomap" title="该报表行无对应科目映射（不适用）">—</span>
-              <span v-else class="gt-amt">
+              <span v-else class="gt-amt" :data-gt-value="row.unadjusted">
                 <el-tooltip v-if="row._formula" :content="'ƒx ' + row._formula" placement="top" :show-after="500">
                   <span>{{ fmt(row.unadjusted) }}</span>
                 </el-tooltip>
@@ -938,35 +934,19 @@
           </el-table-column>
           <el-table-column v-if="!tbSumCollapseAdj" label="重分类调整" header-align="center">
             <el-table-column prop="rcl_dr" label="借方" width="120" align="right">
-              <template #default="{ row, $index }">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 2)"
-                  v-model="row.rcl_dr"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 2)">
-                  <GtAmountCell :value="row.rcl_dr" />
-                </span>
+              <template #default="{ row }">
+                <GtGridCell :value="row.rcl_dr">
+                  <template #display><span class="gt-tb-editable"><GtAmountCell :value="row.rcl_dr" /></span></template>
+                  <el-input-number v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @change="recalcTbSummaryAudited()" />
+                </GtGridCell>
               </template>
             </el-table-column>
             <el-table-column prop="rcl_cr" label="贷方" width="120" align="right">
-              <template #default="{ row, $index }">
-                <el-input-number
-                  v-if="tbSumLazyEdit.isEditing($index, 3)"
-                  v-model="row.rcl_cr"
-                  size="small"
-                  :controls="false"
-                  style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
-                  autofocus
-                />
-                <span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit($index, 3)">
-                  <GtAmountCell :value="row.rcl_cr" />
-                </span>
+              <template #default="{ row }">
+                <GtGridCell :value="row.rcl_cr">
+                  <template #display><span class="gt-tb-editable"><GtAmountCell :value="row.rcl_cr" /></span></template>
+                  <el-input-number v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @change="recalcTbSummaryAudited()" />
+                </GtGridCell>
               </template>
             </el-table-column>
           </el-table-column>
@@ -989,7 +969,7 @@
           <el-table-column v-if="tbSumShowVariance" label="调整净额" width="120" align="right" class-name="gt-tb-sum-variance-col">
             <template #default="{ row }">
               <template v-if="!row.is_total && !row.is_category && row.unadjusted != null && row.audited != null">
-                <span :class="{ 'gt-tb-var-warn': Math.abs(Number(row.audited) - Number(row.unadjusted)) > 0.01 }" :style="{ color: (Number(row.audited) - Number(row.unadjusted)) < 0 ? 'var(--gt-color-coral)' : '' }">
+                <span :class="{ 'gt-tb-var-warn': Math.abs(Number(row.audited) - Number(row.unadjusted)) > 0.01 }" :style="{ color: (Number(row.audited) - Number(row.unadjusted)) < 0 ? 'var(--gt-color-coral)' : '' }" :data-gt-value="Number(row.audited) - Number(row.unadjusted)">
                   {{ fmt(Number(row.audited) - Number(row.unadjusted)) }}
                   <el-tooltip v-if="materialityLevels.sat > 0 && Math.abs(Number(row.audited) - Number(row.unadjusted)) > materialityLevels.sat" content="调整金额超微小错报阈值(SAT)，可能构成未更正错报" placement="top">
                     <span style="color:var(--el-color-warning);margin-left:2px">⚠</span>
@@ -1033,7 +1013,7 @@
       <!-- 试算平衡表右键菜单 -->
       <div v-if="tbSumCtxVisible" class="gt-tb-sum-ctx" :style="{ left: tbSumCtxX + 'px', top: tbSumCtxY + 'px' }" @contextmenu.prevent>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxCopy">
-          <span class="gt-ucell-ctx-icon">📋</span> {{ tbSumSelectedRows.size > 1 ? `复制选中 (${tbSumSelectedRows.size}行)` : '复制值' }}
+          <span class="gt-ucell-ctx-icon">📋</span> {{ tbSumPickedRows.length > 1 ? `复制选中 (${tbSumPickedRows.length}行)` : '复制值' }}
         </div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxFormula"><span class="gt-ucell-ctx-icon">ƒx</span> 查看公式</div>
         <div class="gt-ucell-ctx-item" @click="onTbSumCtxDetail"><span class="gt-ucell-ctx-icon">📊</span> 汇总明细</div>
@@ -1205,6 +1185,7 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewReferences"><span class="gt-ucell-ctx-icon">🔎</span> 查看引用方</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
+    <div v-if="isTbAccountRow(tbCtx.contextMenu.rowData)" class="gt-ucell-ctx-item" @click="onTbCtxToggleDirection"><span class="gt-ucell-ctx-icon">⇄</span> 切换借贷方向</div>
   </CellContextMenu>
 
   <!-- V3 Req 9.6: 数字信任度面板 -->
@@ -1355,7 +1336,6 @@ import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
-import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -1380,6 +1360,8 @@ import StaleIndicator from '@/components/StaleIndicator.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 import DataQualityDialog from '@/components/DataQualityDialog.vue'
 import TbVersionDrawer from '@/components/trial-balance/TbVersionDrawer.vue'
 import TbComparisonView from '@/components/trial-balance/TbComparisonView.vue'
@@ -2750,6 +2732,16 @@ const tbSumCtxX = ref(0)
 const tbSumCtxY = ref(0)
 const tbSumCtxRow = ref<any>(null)
 const tbSummaryTableRef = ref<any>(null)
+tbSumCtx.followTables(() => [tbSummaryTableRef.value])
+
+/** 选中的行（右键「复制选中」用）：Excel / 单击编辑方式取表格内核选区所在行（可见行 = 筛选后的数据），经典方式取页面的行选择 */
+const tbSumPickedRows = computed<any[]>(() => {
+  if (tbSumCtx.kernelActive()) {
+    const visible = [...new Set(tbSumCtx.selectedCells.value.map((c) => c.row))].sort((a, b) => a - b)
+    return visible.map((i) => filteredTbSummaryRows.value[i]).filter(Boolean)
+  }
+  return [...tbSumSelectedRows.value].sort((a, b) => a - b).map((i) => tbSummaryRows.value[i]).filter(Boolean)
+})
 
 // 试算平衡表最大高度（表头固定）
 const tbSummaryMaxHeight = computed(() => {
@@ -2764,7 +2756,8 @@ function tbSumRowClassName({ row, rowIndex }: { row: any; rowIndex: number }) {
   if (row.is_total) classes.push('gt-tb-sum-total')
   if (row.is_category) classes.push('gt-tb-sum-category')
   if (row.formula_detached) classes.push('gt-tb-sum-detached')
-  if (tbSumSelectedRows.value.has(rowIndex)) classes.push('gt-tb-sum-selected')
+  // Excel / 单击编辑方式选区由表格内核画，不再另画一套行选中
+  if (!tbSumCtx.kernelActive() && tbSumSelectedRows.value.has(rowIndex)) classes.push('gt-tb-sum-selected')
   // P1-8: 审定数 > PM 的行加粗（重大科目醒目）
   if (materialityLevels.value.pm > 0 && !row.is_total && !row.is_category) {
     const audited = Math.abs(Number(row.audited) || 0)
@@ -2781,7 +2774,7 @@ function tbSumCellClassName({ rowIndex, columnIndex }: { rowIndex: number; colum
 // el-table 单元格点击事件（单选单元格 + 行选择）
 function onTbSumCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const ri = tbSummaryRows.value.indexOf(row)
-  if (ri < 0) return
+  if (ri < 0 || tbSumCtx.kernelActive()) return // Excel / 单击编辑方式：鼠标按下时表格内核已选好（行选择见 tbSumPickedRows）
   // 列索引映射
   const colIdx = _tbSumColIndex(column.property)
   if (colIdx >= 0) {
@@ -2815,9 +2808,16 @@ function onTbSumElContextMenu(row: any, _column: any, event: MouseEvent) {
   onTbSumContextMenu(event, row, ri)
 }
 
-// el-table 行双击事件
-function onTbSumElDblClick(row: any) {
+// el-table 行双击：只读格才跳转；可编辑格双击是编辑（Excel / 单击编辑方式由表格内核接管、不冒泡到这里，经典方式在这里挡住）
+function onTbSumElDblClick(row: any, column: any) {
+  if (isTbSumEditableCell(row, column?.property)) return
   onTbSumDblClick(row)
+}
+
+/** 试算平衡表可编辑格：重分类借贷始终可改，未审数在编辑模式或断开公式的行可改 */
+function isTbSumEditableCell(row: any, prop: string | undefined): boolean {
+  if (prop === 'rcl_dr' || prop === 'rcl_cr') return true
+  return prop === 'unadjusted' && (tbSumUnadjEditable.value || !!row.formula_detached)
 }
 
 // 兼容旧代码的单行选中
@@ -2858,8 +2858,8 @@ function onTbSumContextMenu(event: MouseEvent, row: any, _ri: number) {
 }
 
 function onTbSumDblClick(row: any) {
-  // 可编辑模式或已断开公式的行双击不跳转
-  if (tbSumEditMode.value || row.formula_detached) return
+  // 编辑模式下整表可编辑：双击不跳转，改走右键「数据溯源」或行尾「更多」（R8.4）；断开公式的行只挡可编辑格（见 onTbSumElDblClick）
+  if (tbSumEditMode.value) return
   // #7: 优先跳转底稿（如有关联底稿），否则溯源到科目明细
   if (row.row_name && wpMappingIndex.value) {
     const found = Object.values(wpMappingIndex.value).find((m: any) => m.wp_name?.includes(row.row_name))
@@ -2903,16 +2903,15 @@ function onTbSumTrace(row: any) {
 function onTbSumCtxCopy() {
   tbSumCtxVisible.value = false
   // 多行复制
-  const selectedIndices = [...tbSumSelectedRows.value].sort((a, b) => a - b)
-  if (!selectedIndices.length && tbSumCtxRow.value) {
+  const picked = tbSumPickedRows.value
+  if (!picked.length && tbSumCtxRow.value) {
     // 没有选中行时复制右键行
     const row = tbSumCtxRow.value
     navigator.clipboard.writeText(`${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.audited || ''}`)
     ElMessage.success('已复制')
     return
   }
-  const lines = selectedIndices.map(i => {
-    const row = tbSummaryRows.value[i]
+  const lines = picked.map((row) => {
     return `${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.aje_dr || ''}\t${row.aje_cr || ''}\t${row.rcl_dr || ''}\t${row.rcl_cr || ''}\t${row.audited || ''}`
   })
   navigator.clipboard.writeText(lines.join('\n'))
@@ -3085,7 +3084,6 @@ function copyTbTable() {
 const tbCtx = useCellSelection()
 const penetrate = usePenetrate()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
-const tbSumLazyEdit = useLazyEdit()
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
 const tbTableRef = ref<any>(null)
@@ -3160,9 +3158,8 @@ const tbSearch = useTableSearch(
 function onKeydown(e: KeyboardEvent) {
   // Backspace：从溯源返回试算平衡表原位置
   if (e.key === 'Backspace' && tbTraceOrigin.value?.fromSummary && tbViewMode.value === 'detail') {
-    const target = e.target as HTMLElement
-    // 不拦截输入框内的 Backspace
-    if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
+    // 不拦截输入框内的 Backspace（表格承接框不算输入框：选中单元格时照常返回）
+    if (isTextEntryTarget(e.target)) return
     e.preventDefault()
     const origin = tbTraceOrigin.value
     tbViewMode.value = 'summary'
@@ -3172,6 +3169,9 @@ function onKeydown(e: KeyboardEvent) {
       const scrollEl = tbSummaryTableRef.value?.$el?.querySelector('.el-table__body-wrapper')
       if (scrollEl && origin.scrollTop) scrollEl.scrollTop = origin.scrollTop
       if (origin.rowIndex >= 0) tbSumSelectedRows.value = new Set([origin.rowIndex])
+      // Excel / 单击编辑方式选区归表格内核：选中原来那一行
+      const vi = filteredTbSummaryRows.value.indexOf(tbSummaryRows.value[origin.rowIndex])
+      if (tbSumCtx.kernelActive() && vi >= 0) tbSumCtx.selectRow(vi, 0)
     }, 100)
     return
   }
@@ -3471,6 +3471,18 @@ function onTbCtxFormula() {
 function onTbCtxOpenWp() {
   tbCtx.closeContextMenu()
   if (tbCtx.contextMenu.rowData?.standard_account_code) onOpenWorkpaper(tbCtx.contextMenu.rowData.standard_account_code)
+}
+
+/** 科目行（非小计 / 合计）才能切换借贷方向 */
+function isTbAccountRow(row: any): boolean {
+  return !!row?.standard_account_code && !row._isSubtotal && !row._isTotal
+}
+
+// 方向切换改走双击或右键菜单：单击只选中（spec excel-style-table-editing R8.4）
+function onTbCtxToggleDirection() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (isTbAccountRow(row)) toggleDirection(row)
 }
 
 // V3 Req 9.6: 数字信任度

@@ -472,7 +472,8 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双表+无偿调拨 / H1-7·8带入 / 入账差异 / 占比 / H10勾稽 / 无交易 / 导入导出 / A7跳转
  */
 import { ref, computed, inject, toRef, onMounted, defineComponent, h } from 'vue'
-import { ElMessage, ElMessageBox, ElSelect, ElOption } from 'element-plus'
+import { ElMessage, ElMessageBox, ElOption } from 'element-plus'
+import { ElSelect } from '@/components/grid/adapters'
 import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH1LeaseCheck,

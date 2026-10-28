@@ -538,7 +538,8 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐源模板 54 列：4 区段 Tab + 未审/期初调整/账项调整/审定 + 净值 + 核对标志 + 结论 A/B/C
  */
 import { ref, computed, toRef, inject, onMounted, defineComponent, h } from 'vue'
-import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElInputNumber } from '@/components/grid/adapters'
 import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH1Detail,

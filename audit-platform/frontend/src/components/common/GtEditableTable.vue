@@ -98,38 +98,28 @@
             :editing="editMode.isEditing.value"
             :col="col"
           />
-          <!-- 内置编辑模式 -->
+          <!-- 内置编辑器（spec excel-style-table-editing 5.2）：随「表格编辑」个人设置 —— Excel / 单击编辑方式平时只显示文字，
+               双击 / F2 / 直接输入才挂输入框；经典方式输入框常驻。键盘、粘贴、撤销由表格内核负责 -->
           <template v-else-if="editable && editMode.isEditing.value && col.editable !== false && !isCellLocked(col, row, $index)">
-            <template v-if="lazyEdit && lazyEditState">
-              <!-- 懒加载编辑：点击才渲染编辑控件 -->
-              <component
-                v-if="lazyEditState.isEditing($index, getColIdx(col.prop))"
-                :is="getEditComponent(col)"
-                v-model="row[col.prop]"
-                size="small"
-                v-bind="getEditProps(col)"
-                @blur="onEditBlur(col, row, $index)"
-                @input="editMode.markDirty()"
-                @change="editMode.markDirty()"
-                autofocus
-              />
-              <span
-                v-else
-                class="gt-et-cell-text gt-et-cell-editable"
-                @click="lazyEditState.startEdit($index, getColIdx(col.prop))"
-              >{{ formatCellValue(row, col) }}</span>
-            </template>
-            <template v-else>
-              <!-- 直接编辑模式 -->
-              <component
-                :is="getEditComponent(col)"
-                v-model="row[col.prop]"
-                size="small"
-                v-bind="getEditProps(col)"
-                @input="editMode.markDirty()"
-                @change="editMode.markDirty()"
-              />
-            </template>
+            <!-- 标脏只看提交（change）：Esc 取消的编辑不算修改（原先 @input 即标脏，取消后仍提示未保存） -->
+            <component
+              v-if="col.editType === 'select'"
+              :is="editComponents.select"
+              v-model="row[col.prop]"
+              size="small"
+              v-bind="getEditProps(col)"
+              @change="onEditChange(col, row)"
+            >
+              <el-option v-for="o in col.editOptions || []" :key="String(o.value)" :label="o.label" :value="o.value" />
+            </component>
+            <component
+              v-else
+              :is="getEditComponent(col)"
+              v-model="row[col.prop]"
+              size="small"
+              v-bind="getEditProps(col)"
+              @change="onEditChange(col, row)"
+            />
           </template>
           <!-- 锁定单元格（显示锁定图标） -->
           <CommentTooltip
@@ -191,10 +181,10 @@
  * - 新代码请按场景使用 GtTableExtended（列表型）或 GtFormTable（编辑型）
  * - 60 天观察期后无新增引用即可删除
  */
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick, type Component } from 'vue'
 import { ElMessage } from 'element-plus'
+import { ElDatePicker, ElInput, ElInputNumber, ElSelect } from '@/components/grid/adapters'
 import { useCellSelection } from '@/composables/useCellSelection'
-import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableToolbar } from '@/composables/useTableToolbar'
@@ -229,6 +219,7 @@ export interface GtColumn {
 // ── Props ─────────────────────────────────────────────────────────────────────
 const props = withDefaults(defineProps<{
   modelValue: Record<string, any>[]; columns: GtColumn[]; editable?: boolean
+  /** 已不生效（spec excel-style-table-editing 5.2）：单元格何时显示输入框由「表格编辑」个人设置决定 */
   showSelection?: boolean; lazyEdit?: boolean; sheetKey?: string
   maxHeight?: string | number; showToolbar?: boolean; showSelectionBar?: boolean
   showFooter?: boolean; showSummary?: boolean
@@ -260,8 +251,6 @@ const displayPrefs = useDisplayPrefsStore()
 const cellSelection = useCellSelection()
 const editMode = useEditMode({ guardRoute: false })
 const fullscreen = useFullscreen()
-// lazyEdit 仅在 editable=true 时初始化，editable=false 时无需创建编辑状态
-const lazyEditState = (props.lazyEdit && props.editable) ? useLazyEdit() : null
 const tableDataRef = computed({
   get: () => props.modelValue, set: (v) => emit('update:modelValue', v),
 })
@@ -383,8 +372,10 @@ setupPasteListener(tableRef, (event: ClipboardEvent) => {
 })
 
 // ── 键盘导航（Tab/Enter/方向键）[R9.5] ──────────────────────────────────────
+// 只在经典方式下生效：Excel / 单击编辑方式由表格内核处理键盘（spec excel-style-table-editing 5.2）
 useKeyboardNav({
   containerRef: containerRef as any,
+  enabled: () => !cellSelection.kernelActive(),
   rowCount: () => props.modelValue.length,
   colCount: () => visibleColumns.value.length,
   getSelection: () => {
@@ -400,14 +391,6 @@ useKeyboardNav({
     cellSelection.selectCell(row, col + offset, val, false, false)
   },
   clearSelection: () => cellSelection.clearSelection(),
-  startEdit: (row: number, col: number) => {
-    if (lazyEditState && editMode.isEditing.value) {
-      lazyEditState.startEdit(row, col)
-    }
-  },
-  stopEdit: () => {
-    if (lazyEditState) lazyEditState.stopEdit()
-  },
 })
 
 // ── 单元格样式 ────────────────────────────────────────────────────────────────
@@ -459,7 +442,13 @@ async function handleExitEdit() { if (await editMode.exitEdit()) emit('edit-chan
 
 // ── 右键菜单操作 ──────────────────────────────────────────────────────────────
 function handleCtxCopy() {
-  copySelection(cellSelection.selectedCells.value, props.modelValue, visibleColumns.value.map(c => ({ key: c.prop, label: c.label })))
+  if (cellSelection.kernelActive()) {
+    // 表格内核的坐标含多选 / 展开列：按格里的显示文字复制（与 Ctrl+C 同口径）
+    cellSelection.copySelectedValues()
+    ElMessage.success('已复制')
+  } else {
+    copySelection(cellSelection.selectedCells.value, props.modelValue, visibleColumns.value.map(c => ({ key: c.prop, label: c.label })))
+  }
   cellSelection.closeContextMenu()
 }
 function handleCtxSum() {
@@ -475,9 +464,9 @@ function isCellLocked(col: GtColumn, row: Record<string, any>, rowIndex: number)
   return false
 }
 
-/** 编辑完成时校验 [R10.2] */
-function onEditBlur(col: GtColumn, row: Record<string, any>, rowIndex: number) {
-  if (lazyEditState) lazyEditState.stopEdit()
+/** 提交时标脏并校验 [R10.2]（原先只挂在懒编辑的 blur 上，直接编辑模式从不校验） */
+function onEditChange(col: GtColumn, row: Record<string, any>) {
+  editMode.markDirty()
   // 数值范围校验
   if (col.validator && col.editType === 'number') {
     const val = Number(row[col.prop])
@@ -498,9 +487,15 @@ function formatCellValue(row: Record<string, any>, col: GtColumn): string {
   if (col.formatter) return col.formatter(row[col.prop], row)
   const val = row[col.prop]; return val == null || val === '' ? '-' : String(val)
 }
-function getEditComponent(col: GtColumn): string {
-  const map: Record<string, string> = { number: 'el-input-number', select: 'el-select', date: 'el-date-picker' }
-  return map[col.editType || ''] || 'el-input'
+/**
+ * 编辑器组件对象（不能用 'el-input-number' 这类字符串：应用里没有全局注册 Element 组件，
+ * 动态 :is 字符串解析不到，原先内置编辑器从未真正渲染成输入框）。
+ */
+const editComponents: Record<'input' | 'number' | 'select' | 'date', Component> = {
+  input: ElInput, number: ElInputNumber, select: ElSelect, date: ElDatePicker,
+}
+function getEditComponent(col: GtColumn): Component {
+  return editComponents[col.editType || 'input'] ?? ElInput
 }
 function getEditProps(col: GtColumn): Record<string, any> {
   const base: Record<string, any> = { style: 'width:100%' }
@@ -532,7 +527,8 @@ onMounted(() => {
   }
 })
 
-defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tableRef })
+/** lazyEditState 保留为 null（懒编辑已由表格内核取代，见 spec excel-style-table-editing 5.2） */
+defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState: null, tableRef })
 </script>
 
 <style scoped>
@@ -555,17 +551,6 @@ defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tabl
   display: inline-block;
   min-height: 20px;
   line-height: 20px;
-}
-
-.gt-et-cell-editable {
-  cursor: pointer;
-  border-radius: 2px;
-  padding: 0 2px;
-  width: 100%;
-}
-
-.gt-et-cell-editable:hover {
-  background: rgba(75, 45, 119, 0.06);
 }
 
 .gt-et-cell-locked {

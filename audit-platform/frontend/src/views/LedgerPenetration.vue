@@ -1392,6 +1392,7 @@ import { voucherKeyAmbiguityOf, voucherLabel, type VoucherKeyAmbiguity, type Vou
 import { useLedgerImport } from '@/views/composables/useLedgerImport'
 import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
 import { useLedgerNavigation } from '@/views/composables/useLedgerNavigation'
+import { isTextEntryTarget } from '@/utils/shortcuts'
 
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
@@ -4702,9 +4703,8 @@ function refresh() {
 
 // ── 键盘快捷键：Enter 返回上一级 / Backspace 返回上一页 ──
 function onKeyDown(e: KeyboardEvent) {
-  // 如果焦点在输入框内，不拦截
-  const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
-  if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return
+  // 如果焦点在输入框内，不拦截（表格承接框不算输入框：选中单元格时照常返回）
+  if (isTextEntryTarget(e.target)) return
 
   if (e.key === 'Enter' && currentLevel.value !== 'balance') {
     e.preventDefault()

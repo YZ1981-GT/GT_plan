@@ -468,7 +468,8 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef } from 'vue'
-import { ElInput, ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import { fmtAmount } from '@/utils/formatters'
 import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'

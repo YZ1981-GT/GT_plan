@@ -423,7 +423,8 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  */
 import { ref, computed, inject, toRef, defineComponent, h, onMounted, onUnmounted, type Ref } from 'vue'
 import { Download } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButton } from 'element-plus'
+import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElButton } from 'element-plus'
+import { ElInputNumber } from '@/components/grid/adapters'
 import http from '@/utils/http'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import {

@@ -247,7 +247,8 @@
  * 字段与后端 _G7_11_KEYS / g7DisposalSingleModel 对齐
  */
 import { ref, computed, inject, onMounted, defineComponent, h } from 'vue'
-import { ElMessage, ElInputNumber } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElInputNumber } from '@/components/grid/adapters'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'

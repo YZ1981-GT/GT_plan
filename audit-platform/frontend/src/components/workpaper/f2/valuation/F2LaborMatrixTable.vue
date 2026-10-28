@@ -1,6 +1,6 @@
 <template>
   <div class="table-scroll">
-    <table class="labor-table">
+    <GtGridTable class="labor-table">
       <thead>
         <tr>
           <th rowspan="2" class="col-product">产品</th>
@@ -79,13 +79,14 @@
           </td>
         </tr>
       </tbody>
-    </table>
+    </GtGridTable>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { EnrichedLaborProductLine, LaborMonthKey } from '../../composables/useF2DirectLaborMatrixFormulas'
+import GtGridTable from '@/components/grid/GtGridTable.vue'
 
 const props = defineProps<{
   lines: EnrichedLaborProductLine[]

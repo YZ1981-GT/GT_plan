@@ -476,7 +476,7 @@
     <!-- 公式编辑弹窗 -->
     <FormulaEditDialog
       v-model="showFormulaEdit"
-      :row="editingRow"
+      :row="editingRow" :prefill="editPrefill"
       :source-rows="currentRows"
       :applicable-standard="`${fmTemplateType}_standalone`"
       :project-id="props.projectId"
@@ -2858,9 +2858,8 @@ function onApplySuggestion(s: { row_code: string; formula: string; id?: string }
   if (!row) return
   // 打开编辑弹窗，预填建议公式（走统一编辑+保存链路，不直接写入避免绕过校验）
   editingRow.value = row
-  editFormula.value = s.formula
-  editCategory.value = s.formula_type || 'auto_calc'
-  editDescription.value = ''
+  // 预填交给弹窗（原先写进行内编辑的三个缓冲，弹窗不读 ⇒ 打开总是空的；spec excel-style-table-editing 5.5 发现）
+  editPrefill.value = { formula: s.formula, category: s.formula_type || 'auto_calc' }
   showFormulaEdit.value = true
   ElMessage.info(`已预填建议公式到编辑弹窗，确认后保存`)
 }
@@ -3011,6 +3010,9 @@ function onParamPickerSelect(formulaText: string) {
 // 公式编辑弹窗
 const showFormulaEdit = ref(false)
 const editingRow = ref<any>(null)
+/** 「建议公式」预填（只在打开弹窗那一次用，弹窗关闭即清空） */
+const editPrefill = ref<{ formula: string; category?: string; description?: string } | null>(null)
+watch(showFormulaEdit, (open) => { if (!open) editPrefill.value = null })
 
 function startEdit(row: any) {
   // Task 1.4 / ADR-FMC-02：只读投影（surfaced/Tier B）不可进入编辑态（纵深防御：

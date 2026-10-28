@@ -14,6 +14,7 @@
         { 'gt-amount-cell--clickable': clickable },
       ]"
       style="white-space: nowrap"
+      :data-gt-value="rawValue"
       @click="handleClick"
     >
       {{ formattedDisplay }}
@@ -105,6 +106,15 @@ const formattedDisplay = computed<string>(() => {
   const converted = d.dividedBy(unitCfg.divisor)
   const rounded = converted.toDecimalPlaces(displayPrefs.decimals, Decimal.ROUND_HALF_UP)
   return formatWithSeparator(rounded, displayPrefs.decimals)
+})
+
+/**
+ * 原始金额（元，不随显示单位换算）：表格选区的求和 / 统计按它算（spec excel-style-table-editing 5.1）。
+ * 无值为空串。
+ */
+const rawValue = computed<string>(() => {
+  const d = safeDecimal(props.value)
+  return d === null ? '' : d.toString()
 })
 
 /**
