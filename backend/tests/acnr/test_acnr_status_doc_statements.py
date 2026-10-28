@@ -125,6 +125,19 @@ def _ci_job_runs(job: str, command: str) -> bool:
         (s or {}).get("run") == command for s in body.get("steps") or [])
 
 
+_BYPASS_REL = "backend/scripts/check/acnr_bypass_scan.py"
+
+
+def _coverage_is_thin_shell() -> bool:
+    """check_acnr_consumer_coverage.py 只从 acnr_bypass_scan 导入 main，自身不定义函数 / 类（AST，T24）。"""
+    import ast as _ast
+
+    tree = _ast.parse(_read(_REPO / "backend/scripts/check/check_acnr_consumer_coverage.py"))
+    imports = [(n.module, [a.name for a in n.names]) for n in _ast.walk(tree) if isinstance(n, _ast.ImportFrom)]
+    defs = [n for n in _ast.walk(tree) if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef))]
+    return ("acnr_bypass_scan", ["main"]) in imports and not defs
+
+
 def _ccr_checker_has_no_private_matching() -> bool:
     """CCR 检查器不再定义私有表名匹配（无 _find_sheet / OfflineCatalog / _resolve_3arg / _resolve_2arg，AST）。"""
     import ast as _ast
@@ -277,9 +290,21 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
-            task_open("T24", "T29", "T30"),
-            in_planned("T24", "T29", "T30")),
+        "随本 spec 后续任务加入的门禁见下表——显示名单一来源（T29、T30）": P(
+            task_open("T29", "T30"),
+            in_planned("T29", "T30")),
+        "消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它）": CB(
+            _BYPASS_REL, ("run", "scan_backend", "ledger_problems", "main"), _T + "test_acnr_bypass_ratchet.py",
+            calls(_BYPASS_REL, "run", "scan_backend", "ledger_problems"),
+            exists("audit-platform/frontend/src/acnrBypassRatchet.spec.ts"), exists("backend/data/acnr/bypass_baseline.json"),
+            claim("check_acnr_consumer_coverage.py 只导入 acnr_bypass_scan.main、不定义函数（AST）", _coverage_is_thin_shell),
+            claim("CI 作业 acnr-consumer-coverage 运行 check_acnr_consumer_coverage.py --strict 且不 continue-on-error（YAML）",
+                  lambda: _ci_job_runs("acnr-consumer-coverage",
+                                       "python backend/scripts/check/check_acnr_consumer_coverage.py --strict")),
+            has_tests(_T + "test_acnr_bypass_ratchet.py", "test_real_repo_strict_green_and_counts_recomputed",
+                      "test_injected_v1_import_is_new_bypass", "test_comment_or_docstring_mention_is_not_a_bypass",
+                      "test_removed_baseline_call_is_stale_entry",
+                      "test_ledger_nonexistent_symbol_file_and_migrated_in_baseline")),
         "L1 目录加载与内存索引": CB(
             _A + "catalog.py", ("CatalogIndex", "get_catalog", "list_sheets", "list_cells"),
             _T + "test_catalog_index_fail_closed.py"),
@@ -519,7 +544,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "消费方台账与绕过棘轮、四个 ACNR CI 作业转绿": L("T24"),
         "版本锁 / acnr_targets / 拒绝计入 ACNR 指标": L("T26"),
         "统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示": L("T29、T30、T31"),
         "INDEX 登记与提交边界核对": L("T33"),
@@ -541,7 +565,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "**V1**（`services/address_registry`，动态寻址）：试算表 / 报表 / 附注 / 辅助余额等非底稿域的解析者，ACNR 对这些域委托 V1": P(
             exists("backend/app/services/address_registry.py"), NON_WP_TO_V1),
         "定位是「canonical resolver + legacy 委托」，不是全平台唯一入口": P(RESOLVER_DOC_OK),
-        "平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点（基线待 T24 冻结）": P(V1_BYPASS, task_open("T24")),
+        "平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点，已冻结为基线（见组件表「消费方绕过棘轮与台账」）": P(
+            V1_BYPASS, exists("backend/data/acnr/bypass_baseline.json"),
+            has_tests(_T + "test_acnr_bypass_ratchet.py", "test_real_repo_strict_green_and_counts_recomputed")),
         "**V2**（`routers/address_registry_v2.py` 与 stale 传播引擎）：依赖图与 stale 标记": P(
             exists(_V2_REL), defines(_STALE_REL, "StalePropagationEngine")),
         "读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份，四个静态文件的双读对账产物与 CCR 端点身份检查见组件表": P(

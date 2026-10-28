@@ -60,7 +60,6 @@ _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
     "display.py": ("T29", ("file", "backend/app/services/acnr/display.py")),
     "AcnrCandidatesHint": ("T31", ("file", "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue")),
-    "acnr_bypass_scan": ("T24", ("file", "backend/scripts/check/acnr_bypass_scan.py")),
 }
 
 #: py_ident 探测扫描的目录（AST：def / class / 赋值目标 / 注解字段 / 字符串常量）。

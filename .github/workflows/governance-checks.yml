@@ -1553,8 +1553,8 @@ jobs:
           fi
 
   acnr-consumer-coverage:
-    # ACNR Req-11: Consumer Coverage 真实扫描器
-    # 扫描 backend/app/ 下 address_registry. 直接调用，阻断未登记的新增消费者
+    # ACNR Req-11 / acnr-foundation-defect-closure T24（需求 13）：薄壳转发 acnr_bypass_scan.py，
+    # 按 AST 核对后端绕过点基线 backend/data/acnr/bypass_baseline.json 与消费方台账 consumer_ledger.json（只依赖标准库）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

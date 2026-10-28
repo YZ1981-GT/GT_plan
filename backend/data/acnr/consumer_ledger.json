@@ -1,0 +1,303 @@
+{
+  "description": "ACNR 寻址消费方台账（acnr-foundation-defect-closure T24 / 需求 13.1 / design §14.2、§17）。status ∈ migrated（已迁移）/ legacy_fallback（legacy 回退）/ not_wired（未接入）。守卫：文件须存在；Python 符号由 backend/scripts/check/acnr_bypass_scan.py 用 ast 核对、前端符号由 audit-platform/frontend/src/acnrBypassRatchet.spec.ts 用 TS 编译器 API 核对；migrated 条目的文件不得在绕过基线里；基线里的每个文件都须被某个非 migrated 条目登记；CCR 读取方须进基线或台账。",
+  "entries": [
+    {
+      "id": "formula-picker",
+      "consumer": "公式选址",
+      "files": [
+        "audit-platform/frontend/src/components/formula/FormulaRefPicker.vue",
+        "audit-platform/frontend/src/components/formula/CellSelector.vue",
+        "audit-platform/frontend/src/services/acnr/useAcnr.ts"
+      ],
+      "symbols": [
+        {"file": "audit-platform/frontend/src/services/acnr/useAcnr.ts", "name": "useAcnr"},
+        {"file": "audit-platform/frontend/src/components/formula/FormulaRefPicker.vue", "name": "ensureWpSheets"}
+      ],
+      "status": "legacy_fallback",
+      "target": "底稿域走 ACNR（useAcnr.listSheets / listCells），非底稿域保持 V1 委托",
+      "notes": "非底稿域经 useAddressRegistry 走 V1；显示名统一随 T29、T30"
+    },
+    {
+      "id": "formula-save-validation",
+      "consumer": "公式保存校验",
+      "files": ["backend/app/services/acnr/formula_validation.py"],
+      "symbols": [{"file": "backend/app/services/acnr/formula_validation.py", "name": "validate_refs_via_acnr"}],
+      "status": "migrated",
+      "target": "底稿域按 ACNR 校验；非底稿域在 ACNR 包内委托 V1",
+      "notes": "停用引用接受并计指标（T10、T26）"
+    },
+    {
+      "id": "formula-manager-tree",
+      "consumer": "公式管理与编辑树",
+      "files": [
+        "audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue",
+        "audit-platform/frontend/src/components/formula/FormulaEditDialog.vue"
+      ],
+      "symbols": [
+        {"file": "audit-platform/frontend/src/components/formula/FormulaEditDialog.vue", "name": "loadWpFromLegacyRegistry"}
+      ],
+      "status": "legacy_fallback",
+      "target": "FormulaEditDialog 的底稿浏览改走 ACNR，去掉 /api/address-registry 直写（BP-3）",
+      "notes": "树已走 ACNR；legacy 回退为直写 /api/address-registry 字面量"
+    },
+    {
+      "id": "address-store",
+      "consumer": "地址 store",
+      "files": ["audit-platform/frontend/src/stores/addressRegistry.ts"],
+      "symbols": [{"file": "audit-platform/frontend/src/stores/addressRegistry.ts", "name": "useAddressRegistry"}],
+      "status": "legacy_fallback",
+      "target": "搜索改走 ACNR",
+      "notes": "V1 搜索、ACNR→V1 回退（BP-3 路径常量）；订阅随 refresh 切换（T27）"
+    },
+    {
+      "id": "common-api-v1",
+      "consumer": "通用 API 的 V1 地址注册表封装",
+      "files": ["audit-platform/frontend/src/services/commonApi.ts"],
+      "symbols": [
+        {"file": "audit-platform/frontend/src/services/commonApi.ts", "name": "searchAddresses"},
+        {"file": "audit-platform/frontend/src/services/commonApi.ts", "name": "resolveAddress"}
+      ],
+      "status": "legacy_fallback",
+      "target": "调用方改用 useAcnr / ACNR 端点后删除这组封装",
+      "notes": "BP-3 路径常量（search / stats / resolve / validate / jump / invalidate）"
+    },
+    {
+      "id": "custom-query-tree-values",
+      "consumer": "高级查询地址树与单元格取值",
+      "files": [
+        "audit-platform/frontend/src/components/custom-query/CustomQueryFieldPicker.vue",
+        "backend/app/services/custom_query/acnr_target_values.py",
+        "backend/app/services/acnr/wp_cell_target.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/services/custom_query/acnr_target_values.py", "name": "resolve_acnr_targets"},
+        {"file": "backend/app/services/custom_query/acnr_target_values.py", "name": "read_acnr_target_values"},
+        {"file": "backend/app/services/acnr/wp_cell_target.py", "name": "read_entry_cell"}
+      ],
+      "status": "migrated",
+      "target": "—",
+      "notes": "T14~T16 接线"
+    },
+    {
+      "id": "query-result-refs",
+      "consumer": "高级查询结果引用",
+      "files": [
+        "backend/app/routers/query_builder.py",
+        "audit-platform/frontend/src/components/query/queryResultLinks.ts"
+      ],
+      "symbols": [
+        {"file": "backend/app/routers/query_builder.py", "name": "_derive_formula_refs"},
+        {"file": "audit-platform/frontend/src/components/query/queryResultLinks.ts", "name": "validatePageRefs"}
+      ],
+      "status": "not_wired",
+      "target": "结果列带 addr_id（另立 spec）",
+      "notes": "只派生 TB 两表引用；本页引用校验调 V1 /validate（BP-3 路径常量）"
+    },
+    {
+      "id": "workpaper-navigation",
+      "consumer": "底稿导航",
+      "files": [
+        "audit-platform/frontend/src/composables/useWorkpaperNavigation.ts",
+        "audit-platform/frontend/src/components/workpaper/WorkpaperHtmlTable.vue",
+        "audit-platform/frontend/src/components/workpaper/WorkpaperTraceView.vue",
+        "audit-platform/frontend/src/components/workpaper/s34-ipo-bundle/useS34CrossRef.ts",
+        "audit-platform/frontend/src/components/workpaper/s35-refinance-bundle/useS35CrossRef.ts"
+      ],
+      "symbols": [
+        {"file": "audit-platform/frontend/src/composables/useWorkpaperNavigation.ts", "name": "useWorkpaperNavigation"},
+        {"file": "audit-platform/frontend/src/components/workpaper/s34-ipo-bundle/useS34CrossRef.ts", "name": "useS34CrossRef"},
+        {"file": "audit-platform/frontend/src/components/workpaper/s35-refinance-bundle/useS35CrossRef.ts", "name": "useS35CrossRef"}
+      ],
+      "status": "legacy_fallback",
+      "target": "只走 resolveIndex / resolve-instance",
+      "notes": "BP-4：useWorkpaperRegistry 与两个 legacy 门面；useS34CrossRef / useS35CrossRef 属他人在研文件，只登记不改"
+    },
+    {
+      "id": "cross-sheet-trace",
+      "consumer": "跨 sheet 追溯",
+      "files": [
+        "backend/app/services/custom_query/cross_sheet_trace_orchestrator.py",
+        "backend/app/services/wp_formula_eval_service.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/services/custom_query/cross_sheet_trace_orchestrator.py", "name": "CrossSheetTraceOrchestrator"},
+        {"file": "backend/app/services/wp_formula_eval_service.py", "name": "evaluate_wp_formula_expression"}
+      ],
+      "status": "migrated",
+      "target": "—",
+      "notes": "节点身份经 exact_identity（T20）；求值服务只取值"
+    },
+    {
+      "id": "wp-formula-3arg",
+      "consumer": "底稿公式三参 WP",
+      "files": ["backend/app/services/formula_engine.py"],
+      "symbols": [{"file": "backend/app/services/formula_engine.py", "name": "WPExecutor"}],
+      "status": "migrated",
+      "target": "—",
+      "notes": "A1 第三参经 wp_cell_target（T13）；extract_custom_cells 是取值工具不算寻址"
+    },
+    {
+      "id": "ccr-checker",
+      "consumer": "CCR 检查器与报告问题清单",
+      "files": [
+        "backend/scripts/acnr/check_ccr_resolve.py",
+        "backend/app/services/acnr/ccr_sources.py",
+        "backend/app/services/acnr/catalog_build.py"
+      ],
+      "symbols": [
+        {"file": "backend/scripts/acnr/check_ccr_resolve.py", "name": "run"},
+        {"file": "backend/app/services/acnr/ccr_sources.py", "name": "unresolved_source_ids"},
+        {"file": "backend/app/services/acnr/catalog_build.py", "name": "_ccr_unresolved"}
+      ],
+      "status": "migrated",
+      "target": "—",
+      "notes": "CCR 端点身份经 exact_identity（T22）"
+    },
+    {
+      "id": "ccr-business-rules",
+      "consumer": "CCR 跨底稿业务规则读取方（不推 sheet 身份）",
+      "files": [
+        "backend/app/routers/linkage_panorama.py",
+        "backend/app/routers/template_library_mgmt.py",
+        "backend/app/routers/wp_relation_router.py",
+        "backend/app/routers/wp_step_mapping.py",
+        "backend/app/services/cross_cycle_breakage_service.py",
+        "backend/app/services/cross_ref_service.py",
+        "backend/app/services/formula_check_catalog.py",
+        "backend/app/services/formula_reverse_index.py",
+        "backend/app/services/wp_trace_service.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/routers/linkage_panorama.py", "name": "_load_cwr_references"},
+        {"file": "backend/app/routers/template_library_mgmt.py", "name": "_load_cross_wp_references"},
+        {"file": "backend/app/routers/wp_relation_router.py", "name": "get_wp_relation_graph"},
+        {"file": "backend/app/routers/wp_step_mapping.py", "name": "get_dependency_graph"},
+        {"file": "backend/app/services/cross_cycle_breakage_service.py", "name": "load_cwr_references"},
+        {"file": "backend/app/services/cross_ref_service.py", "name": "CrossRefService"},
+        {"file": "backend/app/services/formula_check_catalog.py", "name": "_cross_wp_references"},
+        {"file": "backend/app/services/formula_reverse_index.py", "name": "FormulaReverseIndex._build_from_cross_wp_references"},
+        {"file": "backend/app/services/wp_trace_service.py", "name": "_load_static_references"}
+      ],
+      "status": "not_wired",
+      "target": "需要 sheet 身份时改经 ccr_sources（exact_identity）",
+      "notes": "R2-F12 窄定义：只读 cross_wp_references.json 做跨底稿业务规则或展示，不算绕过；formula_reverse_index 的边端点经 acnr.catalog._formula_ref_to_addr_id"
+    },
+    {
+      "id": "report-domain",
+      "consumer": "报表",
+      "files": ["backend/app/services/acnr/resolver.py"],
+      "symbols": [{"file": "backend/app/services/acnr/resolver.py", "name": "_delegate_v1"}],
+      "status": "not_wired",
+      "target": "报表进 L1 或定义非底稿域身份（design §16 Q7）",
+      "notes": "报表域经 ACNR 委托 V1"
+    },
+    {
+      "id": "disclosure-notes",
+      "consumer": "附注",
+      "files": [
+        "audit-platform/frontend/src/views/DisclosureEditor.vue",
+        "audit-platform/frontend/src/views/composables/useNoteTree.ts"
+      ],
+      "symbols": [{"file": "audit-platform/frontend/src/views/composables/useNoteTree.ts", "name": "useNoteTree"}],
+      "status": "legacy_fallback",
+      "target": "同报表（Q7）",
+      "notes": "resolveIndex(note:...) 经 V1；订阅带项目（T27）"
+    },
+    {
+      "id": "consolidation",
+      "consumer": "合并",
+      "files": [
+        "audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue",
+        "audit-platform/frontend/src/components/consolidation/composables/useConsolReportAddress.ts"
+      ],
+      "symbols": [
+        {"file": "audit-platform/frontend/src/components/consolidation/composables/useConsolReportAddress.ts", "name": "useConsolReportAddress"}
+      ],
+      "status": "legacy_fallback",
+      "target": "同报表（Q7）",
+      "notes": "订阅带项目（T27）"
+    },
+    {
+      "id": "sync-invalidation",
+      "consumer": "同步与失效",
+      "files": [
+        "backend/app/services/acnr/events.py",
+        "backend/app/services/event_handlers/_impl.py",
+        "backend/app/routers/wp_structure.py",
+        "backend/app/services/wp_structure_bridge.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/services/acnr/events.py", "name": "invalidate"},
+        {"file": "backend/app/services/event_handlers/_impl.py", "name": "register_event_handlers"},
+        {"file": "backend/app/routers/wp_structure.py", "name": "save_structure"},
+        {"file": "backend/app/services/wp_structure_bridge.py", "name": "get_workpaper_addresses"}
+      ],
+      "status": "legacy_fallback",
+      "target": "失效统一走 acnr.events.invalidate",
+      "notes": "BP-1：_impl.py / wp_structure.py 直调 address_registry.invalidate_async，wp_structure_bridge.py 用 build_uri / build_jump_route"
+    },
+    {
+      "id": "bulk-import-export",
+      "consumer": "导入导出",
+      "files": ["backend/app/services/bulk_tab/manifest_builder.py"],
+      "symbols": [{"file": "backend/app/services/bulk_tab/manifest_builder.py", "name": "build_manifest"}],
+      "status": "migrated",
+      "target": "—",
+      "notes": "只读 ACNR manifest，依托目录发布门禁"
+    },
+    {
+      "id": "ai-chat-mention",
+      "consumer": "AI 对话提及",
+      "files": [
+        "backend/app/services/ai_chat/address_mention.py",
+        "backend/app/services/ai_chat/mention_service.py",
+        "backend/app/services/ai_chat/mcp_tools.py",
+        "backend/app/services/ai_chat/address_index_source.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/services/ai_chat/address_mention.py", "name": "_load_address_entry"},
+        {"file": "backend/app/services/ai_chat/mention_service.py", "name": "MentionSearchService._search_address"},
+        {"file": "backend/app/services/ai_chat/mcp_tools.py", "name": "_search_address_ids"},
+        {"file": "backend/app/services/ai_chat/address_index_source.py", "name": "AddressCoordinateIndexSource._fetch_from_legacy"}
+      ],
+      "status": "legacy_fallback",
+      "target": "改走 ACNR facade",
+      "notes": "BP-1：V1 直连"
+    },
+    {
+      "id": "v2-graph-stale",
+      "consumer": "V2 依赖图与 stale",
+      "files": [
+        "backend/app/routers/address_registry_v2.py",
+        "backend/app/services/stale_propagation_engine.py",
+        "backend/app/services/linkage_graph_builder.py",
+        "audit-platform/frontend/src/composables/useStaleImpact.ts"
+      ],
+      "symbols": [
+        {"file": "backend/app/routers/address_registry_v2.py", "name": "stale_impact"},
+        {"file": "backend/app/services/stale_propagation_engine.py", "name": "StalePropagationEngine"},
+        {"file": "backend/app/services/linkage_graph_builder.py", "name": "LinkageGraphBuilder._from_l3_dependencies"},
+        {"file": "backend/app/services/linkage_graph_builder.py", "name": "LinkageGraphBuilder._from_cross_wp_references"},
+        {"file": "audit-platform/frontend/src/composables/useStaleImpact.ts", "name": "useStaleImpact"}
+      ],
+      "status": "legacy_fallback",
+      "target": "图边改为 addr_id（design §16 Q6）",
+      "notes": "读端点节点与 stale 写入口经 v2_canonical（T21）；linkage_graph_builder 按 sheet 字符串拼图身份键（BP-2），useStaleImpact 引用 addressRegistry.v2 路径常量（BP-3）"
+    },
+    {
+      "id": "legacy-nav-facade",
+      "consumer": "legacy 导航门面",
+      "files": [
+        "backend/app/routers/wp_index_resolve.py",
+        "backend/app/routers/wp_workpaper_index_resolve.py"
+      ],
+      "symbols": [
+        {"file": "backend/app/routers/wp_index_resolve.py", "name": "resolve_wp_index"},
+        {"file": "backend/app/routers/wp_workpaper_index_resolve.py", "name": "resolve_workpaper_index"}
+      ],
+      "status": "migrated",
+      "target": "—",
+      "notes": "已转发 ACNR；鉴权仅登录（design §16 Q12）"
+    }
+  ]
+}

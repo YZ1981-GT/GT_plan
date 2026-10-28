@@ -63,6 +63,7 @@
 | 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
@@ -70,14 +71,13 @@
 | 底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，回收站给中文原因） | 后端 | `backend/app/routers/acnr.py` | `acnr_locate_workpaper` | `backend/tests/acnr/test_workpaper_locate_endpoint.py` |
 | 底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约 | 前端 | `audit-platform/frontend/src/views/composables/workpaperShortLink.ts` | `resolveShortLink`、`shortLinkQuery` | `audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
+门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——显示名单一来源（T29、T30）。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
-| 消费方台账与绕过棘轮、四个 ACNR CI 作业转绿 | T24 |
 | 版本锁 / acnr_targets / 拒绝计入 ACNR 指标 | T26 |
 | 统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示 | T29、T30、T31 |
 | INDEX 登记与提交边界核对 | T33 |
@@ -89,7 +89,7 @@
 ### V1 / V2 / legacy 导航的并行关系（现状）
 
 - **ACNR（L1 + L2 + L3）**：底稿域（wp）由 `acnr/resolver.py` 解析；L1 目录只覆盖底稿域（见上表 `catalog.domains`）。
-- **V1**（`services/address_registry`，动态寻址）：试算表 / 报表 / 附注 / 辅助余额等非底稿域的解析者，ACNR 对这些域委托 V1。定位是「canonical resolver + legacy 委托」，不是全平台唯一入口；平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点（基线待 T24 冻结）。
+- **V1**（`services/address_registry`，动态寻址）：试算表 / 报表 / 附注 / 辅助余额等非底稿域的解析者，ACNR 对这些域委托 V1。定位是「canonical resolver + legacy 委托」，不是全平台唯一入口；平台里仍有直接调用 V1 或自行推导 sheet 身份的绕过点，已冻结为基线（见组件表「消费方绕过棘轮与台账」）。
 - **V2**（`routers/address_registry_v2.py` 与 stale 传播引擎）：依赖图与 stale 标记；读端点的节点与 stale 写入口经 `acnr/v2_canonical.py` 取规范身份，四个静态文件的双读对账产物与 CCR 端点身份检查见组件表。写 stale 的端点已加项目鉴权（见组件表）。
 - **legacy 导航门面**（`wp_index_resolve` 等）：已转发 ACNR，`resolve_instance` 按 `wp_index.wp_code` 绑定项目已有底稿。
 
