@@ -26,6 +26,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from app.services.audit_logger_enhanced import AuditLoggerEnhanced
 from app.services.custom_query.addressing_service import (
     AddressingService,
     ResolvedTarget,
@@ -146,10 +147,9 @@ async def test_p29_optimistic_lock_stale_rejection(
 # Property 30: 回写事务原子性（Task 15.7, R3.6 / R9.4 / R14.8）
 # ═══════════════════════════════════════════════════════════════════════════
 
-_RESOLVE_TARGET_PATH = (
-    "app.services.custom_query.addressing_service.addressing_service.resolve_target"
-)
-_AUDIT_LOGGER_PATH = "app.services.audit_logger_enhanced.audit_logger"
+# 🔴 桩一律打在类上（staticmethod 包一层），不打在模块单例 addressing_service / audit_logger 实例上：
+# monkeypatch.setattr 对实例上「来自类」的方法，撤销时把原方法写成实例属性留在单例上，挡住之后用例的类级替换
+# （advanced-query-linkage-closure B6：排在本文件之后的 test_aql_writeback_isolation_pg 4 例因此调到真实 resolve_target）。
 
 # 归属校验用的两个合法 UUID（project_mismatch 场景）
 _PID_A = "11111111-1111-1111-1111-111111111111"
@@ -285,7 +285,7 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
                 jump_route="/wp/x", entry_type="cell",
             )
 
-    monkeypatch.setattr(_RESOLVE_TARGET_PATH, _fake_resolve)
+    monkeypatch.setattr(AddressingService, "resolve_target", staticmethod(_fake_resolve))
 
     # 审计桩（step10）
     async def _audit_ok(**kwargs):
@@ -295,8 +295,9 @@ async def test_p30_writeback_transaction_atomicity(inject, monkeypatch):
         raise RuntimeError("audit queue down")
 
     monkeypatch.setattr(
-        f"{_AUDIT_LOGGER_PATH}.log_action",
-        _audit_boom if inject == "audit_fails" else _audit_ok,
+        AuditLoggerEnhanced,
+        "log_action",
+        staticmethod(_audit_boom if inject == "audit_fails" else _audit_ok),
     )
 
     writer = SnapshotWriter()
