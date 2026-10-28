@@ -228,18 +228,3 @@ export {
   assertFShellConsumerCompatible,
   type FShellContractSnapshot,
 } from './fShellContract'
-
-export {
-  inspectGtWpToolbarOutlets,
-  loadGtWpToolbarSource,
-  scanDuplicateCapabilityFindings,
-} from './hostInventoryScanners'
-
-export {
-  DENOMINATOR_HOSTS,
-  runFullInventoryGate,
-  buildT15EvidencePayload,
-  type FullInventoryGateResult,
-  type HostAdjudication,
-  type DenominatorHost,
-} from './fullInventoryGate'

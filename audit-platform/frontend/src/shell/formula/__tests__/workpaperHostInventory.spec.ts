@@ -17,12 +17,16 @@ import {
   COMPATIBILITY_OUTLET_SLOT,
   assertCssClassIsNotOutletCapability,
   buildWorkpaperHostInventory,
-  inspectGtWpToolbarOutlets,
-  loadGtWpToolbarSource,
   registerHostAdapterTelemetry,
   resetHostAdapterTelemetry,
-  scanDuplicateCapabilityFindings,
 } from '@/shell/formula'
+// 🔴 node-only 扫描器已从浏览器入口 index 剥离（vite build 会把 node:fs 拉进浏览器图直接失败，
+//    2026-10-28 服务器部署实测）；测试侧改直达子模块，语义不变。
+import {
+  inspectGtWpToolbarOutlets,
+  loadGtWpToolbarSource,
+  scanDuplicateCapabilityFindings,
+} from '@/shell/formula/hostInventoryScanners'
 
 // 落盘只为验证运行记录能原样读回：写临时目录。原先写 `.kiro/specs/workpaper-page-formula-toolbar-closure/basis`
 // —— 该 spec 已归档到 `_archive/05-business-features/`，每跑一次就在 specs 根下造出一个只有这份文件的「活动 spec」目录。

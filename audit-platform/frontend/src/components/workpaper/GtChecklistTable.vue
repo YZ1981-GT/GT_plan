@@ -27,18 +27,9 @@ import type {
   ChecklistHtmlData,
   ReviewSignHint,
 } from './checklistTypes'
+import { EMPTY_CHECKLIST_HTML_DATA } from './checklistTypes'
 
 // ─── Props / Emits ───
-const EMPTY_CHECKLIST_HTML_DATA: ChecklistHtmlData = {
-  template: {
-    wp_code: '',
-    title: '',
-    sections: [],
-    toc: [],
-    stats: { total_actionable: 0, total_guidance: 0, total_sections: 0 },
-  },
-  responses: {},
-}
 
 const props = withDefaults(defineProps<{
   wpId: string
