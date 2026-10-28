@@ -2,7 +2,7 @@
  * useF1DisclosureListed — 预付账款附注披露（上市公司）
  * 对齐 Excel：账龄分析(+比例) / 超1年重要 / 前五名(汇总+分别) + 同步附注五、7
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcPercentage } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
@@ -536,7 +536,8 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
     }
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
+  onScopeDispose(() => {
     for (const { event, handler } of eventListeners) {
       window.removeEventListener(event, handler)
     }

@@ -568,3 +568,107 @@ class TestApplySubtotal:
         assert Decimal(rows[4][1]) == Decimal("40")
         assert rows[5][0] == "合计"
         assert Decimal(rows[5][1]) == Decimal("100")   # total = A+B+C+D
+
+
+class TestApplyOptionalAndPlaceholder:
+    """spec note-pull-followup-closure：R12 取消勾选的可选行不拉数 / R15 不写「……」占位行、手工格跟着行名走。"""
+
+    @staticmethod
+    async def _seed_pushed(db: AsyncSession, project_id: UUID, rows: list[dict]) -> None:
+        db.add(DisclosureNote(
+            project_id=project_id, year=_YEAR,
+            note_section=resolve_standalone_section("soe", _SECTION), section_title="管理费用",
+            table_data={"_tables": [{
+                "name": resolve_standalone_table_name("soe", _SECTION),
+                "headers": ["项目", "本期发生额", "上期发生额"], "rows": rows,
+            }]},
+            status="draft",
+        ))
+        await db.flush()
+
+    @pytest.mark.asyncio
+    async def test_inactive_optional_row_not_pulled(self, db, user, consol_project, child_projects):
+        def pushed(label, rid, category, values, active=None):
+            row = {"label": label, "values": values, "row_type": "data",
+                   "_pushed_row_id": rid, "_pushed_category": category}
+            if active is not None:
+                row["_pushed_optional_active"] = active
+            return row
+
+        await self._seed_pushed(db, child_projects[0].id, [
+            pushed("库存现金", "r-cash", "required", [100.0, 90.0]),
+            pushed("其他货币资金", "r-other", "optional", [5.0, 4.0], active=False),  # 甲：本企业不适用
+        ])
+        await self._seed_pushed(db, child_projects[1].id, [
+            pushed("库存现金", "r-cash", "required", [50.0, 40.0]),
+            pushed("其他货币资金", "r-other", "optional", [10.0, 5.0], active=True),
+        ])
+        tmpl = await create_template(
+            db, template_type="soe", section_id=_SECTION, created_by=user.id,
+            rows=[{"canonical_name": "库存现金"}, {"canonical_name": "其他货币资金", "category": "optional"},
+                  {"canonical_name": "合计", "row_type": "total"}],
+        )
+        tr, vid = tmpl["latest_version"]["rows"], UUID(tmpl["latest_version"]["id"])
+        await bind_template_version(db, project_id=consol_project.id, section_id=_SECTION,
+                                    template_version_id=vid, bound_by=user.id)
+        h = compute_source_structure_hash(_SECTION, [["库存现金"], ["其他货币资金"]])
+        await confirm_mapping(
+            db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR,
+            template_version_id=vid, source_structure_hash=h,
+            mappings=[{"source_label": "库存现金", "target_row_id": tr[0]["target_row_id"], "mapping_action": "map"},
+                      {"source_label": "其他货币资金", "target_row_id": tr[1]["target_row_id"], "mapping_action": "map"}],
+            entity_node_keys=[{"node_key": "A:sub", "project_id": str(child_projects[0].id), "hash": h},
+                              {"node_key": "B:sub", "project_id": str(child_projects[1].id), "hash": h}],
+            confirmed_by=user.id,
+        )
+        result = await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
+
+        import sqlalchemy as sa
+        record = (await db.execute(sa.select(ConsolNoteData).where(
+            ConsolNoteData.project_id == consol_project.id, ConsolNoteData.section_id == _SECTION))).scalar_one()
+        rows = record.data["rows"]
+        assert [r[:3] for r in rows] == [["库存现金", "150.00", "130.00"], ["其他货币资金", "10.00", "5.00"],
+                                          ["合计", "160.00", "135.00"]], "甲的可选行标了不适用 ⇒ 只计乙"
+        assert result["inactive_optional_count"] == 1
+        prov = {p["entity_node_key"]: p for p in record.data["_detail_provenance"]}
+        assert prov["A:sub"]["inactive_optional_rows"] == ["其他货币资金"]
+        assert "inactive_optional_rows" not in prov["B:sub"]
+
+    @pytest.mark.asyncio
+    async def test_placeholder_not_written_and_manual_cell_follows_row(self, db, user, consol_project, child_projects):
+        await _seed_disclosure(db, child_projects[0].id, [["工资", "100", "80"], ["办公费", "50", "40"]])
+        tmpl = await create_template(  # 修复前建的模板：「……」是固定行
+            db, template_type="soe", section_id=_SECTION, created_by=user.id,
+            rows=[{"canonical_name": "工资"}, {"canonical_name": "……"}, {"canonical_name": "办公费"},
+                  {"canonical_name": "合计", "row_type": "total"}],
+        )
+        tr, vid = tmpl["latest_version"]["rows"], UUID(tmpl["latest_version"]["id"])
+        assert tr[1]["category"] == "required"
+        await bind_template_version(db, project_id=consol_project.id, section_id=_SECTION,
+                                    template_version_id=vid, bound_by=user.id)
+        h = compute_source_structure_hash(_SECTION, [["工资"], ["办公费"]])
+        await confirm_mapping(
+            db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR,
+            template_version_id=vid, source_structure_hash=h,
+            mappings=[{"source_label": "工资", "target_row_id": tr[0]["target_row_id"], "mapping_action": "map"},
+                      {"source_label": "办公费", "target_row_id": tr[2]["target_row_id"], "mapping_action": "map"}],
+            entity_node_keys=[{"node_key": "A:sub", "project_id": str(child_projects[0].id), "hash": h}],
+            confirmed_by=user.id,
+        )
+        # 上一次拉数（修复前）写出的数据：带「……」行，办公费本期是手填 999
+        db.add(ConsolNoteData(project_id=consol_project.id, year=_YEAR, section_id=_SECTION, data={
+            "rows": [["工资", "", ""], ["……", "", ""], ["办公费", "999", ""], ["合计", "", ""]],
+            "manual_cells": [{"row": 2, "col": 1}],
+        }))
+        await db.flush()
+
+        result = await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
+
+        import sqlalchemy as sa
+        record = (await db.execute(sa.select(ConsolNoteData).where(
+            ConsolNoteData.project_id == consol_project.id, ConsolNoteData.section_id == _SECTION))).scalar_one()
+        assert [r[:3] for r in record.data["rows"]] == [
+            ["工资", "100.00", "80.00"], ["办公费", "999", "40.00"], ["合计", "1099.00", "120.00"]]
+        assert record.data["manual_cells"] == [{"row": 1, "col": 1}], "手工标记跟着「办公费」移到新行号"
+        assert result["dropped_placeholders"] == ["……"] and result["lost_protected"] == []
+        assert result["kept_manual"] == [{"row": 1, "col": 1, "kept_value": "999"}]

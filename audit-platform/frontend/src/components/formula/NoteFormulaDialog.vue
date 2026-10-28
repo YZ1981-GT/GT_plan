@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="附注公式管理"
-    width="800px"
+    width="960px"
     append-to-body
     destroy-on-close
   >
@@ -24,7 +24,33 @@
 
       <!-- 公式列表 -->
       <el-table v-loading="loading" :data="filteredFormulas" size="small" border max-height="350">
-        <el-table-column prop="target" label="目标单元格" width="120" />
+        <el-table-column label="目标单元格" min-width="200">
+          <template #default="{ row }">
+            <!-- 新增公式选目标（表 / 行 / 列）：原先目标列不可编辑，新增的公式保存时被当空行丢掉却提示「已保存」 -->
+            <div v-if="row._editing && row._isNew" class="gt-nf-target">
+              <template v-if="targetTables.length">
+                <el-select :model-value="cellOf(row).table" size="small" placeholder="表" aria-label="目标表"
+                           @update:model-value="(v: number) => setCell(row, { table: v })">
+                  <el-option v-for="t in targetTables" :key="t.index" :label="t.name" :value="t.index" />
+                </el-select>
+                <el-select :model-value="cellOf(row).row" size="small" placeholder="行" aria-label="目标行"
+                           :disabled="cellOf(row).table === undefined"
+                           @update:model-value="(v: number) => setCell(row, { ...cellOf(row), row: v })">
+                  <el-option v-for="(label, i) in tableOf(row)?.rows || []" :key="i" :label="label" :value="i" />
+                </el-select>
+                <el-select :model-value="cellOf(row).col" size="small" placeholder="列" aria-label="目标列"
+                           :disabled="cellOf(row).table === undefined"
+                           @update:model-value="(v: number) => setCell(row, { ...cellOf(row), col: v })">
+                  <el-option v-for="(label, i) in tableOf(row)?.columns || []" :key="i" :label="label" :value="i" />
+                </el-select>
+              </template>
+              <span v-else class="gt-nf-hint">本章节没有表格，不能设单元格公式</span>
+            </div>
+            <span v-else :title="row.target" style="font-size: var(--gt-font-size-xs)">
+              {{ row.target_label || row.target || '（未选目标）' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="公式" min-width="250">
           <template #default="{ row }">
             <el-input v-if="row._editing" v-model="row.formula" size="small">
@@ -90,6 +116,9 @@ import { useAddressRegistry } from '@/stores/addressRegistry'
 import { formatRefIssue } from '@/utils/formulaRefIssues'
 import { showFormulaError } from '@/composables/formula/useFormulaSettings'
 import FormulaRefPicker from './FormulaRefPicker.vue'
+import {
+  describeApplyResult, describeFormulaTarget, formulaKey, parseFormulaKey, type NoteFormulaTargetTable,
+} from './noteFormulaTargets'
 
 const props = defineProps<{
   modelValue: boolean
@@ -159,11 +188,39 @@ const formulas = ref<any[]>([])
  */
 const loadedTokens = ref<Record<string, string | null> | null>(null)
 
-/** 列表 / 保存接口同形：`{formulas, loaded}`；每条带层级标签（全局 / 本项目 / 系统预设 …）。 */
+/** 目标清单：逐表行名 / 列名（列表接口 `targets`，与执行器同一份表格）。 */
+const targetTables = ref<NoteFormulaTargetTable[]>([])
+
+/** 列表 / 保存接口同形：`{formulas, loaded, targets}`；每条带层级标签（全局 / 本项目 / 系统预设 …）与可读目标。 */
 function applyListing(resp: any) {
   const list = resp?.formulas
   formulas.value = (Array.isArray(list) ? list : []).map((f: any) => ({ ...f, _editing: false }))
   loadedTokens.value = resp?.loaded ?? {}
+  targetTables.value = Array.isArray(resp?.targets) ? resp.targets : []
+}
+
+type DraftCell = { table?: number; row?: number; col?: number }
+
+/** 新增行正在选的目标（选齐表 / 行 / 列才写回 `target`）。 */
+function cellOf(row: any): DraftCell {
+  if (row._cell) return row._cell
+  return parseFormulaKey(row.target) ?? {}
+}
+
+function tableOf(row: any): NoteFormulaTargetTable | undefined {
+  const t = cellOf(row).table
+  return targetTables.value.find((x) => x.index === t)
+}
+
+function setCell(row: any, cell: DraftCell) {
+  row._cell = cell
+  if (cell.table !== undefined && cell.row !== undefined && cell.col !== undefined) {
+    row.target = formulaKey({ table: cell.table, row: cell.row, col: cell.col })
+    row.target_label = describeFormulaTarget(row.target, targetTables.value)
+  } else {
+    row.target = ''
+    row.target_label = ''
+  }
 }
 
 const filteredFormulas = computed(() => {
@@ -233,16 +290,22 @@ async function persistFormulas(): Promise<boolean> {
     ElMessage.warning('请先选择附注章节')
     return false
   }
+  // 有公式却没选目标：原先被后端当空行丢掉、仍提示「已保存」（spec note-pull-header-formula-closure F7）
+  const untargeted = formulas.value.filter(f => (f?.formula || '').trim() && !String(f?.target || '').trim())
+  if (untargeted.length) {
+    ElMessage.warning(`有 ${untargeted.length} 条公式没有选择目标单元格（表 / 行 / 列），未保存`)
+    return false
+  }
   const dangling = await collectDanglingRefs(formulas.value)
   if (dangling.length) {
     ElMessage.error(`公式引用无法解析，未保存：${[...new Set(dangling)].join('；')}`)
     return false
   }
   const noteSection = props.currentNote.note_section
-  // 剔除前端本地态字段（_editing）与只读展示字段（层级），只送持久化 shape
+  // 剔除前端本地态字段（_editing / _isNew / _cell）与只读展示字段（层级 / 可读目标），只送持久化 shape
   const payload = formulas.value
     .filter(f => (f?.formula || '').trim())
-    .map(({ _editing, layer, layer_label, pending, slot_key, ...rest }) => rest)
+    .map(({ _editing, _isNew, _cell, layer, layer_label, pending, slot_key, target_label, ...rest }) => rest)
   persisting.value = true
   try {
     // 错误由本弹窗显示（_silent：全局拦截器不再先弹一次）；422 悬空引用逐条列「引用：原因」
@@ -258,7 +321,12 @@ async function persistFormulas(): Promise<boolean> {
       const fresh = new Map<string, any>((resp.formulas || []).map((f: any) => [f.target, f]))
       for (const f of formulas.value) {
         const r = fresh.get(f.target)
-        if (r) Object.assign(f, { layer: r.layer, layer_label: r.layer_label, pending: r.pending, slot_key: r.slot_key })
+        if (r) {
+          Object.assign(f, { layer: r.layer, layer_label: r.layer_label, pending: r.pending, slot_key: r.slot_key,
+            target_label: r.target_label ?? f.target_label })
+          f._isNew = false
+          delete f._cell
+        }
       }
     }
     emit('saved')
@@ -281,16 +349,18 @@ async function completeRow(row: any) {
   }
 }
 
-// 新增公式：推入空可编辑行（Req 15.3，去掉硬编码 SUM 占位）
+// 新增公式：推入空可编辑行（Req 15.3，去掉硬编码 SUM 占位）；目标在行内选（表 / 行 / 列）
 function addFormula() {
   formulas.value.push({
     target: '',
+    target_label: '',
     formula: '',
     category: activeCategory.value,
     description: '',
     source: '手工',
     type: '',
     _editing: true,
+    _isNew: true,
   })
 }
 
@@ -311,7 +381,7 @@ async function onApply() {
     const result = await api.post(
       noteFormula.apply(props.projectId, props.year, noteSection)
     )
-    ElMessage.success(`公式已应用：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
+    ElMessage.success(describeApplyResult(result))
     emit('applied')
   } catch (e: any) {
     handleApiError(e, '应用失败')
@@ -320,8 +390,8 @@ async function onApply() {
   }
 }
 
-// ─── 重新生成（Req 15.4）：显式从 check_presets 重生成预设公式 ─────
-// 独立于 onApply，不持久化用户编辑集，仅触发后端按预设重生成并计算。
+// ─── 重新生成（Req 15.4）：按每张表当前结构重新生成预设公式并计算 ─────
+// 独立于 onApply，不持久化用户编辑集；regenerate=true 让后端丢掉章节里存过的旧公式（按行号指格，增删行后会指错格）。
 async function onRegenerate() {
   if (!props.projectId || !props.year || !props.currentNote) {
     ElMessage.warning('请先选择附注章节')
@@ -331,9 +401,9 @@ async function onRegenerate() {
   try {
     const noteSection = props.currentNote.note_section
     const result = await api.post(
-      noteFormula.apply(props.projectId, props.year, noteSection)
+      noteFormula.apply(props.projectId, props.year, noteSection), null, { params: { regenerate: true } },
     )
-    ElMessage.success(`已重新生成：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
+    ElMessage.success(describeApplyResult(result, '已重新生成'))
     // 重新生成后刷新列表，展示最新预设公式
     await loadFormulas()
     emit('applied')
@@ -348,4 +418,7 @@ async function onRegenerate() {
 <style scoped>
 .gt-nf-empty { text-align: center; padding: 40px; color: var(--gt-color-text-tertiary); }
 .gt-nf-header { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.gt-nf-target { display: flex; gap: 4px; }
+.gt-nf-target .el-select { flex: 1; min-width: 0; }
+.gt-nf-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 </style>

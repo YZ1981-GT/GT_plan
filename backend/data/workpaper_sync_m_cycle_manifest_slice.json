@@ -1084,10 +1084,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L58",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L125",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L121",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L158",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L59",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L126",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L122",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L159",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -3807,7 +3807,7 @@
     "hardcoded_patterns_at_zero": 6,
     "hardcoded_patterns_total": 6
    },
-   "why_zero_is_a_judgement": "六族全 0 命中。这是**判据**不是缺席：扫描分母是 M 域 222 个生产文件（现算，非空），且同一套正则在 G/H/I/K 循环上有过非 0 命中。变异脚本会往真源码里注入一处 `blankRows(p, 3)` 证明该族不是恒 0。"
+   "why_zero_is_a_judgement": "六族全 0 命中。这是**判据**不是缺席：扫描分母是 M 域 228 个生产文件（现算，非空；原 222，2026-10-28 note-pull-followup-closure R1 新增 6 个：`composables/m1DisclosureForm.ts` / `m2DisclosureForm.ts` / `m3DisclosureForm.ts`（M1~M3 披露 Tab 的默认行、读回与快照原样抽出，Tab 与附注离屏同步共用）+ `m1HeadlessDisclosure.ts` / `m2HeadlessDisclosure.ts` / `m3HeadlessDisclosure.ts`（离屏 provider）；六族模式在这 6 个文件里同为 0 命中），且同一套正则在 G/H/I/K 循环上有过非 0 命中。变异脚本会往真源码里注入一处 `blankRows(p, 3)` 证明该族不是恒 0。"
   }
  },
  "honest_adjudication_summary": {
@@ -3874,7 +3874,7 @@
   "entries_with_inert_switch": 0,
   "entries_with_no_switch_at_all": 1,
   "entries_mounting_the_ac14_notice": 0,
-  "m_production_files_scanned": 222,
+  "m_production_files_scanned": 228,
   "dynamic_row_identity_tables": 3,
   "positional_identity_render_key_hits": 1,
   "positional_identity_persistence_key_hits": 44,

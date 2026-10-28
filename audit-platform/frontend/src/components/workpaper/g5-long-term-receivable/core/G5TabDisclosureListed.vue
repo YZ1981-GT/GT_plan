@@ -757,15 +757,11 @@ import { useG5DisclosureListed } from '../../composables/useG5DisclosureListed'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
-  buildG5ListedSyncPayload,
-  g5PortfolioTableNames,
-} from '../../composables/g5DisclosureSyncPayload'
+  G5_LISTED_SYNCED_TABLES_ITEM,
+  buildG5ListedTabSyncPayload,
+} from '../../composables/g5DisclosureTabSync'
 import { G5_NOTE_SECTION } from '../../composables/g5NoteSectionMap'
-import {
-  buildRemovedTableKeys,
-  parseSyncedTableNames,
-  serializeSyncedTableNames,
-} from '../../composables/disclosureSyncedTables'
+import { serializeSyncedTableNames } from '../../composables/disclosureSyncedTables'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
 import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 import { api } from '@/services/apiProxy'
@@ -797,36 +793,17 @@ const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG5AiGenerate(
 // ─── 同步到附注（§五、16）───────────────────────────────────────────────
 // 组合计提表是**动态多表**（`组合计提项目：{组合名}`）→ 组合改名/删除会在附注侧留孤儿表，
 // 故持久化「上次同步表名」并在同步**成功后**才 markSynced（失败也写会把现存表当孤儿删）。
-const SYNCED_TABLES_ITEM = 'G5-disclosure-listed-synced-tables'
+// 快照与载荷（含孤儿表差集）与附注页离屏同步共用 `g5DisclosureTabSync`。
 const isSyncing = ref(false)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 
-function listedSnapshot() {
-  const st = dis.state.value
-  return {
-    natureRows: dis.natureDisplayRows.value,
-    methodRows: dis.methodDisplayRows.value,
-    individualDetails: st.individualDetails,
-    portfolios: st.portfolios,
-    movementRows: dis.movementDisplayRows.value,
-    writeoffRows: st.writeoffRows,
-    unrealizedNote: st.unrealizedNote ?? '',
-    noteText: dis.noteText.value ?? '',
-  }
-}
-
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || isReadonly.value || !props.projectId) return
-  const snap = listedSnapshot()
-  const pushed = g5PortfolioTableNames(snap.portfolios)
-  const previouslySynced = parseSyncedTableNames(
-    g5Notes.allResponses.value.get(SYNCED_TABLES_ITEM)?.remark ?? null,
-  )
-  const payload = buildG5ListedSyncPayload(
+  const { payload, pushed } = buildG5ListedTabSyncPayload(
     props.wpId,
     props.applicableStandards,
-    snap,
-    buildRemovedTableKeys({ previouslySynced, pushed }),
+    dis,
+    g5Notes.allResponses.value,
   )
   if (!payload) return
   isSyncing.value = true
@@ -837,7 +814,7 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
     // 仅同步成功后记账，否则下次会把仍存在的表误判为孤儿
-    g5Notes.debouncedSave(SYNCED_TABLES_ITEM, {
+    g5Notes.debouncedSave(G5_LISTED_SYNCED_TABLES_ITEM, {
       remark: serializeSyncedTableNames(pushed),
     })
     ElMessage.success(`已同步 ${rows} 行到附注模块「${G5_NOTE_SECTION.listed} 长期应收款」`)

@@ -33,7 +33,7 @@ DOCX_DIR = DATA_DIR / "audit_report_templates" / "disclosure_notes"
 # 导入 multi_header_to_column_groups；表头行数判定用平台的 app.services.note_word_table
 sys.path.insert(0, str(ROOT / "scripts" / "seed"))
 sys.path.insert(0, str(ROOT))
-from seed_consol_note_sections import multi_header_to_column_groups
+from seed_consol_note_sections import fill_label_header, multi_header_to_column_groups
 from app.services.note_word_table import seed_table_structure, sync_logical_columns  # noqa: E402  与平台同一构建（R7.6）
 
 
@@ -423,6 +423,7 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             entry.pop("_column_groups", None)
             if built.get("_column_groups"):
                 entry["_column_groups"] = built["_column_groups"]
+            fill_label_header(entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         struct_updated += 1
 
@@ -475,6 +476,7 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         }
         if built.get("_column_groups"):
             new_entry["_column_groups"] = built["_column_groups"]
+        fill_label_header(new_entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         if verbose:
             print(f"    P2 +{sid}: {wt['cols']}col, mh={'Y' if built['multi_header'] else 'N'}, rows={len(built['rows'])}")
@@ -550,6 +552,7 @@ def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             cg = multi_header_to_column_groups(new_entry["multi_header"])
             if cg:
                 new_entry["_column_groups"] = cg
+        fill_label_header(new_entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         if verbose:
             print(f"    P3 +{sid}: ch={ch}, {wt['cols']}col, mh={'Y' if mh else 'N'}")

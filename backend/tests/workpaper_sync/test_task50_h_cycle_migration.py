@@ -299,6 +299,9 @@ def _positional_identity_hits(files: list[pathlib.Path]) -> list[tuple[str, int,
     """穷举「身份字段的值由位置派生」的命中，返回 `(相对路径, 行号, 身份键, 表达式)`。"""
     hits: list[tuple[str, int, str, str]] = []
     for path in files:
+        # 该清单描述生产代码的身份缺陷；测试夹具会故意构造位置化反例，不能登记成生产欠账。
+        if "__tests__" in path.parts:
+            continue
         source = path.read_text(encoding="utf-8", errors="replace")
         rel = path.relative_to(ROOT).as_posix()
         for no, line in enumerate(source.splitlines(), 1):
@@ -510,6 +513,13 @@ class TestGuardSelfChecks:
     def test_positional_token_catches_the_real_seed_form(self) -> None:
         expr = _value_expr_after_key("rowId: `seed-${idx}`,", "rowId")
         assert expr is not None and _POSITIONAL_IDENTITY_TOKEN.search(expr)
+
+    def test_positional_inventory_ignores_non_vacuous_test_fixture(self) -> None:
+        """清单只管生产代码；测试会故意用位置化 id 造样本，不能把它登记成生产欠账。"""
+        fixture = COMPOSABLES / "__tests__" / "h10VoucherFill.spec.ts"
+        source = fixture.read_text(encoding="utf-8")
+        assert "id: `d${i}`" in source, "反向样本消失，测试会空转"
+        assert _positional_identity_hits([fixture]) == []
 
     def test_null_placeholder_stripper_only_removes_literal_nulls(self) -> None:
         real_dual = "{ item_id: id, conclusion: existing?.conclusion ?? null, remark: v }"

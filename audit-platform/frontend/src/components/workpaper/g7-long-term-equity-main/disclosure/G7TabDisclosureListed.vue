@@ -859,13 +859,20 @@ function captureVersionFromItem(item: any): void {
   if (next) loadedVersion.value = String(next)
 }
 
+/** 编辑后的保存：存成功排一次自动同步 */
 async function persist(): Promise<void> {
-  if (props.isReadonly || !props.wpId) return
+  if (await saveState()) autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+/** 只存不排同步（同步前后的保存用这个；用 persist 会每 800ms 再同步一次，直到卸载）；存成功回 true */
+async function saveState(): Promise<boolean> {
+  if (props.isReadonly || !props.wpId) return false
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
   }
   savePhase.value = SAVE_PHASE.SAVING
+  let saved = false
   try {
     await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId || undefined,
@@ -878,18 +885,15 @@ async function persist(): Promise<void> {
     }, { _silent: true } as any)
     hasLocalEdits = false
     savePhase.value = SAVE_PHASE.SAVED
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+    saved = true
     await refreshLoadedVersion()
   } catch (err: any) {
     const status = err?.response?.status
     const detail = err?.response?.data?.detail
-    if (status === 409 || detail?.code === 'version_conflict') {
-      savePhase.value = SAVE_PHASE.ERROR
-      ElMessage.error('披露数据已被他人修改，请刷新页面后重试')
-      return
-    }
     savePhase.value = SAVE_PHASE.ERROR
+    if (status === 409 || detail?.code === 'version_conflict') ElMessage.error('披露数据已被他人修改，请刷新页面后重试')
   }
+  return saved
 }
 
 function applySavedState(saved: Partial<G7ListedDisclosureState>): void {
@@ -1054,7 +1058,7 @@ async function syncToDisclosureNotes(): Promise<void> {
     let data: any
     let payloads: ReturnType<typeof buildG7ListedSyncPayloads>
     try {
-      await persist()
+      await saveState()
       payloads = buildG7ListedSyncPayloads(serialisableState())
       const result: any = await api.post(
         `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
@@ -1095,7 +1099,7 @@ async function syncToDisclosureNotes(): Promise<void> {
       `（含 ${NOTE_SECTION_ID} 长期股权投资与 七、1 在其他主体中的权益）`
     try {
       state.previouslySyncedTables = markG7ListedSynced(serialisableState(), payloads)
-      await persist()
+      await saveState()
       dispatchNoteUpdated()
       ElMessage.success(okText)
     } catch (err: unknown) {

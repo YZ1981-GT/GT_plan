@@ -136,7 +136,15 @@ import { useM7FormData } from '../../composables/useM7FormData'
 import { useNoteAutoFill } from '../../composables/useNoteAutoFill'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import {
+  applyM7AutoFill,
+  buildM7TabSyncPayload,
+  createM7SoeDisclosureRows,
+  M7_AUTO_FILL_SOURCES,
+  restoreM7Disclosure,
+  type M7SoeDisclosureRow,
+} from '../../composables/mEquityDisclosureForm'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 import { M_CYCLE_ACCOUNT } from '../../composables/mCycleAccountScope'
@@ -163,22 +171,10 @@ const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: co
 const lastRefreshTime = ref('')
 const disclosureNote = ref('')
 
-interface SoeDisclosureRow {
-  item: string
-  beginBalance: number
-  increase: number
-  expenseDecrease: number
-  capitalDecrease: number
-  endBalance: number
-  policyBasis: string
-}
+// 默认行 / 读回 / 取数应用 / 同步快照与附注页离屏同步共用 mEquityDisclosureForm（spec note-pull-followup-closure R1）
+type SoeDisclosureRow = M7SoeDisclosureRow
 
-const disclosureRows = ref<SoeDisclosureRow[]>([
-  { item: '安全生产费', beginBalance: 0, increase: 0, expenseDecrease: 0, capitalDecrease: 0, endBalance: 0, policyBasis: '' },
-  { item: '维简费', beginBalance: 0, increase: 0, expenseDecrease: 0, capitalDecrease: 0, endBalance: 0, policyBasis: '' },
-  { item: '其他专项储备', beginBalance: 0, increase: 0, expenseDecrease: 0, capitalDecrease: 0, endBalance: 0, policyBasis: '' },
-  { item: '合  计', beginBalance: 0, increase: 0, expenseDecrease: 0, capitalDecrease: 0, endBalance: 0, policyBasis: '' },
-])
+const disclosureRows = ref<SoeDisclosureRow[]>(createM7SoeDisclosureRows())
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtAmount(val: number): string {
@@ -195,20 +191,11 @@ function parseNum(v: any): number {
 // ─── 从 M7-1 审定数据刷新附注（P2：统一 useNoteAutoFill SDK）────────────────
 const autoFill = useNoteAutoFill({
   allResponses: computed(() => formData.allResponses.value) as any,
-  sources: {
-    safety: 'M7-1-safety-subtotal',
-    maintenance: 'M7-1-maintenance-subtotal',
-    other: 'M7-1-other-subtotal',
-    total: 'M7-1-total-audited',
-  },
+  sources: M7_AUTO_FILL_SOURCES,
   accountCodes: [M_CYCLE_ACCOUNT.M7.code],
   reload: () => formData.loadData(),
   onRefresh: (v) => {
-    if ((v.total ?? 0) !== 0 || (v.safety ?? 0) !== 0) {
-      disclosureRows.value[0].endBalance = v.safety ?? 0
-      disclosureRows.value[1].endBalance = v.maintenance ?? 0
-      disclosureRows.value[2].endBalance = v.other ?? 0
-      disclosureRows.value[3].endBalance = v.total ?? 0
+    if (applyM7AutoFill(disclosureRows.value, v)) {
       lastRefreshTime.value = autoFill.lastRefreshAt.value
       autoSync.scheduleAutoSync(syncToDisclosureNotes)
     }
@@ -232,19 +219,7 @@ function saveDisclosureNote(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildMEquitySyncPayload(props.wpId, {
-    cycle: 'M7',
-    variant: 'soe',
-    rows: disclosureRows.value.map((r) => ({
-      label: r.item,
-      begin: Number(r.beginBalance) || 0,
-      increase: Number(r.increase) || 0,
-      decrease: (Number(r.expenseDecrease) || 0) + (Number(r.capitalDecrease) || 0),
-      end: Number(r.endBalance) || 0,
-      remark: r.policyBasis || '',
-    })),
-    note: disclosureNote.value?.trim() || undefined,
-  })
+  const payload = buildM7TabSyncPayload(props.wpId, 'soe', disclosureRows.value, disclosureNote.value)
   if (!payload) {
     ElMessage.warning('当前项目准则不适用国企附注同步')
     return
@@ -295,15 +270,9 @@ function handleReview(): void { openReviewDialog?.('M7-disclosure-soe', '附注�
 onMounted(async () => {
   await formData.loadData()
 
-  // 恢复已保存的披露说明
-  const noteResp = formData.allResponses.value.get('M7-disclosure-soe-note')
-  if (noteResp?.remark) disclosureNote.value = noteResp.remark
-
-  // 恢复行计提依据
-  disclosureRows.value.forEach((row, i) => {
-    const resp = formData.allResponses.value.get(`M7-disclosure-soe-row-${i}-policy`)
-    if (resp?.remark) row.policyBasis = resp.remark
-  })
+  // 恢复已保存的披露说明与行计提依据
+  const note = restoreM7Disclosure(formData.allResponses.value, 'soe', disclosureRows.value)
+  if (note != null) disclosureNote.value = note
 
   // 数据加载后从审定数据取数刷新
   autoFill.pull()

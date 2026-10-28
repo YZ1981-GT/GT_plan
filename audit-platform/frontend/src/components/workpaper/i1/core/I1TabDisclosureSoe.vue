@@ -217,6 +217,7 @@ const {
   auditConclusion,
   crossCheck,
   prepValidation,
+  buildSyncSnapshot,
   persist,
   updateCategory,
   addCategory,
@@ -361,17 +362,8 @@ async function syncToNotes() {
     }
   }
   persist()
-  const payloads = buildI1SoeSyncPayloads(props.wpId, props.applicableStandards || [], {
-    layers: layers.value,
-    noteIndefinite: noteIndefinite.value,
-    noteMortgage: noteMortgage.value,
-    noteValuation: noteValuation.value,
-    noteImpairment: noteImpairment.value,
-    noteNotReady: noteNotReady.value,
-    noteSale: noteSale.value,
-    noteTitle: noteTitle.value,
-    amortAlloc: amortAlloc.value,
-  })
+  // 快照与附注页离屏同步共用（useI1Disclosure.buildSyncSnapshot，同一载荷）
+  const payloads = buildI1SoeSyncPayloads(props.wpId, props.applicableStandards || [], buildSyncSnapshot())
   if (!payloads.length) {
     ElMessage.warning('当前不适用国企附注同步')
     return

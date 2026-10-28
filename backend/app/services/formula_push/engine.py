@@ -622,51 +622,46 @@ async def _push_note(
         ).with_for_update()
     )).scalar_one_or_none()
     reason = None
+    # 子表规则（``*.note.subtable_*``）只认本章节里精确同名的那张表：不回退首表、不按章节标题改投到别的章节、缺表不建骨架
+    # （原先回退首表 / 改投会把科目合计写进别的表；spec note-pull-followup-closure R2.3）
+    is_subtable = ".note.subtable_" in rule.rule_id
     if note is None:
         reason = f"附注尚未生成「{section} {table_name}」章节（在附注模块生成后下次推送纳入）"
-    elif (note.section_title or "").strip() != _title_check_name:
-        # ── 章节号不匹配：子表规则可通过 sub_table_data 验证 ──
-        # 子表规则的 table_name 不等于章节标题是正常的（如 D1 章节「应收票据」下有
-        # 「应收票据分类」「坏账分类」等子表）。仅对 subtable 规则：如果 sub_table_data
-        # 中能找到目标表，就不因标题不匹配而 skip。主表规则仍需标题匹配。
-        # spec: formula-push-subtable-expansion
-        _is_subtable = "subtable" in rule.rule_id
-        _td = note.table_data if isinstance(note.table_data, dict) else {}
-        _sub = _td.get("sub_table_data", {})
-        if _is_subtable and isinstance(_sub, dict) and table_name in _sub:
-            pass  # 子表存在于该章节中，跳过标题校验
+    elif is_subtable:
+        if not note_writer.has_table(note.table_data, table_name):
+            reason = f"附注 {section}「{note.section_title or ''}」里没有「{table_name}」表（子表规则只按表名精确定位），未推送"
+    elif not is_subtable and (note.section_title or "").strip() != _title_check_name:
+        # ── 章节号不匹配：主表规则按章节标题反查（spec: formula-push-note-skip-reduction · 需求 3.1） ──
+        _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
+        fallback_rows = (await ctx.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == ctx.project_id,
+                DisclosureNote.year == ctx.year,
+                DisclosureNote.section_title == _title_check_name,
+                DisclosureNote.is_deleted == sa.false(),
+                DisclosureNote.note_section.like(f"{_section_prefix}%"),
+            ).with_for_update()
+        )).scalars().all()
+        if len(fallback_rows) == 1:
+            logger.info(
+                "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
+                _title_check_name, fallback_rows[0].note_section, section,
+            )
+            note = fallback_rows[0]
+            section = fallback_rows[0].note_section
+            section_addr = f"note://{section}/{table_name}"
         else:
-            # 尝试按 section_title 反查（spec: formula-push-note-skip-reduction · 需求 3.1）
-            _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
-            fallback_rows = (await ctx.db.execute(
-                sa.select(DisclosureNote).where(
-                    DisclosureNote.project_id == ctx.project_id,
-                    DisclosureNote.year == ctx.year,
-                    DisclosureNote.section_title == _title_check_name,
-                    DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.note_section.like(f"{_section_prefix}%"),
-                ).with_for_update()
-            )).scalars().all()
-            if len(fallback_rows) == 1:
-                logger.info(
-                    "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
-                    _title_check_name, fallback_rows[0].note_section, section,
-                )
-                note = fallback_rows[0]
-                section = fallback_rows[0].note_section
-                section_addr = f"note://{section}/{table_name}"
-            else:
-                reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
-    elif str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
+            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
+    if reason is None and note is not None and str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
     table_data = copy.deepcopy(note.table_data) if note is not None else None
     table = None
     if reason is None:
-        table, reason = note_writer.locate_table(table_data, table_name)
+        table, reason = note_writer.locate_table(table_data, table_name, exact=is_subtable)
 
-    # ── 缺表时尝试建骨架（需求 5.1）──────────────────────────────────
+    # ── 缺表时尝试建骨架（需求 5.1；子表规则宁缺勿造，不建） ──────────────────
     skeleton_built = False
-    if table is None and reason and "没有" in reason and table_data is not None:
+    if not is_subtable and table is None and reason and "没有" in reason and table_data is not None:
         # _source 为 workpaper/workpaper_html 或 None（旧格式未标记）都允许建骨架
         source = table_data.get("_source")
         if source in note_writer.WORKPAPER_SOURCES or source is None:
@@ -740,6 +735,11 @@ async def _push_note(
                 ctx.skip(rule.rule_id, "note", "note", addr,
                          f"取数行「{'」「'.join(dict.fromkeys(claims[index]))}」都对上附注「{note_writer.row_label(table.rows[index])}」"
                          "行，同一格不能由多条取数覆盖写，附注保持原值")
+            elif f"{value_key}_resolved" not in row:
+                # 取数行没有这个值（子表字段如「坏账准备」「比例」不由本底稿取数）：原来 KeyError 让整张底稿回滚
+                # （spec note-pull-followup-closure R2.3）
+                ctx.skip(rule.rule_id, "note", "note", addr,
+                         f"取数行没有「{field_name}」的值（本底稿取数只有期末 / 期初数），附注保持原值")
             elif not row[f"{value_key}_resolved"]:
                 # 科目不存在是真正 skip，不参与延迟
                 ctx.skip(rule.rule_id, "note", "note", addr, "底稿未取到该行数值（本项目无此科目），附注保持原值")
@@ -797,9 +797,9 @@ async def _push_note(
     # 首次推送后标记 _source，下次推送走正常路径不再触发旧格式兜底
     if table_data.get("_source") is None:
         table_data["_source"] = "workpaper"
-    # 同步指纹：与 sync-from-workpaper 同写，pull-from-workpapers 据此认定「真正同步过」（需求 5）
-    table_data["_last_sync_wp_id"] = str(paper.id)
-    table_data["_last_sync_at"] = ctx.now.isoformat()
+    # 推送不写同步指纹（``_last_sync_wp_id`` / ``_last_sync_at``）：指纹只表示「底稿披露表同步过」，离屏同步据此判断
+    # 「已有人工填写不覆盖」；推送写了它，推送过的章节就冒充同步过（spec note-pull-followup-closure R3.2 / ADR-3）。
+    # 推送的来源记在 ``last_sync_source`` 与推送状态表。
     note_writer.sync_first_table_mirror(table_data)  # 旧格式写的是 _tables[0] ⇒ 顶层镜像跟着改
     note.table_data = table_data
     flag_modified(note, "table_data")

@@ -567,12 +567,18 @@ def table_blank_for_delivery(rows: Any, columns: Any = None) -> bool:
     ``is_empty_table`` 在没有列定义时把 0 当「文本列里填了 0」算非空 —— 模块页口径；交付件里全 0 的表
     渲染出来是一张只有行名的空表（金额 0 显示为空白），与「本期无此业务」同义，不出具。
     """
-    from app.services.note_empty_table_detector import SKIP_ROW_TYPES, is_empty_table
+    from app.services.note_empty_table_detector import (
+        SKIP_ROW_TYPES, is_empty_table, is_total_row, total_row_has_amount,
+    )
 
     if is_empty_table(rows, columns):
         return True
     for row in rows if isinstance(rows, list) else []:
-        if not isinstance(row, dict) or row.get("is_total") or str(row.get("row_type") or "") in SKIP_ROW_TYPES:
+        if not isinstance(row, dict) or str(row.get("row_type") or "") in SKIP_ROW_TYPES:
+            continue
+        if is_total_row(row):
+            if total_row_has_amount(row, columns):
+                return False  # 合计行有数（公式推送的合计行兜底）：有业务
             continue
         values = row.get("values")
         if isinstance(values, list) and not all(_zero_like(v) for v in values):

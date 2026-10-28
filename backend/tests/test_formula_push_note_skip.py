@@ -1348,10 +1348,10 @@ class TestPushNoteEngineIntegration:
         assert note.table_data.get("_source") == "workpaper", (
             f"首次推送后 _source 应为 'workpaper'，实际: {note.table_data.get('_source')!r}"
         )
-        # 同步指纹被写入
-        assert note.table_data.get("_last_sync_wp_id") == str(_PAPER_ID)
-        assert note.table_data.get("_last_sync_at") is not None
-        # ORM 属性被更新
+        # 推送不写同步指纹（只有底稿披露同步写；spec note-pull-followup-closure R3.2）
+        assert "_last_sync_wp_id" not in note.table_data
+        assert "_last_sync_at" not in note.table_data
+        # ORM 属性被更新（推送来源记在 last_sync_source）
         assert note.is_stale is False
         assert note.last_sync_source == "formula_push"
 

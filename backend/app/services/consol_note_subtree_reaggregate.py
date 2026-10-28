@@ -8,7 +8,7 @@ spec: consol-note-header-library-and-node-reaggregate（R3 / design §8）
 - 差额节点：按抵销 / 调整分录算差额（``fill_by_formula(node_key=差额节点)``）；本章节没有公式 ⇒ 不写，
   汇总时用已保存的数（手工录的差额）；
 - 汇总节点：Σ 直接下级已保存附注数（下级汇总节点用本轮汇总结果）+ 差额节点；合计 / 小计按本表重算
-  （``build_table_rows``，与明细映射拉数同一函数）；手工 / 锁定格不动；写来源标记 ``subtree_aggregate``
+  （``build_note_rows``，与明细映射拉数同一函数；「……」占位行没有数不写）；手工 / 锁定格不动；写来源标记 ``subtree_aggregate``
   与下级构成 ``_subtree_provenance``。
 
 个别数只从单体附注来：来源是试算表公式（``formula``）的非差额下级不计入并回报原因；没有任何非差额下级
@@ -42,6 +42,8 @@ from app.services.consol_note_detail_apply_service import (
     _parse_locked_cells,
     _parse_manual_cells,
     apply_detail_refresh,
+    placeholder_rows,
+    remap_protected,
 )
 from app.services.consol_note_detail_source_service import _row_type
 from app.services.consol_note_formula_service import (
@@ -62,7 +64,17 @@ from app.services.consol_note_formula_service import (
     resolve_note_template_type,
     section_formulas,
 )
-from app.services.consol_note_table_totals import TOTAL_ROW_TYPES, build_table_rows, to_decimal
+from app.services.consol_note_detail_suggest import is_placeholder_label
+from app.services.consol_note_table_totals import TOTAL_ROW_TYPES, build_note_rows, to_decimal
+from app.services.consol_note_topn import (
+    group_unit_names,
+    rerank,
+    section_topn_limit,
+    topn_denominator,
+    topn_entries,
+    topn_table,
+    write_topn,
+)
 from app.services.consol_tree_service import TreeNode, build_tree, find_node_by_key, iter_nodes
 
 logger = logging.getLogger(__name__)
@@ -205,6 +217,7 @@ class _Run:
         self.order = [n for n in reversed(list(iter_nodes(node))) if n.node_key]
         self.tallies = {n.node_key: _NodeTally(n, _action(n)) for n in self.order}
         self.skeletons: dict[str, list[tuple[str, str | None]]] = {}
+        self.placeholders: dict[str, list[int]] = {}   # 骨架里的「……」占位行（R15：没有数不写）
         self.bound_sections: set[str] = set()
         self.mapping: dict[tuple[str, str], str] = {}
         self.formulas: dict[str, list[Any]] = {}
@@ -254,6 +267,7 @@ class _Run:
             rows = version.rows if version is not None and isinstance(version.rows, list) else []
             if rows:
                 self.skeletons[b.section_id] = [(str(r.get("canonical_name") or ""), r.get("row_type")) for r in rows]
+                self.placeholders[b.section_id] = placeholder_rows(rows)
         for sid, key, status in (await self.db.execute(sa.select(
             ConsolNoteMappingBinding.section_id, ConsolNoteMappingBinding.entity_node_key,
             ConsolNoteMappingBinding.status,
@@ -342,14 +356,16 @@ class _Run:
         def skip(reason: str, *, pending: bool = False) -> _Outcome:
             return _Outcome(sid, node, ACTION_PULL, _SKIPPED, reason, pending=pending)
 
-        if sid not in self.bound_sections:
+        # 「前 N 名」表不经明细模板与映射（R10）：按单位重排，只看映射里是否排除了该企业
+        topn = section_topn_limit(self.template_type, sid)
+        if not topn and sid not in self.bound_sections:
             return skip("本章节未绑定明细模板（在「📋 明细映射」绑定模板并确认映射后才能从单体附注拉数）")
         if node.project_id is None:
             return skip("没有单体项目，无单体附注可拉")
         status = self.mapping.get((sid, node.node_key))
-        if status is None:
+        if status is None and not topn:
             return skip("未确认映射（或单体附注没有该表）", pending=True)
-        if status == "stale":
+        if status == "stale" and not topn:
             return skip("单体附注结构已变化，需重新确认映射", pending=True)
         if status == "excluded":
             return skip("映射中已排除该企业，不计入")
@@ -394,20 +410,23 @@ class _Run:
 
     # ── 汇总节点：Σ 直接下级已保存数 + 差额 ──
 
-    def _skeleton(self, sid: str) -> tuple[list[tuple[str, str | None]], dict[int, list[str]]]:
-        """骨架行（行名, 行类型）+ 原样保留的行：有明细模板绑定用绑定版本的行；没有用合并附注模板行
+    def _skeleton(self, sid: str) -> tuple[list[tuple[str, str | None]], dict[int, list[str]], list[int]]:
+        """骨架行（行名, 行类型）+ 原样保留的行 + 「……」占位行号：有明细模板绑定用绑定版本的行；没有用合并附注模板行
         （行类型与「从来源建议模板」同一判定 ``_row_type``；表内嵌的子表头行原样保留，不参与求和）。"""
         if sid in self.skeletons:
-            return self.skeletons[sid], {}
+            return self.skeletons[sid], {}, self.placeholders.get(sid, [])
         table = find_table(self.template_type, sid) or {}
         headers = table.get("headers") or []
         skeleton: list[tuple[str, str | None]] = []
         verbatim: dict[int, list[str]] = {}
         for i, row in enumerate(table.get("rows") or []):
-            skeleton.append((_first_cell(row).strip(), _row_type(row)))
-            if i <= 2 and i == len(verbatim) and _is_embedded_header_row(row, headers):
+            embedded = i <= 2 and i == len(verbatim) and _is_embedded_header_row(row, headers)
+            # 表内子表头不参与合计构成（标 header，合计构成按结构行跳过）
+            skeleton.append((_first_cell(row).strip(), "header" if embedded else _row_type(row)))
+            if embedded:
                 verbatim[i] = [str(v) if v is not None else "" for v in row]
-        return skeleton, verbatim
+        placeholders = [i for i, (name, _rt) in enumerate(skeleton) if i not in verbatim and is_placeholder_label(name)]
+        return skeleton, verbatim, placeholders
 
     async def _aggregate(self, sid: str, node: TreeNode) -> _Outcome:
         def skip(reason: str) -> _Outcome:
@@ -423,7 +442,10 @@ class _Run:
                                          node_key=node.node_key, is_root_consol=is_root)
         if source is not None and getattr(source, "cell_state", "auto") == "locked":
             return skip("整节锁定，未覆盖")
-        skeleton, verbatim = self._skeleton(sid)
+        topn = section_topn_limit(self.template_type, sid)
+        if topn:
+            return await self._aggregate_topn(sid, node, topn, source)
+        skeleton, verbatim, placeholders = self._skeleton(sid)
         if not skeleton:
             return skip("没有可用的表格行（模板为空）")
         index: dict[tuple[str, int], int] = {}
@@ -470,14 +492,16 @@ class _Run:
         existing_rows = data.get("rows") if isinstance(data.get("rows"), list) else []
         if existing_rows and isinstance(existing_rows[0], (list, tuple)):
             width = max(width, len(existing_rows[0]))
-        protected = _parse_manual_cells(data) | _parse_locked_cells(record)
+        manual, locked = _parse_manual_cells(data), _parse_locked_cells(record)
         for i in verbatim:
             amounts.pop(i, None)
-        new_rows, filled, kept = build_table_rows(
-            skeleton, amounts, width=width, protected=protected, existing_rows=existing_rows,
-        )
+        # 「……」占位行没有下级数、也没有手填值就不写；手工 / 锁定格按行名对到新行号（R15）
+        built = build_note_rows(skeleton, amounts, width=width, protected=manual | locked,
+                                existing_rows=existing_rows, placeholders=placeholders)
+        new_rows, filled, kept = built.rows, built.filled, built.kept
+        lost_protected = remap_protected(data, record, manual, locked, built.old_to_new)
         for i, cells in verbatim.items():
-            new_rows[i] = (cells + [""] * width)[:width]
+            new_rows[built.kept_index[i]] = (cells + [""] * width)[:width]
         now = datetime.now(timezone.utc)
         for stale_key in ("_detail_provenance", "_detail_entity_count", "_detail_applied_at"):
             data.pop(stale_key, None)
@@ -498,14 +522,67 @@ class _Run:
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
             "filled_count": len(filled),
             "kept_manual_count": len(kept),
+            "dropped_placeholders": built.dropped_placeholders,
+            "lost_protected": lost_protected[:50],
             "unplaced_count": len(unplaced),
             "children": [{k: e.get(k) for k in ("node_key", "included", "reason")} for e in provenance],
+        })
+
+    async def _aggregate_topn(self, sid: str, node: TreeNode, limit: int, source: ConsolNoteData | None) -> _Outcome:
+        """「前 N 名」表：下级已保存的前 N 名按单位合并重排（R10）。下级第 N 名之后的单位看不到 ⇒ 近似（写进 ``_topn``）。"""
+        headers, columns = topn_table(self.template_type, sid)
+        if columns is None:
+            return _Outcome(sid, node, ACTION_AGGREGATE, _SKIPPED, f"前 {limit} 名表认不出期末余额列，无法重排")
+        children = await self._records(sid, [c.node_key for c in node.children if c.node_key])
+        entries: list[Any] = []
+        provenance: list[dict[str, Any]] = []
+        for child in node.children:
+            entry: dict[str, Any] = {"node_key": child.node_key, "kind": child.kind, "label": _label(child),
+                                     "included": False}
+            record = children.get(child.node_key)
+            if child.kind == KIND_ELIM:
+                entry["reason"] = "差额户不参与前 N 名重排"
+            elif _action(child) == ACTION_PULL and self.mapping.get((sid, child.node_key)) == "excluded":
+                entry["reason"] = "映射中已排除"
+            elif record is None or not isinstance(record.data, dict) or not record.data.get("rows"):
+                entry["reason"] = "没有数据"
+            elif record_write_source(record) == "formula":
+                entry["reason"] = "来源是试算表公式（按公式填入），个别数只从单体附注取，未计入"
+            else:
+                units = topn_entries(record.data["rows"], child.node_key)
+                entries.extend(units)
+                entry.update(included=True, has_values=bool(units))
+            provenance.append(entry)
+        if not entries:
+            return _Outcome(sid, node, ACTION_AGGREGATE, _SKIPPED, f"下级企业都没有可重排的前 {limit} 名数据")
+        record = await self._writable_record(sid, node, source)
+        denominator, note = await topn_denominator(self.db, project_id=self.project_id, year=self.year,
+                                                   template_type=self.template_type, section_id=sid,
+                                                   node_key=node.node_key)
+        result = rerank(entries, columns=columns, limit=limit, width=max(len(headers), 2),
+                        exclude=group_unit_names(self.tree), denominator=denominator, denominator_reason=note)
+        now = datetime.now(timezone.utc)
+        summary = write_topn(record, headers=headers, result=result, limit=limit, approximate=True,
+                             denominator=denominator, denominator_note=note, data_updates={
+                                 "_last_write_source": WRITE_SOURCE,
+                                 "_subtree_child_count": sum(1 for e in provenance if e["included"] and e.get("has_values")),
+                                 "_subtree_provenance": {"children": provenance, "unplaced": [],
+                                                         "aggregated_at": now.isoformat()}})
+        for stale_key in ("_detail_provenance", "_detail_entity_count", "_detail_applied_at"):
+            record.data.pop(stale_key, None)
+        await self._snapshot(sid, node, record)
+        await self.db.flush()
+        return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
+            "filled_count": sum(1 for row in result.rows for cell in row[1:] if str(cell).strip()),
+            "kept_manual_count": len(summary["kept"]), "lost_protected": summary["lost_protected"][:50],
+            "topn": summary, "children": [{k: e.get(k) for k in ("node_key", "included", "reason")} for e in provenance],
         })
 
     def _accumulate(self, rows: list[Any], index: dict[tuple[str, int], int],
                     skeleton: list[tuple[str, str | None]], amounts: dict[int, dict[int, Decimal]],
                     unplaced: list[dict[str, Any]], child: TreeNode) -> tuple[bool, int]:
-        """下级已保存行按（规范化行名, 同名序号）对到骨架行逐列相加；合计 / 小计行不取（本表重算）。"""
+        """下级已保存行按（规范化行名, 同名序号）对到骨架行逐列相加。合计 / 小计行也加（判得准的由本表按合计构成重算、
+        不用它；判不准的用各下级之和），但只有合计行有数不算「有可汇总的数据」。"""
         added, width = False, 0
         seen: Counter = Counter()
         for row in rows:
@@ -522,12 +599,11 @@ class _Run:
                 if values and _row_type([name]) not in TOTAL_ROW_TYPES:
                     unplaced.append({"node_key": child.node_key, "label": name or "（空行名）"})
                 continue
-            if skeleton[idx][1] in TOTAL_ROW_TYPES:
-                continue
+            is_total = skeleton[idx][1] in TOTAL_ROW_TYPES
             bucket = amounts.setdefault(idx, {})
             for col, value in values.items():
                 bucket[col] = bucket.get(col, Decimal("0")) + value
-                added = True
+                added = added or not is_total
         return added, width
 
     # ── 记录读写 ──

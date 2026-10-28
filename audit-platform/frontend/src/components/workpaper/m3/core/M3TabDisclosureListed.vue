@@ -183,7 +183,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM3FormData } from '../../composables/useM3FormData'
-import { calcContraEquityEndBalance } from '../../composables/useM3FormulaEngine'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
@@ -201,24 +200,21 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-// ─── 同步链路 ───────────────────────────────────────────────────────────────
+// ─── 同步链路（行 / 重算 / 读回 / 快照在 m3DisclosureForm，与附注页离屏同步共用） ──────
 
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM3SyncPayload, type M3DisclosureRow as M3Row } from '../../composables/m3NoteSectionMap'
+import {
+  buildM3TabSyncPayload,
+  createM3TreasuryRows,
+  recalcM3TreasuryRows,
+  restoreM3TreasuryDisclosure,
+  type M3TreasuryDisclosureRow,
+  type M3TreasuryDisclosureState,
+} from '../../composables/m3DisclosureForm'
 import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M3Row[] = treasuryChangeRows.value.map((r) => ({
-    label: r.item,
-    begin: r.beginAmount,
-    increase: r.repurchaseIncrease,
-    decrease: r.cancelDecrease,
-  }))
-  const payload = buildM3SyncPayload(
-    props.wpId,
-    rows,
-    { purpose: purposeNote.value, execution: executionNote.value, equityImpact: equityImpactNote.value },
-  )
+  const payload = buildM3TabSyncPayload(props.wpId, disclosureState())
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -236,32 +232,25 @@ const formData = useM3FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface TreasuryDisclosureRow {
-  item: string
-  beginAmount: number
-  repurchaseIncrease: number
-  cancelDecrease: number
-  endAmount: number
-}
-
-const treasuryChangeRows = ref<TreasuryDisclosureRow[]>([
-  { item: '一、库存股合计', beginAmount: 0, repurchaseIncrease: 0, cancelDecrease: 0, endAmount: 0 },
-  { item: '  其中：员工持股计划', beginAmount: 0, repurchaseIncrease: 0, cancelDecrease: 0, endAmount: 0 },
-  { item: '  市值管理/减少注册资本', beginAmount: 0, repurchaseIncrease: 0, cancelDecrease: 0, endAmount: 0 },
-  { item: '  股权激励', beginAmount: 0, repurchaseIncrease: 0, cancelDecrease: 0, endAmount: 0 },
-  { item: '  其他', beginAmount: 0, repurchaseIncrease: 0, cancelDecrease: 0, endAmount: 0 },
-])
+const treasuryChangeRows = ref<M3TreasuryDisclosureRow[]>(createM3TreasuryRows())
 
 const purposeNote = ref('')
 const executionNote = ref('')
 const equityImpactNote = ref('')
 
+function disclosureState(): M3TreasuryDisclosureState {
+  return {
+    rows: treasuryChangeRows.value,
+    purpose: purposeNote.value,
+    execution: executionNote.value,
+    equityImpact: equityImpactNote.value,
+  }
+}
+
 // ─── Computed: 期末 = 期初 + 回购增加 − 注销减少（备抵借方） ───────────────
 
 function recalcEnd(): void {
-  treasuryChangeRows.value.forEach(row => {
-    row.endAmount = calcContraEquityEndBalance(row.beginAmount, row.repurchaseIncrease, row.cancelDecrease)
-  })
+  recalcM3TreasuryRows(treasuryChangeRows.value)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -391,25 +380,11 @@ function fmtAmount(val: number): string {
 // ─── Restore state ──────────────────────────────────────────────────────────
 
 function _restoreFromResponses(): void {
-  const rowData = formData.allResponses.value.get('M3-disclosure-listed-treasury-rows')
-  if (rowData?.remark) {
-    try {
-      const parsed = JSON.parse(rowData.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        treasuryChangeRows.value = parsed
-        recalcEnd()
-      }
-    } catch { /* ignore */ }
-  }
-
-  const purpose = formData.allResponses.value.get('M3-disclosure-listed-purpose')
-  if (purpose?.remark) purposeNote.value = purpose.remark
-
-  const execution = formData.allResponses.value.get('M3-disclosure-listed-execution')
-  if (execution?.remark) executionNote.value = execution.remark
-
-  const equity = formData.allResponses.value.get('M3-disclosure-listed-equity-impact')
-  if (equity?.remark) equityImpactNote.value = equity.remark
+  const next = restoreM3TreasuryDisclosure(formData.allResponses.value, disclosureState())
+  treasuryChangeRows.value = next.rows
+  purposeNote.value = next.purpose
+  executionNote.value = next.execution
+  equityImpactNote.value = next.equityImpact
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

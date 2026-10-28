@@ -373,8 +373,9 @@ async def test_note_rows_follow_disclosure_and_total_is_recomputed_from_actual_r
     assert rows["手工加的行"]["end_amount"] == 5
     assert rows["其中：存放在境外的款项总额"]["end_amount"] == 7
     assert note.table_data["sub_table_data"]["受限制的货币资金明细"] == [{"label": "保证金", "end_amount": 9}]
-    # 同步指纹 + 来源（pull-from-workpapers 据 _last_sync_wp_id 认定已同步）
-    assert note.table_data["_last_sync_wp_id"] == str(env.wp_id)
+    # 同步指纹只由底稿披露同步写：推送不改它（原来的「旧底稿同步」原样保留；spec note-pull-followup-closure R3.2），
+    # 推送来源记在 last_sync_source
+    assert note.table_data["_last_sync_wp_id"] == "旧底稿同步" and "_last_sync_at" not in note.table_data
     assert (note.last_sync_source, note.last_sync_wp_id) == ("formula_push", env.wp_id)
     assert result.note_sections == ["五、1"] and "note" in result.stages
 

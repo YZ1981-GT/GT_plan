@@ -208,12 +208,7 @@ class ConsolNoteMappingRule(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    # V200: 记录该项目规则是否已提升为模板，防止重复提升
-    promoted_to_template_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("consol_note_mapping_rule_template.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    # V202 的 promoted_to_template_id（规则提升为模板）已随规则模板库退役（V208 删列，spec note-pull-followup-closure R16）
 
     __table_args__ = (
         CheckConstraint("version_number > 0", name="ck_cnmr_version_positive"),
@@ -289,9 +284,3 @@ class ConsolNoteMappingBinding(Base):
         ),
         Index("idx_cnmb_rule", "rule_id"),
     )
-
-
-# ``ConsolNoteMappingRule.promoted_to_template_id`` 外键指向 V200 的规则模板表；只加载本模块时
-# （测试按需导入、``Base.metadata.create_all``）目标表必须同时登记在同一 MetaData，否则
-# NoReferencedTableError。模板模块只依赖 Base、按表名引用本模块的表，无导入环。
-from app.models import consol_note_mapping_template_models as _rule_template_models  # noqa: E402,F401

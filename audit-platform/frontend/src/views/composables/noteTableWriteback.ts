@@ -1,9 +1,10 @@
 /**
  * 附注投影编辑反写。
  *
- * `_tables` 对 workpaper 来源只是读时投影；真正保存的数据仍是
- * `sub_table_data`。本模块只按投影携带的源坐标写 raw，不按显示行号猜源行。
+ * workpaper 来源且有子表数据时，`_tables` 只是读时投影，真正保存的数据是 `sub_table_data`；没有子表数据时
+ * `_tables` 就是存下来的数据。本模块只按投影携带的源坐标写 raw，不按显示行号猜源行。
  */
+import { projectSubTablesClient } from '@/components/workpaper/composables/disclosureColumnDefs'
 
 export const WORKPAPER_SOURCES = new Set(['workpaper', 'workpaper_html'])
 export const EXPORT_DISABLED_SUB_TABLES_KEY = '_export_disabled_sub_tables'
@@ -150,17 +151,71 @@ function requireLabelRef(table: any, rowIndex: number): SourceRowRef {
   return ref as SourceRowRef
 }
 
-/** 把一个投影单元格写入 raw，保留 null、0、空字符串。 */
+/** 附注自己表格里的一格的模式标记（`_cell_modes[值列号]`）；底稿来源（子表投影）的格没有这类标记 ⇒ 返回 null。 */
+function ownCellModes(tableData: Record<string, any>, ref: SourceCellRef): { row: any; key: string } | null {
+  if (ref.row.sourceSubTableKey) return null
+  const row = sourceRowsForRef(tableData, ref.row)[ref.row.rowIndex]
+  return row && typeof row === 'object' ? { row, key: String(ref.column.valueIndex) } : null
+}
+
+/**
+ * 把一个投影单元格写入 raw，保留 null、0、空字符串。
+ * `markManual`：用户改了数值 ⇒ 附注自己表格里的这一格标人工（推送 / 公式 / 刷新不覆盖，可恢复自动；spec
+ * note-pull-followup-closure R5）；合计、横向公式等派生写入不标。
+ */
 export function applyProjectedCell(
   tableData: Record<string, any>,
   table: any,
   rowIndex: number,
   valueIndex: number,
   value: unknown,
+  options: { markManual?: boolean } = {},
 ): Record<string, any> {
   const out = cloneNoteTableValue(tableData)
   const ref = requireCellRef(table, rowIndex, valueIndex)
   setSourceValue(out, ref.row, ref.column, value)
+  const own = options.markManual ? ownCellModes(out, ref) : null
+  if (own) own.row._cell_modes = { ...(own.row._cell_modes || {}), [own.key]: 'manual' }
+  return out
+}
+
+/**
+ * 人工格恢复自动（R5）：去掉人工标记。生成时有绑定的格记 `auto`；没有绑定的格（`_cell_meta.unbound`）不写模式。
+ * 下次推送 / 公式 / 刷新按自动取数写入。底稿来源的格拒绝。
+ */
+export function applyProjectedCellAuto(
+  tableData: Record<string, any>,
+  table: any,
+  rowIndex: number,
+  valueIndex: number,
+): Record<string, any> {
+  const out = cloneNoteTableValue(tableData)
+  const own = ownCellModes(out, requireCellRef(table, rowIndex, valueIndex))
+  if (!own) throw new NoteTableWritebackError('底稿同步来的表没有人工标记，已拒绝写入')
+  const modes = { ...(own.row._cell_modes || {}) }
+  if (own.row._cell_meta?.[own.key]?.unbound) delete modes[own.key]
+  else modes[own.key] = 'auto'
+  own.row._cell_modes = modes
+  return out
+}
+
+/**
+ * 把一个行级标记写入 raw（集团下推可选行的「本企业不适用」：`_pushed_optional_active`，spec note-pull-followup-closure R14）。
+ * 下推只写在附注自己的表格里，底稿来源（子表投影）的行没有这类标记 ⇒ 拒绝写入。
+ */
+export function applyProjectedRowFlag(
+  tableData: Record<string, any>,
+  table: any,
+  rowIndex: number,
+  key: '_pushed_optional_active',
+  value: boolean,
+): Record<string, any> {
+  const out = cloneNoteTableValue(tableData)
+  const ref = requireLabelRef(table, rowIndex)
+  if (ref.sourceSubTableKey) throw new NoteTableWritebackError('底稿同步来的表没有集团下推行，已拒绝写入')
+  const row = sourceRowsForRef(out, ref)[ref.rowIndex]
+  if (!row || typeof row !== 'object') throw new NoteTableWritebackError(`源表第 ${ref.rowIndex + 1} 行不存在，已拒绝写入`)
+  row[key] = value
   return out
 }
 
@@ -219,8 +274,11 @@ export function prepareNoteTableData(
     })
   }
 
-  // `_tables` 是 workpaper 的读时副本，不能作为持久化结构发送回后端。
-  if (isWorkpaper) delete out._tables
+  // `_tables` 只在它是 sub_table_data 的读时投影时剥掉（与后端 GET 同口径：投影非空才用投影覆盖 `_tables`）。
+  // workpaper 来源但没有可投影的子表时（公式推送对旧格式附注兜底写 `_tables` 并标 `_source=workpaper`），
+  // `_tables` 就是存下来的数据本身、编辑也写在它上面 —— 剥掉会丢掉首表以外的表和这次的编辑
+  // （spec note-pull-followup-closure 浏览器实测：保存后【测试】甲 五、1「受限制的货币资金明细」整表消失）。
+  if (isWorkpaper && (projectSubTablesClient(out)?.length ?? 0) > 0) delete out._tables
   return out
 }
 

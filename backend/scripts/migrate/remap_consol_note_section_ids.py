@@ -54,11 +54,6 @@ from app.models.consol_note_mapping_models import (  # noqa: E402
     ConsolNoteMappingRule,
     ConsolNoteTemplateBinding,
 )
-from app.models.consol_note_mapping_template_models import (  # noqa: E402
-    ConsolNoteMappingRuleTemplate,
-    ConsolNoteStructureLock,
-    ConsolNoteValueConfirmation,
-)
 from app.models.consol_push_models import ConsolNoteFormula  # noqa: E402
 from app.models.core import Log  # noqa: E402
 from app.models.formula_setting_models import FormulaSetting, FormulaSyncItem, FormulaTemplateVersion  # noqa: E402
@@ -95,16 +90,12 @@ SPECS: tuple[Spec, ...] = (
          derived=lambda r: r.source in SEED_SOURCES and not r.is_deleted),
     Spec("consol_note_detail_template", ConsolNoteDetailTemplate, ("template_type", "created_by"), project_attr=None,
          std_attr="template_type", active=lambda r: not r.is_deleted),
-    Spec("consol_note_mapping_rule_template", ConsolNoteMappingRuleTemplate,
-         ("template_type", "source_structure_hash", "version_number"), project_attr=None, std_attr="template_type",
-         active=lambda r: r.is_active),
+    # V202 的规则模板库 / 值确认 / 结构锁三表已退役（V208 删表，spec note-pull-followup-closure R16）；
+    # 2026-10-23 的 R7 迁移备份里这三表 0 个动作，--restore 不受影响
     Spec("consol_note_mapping_rule", ConsolNoteMappingRule,
          ("project_id", "template_version_id", "source_structure_hash", "version_number"), active=lambda r: r.is_active),
     Spec("consol_note_mapping_binding", ConsolNoteMappingBinding, ("project_id", "entity_node_key")),
     Spec("consol_note_template_binding", ConsolNoteTemplateBinding, ("project_id",)),
-    Spec("consol_note_value_confirmation", ConsolNoteValueConfirmation, ("project_id", "entity_node_key")),
-    Spec("consol_note_structure_lock", ConsolNoteStructureLock, ("consol_project_id",), project_attr="consol_project_id",
-         active=lambda r: r.is_active),
     Spec("account_note_mapping", AccountNoteMapping, ("project_id", "account_name", "row_name")),
     Spec("formula_setting(global)", FormulaSetting, ("domain", "scope"), column="slot_key", slot=True, project_attr=None,
          std_attr="scope", active=lambda r: not r.is_deleted,

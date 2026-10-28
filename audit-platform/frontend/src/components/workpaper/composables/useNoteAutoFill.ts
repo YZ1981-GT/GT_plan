@@ -46,6 +46,26 @@ export function parseNoteNumber(v: any): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * 按 sources 从回复里取数（`pull()` 的取数部分；附注页离屏同步按同一口径现算，spec note-pull-followup-closure R1）。
+ * values = 解析出的数值（非有限数为 null），raw = 原始回复（没有为 null）。
+ */
+export function readNoteAutoFillValues(
+  map: ReadonlyMap<string, any> | null | undefined,
+  sources: Record<string, string>,
+  field: 'remark' | 'conclusion' = 'remark',
+): { values: Record<string, number | null>; raw: Record<string, any> } {
+  const values: Record<string, number | null> = {}
+  const raw: Record<string, any> = {}
+  for (const [key, itemId] of Object.entries(sources)) {
+    const resp = map?.get?.(itemId)
+    raw[key] = resp ?? null
+    const rawVal = resp?.[field] ?? resp?.conclusion ?? resp?.remark
+    values[key] = parseNoteNumber(rawVal)
+  }
+  return { values, raw }
+}
+
 export function useNoteAutoFill(opts: NoteAutoFillOptions) {
   const field = opts.field ?? 'remark'
   const debounceMs = opts.debounceMs ?? 300
@@ -57,15 +77,7 @@ export function useNoteAutoFill(opts: NoteAutoFillOptions) {
 
   /** 从 allResponses 按 sources 取数并触发 onRefresh。 */
   function pull(): void {
-    const nextValues: Record<string, number | null> = {}
-    const nextRaw: Record<string, any> = {}
-    const map = opts.allResponses.value
-    for (const [key, itemId] of Object.entries(opts.sources)) {
-      const resp = map?.get?.(itemId)
-      nextRaw[key] = resp ?? null
-      const rawVal = resp?.[field] ?? resp?.conclusion ?? resp?.remark
-      nextValues[key] = parseNoteNumber(rawVal)
-    }
+    const { values: nextValues, raw: nextRaw } = readNoteAutoFillValues(opts.allResponses.value, opts.sources, field)
     values.value = nextValues
     rawValues.value = nextRaw
     lastRefreshAt.value = new Date().toLocaleTimeString('zh-CN')

@@ -213,7 +213,14 @@ import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM2ListedSyncPayload, type M2ListedRow } from '../../composables/m2NoteSectionMap'
+import {
+  buildM2ListedTabSyncPayload,
+  createM2ListedCapitalRows,
+  recalcM2ListedRows,
+  restoreM2ListedDisclosure,
+  type M2ListedCapitalRow,
+  type M2ListedDisclosureState,
+} from '../../composables/m2DisclosureForm'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import http from '@/utils/http'
 
@@ -239,24 +246,10 @@ const formData = useM2FormData({
   projectId: computed(() => props.projectId),
 })
 
-// ─── 同步链路 ───────────────────────────────────────────────────────────────
+// ─── 同步链路（行 / 重算 / 读回 / 快照在 m2DisclosureForm，与附注页离屏同步共用） ──────
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M2ListedRow[] = capitalChangeRows.value
-    .filter((r) => r.item !== '三、股份总数') // 合计行由载荷构建
-    .map((r) => ({
-      label: r.item,
-      beginShares: r.beginShares,
-      issueNew: r.issueNew ?? 0,
-      bonusShares: r.bonusShares ?? 0,
-      reserveToShares: r.reserveToShares ?? 0,
-      otherChange: r.otherChange ?? 0,
-    }))
-  const payload = buildM2ListedSyncPayload(props.wpId, rows, {
-    restricted: restrictedNote.value,
-    changeReason: changeReasonNote.value,
-    eps: epsNote.value,
-  })
+  const payload = buildM2ListedTabSyncPayload(props.wpId, disclosureState())
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -267,47 +260,25 @@ const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface CapitalRow {
-  item: string
-  beginShares: number
-  issueNew: number
-  bonusShares: number
-  reserveToShares: number
-  otherChange: number
-  endShares: number
-  ratio: number
-}
-
-const capitalChangeRows = ref<CapitalRow[]>([
-  { item: '一、有限售条件股份', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  1.国家持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  2.国有法人持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  3.其他内资持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  4.外资持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '二、无限售条件股份', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  1.人民币普通股（A股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  2.境内上市外资股（B股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  3.境外上市外资股（H股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '  4.其他', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-  { item: '三、股份总数', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
-])
+const capitalChangeRows = ref<M2ListedCapitalRow[]>(createM2ListedCapitalRows())
 
 const restrictedNote = ref('')
 const changeReasonNote = ref('')
 const epsNote = ref('')
 
+function disclosureState(): M2ListedDisclosureState {
+  return {
+    rows: capitalChangeRows.value,
+    restricted: restrictedNote.value,
+    changeReason: changeReasonNote.value,
+    eps: epsNote.value,
+  }
+}
+
 // ─── Computed: 期末数 = 期初+增-减, 占比 ─────────────────────────────────────
 
 function recalcEndAndRatio(): void {
-  const totalEnd = capitalChangeRows.value.reduce((sum, row) => {
-    const end = row.beginShares + row.issueNew + row.bonusShares + row.reserveToShares + row.otherChange
-    return sum + end
-  }, 0)
-
-  capitalChangeRows.value.forEach(row => {
-    row.endShares = row.beginShares + row.issueNew + row.bonusShares + row.reserveToShares + row.otherChange
-    row.ratio = totalEnd > 0 ? row.endShares / totalEnd : 0
-  })
+  recalcM2ListedRows(capitalChangeRows.value)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -377,35 +348,12 @@ function fmtShares(val: number): string {
 // ─── Restore state ──────────────────────────────────────────────────────────
 
 function _restoreFromResponses(): void {
-  const rowData = formData.allResponses.value.get('M2-disclosure-listed-capital-rows')
-  if (rowData?.remark) {
-    try {
-      const parsed = JSON.parse(rowData.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // 旧版兼容：旧字段 increaseShares/decreaseShares → 新结构 issueNew（作为兜底映射）
-        capitalChangeRows.value = parsed.map((r: any) => ({
-          item: r.item ?? '',
-          beginShares: r.beginShares ?? 0,
-          issueNew: r.issueNew ?? r.increaseShares ?? 0,
-          bonusShares: r.bonusShares ?? 0,
-          reserveToShares: r.reserveToShares ?? 0,
-          otherChange: r.otherChange ?? 0,
-          endShares: r.endShares ?? 0,
-          ratio: r.ratio ?? 0,
-        }))
-        recalcEndAndRatio()
-      }
-    } catch { /* ignore */ }
-  }
-
-  const restricted = formData.allResponses.value.get('M2-disclosure-listed-restricted')
-  if (restricted?.remark) restrictedNote.value = restricted.remark
-
-  const reason = formData.allResponses.value.get('M2-disclosure-listed-change-reason')
-  if (reason?.remark) changeReasonNote.value = reason.remark
-
-  const eps = formData.allResponses.value.get('M2-disclosure-listed-eps')
-  if (eps?.remark) epsNote.value = eps.remark
+  // 旧版兼容（旧字段 increaseShares → issueNew）与重算都在 restoreM2ListedDisclosure 里
+  const next = restoreM2ListedDisclosure(formData.allResponses.value, disclosureState())
+  capitalChangeRows.value = next.rows
+  restrictedNote.value = next.restricted
+  changeReasonNote.value = next.changeReason
+  epsNote.value = next.eps
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

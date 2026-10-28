@@ -118,6 +118,7 @@ import { eventBus } from '@/utils/eventBus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import { useL1DisclosureData } from '@/composables/useL1DisclosureData'
 import { L1_NOTE_SECTION, buildL1SyncPayload } from '../../composables/l1NoteSectionMap'
+import { buildL1SyncOptions, buildL1SyncRequestBody } from '../../composables/l1DisclosureSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
@@ -206,21 +207,14 @@ async function syncToDisclosureNotes() {
   if (props.isReadonly || !props.projectId) return
   syncing.value = true
   try {
-    const { sub_table_data, columns } = buildL1SyncPayload({
-      variant: 'soe',
-      categoryRows: categoryRows.value,
-      categoryTotal: categoryTotal.value,
-      overdueRows: overdueRows.value,
-      conclusionText: conclusionText.value,
-    })
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      wp_id: props.wpId,
-      sheet_name: 'L1-note-soe',
-      section_id: L1_NOTE_SECTION.soe,
-      current_standard: 'soe_standalone',
-      sub_table_data,
-      columns,
-    })
+    // 入参 / 请求体与附注页离屏同步共用（l1DisclosureSync，spec note-pull-followup-closure R1）
+    const payload = buildL1SyncPayload(buildL1SyncOptions('soe', {
+      categoryRows, categoryTotal, overdueRows, conclusionText,
+    }))
+    await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      buildL1SyncRequestBody('soe', props.wpId, payload),
+    )
     ElMessage.success(`已同步到附注（${L1_NOTE_SECTION.soe}）`)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'L1',

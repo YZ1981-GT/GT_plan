@@ -8,7 +8,8 @@ import { ref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { refreshDisclosureFromWorkpapers, refreshDisclosureSection, type RefreshFromWorkpapersResult } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
-import http from '@/utils/http'
+import { describeWorkpaperPull, pullFromWorkpapers, type HeadlessSyncOutcome } from './noteWorkpaperPull'
+import { runHeadlessDisclosure } from './noteHeadlessDisclosure'
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
   isD1NotesReceivableNoteSection,
@@ -62,7 +63,7 @@ export interface UseNoteRefreshReturn {
   onRefreshAll: () => Promise<void>
   onManualRefresh: () => Promise<void>
   onStaleRecalc: () => Promise<void>
-  showRefreshResultMessage: (result: RefreshFromWorkpapersResult) => void
+  showRefreshResultMessage: (result: RefreshFromWorkpapersResult, extra?: { lines: string[]; warn: boolean }) => void
   onWorkpaperSaved: (payload: { projectId: string }) => void
   onDisclosureNoteTextUpdated: (payload: Record<string, unknown>) => void
 }
@@ -79,73 +80,73 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
    * 刷新结果差异化提示（Req 2.8, 2.9, 1.4）
    * GT 紫令牌通过 customClass: 'gt-msg-purple' 实现
    */
-  function showRefreshResultMessage(result: RefreshFromWorkpapersResult) {
+  function showRefreshResultMessage(
+    result: RefreshFromWorkpapersResult,
+    extra: { lines: string[]; warn: boolean } = { lines: [], warn: false },
+  ) {
     const cellsUpdated = result?.cells_updated ?? 0
     const textOnlySections = result?.text_only_sections ?? []
     const errors = result?.errors ?? []
+    let type: 'success' | 'info' | 'warning' = 'info'
+    let message: string
+    let duration = 3000
 
-    // 有错误时优先提示错误
     if (errors.length > 0) {
-      ElMessage({
-        type: 'warning',
-        message: `刷新完成，${errors.length} 个章节取数失败：${errors.slice(0, 3).join('；')}${errors.length > 3 ? '…' : ''}`,
-        duration: 5000,
-        customClass: 'gt-msg-purple',
-      })
-      return
-    }
-
-    // 有更新的单元格
-    if (cellsUpdated > 0) {
-      let msg = `已刷新 ${cellsUpdated} 个单元格`
+      // 有错误时优先提示错误
+      type = 'warning'
+      duration = 5000
+      message = `刷新完成，${errors.length} 个章节取数失败：${errors.slice(0, 3).join('；')}${errors.length > 3 ? '…' : ''}`
+    } else if (cellsUpdated > 0) {
+      type = 'success'
+      duration = 4000
+      message = `已刷新 ${cellsUpdated} 个单元格`
       // 存在纯文本章节需手动重填
       if (textOnlySections.length > 0) {
         const sectionNames = textOnlySections.slice(0, 5).join('、')
         const suffix = textOnlySections.length > 5 ? '等' : ''
-        msg += `；以下章节需手动重填：${sectionNames}${suffix}`
+        message += `；以下章节需手动重填：${sectionNames}${suffix}`
       }
-      ElMessage({
-        type: 'success',
-        message: msg,
-        duration: 4000,
-        customClass: 'gt-msg-purple',
-      })
-      return
-    }
-
-    // 无更新但有纯文本章节
-    if (textOnlySections.length > 0) {
+    } else if (textOnlySections.length > 0) {
+      duration = 4000
       const sectionNames = textOnlySections.slice(0, 5).join('、')
       const suffix = textOnlySections.length > 5 ? '等' : ''
-      ElMessage({
-        type: 'info',
-        message: `数据已是最新，无需刷新；以下章节需手动重填：${sectionNames}${suffix}`,
-        duration: 4000,
-        customClass: 'gt-msg-purple',
-      })
-      return
+      message = `数据已是最新，无需刷新；以下章节需手动重填：${sectionNames}${suffix}`
+    } else {
+      message = '数据已是最新，无需刷新'
     }
 
-    // 全无更新也无纯文本章节
-    ElMessage({
-      type: 'info',
-      message: '数据已是最新，无需刷新',
-      duration: 3000,
-      customClass: 'gt-msg-purple',
-    })
+    // 从底稿取数（公式推送 + 离屏同步披露表）的结果并入同一条提示
+    if (extra.lines.length) {
+      message = cellsUpdated > 0 || errors.length > 0 || textOnlySections.length > 0
+        ? `${message}；${extra.lines.join('；')}`
+        : extra.lines.join('；')
+      duration = Math.max(duration, 6000)
+      if (extra.warn) type = 'warning'
+      else if (type === 'info' && extra.lines.some((l) => l.startsWith('公式推送按审定数写入') || l.startsWith('已从底稿披露表同步'))) {
+        type = 'success'
+      }
+    }
+    ElMessage({ type, message, duration, customClass: 'gt-msg-purple', showClose: extra.lines.length > 1 })
   }
 
   /**
-   * 触发底稿→附注同步标记（让 refill 知道有底稿映射的章节应跳过表格覆盖）。
-   * section=null 时全部章节，否则单个章节。fail-open：失败不阻断刷新流程。
+   * 从底稿取数（spec note-pull-header-formula-closure R2）：后端按公式推送规则把审定数推到附注主表，
+   * 再对已接入离屏同步的底稿按披露 Tab 同一套代码现算披露表同步到附注。失败不阻断后续刷新，原因并入提示。
    */
-  async function _pullFromWorkpapers(section: string | null) {
-    try {
-      await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/pull-from-workpapers`, null, {
-        params: section ? { note_section: section } : undefined,
-        _silent: true,
-      } as any)
-    } catch { /* fail-open: 拉取失败不阻断刷新 */ }
+  async function _pullFromWorkpapers(section: string | null): Promise<{ lines: string[]; warn: boolean }> {
+    const { result, error } = await pullFromWorkpapers(projectId.value, year.value, section)
+    let outcomes: HeadlessSyncOutcome[] = []
+    let pending: string[] = []
+    if (result) {
+      try {
+        ({ outcomes, pending } = await runHeadlessDisclosure(result, {
+          projectId: projectId.value, year: year.value, allSections: section === null,
+        }))
+      } catch (err: any) {
+        outcomes = [{ wpCode: '—', section: section || '', status: 'failed', message: err?.message || '离屏同步失败' }]
+      }
+    }
+    return describeWorkpaperPull(result, error, outcomes, { pendingWpCodes: pending })
   }
 
   /**
@@ -165,11 +166,11 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     }
     refreshLoading.value = true
     try {
-      // 先触发底稿→附注同步标记（确保 refill 知道该章节由底稿驱动，跳过表格覆盖）
-      await _pullFromWorkpapers(section)
+      // 先从底稿取数（公式推送 + 离屏同步披露表），再按模板绑定重算
+      const pulled = await _pullFromWorkpapers(section)
       const result = await refreshDisclosureSection(projectId.value, year.value, section)
-      showRefreshResultMessage(result)
       await fetchDetail(section)
+      showRefreshResultMessage(result, pulled)
     } catch (e) { handleApiError(e, '刷新附注') }
     finally { refreshLoading.value = false }
   }
@@ -184,8 +185,8 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
   async function onRefreshAll() {
     refreshAllLoading.value = true
     try {
-      // 先触发全部底稿→附注同步标记
-      await _pullFromWorkpapers(null)
+      // 先从全部底稿取数（公式推送 + 离屏同步披露表）
+      const pulled = await _pullFromWorkpapers(null)
       const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
       // 清空全部章节详情缓存，避免其它已缓存章节仍显示旧数据
       invalidateAllCache?.()
@@ -193,7 +194,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       await fetchTree()
       // 重载当前正在查看的章节详情
       if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-      showRefreshResultMessage(result)
+      showRefreshResultMessage(result, pulled)
     } catch (e) { handleApiError(e, '全部刷新附注') }
     finally { refreshAllLoading.value = false }
   }

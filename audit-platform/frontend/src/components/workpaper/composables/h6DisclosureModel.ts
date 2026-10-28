@@ -249,6 +249,45 @@ export function serializePack(state: H6DisclosureState): string {
   })
 }
 
+/**
+ * 读回已保存的披露状态：打包优先，清理明细 / 进展说明再按单键补（底稿披露 Tab 挂载与附注页离屏同步共用，
+ * spec note-pull-followup-closure R1；原样抽自 `H6TabDisclosure.hydrate`）。
+ */
+export function hydrateH6DisclosureState(
+  state: H6DisclosureState,
+  responses: ReadonlyMap<string, any>,
+  keys: { pack: string; clearingRows: string; clearingNote: string },
+): void {
+  const pack = parsePack(responses.get(keys.pack)?.remark)
+  if (pack) {
+    state.faEnd = pack.faEnd ?? 0
+    state.faPrior = pack.faPrior ?? 0
+    if (pack.clearingRows?.length) state.clearingRows = pack.clearingRows
+    if (typeof pack.clearingNote === 'string') state.clearingNote = pack.clearingNote
+  }
+  if (!state.clearingRows.length) {
+    const raw = responses.get(keys.clearingRows)?.remark
+    let parsed: unknown = null
+    if (raw) {
+      try { parsed = JSON.parse(raw) } catch { parsed = null }
+    }
+    const rows = hydrateClearingRows(parsed)
+    if (rows.length) state.clearingRows = rows
+  }
+  const note = responses.get(keys.clearingNote)?.remark
+  if (typeof note === 'string' && note && !state.clearingNote) state.clearingNote = note
+}
+
+/** 「同步到附注」载荷用的状态快照（Tab 与离屏同步共用；字段与顺序同 Tab 原内联对象） */
+export function h6DisclosureSyncSnapshot(state: H6DisclosureState): H6DisclosureState {
+  return {
+    faEnd: state.faEnd,
+    faPrior: state.faPrior,
+    clearingRows: state.clearingRows,
+    clearingNote: state.clearingNote,
+  }
+}
+
 export function fmtAmt(val: number | null | undefined): string {
   if (val == null || Number.isNaN(val) || val === 0) return '-'
   if (val < 0) {

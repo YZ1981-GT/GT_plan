@@ -293,15 +293,15 @@ class TestValidateAllFailOpen:
 
 class TestExecutorContract:
     def test_executors_cover_all_validation_types(self):
-        """EXECUTORS 字典覆盖全部 11 个 ValidationType 枚举成员，无遗漏。"""
+        """EXECUTORS 字典覆盖全部 12 个 ValidationType 枚举成员，无遗漏。"""
         assert set(EXECUTORS.keys()) == set(ValidationType)
-        assert len(EXECUTORS) == 11
+        assert len(EXECUTORS) == 12
         # 每个 type 都有 callable executor
         for vt in ValidationType:
             assert callable(EXECUTORS[vt])
 
     def test_validation_type_members_unchanged(self):
-        """ValidationType 恰好 11 个成员，值不变。"""
+        """ValidationType 恰好 12 个成员，值不变（2026-10-27 新增「期间衔接」，spec note-pull-followup-closure R8）。"""
         expected = {
             "BALANCE": "余额",
             "WIDE_TABLE": "宽表",
@@ -314,10 +314,11 @@ class TestExecutorContract:
             "AGING_PROGRESSION": "账龄衔接",
             "LLM_REVIEW": "LLM审核",
             "DESCRIPTION": "描述",
+            "PERIOD_CONTINUITY": "期间衔接",
         }
         actual = {m.name: m.value for m in ValidationType}
         assert actual == expected
-        assert len(ValidationType) == 11
+        assert len(ValidationType) == 12
 
 
 # ---------------------------------------------------------------------------

@@ -133,6 +133,14 @@ import {
 } from '../../composables/h7DisclosureSyncPayload'
 import { H7_NOTE_SECTION } from '../../composables/h7NoteSectionMap'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
+// hydrate 解析与「同步到附注」快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import {
+  H7_SOE_NOTE_ITEM_ID,
+  H7_SOE_NOTE_KEYS,
+  h7SoeSyncSnapshot,
+  readH7SoeForm,
+  type H7SoeNoteKey,
+} from '../../composables/h7DisclosureForm'
 
 const props = defineProps<{
   wpId: string
@@ -150,19 +158,15 @@ const isSyncing = ref(false)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
 
-const NOTE_KEYS = ['soe-policy', 'soe-fair-basis', 'soe-supplement'] as const
-type NoteKey = (typeof NOTE_KEYS)[number]
+const NOTE_KEYS = H7_SOE_NOTE_KEYS
+type NoteKey = H7SoeNoteKey
 
 const SRC_HINT: Record<string, string> = {
   'soe-fair-basis': H7_SOE_GUIDANCE.fairBasis,
   'soe-supplement': `${H7_SOE_GUIDANCE.supplement}${H7_SOE_GUIDANCE.risk}`,
 }
 
-const NOTE_ITEM_ID: Record<NoteKey, string> = {
-  'soe-policy': H7_SOE_KEYS.notePolicy,
-  'soe-fair-basis': H7_SOE_KEYS.noteFairBasis,
-  'soe-supplement': H7_SOE_KEYS.noteSupplement,
-}
+const NOTE_ITEM_ID = H7_SOE_NOTE_ITEM_ID
 
 type Mode = 'cost' | 'fair'
 
@@ -185,46 +189,10 @@ const fairRows = computed(() => buildSoeDisplayRows(blocks.value.fair))
  */
 const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 
-function readRaw(itemId: string): string {
-  const item = localResponses.value.get(itemId)
-  return String(item?.remark ?? item?.conclusion ?? '')
-}
-
-function parseBlocks(raw: string): H7SoeIndustryBlock[] {
-  if (!raw.trim()) return createDefaultSoeBlocks()
-  try {
-    const v = JSON.parse(raw)
-    if (!Array.isArray(v)) return createDefaultSoeBlocks()
-    // 反序列化补齐：缺失产业按源模板四类补空块，顺序归一
-    return H7_SOE_INDUSTRIES.map((ind) => {
-      const hit = v.find((b: any) => b?.key === ind.key)
-      return {
-        key: ind.key,
-        selfAmounts: {
-          begin: Number(hit?.selfAmounts?.begin) || 0,
-          increase: Number(hit?.selfAmounts?.increase) || 0,
-          decrease: Number(hit?.selfAmounts?.decrease) || 0,
-        },
-        categories: Array.isArray(hit?.categories)
-          ? hit.categories.map((c: any) => ({
-              id: String(c?.id ?? ''),
-              name: String(c?.name ?? ''),
-              begin: Number(c?.begin) || 0,
-              increase: Number(c?.increase) || 0,
-              decrease: Number(c?.decrease) || 0,
-            })).filter((c: any) => c.id && c.name)
-          : [],
-      }
-    })
-  } catch { return createDefaultSoeBlocks() }
-}
-
 function hydrate(): void {
-  blocks.value = {
-    cost: parseBlocks(readRaw(H7_SOE_KEYS.cost)),
-    fair: parseBlocks(readRaw(H7_SOE_KEYS.fair)),
-  }
-  for (const k of NOTE_KEYS) noteTexts.value[k] = readRaw(NOTE_ITEM_ID[k])
+  const form = readH7SoeForm(localResponses.value)
+  blocks.value = { cost: form.cost, fair: form.fair }
+  for (const k of NOTE_KEYS) noteTexts.value[k] = form.noteTexts[k]
 }
 
 async function loadOwn(): Promise<void> {
@@ -377,13 +345,11 @@ function handleReview(key: string): void {
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
-  const payloads = buildH7SoeSyncPayloads(props.wpId, props.applicableStandards || [], {
+  const payloads = buildH7SoeSyncPayloads(props.wpId, props.applicableStandards || [], h7SoeSyncSnapshot({
     cost: blocks.value.cost,
     fair: blocks.value.fair,
-    notePolicy: noteTexts.value['soe-policy'] || '',
-    noteFairBasis: noteTexts.value['soe-fair-basis'] || '',
-    noteSupplement: noteTexts.value['soe-supplement'] || '',
-  })
+    noteTexts: noteTexts.value,
+  }))
   if (!payloads.length) {
     ElMessage.warning('当前不适用国企附注同步')
     return

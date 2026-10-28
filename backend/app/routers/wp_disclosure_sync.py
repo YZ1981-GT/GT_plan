@@ -96,6 +96,19 @@ class SyncFromWorkpaperResponse(BaseModel):
         description="是否新建了 disclosure_notes 记录（False=更新现有）",
     )
     texts_synced: int = Field(0, description="写入的叙述正文章节数")
+    # 以下字段服务层早就返回，原响应模型没声明 ⇒ 被 FastAPI 按 response_model 过滤掉，前端读到的恒为 undefined
+    # （行级合并 fail closed 的提示从未出现过；spec note-pull-followup-closure R3 补齐，test_wp_disclosure_sync 钉住）
+    revived: bool = Field(False, description="是否复活了被软删的同键章节")
+    blocked_by_manual_override: bool = Field(False, description="是否被整节人工覆盖守卫拦下（表格未写）")
+    row_scoped_tables: list[str] = Field(default_factory=list, description="本次走行级合并的表")
+    row_scope_unresolved: list[str] = Field(default_factory=list, description="段边界解析失败而跳过写入的表")
+    row_scope_unresolved_reasons: dict[str, str] = Field(default_factory=dict, description="逐表的解析失败原因")
+    push_kept: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="公式推送写过、本次同步来的值与之不同而保持推送值的格（以试算表审定数为准）",
+    )
+    skipped: bool = Field(False, description="章节不适用于本项目口径（单体项目的合并专属章节等），未写入")
+    reason: str | None = Field(None, description="跳过原因")
 
 
 class SyncBatchItem(BaseModel):
@@ -228,6 +241,11 @@ async def sync_disclosure_from_workpaper(
             detail=f"附注同步失败: {exc}",
         ) from exc
 
+    if "skipped_reason" in result:
+        # 项目没有审计年度、载荷也没带年度：服务层不按今年猜、不写入。原来把这个结果直接构造响应模型 ⇒ 缺必填字段
+        # 抛 ValidationError、对外是 500（spec note-pull-followup-closure R3 顺带修）
+        raise HTTPException(status_code=422, detail=f"附注未同步：{result['skipped_reason']}")
+
     # P0-4（附注联动复盘）：底稿同步成功（service 内已 commit）后自动补跑一次附注校验
     # 并落库，使 findings 在附注树/看板上可见。fail-open，不影响已提交的同步结果。
     await _autorun_validation(db, project_id, body.year)
@@ -305,6 +323,11 @@ class SyncFromHtmlResponse(BaseModel):
     synced_at: str | None = None
     created: bool | None = None
     reason: str | None = None
+    # 与 SyncFromWorkpaperResponse 同名同义（原模型没声明 ⇒ 被过滤；spec note-pull-followup-closure R3）
+    row_scoped_tables: list[str] = Field(default_factory=list)
+    row_scope_unresolved: list[str] = Field(default_factory=list)
+    row_scope_unresolved_reasons: dict[str, str] = Field(default_factory=dict)
+    push_kept: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ConflictDetail(BaseModel):

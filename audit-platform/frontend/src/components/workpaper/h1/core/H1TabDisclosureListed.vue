@@ -841,7 +841,14 @@ function scheduleSave() {
   }, 600)
 }
 
+/** 编辑后的保存：存完排一次自动同步 */
 function persistAll() {
+  saveAll()
+  autoSync.scheduleAutoSync(syncToNotes)
+}
+
+/** 只存不排同步（同步前先存用这个；用 persistAll 会每 800ms 再同步一次，直到卸载） */
+function saveAll() {
   saveResponse(H1_LISTED_ITEM.summary, [...summary])
   saveResponse(H1_LISTED_ITEM.categories, categories.value)
   saveResponse(H1_LISTED_ITEM.movement, movement.value)
@@ -865,7 +872,6 @@ function persistAll() {
     sectionIds: [noteSectionId],
     text: noteImpairment.value || noteMortgage.value || '',
   })
-  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function handleImportExport(cmd: string) {
@@ -1254,7 +1260,7 @@ async function syncToNotes() {
     ElMessage.warning('本项目附注口径为国有企业，请在「附注披露信息（国有企业）」页同步（上市章节与国企章节不可混用）')
     return
   }
-  persistAll()
+  saveAll()
   const payloads = buildH1ListedSyncPayloads(props.wpId, [], getSnapshot(), {
     currentStandard: resolveH1CurrentStandardFromProject('listed', props.templateType, props.reportScope),
   })

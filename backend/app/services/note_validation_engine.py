@@ -1,11 +1,11 @@
 """附注校验公式引擎
 
-实现 11 种校验类型：余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/账龄衔接/LLM审核/描述
+实现 12 种校验类型：余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/账龄衔接/LLM审核/描述/期间衔接
 遵循互斥规则：[余额] 不与 [其中项]/[宽表] 共存
 其中项通用规则：sum(明细行) = 合计行
 
 PRESET_TO_RULE 字典（Sprint 4 Task 4.1）：把 ``check_presets`` / ``_validation_rules``
-字段中的 11 个中文枚举映射到引擎内部的英文规则代号，引擎在处理 ``note.table_data
+字段中的 12 个中文枚举映射到引擎内部的英文规则代号，引擎在处理 ``note.table_data
 ._validation_rules`` 字段时通过该字典派发到对应执行器。``"描述"`` 映射为 ``"SKIP"``，
 表示该 preset 仅用于章节级文字描述，不参与数值校验。
 
@@ -69,6 +69,7 @@ class ValidationType(str, Enum):
     AGING_PROGRESSION = "账龄衔接"
     LLM_REVIEW = "LLM审核"
     DESCRIPTION = "描述"
+    PERIOD_CONTINUITY = "期间衔接"
 
 
 # Mutual exclusion rule: 余额 cannot coexist with 其中项 or 宽表
@@ -84,9 +85,12 @@ MUTUALLY_EXCLUSIVE = {
 # ---------------------------------------------------------------------------
 
 #: ``PRESET_TO_RULE`` 把 ``note.table_data._validation_rules`` / ``check_presets``
-#: 中的 11 个中文枚举映射到引擎内部代号；``"描述"`` 映射为 ``"SKIP"``，引擎据此
+#: 中的 12 个中文枚举映射到引擎内部代号；``"描述"`` 映射为 ``"SKIP"``，引擎据此
 #: 跳过纯文本说明类章节（不产生 ValidationResult）。未识别的 preset 经
 #: ``resolve_rule_from_preset`` 也返回 ``None``（默认跳过 + warning 日志）。
+#: 生成附注时注入 ``_validation_rules`` 的白名单（``disclosure_engine._VALID_VALIDATION_PRESETS``）由本字典的键派生；
+#: 两版单体模板出现的中文预设名都必须是本字典的键（守卫 ``test_note_preset_names_have_destination``）——原先缺
+#: 「期间衔接」，未分配利润两章的该项在注入时被静默丢弃（spec note-pull-followup-closure R8）。
 PRESET_TO_RULE: dict[str, str] = {
     "余额": "BALANCE_TIE",
     "宽表": "WIDE_TABLE_HORIZONTAL",
@@ -99,6 +103,7 @@ PRESET_TO_RULE: dict[str, str] = {
     "账龄衔接": "AGING_PROGRESSION",
     "LLM审核": "LLM_SEMANTIC_REVIEW",
     "描述": "SKIP",
+    "期间衔接": "PERIOD_CONTINUITY",
 }
 
 #: 11 个 PRESET_TO_RULE 代号 → ValidationType 反向映射；``"SKIP"`` 不在表内
@@ -114,6 +119,7 @@ _RULE_CODE_TO_TYPE: dict[str, ValidationType] = {
     "ROW_COMPLETENESS": ValidationType.COMPLETENESS,
     "AGING_PROGRESSION": ValidationType.AGING_PROGRESSION,
     "LLM_SEMANTIC_REVIEW": ValidationType.LLM_REVIEW,
+    "PERIOD_CONTINUITY": ValidationType.PERIOD_CONTINUITY,
 }
 
 

@@ -55,13 +55,16 @@ export function useNoteTableInteraction(options: UseNoteTableInteractionOptions)
 
   // ─── 单元格定位 ─────────────────────────────────────────────────────────
 
-  /** 把 (row, column) 解析成表内下标；任一维解析失败返回 null */
+  /** 把 (row, column) 解析成表内下标；任一维解析失败返回 null。
+   * 列优先按列树叶子的 column-key（`h{表头序号}`，NoteTableColumnNode）：多级表头里期末 / 上年年末下各有一列「应收账款」，
+   * 按列名只能找到第一列 —— 点上年年末的格子会选中、编辑期末那一格（2026-10-26 浏览器实测）；没有 key 才按列名。 */
   function locate(row: any, column: any): { rowIdx: number; colIdx: number; values: any[] } | null {
     const tableRows = activeTableData.value?.rows || []
     const rowIdx = tableRows.findIndex((candidate: any) => toRaw(candidate) === toRaw(row))
     const headers = activeTableData.value?.headers || []
-    const colIdx = headers.indexOf(column?.label)
-    if (rowIdx < 0 || colIdx < 0) return null
+    const keyed = /^h(\d+)$/.exec(String(column?.columnKey ?? ''))
+    const colIdx = keyed ? Number(keyed[1]) : headers.indexOf(column?.label)
+    if (rowIdx < 0 || colIdx < 0 || colIdx >= headers.length) return null
     return { rowIdx, colIdx, values: row?.values || row?.cells || [] }
   }
 

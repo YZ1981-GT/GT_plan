@@ -33,7 +33,6 @@ from app.models.consol_note_mapping_models import (
     ConsolNoteMappingRule,
     ConsolNoteTemplateBinding,
 )
-from app.models.consol_note_mapping_template_models import ConsolNoteValueConfirmation
 from app.models.core import Project, User
 from app.models.report_models import DisclosureNote
 from app.services import consol_note_stale_handler as stale_handler
@@ -54,7 +53,7 @@ _TABLES = [
     User.__table__, Project.__table__, DisclosureNote.__table__, ConsolNoteData.__table__,
     ConsolNoteDetailTemplate.__table__, ConsolNoteDetailTemplateVersion.__table__,
     ConsolNoteTemplateBinding.__table__, ConsolNoteMappingRule.__table__,
-    ConsolNoteMappingBinding.__table__, ConsolNoteValueConfirmation.__table__,
+    ConsolNoteMappingBinding.__table__,
 ]
 _YEAR = 2025
 _SECTION = "五-1-1"  # 合并「货币资金」 ↔ 单体「八、1」子表「货币资金」
@@ -165,13 +164,13 @@ A_ROWS = [
 
 
 async def _bind_template_from_suggestion(db: AsyncSession, user: User, consol: Project) -> dict:
-    """用户在模板编辑器点「💡 从来源建议」→ 删掉来源独有的「现金」行、把它记为「库存现金」别名 → 保存并绑定。"""
+    """用户在模板编辑器点「💡 从来源建议」→ 保存并绑定（来源独有的行删掉；「现金」建议里已并进「库存现金」别名）。"""
     suggestion = await suggest_template_for_section(db, project_id=consol.id, section_id=_SECTION, year=_YEAR)
     rows = []
     for r in suggestion["suggested_rows"]:
         if r["origin"] == "source":
             continue
-        aliases = list(r["aliases"]) + (["现金"] if r["canonical_name"] == "库存现金" else [])
+        aliases = list(r["aliases"]) + (["现金"] if r["canonical_name"] == "库存现金" and "现金" not in r["aliases"] else [])
         rows.append({"canonical_name": r["canonical_name"], "aliases": aliases, "row_type": r["row_type"]})
     tmpl = await create_template(db, template_type="soe", section_id=_SECTION, rows=rows, created_by=user.id)
     await bind_template_version(
@@ -228,7 +227,10 @@ class TestFullChainFromStandaloneNotes:
         template_labels = [r[0] for r in find_table("soe", _SECTION)["rows"]]
         skeleton = [r["canonical_name"] for r in suggestion["suggested_rows"] if r["origin"] == "template"]
         assert skeleton == [lbl.replace(" ", "") if lbl.replace(" ", "") == "合计" else lbl for lbl in template_labels]
-        assert [r["canonical_name"] for r in suggestion["suggested_rows"] if r["origin"] == "source"] == ["现金"]
+        # 全局别名库认得「现金」= 库存现金：并进模板行别名，不单列一行（note-pull-header-formula-closure R6.3；
+        # 原先单列 ⇒ 不删就建模板时合并附注出现「库存现金」「现金」两行，金额各算一半）
+        assert [r["canonical_name"] for r in suggestion["suggested_rows"] if r["origin"] == "source"] == []
+        assert "现金" in next(r for r in suggestion["suggested_rows"] if r["canonical_name"] == "库存现金")["aliases"]
         missing = {s["node_key"]: s for s in suggestion["entity_sources"] if s["status"] != "found"}
         assert missing["B:subsidiary"]["status"] == "missing" and "八、1" in missing["B:subsidiary"]["reason"]
 
@@ -274,7 +276,8 @@ class TestFullChainFromStandaloneNotes:
         tt = await resolve_section_template_type(db, group["G"].id)
         sources = await load_source_tables(db, [group["A"].id, group["B"].id], "五-1-2", _YEAR, template_type=tt)
         assert sources[group["A"].id].table_name == "受限制的货币资金明细"
-        assert sources[group["A"].id].rows == [{"label": "银行承兑汇票保证金", "row_type": "data", "values": [88.0, None]}]
+        assert sources[group["A"].id].rows == [
+            {"label": "银行承兑汇票保证金", "row_type": "data", "values": [88.0, None], "_occurrence": 0}]
         assert sources[group["B"].id].status == "missing"
 
 
@@ -295,7 +298,7 @@ class TestMixedTemplateGroup:
         st = sources[group["A"].id]
         assert st.table_name == "货币资金"
         # 上市版合并表头「期末余额 / 上年年末余额」与国企版「期末余额 / 期初余额」同位置
-        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73]}
+        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0}
 
         # 子企业保存「八、1」→ 上市版合并章节（映射到单体「五、1」）照样按标题判为受影响
         affected = await stale_handler._affected_consol_sections(db, group["A"].id, "八、1", "货币资金")

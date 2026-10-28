@@ -501,7 +501,8 @@ class TestZeroVisibleContent:
     def test_skip_sets_include_expandable(self) -> None:
         from app.services.note_empty_table_detector import SKIP_ROW_TYPES
         from app.services.note_is_empty_calc import _SKIP_ROW_TYPES as EMPTY_SKIP
-        from app.services.note_total_recalc import _SKIP_ROW_TYPES as TOTAL_SKIP
+        # 合计构成的唯一判定（note_total_terms；原 note_total_recalc 无生产调用方，spec note-pull-followup-closure R9 删除）
+        from app.services.note_total_terms import _SKIP_ROW_TYPES as TOTAL_SKIP
 
         assert EXPANDABLE in SKIP_ROW_TYPES, "空表检测未跳过可扩位行"
         assert EXPANDABLE in EMPTY_SKIP, "判空未跳过可扩位行"

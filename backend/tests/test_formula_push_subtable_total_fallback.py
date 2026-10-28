@@ -26,13 +26,14 @@ _PL = "损益类：本期 / 上期发生额按性质（来源）列示，合计 
 #: (rule_id, 口径) → 科目合计为什么就是这张子表的合计
 _BREAKDOWN: dict[tuple[str, str], str] = {
     ("F1.note.subtable_0", "soe"): "预付款项按账龄列示：小计 = 1123 账面余额",
-    ("F2.note.subtable_1", "listed"): "binding 不给子表规则出行（note_direct._book_value_rows），兜底无源",
-    ("F2.note.subtable_1", "soe"): "binding 不给子表规则出行（note_direct._book_value_rows），兜底无源",
+    # F2.note.subtable_1（存货跌价准备变动表，binding 不给子表出行、兜底无源）2026-10-27 删除（spec note-pull-followup-closure R2.2）
     ("G7.note.subtable_0", "soe"): "长期股权投资分类：小计（减值准备前）= 1511 账面余额",
     ("G7.note.subtable_1", "soe"): "长期股权投资明细：合计期初 = 1511 年初余额",
     ("L1.note.subtable_0", "listed"): "短期借款分类：合计 = 2001",
     ("L1.note.subtable_0", "soe"): "短期借款分类：合计 = 2001",
     ("K3.note.subtable_4", "soe"): "其他应付款按款项性质列示：合计 = 2241",
+    # 上市版同一张表叫「其他应付款（按款项性质列示）」（2026-10-27 补 table_by_template，spec note-pull-followup-closure R2.2）
+    ("K3.note.subtable_4", "listed"): "其他应付款按款项性质列示：合计 = 2241",
     ("M9.note.subtable_1", "listed"): "其他综合收益各项目：合计期末 = 4003 期末余额",
     ("G13.note.subtable_0", "listed"): _PL,
     ("G13.note.subtable_0", "soe"): _PL,

@@ -270,6 +270,109 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+// spec note-pull-header-formula-closure R3：新增公式选目标（表 / 行 / 列）、可读目标、没目标不保存
+describe('NoteFormulaDialog — 公式目标（表 / 行 / 列）', () => {
+  const TARGETS = [
+    { index: 0, name: '（1）按账龄披露应收账款', rows: ['1年以内', '1至2年', '合 计'], columns: ['期末数', '期初数'] },
+    { index: 1, name: '（3）坏账准备变动', rows: ['按单项', '按组合', '合 计'], columns: ['期初数', '本期计提', '期末数'] },
+  ]
+  const PRESET = { target: '2:0', target_label: '（1）按账龄披露应收账款 · 合 计 · 期末数', formula: 'SUM(0:1, 0)',
+    category: 'auto_calc', source: 'preset.total', layer: 'preset', layer_label: '系统预设' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue({ formulas: [PRESET], loaded: {}, targets: TARGETS })
+    mockPut.mockResolvedValue({ formulas: [PRESET, { target: 't1:2:1', target_label: '（3）坏账准备变动 · 合 计 · 本期计提',
+      formula: 'cell(0,1) + cell(1,1)', category: 'auto_calc', layer: 'project', layer_label: '本项目' }], loaded: {} })
+    mockPost.mockResolvedValue({ executed: 3, updated: 1, results: [
+      { cell: 't1:2:0', status: 'skipped', reason: '引用的单元格都没有数' },
+      { cell: 't1:2:2', status: 'skipped', reason: '引用的单元格都没有数' },
+      { cell: '2:0', status: 'ok' },
+    ] })
+    mockValidate.mockResolvedValue({ valid: true, issues: [] })
+  })
+
+  it('列表显示「表名 · 行名 · 列名」', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    expect(wrapper.text()).toContain('（1）按账龄披露应收账款 · 合 计 · 期末数')
+    expect((wrapper.vm as any).targetTables).toHaveLength(2)
+    wrapper.unmount()
+  })
+
+  it('新增公式选齐表 / 行 / 列后保存，目标按表维度写成 t1:2:1、本地字段不入库', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    vm.addFormula()
+    const row = vm.formulas[1]
+    vm.setCell(row, { table: 1 })
+    expect(row.target, '没选齐不写目标').toBe('')
+    vm.setCell(row, { table: 1, row: 2 })
+    vm.setCell(row, { table: 1, row: 2, col: 1 })
+    expect(row.target).toBe('t1:2:1')
+    expect(row.target_label).toBe('（3）坏账准备变动 · 合 计 · 本期计提')
+    row.formula = 'cell(0,1) + cell(1,1)'
+    await vm.completeRow(row)
+    await flushPromises()
+    const sent = mockPut.mock.calls[0][1].formulas
+    expect(sent.map((f: any) => f.target)).toEqual(['2:0', 't1:2:1'])
+    for (const f of sent) {
+      for (const k of ['_editing', '_isNew', '_cell', 'target_label', 'layer_label']) expect(f).not.toHaveProperty(k)
+    }
+    expect(row._editing).toBe(false)
+    expect(row._isNew).toBe(false)
+    expect(row.layer_label).toBe('本项目')
+    wrapper.unmount()
+  })
+
+  it('有公式没选目标：提示且不保存（原先被当空行丢掉、仍提示已保存）', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    vm.addFormula()
+    const row = vm.formulas[1]
+    row.formula = 'SUM(0:1, 0)'
+    await vm.completeRow(row)
+    await flushPromises()
+    expect(mockPut).not.toHaveBeenCalled()
+    expect(mockMsgWarning).toHaveBeenCalledWith('有 1 条公式没有选择目标单元格（表 / 行 / 列），未保存')
+    expect(row._editing).toBe(true)
+    expect(mockMsgSuccess).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('服务端 422 目标无效：逐条列「【目标】原因」', async () => {
+    mockPut.mockRejectedValue({ response: { status: 422, data: { detail: {
+      error_code: 'FORMULA_TARGET_INVALID', message: '公式目标单元格无效，未保存',
+      issues: [{ target: 't1:9:0', message: '超出「（3）坏账准备变动」（3 行 × 3 列）' }],
+    } } } })
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    vm.formulas[0]._editing = true
+    await vm.completeRow(vm.formulas[0])
+    await flushPromises()
+    expect(String(mockMsgError.mock.calls[0][0])).toContain('【t1:9:0】超出「（3）坏账准备变动」（3 行 × 3 列）')
+    wrapper.unmount()
+  })
+
+  it('应用 / 重新生成：提示写明没写入的原因；重新生成带 regenerate', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    await vm.onApply()
+    await flushPromises()
+    expect(mockMsgSuccess).toHaveBeenLastCalledWith('公式已应用：执行 3 个，更新 1 个单元格；2 个未写入（引用的单元格都没有数 2 个）')
+    await vm.onRegenerate()
+    await flushPromises()
+    expect(mockPost.mock.calls.at(-1)?.[2]).toEqual({ params: { regenerate: true } })
+    expect(String(mockMsgSuccess.mock.calls.at(-1)?.[0])).toMatch(/^已重新生成：/)
+    wrapper.unmount()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 // spec formula-fetch-followup-defect-closure 7.2 浏览器实测：提示只列引用、不说原因（原因在问题的 message 里）
 describe('NoteFormulaDialog — 悬空引用提示写明原因', () => {
   /** 后端 `validate_formula_refs` 的真实形状：原因在 message，status 是状态码 */

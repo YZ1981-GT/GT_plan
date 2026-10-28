@@ -142,6 +142,9 @@ NEW_DOMAIN_TEST_FILES: tuple[str, ...] = (
     "nCycleCanaryRowIdentity.spec.ts",
     "nCycleLane3RowIdentity.spec.ts",
     "nCycleLane2RouterAndKeys.spec.ts",
+    # 附注页离屏同步 provider 的等价用例（spec note-pull-followup-closure R1）
+    "n1HeadlessDisclosure.spec.ts", "n2HeadlessDisclosure.spec.ts",
+    "n4HeadlessDisclosure.spec.ts", "n5HeadlessDisclosure.spec.ts",
 )
 #: 只用 `upper` 分支时的漏检量（design 记 35）
 UPPER_ONLY_MISSED = 39
@@ -565,8 +568,12 @@ HEALTH_CONVERGED_HOSTS: frozenset[str] = frozenset({N3})
 #: live dual-mode 模块中已收敛 health / config 直调的个数（lane2 T6/T7：useN1DualMode）
 LIVE_MODULES_HEALTH_CONVERGED = 1
 LIVE_MODULES_CONFIG_CONVERGED = 1
-#: 本系列新增、落在 N 域口径内的生产文件（lower 分支收入）
-NEW_DOMAIN_PROD_FILES: tuple[str, ...] = ("n1SheetRouting.ts", "n3SheetRouting.ts")
+#: 本系列新增、落在 N 域口径内的生产文件（lower 分支收入）。
+#: 后四个是附注页离屏同步的 provider（spec note-pull-followup-closure R1：N1 / N2 / N4 / N5 接入，N3 无披露 Tab）
+NEW_DOMAIN_PROD_FILES: tuple[str, ...] = (
+    "n1SheetRouting.ts", "n3SheetRouting.ts",
+    "n1HeadlessDisclosure.ts", "n2HeadlessDisclosure.ts", "n4HeadlessDisclosure.ts", "n5HeadlessDisclosure.ts",
+)
 #: lane2 T8 后 A 族（位置化持久化键）目标态
 A_FAMILY_AFTER_LANE2 = 0
 

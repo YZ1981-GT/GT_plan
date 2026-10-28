@@ -146,6 +146,13 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
+import {
+  L7_DISCLOSURE_ROWS_ITEM_ID,
+  buildL7ListedDisclosureSnapshot,
+  createL7ListedDisclosureRows,
+  restoreL7ListedDisclosure,
+  type L7ListedDisclosureRow,
+} from '../../composables/l7DisclosureTabState'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -173,26 +180,11 @@ const formData = useL7FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface L7Row { item: string; endAmount: number; priorYearEnd: number }
-
 /** 持久化键（整表 JSON；旧版是逐格 `L7-disclosure-listed-{i}-{field}`，见 restore 兼容） */
-const ROWS_ITEM_ID = 'L7-disclosure-listed-rows'
+const ROWS_ITEM_ID = L7_DISCLOSURE_ROWS_ITEM_ID.listed
 
-/**
- * 源模板 五、52 是**空行骨架**（r7~r11 五个空行，无固定行名）→ 默认给 5 个
- * 常见项目名作示例、行名可编辑可增删，避免把示例名当披露内容写死。
- */
-function defaultRows(): L7Row[] {
-  return [
-    { item: '递延收益', endAmount: 0, priorYearEnd: 0 },
-    { item: '长期保证金/押金', endAmount: 0, priorYearEnd: 0 },
-    { item: '政府补助（非流动）', endAmount: 0, priorYearEnd: 0 },
-    { item: '预收款项（非流动）', endAmount: 0, priorYearEnd: 0 },
-    { item: '其他', endAmount: 0, priorYearEnd: 0 },
-  ]
-}
-
-const disclosureRows = ref<L7Row[]>(defaultRows())
+/** 默认行与读回、同步快照见 l7DisclosureTabState（离屏同步共用） */
+const disclosureRows = ref<L7ListedDisclosureRow[]>(createL7ListedDisclosureRows())
 
 /** 合计行**读时派生**（禁持久化派生值） */
 const displayRows = computed(() => [
@@ -244,16 +236,7 @@ const isSyncing = ref(false)
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildL7SyncPayload(props.wpId, {
-    variant: 'listed',
-    rows: disclosureRows.value
-      .filter((r) => String(r.item ?? '').trim())
-      .map((r) => ({
-        label: r.item,
-        endAmount: Number(r.endAmount) || 0,
-        priorAmount: Number(r.priorYearEnd) || 0,
-      })),
-  })
+  const payload = buildL7SyncPayload(props.wpId, buildL7ListedDisclosureSnapshot(disclosureRows.value))
   if (!payload) {
     ElMessage.warning('当前项目准则不适用上市附注同步')
     return
@@ -301,38 +284,12 @@ function handleReview() { openReviewDialog?.('L7-disclosure-listed', '附注披�
 /** 只读金额走平台单一真源（千分符 + 2 位小数 + 「元」偏好） */
 const fmtAmt = (val: number) => fmtAmount(val)
 
-// ─── 反序列化（含旧版逐格 key 兼容） ────────────────────────────────────────
+// ─── 反序列化（含旧版逐格 key 兼容，见 restoreL7ListedDisclosure） ───────────
 
 function restoreRows() {
-  const packed = formData.allResponses.value.get(ROWS_ITEM_ID)?.remark
-  if (packed) {
-    try {
-      const parsed = JSON.parse(packed)
-      if (Array.isArray(parsed) && parsed.length) {
-        disclosureRows.value = parsed.map((r: any) => ({
-          item: String(r?.item ?? ''),
-          endAmount: Number(r?.endAmount) || 0,
-          priorYearEnd: Number(r?.priorYearEnd) || 0,
-        }))
-        return
-      }
-    } catch { /* 落到旧格式兼容 */ }
-  }
-  // 旧格式：逐格 `L7-disclosure-listed-{index}-{field}`（含被当数据行的第 6 行合计，丢弃）
-  const rows = defaultRows()
-  let touched = false
-  rows.forEach((row, i) => {
-    for (const field of ['endAmount', 'priorYearEnd'] as const) {
-      const raw = formData.allResponses.value.get(`L7-disclosure-listed-${i}-${field}`)?.remark
-      if (raw != null && raw !== '') {
-        const n = Number(raw)
-        if (Number.isFinite(n)) { row[field] = n; touched = true }
-      }
-    }
-  })
-  if (touched) disclosureRows.value = rows
-  const savedConclusion = formData.allResponses.value.get('L7-disc-listed-conclusion')?.remark
-  if (savedConclusion) conclusion.value = String(savedConclusion)
+  const restored = restoreL7ListedDisclosure(formData.allResponses.value)
+  if (restored.rows) disclosureRows.value = restored.rows
+  if (restored.conclusion) conclusion.value = restored.conclusion
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────

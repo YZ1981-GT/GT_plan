@@ -13,7 +13,7 @@
  *
  * Requirements: 12.1-12.8, 14.1-14.6
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD3FormulaEngine'
 import type { ChecklistResponse } from './useD3FormData'
 import type { useD3CrossSheet } from './useD3CrossSheet'
@@ -193,8 +193,13 @@ export function useD3DisclosureListed(options: UseD3DisclosureListedOptions) {
       else if (idx === '3') note3.value = detail.text || ''
     }
   }
-  window.addEventListener('note:section-updated', noteUpdateHandler)
-  eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不订阅：没有卸载钩子退订，
+  // 订阅会一直留着（spec note-pull-followup-closure R1）。组件内行为不变。
+  const hasInstance = !!getCurrentInstance()
+  if (hasInstance) {
+    window.addEventListener('note:section-updated', noteUpdateHandler)
+    eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  }
 
   // ─── Row operations (section 2 & 3) ──────────────────────────────────
 
@@ -248,11 +253,13 @@ export function useD3DisclosureListed(options: UseD3DisclosureListedOptions) {
 
   // ─── Lifecycle ───────────────────────────────────────────────────────
 
-  onBeforeUnmount(() => {
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
-  })
+  if (hasInstance) {
+    onBeforeUnmount(() => {
+      for (const { event, handler } of eventListeners) {
+        window.removeEventListener(event, handler)
+      }
+    })
+  }
 
   // ─── Return ──────────────────────────────────────────────────────────
 

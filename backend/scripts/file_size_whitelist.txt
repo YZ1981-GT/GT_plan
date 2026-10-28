@@ -1726,3 +1726,12 @@ backend/tests/test_advanced_query_hardening_wave012.py  2222
 #   JSON 载荷读写（load_json_payload ~ upsert_json_rows）/ 账龄动态列（subject_aging_periods ~ resolve_aging_segments）/
 #   路由工厂 create_cycle_import_export_router（约 310 行）各成模块，本文件只留 re-export。
 backend/app/routers/wp_render_strategies/_cycle_import_export_common.py  925
+# note-pull-followup-closure（2026-10-28）：两份历史大文件（HEAD 已超限且此前未登记，任何改动都会被门禁拒）。
+#   note_conversion_service.py —— HEAD 2321 行。本 spec 只把一句 docstring 里已删模块 note_total_recalc 的引用改成
+#     现行写入方（行数不变），基线取 HEAD 值。拆分方向：转换规则表 / 单元格三态统计 / 章节转换编排各成模块。
+backend/app/services/note_conversion_service.py  2321
+#   note_validation_executors.py —— HEAD 1337 行。本 spec R8 新增「期间衔接」执行器（期初行 / 期末行按行名认、
+#     本期 / 上期列按表头认、可核上年附注），+91 行，基线取现值 1428。拆分方向：先把取表 / 取值共用 helper
+#     （_to_decimal / _norm_headers / _row_values / _resolve_section_table）下沉到独立模块（否则拆出的执行器与本文件循环导入），
+#     再按规则类型（余额 / 勾稽 / 账龄 / 期间衔接 / 文本）拆成伴生模块，本文件只留 EXECUTORS 登记。
+backend/app/services/note_validation_executors.py  1428

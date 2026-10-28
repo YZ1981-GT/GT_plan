@@ -171,20 +171,18 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-// ─── 同步链路（浅合并推 K3 §五、42 的应付股利两张子表） ─────────────────────
+// ─── 同步链路（浅合并推 K3 §五、42 的应付股利子表；行 / 读回 / 快照在 m1DisclosureForm，与附注页离屏同步共用） ──
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM1SyncPayload, type M1DividendRow, type M1OverdueRow } from '../../composables/m1NoteSectionMap'
+import {
+  buildM1ListedTabSyncPayload,
+  createM1ListedDisclosureRows,
+  restoreM1ListedDisclosureRows,
+} from '../../composables/m1DisclosureForm'
 import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const dividendRows: M1DividendRow[] = detailRows.value.map((r: any) => ({
-    label: r.item || r.label || '',
-    endAmount: Number(r.endAmount) || 0,
-    priorAmount: Number(r.priorAmount) || 0,
-  }))
-  // 如果有超1年明细则推（从 overdueNote 暂不构造结构行，待后续增加录入区块）
-  const overdueRows: M1OverdueRow[] = []
-  const payload = buildM1SyncPayload(props.wpId, 'listed', dividendRows, overdueRows)
+  // 「超过1年未支付」表暂无录入区块（overdueNote 是说明文本）⇒ 只推应付股利表
+  const payload = buildM1ListedTabSyncPayload(props.wpId, detailRows.value)
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -202,13 +200,7 @@ const formData = useM1FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const detailRows = ref([
-  { item: '股东A（境内法人）', endAmount: 0, priorYearEnd: 0 },
-  { item: '股东B（境内自然人）', endAmount: 0, priorYearEnd: 0 },
-  { item: '股东C（境外法人）', endAmount: 0, priorYearEnd: 0 },
-  { item: '股东D（其他）', endAmount: 0, priorYearEnd: 0 },
-  { item: '合计', endAmount: 0, priorYearEnd: 0 },
-])
+const detailRows = ref(createM1ListedDisclosureRows())
 
 const overdueNote = ref('')
 const policyNote = ref('')
@@ -290,12 +282,7 @@ onMounted(async () => {
   planNote.value = responses.get('M1-disclosure-listed-plan')?.remark || ''
   disclosureConclusion.value = responses.get('M1-disc-listed-conclusion')?.remark || ''
   // Restore detail rows
-  for (let i = 0; i < detailRows.value.length; i++) {
-    const endResp = responses.get(`M1-disclosure-listed-${i}-endAmount`)
-    const priorResp = responses.get(`M1-disclosure-listed-${i}-priorYearEnd`)
-    if (endResp?.remark) detailRows.value[i].endAmount = Number(endResp.remark) || 0
-    if (priorResp?.remark) detailRows.value[i].priorYearEnd = Number(priorResp.remark) || 0
-  }
+  restoreM1ListedDisclosureRows(responses, detailRows.value)
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 

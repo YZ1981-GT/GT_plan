@@ -4,7 +4,7 @@
  * 上市/国企模板：「不存在的项目可以删除」——无发生额行默认不展示、不进附注正文；
  * 与附注模块：EventBus sectionId + sync-from-workpaper 结构化子表（空行不推送）。
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { parseNum, calcChangeAmount, calcChangeRate } from './useG14FormulaEngine'
 import {
   G14_ACCOUNT_CODE,
@@ -272,9 +272,17 @@ export function useG14Disclosure(options: {
     }
   }
 
+  /** 「从明细同步」：G14-2 明细回填本期发生额后保存 */
   function syncFromDetail(): void {
+    try {
+      if (applyDetailPatch()) persist()
+    } catch { /* ignore */ }
+  }
+
+  /** 由 G14-2 明细回填本期发生额（只改内存）；没有明细或解析失败返回 false、不动行 */
+  function applyDetailPatch(): boolean {
     const detailJson = options.allResponses.value.get('G14-detail-rows')?.remark
-    if (!detailJson) return
+    if (!detailJson) return false
     try {
       const detailRows = JSON.parse(detailJson) as any[]
       if (variant === 'listed') {
@@ -300,8 +308,10 @@ export function useG14Disclosure(options: {
           return hit ? enrichRow({ ...r, currentAmount: hit.currentAudited ?? r.currentAmount }, variant) : r
         })
       }
-      persist()
-    } catch { /* ignore */ }
+      return true
+    } catch {
+      return false
+    }
   }
 
   function handleAdjudicated(e: Event): void {
@@ -312,7 +322,11 @@ export function useG14Disclosure(options: {
     }
   }
 
-  function pullLatestAdjudicated(): void {
+  /**
+   * 审定数 → G14-2 明细本期 → G14-1 上期审定（两步回填各自保存）。Tab 挂载与「刷新」调它；附注页离屏同步在 prepare 里调
+   * `pullLatestAdjudicated({ persist: false })`：同一回填只改内存、不保存（spec note-pull-followup-closure R1）。
+   */
+  function pullLatestAdjudicated(opts: { persist?: boolean } = {}): void {
     const amt = options.allResponses.value.get('G14-1-adjudicated-amount')?.conclusion
     if (amt != null) {
       adjudicatedAmount.value = parseNum(amt)
@@ -320,7 +334,8 @@ export function useG14Disclosure(options: {
       const tb = options.allResponses.value.get('G14-adj-tb')?.remark
       if (tb != null) adjudicatedAmount.value = parseNum(tb)
     }
-    syncFromDetail()
+    if (opts.persist === false) applyDetailPatch()
+    else syncFromDetail()
     const prior = options.allResponses.value.get('G14-adj-prior')
     if (prior?.remark) {
       try {
@@ -347,7 +362,7 @@ export function useG14Disclosure(options: {
             return p ? enrichRow({ ...r, priorAmount: priorAuditedFromStoreEntry(p) }, variant) : r
           })
         }
-        persist()
+        if (opts.persist !== false) persist()
       } catch { /* ignore */ }
     }
   }
@@ -384,17 +399,21 @@ export function useG14Disclosure(options: {
     variant === 'listed' ? '附注披露（上市公司）' : '附注披露（国企）',
   )
 
-  onMounted(() => {
-    pullLatestAdjudicated()
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    window.addEventListener('g14:detail-updated', onDetailUpdated)
-    publishNoteUpdate()
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-    window.removeEventListener('g14:detail-updated', onDetailUpdated)
-    if (noteTimer) clearTimeout(noteTimer)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅窗口事件、不广播说明；挂载时的回填
+  // 由调用方显式调 `pullLatestAdjudicated({ persist: false })`（spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      pullLatestAdjudicated()
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      window.addEventListener('g14:detail-updated', onDetailUpdated)
+      publishNoteUpdate()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+      window.removeEventListener('g14:detail-updated', onDetailUpdated)
+      if (noteTimer) clearTimeout(noteTimer)
+    })
+  }
 
   function onDetailUpdated(): void {
     syncFromDetail()

@@ -2,7 +2,7 @@
  * useG11Disclosure — 附注披露（上市/国企）
  * G11-2 明细优先 → G11-1 审定分项 → 残差进「其他」；上市含处置交易性子表；国企含汇回限制说明。
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { G11_ACCOUNT_CODE } from './g11Constants'
 import { parseNum, calcChangeAmount, calcChangeRate } from './useG11FormulaEngine'
@@ -398,17 +398,21 @@ export function useG11Disclosure(options: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    window.addEventListener('g11:disclosure-pulled', onDisclosurePulled)
-    pullLatestAdjudicated(false)
-    publishNoteUpdate()
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-    window.removeEventListener('g11:disclosure-pulled', onDisclosurePulled)
-    if (noteTimer) clearTimeout(noteTimer)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅窗口事件、不广播说明
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      window.addEventListener('g11:disclosure-pulled', onDisclosurePulled)
+      pullLatestAdjudicated(false)
+      publishNoteUpdate()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+      window.removeEventListener('g11:disclosure-pulled', onDisclosurePulled)
+      if (noteTimer) clearTimeout(noteTimer)
+    })
+  }
 
   return {
     title,

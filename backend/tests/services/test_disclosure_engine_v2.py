@@ -218,10 +218,10 @@ async def test_build_with_binding_missing_row_returns_none_values():
     )
     extra = out["rows"][0]
     assert extra["label"] == "委托加工材料"
-    # binding 缺该 row → 每列 manual placeholder + values None
+    # binding 缺该 row → values None、不标 manual（没有绑定 ≠ 人工，spec note-pull-followup-closure R5）
     assert extra["values"] == [None, None]
-    assert extra["_cell_modes"]["0"] == "manual"
-    assert extra["_cell_modes"]["1"] == "manual"
+    assert extra["_cell_modes"] == {}
+    assert extra["_cell_meta"]["0"]["unbound"] is True and extra["_cell_meta"]["1"]["unbound"] is True
     # 但语义仍记录（来自 header_normalize）
     assert extra["_cell_meta"]["0"]["semantic"] == "closing_balance"
 
@@ -263,8 +263,8 @@ async def test_build_with_binding_locked_mode_skips_resolver():
 
 
 @pytest.mark.asyncio
-async def test_build_with_binding_header_normalize_short_falls_back_to_manual():
-    """header_normalize 长度不足 → 兜底 manual placeholder."""
+async def test_build_with_binding_header_normalize_short_is_unbound():
+    """header_normalize 长度不足 → 留空、记 unbound（原为兜底 manual placeholder，R5 改）."""
     eng = _make_engine()
     binding = _three_col_binding()
     binding["header_normalize"] = [{"text": "项目", "semantic": "manual_text"}]
@@ -272,11 +272,11 @@ async def test_build_with_binding_header_normalize_short_falls_back_to_manual():
         uuid4(), 2025, "五、1 存货",
         _three_col_template(), binding,
     )
-    # 期末 / 期初 column 都没 semantic → manual + None
+    # 期末 / 期初 column 都没 semantic → None、不标 manual、记 unbound（R5）
     row = out["rows"][0]
     assert row["values"] == [None, None]
-    assert row["_cell_modes"]["0"] == "manual"
-    assert row["_cell_meta"]["0"]["semantic"] is None
+    assert row["_cell_modes"] == {}
+    assert row["_cell_meta"]["0"]["semantic"] is None and row["_cell_meta"]["0"]["unbound"] is True
 
 
 @pytest.mark.asyncio

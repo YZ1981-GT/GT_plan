@@ -123,7 +123,7 @@
  *
  * 科目：2245 其他流动负债（负债类）
  */
-import { reactive, inject, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { reactive, ref, inject, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -135,6 +135,13 @@ import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSec
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import { isK4Event as matchesK4Event, k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
+import {
+  applyK4SoeAutoFill,
+  buildK4SoeDisclosureSnapshot,
+  createK4SoeDisclosureSections,
+  loadK4SoeDisclosureState,
+  type K4SoeDisclosureSection,
+} from '../../composables/k4DisclosureTabState'
 
 // 🔴 原写死 '2245' —— 该码不是其他流动负债：按它监听会把别的科目的审定事件当成 K4 的，
 //    按它发事件会让按科目码匹配的下游认错科目。现取宿主 provide 的 tb_source_codes 解析结果，
@@ -163,77 +170,12 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
-// ═══ 数据模型 ═══
-interface DisclosureRow {
-  rowIdx: number
-  item: string
-  endBalance: number
-  beginBalance: number
-  remark: string
-  isFormula?: boolean
-  isAutoFilled?: boolean
-}
-
-interface DisclosureSection {
-  id: string
-  title: string
-  rows: DisclosureRow[]
-  hasTextArea: boolean
-  textContent: string
-}
-
-// ═══ 构建14行分配到3个section ═══
-function makeRow(item: string, idx: number, opts?: Partial<DisclosureRow>): DisclosureRow {
-  return {
-    rowIdx: idx, item, endBalance: 0, beginBalance: 0, remark: '',
-    ...opts,
-  }
-}
-
-function buildSections(): DisclosureSection[] {
-  // 一、按项目性质分类（~9行）
-  const natureItems = [
-    '预提费用', '待转销项税额', '代扣代缴款项', '待认证进项税额',
-    '应付短期利息', '其他', '合计',
-  ]
-  const natureRows = natureItems.map((item, i) => makeRow(item, i, { isFormula: item === '合计' }))
-
-  // 二、增减变动说明（~3行）
-  const changeItems = ['本期增加', '本期减少', '净变动']
-  const changeRows = changeItems.map((item, i) => makeRow(item, i, { isFormula: item === '净变动' }))
-
-  return [
-    { id: 'nature', title: '一、按项目性质分类', rows: natureRows, hasTextArea: true, textContent: '' },
-    { id: 'change', title: '二、增减变动说明', rows: changeRows, hasTextArea: true, textContent: '' },
-    { id: 'k7-reconcile', title: '三、政府补助与K7递延收益勾稽', rows: [], hasTextArea: true, textContent: '' },
-    { id: 'other', title: '四、其他披露事项', rows: [], hasTextArea: true, textContent: '' },
-  ]
-}
-
-const sections = reactive<DisclosureSection[]>(buildSections())
+// ═══ 数据模型（四段初值 / 读回 / 自动取数 / 同步快照与附注页离屏同步共用 k4DisclosureTabState）═══
+const sections = reactive<K4SoeDisclosureSection[]>(createK4SoeDisclosureSections())
 
 // ═══ 自动取数 from allResponses ═══
 function applyAutoFill(): void {
-  const endBal = getResponseNumber('K4-1-liability-end')
-  const beginBal = getResponseNumber('K4-1-liability-begin')
-
-  // 按性质合计行自动填充
-  const natureSection = sections.find(s => s.id === 'nature')
-  if (natureSection) {
-    const totalRow = natureSection.rows.find(r => r.item === '合计')
-    if (totalRow) {
-      totalRow.endBalance = endBal
-      totalRow.beginBalance = beginBal
-      totalRow.isAutoFilled = true
-    }
-  }
-}
-
-function getResponseNumber(key: string): number {
-  const item = props.allResponses.get(key)
-  if (!item) return 0
-  const val = item.value ?? item
-  return typeof val === 'number' ? val : parseFloat(val) || 0
+  applyK4SoeAutoFill(props.allResponses, sections)
 }
 
 // ═══ EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ═══
@@ -343,15 +285,9 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
 // ═══ 持久化 ═══
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 只推「一、按项目性质分类」段：`二、增减变动说明` 的本期增加/减少/净变动不是科目行，
-  // 混进同一张附注表会变成假科目（原 `sections.flatMap` 把两段压进一张表）。
-  // 增减变动说明随 `_note_texts` 走文字。
-  const natureSection = sections.find(s => s.id === 'nature')
-  const rows = (natureSection?.rows ?? [])
-    .filter(r => !r.isFormula)
-    .map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
-  const payload = buildK4SyncPayload('soe', props.wpId || '', rows, narrative)
+  // 只推「一、按项目性质分类」段（增减变动说明随 `_note_texts` 走文字），见 buildK4SoeDisclosureSnapshot
+  const snapshot = buildK4SoeDisclosureSnapshot(sections)
+  const payload = buildK4SyncPayload('soe', props.wpId || '', snapshot.rows, snapshot.narrative)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -377,18 +313,9 @@ function scheduleAutoSnapshot(): void {
   try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
 }
 
+// 🔴 原只读回复的 value 字段（宿主回复只有 remark / conclusion ⇒ 已存四段从不读回），现读 remark，见 loadK4SoeDisclosureState
 function loadSavedData(): void {
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
-    const saved = props.allResponses.get(`K4-disc-soe-${section.id}`)
-    if (saved?.value) {
-      try {
-        const parsed = typeof saved.value === 'string' ? JSON.parse(saved.value) : saved.value
-        if (parsed.rows?.length) section.rows = parsed.rows
-        if (parsed.textContent) section.textContent = parsed.textContent
-      } catch { /* ignore */ }
-    }
-  }
+  loadK4SoeDisclosureState(props.allResponses, sections)
 }
 
 // ═══ 复核 ═══

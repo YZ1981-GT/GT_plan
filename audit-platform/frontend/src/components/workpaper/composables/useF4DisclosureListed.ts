@@ -7,7 +7,10 @@
  * 2. 账龄超过1年的重要应付账款：联动长期挂账检查表F4-5
  *    （债权人/期末余额/未偿还或未结转的原因），支持同步与手工行。
  */
-import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import {
+  computed, onScopeDispose, ref, toValue, watch,
+  type ComputedRef, type MaybeRefOrGetter, type Ref,
+} from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { parseNum, calcSubtotal, calcOutstandingDays } from './useF4AccPayFormulaEngine'
@@ -32,8 +35,11 @@ export interface UseF4DisclosureListedOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
-  /** 项目适用准则（用于 current_standard 分流）；未提供时按 listed_standalone */
-  applicableStandards?: Ref<readonly string[] | null | undefined>
+  /**
+   * 项目适用准则（用于 current_standard 分流）；未提供时按 listed_standalone。
+   * Ref 与 getter 都收（Tab 传 `() => props.applicableStandards`；原先只读 `.value`，getter 恒读成空 ⇒ 合并口径被当单体）。
+   */
+  applicableStandards?: MaybeRefOrGetter<readonly string[] | null | undefined>
 }
 
 /**
@@ -418,7 +424,7 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
   function buildSyncPayload() {
     return buildF4ListedSyncPayload(
       options.wpId.value,
-      options.applicableStandards?.value,
+      toValue(options.applicableStandards),
       natureRows.value.map((row) => ({
         label: row.label,
         endAmount: row.closingBalance,
@@ -466,7 +472,8 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
     }
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁（组件卸载 / 离屏同步结束）时冲刷待保存项
+  onScopeDispose(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null

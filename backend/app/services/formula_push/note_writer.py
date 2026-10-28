@@ -343,13 +343,33 @@ def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
     return keys, note
 
 
-def _pick_table(tables: list, name: str) -> int:
-    """规则表名与某张表同名（去空白比）就推那张；否则首表（= 顶层镜像那张，原兜底写的就是它）。"""
+def _find_table(tables: list, name: str) -> int | None:
+    """与规则表名同名（去空白比）的那张表的序号；没有返回 None。"""
     want = _norm_header(name)
     for index, table in enumerate(tables):
         if want and isinstance(table, dict) and _norm_header(table.get("name")) == want:
             return index
-    return 0
+    return None
+
+
+def _pick_table(tables: list, name: str) -> int:
+    """规则表名与某张表同名（去空白比）就推那张；否则首表（= 顶层镜像那张，原兜底写的就是它）。主表规则用。"""
+    index = _find_table(tables, name)
+    return 0 if index is None else index
+
+
+def has_table(table_data: Any, table: str) -> bool:
+    """章节里有没有这张表：``sub_table_data`` 的键（精确，与 ``locate_table`` 同口径）、``_tables[].name``（去空白比）；
+    旧单表格式看顶层 ``name``。子表规则据此判断章节是否就是目标（spec note-pull-followup-closure R2.3）。"""
+    if not isinstance(table_data, dict) or not str(table or "").strip():
+        return False
+    sub = table_data.get("sub_table_data")
+    if isinstance(sub, dict) and sub:
+        return table in sub
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        return _find_table(tables, table) is not None
+    return bool(table_data.get("rows")) and _norm_header(table_data.get("name")) == _norm_header(table)
 
 
 def sync_first_table_mirror(table_data: dict) -> None:
@@ -366,13 +386,15 @@ def sync_first_table_mirror(table_data: dict) -> None:
         table_data["rows"] = copy.deepcopy(first)
 
 
-def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | None]:
+def locate_table(table_data: Any, table: str, *, exact: bool = False) -> tuple[NoteTable | None, str | None]:
     """定位附注表；返回 (表, None) 或 (None, 中文跳过原因)。
 
     分级判断（spec: formula-push-note-skip-reduction · 需求 1.1–1.3）：
     - ``_source`` 明确非底稿 → 跳过
     - ``sub_table_data`` 存在且含目标子表 → 按子表定位
     - 无 ``sub_table_data`` 但有顶层 ``rows`` → 旧格式兜底
+
+    ``exact``（子表规则）：旧格式也只认同名表，不回退首表（spec note-pull-followup-closure R2.3）。
     """
     if not isinstance(table_data, dict) or not table_data:
         return None, "附注章节尚无表格数据"
@@ -401,7 +423,10 @@ def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | N
     locked = detect_manual_override(table_data)
     tables = table_data.get("_tables")
     if isinstance(tables, list) and tables:
-        target = tables[_pick_table(tables, table)]
+        index = _find_table(tables, table) if exact else _pick_table(tables, table)
+        if index is None:
+            return None, f"附注中没有「{table}」表"
+        target = tables[index]
         rows = target.get("rows") if isinstance(target, dict) else None
         if not (isinstance(rows, list) and rows):
             return None, "附注章节无可定位的表格数据"
@@ -409,6 +434,8 @@ def locate_table(table_data: Any, table: str) -> tuple[NoteTable | None, str | N
         return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
     rows = table_data.get("rows")
     if isinstance(rows, list) and rows:
+        if exact and _norm_header(table_data.get("name")) != _norm_header(table):
+            return None, f"附注中没有「{table}」表"
         keys, note = legacy_value_keys(table_data)
         return NoteTable(rows=rows, value_keys=keys, section_locked=locked, column_note=note), None
 

@@ -17,7 +17,6 @@ import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD2DisclosureNote } from '../composables/useD2DisclosureNote'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import {
-  buildD2SyncPayload,
   D2_NOTE_SECTION,
   D2_NOTE_TEXT_SECTIONS,
   D2_TABLE_NAMES,
@@ -33,7 +32,7 @@ import { useD2DisclosureImportExport } from '../composables/useD2DisclosureImpor
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
-import { dataTableNames } from '../composables/disclosureSyncedTables'
+import { postD2DisclosureSync } from '../composables/d2DisclosureSync'
 import { D2_DISCLOSURE_SHEET_NAME } from '../composables/d2NoteSectionMap'
 import { useRestrictedAssetsSync } from '../composables/useRestrictedAssetsSync'
 import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
@@ -458,38 +457,17 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
-    // R7.5 基线播种：首次同步（尚无「上次已同步表名」持久化）时读一次附注现存表名，
-    // 按 D2 命名空间过滤后写入基线 → 让上线前就残留的孤儿表在本轮一次性被清掉。
-    // 读取失败（附注尚未生成）不阻断同步，下次同步再试。
-    // 年度未设置：跳过播种（同步本身不带年度；播种本就是尽力而为，下次同步再试）
-    const seedYear = auditYear.value
-    if (syncedTableNames.value.length === 0 && seedYear != null) {
-      try {
-        const detail: any = await getDisclosureNoteDetail(
-          props.projectId,
-          seedYear,
-          D2_NOTE_SECTION[props.variant],
-        )
-        seedSyncedTablesFromNote(detail?.table_data)
-      } catch {
-        // 附注章节不存在 / 网络失败 → 跳过播种
-      }
-    }
-    const payload = buildD2SyncPayload(
-      props.variant,
-      props.wpId || '',
-      props.applicableStandards ?? null,
-      buildSnapshot(),
+    // 播种 / 建载荷 / POST / 记录已同步表名与附注页离屏同步共用（d2DisclosureSync.ts，同一载荷）
+    const { rows } = await postD2DisclosureSync(
+      { syncedTableNames, seedSyncedTablesFromNote, buildSnapshot, markSynced },
+      {
+        projectId: props.projectId,
+        year: auditYear.value,
+        variant: props.variant,
+        wpId: props.wpId || '',
+        applicableStandards: props.applicableStandards ?? null,
+      },
     )
-    const result: any = await http.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-      payload,
-    )
-    const data = result?.data ?? result
-    const rows = Number(data?.rows_synced ?? 0)
-    // R7：POST 成功后才记录本轮推送的子表名，作为下次孤儿表差集的基准。
-    // 失败路径绝不写入 —— 否则下次会把本轮表名当「上次已同步」而误删现存表。
-    markSynced(dataTableNames(payload.sub_table_data as Record<string, unknown>))
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: {
         wpCode: 'D2',

@@ -113,6 +113,52 @@ export const K2_CARBON_ROWS: readonly string[] = [
 
 export const K2_TOTAL_ROW_LABEL = '合计'
 
+// ── 叙述段（Tab 编辑区与同步快照共用；`_note_texts` 的中文 title 真源）──────────
+
+export type K2ListedTextKey = 'significant' | 'contractCost' | 'carbon'
+
+export interface K2ListedTextSegment {
+  key: K2ListedTextKey
+  title: string
+  requirement: string
+  placeholder: string
+}
+
+/** 上市文本段定义 —— requirement 逐字取自 note_template_listed.json §五、13 text_sections */
+export const K2_LISTED_TEXT_SEGMENTS: readonly K2ListedTextSegment[] = [
+  {
+    key: 'significant',
+    title: '金额较大的其他流动资产说明',
+    requirement:
+      '（金额较大的其他流动资产，应说明其内容、性质）【提示：进项税额，根据应交税费-应交增值税科目借方余额分析填列；'
+      + '多交或预缴的增值税额，根据应交税费-未交增值税科目以及应交税费-预交增值税科目借方余额分析填列。'
+      + '上述重分类事项，如属于其他非流动资产的，应在其他非流动资产科目列示。】',
+    placeholder: '按①表金额较大的项目，逐项说明其内容与性质',
+  },
+  {
+    key: 'contractCost',
+    title: '合同取得成本判断与摊销方法说明',
+    requirement:
+      '披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、'
+      + '按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。'
+      + '摊销期限未超过一年的合同取得成本于其发生时计入当期损益。',
+    placeholder: '说明资本化判断依据、摊销方法与摊销期间，以及本期摊销及减值损失金额',
+  },
+  {
+    key: 'carbon',
+    title: '碳排放权相关信息说明',
+    requirement:
+      '披露与碳排放权相关的信息，包括：①与碳排放权交易相关的信息（参与减排机制的特征、碳排放战略、节能减排措施等）；'
+      + '②碳排放配额的具体来源（配额取得方式、取得年度、用途、结转原因等）；'
+      + '③节能减排或超额排放情况（免费分配取得的碳排放配额与同期实际排放量有关数据的对比情况、原因等）；'
+      + '④碳排放配额变动情况按③表格式披露。',
+    placeholder: '按①②③四项要求分别说明',
+  },
+]
+
+/** 国企 八、14 单段说明 */
+export const K2_SOE_NOTE_TEXT = { section: 'k2-soe-note', title: '其他流动资产说明' } as const
+
 // ── 列定义 ───────────────────────────────────────────────────────────────────
 
 /** 类别列键（`cat_1` 起，与 `categories` 下标一一对应） */

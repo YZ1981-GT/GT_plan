@@ -190,7 +190,7 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
     1. 把该企业绑定为来源的合并项目 + 合并章节；
     2. 合并章节经章节映射换算成单体章节号，与本次保存的章节一致才算受影响；事件没带
        章节号（如整本生成）时该企业全部已绑定章节都受影响；
-    3. 交 ``consol_note_value_change_service.on_note_section_saved`` 标 is_stale、降级值确认；
+    3. 交 ``consol_note_value_change_service.on_note_section_saved`` 标 is_stale；
     4. 每个受影响的合并项目推一条 ``consol.note_stale`` SSE。
     """
     project_id = getattr(event, "project_id", None)
@@ -206,10 +206,6 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
 
     try:
         from app.core.database import async_session as async_session_factory
-        from app.services.consol_note_detail_source_service import (
-            load_entity_source_rows,
-            resolve_section_template_type,
-        )
         from app.services.consol_note_value_change_service import on_note_section_saved
 
         stale_by_project: dict[UUID, int] = {}
@@ -217,13 +213,9 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
             note_section, section_title = await _resolve_saved_note_section(db, entity_project_id, year, saved)
             affected = await _affected_consol_sections(db, entity_project_id, note_section, section_title)
             for section_id, consol_pids in affected.items():
-                template_type = await resolve_section_template_type(db, consol_pids[0])
-                rows = await load_entity_source_rows(
-                    db, entity_project_id, section_id, year, template_type=template_type,
-                )
                 result = await on_note_section_saved(
                     db, entity_project_id=entity_project_id, section_id=section_id,
-                    year=year, rows=rows, consol_project_ids=consol_pids,
+                    year=year, consol_project_ids=consol_pids,
                 )
                 for item in (result or {}).get("affected_projects", []):
                     pid = UUID(item["consol_project_id"])

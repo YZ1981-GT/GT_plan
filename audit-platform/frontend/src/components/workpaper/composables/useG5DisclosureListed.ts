@@ -6,7 +6,7 @@
  * - 组合一致性：从 G5-3 组合名 / G5-8 政策候选同步，并提示与会计政策一致
  * - 从 G5-1/G5-2/G5-3 取数；比例防 #DIV/0!；性质合计↔坏账合计勾稽
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import type { ChecklistResponse } from './useF1FormData'
 import { G5_ACCOUNT_CODE } from './g5Constants'
 import { parseG5AdjStore } from './g5AdjudicationItems'
@@ -649,12 +649,16 @@ export function useG5DisclosureListed(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不监听审定事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+  }
 
   return {
     state,

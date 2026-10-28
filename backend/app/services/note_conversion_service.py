@@ -205,7 +205,7 @@ def count_manual_cells(node: Any) -> int:
 
     🔴 但**顶层 ``rows`` 是 ``_tables[0].rows`` 的冗余副本** —— 真实库实测两者同时
     存在的 392 个章节里 **392/392 逐字节相同**（legacy 单表表示，
-    ``note_total_recalc`` 亦明写「末尾把首张表的 rows 镜像到顶层」）⇒ 朴素递归会把
+    生成链与 ``note_writer.sync_first_table_mirror`` 都把首张表的 rows 镜像到顶层）⇒ 朴素递归会把
     这批 manual 单元格**计两次**，让上报数虚增一倍。故仅当两者**实测相等**时才跳过
     顶层 ``rows``（数据驱动，不假设镜像一定成立；万一不相等则两处都算，宁多算不漏）。
 
