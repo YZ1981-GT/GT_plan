@@ -255,8 +255,19 @@ describe('结果列下钻 useAcnrDrill — resolveIndex 拿 jump_route 跳转 (R
 // ════════════════════════════════════════════════════════════════════════════
 // R11.6 — 高级构建器入口禁用态
 // ════════════════════════════════════════════════════════════════════════════
+// advanced-query-linkage-closure 任务 30（AQ-21，ADR-AQL-08）：入口判据改由后端 GET /api/query/access 给出，前端不再
+// 按系统角色判定——下面两例改为驱动该接口，并故意让前端角色与接口结论相反，证明角色不再参与判定。
+const BUILDER_FORBIDDEN = '高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用'
+
 describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
-  async function mountTab() {
+  async function mountTab(access?: unknown) {
+    if (access !== undefined) {
+      const { resetQueryBuilderAccessCache } = await import('@/composables/useQueryBuilderAccess')
+      const { useAuthStore } = await import('@/stores/auth')
+      resetQueryBuilderAccessCache()
+      useAuthStore().token = 'tok'
+      apiMocks.get.mockImplementation((url: string) => Promise.resolve(String(url) === '/api/query/access' ? access : []))
+    }
     const CustomQueryTab = (await import('@/components/template-library/CustomQueryTab.vue')).default
     const wrapper = shallowMount(CustomQueryTab, {
       global: {
@@ -270,21 +281,25 @@ describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
     return wrapper
   }
 
-  it('非 admin/manager/partner 角色 → canUseBuilder=false，onOpenBuilder 不打开构建器', async () => {
-    roleHolder.value = 'auditor'
-    const wrapper = await mountTab()
+  it('接口判无权 → canUseBuilder=false，onOpenBuilder 不打开构建器，原因取接口文案（含合伙人）', async () => {
+    roleHolder.value = 'admin' // 前端角色是 admin 也不放行：判据只在接口
+    const wrapper = await mountTab({ allowed: false, basis: null, reason: BUILDER_FORBIDDEN, all_projects: false, accessible_project_count: 0 })
     expect(wrapper.vm.canUseBuilder).toBe(false)
     // 双保险：即便被绕过点击也不打开
     wrapper.vm.onOpenBuilder()
     expect(wrapper.vm.builderDialogVisible).toBe(false)
     // 有原因提示文案
     expect(wrapper.vm.builderDisabledReason).toContain('管理员')
+    expect(wrapper.vm.builderDisabledReason).toContain('合伙人')
   })
 
-  it('admin/manager/partner 角色 → canUseBuilder=true 且可打开构建器', async () => {
-    for (const role of ['admin', 'manager', 'partner']) {
-      roleHolder.value = role
-      const wrapper = await mountTab()
+  it('接口判可用（系统角色，或系统角色为 auditor 的项目经理）→ canUseBuilder=true 且可打开构建器', async () => {
+    roleHolder.value = 'auditor' // 改造前前端按角色挡住的现场项目经理（AQ-21）
+    for (const access of [
+      { allowed: true, basis: 'system_role', reason: null, all_projects: true, accessible_project_count: null },
+      { allowed: true, basis: 'project_manager', reason: null, all_projects: false, accessible_project_count: 1 },
+    ]) {
+      const wrapper = await mountTab(access)
       expect(wrapper.vm.canUseBuilder).toBe(true)
       wrapper.vm.onOpenBuilder()
       expect(wrapper.vm.builderDialogVisible).toBe(true)

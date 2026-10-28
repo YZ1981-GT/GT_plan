@@ -52,9 +52,12 @@ vi.mock('element-plus', async () => {
 vi.mock('vue-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => ({ params: {}, query: {}, path: '/advanced-query' }),
+  useRouter: () => ({ resolve: () => ({ href: '/' }) }),
 }))
 
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
+import { resetQueryBuilderAccessCache } from '@/composables/useQueryBuilderAccess'
+import { useAuthStore } from '@/stores/auth'
 
 const FIXTURE_SCHEMA = {
   tables: [
@@ -84,12 +87,17 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPost.mockReset()
   mockHttpPost.mockReset()
+  sessionStorage.clear()
+  resetQueryBuilderAccessCache()
 })
 
 
 describe('AdvancedQueryBuilder — schema 加载', () => {
-  it('mount 时调用 /api/query/schema 并渲染表选项', async () => {
-    mockGet.mockResolvedValue(FIXTURE_SCHEMA)
+  it('mount 时调用 /api/query/schema 并渲染表选项；副标题不写死角色，随 access 接口（advanced-query-linkage-closure 任务 30）', async () => {
+    useAuthStore().token = 'tok'
+    mockGet.mockImplementation((url: string) => Promise.resolve(url === '/api/query/access'
+      ? { allowed: false, basis: null, reason: '高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用', all_projects: false, accessible_project_count: 0 }
+      : FIXTURE_SCHEMA))
     const wrapper = mount(AdvancedQueryBuilder, {
       global: {
         stubs: {
@@ -112,7 +120,9 @@ describe('AdvancedQueryBuilder — schema 加载', () => {
     await flushPromises()
     expect(mockGet).toHaveBeenCalledWith('/api/query/schema')
     expect(wrapper.text()).toContain('高级查询构建器')
-    expect(wrapper.text()).toContain('admin / manager')
+    // 改造前副标题写死「仅 admin / manager / partner 可访问」（漏了项目经理）：现在显示接口给的原因
+    expect(wrapper.text()).not.toContain('admin / manager')
+    expect(wrapper.find('[data-testid="aqb-subtitle"]').text()).toContain('含任一项目的项目经理')
   })
 })
 

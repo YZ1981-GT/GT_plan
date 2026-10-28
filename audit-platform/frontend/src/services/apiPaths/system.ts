@@ -644,6 +644,15 @@ export const customQuery = {
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
 } as const
 
+// ─── 高级查询构建器（advanced-query-linkage-closure 任务 30） ───────────────────────
+// preview / execute / export-excel 三个请求仍以字符串字面量写在构建器里：acnr-foundation-defect-closure T16 的
+// 请求体契约（components/custom-query/__tests__/queryPayloads.contract.spec.ts）按字面量识别构建器调用点。
+export const queryBuilder = {
+  /** 当前用户能否使用构建器、作用域内项目数与不可用原因（前端入口与后端门禁同一判定，R3.6） */
+  access: '/api/query/access',
+  schema: '/api/query/schema',
+} as const
+
 // ─── 系统枚举字典 ───────────────────────────────────────────────────────────
 
 export const systemDicts = {

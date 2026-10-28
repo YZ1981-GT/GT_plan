@@ -1,33 +1,60 @@
 <!--
   AdvancedQueryBuilder.vue — S-3 高级查询构建器
 
-  spec proposal-remaining-18 task 5.1
+  spec proposal-remaining-18 task 5.1；advanced-query-linkage-closure 任务 30（AQ-18 / 20 / 21 / 28 / 29 前端）
 
-  路由：/advanced-query
-  权限：仅 admin / manager / partner（与后端 RBAC 一致）
+  嵌在高级查询弹窗与页面版（/custom-query）的对话框里使用。
+  准入：与后端同一判定（GET /api/query/access，useQueryBuilderAccess）——系统管理员 / 合伙人 / 经理，或任一项目的
+  项目经理 / 合伙人（edit 级）；不可用时显示接口给的原因并禁用操作（后端门禁仍是安全边界）。
 
   能力：
+  - 查询范围：在项目里打开（父组件传入或路由带项目）时默认限定当前项目与审计年度，可切到「跨项目」
   - 表选择：从后端 /api/query/schema 加载白名单
   - 字段勾选：复选框选取要返回的列
   - 过滤条件：多行 field/op/value 构造，AND/OR 逻辑
-  - 排序、分组、聚合、limit
+  - 排序、分组、聚合、每页行数与翻页（total 为全量行数）
   - SQL 预览：调用 /api/query/preview 渲染只读 SQL
-  - 执行查询：调用 /api/query/execute 显示结果表格
-  - 导出 Excel：调用 /api/query/export-excel 下载 xlsx
+  - 执行查询：调用 /api/query/execute 显示结果表格；单项目结果可逐行「打开」（下钻）与「复制引用」（经地址库校验）
+  - 导出 Excel：调用 /api/query/export-excel 导出全部结果（表头为界面所见中文列名）
 -->
 <template>
   <div class="gt-aqb gt-fade-in" :class="{ 'gt-aqb--embedded': embedded }">
     <div v-if="!embedded" class="gt-aqb-header">
       <h2 class="gt-aqb-title">高级查询构建器</h2>
-      <span class="gt-aqb-subtitle">
-        可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager / partner 可访问
+      <span class="gt-aqb-subtitle" data-testid="aqb-subtitle">
+        可视化条件 · SQL 预览 · 结果导出<template v-if="accessSummary"> · {{ accessSummary }}</template>
       </span>
     </div>
+
+    <el-alert
+      v-if="accessBlocked && !accessLoading"
+      :title="builderDisabledReason"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gt-aqb-access-alert"
+      data-testid="aqb-access-blocked"
+    />
 
     <div class="gt-aqb-body">
       <!-- 左：构造器 -->
       <div class="gt-aqb-builder">
         <el-form :model="dsl" label-position="top" size="small">
+          <!-- 查询范围：在项目里打开时默认当前项目与审计年度（R3.5） -->
+          <el-form-item v-if="contextProjectId" label="查询范围">
+            <div class="gt-aqb-scope-row">
+              <span data-testid="aqb-scope-current">{{ scopedToProject ? currentScopeText : '跨项目：可访问的全部项目' }}</span>
+              <el-switch
+                v-if="canCrossProject"
+                v-model="crossProject"
+                size="small"
+                active-text="跨项目"
+                aria-label="切换跨项目查询"
+                data-testid="aqb-cross-project"
+              />
+            </div>
+          </el-form-item>
+
           <!-- 表选择 -->
           <el-form-item label="数据表">
             <el-select
@@ -70,7 +97,7 @@
           <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；跨模块 cell 级字段） -->
           <el-form-item label="ACNR 选字段（跨模块单元格）">
             <CustomQueryFieldPicker v-model="acnrFieldIds" />
-            <div v-if="!routeProjectId" class="gt-aqb-field-hint" data-testid="acnr-no-project">{{ BUILDER_NO_PROJECT_HINT }}</div>
+            <div v-if="!contextProjectId" class="gt-aqb-field-hint" data-testid="acnr-no-project">{{ BUILDER_NO_PROJECT_HINT }}</div>
           </el-form-item>
 
           <!-- 过滤条件 -->
@@ -90,7 +117,7 @@
                 :key="idx"
                 class="gt-aqb-filter-row"
               >
-                <el-select v-model="f.field" placeholder="字段" size="small" filterable style="width: 200px">
+                <el-select v-model="f.field" placeholder="字段" size="small" filterable class="gt-aqb-filter-field">
                   <el-option
                     v-for="fld in currentTable.fields"
                     :key="fld"
@@ -98,7 +125,7 @@
                     :value="fld"
                   />
                 </el-select>
-                <el-select v-model="f.op" placeholder="操作符" size="small" style="width: 130px">
+                <el-select v-model="f.op" placeholder="操作符" size="small" class="gt-aqb-filter-op">
                   <el-option
                     v-for="op in schema?.operators || []"
                     :key="op"
@@ -106,12 +133,14 @@
                     :value="op"
                   />
                 </el-select>
+                <!-- 值框最小 120px、行可换行：嵌在弹窗窄栏里时字段与操作符下拉曾把它挤成 0 宽（B3 浏览器复测） -->
                 <el-input
                   v-if="needsValue(f.op)"
                   v-model="f.value"
                   :placeholder="valuePlaceholder(f.op)"
                   size="small"
-                  style="flex: 1"
+                  class="gt-aqb-filter-value"
+                  aria-label="条件值"
                 />
                 <span v-else class="gt-aqb-filter-noval">无需值</span>
                 <el-button link type="danger" @click="removeFilter(idx)" size="small">
@@ -207,11 +236,11 @@
                 <el-select v-model="a.func" size="small" style="width: 110px">
                   <el-option v-for="fn in (schema?.aggregates || [])" :key="fn" :label="fn.toUpperCase()" :value="fn" />
                 </el-select>
-                <el-select v-model="a.field" size="small" filterable style="width: 200px">
+                <el-select v-model="a.field" size="small" filterable class="gt-aqb-filter-field">
                   <el-option label="*（行数）" value="*" />
                   <el-option v-for="fld in currentTable.fields" :key="fld" :label="fld" :value="fld" />
                 </el-select>
-                <el-input v-model="a.alias" size="small" placeholder="别名" style="flex: 1" />
+                <el-input v-model="a.alias" size="small" placeholder="别名" class="gt-aqb-filter-value" aria-label="聚合别名" />
                 <el-button link type="danger" @click="removeAggregate(idx)" size="small">
                   删除
                 </el-button>
@@ -226,22 +255,27 @@
             </el-select>
           </el-form-item>
 
-          <!-- 高级：limit -->
-          <el-form-item label="结果限制">
-            <el-input-number v-model="dsl.limit" :min="1" :max="1000" size="small" />
+          <!-- 每页行数（翻页查看其余结果；导出不受此限） -->
+          <el-form-item label="每页行数">
+            <el-input-number v-model="dsl.limit" :min="1" :max="1000" size="small" aria-label="每页行数" />
             <span style="margin-left:8px;color:#888;font-size:12px">
-              （上限 1000，避免拉爆数据库）
+              （1~1000；翻页查看其余结果，「导出 Excel」导出全部结果）
             </span>
           </el-form-item>
 
           <el-form-item>
-            <el-button type="primary" @click="doPreview" :loading="loadingPreview">
+            <el-button type="primary" @click="doPreview" :loading="loadingPreview" :disabled="accessBlocked">
               生成 SQL 预览
             </el-button>
-            <el-button type="success" @click="doExecute" :loading="loadingExecute">
+            <el-button type="success" @click="doExecute" :loading="loadingExecute" :disabled="accessBlocked">
               执行查询
             </el-button>
-            <el-button @click="doExport" :loading="loadingExport" :disabled="!result">
+            <el-button
+              @click="doExport"
+              :loading="loadingExport"
+              :disabled="!result || accessBlocked"
+              aria-label="导出全部结果为 Excel"
+            >
               导出 Excel
             </el-button>
           </el-form-item>
@@ -261,11 +295,7 @@
         <div class="gt-aqb-section">
           <div class="gt-aqb-section-title">
             查询结果 <span v-if="result" class="gt-aqb-result-count">共 {{ result.total }} 行</span>
-            <span v-if="result?.scope" class="gt-aqb-scope-tag">
-              {{ result.scope.all_projects
-                ? '范围：全部项目'
-                : `范围：${result.scope.project_count} 个项目` }}
-            </span>
+            <span v-if="resultScopeText" class="gt-aqb-scope-tag" data-testid="aqb-result-scope">{{ resultScopeText }}</span>
             <el-checkbox
               v-if="result && result.rows.length"
               v-model="showTechnicalColumns"
@@ -273,6 +303,21 @@
               class="gt-aqb-tech-toggle"
             >显示技术字段<template v-if="hiddenTechnicalCount > 0">（已隐藏 {{ hiddenTechnicalCount }} 列）</template></el-checkbox>
           </div>
+          <!-- 查询失败：持久显示中文原因与追踪号（R11.1；不落到「查询返回 0 行」） -->
+          <el-alert
+            v-if="queryError"
+            type="error"
+            :closable="false"
+            show-icon
+            class="gt-aqb-warning"
+            data-testid="aqb-query-error"
+          >
+            <template #title>{{ queryError.message }}</template>
+            <div v-if="queryError.correlationId" class="gt-aqb-error-trace">
+              追踪号：{{ queryError.correlationId }}
+              <el-button link type="primary" size="small" aria-label="复制追踪号" @click="copyCorrelationId">复制追踪号</el-button>
+            </div>
+          </el-alert>
           <el-alert
             v-for="w in result?.warnings || []"
             :key="w"
@@ -282,7 +327,7 @@
             show-icon
             class="gt-aqb-warning"
           />
-          <AcnrTargetResults :block="result?.acnr_results" :project-id="routeProjectId" />
+          <AcnrTargetResults :block="result?.acnr_results" :project-id="contextProjectId" />
           <el-table
             v-if="result && result.rows.length"
             :data="result.rows"
@@ -291,6 +336,34 @@
             size="small"
             max-height="500"
           >
+            <!-- 单项目结果：逐行下钻到权威页面与复制经地址库校验的引用（R7.1~R7.3；跨项目结果不下钻） -->
+            <el-table-column v-if="rowActionsEnabled" label="操作" width="150" fixed="left">
+              <template #default="{ row, $index }">
+                <el-button
+                  v-if="drillOf(row)"
+                  link
+                  type="primary"
+                  size="small"
+                  :title="drillOf(row)?.label"
+                  :aria-label="drillOf(row)?.label"
+                  data-testid="aqb-row-open"
+                  @click="onOpenRow(row)"
+                >打开</el-button>
+                <el-tooltip v-if="refOf($index)" :content="refHint($index)" placement="top">
+                  <span class="gt-aqb-ref-wrap">
+                    <el-button
+                      link
+                      type="primary"
+                      size="small"
+                      :disabled="!refUsable($index)"
+                      :aria-label="`复制引用 ${refOf($index)}`"
+                      data-testid="aqb-row-copy-ref"
+                      @click="copyFormulaRef($index)"
+                    >复制引用</el-button>
+                  </span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
             <el-table-column
               v-for="col in resultColumns"
               :key="col.key"
@@ -308,7 +381,7 @@
                   <span>{{ row[col.key] }}</span>
                   <GtIndexChip
                     :value="addrIdToIndexRef(cellAddrId(row, col)) || ''"
-                    :context-project-id="(route.params.projectId as string) || ''"
+                    :context-project-id="contextProjectId"
                     :validate="false"
                     prevent-navigate
                     context="下钻到数据来源底稿格"
@@ -320,28 +393,21 @@
                 <span v-else>{{ row[col.key] }}</span>
               </template>
             </el-table-column>
-            <!-- P2-6: 公式引用列——当 formula_refs 有非 null 值时显示，支持一键复制到公式编辑器 -->
-            <el-table-column
-              v-if="hasFormulaRefs"
-              label="公式引用"
-              width="200"
-              fixed="right"
-            >
-              <template #default="{ $index }">
-                <span
-                  v-if="result!.formula_refs?.[$index]"
-                  class="gt-aqb-formula-ref"
-                  @click="copyFormulaRef($index)"
-                  title="点击复制公式引用"
-                >
-                  {{ result!.formula_refs![$index] }}
-                  <el-icon style="margin-left:4px;vertical-align:middle"><DocumentCopy /></el-icon>
-                </span>
-              </template>
-            </el-table-column>
           </el-table>
           <div v-else-if="result" class="gt-aqb-empty">查询返回 0 行</div>
-          <div v-else class="gt-aqb-empty">尚未执行查询</div>
+          <div v-else-if="!queryError" class="gt-aqb-empty">尚未执行查询</div>
+          <!-- 翻页（offset）：total 是全量行数（分组时为组数），R2.6 -->
+          <nav v-if="result && (result.total > dsl.limit || page > 1)" class="gt-aqb-pager" aria-label="查询结果翻页">
+            <el-pagination
+              v-model:current-page="page"
+              :page-size="dsl.limit"
+              :total="result.total"
+              layout="total, prev, pager, next, jumper"
+              size="small"
+              background
+              @current-change="onPageChange"
+            />
+          </nav>
         </div>
       </div>
     </div>
@@ -350,14 +416,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { DocumentCopy } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
+import { queryBuilder as P_qb } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
 import { sanitizeExportName } from '@/components/query/queryExport'
+import { describeQueryError, queryErrorToast, type QueryErrorText } from '@/components/query/queryErrorText'
+import { buildRowDrill, openRowDrill, validatePageRefs, type RefCheck, type RowDrill } from '@/components/query/queryResultLinks'
 import {
   defaultFieldsOf,
   filterVisibleColumns,
@@ -365,12 +433,24 @@ import {
 } from '@/components/query/queryFieldTiers'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
-import { BUILDER_NO_PROJECT_HINT, buildBuilderPayload, notifyQueryError, readBlobErrorBody } from '@/components/custom-query/queryPayloads'
+import {
+  BUILDER_NO_PROJECT_HINT, buildBuilderPayload, isKnownYear, readBlobErrorBody,
+} from '@/components/custom-query/queryPayloads'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useProjectStore } from '@/stores/project'
+import { useAuthStore } from '@/stores/auth'
+import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import { useAcnrDrill, normalizeColumns, cellAddrId, addrIdToIndexRef, type QueryColumnMeta } from '@/composables/useAcnrDrill'
 
-withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+/**
+ * projectId / year：宿主（高级查询弹窗、页面版）当前的项目与审计年度。没传时取路由项目，年度依次取路由 `?year`、
+ * 该项目的审计年度（项目 store），都取不到为空（不按日历年兜底）。
+ */
+const props = withDefaults(defineProps<{
+  embedded?: boolean
+  projectId?: string | null
+  year?: number | null
+}>(), { embedded: false, projectId: null, year: null })
 
 interface TableMetaTiers {
   default_fields?: string[]
@@ -414,8 +494,8 @@ interface QueryResult {
   table: string
   sql: string
   formula_refs?: (string | null)[]
-  /** 本次生效的项目作用域（R2.2：跨项目查询要让用户知道自己在跨项目） */
-  scope?: { all_projects: boolean; project_count: number | null; unscoped_tables: string[] }
+  /** 本次生效的项目作用域（R2.2：跨项目查询要让用户知道自己在跨项目；requested_project_id = 限定了单个项目） */
+  scope?: { all_projects: boolean; project_count: number | null; unscoped_tables: string[]; requested_project_id?: string | null }
   /** 非致命提示（全局配置表未按项目过滤、无项目分派等） */
   warnings?: string[]
   /** 单元格取值结果（只在请求带 acnr_targets 时出现） */
@@ -425,18 +505,54 @@ interface QueryResult {
 const schema = ref<Schema | null>(null)
 // ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作跨模块查询字段标识）
 const acnrFieldIds = ref<string[]>([])
-// schema 缓存（sessionStorage）
+// schema 缓存（sessionStorage，按登录用户分开：字段按角色隐去 PII，换人登录不沿用上一个人的字段表）
 // schema 版本号随「下发列分层」升位：旧缓存不含 default_fields/technical_fields，
 // 沿用会让字段下拉退化为不分组、结果表也无从隐藏技术列。
 const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v2'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
+/** 最近一次查询失败（结果区持久显示） */
+const queryError = ref<QueryErrorText | null>(null)
 
-// 结果列下钻（R4.2/R4.4/R4.6/R4.7）：project 上下文取自路由（构建器可在项目内嵌入使用）
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
+
+// ─── 项目上下文与查询范围（R3.5，AQ-18） ──────────────────────────────────────────
 const routeProjectId = computed(() => (route.params.projectId as string) || '')
-const { drill } = useAcnrDrill(() => routeProjectId.value)
+/** 宿主传入的项目优先，其次路由项目（构建器嵌在项目页的弹窗里） */
+const contextProjectId = computed(() => props.projectId || routeProjectId.value)
+const contextYear = computed<number | null>(() => {
+  if (isKnownYear(props.year)) return props.year
+  const routeYear = Number(route.query?.year)
+  if (isKnownYear(routeYear)) return routeYear
+  const pid = contextProjectId.value
+  return pid && projectStore.projectId === pid && isKnownYear(projectStore.auditYear) ? projectStore.auditYear : null
+})
+const {
+  canUseBuilder, builderDisabledReason, allProjects, accessibleProjectCount, loading: accessLoading,
+} = useQueryBuilderAccess()
+/** 不可用（无权 / 作用域为空 / 尚未确认）时禁用操作；原因见顶部提示 */
+const accessBlocked = computed(() => !canUseBuilder.value)
+const accessSummary = computed(() => {
+  if (canUseBuilder.value) return allProjects.value ? '可查询全部项目' : `可查询 ${accessibleProjectCount.value ?? 0} 个项目`
+  return accessLoading.value ? '' : builderDisabledReason.value
+})
+/** 显式切到跨项目查询（只有可访问项目多于 1 个，或 admin / partner 时才出现） */
+const crossProject = ref(false)
+const canCrossProject = computed(() =>
+  !!contextProjectId.value && (allProjects.value || (accessibleProjectCount.value ?? 0) > 1),
+)
+const scopedToProject = computed(() => !!contextProjectId.value && !(crossProject.value && canCrossProject.value))
+const currentScopeText = computed(() =>
+  `当前项目${contextYear.value ? `（${contextYear.value} 年度）` : '（审计年度未确定，不按年度筛选）'}`,
+)
+/** 本次结果的查询上下文（翻页、下钻与引用校验都按执行时的项目与年度，不随表单后来的改动漂移） */
+const lastQuery = reactive<{ projectId: string | null; year: number | null }>({ projectId: null, year: null })
+
+// 结果列下钻（R4.2/R4.4/R4.6/R4.7）：project 上下文与请求同一个
+const { drill } = useAcnrDrill(() => contextProjectId.value)
 // 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
 // ─── 列分层（R7.2 / R11.3）：真源在后端 table_whitelist，前端只分组不硬编码列名 ───
 const fieldGroups = computed(() => groupFieldsByTier(currentTable.value))
@@ -456,9 +572,18 @@ const resultColumns = computed<QueryColumnMeta[]>(() =>
   filterVisibleColumns(allResultColumns.value, currentTable.value, showTechnicalColumns.value),
 )
 
+const resultScopeText = computed(() => {
+  const s = result.value?.scope
+  if (!s) return ''
+  if (s.requested_project_id) return `范围：当前项目${lastQuery.year ? `（${lastQuery.year} 年度）` : ''}`
+  return s.all_projects ? '范围：全部项目' : `范围：${s.project_count} 个项目`
+})
+
 const loadingPreview = ref(false)
 const loadingExecute = ref(false)
 const loadingExport = ref(false)
+/** 当前页（offset = (page - 1) × 每页行数） */
+const page = ref(1)
 
 const dsl = reactive<{
   table: string
@@ -497,17 +622,18 @@ function joinOnSummary(j: JoinRow): string {
 }
 
 onMounted(async () => {
+  const cacheKey = `${SCHEMA_CACHE_KEY}:${authStore.user?.id || 'anon'}`
   // 先尝试 schema 缓存（登录会话内只拉一次）
   try {
-    const cached = sessionStorage.getItem(SCHEMA_CACHE_KEY)
+    const cached = sessionStorage.getItem(cacheKey)
     if (cached) {
       schema.value = JSON.parse(cached)
       return
     }
   } catch { /* ignore */ }
   try {
-    schema.value = await api.get<Schema>('/api/query/schema')
-    try { sessionStorage.setItem(SCHEMA_CACHE_KEY, JSON.stringify(schema.value)) } catch { /* ignore */ }
+    schema.value = await api.get<Schema>(P_qb.schema)
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(schema.value)) } catch { /* ignore */ }
   } catch (e: any) {
     handleApiError(e, '加载查询元信息')
   }
@@ -523,6 +649,8 @@ function onTableChange() {
   dsl.group_by = []
   sqlPreview.value = ''
   result.value = null
+  queryError.value = null
+  page.value = 1
 }
 
 function addJoin() {
@@ -598,10 +726,33 @@ function opLabel(op: string): string {
   } as Record<string, string>)[op] || op
 }
 
-/** 请求体：单元格取值目标随路由项目与项目审计年度发送（年度未知不发，由后端补齐），T16。 */
+/**
+ * 请求体（唯一构造处 queryPayloads.buildBuilderPayload）：在项目里默认限定当前项目与审计年度，「跨项目」时只有单元格
+ * 取值目标才带项目（T16 规则）；offset 翻页。
+ */
 function buildPayload() {
-  const pid = routeProjectId.value
-  return buildBuilderPayload(dsl, acnrFieldIds.value, { projectId: pid, year: projectStore.projectId === pid ? projectStore.auditYear : null })
+  return buildBuilderPayload(dsl, acnrFieldIds.value, {
+    projectId: contextProjectId.value, year: contextYear.value, scopeToProject: scopedToProject.value,
+    offset: (page.value - 1) * dsl.limit,
+  })
+}
+
+/** 导出请求体：同一查询（不分页）+ 界面所见的中文表头（R8.1） */
+function buildExportPayload() {
+  return buildBuilderPayload(dsl, acnrFieldIds.value, {
+    projectId: contextProjectId.value, year: contextYear.value, scopeToProject: scopedToProject.value,
+    headers: exportHeaders(),
+  })
+}
+
+/** 列名 → 界面所见中文表头（已有结果时按结果列；未执行时按所选字段），后端 ExportDSL.headers 最多 200 项 */
+function exportHeaders(): Record<string, string> {
+  const pairs: [string, string][] = result.value
+    ? allResultColumns.value.map((c) => [c.key, c.title])
+    : dsl.fields.map((f) => [f, resolveColumnLabel(f)])
+  const out: Record<string, string> = {}
+  for (const [key, title] of pairs.slice(0, 200)) if (key && title) out[key] = title
+  return out
 }
 
 async function doPreview() {
@@ -618,24 +769,44 @@ async function doPreview() {
     )
     sqlPreview.value = resp.sql
   } catch (e: any) {
-    notifyQueryError(e, '生成 SQL 预览')
+    ElMessage.warning(queryErrorToast('生成 SQL 预览', describeQueryError(e)))
   } finally {
     loadingPreview.value = false
   }
 }
 
+/** 执行查询：从第 1 页开始 */
 async function doExecute() {
+  page.value = 1
+  await runQuery()
+}
+
+/** 翻页：同一查询换 offset */
+function onPageChange(p: number) {
+  page.value = p
+  void runQuery()
+}
+
+async function runQuery() {
   if (!dsl.table) {
     ElMessage.warning('请先选择数据表')
     return
   }
   loadingExecute.value = true
+  queryError.value = null
+  // 记下本次发送的项目与年度（纯函数，与下面请求体同一份输入；请求体须直接是构造函数调用，见 queryPayloads 契约）
+  const sent = buildPayload()
   try {
+    // 调用方自管错误提示（_silent）：失败时结果区显示后端原因与追踪号，确定性错误不自动重试（R11.1）
     const resp = await api.post<QueryResult>('/api/query/execute', buildPayload(), { _silent: true } as any)
+    lastQuery.projectId = typeof sent.project_id === 'string' ? sent.project_id : null
+    lastQuery.year = isKnownYear(sent.year) ? sent.year : null
     result.value = resp
     sqlPreview.value = resp.sql
+    void validateRefs()
   } catch (e: any) {
-    notifyQueryError(e, '查询执行')
+    result.value = null
+    queryError.value = describeQueryError(e)
   } finally {
     loadingExecute.value = false
   }
@@ -643,7 +814,7 @@ async function doExecute() {
 
 async function doExport() {
   if (!dsl.table) return
-  // 大量数据导出前提示（result.total > 1000 或 limit > 500）
+  // 大量数据导出前提示（导出全部：按全量行数提示）
   const expectedRows = result.value?.total ?? dsl.limit
   if (expectedRows > 500) {
     try {
@@ -657,7 +828,7 @@ async function doExport() {
   loadingExport.value = true
   try {
     // 调用方自管错误提示（_silent）：被拒时错误体是 Blob，读成 JSON 后逐项显示原因（T16 / RV7.5-03）
-    const response = await http.post('/api/query/export-excel', buildPayload(), { responseType: 'blob', _silent: true } as any)
+    const response = await http.post('/api/query/export-excel', buildExportPayload(), { responseType: 'blob', _silent: true } as any)
     const blob = new Blob([response.data])
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
@@ -668,23 +839,86 @@ async function doExport() {
     URL.revokeObjectURL(link.href)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    notifyQueryError(await readBlobErrorBody(e), '导出 Excel')
+    ElMessage.warning(queryErrorToast('导出 Excel', describeQueryError(await readBlobErrorBody(e))))
   } finally {
     loadingExport.value = false
   }
 }
 
-// ─── P2-6: 公式引用支持（查询结果 → 结构化引用桥接） ─────────────────────────
+function copyCorrelationId() {
+  const id = queryError.value?.correlationId
+  if (!id) return
+  navigator.clipboard.writeText(id).then(
+    () => { ElMessage.success('已复制追踪号') },
+    () => { ElMessage.warning('复制失败，请手动复制') },
+  )
+}
 
-/** 当前结果中是否有可用的 formula_refs（至少一个非 null） */
-const hasFormulaRefs = computed(() => {
-  return result.value?.formula_refs?.some(r => r != null) ?? false
-})
+// ─── 行操作：下钻与复制引用（单项目结果；ADR-AQL-01 / 18） ─────────────────────────────
 
-/** 一键复制公式引用到剪贴板 */
+/** 本次结果限定在单个项目：才可下钻与复制引用（跨项目结果不下钻） */
+const rowActionsEnabled = computed(() => !!lastQuery.projectId && !!result.value?.scope?.requested_project_id)
+
+function drillOf(row: Record<string, unknown>): RowDrill | null {
+  if (!result.value) return null
+  return buildRowDrill({ kind: 'table', key: result.value.table, projectId: lastQuery.projectId, year: lastQuery.year }, row)
+}
+
+async function onOpenRow(row: Record<string, unknown>) {
+  const target = drillOf(row)
+  if (!target || !router) return
+  const reason = await openRowDrill(target, router)
+  if (reason) ElMessage.warning(reason)
+}
+
+/** 引用由后端按行给出（试算表行 TB(标准码,'审定数')），复制前按本页批量经地址库校验（R7.3） */
+const refChecks = ref<Map<string, RefCheck>>(new Map())
+const refsPending = ref(false)
+let refRound = 0
+
+function refOf(index: number): string | null {
+  return result.value?.formula_refs?.[index] ?? null
+}
+
+async function validateRefs() {
+  const round = ++refRound
+  refChecks.value = new Map()
+  const refs = rowActionsEnabled.value ? (result.value?.formula_refs ?? []) : []
+  if (!refs.some(Boolean)) {
+    refsPending.value = false
+    return
+  }
+  refsPending.value = true
+  const pid = lastQuery.projectId
+  const checks = await validatePageRefs(refs, {
+    projectId: pid, year: lastQuery.year, templateType: projectStore.projectId === pid ? projectStore.standard : null,
+  })
+  if (round !== refRound) return
+  refChecks.value = checks
+  refsPending.value = false
+}
+
+function refUsable(index: number): boolean {
+  const ref = refOf(index)
+  return !!ref && !refsPending.value && !!refChecks.value.get(ref)?.ok
+}
+
+function refHint(index: number): string {
+  const ref = refOf(index)
+  if (!ref) return ''
+  const check = refsPending.value ? undefined : refChecks.value.get(ref)
+  if (!check) return '正在校验引用…'
+  return check.ok ? `复制 ${ref}` : (check.reason || '该引用不可用')
+}
+
+/** 复制公式引用：只复制经地址库校验通过的引用 */
 function copyFormulaRef(index: number) {
-  const ref = result.value?.formula_refs?.[index]
+  const ref = refOf(index)
   if (!ref) return
+  if (!refUsable(index)) {
+    ElMessage.warning(refHint(index))
+    return
+  }
   navigator.clipboard.writeText(ref).then(() => {
     ElMessage.success(`已复制: ${ref}`)
   }).catch(() => {
@@ -723,6 +957,9 @@ function copyFormulaRef(index: number) {
 .gt-aqb-subtitle {
   font-size: 12px;
   color: #888;
+}
+.gt-aqb-access-alert {
+  margin-bottom: 12px;
 }
 .gt-aqb-body {
   flex: 1;
@@ -792,8 +1029,20 @@ function copyFormulaRef(index: number) {
 }
 .gt-aqb-filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+.gt-aqb-filter-field {
+  width: 180px;
+}
+.gt-aqb-filter-op {
+  width: 130px;
+}
+/* 条件值与聚合别名：至少 120px，空间不够时整行换行而不是被挤成 0 宽（R6.4 同口径） */
+.gt-aqb-filter-value {
+  flex: 1 1 120px;
+  min-width: 120px;
 }
 .gt-aqb-filter-noval {
   color: #888;
@@ -814,6 +1063,14 @@ function copyFormulaRef(index: number) {
   color: #909399;
 }
 
+.gt-aqb-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #606266;
+}
+
 .gt-aqb-scope-tag {
   margin-left: 8px;
   font-size: 12px;
@@ -828,25 +1085,25 @@ function copyFormulaRef(index: number) {
   margin-bottom: 8px;
 }
 
+.gt-aqb-error-trace {
+  font-size: 12px;
+  color: #909399;
+}
+
 .gt-aqb-result-count {
   font-size: 12px;
   color: #666;
   font-weight: normal;
   margin-left: 8px;
 }
-.gt-aqb-formula-ref {
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 11px;
-  color: var(--gt-color-primary, #5b3aa8);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #f3eef8;
-  white-space: nowrap;
-  transition: background 0.15s;
+.gt-aqb-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
-.gt-aqb-formula-ref:hover {
-  background: #e8ddf4;
+.gt-aqb-ref-wrap {
+  display: inline-block;
+  margin-left: 6px;
 }
 .gt-aqb-drill-cell {
   display: inline-flex;

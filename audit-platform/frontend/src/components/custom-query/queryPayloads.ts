@@ -8,6 +8,10 @@
  * 提示先进入（选择）项目。构建器的 `project_id` / `year` 只随单元格取值目标一起发送（不带目标的常规查询保持原来的
  * 跨项目范围不变）；`year` 只在项目审计年度已知时发送，未知时由后端按项目补齐、仍未知返回 `YEAR_REQUIRED`，前端不用
  * 日历年兜底。两个函数都是纯函数；`queryErrorText` 把后端的拒绝形状转成中文提示，`notifyQueryError` 负责弹出。
+ *
+ * advanced-query-linkage-closure 任务 30 在构建器请求体上加了三个可选参数（不另造第二个构造函数）：`scopeToProject`
+ * 为真时不带目标也发 `project_id` / `year`（从项目页打开的构建器默认限定当前项目与审计年度，R3.5；「跨项目」时为假，
+ * 规则同上一段）；`offset` 翻页；`headers` 是「导出全部」的中文表头（R8.1）。不传这三个参数时输出与原先逐键相同。
  */
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -60,9 +64,19 @@ function builderFilterValue(op: string, raw: string | null): unknown {
   return raw
 }
 
-/** 构建器请求体（后端 `QueryDSL`）。 */
+/** 构建器请求的项目上下文与翻页 / 导出参数（advanced-query-linkage-closure 任务 30） */
+export interface BuilderPayloadContext extends QueryProjectContext {
+  /** 限定当前项目（与审计年度）查询：从项目页打开构建器的默认范围（R3.5）；「跨项目」时为 false */
+  scopeToProject?: boolean
+  /** 翻页起始行（后端 `QueryDSL.offset`）；0 或缺省不发 */
+  offset?: number
+  /** 「导出全部」的中文表头（后端 `ExportDSL.headers`，键为结果列名）；只在导出请求里传 */
+  headers?: Record<string, string>
+}
+
+/** 构建器请求体（后端 `QueryDSL` / 导出时 `ExportDSL`）。 */
 export function buildBuilderPayload(
-  dsl: BuilderDslState, acnrTargets: readonly string[], ctx: QueryProjectContext,
+  dsl: BuilderDslState, acnrTargets: readonly string[], ctx: BuilderPayloadContext,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     table: dsl.table,
@@ -77,11 +91,14 @@ export function buildBuilderPayload(
     group_by: dsl.group_by,
     limit: dsl.limit,
   }
-  if (ctx.projectId && acnrTargets.length) {
+  const withTargets = !!ctx.projectId && acnrTargets.length > 0
+  if (ctx.projectId && (ctx.scopeToProject || withTargets)) {
     payload.project_id = ctx.projectId
     if (isKnownYear(ctx.year)) payload.year = ctx.year
-    payload.acnr_targets = [...acnrTargets]
   }
+  if (withTargets) payload.acnr_targets = [...acnrTargets]
+  if (typeof ctx.offset === 'number' && Number.isInteger(ctx.offset) && ctx.offset > 0) payload.offset = ctx.offset
+  if (ctx.headers && Object.keys(ctx.headers).length) payload.headers = { ...ctx.headers }
   return payload
 }
 

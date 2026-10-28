@@ -10,6 +10,7 @@
   "include": [
     "src/components/custom-query/__tests__/advancedQueryFrontend-p7.spec.ts",
     "src/views/__tests__/AdvancedQueryBuilder.spec.ts",
+    "src/views/__tests__/AdvancedQueryBuilder.linkage.spec.ts",
     "src/components/query/queryColumnLabels.ts",
     "src/components/query/__tests__/queryColumnLabels.spec.ts",
     "src/components/query/querySourceUri.ts",
@@ -25,8 +26,11 @@
     "src/components/query/__tests__/queryTemplateCache.spec.ts",
     "src/components/query/queryIndicatorCache.ts",
     "src/components/query/__tests__/queryIndicatorCache.spec.ts",
+    "src/components/query/__tests__/builderPayloadScope.spec.ts",
     "src/composables/useLedgerUrlSync.ts",
     "src/composables/__tests__/useLedgerUrlSync.spec.ts",
+    "src/composables/useQueryBuilderAccess.ts",
+    "src/composables/__tests__/useQueryBuilderAccess.spec.ts",
     "src/env.d.ts"
   ]
 }

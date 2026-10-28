@@ -11,7 +11,9 @@ Feature: advanced-query-hardening-wiring-closure
 
 from __future__ import annotations
 
+import inspect
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -574,37 +576,101 @@ def test_p1_wp_id_by_code_requires_ownership(project_id, wp_code):
 # ════════════════════════════════════════════════════════════════════════════
 # Property 23 — 前后端构建器权限判据同源（跨语言真源锁死）
 # **Validates: Requirements 11.1**
+#
+# advanced-query-linkage-closure 任务 30（AQ-21，ADR-AQL-08）改写：原守卫锁的是「前端 QUERY_BUILDER_ROLES 与
+# 后端 _QUERY_BUILDER_ROLES 两份角色清单逐项相等」——两份清单同口径地漏掉了「系统角色为 auditor 的项目经理」，
+# 守卫恒绿而前端把有权的人挡在外面。现在真源只在后端（builder_access），前端经 GET /api/query/access 取结论、
+# 不再持有任何角色清单；本守卫锁死这条链路的两端。
 # ════════════════════════════════════════════════════════════════════════════
-def test_p23_frontend_builder_roles_match_backend_whitelist():
-    """前端 `QUERY_BUILDER_ROLES` 必须与后端 `_QUERY_BUILDER_ROLES` 完全一致。
+_FRONTEND_SRC = Path(__file__).resolve().parents[2] / "audit-platform" / "frontend" / "src"
 
-    前端不可能 import Python 常量，两侧必然各存一份 —— 所以需要守卫把它们锁死。
-    改造前前端用的是 `canDo('edit','project_settings')`（资源级矩阵判据），与后端的
-    角色白名单根本不是同一套语义，两侧会漂移成「按钮可点但必 403」。
+
+def _ts_tokens(source: str):
+    """极简 TS 词法（跳过注释）：产出 ``("str", 内容)`` / ``("id", 标识符)``。模板串整段按字符串，不展开 ``${}``。
+
+    用记号而不是在源码文本里找子串：注释与说明文字里出现角色名不算「持有角色清单」。
     """
-    import re
-    from pathlib import Path as _Path
+    i, n = 0, len(source)
+    while i < n:
+        c = source[i]
+        if source.startswith("//", i):
+            j = source.find("\n", i)
+            i = n if j < 0 else j
+        elif source.startswith("/*", i):
+            j = source.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif c in "'\"`":
+            j, buf = i + 1, []
+            while j < n and source[j] != c:
+                if source[j] == "\\" and j + 1 < n:
+                    buf.append(source[j + 1])
+                    j += 2
+                    continue
+                buf.append(source[j])
+                j += 1
+            yield ("str", "".join(buf))
+            i = j + 1
+        elif c.isalpha() or c in "_$":
+            j = i
+            while j < n and (source[j].isalnum() or source[j] in "_$"):
+                j += 1
+            yield ("id", source[i:j])
+            i = j
+        else:
+            i += 1
 
+
+def _called_names(fn) -> set[str]:
+    """函数体里被调用的名字（AST：``f()`` 取 ``f``，``x.f()`` 取 ``f``）。"""
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                names.add(node.func.id)
+            elif isinstance(node.func, ast.Attribute):
+                names.add(node.func.attr)
+    return names
+
+
+def test_p23_builder_gate_and_access_endpoint_share_one_admission():
+    """后端：构建器门禁与 access 接口调同一个准入函数，access 路由已注册（前端判据的唯一来源）。"""
+    from app.routers import query_builder as qb
+    from app.services.custom_query import builder_access as ba
+
+    assert "builder_admission" in _called_names(qb.require_query_builder_access)
+    assert "resolve_builder_access" in _called_names(qb.get_access)
+    assert "builder_admission" in _called_names(ba.resolve_builder_access)
+    routes = {(r.path, tuple(sorted(r.methods))) for r in qb.router.routes}
+    assert ("/api/query/access", ("GET",)) in routes
+
+
+def test_p23_frontend_builder_gate_reads_access_endpoint_not_role_list():
+    """前端：判据 composable 不持有任何系统角色字面量与角色清单，经 apiPaths 的 queryBuilder.access 取结论。"""
     from app.routers.query_builder import _QUERY_BUILDER_ROLES
 
-    ts = (
-        _Path(__file__).resolve().parents[2]
-        / "audit-platform"
-        / "frontend"
-        / "src"
-        / "composables"
-        / "useQueryBuilderAccess.ts"
-    )
+    ts = _FRONTEND_SRC / "composables" / "useQueryBuilderAccess.ts"
     assert ts.exists(), f"前端判据文件不存在：{ts}"
-    source = ts.read_text(encoding="utf-8")
-    m = re.search(r"QUERY_BUILDER_ROLES\s*=\s*\[([^\]]*)\]", source)
-    assert m, "未在前端文件中解析到 QUERY_BUILDER_ROLES"
-    frontend_roles = {
-        token.strip().strip("'\"") for token in m.group(1).split(",") if token.strip()
-    }
-    assert frontend_roles == set(_QUERY_BUILDER_ROLES), (
-        f"前端 {sorted(frontend_roles)} != 后端 {sorted(_QUERY_BUILDER_ROLES)}"
+    tokens = list(_ts_tokens(ts.read_text(encoding="utf-8")))
+    strings = [t for kind, t in tokens if kind == "str"]
+    idents = {t for kind, t in tokens if kind == "id"}
+    assert len(strings) > 5, "词法没读到字符串记号（扫描器空转）"
+    assert not set(strings) & set(_QUERY_BUILDER_ROLES), (
+        f"前端判据又写了系统角色字面量：{sorted(set(strings) & set(_QUERY_BUILDER_ROLES))}"
     )
+    assert "QUERY_BUILDER_ROLES" not in idents
+    assert {"queryBuilder", "access"} <= idents, "未经 apiPaths 的 queryBuilder.access 取准入结论"
+
+    system_ts = _FRONTEND_SRC / "services" / "apiPaths" / "system.ts"
+    stoks = list(_ts_tokens(system_ts.read_text(encoding="utf-8")))
+    start = next(i for i, (kind, t) in enumerate(stoks) if kind == "id" and t == "queryBuilder")
+    end = next(i for i in range(start, len(stoks)) if stoks[i] == ("id", "as"))
+    group = stoks[start:end]
+    access_at = group.index(("id", "access"))
+    assert group[access_at + 1] == ("str", "/api/query/access"), "queryBuilder.access 与后端注册路径不一致"
 
 
 def test_p23_frontend_does_not_use_resource_matrix_for_builder_gate():
