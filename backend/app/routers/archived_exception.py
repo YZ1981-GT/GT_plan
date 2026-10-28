@@ -11,7 +11,8 @@
 - 需要 reason（非空）+ project_code 二次确认
 - 校验 project_code 匹配项目名称（二次确认机制）
 - 项目必须处于 archived 状态
-- 成功后 project.status → execution（恢复活跃状态）
+- 成功后 project.status → execution（恢复活跃状态）；底稿恢复归档前状态、清归档时间与保留期
+  （锁定的逆操作，spec attachment-archive-and-a-class-evidence ADR-AE-13）
 - 写入 audit_log (event_type=archive_unarchive)
 
 Validates: Requirements 1.2, AC 1.5, AC 1.7
@@ -29,6 +30,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import ProjectStatus
 from app.models.core import Project, User
+from app.services.archive_orchestrator import restore_after_unarchive
 from app.services.audit_log_helper import append_audit_log
 
 logger = logging.getLogger(__name__)
@@ -189,6 +191,8 @@ async def unarchive_project(
 
     # 更新项目状态 → execution（恢复活跃状态）
     project.status = ProjectStatus.execution
+    # 锁定的逆操作：底稿恢复归档前状态、清归档时间 / 保留期
+    restored = await restore_after_unarchive(db, project_id)
 
     # 写入审计日志
     await append_audit_log(db, {
@@ -201,6 +205,8 @@ async def unarchive_project(
             "event_type": "archive_unarchive",
             "reason": body.reason,
             "previous_status": previous_status,
+            "workpapers_restored": restored["workpapers_restored"],
+            "archive_job_id": restored["job_id"],
         },
     })
 
@@ -211,4 +217,5 @@ async def unarchive_project(
         "message": "项目已成功解除归档",
         "project_id": str(project_id),
         "new_status": project.status.value,
+        "workpapers_restored": restored["workpapers_restored"],
     }

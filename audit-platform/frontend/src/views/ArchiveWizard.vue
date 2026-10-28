@@ -74,7 +74,7 @@
                   <el-table-column prop="assignee" label="责任人" width="100">
                     <template #default="{ row }">{{ row.assignee || '—' }}</template>
                   </el-table-column>
-                  <el-table-column prop="status" label="状态" width="100">
+                  <el-table-column prop="status" label="状态 / 说明" min-width="200">
                     <template #default="{ row }">{{ statusLabel(row.status) }}</template>
                   </el-table-column>
                 </el-table>
@@ -190,13 +190,16 @@
               <template #sub-title>
                 <div class="gt-archive-fail-detail">
                   <p v-if="jobData.failed_section">
-                    <strong>失败章节：</strong>{{ jobData.failed_section }}
+                    <strong>失败步骤：</strong>{{ archiveSectionLabel(jobData.failed_section) }}
                   </p>
                   <p v-if="jobData.failed_reason">
                     <strong>失败原因：</strong>{{ jobData.failed_reason }}
                   </p>
+                  <ul v-if="failedProblems.length" class="gt-archive-fail-problems">
+                    <li v-for="(p, i) in failedProblems" :key="i">{{ p }}</li>
+                  </ul>
                   <p v-if="jobData.last_succeeded_section">
-                    <strong>最后成功章节：</strong>{{ jobData.last_succeeded_section }}
+                    <strong>最后成功步骤：</strong>{{ archiveSectionLabel(jobData.last_succeeded_section) }}
                   </p>
                 </div>
               </template>
@@ -276,7 +279,10 @@ import {
   startArchiveOrchestrate,
   getArchiveJob,
   retryArchiveJob,
+  downloadArchivePackage,
 } from '@/services/archiveApi'
+import { requestConfirmationToken } from '@/utils/passwordConfirm'
+import { archiveCategoryLabel, archiveSectionLabel } from '@/constants/archiveLabels'
 import type { ArchiveJob } from '@/services/archiveApi'
 import { showApiError } from '@/composables/useApiError'
 import { handleApiError } from '@/utils/errorHandler'
@@ -345,15 +351,7 @@ const completenessLoading = ref(false)
 const completenessReport = ref<CompletenessReport | null>(null)
 const isPrinting = ref(false)
 
-function categoryLabel(category: string): string {
-  switch (category) {
-    case 'missing': return '缺失底稿'
-    case 'unsigned': return '未签字底稿'
-    case 'unresolved_reviews': return '未解决复核意见'
-    case 'stale': return '过期底稿'
-    default: return category
-  }
-}
+const categoryLabel = archiveCategoryLabel
 
 const STATUS_LABELS: Record<string, string> = {
   // WorkingPaper 文件状态
@@ -430,7 +428,16 @@ const progressPercent = computed(() => {
   return Math.round((done / sections.length) * 100)
 })
 
+/** 失败步骤的逐项问题（打包缺件清单等），最多显示 20 条 */
+const failedProblems = computed<string[]>(() => {
+  const job = jobData.value
+  if (!job?.failed_section) return []
+  return (job.section_progress?.[job.failed_section]?.problems || []).slice(0, 20)
+})
+
 async function handleStartArchive() {
+  const confirmationToken = await requestConfirmationToken('归档确认')
+  if (!confirmationToken) return
   startingArchive.value = true
   isExecuting.value = true
   try {
@@ -439,12 +446,13 @@ async function handleStartArchive() {
       push_to_cloud: archiveOptions.value.push_to_cloud,
       purge_local: archiveOptions.value.purge_local,
       gate_eval_id: readinessData.value.gate_eval_id || undefined,
-    })
-    // 更新路由到 job 视图
+    }, confirmationToken)
+    jobData.value = resp
+    // 更新路由到 job 视图（接口返回作业本身，id 字段即作业 id）
     router.replace({
-      path: `/projects/${projectId.value}/archive/jobs/${resp.archive_job_id}`,
+      path: `/projects/${projectId.value}/archive/jobs/${resp.id}`,
     })
-    startPolling(resp.archive_job_id)
+    startPolling(resp.id)
   } catch (err: any) {
     isExecuting.value = false
     // R1 Bug Fix 8: 使用 showApiError 统一处理
@@ -456,9 +464,11 @@ async function handleStartArchive() {
 
 async function handleRetry() {
   if (!jobData.value) return
+  const confirmationToken = await requestConfirmationToken('重试归档确认')
+  if (!confirmationToken) return
   retrying.value = true
   try {
-    const resp = await retryArchiveJob(projectId.value, jobData.value.id)
+    const resp = await retryArchiveJob(projectId.value, jobData.value.id, confirmationToken)
     jobData.value = resp
     startPolling(resp.id)
   } catch (err: any) {
@@ -498,9 +508,12 @@ async function pollJob(jobId: string) {
   }
 }
 
-function handleDownload() {
-  if (jobData.value?.output_url) {
-    window.open(jobData.value.output_url, '_blank')
+async function handleDownload() {
+  if (!jobData.value?.output_url) return
+  try {
+    await downloadArchivePackage(jobData.value.output_url)
+  } catch (err: any) {
+    handleApiError(err, '下载归档包')
   }
 }
 
@@ -547,6 +560,13 @@ onBeforeUnmount(() => {
 
 .gt-archive-step {
   min-height: 300px;
+}
+
+.gt-archive-fail-problems {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+  text-align: left;
+  font-size: var(--gt-font-size-sm);
 }
 
 .gt-archive-step-desc {

@@ -31,6 +31,7 @@ if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
 # 仅注册测试所需的模型
 import app.models.core  # noqa: F401
 import app.models.audit_log_models  # noqa: F401
+import app.models.archive_models  # noqa: F401  解除归档按最近一次归档作业的锁定记录恢复底稿
 
 from app.models.audit_log_models import AuditLogEntry
 from app.models.core import Project
@@ -75,6 +76,7 @@ async def db_session() -> AsyncSession:
             Base.metadata.tables["users"],
             Base.metadata.tables["projects"],
             Base.metadata.tables["audit_log_entries"],
+            Base.metadata.tables["archive_jobs"],
         ]
         await conn.run_sync(
             Base.metadata.create_all, tables=tables_to_create

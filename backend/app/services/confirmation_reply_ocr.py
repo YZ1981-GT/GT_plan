@@ -31,13 +31,10 @@ class ReplyOcrFailed(Exception):
 
 
 def _local_original(file_path: str | None) -> Path | None:
-    """本地原件：记录的路径；读不到再按 ``storage/`` 相对路径找（与附件下载同口径）。"""
-    if not file_path:
-        return None
-    for candidate in (Path(file_path), Path("storage") / file_path.lstrip("/")):
-        if candidate.is_file():
-            return candidate
-    return None
+    """本地原件（与附件下载同口径，见 ``attachment_upload_policy.resolve_local_attachment_file``）。"""
+    from app.services.attachment_upload_policy import resolve_local_attachment_file
+
+    return resolve_local_attachment_file(file_path)
 
 
 async def _recognize_original(db: AsyncSession, att: Attachment) -> str:

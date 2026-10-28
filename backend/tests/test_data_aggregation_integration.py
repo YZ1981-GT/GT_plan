@@ -392,10 +392,14 @@ class TestCompletenessReportIntegration:
         response = await get_archive_completeness_report(mock_db, project_id)
 
         assert isinstance(response, CompletenessReportResponse)
-        assert len(response.categories) == 4
+        # 原 4 类 + 抽样记录（sampling-evaluation-and-governance-closure R8.4）
+        # + 5 类证据 / 文件检查（attachment-archive-and-a-class-evidence 需求 5）
+        assert len(response.categories) == 10
 
         category_names = {cat.category for cat in response.categories}
-        assert category_names == {"missing", "unsigned", "unresolved_reviews", "stale"}
+        assert {"missing", "unsigned", "unresolved_reviews", "stale"} <= category_names
+        assert {"sampling_records", "missing_files", "evidence_gaps", "unreplied_confirmations",
+                "unconfirmed_ocr", "orphan_files"} <= category_names
 
     @pytest.mark.asyncio
     async def test_can_proceed_when_no_blocking_items(self):

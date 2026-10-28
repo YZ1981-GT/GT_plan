@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import shutil
-import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -140,33 +139,3 @@ class WpStorageService:
             }
             for v in versions
         ]
-
-    async def archive_project(self, project_id: UUID) -> dict:
-        """归档项目底稿 — 压缩为 .tar.gz 移到冷存储"""
-        project_dir = STORAGE_ROOT / str(project_id)
-        # 同上：紧接着 `tar.add(dir)` 与 `rglob`，必须是目录才行。
-        if not project_dir.is_dir():
-            return {"error": "项目目录不存在"}
-
-        archive_dir = STORAGE_ROOT.parent / "archives"
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        archive_path = archive_dir / f"{project_id}.tar.gz"
-
-        try:
-            with tarfile.open(str(archive_path), "w:gz") as tar:
-                tar.add(str(project_dir), arcname=str(project_id))
-
-            archive_size = archive_path.stat().st_size
-            original_size = sum(f.stat().st_size for f in project_dir.rglob("*") if f.is_file())
-
-            logger.info(f"项目归档完成: {project_id}, {original_size} → {archive_size} bytes")
-            return {
-                "project_id": str(project_id),
-                "archive_path": str(archive_path),
-                "original_size": original_size,
-                "archive_size": archive_size,
-                "compression_ratio": round(archive_size / original_size * 100, 1) if original_size > 0 else 0,
-            }
-        except Exception as e:
-            logger.error(f"归档失败: {e}")
-            return {"error": str(e)}

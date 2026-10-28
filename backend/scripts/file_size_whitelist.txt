@@ -1674,7 +1674,7 @@ audit-platform/frontend/src/components/workpaper/composables/useH1LeaseCheck.ts 
 audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue  1528
 backend/app/routers/audit_check.py  892
 backend/app/services/account_chart_service.py  1515
-backend/app/services/qc_engine.py  974
+backend/app/services/qc_engine.py  959
 #   WorkpaperWordEditor.spec.ts —— 历史大文件（HEAD 已 1929 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-26 audit-year-calendar-fallback-ratchet 任务 8.2：组件年度改为宿主 > 路由 > 项目信息后，
 #     3 个夹具补项目审计年度、加「项目未设置审计年度不写字段覆盖」用例（+27）。
