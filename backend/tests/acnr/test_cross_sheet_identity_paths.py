@@ -3,8 +3,9 @@
 - ``backend/app`` 里每个 ``CrossSheetResolver(...)`` 构造都显式传 ``resolve_identity=False``（含模块单例），即
   生产使用方要么由编排器经 exact_identity 拿身份、要么声明只取值；
 - 同步桥接 ``_sync_resolve`` 只在 ``cross_sheet_resolver.py`` 里被引用，且只在 ``_bridge_identity`` 内；
-  ``_bridge_identity`` 的调用都在 ``if self._resolve_identity`` 分支里 ⇒ 生产路径上同步桥接（运行中的事件循环里恒
-  降级为 None）不可达；
+  ``_bridge_identity`` 的调用都在 ``if self._resolve_identity`` 的 body 里（条件恰为该属性，取反 / 组合 / else 分支都红）
+  ⇒ 生产路径上同步桥接（运行中的事件循环里恒降级为 None）不可达。tasks.md 原文写「生产不引用 _sync_resolve」，
+  实现保留该函数，按需求 8.2「若保留须由守卫证明不可达」以本守卫证明（RV7.7-01）；
 - 反向自检：扫描确实找到了已知的两处生产构造，避免扫描范围失效时判据空转。
 """
 from __future__ import annotations
@@ -95,6 +96,13 @@ def test_sync_bridge_only_referenced_inside_guarded_helper():
     assert calls, "反向自检：没有找到 _bridge_identity 的调用"
     for call in calls:
         guard = enclosing(call, (ast.If,))
-        assert guard is not None and any(
-            isinstance(n, ast.Attribute) and n.attr == "_resolve_identity" for n in ast.walk(guard.test)
-        ), f"第 {call.lineno} 行调用 _bridge_identity 不在 if self._resolve_identity 分支里"
+        assert guard is not None, f"第 {call.lineno} 行调用 _bridge_identity 不在任何 if 分支里"
+        test = guard.test
+        # 条件必须恰为 self._resolve_identity（取反、与其他条件组合都不算），调用必须在 body 而非 orelse
+        assert (isinstance(test, ast.Attribute) and test.attr == "_resolve_identity"
+                and isinstance(test.value, ast.Name) and test.value.id == "self"), (
+            f"第 {call.lineno} 行调用 _bridge_identity 的 if 条件不是 self._resolve_identity：{ast.unparse(test)}")
+        branch = call
+        while parents.get(branch) is not guard:
+            branch = parents[branch]
+        assert branch in guard.body, f"第 {call.lineno} 行调用 _bridge_identity 在 if self._resolve_identity 的 else 分支里"
