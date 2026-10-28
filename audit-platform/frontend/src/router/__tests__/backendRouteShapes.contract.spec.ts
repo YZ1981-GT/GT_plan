@@ -17,6 +17,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import ts from 'typescript'
+import { parse as parseSfc } from '@vue/compiler-sfc'
 
 vi.mock('nprogress', () => ({ default: { start: vi.fn(), done: vi.fn(), configure: vi.fn() } }))
 
@@ -93,6 +95,22 @@ describe('后端跳转路由形态能命中前端路由（不落 404）', () => 
       expect(present.has(key), `失效条目：${key}`).toBe(true)
       expect(resolvesToPage(sample(key.split(' ')[1])).ok, `${key} 已能命中，请删条目`).toBe(false)
     }
+  })
+
+  it('布局对短链渲染路由内容：DefaultLayout 的全宽前缀含 /workpapers/（否则落进浏览模式、短链页不挂载）', () => {
+    const sfc = parseSfc(readFileSync(join(SRC, 'layouts', 'DefaultLayout.vue'), 'utf-8')).descriptor
+    const sf = ts.createSourceFile('DefaultLayout.ts', sfc.scriptSetup?.content || '', ts.ScriptTarget.Latest, true)
+    let prefixes: string[] | null = null
+    const visit = (n: ts.Node) => {
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === 'FULLWIDTH_PREFIXES'
+        && n.initializer && ts.isArrayLiteralExpression(n.initializer)) {
+        prefixes = n.initializer.elements.filter(ts.isStringLiteral).map((e) => e.text)
+      }
+      ts.forEachChild(n, visit)
+    }
+    visit(sf)
+    expect(prefixes, '未找到 FULLWIDTH_PREFIXES').not.toBeNull()
+    expect(prefixes!.some((p) => `/workpapers/${SAMPLE_ID}`.startsWith(p))).toBe(true)
   })
 
   it('短链命中 WorkpaperShortLink、在需要登录的布局下，查询串原样保留', () => {

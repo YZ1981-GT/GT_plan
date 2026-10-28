@@ -300,7 +300,8 @@ const FULLWIDTH_PATHS = [
   // procedure-delegation-notification / Task 12：跨项目"我的程序任务"全宽独立页
   '/my-procedures',
 ]
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
+// '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/', '/workpapers/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true
