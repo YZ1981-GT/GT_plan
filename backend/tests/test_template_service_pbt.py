@@ -14,6 +14,14 @@ advanced-query-module Tasks 14.3 / 14.4 / 14.5 — 逐条映射设计属性 P25 
 
 铁律：每条属性一个测试，`@settings(max_examples=5)`（fast profile 收敛 example 数），
 用 fakes/stubs（session / guard / addressing / executor）不触真实 DB。
+
+advanced-query-linkage-closure 任务 24 改写（design §10.1，逐条理由）：
+  - P25 非法 scope 的生成器去掉 ``'private'``：它是入库规范值，把它当非法输入正是 AQ-16（保存恒 500）的根因；
+    非法集合改为 adapter 接受集合（private / team / project / public / global / personal）之外。
+  - P26 可见性判定改为 ``TemplateScopeAdapter.is_visible``（唯一判定，ADR-AQL-11），oracle 随之：多了 ``project`` 档；
+    team / project 没有锚点与分享项目时任何人（含 admin / partner）都不可见（原 oracle 让 admin 看到无锚点的 team
+    模板——缺锚点按 adapter 合同 fail-closed，不能变成隐式公开）。
+  - P26 不可见的错误码 ``TEMPLATE_FORBIDDEN`` → ``TEMPLATE_NOT_VISIBLE``（R9.2 统一错误码，文案「无权访问该模板」）。
 """
 
 from __future__ import annotations
@@ -25,18 +33,20 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.services.custom_query.addressing_service import ResolvedTarget
+from app.services.custom_query.template_scope_adapter import TemplateScopeAdapter
 from app.services.custom_query.template_service import (
     StaleRef,
     TemplateExecutionResult,
     TemplateForbiddenError,
     TemplateInvalidError,
     TemplateService,
-    _is_template_visible,
 )
 
 # 固定项目 id 池 —— 让分享集合 / 可访问集合可控地相交（避免随机 UUID 永不相交）。
 _PROJECT_POOL: list[uuid.UUID] = [uuid.uuid4() for _ in range(5)]
-_CANONICAL_SCOPES = ("private", "team", "public", "global")
+# 库里可能出现的 scope：四个规范值 + 历史 global（读取兼容）
+_CANONICAL_SCOPES = ("private", "team", "project", "public", "global")
+_ACCEPTED_SCOPES = {"private", "team", "project", "public", "global", "personal"}
 
 
 # ─── 测试替身（镜像 test_advanced_query_template_*.py 风格）──────────────────
@@ -148,15 +158,16 @@ def _make_executor(result, capture: dict):
 def _expected_visible(
     *, scope, owner_id, shared, user_id, accessible: set | None
 ) -> bool:
-    """P26 参考实现（oracle）：模板可见性规则的独立朴素判定。"""
+    """P26 参考实现（oracle）：模板可见性规则的独立朴素判定（R9.2）。"""
     if owner_id is not None and user_id is not None and owner_id == user_id:
         return True
     if scope in ("global", "public"):
         return True
-    if scope == "team":
-        if accessible is None:  # admin / partner
-            return True
-        return bool(set(shared) & accessible)
+    if scope in ("team", "project"):
+        # 没有 config 锚点的历史 team 按分享项目判定；没有任何项目 ⇒ fail-closed（admin / partner 亦不可见）
+        if not shared:
+            return False
+        return accessible is None or bool(set(shared) & accessible)
     # private（非所有者）或未知 scope
     return False
 
@@ -172,12 +183,9 @@ _illegal_names = st.one_of(
     st.text(alphabet=" \t\n", min_size=1, max_size=8),
     st.text(min_size=201, max_size=260),
 )
-# 非法 scope：不属于 {global, personal, team, public}（含 canonical 'private' 别名之外的值）。
+# 非法 scope：不属于 adapter 接受的集合（private / team / project / public / global / personal）。
 _illegal_scopes = st.one_of(
-    st.just("private"),  # 'private' 非合法输入（合法输入用别名 'personal'）
-    st.text(min_size=1, max_size=12).filter(
-        lambda s: s.strip().lower() not in {"global", "personal", "team", "public"}
-    ),
+    st.text(min_size=1, max_size=12).filter(lambda s: s.strip().lower() not in _ACCEPTED_SCOPES),
     st.just(""),
 )
 
@@ -185,7 +193,7 @@ _illegal_scopes = st.one_of(
 @settings(max_examples=5)
 @given(
     illegal_name=_illegal_names,
-    valid_scope=st.sampled_from(["global", "personal", "team", "public"]),
+    valid_scope=st.sampled_from(["global", "personal", "private", "team", "public"]),
 )
 @pytest.mark.asyncio
 async def test_p25_illegal_name_rejected_no_partial_record(illegal_name, valid_scope):
@@ -268,8 +276,8 @@ async def test_p26_visibility_matches_rule(
         accessible=accessible,
     )
 
-    # 纯函数判定与 oracle 一致
-    actual = _is_template_visible(
+    # 纯函数判定（唯一判定 TemplateScopeAdapter.is_visible）与 oracle 一致
+    actual = TemplateScopeAdapter.is_visible(
         scope=scope,
         owner_id=owner_id,
         shared_project_ids=shared,
@@ -290,10 +298,10 @@ async def test_p26_visibility_matches_rule(
         # 可见 → 不抛异常
         await svc.assert_executable(tpl, user=user, db=None, guard=guard)
     else:
-        # 不可见 → TEMPLATE_FORBIDDEN 403
+        # 不可见 → TEMPLATE_NOT_VISIBLE 403「无权访问该模板」
         with pytest.raises(TemplateForbiddenError) as exc:
             await svc.assert_executable(tpl, user=user, db=None, guard=guard)
-        assert exc.value.error_code == "TEMPLATE_FORBIDDEN"
+        assert (exc.value.error_code, exc.value.message) == ("TEMPLATE_NOT_VISIBLE", "无权访问该模板")
 
 
 # ─── Property 27: 模板失效引用部分降级 ──────────────────────────────────────

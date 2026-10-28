@@ -41,7 +41,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError, model_validator
-from sqlalchemy import or_, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -55,7 +55,7 @@ from app.services.custom_query.template_scope_adapter import (
     TemplateScopeAdapter,
     TemplateScopeValidationError,
 )
-from app.services.custom_query.template_service import template_service
+from app.services.custom_query.template_service import TemplateForbiddenError, TemplateInvalidError, template_service
 from app.services.custom_query.pagination import (
     MAX_LIMIT as PAGE_MAX_LIMIT,
     MIN_LIMIT as PAGE_MIN_LIMIT,
@@ -1060,9 +1060,12 @@ class TemplateUpdateRequest(BaseModel):
 
 
 class TemplateExecuteRequest(BaseModel):
-    """模板执行请求：只带目标项目，其余查询参数取自模板 config。"""
+    """模板执行请求：目标项目、可选年度（缺省取目标项目审计年度，R9.3）与翻页；其余查询参数取自模板 config。"""
 
     project_id: str
+    year: int | None = Field(default=None, ge=2000, le=2100)
+    limit: int | None = Field(default=None, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
+    offset: int | None = Field(default=None, ge=0)
 
 
 class TemplateResponse(BaseModel):
@@ -1213,31 +1216,24 @@ from app.routers.custom_query_writeback import (  # noqa: E402
 )
 from app.services.custom_query.template_scope_guard import (  # noqa: E402
     _assert_template_visible,
+    _load_template,
     _normalize_template_scope,
+    _template_not_visible,
     _template_owner_id,
 )
+
+
+def _template_invalid(exc: TemplateInvalidError) -> HTTPException:
+    return HTTPException(status_code=400, detail={"error_code": exc.error_code, "message": exc.message})
+
 
 @router.get("/templates")
 async def list_templates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出可见模板：本人创建的所有 + 全局共享。
-
-    按 updated_at 倒序排列（最近编辑置顶）。
-    """
-    stmt = (
-        select(CustomQueryTemplate)
-        .where(
-            or_(
-                CustomQueryTemplate.created_by == current_user.id,
-                CustomQueryTemplate.scope == "global",
-            )
-        )
-        .order_by(CustomQueryTemplate.updated_at.desc())
-    )
-    result = await db.execute(stmt)
-    templates = result.scalars().all()
+    """列出当前用户可见的模板（本人、公开、指定项目共享、历史 team；R9.2），最近修改在前，最多 500 条（先过滤后截断）。"""
+    templates = await template_service.visible_templates(current_user, db)
     return {
         "templates": [_serialize_template(t, current_user.id) for t in templates],
         "total": len(templates),
@@ -1268,16 +1264,19 @@ async def create_template(
         await db.rollback()
         raise
 
-    tpl = await template_service.save_template(
-        db=db,
-        creator_id=current_user.id,
-        name=body.name,
-        scope=normalized.scope,
-        config=body.config,
-        description=body.description,
-        data_source=body.data_source,
-        shared_project_ids=list(normalized.shared_project_ids),
-    )
+    try:
+        tpl = await template_service.save_template(
+            db=db,
+            creator_id=current_user.id,
+            name=body.name,
+            scope=normalized.scope,
+            config=body.config,
+            description=body.description,
+            data_source=body.data_source,
+            shared_project_ids=list(normalized.shared_project_ids),
+        )
+    except TemplateInvalidError as exc:  # 名称 / scope 校验失败：400 中文原因（R9.1），原先未捕获 ⇒ 500
+        raise _template_invalid(exc) from None
     await db.commit()
     await db.refresh(tpl)
     return _serialize_template(tpl, current_user.id)
@@ -1289,17 +1288,9 @@ async def get_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取模板详情。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-    # 权限：本人 or 全局可见
-    if tpl.scope != "global" and tpl.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail={"error_code": "TEMPLATE_NOT_VISIBLE"})
+    """获取模板详情：可见性与列表、执行同一判定（R9.2）。"""
+    tpl = await _load_template(db, template_id)
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
     return _serialize_template(tpl, current_user.id)
 
 
@@ -1311,18 +1302,16 @@ async def update_template(
     current_user: User = Depends(get_current_user),
 ):
     """更新模板（仅创建者）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     # 仅创建者可改 —— **admin 也不例外**（R8.5）。模板承载的是个人查询习惯与分享
     # 意图，管理员改他人模板会让对方看到与自己意图不符的结果却无从察觉。
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_UPDATE"})
+    try:  # 名称与保存同一口径（去首尾空白后 1~200 字符），不合格 400 中文原因（R9.1）
+        name = template_service.validate_name(body.name) if body.name is not None else None
+    except TemplateInvalidError as exc:
+        raise _template_invalid(exc) from None
 
     if body.scope is not None or body.shared_project_ids is not None:
         normalized = _normalize_template_scope(
@@ -1339,19 +1328,18 @@ async def update_template(
         except HTTPException:
             await db.rollback()
             raise
+        # 入库只写归一后的值（原先末尾又把 body.scope 原样写回 ⇒ 传 global 入库仍是 global，AQ-16）
         tpl.scope = normalized.scope
         tpl.shared_project_ids = list(normalized.shared_project_ids)
 
-    if body.name is not None:
-        tpl.name = body.name
+    if name is not None:
+        tpl.name = name
     if body.description is not None:
         tpl.description = body.description
     if body.data_source is not None:
         tpl.data_source = body.data_source
     if body.config is not None:
         tpl.config = body.config
-    if body.scope is not None:
-        tpl.scope = body.scope
     tpl.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(tpl)
@@ -1365,13 +1353,7 @@ async def delete_template(
     current_user: User = Depends(get_current_user),
 ):
     """删除模板 —— **仅创建者**，admin 亦不可删他人模板（R8.5）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_DELETE"})
@@ -1388,41 +1370,34 @@ async def execute_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6）。
+    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6；R9.3）。
 
     关键在于**不另走旁路**：模板只是一组查询参数，执行仍经 `execute_query` →
     `ExecuteCompatibilityAdapter` → 编排器，因此归属校验、分页、审计与直接查询
-    完全一致。改造前根本没有此端点，模板「执行」由前端把 config 拼成 execute
-    请求体自行发起，服务端无从校验模板可见性。
+    完全一致。顺序：模板可见（403 ``TEMPLATE_NOT_VISIBLE``）→ 目标项目归属（403，在本函数体内直接校验，先于
+    年度解析，免得无权用户从 422 得知项目有没有审计年度）→ 年度 = 请求年度，否则目标项目审计年度（都没有 422，
+    平台统一文案）→ ``config_to_request``（唯一翻译）→ ``execute_query``。改造前年度取模板里存的值，在别的项目上
+    执行会查错年度；模板没存年度时 ``year=0`` 直接 422。
     """
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    from app.deps import require_project_audit_year
+    from app.services.custom_query.ownership_guard import ownership_guard
 
-    # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
-    await template_service.assert_executable(tpl, user=current_user, db=db)
-
-    config = tpl.config if isinstance(tpl.config, dict) else {}
+    tpl = await _load_template(db, template_id)
+    try:  # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
+        await template_service.assert_executable(tpl, user=current_user, db=db)
+    except TemplateForbiddenError:  # 原先未映射 ⇒ 500
+        raise _template_not_visible() from None
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
+    year = await require_project_audit_year(db, body.project_id, body.year)
     try:  # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
-        query_body = QueryRequest(
-            project_id=str(body.project_id),
-            year=int(config.get("year") or 0),
-            source=str(config.get("source") or tpl.data_source or ""),
-            filters=config.get("filters") or {},
-            columns=list(config.get("selected_columns") or config.get("columns") or []),
-            limit=int(config.get("page_size") or config.get("limit") or 500),
-            offset=int(config.get("offset") or 0),
-            sort=list(config.get("sort") or []),
-            group=config.get("group"),
-            pivot=config.get("pivot"),
-            acnr_targets=list(config.get("acnr_targets") or []),
-        )
+        query_body = QueryRequest(**template_service.config_to_request(
+            tpl.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
+            fallback_source=tpl.data_source,
+        ))
     except ValidationError as exc:
         raise template_config_rejected(exc) from None
+    except ValueError as exc:  # 条件里还有未取值的参数占位
+        raise HTTPException(status_code=400, detail={"error_code": "TEMPLATE_INVALID", "message": str(exc)}) from None
     return await execute_query(query_body, response, db, current_user)
 
 

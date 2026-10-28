@@ -4,15 +4,13 @@
 
 职责（本任务 14.1 范围）：
   - 将查询保存为模板，持久化到 ``custom_query_templates`` 表。
-  - 校验名称（长度 1–200 字符）与 scope（``global`` / ``personal`` / ``team`` /
-    ``public``）；``personal`` 是真实四值模型 ``private`` 的别名（Glossary：
-    private == "personal"），入库归一为 ``private``。
+  - 校验名称（长度 1–200 字符）与 scope。scope 的归一与可见性只有一处实现：
+    ``TemplateScopeAdapter``（advanced-query-linkage-closure ADR-AQL-11 / design §3.6，AQ-16）。改造前本服务另有一套
+    ``VALID_INPUT_SCOPES``（不认 ``private`` / ``project``）与以 ``global`` 判公开的可见性：路由先经 adapter 归一成
+    ``private``，到这里又被判非法 ⇒ 保存恒 500；入库值是 ``public`` 而列表只认 ``global`` ⇒ 公开模板别人看不到。
   - 非法名称 / 非法 scope / 非法分享项目标识 → ``TemplateInvalidError``
-    （error_code ``TEMPLATE_INVALID``，含失败原因），**不创建任何部分模板记录**
+    （error_code ``TEMPLATE_INVALID``，含中文原因），**不创建任何部分模板记录**
     （校验全部通过后才 ``db.add``）。
-  - 分享语义（写入路径）：``global`` / ``public`` 全员可见（无需 shared_project_ids，
-    入库置空）；``private`` / ``team`` + 所有者显式分享 → 写入 ``shared_project_ids``，
-    供 task 14.2 的可见性规则据此仅对有访问权的项目组成员放行。
 
 铁律：
   - **service 只 flush 不 commit**（平台铁律）：本服务 ``db.add`` + ``await
@@ -21,11 +19,11 @@
     此时数据库无任何写入。
 
 Task 14.2 扩展（本文件同时实现）：
-  - **可见性规则**（R13.3 / R13.4）：``global`` / ``public`` 全员（已认证用户）
-    可见；``team`` + 显式分享 → 仅对 ``shared_project_ids`` 有访问权的项目组成员
-    可见可执行；``private`` → 仅所有者本人可见。所有者对自己创建的模板恒可见
-    （private 语义与此一致）。无分享 / 无访问权 → ``TemplateForbiddenError``
-    （error_code ``TEMPLATE_FORBIDDEN``，HTTP 403）。
+  - **可见性规则**：本人恒可见；公开（含历史 ``global``）全员可见；指定项目共享 → 对任一共享项目有访问权即可见；
+    历史 ``team`` → 锚点项目成员可见；私有 → 仅本人（admin / partner 亦不例外）。判定一律走
+    ``TemplateScopeAdapter.is_visible``，列表、详情、执行三处同一结论（R9.2）。不可见 → ``TemplateForbiddenError``
+    （error_code ``TEMPLATE_NOT_VISIBLE``，「无权访问该模板」，HTTP 403）。
+  - **执行翻译**：:meth:`TemplateService.config_to_request` 是模板 config → 业务视图 execute 请求的唯一翻译。
   - **执行**（R13.5）：按当前用户可访问项目范围套 Ownership_Check，仅返回有权行
     （复用 ``OwnershipGuard.filter_accessible_rows``；跨项目聚合行才施加，单项目
     结果由编排层 ``assert_target_accessible`` 项目级作用域保障）。
@@ -46,6 +44,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.custom_query_models import CustomQueryTemplate
@@ -54,29 +53,29 @@ from app.services.custom_query.addressing_service import (
     addressing_service,
 )
 from app.services.custom_query.ownership_guard import OwnershipGuard, ownership_guard
+from app.services.custom_query.template_scope_adapter import (
+    TemplateScopeAdapter,
+    TemplateScopeValidationError,
+)
 
 logger = logging.getLogger(__name__)
-
-# ─── scope 模型（真实四值 + personal 别名）────────────────────────────────────
-# 用户可输入的 scope（含 personal 别名）
-VALID_INPUT_SCOPES: frozenset[str] = frozenset(
-    {"global", "personal", "team", "public"}
-)
-# personal 是 private 的别名（Glossary：private == "personal"）
-_SCOPE_ALIASES: dict[str, str] = {"personal": "private"}
-# 入库的 canonical 四值模型
-CANONICAL_SCOPES: frozenset[str] = frozenset({"private", "team", "public", "global"})
-# 全员可见的 scope（无需 shared_project_ids）
-_ALL_VISIBLE_SCOPES: frozenset[str] = frozenset({"global", "public"})
 
 # 名称长度约束（R13.1 / R13.2）
 NAME_MIN_LEN = 1
 NAME_MAX_LEN = 200
 
+#: 列表最多返回的可见模板数（先按可见性过滤、再截断，design §3.6）
+VISIBLE_TEMPLATE_LIMIT = 500
+#: 列表候选的分批读取量（候选 = 本人的 + 可能对他人可见的 scope）
+_CANDIDATE_BATCH = 500
+#: 可能对作者以外的人可见的 scope（private / personal 只有作者看得到，由「作者 = 本人」一支取回）
+_SHARED_SCOPES = ("public", "global", "project", "team")
+
 # 错误码（design.md Error Handling：TEMPLATE_INVALID → HTTP 400，含原因）
 ERR_CODE_TEMPLATE_INVALID = "TEMPLATE_INVALID"
-# 错误码（design.md Error Handling：无分享/访问权 → TEMPLATE_FORBIDDEN → HTTP 403）
-ERR_CODE_TEMPLATE_FORBIDDEN = "TEMPLATE_FORBIDDEN"
+# 错误码（advanced-query-linkage-closure R9.2：读取 / 执行不可见模板 → 403 TEMPLATE_NOT_VISIBLE「无权访问该模板」）
+ERR_CODE_TEMPLATE_NOT_VISIBLE = "TEMPLATE_NOT_VISIBLE"
+TEMPLATE_NOT_VISIBLE_MESSAGE = "无权访问该模板"
 
 
 class TemplateInvalidError(Exception):
@@ -94,14 +93,16 @@ class TemplateInvalidError(Exception):
 
 
 class TemplateForbiddenError(Exception):
-    """模板无分享 / 无访问权（R13.4）。
+    """模板对当前用户不可见（R13.4；advanced-query-linkage-closure R9.2）。
 
-    携带 ``error_code``（``TEMPLATE_FORBIDDEN``）与描述性 ``message``，供 router
+    携带 ``error_code``（``TEMPLATE_NOT_VISIBLE``）与 ``message``（「无权访问该模板」），供 router
     层转为统一错误契约（``detail={error_code, message}``，HTTP 403）。校验在触达
     数据层之前完成，拒绝时不泄露模板内容。
     """
 
-    def __init__(self, message: str, *, error_code: str = ERR_CODE_TEMPLATE_FORBIDDEN) -> None:
+    def __init__(
+        self, message: str = TEMPLATE_NOT_VISIBLE_MESSAGE, *, error_code: str = ERR_CODE_TEMPLATE_NOT_VISIBLE
+    ) -> None:
         self.error_code = error_code
         self.message = message
         super().__init__(message)
@@ -177,65 +178,42 @@ def _to_uuid(value: Any) -> uuid.UUID | None:
         return None
 
 
-def _is_template_visible(
-    *,
-    scope: str,
-    owner_id: Any,
-    shared_project_ids: Any,
-    user_id: uuid.UUID | None,
-    accessible_project_ids: set[uuid.UUID] | None,
+def _config_project_id(template: Any) -> Any:
+    """team 模板的锚点项目（``config.project_id``）；config 不是 dict 时视为没有锚点。"""
+    config = getattr(template, "config", None)
+    return config.get("project_id") if isinstance(config, dict) else None
+
+
+def _template_visible_to(
+    template: Any, user_id: uuid.UUID | None, accessible_project_ids: set[uuid.UUID] | None
 ) -> bool:
-    """纯函数：判定模板对当前用户是否可见可执行（R13.3 / R13.4）。
-
-    规则（``accessible_project_ids`` 为 ``None`` 表示 admin / partner 可访问全部项目）：
-      - 所有者本人 → 恒可见（涵盖 ``private`` 仅所有者可见语义）。
-      - ``global`` / ``public`` → 全员（已认证用户）可见。
-      - ``team`` → 仅当 ``shared_project_ids`` 与用户可访问项目集合有交集
-        （admin / partner 视为可访问全部 → 可见）。
-      - ``private``（非所有者）→ 不可见。
-
-    注意：``private`` 严格限所有者本人，即便 admin / partner 亦不可见他人私有模板
-    （项目数据全访问权不等于他人模板隐私可见性，R13.3 明确 private 仅所有者可见）。
-    """
-    oid = _to_uuid(owner_id)
-    if oid is not None and user_id is not None and oid == user_id:
-        return True
-
-    if scope in _ALL_VISIBLE_SCOPES:
-        return True
-
-    if scope == "team":
-        if accessible_project_ids is None:  # admin / partner
-            return True
-        shared: set[uuid.UUID] = set()
-        for raw in shared_project_ids or []:
-            pid = _to_uuid(raw)
-            if pid is not None:
-                shared.add(pid)
-        return bool(shared & accessible_project_ids)
-
-    # private（非所有者）或未知 scope → 不可见（fail-closed）
-    return False
+    """模板对当前用户是否可见：唯一判定 ``TemplateScopeAdapter.is_visible``（``accessible_project_ids`` 为 ``None``
+    表示 admin / partner 可访问全部项目；私有模板仍只给作者本人）。"""
+    return TemplateScopeAdapter.is_visible(
+        scope=template.scope,
+        owner_id=template.owner_id,
+        user_id=user_id,
+        shared_project_ids=getattr(template, "shared_project_ids", None),
+        config_project_id=_config_project_id(template),
+        accessible_project_ids=accessible_project_ids,
+    )
 
 
-def _normalize_scope(scope: Any) -> str:
-    """校验并归一 scope；非法 → TemplateInvalidError。
+def _param_names(value: Any) -> list[str]:
+    """条件值里的参数占位 ``{"$param": 名}``（含 ``between`` 等列表值的各端）。"""
+    if isinstance(value, dict) and "$param" in value:
+        return [str(value["$param"])]
+    if isinstance(value, (list, tuple)):
+        return [name for item in value for name in _param_names(item)]
+    return []
 
-    - 接受 ``global`` / ``personal`` / ``team`` / ``public``。
-    - ``personal`` 归一为 canonical ``private``。
-    - 其余（None / 空 / 非字符串 / 未知值）→ 非法。
-    """
-    if not isinstance(scope, str):
-        raise TemplateInvalidError(
-            f"scope 非法：期望 {sorted(VALID_INPUT_SCOPES)} 之一，实际类型 "
-            f"{type(scope).__name__}"
-        )
-    normalized = scope.strip().lower()
-    if normalized not in VALID_INPUT_SCOPES:
-        raise TemplateInvalidError(
-            f"scope 非法：'{scope}' 不属于 {sorted(VALID_INPUT_SCOPES)}"
-        )
-    return _SCOPE_ALIASES.get(normalized, normalized)
+
+def unresolved_params(config: Any) -> list[str]:
+    """模板 config 的条件里尚未解析的参数占位名（按出现顺序）。"""
+    conditions = config.get("conditions") if isinstance(config, dict) else None
+    if not isinstance(conditions, list):
+        return []
+    return [name for cond in conditions if isinstance(cond, dict) for name in _param_names(cond.get("value"))]
 
 
 def _validate_name(name: Any) -> str:
@@ -255,41 +233,6 @@ def _validate_name(name: Any) -> str:
             f"名称非法：长度 {len(cleaned)} 超过上限 {NAME_MAX_LEN} 字符"
         )
     return cleaned
-
-
-def _normalize_shared_project_ids(
-    canonical_scope: str, shared_project_ids: Any
-) -> list[uuid.UUID]:
-    """校验并归一显式分享的项目 id 列表；非法 UUID → TemplateInvalidError。
-
-    - ``global`` / ``public``：全员可见，无需分享 → 一律置空（忽略传入值）。
-    - ``private`` / ``team``：将传入项目标识逐个解析为 UUID（去重、保序），
-      任一非法 → 非法（不建部分记录）。
-    """
-    if canonical_scope in _ALL_VISIBLE_SCOPES:
-        return []
-    if not shared_project_ids:
-        return []
-    if not isinstance(shared_project_ids, (list, tuple, set)):
-        raise TemplateInvalidError(
-            "shared_project_ids 非法：期望项目 id 列表"
-        )
-    result: list[uuid.UUID] = []
-    seen: set[uuid.UUID] = set()
-    for raw in shared_project_ids:
-        if isinstance(raw, uuid.UUID):
-            pid = raw
-        else:
-            try:
-                pid = uuid.UUID(str(raw))
-            except (ValueError, TypeError, AttributeError):
-                raise TemplateInvalidError(
-                    f"shared_project_ids 含非法项目标识：'{raw}'"
-                )
-        if pid not in seen:
-            seen.add(pid)
-            result.append(pid)
-    return result
 
 
 class TemplateService:
@@ -317,20 +260,20 @@ class TemplateService:
         校验顺序（任一失败即抛 TemplateInvalidError，此时无任何 db 写入 → 不建
         部分记录，R13.2）：
           1. 名称长度 1–200。
-          2. scope ∈ {global, personal, team, public}，personal → private。
-          3. shared_project_ids 全部可解析为 UUID（仅 private/team 生效）。
+          2. scope 与分享项目经 ``TemplateScopeAdapter.normalize`` 归一（private / team / project / public，
+             历史 global → public、personal → private；只有 project 带分享项目，且至少一个、都是合法 UUID）。
 
         校验全部通过后 ``db.add`` + ``await db.flush()``（**只 flush 不 commit**，
         提交由调用方负责）。
-
-        分享语义（R13.3 写入路径）：
-          - global / public → shared_project_ids 置空（全员可见）。
-          - private / team + 显式分享 → 写入 shared_project_ids。
         """
         # ── 校验（在任何 db 写入之前，保证不建部分记录）──
         clean_name = _validate_name(name)
-        canonical_scope = _normalize_scope(scope)
-        shared = _normalize_shared_project_ids(canonical_scope, shared_project_ids)
+        try:
+            normalized = TemplateScopeAdapter.normalize(
+                scope, shared_project_ids, config_project_id=(config or {}).get("project_id")
+            )
+        except TemplateScopeValidationError as exc:
+            raise TemplateInvalidError(str(exc)) from None
 
         # ── 构造并持久化（只 flush 不 commit）──
         tpl = CustomQueryTemplate(
@@ -339,8 +282,8 @@ class TemplateService:
             description=description,
             data_source=data_source,
             config=config or {},
-            scope=canonical_scope,
-            shared_project_ids=shared,
+            scope=normalized.scope,
+            shared_project_ids=list(normalized.shared_project_ids),
             tags=list(tags) if tags else [],
             creator_id=creator_id,
             created_by=creator_id,
@@ -359,22 +302,15 @@ class TemplateService:
         db: AsyncSession,
         guard: OwnershipGuard | None = None,
     ) -> bool:
-        """判定模板对当前用户是否可见可执行（R13.3 / R13.4）。
+        """判定模板对当前用户是否可见可执行（R13.3 / R13.4；R9.2）。
 
         复用 ``OwnershipGuard.get_accessible_project_ids`` 计算用户可访问项目集合
-        （project_users ∪ project_assignments，admin / partner → 全部），再按
-        scope / 分享 / 所有权规则判定（``_is_template_visible`` 纯函数）。
+        （project_users ∪ project_assignments，admin / partner → 全部），再交
+        ``TemplateScopeAdapter.is_visible`` 判定（列表、详情、执行同一判定）。
         """
         g = guard or ownership_guard
         accessible = await g.get_accessible_project_ids(user, db)
-        user_id = _to_uuid(getattr(user, "id", None))
-        return _is_template_visible(
-            scope=template.scope,
-            owner_id=template.owner_id,
-            shared_project_ids=template.shared_project_ids,
-            user_id=user_id,
-            accessible_project_ids=accessible,
-        )
+        return _template_visible_to(template, _to_uuid(getattr(user, "id", None)), accessible)
 
     async def assert_executable(
         self,
@@ -384,12 +320,100 @@ class TemplateService:
         db: AsyncSession,
         guard: OwnershipGuard | None = None,
     ) -> None:
-        """不可见 → ``TemplateForbiddenError``（HTTP 403，R13.4）。
+        """不可见 → ``TemplateForbiddenError``（HTTP 403 ``TEMPLATE_NOT_VISIBLE``「无权访问该模板」）。
 
         在触达任何数据层 / 执行查询之前调用；拒绝时不泄露模板内容。
         """
         if not await self.is_visible(template, user=user, db=db, guard=guard):
-            raise TemplateForbiddenError("无权访问该模板：既非所有者，也无有效分享 / 访问权")
+            raise TemplateForbiddenError()
+
+    async def visible_templates(
+        self,
+        user: Any,
+        db: AsyncSession,
+        *,
+        guard: OwnershipGuard | None = None,
+        limit: int = VISIBLE_TEMPLATE_LIMIT,
+    ) -> list[CustomQueryTemplate]:
+        """当前用户可见的模板，按最近修改倒序，最多 ``limit`` 条（R9.2，design §3.6）。
+
+        SQL 只取候选（作者 = 本人，或 scope 可能对他人可见），再逐条按 :meth:`is_visible` 的同一判定过滤，
+        凑满 ``limit`` 条为止 —— 先过滤后截断：较新的不可见模板再多，也挤不掉较旧的可见模板。
+        """
+        g = guard or ownership_guard
+        accessible = await g.get_accessible_project_ids(user, db)
+        user_id = _to_uuid(getattr(user, "id", None))
+        owner = func.coalesce(CustomQueryTemplate.creator_id, CustomQueryTemplate.created_by)
+        stmt = (
+            select(CustomQueryTemplate)
+            .where(or_(owner == user_id, CustomQueryTemplate.scope.in_(_SHARED_SCOPES)))
+            .order_by(CustomQueryTemplate.updated_at.desc(), CustomQueryTemplate.id)
+        )
+        visible: list[CustomQueryTemplate] = []
+        offset = 0
+        while len(visible) < limit:
+            batch = (await db.execute(stmt.offset(offset).limit(_CANDIDATE_BATCH))).scalars().all()
+            visible.extend(t for t in batch if _template_visible_to(t, user_id, accessible))
+            if len(batch) < _CANDIDATE_BATCH:
+                break
+            offset += _CANDIDATE_BATCH
+        return visible[:limit]
+
+    @staticmethod
+    def validate_name(name: Any) -> str:
+        """模板名称校验（去首尾空白后 1–200 字符），非法 → ``TemplateInvalidError``；更新模板时同一口径。"""
+        return _validate_name(name)
+
+    @staticmethod
+    def config_to_request(
+        config: Any,
+        *,
+        project_id: Any,
+        year: int,
+        limit: int | None = None,
+        offset: int | None = None,
+        fallback_source: str | None = None,
+    ) -> dict[str, Any]:
+        """模板 config → 业务视图 execute 请求体（模板执行的唯一翻译，design §3.6；R9.3）。
+
+        - ``source``（缺省用模板的 ``data_source``）；``filters`` 并入顶层 ``cell_range`` / ``sheet_name``；
+          ``conditions`` / ``condition_logic``（大小写归一）；``selected_columns``（或 ``columns``）→ ``columns``；
+          ``sort``，没有时 ``sort_field`` / ``sort_order`` → ``sort``；``page_size``（或 ``limit``）→ ``limit``；
+          ``group`` / ``pivot``；``acnr_targets`` 原样带上（字段归 acnr-foundation-defect-closure D1，用户裁决 Q0）。
+        - ``filter_text`` 是前端的本页显示过滤，不进请求；模板里存的 ``year`` 不用（年度由调用方按请求年度 →
+          目标项目审计年度解析后传入）。
+        - ``limit`` / ``offset`` 以调用方传入为准（翻页），未传才取模板里的值。
+        - 条件里仍有参数占位 ``{"$param": 名}`` ⇒ ``ValueError``：占位须先解析成具体值，不能当字面值去查。
+
+        只翻译、不校验取值：类型与范围由 ``QueryRequest`` 校验（不合格 ⇒ ``ValidationError``，路由转 422）。
+        """
+        cfg = config if isinstance(config, dict) else {}
+        pending = unresolved_params(cfg)
+        if pending:
+            raise ValueError(f"模板条件里的参数「{pending[0]}」尚未取值，未执行查询")
+        filters = cfg.get("filters") or {}
+        if isinstance(filters, dict):  # 不是 dict 的原样交给 QueryRequest 校验（⇒ 422 点名该项），不在这里吞掉
+            filters = {**filters, **{key: cfg[key] for key in ("cell_range", "sheet_name") if cfg.get(key)}}
+        sort = cfg.get("sort")
+        if not sort and cfg.get("sort_field"):
+            descending = str(cfg.get("sort_order") or "").lower() in ("desc", "descending")
+            sort = [{"field": cfg["sort_field"], "direction": "desc" if descending else "asc"}]
+        logic = cfg.get("condition_logic")
+        return {
+            "project_id": str(project_id),
+            "year": year,
+            "source": str(cfg.get("source") or fallback_source or ""),
+            "filters": filters,
+            "columns": cfg.get("selected_columns") or cfg.get("columns") or [],
+            "conditions": cfg.get("conditions") or [],
+            "condition_logic": logic.lower() if isinstance(logic, str) and logic else "and",
+            "limit": limit if limit is not None else (cfg.get("page_size") or cfg.get("limit") or 500),
+            "offset": offset if offset is not None else (cfg.get("offset") or 0),
+            "sort": sort or [],
+            "group": cfg.get("group"),
+            "pivot": cfg.get("pivot"),
+            "acnr_targets": cfg.get("acnr_targets") or [],
+        }
 
     # ── Task 14.2：执行 + 失效引用降级（R13.5 / R13.7）───────────────────────
 

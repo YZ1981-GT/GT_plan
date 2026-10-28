@@ -2,10 +2,21 @@
 
 覆盖：
   - 名称校验（1–200 字符；空 / 空白 / 超 200 → TEMPLATE_INVALID，不建部分记录）
-  - scope 校验与 personal → private 别名归一
-  - 非法 scope → TEMPLATE_INVALID
-  - shared_project_ids 校验（私有/团队写入；global/public 置空；非法 UUID 拒绝）
+  - scope 归一只走 ``TemplateScopeAdapter``：private / team / project / public 入库原值，历史 global → public、
+    personal → private
+  - 非法 scope → TEMPLATE_INVALID（中文原因）
+  - shared_project_ids 只有 project 档写入（去重、按 UUID 文本排序），其余档置空；非法 UUID / project 档为空 → 拒绝
   - service 只 flush 不 commit（调用方 commit）
+
+advanced-query-linkage-closure 任务 24 改写的断言（design §10.1，逐条理由）：
+  - 原「``'private'`` 不是合法输入、``'global'`` 原样入库」：这正是 AQ-16 的根因——路由先经 adapter 把 scope 归一成
+    ``private``，本服务再按自己那份 ``VALID_INPUT_SCOPES`` 判非法 ⇒ 保存恒 500；``project`` 同样被判非法。改为 adapter
+    口径：private / project 合法，历史 global 入库为 public（ADR-AQL-11：入库规范值 private / project / public）。
+  - 原「private / team 也写入分享项目」：adapter 合同里只有 project 档有分享项目（team 的锚点在 ``config.project_id``），
+    私有模板带分享项目自相矛盾 ⇒ 改为置空。
+  - 原「分享项目去重保序」：adapter 去重后按 UUID 文本排序（等价集合不因提交顺序漂移）⇒ 改断言排序后的结果。
+  - 原直接调用的 ``_normalize_scope`` / ``_normalize_shared_project_ids`` 已删除（scope 归一只有 adapter 一处），改经
+    ``save_template`` 断言入库值。
 
 _Requirements: 13.1, 13.2, 13.3_
 """
@@ -19,8 +30,6 @@ import pytest
 from app.services.custom_query.template_service import (
     TemplateInvalidError,
     TemplateService,
-    _normalize_scope,
-    _normalize_shared_project_ids,
     _validate_name,
 )
 
@@ -43,7 +52,15 @@ class _FakeSession:
         self.commit_calls += 1
 
 
-# ─── 纯函数校验 ──────────────────────────────────────────────────────────────
+async def _save(scope, shared=None, *, config=None):
+    db = _FakeSession()
+    tpl = await TemplateService().save_template(
+        db=db, creator_id=uuid.uuid4(), name="测试模板", scope=scope, shared_project_ids=shared, config=config,
+    )
+    return tpl, db
+
+
+# ─── 名称校验 ────────────────────────────────────────────────────────────────
 
 
 def test_validate_name_accepts_valid():
@@ -61,44 +78,67 @@ def test_validate_name_rejects_invalid(bad):
     assert exc.value.error_code == "TEMPLATE_INVALID"
 
 
-def test_normalize_scope_alias_personal_to_private():
-    assert _normalize_scope("personal") == "private"
-    assert _normalize_scope("PERSONAL") == "private"
-    assert _normalize_scope("global") == "global"
-    assert _normalize_scope("team") == "team"
-    assert _normalize_scope("public") == "public"
+# ─── scope 归一（adapter 口径）────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("bad", ["private", "unknown", "", None, 42])
-def test_normalize_scope_rejects_invalid(bad):
-    # 注意：'private' 不是合法输入（合法输入用别名 'personal'）
-    with pytest.raises(TemplateInvalidError):
-        _normalize_scope(bad)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("given", "stored"),
+    [("personal", "private"), ("PERSONAL", "private"), ("private", "private"), ("global", "public"),
+     ("public", "public"), ("team", "team")],
+)
+async def test_scope_is_normalized_by_the_adapter(given, stored):
+    tpl, _db = await _save(given)
+    assert tpl.scope == stored
 
 
-def test_shared_ids_empty_for_all_visible_scopes():
-    pid = str(uuid.uuid4())
-    assert _normalize_shared_project_ids("global", [pid]) == []
-    assert _normalize_shared_project_ids("public", [pid]) == []
+@pytest.mark.asyncio
+async def test_project_scope_is_accepted_with_shared_projects():
+    p1 = uuid.uuid4()
+    tpl, _db = await _save(" Project ", [str(p1)])
+    assert (tpl.scope, tpl.shared_project_ids) == ("project", [p1])
 
 
-def test_shared_ids_written_for_private_and_team():
-    p1, p2 = uuid.uuid4(), uuid.uuid4()
-    out = _normalize_shared_project_ids("private", [str(p1), str(p2)])
-    assert out == [p1, p2]
-    out_team = _normalize_shared_project_ids("team", [p1])
-    assert out_team == [p1]
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("bad", "reason"),
+    [("unknown", "不支持的模板范围：unknown"), ("", "不支持的模板范围："), (None, "scope 必须是字符串"),
+     (42, "scope 必须是字符串")],
+)
+async def test_invalid_scope_is_rejected_with_a_chinese_reason(bad, reason):
+    with pytest.raises(TemplateInvalidError) as exc:
+        await _save(bad)
+    assert exc.value.error_code == "TEMPLATE_INVALID"
+    assert exc.value.message == reason
 
 
-def test_shared_ids_dedup_preserves_order():
-    p1, p2 = uuid.uuid4(), uuid.uuid4()
-    out = _normalize_shared_project_ids("private", [p1, p2, p1])
-    assert out == [p1, p2]
+# ─── 分享项目 ────────────────────────────────────────────────────────────────
 
 
-def test_shared_ids_rejects_invalid_uuid():
-    with pytest.raises(TemplateInvalidError):
-        _normalize_shared_project_ids("private", ["not-a-uuid"])
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["private", "personal", "team", "public", "global"])
+async def test_only_project_scope_keeps_shared_project_ids(scope):
+    tpl, _db = await _save(scope, [str(uuid.uuid4())])
+    assert tpl.shared_project_ids == []
+
+
+@pytest.mark.asyncio
+async def test_project_shared_ids_are_deduplicated_and_sorted():
+    p1, p2 = sorted((uuid.uuid4(), uuid.uuid4()), key=str)
+    tpl, _db = await _save("project", [str(p2), p1, str(p2)])
+    assert tpl.shared_project_ids == [p1, p2]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("shared", "reason"),
+    [(["not-a-uuid"], "共享项目标识非法：not-a-uuid"), (None, "指定项目共享至少需要一个项目"),
+     ([], "指定项目共享至少需要一个项目")],
+)
+async def test_project_scope_rejects_bad_or_missing_projects(shared, reason):
+    with pytest.raises(TemplateInvalidError) as exc:
+        await _save("project", shared)
+    assert exc.value.message == reason
 
 
 # ─── save_template 集成（Fake session）───────────────────────────────────────
@@ -127,38 +167,6 @@ async def test_save_template_persists_and_only_flushes():
     assert db.flush_calls == 1
     assert db.commit_calls == 0
     assert db.added == [tpl]
-
-
-@pytest.mark.asyncio
-async def test_save_template_writes_shared_project_ids():
-    db = _FakeSession()
-    svc = TemplateService()
-    p1 = uuid.uuid4()
-
-    tpl = await svc.save_template(
-        db=db,
-        creator_id=uuid.uuid4(),
-        name="分享模板",
-        scope="team",
-        shared_project_ids=[str(p1)],
-    )
-    assert tpl.shared_project_ids == [p1]
-
-
-@pytest.mark.asyncio
-async def test_save_template_global_ignores_shared_ids():
-    db = _FakeSession()
-    svc = TemplateService()
-
-    tpl = await svc.save_template(
-        db=db,
-        creator_id=uuid.uuid4(),
-        name="全局模板",
-        scope="global",
-        shared_project_ids=[str(uuid.uuid4())],
-    )
-    assert tpl.scope == "global"
-    assert tpl.shared_project_ids == []
 
 
 @pytest.mark.asyncio

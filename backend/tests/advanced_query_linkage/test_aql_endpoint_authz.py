@@ -400,8 +400,9 @@ ROWS: tuple[Row, ...] = (
         codes(401, 403, 403, 403, 200, 403, 403, 403), (custom_query.router,), _TPL, ("templates",)),
     Row("12", "P", (Call("DELETE", f"{CQ}/templates/{{template_id}}", f"{CQ}/templates/{{S}}"),),
         codes(401, 403, 403, 403, 204, 403, 403, 403), (custom_query.router,), _TPL, ("templates",)),
+    # 年度随请求带上（界面执行时总有当前年度；不带时取目标项目审计年度，权限世界的项目没有审计年度 ⇒ 422，另有用例）
     Row("13", "P", (Call("POST", f"{CQ}/templates/{{template_id}}/execute", f"{CQ}/templates/{{S}}/execute",
-                         _body({"project_id": str(X)})),),
+                         _body({"project_id": str(X), "year": YEAR})),),
         codes(401, 403, _x_cycle_empty(), _x_cycle_empty(), _x_trial_balance(), 403, *([_x_trial_balance()] * 2)),
         (custom_query.router,), (*_TPL, *_TB), ("templates", "tb_xy")),
     Row("14", "P", (Call("GET", "/api/recycle-bin", "/api/recycle-bin?item_type=custom_query_template"),),
@@ -490,12 +491,7 @@ def _each(columns: tuple[str, ...], reason: str) -> dict[str, str]:
 
 
 PENDING: dict[str, dict[str, str]] = {
-    "6": _each(_LOGGED_IN, "任务 24（AQ-16）：列表以 scope == 'global' 判公开（入库值是 public），不认 project 共享"),
-    "7": _each(_LOGGED_IN, "任务 24（AQ-16）：save_template 不认 private，TemplateInvalidError 未捕获（500）"),
-    "8": _each(("E", "PM", "AD"), "任务 24（AQ-16）：save_template 不认 project，TemplateInvalidError 未捕获（500）"),
-    "9": _each(("R", "E", "P", "AD"), "任务 24（AQ-16）：详情只认 global 与作者，project 共享不可见"),
-    "13": _each(("A", "R", "E", "SM", "P", "AD"),
-                "任务 24（AQ-16）：project 共享不可见；TemplateForbiddenError 未映射为 403（500）"),
+    # 6~9、13 在任务 24（B8）转正
     # 14~16 的前置（PM 软删 S）对每一列都先执行，硬删时整行在前置处失败
     "14": {"*": "任务 25（AQ-30）：模板是硬删、回收站没有模板类型；另：合入前本地 HEAD 的回收站列表 import 缺失模块 "
                 "app.services.user_display_names（远端已有，BM 合入后补齐）"},

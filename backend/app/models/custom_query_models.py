@@ -24,6 +24,23 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 
 
+class _SqliteUuidList(sa.types.TypeDecorator):
+    """SQLite 测试方言下的 UUID 数组：存成 JSON 文本数组、读回 ``uuid.UUID``，与 PG 的 ``UUID[]`` 同一语义。
+
+    直接用 ``sa.JSON()`` 时元素是 UUID 对象会 ``TypeError: Object of type UUID is not JSON serializable``——
+    「指定项目共享」模板在 SQLite 上一保存就失败（advanced-query-linkage-closure 任务 24 现跑）。PG 不经过这里。
+    """
+
+    impl = sa.JSON
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else [str(item) for item in value]
+
+    def process_result_value(self, value, dialect):
+        return None if value is None else [uuid.UUID(str(item)) for item in value]
+
+
 class CustomQueryTemplate(Base):
     """自定义查询模板。
 
@@ -50,16 +67,17 @@ class CustomQueryTemplate(Base):
     )
     # shared_project_ids: 显式分享的项目 id 列表（scope='personal' + 分享场景）
     # 与 V101 逐列对齐：UUID[] NOT NULL DEFAULT '{}'
-    # NOTE: 数组列需要两处适配，缺任一在 SQLite 测试方言下都会炸：
+    # NOTE: 数组列需要三处适配，缺任一在 SQLite 测试方言下都会炸：
     #   ① 方言变体 —— SQLite 无 ARRAY 类型，绑定 list 参数直接
     #      `ProgrammingError: type 'list' is not supported`，故退化为 JSON；
     #   ② Python 侧 `default=list` —— PG 数组字面量 `'{}'` 作为 server_default
     #      在 SQLite 上被当普通字符串存入，读回时 ARRAY 的 item processor 会对
     #      "{}" 逐字符调 `UUID()` → `badly formed hexadecimal UUID string`。
     #      显式 default 使 INSERT 自带空列表，两种方言行为一致。
+    #   ③ UUID 元素 —— JSON 序列化不认 UUID 对象，``_SqliteUuidList`` 存文本、读回 UUID。
     # PG 侧语义完全不变（仍是 UUID[] / TEXT[] + GIN 索引）。
     shared_project_ids: Mapped[list[uuid.UUID]] = mapped_column(
-        ARRAY(PG_UUID(as_uuid=True)).with_variant(sa.JSON(), "sqlite"),
+        ARRAY(PG_UUID(as_uuid=True)).with_variant(_SqliteUuidList(), "sqlite"),
         nullable=False,
         default=list,
         server_default=sa.text("'{}'"),

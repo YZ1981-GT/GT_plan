@@ -660,14 +660,22 @@ class TestReadonlyGateConvergence:
 
     @pytest.mark.asyncio
     async def test_template_execute_inaccessible_target_project_403(self, monkeypatch):
-        """模板执行使用无权项目 → 403（模板执行复用 execute_query 主链路）。"""
+        """模板执行使用无权项目 → 403。
+
+        advanced-query-linkage-closure 任务 24：目标项目归属在端点函数体内先于年度解析校验（``ownership_guard``），
+        403 来自那里（execute_query 主链路的同一判定仍在，见下面替换的 adapter）。越权审计的写入换成记录桩：
+        真实写入会经本机 Redis 进共享库的审计表（任务 26 查到过测试假用户的审计泄漏）。
+        """
         import app.routers.custom_query as router_module
+        from app.services.audit_logger_enhanced import audit_logger
         from app.services.custom_query.execute_compatibility import ExecuteCompatibilityAdapter
         from app.services.custom_query.template_service import template_service as ts_inst
 
         async def reject_adapter(self, body, *, user, db):
             raise HTTPException(status_code=403, detail={"error_code": "FORBIDDEN_PROJECT", "message": "无权访问该项目数据"})
 
+        audited = AsyncMock()
+        monkeypatch.setitem(vars(audit_logger), "log_action", audited)
         monkeypatch.setattr(ExecuteCompatibilityAdapter, "execute", reject_adapter)
         monkeypatch.setattr("app.services.gin_index_monitor.is_index_building", lambda: False)
 
@@ -684,10 +692,9 @@ class TestReadonlyGateConvergence:
         async def pass_exec(tpl, *, user, db):
             return None
 
-        monkeypatch.setattr(ts_inst, "assert_executable", pass_exec)
+        monkeypatch.setitem(vars(ts_inst), "assert_executable", pass_exec)
 
-        # The template execute delegates to execute_query which goes through the adapter
-        # which will raise 403 on the target project
+        # 目标项目归属先于年度解析与取数校验：无权项目 → 403 FORBIDDEN_PROJECT，并记一条越权审计
         with pytest.raises(HTTPException) as exc:
             await router_module.execute_template(
                 template_id="00000000-0000-0000-0000-000000000001",
@@ -697,6 +704,8 @@ class TestReadonlyGateConvergence:
                 current_user=SimpleNamespace(id="u1"),
             )
         assert exc.value.status_code == 403
+        assert exc.value.detail["error_code"] == "FORBIDDEN_PROJECT"
+        assert audited.await_count == 1
 
     @pytest.mark.asyncio
     async def test_multi_target_one_inaccessible_rejects_all_not_partial(self, monkeypatch):

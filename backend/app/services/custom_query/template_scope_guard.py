@@ -13,6 +13,7 @@ _Requirements: 8.1, 8.2, 8.3, 8.5
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
@@ -24,7 +25,11 @@ from app.services.custom_query.template_scope_adapter import (
     TemplateScopeAdapter,
     TemplateScopeValidationError,
 )
-from app.services.custom_query.template_service import template_service
+from app.services.custom_query.template_service import (
+    ERR_CODE_TEMPLATE_NOT_VISIBLE,
+    TEMPLATE_NOT_VISIBLE_MESSAGE,
+    template_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,14 +68,36 @@ def _normalize_template_scope(
 
 
 
+def _template_not_visible() -> HTTPException:
+    """读取 / 执行 / 修改不可见模板：403 ``TEMPLATE_NOT_VISIBLE``「无权访问该模板」（advanced-query-linkage-closure R9.2）。"""
+    return HTTPException(
+        status_code=403,
+        detail={"error_code": ERR_CODE_TEMPLATE_NOT_VISIBLE, "message": TEMPLATE_NOT_VISIBLE_MESSAGE},
+    )
+
+
+async def _load_template(db: Any, template_id: Any) -> CustomQueryTemplate:
+    """按路径参数取模板：标识非法 400 ``INVALID_TEMPLATE_ID``，不存在 404 ``TEMPLATE_NOT_FOUND``。"""
+    try:
+        tpl_uuid = uuid.UUID(str(template_id))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID", "message": "模板标识非法"}
+        ) from None
+    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
+    if tpl is None:
+        raise HTTPException(
+            status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND", "message": "模板不存在或已删除"}
+        )
+    return tpl
+
+
 async def _assert_template_visible(
     tpl: CustomQueryTemplate, *, current_user: Any, db: Any
 ) -> None:
     """模板可见性校验，复用 TemplateService 的单一判定（R8.1）。"""
     if not await template_service.is_visible(tpl, user=current_user, db=db):
-        raise HTTPException(
-            status_code=403, detail={"error_code": "TEMPLATE_NOT_VISIBLE"}
-        )
+        raise _template_not_visible()
 
 
 def _template_owner_id(tpl: CustomQueryTemplate) -> Any:
