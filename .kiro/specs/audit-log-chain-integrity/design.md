@@ -29,6 +29,8 @@
 
 **Task 0 重算（2026-10-29，HEAD `1fc47bb3a`）**：15 行全部复核，DB 数字无变化——total 1836 / 403 链 / 全局 948 / 链尾 404 / 分叉 1（同一处 `9f4c6bb42517`）/ 断头 0 / v1 不符 12 / 同链同 ts 49 组；AST 41 处 / 25 文件、吞异常 20 处（去重后）/ 11 文件、begin_nested 2 处、AuditLogEntry 构造 4 处（绕过 3 处）、哈希副本 4 份；取锁点数量 12（`chain_orchestrator` 实际用 asyncio.Lock 不用 advisory，不变）。迁移三路合扫：git 最高 V216、磁盘最高 V216（V212 仅磁盘未入 git）、共享库 schema_version 最高 V217（V218~V220 仍未入库）⇒ ≥ V221 仍有效。探针输出存 `tmp_audit_chain/baseline/`。
 
+**设计复核补充（2026-10-29，共享库只读 + 整合树 AST）**：①第 7 行 11 行 `cell_writeback` 的不符原因已查明：写入时参与哈希的 `object_id` 是调用方传入的 32 位十六进制原串（无连字符，与载荷里的 `wp_code` 相同），而 `object_id` 列存的是规范化后的带连字符 UUID；按无连字符写法重算，11 行全部一致（每行试 560 种组合，命中都是这一种）。对照组 2026-10-27 的 4 行 `cell_writeback` 按带连字符写法一致。`formula.changed` 那 1 行试 240 种组合都不命中，`resource_id` 原值没有落库，无法重算。⇒ ADR-04 的 v1 重算改为对 `object_id` / `user_id` 依次试两种写法，`legacy_unverifiable` 预期从 12 降为 1。②第 12 行的锁清单更正：`chain_orchestrator` 的 `_try_acquire_lock` 用进程内 `asyncio.Lock`（模块文档写的 `pg_advisory_xact_lock` 已过时），不是咨询锁，应去掉。按「非文档字符串里的 SQL，含 f-string」口径现算，事务级咨询锁共 13 个取锁函数 / 11 个模块：`formula_settings.engine` 的 `lock_domain`（f-string，有共享 / 排他两种）与 `lock_project`、`workpaper_sync.repository` 的 `lock_workpaper` 与 `try_lock_workpaper`，其余 9 个模块各 1 个（`draft_refresh_service`、`draft_refresh_orchestrator`、`formula_push.engine`、`consol_push_service`、`consol_elimination_sheet_service`、`consol_note_formula_service`、`formula_settings.template_sync`、`attachment_service` 版本链、`adjustment_service` 编号）。另有会话级咨询锁 3 处（`migration_runner`、`workpaper_sync.repository.lock_room_oo_apply`、`workers/_leader_lock`）。ADR-09 的探测器按 `pg_(try_)?advisory_(xact_)?lock(_shared)?` 匹配语句，才能覆盖 `try_lock_workpaper`、`lock_domain` 的共享锁与会话级锁。审计 worker 自己的 `_write_batch` 由本 spec 重写，不计。
+
 ## 2. 架构裁定
 
 **ADR-ALC-01 单一写链内核。** 新包 `backend/app/services/audit_chain/`（每个模块 ≤ 300 行）：
@@ -48,7 +50,7 @@
 
 **ADR-ALC-03 分叉确认先于 fail-closed（I2、I4）。** 确认条目：`action_type='audit.fork_ack'`、`object_type='audit_log_entry'`，载荷含 `survivor_entry_id / dead_entry_id / reason / operator_id`，`prev_hash` = survivor 的 `entry_hash`，直接插入、不经链尾查找。前置校验在链锁内做：该链未确认链尾集合恰为 {survivor, dead}，否则拒绝并列出实际集合。入口只有命令行 `backend/scripts/ops/audit_chain_fork_ack.py`（默认只读演示，`--apply` 才写，`--operator` 必须是 admin 用户），不开 HTTP 端点。交付分两批：批 A 只读扫描、确认工具、健康字段、校验端点；用户在共享库执行确认（§7 Y1）后再合入批 B 的 fail-closed 代码。批 B 合入前的检查记录必须含「共享库未确认分叉 = 0」的扫描输出。
 
-**ADR-ALC-04 v2 可重放哈希（I6）。** 参与哈希的字段：`{"v": 2, "ts", "user_id", "action_type", "object_type", "resource_id", "project_id", "year", "payload", "prev_hash"}`，`json.dumps(..., sort_keys=True, ensure_ascii=False, separators=(",", ":"))` 后 sha256。`ts` 由应用生成、写库与哈希用同一个值，格式 `astimezone(UTC).isoformat(timespec="microseconds")`；`resource_id` 用调用方原字符串（解决 §1 第 7 行的 `object_id` 丢失）；`payload` 是规范化后的业务载荷。落库载荷另带保留键 `_hash_v: 2`、`_resource_id`、`_year`（调用方给了年度才写），保留键不进 `payload` 字段的哈希输入。浮点存成定点字符串后，JSONB 往返不再改变数字写法（`1e20` 原先会变成 `100000000000000000000`）。没有 `_hash_v` 的旧行按 v1 公式重算：一致计 `legacy_verified`，不一致计 `legacy_unverifiable`，不算断链；链接关系照常校验。载荷读者（公式历史、时间轴等读 `result_value` 之类数值字段的地方）实施时逐个现读，数值改成字符串后展示不受影响的才放行，否则在读者处转回数值。
+**ADR-ALC-04 v2 可重放哈希（I6）。** 参与哈希的字段：`{"v": 2, "ts", "user_id", "action_type", "object_type", "resource_id", "project_id", "year", "payload", "prev_hash"}`，`json.dumps(..., sort_keys=True, ensure_ascii=False, separators=(",", ":"))` 后 sha256。`ts` 由应用生成、写库与哈希用同一个值，格式 `astimezone(UTC).isoformat(timespec="microseconds")`；`resource_id` 用调用方原字符串（解决 §1 第 7 行的 `object_id` 丢失）；`payload` 是规范化后的业务载荷。落库载荷另带保留键 `_hash_v: 2`、`_resource_id`、`_year`（调用方给了年度才写），保留键不进 `payload` 字段的哈希输入。浮点存成定点字符串后，JSONB 往返不再改变数字写法（`1e20` 原先会变成 `100000000000000000000`）。没有 `_hash_v` 的旧行按 v1 公式重算：`object_id` / `user_id` 依次试带连字符与无连字符（32 位十六进制）两种写法（同一 UUID 值的两种写法，不放宽内容校验；依据见 §1 设计复核补充①），任一写法一致计 `legacy_verified`，都不一致计 `legacy_unverifiable`，不算断链；链接关系照常校验。载荷读者（公式历史、时间轴等读 `result_value` 之类数值字段的地方）实施时逐个现读，数值改成字符串后展示不受影响的才放行，否则在读者处转回数值。
 
 **ADR-ALC-05 按链接关系校验（I7）。** `GET /api/audit-logs/verify-chain` 鉴权不变。读出整条链（只取校验需要的列），按 `entry_hash → 条目`、`prev_hash → 后继列表` 建索引，从创世条目沿链走：
 
@@ -75,7 +77,7 @@ AST 守卫 `tests/audit_chain/test_audit_call_site_policy.py`：全仓每个 `ap
 
 **ADR-ALC-08 绕过写入方收口。** §1 第 8 行三处改为调 `append_audit_log`（`unlock`、`sync_from_html` 记 `mandatory`；`confirm-warning` 见 §7 Y3）。AST 守卫：`AuditLogEntry(` 构造只允许出现在 `audit_chain/head.py`、`audit_chain/forks.py`；`backend/app` 内任何 SQL 文本不得含 `INSERT INTO audit_log_entries`；守卫带违规样本自检。
 
-**ADR-ALC-09 锁顺序（I5）。** `lock_order.py` 在 `Session` 上挂 `do_orm_execute` 监听：语句含 `pg_advisory_xact_lock` / `pg_advisory_lock` 时，若本事务已持有审计链锁且这次不是审计链锁 ⇒ 记一次违规；同一事务取第二条审计链锁时链键必须大于已持有的全部链键，否则也记违规。`after_transaction_end` 清空记录。设 `GT_AUDIT_LOCK_ORDER_STRICT=1`（测试 conftest 设置）时违规抛 `AuditLockOrderViolation`，生产只记 error 日志与计数。新增 `append_audit_log_batch(db, payloads)`：按链键升序写入，同一事务写多条链的调用方（`formula_settings.audit` 的逐项目留痕等，实施时现扫）改用它。存量违规以严格模式跑回归得出，能挪到事务末尾的就挪，挪不了的进白名单（写理由，只许变短）。
+**ADR-ALC-09 锁顺序（I5）。** `lock_order.py` 在 `Session` 上挂 `do_orm_execute` 监听：语句匹配 `pg_(try_)?advisory_(xact_)?lock(_shared)?` 时，若本事务已持有审计链锁且这次不是审计链锁 ⇒ 记一次违规；同一事务取第二条审计链锁时链键必须大于已持有的全部链键，否则也记违规。`after_transaction_end` 清空记录。设 `GT_AUDIT_LOCK_ORDER_STRICT=1`（测试 conftest 设置）时违规抛 `AuditLockOrderViolation`，生产只记 error 日志与计数。新增 `append_audit_log_batch(db, payloads)`：按链键升序写入，同一事务写多条链的调用方（`formula_settings.audit` 的逐项目留痕等，实施时现扫）改用它。存量违规以严格模式跑回归得出，能挪到事务末尾的就挪，挪不了的进白名单（写理由，只许变短）。
 
 **ADR-ALC-10 健康检查字段（I4）。** `/api/health` 增 `audit_chain{unacknowledged_forks, quarantined_entries, checked_at}`：`unacknowledged_forks > 0` 或 `quarantined_entries > 0` ⇒ `degraded`。分叉数用 `prev_hash` 索引分组统计后减去已确认的分支，结果进程内缓存 300 秒；隔离区条数用 `SCAN audit:log:quarantine:*` + `LLEN` 求和，Redis 不可用时该项为 `null` 且不参与判定。端点无需登录，只暴露计数。
 
@@ -118,7 +120,7 @@ AST 守卫 `tests/audit_chain/test_audit_call_site_policy.py`：全仓每个 `ap
 | 惰性初始化在大链上首写变慢 | `prev_hash` 与链键两个索引；运维脚本可预先写链尾行 |
 | 多进程 worker 与请求并发写同一链 | 同一个咨询锁键（`hashtextextended`，跨进程稳定）；worker 每链一个事务 |
 | 载荷浮点改字符串影响读者 | ADR-04 的读者现读；只改新写入的行，旧行不动 |
-| 11 行测试垃圾与 1 行 `formula.changed` 永远 `legacy_unverifiable` | 不删（审计表只追加）；校验结果单列，不算断链 |
+| 1 行 `formula.changed` 永远 `legacy_unverifiable`（11 行测试写入的 `cell_writeback` 按无连字符写法可重算，计 `legacy_verified`） | 不删（审计表只追加）；校验结果单列，不算断链 |
 
 ## 7. 待用户拍板
 

@@ -15,6 +15,8 @@ platform-architecture-convergence Task 12：
 Validates: Requirements 4.8, 4.9
 """
 
+import time
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -77,17 +79,23 @@ async def health_check(
     migration_info = await _query_migration_status()
     drift_info = await _query_schema_drift()
 
+    # 审计链健康（ADR-ALC-10）
+    audit_chain_info = await _query_audit_chain_health(ctx.db)
+
     # 状态判定
     #
     # degraded 只看「critical 漂移」（schema_drift_detector.CRITICAL_DRIFT_TYPES —— 会导致
-    # 业务接口运行时 500 / 插入失败，或已应用迁移的编辑静默丢失）+ 迁移失败。INFO 级 db_extra（DB 历史残留表/列，
-    # 如 deleted_at 软删列、raw SQL 建的表）和 WARN 级 type_mismatch 仅作可观测
-    # 暴露，不翻 degraded banner——否则共库残留噪音会让 health 永远 degraded。
-    # 与启动 self-check（startup_registry.run_schema_drift_check，count_critical）口径一致。
+    # 业务接口运行时 500 / 插入失败，或已应用迁移的编辑静默丢失）+ 迁移失败 + 审计链分叉。
+    # INFO 级 db_extra（DB 历史残留表/列，如 deleted_at 软删列、raw SQL 建的表）和
+    # WARN 级 type_mismatch 仅作可观测暴露，不翻 degraded banner。
     if not all_healthy:
         status = "unhealthy"
         status_code = 503
-    elif migration_info["failures"] or drift_info["critical_count"] > 0:
+    elif (
+        migration_info["failures"]
+        or drift_info["critical_count"] > 0
+        or audit_chain_info["unacknowledged_forks"] > 0
+    ):
         status = "degraded"
         status_code = 200
     else:
@@ -102,10 +110,45 @@ async def health_check(
             "redis": redis_details,
             "migration": migration_info,
             "schema_drift": drift_info,
+            "audit_chain": audit_chain_info,
             # 启动报告只读进程内快照，不做 I/O；best_effort 失败不翻 status（Req 6.x）
             "startup": startup_report_as_dict(),
         },
     )
+
+
+# ── 审计链健康缓存（进程级，300 秒） ──────────────────────────────
+_audit_chain_cache: dict[str, object] = {"data": None, "ts": 0.0}
+_AUDIT_CHAIN_CACHE_TTL = 300  # 秒
+
+
+async def _query_audit_chain_health(db) -> dict:
+    """查询未确认分叉数（带进程级 300s 缓存）。"""
+    now = time.monotonic()
+    if (
+        _audit_chain_cache["data"] is not None
+        and now - _audit_chain_cache["ts"] < _AUDIT_CHAIN_CACHE_TTL
+    ):
+        return _audit_chain_cache["data"]
+
+    from datetime import datetime, timezone
+
+    try:
+        from app.services.audit_chain.forks import scan_forks
+
+        forks = await scan_forks(db)
+        unack = sum(1 for f in forks if len(f.get("survivors", [])) > 1)
+    except Exception:
+        unack = 0
+
+    result = {
+        "unacknowledged_forks": unack,
+        "quarantined_entries": 0,  # batch A 硬编码，batch B 加真实隔离区
+        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    _audit_chain_cache["data"] = result
+    _audit_chain_cache["ts"] = now
+    return result
 
 
 async def _query_migration_status() -> dict:
