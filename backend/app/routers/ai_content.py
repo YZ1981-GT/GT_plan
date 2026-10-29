@@ -28,7 +28,12 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, assert_project_permission
+from app.deps import (
+    assert_project_permission,
+    check_consol_lock,
+    get_current_user,
+    require_project_access,
+)
 from app.models.core import User
 from app.services import ai_content_log_service
 
@@ -197,73 +202,71 @@ def _note_target_id(log) -> UUID | None:
 async def _writeback_note(db: AsyncSession, log, user, note_id: UUID) -> dict:
     """把确认 / 修订后的 AI 文本追加进附注 ``text_content``。
 
-    走 DisclosureEngine.update_note（盖编辑戳 + 协调器语义）。
+    经 ``DisclosureEngine(db).update_note`` 写入（盖「最近一次编辑」），提交后由调用方发 NOTE_SECTION_SAVED。
     写前检查 edit 权限和合并锁，不满足则抛 HTTPException（由调用方捕获回滚）。
     """
     # edit 无权 → 403
     await assert_project_permission(db, user, log.project_id, "edit")
 
-    # 合并锁 → 423
-    from app.services.consol_lock_service import check_consol_lock
-    await check_consol_lock(db, log.project_id)
+    # 合并锁 → 423（锁定时 check_consol_lock 抛 HTTPException(423)）
+    await check_consol_lock(project_id=log.project_id, db=db)
 
     content = log.revised_content if log.revised_content else log.generated_content
     if not content or not content.strip():
         return {"written": False, "reason": "AI 内容为空，未写入"}
 
+    from sqlalchemy import select
+
+    from app.models.report_models import DisclosureNote
     from app.services.disclosure_engine import DisclosureEngine
 
-    # 读当前附注正文，追加 AI 文本
-    from sqlalchemy import select, text as sa_text
+    # 只认本日志所属项目里未删除的附注：上面的 edit 权限与合并锁都按 log.project_id 判，
+    # 写入目标必须在同一个项目里（target_cell 里的附注 id 是存下来的字符串，不能单凭它跨项目写）。
+    # 用 ORM 比较 UUID：原生 SQL 绑 str(uuid) 在 SQLite（存 32 位十六进制）上恒匹配不到。
     row = (await db.execute(
-        sa_text("SELECT text_content, note_section, project_id FROM disclosure_notes WHERE id = :nid"),
-        {"nid": str(note_id)},
-    )).fetchone()
+        select(DisclosureNote.text_content, DisclosureNote.note_section, DisclosureNote.year).where(
+            DisclosureNote.id == note_id,
+            DisclosureNote.project_id == log.project_id,
+            DisclosureNote.is_deleted.is_(False),
+        )
+    )).first()
 
-    if not row:
+    if row is None:
         return {"written": False, "reason": "附注不存在"}
 
-    current_text = row[0] or ""
-    note_section = row[1]
+    current_text = row.text_content or ""
     separator = "\n\n---\n\n" if current_text.strip() else ""
     new_text = current_text + separator + content.strip()
 
-    await DisclosureEngine.update_note(
-        db=db,
-        note_id=note_id,
+    # update_note 是实例方法：盖「最近一次编辑」并走附注写入的统一校验
+    note = await DisclosureEngine(db).update_note(
+        note_id,
         text_content=new_text,
         user_id=user.id,
     )
+    if note is None:
+        return {"written": False, "reason": "附注不存在"}
     await db.flush()
-
-    # 取附注年度（用于 NOTE_SECTION_SAVED 事件）
-    note_year = None
-    try:
-        yr_row = (await db.execute(
-            sa_text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
-            {"pid": str(log.project_id)},
-        )).scalar()
-        note_year = yr_row
-    except Exception:
-        pass
 
     return {
         "written": True,
-        "note_section": note_section,
-        "note_year": note_year,
+        "note_section": row.note_section,
+        "note_year": row.year,
     }
 
 
 async def _note_saved_event(note_id, project_id, note_year, note_section):
     """发 NOTE_SECTION_SAVED 事件（附注刷新 / 下游失效）。失败不回滚已提交内容。"""
     try:
-        from app.services.event_bus import event_bus, EventPayload
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        # 与附注编辑端点（disclosure_notes.update_note）同一载荷：订阅方从 extra.section_code 定位章节
         await event_bus.publish(EventPayload(
-            event_type="NOTE_SECTION_SAVED",
-            source_id=str(note_id),
-            project_id=str(project_id),
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
             year=note_year,
-            detail={"note_section": note_section},
+            extra={"section_code": note_section or str(note_id), "action": "update"},
         ))
     except Exception:
         logger.warning("AI 确认写附注已提交但 NOTE_SECTION_SAVED 发布失败", exc_info=True)

@@ -186,3 +186,9 @@ backend/scripts/diagnose/_mutation_reports/
 # 临时 commit message 文件（PowerShell 下长中文 commit message 只能走 -F <file>；
 # 2026-09-22 实测 `git add -A` 会抢在 `git commit -F` 读取之前把它一起提交进去）
 _commit_msg.tmp
+
+# 从仓库根启动进程 / 跑测试时落下的日志（后端自身日志在 backend/logs/，已忽略）
+/logs/
+# 附注绑定脚本写前自动备份（normalize_note_bindings / generate_note_formula_data 按需自建目录；
+# 绑定文件本身已入库，历史版本看 git log）
+backend/data/note_template_bindings_backup/
