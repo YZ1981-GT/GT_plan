@@ -643,7 +643,6 @@ export const customQuery = {
   execute: '/api/custom-query/execute',
   /** 业务视图「导出全部」：按当前查询服务端流式导出全量结果（R8.1，advanced-query-linkage-closure 任务 28 / 29） */
   export: '/api/custom-query/export',
-  cellWriteback: '/api/custom-query/cell-writeback',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
   /** 按当前项目执行模板（服务端重新鉴权、可翻页；年度缺省取目标项目审计年度，R9.3） */
