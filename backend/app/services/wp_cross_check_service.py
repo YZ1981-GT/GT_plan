@@ -290,15 +290,15 @@ class CrossCheckService:
         self, project_id: UUID, year: int, rule: dict
     ) -> dict:
         """执行 ABS 比较规则（如 XR-08 利息收支合理性）"""
-        # 简化：标记为 skip（需要底稿数据支持）
+        # ADR-CCN-04: 未实现的规则标 not_executed 而非 skip，使签字门禁可见
         return {
             "rule_id": rule["rule_id"],
             "description": rule.get("description", ""),
-            "status": "skip",
+            "status": "not_executed",
             "left_amount": None,
             "right_amount": None,
             "difference": None,
-            "details": {"reason": "ABS 比较规则需要底稿数据，暂跳过"},
+            "details": {"reason": "利息合理性规则尚未实现"},
         }
 
     # ─── 表达式求值 ───────────────────────────────────────────────────────────

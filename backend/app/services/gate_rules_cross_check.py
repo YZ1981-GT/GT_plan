@@ -1,23 +1,30 @@
 """跨科目校验门禁规则
 
 Sprint 4 Task 4.8: 集成到签字前门禁 gate_engine（CROSS_CHECK_PASSED 规则）
+S2 ADR-CCN-04: XR 进签字判据 — 年度单一来源 + 结果转五态 + observe/enforce
 """
 
 import logging
+import os
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.phase14_enums import GateType
+from app.models.phase14_enums import GateType, GateSeverity
 from app.services.gate_engine import GateRule, GateRuleHit, rule_registry
 
 logger = logging.getLogger(__name__)
+
+# observe/enforce 模式：observe 下 blocking 降为 warning，enforce 下保留 blocking
+_ENFORCEMENT_MODE = os.environ.get("CONSISTENCY_GATE_ENFORCEMENT", "observe")
 
 
 class CrossCheckPassedRule(GateRule):
     """跨科目校验通过规则
 
-    签字前门禁：检查所有 blocking 级别的跨科目校验规则是否通过。
+    签字前门禁：检查所有跨科目校验规则结果，按五态转换并汇总。
+    ADR-CCN-04: 年度取 fetch_project_audit_year，skip→not_executed，
+    observe/enforce 决定返回 severity。
     """
 
     rule_code = "R4-CROSS-CHECK"
@@ -27,47 +34,141 @@ class CrossCheckPassedRule(GateRule):
     async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
         """检查跨科目校验是否全部通过"""
         from app.services.wp_cross_check_service import CrossCheckService
+        from app.services.project_audit_year import fetch_project_audit_year
 
         project_id = context.get("project_id")
         if not project_id:
             return None
 
-        # 从 context 获取年度，默认当前年
-        year = context.get("year")
+        # ── 年度单一来源（ADR-CCN-04）───────────────────────────
+        year = context.get("year") or await fetch_project_audit_year(db, project_id)
         if not year:
-            # 尝试从项目数据获取年度（working_paper 无 year 列；
-            # 用 trial_balance.year，无则用 projects.audit_period_end 推导）
-            import sqlalchemy as sa
-            try:
-                q = sa.text("""
-                    SELECT year FROM trial_balance
-                    WHERE project_id = :pid AND year IS NOT NULL
-                    ORDER BY year DESC LIMIT 1
-                """)
-                result = await db.execute(q, {"pid": str(project_id)})
-                row = result.first()
-                year = row[0] if row else None
-            except Exception:
-                year = None
+            return self.not_executed("项目未设置审计年度，未运行跨科目校验")
 
-        if not year:
-            # 无法确定年度，跳过检查
+        # ── 执行全量校验 ────────────────────────────────────────
+        svc = CrossCheckService(db)
+        results = await svc.execute(project_id, year, trigger="sign_off")
+
+        # ── 结果转五态（ADR-CCN-01）────────────────────────────
+        failed_items: list[dict] = []
+        not_executed_items: list[dict] = []
+        error_items: list[dict] = []
+        all_passed = True
+
+        for r in results:
+            status = r.get("status", "")
+            rule_id = r.get("rule_id", "")
+            description = r.get("description", "")
+            details = r.get("details") or {}
+
+            if status == "pass":
+                continue
+            elif status == "fail":
+                all_passed = False
+                # 查规则定义获取 severity
+                rule_severity = _get_rule_severity(rule_id)
+                failed_items.append({
+                    "rule_id": rule_id,
+                    "description": description,
+                    "severity": rule_severity,
+                    "left": r.get("left_amount"),
+                    "right": r.get("right_amount"),
+                    "diff": r.get("difference"),
+                })
+            elif status in ("skip", "not_executed"):
+                all_passed = False
+                reason = details.get("reason", "数据不足或规则未实现")
+                not_executed_items.append({
+                    "rule_id": rule_id,
+                    "description": description,
+                    "reason": reason,
+                })
+            elif status == "error":
+                all_passed = False
+                error_msg = details.get("error", "未知错误")
+                error_items.append({
+                    "rule_id": rule_id,
+                    "description": description,
+                    "error": error_msg,
+                })
+            else:
+                # 未知状态视为 error
+                all_passed = False
+                error_items.append({
+                    "rule_id": rule_id,
+                    "description": description,
+                    "error": f"未知结果状态: {status}",
+                })
+
+        # ── 全部通过 → 放行 ─────────────────────────────────
+        if all_passed:
             return None
 
-        svc = CrossCheckService(db)
-        passed = await svc.check_for_sign_off(project_id, year)
+        # ── 汇总 severity ────────────────────────────────────
+        has_blocking_fail = any(
+            item.get("severity") == "blocking" for item in failed_items
+        )
 
-        if not passed:
-            return GateRuleHit(
-                rule_code=self.rule_code,
-                error_code=self.error_code,
-                severity=self.severity,
-                message="跨科目校验存在 blocking 级别失败项，请先修正差异",
-                location={"project_id": str(project_id), "year": year},
-                suggested_action="执行跨科目校验并修正所有 blocking 差异",
+        # observe 下一律 warning；enforce 下有 blocking 级 failed 才 blocking
+        enforcement = os.environ.get("CONSISTENCY_GATE_ENFORCEMENT", "observe")
+        if enforcement == "enforce" and (
+            has_blocking_fail or not_executed_items or error_items
+        ):
+            hit_severity = GateSeverity.blocking
+        else:
+            hit_severity = GateSeverity.warning
+
+        # ── 拼消息（最多列 3 条问题）──────────────────────────
+        problem_lines: list[str] = []
+        for item in failed_items[:3]:
+            problem_lines.append(
+                f"{item['rule_id']}({item['description']}): "
+                f"差额 {item.get('diff', '?')}"
+            )
+        for item in not_executed_items[:max(0, 3 - len(problem_lines))]:
+            problem_lines.append(
+                f"{item['rule_id']}({item['description']}): "
+                f"未执行 - {item.get('reason', '')}"
+            )
+        for item in error_items[:max(0, 3 - len(problem_lines))]:
+            problem_lines.append(
+                f"{item['rule_id']}({item['description']}): "
+                f"异常 - {item.get('error', '')}"
             )
 
-        return None
+        total_problems = (
+            len(failed_items) + len(not_executed_items) + len(error_items)
+        )
+        extra_count = total_problems - len(problem_lines)
+        if extra_count > 0:
+            problem_lines.append(f"还有 {extra_count} 条")
+
+        message = "跨科目校验未全部通过：" + "；".join(problem_lines)
+
+        return GateRuleHit(
+            rule_code=self.rule_code,
+            error_code=self.error_code,
+            severity=hit_severity,
+            message=message,
+            location={
+                "project_id": str(project_id),
+                "year": year,
+                "failed_count": len(failed_items),
+                "not_executed_count": len(not_executed_items),
+                "error_count": len(error_items),
+            },
+            suggested_action="执行跨科目校验并修正差异，或确认已知偏差",
+        )
+
+
+def _get_rule_severity(rule_id: str) -> str:
+    """从规则库获取规则的 severity，默认 warning"""
+    from app.services.wp_cross_check_service import load_rules
+
+    for rule in load_rules():
+        if rule.get("rule_id") == rule_id:
+            return rule.get("severity", "warning")
+    return "warning"
 
 
 def register_cross_check_rules():

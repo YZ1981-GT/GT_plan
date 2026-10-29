@@ -45,7 +45,7 @@
     {
       "rule_id": "XR-05",
       "description": "未分配利润等式",
-      "formula": "WP('M6','审定表','期末') == WP('M6','审定表','期初') + TB_SUM('5001~6999','审定数') - WP('M5','审定表','本期提取') - WP('M1','审定表','本期分配')",
+      "formula": "WP('M6','审定表','期末') == WP('M6','审定表','期初') + SUM_TB('5001~6999','审定数') - WP('M5','审定表','本期提取') - WP('M1','审定表','本期分配')",
       "tolerance": 0.01,
       "severity": "blocking",
       "applicable_stages": ["completion"],

@@ -145,6 +145,8 @@ _SIGN_OFF_RULE_CATEGORY: dict[str, str] = {
     "R7-SUBSEQUENT": "subsequent_events",
     "R7-GOING-CONCERN": "going_concern",
     "R7-MGMT-REP": "mgmt_representation",
+    # S2 ADR-CCN-04：跨科目校验签字门禁
+    "R4-CROSS-CHECK": "misc",
 }
 
 _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
@@ -169,6 +171,8 @@ _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
     "R7-SUBSEQUENT": "subsequent_events",
     "R7-GOING-CONCERN": "going_concern",
     "R7-MGMT-REP": "mgmt_representation",
+    # S2 ADR-CCN-04：跨科目校验签字门禁
+    "R4-CROSS-CHECK": "misc",
 }
 
 
