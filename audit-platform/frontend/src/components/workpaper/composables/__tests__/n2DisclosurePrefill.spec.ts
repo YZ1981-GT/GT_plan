@@ -4,7 +4,13 @@
  * spec: .kiro/specs/n2-disclosure-and-extraction-alignment/ Task 4.3
  */
 import { describe, it, expect } from 'vitest'
-import { prefillFromAdjudication, N2_LISTED_TAX_ITEMS, N2_SOE_TAX_ITEMS } from '../useN2DisclosureTables'
+import { ref } from 'vue'
+import {
+  prefillFromAdjudication,
+  N2_LISTED_TAX_ITEMS,
+  N2_SOE_TAX_ITEMS,
+  useN2DisclosureTables,
+} from '../useN2DisclosureTables'
 import { computeN2SoeEnd, type N2DisclosureVariant } from '../n2NoteSectionMap'
 import { N2_FIXED_TAX_LABELS } from '../n2TaxLabelMap'
 
@@ -235,5 +241,44 @@ describe('动态增行', () => {
     // 印花税应在固定 13 行之后
     const idx = result.listedRows!.indexOf(stampRow!)
     expect(idx).toBeGreaterThanOrEqual(13)
+  })
+})
+
+
+describe('国企披露从 N2-2 持久化形状恢复派生金额', () => {
+  it('不依赖已删除的 aud* 缓存，并把 beginRje 纳入期初审定数', () => {
+    const persisted = [{
+      id: 'row-1',
+      taxType: '企业所得税',
+      taxRate: 0.25,
+      unadjBegin: 100,
+      unadjPayable: 30,
+      unadjPaid: 10,
+      beginAdjust: 5,
+      beginRje: 7,
+      ajePayable: 2,
+      ajePaid: 3,
+      rjePayable: 4,
+      rjePaid: 1,
+      remark: '核对完成',
+      audBegin: 999,
+      audPayable: 999,
+      audPaid: 999,
+    }]
+    const allResponses = ref(new Map([
+      ['N2-2-detail-rows', { conclusion: JSON.stringify(persisted) }],
+    ]))
+    const model = useN2DisclosureTables({ variant: 'soe', allResponses })
+
+    model.restore()
+
+    const row = model.soeRowsWithEnd.value.find((item) => item.item === '企业所得税')
+    expect(row).toEqual({
+      item: '企业所得税',
+      opening: 112,
+      payable: 36,
+      paid: 14,
+      end: 134,
+    })
   })
 })

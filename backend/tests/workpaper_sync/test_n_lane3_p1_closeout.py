@@ -12,9 +12,8 @@ NB-P: 21~22
 """
 from __future__ import annotations
 
-import hashlib
 import pathlib
-import re
+import sys
 
 import openpyxl
 import pytest
@@ -27,7 +26,6 @@ FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
 WP_COMPONENTS = FRONTEND / "components" / "workpaper"
 WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
-import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
 import n_cycle_scanner_summary as scanner  # noqa: E402
 
@@ -37,10 +35,10 @@ import n_cycle_scanner_summary as scanner  # noqa: E402
 # ════════════════════════════════════════════════════════════════════════════
 
 class TestFamilyA1Defects:
-    """NB-P21：N5 两处真缺陷 + 连带影响。"""
+    """NB-P21：N5 两处 A1 同形缺陷已按 37:1 / 28:1 反证修复。"""
 
-    def test_n5_6_1_e12_contains_n5(self):
-        """N5-6-1 E12 公式包含 N5 引用（真缺陷，应为 D12）。"""
+    def test_n5_6_1_e12_uses_d12(self):
+        """N5-6-1 E12 与同列正确形态一致，不再把 wp_code N5 当单元格。"""
         xlsx = None
         for f in TEMPLATE_DIR.glob("*.xlsx"):
             if "N5" in f.stem and not f.name.startswith("~$"):
@@ -65,11 +63,12 @@ class TestFamilyA1Defects:
             if isinstance(v, str) and "D" in v:
                 correct_count += 1
         wb.close()
-        assert isinstance(e12, str) and "N5" in e12, f"E12={e12}"
-        assert correct_count >= 20, f"反向分母 {correct_count}（期望 >= 20，37:1）"
+        assert e12 == "=C12+D12", f"E12={e12}"
+        assert "N5" not in e12
+        assert correct_count >= 20, f"反向分母 {correct_count}（修复前 37:1）"
 
-    def test_n5_8_h12_contains_n5(self):
-        """N5-8 H12 公式包含 N5 引用（真缺陷，连带 r39 SUM 错）。"""
+    def test_n5_8_h12_uses_d12(self):
+        """N5-8 H12 恢复 D12 分量，H39 的 SUM 因而不再漏数。"""
         xlsx = None
         for f in TEMPLATE_DIR.glob("*.xlsx"):
             if "N5" in f.stem and not f.name.startswith("~$"):
@@ -92,9 +91,12 @@ class TestFamilyA1Defects:
             v = ws[f"H{r}"].value
             if isinstance(v, str) and v.startswith("="):
                 correct_count += 1
+        h39 = ws["H39"].value
         wb.close()
-        assert isinstance(h12, str) and "N5" in h12, f"H12={h12}"
-        assert correct_count >= 15, f"反向分母 {correct_count}（期望 >= 15，28:1）"
+        assert h12 == "=C12-B12+D12-E12-F12+G12", f"H12={h12}"
+        assert "N5" not in h12
+        assert h39 == "=SUM(H10:H38)"
+        assert correct_count >= 15, f"反向分母 {correct_count}（修复前 28:1）"
 
     def test_lane3_no_family_a2(self):
         """NB-P21：本 spec 无族 A2（空分母）。"""

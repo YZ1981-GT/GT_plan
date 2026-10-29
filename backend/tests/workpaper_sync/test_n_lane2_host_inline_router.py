@@ -74,10 +74,11 @@ class TestLane2Attribution:
         assert "BP-10" in per[F.N1] and "BP-10" in per[F.N3]
 
     def test_attribution_shares(self, tf) -> None:
-        """归属份额：sheets 16 / 公式格 755 / 带 fx 12（与 foundation 算术表同行）。"""
+        """归属份额：sheets 16 / 公式格由两本权威模板事实相加 / 带 fx 12。"""
         mine = [f for f in tf.sheets if f.workbook in (N1_WB, N3_WB)]
+        expected_formula_cells = F.LANE2_FORMULA_CELLS
         _eq("sheets", len(mine), 16)
-        _eq("公式格", sum(f.formula_cells for f in mine), 755)
+        _eq("公式格", sum(f.formula_cells for f in mine), expected_formula_cells)
         _eq("带 fx", sum(1 for f in mine if f.formula_cells), 12)
 
 
@@ -257,18 +258,21 @@ class TestLane2PayloadAndLiveDb:
         _eq("lane2 真库行", len(mine), 0)
 
 
-# ═══ Task 13 / 14 · 模板缺陷登记（NA-P19 ~ NA-P22） ═══════════════════════════
+# ═══ Task 13 / 14 · 模板缺陷修复与登记（NA-P19 ~ NA-P22） ═══════════════════
 class TestLane2TemplateDefects:
-    def test_a2_family_n3_2(self, tf) -> None:
-        """NA-P19：N3-2 H11~H21 整列 `=F#+O#`，与 A1 分开计数。"""
+    def test_a2_family_n3_2_is_closed(self, tf) -> None:
+        """NA-P19：N3-2 H11:H21 已修为 E+F+G，A2 结构残留清零。"""
         a2 = [h for h in tf.overflow if h.family == "A2_structural_residue"]
-        _eq("A2", len(a2), 11)
-        assert all(h.workbook == N3_WB for h in a2)
-        assert all(re.fullmatch(r"=F(\d+)\+O\d+", h.formula) for h in a2)
+        _eq("A2", a2, [])
 
-    def test_n3_2_e23_legal(self, tf) -> None:
+    def test_n3_2_e23_range_is_fixed(self, tf) -> None:
         b = [(h.sheet, h.cell) for h in tf.overflow if h.family == "B_range_end" and h.workbook == N3_WB]
-        _eq("合法区间终点", b, [("递延所得税负债明细表N3-2", "E23")])
+        _eq("N3 B_range_end", b, [])
+        wb = S.load_workbook(S.N_TEMPLATE_DIR / N3_WB)
+        try:
+            _eq("E23", wb["递延所得税负债明细表N3-2"]["E23"].value, "=SUM(E11:E22)")
+        finally:
+            wb.close()
 
     def test_de_form_literals(self, tf) -> None:
         """「表的{码}」3 处全在 lane2 两册，按原始字面量锁定。"""
@@ -292,7 +296,7 @@ class TestLane2TemplateDefects:
         _eq("N1-4 裸 IF", n1_4.bare_if_cells, max(f.bare_if_cells for f in tf.sheets))
 
     def test_n3_extremes_and_empty_disclosure(self, tf) -> None:
-        """NA-P22：🔴 N3 无附注披露（n=0）⇒ disclosure 判据空分母；sheets 最少 6 / 公式格最少 162。"""
+        """NA-P22：🔴 N3 无附注披露（n=0）⇒ disclosure 判据空分母；sheets 最少 6 / 公式格最少 164。"""
         n3 = [f for f in tf.sheets if f.workbook == N3_WB]
         _eq("N3 附注 sheet", [f.sheet for f in n3 if "附注" in f.sheet], [])
         per_wb: dict[str, int] = {}

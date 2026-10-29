@@ -45,7 +45,7 @@
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>明细表规则（源模板 16 列）：</strong>
-        未审期末 F = 期初 C + 应交 D − 已交 E；审定期初 M = C + 期初调整 G；
+        未审期末 F = 期初 C + 应交 D − 已交 E；审定期初 M = C + 期初账项调整 G + 期初重分类调整 H；
         审定应交 N = D + 账项调整应交 I + 重分类应交 K；审定已交 O = E + 账项调整已交 J + 重分类已交 L；
         审定期末 P = M + N − O。灰底列为公式自动计算。
       </div>
@@ -165,20 +165,36 @@
         </el-table-column>
       </el-table-column>
 
-      <!-- 期初调整 G（单列） -->
-      <el-table-column label="期初调整" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.beginAdjust"
-            :controls="false"
-            :precision="2"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => handleUpdate(row.id, 'beginAdjust', val ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.beginAdjust) }}</span>
-        </template>
+      <!-- 期初调整 G/H -->
+      <el-table-column label="期初调整" align="center">
+        <el-table-column label="账项调整" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginAdjust"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width:100%"
+              @change="(val: number | undefined) => handleUpdate(row.id, 'beginAdjust', val ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.beginAdjust) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类调整" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginRje"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width:100%"
+              @change="(val: number | undefined) => handleUpdate(row.id, 'beginRje', val ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.beginRje) }}</span>
+          </template>
+        </el-table-column>
       </el-table-column>
 
       <!-- 账项调整 分组 -->
@@ -249,7 +265,7 @@
       <el-table-column label="审定" align="center">
         <el-table-column min-width="110" align="right">
           <template #header>
-            <span class="formula-header" title="审定期初 M = 未审期初 C + 期初调整 G">期初</span>
+            <span class="formula-header" title="审定期初 M = 未审期初 C + 期初账项调整 G + 期初重分类调整 H">期初</span>
           </template>
           <template #default="{ row }">
             <span class="formula-cell">{{ fmtAmount(row.audBegin) }}</span>
@@ -353,8 +369,8 @@
     <details class="n2-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>本表按源模板 16 列结构：项目 / 税率 / 未审(期初·应交·已交·期末) / 期初调整 / 账项调整(应交·已交) / 重分类(应交·已交) / 审定(期初·应交·已交·期末) / 备注。</li>
-        <li>灰底虚线列为公式自动计算：F=C+D−E、M=C+G、N=D+I+K、O=E+J+L、P=M+N−O。</li>
+        <li>本表按源模板 A~Q 共 17 列：项目 / 税率或税收优惠 / 未审(期初·应交·已交·期末) / 期初调整(账项·重分类) / 账项调整(应交·已交) / 重分类(应交·已交) / 审定(期初·应交·已交·期末) / 备注。</li>
+        <li>灰底虚线列为公式自动计算：F=C+D−E、M=C+G+H、N=D+I+K、O=E+J+L、P=M+N−O。</li>
         <li>13 个固定税种（增值税/消费税/城建税/教育费附加/房产税/印花税/所得税等）可新增/删除。</li>
         <li>"从 N2-1 带入"：无数据时按 13 固定税种从审定表带入未审期初。</li>
         <li>支持导入导出（模板/数据/xlsx）。</li>
@@ -374,11 +390,11 @@
 
 <script setup lang="ts">
 /**
- * N2TabDetail — N2-2 应交税费明细表（16 列源模板对齐版）
+ * N2TabDetail — N2-2 应交税费明细表（A~Q 17 列源模板对齐版）
  *
- * 源结构：项目 / 税率 / 未审(期初C/应交D/已交E/期末F=C+D-E) / 期初调整G /
- *   账项调整(应交I/已交J) / 重分类(应交K/已交L) /
- *   审定(期初M=C+G/应交N=D+I+K/已交O=E+J+L/期末P=M+N-O) / 备注
+ * 源结构：项目 / 税率或税收优惠 / 未审(期初C/应交D/已交E/期末F=C+D-E) /
+ *   期初调整(账项G/重分类H) / 账项调整(应交I/已交J) / 重分类(应交K/已交L) /
+ *   审定(期初M=C+G+H/应交N=D+I+K/已交O=E+J+L/期末P=M+N-O) / 备注
  *
  * - 嵌套分组表头；公式列灰底自动
  * - 13 固定税种 + 可新增/删（ElMessageBox.prompt 输入名称）
@@ -403,6 +419,10 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly?: boolean
   year?: string
+}>()
+
+const emit = defineEmits<{
+  imported: []
 }>()
 
 // ─── FormData ────────────────────────────────────────────────────────────────
@@ -564,21 +584,22 @@ async function handleSeedFromN21() {
 function getSummaries({ columns }: { columns: any[] }) {
   const sums: string[] = []
   const t = total.value
-  // leaf 列顺序: 项目(0) 税率(1) C(2) D(3) E(4) F(5) G(6) I(7) J(8) K(9) L(10) M(11) N(12) O(13) P(14) 备注(15) 操作(16)
+  // leaf 列顺序: 项目(0) 税率(1) C(2) D(3) E(4) F(5) G(6) H(7) I(8) J(9) K(10) L(11) M(12) N(13) O(14) P(15) 备注(16) 操作(17)
   const map: Record<number, string> = {
     2: fmtAmount(t.unadjBegin),
     3: fmtAmount(t.unadjPayable),
     4: fmtAmount(t.unadjPaid),
     5: fmtAmount(t.unadjEnd),
     6: fmtAmount(t.beginAdjust),
-    7: fmtAmount(t.ajePayable),
-    8: fmtAmount(t.ajePaid),
-    9: fmtAmount(t.rjePayable),
-    10: fmtAmount(t.rjePaid),
-    11: fmtAmount(t.audBegin),
-    12: fmtAmount(t.audPayable),
-    13: fmtAmount(t.audPaid),
-    14: fmtAmount(t.audEnd),
+    7: fmtAmount(t.beginRje),
+    8: fmtAmount(t.ajePayable),
+    9: fmtAmount(t.ajePaid),
+    10: fmtAmount(t.rjePayable),
+    11: fmtAmount(t.rjePaid),
+    12: fmtAmount(t.audBegin),
+    13: fmtAmount(t.audPayable),
+    14: fmtAmount(t.audPaid),
+    15: fmtAmount(t.audEnd),
   }
   columns.forEach((_col: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
@@ -601,7 +622,8 @@ async function handleFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  await importData(file, 'N2-2')
+  const result = await importData(file, 'N2-2')
+  if (result.success) emit('imported')
   input.value = ''
 }
 

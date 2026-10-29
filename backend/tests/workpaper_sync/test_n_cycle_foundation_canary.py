@@ -20,7 +20,6 @@ Properties: NF-P1 ~ NF-P40 · 共同判据 NC-1 ~ NC-37
 """
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
@@ -218,7 +217,7 @@ class TestEntryBaselineAndArithmetic:
     def test_formula_cell_caliber_and_data_only_counterproof(
         self, template_facts: S.TemplateFacts
     ) -> None:
-        """NF-P4：公式格 2185（`data_only=False`）+ `data_only=True` 反证命中 0。"""
+        """NF-P4：公式格 2184（`data_only=False`）+ `data_only=True` 反证命中 0。"""
         per_wb: dict[str, int] = {}
         with_fx: dict[str, int] = {}
         for f in template_facts.sheets:
@@ -602,14 +601,14 @@ class TestTransportKeyResolution:
 # ═══════════════════════════════════════════════════════════════════════════
 class TestTemplateGeometryAndDefects:
     def test_overflow_refs_three_families(self, template_facts) -> None:
-        """NF-P20：超列引用 17 = A1 3 + A2 11 + B 3（与 design 逐值吻合）。"""
+        """NF-P20：原三族 17 处超列引用均已按模板正确口径清零。"""
         _eq("超列总数", len(template_facts.overflow), F.OVERFLOW_TOTAL)
         _eq("三族分布", S.overflow_family_histogram(template_facts.overflow), F.OVERFLOW_FAMILIES)
 
     def test_wrong_caliber_is_much_larger(self, template_facts) -> None:
         """错口径对照：不剔 sheet 限定段 ⇒ 大量假阳（防未来放宽正则）。"""
         _eq("错口径", template_facts.overflow_wrong_caliber, F.OVERFLOW_WRONG_CALIBER)
-        assert template_facts.overflow_wrong_caliber > 5 * len(template_facts.overflow)
+        assert template_facts.overflow_wrong_caliber > len(template_facts.overflow)
 
     def test_sheet_qualified_ref_is_judged_against_its_own_sheet(self) -> None:
         """🔴 口径修复防回归：`'明细表N2-2'!M10` 的 M10 不得拿本表 max_column 判越界。"""
@@ -618,40 +617,32 @@ class TestTemplateGeometryAndDefects:
         cleaned2 = S.clean_formula_for_col_scan("=B9+C9+N4")
         assert "N4" in cleaned2, "本表引用被误剔 ⇒ 真缺陷会漏"
 
-    def test_a1_real_defects_are_the_three_d_column_replacements(self, template_facts) -> None:
-        """T-1/T-2/T-3：三处全是 D 列被换成本册 wp_code（系统性操作残留）。"""
+    def test_a1_real_defects_are_closed(self, template_facts) -> None:
+        """T-1/T-2/T-3：三处 D 列被换成本册 wp_code 的缺陷已全部修复。"""
         a1 = sorted((h.sheet, h.cell, h.ref_col) for h in template_facts.overflow
                     if h.family == "A1_real_defect")
-        _eq("A1 三处", a1, [
-            ("加计扣除研发费用情况明细表N5-6-1", "E12", "N"),
-            ("税金及附加明细表N4-2", "E9", "N"),
-            ("递延所得税费用核对表N5-8", "H12", "N"),
-        ])
+        _eq("A1 缺陷", a1, [])
 
-    def test_t1_canary_defect_recorded_with_reverse_denominator(self) -> None:
-        """Task 18：`N4-2 E9 = B9+C9+N4`（反向分母 9:1）以记录型断言锁定。
-
-        🔴 本 spec SHALL NOT 修改 .xlsx —— 将来修了模板这条会显式打红，提醒同步更新。
-        """
+    def test_t1_canary_formula_uses_d_column(self) -> None:
+        """N4-2 E9 已与 E10:E18 同形为 B+C+D，保留 10 行反向分母。"""
         path = S.N_TEMPLATE_DIR / "N4 税金及附加.xlsx"
         wb = S.load_workbook(path)
         try:
             ws = wb["税金及附加明细表N4-2"]
-            _eq("E9", ws["E9"].value, "=B9+C9+N4")
+            _eq("E9", ws["E9"].value, "=B9+C9+D9")
             correct = [
                 r for r in range(4, (ws.max_row or 0) + 1)
                 if isinstance(ws[f"E{r}"].value, str)
                 and ws[f"E{r}"].value.replace(" ", "") == f"=B{r}+C{r}+D{r}"
             ]
-            _eq("同列正确形态行数（反向分母）", len(correct), 9)
+            _eq("同列正确形态行数", len(correct), 10)
         finally:
             wb.close()
 
-    def test_a2_is_not_merged_with_a1(self, template_facts) -> None:
-        """T-4：`N3-2 H11~H21` 整列同形无反向分母 ⇒ 结构残留，与 A1 分开计数。"""
+    def test_a2_structural_residue_is_closed(self, template_facts) -> None:
+        """N3-2 H11:H21 已改为 E+F+G，不再引用空白的 O3:O13。"""
         a2 = [h for h in template_facts.overflow if h.family == "A2_structural_residue"]
-        _eq("A2 全在 N3-2 H 列", {(h.sheet, h.cell[0]) for h in a2}, {("递延所得税负债明细表N3-2", "H")})
-        _eq("A2 行号", sorted(int(h.cell[1:]) for h in a2), list(range(11, 22)))
+        _eq("A2", a2, [])
 
     def test_missing_subtotal_dual_condition(self, template_facts) -> None:
         """NF-P21：严格 0 / 粗口径 4（design 正文只列举 4 处，「8」是自身计数错）。"""

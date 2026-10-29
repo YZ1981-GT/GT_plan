@@ -51,7 +51,12 @@ def _col(column: str, rows: range, old: str | None, new: str, template: str, she
 
 
 D5, F1, K3 = "D/D5 应收款项融资.xlsx", "F/F1 预付账款.xlsx", "K/K3 其他应付款.xlsx"
-N1, N3, N4 = "N/N1 递延所得税资产.xlsx", "N/N3 递延所得税负债.xlsx", "N/N4 税金及附加.xlsx"
+N1, N3, N4, N5 = (
+    "N/N1 递延所得税资产.xlsx",
+    "N/N3 递延所得税负债.xlsx",
+    "N/N4 税金及附加.xlsx",
+    "N/N5 所得税费用.xlsx",
+)
 H2, G8, D6 = "H/H2 在建工程.xlsx", "G/G8 其他权益工具投资.xlsx", "D/D6 合同资产.xlsx"
 K1, D1, G5 = "K/K1 其他应收款.xlsx", "D/D1 应收票据.xlsx", "G/G5 长期应收款.xlsx"
 I3, H3 = "I/I3 商誉.xlsx", "H/H3 投资性房地产.xlsx"
@@ -202,6 +207,20 @@ def fixes() -> list[Fix]:
     #       补的公式格带缓存值 0：同行 Q/S/AB 模板格都是 `<f>…</f><v>0</v>`（数据行 E/F/G 为空，算得 0），
     #       只写 <f> 时未经 OO 重算的反读读不到 H（键缺失），与同行三列不同形
     out += _col("H", range(13, 26), None, "=E{r}+F{r}+G{r}", D2A, "明细表D2-2", cached="0")
+    # ── 第四批（NC-32：wp_code 与 A1 列引用同形，静默吞 D12）────────────
+    # N5-6-1 E12 同列 37 个正常式均为 C+D；N5-8 H12 同列 28 个正常式均含 +D。
+    # 同表 D11 是「人员费用」小计，应只求 D12:D16；原式 D5:N16 跨整块并越出有效列。
+    out += [
+        Fix(N5, "加计扣除研发费用情况明细表N5-6-1", "D11", "=SUM(D5:N16)", "=SUM(D12:D16)"),
+        Fix(N5, "加计扣除研发费用情况明细表N5-6-1", "E12", "=C12+N5", "=C12+D12"),
+        Fix(
+            N5,
+            "递延所得税费用核对表N5-8",
+            "H12",
+            "=C12-B12+N5-E12-F12+G12",
+            "=C12-B12+D12-E12-F12+G12",
+        ),
+    ]
     return out
 
 

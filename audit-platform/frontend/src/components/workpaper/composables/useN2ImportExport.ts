@@ -14,7 +14,7 @@
  * - 后端三端点:
  *   - GET  /api/n2-taxes-payable/{wpId}/export-template?sheet={sheetCode}
  *   - GET  /api/n2-taxes-payable/{wpId}/export-data?sheet={sheetCode}
- *   - POST /api/n2-taxes-payable/{wpId}/import-data (multipart FormData with sheet field)
+ *   - POST /api/n2-taxes-payable/{wpId}/import-data?sheet={sheetCode} (multipart FormData)
  * - RFC5987 中文文件名解析
  * - Blob下载: responseType:'blob' → URL.createObjectURL → a.click()
  */
@@ -41,8 +41,8 @@ export interface N2ImportResult {
   message: string
   /** 导入行数 */
   rowCount?: number
-  /** 警告信息 */
-  warning?: string
+  /** 后端返回的非阻断警告，逐条保留 */
+  warnings?: string[]
 }
 
 export interface UseN2ImportExportOptions {
@@ -224,7 +224,7 @@ export function useN2ImportExport(options: UseN2ImportExportOptions) {
 
   /**
    * 导入xlsx数据
-   * POST /api/n2-taxes-payable/{wpId}/import-data (multipart/form-data with sheet field)
+   * POST /api/n2-taxes-payable/{wpId}/import-data?sheet={sheetCode} (multipart/form-data)
    */
   async function importData(file: File, sheet?: N2ExportSheetCode): Promise<N2ImportResult> {
     if (!wpId.value) {
@@ -236,28 +236,32 @@ export function useN2ImportExport(options: UseN2ImportExportOptions) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      if (sheet) formData.append('sheet', sheet)
+      const params = sheet ? { sheet } : {}
 
       const response = await http.post(
         `${API_BASE}/${wpId.value}/import-data`,
         formData,
         {
+          params,
           headers: { 'Content-Type': 'multipart/form-data' },
         },
       )
 
       // 兼容 ResponseWrapperMiddleware 信封
       const data: any = response.data?.data ?? response.data
+      const warnings = Array.isArray(data?.warnings)
+        ? data.warnings.map((warning: unknown) => String(warning))
+        : []
       const result: N2ImportResult = {
         success: true,
         message: data?.message || '导入成功',
         rowCount: data?.imported_count ?? data?.row_count ?? 0,
-        warning: data?.warning,
+        warnings,
       }
 
       let msg = `成功导入 ${result.rowCount} 行数据`
-      if (result.warning) {
-        msg += `（${result.warning}）`
+      if (warnings.length) {
+        msg += `（${warnings.join('；')}）`
       }
       ElMessage.success(msg)
       return result

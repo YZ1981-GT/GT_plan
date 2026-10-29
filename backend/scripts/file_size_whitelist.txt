@@ -1735,3 +1735,11 @@ backend/app/services/note_conversion_service.py  2321
 #     （_to_decimal / _norm_headers / _row_values / _resolve_section_table）下沉到独立模块（否则拆出的执行器与本文件循环导入），
 #     再按规则类型（余额 / 勾稽 / 账龄 / 期间衔接 / 文本）拆成伴生模块，本文件只留 EXECUTORS 登记。
 backend/app/services/note_validation_executors.py  1428
+
+#   test_n_cycle_foundation_canary.py —— N 循环 foundation 的 NF-P1~40 单文件历史守卫，
+#     本批改动前已超过 800 行；本次只把模板缺陷断言翻为修复态并同步现算基线，
+#     代码净减 9 行（1074 → 1065），不应因“改小”而被旧的未登记欠账阻断。
+#     拆分方向：按域基线 / 模板几何 / 传输键 / 真库证据 / 收尾自检五组拆文件；
+#     需与引用其 module fixture 的测试同批迁移，避免只搬代码让变异判据空转。
+#     spec: oo-writeback-template-parity-closure 批 C 复盘收口
+backend/tests/workpaper_sync/test_n_cycle_foundation_canary.py  1065

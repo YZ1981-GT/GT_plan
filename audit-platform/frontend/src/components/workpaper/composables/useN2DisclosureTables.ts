@@ -31,6 +31,7 @@ import {
 } from './nCycleTaxConsistency'
 import { nz, sumNullable, type NullableAmount } from './shared/disclosureConsistency'
 import type { WpSegColumn, WpSegment } from './shared/disclosureSegmentTypes'
+import { enrichN2DetailRow } from './useN2Detail'
 
 // ─── 行骨架（源模板 R8~R20 逐字 13 行，两版完全一致）─────────────────────────
 
@@ -353,13 +354,14 @@ export function useN2DisclosureTables(opts: UseN2DisclosureTablesOptions) {
         // 无持久化数据 → 构造默认骨架后从 N2-2 明细带入；未填时用四表种子带出期初
         const skeleton = N2_SOE_TAX_ITEMS.map((item) => ({ item, opening: null, payable: null, paid: null } as N2SoeRowModel))
         const detRaw = allResponses.value.get('N2-2-detail-rows')?.conclusion
-        const detailRows = parseJsonArray<{ taxType: string; audBegin: number; audPayable: number; audPaid: number }>(detRaw)
+        const persistedRows = parseJsonArray<Record<string, unknown>>(detRaw)
+        const detailRows = persistedRows?.map(enrichN2DetailRow) ?? []
         const seeds = renderPrefill?.value ?? []
-        if (detailRows?.length || seeds.length) {
+        if (detailRows.length || seeds.length) {
           const result = prefillFromAdjudication({
             variant: 'soe',
             adjRows: [],
-            detailRows: detailRows ?? [],
+            detailRows,
             renderPrefill: seeds,
             existingSoeRows: skeleton,
           })

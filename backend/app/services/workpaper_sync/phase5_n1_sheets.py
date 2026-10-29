@@ -2,13 +2,13 @@
 """N1 递延所得税资产 — 受管 sheet 层声明。
 
 受管 sheet = `递延所得税资产明细表N1-2`：两级表头 R9/R10、14列 A-N、
-数据区 R11-R29（19行固定项）、无 footer 标签行（R30+ 是说明区）。
+数据区 R11-R40（30 行，含 R40 占位行），R41 预留空行，R42 为无标签合计行。
 公式列 E=ROUND(C*D,2) / H=E+F+G / K=ROUND(I*J,2) / N=K+L+M。
 （模板 H / N 原为 =F+E / =L+K，漏了重分类调整 G / M；spec oo-writeback-template-parity-closure R1
 按会计口径修模板，并给合计行补了 G / M 两列 SUM。）
 """
 from __future__ import annotations
-from typing import Any, Final, Mapping
+from typing import Final, Mapping
 from app.services.workpaper_sync.models import AuthorityModel
 from app.services.workpaper_sync.phase5_row_table_sheet import (
     RowTableSheetSpec, StoreKind,
