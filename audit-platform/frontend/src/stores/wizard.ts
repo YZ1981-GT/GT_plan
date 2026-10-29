@@ -38,6 +38,8 @@ export interface BasicInfo {
   overseas_income_credit_method: string
   signing_partner_id: string | null
   manager_id: string | null
+  signing_partner_staff_id?: string | null
+  manager_staff_id?: string | null
   budget_hours: number | null
   contract_amount: number | null
 }
@@ -143,8 +145,7 @@ export const useWizardStore = defineStore('wizard', {
     loading: false,
     /** 最近一次建项/保存基本信息时后端给出的说明（如「已同步集团关系到同企业的合并项目」） */
     lastNotices: [] as string[],
-    /** 用户 UUID → 用户名映射（BasicInfoStep 加载 /api/users/ 时写入），
-     *  供 ConfirmationStep 等处把 signing_partner_id / manager_id 显示成人名 */
+    /** 人员 UUID / 关联用户 UUID → 人员姓名，由 BasicInfoStep 从人员档案加载。 */
     teamUserNames: {} as Record<string, string>,
   }),
 
@@ -225,6 +226,10 @@ export const useWizardStore = defineStore('wizard', {
           const value = (basicInfo[key] ?? '').trim()
           if (value) payload[key] = value
         }
+        // 人员档案保留显式清空，与未提交字段区分。
+        for (const key of ['signing_partner_staff_id', 'manager_staff_id'] as const) {
+          if (key in basicInfo) payload[key] = basicInfo[key] || null
+        }
         if (basicInfo.signing_partner_id) {
           payload.signing_partner_id = basicInfo.signing_partner_id
         }
@@ -295,6 +300,10 @@ export const useWizardStore = defineStore('wizard', {
           accounting_standard: 'CAS',
           template_type: proj.template_type || 'soe',
           report_scope: proj.report_scope || 'standalone',
+          signing_partner_id: proj.signing_partner_id || null,
+          manager_id: proj.manager_id || null,
+          signing_partner_staff_id: proj.signing_partner_staff_id || null,
+          manager_staff_id: proj.manager_staff_id || null,
           // 需求 1.6：批量导入项目的兜底回填也要恢复集团关系
           ...pickGroupFields(proj),
           // 企业信息（V209）：兜底回填同样恢复，否则再保存会被判为未填

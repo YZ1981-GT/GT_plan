@@ -86,6 +86,7 @@ export interface WorkHourEntryRecord {
 
 export async function listStaff(params?: {
   search?: string; department?: string; partner_name?: string; offset?: number; limit?: number
+  title?: string; status?: string; project_id?: string
 }): Promise<StaffListResponse> {
   const { data } = await http.get(P.list, { params })
   return data as StaffListResponse

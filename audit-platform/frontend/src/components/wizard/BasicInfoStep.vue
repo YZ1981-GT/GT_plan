@@ -216,41 +216,49 @@
           <div class="gt-form-section-title">项目团队</div>
 
           <!-- prop 必须显式写出：缺了 prop 的 el-form-item 不参与校验、也不显示必填星号 -->
-          <el-form-item label="签字合伙人" prop="signing_partner_id">
+          <el-form-item label="签字合伙人" prop="signing_partner_staff_id">
             <el-select
-              v-model="form.signing_partner_id"
+              v-model="form.signing_partner_staff_id"
               placeholder="请选择签字合伙人"
               style="width: 100%"
               filterable
               clearable
               :loading="teamLoading"
+              :disabled="teamLoading || teamFailed"
+              no-data-text="人员档案中暂无合伙人"
+              data-testid="signing-partner-select"
+              @change="onPartnerChange"
             >
-              <el-option
-                v-for="u in partnerOptions"
-                :key="u.id"
-                :label="u.username"
-                :value="u.id"
-              />
+              <el-option v-for="person in partnerOptions" :key="person.id" :label="person.name" :value="person.id">
+                <span>{{ person.name }}</span>
+                <span class="gt-staff-option-detail">{{ person.employee_no || person.department }}</span>
+              </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="项目经理" prop="manager_id">
+          <el-form-item label="项目经理" prop="manager_staff_id">
             <el-select
-              v-model="form.manager_id"
-              placeholder="请选择项目经理"
+              v-model="form.manager_staff_id"
+              :placeholder="selectedPartner ? '请选择项目经理' : '请先选择签字合伙人'"
               style="width: 100%"
               filterable
               clearable
               :loading="teamLoading"
+              :disabled="!selectedPartner || teamLoading || teamFailed"
+              no-data-text="该合伙人名下暂无可选人员"
+              data-testid="project-manager-select"
+              @change="onManagerChange"
             >
-              <el-option
-                v-for="u in managerOptions"
-                :key="u.id"
-                :label="u.username"
-                :value="u.id"
-              />
+              <el-option v-for="person in managerOptions" :key="person.id" :label="person.name" :value="person.id">
+                <span>{{ person.name }}</span>
+                <span class="gt-staff-option-detail">{{ person.employee_no || person.department }}</span>
+              </el-option>
             </el-select>
           </el-form-item>
+          <el-alert v-if="teamFailed" title="人员档案加载失败" type="error" :closable="false" show-icon>
+            <el-button link type="primary" @click="loadTeamStaff">重新加载</el-button>
+          </el-alert>
+          <el-alert v-else-if="selectionError && !teamLoading" :title="selectionError" type="warning" :closable="false" show-icon />
 
           <div class="gt-form-section-title" style="margin-top: 20px">预算与合同</div>
 
@@ -349,6 +357,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useProjectStaffOptions } from '@/composables/useProjectStaffOptions'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
@@ -409,37 +418,6 @@ const customTemplateLoading = ref(false)
 const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
 const recommendation = ref<TemplateRecommendation | null>(null)
 
-// ─── 项目团队下拉（签字合伙人 / 项目经理）──────────────────────────────────
-// 后端 ProjectCreate 要求 signing_partner_id / manager_id 为 UUID，
-// 原先的 el-input 让用户手输姓名 → 422 uuid_parsing。
-// 数据源 /api/users/（须登录），按角色过滤：partner → 签字合伙人，manager → 项目经理。
-interface TeamUserOption { id: string; username: string; role: string; is_active: boolean }
-const teamLoading = ref(false)
-const teamUsers = ref<TeamUserOption[]>([])
-const partnerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'partner'))
-const managerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'manager'))
-
-async function loadTeamUsers() {
-  if (teamUsers.value.length > 0) return
-  teamLoading.value = true
-  try {
-    const list = await api.get('/api/users/')
-    teamUsers.value = (Array.isArray(list) ? list : (list as any)?.data ?? []) as TeamUserOption[]
-    // UUID → 用户名映射写入 store，ConfirmationStep 显示人名用
-    const map: Record<string, string> = {}
-    for (const u of teamUsers.value) map[u.id] = u.username
-    wizardStore.teamUserNames = map
-  } catch {
-    teamUsers.value = []
-    // 🔴 签字合伙人 / 项目经理已是必填项：拉取失败会让两个下拉都为空，
-    // 用户看到"请选择"却无可选项、且无从得知原因 ⇒ 必须把失败显式告知，
-    // 不能像原先那样静默吞掉（原注释说"用户仍可跳过这两个可空字段"已不成立）。
-    ElMessage.error('项目团队人员列表加载失败，签字合伙人与项目经理无法选择，请刷新页面重试')
-  } finally {
-    teamLoading.value = false
-  }
-}
-
 const SUBTYPE_DESC: Record<string, string> = {
   type_a: '上市公司、三板创新层及公开发债',
   type_b: '三板基础层、银行、保险、期货、证券',
@@ -466,7 +444,7 @@ const showCategoryReference = ref(false)
 
 const currentCategoryLetter = computed(() => {
   const map: Record<string, string> = { type_a: 'A', type_b: 'B', type_c: 'C' }
-  return map[form.company_subtype] || ''
+  return form.company_subtype ? map[form.company_subtype] || '' : ''
 })
 
 function onCategorySelect(value: string) {
@@ -546,9 +524,16 @@ const form = reactive<BasicInfo>({
   overseas_income_credit_method: '',
   signing_partner_id: null,
   manager_id: null,
+  signing_partner_staff_id: null,
+  manager_staff_id: null,
   budget_hours: null,
   contract_amount: null,
 })
+
+const {
+  partnerOptions, managerOptions, selectedPartner, teamLoading, teamFailed, selectionError,
+  loadTeamStaff, restoreSelection, onPartnerChange, onManagerChange,
+} = useProjectStaffOptions(form, names => { wizardStore.teamUserNames = names })
 
 // ─── 集团架构：与上级关系联动（需求 1.3 / 1.5 / 2.3 / 2.4）──────────────────────
 // 没有有效上级（上级代码为空，或就是本企业代码）⇒ 下拉置灰且值为空；
@@ -618,6 +603,7 @@ function applySaved(saved: Partial<BasicInfo> & Record<string, unknown>) {
   const rest: Record<string, unknown> = { ...saved }
   delete rest.consolidation_type
   Object.assign(form, rest)
+  restoreSelection()
   for (const key of ['parent_company_name', 'parent_company_code', 'relation_to_parent',
     'ultimate_company_name', 'ultimate_company_code',
     // 企业信息（V209）：后端未填时回 null，归一成空串以符合 BasicInfo 的 string 类型
@@ -688,10 +674,10 @@ const rules: FormRules = {
   // 项目团队两项必填（后端 POST /api/projects 同步校验）。
   // 初值是 null 且下拉带 clearable ⇒ 必须用 change 触发，并显式拦 null/空串
   // （required 对 null 生效，但清空后值为 null 仍需即时提示）。
-  signing_partner_id: [
+  signing_partner_staff_id: [
     { required: true, message: '请选择签字合伙人', trigger: 'change' },
   ],
-  manager_id: [
+  manager_staff_id: [
     { required: true, message: '请选择项目经理', trigger: 'change' },
   ],
   template_type: [{ required: true, message: '请选择附注模板类型', trigger: 'change' }],
@@ -785,7 +771,7 @@ onMounted(async () => {
     applySaved(saved)
   }
   // 项目团队下拉数据（签字合伙人/项目经理）
-  loadTeamUsers()
+  loadTeamStaff()
   if (form.template_type === 'custom') {
     await loadCustomTemplates()
     if (form.custom_template_id) {
@@ -810,6 +796,10 @@ async function validate(): Promise<BasicInfo | null> {
   } catch {
     return null
   }
+  if (selectionError.value) {
+    ElMessage.warning(selectionError.value)
+    return null
+  }
   // 用户取消确认 ⇒ 停留在表单，不保存
   if (!(await confirmSelfReference())) return null
   // 没有有效上级时关系必须为空（后端同样强制，这里保证提交值自洽）
@@ -820,6 +810,11 @@ defineExpose({ validate, formRef })
 </script>
 
 <style scoped>
+.gt-staff-option-detail {
+  margin-left: 12px;
+  color: var(--gt-color-text-tertiary);
+  font-size: 12px;
+}
 .gt-basic-info-step {
   max-width: 960px;
   margin: 0 auto;

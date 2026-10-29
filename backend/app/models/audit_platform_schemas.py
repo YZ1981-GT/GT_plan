@@ -118,6 +118,8 @@ class BasicInfoSchema(BaseModel):
     overseas_income_credit_method: str | None = None  # 境外所得抵免方式
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
+    signing_partner_staff_id: UUID | None = None
+    manager_staff_id: UUID | None = None
 
 
 class TeamMemberAssignment(BaseModel):
@@ -168,6 +170,10 @@ class ProjectCreateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    signing_partner_id: UUID | None = None
+    manager_id: UUID | None = None
+    signing_partner_staff_id: UUID | None = None
+    manager_staff_id: UUID | None = None
     name: str | None = None
     client_name: str
     short_name: str | None = None

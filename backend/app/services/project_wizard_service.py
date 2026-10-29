@@ -22,6 +22,7 @@ from app.models.audit_platform_schemas import (
     WizardStepSaveResponse,
 )
 from app.services.note_template_service import NoteTemplateService
+from app.services.project_staff_selection import dump_basic_info, resolve_staff_selection
 from app.services.uscc_validator import validate_uscc
 from app.services.uniqueness_checker import check_uniqueness
 
@@ -259,6 +260,8 @@ async def create_project(
     if not is_unique:
         raise HTTPException(status_code=409, detail=uniqueness_error)
 
+    data = await resolve_staff_selection(data, db)
+
     # --- 集团架构字段：规范化 + 继承同企业另一口径项目 + 补默认（需求 1/2）---
     from app.services.group_links import prepare_group_fields
 
@@ -280,7 +283,7 @@ async def create_project(
     project._group_notices = notices  # type: ignore[attr-defined]
 
     # 初始化 wizard_state，并将 basic_info 步骤数据写入
-    basic_info_data = data.model_dump(mode="json")
+    basic_info_data = dump_basic_info(data)
     if custom_template_snapshot is not None:
         basic_info_data["custom_template_snapshot"] = custom_template_snapshot
     state = WizardState(
@@ -387,6 +390,10 @@ async def update_step(
                 status_code=422,
                 detail=f"基本信息字段缺失或格式错误：{'、'.join(fields) or '未知字段'}",
             ) from exc
+        parsed = await resolve_staff_selection(
+            parsed, db,
+            existing_basic_info=existing_basic_info.data if existing_basic_info is not None else None,
+        )
         notices = await prepare_group_fields(
             db, parsed, project_id=project.id,
             report_scope=parsed.report_scope or DEFAULT_REPORT_SCOPE, inherit=False,
@@ -397,7 +404,7 @@ async def update_step(
             parsed,
             existing_basic_info.data if existing_basic_info is not None else None,
         )
-        step_data = basic_info.model_dump(mode="json")
+        step_data = dump_basic_info(basic_info)
         if custom_template_snapshot is not None:
             step_data["custom_template_snapshot"] = custom_template_snapshot
         _sync_basic_info_to_project(project, basic_info)

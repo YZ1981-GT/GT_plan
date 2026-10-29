@@ -20,6 +20,10 @@ vi.mock('@/services/apiProxy', () => ({
   api: { get: vi.fn().mockResolvedValue([]) },
 }))
 
+vi.mock('@/services/staffApi', () => ({
+  listStaff: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+}))
+
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
 import { useWizardStore } from '@/stores/wizard'
 

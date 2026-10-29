@@ -155,7 +155,17 @@
         </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="所属合伙人"><el-input v-model="formData.partner_name" /></el-form-item>
+            <el-form-item label="所属合伙人">
+              <el-select v-model="formData.partner_name" filterable clearable value-on-clear=""
+                placeholder="请选择合伙人" aria-label="所属合伙人" style="width: 100%"
+                :loading="partnersLoading" loading-text="加载中" no-match-text="无匹配合伙人"
+                :no-data-text="partnersFailed ? '加载失败，请重新展开重试' : '暂无合伙人'"
+                @visible-change="(visible: boolean) => { if (visible && partnersFailed) loadPartnerOptions() }">
+                <el-option v-if="formData.partner_name && !partnerNames.includes(formData.partner_name)"
+                  :label="formData.partner_name" :value="formData.partner_name" disabled />
+                <el-option v-for="name in partnerNames" :key="name" :label="name" :value="name" />
+              </el-select>
+            </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="入职日期">
@@ -330,6 +340,7 @@ import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { Search, Plus, ArrowDown, Check, Loading } from '@element-plus/icons-vue'
 import { listStaff, createStaff, updateStaff, getStaffResume, type StaffMember } from '@/services/staffApi'
 import { deleteStaffWithConfirm } from '@/composables/useStaffDelete'
+import { useStaffPartnerOptions } from '@/composables/useStaffPartnerOptions'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
@@ -359,6 +370,7 @@ const showResumeDialog = ref(false)
 const editingStaff = ref<StaffMember | null>(null)
 const saving = ref(false)
 const resumeData = ref<any>(null)
+const { partnerNames, partnersLoading, partnersFailed, loadPartnerOptions } = useStaffPartnerOptions()
 
 // P2 统计卡真实数据
 const statsData = ref({ total: 0, cpa_count: 0, partner_count: 0, active_project_count: 0 })
@@ -443,7 +455,7 @@ async function loadStaff() {
       ...(filterStatus.value ? { status: filterStatus.value } : {}),
       // #8 项目联动
       ...(routeProjectId.value ? { project_id: routeProjectId.value } : {}),
-    } as any)
+    })
     staffList.value = res.items
     total.value = res.total
     relayoutTable()
@@ -507,6 +519,7 @@ function openCreateDialog() {
     role_level: '', qualifications: [], industry_experience: [],
   }
   showCreateDialog.value = true
+  void loadPartnerOptions()
 }
 
 function editStaff(row: StaffMember) {
@@ -522,6 +535,7 @@ function editStaff(row: StaffMember) {
     qualifications: r.qualifications || [], industry_experience: r.industry_experience || [],
   }
   showCreateDialog.value = true
+  void loadPartnerOptions()
 }
 
 async function viewResume(row: StaffMember) {

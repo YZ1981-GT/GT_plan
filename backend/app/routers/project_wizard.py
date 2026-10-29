@@ -39,8 +39,14 @@ def _extract_project_audit_year(project: Project) -> int | None:
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:
     audit_year = resolve_project_audit_year(project)
+    state = project.wizard_state or {}
+    basic_info = ((state.get("steps") or {}).get("basic_info") or {}).get("data") or {}
     return ProjectCreateResponse(
         id=project.id,
+        signing_partner_id=project.partner_id,
+        manager_id=project.manager_id,
+        signing_partner_staff_id=basic_info.get("signing_partner_staff_id"),
+        manager_staff_id=basic_info.get("manager_staff_id"),
         name=project.name,
         client_name=project.client_name,
         short_name=project.short_name,
@@ -257,9 +263,15 @@ async def create_project(
     # 存量项目不受影响：分步更新走 PUT .../wizard/{step} 不经本校验。
     if not (data.legal_representative or "").strip():
         raise HTTPException(status_code=422, detail="法定代表人为必填项")
-    if data.signing_partner_id is None:
+    # 新协议按人员档案必填，关联账号由 service 派生；旧协议继续校验账号。
+    from app.services.project_staff_selection import STAFF_FIELDS
+
+    uses_staff = bool(STAFF_FIELDS.intersection(data.model_fields_set))
+    partner_id = data.signing_partner_staff_id if uses_staff else data.signing_partner_id
+    manager_id = data.manager_staff_id if uses_staff else data.manager_id
+    if partner_id is None:
         raise HTTPException(status_code=422, detail="签字合伙人为必填项")
-    if data.manager_id is None:
+    if manager_id is None:
         raise HTTPException(status_code=422, detail="项目经理为必填项")
 
     project = await project_wizard_service.create_project(data, db)

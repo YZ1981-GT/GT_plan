@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.staff_models import ProjectAssignment, StaffMember
@@ -75,9 +76,27 @@ class StaffService:
     # 创建
     # ------------------------------------------------------------------
     async def create_staff(self, data: dict) -> StaffMember:
+        data = dict(data)
+        employee_no = data.get("employee_no")
+        if isinstance(employee_no, str) and not employee_no.strip():
+            data["employee_no"] = None
         staff = StaffMember(**data)
-        self.db.add(staff)
-        await self.db.flush()
+        try:
+            # 保存点只回滚本次新增，避免工号冲突使批量调用的事务失效。
+            async with self.db.begin_nested():
+                self.db.add(staff)
+                await self.db.flush()
+        except sa.exc.IntegrityError as exc:
+            original = exc.orig
+            cause = getattr(original, "__cause__", None)
+            constraint = getattr(cause, "constraint_name", None)
+            if (
+                constraint == "staff_members_employee_no_key"
+                or "staff_members_employee_no_key" in str(original)
+                or str(original) == "UNIQUE constraint failed: staff_members.employee_no"
+            ):
+                raise HTTPException(409, "工号已存在，请使用其他工号或留空") from exc
+            raise
         return staff
 
     # ------------------------------------------------------------------

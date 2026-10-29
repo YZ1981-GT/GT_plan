@@ -39,11 +39,11 @@
           </div>
           <div class="info-row">
             <span class="info-label">签字合伙人</span>
-            <span class="info-value">{{ teamNameById(basicInfo.signing_partner_id) }}</span>
+            <span class="info-value">{{ teamNameById(basicInfo.signing_partner_staff_id || basicInfo.signing_partner_id) }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">项目经理</span>
-            <span class="info-value">{{ teamNameById(basicInfo.manager_id) }}</span>
+            <span class="info-value">{{ teamNameById(basicInfo.manager_staff_id || basicInfo.manager_id) }}</span>
           </div>
         </div>
       </div>
@@ -135,8 +135,7 @@ import { getStatusLabel } from '@/constants/statusEnum'
 
 const wizardStore = useWizardStore()
 
-// 签字合伙人/项目经理：BasicInfo 存的是用户 UUID，确认页显示用户名。
-// 名称映射由 BasicInfoStep 加载团队用户时写入 wizardStore.teamUserNames（同源 /api/users/）。
+// 优先以人员档案编号显示姓名，兼容旧项目只保存用户编号。
 function teamNameById(id: string | null): string {
   if (!id) return '—'
   return (wizardStore.teamUserNames as Record<string, string>)[id] ?? id
