@@ -6,6 +6,9 @@
 - `display.py` 在已提交输入上重算的显示名与已发布目录全部条目逐字相等（生成器写入的就是这个函数的结果）；
 - 夹具值与已发布目录、`/api/acnr/resolve`（POST / GET）、`/api/acnr/entries`、acnr_targets 预览、V2 节点逐字相等；
 - 候选（多义 / 禁止别名、cell 多命中）的显示名取目录字段；L3 / 非底稿域结果用同一函数现算。
+
+T30 拍板规则 B（design §13.2）：编码等于所属底稿编码的 sheet 不参与同名序号。夹具 `rule_b` 段逐张钉住受影响的
+20 张（10 组「父级自身 + 同名 sheet」）的新名字：都不带序号；10 张非父级 sheet 的新名字与 T29 时公式管理树的名字相同。
 """
 from __future__ import annotations
 
@@ -70,6 +73,23 @@ def test_display_py_recomputes_every_published_label():
     assert len(_CATALOG["sheets"]) > 1000 and all(e.get("display_label") for e in _CATALOG["sheets"] + _CATALOG["cells"])
 
 
+def test_rule_b_pairs_drop_redundant_sequence_numbers():
+    """规则 B：20 张逐张钉住；父级自身那张与同名 sheet 都不带序号，非父级的与 T29 公式管理树同名。"""
+    pairs = _FIXTURE["rule_b"]
+    assert len(pairs) == 20 and sum(p["is_parent_code"] for p in pairs) == 10
+    assert {p["addr_id"].split("/")[0] for p in pairs} == {
+        "A18", "A26", "A27", "C23", "D1", "D3", "F1", "F3", "F4", "F5"}
+    for p in pairs:
+        parent, code = p["addr_id"].split("/")
+        assert p["is_parent_code"] is (parent == code)
+        assert _SHEETS[p["addr_id"]]["display_label"] == p["display_label"], p["addr_id"]
+        assert p["t29_display_label"] == f"{p['display_label']}（{1 if p['is_parent_code'] else 2}）", p["addr_id"]
+        if not p["is_parent_code"]:
+            assert p["display_label"] == p["formula_manager_tree_label_t29"], p["addr_id"]
+    assert _SHEETS["D1/D1"]["display_label"] == "D1 应收票据审定表"
+    assert _SHEETS["D1/D1-1"]["display_label"] == "D1-1 应收票据审定表"
+
+
 @pytest.mark.parametrize("case", _FIXTURE["synthetic"], ids=lambda c: c["case"])
 def test_synthetic_groups(case):
     src = display.NameSources(mapping=case["sources"]["mapping"], sheet_names=case["sources"]["sheet_names"])
@@ -98,7 +118,7 @@ def client():
 
 
 def test_resolve_endpoints_output_catalog_display_label(client):
-    for x in _FIXTURE["sheets"] + _FIXTURE["cells"]:
+    for x in _FIXTURE["sheets"] + _FIXTURE["cells"] + _FIXTURE["rule_b"]:
         post = client.post("/api/acnr/resolve", json={"addr_id": x["addr_id"]})
         got = client.get("/api/acnr/resolve", params={"addr_id": x["addr_id"]})
         assert post.status_code == 200 and got.status_code == 200, x["addr_id"]
@@ -109,7 +129,7 @@ def test_resolve_endpoints_output_catalog_display_label(client):
 
 def test_entries_output_catalog_display_label(client):
     rows = {r["addr_id"]: r for r in client.get("/api/acnr/entries", params={"include_deprecated": True}).json()}
-    for x in _FIXTURE["sheets"]:
+    for x in _FIXTURE["sheets"] + _FIXTURE["rule_b"]:
         assert rows[x["addr_id"]]["display_label"] == x["display_label"], x["addr_id"]
 
 

@@ -1,12 +1,13 @@
 """ACNR 统一显示名（acnr-foundation-defect-closure T29，需求 12.1 / D10，design §13.2）——纯函数，只依赖标准库。
 
-规则以前端 `sheetDisplayName.ts::composeSheetLabelsForGroup` 的现行口径逐行移植（三棵树用户可见名不变）：
+规则以前端 `sheetDisplayName.ts::composeSheetLabelsForGroup`（T29 时的口径）为基线移植，T30 拍板修订第 4 条（规则 B）：
 
 1. 同一父级（`parent_wp_code`）一组，按编码自然排序（`wp_code_compare`，与前端 `wpCodeNaturalCompare` 同序）；
 2. 名称 = 平台底稿名（`wp_account_mapping.json` 的 `wp_name`）→ 兜底 `sheet_display_names.json`（手工维护）→
    去尾编码的模板名（`clean_sheet_label_name`）；名称等于编码（纯编码占位）则置空、只显示编码；
 3. 科目简称（父级的 `account_name`，缺则组内首个有简称的 sheet）不在名称里时加「简称·」前缀；
-4. 同组内仍重名的按编码序追加（1）（2）；
+4. 同组内仍重名的按编码序追加（1）（2）；编码等于所属底稿编码的那张 sheet 不参与序号（标签以编码开头已能区分），
+   同组其余重名的 sheet 仍不少于 2 张时照常从（1）编号（T30 拍板，design §13.2）；
 5. 标签 = `{sheet_code} {名称}`，名称为空时只有 `{sheet_code}`。
 
 只多一条：停用条目加「（已停用）」。分组与序号只数未停用的 sheet（前端树从 `/api/acnr/entries` 建树，
@@ -120,6 +121,11 @@ def _base_name(sheet: Mapping[str, Any], sources: NameSources, subject: str) -> 
     return name
 
 
+def _numbered(sheet: Mapping[str, Any]) -> bool:
+    """是否参与同名序号：编码等于所属底稿编码的那张 sheet 不参与（标签以编码开头已能区分，T30 拍板规则 B）。"""
+    return (sheet.get("sheet_code") or "") != (sheet.get("parent_wp_code") or "")
+
+
 def compose_sheet_labels(group: list[Mapping[str, Any]], sources: NameSources) -> dict[str, str]:
     """一个父级内全部 sheet 的显示名：返回 {addr_id: display_label}（规则见模块文档）。
 
@@ -129,15 +135,15 @@ def compose_sheet_labels(group: list[Mapping[str, Any]], sources: NameSources) -
                                 for s in (active or group)) if a), "")
     ordered = sorted(active, key=functools.cmp_to_key(lambda x, y: wp_code_compare(x.get("sheet_code") or "",
                                                                                    y.get("sheet_code") or "")))
-    named = [(s, _base_name(s, sources, subject)) for s in ordered]
+    named = [(s, _base_name(s, sources, subject), _numbered(s)) for s in ordered]
     counts: dict[str, int] = {}
-    for _s, name in named:
-        if name:
+    for _s, name, numbered in named:
+        if name and numbered:
             counts[name] = counts.get(name, 0) + 1
     seen: dict[str, int] = {}
     out: dict[str, str] = {}
-    for s, name in named:
-        if name and counts[name] > 1:
+    for s, name, numbered in named:
+        if name and numbered and counts[name] > 1:
             seen[name] = seen.get(name, 0) + 1
             name = f"{name}（{seen[name]}）"
         code = s.get("sheet_code") or ""

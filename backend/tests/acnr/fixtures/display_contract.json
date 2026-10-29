@@ -1,16 +1,16 @@
 {
-  "description": "ACNR 统一显示名跨语言契约（acnr-foundation-defect-closure T29，design §13.3）。sheets / cells 从真实目录抽样，值须与已发布目录、/api/acnr/resolve、acnr_targets 逐字相等；synthetic 为真实目录没有的情形（纯编码等），按 display.compose_sheet_labels 现算核对。",
+  "description": "ACNR 统一显示名跨语言契约（acnr-foundation-defect-closure T29，design §13.3；T30 拍板规则 B 修订：编码等于所属底稿编码的 sheet 不参与同名序号）。sheets / cells / rule_b 从真实目录抽样，值须与已发布目录、/api/acnr/resolve、acnr_targets 与前端三棵树逐字相等；synthetic 为真实目录没有的情形（纯编码等），按 display.compose_sheet_labels 现算核对。",
   "sheets": [
     {
       "case": "同组序号（1）",
-      "addr_id": "A18/A18",
-      "display_label": "A18 向监管部门报送审计小结的函（1）",
+      "addr_id": "A3/A3-1",
+      "display_label": "A3-1 合并流程程序表·已审比率分析（1）",
       "deprecated": false
     },
     {
       "case": "同组序号（2）",
-      "addr_id": "A18/A18-1",
-      "display_label": "A18-1 向监管部门报送审计小结的函（2）",
+      "addr_id": "A3/A3-4",
+      "display_label": "A3-4 合并流程程序表·已审比率分析（2）",
       "deprecated": false
     },
     {
@@ -142,6 +142,202 @@
         "Z2/Z2-10": "Z2-10 科目·明细表（2）",
         "Z2/Z2-3": "Z2-3 科目·明细表（已停用）"
       }
+    },
+    {
+      "case": "规则 B：编码等于底稿编码的 sheet 不参与序号，其余重名 2 张以上照常编号",
+      "sources": {
+        "mapping": {},
+        "sheet_names": {}
+      },
+      "group": [
+        {
+          "addr_id": "Z3/Z3",
+          "sheet_code": "Z3",
+          "parent_wp_code": "Z3",
+          "sheet_name": "审定表Z3"
+        },
+        {
+          "addr_id": "Z3/Z3-1",
+          "sheet_code": "Z3-1",
+          "parent_wp_code": "Z3",
+          "sheet_name": "审定表Z3-1"
+        },
+        {
+          "addr_id": "Z3/Z3-2",
+          "sheet_code": "Z3-2",
+          "parent_wp_code": "Z3",
+          "sheet_name": "审定表Z3-2"
+        },
+        {
+          "addr_id": "Z3/Z3-3",
+          "sheet_code": "Z3-3",
+          "parent_wp_code": "Z3",
+          "sheet_name": "明细表Z3-3"
+        }
+      ],
+      "expected": {
+        "Z3/Z3": "Z3 审定表",
+        "Z3/Z3-1": "Z3-1 审定表（1）",
+        "Z3/Z3-2": "Z3-2 审定表（2）",
+        "Z3/Z3-3": "Z3-3 明细表"
+      }
+    },
+    {
+      "case": "规则 B：编码等于底稿编码的 sheet 与另一张同名、其余只剩 1 张则都不编号",
+      "sources": {
+        "mapping": {},
+        "sheet_names": {}
+      },
+      "group": [
+        {
+          "addr_id": "Z4/Z4",
+          "sheet_code": "Z4",
+          "parent_wp_code": "Z4",
+          "sheet_name": "审定表Z4"
+        },
+        {
+          "addr_id": "Z4/Z4-1",
+          "sheet_code": "Z4-1",
+          "parent_wp_code": "Z4",
+          "sheet_name": "审定表Z4-1"
+        }
+      ],
+      "expected": {
+        "Z4/Z4": "Z4 审定表",
+        "Z4/Z4-1": "Z4-1 审定表"
+      }
+    }
+  ],
+  "rule_b": [
+    {
+      "addr_id": "A18/A18",
+      "is_parent_code": true,
+      "t29_display_label": "A18 向监管部门报送审计小结的函（1）",
+      "display_label": "A18 向监管部门报送审计小结的函"
+    },
+    {
+      "addr_id": "A18/A18-1",
+      "is_parent_code": false,
+      "t29_display_label": "A18-1 向监管部门报送审计小结的函（2）",
+      "display_label": "A18-1 向监管部门报送审计小结的函",
+      "formula_manager_tree_label_t29": "A18-1 向监管部门报送审计小结的函"
+    },
+    {
+      "addr_id": "A26/A26",
+      "is_parent_code": true,
+      "t29_display_label": "A26 专业技术委员会业务报告审核提交资料清单（1）",
+      "display_label": "A26 专业技术委员会业务报告审核提交资料清单"
+    },
+    {
+      "addr_id": "A26/A26-1",
+      "is_parent_code": false,
+      "t29_display_label": "A26-1 专业技术委员会业务报告审核提交资料清单（2）",
+      "display_label": "A26-1 专业技术委员会业务报告审核提交资料清单",
+      "formula_manager_tree_label_t29": "A26-1 专业技术委员会业务报告审核提交资料清单"
+    },
+    {
+      "addr_id": "A27/A27",
+      "is_parent_code": true,
+      "t29_display_label": "A27 IT审计总结备忘录（1）",
+      "display_label": "A27 IT审计总结备忘录"
+    },
+    {
+      "addr_id": "A27/A27-1",
+      "is_parent_code": false,
+      "t29_display_label": "A27-1 IT审计总结备忘录（2）",
+      "display_label": "A27-1 IT审计总结备忘录",
+      "formula_manager_tree_label_t29": "A27-1 IT审计总结备忘录"
+    },
+    {
+      "addr_id": "C23/C23",
+      "is_parent_code": true,
+      "t29_display_label": "C23 会计分录控制测试（1）",
+      "display_label": "C23 会计分录控制测试"
+    },
+    {
+      "addr_id": "C23/C23-2",
+      "is_parent_code": false,
+      "t29_display_label": "C23-2 会计分录控制测试（2）",
+      "display_label": "C23-2 会计分录控制测试",
+      "formula_manager_tree_label_t29": "C23-2 会计分录控制测试"
+    },
+    {
+      "addr_id": "D1/D1",
+      "is_parent_code": true,
+      "t29_display_label": "D1 应收票据审定表（1）",
+      "display_label": "D1 应收票据审定表"
+    },
+    {
+      "addr_id": "D1/D1-1",
+      "is_parent_code": false,
+      "t29_display_label": "D1-1 应收票据审定表（2）",
+      "display_label": "D1-1 应收票据审定表",
+      "formula_manager_tree_label_t29": "D1-1 应收票据审定表"
+    },
+    {
+      "addr_id": "D3/D3",
+      "is_parent_code": true,
+      "t29_display_label": "D3 预收款项·预收账款审定表（1）",
+      "display_label": "D3 预收款项·预收账款审定表"
+    },
+    {
+      "addr_id": "D3/D3-1",
+      "is_parent_code": false,
+      "t29_display_label": "D3-1 预收款项·预收账款审定表（2）",
+      "display_label": "D3-1 预收款项·预收账款审定表",
+      "formula_manager_tree_label_t29": "D3-1 预收款项·预收账款审定表"
+    },
+    {
+      "addr_id": "F1/F1",
+      "is_parent_code": true,
+      "t29_display_label": "F1 预付款项·预付账款审定表（1）",
+      "display_label": "F1 预付款项·预付账款审定表"
+    },
+    {
+      "addr_id": "F1/F1-1",
+      "is_parent_code": false,
+      "t29_display_label": "F1-1 预付款项·预付账款审定表（2）",
+      "display_label": "F1-1 预付款项·预付账款审定表",
+      "formula_manager_tree_label_t29": "F1-1 预付款项·预付账款审定表"
+    },
+    {
+      "addr_id": "F3/F3",
+      "is_parent_code": true,
+      "t29_display_label": "F3 应付票据审定表（1）",
+      "display_label": "F3 应付票据审定表"
+    },
+    {
+      "addr_id": "F3/F3-1",
+      "is_parent_code": false,
+      "t29_display_label": "F3-1 应付票据审定表（2）",
+      "display_label": "F3-1 应付票据审定表",
+      "formula_manager_tree_label_t29": "F3-1 应付票据审定表"
+    },
+    {
+      "addr_id": "F4/F4",
+      "is_parent_code": true,
+      "t29_display_label": "F4 应付账款审定表（1）",
+      "display_label": "F4 应付账款审定表"
+    },
+    {
+      "addr_id": "F4/F4-1",
+      "is_parent_code": false,
+      "t29_display_label": "F4-1 应付账款审定表（2）",
+      "display_label": "F4-1 应付账款审定表",
+      "formula_manager_tree_label_t29": "F4-1 应付账款审定表"
+    },
+    {
+      "addr_id": "F5/F5",
+      "is_parent_code": true,
+      "t29_display_label": "F5 营业成本审定表（1）",
+      "display_label": "F5 营业成本审定表"
+    },
+    {
+      "addr_id": "F5/F5-1",
+      "is_parent_code": false,
+      "t29_display_label": "F5-1 营业成本审定表（2）",
+      "display_label": "F5-1 营业成本审定表",
+      "formula_manager_tree_label_t29": "F5-1 营业成本审定表"
     }
   ]
 }
