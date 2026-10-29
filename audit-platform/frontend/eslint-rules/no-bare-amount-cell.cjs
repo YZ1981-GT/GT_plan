@@ -14,7 +14,7 @@
 // 注：本规则用 vue-eslint-parser defineTemplateBodyVisitor 走模板 AST，
 //     不能直接 return { VElement(...) }（vue 文件默认 visitor 不走模板）。
 
-// 金额关键字（与 _scan_bare_amount_cells.mjs 保持一致）
+// 金额关键字（prop / label 任一命中即视为金额列）
 const AMOUNT_PROP_RE =
   /(amount|balance|debit|credit|tax|cost|price|principal|interest|payable|receivable|salary|fund|equity|capital|fee|charge|discount|profit|loss|revenue|expense|income|net_asset|netasset)/i
 const AMOUNT_LABEL_RE =
