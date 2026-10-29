@@ -1,0 +1,147 @@
+{
+  "description": "ACNR 统一显示名跨语言契约（acnr-foundation-defect-closure T29，design §13.3）。sheets / cells 从真实目录抽样，值须与已发布目录、/api/acnr/resolve、acnr_targets 逐字相等；synthetic 为真实目录没有的情形（纯编码等），按 display.compose_sheet_labels 现算核对。",
+  "sheets": [
+    {
+      "case": "同组序号（1）",
+      "addr_id": "A18/A18",
+      "display_label": "A18 向监管部门报送审计小结的函（1）",
+      "deprecated": false
+    },
+    {
+      "case": "同组序号（2）",
+      "addr_id": "A18/A18-1",
+      "display_label": "A18-1 向监管部门报送审计小结的函（2）",
+      "deprecated": false
+    },
+    {
+      "case": "科目简称前缀",
+      "addr_id": "A1/A1-11",
+      "display_label": "A1-11 财务报告程序表·业务报告签发流转控制表",
+      "deprecated": false
+    },
+    {
+      "case": "停用",
+      "addr_id": "K14/K14",
+      "display_label": "K14 资产处置收益审定表（已停用）",
+      "deprecated": true
+    },
+    {
+      "case": "design 示例：取平台底稿名",
+      "addr_id": "E1/E1-14",
+      "display_label": "E1-14 货币资金分析程序（一）",
+      "deprecated": false
+    },
+    {
+      "case": "design 示例：父级自身",
+      "addr_id": "H1/H1",
+      "display_label": "H1 固定资产",
+      "deprecated": false
+    },
+    {
+      "case": "design 示例：同名组由映射名区分",
+      "addr_id": "F2/F2-33",
+      "display_label": "F2-33 存货检查（五）",
+      "deprecated": false
+    }
+  ],
+  "cells": [
+    {
+      "case": "A1 + 语义标签",
+      "addr_id": "D1/D1-2/F50",
+      "cell_label": "F50 合计行-票面金额合计",
+      "display_label": "D1-2 应收票据原值明细（按类） › F50 合计行-票面金额合计",
+      "deprecated": false
+    },
+    {
+      "case": "语义待核对",
+      "addr_id": "F3/F3-5/B25",
+      "cell_label": "B25（语义待核对）",
+      "display_label": "F3-5 应付票据逾期检查 › B25（语义待核对）",
+      "deprecated": false
+    },
+    {
+      "case": "停用（坐标待核对）",
+      "addr_id": "F3/F3-6/E30",
+      "cell_label": "E30（坐标待核对）",
+      "display_label": "F3-6 应付票据关联方检查 › E30（坐标待核对）",
+      "deprecated": true
+    }
+  ],
+  "synthetic": [
+    {
+      "case": "纯编码（名称等于编码即只显示编码）与去尾编码模板名",
+      "sources": {
+        "mapping": {
+          "Z1-3": {
+            "account_name": "",
+            "wp_name": "Z1-3"
+          }
+        },
+        "sheet_names": {}
+      },
+      "group": [
+        {
+          "addr_id": "Z1/Z1-1",
+          "sheet_code": "Z1-1",
+          "parent_wp_code": "Z1",
+          "sheet_name": "Z1-1"
+        },
+        {
+          "addr_id": "Z1/Z1-2",
+          "sheet_code": "Z1-2",
+          "parent_wp_code": "Z1",
+          "sheet_name": "审定表Z1-2"
+        },
+        {
+          "addr_id": "Z1/Z1-3",
+          "sheet_code": "Z1-3",
+          "parent_wp_code": "Z1",
+          "sheet_name": "任意名Z1-3"
+        }
+      ],
+      "expected": {
+        "Z1/Z1-1": "Z1-1",
+        "Z1/Z1-2": "Z1-2 审定表",
+        "Z1/Z1-3": "Z1-3"
+      }
+    },
+    {
+      "case": "停用不参与序号、自然排序（Z2-10 排在 Z2-2 之后）",
+      "sources": {
+        "mapping": {
+          "Z2": {
+            "account_name": "科目",
+            "wp_name": "科目"
+          }
+        },
+        "sheet_names": {}
+      },
+      "group": [
+        {
+          "addr_id": "Z2/Z2-10",
+          "sheet_code": "Z2-10",
+          "parent_wp_code": "Z2",
+          "sheet_name": "明细表Z2-10"
+        },
+        {
+          "addr_id": "Z2/Z2-2",
+          "sheet_code": "Z2-2",
+          "parent_wp_code": "Z2",
+          "sheet_name": "明细表Z2-2"
+        },
+        {
+          "addr_id": "Z2/Z2-3",
+          "sheet_code": "Z2-3",
+          "parent_wp_code": "Z2",
+          "sheet_name": "明细表Z2-3",
+          "deprecated": true
+        }
+      ],
+      "expected": {
+        "Z2/Z2-2": "Z2-2 科目·明细表（1）",
+        "Z2/Z2-10": "Z2-10 科目·明细表（2）",
+        "Z2/Z2-3": "Z2-3 科目·明细表（已停用）"
+      }
+    }
+  ]
+}

@@ -47,15 +47,15 @@ def _wp_name_index() -> dict[str, dict[str, str]]:
         return {}
 
 
-# 按文件 mtime 缓存 sheet_display_names.json（重生成后无需重启即生效）
+# 按文件 mtime 缓存 sheet_display_names.json（修改后无需重启即生效）
 _SHEET_DISPLAY_CACHE: dict[str, dict[str, str]] = {}
 
 
 def _sheet_display_names() -> dict[str, str]:
     """{sheet_code: 规范底稿名} 索引，源自 sheet_display_names.json。
 
-    权威真源为 workpaper_sheet_classification（每张 sheet 真实 tab 名以自身
-    wp_code 结尾）；用 scripts/gen_sheet_display_names.py 生成。作为
+    初值取自 workpaper_sheet_classification（每张 sheet 真实 tab 名以自身
+    wp_code 结尾），现为手工维护的目录生成器输入（生成脚本已删除，T29）。作为
     wp_account_mapping 的兜底，补齐重名占位 sheet（如 D2-7~13/D4-14~36）的
     可区分名称。按 mtime 缓存：JSON 重生成后自动生效，无需重启。
     降级：文件缺失/加载失败返回空 dict 不阻断。
@@ -291,7 +291,8 @@ def list_sheets(
         result = [s for s in result if not s.get("deprecated")]
 
     # 附加「科目简称」(account_name，取父底稿) 与「规范底稿名」(mapped_sheet_name，
-    # 取本 sheet_code)，供前端组建可区分的显示名。返回浅拷贝避免污染 catalog 缓存。
+    # 取本 sheet_code)，只增不改（统一显示名已由生成器写进 display_label，口径同 display.NameSources）。
+    # 返回浅拷贝避免污染 catalog 缓存。
     # mapped_sheet_name 优先 wp_account_mapping 的策管名，兜底 classification 真名。
     name_idx = _wp_name_index()
     disp_names = _sheet_display_names()

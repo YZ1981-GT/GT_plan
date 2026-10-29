@@ -43,7 +43,8 @@ from app.services.acnr.catalog import (
     _build_jump_route,
 )
 from app.services.acnr.immutability import get_project_registry_version
-from app.services.acnr.resolve_identity import deprecation_fields, step1_identity
+from app.services.acnr.resolve_identity import (cell_candidate, computed_display_label, deprecation_fields,
+                                                step1_identity)
 from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
 from app.services.acnr.runtime import get_runtime_entries, RuntimeCellEntry
 
@@ -194,6 +195,7 @@ class ResolveResult:
     entry_type: Optional[str] = None
     cell_address: Optional[str] = None
     semantic_label: Optional[str] = None
+    display_label: Optional[str] = None  # 统一显示名（目录字段；L3 / V1 用 display.cell_labels 现算，T29）
     formula_ref: Optional[str] = None
     uri: Optional[str] = None
     jump_route: Optional[str] = None
@@ -312,6 +314,7 @@ def _delegate_v1(
         entry_type=parts["domain"],
         cell_address=parts.get("cell"),
         semantic_label=None,
+        display_label=computed_display_label("/".join(x for x in (parts["source"], parts["path"]) if x), parts.get("cell"), None),
         formula_ref=resolved_formula_ref,
         uri=resolved_uri,
         jump_route=None,  # jump_route 需要 project context，调用方自行 build
@@ -553,14 +556,7 @@ async def full_resolve(
                 return ResolveResult(
                     found=False,
                     error="ambiguous",
-                    candidates=[
-                        {
-                            "addr_id": c.get("addr_id"),
-                            "display_label": c.get("semantic_label") or c.get("addr_id"),
-                            "score": 1.0,
-                        }
-                        for c in exact
-                    ],
+                    candidates=[cell_candidate(c) for c in exact],
                     source_layer="L1_cell",
                 )
 
@@ -580,14 +576,7 @@ async def full_resolve(
                 return ResolveResult(
                     found=False,
                     error="ambiguous",
-                    candidates=[
-                        {
-                            "addr_id": c.get("addr_id"),
-                            "display_label": c.get("semantic_label") or c.get("addr_id"),
-                            "score": 1.0,
-                        }
-                        for c in semantic
-                    ],
+                    candidates=[cell_candidate(c) for c in semantic],
                     source_layer="L1_cell",
                 )
 
@@ -699,14 +688,8 @@ async def full_resolve(
                 return ResolveResult(
                     found=False,
                     error="ambiguous",
-                    candidates=[
-                        {
-                            "addr_id": c.addr_id,
-                            "display_label": c.semantic_label or c.addr_id,
-                            "score": 1.0,
-                        }
-                        for c in l3_candidates
-                    ],
+                    candidates=[{"addr_id": c.addr_id, "score": 1.0, "display_label": computed_display_label(
+                        c.wp_code, c.cell_address, c.semantic_label)} for c in l3_candidates],
                     source_layer="L3",
                 )
 
@@ -768,6 +751,7 @@ def _build_cell_resolve_result(
         entry_type="cell",
         cell_address=cell.get("cell_address"),
         semantic_label=cell.get("semantic_label"),
+        display_label=cell.get("display_label"),
         formula_ref=cell.get("formula_ref"),
         uri=cell.get("uri"),
         jump_route=jump_route,
@@ -787,6 +771,7 @@ def _build_sheet_resolve_result(
         found=True,
         addr_id=sheet.get("addr_id"),
         entry_type="sheet",
+        display_label=sheet.get("display_label"),
         jump_route=sheet.get("jump_route_template"),
         source_layer="L1_sheet",
         **deprecation_fields(sheet, cat if cat is not None else get_catalog()),
@@ -801,6 +786,7 @@ def _build_runtime_resolve_result(entry: RuntimeCellEntry) -> ResolveResult:
         entry_type="runtime_cell",
         cell_address=entry.cell_address,
         semantic_label=entry.semantic_label,
+        display_label=computed_display_label(entry.wp_code, entry.cell_address, entry.semantic_label),
         formula_ref=entry.formula_ref,
         uri=entry.uri,
         jump_route=None,  # runtime entry 无 jump_route_template，需显式 resolve_instance

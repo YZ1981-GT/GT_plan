@@ -10,7 +10,7 @@
 3. `build_release`：在基础产物（`generate_catalog()`：classification 骨架 + I/E manifest + 渲染注册 + 标签别名 + 坐标种子
    + overrides）之上叠加 sheet_verdicts（补登 5 张父 sheet、K14~K18 停用）、平台底稿名与禁止别名、标签源别名处置
    （`sources/alias_policy.json`，T09）、上一批次别名沿用、cell_verdicts（孤儿 25 / 超范围 14 停用、范围内 33 语义待核对）、
-   cell 名称规则，再跑发布门禁，产出带 open_problems、release 段与四组分组（`catalog_report_buckets`）的报告；
+   cell 名称规则与统一显示名（`display.apply_display_labels`，T29），再跑发布门禁，产出带 open_problems、release 段与四组分组（`catalog_report_buckets`）的报告；
    open_problems.ccr_unresolved 按新目录经 `ccr_sources` 现算（T22，与 CI 检查器 `check_ccr_resolve` 同一函数）。
 
 只依赖标准库与本包。
@@ -25,7 +25,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
-from . import catalog_contract, catalog_names, catalog_release, catalog_report_buckets, ccr_sources
+from . import catalog_contract, catalog_names, catalog_release, catalog_report_buckets, ccr_sources, display
 from .catalog_integrity import content_sha256
 from .loaders.from_classification import SheetCatalogEntry, load_sheet_skeletons_from_classification
 from .loaders.from_sheet_verdicts import load_sheet_verdicts
@@ -244,6 +244,7 @@ def build_release(
                                                 for c in verdicts.cell_verdicts])
     catalog_names.apply_cell_names(catalog)
     catalog["sheets"].sort(key=lambda s: s["addr_id"])
+    display.apply_display_labels(catalog, display.load_name_sources(backend_root))
     catalog["cells"].sort(key=lambda c: c["addr_id"])
 
     catalog_text = deterministic_json(catalog)

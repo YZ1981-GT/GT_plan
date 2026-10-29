@@ -1,7 +1,8 @@
 """ACNR Catalog Generator — 目录唯一写出方（design §5.3，T07）。
 
 `generate_catalog()` 合并基础输入（classification 骨架、I/E manifest、渲染注册、标签别名、坐标种子、overrides）；
-写出走 `main()`：`app.services.acnr.catalog_build.build_release` 在基础产物上叠加判定记录与名称规则、跑发布门禁，
+写出走 `main()`：`app.services.acnr.catalog_build.build_release` 在基础产物上叠加判定记录与名称规则、
+写统一显示名（`display.apply_display_labels`，输入含 `wp_account_mapping.json` 与 `sheet_display_names.json`，T29）、跑发布门禁，
 门禁通过后同批写出 快照 → schema → 报告（含 release 段）→ 目录，每个文件先写临时文件再 `os.replace`。
 
 Usage:

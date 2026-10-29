@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
 
+from app.services.acnr import display
 from app.services.acnr.limits import ACNR_BATCH_DEADLINE_S
 from app.services.acnr.metrics import get_acnr_metrics
 from app.services.acnr.reasons import TARGET_REJECT_REASONS
@@ -157,12 +158,11 @@ async def resolve_acnr_targets(
 
 
 def _display_label(cell: dict, sheet: dict) -> str:
-    """目录统一显示名（T29 由生成器写入 cell 的 ``display_label``）；写入前用 sheet 显示名 › 坐标 语义名 过渡。"""
+    """目录统一显示名（生成器经 ``display.apply_display_labels`` 写入 cell 的 ``display_label``，T29）；
+    缺字段的目录（测试自造夹具）用同一函数 ``display.cell_labels`` 现算。"""
     if cell.get("display_label"):
         return str(cell["display_label"])
-    head = sheet.get("display_label") or sheet.get("addr_id") or ""
-    tail = " ".join(x for x in (cell.get("cell_address"), cell.get("semantic_label")) if x)
-    return f"{head} › {tail}" if tail else str(head)
+    return display.cell_labels(sheet.get("display_label") or sheet.get("addr_id") or "", cell)[1]
 
 
 def _jump_route(sheet: dict, wp_id) -> str | None:

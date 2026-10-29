@@ -4,7 +4,8 @@ V2 静态依赖图（L2 语义锚点、resolved refs、L3 依赖、统一依赖�
 用「底稿编码 + 表显示名 + 末段」描述。本模块把它们换成平台规范身份，只调用 ``exact_identity``，
 不用正则从显示名里猜 sheet_code。
 
-``canonical_node`` 的结果里 ``addr_id`` 与 ``unresolved_reason`` 恰有其一：
+``canonical_node`` 的结果里 ``addr_id`` 与 ``unresolved_reason`` 恰有其一；``addr_id`` 有值时另带目录的统一显示名
+``display_label``（T29，与 ``/api/acnr/resolve``、acnr_targets 同一字段）：
 
 | 情形 | addr_id | identity_key | unresolved_code |
 |---|---|---|---|
@@ -43,8 +44,8 @@ _SHEET_STATE_CODE = {
     "wp_not_in_catalog": "wp_not_in_catalog",
 }
 
-#: 响应里追加的四个字段（只增，旧字段不变）
-RESPONSE_FIELDS = ("addr_id", "sheet_addr_id", "unresolved_code", "unresolved_reason")
+#: 响应里追加的字段（只增，旧字段不变）；display_label 只在 addr_id 为目录登记格时有值，取目录字段（T29）
+RESPONSE_FIELDS = ("addr_id", "sheet_addr_id", "unresolved_code", "unresolved_reason", "display_label")
 
 
 @dataclass(frozen=True)
@@ -54,10 +55,20 @@ class CanonicalNode:
     identity_key: str | None = None
     unresolved_code: str | None = None
     unresolved_reason: str | None = None
+    display_label: str | None = None
 
     def response_fields(self) -> dict:
-        """V2 响应里追加的四个字段。"""
+        """V2 响应里追加的字段。"""
         return {name: getattr(self, name) for name in RESPONSE_FIELDS}
+
+
+def _catalog_display_label(addr_id: str, index: "CatalogIndex | None") -> str | None:
+    """目录登记格的统一显示名（与 `/api/acnr/resolve`、acnr_targets 同一字段）。"""
+    if index is None:
+        from .catalog import get_catalog
+
+        index = get_catalog()
+    return (index.cells_by_addr_id.get(addr_id) or {}).get("display_label")
 
 
 def _unresolved(code: str, *, sheet_addr_id: str | None = None, identity_key: str | None = None,
@@ -85,7 +96,8 @@ def canonical_node(wp_code: str | None, sheet: str | None, last: str | None, *,
         cm = exact_identity.cell_of(wp_code, sheet, last, index=index)
         if cm.ok and cm.addr_id:
             if cm.in_catalog:
-                return CanonicalNode(addr_id=cm.addr_id, sheet_addr_id=sheet_addr_id, identity_key=cm.addr_id)
+                return CanonicalNode(addr_id=cm.addr_id, sheet_addr_id=sheet_addr_id, identity_key=cm.addr_id,
+                                     display_label=_catalog_display_label(cm.addr_id, index))
             return _unresolved("cell_not_in_catalog", sheet_addr_id=sheet_addr_id, identity_key=cm.addr_id)
     return _unresolved("label_not_a1", sheet_addr_id=sheet_addr_id, identity_key=f"{sheet_addr_id}#{last}")
 
@@ -124,7 +136,7 @@ def non_workpaper_node(module: str | None) -> CanonicalNode:
 
 def annotate(node: dict, wp_code: str | None, sheet: str | None, last: str | None, *,
              index: "CatalogIndex | None" = None) -> dict:
-    """在 V2 响应节点 dict 上追加四个规范字段（不改旧字段），返回同一个 dict。"""
+    """在 V2 响应节点 dict 上追加规范字段（不改旧字段），返回同一个 dict。"""
     node.update(canonical_node(wp_code, sheet, last, index=index).response_fields())
     return node
 

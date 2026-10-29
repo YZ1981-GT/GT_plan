@@ -674,6 +674,7 @@ TestClient 以「不属于任何项目的审计员」身份（覆盖 `get_curren
 - 不新增 `display_name`：沿用 `display_label` 字段名，取值规则改为上述显示名（只用于显示，消费方均原样展示）；cell 新增同名字段与 `cell_label`。生成器写出，`list_sheets`、resolve 命中与候选、acnr_targets、V2 节点都输出同一字段；L3 运行时条目与 V1 委托结果由 resolver 用同一函数现算。
 - 输入：`wp_account_mapping.json` 与 `sheet_display_names.json` 成为生成器输入（进 `inputs_fingerprint`）。`sheet_display_names.json` 改为手工维护；`gen_sheet_display_names.py` 删除（删前 grep 调用方；重跑会回退 36 条）。`check_sheet_display_names.py` 改为薄壳：读已提交目录，用 `display.py` 列出名称为空（纯编码）的 sheet，CI 作业维持报告模式。`list_sheets` 继续注入 `account_name` / `mapped_sheet_name`（只增不改），但前端不再读后者。
 - 树的父节点标题「{父级码} {科目简称}」不是某个 addr_id 的显示名，保留在前端单一函数 `sheetDisplayName.groupHeaderLabel`。
+- 勘误（T29 实施现算，不改上文原句）：上文「三棵树的用户可见名不变」对公式管理树不完全成立。选址器与公式编辑树按父级整组调用 `composeSheetLabelsForGroup`，与 `display.compose_sheet_labels` 对 1220 张未停用 sheet 逐条相同；公式管理树 `buildWpDomainTree` 先滤掉 `sheet_code == parent_wp_code` 的条目再分组，A18-1、A26-1、A27-1、C23-2、D1-1、D3-1、F1-1、F3-1、F4-1、F5-1 共 10 张在该树里不带序号，统一规则下带「（2）」（同组的父级自身条目占「（1）」）。T30 改读 `display_label` 后这 10 张在公式管理树里会多出序号；保留还是改规则由 T30 实施前决定（证据 `tmp_acnr_foundation/out/s11r1_fe_equiv.json`）。
 
 ### 13.3 前端改动与守卫
 

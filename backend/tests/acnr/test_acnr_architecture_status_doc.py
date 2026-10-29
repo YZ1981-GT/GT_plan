@@ -58,7 +58,6 @@ H_PLANNED = "### 计划中（未落地）"
 _PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
     "lock_project_registry": ("T17", ("py_ident", "lock_project_registry")),
     "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
-    "display.py": ("T29", ("file", "backend/app/services/acnr/display.py")),
     "AcnrCandidatesHint": ("T31", ("file", "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue")),
 }
 

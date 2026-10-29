@@ -1577,11 +1577,10 @@ jobs:
         run: python backend/scripts/check/check_acnr_snapshot_count.py --strict
 
   acnr-sheet-display-names:
-    # ACNR sheet 显示名覆盖/漂移守卫（report 模式）
-    # catalog 新增/改名后 sheet_display_names.json 未更新会产生重名占位显示；
-    # 本检查仅用已提交文件（global_catalog + wp_account_mapping + sheet_display_names
-    # + prefill_formula_mapping）报告未覆盖 sheet（GAP）。当前 GAP=0；report 模式
-    # 不阻断，稳定后可切 --strict。漂移时重跑 scripts/gen_sheet_display_names.py 补齐。
+    # ACNR sheet 显示名报告（report 模式，acnr-foundation-defect-closure T29）
+    # 显示名由目录生成器经 app/services/acnr/display.py 写入 global_catalog.json 的 display_label；
+    # 本检查只读已提交目录，按同一规则列出名称为空（纯编码）的 sheet、核对显示名与重算一致。
+    # report 模式不阻断。补名称改手工维护的 sheet_display_names.json 后重新发布目录（generate_catalog.py）。
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

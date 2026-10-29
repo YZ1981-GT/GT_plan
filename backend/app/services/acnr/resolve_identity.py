@@ -8,12 +8,14 @@
   判定用调用方传入的目录（版本锁定时即锁定快照），不读当前目录。
 - `deprecation_fields`：命中停用条目时返回 `deprecated` / `replaced_by` / 中文 `reason`
   （「该地址已停用，建议改用 …」），非停用条目返回空字典。
+- `cell_candidate` / `computed_display_label`：候选与命中的显示名（T29）——目录条目取目录的 `display_label`，
+  L3 运行时条目与非底稿域委托结果用 `display.cell_labels` 现算。
 """
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from app.services.acnr import reasons
+from app.services.acnr import display, reasons
 from app.services.acnr.catalog import (
     _formula_ref_to_sheet_match,
     _index_ref_to_addr_id,
@@ -68,6 +70,18 @@ def step1_identity(
     }
 
 
+def cell_candidate(cell: dict) -> dict[str, Any]:
+    """目录 cell 候选：显示名取目录的 `display_label`（T29 由生成器写入）。"""
+    return {"addr_id": cell.get("addr_id"),
+            "display_label": cell.get("display_label") or cell.get("semantic_label") or cell.get("addr_id"),
+            "score": 1.0}
+
+
+def computed_display_label(head: str | None, cell_address: str | None, semantic_label: str | None) -> str:
+    """不在目录里的命中（L3 运行时条目、非底稿域委托 V1）用目录同一函数 `display.cell_labels` 现算显示名。"""
+    return display.cell_labels(head or "", {"cell_address": cell_address, "semantic_label": semantic_label})[1]
+
+
 def deprecation_fields(entry: dict, cat: "CatalogIndex") -> dict[str, Any]:
     """停用条目的 `deprecated` / `replaced_by` / `reason`；非停用条目返回 {}。"""
     if not entry.get("deprecated"):
@@ -81,4 +95,4 @@ def deprecation_fields(entry: dict, cat: "CatalogIndex") -> dict[str, Any]:
     }
 
 
-__all__ = ["step1_identity", "deprecation_fields"]
+__all__ = ["step1_identity", "deprecation_fields", "cell_candidate", "computed_display_label"]

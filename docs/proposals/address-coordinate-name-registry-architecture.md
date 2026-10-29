@@ -52,7 +52,7 @@
 | 高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误） | 后端 | `backend/app/services/custom_query/strict_model.py` | `StrictRequestModel`、`AcnrTargetList`、`TemplateConfig`、`template_config_rejected` | `backend/tests/test_query_dsl_rejects_unknown_fields.py` |
 | `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
 | 跨 sheet 追溯节点规范身份（`/api/custom-query/cross-sheet-trace` 的每个节点按「父底稿 + sheet 名或编码 + A1」经唯一精确身份判定取规范 addr_id：sheet 已识别且 A1 合法即解析成功并标明是否为目录登记格，sheet 不识别、多义、命中禁止别名或 A1 非法给中文原因；同步追溯的生产构造都不经同步桥接取身份） | 后端 | `backend/app/services/custom_query/cross_sheet_trace_orchestrator.py` | `CrossSheetTraceOrchestrator`、`TracedRefNode` | `backend/tests/acnr/test_cross_sheet_trace_async_e2e.py` |
-| V2 依赖图节点规范身份与 stale 起点身份（V2 `/resolve`、`/anchors`、`/stale-impact`、`/dependencies` 的节点与边端点追加 addr_id、sheet_addr_id、unresolved_code、unresolved_reason，经唯一精确身份判定取得，addr_id 与中文原因恰有其一；`/resolve` 的包含匹配只作候选；stale 写入口与图中底稿键共用同一身份函数，身份算不出不写 stale 并返回原因） | 后端 | `backend/app/services/acnr/v2_canonical.py` | `canonical_node`、`canonical_uri`、`canonical_addr`、`annotate` | `backend/tests/acnr/test_v2_canonical_reconcile.py` |
+| V2 依赖图节点规范身份与 stale 起点身份（V2 `/resolve`、`/anchors`、`/stale-impact`、`/dependencies` 的节点与边端点追加 addr_id、sheet_addr_id、unresolved_code、unresolved_reason，经唯一精确身份判定取得，addr_id 与中文原因恰有其一，addr_id 为目录登记格时另带目录的统一显示名 display_label；`/resolve` 的包含匹配只作候选；stale 写入口与图中底稿键共用同一身份函数，身份算不出不写 stale 并返回原因） | 后端 | `backend/app/services/acnr/v2_canonical.py` | `canonical_node`、`canonical_uri`、`canonical_addr`、`annotate` | `backend/tests/acnr/test_v2_canonical_reconcile.py` |
 | CCR 端点规范身份与 CI 检查（`cross_wp_references.json` 的源与底稿目标经唯一精确身份判定取身份，检查器无私有匹配、只依赖标准库；不可解析的源须在豁免清单逐条登记，清单外或已失效的豁免即阻断；生成器按新目录把不可解析源写进报告问题清单，供豁免门禁核实；解析到停用条目的引用单列） | 后端 | `backend/app/services/acnr/ccr_sources.py` | `source_end`、`target_ends`、`unresolved_source_ids`、`is_deprecated` | `backend/tests/acnr/test_ccr_resolve.py` |
 | V2 静态数据双读对账产物（L2 语义锚点、resolved refs、L3 依赖、CCR 四个文件的每个节点与边端点，经 V2 读端点同一身份函数按来源文件 × 分类计数，每类附中文原因与样本，不含时间戳；`--check` 比对，CI 运行） | 后端 | `backend/scripts/acnr/reconcile_v2_canonical.py` | `build`、`main` | `backend/tests/acnr/test_ccr_resolve.py` |
 | 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
@@ -61,6 +61,7 @@
 | 平台底稿索引名 loader（名称规则模块调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
 | 生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码 | 后端 | `backend/app/services/acnr/catalog_names.py` | `merge_platform_names`、`apply_cell_names`、`apply_cell_verdicts` | `backend/tests/acnr/test_name_system.py` |
 | 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
+| 统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号，停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算） | 后端 | `backend/app/services/acnr/display.py` | `compose_sheet_labels`、`cell_labels`、`apply_display_labels` | `backend/tests/acnr/test_display_contract.py` |
 | 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
@@ -72,14 +73,14 @@
 | 底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，回收站给中文原因） | 后端 | `backend/app/routers/acnr.py` | `acnr_locate_workpaper` | `backend/tests/acnr/test_workpaper_locate_endpoint.py` |
 | 底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约 | 前端 | `audit-platform/frontend/src/views/composables/workpaperShortLink.ts` | `resolveShortLink`、`shortLinkQuery` | `audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——显示名单一来源（T29、T30）。
+门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——前端显示名单一来源（T30）。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
-| 统一显示名（后端 display.py 写入目录、前端改读 display_label）、歧义候选与外部命名空间中文提示 | T29、T30、T31 |
+| 前端显示改读目录的 display_label、歧义候选与外部命名空间中文提示 | T30、T31 |
 | INDEX 登记与提交边界核对 | T33 |
 
 ### 版本号格式
