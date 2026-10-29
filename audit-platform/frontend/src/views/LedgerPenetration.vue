@@ -654,7 +654,7 @@
               v-for="k in ledgerExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
@@ -791,7 +791,7 @@
               v-for="k in voucherExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
@@ -898,7 +898,7 @@
               v-for="k in auxLedgerExtraAllKeys"
               :key="k"
               :model-value="!hiddenExtraCols.has(k)"
-              @change="(v) => toggleExtraCol(k, v as boolean)"
+              @change="toggleExtraCol(k, $event as boolean)"
             >{{ k }}</el-checkbox>
           </div>
         </el-popover>
@@ -1027,6 +1027,18 @@
          element-loading-background="rgba(255,255,255,0.85)">
     <!-- 步骤1：上传文件 -->
     <div v-if="importStep === 'upload'">
+      <el-alert
+        v-if="incrementalUploadRequest"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #title>增量追加不会修改当前账套</template>
+        文件月份：{{ incrementalUploadRequest.filePeriods.join('、') || '待文件解析确认' }}；
+        策略：{{ incrementalUploadRequest.strategy === 'overwrite' ? '重叠月份使用文件版本' : '重叠月份保留上一版本' }}。
+        只有新 staged 完整合并并通过校验后才会激活。
+      </el-alert>
       <el-upload
         ref="uploadRef"
         drag
@@ -1189,6 +1201,19 @@
           </el-table-column>
         </el-table>
       </div>
+
+      <el-alert
+        v-if="incrementalUploadRequest"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-top: 12px"
+      >
+        <template #title>余额表沿用确认</template>
+        <el-checkbox v-model="balanceCarryConfirmed">
+          我已知悉：如果本次文件没有余额表，系统会沿用上一版本余额表；新增月份不会自动改写余额表口径。
+        </el-checkbox>
+      </el-alert>
     </div>
 
     <!-- 步骤3：导入中 -->
@@ -1210,6 +1235,8 @@
         :validation-title="importValidationSummaryTitle"
         :validation-alert-type="importValidationSummaryAlertType"
         :show-success-icon="true"
+        :append-report="importedResult?.append"
+        :voucher-diff="importedResult?.voucher_diff"
         container-style="text-align: center; padding: 30px 0"
         validation-panel-style="margin-top: 16px; text-align: left"
       />
@@ -1245,7 +1272,7 @@
         解析预览
       </el-button>
       <el-button v-if="importStep === 'preview'" @click="importStep = 'upload'">返回修改</el-button>
-      <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
+      <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" :disabled="!!incrementalUploadRequest && !balanceCarryConfirmed" @click="doImport">
         确认导入
       </el-button>
       <el-button v-if="importStep === 'importing'" @click="onMoveToBackground">关闭（后台继续）</el-button>
@@ -1351,6 +1378,19 @@
             <el-table-column prop="activated_at" label="激活时间" width="140">
               <template #default="{ row }"><span class="gt-amt">{{ row.activated_at ? new Date(row.activated_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
             </el-table-column>
+            <el-table-column label="操作" width="130" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="row.status === 'active' && row.previous_dataset_id"
+                  type="warning"
+                  link
+                  @click="rollbackDataset(row)"
+                >
+                  回滚到上一版本
+                </el-button>
+                <span v-else style="color: var(--gt-color-text-tertiary)">—</span>
+              </template>
+            </el-table-column>
           </el-table>
         </el-tab-pane>
       </el-tabs>
@@ -1370,6 +1410,7 @@ import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/
 import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
 import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import { appendFormFields, type IncrementalUploadRequest, type LedgerAppendReport, type VoucherDiffReport } from '@/components/ledger-import/ledgerAppendResult'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
 import { buildImportFormData } from '@/utils/importFormData'
 import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
@@ -1378,7 +1419,7 @@ import { applyImportSuccess, resolveImportSuccess } from '@/utils/importSuccess'
 import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinishImportPolling, hasImportFailed } from '@/utils/useImportJobFlow'
 import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
 import { useImportValidation } from '@/utils/useImportValidation'
-import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
+import { getActiveLedgerDataset, getImportJob, rollbackLedgerDataset, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
@@ -1743,6 +1784,8 @@ async function runDedup() {
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
+const incrementalUploadRequest = ref<IncrementalUploadRequest | null>(null)
+const balanceCarryConfirmed = ref(false)
 
 // 账表数据管理弹窗
 const dataManagerVisible = ref(false)
@@ -1767,6 +1810,33 @@ async function loadImportHistory() {
   }
 }
 
+async function rollbackDataset(row: { id: string; previous_dataset_id?: string | null }) {
+  if (selectedYear.value == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '确认回滚到上一版本？当前版本仍会保留在导入历史中。',
+      '回滚数据集',
+      { type: 'warning', confirmButtonText: '确认回滚', cancelButtonText: '取消' },
+    )
+    await rollbackLedgerDataset(
+      projectId.value,
+      row.id,
+      selectedYear.value,
+      '用户从导入历史回滚',
+    )
+    ElMessage.success('回滚成功，已恢复上一版本账套')
+    await loadImportHistory()
+    await getActiveLedgerDataset(projectId.value, selectedYear.value)
+    onDataChanged()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    handleApiError(error, '回滚')
+  }
+}
+
 function formatRecordSummary(summary: Record<string, unknown> | null | undefined) {
   if (!summary) return '—'
   const parts: string[] = []
@@ -1783,18 +1853,19 @@ function onDataChanged() {
   loadAuxBalance()
 }
 
-function onIncrementalUpload(year: number) {
-  // 用户在数据管理弹窗选了增量追加
+function onIncrementalUpload(request: IncrementalUploadRequest) {
   dataManagerVisible.value = false
+  incrementalUploadRequest.value = request
+  balanceCarryConfirmed.value = false
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
-  importYear.value = year
+  importYear.value = request.year
   ElNotification({
     title: '增量追加模式',
-    message: `请上传 ${year} 年的序时账文件，系统将自动检测并只追加新月份`,
+    message: `请上传 ${request.year} 年文件；新版本会继承未覆盖月份，当前账套在成功激活前不会改动`,
     type: 'info',
-    duration: 5000,
+    duration: 6000,
   })
 }
 const importFiles = ref<File[]>([])
@@ -1824,6 +1895,8 @@ interface LedgerImportResultPayload {
   validation_summary?: ImportValidationSummary
   errors?: string[]
   batch_id?: string | null
+  append?: LedgerAppendReport | null
+  voucher_diff?: VoucherDiffReport | null
 }
 
 const importedResult = ref<LedgerImportResultPayload | null>(null)
@@ -1968,6 +2041,8 @@ function stopImportStatusPolling() {
 }
 
 function openImportDialog(options: { autoRecoverActiveJob?: boolean } = {}) {
+  incrementalUploadRequest.value = null
+  balanceCarryConfirmed.value = false
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
@@ -2193,6 +2268,11 @@ async function doImport() {
       mappingFieldName: 'custom_mapping',
       mappingPayload: mappingParam,
     })
+    for (const [key, value] of Object.entries(
+      appendFormFields(incrementalUploadRequest.value, balanceCarryConfirmed.value),
+    )) {
+      formData.append(key, value)
+    }
     const url = buildImportJobUrl({
       basePath: P_ledger.smartImport(projectId.value),
       year: yr,
@@ -2230,16 +2310,13 @@ async function doImport() {
       shouldIgnoreError: (error) => (error as Error)?.message === '__ABORTED__',
       onSuccessStatus: (status) => {
         const payload = status?.result
-        const resolvedImportedResult = (payload?.imported && !payload?.validation)
-          ? { imported: payload.imported }
-          : payload
         const importSuccess = resolveImportSuccess({
-          result: resolvedImportedResult,
+          result: payload,
           nextStage: 'done' as const,
         })
         const completionToast = resolveImportCompletionToast(
           status?.message || null,
-          resolvedImportedResult?.validation_summary as any,
+          payload?.validation_summary as any,
         )
         if (completionToast.type === 'warning') {
           ElMessage.warning(completionToast.message)
@@ -2604,10 +2681,11 @@ function copyCurrentVoucher() {
 
 /** 抽中本凭证：标记为抽样凭证（用于审计抽凭） */
 async function sampleCurrentVoucher() {
-  if (!currentVoucher.value) return
+  const auditYear = year.value
+  if (!currentVoucher.value || auditYear == null) return
   try {
     await attachVoucher(projectId.value, {
-      year: year.value,
+      year: auditYear,
       voucherNo: currentVoucher.value,
       voucherDate: currentVoucherDate.value || null,
       voucherType: currentVoucherType.value,
@@ -4959,7 +5037,7 @@ onBeforeUnmount(() => {
   font-size: 10px /* allow-px: special */;
   line-height: 1.4;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   display: block;
 }
 :deep(.gt-summary-col .cell) {
@@ -5009,12 +5087,12 @@ onBeforeUnmount(() => {
   border: 1px solid var(--gt-color-border, #e4e7ed);
   border-bottom: none;
   border-radius: 4px 4px 0 0;
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-virtual-toolbar .gt-virtual-stats {
   margin-left: auto;
   color: var(--gt-color-text-secondary, #909399);
-  font-size: 12px;
+  font-size: var(--gt-font-size-xs);
 }
 .gt-ledger-vrow-checkbox {
   cursor: pointer;

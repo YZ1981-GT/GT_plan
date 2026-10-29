@@ -1745,3 +1745,16 @@ backend/app/services/note_validation_executors.py  1428
 #     需与引用其 module fixture 的测试同批迁移，避免只搬代码让变异判据空转。
 #     spec: oo-writeback-template-parity-closure 批 C 复盘收口
 backend/tests/workpaper_sync/test_n_cycle_foundation_canary.py  1065
+
+# ledger-incremental-append-true-merge（2026-10-29）：四个文件在本轮前已超过 800 行且未登记；
+# baseline 为提交前 HEAD 的 splitlines 真值，不含本轮增量（现值分别 1023/1064/3189/807，均在 +5% 内）。
+# 本轮只加 options 透传 / active 科目版本过滤 / staged 合并接线，并把主要逻辑放新模块；
+# 拆分方向：mapping_service 按建议/确认拆，runner 按 legacy/v2 拆，smart engine 按解析/写入拆，v2 router 按 detect/submit/jobs 拆。
+backend/app/services/mapping_service.py  1013
+backend/app/services/import_job_runner.py  1054
+backend/app/services/smart_import_engine.py  3154
+backend/app/routers/ledger_import_v2.py  817
+# import_queue_service.py —— HEAD 已有 932 行。本轮仅把完整导入的 Redis 分布式锁和 active_set
+# 释放接到异步路径（不再只清内存锁），净行数不增；拆分方向：Redis/DB 锁原语、作业批次状态机和
+# 查询/管理接口拆为三个服务模块，本文件保留兼容门面。
+backend/app/services/import_queue_service.py  932

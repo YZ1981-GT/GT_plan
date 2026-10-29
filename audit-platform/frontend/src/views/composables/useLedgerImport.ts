@@ -307,7 +307,7 @@ export function useLedgerImport(projectId: Ref<string> | ComputedRef<string>, ye
     importYear.value = yr
     ElNotification({
       title: '增量追加模式',
-      message: `请上传 ${yr} 年的序时账文件，系统将自动检测并只追加新月份`,
+      message: `请上传 ${yr} 年文件；新版本会继承未覆盖月份，当前账套在成功激活前不会改动`,
       type: 'info',
       duration: 5000,
     })

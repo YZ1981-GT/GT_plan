@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -19,11 +19,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, check_consol_lock
+from app.deps import get_current_user, check_consol_lock, require_project_access
 from app.models.core import User
 from app.services.ledger_data_service import (
     LEDGER_TABLES,
-    apply_incremental,
     compute_incremental_diff,
     dedup_ledger_data,
     delete_ledger_data,
@@ -87,6 +86,7 @@ class IncrementalDetectRequest(BaseModel):
     """增量导入预检。"""
     year: int
     file_periods: list[int] = Field(..., description="文件中的月份列表")
+    overlap_strategy: Literal["skip", "overwrite"] = "skip"
 
 
 @router.get("/summary")
@@ -94,7 +94,7 @@ async def get_ledger_summary(
     project_id: UUID,
     year: Optional[int] = Query(None, description="只查某一年（None 则全部）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
     """查询项目已导入账表数据概览。"""
     try:
@@ -258,7 +258,7 @@ async def detect_incremental(
     project_id: UUID,
     request: IncrementalDetectRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
     """增量追加预检：返回期间差异。
 
@@ -270,11 +270,23 @@ async def detect_incremental(
         db, project_id=project_id, year=request.year
     )
     file_periods_set = set(request.file_periods)
+    if not file_periods_set or any(month < 1 or month > 12 for month in file_periods_set):
+        raise HTTPException(status_code=422, detail="文件月份必须是 1~12 的非空集合")
     diff = compute_incremental_diff(existing, file_periods_set)
+    inherit = (
+        sorted(existing)
+        if request.overlap_strategy == "skip"
+        else diff["only_existing"]
+    )
     return {
         "year": request.year,
+        "strategy": request.overlap_strategy,
         "existing_periods": sorted(existing),
         "file_periods": sorted(file_periods_set),
+        "new_periods": diff["new"],
+        "inherited_periods": inherit,
+        "skipped_file_periods": diff["overlap"] if request.overlap_strategy == "skip" else [],
+        "overwritten_periods": diff["overlap"] if request.overlap_strategy == "overwrite" else [],
         "diff": diff,
         "can_append_safely": len(diff["overlap"]) == 0,
         "requires_confirm": len(diff["overlap"]) > 0,
@@ -296,48 +308,17 @@ class IncrementalApplyRequest(BaseModel):
 async def apply_incremental_endpoint(
     project_id: UUID,
     request: IncrementalApplyRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ) -> dict:
-    """S6-15: 增量追加执行——按策略清理将被覆盖的期间。
-
-    清理完成后，前端继续走正常的 `/ledger-import/submit` 触发新导入；
-    或者本端点不变，由前端分两步调用（先 detect，再本端点清理旧月）。
-
-    overlap_strategy:
-      - skip: 跳过重叠月份（不删除）
-      - overwrite: 删除重叠月份（必须 confirmed=True）
-    """
-    # 权限校验
-    if current_user.role not in ("admin", "partner", "manager"):
-        raise HTTPException(status_code=403, detail="仅项目经理及以上可执行增量追加")
-
-    if request.overlap_strategy == "overwrite" and not request.confirmed:
-        raise HTTPException(
-            status_code=400,
-            detail="overwrite 策略必须显式确认（confirmed=true）",
-        )
-
-    try:
-        result = await apply_incremental(
-            db,
-            project_id=project_id,
-            year=request.year,
-            file_periods=request.file_periods,
-            overlap_strategy=request.overlap_strategy,
-        )
-        logger.info(
-            "incremental apply by user=%s project=%s year=%d strategy=%s executed=%s",
-            current_user.id, project_id, request.year,
-            request.overlap_strategy, result.get("executed"),
-        )
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        logger.exception("apply_incremental failed")
-        raise HTTPException(status_code=500, detail=f"增量追加失败: {exc}")
+    """旧的 active 数据预删入口永久退役；追加只允许在 staged 内合并。"""
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "INCREMENTAL_APPLY_RETIRED",
+            "message": "旧的增量清理入口已退役，请从导入页重新发起增量追加；现行流程不会修改当前账套。",
+        },
+    )
 
 
 __all__ = ["router"]

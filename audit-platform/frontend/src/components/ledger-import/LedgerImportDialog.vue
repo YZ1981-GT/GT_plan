@@ -16,6 +16,19 @@
       <el-step title="导入进度" />
     </el-steps>
 
+    <el-alert
+      v-if="appendStrategy"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="append-mode-alert"
+    >
+      <template #title>增量追加只在新版本内合并，不修改当前账套</template>
+      <el-checkbox v-model="balanceCarryConfirmed">
+        我已知悉：文件不含余额表时将沿用上一版本余额表。
+      </el-checkbox>
+    </el-alert>
+
     <!-- Step 0: 上传文件 -->
     <UploadStep
       v-if="currentStep === 0"
@@ -62,12 +75,14 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import UploadStep from './UploadStep.vue'
 import DetectionPreview from './DetectionPreview.vue'
 import ColumnMappingEditor from './ColumnMappingEditor.vue'
 import ImportProgress from './ImportProgress.vue'
 import ErrorDialog from './ErrorDialog.vue'
+import type { ConfirmedMapping } from '@/types/ledger-import'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -153,34 +168,12 @@ export interface ImportError {
   } | null
 }
 
-/**
- * @deprecated 使用 `@/types/ledger-import` 中的 `ConfirmedMapping` 代替。
- * 此接口保留兼容现有 submit 流程，Task 5.2 将完成迁移。
- */
-export interface ConfirmedMapping {
-  file_name: string
-  sheet_name: string
-  table_type: string
-  mapping_entries: import('@/types/ledger-import').MappingEntry[]
-  aux_dimension_columns: number[]
-  sheet_key: string
-  detection_id?: string
-  file_fingerprint?: string
-  software_fingerprint?: string
-  confirmed_by_user?: boolean
-  /** @deprecated 旧格式兼容字段，submit gate 将自动转换 */
-  file?: string
-  /** @deprecated 旧格式兼容字段 */
-  sheet?: string
-  /** @deprecated 旧格式兼容字段 */
-  column_mapping?: Record<string, string>
-}
-
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
 const props = defineProps<{
   modelValue: boolean
   projectId: string
+  appendStrategy?: 'skip' | 'overwrite' | null
 }>()
 
 const emit = defineEmits<{
@@ -194,6 +187,7 @@ const currentStep = ref(0)
 const detectionResult = ref<LedgerDetectionResult | null>(null)
 const confirmedSheets = ref<SheetDetection[]>([])
 const forceSubmitFlag = ref(false)
+const balanceCarryConfirmed = ref(false)
 const jobId = ref('')
 const importErrors = ref<ImportError[]>([])
 const errorDialogVisible = ref(false)
@@ -240,6 +234,10 @@ function onMappingConfirm(mappings: ConfirmedMapping[]) {
 
 async function submitImportJob(mappings: ConfirmedMapping[]) {
   if (!detectionResult.value) return
+  if (props.appendStrategy && !balanceCarryConfirmed.value) {
+    ElMessage.warning('请先确认余额表可能沿用上一版本口径')
+    return
+  }
   try {
     const { api } = await import('@/services/apiProxy')
     const res = await api.post(
@@ -250,6 +248,9 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
         confirmed_mappings: mappings,
         force_activate: false,
         force_submit: forceSubmitFlag.value,
+        incremental: !!props.appendStrategy,
+        overlap_strategy: props.appendStrategy || 'skip',
+        balance_carry_confirmed: balanceCarryConfirmed.value,
       }
     )
     jobId.value = (res as { job_id: string }).job_id
@@ -292,12 +293,17 @@ function onClose() {
   detectionResult.value = null
   confirmedSheets.value = []
   forceSubmitFlag.value = false
+  balanceCarryConfirmed.value = false
   jobId.value = ''
   importErrors.value = []
 }
 </script>
 
 <style scoped>
+.append-mode-alert {
+  margin-bottom: var(--gt-space-4);
+}
+
 .el-dialog {
   --el-dialog-padding-primary: 20px;
 }
