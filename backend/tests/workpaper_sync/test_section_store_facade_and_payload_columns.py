@@ -256,6 +256,9 @@ def test_g6_dict_shell_projection_and_state_merge_keep_other_keys() -> None:
 @pytest.mark.parametrize(
     ("name", "expected"),
     [
+        ("phase5_n1_deferred_tax_assets", C.CONCLUSION_ONLY),
+        ("phase5_n2_taxes_payable", C.CONCLUSION_ONLY),
+        ("phase5_n3_deferred_tax_liabilities", C.CONCLUSION_ONLY),
         ("phase5_g1_trading_financial_assets", C.CONCLUSION_ONLY),
         ("phase5_g3_dividend_receivable", C.CONCLUSION_ONLY),
         ("phase5_g6_other_bond", C.CONCLUSION_ONLY),

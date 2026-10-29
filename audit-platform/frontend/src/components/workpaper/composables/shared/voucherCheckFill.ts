@@ -16,10 +16,30 @@
  *
  * 配对只在后端做（voucher_pairing），这里只按 `pairing` 结果生成待写入项（`prepareSamples`）。
  */
-import { computed, type MaybeRefOrGetter, type Ref, toValue } from 'vue'
+import {
+  computed,
+  getCurrentInstance,
+  hasInjectionContext,
+  inject,
+  onBeforeUnmount,
+  type MaybeRefOrGetter,
+  type Ref,
+  toValue,
+  watch,
+} from 'vue'
 import Decimal from 'decimal.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useProjectAuditPhase, type AuditPhase } from '@/composables/useProjectAuditPhase'
+import { WorkpaperRuntimeContextKey } from '../useWorkpaperScaffold'
+import {
+  notifyVoucherSurvivalRowsChanged,
+  registerVoucherSurvivalHost,
+  rememberVoucherSurvivalContext,
+  type RegisteredSurvivalRow,
+  type SurvivalCheckWire,
+  type SurvivalRequestRow,
+  type SurvivalResultWire,
+} from './voucherSurvivalRegistry'
 import { amountString, normDate, normText, sideOf, signedAmount } from '@/utils/voucherIdentity'
 
 export const META_KEY = '_gt'
@@ -100,13 +120,59 @@ export interface MergeResult<R> {
 /** 预审样本存续核对结果（任务 17，design §7）：未变 / 分录已改 / 疑似重编号 / 凭证已删除 */
 export type SurvivalStatus = 'unchanged' | 'modified' | 'renumbered' | 'deleted'
 export const SURVIVAL_LABEL: Readonly<Record<SurvivalStatus, string>> = {
-  unchanged: '存续', modified: '分录已改', renumbered: '疑似重编号', deleted: '凭证已删除',
+  unchanged: '未变', modified: '分录已改', renumbered: '疑似重编号', deleted: '凭证已删除',
 }
 export const SOURCE_LABEL: Readonly<Record<RowSource, string>> = { engine: '抽凭', attach: '挂凭', manual: '手工' }
 
 const PHASES: ReadonlySet<string> = new Set(['preliminary', 'final'])
 const SOURCES: ReadonlySet<string> = new Set(['engine', 'attach', 'manual'])
 const STATUSES: ReadonlySet<string> = new Set(['paired', 'multi', 'large', 'unknown_side'])
+const SURVIVAL_STATUSES: ReadonlySet<string> = new Set(['unchanged', 'modified', 'renumbered', 'deleted'])
+
+/**
+ * 预审行 → 存续核对请求。lfp 是身份真源，科目 / 借贷栏 / 金额从它解析再随请求发出；
+ * 解析失败返回 null，由横幅计入「缺身份、无法自动核对」，绝不从分母静默消失。
+ */
+export function survivalRequestOf(row: unknown): SurvivalRequestRow | null {
+  const meta = metaOf(row)
+  if (meta?.ph !== 'preliminary' || !meta.lfp || !meta.vk) return null
+  try {
+    const parts = JSON.parse(meta.lfp)
+    const vk = JSON.parse(meta.vk)
+    if (!Array.isArray(parts) || parts.length !== 9 || !Array.isArray(vk) || vk.length !== 5) return null
+    if (JSON.stringify(parts.slice(0, 5)) !== JSON.stringify(vk)) return null
+    const side = parts[6]
+    if (side !== 'D' && side !== 'C' && side !== 'X') return null
+    const sv = (meta.sv ?? {}) as Record<string, unknown>
+    const previousStatus = SURVIVAL_STATUSES.has(String(sv.status)) ? String(sv.status) as SurvivalStatus : null
+    return {
+      row_key: meta.lfp,
+      lfp: meta.lfp,
+      vk: meta.vk,
+      account_code: String(parts[5] ?? ''),
+      side,
+      amount: String(parts[7] ?? ''),
+      previous_dataset_id: typeof sv.datasetId === 'string' ? sv.datasetId : null,
+      previous_status: previousStatus,
+      acknowledged: typeof sv.ackAt === 'string' && !!sv.ackAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+function survivalDetail(result: SurvivalResultWire): string {
+  if (result.status === 'unchanged') return '当前账套仍存在同一分录'
+  if (result.status === 'modified') {
+    const count = Number(result.current_voucher?.line_count ?? 0)
+    return `原凭证仍在，但分录内容已变化${count > 0 ? `（当前凭证 ${count} 条分录）` : ''}`
+  }
+  if (result.status === 'renumbered') {
+    const labels = (result.candidates ?? []).map(c => `${c.voucher_date ?? ''} ${c.voucher_type ? `${c.voucher_type}-` : ''}${c.voucher_no ?? ''}`.trim())
+    return labels.length ? `同日期、科目、借贷栏及金额的候选凭证：${labels.join('、')}` : '存在疑似改号凭证'
+  }
+  return '当前账套中未找到原凭证或同金额改号候选'
+}
 
 /** 行上的 `_gt`（校验过形状）；没有或不合法返回 null */
 export function metaOf(row: unknown): VoucherRowMeta | null {
@@ -503,6 +569,89 @@ export function useVoucherCheckFill<R extends object>(opts: VoucherCheckFillOpti
   const legacy = (opts.legacy ?? legacyIdentity) as (r: unknown) => string | null
   const tableMap = (): Record<string, Ref<R[]>> =>
     ('value' in (opts.tables as object) ? { [SINGLE]: opts.tables as Ref<R[]> } : opts.tables as Record<string, Ref<R[]>>)
+
+  // 父级 GtWpRenderer 的横幅与本子组件通过 workpaperId 注册表通信；组合式函数在无组件上下文的单测里不注册。
+  const runtime = hasInjectionContext() ? inject(WorkpaperRuntimeContextKey, null) : null
+  let unregisterSurvival: () => void = () => undefined
+
+  function collectSurvivalRows(): RegisteredSurvivalRow[] {
+    const out: RegisteredSurvivalRow[] = []
+    for (const table of Object.values(tableMap())) {
+      for (const row of table.value) {
+        const meta = metaOf(row)
+        if (meta?.ph !== 'preliminary') continue
+        const request = survivalRequestOf(row)
+        out.push({ request, unsupported: request === null })
+      }
+    }
+    return out
+  }
+
+  function applySurvival(result: SurvivalCheckWire): boolean {
+    const byFp = new Map(result.results.map(row => [row.lfp, row]))
+    let anyChanged = false
+    for (const [tableKey, table] of Object.entries(tableMap())) {
+      let tableChanged = false
+      const next = table.value.map((row) => {
+        const meta = metaOf(row)
+        const found = meta?.ph === 'preliminary' && meta.lfp ? byFp.get(meta.lfp) : undefined
+        if (!meta || !found) return row
+        const old = (meta.sv ?? {}) as Record<string, unknown>
+        const preserveAck = found.acknowledged
+          && old.datasetId === result.dataset_id && old.status === found.status && typeof old.ackAt === 'string'
+        const sv: Record<string, unknown> = {
+          status: found.status,
+          datasetId: result.dataset_id,
+          checkId: result.check_id,
+          checkedAt: result.checked_at,
+          detail: survivalDetail(found),
+          candidateVoucherKeys: (found.candidates ?? []).map(c => c.voucher_key).filter(Boolean),
+          ...(preserveAck ? { ackBy: old.ackBy, ackAt: old.ackAt } : {}),
+        }
+        rememberVoucherSurvivalContext(runtime?.wpId.value ?? '', found.lfp, result.check_id, result.dataset_id)
+        if (JSON.stringify(old) === JSON.stringify(sv)) return row
+        tableChanged = anyChanged = true
+        return { ...row, [META_KEY]: { ...meta, sv } }
+      })
+      if (tableChanged) {
+        table.value = next
+        opts.afterChange?.(tableKey, next)
+      }
+    }
+    return anyChanged
+  }
+
+  function acknowledgeSurvival(lfp: string, ackBy: string, ackAt: string): boolean {
+    let anyChanged = false
+    for (const [tableKey, table] of Object.entries(tableMap())) {
+      let tableChanged = false
+      const next = table.value.map((row) => {
+        const meta = metaOf(row)
+        const sv = meta?.sv as Record<string, unknown> | null | undefined
+        if (!meta || meta.lfp !== lfp || !sv || sv.status === 'unchanged' || sv.ackAt) return row
+        tableChanged = anyChanged = true
+        return { ...row, [META_KEY]: { ...meta, sv: { ...sv, ackBy, ackAt } } }
+      })
+      if (tableChanged) {
+        table.value = next
+        opts.afterChange?.(tableKey, next)
+      }
+    }
+    return anyChanged
+  }
+
+  if (runtime && getCurrentInstance()) {
+    watch(runtime.wpId, (wpId) => {
+      unregisterSurvival()
+      unregisterSurvival = registerVoucherSurvivalHost(wpId, {
+        collect: collectSurvivalRows,
+        apply: applySurvival,
+        acknowledge: acknowledgeSurvival,
+        persist: opts.persist,
+      })
+    }, { immediate: true })
+    onBeforeUnmount(() => unregisterSurvival())
+  }
   /**
    * 每张表的预审行读入版本：主键 → 行；有指纹的行按「指纹 + 对方科目」索引，没有指纹的按旧行键索引
    * （旧行键只用来认读入时没有指纹、之后被触碰迁移补了指纹的行；有指纹的行同号同日同金额也是别的分录）
@@ -546,6 +695,7 @@ export function useVoucherCheckFill<R extends object>(opts: VoucherCheckFillOpti
   function markLoaded(): void {
     locked.clear()
     for (const [key, table] of Object.entries(tableMap())) snapshot(key, table.value)
+    notifyVoucherSurvivalRowsChanged()
   }
   /**
    * 保存前过一遍（需求 6.3「年审阶段预审行不可改、不可删」的兜底）：
@@ -613,6 +763,7 @@ export function useVoucherCheckFill<R extends object>(opts: VoucherCheckFillOpti
       outcome.replaced += m.replaced
     }
     await opts.persist()
+    notifyVoucherSurvivalRowsChanged()
     return outcome
   }
   /** 抽凭引擎回填；`scope.tables` 限定替换只动哪几张表（缺省全部） */
@@ -684,16 +835,22 @@ export function useVoucherCheckFill<R extends object>(opts: VoucherCheckFillOpti
       opts.afterChange?.(key, next)
     }
     await opts.persist()
+    notifyVoucherSurvivalRowsChanged()
     ElMessage.success(toDelete.length || kept.length
       ? `已撤销本批次，删除 ${toDelete.length} 行${kept.length ? `；${kept.length} 行同时来自挂凭或手工录入，已保留` : ''}`
       : '已撤销本批次（底稿里没有本批次填入的行）')
     return true
   }
+  async function ready(): Promise<unknown> {
+    const result = await auditPhase.load()
+    notifyVoucherSurvivalRowsChanged()
+    return result
+  }
   return {
     phase,
     phaseText: auditPhase.text,
-    /** 等项目阶段读入（宿主要按阶段判只读时先 await） */
-    ready: () => auditPhase.load(),
+    /** 等项目阶段读入（宿主要按阶段判只读时先 await）；同时通知底稿级存续横幅重扫行 */
+    ready,
     isRowLocked,
     rowClass,
     markLoaded,

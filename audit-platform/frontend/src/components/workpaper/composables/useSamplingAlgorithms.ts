@@ -228,6 +228,8 @@ export interface MisstatementResult {
   basicPrecision: string
   incrementalAllowance: string
   upperLimit: string
+  /** 样本实际错报合计 E（年审合并评价口径 b 的预审分量，见 samplingPhaseEvaluation.ts）；旧评价回读时没有 */
+  sampleErrorTotal?: string
 }
 
 /**

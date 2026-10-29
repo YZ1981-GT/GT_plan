@@ -83,6 +83,13 @@ function makeSavedFormula(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function deferred<T = any>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
 // ─── Stubs ────────────────────────────────────────────────────────────────────
 // ElDialog：渲染 default + footer 插槽（内容/底部按钮可被测试访问）
 const ElDialogStub = defineComponent({
@@ -129,7 +136,8 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     const formulas = (wrapper.vm as any).formulas
     expect(formulas).toHaveLength(1)
     expect(formulas[0].formula).toBe("TB('1122','审定数')")
-    expect(formulas[0]._editing).toBe(false)
+    expect(formulas[0]._editing).toBeUndefined()
+    expect(wrapper.text()).toContain('双击公式 / 说明格修改，提交后自动保存')
     // 设置校验上下文
     expect(mockRefresh).toHaveBeenCalledWith(PROJECT_ID, YEAR)
     wrapper.unmount()
@@ -140,20 +148,16 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     const wrapper = mountDialog()
     await openDialog(wrapper)
 
-    const row = (wrapper.vm as any).formulas[0]
-    row._editing = true
-    await (wrapper.vm as any).completeRow(row)
+    await (wrapper.vm as any).completeRow()
     await flushPromises()
 
-    // PUT 携带持久化 shape（剔除 _editing）
+    // PUT 携带持久化 shape（不混入前端本地字段）
     expect(mockPut).toHaveBeenCalledTimes(1)
     const [url, body] = mockPut.mock.calls[0]
     expect(url).toBe(FORMULAS_URL)
     expect(body.formulas).toHaveLength(1)
     expect(body.formulas[0]).not.toHaveProperty('_editing')
     expect(body.formulas[0].formula).toBe("TB('1122','审定数')")
-    // 成功后退出编辑态 + 成功提示
-    expect(row._editing).toBe(false)
     expect(mockMsgSuccess).toHaveBeenCalled()
     // 通知宿主（公式管理中心据此重取本章节公式，formula-governance-coverage-closure R4）
     expect(wrapper.emitted('saved')).toHaveLength(1)
@@ -181,16 +185,140 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     const wrapper = mountDialog()
     await openDialog(wrapper)
     const row = (wrapper.vm as any).formulas[0]
-    row._editing = true
-    await (wrapper.vm as any).completeRow(row)
+    await (wrapper.vm as any).completeRow()
     expect(mockPut.mock.calls[0][1].loaded).toEqual({ [slot]: 'G3' })
     expect(mockPut.mock.calls[0][1].formulas[0]).not.toHaveProperty('layer_label')
-    expect(row._editing).toBe(false)
     expect(row.layer_label).toBe('本项目')
 
-    row._editing = true
-    await (wrapper.vm as any).completeRow(row)
+    await (wrapper.vm as any).completeRow()
     expect(mockPut.mock.calls[1][1].loaded).toEqual({ [slot]: 'L1' })
+    wrapper.unmount()
+  })
+
+  it('格内提交自动保存，失败时只还原该格', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    const row = vm.formulas[0]
+
+    await vm.onFormulaCellCommit(row, 'description', '新说明')
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    expect(mockPut.mock.calls[0][1].formulas[0].description).toBe('新说明')
+    expect(row.description).toBe('新说明')
+
+    mockPut.mockRejectedValueOnce(new Error('保存失败'))
+    const saved = await vm.onFormulaCellCommit(row, 'description', '失败值')
+    expect(saved).toBe(false)
+    expect(row.description).toBe('新说明')
+    wrapper.unmount()
+  })
+
+  it('未选完目标的新行不阻塞既有格自动保存，也不被旧回执从列表抹掉', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    vm.addFormula()
+    const draft = vm.formulas[1]
+    await vm.onFormulaCellCommit(draft, 'formula', 'SUM(0:1, 0)')
+    expect(mockPut).not.toHaveBeenCalled()
+
+    mockPut.mockResolvedValue({
+      formulas: [makeSavedFormula({ description: '既有行新说明', layer: 'project', layer_label: '本项目' })],
+      loaded: { R1: 'L1' },
+    })
+    await vm.onFormulaCellCommit(vm.formulas[0], 'description', '既有行新说明')
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    expect(mockPut.mock.calls[0][1].formulas).toHaveLength(1)
+    expect(vm.formulas).toContain(draft)
+    expect(draft._isNew).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('同一微任务内相邻格提交合并成一次 PUT', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    const row = vm.formulas[0]
+
+    const formulaSave = vm.onFormulaCellCommit(row, 'formula', "TB('1122','期末数')")
+    const descriptionSave = vm.onFormulaCellCommit(row, 'description', '合并保存')
+    await Promise.all([formulaSave, descriptionSave])
+
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    expect(mockPut.mock.calls[0][1].formulas[0]).toMatchObject({
+      formula: "TB('1122','期末数')",
+      description: '合并保存',
+    })
+    wrapper.unmount()
+  })
+
+  it('保存中继续提交会串行发下一批，并使用上一批返回的新令牌', async () => {
+    const first = deferred<any>()
+    const second = deferred<any>()
+    mockGet.mockResolvedValue({ formulas: [makeSavedFormula()], loaded: { R1: 'G1' } })
+    mockPut.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    const row = vm.formulas[0]
+
+    const p1 = vm.onFormulaCellCommit(row, 'formula', "TB('1122','期末数')")
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    const p2 = vm.onFormulaCellCommit(row, 'description', '第二批')
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(1)
+
+    first.resolve({ formulas: [makeSavedFormula({ formula: "TB('1122','期末数')" })], loaded: { R1: 'L1' } })
+    await p1
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(2)
+    expect(mockPut.mock.calls[1][1].loaded).toEqual({ R1: 'L1' })
+    expect(mockPut.mock.calls[1][1].formulas[0].description).toBe('第二批')
+    second.resolve({ formulas: [makeSavedFormula({ formula: "TB('1122','期末数')", description: '第二批' })], loaded: { R1: 'L2' } })
+    await p2
+    wrapper.unmount()
+  })
+
+  it('显式保存期间仍可继续格内编辑，后续自动保存串行等待新令牌', async () => {
+    const first = deferred<any>()
+    const second = deferred<any>()
+    mockGet.mockResolvedValue({ formulas: [makeSavedFormula()], loaded: { R1: 'G1' } })
+    mockPut.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    const row = vm.formulas[0]
+
+    const explicit = vm.completeRow()
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    const automatic = vm.onFormulaCellCommit(row, 'description', '保存中仍可编辑')
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(1)
+
+    first.resolve({ formulas: [makeSavedFormula()], loaded: { R1: 'L1' } })
+    await explicit
+    await flushPromises()
+    expect(mockPut).toHaveBeenCalledTimes(2)
+    expect(mockPut.mock.calls[1][1].loaded).toEqual({ R1: 'L1' })
+    second.resolve({ formulas: [makeSavedFormula({ description: '保存中仍可编辑' })], loaded: { R1: 'L2' } })
+    await automatic
+    wrapper.unmount()
+  })
+
+  it('引用选择器向既有行插入引用后也自动保存', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    const row = vm.formulas[0]
+    vm.editingRow = row
+
+    vm.onInsertRef(" + NOTE('五、1','合计','期末')", '')
+    await vm.flushScheduledSaves()
+
+    expect(mockPut).toHaveBeenCalledTimes(1)
+    expect(mockPut.mock.calls[0][1].formulas[0].formula).toContain("NOTE('五、1','合计','期末')")
     wrapper.unmount()
   })
 
@@ -255,15 +383,11 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     const wrapper = mountDialog()
     await openDialog(wrapper)
 
-    const row = (wrapper.vm as any).formulas[0]
-    row._editing = true
-    await (wrapper.vm as any).completeRow(row)
+    await (wrapper.vm as any).completeRow()
     await flushPromises()
 
     expect(mockMsgError).toHaveBeenCalled()
     expect(mockPut).not.toHaveBeenCalled()
-    // 拦截后保持编辑态（未成功保存）
-    expect(row._editing).toBe(true)
     expect(mockMsgSuccess).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -313,14 +437,13 @@ describe('NoteFormulaDialog — 公式目标（表 / 行 / 列）', () => {
     expect(row.target).toBe('t1:2:1')
     expect(row.target_label).toBe('（3）坏账准备变动 · 合 计 · 本期计提')
     row.formula = 'cell(0,1) + cell(1,1)'
-    await vm.completeRow(row)
+    await vm.completeRow()
     await flushPromises()
     const sent = mockPut.mock.calls[0][1].formulas
     expect(sent.map((f: any) => f.target)).toEqual(['2:0', 't1:2:1'])
     for (const f of sent) {
       for (const k of ['_editing', '_isNew', '_cell', 'target_label', 'layer_label']) expect(f).not.toHaveProperty(k)
     }
-    expect(row._editing).toBe(false)
     expect(row._isNew).toBe(false)
     expect(row.layer_label).toBe('本项目')
     wrapper.unmount()
@@ -333,11 +456,11 @@ describe('NoteFormulaDialog — 公式目标（表 / 行 / 列）', () => {
     vm.addFormula()
     const row = vm.formulas[1]
     row.formula = 'SUM(0:1, 0)'
-    await vm.completeRow(row)
+    await vm.completeRow()
     await flushPromises()
     expect(mockPut).not.toHaveBeenCalled()
     expect(mockMsgWarning).toHaveBeenCalledWith('有 1 条公式没有选择目标单元格（表 / 行 / 列），未保存')
-    expect(row._editing).toBe(true)
+    expect(row._isNew).toBe(true)
     expect(mockMsgSuccess).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -350,8 +473,7 @@ describe('NoteFormulaDialog — 公式目标（表 / 行 / 列）', () => {
     const wrapper = mountDialog()
     await openDialog(wrapper)
     const vm = wrapper.vm as any
-    vm.formulas[0]._editing = true
-    await vm.completeRow(vm.formulas[0])
+    await vm.completeRow()
     await flushPromises()
     expect(String(mockMsgError.mock.calls[0][0])).toContain('【t1:9:0】超出「（3）坏账准备变动」（3 行 × 3 列）')
     wrapper.unmount()
@@ -391,11 +513,9 @@ describe('NoteFormulaDialog — 悬空引用提示写明原因', () => {
   async function completeFirstRow() {
     const wrapper = mountDialog()
     await openDialog(wrapper)
-    const row = (wrapper.vm as any).formulas[0]
-    row._editing = true
-    await (wrapper.vm as any).completeRow(row)
+    await (wrapper.vm as any).completeRow()
     await flushPromises()
-    return { wrapper, row }
+    return { wrapper }
   }
 
   it('保存前校验：提示「引用：原因」，不只列引用', async () => {
@@ -411,11 +531,10 @@ describe('NoteFormulaDialog — 悬空引用提示写明原因', () => {
     mockPut.mockRejectedValue({ response: { status: 422, data: { detail: {
       error_code: 'FORMULA_DANGLING_REFS', message: '公式含悬空引用，拒绝保存', issues: [{ ...ISSUE, target: 'R1' }],
     } } } })
-    const { wrapper, row } = await completeFirstRow()
+    const { wrapper } = await completeFirstRow()
     expect(mockPut.mock.calls[0][2]).toMatchObject({ _silent: true })
     expect(mockMsgError).toHaveBeenCalledTimes(1)
     expect(String(mockMsgError.mock.calls[0][0])).toContain(`【R1】${ISSUE.ref}：${ISSUE.message}`)
-    expect(row._editing, '没保存成功不能退出编辑态').toBe(true)
     wrapper.unmount()
   })
 

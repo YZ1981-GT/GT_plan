@@ -233,8 +233,17 @@ describe('R2 — 评价载荷与持久化', () => {
     expect(mockHttp.post).not.toHaveBeenCalled()
   })
 
-  it('persistEvaluation 打到 voucher-evaluation 端点并回填来源批次', async () => {
+  it('当前样本尚未回填时不发评价请求：禁止 log_id=null 默认命中并覆盖上一条预审批次', async () => {
     const s = makeEvaluatedEngine()
+    const ok = await s.persistEvaluation()
+    expect(ok).toBe(false)
+    expect(mockHttp.post).not.toHaveBeenCalled()
+    expect(mockMsg.info).toHaveBeenCalledWith('尚未回填抽凭批次，抽样评价将在回填时一并保存')
+  })
+
+  it('persistEvaluation 只写显式绑定的批次，并回填服务端返回的来源批次', async () => {
+    const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-target', batchId: 'batch-target', evaluatedAt: null }
     mockHttp.post.mockResolvedValueOnce({
       data: { success: true, log_id: 'log-9', batch_id: 'batch-9', evaluation: { evaluated_at: '2026-08-04T12:00:00Z' } },
     })
@@ -243,22 +252,25 @@ describe('R2 — 评价载荷与持久化', () => {
     const [url, body] = mockHttp.post.mock.calls.at(-1)!
     expect(String(url)).toContain('/sampling/voucher-evaluation')
     expect(body.workpaper_id).toBe('wp-001')
+    expect(body.log_id).toBe('log-target')
     expect(body.evaluation).toHaveProperty('projected')
     expect(s.loadedFromBatch.value).toEqual({
       logId: 'log-9', batchId: 'batch-9', evaluatedAt: '2026-08-04T12:00:00Z',
     })
   })
 
-  it('保存失败必须明示，禁静默吞（平台已有 catch{} 吞 422 的踩坑）', async () => {
+  it('显式批次保存失败必须明示，禁静默吞（平台已有 catch{} 吞 422 的踩坑）', async () => {
     const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-target', batchId: null, evaluatedAt: null }
     mockHttp.post.mockRejectedValueOnce({ response: { status: 500 } })
     const ok = await s.persistEvaluation()
     expect(ok).toBe(false)
     expect(mockMsg.error).toHaveBeenCalled()
   })
 
-  it('404（尚无批次）降级为信息提示而非报错', async () => {
+  it('显式绑定的批次已不存在时，404 降级为信息提示而非报错', async () => {
     const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-deleted', batchId: null, evaluatedAt: null }
     mockHttp.post.mockRejectedValueOnce({ response: { status: 404 } })
     await s.persistEvaluation()
     expect(mockMsg.info).toHaveBeenCalled()
@@ -468,14 +480,16 @@ describe('Property 7 — 推送草稿的金额、类型与描述标识', () => {
 describe('R3.7/3.8 — 重复推送确认与已推送标记', () => {
   it('推送成功后写回 a13_pushed_at 并随评价落库', async () => {
     const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-target', batchId: 'batch-target', evaluatedAt: null }
     await s.pushProjectedToA13()
     expect(s.a13PushedAt.value).not.toBeNull()
     const [, body] = mockHttp.post.mock.calls.at(-1)!
     expect(body.evaluation.a13_pushed_at).toBe(s.a13PushedAt.value)
   })
 
-  it('持久化失败时回滚内存标记以便重试（否则重试被自己的标记挡住）', async () => {
+  it('显式批次持久化失败时回滚内存标记以便重试（否则重试被自己的标记挡住）', async () => {
     const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-target', batchId: 'batch-target', evaluatedAt: null }
     mockHttp.post.mockRejectedValueOnce({ response: { status: 500 } })
     await s.pushProjectedToA13()
     expect(s.a13PushedAt.value).toBeNull()

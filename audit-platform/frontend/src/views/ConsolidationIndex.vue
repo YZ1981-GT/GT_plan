@@ -476,6 +476,15 @@
         </el-tooltip>
       </div>
 
+      <el-alert
+        v-if="drillDownTarget?.period === 'prior'"
+        type="info"
+        :closable="false"
+        show-icon
+        title="上期数取自上年合并报表，不按当前企业树穿透"
+        style="margin-bottom:10px"
+      />
+
       <!-- 正常视图 -->
       <template v-if="!drillDownTransposed">
         <!-- 直接下级汇总 -->
@@ -538,7 +547,7 @@
         </el-table>
       </template>
 
-      <el-empty v-if="!drillDownDirectRows.length && !drillDownLoading" description="请先在表格中选中一个单元格，再点击查看" />
+      <el-empty v-if="!drillDownDirectRows.length && !drillDownLoading && drillDownTarget?.period !== 'prior'" description="当前金额暂无企业树构成" />
     </el-dialog>
 
     <!-- 右键菜单（统一组件） -->
@@ -683,6 +692,14 @@ import {
   clearEntityCache as _clearEntityCache,
 } from '@/components/consolidation/composables/consolCacheKeys'
 import { createConsolRequestGuard } from '@/components/consolidation/composables/consolRequestGuard'
+import {
+  consolDrillTargetKey,
+  createReportConsolDrillTarget,
+  createTbConsolDrillTarget,
+  isConsolDrillTargetCurrent,
+  type ConsolDrillTarget,
+  type ConsolDrillTargetContext,
+} from '@/components/consolidation/composables/consolDrillTarget'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
@@ -1022,7 +1039,9 @@ function onOpenFormula() {
 const showCellDrillDown = ref(false)
 const drillDownLoading = ref(false)
 const drillDownLevel = ref<'direct' | 'leaf'>('direct')
-const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
+const drillDownTarget = ref<ConsolDrillTarget | null>(null)
+const EMPTY_DRILL_CELL = Object.freeze({ itemName: '', colName: '', totalValue: null as number | null })
+const drillDownCell = computed(() => drillDownTarget.value ?? EMPTY_DRILL_CELL)
 // consolBreakdown drill：当前穿透科目的 ACNR TB 域 jump_route（Req 20.1），miss 时为 null
 const drillDownAccountCode = ref('')
 const drillDownJumpRoute = ref<string | null>(null)
@@ -1043,6 +1062,11 @@ consolCtx.setupTableDrag(consolTableRef, (rowIdx: number, colIdx: number) => {
   if (colIdx === 3) return row.prior_period_amount
   return null
 })
+// 试算平衡表在子组件内；把它的真实 el-table 根登记给同一门面，右键菜单与 SelectionBar 才读取该表内核的选区。
+consolCtx.followTables(() => {
+  const root = (consolTbTabRef.value as any)?.$el as HTMLElement | undefined
+  return [root?.querySelector('[data-testid="ctb-table"]')].filter(Boolean)
+})
 
 // ─── 显示偏好（全局单位/字号） ──────────────────────────────────────────────
 const displayPrefs = useDisplayPrefsStore()
@@ -1052,14 +1076,53 @@ const fmt = (v: any) => displayPrefs.fmt(v)
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const consolSearch = useTableSearch(computed(() => []), ['row_name'])
 
-// 兼容别名（供 drillDown 等已有逻辑使用）
+// 兼容别名（右键菜单仍读取统一选区；穿透请求不再从选区反推目标）
 const selectedCells = consolCtx.selectedCells
+
+function currentConsolDrillContext(): ConsolDrillTargetContext {
+  if (activeTab.value === 'consol_tb') {
+    return { source: 'tb', reportType: consolTbType.value, nodeKey: consolTbNodeKey.value }
+  }
+  if (activeTab.value === 'consol_report' && consolReportView.value === 'report') {
+    return { source: 'report', reportType: consolReportType.value, nodeKey: currentEntityNodeKey.value }
+  }
+  return { source: null, reportType: '', nodeKey: '' }
+}
+
+const drillDownRequestGuard = createConsolRequestGuard(() => ({
+  projectId: projectId.value,
+  year: effectiveConsolYear(),
+  ...currentConsolDrillContext(),
+  targetKey: consolDrillTargetKey(drillDownTarget.value),
+}))
+
+function clearDrillDownResults(): void {
+  drillDownDirectRows.value = []
+  drillDownLeafRows.value = []
+  drillDownJumpRoute.value = null
+  drillDownAccountCode.value = ''
+}
+
+function setConsolDrillTarget(target: ConsolDrillTarget | null): void {
+  drillDownRequestGuard.abort()
+  drillDownTarget.value = target
+  drillDownLoading.value = false
+  clearDrillDownResults()
+}
+
+function resetConsolDrillDown(): void {
+  drillDownRequestGuard.abort()
+  drillDownTarget.value = null
+  showCellDrillDown.value = false
+  drillDownLoading.value = false
+  clearDrillDownResults()
+}
 
 const currentDrillDownRows = computed(() => {
   return drillDownLevel.value === 'direct' ? drillDownDirectRows.value : drillDownLeafRows.value
 })
 const drillDownTitle = computed(() => {
-  return `汇总穿透 — ${drillDownCell.itemName} / ${drillDownCell.colName}`
+  return `汇总穿透 — ${drillDownCell.value.itemName} / ${drillDownCell.value.colName}`
 })
 
 const consolEquityTableHeight = ref(600)
@@ -1086,7 +1149,7 @@ const drillDownTransposedRows = computed(() => {
     rows.push(parentRow)
   }
   // 金额行
-  const amtRow: any = { field: '金额', total: fmtAmt(drillDownCell.totalValue) }
+  const amtRow: any = { field: '金额', total: fmtAmt(drillDownCell.value.totalValue) }
   items.forEach((r, i) => { amtRow['col_' + i] = fmtAmt(r.amount) })
   rows.push(amtRow)
   // 占比行
@@ -1114,78 +1177,71 @@ function openCellDrillDown() {
     return
   }
 
-  // 报表模式
-  if (consolReportRows.value.length) {
-    showCellDrillDown.value = true
-    drillDownCell.itemName = '请在报表中选择科目'
-    drillDownCell.colName = '合并本期'
-    drillDownCell.totalValue = null
-    loadDrillDownData()
+  const target = drillDownTarget.value
+  if (!isConsolDrillTargetCurrent(target, currentConsolDrillContext())) {
+    ElMessage.info('请先在合并试算表或合并报表的金额格上选择汇总穿透')
     return
   }
-
-  ElMessage.info('请先打开一个附注表格或报表，选中行后再点击查看')
+  showCellDrillDown.value = true
+  void loadDrillDownData(target)
 }
 
-async function loadDrillDownData() {
-  // 每次穿透先清空 consolBreakdown drill 的 jump_route（避免上次残留，Req 20.1）
-  drillDownJumpRoute.value = null
-  drillDownAccountCode.value = ''
-  if (!drillDownCell.itemName || drillDownCell.itemName.startsWith('请')) {
-    drillDownDirectRows.value = []
-    drillDownLeafRows.value = []
+async function loadDrillDownData(target: ConsolDrillTarget | null = drillDownTarget.value) {
+  clearDrillDownResults()
+  if (!target || target !== drillDownTarget.value) return
+  if (!isConsolDrillTargetCurrent(target, currentConsolDrillContext())) return
+
+  if (target.period === 'prior') {
+    ElMessage.info('上期数取自上年合并报表，不按企业树穿透')
     return
   }
+  const requestYear = effectiveConsolYear()
+  if (requestYear == null) {
+    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+    return
+  }
+
+  const ticket = drillDownRequestGuard.startRequest()
   drillDownLoading.value = true
+  drillDownAccountCode.value = target.accountCode ?? ''
+
+  if (target.accountCode) {
+    void consolReportAddr.resolveAccountJump(target.accountCode).then((result) => {
+      if (drillDownRequestGuard.isStale(ticket)) return
+      drillDownJumpRoute.value = result.found ? result.jumpRoute : null
+    }).catch(() => {
+      if (!drillDownRequestGuard.isStale(ticket)) drillDownJumpRoute.value = null
+    })
+  }
+
   try {
-    // 确定当前查看的报表类型和行次
-    const reportType = activeTab.value === 'consol_tb' ? consolTbType.value : consolReportType.value
-    const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
-    const selectedRow = selectedCells.value.length ? sourceRows[selectedCells.value[0].row] : null
-    const rowCode = selectedRow?.row_code || ''
-    const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
-
-    // consolBreakdown drill：account_code 经 ACNR TB 域解析取 jump_route（Req 20.1）。
-    // 数值穿透仍走既有 P_rc.drillDown（逻辑不变，Req 20.9）；此处仅附加地址跳转能力，miss 回退纯文本。
-    const acctCode = consolReportAddr.accountForRow(selectedRow) || (activeTab.value === 'consol_tb' ? (selectedRow?.standard_account_code || '') : '')
-    drillDownAccountCode.value = acctCode
-    if (acctCode) {
-      consolReportAddr.resolveAccountJump(acctCode).then((r) => {
-        drillDownJumpRoute.value = r.found ? r.jumpRoute : null
-      }).catch(() => { drillDownJumpRoute.value = null })
-    }
-
-    // 按企业树取该行的构成（与报表差额表同一求值；上期列暂无树上构成，只穿透本期）
-    if (colField === 'prior_period_amount') {
-      drillDownDirectRows.value = []
-      drillDownLeafRows.value = []
-      ElMessage.info('上期数取自上年合并报表，不按企业树穿透')
-      return
-    }
     const result: any = await api.post(P_rc.drillDown, {
       project_id: projectId.value,
-      year: effectiveConsolYear(),
-      report_type: reportType,
-      row_code: rowCode,
-      // 试算页选了下级汇总节点 ⇒ 按该节点的直接下级分解（与页面显示的数同一节点）
-      ...(activeTab.value === 'consol_tb' && consolTbTabRef.value?.nodeKey ? { node_key: consolTbTabRef.value.nodeKey } : {}),
-    })
-    const toRow = (r: any) => ({
-      company_name: r.company_name,
-      company_code: r.company_code,
-      amount: r.amount == null ? null : Number(r.amount),
-      ratio: r.pct == null ? 0 : Number(r.pct),
-      source: r.reason ? `${r.source}（${r.reason}）` : r.source,
-      parent_name: r.parent_name || '',
+      year: requestYear,
+      report_type: target.reportType,
+      row_code: target.rowCode,
+      node_key: target.nodeKey,
+    }, { signal: ticket.signal })
+    if (drillDownRequestGuard.isStale(ticket)) return
+
+    const toRow = (row: any) => ({
+      company_name: row.company_name,
+      company_code: row.company_code,
+      amount: row.amount == null ? null : Number(row.amount),
+      ratio: row.pct == null ? 0 : Number(row.pct),
+      source: row.reason ? `${row.source}（${row.reason}）` : row.source,
+      parent_name: row.parent_name || '',
     })
     drillDownDirectRows.value = (result?.rows || []).map(toRow)
     drillDownLeafRows.value = (result?.leaf_rows || []).map(toRow)
     if (result?.note) ElMessage.info(result.note)
-  } catch (err: any) {
-    drillDownDirectRows.value = []
-    drillDownLeafRows.value = []
-    handleApiError(err, '汇总穿透')
-  } finally { drillDownLoading.value = false }
+  } catch (error: any) {
+    if (drillDownRequestGuard.isStale(ticket) || isRequestCancelled(error)) return
+    clearDrillDownResults()
+    handleApiError(error, '汇总穿透')
+  } finally {
+    if (!drillDownRequestGuard.isStale(ticket)) drillDownLoading.value = false
+  }
 }
 
 /**
@@ -1251,7 +1307,7 @@ async function exportDrillDown() {
       rows: [headers, ...dataRows],
       colWidths: headers.map(() => ({ wch: 16 })),
     }],
-    fileName: `汇总穿透_${drillDownCell.itemName}.xlsx`,
+    fileName: `汇总穿透_${drillDownCell.value.itemName}.xlsx`,
     applyStyles: false,
     successMessage: false,
   })
@@ -1464,6 +1520,7 @@ function fmtAmt(v: any): string {
 // 兼容别名：供「汇总穿透」等逻辑引用当前表的行与报表类型
 const consolTbRows = computed(() => consolTbTabRef.value?.rows || [])
 const consolTbType = computed(() => consolTbTabRef.value?.reportType || 'balance_sheet')
+const consolTbNodeKey = computed(() => consolTbTabRef.value?.nodeKey || currentEntityNodeKey.value)
 
 function loadConsolTb() {
   consolTbTabRef.value?.load()
@@ -1481,12 +1538,15 @@ function onTbAudit(results: any[]) {
 
 /** 试算页右键：「汇总穿透」按合并审定数看企业树构成（单元格本身点开是分录 / 个别数穿透） */
 function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
-  const value = row.consolidated == null ? null : Number(row.consolidated)
+  const target = createTbConsolDrillTarget(row, {
+    reportType: consolTbType.value,
+    nodeKey: consolTbNodeKey.value,
+    accountCode: consolReportAddr.accountForRow(row),
+  })
+  setConsolDrillTarget(target)
+  const value = target?.totalValue ?? null
   selectedCells.value = [{ row: ri, col: 2, value }]
-  drillDownCell.itemName = row.row_name
-  drillDownCell.colName = '合并审定数'
-  drillDownCell.totalValue = value
-  consolCtx.openContextMenu(e, row.row_name, row)
+  consolCtx.openContextMenu(e, target?.itemName || row.row_name || '', row)
 }
 
 // ─── Tab 5: 合并报表 ─────────────────────────────────────────────────────────
@@ -1707,34 +1767,49 @@ function reportCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
+function reportColumnIndex(label: string): number {
+  if (label === '行次') return 0
+  if (label === '项目') return 1
+  if (label === reportColumnLabels.value.current) return 2
+  if (label === reportColumnLabels.value.prior) return 3
+  return -1
+}
+
+function reportDrillTarget(row: any, column: any): ConsolDrillTarget | null {
+  return createReportConsolDrillTarget(row, {
+    label: column?.label,
+    currentLabel: reportColumnLabels.value.current,
+    priorLabel: reportColumnLabels.value.prior,
+  }, {
+    reportType: consolReportType.value,
+    nodeKey: currentEntityNodeKey.value,
+    accountCode: consolReportAddr.accountForRow(row),
+  })
+}
+
 function onReportCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   consolCtx.closeContextMenu()
   const rowIdx = consolReportRows.value.indexOf(row)
-  const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
-  const colIdx = colMap[column.label] ?? -1
+  const colIdx = reportColumnIndex(column.label)
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
   consolCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
-  if (consolCtx.selectedCells.value.length === 1) {
-    drillDownCell.itemName = row.row_name || ''
-    drillDownCell.colName = column.label || ''
-    drillDownCell.totalValue = Number(value) || null
-  }
+  setConsolDrillTarget(consolCtx.selectedCells.value.length === 1 ? reportDrillTarget(row, column) : null)
 }
 
 function onReportCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const rowIdx = consolReportRows.value.indexOf(row)
-  const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
-  const colIdx = colMap[column.label] ?? -1
-  // 如果右键点击的单元格已在选区内，保持选区不变
-  if (rowIdx >= 0 && colIdx >= 0 && !consolCtx.isCellSelected(rowIdx, colIdx)) {
-    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  const colIdx = reportColumnIndex(column.label)
+  if (rowIdx < 0 || colIdx < 0) return
+  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  // 经典方式点到选区外才改为单选；Excel / 单击编辑方式由内核在 contextmenu capture 阶段先选好。
+  if (!consolCtx.kernelActive() && !consolCtx.isCellSelected(rowIdx, colIdx)) {
     consolCtx.selectCell(rowIdx, colIdx, value, false)
-    drillDownCell.itemName = row.row_name || ''
-    drillDownCell.colName = column.label || ''
-    drillDownCell.totalValue = Number(value) || null
   }
-  consolCtx.openContextMenu(event, drillDownCell.itemName || row.row_name, row)
+  // 穿透目标永远冻结本次右键的格；即使右键发生在多选区第二行，也不读取 selectedCells[0]。
+  const target = reportDrillTarget(row, column)
+  setConsolDrillTarget(target)
+  consolCtx.openContextMenu(event, target?.itemName || row.row_name || '', row)
 }
 
 function onConsolCtxCopy() {
@@ -2097,6 +2172,7 @@ onUnmounted(() => {
   eventBus.off('consol-open-elim-panel', onOpenElimPanelEvent)
   eventBus.off('consol-request-push', queueConsolPush)
   eventBus.off('consol-current-node-request', broadcastCurrentNode)
+  resetConsolDrillDown()
   refreshTracking.stop()
   stopConsolPushEvents()
 })
@@ -2188,6 +2264,18 @@ watch(activeTab, (tab) => {
   if (tab === 'consol_note') eventBus.emit('four-col-switch', { tab: 'notes' })
   loadActiveTabContent(tab)
 })
+
+// 穿透目标绑定创建它的完整视图上下文；任何维度变化都关闭旧弹窗并使飞行中响应失效。
+watch([
+  () => projectId.value,
+  () => effectiveConsolYear(),
+  () => activeTab.value,
+  () => consolReportType.value,
+  () => currentEntityNodeKey.value,
+  () => consolTbType.value,
+  () => consolTbNodeKey.value,
+  () => consolReportView.value,
+], resetConsolDrillDown)
 
 // 同一路由组件切换项目/企业树年度时重绑项目级 raw SSE，并重读权威推送状态
 watch(() => [projectId.value, effectiveConsolYear()] as const, ([pid, y], old) => {

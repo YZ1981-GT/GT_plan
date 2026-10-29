@@ -58,6 +58,7 @@ import * as h5Detail from '../../composables/useH5Detail'
 import * as h6Detail from '../../composables/useH6Detail'
 import * as h8Detail from '../../composables/useH8Detail'
 import * as h9Detail from '../../composables/useH9Detail'
+import * as n1Detail from '../../composables/useN1Detail'
 import * as l1FormData from '@/composables/useL1FormData'
 import * as l4FinLiab from '../../composables/useL4FinLiabRows'
 import * as l5Detail from '../../composables/useL5Detail'
@@ -391,6 +392,15 @@ export const PARITY_ADAPTERS: Readonly<Record<string, ParityAdapter>> = {
   'H9-2-rows': {
     source: 'useH9Detail.normalizeH9DetailRow',
     compute: (raw) => asRow(h9Detail.normalizeH9DetailRow(raw)),
+  },
+  'N1-2-detail-rows': {
+    source: 'useN1Detail.enrichN1DetailRow',
+    compute: (raw) => asRow(n1Detail.enrichN1DetailRow(merged<n1Detail.N1DetailRow>({
+      id: 'parity', itemName: '', category: '', bookValue: 0, taxBase: 0,
+      beginDiff: 0, beginTaxRate: 0, beginAje: 0, beginRje: 0,
+      endDiff: 0, endTaxRate: 0, endAje: 0, endRje: 0,
+      recognized: 0, reversed: 0, remark: '',
+    }, raw), 1)),
   },
   'L1-2-rows': {
     source: 'useL1FormData.recalcL1DetailRow',

@@ -50,6 +50,9 @@ import type {
   SamplingConfig,
 } from '../composables/useSamplingAlgorithms'
 import WpCommitInput from '../shared/WpCommitInput.vue'
+import FinalPopulationModeDialog from './FinalPopulationModeDialog.vue'
+import CombinedPhaseEvaluation from './CombinedPhaseEvaluation.vue'
+import { chooseFinalPopulationMode, type FinalPopulationModePicker } from '../composables/useFinalPopulationMode'
 
 // ─── 异步加载子组件（后续任务实现） ──────────────────────────────────────────
 
@@ -436,6 +439,13 @@ async function handleConfirmFill() {
     // 检查合规性
     checkCompliance()
   }
+}
+
+// ─── 年审抽样口径（需求 7.1）：本底稿有预审工作时先弹窗选 a / b，取消则不抽 ──────────
+const populationModeDialog = ref<FinalPopulationModePicker | null>(null)
+async function runSampling(): Promise<void> {
+  const mode = await chooseFinalPopulationMode(props.projectId, props.workpaperId, props.year, populationModeDialog.value)
+  if (mode !== false) await triggerSampling({ finalPopulationMode: mode })
 }
 
 // ─── 撤销抽凭：宿主按批次删行（ADR-VK-08），年审阶段不撤销预审批次（需求 6.3）──────
@@ -994,7 +1004,9 @@ async function handleResample() {
         <el-select v-model="batchCheckResult" size="small" placeholder="批量核查" clearable style="width: 90px">
           <el-option v-for="opt in checkResultOptions.filter(o => o.value)" :key="opt.value" :value="opt.value" :label="opt.label" />
         </el-select>
-        <el-button size="small" type="success" plain :disabled="!batchCheckResult" @click="applyBatchCheckResult">
+        <!-- applyBatchCheckResult 另被表头 @change(val) 调用；按钮必须显式零参数调用，
+             否则 Vue 会把 PointerEvent 当 overrideVal 传入，核查结果写成 [object PointerEvent] -->
+        <el-button size="small" type="success" plain :disabled="!batchCheckResult" @click="() => applyBatchCheckResult()">
           填入
         </el-button>
       </div>
@@ -1426,6 +1438,13 @@ async function handleResample() {
           <span class="conclusion-hint">结论建议由系统计算，需经审计师确认后方可作为最终结论</span>
         </div>
 
+        <!-- 全年合并评价（需求 7.5）：卡片显示的是带年审口径的年审批次时出现，数字与结论取后端 -->
+        <CombinedPhaseEvaluation
+          :project-id="props.projectId" :workpaper-id="props.workpaperId" :log-id="loadedFromBatch?.logId ?? null"
+          :refresh-key="`${filledBatchId ?? ''}|${loadedFromBatch?.evaluatedAt ?? ''}`"
+          :enabled="projectPhase !== 'preliminary' && !!(loadedFromBatch || filledBatchId)"
+        />
+
         <!-- 推断错报记入未更正错报汇总（R3.5~3.8）：CAS 1251 要求推断错报与
              事实错报一并汇总后与重要性比较，这是形成审计意见的必要步骤 -->
         <div class="a13-push-bar">
@@ -1474,7 +1493,7 @@ async function handleResample() {
       :loading="loading"
       :suggested-sample-size="suggestedSampleSize"
       :tolerable-from-materiality="tolerableFromMateriality"
-      @execute="triggerSampling"
+      @execute="runSampling"
       @compute-suggested="handleComputeSuggested"
       @apply-suggested="handleApplySuggested"
       @load-tolerable="handleLoadTolerable"
@@ -1513,6 +1532,8 @@ async function handleResample() {
       v-model:visible="comparePanelVisible"
       :compare-result="compareResult"
     />
+
+    <FinalPopulationModeDialog ref="populationModeDialog" />
   </div>
 </template>
 

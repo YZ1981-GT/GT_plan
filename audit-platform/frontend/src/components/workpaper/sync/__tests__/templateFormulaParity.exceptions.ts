@@ -23,7 +23,7 @@ export const UNCOVERED_ITEMS: Readonly<Record<string, string>> = {
   'F4-1-adj-aging-slot-rows': 'R3 任务 9：字段名已对齐（9.4c），但契约 store item 前端不存在（前端账龄段行 + 残差行共存 F4-1-adj-aging-rows，要区判据 + 多区门面）',
   'G5-2-rows': 'R3 任务 9：前端行模型与模板列不同构（前端 合同金额 − 已收回，模板 期初 + 借 − 贷 与审定三列，期初 / 调整列前端都没有）',
   'H3-2-cost-rows': 'R3 任务 9：前端期末多算转入 / 转出两列，审定三列按「未审 + AJE + RJE」而模板是审定滚动；模板 I~N / V~AA / AI~AN 前端无字段（design §3.2）',
-  'N2-2-detail-rows': 'R3 批 C：字段名已改前端名，但前端无 H 列 beginRje（模板重分类调整列），行模型 R2 待裁',
+  'N2-2-detail-rows': 'R2 待裁：模板 B 列“税率或税收优惠”为自由文本，前端 N2Detail16Row 只接受数值 taxRate；公式列虽已接通，整表适配器留待字段形态裁决',
   'N3-2-rows': 'R3 批 C：字段名已改前端名，但前端 useN3Detail 行模型与模板不同构（无两期暂时性差异 / 调整列）',
   'N4-2-detail-rows': 'R3 批 C：前端 N4 存 taxBasis×taxRate，不是模板的 未审+调整=审定',
 }

@@ -562,20 +562,24 @@
                 <NoteTableColumnNode v-for="(node, ni) in activeTableColumns" :key="`${activeTableTab}-${ni}-${node.label}`" :node="node">
                   <template #cell="{ row, $index, headerIdx, label }">
                     <template v-if="headerIdx === 0">
-                      <template v-if="editMode && !row.is_total && !isPushedFixedRow(row)">
-                        <el-input v-if="isActiveCellEditing($index, -1)"
-                          v-model="row.label" size="small" style="width: 100%; height: 22px"
+                      <GtGridCell
+                        :editable="editMode && !row.is_total && !isPushedFixedRow(row)"
+                        :value="row.label"
+                        :text="row.label || ''"
+                      >
+                        <template #display>
+                          <span v-if="editMode && !row.is_total && !isPushedFixedRow(row)"
+                            class="gt-cell-editable gt-cell-editable--label"
+                            :aria-label="`${label || '项目'} 行${$index + 1}：${row.label || '空'}`">
+                            {{ row.label || '' }}
+                          </span>
+                          <span v-else :class="{ 'total-label': row.is_total }">{{ row.label || '' }}</span>
+                        </template>
+                        <ElInput
+                          :model-value="row.label" size="small" style="width: 100%; height: 22px"
                           :aria-label="`${label || '项目'} 行${$index + 1} 编辑`"
-                          @change="onLabelChange($index, $event)"
-                          @blur="onActiveCellBlur($event, $index, -1)"
-                          @keydown="onActiveCellKeydown($event, $index, -1)" />
-                        <span v-else class="gt-cell-editable gt-cell-editable--label" :class="{ 'total-label': row.is_total }"
-                          role="gridcell" tabindex="0"
-                          :aria-label="`${label || '项目'} 行${$index + 1}：${row.label || '空'}`">
-                          {{ row.label || '' }}
-                        </span>
-                      </template>
-                      <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
+                          @change="onLabelChange($index, $event)" />
+                      </GtGridCell>
                       <NotePushedRowMark :row="row" :editable="editMode" @toggle="onPushedOptionalToggle($index, $event)" />
                     </template>
                     <template v-else>
@@ -587,25 +591,26 @@
                       >
                       <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, headerIdx)">
                       <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, headerIdx - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, headerIdx - 1), 'gt-cell-resolve-failed': isCellResolveFailed(row, headerIdx - 1) }">
-                        <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, headerIdx - 1)"
-                          v-model="row.values[headerIdx - 1]" :controls="false" :precision="2"
-                          size="small" style="width: 100%; height: 22px"
-                          :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
-                          @change="onCellValueChange($index, headerIdx - 1, $event)"
-                          @blur="onActiveCellBlur($event, $index, headerIdx - 1)"
-                          @keydown="onActiveCellKeydown($event, $index, headerIdx - 1)" />
-                        <span v-else-if="editMode && !row.is_total" class="gt-cell-editable"
-                          role="gridcell"
-                          tabindex="0"
-                          :aria-label="`${label || '列'} 行${$index + 1}：${getCellValue(row, headerIdx - 1) ?? '空'}`">
-                          <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
-                        </span>
-                        <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, headerIdx - 1) }]">
-                          <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
-                        </span>
-                        <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                          <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
-                        </span>
+                        <GtGridCell
+                          :editable="editMode && !row.is_total"
+                          :value="getCellValue(row, headerIdx - 1)"
+                          kind="number"
+                        >
+                          <template #display>
+                            <span v-if="editMode && !row.is_total" class="gt-cell-editable"
+                              :aria-label="`${label || '列'} 行${$index + 1}：${getCellValue(row, headerIdx - 1) ?? '空'}`">
+                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                            <span v-else :class="['gt-amt', { 'total-val': row.is_total, 'gt-formula-mismatch': row.is_total && isFormulaMismatch(row, headerIdx - 1) }]">
+                              <GtAmountCell :value="getCellValue(row, headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                          </template>
+                          <ElInputNumber
+                            :model-value="getCellValue(row, headerIdx - 1)" :controls="false" :precision="2"
+                            size="small" style="width: 100%; height: 22px"
+                            :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
+                            @change="onCellValueChange($index, headerIdx - 1, $event)" />
+                        </GtGridCell>
                         <span v-if="getCellMode(row, headerIdx - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, headerIdx - 1, $event)">📊</span>
                         <span v-else-if="getCellMode(row, headerIdx - 1) === 'manual'" class="gt-cell-manual"
                           :class="{ 'gt-cell-trace-trigger': editMode }" data-testid="note-cell-manual"
@@ -1211,6 +1216,8 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtGridCell from '@/components/grid/GtGridCell.vue'
+import { ElInput, ElInputNumber } from '@/components/grid/adapters'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
@@ -1735,77 +1742,7 @@ async function exitNoteEdit(force = false): Promise<boolean> {
   }
   return result
 }
-// ─── 单元格激活编辑（仅活跃单元格渲染 input，其余保持轻量 span）──────────────────
-const activeCellEdit = ref<{ rowIndex: number; colIndex: number } | null>(null)
-
-function isActiveCellEditing(rowIndex: number, colIndex: number): boolean {
-  if (!activeCellEdit.value) return false
-  return activeCellEdit.value.rowIndex === rowIndex && activeCellEdit.value.colIndex === colIndex
-}
-
-function activateCell(rowIndex: number, colIndex: number) {
-  if (!editMode.value) return
-  activeCellEdit.value = { rowIndex, colIndex }
-  // 用 nextTick 自动聚焦 input
-  nextTick(() => {
-    const input = document.querySelector('.gt-de-note-table .el-input-number input') as HTMLInputElement | null
-    input?.focus()
-    input?.select()
-  })
-}
-
-function deactivateCell() {
-  activeCellEdit.value = null
-}
-
-function onActiveCellBlur(event: FocusEvent, rowIndex: number, colIndex: number) {
-  // 如果焦点移到了同表格内另一个元素（如用户点击另一单元格），不 deactivate
-  // — onDeCellClick 会自行调用 activateCell 切换到新单元格
-  const related = event.relatedTarget as HTMLElement | null
-  if (related?.closest('.gt-de-note-table')) return
-  // 焦点移出表格范围，deactivate
-  if (activeCellEdit.value?.rowIndex === rowIndex && activeCellEdit.value?.colIndex === colIndex) {
-    deactivateCell()
-  }
-}
-
-function onActiveCellKeydown(event: KeyboardEvent, rowIndex: number, colIndex: number) {
-  const headers = activeTableData.value?.headers || []
-  const rows = activeTableData.value?.rows || []
-  const maxCol = headers.length - 2  // 减去 label 列
-  const maxRow = rows.length - 1
-
-  if (event.key === 'Tab') {
-    event.preventDefault()
-    const nextCol = event.shiftKey ? colIndex - 1 : colIndex + 1
-    if (nextCol >= -1 && nextCol <= maxCol) {
-      if (!rows[rowIndex]?.is_total) {
-        activateCell(rowIndex, nextCol)
-      }
-    } else if (!event.shiftKey && nextCol > maxCol) {
-      // 下一行 label 列
-      for (let r = rowIndex + 1; r <= maxRow; r++) {
-        if (!rows[r]?.is_total) { activateCell(r, -1); break }
-      }
-    } else if (event.shiftKey && nextCol < -1) {
-      // 上一行末列
-      for (let r = rowIndex - 1; r >= 0; r--) {
-        if (!rows[r]?.is_total) { activateCell(r, maxCol); break }
-      }
-    }
-  } else if (event.key === 'Enter') {
-    event.preventDefault()
-    // 下一行同列
-    for (let r = rowIndex + 1; r <= maxRow; r++) {
-      if (!rows[r]?.is_total) { activateCell(r, colIndex); break }
-    }
-  } else if (event.key === 'Escape') {
-    deactivateCell()
-  }
-}
-
-// 退出编辑时清除活跃单元格
-watch(() => editMode.value, (editing) => { if (!editing) deactivateCell() })
+// 单元格选中 / 双击 / F2 / 直接输入 / Tab / Enter / Esc 统一由 GtGridCell + GridKernel 处理。
 
 // 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
 watch(() => editMode.value, async (editing) => {
@@ -2036,12 +1973,10 @@ const exportEnabledTables = computed({
 watch(() => currentNote.value?.note_section, () => {
   activeTableTab.value = '0'
   noteTableStructure.clearHistory()
-  deactivateCell()
   syncBannerDismissed.value = false
 })
 
-// 切换多表 Tab 时清除活跃单元格（防坐标错位）
-watch(activeTableTab, () => { deactivateCell() })
+// 切换多表 Tab 时由旧行卸载 / 新行挂载让 GridKernel 自动收起编辑器与重建坐标。
 
 // ─── 附注表格结构编辑 (Req 38.1-38.6) ─────────────────────────────────────
 const structureEditState = computed(() => resolveNoteStructureEditState(
@@ -3154,8 +3089,8 @@ const {
   deCellClassName, onDeCellClick, onDeCellContextMenu,
   onDeCtxCopy, onDeCtxFormula, onDeCtxTrustScore, onDeCtxSum, onDeCtxCompare,
 } = useNoteTableInteraction({
-  activeTableData, currentNote, editMode, showNoteFormulaManager,
-  deCtx: deCtx as any, deComments, activateCell, fmtAmount,
+  activeTableData, currentNote, showNoteFormulaManager,
+  deCtx: deCtx as any, deComments, fmtAmount,
 })
 
 /** 行级 CSS class：消费后端 _row_types 实现合计/小计/header 行样式（对齐合并附注） */

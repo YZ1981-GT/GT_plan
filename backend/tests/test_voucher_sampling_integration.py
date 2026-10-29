@@ -74,6 +74,17 @@ def _stub_population_reconcile():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_final_population():
+    """年审口径（任务 15）在这些流程测试中打桩为「不适用」（本底稿没有预审工作）。
+
+    不打桩时它会拿 AsyncMock 会话去读项目阶段而 500。口径本身由 test_sampling_phase_pg.py（真库）
+    与 test_sampling_final_population.py 覆盖。
+    """
+    with patch("app.routers.voucher_sampling.resolve_final_population", new=AsyncMock(return_value=None)):
+        yield
+
+
 # ─── Fake User ────────────────────────────────────────────────────────────────
 
 

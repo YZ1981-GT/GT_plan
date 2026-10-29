@@ -61,13 +61,15 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- N2-2 明细表（23列区段Tab，22公式） -->
+      <!-- N2-2 明细表（A:Q 17 列，5 个派生公式） -->
       <N2TabDetail
         v-else-if="currentSheet === 'N2-2'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :year="n2Year"
+        @imported="selfLoad"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />

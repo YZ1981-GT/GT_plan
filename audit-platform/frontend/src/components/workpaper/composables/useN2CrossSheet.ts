@@ -183,12 +183,12 @@ function _adjRowEndAudited(r: any): number {
 
 /**
  * N2-2 明细表单行「审定·期末」派生（源模板 N2-2!P = M+N−O）：
- * - M 审定期初 = C 未审期初 + G 期初调整
+ * - M 审定期初 = C 未审期初 + G 期初账项调整 + H 期初重分类调整
  * - N 审定应交 = D 未审应交 + I 账项调整应交 + K 重分类应交
  * - O 审定已交 = E 未审已交 + J 账项调整已交 + L 重分类已交
  */
 function _detailRowAudEnd(r: any): number {
-  const m = parseNum(r.unadjBegin) + parseNum(r.beginAdjust)
+  const m = parseNum(r.unadjBegin) + parseNum(r.beginAdjust) + parseNum(r.beginRje)
   const n = parseNum(r.unadjPayable) + parseNum(r.ajePayable) + parseNum(r.rjePayable)
   const o = parseNum(r.unadjPaid) + parseNum(r.ajePaid) + parseNum(r.rjePaid)
   return m + n - o
@@ -258,7 +258,7 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
     }
 
     // 明细表各行审定期末汇总。
-    // 🔴 N2-2-detail-rows 只存原始录入列（unadjBegin/beginAdjust/unadj|aje|rje Payable/Paid），
+    // 🔴 N2-2-detail-rows 只存原始录入列（unadjBegin/beginAdjust/beginRje/unadj|aje|rje Payable/Paid），
     //    审定列 M/N/O/P 全是派生列不落库，故必须按源模板 P=M+N−O 现算，不能读 row.audEnd。
     const detailResp = allResponses.value.get(N2_CROSS_SHEET_ITEM_IDS.detailRows)
     const detailRows = safeParseRows<Record<string, unknown>>(detailResp?.conclusion)

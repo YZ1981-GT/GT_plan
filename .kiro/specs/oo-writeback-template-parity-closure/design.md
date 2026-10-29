@@ -9,7 +9,7 @@
 
 ## §2 模板公式修正清单（R1）
 
-判定依据：同表其他行、同循环同结构的表、表头语义三者一致指向的写法。只改公式与表头错字，不改样式、合并区、行列。逐格清单只有一份：`backend/scripts/fix/fix_template_formula_defects.py` 的 `fixes()`（第一批 19 本 285 格 #1~#19；第二批 6 本 43 格 #20~#28，其中 D1 两批都有；第三批 4 本 55 格 #29~#32，由前端 ↔ 模板对拍普查核出，D6 / D2-1至D2-4 前两批已有 ⇒ 合计 26 本 383 格），守卫 `tests/workpaper_sync/test_template_formula_defects_fixed.py` 直接读它。
+判定依据：同表其他行、同循环同结构的表、表头语义三者一致指向的写法。只改公式与表头错字，不改样式、合并区、行列。逐格清单只有一份：`backend/scripts/fix/fix_template_formula_defects.py` 的 `fixes()`（第一批 19 本 285 格 #1~#19；第二批 6 本 43 格 #20~#28，其中 D1 两批都有；第三批 4 本 55 格 #29~#32；第四批 N5 1 本 3 格 #33 ⇒ 合计 27 本 386 格），守卫 `tests/workpaper_sync/test_template_formula_defects_fixed.py` 直接读它。
 
 | # | 模板 / sheet | 格 | 现状 → 改为 | 依据 |
 |---|---|---|---|---|
@@ -45,6 +45,7 @@
 | 30 | D6 / 减值准备测算D6-8 | F13:F17；C18、D18 | `=B−E` → `=D−E`；C18 的 `SUM` 与 D18 的比例式互换 | 表头 ⑤=③−④（应计提 − 账面），同结构 D1-15 / D2-9；小计行与 D2-9 #22 同一处错 |
 | 31 | G9 / 明细表G9-2 | L、Y（R12~16、R19~23、R26~28） | `=E+K` / `=R+X` → `=J+K` / `=W+X` | 「期初 / 期末报表数」= 审定公允价值 + 重分类；原式取未审 E / R，同结构 G1-2 是 J+K / W+X |
 | 32 | D2-1至D2-4 / 明细表D2-2 | H13:H25 | 空 → `=E+F+G`（带缓存值 0） | 期初审定余额漏公式；同表期末审定 AB=S+Z+AA，D1-3 / D3-2 / D5-2 / D6-2 / D7-2 期初审定都是未审 + 账项 + 重分类。同行 Q/S/AB 模板格是 `<f>…</f><v>0</v>`，只写 `<f>` 时未经 OO 重算的反读读不到 H（键缺失） |
+| 33 | N5 / 加计扣除研发费用情况明细表N5-6-1、递延所得税费用核对表N5-8 | D11、E12；H12 | `SUM(D5:N16)`→`SUM(D12:D16)`；`C12+N5`→`C12+D12`；`…+N5…`→`…+D12…` | D11 是人员费用小计，仅覆盖 D12:D16；E12 同列 37:1、H12 同列 28:1 的正确形态都引用 D12。`N5` 与 A1 引用同形，Excel 静默当作 N5 单元格，吞掉 D12 分量；修后三族超列引用 17→0 |
 
 - #15~#19 中的 G5-1 G9/H9、G7、K6、L4 附注是本轮用「同行跨表单格引用指向不同行」普查（117 条候选，逐条核后 4 处真错，其余是标签 / 目录引用或减值与余额分行）新发现的；L4-3 合计行、I3、H3、G5 是 provider 早就登记、原定「覆盖层修」或「只登记不改」的。
 - 登记了但核实不是错误：F2-26!J9（模板已是 `=G9+H9-I9`）、F5-7!G31（已是 `G24+G25+G26-G27-G28-G29-G30`）——登记文字过期；F4-6 B8:B11 下拉来源指向空列、L3-7 的 `#REF!` 与断开的定义名不是可按同表推出正确写法的公式错误，不改。
@@ -53,6 +54,7 @@
 - 连带更新：provider `TEMPLATE_SHA256` 与审核依据文本、`generate_phase5_*` 重生成 18 份契约（K3 / K6 原先不在 K 生成器清单里，补上）、`g7_column_source_facts.json`、`tests/_snapshots/wp_templates_baseline.json`（同时补回 29 本早已提交却从未回填的净化改动，守卫在 HEAD 上本就是红的）、`data/prev3_prefill_locator.json`（只变 16 行 sha）、12 份 manifest slice（文本级刷新，`D4收入底稿.xlsx` 改名登记）、`_sync_provider_golden_digest.json`、两个变异脚本的锚点；归档 spec 证据与 `definition_store` 历史不改。
 - 第二批同口径：13 个 provider + `delivered_contracts_ledger`、6 份契约（d1.notes_receivable_detail / d2.inspection / d2.receivable_detail / d7 / g10 / g13）、模板快照（模板总字节 45_834_727 → 45_795_461）、预填定位表、D / G 两份 slice、golden、两个变异脚本锚点、D2 大 JSON 试点的模板字节数常量（123_162 → 105_407，解压后只有 sheet9 变）。契约顺带两处：D1-15 E 列由公式字段改为可编辑（#21）；D1-4 G「其他增加」→ `currentOther`、J「其他减少」→ `currentRecovery`（原映射位置对、加减方向反：前端「收回」是减项、「其他」是加项）。
 - 第三批同口径：provider（G14 / D6 / G9 / D2 大 JSON 试点）与 `delivered_contracts_ledger`、`wp_surfaced_g` 文案、4 份契约（d2.receivable_detail / d6.contract_assets_detail / g9.other_noncurrent_detail / g14.credit_impairment_detail）、模板快照（45_795_461 → 45_775_626）、预填定位表、D / G 两份 slice、golden、三个变异脚本锚点（task41 / task46 / task49）。契约顺带：D2-2 H「期初审定」由可编辑改为公式字段（#32）；G14 provider 的 `TEMPLATE_ROW_DEFECTS_G1402` 改为已修留痕 `TEMPLATE_DEFECT_K_G1402`。
+- 第四批同口径：N5 三格（#33）、`phase5_n5_sheets.TEMPLATE_SHA256`、N5 reviewed 契约、模板快照、prev3 哈希与 N slice 两处模板事实；旧 N lane 守卫由「缺陷存在」翻成正确公式，超列三族现算从 17（A1 3 / A2 11 / B 3）清零，错口径扫描 193→176。
 - 前端无对应计算的组（G5-1 期末账项 / 重分类是手填、G7-1 / K6 附注 / L4 附注与 L4-3 合计行前端不逐格复刻）只改模板。
 
 ### 存量产物（真实项目）
@@ -63,6 +65,7 @@
 - 重药控股安徽有限公司_2025（4）：D1、D4、F1、G5
 - 第二批（契约 d1 / d2.inspection / d2.receivable_detail / d7 / g10 / g13）：重庆和平药房_2025 的 D2、G10、G13；重庆和平药房_2024 的 D2；重药安徽_2025 的 D1、D2、D7
 - 第三批（契约 d2.receivable_detail / d6 / g9 / g14；`working_paper_sync_entry_state` 现查）：新增重庆和平药房_2025 的 G9、G14；D2（和平药房_2024 / _2025、重药安徽_2025）与和平药房_2025 的 D6 已在前两批名单内。L1 / L5 / L6 / L8 只改前端、契约未变，不需要重发布
+- 第四批：重庆和平药房连锁有限责任公司_2025 的 N5 已有 generation=1；模板和 N5 契约已变，按「只做【测试】项目」约束未重发布，列入待用户放行清单。真库没有 N2-2 旧键或新键数据，本轮无需迁移。
 
 第一批没有【测试】项目发布过这些 entry，【测试】项目首次打开即按新模板发布。（原设计「未重发布的项目 OO 侧仍是旧公式」的假设不成立，以此为准。）第二批发布过 D2 的两个【测试】项目（OO公式重算验收、在线编辑回表单验收）都已删除（项目在回收站），重发布报「冻结 bundle 与契约脱钩」、provisioning 按可见性过滤找不到目标——打不开的产物无需重发布。
 
@@ -281,6 +284,34 @@
 - 回归（对 dbd010b28）：后端 528 个文件新增失败只有「已提交代码 import 未提交模块」（两个新模块入库即消），另 10 条由红转绿；PG 11 个文件新增 0；前端 244 个文件新增 1 条 `useG5FormulaEngine.pbt` P15 —— 6 个 1e9 量级正数正反序求和、按 1e-6 比较，浮点尾差超容差；失败种子 -1895920294 在 base 上复跑同样红，与本批无关（R9 登记）；vue-tsc 单区域（useG1Detail.ts）无新增。
 - 真实项目：和平药房 2025 的 G1 / G3 / G4 主表 / G6 主表与重药安徽的 G5 已发布，五份契约都变了（列口径、复核文字、G1 A 列键），在线编辑会报「冻结身份与生产契约脱钩」，要重发布；只做测试项目，未重发布（列入重发布清单）。
 
+### §4.10 批 C 与复盘收口：N 循环 store 契约、N2 A:Q、N1 对拍（2026-10-28~29）
+
+批 C（v1.0.31）先完成 N1 几何 29/31→40/42、N1/N2 store item 改 `-detail-rows`、N1/N2/N3 json key 改前端名、五条 N plan 登记和五份契约生成。复盘重新按**运行时调用链**而非声明检查，发现三处假绿并在本批收口：
+
+1. **载荷列声明未生效**：`PAYLOAD_COLUMN=conclusion` 只加在 `phase5_n{1,2,3}_sheets.py`，三个 provider 的显式 import 列表没有重导出；`payload_columns_of(provider)` 因而仍走默认 remark。现将两常量从三份 provider 重导出，运行时逐条实测 read_order 都是 conclusion。
+2. **N1 对拍空窗**：N1 已从 `UNCOVERED_ITEMS` 删除，但 `templateFormulaParity.generated.json` 没重生成、`PARITY_ADAPTERS` 也没有 N1，守卫在旧清单上仍绿。现把 N1 行计算抽成生产纯函数 `enrichN1DetailRow`，生成清单改为 `N1-2-detail-rows`，加真实适配器；模板四公式与前端逐样本对拍。
+3. **N2 活路径仍是旧模型**：前端实际调用长前缀 `/api/n2-taxes-payable/*`，其 service 仍导入导出旧 23 列、动态拼出双前缀 `N2-N2-2-rows` 并写 remark；批 C 只改了未挂载的短前缀工厂。新增 `n2_detail_model.py` 作后端单一来源，N2-2 统一为 `N2-2-detail-rows.conclusion`、A:Q 17 列；导入补 `project_id`，只存可编辑列，导出重算 F/M/N/O/P。前端补模板 H 列 `beginRje`，M 改 C+G+H，跨表勾稽和 AI 复核上下文均按原始行实时算 P，不读不存在的 `endBalance`。导入 `sheet` 改走 query 参数（原放 multipart body，FastAPI Query 收不到）。真库两个键现查均 0 行，无迁移。
+
+其余收口：
+
+- `store_item_registry.py` 的 K2~K7 与 N1~N5 十一条同构单 rows plan 改 `_row_plans` 表驱动；运行时 dataclass 序列化与改前逐值相等，76 条顺序不变，1019 行（从 1047 降 28，低于白名单上限）。
+- N5 第四批修 3 格，见 §2 #33；用户已授权「模板错按正确口径」，否决继续增加“已知缺陷仍存在”守卫。模板哈希、N5 契约、快照、prev3 与 N slice 同步。
+- field-name 例外 30/365→29/364（N2 `beginRje` 清零）；公式对拍未覆盖仍保留 N2 一条，理由改为模板 B 列自由文本与前端数值 taxRate 的 R2 待裁。
+- 新增 N1 三条语义靶子；在 `wsr_head` 磁盘变异 store item / payload column / LAST_DATA_ROW，3/3 由目标断言打红、无 collection error，每轮及最终 sha256 恢复。
+- `push_version.py` 的 push 路径先 `fetch --prune --no-tags`，失败立即停在打标签前；`check-push` 取不到远端标签清单同样 fail-closed。atomic push 失败仅在远端分支 SHA 与**完整版本标签映射**逐值未变时原样重试一次，远端前移或新增任一版本标签都不自动重放。标签说明的上一版本优先取远端 tag map 的 peeled commit，不再依赖本地是否抓过标签对象；流程写入 `docs/operations/git-workflow.md`，6 条安全边界测试通过。
+
+首轮语义审查（报告 `semantic-review/2026-10-29-072447-pr-local.md`）另抓出 8 项，复核后逐项处置：
+
+1. N2 长前缀导出 / 导入在读正文或上传体前分别执行 `authorize_wp_read` / `authorize_wp_edit`，并以 `read_checklist` / `save_checklist` 进入 Wp_Bound_Gate；非法 UUID 统一按不可枚举资源返回。
+2. 导入由“前三列表头不符只告警、缺列按位置兜底”改为完整 17 列逐位等值，缺列 / 多列 / 调序 / 重复列都拒绝；NaN / Infinity 在 JSON 序列化前拒绝，`allow_nan=False` 作第二道门。整本先解析、后按稳定 item_id 锁行并原子写，记录 `updated_by`、冲突更新递增 `content_version`；router 统一 commit / rollback，提交后只发一次 `WORKPAPER_SAVED`。
+3. 国企披露不再直接读取已退出持久化形状的 `audBegin/audPayable/audPaid`，而是在读取 `N2-2-detail-rows` 时调用生产 `enrichN2DetailRow`；带非零 C/G/H、D/I/K、E/J/L 的回归证明 opening / payable / paid / end 分别为 112 / 36 / 14 / 134，陈旧 `aud* = 999` 不被采纳。
+4. N2-2 导入成功后子 Tab 发 `imported`，宿主唯一 `selfLoad` 重读 render-config；失败不发事件。宿主同时补齐必需的 `projectId`。
+5. `n2ImportExportWire.spec.ts` 进入 N 域测试事实；lane2 公式数从 `n_cycle_facts.LANE2_FORMULA_CELLS` 派生。N1 纯函数抽取移除一个展示序号源码站点，slice 的 family 与两处汇总计数按现算 8→7；N5 模板净减 1 B，模板总字节基线同步为 45,775,625。`test_n_cycle_foundation_canary.py` 改前已超 800 行，本批把旧缺陷断言翻为修复态后净减 9 行至 1065；按当前真实行数登记白名单并冻结 5% 膨胀，拆分轴写在白名单注释中。
+6. `push_version.py` 的三个安全缺口按上段收口；源码稳定后才运行 `install.ps1`，避免在验证中途把共享 hook 换成半成品。
+7. 回归中随机命中 `JSON.stringify(-0) → 0`，原 PBT 用 `Object.is` 把数值等价的零判成改写；断言改为金额数值相等，失败种子对应反例转为稳定通过。
+
+验证证据：N2 / push / 模板与 N 域目标后端 25 passed，项目鉴权与真实 router 挂载 43 passed；N2 前端 27 passed，相关前端 23 文件 643 passed，相对基线新增失败 0、修复 2；单区域 vue-tsc 候选 53 / 基线 54，新增 0、消除 1；N1~N5 契约生成器、公式对拍 `--check`、27 本 386 格模板修复清单、N5 OOXML 定向差异、字段名守卫、ruff / py_compile / ESLint / JSON / `git diff --check` 均通过。相关后端成对全组的最终结果见 §9 末段。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。
@@ -309,6 +340,14 @@
 第三批（模板 #29~#32 + §3.2 前端 + 对拍守卫 + L8-2）同口径全量对第二批：后端 779 失败 / 271 报错 / 15446 通过，由过转红 3 条，都是按源码文本 / 行号取证的守卫跟着本批前端重构失效：H5 行归一外提后 `_normalizeRow` 只剩转发（守卫按 `function _normalize*` 函数体找 `rowId: raw.rowId ??`，改为模块级 `_normalizeRow` 本体 + 导出别名）、L8 保存改存算好的行（守卫断言改为 `rowsForStore(computedRows.value)`）、H slice 行号锚点（H4 / H6 / H9 行身份行、H6 展示序号行、H5 读写行随函数外提移位）。锚点处理：引号内的整条锚点用 `resync_data_line_anchors.py --only <本批改过的 7 个前端文件>` 平移 18 处；工具不认的连写 / 带括号说明 / 正文锚点逐条改（H slice 10 处、G 删除计划 3 处）；L slice 两组锚点 HEAD 起就指错，一并改正——L6-2 展示序号锚点指的是 `rowId` 行（改指 `seq` 行），L1 读写锚点自 1b617652c 起指向空行与无关行（第一轮回归里因本批给该文件加了 20 行、碰巧落到非空行而「转过」，改指 `api.get` / `api.put` 两行后 `test_formdata_refs_really_hit_the_checklist_calls` 也转过）。子集复跑由过转红 0；由红转过 6 条（延迟导入守卫 3 条：基线里的 `phase5_f4_01_adjudication` 已由 5cb7ebe70 交付，按「修好必须删」移出；L slice 锚点 3 条）。根目录 12 个相关文件（模板快照、prev3 定位表、G9 / G14 / D6 / D2、对拍清单守卫等）对第二批提交逐条对比新增失败 0，既有红 134 条（`test_g_cycle_export_import_verification` 131 条；`test_wp_templates_readonly` 3 条，其中 2 条报错只在与其他文件同跑时出现、单跑不出现，1 条是真库 81 份底稿 `file_path` 指向模板库），R9 处理。合并到上游新提交后，双方改过的 52 个后端测试文件对上游干净检出逐条对比新增失败 0，前端 78 个相关文件只剩基线既有的 `useF5Integration` 1 条。前端全量对第二批：38017 例，由过转红 2 条，都是本批未动组件的随机属性用例（`DefaultLayoutNavigation.pbt` 反例 `"toString"` 落到对象原型上、`useG5FormulaEngine.pbt` P15 十亿级金额浮点求和次序差 9.5e-7 超容差），记入 §11；由红转过 2 条（a173 / a81 随机用例）。
 
 批 A1（任务 9.4a）同口径全量对第三批推送提交 083f5e774：后端 699 失败 / 182 报错 / 15702 通过（基线 704 / 182 / 15616），由过转红 2 条都是本批改对了行为、旧判据钉着旧缺陷（aos8 多 item 登记、D1 去切片变异反证，见 §4.1），已改写；由红转过 7 条（PG 路由 6、模板覆盖层 1，非本批改动）。前端全量 38142 例由过转红 1 条：`transposeGrid` 随机属性用例（反例里 `-0` 经 JSON 克隆变 `0`），用失败种子在 083f5e774 上复现同红，非本批引入。
+
+批 C 与语义审查收口的最终同口径回归（候选 `oo_parity_push` 对基线 `oo_review_base`，两者基点均为 `8107371f0`）：后端按 78 文件清单，候选 **2621 passed / 112 failed / 24 skipped / 6 errors**，基线 **2571 / 124 / 24 / 6**；逐 node 比较 `new_bad=0`、`both_bad=118`、候选修复 5。候选仍红的 112+6 全在基线同红，主要是归档 spec 证据目录缺失、旧 N/M/L 锚点与真库快照漂移，不归因给本批。前端按 23 文件清单 **643 passed**，基线 22 文件 633 passed / 2 failed，`new_bad=0`、修复模板对拍 2；单区域 vue-tsc 候选 53 / 基线 54，新增 0、消除 1。首轮语义报告的代码问题全部闭合；共享 `.git/hooks/push_version.py` 安装副本在提交前刻意不更新，提交并同步主工作树后运行 `install.ps1` 作为最后部署门。
+
+推送前远端又前移 8 个提交到 `35c49967a`。在该提交上新建分离头 worktree 重放，远端 71 个改动路径与本批 56 个路径交集为 0；重放后的 56 个暂存 blob 与已验证提交 `e513e85a8` 逐字节相同。再以 `35c49967a` 建干净基线串行复跑：后端计数与上段完全相同（`new_bad=0`、修复 5），前端仍 643 passed / 基线 2 failed（新增 0、修复 2），vue-tsc 仍 53 / 54（新增 0、消除 1）；暂存树自洽两道门均通过。
+
+浏览器首轮在和平药房 2025 的 N2-2 只读走查确认 H「期初重分类调整」及 M=C+G+H 已渲染，同时发现方法说明仍写“源模板 16 列”，与 A:Q 17 列不一致；跟随修复改为 17 列并增加挂载断言，随后再走查确认。主提交已推送，故该修复按不可改写历史原则另发跟随版本，不 force / amend 已发布提交。
+
+浏览器继续点“导出模板”复现 404；项目 `authorize_wp_read` 已通过，真正拒绝点是精确门禁把业务选择码 `N2-2` 误当 `requested_sheet_key`。同一 admin / 同一底稿去掉该参数后门禁立即返回可访问上下文。N2 长前缀本就是整份 checklist 的导入导出入口，router-level dedicated gate 与显式 read/edit + checklist gate 已覆盖资源、项目与写权限；移除这个错误的 sheet 绑定，并用路由参数捕获测试钉住“不传伪 sheet key”。
 
 ## §10 被否决的方案
 

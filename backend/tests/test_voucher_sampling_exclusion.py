@@ -413,6 +413,7 @@ class TestRoutersHandExclusionsToFilters:
         with patch("app.routers.voucher_sampling._authorize_and_validate_extract", new=AsyncMock(return_value=None)), \
                 patch("app.routers.voucher_sampling.resolve_population_reconcile",
                       new=AsyncMock(return_value=PopulationReconcileFacts(available=False))), \
+                patch("app.routers.voucher_sampling.resolve_final_population", new=AsyncMock(return_value=None)), \
                 patch("app.routers.voucher_sampling.collect_exclusions", new=AsyncMock(return_value=ex)) as collect, \
                 patch("app.routers.voucher_sampling.LedgerSamplingService") as svc:
             svc.build_ledger_query = AsyncMock(return_value=MagicMock())

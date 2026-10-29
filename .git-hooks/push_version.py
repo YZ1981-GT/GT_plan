@@ -19,9 +19,10 @@
     python .git-hooks/push_version.py list [-n 10 | --all]              # 已发布版本与主要变动
     （check-push 由 pre-push 钩子调用：从标准输入读 git 传入的推送清单逐条校验）
 
-push 依次：同步远端分支和标签 → 确认远端分支没有 HEAD 之外的提交 → 取下一个版本号 → 在 HEAD 打
-附注标签（主要变动 + 自上一版本以来的提交清单）→ git push --atomic 同时推分支和标签。推送失败时
-删掉本次新建的本地标签，下次重新取号。
+push 依次：同步远端分支（fetch 失败即停）→ 用 ls-remote 读取远端标签 → 确认远端分支没有 HEAD 之外的提交 →
+取下一个版本号 → 在 HEAD 打附注标签（主要变动 + 自上一版本以来的提交清单）→ git push --atomic 同时推分支和标签。
+推送命令失败后先核对远端；远端引用完全未变化时只原样重试一次，远端前移或版本号被占时不自动重放并删除
+本次新建的本地标签。
 
 安装：仓库根执行 powershell -ExecutionPolicy Bypass -File .git-hooks/install.ps1
 （把 pre-push / pre-commit / 本文件复制到 .git/hooks/，各 worktree 共用）。
@@ -252,8 +253,9 @@ def check_push(remote: str, updates: list[RefUpdate]) -> int:
 
     remote_tags = remote_tag_map(remote)
     if remote_tags is None:
-        print(f"{HOOK_TAG} ⚠️ 取不到远端标签清单，版本号只和本地已知的标签比较")
-    known = list(remote_tags) if remote_tags is not None else list(local_version_tags())
+        print(f"{HOOK_TAG} ❌ 取不到远端标签清单，无法证明版本号安全，拒绝 push")
+        return 1
+    known = list(remote_tags)
     pushing = {tag_name(u) for u in version_tags}
     others = [(v, n) for n in known if n not in pushing and (v := parse_version(n))]
     top_v, top_name = max(others) if others else (INITIAL_VERSION, f"{BASELINE_BRANCH}（= 1.0）")
@@ -333,8 +335,25 @@ def notes_from_args(args: argparse.Namespace) -> list[str]:
     return items
 
 
-def previous_version_base(remote: str, head: str, local_tags: dict[str, str]) -> tuple[str | None, str]:
-    """上一个版本的提交：HEAD 祖先里版本号最大的版本标签；一个都没有就用 dev1.0 分支。"""
+def previous_version_base(
+    remote: str,
+    head: str,
+    local_tags: dict[str, str],
+    remote_tags: dict[str, tuple[str, str]],
+) -> tuple[str | None, str]:
+    """上一个版本提交：优先使用远端标签已剥离的提交，再退回本地标签与 dev1.0。"""
+    for name in sorted(
+        (candidate for candidate in remote_tags if parse_version(candidate)),
+        key=parse_version,
+        reverse=True,
+    ):
+        commit = remote_tags[name][1]
+        if (
+            commit != head
+            and git_ok("cat-file", "-e", f"{commit}^{{commit}}")
+            and git_ok("merge-base", "--is-ancestor", commit, head)
+        ):
+            return commit, f"自 {name} 起"
     for name in sorted(local_tags, key=parse_version, reverse=True):
         commit = peel_commit(local_tags[name])
         if commit and commit != head and git_ok("merge-base", "--is-ancestor", commit, head):
@@ -363,6 +382,47 @@ def compose_message(name: str, branch: str, items: list[str], head: str, base: s
     return "\n".join(lines) + "\n"
 
 
+def remote_branch_sha(remote: str, branch: str) -> str | None:
+    """远端分支 SHA；查询失败返回 None，分支不存在返回空串。"""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-remote", remote, f"refs/heads/{branch}"],
+            capture_output=True,
+            env=_env(),
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", errors="replace").partition("\t")[0].strip()
+
+
+def _version_tag_view(
+    tags: dict[str, tuple[str, str]],
+) -> dict[str, tuple[str, str]]:
+    """只保留严格版本标签；非版本标签变化不影响版本号安全判定。"""
+    return {name: target for name, target in tags.items() if parse_version(name)}
+
+
+def may_retry_same_atomic_push(
+    *,
+    branch_before: str,
+    branch_after: str | None,
+    tag_name: str,
+    tags_before: dict[str, tuple[str, str]],
+    tags_after: dict[str, tuple[str, str]] | None,
+) -> bool:
+    """只有远端分支与完整版本标签视图都未变化时，才允许原样重发一次。"""
+    return (
+        branch_after is not None
+        and branch_after == branch_before
+        and tags_after is not None
+        and tag_name not in tags_before
+        and _version_tag_view(tags_after) == _version_tag_view(tags_before)
+    )
+
+
 def cmd_push(args: argparse.Namespace) -> int:
     remote = args.remote
     branch = args.branch or git("symbolic-ref", "--quiet", "--short", "HEAD", check=False).strip()
@@ -373,11 +433,17 @@ def cmd_push(args: argparse.Namespace) -> int:
         return fail("工作树有未提交 / 未跟踪的文件，pre-push 会拒推：先提交，或在干净的临时 worktree 里推送（加 --branch）")
     head = git("rev-parse", "HEAD").strip()
 
-    print(f"{TOOL_TAG} 同步远端 {remote} 的分支和标签…", flush=True)
-    fetch = subprocess.run(["git", "fetch", "--prune", "--tags", remote], capture_output=True, env=_env())
+    print(f"{TOOL_TAG} 同步远端 {remote} 的分支…", flush=True)
+    fetch = subprocess.run(
+        ["git", "fetch", "--prune", "--no-tags", remote],
+        capture_output=True,
+        env=_env(),
+    )
     if fetch.returncode != 0:
         tail = fetch.stderr.decode("utf-8", errors="replace").strip().splitlines()[-3:]
-        print(f"{TOOL_TAG} ⚠️ fetch 没有完全成功：{' / '.join(tail)}")
+        return fail(
+            f"fetch 失败，无法证明远端视图是最新的，已停止推送：{' / '.join(tail)}"
+        )
     tracking = f"refs/remotes/{remote}/{branch}"
     if git_ok("rev-parse", "--verify", "--quiet", tracking):
         behind = int(git("rev-list", "--count", f"HEAD..{tracking}").strip())
@@ -387,7 +453,14 @@ def cmd_push(args: argparse.Namespace) -> int:
             print(f"{TOOL_TAG} HEAD 已在远端 {branch} 上，没有要推送的新提交")
             return 0
 
+    remote_head_before = (
+        git("rev-parse", tracking).strip()
+        if git_ok("rev-parse", "--verify", "--quiet", tracking)
+        else ""
+    )
     remote_tags = remote_tag_map(remote)
+    if remote_tags is None:
+        return fail("取不到远端标签清单，无法安全分配版本号，已停止推送")
     local_tags = local_version_tags()
     head_tags = sorted((t for t in git("tag", "--points-at", head).split() if t in local_tags), key=parse_version)
     created = False
@@ -418,7 +491,7 @@ def cmd_push(args: argparse.Namespace) -> int:
         name = fmt_version(ver)
         if git_ok("rev-parse", "--verify", "--quiet", f"refs/tags/{name}"):
             return fail(f"本地已有标签 {name}（指向别的提交，可能是上次推送没成功留下的）：git tag -d {name} 后重跑")
-        base, label = previous_version_base(remote, head, local_tags)
+        base, label = previous_version_base(remote, head, local_tags, remote_tags)
         message = compose_message(name, branch, items, head, base, label)
         if args.dry_run:
             print(f"{TOOL_TAG} 下一个版本 {name}（--dry-run：没打标签、没推送），标签说明如下：\n")
@@ -447,13 +520,42 @@ def cmd_push(args: argparse.Namespace) -> int:
     if rc == 0:
         print(f"{TOOL_TAG} ✅ 已推送 {branch} 和 {name}")
         return 0
-    # 命令失败先核对远端：见过推送命令被打断、远端其实已经更新的情况
-    remote_head = git("ls-remote", remote, f"refs/heads/{branch}", check=False).partition("\t")[0].strip()
+    # 命令失败先核对远端：见过推送命令被打断、远端其实已经更新的情况。
     tag_obj = git("rev-parse", "--verify", "--quiet", f"refs/tags/{name}", check=False).strip()
-    remote_tag = (remote_tag_map(remote) or {}).get(name, ("", ""))[0]
+    remote_head = remote_branch_sha(remote, branch)
+    remote_tags_after = remote_tag_map(remote)
+    remote_tag = (remote_tags_after or {}).get(name, ("", ""))[0]
     if remote_head == head and tag_obj and remote_tag == tag_obj:
         print(f"{TOOL_TAG} ⚠️ 推送命令返回失败，但远端已经是本次结果（{branch} = {head[:9]}，{name} 已在远端），按成功处理")
         return 0
+
+    # 仅网络瞬断且远端引用完全没变化时，原样重发同一条 atomic push 一次。
+    # 远端分支前移或标签号被占时绝不自动 rebase/cherry-pick，交给隔离 worktree 人工重放。
+    if may_retry_same_atomic_push(
+        branch_before=remote_head_before,
+        branch_after=remote_head,
+        tag_name=name,
+        tags_before=remote_tags,
+        tags_after=remote_tags_after,
+    ):
+        print(f"{TOOL_TAG} 远端引用未变化，原样重试一次 atomic push…", flush=True)
+        retry_rc = subprocess.run(cmd, env=_env()).returncode
+        if retry_rc == 0:
+            print(f"{TOOL_TAG} ✅ 重试后已推送 {branch} 和 {name}")
+            return 0
+        rc = retry_rc or rc
+        remote_head = remote_branch_sha(remote, branch)
+        remote_tags_after = remote_tag_map(remote)
+        remote_tag = (remote_tags_after or {}).get(name, ("", ""))[0]
+        if remote_head == head and tag_obj and remote_tag == tag_obj:
+            print(f"{TOOL_TAG} ⚠️ 重试返回失败，但远端已经是本次结果，按成功处理")
+            return 0
+    elif remote_head is not None and remote_head != remote_head_before:
+        print(
+            f"{TOOL_TAG} 远端 {branch} 已从 {remote_head_before[:9] or '<不存在>'} "
+            f"前移到 {remote_head[:9] or '<不存在>'}，不自动重放"
+        )
+
     if created:
         git("tag", "-d", name, check=False)
         print(f"{TOOL_TAG} ❌ 推送没成功，已删掉本次新建的本地标签 {name}（下次重新取号）")

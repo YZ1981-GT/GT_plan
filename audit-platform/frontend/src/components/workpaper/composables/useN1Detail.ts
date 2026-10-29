@@ -156,6 +156,33 @@ export const N1_DEFAULT_DETAIL_ITEMS: Array<{ itemName: string; category: string
   { itemName: '除上述项目以外的其他', category: '其他' },
 ]
 
+// ─── Pure row calculation ──────────────────────────────────────────────────
+
+/** 一行原始录入 → 模板公式列；页面与跨语言公式对拍共用这一份实现。 */
+export function enrichN1DetailRow(row: N1DetailRow, seq: number): N1DetailComputed {
+  const beginDeferredTax = Math.round(calcDeferredTax(row.beginDiff, row.beginTaxRate) * 100) / 100
+  const deductibleDiff = resolveDeductibleDiff(row)
+  const endDeferredTax = Math.round(calcDeferredTax(deductibleDiff, row.endTaxRate) * 100) / 100
+  const endAudited = calcAuditedAmount(endDeferredTax, row.endAje, row.endRje)
+  const beginAudited = calcAuditedAmount(beginDeferredTax, row.beginAje, row.beginRje)
+  const rollForwardEnd = beginAudited + parseNum(row.recognized) - parseNum(row.reversed)
+  const rollForwardDiff = Math.round((endAudited - rollForwardEnd) * 100) / 100
+  return {
+    ...row,
+    seq,
+    deductibleDiff,
+    beginDeferredTax,
+    beginAudited,
+    endDeferredTax,
+    endAudited,
+    rollForwardEnd: Math.round(rollForwardEnd * 100) / 100,
+    rollForwardDiff,
+    hasRollForwardDiff:
+      (parseNum(row.recognized) !== 0 || parseNum(row.reversed) !== 0)
+      && Math.abs(rollForwardDiff) > 0.01,
+  }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useN1Detail(options: UseN1DetailOptions) {
@@ -211,35 +238,9 @@ export function useN1Detail(options: UseN1DetailOptions) {
 
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 
-  const computedRows: ComputedRef<N1DetailComputed[]> = computed(() => {
-    return rows.value.map((row, i) => {
-      const beginDeferredTax = Math.round(calcDeferredTax(row.beginDiff, row.beginTaxRate) * 100) / 100
-      // 可抵扣暂时性差异（期末）：口径收敛到 resolveDeductibleDiff（披露表共用同一函数）
-      // 铁律：期初用 beginDiff，期末优先用手工 endDiff，否则回退「计税基础−账面价值」，
-      //       否则用户填的期末差异列会成为死列，且披露侧会与明细侧口径漂移。
-      const deductibleDiff = resolveDeductibleDiff(row)
-      const endDeferredTax = Math.round(calcDeferredTax(deductibleDiff, row.endTaxRate) * 100) / 100
-      const endAudited = calcAuditedAmount(endDeferredTax, row.endAje, row.endRje)
-      const beginAudited = calcAuditedAmount(beginDeferredTax, row.beginAje, row.beginRje)
-      // roll-forward 自校验：期末 = 期初 + 本期确认 − 本期转回（资产类借增贷减）
-      const rollForwardEnd = beginAudited + parseNum(row.recognized) - parseNum(row.reversed)
-      const rollForwardDiff = Math.round((endAudited - rollForwardEnd) * 100) / 100
-      return {
-        ...row,
-        seq: i + 1,
-        deductibleDiff,
-        beginDeferredTax,
-        beginAudited,
-        endDeferredTax,
-        endAudited,
-        rollForwardEnd: Math.round(rollForwardEnd * 100) / 100,
-        rollForwardDiff,
-        hasRollForwardDiff:
-          (parseNum(row.recognized) !== 0 || parseNum(row.reversed) !== 0) &&
-          Math.abs(rollForwardDiff) > 0.01,
-      }
-    })
-  })
+  const computedRows: ComputedRef<N1DetailComputed[]> = computed(() =>
+    rows.value.map((row, i) => enrichN1DetailRow(row, i + 1)),
+  )
 
   // ─── 3. 分类小计 ──────────────────────────────────────────────────────
 

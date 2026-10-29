@@ -20,12 +20,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable, Mapping
 
 from sqlalchemy import text
 
 from app.core.database import async_session
+from app.services.n2_detail_model import N2_DETAIL_ITEM_ID, n2_detail_audited_end
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,8 @@ class CycleReconConfig:
     audited_total_keys: tuple[str, ...]     # 审定表合计 item_id（多个则求和，如 N5 当期+递延）
     detail_total_keys: tuple[str, ...] = ()  # 明细表合计 item_id（取第一个非零）
     detail_rows_key: str | None = None       # 明细行 JSON item_id（行求和场景，如 N2/N3）
-    detail_rows_field: str | None = None     # 行内金额字段名
+    detail_rows_field: str | None = None     # 行内金额字段名（直接求和）
+    detail_rows_value: Callable[[Mapping[str, Any]], float] | None = None  # 行内派生金额
     detail_rows_store: str = "conclusion"    # 明细行 JSON 存储字段（remark|conclusion）
     detail_label: str = "明细表"             # 明细侧展示标签
 
@@ -137,7 +139,8 @@ _REGISTRY: dict[str, CycleReconConfig] = {
     "N2": CycleReconConfig(
         label="应交税费", account_codes=("2221",), is_occurrence=False,
         audited_total_keys=("N2-1-total-audited",),
-        detail_rows_key="N2-2-rows", detail_rows_field="endBalance",
+        detail_rows_key=N2_DETAIL_ITEM_ID,
+        detail_rows_value=n2_detail_audited_end,
         detail_rows_store="conclusion",
     ),
     "N3": CycleReconConfig(
@@ -198,12 +201,9 @@ def _sum_rows_field(
     rows_key: str,
     field_name: str,
     store: str,
+    value_fn: Callable[[Mapping[str, Any]], float] | None = None,
 ) -> tuple[float, bool]:
-    """对明细行 JSON 内某字段求和；返回 (合计, 是否有行)。
-
-    N2/N3 明细存为 JSON 数组，字段可能缺失时用 0（与前端一致，前端另有兜底公式，
-    此处仅做合计核对，取行内已算好的期末值即可）。
-    """
+    """对明细行 JSON 内字段或派生值求和；返回 (合计, 是否有行)。"""
     entry = by_id.get(rows_key)
     if not entry:
         return 0.0, False
@@ -219,7 +219,7 @@ def _sum_rows_field(
     total = 0.0
     for row in rows:
         if isinstance(row, dict):
-            total += _parse_num(row.get(field_name))
+            total += value_fn(row) if value_fn is not None else _parse_num(row.get(field_name))
     return total, True
 
 
@@ -358,9 +358,13 @@ async def _compute_cycle_reconciliation(
             detail_total = v
             has_detail = True
             break
-    if not has_detail and cfg.detail_rows_key and cfg.detail_rows_field:
+    if not has_detail and cfg.detail_rows_key and (cfg.detail_rows_field or cfg.detail_rows_value):
         detail_total, has_detail = _sum_rows_field(
-            by_id, cfg.detail_rows_key, cfg.detail_rows_field, cfg.detail_rows_store
+            by_id,
+            cfg.detail_rows_key,
+            cfg.detail_rows_field or "",
+            cfg.detail_rows_store,
+            cfg.detail_rows_value,
         )
 
     # 4. TB 未审/审定（DB 权威）

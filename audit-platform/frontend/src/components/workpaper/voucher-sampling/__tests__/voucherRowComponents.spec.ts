@@ -40,6 +40,7 @@ describe('VoucherRowMetaTag', () => {
     expect(paired).toContain('年审')
     expect(paired).not.toContain('非配对')
     expect(paired).toContain('分录已改（已确认）')
+    expect(tagText(metaRow({ ph: 'preliminary', src: ['engine'], pr: 'paired', sv: { status: 'unchanged' } }))).toContain('未变')
     expect(tagText(metaRow(null))).toBe('手工')
     expect(tagText(metaRow({ ph: null, src: [], pr: null }))).toContain('阶段未标')
   })

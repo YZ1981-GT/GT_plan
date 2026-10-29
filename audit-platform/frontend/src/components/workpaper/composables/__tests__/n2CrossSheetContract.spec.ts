@@ -19,6 +19,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { useN2CrossSheet, N2_CROSS_SHEET_ITEM_IDS } from '../useN2CrossSheet'
+import { useN2Detail16 } from '../useN2Detail'
 import type { ChecklistResponse } from '../useN2FormData'
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -38,13 +39,13 @@ function adjRow(taxType: string, endUnadj: number, endAje = 0, endRje = 0) {
 }
 
 /**
- * N2-2 明细表原始录入行（16 列模型 N2Detail16Row 落库形状）。
- * 审定期末 P = M+N−O = (unadjBegin+beginAdjust) + (unadj+aje+rje Payable) − (unadj+aje+rje Paid)
+ * N2-2 明细表原始录入行（A:Q 17 列模型 N2Detail16Row 落库形状）。
+ * 审定期末 P = M+N−O = (unadjBegin+beginAdjust+beginRje) + (unadj+aje+rje Payable) − (unadj+aje+rje Paid)
  */
 function detailRow(
   taxType: string,
   opts: Partial<{
-    unadjBegin: number; beginAdjust: number
+    unadjBegin: number; beginAdjust: number; beginRje: number
     unadjPayable: number; ajePayable: number; rjePayable: number
     unadjPaid: number; ajePaid: number; rjePaid: number
   }> = {},
@@ -53,7 +54,7 @@ function detailRow(
     id: `row-${taxType}`,
     taxType,
     taxRate: 0,
-    unadjBegin: 0, beginAdjust: 0,
+    unadjBegin: 0, beginAdjust: 0, beginRje: 0,
     unadjPayable: 0, ajePayable: 0, rjePayable: 0,
     unadjPaid: 0, ajePaid: 0, rjePaid: 0,
     remark: '',
@@ -87,6 +88,25 @@ const SRC_CODE = stripComments(SRC)
 
 // ─── P1 行为：勾稽必须算出真值（假绿必红） ───────────────────────────────────
 
+describe('N2-2 A:Q 行模型', () => {
+  it('H 列期初重分类进入 M 审定期初和 P 审定期末', () => {
+    const allResponses = mkResponses({
+      [N2_CROSS_SHEET_ITEM_IDS.detailRows]: [
+        detailRow('企业所得税', { unadjBegin: 100, beginAdjust: 5, beginRje: 7 }),
+      ],
+    })
+    const api = useN2Detail16({
+      allResponses: allResponses as any,
+      saveField: async () => {},
+      getField: () => null,
+    })
+    expect(api.rows.value[0].beginRje).toBe(7)
+    expect(api.rows.value[0].audBegin).toBe(112)
+    expect(api.rows.value[0].audEnd).toBe(112)
+    expect(api.total.value.beginRje).toBe(7)
+  })
+})
+
 describe('P1 adjudicationVsDetail — 审定期末合计勾稽（源模板 N2-1!I22 ↔ N2-2!P25）', () => {
   it('两侧一致时 isMatch=true，且合计确实非零（防两侧恒 0 的假绿）', () => {
     // N2-1: 期末审定 = endUnadj+endAje+endRje = 100+20+5 = 125；800+0+0=800 → 合计 925
@@ -119,20 +139,20 @@ describe('P1 adjudicationVsDetail — 审定期末合计勾稽（源模板 N2-1!
     expect(r2.adjudicationVsDetail.value.isMatch).toBe(false)
   })
 
-  it('明细侧按源模板 P=M+N−O 现算（已交冲减、期初调整计入）', () => {
-    // M = 300+50 = 350 ; N = 100+10+5 = 115 ; O = 40+3+2 = 45 → P = 420
+  it('明细侧按源模板 P=M+N−O 现算（已交冲减、期初两类调整均计入）', () => {
+    // M = 300+50+7 = 357 ; N = 100+10+5 = 115 ; O = 40+3+2 = 45 → P = 427
     const allResponses = mkResponses({
       [N2_CROSS_SHEET_ITEM_IDS.detailRows]: [
         detailRow('房产税', {
-          unadjBegin: 300, beginAdjust: 50,
+          unadjBegin: 300, beginAdjust: 50, beginRje: 7,
           unadjPayable: 100, ajePayable: 10, rjePayable: 5,
           unadjPaid: 40, ajePaid: 3, rjePaid: 2,
         }),
       ],
     })
     const { adjudicationVsDetail } = useN2CrossSheet(allResponses as any)
-    // 审定侧无数据 → 0；diff = 0 − 420
-    expect(adjudicationVsDetail.value.diff).toBe(-420)
+    // 审定侧无数据 → 0；diff = 0 − 427
+    expect(adjudicationVsDetail.value.diff).toBe(-427)
   })
 
   it('无审定行数据时回退 N2-1-end-audited-total（而非全库无人写的 end-balance-total）', () => {

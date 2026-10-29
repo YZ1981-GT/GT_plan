@@ -464,12 +464,6 @@
     ],
     "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接"
   },
-  "n2.taxes_payable|N2-2-detail-rows": {
-    "fields": [
-      "beginRje"
-    ],
-    "reason": "R2 结构差异（前端行模型与模板列不同构，任务 9.1 批 C 只改已接通的字段名，结构差异待用户裁决）：H 列重分类调整，前端缺 beginRje"
-  },
   "n3.deferred_tax_liabilities|N3-2-rows": {
     "fields": [
       "beginAje",

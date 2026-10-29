@@ -20,23 +20,19 @@ describe('useNoteTableInteraction', () => {
   it('locates a table row emitted as a Vue proxy against the raw projected row', () => {
     const row = { label: '固定资产', values: [123], is_total: false }
     const rows = [row]
-    const activateCell = vi.fn()
     const context = createContext()
     const api = useNoteTableInteraction({
       activeTableData: ref({ headers: ['项目', '期末账面价值'], rows }),
       currentNote: ref({ note_section: '八、22' }),
-      editMode: ref(true),
       showNoteFormulaManager: ref(false),
       deCtx: context,
       deComments: { commentCellClass: () => '' },
-      activateCell,
       fmtAmount: String,
     })
 
     api.onDeCellClick(reactive(row), { label: '期末账面价值' }, document.createElement('td'), new MouseEvent('click'))
 
     expect(context.selectCell).toHaveBeenCalledWith(0, 1, 123, false, false)
-    expect(activateCell).toHaveBeenCalledWith(0, 0)
   })
 
   it('maps the label column from row.label without shifting physical table coordinates', () => {
@@ -45,11 +41,9 @@ describe('useNoteTableInteraction', () => {
     const api = useNoteTableInteraction({
       activeTableData: ref({ headers: ['项目', '期末账面价值'], rows: [row] }),
       currentNote: ref({}),
-      editMode: ref(true),
       showNoteFormulaManager: ref(false),
       deCtx: context,
       deComments: { commentCellClass: () => '' },
-      activateCell: vi.fn(),
       fmtAmount: String,
     })
 
@@ -65,11 +59,9 @@ describe('useNoteTableInteraction', () => {
     const api = useNoteTableInteraction({
       activeTableData: ref({ headers: ['项目', '期末账面价值'], rows: [row] }),
       currentNote: ref({}),
-      editMode: ref(false),
       showNoteFormulaManager: ref(false),
       deCtx: context,
       deComments: { commentCellClass: () => '' },
-      activateCell: vi.fn(),
       fmtAmount: String,
     })
     const event = new MouseEvent('contextmenu')
@@ -83,48 +75,67 @@ describe('useNoteTableInteraction', () => {
 
   it('同名叶子列按 column-key 定位：点上年年末「应收账款」不会选中期末那一格（浏览器实测）', () => {
     const context = createContext()
-    const activateCell = vi.fn()
     const row = { label: '1年以内', values: [100, 10, 80, 8], is_total: false }
     const api = useNoteTableInteraction({
       activeTableData: ref({ headers: ['账龄', '应收账款', '坏账准备', '应收账款', '坏账准备'], rows: [row] }),
       currentNote: ref({}),
-      editMode: ref(true),
       showNoteFormulaManager: ref(false),
       deCtx: context,
       deComments: { commentCellClass: () => '' },
-      activateCell,
       fmtAmount: String,
     })
 
     api.onDeCellClick(reactive(row), { label: '应收账款', columnKey: 'h3' }, document.createElement('td'), new MouseEvent('click'))
     expect(context.selectCell).toHaveBeenCalledWith(0, 3, 80, false, false)
-    expect(activateCell).toHaveBeenCalledWith(0, 2)
 
     const event = new MouseEvent('contextmenu')
     api.onDeCellContextMenu(reactive(row), { label: '坏账准备', columnKey: 'h4' }, document.createElement('td'), event)
     expect(context.selectCell).toHaveBeenLastCalledWith(0, 4, 8, false)
 
     // 越界的 key 不定位（不落到别的列）
-    activateCell.mockClear()
+    context.selectCell.mockClear()
     api.onDeCellClick(reactive(row), { label: '应收账款', columnKey: 'h9' }, document.createElement('td'), new MouseEvent('click'))
-    expect(activateCell).not.toHaveBeenCalled()
+    expect(context.selectCell).not.toHaveBeenCalled()
   })
 
-  it('does not activate a row that is not part of the active projection', () => {
-    const activateCell = vi.fn()
+  it('右键已有选区内另一格：保持选区但菜单标题跟本次点击行', () => {
+    const context = createContext()
+    context.contextMenu.itemName = '旧项目'
+    context.isCellSelected = () => true
+    const rows = [
+      { label: '固定资产', values: [123] },
+      { label: '无形资产', values: [456] },
+    ]
+    const api = useNoteTableInteraction({
+      activeTableData: ref({ headers: ['项目', '期末账面价值'], rows }),
+      currentNote: ref({}),
+      showNoteFormulaManager: ref(false),
+      deCtx: context,
+      deComments: { commentCellClass: () => '' },
+      fmtAmount: String,
+    })
+    const event = new MouseEvent('contextmenu')
+
+    api.onDeCellContextMenu(reactive(rows[1]), { label: '期末账面价值' }, document.createElement('td'), event)
+
+    expect(context.selectCell).not.toHaveBeenCalled()
+    expect(context.contextMenu.itemName).toBe('无形资产')
+    expect(context.openContextMenu).toHaveBeenCalledWith(event, '无形资产')
+  })
+
+  it('does not select a row that is not part of the active projection', () => {
+    const context = createContext()
     const api = useNoteTableInteraction({
       activeTableData: ref({ headers: ['项目', '期末账面价值'], rows: [{ label: '固定资产', values: [123] }] }),
       currentNote: ref({}),
-      editMode: ref(true),
       showNoteFormulaManager: ref(false),
-      deCtx: createContext(),
+      deCtx: context,
       deComments: { commentCellClass: () => '' },
-      activateCell,
       fmtAmount: String,
     })
 
     api.onDeCellClick({ label: '外部行', values: [7] }, { label: '期末账面价值' }, document.createElement('td'), new MouseEvent('click'))
 
-    expect(activateCell).not.toHaveBeenCalled()
+    expect(context.selectCell).not.toHaveBeenCalled()
   })
 })

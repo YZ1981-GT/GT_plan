@@ -74,6 +74,8 @@ export interface WorkpaperRuntimeContext {
   wpCode: Ref<string>
   /** 审计年度；项目没填为 null、宿主未传为 undefined —— 消费方一律按「取不到」处理，不按今年兜底 */
   year: Ref<number | null | undefined>
+  /** 整张底稿只读（归档 / 在线编辑后台合并 / 外层 readonly）；系统行确认也必须遵守 */
+  readonly: Ref<boolean>
   /**
    * 项目适用准则（归一后的 `string[]`，缺省 `[]` 而非 undefined）。
    *
@@ -146,6 +148,7 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
   const wpIdRef = normalizeRef(opts.wpId)
   const projectIdRef = normalizeRef(opts.projectId)
   const yearRef = normalizeRef<number | null | undefined>(opts.year)
+  const readonlyRef = normalizeRef<boolean>(opts.readonly ?? false)
   const contextReadyRef = normalizeRef(opts.contextReady ?? true)
   const applicableStandardsSource = normalizeRef<unknown>(opts.applicableStandards)
   // 响应式：render-config 到达后自动更新（不是一次性快照）；未传时恒 []。
@@ -244,6 +247,7 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
     projectId: projectIdRef,
     wpCode: wpCodeRef,
     year: yearRef,
+    readonly: readonlyRef,
     applicableStandards,
     displayPrefs,
     agingConfig,

@@ -122,9 +122,31 @@ def build_population_description(criteria: dict) -> str:
     if unit == "voucher":
         parts.append("抽样单位=整张凭证")
 
+    mode_text = _final_population_text(criteria)
+    if mode_text:
+        parts.append(mode_text)
+
     if not parts:
         return "未记录过滤条件（抽样时点留痕缺失）"
     return "序时账；" + "；".join(parts)
+
+
+def _final_population_text(criteria: dict) -> str:
+    """年审口径（spec voucher-identity-writeback-and-audit-phase 任务 15，需求 7.4）；没有口径的批次返回空串。"""
+    fp = criteria.get("final_population") if isinstance(criteria.get("final_population"), dict) else {}
+    mode = criteria.get("final_population_mode") or fp.get("mode")
+    if mode == "remaining":
+        cutoff = fp.get("interim_cutoff_date")
+        text = f"年审口径 a：只抽预审截止日{f' {cutoff} ' if cutoff else ''}次日至期末"
+        if fp.get("date_start") and fp.get("date_end"):
+            text += f"（实际 {fp['date_start']} 至 {fp['date_end']}）"
+        if fp.get("interim_cutoff_source") == "interim_batches":
+            text += "；项目未设预审截止日，取预审批次期间上限"
+        return text
+    if mode == "full_minus_interim":
+        return (f"年审口径 b：全年扣除本底稿预审已检样本（预审批次分录 {_as_int(fp.get('interim_batch_line_fps')) or 0} 条、"
+                f"预审挂凭分录 {_as_int(fp.get('excluded_attach_lines')) or 0} 条）")
+    return ""
 
 
 def build_sampling_purpose(criteria: dict) -> str:
@@ -245,6 +267,11 @@ def build_conclusion_supplements(evaluation: dict) -> list[str]:
     reason = evaluation.get("reconcile_override_reason")
     if reason:
         parts.append(f"【总体完整性核对放行理由】{reason}")
+
+    # 全年合并评价（任务 16，需求 7.6）：年审批次保存评价时服务端写入；没有就不出这一条
+    combined = evaluation.get("combined")
+    if isinstance(combined, dict) and combined.get("conclusion_message"):
+        parts.append(f"【全年合并评价】{combined['conclusion_message']}")
 
     return parts
 

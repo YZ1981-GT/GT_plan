@@ -266,7 +266,7 @@ describe('confirmFill 只记日志、返回本次勾选的样本', () => {
   })
 
   it('返回勾选的样本（不与任何已有行合并），日志不带 before_data，旧「合并」按追加记', async () => {
-    mockHttp.post.mockResolvedValue({ data: { data: { batch_id: 'b-1' } } })
+    mockHttp.post.mockResolvedValue({ data: { data: { id: 'log-1', batch_id: 'b-1' } } })
     const s = useVoucherSampling(makeOptions())
     s.fillMode.value = 'merge'
     const a = makeVoucher({ voucherNo: 'V1', lineFp: 'fp-1', voucherKey: 'vk-1' })
@@ -279,6 +279,7 @@ describe('confirmFill 只记日志、返回本次勾选的样本', () => {
     expect('before_data' in body).toBe(false)
     expect(body.extraction_criteria.filled_line_fps).toEqual(['fp-1'])
     expect(s.filledBatchId.value).toBe('b-1')
+    expect(s.loadedFromBatch.value).toEqual({ logId: 'log-1', batchId: 'b-1', evaluatedAt: null })
   })
 
   it('「替换本阶段抽凭行」记 replace', async () => {
