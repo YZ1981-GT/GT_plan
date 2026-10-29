@@ -135,7 +135,9 @@ backend/scripts/fix/fix_projection_representation_rehash.py  1090
 #     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
 #     spec: advanced-query-hardening-wiring-closure
 #     2026-10-27 advanced-query-linkage-closure 任务 7 / 17 / 18：上述取数器已全部下沉（source_registry + fetchers/），baseline 按实际行数下调（1993 → 1841）。
-backend/app/routers/custom_query.py  1841
+#     2026-10-29 同 spec B13（design §9 / N4「基线 = 真实行数」）：B7~B11 新增服务端导出、模板执行与回收站、分享目标、模板溯源修复后实际 1911 行
+#     （一直在门限 1933 内），baseline 同步为实际行数（1841 → 1911）；B14 新增预置模板三条薄路由后再按当时实际行数同步。
+backend/app/routers/custom_query.py  1911
 
 #   disclosure_notes.py（改动前 1454 行）/ wp_editor_router.py（1120 行）——
 #     **两者改动前即已超限**。
