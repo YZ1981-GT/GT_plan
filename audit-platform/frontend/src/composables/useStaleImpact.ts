@@ -64,6 +64,9 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     /** 项目审计年度：给了但为空（项目没填）⇒ 不分析；不传 ⇒ 由后端按项目审计年度补齐（/impact 的 year 可缺省） */
     year?: number | null
   }) {
+    // 每次通知先清掉上一次的原因：本次没发请求（缺项目 / 年度）或请求失败时，调用方读到的不能是上一次
+    // 别的 sheet 留下的原因（T31 返工）
+    unresolvedReason.value = ''
     const code = wpCode.value
     if (!code) return
     // 没有项目上下文就不发请求：后端要求项目鉴权，裸发必 403

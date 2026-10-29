@@ -64,10 +64,11 @@ vi.mock('@/utils/logger', () => ({
   logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { useEditorSave, type UseEditorSaveOptions } from '../useEditorSave'
+import { useEditorSave, __resetUnresolvedNotices, type UseEditorSaveOptions } from '../useEditorSave'
 import { api as httpApi } from '@/services/apiProxy'
 import { getWorkpaper } from '@/services/workpaperApi'
 import { eventBus } from '@/utils/eventBus'
+import { ElMessage } from 'element-plus'
 
 function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSaveOptions {
   return {
@@ -222,5 +223,58 @@ describe('useEditorSave — onSave 主要行为', () => {
 
     expect(success).toBe(false)
     expect(httpApi.post).not.toHaveBeenCalled()
+  })
+})
+
+describe('useEditorSave — 起点身份算不出时提示「未能分析下游影响」（design §10.2 / RV9.1-02）', () => {
+  const REASON = '引用末段是语义标签、不是 A1 单元格坐标'
+  const sheetName = ref('审定表D2-1')
+
+  /** 走真实 onSave；staleImpact 只替换网络那一层（notify），原因由 unresolvedReason 给出。 */
+  function optsWithReason(reason: string) {
+    return makeOptions({
+      year: computed(() => 2025),
+      univerAPI: ref({
+        getActiveWorkbook: () => ({
+          getSnapshot: () => ({ id: 'wb1', sheets: { s1: {} } }),
+          getActiveSheet: () => ({ getSheetName: () => sheetName.value }),
+        }),
+      }),
+      staleImpact: { notify: vi.fn().mockResolvedValue({ total: 0 }), unresolvedReason: ref(reason) } as any,
+    })
+  }
+
+  const unresolvedNotices = () => vi.mocked(ElMessage.info).mock.calls
+    .map((c) => String((c[0] as any)?.message ?? c[0]))
+    .filter((m) => m.startsWith('未能分析下游影响'))
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    __resetUnresolvedNotices()
+    sheetName.value = '审定表D2-1'
+    vi.mocked(httpApi.post).mockResolvedValue({ message: '保存成功' })
+    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 } as any)
+  })
+
+  it('同一底稿同一 sheet 连存两次只提示一次、文案带后端原因；换 sheet 再提示一次', async () => {
+    const save = useEditorSave(optsWithReason(REASON))
+    expect(await save.onSave()).toBe(true)
+    expect(await save.onSave()).toBe(true)
+    expect(unresolvedNotices()).toEqual([`未能分析下游影响：${REASON}`])
+    sheetName.value = '明细表D2-2'
+    await save.onSave()
+    expect(unresolvedNotices()).toHaveLength(2)
+  })
+
+  it('编辑器重新挂载（新的 useEditorSave 实例）后同一 (底稿, sheet) 不再提示', async () => {
+    await useEditorSave(optsWithReason(REASON)).onSave()
+    await useEditorSave(optsWithReason(REASON)).onSave()
+    expect(unresolvedNotices()).toHaveLength(1)
+  })
+
+  it('后端能分析（原因为空或只有空白）时不提示', async () => {
+    await useEditorSave(optsWithReason('')).onSave()
+    await useEditorSave(optsWithReason('   ')).onSave()
+    expect(unresolvedNotices()).toEqual([])
   })
 })

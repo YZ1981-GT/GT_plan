@@ -593,6 +593,7 @@ V2 读四个静态文件（`l2_semantic` 181 个底稿键、`resolved_refs`、`l
 - stale 引擎：`_addr_id_index` 改为 `_identity_index: dict[str, list[str]]`，载图时对每个图键算 `identity_key`；入口 `_start_keys(source_uri) -> (keys, unresolved)`：输入是图键或 `WP:` 写法或 addr_id → 先算 `identity_key` 再查索引；非 WP 域图键（TB: / REPORT: 等）按字面。`identity_key` 为空（sheet 多义或禁止、sheet / 底稿不在目录、非四段且非自定义占位）→ 不写库，返回 `{"affected": [], "total": 0, "degraded": false, "unresolved_code", "unresolved_reason"}`；身份算出但图中无此节点 → 返回空影响（不是错误，`unresolved_reason` 为空）。图键与入口共用 `canonical_node`；`linkage_graph_builder._normalize_wp_uri_to_addr_id` 不再被写路径使用（只读使用方登记台账，§16 Q6）。
 - 真实入参对照（p35，用 D~N 每张 sheet 模拟编辑器保存）：以目录名为活动 sheet 名的 947 条中，旧逻辑正确命中 113（字面 97 + 正则归一 16），新规则命中同样 113，其余 834 条两者都无起点（832 条身份已识别但图中无该标签节点、2 条 F2「底稿目录」多义）；以模板册真实 tab 名为活动 sheet 名的 1128 条中，旧逻辑正确 100、新规则 100。两组都没有旧逻辑「命中但错 sheet」的样本。
 - 前端：`useStaleImpact` 暴露 `unresolvedReason`；`useEditorSave` 在其非空时 `ElMessage.info`「未能分析下游影响：{原因}」，同一会话对同一 (底稿, sheet) 只提示一次；后端计指标 `stale_start_unresolved{code}`。
+  - T31 返工补记（2026-10-30）：`useStaleImpact.notify` 每次通知先清空 `unresolvedReason`——本次没发请求（缺项目 / 年度为空）或请求失败时不留旧值，否则保存流程会把上一次别的 sheet 的原因再提示一次；「同一 (底稿, sheet) 只提示一次」由 `useEditorSave.spec.ts` 走真实保存流程断言。
 - 双读对账：`scripts/acnr/reconcile_v2_canonical.py --write | --check` 生成 `data/acnr/v2_canonical_reconcile.json`（按「来源文件 × 分类」计数，每类附中文原因与前 20 个样本，不含时间戳），CI 跑 `--check`。
 
 ### 10.3 CCR 不可解析源（需求 9.5）

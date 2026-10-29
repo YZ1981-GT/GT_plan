@@ -3,7 +3,8 @@
  *
  * 后端守卫 backend/tests/acnr/test_acnr_architecture_status_doc.py 用 Python AST 核对后端行，
  * 前端行它只能核对文件存在。本守卫补上前端：用 TypeScript 编译器 API 解析「已落地：组件」表里
- * 类型为「前端」的模块，断言所列符号确实被导出、所列测试文件里确有 it / test 用例。
+ * 类型为「前端」的模块，断言所列符号确实被导出、所列测试文件里确有 it / test 用例。`.vue` 单文件组件
+ * 取 `<script>` / `<script setup>` 与模板表达式（@vue/compiler-sfc），默认导出即组件本身、按文件名计。
  *
  * 登记制（段四复审第 2 轮 F4-02 残留二）：前端行的「组件」描述也是陈述，必须在 FRONTEND_CLAIMS 里逐字登记
  * 并绑定编译器 API 判据（例如「按项目订阅失效」= useAcnr 首参为 projectId 且调用 subscribeInvalidation）；
@@ -12,8 +13,9 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import ts from 'typescript'
+import { parse as parseSfc } from '@vue/compiler-sfc'
 
 const REPO = resolve(__dirname, '../../../../../..')
 const DOC = join(REPO, 'docs/proposals/address-coordinate-name-registry-architecture.md')
@@ -48,9 +50,40 @@ function frontendRows(): string[][] {
   return tableRows.filter((r) => r[1] === '前端')
 }
 
+/** 模块源码：`.vue` 取 `<script>` 与 `<script setup>` 的脚本、模板里的插值与指令表达式（@vue/compiler-sfc）；
+ * 其余文件取整段源码。指令表达式记为「指令名[:参数]=表达式」，例如 `for=c in candidates`、`on:click=pick(c)`。 */
+interface ModuleSource { script: string; templateExprs: string[]; isSfc: boolean }
+
+function moduleSource(file: string): ModuleSource {
+  const text = readFileSync(file, 'utf-8')
+  if (!file.endsWith('.vue')) return { script: text, templateExprs: [], isSfc: false }
+  const { descriptor } = parseSfc(text)
+  const script = [descriptor.script, descriptor.scriptSetup].map((b) => b?.content ?? '').join('\n')
+  const exprs: string[] = []
+  const visit = (node: any) => {
+    if (!node) return
+    if (node.type === 5 && node.content?.content) exprs.push(node.content.content.trim()) // 插值
+    for (const prop of node.props ?? []) {
+      if (prop.type === 7 && prop.exp?.content) {
+        exprs.push(`${prop.name}${prop.arg?.content ? `:${prop.arg.content}` : ''}=${prop.exp.content.trim()}`)
+      }
+    }
+    for (const child of node.children ?? []) visit(child)
+  }
+  visit(descriptor.template?.ast)
+  return { script, templateExprs: exprs, isSfc: Boolean(descriptor.template || descriptor.script || descriptor.scriptSetup) }
+}
+
+function scriptSourceFile(file: string, src: ModuleSource): ts.SourceFile {
+  return ts.createSourceFile(src.isSfc ? `${file}.ts` : file, src.script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+}
+
 function exportedNames(file: string): Set<string> {
-  const sf = ts.createSourceFile(file, readFileSync(file, 'utf-8'), ts.ScriptTarget.Latest, true)
+  const src = moduleSource(file)
+  const sf = scriptSourceFile(file, src)
   const names = new Set<string>()
+  // 单文件组件的默认导出就是组件本身，按文件名（不含 .vue）导入使用
+  if (src.isSfc) names.add(basename(file, '.vue'))
   const isExported = (n: ts.Node) =>
     (ts.getCombinedModifierFlags(n as ts.Declaration) & ts.ModifierFlags.Export) !== 0
   for (const st of sf.statements) {
@@ -227,8 +260,61 @@ function counterExample(exprs: BoolExpr[], pred: (vals: boolean[]) => boolean): 
   return null
 }
 
-/** 前端组件行「组件」描述 → 编译器 API 判据（返回不成立的原因；登记制：未登记的描述即红）。 */
-const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
+/** 节点子树里读取的属性名（`a.b` 的 b；注释与字符串不计）。 */
+function propertyReads(node: ts.Node | undefined): Set<string> {
+  const s = new Set<string>()
+  const v = (n: ts.Node) => { if (ts.isPropertyAccessExpression(n)) s.add(n.name.text); ts.forEachChild(n, v) }
+  if (node) v(node)
+  return s
+}
+
+/** 子树里是否有满足 pred 的节点。 */
+function someNode(node: ts.Node | undefined, pred: (n: ts.Node) => boolean): boolean {
+  let hit = false
+  const v = (n: ts.Node) => { if (hit) return; if (pred(n)) { hit = true; return } ts.forEachChild(n, v) }
+  if (node) v(node)
+  return hit
+}
+
+/** T31 可解释提示组件（`AcnrCandidatesHint.vue`）的判据：脚本读后端四样、模板逐项显示、点选按 addr_id 交回、字段名中文化且未登记照原样。 */
+function candidatesHintProblems(sf: ts.SourceFile, src: ModuleSource): string[] {
+  if (!src.isSfc) return ['模块须为 .vue 单文件组件']
+  const problems: string[] = []
+  const reads = propertyReads(sf)
+  for (const p of ['reason', 'required_context', 'candidates', 'next_step']) {
+    if (!reads.has(p)) problems.push(`脚本须读取后端结果的 ${p}（文案取后端给的，不在组件里编）`)
+  }
+  for (const [want, label] of [['reasonText', '中文原因'], ['requiredContextText', '需补充的上下文'], ['nextStepText', '下一步']]) {
+    if (!src.templateExprs.includes(want)) problems.push(`模板须插值显示${label}（${want}）`)
+  }
+  const forCandidates = src.templateExprs.find((e) => /^for=\s*\(?\s*(\w+)[^)]*\)?\s+(?:in|of)\s+candidates$/.test(e))
+  if (!forCandidates) problems.push('模板须逐个列出候选（v-for … in candidates）')
+  if (!src.templateExprs.some((e) => /^on:click=pick\(\s*\w+\s*\)$/.test(e))) problems.push('候选须可点选（@click="pick(候选)"）')
+  const pick = sf.statements.find((st): st is ts.FunctionDeclaration => ts.isFunctionDeclaration(st) && st.name?.text === 'pick')
+  const emitsAddrId = someNode(pick, (n) => ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'emit'
+    && n.arguments.length >= 2 && ts.isStringLiteral(n.arguments[0]) && n.arguments[0].text === 'pick'
+    && ts.isPropertyAccessExpression(n.arguments[1]) && n.arguments[1].name.text === 'addr_id')
+  if (!emitsAddrId) problems.push("pick 须 emit('pick', 候选.addr_id, …)，交调用方按 addr_id 重解析")
+  let labels: ts.ObjectLiteralExpression | undefined
+  someNode(sf, (n) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === 'CONTEXT_LABELS'
+      && n.initializer && ts.isObjectLiteralExpression(n.initializer)) { labels = n.initializer; return true }
+    return false
+  })
+  const values = labels?.properties.map((p) => (ts.isPropertyAssignment(p) && ts.isStringLiteral(p.initializer) ? p.initializer.text : '')) ?? []
+  if (!values.length || values.some((x) => !/[\u4e00-\u9fff]/.test(x))) problems.push('CONTEXT_LABELS 须是「字段名 → 中文说明」的对象字面量')
+  const keepsUnknown = someNode(sf, (n) => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.BarBarToken
+    && ts.isElementAccessExpression(n.left) && ts.isIdentifier(n.left.expression) && n.left.expression.text === 'CONTEXT_LABELS'
+    && ts.isIdentifier(n.left.argumentExpression) && ts.isIdentifier(n.right) && n.right.text === n.left.argumentExpression.text)
+  if (!keepsUnknown) problems.push('未登记的字段名须照原样显示（CONTEXT_LABELS[k] || k）')
+  return problems
+}
+
+/** 前端组件行「组件」描述 → 编译器 API 判据（返回不成立的原因；登记制：未登记的描述即红）。
+ * 第二个参数是模块源码（`.vue` 带模板表达式），只有单文件组件的判据用到。 */
+const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile, src: ModuleSource) => string[]> = {
+  '地址解析不出唯一结果时的可解释提示（显示后端给的中文原因、需补充的上下文与候选，点选候选按 addr_id 重解析；上下文字段名显示为中文说明，未登记的字段名照原样显示）':
+    candidatesHintProblems,
   '前端 ACNR SDK，按项目订阅失效': (sf) => {
     const problems: string[] = []
     const use = exportedFunction(sf, 'useAcnr')
@@ -352,8 +438,8 @@ describe('架构提案现状节：前端组件行（TS 编译器 API）', () => 
       if (!claim) { problems.push(`未登记的前端组件描述：${name}`); continue }
       const modPath = join(REPO, strip(module))
       if (!existsSync(modPath)) { problems.push(`${name}: 模块不存在 ${strip(module)}`); continue }
-      const sf = ts.createSourceFile(modPath, readFileSync(modPath, 'utf-8'), ts.ScriptTarget.Latest, true)
-      problems.push(...claim(sf).map((p) => `${name}：${p}`))
+      const src = moduleSource(modPath)
+      problems.push(...claim(scriptSourceFile(modPath, src), src).map((p) => `${name}：${p}`))
     }
     expect(problems, problems.join('\n')).toEqual([])
   })

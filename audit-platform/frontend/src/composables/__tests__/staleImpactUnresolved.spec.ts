@@ -3,10 +3,11 @@
  *
  * 判据（design §10.2）：
  * 1. useStaleImpact 暴露 unresolvedReason，取后端 unresolved_reason；能分析时为空。
- * 2. 同一会话同一 (底稿, sheet) 只提示一次；换 sheet 会再提示一次。
- * 3. 后端能分析时不提示。
+ * 2. 每次通知先清掉上一次的原因：本次没发请求或请求失败时不留旧原因（T31 返工）。
+ * 3. 同一会话同一 (底稿, sheet) 只提示一次、换 sheet 再提示、后端能分析时不提示 —— 这三条走真实保存流程，
+ *    用例在 useEditorSave.spec.ts（原先在本文件里复刻了一份判定再测，改坏生产代码也照样绿）。
  *
- * 变异：notify 不再读 unresolved_reason，或去掉去重 → 本文件对应用例红。
+ * 变异：notify 不再读 unresolved_reason，或开头不清旧原因 → 本文件对应用例红。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -58,74 +59,32 @@ describe('useStaleImpact.unresolvedReason', () => {
   })
 })
 
-// ─── 保存流程只提示一次 ───
-
-const infoMessages: string[] = []
-
-describe('保存后「未能分析下游影响」只提示一次', () => {
+describe('useStaleImpact.unresolvedReason 不留上一次的原因', () => {
   beforeEach(() => {
-    infoMessages.length = 0
+    post.mockReset()
   })
 
-  /**
-   * 直接复刻 useEditorSave 里的提示判定（同一份判据：非空 + 同一 (底稿, sheet) 去重），
-   * 以免为了测一句提示去搭整个 Univer 编辑器。去重集合的实现由下面的源码断言钉住。
-   */
-  function makeNotifier() {
-    const seen = new Set<string>()
-    return (wp: string, sheet: string, reason: string) => {
-      const text = String(reason || '').trim()
-      if (!text) return
-      const key = `${wp}|${sheet}`
-      if (seen.has(key)) return
-      seen.add(key)
-      infoMessages.push(`未能分析下游影响：${text}`)
-    }
+  async function withReason() {
+    post.mockResolvedValueOnce({ data: { unresolved_reason: '上一次的原因', affected: [], total: 0 } })
+    const s = useStaleImpact('D2')
+    await s.notify({ sheet: '审定表D2-1', cell: 'C10', project_id: 'p1', year: 2025 })
+    expect(s.unresolvedReason.value).toBe('上一次的原因')
+    return s
   }
 
-  it('同一底稿同一 sheet 连存两次只提示一次，换 sheet 再提示', () => {
-    const notify = makeNotifier()
-    notify('D2', '审定表D2-1', '引用末段是语义标签、不是 A1 单元格坐标')
-    notify('D2', '审定表D2-1', '引用末段是语义标签、不是 A1 单元格坐标')
-    expect(infoMessages).toHaveLength(1)
-    notify('D2', '明细表D2-2', '引用末段是语义标签、不是 A1 单元格坐标')
-    expect(infoMessages).toHaveLength(2)
+  it('下一次因年度为空没有发请求 → 原因清空', async () => {
+    const s = await withReason()
+    await s.notify({ sheet: '明细表D2-2', cell: 'C10', project_id: 'p1', year: null })
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(s.unresolvedReason.value).toBe('')
   })
 
-  it('原因为空时不提示', () => {
-    const notify = makeNotifier()
-    notify('D2', '审定表D2-1', '')
-    notify('D2', '审定表D2-1', '   ')
-    expect(infoMessages).toHaveLength(0)
+  it('下一次请求被拒（403）→ 原因清空', async () => {
+    const s = await withReason()
+    post.mockRejectedValueOnce({ response: { status: 403 } })
+    await s.notify({ sheet: '明细表D2-2', cell: 'C10', project_id: 'p1', year: 2025 })
+    expect(s.unresolvedReason.value).toBe('')
   })
 })
 
-// ─── 源码判据：保证生产代码真的接了这条线 ───
-
-describe('useEditorSave 源码判据', () => {
-  it('保存流程读 unresolvedReason，并按 (底稿, sheet) 去重提示', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../useEditorSave.ts'),
-      'utf-8',
-    )
-    expect(src).toContain('unresolvedReason')
-    expect(src).toContain('未能分析下游影响：')
-    // 去重集合在模块级（同一会话跨挂载有效），且按 底稿|sheet 作键
-    expect(src).toMatch(/const notifiedUnresolved = new Set<string>\(\)/)
-    expect(src).toMatch(/notifiedUnresolved\.has\(key\)/)
-    expect(src).toMatch(/notifiedUnresolved\.add\(key\)/)
-  })
-
-  it('useStaleImpact 导出 unresolvedReason 并从响应体读取', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../useStaleImpact.ts'),
-      'utf-8',
-    )
-    expect(src).toContain('unresolved_reason')
-    expect(src).toMatch(/unresolvedReason,/)
-  })
-})
+// 保存流程「同一 (底稿, sheet) 只提示一次」的行为用例在 useEditorSave.spec.ts（走真实 onSave，不复刻判定）。
