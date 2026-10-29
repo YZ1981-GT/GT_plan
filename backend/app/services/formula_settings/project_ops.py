@@ -14,6 +14,7 @@ from app.services.formula_settings.definitions import get_spec, same_exec
 from app.services.formula_settings.effective import upstream_records
 from app.services.formula_settings.engine import lock_project
 from app.services.formula_settings.errors import (
+    DomainNotApplicable,
     Forbidden,
     FormulaSettingError,
     NotFound,
@@ -35,6 +36,13 @@ async def require_project(db: AsyncSession, domain: str, project_id: uuid.UUID, 
                           writable: bool = True) -> ProjectInfo:
     project = await get_project(db, domain, project_id)
     if project is None:
+        # 区分「不存在」与「域不适用」：先查项目是否存在
+        from app.models.core import Project
+        exists = (await db.execute(
+            sa.select(sa.literal(1)).where(Project.id == project_id, Project.is_deleted == sa.false())
+        )).scalar_one_or_none()
+        if exists is not None:
+            raise DomainNotApplicable("该项目不是合并项目，不适用合并附注公式")
         raise NotFound("项目不存在或已删除")
     if writable and project.frozen:
         raise Forbidden("项目已归档，公式定义保持归档时的状态，不能修改", status_code=423, code="PROJECT_ARCHIVED")

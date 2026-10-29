@@ -50,3 +50,8 @@ class Forbidden(FormulaSettingError):
 class NotFound(FormulaSettingError):
     status_code = 404
     code = "FORMULA_SETTING_NOT_FOUND"
+
+
+class DomainNotApplicable(FormulaSettingError):
+    status_code = 422
+    code = "FORMULA_DOMAIN_NOT_APPLICABLE"

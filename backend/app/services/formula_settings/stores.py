@@ -68,8 +68,11 @@ class DomainStore:
     def spec(self):
         return get_spec(self.domain)
 
-    async def project_scope(self, db: AsyncSession, project_id: uuid.UUID) -> str:
-        """项目在本域的全局作用范围（与批量口径 ``projects.scope_of`` 同一函数）。"""
+    async def project_scope(self, db: AsyncSession, project_id: uuid.UUID) -> str | None:
+        """项目在本域的全局作用范围（与批量口径 ``projects.scope_of`` 同一函数）。
+
+        返回 ``None`` 表示该域对此项目不适用。
+        """
         if self.spec.scope_kind == "any":
             return ANY_SCOPE
         from app.models.core import Project
@@ -80,7 +83,9 @@ class DomainStore:
                 Project.id == project_id, Project.is_deleted == sa.false())
         )).one_or_none()
         if row is None:
-            return scope_of(self.domain, None, None) if self.spec.scope_kind == "template_type" else "enterprise"
+            if self.spec.scope_kind in ("template_type", "consolidated_template_type"):
+                return scope_of(self.domain, None, None)
+            return "enterprise"
         return scope_of(self.domain, row[0], row[1])
 
     #: 全局层是否有通用作用范围 ``*``（精确范围优先、回退 ``*``）

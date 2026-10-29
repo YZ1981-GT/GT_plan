@@ -325,7 +325,7 @@ async def test_consol_note_effective_and_kernel():
 
     async with make_db(EXTRA) as factory, factory() as db:
         admin = await add_user(db, "adm", "admin")
-        follow, mine = await add_project(db, "乙"), await add_project(db, "丙")
+        follow, mine = await add_project(db, "乙", report_scope="consolidated"), await add_project(db, "丙", report_scope="consolidated")
         await publish_global(db, domain="consol_note", scope="soe", user_id=admin.id, changes=[
             {"slot_key": CELL, "definition": {"formula": "TB('1122','期末余额')"}}])
         g = (await db.execute(sa.select(ConsolNoteFormula))).scalar_one()

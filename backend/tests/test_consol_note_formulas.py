@@ -4,7 +4,7 @@
 - 种子落库幂等：重复种子化 0 变化；人工公式不被覆盖；人工删除的不补回；规则不再产出的种子删除；
 - 求值：附注单元格与合并报表同一求值（``REPORT('BS-006')`` == 报表行），四度量之和 == 合并数，子节点贡献之和 == 合并数；
 - P10：按公式填入不改手工单元格，清除待更新标记，已保存数据插删过行时按项目名定位；
-- 端点：真发请求；公式增删改只允许 admin / partner / manager；附注差额与填入按项目权限（非成员 403、只读不能填入）。
+- 端点：真发请求；公式增删改只允许 admin（ADR-CNS-02）；附注差额与填入按项目权限（非成员 403、只读不能填入）。
 """
 
 from __future__ import annotations
@@ -530,7 +530,9 @@ class TestEndpoints:
         body = {"template_type": "soe", "section_id": "五-1-1", "row_index": 5, "col_index": 1,
                 "formula": "TB('1122','期末余额')"}
         async with note_client(outsider) as c:
-            assert (await c.get(_NF, params={"template_type": "soe"})).status_code == 200, "模板级配置：登录即可读"
+            r = await c.get(_NF, params={"template_type": "soe"})
+            assert r.status_code == 200, "模板级配置：登录即可读"
+            assert r.json().get("can_edit_global") is False, "审计员不能改 ⇒ can_edit_global 为 false"
             assert (await c.post(_NF, json=body)).status_code == 403, "审计员不能改模板级公式"
             assert (await c.post(f"{_NF}/seed", params={"template_type": "soe"})).status_code == 403
             assert (await c.get(f"{_NS}/breakdown/{gid}/{Y}/五-1-1")).status_code == 403
@@ -538,9 +540,19 @@ class TestEndpoints:
         async with note_client(reader) as c:
             assert (await c.get(f"{_NS}/breakdown/{gid}/{Y}/五-1-1")).status_code == 200
             assert (await c.post(f"{_NS}/fill-by-formula/{gid}/{Y}/五-1-1")).status_code == 403, "只读不能填入"
+        # ADR-CNS-02：经理不再能改合并附注全局公式（仅 admin）
         async with note_client(manager) as c:
+            r = await c.get(_NF, params={"template_type": "soe"})
+            assert r.json().get("can_edit_global") is False, "经理 ⇒ can_edit_global 为 false"
+            assert (await c.post(_NF, json=body)).status_code == 403, "经理不能改合并附注全局公式"
+            assert (await c.post(f"{_NF}/seed", params={"template_type": "soe"})).status_code == 403
+        # admin 可以
+        admin = _User(UserRole.admin)
+        async with note_client(admin) as c:
+            r = await c.get(_NF, params={"template_type": "soe"})
+            assert r.json().get("can_edit_global") is True, "admin ⇒ can_edit_global 为 true"
             made = await c.post(_NF, json=body)
-            assert made.status_code == 201, "经理可以改公式"
+            assert made.status_code == 201, "admin 可以改公式"
             fid = made.json()["id"]
         async with note_client(outsider) as c:
             assert (await c.put(f"{_NF}/{fid}", json={"formula": "TB('1001','期末余额')"})).status_code == 403
@@ -554,3 +566,78 @@ class TestEndpoints:
         async with note_client(admin) as c:
             locked = await c.post(f"{_NS}/fill-by-formula/{gid}/{Y}/五-1-1")
             assert locked.status_code == 423, "合并锁定后不能改附注数据"
+
+    @pytest.mark.asyncio
+    async def test_permission_recipe_admin_only(self, db, group, note_client):
+        """ADR-CNS-02 配方表：只有 admin 能写合并附注全局公式，其余角色全 403。
+
+        验证四个写操作（add / edit / delete / reseed）的权限，
+        并确认 403 时 consol_note_formula 行数与内容哈希不变。
+        """
+        import hashlib
+
+        admin = _User(UserRole.admin)
+        # 先用 admin 创建一行，供后续 edit / delete 测试
+        async with note_client(admin) as c:
+            made = await c.post(_NF, json={"template_type": "soe", "section_id": "五-1-1",
+                                           "row_index": 5, "col_index": 1,
+                                           "formula": "TB('1122','期末余额')"})
+            assert made.status_code == 201
+            fid = made.json()["id"]
+            version = made.json().get("version", 1)
+
+        # 取一个基线快照（行数 + 内容哈希）
+        async def _snapshot():
+            rows = (await db.execute(sa.select(ConsolNoteFormula).where(
+                ConsolNoteFormula.is_deleted == False))).scalars().all()  # noqa: E712
+            content = "|".join(sorted(f"{r.id}:{r.formula}" for r in rows))
+            return len(rows), hashlib.sha256(content.encode()).hexdigest()
+
+        before_count, before_hash = await _snapshot()
+
+        # 非 admin 角色（partner / manager / qc / eqcr / auditor）全部 403
+        non_admin_roles = [
+            UserRole.partner, UserRole.manager,
+            getattr(UserRole, "qc", None), getattr(UserRole, "eqcr", None),
+            UserRole.auditor,
+        ]
+        for role_enum in non_admin_roles:
+            if role_enum is None:
+                continue
+            user = _User(role_enum)
+            async with note_client(user) as c:
+                role_name = getattr(role_enum, "value", str(role_enum))
+                # add
+                r = await c.post(_NF, json={"template_type": "soe", "section_id": "五-1-1",
+                                            "row_index": 7, "col_index": 1,
+                                            "formula": "TB('1001','期末余额')"})
+                assert r.status_code == 403, f"{role_name} add should be 403"
+                # edit
+                r = await c.put(f"{_NF}/{fid}", json={"formula": "TB('1001','期末余额')",
+                                                       "expected_version": version})
+                assert r.status_code == 403, f"{role_name} edit should be 403"
+                # delete
+                r = await c.delete(f"{_NF}/{fid}", params={"expected_version": str(version)})
+                assert r.status_code == 403, f"{role_name} delete should be 403"
+                # reseed
+                r = await c.post(f"{_NF}/seed", params={"template_type": "soe"})
+                assert r.status_code == 403, f"{role_name} reseed should be 403"
+
+        # 行数与内容哈希不变（拒绝时无副作用）
+        after_count, after_hash = await _snapshot()
+        assert (after_count, after_hash) == (before_count, before_hash), \
+            "403 拒绝后 consol_note_formula 行数与内容哈希必须不变"
+
+        # admin 四个操作全部成功
+        async with note_client(admin) as c:
+            # reseed
+            r = await c.post(f"{_NF}/seed", params={"template_type": "soe"})
+            assert r.status_code == 200, f"admin reseed: {r.text}"
+            # edit
+            r = await c.put(f"{_NF}/{fid}", json={"formula": "TB('1001','期末余额')",
+                                                    "expected_version": version})
+            assert r.status_code == 200, f"admin edit: {r.text}"
+            # delete
+            new_version = r.json().get("version", version)
+            r = await c.delete(f"{_NF}/{fid}", params={"expected_version": str(new_version)})
+            assert r.status_code == 200, f"admin delete: {r.text}"

@@ -110,6 +110,15 @@ async def _is_frozen(db, project_id: uuid.UUID) -> bool | None:
     return status == ProjectStatus.archived
 
 
+async def _is_consolidated(db, project_id: uuid.UUID) -> bool:
+    """项目的 report_scope 是否为 ``consolidated``（不存在 / 已删除 / 非合并均返 False）。"""
+    from app.models.core import Project
+
+    rs = (await db.execute(sa.select(Project.report_scope).where(
+        Project.id == project_id, Project.is_deleted == sa.false()))).scalar_one_or_none()
+    return rs == "consolidated"
+
+
 async def propagate_report(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
     from app.models.report_models import FinancialReport
     from app.services.formula_settings.effective_report import load_effective_report_configs
@@ -196,6 +205,8 @@ async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_ke
     if year is None:
         return {"skipped": "no_year", "sections": sections}
     async with _factory()() as db:
+        if not await _is_consolidated(db, project_id):
+            return {"skipped": "not_consolidated"}
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
         result = await fill_note_sections(db, project_id, year, sections)

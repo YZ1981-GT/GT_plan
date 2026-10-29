@@ -50,9 +50,14 @@ async def _source_definitions(db: AsyncSession, domain: str, project_id: uuid.UU
 
 
 async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_keys: list[str],
-                     target_ids: list[uuid.UUID]) -> tuple[dict[str, dict], list[dict[str, Any]]]:
+                     target_ids: list[uuid.UUID]) -> tuple[dict[str, dict], list[dict[str, Any]], list[dict[str, Any]]]:
+    """返回 (source_definitions, plan, skipped)。
+
+    ``skipped`` 列出被域作用范围过滤掉的目标（例如 consol_note 域中的单体项目）。
+    """
     source = await _source_definitions(db, domain, source_id, slot_keys)
-    targets = await list_projects(db, domain, ids=[t for t in target_ids if t != source_id])
+    non_source_ids = [t for t in target_ids if t != source_id]
+    targets = await list_projects(db, domain, ids=non_source_ids)
     plan = []
     for t in targets:
         eff = await effective_slots(db, domain, t.id, scope=t.scope)
@@ -64,7 +69,20 @@ async def _push_plan(db: AsyncSession, domain: str, source_id: uuid.UUID, slot_k
                                      local=lo.local_state() if lo else None, frozen=t.frozen)
             plan.append({"target": t, "slot_key": slot, "label": src["label"], "structure": src["structure"],
                          "source": src["definition"], "effective": e, "category": category})
-    return source, plan
+    # 被域作用范围过滤的目标
+    skipped: list[dict[str, Any]] = []
+    resolved_ids = {t.id for t in targets}
+    missing_ids = [tid for tid in non_source_ids if tid not in resolved_ids]
+    if missing_ids:
+        from app.models.core import Project
+        existing = {row[0] for row in (await db.execute(
+            sa.select(Project.id).where(Project.id.in_(missing_ids), Project.is_deleted == sa.false())
+        )).all()}
+        for tid in missing_ids:
+            if tid in existing:
+                skipped.append({"project_id": str(tid),
+                                "reason": "该项目不是合并项目，不适用合并附注公式"})
+    return source, plan, skipped
 
 
 def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:
@@ -86,12 +104,15 @@ def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:
 async def apply_preview(db: AsyncSession, *, domain: str, project_id: uuid.UUID, slot_keys: list[str],
                         target_ids: list[uuid.UUID]) -> dict[str, Any]:
     get_spec(domain)
-    _, plan = await _push_plan(db, domain, project_id, slot_keys, target_ids)
+    _, plan, skipped = await _push_plan(db, domain, project_id, slot_keys, target_ids)
     counts: dict[str, int] = {c.value: 0 for c in Category}
     for p in plan:
         counts[p["category"].value] += 1
-    return {"domain": domain, "counts": counts, "conflict_count": counts[Category.CONFLICT.value],
-            "items": [_push_item_dict(domain, p) for p in plan]}
+    result: dict[str, Any] = {"domain": domain, "counts": counts, "conflict_count": counts[Category.CONFLICT.value],
+                               "items": [_push_item_dict(domain, p) for p in plan]}
+    if skipped:
+        result["skipped"] = skipped
+    return result
 
 
 async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.UUID, slot_keys: list[str],
@@ -106,7 +127,7 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
             return {"publish_id": str(replay.id), "idempotent": True, "summary": replay.summary, "events": []}
     for t in sorted(set(target_ids) - {project_id}, key=str):
         await lock_project(db, domain, t)
-    source, plan = await _push_plan(db, domain, project_id, slot_keys, target_ids)
+    source, plan, skipped = await _push_plan(db, domain, project_id, slot_keys, target_ids)
     store = get_store(domain)
     publish_id = uuid.uuid4()
     counts: dict[str, int] = {c.value: 0 for c in Category}
@@ -165,8 +186,11 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
     for pid, entries in audits.items():
         await audit_project(db, user_id=user_id, project_id=pid, domain=domain, action="push",
                             source="apply_to_projects", changes=entries, publish_id=publish_id)
-    return {"publish_id": str(publish_id), "idempotent": False, "summary": summary,
-            "events": [{"project_id": str(pid), "slot_keys": slots} for pid, slots in events.items()]}
+    result = {"publish_id": str(publish_id), "idempotent": False, "summary": summary,
+              "events": [{"project_id": str(pid), "slot_keys": slots} for pid, slots in events.items()]}
+    if skipped:
+        result["skipped"] = skipped
+    return result
 
 
 # ── 设为全局 / 全局候选 ───────────────────────────────────────────────────────

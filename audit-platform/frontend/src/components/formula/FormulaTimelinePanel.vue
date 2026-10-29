@@ -13,6 +13,22 @@
 
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
 
+    <!-- 部分来源不可用提示（需求 10.2、10.3）-->
+    <el-alert
+      v-if="unavailableSources.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gt-ftl-unavailable"
+    >
+      <template #title>
+        部分来源不可用
+      </template>
+      <ul style="margin:2px 0 0;padding-left:16px;font-size:12px">
+        <li v-for="(src, idx) in unavailableSources" :key="idx">{{ src.source }}：{{ src.message }}</li>
+      </ul>
+    </el-alert>
+
     <!-- 类型过滤 -->
     <div v-if="events.length" class="gt-ftl-filters">
       <el-checkbox-group v-model="activeTypes" size="small">
@@ -58,6 +74,7 @@ const props = defineProps<{
 
 const events = ref<any[]>([])
 const eventTypes = ref<Record<string, any>>({})
+const unavailableSources = ref<Array<{ source: string; message: string }>>([])
 const loading = ref(false)
 const error = ref('')
 const expandedIdx = ref<number | null>(null)
@@ -75,6 +92,7 @@ async function load() {
     const data = await api.get(formulaTimeline.list(props.projectId, props.year), { _silent: true } as any)
     events.value = data.events || []
     eventTypes.value = data.event_types || {}
+    unavailableSources.value = data.unavailable_sources || []
   } catch (e: any) {
     error.value = formulaErrorText(e, '加载失败')
   } finally {
@@ -115,6 +133,7 @@ function dotColor(type: string) { return TYPE_COLORS[type] || '#909399' }
 .gt-ftl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .gt-ftl-title { font-weight: 600; font-size: var(--gt-font-size-sm); }
 .gt-ftl-muted { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-ftl-unavailable { margin-bottom: 8px; }
 .gt-ftl-filters { margin-bottom: 8px; }
 .gt-ftl-timeline { position: relative; padding-left: 28px; max-height: 500px; overflow-y: auto; }
 .gt-ftl-timeline::before { content: ''; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--gt-color-border-light); }

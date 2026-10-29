@@ -43,9 +43,9 @@ const NOTE_ROW = {
   formula: "TB('1001','期末余额')", source: 'seed', source_label: '自动种子',
   description: null, updated_at: null, updated_by: null, version: 2,
 }
-function noteList() {
+function noteList(canEditGlobal = true) {
   return {
-    template_type: 'soe', count: 1,
+    template_type: 'soe', count: 1, can_edit_global: canEditGlobal,
     sections: [{ section_id: '五-1-1', title: '货币资金', parent_section: '五、报表科目', formulas: [{ ...NOTE_ROW }] }],
   }
 }
@@ -280,7 +280,7 @@ describe('合并附注公式', () => {
   })
 
   it('审计员只读：不能进入编辑、删除或种子化', async () => {
-    roleState.effectiveRole = 'auditor'
+    service.listConsolNoteFormulas.mockResolvedValue(noteList(false))
     const wrapper = create({ mode: 'note' })
     await flushPromises()
     expect(state(wrapper).canManage).toBe(false)
@@ -294,5 +294,74 @@ describe('合并附注公式', () => {
     expect(service.deleteConsolNoteFormula).not.toHaveBeenCalled()
     expect(service.reseedConsolNoteFormulas).not.toHaveBeenCalled()
     wrapper.unmount()
+  })
+})
+
+describe('ADR-CNS-02 can_edit_global 能力字段', () => {
+  it('can_edit_global=true：canManage 为真，编辑功能可用', async () => {
+    service.listConsolNoteFormulas.mockResolvedValue(noteList(true))
+    const wrapper = create({ mode: 'note', noteSection: '五-1-1' })
+    await flushPromises()
+    expect(state(wrapper).canManage).toBe(true)
+    // 功能验证：admin 能进入编辑
+    state(wrapper).onCellEdit(state(wrapper).noteRows[0], 'formula', "TB('1002','期末余额')")
+    expect(Object.keys(state(wrapper).pending)).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('can_edit_global=false：canManage 为假，编辑功能被拒', async () => {
+    service.listConsolNoteFormulas.mockResolvedValue(noteList(false))
+    const wrapper = create({ mode: 'note', noteSection: '五-1-1' })
+    await flushPromises()
+    expect(state(wrapper).canManage).toBe(false)
+    // 编辑被拒
+    state(wrapper).onCellEdit(state(wrapper).noteRows[0], 'formula', "TB('1002','期末余额')")
+    expect(Object.keys(state(wrapper).pending)).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('can_edit_global 未返回（旧后端兼容）：canManage 缺省 false', async () => {
+    service.listConsolNoteFormulas.mockResolvedValue({
+      template_type: 'soe', count: 0, sections: [],
+    })
+    const wrapper = create({ mode: 'note' })
+    await flushPromises()
+    expect(state(wrapper).canManage).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('报表模式不受 can_edit_global 影响：canManage 始终为真', async () => {
+    service.listConsolNoteFormulas.mockResolvedValue(noteList(false))
+    const wrapper = create({ mode: 'report' })
+    await flushPromises()
+    expect(state(wrapper).canManage).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('提示文案只提 admin 不提 partner/manager', async () => {
+    service.listConsolNoteFormulas.mockResolvedValue(noteList(false))
+    const wrapper = create({ mode: 'note', noteSection: '五-1-1' })
+    await flushPromises()
+    const html = wrapper.html()
+    expect(html).toContain('只有管理员可以修改合并附注公式')
+    expect(html).not.toContain('合伙人')
+    expect(html).not.toContain('经理')
+    wrapper.unmount()
+  })
+})
+
+describe('ADR-CNS-02 源码守卫', () => {
+  it('组件源码不得包含角色名字面量集合（禁 managerRoles / Set 写法）', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../ConsolFormulaManagementPanel.vue'), 'utf-8',
+    )
+    // 不能有 Set(['admin', ... ]) 或类似角色名集合
+    expect(src).not.toMatch(/new\s+Set\s*\(\s*\[.*?['"]admin['"]/s)
+    expect(src).not.toMatch(/managerRoles/)
+    // 检查不出现 partner/manager 作为角色判定
+    expect(src).not.toMatch(/['"]partner['"]\s*[,\])]/)
+    expect(src).not.toMatch(/['"]manager['"]\s*[,\])]/)
   })
 })

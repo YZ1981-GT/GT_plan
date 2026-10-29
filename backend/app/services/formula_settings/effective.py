@@ -116,7 +116,11 @@ async def effective_slots(db: AsyncSession, domain: str, project_id: uuid.UUID, 
                           scope: str | None = None) -> dict[str, EffectiveSlot]:
     """本项目在 ``domain`` 上全部公式位的有效定义与层级。"""
     store = get_store(domain)
-    scope = scope or await store.project_scope(db, project_id)
+    if scope is None:
+        scope = await store.project_scope(db, project_id)
+    if scope is None:
+        # 域不适用于此项目（例如 consol_note 对单体项目）
+        return {}
     upstream = await upstream_records(db, store, scope)
     local = await store.list_project(db, project_id)
     pending = await pending_slot_keys(db, domain, project_id)

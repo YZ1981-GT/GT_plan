@@ -21,7 +21,8 @@ class DomainSpec:
     label: str
     exec_fields: tuple[str, ...]
     desc_fields: tuple[str, ...]
-    #: 全局层作用范围：standard（适用准则）/ template_type（附注模板类型）/ any（通用 ``*``）
+    #: 全局层作用范围：standard（适用准则）/ template_type（附注模板类型）
+    #: / consolidated_template_type（模板类型 + 必须是合并项目）/ any（通用 ``*``）
     scope_kind: str
     #: 停用 = 公式字段全空（报表域：项目行公式置空即停用，没有单独的停用标记列）
     disabled_as_empty: bool = False
@@ -46,7 +47,7 @@ DOMAINS: dict[str, DomainSpec] = {
     ),
     "cross_check": DomainSpec(
         "cross_check", "表间审核规则",
-        ("left_ref", "operator", "right_ref", "tolerance"),
+        ("left_ref", "operator", "right_ref", "tolerance", "severity"),
         ("label", "description"),
         "standard",
     ),
@@ -66,7 +67,7 @@ DOMAINS: dict[str, DomainSpec] = {
         "consol_note", "合并附注公式",
         ("formula",),
         ("description",),
-        "template_type",
+        "consolidated_template_type",
     ),
     # 公式位 = 推送规则 rule_id；系统预设 = formula_push_rules.json（spec formula-governance-coverage-closure R2）
     "push": DomainSpec(

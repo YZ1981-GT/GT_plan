@@ -1,6 +1,6 @@
 """合并附注单元格公式（spec consol-elimination-single-source-push 任务 7，design §十 公式管理「合并附注」节点）。
 
-模板级配置（不属于某个项目）：读 = 已登录；写 = admin / partner / manager（design §十）。
+模板级配置（不属于某个项目）：读 = 已登录；写 = admin（ADR-CNS-02；原 admin / partner / manager）。
 改动后前端对当前合并项目调 ``POST /api/consolidation/{pid}/{year}/push``（公式是模板级，后端不知道该推哪个项目）。
 
 formula-global-settings-sync：模板级表即合并附注域的全局层，增删改经全局发布（版本 + 同步内核）；
@@ -27,11 +27,12 @@ from app.services.consol_note_formula_service import (
 )
 from app.services.formula_settings import consol_note_settings as settings
 from app.services.formula_settings.errors import FormulaSettingError
+from app.services.formula_settings.permissions import can_edit_global
 from app.services.formula_settings.propagation import publish_events
 
 router = APIRouter(prefix="/api/consol-note-formulas", tags=["合并附注公式"])
 
-EDITOR_ROLES = ["admin", "partner", "manager"]
+EDITOR_ROLES = ["admin"]
 
 
 def _error(exc: NoteFormulaError | FormulaSettingError) -> HTTPException:
@@ -56,6 +57,7 @@ async def get_note_formulas(
     """按章节列出合并附注公式（单元格位置、公式、来源：自动种子 / 人工）。
 
     首次读取（或模板 / 合并口径报表配置变化后）按需种子化并提交 —— 写的是模板级派生配置，不是项目数据。
+    响应包含 ``can_edit_global``：调用方据此显示或隐藏编辑控件。
     """
     try:
         result = await list_note_formulas(db, template_type, section_id)
@@ -63,6 +65,7 @@ async def get_note_formulas(
         await db.rollback()
         raise _error(e) from e
     await db.commit()
+    result["can_edit_global"] = can_edit_global(user)
     return result
 
 

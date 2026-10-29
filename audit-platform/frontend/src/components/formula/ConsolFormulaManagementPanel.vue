@@ -10,7 +10,7 @@
     <el-alert type="warning" :closable="false" show-icon class="gt-cfmp-alert"
       title="这里维护的是模板级合并公式：修改会影响所有使用同一模板的合并项目；保存后将立即为当前项目启动合并推送。" />
     <el-alert v-if="mode === 'note' && !canManage" type="info" :closable="false" show-icon class="gt-cfmp-alert"
-      title="当前角色可查看合并附注公式；只有管理员、合伙人和经理可以新增、修改、删除或重新种子化。" />
+      title="当前角色可查看合并附注公式；只有管理员可以修改合并附注公式（修改会影响所有同模板的合并项目）。" />
 
     <el-tabs v-model="panelTab" data-testid="consol-formula-tabs">
       <el-tab-pane name="formulas" :label="mode === 'report' ? '合并报表公式' : '合并附注公式'">
@@ -176,8 +176,6 @@ import { formatTime, reportTypeLabel } from '@/components/consolidation/composab
 import ConsolPushPanel from '@/components/consolidation/ConsolPushPanel.vue'
 import GtGridCell from '@/components/grid/GtGridCell.vue'
 import { ElInput, ElSelect } from '@/components/grid/adapters'
-import { useAuthStore } from '@/stores/auth'
-import { useRoleContextStore } from '@/stores/roleContext'
 
 defineOptions({ name: 'ConsolFormulaManagementPanel' })
 
@@ -201,11 +199,9 @@ const props = withDefaults(defineProps<{
   noteSection?: string
 }>(), { reportType: 'balance_sheet', noteSection: '' })
 
-const auth = useAuthStore()
-const roleContext = useRoleContextStore()
-const managerRoles = new Set(['admin', 'partner', 'manager'])
-const effectiveRole = computed(() => roleContext.effectiveRole || auth.user?.role || '')
-const canManage = computed(() => managerRoles.has(effectiveRole.value))
+/** 合并附注公式编辑权限：从列表 API 响应的 can_edit_global 字段读取（ADR-CNS-02 单一来源） */
+const canEditGlobal = ref(false)
+const canManage = computed(() => props.mode === 'note' ? canEditGlobal.value : true)
 const templateType = computed<ConsolNoteTemplateType>(() => props.templateType === 'listed' ? 'listed' : 'soe')
 const consolidatedStandard = computed(() => `${templateType.value}_consolidated`)
 const panelTab = ref('formulas')
@@ -240,7 +236,12 @@ async function load() {
       ])
       if (seq !== loadSeq) return
       if (groupsResult.status === 'fulfilled') groups = groupsResult.value ?? []
-      if (formulasResult.status === 'fulfilled') formulas = formulasResult.value ?? { sections: [] }
+      if (formulasResult.status === 'fulfilled') {
+        formulas = formulasResult.value ?? { sections: [] }
+        if (formulasResult.value?.can_edit_global != null) {
+          canEditGlobal.value = !!formulasResult.value.can_edit_global
+        }
+      }
       else console.warn('[ConsolFormulaPanel] 公式加载失败（章节导航仍可用）', formulasResult.reason)
 
       const options: Array<{ section_id: string; title: string | null }> = []

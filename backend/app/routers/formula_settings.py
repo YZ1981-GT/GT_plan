@@ -38,6 +38,7 @@ _STANDARD_ORDER = ["soe_standalone", "soe_consolidated", "listed_standalone", "l
 _SCOPE_OPTIONS = {
     "standard": _STANDARD_ORDER,
     "template_type": ["soe", "listed"],
+    "consolidated_template_type": ["soe", "listed"],
     "any": ["*"],
 }
 _SCOPE_LABELS = {
@@ -120,8 +121,8 @@ class ReviewBody(BaseModel):
 
 
 def _is_admin(user: User) -> bool:
-    role = getattr(user, "role", None)
-    return getattr(role, "value", role) == "admin"
+    from app.services.formula_settings.permissions import can_edit_global
+    return can_edit_global(user)
 
 
 def _require_admin(user: User) -> None:
@@ -306,7 +307,7 @@ async def apply_targets(project_id: uuid.UUID, domain: str = Query("report", max
     infos = {p.id: p for p in await list_projects(db, domain, ids=[r[0] for r in rows])}
     return {"items": [{"project_id": str(pid), "name": name, "scope": infos[pid].scope if pid in infos else "",
                        "same_scope": source is not None and pid in infos and infos[pid].scope == source.scope}
-                      for pid, name in rows]}
+                      for pid, name in rows if pid in infos]}
 
 
 @project_router.get("/{domain}/effective")
