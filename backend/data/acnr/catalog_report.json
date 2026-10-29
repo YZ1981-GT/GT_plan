@@ -863,7 +863,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-29T00:23:04.072407+00:00",
+  "generated_at": "2026-10-29T07:55:33.927982+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -1683,9 +1683,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261029002303",
+  "registry_version": "20261029075533",
   "release": {
-    "catalog_sha256": "ae5ee0cfd7dc8de7d20d29f40406e26bc7b23f02364c5a89cc240b9db0626a73",
+    "catalog_sha256": "b3a08722f11cdb1ea8b10c0a8e3ca0b2cc903d92c3f36e34f4b284e51dc64f6f",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -1764,8 +1764,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261028151046.json",
-        "sha256": "36f8fe261a86b2e4dc8f3065a3b86dfabc3b83b3898139c8b4138dc6f23e4a47"
+        "path": "backend/data/acnr/catalog_snapshots/20261029002303.json",
+        "sha256": "ae5ee0cfd7dc8de7d20d29f40406e26bc7b23f02364c5a89cc240b9db0626a73"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -1892,10 +1892,10 @@
         "sha256": "74c881dccc7799f8b27e4bf8e7591e01704e3ff9810c72a0c65585307261e620"
       }
     ],
-    "inputs_fingerprint": "52f88a5f34691a9aa2c6f8bb3f96b5d7d1988c0a5963b9ea713e1c74c33a1180",
-    "previous_catalog_sha256": "36f8fe261a86b2e4dc8f3065a3b86dfabc3b83b3898139c8b4138dc6f23e4a47",
-    "previous_version": "20261028151046",
-    "registry_version": "20261029002303",
+    "inputs_fingerprint": "c380ca0fd24d01a12cff49553e68b050616bb1d965313b964369e78dd8454ddc",
+    "previous_catalog_sha256": "ae5ee0cfd7dc8de7d20d29f40406e26bc7b23f02364c5a89cc240b9db0626a73",
+    "previous_version": "20261029002303",
+    "registry_version": "20261029075533",
     "schema_sha256": "6f3ee9a5c1be46e1c2d290997320317ac3d1080ab25d7afbf3244a196580c896"
   },
   "summary": {
