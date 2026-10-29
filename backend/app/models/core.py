@@ -1,12 +1,13 @@
 """5张核心业务表模型：User, Project, ProjectUser, Log, Notification"""
 
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.models.base import (
     AuditMixin,
@@ -48,6 +49,12 @@ class User(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
 # ---------------------------------------------------------------------------
 # Project 模型
 # ---------------------------------------------------------------------------
+
+#: 锁定的 ACNR 目录版本号形态：14 位 UTC 时间戳（T17）。
+#: 形态与 `app.services.acnr.catalog_contract.REGISTRY_VERSION_PATTERN` 必须一致 ——
+#: 模型层不反向依赖 services，改为由守卫
+#: `backend/tests/acnr/test_project_registry_lock_schema.py` 逐字比对两处，任一处改了即红。
+_ACNR_REGISTRY_VERSION_RE = re.compile(r"^\d{14}$")
 
 
 class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
@@ -174,6 +181,35 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         default=None,
         comment='工时预算配置: {"by_cycle":{"D":100,"E":80,...},"by_user":{"user_id":160,...},"total":800}',
     )
+
+    # V216（acnr-foundation-defect-closure 需求 7.1~7.2 / D5 / T17）：锁定的 ACNR 地址目录版本。
+    # NULL = 未锁定，按当前目录解析；存量不回填（归档时没记过版本，编不出真实值）。
+    # 只由 `app/services/acnr/project_registry_lock.py` 在归档 / 取消归档的同一事务里写，
+    # 两列同写同清；写入前要求该版本的快照存在且内容自洽，否则不落库（RegistryLockError）。
+    acnr_registry_version: Mapped[str | None] = mapped_column(
+        String(14), nullable=True,
+        comment="锁定的 ACNR 地址目录版本号（14 位 UTC 时间戳）；NULL = 未锁定，按当前目录解析",
+    )
+    acnr_registry_locked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="ACNR 目录版本锁定时间；与 acnr_registry_version 同写同清",
+    )
+
+    @validates("acnr_registry_version")
+    def _validate_acnr_registry_version(self, _key: str, value: str | None) -> str | None:
+        """版本号必须是 14 位 UTC 时间戳；清锁写 None。
+
+        在模型层拦一道是为了「写进去的就一定解析得回来」：版本号是快照文件名，
+        形态不对意味着按它找不到快照，而那时项目已经归档、错误发现得太晚。
+        """
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not _ACNR_REGISTRY_VERSION_RE.fullmatch(normalized):
+            raise ValueError(
+                f"acnr_registry_version 必须是 14 位 UTC 时间戳（形如 20261029075533），收到 {value!r}"
+            )
+        return normalized
 
     # 软删除标记
     is_deleted: Mapped[bool] = mapped_column(
