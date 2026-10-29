@@ -1,6 +1,6 @@
 {
  "description": "T21 编辑器保存入参模拟（D~N 循环）：目录名 / 模板 tab 名作活动表名，末段「审定数」。old_correct_start 为旧逻辑（正则归一 + 先到者胜出）命中且同一张表的起点；由 backend/scripts/acnr/gen_editor_save_inputs.py 生成，不含时间戳。",
- "catalog_version": "20261028151046",
+ "catalog_version": "20261029002303",
  "inputs": [
   {
    "group": "模板 tab 名",

@@ -90,7 +90,7 @@ def test_four_snapshots_load_and_validate():
     legacy = {"20260710000000.json", "20260727114611.json", "20260727114738.json", "20260727115337.json",
               "20261027130014.json", "20261027145857.json",
               "20261027161822.json", "20261028075152.json",
-              "20261028130507.json"}  # 4 份 T07 前快照 + 已被取代的发布批次快照（T07、T09、T10、T22、段十输入变化批次）
+              "20261028130507.json", "20261028151046.json"}  # 4 份 T07 前快照 + 已被取代的发布批次快照（T07、T09、T10、T22、段十输入变化批次、段十 RV10.1-02 批次）
     release = json.loads((_ACNR / "catalog_report.json").read_text(encoding="utf-8"))["release"]["registry_version"]
     # 既有快照 + 当前发布批次的快照
     assert {s.name for s in snaps} == legacy | {f"{release}.json"}
