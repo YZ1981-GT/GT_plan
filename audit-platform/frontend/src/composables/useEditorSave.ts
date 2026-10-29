@@ -44,6 +44,17 @@ export interface UseEditorSaveOptions {
   /** 项目审计年度（保存后的下游影响分析按它算；没有再看底稿详情的 year，都没有不分析） */
   year?: Readonly<Ref<number | null>>
 }
+/**
+ * 已提示过「未能分析下游影响」的 (底稿, sheet)。
+ * 放模块级 = 同一会话内只提示一次，编辑器重新挂载也不重复刷屏（design §10.2 / RV9.1-02）。
+ */
+const notifiedUnresolved = new Set<string>()
+
+/** 仅测试用：重置本会话的提示去重记录。 */
+export function __resetUnresolvedNotices() {
+  notifiedUnresolved.clear()
+}
+
 export function useEditorSave(opts: UseEditorSaveOptions) {
   const router = useRouter()
   const saving = ref(false)
@@ -128,6 +139,17 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
           const total = impactResp.total || impactResp.total_affected
           ElMessage.info({ message: `已识别 ${total} 个下游影响点（点击右侧"影响范围"查看）`, duration: 4000 })
           if (opts.showStaleImpactPanel) opts.showStaleImpactPanel.value = true
+        }
+        // 起点地址算不出规范身份：后端没写 stale，照实告诉用户这次没分析下游，
+        // 别让人以为「没有下游」。同一会话同一 (底稿, sheet) 只提示一次，避免反复保存刷屏。
+        // （design §10.2 / RV9.1-02）
+        const unresolved = String(opts.staleImpact.unresolvedReason?.value || '').trim()
+        if (unresolved) {
+          const key = `${opts.wpDetail.value?.wp_code || opts.wpId.value}|${sheetName}`
+          if (!notifiedUnresolved.has(key)) {
+            notifiedUnresolved.add(key)
+            ElMessage.info({ message: `未能分析下游影响：${unresolved}`, duration: 5000 })
+          }
         }
       } catch (e) {
         logger.warn('[stale-impact] notify failed (non-blocking):', e)

@@ -43,6 +43,7 @@ from app.services.acnr.catalog import (
     _build_jump_route,
 )
 from app.services.acnr.immutability import get_project_registry_version
+from app.services.acnr.reasons import ambiguous_fields, external_namespace_reason
 from app.services.acnr.resolve_identity import (cell_candidate, computed_display_label, deprecation_fields,
                                                 step1_identity)
 from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
@@ -211,6 +212,8 @@ class ResolveResult:
     deprecated: Optional[bool] = None  # 命中停用条目（design §3.3）
     replaced_by: Optional[str] = None  # 停用条目的替代地址
     required_context: Optional[list[str]] = None  # 多义 / 禁止别名时需补的上下文
+    #: 下一步该怎么办（中文，供界面直接显示）；外部命名空间等「不可定位」场景必填（T31）
+    next_step: Optional[str] = None
 
 
 def _detect_non_wp_domain(
@@ -282,12 +285,19 @@ def _delegate_v1(
             resolved_uri = v1_build_uri("note", target)
         else:
             # 外部模块（Adj/Att/EQCR/Calc/Sample/Confirm）
-            # 首期只登记不解析物理格（R11.4），返回 miss
+            # 首期只登记不解析物理格（R11.4），返回 miss。
+            # T31：带中文原因与下一步，界面不再只看到英文错误码；文案取自
+            # grammar_v1.json 的 label_zh / next_step_zh（唯一来源）。
+            from app.services.acnr.grammar import external_namespace_meta
+
+            meta = external_namespace_meta(ns)
             return ResolveResult(
                 found=False,
                 error="external_module_not_resolved",
                 candidates=[],
                 source_layer="V1",
+                reason=external_namespace_reason((meta or {}).get("label_zh", "")),
+                next_step=(meta or {}).get("next_step_zh") or None,
             )
 
     if not resolved_uri:
@@ -558,6 +568,7 @@ async def full_resolve(
                     error="ambiguous",
                     candidates=[cell_candidate(c) for c in exact],
                     source_layer="L1_cell",
+                    **ambiguous_fields("cell"),
                 )
 
             # ─── Step 5: semantic_label 包含匹配 ────────────────────────
@@ -578,6 +589,7 @@ async def full_resolve(
                     error="ambiguous",
                     candidates=[cell_candidate(c) for c in semantic],
                     source_layer="L1_cell",
+                    **ambiguous_fields("cell"),
                 )
 
     # 4c. 单段 → 裸 sheet_code 匹配
@@ -606,6 +618,7 @@ async def full_resolve(
                     for e in code_matches
                 ],
                 source_layer="L1_sheet",
+                **ambiguous_fields("sheet_code", text=parts[0]),
             )
 
     # 4d. 别名反查（含项目级别名）
@@ -691,6 +704,7 @@ async def full_resolve(
                     candidates=[{"addr_id": c.addr_id, "score": 1.0, "display_label": computed_display_label(
                         c.wp_code, c.cell_address, c.semantic_label)} for c in l3_candidates],
                     source_layer="L3",
+                    **ambiguous_fields("runtime"),
                 )
 
     # ─── Step 8: miss → metrics + 相近项推荐（≤5）（R5.6）─────────────────

@@ -601,3 +601,52 @@ def gc_runtime_rows(CB: Callable) -> dict:
                       "test_committed_unknown_when_git_missing", "test_committed_unknown_when_git_errors",
                       "test_real_registries_are_committed", "test_untracked_strays_cleaned_when_refs_verified")),
     }
+
+
+# ─── 底稿短链页路由（T16）────────────────────────────────────────────────────
+
+
+def _short_link_route_ok() -> bool:
+    """前端底稿域路由表登记了短链 workpapers/:wpId → WorkpaperShortLink.vue（TS 源码里的路由对象）。"""
+    src = _read(_REPO / "audit-platform/frontend/src/router/domains/workpapers.ts")
+    return ("path: 'workpapers/:wpId'" in src and "name: 'WorkpaperShortLink'" in src
+            and "@/views/WorkpaperShortLink.vue" in src)
+
+
+# ─── 歧义候选与外部命名空间中文提示（T31）──────────────────────────────────
+
+
+def _external_namespace_labels() -> dict[str, dict]:
+    from app.services.acnr.grammar import external_namespace_meta, external_namespace_names
+
+    return {n: (external_namespace_meta(n) or {}) for n in external_namespace_names()}
+
+
+def _external_namespaces_have_zh() -> bool:
+    """语法文件里每个标了 external_module 的命名空间都有 label_zh 与 next_step_zh。"""
+    metas = _external_namespace_labels()
+    return bool(metas) and all(m.get("label_zh") and m.get("next_step_zh") for m in metas.values())
+
+
+def _resolver_has_no_inline_external_text() -> bool:
+    """解析器不内联外部命名空间的中文文案（单一来源在语法文件 + reasons）。"""
+    text = _read(_RESOLVER)
+    if "暂不支持定位到物理地址" in text:
+        return False
+    return all(m.get("label_zh", "\x00") not in text for m in _external_namespace_labels().values())
+
+
+#: T31 登记用的符号、模块路径与判据（登记表里只写一行，判据集中在此）
+T31_REASON_SYMBOLS = ("external_namespace_reason", "ambiguous_fields", "EXTERNAL_NAMESPACE_REASON")
+T31_HINT_MODULE = "audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue"
+T31_HINT_TEST = "audit-platform/frontend/src/components/acnr/__tests__/acnrCandidatesHint.spec.ts"
+T31_REASON_CHECKS: tuple[Check, ...] = (
+    task_done("T31"),
+    claim("语法文件里每个外部命名空间都有中文标签与下一步", _external_namespaces_have_zh),
+    claim("解析器不自带外部命名空间文案字面量（单一来源在语法文件 + reasons）",
+          _resolver_has_no_inline_external_text),
+    has_tests("backend/tests/acnr/test_external_namespace_reasons.py",
+              "test_every_external_namespace_has_chinese_label_and_next_step",
+              "test_every_ambiguous_return_in_resolver_carries_reason",
+              "test_user_facing_text_has_no_error_code"),
+)

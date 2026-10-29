@@ -90,6 +90,60 @@ NODE_UNRESOLVED_REASONS: dict[str, str] = {
 }
 
 
+# ─── full_resolve 多命中（design §12.2；T31） ─────────────────────────────
+#
+# `step1_identity`（表名多义 / 禁止别名）已自带 reason 与 required_context；这里补的是
+# 它之后、按坐标或语义标签在表内多命中、以及裸编码在多张底稿下多命中的几种。
+
+#: 多命中类型 → (原因模板, 需补的上下文, 下一步)
+_AMBIGUOUS: dict[str, tuple[str, list[str], str]] = {
+    "cell": (
+        "该引用在同一张表下匹配到多个单元格",
+        ["cell_address"],
+        "请改用单元格坐标（形如 C10）指定，或从候选中选择一个",
+    ),
+    "sheet_code": (
+        "编码「{text}」在多张底稿下都登记了",
+        ["parent_wp_code"],
+        "请补上所属底稿编码再解析，或从候选中选择一个",
+    ),
+    "runtime": (
+        "该自定义底稿下有多个同名单元格",
+        ["cell_address"],
+        "请改用单元格坐标指定，或从候选中选择一个",
+    ),
+}
+
+#: 多命中类型（供守卫遍历，避免写死清单）
+AMBIGUOUS_KINDS: tuple[str, ...] = tuple(_AMBIGUOUS)
+
+
+def ambiguous_fields(kind: str, *, text: str = "") -> dict[str, object]:
+    """多命中时的 reason / required_context / next_step（直接展开进 ResolveResult）。"""
+    reason, ctx, next_step = _AMBIGUOUS[kind]
+    return {
+        "reason": reason.format(text=text),
+        "required_context": list(ctx),
+        "next_step": next_step,
+    }
+
+
+# ─── 外部命名空间（design §12.4；T31） ────────────────────────────────────
+#
+# 地址库登记 Adj/Att/EQCR/Calc/Sample/Confirm 这六类引用，但不把它们解析到物理
+# 单元格。标签与下一步文案的唯一来源是 grammar_v1.json 的 label_zh / next_step_zh
+# （经 `grammar.external_namespace_meta` 读取），这里只放拼装模板，避免同一句话在
+# 前后端各写一份。
+
+#: 外部命名空间不可定位时的原因；{label_zh} 填 grammar 里的中文标签。
+EXTERNAL_NAMESPACE_REASON = "「{label_zh}」类引用暂不支持定位到物理地址"
+
+
+def external_namespace_reason(label_zh: str) -> str:
+    """组装外部命名空间的中文原因。label_zh 为空时退化为「外部模块」。"""
+    return EXTERNAL_NAMESPACE_REASON.format(label_zh=label_zh or "外部模块")
+
+
 # ─── 停用条目（design §3.3） ───────────────────────────────────────────────
 
 #: full_resolve 命中停用条目时的原因；{replaced_by} 填替代地址的显示名。

@@ -76,6 +76,15 @@ class AcnrResolveResponse(BaseModel):
     #: 非底稿域是否按项目数据核过存在（R5.1）；``reason`` = 判不存在 / 无法确认的原因
     verified: Optional[bool] = None
     reason: Optional[str] = None
+    #: 统一显示名（T29/T30 由后端 display 单一来源给出）
+    display_label: Optional[str] = None
+    #: 下一步该怎么办（中文，界面直接显示；外部命名空间等不可定位场景必填，T31）
+    next_step: Optional[str] = None
+    #: 多义 / 禁止别名时需要补的上下文字段名
+    required_context: Optional[list] = None
+    #: 命中停用条目（design §3.3）及其替代地址
+    deprecated: Optional[bool] = None
+    replaced_by: Optional[str] = None
 
 router = APIRouter(prefix="/api/acnr", tags=["ACNR-地址坐标名称注册中心"])
 

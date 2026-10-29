@@ -118,6 +118,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "Adj/{target}",
+      "label_zh": "审计调整分录",
+      "next_step_zh": "请在「调整分录」模块按编号查看该分录",
       "notes": "外部模块（审计调整分录）；首期只登记不解析物理格（R11.4）。"
     },
     "Att": {
@@ -126,6 +128,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "Att/{target}",
+      "label_zh": "附件",
+      "next_step_zh": "请在「附件管理」按编号查看该附件",
       "notes": "外部模块（附件）；首期只登记不解析物理格（R11.4）。"
     },
     "EQCR": {
@@ -134,6 +138,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "EQCR/{target}",
+      "label_zh": "项目质量控制复核",
+      "next_step_zh": "请在「EQCR 工作台」按编号查看该复核记录",
       "notes": "外部模块（项目质量控制复核）；首期只登记不解析物理格（R11.4）。"
     },
     "Calc": {
@@ -142,6 +148,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "Calc/{target}",
+      "label_zh": "计算测算",
+      "next_step_zh": "请在对应底稿内打开计算弹窗查看该测算",
       "notes": "外部模块（计算/测算）；首期只登记不解析物理格（R11.4）。"
     },
     "Sample": {
@@ -150,6 +158,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "Sample/{target}",
+      "label_zh": "抽样",
+      "next_step_zh": "请在「抽样」模块按编号查看该样本",
       "notes": "外部模块（抽样）；首期只登记不解析物理格（R11.4）。"
     },
     "Confirm": {
@@ -158,6 +168,8 @@
       "exists": true,
       "external_module": true,
       "addr_id": "Confirm/{target}",
+      "label_zh": "函证",
+      "next_step_zh": "请在「函证管理」按编号查看该函证",
       "notes": "外部模块（函证）；首期只登记不解析物理格（R11.4）。"
     }
   }

@@ -108,8 +108,15 @@ export interface AcnrResolveResult {
   verified?: boolean
   /** 裁剪状态（底稿域命中但当前项目被裁剪时由后端返回）。 */
   trimmed?: boolean
-  /** 判不存在 / 无法确认的原因 */
+  /** 判不存在 / 无法确认的原因（中文，可直接显示） */
   reason?: string
+  /** 下一步该怎么办（中文；外部命名空间等不可定位场景由后端必填，T31） */
+  next_step?: string
+  /** 多义 / 禁止别名时需要补的上下文字段名（T31） */
+  required_context?: string[]
+  /** 命中停用条目（design §3.3）及其替代地址 */
+  deprecated?: boolean
+  replaced_by?: string
   candidates?: Array<{
     addr_id: string
     display_label: string

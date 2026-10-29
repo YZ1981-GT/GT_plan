@@ -46,6 +46,12 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
   const totalAffected = ref(0)
   const loading = ref(false)
   const lastNotifyTs = ref(0)
+  /**
+   * 起点地址算不出规范身份时后端给的中文原因（design §10.2 / RV9.1-02）。
+   * 后端此时不写 stale，返回 unresolved_code + unresolved_reason；界面要告诉用户
+   * 「这次没能分析下游」而不是静悄悄当成「没有下游」。能分析时置空。
+   */
+  const unresolvedReason = ref('')
 
   const wpCode = computed(() => unref(wpCodeSource))
 
@@ -80,6 +86,10 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
       if (payload.year) body.year = payload.year
 
       const res: any = await http.post(linkageBus.impact, body)
+      const payloadBody = res.data || res || {}
+
+      // 起点身份算不出：后端没写 stale，把原因留给调用方提示（RV9.1-02）
+      unresolvedReason.value = String(payloadBody.unresolved_reason || '').trim()
 
       // 将 affected URIs 转换为 StaleAffectedItem 格式
       const affectedUris: string[] = res.data?.affected || res?.affected || []
@@ -146,6 +156,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     affected.value = []
     totalAffected.value = 0
     lastNotifyTs.value = 0
+    unresolvedReason.value = ''
   }
 
   return {
@@ -157,6 +168,7 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
     refresh,
     clear,
     lastNotifyTs,
+    unresolvedReason,
   }
 }
 

@@ -157,13 +157,22 @@ def compose_sheet_labels(group: list[Mapping[str, Any]], sources: NameSources) -
 
 
 def cell_labels(sheet_label: str, cell: Mapping[str, Any]) -> tuple[str, str]:
-    """返回 (cell_label, display_label)。判定记录已写入的 cell_label（语义待核对 / 坐标待核对）照用。"""
+    """返回 (cell_label, display_label)。判定记录已写入的 cell_label（语义待核对 / 坐标待核对）照用。
+
+    两段都有才加分隔符：目录里的 cell 一定有 A1 坐标（发布门禁卡着），所以 label 不会空；
+    但非底稿域委托 V1 时「列」可能为空（如 ``note://五、3``），此时只显示源，不要留一个
+    后面空无一物的「五、3 › 」（T31 现算发现）。
+    """
     label = cell.get("cell_label")
     if not label:
         a1 = cell.get("cell_address") or ""
         semantic = (cell.get("semantic_label") or "").strip()
         label = " ".join(x for x in (a1, semantic) if x) or str(cell.get("addr_id") or "")
-    return label, f"{sheet_label}{CELL_SEPARATOR}{label}" if sheet_label else label
+    if not sheet_label:
+        return label, label
+    if not label:
+        return label, sheet_label
+    return label, f"{sheet_label}{CELL_SEPARATOR}{label}"
 
 
 def group_by_parent(sheets: Iterable[Mapping[str, Any]]) -> dict[str, list[Mapping[str, Any]]]:

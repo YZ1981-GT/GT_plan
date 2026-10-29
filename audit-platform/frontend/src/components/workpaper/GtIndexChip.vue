@@ -207,8 +207,12 @@ const tooltipContent = computed(() => {
   }
 
   if (resolveStatus.value === 'not_exists') {
-    // 试算表 / 附注等非底稿引用按项目数据判不存在时后端给出原因（R5.1），照实显示，不说成「底稿不存在」
-    return acnrResult.value?.reason || '底稿不存在'
+    // T31：后端对判不出地址的情形给中文 reason + next_step（外部命名空间 Adj/Att/EQCR/
+    // Calc/Sample/Confirm 走的就是这条路）。两句都照实显示，绝不显示 error 英文码，
+    // 也不把非底稿引用一律说成「底稿不存在」。
+    const lines = [acnrResult.value?.reason, acnrResult.value?.next_step]
+    const text = lines.filter(Boolean).join('\n')
+    return text || '底稿不存在'
   }
 
   if (resolveStatus.value === 'trimmed') {
@@ -218,8 +222,15 @@ const tooltipContent = computed(() => {
   if (resolveStatus.value === 'exists') {
     const { ns, layer, target } = parsed.value
     const layerLabel = ['', '单元格', 'Sheet', '底稿', '模块'][layer] || ''
-    // 首行：解析结果的统一显示名（目录 display_label，T30）；其后跳转说明与上下文摘要
-    const lines = [acnrResult.value?.display_label, `${layerLabel}跳转 → ${ns}:${target}`, props.context]
+    // 首行：解析结果的统一显示名（目录 display_label，T30）；
+    // 停用条目仍可跳转，但要把停用原因一并说清（RV7-03 / design §3.3）；
+    // 其后跳转说明与上下文摘要。
+    const lines = [
+      acnrResult.value?.display_label,
+      acnrResult.value?.deprecated ? acnrResult.value?.reason : '',
+      `${layerLabel}跳转 → ${ns}:${target}`,
+      props.context,
+    ]
     return lines.filter(Boolean).join('\n')
   }
 

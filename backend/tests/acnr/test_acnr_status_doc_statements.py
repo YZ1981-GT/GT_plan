@@ -38,7 +38,8 @@ from tests.acnr._status_doc_checks import (
     _DESIGN, _FE_GUARD_REL, _GEN_REL, _LINKAGE_REL, _RESOLVER_REL, _STALE_REL, _STATUS_GUARD_REL, _SUBSECTIONS,
     _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_ROWS_OPEN,
     RESOLVER_DOC_OK,
-    SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, V1_BYPASS, Check, Unit,
+    SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, T31_HINT_MODULE, T31_HINT_TEST, T31_REASON_CHECKS,
+    T31_REASON_SYMBOLS, V1_BYPASS, Check, Unit, _short_link_route_ok,
     _component_tests_present, _exact_identity_is_pure, _exact_identity_only_release_imports, _production_importers_of,
     _full_resolve_step1_uses_exact_identity,
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
@@ -223,13 +224,6 @@ def _locate_gate_ok() -> bool:
              and getattr(c.func, "id", getattr(c.func, "attr", None)) == "assert_project_permission"
              and any(getattr(a, "value", None) == "readonly" for a in c.args)]
     return bool(routes) and bool(calls)
-
-
-def _short_link_route_ok() -> bool:
-    """前端底稿域路由表登记了短链 workpapers/:wpId → WorkpaperShortLink.vue（TS 源码里的路由对象）。"""
-    src = _read(_REPO / "audit-platform/frontend/src/router/domains/workpapers.ts")
-    return ("path: 'workpapers/:wpId'" in src and "name: 'WorkpaperShortLink'" in src
-            and "@/views/WorkpaperShortLink.vue" in src)
 
 
 _STATEMENTS: dict[str, dict[str, Stmt]] = {
@@ -558,10 +552,13 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             has_tests(_T + "test_frontend_route_shapes_fixture.py", "test_fixture_matches_backend_sources")),
         "前端显示名只读目录（选址器、高级查询选字段、公式管理与公式编辑三棵树，公式选址器、地址库搜索、已选字段、取值结果区与索引 chip 都读目录的 display_label / cell_label，前端只按编码排序、父节点标题加科目简称；停用 cell 由同一谓词过滤）": CF("audit-platform/frontend/src/services/acnr/sheetDisplayName.ts", ("sortSheetsForGroup", "groupHeaderLabel", "wpCodeNaturalCompare"),
             "audit-platform/frontend/src/acnrDisplaySingleSource.spec.ts", exists(_FE_GUARD_REL), exists("audit-platform/frontend/src/services/acnr/cellListing.ts")),
+        "歧义候选与外部命名空间的中文原因（`full_resolve` 多命中给中文原因、所需补充的上下文与下一步；六类外部模块引用返回「该类引用暂不支持定位到物理地址」与下一步，中文标签与下一步取自语法文件，解析器不自带文案字面量）": CB(
+            _A + "reasons.py", T31_REASON_SYMBOLS, _T + "test_external_namespace_reasons.py", *T31_REASON_CHECKS),
+        "地址解析不出唯一结果时的可解释提示（显示后端给的中文原因、需补充的上下文与候选，点选候选按 addr_id 重解析；上下文字段名显示为中文说明，未登记的字段名照原样显示）": CF(
+            T31_HINT_MODULE, "AcnrCandidatesHint", T31_HINT_TEST, task_done("T31"), exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "歧义候选与外部命名空间中文提示": L("T31"),
         "INDEX 登记与提交边界核对": L("T33"),
     },
     H_VERSION: {
