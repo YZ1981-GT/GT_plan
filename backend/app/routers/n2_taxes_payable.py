@@ -103,7 +103,6 @@ async def _authorize_n2_io(
     current_user: User,
     *,
     wp_id: str,
-    sheet: str | None,
     write: bool,
     route_name: str,
 ) -> tuple[UUID, UUID]:
@@ -124,7 +123,6 @@ async def _authorize_n2_io(
         project_id=project_id,
         entry_family="checklist",
         route_name=route_name,
-        requested_sheet_key=sheet,
     )
     return wp_uuid, project_id
 
@@ -208,7 +206,6 @@ async def n2_export_template(
         db,
         current_user,
         wp_id=wp_id,
-        sheet=sheet,
         write=False,
         route_name="/api/n2-taxes-payable/{wp_id}/export-template",
     )
@@ -249,7 +246,6 @@ async def n2_export_data(
         db,
         current_user,
         wp_id=wp_id,
-        sheet=sheet,
         write=False,
         route_name="/api/n2-taxes-payable/{wp_id}/export-data",
     )
@@ -297,7 +293,6 @@ async def n2_import_data(
         db,
         current_user,
         wp_id=wp_id,
-        sheet=sheet,
         write=True,
         route_name="/api/n2-taxes-payable/{wp_id}/import-data",
     )

@@ -376,7 +376,7 @@ async def test_n2_import_authorizes_and_publishes_only_after_commit(
     assert upload.read_count == 1
     assert gate_call["action"] == "save_checklist"
     assert gate_call["project_id"] == project_id
-    assert gate_call["requested_sheet_key"] == "N2-2"
+    assert gate_call.get("requested_sheet_key") is None
     assert service_call["project_id"] == project_id
     assert service_call["updated_by"] == user_id
     assert db.rolled_back == 0
