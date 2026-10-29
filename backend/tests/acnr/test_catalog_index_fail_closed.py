@@ -142,6 +142,7 @@ _SNAPSHOT_CONTENT_SHA256 = {
     "20261028075152.json": "5d2d5fd96e7589022ff93913639d67232f0c9baf4767778d191976a5eaac5755",  # T22 批次
     "20261028130507.json": "7d8477ceeec4a997bde230787f5240af1cf8c6c74d5d81aaa84b402f5cbd18bd",  # 段十 wp_account_mapping 输入变化批次
     "20261028151046.json": "36f8fe261a86b2e4dc8f3065a3b86dfabc3b83b3898139c8b4138dc6f23e4a47",  # 段十 RV10.1-02 批次
+    "20261029002303.json": "ae5ee0cfd7dc8de7d20d29f40406e26bc7b23f02364c5a89cc240b9db0626a73",  # T29 统一显示名批次
 }
 
 
