@@ -222,6 +222,23 @@ describe('守卫：显示名只读目录 display_label（T30）', () => {
     expect(reads.length).toBe(NON_DISPLAY_READS.reduce((n, a) => n + a.count, 0))
   })
 
+  it('列 cell 的四处都用 isListedCell 过滤停用 cell、自身不读 .deprecated（RV7-02 同一谓词）', () => {
+    for (const f of ['services/acnr/useAcnr.ts', 'components/formula/FormulaRefPicker.vue', 'stores/addressRegistry.ts',
+      'components/formula/leftPanelAnchors.ts']) {
+      const text = readFileSync(join(SRC, f), 'utf-8')
+      const code = f.endsWith('.vue') ? parseSfc(text).descriptor.scriptSetup?.content || '' : text
+      const sf = ts.createSourceFile('x.ts', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+      let deprecatedReads = 0
+      const v = (n: ts.Node) => {
+        if (ts.isPropertyAccessExpression(n) && n.name.text === 'deprecated' && !inType(n)) deprecatedReads++
+        ts.forEachChild(n, v)
+      }
+      v(sf)
+      expect(identifiersIn(code).has('isListedCell'), `${f} 须用 isListedCell`).toBe(true)
+      expect(deprecatedReads, `${f} 自己读了 .deprecated`).toBe(0)
+    }
+  })
+
   it('公式管理树与公式编辑树、地址树都经 sortSheetsForGroup / groupHeaderLabel 取名', () => {
     for (const f of ['components/formula/FormulaManagerDialog.vue', 'components/formula/FormulaEditDialog.vue', 'services/acnr/useAcnr.ts']) {
       const text = readFileSync(join(SRC, f), 'utf-8')
@@ -252,7 +269,10 @@ function cellEntry(c: (typeof FIXTURE.cells)[number]) {
   return { addr_id: c.addr_id, parent_addr_id: `${p}/${s}`, domain: 'wp', cell_address: a, semantic_label: '语义（不应单独显示）',
     formula_ref: `WP('${p}','${s}','${a}')`, cell_label: c.cell_label, display_label: c.display_label, deprecated: c.deprecated }
 }
-const CELL_ROWS = FIXTURE.cells.map(cellEntry)
+/** 夹具停用 cell 的副本挂到选址器用例所在 sheet 下（真实目录该 sheet 没有停用 cell），检验「停用 cell 不列」 */
+const DEAD = FIXTURE.cells.find((c) => c.deprecated)!
+const DEAD_IN_SHEET = { ...cellEntry(DEAD), addr_id: `${CELL_SHEET}/Z99`, parent_addr_id: CELL_SHEET, cell_address: 'Z99' }
+const CELL_ROWS = [...FIXTURE.cells.map(cellEntry), DEAD_IN_SHEET]
 
 function routeGet(url: string, opts?: any) {
   if (url === '/api/acnr/entries') return Promise.resolve({ data: SHEET_ROWS })
@@ -301,6 +321,7 @@ describe('渲染：显示文本逐字等于夹具（T30）', () => {
     const nodes = await useAcnr().loadCellNodes(sheet as never)
     const want = FIXTURE.cells.filter((c) => !c.deprecated && c.addr_id.startsWith(`${CELL_SHEET}/`))
     expect(nodes.map((n) => n.label)).toEqual(want.map((c) => c.cell_label))
+    expect(nodes.map((n) => n.addrId)).not.toContain(DEAD_IN_SHEET.addr_id)
   })
 
   it('公式选址器：sheet 下拉 = display_label；单元格列 = cell_label；停用 cell 不列；将插入标签 = display_label', async () => {
@@ -335,6 +356,7 @@ describe('渲染：显示文本逐字等于夹具（T30）', () => {
     const rows = table.props('data') as any[]
     const live = FIXTURE.cells.filter((c) => !c.deprecated && c.addr_id.startsWith(`${CELL_SHEET}/`))
     expect(rows.map((r) => r.cell_label)).toEqual(live.map((c) => c.cell_label))
+    expect(rows.map((r) => r.formula_ref)).not.toContain(DEAD_IN_SHEET.formula_ref)
     table.vm.$emit('row-click', rows[0])
     await nextTick()
     expect(wrapper.text()).toContain(`底稿 ${live[0].display_label}`)
