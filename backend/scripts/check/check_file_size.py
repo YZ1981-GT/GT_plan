@@ -106,7 +106,9 @@ HARD_CAPS = {
     # 待办：report-view-slimdown 已归档但目标未达成（抽出 6 composable + 3 组件后
     # 又被功能开发加回 843 行）。真瘦身应另立 spec，按 ReportDialogs / 跨表核对 /
     # 多年度对比 / 报表分析 四个关注点继续切，不在本次 ADJ 接线范围内。
-    "audit-platform/frontend/src/views/ReportView.vue": 1949,
+    # 2026-10-29 advanced-query-linkage-closure 任务 32 下调为 1943：此前文件已是 1944 而 cap 仍为 1949（棘轮
+    # test_hard_cap_ratchet 余量 5 打红，非该 spec 引入）；该批把 ?year 判定挪进 useReportRouteFocus，再减 1。
+    "audit-platform/frontend/src/views/ReportView.vue": 1943,
 }
 
 EXCLUDE_PARTS = {".git", ".venv", "__pycache__", "node_modules", "dist", "build",

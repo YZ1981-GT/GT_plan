@@ -52,6 +52,18 @@
     "src/components/template-library/__tests__/CustomQueryTab.linkage.spec.ts",
     "src/components/custom-query/__tests__/CustomQueryTabRejection.spec.ts",
     "src/components/query/__tests__/SheetCellRangePicker.year.spec.ts",
+    "src/components/query/__tests__/CustomQueryDialog.entry.spec.ts",
+    "src/composables/useReportRouteFocus.ts",
+    "src/composables/__tests__/useReportRouteFocus.spec.ts",
+    "src/components/template-library/WpTemplateTab.vue",
+    "src/components/template-library/__tests__/WpTemplateTab.initialSearch.spec.ts",
+    "src/components/query/__tests__/CustomQueryDialog.trace.spec.ts",
+    "src/components/query/MyTemplatesDialog.vue",
+    "src/components/query/queryTemplateRestore.ts",
+    "src/components/query/__tests__/MyTemplatesDialog.spec.ts",
+    "src/components/query/__tests__/queryTemplateRestore.spec.ts",
+    "src/components/query/__tests__/CustomQueryDialog.templates.spec.ts",
+    "src/services/apiPaths/system.ts",
     "src/env.d.ts"
   ]
 }

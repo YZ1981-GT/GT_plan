@@ -1817,9 +1817,39 @@ class AddressResolveResponse(BaseModel):
     template_name: str | None = None
     sheet_name: str | None = None
     cell_ref: str | None = None
-    registered: bool = False  # wp_template_registry 是否已注册
-    route_path: str = ""  # 前端跳转路径
-    route_query: dict = Field(default_factory=dict)  # highlight 参数
+    registered: bool = False  # 模板目录里有没有这个模板（底稿：wp_template_registry 表或 JSON 目录）
+    route_path: str = ""  # 前端跳转路径（未登记 / 没有模板定义时为空）
+    route_query: dict = Field(default_factory=dict)  # 模板库页签名与定位键（tab / wp_code 等），不含 highlight
+
+
+# 模板库（TemplateLibraryMgmt）真实页签名：原先返回 workpaper / report / note，页面认不出、只停在默认页签
+_TEMPLATE_LIBRARY_TABS = {"workpaper": "wp-template", "report": "report-config", "note": "note-template"}
+
+
+async def _wp_template_name(db: AsyncSession, wp_code: str) -> str | None:
+    """底稿编码在模板目录里的名称，未登记为 None（ADR-AQL-17，与指标树 ``_build_workpaper_tree`` 同一目录）。
+
+    ``wp_template_registry`` 表存在且有记录时以表为准；表不存在 / 为空 / 查询失败时用 JSON 目录
+    （wp_account_mapping + step_sheet_mapping）。原先无条件查表，表不存在即 500（AQ-17）。
+    """
+    try:
+        async with db.begin_nested():  # 保存点：查表失败回滚到这里，不让本请求事务停在 aborted（PG）
+            if await wp_template_registry_service.table_exists(db):
+                rows = await wp_template_registry_service.load_tree(db)
+                if rows:
+                    hit = next((r for r in rows if r.get("wp_code") == wp_code), None)
+                    return (hit.get("wp_name") or wp_code) if hit else None
+    except Exception as exc:  # 表不存在（SQLite 无 information_schema）等：改用 JSON 目录
+        logger.debug("address-resolve: wp_template_registry 不可用，改用 JSON 目录：%s", exc)
+    try:
+        step = _load_step_sheet_mapping().get(wp_code)
+        if step:
+            return step.get("wp_name") or wp_code
+        hit = next((m for m in _load_wp_mapping() if m.get("wp_code") == wp_code), None)
+        return (hit.get("wp_name") or hit.get("account_name") or wp_code) if hit else None
+    except Exception as exc:
+        logger.warning("address-resolve: 底稿模板目录读取失败，按未登记返回：%s", exc)
+        return None
 
 
 @router.get("/address-resolve", response_model=AddressResolveResponse)
@@ -1828,80 +1858,47 @@ async def address_resolve(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """URI 反查模板信息（模板溯源）。
+    """URI 反查模板信息（模板溯源，ADR-AQL-17；R7.4）。
 
-    Requirements: Req 14 AC 2, AC 3
-    - 解析 URI 得到 module / wp_code / sheet / cell
-    - 查 wp_template_registry 判断是否已注册
-    - 返回前端跳转路径 + highlight 参数
+    - 底稿：按模板目录判定登记（``_wp_template_name``），登记了才返回模板库「底稿模板」页签与 ``wp_code``（页面按它搜索）；
+    - 报表 / 附注：模板库「报表配置」/「附注模板」页签；
+    - 调整分录 / 试算类结果没有模板定义：``registered=false``、空路由（前端提示「该类结果没有模板定义」）；
+    - 不再返回 ``highlight``：模板页不支持按单元格高亮。
     """
     from app.services.custom_query.module_cell_resolver import parse_source_uri
 
     parsed = parse_source_uri(uri)
     if not parsed:
-        raise HTTPException(status_code=400, detail=f"Invalid source URI: {uri}")
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"无法识别的数据源地址：{uri}"})
 
     module = parsed.get("module", "")
     qualifier = parsed.get("qualifier", "")
     sheet_name = parsed.get("sheet_name")
     cell_range = parsed.get("cell_range")
 
-    # 对于 workpaper 模块，qualifier 是 wp_code
     template_wp_code: str | None = None
-    template_name: str | None = None
+    template_name: str | None = qualifier or None
     registered = False
-    route_path = ""
     route_query: dict = {}
 
     if module == "workpaper":
         template_wp_code = qualifier
-        # 查 wp_template_registry 判断是否已注册
-        result = await db.execute(
-            text("SELECT wp_name FROM wp_template_registry WHERE wp_code = :code"),
-            {"code": qualifier},
-        )
-        row = result.first()
-        if row:
-            registered = True
-            template_name = row[0]
-        # 前端跳转路径：模板库底稿详情
-        route_path = "/template-library"
-        route_query = {"tab": "workpaper", "wp_code": qualifier}
-        if sheet_name:
-            route_query["sheet"] = sheet_name
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        template_name = await _wp_template_name(db, qualifier)
+        registered = template_name is not None
+        route_query = {"wp_code": qualifier}
     elif module == "report":
-        template_wp_code = None
-        template_name = qualifier  # report_type as name
-        registered = True  # 报表模板始终存在于 report_config
-        route_path = "/template-library"
-        route_query = {"tab": "report", "report_type": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        registered = True  # 报表模板恒在 report_config
+        route_query = {"report_type": qualifier}
     elif module == "note":
-        template_wp_code = None
-        template_name = qualifier  # section_id as name
-        registered = True  # 附注模板始终存在于 seed JSON
-        route_path = "/template-library"
-        route_query = {"tab": "note", "section_id": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
+        registered = True  # 附注模板恒在种子 JSON
+        route_query = {"section_id": qualifier}
+    elif module not in ("adj", "tb"):
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"不支持的模块：{module}"})
 
-    elif module in ("adj", "tb"):
-        template_wp_code = None
-        template_name = qualifier
-        registered = False
-        route_path = "/template-library"
-        route_query = {"tab": module, "qualifier": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported module: {module}")
-
+    route_path = "/template-library" if registered else ""
+    route_query = {"tab": _TEMPLATE_LIBRARY_TABS[module], **route_query} if registered else {}
     return AddressResolveResponse(
         module=module,
         template_wp_code=template_wp_code,

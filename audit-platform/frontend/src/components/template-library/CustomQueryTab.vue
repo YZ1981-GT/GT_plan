@@ -105,9 +105,9 @@
       </el-form>
 
       <div class="gt-cqt-top-actions">
-        <el-button size="small" @click="loadTemplates" :loading="loadingTemplates">
+        <el-button size="small" aria-label="我的模板" data-testid="cqt-templates" @click="templatesDialogVisible = true">
           <el-icon style="margin-right: 4px"><Folder /></el-icon>
-          我的模板 ({{ templates.length }})
+          我的模板
         </el-button>
         <el-button size="small" type="primary" plain @click="onSaveTemplate">
           <el-icon style="margin-right: 4px"><DocumentAdd /></el-icon>
@@ -327,53 +327,8 @@
       </el-col>
     </el-row>
 
-    <!-- 模板列表对话框（任务 33 改为共用的 MyTemplatesDialog） -->
-    <el-dialog
-      v-model="templatesDialogVisible"
-      title="查询模板"
-      width="720px"
-    >
-      <el-table :data="templates" size="small" border>
-        <el-table-column prop="name" label="名称" min-width="180" />
-        <el-table-column prop="data_source" label="数据源" width="140" />
-        <el-table-column label="可见范围" width="110" align="center">
-          <template #default="{ row }">
-            <!-- legacy `global` 归一显示为 canonical「公开」（R11.5） -->
-            <el-tag
-              :type="normalizeTemplateScope(row.scope) === 'private' ? 'info' : 'warning'"
-              size="small"
-              effect="plain"
-              round
-            >
-              {{ templateScopeLabel(row.scope) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="updated_at" label="更新时间" width="160">
-          <template #default="{ row }">
-            <span class="gt-cqt-em">
-              {{ row.updated_at ? new Date(row.updated_at).toLocaleString() : '—' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button size="small" link type="primary" @click="onLoadTemplate(row)">
-              加载
-            </el-button>
-            <el-button
-              v-if="row.is_owner"
-              size="small"
-              link
-              type="danger"
-              @click="onDeleteTemplate(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
+    <!-- 查询模板：与弹窗「📑 模板」同一个选择组件（R9.4）；「载入」还原数据源、条件、列、排序、每页行数 -->
+    <MyTemplatesDialog v-model="templatesDialogVisible" @load="(_cfg, tpl) => onTemplateLoad(tpl)" />
 
     <!-- 保存模板：三档可见范围，可分享项目取 template-share-targets（AQ-39，与弹窗 💾 同一组件） -->
     <QueryTemplateSaveDialog
@@ -400,7 +355,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Download, Folder, DocumentAdd, MagicStick } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { customQuery as P_cq, projects as P_proj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
@@ -421,15 +376,13 @@ import QueryErrorAlert from '@/components/query/QueryErrorAlert.vue'
 import QueryResultPager from '@/components/query/QueryResultPager.vue'
 import QueryRowActions from '@/components/query/QueryRowActions.vue'
 import QueryTemplateSaveDialog from '@/components/query/QueryTemplateSaveDialog.vue'
-import {
-  conditionsIncompleteReason, fromSavedConditions, normalizeConditionLogic, toRequestConditions,
-  type ConditionState,
-} from '@/components/query/queryConditions'
+import { conditionsIncompleteReason, toRequestConditions, type ConditionState } from '@/components/query/queryConditions'
+import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
+import { restoreTemplateQuery, type QueryTemplateItem } from '@/components/query/queryTemplateRestore'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from '@/components/query/queryErrorText'
 import { columnTypesOf, formatQueryCell, isAmountCell } from '@/components/query/queryCellFormat'
 import { flattenIndicatorGroups, loadIndicatorTree, type IndicatorOptionGroup } from '@/components/query/queryIndicatorLoader'
 import { buildExportBody, exportAllQueryRows } from '@/components/query/queryServerExport'
-import { normalizeTemplateScope, templateScopeLabel } from '@/components/query/queryTemplateScope'
 import { useQueryRowLinks } from '@/components/query/useQueryRowLinks'
 
 interface QueryResult {
@@ -457,19 +410,6 @@ interface ProjectItem {
    */
   audit_year?: number | null
 }
-interface TemplateItem {
-  id: string
-  name: string
-  description?: string | null
-  data_source: string
-  config: any
-  scope: string
-  created_by: string
-  is_owner: boolean
-  created_at: string
-  updated_at: string
-}
-
 // ─── 状态 ───
 /** 数据源下拉：指标树（骨架 + 附注分支）拍平成「顶层组 → 叶子」 */
 const indicatorTree = ref<IndicatorOptionGroup[]>([])
@@ -527,10 +467,8 @@ function onOpenBuilder() {
 }
 
 // 模板
-const templates = ref<TemplateItem[]>([])
 const templatesDialogVisible = ref(false)
 const saveDialogVisible = ref(false)
-const loadingTemplates = ref(false)
 
 // 结果列下钻（R4.2/R4.4/R4.6/R4.7）：以当前查询上下文 project_id 解析 jump_route
 const { drill } = useAcnrDrill(() => formCtx.value.project_id)
@@ -605,8 +543,9 @@ const templateConfig = computed<Record<string, unknown>>(() => ({
   selected_columns: selectedColumns.value,
   available_columns: availableColumns.value,
   acnr_targets: acnrFieldIds.value,
-  // 排序随模板保存（后端 config_to_request 把 sort_field / sort_order 译成请求的 sort）
+  // 排序随模板保存（后端 config_to_request 把 sort_field / sort_order 译成请求的 sort）；每页行数随模板保存（R9.4）
   ...(sortState.value ? { sort_field: sortState.value.field, sort_order: sortState.value.direction } : {}),
+  page_size: pageSize.value,
 }))
 
 // ─── 数据加载 ───
@@ -813,20 +752,7 @@ async function onExportAll() {
   }
 }
 
-// ─── 模板管理 ───
-async function loadTemplates() {
-  loadingTemplates.value = true
-  try {
-    const data = await api.get<{ templates: TemplateItem[]; total: number }>(P_cq.templates)
-    templates.value = data?.templates || []
-    templatesDialogVisible.value = true
-  } catch (e: any) {
-    handleApiError(e, '加载查询模板列表')
-  } finally {
-    loadingTemplates.value = false
-  }
-}
-
+// ─── 模板管理（列表、删除进回收站在共用的 MyTemplatesDialog）───
 function onSaveTemplate() {
   if (!formCtx.value.source) {
     ElMessage.warning('请先选择数据源后再保存')
@@ -835,40 +761,23 @@ function onSaveTemplate() {
   saveDialogVisible.value = true
 }
 
-function onLoadTemplate(tpl: TemplateItem) {
-  const cfg = tpl.config || {}
-  formCtx.value.source = tpl.data_source
-  if (isKnownYear(cfg.year)) formCtx.value.year = cfg.year
+/**
+ * 「载入」模板（R9.4，queryTemplateRestore）：还原数据源、条件（兼容旧写法）、列、排序、每页行数与单元格取值目标；
+ * 项目与年度保持界面当前的（原先套用模板里存的年度，与模板执行「年度取请求年度」不一致，R9.3）。
+ */
+function onTemplateLoad(tpl: QueryTemplateItem) {
+  const restored = restoreTemplateQuery(tpl)
+  if (!restored) return
+  formCtx.value.source = restored.source
   onSourceChange()
-  if (Array.isArray(cfg.available_columns)) availableColumns.value = cfg.available_columns
-  if (Array.isArray(cfg.selected_columns)) selectedColumns.value = cfg.selected_columns
-  // 兼容改造前保存的条件写法（operator / contains、大写 AND / OR）
-  conditionState.value = {
-    conditions: fromSavedConditions(cfg.conditions),
-    logic: normalizeConditionLogic(cfg.condition_logic),
-  }
-  acnrFieldIds.value = Array.isArray(cfg.acnr_targets) ? cfg.acnr_targets : []
-  templatesDialogVisible.value = false
-  ElMessage.success(`已加载模板：${tpl.name}`)
-}
-
-async function onDeleteTemplate(tpl: TemplateItem) {
-  try {
-    await ElMessageBox.confirm(
-      `确认删除模板「${tpl.name}」？删除后可在回收站恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-    )
-  } catch {
-    return
-  }
-  try {
-    await api.delete(P_cq.templateDetail(tpl.id))
-    ElMessage.success('已删除')
-    await loadTemplates()
-  } catch (e: any) {
-    handleApiError(e, '删除查询模板')
-  }
+  if (restored.availableColumns.length) availableColumns.value = restored.availableColumns
+  if (restored.columns.length) selectedColumns.value = restored.columns
+  conditionState.value = restored.condition
+  sortState.value = restored.sort
+  if (restored.pageSize) pageSize.value = restored.pageSize
+  page.value = 1
+  acnrFieldIds.value = restored.acnrTargets
+  ElMessage.success(`已载入模板「${tpl.name}」，点击「执行查询」查看结果`)
 }
 
 // 项目变化时清除结果；项目或年度变化时按新上下文重新取指标树（附注分支随项目年度变）

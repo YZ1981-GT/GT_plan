@@ -361,10 +361,11 @@
     <!-- 全局自定义查询弹窗 -->
     <CustomQueryDialog
       v-model="showCustomQuery"
-      :project-id="currentProjectId"
-      :year="currentYear"
-      :initial-tab="customQueryInitialTab"
-      :initial-source="customQueryInitialSource"
+      :project-id="customQueryContext.projectId"
+      :year="customQueryYear"
+      :initial-tab="customQueryContext.initialTab"
+      :initial-source="customQueryContext.initialSource"
+      :initial-notice="customQueryContext.initialNotice"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->
@@ -394,6 +395,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendingSyncDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import { resolveDialogOpenContext, type OpenCustomQueryPayload } from '@/components/query/queryEntryContext'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import DshPanel from '@/components/ai/DshPanel.vue'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
@@ -594,8 +596,6 @@ const showFormulaManager = ref(false)
 const formulaOwnerState = ref<FormulaManagerContextOwnerState>({})
 const formulaContext = computed(() => formulaOwnerState.value.active)
 const showCustomQuery = ref(false)
-const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
-const customQueryInitialSource = ref<string | undefined>(undefined)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 // 全局弹窗（公式管理 / 一键刷新 / 自定义查询）的年度：路由 → 项目 store；都没有为 null（原先兜底去年）
@@ -608,6 +608,12 @@ const currentYear = computed<number | null>(() => {
     return null // 无 pinia 上下文
   }
 })
+// 高级查询弹窗本次打开的上下文（queryEntryContext 一处映射，关闭即丢弃事件）；年度只给弹窗（currentYear 及公式管理 / 一键刷新的绑定不动）：
+// 弹窗项目是路由项目时取页面年度，事件带来别的项目时留空 ⇒ 弹窗取该项目审计年度
+const customQueryEvent = ref<OpenCustomQueryPayload | null>(null)
+const customQueryContext = computed(() => resolveDialogOpenContext({ route, eventPayload: customQueryEvent.value }))
+const customQueryYear = computed(() => (customQueryContext.value.projectId === currentProjectId.value ? currentYear.value : null))
+watch(showCustomQuery, (open) => { if (!open) customQueryEvent.value = null })
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {
@@ -967,10 +973,9 @@ watch(showFormulaManager, (open) => {
   if (!open) formulaOwnerState.value = {}
 })
 
-/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
-function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced'; source?: string; project_id?: string }) {
-  customQueryInitialTab.value = payload?.tab || 'basic'
-  customQueryInitialSource.value = payload?.source || undefined
+/** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发）；项目、年度、页签与预选源经 resolveDialogOpenContext */
+function onOpenCustomQueryEvent(payload?: OpenCustomQueryPayload) {
+  customQueryEvent.value = payload ?? null
   showCustomQuery.value = true
 }
 

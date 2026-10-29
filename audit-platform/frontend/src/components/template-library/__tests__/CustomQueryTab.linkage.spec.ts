@@ -43,6 +43,7 @@ import CustomQueryTab from '@/components/template-library/CustomQueryTab.vue'
 import QueryConditionEditor from '@/components/query/QueryConditionEditor.vue'
 import QueryResultPager from '@/components/query/QueryResultPager.vue'
 import QueryTemplateSaveDialog from '@/components/query/QueryTemplateSaveDialog.vue'
+import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 
 const PID = '5942c12e-65fb-4187-ace3-79d45a90cb53'
@@ -344,5 +345,39 @@ describe('保存为模板三档（AQ-39，R9.1）', () => {
       .toContain('当前没有可编辑的项目，仅可保存为「仅我可见」')
     wrapper.unmount()
     document.body.innerHTML = ''
+  })
+})
+
+describe('「我的模板」载入（R9.4，任务 33）', () => {
+  it('与弹窗同一个选择组件；载入还原数据源、条件、列、排序、每页行数与取值目标，年度不取模板里存的', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    const picker = wrapper.findComponent(MyTemplatesDialog)
+    expect(picker.exists(), '页面版应挂共用的 MyTemplatesDialog（原先是内联的模板表格）').toBe(true)
+    expect(picker.props('allowRun')).toBe(false)
+    wrapper.vm.templatesDialogVisible = true
+    await flushPromises()
+    expect(picker.props('modelValue')).toBe(true)
+    // 页面版保存的 config 不含 source（数据源在 data_source）；条件为改造前写法（operator、大写 AND）
+    const tpl = { id: 't1', name: '【测试】大额凭证', data_source: 'ledger_entries', scope: 'private', is_owner: true,
+      config: { project_id: PID, year: 2023, condition_logic: 'OR',
+        conditions: [{ field: 'debit_amount', operator: 'gt', value: 100000000 }],
+        selected_columns: ['voucher_no', 'debit_amount'], sort_field: 'debit_amount', sort_order: 'desc', page_size: 200,
+        acnr_targets: ['E1/E1-14/C10'] } }
+    picker.vm.$emit('load', tpl.config, tpl)
+    await flushPromises()
+    expect(wrapper.vm.formCtx).toMatchObject({ source: 'ledger_entries', project_id: PID, year: 2025 })
+    expect(wrapper.vm.conditionState).toEqual({ conditions: [{ field: 'debit_amount', op: 'gt', value: '100000000' }], logic: 'or' })
+    expect(wrapper.vm.selectedColumns).toEqual(['voucher_no', 'debit_amount'])
+    expect(wrapper.vm.sortState).toEqual({ field: 'debit_amount', direction: 'desc' })
+    expect(wrapper.vm.pageSize).toBe(200)
+    expect(wrapper.vm.acnrFieldIds).toEqual(['E1/E1-14/C10'])
+    await wrapper.vm.onExecute()
+    await flushPromises()
+    expect(executeBodies().at(-1)).toMatchObject({
+      year: 2025, source: 'ledger_entries', condition_logic: 'or', columns: ['voucher_no', 'debit_amount'],
+      sort: [{ field: 'debit_amount', direction: 'desc' }], limit: 200, offset: 0,
+    })
+    expect(wrapper.vm.templateConfig).toMatchObject({ page_size: 200 })
   })
 })

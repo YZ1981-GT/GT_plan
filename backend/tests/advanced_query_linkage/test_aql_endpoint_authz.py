@@ -504,7 +504,7 @@ def _each(columns: tuple[str, ...], reason: str) -> dict[str, str]:
 
 PENDING: dict[str, dict[str, str]] = {
     # 6~9、13 在任务 24（B8）转正；14~16（前置：PM 软删 S，对每一列都先执行）在任务 25（B8）转正
-    "22": _each(_LOGGED_IN, "任务 32（AQ-17）：wp_template_registry 表不存在时 address-resolve 500"),
+    # 22 在任务 32（B11，AQ-17：wp_template_registry 表不存在时改用 JSON 目录）转正
     # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表 23c / 25c / 26c / 28c 在任务 23（B6）转正
 }
 

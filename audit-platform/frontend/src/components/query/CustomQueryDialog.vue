@@ -129,7 +129,8 @@
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
-              <el-button size="small" @click="goToFullCustomQuery" title="跳转独立页支持模板保存/共享">📑 模板</el-button>
+              <el-button size="small" aria-label="查询模板" data-testid="cq-templates" title="载入或执行已保存的查询模板"
+                @click="templatesVisible = true">📑 模板</el-button>
               <el-button size="small" @click="openSaveDialog" :disabled="!selectedSource" title="保存当前选区/条件为查询模板">💾 保存</el-button>
               <el-button size="small" @click="transposed = !transposed">{{ transposed ? '↩ 还原' : '↔ 转置' }}</el-button>
               <el-button size="small" @click="copyResult">📋 复制</el-button>
@@ -169,6 +170,12 @@
                   :label="`${t.name || `表 ${t.index + 1}`}（${t.row_count} 行）`" />
               </el-select>
             </div>
+            <!-- 入口带来的说明（R10.5：附注模板落附注目录时提示编号体系不同）；换数据源即清除 -->
+            <el-alert v-if="entryNotice" type="info" show-icon :title="entryNotice.text" class="gt-cq-entry-notice"
+              data-testid="cq-entry-notice" @close="entryNotice = null" />
+            <!-- 载入 / 执行的模板（R9.3 / R9.4）：弹窗不能编辑的条件与列照样随查询发送并在此写明；关闭即不再使用 -->
+            <el-alert v-if="templateNotice" type="info" show-icon :title="templateNotice" class="gt-cq-entry-notice"
+              data-testid="cq-template-notice" @close="clearTemplateState" />
             <!-- 查询失败：持久显示中文原因与追踪号，不落到「暂无数据」（R11.1） -->
             <QueryErrorAlert v-if="queryError" :error="queryError" />
             <!-- 结果表格 -->
@@ -257,15 +264,17 @@
     <!-- 💾 保存：三档可见范围，可分享项目与页面版同一来源（AQ-39） -->
     <QueryTemplateSaveDialog v-model="saveDialogVisible" :data-source="selectedSource" :config="templateConfig"
       :projects="projectOptions" :default-description="templateDescription" />
+    <!-- 📑 模板：与页面版同一个选择组件；「执行」按当前项目经服务端模板执行端点（重新鉴权、可翻页） -->
+    <MyTemplatesDialog v-model="templatesVisible" allow-run :run-blocked-reason="localProjectId ? '' : '请先选择项目'"
+      @load="(_cfg, tpl) => applyTemplate(tpl, false)" @run="(tpl) => applyTemplate(tpl, true)" />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FullScreen, Aim, Close, RefreshLeft } from '@element-plus/icons-vue'
-import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { resolveColumnLabel } from './queryColumnLabels'
 import { exportQueryResultToXlsx, sanitizeExportName } from './queryExport'
@@ -273,7 +282,9 @@ import { buildTraceUri, reportTypeOfSource, RESOLVE_FAIL_MSG } from './querySour
 import { listProjectsWithProgress } from '@/services/commonApi'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import SheetCellRangePicker from '@/components/query/SheetCellRangePicker.vue'
-import { buildBusinessPayload, isKnownYear, readBlobErrorBody, type QuerySort } from '@/components/custom-query/queryPayloads'
+import {
+  buildBusinessPayload, isKnownYear, readBlobErrorBody, type BusinessQueryInput, type QuerySort,
+} from '@/components/custom-query/queryPayloads'
 import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from './queryErrorText'
 import { columnTypesOf, formatQueryCell, isAmountCell } from './queryCellFormat'
@@ -284,6 +295,10 @@ import QueryErrorAlert from './QueryErrorAlert.vue'
 import QueryResultPager from './QueryResultPager.vue'
 import QueryRowActions from './QueryRowActions.vue'
 import QueryTemplateSaveDialog from './QueryTemplateSaveDialog.vue'
+import MyTemplatesDialog from './MyTemplatesDialog.vue'
+import { toRequestConditions, type ConditionLogic, type RequestCondition } from './queryConditions'
+import { restoreTemplateQuery, type QueryTemplateItem } from './queryTemplateRestore'
+import { customQuery as P_cq } from '@/services/apiPaths'
 
 const props = defineProps<{
   modelValue: boolean
@@ -292,8 +307,10 @@ const props = defineProps<{
   year: number | null
   /** 初始 tab：'basic'（默认业务视图）/ 'advanced'（高级构建器） */
   initialTab?: 'basic' | 'advanced'
-  /** 初始 source（从模板页跳入时预填） */
+  /** 初始 source（侧栏按当前页预选、模板库按钮经 resolveTemplateLibrarySource 映射；每次打开都套用） */
   initialSource?: string
+  /** 随初始 source 带来的说明（模板库附注按钮：模板章节号与项目附注编号不同），用户换数据源即清除 */
+  initialNotice?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
 const visible = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) })
@@ -306,12 +323,6 @@ watch(visible, (v) => { if (!v) fullscreen.value = false })
 const router = useRouter()
 // 构建器页签：与后端准入同一判定（GET /api/query/access，ADR-AQL-08）；原先按系统角色 {admin, manager, partner} 自判
 const { canUseBuilder, builderDisabledReason } = useQueryBuilderAccess()
-
-/** 跳转独立页 — 复杂模板保存/共享走那里（避免本弹窗膨胀） */
-function goToFullCustomQuery() {
-  visible.value = false
-  router.push('/custom-query')
-}
 
 const activeTab = ref<'basic' | 'advanced'>(props.initialTab || 'basic')
 // 弹窗每次打开都按 initialTab 重置 active
@@ -370,13 +381,29 @@ const pageSize = ref(100)
 const resultTotal = ref(0)
 const resultMeta = ref<Record<string, any> | null>(null)
 const queryError = ref<QueryErrorText | null>(null)
+/** 本次打开带来的说明与它所属的源（initialNotice） */
+const entryNotice = ref<{ source: string; text: string } | null>(null)
 const exporting = ref(false)
 const saveDialogVisible = ref(false)
 // 附注章节当前显示第几张表（meta.tables 多于 1 张时可切换）
 const noteTableIndex = ref(0)
-/** 本次结果所属的查询（操作列的下钻 / 引用按它，不按界面当前选择） */
-const lastRun = ref<{ source: string; projectId: string; year: number | null; sort: QuerySort[] }>(
-  { source: '', projectId: '', year: null, sort: [] })
+/** 本次结果所属的查询（操作列的下钻 / 引用、导出全部的筛选与文件名都按它，不按界面当前选择；B10 评审非阻塞 #1） */
+interface QueryRun {
+  source: string; projectId: string; year: number | null; sort: QuerySort[]
+  filters: Record<string, unknown>; projectLabel: string; sourceLabel: string
+  /** 载入的模板带来的条件 / 列（弹窗内不可编辑，照样随查询与导出发送） */
+  extra: Pick<BusinessQueryInput, 'conditions' | 'condition_logic' | 'columns'>
+}
+const lastRun = ref<QueryRun>(
+  { source: '', projectId: '', year: null, sort: [], filters: {}, projectLabel: '', sourceLabel: '', extra: {} })
+// 📑 模板（R9.3 / R9.4）：与页面版同一个选择组件
+const templatesVisible = ref(false)
+/** 载入的模板里弹窗不能编辑的部分（条件 / 列）：随查询发送并在结果区上方写明；换数据源或关闭提示即清除 */
+const templateQuery = ref<{
+  name: string; source: string; conditions: RequestCondition[]; logic: ConditionLogic; columns: string[]
+} | null>(null)
+/** 本次结果来自「执行模板」：翻页仍走模板执行端点；手动查询、排序、换数据源即回到普通查询 */
+const templateRun = ref<{ id: string; name: string } | null>(null)
 // 排序（R2.2）：点表头在数据库内对全量排序、空值在后，回到第 1 页；换数据源即清除（新源未必有该列）
 const sortState = ref<QuerySort | null>(null)
 const resultTableRef = ref<{ clearSort?: () => void } | null>(null)
@@ -386,7 +413,7 @@ const tableDefaultSort = computed(() => (sortState.value
   : undefined))
 function onSortChange({ prop, order }: { prop?: string | null; order?: string | null }) {
   sortState.value = prop && order ? { field: String(prop), direction: order === 'descending' ? 'desc' : 'asc' } : null
-  void executeQuery()
+  void executeQuery() // 模板执行端点不收排序：改排序即回到普通查询（载入的条件照常带上）
 }
 
 // 查询历史（最近 10 次，localStorage 持久，点击回填并重查）
@@ -682,6 +709,8 @@ function resetCategoryFilter() {
 
 // selectedSource 改变时自动派生 filterReportType 并同步左侧树高亮
 watch(selectedSource, (v) => {
+  if (entryNotice.value && entryNotice.value.source !== v) entryNotice.value = null // 入口说明只属于带来的那个源
+  if (templateQuery.value?.source !== v) clearTemplateState() // 载入的模板条件只属于模板的数据源
   noteTableIndex.value = 0 // 换数据源：附注表格回到第一张
   sortState.value = null // 换数据源：清除排序（新源未必有该列）
   resultTableRef.value?.clearSort?.()
@@ -776,8 +805,11 @@ const templateConfig = computed<Record<string, unknown>>(() => {
   }
   if (sheetCellRange.value) config.cell_range = sheetCellRange.value
   if (sheetPickerCtx.value.sheetName) config.sheet_name = sheetPickerCtx.value.sheetName
-  // 排序随模板保存（后端 config_to_request 把 sort_field / sort_order 译成请求的 sort）
+  // 排序随模板保存（后端 config_to_request 把 sort_field / sort_order 译成请求的 sort）；每页行数随模板保存（R9.4）
   if (sortState.value) Object.assign(config, { sort_field: sortState.value.field, sort_order: sortState.value.direction })
+  config.page_size = pageSize.value
+  const tq = templateQuery.value // 载入的模板条件 / 列：另存时一并保存，不丢
+  if (tq) Object.assign(config, { conditions: tq.conditions, condition_logic: tq.logic, selected_columns: tq.columns })
   return config
 })
 const templateDescription = computed(() =>
@@ -785,6 +817,55 @@ const templateDescription = computed(() =>
 function openSaveDialog() {
   if (!selectedSource.value) return
   saveDialogVisible.value = true
+}
+
+/** 载入 / 执行的模板说明（结果区上方）：执行时写明按模板执行；有弹窗不能编辑的条件 / 列时逐项写明 */
+const templateNotice = computed(() => {
+  const tq = templateQuery.value
+  const name = templateRun.value?.name ?? tq?.name
+  if (!name) return ''
+  const head = templateRun.value ? `按模板「${name}」执行（服务端按模板重新鉴权，翻页沿用模板）` : `已载入模板「${name}」`
+  const parts = [
+    tq?.conditions.length ? `${tq.conditions.length} 条筛选条件（${tq.logic === 'or' ? '满足任一' : '全部满足'}）` : '',
+    tq?.columns.length ? `${tq.columns.length} 列` : '',
+  ].filter(Boolean)
+  return parts.length ? `${head}：${parts.join('、')}随查询发送（弹窗内不能编辑，可在页面版编辑；关闭本提示即不再使用）` : head
+})
+function clearTemplateState() {
+  templateQuery.value = null
+  templateRun.value = null
+}
+
+/**
+ * 「载入」/「执行」模板（R9.3 / R9.4，queryTemplateRestore）：还原数据源、排序、每页行数、底稿选区与本页筛选；条件与列
+ * 弹窗不能编辑，照样随查询发送。执行 = 还原后立即经服务端模板执行端点查第 1 页。项目与年度用弹窗当前的（不取模板里存的）。
+ */
+async function applyTemplate(tpl: QueryTemplateItem, run: boolean) {
+  const restored = restoreTemplateQuery(tpl)
+  if (!restored) {
+    ElMessage.warning('模板没有数据源，无法载入')
+    return
+  }
+  clearTemplateState()
+  selectedSource.value = restored.source
+  await nextTick() // 换数据源的 watch 先清掉排序 / 选区，再还原模板里的
+  sortState.value = restored.sort
+  if (restored.pageSize) pageSize.value = restored.pageSize
+  filterText.value = restored.filterText
+  sheetCellRange.value = restored.cellRange
+  if (restored.cellRange) sheetPickerVisible.value = false
+  const conditions = toRequestConditions(restored.condition.conditions)
+  if (conditions.length || restored.columns.length) {
+    templateQuery.value = {
+      name: tpl.name, source: restored.source, conditions, logic: restored.condition.logic, columns: restored.columns,
+    }
+  }
+  if (!run) {
+    ElMessage.success(`已载入模板「${tpl.name}」，点击「▶ 查询」执行`)
+    return
+  }
+  templateRun.value = { id: tpl.id, name: tpl.name }
+  await executeQuery(true, true)
 }
 
 // 操作列：打开权威页面 / 复制引用（底稿单元格列的链接也走这里：新标签打开并定位 ?sheet=&cell=，原先同标签 ?highlight=）
@@ -820,24 +901,24 @@ async function onTraceToTemplate() {
   const row = ctxMenuRow.value
   if (!row) return
 
-  const uri = buildTraceUri(row, selectedSource.value)
+  // 行属于本次结果（不按界面当前选的数据源）；URI 按 address-resolve 认的模块前缀生成（ADR-AQL-17）
+  const uri = buildTraceUri(row, lastRun.value.source || selectedSource.value)
   if (!uri) {
     ElMessage.warning(RESOLVE_FAIL_MSG.noUri)
     return
   }
 
   try {
-    const resp = await api.get('/api/custom-query/address-resolve', {
-      params: { uri },
-    }) as any
-    if (!resp.registered && resp.module === 'workpaper') {
-      ElMessage.warning(RESOLVE_FAIL_MSG.notRegistered)
+    const resp = await api.get('/api/custom-query/address-resolve', { params: { uri }, _silent: true } as any) as any
+    // 未登记的底稿编码、调整分录 / 试算类结果（没有模板定义）：提示原因，不跳转（原先底稿表不存在即 500，AQ-17）
+    if (!resp?.registered || !resp.route_path) {
+      ElMessage.warning(resp?.module === 'workpaper' ? RESOLVE_FAIL_MSG.notRegistered : RESOLVE_FAIL_MSG.noTemplate)
       return
     }
     visible.value = false
     router.push({ path: resp.route_path, query: resp.route_query })
-  } catch (err: any) {
-    handleApiError(err, '模板溯源失败')
+  } catch (err: unknown) {
+    ElMessage.warning(queryErrorToast('模板溯源', describeQueryError(err)))
   }
 }
 
@@ -864,8 +945,12 @@ function requestFilters(source: string): Record<string, unknown> {
   return filters
 }
 
-/** 执行查询（resetPage = 新条件从第 1 页开始；翻页 / 切表时为 false） */
-async function executeQuery(resetPage = true) {
+/**
+ * 执行查询（resetPage = 新条件从第 1 页开始；翻页时为 false）。viaTemplate = 「执行模板」：经服务端模板执行端点
+ * （重新鉴权、按模板配置取数，R9.3）；之后翻页仍走它，其余从第 1 页起的查询（手动、排序、切表）回到普通查询。
+ */
+async function executeQuery(resetPage = true, viaTemplate = false) {
+  if (resetPage && !viaTemplate) templateRun.value = null
   if (!localProjectId.value && _sourceRequiresProject(selectedSource.value)) {
     ElMessage.warning('该数据源需先选择项目（模板浏览模式仅支持报表/附注/底稿模板）')
     return
@@ -880,15 +965,26 @@ async function executeQuery(resetPage = true) {
   loading.value = true
   queryError.value = null
   const source = selectedSource.value
-  const run = { source, projectId: localProjectId.value, year: localYear.value, sort: sortState.value ? [sortState.value] : [] }
+  const tq = templateQuery.value
+  const run: QueryRun = {
+    source, projectId: localProjectId.value, year: localYear.value, sort: sortState.value ? [sortState.value] : [],
+    filters: requestFilters(source), projectLabel: currentProjectLabel.value, sourceLabel: currentSourceLabel.value,
+    extra: tq ? { conditions: tq.conditions, condition_logic: tq.logic, ...(tq.columns.length ? { columns: tq.columns } : {}) } : {},
+  }
+  const tplRun = templateRun.value
+  const offset = (page.value - 1) * pageSize.value
   try {
     // 调用方自管错误（_silent）：失败在结果区显示后端原因与追踪号，确定性错误不自动重试（R11.1）；
     // 原先 validateStatus: s < 600 把 4xx / 5xx 的错误体当数据，落到「暂无该数据源记录」（AQ-09）
-    const data = await api.post('/api/custom-query/execute', buildBusinessPayload({
-      projectId: run.projectId, year: run.year, source, filters: requestFilters(source),
-      ...(run.sort.length ? { sort: run.sort } : {}),
-      limit: pageSize.value, offset: (page.value - 1) * pageSize.value,
-    }), { _silent: true } as any) as any
+    const data = tplRun
+      ? await api.post(P_cq.templateExecute(tplRun.id), {
+        project_id: run.projectId, year: run.year, limit: pageSize.value, offset,
+      }, { _silent: true } as any) as any
+      : await api.post('/api/custom-query/execute', buildBusinessPayload({
+        projectId: run.projectId, year: run.year, source, filters: run.filters, ...run.extra,
+        ...(run.sort.length ? { sort: run.sort } : {}),
+        limit: pageSize.value, offset,
+      }), { _silent: true } as any) as any
     const cols: unknown[] = Array.isArray(data?.columns) ? data.columns : []
     resultRows.value = Array.isArray(data?.rows) ? data.rows : []
     resultColumns.value = cols.length
@@ -931,9 +1027,10 @@ function copyResult() {
 }
 
 function exportBaseName() {
-  const projName = (currentProjectLabel.value || '查询').replace(/[\\/:*?"<>|]/g, '_')
-  const srcName = (currentSourceLabel.value || selectedSource.value).replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\s]/gu, '')
-  return sanitizeExportName(`${projName}_${srcName}_${lastRun.value.year ?? ''}`)
+  const run = lastRun.value
+  const projName = (run.projectLabel || '查询').replace(/[\\/:*?"<>|]/g, '_')
+  const srcName = (run.sourceLabel || run.source).replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\s]/gu, '')
+  return sanitizeExportName(`${projName}_${srcName}_${run.year ?? ''}`)
 }
 
 function onExportCommand(command: string) {
@@ -960,7 +1057,7 @@ async function exportAll() {
   exporting.value = true
   try {
     const payload = buildBusinessPayload({
-      projectId: run.projectId, year: run.year, source: run.source, filters: requestFilters(run.source),
+      projectId: run.projectId, year: run.year, source: run.source, filters: run.filters, ...run.extra,
       ...(run.sort.length ? { sort: run.sort } : {}),
     })
     const headers = Object.fromEntries(resultColumns.value.map((c) => [c, columnLabel(c)]))
@@ -992,12 +1089,17 @@ watch([visible, localProjectId, localYear], ([open]) => {
 // 加载查询历史（localStorage 持久）
 loadQueryHistory()
 
-// ─── Req 14 AC 5: open-custom-query 事件带 source 时自动选中 + 树 reveal ────
-watch(() => props.initialSource, (source) => {
-  if (!source) return
-  // 等树加载完成后再 reveal
+// ─── 入口预选（R10.3 / R10.5）：每次打开都套用 initialSource（原先只在它变化时套用：同一页再开一次、或用户换过源后再开，
+// 预选不生效）；数据源立即选中，树里的高亮与展开等树加载完再做（原先连选中也等树，树取不到时预选整个丢失）──
+watch(() => [visible.value, props.initialSource, props.initialNotice] as const, ([open, source, notice]) => {
+  if (!open) { entryNotice.value = null; return }
+  entryNotice.value = source && notice ? { source, text: notice } : null
+  if (source) revealSource(source)
+}, { immediate: true })
+
+function revealSource(source: string) {
+  selectedSource.value = source
   const doReveal = () => {
-    selectedSource.value = source
     // 在树中查找匹配节点并展开 + 选中
     if (treeRef.value) {
       treeRef.value.setCurrentKey(source)
@@ -1028,7 +1130,7 @@ watch(() => props.initialSource, (source) => {
       }
     })
   }
-})
+}
 </script>
 
 <style scoped>

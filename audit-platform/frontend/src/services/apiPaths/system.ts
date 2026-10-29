@@ -646,6 +646,8 @@ export const customQuery = {
   cellWriteback: '/api/custom-query/cell-writeback',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
+  /** 按当前项目执行模板（服务端重新鉴权、可翻页；年度缺省取目标项目审计年度，R9.3） */
+  templateExecute: (id: string) => `/api/custom-query/templates/${id}/execute`,
   /** 「保存为模板」里「指定项目共享」可选的项目（与保存时逐项目 edit 鉴权同一口径，AQ-39） */
   templateShareTargets: '/api/custom-query/template-share-targets',
 } as const
