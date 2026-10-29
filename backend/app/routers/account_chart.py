@@ -3,6 +3,7 @@
 Validates: Requirements 2.2, 2.5, 2.6
 """
 
+import logging
 import time
 from uuid import UUID
 
@@ -19,6 +20,8 @@ from app.models.audit_platform_schemas import (
 from app.models.core import User
 from app.services import account_chart_service
 from app.services.import_ops_audit_service import ImportOpsAuditService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["account-chart"])
 
@@ -74,6 +77,22 @@ async def get_standard_chart(
     basic_info = state.steps.get("basic_info")
     if basic_info and basic_info.data:
         accounting_standard = basic_info.data.get("accounting_standard", "enterprise")
+
+    # 未接入准则回落企业会计准则科目表。
+    # 向导可选的准则多于已接入的科目表模板（account_chart_service._STANDARD_FILES
+    # 目前只有 enterprise），政府会计 / 民间非营利等选项会让本端点抛 400，
+    # 科目表整页打不开。回落到 enterprise 并记 warning：功能可用且缺口可见。
+    # 判据取服务层映射为单一真源，接入新准则后此处自动不再回落。
+    supported = account_chart_service.supported_standards()
+    if accounting_standard not in supported:
+        logger.warning(
+            "项目 %s 的会计准则 %r 尚未接入标准科目表（已接入：%s），"
+            "回落 enterprise 科目表",
+            project_id,
+            accounting_standard,
+            ", ".join(sorted(supported)),
+        )
+        accounting_standard = "enterprise"
 
     return await account_chart_service.load_standard_template(
         project_id, accounting_standard, db

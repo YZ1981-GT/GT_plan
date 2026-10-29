@@ -241,6 +241,8 @@ import { useRouter } from 'vue-router'
 import { listProjects } from '@/services/commonApi'
 import { Plus, Upload, OfficeBuilding, Document } from '@element-plus/icons-vue'
 import { getProjectDisplayName, buildConsolidatedKeySet } from '@/utils/project_display'
+// 别名导入：本文件已有同名的本地 getStatusLabel（项目状态用），不能直接同名引入
+import { getStatusLabel as getProjectTypeLabelFromDict } from '@/constants/statusEnum'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 import { useGroupTree, highlightSegments, consolMethodLabel, formatShareholding, type TreeNode } from '@/composables/useGroupTree'
 
@@ -361,7 +363,8 @@ function getProjectTypeTag(t: string) {
   return ({ annual: '', special: 'warning', ipo: 'success', internal_control: 'info' } as any)[t] || ''
 }
 function getProjectTypeLabel(t: string) {
-  return ({ annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' } as any)[t] || t || '—'
+  // 单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS（勿在此重建映射）
+  return getProjectTypeLabelFromDict('project_type', t)
 }
 function getStatusTag(s: string) {
   return ({ created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' } as any)[s] || ''

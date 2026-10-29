@@ -2,6 +2,7 @@
   <ThreeColumnLayout
     :hide-middle="hideMiddle"
     :catalog-title="catalogTitle"
+    :hide-sidebar="isBrowseMode && !fourCol && !!selectedProject"
     @nav-change="onNavChange"
     @view-change="onViewChange"
     @open-global-search="showGlobalSearch = true"
@@ -407,7 +408,7 @@ function onCatalogSelect(item: any) {
   padding: var(--gt-space-4);
 }
 
-/* 顶栏操作按钮（白色文字，深紫背景上清晰可见） */
+/* 顶栏操作按钮（顶栏已改白底，前景改常规文字色；原为反白文字配深紫底） */
 .gt-topbar-action-link {
   display: inline-flex;
   align-items: center;
@@ -420,13 +421,14 @@ function onCatalogSelect(item: any) {
   border-radius: 6px;
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: var(--gt-color-text-inverse);
+  color: var(--gt-color-text-secondary, #606266);
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
 }
 .gt-topbar-action-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--gt-color-primary-bg, rgba(75, 45, 119, 0.06));
+  color: var(--gt-color-primary);
 }
 .gt-topbar-btn-text { line-height: 1; }
 .gt-topbar-btn-caret { font-size: 10px; opacity: 0.85; }

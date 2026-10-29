@@ -31,17 +31,21 @@
 
       <!-- 内容区 -->
       <div class="gt-node-body" @click="$emit('select', node)">
+        <!-- 标题显示项目简称（原先显示 node.name 即「客户名_年度」，与下方元信息重复） -->
         <div class="gt-node-title">
           <el-icon v-if="node.report_scope === 'consolidated'" :size="13" style="color: var(--gt-color-primary); margin-right: 4px"><FolderOpened /></el-icon>
-          {{ node.name || node.client_name || '未命名项目' }}
+          {{ node.short_name || node.client_name || '未命名项目' }}
+          <el-tag v-if="projectTypeLabel" size="small" class="gt-node-type-tag">{{ projectTypeLabel }}</el-tag>
         </div>
         <div class="gt-node-meta">
-          <span>{{ node.short_name || node.client_name || '-' }}</span>
+          <span class="gt-node-meta-info">
+            <span>客户：{{ node.client_name || '-' }}</span>
+            <span>鉴证期间：{{ node.audit_year || '—' }}</span>
+          </span>
           <span class="gt-node-meta-right">
             <el-tag v-if="node.consol_lock" size="small" type="warning">🔒 已锁定</el-tag>
-            <el-tooltip v-if="node.status !== 'created'" :content="statusHint(node.status)" placement="top" :show-after="300">
-              <GtStatusTag dict-key="project_status" :value="node.status" style="cursor: help" />
-            </el-tooltip>
+            <!-- 状态 tooltip 已停用：审计阶段提示文案与税审流程不一致，仅保留状态标签 -->
+            <!-- <GtStatusTag v-if="node.status !== 'created'" dict-key="project_status" :value="node.status" /> -->
             <el-button
               class="gt-node-action-inline"
               :icon="EditPen"
@@ -83,6 +87,7 @@
 import { ref, computed } from 'vue'
 import { FolderOpened, Delete, EditPen } from '@element-plus/icons-vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { getStatusLabel } from '@/constants/statusEnum'
 
 interface ProjectNode {
   id: string
@@ -92,8 +97,14 @@ interface ProjectNode {
   status: string
   report_scope: string | null
   consol_lock?: boolean
+  project_type?: string | null
+  audit_year?: number | null
+  audit_period_start?: string | null
+  audit_period_end?: string | null
   children?: ProjectNode[]
 }
+
+// 项目类型中文标签的单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS
 
 const props = defineProps<{
   node: ProjectNode
@@ -112,16 +123,26 @@ defineEmits<{
 const expanded = ref(true)
 const hasChildren = computed(() => (props.node.children?.length ?? 0) > 0)
 
-function statusHint(s: string): string {
-  const tips: Record<string, string> = {
-    planning: '计划中：请导入账套并完成科目映射',
-    execution: '执行中：编制底稿、录入调整分录',
-    completion: '完成阶段：生成报表、复核底稿',
-    reporting: '报告阶段：编辑附注、出具报告',
-    archived: '已归档：项目已锁定',
-  }
-  return tips[s] || s
-}
+/** 项目类型中文标签；未知或未填类型不显示标签（不显示英文原值） */
+const projectTypeLabel = computed(() => {
+  const t = props.node.project_type
+  if (!t) return ''
+  const label = getStatusLabel('project_type', t)
+  // getStatusLabel 对未知值返回原值（英文枚举）⇒ 这里判断后不显示
+  return label === t ? '' : label
+})
+
+/**
+ * 鉴证期间：优先用起止日期，缺失时回落审计年度。
+ * 日期按 YYYY-MM-DD 前 10 位截取（后端返回 UTC 时间串，这里只取日期部分）。
+ */
+const attestationPeriod = computed(() => {
+  const start = props.node.audit_period_start?.slice(0, 10)
+  const end = props.node.audit_period_end?.slice(0, 10)
+  if (start && end) return `${start} ~ ${end}`
+  const year = props.node.audit_year
+  return year ? `${year} 年度` : ''
+})
 </script>
 
 <style scoped>
@@ -202,6 +223,27 @@ function statusHint(s: string): string {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 标题后的项目类型标签 */
+.gt-node-type-tag {
+  margin-left: 6px;
+  flex-shrink: 0;
+  transform: scale(0.9);
+  transform-origin: left center;
+}
+
+/* 元信息行：客户名称 + 鉴证期间 */
+.gt-node-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.gt-node-period {
+  color: var(--gt-color-text-tertiary);
   flex-shrink: 0;
 }
 

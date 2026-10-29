@@ -6,7 +6,8 @@
       { 'dsh-panel--open': modelValue },
     ]"
   >
-    <!-- 折叠态：侧边触发按钮（语义 button） -->
+    <!-- 折叠态侧边触发按钮已停用（税审 demo）：与顶栏「AI 助手」入口一并隐藏。
+         面板展开态逻辑保持可用（modelValue 为真时仍正常渲染），恢复时取消注释即可。
     <button
       v-if="!modelValue"
       ref="triggerRef"
@@ -22,6 +23,7 @@
       </span>
       <span class="dsh-panel-trigger-text">AI</span>
     </button>
+    -->
 
     <!-- 展开态 -->
     <template v-if="modelValue">

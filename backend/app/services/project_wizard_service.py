@@ -106,6 +106,25 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     project.relation_to_parent = data.relation_to_parent
     project.ultimate_company_name = data.ultimate_company_name
     project.ultimate_company_code = data.ultimate_company_code
+    # ── 企业信息（V209 / 税审建项向导）────────────────────────────────
+    # 刻意用「None 不覆盖」语义：本函数同时服务建项与分步更新，而企业信息只在
+    # 基本信息步骤填写。旧客户端或只改其他字段的请求不会携带这组键，
+    # 直接赋值会把已录入的值清成 NULL。空串按未填处理（归一到 None 不写入）。
+    for _field in (
+        "legal_representative",
+        "special_industry_type",
+        "small_micro_enterprise_type",
+        "tax_incentive_type",
+        "branch_institution_type",
+        "overseas_income_credit_method",
+    ):
+        _value = getattr(data, _field, None)
+        if _value is None:
+            continue
+        _value = _value.strip() if isinstance(_value, str) else _value
+        if _value == "":
+            continue
+        setattr(project, _field, _value)
 
 
 def _validate_custom_template_messages(step_data: dict | None) -> list[ValidationMessage]:

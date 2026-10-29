@@ -5,15 +5,11 @@
  *       分级错误处理、请求取消（AbortController）、请求去重、自动重试
  */
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
-import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
 import { getClientInstanceId } from './clientInstance'
 import { refIssueDetailText } from './formulaRefIssues'
-
-// ── NProgress 活跃请求计数器 ──────────────────────────────
-let activeRequests = 0
 
 // ── Trace ID 存储（R7-S2-11）──────────────────────────────
 let _lastTraceId = ''
@@ -248,13 +244,6 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers['X-Client-Instance'] = getClientInstanceId()
   }
   addPending(config)
-  // NProgress：首个请求启动进度条，后续请求递增
-  activeRequests++
-  if (activeRequests === 1) {
-    NProgress.start()
-  } else {
-    NProgress.inc()
-  }
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
@@ -301,9 +290,6 @@ http.interceptors.response.use(
     }
     // R10 Spec C: 5xx 环形缓冲区记录响应
     _trackResponse(response.status)
-    // NProgress：所有请求完成后结束进度条
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
     // 记录请求日志
     const startTime = (response.config as any)._startTime
     if (startTime) {
@@ -336,9 +322,6 @@ http.interceptors.response.use(
     _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // R10 Spec C: 5xx 环形缓冲区记录错误响应
     _trackResponse(error.response?.status ?? 0)
-    // NProgress：错误时也递减计数
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
 
     // 记录错误请求日志
     if (error.config) {

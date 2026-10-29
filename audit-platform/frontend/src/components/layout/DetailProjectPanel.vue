@@ -22,20 +22,23 @@
               <el-descriptions-item label="项目类型">
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="公司简称">{{ project.short_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="项目简称">{{ project.short_name || '-' }}</el-descriptions-item>
+              <!-- 「报表准则」项已停用（税审口径）：报表标准不再由用户选择，
+                   展示该项对税审项目无意义。恢复时连同向导的报表标准选择区一并恢复。
               <el-descriptions-item label="报表准则">
                 <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
                   {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}
                 </el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="报表范围">
+              -->
+             <!-- <el-descriptions-item label="报表范围">
                 <el-tag :type="project.report_scope === 'consolidated' ? 'success' : 'info'" size="small">
                   {{ project.report_scope === 'consolidated' ? '合并报表' : '单体报表' }}
                 </el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="项目状态">
                 <GtStatusTag dict-key="project_status" :value="project.status" />
-              </el-descriptions-item>
+              </el-descriptions-item> -->
               <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
               <!-- 双向导航 4.1：单体项目所属集团链接 → 跳合并项目 -->
@@ -46,7 +49,8 @@
               </el-descriptions-item>
             </el-descriptions>
 
-            <!-- 当前阶段引导：项目所处阶段 + 下一步该做什么 + 底稿完成率一眼可见 -->
+            <!-- 当前阶段引导条已停用（税审 demo）：审计阶段模型与税审流程不一致。
+                 statusTooltip / metrics.wpRate 仍被其他区域消费，故只停用此处展示。
             <div class="gt-stage-guide">
               <div class="gt-stage-guide__main">
                 <el-icon class="gt-stage-guide__icon" color="var(--gt-color-primary)"><Guide /></el-icon>
@@ -62,6 +66,7 @@
                 />
               </div>
             </div>
+            -->
 
             <!-- 配置缺失提示 -->
             <el-alert
@@ -100,9 +105,10 @@
             <div class="gt-quick-tip">
               💡 提示：首次使用请按建议流程操作。先导入账套数据，完成科目映射后系统自动生成试算表，再依次编制底稿、生成报表和附注。
             </div>
-            <!-- 核心流程（按建议流程顺序，随项目阶段高亮"下一步"） -->
+            <!-- 数据中枢（税审口径）：按导入 → 未审 → 调整 → 底稿 → 已审 → 报告的取数链排列。
+                 原「核心流程」组（账套导入/试算表/调整分录/底稿/报表/附注）已替换。 -->
             <div class="gt-quick-group">
-              <div class="gt-quick-group__label">核心流程</div>
+              <div class="gt-quick-group__label">数据中枢</div>
               <div class="gt-quick-grid">
                 <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
                   <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'import' }" @click="goToLedgerImport()">
@@ -111,43 +117,57 @@
                     <span>账套导入</span>
                   </div>
                 </el-tooltip>
-                <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
+                <el-tooltip content="试算平衡表（未审数，需先导入数据+科目映射）" placement="top">
                   <div class="gt-quick-btn" @click="goTo('trial-balance')">
                     <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
-                    <span>试算表</span>
+                    <span>试算平衡表(未审)</span>
                   </div>
                 </el-tooltip>
                 <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
                   <div class="gt-quick-btn" @click="goTo('adjustments')">
                     <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
-                    <span>调整分录</span>
+                    <span>审计调整分录</span>
                   </div>
                 </el-tooltip>
-                <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
+                <el-tooltip content="查看和编辑税务底稿（需先生成底稿）" placement="top">
                   <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'workpapers' }" @click="goTo('workpapers', { view: 'lifecycle' })">
                     <span v-if="recommendedAction === 'workpapers'" class="gt-quick-btn__badge">下一步</span>
                     <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
-                    <span>底稿</span>
+                    <span>税务底稿</span>
                   </div>
                 </el-tooltip>
-                <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
+                <el-tooltip content="科目余额表与报表（已审数，需先导入数据并生成报表）" placement="top">
                   <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'reports' }" @click="goTo('reports')">
                     <span v-if="recommendedAction === 'reports'" class="gt-quick-btn__badge">下一步</span>
                     <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
-                    <span>报表</span>
+                    <span>科目余额表&amp;报表(已审)</span>
                   </div>
                 </el-tooltip>
-                <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
+                <!-- 与左侧项目子菜单的「鉴证报告」同一目标（/disclosure-notes），
+                     两处入口不得分叉指向不同页面。 -->
+                <el-tooltip content="编制鉴证报告" placement="top">
                   <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'disclosure-notes' }" @click="goTo('disclosure-notes')">
                     <span v-if="recommendedAction === 'disclosure-notes'" class="gt-quick-btn__badge">下一步</span>
                     <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
-                    <span>附注</span>
+                    <span>鉴证报告</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('ledger')">
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
+                    <span>查账</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="在独立窗口打开查账（可同时保持查账界面操作底稿）" placement="top">
+                  <div class="gt-quick-btn" @click="onOpenLedgerWindow">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><CopyDocument /></el-icon>
+                    <span>查账窗口</span>
                   </div>
                 </el-tooltip>
               </div>
             </div>
 
-            <!-- 辅助工具 -->
+            <!-- 辅助工具 
             <div class="gt-quick-group">
               <div class="gt-quick-group__label">辅助工具</div>
               <div class="gt-quick-grid">
@@ -163,18 +183,7 @@
                     <span>审计检查</span>
                   </div>
                 </el-tooltip>
-                <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
-                  <div class="gt-quick-btn" @click="goTo('ledger')">
-                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
-                    <span>查账</span>
-                  </div>
-                </el-tooltip>
-                <el-tooltip content="在独立窗口打开查账（可同时保持查账界面操作底稿）" placement="top">
-                  <div class="gt-quick-btn" @click="onOpenLedgerWindow">
-                    <el-icon :size="20" color="var(--gt-color-primary)"><CopyDocument /></el-icon>
-                    <span>查账窗口</span>
-                  </div>
-                </el-tooltip>
+                
                 <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
                   <div class="gt-quick-btn" @click="goTo('deliverable-center')">
                     <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
@@ -188,9 +197,9 @@
                   </div>
                 </el-tooltip>
               </div>
-            </div>
+            </div>-->
 
-            <!-- 项目管理（含危险操作，置于末尾） -->
+            <!-- 项目管理（含危险操作，置于末尾）
             <div class="gt-quick-group">
               <div class="gt-quick-group__label">项目管理</div>
               <div class="gt-quick-grid">
@@ -213,7 +222,7 @@
                   </div>
                 </el-tooltip>
               </div>
-            </div>
+            </div> -->
           </div>
 
           <!-- 导入进度实时面板 -->
@@ -625,6 +634,7 @@ import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
+import { getStatusLabel } from '@/constants/statusEnum'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
@@ -1027,8 +1037,8 @@ async function onCreateNextYear() {
 
 
 function typeLabel(t: string) {
-  const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
-  return m[t] || t || '-'
+  // 单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS（勿在此重建映射）
+  return getStatusLabel('project_type', t)
 }
 function formatDate(d: string) {
   if (!d) return '-'

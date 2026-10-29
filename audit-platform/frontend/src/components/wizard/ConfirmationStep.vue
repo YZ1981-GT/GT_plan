@@ -131,6 +131,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { CONFIRMATION_REQUIRED_STEPS, STEP_LABELS, useWizardStore, type BasicInfo, type StepKey } from '@/stores/wizard'
+import { getStatusLabel } from '@/constants/statusEnum'
 
 const wizardStore = useWizardStore()
 
@@ -141,18 +142,13 @@ function teamNameById(id: string | null): string {
   return (wizardStore.teamUserNames as Record<string, string>)[id] ?? id
 }
 
-const PROJECT_TYPE_MAP: Record<string, string> = {
-  annual: '年度审计',
-  special: '专项审计',
-  ipo: 'IPO审计',
-  internal_control: '内控审计',
-}
 
 const STANDARD_MAP: Record<string, string> = {
   enterprise: '企业会计准则',
   small_enterprise: '小企业会计准则',
   financial: '金融企业会计准则',
   government: '政府会计准则',
+  non_profit_accounting: '民间非营利组织会计制度',
 }
 
 const TEMPLATE_MAP: Record<string, string> = {
@@ -183,7 +179,8 @@ const basicInfo = computed<BasicInfo>(() => {
   }
 })
 
-const projectTypeLabel = computed(() => PROJECT_TYPE_MAP[basicInfo.value.project_type] ?? '—')
+// 单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS（勿在此重建映射）
+const projectTypeLabel = computed(() => getStatusLabel('project_type', basicInfo.value.project_type))
 const standardLabel = computed(() => STANDARD_MAP[basicInfo.value.accounting_standard] ?? '—')
 const templateLabel = computed(() => {
   if (basicInfo.value.template_type === 'custom') {

@@ -26,7 +26,7 @@
   --gt-color-success-light: #edf7ef;
 
   /* ── 渐变预设 ── */
-  --gt-gradient-primary: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
+  --gt-gradient-primary: linear-gradient(135deg, #4c1273 0%, #6e0ba6 50%, #a855f7 100%);
   --gt-gradient-teal: linear-gradient(135deg, #007a94 0%, #0094B3 50%, #33c4d9 100%);
   --gt-gradient-coral: linear-gradient(135deg, #d93a33 0%, #FF5149 50%, #ff7b74 100%);
   --gt-gradient-success: linear-gradient(135deg, #1e8a38 0%, #28A745 50%, #4cd964 100%);
@@ -191,7 +191,7 @@ html.dark {
   --gt-color-success-light: #0d2d14;
 
   /* ── 渐变预设 ── */
-  --gt-gradient-primary: linear-gradient(135deg, #2B1D4D 0%, #4b2d77 50%, #7b5ba8 100%);
+  --gt-gradient-primary: linear-gradient(135deg, #4c1273 0%, #6e0ba6 50%, #a855f7 100%);
   --gt-gradient-teal: linear-gradient(135deg, #0d2a30 0%, #007a94 50%, #0094B3 100%);
   --gt-gradient-coral: linear-gradient(135deg, #2d1515 0%, #d93a33 50%, #FF5149 100%);
   --gt-gradient-success: linear-gradient(135deg, #0d2d14 0%, #1e8a38 50%, #28A745 100%);
@@ -291,7 +291,7 @@ html.dark {
     --gt-color-wheat-light: #fff8e6;
     --gt-color-success: #28A745;
     --gt-color-success-light: #edf7ef;
-    --gt-gradient-primary: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
+    --gt-gradient-primary: linear-gradient(135deg, #4c1273 0%, #6e0ba6 50%, #a855f7 100%);
     --gt-gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8f7fc 100%);
     --gt-gradient-sidebar: linear-gradient(180deg, #f8f7fc 0%, #f0edf5 100%);
     --gt-color-text: #1d1d1f;

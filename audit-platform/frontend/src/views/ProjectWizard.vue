@@ -17,6 +17,12 @@
     <div class="gt-wizard-footer">
       <div class="gt-wizard-footer-spacer" />
       <el-button
+        :disabled="submitting"
+        @click="handleCancel"
+      >
+        取消
+      </el-button>
+      <el-button
         v-if="wizardStore.projectId"
         :loading="wizardStore.loading || submitting"
         @click="handleSave"
@@ -106,6 +112,11 @@ function showGroupNotices() {
     type: 'info',
     duration: 8000,
   })
+}
+
+/** 取消建项：直接返回项目列表，不保存当前步骤的未提交改动 */
+function handleCancel() {
+  router.push('/projects')
 }
 
 async function handleSave() {

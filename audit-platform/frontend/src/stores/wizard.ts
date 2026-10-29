@@ -23,6 +23,19 @@ export interface BasicInfo {
   relation_to_parent: string
   ultimate_company_name: string
   ultimate_company_code: string
+  // ── 企业信息（V209 / 税审建项向导）：全部可空，未填为空串 ──
+  /** 法定代表人 */
+  legal_representative: string
+  /** 特殊行业类型：financial 金融 / insurance 保险 / bank 银行 / securities 证券 / '' 非特殊行业 */
+  special_industry_type: string
+  /** 小微企业类型 */
+  small_micro_enterprise_type: string
+  /** 税收优惠类型 */
+  tax_incentive_type: string
+  /** 总分机构类型 */
+  branch_institution_type: string
+  /** 境外所得抵免方式 */
+  overseas_income_credit_method: string
   signing_partner_id: string | null
   manager_id: string | null
   budget_hours: number | null
@@ -81,12 +94,39 @@ export const GROUP_FIELDS = [
   'ultimate_company_code',
 ] as const
 
+/**
+ * 企业信息字段（V209 / 税审建项向导），与后端 BasicInfoSchema 同名同序。
+ * 全部可空：空串不进 payload，后端「None 不覆盖已有值」，避免分步更新清空已录入值。
+ */
+export const ENTERPRISE_INFO_FIELDS = [
+  'legal_representative',
+  'special_industry_type',
+  'small_micro_enterprise_type',
+  'tax_incentive_type',
+  'branch_institution_type',
+  'overseas_income_credit_method',
+] as const
+
 type GroupField = (typeof GROUP_FIELDS)[number]
 
 /** 从项目详情/创建响应取集团关系字段（null → ''，便于直接回填表单） */
 export function pickGroupFields(source: Record<string, unknown> | null | undefined): Record<GroupField, string> {
   const out = {} as Record<GroupField, string>
   for (const key of GROUP_FIELDS) {
+    const value = source?.[key]
+    out[key] = typeof value === 'string' ? value : ''
+  }
+  return out
+}
+
+type EnterpriseInfoField = (typeof ENTERPRISE_INFO_FIELDS)[number]
+
+/** 从项目详情/创建响应取企业信息字段（null → ''，便于直接回填表单） */
+export function pickEnterpriseInfoFields(
+  source: Record<string, unknown> | null | undefined,
+): Record<EnterpriseInfoField, string> {
+  const out = {} as Record<EnterpriseInfoField, string>
+  for (const key of ENTERPRISE_INFO_FIELDS) {
     const value = source?.[key]
     out[key] = typeof value === 'string' ? value : ''
   }
@@ -180,6 +220,11 @@ export const useWizardStore = defineStore('wizard', {
           const value = (basicInfo[key] ?? '').trim()
           if (value) payload[key] = value
         }
+        // 企业信息（V209）：空串不发送，由后端保留已有值
+        for (const key of ENTERPRISE_INFO_FIELDS) {
+          const value = (basicInfo[key] ?? '').trim()
+          if (value) payload[key] = value
+        }
         if (basicInfo.signing_partner_id) {
           payload.signing_partner_id = basicInfo.signing_partner_id
         }
@@ -252,6 +297,8 @@ export const useWizardStore = defineStore('wizard', {
           report_scope: proj.report_scope || 'standalone',
           // 需求 1.6：批量导入项目的兜底回填也要恢复集团关系
           ...pickGroupFields(proj),
+          // 企业信息（V209）：兜底回填同样恢复，否则再保存会被判为未填
+          ...pickEnterpriseInfoFields(proj),
         }
         this.completedSteps.basic_info = true
       } catch {

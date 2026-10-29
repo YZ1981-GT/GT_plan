@@ -9,7 +9,7 @@
 
 /* 主按钮：渐变更柔和 + 内发光 */
 .el-button--primary {
-  background: linear-gradient(135deg, #4b2d77 0%, #6b42a8 60%, #8b5fcf 100%) !important;
+  background: linear-gradient(135deg, #4c1273 0%, #6e0ba6 60%, #a855f7 100%) !important;
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3), inset 0 1px 0 rgba(255,255,255,0.15) !important;
   border: none !important;
   font-weight: 600 !important;

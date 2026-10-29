@@ -303,6 +303,25 @@ export const PROJECT_STATUS_LABELS: Record<string, StatusDictEntry> = {
   archived:   { label: '已归档', color: 'info' },
 }
 
+/**
+ * 项目类型中文映射（单一真源）。
+ *
+ * 取值必须与后端 ProjectType 枚举（backend/app/models/base.py）一致。
+ * 🔴 本映射建立前，同一份 map 在前端被复制了 7 份（DetailProjectPanel / ProjectTreeNode /
+ * Projects / AttachmentHub / ConfirmationIndex / ArchiveIndex / ConfirmationStep），
+ * 新增 enterprise_income_tax_settlement 时漏改 5 处 ⇒ 界面直接显示英文枚举值。
+ * 新增项目类型只改这里。
+ */
+export const PROJECT_TYPE_LABELS: Record<string, StatusDictEntry> = {
+  annual:                           { label: '年度审计',           color: '' },
+  special:                          { label: '专项审计',           color: '' },
+  ipo:                              { label: 'IPO审计',            color: 'warning' },
+  internal_control:                 { label: '内控审计',           color: '' },
+  capital_verification:             { label: '验资',               color: 'info' },
+  tax_audit:                        { label: '税审',               color: 'primary' },
+  enterprise_income_tax_settlement: { label: '企业所得税汇算清缴', color: 'primary' },
+}
+
 /** 问题工单状态中文映射 */
 export const ISSUE_STATUS_LABELS: Record<string, StatusDictEntry> = {
   open:            { label: '待处理', color: 'info' },
@@ -356,6 +375,9 @@ export const STATUS_DICT: Record<string, Record<string, StatusDictEntry>> = {
   adjustment_status: ADJUSTMENT_STATUS_LABELS,
   report_status: REPORT_STATUS_LABELS,
   project_status: PROJECT_STATUS_LABELS,
+  // 后端 system_dicts._DICTS 暂无 project_type；GtStatusTag / getStatusLabel
+  // 在 dictStore 未命中时会回落到本映射，故注册安全。
+  project_type: PROJECT_TYPE_LABELS,
   issue_status: ISSUE_STATUS_LABELS,
   template_status: TEMPLATE_STATUS_LABELS,
   workhour_status: WORKHOUR_STATUS_LABELS,

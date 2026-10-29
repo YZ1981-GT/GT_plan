@@ -109,6 +109,16 @@ _STANDARD_FILES = {
     "enterprise": "standard_account_chart.json",
 }
 
+
+def supported_standards() -> frozenset[str]:
+    """已接入标准科目表模板的会计准则集合（单一真源）。
+
+    向导可选的会计准则多于这里已接入的模板。调用方（如 account_chart 路由）
+    据此判断是否需要回落 enterprise，而不是各自硬编码准则清单 ——
+    接入新准则只需在 ``_STANDARD_FILES`` 加一行并放置 JSON 种子文件。
+    """
+    return frozenset(_STANDARD_FILES)
+
 # Account code prefix → category mapping
 _CODE_CATEGORY_MAP: dict[str, AccountCategory] = {
     "1": AccountCategory.asset,

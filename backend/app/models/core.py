@@ -111,6 +111,28 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         String(20), nullable=True, default=None
     )
 
+    # ── 企业信息（V209 / 税审建项向导）────────────────────────────────
+    # 全部可空、存量零回填。刻意用专列而非 JSONB：N5-6 等税审底稿按列查询取数，
+    # JSONB 取数需 ->> 转换且无法建普通索引。
+    legal_representative: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="法定代表人"
+    )
+    special_industry_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="特殊行业类型：金融/保险/银行/证券"
+    )
+    small_micro_enterprise_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="小微企业类型"
+    )
+    tax_incentive_type: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, comment="税收优惠类型"
+    )
+    branch_institution_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="总分机构类型"
+    )
+    overseas_income_credit_method: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="境外所得抵免方式"
+    )
+
     # 合并锁定（Phase 0 — consol-phase0-core-pipeline / C3 三层一致 + F2 锁定闭环）
     consol_lock: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false"), nullable=False

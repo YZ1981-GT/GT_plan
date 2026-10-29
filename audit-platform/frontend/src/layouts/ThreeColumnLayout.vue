@@ -4,28 +4,38 @@
     <header class="gt-topbar">
       <div class="gt-topbar-left">
         <div class="gt-logo" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠/展开导航">
-          <img src="/gt-logo-white.png" alt="Grant Thornton 致同" class="gt-logo-img" />
+          <!-- 顶栏改白底后用深色版 logo。
+               ⚠ 命名反直觉：logo-citar-light.png 是「用于浅色背景」的深紫+黑字版，
+               而 logo-citar.png 是纯白版（只能用在深色底上）。切勿按文件名对调。 -->
+          <img src="/logo-citar-light.png" alt="致同 CITAR" class="gt-logo-img" />
+          <!-- logo 文字已清空（品牌更名）：平台名以页面标题呈现，顶栏只留图形标识 -->
           <transition name="gt-fade">
-            <span v-if="!sidebarCollapsed" class="gt-logo-text">审计平台</span>
+            <span v-if="!sidebarCollapsed" class="gt-logo-text"></span>
           </transition>
         </div>
       </div>
-      <div class="gt-topbar-center">
+       <!-- <div class="gt-topbar-center">
         <el-breadcrumb separator="/">
           <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
           <el-breadcrumb-item v-if="currentModule">{{ currentModule }}</el-breadcrumb-item>
-        </el-breadcrumb>
-      </div>
+        </el-breadcrumb> 
+      </div>  -->
       <div class="gt-topbar-right">
-        <!-- 全局搜索（Ctrl+K） -->
-        <el-tooltip content="全局搜索 (Ctrl+K)" placement="bottom">
-          <span class="gt-topbar-btn" @click="$emit('open-global-search')">
-            <el-icon><Search /></el-icon>
-          </span>
-        </el-tooltip>
+        <!-- ⛔ 顶栏按钮批量停用（税审 demo）：全局搜索 / 通知铃铛 / 显示设置 /
+             四栏切换 / 回收站 / 系统设置 / 导入指示 / AI 助手 / 金额单位 / 暗色切换。
+             用 <template v-if="false"> 而非 HTML 注释 —— 这些区块内部本身含注释，
+             HTML 注释不可嵌套，内层 会提前闭合导致模板结构损坏。
+             恢复时删掉对应的 template 包裹层即可。 -->
+        <template v-if="false">
+          <!-- 全局搜索（Ctrl+K） -->
+          <el-tooltip content="全局搜索 (Ctrl+K)" placement="bottom">
+            <span class="gt-topbar-btn" @click="$emit('open-global-search')">
+              <el-icon><Search /></el-icon>
+            </span>
+          </el-tooltip>
 
-        <!-- 通知铃铛 -->
-        <slot name="nav-notifications" />
+          <!-- 通知铃铛 -->
+          <slot name="nav-notifications" />
 
         <!-- 显示设置 Aa -->
         <el-popover placement="bottom" :width="240" trigger="click" :teleported="true">
@@ -72,36 +82,38 @@
                 <el-radio-button :value="0.5">50%</el-radio-button>
               </el-radio-group>
             </div>
-          </div>
-        </el-popover>
+            </div>
+          </el-popover>
 
-        <div class="gt-topbar-divider" />
+          <div class="gt-topbar-divider" />
 
-        <!-- 视图切换按钮（三栏/四栏） -->
-        <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图（点击显示附注章节树）'" placement="bottom">
-          <div
-            class="gt-topbar-btn"
-            :class="{ 'gt-topbar-btn--pulse': !fourColumnMode && isConsolNotePage }"
-            @click="fourColumnMode = !fourColumnMode"
-          >
-            <el-icon :size="18"><Grid v-if="!fourColumnMode" /><Menu v-else /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="回收站" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/recycle-bin')">
-            <el-icon :size="18"><DeleteFilled /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="系统设置" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings')">
-            <el-icon :size="18"><Setting /></el-icon>
-          </div>
-        </el-tooltip>
+          <!-- 视图切换按钮（三栏/四栏） -->
+          <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图（点击显示附注章节树）'" placement="bottom">
+            <div
+              class="gt-topbar-btn"
+              :class="{ 'gt-topbar-btn--pulse': !fourColumnMode && isConsolNotePage }"
+              @click="fourColumnMode = !fourColumnMode"
+            >
+              <el-icon :size="18"><Grid v-if="!fourColumnMode" /><Menu v-else /></el-icon>
+            </div>
+          </el-tooltip>
+          <el-tooltip content="回收站" placement="bottom">
+            <div class="gt-topbar-btn" @click="router.push('/recycle-bin')">
+              <el-icon :size="18"><DeleteFilled /></el-icon>
+            </div>
+          </el-tooltip>
+          <el-tooltip content="系统设置" placement="bottom">
+            <div class="gt-topbar-btn" @click="router.push('/settings')">
+              <el-icon :size="18"><Setting /></el-icon>
+            </div>
+          </el-tooltip>
+        </template>
         <!-- 公式待确认角标 + 弹窗（formula-global-settings-sync R5：进入项目自动弹一次，角标常驻） -->
         <FormulaPendingSyncDialog :project-id="currentProjectId" @resolved="onFormulaSaved" />
-        <!-- 后台导入任务指示 -->
+        <!-- 后台导入任务指示：已停用（税审 demo）。
+             条件置 false 而非删除，保留 bgImportStatus 相关逻辑不动。 -->
         <el-tooltip
-          v-if="bgImportStatus"
+          v-if="false && bgImportStatus"
           :content="bgImportStatus.tooltip"
           placement="bottom"
           effect="dark"
@@ -127,28 +139,30 @@
 
         <div class="gt-topbar-divider" />
 
-        <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
-        <slot name="nav-review-inbox" />
+        <!-- 复核收件箱入口（reviewer/partner/admin 可见） 
+        <slot name="nav-review-inbox" />-->
 
-        <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
-        <slot name="nav-eqcr" />
+        <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） 
+        <slot name="nav-eqcr" />-->
 
-        <!-- AI 助手快捷入口 -->
-        <el-tooltip :content="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'" placement="bottom">
-          <el-badge :value="dshUnreadCount" :hidden="dshUnreadCount === 0 || showDshPanel" :max="99" class="gt-dsh-badge">
-            <button
-              class="gt-topbar-btn"
-              :class="{ 'gt-topbar-btn--active': showDshPanel }"
-              type="button"
-              :aria-label="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'"
-              :aria-expanded="showDshPanel"
-              aria-controls="dsh-panel-region"
-              @click="showDshPanel = !showDshPanel"
-            >
-              <el-icon :size="18"><ChatDotSquare /></el-icon>
-            </button>
-          </el-badge>
-        </el-tooltip>
+        <!-- AI 助手快捷入口：已停用（与 DshPanel 折叠态触发按钮一并隐藏） -->
+        <template v-if="false">
+          <el-tooltip :content="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'" placement="bottom">
+            <el-badge :value="dshUnreadCount" :hidden="dshUnreadCount === 0 || showDshPanel" :max="99" class="gt-dsh-badge">
+              <button
+                class="gt-topbar-btn"
+                :class="{ 'gt-topbar-btn--active': showDshPanel }"
+                type="button"
+                :aria-label="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'"
+                :aria-expanded="showDshPanel"
+                aria-controls="dsh-panel-region"
+                @click="showDshPanel = !showDshPanel"
+              >
+                <el-icon :size="18"><ChatDotSquare /></el-icon>
+              </button>
+            </el-badge>
+          </el-tooltip>
+        </template>
 
         <!-- formula-toolbar Task 5: primary outlet — AI 后、金额单位快捷前 -->
         <WorkpaperPrimaryCapabilitiesHost
@@ -160,19 +174,20 @@
           </template>
         </WorkpaperPrimaryCapabilitiesHost>
 
-        <!-- 金额单位快捷（保证 AI → ƒx outlet → 金额单位 顺序） -->
-        <el-tooltip content="金额单位" placement="bottom">
-          <div class="gt-topbar-btn" title="金额单位" aria-label="金额单位">
-            <span class="gt-topbar-text-icon">{{ amountUnitShortLabel }}</span>
-          </div>
-        </el-tooltip>
+        <!-- 金额单位快捷 / 暗色模式切换：已停用（税审 demo） -->
+        <template v-if="false">
+          <el-tooltip content="金额单位" placement="bottom">
+            <div class="gt-topbar-btn" title="金额单位" aria-label="金额单位">
+              <span class="gt-topbar-text-icon">{{ amountUnitShortLabel }}</span>
+            </div>
+          </el-tooltip>
 
-        <!-- Phase 3 F4: 暗色模式切换按钮 -->
-        <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
-          <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
-            <span class="gt-theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
-          </div>
-        </el-tooltip>
+          <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
+            <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
+              <span class="gt-theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
+            </div>
+          </el-tooltip>
+        </template>
 
         <el-dropdown trigger="click">
           <div class="gt-user-info">
@@ -199,40 +214,61 @@
     <!-- 三栏主体 -->
     <div class="gt-body">
       <!-- 左侧栏：1级功能导航 -->
-      <aside class="gt-sidebar" :style="{ width: sidebarCollapsed ? '56px' : sidebarWidth + 'px' }" role="navigation">
+      <aside v-show="!hideSidebar" class="gt-sidebar" :style="{ width: sidebarCollapsed ? '56px' : sidebarWidth + 'px' }" role="navigation">
         <nav class="gt-nav">
-          <div
-            v-for="item in navItems"
-            :key="item.key"
-            class="gt-nav-item"
-            :class="{ 'gt-nav-item--active': activeNav === item.key }"
-            @click="onNavClick(item)"
-            :title="item.label"
-          >
-            <el-icon :size="20"><component :is="item.icon" /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">
-                {{ item.label }}
-                <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
-                <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
-                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
-              </span>
-            </transition>
-          </div>
-          <!-- 公式管理（弹窗触发，非路由） -->
-          <div class="gt-nav-item" @click="onOpenFormulaEvent()" title="公式管理">
-            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700;width:20px;text-align:center;display:inline-block">ƒx</span>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
-            </transition>
-          </div>
-          <!-- 高级查询（弹窗触发，非路由） -->
-          <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
-            <el-icon :size="20"><Search /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
-            </transition>
-          </div>
+          <template v-for="item in navItems" :key="item.key">
+            <div
+              class="gt-nav-item"
+              :class="{ 'gt-nav-item--active': activeNav === item.key }"
+              @click="onNavClick(item)"
+              :title="item.label"
+            >
+              <el-icon :size="20"><component :is="item.icon" /></el-icon>
+              <transition name="gt-fade">
+                <span v-if="!sidebarCollapsed" class="gt-nav-label">
+                  {{ item.label }}
+                  <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
+                  <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
+                  <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
+                </span>
+              </transition>
+            </div>
+
+            <!-- 项目子菜单：仅在已进入某个项目时显示（需要 projectId 拼路径） -->
+            <div
+              v-for="sub in (item.key === 'projects' ? projectSubNavItems : [])"
+              :key="sub.key"
+              class="gt-nav-item gt-nav-item--sub"
+              :class="{ 'gt-nav-item--active': activeProjectSubNav === sub.key }"
+              @click="onProjectSubNavClick(sub)"
+              :title="sub.label"
+            >
+              <el-icon :size="16"><component :is="sub.icon" /></el-icon>
+              <transition name="gt-fade">
+                <span v-if="!sidebarCollapsed" class="gt-nav-label gt-nav-label--sub">{{ sub.label }}</span>
+              </transition>
+            </div>
+          </template>
+          <!-- ⛔「公式管理」「高级查询」菜单已隐藏（税审 demo）。
+               两者都是弹窗触发而非路由，弹窗组件本身保留在下方（仍可由其他入口/
+               eventBus 'open-formula-manager' 唤起），这里只摘掉侧栏入口。
+               用 <template v-if="false"> 而非 HTML 注释：区块内部含注释，注释不可嵌套。 -->
+          <template v-if="false">
+            <!-- 公式管理（弹窗触发，非路由） -->
+            <div class="gt-nav-item" @click="onOpenFormulaEvent()" title="公式管理">
+              <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700;width:20px;text-align:center;display:inline-block">ƒx</span>
+              <transition name="gt-fade">
+                <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
+              </transition>
+            </div>
+            <!-- 高级查询（弹窗触发，非路由） -->
+            <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
+              <el-icon :size="20"><Search /></el-icon>
+              <transition name="gt-fade">
+                <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
+              </transition>
+            </div>
+          </template>
           <!-- 收起 -->
           <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
             <el-icon :size="20"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
@@ -244,8 +280,9 @@
       </aside>
 
       <!-- 左侧拖拽分隔线（始终显示，用于调整左侧栏宽度） -->
+      <!-- 左拖拽分隔线：侧栏隐藏时一并隐藏，否则会留下一条无对应栏位的竖线 -->
       <div
-        v-if="!sidebarCollapsed"
+        v-if="!sidebarCollapsed && !hideSidebar"
         class="gt-resizer"
         @mousedown="startResize('left', $event)"
       />
@@ -365,7 +402,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, provide, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -378,7 +415,7 @@ import {
   Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
-  Search,
+  Search, Upload, Edit, Notebook, TrendCharts, CopyDocument,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
@@ -399,6 +436,7 @@ import {
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
 import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type FourColSwitchPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
+import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
 
@@ -431,95 +469,127 @@ const props = defineProps<{
   hideMiddle?: boolean
   fourColumn?: boolean
   catalogTitle?: string
+  /**
+   * 隐藏左侧 1 级功能导航栏。
+   * 展示项目详情时由 DefaultLayout 下发（浏览模式 + 非四栏 + 已选中项目），
+   * 让详情面板获得完整横向空间。
+   * 🔴 用 v-show 而非 CSS 写死 display:none —— 写死会连带破坏响应式断点里的
+   * .gt-sidebar 规则（移动端横向导航），且无法按场景恢复。
+   */
+  hideSidebar?: boolean
 }>()
 
 // ── 导航项（R7-S2-01：角色感知动态化） ──
 const roleStore = useRoleContextStore()
 
-const FALLBACK_NAV = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production', roles: null },
-  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production', roles: null },
-  { key: 'team', label: '人员档案', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
-  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'production', roles: null },
-  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
-  { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
-  { key: 'formula-global', label: '全局公式', icon: Grid, path: '/settings/formula-global', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
-  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
-  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
-  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
-  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin'] },
+/**
+ * 项目下的子菜单（税审取数链顺序）。
+ * 仅在已进入某个项目（路由含 projectId）时才渲染 —— 项目列表页没有可拼的 ID，整组自动隐藏。
+ *
+ * 两类条目：
+ * - 带 `subPath`：站内路由，拼成 `/projects/{当前项目ID}{subPath}`
+ * - 带 `action`：非路由动作（查账窗口是 window.open 打开的独立窗口，不是本布局内的页面）
+ */
+type ProjectSubNavEntry = {
+  key: string
+  label: string
+  icon: Component
+  subPath?: string
+  action?: 'ledger-window'
+}
+
+const PROJECT_SUB_NAV: ProjectSubNavEntry[] = [
+  { key: 'sub-ledger-import', label: '账套导入', icon: Upload, subPath: '/ledger-import' },
+  { key: 'sub-trial-balance', label: '试算平衡表(未审)', icon: Grid, subPath: '/trial-balance' },
+  { key: 'sub-adjustments', label: '审计调整分录', icon: Edit, subPath: '/adjustments' },
+  { key: 'sub-workpapers', label: '税务底稿', icon: Notebook, subPath: '/workpapers' },
+  { key: 'sub-reports', label: '科目余额表&报表(已审)', icon: TrendCharts, subPath: '/reports' },
+  { key: 'sub-disclosure-notes', label: '鉴证报告', icon: Document, subPath: '/disclosure-notes' },
+  // 独立查账窗口（multi-window-ledger-workbench）：window.open 到 /ledger-workbench/:projectId，
+  // 窗口名按 projectId 固定 ⇒ 重复点击聚焦已有窗口而非重复开窗。
+  { key: 'sub-ledger-window', label: '查账窗口', icon: CopyDocument, action: 'ledger-window' },
 ]
 
 /**
- * 按角色过滤 + 覆盖路径
- * - roles=null 表示所有角色可见
- * - 按角色覆盖"看板"默认路径
+ * 左侧 1 级导航。
+ * 税审 demo 只保留「项目」与「账号权限」两项，其余（仪表盘/人员档案/工时/看板/
+ * 合并/函证/归档/附件/模板库/全局公式/知识库/私人库/AI 模型）已移除。
+ * 🔴 「账号权限」保留 roles:['admin'] 限制 —— 它是用户与权限管理入口，
+ *    放开给全角色等于把账号管理暴露给所有登录用户。
+ */
+const FALLBACK_NAV = [
+  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production', roles: null },
+  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+]
+
+/**
+ * 按角色过滤（roles=null 表示所有角色可见）。
+ * 原先还按角色覆盖「看板」路径（manager/partner 各自仪表盘），该菜单已移除故一并删去。
  */
 function buildNavForRole(nav: typeof FALLBACK_NAV, role: string) {
-  return nav
-    .filter(item => !item.roles || item.roles.includes(role))
-    .map(item => {
-      if (item.key === 'mgmt-dashboard') {
-        if (role === 'manager') return { ...item, path: '/dashboard/manager' }
-        if (role === 'partner') return { ...item, path: '/dashboard/partner' }
-      }
-      return item
-    })
+  return nav.filter(item => !item.roles || item.roles.includes(role))
 }
 
-// ── 合并菜单条件显示（group-tree-architecture Task 17.1） ──
-// 是否存在 report_scope='consolidated' 的合并项目。
-// 决策：projectStore 是单项目上下文 store，projectOptions 仅含 {id,name} 无 report_scope，
-// 无法干净派生，故采用首次轻量 API 调用并缓存结果（任务明确允许"首次 API 调用缓存结果"）。
-// fail-open：查询失败时默认显示菜单，避免瞬时错误隐藏有效功能。
-const hasConsolidatedProjects = ref(false)
-let consolidatedChecked = false
+// 原「合并菜单条件显示」探测（group-tree-architecture Task 17.1）已随「合并」菜单一并移除：
+// 它每次布局挂载都要 GET /api/projects/tree?scope=consolidated 来决定是否显示该菜单，
+// 菜单移除后这个请求纯属浪费。恢复「合并」菜单时需同时恢复该探测。
 
-async function checkConsolidatedProjects() {
-  if (consolidatedChecked) return
-  consolidatedChecked = true
-  try {
-    // GET /api/projects/tree?scope=consolidated → {trees, independents}
-    // 存在合并项目的判定：trees 非空（每棵树根为 ultimate 合并项目）或 independents 中有合并项目
-    // 不传 validateStatus：非 2xx 响应抛错 → 进 catch 走 fail-open 显示菜单
-    const data: any = await api.get('/api/projects/tree', {
-      params: { scope: 'consolidated' },
-    })
-    const trees = Array.isArray(data?.trees) ? data.trees : []
-    const independents = Array.isArray(data?.independents) ? data.independents : []
-    hasConsolidatedProjects.value = trees.length > 0 || independents.length > 0
-  } catch {
-    // fail-open：异常时显示菜单
-    hasConsolidatedProjects.value = true
-  }
-}
+const navItems = computed(() =>
+  buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor'),
+)
 
-const navItems = computed(() => {
-  const items = buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor')
-  // 无合并项目时隐藏"合并"菜单（保留角色过滤）
-  if (!hasConsolidatedProjects.value) {
-    return items.filter(item => item.key !== 'consolidation')
-  }
-  return items
+/**
+ * 项目子菜单：仅在路由含 projectId 时可用（否则无法拼出目标路径）。
+ * 返回已拼好绝对路径的数组，模板直接渲染。
+ */
+const projectSubNavItems = computed(() => {
+  // 直接读 route.params 而不复用下方的 currentProjectId：
+  // 后者声明在本文件更靠后的位置，跨前后引用虽因 computed 惰性求值可用，但很脆弱。
+  const pid = (route.params.projectId as string) || ''
+  if (!pid) return []
+  return PROJECT_SUB_NAV.map(item => ({
+    ...item,
+    // 动作型条目（查账窗口）没有站内路径，path 置空串 ⇒ 不参与高亮匹配
+    path: item.subPath ? `/projects/${pid}${item.subPath}` : '',
+  }))
 })
+
+/**
+ * 当前命中的子菜单 key（按路径前缀匹配，空串表示未命中）。
+ * 动作型条目 path 为空串，必须排除 —— 否则 `startsWith('')` 恒为真会把它误判成命中。
+ */
+const activeProjectSubNav = computed(() => {
+  const p = route.path
+  return projectSubNavItems.value.find(item => item.path && p.startsWith(item.path))?.key || ''
+})
+
+/** 子菜单点击：路由型带上当前年度（与 DetailProjectPanel 的 goTo 口径一致）；动作型另走分支 */
+function onProjectSubNavClick(item: { key: string; path: string; action?: 'ledger-window' }) {
+  const year = route.query.year ? String(route.query.year) : undefined
+
+  if (item.action === 'ledger-window') {
+    openLedgerWindow((route.params.projectId as string) || '', year ? Number(year) : undefined)
+    return
+  }
+
+  if (!item.path) return
+  router.push({ path: item.path, query: year ? { year } : {} })
+}
 
 const activeNav = computed(() => {
   const p = route.path
-  if (p === '/') return 'dashboard'
+  // 「仪表盘」菜单已移除，根路径按项目高亮（登录后也统一落在项目页）
+  if (p === '/') return 'projects'
   // 顶部栏路由不高亮左侧导航
   const topBarPaths = ['/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
-  // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
-  if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
+  // 原先 /projects/:id/consolidation 高亮「合并」菜单；该菜单已移除，
+  // 现按下方通用前缀匹配归入「项目」（否则该页面左侧无任何高亮）。
   for (const item of navItems.value) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
-  if (p.startsWith('/projects')) return 'projects'
-  return 'dashboard'
+  // 兜底按项目高亮（左侧只剩项目与账号权限两项，未命中账号权限即项目）
+  return 'projects'
 })
 
 const currentModule = computed(() => {
@@ -997,7 +1067,6 @@ function onShortcutUndo() {
 
 onMounted(() => {
   loadPrefs()
-  checkConsolidatedProjects()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
   eventBus.on('open-custom-query', onOpenCustomQueryEvent)
@@ -1036,15 +1105,19 @@ onUnmounted(() => {
   background: var(--gt-color-bg);
 }
 
-/* ── 顶部导航栏（致同品牌深紫） ── */
+/* ── 顶部导航栏（白底）──
+   原为致同品牌深紫底（--gt-color-primary）+ 全套反白前景色。
+   改白底后，下方顶栏内所有前景色（logo / 面包屑 / 按钮 / 图标 / 用户区）
+   都必须一并从「反白」改成常规文字色，否则白字落在白底上不可见。
+   白底与下方内容区同色 ⇒ 必须补 border-bottom 才有层次分隔（原深紫底不需要）。 */
 .gt-topbar {
   height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--gt-space-4);
-  background: var(--gt-color-primary);
-  border-bottom: none;
+  background: var(--gt-color-bg-white, #fff);
+  border-bottom: 1px solid var(--gt-color-border-light, #ebeef5);
   flex-shrink: 0;
   z-index: 100;
 }
@@ -1052,8 +1125,8 @@ onUnmounted(() => {
 .gt-topbar-left { display: flex; align-items: center; }
 .gt-topbar-center { flex: 1; padding: 0 var(--gt-space-4); }
 .gt-topbar-center :deep(.el-breadcrumb__inner),
-.gt-topbar-center :deep(.el-breadcrumb__separator) { color: rgba(255, 255, 255, 0.7); }
-.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: var(--gt-color-text-inverse); }
+.gt-topbar-center :deep(.el-breadcrumb__separator) { color: var(--gt-color-text-secondary, #606266); }
+.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: var(--gt-color-primary); }
 .gt-topbar-right { display: flex; align-items: center; gap: 4px; }
 .gt-topbar-right > * { display: inline-flex; align-items: center; }
 
@@ -1066,12 +1139,12 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-logo:hover { background: rgba(255, 255, 255, 0.1); }
-.gt-logo-img { height: 40px; width: auto; }
+.gt-logo:hover { background: var(--gt-color-primary-bg, rgba(75, 45, 119, 0.06)); }
+.gt-logo-img { height: 36px; width: auto; }
 .gt-logo-text {
   font-size: var(--gt-font-size-sm);
   font-weight: 700;
-  color: var(--gt-color-text-inverse);
+  color: var(--gt-color-primary);
   white-space: nowrap;
 }
 
@@ -1087,12 +1160,18 @@ onUnmounted(() => {
   background: transparent;
   padding: 0;
   font-family: inherit;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--gt-color-text-secondary, #606266);
   font-size: var(--gt-font-size-sm);
   transition: background 0.15s ease;
 }
-.gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
-.gt-topbar-btn--active { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.gt-topbar-btn:hover {
+  background: var(--gt-color-primary-bg, rgba(75, 45, 119, 0.06));
+  color: var(--gt-color-primary);
+}
+.gt-topbar-btn--active {
+  background: var(--gt-color-primary);
+  color: var(--gt-color-text-inverse, #fff);
+}
 .gt-topbar-btn--pulse {
   animation: gt-pulse-hint 1.5s ease-in-out infinite;
   position: relative;
@@ -1149,17 +1228,20 @@ onUnmounted(() => {
   line-height: 1;
 }
 
-/* 顶栏内所有 el-button text / el-badge 适配深紫背景 */
-.gt-topbar-right :deep(.el-button--text) { color: rgba(255, 255, 255, 0.85); }
-.gt-topbar-right :deep(.el-button--text:hover) { color: #fff; background: rgba(255, 255, 255, 0.1); }
-.gt-topbar-right :deep(.el-icon) { color: rgba(255, 255, 255, 0.9); }
+/* 顶栏内所有 el-button text / el-icon / el-dropdown 适配白色背景 */
+.gt-topbar-right :deep(.el-button--text) { color: var(--gt-color-text-secondary, #606266); }
+.gt-topbar-right :deep(.el-button--text:hover) {
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg, rgba(75, 45, 119, 0.06));
+}
+.gt-topbar-right :deep(.el-icon) { color: var(--gt-color-text-secondary, #606266); }
 .gt-topbar-right :deep(.el-icon svg) { fill: currentColor; }
-.gt-topbar-right :deep(.el-dropdown) { color: var(--gt-color-text-inverse); }
+.gt-topbar-right :deep(.el-dropdown) { color: var(--gt-color-text, #303133); }
 
 .gt-topbar-divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--gt-color-border-light, #ebeef5);
   margin: 0 8px;
 }
 
@@ -1198,18 +1280,19 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-user-info:hover { background: rgba(255, 255, 255, 0.15); }
+.gt-user-info:hover { background: var(--gt-color-primary-bg, rgba(75, 45, 119, 0.06)); }
 .gt-avatar {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--gt-color-text-inverse);
+  /* 白底上头像改用品牌紫实底 + 白字，保证首字母可读 */
+  background: var(--gt-gradient-primary);
+  color: var(--gt-color-text-inverse, #fff);
   font-weight: 600;
   font-size: var(--gt-font-size-sm);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: none;
 }
 .gt-username {
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: var(--gt-color-text-inverse);
+  color: var(--gt-color-text, #303133);
 }
 
 /* ── 三栏主体 ── */
@@ -1262,6 +1345,25 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3);
 }
 .gt-nav-label { font-weight: 500; }
+
+/* ── 项目子菜单：缩进 + 弱化，与 1 级项区分 ── */
+.gt-nav-item--sub {
+  padding: 7px 12px 7px 28px;
+  font-size: var(--gt-font-size-xs);
+  position: relative;
+}
+
+.gt-nav-item--sub:hover {
+  color: var(--gt-color-primary);
+}
+.gt-nav-label--sub { font-weight: 400; }
+
+/* 侧栏收起时子菜单只剩图标，取消缩进与竖线 */
+.gt-three-col--collapsed .gt-nav-item--sub {
+  padding: 7px 12px;
+  justify-content: center;
+}
+.gt-three-col--collapsed .gt-nav-item--sub::before { display: none; }
 .gt-maturity-badge {
   font-size: var(--gt-font-size-xs); font-weight: 600; padding: 1px 4px; border-radius: 3px;
   margin-left: 4px; vertical-align: middle; line-height: 1;

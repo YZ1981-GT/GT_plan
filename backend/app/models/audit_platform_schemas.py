@@ -109,6 +109,13 @@ class BasicInfoSchema(BaseModel):
     relation_to_parent: str | None = None  # 与上级关系：subsidiary（子公司）/ branch（分公司）
     ultimate_company_name: str | None = None  # 最终控制方名称
     ultimate_company_code: str | None = None  # 最终控制方代码（统一社会信用代码，可空）
+    # ── 企业信息（V209 / 税审建项向导）：全部可空，存量项目零回填 ──
+    legal_representative: str | None = None  # 法定代表人
+    special_industry_type: str | None = None  # 特殊行业类型：金融/保险/银行/证券
+    small_micro_enterprise_type: str | None = None  # 小微企业类型
+    tax_incentive_type: str | None = None  # 税收优惠类型
+    branch_institution_type: str | None = None  # 总分机构类型
+    overseas_income_credit_method: str | None = None  # 境外所得抵免方式
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
 
@@ -178,6 +185,13 @@ class ProjectCreateResponse(BaseModel):
     relation_to_parent: str | None = None
     ultimate_company_name: str | None = None
     ultimate_company_code: str | None = None
+    # ── 企业信息（V209）：详情回填用，from_attributes 直读 ORM 同名列 ──
+    legal_representative: str | None = None
+    special_industry_type: str | None = None
+    small_micro_enterprise_type: str | None = None
+    tax_incentive_type: str | None = None
+    branch_institution_type: str | None = None
+    overseas_income_credit_method: str | None = None
     # 派生值（ADR-CTREE-001）：直接消费本项目的合并项目
     parent_project_id: UUID | None = None
     consol_level: int = 1

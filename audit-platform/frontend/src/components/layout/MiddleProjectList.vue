@@ -40,6 +40,8 @@
         size="small"
         @change="toggleSelectAll"
       >全选</el-checkbox>
+      <!-- 状态筛选下拉已停用（税审 demo）：审计状态枚举与税审流程不一致。
+           filterStatus 恒为空串 ⇒ 下方筛选逻辑对状态不做过滤，恢复时取消注释即可。
       <el-select v-model="filterStatus" placeholder="状态" size="small" clearable style="width: 90px">
         <el-option label="已创建" value="created" />
         <el-option label="计划中" value="planning" />
@@ -47,6 +49,7 @@
         <el-option label="已完成" value="completion" />
         <el-option label="已归档" value="archived" />
       </el-select>
+      -->
       <el-select v-model="filterYear" placeholder="年度" size="small" clearable style="width: 80px">
         <el-option v-for="y in yearOptions" :key="y" :label="String(y)" :value="y" />
       </el-select>
@@ -89,11 +92,17 @@ interface ProjectItem {
   id: string
   name: string | null
   client_name: string
+  short_name?: string
   status: string
   report_scope: string | null
   parent_project_id: string | null
   consol_level: number
   consol_lock?: boolean
+  // 税审 demo：ProjectTreeNode 显示项目类型中文标签与鉴证期间，需要这些字段进类型声明
+  audit_year?: number | null
+  project_type?: string | null
+  audit_period_start?: string | null
+  audit_period_end?: string | null
   children?: ProjectItem[]
 }
 

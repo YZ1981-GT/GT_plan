@@ -29,8 +29,13 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       // Windows IPv6 loopback 在部分开发机上会出现“显示 LISTENING 但连接被拒绝”。
-      // 显式监听 IPv4 全接口，start-dev / Playwright / transform probe 统一走 127.0.0.1。
-      host: '0.0.0.0',
+      // start-dev / Playwright / transform probe 统一走 127.0.0.1。
+      // host: true 绑定全部网卡（IPv4 + IPv6），是 '0.0.0.0' 的超集，127.0.0.1 仍可直连；
+      // 改用 true 以支持通过局域网 IP / 自定义域名访问开发服务。
+      host: true,
+      // 允许任意 Host 头：经局域网 IP 或自定义域名访问时，vite 默认会以
+      // “Blocked request. This host is not allowed.” 拒绝，开发期统一放开。
+      allowedHosts: true,
       port: devPort,
       // 🔴 必须 true：strictPort=false 时 vite 在 3030 被占用时会**静默漂移**到 3031
       //    （只在 stdout 打一行 "Port 3030 is in use, trying another one..."，退出码 0）。

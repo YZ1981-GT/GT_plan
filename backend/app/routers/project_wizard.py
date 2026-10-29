@@ -248,6 +248,20 @@ async def create_project(
 
     Validates: Requirements 1.2, 1.3
     """
+    # 建项必填项（税审建项向导）：法定代表人 / 签字合伙人 / 项目经理。
+    # 🔴 刻意放在端点层而不是 project_wizard_service.create_project 的校验链里：
+    # 批量导入（batch_project_service）直接调那个 service 且**这三个字段都不提供**
+    # （自动建的合并根、以及按表格行建项都没有这些列），放进 service 会打断批量导入，
+    # 而且那边外层 `except HTTPException` 会把 422 误当成唯一性冲突走"复用已存在项目"分支，
+    # 失败还会被静默吞掉。service 层保持宽松，由本端点（向导唯一建项入口）强制。
+    # 存量项目不受影响：分步更新走 PUT .../wizard/{step} 不经本校验。
+    if not (data.legal_representative or "").strip():
+        raise HTTPException(status_code=422, detail="法定代表人为必填项")
+    if data.signing_partner_id is None:
+        raise HTTPException(status_code=422, detail="签字合伙人为必填项")
+    if data.manager_id is None:
+        raise HTTPException(status_code=422, detail="项目经理为必填项")
+
     project = await project_wizard_service.create_project(data, db)
     return _to_project_response(project)
 

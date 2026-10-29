@@ -105,6 +105,10 @@ _PROJECT_TYPE_MAP = {
     "内控审计": "internal_control",
     "验资": "capital_verification",
     "税审": "tax_audit",
+    # 缺此项时，表格里填「企业所得税汇算清缴」会让 _PROJECT_TYPE_MAP.get() 返回 None，
+    # 被报成「项目类型为必填项」⇒ 整行导入失败。前端展示用映射见
+    # audit-platform/frontend/src/constants/statusEnum.ts PROJECT_TYPE_LABELS。
+    "企业所得税汇算清缴": "enterprise_income_tax_settlement",
 }
 
 # 会计准则映射：中文 → 内部值

@@ -51,37 +51,112 @@
 
           <el-form-item label="项目类型" prop="project_type">
             <el-select v-model="form.project_type" placeholder="请选择" style="width: 100%">
-              <el-option label="年度审计" value="annual" />
-              <el-option label="专项审计" value="special" />
-              <el-option label="IPO审计" value="ipo" />
-              <el-option label="内控审计" value="internal_control" />
-              <el-option label="验资" value="capital_verification" />
-              <el-option label="税审" value="tax_audit" />
+              <el-option label="企业所得税汇算清缴" value="enterprise_income_tax_settlement" />
             </el-select>
           </el-form-item>
 
           <el-form-item label="会计准则" prop="accounting_standard">
             <el-select v-model="form.accounting_standard" placeholder="请选择" style="width: 100%">
               <el-option label="企业会计准则" value="enterprise" />
-              <el-option label="小企业会计准则" value="small_enterprise" />
-              <el-option label="金融企业会计准则" value="financial" />
               <el-option label="政府会计准则" value="government" />
-              <el-option label="国际准则 IFRS" value="ifrs" />
+              <el-option label="民间非营利组织会计制度" value="non_profit_accounting" />
             </el-select>
           </el-form-item>
 
-          <div class="gt-form-section-title" style="margin-top: 20px">模板与报表</div>
+          <!-- ── 企业信息（V209 / 税审建项向导）────────────────────────
+               法定代表人必填（后端 POST /api/projects 同步校验）；其余 5 项可空。
+               存量项目该组字段均为空（V209 零回填），允许稍后补录。
+               空串不进 payload，后端按「None 不覆盖已有值」处理。 -->
+          <div class="gt-form-section-title" style="margin-top: 20px">企业信息</div>
 
-          <el-form-item label="报表标准" prop="template_type">
-            <el-select v-model="form.template_type" placeholder="请选择报表标准" style="width: 200px">
-              <el-option label="国有企业" value="soe" />
-              <el-option label="上市公司" value="listed" />
-              <el-option label="自定义" value="custom" />
-            </el-select>
-            <span style="margin-left: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
-              决定报表行次和附注模板
-            </span>
+          <el-form-item label="法定代表人" prop="legal_representative">
+            <el-input
+              v-model="form.legal_representative"
+              placeholder="请输入法定代表人姓名"
+              maxlength="100"
+              clearable
+            />
           </el-form-item>
+
+          <el-form-item label="特殊行业类型" prop="special_industry_type">
+            <el-select
+              v-model="form.special_industry_type"
+              placeholder="非特殊行业可不填"
+              style="width: 100%"
+              clearable
+            >
+              <el-option
+                v-for="opt in SPECIAL_INDUSTRY_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="小微企业类型" prop="small_micro_enterprise_type">
+            <el-select
+              v-model="form.small_micro_enterprise_type"
+              placeholder="非小微企业可不填"
+              style="width: 100%"
+              clearable
+            >
+              <el-option
+                v-for="opt in SMALL_MICRO_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="适用税收优惠的企业类型" prop="tax_incentive_type">
+            <el-select
+              v-model="form.tax_incentive_type"
+              placeholder="无税收优惠可不填"
+              style="width: 100%"
+              clearable
+            >
+        
+              <el-option label="有限合伙制企业" value="limited_partnership" />
+              <el-option label="创业投资企业" value="venture_capital" />
+              <el-option label="技术先进型服务企业" value="advanced_tech_service" />
+              <el-option label="非营利组织" value="non_profit" />
+              <el-option label="软件、集成电路企业" value="software_ic" />
+              <el-option label="科技型中小企业" value="tech_sme" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="总分机构企业类型" prop="branch_institution_type">
+            <el-select
+              v-model="form.branch_institution_type"
+              placeholder="非总分机构可不填"
+              style="width: 100%"
+              clearable
+            >
+               <el-option label="非跨地区经营企业" value="non_cross_region" />
+              <el-option label="跨地区经营汇总纳税企业总机构" value="cross_region_hq" />
+              <el-option label="跨地区经营汇总纳税企业分支机构" value="cross_region_branch" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="境外所得抵免方式" prop="overseas_income_credit_method">
+            <el-select
+              v-model="form.overseas_income_credit_method"
+              placeholder="无境外所得可不填"
+              style="width: 100%"
+              clearable
+            >
+              <el-option label="分国（地区）不分项" value="per_country" />
+              <el-option label="不分国（地区）不分项" value="comprehensive" />
+            </el-select>
+          </el-form-item>
+
+         <!-- <div class="gt-form-section-title" style="margin-top: 20px">模板与报表</div> -->
+
+          <!-- 「报表标准」选择区已移除（税审建项向导）：税审项目报表标准固定，
+               不由用户选择。form.template_type 仍保留默认值 'soe' 供后端与
+               附注模板链路消费，详见下方 template_type 默认值注释。 
 
           <el-form-item label="业务类型" prop="company_subtype">
             <el-alert
@@ -131,7 +206,7 @@
               <el-radio-button value="standalone">单户报表</el-radio-button>
               <el-radio-button value="consolidated">合并报表</el-radio-button>
             </el-radio-group>
-          </el-form-item>
+          </el-form-item> -->
           <!-- 「合并类型」单选已移除（consol-tree-three-code-autobuild 需求 1.7 / 4）：
                合并方式按下级企业的与上级关系自动识别，子公司与分公司可以并存。 -->
         </div>
@@ -140,7 +215,8 @@
         <div class="gt-form-col">
           <div class="gt-form-section-title">项目团队</div>
 
-          <el-form-item label="签字合伙人">
+          <!-- prop 必须显式写出：缺了 prop 的 el-form-item 不参与校验、也不显示必填星号 -->
+          <el-form-item label="签字合伙人" prop="signing_partner_id">
             <el-select
               v-model="form.signing_partner_id"
               placeholder="请选择签字合伙人"
@@ -158,7 +234,7 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="项目经理">
+          <el-form-item label="项目经理" prop="manager_id">
             <el-select
               v-model="form.manager_id"
               placeholder="请选择项目经理"
@@ -198,7 +274,7 @@
             />
           </el-form-item>
 
-          <!-- 集团架构：所有项目都填写（需求 1.1）。合并企业树由各项目的这组字段自动推导 -->
+          <!-- 集团架构：所有项目都填写（需求 1.1）。合并企业树由各项目的这组字段自动推导 
           <div class="gt-form-section-title gt-group-section" style="margin-top: 20px" data-testid="group-section">
             集团架构
           </div>
@@ -241,7 +317,7 @@
 
           <el-form-item label="控制方代码" prop="ultimate_company_code">
             <el-input v-model="form.ultimate_company_code" placeholder="最终控制方的统一社会信用代码" maxlength="18" />
-          </el-form-item>
+          </el-form-item> 
 
           <div class="gt-group-hint" data-testid="group-hint">合并项目的下级企业按各项目的上级代码自动识别：子公司进入合并，分公司并入母公司汇总，无需在合并模块再次挂接。</div>
 
@@ -253,7 +329,7 @@
             style="margin-top: 12px"
           >
             合并项目会自动生成「合并户」「差额户」「单体母公司户」三个节点（母公司有分公司时为「母公司户」，下挂「母分差额户」「本部单体户」和各分公司）；抵销与调整分录记在差额户。
-          </el-alert>
+          </el-alert> -->
         </div>
       </div>
     </el-form>
@@ -272,7 +348,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
@@ -287,6 +363,43 @@ import {
   type GroupRelation,
 } from '@/utils/groupRelation'
 import BusinessCategoryFlowChart from '@/components/project/BusinessCategoryFlowChart.vue'
+
+// ── 企业信息下拉选项（V209 / 税审建项向导）────────────────────────────
+// value 为入库值（后端 VARCHAR 列，非 PG 枚举 ⇒ 增删选项不需要迁移）。
+// label 为界面中文；全部允许留空（clearable），空串不进 payload。
+const SPECIAL_INDUSTRY_OPTIONS = [
+  { value: 'financial', label: '金融' },
+  { value: 'insurance', label: '保险' },
+  { value: 'bank', label: '银行' },
+  { value: 'securities', label: '证券' },
+] as const
+
+const SMALL_MICRO_OPTIONS = [
+  { value: 'restricted', label: '限制和禁止的小微企业' },
+  { value: 'non_restricted', label: '非限制和禁止的小微企业' },
+] as const
+
+const TAX_INCENTIVE_OPTIONS = [
+  { value: 'high_tech', label: '高新技术企业' },
+  { value: 'tech_sme', label: '科技型中小企业' },
+  { value: 'software_ic', label: '软件与集成电路企业' },
+  { value: 'western_development', label: '西部大开发' },
+  { value: 'agriculture', label: '农林牧渔优惠' },
+  { value: 'other', label: '其他优惠' },
+  { value: 'none', label: '无优惠' },
+] as const
+
+const BRANCH_INSTITUTION_OPTIONS = [
+  { value: 'headquarters', label: '总机构' },
+  { value: 'branch', label: '分支机构' },
+  { value: 'independent', label: '独立纳税人（非总分机构）' },
+] as const
+
+const OVERSEAS_CREDIT_OPTIONS = [
+  { value: 'country_basket', label: '分国（地区）不分项' },
+  { value: 'comprehensive', label: '不分国（地区）不分项' },
+  { value: 'none', label: '无境外所得' },
+] as const
 
 const router = useRouter()
 const wizardStore = useWizardStore()
@@ -317,8 +430,11 @@ async function loadTeamUsers() {
     for (const u of teamUsers.value) map[u.id] = u.username
     wizardStore.teamUserNames = map
   } catch {
-    // 拉取失败不阻断向导；下拉为空时用户仍可跳过这两个可空字段
     teamUsers.value = []
+    // 🔴 签字合伙人 / 项目经理已是必填项：拉取失败会让两个下拉都为空，
+    // 用户看到"请选择"却无可选项、且无从得知原因 ⇒ 必须把失败显式告知，
+    // 不能像原先那样静默吞掉（原注释说"用户仍可跳过这两个可空字段"已不成立）。
+    ElMessage.error('项目团队人员列表加载失败，签字合伙人与项目经理无法选择，请刷新页面重试')
   } finally {
     teamLoading.value = false
   }
@@ -402,9 +518,13 @@ const form = reactive<BasicInfo>({
   client_name: '',
   short_name: '',
   audit_year: null,
-  project_type: '',
+  // 税审建项向导：项目类型只保留「企业所得税汇算清缴」一个选项，直接默认选中
+  // （必填 + 单选项时再让用户点一次没有意义）。
+  project_type: 'enterprise_income_tax_settlement',
   accounting_standard: '',
   company_code: '',
+  // 「报表标准」选择区已移除，此处默认值是 template_type 的唯一来源：
+  // 后端 BasicInfoSchema.template_type 与附注模板链路仍消费该值。
   template_type: 'soe',
   company_subtype: null,
   custom_template_id: '',
@@ -416,6 +536,14 @@ const form = reactive<BasicInfo>({
   relation_to_parent: '',
   ultimate_company_name: '',
   ultimate_company_code: '',
+  // 企业信息（V209）：未填为空串（空串不进 payload）。
+  // legal_representative 为必填（见 rules）；其余 5 项可空。
+  legal_representative: '',
+  special_industry_type: '',
+  small_micro_enterprise_type: '',
+  tax_incentive_type: '',
+  branch_institution_type: '',
+  overseas_income_credit_method: '',
   signing_partner_id: null,
   manager_id: null,
   budget_hours: null,
@@ -491,7 +619,10 @@ function applySaved(saved: Partial<BasicInfo> & Record<string, unknown>) {
   delete rest.consolidation_type
   Object.assign(form, rest)
   for (const key of ['parent_company_name', 'parent_company_code', 'relation_to_parent',
-    'ultimate_company_name', 'ultimate_company_code'] as const) {
+    'ultimate_company_name', 'ultimate_company_code',
+    // 企业信息（V209）：后端未填时回 null，归一成空串以符合 BasicInfo 的 string 类型
+    'legal_representative', 'special_industry_type', 'small_micro_enterprise_type',
+    'tax_incentive_type', 'branch_institution_type', 'overseas_income_credit_method'] as const) {
     if (form[key] == null) form[key] = ''
   }
   const savedRelation = form.relation_to_parent
@@ -538,6 +669,31 @@ const rules: FormRules = {
   audit_year: [{ required: true, message: '请选择审计年度', trigger: 'change' }],
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],
+  // 法定代表人必填（后端 POST /api/projects 同步校验，绕过界面也写不进空值）。
+  // 其余 5 个企业信息字段仍可空。
+  legal_representative: [
+    { required: true, message: '请输入法定代表人', trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        // 纯空格不算已填（后端用 .strip() 判断，两侧口径必须一致）
+        if (!String(value ?? '').trim()) {
+          callback(new Error('请输入法定代表人'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  // 项目团队两项必填（后端 POST /api/projects 同步校验）。
+  // 初值是 null 且下拉带 clearable ⇒ 必须用 change 触发，并显式拦 null/空串
+  // （required 对 null 生效，但清空后值为 null 仍需即时提示）。
+  signing_partner_id: [
+    { required: true, message: '请选择签字合伙人', trigger: 'change' },
+  ],
+  manager_id: [
+    { required: true, message: '请选择项目经理', trigger: 'change' },
+  ],
   template_type: [{ required: true, message: '请选择附注模板类型', trigger: 'change' }],
   custom_template_id: [{
     validator: (_rule, value, callback) => {

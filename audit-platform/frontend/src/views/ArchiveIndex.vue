@@ -79,20 +79,13 @@ import { Box, User } from '@element-plus/icons-vue'
 import { listProjectsWithProgress, listProjects } from '@/services/commonApi'
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { getStatusLabel } from '@/constants/statusEnum'
 
 const router = useRouter()
 const loading = ref(false)
 const projects = ref<any[]>([])
 const searchText = ref('')
 const statusFilter = ref<'all' | 'active' | 'archived'>('all')
-
-const TYPE_MAP: Record<string, string> = {
-  annual: '年度审计',
-  interim: '中期审计',
-  special: '专项审计',
-  ipo: 'IPO审计',
-  internal_control: '内控审计',
-}
 
 const ARCHIVED_STATUSES = ['archived', 'completed', 'closed']
 
@@ -118,7 +111,8 @@ const filteredProjects = computed(() => {
 })
 
 function typeLabel(type: string) {
-  return TYPE_MAP[type] || type || '—'
+  // 单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS（勿在此重建映射）
+  return getStatusLabel('project_type', type)
 }
 
 function progressOf(p: any): number {

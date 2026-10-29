@@ -41,6 +41,7 @@ import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import AttachmentHandbookDialog from './AttachmentHandbookDialog.vue'
+import { getStatusLabel } from '@/constants/statusEnum'
 
 // TODO: replace window.open with AttachmentPreviewDrawer when per-file preview is added to this hub view
 
@@ -48,16 +49,11 @@ const loading = ref(false)
 const projects = ref<any[]>([])
 const handbookVisible = ref(false)
 
-const TYPE_MAP: Record<string, string> = {
-  annual: '年度审计',
-  interim: '中期审计',
-  special: '专项审计',
-  ipo: 'IPO审计',
-  internal_control: '内控审计',
-}
-
 function typeLabel(type: string): string {
-  return TYPE_MAP[type] || type || '—'
+  // 单一真源：@/constants/statusEnum PROJECT_TYPE_LABELS（勿在此重建映射）
+  // 原本地映射含 interim:'中期审计'，但后端 ProjectType 枚举无此值
+  // （interim 只是 archive_models 的归档类型），PG 枚举也不允许，属幽灵值，已不再映射。
+  return getStatusLabel('project_type', type)
 }
 
 onMounted(async () => {
