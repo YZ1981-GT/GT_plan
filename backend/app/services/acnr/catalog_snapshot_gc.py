@@ -52,42 +52,6 @@ def list_snapshot_versions(snapshots_dir: Path | None = None) -> list[str]:
     return versions
 
 
-def get_referenced_versions(
-    *,
-    session: Any | None = None,
-    referenced_versions_override: set[str] | None = None,
-) -> set[str] | None:
-    """获取被项目锁定引用的版本集合。
-
-    如果提供 referenced_versions_override（测试/调用方查得），直接返回该集合。
-    否则查询 PG: SELECT DISTINCT registry_version FROM projects
-    WHERE registry_version IS NOT NULL。
-
-    Args:
-        session: SQLAlchemy async session（生产环境使用）
-        referenced_versions_override: 直接提供的引用集合（调用方查询后传入）
-
-    Returns:
-        被引用的 registry_version 集合；**无法验证引用时返回 None**（fail-closed）。
-
-    ⚠️ fail-closed 语义（Req-16.3）：
-        返回空集 set() 表示「已确认无任何版本被引用」→ keep_recent 之外全可删。
-        返回 None 表示「无法验证引用关系」→ 调用方必须 fail-closed 不删除任何快照，
-        避免误删被项目锁定的历史版本。此处同步函数无法执行 async DB 查询，
-        故除非调用方传入 override，一律返回 None。
-    """
-    if referenced_versions_override is not None:
-        return referenced_versions_override
-
-    # 生产路径需 async DB 查询（本同步函数无法执行）；由调用方查询后经 override 传入。
-    # 无 override 且无法验证 → 返回 None（fail-closed），绝不返回空集当作「无引用」。
-    logger.warning(
-        "catalog_snapshot_gc: 无法验证被引用版本集合（未提供 override，同步路径不查 DB），"
-        "返回 None → fail-closed（本次不删除任何快照）"
-    )
-    return None
-
-
 def compute_versions_to_delete(
     all_versions: list[str],
     referenced_versions: set[str] | None,
@@ -170,8 +134,9 @@ def cleanup_stale_snapshots(
     sd = snapshots_dir or _get_snapshots_dir()
     all_versions = list_snapshot_versions(sd)
 
-    # 获取被引用版本；None 表示不可验证 → fail-closed（compute_versions_to_delete 返回 []）
-    refs = referenced_versions if referenced_versions is not None else get_referenced_versions()
+    # 调用方必须显式给出经数据库证实的引用集合。None 表示不可验证，fail-closed；
+    # 纯文件生成器不会暗中退回旧同步来源。
+    refs = referenced_versions
     reference_status = "unverifiable" if refs is None else "verified"
 
     # 计算应删除的版本（refs 为 None 时恒为空，不删除任何快照）
@@ -273,12 +238,51 @@ def committed_snapshot_versions(snapshots_dir: Path) -> frozenset[str] | None:
 async def referenced_registry_versions(db: Any | None) -> set[str] | None:
     """从数据库取被项目锁定的目录版本集合；不能从数据库证实时返回 None（调用方 fail-closed 不删）。
 
-    T17 落库之前 projects 没有锁定列，引用集无从查证，故恒返回 None。进程内归档字典
-    （immutability._project_registry_versions）冷启动为空、不跨进程，不作引用来源（RV13.1-01）。
-    T19 在此补查库（projects.acnr_registry_version，含软删）；查库失败、没有可用会话仍须返回 None。
+    引用集**只认数据库**（`projects.acnr_registry_version`，V216 落库，T19）：
+    - **含软删项目**（不加 `is_deleted` 过滤）—— 软删只是回收站，项目恢复后还要按锁定版本解析，
+      它引用的快照现在就不能删。
+    - 没有可用会话、查库失败、列还不存在（迁移没跑）→ 返回 None，调用方一个都不删。
+      宁可留着多余快照，也不能删掉某个归档项目唯一的解析依据（RV13.1-01）。
+
+    进程内归档字典不作引用来源：它冷启动为空、不跨进程，拿它当引用集等于冷启动时「没有任何引用」。
     """
-    logger.info("catalog_snapshot_gc: projects 尚无目录版本锁定列（T17 前），引用集不可验证")
-    return None
+    if db is None:
+        logger.info("catalog_snapshot_gc: 没有可用数据库会话，引用集不可验证 → 不删除")
+        return None
+
+    import sqlalchemy as sa
+
+    from app.models.core import Project
+
+    rows = (
+        await db.execute(
+            sa.select(Project.acnr_registry_version)
+            .where(Project.acnr_registry_version.is_not(None))
+            .distinct()
+        )
+    ).all()
+    versions = {row[0] for row in rows if row[0]}
+    logger.info(
+        "catalog_snapshot_gc: 引用集已从数据库证实，%d 个版本被项目锁定", len(versions)
+    )
+    return versions
+
+
+async def _referenced_versions_with_own_session() -> set[str] | None:
+    """没传会话时自开一个短会话查引用集；开不出来就返回 None（调用方不删）。
+
+    启动任务 `_task_acnr_catalog_snapshot_gc` 不带会话。如果这里不自开会话、直接按
+    「没有会话 = 不可验证」处理，那条启动任务就永远一个都不删 —— 等于摆设，散落快照会无限堆积。
+    开会话或查库失败一律返回 None（fail-closed），启动期数据库没就绪不会让启动任务变成删库动作。
+    """
+    from app.core.database import async_session
+
+    try:
+        async with async_session() as db:
+            return await referenced_registry_versions(db)
+    except Exception as exc:  # noqa: BLE001 — 自开会话失败同样按「不可验证」处理
+        logger.warning("catalog_snapshot_gc: 自开短会话查引用集失败（%s）→ 不删除", exc)
+        return None
 
 
 async def run_db_aware_gc(
@@ -297,7 +301,10 @@ async def run_db_aware_gc(
     """
     sd = _get_snapshots_dir()
     try:
-        refs = await referenced_registry_versions(session)
+        if session is not None:
+            refs = await referenced_registry_versions(session)
+        else:
+            refs = await _referenced_versions_with_own_session()
     except Exception as exc:  # noqa: BLE001 — 任何查库异常都按「不可验证」处理
         logger.warning("run_db_aware_gc: 查库取引用集失败 → fail-closed 不删除: %s", exc)
         refs = None

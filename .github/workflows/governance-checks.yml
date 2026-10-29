@@ -1565,8 +1565,9 @@ jobs:
         run: python backend/scripts/check/check_acnr_consumer_coverage.py --strict
 
   acnr-snapshot-count:
-    # ACNR Req-16.4: 快照数量守卫
-    # 校验快照目录总数 ≤ keep_recent + referenced_count，防止清理逻辑失效导致膨胀
+    # ACNR Req-16.4 / acnr-foundation-defect-closure RV14.1-01: 快照生命周期守卫（只依赖标准库）
+    # 与运行时快照清理同一判据：不在最近 keep_recent 份之内、未登记进 git 索引、也未被锁定的快照即违规；
+    # 已登记的快照是发布历史，运行时不删，不论多少份都不算违规；判定不了 git 登记状态即失败
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -574,32 +574,98 @@ SPEC_TASKS = exists(_TASKS_REL)
 
 _GC_REL = "backend/app/services/acnr/catalog_snapshot_gc.py"
 _GC_TEST_REL = "backend/tests/acnr/test_catalog_snapshot_gc_runtime.py"
+_GC_PG_TEST_REL = "backend/tests/acnr/test_catalog_snapshot_gc_pg.py"
+_SNAPSHOT_GUARD_REL = "backend/scripts/check/check_acnr_snapshot_count.py"
+_SNAPSHOT_GUARD_TEST_REL = "backend/tests/acnr/test_acnr_snapshot_count_guard.py"
 
 
-def _gc_refs_unverifiable() -> bool:
-    """referenced_registry_versions 是 async 函数且每个 return 都返回常量 None（RV13.1-01；T19 改查库时须改本行登记）。"""
+def _gc_refs_from_lock_column() -> bool:
+    """referenced_registry_versions 是 async 函数：查 `Project.acnr_registry_version` 的非空值，不按 is_deleted 过滤
+    （属性、关键字参数、文档字符串以外的 SQL 字面量都不出现 is_deleted），没有会话时返回 None（AST，T19）。"""
     fn = _func(_GC_REL, "referenced_registry_versions")
-    rets = [n for n in ast.walk(fn) if isinstance(n, ast.Return)] if fn is not None else []
-    return isinstance(fn, ast.AsyncFunctionDef) and bool(rets) and all(
-        isinstance(r.value, ast.Constant) and r.value.value is None for r in rets)
+    if not isinstance(fn, ast.AsyncFunctionDef):
+        return False
+    body = fn.body[1:] if fn.body and isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant) \
+        else fn.body
+    nodes = [n for stmt in body for n in ast.walk(stmt)]
+    reads_lock = any(isinstance(n, ast.Attribute) and n.attr == "acnr_registry_version"
+                     and isinstance(n.value, ast.Name) and n.value.id == "Project" for n in nodes)
+    not_null = any(isinstance(n, ast.Call) and getattr(n.func, "attr", "") in ("is_not", "isnot") for n in nodes)
+    filters_deleted = any((isinstance(n, ast.Attribute) and n.attr == "is_deleted")
+                          or (isinstance(n, ast.keyword) and n.arg == "is_deleted")
+                          or (isinstance(n, ast.Constant) and isinstance(n.value, str) and "is_deleted" in n.value)
+                          for n in nodes)
+    none_return = any(isinstance(n, ast.Return) and isinstance(n.value, ast.Constant) and n.value.value is None
+                      for n in nodes)
+    return reads_lock and not_null and not filters_deleted and none_return
+
+
+def _gc_own_session_fail_closed() -> bool:
+    """_referenced_versions_with_own_session 是 async 函数，捕获 Exception 的分支返回 None（AST，T19）。"""
+    fn = _func(_GC_REL, "_referenced_versions_with_own_session")
+    if not isinstance(fn, ast.AsyncFunctionDef):
+        return False
+    handlers = [h for t in ast.walk(fn) if isinstance(t, ast.Try) for h in t.handlers]
+    return any(isinstance(h.type, ast.Name) and h.type.id == "Exception" and any(
+        isinstance(s, ast.Return) and isinstance(s.value, ast.Constant) and s.value.value is None for s in h.body)
+        for h in handlers)
+
+
+def _snapshot_guard_reuses_gc_rule() -> bool:
+    """快照门禁按文件加载运行时清理模块，lifecycle_problems 经它判「已登记」与「会被删」，门禁自身不导入 subprocess（AST）。"""
+    tree = _tree(_SNAPSHOT_GUARD_REL)
+    imported = {a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+    loads_gc = any(isinstance(n, ast.Constant) and n.value == "catalog_snapshot_gc.py" for n in ast.walk(tree))
+    fn = _func(_SNAPSHOT_GUARD_REL, "lifecycle_problems")
+    used = {n.attr for n in ast.walk(fn) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+            and n.value.id == "gc"} if fn is not None else set()
+    return loads_gc and "subprocess" not in imported and {
+        "list_snapshot_versions", "committed_snapshot_versions", "cleanup_stale_snapshots"} <= used
+
+
+def _ci_job_runs(job: str, command: str) -> bool:
+    """governance-checks.yml 的 ``job`` 有一步恰好运行 ``command``，且该作业不 continue-on-error（YAML 解析，T22）。"""
+    import yaml
+
+    jobs = yaml.safe_load(_read(_REPO / ".github" / "workflows" / "governance-checks.yml")).get("jobs") or {}
+    body = jobs.get(job) or {}
+    return not body.get("continue-on-error") and any(
+        (s or {}).get("run") == command for s in body.get("steps") or [])
 
 
 def gc_runtime_rows(CB: Callable) -> dict:
-    """组件表「运行时快照清理」一行的登记（RV13.1-01）。放在判据库是因为登记表文件已到 800 行上限；
-    CB 由登记表传入（Stmt 定义在登记表里）。"""
+    """组件表「运行时快照清理」与「快照生命周期门禁」两行的登记（RV13.1-01 / T19 / RV14.1-01）。放在判据库是因为
+    登记表文件已到 800 行上限；CB 由登记表传入（Stmt 定义在登记表里）。"""
     return {
-        "运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口；引用集只认数据库、证实不了即一个都不删，版本锁落库前恒证实不了、不读进程内归档字典；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理）": CB(
+        "运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口，不带会话时自开短会话；引用集只认数据库里项目表落库的版本锁，含移入回收站的项目，不读进程内归档字典；没有会话或查库失败即一个都不删；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理）": CB(
             _GC_REL, ("run_db_aware_gc", "referenced_registry_versions", "committed_snapshot_versions"), _GC_TEST_REL,
             calls("backend/app/core/startup_registry.py", "_task_acnr_catalog_snapshot_gc", "run_db_aware_gc"),
             calls("backend/scripts/acnr/gc_snapshots.py", "_main", "run_db_aware_gc"),
-            calls(_GC_REL, "run_db_aware_gc", "referenced_registry_versions", "committed_snapshot_versions",
-                  "cleanup_stale_snapshots"),
+            calls(_GC_REL, "run_db_aware_gc", "referenced_registry_versions", "_referenced_versions_with_own_session",
+                  "committed_snapshot_versions", "cleanup_stale_snapshots"),
+            calls(_GC_REL, "_referenced_versions_with_own_session", "async_session", "referenced_registry_versions"),
             not_imports(_GC_REL, "immutability"),
-            claim("版本锁落库前 referenced_registry_versions 每个 return 都返回 None（AST）", _gc_refs_unverifiable),
+            claim("referenced_registry_versions 查项目表的版本锁列、不按 is_deleted 过滤，没有会话返回 None（AST）",
+                  _gc_refs_from_lock_column),
+            claim("自开短会话查库出任何异常都返回 None（AST）", _gc_own_session_fail_closed),
             has_tests(_GC_TEST_REL, "test_cold_start_unverifiable_refs_startup_task_deletes_none",
-                      "test_db_query_error_fail_closed", "test_cold_start_13_registered_startup_task_deletes_none",
+                      "test_no_session_opens_own_session_and_verifies", "test_own_session_failure_is_fail_closed",
+                      "test_db_query_error_fail_closed", "test_referenced_versions_without_session_is_none",
+                      "test_referenced_versions_reads_locked_column_including_soft_deleted",
+                      "test_cold_start_13_registered_startup_task_deletes_none",
                       "test_committed_unknown_when_git_missing", "test_committed_unknown_when_git_errors",
-                      "test_real_registries_are_committed", "test_untracked_strays_cleaned_when_refs_verified")),
+                      "test_real_registries_are_committed", "test_untracked_strays_cleaned_when_refs_verified"),
+            has_tests(_GC_PG_TEST_REL, "test_startup_task_keeps_snapshot_locked_by_recycle_bin_project",
+                      "test_gc_cli_reads_same_lock_and_dry_run_deletes_nothing", "test_pg_query_failure_deletes_nothing")),
+        "快照生命周期门禁（CI 作业按运行时清理同一判据核对：不在最近保留份数之内、未登记进 git 索引、也未被锁定的快照即违规，已登记的快照不论多少份都不算；判定不了哪些已登记即失败）": CB(
+            _SNAPSHOT_GUARD_REL, ("lifecycle_problems", "main"), _SNAPSHOT_GUARD_TEST_REL,
+            claim("门禁经运行时清理模块判定、自身不调 git（AST）", _snapshot_guard_reuses_gc_rule),
+            claim("CI 作业 acnr-snapshot-count 运行 check_acnr_snapshot_count.py --strict 且不 continue-on-error（YAML）",
+                  lambda: _ci_job_runs("acnr-snapshot-count", f"python {_SNAPSHOT_GUARD_REL} --strict")),
+            has_tests(_SNAPSHOT_GUARD_TEST_REL, "test_real_committed_snapshots_pass_strict",
+                      "test_committed_beyond_keep_recent_pass_strict", "test_old_uncommitted_unreferenced_snapshot_fails",
+                      "test_exact_reference_protects_only_its_version", "test_git_registration_unknown_is_fail_closed",
+                      "test_strays_equal_what_runtime_gc_would_delete", "test_guard_reuses_runtime_gc_rule")),
     }
 
 

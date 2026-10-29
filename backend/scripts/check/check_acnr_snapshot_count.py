@@ -1,136 +1,100 @@
 #!/usr/bin/env python3
-"""
-check_acnr_snapshot_count.py — ACNR 快照数量守卫
+"""ACNR 快照生命周期守卫（CI 作业 acnr-snapshot-count，RV14.1-01）。
 
-校验快照目录总数 ≤ keep_recent + referenced_count。
-防止清理逻辑失效导致快照膨胀。
+判据与运行时快照清理是同一份：按文件加载 `backend/app/services/acnr/catalog_snapshot_gc.py`
+（该模块顶层只用标准库；按文件加载不经 app 包初始化，CI 作业不装依赖也能跑），用它的
+`committed_snapshot_versions` 与 `cleanup_stale_snapshots(dry_run=True)` 现算「引用集已证实时，运行时
+清理会删掉哪些快照」—— 不在最近 keep_recent 份之内、没有登记进 git 索引、也没有被 `--referenced-version`
+精确点名的快照。有一份即违规（--strict 退出 1）。
 
-零依赖（仅 stdlib）。显式 UTF-8 读写。
-
-Usage:
-    python check_acnr_snapshot_count.py             # 报告模式（退出码恒 0）
-    python check_acnr_snapshot_count.py --strict    # 严格模式（CI 用，超限退出码 1）
-
-Feature: acnr-runtime-convergence, Task 19
-Requirements: Req-16.4
+已登记进 git 索引的快照不算违规：它们是生成器的发布历史，运行时一律不删（RV13.1-01），保留与删除
+只经生成器发布流程（随 git 提交删除并同时改两份登记）。旧口径「快照总数 ≤ keep_recent + 被引用数」
+与这条保证矛盾：本 spec 每发一个批次就多一份已登记快照，总数必然超过 keep_recent。
+判定不了哪些已登记（不在 git 仓库、没有 git、git 出错或超时）→ --strict 退出 2，不把未知当作可清理。
 """
 from __future__ import annotations
 
 import argparse
-import json
+import importlib.util
 import sys
 from pathlib import Path
+from types import ModuleType
 
-# ─── UTF-8 输出 ───────────────────────────────────────────────────────────────
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):
     pass
 
-# ─── 路径 ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent  # GT_plan/
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 SNAPSHOTS_DIR = PROJECT_ROOT / "backend" / "data" / "acnr" / "catalog_snapshots"
-CATALOG_PATH = PROJECT_ROOT / "backend" / "data" / "acnr" / "global_catalog.json"
-
-# ─── 常量 ─────────────────────────────────────────────────────────────────────
+GC_MODULE_PATH = PROJECT_ROOT / "backend" / "app" / "services" / "acnr" / "catalog_snapshot_gc.py"
 DEFAULT_KEEP_RECENT = 10
 
 
-def count_snapshots(snapshots_dir: Path) -> int:
-    """统计快照目录下 .json 文件数量。"""
-    if not snapshots_dir.exists():
-        return 0
-    return sum(1 for f in snapshots_dir.iterdir() if f.suffix == ".json")
+def _load_gc() -> ModuleType:
+    """按文件加载运行时清理模块（单一判据来源）。"""
+    spec = importlib.util.spec_from_file_location("_acnr_catalog_snapshot_gc", GC_MODULE_PATH)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载运行时快照清理模块：{GC_MODULE_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def get_referenced_count_from_catalog(catalog_path: Path) -> int:
-    """从 catalog_report 或 projects 维度估算被引用版本数。
+gc = _load_gc()
 
-    离线 CI 模式：无法查 DB，使用保守估计。
-    如果 catalog 存在，至少当前版本被引用（=1）。
-    实际生产中应查 PG: SELECT COUNT(DISTINCT registry_version) FROM projects
-    WHERE registry_version IS NOT NULL。
 
-    CI 守卫用近似值：referenced_count = 已知快照中被项目使用的版本数。
-    保守默认 = 0（最严格校验）。
+def lifecycle_problems(
+    snapshots_dir: Path,
+    *,
+    keep_recent: int,
+    referenced_versions: set[str],
+) -> tuple[list[str], frozenset[str] | None, list[str]]:
+    """返回 (目录里的全部版本, 已登记进 git 索引的版本或 None, 运行时清理会删掉的散落版本)。
+
+    判定不了哪些已登记时第三项为全部版本（全部算未知、一个都不能当作可清理）。
     """
-    # 如果有 catalog，可以检查当前版本作为最低保底
-    if catalog_path.exists():
-        try:
-            data = json.loads(catalog_path.read_text(encoding="utf-8"))
-            # 当前版本至少被一个项目引用（保守计 0，实际可能更多）
-            _ = data.get("registry_version", "")
-            return 0  # CI 保守模式：假设 0 被引用 → 最严格
-        except (json.JSONDecodeError, OSError):
-            pass
-    return 0
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="ACNR Snapshot Count Guard — 校验快照总数不超限"
+    versions = gc.list_snapshot_versions(snapshots_dir)
+    committed = gc.committed_snapshot_versions(snapshots_dir)
+    if committed is None:
+        return versions, None, versions
+    report = gc.cleanup_stale_snapshots(
+        keep_recent=keep_recent, snapshots_dir=snapshots_dir,
+        referenced_versions=set(referenced_versions), protected_versions=committed, dry_run=True,
     )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="严格模式（超限则退出码 1）",
+    return versions, committed, sorted(report["deleted"])
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="ACNR 快照生命周期守卫")
+    parser.add_argument("--strict", action="store_true", help="违规时退出码非 0（CI 用）")
+    parser.add_argument("--keep-recent", type=int, default=DEFAULT_KEEP_RECENT, help="保留最近版本数")
+    parser.add_argument("--referenced-version", action="append", default=[],
+                        help="被项目锁定的版本（可重复；精确匹配）")
+    parser.add_argument("--snapshots-dir", type=Path, default=SNAPSHOTS_DIR, help="快照目录")
+    args = parser.parse_args(argv)
+
+    referenced = set(args.referenced_version)
+    versions, committed, strays = lifecycle_problems(
+        args.snapshots_dir, keep_recent=args.keep_recent, referenced_versions=referenced,
     )
-    parser.add_argument(
-        "--keep-recent",
-        type=int,
-        default=DEFAULT_KEEP_RECENT,
-        help=f"保留最近版本数（默认 {DEFAULT_KEEP_RECENT}）",
-    )
-    parser.add_argument(
-        "--referenced-count",
-        type=int,
-        default=None,
-        help="手动指定被引用版本数（默认从 catalog 推断）",
-    )
-    parser.add_argument(
-        "--snapshots-dir",
-        type=Path,
-        default=SNAPSHOTS_DIR,
-        help="快照目录路径（默认自动定位）",
-    )
-    args = parser.parse_args()
-
-    print("[ACNR Snapshot Count] Checking snapshot directory...")
-
-    # 统计快照数量
-    total = count_snapshots(args.snapshots_dir)
-
-    # 被引用数量
-    if args.referenced_count is not None:
-        referenced = args.referenced_count
-    else:
-        referenced = get_referenced_count_from_catalog(CATALOG_PATH)
-
-    max_allowed = args.keep_recent + referenced
-
-    print(f"  Snapshots directory: {args.snapshots_dir}")
-    print(f"  Total snapshots: {total}")
+    print("[ACNR Snapshot Lifecycle]")
+    print(f"  directory: {args.snapshots_dir}")
+    print(f"  total: {len(versions)}")
     print(f"  keep_recent: {args.keep_recent}")
-    print(f"  referenced_count: {referenced}")
-    print(f"  Max allowed: {max_allowed}")
+    print(f"  committed: {'unverifiable' if committed is None else len(committed)}")
+    print(f"  referenced_versions: {sorted(referenced)}")
 
-    if total > max_allowed:
-        print(
-            f"\n[FAIL] Snapshot count ({total}) exceeds "
-            f"keep_recent ({args.keep_recent}) + referenced ({referenced}) = {max_allowed}"
-        )
-        print(
-            "  This indicates cleanup_stale_snapshots is not running properly "
-            "or referenced_count is underestimated."
-        )
-        if args.strict:
-            return 1
-    else:
-        print(f"\n[OK] Snapshot count ({total}) <= max allowed ({max_allowed}).")
-
+    if committed is None:
+        print("[FAIL] 无法确认快照的 git 登记状态；拒绝把未知快照视为可清理。")
+        return 2 if args.strict else 0
+    if strays:
+        print(f"[FAIL] 运行时清理会删掉的散落快照（不在最近保留范围、未登记进 git 索引、未被锁定）: {strays}")
+        return 1 if args.strict else 0
+    print("[OK] 没有运行时清理会删掉的散落快照。")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

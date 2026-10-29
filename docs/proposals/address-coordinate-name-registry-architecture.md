@@ -67,7 +67,8 @@
 | 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
 | ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源为项目表落库的版本锁；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other） | 后端 | `backend/app/services/acnr/metrics.py` | `AcnrMetricsCollector`、`get_acnr_metrics`、`VERSION_LOCK_COUNTERS` | `backend/tests/acnr/test_acnr_metrics.py` |
 | 版本锁已落库到项目表（归档的两条写入路径——交付件全部归档、归档编排的锁定步——都在把项目置为已归档之前锁定当时的目录版本，锁前先确认该版本的快照存在且内容自洽，锁不上就不归档；解除归档在同一事务里解锁；`full_resolve` 与单元格取值接线读同一份落库的锁，带项目而无会话时如实标明未核对；锁定版本的快照缺失、损坏或锁定失败返回冲突错误与中文原因，前端收到后不回退其他解析方式） | 后端 | `backend/app/services/acnr/project_registry_lock.py` | `lock_project_registry`、`unlock_project_registry`、`get_locked_version`、`verify_snapshot`、`RegistryLockError` | `backend/tests/acnr/test_project_registry_lock_pg.py` |
-| 运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口；引用集只认数据库、证实不了即一个都不删，版本锁落库前恒证实不了、不读进程内归档字典；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理） | 后端 | `backend/app/services/acnr/catalog_snapshot_gc.py` | `run_db_aware_gc`、`referenced_registry_versions`、`committed_snapshot_versions` | `backend/tests/acnr/test_catalog_snapshot_gc_runtime.py` |
+| 运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口，不带会话时自开短会话；引用集只认数据库里项目表落库的版本锁，含移入回收站的项目，不读进程内归档字典；没有会话或查库失败即一个都不删；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理） | 后端 | `backend/app/services/acnr/catalog_snapshot_gc.py` | `run_db_aware_gc`、`referenced_registry_versions`、`committed_snapshot_versions` | `backend/tests/acnr/test_catalog_snapshot_gc_runtime.py` |
+| 快照生命周期门禁（CI 作业按运行时清理同一判据核对：不在最近保留份数之内、未登记进 git 索引、也未被锁定的快照即违规，已登记的快照不论多少份都不算；判定不了哪些已登记即失败） | 后端 | `backend/scripts/check/check_acnr_snapshot_count.py` | `lifecycle_problems`、`main` | `backend/tests/acnr/test_acnr_snapshot_count_guard.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
@@ -84,7 +85,6 @@
 
 | 事项 | 任务 |
 |---|---|
-| 按库引用的快照清理（快照清理的引用集改查项目表的版本锁） | T19 |
 | INDEX 登记与提交边界核对 | T33 |
 
 ### 版本号格式

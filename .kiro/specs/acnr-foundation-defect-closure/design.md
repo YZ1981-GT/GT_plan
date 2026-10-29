@@ -529,6 +529,10 @@ CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 
 
 由此，需求 7.4「只删除未被任何项目锁定、且不在最近 N 份之内的快照」仍成立（运行时删的更少）；T19 的 pg_only 用例「未被引用的被删」须用未登记进 git 索引的临时快照来证（临时目录做成 git 仓库、快照不 add），并保留以上两条保证：`referenced_registry_versions` 改成查库后，「查库失败 / 无会话 → None」与「已登记不删」的用例（`test_catalog_snapshot_gc_runtime.py`）必须照旧通过。
 
+**T19 实施记录（2026-10-29，待评审核实）：查库落地，上面第 1 条「T17 落库前恒返回 None、运行时清理不删任何文件」自此不再成立。** `referenced_registry_versions(db)` 查 `SELECT DISTINCT acnr_registry_version FROM projects WHERE acnr_registry_version IS NOT NULL`（ORM 写法，不加 `is_deleted` 过滤，回收站里的项目恢复后还要按锁定版本解析），`db` 为 None 返回 None。`run_db_aware_gc(session=None)` 经 `_referenced_versions_with_own_session` 自开短会话；本节原文写的 `get_session()` 在 `app/core/database.py` 里不存在，实际用会话工厂 `async_session`；开会话或查库出任何异常都返回 None。同步占位 `get_referenced_versions`（只在传入 override 时返回集合，否则恒 None）删除：它唯一的调用处是 `cleanup_stale_snapshots` 在 `referenced_versions` 缺省时的分支，结果同为 None，删后行为不变；生成器离线清理显式传 None，仍是「引用不可验证即不删」。上面两条保证保留：引用集只认数据库；已登记进 git 索引的快照运行时一律不删。于是运行时清理现在会删的只有未登记进 git 索引、不在最近 keep_recent 份之内、也没有被任何项目（含回收站项目）锁定的散落快照。
+
+**RV14.1-01（段十四复审，阻断）：CI 快照门禁按版本集合核对，判据与运行时清理是同一份。** 旧门禁 `check_acnr_snapshot_count.py --strict` 判「快照总数 ≤ keep_recent + 被引用数」，CI 里没有数据库，被引用数写死 0；而第 2 条保证让已登记快照运行时永不删、生成器离线清理恒不可验证，本 spec 每发一个批次就多一份已登记快照，总数必然超过 keep_recent（T29 批次起 11、12 份，作业一直 exit 1）。新判据：门禁按文件加载 `app/services/acnr/catalog_snapshot_gc.py`（模块顶层只用标准库；按文件加载不经 `app` 包初始化，CI 作业不装依赖也能跑），用它的 `committed_snapshot_versions` 与 `cleanup_stale_snapshots(dry_run=True)` 现算「引用集已证实时运行时清理会删掉的快照」：不在最近 keep_recent 份之内、未登记进 git 索引、也没有被 `--referenced-version` 精确点名。有一份即违规（strict 退出 1），已登记的快照不论多少份都不算；判定不了 git 登记状态 strict 退出 2。不在门禁里另写一份 git 判定与散落规则：上一会话的改写就复制了一份，改坏其中一份时另一份的用例照样绿。没有采用「生成器发布时随提交删除已取代快照」：每个批次都要同时改两份测试常量登记，且与第 2 条「已提交快照的保留与删除只经发布流程」的现行做法（全部保留）不符，留待发布流程另行决定。CI 作业 `acnr-snapshot-count` 的命令不变（`actions/checkout@v4` 带 `.git`，`git ls-files` 可用），只改注释；本 spec 每轮核对的 CI 命令清单加入这条（共 15 条）。
+
 ### 8.5 验证
 
 - 三层一致：迁移列、ORM 字段（含 `DateTime(timezone=True)`）、服务读写同名同型，守卫读迁移文本与 ORM 元数据逐项比对类型。

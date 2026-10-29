@@ -39,7 +39,7 @@ from tests.acnr._status_doc_checks import (
     _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_ROWS_OPEN,
     RESOLVER_DOC_OK,
     SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, T31_HINT_MODULE, T31_HINT_TEST, T31_REASON_CHECKS,
-    T31_REASON_SYMBOLS, V1_BYPASS, Check, Unit, _short_link_route_ok,
+    T31_REASON_SYMBOLS, V1_BYPASS, Check, Unit, _ci_job_runs, _short_link_route_ok,
     _component_tests_present, _exact_identity_is_pure, _exact_identity_only_release_imports, _production_importers_of,
     _full_resolve_step1_uses_exact_identity,
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
@@ -114,16 +114,6 @@ _CCR_SRC_REL = _A + "ccr_sources.py"
 _CCR_CHK_REL = "backend/scripts/acnr/check_ccr_resolve.py"
 _RECON_REL = "backend/scripts/acnr/reconcile_v2_canonical.py"
 _RECON_OUT = "backend/data/acnr/v2_canonical_reconcile.json"
-
-
-def _ci_job_runs(job: str, command: str) -> bool:
-    """governance-checks.yml 的 ``job`` 有一步恰好运行 ``command``，且该作业不 continue-on-error（YAML 解析，T22）。"""
-    import yaml
-
-    jobs = yaml.safe_load(_read(_REPO / ".github" / "workflows" / "governance-checks.yml")).get("jobs") or {}
-    body = jobs.get(job) or {}
-    return not body.get("continue-on-error") and any(
-        (s or {}).get("run") == command for s in body.get("steps") or [])
 
 
 _BYPASS_REL = "backend/scripts/check/acnr_bypass_scan.py"
@@ -559,7 +549,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             T31_HINT_MODULE, "AcnrCandidatesHint", T31_HINT_TEST, task_done("T31"), exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "按库引用的快照清理（快照清理的引用集改查项目表的版本锁）": L("T19"),
         "INDEX 登记与提交边界核对": L("T33"),
     },
     H_VERSION: {

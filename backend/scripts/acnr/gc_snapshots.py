@@ -1,8 +1,9 @@
 """ACNR Catalog 快照 DB-aware GC CLI（P2-1：该清理清理）
 
-与启动任务走同一入口 run_db_aware_gc：引用集只认数据库，证实不了就一个都不删；
-已提交进仓库的快照一律不删（RV13.1-01）。只清理「非最近 keep_recent、无项目锁定引用、
-未提交」的 catalog_snapshots/*.json。T17 落库前引用集恒不可验证，本工具不删任何文件。
+与启动任务走同一入口 run_db_aware_gc（不带会话，入口自开短会话）：引用集只认数据库里
+项目表落库的版本锁（`projects.acnr_registry_version`，含移入回收站的项目），没有会话或查库失败
+就一个都不删；已提交进仓库的快照一律不删（RV13.1-01）。只清理「非最近 keep_recent、无项目
+锁定引用、未提交」的 catalog_snapshots/*.json。
 
 用法（cwd=backend）：
     python -m scripts.acnr.gc_snapshots            # 真删（keep_recent=10）
