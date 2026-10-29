@@ -212,6 +212,26 @@ class GateEngine:
         }
         hit_rules.sort(key=lambda h: severity_order.get(h.severity, 99))
 
+        # ── S2 ADR-CCN-06: enforce 下按确认与指纹移出阻断集合 ──
+        if _enforcement_mode() == "enforce" and gate_type == GateType.sign_off:
+            year = context.get("year")
+            if not year:
+                try:
+                    from app.services.project_audit_year import fetch_project_audit_year
+                    year = await fetch_project_audit_year(db, project_id)
+                except Exception:
+                    year = None
+            if year:
+                acks = await _load_active_acknowledgements(db, project_id, year)
+                ack_map = {a.check_name: a for a in acks}
+                for hit in hit_rules:
+                    if hit.severity == GateSeverity.blocking:
+                        ack = ack_map.get(hit.rule_code)
+                        if ack and ack.result_fingerprint == _compute_fingerprint_for_hit(hit):
+                            hit.severity = GateSeverity.warning
+                            hit.location["acknowledged_by"] = str(ack.acknowledged_by)
+                            hit.location["acknowledged_reason"] = ack.reason
+
         # 决策
         has_blocking = any(h.severity == GateSeverity.blocking for h in hit_rules)
         has_warning = any(h.severity == GateSeverity.warning for h in hit_rules)
@@ -276,6 +296,50 @@ class GateEngine:
         self._cache[cache_key] = (result, now)
 
         return result
+
+
+# ── S2 ADR-CCN-06: 辅助函数 ────────────────────────────────────
+
+
+def _enforcement_mode() -> str:
+    """读取当前 observe/enforce 模式"""
+    import os
+    return os.environ.get("CONSISTENCY_GATE_ENFORCEMENT", "observe")
+
+
+async def _load_active_acknowledgements(
+    db: AsyncSession, project_id: uuid.UUID, year: int
+) -> list:
+    """加载项目 + 年度的未撤销确认列表"""
+    import sqlalchemy as sa
+    from app.models.gate_acknowledgement_models import GateAcknowledgement
+
+    stmt = sa.select(GateAcknowledgement).where(
+        GateAcknowledgement.project_id == project_id,
+        GateAcknowledgement.year == year,
+        GateAcknowledgement.revoked_at.is_(None),
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+def _compute_fingerprint_for_hit(hit: GateRuleHit) -> str:
+    """从 GateRuleHit 的 location 计算指纹"""
+    from app.services.gate_acknowledgement_service import compute_result_fingerprint
+
+    location = hit.location or {}
+    key_numbers: dict[str, float | None] = {}
+    for k, v in location.items():
+        if isinstance(v, (int, float)):
+            key_numbers[k] = v
+        elif v is None:
+            key_numbers[k] = v
+    return compute_result_fingerprint(
+        check_name=hit.rule_code,
+        branch_id=location.get("branch_id", ""),
+        status=hit.severity,
+        key_numbers=key_numbers,
+    )
 
 
 # 全局单例

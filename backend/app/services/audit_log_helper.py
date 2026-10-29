@@ -53,6 +53,8 @@ EventType = Literal[
     "ai_chat_adopt_requested",
     "ai_chat_attachment_cleanup",
     "ai_chat_tool_lifecycle",
+    # S2 ADR-CCN-06：门禁逐项确认留痕
+    "gate_acknowledgement",
 ]
 
 
@@ -99,6 +101,8 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "ai_chat_attachment_cleanup": {"run_id", "attachment_id", "status", "bytes_freed"},
     # Property 32：tool call 审计（started + finished/failed 成对）
     "ai_chat_tool_lifecycle": {"run_id", "tool_call_id", "tool_name", "status"},
+    # S2 ADR-CCN-06：门禁逐项确认留痕
+    "gate_acknowledgement": {"check_name"},
 }
 
 # 创世哈希（与 audit_log_writer_worker 保持一致）

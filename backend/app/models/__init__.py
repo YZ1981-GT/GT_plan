@@ -175,6 +175,8 @@ from app.models.consol_scope_confirmation_models import (  # noqa: F401
     ConsolScopeConfirmation,
     ConsolScopeConfirmationNode,
 )
+# 门禁逐项确认留痕（迁移 V217, S2 ADR-CCN-06）
+from app.models.gate_acknowledgement_models import GateAcknowledgement  # noqa: F401
 # 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
 from app.models.workpaper_sync_models import (  # noqa: F401
     WORKPAPER_SYNC_TABLES,

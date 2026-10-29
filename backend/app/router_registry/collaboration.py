@@ -110,6 +110,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     for r in [gate_router, trace_router, sod_router]:
         app.include_router(r, prefix="/api", tags=["门禁与治理"])
 
+    # S2 ADR-CCN-06: 门禁逐项确认留痕（路径已含 /api 前缀，不重复加）
+    from app.routers.gate_acknowledgements import router as gate_ack_router
+    app.include_router(gate_ack_router, tags=["门禁与治理"])
+
     # ═══ §10. Phase 15: 任务树与事件编排 ═══
     from app.routers.task_tree import router as task_tree_router
     from app.routers.issues import router as issues_router
