@@ -51,6 +51,20 @@ class GateRule(ABC):
         """检查规则，命中返回 GateRuleHit，未命中返回 None"""
         ...
 
+    def not_executed(self, message: str) -> GateRuleHit:
+        """快捷方法：返回「未执行」命中，severity 按 observe/enforce 模式决定"""
+        severity = (
+            GateSeverity.blocking
+            if _enforcement_mode() == "enforce"
+            else GateSeverity.warning
+        )
+        return GateRuleHit(
+            rule_code=self.rule_code,
+            error_code=self.error_code,
+            severity=severity,
+            message=message,
+        )
+
 
 class RuleRegistry:
     """规则注册表"""

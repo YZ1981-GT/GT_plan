@@ -35,6 +35,19 @@ class GateSeverity(str, Enum):
     info = "info"
 
 
+class CheckStatus(str, Enum):
+    """校对结果五态（ADR-CCN-01）
+
+    XR / 表间审核 / 附注校对类公式三个执行器的统一结果状态。
+    与 check_outcome.py 工厂函数及 STATUS_LABEL 对齐。
+    """
+    passed = "passed"
+    failed = "failed"
+    not_executed = "not_executed"
+    not_applicable = "not_applicable"
+    error = "error"
+
+
 class IssueSeverity(str, Enum):
     """问题单严重度（Phase 15 使用）"""
     blocker = "blocker"
