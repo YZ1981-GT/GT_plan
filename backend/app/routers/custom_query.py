@@ -1032,7 +1032,7 @@ async def _legacy_business_fetcher(req, resolved, db):
     """编排器 ``business_fetcher`` 的 router 侧入口（R3.7 / R4.8）。
 
     实现委托 ``services.custom_query.business_fetchers.business_fetcher``，不构成第二条分派路径；返回
-    ``FetchPage``（注册表 SQL 源 / JSON 内存源）或 ``(rows, columns)``（跨模块单元格源，任务 34 删除）。
+    ``FetchPage``（注册表 SQL 源 / JSON 内存源；跨模块单元格源键已随任务 34 删除，按未知数据源 400）。
     """
     from app.services.custom_query.business_fetchers import business_fetcher
 

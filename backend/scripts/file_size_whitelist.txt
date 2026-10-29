@@ -1344,7 +1344,7 @@ backend/tests/test_formula_push_engine.py 934
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
 #     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。拆分方向：企业树侧栏连同搜索、收起状态与样式抽成独立组件。
 audit-platform/frontend/src/views/ConsolidationIndex.vue 2368
-backend/tests/test_module_cell_resolver.py 835
+backend/tests/test_module_cell_resolver.py 115
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
 #   ConsolWorksheetTabs.vue —— 2026-10-23 同上：合并工作底稿新增只读「分录汇总表」页签（D-1，读 /api/consolidation/worksheet/entry-summary），
 #     HEAD 1577 → 1649。拆分方向：各静态表页签（分录汇总 / 抵销表等）抽成子组件，主组件只保留页签调度。

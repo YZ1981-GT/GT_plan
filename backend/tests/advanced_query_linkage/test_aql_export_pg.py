@@ -137,6 +137,8 @@ async def test_hp_full_year_export_is_rejected_before_any_row_is_read(business, 
 @pytest.mark.parametrize(("extra", "code"), [
     ({"group": {"dimensions": ["account_code"], "aggregates": []}}, "EXPORT_GROUPING_UNSUPPORTED"),
     ({"filters": {"debit_amount_min": 1}}, "UNKNOWN_FILTER_KEY"),
+    # 跨模块单元格源族已删除（任务 34，AQ-25）：按未知数据源 400（改前当作非 SQL 源，带条件即 CONDITIONS_UNSUPPORTED）
+    ({"source": "report:balance_sheet|A1:C5"}, "UNKNOWN_SOURCE"),
 ])
 async def test_rejections_happen_before_taking_a_slot(business, monkeypatch, extra: dict, code: str):
     taken: list[str] = []

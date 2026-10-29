@@ -141,6 +141,36 @@ def test_unknown_source_is_400(source: str) -> None:
     assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE"
 
 
+#: 跨模块单元格源键（``{report|note|adj|tb}:限定词|区域``）：取数实现随任务 34 删除（AQ-25，design §3.9），前端没有入口发它们
+_MODULE_CELL_SOURCES = ["report:balance_sheet|A1:C5", "note:五-1-1|C3:D8", "adj:aje|B2:E10", "tb:detail|C1:C50"]
+
+
+def _module_cell_req(source: str):
+    from app.services.custom_query.query_orchestrator import QueryRequest
+
+    return QueryRequest(entry="business", project_id=str(_PID), year=2025, source=source)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_business_fetcher(source: str) -> None:
+    """execute 的分派入口按未知数据源 400（改前：先认出该源族，交跨模块单元格取数、200 返回虚拟单元格）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.business_fetcher(_module_cell_req(source), [], None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_prepare_export(source: str) -> None:
+    """「导出全部」同一分派入口同样 400（改前：当作非 SQL 源返回 None，交内存路径取数）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.prepare_export(_module_cell_req(source), None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
 # ─── 语句形态 ────────────────────────────────────────────────────────────────
 
 
