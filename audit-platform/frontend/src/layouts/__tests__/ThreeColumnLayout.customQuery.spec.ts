@@ -6,7 +6,8 @@
  *   （布局只为弹窗新增年度，`currentYear` 不动，变异 B11-b）；
  * - 接线：侧栏打开按当前页预选数据源；模板库事件带的项目优先于路由（原先被丢弃，变异 B11-a），事件带的模板口径源经
  *   `resolveTemplateLibrarySource` 映射（原先原样传、400 UNKNOWN_SOURCE，变异 #33），附注模板带出编号体系提示；
- *   关闭即丢弃事件；非项目页不给项目、年度留空（B10 评审非阻塞 #2）。
+ *   关闭即丢弃事件；非项目页不给项目、年度留空（B10 评审非阻塞 #2）；模板库 URL 不带项目时页面自取的演示项目不进弹窗，
+ *   带 `?project_id` 时采纳它（B11 评审 F1，变异 B11r-a）。
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -172,12 +173,41 @@ describe('模板库「📊 高级查询」事件（R10.1、R10.5，AQ-37 / AQ-38
   })
 
   it('报表模板 report:<类型> 映射为报表源键（原先原样传给 execute ⇒ 400 UNKNOWN_SOURCE）', async () => {
-    setRoute('TemplateLibraryMgmt', null)
+    setRoute('TemplateLibraryMgmt', null, { project_id: 'p3' })
     const w = mountLayout()
     await flushPromises()
     emitOpenEvent({ tab: 'basic', source: 'report:balance_sheet', project_id: 'p3' })
     await nextTick()
     expect(dialogState(w)).toMatchObject({ projectId: 'p3', source: 'report_balance_sheet', notice: undefined })
+  })
+
+  it('模板库 URL 不带项目：底稿模板详情带来的演示项目不进弹窗，项目与年度都为空（B11 评审 F1，R10.1 / AQ-37）', async () => {
+    const store = useProjectStore()
+    store.year = 2025
+    setRoute('TemplateLibraryMgmt', null)
+    await store.syncFromRoute(route as any)
+    const w = mountLayout()
+    await flushPromises()
+    // TemplateLibraryMgmt 的 ensureFallbackProject 取项目列表第一项 → WpTemplateDetail → TemplateLibraryButton 放进事件
+    emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p-demo' })
+    await nextTick()
+    expect(dialogState(w)).toEqual({
+      open: true, projectId: '', year: null, tab: 'basic', source: 'workpaper:E1', notice: undefined,
+    })
+  })
+
+  it('模板库 URL 带 ?project_id：采纳该项目，年度留空交弹窗取它的审计年度；事件项目与路由不一致时取路由的', async () => {
+    setRoute('TemplateLibraryMgmt', null, { project_id: 'p3', tab: 'wp-template' })
+    const w = mountLayout()
+    await flushPromises()
+    emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p3' })
+    await nextTick()
+    expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p3', year: null, source: 'workpaper:E1' })
+    dialogOf(w).vm.$emit('update:modelValue', false)
+    await nextTick()
+    emitOpenEvent({ tab: 'basic', source: 'workpaper:E1', project_id: 'p-demo' })
+    await nextTick()
+    expect(dialogState(w)).toMatchObject({ open: true, projectId: 'p3', year: null })
   })
 
   it('附注模板落附注目录并带编号体系提示', async () => {

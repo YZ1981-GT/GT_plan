@@ -1,10 +1,12 @@
 /**
  * queryEntryContext.spec.ts — 打开高级查询时的入口上下文（advanced-query-linkage-closure 任务 27；ADR-AQL-15，R10.1~R10.3、R10.5）
  *
- * 纯函数：路由 → 预选源；模板库按钮的模板口径源 URI → 注册表源键（AQ-38，变异 #33）；弹窗打开时的项目 / 年度 / 预选源。
+ * 纯函数：路由 → 预选源；模板库按钮的模板口径源 URI → 注册表源键（AQ-38，变异 #33）；弹窗打开时的项目 / 年度 / 预选源；
+ * 模板库页只认路由明确带的项目，页面自取的演示项目不进弹窗（B11 评审 F1，变异 B11r-a / B11r-b / B11r-c）。
  */
 import { describe, it, expect } from 'vitest'
 import {
+  TEMPLATE_LIBRARY_ROUTE,
   TEMPLATE_NOTE_NOTICE,
   resolveDialogOpenContext,
   resolveQueryEntryContext,
@@ -94,11 +96,49 @@ describe('resolveDialogOpenContext — 弹窗每次打开的项目、年度与�
 
   it('事件带的模板口径源经映射，附注模板带出提示；页签按事件', () => {
     const ctx = resolveDialogOpenContext({
-      route: r('TemplateLibraryMgmt', {}, null), eventPayload: { source: 'note:五-1-1', project_id: PID, tab: 'advanced' },
+      route: r(TEMPLATE_LIBRARY_ROUTE, { project_id: PID }, null),
+      eventPayload: { source: 'note:五-1-1', project_id: PID, tab: 'advanced' },
     })
     expect(ctx).toEqual({ projectId: PID, initialTab: 'advanced', initialSource: 'disclosure', initialNotice: TEMPLATE_NOTE_NOTICE })
     expect(resolveDialogOpenContext({ route: r('Reports'), eventPayload: { source: 'report:balance_sheet' } }).initialSource)
       .toBe('report_balance_sheet')
+  })
+
+  it('模板库页 URL 不带项目：事件里的项目（页面自取的演示项目）不采纳，弹窗项目为空、年度不给（R10.1，AQ-37）', () => {
+    expect(TEMPLATE_LIBRARY_ROUTE).toBe('TemplateLibraryMgmt')
+    const ctx = resolveDialogOpenContext({
+      route: r(TEMPLATE_LIBRARY_ROUTE, {}, null), eventPayload: { tab: 'basic', source: 'workpaper:E1', project_id: PID },
+    })
+    expect(ctx, '演示项目不应成为弹窗项目').toEqual({ projectId: '', initialTab: 'basic', initialSource: 'workpaper:E1' })
+    const report = resolveDialogOpenContext({
+      route: r(TEMPLATE_LIBRARY_ROUTE, { tab: 'report-config' }, null),
+      eventPayload: { source: 'report:balance_sheet', project_id: OTHER },
+    })
+    expect(report.projectId, '报表模板同样不带演示项目').toBe('')
+    expect(report.initialSource).toBe('report_balance_sheet')
+  })
+
+  it('模板库页 URL 带 ?project_id：事件项目与它一致才采纳，不一致取路由的；事件不带项目时为空', () => {
+    const same = resolveDialogOpenContext({
+      route: r(TEMPLATE_LIBRARY_ROUTE, { project_id: OTHER }, null), eventPayload: { source: 'workpaper:E1', project_id: OTHER },
+    })
+    expect(same.projectId, '路由明确带的项目').toBe(OTHER)
+    expect(same.year, '模板库页不是该项目的项目页：年度交弹窗取该项目审计年度').toBeUndefined()
+    const mismatch = resolveDialogOpenContext({
+      route: r(TEMPLATE_LIBRARY_ROUTE, { project_id: OTHER }, null), eventPayload: { source: 'workpaper:E1', project_id: PID },
+    })
+    expect(mismatch.projectId, '路由项目与事件项目不一致时取路由的').toBe(OTHER)
+    const byParam = resolveDialogOpenContext({
+      route: { name: TEMPLATE_LIBRARY_ROUTE, params: { projectId: PID }, query: { project_id: OTHER } },
+      eventPayload: { project_id: PID },
+    })
+    expect(byParam.projectId, 'params.projectId 先于 ?project_id（与模板库页 currentProjectId 同序）').toBe(PID)
+    const noEventProject = resolveDialogOpenContext({
+      route: r(TEMPLATE_LIBRARY_ROUTE, { project_id: OTHER }, null), eventPayload: { source: 'report:balance_sheet' },
+    })
+    expect(noEventProject.projectId, '报表 / 附注模板按钮不带项目：照旧不预选').toBe('')
+    expect(resolveDialogOpenContext({ route: r(TEMPLATE_LIBRARY_ROUTE, { project_id: OTHER }, null) }).projectId,
+      '侧栏打开：照旧不预选').toBe('')
   })
 
   it('事件不带源（如工作台快捷入口）：不按路由预选', () => {
