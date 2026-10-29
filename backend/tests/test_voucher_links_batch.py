@@ -246,7 +246,10 @@ async def test_existed_keeps_phase_and_revived_takes_current_phase(client, db):
     single = (await client.post(_url("sample-voucher"), json={"year": YEAR, **_voucher("FY"),
                                                                "working_paper_id": str(WP_A)})).json()
     assert (single["status"], single["phase"]) == ("updated", "preliminary")
+    # 预审挂凭只能在预审阶段取消（年审阶段 409，见 test_cancel_attach_only_manual_rows_...）；取消后到年审再挂即复活
+    await _set_phase(db, "preliminary")
     assert (await client.delete(_url(f"sampled-vouchers/{created['id']}"))).status_code == 200
+    await _set_phase(db, "final")
     revived = (await _batch(client, [_voucher("FY")], [WP_A])).json()["results"][0]
     assert (revived["status"], revived["phase"], revived["id"]) == ("created", "final", created["id"])
     (row,) = await _rows(db)
@@ -376,3 +379,37 @@ def test_new_routes_registered_once_in_the_real_app():
     assert sorted(seen) == sorted(want)
     assert {r.endpoint.__module__ for r in app.routes if getattr(r, "path", "") in {p for _, p in want}} == {
         "app.routers.voucher_links"}
+
+
+async def test_cancel_attach_only_manual_rows_and_not_preliminary_in_final_phase(client, db):
+    """任务 15：取消挂凭只删手工挂凭；年审阶段不删预审挂凭（年审口径 b 据此扣除预审已检分录）；
+    引擎批次的登记要撤销批次；不属于本项目 404；已删的再删照常返回。"""
+    await _set_phase(db, "preliminary")
+    pre = (await _batch(client, [_voucher("FY")], [WP_A])).json()["results"][0]
+    await _set_phase(db, "final")
+    fin = (await _batch(client, [_voucher("ZZ")], [WP_A])).json()["results"][0]
+
+    locked = await client.delete(_url(f"sampled-vouchers/{pre['id']}"))
+    assert locked.status_code == 409 and locked.json()["detail"]["error_code"] == "PRELIMINARY_ATTACH_LOCKED"
+    assert (await client.delete(_url(f"sampled-vouchers/{fin['id']}"))).status_code == 200
+    assert (await client.delete(_url(f"sampled-vouchers/{fin['id']}"))).status_code == 200  # 幂等
+    await _set_phase(db, "preliminary")
+    assert (await client.delete(_url(f"sampled-vouchers/{pre['id']}"))).status_code == 200  # 预审阶段照常可删
+
+    engine_row = SampledVoucher(id=uuid.uuid4(), project_id=PROJECT, year=YEAR, voucher_no="0003",
+                                voucher_date=date(2025, 1, 7), batch_id=uuid.uuid4(), working_paper_id=WP_A,
+                                phase="preliminary")
+    other_row = SampledVoucher(id=uuid.uuid4(), project_id=OTHER_PROJECT, year=YEAR, voucher_no="0003",
+                               working_paper_id=WP_OTHER, phase="final")
+    db.add_all([engine_row, other_row])
+    await db.commit()
+    by_engine = await client.delete(_url(f"sampled-vouchers/{engine_row.id}"))
+    assert by_engine.status_code == 409 and by_engine.json()["detail"]["error_code"] == "ENGINE_REGISTRATION_LOCKED"
+    assert (await client.delete(_url(f"sampled-vouchers/{other_row.id}"))).status_code == 404
+    assert (await client.delete(_url(f"sampled-vouchers/{uuid.uuid4()}"))).status_code == 404
+    client.as_user(READER)
+    assert (await client.delete(_url(f"sampled-vouchers/{fin['id']}"))).status_code == 403
+
+    deleted = {str(r.id): r.is_deleted for r in await _rows(db)}
+    assert deleted[pre["id"]] and deleted[fin["id"]]
+    assert not deleted[str(engine_row.id)] and not deleted[str(other_row.id)]

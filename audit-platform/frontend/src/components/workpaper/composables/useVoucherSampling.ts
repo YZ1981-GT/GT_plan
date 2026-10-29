@@ -71,6 +71,13 @@ import {
 } from './samplingPopulationReconcile'
 import { useVersionTrail } from './useVersionTrail'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import {
+  finalPopulationModeOf,
+  parseFinalPopulationTrace,
+  type FinalPopulationMode,
+  type FinalPopulationTrace,
+} from './useFinalPopulationMode'
+import { computeSampleErrorTotal } from './samplingPhaseEvaluation'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -158,6 +165,8 @@ export interface ExtractionLogEntry {
   conclusion?: string | null
   /** 只记了凭证号的旧记录：它参与的已抽排除按凭证号整张排除（会连带同号的其他凭证） */
   legacyExclusion?: boolean
+  /** 年审口径（需求 7.4）：只有年审且该底稿当时有预审工作的批次才有 */
+  finalPopulationMode?: FinalPopulationMode | null
 }
 
 export interface CompareResult {
@@ -424,6 +433,11 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    * UI 如实提示但不阻断抽样（"先建底稿后导账套"是合法工作流）。
    */
   const datasetId = ref<string | null>(null)
+
+  /** 年审口径（需求 7.1）：引擎问过用户后经 triggerSampling 传入；重抽（不带参数）沿用上次 */
+  let requestedFinalPopulationMode: FinalPopulationMode | null = null
+  /** 后端回的口径留痕（stats.final_population）；回填时写进批次留痕（需求 7.4） */
+  const finalPopulation = ref<FinalPopulationTrace | null>(null)
   /**
    * 本次回填形成的批次号（R6.2）：由 `cutoff-fill` 响应回报，供底稿方法学 bar
    * 渲染「批次号」列，使归档件上的样本可追溯到唯一批次。
@@ -658,6 +672,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       stratifiedDetail.value = null
       result = projectMisstatement(samples, config.value.samplingMethod, interval, popAmount, cl)
     }
+    // 样本实际错报合计 E（需求 7.6）：与推断同一批样本，随评价保存，年审口径 b 合并评价用它
+    result = { ...result, sampleErrorTotal: computeSampleErrorTotal(samples) }
     misstatementResult.value = result
 
     const tol = config.value.tolerableMisstatement
@@ -752,12 +768,13 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   /**
    * 执行抽样：POST /voucher-extract → 填充 sampledVouchers → 打开预览
    */
-  async function triggerSampling(): Promise<void> {
+  async function triggerSampling(opts?: { finalPopulationMode?: FinalPopulationMode | null }): Promise<void> {
     if (!validateConfig()) return
     if (year.value == null) {
       ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
       return
     }
+    if (opts && 'finalPopulationMode' in opts) requestedFinalPopulationMode = opts.finalPopulationMode ?? null
 
     loading.value = true
     try {
@@ -774,6 +791,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         random_seed: config.value.randomSeed ?? null,
         // 后端只收预审 / 年审（其他 422）；宿主借 phase 传「本期 / 期后」的不发，由后端按项目阶段取
         phase: phase.value === 'preliminary' || phase.value === 'final' ? phase.value : undefined,
+        ...(requestedFinalPopulationMode ? { final_population_mode: requestedFinalPopulationMode } : {}),
         workpaper_id: workpaperId.value,
         year: year.value,
         filters: {
@@ -801,6 +819,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       const statsData = data?.stats ?? {}
       const responseSeedUsed: number | null = data?.seed_used ?? null
       const truncated: boolean = data?.truncated ?? false
+      finalPopulation.value = parseFinalPopulationTrace(statsData.final_population)
 
       if (items.length === 0) {
         ElMessage.info('未找到符合条件的凭证，请调整过滤条件')
@@ -1125,6 +1144,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             sampling_params: buildSamplingParams(),
             random_seed: seedUsed.value,
             phase: phase.value,
+            // 年审口径留痕（需求 7.4）：口径、预审截止日、排除清单规模；口径也参与批次幂等键
+            ...(finalPopulation.value
+              ? { final_population_mode: finalPopulation.value.mode, final_population: finalPopulation.value }
+              : {}),
             // 本次实际回填的凭证号清单：后端据此排除已抽凭证、预审转年审排重、
             // 版本比较（此前从不发送 → 排重/比较链路空转）。去空去重保持稳定。
             filled_voucher_nos: Array.from(
@@ -1197,7 +1220,13 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 不返回 data 本身）→ 必须 `res.data.data`，否则恒 undefined。
       const fillData = (fillRes?.data as any)?.data ?? fillRes?.data
       const rawBatchId = fillData?.batch_id ?? fillData?.batchId ?? null
+      const rawLogId = fillData?.id ?? fillData?.log_id ?? null
       filledBatchId.value = rawBatchId != null ? String(rawBatchId) : null
+      // 当前会话后续评价必须显式绑本次 log id。只存 batch_id、再让 /voucher-evaluation 默认选
+      // 「最近一批」会在年审尚未回填时把评价写进上一条预审批次（2026-10-28 浏览器实测）。
+      loadedFromBatch.value = rawLogId != null
+        ? { logId: String(rawLogId), batchId: filledBatchId.value, evaluatedAt: null }
+        : null
     } catch {
       ElMessage.error('记录填充日志失败')
       return []
@@ -1251,6 +1280,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           resampleReason: item.resample_reason ?? item.resampleReason ?? criteria.resample_reason ?? null,
           conclusion: item.conclusion ?? criteria.conclusion ?? null,
           legacyExclusion: Boolean(item.legacy_exclusion ?? false),
+          finalPopulationMode: finalPopulationModeOf(criteria.final_population_mode),
         }
       })
 
@@ -1411,6 +1441,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       basic_precision: r.basicPrecision,
       incremental_allowance: r.incrementalAllowance,
       upper_limit: r.upperLimit,
+      // 样本实际错报合计 E（需求 7.6）；回读的旧评价没有就发 null，后端不写
+      sample_error_total: r.sampleErrorTotal ?? null,
       tolerable_misstatement: config.value.tolerableMisstatement ?? null,
       checked_sample_count: checkedSampleCount.value,
       unchecked_sample_count: uncheckedSampleCount.value,
@@ -1464,12 +1496,19 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     const payload = buildEvaluationPayload()
     if (!payload) return false
     if (!projectId.value || !workpaperId.value) return false
+    const targetLogId = loadedFromBatch.value?.logId
+    // 当前会话抽出的样本尚未回填时还没有批次。绝不能传 log_id=null 让后端默认选「最近一批」：
+    // 年审草稿会据此覆盖上一条预审批次的 P/U/E，正好破坏两阶段合并评价。评价会随 cutoff-fill 一并落库。
+    if (!targetLogId) {
+      ElMessage.info('尚未回填抽凭批次，抽样评价将在回填时一并保存')
+      return false
+    }
     try {
       const res = await http.post(
         `/api/projects/${projectId.value}/sampling/voucher-evaluation`,
         {
           workpaper_id: workpaperId.value,
-          log_id: loadedFromBatch.value?.logId ?? null,
+          log_id: targetLogId,
           evaluation: { ...payload, ...(extra ?? {}) },
         },
       )
@@ -1519,6 +1558,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         basicPrecision: String(ev.basic_precision ?? '0.00'),
         incrementalAllowance: String(ev.incremental_allowance ?? '0.00'),
         upperLimit: String(ev.upper_limit ?? '0.00'),
+        // 回读必须带上 E：确认结论等动作会原样重存评价，漏了就把库里的 E 抹掉
+        ...(ev.sample_error_total != null ? { sampleErrorTotal: String(ev.sample_error_total) } : {}),
       }
       const code = String(ev.conclusion_code ?? 'undetermined')
       // 抑制一次 watch：先写结论会触发"确认失效"，把下一行刚还原的确认状态打回 false
@@ -1719,6 +1760,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     methodologySnapshot,
     // 抽样框版本 + 评价留痕状态（R1/R2/R3）
     datasetId,
+    finalPopulation,
     filledBatchId,
     loadedFromBatch,
     conclusionConfirmed,

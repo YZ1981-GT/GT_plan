@@ -286,13 +286,31 @@ async def delete_sampled_voucher(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """取消抽样（软删）"""
-    await db.execute(
-        sa.update(SampledVoucher)
-        .where(SampledVoucher.id == sampled_id, SampledVoucher.project_id == project_id)
-        .values(is_deleted=True)
-    )
-    await db.commit()
+    """取消挂凭（软删）。只删手工挂凭；年审阶段不删预审挂凭（任务 15）。
+
+    - 抽凭引擎批次的登记（``batch_id`` 非空）409 ``ENGINE_REGISTRATION_LOCKED``：要撤销整个批次（宿主按批次删行），
+      单删登记会让底稿行与登记对不上；
+    - 项目在年审阶段时预审挂凭 409 ``PRELIMINARY_ATTACH_LOCKED``（需求 6.3「年审阶段预审行不可删」）：年审口径 b 按它扣除
+      预审已检分录，删掉后同一分录会被年审再抽一次；
+    - 不属于本项目 404；已删的再删照常返回（幂等）。
+    """
+    row = (await db.execute(sa.select(SampledVoucher).where(
+        SampledVoucher.id == sampled_id, SampledVoucher.project_id == project_id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="挂凭记录不存在")
+    if not row.is_deleted:
+        if row.batch_id is not None:
+            raise HTTPException(status_code=409, detail={
+                "error_code": "ENGINE_REGISTRATION_LOCKED",
+                "message": "这是抽凭引擎批次的登记，不能单独取消；请在该底稿的抽凭历史里撤销该批次",
+            })
+        if row.phase == "preliminary" and await project_phase(db, project_id) == "final":
+            raise HTTPException(status_code=409, detail={
+                "error_code": "PRELIMINARY_ATTACH_LOCKED",
+                "message": "项目已进入年审阶段，预审挂凭不能取消（年审抽样要据此扣除预审已检分录）",
+            })
+        row.is_deleted = True
+        await db.commit()
     return {"status": "deleted", "id": str(sampled_id)}
 
 

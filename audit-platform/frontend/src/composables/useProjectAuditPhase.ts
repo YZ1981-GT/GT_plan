@@ -14,6 +14,7 @@ import { projects as P_projects } from '@/services/apiPaths'
 
 export type AuditPhase = 'preliminary' | 'final'
 
+export const AUDIT_PHASE = Object.freeze({ preliminary: 'preliminary', final: 'final' } as const)
 export const AUDIT_PHASE_LABEL: Record<AuditPhase, string> = { preliminary: '预审', final: '年审' }
 
 export interface ProjectAuditPhaseState {

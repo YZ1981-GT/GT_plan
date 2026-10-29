@@ -240,6 +240,7 @@ class TestVoucherExtractPhase:
                       new=AsyncMock(return_value=PopulationReconcileFacts(available=False))), \
                 patch("app.routers.voucher_sampling.project_phase",
                       new=AsyncMock(return_value=project_phase)) as phase_of, \
+                patch("app.routers.voucher_sampling.resolve_final_population", new=AsyncMock(return_value=None)), \
                 patch("app.routers.voucher_sampling.collect_exclusions",
                       new=AsyncMock(return_value=SamplingExclusions())) as collect, \
                 patch("app.routers.voucher_sampling.LedgerSamplingService") as svc:
