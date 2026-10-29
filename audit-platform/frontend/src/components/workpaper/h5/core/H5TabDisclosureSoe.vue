@@ -8,7 +8,7 @@
         <div class="section-title">
           <span>附注披露 — 国企版</span>
           <div class="title-actions">
-            <el-button size="small" type="success" :loading="syncing" :disabled="!hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
+            <el-button size="small" type="success" :loading="syncing" :disabled="props.isReadonly || !hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
             <el-button size="small" type="primary" plain @click="jumpToNote">↩ 跳转回附注（八、25）</el-button>
             <el-button size="small" type="default" link @click="openReview('disclosure')">💬 复核</el-button>
           </div>
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount, toRef, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -94,6 +94,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   applicableStandards?: string[]
+  saveResponse: (itemId: string, value: any) => Promise<void> | void
 }>()
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
@@ -105,11 +106,10 @@ const soeDisclosureText = ref('')
 // → 未同步就刷新即丢，AI 生成的文本同样存不下来。此处补齐 hydrate + persist。
 // 键与 h5SoeDisclosureForm.H5_SOE_TEXT_ITEM 同值（读取走共用函数；守卫钉住两处一致）
 const H5_SOE_TEXT_ITEM = 'H5-disc-soe-text'
-const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 function persistText(): void {
   if (props.isReadonly) return
-  saveResponse(H5_SOE_TEXT_ITEM, { remark: soeDisclosureText.value || '' })
+  void props.saveResponse(H5_SOE_TEXT_ITEM, soeDisclosureText.value || '')
 }
 
 watch(
@@ -181,6 +181,7 @@ const consistencyChecks = computed(() => {
 
 // ─── 同步到附注 ──────────────────────────────────────────────────────────────
 async function syncToNote(): Promise<void> {
+  if (props.isReadonly) return
   const rows = summaryRows.value
   if (h5SoeSummaryIsEmpty(rows)) {
     ElMessage.warning('请先填写披露数据')

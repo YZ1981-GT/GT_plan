@@ -63,6 +63,8 @@ export interface UseNoteRefreshReturn {
   onRefreshAll: () => Promise<void>
   onManualRefresh: () => Promise<void>
   onStaleRecalc: () => Promise<void>
+  /** 只执行 prepare→headless→push；调用方随后执行 refill→note formulas。 */
+  syncFromWorkpaperDisclosures: (section: string | null) => Promise<{ lines: string[]; warn: boolean }>
   showRefreshResultMessage: (result: RefreshFromWorkpapersResult, extra?: { lines: string[]; warn: boolean }) => void
   onWorkpaperSaved: (payload: { projectId: string }) => void
   onDisclosureNoteTextUpdated: (payload: Record<string, unknown>) => void
@@ -134,19 +136,25 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
    * 再对已接入离屏同步的底稿按披露 Tab 同一套代码现算披露表同步到附注。失败不阻断后续刷新，原因并入提示。
    */
   async function _pullFromWorkpapers(section: string | null): Promise<{ lines: string[]; warn: boolean }> {
-    const { result, error } = await pullFromWorkpapers(projectId.value, year.value, section)
+    // 两阶段保证顺序：先拿上下文跑披露 builder，再用审定数覆盖主表；表内公式由随后 refill 最后执行。
+    const prepared = await pullFromWorkpapers(projectId.value, year.value, section, 'prepare')
     let outcomes: HeadlessSyncOutcome[] = []
     let pending: string[] = []
-    if (result) {
+    if (prepared.result) {
       try {
-        ({ outcomes, pending } = await runHeadlessDisclosure(result, {
+        ({ outcomes, pending } = await runHeadlessDisclosure(prepared.result, {
           projectId: projectId.value, year: year.value, allSections: section === null,
         }))
       } catch (err: any) {
         outcomes = [{ wpCode: '—', section: section || '', status: 'failed', message: err?.message || '离屏同步失败' }]
       }
     }
-    return describeWorkpaperPull(result, error, outcomes, { pendingWpCodes: pending })
+    const pushed = prepared.result
+      ? await pullFromWorkpapers(projectId.value, year.value, section, 'push')
+      : { result: null, error: null }
+    const result = pushed.result ?? prepared.result
+    const errors = [prepared.error, pushed.error].filter((item): item is string => !!item)
+    return describeWorkpaperPull(result, errors.length ? errors.join('；') : null, outcomes, { pendingWpCodes: pending })
   }
 
   /**
@@ -169,6 +177,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       // 先从底稿取数（公式推送 + 离屏同步披露表），再按模板绑定重算
       const pulled = await _pullFromWorkpapers(section)
       const result = await refreshDisclosureSection(projectId.value, year.value, section)
+      await fetchTree()
       await fetchDetail(section)
       showRefreshResultMessage(result, pulled)
     } catch (e) { handleApiError(e, '刷新附注') }
@@ -202,9 +211,14 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
   async function onManualRefresh() {
     syncError.value = false
     try {
-      const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-      if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-      showRefreshResultMessage(result)
+      const section = currentNote.value?.note_section || null
+      const pulled = await _pullFromWorkpapers(section)
+      const result = section
+        ? await refreshDisclosureSection(projectId.value, year.value, section)
+        : await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      await fetchTree()
+      if (section) await fetchDetail(section)
+      showRefreshResultMessage(result, pulled)
     } catch (e) {
       syncError.value = true
       handleApiError(e, '刷新附注')
@@ -220,12 +234,14 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       handleApiError(e, '试算表重算')
       return
     }
-    // 重算试算表后，再触发附注从底稿刷新获取差异化提示
+    // 重算试算表后，完整执行披露明细→审定主表→binding→表内公式。
     try {
+      const pulled = await _pullFromWorkpapers(null)
       const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-      showRefreshResultMessage(result)
+      showRefreshResultMessage(result, pulled)
     } catch { /* stale recalc 已完成，附注刷新失败静默 */ }
     await fetchTree()
+    if (currentNote.value) await fetchDetail(currentNote.value.note_section)
 
     const kept = Number(resolution?.kept_stale ?? 0)
     if (kept > 0) {
@@ -248,8 +264,12 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     syncDebounceTimer = setTimeout(async () => {
       syncError.value = false
       try {
-        await refreshDisclosureFromWorkpapers(projectId.value, year.value)
-        if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+        const section = currentNote.value?.note_section
+        if (!section) return
+        await _pullFromWorkpapers(section)
+        await refreshDisclosureSection(projectId.value, year.value, section)
+        await fetchTree()
+        await fetchDetail(section)
       } catch (err: any) {
         // partner-manager-edit-permission: 403 被拒时不置 syncError、不显示底稿同步失败提示
         if (canWrite && err?.response?.status === 403) return
@@ -418,6 +438,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     onRefreshAll,
     onManualRefresh,
     onStaleRecalc,
+    syncFromWorkpaperDisclosures: _pullFromWorkpapers,
     showRefreshResultMessage,
     onWorkpaperSaved,
     onDisclosureNoteTextUpdated,

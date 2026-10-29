@@ -228,9 +228,14 @@ function publishNoteText(): void {
   try {
     eventBus.emit('disclosure:note-text-updated', {
       wpCode: 'K4',
+      wpId: props.wpId,
+      projectId: props.projectId,
+      variant: 'soe',
       accountCode: k4EventCode(),
       section: 'soe',
+      sectionIds: [K4_NOTE_SECTION.soe],
       text: allText,
+      timestamp: Date.now(),
     })
   } catch { /* silent */ }
 }
@@ -290,9 +295,14 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildK4SyncPayload('soe', props.wpId || '', snapshot.rows, snapshot.narrative)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K4', variant: 'soe', accountCode: k4EventCode(),
-      projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.soe],
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K4',
+      wpId: props.wpId,
+      variant: 'soe',
+      accountCode: k4EventCode(),
+      projectId: props.projectId,
+      sectionIds: [K4_NOTE_SECTION.soe],
+      timestamp: Date.now(),
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

@@ -351,9 +351,14 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildK4SyncPayload('listed', props.wpId || '', snapshot.rows, snapshot.narrative, snapshot.extras)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K4', variant: 'listed', accountCode: k4EventCode(),
-      projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.listed],
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K4',
+      wpId: props.wpId,
+      variant: 'listed',
+      accountCode: k4EventCode(),
+      projectId: props.projectId,
+      sectionIds: [K4_NOTE_SECTION.listed],
+      timestamp: Date.now(),
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }
@@ -408,7 +413,17 @@ function onSummaryEdit(row: SummaryRow, field: string, value: any): void {
 function onNoteTextChange(): void {
   persistNote()
   try {
-    eventBus.emit('disclosure:note-text-updated', { wpCode: 'K4', accountCode: k4EventCode(), section: 'listed', text: noteText.value })
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K4',
+      wpId: props.wpId,
+      projectId: props.projectId,
+      variant: 'listed',
+      accountCode: k4EventCode(),
+      section: 'listed',
+      sectionIds: [K4_NOTE_SECTION.listed],
+      text: noteText.value,
+      timestamp: Date.now(),
+    })
   } catch { /* silent */ }
 }
 

@@ -2,6 +2,7 @@
 import type { HeadlessProviderLoader } from '../headlessFramework'
 
 export const FJN_HEADLESS: Record<string, HeadlessProviderLoader> = {
+  F1: () => import('@/components/workpaper/composables/f1HeadlessDisclosure').then((m) => m.f1HeadlessProvider),
   F2: () => import('@/components/workpaper/composables/f2HeadlessDisclosure').then((m) => m.f2HeadlessProvider),
   F3: () => import('@/components/workpaper/composables/f3HeadlessDisclosure').then((m) => m.f3HeadlessProvider),
   F4: () => import('@/components/workpaper/composables/f4HeadlessDisclosure').then((m) => m.f4HeadlessProvider),

@@ -563,6 +563,7 @@ import {
   type SummaryRow,
   type TitleCertRow,
 } from '../../composables/h1ListedDisclosureModel'
+import { restoreH1ListedState } from '../../composables/h1DisclosureTabState'
 import { mapOperatingToDisclosureRows, type OperatingLeaseRow } from '../../composables/useH1LeaseCheck'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import {
@@ -738,97 +739,24 @@ function fmt(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function parseJson<T>(id: string, fb: T): T {
-  const raw = props.allResponses.get(id)?.remark
-  if (!raw) return fb
-  try {
-    const p = JSON.parse(raw)
-    return (p ?? fb) as T
-  } catch { return fb }
-}
 
 function load() {
-  const sumSaved = parseJson<SummaryRow[] | null>(H1_LISTED_ITEM.summary, null)
-  if (Array.isArray(sumSaved) && sumSaved.length) {
-    for (const s of sumSaved) {
-      const row = summary.find((r) => r.key === s.key)
-      if (row) Object.assign(row, s)
-    }
-  }
-
-  const cats = parseJson<H1ListedCategory[] | null>(H1_LISTED_ITEM.categories, null)
-  if (Array.isArray(cats) && cats.length) categories.value = cats
-
-  const mov = parseJson<MovementCellMap | null>(H1_LISTED_ITEM.movement, null)
-  if (mov && typeof mov === 'object') movement.value = mov
-
-  const idle = parseJson<IdleRow[] | null>(H1_LISTED_ITEM.idle, null)
-  if (Array.isArray(idle) && idle.length) idleRows.value = idle
-
-  const lease = parseJson<LeaseOutRow[] | null>(H1_LISTED_ITEM.leaseOut, null)
-    ?? parseJson<LeaseOutRow[] | null>(H1_LISTED_ITEM.leaseOutLegacy, null)
-  if (Array.isArray(lease) && lease.length) {
-    // 兼容旧动态行 {name, amount}
-    leaseRows.value = lease.map((r: any, i) => ({
-      rowId: r.rowId || `lease-${i}`,
-      name: r.name || '',
-      bookValue: num(r.bookValue ?? r.amount),
-      isPreset: r.isPreset,
-    }))
-  }
-
-  const title = parseJson<TitleCertRow[] | null>(H1_LISTED_ITEM.titleCert, null)
-  if (Array.isArray(title) && title.length) titleCertRows.value = title
-
-  const clearing = parseJson<ClearingRow[] | null>(H1_LISTED_ITEM.clearing, null)
-  if (Array.isArray(clearing) && clearing.length) clearingRows.value = clearing
-
-  const mort = parseJson<MortgageRow[] | null>(H1_LISTED_ITEM.mortgageRows, null)
-    ?? parseJson<any[] | null>(H1_LISTED_ITEM.mortgageLegacy, null)
-  if (Array.isArray(mort) && mort.length) {
-    mortgageRows.value = mort.map((r: any, i) => ({
-      rowId: r.rowId || `mort-${i}`,
-      name: r.name || '',
-      amount: num(r.amount),
-      description: r.description || '',
-      remark: r.remark || '',
-    }))
-  }
-
-  const gov = parseJson<typeof govSubsidy | null>(H1_LISTED_ITEM.govSubsidy, null)
-  if (gov) Object.assign(govSubsidy, gov)
-
-  const fdep = parseJson<FullyDepRow[] | null>(H1_LISTED_ITEM.fullyDepreciated, null)
-  if (Array.isArray(fdep) && fdep.length) {
-    fullyDepRows.value = fdep.map((r: any, i) => ({
-      rowId: r.rowId || `fdep-${i}`,
-      name: r.name || '',
-      cost: num(r.cost),
-      remark: r.remark || '',
-    }))
-  }
-
-  const ni = props.allResponses.get(H1_LISTED_ITEM.noteImpairment)?.remark
-  if (ni) noteImpairment.value = ni
-  const nm = props.allResponses.get(H1_LISTED_ITEM.noteMortgage)?.remark
-  if (nm) noteMortgage.value = nm
-  const ns = props.allResponses.get(H1_LISTED_ITEM.noteSale)?.remark
-  if (ns) noteSale.value = ns
-  const nc = props.allResponses.get(H1_LISTED_ITEM.noteClearing)?.remark
-  if (nc) noteClearing.value = nc
-
-  // 变动表全空时从 H1-1 seed
-  if (isMovementEmpty(movement.value)) {
-    seedFromAdjudication(false)
-  }
-  // 汇总表固定资产期末为空时，用变动表账面价值合计
-  const fa = summary.find((r) => r.key === 'fixed_assets')!
-  if (num(fa.endBalance) === 0) {
-    const bookEnd = H1_LISTED_MOVEMENT_ROWS.find((d) => d.key === 'book_end')!
-    fa.endBalance = totalCellValue(movement.value, bookEnd, categories.value)
-    const bookBegin = H1_LISTED_MOVEMENT_ROWS.find((d) => d.key === 'book_begin')!
-    fa.priorBalance = totalCellValue(movement.value, bookBegin, categories.value)
-  }
+  const restored = restoreH1ListedState(props.allResponses)
+  const snap = restored.snapshot
+  summary.splice(0, summary.length, ...snap.summary)
+  categories.value = snap.categories
+  movement.value = snap.movement
+  idleRows.value = snap.idle
+  leaseRows.value = snap.leaseOut
+  titleCertRows.value = snap.titleCert
+  clearingRows.value = snap.clearing
+  Object.assign(govSubsidy, snap.govSubsidy)
+  noteImpairment.value = snap.noteImpairment
+  noteMortgage.value = snap.noteMortgage
+  noteSale.value = snap.noteSale
+  noteClearing.value = snap.noteClearing
+  mortgageRows.value = restored.mortgageRows
+  fullyDepRows.value = restored.fullyDepRows
 }
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null

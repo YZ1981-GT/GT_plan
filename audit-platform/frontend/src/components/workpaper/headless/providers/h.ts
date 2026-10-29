@@ -2,7 +2,9 @@
 import type { HeadlessProviderLoader } from '../headlessFramework'
 
 export const H_HEADLESS: Record<string, HeadlessProviderLoader> = {
+  H1: () => import('@/components/workpaper/composables/h1HeadlessDisclosure').then((m) => m.h1HeadlessProvider),
   H2: () => import('@/components/workpaper/composables/h2HeadlessDisclosure').then((m) => m.h2HeadlessProvider),
+  H3: () => import('@/components/workpaper/composables/h3HeadlessDisclosure').then((m) => m.h3HeadlessProvider),
   H4: () => import('@/components/workpaper/composables/h4HeadlessDisclosure').then((m) => m.h4HeadlessProvider),
   H5: () => import('@/components/workpaper/composables/h5HeadlessDisclosure').then((m) => m.h5HeadlessProvider),
   H6: () => import('@/components/workpaper/composables/h6HeadlessDisclosure').then((m) => m.h6HeadlessProvider),

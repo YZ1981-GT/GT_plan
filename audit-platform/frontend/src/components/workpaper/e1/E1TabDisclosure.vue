@@ -96,6 +96,17 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useHostApplicableStandards } from '../composables/hostApplicableStandards'
 import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
+import {
+  createE1CurrencyRow,
+  createE1DefaultForeignRows,
+  normalizeE1ForeignRows,
+  resolveE1ManagedRestrictedRows,
+  restoreE1ForeignCurrency,
+  restoreE1NoteTexts,
+  restoreE1Openings,
+  restoreE1RestrictedState,
+} from '../composables/e1DisclosureTabState'
+import { buildE1DisclosureSyncPlan, type E1SyncPlanItem } from '../composables/e1DisclosureSyncPlan'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -221,11 +232,7 @@ const objective = computed(() =>
 const openingMap = ref<Record<string, number>>({})
 
 function loadOpenings(): void {
-  const key = `${storagePrefix.value}-openings`
-  const resp = props.allResponses.get(key)
-  if (resp?.remark) {
-    try { openingMap.value = JSON.parse(resp.remark) } catch { openingMap.value = {} }
-  }
+  openingMap.value = restoreE1Openings(props.allResponses, variant.value)
 }
 loadOpenings()
 
@@ -275,46 +282,11 @@ const DETAILED_CURRENCIES = E1_DEFAULT_CURRENCIES.map((c) => c.label)
 const DETAILED_PROJECTS = E1_FX_GROUPS.map((g) => g.label)
 
 function createCurrencyRow(groupId: string, currency: string, suffix: string): ForeignCurrencyRow {
-  const isRmb = currency === BASE_CURRENCY_LABEL
-  return {
-    id: `fc-currency-${suffix}`,
-    groupId,
-    item: currency,
-    currency,
-    isGroup: false,
-    indent: true,
-    endForeign: 0,
-    endRate: isRmb ? 1 : 0,
-    endRmb: 0,
-    openForeign: 0,
-    openRate: isRmb ? 1 : 0,
-    openRmb: 0,
-  }
+  return createE1CurrencyRow(groupId, currency, suffix)
 }
 
 function createDefaultForeignRows(mode: ForeignCurrencyMode): ForeignCurrencyRow[] {
-  const stamp = Date.now()
-  const projects = mode === 'detailed' ? DETAILED_PROJECTS : [E1_FX_SIMPLE_GROUP_LABEL]
-  const currencies = mode === 'detailed' ? DETAILED_CURRENCIES : SIMPLE_CURRENCIES
-  return projects.flatMap((item, projectIndex) => {
-    const groupId = `fc-group-${mode}-${stamp}-${projectIndex}`
-    const group: ForeignCurrencyRow = {
-      id: groupId,
-      groupId,
-      item: `${item}：`,
-      currency: '',
-      isGroup: true,
-      indent: false,
-      endForeign: 0,
-      endRate: 0,
-      endRmb: 0,
-      openForeign: 0,
-      openRate: 0,
-      openRmb: 0,
-    }
-    return [group, ...currencies.map((currency, currencyIndex) =>
-      createCurrencyRow(groupId, currency, `${mode}-${stamp}-${projectIndex}-${currencyIndex}`))]
-  })
+  return createE1DefaultForeignRows(mode)
 }
 
 // 默认「详细版」：源模板「附注披露信息(上市公司)」外币表即按 库存现金/银行存款/
@@ -327,57 +299,14 @@ const foreignCurrencyRows = computed(() =>
 )
 
 function normalizeForeignRows(rows: any[]): ForeignCurrencyRow[] {
-  let currentGroupId = ''
-  return rows.map((raw: any, index: number) => {
-    const isGroup = !!raw.isGroup
-    const id = String(raw.id || `fc-migrated-${Date.now()}-${index}`)
-    if (isGroup) currentGroupId = id
-    const currency = isGroup ? '' : String(raw.currency || raw.item || '').replace(/^其中[：:]?/, '').trim()
-    const groupId = isGroup ? id : String(raw.groupId || currentGroupId)
-    const endForeign = Number(raw.endForeign) || 0
-    const endRate = Number(raw.endRate) || 0
-    const openForeign = Number(raw.openForeign) || 0
-    const openRate = Number(raw.openRate) || 0
-    return {
-      id,
-      groupId,
-      item: isGroup ? String(raw.item || `${E1_FX_SIMPLE_GROUP_LABEL}：`) : currency,
-      currency,
-      isGroup,
-      indent: !isGroup,
-      endForeign,
-      endRate,
-      endRmb: endForeign * endRate,
-      openForeign,
-      openRate,
-      openRmb: openForeign * openRate,
-    }
-  })
+  return normalizeE1ForeignRows(rows)
 }
 
 function loadForeignCurrency(): void {
-  foreignCurrencyMode.value = 'detailed'
-  simpleForeignCurrencyRows.value = createDefaultForeignRows('simple')
-  detailedForeignCurrencyRows.value = createDefaultForeignRows('detailed')
-  const resp = props.allResponses.get(`${storagePrefix.value}-foreign-currency`)
-  if (!resp?.remark) return
-  try {
-    const parsed = JSON.parse(resp.remark)
-    // 兼容已保存的旧数组结构：旧数据即上市公司简版。
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      simpleForeignCurrencyRows.value = normalizeForeignRows(parsed)
-      return
-    }
-    if (parsed && typeof parsed === 'object') {
-      foreignCurrencyMode.value = parsed.mode === 'detailed' ? 'detailed' : 'simple'
-      if (Array.isArray(parsed.simpleRows) && parsed.simpleRows.length > 0) {
-        simpleForeignCurrencyRows.value = normalizeForeignRows(parsed.simpleRows)
-      }
-      if (Array.isArray(parsed.detailedRows) && parsed.detailedRows.length > 0) {
-        detailedForeignCurrencyRows.value = normalizeForeignRows(parsed.detailedRows)
-      }
-    }
-  } catch {}
+  const restored = restoreE1ForeignCurrency(props.allResponses, variant.value)
+  foreignCurrencyMode.value = restored.mode
+  simpleForeignCurrencyRows.value = restored.simpleRows
+  detailedForeignCurrencyRows.value = restored.detailedRows
 }
 loadForeignCurrency()
 
@@ -531,54 +460,32 @@ const restrictedPersisted = ref<E1RestrictedRow[]>([])
  * `e1RestrictedScope.nextRestrictedSeq`。
  */
 const restrictedSeq = ref(0)
+const restrictedHasSavedRows = ref(false)
+const restrictedParseError = ref(false)
 
 function loadRestricted(): void {
-  restrictedManualMap.value = parseManualMap(
-    props.allResponses.get(e1RestrictedMapKey(variant.value))?.remark,
-  )
-  // 单调计数器：读回上次的最大序号（缺省 0）。不由行集派生 —— 行集里删掉的序号
-  // 正是不能复用的那些（Property 28）。
-  restrictedSeq.value = parseRestrictedSeq(
-    props.allResponses.get(e1RestrictedSeqKey(variant.value))?.remark,
-  )
-  const resp = props.allResponses.get(`${storagePrefix.value}-restricted`)
-  if (!resp?.remark) {
-    restrictedPersisted.value = []
-    return
-  }
-  try {
-    const parsed = JSON.parse(resp.remark)
-    if (!Array.isArray(parsed)) {
-      restrictedPersisted.value = []
-      return
-    }
-    restrictedPersisted.value = parsed.map((r: any, i: number) => ({
-      // 兼容旧结构：旧版是 {id,item,openingAmount,endingAmount,reason}，
-      // 无 bucketKey → 按 item 名建自定义类别（不丢审计师已录入的数据）
-      id: String(r.id || e1RestrictedRowId(String(r.bucketKey || 'legacy'), i)),
-      bucketKey: String(r.bucketKey || customBucketKey(String(r.item || ''))),
-      label: String(r.label || r.item || ''),
-      openingAmount: Number(r.openingAmount) || 0,
-      // 更旧的结构只有 amount，迁移时视为期末金额
-      endingAmount: Number(r.endingAmount ?? r.amount) || 0,
-      reason: String(r.reason || ''),
-      codes: Array.isArray(r.codes) ? r.codes.map((c: unknown) => String(c)) : [],
-      fromFourTable: !!r.fromFourTable,
-    }))
-  } catch {
-    restrictedPersisted.value = []
-  }
+  const restored = restoreE1RestrictedState(props.allResponses, variant.value)
+  restrictedManualMap.value = restored.manualMap
+  restrictedSeq.value = restored.seq
+  restrictedPersisted.value = restored.persistedRows
+  restrictedHasSavedRows.value = restored.hasSavedRows
+  restrictedParseError.value = restored.parseError
 }
 loadRestricted()
 
 /** ②表行 = 四表自动分类 ⊕ 人工归类 ⊕ 纯手工行（读时推导，不持久化派生值） */
-const restrictedRows = computed<E1RestrictedRow[]>(() =>
-  resolveRestrictedRows({
-    prefill: restrictedPrefill.value,
+const restrictedResolution = computed(() => resolveE1ManagedRestrictedRows({
+  rawPrefill: props.htmlData?.restricted_prefill,
+  restored: {
     manualMap: restrictedManualMap.value,
-    existingRows: restrictedPersisted.value,
-  }),
-)
+    persistedRows: restrictedPersisted.value,
+    seq: restrictedSeq.value,
+    hasSavedRows: restrictedHasSavedRows.value,
+    parseError: restrictedParseError.value,
+  },
+}))
+const restrictedRows = computed<E1RestrictedRow[]>(() => restrictedResolution.value.rows)
+const restrictedRowsForSync = computed(() => restrictedResolution.value.managedRows)
 
 /** 仍待归类的叶子（四表新增科目自动出现在这里） */
 const restrictedPending = computed(() =>
@@ -825,20 +732,7 @@ const noteTexts = ref<Record<string, string>>({})
 const noteTextDefs = computed(() => e1NoteTexts(variant.value))
 
 function loadNote(): void {
-  const next: Record<string, string> = {}
-  let anyNew = false
-  for (const def of e1NoteTexts(variant.value)) {
-    const v = props.allResponses.get(e1NoteTextKey(variant.value, def.key))?.remark || ''
-    next[def.key] = v
-    if (v) anyNew = true
-  }
-  // 迁移：旧版单一说明框的内容承接到首段（受限及境外款项说明），不丢已写的字
-  if (!anyNew) {
-    const legacy = props.allResponses.get(e1LegacyNoteKey(variant.value))?.remark || ''
-    const first = e1NoteTexts(variant.value)[0]
-    if (legacy && first) next[first.key] = legacy
-  }
-  noteTexts.value = next
+  noteTexts.value = restoreE1NoteTexts(props.allResponses, variant.value).texts
 }
 loadNote()
 
@@ -1068,9 +962,12 @@ const isSyncing = ref(false)
  * （空推送会把段恢复成模板骨架，等于清掉审计师在附注模块手填的货币资金段）。
  * 失败静默：外币段是附加推送，不能让它的失败盖掉主章节「已同步」的提示。
  */
-async function syncFxSectionToNote(year: number | undefined): Promise<void> {
+async function syncFxSectionToNote(
+  year: number | undefined,
+  planned?: E1SyncPlanItem | null,
+): Promise<void> {
   if (!variantApplicable.value) return // 门控
-  const fxPayload = buildE1FxSyncPayload(variant.value, props.wpId || '', applicableStandards.value, {
+  const fallback = () => buildE1FxSyncPayload(variant.value, props.wpId || '', applicableStandards.value, {
     fxRows: foreignCurrencyRows.value.map((r) => ({
       groupId: r.groupId,
       currency: r.currency,
@@ -1080,6 +977,7 @@ async function syncFxSectionToNote(year: number | undefined): Promise<void> {
       endRmb: r.endRmb,
     })),
   })
+  const fxPayload = planned === undefined ? fallback() : (planned?.payload ?? null)
   if (!fxPayload) return
   try {
     const resp: any = await http.post(
@@ -1118,61 +1016,50 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
-    const snapshot: E1DisclosureSnapshot = {
-      mainRows: disclosureRows.value.map(r => ({
-        key: r.key,
-        label: r.label,
-        endingAmount: r.endingAmount,
-        openingAmount: r.openingAmount,
-      })),
-      // ②表**两变体都推**（用户裁决 2026-08-01：上市侧也建该表）。
-      // 条件表语义：无行时不推空表，由 e1NoteSectionMap 放进 _removed_table_keys。
-      restrictedRows: restrictedRows.value.map(r => ({
-        item: r.label,
-        openingAmount: r.openingAmount,
-        endingAmount: r.endingAmount,
-        reason: r.reason,
-      })),
-      // 按源模板分段推送（每段带中文 title，否则附注正文会渲染成英文键）
-      noteSections: noteTextDefs.value.map(d => ({
-        key: d.key,
-        title: d.title,
-        text: noteTexts.value[d.key] || '',
-      })),
-    }
-    const payload = buildE1SyncPayload(
-      variant.value,
-      props.wpId || '',
-      applicableStandards.value,
-      snapshot,
-      { mainTable: false },  // 主表由后端公式推送写入（需求 5.4）
-    )
-    // 显式携带审计年度，定位到项目审计年度的附注记录（否则后端默认取服务器当前年）
     const yr = Number(auditYear.value) || undefined
-    const resp: any = await http.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-      yr ? { ...payload, year: yr } : payload,
-    )
-    // http.post 解析为 AxiosResponse（响应拦截器已把 {code,data} 信封解包到 resp.data）；
-    // 结果字段（success/section_id）在 resp.data 上，不能直接读 resp（否则恒 undefined→误报"返回异常"）。
-    const data = resp?.data ?? resp
-    const sectionId = E1_NOTE_SECTION[variant.value]
-    if (data && (data.success || data.section_id)) {
-      ElMessage.success(`已同步到附注「${sectionId} 货币资金」`)
-      // 通知附注模块刷新（若正打开该章节）
-      eventBus.emit('disclosure:note-text-updated', {
-        wpCode: 'E1',
-        variant: variant.value,
-        accountCode: '1001',
-        projectId: props.projectId,
-        sectionIds: [sectionId],
-        timestamp: Date.now(),
-      })
-    } else {
-      ElMessage.warning('同步附注返回异常')
+    const plan = buildE1DisclosureSyncPlan({
+      variant: variant.value,
+      wpId: props.wpId || '',
+      year: yr,
+      applicableStandards: applicableStandards.value,
+      mainRows: disclosureRows.value.map(row => ({
+        key: row.key,
+        label: row.label,
+        endingAmount: row.endingAmount,
+        openingAmount: row.openingAmount,
+      })),
+      restrictedRows: restrictedRowsForSync.value,
+      noteSections: noteTextDefs.value.map(def => ({
+        key: def.key,
+        title: def.title,
+        text: noteTexts.value[def.key] || '',
+      })),
+      foreignCurrencyRows: foreignCurrencyRows.value,
+    })
+    const main = plan.find(item => item.kind === 'main')
+    if (main) {
+      const resp: any = await http.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        main.payload,
+      )
+      const data = resp?.data ?? resp
+      const sectionId = E1_NOTE_SECTION[variant.value]
+      if (data && (data.success || data.section_id)) {
+        ElMessage.success(`已同步到附注「${sectionId} 货币资金」`)
+        eventBus.emit('disclosure:note-text-updated', {
+          wpCode: 'E1',
+          variant: variant.value,
+          accountCode: '1001',
+          projectId: props.projectId,
+          sectionIds: [sectionId],
+          timestamp: Date.now(),
+        })
+      } else {
+        ElMessage.warning('同步附注返回异常')
+      }
     }
-    await syncFxSectionToNote(yr)
-    await syncRestrictedAssetsToNote(yr)
+    await syncFxSectionToNote(yr, plan.find(item => item.kind === 'fx') ?? null)
+    await syncRestrictedAssetsToNote(yr, plan.filter(item => item.kind === 'restricted'))
   } catch (err: any) {
     // 重复点击被请求去重取消（axios cancel / ERR_CANCELED）：首个请求仍在进行，静默忽略不吓用户
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
@@ -1196,9 +1083,12 @@ async function syncToDisclosureNotes(): Promise<void> {
  * 无受限资金（②表空或全零）时 `buildRestrictedAssetsPayloads` 返回 `[]` → 不推
  * （空推送会把段恢复成模板骨架，等于清掉审计师手填内容）。失败静默不盖主提示。
  */
-async function syncRestrictedAssetsToNote(year: number | undefined): Promise<void> {
+async function syncRestrictedAssetsToNote(
+  year: number | undefined,
+  planned?: readonly E1SyncPlanItem[],
+): Promise<void> {
   if (!variantApplicable.value) return // 门控
-  const payloads = buildRestrictedAssetsPayloads(
+  const fallback = () => buildRestrictedAssetsPayloads(
     variant.value,
     props.wpId || '',
     applicableStandards.value,
@@ -1215,6 +1105,9 @@ async function syncRestrictedAssetsToNote(year: number | undefined): Promise<voi
     },
     E1_DISCLOSURE_SHEET_NAME,
   )
+  const payloads = planned === undefined
+    ? fallback()
+    : planned.map(item => item.payload)
   if (!payloads.length) return
   const sectionId = RESTRICTED_ASSETS_NOTE_SECTION[variant.value]
   for (const payload of payloads) {

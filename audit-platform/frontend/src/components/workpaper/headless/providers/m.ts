@@ -7,6 +7,9 @@ export const M_HEADLESS: Record<string, HeadlessProviderLoader> = {
   M3: () => import('@/components/workpaper/composables/m3HeadlessDisclosure').then((m) => m.m3HeadlessProvider),
   M4: () => import('@/components/workpaper/composables/mEquityHeadlessDisclosure').then((m) => m.m4HeadlessProvider),
   M5: () => import('@/components/workpaper/composables/mEquityHeadlessDisclosure').then((m) => m.m5HeadlessProvider),
+  M6: () => import('@/components/workpaper/composables/m6HeadlessDisclosure').then((m) => m.m6HeadlessProvider),
   M7: () => import('@/components/workpaper/composables/mEquityHeadlessDisclosure').then((m) => m.m7HeadlessProvider),
   M8: () => import('@/components/workpaper/composables/mEquityHeadlessDisclosure').then((m) => m.m8HeadlessProvider),
+  M9: () => import('@/components/workpaper/composables/m9HeadlessDisclosure').then((m) => m.m9HeadlessProvider),
+  M10: () => import('@/components/workpaper/composables/m10HeadlessDisclosure').then((m) => m.m10HeadlessProvider),
 }

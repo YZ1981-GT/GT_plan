@@ -8,4 +8,5 @@ export const G1_HEADLESS: Record<string, HeadlessProviderLoader> = {
   G4: () => import('@/components/workpaper/composables/g4HeadlessDisclosure').then((m) => m.g4HeadlessProvider),
   G5: () => import('@/components/workpaper/composables/g5HeadlessDisclosure').then((m) => m.g5HeadlessProvider),
   G6: () => import('@/components/workpaper/composables/g6HeadlessDisclosure').then((m) => m.g6HeadlessProvider),
+  G7: () => import('@/components/workpaper/composables/g7HeadlessDisclosure').then((m) => m.g7HeadlessProvider),
 }

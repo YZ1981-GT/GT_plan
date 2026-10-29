@@ -6,8 +6,8 @@
  * - provider 模块离屏没有界面：不 import element-plus / `.vue` 组件、不调 Tab 的 `syncTo…` 同步函数（里面有提示 / 确认框）、
  *   不接受限资产段同步。
  */
-import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { HEADLESS_PROVIDER_GROUPS, HEADLESS_PROVIDERS } from '../registry'
 
@@ -30,11 +30,50 @@ function entries(group: string): Array<{ code: string; path: string; name: strin
   return [...text.matchAll(ENTRY_RE)].map((m) => ({ code: m[1], path: m[2], name: m[3] }))
 }
 
-function moduleSource(spec: string): string {
+function moduleFile(spec: string): string {
   const base = spec.startsWith('@/') ? resolve(SRC, spec.slice(2)) : resolve(__dirname, '../providers', spec)
   const file = [`${base}.ts`, `${base}/index.ts`].find((p) => existsSync(p))
   if (!file) throw new Error(`找不到 provider 模块：${spec}`)
-  return readFileSync(file, 'utf-8')
+  return file
+}
+
+function moduleSource(spec: string): string {
+  return readFileSync(moduleFile(spec), 'utf-8')
+}
+
+function productionTs(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const path = resolve(dir, name)
+    if (statSync(path).isDirectory()) {
+      if (name !== '__tests__' && name !== 'node_modules') productionTs(path, out)
+    } else if (name.endsWith('.ts') && !name.endsWith('.spec.ts') && !name.endsWith('.test.ts')) {
+      out.push(path)
+    }
+  }
+  return out
+}
+
+function diskProviderExports(): string[] {
+  const found: string[] = []
+  const re = /export\s+const\s+(\w+HeadlessProvider)\b[^=]*=\s*defineHeadlessProvider[<(]/g
+  for (const file of productionTs(SRC)) {
+    const source = readFileSync(file, 'utf-8')
+    for (const match of source.matchAll(re)) {
+      found.push(`${relative(SRC, file).replace(/\\/g, '/')}:${match[1]}`)
+    }
+  }
+  return found.sort()
+}
+
+function registeredProviderExports(): string[] {
+  const found: string[] = []
+  for (const group of Object.keys(HEADLESS_PROVIDER_GROUPS)) {
+    for (const entry of entries(group)) {
+      const file = relative(SRC, moduleFile(entry.path)).replace(/\\/g, '/')
+      found.push(`${file}:${entry.name}`)
+    }
+  }
+  return found.sort()
 }
 
 describe('离屏 provider 登记', () => {
@@ -62,6 +101,14 @@ describe('离屏 provider 登记', () => {
         for (const [re, what] of FORBIDDEN) expect(re.test(src), `${code}：${path} 不得${what}`).toBe(false)
       }
     }
+  })
+
+  it('生产树里每个 provider 导出都恰好登记一次（禁止 F1 类孤儿 provider）', () => {
+    const disk = diskProviderExports()
+    const registered = registeredProviderExports()
+    expect(new Set(registered).size, '同一 provider 导出被重复登记').toBe(registered.length)
+    expect(registered, '磁盘 provider 与注册表不闭合').toEqual(disk)
+    expect(disk.length).toBeGreaterThan(60)
   })
 
   it('登记项都能加载出 provider 函数', async () => {

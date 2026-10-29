@@ -177,7 +177,7 @@
  *
  * 科目：4201 库存股（**借方/权益备抵类！**）
  */
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
@@ -221,7 +221,9 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch { /* fail-open: 同步失败不打断编辑 */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -262,13 +264,13 @@ function updateTreasuryRow(index: number, field: 'beginAmount' | 'repurchaseIncr
     formData.debouncedSave('M3-disclosure-listed-treasury-rows', {
       remark: JSON.stringify(treasuryChangeRows.value),
     })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M3-disclosure-listed-${section}`, { remark: value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 /**
@@ -327,7 +329,7 @@ async function handlePullFromAdjudication() {
     import('element-plus').then(({ ElMessage }) => {
       ElMessage.success(`已从审定表/明细表带入：期初${fmtAmount(totalBegin)}，回购+${fmtAmount(totalRepurchase)}，注销-${fmtAmount(totalCancel)}`)
     })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
@@ -399,7 +401,8 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 </script>

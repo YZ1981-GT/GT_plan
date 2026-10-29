@@ -276,7 +276,8 @@ async def _affected_consol_sections(
     import sqlalchemy as sa
     from app.models.consol_note_mapping_models import ConsolNoteMappingBinding
     from app.services.consol_note_detail_source_service import resolve_section_template_type
-    from app.services.consol_note_section_mapping import resolve_mapping_entry
+    from app.services.consol_note_section_mapping import all_mapped_sections, resolve_mapping_entry
+    from app.services.consol_note_topn import section_topn_limit
 
     title_key = "".join(str(section_title or "").split())
     pairs = (await db.execute(
@@ -301,7 +302,30 @@ async def _affected_consol_sections(
             ) == title_key
             if not (same_number or same_title):
                 continue
-        affected.setdefault(section_id, []).append(consol_pid)
+        bucket = affected.setdefault(section_id, [])
+        if consol_pid not in bucket:
+            bucket.append(consol_pid)
+
+    # 前 N 名表按单位动态重排，设计上不建 MappingBinding；仅按绑定反查会永远漏掉这些章节。
+    # 用该企业在同一合并项目的任一绑定确认项目归属，再按章节映射补入动态表影响面。
+    for consol_pid in {pid for pid, _section in pairs}:
+        if consol_pid not in template_types:
+            template_types[consol_pid] = await resolve_section_template_type(db, consol_pid)
+        template_type = template_types[consol_pid]
+        for entry in all_mapped_sections(template_type):
+            section_id = str(entry.get("consol_section_id") or "")
+            if not section_id or not section_topn_limit(template_type, section_id):
+                continue
+            if note_section:
+                same_number = entry.get("standalone_note_section") == note_section
+                same_title = bool(title_key) and "".join(
+                    str(entry.get("standalone_section_title") or "").split()
+                ) == title_key
+                if not (same_number or same_title):
+                    continue
+            bucket = affected.setdefault(section_id, [])
+            if consol_pid not in bucket:
+                bucket.append(consol_pid)
     return affected
 
 

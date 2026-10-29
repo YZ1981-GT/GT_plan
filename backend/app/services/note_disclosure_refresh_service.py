@@ -35,40 +35,36 @@ _REGISTRY_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_
 
 
 @lru_cache(maxsize=1)
-def _load_registry() -> dict[str, dict[str, str]]:
-    """wp_code → {listed: 章节号, soe: 章节号, sheet_listed, sheet_soe}。
-
-    与 disclosure_stale_marker._registry 同源同格式，独立缓存避免循环依赖。
-    """
+def _load_registry() -> dict[str, dict[str, Any]]:
+    """wp_code → 原始注册项；章节展开统一走 ``registry_sections``。"""
     try:
         doc = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
     except Exception as exc:
         logger.warning("note_disclosure_refresh: registry unavailable: %s", exc)
         return {}
-    out: dict[str, dict[str, str]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for e in doc.get("entries") or []:
         if not isinstance(e, dict):
             continue
         code = str(e.get("wp_code") or "").strip()
-        if not code:
-            continue
-        out[code] = {
-            k: str(e.get(k) or "").strip()
-            for k in ("listed", "soe", "sheet_listed", "sheet_soe")
-            if str(e.get(k) or "").strip()
-        }
+        if code:
+            out[code] = dict(e)
     return out
 
 
 def sections_for_wp_code(wp_code: str, variant: str | None = None) -> list[str]:
-    """该底稿对应的附注章节号。variant 可选过滤 listed/soe。"""
+    """该底稿对应的全部附注章节；包含 ``*_sections`` 复数映射。"""
+    from app.services.note_readiness_service import registry_sections
+
     entry = _load_registry().get(wp_code.strip())
     if not entry:
         return []
-    if variant:
-        sec = entry.get(variant)
-        return [sec] if sec else []
-    return [v for k, v in entry.items() if k in ("listed", "soe") and v]
+    variants = (variant,) if variant else ("listed", "soe")
+    return list(dict.fromkeys(
+        section
+        for item_variant in variants
+        for section in registry_sections(entry, item_variant)
+    ))
 
 
 def all_wp_codes() -> list[str]:

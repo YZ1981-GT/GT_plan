@@ -68,7 +68,10 @@ class SourceTable:
         }
 
 
-_SKIP_ROW_TYPES = frozenset({"expandable", "dynamic_anchor", "dynamic_marker_end"})
+_SKIP_ROW_TYPES = frozenset({
+    "expandable", "dynamic_anchor", "dynamic_marker_end",
+    "header", "header_label", "title", "section_header",
+})
 
 
 def _row_label(row: Any) -> str:

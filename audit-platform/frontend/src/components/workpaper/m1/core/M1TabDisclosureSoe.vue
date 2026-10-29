@@ -130,7 +130,7 @@
  * - textarea sections (autosize) for each disclosure area
  * - AI辅助 per section title
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -170,7 +170,9 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -193,18 +195,18 @@ function updateDetailRow(index: number, field: 'beginBalance' | 'endBalance', va
   if (index >= 0 && index < detailRows.value.length) {
     detailRows.value[index][field] = val
     formData.debouncedSave(`M1-disclosure-soe-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleSoeCapitalNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-capital', { remark: soeCapitalNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleDistributionNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-distribution', { remark: distributionNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleConclusionChange() {
@@ -256,7 +258,8 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 </script>

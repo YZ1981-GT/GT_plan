@@ -471,6 +471,32 @@ async def _post_as_member(world, user, payload, *, result=None):
     return resp, sync, validation, client
 
 
+_BATCH_SYNC_PATH = f"/api/projects/{TARGET_PROJECT_ID}/disclosure-notes/sync-batch-from-workpaper"
+_BATCH_RBAC_PAYLOAD = {
+    "wp_id": str(WP_ID),
+    "current_standard": "soe_standalone",
+    "year": 2025,
+    "require_all_applied": True,
+    "items": [{
+        "sheet_name": "附注披露信息(国企)",
+        "section_id": "八、18",
+        "sub_table_data": {"长期股权投资": []},
+        "owner_key": "G7:soe",
+        "replace_owned_tables": True,
+    }],
+}
+
+
+async def _post_batch_as_member(world, user):
+    sync = world.stub(wp_disclosure_sync_module, "sync_batch_from_workpaper", returns={
+        "success": True, "sections_synced": 1, "rows_synced": 0, "texts_synced": 0,
+        "synced_at": "2026-10-29T00:00:00+00:00", "results": [],
+    })
+    async with world.client(wp_disclosure_sync_router, user=user) as client:
+        resp = await client.post(_BATCH_SYNC_PATH, json=_BATCH_RBAC_PAYLOAD)
+    return resp, sync, client
+
+
 @pytest.mark.asyncio
 async def test_sync_403_for_non_admin_without_project_access(world):
     """auditor without project_users record on the target project → 403（在另一项目上是 edit 级也不行）。"""
@@ -498,6 +524,27 @@ async def test_sync_403_for_readonly_user(world):
 
     assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
     assert (sync.count, validation.count) == (0, 0)
+    client.assert_passed(_GATE, times=1)
+
+
+@pytest.mark.asyncio
+async def test_batch_sync_403_for_non_member(world):
+    identity = await world.non_member()
+    resp, sync, client = await _post_batch_as_member(world, identity.user)
+
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert sync.count == 0
+    client.assert_passed(_GATE, times=1)
+
+
+@pytest.mark.asyncio
+async def test_batch_sync_403_for_readonly_member(world):
+    role, level = map_assignment_role("观察员")
+    identity = await world.member(level, role)
+    resp, sync, client = await _post_batch_as_member(world, identity.user)
+
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert sync.count == 0
     client.assert_passed(_GATE, times=1)
 
 
@@ -610,11 +657,14 @@ async def test_sync_batch_happy_path():
     payload = {
         "wp_id": str(WP_ID),
         "current_standard": "soe",
+        "require_all_applied": True,
         "items": [
             {
                 "sheet_name": "附注披露信息（国企）",
                 "section_id": "七、本期纳入合并报表范围的子公司基本情况",
                 "sub_table_data": {"主表": [{"a": 1}]},
+                "owner_key": "G7:soe",
+                "replace_owned_tables": True,
             },
             {
                 "sheet_name": "附注披露信息（国企）",
@@ -655,4 +705,7 @@ async def test_sync_batch_happy_path():
     assert body["texts_synced"] == 1
     assert mock_svc.await_count == 1
     assert len(mock_svc.await_args.kwargs["items"]) == 2
+    assert mock_svc.await_args.kwargs["require_all_applied"] is True
+    assert mock_svc.await_args.kwargs["items"][0]["owner_key"] == "G7:soe"
+    assert mock_svc.await_args.kwargs["items"][0]["replace_owned_tables"] is True
 

@@ -30,6 +30,14 @@ export interface DisclosureNoteRow {
   increase: number
   decrease: number
   usage: string
+  fairChange?: number
+  buyOrProvision?: number
+  transferIn?: number
+  disposal?: number
+  transferOut?: number
+  bookValue?: number
+  reason?: string
+  [key: string]: unknown
 }
 
 /** CAS39 公允价值层次披露行（公允价值模式适用） */
@@ -114,14 +122,22 @@ export function useH3Disclosure(params: {
   }
 
   function _normNoteRow(raw: any, idx: number, keyPrefix: string): DisclosureNoteRow {
-    return {
-      rowId: raw?.rowId ?? `${keyPrefix}-${idx}`,
-      category: raw?.category ?? '',
-      beginBalance: Number(raw?.beginBalance) || 0,
-      increase: Number(raw?.increase) || 0,
-      decrease: Number(raw?.decrease) || 0,
-      usage: raw?.usage ?? '',
+    const source = raw && typeof raw === 'object' ? raw : {}
+    const row: DisclosureNoteRow = {
+      ...source,
+      rowId: source.rowId ?? `${keyPrefix}-${idx}`,
+      category: source.category ?? '',
+      beginBalance: Number(source.beginBalance) || 0,
+      increase: Number(source.increase) || 0,
+      decrease: Number(source.decrease) || 0,
+      usage: source.usage ?? '',
     }
+    // 国企两级列与公允价值列是可选字段；缺失必须保持 undefined，
+    // builder 才能区分“未提供细分列”和“明确填 0”。
+    for (const key of ['fairChange', 'buyOrProvision', 'transferIn', 'disposal', 'transferOut', 'bookValue'] as const) {
+      if (source[key] !== undefined) row[key] = Number(source[key]) || 0
+    }
+    return row
   }
 
   function _defaultNoteRows(key: string): DisclosureNoteRow[] {
@@ -142,6 +158,14 @@ export function useH3Disclosure(params: {
       sectionRows[key] = _defaultNoteRows(key)
     }
     return sectionRows[key]
+  }
+
+  /**
+   * 同步载荷只读取宿主 Map 中真实存在的键。默认展示骨架没有来源，返回 undefined，
+   * 避免仅编辑说明文字时把分类骨架转换成整张 0 表推到附注。
+   */
+  function getSectionRowsForSync(key: string): DisclosureNoteRow[] | undefined {
+    return allResponses.value.has(_rowsItemId(key)) ? getSectionRows(key) : undefined
   }
 
   /** 行变更：组件已 v-model 就地修改，持久化整表 */
@@ -336,7 +360,8 @@ export function useH3Disclosure(params: {
     sections, sectionDefs, measurementDesc,
     updateSection, refreshAutoData, subscribeEvents, unsubscribeEvents, loadSections,
     // keyed API（H3TabDisclosureListed / H3TabDisclosureSoe 使用）
-    sectionRows, sectionTexts, getSectionRows, updateRow, updateText, addSectionRow, removeSectionRow, createSectionRow,
+    sectionRows, sectionTexts, getSectionRows, getSectionRowsForSync,
+    updateRow, updateText, addSectionRow, removeSectionRow, createSectionRow,
     // CAS39 公允价值层次披露（公允价值模式）
     fvHierarchyRows, fvHierarchyTotalsByLevel,
     addFvHierarchyRow, removeFvHierarchyRow, updateFvHierarchyRow, importFvHierarchyFromH38,

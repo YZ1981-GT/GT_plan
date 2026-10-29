@@ -148,7 +148,7 @@
  * - textarea sections (autosize) for each disclosure area
  * - AI辅助 per section title
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -189,7 +189,9 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -213,23 +215,23 @@ function updateDetailRow(index: number, field: 'endAmount' | 'priorYearEnd', val
   if (index >= 0 && index < detailRows.value.length) {
     detailRows.value[index][field] = val
     formData.debouncedSave(`M1-disclosure-listed-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleOverdueNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-overdue', { remark: overdueNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handlePolicyNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-policy', { remark: policyNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handlePlanNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-plan', { remark: planNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleConclusionChange() {
@@ -286,7 +288,8 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 </script>

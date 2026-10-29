@@ -31,7 +31,7 @@ describe('pullFromWorkpapers', () => {
     const [url, body, cfg] = h.post.mock.calls[0]
     expect(url).toBe('/api/disclosure-notes/p1/2025/pull-from-workpapers')
     expect(body).toBeNull()
-    expect(cfg).toMatchObject({ params: { note_section: '八、5' }, _silent: true })
+    expect(cfg).toMatchObject({ params: { note_section: '八、5', phase: 'all' }, _silent: true })
   })
 
   it('请求失败不抛：回中文原因（不再静默吞掉）', async () => {
@@ -39,7 +39,7 @@ describe('pullFromWorkpapers', () => {
     const { result, error } = await pullFromWorkpapers('p1', 2025, null)
     expect(result).toBeNull()
     expect(error).toBe('从底稿取数失败：项目不存在')
-    expect(h.post.mock.calls[0][2]).toMatchObject({ params: undefined })
+    expect(h.post.mock.calls[0][2]).toMatchObject({ params: { phase: 'all' } })
   })
 })
 

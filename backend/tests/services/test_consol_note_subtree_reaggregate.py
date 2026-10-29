@@ -273,10 +273,12 @@ class TestProtectionAndSkips:
             "sections": [_SECTION], "reasons": ["未确认映射（或单体附注没有该表）"],
         }]
         root = await _rec(db, group, "G:consol")
-        assert _rows(root)["库存现金"] == (D("476.73"), D("336.73"))   # 只有 A 合并
-        children = {c["node_key"]: c for c in root.data["_subtree_provenance"]["children"]}
-        for key in ("B:subsidiary", "G:parent"):
-            assert children[key]["included"] is False and "试算表公式" in children[key]["reason"]
+        assert root is None, "存在待确认来源时不得在半截旧数据上生成并标新鲜的根节点"
+        root_node = _nodes(result)["G:consol"]
+        assert root_node["written"] == 0
+        assert root_node["reasons"][0]["reason"].startswith("下级")
+        assert "没算出" in root_node["reasons"][0]["reason"]
+        assert _rows(await _rec(db, group, "A:consol"))["库存现金"] == (D("476.73"), D("336.73"))
 
     @pytest.mark.asyncio
     async def test_excluded_entity_is_not_pulled_and_its_old_rows_are_not_counted(self, db, user, group):

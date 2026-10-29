@@ -29,7 +29,10 @@ export interface NotePullSection extends NotePullSectionState {
   reasons: string[]
 }
 
+export type NotePullPhase = 'all' | 'prepare' | 'push'
+
 export interface NotePullResult {
+  phase?: NotePullPhase
   synced: number
   skipped: number
   skipped_never_synced: number
@@ -65,12 +68,13 @@ export async function pullFromWorkpapers(
   projectId: string,
   year: number,
   section: string | null,
+  phase: NotePullPhase = 'all',
 ): Promise<{ result: NotePullResult | null; error: string | null }> {
   try {
     const res: any = await http.post(
       `/api/disclosure-notes/${projectId}/${year}/pull-from-workpapers`,
       null,
-      { params: section ? { note_section: section } : undefined, _silent: true } as any,
+      { params: { ...(section ? { note_section: section } : {}), phase }, _silent: true } as any,
     )
     const data = res?.data ?? res
     return { result: data && Array.isArray(data.sections) ? (data as NotePullResult) : null, error: null }

@@ -404,9 +404,7 @@ import {
 } from '../../composables/g7DisclosureCrossSheet'
 import {
   G7_SOE_DISCLOSURE_SECTIONS,
-  buildG7SoeColumns,
   buildG7SoeSyncPayloads,
-  markG7SoeSynced,
   createG7SoeDisclosureState,
   g7SoeChapterSections,
   resolveG7SoeTableColumns,
@@ -420,7 +418,6 @@ import {
 import { buildG7HeaderBlocks, type G7HeaderBlock } from './g7DisclosureHeaderBlocks'
 import { describeSyncError, describeSyncTailFailure } from './g7DisclosureSyncFeedback'
 import G7DisclosureCell from './G7DisclosureCell.vue'
-import { pickColumnsForPayload } from './g7PayloadColumns'
 import { tableMetaSources } from './g7DisclosureTableMeta'
 import { seedG7MovementFromLeafCategories, type G7LeafBucketSlot } from '../../composables/g7FourTableSeed'
 // 🔴 科目码单一真源：运行态取宿主 provide 的 tb_source_codes（报表映射解析结果），
@@ -436,12 +433,15 @@ import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureCo
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildG7ConsistencyChecks, type G7ConsistencyInput } from '../../composables/g7DisclosureConsistency'
+import {
+  applyG7SoeSavedState,
+  serialiseG7SoeState,
+} from '../../composables/g7DisclosureStateCodec'
+import { buildG7SoeBatchRequest } from '../../composables/g7DisclosureSyncPayload'
 
 const RESPONSE_KEY = 'G7-main-disclosure-soe-v2'
 const SHEET_NAME = '附注披露信息（国企）'
 const CURRENT_STANDARD = 'soe'
-// 列头元数据（disclosure-table-sync-convergence）：全部 SOE 子表键 → ColumnDef
-const soeColumns = buildG7SoeColumns()
 
 function resolveAuditYear(htmlData: Record<string, any> | null | undefined): number | undefined {
   const raw = htmlData?.project_context?.audit_year
@@ -842,26 +842,7 @@ async function removeSlotEntity(slotConfig: { slot: string }, name: string): Pro
 }
 
 function serialisableState(): G7SoeDisclosureState {
-  return {
-    version: 2,
-    tables: Object.fromEntries(
-      Object.entries(state.tables).map(([key, rows]) => [
-        key,
-        rows.map(row => ({
-          ...row,
-          values: { ...row.values },
-          sumRows: row.sumRows ? [...row.sumRows] : undefined,
-          diffRows: row.diffRows ? [...row.diffRows] as [string, string] : undefined,
-        })),
-      ]),
-    ),
-    texts: { ...state.texts },
-    updatedAt: new Date().toISOString(),
-    previouslySyncedTables: state.previouslySyncedTables ? { ...state.previouslySyncedTables } : undefined,
-    entitySlots: state.entitySlots
-      ? Object.fromEntries(Object.entries(state.entitySlots).map(([k, v]) => [k, [...v]]))
-      : undefined,
-  }
+  return serialiseG7SoeState(state)
 }
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────────────
@@ -1053,37 +1034,7 @@ async function saveState(): Promise<boolean> {
 }
 
 function applySavedState(saved: Partial<G7SoeDisclosureState>): void {
-  if (saved.version !== 2) return
-  if (saved.tables && typeof saved.tables === 'object') {
-    for (const [tableId, rows] of Object.entries(saved.tables)) {
-      if (Array.isArray(rows) && tableId in state.tables) {
-        state.tables[tableId] = rows.map(row => ({
-          ...row,
-          values: { ...(row.values ?? {}) },
-          sumRows: row.sumRows ? [...row.sumRows] : undefined,
-          diffRows: row.diffRows ? [...row.diffRows] as [string, string] : undefined,
-        }))
-      }
-    }
-  }
-  if (saved.texts && typeof saved.texts === 'object') Object.assign(state.texts, saved.texts)
-  // 🔴 必须恢复 `previouslySyncedTables`（Task 13）：`serialisableState()` 一直在
-  // 持久化它，但改造前**载入时不读回** ⇒ 每次打开底稿基线都退回 `{}`，
-  // 差集恒空、`_removed_table_keys` 永不上报（写了也白写）。
-  if (saved.previouslySyncedTables && typeof saved.previouslySyncedTables === 'object') {
-    state.previouslySyncedTables = Object.fromEntries(
-      Object.entries(saved.previouslySyncedTables).map(([k, v]) => [
-        k,
-        Array.isArray(v) ? [...v] : [],
-      ]),
-    )
-  }
-  if (saved.entitySlots && typeof saved.entitySlots === 'object') {
-    if (!state.entitySlots) state.entitySlots = {}
-    for (const [slot, names] of Object.entries(saved.entitySlots)) {
-      if (Array.isArray(names)) state.entitySlots[slot] = [...names]
-    }
-  }
+  applyG7SoeSavedState(state, saved)
 }
 
 function parseSavedRemark(remark: unknown): boolean {
@@ -1221,28 +1172,17 @@ async function syncToDisclosureNotes(): Promise<void> {
     //    附注章节映射」**同时出现**，而库里 13 章节全部写入 ⇒ 失败提示是误报，
     //    还把排查方向指向根本没问题的章节映射，并诱使重复写库。
     let data: any
-    let payloads: ReturnType<typeof buildG7SoeSyncPayloads>
+    let request: ReturnType<typeof buildG7SoeBatchRequest>
     try {
-      await saveState()
-      payloads = buildG7SoeSyncPayloads(serialisableState())
+      if (!await saveState()) return
+      request = buildG7SoeBatchRequest({
+        wpId: props.wpId,
+        year: resolveAuditYear(props.htmlData as Record<string, any> | null),
+        state: serialisableState(),
+      })
       const result: any = await api.post(
         `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
-        {
-          wp_id: props.wpId,
-          current_standard: CURRENT_STANDARD,
-          year: resolveAuditYear(props.htmlData as Record<string, any> | null),
-        // 🔴 列元数据必须按 payload 实含表名收窄（`pickColumnsForPayload`）：
-        // 原实现给每个 section 都发**全部 23 张表**的列定义，于是 A 章节的记录里也被
-        // 写入 B 章节表的列头。B 类改 key 后这会让「列已是 label / 行还是 `项目`」
-        // 的错配窗口从「本章节」放大到「任何被同步过的章节」，而投影器兜底是
-        // **单向**的（只能 label→旧 key，不能旧 key→label）⇒ 存量行名会读成空。
-          items: payloads.map(payload => ({
-            sheet_name: SHEET_NAME,
-            section_id: payload.noteSectionId,
-            sub_table_data: payload.subTableData,
-            columns: pickColumnsForPayload(payload.subTableData, soeColumns),
-          })),
-        },
+        request,
       )
       data = result?.data ?? result
     } catch (err: unknown) {
@@ -1258,15 +1198,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     // ── ② 成功后的收尾：失败 ⇒ 附注**已落地**，绝不能报「同步失败」──────────
     const okText =
       `已同步 ${Number(data?.rows_synced ?? 0)} 行到 ` +
-      `${Number(data?.sections_synced ?? payloads.length)} 个附注章节（含合并范围变化与八、18）`
+      `${Number(data?.sections_synced ?? request.items.length)} 个附注章节（含合并范围变化与八、18）`
     try {
-      // 🔴 同步成功后必须回写「本次各章节实际推送的表名」基线并落库（Task 13）：
-      // 少了这一步，`previouslySyncedTables` 永远停在 `{}`，`buildRemovedTableKeys`
-      // 的被减数恒空 ⇒ `_removed_table_keys` 永不上报 ⇒ 删表后附注永久残留过时明细。
-      // 顺序必须是「同步成功 → 更新基线 → persist」：先 persist 会把旧基线写回，
-      // 而在 `api.post` 失败时不更新基线才是对的（那次推送没落地）。
-      state.previouslySyncedTables = markG7SoeSynced(serialisableState(), payloads)
-      await saveState()
       dispatchNoteUpdated()
       ElMessage.success(okText)
     } catch (err: unknown) {

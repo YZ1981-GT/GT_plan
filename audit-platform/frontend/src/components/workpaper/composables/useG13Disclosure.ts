@@ -38,6 +38,50 @@ export interface G13DisclosureRow {
   remark: string
 }
 
+export interface G13DisclosurePatchResult {
+  changed: boolean
+  sourceFound: boolean
+  fieldsChanged: number
+}
+
+interface AmountSource {
+  found: boolean
+  value: number
+}
+
+const MISSING_AMOUNT: AmountSource = { found: false, value: 0 }
+
+function amountSource(value: unknown): AmountSource {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) return MISSING_AMOUNT
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? { found: true, value: parsed } : MISSING_AMOUNT
+}
+
+function priorAmountSource(entry: unknown): AmountSource {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return MISSING_AMOUNT
+  const value = entry as Record<string, unknown>
+  const audited = amountSource(value.priorAudited)
+  if (audited.found) return audited
+
+  const unadjusted = amountSource(value.priorUnadjusted)
+  const adjustment = amountSource(value.priorAdjustment)
+  if (!unadjusted.found && !adjustment.found) return MISSING_AMOUNT
+  return { found: true, value: unadjusted.value + adjustment.value }
+}
+
+function emptyPatchResult(): G13DisclosurePatchResult {
+  return { changed: false, sourceFound: false, fieldsChanged: 0 }
+}
+
+function mergePatchResults(...results: G13DisclosurePatchResult[]): G13DisclosurePatchResult {
+  const fieldsChanged = results.reduce((total, result) => total + result.fieldsChanged, 0)
+  return {
+    changed: fieldsChanged > 0,
+    sourceFound: results.some((result) => result.sourceFound),
+    fieldsChanged,
+  }
+}
+
 function rowDefs(variant: 'listed' | 'soe'): readonly G13DisclosureRowDef[] {
   return variant === 'listed' ? G13_DISCLOSURE_LISTED_ROWS : G13_DISCLOSURE_SOE_ROWS
 }
@@ -280,22 +324,52 @@ export function useG13Disclosure(options: {
     }
   }
 
-  /** 「从明细同步」：G13-2 明细回填本期发生额后保存 */
-  function syncFromDetail(): void {
-    try {
-      if (applyDetailPatch()) persist()
-    } catch { /* ignore */ }
+  function applyAmountPatch(
+    field: 'currentAmount' | 'priorAmount',
+    amounts: Map<string, number>,
+  ): G13DisclosurePatchResult {
+    let sourceFound = false
+    let fieldsChanged = 0
+    const patchedRows = rows.value.map((row) => {
+      if (!amounts.has(row.rowKey)) return row
+      sourceFound = true
+      const amount = amounts.get(row.rowKey)!
+      if (row[field] === amount) return row
+      fieldsChanged += 1
+      return enrichRow({ ...row, [field]: amount }, variant)
+    })
+    if (fieldsChanged > 0) rows.value = patchedRows
+    return { changed: fieldsChanged > 0, sourceFound, fieldsChanged }
   }
 
-  /** 由 G13-2 明细按来源汇总本期发生额（只改内存）；没有明细或解析失败返回 false、不动行 */
-  function applyDetailPatch(): boolean {
+  function persistPatch(result: G13DisclosurePatchResult, enabled = true): void {
+    if (enabled && result.sourceFound && result.changed && !options.isReadonly.value) {
+      persist()
+    }
+  }
+
+  /** 「从明细同步」：仅在来源存在、值变化且可写时保存本期回填。 */
+  function syncFromDetail(): G13DisclosurePatchResult {
+    const result = applyDetailPatch()
+    persistPatch(result)
+    return result
+  }
+
+  /** 由 G13-2 明细按来源汇总本期发生额；缺字段或缺行保留已存值，明确 0 有效。 */
+  function applyDetailPatch(): G13DisclosurePatchResult {
     const detailJson = options.allResponses.value.get('G13-detail-rows')?.remark
-    if (!detailJson) return false
+    if (!detailJson) return emptyPatchResult()
     try {
       const detailRows = JSON.parse(detailJson) as any[]
+      if (!Array.isArray(detailRows)) return emptyPatchResult()
       const sums = new Map<string, number>()
+      let hasAmountSource = false
       for (const d of detailRows) {
-        const amount = parseNum(d.currentAudited ?? d.fvChange)
+        const audited = amountSource(d?.currentAudited)
+        const amount = audited.found ? audited : amountSource(d?.fvChange)
+        if (!amount.found) continue
+        hasAmountSource = true
+
         const belong = String(d.belongAccount ?? '')
         const instrumentType = String(d.instrumentType ?? '')
         const remark = String(d.remark ?? '')
@@ -312,33 +386,64 @@ export function useG13Disclosure(options: {
           discKey = G13_DETAIL_TO_DISCLOSURE[belong] ?? 'other'
           if (discKey === 'derivatives') discKey = 'derivative_assets'
         }
-        sums.set(discKey, (sums.get(discKey) ?? 0) + amount)
+        sums.set(discKey, (sums.get(discKey) ?? 0) + amount.value)
 
         if (variant === 'listed') {
           const ofWhichAdj = mapBelongToOfWhichRow(belong, instrumentType, remark)
           if (ofWhichAdj) {
             const ofWhichDisc = G13_ADJ_TO_DISCLOSURE_LISTED[ofWhichAdj] ?? ofWhichAdj
-            sums.set(ofWhichDisc, (sums.get(ofWhichDisc) ?? 0) + amount)
+            sums.set(ofWhichDisc, (sums.get(ofWhichDisc) ?? 0) + amount.value)
           }
         }
       }
 
-      const ofWhichKeys = new Set(
-        rowDefs(variant).filter((d) => d.ofWhich).map((d) => d.rowKey),
-      )
-      rows.value = rows.value.map((r) => {
-        if (sums.has(r.rowKey)) {
-          return enrichRow({ ...r, currentAmount: sums.get(r.rowKey)! }, variant)
+      // 一旦明细里至少有一项可解释的金额，它就是本期完整来源；上市“其中”备忘行
+      // 没命中表示明确为 0。若所有来源行都缺金额，则仍按“来源不存在”保留已存值。
+      if (variant === 'listed' && hasAmountSource) {
+        for (const definition of rowDefs(variant)) {
+          if (definition.ofWhich && !sums.has(definition.rowKey)) sums.set(definition.rowKey, 0)
         }
-        // 指定备忘行无命中则清零，避免陈旧「其中」
-        if (ofWhichKeys.has(r.rowKey)) {
-          return enrichRow({ ...r, currentAmount: 0 }, variant)
-        }
-        return r
-      })
-      return true
+      }
+
+      return applyAmountPatch('currentAmount', sums)
     } catch {
-      return false
+      return emptyPatchResult()
+    }
+  }
+
+  /** 由 G13-1 上期审定回填上期发生额；显式 priorAudited=0 不回退到旧分量。 */
+  function applyPriorPatch(): G13DisclosurePatchResult {
+    const prior = options.allResponses.value.get('G13-adj-prior')?.remark
+    if (!prior) return emptyPatchResult()
+    try {
+      const store = JSON.parse(prior) as Record<string, unknown>
+      if (!store || typeof store !== 'object' || Array.isArray(store)) return emptyPatchResult()
+      const priorSums = new Map<string, number>()
+      for (const [adjKey, rawValue] of Object.entries(store)) {
+        const amount = priorAmountSource(rawValue)
+        if (!amount.found) continue
+
+        let discKey = adjKey
+        if (variant === 'listed') {
+          if (adjKey === 'derivative_assets' || adjKey === 'derivative_liabilities') discKey = 'derivatives'
+          if (adjKey === 'derivatives') discKey = 'derivatives'
+        }
+        if (variant === 'soe') {
+          if (adjKey === 'derivatives') discKey = 'derivative_assets'
+          // 国企无「其中」披露行：指定类备忘不单独落表
+          if (
+            adjKey === 'designated_fv_assets'
+            || adjKey === 'designated_fv_liabilities'
+            || adjKey === 'designated_fv_other'
+          ) continue
+        }
+        if (rowDefs(variant).some((definition) => definition.rowKey === discKey)) {
+          priorSums.set(discKey, (priorSums.get(discKey) ?? 0) + amount.value)
+        }
+      }
+      return applyAmountPatch('priorAmount', priorSums)
+    } catch {
+      return emptyPatchResult()
     }
   }
 
@@ -351,45 +456,16 @@ export function useG13Disclosure(options: {
   }
 
   /**
-   * 审定数 → G13-2 明细本期 → G13-1 上期审定。Tab 挂载与「刷新」调它（明细回填后保存）；附注页离屏同步在 prepare 里调
-   * `pullLatestAdjudicated({ persist: false })`：同一回填只改内存、不保存（spec note-pull-followup-closure R1）。
+   * 审定数 → G13-2 明细本期 → G13-1 上期审定。先完成两侧 patch，再按来源、变化和写权限最多保存一次。
+   * 附注页离屏同步传 `{ persist: false }`，只改内存、不保存。
    */
-  function pullLatestAdjudicated(opts: { persist?: boolean } = {}): void {
-    const amt = options.allResponses.value.get('G13-1-adjudicated-amount')?.conclusion
-    if (amt != null) adjudicatedAmount.value = parseNum(amt)
-    if (opts.persist === false) applyDetailPatch()
-    else syncFromDetail()
-    const prior = options.allResponses.value.get('G13-adj-prior')?.remark
-    if (prior) {
-      try {
-        const store = JSON.parse(prior) as Record<string, any>
-        const priorSums = new Map<string, number>()
-        for (const [adjKey, val] of Object.entries(store)) {
-          let discKey = adjKey
-          if (variant === 'listed') {
-            if (adjKey === 'derivative_assets' || adjKey === 'derivative_liabilities') discKey = 'derivatives'
-            if (adjKey === 'derivatives') discKey = 'derivatives'
-          }
-          if (variant === 'soe') {
-            if (adjKey === 'derivatives') discKey = 'derivative_assets'
-            // 国企无「其中」披露行：指定类备忘不单独落表
-            if (
-              adjKey === 'designated_fv_assets'
-              || adjKey === 'designated_fv_liabilities'
-              || adjKey === 'designated_fv_other'
-            ) continue
-          }
-          if (rowDefs(variant).some((d) => d.rowKey === discKey)) {
-            const priorAudited = parseNum(val?.priorAudited)
-              || (parseNum(val?.priorUnadjusted) + parseNum(val?.priorAdjustment))
-            priorSums.set(discKey, (priorSums.get(discKey) ?? 0) + priorAudited)
-          }
-        }
-        rows.value = rows.value.map((r) =>
-          priorSums.has(r.rowKey) ? enrichRow({ ...r, priorAmount: priorSums.get(r.rowKey)! }, variant) : r,
-        )
-      } catch { /* ignore */ }
-    }
+  function pullLatestAdjudicated(opts: { persist?: boolean } = {}): G13DisclosurePatchResult {
+    const adjudicated = amountSource(options.allResponses.value.get('G13-1-adjudicated-amount')?.conclusion)
+    if (adjudicated.found) adjudicatedAmount.value = adjudicated.value
+
+    const result = mergePatchResults(applyDetailPatch(), applyPriorPatch())
+    persistPatch(result, opts.persist !== false)
+    return result
   }
 
   async function generateAiConclusion(): Promise<void> {

@@ -10,7 +10,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import { expect, type Mock } from 'vitest'
 
 const EL_TAGS = [
-  'el-button', 'el-card', 'el-icon', 'el-input', 'el-table', 'el-table-column', 'el-tag', 'el-tooltip',
+  'el-button', 'el-card', 'el-icon', 'el-input', 'el-input-number', 'el-table', 'el-table-column', 'el-tag', 'el-tooltip',
 ]
 export const M_TAB_STUBS: Record<string, true> = {
   ...Object.fromEntries(EL_TAGS.map((t) => [t, true])),

@@ -94,15 +94,21 @@ runDisclosureSubtableContract({
   ],
 })
 
-// 八、47 一年内到期的长期应付款（仅国企）
+// 一年内到期的长期应付款（上市五、43 / 国企八、47，表名字面分取）
 runDisclosureSubtableContract({
   cycle: 'L5-within1y',
   variants: [
     {
+      variant: 'listed',
+      section: L5_WITHIN1Y_NOTE_SECTION.listed,
+      subtables: { main: L5_WITHIN1Y_SUBTABLE.listed },
+      columns: l5Within1yColumns('listed'),
+    },
+    {
       variant: 'soe',
       section: L5_WITHIN1Y_NOTE_SECTION.soe,
-      subtables: L5_WITHIN1Y_SUBTABLE,
-      columns: l5Within1yColumns(),
+      subtables: { main: L5_WITHIN1Y_SUBTABLE.soe },
+      columns: l5Within1yColumns('soe'),
     },
   ],
 })

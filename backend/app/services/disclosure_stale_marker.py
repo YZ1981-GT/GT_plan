@@ -72,36 +72,33 @@ def is_enabled() -> bool:
 
 
 @lru_cache(maxsize=1)
-def _registry() -> dict[str, dict[str, str]]:
-    """wp_code → {listed: 章节号, soe: 章节号}（模块级缓存，registry 是生成产物）。"""
+def _registry() -> dict[str, dict[str, Any]]:
+    """wp_code → 原始注册项；主章节与复数章节由统一访问器展开。"""
     try:
         doc = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001 — registry 不可用时兜底降级为空
         logger.warning("disclosure_stale_marker: registry unavailable: %s", exc)
         return {}
-    out: dict[str, dict[str, str]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for e in doc.get("entries") or []:
         if not isinstance(e, dict):
             continue
         code = str(e.get("wp_code") or "").strip()
-        if not code:
-            continue
-        out[code] = {
-            k: str(e.get(k) or "").strip()
-            for k in ("listed", "soe")
-            if str(e.get(k) or "").strip()
-        }
+        if code:
+            out[code] = dict(e)
     return out
 
 
 def sections_for_wp_code(wp_code: str | None) -> list[str]:
-    """该底稿对应的附注章节号（listed + soe 都返回，实际只有匹配 variant 的存在）。"""
+    """该底稿对应的全部附注章节（listed/soe 主章节与复数章节稳定去重）。"""
     if not wp_code:
         return []
     entry = _registry().get(str(wp_code).strip())
     if not entry:
         return []
-    return [v for v in entry.values() if v]
+    from app.services.note_readiness_service import registry_sections
+
+    return list(dict.fromkeys((*registry_sections(entry, "listed"), *registry_sections(entry, "soe"))))
 
 
 def wp_code_from_payload(extra: Any) -> str | None:

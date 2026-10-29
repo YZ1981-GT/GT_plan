@@ -22,6 +22,7 @@ import { resolve } from 'path'
 const WP_ROOT = resolve(__dirname, '../..')
 const HOST = resolve(WP_ROOT, 'GtE1MonetaryFund.vue')
 const DISCLOSURE = resolve(WP_ROOT, 'e1/E1TabDisclosure.vue')
+const SYNC_PLAN = resolve(__dirname, '../e1DisclosureSyncPlan.ts')
 
 function blankComments(src: string): string {
   const blank = (m: string) => m.replace(/[^\n]/g, ' ')
@@ -87,12 +88,14 @@ describe('E1 宿主传参', () => {
     expect(src).toMatch(/htmlData\?:/)
   })
 
-  it('🔴 披露组件不得再给 buildE1SyncPayload 传 null 准则', () => {
+  it('🔴 真实 Tab 经共享 plan 透传项目准则，plan 不得给 buildE1SyncPayload 传 null', () => {
     const src = blankComments(readFileSync(DISCLOSURE, 'utf-8'))
-    expect(src).toContain('buildE1SyncPayload(')
-    // 旧缺陷形态：buildE1SyncPayload(variant.value, wpId, null, snapshot)
-    expect(src).not.toMatch(/buildE1SyncPayload\([\s\S]{0,120}?,\s*null\s*,/)
-    expect(src).toMatch(/buildE1SyncPayload\([\s\S]{0,160}?applicableStandards\.value/)
+    const plan = blankComments(readFileSync(SYNC_PLAN, 'utf-8'))
+    expect(src).toContain('buildE1DisclosureSyncPlan(')
+    expect(src).toMatch(/buildE1DisclosureSyncPlan\([\s\S]{0,260}?applicableStandards:\s*applicableStandards\.value/)
+    expect(plan).toContain('buildE1SyncPayload(')
+    expect(plan).not.toMatch(/buildE1SyncPayload\([\s\S]{0,160}?,\s*null\s*,/)
+    expect(plan).toMatch(/buildE1SyncPayload\([\s\S]{0,200}?input\.applicableStandards/)
     expect(src).toContain('useHostApplicableStandards')
   })
 

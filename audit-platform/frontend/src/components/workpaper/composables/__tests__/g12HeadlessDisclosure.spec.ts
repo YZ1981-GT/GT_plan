@@ -2,9 +2,9 @@
  * G12 净敞口套期收益披露表离屏同步 = 底稿披露 Tab 同一套代码（spec note-pull-followup-closure R1）。
  *
  * 快照原在两个 Tab 的 `syncToDisclosureNotes` 里内联，抽成 `g12DisclosureSyncSnapshot`；Tab 挂载时的回填（G12-1 审定 / G12-2 明细
- * 重算各行，之后保存并广播）抽出只改内存的一步 `applyAdjudicationPatch`，离屏在 prepare 里调它。判据：①挂载真实 Tab（挂载回填后）
- * 点「同步到附注」发出的载荷 == 离屏载荷，且载荷是回填后的值（已存旧值被覆盖）②离屏不写底稿、不广播、不订阅窗口事件，组件内照旧
- * ③只读 G12 条目、静默发出 ④口径不适用回空 ⑤静态接线。
+ * 按存在的来源 patch 各行，仅真实变化且可写时保存）抽出只改内存的一步 `applyAdjudicationPatch`，离屏在 prepare 里调它。判据：
+ * ①挂载真实 Tab（挂载回填后）点「同步到附注」发出的载荷 == 离屏载荷 ②离屏不写底稿、不广播、不订阅窗口事件
+ * ③缺失/明确 0/只读/无变化持久化门 ④口径不适用回空 ⑤静态接线。
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -106,6 +106,48 @@ async function tabPayload(variant: 'soe' | 'listed', stds: string[]) {
 /** 窗口事件广播的探针（单独成函数以便精确推断类型） */
 const spyDispatch = () => vi.spyOn(window, 'dispatchEvent')
 
+function storedG12Map(extra: ChecklistResponse[] = []): Map<string, ChecklistResponse> {
+  const responses: ChecklistResponse[] = [
+    {
+      item_id: 'G12-disclosure-listed',
+      remark: J([{ rowKey: 'net_hedge', label: '净敞口套期收益', currentAmount: 91, priorAmount: 81, remark: '已存值' }]),
+      conclusion: null,
+    },
+    { item_id: 'G12-disclosure-listed-note', remark: '已存说明', conclusion: null },
+    ...extra,
+  ]
+  return new Map(responses.map((response) => [response.item_id, response]))
+}
+
+function mountG12Disclosure(
+  allResponses: Map<string, ChecklistResponse>,
+  isReadonly = false,
+) {
+  const save = vi.fn()
+  let disclosure!: ReturnType<typeof useG12Disclosure>
+  const wrapper = mount(defineComponent({
+    setup() {
+      disclosure = useG12Disclosure({
+        variant: 'listed',
+        allResponses: ref(allResponses),
+        wpId: ref('wp-g12'),
+        isReadonly: ref(isReadonly),
+        debouncedSave: save,
+      })
+      return () => null
+    },
+  }))
+  return { disclosure, save, wrapper }
+}
+
+function savedG12Rows(save: ReturnType<typeof vi.fn>) {
+  const rowCalls = save.mock.calls.filter(([itemId]) => itemId === 'G12-disclosure-listed')
+  return {
+    rowCalls,
+    rows: rowCalls.length ? JSON.parse(String(rowCalls[0][1]?.remark)) : [],
+  }
+}
+
 describe('g12HeadlessProvider', () => {
   let warn: ReturnType<typeof vi.spyOn>
   let listen: ReturnType<typeof vi.spyOn>
@@ -153,23 +195,54 @@ describe('g12HeadlessProvider', () => {
     expect(J(sent)).toBe(J(await tabPayload('soe', SOE.applicableStandards)))
   })
 
-  it('离屏不写底稿、不广播、不订阅窗口事件、不挂钩子；组件内照旧', async () => {
+  it('离屏不写底稿、不广播、不订阅、不挂钩子；组件挂载无来源时保留非零已存值且不保存', async () => {
     await g12HeadlessProvider(LISTED)
     expect(listen.mock.calls.some(([type]) => type === 'substantive:adjudicated' || type === 'g12:hedge-detail-updated')).toBe(false)
     expect(dispatch.mock.calls.some(([ev]) => (ev as Event).type === 'disclosure:note-text-updated')).toBe(false)
     expect(warn.mock.calls.some((args) => String(args[0]).includes('no active component instance'))).toBe(false)
 
-    const save = vi.fn()
-    const w = mount(defineComponent({
-      setup() {
-        useG12Disclosure({ variant: 'listed', allResponses: ref(new Map()), wpId: ref('wp-g12'), isReadonly: ref(false), debouncedSave: save })
-        return () => null
-      },
-    }))
+    const { disclosure, save, wrapper } = mountG12Disclosure(storedG12Map())
     expect(listen.mock.calls.some(([type]) => type === 'g12:hedge-detail-updated')).toBe(true)
-    expect(save).toHaveBeenCalled()
-    expect(dispatch.mock.calls.some(([ev]) => (ev as Event).type === 'disclosure:note-text-updated')).toBe(true)
-    w.unmount()
+    expect(disclosure.rows.value[0]).toMatchObject({ currentAmount: 91, priorAmount: 81, remark: '已存值' })
+    expect(save).not.toHaveBeenCalled()
+    expect(dispatch.mock.calls.some(([ev]) => (ev as Event).type === 'disclosure:note-text-updated')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('挂载时明确 0 会覆盖非零已存值，并只持久化一次最终行状态', () => {
+    const map = storedG12Map([
+      { item_id: 'G12-1-adjudicated-amount', conclusion: '0', remark: null },
+      { item_id: 'G12-adj-prior', conclusion: null, remark: J({ net_hedge: { priorAudited: 0 } }) },
+    ])
+    const { disclosure, save, wrapper } = mountG12Disclosure(map)
+    expect(disclosure.rows.value[0]).toMatchObject({ currentAmount: 0, priorAmount: 0 })
+    const saved = savedG12Rows(save)
+    expect(saved.rowCalls).toHaveLength(1)
+    expect(saved.rows[0]).toMatchObject({ currentAmount: 0, priorAmount: 0 })
+    expect(save.mock.calls.filter(([itemId]) => itemId === 'G12-disclosure-listed-note')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('只读挂载仍应用来源 patch 供回显，但不持久化', () => {
+    const map = storedG12Map([
+      { item_id: 'G12-1-adjudicated-amount', conclusion: '123', remark: null },
+      { item_id: 'G12-adj-prior', conclusion: null, remark: J({ net_hedge: { priorAudited: 45 } }) },
+    ])
+    const { disclosure, save, wrapper } = mountG12Disclosure(map, true)
+    expect(disclosure.rows.value[0]).toMatchObject({ currentAmount: 123, priorAmount: 45 })
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('来源值与非零已存值相同时不持久化', () => {
+    const map = storedG12Map([
+      { item_id: 'G12-1-adjudicated-amount', conclusion: '91', remark: null },
+      { item_id: 'G12-adj-prior', conclusion: null, remark: J({ net_hedge: { priorAudited: 81 } }) },
+    ])
+    const { disclosure, save, wrapper } = mountG12Disclosure(map)
+    expect(disclosure.rows.value[0]).toMatchObject({ currentAmount: 91, priorAmount: 81 })
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('口径不适用回空，不发请求', async () => {
@@ -178,7 +251,7 @@ describe('g12HeadlessProvider', () => {
     expect(h.post).not.toHaveBeenCalled()
   })
 
-  it('静态接线：两个 Tab 调共用快照函数，不再内联；挂载回填与「从 G12-1 同步」共用 applyAdjudicationPatch', () => {
+  it('静态接线：两个 Tab 调共用快照函数；挂载回填走结构化 patch 与三条件保存门', () => {
     const dir = resolve(__dirname, '../../g12-net-hedge-gains/core')
     for (const [file, variant] of [['G12TabDisclosureListed.vue', 'listed'], ['G12TabDisclosureSOE.vue', 'soe']] as const) {
       const src = readFileSync(resolve(dir, file), 'utf-8')
@@ -187,6 +260,7 @@ describe('g12HeadlessProvider', () => {
     }
     const composable = readFileSync(resolve(__dirname, '../useG12Disclosure.ts'), 'utf-8').replace(/\r?\n\r?\n/g, '\n')
     expect(composable).toMatch(/if \(getCurrentInstance\(\)\) \{\s*onMounted\(\(\) => \{\s*pullLatestAdjudicated\(\)/)
-    expect(composable).toMatch(/const n = applyAdjudicationPatch\(\)\s*persist\(\)/)
+    expect(composable).toContain('result.sourceFound && result.changed && !opts.isReadonly.value')
+    expect(composable).not.toMatch(/const n = applyAdjudicationPatch\(\)\s*persist\(\)/)
   })
 })

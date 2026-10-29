@@ -45,7 +45,10 @@ async def extract_ocr_fields(
     """
     att = await load_attachment(db, attachment_id)
     cached = att.ocr_status == "completed" and bool(att.ocr_fields_cache)
-    await assert_project_permission(db, current_user, att.project_id, "readonly" if cached else "edit")
+    if cached:
+        await assert_project_permission(db, current_user, att.project_id, "readonly")
+    else:
+        await assert_project_permission(db, current_user, att.project_id, "edit")
     # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）：
     # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
     await enforce_attachment_wp_visibility(

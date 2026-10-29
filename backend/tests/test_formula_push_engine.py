@@ -674,7 +674,8 @@ async def test_failure_rolls_back_and_records_partial_run(env):
 
 @pytest.mark.asyncio
 async def test_engine_writes_never_publish_workpaper_saved(env, monkeypatch):
-    """防回环：引擎写入只广播 formula.pushed，不发 WORKPAPER_SAVED（否则保存事件 → 推送 → 保存事件……）。"""
+    """防回环：引擎发布 NOTE_SECTION_SAVED 给下游，但绝不发 WORKPAPER_SAVED。"""
+    from app.models.audit_platform_schemas import EventType
     from app.services.event_bus import event_bus
 
     published: list = []
@@ -688,7 +689,10 @@ async def test_engine_writes_never_publish_workpaper_saved(env, monkeypatch):
     await env.add_note("五、1", _f2_note())
     result = await env.push()
     assert result.written_count > 0 and result.note_sections == ["五、1"]
-    assert published == [] and [e for e, _ in env.broadcasts] == ["formula.pushed"]
+    assert [payload.event_type for payload in published] == [EventType.NOTE_SECTION_SAVED]
+    assert published[0].extra["section_code"] == "五、1" and published[0].extra["action"] == "formula_push"
+    assert all(payload.event_type != EventType.WORKPAPER_SAVED for payload in published)
+    assert [e for e, _ in env.broadcasts] == ["formula.pushed"]
 
 
 

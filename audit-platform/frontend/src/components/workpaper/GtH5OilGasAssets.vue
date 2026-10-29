@@ -285,6 +285,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :save-response="persistResponse"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -323,6 +324,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
+import { useH5FormData } from './composables/useH5FormData'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -407,6 +409,18 @@ const isReadonly = computed(() => !!props.readonly)
 const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
+const h5FormData = useH5FormData({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  allResponses,
+})
+
+/** H5 国企披露文字的唯一保存 adapter：同一 Map 乐观更新，再走现有 checklist PUT。 */
+async function persistResponse(itemId: string, value: any): Promise<void> {
+  if (isReadonly.value) return
+  await h5FormData.saveResponse(itemId, value)
+}
+
 const depletionBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
 // ─── 双模式切换（统一接桥，替代宿主内联的第二份实现）──────────────────────────
