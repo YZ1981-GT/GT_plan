@@ -81,6 +81,13 @@ describe('N2 导入请求契约', () => {
     )
   })
 
+  it('详情页可见列数文案与 A:Q 结构一致', () => {
+    const wrapper = mountDetail()
+    expect(wrapper.text()).toContain('明细表规则（源模板 17 列）')
+    expect(wrapper.text()).not.toContain('源模板 16 列')
+    wrapper.unmount()
+  })
+
   it('详情页仅在导入成功后发 imported，交由宿主读回唯一快照', async () => {
     const wrapper = mountDetail()
     const input = wrapper.get('input[type="file"]')

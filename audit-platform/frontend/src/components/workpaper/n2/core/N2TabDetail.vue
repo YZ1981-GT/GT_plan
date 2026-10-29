@@ -44,7 +44,7 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>明细表规则（源模板 16 列）：</strong>
+        <strong>明细表规则（源模板 17 列）：</strong>
         未审期末 F = 期初 C + 应交 D − 已交 E；审定期初 M = C + 期初账项调整 G + 期初重分类调整 H；
         审定应交 N = D + 账项调整应交 I + 重分类应交 K；审定已交 O = E + 账项调整已交 J + 重分类已交 L；
         审定期末 P = M + N − O。灰底列为公式自动计算。
@@ -71,7 +71,7 @@
       </div>
     </div>
 
-    <!-- ═══ 16列明细表（嵌套分组表头） ═══ -->
+    <!-- ═══ A:Q 17 列明细表（嵌套分组表头） ═══ -->
     <el-table
       :data="rows"
       border
