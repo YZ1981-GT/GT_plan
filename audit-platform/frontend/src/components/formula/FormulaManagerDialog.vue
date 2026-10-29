@@ -560,7 +560,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
-import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
+import { wpCodeNaturalCompare, sortSheetsForGroup, groupHeaderLabel } from '@/services/acnr/sheetDisplayName'
 import {
   useFormulaScopeCatalog,
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
@@ -1523,7 +1523,7 @@ async function loadAcnrTree() {
 }
 
 /** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet）；
- *  显示名/排序/序号消歧统一走单一真源 composeSheetLabelsForGroup（sheetDisplayName.ts） */
+ *  显示名读目录 display_label（后端 display.py 单一来源），这里只排序（sortSheetsForGroup，T30） */
 function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
   // 过滤掉 sheet_code === parent_wp_code 的幻影条目（catalog 中"底稿自身作为子 sheet"的占位，
   // 如 D1 parent 下有 sheet_code='D1' 与 sheet_code='D1-1' 重复，前者是冗余占位应排除）
@@ -1547,8 +1547,7 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
     const parentNodes = [...byParent.entries()]
       .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
       .map(([parentCode, parentSheets]) => {
-        const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
-        const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => ({
+        const children = sortSheetsForGroup(parentSheets).map(({ entry, label }) => ({
           key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
           label,
           icon: '',
@@ -1559,7 +1558,7 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
         return {
           key: `wp_${parentCode.toLowerCase()}`,
           // 父节点也带科目简称：如「D2 应收账款」，避免裸编码难辨识
-          label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+          label: groupHeaderLabel(parentCode, parentSheets),
           icon: '',
           children,
           _wpCode: parentCode,
@@ -1644,7 +1643,7 @@ const treeData = computed(() => {
       key: 'aux', label: DOMAIN_TREE_META.aux.label, icon: DOMAIN_TREE_META.aux.icon,
       children: auxSheets.map(s => ({
         key: `aux_${s.sheet_code || s.addr_id}`,
-        label: s.sheet_name || s.sheet_code || s.addr_id,
+        label: s.display_label || s.sheet_code || s.addr_id,
         icon: '',
         _addrId: s.addr_id,
       })),

@@ -119,7 +119,7 @@
             <el-option
               v-for="s in wpSheetOptions"
               :key="s.addr_id"
-              :label="`[${s.parent_wp_code}] ${s.sheet_name || s.sheet_code}`"
+              :label="s.display_label || s.sheet_code"
               :value="s.addr_id"
             />
           </el-select>

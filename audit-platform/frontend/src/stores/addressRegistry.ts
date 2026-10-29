@@ -21,6 +21,7 @@ import { addressRegistry as paths } from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
 import {
   useAcnr,
+  isListedCell,
   type AcnrSheetEntry,
   type AcnrCellEntry,
   type AcnrResolveResult,
@@ -106,7 +107,7 @@ function _mapAcnrResolveToResult(uri: string, r: AcnrResolveResult): ResolveResu
   return {
     found: !!r.found,
     uri: outUri,
-    label: r.semantic_label,
+    label: r.display_label,
     formula_ref: r.formula_ref,
     jump_route: r.jump_route,
     domain: _domainFromUri(r.uri) ?? _domainFromUri(uri) ?? (r.addr_id ? 'wp' : undefined),
@@ -122,7 +123,7 @@ function _mapSheetToEntry(s: AcnrSheetEntry): AddressEntry {
     source: s.parent_wp_code,
     path: s.sheet_code,
     cell: '',
-    label: s.sheet_name || s.sheet_code,
+    label: s.display_label || s.sheet_code,
     formula_ref: '',
     jump_route: '',
     wp_code: s.parent_wp_code,
@@ -139,7 +140,7 @@ function _mapCellToEntry(c: AcnrCellEntry): AddressEntry {
     source: wpCode,
     path: sheetCode,
     cell: c.cell_address || coord,
-    label: c.semantic_label || c.cell_address || c.addr_id,
+    label: c.display_label || c.cell_address || c.addr_id,
     formula_ref: c.formula_ref || '',
     jump_route: '',
     wp_code: wpCode,
@@ -263,7 +264,7 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
 
     const matchedSheets = kw
       ? sheetList.filter(s =>
-          (s.sheet_name || '').toLowerCase().includes(kw) ||
+          (s.display_label || '').toLowerCase().includes(kw) ||
           (s.sheet_code || '').toLowerCase().includes(kw) ||
           (s.parent_wp_code || '').toLowerCase().includes(kw),
         )
@@ -276,7 +277,8 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     for (const s of matchedSheets.slice(0, CELL_SHEET_LIMIT)) {
       try {
         const cells = await _acnr.listCells(s.parent_wp_code, s.sheet_code)
-        for (const c of cells) results.push(_mapCellToEntry(c))
+        // 停用 cell 不列（与地址树 loadCellNodes 同一谓词，RV7-02）
+        for (const c of cells.filter(isListedCell)) results.push(_mapCellToEntry(c))
       } catch {
         /* 单 sheet cell 加载失败忽略，不影响整体搜索 */
       }

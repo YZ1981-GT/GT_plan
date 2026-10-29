@@ -61,7 +61,7 @@
 | 平台底稿索引名 loader（名称规则模块调用） | 后端 | `backend/app/services/acnr/loaders/from_wp_account_mapping.py` | `load_wp_account_mapping_aliases` | `backend/tests/acnr/test_name_system.py` |
 | 生成器名称规则：平台底稿名并入别名并逐条往返、同父一名多码记禁止别名、cell 写法按名称归属选模板名或编码 | 后端 | `backend/app/services/acnr/catalog_names.py` | `merge_platform_names`、`apply_cell_names`、`apply_cell_verdicts` | `backend/tests/acnr/test_name_system.py` |
 | 发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段 | 后端 | `backend/app/services/acnr/catalog_build.py` | `build_release`、`locate_previous`、`inputs_fingerprint` | `backend/tests/acnr/test_generator_release_flow.py` |
-| 统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号，停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算） | 后端 | `backend/app/services/acnr/display.py` | `compose_sheet_labels`、`cell_labels`、`apply_display_labels` | `backend/tests/acnr/test_display_contract.py` |
+| 统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号（编码等于所属底稿编码的那张不参与序号），停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算） | 后端 | `backend/app/services/acnr/display.py` | `compose_sheet_labels`、`cell_labels`、`apply_display_labels` | `backend/tests/acnr/test_display_contract.py` |
 | 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
@@ -72,15 +72,16 @@
 | 高级查询单元格取值的请求构造与拒绝提示（业务视图与构建器的请求体由同一模块构造：有项目且有单元格目标才发送单元格目标；构建器的项目与年度在限定当前项目或带单元格目标时发送、年度未知不发；拒绝、无权、解析不可用转成中文提示） | 前端 | `audit-platform/frontend/src/components/custom-query/queryPayloads.ts` | `buildBusinessPayload`、`buildBuilderPayload`、`queryErrorText` | `audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts` |
 | 底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，回收站给中文原因） | 后端 | `backend/app/routers/acnr.py` | `acnr_locate_workpaper` | `backend/tests/acnr/test_workpaper_locate_endpoint.py` |
 | 底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约 | 前端 | `audit-platform/frontend/src/views/composables/workpaperShortLink.ts` | `resolveShortLink`、`shortLinkQuery` | `audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts` |
+| 前端显示名只读目录（选址器、高级查询选字段、公式管理与公式编辑三棵树，公式选址器、地址库搜索、已选字段、取值结果区与索引 chip 都读目录的 display_label / cell_label，前端只按编码排序、父节点标题加科目简称；停用 cell 由同一谓词过滤） | 前端 | `audit-platform/frontend/src/services/acnr/sheetDisplayName.ts` | `sortSheetsForGroup`、`groupHeaderLabel`、`wpCodeNaturalCompare` | `audit-platform/frontend/src/acnrDisplaySingleSource.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——前端显示名单一来源（T30）。
+门禁清单：已经在跑的守卫见上表「测试」列。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
-| 前端显示改读目录的 display_label、歧义候选与外部命名空间中文提示 | T30、T31 |
+| 歧义候选与外部命名空间中文提示 | T31 |
 | INDEX 登记与提交边界核对 | T33 |
 
 ### 版本号格式

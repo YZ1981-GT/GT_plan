@@ -290,7 +290,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——前端显示名单一来源（T30）": P(task_open("T30"), in_planned("T30")),
         "消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它）": CB(
             _BYPASS_REL, ("run", "scan_backend", "ledger_problems", "main"), _T + "test_acnr_bypass_ratchet.py",
             calls(_BYPASS_REL, "run", "scan_backend", "ledger_problems"),
@@ -496,7 +495,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "发布候选构建：叠加判定记录与名称规则、上一批次别名沿用、输入指纹与报告 release 段": CB(
             _BUILD_REL, ("build_release", "locate_previous", "inputs_fingerprint"), _T + "test_generator_release_flow.py",
             has_tests(_T + "test_generator_release_flow.py", "test_release_section_is_consistent_with_artifacts")),
-        "统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号，停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算）": CB(
+        "统一显示名（发布候选构建按同一规则写进目录：sheet 的 display_label 为「编码 名称」，名称取平台底稿名、其次手工维护的 sheet 显示名、再次去尾编码的模板名，名称等于编码时只显示编码，加科目简称前缀，同父级重名按编码自然序加序号（编码等于所属底稿编码的那张不参与序号），停用条目加「（已停用）」；cell 的 cell_label 为「A1 语义标签」、display_label 为「sheet 显示名 › cell_label」；`/api/acnr/resolve` 的命中与候选、acnr_targets、V2 节点输出同一字段，L3 运行时条目与非底稿域委托结果用同一函数现算）": CB(
             _A + "display.py", ("compose_sheet_labels", "cell_labels", "apply_display_labels"), _T + "test_display_contract.py",
             calls(_BUILD_REL, "build_release", "apply_display_labels", "load_name_sources"),
             calls(_RESOLVER_REL, "_build_runtime_resolve_result", "computed_display_label"),
@@ -504,7 +503,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             calls(_CQ + "acnr_target_values.py", "_display_label", "cell_labels"),
             has_tests(_T + "test_display_contract.py", "test_display_py_recomputes_every_published_label", "test_published_catalog_equals_fixture",
                       "test_resolve_endpoints_output_catalog_display_label", "test_acnr_targets_preview_outputs_catalog_display_label",
-                      "test_candidates_use_catalog_display_label", "test_synthetic_groups")),
+                      "test_candidates_use_catalog_display_label", "test_synthetic_groups", "test_rule_b_pairs_drop_redundant_sequence_numbers")),
         "目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断）": CB(
             _A + "catalog_report_buckets.py", ("build_buckets", "bucket_problems"), _T + "test_catalog_report_buckets.py",
             calls(_BUILD_REL, "build_release", "build_buckets"), calls(_NAMES_REL, "apply_alias_policy", "sheet_of"),
@@ -557,10 +556,12 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             claim("底稿域路由表登记短链 workpapers/:wpId", _short_link_route_ok),
             exists("audit-platform/frontend/src/router/__tests__/backendRouteShapes.contract.spec.ts"),
             has_tests(_T + "test_frontend_route_shapes_fixture.py", "test_fixture_matches_backend_sources")),
+        "前端显示名只读目录（选址器、高级查询选字段、公式管理与公式编辑三棵树，公式选址器、地址库搜索、已选字段、取值结果区与索引 chip 都读目录的 display_label / cell_label，前端只按编码排序、父节点标题加科目简称；停用 cell 由同一谓词过滤）": CF("audit-platform/frontend/src/services/acnr/sheetDisplayName.ts", ("sortSheetsForGroup", "groupHeaderLabel", "wpCodeNaturalCompare"),
+            "audit-platform/frontend/src/acnrDisplaySingleSource.spec.ts", exists(_FE_GUARD_REL), exists("audit-platform/frontend/src/services/acnr/cellListing.ts")),
     },
     H_PLANNED: {
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
-        "前端显示改读目录的 display_label、歧义候选与外部命名空间中文提示": L("T30、T31"),
+        "歧义候选与外部命名空间中文提示": L("T31"),
         "INDEX 登记与提交边界核对": L("T33"),
     },
     H_VERSION: {

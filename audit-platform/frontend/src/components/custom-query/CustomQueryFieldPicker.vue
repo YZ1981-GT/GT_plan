@@ -304,8 +304,9 @@ function toggleField(data: PickerNode) {
     next.splice(idx, 1)
   } else {
     next.push(data.addrId)
-    // 记录 addr_id → 可读标签
-    labelMap.value = { ...labelMap.value, [data.addrId]: data.label }
+    // 记录 addr_id → 已选标签（目录统一显示名 display_label；树叶子只显示 cell_label，T30）
+    const shown = (data.meta as AcnrCellEntry | undefined)?.display_label || data.label
+    labelMap.value = { ...labelMap.value, [data.addrId]: shown }
     // acnr Req 8.4：emit addr_id + formula_ref（供父级查询表单构造引用）
     const cellMeta = data.meta as AcnrCellEntry | undefined
     emit('select', {

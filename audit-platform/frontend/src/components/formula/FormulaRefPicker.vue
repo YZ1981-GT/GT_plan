@@ -112,11 +112,11 @@
             <el-option
               v-for="s in wpSheets"
               :key="s.addr_id"
-              :label="`[${s.parent_wp_code}] ${s.sheet_name || s.sheet_code}`"
+              :label="s.display_label || s.sheet_code"
               :value="s.addr_id"
             />
           </el-select>
-          <el-input v-model="wpCellSearch" placeholder="搜索坐标/语义/引用..." size="small" clearable style="width: 220px" />
+          <el-input v-model="wpCellSearch" placeholder="搜索单元格/引用..." size="small" clearable style="width: 220px" />
         </div>
         <el-table
           v-if="filteredWpCells.length"
@@ -128,11 +128,8 @@
           @row-click="onSelectWpCell"
           style="cursor: pointer"
         >
-          <el-table-column label="坐标" width="100">
-            <template #default="{ row }">{{ row.cell_address || '—' }}</template>
-          </el-table-column>
-          <el-table-column label="语义标签" min-width="180">
-            <template #default="{ row }">{{ row.semantic_label }}</template>
+          <el-table-column label="单元格" min-width="200">
+            <template #default="{ row }">{{ row.cell_label }}</template>
           </el-table-column>
           <el-table-column label="引用" min-width="200">
             <template #default="{ row }">
@@ -164,7 +161,7 @@
 import { ref, computed, watch } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useAddressRegistry } from '@/stores/addressRegistry'
-import { useAcnr, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
+import { useAcnr, isListedCell, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
 import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 const addrStore = useAddressRegistry()
@@ -202,7 +199,10 @@ const selectedLabel = ref('')
 // ─── WP 域（ACNR 底稿单元格）───
 interface WpCellRow {
   cell_address: string
-  semantic_label: string
+  /** 单元格表「单元格」列（目录 cell_label） */
+  cell_label: string
+  /** 统一显示名（目录 display_label），搜索与「将插入」标签用 */
+  display_label: string
   formula_ref: string
   parent_wp_code: string
   sheet_code: string
@@ -239,7 +239,8 @@ const filteredWpCells = computed<WpCellRow[]>(() => {
       const cellAddr = c.cell_address || ''
       return {
         cell_address: cellAddr,
-        semantic_label: c.semantic_label || cellAddr || c.addr_id,
+        cell_label: c.cell_label || cellAddr || c.addr_id,
+        display_label: c.display_label || c.cell_label || cellAddr || c.addr_id,
         // R14.5: 优先用 ACNR 条目自带的 grammar_v1 formula_ref（含 custom_flat），
         // 缺失时兜底构造 3 参 WP('parent','sheet','cell')。
         formula_ref: c.formula_ref || buildWpFormulaRef(sheet.parent_wp_code, sheet.sheet_code, cellAddr),
@@ -253,7 +254,8 @@ const filteredWpCells = computed<WpCellRow[]>(() => {
       .filter(e => e.formula_ref)
       .map(e => ({
         cell_address: e.cell || '',
-        semantic_label: e.label || e.cell || e.uri,
+        cell_label: e.label || e.cell || e.uri,
+        display_label: e.label || e.cell || e.uri,
         formula_ref: e.formula_ref,
         parent_wp_code: e.wp_code || '',
         sheet_code: e.sheet_code || '',
@@ -262,7 +264,7 @@ const filteredWpCells = computed<WpCellRow[]>(() => {
   if (!kw) return rows
   return rows.filter(r =>
     (r.cell_address || '').toLowerCase().includes(kw) ||
-    (r.semantic_label || '').toLowerCase().includes(kw) ||
+    (r.display_label || '').toLowerCase().includes(kw) ||
     (r.formula_ref || '').toLowerCase().includes(kw),
   )
 })
@@ -291,7 +293,8 @@ async function onWpSheetChange(addrId: string | null) {
   if (!s) return
   wpCellsLoading.value = true
   try {
-    wpCells.value = await acnr.listCells(s.parent_wp_code, s.sheet_code)
+    // 停用 cell 不列（与地址树 loadCellNodes 同一谓词，RV7-02）
+    wpCells.value = (await acnr.listCells(s.parent_wp_code, s.sheet_code)).filter(isListedCell)
   } catch {
     wpCells.value = []
   } finally {
@@ -302,8 +305,7 @@ async function onWpSheetChange(addrId: string | null) {
 function onSelectWpCell(row: WpCellRow) {
   if (!row.formula_ref) return
   selectedFormula.value = row.formula_ref
-  const codeTag = row.parent_wp_code ? `[${row.parent_wp_code}] ` : ''
-  selectedLabel.value = `底稿 ${codeTag}${row.semantic_label}`
+  selectedLabel.value = `底稿 ${row.display_label}`
 }
 
 // WP tab 首次激活时懒加载 sheet 目录

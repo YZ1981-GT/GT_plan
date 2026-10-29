@@ -419,7 +419,7 @@ async function loadWpRows(): Promise<any[]> {
       seen.add(code)
       rows.push({
         code,
-        name: s.sheet_name || s.sheet_code || code,
+        name: s.display_label || s.sheet_code || code,
         _ref: `WP('${code}','审定数')`,
       })
     }

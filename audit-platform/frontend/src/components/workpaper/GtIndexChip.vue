@@ -218,12 +218,9 @@ const tooltipContent = computed(() => {
   if (resolveStatus.value === 'exists') {
     const { ns, layer, target } = parsed.value
     const layerLabel = ['', '单元格', 'Sheet', '底稿', '模块'][layer] || ''
-    const base = `${layerLabel}跳转 → ${ns}:${target}`
-    // 附带上下文摘要
-    if (props.context) {
-      return `${base}\n${props.context}`
-    }
-    return base
+    // 首行：解析结果的统一显示名（目录 display_label，T30）；其后跳转说明与上下文摘要
+    const lines = [acnrResult.value?.display_label, `${layerLabel}跳转 → ${ns}:${target}`, props.context]
+    return lines.filter(Boolean).join('\n')
   }
 
   if (resolveStatus.value === 'pending' && resolving.value) {

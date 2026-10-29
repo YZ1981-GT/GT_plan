@@ -35,7 +35,8 @@ import {
   type ProjectEventSubscription,
 } from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
-import { composeSheetLabelsForGroup } from './sheetDisplayName'
+import { groupHeaderLabel, sortSheetsForGroup } from './sheetDisplayName'
+import { isListedCell } from './cellListing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,14 @@ export interface AcnrCellEntry {
   formula_ref: string
   uri?: string
   deprecated?: boolean
+  /** 单元格显示标签「{A1} {语义标签}」（后端 display.cell_labels 写入目录，T29） */
+  cell_label?: string
+  /** 统一显示名「{所属 sheet 的 display_label} › {cell_label}」 */
+  display_label?: string
 }
+
+// 停用 cell 不进地址树 / 选址列表的唯一谓词（RV7-02），loadCellNodes 与各选址处共用
+export { isListedCell }
 
 /** Resolve 结果 */
 export interface AcnrResolveResult {
@@ -88,6 +96,8 @@ export interface AcnrResolveResult {
   entry_type?: 'sheet' | 'cell' | 'runtime'
   cell_address?: string
   semantic_label?: string
+  /** 统一显示名（目录字段；L3 / 非底稿域由后端同一函数现算，T29） */
+  display_label?: string
   formula_ref?: string
   uri?: string
   jump_route?: string
@@ -856,17 +866,16 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
       groups.get(key)!.push(s)
     }
 
-    // 构建树（显示名走单一真源 composeSheetLabelsForGroup，与公式管理树一致）
+    // 构建树（显示名读目录 display_label，后端 display.py 单一来源，与公式管理树一致，T30）
     const tree: AcnrTreeNode[] = []
     for (const [parentCode, sheetsInGroup] of groups) {
-      const subjectAbbr = sheetsInGroup.find((s) => s.account_name)?.account_name || ''
       const parentNode: AcnrTreeNode = {
         // 父节点带科目简称（如「D2 应收账款」），value 仍用 parentCode 不变
-        label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+        label: groupHeaderLabel(parentCode, sheetsInGroup),
         value: parentCode,
         type: 'sheet',
         addrId: parentCode,
-        children: composeSheetLabelsForGroup(sheetsInGroup).map(({ entry, label }) => ({
+        children: sortSheetsForGroup(sheetsInGroup).map(({ entry, label }) => ({
           label,
           value: entry.addr_id,
           type: 'sheet' as const,
@@ -887,8 +896,9 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
    */
   async function loadCellNodes(sheetEntry: AcnrSheetEntry): Promise<AcnrTreeNode[]> {
     const cellList = await listCells(sheetEntry.parent_wp_code, sheetEntry.sheet_code)
-    return cellList.filter((c) => !c.deprecated).map((c) => ({
-      label: c.semantic_label || c.cell_address || c.addr_id,
+    return cellList.filter(isListedCell).map((c) => ({
+      // 叶子用 cell_label（父节点已显示 sheet 名，design §13.2）
+      label: c.cell_label || c.cell_address || c.addr_id,
       value: c.addr_id,
       type: 'cell' as const,
       addrId: c.addr_id,

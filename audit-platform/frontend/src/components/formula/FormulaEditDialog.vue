@@ -893,7 +893,7 @@ async function openSourceBrowserForWP() {
         .sort((a, b) => (a.sheet_code || '').localeCompare(b.sheet_code || ''))
         .map((s) => ({
           row_code: s.sheet_code || s.parent_wp_code || '',
-          row_name: s.mapped_sheet_name || s.account_name || s.sheet_name || '',
+          row_name: s.display_label || s.sheet_code || '',
           indent_level: 0,
           formula: '',
           _ref: `WP('${s.parent_wp_code || ''}','${s.sheet_code || ''}','审定数')`,
@@ -945,7 +945,7 @@ function toggleRefGroup(key: string) {
 
 // ── 数据源一览树形数据（与公式管理中心左侧树同结构） ──
 // useAcnr / AcnrSheetEntry 已在文件顶部统一 import（此处勿重复，否则 TS2300 重复标识符）。
-import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
+import { wpCodeNaturalCompare, sortSheetsForGroup, groupHeaderLabel } from '@/services/acnr/sheetDisplayName'
 
 const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])
 const acnrSourceLoaded = ref(false)
@@ -1092,8 +1092,7 @@ const sourceTreeData = computed(() => {
       const parentNodes = [...byParent.entries()]
         .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
         .map(([parentCode, parentSheets]) => {
-          const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
-          const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => {
+          const children = sortSheetsForGroup(parentSheets).map(({ entry, label }) => {
             totalLeaves++
             return {
               key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
@@ -1106,7 +1105,7 @@ const sourceTreeData = computed(() => {
           })
           return {
             key: `wp_p_${parentCode.toLowerCase()}`,
-            label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+            label: groupHeaderLabel(parentCode, parentSheets),
             icon: '',
             children,
           }

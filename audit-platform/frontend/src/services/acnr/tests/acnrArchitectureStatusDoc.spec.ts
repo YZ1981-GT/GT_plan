@@ -299,6 +299,27 @@ const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
     }
     return problems
   },
+  '前端显示名只读目录（选址器、高级查询选字段、公式管理与公式编辑三棵树，公式选址器、地址库搜索、已选字段、取值结果区与索引 chip 都读目录的 display_label / cell_label，前端只按编码排序、父节点标题加科目简称；停用 cell 由同一谓词过滤）': (sf) => {
+    const problems: string[] = []
+    const sort = exportedFunction(sf, 'sortSheetsForGroup')
+    const head = exportedFunction(sf, 'groupHeaderLabel')
+    // 函数体内读取的属性名（AST，注释与字符串不计）
+    const read = (fn: ts.Node | undefined) => {
+      const s = new Set<string>()
+      const v = (n: ts.Node) => { if (ts.isPropertyAccessExpression(n)) s.add(n.name.text); ts.forEachChild(n, v) }
+      if (fn) v(fn)
+      return s
+    }
+    const sortReads = read(sort)
+    if (!sort || !sortReads.has('display_label')) problems.push('sortSheetsForGroup 须读 display_label 作标签')
+    for (const p of ['sheet_name', 'mapped_sheet_name', 'account_name']) if (sortReads.has(p)) problems.push(`sortSheetsForGroup 不得读 ${p} 拼名`)
+    if (!head || !read(head).has('account_name')) problems.push('groupHeaderLabel 须读科目简称 account_name')
+    for (const gone of ['composeSheetLabelsForGroup', 'cleanSheetLabelName']) if (exportedFunction(sf, gone)) problems.push(`不应再导出 ${gone}`)
+    for (const f of ['audit-platform/frontend/src/acnrDisplaySingleSource.spec.ts', 'audit-platform/frontend/src/services/acnr/cellListing.ts']) {
+      if (!existsSync(join(REPO, f))) problems.push(`缺 ${f}`)
+    }
+    return problems
+  },
 }
 
 describe('架构提案现状节：前端组件行（TS 编译器 API）', () => {
