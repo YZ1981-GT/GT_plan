@@ -10,14 +10,17 @@
  *
  * _Requirements: 3.5, 5.2_
  *
- * 运行前提：后端 9980 + 前端 3030 + 项目 0ec33ac9（重药控股安徽）已有数据。
- * 手工跑：`npx playwright test advanced-query-consolidation-critical-path`
+ * 运行前提：后端 9980 + 前端 3030（另起的一套用 `E2E_BASE_URL` / `E2E_BACKEND_URL` 指过去），admin 可见的第一个项目
+ * 有审计年度与数据（原写的项目 0ec33ac9 已不在 projects 表，常量从未被用到，advanced-query-linkage-closure 任务 36 删去）。
+ * 手工跑：`npx playwright test advanced-query-consolidation-critical-path`（globalSetup 会往库里 seed，只读核对时设 `SKIP_E2E_SEED=1`）
+ *
+ * 任务 36 静态复核（2026-10-29）：导出改为「导出 ▾」下拉（导出全部：服务端 / 导出当前页：前端 xlsx），按钮在没有结果时置灰；
+ * 「右键溯源」只在高级查询弹窗的结果表上有（页面版结果表没有右键菜单），本 spec 的该用例在页面版上按「前置条件不满足」记录。
  */
 import { test, expect, type Page } from '@playwright/test'
 
-const FRONTEND = 'http://localhost:3030'
-const BACKEND = 'http://localhost:9980'
-const PROJECT_ID = '0ec33ac9-58a1-4b4d-b92d-61bff3d10a0a'
+const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:3030'
+const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:9980'
 
 // 已知良性异常（非本 spec 崩溃信号）
 const BENIGN_ERROR_PATTERNS = [
@@ -197,13 +200,13 @@ test.describe('高级查询收敛 关键路径 (Task 6.2*)', () => {
 
     await executeBusinessViewQuery(page)
 
-    await test.step('点击导出 Excel 按钮', async () => {
-      const exportBtn = page.getByRole('button', { name: /导出|Excel|xlsx/i })
-      if (await exportBtn.count()) {
+    await test.step('点击「导出 ▾」→「导出当前页」', async () => {
+      const exportBtn = page.getByTestId('cqt-export')
+      if ((await exportBtn.count()) && (await exportBtn.isEnabled())) {
         // 监听下载事件或网络请求
         const downloadPromise = page.waitForEvent('download', { timeout: 10000 }).catch(() => null)
 
-        // 对后端 export-excel 端点的请求监控
+        // 对后端导出端点的请求监控（导出全部走 POST /api/custom-query/export）
         const exportRequestPromise = page
           .waitForResponse(
             (resp) =>
@@ -215,6 +218,7 @@ test.describe('高级查询收敛 关键路径 (Task 6.2*)', () => {
           .catch(() => null)
 
         await exportBtn.click()
+        await page.getByTestId('cqt-export-page').click()
         await page.waitForTimeout(2000)
 
         // 前端 xlsx 导出：会触发 download 事件（exportQueryResultToXlsx 用 SheetJS 前端生成）
@@ -235,8 +239,8 @@ test.describe('高级查询收敛 关键路径 (Task 6.2*)', () => {
           ).toBeTruthy()
         }
       } else {
-        // 无导出按钮 = 可能查询未返回数据，视为数据前置条件不满足
-        test.info().annotations.push({ type: 'info', description: '导出按钮未出现（查询可能无结果）' })
+        // 导出按钮置灰 = 查询没有结果（或没能执行），视为数据前置条件不满足
+        test.info().annotations.push({ type: 'info', description: '导出不可用（查询没有结果）' })
       }
     })
 
@@ -381,10 +385,11 @@ test.describe('高级查询收敛 关键路径 (Task 6.2*)', () => {
     await executeBusinessViewQuery(page)
     await page.waitForTimeout(500)
 
-    // 尝试导出
-    const exportBtn = page.getByRole('button', { name: /导出|Excel|xlsx/i })
-    if (await exportBtn.count()) {
+    // 尝试导出（「导出 ▾」下拉 →「导出当前页」；没有结果时按钮置灰，不点）
+    const exportBtn = page.getByTestId('cqt-export')
+    if ((await exportBtn.count()) && (await exportBtn.isEnabled())) {
       await exportBtn.click()
+      await page.getByTestId('cqt-export-page').click()
       await page.waitForTimeout(1000)
     }
 
