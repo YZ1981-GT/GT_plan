@@ -46,7 +46,13 @@ function manualSkipMessage(section: string, state: NotePullSectionState): string
  */
 export async function runHeadlessDisclosure(
   pull: NotePullResult,
-  ctx: { projectId: string; year: number; allSections?: boolean },
+  ctx: {
+    projectId: string
+    year: number
+    allSections?: boolean
+    templateType?: string
+    reportScope?: string
+  },
 ): Promise<{ outcomes: HeadlessSyncOutcome[]; pending: string[] }> {
   const outcomes: HeadlessSyncOutcome[] = []
   const pending: string[] = []
@@ -84,6 +90,8 @@ export async function runHeadlessDisclosure(
       const res = await provider({
         projectId: ctx.projectId, year: ctx.year, variant: pull.variant, wpId, wpCode: code,
         applicableStandards: pull.applicable_standards || [], sectionGuard,
+        templateType: ctx.templateType,
+        reportScope: ctx.reportScope,
       })
       if (!res.sections.length) {
         outcomes.push({ wpCode: code, section: first, status: 'skipped', message: '本项目口径没有这张底稿的披露表' })

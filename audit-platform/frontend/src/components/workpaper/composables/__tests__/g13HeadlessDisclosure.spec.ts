@@ -1,10 +1,9 @@
 /**
  * G13 公允价值变动收益披露表离屏同步 = 底稿披露 Tab 同一套代码（spec note-pull-followup-closure R1）。
  *
- * Tab 本就调 composable 的快照 `getSyncSnapshot()` + `buildG13SyncPayloads`；Tab 挂载时的回填（审定数 + G13-2 明细本期 + G13-1 上期，
- * 明细回填后保存）由 `pullLatestAdjudicated({ persist: false })` 只改内存地做一遍（明细回填抽成 `applyDetailPatch`，「从明细同步」=
- * 它 + 保存）。判据：①挂载真实 Tab（挂载回填后）点「同步到附注」发出的载荷 == 离屏载荷，且是回填后的值 ②离屏不写底稿、不广播、
- * 不订阅、不挂钩子，组件内照旧 ③只读 G13 条目、静默发出 ④口径不适用回空 ⑤静态接线。
+ * Tab 调 composable 的快照 `getSyncSnapshot()` + `buildG13SyncPayloads`；挂载回填先完成 G13-2 明细本期与 G13-1 上期 patch，
+ * 再按来源存在、真实变化和可写状态最多保存一次。判据：①真实 Tab 与离屏载荷逐字节相等 ②离屏无底稿写入和 UI 副作用
+ * ③非零存量下覆盖缺失、明确 0、单边、只读、无变化与一次最终保存 ④口径不适用回空 ⑤静态接线。
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -114,6 +113,51 @@ const row = (sent: any, key: string) => (sent.sub_table_data[G13_MAIN_SUBTABLE] 
 /** 窗口事件广播的探针（单独成函数以便精确推断类型） */
 const spyDispatch = () => vi.spyOn(window, 'dispatchEvent')
 
+function storedG13Map(extra: ChecklistResponse[] = []): Map<string, ChecklistResponse> {
+  const responses: ChecklistResponse[] = [
+    {
+      item_id: 'G13-disclosure-listed',
+      remark: J([
+        { rowKey: 'trading_assets', label: '交易性金融资产', currentAmount: 91, priorAmount: 81, remark: '已存值' },
+        { rowKey: 'designated_fv_assets', label: '其中：指定类别', currentAmount: 71, priorAmount: 61, remark: '保留项' },
+      ]),
+      conclusion: null,
+    },
+    { item_id: 'G13-disclosure-listed-note', remark: '已存说明', conclusion: null },
+    ...extra,
+  ]
+  return new Map(responses.map((response) => [response.item_id, response]))
+}
+
+function mountG13Disclosure(
+  allResponses: Map<string, ChecklistResponse>,
+  isReadonly = false,
+) {
+  const save = vi.fn()
+  let disclosure!: ReturnType<typeof useG13Disclosure>
+  const wrapper = mount(defineComponent({
+    setup() {
+      disclosure = useG13Disclosure({
+        variant: 'listed',
+        allResponses: ref(allResponses),
+        wpId: ref('wp-g13'),
+        isReadonly: ref(isReadonly),
+        debouncedSave: save,
+      })
+      return () => null
+    },
+  }))
+  return { disclosure, save, wrapper }
+}
+
+function savedG13Rows(save: ReturnType<typeof vi.fn>) {
+  const rowCalls = save.mock.calls.filter(([itemId]) => itemId === 'G13-disclosure-listed')
+  return {
+    rowCalls,
+    rows: rowCalls.length ? JSON.parse(String(rowCalls[0][1]?.remark)) : [],
+  }
+}
+
 describe('g13HeadlessProvider', () => {
   let warn: ReturnType<typeof vi.spyOn>
   let listen: ReturnType<typeof vi.spyOn>
@@ -160,7 +204,7 @@ describe('g13HeadlessProvider', () => {
     expect(J(sent)).toBe(J(await tabPayload('soe', SOE.applicableStandards)))
   })
 
-  it('离屏不写底稿、不广播、不订阅、不挂钩子；组件内照旧', async () => {
+  it('离屏不写底稿、不广播、不订阅、不挂钩子；组件将本期与上期最终状态只持久化一次', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       await g13HeadlessProvider(LISTED)
@@ -179,12 +223,156 @@ describe('g13HeadlessProvider', () => {
       }))
       expect(listen.mock.calls.some(([type]) => type === 'substantive:adjudicated')).toBe(true)
       expect(dispatch.mock.calls.some(([ev]) => (ev as Event).type === 'disclosure:note-text-updated')).toBe(true)
-      expect(save).toHaveBeenCalledWith('G13-disclosure-soe', expect.anything())
+      const rowCalls = save.mock.calls.filter(([itemId]) => itemId === 'G13-disclosure-soe')
+      expect(rowCalls).toHaveLength(1)
+      const savedRows = JSON.parse(String(rowCalls[0][1]?.remark))
+      expect(savedRows.find((item: any) => item.rowKey === 'trading_assets')).toMatchObject({
+        currentAmount: 350,
+        priorAmount: 200,
+      })
+      expect(save.mock.calls.filter(([itemId]) => itemId === 'G13-disclosure-soe-note')).toHaveLength(1)
       w.unmount()
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()
     }
+  })
+
+  it('挂载来源行缺字段时保留非零已存值且不保存', () => {
+    const map = storedG13Map([
+      {
+        item_id: 'G13-detail-rows',
+        conclusion: null,
+        remark: J([{ belongAccount: 'G1', instrumentType: '股票' }]),
+      },
+      { item_id: 'G13-adj-prior', conclusion: null, remark: J({ trading_assets: {} }) },
+    ])
+    const { disclosure, save, wrapper } = mountG13Disclosure(map)
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount: 91,
+      priorAmount: 81,
+      remark: '已存值',
+    })
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'designated_fv_assets')).toMatchObject({
+      currentAmount: 71,
+      priorAmount: 61,
+    })
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('明确 0 会覆盖非零本期与上期，并只保存一次完整最终状态', () => {
+    const map = storedG13Map([
+      {
+        item_id: 'G13-detail-rows',
+        conclusion: null,
+        remark: J([{ belongAccount: 'G1', instrumentType: '股票', currentAudited: 0 }]),
+      },
+      {
+        item_id: 'G13-adj-prior',
+        conclusion: null,
+        remark: J({ trading_assets: { priorAudited: 0, priorUnadjusted: 70, priorAdjustment: 5 } }),
+      },
+    ])
+    const { disclosure, save, wrapper } = mountG13Disclosure(map)
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount: 0,
+      priorAmount: 0,
+    })
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'designated_fv_assets')).toMatchObject({
+      currentAmount: 0,
+      priorAmount: 61,
+    })
+    const saved = savedG13Rows(save)
+    expect(saved.rowCalls).toHaveLength(1)
+    expect(saved.rows.find((item: any) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount: 0,
+      priorAmount: 0,
+    })
+    expect(saved.rows.find((item: any) => item.rowKey === 'designated_fv_assets')).toMatchObject({
+      currentAmount: 0,
+      priorAmount: 61,
+    })
+    expect(save.mock.calls.filter(([itemId]) => itemId === 'G13-disclosure-listed-note')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it.each([
+    {
+      name: '仅本期来源',
+      extra: [{ item_id: 'G13-detail-rows', conclusion: null, remark: J([{ belongAccount: 'G1', instrumentType: '股票', currentAudited: 123 }]) }],
+      currentAmount: 123,
+      priorAmount: 81,
+    },
+    {
+      name: '仅上期来源',
+      extra: [{ item_id: 'G13-adj-prior', conclusion: null, remark: J({ trading_assets: { priorAudited: 45 } }) }],
+      currentAmount: 91,
+      priorAmount: 45,
+    },
+  ])('$name：只更新有来源的一侧并保存一次', ({ extra, currentAmount, priorAmount }) => {
+    const { disclosure, save, wrapper } = mountG13Disclosure(storedG13Map(extra))
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount,
+      priorAmount,
+    })
+    const saved = savedG13Rows(save)
+    expect(saved.rowCalls).toHaveLength(1)
+    expect(saved.rows.find((item: any) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount,
+      priorAmount,
+    })
+    wrapper.unmount()
+  })
+
+  it('只读挂载应用本期与上期 patch 供回显，但不保存', () => {
+    const map = storedG13Map([
+      {
+        item_id: 'G13-detail-rows',
+        conclusion: null,
+        remark: J([{ belongAccount: 'G1', instrumentType: '股票', currentAudited: 123 }]),
+      },
+      { item_id: 'G13-adj-prior', conclusion: null, remark: J({ trading_assets: { priorAudited: 45 } }) },
+    ])
+    const { disclosure, save, wrapper } = mountG13Disclosure(map, true)
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount: 123,
+      priorAmount: 45,
+    })
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('来源与非零已存值相同时不保存', () => {
+    const map = storedG13Map([
+      {
+        item_id: 'G13-detail-rows',
+        conclusion: null,
+        remark: J([
+          { belongAccount: 'G1', instrumentType: '股票', currentAudited: 20 },
+          { belongAccount: 'G1', instrumentType: '指定FVTPL', currentAudited: 71 },
+        ]),
+      },
+      {
+        item_id: 'G13-adj-prior',
+        conclusion: null,
+        remark: J({
+          trading_assets: { priorAudited: 81 },
+          designated_fv_assets: { priorAudited: 61 },
+        }),
+      },
+    ])
+    const { disclosure, save, wrapper } = mountG13Disclosure(map)
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'trading_assets')).toMatchObject({
+      currentAmount: 91,
+      priorAmount: 81,
+    })
+    expect(disclosure.rows.value.find((item) => item.rowKey === 'designated_fv_assets')).toMatchObject({
+      currentAmount: 71,
+      priorAmount: 61,
+    })
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('口径不适用回空，不发请求', async () => {
@@ -193,17 +381,21 @@ describe('g13HeadlessProvider', () => {
     expect(h.post).not.toHaveBeenCalled()
   })
 
-  it('静态接线：两个 Tab 调 composable 快照 + 同一 builder；「从明细同步」= 内存回填 + 保存；钩子在组件实例守卫里', () => {
+  it('静态接线：两个 Tab 调 composable 快照，刷新不重复 patch；G13 先合并两侧结果再走单一保存门', () => {
     const dir = resolve(__dirname, '../../g13-fair-value-changes')
     for (const [file, variant] of [['G13TabDisclosureListed.vue', 'listed'], ['G13TabDisclosureSOE.vue', 'soe']] as const) {
       const src = readFileSync(resolve(dir, file), 'utf-8')
       expect(src, file).toMatch(new RegExp(
         `buildG13SyncPayloads\\(\\s*props\\.wpId,\\s*'${variant}',\\s*props\\.applicableStandards \\?\\? \\[\\],\\s*dis\\.getSyncSnapshot\\(\\),?\\s*\\)`,
       ))
+      const refreshBody = src.match(/function onReconcileRefresh\(\): void \{[^}]*\}/)?.[0] ?? ''
+      expect(refreshBody, file).toContain('dis.pullLatestAdjudicated()')
+      expect(refreshBody, file).not.toContain('dis.syncFromDetail()')
     }
     const composable = readFileSync(resolve(__dirname, '../useG13Disclosure.ts'), 'utf-8')
-    expect(composable).toMatch(/function syncFromDetail\(\): void \{\s*try \{\s*if \(applyDetailPatch\(\)\) persist\(\)/)
-    expect(composable).toMatch(/if \(opts\.persist === false\) applyDetailPatch\(\)\s*else syncFromDetail\(\)/)
+    expect(composable).toContain('mergePatchResults(applyDetailPatch(), applyPriorPatch())')
+    expect(composable).toContain('result.sourceFound && result.changed && !options.isReadonly.value')
+    expect(composable).not.toMatch(/if \(opts\.persist === false\) applyDetailPatch\(\)\s*else syncFromDetail\(\)/)
     expect(composable).toMatch(/if \(getCurrentInstance\(\)\) \{\s*onMounted\(\(\) => \{\s*pullLatestAdjudicated\(\)/)
   })
 })

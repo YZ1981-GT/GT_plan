@@ -76,18 +76,18 @@
       </template>
       <el-descriptions :column="2" border size="small">
         <el-descriptions-item label="期末未确认融资费用">
-          <el-input-number v-if="!isReadonly" v-model="unrecognizedEnd" :controls="false" size="small" style="width:160px" />
+          <el-input-number v-if="!isReadonly" v-model="unrecognizedEnd" :controls="false" size="small" style="width:160px" @change="saveUnrecognized" />
           <span v-else>{{ fmtAmount(unrecognizedEnd) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="期初未确认融资费用">
-          <el-input-number v-if="!isReadonly" v-model="unrecognizedBegin" :controls="false" size="small" style="width:160px" />
+          <el-input-number v-if="!isReadonly" v-model="unrecognizedBegin" :controls="false" size="small" style="width:160px" @change="saveUnrecognized" />
           <span v-else>{{ fmtAmount(unrecognizedBegin) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="期末账面价值（净额）">
           <span class="formula-value">{{ fmtAmount(netBookValue) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="本期摊销额">
-          <el-input-number v-if="!isReadonly" v-model="periodAmortizationAmount" :controls="false" size="small" style="width:160px" />
+          <el-input-number v-if="!isReadonly" v-model="periodAmortizationAmount" :controls="false" size="small" style="width:160px" @change="saveUnrecognized" />
           <span v-else>{{ fmtAmount(periodAmortizationAmount) }}</span>
         </el-descriptions-item>
       </el-descriptions>
@@ -163,7 +163,7 @@
  * L5TabDisclosureSoe — 附注披露信息（国有企业）
  * Requirements: 5.4-5.5
  */
-import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -171,7 +171,14 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { calcNetPayable } from '../../composables/useL5FormulaEngine'
-import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
+import {
+  buildL5DisclosureSyncBodies,
+  createL5CategoryRows,
+  createL5MaturityRows,
+  restoreL5DisclosureState,
+  type L5CategoryRow,
+  type L5DisclosureState,
+} from '../../composables/l5DisclosureTabState'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
@@ -200,13 +207,7 @@ const formData = useL5FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const categoryRows = ref([
-  { category: '融资租赁款', endBalance: 0, beginBalance: 0 },
-  { category: '分期付款购入资产款', endBalance: 0, beginBalance: 0 },
-  { category: '国有资本融资安排', endBalance: 0, beginBalance: 0 },
-  { category: '其他长期应付款', endBalance: 0, beginBalance: 0 },
-  { category: '合计', endBalance: 0, beginBalance: 0 },
-])
+const categoryRows = ref<L5CategoryRow[]>(createL5CategoryRows('soe'))
 
 const unrecognizedEnd = ref(0)
 const unrecognizedBegin = ref(0)
@@ -230,39 +231,58 @@ function updateCategoryRow(index: number, field: 'endBalance' | 'beginBalance', 
 }
 
 // ─── 同步到附注 ──────────────────────────────────────────────────────────────
-//
-// 🔴 同 L5 上市：只推主表（长期应付款净额 / 专项应付款 / 合计）。国企侧「①前5 项」
-//    明细表与组件 categoryRows 不同构（源为按单位/项目前 5 大 + 其他），不强推。
-//    专项应付款行由 L6 底稿维护。
 const isSyncing = ref(false)
+let disclosureHydrated = false
 
-watch([unrecognizedEnd, unrecognizedBegin], () => {
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
-})
+function saveUnrecognized() {
+  formData.debouncedSave('L5-disclosure-soe-unrecognized-end', { remark: String(unrecognizedEnd.value) })
+  formData.debouncedSave('L5-disclosure-soe-unrecognized-begin', { remark: String(unrecognizedBegin.value) })
+  formData.debouncedSave('L5-disclosure-soe-amortization', { remark: String(periodAmortizationAmount.value) })
+  if (disclosureHydrated) autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+function currentState(): L5DisclosureState {
+  return {
+    ...restoreL5DisclosureState(formData.allResponses.value, 'soe'),
+    categoryRows: categoryRows.value,
+    unrecognizedEnd: unrecognizedEnd.value,
+    unrecognizedBegin: unrecognizedBegin.value,
+    periodAmortizationAmount: periodAmortizationAmount.value,
+    maturityRows: createL5MaturityRows(),
+    soeSpecialNote: soeSpecialNote.value,
+    relatedPartyNote: relatedPartyNote.value,
+    conclusion: conclusion.value,
+  }
+}
+
+function hydrateDisclosure(): void {
+  const state = restoreL5DisclosureState(formData.allResponses.value, 'soe')
+  categoryRows.value = state.categoryRows
+  unrecognizedEnd.value = state.unrecognizedEnd
+  unrecognizedBegin.value = state.unrecognizedBegin
+  periodAmortizationAmount.value = state.periodAmortizationAmount
+  soeSpecialNote.value = state.soeSpecialNote
+  relatedPartyNote.value = state.relatedPartyNote
+  conclusion.value = state.conclusion
+}
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const total = categoryRows.value[categoryRows.value.length - 1] || { endBalance: 0, beginBalance: 0 }
-  const payload = buildL5SyncPayload(props.wpId, {
-    variant: 'soe',
-    longTerm: {
-      end: calcNetPayable(Number(total.endBalance) || 0, Number(unrecognizedEnd.value) || 0),
-      prior: calcNetPayable(Number(total.beginBalance) || 0, Number(unrecognizedBegin.value) || 0),
-    },
-    special: { end: 0, prior: 0 },
+  const bodies = buildL5DisclosureSyncBodies({
+    variant: 'soe', wpId: props.wpId, applicableStandards: props.applicableStandards, state: currentState(),
   })
-  if (!payload) {
-    ElMessage.warning('当前项目准则不适用国企附注同步')
+  if (!bodies.length) {
+    ElMessage.warning('暂无已保存的长期应付款披露数据')
     return
   }
   isSyncing.value = true
   try {
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    ElMessage.success('已同步到附注（八、53 长期应付款）')
+    for (const body of bodies) {
+      await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, body)
+    }
+    ElMessage.success(`已同步到附注（${bodies.map((body) => body.section_id).join('、')}）`)
     eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'L5',
-      projectId: props.projectId,
-      sectionIds: [L5_NOTE_SECTION.soe],
+      wpCode: 'L5', projectId: props.projectId, sectionIds: bodies.map((body) => body.section_id),
     })
   } catch (err) {
     handleDisclosureSyncError(err)
@@ -278,10 +298,12 @@ function jumpToNote() {
 
 function handleSoeNoteChange() {
   formData.debouncedSave('L5-disclosure-soe-special', { remark: soeSpecialNote.value || null })
+  if (disclosureHydrated) autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleRelatedPartyNoteChange() {
   formData.debouncedSave('L5-disclosure-soe-related', { remark: relatedPartyNote.value || null })
+  if (disclosureHydrated) autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleAI(section: string) {
@@ -305,12 +327,16 @@ function fmtAmount(val: number): string {
 
 // ─── EventBus subscribe ─────────────────────────────────────────────────────
 
-function onAdjudicatedRefresh() {
-  formData.loadData()
+async function onAdjudicatedRefresh() {
+  await formData.loadData()
+  hydrateDisclosure()
 }
 
 onMounted(async () => {
   await formData.loadData()
+  hydrateDisclosure()
+  await nextTick()
+  disclosureHydrated = true
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 

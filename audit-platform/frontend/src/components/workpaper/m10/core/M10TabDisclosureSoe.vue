@@ -20,10 +20,9 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>国有企业其他权益工具附注披露（12×19）：</strong>
-        与上市公司结构类似但更简化。国有企业发行永续债/优先股需额外关注国资委相关审批要求、
-        资金用途限制以及对国有资本保值增值的影响说明。
-        数据自动从M10-1审定表拉取（subscribe 'substantive:adjudicated' 事件刷新）。
+        <strong>国有企业其他权益工具变动披露：</strong>
+        分项列示期初、本期增加、本期减少和期末的数量及账面价值。
+        每行三组数量均已录入后才同步，缺少数量来源时不会用默认零覆盖附注。
       </div>
     </div>
 
@@ -44,7 +43,14 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="期初余额" width="140" align="right">
+        <el-table-column label="期初数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.beginQty" :controls="false"
+              @change="(val: number | undefined) => updateRow($index, 'beginQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.beginQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初账面价值" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
               <WpAmountInput
@@ -56,10 +62,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="本期发行" width="140" align="right">
+        <el-table-column label="本期增加数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.increaseQty" :controls="false"
+              @change="(val: number | undefined) => updateRow($index, 'increaseQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.increaseQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="贷方增加：发行/转入（权益类贷方）" placement="top">
-              <span class="formula-col-header">本期发行</span>
+              <span class="formula-col-header">本期增加账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row, $index }">
@@ -73,10 +86,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="本期赎回/转换" width="140" align="right">
+        <el-table-column label="本期减少数量" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!row._isTotal && !isReadonly" :model-value="row.decreaseQty" :controls="false"
+              @change="(val: number | undefined) => updateRow($index, 'decreaseQty', val ?? null)" />
+            <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.decreaseQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="借方减少：赎回/转换（权益类借方）" placement="top">
-              <span class="formula-col-header">本期赎回/转换</span>
+              <span class="formula-col-header">本期减少账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row, $index }">
@@ -90,10 +110,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="期末余额" width="140" align="right">
+        <el-table-column label="期末数量" width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.endQty) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末账面价值" width="140" align="right">
           <template #header>
             <el-tooltip content="期末=期初+本期发行-本期赎回（权益类贷方）" placement="top">
-              <span class="formula-col-header">期末余额</span>
+              <span class="formula-col-header">期末账面价值</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
@@ -149,7 +174,7 @@
       <ul>
         <li>国企格式较上市公司简化（12行×19列）</li>
         <li>国有企业发行永续债/优先股需关注国资委审批和资金用途限制</li>
-        <li>数据从M10-1审定表自动拉取，订阅审定事件刷新</li>
+        <li>数量与账面价值逐项保存，完整行修改后自动同步附注</li>
         <li>期末 = 期初 + 本期发行 - 本期赎回/转换（权益类贷方）</li>
         <li>分类依据应明确说明按CAS37判定为权益工具的理由</li>
         <li>需说明对国有资本保值增值的影响</li>
@@ -173,16 +198,25 @@
  * - textarea sections (autosize) for each disclosure area
  * - AI辅助 per section title
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM10FormData } from '../../composables/useM10FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
-import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM10SoeSyncPayload, type M10MovementRow } from '../../composables/m10NoteSectionMap'
+import {
+  buildM10DisclosurePayload,
+  createM10Rows,
+  m10DisplayRows,
+  m10MovementItemId,
+  m10NoteText,
+  restoreM10Rows,
+  type M10DisplayRow,
+  type M10MovementField,
+  type M10UiRow,
+} from '../../composables/m10DisclosureForm'
 import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -212,89 +246,60 @@ const formData = useM10FormData({
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M10MovementRow[] = dataRows.value.map((r) => ({
-    label: r.item,
-    beginQty: 0,  // UI 暂无数量维度
-    beginValue: r.beginBalance,
-    increaseQty: 0,
-    increaseValue: r.issuance,
-    decreaseQty: 0,
-    decreaseValue: r.redemption,
-  }))
-  const noteText = [classificationBasis.value, soeSpecialNote.value].filter(Boolean).join('\n\n')
-  const payload = buildM10SoeSyncPayload(props.wpId, rows, noteText || undefined)
-  if (!payload) return
+  const payload = buildM10DisclosurePayload({
+    wpId: props.wpId,
+    variant: 'soe',
+    rows: dataRows.value,
+    noteText: m10NoteText(formData.allResponses.value, 'soe'),
+  })
+  if (!payload || props.isReadonly) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  item: string
-  beginBalance: number
-  issuance: number
-  redemption: number
-  endBalance: number
-  _isTotal?: boolean
-}
 
-const dataRows = ref<DisclosureRow[]>([
-  { item: '永续债', beginBalance: 0, issuance: 0, redemption: 0, endBalance: 0 },
-  { item: '优先股', beginBalance: 0, issuance: 0, redemption: 0, endBalance: 0 },
-  { item: '其他权益工具', beginBalance: 0, issuance: 0, redemption: 0, endBalance: 0 },
-])
+const dataRows = ref<M10UiRow[]>(createM10Rows('soe'))
 
 const classificationBasis = ref('')
 const soeSpecialNote = ref('')
 
 // ─── 合计行 + 计算 ──────────────────────────────────────────────────────────
 
-const disclosureRows = computed<DisclosureRow[]>(() => {
-  const rows: DisclosureRow[] = dataRows.value.map(r => ({
-    ...r,
-    endBalance: calcEquityEndBalance(r.beginBalance, r.issuance, r.redemption),
-  }))
-  // 合计行
-  const totalBegin = rows.reduce((s, r) => s + r.beginBalance, 0)
-  const totalIssuance = rows.reduce((s, r) => s + r.issuance, 0)
-  const totalRedemption = rows.reduce((s, r) => s + r.redemption, 0)
-  rows.push({
-    item: '合计',
-    beginBalance: totalBegin,
-    issuance: totalIssuance,
-    redemption: totalRedemption,
-    endBalance: calcEquityEndBalance(totalBegin, totalIssuance, totalRedemption),
-    _isTotal: true,
-  })
-  return rows
-})
+const disclosureRows = computed<M10DisplayRow[]>(() => m10DisplayRows(dataRows.value))
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function updateRow(index: number, field: 'beginBalance' | 'issuance' | 'redemption', val: number): void {
-  if (index >= 0 && index < dataRows.value.length) {
-    dataRows.value[index][field] = val
-    formData.debouncedSave(`M10-disclosure-soe-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
-  }
+function updateRow(index: number, field: M10MovementField, val: number | null): void {
+  if (props.isReadonly) return
+  const row = dataRows.value[index]
+  if (!row) return
+  const parsed = val === null ? null : Number(val)
+  row[field] = parsed !== null && Number.isFinite(parsed) ? parsed : null
+  formData.debouncedSave(m10MovementItemId('soe', row.key, field), {
+    remark: row[field] === null ? null : String(row[field]),
+  })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
-function getRowClassName({ row }: { row: DisclosureRow; rowIndex: number }): string {
+function getRowClassName({ row }: { row: M10DisplayRow; rowIndex: number }): string {
   return row._isTotal ? 'total-row' : ''
 }
 
 function handleClassificationBasisChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M10-disclosure-soe-classification-basis', { remark: classificationBasis.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleSoeSpecialNoteChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M10-disclosure-soe-special-note', { remark: soeSpecialNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
@@ -340,18 +345,10 @@ function fmtAmount(val: number): string {
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 
 function restoreData(): void {
-  for (let i = 0; i < dataRows.value.length; i++) {
-    for (const field of ['beginBalance', 'issuance', 'redemption'] as const) {
-      const resp = formData.allResponses.value.get(`M10-disclosure-soe-${i}-${field}`)
-      if (resp?.remark) {
-        dataRows.value[i][field] = Number(resp.remark) || 0
-      }
-    }
-  }
-  const classResp = formData.allResponses.value.get('M10-disclosure-soe-classification-basis')
-  if (classResp?.remark) classificationBasis.value = classResp.remark
-  const soeResp = formData.allResponses.value.get('M10-disclosure-soe-special-note')
-  if (soeResp?.remark) soeSpecialNote.value = soeResp.remark
+  const responses = formData.allResponses.value
+  dataRows.value = restoreM10Rows(responses, 'soe')
+  classificationBasis.value = responses.get('M10-disclosure-soe-classification-basis')?.remark || ''
+  soeSpecialNote.value = responses.get('M10-disclosure-soe-special-note')?.remark || ''
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
@@ -371,6 +368,7 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

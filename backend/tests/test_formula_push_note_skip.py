@@ -271,60 +271,9 @@ def test_has_obscured_data_skip_underscore_keys():
 # ═══════════════════════════════════════════════════════════════════════════════
 # Task 4: 单科目合计行兜底（engine 层集成测试）
 # Task 5: 章节号动态定位（engine 层集成测试）
-# Task 2: 首次推送标记 _source
 #
-# 这三个需要 mock DB + engine._push_note，用较重的 fixture。
-# 下面先对改动的纯函数/局部逻辑做轻量断言。
+# source semantics 由下方直接调用 engine._push_note 的回归验证；不再复制生产分支。
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestSourceMarkedAfterFirstPush:
-    """Task 2.2 · 需求 1.4：首次推送后 _source 由 None → 'workpaper'；
-    第二次推送走正常路径不再触发旧格式兜底。
-    """
-
-    def test_source_marked_after_first_push(self):
-        """推送前 _source=None → 模拟推送标记 → _source='workpaper'；
-        第二次 locate_table 仍正常返回（走 WORKPAPER_SOURCES 路径）。
-        """
-        # ── 阶段 1：_source=None，旧格式兜底可定位 ──
-        table_data = {
-            "_source": None,
-            "rows": [
-                {"label": "信用借款", "values": [1000, 800]},
-                {"label": "合计", "values": [1000, 800], "is_total": True},
-            ],
-        }
-        table_before, reason_before = locate_table(table_data, "短期借款")
-        assert table_before is not None, "_source=None 应走旧格式兜底"
-        assert reason_before is None
-
-        # ── 阶段 2：模拟 engine._push_note 的标记逻辑（engine.py L735-736） ──
-        if table_data.get("_source") is None:
-            table_data["_source"] = "workpaper"
-        assert table_data["_source"] == "workpaper"
-
-        # ── 阶段 3：第二次推送，_source='workpaper' 走正常路径 ──
-        # 给 table_data 加上 sub_table_data 模拟引擎骨架构建后的状态
-        table_data["sub_table_data"] = {
-            "短期借款": [
-                {"label": "信用借款", "values": [1000, 800]},
-                {"label": "合计", "values": [1000, 800], "is_total": True},
-            ],
-        }
-        table_after, reason_after = locate_table(table_data, "短期借款")
-        assert table_after is not None, "_source='workpaper' 应走正常子表路径"
-        assert reason_after is None
-        # 第二次走子表路径，rows 应来自 sub_table_data（非旧格式兜底）
-        assert len(table_after.rows) == 2
-
-    def test_source_none_marked_only_once(self):
-        """_source 已为 'workpaper' 时标记逻辑不再修改。"""
-        table_data = {"_source": "workpaper", "sub_table_data": {"X": [{"label": "a"}]}}
-        # 模拟标记逻辑
-        if table_data.get("_source") is None:
-            table_data["_source"] = "workpaper"
-        assert table_data["_source"] == "workpaper"  # 不变
 
 
 class TestFindTotalRowForFallback:
@@ -974,7 +923,7 @@ class TestSectionDynamicLookupOnMismatch:
 #   - 需求 2.3: 单科目合计行兜底（is_single=True → source_row 取首个数据行）
 #   - 需求 2.4: 多科目合计行兜底（is_single=False → source_row 取 is_total 行）
 #   - skip_total_recalc=True 时 _push_note_total 不被调用
-#   - 需求 1.4: _source=None → 首次写入后标记 "workpaper"
+#   - ADR-NRG-007: 原生旧格式写入保持 `_source`，动作来源只记 ORM
 #   - 需求 3.1: 章节号动态定位（按 section_title 反查唯一命中）
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1305,27 +1254,34 @@ class TestPushNoteEngineIntegration:
             "_push_note_total 应被调用 1 次（正常合计重算路径）"
         )
 
-    # ── Test 4: _source=None → 首次写入后标记 "workpaper" ─────────────
+    # ── Test 4: 原生旧格式写入保持 source semantics ────────────────────
 
-    def test_push_note_source_marked_after_write(self):
-        """需求 1.4：_source=None 的附注首次被推送后，table_data._source
-        自动设为 "workpaper"。
+    def test_push_note_preserves_legacy_source_after_write(self):
+        """ADR-NRG-007：公式推送修改原生旧格式时保持显式 ``_source=None``。
+
+        最近动作仍由 ORM ``last_sync_source=formula_push`` 表达，JSON 不生成
+        底稿披露同步指纹。
         """
-        # 旧格式附注：只有顶层 rows，_source=None
-        old_rows = [
-            {"label": "信用借款", "end_amount": 1000, "prior_amount": 800, "is_total": False},
-            {"label": "合计", "end_amount": 1000, "prior_amount": 800, "is_total": True, "row_type": "total"},
-        ]
+        legacy_table = {
+            "name": "短期借款",
+            "headers": ["项目", "期末余额", "期初余额"],
+            "rows": [
+                {"label": "信用借款", "values": [1000, 800]},
+                {"label": "合计", "values": [1000, 800], "is_total": True, "row_type": "total"},
+            ],
+        }
         table_data = {
             "_source": None,
-            "rows": old_rows,
+            "_tables": [copy.deepcopy(legacy_table)],
+            "name": legacy_table["name"],
+            "headers": copy.deepcopy(legacy_table["headers"]),
+            "rows": copy.deepcopy(legacy_table["rows"]),
         }
         note = _make_note_mock(section_title="短期借款", table_data=table_data)
         db = _setup_db_for_single_note(note)
         ctx = _make_ctx(db=db)
         paper = _make_paper()
 
-        # binding: 单科目，note_rows 的 note_label 不匹配任何行 → 走兜底
         note_rows = [
             {"note_label": "短期借款", "label": "短期借款",
              "ending": 1500, "ending_resolved": True, "opening": 900, "opening_resolved": True,
@@ -1342,18 +1298,12 @@ class TestPushNoteEngineIntegration:
                                        overlay={}, sources=sources, paper=paper)
             )
 
-        # ── 断言 ──
         assert section is not None, "应有写入（兜底路径）"
-        # _source 被标记为 "workpaper"（engine.py L735-736）
-        assert note.table_data.get("_source") == "workpaper", (
-            f"首次推送后 _source 应为 'workpaper'，实际: {note.table_data.get('_source')!r}"
-        )
-        # 推送不写同步指纹（只有底稿披露同步写；spec note-pull-followup-closure R3.2）
-        assert "_last_sync_wp_id" not in note.table_data
-        assert "_last_sync_at" not in note.table_data
-        # ORM 属性被更新（推送来源记在 last_sync_source）
+        assert "_source" in note.table_data and note.table_data["_source"] is None
+        assert not {"_last_sync_wp_id", "_last_sync_sheet", "_last_sync_at"} & note.table_data.keys()
         assert note.is_stale is False
         assert note.last_sync_source == "formula_push"
+        assert note.last_sync_wp_id == paper.id
 
     # ── Test 5: 章节号动态定位唯一命中 ──────────────────────────────
 

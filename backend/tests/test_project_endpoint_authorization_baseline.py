@@ -438,7 +438,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 2026-10-27 现算 169（改前 189）：spec consol-autotree-residual-closure R1.1 / R1.3 给报表页 / 报表行次映射 / 报表行关联
 #: 底稿 / 试算分析四个 router 共 20 个端点改挂 ``require_project_access``（readonly / edit）后降 20。
 #: 2026-10-27 现算 166：审计报告 3 个端点（generate/update_paragraph/update_status）加 assert_project_permission 后降 3。
-_IDENTITY_ONLY_BASELINE = 166
+_IDENTITY_ONLY_BASELINE = 165
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -612,7 +612,7 @@ _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 #: 2026-10-27 现算 256（改前 260）：spec consol-autotree-residual-closure R1.3 报表映射 3 个端点 + 报表 Excel 导出改挂项目级。
 #: 2026-10-27 spec attachment-security-baseline：函证路由 17 个端点挂路由级项目门，在上一条基础上再减 17，现算 → 239
 #: 2026-10-28 合入远端（BM，advanced-query-linkage-closure 在 tmp_aql_verify 构建 M）后现算 238。
-_PREFIXED_IDENTITY_ONLY_BASELINE = 238
+_PREFIXED_IDENTITY_ONLY_BASELINE = 236
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:

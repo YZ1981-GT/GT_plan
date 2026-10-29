@@ -503,6 +503,13 @@ export type Events = {
     wpCode: string
     section?: string
     timestamp: number
+    accountCode?: string
+    text?: string
+    projectId?: string
+    wpId?: string
+    sectionId?: string
+    sectionIds?: string[]
+    variant?: 'listed' | 'soe'
   }
 
   // D4 价格分析异常回标上游（D4-10 客户价格 / D4-11 产品价格 → D4-2 主营明细行标记）

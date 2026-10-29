@@ -70,6 +70,8 @@ export function useH3FormData(params: {
   wpId: Ref<string>
   projectId: Ref<string>
   measurementModel: Ref<string>
+  /** 宿主已加载的响应 Map；Tab 必须复用它，禁止再建未加载的内部状态。 */
+  allResponses?: Ref<Map<string, ChecklistItem>>
 }) {
   const { wpId, projectId, measurementModel } = params
 
@@ -77,7 +79,7 @@ export function useH3FormData(params: {
   const isLoading = ref(false)
   const isSaving = ref(false)
   const lastSavedAt = ref<string | null>(null)
-  const allResponses = ref<Map<string, ChecklistItem>>(new Map())
+  const allResponses = params.allResponses ?? ref<Map<string, ChecklistItem>>(new Map())
   const projectContext = ref<ProjectContext>({})
   const tbData = ref<TbData>({ ...EMPTY_TB_DATA })
   const renderMeta = ref<Record<string, any>>({})

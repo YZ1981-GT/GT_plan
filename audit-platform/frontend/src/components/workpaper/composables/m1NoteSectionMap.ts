@@ -52,6 +52,12 @@ function twoPeriodListed(labelCol: string): ColumnDef[] {
   ])
 }
 
+/** M1 只拥有股利明细表；共享主表由服务端派生。 */
+export const M1_TABLE_SCOPE = {
+  listed: [M1_LISTED_SUBTABLES.dividend, M1_LISTED_SUBTABLES.dividendOverdue],
+  soe: [M1_SOE_SUBTABLES.dividend],
+} as const
+
 function twoPeriodSoe(labelCol: string): ColumnDef[] {
   return defineColumns([
     { key: 'label', label: labelCol, is_label: true, flat: true },
@@ -117,6 +123,11 @@ export function buildM1SyncPayload(
 
   const isListed = variant === 'listed'
   const sub: Record<string, Record<string, unknown>[]> = {}
+  const allColumns = isListed ? buildM1ListedColumns() : buildM1SoeColumns()
+  const dividendTable = isListed ? M1_LISTED_SUBTABLES.dividend : M1_SOE_SUBTABLES.dividend
+  const columns: Record<string, ColumnDef[]> = {
+    [dividendTable]: allColumns[dividendTable],
+  }
 
   // 应付股利主表
   const dividendData = dividendRows
@@ -133,7 +144,7 @@ export function buildM1SyncPayload(
     prior_amount: dividendData.reduce((s, r) => s + num(r.prior_amount), 0),
     ...({ is_total: true } as any),
   })
-  sub[isListed ? M1_LISTED_SUBTABLES.dividend : M1_SOE_SUBTABLES.dividend] = dividendData
+  sub[dividendTable] = dividendData
 
   // 超1年表（仅上市）
   if (isListed && overdueRows && overdueRows.length > 0) {
@@ -152,6 +163,7 @@ export function buildM1SyncPayload(
         ...({ is_total: true } as any),
       })
       sub[M1_LISTED_SUBTABLES.dividendOverdue] = overdueData
+      columns[M1_LISTED_SUBTABLES.dividendOverdue] = allColumns[M1_LISTED_SUBTABLES.dividendOverdue]
     }
   }
 
@@ -161,6 +173,6 @@ export function buildM1SyncPayload(
     section_id: M1_NOTE_SECTION[variant],
     current_standard: isListed ? 'listed_standalone' : 'soe_standalone',
     sub_table_data: sub,
-    columns: isListed ? buildM1ListedColumns() : buildM1SoeColumns(),
+    columns,
   }
 }

@@ -20,18 +20,24 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>上市公司附注披露要求（30×18）：</strong>
-        按CAS30"其他综合收益"准则要求，分"以后不能重分类进损益"和"以后能重分类进损益"
-        两大类分别列示税前金额、所得税影响和税后净额。数据自动从审定表/明细表拉取
-        （subscribe 'substantive:adjudicated' 事件刷新）。
+        <strong>上市公司其他综合收益披露：</strong>
+        资产负债表与利润表口径分别保存。每张表按不能重分类与将重分类两类，列示期初余额、
+        税前发生额、转入损益、所得税、税后归属及期末余额。
       </div>
     </div>
 
     <!-- ═══ Section 1: 不能重分类进损益的OCI ═══ -->
+    <div class="statement-switch">
+      <el-radio-group v-model="activeStatement" size="small">
+        <el-radio-button value="balanceSheet">资产负债表口径</el-radio-button>
+        <el-radio-button value="incomeStatement">利润表口径</el-radio-button>
+      </el-radio-group>
+      <span>两张披露表独立保存，切换不会互相覆盖。</span>
+    </div>
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>一、以后不能重分类进损益的其他综合收益</span>
+          <span>一、不能重分类进损益的其他综合收益</span>
           <el-button size="small" :loading="aiLoading === 'section-non-reclass'" :disabled="isReadonly" @click="handleAI('section-non-reclass')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -39,39 +45,49 @@
       </template>
       <el-table :data="nonReclassRows" border size="small" style="width: 100%">
         <el-table-column prop="item" label="项目" min-width="200" />
-        <el-table-column label="本期税前发生额" min-width="130" align="right">
+        <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.preTaxAmount"
-              @update:model-value="(val: number) => updateNonReclassRow($index, 'preTaxAmount', val)"
-            />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.priorYearAmount"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'priorYearAmount', val)" />
+            <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期所得税前发生额" min-width="130" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.preTaxAmount"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'preTaxAmount', val)" />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="所得税影响" min-width="120" align="right">
+        <el-table-column label="减：前期转入损益" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.taxEffect"
-              @update:model-value="(val: number) => updateNonReclassRow($index, 'taxEffect', val)"
-            />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.transferToPl"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'transferToPl', val)" />
+            <span v-else>{{ fmtAmount(row.transferToPl) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减：所得税费用" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.taxEffect"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'taxEffect', val)" />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="税后净额" min-width="120" align="right">
+        <el-table-column label="税后归属于母公司" min-width="130" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ fmtAmount(row.preTaxAmount - row.taxEffect) }}</span>
+            <span class="formula-cell">{{ fmtAmount(row.preTaxAmount - row.transferToPl - row.taxEffect - row.afterTaxMinority) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="上年同期" min-width="120" align="right">
+        <el-table-column label="税后归属于少数股东" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.priorYearAmount"
-              @update:model-value="(val: number) => updateNonReclassRow($index, 'priorYearAmount', val)"
-            />
-            <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
+            <WpAmountInput v-if="!isReadonly" :model-value="row.afterTaxMinority"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'afterTaxMinority', val)" />
+            <span v-else>{{ fmtAmount(row.afterTaxMinority) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmount(row.priorYearAmount + row.preTaxAmount - row.transferToPl - row.taxEffect - row.afterTaxMinority) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -81,7 +97,7 @@
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>二、以后将重分类进损益的其他综合收益</span>
+          <span>二、将重分类进损益的其他综合收益</span>
           <el-button size="small" :loading="aiLoading === 'section-reclass'" :disabled="isReadonly" @click="handleAI('section-reclass')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -89,39 +105,49 @@
       </template>
       <el-table :data="reclassRows" border size="small" style="width: 100%">
         <el-table-column prop="item" label="项目" min-width="200" />
-        <el-table-column label="本期税前发生额" min-width="130" align="right">
+        <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.preTaxAmount"
-              @update:model-value="(val: number) => updateReclassRow($index, 'preTaxAmount', val)"
-            />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.priorYearAmount"
+              @update:model-value="(val: number) => updateReclassRow($index, 'priorYearAmount', val)" />
+            <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期所得税前发生额" min-width="130" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.preTaxAmount"
+              @update:model-value="(val: number) => updateReclassRow($index, 'preTaxAmount', val)" />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="所得税影响" min-width="120" align="right">
+        <el-table-column label="减：前期转入损益" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.taxEffect"
-              @update:model-value="(val: number) => updateReclassRow($index, 'taxEffect', val)"
-            />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.transferToPl"
+              @update:model-value="(val: number) => updateReclassRow($index, 'transferToPl', val)" />
+            <span v-else>{{ fmtAmount(row.transferToPl) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减：所得税费用" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.taxEffect"
+              @update:model-value="(val: number) => updateReclassRow($index, 'taxEffect', val)" />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="税后净额" min-width="120" align="right">
+        <el-table-column label="税后归属于母公司" min-width="130" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ fmtAmount(row.preTaxAmount - row.taxEffect) }}</span>
+            <span class="formula-cell">{{ fmtAmount(row.preTaxAmount - row.transferToPl - row.taxEffect - row.afterTaxMinority) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="上年同期" min-width="120" align="right">
+        <el-table-column label="税后归属于少数股东" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <WpAmountInput
-              v-if="!isReadonly"
-              :model-value="row.priorYearAmount"
-              @update:model-value="(val: number) => updateReclassRow($index, 'priorYearAmount', val)"
-            />
-            <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
+            <WpAmountInput v-if="!isReadonly" :model-value="row.afterTaxMinority"
+              @update:model-value="(val: number) => updateReclassRow($index, 'afterTaxMinority', val)" />
+            <span v-else>{{ fmtAmount(row.afterTaxMinority) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmount(row.priorYearAmount + row.preTaxAmount - row.transferToPl - row.taxEffect - row.afterTaxMinority) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -141,7 +167,7 @@
         <el-descriptions-item label="不可重分类税后净额合计">{{ fmtAmount(nonReclassTotalNet) }}</el-descriptions-item>
         <el-descriptions-item label="可重分类税后净额合计">{{ fmtAmount(reclassTotalNet) }}</el-descriptions-item>
         <el-descriptions-item label="OCI税后净额合计">{{ fmtAmount(totalNet) }}</el-descriptions-item>
-        <el-descriptions-item label="上年同期合计">{{ fmtAmount(totalPriorYear) }}</el-descriptions-item>
+        <el-descriptions-item label="期初余额合计">{{ fmtAmount(totalPriorYear) }}</el-descriptions-item>
       </el-descriptions>
     </el-card>
 
@@ -215,16 +241,23 @@
  * - AI辅助按钮 each section
  * - autosize textarea for 文本段
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM9FormData } from '../../composables/useM9FormData'
-import { calcAfterTaxNet } from '../../composables/useM9OciEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM9ListedSyncPayload, type M9ListedRow } from '../../composables/m9NoteSectionMap'
+import {
+  buildM9DisclosurePayload,
+  createM9ListedRows,
+  m9NoteText,
+  restoreM9ListedRows,
+  type M9Group,
+  type M9ListedUiRow,
+  type M9Statement,
+} from '../../composables/m9DisclosureForm'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -251,63 +284,42 @@ const formData = useM9FormData({
 
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 
-function _mapToListedRows(rows: DisclosureRow[]): M9ListedRow[] {
-  return rows
-    .filter((r) => !r.item.includes('小计') && !r.item.includes('合计'))
-    .map((r) => ({
-      label: r.item,
-      beginAmount: r.priorYearAmount,
-      preTax: r.preTaxAmount,
-      transferToPl: 0,
-      taxEffect: r.taxEffect,
-      afterTaxParent: r.preTaxAmount - r.taxEffect, // 税后归母 = 税前 - 所得税
-      afterTaxMinority: 0,
-    }))
-}
+const activeStatement = ref<M9Statement>('balanceSheet')
+const balanceSheetNonRows = ref<M9ListedUiRow[]>(createM9ListedRows('nonReclass'))
+const balanceSheetReclassRows = ref<M9ListedUiRow[]>(createM9ListedRows('reclass'))
+const incomeStatementNonRows = ref<M9ListedUiRow[]>(createM9ListedRows('nonReclass'))
+const incomeStatementReclassRows = ref<M9ListedUiRow[]>(createM9ListedRows('reclass'))
+const nonReclassRows = computed(() => activeStatement.value === 'balanceSheet'
+  ? balanceSheetNonRows.value
+  : incomeStatementNonRows.value)
+const reclassRows = computed(() => activeStatement.value === 'balanceSheet'
+  ? balanceSheetReclassRows.value
+  : incomeStatementReclassRows.value)
 
 async function syncToDisclosureNotes(): Promise<void> {
-  const bsRows = [
-    ...(_mapToListedRows(nonReclassRows.value)),
-    ...(_mapToListedRows(reclassRows.value)),
-  ]
-  // 上市版两表同数据（资产负债表视角 + 利润表视角），当前 UI 未区分
-  const payload = buildM9ListedSyncPayload(props.wpId, bsRows, bsRows)
-  if (!payload) return
+  const payload = buildM9DisclosurePayload({
+    variant: 'listed',
+    wpId: props.wpId,
+    bsNon: balanceSheetNonRows.value,
+    bsReclass: balanceSheetReclassRows.value,
+    plNon: incomeStatementNonRows.value,
+    plReclass: incomeStatementReclassRows.value,
+    noteText: m9NoteText(formData.allResponses.value, 'listed'),
+  })
+  if (!payload || props.isReadonly) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── State: 不可重分类OCI行 ─────────────────────────────────────────────────
 
-interface DisclosureRow {
-  item: string
-  preTaxAmount: number
-  taxEffect: number
-  priorYearAmount: number
-}
 
-const nonReclassRows = ref<DisclosureRow[]>([
-  { item: '1. 重新计量设定受益计划变动额（J2）', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '2. 权益法下不能转损益的其他综合收益', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '3. 其他权益工具投资公允价值变动（G8）', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '4. 企业自身信用风险公允价值变动', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '小计', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-])
 
 // ─── State: 可重分类OCI行 ───────────────────────────────────────────────────
 
-const reclassRows = ref<DisclosureRow[]>([
-  { item: '1. 权益法下可转损益的其他综合收益', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '2. 其他债权投资公允价值变动', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '3. 金融资产重分类计入其他综合收益的金额', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '4. 其他债权投资信用减值准备', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '5. 现金流量套期储备', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '6. 外币财务报表折算差额', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-  { item: '小计', preTaxAmount: 0, taxEffect: 0, priorYearAmount: 0 },
-])
 
 // ─── State: 文本区 ──────────────────────────────────────────────────────────
 
@@ -316,48 +328,51 @@ const transferNote = ref('')
 
 // ─── Computed ────────────────────────────────────────────────────────────────
 
-const nonReclassTotalNet = computed(() => {
-  return nonReclassRows.value.reduce((sum, row) => sum + calcAfterTaxNet(row.preTaxAmount, row.taxEffect), 0)
-})
+const listedNet = (row: M9ListedUiRow) => row.preTaxAmount - row.transferToPl - row.taxEffect
+const nonReclassTotalNet = computed(() => nonReclassRows.value.reduce((sum, row) => sum + listedNet(row), 0))
 
-const reclassTotalNet = computed(() => {
-  return reclassRows.value.reduce((sum, row) => sum + calcAfterTaxNet(row.preTaxAmount, row.taxEffect), 0)
-})
+const reclassTotalNet = computed(() => reclassRows.value.reduce((sum, row) => sum + listedNet(row), 0))
 
 const totalNet = computed(() => nonReclassTotalNet.value + reclassTotalNet.value)
 
 const totalPriorYear = computed(() => {
-  const nonR = nonReclassRows.value.reduce((sum, row) => sum + row.priorYearAmount, 0)
-  const r = reclassRows.value.reduce((sum, row) => sum + row.priorYearAmount, 0)
-  return nonR + r
+  return [...nonReclassRows.value, ...reclassRows.value]
+    .reduce((sum, row) => sum + row.priorYearAmount, 0)
 })
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function updateNonReclassRow(index: number, field: keyof DisclosureRow, val: number) {
-  if (index >= 0 && index < nonReclassRows.value.length) {
-    (nonReclassRows.value[index] as any)[field] = val
-    formData.debouncedSave(`M9-disclosure-listed-nonReclass-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
-  }
+type M9ListedNumericField = Exclude<keyof M9ListedUiRow, 'key' | 'item'>
+function updateListedRow(group: M9Group, index: number, field: M9ListedNumericField, val: number): void {
+  if (props.isReadonly) return
+  const rows = group === 'nonReclass' ? nonReclassRows.value : reclassRows.value
+  const row = rows[index]
+  if (!row) return
+  row[field] = Number(val) || 0
+  formData.debouncedSave(
+    `M9-disclosure-listed-${activeStatement.value}-${group}-${row.key}-${field}`,
+    { remark: String(val) },
+  )
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+function updateNonReclassRow(index: number, field: M9ListedNumericField, val: number) {
+  updateListedRow('nonReclass', index, field, val)
 }
 
-function updateReclassRow(index: number, field: keyof DisclosureRow, val: number) {
-  if (index >= 0 && index < reclassRows.value.length) {
-    (reclassRows.value[index] as any)[field] = val
-    formData.debouncedSave(`M9-disclosure-listed-reclass-${index}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
-  }
+function updateReclassRow(index: number, field: M9ListedNumericField, val: number) {
+  updateListedRow('reclass', index, field, val)
 }
 
 function handleOciRemarkChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M9-disclosure-listed-remark', { remark: ociRemarkNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleTransferNoteChange() {
+  if (props.isReadonly) return
   formData.debouncedSave('M9-disclosure-listed-transfer', { remark: transferNote.value || null })
-  scheduleAutoSync()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 const LISTED_NOTE_TARGETS: Record<string, { get: () => string; set: (v: string) => void; save: () => void }> = {
@@ -374,7 +389,7 @@ async function handleAI(section: string): Promise<void> {
       不可重分类税后合计: fmtAmount(nonReclassTotalNet.value),
       可重分类税后合计: fmtAmount(reclassTotalNet.value),
       OCI税后净额合计: fmtAmount(totalNet.value),
-      上年同期合计: fmtAmount(totalPriorYear.value),
+      期初余额合计: fmtAmount(totalPriorYear.value),
     }
     const target = LISTED_NOTE_TARGETS[section]
     const text = await generateAiText({ section: `m9-disclosure-listed-${section}`, context, existingContent: target ? target.get() : '' })
@@ -392,18 +407,30 @@ function fmtAmount(val: number): string {
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
 
-function onAdjudicatedRefresh() {
-  formData.loadData()
+function restoreData(): void {
+  const responses = formData.allResponses.value
+  balanceSheetNonRows.value = restoreM9ListedRows(responses, 'balanceSheet', 'nonReclass')
+  balanceSheetReclassRows.value = restoreM9ListedRows(responses, 'balanceSheet', 'reclass')
+  incomeStatementNonRows.value = restoreM9ListedRows(responses, 'incomeStatement', 'nonReclass')
+  incomeStatementReclassRows.value = restoreM9ListedRows(responses, 'incomeStatement', 'reclass')
+  ociRemarkNote.value = responses.get('M9-disclosure-listed-remark')?.remark || ''
+  transferNote.value = responses.get('M9-disclosure-listed-transfer')?.remark || ''
+}
+async function onAdjudicatedRefresh(): Promise<void> {
+  await formData.loadData()
+  restoreData()
 }
 
 onMounted(async () => {
   await formData.loadData()
+  restoreData()
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>
@@ -414,6 +441,7 @@ onUnmounted(() => {
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
+.statement-switch { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #606266; }
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }

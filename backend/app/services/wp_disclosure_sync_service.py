@@ -41,6 +41,14 @@ from app.services.note_shared_table_segments import (
     template_rows,
 )
 from app.services.note_sub_table_projector import normalize_sub_table_data
+from app.services.wp_disclosure_derived_tables import (
+    rebuild_other_payables_summary,
+)
+from app.services.wp_disclosure_owner_ledger import (
+    TABLE_OWNER_LEDGER_KEY,
+    apply_table_owner_ledger as _apply_table_owner_ledger,
+)
+from app.services.wp_disclosure_sync_batch import run_sync_batch_from_workpaper
 from app.services.standard_unification_service import (
     StandardUnificationService,
     derive_applicable_standards,
@@ -796,6 +804,8 @@ async def sync_from_workpaper(
     year: int | None = None,
     sub_table_columns: dict[str, list[dict]] | None = None,
     propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
+    owner_key: str | None = None,
+    replace_owned_tables: bool = False,
     commit: bool = True,
 ) -> dict[str, Any]:
     """C 类底稿 sheet 保存时，将 sub_table_data 同步到 disclosure_notes 模块对应 section。
@@ -830,6 +840,11 @@ async def sync_from_workpaper(
     if not section_id or not section_id.strip():
         raise ValueError("section_id 不能为空")
     section_id = section_id.strip()
+    normalized_owner_key = str(owner_key or "").strip()
+    if owner_key is not None and not normalized_owner_key:
+        raise ValueError("owner_key 不能为空")
+    if replace_owned_tables and not normalized_owner_key:
+        raise ValueError("replace_owned_tables=true 时必须提供 owner_key")
 
     # 一次查询同时拿到审计年度、项目准则与口径两列（R4.7）
     (
@@ -997,6 +1012,36 @@ async def sync_from_workpaper(
                 dropped, section_id,
             )
 
+    # ── 服务端 owner 差集：与表数据同一行锁、同一事务 ──────────────────
+    # 行级边界未解析时实际写入不完整，不能删除旧表或推进 owner。严格批量调用方
+    # 随后会把整批回滚；非严格调用方也保留旧 owner，避免把失败当成功基线。
+    owner_dropped: list[str] = []
+    if normalized_owner_key and not row_scope_unresolved:
+        owner_dropped = _apply_table_owner_ledger(
+            new_table_data,
+            owner_key=normalized_owner_key,
+            wp_id=wp_id,
+            sheet_name=sheet_name,
+            pushed_tables=clean_sub_table_data,
+            columns=clean_columns,
+            note_texts=note_texts,
+            removed_text_sections=removed_text_sections,
+            row_scopes=row_scopes,
+            replace_owned_tables=replace_owned_tables,
+            synced_at=now,
+        )
+        if owner_dropped:
+            logger.info(
+                "wp_disclosure_sync: owner=%s dropped obsolete sub-tables %s section=%s",
+                normalized_owner_key, owner_dropped, section_id,
+            )
+
+    derived_tables = rebuild_other_payables_summary(
+        new_table_data,
+        current_standard=current_standard,
+        section_id=section_id,
+    )
+
     new_table_data["_source"] = "workpaper"
     new_table_data["_current_standard"] = current_standard
     new_table_data["_last_sync_wp_id"] = str(wp_id)
@@ -1005,12 +1050,13 @@ async def sync_from_workpaper(
 
     # ── 公式推送写过的主表格保持推送值、逐格回报（ADR-3；spec note-pull-followup-closure R3） ──
     push_kept: list[dict[str, Any]] = []
-    if note is not None and clean_sub_table_data:
+    # owner 以空集合放弃旧来源表时，派生主表仍会变化；此时也必须重放公式拥有格。
+    if note is not None and (clean_sub_table_data or derived_tables):
         from app.services.note_push_ownership import reapply_pushed_cells
 
         push_kept = await reapply_pushed_cells(
             db, project_id=project_id, year=target_year, section=section_id,
-            table_data=new_table_data, touched=clean_sub_table_data.keys(),
+            table_data=new_table_data, touched=set(clean_sub_table_data) | derived_tables,
         )
 
     # ── 叙述段按 `section` 浅合并（原实现是整列表替换）──────────────────────
@@ -1204,57 +1250,21 @@ async def sync_batch_from_workpaper(
     user: User,
     year: int | None = None,
     propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
+    require_all_applied: bool = False,
 ) -> dict[str, Any]:
-    """多章节一次事务同步：任一失败则整批回滚。"""
-    if not items:
-        raise ValueError("items 不能为空")
-
-    results: list[dict[str, Any]] = []
-    try:
-        for item in items:
-            section_id = str(item.get("section_id") or "").strip()
-            sheet_name = str(item.get("sheet_name") or "").strip()
-            if not section_id or not sheet_name:
-                raise ValueError("每个 item 必须包含 section_id 与 sheet_name")
-            sub_table_data = item.get("sub_table_data") or {}
-            if not isinstance(sub_table_data, dict):
-                raise ValueError(f"section {section_id} 的 sub_table_data 必须为对象")
-            sub_table_columns = item.get("columns")
-            if sub_table_columns is not None and not isinstance(sub_table_columns, dict):
-                raise ValueError(f"section {section_id} 的 columns 必须为对象")
-            result = await sync_from_workpaper(
-                db,
-                project_id,
-                wp_id=wp_id,
-                sheet_name=sheet_name,
-                section_id=section_id,
-                sub_table_data=sub_table_data,
-                current_standard=current_standard,
-                user=user,
-                year=year,
-                sub_table_columns=sub_table_columns,
-                propagation_origin=propagation_origin,
-                commit=False,
-            )
-            if "skipped_reason" in result:
-                # 项目没有审计年度、载荷也没带年度：单章节端点回 422（R3）；批量原先把它当成功汇总 ⇒ 读 results[-1]["synced_at"]
-                # KeyError、对外 500（L3 国企 / G7 走批量）。抛 ValueError ⇒ 整批回滚、路由回 422 中文原因
-                # （spec note-pull-followup-closure R1 实施中发现，与 R3 同口径）
-                raise ValueError(f"附注未同步：{result['skipped_reason']}")
-            results.append(result)
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    return {
-        "success": True,
-        "sections_synced": len(results),
-        "rows_synced": sum(int(item.get("rows_synced") or 0) for item in results),
-        "texts_synced": sum(int(item.get("texts_synced") or 0) for item in results),
-        "results": results,
-        "synced_at": results[-1]["synced_at"] if results else datetime.now(timezone.utc).isoformat(),
-    }
+    """多章节一次事务同步；严格模式下任何语义性 no-op 也整批回滚。"""
+    return await run_sync_batch_from_workpaper(
+        db,
+        project_id,
+        wp_id=wp_id,
+        current_standard=current_standard,
+        items=items,
+        user=user,
+        year=year,
+        propagation_origin=propagation_origin,
+        require_all_applied=require_all_applied,
+        sync_one=sync_from_workpaper,
+    )
 
 
 # ─── US-3: HTML 路径同步服务类 ────────────────────────────────────────────────

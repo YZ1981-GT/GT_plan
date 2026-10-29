@@ -23,6 +23,8 @@ import pathlib
 import re
 from collections import defaultdict
 
+from tests.workpaper_sync.k_domain_growth_facts import K_DOMAIN_ADDED_FILES
+
 _THIS = pathlib.Path(__file__).resolve()
 ROOT = _THIS.parents[3]
 BACKEND = ROOT / "backend"
@@ -728,13 +730,13 @@ BP5_MODE_PREF_FILES_BASELINE = 16
 
 
 def bp5_expected_k_domain_files(*, include_kam: bool = False) -> int:
-    """删除后的 K 域文件数 = 基线 − 7。"""
+    """当前 K 域文件数 = 历史基线 − 已删 + 具名新增。"""
     base = (
         BP5_K_DOMAIN_FILES_BASELINE_WITH_KAM
         if include_kam
         else BP5_K_DOMAIN_FILES_BASELINE
     )
-    return base - BP5_DELETED_COUNT
+    return base - BP5_DELETED_COUNT + len(K_DOMAIN_ADDED_FILES)
 
 
 def bp5_orphan_is_deleted(name: str) -> bool:

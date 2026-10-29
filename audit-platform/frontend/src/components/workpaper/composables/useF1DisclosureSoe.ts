@@ -74,6 +74,11 @@ export interface UseF1DisclosureSoeOptions {
   isReadonly: Ref<boolean>
   applicableStandards: Ref<string[]>
   /**
+   * 是否订阅附注编辑器的跨组件文本更新。真实 Tab 缺省订阅；离屏 provider 必须显式关闭，
+   * 避免刷新附注时短暂挂全局监听或响应另一个页面的 UI 事件。
+   */
+  listenForNoteUpdates?: boolean
+  /**
    * 四表库减值准备（render `impairment_prefill`）；`null` = 四表库无
    * 「坏账准备-预付账款」科目。
    *
@@ -221,7 +226,7 @@ export function buildSoeOver1Rows(input: {
 export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
   const {
     allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards,
-    impairmentPrefill, clientName,
+    impairmentPrefill, clientName, listenForNoteUpdates = true,
   } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
@@ -511,8 +516,10 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
       else if (idx === '3') note3.value = detail.text || ''
     }
   }
-  window.addEventListener('note:section-updated', noteUpdateHandler)
-  eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  if (listenForNoteUpdates) {
+    window.addEventListener('note:section-updated', noteUpdateHandler)
+    eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  }
 
   function getSyncSnapshot(): F1SoeSyncSnapshot {
     return {

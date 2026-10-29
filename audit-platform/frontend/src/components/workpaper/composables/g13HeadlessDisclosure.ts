@@ -2,8 +2,8 @@
  * G13 公允价值变动收益披露表离屏同步（附注页「刷新」用，spec note-pull-followup-closure R1）。
  *
  * 与底稿披露 Tab（`G13TabDisclosureListed` / `G13TabDisclosureSOE`）同一套代码：`useG13Disclosure`（已存披露行 / 附注说明，立即读）
- * → prepare 做 Tab 挂载时的回填 `pullLatestAdjudicated({ persist: false })`（审定数 + G13-2 明细本期 + G13-1 上期；Tab 挂载时明细回填
- * 后保存，离屏只改内存）→ Tab 同一个快照 `getSyncSnapshot()` + 同一个 `buildG13SyncPayloads`（上市 五、75 / 国企 八、72）。
+ * → prepare 做 Tab 挂载时的回填 `pullLatestAdjudicated({ persist: false })`（审定数 + G13-2 明细本期 + G13-1 上期；Tab 先合并
+ * 两侧 patch，再仅在真实变化且可写时保存一次，离屏只改内存）→ Tab 同一个快照 `getSyncSnapshot()` + 同一个 `buildG13SyncPayloads`。
  * 离屏不挂钩子、不订阅审定事件、不广播，保存回调为空。前缀与底稿主入口 `useG13FormData` 同口径（`G13`）。
  */
 import { ref } from 'vue'

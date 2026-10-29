@@ -110,8 +110,9 @@ describe('m1HeadlessProvider', () => {
       { label: '股东D（其他）', end_amount: 0, prior_amount: 0 },
       { label: '合计', end_amount: 920, prior_amount: 650, is_total: true },
     ])
-    // 「超过1年未支付」表暂无录入区块 ⇒ 不推、也不进 _removed_table_keys（不删 K3 写的同名表）
+    // 「超过1年未支付」表暂无录入区块 ⇒ 数据与 columns 都不推，也不删除已有 M1 数据。
     expect(Object.keys(sent.sub_table_data)).toEqual([M1_LISTED_SUBTABLES.dividend])
+    expect(Object.keys(sent.columns)).toEqual([M1_LISTED_SUBTABLES.dividend])
     expect(sent.sub_table_data._removed_table_keys).toBeUndefined()
   })
 

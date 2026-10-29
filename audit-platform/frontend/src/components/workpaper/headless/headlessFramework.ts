@@ -28,6 +28,10 @@ export interface HeadlessDisclosureContext {
   wpId: string
   wpCode: string
   applicableStandards: string[]
+  /** 项目附注模板类型；未提供时 provider 可从 render-config 的 project_context 读取。 */
+  templateType?: string
+  /** standalone|consolidated；未提供时 provider 可从 render-config 读取。 */
+  reportScope?: string
   /**
    * 章节写入前的判定：`null` = 写；字符串 = 不写（非空写进提示，空串 = 不在本次刷新范围、静默跳过）。
    * 缺省全写（单测 / 直接调用）。
@@ -77,6 +81,13 @@ export interface HeadlessProviderSpec<T> {
     HeadlessSyncPayload | readonly HeadlessSyncPayload[] | null | undefined
     | Promise<HeadlessSyncPayload | readonly HeadlessSyncPayload[] | null | undefined>
   post?: (instance: T, payload: HeadlessSyncPayload, input: HeadlessProviderInput) => Promise<HeadlessSectionResult>
+  /**
+   * 通过一个原子批量请求发送所有已通过 sectionGuard 的章节。失败时框架把同一错误
+   * 回报到批内每个章节；不得与 `post` 同时声明。
+   */
+  postAll?: (
+    instance: T, payloads: readonly HeadlessSyncPayload[], input: HeadlessProviderInput,
+  ) => Promise<readonly HeadlessSectionResult[]>
 }
 
 /** 底稿的 checklist 响应（只取本底稿前缀的条目，与底稿主入口同口径）。 */
@@ -121,6 +132,16 @@ export async function postHeadlessSyncPayload(projectId: string, payload: Headle
   )
   const data = res?.data ?? res
   const section = String(data?.section_id || payload.section_id)
+  const unresolved = Array.isArray(data?.row_scope_unresolved)
+    ? data.row_scope_unresolved.map((name: unknown) => String(name)).filter(Boolean)
+    : []
+  if (unresolved.length > 0) {
+    const reasons = data?.row_scope_unresolved_reasons && typeof data.row_scope_unresolved_reasons === 'object'
+      ? data.row_scope_unresolved_reasons as Record<string, string>
+      : {}
+    const detail = unresolved.map((name: string) => reasons[name] ? `${name}（${reasons[name]}）` : name).join('、')
+    return { section, rows: 0, error: `附注分段同步未写入：${detail}` }
+  }
   if (data?.skipped) return { section, rows: 0, skipped: SKIP_REASON[data.reason] || `章节未写入：${data.reason || '不适用'}` }
   if (data?.blocked_by_manual_override) return { section, rows: 0, skipped: `附注 ${section} 标记了整节人工覆盖，未写入` }
   return {
@@ -159,21 +180,49 @@ export function defineHeadlessProvider<T>(spec: HeadlessProviderSpec<T>): Headle
       if (spec.prepare) await spec.prepare(instance, input)
       await nextTick()
       const payloads = payloadList(await spec.build(instance, input))
-      const sections: HeadlessSectionResult[] = []
-      for (const payload of payloads) {
+      if (spec.post && spec.postAll) throw new Error(`${ctx.wpCode} provider 不能同时声明 post 与 postAll`)
+      const sections: Array<HeadlessSectionResult | null> = payloads.map(() => null)
+      const allowed: Array<{ payload: HeadlessSyncPayload; index: number }> = []
+      payloads.forEach((payload, index) => {
         const section = String(payload.section_id ?? '')
         const why = ctx.sectionGuard ? ctx.sectionGuard(section) : null
         if (why !== null) {
-          sections.push({ section, rows: 0, skipped: why })
-          continue
+          sections[index] = { section, rows: 0, skipped: why }
+        } else {
+          allowed.push({ payload, index })
         }
+      })
+
+      if (spec.postAll && allowed.length > 0) {
         try {
-          sections.push(await (spec.post ? spec.post(instance, payload, input) : postHeadlessSyncPayload(ctx.projectId, payload)))
+          const posted = [...await spec.postAll(instance, allowed.map(item => item.payload), input)]
+          if (posted.length !== allowed.length) {
+            throw new Error(
+              `${ctx.wpCode} 批量同步回执数 ${posted.length} 与请求章节数 ${allowed.length} 不一致`,
+            )
+          }
+          allowed.forEach((item, resultIndex) => {
+            sections[item.index] = posted[resultIndex]
+          })
         } catch (err: any) {
-          sections.push({ section, rows: 0, error: headlessErrorMessage(err) })
+          const message = headlessErrorMessage(err)
+          allowed.forEach(({ payload, index }) => {
+            sections[index] = { section: String(payload.section_id ?? ''), rows: 0, error: message }
+          })
+        }
+      } else {
+        for (const { payload, index } of allowed) {
+          const section = String(payload.section_id ?? '')
+          try {
+            sections[index] = await (
+              spec.post ? spec.post(instance, payload, input) : postHeadlessSyncPayload(ctx.projectId, payload)
+            )
+          } catch (err: any) {
+            sections[index] = { section, rows: 0, error: headlessErrorMessage(err) }
+          }
         }
       }
-      return { sections }
+      return { sections: sections.filter((item): item is HeadlessSectionResult => item !== null) }
     } finally {
       scope.stop()
     }

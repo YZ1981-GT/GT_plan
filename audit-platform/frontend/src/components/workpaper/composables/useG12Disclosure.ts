@@ -56,6 +56,18 @@ export interface G12DisclosureRow {
 
 
 
+export interface G12DisclosurePatchResult {
+
+  changed: boolean
+
+  sourceFound: boolean
+
+  fieldsChanged: number
+
+}
+
+
+
 function rowDefs(variant: 'listed' | 'soe') {
 
   return variant === 'listed' ? G12_DISCLOSURE_LISTED_ROWS : G12_DISCLOSURE_SOE_ROWS
@@ -131,6 +143,18 @@ function parsePriorStore(raw?: string | null): Record<string, { priorUnadjusted?
     return {}
 
   }
+
+}
+
+
+
+function optionalAmount(raw: unknown): number | null {
+
+  if (raw == null || (typeof raw === 'string' && raw.trim() === '')) return null
+
+  const amount = typeof raw === 'number' ? raw : Number(raw)
+
+  return Number.isFinite(amount) ? amount : null
 
 }
 
@@ -322,7 +346,7 @@ export function useG12Disclosure(opts: {
 
     const amtRaw = opts.allResponses.value.get('G12-1-adjudicated-amount')?.conclusion
 
-    const adjudicatedTotal = amtRaw != null ? parseNum(amtRaw) : null
+    const adjudicatedTotal = optionalAmount(amtRaw)
 
     const priorStore = parsePriorStore(opts.allResponses.value.get('G12-adj-prior')?.remark)
 
@@ -336,13 +360,13 @@ export function useG12Disclosure(opts: {
 
   /**
 
-   * 由 G12-1 审定 / G12-2 明细回填附注各行（只改内存）。「从 G12-1 同步」与 Tab 挂载时在此之后保存并广播；
+   * 由 G12-1 审定 / G12-2 明细回填附注各行（只改内存）。缺失来源保留原值；显式 0 仍是有效来源。
 
-   * 附注页离屏同步只调这一步（不写底稿，spec note-pull-followup-closure R1）。
+   * 附注页离屏同步只调这一步，不写底稿（spec note-pull-followup-closure R1）。
 
    */
 
-  function applyAdjudicationPatch(): number {
+  function applyAdjudicationPatch(): G12DisclosurePatchResult {
 
     const { adjudicatedTotal, priorStore, hedgeDetailJson } = readAdjudicationContext()
 
@@ -350,7 +374,7 @@ export function useG12Disclosure(opts: {
 
 
 
-    const patched = buildG12DisclosureSyncPatch(rows.value, {
+    const patch = buildG12DisclosureSyncPatch(rows.value, {
 
       variant: opts.variant,
 
@@ -362,9 +386,21 @@ export function useG12Disclosure(opts: {
 
     })
 
-    rows.value = patched.map((r) => enrichRow(r, opts.variant))
+    if (patch.changed) {
 
-    return patched.length
+      rows.value = patch.rows.map((r) => enrichRow(r, opts.variant))
+
+    }
+
+    return {
+
+      changed: patch.changed,
+
+      sourceFound: patch.sourceFound,
+
+      fieldsChanged: patch.fieldsChanged,
+
+    }
 
   }
 
@@ -372,15 +408,21 @@ export function useG12Disclosure(opts: {
 
   function syncFromG12Adjudication(showMessage = true): number {
 
-    if (opts.isReadonly.value) return 0
+    const result = applyAdjudicationPatch()
 
-    const n = applyAdjudicationPatch()
+    if (result.sourceFound && result.changed && !opts.isReadonly.value) {
 
-    persist()
+      persist()
 
-    if (showMessage) ElMessage.success('已从 G12-1 / G12-2 同步附注发生额')
+    }
 
-    return n
+    if (showMessage && result.sourceFound) {
+
+      ElMessage.success('已从 G12-1 / G12-2 同步附注发生额')
+
+    }
+
+    return result.fieldsChanged
 
   }
 
@@ -394,7 +436,7 @@ export function useG12Disclosure(opts: {
 
       adjudicatedAmount.value = d.adjudicatedAmount
 
-      if (!opts.isReadonly.value) syncFromG12Adjudication(false)
+      syncFromG12Adjudication(false)
 
     }
 
@@ -404,10 +446,6 @@ export function useG12Disclosure(opts: {
 
   function pullLatestAdjudicated(): void {
 
-    const { adjudicatedTotal } = readAdjudicationContext()
-
-    if (adjudicatedTotal != null) adjudicatedAmount.value = adjudicatedTotal
-
     syncFromG12Adjudication(false)
 
   }
@@ -416,7 +454,7 @@ export function useG12Disclosure(opts: {
 
   function onHedgeDetailUpdated() {
 
-    if (!opts.isReadonly.value) pullLatestAdjudicated()
+    pullLatestAdjudicated()
 
   }
 

@@ -5752,3 +5752,29 @@ instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 
 - 证据：磁盘变异 A 28 / B 20 / C 24 / D 57 / E 50 / F 39 / G 33 / H 3 / I 3 / J 5 / J2 2 全部打红在预期断言（首轮存活的逐条补用例再跑）；前端离屏同步 76 个用例文件 390 passed；候选树（远端头 dab0ad387 + 本 spec）对照远端头：后端 1427 个相关文件逐文件归因，只在候选树红的是程序裁剪 spec 的逐字节判据 4 条（已登记、提交即自愈），本 spec 修好 6 条；前端 428 个用例文件只余一条同种子在远端头同红的随机 PBT；全量 vue-tsc 3116 对 3129、新增 0
 - 🔴 教训：①判「读时投影」按投影内容非空，不按来源标记 ②同步链路里调「保存 + 排同步」⇒ 页面开着无限同步 ③getter 传给只读 `.value` 的选项、同步函数传进选项参数，类型都能过 ⇒ 等价用例挂真实 Tab 比请求体 ④代码跨文件挪动后 slice 锚点改指新文件；新文件落进循环 strict 域口径要在该循环 facts 登记 ⑤镜像测试只查「出现过」的判据改一行照样绿（J1 category）⇒ 逐行比对 ⑥远端在动手期间前进 114 + 1 个提交：候选树按远端头三方合并、按固定提交号（不按 HEAD）取本 spec 的改动
 - 待定（未改，见 design §3.3）：M 循环 `useDisclosureAutoSync(sync)` 误用（修了会让 M6 / M9 / M10 与模板结构不符的载荷开始写附注）、H3 Tab 从不加载、G12 / G13 挂载回填、H5 不 provide `saveResponse`、公式推送把旧格式章节标 workpaper 来源等
+
+## 2026-10-29 附注取数残留与治理收口（spec `note-pull-residual-governance-closure`，49/50；待版本推送与资源清理）
+
+缘起：承接 `note-pull-followup-closure` 冻结的 11 个离屏码、M 自动同步误用、G12/G13/H3/H5 挂载写入缺陷、共享章节 owner、公式来源、鉴权动态门、18 条归因域边界和 Task 23.1 真实环境欠账；用户要求“未做的按建议逐一修复，再整体复盘”。
+
+- 挂载与自动同步：G12 区分缺来源 / 明确 0，只有真实变化且可写才存；G13 先合并本期与上期再最多保存一次；H3 宿主与 Tab 共用响应 Map，四口径非零重挂载；H5 显式保存 adapter；M1/M2/M3/M8 与结构对齐后的 M6/M9/M10 使用合法 options、带参 schedule、卸载 cancel，AST 门逐处守护。
+- 模板与 provider：M9 上市 BS/PL 两表拆开、国企 43 行；M10 三组数量有来源才拥有变动行，不发空基本情况/持有者表；F1/H3/L4/L5/M6/M9/M10/K3/H1/G7/E1 全部通过真实 Tab 与 provider 非零逐章节 JSON 等价。最终 registry 78/78、`NOT_YET_HEADLESS=[]`、孤儿 0。
+- 共享写权：L2 只拥有利息表，M1 只拥有股利表，K3 只拥有按性质与长期挂账表；后端按三份独占明细重建共享“其他应付款”主表，六种到达顺序一致。G7 在 `DisclosureNote.table_data._workpaper_table_owners` v1 中同事务维护 owner、表、列和稳定 payload hash；strict batch 遇人工覆盖、口径跳过、row-scope 未解析均整批回滚。
+- 来源与治理：公式推送改旧 `_tables` 时保持结构 `_source`；MethodLevel 将 GET/HEAD 定为 readonly、其余 edit、未知方法 fail closed，附件对象门与 OCR 双分支进入清册。note 清册 101；远端最新重生后 edit 清册 755 门点 / 725 端点 / 198 文件；identity 166→165、238→236。
+- 域 checker：排除 generated / `*.d.ts`，解析 Python package alias，最高 specificity 并列 fail closed；`--write-baseline` 有 new 拒写，`--shrink-only` 只移除 resolved。baseline 897→724，未吸收其他债。最终 checker 下开工 HEAD 与候选均 1301，逐 identity added/resolved 都为 0；相对 debt baseline 两树同报 577 条，属于预存平台债。
+- 可逆 UAT：`note_pull_residual_uat.py` 只允许名称含【测试】、listed consolidated、2025、恰两数据叶子、未归档/未锁定目标，并以 advisory lock + 8 表整行 `row_to_json`/JSON-null/PK/hash 保护。浏览器 `五-5-6` 得 300.00/240.00；`五-8-18` 同名合并 1300.00，集团内两单位排除，beyond 4，分母 10000，前五合计 4300.00、比例 43.00、近似提示；独立 GET 与硬刷新一致。最终 capture-after 后 restore，事务内、提交后、独立 verify 全部等于 before。
+- 环境偏离：Docker Desktop 宿主端口转发失效，改在 `gt_workplan_default` 内跑 DB/HTTP；browserless 与反代共享 namespace，外显 URL 仍为 `127.0.0.1:3030`。PG 长连接达到上限时仅重启本地容器清连接，数据卷不变；恢复未受影响。
+- 收尾门禁抓出的真实问题：①行数门不抬白名单，owner/batch/K 新增文件账本拆成 125/102/39 行模块，原文件降至 1649/779；②L5 国企 other 字段协议错配会把非零归零，显式投影并以 321/123 + 小计守护；③M10 input-number 清空 `undefined→null` 且 0 保留；④披露事件保持 timestamp 必填，补 wpId/sectionId，F2/H4/K4 补项目/章节上下文并删 K4 `as any`；⑤gitleaks 对 G7 业务 owner key 的误报用单行 `gitleaks:allow`，未扩大 allowlist。
+- 验证：后端最终 267 passed；前端 28 文件 619 passed，类型修复后重点 8 文件 211 passed；全量 vue-tsc 同 HEAD 双树各跑一次，3084→2983，规范化多重集 added 0 / resolved 101、无 OOM；行数门、gitleaks、`git diff --check`、两份清册 `--check` 通过。最终候选 Vite/backend Playwright 打开活动【测试】E1 上市披露并硬刷新，非 GET 全部只读拦截，console/network/HTTP 错误 0。
+- 五角色复盘：业务合伙人确认权威源/近似提示；项目经理确认 78 码可复算；质控确认缺来源、0、只读、失败、排列与恢复反例；审计助理确认 UI 数值/来源/硬刷新；EQCR 确认 owner hash、method-level 鉴权与逐行恢复。未发现新 P0。
+- 后续 ROI：P1 建 headless 运行观测（6~8 文件）与 PG 连接来源/饱和治理（4~8 文件）；577 条域债按 SCC 分批只减；P2 建披露事件 cast AST 棘轮与全量 vue-tsc 诊断基线工具；provider 代码生成因已有 78/78 精确门暂缓。详见 design §8~§9。
+
+### 2026-10-29：note-pull residual 远端最新重放终验补记
+- fetch 后目标分支由开工基线 `8107371f0` 前进 22 个提交到 `5d0a4b60a`；本轮 151 路径与远端 209 路径仅 INDEX / memory 重叠。新锁定 detached worktree 三方重放，保留远端 INDEX 全部新内容后插入本 spec 行，memory 自动合并。
+- 远端新增鉴权调用使旧 edit 清册按预期变红（3 gate points + 1 direct comparison）；在重放树重生后为 755 门点 / 725 端点 / 198 文件，二次 `--check` 通过；note 清册仍 101。
+- 远端最新终验：后端 267 passed、前端 619 passed；全量 vue-tsc 远端 3089 / 候选 2988，规范化 added 0 / resolved 101、无 OOM；行数门、gitleaks、diff-check 通过。域边界远端/候选均 1304、identity 差集 0；相对 debt baseline 同为 580（比开工快照 577 多 3，来自远端而非本轮，未吸收）。
+
+### 2026-10-29：note-pull residual 推送预演后二次远端前进
+- 首次本地提交 `06eb2edc2` 后，版本推送 dry-run 再 fetch 发现远端新增 `43b189d49` 并占用 v1.0.42；未推送、未 force，重新从最新远端建锁定 detached 候选。四个重叠文件只有 INDEX 文本冲突，Python 自动合并后人工核对远端 NOTE_SECTION_SAVED/stale/刷新链与本轮 `_source`/owner/strict/派生主表均在。
+- 语义复核抓到 Git 不会报的接缝：owner 空集合删除旧来源表仍会重建共享主表，而 pushed-cell 保护只看 incoming 非空。改门为 `clean_sub_table_data or derived_tables`，新增 L2 放弃/应付股利保留反例；旧门变异稳定红，修复绿。
+- 接缝终验：后端 238 passed、前端 38 passed；vue-tsc 最终远端 3088 / 候选 2987，added 0 / resolved 101；域两树 1304、identity 差集 0。旧本地提交只作保护，最终提交在 43b189d49 之上重建。

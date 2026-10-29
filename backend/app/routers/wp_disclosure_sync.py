@@ -121,6 +121,15 @@ class SyncBatchItem(BaseModel):
         description="子表数据（含 `_` 前缀元数据键，同单章节同步）",
     )
     columns: dict[str, list[dict]] | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
+    owner_key: str | None = Field(
+        None,
+        min_length=1,
+        description="该章节内的稳定子表 owner；与 replace_owned_tables 配合由服务端计算删除差集",
+    )
+    replace_owned_tables: bool = Field(
+        False,
+        description="是否以本次表集合替换该 owner 上次成功集合；纯叙述章节必须为 false",
+    )
 
 
 class SyncBatchFromWorkpaperRequest(BaseModel):
@@ -130,6 +139,10 @@ class SyncBatchFromWorkpaperRequest(BaseModel):
     current_standard: str = Field(..., min_length=1)
     items: list[SyncBatchItem] = Field(..., min_length=1)
     year: int | None = None
+    require_all_applied: bool = Field(
+        False,
+        description="任一章节被跳过、人工覆盖拦截或行段未解析时整批回滚",
+    )
 
 
 class StandardMismatchDetail(BaseModel):
@@ -317,6 +330,7 @@ async def sync_disclosure_batch_from_workpaper(
             items=[item.model_dump() for item in body.items],
             user=current_user,
             year=body.year,
+            require_all_applied=body.require_all_applied,
         )
     except StandardMismatchError as exc:
         raise _standard_mismatch_http(exc) from exc

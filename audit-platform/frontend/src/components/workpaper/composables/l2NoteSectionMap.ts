@@ -9,7 +9,7 @@
  *
  * 🔴 裁决 A（spec l-cycle-…completion R4）：该子表的写权从 K3 收敛到 L2。
  *    K3 侧改只读展示 + 引导跳转，buildK3SyncPayload 停止推送这两张表。
- *    L2 与 K3 在同一章节内表名零交集 → 走既有表级浅合并，不需要行级合并。
+ *    L2/M1/K3 的 owner scope 两两不交；共享主表由服务端从三家明细合计派生。
  *
  * spec: .kiro/specs/l-cycle-extraction-formula-and-disclosure-completion/ R4
  */
@@ -49,6 +49,12 @@ export function buildL2ListedInterestColumns(): ColumnDef[] {
     { key: 'prior_amount', label: '上年年末数', format: 'amount', align: 'right' },
   ])
 }
+
+/** L2 只拥有利息明细表；共享主表由服务端派生。 */
+export const L2_TABLE_SCOPE = {
+  listed: [L2_LISTED_SUBTABLE.interest, L2_LISTED_SUBTABLE.overdue],
+  soe: [L2_SOE_SUBTABLE.interest, L2_SOE_SUBTABLE.overdue],
+} as const
 
 /** Listed 逾期利息列（标签列名逐字 = 源 xlsx R17「借款单位」，与单体模板 五、42 同；R8.4 批 9b-1） */
 export function buildL2ListedOverdueColumns(): ColumnDef[] {
@@ -182,8 +188,8 @@ function normalizeLabel(raw: string, variant: L2DisclosureVariant): string {
  * 构建 L2 同步载荷。
  *
  * 🔴 只推自己负责的两张子表（应付利息 + 逾期利息），
- *    五、42/八、42 内其余子表（其他应付款/应付股利等）由 K3 负责、原样保留。
- *    不得声明 _removed_table_keys 指向 K3 的子表。
+ *    五、42/八、42 内股利表由 M1、其他应付款明细由 K3 负责；共享主表由服务端派生。
+ *    不得声明 _removed_table_keys 指向其他 owner 的子表。
  */
 export function buildL2SyncPayload(
   variant: L2DisclosureVariant,

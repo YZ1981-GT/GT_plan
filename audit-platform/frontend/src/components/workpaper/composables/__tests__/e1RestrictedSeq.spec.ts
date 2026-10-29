@@ -46,6 +46,7 @@ import {
 
 const VUE = resolve(__dirname, '../../e1/E1TabDisclosure.vue')
 const TS = resolve(__dirname, '../e1RestrictedScope.ts')
+const STATE = resolve(__dirname, '../e1DisclosureTabState.ts')
 
 function readVue(): string {
   return readFileSync(VUE, 'utf-8')
@@ -625,11 +626,14 @@ describe('E1TabDisclosure 组件接线（源码级，判据落在函数体内）
     expect(body).not.toMatch(/Math\.max\([^)]*\)\s*\+\s*1/)
   })
 
-  it('计数器读回走 parseRestrictedSeq（在 loadRestricted 体内）', () => {
-    const body = fnBody(stripComments(readVue()), 'loadRestricted')
-    expect(body, 'loadRestricted 函数体未截到（守卫自身缺陷）').not.toBe('')
-    expect(body).toContain('parseRestrictedSeq(')
-    expect(body).toContain('e1RestrictedSeqKey(')
+  it('计数器读回由共享恢复器走 parseRestrictedSeq，真实 Tab 必须调用恢复器', () => {
+    const tabBody = fnBody(stripComments(readVue()), 'loadRestricted')
+    const stateBody = fnBody(stripComments(readFileSync(STATE, 'utf-8')), 'restoreE1RestrictedState')
+    expect(tabBody, 'loadRestricted 函数体未截到（守卫自身缺陷）').not.toBe('')
+    expect(tabBody).toContain('restoreE1RestrictedState(')
+    expect(stateBody, '共享恢复器函数体未截到').not.toBe('')
+    expect(stateBody).toContain('parseRestrictedSeq(')
+    expect(stateBody).toContain('e1RestrictedSeqKey(')
   })
 
   it('🔴 计数器随行落库：buildItems 体内往 items 推 seqKey', () => {

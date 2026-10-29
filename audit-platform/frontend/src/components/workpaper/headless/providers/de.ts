@@ -9,4 +9,5 @@ export const DE_HEADLESS: Record<string, HeadlessProviderLoader> = {
   D5: () => import('@/components/workpaper/composables/d5HeadlessDisclosure').then((m) => m.d5HeadlessProvider),
   D6: () => import('@/components/workpaper/composables/d6HeadlessDisclosure').then((m) => m.d6HeadlessProvider),
   D7: () => import('@/components/workpaper/composables/d7HeadlessDisclosure').then((m) => m.d7HeadlessProvider),
+  E1: () => import('@/components/workpaper/composables/e1HeadlessDisclosure').then((m) => m.e1HeadlessProvider),
 }

@@ -164,19 +164,23 @@ export function buildM9ListedSyncPayload(
         after_tax_minority: num(r.afterTaxMinority),
         end_amount: m9ListedEnd(r),
       }))
-    // 合计行
-    const total: Record<string, unknown> = {
-      label: '合计',
-      begin_amount: data.reduce((s, r) => s + num(r.begin_amount), 0),
-      pre_tax: data.reduce((s, r) => s + num(r.pre_tax), 0),
-      transfer_to_pl: data.reduce((s, r) => s + num(r.transfer_to_pl), 0),
-      tax_effect: data.reduce((s, r) => s + num(r.tax_effect), 0),
-      after_tax_parent: data.reduce((s, r) => s + num(r.after_tax_parent), 0),
-      after_tax_minority: data.reduce((s, r) => s + num(r.after_tax_minority), 0),
-      end_amount: data.reduce((s, r) => s + num(r.end_amount), 0),
-      is_total: true,
+    if (!data.some((row) => row.label === '其他综合收益合计')) {
+      const values = data.filter((row) => !String(row.label).startsWith('一、') && !String(row.label).startsWith('二、'))
+      data.push({
+        label: '其他综合收益合计',
+        begin_amount: values.reduce((s, r) => s + num(r.begin_amount), 0),
+        pre_tax: values.reduce((s, r) => s + num(r.pre_tax), 0),
+        transfer_to_pl: values.reduce((s, r) => s + num(r.transfer_to_pl), 0),
+        tax_effect: values.reduce((s, r) => s + num(r.tax_effect), 0),
+        after_tax_parent: values.reduce((s, r) => s + num(r.after_tax_parent), 0),
+        after_tax_minority: values.reduce((s, r) => s + num(r.after_tax_minority), 0),
+        end_amount: values.reduce((s, r) => s + num(r.end_amount), 0),
+        is_total: true,
+      })
+    } else {
+      const total = data.find((row) => row.label === '其他综合收益合计')!
+      total.is_total = true
     }
-    data.push(total)
     return data
   }
 
@@ -212,18 +216,22 @@ export function buildM9SoeSyncPayload(
       prior_net: num(r.priorNet),
     }))
 
-  // 合计行
-  const total: Record<string, unknown> = {
-    label: '合计',
-    end_pre_tax: data.reduce((s, r) => s + num(r.end_pre_tax), 0),
-    end_tax: data.reduce((s, r) => s + num(r.end_tax), 0),
-    end_net: data.reduce((s, r) => s + num(r.end_net), 0),
-    prior_pre_tax: data.reduce((s, r) => s + num(r.prior_pre_tax), 0),
-    prior_tax: data.reduce((s, r) => s + num(r.prior_tax), 0),
-    prior_net: data.reduce((s, r) => s + num(r.prior_net), 0),
-    is_total: true,
+  if (!data.some((row) => row.label === '三、其他综合收益合计')) {
+    const values = data.filter((row) => !String(row.label).startsWith('一、') && !String(row.label).startsWith('二、'))
+    data.push({
+      label: '三、其他综合收益合计',
+      end_pre_tax: values.reduce((s, r) => s + num(r.end_pre_tax), 0),
+      end_tax: values.reduce((s, r) => s + num(r.end_tax), 0),
+      end_net: values.reduce((s, r) => s + num(r.end_net), 0),
+      prior_pre_tax: values.reduce((s, r) => s + num(r.prior_pre_tax), 0),
+      prior_tax: values.reduce((s, r) => s + num(r.prior_tax), 0),
+      prior_net: values.reduce((s, r) => s + num(r.prior_net), 0),
+      is_total: true,
+    })
+  } else {
+    const total = data.find((row) => row.label === '三、其他综合收益合计')!
+    total.is_total = true
   }
-  data.push(total)
 
   return {
     wp_id: wpId,

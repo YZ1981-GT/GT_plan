@@ -273,70 +273,22 @@ describe('G7 SOE `_removed_table_keys` 逐章节差集', () => {
     }
   })
 
-  it('宿主三处接线齐全（回写基线 / 落库 / 载入恢复）—— 缺一即整条链空转', async () => {
-    const { readFileSync, existsSync } = await import('node:fs')
-    const { dirname, resolve } = await import('node:path')
+  it('宿主保存成功后才发严格批量请求，且不再二次写底稿基线', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const host = readFileSync(resolve(__dirname, 'G7TabDisclosureSOE.vue'), 'utf-8')
+    const start = host.indexOf('async function syncToDisclosureNotes')
+    const end = host.indexOf('function handleAdjudicated', start)
+    const body = host.slice(start, end)
 
-    // 仓库根定位：双哨兵具体文件（禁写死回退级数）
-    const SENTINELS = ['backend/data/note_template_soe.json', '.kiro/steering/memory.md']
-    let dir = __dirname
-    let root = ''
-    for (let i = 0; i < 14; i += 1) {
-      if (SENTINELS.every(s => existsSync(resolve(dir, s)))) {
-        root = dir
-        break
-      }
-      const parent = dirname(dir)
-      if (parent === dir) break
-      dir = parent
-    }
-    expect(root, '仓库根定位失败').not.toBe('')
+    expect(body).toContain('if (!await saveState()) return')
+    expect(body).toContain('buildG7SoeBatchRequest(')
+    expect((body.match(/await saveState\(\)/g) ?? []).length).toBe(1)
+    expect(body).not.toContain('markG7SoeSynced(')
+    expect(body).not.toContain('previouslySyncedTables')
 
-    const host = readFileSync(
-      resolve(
-        root,
-        'audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue',
-      ),
-      'utf-8',
-    ).replace(/\r\n/g, '\n')
-
-    // ① 同步成功后回写基线（必须在 api.post 之后，失败时不更新基线）
-    expect(
-      /state\.previouslySyncedTables\s*=\s*markG7SoeSynced\(/.test(host),
-      '宿主未在同步成功后调用 markG7SoeSynced ⇒ 基线恒为 {} ⇒ 差集恒空',
-    ).toBe(true)
-    // ② 回写后必须落库（否则刷新即丢）。同步链路里用只存不排同步的 saveState（persist 存完会再排一次同步 ⇒
-    //    每 800ms 重复同步直到卸载，守卫 disclosureSyncIndirectSelfSchedule.spec.ts）
-    const afterMark = host.slice(host.indexOf('markG7SoeSynced('))
-    expect(
-      /await saveState\(\)/.test(afterMark.slice(0, 600)),
-      'markG7SoeSynced 之后未落库 ⇒ 基线不落库',
-    ).toBe(true)
-    // ③ 载入时恢复（listed 有、改造前 soe 没有 ⇒ 每次打开都退回 {}）
-    //
-    // 🔴 判据必须匹配**条件表达式形态**，不能只查 `saved.previouslySyncedTables` 字样：
-    //    该字样在恢复分支的赋值语句里也出现，把守卫门 `if (…)` 改成 `if (false)`
-    //    后字样仍在 ⇒ 只查字样的守卫**仍然绿**（本轮变异检验已实测踩到这个 GREEN）。
-    const restoreCond =
-      /if\s*\(\s*saved\.previouslySyncedTables\s*&&\s*typeof\s+saved\.previouslySyncedTables\s*===\s*['"]object['"]\s*\)/
-    expect(
-      restoreCond.test(host),
-      '宿主载入时未恢复 previouslySyncedTables（或恢复条件被改坏）⇒ 基线每次打开都归零',
-    ).toBe(true)
-
-    // 反向自检：三条判据都要能区分「有」与「被改坏」两种形态
-    expect(/state\.previouslySyncedTables\s*=\s*markG7SoeSynced\(/.test('// nothing')).toBe(false)
-    expect(restoreCond.test('// nothing')).toBe(false)
-    expect(
-      restoreCond.test('if (false) {\n  x = Object.entries(saved.previouslySyncedTables)\n}'),
-      '判据被 `if (false)` 骗过 ⇒ 退化成 grep 式守卫',
-    ).toBe(false)
-    expect(
-      restoreCond.test(
-        "if (saved.previouslySyncedTables && typeof saved.previouslySyncedTables === 'object') {",
-      ),
-      '判据对正确形态应命中',
-    ).toBe(true)
+    const broken = body.replace('if (!await saveState()) return', 'await saveState()')
+    expect(broken).not.toContain('if (!await saveState()) return')
   })
 })
 

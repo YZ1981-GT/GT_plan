@@ -76,13 +76,15 @@ export function useH5FormData(opts: {
   wpId: Ref<string>
   projectId: Ref<string>
   sheetName?: Ref<string>
+  /** 宿主可注入已加载的 Map，使保存与重挂载读取共享同一状态。 */
+  allResponses?: Ref<Map<string, ChecklistItem>>
 }) {
   const { wpId, projectId } = opts
 
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const isSaving = ref(false)
-  const allResponses = ref<Map<string, ChecklistItem>>(new Map())
+  const allResponses = opts.allResponses ?? ref<Map<string, ChecklistItem>>(new Map())
   const renderMeta = ref<Record<string, any>>({})
   const tbData = ref<H5TbData>({
     costUnadjusted: 0,

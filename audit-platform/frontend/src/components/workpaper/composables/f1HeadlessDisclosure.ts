@@ -3,21 +3,19 @@
  *
  * 与底稿披露 Tab 同一套代码，外壳那部分也照主入口 `GtF1Prepayment` 装配：
  * - 账龄口径 `useF1AgingScope`（表级覆盖 > 项目账龄配置，配置由框架预取进缓存）→ 跨表 `useF1CrossSheet`；
- * - 减值准备预填 / 被审计单位名称：外壳传给 Tab 的是本口径披露 sheet 的 `html_data`，这里用外壳同一个
- *   `resolveRenderSheet` 在渲染配置里定位它，再按主入口同一取法 `f1ImpairmentPrefillOf` / `f1ClientNameOf` 取；
+ * - 减值准备预填 / 被审计单位名称：外壳传给 Tab 的是本口径披露 sheet 的 `html_data`，这里用共享的
+ *   `f1DisclosureHtmlDataOf` 在渲染配置里按宿主同一名称语义定位，再按主入口同一取法读取；
  * - 上市 `useF1DisclosureListed` / 国企 `useF1DisclosureSoe` → 同一个 `getSyncSnapshot` → 同一个子表 builder →
  *   同一个 `buildF1SyncPayload`（口径不适用回 null）。保存回调为空（离屏不改底稿）。
  */
 import { ref } from 'vue'
 import { defineHeadlessProvider } from '@/components/workpaper/headless/headlessFramework'
-import { resolveRenderSheet } from '@/composables/useWpRenderer'
 import { useF1AgingScope } from './useF1AgingScope'
 import { useF1CrossSheet } from './useF1CrossSheet'
 import { useF1DisclosureListed } from './useF1DisclosureListed'
 import { useF1DisclosureSoe } from './useF1DisclosureSoe'
 import { buildF1ListedSubTableData, buildF1SoeSubTableData, buildF1SyncPayload } from './f1DisclosureSyncPayload'
-import { F1_DISCLOSURE_SHEET_NAME } from './f1NoteSectionMap'
-import { f1ClientNameOf, f1ImpairmentPrefillOf } from './f1HostRenderContext'
+import { f1ClientNameOf, f1DisclosureHtmlDataOf, f1ImpairmentPrefillOf } from './f1HostRenderContext'
 
 export const f1HeadlessProvider = defineHeadlessProvider({
   // 与主入口 useF1FormData 同口径
@@ -28,8 +26,7 @@ export const f1HeadlessProvider = defineHeadlessProvider({
     const projectId = ref(ctx.projectId)
     const isReadonly = ref(false)
     const agingScope = useF1AgingScope({ allResponses, projectId, debouncedSave: () => {}, isReadonly })
-    const sheets = Array.isArray(renderConfig?.sheets) ? renderConfig.sheets : []
-    const htmlData = resolveRenderSheet(sheets, F1_DISCLOSURE_SHEET_NAME[ctx.variant])?.html_data
+    const htmlData = f1DisclosureHtmlDataOf(renderConfig, ctx.variant)
     const options = {
       allResponses,
       wpId: ref(ctx.wpId),
@@ -41,6 +38,7 @@ export const f1HeadlessProvider = defineHeadlessProvider({
       applicableStandards: ref([...ctx.applicableStandards]),
       impairmentPrefill: ref(f1ImpairmentPrefillOf(htmlData)),
       clientName: ref(f1ClientNameOf(htmlData)),
+      listenForNoteUpdates: false,
     }
     return ctx.variant === 'listed'
       ? { variant: 'listed' as const, disclosure: useF1DisclosureListed(options) }

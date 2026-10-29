@@ -221,9 +221,12 @@ async function syncToNotes() {
     }
     eventBus.emit('disclosure:note-text-updated', {
       wpCode: 'H4',
+      wpId: props.wpId,
       accountCode: '1605',
       projectId: props.projectId,
       sectionIds: [noteSectionId],
+      variant: 'listed',
+      timestamp: Date.now(),
     })
     ElMessage.success('已同步到附注（五、23 工程物资子表）')
   } catch (e: any) {

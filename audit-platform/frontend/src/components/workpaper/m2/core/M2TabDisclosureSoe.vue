@@ -178,7 +178,7 @@
  * - 国资/出资方式/验资登记 textarea sections
  * - AI辅助 per section
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -228,7 +228,9 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -262,13 +264,13 @@ function updateCapitalRow(index: number, field: 'beginAmount' | 'increaseAmount'
     formData.debouncedSave('M2-disclosure-soe-capital-rows', {
       remark: JSON.stringify(capitalChangeRows.value),
     })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M2-disclosure-soe-${section}`, { remark: value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // section → { ref, 持久化key } 映射
@@ -340,7 +342,8 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 </script>

@@ -1493,7 +1493,7 @@ export function buildG7SoeSectionSyncData(
   for (const table of section.tables ?? []) {
     result[syncTableKey(table)] = materializeG7DisclosureRows(
       state.tables[table.id] ?? [],
-      table.columns,
+      resolveG7SoeTableColumns(table, state.entitySlots),
     )
   }
   const noteTexts = (section.narratives ?? [])
@@ -1512,11 +1512,13 @@ export function buildG7SoeSectionSyncData(
  * 键与 syncTableKey 一致；投影器仅按各 payload 实含键查找，多余键自动忽略。
  * label 逐字取自各表 columns 配置，标签列承载 row.label → '项目'。
  */
-export function buildG7SoeColumns(): Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> {
+export function buildG7SoeColumns(
+  entitySlots?: Record<string, string[]>,
+): Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> {
   const result: Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> = {}
   for (const section of G7_SOE_DISCLOSURE_SECTIONS) {
     for (const table of section.tables ?? []) {
-      const columns = table.columns
+      const columns = resolveG7SoeTableColumns(table, entitySlots)
       // 🔴 Property 9: flat/group 必须在同步载荷 columns 与模板 seed 两处都表态。
       // 有 group 的表 → 标签列不标 flat（混合分组：标签列 rowspan=2，其余列按 group 聚合）。
       // 无 group 的表 → 标签列标 flat（显式单级表头，抑制后端前缀推断）。

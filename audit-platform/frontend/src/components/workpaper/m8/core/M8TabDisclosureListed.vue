@@ -162,7 +162,7 @@
  *
  * Composables: useM8FormData + useVersionTrail（双模式由主入口统一承载）
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
@@ -204,7 +204,9 @@ async function syncToDisclosureNotes(): Promise<void> {
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
@@ -273,13 +275,13 @@ function updateDataRow(tableIndex: number, field: keyof DisclosureDataRow, val: 
   if (tableIndex >= 0 && tableIndex < dataRows.value.length) {
     (dataRows.value[tableIndex] as any)[field] = val
     formData.debouncedSave(`M8-disclosure-listed-row-${tableIndex}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleNoteChange(): void {
   formData.debouncedSave('M8-disclosure-listed-note', { remark: disclosureNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 async function handleAI(section: string): Promise<void> {
@@ -323,7 +325,8 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated', onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated', onAdjudicatedRefresh)
 })
 

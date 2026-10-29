@@ -683,7 +683,8 @@ async def _push_note(
             sub[table_name] = skeleton.rows
             cols = table_data.setdefault("_sub_table_columns", {})
             cols[table_name] = skeleton.columns
-            table_data["_source"] = "workpaper"
+            # `_source` 是结构来源，不是本次动作来源；先完成骨架定位，成功写入后才为
+            # 本次新建且尚无来源的结构补标。既有 workpaper_html 必须原样保留。
             # 缺省 _current_standard（引擎按项目模板类型选章节，此时该字段可能未设）
             if "_current_standard" not in table_data:
                 table_data["_current_standard"] = template_type
@@ -794,9 +795,9 @@ async def _push_note(
 
     if not wrote:
         return None
-    # spec: formula-push-note-skip-reduction · 需求 1.4
-    # 首次推送后标记 _source，下次推送走正常路径不再触发旧格式兜底
-    if table_data.get("_source") is None:
+    # JSON `_source` 只描述 sub_table_data 的投影结构（ADR-NRG-007）。原生 `_tables`
+    # 写入保持原值；只有本次真正建成骨架且发生写入时，才为缺失的结构来源补标。
+    if skeleton_built and table_data.get("_source") is None:
         table_data["_source"] = "workpaper"
     # 推送不写同步指纹（``_last_sync_wp_id`` / ``_last_sync_at``）：指纹只表示「底稿披露表同步过」，离屏同步据此判断
     # 「已有人工填写不覆盖」；推送写了它，推送过的章节就冒充同步过（spec note-pull-followup-closure R3.2 / ADR-3）。
