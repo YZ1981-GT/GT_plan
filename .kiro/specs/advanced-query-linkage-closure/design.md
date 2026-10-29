@@ -313,6 +313,13 @@ B8 实施补记（2026-10-28，任务 24、25；与上文不同或没写到的�
 | tb / adj / report 写入 | `test_snapshot_writer.py` 对应用例删除并按实际行数下调白名单基线 1,418；`test_custom_query_auth_*` 的 tb 用例改为断言 422；`test_project_endpoint_authz_body_carried.py` 证明链不变（`_assert_writeback_authorized` 保留） |
 | `SaveAsTemplateButton.vue`、`SnapshotStalenessChip.vue`、`customQuery.cellWriteback` | 删 `useSnapshotStaleness.test.ts`；`components.d.ts` 随构建工具重新生成 |
 
+**B12 实施补记（2026-10-29，任务 34）**：
+- 三类各一个提交（跨模块单元格源族 + 选区器模块模式 / 两个零挂载组件 / `cellWriteback` 常量），删前各打本地 tag。跨模块单元格源键（`{report|note|adj|tb}:限定词|区域`）删后由 `resolve_source` 按未知数据源 400 `UNKNOWN_SOURCE`，execute 与「导出全部」同一口径，有单元、真 PG 端点用例与变异钉住。`business_fetcher` 不再返回 `(rows, columns)`，返回类型收为 `FetchPage`；编排器对旧元组的兼容路径保留（既有编排器测试用它）。
+- 选区器模块分支里的 execute 请求是 acnr 任务 16 登记的业务视图调用点之一：删掉该分支后，`queryPayloads.contract.spec.ts` 的调用点登记同一提交去掉该文件（契约意图不变：其余调用点的请求体仍经 `buildBusinessPayload`）。
+- `components.d.ts` 只手工删两条声明，不整体重新生成：在本 worktree 起 Vite 时重新生成的文件会带进与本 spec 无关的组件；实测重新生成的文件里也没有这两个组件。
+- 不删：`types/custom-query-template.ts`（只被 `SaveAsTemplateButton` 引用，任务 46 要给它加 `filters`）；只在注释里提到 `module_cell_resolver` 的 `addressing_service.py`、`trial_balance_service.py` 与两个测试；`backend/scripts/check/baselines/python_service_lines_baseline.json` 里该文件 541 行的登记（≥ 400 行才登记的膨胀基线，文件变小不触发）。
+- 验收时发现【测试】凭证身份走查_2025（ca8da212）已被他人软删（2026-10-29 01:04 UTC），项目信息接口 404，而 admin 在该项目上照常能执行业务视图查询；业务视图对已删项目是否应拒绝不在本 spec 的需求里（构建器作用域已排除已删项目，R3.1），登记为范围外。选区器验收另在未删的安徽骨科医院_2025 上做了一遍（只读）。
+
 ### 3.10 循环范围（`services/custom_query/cycle_scope.py`，新）
 ```python
 @dataclass(frozen=True)
