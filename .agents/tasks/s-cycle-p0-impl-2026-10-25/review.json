@@ -1,8 +1,0 @@
-{
-  "verdict": "CHANGES_REQUESTED",
-  "findings": [
-    "GtWpRenderer isWpNotApplicable reads renderConfig.value?.project_context?.business_category but the render-config top-level response has no project_context field. projectBiz is always empty string, isIpoProject returns false, overlay always shows for all applicable_when workpapers regardless of project type. Fix: inject business_category at render-config top level alongside applicable_when, or read from useProjectStore (already imported). CONFIRMED.",
-    "_WP_APPLICABLE_WHEN imported as private symbol across modules (non-blocking, matches existing _WP_CODE_OVERRIDE pattern)."
-  ],
-  "reviewDoc": ".agents/tasks/s-cycle-p0-impl-2026-10-25/2026-10-25-232000-review.md"
-}

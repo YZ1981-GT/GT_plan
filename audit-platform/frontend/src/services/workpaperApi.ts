@@ -55,6 +55,8 @@ export interface WpIndexItem {
   audit_cycle: string | null
   status: string | null
   assigned_to: string | null
+  assigned_to_name?: string | null
+  assigned_to_username?: string | null
   reviewer: string | null
 }
 

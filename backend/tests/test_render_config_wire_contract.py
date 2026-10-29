@@ -163,7 +163,9 @@ def test_live_golden_outer_fields_equal_model_plus_declared_reserved_fields() ->
         for name, field in SheetRenderConfig.model_fields.items()
     }
 
-    # word-template 分支字段：真实样本未命中，但模型与前端 reserved 清单必须同时登记。
+    # word-template 分支字段：真实样本未命中，但模型与前端生命周期清单必须同时登记。
+    # ``not_applicable`` 虽未出现在历史 golden 样本中，已由 GtWpRenderer
+    # 消费为顶层适用性覆盖层，因此它是 active，不是 reserved。
     model_only = root_model_fields - root_runtime_fields
     assert model_only == {
         "permissions",
@@ -173,10 +175,13 @@ def test_live_golden_outer_fields_equal_model_plus_declared_reserved_fields() ->
         "not_applicable",
     }
     frontend_src = DEFAULT_FRONTEND_PATH.read_text(encoding="utf-8")
-    for field in sorted(model_only | {"guidance", "scope"}):
+    for field in sorted((model_only - {"not_applicable"}) | {"guidance", "scope"}):
         assert f"  {field}: 'reserved'" in frontend_src, (
             f"模型/运行时未消费字段 {field} 必须在 RENDER_CONFIG_FIELD_STATUS 登记为 reserved"
         )
+    assert "  not_applicable: 'active'" in frontend_src, (
+        "not_applicable 已由 GtWpRenderer 消费，必须登记为 active"
+    )
     assert "  decision_trace: 'active'" in frontend_src, (
         "decision_trace 已由 WpDecisionTracePanel 消费，必须登记为 active"
     )

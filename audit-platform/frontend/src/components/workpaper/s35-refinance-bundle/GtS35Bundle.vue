@@ -25,6 +25,7 @@ import { useS35BundleState, S35_TAB_DEFS, type TabDef } from '../composables/use
 import { useS35CrossRef } from './useS35CrossRef'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 import GtS35DetailTable from './GtS35DetailTable.vue'
+import BundleAssigneeDisplay from '../shared/BundleAssigneeDisplay.vue'
 
 type S35SheetCode = 'S35-1-1' | 'S35-2-1' | 'S35-3-1'
 
@@ -43,6 +44,7 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 
 const {
   wpIdMap,
+  assignedToMap,
   visibleTabs,
   completionMap,
   progressSummary,
@@ -233,6 +235,10 @@ onMounted(async () => {
           :name="tab.id"
           lazy
         >
+          <BundleAssigneeDisplay
+            :tab-code="tab.wpCode"
+            :assignment="assignedToMap[tab.wpCode]"
+          />
           <!-- ═══ 含子表的 Tab：子 sheet 切换 (Req 3.3) ═══ -->
           <template v-if="hasSubSheets(tab)">
             <!-- 子 sheet 切换：核查程序表 / 明细核查表 -->

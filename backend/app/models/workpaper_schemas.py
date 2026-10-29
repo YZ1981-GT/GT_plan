@@ -114,6 +114,8 @@ class WPIndexResponse(BaseModel):
     wp_name: str
     audit_cycle: str | None = None
     assigned_to: UUID | None = None
+    assigned_to_name: str | None = None
+    assigned_to_username: str | None = None
     reviewer: UUID | None = None
     status: WpStatus = WpStatus.not_started
     cross_ref_codes: list[str] | None = None

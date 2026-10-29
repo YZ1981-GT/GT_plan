@@ -19,6 +19,7 @@ import sqlalchemy as sa
 from app.core.database import get_db
 from app.deps import require_project_access, check_consol_lock
 from app.models.core import User
+from app.models.staff_models import StaffMember
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper
 
 router = APIRouter(
@@ -38,10 +39,31 @@ async def list_wp_index(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """底稿索引列表（需项目成员权限）"""
-    from app.models.workpaper_models import WorkingPaper
+    # staff_members.user_id 不是唯一键：用相关子查询选取首条未删除人员记录，
+    # 避免同一用户存在历史/重复人员档案时把一个 wp_index 展开成多行。
+    staff_name = (
+        sa.select(StaffMember.name)
+        .where(
+            StaffMember.user_id == WpIndex.assigned_to,
+            StaffMember.is_deleted == sa.false(),
+        )
+        .order_by(StaffMember.created_at.asc(), StaffMember.id.asc())
+        .limit(1)
+        .correlate(WpIndex)
+        .scalar_subquery()
+    )
     result = await db.execute(
-        sa.select(WpIndex, WorkingPaper.id.label("wp_id"))
+        sa.select(
+            WpIndex,
+            WorkingPaper.id.label("wp_id"),
+            User.username.label("assigned_to_username"),
+            sa.func.coalesce(
+                sa.func.nullif(sa.func.trim(staff_name), ""),
+                User.username,
+            ).label("assigned_to_name"),
+        )
         .outerjoin(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .outerjoin(User, User.id == WpIndex.assigned_to)
         .where(WpIndex.project_id == project_id, WpIndex.is_deleted == sa.false())
         .order_by(WpIndex.wp_code)
     )
@@ -55,6 +77,8 @@ async def list_wp_index(
             "audit_cycle": row.WpIndex.audit_cycle,
             "status": row.WpIndex.status.value if row.WpIndex.status else None,
             "assigned_to": str(row.WpIndex.assigned_to) if row.WpIndex.assigned_to else None,
+            "assigned_to_name": row.assigned_to_name,
+            "assigned_to_username": row.assigned_to_username,
             "reviewer": str(row.WpIndex.reviewer) if row.WpIndex.reviewer else None,
         }
         for row in rows

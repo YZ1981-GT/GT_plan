@@ -18,6 +18,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { getWpIndex } from '@/services/workpaperApi'
 import { api } from '@/services/apiProxy'
+import { buildBundleAssigneeMap, type BundleAssignee } from '../shared/bundleAssignee'
 import { S33_ANN14_TABS, type S33TabDef } from './S33_TAB_CONFIG'
 
 // ─── Types (exported for testability) ───
@@ -44,6 +45,8 @@ export interface UseS33BundleStateOptions {
 export interface UseS33BundleStateReturn {
   /** S33-x wp_code → wp_id 映射 */
   wpIdMap: ComputedRef<Record<string, string>>
+  /** S33-x wp_code → 负责人展示信息（只读索引 JOIN 结果） */
+  assignedToMap: ComputedRef<Record<string, BundleAssignee>>
   /** 仅 wpIdMap 有值的核查底稿 Tab（驱动 el-tabs 渲染） */
   visibleTabs: ComputedRef<S33TabDef[]>
   /** 各底稿完成状态（Task 3.2 实现） */
@@ -128,11 +131,14 @@ export function useS33BundleState(options: UseS33BundleStateOptions): UseS33Bund
   const loading = ref(false)
   /** S33-x → wp_id 内部状态 */
   const wpIdMapState = ref<Record<string, string>>({})
+  /** S33-x → 负责人展示信息 */
+  const assignedToMapState = ref<Record<string, BundleAssignee>>({})
   /** S33-x → checklist-responses 原始数据缓存 */
   const responsesCache = ref<Record<string, ChecklistResponse[]>>({})
 
   // ─── wpIdMap（Task 3.1）───
   const wpIdMap = computed<Record<string, string>>(() => wpIdMapState.value)
+  const assignedToMap = computed<Record<string, BundleAssignee>>(() => assignedToMapState.value)
 
   // ─── visibleTabs（Task 3.1）───
   const visibleTabs = computed<S33TabDef[]>(() =>
@@ -163,14 +169,17 @@ export function useS33BundleState(options: UseS33BundleStateOptions): UseS33Bund
   async function loadWpIndex(): Promise<void> {
     if (!projectId.value) {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
       return
     }
     loading.value = true
     try {
       const items = await getWpIndex(projectId.value)
       wpIdMapState.value = buildWpIdMap(items)
+      assignedToMapState.value = buildBundleAssigneeMap(items)
     } catch {
       wpIdMapState.value = {}
+      assignedToMapState.value = {}
     } finally {
       loading.value = false
     }
@@ -232,6 +241,7 @@ export function useS33BundleState(options: UseS33BundleStateOptions): UseS33Bund
 
   return {
     wpIdMap,
+    assignedToMap,
     visibleTabs,
     completionMap,
     progressSummary,

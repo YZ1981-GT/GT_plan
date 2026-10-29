@@ -78,14 +78,14 @@
 
 - [x] P2.1 对 `risk_assessments` 执行 `SELECT DISTINCT account_or_cycle ... LIMIT 50`，记录真实值域并确认映射；若数据库不可用，保留环境阻塞，不伪造枚举。
 - [x] P2.2 实现 S34 风险指示器和四象限 `applicable/recommended/not_applicable`，增加 service/Overview 测试。
-- [-] P2.3 在 4 个 bundle 的 tab 展示 `assigned_to` 对应 staff name，缺失时回退 username；增加 JOIN/展示测试，不改变 assignment_service 粒度。
+- [x] P2.3 在 4 个 bundle 的 tab 展示 `assigned_to` 对应 staff name，缺失时回退 username；增加 JOIN/展示测试，不改变 assignment_service 粒度。
 
 ## Phase Final — 回归与收口
 
-- [ ] F1 后端回归：predicate、render-config、dispatch、classification contract、resolver、mapping 测试；仅将 capability manifest 失败作为预存记录。
-- [ ] F2 前端回归：IPO 核心/D4/F2、GtWpRenderer、s-checklist、S 路由、S34/S35 相关测试；单区域 type proof 已由 D8 覆盖。
-- [ ] F3 浏览器回归：S3/S12/S14/S15/S20/S21 既有专属组件不受影响；bundle overlay、S17 classification gate 和测试项目数据清理有记录。
-- [ ] F4 三件套一致性检查：逐条核对 requirements 的验收标准均有 design 方案和 task 承接；未批准决策、环境失败、未完成任务保持未勾选，不以代码存在或 registry 测试绿替代证据。
+- [x] F1 后端回归：predicate、render-config、dispatch、classification contract、resolver、mapping 测试；仅将 capability manifest 失败作为预存记录。
+- [x] F2 前端回归：IPO 核心/D4/F2、GtWpRenderer、s-checklist、S 路由、S34/S35 相关测试；单区域 type proof 已由 D8 覆盖。
+- [x] F3 浏览器回归：S3/S12/S14/S15/S20/S21 既有专属组件不受影响；bundle overlay、S17 classification gate 和测试项目数据清理有记录。
+- [x] F4 三件套一致性检查：逐条核对 requirements 的验收标准均有 design 方案和 task 承接；未批准决策、环境失败、未完成任务保持未勾选，不以代码存在或 registry 测试绿替代证据。
 
 ## Notes
 

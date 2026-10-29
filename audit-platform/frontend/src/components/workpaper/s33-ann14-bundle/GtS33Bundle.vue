@@ -21,6 +21,7 @@ import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useS33BundleState } from './useS33BundleState'
 import { S33_ANN14_TABS, type S33TabDef } from './S33_TAB_CONFIG'
+import BundleAssigneeDisplay from '../shared/BundleAssigneeDisplay.vue'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 
 // ─── Props ───
@@ -38,6 +39,7 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 
 const {
   wpIdMap,
+  assignedToMap,
   visibleTabs,
   progressSummary,
   loading,
@@ -251,6 +253,10 @@ onMounted(async () => {
           :name="tab.id"
           lazy
         >
+          <BundleAssigneeDisplay
+            :tab-code="tab.wpCode"
+            :assignment="assignedToMap[tab.wpCode]"
+          />
           <!-- Task 4.2: 隐藏程序表变体切换入口 (Req 3.4) -->
           <div
             v-if="tab.hiddenVariantSheet"

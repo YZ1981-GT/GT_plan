@@ -182,6 +182,15 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         comment='工时预算配置: {"by_cycle":{"D":100,"E":80,...},"by_user":{"user_id":160,...},"total":800}',
     )
 
+    # V212（voucher-identity-writeback-and-audit-phase 任务 8，ADR-VK-09）：当前审计阶段与预审截止日。
+    # 抽凭、挂凭、挂凭回拉生成的行按 current_audit_phase 标阶段；改动只走
+    # PUT /api/projects/{id}/audit-phase（经理、合伙人含签字合伙人、admin），写 app_audit_log。
+    current_audit_phase: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="final", server_default=text("'final'"),
+        comment="当前审计阶段: preliminary 预审 / final 年审（CHECK ck_projects_current_audit_phase）",
+    )
+    interim_cutoff_date: Mapped[date | None] = mapped_column(nullable=True, comment="预审截止日")
+
     # V216（acnr-foundation-defect-closure 需求 7.1~7.2 / D5 / T17）：锁定的 ACNR 地址目录版本。
     # NULL = 未锁定，按当前目录解析；存量不回填（归档时没记过版本，编不出真实值）。
     # 只由 `app/services/acnr/project_registry_lock.py` 在归档 / 取消归档的同一事务里写，

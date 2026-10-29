@@ -798,6 +798,16 @@
         "executionId": "c9072e39-5ec2-4f11-a2bf-0e961333f870",
         "chatSessionId": "sess_e9689c6d-2742-454c-aa4f-d97cf214975d",
         "timestamp": 1792927993342
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942248769
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942622883
       }
     ],
     "F2 前端回归：IPO 核心/D4/F2、GtWpRenderer、s-checklist、S 路由、S34/S35 相关测试；单区域 type proof 已由 D8 覆盖。": [
@@ -805,6 +815,16 @@
         "executionId": "c9072e39-5ec2-4f11-a2bf-0e961333f870",
         "chatSessionId": "sess_e9689c6d-2742-454c-aa4f-d97cf214975d",
         "timestamp": 1792927993384
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942634222
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942859303
       }
     ],
     "F3 浏览器回归：S3/S12/S14/S15/S20/S21 既有专属组件不受影响；bundle overlay、S17 classification gate 和测试项目数据清理有记录。": [
@@ -812,6 +832,16 @@
         "executionId": "c9072e39-5ec2-4f11-a2bf-0e961333f870",
         "chatSessionId": "sess_e9689c6d-2742-454c-aa4f-d97cf214975d",
         "timestamp": 1792927993427
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942878104
+      },
+      {
+        "executionId": "1c6a443b-e0b2-421e-a680-60d0cf6a1fa6",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792944513841
       }
     ],
     "F4 三件套一致性检查：逐条核对 requirements 的验收标准均有 design 方案和 task 承接；未批准决策、环境失败、未完成任务保持未勾选，不以代码存在或 registry 测试绿替代证据。": [
@@ -819,6 +849,21 @@
         "executionId": "c9072e39-5ec2-4f11-a2bf-0e961333f870",
         "chatSessionId": "sess_e9689c6d-2742-454c-aa4f-d97cf214975d",
         "timestamp": 1792927993469
+      },
+      {
+        "executionId": "1c6a443b-e0b2-421e-a680-60d0cf6a1fa6",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792944521947
+      },
+      {
+        "executionId": "e046a2d1-8f5f-4c97-897e-b2fe1df09d95",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792944809071
+      },
+      {
+        "executionId": "e046a2d1-8f5f-4c97-897e-b2fe1df09d95",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792944814047
       }
     ],
     "P2.1 对 `risk_assessments` 执行 `SELECT DISTINCT account_or_cycle ... LIMIT 50`，记录真实值域并确认映射；若数据库不可用，保留环境阻塞，不伪造枚举。": [
@@ -865,6 +910,11 @@
         "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
         "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
         "timestamp": 1792941678434
+      },
+      {
+        "executionId": "b53d20db-7aa1-4812-b622-bf44b9e8b9d2",
+        "chatSessionId": "sess_bfe46da4-755e-4a59-87d8-cf28a92dc502",
+        "timestamp": 1792942232312
       }
     ]
   }

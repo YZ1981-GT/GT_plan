@@ -23,6 +23,7 @@ import { useS32BundleState } from './useS32BundleState'
 import { S32_FRAUD_TABS, type S32TabDef } from './S32_TAB_CONFIG'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 import GtGridSheet from '../GtGridSheet.vue'
+import BundleAssigneeDisplay from '../shared/BundleAssigneeDisplay.vue'
 
 // ─── Props ───
 const props = withDefaults(defineProps<{
@@ -39,6 +40,7 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 
 const {
   wpIdMap,
+  assignedToMap,
   visibleTabs,
   progressSummary,
   loading,
@@ -321,6 +323,10 @@ onMounted(async () => {
           :name="tab.id"
           lazy
         >
+          <BundleAssigneeDisplay
+            :tab-code="tab.wpCode"
+            :assignment="assignedToMap[tab.wpCode]"
+          />
           <!-- Task 4.3: 提示折叠区块 (Req 3.4) -->
           <details
             v-if="tab.tipSheet && tipsCache[tab.wpCode]"
