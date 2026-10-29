@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.consol_note_data_models import ConsolNoteData
 from app.services.consol_note_table_totals import to_decimal as _to_decimal
 from app.models.consol_note_mapping_models import (
+    ConsolNoteDetailTemplate,
     ConsolNoteDetailTemplateVersion,
     ConsolNoteMappingBinding,
     ConsolNoteMappingRule,
@@ -109,6 +110,14 @@ async def apply_detail_refresh(
     )).scalar_one_or_none()
     if version is None:
         raise ApplyError(400, "VERSION_MISSING", "绑定的模板版本不存在")
+    template_identity = (await db.execute(
+        sa.select(ConsolNoteDetailTemplate.template_type, ConsolNoteDetailTemplate.section_id).where(
+            ConsolNoteDetailTemplate.id == version.template_id,
+            ConsolNoteDetailTemplate.is_deleted == sa.false(),
+        )
+    )).one_or_none()
+    if template_identity is None or template_identity.template_type != template_type or template_identity.section_id != section_id:
+        raise ApplyError(409, "TEMPLATE_BINDING_MISMATCH", "绑定的模板版本不属于当前附注口径或章节，请重新绑定")
 
     template_rows: list[dict[str, Any]] = version.rows if isinstance(version.rows, list) else []
     target_row_index = {str(tr["target_row_id"]): i for i, tr in enumerate(template_rows)}
@@ -149,16 +158,32 @@ async def apply_detail_refresh(
         src = sources.get(pid)
         return src.rows if src is not None else []
 
-    if preview_entity_hashes:
-        for b in confirmed:
+    # 服务端每次 apply 都复核绑定时结构，不能只相信可选的客户端 preview hash。
+    fresh_confirmed: list[ConsolNoteMappingBinding] = []
+    structure_changed: list[str] = []
+    for b in confirmed:
+        current_hash = compute_source_structure_hash(section_id, _rows_of(b.entity_project_id))
+        if current_hash != b.bound_source_hash:
+            b.status = "stale"
+            stale.append(b)
+            structure_changed.append(b.entity_node_key)
+            continue
+        if preview_entity_hashes:
             expected = preview_entity_hashes.get(b.entity_node_key)
-            if expected is None:
-                continue
-            if compute_source_structure_hash(section_id, _rows_of(b.entity_project_id)) != expected:
+            if expected is not None and current_hash != expected:
                 raise ApplyError(
                     409, "SOURCE_CHANGED",
                     f"企业 {b.entity_node_key} 的来源数据已变化，请重新预览",
                 )
+        fresh_confirmed.append(b)
+    confirmed = fresh_confirmed
+    if not confirmed and structure_changed:
+        await db.flush()
+        raise ApplyError(
+            409, "SOURCE_CHANGED",
+            "来源结构已变化，请重新预览并确认映射",
+            {"stale_entities": structure_changed[:50]},
+        )
 
     # ── 4. 加载规则并检查阻断 ──
     rule_ids = list({b.rule_id for b in confirmed if b.rule_id is not None})
@@ -174,6 +199,14 @@ async def apply_detail_refresh(
         rule = rule_cache.get(b.rule_id)
         if rule is None:
             unmapped_labels.append(f"企业 {b.entity_node_key} 的规则已删除")
+            continue
+        if (
+            rule.is_active is not True
+            or rule.project_id != project_id
+            or rule.section_id != section_id
+            or rule.template_version_id != binding.template_version_id
+        ):
+            unmapped_labels.append(f"企业 {b.entity_node_key} 的规则与当前项目、章节或模板版本不一致")
             continue
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
             if m.get("mapping_action", "") in ("map", "map_merge"):

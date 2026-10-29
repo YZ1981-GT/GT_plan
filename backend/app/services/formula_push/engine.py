@@ -36,6 +36,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
 from app.services.formula_push import note_writer
+from app.services.formula_push.note_events import publish_note_sections
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
 from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
@@ -959,6 +960,7 @@ async def run_and_commit(
         raise
     if not dry_run and result.run_id is not None:
         _broadcast(result)
+        await publish_note_sections(result.project_id, result.year, result.note_sections, result.run_id)
     return result
 
 

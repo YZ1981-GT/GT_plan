@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter, defaultdict
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -35,17 +35,19 @@ def codes_by_section(variant: str, sections: list[str] | None) -> dict[str, list
 
     ``sections`` 为空 = 注册表里本准则的全部章节。映射真源 = ``note_workpaper_sync_registry.json``。
     """
-    from app.services.note_readiness_service import _load_registry_entries
+    from app.services.note_readiness_service import _load_registry_entries, registry_sections
 
     wanted = set(sections) if sections else None
     out: dict[str, list[str]] = defaultdict(list)
     for entry in _load_registry_entries():
         code = str(entry.get("wp_code") or "").strip()
-        sec = str(entry.get(variant) or "").strip()
-        if not code or not sec or (wanted is not None and sec not in wanted):
+        if not code:
             continue
-        if code not in out[sec]:
-            out[sec].append(code)
+        for sec in registry_sections(entry, variant):
+            if wanted is not None and sec not in wanted:
+                continue
+            if code not in out[sec]:
+                out[sec].append(code)
     if wanted:
         for sec in wanted:
             out.setdefault(sec, [])
@@ -196,7 +198,7 @@ async def _apply_note_formulas(db: AsyncSession, project_id: UUID, year: int,
 
 
 async def _mark_synced_sections(db: AsyncSession, project_id: UUID, year: int,
-                                sections: list[str]) -> dict[str, Any]:
+                                sections: list[str], *, mutate_source: bool = True) -> dict[str, Any]:
     """已由底稿同步过（带 ``_last_sync_wp_id``）的章节补 ``_source=workpaper``；不改同步时间（没有同步就不算同步）。
 
     另回逐章节状态 ``states[章节] = {exists, synced_before, manual_values}``（前端离屏同步的覆盖判断）。指纹只由底稿
@@ -228,12 +230,13 @@ async def _mark_synced_sections(db: AsyncSession, project_id: UUID, year: int,
             never += 1
             continue
         synced += 1
-        if td.get("_source") not in ("workpaper", "workpaper_html"):
+        if mutate_source and td.get("_source") not in ("workpaper", "workpaper_html"):
             td = dict(td)
             td["_source"] = "workpaper"
             note.table_data = td
             flag_modified(note, "table_data")
-    await db.flush()
+    if mutate_source:
+        await db.flush()
     return {"synced": synced, "skipped": skipped, "skipped_never_synced": never, "states": states}
 
 
@@ -268,8 +271,13 @@ async def pull_sections(
     *,
     sections: list[str] | None,
     user_id: UUID | None,
+    phase: Literal["all", "prepare", "push"] = "all",
 ) -> dict[str, Any]:
-    """按章节从底稿取数（公式推送），回逐章节结果。``sections`` 为空 = 本准则全部有底稿映射的章节。"""
+    """按章节准备底稿上下文或执行推送。
+
+    ``prepare`` 只返回 headless 所需上下文；``push`` 只在披露明细写入后推审定主表；
+    ``all`` 保留旧调用的一步式行为（推送后立即执行附注公式）。
+    """
     from app.models.core import Project
     from app.services.formula_push.bindings import supported_wp_codes
 
@@ -282,13 +290,26 @@ async def pull_sections(
     supported = set(supported_wp_codes())
     codes = sorted({c for cs in by_section.values() for c in cs if c in supported})
 
+    if phase not in {"all", "prepare", "push"}:
+        raise ValueError(f"未知取数阶段：{phase}")
+
     result, push_error = (None, None)
-    if codes:
+    if phase != "prepare" and codes:
         result, push_error = await _push(db, project_id, year, codes, user_id)
     per = summarize_push(result, target_sections) if result is not None else {}
-    formula_runs = await _apply_note_formulas(db, project_id, year, target_sections)
+    # 两阶段前端会在 headless 后调用 phase=push，再由 refill service 最后执行公式；
+    # 旧调用未传 phase 时保持一步式 push→formula 行为。
+    formula_runs = (
+        await _apply_note_formulas(db, project_id, year, target_sections)
+        if phase == "all"
+        else {}
+    )
 
-    marks = await _mark_synced_sections(db, project_id, year, target_sections)
+    marks = (
+        await _mark_synced_sections(db, project_id, year, target_sections, mutate_source=False)
+        if phase == "prepare"
+        else await _mark_synced_sections(db, project_id, year, target_sections)
+    )
     states = marks.pop("states", None) or {}
     # 全部刷新：一张底稿可写多个章节（注册表只记主章节），离屏同步对注册表外的章节同样按「已有人工填写不覆盖」判
     other_states = {} if sections else await _other_section_states(db, project_id, year, set(target_sections))
@@ -310,6 +331,7 @@ async def pull_sections(
     summary = result.summary() if result is not None else None
     return {
         **marks,
+        "phase": phase,
         "variant": variant,
         "formulas": {
             "updated": sum(r["updated"] for r in formula_runs.values()),

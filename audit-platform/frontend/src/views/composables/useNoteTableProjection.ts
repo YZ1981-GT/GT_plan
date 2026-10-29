@@ -53,10 +53,22 @@ export function useNoteTableProjection(options: UseNoteTableProjectionOptions) {
       ]))
       rawTables = clientProjected.map((table: any) => {
         const serverTable = serverByKey.get(table?._source_sub_table_key || table?.name)
-        const metadata = serverTable && typeof serverTable === 'object' ? { ...serverTable } : {}
+        const metadata: Record<string, any> = serverTable && typeof serverTable === 'object'
+          ? { ...serverTable }
+          : {}
         // 导出开关以 raw 顶层清单为准，不能让旧投影的 false 残留覆盖已恢复的状态。
         delete metadata.export_enabled
-        return { ...metadata, ...table }
+        const merged = { ...metadata, ...table }
+        // raw 行/columns/_source*Refs 是即时编辑与写回坐标真源；以下结构字段由后端按对应
+        // 国企/上市模板增强，必须覆盖旧 builder 表头，才能忠实显示 Word 合并单元格。
+        const structuralKeys = [
+          'name', 'headers', 'multi_header', 'header_rows', '_column_groups', '_row_types',
+          '_display_layout', 'guidance', 'text_after_table', 'auto_index',
+        ] as const
+        for (const key of structuralKeys) {
+          if (Object.prototype.hasOwnProperty.call(metadata, key)) merged[key] = metadata[key]
+        }
+        return merged
       })
     }
     if (!rawTables && td._tables && Array.isArray(td._tables) && td._tables.length > 0) {

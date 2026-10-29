@@ -15,7 +15,7 @@ Validates: Requirements 4.1-4.11, 5.1-5.5
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -457,6 +457,9 @@ async def pull_from_workpapers(
     project_id: UUID,
     year: int,
     note_section: str | None = None,
+    phase: Literal["all", "prepare", "push"] = Query(
+        "all", description="prepare=只准备离屏上下文；push=披露明细写入后推审定主表；all=兼容旧一步式调用",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
@@ -473,7 +476,8 @@ async def pull_from_workpapers(
 
     try:
         result = await pull_sections(
-            db, project_id, year, sections=[note_section] if note_section else None, user_id=current_user.id,
+            db, project_id, year, sections=[note_section] if note_section else None,
+            user_id=current_user.id, phase=phase,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -532,7 +536,7 @@ async def get_wp_sync_status(
         ]}
     """
     from app.services.note_content_utils import note_has_data
-    from app.services.note_readiness_service import _load_registry_entries
+    from app.services.note_readiness_service import _load_registry_entries, registry_sections
 
     code = (wp_code or "").strip().upper()
     entry = next(
@@ -542,11 +546,11 @@ async def get_wp_sync_status(
     if entry is None:
         return {"wp_code": code, "variants": []}
 
-    sections = {
-        v: entry.get(v)
-        for v in ("listed", "soe")
-        if isinstance(entry.get(v), str) and entry.get(v)
-    }
+    sections = [
+        (variant, section)
+        for variant in ("listed", "soe")
+        for section in registry_sections(entry, variant)
+    ]
     if not sections:
         return {"wp_code": code, "variants": []}
 
@@ -557,7 +561,7 @@ async def get_wp_sync_status(
                     DisclosureNote.project_id == project_id,
                     DisclosureNote.year == year,
                     DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.note_section.in_(list(sections.values())),
+                    DisclosureNote.note_section.in_([section for _variant, section in sections]),
                 )
             )
         )
@@ -567,7 +571,7 @@ async def get_wp_sync_status(
     by_section = {n.note_section: n for n in notes}
 
     variants = []
-    for variant, section in sections.items():
+    for variant, section in sections:
         n = by_section.get(section)
         variants.append(
             {

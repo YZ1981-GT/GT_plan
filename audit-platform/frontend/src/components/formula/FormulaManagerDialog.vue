@@ -3222,6 +3222,28 @@ async function onApplyFormulas() {
     return
   }
 
+  // 附注节点必须执行章节公式端点；通用 report 批执行只返回弹窗缓存，无法写入 disclosure_notes。
+  if (isNoteDomainNodeKey(selectedNodeKey.value)) {
+    const target = noteEditTarget.value
+    if (!target) {
+      ElMessage.warning('请先在左侧选择具体的附注章节')
+      return
+    }
+    applying.value = true
+    try {
+      const result: any = await api.post(P_nf.apply(props.projectId, props.year, target.note_section))
+      const updated = Number(result?.updated ?? result?.cells_updated ?? 0)
+      ElMessage.success(updated > 0 ? `已应用本章节公式，更新 ${updated} 个单元格` : '本章节公式计算完成，数据已是最新')
+      await loadNoteUserFormulas(target.note_section, true)
+      emit('applied')
+    } catch (e: any) {
+      handleApiError(e, '附注公式执行失败')
+    } finally {
+      applying.value = false
+    }
+    return
+  }
+
   // 收集当前节点所有带公式的行
   const formulaRows = currentRows.value.filter((r: any) => r.formula && r.formula_category === 'auto_calc')
   if (!formulaRows.length) {
@@ -3359,6 +3381,10 @@ const canEditGlobal = ref(false)
 const projectReportScope = ref('')
 /** 当前节点对应的公式域 */
 const settingsDomain = computed(() => {
+  if (activeCategory.value === 'formula_push') return 'push'
+  if (props.scope === 'workpaper') return 'wp'
+  if (props.scope === 'note') return 'note'
+  if (props.scope === 'consol_note') return 'consol_note'
   const k = selectedNodeKey.value
   if (k === 'tb_detail') return 'tb_detail'
   if (k.startsWith('cross_')) return 'cross_check'

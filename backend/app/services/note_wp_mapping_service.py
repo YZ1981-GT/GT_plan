@@ -63,6 +63,8 @@ def _build_default_wp_mapping() -> dict[str, str]:
             / "note_workpaper_sync_registry.json"
         )
         raw = json.loads(p.read_text(encoding="utf-8"))
+        from app.services.note_readiness_service import registry_sections
+
         out: dict[str, str] = {}
         for e in raw.get("entries", []):
             if not isinstance(e, dict):
@@ -70,10 +72,9 @@ def _build_default_wp_mapping() -> dict[str, str]:
             code = str(e.get("wp_code") or "").strip()
             if not code:
                 continue
-            for key in ("listed", "soe"):
-                sec = e.get(key)
-                if isinstance(sec, str) and sec.strip():
-                    out.setdefault(sec.strip(), code)  # 首个赢，避免一 section 多 wp 覆盖
+            for variant in ("listed", "soe"):
+                for sec in registry_sections(e, variant):
+                    out.setdefault(sec, code)  # 首个赢，避免一 section 多 wp 覆盖
         if out:
             return out
     except Exception:  # pragma: no cover — registry 缺失/损坏时安全降级
@@ -82,6 +83,21 @@ def _build_default_wp_mapping() -> dict[str, str]:
 
 
 DEFAULT_WP_MAPPING = _build_default_wp_mapping()
+
+
+async def _apply_final_note_formulas(
+    db: AsyncSession, project_id: UUID, year: int, sections: list[str],
+) -> dict[str, Any]:
+    """refill 后执行每张表的预设/用户公式，保证公式读取的是最终披露明细。"""
+    from app.services.note_workpaper_pull_service import _apply_note_formulas
+
+    runs = await _apply_note_formulas(db, project_id, year, list(dict.fromkeys(sections)))
+    errors = [f"附注公式失败 {section}: {item['error']}" for section, item in runs.items() if item.get("error")]
+    return {
+        "formula_updated": sum(int(item.get("updated") or 0) for item in runs.values()),
+        "formula_sections": [section for section, item in runs.items() if int(item.get("updated") or 0) > 0],
+        "formula_errors": errors,
+    }
 
 
 def _iter_formula_rows(table_data: dict[str, Any]) -> Iterator[dict[str, Any]]:
@@ -229,13 +245,18 @@ class NoteWpMappingService:
             project_id, year, affected_sections, skip_manual=True
         )
 
-        # 4. 构造向后兼容的响应体
+        # 4. 最后执行附注表内预设/用户公式：headless 披露明细与 binding 已全部落到当前事务。
+        formulas = await _apply_final_note_formulas(self.db, project_id, year, affected_sections)
+        report.errors.extend(formulas["formula_errors"])
+
+        # 5. 构造向后兼容的响应体
         return {
             "refreshed": report.cells_updated,
             "total_notes": total_notes,
             "sections_recomputed": report.sections_recomputed,
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
+            **formulas,
         }
 
     async def refresh_section_from_workpapers(
@@ -253,12 +274,15 @@ class NoteWpMappingService:
         report = await engine.refill_sections(
             project_id, year, [note_section], skip_manual=True
         )
+        formulas = await _apply_final_note_formulas(self.db, project_id, year, [note_section])
+        report.errors.extend(formulas["formula_errors"])
         return {
             "refreshed": report.cells_updated,
             "total_notes": 1,
             "sections_recomputed": report.sections_recomputed,
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
+            **formulas,
         }
 
     async def toggle_cell_mode(

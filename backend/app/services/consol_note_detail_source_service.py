@@ -63,6 +63,8 @@ def _row_type(row: Any) -> str:
         rt = str(row.get("row_type", "data")).strip()
         if rt in ("total", "subtotal"):
             return rt
+        if rt in ("header", "header_label", "title", "section_header"):
+            return "header"
         if rt not in ("data", ""):
             # 非标准类型（如 header）——不做标签推导，直接归为 data
             return "data"
@@ -119,6 +121,8 @@ def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
     for row in rows:
         label = _first_cell(row).strip()
         rt = _row_type(row)
+        if rt == "header":
+            continue
         sk = _stable_key(row)
         if not sk:
             count = seen.get(label, 0)
@@ -268,6 +272,19 @@ async def load_source_tables(
         return {pid: SourceTable(reason=reason, status="no_source") for pid in ids}
     standalone_title = str(entry.get("standalone_section_title") or "").strip()
 
+    # 每家来源企业按自己的附注模板口径识别标题行。合并项目可能是国企口径、子企业是上市口径；
+    # 目标列仍取合并模板，来源表头/续表规则必须取该单体项目自己的 soe/listed。
+    from app.models.core import Project
+
+    source_variants = {
+        pid: ("listed" if "listed" in str(value or "").lower() else "soe")
+        for pid, value in (await db.execute(
+            sa.select(Project.id, Project.template_type).where(
+                Project.id.in_(ids), Project.is_deleted == sa.false(),
+            )
+        )).all()
+    }
+
     notes = (await db.execute(
         sa.select(
             DisclosureNote.project_id, DisclosureNote.note_section, DisclosureNote.table_data,
@@ -300,7 +317,7 @@ async def load_source_tables(
                 table_name=entry.get("standalone_table_name"),
                 title=entry.get("consol_title"),
                 section_title=note.section_title,
-                std=template_type,
+                std=source_variants.get(pid, template_type),
                 consol_section_id=section_id,
                 standalone_section=note.note_section,
             )

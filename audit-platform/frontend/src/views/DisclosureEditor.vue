@@ -2190,6 +2190,7 @@ function isFormulaMismatch(row: any, colIdx: number): boolean {
 const {
   refreshLoading, refreshAllLoading, syncError,
   onRefreshFromWP, onRefreshAll, onManualRefresh, onStaleRecalc,
+  syncFromWorkpaperDisclosures,
   showRefreshResultMessage, onWorkpaperSaved, onDisclosureNoteTextUpdated,
 } = useNoteRefresh({
   projectId,
@@ -2686,13 +2687,17 @@ async function onGenerate() {
   if (!ok) return
   await withLoading(genLoading, async () => {
     try {
-      // 生成前先触发底稿→附注同步标记（确保已同步的章节不被生成覆盖）
-      try {
-        await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/pull-from-workpapers`, null, { _silent: true } as any)
-      } catch { /* fail-open */ }
+      // 首次生成也先用同一完整链：prepare → headless → 审定主表推送；生成后再做 binding 与表内公式。
+      const pulled = await syncFromWorkpaperDisclosures(null)
       await generateDisclosureNotes(projectId.value, year.value, templateType.value)
-      ElMessage.success('附注生成完成')
+      const refreshed = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      invalidateDetailCache()
       await fetchTree()
+      if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
+      ElMessage.success('附注生成并刷新完成')
+      if (pulled.lines.length || refreshed.cells_updated || refreshed.errors?.length) {
+        showRefreshResultMessage(refreshed, pulled)
+      }
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || ''
       if (msg) ElMessage.warning('附注生成：' + msg)

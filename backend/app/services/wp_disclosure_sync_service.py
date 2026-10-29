@@ -1061,6 +1061,7 @@ async def sync_from_workpaper(
             text_content=formatted_texts or None,
             source_template=source_template_value,
             status=NoteStatus.draft,
+            is_stale=False,
             last_sync_source="workpaper",
             last_sync_wp_id=wp_id,
             last_sync_at=now,
@@ -1156,6 +1157,8 @@ async def sync_from_workpaper(
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now
         note.last_sync_user_id = user.id
+        note.is_stale = False
+        note.stale_source = None
         note.updated_by = user.id
         note.updated_at = now
         logger.info(

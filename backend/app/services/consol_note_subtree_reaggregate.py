@@ -86,7 +86,9 @@ WRITE_SOURCE = "subtree_aggregate"
 ACTION_PULL, ACTION_ELIM, ACTION_AGGREGATE = "pull", "elim", "aggregate"
 _PERSISTED, _SKIPPED, _FAILED = "persisted", "skipped", "failed"
 #: 这些拉数失败要用户去「📋 明细映射」处理（列入待确认映射企业）
-_PENDING_APPLY_CODES = frozenset({"NO_BINDINGS", "UNMAPPED_ROWS", "SOURCE_CHANGED", "VERSION_MISSING"})
+_PENDING_APPLY_CODES = frozenset({
+    "NO_BINDINGS", "UNMAPPED_ROWS", "SOURCE_CHANGED", "VERSION_MISSING", "TEMPLATE_BINDING_MISMATCH",
+})
 
 
 async def reaggregate_subtree(
@@ -354,7 +356,7 @@ class _Run:
 
     async def _pull(self, sid: str, node: TreeNode) -> _Outcome:
         def skip(reason: str, *, pending: bool = False) -> _Outcome:
-            return _Outcome(sid, node, ACTION_PULL, _SKIPPED, reason, pending=pending)
+            return _Outcome(sid, node, ACTION_PULL, _SKIPPED, reason, pending=pending, incomplete=pending)
 
         # 「前 N 名」表不经明细模板与映射（R10）：按单位重排，只看映射里是否排除了该企业
         topn = section_topn_limit(self.template_type, sid)

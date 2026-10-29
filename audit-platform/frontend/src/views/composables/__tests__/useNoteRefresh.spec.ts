@@ -69,10 +69,10 @@ describe('useNoteRefresh 刷新先从底稿取数（spec note-pull-header-formul
     return { api, order, fetchDetail, fetchTree }
   }
 
-  it('当前章节刷新：先 pull-from-workpapers（带章节）→ 离屏同步 → 按模板重算 → 重载详情，提示并入取数结果', async () => {
+  it('当前章节刷新：prepare → 离屏同步 → push → 按模板与表内公式重算 → 重载目录和详情', async () => {
     const { api, order } = setup()
     const pulled = pullResult()
-    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[2]}`); return { result: pulled, error: null } })
+    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[3]}:${args[2]}`); return { result: pulled, error: null } })
     vi.mocked(runHeadlessDisclosure).mockImplementation(async (pull) => {
       order.push('headless')
       expect(pull).toBe(pulled)
@@ -82,10 +82,11 @@ describe('useNoteRefresh 刷新先从底稿取数（spec note-pull-header-formul
 
     await api.onRefreshFromWP()
 
-    expect(pullFromWorkpapers).toHaveBeenCalledWith('p1', 2025, '八、5')
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(1, 'p1', 2025, '八、5', 'prepare')
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(2, 'p1', 2025, '八、5', 'push')
     // 单章节刷新：底稿写的其他章节不在本次范围（spec note-pull-followup-closure R1）
     expect(runHeadlessDisclosure).toHaveBeenCalledWith(pulled, { projectId: 'p1', year: 2025, allSections: false })
-    expect(order).toEqual(['pull:八、5', 'headless', 'section:八、5', 'detail:八、5'])
+    expect(order).toEqual(['pull:prepare:八、5', 'headless', 'pull:push:八、5', 'section:八、5', 'tree', 'detail:八、5'])
     const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
     expect(msg.type).toBe('success')
     expect(msg.message).toContain('公式推送按审定数写入 3 格（八、5）')
@@ -121,17 +122,18 @@ describe('useNoteRefresh 刷新先从底稿取数（spec note-pull-header-formul
     expect(msg.message).toContain('账龄配置读取失败')
   })
 
-  it('全部刷新：先对全部章节取数（不带章节）再项目级重算，未接入离屏同步的底稿写进提示', async () => {
+  it('全部刷新：prepare → 全部 headless → push → 项目级重算，未接入 provider 的底稿写进提示', async () => {
     const { api, order } = setup()
-    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[2]}`); return { result: pullResult(), error: null } })
+    vi.mocked(pullFromWorkpapers).mockImplementation(async (...args) => { order.push(`pull:${args[3]}:${args[2]}`); return { result: pullResult(), error: null } })
     vi.mocked(runHeadlessDisclosure).mockResolvedValue({ outcomes: [], pending: ['E1', 'F2'] })
     vi.mocked(refreshDisclosureFromWorkpapers).mockImplementation(async () => { order.push('all'); return { cells_updated: 0 } as any })
 
     await api.onRefreshAll()
 
-    expect(pullFromWorkpapers).toHaveBeenCalledWith('p1', 2025, null)
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(1, 'p1', 2025, null, 'prepare')
+    expect(pullFromWorkpapers).toHaveBeenNthCalledWith(2, 'p1', 2025, null, 'push')
     expect(vi.mocked(runHeadlessDisclosure).mock.calls[0][1]).toEqual({ projectId: 'p1', year: 2025, allSections: true })
-    expect(order).toEqual(['pull:null', 'all', 'tree', 'detail:八、5'])
+    expect(order).toEqual(['pull:prepare:null', 'pull:push:null', 'all', 'tree', 'detail:八、5'])
     const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
     expect(msg.message).toContain('底稿 E1、F2 的明细表需在底稿附注披露页保存一次后同步')
     expect(api.refreshAllLoading.value).toBe(false)
