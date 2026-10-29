@@ -263,9 +263,9 @@ class TestObserveEnforceRouter:
                 f"/api/projects/{uuid.uuid4()}/consistency-gate/acknowledgements",
                 json={
                     "year": 2025, "check_name": "R4-CROSS-CHECK",
-                    "status": "failed", "result_fingerprint": "abc",
+                    "status": "failed",
+                    "key_numbers": {"diff": 10.0},
                     "reason": "这是一个足够长的确认原因",
-                    "check_class": "data-missing",
                 },
             )
 
@@ -290,9 +290,9 @@ class TestObserveEnforceRouter:
                 f"/api/projects/{uuid.uuid4()}/consistency-gate/acknowledgements",
                 json={
                     "year": 2025, "check_name": "R4-CROSS-CHECK",
-                    "status": "failed", "result_fingerprint": "abc",
+                    "status": "failed",
+                    "key_numbers": {"diff": 10.0},
                     "reason": "这是一个足够长的确认原因",
-                    "check_class": "data-missing",
                 },
             )
 

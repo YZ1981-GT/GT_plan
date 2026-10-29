@@ -338,7 +338,12 @@ async def _load_active_acknowledgements(
 
 
 def _compute_fingerprint_for_hit(hit: GateRuleHit) -> str:
-    """从 GateRuleHit 的 location 计算指纹"""
+    """从 GateRuleHit 的 location 计算指纹。
+
+    指纹 status 分量使用 hit.severity（blocking/warning），
+    与 acknowledge 端点中使用 GateSeverity.blocking 一致
+    （确认仅在 enforce 模式下创建，此时阻断项 severity 恒为 blocking）。
+    """
     from app.services.gate_acknowledgement_service import compute_result_fingerprint
 
     location = hit.location or {}

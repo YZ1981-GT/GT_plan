@@ -102,14 +102,22 @@ async function submitConfirm() {
   try {
     const hit = confirmingHit.value
     const location = hit.location || {}
+
+    // 提取 location 中的数值字段，由后端计算指纹
+    const keyNumbers: Record<string, number | null> = {}
+    for (const [k, v] of Object.entries(location)) {
+      if (typeof v === 'number' || v === null) {
+        keyNumbers[k] = v as number | null
+      }
+    }
+
     await acknowledge(props.projectId, {
       year: props.year,
       check_name: hit.rule_code,
       branch_id: String(location.branch_id || ''),
       status: hit.status || hit.severity || 'failed',
-      result_fingerprint: '', // 由后端计算或前端传入
+      key_numbers: keyNumbers,
       reason: confirmReason.value,
-      check_class: hit.check_class || 'data-missing',
     })
     ElMessage.success('确认成功')
     confirmDialogVisible.value = false

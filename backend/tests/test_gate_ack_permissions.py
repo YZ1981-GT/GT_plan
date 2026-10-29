@@ -37,30 +37,29 @@ def _make_app(role: str = "partner"):
     return app, mock_user
 
 
-def _ack_body(check_class: str = "data-missing") -> dict:
+def _ack_body(status: str = "not_executed") -> dict:
     return {
         "year": 2025,
         "check_name": "R4-CROSS-CHECK",
-        "status": "failed",
-        "result_fingerprint": "abc123",
+        "status": status,
+        "key_numbers": {"diff": 10.0},
         "reason": "这是一个足够长的确认原因说明",
-        "check_class": check_class,
     }
 
 
 class TestPermissionRecipeTable:
 
     @pytest.mark.parametrize(
-        "role, check_class, expected_status",
+        "role, status, expected_status",
         [
-            pytest.param("partner", "comparison-fail", 200, id="partner_comparison_fail_200"),
-            pytest.param("manager", "comparison-fail", 403, id="manager_comparison_fail_403"),
-            pytest.param("partner", "data-missing", 200, id="partner_data_missing_200"),
-            pytest.param("manager", "data-missing", 200, id="manager_data_missing_200"),
-            pytest.param("auditor", "data-missing", 200, id="auditor_data_missing_200"),
+            pytest.param("partner", "failed", 200, id="partner_comparison_fail_200"),
+            pytest.param("manager", "failed", 403, id="manager_comparison_fail_403"),
+            pytest.param("partner", "not_executed", 200, id="partner_data_missing_200"),
+            pytest.param("manager", "not_executed", 200, id="manager_data_missing_200"),
+            pytest.param("auditor", "not_executed", 200, id="auditor_data_missing_200"),
         ],
     )
-    def test_permission_recipe(self, role, check_class, expected_status):
+    def test_permission_recipe(self, role, status, expected_status):
         app, _ = _make_app(role=role)
 
         with (
@@ -76,11 +75,11 @@ class TestPermissionRecipeTable:
             client = TestClient(app)
             resp = client.post(
                 f"/api/projects/{uuid.uuid4()}/consistency-gate/acknowledgements",
-                json=_ack_body(check_class),
+                json=_ack_body(status),
             )
 
         assert resp.status_code == expected_status, (
-            f"角色={role} check_class={check_class} "
+            f"角色={role} status={status} "
             f"期望={expected_status} 实际={resp.status_code}"
         )
 

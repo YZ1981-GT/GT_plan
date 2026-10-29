@@ -6,7 +6,7 @@
 - POST /api/projects/{project_id}/consistency-gate/acknowledgements/{ack_id}/revoke  撤销
 
 权限 D1:
-- comparison-fail 类确认仅签字合伙人可操作
+- comparison-fail 类确认仅签字合伙人可操作（由后端根据 check_name + status 派生，不信任客户端）
 - data-missing / check-exception 类需 edit 级
 - 列表需 review 级
 - observe 模式下 POST 确认返回 409
@@ -21,9 +21,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
+from app.models.phase14_enums import GateSeverity
 from app.services import gate_acknowledgement_service as ack_svc
+from app.services.gate_acknowledgement_service import compute_result_fingerprint
 
 router = APIRouter()
+
+# ── 比较不通过类规则（需签字合伙人确认） ──────────────────────
+_COMPARISON_FAIL_RULES: frozenset[str] = frozenset({"R4-CROSS-CHECK"})
+
+
+def _classify_check(check_name: str, status: str) -> str:
+    """根据规则编码和检查状态派生确认类别（不信任客户端）。
+
+    - comparison-fail: 数值比较未通过，需签字合伙人
+    - data-missing: 数据不足 / 规则未执行
+    - check-exception: 其他异常
+    """
+    if check_name in _COMPARISON_FAIL_RULES and status == "failed":
+        return "comparison-fail"
+    if status in ("not_executed", "not_applicable"):
+        return "data-missing"
+    return "check-exception"
 
 
 class AcknowledgementCreateBody(BaseModel):
@@ -32,9 +51,11 @@ class AcknowledgementCreateBody(BaseModel):
     check_name: str
     branch_id: str = ""
     status: str
-    result_fingerprint: str
+    key_numbers: dict[str, float | None] = {}
     reason: str = Field(..., min_length=10, description="确认原因，至少 10 字符")
-    check_class: str = "data-missing"  # data-missing / check-exception / comparison-fail
+    # 以下字段保留用于向后兼容，后端忽略客户端传值
+    result_fingerprint: str = ""  # 由后端根据 key_numbers 计算
+    check_class: str = "data-missing"  # 由后端根据 check_name + status 派生
 
 
 @router.get("/api/projects/{project_id}/consistency-gate/acknowledgements")
@@ -64,8 +85,17 @@ async def create_acknowledgement(
     if enforcement != "enforce":
         raise HTTPException(409, "当前为只提示模式，无需确认")
 
-    # D1 权限分级：comparison-fail 只允许 partner
-    if body.check_class == "comparison-fail":
+    # 后端计算指纹（不信任客户端传值）——与 gate_engine._compute_fingerprint_for_hit 同口径
+    result_fingerprint = compute_result_fingerprint(
+        check_name=body.check_name,
+        branch_id=body.branch_id,
+        status=GateSeverity.blocking,  # 确认仅在 enforce 模式下创建，severity 恒为 blocking
+        key_numbers=body.key_numbers,
+    )
+
+    # D1 权限分级：由后端根据 (check_name, status) 派生类别，不信任客户端 check_class
+    check_class = _classify_check(body.check_name, body.status)
+    if check_class == "comparison-fail":
         user_role = getattr(user, "role", None) or getattr(user, "system_role", None) or ""
         if str(user_role) != "partner":
             raise HTTPException(403, "比较不通过类确认仅签字合伙人可操作")
@@ -79,7 +109,7 @@ async def create_acknowledgement(
             check_name=body.check_name,
             branch_id=body.branch_id,
             status=body.status,
-            result_fingerprint=body.result_fingerprint,
+            result_fingerprint=result_fingerprint,
             reason=body.reason,
             user_id=user.id,
             user_role=user_role_str,

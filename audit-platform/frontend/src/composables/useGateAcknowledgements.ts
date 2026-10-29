@@ -26,9 +26,8 @@ export interface AcknowledgeBody {
   check_name: string
   branch_id?: string
   status: string
-  result_fingerprint: string
+  key_numbers?: Record<string, number | null>
   reason: string
-  check_class?: string // data-missing / check-exception / comparison-fail
 }
 
 /**
