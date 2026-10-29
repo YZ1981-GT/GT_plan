@@ -108,6 +108,25 @@ async def test_report_and_note_open_their_library_tabs(sqlite_client: AsyncClien
     assert (body["route_path"], body["route_query"]) == ("/template-library", {"tab": tab, key: value})
 
 
+@pytest.mark.parametrize(("uri", "tab", "key"), [
+    ("report:", "report-config", "report_type"),  # 报表行次配置的行没有 report_type ⇒ buildTraceUri 生成 `report:`
+    ("note:", "note-template", "section_id"),  # 附注目录（source = disclosure）⇒ `note:`
+])
+async def test_empty_qualifier_opens_the_library_tab_without_locating(sqlite_client: AsyncClient, uri: str, tab: str,
+                                                                      key: str) -> None:
+    """空限定词（B11 评审非阻塞 #2，B13 补）：不 400 / 500，照常打开模板库对应页签，只是没有可定位的报表类型 / 章节。"""
+    body = await _resolve(sqlite_client, uri)
+    assert (body["module"], body["registered"], body["template_name"]) == (uri.rstrip(":"), True, None)
+    assert body["route_path"] == "/template-library" and body["route_query"]["tab"] == tab
+    assert not body["route_query"].get(key), f"空限定词不应带出定位值：{body['route_query']}"
+
+
+async def test_empty_workpaper_code_is_unregistered(sqlite_client: AsyncClient) -> None:
+    """`workpaper:` 没有底稿编码：按未登记返回（前端提示「未在模板目录中登记」），不 500。"""
+    body = await _resolve(sqlite_client, "workpaper:")
+    assert (body["module"], body["registered"], body["route_path"], body["route_query"]) == ("workpaper", False, "", {})
+
+
 @pytest.mark.parametrize("uri", ["adj:adj_aje", "tb:tb_detail", "tb:ledger_entries"])
 async def test_adjustment_and_trial_balance_results_have_no_template(sqlite_client: AsyncClient, uri: str) -> None:
     """调整分录 / 试算与四表类结果没有模板定义：registered=false、空路由（前端提示「该类结果没有模板定义」）。"""

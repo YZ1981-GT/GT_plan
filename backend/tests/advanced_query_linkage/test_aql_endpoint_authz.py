@@ -18,9 +18,11 @@
   集合恰为应见集合；403 区分「没有构建器准入」与「人员表角色门」；回写预览与确认核对条目原因与错误码；回收站三行的前置
   先确认是软删（否则不可见列的格子会因「硬删后本来就不存在」而碰巧通过）。
 
-现已成立的格直接断言；待修复的格登记在 ``PENDING``（行号 → 列 → 修复任务号与原因），以 ``xfail(strict=True)`` 钉住：
-修好即 XPASS 变红，逼着删掉登记。路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由
-都要在表里出现，缺一条即红并点名（新增路由在其任务里补行；已删路由只出现在第 29 行，暂缓删除的 cross-sheet-trace 在 29b）。
+全部转正（任务 35）：每格都是直接断言，不再有 ``xfail`` 登记（B1 起以 ``PENDING`` + ``xfail(strict=True)`` 钉住待修格，
+B3 / B6 / B8 / B11 逐格修好后清空；``test_every_cell_is_a_direct_assertion`` 防止再加回标记）。路由对账两个方向：
+custom_query、custom_query_writeback、query_builder 三个 router 的每条路由都要在表里出现，缺一条即红并点名（新增路由在其
+任务里补行）；表里写的路由都要还在它请求的 router 上，只有已删路由（``DELETED_ROUTES``）例外且只出现在第 29 行，
+暂缓删除的 cross-sheet-trace 仍在 router 上（第 29b 行）。
 """
 from __future__ import annotations
 
@@ -494,35 +496,17 @@ ROWS: tuple[Row, ...] = (
         {"NM": _access(True, False, 0, NO_PROJECT_REASON)}, (query_builder.router,), (WpIndex.__table__,)),
 )
 
-#: 待修复的格：行号 → 列（"*" = 整行）→ 修复任务与原因（2026-10-27 B1 现跑的红形态）。修好一格删一格；全部转正在任务 35。
-_LOGGED_IN = ("A", "R", "E", "PM", "SM", "P", "AD")
-
-
-def _each(columns: tuple[str, ...], reason: str) -> dict[str, str]:
-    return dict.fromkeys(columns, reason)
-
-
-PENDING: dict[str, dict[str, str]] = {
-    # 6~9、13 在任务 24（B8）转正；14~16（前置：PM 软删 S，对每一列都先执行）在任务 25（B8）转正
-    # 22 在任务 32（B11，AQ-17：wp_template_registry 表不存在时改用 JSON 目录）转正
-    # 23~28、23n 在任务 9 / 12（B3）转正；循环受限子表 23c / 25c / 26c / 28c 在任务 23（B6）转正
-}
-
-
-def _pending(row: Row, column: str) -> str | None:
-    reasons = PENDING.get(row.no, {})
-    return reasons.get(column) or reasons.get("*")
+#: 已删除的路由只出现在第 29 行（期望全是 404）；暂缓删除的 cross-sheet-trace 仍在 router 上（第 29b 行）。
+DELETED_ROUTES: dict[tuple[str, str], str] = {("POST", f"{CQ}/batch-execute"): "29"}
 
 
 def _cells() -> list[Any]:
+    """逐格一条用例。全部转正（任务 35）：每格都是直接断言，只有 P 底座的格带 ``pg_only``，不再有 xfail 登记。"""
     cells = []
     for row_index, row in enumerate(ROWS):
         for call_index, call in enumerate(row.calls):
             for column in row.expect:
                 marks = [pytest.mark.pg_only] if row.base == "P" else []
-                reason = _pending(row, column)
-                if reason:
-                    marks.append(pytest.mark.xfail(strict=True, reason=reason))
                 suffix = f"·{call.label}" if call.label else ""
                 cells.append(pytest.param(row_index, call_index, column, marks=marks, id=f"{row.no}{suffix}-{column}"))
     return cells
@@ -564,9 +548,9 @@ def _declared_routes() -> set[tuple[str, str]]:
     return {(call.method, call.route) for row in ROWS for call in row.calls}
 
 
-def _router_routes() -> set[tuple[str, str]]:
+def _router_routes(routers: tuple[APIRouter, ...] = RECONCILED_ROUTERS) -> set[tuple[str, str]]:
     found = set()
-    for router in RECONCILED_ROUTERS:
+    for router in routers:
         for route in router.routes:
             if isinstance(route, APIRoute):
                 found |= {(method, route.path) for method in route.methods if method != "HEAD"}
@@ -579,6 +563,32 @@ def test_every_route_of_the_three_routers_is_in_the_table() -> None:
         f"{method} {path}" for method, path in missing)
 
 
+def test_declared_routes_exist_except_the_deleted_ones() -> None:
+    """反向对账：表里写的路由都还在它所请求的 router 上，已删路由只出现在第 29 行（期望 404 的格不能指向随手写错的路径）。"""
+    on_routers = _router_routes(tuple({id(r): r for row in ROWS for r in row.routers}.values()))
+    gone: dict[tuple[str, str], set[str]] = {}
+    for row in ROWS:
+        for call in row.calls:
+            if (call.method, call.route) not in on_routers:
+                gone.setdefault((call.method, call.route), set()).add(row.no)
+    assert gone == {route: {no} for route, no in DELETED_ROUTES.items()}, (
+        f"不在 router 上的路由应恰为已删的 {sorted(DELETED_ROUTES)}（只在第 29 行），实得 {gone}")
+    deleted_rows = [row for row in ROWS if row.no in set(DELETED_ROUTES.values())]
+    assert deleted_rows and all(cell.status == 404 for row in deleted_rows for cell in row.expect.values()), \
+        "已删路由的行每一格都应是 404"
+
+
+def test_every_cell_is_a_direct_assertion() -> None:
+    """全部转正（任务 35）：没有任何一格带 xfail / skip 之类的标记，P 底座的格只带 pg_only（跑真库时 skipped 须为 0）。"""
+    stray = {param.id: [mark.name for mark in param.marks if mark.name != "pg_only"]
+             for param in _cells() if any(mark.name != "pg_only" for mark in param.marks)}
+    assert stray == {}, f"这些格不是直接断言：{stray}"
+    base_p = {f"{row.no}" for row in ROWS if row.base == "P"}
+    unmarked = [p.id for p in _cells() if p.id.split("-", 1)[0].split("·")[0] in base_p
+                and not any(m.name == "pg_only" for m in p.marks)]
+    assert unmarked == [], f"P 底座的格应带 pg_only：{unmarked}"
+
+
 def test_table_rows_match_design_shape() -> None:
     main = [row for row in ROWS if set(row.expect) == set(COLUMNS)]
     numbers = [row.no for row in main]
@@ -587,9 +597,3 @@ def test_table_rows_match_design_shape() -> None:
     assert sorted(set(numbers), key=key) == expected, numbers
     sub = {row.no: set(row.expect) for row in ROWS if set(row.expect) != set(COLUMNS)}
     assert sub == {"23c": {"CR"}, "25c": {"CR"}, "26c": {"CR"}, "28c": {"CR"}, "23n": {"NM"}}, sub
-    for no, reasons in PENDING.items():
-        rows = [row for row in ROWS if row.no == no]
-        assert rows, f"PENDING 登记了不存在的行 {no}"
-        for column in reasons:
-            assert column == "*" or any(column in row.expect for row in rows), f"PENDING 第 {no} 行登记了不存在的列 {column}"
-        assert all(reason.startswith("任务 ") for reason in reasons.values()), f"PENDING 第 {no} 行须写明修复任务号"
