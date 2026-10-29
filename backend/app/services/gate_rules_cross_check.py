@@ -145,6 +145,15 @@ class CrossCheckPassedRule(GateRule):
 
         message = "跨科目校验未全部通过：" + "；".join(problem_lines)
 
+        # ── ADR-CCN-06 指纹对齐：location 包含 diff/left/right ───
+        # _compute_fingerprint_for_hit 提取 location 中全部数值型字段作
+        # key_numbers，router 端的 body.key_numbers 需要传递同一组数值。
+        # 如果 location 只有 counts 而 client 传 diff/left/right，两侧
+        # key sets 不同 → 指纹永远不匹配 → blocking→warning 降级死代码。
+        _sum_diff = sum(abs(item.get("diff") or 0) for item in failed_items)
+        _sum_left = sum(abs(item.get("left") or 0) for item in failed_items)
+        _sum_right = sum(abs(item.get("right") or 0) for item in failed_items)
+
         return GateRuleHit(
             rule_code=self.rule_code,
             error_code=self.error_code,
@@ -156,6 +165,9 @@ class CrossCheckPassedRule(GateRule):
                 "failed_count": len(failed_items),
                 "not_executed_count": len(not_executed_items),
                 "error_count": len(error_items),
+                "diff": round(float(_sum_diff), 2),
+                "left": round(float(_sum_left), 2),
+                "right": round(float(_sum_right), 2),
             },
             suggested_action="执行跨科目校验并修正差异，或确认已知偏差",
         )

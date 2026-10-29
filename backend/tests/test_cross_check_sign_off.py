@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.phase14_enums import GateSeverity, CheckStatus
+from app.models.phase14_enums import GateSeverity
 from app.services.gate_engine import GateRuleHit
 
 # ── Fixtures ───────────────────────────────────────────────────
@@ -341,3 +341,141 @@ class TestYearSource:
             await rule.check(mock_db, context)
 
         mock_fetch.assert_awaited_once_with(mock_db, project_id)
+
+
+# ── ADR-CCN-06: location 包含 diff/left/right 确保指纹对齐 ──
+
+
+class TestLocationFingerprintAlignment:
+    """CrossCheckPassedRule.check() 的 location 必须包含 diff/left/right，
+    与 gate_engine._compute_fingerprint_for_hit 和 router key_numbers 口径一致。
+    """
+
+    @pytest.mark.asyncio
+    async def test_location_contains_diff_left_right(self, mock_db, project_id):
+        """有失败项时 location 含对应数值"""
+        from app.services.gate_rules_cross_check import CrossCheckPassedRule
+
+        rule = CrossCheckPassedRule()
+        xr_results = [
+            _xr_result("XR-01", "fail", severity="blocking",
+                        left=100.0, right=90.0, diff=10.0),
+        ]
+        context = {"project_id": project_id, "year": 2025}
+
+        with (
+            patch(
+                "app.services.project_audit_year.fetch_project_audit_year",
+                new=AsyncMock(return_value=2025),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService.execute",
+                new=AsyncMock(return_value=xr_results),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService._persist_results",
+                new=AsyncMock(),
+            ),
+            patch.dict(os.environ, {"CONSISTENCY_GATE_ENFORCEMENT": "observe"}),
+        ):
+            hit = await rule.check(mock_db, context)
+
+        assert hit is not None
+        loc = hit.location
+        assert "diff" in loc, "location 缺少 diff（指纹对齐要求）"
+        assert "left" in loc, "location 缺少 left（指纹对齐要求）"
+        assert "right" in loc, "location 缺少 right（指纹对齐要求）"
+        assert loc["diff"] == 10.0
+        assert loc["left"] == 100.0
+        assert loc["right"] == 90.0
+
+    @pytest.mark.asyncio
+    async def test_location_fingerprint_matches_router_side(self, mock_db, project_id):
+        """engine 侧和 router 侧用同一 key_numbers 时指纹一致"""
+        from app.services.gate_rules_cross_check import CrossCheckPassedRule
+        from app.services.gate_engine import _compute_fingerprint_for_hit
+        from app.services.gate_acknowledgement_service import compute_result_fingerprint
+
+        rule = CrossCheckPassedRule()
+        xr_results = [
+            _xr_result("XR-01", "fail", severity="blocking",
+                        left=100.0, right=90.0, diff=10.0),
+            _xr_result("XR-02", "fail", severity="warning",
+                        left=50.0, right=45.0, diff=5.0),
+        ]
+        context = {"project_id": project_id, "year": 2025}
+
+        with (
+            patch(
+                "app.services.project_audit_year.fetch_project_audit_year",
+                new=AsyncMock(return_value=2025),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService.execute",
+                new=AsyncMock(return_value=xr_results),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService._persist_results",
+                new=AsyncMock(),
+            ),
+            patch.dict(os.environ, {"CONSISTENCY_GATE_ENFORCEMENT": "enforce"}),
+        ):
+            hit = await rule.check(mock_db, context)
+
+        assert hit is not None
+
+        # engine 侧指纹
+        engine_fp = _compute_fingerprint_for_hit(hit)
+
+        # router 侧指纹：client 传回 location 中全部数值型字段
+        loc = hit.location
+        client_key_numbers = {
+            k: v for k, v in loc.items()
+            if isinstance(v, (int, float)) or v is None
+        }
+        router_fp = compute_result_fingerprint(
+            check_name=hit.rule_code,
+            branch_id=loc.get("branch_id", ""),
+            status=hit.severity,
+            key_numbers=client_key_numbers,
+        )
+
+        assert engine_fp == router_fp, (
+            f"engine 侧指纹与 router 侧指纹不一致：\n"
+            f"  engine={engine_fp}\n  router={router_fp}\n"
+            f"  location={loc}\n  client_key_numbers={client_key_numbers}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_location_zeros_when_no_failures(self, mock_db, project_id):
+        """仅 not_executed 项时 diff/left/right 为 0.0"""
+        from app.services.gate_rules_cross_check import CrossCheckPassedRule
+
+        rule = CrossCheckPassedRule()
+        xr_results = [
+            _xr_result("XR-08", "not_executed", reason="规则未实现"),
+        ]
+        context = {"project_id": project_id, "year": 2025}
+
+        with (
+            patch(
+                "app.services.project_audit_year.fetch_project_audit_year",
+                new=AsyncMock(return_value=2025),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService.execute",
+                new=AsyncMock(return_value=xr_results),
+            ),
+            patch(
+                "app.services.wp_cross_check_service.CrossCheckService._persist_results",
+                new=AsyncMock(),
+            ),
+            patch.dict(os.environ, {"CONSISTENCY_GATE_ENFORCEMENT": "observe"}),
+        ):
+            hit = await rule.check(mock_db, context)
+
+        assert hit is not None
+        loc = hit.location
+        assert loc["diff"] == 0.0
+        assert loc["left"] == 0.0
+        assert loc["right"] == 0.0
