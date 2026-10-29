@@ -1,7 +1,8 @@
 """ACNR Catalog 快照 DB-aware GC CLI（P2-1：该清理清理）
 
-查 projects.registry_version 得引用集，删除「非最近 keep_recent 且无项目锁定引用」
-的 catalog_snapshots/*.json，防止无界增长。
+与启动任务走同一入口 run_db_aware_gc：引用集只认数据库，证实不了就一个都不删；
+已提交进仓库的快照一律不删（RV13.1-01）。只清理「非最近 keep_recent、无项目锁定引用、
+未提交」的 catalog_snapshots/*.json。T17 落库前引用集恒不可验证，本工具不删任何文件。
 
 用法（cwd=backend）：
     python -m scripts.acnr.gc_snapshots            # 真删（keep_recent=10）
@@ -32,6 +33,7 @@ async def _main() -> int:
     print(f"  referenced_count  = {report['referenced_count']}")
     print(f"  deleted           = {len(report['deleted'])} {report['deleted']}")
     print(f"  skipped_referenced= {len(report['skipped_referenced'])}")
+    print(f"  skipped_committed = {len(report['skipped_protected'])}（已提交进仓库，运行时不删）")
     print(f"  dry_run           = {report['dry_run']}")
     if report["reference_status"] == "unverifiable":
         print("  [WARN] 引用集不可验证 → fail-closed，未删除任何快照")

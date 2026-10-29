@@ -570,3 +570,34 @@ RESOLVER_DOC_OK = claim("resolver 模块与函数文档定位为「canonical res
 V1_BYPASS = claim("backend/app 里仍有绕过 ACNR 直接导入 V1 的文件（AST）", lambda: bool(_v1_direct_importers()))
 NON_WP_TO_V1 = claim("resolver 的非底稿域（tb / report / note / aux）经 _delegate_v1 委托 V1（AST）", _non_wp_delegated_to_v1)
 SPEC_TASKS = exists(_TASKS_REL)
+
+
+_GC_REL = "backend/app/services/acnr/catalog_snapshot_gc.py"
+_GC_TEST_REL = "backend/tests/acnr/test_catalog_snapshot_gc_runtime.py"
+
+
+def _gc_refs_unverifiable() -> bool:
+    """referenced_registry_versions 是 async 函数且每个 return 都返回常量 None（RV13.1-01；T19 改查库时须改本行登记）。"""
+    fn = _func(_GC_REL, "referenced_registry_versions")
+    rets = [n for n in ast.walk(fn) if isinstance(n, ast.Return)] if fn is not None else []
+    return isinstance(fn, ast.AsyncFunctionDef) and bool(rets) and all(
+        isinstance(r.value, ast.Constant) and r.value.value is None for r in rets)
+
+
+def gc_runtime_rows(CB: Callable) -> dict:
+    """组件表「运行时快照清理」一行的登记（RV13.1-01）。放在判据库是因为登记表文件已到 800 行上限；
+    CB 由登记表传入（Stmt 定义在登记表里）。"""
+    return {
+        "运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口；引用集只认数据库、证实不了即一个都不删，版本锁落库前恒证实不了、不读进程内归档字典；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理）": CB(
+            _GC_REL, ("run_db_aware_gc", "referenced_registry_versions", "committed_snapshot_versions"), _GC_TEST_REL,
+            calls("backend/app/core/startup_registry.py", "_task_acnr_catalog_snapshot_gc", "run_db_aware_gc"),
+            calls("backend/scripts/acnr/gc_snapshots.py", "_main", "run_db_aware_gc"),
+            calls(_GC_REL, "run_db_aware_gc", "referenced_registry_versions", "committed_snapshot_versions",
+                  "cleanup_stale_snapshots"),
+            not_imports(_GC_REL, "immutability"),
+            claim("版本锁落库前 referenced_registry_versions 每个 return 都返回 None（AST）", _gc_refs_unverifiable),
+            has_tests(_GC_TEST_REL, "test_cold_start_unverifiable_refs_startup_task_deletes_none",
+                      "test_db_query_error_fail_closed", "test_cold_start_13_registered_startup_task_deletes_none",
+                      "test_committed_unknown_when_git_missing", "test_committed_unknown_when_git_errors",
+                      "test_real_registries_are_committed", "test_untracked_strays_cleaned_when_refs_verified")),
+    }

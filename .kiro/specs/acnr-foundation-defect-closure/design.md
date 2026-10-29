@@ -521,6 +521,14 @@ CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 
 
 `catalog_snapshot_gc` 新增 `async referenced_registry_versions(db) -> set[str]`：查 `projects.acnr_registry_version IS NOT NULL`（含软删），取代 `query_referenced_versions`（删除后者，连同其对 `list_archived_projects` 的 import）。`run_db_aware_gc(session=None, *, keep_recent=10, dry_run=False)`：`session` 为 None 时用 `async with get_session()` 自开短会话；在其中 `await referenced_registry_versions(db)`；**查库异常时 `referenced_versions=None`、fail-closed 不删**（与现状 except 分支语义一致，但来源从进程内集合换成库）。启动任务 `_task_acnr_catalog_snapshot_gc` 与 `scripts/acnr/gc_snapshots.py` 都走这一个入口（不再有 `--db` / 内存两套路径）。生成器内离线清理（无 db）保持「引用不可验证即不删」。启动期这条路径现在能真正保护被锁的旧快照：被某项目锁定、但不在最近 keep_recent 之内的快照不会被 GC 删除。
 
+**RV13.1-01（段十三复审，编排方 2026-10-29 决定提前到 T31 之前做）：运行时清理的两条保证，与本节原文的偏离。** 现象：开发后端以 `--reload` 运行，每个新 worker 都跑启动任务 `acnr_catalog_snapshot_gc`；原 `run_db_aware_gc` 的引用集取自进程内归档字典，冷启动为空却被当成「已证实无引用」，于是最近 10 份之外的已提交快照被删（主树 12 份时删 2 份，在临时目录 13 份时删 3 份，重放见续做记录第十四段 r1）。本 spec 每发一个批次快照加一份，任何会话改一下 backend/app 就会在共享主树里删掉被不可变登记钉住的历史快照。改法（`catalog_snapshot_gc.run_db_aware_gc`，启动任务与 `gc_snapshots.py` 仍走这一个入口）：
+
+1. **fail-closed**：引用集只认数据库（`referenced_registry_versions(db)`），不再读进程内字典（删 `query_referenced_versions`）。返回 None 或抛错即一个都不删。T17 落库前 projects 没有锁定列，该函数恒返回 None，所以现在运行时清理不删任何文件；T19 在此补查库，查库失败、没有可用会话仍须返回 None。
+2. **已登记进仓库的快照运行时一律不删**（`committed_snapshot_versions`）：本节原文按「最近 keep_recent 份 + 被锁版本」之外的都删，这会删掉不可变登记（`test_catalog_index_fail_closed._SNAPSHOT_CONTENT_SHA256`）与已取代清单（`test_catalog_schema_single_source`）钉住的历史快照。这两份登记是测试常量，生产代码不能读，而它们只能登记已提交的快照，故运行时以 git 索引判「已登记」（守卫 `test_real_registries_are_committed` 断言两份登记与当前批次快照都在 git 索引里）。判定不了（不在 git 仓库、没有 git、git 出错或超时）就当作全部已登记，一个都不删；打包部署没有 git，因而永不删。已提交快照的保留与删除只经生成器发布流程处理（随 git 提交删除并同时改两份登记）；`gc_snapshots.py` 与启动任务同一入口，同样不删已提交快照。
+3. 未登记进仓库的散落快照（例如在某个 worktree 发布后没提交的），在引用集已由数据库证实时仍按 keep_recent + 未被锁定清理。
+
+由此，需求 7.4「只删除未被任何项目锁定、且不在最近 N 份之内的快照」仍成立（运行时删的更少）；T19 的 pg_only 用例「未被引用的被删」须用未登记进 git 索引的临时快照来证（临时目录做成 git 仓库、快照不 add），并保留以上两条保证：`referenced_registry_versions` 改成查库后，「查库失败 / 无会话 → None」与「已登记不删」的用例（`test_catalog_snapshot_gc_runtime.py`）必须照旧通过。
+
 ### 8.5 验证
 
 - 三层一致：迁移列、ORM 字段（含 `DateTime(timezone=True)`）、服务读写同名同型，守卫读迁移文本与 ORM 元数据逐项比对类型。

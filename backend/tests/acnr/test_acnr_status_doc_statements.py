@@ -43,7 +43,7 @@ from tests.acnr._status_doc_checks import (
     _full_resolve_step1_uses_exact_identity,
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
-    _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, has_tests,
+    _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, gc_runtime_rows, has_tests,
     in_planned, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
 )
 from tests.acnr.test_acnr_architecture_status_doc import (
@@ -209,7 +209,6 @@ def _template_configs_are_checked() -> bool:
             if isinstance(n, _ast.AnnAssign) and getattr(n.target, "id", None) == "config":
                 found[cls.name] = {x.id for x in _ast.walk(n.annotation) if isinstance(x, _ast.Name)}
     return all("TemplateConfig" in found.get(c, set()) for c in ("TemplateCreateRequest", "TemplateUpdateRequest"))
-
 
 
 def _locate_gate_ok() -> bool:
@@ -529,6 +528,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             calls(_STALE_REL, "on_change", "record_stale_start_unresolved"),
             has_tests(_T + "test_acnr_metrics.py", "test_fresh_counters_have_all_keys_zero", "test_rejected_targets_counted_per_error_code",
                       "test_labelled_counters_bound_unknown_codes_to_other", "test_metrics_endpoint_returns_counters")),
+        **gc_runtime_rows(CB),  # 运行时快照清理一行（RV13.1-01），登记在判据库：本文件已到 800 行上限
         "写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等）": CB(
             _LINKAGE_REL, ("stale_impact", "stale_impact_by_addr"), _T + "test_stale_write_endpoint_authz.py",
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz),
