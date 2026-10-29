@@ -36,6 +36,7 @@ import {
 } from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
 import { groupHeaderLabel, sortSheetsForGroup } from './sheetDisplayName'
+import { parseAcnrRegistryFailure } from './registryLockFailure'
 import { isListedCell } from './cellListing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -668,9 +669,9 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      // 网络错误也视为校验失败（保守策略：非法引用绝不入库）
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      // 目录版本治理错误是终态：上层不得把归档项目改按当前目录或 V1 解析。
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -695,8 +696,8 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -720,8 +721,8 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 
@@ -751,8 +752,8 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
-    } catch {
-      return { found: false, error: 'resolve_failed' }
+    } catch (e) {
+      return parseAcnrRegistryFailure(e) ?? { found: false, error: 'resolve_failed' }
     }
   }
 

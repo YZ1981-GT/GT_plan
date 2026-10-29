@@ -24,7 +24,7 @@ import app.models  # noqa: E402, F401
 from app.models.base import Base, ProjectStatus  # noqa: E402
 from app.models.core import Project, User  # noqa: E402
 from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType  # noqa: E402
-from app.services.acnr import immutability, wp_cell_target  # noqa: E402
+from app.services.acnr import wp_cell_target  # noqa: E402
 from app.services.acnr.catalog import get_catalog  # noqa: E402
 from app.services.acnr.limits import ACNR_BATCH_DEADLINE_S, ACNR_BATCH_LIMIT  # noqa: E402
 from app.services.acnr.resolver import VersionNotFoundError  # noqa: E402
@@ -76,7 +76,6 @@ async def world():
         await db.commit()
         yield {"db": db, "pid": pid, "papers": papers}
     await engine.dispose()
-    immutability.remove_project_registry_version(str(pid))
 
 
 def test_limits_shared_with_resolve_batch():
@@ -188,13 +187,20 @@ async def test_effective_catalog_unlocked_is_current(world):
     assert await effective_catalog(world["db"], None) is get_catalog()
 
 
+async def _set_lock(db, pid, version: str) -> None:
+    project = await db.get(Project, pid)
+    project.acnr_registry_version = version
+    await db.flush()
+    db.info.pop("acnr_locked_version", None)
+
+
 async def test_locked_project_judges_identity_by_locked_catalog(world):
     """锁定上一批目录：I1 的「I1-1」在锁定目录里不是别名 ⇒ 按原文读「I1-1」表（22），当前目录读审定表I1（11）。"""
     db, pid = world["db"], world["pid"]
     current = await read_formula_cell(db, project_id=pid, year=None, wp_code="I1", sheet_text="I1-1", cell="C5",
                                       index=await effective_catalog(db, pid))
     assert current.read.value == Decimal("11")
-    immutability.record_project_registry_version(str(pid), _OLD_VERSION)
+    await _set_lock(db, pid, _OLD_VERSION)
     locked_index = await effective_catalog(db, pid)
     assert locked_index.registry_version == _OLD_VERSION
     locked = await read_formula_cell(db, project_id=pid, year=None, wp_code="I1", sheet_text="I1-1", cell="C5",
@@ -203,7 +209,7 @@ async def test_locked_project_judges_identity_by_locked_catalog(world):
 
 
 async def test_locked_snapshot_missing_raises(world):
-    immutability.record_project_registry_version(str(world["pid"]), "19990101000000")
+    await _set_lock(world["db"], world["pid"], "19990101000000")
     with pytest.raises(VersionNotFoundError):
         await effective_catalog(world["db"], world["pid"])
 

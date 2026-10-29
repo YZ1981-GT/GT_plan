@@ -487,6 +487,18 @@ async def confirm_project(
     """
     project = await _get_project_or_404(db, project_id)
 
+    # 已归档项目只读：向导确认会把状态改成 planning，等于把归档项目拉回活跃态，
+    # 而 ACNR 目录版本锁还留在原处 —— 项目活跃却按旧目录解析（T18 / 需求 7.3）。
+    # 归档项目要改先走「解除归档」（那里会同时解锁），不从向导绕过去。
+    if project.status == ProjectStatus.archived:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "PROJECT_ARCHIVED",
+                "message": "项目已归档，不能确认向导；如需修改请先解除归档",
+            },
+        )
+
     if project.status != ProjectStatus.created:
         raise HTTPException(
             status_code=400,

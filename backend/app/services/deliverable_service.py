@@ -880,6 +880,10 @@ class DeliverableService(ExportTaskService):
                 all_tasks = list(all_result.scalars().all())
                 terminal = {WordExportStatus.archived.value}
                 if all_tasks and all(t.status in terminal for t in all_tasks):
+                    # 置归档前先锁 ACNR 目录版本（T18）：锁不上就不归档，异常上抛让路由不提交
+                    from app.services.acnr.project_registry_lock import lock_project_registry
+
+                    await lock_project_registry(self.db, project_id)
                     project.status = ProjectStatus.archived
 
         await self.db.flush()

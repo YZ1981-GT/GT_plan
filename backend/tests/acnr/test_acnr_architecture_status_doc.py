@@ -55,10 +55,9 @@ H_COMPONENTS = "### 已落地：组件"
 H_PLANNED = "### 计划中（未落地）"
 
 #: 计划中符号 → (任务号, 落地探测方式)。节内提到它而代码里还没有时，同一行必须带仍未勾选的任务号。
-_PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {
-    "lock_project_registry": ("T17", ("py_ident", "lock_project_registry")),
-    "project_registry_lock": ("T17", ("file", "backend/app/services/acnr/project_registry_lock.py")),
-}
+#: T17 / T18 落地后 `lock_project_registry` 与 `project_registry_lock` 已在代码里出现，按失效条目删除
+#: （现状节对应内容已移到「已落地：组件」的「版本锁（落库）」行）。今后新增计划中符号时再登记。
+_PLANNED_SYMBOLS: dict[str, tuple[str, tuple[str, str]]] = {}
 
 #: py_ident 探测扫描的目录（AST：def / class / 赋值目标 / 注解字段 / 字符串常量）。
 _IDENT_SCAN_DIRS = ("backend/app/services/acnr", "backend/app/services/custom_query",
@@ -637,10 +636,12 @@ def test_true_completion_claims_are_in_use():
     ("| 目录生成器（写出前跑 catalog_release 门禁；`--check` 结构化比对，漂移退出 2） | 后端 |", True, True),  # R-G3d
     ("| 发布门禁模块（已接入生成器，目录写出前运行） | 后端 |", True, False),                             # R-G3f 现为真
     ("25 个孤儿 cell 已全部停用、孤儿计数已清零。", True, False),                                         # R-G3e 现为真（数字另由数字规则拦）
-    ("| 版本锁（已持久化到项目表） | 后端 |", True, True),                                               # T17 未落地
+    ("| 版本锁（已持久化到项目表） | 后端 |", True, False),                                              # T17 落地后现为真
     ("| 发布门禁模块（尚未接入生成器） | 后端 |", True, False),
     ("版本锁已持久化（T17）。", False, False),
-    ("版本锁已持久化（T17）。", True, True),  # 「已落地」子节不接受任务号豁免
+    ("版本锁已持久化（T17）。", True, False),  # T17 落地后判据为真：「已落地」子节写这句也成立
+    # 判据为真时的反向自检：未登记的完成态动词照样红（证明翻真后规则没有整体放行）
+    ("| 版本锁（已在归档时自动启用） | 后端 |", True, True),
     ("| 发布门禁模块（已在生成器中启用） | 后端 |", True, True),  # 未登记的完成态动词也红
     ("门禁清单：已经在跑的守卫见上表「测试」列。", True, False),  # 「已经在跑」不是完成态动词
 ])

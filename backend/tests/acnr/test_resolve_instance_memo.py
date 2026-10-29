@@ -127,7 +127,7 @@ async def test_batch_10_same_sheet_resolve_instance_called_once(mock_auth, mock_
 
         with patch("app.services.acnr.resolver.get_catalog", return_value=fake_catalog):
             with patch("app.services.acnr.resolver.get_project_overlay", return_value=fake_overlay):
-                with patch("app.services.acnr.resolver.get_project_registry_version", return_value=None):
+                with patch("app.services.acnr.resolver.get_locked_version", new=AsyncMock(return_value=None)):
                     with patch("app.services.acnr.resolver._detect_non_wp_domain", return_value=None):
                         body = AcnrResolveBatchRequest(
                             items=[
@@ -211,7 +211,7 @@ async def test_different_sheet_codes_each_call_db_once(mock_auth, mock_user):
 
         with patch("app.services.acnr.resolver.get_catalog", return_value=fake_catalog):
             with patch("app.services.acnr.resolver.get_project_overlay", return_value=fake_overlay):
-                with patch("app.services.acnr.resolver.get_project_registry_version", return_value=None):
+                with patch("app.services.acnr.resolver.get_locked_version", new=AsyncMock(return_value=None)):
                     with patch("app.services.acnr.resolver._detect_non_wp_domain", return_value=None):
                         # 5 items for D2-2 + 5 items for D2-3
                         items = (
@@ -280,7 +280,7 @@ async def test_disambiguation_result_not_cached(mock_auth, mock_user):
 
         with patch("app.services.acnr.resolver.get_catalog", return_value=fake_catalog):
             with patch("app.services.acnr.resolver.get_project_overlay", return_value=fake_overlay):
-                with patch("app.services.acnr.resolver.get_project_registry_version", return_value=None):
+                with patch("app.services.acnr.resolver.get_locked_version", new=AsyncMock(return_value=None)):
                     with patch("app.services.acnr.resolver._detect_non_wp_domain", return_value=None):
                         # 3 items with same sheet → disambiguation should NOT cache
                         body = AcnrResolveBatchRequest(
@@ -347,7 +347,7 @@ async def test_memo_is_request_scoped_not_shared_across_requests(mock_auth, mock
 
         with patch("app.services.acnr.resolver.get_catalog", return_value=fake_catalog):
             with patch("app.services.acnr.resolver.get_project_overlay", return_value=fake_overlay):
-                with patch("app.services.acnr.resolver.get_project_registry_version", return_value=None):
+                with patch("app.services.acnr.resolver.get_locked_version", new=AsyncMock(return_value=None)):
                     with patch("app.services.acnr.resolver._detect_non_wp_domain", return_value=None):
                         body = AcnrResolveBatchRequest(
                             items=[AcnrResolveBatchItem(addr_id="D2/D2-2/E100") for _ in range(3)],

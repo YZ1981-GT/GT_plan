@@ -26,6 +26,7 @@ import {
   type AcnrCellEntry,
   type AcnrResolveResult,
 } from '@/services/acnr/useAcnr'
+import { isAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
 
 /**
  * 整库加载一次最多取的地址条数 = 后端 `ADDRESS_REGISTRY_MAX_LIMIT`（守卫 backend/tests/test_address_registry_limit.py 比对）。
@@ -63,6 +64,8 @@ export interface ResolveResult {
   jump_route?: string
   domain?: string
   tags?: string[]
+  error?: string
+  reason?: string
 }
 
 export interface ValidateResult {
@@ -112,6 +115,8 @@ function _mapAcnrResolveToResult(uri: string, r: AcnrResolveResult): ResolveResu
     jump_route: r.jump_route,
     domain: _domainFromUri(r.uri) ?? _domainFromUri(uri) ?? (r.addr_id ? 'wp' : undefined),
     tags: undefined,
+    error: r.error,
+    reason: r.reason,
   }
 }
 
@@ -348,7 +353,10 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
       if (acnrRes && acnrRes.found) {
         return _mapAcnrResolveToResult(uri, acnrRes)
       }
-      // found=false（含 invalid_uri / 未命中）→ 落到 legacy 回退
+      if (isAcnrRegistryFailure(acnrRes)) {
+        return _mapAcnrResolveToResult(uri, acnrRes)
+      }
+      // found=false（普通未命中）→ 落到 legacy 回退
     } catch (e) {
       console.warn('[addressRegistry] ACNR resolve 异常，回退 legacy', e)
     }
@@ -380,6 +388,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
         const r = await _acnr.resolveFormula(formula, _projectId.value || undefined)
         if (r && r.found) {
           return { valid: true, issues: [], formula }
+        }
+        if (isAcnrRegistryFailure(r)) {
+          return { valid: false, issues: [{ ref: formula, message: r.reason }], formula }
         }
       } catch (e) {
         console.warn('[addressRegistry] ACNR validate 异常，回退 legacy(fail-open)', e)

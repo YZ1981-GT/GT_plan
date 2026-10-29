@@ -42,7 +42,7 @@ from app.services.acnr.catalog import (
     _ambiguous_response,
     _build_jump_route,
 )
-from app.services.acnr.immutability import get_project_registry_version
+from app.services.acnr.project_registry_lock import get_locked_version
 from app.services.acnr.reasons import ambiguous_fields, external_namespace_reason
 from app.services.acnr.resolve_identity import (cell_candidate, computed_display_label, deprecation_fields,
                                                 step1_identity)
@@ -56,17 +56,20 @@ logger = logging.getLogger(__name__)
 
 
 class VersionNotFoundError(Exception):
-    """请求的 registry_version 不存在对应 catalog 快照。
-
-    Requirements: Req-9.3 — 版本缺失返回明确治理错误。
-    """
+    """请求的 registry_version 不存在对应 catalog 快照。"""
 
     def __init__(self, version: str) -> None:
         self.version = version
-        super().__init__(
-            f"Catalog snapshot not found for registry_version={version!r}. "
-            f"Requested version does not have an archived snapshot."
-        )
+        super().__init__(f"Catalog snapshot not found for registry_version={version!r}")
+
+
+class VersionInvalidError(Exception):
+    """请求的快照存在，但内容损坏或与版本不自洽。"""
+
+    def __init__(self, version: str, detail: str) -> None:
+        self.version = version
+        self.detail = detail
+        super().__init__(f"Catalog snapshot invalid for registry_version={version!r}: {detail}")
 
 
 # ─── Versioned Catalog Loading (Req-9) ───────────────────────────────────────
@@ -102,10 +105,18 @@ def load_versioned_catalog(version: str) -> CatalogIndex:
 
     try:
         data = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as e:
-        raise VersionNotFoundError(version) from e
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+        raise VersionInvalidError(version, f"无法解析（{exc}）") from exc
+    if data.get("registry_version") != version:
+        raise VersionInvalidError(
+            version,
+            f"快照内记的版本是 {data.get('registry_version')!r}，与文件名不一致",
+        )
 
-    catalog_index = CatalogIndex(data)
+    try:
+        catalog_index = CatalogIndex(data)
+    except Exception as exc:
+        raise VersionInvalidError(version, f"目录完整性校验失败（{exc}）") from exc
     logger.info(
         "ACNR versioned catalog loaded: version=%s sheets=%d cells=%d",
         version,
@@ -214,6 +225,8 @@ class ResolveResult:
     required_context: Optional[list[str]] = None  # 多义 / 禁止别名时需补的上下文
     #: 下一步该怎么办（中文，供界面直接显示）；外部命名空间等「不可定位」场景必填（T31）
     next_step: Optional[str] = None
+    #: 带 project_id 时是否已从数据库核对版本锁；无 db 时明确为 False。
+    version_lock_checked: Optional[bool] = None
 
 
 def _detect_non_wp_domain(
@@ -381,6 +394,11 @@ async def full_resolve(
 
     cat = get_catalog()
     overlay = get_project_overlay()
+    version_lock_checked: bool | None = None
+
+    def _with_lock_state(result: ResolveResult) -> ResolveResult:
+        result.version_lock_checked = version_lock_checked
+        return result
 
     # ─── Req-9: 版本锁定解析（归档项目按锁定 registry_version 解析）──────
     # 完整实现：
@@ -388,9 +406,16 @@ async def full_resolve(
     #   - locked_version != current → 加载对应版本快照
     #   - 快照缺失 → 抛出 VersionNotFoundError（明确治理错误）
     if project_id:
-        if db is None:  # T26：无会话即无法核对落库的版本锁（落库随 T17 / T18；此前仍读进程内登记）
+        # 锁源 = 落库的 `projects.acnr_registry_version`（T18 接线；原先读进程内字典，
+        # 进程一重启锁就没了，归档项目会按新目录解析 —— 见 project_registry_lock 模块说明）。
+        if db is None:
+            # 无会话就查不了落库的锁。生产代码里「带 project_id 却不带 db」现算为 0。
             _metrics.record_version_lock("unchecked")
-        locked_version = get_project_registry_version(project_id)
+            locked_version = None
+            version_lock_checked = False
+        else:
+            locked_version = await get_locked_version(db, project_id)
+            version_lock_checked = True
         if locked_version:
             current_version = cat.registry_version
             if locked_version != current_version:
@@ -437,13 +462,13 @@ async def full_resolve(
                 domain=non_wp_domain,
                 silent=True,
             )
-        return result
+        return _with_lock_state(result)
 
     # ─── Step 1: grammar 规范化 → 推导 addr_id（exact_identity；多义 / 禁止别名直接返回）──
     resolved_addr_id, _blocked = step1_identity(cat, uri=uri, formula_ref=formula_ref, addr_id=addr_id, index_ref=index_ref)
     if _blocked is not None:
         _resolve_metrics["ambiguous"] += 1
-        return ResolveResult(**_blocked)
+        return _with_lock_state(ResolveResult(**_blocked))
     if not resolved_addr_id:
         # 无法解析输入
         _resolve_metrics["miss"] += 1
@@ -457,7 +482,7 @@ async def full_resolve(
             result="miss",
             latency_ms=_latency,
         )
-        return ResolveResult(found=False, candidates=candidates, source_layer=None)
+        return _with_lock_state(ResolveResult(found=False, candidates=candidates, source_layer=None))
 
     # ─── Canonical normalization (Req-6): 内部使用 CanonicalAddress 比较 ───
     # 通过 CanonicalAddress round-trip 确保 addr_id 格式规范
@@ -524,7 +549,7 @@ async def full_resolve(
             result="found",
             latency_ms=_latency,
         )
-        return result
+        return _with_lock_state(result)
 
     # ─── Step 4: L1 SheetCatalogEntry + aliases → cell 级 match ──────────
     # 4a. 先尝试 sheet 精确匹配
@@ -537,7 +562,7 @@ async def full_resolve(
         if project_id and db:
             result = await _attach_wp_id(result, project_id, db, _instance_memo)
         _resolve_metrics["hit"] += 1
-        return result
+        return _with_lock_state(result)
 
     # 4b. 尝试 addr_id 的 sheet 部分（前两段）+ 别名匹配
     parts = resolved_addr_id.split("/")
@@ -558,7 +583,7 @@ async def full_resolve(
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
 
             # 多命中 → ambiguous (R5.5)
             if len(exact) > 1:
@@ -581,7 +606,7 @@ async def full_resolve(
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
             if len(semantic) > 1:
                 _resolve_metrics["ambiguous"] += 1
                 return ResolveResult(
@@ -603,7 +628,7 @@ async def full_resolve(
             if project_id and db:
                 result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
-            return result
+            return _with_lock_state(result)
         if len(code_matches) > 1:
             _resolve_metrics["ambiguous"] += 1
             return ResolveResult(
@@ -650,7 +675,7 @@ async def full_resolve(
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
             # semantic 包含
             semantic = [c for c in cells if cell_desc in (c.get("semantic_label") or "")]
             if len(semantic) == 1:
@@ -658,14 +683,14 @@ async def full_resolve(
                 if project_id and db:
                     result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
 
         elif len(alias_matches) == 1:
             result = _build_sheet_resolve_result(alias_matches[0], project_id, overlay, cat)
             if project_id and db:
                 result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
-            return result
+            return _with_lock_state(result)
 
     # ─── Step 6: L3 RuntimeCellEntry（project-scoped）────────────────────
     # Req-19: L3 模糊搜索收紧 — 移除 startswith(wp_code) 宽松条件
@@ -679,7 +704,7 @@ async def full_resolve(
             if rt_entry:
                 result = _build_runtime_resolve_result(rt_entry)
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
 
             # 收紧的模糊搜索：仅 cell_address 精确 + endswith("/" + cell_address)
             # 不再使用 startswith(wp_code)，避免 D2 vs D2-2 互相错格
@@ -694,7 +719,7 @@ async def full_resolve(
             if len(l3_candidates) == 1:
                 result = _build_runtime_resolve_result(l3_candidates[0])
                 _resolve_metrics["hit"] += 1
-                return result
+                return _with_lock_state(result)
             elif len(l3_candidates) > 1:
                 # 多候选 → ambiguous（Req-19.3, Req-5.3 残留漏洞修复）
                 _resolve_metrics["ambiguous"] += 1
@@ -720,12 +745,12 @@ async def full_resolve(
             result="miss",
             latency_ms=_latency,
         )
-        return ResolveResult(
+        return _with_lock_state(ResolveResult(
             found=False,
             error="invalid_addr_id",
             candidates=[],
             source_layer=None,
-        )
+        ))
 
     candidates = _find_candidates(resolved_addr_id, max_results=5)
     _result = ResolveResult(found=False, candidates=candidates, source_layer=None)
@@ -737,7 +762,7 @@ async def full_resolve(
         result="miss",
         latency_ms=_latency,
     )
-    return _result
+    return _with_lock_state(_result)
 
 
 # ─── Resolve Result Builders ──────────────────────────────────────────────────

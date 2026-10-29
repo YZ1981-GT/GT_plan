@@ -242,6 +242,11 @@ class AddressingService:
                 raw=raw, found=False, error=ERR_RESOLVE_UNAVAILABLE
             )
         except Exception as exc:  # resolve 依赖故障 → 视为不可用，中止（不返回部分结果）
+            from app.services.acnr.project_registry_lock import RegistryLockError
+            from app.services.acnr.resolver import VersionInvalidError, VersionNotFoundError
+
+            if isinstance(exc, (RegistryLockError, VersionInvalidError, VersionNotFoundError)):
+                raise
             logger.warning("resolve_target failed: raw=%s error=%s", raw, exc)
             return ResolvedTarget(
                 raw=raw, found=False, error=ERR_RESOLVE_UNAVAILABLE

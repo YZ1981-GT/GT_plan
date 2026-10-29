@@ -12,10 +12,6 @@ import pytest
 
 import app.services.acnr.resolver as resolver_mod
 from app.services.acnr.catalog import CatalogIndex, get_catalog
-from app.services.acnr.immutability import (
-    record_project_registry_version,
-    remove_project_registry_version,
-)
 
 _LOCKED_VERSION = "20200101000000"
 _OLD = "Z9/Z9-1"
@@ -46,15 +42,17 @@ def locked_project(monkeypatch):
     assert _NEW not in get_catalog().sheets_by_addr_id, "前提：当前目录里没有该替代地址"
     locked = _locked_index()
     monkeypatch.setattr(resolver_mod, "load_versioned_catalog", lambda version: locked)
+    async def _locked(_db, _project_id):
+        return _LOCKED_VERSION
+
+    monkeypatch.setattr(resolver_mod, "get_locked_version", _locked)
     pid = str(uuid4())
-    record_project_registry_version(pid, _LOCKED_VERSION)
     yield pid
-    remove_project_registry_version(pid)
 
 
 @pytest.mark.parametrize("addr_id", [_OLD, f"{_OLD}/B5"], ids=["sheet", "cell"])
 async def test_replacement_label_comes_from_locked_catalog(locked_project, addr_id):
-    res = await resolver_mod.full_resolve(addr_id=addr_id, project_id=locked_project)
+    res = await resolver_mod.full_resolve(addr_id=addr_id, project_id=locked_project, db=object())
     assert res.found and res.deprecated and res.replaced_by == _NEW
     assert _NEW_LABEL in (res.reason or ""), res.reason
 

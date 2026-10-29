@@ -30,7 +30,13 @@ from app.services.acnr.catalog import (
     lookup,
 )
 from app.services.acnr.limits import ACNR_BATCH_LIMIT
-from app.services.acnr.resolver import full_resolve, resolve_instance
+from app.services.acnr.resolver import (
+    VersionInvalidError,
+    VersionNotFoundError,
+    full_resolve,
+    resolve_instance,
+)
+from app.services.acnr.project_registry_lock import RegistryLockError
 from app.services.acnr.overlay import (
     apply_project_overlay,
     remove_project_overlay,
@@ -266,6 +272,8 @@ async def acnr_resolve_batch(
                 response.pop("wp_id", None)
                 response.pop("jump_route", None)
             results.append({k: v for k, v in response.items() if v is not None})
+        except (RegistryLockError, VersionInvalidError, VersionNotFoundError):
+            raise
         except Exception:
             results.append({"found": False, "error": "resolve_error"})
 

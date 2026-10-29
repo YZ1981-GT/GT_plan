@@ -34,11 +34,6 @@ from app.services.acnr.resolver import (
     _CATALOG_SNAPSHOTS_DIR,
 )
 from app.services.acnr.catalog import CatalogIndex
-from app.services.acnr.immutability import (
-    record_project_registry_version,
-    remove_project_registry_version,
-    _project_registry_versions,
-)
 
 
 # ─── Strategies ───────────────────────────────────────────────────────────────
@@ -194,8 +189,8 @@ class TestVersionedResolveDeterminism:
         original_dir = resolver_mod._CATALOG_SNAPSHOTS_DIR
         resolver_mod._CATALOG_SNAPSHOTS_DIR = tmp_path
 
-        # 注册项目锁定版本
-        record_project_registry_version(project_id, version)
+        async def _locked(_db, _project_id):
+            return version
 
         # Mock 当前 catalog version 为不同值（触发版本分支）
         from app.services.acnr.catalog import get_catalog as real_get_catalog
@@ -209,10 +204,11 @@ class TestVersionedResolveDeterminism:
                 "cells": [],
             })
 
-            with patch("app.services.acnr.resolver.get_catalog", return_value=mock_cat):
+            with patch("app.services.acnr.resolver.get_catalog", return_value=mock_cat), \
+                    patch("app.services.acnr.resolver.get_locked_version", side_effect=_locked):
                 # 两次调用应产生完全一致的结果
-                result1 = asyncio.run(full_resolve(addr_id=addr_id, project_id=project_id))
-                result2 = asyncio.run(full_resolve(addr_id=addr_id, project_id=project_id))
+                result1 = asyncio.run(full_resolve(addr_id=addr_id, project_id=project_id, db=object()))
+                result2 = asyncio.run(full_resolve(addr_id=addr_id, project_id=project_id, db=object()))
 
             # 核心断言：幂等性
             assert result1.found == result2.found
@@ -224,7 +220,6 @@ class TestVersionedResolveDeterminism:
             assert result1.source_layer == result2.source_layer
         finally:
             resolver_mod._CATALOG_SNAPSHOTS_DIR = original_dir
-            remove_project_registry_version(project_id)
             load_versioned_catalog.cache_clear()
 
     @settings(max_examples=5, deadline=None)
@@ -247,7 +242,8 @@ class TestVersionedResolveDeterminism:
         original_dir = resolver_mod._CATALOG_SNAPSHOTS_DIR
         resolver_mod._CATALOG_SNAPSHOTS_DIR = tmp_path
 
-        record_project_registry_version(project_id, version)
+        async def _locked(_db, _project_id):
+            return version
 
         try:
             mock_cat = CatalogIndex({
@@ -257,14 +253,14 @@ class TestVersionedResolveDeterminism:
                 "cells": [],
             })
 
-            with patch("app.services.acnr.resolver.get_catalog", return_value=mock_cat):
+            with patch("app.services.acnr.resolver.get_catalog", return_value=mock_cat), \
+                    patch("app.services.acnr.resolver.get_locked_version", side_effect=_locked):
                 with pytest.raises(VersionNotFoundError) as exc_info:
-                    asyncio.run(full_resolve(addr_id="D2/D2-2/E100", project_id=project_id))
+                    asyncio.run(full_resolve(addr_id="D2/D2-2/E100", project_id=project_id, db=object()))
 
                 assert exc_info.value.version == version
         finally:
             resolver_mod._CATALOG_SNAPSHOTS_DIR = original_dir
-            remove_project_registry_version(project_id)
             load_versioned_catalog.cache_clear()
 
     @settings(max_examples=5, deadline=None)

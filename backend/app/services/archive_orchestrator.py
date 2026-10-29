@@ -227,6 +227,14 @@ class ArchiveOrchestrator:
                 sa.select(WorkingPaper.id, WorkingPaper.status).where(*live, WorkingPaper.status != WpFileStatus.archived)
             )).all()
         }
+        # 归档即锁定 ACNR 地址目录版本（T18 / 需求 7.2）：归档后的底稿地址要按归档当时的目录
+        # 版本解析，锁不上就不许归档 —— 否则目录升级后归档项目的地址对不回去，而那时已无法补救。
+        # 快照缺失 / 内容不自洽 / 已锁到别的版本 → RegistryLockError 上抛，本步失败、整个归档
+        # job 失败、事务不提交（项目状态不会停在半归档）。
+        from app.services.acnr.project_registry_lock import lock_project_registry
+
+        await lock_project_registry(self.db, job.project_id)
+
         now = datetime.now(timezone.utc)
         project.status = ProjectStatus.archived
         project.archived_at = now

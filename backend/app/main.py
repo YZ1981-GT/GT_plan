@@ -68,6 +68,13 @@ from app.middleware.gzip_offload import OffloadingGZipMiddleware
 from app.middleware.observability import ObservabilityMiddleware
 from app.middleware.inflight import InflightTrackingMiddleware
 from app.router_registry import register_all_routers
+from app.services.acnr.http_errors import (
+    registry_lock_error_handler,
+    version_invalid_error_handler,
+    version_not_found_error_handler,
+)
+from app.services.acnr.project_registry_lock import RegistryLockError
+from app.services.acnr.resolver import VersionInvalidError, VersionNotFoundError
 
 
 @asynccontextmanager
@@ -257,6 +264,9 @@ from app.services.evidence_governance.frozen_contracts import (
 
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(RegistryLockError, registry_lock_error_handler)
+app.add_exception_handler(VersionNotFoundError, version_not_found_error_handler)
+app.add_exception_handler(VersionInvalidError, version_invalid_error_handler)
 # 证据治理稳定错误 → 脱敏 4xx/5xx（design §7.2）。必须先于泛型 Exception 处理器注册，
 # 否则 SCOPE_NOT_FOUND_OR_FORBIDDEN 等会被 generic_exception_handler 误报为 500。
 app.add_exception_handler(_EvidenceGovernanceError, evidence_governance_error_handler)

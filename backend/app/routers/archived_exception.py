@@ -193,6 +193,11 @@ async def unarchive_project(
     project.status = ProjectStatus.execution
     # 锁定的逆操作：底稿恢复归档前状态、清归档时间 / 保留期
     restored = await restore_after_unarchive(db, project_id)
+    # ACNR 目录版本锁的逆操作（T18）：解除归档后项目重新活跃，按当前目录解析；
+    # 两列同清，不留悬空的锁（否则目录升级后这个活跃项目仍按旧版本解析）。
+    from app.services.acnr.project_registry_lock import unlock_project_registry
+
+    unlocked_version = await unlock_project_registry(db, project_id)
 
     # 写入审计日志
     await append_audit_log(db, {
@@ -207,6 +212,9 @@ async def unarchive_project(
             "previous_status": previous_status,
             "workpapers_restored": restored["workpapers_restored"],
             "archive_job_id": restored["job_id"],
+            # 解除归档前锁定的 ACNR 目录版本（None = 本来没锁）。留痕是为了日后能查
+            # 「这个项目曾按哪一版目录解析」，重新归档时会锁到当时的当前版本、不一定是这个。
+            "acnr_registry_version_unlocked": unlocked_version,
         },
     })
 

@@ -26,7 +26,7 @@ from app.models.workpaper_models import WpIndex
 from app.services.acnr import exact_identity
 from app.services.acnr.catalog import get_catalog
 from app.services.acnr.reasons import CELL_VALUE_REASONS
-from app.services.acnr.immutability import get_project_registry_version
+from app.services.acnr.project_registry_lock import get_locked_version
 from app.services.acnr.metrics import get_acnr_metrics
 from app.services.formula_management.stable_key import normalize_sheet_key
 from app.services.wp_cell_reader import WpCellRead, resolve_wp_cell
@@ -63,8 +63,12 @@ class TargetRead:
 
 
 async def _locked_version(db, project_id) -> str | None:
-    """项目锁定的目录版本。现阶段与 ``full_resolve`` 同一锁源（进程内登记）；T17 / T18 改为落库的锁。"""
-    return get_project_registry_version(str(project_id))
+    """项目锁定的目录版本，与 ``full_resolve`` 同一锁源：落库的 `projects.acnr_registry_version`。
+
+    两处必须同源 —— 取值接线按一个版本的目录找格子、resolver 按另一个版本判身份，
+    就会出现「身份解析得到但取不到值」这类查不出原因的空值（T18）。
+    """
+    return await get_locked_version(db, project_id)
 
 
 async def effective_catalog(db, project_id) -> "CatalogIndex":
@@ -75,6 +79,7 @@ async def effective_catalog(db, project_id) -> "CatalogIndex":
     metrics = get_acnr_metrics()
     if db is None:  # T26：与 full_resolve 同口径计 version_lock_unchecked
         metrics.record_version_lock("unchecked")
+        return cat
     locked = await _locked_version(db, project_id)
     if not locked:
         return cat

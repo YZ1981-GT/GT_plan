@@ -45,7 +45,7 @@ from tests.acnr._status_doc_checks import (
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
     _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, gc_runtime_rows, has_tests,
-    in_planned, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
+    in_planned, lock_rows, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
 )
 from tests.acnr.test_acnr_architecture_status_doc import (
     _REPO, H_COMPONENTS, H_FACTS, H_PLANNED, _cells, _claim_legacy_forwarding, _claim_stale_authz,
@@ -337,13 +337,13 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_database_error_propagates"),
             claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
                   lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
-        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录））": CB(
+        "单元格取值接线（锁定项目按锁定目录判名、锁定来源与 `full_resolve` 同为项目表落库的版本锁、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录））": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",
             calls(_A + "wp_cell_target.py", "read_entry_cell", "resolve_wp_cell", "bind_wp_code", "sheet_key_for"),
             calls(_A + "wp_cell_target.py", "effective_catalog", "load_versioned_catalog"),
-            calls(_A + "wp_cell_target.py", "_locked_version", "get_project_registry_version"),
-            not_imports(_A + "wp_cell_target.py", "project_registry_lock"), task_open("T17", "T18"),
+            calls(_A + "wp_cell_target.py", "_locked_version", "get_locked_version"),
+            calls(_RESOLVER_REL, "full_resolve", "get_locked_version"),
             has_tests(_T + "test_wp_cell_target.py", "test_locked_project_judges_identity_by_locked_catalog",
                       "test_sheet_level_paper_preferred_over_parent", "test_borrowed_and_ambiguous_names_block"),
             claim("生产代码里导入 wp_cell_target 的恰为 formula_engine、custom_query/acnr_target_values 与"
@@ -514,7 +514,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             claim("目录写出方现算恰为生成器（AST 污点分析）", lambda: __import__(
                 "tests.acnr.test_only_generator_writes_catalog", fromlist=["catalog_writers"]
             ).catalog_writers() == {"scripts/acnr/generate_catalog.py"})),
-        "ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源暂为进程内登记；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other）": CB(
+        "ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源为项目表落库的版本锁；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other）": CB(
             _A + "metrics.py", ("AcnrMetricsCollector", "get_acnr_metrics", "VERSION_LOCK_COUNTERS"), _T + "test_acnr_metrics.py",
             calls(_RESOLVER_REL, "full_resolve", "record_version_lock"), calls(_A + "wp_cell_target.py", "effective_catalog", "record_version_lock"),
             calls(_CQ + "acnr_target_values.py", "resolve_acnr_targets", "record_acnr_target_rejected"),
@@ -523,6 +523,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             has_tests(_T + "test_acnr_metrics.py", "test_fresh_counters_have_all_keys_zero", "test_rejected_targets_counted_per_error_code",
                       "test_labelled_counters_bound_unknown_codes_to_other", "test_metrics_endpoint_returns_counters")),
         **gc_runtime_rows(CB),  # 运行时快照清理一行（RV13.1-01），登记在判据库：本文件已到 800 行上限
+        **lock_rows(CB),  # 版本锁（落库）一行（T17 / T18），同上登记在判据库
         "写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等）": CB(
             _LINKAGE_REL, ("stale_impact", "stale_impact_by_addr"), _T + "test_stale_write_endpoint_authz.py",
             claim("stale_impact / stale_impact_by_addr 调用项目级鉴权（AST）", _claim_stale_authz),
@@ -558,7 +559,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             T31_HINT_MODULE, "AcnrCandidatesHint", T31_HINT_TEST, task_done("T31"), exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
+        "按库引用的快照清理（快照清理的引用集改查项目表的版本锁）": L("T19"),
         "INDEX 登记与提交边界核对": L("T33"),
     },
     H_VERSION: {

@@ -1,23 +1,14 @@
-"""ACNR addr_id 不可变政策 + registry_version 处理
+"""ACNR addr_id 不可变、重命名与弃用政策。
 
-职责：
-1. addr_id 不可变校验 — 生成器合并时阻止已有 addr_id 被移除或变更（R19.1）
-2. 重命名政策 — sheet 权威名变更走 aliases，addr_id 不变（R19.2）
-3. 弃用政策 — deprecated 标记 + 保留 ≥1 registry_version（R19.3）
-4. 归档项目 registry_version 记录（R19.4）
+项目目录版本锁已持久化到 ``projects.acnr_registry_version``，统一由
+``project_registry_lock`` 读写。本模块不再保存任何进程内项目版本状态。
 
-设计约定：
-- M1 阶段 registry_version mapping 用内存 dict 存储
-- 改名操作仅变更 sheet_name 并追加旧名到 aliases
-- addr_id 视为不可变主键，修改等同于破坏性变更
-
-Requirements: 19.1, 19.2, 19.3, 19.4
+Requirements: 19.1, 19.2, 19.3
 """
 from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -287,89 +278,3 @@ def is_safe_to_remove(
     # registry_version 为时间戳字符串（如 "20260710102744"），
     # 字典序比较即可判断版本先后
     return deprecated_at < current_version
-
-
-# ─── R19.4: 归档项目 registry_version 记录 ─────────────────────────────────
-
-
-# M1 阶段用内存 dict 存储项目归档时的 registry_version
-# key: project_id → registry_version
-_project_registry_versions: dict[str, str] = {}
-
-
-@dataclass(slots=True)
-class ProjectRegistryVersionRecord:
-    """归档项目 registry_version 记录。"""
-
-    project_id: str
-    registry_version: str
-    archived_at: str = ""  # ISO 格式时间戳
-
-
-def record_project_registry_version(
-    project_id: str,
-    registry_version: str,
-) -> None:
-    """归档项目时记录当前 registry_version。
-
-    规则（R19.4）：
-    - 项目归档时记录 registry_version
-    - 后续解析该项目引用时按锁定版本解析（R19.5，resolver.py full_resolve 已实现）
-
-    接线位置（应在项目归档流程中调用）：
-    - 当前 M3 实现：由 project archival handler 在归档时调用本函数
-    - 推荐接入点：ProjectService.archive_project() 或对应的 EventBus handler
-      处理 PROJECT_ARCHIVED 事件时调用：
-        from app.services.acnr.immutability import record_project_registry_version
-        from app.services.acnr.catalog import get_catalog
-        record_project_registry_version(project_id, get_catalog().registry_version)
-
-    Args:
-        project_id: 项目 ID
-        registry_version: 归档时的 registry_version
-    """
-    _project_registry_versions[project_id] = registry_version
-    logger.info(
-        "project registry_version recorded: project=%s version=%s",
-        project_id, registry_version,
-    )
-
-
-def get_project_registry_version(project_id: str) -> str | None:
-    """获取归档项目锁定的 registry_version。
-
-    返回 None 表示项目未归档或未记录版本。
-
-    Args:
-        project_id: 项目 ID
-
-    Returns:
-        锁定的 registry_version 或 None
-    """
-    return _project_registry_versions.get(project_id)
-
-
-def remove_project_registry_version(project_id: str) -> bool:
-    """移除项目的 registry_version 记录（取消归档时调用）。
-
-    Returns:
-        True 如果存在且被移除
-    """
-    if project_id in _project_registry_versions:
-        del _project_registry_versions[project_id]
-        return True
-    return False
-
-
-def list_archived_projects() -> dict[str, str]:
-    """列出所有记录了 registry_version 的归档项目。
-
-    Returns:
-        {project_id → registry_version}
-    """
-    return dict(_project_registry_versions)
-
-
-def clear_all_project_versions() -> None:
-    """清除全部项目 registry_version 记录（测试用）。"""
-    _project_registry_versions.clear()

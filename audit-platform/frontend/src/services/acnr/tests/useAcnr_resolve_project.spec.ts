@@ -48,4 +48,24 @@ describe('useAcnr resolve 带项目', () => {
     await acnr.resolveFormula("TB('1001','期末余额')", 'pid-b')
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
+
+  it.each([
+    ['ACNR_REGISTRY_SNAPSHOT_MISSING', 'snapshot_missing', '锁定快照缺失'],
+    ['ACNR_REGISTRY_SNAPSHOT_INVALID', 'snapshot_invalid', '锁定快照损坏'],
+    ['ACNR_REGISTRY_LOCK_FAILED', 'lock_failed', '目录版本锁失败'],
+  ])('409 %s 保留终态分类与中文原因', async (wireCode, error, reason) => {
+    mockGet.mockRejectedValue(Object.assign(new Error('409'), {
+      response: { status: 409, data: { code: 409, error_code: wireCode, message: reason, detail: reason } },
+    }))
+    const acnr = await freshAcnr()
+    await expect(acnr.resolveUri('wp://E1/E1-14#C10', 'pid-1')).resolves.toEqual({
+      found: false, error, reason,
+    })
+    await expect(acnr.resolveFormula("WP('E1','E1-14','C10')", 'pid-1')).resolves.toEqual({
+      found: false, error, reason,
+    })
+    await expect(acnr.resolveIndex('wp:E1', 'pid-1')).resolves.toEqual({
+      found: false, error, reason,
+    })
+  })
 })

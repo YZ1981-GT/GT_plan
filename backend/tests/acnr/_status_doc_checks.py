@@ -603,6 +603,64 @@ def gc_runtime_rows(CB: Callable) -> dict:
     }
 
 
+# ─── 版本锁落库与归档 / 解锁接线（T17 / T18）──────────────────────────────────
+
+_LOCK_REL = "backend/app/services/acnr/project_registry_lock.py"
+_LOCK_HTTP_REL = "backend/app/services/acnr/http_errors.py"
+_LOCK_PG_TEST_REL = "backend/tests/acnr/test_project_registry_lock_pg.py"
+_LOCK_WIRING_TEST_REL = "backend/tests/acnr/test_project_registry_lock_wiring.py"
+
+
+_LOCK_HANDLERS = {
+    "RegistryLockError": "registry_lock_error_handler",
+    "VersionNotFoundError": "version_not_found_error_handler",
+    "VersionInvalidError": "version_invalid_error_handler",
+}
+
+
+def _lock_handlers_registered() -> bool:
+    """main.py 模块顶层的 app.add_exception_handler(异常, 处理器) 恰好把三类治理错误各注册到对应处理器（AST）。"""
+    pairs = set()
+    for n in ast.walk(_tree("backend/app/main.py")):
+        if (isinstance(n, ast.Call) and getattr(n.func, "attr", None) == "add_exception_handler"
+                and len(n.args) == 2 and all(isinstance(a, ast.Name) for a in n.args)):
+            pairs.add((n.args[0].id, n.args[1].id))
+    return set(_LOCK_HANDLERS.items()) <= pairs
+
+
+def lock_rows(CB: Callable) -> dict:
+    """组件表「版本锁（落库）」一行的登记（T17 / T18）。放在判据库是因为登记表文件已到 800 行上限；
+    CB 由登记表传入（Stmt 定义在登记表里）。"""
+    return {
+        "版本锁已落库到项目表（归档的两条写入路径——交付件全部归档、归档编排的锁定步——都在把项目置为已归档之前锁定当时的目录版本，锁前先确认该版本的快照存在且内容自洽，锁不上就不归档；解除归档在同一事务里解锁；`full_resolve` 与单元格取值接线读同一份落库的锁，带项目而无会话时如实标明未核对；锁定版本的快照缺失、损坏或锁定失败返回冲突错误与中文原因，前端收到后不回退其他解析方式）": CB(
+            _LOCK_REL, ("lock_project_registry", "unlock_project_registry", "get_locked_version", "verify_snapshot",
+                        "RegistryLockError"), _LOCK_PG_TEST_REL,
+            calls("backend/app/services/archive_orchestrator.py", "_step_lock", "lock_project_registry"),
+            calls("backend/app/services/deliverable_service.py", "archive_project_deliverables", "lock_project_registry"),
+            calls("backend/app/routers/archived_exception.py", "unarchive_project", "unlock_project_registry"),
+            calls(_RESOLVER_REL, "full_resolve", "get_locked_version"),
+            calls("backend/app/services/acnr/wp_cell_target.py", "_locked_version", "get_locked_version"),
+            calls(_LOCK_REL, "lock_project_registry", "verify_snapshot"),
+            defines(_LOCK_HTTP_REL, "registry_lock_error_handler", "version_not_found_error_handler",
+                    "version_invalid_error_handler"),
+            claim("main.py 把三类版本锁治理错误注册到对应的 409 处理器（AST）", _lock_handlers_registered),
+            claim("immutability 不再定义进程内项目锁 API（AST）", lambda: not (
+                {"record_project_registry_version", "get_project_registry_version", "remove_project_registry_version",
+                 "list_archived_projects", "clear_all_project_versions", "ProjectRegistryVersionRecord"}
+                & _top_level_names(_REPO / "backend/app/services/acnr/immutability.py"))),
+            has_tests(_LOCK_PG_TEST_REL, "test_both_archive_paths_persist_lock_and_rollback_all_rows",
+                      "test_archived_project_resolves_by_locked_version_not_current"),
+            has_tests(_LOCK_WIRING_TEST_REL, "test_project_status_writers_are_exactly_the_five_reviewed_paths",
+                      "test_both_archive_writers_lock_before_archived_assignment",
+                      "test_unarchive_unlocks_before_commit_and_audits_old_version",
+                      "test_in_memory_project_lock_api_is_absent"),
+            has_tests("backend/tests/acnr/test_registry_lock_error_http.py",
+                      "test_real_resolve_route_returns_unwrapped_stable_409"),
+            exists("audit-platform/frontend/src/services/acnr/registryLockFailure.ts"),
+            exists("audit-platform/frontend/src/stores/__tests__/addressRegistry.registryLock.spec.ts")),
+    }
+
+
 # ─── 底稿短链页路由（T16）────────────────────────────────────────────────────
 
 

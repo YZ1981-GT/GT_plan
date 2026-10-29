@@ -47,7 +47,7 @@
 | L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
 | 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则、单元格取值接线、跨 sheet 追溯编排器、V2 依赖图节点规范身份与 CCR 端点规范身份调用它） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
 | 底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它） | 后端 | `backend/app/services/wp_cell_reader.py` | `resolve_wp_cell`、`WpCellRead` | `backend/tests/test_wp_cell_reader_contract.py` |
-| 单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录）） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
+| 单元格取值接线（锁定项目按锁定目录判名、锁定来源与 `full_resolve` 同为项目表落库的版本锁、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录）） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
 | 高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；后端已接到业务视图 execute、模板执行与构建器预览 / 执行 / 导出，构建器先过与业务视图同一项目守卫，带单元格缺项目或年度补不出即拒绝，取值不进查询缓存） | 后端 | `backend/app/services/custom_query/acnr_target_values.py` | `resolve_acnr_targets`、`read_acnr_target_values`、`classify_target`、`plan_builder_targets`、`complete_year` | `backend/tests/acnr/test_acnr_targets_query_e2e.py` |
 | 高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误） | 后端 | `backend/app/services/custom_query/strict_model.py` | `StrictRequestModel`、`AcnrTargetList`、`TemplateConfig`、`template_config_rejected` | `backend/tests/test_query_dsl_rejects_unknown_fields.py` |
 | `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
@@ -65,7 +65,8 @@
 | 目录报告四组分组（blocking / acknowledged / deprecated / info，count 恒等于条目数）与标签源别名逐条处置（未处置即阻断） | 后端 | `backend/app/services/acnr/catalog_report_buckets.py` | `build_buckets`、`bucket_problems` | `backend/tests/acnr/test_catalog_report_buckets.py` |
 | 目录生成器（唯一写出方：门禁通过才写、内容不变不写、`--check` 结构化比对） | 后端 | `backend/scripts/acnr/generate_catalog.py` | `generate_catalog`、`run_write`、`run_check`、`main` | `backend/tests/acnr/test_generator_release_flow.py` |
 | 消费方绕过棘轮与台账（后端绕过点：从 V1 地址服务导入寻址符号、加载 V2 身份文件或读 CCR 后自行拼 sheet 身份，按语法树现算、注释与文档字符串不计；与冻结基线逐条比对，新增或失效都阻断；消费方台账逐项登记状态与迁移目标，文件与符号须真实存在、状态为 migrated 的条目不得在基线里；前端两类绕过点由 `audit-platform/frontend/src/acnrBypassRatchet.spec.ts` 读同一基线核对；CI 作业 acnr-consumer-coverage 经薄壳运行它） | 后端 | `backend/scripts/check/acnr_bypass_scan.py` | `run`、`scan_backend`、`ledger_problems`、`main` | `backend/tests/acnr/test_acnr_bypass_ratchet.py` |
-| ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源暂为进程内登记；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other） | 后端 | `backend/app/services/acnr/metrics.py` | `AcnrMetricsCollector`、`get_acnr_metrics`、`VERSION_LOCK_COUNTERS` | `backend/tests/acnr/test_acnr_metrics.py` |
+| ACNR 计数指标（`/api/acnr/metrics` 的 counters 段，键恒在：版本锁命中、锁定快照缺失、带项目而无会话无法核对版本锁，在 `full_resolve` 与单元格取值接线取目录处计数，锁定来源为项目表落库的版本锁；acnr_targets 逐项拒绝按拒绝码计；停用条目引用被保存；stale 写入口起点身份算不出按原因码计；带原因码的两项遇未登记的码记 other） | 后端 | `backend/app/services/acnr/metrics.py` | `AcnrMetricsCollector`、`get_acnr_metrics`、`VERSION_LOCK_COUNTERS` | `backend/tests/acnr/test_acnr_metrics.py` |
+| 版本锁已落库到项目表（归档的两条写入路径——交付件全部归档、归档编排的锁定步——都在把项目置为已归档之前锁定当时的目录版本，锁前先确认该版本的快照存在且内容自洽，锁不上就不归档；解除归档在同一事务里解锁；`full_resolve` 与单元格取值接线读同一份落库的锁，带项目而无会话时如实标明未核对；锁定版本的快照缺失、损坏或锁定失败返回冲突错误与中文原因，前端收到后不回退其他解析方式） | 后端 | `backend/app/services/acnr/project_registry_lock.py` | `lock_project_registry`、`unlock_project_registry`、`get_locked_version`、`verify_snapshot`、`RegistryLockError` | `backend/tests/acnr/test_project_registry_lock_pg.py` |
 | 运行时快照清理（启动任务与 `gc_snapshots.py` 走同一入口；引用集只认数据库、证实不了即一个都不删，版本锁落库前恒证实不了、不读进程内归档字典；已登记进仓库 git 索引的快照运行时一律不删，判定不了也不删；未登记的散落快照只在引用集已证实时按保留份数与未被锁定清理） | 后端 | `backend/app/services/acnr/catalog_snapshot_gc.py` | `run_db_aware_gc`、`referenced_registry_versions`、`committed_snapshot_versions` | `backend/tests/acnr/test_catalog_snapshot_gc_runtime.py` |
 | 写 stale 端点项目鉴权（`/api/linkage-bus/impact` 等） | 后端 | `backend/app/routers/linkage_bus.py` | `stale_impact`、`stale_impact_by_addr` | `backend/tests/acnr/test_stale_write_endpoint_authz.py` |
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
@@ -83,7 +84,7 @@
 
 | 事项 | 任务 |
 |---|---|
-| 版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理 | T17、T18、T19 |
+| 按库引用的快照清理（快照清理的引用集改查项目表的版本锁） | T19 |
 | INDEX 登记与提交边界核对 | T33 |
 
 ### 版本号格式

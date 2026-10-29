@@ -24,7 +24,6 @@ from app.routers import acnr as acnr_module
 from app.services.acnr import wp_cell_target
 from app.services.acnr.catalog import get_catalog
 from app.services.acnr.formula_validation import validate_refs_via_acnr
-from app.services.acnr.immutability import clear_all_project_versions, record_project_registry_version
 from app.services.acnr.metrics import get_acnr_metrics, reset_acnr_metrics
 from app.services.acnr.resolver import VersionNotFoundError, full_resolve
 from app.services.custom_query.acnr_target_values import resolve_acnr_targets
@@ -37,12 +36,21 @@ _COUNTER_KEYS = {"version_lock_hit", "version_lock_snapshot_missing", "version_l
                  "deprecated_ref_saved", "acnr_targets_rejected", "stale_start_unresolved"}
 
 
+_TEST_LOCKS: dict[str, str] = {}
+
+
 @pytest.fixture(autouse=True)
-def _fresh():
+def _fresh(monkeypatch):
     reset_acnr_metrics()
-    clear_all_project_versions()
+    _TEST_LOCKS.clear()
+
+    async def _locked(_db, project_id):
+        return _TEST_LOCKS.get(str(project_id))
+
+    monkeypatch.setattr("app.services.acnr.resolver.get_locked_version", _locked)
+    monkeypatch.setattr("app.services.acnr.wp_cell_target.get_locked_version", _locked)
     yield
-    clear_all_project_versions()
+    _TEST_LOCKS.clear()
     reset_acnr_metrics()
 
 
@@ -52,7 +60,7 @@ def _counters() -> dict:
 
 def _lock(version: str) -> str:
     pid = str(uuid.uuid4())
-    record_project_registry_version(pid, version)
+    _TEST_LOCKS[pid] = version
     return pid
 
 
@@ -85,18 +93,18 @@ def test_labelled_counters_bound_unknown_codes_to_other():
 # ─── 版本锁：full_resolve ────────────────────────────────────────────────────
 
 
-async def test_full_resolve_locked_project_counts_hit_and_unchecked_without_db():
+async def test_full_resolve_project_without_db_is_unchecked_and_does_not_read_lock():
     pid = _lock(get_catalog().registry_version)
     result = await full_resolve(addr_id="E1/E1-14/C10", project_id=pid)
-    assert result.found is True
-    assert _locks() == (1, 0, 1)
+    assert result.found is True and result.version_lock_checked is False
+    assert _locks() == (0, 0, 1)
 
 
 async def test_full_resolve_with_session_is_not_unchecked():
     """有会话：只计命中（未命中目录的输入在首步返回，不触达会话）。"""
     pid = _lock(get_catalog().registry_version)
     result = await full_resolve(addr_id="ZZ/ZZ-不存在/Z1", project_id=pid, db=object())
-    assert result.found is False
+    assert result.found is False and result.version_lock_checked is True
     assert _locks() == (1, 0, 0)
 
 
@@ -120,13 +128,13 @@ async def test_full_resolve_unlocked_or_projectless_counts_nothing():
 async def test_effective_catalog_counts_same_as_full_resolve():
     cat = get_catalog()
     assert await wp_cell_target.effective_catalog(None, _lock(cat.registry_version)) is cat
-    assert _locks() == (1, 0, 1)
+    assert _locks() == (0, 0, 1)
     with pytest.raises(VersionNotFoundError):
         await wp_cell_target.effective_catalog(object(), _lock(_MISSING_VERSION))
-    assert _locks() == (1, 1, 1)
+    assert _locks() == (0, 1, 1)
     await wp_cell_target.effective_catalog(object(), str(uuid.uuid4()))
     await wp_cell_target.effective_catalog(None, None)
-    assert _locks() == (1, 1, 1)
+    assert _locks() == (0, 1, 1)
 
 
 # ─── acnr_targets 拒绝 ───────────────────────────────────────────────────────

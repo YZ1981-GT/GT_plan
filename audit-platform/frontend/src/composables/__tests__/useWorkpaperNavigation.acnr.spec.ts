@@ -25,6 +25,7 @@ const h = vi.hoisted(() => ({
   apiGetSpy: vi.fn(),
   resolveIndexSpy: vi.fn(),
   warnSpy: vi.fn(),
+  errorSpy: vi.fn(),
 }))
 
 // vue-router：只需 push
@@ -49,7 +50,7 @@ vi.mock('@/services/acnr/useAcnr', () => ({
 
 // ElMessage 副作用隔离
 vi.mock('element-plus', () => ({
-  ElMessage: { warning: h.warnSpy, error: vi.fn(), success: vi.fn() },
+  ElMessage: { warning: h.warnSpy, error: h.errorSpy, success: vi.fn() },
 }))
 
 import { useWorkpaperNavigation } from '../useWorkpaperNavigation'
@@ -71,7 +72,7 @@ describe('navigateToWorkpaper — ACNR 命中（Req 13.1）', () => {
     await navigateToWorkpaper('D2', PROJECT_ID)
 
     // ACNR 前置解析用 'wp:'+wpCode 前缀
-    expect(h.resolveIndexSpy).toHaveBeenCalledWith('wp:D2')
+    expect(h.resolveIndexSpy).toHaveBeenCalledWith('wp:D2', PROJECT_ID)
     // 跳转到 ACNR 返回的 jump_route
     expect(h.pushSpy).toHaveBeenCalledTimes(1)
     expect(h.pushSpy).toHaveBeenCalledWith(jumpRoute)
@@ -111,7 +112,7 @@ describe('navigateToWorkpaper — ACNR miss/异常静默回退（Req 13.2）', (
     const { navigateToWorkpaper } = useWorkpaperNavigation()
     await navigateToWorkpaper('D3', PROJECT_ID)
 
-    expect(h.resolveIndexSpy).toHaveBeenCalledWith('wp:D3')
+    expect(h.resolveIndexSpy).toHaveBeenCalledWith('wp:D3', PROJECT_ID)
     // legacy 路径被完整调用
     expect(h.loadSpy).toHaveBeenCalled()
     expect(h.lookupSpy).toHaveBeenCalledWith('D3')
@@ -146,6 +147,19 @@ describe('navigateToWorkpaper — ACNR miss/异常静默回退（Req 13.2）', (
       params: { projectId: PROJECT_ID },
       query: { tab: 'A5' },
     })
+  })
+
+  it('版本锁终态错误显示中文且不走 legacy', async () => {
+    h.resolveIndexSpy.mockResolvedValue({
+      found: false, error: 'snapshot_missing', reason: '项目锁定的地址目录快照缺失',
+    })
+    const { navigateToWorkpaper } = useWorkpaperNavigation()
+    await navigateToWorkpaper('D3', PROJECT_ID)
+    expect(h.errorSpy).toHaveBeenCalledWith('项目锁定的地址目录快照缺失')
+    expect(h.loadSpy).not.toHaveBeenCalled()
+    expect(h.lookupSpy).not.toHaveBeenCalled()
+    expect(h.apiGetSpy).not.toHaveBeenCalled()
+    expect(h.pushSpy).not.toHaveBeenCalled()
   })
 
   it('回退后 registry 未命中 → ElMessage.warning，不跳转', async () => {

@@ -9,6 +9,7 @@ import { ElMessage } from 'element-plus'
 import { useWorkpaperRegistry, type RegistryEntry } from './useWorkpaperRegistry'
 import { api } from '@/services/apiProxy'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { isAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
 import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -156,9 +157,13 @@ export function useWorkpaperNavigation() {
     // found=false 或任何异常 → 静默回退现有 registry.lookup + index-resolve API 路径（无回归）。
     // 注意：A16-1~7 虚拟码已在上方处理并 return，不会走到此处（Req 13.4 行为不变）。
     try {
-      const acnrResult = await acnr.resolveIndex(`wp:${wpCode}`)
+      const acnrResult = await acnr.resolveIndex(`wp:${wpCode}`, projectId)
       if (acnrResult.found && acnrResult.jump_route) {
         router.push(acnrResult.jump_route)
+        return
+      }
+      if (isAcnrRegistryFailure(acnrResult)) {
+        ElMessage.error(acnrResult.reason || '地址目录版本不可用，请联系管理员处理')
         return
       }
     } catch {
