@@ -98,8 +98,12 @@ def _extract_sql_strings(source: str) -> list[str]:
     #    而本测试长期全绿；该 reader 又被 `except Exception: pass` 完全静默吞掉，
     #    于是「公式引用 report 域 → 静默取空 → 照算出错值」在四层守卫下全部隐形。
     #    f-string 是拼动态列名/表名最常见的写法，恰恰是最该扫的那一类。
+    #
+    # 🔴 模块别名同样要认：`import sqlalchemy as _sa` / `as sa_mod` 后写 `_sa.text(` / `sa_mod.text(`，
+    #    原正则只认字面的 `sa.text`，这类调用整段不扫（2026-10-30 现算：`_c24_import_export.py` 1 段；
+    #    spec ai-content-pending-target-label 变异时发现）⇒ 「<标识符>[.<标识符>…].text(」都算。
     call_re = re.compile(
-        r"""(?:^|[^\w.])(?:sa\.text|sql_text|sa_text|_text|text)\s*\(\s*"""
+        r"""(?:^|[^\w.])(?:(?:[A-Za-z_]\w*\.)+text|sql_text|sa_text|_text|text)\s*\(\s*"""
         r"""(?:[frbFRB]{1,2})?"""
         r"""(?:"{3}(.*?)"{3}|'{3}(.*?)'{3}|"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""",
         re.DOTALL,
@@ -117,7 +121,6 @@ def _collect_referenced_tables() -> dict[str, set[str]]:
     排除：CTE 名（WITH x AS）、SQL 关键字、函数式表源。
     """
     refs: dict[str, set[str]] = {}
-    cte_re = re.compile(r"\bWITH\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\b|,\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s*\(", re.IGNORECASE)
     for fpath in _iter_python_files():
         try:
             source = fpath.read_text(encoding="utf-8", errors="ignore")
@@ -125,23 +128,37 @@ def _collect_referenced_tables() -> dict[str, set[str]]:
             continue
         rel = str(fpath.relative_to(REPO_ROOT))
         for sql in _extract_sql_strings(source):
-            # 剔除 EXTRACT(field FROM col) 等函数内 FROM（非表引用）
-            sql_clean = _EXTRACT_FROM_RE.sub("", sql)
-            # 本 SQL 内定义的 CTE 名，FROM/JOIN 它们不算表引用
-            ctes = {
-                (g1 or g2).lower()
-                for g1, g2 in cte_re.findall(sql_clean)
-                if (g1 or g2)
-            }
-            for m in _FROM_JOIN_RE.finditer(sql_clean):
-                tbl = m.group(1).lower()
-                # 单字母/双字母 token 一律视为别名（FROM (...) l），非真实表
-                if len(tbl) <= 2:
-                    continue
-                if tbl in _SQL_NONTABLE or tbl in _FUNCTION_SOURCES or tbl in ctes:
-                    continue
+            for tbl in _table_refs_in_sql(sql):
                 refs.setdefault(tbl, set()).add(rel)
     return refs
+
+
+_CTE_RE = re.compile(
+    r"\bWITH\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\b|,\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s*\(", re.IGNORECASE
+)
+
+
+def _table_refs_in_sql(sql: str) -> set[str]:
+    """一段 SQL 里 FROM / JOIN 引用的表名（小写）。"""
+    # 剔除 EXTRACT(field FROM col) 等函数内 FROM（非表引用）
+    sql_clean = _EXTRACT_FROM_RE.sub("", sql)
+    # 本 SQL 内定义的 CTE 名，FROM/JOIN 它们不算表引用
+    ctes = {(g1 or g2).lower() for g1, g2 in _CTE_RE.findall(sql_clean) if (g1 or g2)}
+    out: set[str] = set()
+    for m in _FROM_JOIN_RE.finditer(sql_clean):
+        tbl = m.group(1).lower()
+        # 单字母/双字母 token 一律视为别名（FROM (...) l），非真实表
+        if len(tbl) <= 2:
+            continue
+        if tbl in _SQL_NONTABLE or tbl in _FUNCTION_SOURCES or tbl in ctes:
+            continue
+        # 「FROM 名字(」是函数式表源（json_populate_recordset / jsonb_to_recordset …），不是表：
+        # PG 里表的列别名必须先写表别名（FROM t AS x(a, b)），表名后不会直接跟括号。
+        # 2026-10-19 起 note_project_realign_apply 的 json_populate_recordset 被当成幽灵表，本守卫一直红。
+        if sql_clean[m.end():].lstrip().startswith("("):
+            continue
+        out.add(tbl)
+    return out
 
 
 def _collect_orm_tables() -> set[str]:
@@ -234,6 +251,39 @@ def test_phantom_debt_not_growing_and_still_real():
     assert not stale, (
         f"以下表已不再被裸 SQL 引用（已修复？），请从 _KNOWN_PHANTOM_DEBT 移除：{sorted(stale)}"
     )
+
+
+def test_extract_sql_strings_recognizes_call_forms():
+    """抽取正则的自检：各种 text() 调用写法都要抽到，非调用的字符串与同名方法不算（防口径收窄后静默漏扫）。"""
+    sql = "SELECT a FROM t"
+    forms = [
+        f'text("{sql}")',
+        f'sa.text("{sql}")',
+        f'_sa.text("{sql}")',
+        f'sa_mod.text("{sql}")',
+        f'sqlalchemy.sql.text("{sql}")',
+        f'sql_text("{sql}")',
+        f'sa_text("{sql}")',
+        f'_text("{sql}")',
+        f'text(f"{sql}")',
+        f'x = sa.text(\n    "{sql}"\n)',
+    ]
+    for src in forms:
+        assert _extract_sql_strings(src) == [sql], src
+    for src in (f'"{sql}"', f'context("{sql}")', f'el.text_content("{sql}")', f'subtext("{sql}")'):
+        assert _extract_sql_strings(src) == [], src
+
+
+def test_table_refs_skip_function_sources_but_keep_tables():
+    """表名抽取自检：函数式表源不算表，真实表（含紧跟换行 / 别名 / 子查询）照算。"""
+    assert _table_refs_in_sql(
+        "INSERT INTO t SELECT * FROM json_populate_recordset(NULL::t, CAST(:rows AS json))"
+    ) == set()
+    assert _table_refs_in_sql("SELECT * FROM jsonb_to_recordset (:j) AS x(a int)") == set()
+    assert _table_refs_in_sql(
+        "SELECT a.id FROM wp_index a JOIN working_paper\n  wp ON wp.wp_index_id = a.id WHERE x IN (SELECT 1)"
+    ) == {"wp_index", "working_paper"}
+    assert _table_refs_in_sql("WITH cte AS (SELECT 1) SELECT * FROM cte JOIN projects p ON true") == {"projects"}
 
 
 def test_known_table_sets_nonempty():

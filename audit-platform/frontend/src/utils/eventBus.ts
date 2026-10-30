@@ -777,6 +777,9 @@ export type Events = {
   // disclosure-note-doc-upload-and-batch-fill Task 50：附注正文批量写入成功 → 编辑器来源标记刷新
   'note-text-batch:applied': { projectId: string; year: number }
 
+  // ai-content-pending-target-label：AI 面板采纳成功（新增一条待确认 AI 内容）→ 同项目的待确认横幅重拉
+  'ai-content:adopted': { projectId: string }
+
   // A1 Dashboard 子底稿依赖联动
   'a17-audit-summary-completed': { projectId?: string }
   'a1-11-signing-completed': { projectId?: string }

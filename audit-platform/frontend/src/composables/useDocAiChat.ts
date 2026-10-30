@@ -18,6 +18,7 @@
  */
 import { ref, computed, type Ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { eventBus } from '@/utils/eventBus'
 import {
   hostPathSegments,
   hostQueryString,
@@ -411,7 +412,11 @@ export function useDocAiChat(options: UseDocAiChatOptions) {
           idempotency_key: newIdempotencyKey(),
         }),
       })
-      if (res.ok) return { success: true }
+      if (res.ok) {
+        // 采纳会新增一条待确认 AI 内容：通知同项目的待确认横幅重拉（AiContentPendingBanner）
+        if (host.projectId) eventBus.emit('ai-content:adopted', { projectId: host.projectId })
+        return { success: true }
+      }
       // 失败必须带出可执行原因（Req 8.5：保留选择状态并显示可重试原因）
       let code: string | undefined
       let message: string | undefined

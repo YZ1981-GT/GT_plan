@@ -200,6 +200,89 @@ describe('AiContentPendingBanner', () => {
     expect(mockGet).not.toHaveBeenCalled()
   })
 
+  // ── spec ai-content-pending-target-label：显示后端补的目标标签，不露出带 UUID 的原始 target_cell ──
+
+  it('有目标标签：显示来源类型、标签与位置，不显示原始 target_cell', async () => {
+    mockGet.mockResolvedValue({
+      count: 1,
+      items: [{
+        id: 'log-1',
+        instance_type: 'workpaper',
+        target_cell: 'workpaper:3fa85f64-5717-4562-b3fc-2c963f66afa6:E5',
+        target_label: 'D2 应收账款审定表',
+        target_position: 'E5',
+        content: 'x',
+      }],
+    })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    const meta = wrapper.find('.gt-aip-card__meta')
+    expect(meta.exists()).toBe(true)
+    expect(meta.find('.gt-aip-card__where').text()).toBe('底稿')
+    expect(meta.find('.gt-aip-card__target').text()).toBe('D2 应收账款审定表')
+    expect(meta.findAll('.gt-aip-card__cell').map((c) => c.text())).toEqual(['E5'])
+    expect(meta.text()).not.toContain('3fa85f64')
+  })
+
+  it('有目标标签但没有位置：只显示标签', async () => {
+    mockGet.mockResolvedValue({
+      count: 1,
+      items: [{
+        id: 'log-2',
+        instance_type: 'note',
+        target_cell: 'note:9b2f0c1e-0000-4000-8000-000000000001',
+        target_label: '八、1 货币资金',
+        target_position: null,
+        content: 'x',
+      }],
+    })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    const meta = wrapper.find('.gt-aip-card__meta')
+    expect(meta.find('.gt-aip-card__where').text()).toBe('附注')
+    expect(meta.find('.gt-aip-card__target').text()).toBe('八、1 货币资金')
+    expect(meta.find('.gt-aip-card__cell').exists()).toBe(false)
+  })
+
+  it('没有目标标签（目标已找不到 / 旧后端）：照旧显示原始 target_cell', async () => {
+    mockGet.mockResolvedValue({
+      count: 1,
+      items: [{ id: 'log-3', instance_type: 'note', target_cell: 'note:abc:正文', target_label: null, content: 'x' }],
+    })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    const meta = wrapper.find('.gt-aip-card__meta')
+    expect(meta.find('.gt-aip-card__target').exists()).toBe(false)
+    expect(meta.find('.gt-aip-card__cell').text()).toBe('note:abc:正文')
+  })
+
+  it('卡片上有「复制」按钮：点了把该条 AI 原文写进剪贴板（底稿类确认后要到底稿页面粘贴）', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    mockGet.mockResolvedValue({
+      count: 1,
+      items: [{ id: 'log-9', instance_type: 'workpaper', target_cell: 'workpaper:x', content: '底稿结论草稿' }],
+    })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    const btn = wrapper.find('.gt-aip-card__copy')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith('底稿结论草稿')
+  })
+
+  it('卸载后不再响应 ai-content:adopted（取消订阅）', async () => {
+    mockGet.mockResolvedValue({ count: 0 })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'pY' } })
+    await flushPromises()
+    wrapper.unmount()
+    mockGet.mockClear()
+    eventBus.emit('ai-content:adopted', { projectId: 'pY' })
+    await flushPromises()
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
   it('复制内容调用 clipboard 并提示', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, { clipboard: { writeText } })
