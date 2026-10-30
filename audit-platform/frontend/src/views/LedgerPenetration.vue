@@ -1454,6 +1454,8 @@ import { isTextEntryTarget } from '@/utils/shortcuts'
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useProjectStore } from '@/stores/project'
+import { parseAuditYear } from '@/utils/resolveAuditYear'
 
 const route = useRoute()
 const router = useRouter()
@@ -1461,12 +1463,11 @@ const { syncToUrl, readFromUrl } = useLedgerUrlSync()
 const penetrate = usePenetrate()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { onContextChange } = useAuditContext()
+const projectStore = useProjectStore()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => {
-  const q = Number(route.query.year)
-  if (q && q > 2000) return q
-  return null
-})
+// 年度：路由 ?year= → 项目审计年度（DefaultLayout 的 ProjectContextGate 定下来后才挂本页）；都没有为 null，不按日历猜。
+// 原先只读路由：仪表盘、导入完成、报表空态等入口不带 ?year=，四张表请求都缺 year ⇒ 422、整页空白。
+const year = computed<number | null>(() => parseAuditYear(route.query.year) ?? projectStore.year)
 const mainLedgerWindow = useLedgerWindow()
 const tabLedgerWindow = useLedgerWindow()
 const tabAuxWindow = useLedgerWindow()
@@ -2736,7 +2737,12 @@ const currentAuxCode = ref('')
 const searchKeyword = ref('')
 const balanceFilter = ref('all')
 const treeMode = ref(false)
-const balanceTab = ref<'account' | 'aux' | 'ledger' | 'aux_detail'>('account')
+type BalanceTab = 'account' | 'aux' | 'ledger' | 'aux_detail'
+const BALANCE_TABS: readonly string[] = ['account', 'aux', 'ledger', 'aux_detail']
+// 切页签会写 URL（多窗口现场恢复），DefaultLayout 按 fullPath 给页面加 key ⇒ 每次切页签都整页重挂、从 URL 恢复。
+// 页签在建实例时就按 URL 定（原先挂载完才恢复：先闪一下科目余额表和「暂无账套数据」）；URL 里的非法值按科目余额表处理
+const _urlBalanceTab = readFromUrl().balanceTab
+const balanceTab = ref<BalanceTab>(BALANCE_TABS.includes(_urlBalanceTab) ? _urlBalanceTab as BalanceTab : 'account')
 const auxSearchKeyword = ref('')
 const auxFilter = ref('all')
 const auxPage = ref(1)
@@ -4766,6 +4772,9 @@ function onKeyDown(e: KeyboardEvent) {
 }
 onMounted(async () => {
   document.addEventListener('keydown', onKeyDown)
+  // 从 URL 恢复到辅助余额表（切页签后整页重挂 / F5 / 新窗口打开）：先加载它的维度列表和数据。
+  // 原先只恢复页签、不加载 ⇒ 新实例只剩「全部 0」、没有各维度可选（多窗口查账 2026-10-13 起）。
+  if (balanceTab.value === 'aux') await loadAllAuxBalance()
   await loadProjectList()
   await loadCurrentProject()
   await loadAvailableYears()
@@ -4819,9 +4828,7 @@ onMounted(async () => {
     // 数据溯源：从试算表跳转过来时自动定位到指定科目（保留旧行为）
     _scrollToAccount(route.query.account as string)
   }
-  if (urlState.balanceTab !== 'account') {
-    balanceTab.value = urlState.balanceTab as any
-  }
+  // 页签已在建实例时按 URL 定好（见 balanceTab 声明处），这里不再恢复
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
