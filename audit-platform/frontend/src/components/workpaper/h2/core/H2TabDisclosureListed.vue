@@ -425,7 +425,7 @@
  * H2TabDisclosureListed — 附注披露信息（上市公司）
  * 对齐源 xlsx 列结构；动态插行；同步附注五、23
  */
-import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -440,14 +440,12 @@ import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections
 import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
 import { buildH2ListedChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
-import { buildH2ListedSyncPayloads, type H2ListedSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
+import { useH2ListedDisclosureState } from '../../composables/h2DisclosureTabState'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import {
   H2_LISTED_GUIDANCE,
   H2_LISTED_ITEM,
   buildMortgageNoteText,
-  createDefaultListedMaterials,
-  createDefaultListedSummary,
   createEmptyListedProject,
   listedDetailNet,
   listedDetailSubtotal,
@@ -458,17 +456,9 @@ import {
   listedProjectEnd,
   listedProjectSubtotal,
   listedSummaryTotal,
-  mapDetailToListedDetail,
-  mapDetailToListedProjects,
   mapMortgagedDetailToRows,
   newRowId,
   num,
-  type ListedDetailRow,
-  type ListedImpairmentRow,
-  type ListedMaterialRow,
-  type ListedMortgageRow,
-  type ListedProjectRow,
-  type ListedSummaryRow,
 } from '../../composables/h2ListedDisclosureModel'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -495,15 +485,12 @@ const noteSectionId = H2_NOTE_SECTION.listed
 const isSyncing = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-const summary = reactive<ListedSummaryRow[]>(createDefaultListedSummary())
-const detailRows = ref<ListedDetailRow[]>([])
-const projectRows = ref<ListedProjectRow[]>([])
-const impairmentRows = ref<ListedImpairmentRow[]>([])
-const materials = reactive<ListedMaterialRow[]>(createDefaultListedMaterials())
-const mortgageRows = ref<ListedMortgageRow[]>([])
-const noteImpairment = ref('')
-const noteFundSource = ref('')
-const noteMortgage = ref('')
+// 表单状态、挂载读回、取数计算、同步快照与载荷与附注页离屏同步共用（h2DisclosureTabState，spec note-pull-followup-closure R1）
+const listedState = useH2ListedDisclosureState()
+const {
+  summary, detailRows, projectRows, impairmentRows, materials, mortgageRows,
+  noteImpairment, noteFundSource, noteMortgage,
+} = listedState
 
 // ─── 披露说明 AI 辅助 + 复核（原本 3 个文本域全无 AI 按钮） ──────────────────
 const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
@@ -620,81 +607,9 @@ function fmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function parseJson(itemId: string): any {
-  const raw = props.allResponses.get(itemId)?.remark
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-
 function load() {
-  const s = parseJson(H2_LISTED_ITEM.summary)
-  if (Array.isArray(s) && s.length) {
-    for (const row of s) {
-      const t = summary.find((x) => x.key === row.key)
-      if (t) {
-        t.endBalance = num(row.endBalance)
-        t.priorBalance = num(row.priorBalance)
-      }
-    }
-  }
-  const d = parseJson(H2_LISTED_ITEM.detail)
-  detailRows.value = Array.isArray(d) ? d.map((r: any) => ({
-    rowId: r.rowId || newRowId('det'),
-    name: r.name || '',
-    endBook: num(r.endBook),
-    endImpairment: num(r.endImpairment),
-    priorBook: num(r.priorBook),
-    priorImpairment: num(r.priorImpairment),
-  })) : []
-  const p = parseJson(H2_LISTED_ITEM.projects)
-  projectRows.value = Array.isArray(p) ? p.map((r: any) => ({
-    ...createEmptyListedProject(),
-    ...r,
-    rowId: r.rowId || newRowId('proj'),
-    beginBalance: num(r.beginBalance),
-    increase: num(r.increase),
-    transferToFA: num(r.transferToFA),
-    otherDecrease: num(r.otherDecrease),
-    interestCapAccum: num(r.interestCapAccum),
-    interestCapCurrent: num(r.interestCapCurrent),
-    interestCapRate: num(r.interestCapRate),
-    budget: num(r.budget),
-    cumInputPct: num(r.cumInputPct),
-    accumulatedInput: num(r.accumulatedInput),
-  })) : []
-  const i = parseJson(H2_LISTED_ITEM.impairment)
-  impairmentRows.value = Array.isArray(i) ? i.map((r: any) => ({
-    rowId: r.rowId || newRowId('imp'),
-    name: r.name || '',
-    beginBalance: num(r.beginBalance),
-    provision: num(r.provision),
-    decrease: num(r.decrease),
-  })) : []
-  const m = parseJson(H2_LISTED_ITEM.materials)
-  if (Array.isArray(m) && m.length) {
-    for (const row of m) {
-      const t = materials.find((x) => x.key === row.key)
-      if (t) {
-        t.endBalance = num(row.endBalance)
-        t.priorBalance = num(row.priorBalance)
-      }
-    }
-  }
-  noteImpairment.value = String(props.allResponses.get(H2_LISTED_ITEM.noteImpairment)?.remark ?? '')
-  noteFundSource.value = String(props.allResponses.get(H2_LISTED_ITEM.noteFundSource)?.remark ?? '')
-  noteMortgage.value = String(props.allResponses.get(H2_LISTED_ITEM.noteMortgage)?.remark ?? '')
-  const mort = parseJson(H2_LISTED_ITEM.mortgageRows)
-  mortgageRows.value = Array.isArray(mort) ? mort.map((r: any, i: number) => ({
-    rowId: r.rowId || newRowId(`mort-${i}`),
-    name: r.name || '',
-    amount: num(r.amount),
-    description: r.description || '',
-    remark: r.remark || '',
-  })) : []
-
-  const hasData = detailRows.value.length || projectRows.value.length
-    || summary.some((r) => r.endBalance || r.priorBalance)
-  if (!hasData) pullFromSources(false)
+  // 读回已保存的披露表；没有数据则从 H2-1 / H2-2 取数
+  if (!listedState.load(props.allResponses)) pullFromSources(false)
 }
 
 function scheduleSave() {
@@ -703,7 +618,14 @@ function scheduleSave() {
   saveTimer = setTimeout(() => persistAll(), 300)
 }
 
+/** 编辑后的保存：存完排一次自动同步 */
 function persistAll() {
+  saveAll()
+  autoSync.scheduleAutoSync(syncToNotes)
+}
+
+/** 只存不排同步（同步前先存用这个；用 persistAll 会每 800ms 再同步一次，直到卸载） */
+function saveAll() {
   saveResponse(H2_LISTED_ITEM.summary, summary.map((r) => ({ ...r })))
   saveResponse(H2_LISTED_ITEM.detail, detailRows.value)
   saveResponse(H2_LISTED_ITEM.projects, projectRows.value)
@@ -721,7 +643,6 @@ function persistAll() {
     sectionIds: [noteSectionId],
     text: noteImpairment.value || noteFundSource.value || noteMortgage.value || '',
   })
-  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function updateSummary(key: string, field: 'endBalance' | 'priorBalance', v: number) {
@@ -784,44 +705,7 @@ function removeImpairment(rowId: string) {
 }
 
 function pullFromSources(showMsg = true) {
-  const adjRaw = props.allResponses.get('H2-1-rows')?.remark
-  const detRaw = props.allResponses.get('H2-2-rows')?.remark
-  let adj: any[] = []
-  let det: any[] = []
-  try { if (adjRaw) adj = JSON.parse(adjRaw) } catch { /* ignore */ }
-  try { if (detRaw) det = JSON.parse(detRaw) } catch { /* ignore */ }
-
-  if (Array.isArray(det) && det.length) {
-    detailRows.value = mapDetailToListedDetail(det)
-    projectRows.value = mapDetailToListedProjects(det)
-    // 自动带入抵押（不覆盖已有手工编辑行时若为空则填充）
-    if (!mortgageRows.value.length) {
-      const morts = mapMortgagedDetailToRows(det)
-      if (morts.length) {
-        mortgageRows.value = morts
-        if (!noteMortgage.value.trim()) noteMortgage.value = buildMortgageNoteText(morts)
-      }
-    }
-  }
-
-  if (Array.isArray(adj) && adj.length) {
-    const cipBegin = adj.reduce((s, r) => s + num(r.cipBegin), 0)
-    const cipEnd = adj.reduce((s, r) => s + num(r.cipEnd ?? r.audited), 0)
-    const impair = adj.reduce((s, r) => s + num(r.impairment), 0)
-    const cip = summary.find((r) => r.key === 'cip')
-    if (cip) {
-      cip.endBalance = cipEnd - impair
-      cip.priorBalance = cipBegin
-    }
-  } else if (detailRows.value.length) {
-    const tot = listedDetailSubtotal(detailRows.value)
-    const cip = summary.find((r) => r.key === 'cip')
-    if (cip) {
-      cip.endBalance = tot.endNet
-      cip.priorBalance = tot.priorNet
-    }
-  }
-
+  listedState.applySources(props.allResponses)
   scheduleSave()
   if (showMsg) ElMessage.success('已从 H2-1/H2-2 取数填充披露表')
 }
@@ -857,24 +741,10 @@ function removeMortgage(rowId: string) {
   scheduleSave()
 }
 
-function getSnapshot(): H2ListedSyncSnapshot {
-  return {
-    summary: summary.map((r) => ({ ...r })),
-    detail: detailRows.value,
-    projects: projectRows.value,
-    impairment: impairmentRows.value,
-    materials: materials.map((r) => ({ ...r })),
-    mortgage: mortgageRows.value,
-    noteImpairment: noteImpairment.value,
-    noteFundSource: noteFundSource.value,
-    noteMortgage: noteMortgage.value,
-  }
-}
-
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value || !props.projectId || !props.wpId) return
-  persistAll()
-  const payloads = buildH2ListedSyncPayloads(props.wpId, [], getSnapshot())
+  saveAll()
+  const payloads = listedState.syncPayloads(props.wpId)
   if (!payloads.length) {
     ElMessage.warning('当前不适用上市附注同步')
     return

@@ -719,7 +719,7 @@ import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import { useG5DisclosureSoe } from '../../composables/useG5DisclosureSoe'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildG5SoeSyncPayload } from '../../composables/g5DisclosureSyncPayload'
+import { buildG5SoeTabSyncPayload } from '../../composables/g5DisclosureTabSync'
 import { G5_NOTE_SECTION } from '../../composables/g5NoteSectionMap'
 import { G5_SOE_PROVISION_METHOD_PLACEHOLDER } from '../../composables/g5SoeDisclosureRows'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
@@ -760,14 +760,8 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || isReadonly.value || !props.projectId) return
-  const st = dis.state.value
-  const payload = buildG5SoeSyncPayload(props.wpId, props.applicableStandards, {
-    natureRows: dis.natureDisplayRows.value,
-    derecogRows: st.derecogRows,
-    continuing: st.continuing,
-    provisionMethodNote: st.provisionMethodNote ?? '',
-    noteText: dis.noteText.value ?? '',
-  })
+  // 快照与载荷与附注页离屏同步共用 `g5DisclosureTabSync`
+  const payload = buildG5SoeTabSyncPayload(props.wpId, props.applicableStandards, dis)
   if (!payload) return
   isSyncing.value = true
   try {

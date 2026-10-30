@@ -13,7 +13,7 @@
  * Task: 3.6
  * Requirements: 9.1-9.3
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -879,13 +879,17 @@ export function useI3Disclosure(
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
 
-  onUnmounted(() => {
-    window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-  })
+    onUnmounted(() => {
+      window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
+    })
+  }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 

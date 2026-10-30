@@ -21,6 +21,7 @@
  * Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 17.1, 17.2, 17.3, 17.4, 20.1
  */
 
+import type { SamplePairing } from './shared/voucherCheckFill'
 import Decimal from 'decimal.js'
 
 import { formatThresholdPercent } from './samplingCoverageThreshold'
@@ -102,6 +103,11 @@ export interface SampledVoucher {
   voucherKey?: string | null
   /** 分录指纹（账套重导后仍能认出同一笔分录）；回填留痕 filled_line_fps，已抽排除按它 */
   lineFp?: string | null
+  /** 多借多贷精确配对结果（后端 voucher_pairing，需求 3）；回填按它展开或标「多科目」（shared/voucherCheckFill） */
+  pairing?: SamplePairing | null
+  /** 超过配对上限的大凭证不随样本带整张分录（voucherEntries 为空），只给分录行数 */
+  voucherEntriesOmitted?: boolean
+  voucherLineCount?: number | null
   voucherNo: string
   voucherDate: string
   summary: string | null
@@ -222,6 +228,8 @@ export interface MisstatementResult {
   basicPrecision: string
   incrementalAllowance: string
   upperLimit: string
+  /** 样本实际错报合计 E（年审合并评价口径 b 的预审分量，见 samplingPhaseEvaluation.ts）；旧评价回读时没有 */
+  sampleErrorTotal?: string
 }
 
 /**

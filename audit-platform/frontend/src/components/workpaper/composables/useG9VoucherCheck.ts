@@ -4,12 +4,17 @@
  * 核对项三态：null=未测 / true=通过 / false=不通过
  * 异常判定：任一核对项 false → 异常；未测不计入；forceAbnormal 可人工/截止强制
  * 抽样参数：G9-vc-params（对标 G8/D3，落实 Excel 模板「抽样总体/样本量」区）
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行（后端配对），
+ * 按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { parseNum, isDebitCreditBalanced, calcSubtotal } from './useG9FormulaEngine'
 import { mapCutoffToG9Voucher, mergeByFillMode } from './gCycleCutoffFill'
-import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
+import {
+  counterpartText, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import type { ChecklistResponse } from './useF1FormData'
 import { G9_ACCOUNT_CODE, G9_RISK_LEVEL_OPTIONS } from './g9Constants'
@@ -439,6 +444,31 @@ export function mapSampledToG9VoucherRow(s: G9SampledVoucherLike, seq: number): 
   }, seq)
 }
 
+/** 共享回填函数的待写入项 → G9-6 凭证检查行：金额在样本自己的借贷栏，对方科目取后端配对（配不上写「多科目」） */
+export function mapPreparedToG9VoucherRow(item: PreparedItem, seq: number): G9VoucherRow {
+  const s = item.sample as PreparedItem['sample'] & G9SampledVoucherLike
+  const force = !!s.abnormal
+  return enrichG9VoucherRow({
+    voucherDate: s.voucherDate ?? '',
+    voucherNo: s.voucherNo ?? '',
+    businessContent: s.summary ?? '',
+    counterAccount: counterpartText(item),
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+    forceAbnormal: force,
+    abnormalDesc: force ? (s.selectionReason || '抽凭标记异常') : '',
+    riskLevel: force ? 'high' : (s.isHighValue ? 'medium' : 'low'),
+    remark: s.isHighValue ? '高值必选' : (s.selectionReason ?? ''),
+    source: '抽凭',
+  }, seq)
+}
+
+/** 行上已填核对结果、附件、支持性文件、索引或建议（替换与撤销抽凭时据此先确认） */
+export function hasG9VoucherContent(r: G9VoucherRow): boolean {
+  return CHECK_KEYS.some((k) => r[k] !== null)
+    || [r.attachmentRef, r.supportDoc, r.indexRef, r.suggestion].some((v) => String(v ?? '').trim() !== '')
+}
+
 export function buildG9VoucherProcedureSummary(input: {
   rowCount: number
   untested: number
@@ -486,7 +516,7 @@ function parseRows(json: string | null | undefined): G9VoucherRow[] {
   try {
     const arr = JSON.parse(json)
     if (!Array.isArray(arr)) return []
-    return arr.map((r: any, i: number) => enrichG9VoucherRow(r, i + 1))
+    return arr.map((r: any, i: number) => withRowMeta(enrichG9VoucherRow(r, i + 1), r))
   } catch {
     return []
   }
@@ -517,9 +547,23 @@ export function useG9VoucherCheck(opts: {
   const sourceFilter = ref<G9VoucherSourceFilter>('all')
   const browseMode = ref(true)
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G9VoucherRow>({
+    projectId: () => opts.projectId?.value,
+    tables: rows,
+    mapSampleToRow: (item) => mapPreparedToG9VoucherRow(item, rows.value.length + 1),
+    persist: () => persist(),
+    hasUserContent: hasG9VoucherContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: () => opts.isReadonly.value,
+  })
+
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (json) => { rows.value = parseRows(json) },
+    (json) => {
+      rows.value = parseRows(json)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
 
@@ -536,7 +580,7 @@ export function useG9VoucherCheck(opts: {
   )
 
   function persist(): void {
-    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
+    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(rows.value)) })
   }
 
   function persistParams(): void {
@@ -613,8 +657,10 @@ export function useG9VoucherCheck(opts: {
 
   function updateRow(rowId: string, patch: Partial<G9VoucherRow>): void {
     if (opts.isReadonly.value) return
+    const current = rows.value.find((r) => r.rowId === rowId)
+    if (current && voucherFill.isRowLocked(current)) return
     rows.value = rows.value.map((r) =>
-      r.rowId === rowId ? recalcG9VoucherAbnormal(enrichG9VoucherRow({ ...r, ...patch }, r.seq)) : r,
+      r.rowId === rowId ? withRowMeta(recalcG9VoucherAbnormal(enrichG9VoucherRow({ ...r, ...patch }, r.seq)), r) : r,
     )
     persist()
   }
@@ -657,26 +703,35 @@ export function useG9VoucherCheck(opts: {
     persistParams()
   }
 
-  function fillFromSampling(
-    samples: G9SampledVoucherLike[],
-    fillMode: FillMode = 'append',
-    method?: string,
-  ): number {
-    if (opts.isReadonly.value || !samples.length) return 0
-    const expanded = expandMultiAccountVouchers(samples as any[])
-    const before = rows.value.length
-    const mapped = expanded.map((s: any, i: number) => mapSampledToG9VoucherRow(s, before + i + 1))
-    const next = reseq(mergeByFillMode(rows.value, mapped, fillMode, (r) => r.voucherNo || r.rowId))
-    const added = fillMode === 'replace' ? next.length : next.length - before
-    rows.value = next
+  /** 回填 / 挂凭导入 / 撤销之后同步抽样参数：方法、本次样本量（抽凭行数）、目标样本量缺省 */
+  function syncSamplingParamsAfterFill(method: string | undefined, sampleCount: number): void {
     if (method) samplingParams.value.samplingMethod = method
     samplingParams.value.currentSampleSize = rows.value.filter((r) => r.source === '抽凭').length
     if (samplingParams.value.targetSampleSize <= 0) {
-      samplingParams.value.targetSampleSize = Math.max(samples.length, samplingParams.value.currentSampleSize)
+      samplingParams.value.targetSampleSize = Math.max(sampleCount, samplingParams.value.currentSampleSize)
     }
-    persist()
     persistParams()
-    return Math.max(0, added)
+  }
+
+  /** 抽凭引擎回填：一个对方科目一行，按分录指纹去重；「替换本阶段抽凭行」只删本阶段抽凭填入的行 */
+  async function onEngineFilled(payload: EngineFilledPayload & { method?: string }) {
+    const out = await voucherFill.onEngineFilled(payload)
+    if (!out.cancelled) syncSamplingParamsAfterFill(payload.method, payload.samples?.length ?? 0)
+    return out
+  }
+
+  /** 从序时账挂入导入：幂等追加，与抽凭命中同一分录只留一行 */
+  async function onAttachImported(samples: FillSample[]) {
+    const out = await voucherFill.onAttachImported(samples)
+    if (!out.cancelled) syncSamplingParamsAfterFill(undefined, samples.length)
+    return out
+  }
+
+  /** 撤销抽凭批次：按批次删行（同时来自挂凭的保留） */
+  async function onUndoRequest(payload: UndoRequestPayload): Promise<boolean> {
+    const ok = await voucherFill.onUndoRequest(payload)
+    if (ok) syncSamplingParamsAfterFill(undefined, 0)
+    return ok
   }
 
   function reloadFromStore(): void {
@@ -861,8 +916,14 @@ export function useG9VoucherCheck(opts: {
     hintsForRow,
     addRow,
     mergeSample,
-    fillFromSampling,
     reloadFromStore,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     setActiveRowIndex,
     updateConclusion,
     generateAiConclusion,

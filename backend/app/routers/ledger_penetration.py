@@ -169,13 +169,15 @@ async def get_voucher_entries(
     month: int | None = Query(None, ge=1, le=12, description="凭证月份（1~12）；粗粒度，同月内仍可能多张同号凭证"),
     voucher_date: str | None = Query(None, description="凭证日期 YYYY-MM-DD；与凭证号组合唯一定位一张凭证（推荐）"),
     voucher_type: str | None = Query(None, description="凭证字；空串 = 凭证字为空。同日同号多凭证字时必传"),
+    company_code: str | None = Query(None, description="主体编码；一套账两个主体同日同号同凭证字时必传，不给 = 不限"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """一张凭证的分录（凭证键 = 日期 + 凭证字 + 号）；命中多张凭证时 409 VOUCHER_KEY_AMBIGUOUS + 候选。"""
+    """一张凭证的分录（凭证键 = 主体 + 日期 + 凭证字 + 号）；命中多张凭证时 409 VOUCHER_KEY_AMBIGUOUS + 候选。"""
     svc = _svc(db, None)
     return await svc.get_voucher_entries(
         project_id, year, voucher_no, month=month, voucher_date=voucher_date, voucher_type=voucher_type,
+        company_code=company_code,
     )
 
 
@@ -514,6 +516,8 @@ async def smart_import(
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
     custom_mapping: Optional[str] = Form(None, description="自定义列映射JSON"),
     custom_mapping_query: Optional[str] = Query(None, description="兼容旧版 query custom_mapping"),
+    append_strategy: Optional[str] = Form(None, description="增量追加策略：skip / overwrite"),
+    balance_carry_confirmed: bool = Form(False, description="确认沿用上一版本余额表"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
@@ -533,6 +537,8 @@ async def smart_import(
         year=year,
         custom_mapping=custom_mapping or custom_mapping_query,
         payload_style="ledger",
+        append_strategy=append_strategy,
+        balance_carry_confirmed=balance_carry_confirmed,
     )
 
 

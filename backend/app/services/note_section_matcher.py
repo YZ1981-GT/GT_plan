@@ -56,6 +56,7 @@ __all__ = [
     "normalize_for_match",
     "match_section",
     "resolve_alias_counterpart",
+    "resolve_alias_counterparts",
 ]
 
 _WHITESPACE = " \t\r\n\u3000\u00a0\u2002\u2003\u2009"
@@ -230,3 +231,23 @@ def resolve_alias_counterpart(title: str | None, target_side: str) -> str | None
         if target_side == "soe" and key == listed_k:
             return pair.soe_title
     return None
+
+
+def resolve_alias_counterparts(title: str | None, target_side: str) -> tuple[str, ...]:
+    """某标题在对侧的**全部**别名写法（按清单顺序）。
+
+    同一标题在对侧可能登记了多种写法（如上市「营业收入和营业成本」对应国企项目注释章、母公司章两种写法），
+    :func:`resolve_alias_counterpart` 只给第一个；别名桥接（``note_section_pairing.bridge_alias_pairs``）
+    按章类别在全部写法里选。
+    """
+    if target_side not in ("soe", "listed"):
+        return ()
+    key = normalize_for_match(title)
+    if not key:
+        return ()
+    out: list[str] = []
+    for pair in SECTION_TITLE_ALIASES:
+        own, other = (pair.soe_title, pair.listed_title) if target_side == "listed" else (pair.listed_title, pair.soe_title)
+        if key == normalize_for_match(own) and other not in out:
+            out.append(other)
+    return tuple(out)

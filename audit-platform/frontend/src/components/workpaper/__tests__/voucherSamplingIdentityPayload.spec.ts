@@ -75,7 +75,7 @@ describe('抽凭引擎回填留痕', () => {
     ]))
     await s.triggerSampling()
     expect(s.sampledVouchers.value.map((v) => [v.voucherKey, v.lineFp])).toEqual([[VK_FY, FP_FY], [VK_ZZ, FP_ZZ]])
-    await s.confirmFill([])
+    await s.confirmFill()
     const crit = fillCall()[1].extraction_criteria
     expect(crit.filled_line_fps).toEqual([FP_FY, FP_ZZ])
     expect(crit.filled_voucher_keys).toEqual([VK_FY, VK_ZZ])
@@ -88,7 +88,7 @@ describe('抽凭引擎回填留痕', () => {
       item(VK_FY, FP_FY, '2025-01-07', 'FY', '100.00'), item(VK_ZZ, null, '2025-02-07', 'ZZ', '50.00'),
     ]))
     await s.triggerSampling()
-    await s.confirmFill([])
+    await s.confirmFill()
     const crit = fillCall()[1].extraction_criteria
     expect(crit.filled_line_fps).toEqual([])
     expect(crit.filled_voucher_keys).toEqual([VK_FY, VK_ZZ])
@@ -106,7 +106,7 @@ describe('抽凭引擎回填留痕', () => {
     await s.triggerSampling()
     expect(s.sampledVouchers.value.map((v) => v.voucherKey)).toEqual([VK_FY])
     expect(String(mockBox.confirm.mock.calls[0][0])).toContain('2025-02-07 ZZ-0003（已被 K1 抽取）')
-    await s.confirmFill([])
+    await s.confirmFill()
     expect(fillCall()[1].extraction_criteria.duplicate_voucher_keys).toEqual([VK_ZZ])
   })
 

@@ -26,6 +26,7 @@ import { exclusionCaveats } from '@/utils/voucherIdentity'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { determineCutoffStatus, computeDateRange, type CutoffDirection, type CutoffStatus } from './cutoffJudgment'
 import { inWindow as canonicalInWindow, judgeCrossPeriod as canonicalJudge } from './cutoffCanonical'
+import { newEntriesOnly } from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,8 @@ export interface CutoffAutoSamplingOptions {
  *
  * - append: [...existing, ...selected]
  * - replace: [...selected]
- * - merge: existing + selected 中 voucher_no 不在 existing 中的条目
+ * - merge: existing + selected 中不在 existing 里的分录（按分录指纹认同一笔；没有指纹的按凭证号 + 日期 + 金额，
+ *   与底稿回填同口径 shared/voucherCheckFill.newEntriesOnly。以前只按凭证号，同号别日 / 别凭证字的会被丢掉）
  */
 export function applyFillMode(
   existing: ExtractedVoucher[],
@@ -115,11 +117,8 @@ export function applyFillMode(
       return [...existing, ...selected]
     case 'replace':
       return [...selected]
-    case 'merge': {
-      const existingNos = new Set(existing.map(v => v.voucherNo))
-      const newItems = selected.filter(v => !existingNos.has(v.voucherNo))
-      return [...existing, ...newItems]
-    }
+    case 'merge':
+      return [...existing, ...newEntriesOnly(existing, selected)]
     default:
       return [...existing, ...selected]
   }

@@ -196,7 +196,7 @@
       <div class="sampling-extra">
         <div class="sampling-field">
           <label>特定样本</label>
-          <el-input
+          <WpCommitInput
             v-if="!props.isReadonly"
             :model-value="sampling.specificSample"
             type="textarea"
@@ -209,7 +209,7 @@
         </div>
         <div class="sampling-field">
           <label>抽样过程</label>
-          <el-input
+          <WpCommitInput
             v-if="!props.isReadonly"
             :model-value="sampling.samplingProcess"
             type="textarea"
@@ -263,9 +263,14 @@
         class="check-table"
         data-testid="h6-check-table"
         row-key="rowId"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
       >
         <el-table-column type="index" label="序号" width="48" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <el-table-column label="基础信息" align="center">
           <el-table-column v-if="isColVisible('date')" label="日期" width="118">
@@ -284,7 +289,7 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('voucherNo')" label="凭证编号" width="90">
             <template #default="{ row }">
-              <el-input
+              <WpCommitInput
                 v-if="!props.isReadonly"
                 :model-value="row.voucherNo"
                 size="small"
@@ -295,7 +300,7 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('category')" label="类别" width="80">
             <template #default="{ row }">
-              <el-input
+              <WpCommitInput
                 v-if="!props.isReadonly"
                 :model-value="row.category"
                 size="small"
@@ -307,7 +312,7 @@
           <el-table-column v-if="isColVisible('assetName')" label="固定资产名称" min-width="120" fixed>
             <template #default="{ row }">
               <div class="name-cell">
-                <el-input
+                <WpCommitInput
                   v-if="!props.isReadonly"
                   :model-value="row.assetName"
                   size="small"
@@ -327,7 +332,7 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('counterpartAccount')" label="对方科目" width="100">
             <template #default="{ row }">
-              <el-input
+              <WpCommitInput
                 v-if="!props.isReadonly"
                 :model-value="row.counterpartAccount"
                 size="small"
@@ -467,7 +472,7 @@
 
         <el-table-column v-if="isColVisible('clearingReason')" label="清理原因" min-width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!props.isReadonly"
               :model-value="row.clearingReason"
               size="small"
@@ -478,7 +483,7 @@
         </el-table-column>
         <el-table-column v-if="isColVisible('approvedBy')" label="批准人" width="80">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!props.isReadonly"
               :model-value="row.approvedBy"
               size="small"
@@ -522,7 +527,7 @@
 
         <el-table-column v-if="isColVisible('indexRef')" label="索引号" width="80">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!props.isReadonly"
               :model-value="row.indexRef"
               size="small"
@@ -566,7 +571,7 @@
 
         <el-table-column v-if="isColVisible('remark')" label="备注" min-width="100">
           <template #default="{ row }">
-            <el-input
+            <WpCommitInput
               v-if="!props.isReadonly"
               :model-value="row.remark"
               size="small"
@@ -596,6 +601,9 @@
               <b>{{ idx + 1 }}. {{ row.assetName || '未命名' }}</b>
               <span class="card-meta">{{ row.voucherNo || row.date || '' }}</span>
               <el-tag v-if="row.isAbnormal" size="small" type="danger">异常</el-tag>
+              <span @click.stop>
+                <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+              </span>
             </span>
           </template>
           <div class="card-body">
@@ -614,7 +622,7 @@
               <span class="reason-label">核对：</span>
               <el-checkbox-group
                 :model-value="checkedIndexes(row)"
-                :disabled="props.isReadonly"
+                :disabled="props.isReadonly || isVoucherRowLocked(row)"
                 @update:model-value="(v: any) => setChecks(row.rowId, v as number[])"
               >
                 <el-checkbox
@@ -628,13 +636,13 @@
               <span>异常</span>
               <el-switch
                 :model-value="row.isAbnormal"
-                :disabled="props.isReadonly"
+                :disabled="props.isReadonly || isVoucherRowLocked(row)"
                 size="small"
                 @change="(v: boolean | string | number) => updateCell(row.rowId, 'isAbnormal', Boolean(v))"
               />
-              <el-button size="small" link :disabled="props.isReadonly" @click="handleOcr(row)">📎 OCR</el-button>
+              <el-button size="small" link :disabled="props.isReadonly || isVoucherRowLocked(row)" @click="handleOcr(row)">📎 OCR</el-button>
               <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
-              <el-button v-if="!props.isReadonly" size="small" type="danger" link @click="deleteRow(row.rowId)">删除</el-button>
+              <el-button v-if="!props.isReadonly && !isVoucherRowLocked(row)" size="small" type="danger" link @click="deleteRow(row.rowId)">删除</el-button>
             </div>
           </div>
         </el-collapse-item>
@@ -760,7 +768,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎 — 固定资产清理(1606)"
+      :title="`抽凭引擎 — 固定资产清理(${samplingAccountCode})`"
       width="90%"
       top="5vh"
       destroy-on-close
@@ -768,12 +776,12 @@
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         default-method="mus"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -785,7 +793,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H6TabCheck.vue — H6-4 固定资产清理检查表（对齐致同源模板凭证级测试）
  */
-import { ref, computed, inject, toRef, watch, reactive, defineAsyncComponent, type Ref } from 'vue'
+import { ref, computed, inject, toRef, watch, reactive, defineAsyncComponent, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
@@ -810,7 +818,10 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 // spec: voucher-attach-account-mapping-closure（批次 5，任务 18）
@@ -863,7 +874,12 @@ const {
   deleteRow,
   updateCell,
   syncFromDetailRows,
-  fillFromSampledVouchers,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
   applyOcrFields,
   applyLocalDraftNote,
   applyLocalDraftConclusion,
@@ -878,7 +894,10 @@ const {
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
   onSave: (itemId, value) => saveResponse(itemId, value),
+  isReadonly: toRef(props, 'isReadonly'),
 })
+
+onMounted(() => { void voucherFillReady() })
 
 const importExport = useH6ImportExport({
   wpId: toRef(props, 'wpId'),
@@ -1102,6 +1121,9 @@ function rowClassName({ row }: { row: H6CheckRow }) {
   return ''
 }
 
+/** 表格行样式：异常 / 结转不符等提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, voucherRowClass)
+
 function cardItemClass(row: H6CheckRow): string {
   return rowClassName({ row })
 }
@@ -1131,18 +1153,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H6_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] } | any[]) {
-  showSamplingDialog.value = false
-  const samples = Array.isArray(payload) ? payload : (payload?.samples ?? [])
-  if (!Array.isArray(samples) || samples.length === 0) return
-  const n = fillFromSampledVouchers(samples)
-  ElMessage.success(`已填入 ${n} 笔抽凭样本`)
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 
 async function handleOcr(row: H6CheckRow) {

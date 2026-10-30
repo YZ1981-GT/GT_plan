@@ -15,17 +15,17 @@ from __future__ import annotations
 import pathlib
 import re
 
-import pytest
-
 _THIS = pathlib.Path(__file__).resolve()
 ROOT = _THIS.parents[3]
 FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
 WP_COMPONENTS = FRONTEND / "components" / "workpaper"
 WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
-import sys
+import sys  # noqa: E402
+sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "backend" / "scripts" / "analyze"))
 import n_cycle_scanner_summary as scanner  # noqa: E402
+from tests.workpaper_sync import n_cycle_facts as F  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -55,9 +55,12 @@ class TestLane2Attribution:
         """lane2 sheets = 10(N1) + 6(N3) = 16。"""
         assert 10 + 6 == 16
 
-    def test_lane2_formulas_755(self):
-        """lane2 公式格 = 593(N1) + 162(N3) = 755。"""
-        assert 593 + 162 == 755
+    def test_lane2_formulas_from_shared_facts(self):
+        """lane2 公式格只从 N 循环 facts 派生，模板变动时不另改本文件。"""
+        assert F.LANE2_FORMULA_CELLS == sum(
+            F.WORKBOOK_FORMULA_CELLS[F.ENTRY_WORKBOOKS[entry_id]]
+            for entry_id in F.LANE2_ENTRIES
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════

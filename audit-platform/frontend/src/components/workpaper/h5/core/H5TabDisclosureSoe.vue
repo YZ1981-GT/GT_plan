@@ -8,7 +8,7 @@
         <div class="section-title">
           <span>附注披露 — 国企版</span>
           <div class="title-actions">
-            <el-button size="small" type="success" :loading="syncing" :disabled="!hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
+            <el-button size="small" type="success" :loading="syncing" :disabled="props.isReadonly || !hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
             <el-button size="small" type="primary" plain @click="jumpToNote">↩ 跳转回附注（八、25）</el-button>
             <el-button size="small" type="default" link @click="openReview('disclosure')">💬 复核</el-button>
           </div>
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount, toRef, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -79,6 +79,14 @@ import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureCo
 import { buildH5Checks } from '../../composables/h5DisclosureConsistency'
 import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
 import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
+// 汇总四行 / 空表判断 / 层级合计 / 文本读取与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import {
+  buildH5SoeSummaryRows,
+  h5SoeLayerTotals,
+  h5SoeSummaryIsEmpty,
+  readH5SoeDisclosureText,
+  type H5AdjudicatedData,
+} from '../../composables/h5SoeDisclosureForm'
 
 const props = defineProps<{
   wpId: string
@@ -86,6 +94,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   applicableStandards?: string[]
+  saveResponse: (itemId: string, value: any) => Promise<void> | void
 }>()
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
@@ -95,25 +104,25 @@ const soeDisclosureText = ref('')
 
 // 🔴 原实现里 `soeDisclosureText` 只在「同步到附注」时随载荷推出去，**底稿侧从不落库**
 // → 未同步就刷新即丢，AI 生成的文本同样存不下来。此处补齐 hydrate + persist。
+// 键与 h5SoeDisclosureForm.H5_SOE_TEXT_ITEM 同值（读取走共用函数；守卫钉住两处一致）
 const H5_SOE_TEXT_ITEM = 'H5-disc-soe-text'
-const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 function persistText(): void {
   if (props.isReadonly) return
-  saveResponse(H5_SOE_TEXT_ITEM, { remark: soeDisclosureText.value || '' })
+  void props.saveResponse(H5_SOE_TEXT_ITEM, soeDisclosureText.value || '')
 }
 
 watch(
   () => props.allResponses,
   () => {
-    const persisted = String(props.allResponses.get(H5_SOE_TEXT_ITEM)?.remark ?? '')
+    const persisted = readH5SoeDisclosureText(props.allResponses)
     if (persisted && !soeDisclosureText.value) soeDisclosureText.value = persisted
   },
   { immediate: true, deep: true },
 )
 
 const syncing = ref(false)
-const adjudicatedData = ref<{ costAudited: number; depletionAudited: number; impairmentAudited: number; netValue: number } | null>(null)
+const adjudicatedData = ref<H5AdjudicatedData | null>(null)
 
 const hasAdjudicatedData = computed(() => adjudicatedData.value !== null || props.allResponses.has('H5-1-cost-rows'))
 
@@ -140,30 +149,7 @@ onUnmounted(() => {
 
 onBeforeUnmount(() => { autoSync.cancelPending() })
 
-const summaryRows = computed(() => {
-  const data = adjudicatedData.value
-  if (data) {
-    return [
-      { item: '油气资产原值', endBalance: data.costAudited, beginBalance: 0 },
-      { item: '减：累计折耗', endBalance: data.depletionAudited, beginBalance: 0 },
-      { item: '减：减值准备', endBalance: data.impairmentAudited, beginBalance: 0 },
-      { item: '油气资产净值', endBalance: data.netValue, beginBalance: 0 },
-    ]
-  }
-  // Fallback from allResponses
-  let costTotal = 0
-  let deplTotal = 0
-  const costRaw = props.allResponses.get('H5-1-cost-rows')
-  const deplRaw = props.allResponses.get('H5-1-depletion-rows')
-  if (costRaw?.remark) { try { costTotal = JSON.parse(costRaw.remark).reduce((s: number, r: any) => s + (Number(r.audited) || 0), 0) } catch {} }
-  if (deplRaw?.remark) { try { deplTotal = JSON.parse(deplRaw.remark).reduce((s: number, r: any) => s + (Number(r.audited) || 0), 0) } catch {} }
-  return [
-    { item: '油气资产原值', endBalance: costTotal, beginBalance: 0 },
-    { item: '减：累计折耗', endBalance: deplTotal, beginBalance: 0 },
-    { item: '减：减值准备', endBalance: 0, beginBalance: 0 },
-    { item: '油气资产净值', endBalance: costTotal - deplTotal, beginBalance: 0 },
-  ]
-})
+const summaryRows = computed(() => buildH5SoeSummaryRows(adjudicatedData.value, props.allResponses))
 
 // ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮；复核原传字符串签名错误） ────────
 const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
@@ -195,8 +181,9 @@ const consistencyChecks = computed(() => {
 
 // ─── 同步到附注 ──────────────────────────────────────────────────────────────
 async function syncToNote(): Promise<void> {
+  if (props.isReadonly) return
   const rows = summaryRows.value
-  if (rows.every((r) => r.endBalance === 0 && r.beginBalance === 0)) {
+  if (h5SoeSummaryIsEmpty(rows)) {
     ElMessage.warning('请先填写披露数据')
     return
   }
@@ -213,11 +200,7 @@ async function syncToNote(): Promise<void> {
       wpId: props.wpId,
       projectId: props.projectId,
       year,
-      layerTotals: {
-        cost: rows.find((r) => r.item === '油气资产原值')?.endBalance ?? 0,
-        depletion: rows.find((r) => r.item === '减：累计折耗')?.endBalance ?? 0,
-        impairment: rows.find((r) => r.item === '减：减值准备')?.endBalance ?? 0,
-      },
+      layerTotals: h5SoeLayerTotals(rows),
       soeDisclosureText: soeDisclosureText.value,
     })
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)

@@ -20,7 +20,7 @@
  * spec: d4-four-table-extraction-and-disclosure-alignment (Task 5.2)
  * Requirements: 4.2, 4.3, 4.8
  */
-import { ref, computed, watch, onBeforeUnmount, onMounted, inject, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted, inject, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { D4_MAIN_REVENUE_STANDARD } from './d4AccountScope'
 import { parseNum, calcSubtotal } from './useD4FormulaEngine'
 import {
@@ -76,6 +76,11 @@ export interface UseD4DisclosureOptions {
   variant: DisclosureVariant
   saveBatch: (items: Array<{ item_id: string; conclusion: string | null; remark: string }>) => void
   isReadonly: Ref<boolean>
+  /**
+   * 审计年度。缺省取主入口 `provide('d4AuditYear')`；附注页离屏同步在 effectScope 里实例化（没有组件实例，inject 不到）
+   * 时显式传入（spec note-pull-followup-closure R1）。
+   */
+  auditYear?: Ref<number | null>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -138,9 +143,12 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
   const { allResponses, wpId, projectId, variant, saveBatch, isReadonly } = options
   const prefix = `D4-disc-${variant}-`
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
+  // 离屏实例化（附注页离屏同步，没有组件实例）不挂生命周期钩子、不订阅窗口事件：首载刷新由调用方显式 await
+  // `initialRefresh()`，订阅没有卸载钩子退订会一直留着。组件内行为不变。
+  const hasInstance = !!getCurrentInstance()
 
-  // 审计年度由主入口 provide('d4AuditYear') 提供；缺失时保持空态，不猜日历年。
-  const injectedAuditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
+  // 审计年度由主入口 provide('d4AuditYear') 提供（离屏由调用方显式传入）；缺失时保持空态，不猜日历年。
+  const injectedAuditYear = options.auditYear ?? inject<Ref<number | null> | null>('d4AuditYear', null)
   function resolveAuditYear(): number | null {
     const y = injectedAuditYear?.value
     return y && y > 0 ? y : null
@@ -198,12 +206,15 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
   }
   watch(() => allResponses.value.get(prefix + TB_CACHE_KEY)?.remark, loadTbCache, { immediate: true })
 
-  // 首次加载：如果没有缓存数据则自动刷新
-  onMounted(() => {
-    if (!lastRefreshTime.value) {
-      refreshFromTb()
-    }
-  })
+  // 首次加载：如果没有缓存数据则自动刷新（组件 onMounted 与附注页离屏同步共用这一步）
+  function initialRefresh(): Promise<void> {
+    return lastRefreshTime.value ? Promise.resolve() : refreshFromTb()
+  }
+  if (hasInstance) {
+    onMounted(() => {
+      void initialRefresh()
+    })
+  }
 
   // 一键刷新：调后端auto-data端点从TB取最新审定数
   async function refreshFromTb(): Promise<void> {
@@ -742,15 +753,17 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
       }
     }
   }
-  window.addEventListener('note:section-updated', noteUpdateHandler)
-  eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+  if (hasInstance) {
+    window.addEventListener('note:section-updated', noteUpdateHandler)
+    eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
 
-  // ─── Lifecycle cleanup ───────────────────────────────────────────────
-  onBeforeUnmount(() => {
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
-  })
+    // ─── Lifecycle cleanup ─────────────────────────────────────────────
+    onBeforeUnmount(() => {
+      for (const { event, handler } of eventListeners) {
+        window.removeEventListener(event, handler)
+      }
+    })
+  }
 
   // ─── Return ──────────────────────────────────────────────────────────
   return {
@@ -761,6 +774,7 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     isRefreshing,
     lastRefreshTime,
     refreshFromTb,
+    initialRefresh,
     // Section 1
     section1Data,
     section1Total,

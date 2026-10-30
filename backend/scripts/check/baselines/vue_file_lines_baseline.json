@@ -73,7 +73,6 @@
     "audit-platform/frontend/src/components/workpaper/WorkpaperAssignmentMatrix.vue": 692,
     "audit-platform/frontend/src/components/workpaper/FairValueTestDialog.vue": 532,
     "audit-platform/frontend/src/views/WorkpaperList.vue": 530,
-    "audit-platform/frontend/src/components/notes/NoteTableEditor.vue": 529,
     "audit-platform/frontend/src/components/template-library/FormulaCoverageChart.vue": 529,
     "audit-platform/frontend/src/components/workpaper/OcrFieldsDrawer.vue": 527,
     "audit-platform/frontend/src/components/query/SheetCellRangePicker.vue": 524,

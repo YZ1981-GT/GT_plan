@@ -14,7 +14,7 @@
  *
  * Requirements: 8.1-8.8
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { calcImpairmentEnd, parseNum, calcSubtotal } from './useD5FormulaEngine'
 import type { ChecklistResponse } from './useD5FormData'
 import type { D5DisclosureSourceData } from './useD5CrossSheet'
@@ -405,35 +405,38 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
   }
 
   // ─── EventBus: 监听审定表发布 + 附注模块更新（双向同步）────────────
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不订阅：没有卸载钩子退订，
+  // 订阅会一直留着（spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    // 订阅审定表发布事件（crossSheet computed 自动响应 allResponses 变化）
+    eventBus.on('substantive:adjudicated', (payload: any) => {
+      if (payload?.wpCode === 'D5') {
+        // crossSheet 是 computed，allResponses 变化时自动重算
+        // 此处可用于触发 stale 检查或附注一致性提示
+      }
+    })
 
-  // 订阅审定表发布事件（crossSheet computed 自动响应 allResponses 变化）
-  eventBus.on('substantive:adjudicated', (payload: any) => {
-    if (payload?.wpCode === 'D5') {
-      // crossSheet 是 computed，allResponses 变化时自动重算
-      // 此处可用于触发 stale 检查或附注一致性提示
-    }
-  })
-
-  const noteUpdateHandler = (e: Event) => {
-    const detail = (e as CustomEvent).detail
-    if (detail?.wpCode === 'D5') {
-      const section = detail.section as string
-      if (section && noteTexts.value[section] !== undefined) {
-        noteTexts.value[section] = detail.text || ''
+    const noteUpdateHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.wpCode === 'D5') {
+        const section = detail.section as string
+        if (section && noteTexts.value[section] !== undefined) {
+          noteTexts.value[section] = detail.text || ''
+        }
       }
     }
+    window.addEventListener('note:section-updated', noteUpdateHandler)
+    eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
+
+    // ─── Lifecycle ─────────────────────────────────────────────────────
+
+    onBeforeUnmount(() => {
+      for (const { event, handler } of eventListeners) {
+        window.removeEventListener(event, handler)
+      }
+      eventBus.off('substantive:adjudicated')
+    })
   }
-  window.addEventListener('note:section-updated', noteUpdateHandler)
-  eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
-
-  // ─── Lifecycle ───────────────────────────────────────────────────────
-
-  onBeforeUnmount(() => {
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
-    eventBus.off('substantive:adjudicated')
-  })
 
   // ─── Return ──────────────────────────────────────────────────────────
 

@@ -32,6 +32,7 @@ from app.services.ledger_sampling_service import (
     enrich_voucher_context,
 )
 from app.services.voucher_sampling_exclusion import collect_exclusions
+from app.services.sampling_phase_evaluation import attach_combined
 from app.services.sampling_registry_service import (
     register_sampled_vouchers,
     register_sampling_batch,
@@ -255,6 +256,9 @@ async def cutoff_fill(
         if req.extraction_type == "voucher_sampling":
             log_row = await _load_log_row(db, result)
             if log_row is not None:
+                # 年审批次回填时已随带评价：与 /voucher-evaluation 同一函数写全年合并评价（需求 7.6），
+                # 须在登记之前 —— 抽样记录的结论在登记时按批次评价拼出
+                await attach_combined(db, project_id=pid, log=log_row)
                 record_id = await register_sampling_batch(
                     db, log=log_row, created_by=current_user.id
                 )

@@ -17,6 +17,7 @@ export interface SubmitBody {
   incremental?: boolean
   overlap_strategy?: 'skip' | 'overwrite'
   file_periods?: number[] | null
+  balance_carry_confirmed?: boolean
 }
 
 export interface DiagnosticsResult {

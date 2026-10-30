@@ -1,17 +1,15 @@
 /**
  * F3 集成测试 — Task 10.1
- * sheetName 分发、公式链、抽凭分配、EventBus
+ * sheetName 分发、公式链、EventBus
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 import {
   calcCreditBalance, calcAdjustedAmount, calcInterest, calcOverdueDays, parseNum,
 } from '../useF3FormulaEngine'
-import { useF3VoucherCheck } from '../useF3VoucherCheck'
 import { useF3DisclosureListed } from '../useF3DisclosureListed'
 import { useF3Detail, F3_DETAIL_BASIC_COLUMNS, F3_DETAIL_INFO_COLUMNS, F3_DETAIL_AUDIT_COLUMNS } from '../useF3Detail'
 import { useF3OverdueCheck } from '../useF3OverdueCheck'
-import type { SampledVoucher } from '../useSamplingAlgorithms'
 import type { ChecklistResponse } from '../useF3FormData'
 
 /** GtF3NotesPayable currentSheet 逻辑镜像 */
@@ -71,43 +69,8 @@ describe('F3 formula chains', () => {
   })
 })
 
-describe('F3-7 voucher sampling direction split', () => {
-  const allResponses = ref(new Map<string, ChecklistResponse>())
-  const isReadonly = ref(false)
-
-  beforeEach(() => {
-    allResponses.value = new Map()
-  })
-
-  it('maps credit and debit amounts to separate blocks', () => {
-    const { applySamplingResults, creditRows, debitRows } = useF3VoucherCheck({
-      wpId: ref('wp1'),
-      projectId: ref('p1'),
-      allResponses,
-      isReadonly,
-    })
-
-    const samples: SampledVoucher[] = [
-      {
-        voucherNo: 'V001', voucherDate: '2025-03-01', summary: '开票',
-        debitAmount: null, creditAmount: '5000', accountCode: '2201',
-        accountName: '应付票据', counterpartAccount: '应付账款', voucherType: null,
-        accountingPeriod: 3, checkResult: '', abnormal: false,
-      },
-      {
-        voucherNo: 'V002', voucherDate: '2025-04-01', summary: '兑付',
-        debitAmount: '3000', creditAmount: null, accountCode: '2201',
-        accountName: '应付票据', counterpartAccount: '银行存款', voucherType: null,
-        accountingPeriod: 4, checkResult: '', abnormal: false,
-      },
-    ]
-
-    applySamplingResults(samples, 'append')
-
-    expect(creditRows.value.some((r) => r.voucherNo === 'V001' && r.amount === 5000)).toBe(true)
-    expect(debitRows.value.some((r) => r.voucherNo === 'V002' && r.amount === 3000)).toBe(true)
-  })
-})
+// F3-7 抽凭借贷分区（原 applySamplingResults）改经共享回填函数，见 f3VoucherFill.spec
+// （spec voucher-identity-writeback-and-audit-phase 任务 11）
 
 describe('F3 disclosure EventBus', () => {
   const allResponses = ref(new Map<string, ChecklistResponse>())

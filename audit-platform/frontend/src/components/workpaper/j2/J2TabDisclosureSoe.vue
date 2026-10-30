@@ -12,7 +12,7 @@
  *  F (3) 敏感性分析
  *  各区块 JSON 持久化到 checklist_responses.remark（item_id J2-soe-*）。
  */
-import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
+import { ref, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { addDynamicRow, hasLabelConflict } from '../composables/shared/dbpDynamicRows'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
@@ -22,7 +22,17 @@ import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 import J2DisclosureConsistencyPanel from './J2DisclosureConsistencyPanel.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
-import { buildJ2SoeSyncPayload, toJ2SyncRequest } from '../composables/j2DisclosureSyncPayload'
+import {
+  J2_SOE_FIXED_OTHER_KEYS,
+  J2_SOE_KEY,
+  isJ2SoeOtherDynamic,
+  j2SoeMoveRow,
+  j2SoeSumEnd,
+  useJ2SoeDisclosureState,
+  type J2SoeAssetRow,
+  type J2SoeMoveCol,
+  type J2SoeMoveRow,
+} from '../composables/j2DisclosureTabState'
 import { api } from '@/services/apiProxy'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -48,11 +58,18 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
   return src && typeof src === 'object' ? (src as TbSourceCodes) : null
 })
 
-const KEY = {
-  summary: 'J2-soe-summary', change: 'J2-soe-change', maturity: 'J2-soe-maturity',
-  assets: 'J2-soe-assets', assume: 'J2-soe-assumptions', sens: 'J2-soe-sensitivity',
-  noteTerm: 'J2-soe-note-termination', noteDbp: 'J2-soe-note-dbp', noteSens: 'J2-soe-note-sensitivity',
-}
+// 表单状态 / 默认行 / 读回（含动态行还原）/ 同步载荷与附注页离屏同步共用 j2DisclosureTabState（spec note-pull-followup-closure R1）
+const KEY = J2_SOE_KEY
+const soeState = useJ2SoeDisclosureState()
+const {
+  summaryRows, changeRows, maturityRows, assetCompRows, assumeRows, sensRows, noteTerm, noteDbp, noteSens,
+} = soeState
+type MoveCol = J2SoeMoveCol
+type MoveRow = J2SoeMoveRow
+type AssetRow = J2SoeAssetRow
+const mv = j2SoeMoveRow
+const sumEnd = j2SoeSumEnd
+const isOtherDynamic = isJ2SoeOtherDynamic
 
 function n(v: unknown): number { const x = typeof v === 'number' ? v : parseFloat(String(v ?? '')); return Number.isFinite(x) ? x : 0 }
 /** 只读金额统一走平台单一真源（千分符 + 单位偏好） */
@@ -61,13 +78,6 @@ function fmt(v: number | null | undefined): string { return displayPrefs.fmtAmou
 function fmtPct(v: number | null | undefined): string { if (v === null || v === undefined) return '-'; return (v * 100).toFixed(2) + '%' }
 
 // ── A 汇总表（期初/本期增加/本期减少/期末，期末=期初+增-减） ─────────────────────
-interface SumRow { key: string; label: string; begin: number; increase: number; decrease: number }
-const summaryRows = reactive<SumRow[]>([
-  { key: 'dbp_net', label: '设定受益计划净负债', begin: 0, increase: 0, decrease: 0 },
-  { key: 'other_lt_net', label: '符合设定受益计划条件的其他长期职工福利的净负债', begin: 0, increase: 0, decrease: 0 },
-  { key: 'termination', label: '一年后支付的辞退福利', begin: 0, increase: 0, decrease: 0 },
-])
-function sumEnd(r: SumRow): number { return n(r.begin) + n(r.increase) - n(r.decrease) }
 const summaryTotal = computed(() => ({
   begin: summaryRows.reduce((s, r) => s + n(r.begin), 0),
   increase: summaryRows.reduce((s, r) => s + n(r.increase), 0),
@@ -75,44 +85,11 @@ const summaryTotal = computed(() => ({
   end: summaryRows.reduce((s, r) => s + sumEnd(r), 0),
 }))
 
-// ── B 设定受益计划情况：单张合并表（3 组 × 本期/上期 = 6 数值列） ────────────────
-type MoveCol = 'dboCur' | 'dboPrior' | 'assetCur' | 'assetPrior' | 'netCur' | 'netPrior'
-interface MoveRow {
-  key: string; label: string; indent: number
-  kind: 'leaf' | 'sum' | 'grand'; children?: string[]; assetNa?: boolean
-  dboCur: number; dboPrior: number; assetCur: number; assetPrior: number; netCur: number; netPrior: number
-}
-function mv(key: string, label: string, indent: number, kind: MoveRow['kind'], opts: Partial<MoveRow> = {}): MoveRow {
-  return { key, label, indent, kind, dboCur: 0, dboPrior: 0, assetCur: 0, assetPrior: 0, netCur: 0, netPrior: 0, ...opts }
-}
-const changeRows = reactive<MoveRow[]>([
-  mv('begin', '一、期初余额', 0, 'leaf'),
-  mv('pl', '二、计入当期损益的设定受益成本', 0, 'sum', { children: ['pl_service', 'pl_past', 'pl_settle', 'pl_interest'] }),
-  mv('pl_service', '1．当期服务成本', 1, 'leaf', { assetNa: true }),
-  mv('pl_past', '2．过去服务成本', 1, 'leaf', { assetNa: true }),
-  mv('pl_settle', '3．结算利得（损失以"-"表示）', 1, 'leaf', { assetNa: true }),
-  mv('pl_interest', '4．利息净额', 1, 'leaf'),
-  mv('oci', '三、计入其他综合收益的设定受益成本', 0, 'sum', { children: ['oci_remeasure'] }),
-  mv('oci_remeasure', '设定受益计划净负债（净资产）的重新计量', 1, 'sum', { children: ['oci_actuarial', 'oci_return', 'oci_ceiling'] }),
-  mv('oci_actuarial', '1．精算利得（损失以"-"表示）', 2, 'leaf', { assetNa: true }),
-  mv('oci_return', '2．计划资产的回报（计入利息净额的除外）', 2, 'leaf'),
-  mv('oci_ceiling', '3．资产上限影响的变动（计入利息净额的除外）', 2, 'leaf'),
-  mv('other', '四、其他变动', 0, 'sum', { children: ['other_settle', 'other_paid', 'other_etc'] }),
-  mv('other_settle', '1．结算时消除的负债', 1, 'leaf'),
-  mv('other_paid', '2．已支付的福利', 1, 'leaf'),
-  mv('other_etc', '……', 1, 'leaf'),
-  mv('end', '五、期末余额', 0, 'grand'),
-])
+// ── B 设定受益计划情况：单张合并表（3 组 × 本期/上期 = 6 数值列；行定义在 j2DisclosureTabState） ──
 const changeMap = computed(() => { const m: Record<string, MoveRow> = {}; for (const r of changeRows) m[r.key] = r; return m })
 
 // ── B-4 动态行：四、其他变动 ─────────────────────────────────────────────────
-// Spec: { group: 'other', parentKey: 'other', defaultLabel: '', minRows: 0 }
-const FIXED_OTHER_KEYS = new Set(['other_settle', 'other_paid'])
-
-/** 判断是否为四、其他变动区块的动态行（可删除） */
-function isOtherDynamic(row: MoveRow): boolean {
-  return row.kind === 'leaf' && row.key.startsWith('other_') && !FIXED_OTHER_KEYS.has(row.key)
-}
+// Spec: { group: 'other', parentKey: 'other', defaultLabel: '', minRows: 0 }（固定行 / 动态行判定见 j2DisclosureTabState）
 
 async function addOtherRow() {
   if (isReadonly.value) return
@@ -130,7 +107,7 @@ async function addOtherRow() {
     }
     // Find insertion point: before 'end' row
     const endIdx = changeRows.findIndex(r => r.key === 'end')
-    const dynRows = otherLeaves.filter(r => !FIXED_OTHER_KEYS.has(r.key))
+    const dynRows = otherLeaves.filter(r => !J2_SOE_FIXED_OTHER_KEYS.has(r.key))
     const existing = dynRows.map(r => ({ key: r.key, label: r.label, group: 'other', seq: parseInt(r.key.replace('other_', ''), 10) || 0 }))
     const newDyn = addDynamicRow(existing, 'other', label)
     const newRow = mv(newDyn.key, label, 1, 'leaf')
@@ -253,26 +230,9 @@ function editable(row: MoveRow, col: MoveCol): boolean {
 }
 
 // ── C 未折现到期分析 ──────────────────────────────────────────────────────────
-const maturityRows = reactive([
-  { key: 'y1', label: '一年以内', amount: 0 },
-  { key: 'y1_2', label: '一到两年', amount: 0 },
-  { key: 'y2_5', label: '二到五年', amount: 0 },
-  { key: 'y5', label: '五年以上', amount: 0 },
-])
 const maturityTotal = computed(() => maturityRows.reduce((s, r) => s + n(r.amount), 0))
 
-// ── D 计划资产构成（期末/期初；权益/债务工具投资为分组小计行） ──────────────────
-interface AssetRow { key: string; label: string; indent: number; group?: boolean; end: number; begin: number }
-const assetCompRows = reactive<AssetRow[]>([
-  { key: 'cash', label: '现金和现金等价物', indent: 0, end: 0, begin: 0 },
-  { key: 'equity', label: '权益工具投资', indent: 0, group: true, end: 0, begin: 0 },
-  { key: 'equity_1', label: '1、……', indent: 1, end: 0, begin: 0 },
-  { key: 'equity_2', label: '2、……', indent: 1, end: 0, begin: 0 },
-  { key: 'debt', label: '债务工具投资', indent: 0, group: true, end: 0, begin: 0 },
-  { key: 'debt_1', label: '1、……', indent: 1, end: 0, begin: 0 },
-  { key: 'debt_2', label: '2、……', indent: 1, end: 0, begin: 0 },
-  { key: 'other', label: '其他', indent: 0, end: 0, begin: 0 },
-])
+// ── D 计划资产构成（期末/期初；权益/债务工具投资为分组小计行；行定义在 j2DisclosureTabState） ──
 // 合计 = 现金 + 权益工具投资(=Σ子项) + 债务工具投资(=Σ子项) + 其他
 // 父行 equity/debt 是动态派生的子项合计
 const assetGroupSum = computed(() => {
@@ -294,115 +254,17 @@ const assetCompTotal = computed(() => {
   }
 })
 
-// ── E 精算假设 ────────────────────────────────────────────────────────────────
-const assumeRows = reactive([
-  { key: 'discount', label: '折现率', end: 0, begin: 0 },
-  { key: 'mortality', label: '死亡率', end: 0, begin: 0 },
-  { key: 'life', label: '预计平均寿命', end: 0, begin: 0 },
-  { key: 'turnover', label: '职工的离职率', end: 0, begin: 0 },
-  { key: 'salary', label: '薪酬的预期增长率', end: 0, begin: 0 },
-])
-// ── F 敏感性分析 ──────────────────────────────────────────────────────────────
-const sensRows = reactive([
-  { key: 'discount', label: '折现率', delta: 0, up: 0, down: 0 },
-  { key: 'mortality', label: '死亡率', delta: 0, up: 0, down: 0 },
-  { key: 'life', label: '预计平均寿命', delta: 0, up: 0, down: 0 },
-  { key: 'turnover', label: '职工的离职率', delta: 0, up: 0, down: 0 },
-  { key: 'salary', label: '薪酬的预期增长率', delta: 0, up: 0, down: 0 },
-])
+// ── E 精算假设 / F 敏感性分析：行定义在 j2DisclosureTabState ──────────────────────
 
 // ── 说明文本（源模板固定指引作 placeholder，空值时显示、输入即隐藏，无需手动删除） ──
 const PH_TERM = '1、辞退福利的性质、内容及计算依据详见附注八、35；\n2、其他长期职工福利的性质及计算依据。'
 const PH_DBP = '1、设定受益计划形成的原因、特征及与之相关的风险；\n2、如有对计划的修改或结算的，还应当披露修改或结算计划的有关情况；\n3、影响设定受益计划未来缴存金额的有关筹资政策和计划、下一会计年度预期将缴存的金额，设定受益义务有关到期情况的信息，如设定受益义务的加权平均期间、对有关福利支付的到期日分析等。'
 const PH_SENS = '上述敏感性分析是基于一个假设发生变动而其他假设均保持不变，但实际上各种假设通常是相互关联的。上述敏感性分析在计算设定受益义务现值时也同样采用累积福利单位法。进行敏感度分析所采用的重大假设的方法和类型与以前年度比较未发生变动。（如发生变动，应进一步说明发生的具体变动及原因。）'
-const noteTerm = ref('')
-const noteDbp = ref('')
-const noteSens = ref('')
 const aiLoading = ref('')
 
-// ── 加载 ──────────────────────────────────────────────────────────────────────
-function parseJson<T>(id: string, fb: T): T { const raw = props.allResponses?.get(id)?.remark; if (!raw) return fb; try { const p = JSON.parse(raw); return (p ?? fb) as T } catch { return fb } }
-function assignRows<T extends object>(target: T[], saved: unknown) {
-  if (!Array.isArray(saved)) return
-  for (const s of saved as Record<string, unknown>[]) { const row = target.find(r => (r as Record<string, unknown>).key === s.key); if (row) Object.assign(row, s) }
-}
+// ── 加载（读回各区块，含用户新增的动态行；汇总表全 0 时按 J2-1 审定表带出期初） ─────────────
 function load() {
-  assignRows(summaryRows, parseJson(KEY.summary, null))
-
-  // Restore changeRows — including dynamically added other_* rows
-  const savedChange = parseJson<MoveRow[] | null>(KEY.change, null)
-  if (Array.isArray(savedChange)) {
-    // Restore existing fixed rows
-    assignRows(changeRows, savedChange)
-    // Restore dynamic other_* rows that were added by user
-    const endIdx = changeRows.findIndex(r => r.key === 'end')
-    const otherParent = changeRows.find(r => r.key === 'other')
-    for (const s of savedChange) {
-      if (s.key.startsWith('other_') && !FIXED_OTHER_KEYS.has(s.key) && s.key !== 'other_etc' && !changeRows.some(r => r.key === s.key)) {
-        const newRow = mv(s.key, s.label, 1, 'leaf')
-        Object.assign(newRow, s)
-        newRow.indent = 1
-        newRow.kind = 'leaf'
-        const insertAt = endIdx >= 0 ? changeRows.findIndex(r => r.key === 'end') : changeRows.length
-        changeRows.splice(insertAt, 0, newRow)
-        if (otherParent?.children && !otherParent.children.includes(s.key)) {
-          otherParent.children.push(s.key)
-        }
-      }
-    }
-    // Remove the placeholder other_etc row if dynamic rows exist
-    const hasDynOther = changeRows.some(r => isOtherDynamic(r))
-    if (hasDynOther) {
-      const etcIdx = changeRows.findIndex(r => r.key === 'other_etc')
-      if (etcIdx >= 0) changeRows.splice(etcIdx, 1)
-      if (otherParent?.children) {
-        const ci = otherParent.children.indexOf('other_etc')
-        if (ci >= 0) otherParent.children.splice(ci, 1)
-      }
-    }
-  }
-
-  assignRows(maturityRows, parseJson(KEY.maturity, null))
-
-  // Restore assetCompRows — including dynamically added equity_*/debt_* rows
-  const savedAssets = parseJson<AssetRow[] | null>(KEY.assets, null)
-  if (Array.isArray(savedAssets)) {
-    assignRows(assetCompRows, savedAssets)
-    // Restore dynamic sub-rows for equity/debt
-    for (const s of savedAssets) {
-      const isEquitySub = s.key.startsWith('equity_') && s.key !== 'equity_1' && s.key !== 'equity_2'
-      const isDebtSub = s.key.startsWith('debt_') && s.key !== 'debt_1' && s.key !== 'debt_2'
-      if ((isEquitySub || isDebtSub) && !assetCompRows.some(r => r.key === s.key)) {
-        const group = s.key.split('_')[0]
-        const groupParentIdx = assetCompRows.findIndex(r => r.key === group)
-        let insertIdx = groupParentIdx + 1
-        while (insertIdx < assetCompRows.length && assetCompRows[insertIdx].key.startsWith(`${group}_`)) {
-          insertIdx++
-        }
-        const newRow: AssetRow = { key: s.key, label: s.label || '', indent: 1, end: n(s.end), begin: n(s.begin) }
-        assetCompRows.splice(insertIdx, 0, newRow)
-      }
-    }
-  }
-
-  assignRows(assumeRows, parseJson(KEY.assume, null))
-  assignRows(sensRows, parseJson(KEY.sens, null))
-  const t = props.allResponses?.get(KEY.noteTerm)?.remark; if (t) noteTerm.value = t
-  const d = props.allResponses?.get(KEY.noteDbp)?.remark; if (d) noteDbp.value = d
-  const s = props.allResponses?.get(KEY.noteSens)?.remark; if (s) noteSens.value = s
-  // 从审定表(J2-1-main)自动 seed 汇总表期初数（仅在汇总表全 0 时）
-  const anySum = summaryRows.some(r => n(r.begin) !== 0 || n(r.increase) !== 0 || n(r.decrease) !== 0)
-  if (!anySum) {
-    const mainRaw = props.allResponses?.get('J2-1-main')?.remark
-    if (mainRaw) {
-      try {
-        const main = JSON.parse(mainRaw) as Array<Record<string, unknown>>
-        const beginAud = (k: string) => { const r = main.find(x => x.key === k); return r ? n(r.beginUnadj) + n(r.beginAje) : 0 }
-        summaryRows.find(r => r.key === 'dbp_net')!.begin = beginAud('dbp')
-        summaryRows.find(r => r.key === 'termination')!.begin = beginAud('termination')
-      } catch { /* ignore */ }
-    }
-  }
+  soeState.load(props.allResponses)
 }
 
 // ── 保存（防抖） ──────────────────────────────────────────────────────────────
@@ -487,33 +349,11 @@ const { scheduleAutoSync } = useDisclosureAutoSync({ isReadonly: () => isReadonl
 
 async function syncToDisclosureNotes() {
   if (!props.wpId || !props.projectId) return
-  const payload = buildJ2SoeSyncPayload({
-    summaryRows: [...summaryRows],
-    changeRows: changeRows.filter(r => r.kind === 'leaf').map(r => ({
-      key: r.key,
-      label: r.label,
-      dboCur: r.dboCur,
-      dboPrior: r.dboPrior,
-      assetCur: r.assetCur,
-      assetPrior: r.assetPrior,
-      netCur: r.netCur,
-      netPrior: r.netPrior,
-    })),
-    maturityRows: [...maturityRows],
-    assetCompRows: [...assetCompRows],
-    assumeRows: [...assumeRows],
-    sensRows: [...sensRows],
-    noteTerm: noteTerm.value,
-    noteDbp: noteDbp.value,
-    noteSens: noteSens.value,
-    summaryEndFn: (r) => n(r.begin) + n(r.increase) - n(r.decrease),
-  })
+  // 八、54 一条（请求体由 j2DisclosureTabState.syncRequests 组装，离屏同步同一份）
+  const [main] = soeState.syncRequests(props.wpId, auditYear.value)
   try {
     // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）+ 端点契约形状，见 J2TabDisclosureListed 同处说明
-    await api.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-      toJ2SyncRequest(payload, { wpId: props.wpId, currentStandard: 'soe_standalone', year: auditYear.value }),
-    )
+    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, main)
   } catch { /* 失败静默 */ }
 }
 

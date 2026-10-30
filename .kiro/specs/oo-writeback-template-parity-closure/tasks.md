@@ -26,6 +26,7 @@
   - [x] 6.2 改过的模板（第一批 19 本）：provider 常量与审核依据、18 份契约、模板快照、预填定位表、slice、golden、变异锚点；全量回归对比由过转红 7 条（测试写死旧值）已改，子集复跑只剩基线既有红（design §9）。第二批 6 本 43 格（#20~#28）同口径，6 份契约，全量回归由过转红 0 条。第三批 4 本 55 格（#29~#32）同口径，4 份契约（D2-2 H 改公式字段），回归见 design §9
   - [x] 6.3 对应前端改到与修正后模板一致：D5-2 / F1-2 / H2-2 / G8-2 / D5-4 / D1-9 / D1-7 / D1-15 / D2-9 / D1-4 / D2-3 / D6-3；K3-2 前端无审定列；K1-3 / D4-27 / D1-1 / D7-1 / D7-6 / G10-1 / G13-1 前端本就一致（design §3.1）。第三批：G9-2 报表数改审定 + 重分类，G14-2 / D6-8 / D2-2 前端本就按正确口径
   - [x] 6.4 第一批：【测试】项目无这些 entry 的发布产物；第二批：发布过 D2 的两个【测试】项目都已删除（在回收站，在线编辑打不开），重发布工具按可见性过滤找不到目标，无需重发布。受影响真实项目两批共列于 design §2，待用户决定
+  - [x] 6.5 第四批 N5 三格（#33）：D11 小计区间、E12/H12 的 wp_code↔A1 同形错误按 37:1 / 28:1 反证修复；清单 27 本 386 格；模板哈希 / 契约 / 快照 / prev3 / N slice 更新；旧缺陷守卫翻成正确公式。和平药房_2025 N5 generation=1，按「只做【测试】项目」未重发布
 
 - [ ] 7. 前端按模板对齐 D1~F5 登记项（R2.2，design §3.1）
   - [x] 7.1 逐条核模板对错（错的并入任务 6 第二批），按模板改前端，每条配单测（`templateParityDBatch` / `templateParityFGBatch` 等）；D2-10 结构不同，并入 9.4；顺带修 F3 信用证类别崩溃（HEAD 既有）
@@ -38,9 +39,13 @@
 
 - [ ] 9. 字段名接通（R3，按 design §4 裁定）
   - [ ] 9.1 N 循环（N1~N5，含 N1 几何与 store item 前缀）
+    - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12
+    - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10）
+    - [x] 9.1c 语义审查收口：修 N2 跨项目读写、错误表头按位置写、Infinity JSON、国企披露归零、导入后旧快照、N 域新测试/公式数棘轮，以及 push 远端标签 fail-open / 重试竞态 / 本地旧标签基线；定向后端 25、鉴权/挂载 43、前端 643 项通过，候选相对基线新增失败 0（design §4.10）
   - [ ] 9.2 L4-3 与 M 循环（含 `placeholder` store item）
   - [ ] 9.3 G5-2 / G6-5 / G7 / H 循环
     - [x] 9.3a 批 B1：G6-5 全表按前端 `FairValueItem` 改名、D 改 auto_source、前端旧数据反推只在键缺失时做（显式 0 单测）；G4-7 证券名称改名、E 总计 auto_source；G11-2 A 序号 auto_source + 幽灵行锚点改 B；H4-2 J / M auto_source；新守卫 `test_ghost_row_anchor_not_protected.py`（全仓锚点不得受保护，F3-1 种子区可伪证例外）；对拍适配器 +1、未覆盖 14 → 13、例外 4 → 1（design §4.5）。G6-5 store 门面与 `{rows, conclusion}` 载荷未接（批 B3），G5-2 / G7 / H 其余未做
+    - [x] 9.3b 批 B3a：G1 / G3 / G4 / G5 / G6 多区 store 门面按 provider 绑定（`phase5_section_store_facade`，G9 的伴生门面改为薄绑定）、逐区穿线、G6-5 dict 外壳；载荷列按 provider 声明（`store_payload_columns`，回写镜像 / 出方向 / 采纳覆盖的快照 · 删除 · 回滚审计同一口径，remark 口径 SQL 逐字不变）；G4 / G6 单数 store item 改为受管的那一个，`KNOWN_UNWIRED` 15 → 13；G1 A 列「类别」改绑 investType（区归属不受管）；五份契约复核文字按实际改写；golden 门拒空投影、五家基线更新；AOS 判据改正面断言 + 合成对照；新守卫 `test_section_store_facade_and_payload_columns.py`；20 条磁盘变异全红；和平药房 2025 G1 / G3 / G4 / G6 与重药安徽 G5 待重发布（design §4.9）
   - [ ] 9.4 E1 / F2 / D 循环零散字段
     - [x] 9.4a F2-25 / F2-26 / F2-48 / F2-57 按模板表头接前端字段，F2-48 / F2-57 dict store 走 state 合并；回写合并只合本表的键（平台，8 家串表 + G9 / L5 落错区），守卫 `test_store_merge_table_isolation.py` 与三条磁盘变异；对拍适配器 +5、未覆盖 25 → 20（design §4.1）
     - [x] 9.4b E1-2 / E1-4、D3-rp、D6-3（两区）、D7-4 贷方区按模板接前端字段（D7-4 前端补「与对方科目核对」等三列、导入导出带新列）；触类旁通修后端复算口径四处（D6-2 / D6-3 / D7-2 导入、D1 附注推送）；守卫 `test_d6_03_dual_zone_spec.py` / `test_d7_4_analysis_counter_check.py` / `test_period_end_from_prior_unadjusted_backend.py` / `d7AnalysisTemplateColumns.spec.ts`，14 条磁盘变异全红；对拍适配器 +3、未覆盖 20 → 16、例外 5 → 3（design §4.2）

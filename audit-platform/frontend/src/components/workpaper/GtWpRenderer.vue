@@ -52,6 +52,9 @@
 
       <template v-else>
       <WorkpaperBackgroundMergeBanner :wp-id="wpId" />
+      <VoucherSurvivalBanner
+        :project-id="runtimeProjectId" :workpaper-id="wpId" :year="preparationYear" :readonly="effectiveReadonly"
+      />
       <el-alert
         v-if="schemaFallbackBanner"
         type="info"
@@ -408,6 +411,7 @@ import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
+import VoucherSurvivalBanner from '@/components/workpaper/voucher-sampling/VoucherSurvivalBanner.vue'
 import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
 
 // ─── Types ───

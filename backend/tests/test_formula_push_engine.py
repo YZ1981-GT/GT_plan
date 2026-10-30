@@ -373,8 +373,9 @@ async def test_note_rows_follow_disclosure_and_total_is_recomputed_from_actual_r
     assert rows["手工加的行"]["end_amount"] == 5
     assert rows["其中：存放在境外的款项总额"]["end_amount"] == 7
     assert note.table_data["sub_table_data"]["受限制的货币资金明细"] == [{"label": "保证金", "end_amount": 9}]
-    # 同步指纹 + 来源（pull-from-workpapers 据 _last_sync_wp_id 认定已同步）
-    assert note.table_data["_last_sync_wp_id"] == str(env.wp_id)
+    # 同步指纹只由底稿披露同步写：推送不改它（原来的「旧底稿同步」原样保留；spec note-pull-followup-closure R3.2），
+    # 推送来源记在 last_sync_source
+    assert note.table_data["_last_sync_wp_id"] == "旧底稿同步" and "_last_sync_at" not in note.table_data
     assert (note.last_sync_source, note.last_sync_wp_id) == ("formula_push", env.wp_id)
     assert result.note_sections == ["五、1"] and "note" in result.stages
 
@@ -673,7 +674,8 @@ async def test_failure_rolls_back_and_records_partial_run(env):
 
 @pytest.mark.asyncio
 async def test_engine_writes_never_publish_workpaper_saved(env, monkeypatch):
-    """防回环：引擎写入只广播 formula.pushed，不发 WORKPAPER_SAVED（否则保存事件 → 推送 → 保存事件……）。"""
+    """防回环：引擎发布 NOTE_SECTION_SAVED 给下游，但绝不发 WORKPAPER_SAVED。"""
+    from app.models.audit_platform_schemas import EventType
     from app.services.event_bus import event_bus
 
     published: list = []
@@ -687,7 +689,10 @@ async def test_engine_writes_never_publish_workpaper_saved(env, monkeypatch):
     await env.add_note("五、1", _f2_note())
     result = await env.push()
     assert result.written_count > 0 and result.note_sections == ["五、1"]
-    assert published == [] and [e for e, _ in env.broadcasts] == ["formula.pushed"]
+    assert [payload.event_type for payload in published] == [EventType.NOTE_SECTION_SAVED]
+    assert published[0].extra["section_code"] == "五、1" and published[0].extra["action"] == "formula_push"
+    assert all(payload.event_type != EventType.WORKPAPER_SAVED for payload in published)
+    assert [e for e, _ in env.broadcasts] == ["formula.pushed"]
 
 
 

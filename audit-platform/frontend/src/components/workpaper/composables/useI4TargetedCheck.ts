@@ -2,7 +2,7 @@
  * useI4TargetedCheck — I4-5 长期待摊费用针对性检查表
  * 样本选取 + 凭证核对 1~5 + 检查比例（可联动 I4-2 本期发生额）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import {
   type I4TargetedCheckRow,
   type I4TargetedSampleMeta,
@@ -41,6 +41,11 @@ import {
   hasFailedCheck,
   I4_5_DEFAULT_COVERAGE_THRESHOLD,
 } from './i4TargetedCheckModel'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillOutcome, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { hasTargetedCheckContent, keepLockedRows, preparedAsSample } from './assetVoucherFill'
 
 export {
   type I4TargetedCheckRow,
@@ -149,6 +154,9 @@ export function useI4TargetedCheck(
     /** I4 父组件契约：逐 item_id 持久化 */
     onSave?: (itemId: string, value: any) => void | Promise<void>
     asOfYear?: Ref<number | null> | (() => number | null)
+    projectId?: MaybeRefOrGetter<string | null | undefined>
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: MaybeRefOrGetter<boolean | undefined>
   },
 ) {
   const getMap = typeof allResponses === 'function'
@@ -170,7 +178,8 @@ export function useI4TargetedCheck(
 
   function load() {
     const map = getMap()
-    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(normalizeI4TargetedRow)
+    rows.value = _safeParseArray(map.get(STORAGE_ROWS)).map(r => withRowMeta(normalizeI4TargetedRow(r), r))
+    voucherFill.markLoaded()
 
     sampleMeta.value = normalizeI4TargetedSampleMeta(_parseObject(map.get(STORAGE_SAMPLE)))
 
@@ -208,6 +217,52 @@ export function useI4TargetedCheck(
       benefitChangeConclusion,
       earlyTerminationConclusion,
     }
+  }
+
+  /**
+   * 待写入项 → I4-5 行（原映射函数，样本换成本行的对方科目与金额，挂接 I4-2 项目名）；选取原因按测试原因标注，
+   * 测试原因高值规则可覆盖引擎缺省的「高值必选」（与原实现同一规则，逐行判）
+   */
+  function _rowFromPrepared(item: PreparedItem): I4TargetedCheckRow {
+    const s = preparedAsSample(item)
+    const mapped = mapSampledToI4TargetedRow(s, i42ProjectCatalog.value)
+    if (mapped.selectionReason === '高值必选') mapped.selectionReason = ''
+    const probe = { selectionReason: mapped.selectionReason, isHighValue: s.isHighValue, summary: mapped.businessDesc || s.summary, remark: mapped.remark }
+    applyI4SelectionReasonsToSamples([probe], sampleMeta.value.testReasons)
+    mapped.selectionReason = probe.selectionReason || (s.isHighValue ? '高值必选' : '')
+    if (mapped.selectionReason) mapped.isSpecific = true
+    return mapped
+  }
+
+  /** 回填期间先不保存：回填后宿主还要记抽样说明，改完一并保存一次（`onEngineFilled`） */
+  let holdPersist = false
+  /**
+   * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（凭证检查表，一行一个对方科目）。改完整页保存
+   * （与「保存」同一次写入，先全部序列化再逐项存，见 persistAll）。原实现回填只改内存（I6-4 回填后才保存），
+   * 按「日期 + 凭证号」去重（同一凭证的其他分录被丢掉）
+   */
+  const voucherFill = useVoucherCheckFill<I4TargetedCheckRow>({
+    projectId: () => toValue(options?.projectId),
+    tables: rows,
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => (holdPersist ? undefined : persistAll({ skipGate: true })),
+    hasUserContent: hasTargetedCheckContent,
+    readonly: () => toValue(options?.isReadonly) === true,
+  })
+
+  /** 抽凭引擎回填：`onFilled` 收到底稿实际填入的行数（宿主记抽样说明），之后整页保存一次 */
+  async function onEngineFilled(payload: EngineFilledPayload, onFilled?: (added: number) => void): Promise<FillOutcome> {
+    holdPersist = true
+    let out: FillOutcome
+    try {
+      out = await voucherFill.onEngineFilled(payload)
+    } finally {
+      holdPersist = false
+    }
+    if (out.cancelled) return out
+    onFilled?.(out.added)
+    await persistAll({ skipGate: true })
+    return out
   }
 
   watch(() => {
@@ -330,12 +385,12 @@ export function useI4TargetedCheck(
   }
 
   function removeRow(rowId: string) {
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    rows.value = rows.value.filter((r) => r.rowId !== rowId || voucherFill.isRowLocked(r))
   }
 
   function updateRow(rowId: string, field: keyof I4TargetedCheckRow, value: string | number | boolean) {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     if (field === 'selectionReason') {
       const reason = String(value || '')
@@ -364,48 +419,13 @@ export function useI4TargetedCheck(
     }
   }
 
-  function fillFromSampledVouchers(samples: any[]): number {
-    if (!Array.isArray(samples) || !samples.length) return 0
-    const catalog = i42ProjectCatalog.value
-    const existing = new Set(
-      rows.value.map((r) => `${r.voucherDate}|${r.voucherNo}`).filter((k) => k !== '|'),
-    )
-    const mappedBatch: Array<ReturnType<typeof mapSampledToI4TargetedRow> & {
-      isHighValue?: boolean
-      summary?: string
-    }> = []
-    for (const s of samples) {
-      const mapped = mapSampledToI4TargetedRow(s, catalog)
-      const key = `${mapped.voucherDate}|${mapped.voucherNo}`
-      if (key !== '|' && existing.has(key)) continue
-      // 允许测试原因高值规则覆盖引擎默认的「高值必选」
-      if (mapped.selectionReason === '高值必选') mapped.selectionReason = ''
-      mappedBatch.push({
-        ...mapped,
-        isHighValue: !!s.isHighValue,
-        summary: mapped.businessDesc || s.summary || '',
-      })
-      if (key !== '|') existing.add(key)
-    }
-    applyI4SelectionReasonsToSamples(mappedBatch, sampleMeta.value.testReasons)
-    for (const mapped of mappedBatch) {
-      if (!mapped.selectionReason && mapped.isHighValue) mapped.selectionReason = '高值必选'
-      if (mapped.selectionReason) mapped.isSpecific = true
-      const { isHighValue: _hv, summary: _sum, ...row } = mapped as any
-      rows.value.push(row)
-    }
-    const n = mappedBatch.length
-    if (n > 0 && !sampleMeta.value.sampleSize) {
-      sampleMeta.value.sampleSize = rows.value.length
-    }
-    return n
-  }
-
   /** 为空项目名按摘要模糊挂接 I4-2 */
   function linkProjectsFromI42(overwrite = false): { ok: boolean; linked: number; message: string } {
     const catalog = i42ProjectCatalog.value
     if (!catalog.length) return { ok: false, linked: 0, message: 'I4-2 无项目可挂接，请先编制明细表' }
-    const { rows: next, linked } = enrichRowsWithI42Projects(rows.value, catalog, overwrite)
+    // 年审阶段预审行只读：挂接后换回原样，挂接数按实际改了的行数
+    const next = keepLockedRows(enrichRowsWithI42Projects(rows.value, catalog, overwrite).rows, rows.value, voucherFill.isRowLocked, r => r.rowId)
+    const linked = next.filter((r, i) => r !== rows.value[i]).length
     rows.value = next
     return {
       ok: linked > 0,
@@ -603,11 +623,16 @@ export function useI4TargetedCheck(
     if (!sampleMeta.value.sampleSize && rows.value.length) {
       sampleMeta.value.sampleSize = rows.value.length
     }
-    await options.onSave(STORAGE_ROWS, JSON.stringify(rows.value))
-    await options.onSave(STORAGE_SAMPLE, JSON.stringify(sampleMeta.value))
-    await options.onSave(STORAGE_RISK, JSON.stringify(riskFocus.value))
-    await options.onSave(STORAGE_NOTE, auditNote.value)
-    await options.onSave(STORAGE_CONCLUSION, auditConclusion.value)
+    // 先全部序列化再逐项保存：父组件每存一项就改 allResponses，本函数的 watch 随即整页重读 ——
+    // 原实现存完行再序列化抽样说明 / 风险关注，存进去的是重读出的旧值（未保存的修改丢失）
+    const items: Array<[string, string]> = [
+      [STORAGE_ROWS, JSON.stringify(voucherFill.guardPersist(rows.value))],
+      [STORAGE_SAMPLE, JSON.stringify(sampleMeta.value)],
+      [STORAGE_RISK, JSON.stringify(riskFocus.value)],
+      [STORAGE_NOTE, auditNote.value],
+      [STORAGE_CONCLUSION, auditConclusion.value],
+    ]
+    for (const [itemId, value] of items) await options.onSave(itemId, value)
     return opts?.skipGate ? { ok: true, level: 'ok', message: '' } : gate
   }
 
@@ -652,7 +677,6 @@ export function useI4TargetedCheck(
     addRow,
     removeRow,
     updateRow,
-    fillFromSampledVouchers,
     linkProjectsFromI42,
     pushAdjDraftsToI43,
     setPopulationAmount,
@@ -668,6 +692,12 @@ export function useI4TargetedCheck(
     saveConclusion,
     saveRiskFocus,
     load,
+    onEngineFilled,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

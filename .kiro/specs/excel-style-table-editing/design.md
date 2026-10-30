@@ -178,7 +178,14 @@ interface CellEditorHandle {
 - 表样编辑器：后端 HTML 的 `td[contenteditable]` 不改后端，前端接入时改写为「span 编辑器 + 内核」（`grid/contentEditableCells.ts`），拆除时还原；页面原有的 document 级导航只留给经典方式。
 - 自定义底稿网格：经典方式下可编辑格输入框常驻（与其他表格的经典方式一致；原先只有双击编辑这一种）。
 
-**报表矩阵格内编辑（5.4）**：金额格统一为 `components/report/ReportMatrixCell.vue`（GtGridCell + 数字适配组件），表格组件只发 `cell-edit(行, 列键, 值[, 年度])`，保存在 `useReportContextMenu.onRvCellEdit`（逐格 PUT、同一批合并为一次重新取数）。减值表列键与导出模板 `{{imp:CODE:列键}}`、`report_excel_exporter._resolve_imp_value` 同一套。🔴 待拍板（范围外）：报表重新生成（`report_engine._generate_report`）把每行 `source_accounts` 整列改写为取数科目列表，权益表再由 `_apply_eq_matrix_to_db_row` 按底稿 / 试算表重算矩阵 ⇒ 手工改的格在下一次生成后丢失；要保留须另存「手工覆盖」并在生成后回放（后端设计改动，未做）。
+**5.6 实施结果（附注与合并）**：
+- `DisclosureEditor.vue` 的项目名 / 金额格改由 `GtGridCell` 与适配组件托管，删除 `activeCellEdit`；`ConsolNoteTab.vue` 的普通 / 全屏叶子格统一走 `ConsolNoteGridCell`，删除 `useLazyEdit`。合并附注采用单向 `model-value`，只在提交时改业务行，因此 Esc 能真正还原；手工格标记与合计重算仍沿用原业务函数。
+- 合并附注表首列是行勾选列，内核叶子列坐标比业务列多 1。这个偏移只属于该表，因此由局部 `selectedNoteCell()` 做唯一转换，不改 `useCellSelection` 的平台坐标定义；手工状态、恢复公式、批注、差额穿透都读这个转换结果。切章节同时调用 `noteCtx.clearSelection()` 并清空 `drillDownCell`，防止新章节沿用旧目标。
+- `NoteFormulaDialog.vue` 删除行级 `_editing`，公式 / 说明格直接接 `GtGridCell`。格内提交经微任务合批并串行保存，CAS 版本使用每次响应的新令牌；失败只还原该格。自动保存跳过未完成新行，服务端回执只就地更新已保存行，不以整份响应覆盖本地列表，因此保存期间继续新增 / 编辑不会丢失。
+- `ConsolidationIndex.vue` 通过 `consolCtx.followTables()` 跟随 `ConsolTrialBalanceTab` 的真实 `[data-testid="ctb-table"]`，不再造第二套 TB 选区。三个右键入口先按事件实参更新菜单与穿透目标，即使本次右键落在既有选区内，也不沿用旧行。含多个输入控件的一格不强选一个“主编辑器”：`adapters.ts` / `GridKernel.ts` 让控件常驻，并从真实输入值生成复制与统计结果。
+- 验证：新增 / 改写 27 条行为测试；M101~M118 共 18 条磁盘变异全部在预期判据打红；239 个相关测试文件 A/B 的既存 13 条失败与 3 条 todo 集合不变；SFC、vue-tsc、ESLint 均无新增错误。浏览器在【测试】单体 / 集团项目走完三种编辑方式、刷新回读、Esc 无写入、TB / 合并报表右键目标与状态栏，并恢复测试数据；console error 为 0。范围外保留：合并报表 / TB 的“汇总穿透”会先把 `drillDownCell.itemName` 改成占位文案而提前返回，是本轮开始前已有的死路径，需另行修复。
+
+**报表矩阵格内编辑（5.4）**：金额格统一为 `components/report/ReportMatrixCell.vue`（GtGridCell + 数字适配组件），表格组件只发 `cell-edit(行, 列键, 值[, 年度])`，保存在 `useReportContextMenu.onRvCellEdit`（逐格 PUT、同一批合并为一次重新取数）。减值表列键与导出模板 `{{imp:CODE:列键}}`、`report_excel_exporter._resolve_imp_value` 同一套。🔴 待拍板（范围外）：报表重新生成（`report_engine._generate_report`）把每行 `source_accounts` 整列改写为取数科目列表，权益表再由 `_apply_eq_matrix_to_db_row` 按底稿 / 试算表重算矩阵 ⇒ 手工改的格在下一次生成后丢失；要保留须另存「手工覆盖」并在生成后回放（后端设计改动，未做）。金额列 ESLint 卡点（`gt-audit/no-bare-amount-cell`，ci.yml 只减不增）按「列模板里有没有 `<GtAmountCell>`」判，看不到包装组件内部 ⇒ 规则加 `AMOUNT_CELL_WRAPPERS`（组件名 → 文件）登记 `ReportMatrixCell`，登记是可伪证声明：守卫 `amountCellWrapperRule.spec.ts` 读组件模板核对确有 `<GtAmountCell>`（v1.0.26）。
 
 ## 10 集成点
 

@@ -101,38 +101,7 @@ describe('useG1DerivativeCheck', () => {
     expect(dc.instrumentName.value).toBe('利率互换')
   })
 
-  it('抽凭结果映射为凭证抽查行', () => {
-    const allResponses = ref(new Map<string, ChecklistResponse>())
-    const dc = useG1DerivativeCheck({
-      allResponses,
-      debouncedSave: (id, data) => {
-        allResponses.value.set(id, {
-          item_id: id,
-          conclusion: data.conclusion ?? null,
-          remark: data.remark ?? null,
-        } as ChecklistResponse)
-      },
-      isReadonly: ref(false),
-    })
-    const n = dc.applySamplingResults([
-      {
-        voucherNo: '记-001',
-        voucherDate: '2025-12-01',
-        summary: '买入国债',
-        accountCode: '1501',
-        accountName: '交易性金融资产',
-        counterpartAccount: '1002',
-        debitAmount: 1000,
-        creditAmount: 0,
-        checkResult: 'pass',
-        abnormal: false,
-      } as any,
-    ], 'replace')
-    expect(n).toBe(1)
-    expect(dc.vouchers.value[0].voucherNo).toBe('记-001')
-    expect(dc.vouchers.value[0].debitAmount).toBe(1000)
-    expect(dc.vouchers.value[0].conclusion).toBe('未见异常')
-  })
+  // 抽凭回填改走共享回填函数（映射、去重、替换范围），用例见 g1VoucherFill.spec.ts
 
   it('从 G1-13 带入凭证行', () => {
     const allResponses = ref(new Map<string, ChecklistResponse>([

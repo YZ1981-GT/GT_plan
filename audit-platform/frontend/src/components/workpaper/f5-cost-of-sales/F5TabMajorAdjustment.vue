@@ -36,9 +36,9 @@
           :project-id="projectId"
           :workpaper-id="wpId"
           :account-code="samplingAccountCode"
-          phase="final"
           :year="year"
           @filled="handleSamplingFilled"
+          @undo-request="adj.onUndoRequest"
         />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.addRow">+ 新增行</el-button>
       </div>
@@ -71,12 +71,18 @@
       size="small"
       border
       stripe
-      :row-class-name="rowClass"
+      :row-class-name="voucherRowClassName"
       max-height="520"
     >
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="adj.isVoucherRowLocked(row)" :project-id="projectId" :year="year ?? 0" />
+        </template>
+      </el-table-column>
       <el-table-column label="日期" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="!isReadonly"
             :model-value="row.date"
             size="small"
@@ -89,7 +95,7 @@
 
       <el-table-column label="凭证号" width="120">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="!isReadonly"
             :model-value="row.voucherNo"
             size="small"
@@ -101,7 +107,7 @@
 
       <el-table-column label="重大调整事项内容" min-width="180">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="!isReadonly"
             :model-value="row.itemContent"
             size="small"
@@ -140,7 +146,7 @@
 
       <el-table-column label="调整理由" min-width="160">
         <template #default="{ row }">
-          <el-input
+          <WpCommitInput
             v-if="!isReadonly"
             :model-value="row.adjustmentReason"
             size="small"
@@ -207,7 +213,7 @@
           </div>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="adj.auditNote.value"
         type="textarea"
         :autosize="{ minRows: 4, maxRows: 10 }"
@@ -231,7 +237,7 @@
           >🤖 AI生成结论</el-button>
         </div>
       </template>
-      <el-input
+      <WpCommitInput
         :model-value="adj.auditConclusion.value"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
@@ -249,8 +255,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * F5TabMajorAdjustment — F5-8 主营业务成本账户中重大调整事项核查表
  * 源表：日期/凭证号/事项/借贷方/理由/是否充分 + 抽凭 + AI + F5-1/4/7 交叉引用
  */
-import { computed, inject, toRef, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, inject, onMounted, toRef, type Ref } from 'vue'
 import {
   useF5MajorAdjustment,
   F5_MAJOR_ADJ_ADEQUACY_OPTIONS,
@@ -261,7 +266,8 @@ import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
@@ -275,6 +281,7 @@ import type { SamplingMethodologySnapshot } from '../composables/shared/sampling
  */
 import { f5GrossQueryCodes } from '../composables/f5AccountScope'
 import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 // spec: voucher-attach-account-mapping-closure（批次 3c，任务 14）
 const tbSourceCodes = inject<Ref<TbSourceCodes | null>>('tbSourceCodes', null)
@@ -308,7 +315,9 @@ const adj = useF5MajorAdjustment({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   materiality: computed(() => props.materiality ?? 0) as unknown as Ref<number>,
+  projectId: () => props.projectId,
 })
+onMounted(() => { void adj.voucherFillReady() })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
 
@@ -320,6 +329,8 @@ const ieCtx = computed(() =>
 function rowClass({ row }: { row: any }): string {
   return adj.isRowHighlighted(row) ? 'f5-row-warn' : ''
 }
+/** 重大 / 理由不充分行样式 + 年审阶段预审行只读样式 */
+const voucherRowClassName = combineRowClass(rowClass, adj.voucherRowClass as (a: { row: any }) => string)
 
 function isInadequate(v: string): boolean {
   return !v || v === '不充分' || v === '待补充'
@@ -340,12 +351,11 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly),
 })
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode?: FillMode }) {
+/** 抽凭引擎回填：共享回填函数按分录指纹去重，填入几行由共享函数提示；「替换本阶段抽凭行」只删本阶段抽凭填入的行 */
+async function handleSamplingFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const n = adj.mergeSamplingRows((payload?.samples ?? []) as any[])
-  if (n > 0) ElMessage.success(`已填入 ${n} 笔抽凭样本`)
+  void persistMethodology(payload?.methodology)
+  await adj.onEngineFilled(payload)
 }
 
 function fmt(v: number | null | undefined): string {

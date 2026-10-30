@@ -8,8 +8,8 @@
  *   `report_<类型>`；`note:<模板章节号>` → 附注目录 `disclosure` + 编号体系提示（模板「五-1-1」与项目「八、1」不是同一体系，
  *   不猜对应）；`workpaper:…` 与注册表源键原样；
  * - `resolveDialogOpenContext({route, eventPayload})`：弹窗每次打开时的项目、年度、页签与预选源——事件带的项目优先于
- *   路由，非项目页不给项目；侧栏打开（没有事件）按路由预选数据源；事件带源时经上面的映射。弹窗关闭时调用方丢弃本次结果，
- *   下次打开重新计算（不跨次保留事件带来的项目）。
+ *   路由，非项目页不给项目；模板库页只认路由明确带的项目（`TEMPLATE_LIBRARY_ROUTE`，见函数内说明）；侧栏打开（没有事件）
+ *   按路由预选数据源；事件带源时经上面的映射。弹窗关闭时调用方丢弃本次结果，下次打开重新计算（不跨次保留事件带来的项目）。
  */
 import { isKnownYear } from '@/components/custom-query/queryPayloads'
 
@@ -48,6 +48,8 @@ export const REPORT_TAB_TYPES: ReadonlySet<string> = new Set([
   'impairment_provision',
 ])
 export const TEMPLATE_NOTE_NOTICE = '模板章节号与项目附注编号不同，请在目录中选择章节'
+/** 模板库页的路由名（全局页：URL 不带项目时页面自取项目列表第一项作演示项目，见 resolveDialogOpenContext） */
+export const TEMPLATE_LIBRARY_ROUTE = 'TemplateLibraryMgmt'
 
 /** 账簿查询页 `?level` → 数据源（凭证层级仍是序时账） */
 const LEDGER_LEVEL_SOURCES: Readonly<Record<string, string>> = {
@@ -119,10 +121,17 @@ export function resolveDialogOpenContext(input: {
   const fromRoute = resolveQueryEntryContext(input.route)
   const event = input.eventPayload ?? null
   const eventProject = first(event?.project_id)
-  const projectId = eventProject || fromRoute.projectId || ''
+  let projectId = eventProject || fromRoute.projectId || ''
+  if (String(input.route?.name ?? '') === TEMPLATE_LIBRARY_ROUTE) {
+    // 模板库页 URL 不带项目时，页面取项目列表第一项作演示项目，经底稿模板详情的「📊 高级查询」进入事件；用户看不到它
+    // 从哪来，不能当成所选项目（R10.1 非项目页不自动选中项目，AQ-37）⇒ 只认路由明确带的项目（`params.projectId`，
+    // 其次 `?project_id`）：事件带的项目与它一致才采纳，不一致取路由的；路由没带项目、或事件没带项目时为空
+    const routeProject = first(input.route?.params?.projectId) || first(input.route?.query?.project_id)
+    projectId = routeProject && eventProject ? routeProject : ''
+  }
   const out: DialogOpenContext = { projectId, initialTab: event?.tab === 'advanced' ? 'advanced' : 'basic' }
-  // 路由的 ?year 属于路由项目：事件带来别的项目时不套用（交弹窗按所选项目的审计年度取）
-  if (fromRoute.year !== undefined && (!eventProject || eventProject === fromRoute.projectId)) out.year = fromRoute.year
+  // 路由的 ?year 属于路由项目：弹窗项目不是路由项目时不套用（交弹窗按所选项目的审计年度取）
+  if (fromRoute.year !== undefined && projectId === (fromRoute.projectId ?? '')) out.year = fromRoute.year
   if (event?.source) {
     const mapped = resolveTemplateLibrarySource(event.source)
     if (mapped.source) out.initialSource = mapped.source

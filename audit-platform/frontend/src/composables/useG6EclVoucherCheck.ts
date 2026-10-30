@@ -3,8 +3,11 @@
  *
  * 对齐源模板：样本选取标准 → 本期发生额 → 期后处置/新增 →
  * 六项三态核对 → 检查比例、例外事项与审计结论。
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：本期、期后各一张表，
+ * 一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库
+ * （spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, type MaybeRefOrGetter, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { calcSumColumn, parseNum } from '@/composables/useG6EclFormulaEngine'
@@ -15,6 +18,10 @@ import type {
   VoucherSampleCriteria,
   VoucherSelectionCategory,
 } from '@/components/workpaper/composables/useG6EclFormData'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from '@/components/workpaper/composables/shared/voucherCheckFill'
 
 export const G6_VOUCHER_SCHEMA_VERSION = 2
 export const G6_VOUCHER_ROW_KEY = 'G6-15-rows'
@@ -284,10 +291,49 @@ function inferBusinessType(summary: string): string {
   return ''
 }
 
+/**
+ * 共享回填函数的待写入项 → G6-15 检查行（期间由所进的表定）：金额在样本自己的借贷栏，对方科目 = 编码、
+ * 对方明细科目 = 名称（配不上写「多科目」时沿用原来的本科目名称兜底）；同一分录按对方科目展开的几行
+ * sourceId 各不相同（重复样本告警按它认）。
+ */
+export function mapPreparedToG6VoucherRow(item: PreparedItem, period: VoucherCheckPeriod): VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & {
+    summary?: string | null; businessType?: string | null; selectionReason?: string | null
+    samplingMethod?: string | null; accountName?: string | null
+  }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const summary = s.summary ?? ''
+  return migrateVoucherRow({
+    period,
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: summary,
+    businessType: s.businessType || inferBusinessType(summary),
+    counterAccount: code,
+    detailAccount: name && name !== code ? name : (s.accountName ?? ''),
+    debitAmount: item.debitAmount ?? 0,
+    creditAmount: item.creditAmount ?? 0,
+    source: item.meta.src.includes('attach') ? '挂凭' : '抽凭引擎',
+    selectionReason: s.selectionReason ?? '',
+    samplingMethod: s.samplingMethod ?? '',
+    selectionCategory: inferSelectionCategory(s),
+    sourceId: item.meta.lfp ? `${item.meta.lfp}#${item.meta.cp ?? ''}` : '',
+  })
+}
+
+/** 行上已填核对结果、附件、支持性文件、索引、例外说明 / 风险 / 建议或备注（替换与撤销抽凭时据此先确认） */
+export function hasG6VoucherContent(r: VoucherCheckRow): boolean {
+  return voucherCheckResults(r).some(Boolean) || !!r.manualAbnormal
+    || [r.attachment, r.supportingDoc, r.indexRef, r.abnormalNote, r.riskLevel, r.suggestion, r.remark]
+      .some(v => String(v ?? '').trim() !== '')
+}
+
 export function useG6EclVoucherCheck(
   wpId: Ref<string>,
   _projectId?: Ref<string>,
   htmlData?: Ref<Record<string, any> | null>,
+  opts?: { readonly?: MaybeRefOrGetter<boolean> },
 ) {
   const criteria = ref<VoucherSampleCriteria>(createEmptyVoucherCriteria())
   const rows = ref<VoucherCheckRow[]>([])
@@ -405,6 +451,57 @@ export function useG6EclVoucherCheck(
     return warnings
   })
 
+  // ─── 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（本期、期后各一张表） ───
+
+  /** 已在某个期间表的分录（按指纹）：再次回填 / 挂凭导入仍进那张表 */
+  function periodHolding(lfp: string | null): VoucherCheckPeriod | null {
+    if (!lfp) return null
+    return rows.value.find(r => metaOf(r)?.lfp === lfp)?.period ?? null
+  }
+  const periodTable = (period: VoucherCheckPeriod) => computed<VoucherCheckRow[]>({
+    get: () => rows.value.filter(r => r.period === period),
+    set: (list) => {
+      rows.value = period === 'occurrence'
+        ? [...list, ...rows.value.filter(r => r.period === 'post')]
+        : [...rows.value.filter(r => r.period === 'occurrence'), ...list]
+    },
+  })
+  const periodTables = { occurrence: periodTable('occurrence'), post: periodTable('post') }
+  const voucherFill = useVoucherCheckFill<VoucherCheckRow>({
+    projectId: () => _projectId?.value,
+    tables: periodTables,
+    tableOf: item => periodHolding(item.meta.lfp),
+    mapSampleToRow: (item, key) => mapPreparedToG6VoucherRow(item, key as VoucherCheckPeriod),
+    // 宿主深度监听 rows 落库（rowsToPersist 已按读入版本写回预审行），这里不另存
+    persist: () => undefined,
+    hasUserContent: hasG6VoucherContent,
+    afterChange: () => resequence(),
+    readonly: opts?.readonly,
+  })
+
+  /** 保存用的行：年审阶段预审行按读入版本写回（宿主落库与 toJSON 都用它） */
+  function rowsToPersist(): VoucherCheckRow[] {
+    return [
+      ...voucherFill.guardPersist(periodTables.occurrence.value, 'occurrence'),
+      ...voucherFill.guardPersist(periodTables.post.value, 'post'),
+    ]
+  }
+
+  /** 期后表只收资产负债表日之后的凭证：截止日前的剔除并提示 */
+  function dropPreCutoff<S extends FillSample>(period: VoucherCheckPeriod, samples: S[]): S[] {
+    const cutoff = bsDate.value
+    if (period !== 'post' || !cutoff) return samples
+    const kept = samples.filter(s => !(s.voucherDate && s.voucherDate <= cutoff))
+    const rejected = samples.length - kept.length
+    if (rejected) ElMessage.warning(`期后表只收资产负债表日（${cutoff}）之后的凭证，已剔除截止日前 ${rejected} 笔`)
+    return kept
+  }
+
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedRow(row: VoucherCheckRow | undefined): boolean {
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   function resequence(): void {
     let occurrenceSeq = 0
     let postSeq = 0
@@ -423,8 +520,9 @@ export function useG6EclVoucherCheck(
         ...(data.postPeriodRows || []).map((r: any) => ({ ...r, period: 'post' })),
       ]
     }
-    rows.value = rawRows.map(migrateVoucherRow)
+    rows.value = rawRows.map((r, i) => withRowMeta(migrateVoucherRow(r, i), r))
     resequence()
+    voucherFill.markLoaded()
   }
 
   function addRow(period: VoucherCheckPeriod = activePeriod.value): VoucherCheckRow {
@@ -435,82 +533,40 @@ export function useG6EclVoucherCheck(
   }
 
   function removeRow(id: string): void {
+    if (lockedRow(rows.value.find(row => row.id === id))) return
     rows.value = rows.value.filter(row => row.id !== id)
     resequence()
   }
 
   function setCheck(row: VoucherCheckRow, key: keyof VoucherCheckRow, value: VoucherCheckResult): void {
+    if (lockedRow(row)) return
     ;(row as any)[key] = value
     recalcVoucherAbnormal(row)
   }
 
   function setManualAbnormal(row: VoucherCheckRow, value: boolean): void {
+    if (lockedRow(row)) return
     row.manualAbnormal = value
     recalcVoucherAbnormal(row)
   }
 
-  function fillVoucherSamples(
-    period: VoucherCheckPeriod,
-    samples: any[],
-    options: {
-      mode?: 'append' | 'replace' | 'merge'
-      method?: string
-      bsDate?: string
-    } = {},
-  ): { added: number; skipped: number; rejectedPostDated: number } {
-    if (options.mode === 'replace') rows.value = rows.value.filter(row => row.period !== period)
-    const existing = new Set(
-      rows.value.filter(row => row.period === period).map(r => r.sourceId || buildSourceId(r)),
-    )
-    let added = 0
-    let skipped = 0
-    let rejectedPostDated = 0
-    const cutoff = options.bsDate || bsDate.value
+  /**
+   * 抽凭引擎回填进所选的期间表（本期 / 期后，缺省当前期间）：一个对方科目一行，按分录指纹去重；
+   * 「替换本阶段抽凭行」只动所选的表。期后表只收资产负债表日之后的凭证（截止日前的剔除并提示）。
+   * 原实现按 sourceId 去重、替换时清空整个期间（含手工行），已删除。
+   */
+  async function onEngineFilled(
+    payload: EngineFilledPayload & { method?: string },
+    period: VoucherCheckPeriod = activePeriod.value,
+  ) {
+    const samples = dropPreCutoff(period, payload.samples ?? [])
+      .map(s => ({ ...s, samplingMethod: (s as { samplingMethod?: string }).samplingMethod ?? payload.method ?? '' }))
+    return voucherFill.onEngineFilled({ ...payload, samples }, { tables: [period] })
+  }
 
-    for (const sample of samples) {
-      const date = sample.voucherDate ?? sample.date ?? ''
-      // 期后回填：强制日期晚于资产负债表日
-      if (period === 'post' && cutoff && date && date <= cutoff) {
-        rejectedPostDated++
-        continue
-      }
-      const debitAmount = sample.debitAmount ?? 0
-      const creditAmount = sample.creditAmount ?? 0
-      const voucherNo = sample.voucherNo ?? ''
-      const sourceId = buildSourceId({
-        sourceId: sample.sourceId || sample.ledgerLineId || sample.id,
-        date,
-        voucherNo,
-        debitAmount,
-        creditAmount,
-      })
-      if (existing.has(sourceId)) {
-        skipped++
-        continue
-      }
-      const summary = sample.summary ?? sample.businessContent ?? ''
-      const row = migrateVoucherRow({
-        period,
-        date,
-        voucherNo,
-        businessContent: summary,
-        businessType: sample.businessType || inferBusinessType(summary),
-        counterAccount: sample.counterpartAccount ?? sample.counterAccount ?? '',
-        detailAccount: sample.counterpartAccountName ?? sample.accountName ?? sample.detailAccount ?? '',
-        debitAmount,
-        creditAmount,
-        source: '抽凭引擎',
-        selectionReason: sample.selectionReason ?? '',
-        samplingMethod: options.method ?? sample.samplingMethod ?? '',
-        selectionCategory: inferSelectionCategory(sample),
-        sourceId,
-      })
-      rows.value.push(row)
-      existing.add(sourceId)
-      added++
-    }
-    resequence()
-    return { added, skipped, rejectedPostDated }
+  /** 从序时账挂入导入所选的期间表：幂等追加（已在另一期间表的分录留在原处） */
+  async function onAttachImported(samples: FillSample[], period: VoucherCheckPeriod = activePeriod.value) {
+    return voucherFill.onAttachImported(dropPreCutoff(period, samples), { tables: [period] })
   }
 
   /**
@@ -592,7 +648,7 @@ export function useG6EclVoucherCheck(
   }
 
   async function handleRowOcr(row: VoucherCheckRow, file: File): Promise<boolean> {
-    if (!wpId.value) return false
+    if (!wpId.value || lockedRow(row)) return false
     ocrLoadingRowId.value = row.id
     try {
       const body = new FormData()
@@ -649,7 +705,7 @@ export function useG6EclVoucherCheck(
     return {
       schemaVersion: G6_VOUCHER_SCHEMA_VERSION,
       criteria: { ...criteria.value },
-      rows: rows.value.map(row => ({ ...row })),
+      rows: rowsToPersist().map(row => ({ ...row })),
     }
   }
 
@@ -682,7 +738,14 @@ export function useG6EclVoucherCheck(
     removeRow,
     setCheck,
     setManualAbnormal,
-    fillVoucherSamples,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    rowsToPersist,
     evaluateCrossCoverage,
     mapOcrToVoucherFields,
     handleRowOcr,

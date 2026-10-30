@@ -745,11 +745,15 @@ async def test_resolve_table_picks_variant(env_listed):
 
 @pytest.mark.asyncio
 async def test_d1_sync_fingerprint_correct(env_listed):
-    """推送写入后 _last_sync_wp_id / last_sync_source / last_sync_at 正确。"""
+    """推送写入后 last_sync_source / last_sync_wp_id / last_sync_at（ORM 列）记推送；表格里的同步指纹不写。
+
+    指纹（``table_data._last_sync_wp_id`` / ``_last_sync_at``）只表示「底稿披露表同步过」（spec note-pull-followup-closure
+    R3.2）：推送写了它，推送过的章节在取数结果里就成了 ``synced_before=True``，离屏同步「已有人工填写不覆盖」失效。
+    """
     await env_listed.seed_entries(base_entries())
     await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
 
-    result = await env_listed.push(codes=["D1"])
+    await env_listed.push(codes=["D1"])
 
     note = await env_listed.note("五、4")
 
@@ -758,63 +762,33 @@ async def test_d1_sync_fingerprint_correct(env_listed):
     assert note.last_sync_wp_id == env_listed.d1_wp_id
     assert note.last_sync_at is not None
 
-    # JSON 内指纹
-    assert note.table_data["_last_sync_wp_id"] == str(env_listed.d1_wp_id)
-    assert "_last_sync_at" in note.table_data
+    # JSON 内指纹不写
+    assert "_last_sync_wp_id" not in note.table_data
+    assert "_last_sync_at" not in note.table_data
 
 
 @pytest.mark.asyncio
-async def test_push_then_pull_no_duplicate_sync(env_listed):
-    """端到端：推送写入附注后，pull-from-workpapers 识别已同步、不重复拉取。
+async def test_push_does_not_make_section_count_as_synced(env_listed):
+    """端到端：推送写入附注后，取数结果的章节状态 ``synced_before`` 仍为 False（生产函数，不手抄端点判定）。
 
-    在同一 SQLite ORM 环境先推送 D1→五、4，再模拟 pull 端点判定逻辑：
-    - 推送后的五、4 带 ``_last_sync_wp_id`` → pull 走 synced 路径
-    - 推送前的八、1（从未同步）→ pull 走 skipped_never_synced 路径
+    原用例断言「推送过的章节被 pull 识别为已同步」—— 那正是 F4 缺陷：附注页「刷新」先跑推送，推送写了指纹，
+    同一请求里的章节状态就说「同步过」，离屏同步随后覆盖人工填写的格（spec note-pull-followup-closure R3.2）。
     """
+    from app.services.note_workpaper_pull_service import _mark_synced_sections
+
     await env_listed.seed_entries(base_entries())
     await env_listed.add_note("五、4", _d1_listed_note_data(), title="应收票据")
-    # 追加一个从未同步的章节（无 _last_sync_wp_id）
-    await env_listed.add_note("八、1", {"rows": [{"label": "测试行"}], "headers": ["项目"]}, title="货币资金")
+    await env_listed.add_note("八、1", {"rows": [{"label": "测试行"}], "headers": ["项目"],
+                                        "_last_sync_wp_id": "底稿同步过"}, title="货币资金")
 
-    # ── 推送 D1 ──
     await env_listed.push(codes=["D1"])
+    assert (await env_listed.note("五、4")).last_sync_source == "formula_push", "推送确实写了五、4"
 
-    # ── 模拟 pull-from-workpapers 端点的核心判定 ──
-    # 端点逻辑（disclosure_notes.py pull_from_workpapers）:
-    #   td = note.table_data
-    #   if not td.get("_last_sync_wp_id"):
-    #       skipped_never_synced += 1
-    #       continue
-    #   td["_source"] = "workpaper"; td["_last_sync_at"] = ...; synced += 1
-
-    synced = 0
-    skipped_never_synced = 0
-
-    note_pushed = await env_listed.note("五、4")
-    td_pushed = note_pushed.table_data or {}
-    if not td_pushed.get("_last_sync_wp_id"):
-        skipped_never_synced += 1
-    else:
-        synced += 1
-
-    note_never = await env_listed.note("八、1")
-    td_never = note_never.table_data or {}
-    if not td_never.get("_last_sync_wp_id"):
-        skipped_never_synced += 1
-    else:
-        synced += 1
-
-    # 推送过的章节被识别为 synced
-    assert synced == 1, f"推送后的章节应被 pull 识别为已同步，实际 synced={synced}"
-    # 从未同步的章节被跳过
-    assert skipped_never_synced == 1, f"从未同步的章节应被跳过，实际 skipped={skipped_never_synced}"
-
-    # 进一步确认：推送后的 table_data 包含完整指纹
-    assert td_pushed["_last_sync_wp_id"] == str(env_listed.d1_wp_id)
-    assert "_last_sync_at" in td_pushed
-    # 从未同步的 table_data 无指纹
-    assert "_last_sync_wp_id" not in td_never
-    assert "_last_sync_at" not in td_never
+    async with env_listed.factory() as db:
+        out = await _mark_synced_sections(db, env_listed.pid, YEAR, ["五、4", "八、1"])
+    assert out["states"]["五、4"]["synced_before"] is False, "推送过 ≠ 底稿披露同步过"
+    assert out["states"]["八、1"]["synced_before"] is True
+    assert (out["synced"], out["skipped_never_synced"]) == (1, 1)
 
 
 @pytest.mark.asyncio
@@ -1064,9 +1038,10 @@ async def test_shared_chapter_multi_code_tables_no_overwrite(env_shared_chapter)
     assert h4_rows["合计"]["end_amount"] == 888000, "工程物资合计行不受 H2 推送影响"
     assert h4_rows["合计"]["prior_amount"] == 666000
 
-    # 同步指纹只记录 H2 底稿
-    assert note.table_data.get("_last_sync_wp_id") == str(e.h2_wp_id)
+    # 推送来源只记录 H2 底稿（ORM 列）；表格里的同步指纹推送不写（spec note-pull-followup-closure R3.2）
+    assert "_last_sync_wp_id" not in note.table_data
     assert note.last_sync_source == "formula_push"
+    assert note.last_sync_wp_id == e.h2_wp_id
 
 
 @pytest.mark.asyncio

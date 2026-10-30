@@ -190,7 +190,7 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
     1. 把该企业绑定为来源的合并项目 + 合并章节；
     2. 合并章节经章节映射换算成单体章节号，与本次保存的章节一致才算受影响；事件没带
        章节号（如整本生成）时该企业全部已绑定章节都受影响；
-    3. 交 ``consol_note_value_change_service.on_note_section_saved`` 标 is_stale、降级值确认；
+    3. 交 ``consol_note_value_change_service.on_note_section_saved`` 标 is_stale；
     4. 每个受影响的合并项目推一条 ``consol.note_stale`` SSE。
     """
     project_id = getattr(event, "project_id", None)
@@ -206,10 +206,6 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
 
     try:
         from app.core.database import async_session as async_session_factory
-        from app.services.consol_note_detail_source_service import (
-            load_entity_source_rows,
-            resolve_section_template_type,
-        )
         from app.services.consol_note_value_change_service import on_note_section_saved
 
         stale_by_project: dict[UUID, int] = {}
@@ -217,13 +213,9 @@ async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
             note_section, section_title = await _resolve_saved_note_section(db, entity_project_id, year, saved)
             affected = await _affected_consol_sections(db, entity_project_id, note_section, section_title)
             for section_id, consol_pids in affected.items():
-                template_type = await resolve_section_template_type(db, consol_pids[0])
-                rows = await load_entity_source_rows(
-                    db, entity_project_id, section_id, year, template_type=template_type,
-                )
                 result = await on_note_section_saved(
                     db, entity_project_id=entity_project_id, section_id=section_id,
-                    year=year, rows=rows, consol_project_ids=consol_pids,
+                    year=year, consol_project_ids=consol_pids,
                 )
                 for item in (result or {}).get("affected_projects", []):
                     pid = UUID(item["consol_project_id"])
@@ -284,7 +276,8 @@ async def _affected_consol_sections(
     import sqlalchemy as sa
     from app.models.consol_note_mapping_models import ConsolNoteMappingBinding
     from app.services.consol_note_detail_source_service import resolve_section_template_type
-    from app.services.consol_note_section_mapping import resolve_mapping_entry
+    from app.services.consol_note_section_mapping import all_mapped_sections, resolve_mapping_entry
+    from app.services.consol_note_topn import section_topn_limit
 
     title_key = "".join(str(section_title or "").split())
     pairs = (await db.execute(
@@ -309,7 +302,30 @@ async def _affected_consol_sections(
             ) == title_key
             if not (same_number or same_title):
                 continue
-        affected.setdefault(section_id, []).append(consol_pid)
+        bucket = affected.setdefault(section_id, [])
+        if consol_pid not in bucket:
+            bucket.append(consol_pid)
+
+    # 前 N 名表按单位动态重排，设计上不建 MappingBinding；仅按绑定反查会永远漏掉这些章节。
+    # 用该企业在同一合并项目的任一绑定确认项目归属，再按章节映射补入动态表影响面。
+    for consol_pid in {pid for pid, _section in pairs}:
+        if consol_pid not in template_types:
+            template_types[consol_pid] = await resolve_section_template_type(db, consol_pid)
+        template_type = template_types[consol_pid]
+        for entry in all_mapped_sections(template_type):
+            section_id = str(entry.get("consol_section_id") or "")
+            if not section_id or not section_topn_limit(template_type, section_id):
+                continue
+            if note_section:
+                same_number = entry.get("standalone_note_section") == note_section
+                same_title = bool(title_key) and "".join(
+                    str(entry.get("standalone_section_title") or "").split()
+                ) == title_key
+                if not (same_number or same_title):
+                    continue
+            bucket = affected.setdefault(section_id, [])
+            if consol_pid not in bucket:
+                bucket.append(consol_pid)
     return affected
 
 

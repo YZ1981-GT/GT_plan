@@ -113,6 +113,16 @@ class TestDdlMatchesMigrations:
         )
         assert section  # 保留分段引用，确保断言基于该表而非全文件
 
+    def test_scope_values_equal_orm_and_v214(self, script):
+        """scope 允许值三处同一份（advanced-query-linkage-closure 任务 25）：脚本、ORM 检查约束、迁移 V214 的约束。"""
+        from app.models.custom_query_models import TEMPLATE_SCOPE_VALUES
+
+        assert tuple(script.SCOPE_VALUES) == TEMPLATE_SCOPE_VALUES
+        text = self._migration_text("V214")
+        for value in TEMPLATE_SCOPE_VALUES:
+            assert f"'{value}'" in text, f"V214 的 scope 约束缺 {value}"
+        assert {"is_deleted", "deleted_at"} <= set(script.ALTER_ADD_COLUMNS), "旧库补列缺 V214 的软删两列"
+
     def test_v101_shared_column_and_index_covered(self, script):
         """V101 引入的 shared_project_ids 列与 GIN 索引必须被脚本覆盖。"""
         text = self._migration_text("V101")

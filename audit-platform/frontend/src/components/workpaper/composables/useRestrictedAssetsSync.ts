@@ -34,15 +34,15 @@ import http from '@/utils/http'
 import { rowScopeFailureMessage } from './shared/rowScopeFailure'
 
 import {
-  buildRestrictedAssetsPayloads,
   RESTRICTED_ASSETS_NOTE_SECTION,
-  RESTRICTED_ASSETS_OWNERS,
-  summarizeRestrictedRows,
   type RestrictedAssetsOwner,
   type RestrictedAssetsSheetNames,
   type RestrictedAssetsVariant,
 } from './restrictedAssetsNoteSectionMap'
-import { findRestrictedAssetsSource, type ResponseMap } from './restrictedAssetsSources'
+import type { ResponseMap } from './restrictedAssetsSources'
+import {
+  buildRestrictedAssetsSyncPayloads,
+} from './restrictedAssetsSyncPayload'
 
 export interface RestrictedAssetsSyncOptions {
   owner: RestrictedAssetsOwner
@@ -67,35 +67,26 @@ export interface RestrictedAssetsSyncOptions {
 export function useRestrictedAssetsSync(
   opts: RestrictedAssetsSyncOptions,
 ): () => Promise<void> {
-  const source = findRestrictedAssetsSource(opts.owner)
-
   return async function syncRestrictedAssets(): Promise<void> {
     const projectId = opts.projectId()
     if (!projectId || opts.isReadonly?.()) return
-    if (!source) {
-      // 声明表里没有该 owner → 说明该循环还没接（守卫会红），这里静默不报错
-      return
-    }
     const responses = opts.responses()
     if (!responses) return
 
     const variant = opts.variant()
-    const details = source.collect(responses)
-    const payloads = buildRestrictedAssetsPayloads(
+    const plan = buildRestrictedAssetsSyncPayloads({
+      owner: opts.owner,
       variant,
-      opts.wpId() || '',
-      opts.applicableStandards?.() ?? null,
-      {
-        ownerRowCode: opts.owner,
-        rows: summarizeRestrictedRows(RESTRICTED_ASSETS_OWNERS[opts.owner], details),
-      },
-      opts.sheetNames,
-    )
-    if (!payloads.length) return
+      wpId: opts.wpId() || '',
+      responses,
+      applicableStandards: opts.applicableStandards?.() ?? null,
+      sheetNames: opts.sheetNames,
+    })
+    if (!plan.payloads.length || !plan.wpCode) return
 
     const year = opts.year?.()
     const sectionId = RESTRICTED_ASSETS_NOTE_SECTION[variant]
-    for (const payload of payloads) {
+    for (const payload of plan.payloads) {
       try {
         const resp: any = await http.post(
           `/api/projects/${projectId}/disclosure-notes/sync-from-workpaper`,
@@ -113,7 +104,7 @@ export function useRestrictedAssetsSync(
         }
         if (data && (data.success || data.section_id)) {
           eventBus.emit('disclosure:note-text-updated', {
-            wpCode: source.wpCode,
+            wpCode: plan.wpCode,
             variant,
             projectId,
             sectionIds: [sectionId],

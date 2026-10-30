@@ -683,13 +683,10 @@ def register_cycle_linkage_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved_wp_formula_stale)
     logger.debug("WP() cross-workpaper stale propagation handler registered")
 
-    # 底稿保存 → 从披露表刷新附注数据（spec: note-data-from-disclosure-table Task 3）
-    from app.services.note_disclosure_refresh_service import (
-        handle_workpaper_saved as _refresh_note_from_disclosure,
-    )
-
-    event_bus.subscribe(EventType.WORKPAPER_SAVED, _refresh_note_from_disclosure)
-    logger.debug("Disclosure → note refresh handler registered")
+    # 🔴 不再订阅 note_disclosure_refresh_service.handle_workpaper_saved（spec note-pull-header-formula-closure R1）：
+    # 它先跑后端披露表 builder 把与前端不同口径的错数写进附注（D2 账龄期末恒 0、坏账准备恒 0），
+    # 再按有无 sub_table_data 清 / 标 stale（会掩盖真实过期、给模板取数章节误标待更新）。
+    # 底稿披露表 → 附注只由前端披露 Tab 保存后自动同步、附注刷新时离屏同步完成。
 
 
 async def _on_workpaper_saved_wp_formula_stale(payload: EventPayload) -> None:

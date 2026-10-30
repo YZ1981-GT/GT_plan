@@ -4,7 +4,7 @@
 
  */
 
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 
 import { ElMessage } from 'element-plus'
 
@@ -51,6 +51,18 @@ export interface G12DisclosureRow {
   changeRate: number | null
 
   remark: string
+
+}
+
+
+
+export interface G12DisclosurePatchResult {
+
+  changed: boolean
+
+  sourceFound: boolean
+
+  fieldsChanged: number
 
 }
 
@@ -131,6 +143,18 @@ function parsePriorStore(raw?: string | null): Record<string, { priorUnadjusted?
     return {}
 
   }
+
+}
+
+
+
+function optionalAmount(raw: unknown): number | null {
+
+  if (raw == null || (typeof raw === 'string' && raw.trim() === '')) return null
+
+  const amount = typeof raw === 'number' ? raw : Number(raw)
+
+  return Number.isFinite(amount) ? amount : null
 
 }
 
@@ -322,7 +346,7 @@ export function useG12Disclosure(opts: {
 
     const amtRaw = opts.allResponses.value.get('G12-1-adjudicated-amount')?.conclusion
 
-    const adjudicatedTotal = amtRaw != null ? parseNum(amtRaw) : null
+    const adjudicatedTotal = optionalAmount(amtRaw)
 
     const priorStore = parsePriorStore(opts.allResponses.value.get('G12-adj-prior')?.remark)
 
@@ -334,9 +358,15 @@ export function useG12Disclosure(opts: {
 
 
 
-  function syncFromG12Adjudication(showMessage = true): number {
+  /**
 
-    if (opts.isReadonly.value) return 0
+   * 由 G12-1 审定 / G12-2 明细回填附注各行（只改内存）。缺失来源保留原值；显式 0 仍是有效来源。
+
+   * 附注页离屏同步只调这一步，不写底稿（spec note-pull-followup-closure R1）。
+
+   */
+
+  function applyAdjudicationPatch(): G12DisclosurePatchResult {
 
     const { adjudicatedTotal, priorStore, hedgeDetailJson } = readAdjudicationContext()
 
@@ -344,7 +374,7 @@ export function useG12Disclosure(opts: {
 
 
 
-    const patched = buildG12DisclosureSyncPatch(rows.value, {
+    const patch = buildG12DisclosureSyncPatch(rows.value, {
 
       variant: opts.variant,
 
@@ -356,13 +386,43 @@ export function useG12Disclosure(opts: {
 
     })
 
-    rows.value = patched.map((r) => enrichRow(r, opts.variant))
+    if (patch.changed) {
 
-    persist()
+      rows.value = patch.rows.map((r) => enrichRow(r, opts.variant))
 
-    if (showMessage) ElMessage.success('已从 G12-1 / G12-2 同步附注发生额')
+    }
 
-    return patched.length
+    return {
+
+      changed: patch.changed,
+
+      sourceFound: patch.sourceFound,
+
+      fieldsChanged: patch.fieldsChanged,
+
+    }
+
+  }
+
+
+
+  function syncFromG12Adjudication(showMessage = true): number {
+
+    const result = applyAdjudicationPatch()
+
+    if (result.sourceFound && result.changed && !opts.isReadonly.value) {
+
+      persist()
+
+    }
+
+    if (showMessage && result.sourceFound) {
+
+      ElMessage.success('已从 G12-1 / G12-2 同步附注发生额')
+
+    }
+
+    return result.fieldsChanged
 
   }
 
@@ -376,7 +436,7 @@ export function useG12Disclosure(opts: {
 
       adjudicatedAmount.value = d.adjudicatedAmount
 
-      if (!opts.isReadonly.value) syncFromG12Adjudication(false)
+      syncFromG12Adjudication(false)
 
     }
 
@@ -386,10 +446,6 @@ export function useG12Disclosure(opts: {
 
   function pullLatestAdjudicated(): void {
 
-    const { adjudicatedTotal } = readAdjudicationContext()
-
-    if (adjudicatedTotal != null) adjudicatedAmount.value = adjudicatedTotal
-
     syncFromG12Adjudication(false)
 
   }
@@ -398,7 +454,7 @@ export function useG12Disclosure(opts: {
 
   function onHedgeDetailUpdated() {
 
-    if (!opts.isReadonly.value) pullLatestAdjudicated()
+    pullLatestAdjudicated()
 
   }
 
@@ -452,23 +508,31 @@ export function useG12Disclosure(opts: {
 
 
 
-  onMounted(() => {
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅窗口事件；挂载时的回填由调用方
 
-    pullLatestAdjudicated()
+  // 显式调 `applyAdjudicationPatch`（不保存、不广播，spec note-pull-followup-closure R1）。组件内行为不变。
 
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  if (getCurrentInstance()) {
 
-    window.addEventListener('g12:hedge-detail-updated', onHedgeDetailUpdated)
+    onMounted(() => {
 
-  })
+      pullLatestAdjudicated()
 
-  onBeforeUnmount(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
 
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+      window.addEventListener('g12:hedge-detail-updated', onHedgeDetailUpdated)
 
-    window.removeEventListener('g12:hedge-detail-updated', onHedgeDetailUpdated)
+    })
 
-  })
+    onBeforeUnmount(() => {
+
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+
+      window.removeEventListener('g12:hedge-detail-updated', onHedgeDetailUpdated)
+
+    })
+
+  }
 
 
 
@@ -480,7 +544,7 @@ export function useG12Disclosure(opts: {
 
     updateField, updateNoteText, generateAi, generateAiConclusion,
 
-    pullLatestAdjudicated, syncFromG12Adjudication,
+    pullLatestAdjudicated, syncFromG12Adjudication, applyAdjudicationPatch,
 
   }
 

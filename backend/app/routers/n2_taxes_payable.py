@@ -24,6 +24,7 @@ import logging
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -33,8 +34,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import authorize_wp_edit, get_current_user
+from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user
 from app.models.core import User
+from app.routers._wp_gate import enforce_wp_gate
 from app.services.attachment_ocr_writeback import parse_optional_uuid
 from app.services.llm_client import chat_completion
 from app.services.project_audit_year import fetch_project_audit_year
@@ -86,6 +88,57 @@ attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 # AI超时（秒）
 _AI_TIMEOUT = 30.0
+
+
+def _parse_n2_wp_id(raw: str) -> UUID:
+    """N2 路径底稿 ID 统一按不可枚举资源处理。"""
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问") from exc
+
+
+async def _authorize_n2_io(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    wp_id: str,
+    write: bool,
+    route_name: str,
+) -> tuple[UUID, UUID]:
+    """在读取文件或底稿正文前同时完成项目权限和精确 checklist 门禁。"""
+    wp_uuid = _parse_n2_wp_id(wp_id)
+    project_id = await (
+        authorize_wp_edit(db, current_user, wp_uuid)
+        if write
+        else authorize_wp_read(db, current_user, wp_uuid)
+    )
+    await enforce_wp_gate(
+        db,
+        current_user,
+        entrypoint="workpaper.checklist_save" if write else "workpaper.checklist_read",
+        action="save_checklist" if write else "read_checklist",
+        method="POST" if write else "GET",
+        wp_id=wp_uuid,
+        project_id=project_id,
+        entry_family="checklist",
+        route_name=route_name,
+    )
+    return wp_uuid, project_id
+
+
+async def _n2_wp_code(db: AsyncSession, wp_id: UUID) -> str | None:
+    row = (
+        await db.execute(
+            sa.text(
+                "SELECT wi.wp_code FROM working_paper wp "
+                "LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                "WHERE wp.id = :wp_id AND wp.is_deleted = false"
+            ),
+            {"wp_id": str(wp_id)},
+        )
+    ).fetchone()
+    return str(row.wp_code) if row and row.wp_code else None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -149,10 +202,17 @@ async def n2_export_template(
     """
     from app.services.n2_taxes_payable_service import export_template
 
+    wp_uuid, _project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=False,
+        route_name="/api/n2-taxes-payable/{wp_id}/export-template",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
-    buffer = await export_template(wp_id, db, sheet=sheet)
+    buffer = await export_template(str(wp_uuid), db, sheet=sheet)
     filename = f"N2应交税费_{sheet or '全部'}_模板.xlsx"
     return StreamingResponse(
         buffer,
@@ -182,10 +242,17 @@ async def n2_export_data(
     """
     from app.services.n2_taxes_payable_service import export_data
 
+    wp_uuid, _project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=False,
+        route_name="/api/n2-taxes-payable/{wp_id}/export-data",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
-    buffer = await export_data(wp_id, db, sheet=sheet)
+    buffer = await export_data(str(wp_uuid), db, sheet=sheet)
     filename = f"N2应交税费_{sheet or '全部'}_数据.xlsx"
     return StreamingResponse(
         buffer,
@@ -215,12 +282,20 @@ async def n2_import_data(
     验证：文件扩展名(.xlsx/.xls)、列头匹配
 
     Returns:
-        { imported_count: int, message: str, warning?: str }
+        { imported_count: int, message: str, warnings: list[str] }
 
     Requirements: 3.4
     """
+    from app.routers.checklist_responses import _publish_checklist_saved
     from app.services.n2_taxes_payable_service import import_data
 
+    wp_uuid, project_id = await _authorize_n2_io(
+        db,
+        current_user,
+        wp_id=wp_id,
+        write=True,
+        route_name="/api/n2-taxes-payable/{wp_id}/import-data",
+    )
     if sheet and sheet not in SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(SUPPORTED_SHEETS)}")
 
@@ -232,11 +307,33 @@ async def n2_import_data(
 
     content = await file.read()
     try:
-        result = await import_data(wp_id, content, db, sheet=sheet)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+        result = await import_data(
+            str(wp_uuid),
+            content,
+            db,
+            sheet=sheet,
+            project_id=project_id,
+            updated_by=current_user.id,
+        )
+        wp_code = await _n2_wp_code(db, wp_uuid)
+        year = await fetch_project_audit_year(db, project_id)
+        await db.commit()
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
-    await db.commit()
+    item_ids = list(result.pop("_item_ids", []))
+    await _publish_checklist_saved(
+        project_id=project_id,
+        wp_id=wp_uuid,
+        wp_code=wp_code,
+        year=year,
+        item_ids=item_ids,
+        user_id=current_user.id,
+    )
     return result
 
 

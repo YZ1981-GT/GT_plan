@@ -6,16 +6,24 @@
  *  列：日期 | 凭证号 | 重大调整事项内容 | 借方 | 贷方 | 调整理由 | 理由是否充分
  *  提示：检查现金返利、实物返利是否冲减或调整存货/购货当期主营业务成本。
  *  与 F5-1 审定、F5-4 调整分录相互印证。
+ * 抽凭回填 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：按分录指纹去重，行元数据 `_gt`
+ * 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
-import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, type MaybeRefOrGetter, type Ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal } from './useF5CosOfFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 export interface UseF5MajorAdjustmentOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
   materiality?: Ref<number>
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: MaybeRefOrGetter<string | null | undefined>
 }
 
 export interface MajorAdjustmentRow {
@@ -92,7 +100,7 @@ export function migrateF5MajorAdjRows(jsonStr: string | null | undefined): Store
         String(r?.adjustmentReason ?? r?.adjustReason ?? ''),
         String(r?.approvalBasis ?? ''),
       ].filter((s) => s.trim())
-      return {
+      return withRowMeta({
         id: String(r?.id ?? r?.rowId ?? `f5ma-migrated-${i}`),
         date: String(r?.date ?? r?.adjustmentDate ?? r?.adjustDate ?? ''),
         voucherNo: String(r?.voucherNo ?? ''),
@@ -105,11 +113,35 @@ export function migrateF5MajorAdjRows(jsonStr: string | null | undefined): Store
         reasonAdequate: String(
           r?.reasonAdequate ?? r?.auditEvaluation ?? r?.adequate ?? '',
         ),
-      }
+      }, r)
     })
   } catch {
     return []
   }
+}
+
+/** 空白占位行：没有行元数据，日期、凭证号、事项、金额、理由都没填 */
+export function isBlankF5MajorAdjRow(r: StoredMajorAdjustmentRow): boolean {
+  return !metaOf(r) && !r.debitAmount && !r.creditAmount
+    && [r.date, r.voucherNo, r.itemContent, r.adjustmentReason, r.reasonAdequate].every((v) => !String(v ?? '').trim())
+}
+
+/** 共享回填函数的待写入项 → 调整事项行：金额在样本自己的借贷栏；事项缺省取摘要 */
+export function mapPreparedToF5MajorAdjRow(item: PreparedItem): StoredMajorAdjustmentRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  return {
+    ...emptyF5MajorAdjRow(),
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    itemContent: s.summary || '重大成本调整',
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+  }
+}
+
+/** 行上已填调整理由或理由是否充分（替换与撤销抽凭时据此先确认） */
+export function hasF5MajorAdjContent(r: StoredMajorAdjustmentRow): boolean {
+  return [r.adjustmentReason, r.reasonAdequate].some((v) => String(v ?? '').trim() !== '')
 }
 
 export function computeF5MajorAdjRow(stored: StoredMajorAdjustmentRow): MajorAdjustmentRow {
@@ -131,6 +163,32 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
   const auditNote = ref('')
   const auditConclusion = ref('')
 
+  /**
+   * 抽凭回填用的表：写入时去掉空白占位行（表初始有 16 行空行，原实现表全空时整表替换），
+   * 表空了补回默认空白行（同删行）
+   */
+  const fillTable = computed<StoredMajorAdjustmentRow[]>({
+    get: () => storedRows.value,
+    set: (list) => {
+      const kept = list.filter((r) => !!metaOf(r) || !isBlankF5MajorAdjRow(r))
+      storedRows.value = kept.length ? kept : defaultF5MajorAdjRows()
+    },
+  })
+  // 抽凭回填 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<StoredMajorAdjustmentRow>({
+    projectId: options.projectId ?? null,
+    tables: fillTable,
+    mapSampleToRow: (item) => mapPreparedToF5MajorAdjRow(item),
+    persist: () => persist(),
+    hasUserContent: hasF5MajorAdjContent,
+    readonly: () => readonly.value,
+  })
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedId(id: string): boolean {
+    const row = storedRows.value.find((r) => r.id === id)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   function rawJson(): string | null | undefined {
     return allResponses.value.get(STORAGE_KEY)?.remark
   }
@@ -138,6 +196,7 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
   function loadRows(): void {
     const migrated = migrateF5MajorAdjRows(rawJson())
     storedRows.value = migrated.length ? migrated : defaultF5MajorAdjRows()
+    voucherFill.markLoaded()
   }
 
   watch(() => rawJson(), (raw) => {
@@ -187,7 +246,7 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
   const exceedCount = computed(() => rows.value.filter(exceedsMateriality).length)
 
   function persist(): void {
-    const json = JSON.stringify(storedRows.value)
+    const json = JSON.stringify(voucherFill.guardPersist(storedRows.value))
     lastPersisted = json
     allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: json })
     debounceSave()
@@ -215,7 +274,7 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
   }
 
   function updateCell(id: string, key: string, value: number | string): void {
-    if (readonly.value) return
+    if (readonly.value || lockedId(id)) return
     const row = storedRows.value.find((r) => r.id === id)
     if (!row) return
     if (key === 'debitAmount' || key === 'creditAmount') {
@@ -235,40 +294,18 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
   }
 
   function removeRow(id: string): void {
-    if (readonly.value) return
+    if (readonly.value || lockedId(id)) return
     const next = storedRows.value.filter((r) => r.id !== id)
     storedRows.value = next.length ? next : defaultF5MajorAdjRows()
     persist()
   }
 
-  /** 抽凭样本填入（借方/贷方按样本金额拆分） */
-  function mergeSamplingRows(samples: Array<Record<string, any>>): number {
-    if (readonly.value || !samples.length) return 0
-    const mapped = samples.map((s) => {
-      const debit = parseNum(s.debit_amount ?? s.debitAmount)
-      const credit = parseNum(s.credit_amount ?? s.creditAmount)
-      let d = debit
-      let c = credit
-      if (d === 0 && c === 0) {
-        const amt = parseNum(s.amount)
-        if (amt >= 0) d = amt
-        else c = Math.abs(amt)
-      }
-      return {
-        ...emptyF5MajorAdjRow(),
-        date: String(s.voucher_date ?? s.date ?? ''),
-        voucherNo: String(s.voucher_no ?? s.voucherNo ?? ''),
-        itemContent: String(s.summary ?? s.abstract ?? '重大成本调整'),
-        debitAmount: d,
-        creditAmount: c,
-      }
-    })
-    const emptyOnly = storedRows.value.every(
-      (r) => !r.itemContent.trim() && !r.voucherNo.trim() && !r.debitAmount && !r.creditAmount,
-    )
-    storedRows.value = emptyOnly ? mapped : [...storedRows.value, ...mapped]
-    persist()
-    return mapped.length
+  /**
+   * 抽凭引擎回填：一个对方科目一行（后端配对），金额在样本自己的借贷栏，按分录指纹去重；
+   * 「替换本阶段抽凭行」只删本阶段抽凭填入的行（原实现表全空才替换、否则不去重追加，已删除）
+   */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload)
   }
 
   function isRowHighlighted(row: MajorAdjustmentRow): boolean {
@@ -315,7 +352,13 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
     updateCell,
     addRow,
     removeRow,
-    mergeSamplingRows,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     exceedsMateriality,
     isRowHighlighted,
     saveAuditNote,

@@ -1,9 +1,9 @@
-"""L 循环（L1~L8，含 L6）附注规则验证 + note_rows 行为测试。
+"""L 循环（L1~L8）附注规则验证 + note_rows 行为测试（L6 没有附注推送规则，见 test_l6_has_no_note_rule）。
 
 spec: formula-push-note-rollout-batch-e / Task 10
 
 覆盖范围：
-- 7 个科目有 note.main 规则：L1/L2/L3/L4/L5/L6/L8（L7 其他非流动负债没有标准科目，不推送，见下）
+- 6 个科目有 note.main 规则：L1/L2/L3/L4/L5/L8（L7 其他非流动负债没有标准科目，不推送；L6 注册表无章节，不推附注）
   - section_by_template 冻结（L3/L4/L5/L8 非对称章节号）
   - fields = end_amount / prior_amount
   - policy = editable（需求 E8）
@@ -64,7 +64,8 @@ def _make_tb(code: str, ending: str, opening: str, current: str = "0") -> dict:
 # L3 → 五、45 / 八、49（长期借款）— 非对称
 # L4 → 五、46 / 八、50（应付债券）— 非对称
 # L5 → 五、48 / 八、53（长期应付款）— 非对称
-# L6 → 五、40 / 八、40（专项应付款）— 对称
+# L6 → 无附注推送规则（专项应付款：注册表无 L6 章节，专项应付款表在 L5 章节里由 L5 披露同步；原挂 五、40 / 八、40
+#      应付职工薪酬，spec note-pull-followup-closure R2.4 删）
 # L7 → 五、52 / 八、57（其他非流动负债）— 非对称
 # L8 → 五、67 / 八、68（财务费用）— 非对称，损益类
 
@@ -74,7 +75,6 @@ L_NOTE_SECTIONS = [
     ("L3", "五、45", "八、49"),
     ("L4", "五、46", "八、50"),
     ("L5", "五、48", "八、53"),
-    ("L6", "五、40", "八、40"),
     ("L7", "五、52", "八、57"),
     ("L8", "五、67", "八、68"),
 ]
@@ -229,9 +229,9 @@ def test_l_asymmetric_sections(code: str):
     assert listed_num != soe_num, f"{code} 上市/国企章节号数字部分应不同（非对称）"
 
 
-def test_l1_l2_l6_symmetric_sections():
-    """L1、L2、L6 上市/国企章节号数字部分相同（对称）。"""
-    for code in ("L1", "L2", "L6"):
+def test_l1_l2_symmetric_sections():
+    """L1、L2 上市/国企章节号数字部分相同（对称）。"""
+    for code in ("L1", "L2"):
         rule = _l_note_rule(code)
         sections = rule.target.sections
         listed_num = sections["listed"].split("、")[1]
@@ -240,46 +240,16 @@ def test_l1_l2_l6_symmetric_sections():
 
 
 # ========================================================================
-# L6 无 note.main 规则确认
+# L6 无附注推送规则
 # ========================================================================
 
 
-def test_l6_has_note_main_rule():
-    """L6 专项应付款有 note.main 规则：section/fields/policy/table/rows 正面验证。"""
-    rule = _l_note_rule("L6")
-    assert rule.target.sections == {"listed": "五、40", "soe": "八、40"}
-    assert set(rule.target.fields) == {"end_amount", "prior_amount"}
-    assert rule.policy == "editable"
-    assert rule.target.table == "专项应付款"
-    assert rule.target.rows == "l6_note_main"
-    assert rule.stage == "note"
+def test_l6_has_no_note_rule():
+    """L6 专项应付款没有附注推送规则：注册表无 L6 章节；原规则挂 五、40 / 八、40（应付职工薪酬），标题校验永远不过，
+    专项应付款表在 L5 章节（五、48 / 八、53）里由 L5 披露同步（spec note-pull-followup-closure R2.4 删）。"""
+    from app.services.formula_push.rules import load_rules
 
-
-def test_l6_note_direct_note_rows():
-    """L6 专项应付款（资产负债类 2711）: ending 取「期末余额」。"""
-    binding = note_direct_for("L6")
-    binding._last_tb_data = _make_tb("2711", "600000", "400000", "200000")
-
-    rule = _l_note_rule("L6")
-    rows = binding.note_rows({}, "listed", rule)
-
-    assert len(rows) == 1
-    row = rows[0]
-    assert row["ending"] == 600000.0, "L6 ending 应取期末余额（资产负债类）"
-    assert row["opening"] == 400000.0
-    assert row["ending_resolved"] is True
-    assert row["opening_resolved"] is True
-    assert row["is_total"] is False
-    assert row["label"] == "专项应付款"
-
-
-def test_l6_symmetric_sections():
-    """L6 专项应付款上市/国企章节号数字部分相同（对称）。"""
-    rule = _l_note_rule("L6")
-    sections = rule.target.sections
-    listed_num = sections["listed"].split("、")[1]
-    soe_num = sections["soe"].split("、")[1]
-    assert listed_num == soe_num, "L6 上市/国企章节号数字部分应相同（对称）"
+    assert [r.rule_id for r in load_rules() if r.wp_code == "L6" and r.stage == "note"] == []
 
 
 # ========================================================================
@@ -318,7 +288,6 @@ L_BALANCE_CODES = [
     ("L3", "2501", "长期借款"),
     ("L4", "2502", "应付债券"),
     ("L5", "2701", "长期应付款"),
-    ("L6", "2711", "专项应付款"),
 ]
 
 

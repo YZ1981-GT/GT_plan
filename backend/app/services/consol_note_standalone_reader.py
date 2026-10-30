@@ -10,8 +10,9 @@ Word 导出实际显示的那张表：
    （补期间 / 补列）按行名对行，行续表（补行）追加在主表后；比例列不加总、说明类列不取数；
    对不上的列不填，列名回报给用户。
 
-产出 V186 标准来源行 ``{label, row_type, values}``：``values[k]`` 对应合并模板第 ``k+1``
-列（第 0 列是行名）。合计 / 小计行由 apply 按本表数据重算，不信任来源合计。
+产出 V186 标准来源行 ``{label, row_type, values, _occurrence}``：``values[k]`` 对应合并模板第 ``k+1``
+列（第 0 列是行名）；``_occurrence`` 是同名行的出现序号（从 0 起，映射可按（行名, 序号）取行）；集团下推的行另带
+``_pushed_row_id``（明细映射按它精确对应，``exact_id``）。合计 / 小计行由 apply 按本表数据重算，不信任来源合计。
 
 spec: consol-note-pull-from-standalone → consol-note-header-library-and-node-reaggregate（读取层收口）
 """
@@ -67,7 +68,10 @@ class SourceTable:
         }
 
 
-_SKIP_ROW_TYPES = frozenset({"expandable", "dynamic_anchor", "dynamic_marker_end"})
+_SKIP_ROW_TYPES = frozenset({
+    "expandable", "dynamic_anchor", "dynamic_marker_end",
+    "header", "header_label", "title", "section_header",
+})
 
 
 def _row_label(row: Any) -> str:
@@ -182,7 +186,17 @@ def _rows_from(
             src = r if pos == 0 else joined[pos - 1].get(occurrence)
             if src is not None and 1 <= c <= width:
                 values[c - 1] = _cell(src, s)
-        out.append({"label": label, "row_type": rt, "values": values})
+        item: dict[str, Any] = {"label": label, "row_type": rt, "values": values}
+        pushed = r.get("_pushed_row_id") if isinstance(r, dict) else None
+        if pushed:  # 集团下推的行（consol_note_template_push_service）：按行身份对应合并模板行
+            item["_pushed_row_id"] = str(pushed)
+            # 下推类别与可选行开关一起带出：子企业把可选行标成「本企业不适用」（False）⇒ 拉数不取这一行的数
+            # （spec note-pull-followup-closure R12；结构指纹不含这两个键，见 extract_source_rows）
+            if r.get("_pushed_category"):
+                item["_pushed_category"] = str(r["_pushed_category"])
+            if "_pushed_optional_active" in r:
+                item["_pushed_optional_active"] = r["_pushed_optional_active"] is not False
+        out.append(item)
     return out
 
 
@@ -241,6 +255,12 @@ def read_source_table(
         extra_match = match_columns(target_keys, extra_keys, vocab)
         if extra_match.col_map:
             rows += _rows_from(tables[extra], [], extra_match.col_map, width)
+    # 同名行的出现序号（主表 + 行续表连起来数）：映射可按（行名, 序号）取行（spec note-pull-followup-closure R11）
+    # 按去首尾空白的行名数（与映射的 source_label、建议的来源行同一个键）
+    seen: dict[str, int] = {}
+    for item in rows:
+        item["_occurrence"] = seen.get(item["label"], 0)
+        seen[item["label"]] = item["_occurrence"] + 1
 
     return SourceTable(
         rows=rows,

@@ -102,101 +102,107 @@
       <h4>(1) 本期增减变动检查</h4>
       <el-button size="small" :disabled="isReadonly" @click="addSample('current')">+ 添加样本</el-button>
     </div>
-    <el-table :data="currentChangeRows" size="small" border stripe :height="currentChangeRows.length > 15 ? '400px' : undefined">
+    <el-table :data="currentChangeRows" size="small" border stripe :row-class-name="voucherRowClass" :height="currentChangeRows.length > 15 ? '400px' : undefined">
       <el-table-column type="index" label="#" width="40" />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="engineYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="客户名称" width="120">
         <template #default="{ row }">
-          <el-input v-model="row.customerName" size="small" :disabled="isReadonly"
+          <el-input v-model="row.customerName" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'customerName', val)" />
         </template>
       </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.date" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD"
+          <el-input v-model="row.date" size="small" :disabled="isReadonly || isVoucherRowLocked(row)" placeholder="YYYY-MM-DD"
             @change="(val: string) => updateCell('current', row.rowId, 'date', val)" />
         </template>
       </el-table-column>
       <el-table-column label="凭证号" width="90">
         <template #default="{ row }">
-          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly"
+          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'voucherNo', val)" />
         </template>
       </el-table-column>
       <el-table-column label="业务内容" width="130">
         <template #default="{ row }">
-          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly"
+          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'businessContent', val)" />
         </template>
       </el-table-column>
       <el-table-column label="对方科目" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly"
+          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'counterAccount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="对方明细" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly"
+          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'counterDetailAccount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="借方" width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.debitAmount" size="small" :disabled="isReadonly"
+          <el-input v-model.number="row.debitAmount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'debitAmount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly"
+          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'creditAmount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="原始凭证" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly"
+          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'supportingDoc', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核1" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'checkItems.0', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核2" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'checkItems.1', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核3" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'checkItems.2', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核4" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'checkItems.3', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核5" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('current', row.rowId, 'checkItems.4', val)" />
         </template>
       </el-table-column>
       <el-table-column label="索引" width="70">
         <template #default="{ row }">
-          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly"
+          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('current', row.rowId, 'indexRef', val)" />
         </template>
       </el-table-column>
       <el-table-column label="异常标记" width="150">
         <template #default="{ row }">
-          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly" clearable filterable allow-create
+          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly || isVoucherRowLocked(row)" clearable filterable allow-create
             default-first-option placeholder="正常"
             :class="{ 'abnormal-cell': !!row.isAbnormal }"
             @change="(val: string) => updateCell('current', row.rowId, 'isAbnormal', val || '')">
@@ -213,7 +219,7 @@
           <el-upload
             :show-file-list="false"
             :accept="OCR_ACCEPT"
-            :disabled="isReadonly"
+            :disabled="isReadonly || isVoucherRowLocked(row)"
             :before-upload="makeRowOcrHandler('current', row.rowId)"
           >
             <el-tooltip :content="row.attachment ? `已关联：${row.attachment}（点击可重新上传识别）` : '上传图片/PDF 并 OCR 识别'" placement="top">
@@ -221,7 +227,7 @@
                 size="small"
                 :type="row.attachment ? 'success' : 'default'"
                 link
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 :loading="ocrLoadingRowId === row.rowId"
               >📎{{ row.attachment ? '✓' : '' }}</el-button>
             </el-tooltip>
@@ -230,9 +236,9 @@
       </el-table-column>
       <el-table-column label="操作" width="90" v-if="!isReadonly">
         <template #default="{ row }">
-          <el-button size="small" type="primary" link @click="openCheckDialog('current', row)">核对</el-button>
+          <el-button size="small" type="primary" link :disabled="isVoucherRowLocked(row)" @click="openCheckDialog('current', row)">核对</el-button>
           <el-popconfirm title="删除？" @confirm="removeSample('current', row.rowId)">
-            <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+            <template #reference><el-button size="small" type="danger" link :disabled="isVoucherRowLocked(row)">删</el-button></template>
           </el-popconfirm>
         </template>
       </el-table-column>
@@ -245,95 +251,101 @@
       <h4>(2) 期后结转检查</h4>
       <el-button size="small" :disabled="isReadonly" @click="addSample('postPeriod')">+ 添加样本</el-button>
     </div>
-    <el-table :data="postPeriodRows" size="small" border stripe :height="postPeriodRows.length > 15 ? '400px' : undefined">
+    <el-table :data="postPeriodRows" size="small" border stripe :row-class-name="voucherRowClass" :height="postPeriodRows.length > 15 ? '400px' : undefined">
       <el-table-column type="index" label="#" width="40" />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="projectId" :year="engineYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="客户名称" width="120">
         <template #default="{ row }">
-          <el-input v-model="row.customerName" size="small" :disabled="isReadonly"
+          <el-input v-model="row.customerName" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'customerName', val)" />
         </template>
       </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.date" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD"
+          <el-input v-model="row.date" size="small" :disabled="isReadonly || isVoucherRowLocked(row)" placeholder="YYYY-MM-DD"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'date', val)" />
         </template>
       </el-table-column>
       <el-table-column label="凭证号" width="90">
         <template #default="{ row }">
-          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly"
+          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'voucherNo', val)" />
         </template>
       </el-table-column>
       <el-table-column label="业务内容" width="130">
         <template #default="{ row }">
-          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly"
+          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'businessContent', val)" />
         </template>
       </el-table-column>
       <el-table-column label="对方科目" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly"
+          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'counterAccount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="对方明细" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly"
+          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'counterDetailAccount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly"
+          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'creditAmount', val)" />
         </template>
       </el-table-column>
       <el-table-column label="原始凭证" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly"
+          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'supportingDoc', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核1" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.0', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核2" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.1', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核3" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.2', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核4" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.3', val)" />
         </template>
       </el-table-column>
       <el-table-column label="核5" width="40" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly"
+          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.4', val)" />
         </template>
       </el-table-column>
       <el-table-column label="索引" width="70">
         <template #default="{ row }">
-          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly"
+          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly || isVoucherRowLocked(row)"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'indexRef', val)" />
         </template>
       </el-table-column>
       <el-table-column label="异常标记" width="150">
         <template #default="{ row }">
-          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly" clearable filterable allow-create
+          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly || isVoucherRowLocked(row)" clearable filterable allow-create
             default-first-option placeholder="正常"
             :class="{ 'abnormal-cell': !!row.isAbnormal }"
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'isAbnormal', val || '')">
@@ -350,7 +362,7 @@
           <el-upload
             :show-file-list="false"
             :accept="OCR_ACCEPT"
-            :disabled="isReadonly"
+            :disabled="isReadonly || isVoucherRowLocked(row)"
             :before-upload="makeRowOcrHandler('postPeriod', row.rowId)"
           >
             <el-tooltip :content="row.attachment ? `已关联：${row.attachment}（点击可重新上传识别）` : '上传图片/PDF 并 OCR 识别'" placement="top">
@@ -358,7 +370,7 @@
                 size="small"
                 :type="row.attachment ? 'success' : 'default'"
                 link
-                :disabled="isReadonly"
+                :disabled="isReadonly || isVoucherRowLocked(row)"
                 :loading="ocrLoadingRowId === row.rowId"
               >📎{{ row.attachment ? '✓' : '' }}</el-button>
             </el-tooltip>
@@ -367,9 +379,9 @@
       </el-table-column>
       <el-table-column label="操作" width="90" v-if="!isReadonly">
         <template #default="{ row }">
-          <el-button size="small" type="primary" link @click="openCheckDialog('postPeriod', row)">核对</el-button>
+          <el-button size="small" type="primary" link :disabled="isVoucherRowLocked(row)" @click="openCheckDialog('postPeriod', row)">核对</el-button>
           <el-popconfirm title="删除？" @confirm="removeSample('postPeriod', row.rowId)">
-            <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+            <template #reference><el-button size="small" type="danger" link :disabled="isVoucherRowLocked(row)">删</el-button></template>
           </el-popconfirm>
         </template>
       </el-table-column>
@@ -489,7 +501,7 @@
         </div>
       </div>
     </template>
-    <el-input
+    <WpCommitInput
       :model-value="conclusion"
       type="textarea"
       :autosize="{ minRows: 3, maxRows: 10 }"
@@ -512,7 +524,7 @@
   <!-- 抽凭引擎弹窗（dialog-mode，科目 2203） -->
   <el-dialog
     v-model="showSampling"
-    title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 预收账款）"
+    :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 预收账款）`"
     width="880px"
     :close-on-click-modal="false"
     append-to-body
@@ -528,12 +540,12 @@
     <GtVoucherSamplingEngine
       v-if="showSampling && wpId && projectId"
       :account-code="samplingAccountCode"
-      :phase="phase"
       default-method="random"
       :workpaper-id="wpId"
       :project-id="projectId"
       :year="engineYear"
       @filled="onSampleFilled"
+      @undo-request="onUndoRequest"
     />
   </el-dialog>
 
@@ -565,7 +577,7 @@
  * D3TabVoucherCheck.vue — D3-7 凭证检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, ref, toRef, inject, type Ref } from 'vue'
+import { computed, ref, toRef, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY, type VoucherCheckRow } from '../composables/useD3VoucherCheck'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
@@ -583,6 +595,7 @@ import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../voucher-sampling/PostFillAiReviewDialog.vue'
 import D3VoucherCheckDialog from './D3VoucherCheckDialog.vue'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 import {
@@ -602,10 +615,8 @@ const props = withDefaults(defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   year?: number
-  phase?: Phase
 }>(), {
   year: undefined,
-  phase: 'final',
 })
 
 // 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
@@ -631,7 +642,12 @@ const {
   handleRowOcr,
   conclusion,
   updateConclusion,
-  fillFromSampling,
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
   autoMarkCrossPeriod,
   updateRow,
 } = useD3VoucherCheck({
@@ -641,7 +657,10 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  // 挂凭导入按凭证日期分区：晚于资产负债表日进期后结转
+  bsDate: () => (props.year ? `${props.year}-12-31` : null),
 })
+onMounted(() => { void voucherFillReady() })
 
 const progressPct = computed(() => {
   if (!samplingParams.value.targetSampleSize) return 0
@@ -765,7 +784,7 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, engineYear.value, props.wpId, D3_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) {
       const lines = misattached.slice(0, 5).map((m) => {
         const acc = m.actualAccounts.length ? m.actualAccounts.join('、') : '无分录科目'
@@ -782,28 +801,28 @@ async function importFromAttached(): Promise<void> {
 }
 
 /**
- * 抽样引擎 @filled 回调：按填充模式回写到目标区块，行来源=抽凭（Req 7）。
+ * 抽样引擎 @filled 回调：共享回填函数写进所选区块（已在另一区块的分录不重复插入），
+ * 按分录指纹去重；「替换本阶段抽凭行」只删所选区块里本阶段抽凭填入的行（Req 7）。
  * 只读禁用回填（Req 12.3）。
  */
-function onSampleFilled(payload: {
+async function onSampleFilled(payload: {
   samples: SampledVoucher[]
   phase: Phase
   fillMode: FillMode
   method?: SamplingMethod
   methodology?: SamplingMethodologySnapshot
+  batchId?: string | null
 }) {
   if (props.isReadonly) return
   // 方法学先落库：即便回填 0 条，"抽过样且方法学如此"也是应留的痕
   void persistMethodology(payload.methodology)
-  const n = fillFromSampling(payload.samples, payload.fillMode, samplingSection.value)
+  const section = samplingSection.value
+  const out = await onEngineFilled(payload, { tables: [section] })
   showSampling.value = false
-  if (n > 0) {
-    ElMessage.success(`已回填 ${n} 条抽凭样本至${samplingSection.value === 'current' ? '本期增减变动' : '期后结转'}（来源=抽凭）`)
-    // 回写完成 → 触发回写后 AI 复核弹窗（Req 26.1）
-    triggerPostFillReview(payload.samples)
-  } else {
-    ElMessage.info('未回填任何样本')
-  }
+  if (out.cancelled) return
+  // 回写完成 → 触发回写后 AI 复核弹窗（Req 26.1）
+  if (out.added > 0) triggerPostFillReview(payload.samples)
+  // 填入几行（含已存在 / 被替换）由共享回填函数按实际行数提示
 }
 
 // ─── 回写后 AI 复核（Req 26：抽凭回写后触发，section=voucher-review） ─────────
@@ -904,6 +923,8 @@ import { parseNum } from '../composables/useD3FormulaEngine'
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
  */
 import { dCycleScope } from '../composables/dCycleAccountScope'
+
+import WpCommitInput from '../shared/WpCommitInput.vue'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = dCycleScope('D3')?.queryCodes().join(',') ?? ''

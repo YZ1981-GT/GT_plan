@@ -35,6 +35,7 @@ MODULES = (
     "services/sampling_registry_service.py",
     "services/sampled_voucher_queries.py",
     "services/voucher_sampling_exclusion.py",
+    "services/sampling_final_population.py",
 )
 
 #: 允许按凭证号比较、又不走 single_voucher_lines 的函数（理由必填）

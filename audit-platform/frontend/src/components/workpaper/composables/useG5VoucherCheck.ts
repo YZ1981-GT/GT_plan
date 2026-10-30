@@ -10,10 +10,16 @@
  *
  * 持久化：单一 JSON → checklist_responses item_id=G5-12-voucher-check
  * 兼容迁移：旧版扁平 G5-12-rows / 独立 note·conclusion keys
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：本期发生额、期后各一张表
+ * （回填进哪张由宿主的 samplingTarget 定），一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON
+ * 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { readCanonicalRaw } from './g5StorageContract'
-import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 // ─── 源模板五项核对（R13）────────────────────────────────────────────────────
 export const G5_VOUCHER_CHECK_LABELS = [
@@ -40,6 +46,9 @@ export interface G5VoucherRow {
   remark: string
   source?: string
 }
+
+/** 凭证检查的两张表：本期发生额、期后处置 / 新增 */
+export type G5VoucherTarget = 'occurrence' | 'post'
 
 export interface G5SampleCriteria {
   populationDebitCount: number
@@ -126,7 +135,7 @@ function normalizeRow(r: any): G5VoucherRow {
   const amount = Number(r?.amount ?? 0)
   const debit = Number(r?.debitAmount ?? (amount > 0 ? amount : 0))
   const credit = Number(r?.creditAmount ?? (amount < 0 ? Math.abs(amount) : 0))
-  return {
+  return withRowMeta({
     ...base,
     ...r,
     id: r?.id || base.id,
@@ -140,7 +149,32 @@ function normalizeRow(r: any): G5VoucherRow {
       : r?.isAbnormal === '是' || checks.some((c, i) => r?.[`check${i + 1}`] === '✗'),
     remark: r?.remark ?? r?.conclusion ?? '',
     date: r?.date ?? r?.voucherDate ?? '',
+  }, r)
+}
+
+/** 共享回填函数的待写入项 → G5-12 检查行：金额在样本自己的借贷栏，对方科目 = 编码、对方明细 = 名称（配不上写「多科目」） */
+export function mapPreparedToG5VoucherRow(item: PreparedItem): G5VoucherRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null; selectionReason?: string | null; abnormal?: boolean }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  return {
+    ...emptyRow(0),
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    offsetAccount: code,
+    offsetSubAccount: name && name !== code ? name : '',
+    debitAmount: Number(item.debitAmount ?? 0) || 0,
+    creditAmount: Number(item.creditAmount ?? 0) || 0,
+    remark: s.selectionReason || '',
+    source: item.meta.src.includes('attach') ? '挂凭' : '抽凭',
+    abnormal: !!s.abnormal,
   }
+}
+
+/** 行上已勾核对项或已填支持性文件、索引号、备注（替换与撤销抽凭时据此先确认；备注缺省是选样原因，不算） */
+export function hasG5VoucherContent(r: G5VoucherRow): boolean {
+  return r.checks.some(Boolean) || [r.supportingDoc, r.indexNo].some((v) => String(v ?? '').trim() !== '')
 }
 
 /** 旧版扁平行数组 → 新结构（全部归入本期发生额） */
@@ -168,6 +202,13 @@ function migrateLegacyRows(raw: any): Partial<{
 export function useG5VoucherCheck(opts?: {
   allResponses?: Ref<Map<string, any>>
   itemId?: string
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: MaybeRefOrGetter<string | null | undefined>
+  readonly?: MaybeRefOrGetter<boolean>
+  /** 回填 / 撤销改完行之后保存（宿主的 persist） */
+  persist?: () => unknown
+  /** 审计期末日（YYYY-MM-DD）：挂凭导入按凭证日期分表 */
+  periodEnd?: MaybeRefOrGetter<string | null | undefined>
 }) {
   const itemId = opts?.itemId ?? ITEM_ID
   const criteria = ref<G5SampleCriteria>(emptyCriteria())
@@ -177,6 +218,31 @@ export function useG5VoucherCheck(opts?: {
   const conclusion = ref('')
   const conclusionOption = ref('')
   const checkLabels = [...G5_VOUCHER_CHECK_LABELS]
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（本期发生额、期后各一张表）
+  const voucherTables = { occurrence: occurrenceRows, post: postPeriodRows }
+  /** 已在某张表的分录（按指纹）：再次回填 / 挂凭导入仍进那张表 */
+  function tableHolding(lfp: string | null): G5VoucherTarget | null {
+    if (!lfp) return null
+    if (occurrenceRows.value.some((r) => metaOf(r)?.lfp === lfp)) return 'occurrence'
+    if (postPeriodRows.value.some((r) => metaOf(r)?.lfp === lfp)) return 'post'
+    return null
+  }
+  const voucherFill = useVoucherCheckFill<G5VoucherRow>({
+    projectId: opts?.projectId ?? null,
+    tables: voucherTables,
+    tableOf: (item) => {
+      const held = tableHolding(item.meta.lfp)
+      if (held || !item.meta.src.includes('attach')) return held
+      // 挂凭导入没有所选的表：凭证日期在期末之后进期后，其余进本期发生额（同 D3 / D6 / D7）
+      const end = toValue(opts?.periodEnd) || ''
+      return end && String(item.sample.voucherDate ?? '') > end ? 'post' : 'occurrence'
+    },
+    mapSampleToRow: (item) => mapPreparedToG5VoucherRow(item),
+    persist: () => opts?.persist?.(),
+    hasUserContent: hasG5VoucherContent,
+    readonly: opts?.readonly,
+  })
 
   function loadFromMap(map?: Map<string, any>): void {
     if (!map) return
@@ -207,6 +273,7 @@ export function useG5VoucherCheck(opts?: {
       const c = map.get(LEGACY_CONCLUSION_KEY)
       if (c?.remark) conclusion.value = c.remark
     }
+    voucherFill.markLoaded()
   }
 
   function load(): void {
@@ -220,35 +287,26 @@ export function useG5VoucherCheck(opts?: {
     postPeriodRows.value.push(emptyRow(postPeriodRows.value.length))
   }
   function removeOccurrenceRow(id: string): void {
+    if (occurrenceRows.value.some((r) => r.id === id && voucherFill.isRowLocked(r))) return
     occurrenceRows.value = occurrenceRows.value.filter((r) => r.id !== id)
   }
   function removePostPeriodRow(id: string): void {
+    if (postPeriodRows.value.some((r) => r.id === id && voucherFill.isRowLocked(r))) return
     postPeriodRows.value = postPeriodRows.value.filter((r) => r.id !== id)
   }
 
-  /** 抽凭引擎回填 */
-  function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-    const expanded = expandMultiAccountVouchers(samples)
-    const mapped: G5VoucherRow[] = expanded.map((s, i) => ({
-      ...emptyRow(i),
-      date: s.voucherDate ?? s.date ?? '',
-      voucherNo: s.voucherNo ?? '',
-      businessContent: s.summary ?? s.businessContent ?? '',
-      offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
-      offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? '',
-      debitAmount: Number(s.debitAmount ?? 0),
-      creditAmount: Number(s.creditAmount ?? (s.amount != null && Number(s.amount) > 0 ? Number(s.amount) : 0)),
-      remark: s.selectionReason ?? '',
-      source: '抽凭',
-      abnormal: !!s.abnormal,
-    }))
-    const bucket = target === 'occurrence' ? occurrenceRows : postPeriodRows
-    const existing = new Set(bucket.value.map((r) => r.voucherNo).filter(Boolean))
-    for (const r of mapped) {
-      if (r.voucherNo && existing.has(r.voucherNo)) continue
-      bucket.value.push(r)
-      if (r.voucherNo) existing.add(r.voucherNo)
-    }
+  /**
+   * 抽凭引擎回填进所选的表（本期发生额 / 期后，宿主自己的 `samplingTarget`，不再经引擎的 phase 传）：
+   * 一个对方科目一行，按分录指纹去重；「替换本阶段抽凭行」只动所选的表。原实现按凭证号去重、
+   * 经 expandMultiAccountVouchers 展开，已删除。
+   */
+  function onEngineFilled(payload: EngineFilledPayload, target: G5VoucherTarget = 'occurrence') {
+    return voucherFill.onEngineFilled(payload, { tables: [target] })
+  }
+
+  /** 从序时账挂入导入：幂等追加，按凭证日期分表（已在某张表的分录留在原处） */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples)
   }
 
   const occurrenceDebitChecked = computed(() =>
@@ -364,21 +422,17 @@ export function useG5VoucherCheck(opts?: {
   function serialize(): string {
     return JSON.stringify({
       criteria: criteria.value,
-      occurrenceRows: occurrenceRows.value,
-      postPeriodRows: postPeriodRows.value,
+      occurrenceRows: voucherFill.guardPersist(occurrenceRows.value, 'occurrence'),
+      postPeriodRows: voucherFill.guardPersist(postPeriodRows.value, 'post'),
       auditNote: auditNote.value,
       conclusion: conclusion.value,
       conclusionOption: conclusionOption.value,
     })
   }
 
-  /** 兼容旧调用方：合并单样本到本期表 */
-  function mergeSample(sample: Partial<G5VoucherRow> & { summary?: string; amount?: number; voucherDate?: string }): void {
-    fillFromSamples('occurrence', [sample])
-  }
-
   function loadRows(data: any[]): void {
     occurrenceRows.value = data.map(normalizeRow)
+    voucherFill.markLoaded()
   }
 
   return {
@@ -403,12 +457,17 @@ export function useG5VoucherCheck(opts?: {
     addPostPeriodRow,
     removeOccurrenceRow,
     removePostPeriodRow,
-    fillFromSamples,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     applyConclusionTemplate,
     applyFromBalanceRows,
     buildAbnormalAdjDrafts,
     serialize,
-    mergeSample,
     loadRows,
     // 兼容旧 API 名
     rows: occurrenceRows,

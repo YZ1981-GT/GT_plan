@@ -242,6 +242,18 @@ import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffo
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
 import { isK4Event as matchesK4Event, k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
+import {
+  applyK4ListedAutoFill,
+  buildK4ListedDisclosureSnapshot,
+  createK4ListedSummaryRows,
+  k4ListedResponseNumber,
+  loadK4ListedDisclosureState,
+  recalcK4ListedSummaryTotal,
+  type K4ListedBondContRow as BondContRow,
+  type K4ListedBondRow as BondRow,
+  type K4ListedGrantRow as GrantRow,
+  type K4ListedSummaryRow as SummaryRow,
+} from '../../composables/k4DisclosureTabState'
 
 // 🔴 原写死 '2245' —— 该码不是其他流动负债：按它监听会把别的科目的审定事件当成 K4 的，
 //    按它发事件会让按科目码匹配的下游认错科目。现取宿主 provide 的 tb_source_codes 解析结果，
@@ -270,18 +282,8 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
-// ─── 数据模型 ─────────────────────────────────────────────────────────────────
-interface SummaryRow { item: string; endBalance: number; beginBalance: number; remark: string; isTotal?: boolean }
-interface BondRow { name: string; faceValue: number; couponRate: number; issueDate: string; term: string; issueAmount: number }
-interface BondContRow { name: string; beginBalance: number; issued: number; interestAccrued: number; premiumAmort: number; repaid: number; defaulted: string }
-interface GrantRow { item: string; beginBalance: number; increase: number; decrease: number; reason: string }
-
-const SUMMARY_TYPES = ['短期应付债券', '政府补助', '待转销项税额', '应付退货款']
-
-const summaryRows = reactive<SummaryRow[]>([
-  ...SUMMARY_TYPES.map(item => ({ item, endBalance: 0, beginBalance: 0, remark: '' })),
-  { item: '合计', endBalance: 0, beginBalance: 0, remark: '', isTotal: true },
-])
+// ─── 数据模型（初值 / 读回 / 自动取数 / 同步快照与附注页离屏同步共用 k4DisclosureTabState）────────
+const summaryRows = reactive<SummaryRow[]>(createK4ListedSummaryRows())
 const bondRows = ref<BondRow[]>([])
 const bondContRows = ref<BondContRow[]>([])
 const grantRows = ref<GrantRow[]>([])
@@ -289,10 +291,7 @@ const noteText = ref('')
 
 // ─── 计算 ─────────────────────────────────────────────────────────────────────
 function recalcSummaryTotal(): void {
-  const total = summaryRows.find(r => r.isTotal)
-  if (!total) return
-  total.endBalance = summaryRows.filter(r => !r.isTotal).reduce((s, r) => s + (r.endBalance || 0), 0)
-  total.beginBalance = summaryRows.filter(r => !r.isTotal).reduce((s, r) => s + (r.beginBalance || 0), 0)
+  recalcK4ListedSummaryTotal(summaryRows)
 }
 const bondIssueTotal = computed(() => bondRows.value.reduce((s, r) => s + (r.issueAmount || 0), 0))
 function bondContEnd(r: BondContRow): number {
@@ -304,21 +303,10 @@ const grantEndTotal = computed(() => grantRows.value.reduce((s, r) => s + grantE
 
 // ─── 汇总表自动取数（K4-1 审定合计）─────────────────────────────────────────────
 function applyAutoFill(): void {
-  const auditedTotal = getResponseNumber('K4-1-audited-total')
-  const bondRow = summaryRows.find(r => r.item === '短期应付债券')
-  // 仅在用户未手工填写时用审定合计作为参考（填到合计的备注提示）
-  if (auditedTotal && bondRow && !bondRow.endBalance && summaryRows.filter(r => !r.isTotal).every(r => !r.endBalance)) {
-    const total = summaryRows.find(r => r.isTotal)
-    if (total) total.remark = `K4-1审定合计参考：${auditedTotal.toLocaleString('zh-CN')}`
-  }
-  recalcSummaryTotal()
+  applyK4ListedAutoFill(props.allResponses, summaryRows)
 }
 function getResponseNumber(key: string): number {
-  const item = props.allResponses.get(key)
-  if (!item) return 0
-  const val = item.remark ?? item.conclusion ?? item.value ?? item
-  const n = typeof val === 'number' ? val : parseFloat(val)
-  return Number.isFinite(n) ? n : 0
+  return k4ListedResponseNumber(props.allResponses, key)
 }
 
 // ─── 汇总表 vs K4-1 审定合计 差异告警 (修复建议#5) ─────────────────────────────
@@ -353,18 +341,24 @@ function addBondContFromDetail(): void {
 // ─── 同步到附注 ───────────────────────────────────────────────────────────────
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = summaryRows.filter(r => !r.isTotal).map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = noteText.value
-  // 债券明细/续表为条件表：有行才进 sub_table_data（columns 由 builder 走同一判据配对）
-  const payload = buildK4SyncPayload('listed', props.wpId || '', rows, narrative, {
+  // 债券明细/续表为条件表：有行才进 sub_table_data（见 buildK4ListedDisclosureSnapshot）
+  const snapshot = buildK4ListedDisclosureSnapshot({
+    summaryRows,
+    noteText: noteText.value,
     bondRows: bondRows.value,
     bondContRows: bondContRows.value,
   })
+  const payload = buildK4SyncPayload('listed', props.wpId || '', snapshot.rows, snapshot.narrative, snapshot.extras)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K4', variant: 'listed', accountCode: k4EventCode(),
-      projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.listed],
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K4',
+      wpId: props.wpId,
+      variant: 'listed',
+      accountCode: k4EventCode(),
+      projectId: props.projectId,
+      sectionIds: [K4_NOTE_SECTION.listed],
+      timestamp: Date.now(),
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }
@@ -419,7 +413,17 @@ function onSummaryEdit(row: SummaryRow, field: string, value: any): void {
 function onNoteTextChange(): void {
   persistNote()
   try {
-    eventBus.emit('disclosure:note-text-updated', { wpCode: 'K4', accountCode: k4EventCode(), section: 'listed', text: noteText.value })
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'K4',
+      wpId: props.wpId,
+      projectId: props.projectId,
+      variant: 'listed',
+      accountCode: k4EventCode(),
+      section: 'listed',
+      sectionIds: [K4_NOTE_SECTION.listed],
+      text: noteText.value,
+      timestamp: Date.now(),
+    })
   } catch { /* silent */ }
 }
 
@@ -475,27 +479,13 @@ async function handleAiGenerate(): Promise<void> {
   }
 }
 
-// ─── 加载（读 responses_snapshot 的 remark 键）────────────────────────────────
-function _parse(key: string): any {
-  const saved = props.allResponses.get(key)
-  const raw = saved?.remark ?? saved?.conclusion ?? saved?.value ?? null
-  if (!raw) return null
-  try { return typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return null }
-}
+// ─── 加载（读 responses_snapshot 的 remark 键；汇总表就地回填，明细表与说明在这里赋值）──────────
 function loadSavedData(): void {
-  const s = _parse('K4-disc-listed-summary')
-  if (Array.isArray(s) && s.length) {
-    for (const saved of s) {
-      const target = summaryRows.find(r => r.item === saved.item)
-      if (target) { target.endBalance = saved.endBalance || 0; target.beginBalance = saved.beginBalance || 0; target.remark = saved.remark || '' }
-    }
-  }
-  const b = _parse('K4-disc-listed-bonds'); if (Array.isArray(b)) bondRows.value = b
-  const bc = _parse('K4-disc-listed-bond-cont'); if (Array.isArray(bc)) bondContRows.value = bc
-  const g = _parse('K4-disc-listed-grants'); if (Array.isArray(g)) grantRows.value = g
-  const note = props.allResponses.get('K4-disc-listed-note')
-  noteText.value = (note?.remark ?? note?.conclusion ?? note?.value ?? '') || ''
-  recalcSummaryTotal()
+  const saved = loadK4ListedDisclosureState(props.allResponses, summaryRows)
+  if (saved.bondRows) bondRows.value = saved.bondRows
+  if (saved.bondContRows) bondContRows.value = saved.bondContRows
+  if (saved.grantRows) grantRows.value = saved.grantRows
+  noteText.value = saved.noteText
 }
 
 // ─── EventBus ─────────────────────────────────────────────────────────────────

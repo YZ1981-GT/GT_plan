@@ -524,6 +524,7 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   measurementModel: toRef(props, 'measurementModel') as any,
+  allResponses: toRef(props, 'allResponses') as any,
 })
 
 const crossSheet = useH3CrossSheet(
@@ -532,7 +533,8 @@ const crossSheet = useH3CrossSheet(
 )
 
 const {
-  sectionTexts, updateText, getSectionRows, addSectionRow, removeSectionRow, updateRow,
+  sectionTexts, updateText, getSectionRows, getSectionRowsForSync,
+  addSectionRow, removeSectionRow, updateRow,
   fvHierarchyRows, fvHierarchyTotalsByLevel,
   addFvHierarchyRow, removeFvHierarchyRow, updateFvHierarchyRow, importFvHierarchyFromH38,
 } = useH3Disclosure({
@@ -638,11 +640,11 @@ async function syncToDisclosureNotes() {
     const payload = buildH3SyncPayload({
       variant: 'listed',
       measurementModel: props.measurementModel,
-      costOriginalRows: getSectionRows('cost-original'),
-      costDepRows: getSectionRows('cost-dep'),
-      costImpairRows: getSectionRows('cost-impair'),
-      fairChangeRows: getSectionRows('fair-change'),
-      titleRows: getSectionRows('title-cert'),
+      costOriginalRows: getSectionRowsForSync('cost-original'),
+      costDepRows: getSectionRowsForSync('cost-dep'),
+      costImpairRows: getSectionRowsForSync('cost-impair'),
+      fairChangeRows: getSectionRowsForSync('fair-change'),
+      titleRows: getSectionRowsForSync('title-cert'),
       sectionTexts: { ...sectionTexts },
       projectId: props.projectId,
       wpId: props.wpId,

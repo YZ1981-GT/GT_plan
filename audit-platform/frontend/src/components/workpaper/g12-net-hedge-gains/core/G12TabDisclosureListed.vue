@@ -109,7 +109,7 @@ import { useG12Disclosure } from '../../composables/useG12Disclosure'
 import { G12_ACCOUNT_CODE, G12_CORE_WORKFLOW_HINT, G12_CORE_WORKFLOW_STEPS, G12_DISCLOSURE_FORMULA_MAP } from '../../composables/g12Constants'
 import { useG12CoreWorkflow } from '../../composables/useG12CoreWorkflow'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildG12SyncPayload } from '../../composables/g12DisclosureSyncPayload'
+import { buildG12SyncPayload, g12DisclosureSyncSnapshot } from '../../composables/g12DisclosureSyncPayload'
 import { G12_NOTE_SECTION } from '../../composables/g12NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -143,10 +143,7 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
-  const payload = buildG12SyncPayload(props.wpId, 'listed', props.applicableStandards, {
-    rows: dis.rows.value,
-    noteText: dis.noteText.value,
-  })
+  const payload = buildG12SyncPayload(props.wpId, 'listed', props.applicableStandards, g12DisclosureSyncSnapshot(dis))
   if (!payload) return
   isSyncing.value = true
   try {

@@ -32,7 +32,13 @@ from app.models.audit_platform_models import (
     TbLedger,
 )
 from app.services.dataset_query import get_active_filter
-from app.services.voucher_identity import annotate_lines, single_voucher_lines, voucher_type_condition
+from app.services.voucher_identity import (
+    annotate_lines,
+    company_code_condition,
+    single_voucher_lines,
+    voucher_type_condition,
+)
+from app.services.voucher_pairing import annotate_pairing
 
 
 def _stable_ledger_order(tbl) -> tuple:
@@ -352,7 +358,7 @@ class LedgerPenetrationService:
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.counterpart_account, tbl.c.summary, tbl.c.voucher_type, tbl.c.company_code,
                 tbl.c.raw_extra,
             )
             .where(active_filter, code_filter)
@@ -384,19 +390,21 @@ class LedgerPenetrationService:
         month: int | None = None,
         voucher_date: str | None = None,
         voucher_type: str | None = None,
+        company_code: str | None = None,
     ) -> list[dict]:
-        """第三层：一张凭证的分录明细（按凭证键穿透：日期 + 凭证字 + 号，主体随行）。
+        """第三层：一张凭证的分录明细（按凭证键穿透：主体 + 日期 + 凭证字 + 号）。
 
         🔴 凭证号单独不唯一（单号最多对应 83 个日期），同日同号也不唯一：四川物流、宜宾临港、
         辽宁卫生分别有 167 / 118 / 1,247 组同日同号混了 2~5 种凭证字（2025-01-07 的 FY-0003
         与 ZZ-0003）。「(日期, 号) 借贷 100% 平衡」证明不了唯一 —— 两张各自平衡的凭证并在
         一起照样平衡。命中多张凭证时抛 VoucherKeyAmbiguous（409 + 候选），不合并分录。
-        每行带 voucher_key / side / line_fp。
+        每行带 voucher_key / side / line_fp / pairing（多借多贷精确配对，voucher_pairing）。
 
         Args:
             month: 月份过滤（1~12），只在不给日期时用。
             voucher_date: 凭证日期（YYYY-MM-DD）。
             voucher_type: 凭证字；空串 = 凭证字为空的那张，None = 不限。
+            company_code: 主体编码；None / 空串 = 不限（一套账两个主体同日同号时命中两张，409 + 候选）。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
@@ -410,6 +418,9 @@ class LedgerPenetrationService:
             conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
         if voucher_type is not None:
             conditions.append(voucher_type_condition(tbl, voucher_type))
+        company_cond = company_code_condition(tbl, company_code)
+        if company_cond is not None:
+            conditions.append(company_cond)
         stmt = (
             sa.select(
                 tbl.c.id, tbl.c.year, tbl.c.company_code, tbl.c.voucher_date,
@@ -424,7 +435,7 @@ class LedgerPenetrationService:
         )
         result = await self.db.execute(stmt)
         rows = single_voucher_lines([dict(r._mapping) for r in result.fetchall()], year=year)
-        return _attach_extra_fields(annotate_lines(rows, year=year))
+        return _attach_extra_fields(annotate_pairing(annotate_lines(rows, year=year)))
 
     async def get_all_aux_balance(
         self, project_id: UUID, year: int,
@@ -502,7 +513,7 @@ class LedgerPenetrationService:
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.summary,
+                tbl.c.summary, tbl.c.voucher_type, tbl.c.company_code,
                 tbl.c.raw_extra,
             )
             .where(active_filter, tbl.c.account_code == account_code)
@@ -714,7 +725,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
-                tbl.c.accounting_period, tbl.c.voucher_type,
+                tbl.c.accounting_period, tbl.c.voucher_type, tbl.c.company_code,  # 主体：行上凭证键（已挂标识）
                 tbl.c.raw_extra,  # passthrough 列，不参与 window/游标排序
                 running_balance_expr,
             )
@@ -816,7 +827,7 @@ class LedgerPenetrationService:
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.summary,
+                tbl.c.summary, tbl.c.voucher_type, tbl.c.company_code,  # 凭证字 / 主体：行上凭证键
                 tbl.c.raw_extra,
             )
             .where(*where_clauses)

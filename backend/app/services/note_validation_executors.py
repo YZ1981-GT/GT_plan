@@ -1310,6 +1310,96 @@ def _execute_aging_progression(rule: ValidationRule, ctx: ValidationContext) -> 
     return result
 
 
+#: 期间衔接的期初行 / 期末行（未分配利润：国企「上年年末余额 … 本期期末余额」、上市「调整前上期末未分配利润 … 期末未分配利润」）
+_CONTINUITY_OPENING_RE = re.compile(r"^(?:上年年末余额|调整前上期末|上期末|上年末)")
+_CONTINUITY_CLOSING_RE = re.compile(r"^(?:本期期末余额|期末未分配利润|期末余额)$")
+
+
+def _period_columns(headers: list[str]) -> tuple[int | None, int | None]:
+    """(本期列, 上期列) 的 ``values`` 下标（表头第 0 列是项目列）；认不出 ⇒ None。"""
+    current = prior = None
+    for i, h in enumerate(headers[1:]):
+        text = re.sub(r"\s+", "", str(h))
+        if prior is None and text.startswith(("上期", "上年")):
+            prior = i
+        elif current is None and text.startswith(("本期", "本年")):
+            current = i
+    return current, prior
+
+
+def _continuity_cells(td: dict) -> tuple[Any, Any, dict[str, Any]] | None:
+    """(期初行本期格, 期末行上期格, 期末行本期格+位置信息)；表结构认不出 ⇒ None。"""
+    rows = td.get("rows") if isinstance(td.get("rows"), list) else []
+    current, prior = _period_columns(_norm_headers(td))
+    labels = [re.sub(r"\s+", "", str(r.get("label") or "")) if isinstance(r, dict) else "" for r in rows]
+    opening = next((i for i, lab in enumerate(labels) if _CONTINUITY_OPENING_RE.match(lab)), None)
+    closing = next((i for i in range(len(labels) - 1, -1, -1) if _CONTINUITY_CLOSING_RE.match(labels[i])), None)
+    if None in (current, prior, opening, closing) or opening == closing:
+        return None
+
+    def cell(row: int, col: int) -> Any:
+        vals = _row_values(rows[row]) or []
+        value = vals[col] if col < len(vals) else None
+        return value.get("value") if isinstance(value, dict) else value
+
+    return cell(opening, current), cell(closing, prior), {
+        "opening_label": labels[opening], "closing_label": labels[closing],
+        "closing_current": cell(closing, current),
+    }
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() in ("", "-", "—"))
+
+
+def _execute_period_continuity(rule: ValidationRule, ctx: ValidationContext) -> ValidationResult:
+    """期间衔接（spec note-pull-followup-closure R8；国企 八、63 / 上市 五、61 未分配利润）：
+
+    1. 同一张表两期并列：本期列「期初」行（上年年末余额 / 调整前上期末未分配利润）= 上期列「期末」行（本期期末余额 /
+       期末未分配利润）；
+    2. 有上年附注（``ctx.prior_note_data``）时：本年上期列期末 = 上年本期列期末。
+    两格有一格是空的不比（宁漏报不误报）；认不出期初 / 期末行或本期 / 上期列 ⇒ skip。只读。
+    """
+    result = ValidationResult(
+        section_code=rule.section_code, rule_type=rule.rule_type.value, rule_expression=rule.expression,
+    )
+    section = (rule.section_code or "").strip()
+    td = _resolve_section_table(section, ctx.note_data if isinstance(ctx.note_data, dict) else {})
+    found = _continuity_cells(td) if isinstance(td, dict) else None
+    if found is None:
+        result.passed = True
+        result.details = {"check": "period_continuity", "skipped": True,
+                          "reason": "认不出期初 / 期末行或本期 / 上期列"}
+        return result
+    opening_current, closing_prior, info = found
+    checks: list[tuple[str, Any, Any]] = [("本期期初 = 上期期末", opening_current, closing_prior)]
+    prior_td = _resolve_section_table(section, ctx.prior_note_data) if isinstance(ctx.prior_note_data, dict) else None
+    prior_found = _continuity_cells(prior_td) if isinstance(prior_td, dict) else None
+    if prior_found is not None:
+        checks.append(("上期期末 = 上年附注本期期末", closing_prior, prior_found[2]["closing_current"]))
+
+    issues: list[dict[str, Any]] = []
+    compared: list[str] = []
+    max_diff = Decimal("0")
+    for name, left, right in checks:
+        if _blank(left) or _blank(right):
+            continue
+        compared.append(name)
+        a, b = _to_decimal(left), _to_decimal(right)
+        diff = abs(a - b)
+        if diff > _resolve_tolerance(rule.tolerance, a, b):
+            issues.append({"check": name, "left": float(a), "right": float(b), "diff": float(diff)})
+            max_diff = max(max_diff, diff)
+    result.passed = not issues
+    result.details = {"check": "period_continuity", "opening_label": info["opening_label"],
+                      "closing_label": info["closing_label"], "compared": compared, "issues": issues}
+    if not compared:
+        result.details.update(skipped=True, reason="期初 / 期末格为空，未比对")
+    if max_diff > 0:
+        result.diff_amount = max_diff
+    return result
+
+
 def _execute_description(rule: ValidationRule, ctx: ValidationContext) -> ValidationResult:
     """描述类 preset：纯文本章节兜底"""
     return ValidationResult(
@@ -1334,4 +1424,5 @@ EXECUTORS = {
     ValidationType.AGING_PROGRESSION: _execute_aging_progression,
     ValidationType.LLM_REVIEW: _execute_llm_review,
     ValidationType.DESCRIPTION: _execute_description,
+    ValidationType.PERIOD_CONTINUITY: _execute_period_continuity,
 }

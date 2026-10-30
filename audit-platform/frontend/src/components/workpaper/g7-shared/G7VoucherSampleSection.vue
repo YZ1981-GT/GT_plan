@@ -2,7 +2,7 @@
   G7 处置 / 后续计量「凭证抽查」区块（Task 5.1，共享）。
 
   G7-10/G7-11/G7-12 是测算表无凭证明细行 → 本区块提供独立的凭证抽查行，
-  挂载抽凭引擎（account-code=1511 / phase=final），@filled 按 voucherNo 去重回填。
+  挂载抽凭引擎（account-code=1511，阶段取项目当前审计阶段），@filled 经共享回填函数按分录指纹去重回填。
   自包含持久化（useG7SubFormData，storageKey 由父传入，各表独立）。
 -->
 <template>
@@ -19,9 +19,9 @@
             :project-id="projectId"
             :workpaper-id="wpId"
             :account-code="effectiveAccountCode"
-            phase="final"
             :year="auditYear"
             @filled="onSampleFilled"
+            @undo-request="vs.onUndoRequest"
           />
           <el-button v-if="!isReadonly" size="small" @click="addRow">+ 新增</el-button>
         </div>
@@ -31,8 +31,14 @@
     <el-alert type="info" :closable="false" show-icon class="vs-note"
       title="对处置 / 后续计量相关记账凭证抽查：核对凭证号、日期、借贷金额与对方科目，验证处置损益、股利或权益调整的会计处理。" />
 
-    <el-table :data="rows" border size="small" max-height="360" style="font-size: 13px">
+    <el-table :data="rows" border size="small" max-height="360" style="font-size: 13px" :row-class-name="vs.voucherRowClass">
       <el-table-column type="index" label="#" width="45" />
+      <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+      <el-table-column label="来源" width="150">
+        <template #default="{ row }">
+          <VoucherRowMetaCell :row="row" :locked="vs.isVoucherRowLocked(row)" :project-id="projectId" :year="auditYear" />
+        </template>
+      </el-table-column>
       <el-table-column label="日期" width="120">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" v-model="row.voucherDate" size="small" @change="persistRows" />
@@ -96,14 +102,10 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, onMounted, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill'
 import { useG7SubFormData } from '../composables/useG7SubFormData'
-import {
-  createG7VoucherSampleRow,
-  parseG7VoucherSampleRows,
-  mergeVoucherSamples,
-  type G7VoucherSampleRow,
-  type G7VoucherSample,
-} from '../composables/g7VoucherSample'
+import { parseG7VoucherSampleRows, useG7VoucherSampleRows } from '../composables/g7VoucherSample'
 import { gCycleScope } from '../composables/gCycleAccountScope'
 import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
 import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
@@ -143,8 +145,6 @@ const auditYear = computed<number | null>(() => {
   return null
 })
 
-const rows = ref<G7VoucherSampleRow[]>([])
-
 const formData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
@@ -155,26 +155,16 @@ function parseJson(raw: string | null | undefined): unknown {
   try { return JSON.parse(raw) } catch { return null }
 }
 
-function persistRows(): void {
-  if (props.isReadonly) return
-  formData.debouncedSave(props.storageKey, {
-    conclusion: JSON.stringify(rows.value),
-    remark: null,
-  })
-}
-
-function addRow(): void {
-  if (props.isReadonly) return
-  rows.value.push(createG7VoucherSampleRow(rows.value.length + 1))
-  persistRows()
-}
-
-function removeRow(index: number): void {
-  if (props.isReadonly) return
-  rows.value.splice(index, 1)
-  rows.value.forEach((r, i) => { r.seq = i + 1 })
-  persistRows()
-}
+// 行、增删、保存与抽凭回填 / 撤销 / 年审阶段预审行只读（共享回填函数，见 g7VoucherSample.useG7VoucherSampleRows）
+const vs = useG7VoucherSampleRows({
+  projectId: () => props.projectId,
+  readonly: () => props.isReadonly,
+  save: (json) => formData.debouncedSave(props.storageKey, { conclusion: json, remark: null }),
+})
+const rows = vs.rows
+const persistRows = vs.persist
+const addRow = vs.addRow
+const removeRow = vs.removeRow
 
 const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
 const rawMethodologyPersist = buildChecklistDirectPersist({
@@ -197,34 +187,32 @@ const { methodology, persistMethodology } = useSamplingMethodologyPersist({
   isReadonly: computed(() => props.isReadonly === true),
 })
 
-function onSampleFilled(payload: { samples?: G7VoucherSample[] }): void {
+/** 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填完由它保存并提示填入几行 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+  void persistMethodology(payload?.methodology)
 
   if (props.isReadonly) return
-  const samples = payload?.samples ?? []
-  if (!samples.length) {
+  if (!payload?.samples?.length) {
     ElMessage.info('未收到抽凭样本')
     return
   }
-  const { rows: merged, added, skipped } = mergeVoucherSamples(rows.value, samples)
-  rows.value = merged
-  persistRows()
-  ElMessage.success(`已回填 ${added} 笔抽凭样本${skipped ? `（${skipped} 笔凭证号重复已跳过）` : ''}`)
+  await vs.onEngineFilled(payload)
 }
 
 onMounted(async () => {
+  void vs.voucherFillReady()
   await formData.load()
   const saved = formData.data.value.get(props.storageKey)
-  let loaded = parseG7VoucherSampleRows(parseJson(saved?.conclusion as string | undefined))
-  if (!loaded.length) {
+  let payload = parseJson(saved?.conclusion as string | undefined)
+  if (!parseG7VoucherSampleRows(payload).length) {
     const snapshot = props.htmlData?.responses_snapshot?.[props.storageKey]
-    loaded = parseG7VoucherSampleRows(parseJson(snapshot?.conclusion))
+    payload = parseJson(snapshot?.conclusion)
   }
-  rows.value = loaded
+  vs.load(payload)
 })
 
-defineExpose({ rows, onSampleFilled, mergeVoucherSamples })
+defineExpose({ rows, onSampleFilled })
 </script>
 
 <style scoped>

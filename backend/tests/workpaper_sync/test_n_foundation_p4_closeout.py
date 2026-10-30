@@ -16,7 +16,6 @@ import hashlib
 import json
 import pathlib
 import re
-from typing import Any
 
 import pytest
 
@@ -29,7 +28,7 @@ FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
 WP_COMPONENTS = FRONTEND / "components" / "workpaper"
 WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
-import sys
+import sys  # noqa: E402
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
 import n_cycle_scanner_summary as scanner  # noqa: E402
 
@@ -255,13 +254,13 @@ class TestArithmeticSelfCheck:
         """sheets: 9 + 16 + 34 = 59。"""
         assert 9 + 16 + 34 == 59
 
-    def test_formulas_236_755_1194_equals_2185(self):
-        """公式格: 236 + 755 + 1194 = 2185。"""
-        assert 236 + 755 + 1194 == 2185
+    def test_formulas_231_759_1194_equals_2184(self):
+        """公式格: N4 净化 231 + N1/N3 修复 759 + lane3 1194 = 2184。"""
+        assert 231 + 759 + 1194 == 2184
 
-    def test_fx_sheets_7_12_30_equals_49(self):
-        """带 fx sheet: 7 + 12 + 30 = 49。"""
-        assert 7 + 12 + 30 == 49
+    def test_fx_sheets_6_12_30_equals_48(self):
+        """带 fx sheet: N4 净化 6 + lane2 12 + lane3 30 = 48。"""
+        assert 6 + 12 + 30 == 48
 
     def test_html_child_6_12_27_equals_45(self):
         """HTML child: 6 + 12 + 27 = 45。"""

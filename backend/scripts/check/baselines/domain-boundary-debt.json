@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Exact domain-boundary debt identities. Checker fails on NEW identities only; shrink -> update this file.",
-    "count": 898
+    "count": 724
   },
   "entries": [
     {
@@ -43,26 +43,6 @@
       "identity": "forbidden_edge:ai->backend-services:backend/app/routers/knowledge_base.py->backend/app/services/indexing_pipeline.py",
       "kind": "forbidden_edge",
       "detail": "ai may not depend on backend-services (backend/app/routers/knowledge_base.py -> backend/app/services/indexing_pipeline.py)"
-    },
-    {
-      "identity": "forbidden_edge:ai->backend-services:backend/app/routers/knowledge_folders.py->backend/app/services/anydoc_service.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on backend-services (backend/app/routers/knowledge_folders.py -> backend/app/services/anydoc_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:ai->backend-services:backend/app/routers/knowledge_folders.py->backend/app/services/indexing_pipeline.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on backend-services (backend/app/routers/knowledge_folders.py -> backend/app/services/indexing_pipeline.py)"
-    },
-    {
-      "identity": "forbidden_edge:ai->backend-services:backend/app/routers/knowledge_folders.py->backend/app/services/markitdown_service.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on backend-services (backend/app/routers/knowledge_folders.py -> backend/app/services/markitdown_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:ai->backend-services:backend/app/routers/knowledge_folders.py->backend/app/services/mineru_service.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on backend-services (backend/app/routers/knowledge_folders.py -> backend/app/services/mineru_service.py)"
     },
     {
       "identity": "forbidden_edge:ai->backend-services:backend/app/services/ai_chat/address_index_source.py->backend/app/services/acnr/runtime.py",
@@ -225,11 +205,6 @@
       "detail": "auth may not depend on frontend-shared (audit-platform/frontend/src/stores/auth.ts -> audit-platform/frontend/src/utils/http.ts)"
     },
     {
-      "identity": "forbidden_edge:backend-services->backend-routers:backend/app/services/custom_query/business_fetchers.py->backend/app/routers/__init__.py",
-      "kind": "forbidden_edge",
-      "detail": "backend-services may not depend on backend-routers (backend/app/services/custom_query/business_fetchers.py -> backend/app/routers/__init__.py)"
-    },
-    {
       "identity": "forbidden_edge:backend-services->backend-routers:backend/app/services/m5_surplus_reserve_service.py->backend/app/routers/m5_surplus_reserve.py",
       "kind": "forbidden_edge",
       "detail": "backend-services may not depend on backend-routers (backend/app/services/m5_surplus_reserve_service.py -> backend/app/routers/m5_surplus_reserve.py)"
@@ -263,11 +238,6 @@
       "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_auto_elimination_service.py->backend/app/services/internal_trade_service.py",
       "kind": "forbidden_edge",
       "detail": "consolidation may not depend on backend-services (backend/app/services/consol_auto_elimination_service.py -> backend/app/services/internal_trade_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_report_service.py->backend/app/services/amount_resolver.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on backend-services (backend/app/services/consol_report_service.py -> backend/app/services/amount_resolver.py)"
     },
     {
       "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_report_service.py->backend/app/services/goodwill_service.py",
@@ -433,11 +403,6 @@
       "identity": "forbidden_edge:core->backend-services:backend/app/schemas/_common.py->backend/app/services/_decimal_helpers.py",
       "kind": "forbidden_edge",
       "detail": "core may not depend on backend-services (backend/app/schemas/_common.py -> backend/app/services/_decimal_helpers.py)"
-    },
-    {
-      "identity": "forbidden_edge:core->backend-workers:backend/app/core/startup_registry.py->backend/app/workers/__init__.py",
-      "kind": "forbidden_edge",
-      "detail": "core may not depend on backend-workers (backend/app/core/startup_registry.py -> backend/app/workers/__init__.py)"
     },
     {
       "identity": "forbidden_edge:core->consolidation:backend/app/core/startup_registry.py->backend/app/services/consol_elimination_recalc_handler.py",
@@ -865,11 +830,6 @@
       "detail": "formula may not depend on backend-services (backend/app/services/note_formula_engine.py -> backend/app/services/_decimal_helpers.py)"
     },
     {
-      "identity": "forbidden_edge:formula->backend-services:backend/app/services/note_formula_engine.py->backend/app/services/llm_client.py",
-      "kind": "forbidden_edge",
-      "detail": "formula may not depend on backend-services (backend/app/services/note_formula_engine.py -> backend/app/services/llm_client.py)"
-    },
-    {
       "identity": "forbidden_edge:formula->backend-services:backend/app/services/wp_formula_eval_service.py->backend/app/services/custom_query/cross_sheet_resolver.py",
       "kind": "forbidden_edge",
       "detail": "formula may not depend on backend-services (backend/app/services/wp_formula_eval_service.py -> backend/app/services/custom_query/cross_sheet_resolver.py)"
@@ -1028,11 +988,6 @@
       "identity": "forbidden_edge:four-table->backend-services:backend/app/services/four_table/tb_query.py->backend/app/services/dataset_query.py",
       "kind": "forbidden_edge",
       "detail": "four-table may not depend on backend-services (backend/app/services/four_table/tb_query.py -> backend/app/services/dataset_query.py)"
-    },
-    {
-      "identity": "forbidden_edge:four-table->formula:backend/app/services/f2_extraction/validation.py->backend/app/services/wp_formula_eval_service.py",
-      "kind": "forbidden_edge",
-      "detail": "four-table may not depend on formula (backend/app/services/f2_extraction/validation.py -> backend/app/services/wp_formula_eval_service.py)"
     },
     {
       "identity": "forbidden_edge:four-table->import-export:backend/app/routers/data_lifecycle.py->backend/app/services/import_queue_service.py",
@@ -1550,121 +1505,6 @@
       "detail": "frontend-shared may not depend on workpapers (audit-platform/frontend/src/services/cycleHandbookRegistry.ts -> audit-platform/frontend/src/components/workpaper/h9/H9PreparationHandbookDialog.vue)"
     },
     {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai-chat/ChatQuotaCountdown.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai-chat/ChatQuotaCountdown.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AICommandBar.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AICommandBar.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AIContentDashboard.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AIContentDashboard.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AIContentReviewPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AIContentReviewPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AIInsightsDashboard.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AIInsightsDashboard.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AiContentBadge.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AiContentBadge.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AiContentConfirmDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AiContentConfirmDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AiContentPendingBanner.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AiContentPendingBanner.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/AiContentTag.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/AiContentTag.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ChatAttachmentPicker.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ChatAttachmentPicker.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ChatContextInspector.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ChatContextInspector.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ChatMentionPicker.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ChatMentionPicker.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/CommandConfirmCard.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/CommandConfirmCard.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ConfirmationAIAssistant.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ConfirmationAIAssistant.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ConfirmationAIPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ConfirmationAIPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/DocumentOCRPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/DocumentOCRPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/DshPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/DshPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/KnowledgeBasePanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/KnowledgeBasePanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/ModelTable.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/ModelTable.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/NLCommandInput.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/NLCommandInput.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ai/WorkpaperAIFill.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ai/WorkpaperAIFill.vue)"
-    },
-    {
       "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/layouts/ThreeColumnLayout.vue->audit-platform/frontend/src/components/ai/DshPanel.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/layouts/ThreeColumnLayout.vue -> audit-platform/frontend/src/components/ai/DshPanel.vue)"
@@ -1675,116 +1515,6 @@
       "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/router/domains/standalone.ts -> audit-platform/frontend/src/views/ai/AIChatView.vue)"
     },
     {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/ConsolBreakdownDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/ConsolBreakdownDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/ConsolCatalog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/ConsolCatalog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/ConsolMiddleNav.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/ConsolMiddleNav.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/ConsolTrialBalanceTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/ConsolTrialBalanceTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/OrgNode.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/OrgNode.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/CapitalReserveSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/CapitalReserveSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/EliminationSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/EliminationSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/EquitySimSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/EquitySimSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/G7SuggestionDraftSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/G7SuggestionDraftSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/InternalArApSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/InternalArApSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/InternalCashFlowSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/InternalCashFlowSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/InternalTradeSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/InternalTradeSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/InvestmentCostSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/InvestmentCostSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/InvestmentEquitySheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/InvestmentEquitySheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/MinorityInterestSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/MinorityInterestSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/NetAssetSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/NetAssetSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/PostElimIncomeSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/PostElimIncomeSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/PostElimInvestSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/PostElimInvestSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/ShareChangeSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/ShareChangeSheet.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consolidation/worksheets/SubsidiaryInfoSheet.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consolidation/worksheets/SubsidiaryInfoSheet.vue)"
-    },
-    {
       "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/layouts/DefaultLayout.vue->audit-platform/frontend/src/components/consolidation/ConsolCatalog.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/layouts/DefaultLayout.vue -> audit-platform/frontend/src/components/consolidation/ConsolCatalog.vue)"
@@ -1793,521 +1523,6 @@
       "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/layouts/DefaultLayout.vue->audit-platform/frontend/src/components/consolidation/ConsolMiddleNav.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on consolidation (audit-platform/frontend/src/layouts/DefaultLayout.vue -> audit-platform/frontend/src/components/consolidation/ConsolMiddleNav.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/AttachmentActionBar.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/AttachmentActionBar.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/AttachmentEvidenceForm.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/AttachmentEvidenceForm.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/AttachmentImpactDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/AttachmentImpactDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/AttachmentVersionsDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/AttachmentVersionsDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/BatchUploadResultDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/BatchUploadResultDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/attachment/OcrConfirmDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/attachment/OcrConfirmDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/AiGateTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/AiGateTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/ArchiveManifestTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/ArchiveManifestTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/CitationTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/CitationTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/EvidenceRefsTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/EvidenceRefsTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/LegalHoldTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/LegalHoldTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/MetricsTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/MetricsTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/OcrGovernanceTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/OcrGovernanceTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->evidence:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/evidence-governance/ReviewEvidenceTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on evidence (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/evidence-governance/ReviewEvidenceTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/ApprovalPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/ApprovalPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/CompletenessBanner.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/CompletenessBanner.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableDriftAlert.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableDriftAlert.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableExportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableExportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableGroupList.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableGroupList.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableHandbookDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableHandbookDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverablePreview.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverablePreview.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableShortcut.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableShortcut.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableToolbar.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableToolbar.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableTraceDrawer.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableTraceDrawer.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DeliverableVersionList.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DeliverableVersionList.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DisclosureNotesSelectionDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DisclosureNotesSelectionDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DocStructureTree.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DocStructureTree.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/DraftWatermark.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/DraftWatermark.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/LineagePanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/LineagePanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/OnlyOfficeEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/OnlyOfficeEditor.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/OptionalSectionDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/OptionalSectionDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/WritebackConflictDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/WritebackConflictDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/deliverable/WritebackResultPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/deliverable/WritebackResultPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/import/DataImportPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/import/DataImportPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/import/ManualColumnMapper.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/import/ManualColumnMapper.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/import/UnifiedImportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/import/UnifiedImportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ColumnMappingEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ColumnMappingEditor.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/DatasetActivationButton.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/DatasetActivationButton.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/DetectionPreview.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/DetectionPreview.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/DiagnosticPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/DiagnosticPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ErrorDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ErrorDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ImportButton.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ImportButton.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ImportHistoryEntry.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ImportHistoryEntry.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ImportProgress.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ImportProgress.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/ImportTimeline.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/ImportTimeline.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/LedgerBalanceTreeView.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/LedgerBalanceTreeView.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/LedgerDataManager.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/LedgerDataManager.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/LedgerImportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/LedgerImportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/LedgerImportGuideDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/LedgerImportGuideDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/MappingDiff.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/MappingDiff.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->import-export:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/ledger-import/UploadStep.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on import-export (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/ledger-import/UploadStep.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/disclosure/NoteAiFillDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/disclosure/NoteAiFillDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/disclosure/NoteReadinessPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/disclosure/NoteReadinessPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/CellTraceDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/CellTraceDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/HistoricalUploadMenuItem.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/HistoricalUploadMenuItem.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteAiSuggestionPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteAiSuggestionPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteCellSourceDrawer.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteCellSourceDrawer.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteDisclosureContextBar.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteDisclosureContextBar.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteGroupBaselineDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteGroupBaselineDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteOfflineExportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteOfflineExportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteOfflineImportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteOfflineImportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteParagraphVarsEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteParagraphVarsEditor.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NotePolicyReviewPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NotePolicyReviewPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NotePriorYearPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NotePriorYearPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteQualityChecklistPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteQualityChecklistPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteSectionLockBadge.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteSectionLockBadge.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteTableEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteTableEditor.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteTemplateSwitch.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteTemplateSwitch.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NoteVersionTreePanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NoteVersionTreePanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/NotesPrintPreview.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/NotesPrintPreview.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/RelatedPartyDisclosurePanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/RelatedPartyDisclosurePanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->procedures:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/assignment/BatchAssignDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on procedures (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/assignment/BatchAssignDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->procedures:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/assignment/StaffSelectDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on procedures (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/assignment/StaffSelectDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/consistency/ConsistencyReplayPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/consistency/ConsistencyReplayPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrAnnualDeclarationDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrAnnualDeclarationDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrComponentAuditors.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrComponentAuditors.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrEstimates.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrEstimates.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrGoingConcern.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrGoingConcern.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrMateriality.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrMateriality.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrMemoEditor.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrMemoEditor.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrOpinionForm.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrOpinionForm.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrOpinionType.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrOpinionType.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrPriorYearCompare.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrPriorYearCompare.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrRelatedParties.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrRelatedParties.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyFormDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyFormDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTable.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTable.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTxnFormDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTxnFormDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTxnTable.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrRelatedPartyTxnTable.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrReviewNotesPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrReviewNotesPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/EqcrShadowCompute.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/EqcrShadowCompute.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/eqcr/ShadowCompareRow.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/eqcr/ShadowCompareRow.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/QcAnnualReportsEmbed.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/QcAnnualReportsEmbed.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/QcCaseLibraryEmbed.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/QcCaseLibraryEmbed.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/QcClientTrendEmbed.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/QcClientTrendEmbed.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/QcDueProjects.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/QcDueProjects.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/QcRuleListEmbed.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/QcRuleListEmbed.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/VRCoverageTab.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/VRCoverageTab.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/qc/VRHeatmap.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/qc/VRHeatmap.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/review/ReviewCloseDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/review/ReviewCloseDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/review/ReviewEvidencePicker.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/review/ReviewEvidencePicker.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/review/ReviewPrioritySelector.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/review/ReviewPrioritySelector.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/review/ReviewRecommendCard.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/review/ReviewRecommendCard.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/review/ReviewTemplatePanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/review/ReviewTemplatePanel.vue)"
     },
     {
       "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/router/domains/projects.ts->audit-platform/frontend/src/views/independence/IndependenceDeclarationForm.vue",
@@ -2358,46 +1573,6 @@
       "identity": "forbidden_edge:frontend-shell->qc-review:audit-platform/frontend/src/router/domains/qc.ts->audit-platform/frontend/src/views/qc/QcRuleList.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on qc-review (audit-platform/frontend/src/router/domains/qc.ts -> audit-platform/frontend/src/views/qc/QcRuleList.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/MultiYearCompare.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/MultiYearCompare.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportDialogs.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportDialogs.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportDrilldownDialogs.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportDrilldownDialogs.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportEquityTable.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportEquityTable.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportImpairmentTable.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportImpairmentTable.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportMappingDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportMappingDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->reports:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/report/ReportTraceDialogs.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on reports (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/report/ReportTraceDialogs.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->workpaper-rendering:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on workpaper-rendering (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue)"
     },
     {
       "identity": "forbidden_edge:import-export->auth:audit-platform/frontend/src/components/deliverable/DeliverablePreview.vue->audit-platform/frontend/src/stores/auth.ts",
@@ -2485,16 +1660,6 @@
       "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/data_lifecycle_service.py)"
     },
     {
-      "identity": "forbidden_edge:import-export->backend-services:backend/app/services/archive_orchestrator.py->backend/app/services/gate_engine.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/gate_engine.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-services:backend/app/services/archive_orchestrator.py->backend/app/services/gate_eval_store.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/gate_eval_store.py)"
-    },
-    {
       "identity": "forbidden_edge:import-export->backend-services:backend/app/services/archive_orchestrator.py->backend/app/services/notification_service.py",
       "kind": "forbidden_edge",
       "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/notification_service.py)"
@@ -2503,11 +1668,6 @@
       "identity": "forbidden_edge:import-export->backend-services:backend/app/services/archive_orchestrator.py->backend/app/services/notification_types.py",
       "kind": "forbidden_edge",
       "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/notification_types.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-services:backend/app/services/archive_orchestrator.py->backend/app/services/private_storage_service.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-services (backend/app/services/archive_orchestrator.py -> backend/app/services/private_storage_service.py)"
     },
     {
       "identity": "forbidden_edge:import-export->backend-services:backend/app/services/import_error_formatter.py->backend/app/services/smart_import_engine.py",
@@ -2898,16 +2058,6 @@
       "identity": "forbidden_edge:procedures->backend-services:backend/app/services/procedure_trim_engine.py->backend/app/services/audit_logger_enhanced.py",
       "kind": "forbidden_edge",
       "detail": "procedures may not depend on backend-services (backend/app/services/procedure_trim_engine.py -> backend/app/services/audit_logger_enhanced.py)"
-    },
-    {
-      "identity": "forbidden_edge:procedures->backend-services:backend/app/services/procedure_trim_scope.py->backend/app/services/b50_risk_reader.py",
-      "kind": "forbidden_edge",
-      "detail": "procedures may not depend on backend-services (backend/app/services/procedure_trim_scope.py -> backend/app/services/b50_risk_reader.py)"
-    },
-    {
-      "identity": "forbidden_edge:procedures->backend-services:backend/app/services/procedure_trim_scope.py->backend/app/services/dataset_query.py",
-      "kind": "forbidden_edge",
-      "detail": "procedures may not depend on backend-services (backend/app/services/procedure_trim_scope.py -> backend/app/services/dataset_query.py)"
     },
     {
       "identity": "forbidden_edge:procedures->backend-services:backend/app/services/procedure_trim_service.py->backend/app/services/b50_risk_reader.py",
@@ -3425,11 +2575,6 @@
       "detail": "reports may not depend on import-export (backend/app/services/report_line_mapping_service.py -> backend/app/services/ledger_import/direction_resolver.py)"
     },
     {
-      "identity": "forbidden_edge:workpaper-rendering->ai:backend/app/routers/wp_render_strategies/_j2_ai_generate.py->backend/app/services/ai_service.py",
-      "kind": "forbidden_edge",
-      "detail": "workpaper-rendering may not depend on ai (backend/app/routers/wp_render_strategies/_j2_ai_generate.py -> backend/app/services/ai_service.py)"
-    },
-    {
       "identity": "forbidden_edge:workpaper-rendering->backend-routers:backend/app/routers/wp_render_config.py->backend/app/routers/_wp_gate.py",
       "kind": "forbidden_edge",
       "detail": "workpaper-rendering may not depend on backend-routers (backend/app/routers/wp_render_config.py -> backend/app/routers/_wp_gate.py)"
@@ -3643,16 +2788,6 @@
       "identity": "forbidden_edge:workpapers->ai:audit-platform/frontend/src/views/workpaper-editor/EditorBanners.vue->audit-platform/frontend/src/components/ai/AiContentPendingBanner.vue",
       "kind": "forbidden_edge",
       "detail": "workpapers may not depend on ai (audit-platform/frontend/src/views/workpaper-editor/EditorBanners.vue -> audit-platform/frontend/src/components/ai/AiContentPendingBanner.vue)"
-    },
-    {
-      "identity": "forbidden_edge:workpapers->ai:backend/app/routers/wp_guidance_chat.py->backend/app/services/ai_service.py",
-      "kind": "forbidden_edge",
-      "detail": "workpapers may not depend on ai (backend/app/routers/wp_guidance_chat.py -> backend/app/services/ai_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:workpapers->ai:backend/app/routers/wp_guidance_chat.py->backend/app/services/knowledge_index_service.py",
-      "kind": "forbidden_edge",
-      "detail": "workpapers may not depend on ai (backend/app/routers/wp_guidance_chat.py -> backend/app/services/knowledge_index_service.py)"
     },
     {
       "identity": "forbidden_edge:workpapers->ai:backend/app/services/wp_ai_service.py->backend/app/services/reference_doc_service.py",
@@ -4413,11 +3548,6 @@
       "identity": "forbidden_edge:workpapers->import-export:backend/app/services/wp_chat_service.py->backend/app/services/export_mask_service.py",
       "kind": "forbidden_edge",
       "detail": "workpapers may not depend on import-export (backend/app/services/wp_chat_service.py -> backend/app/services/export_mask_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:workpapers->import-export:backend/app/services/wp_cross_check_service.py->backend/app/services/ledger_import/direction_resolver.py",
-      "kind": "forbidden_edge",
-      "detail": "workpapers may not depend on import-export (backend/app/services/wp_cross_check_service.py -> backend/app/services/ledger_import/direction_resolver.py)"
     },
     {
       "identity": "forbidden_edge:workpapers->notes:backend/app/routers/wp_data_rules.py->backend/app/services/note_data_extractor.py",

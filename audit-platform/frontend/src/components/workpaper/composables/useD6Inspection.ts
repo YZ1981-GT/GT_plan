@@ -10,13 +10,19 @@
  *   - addSample(block) / removeSample(block, rowId)
  *   - checkRatioSummary computed（检查比例=检查金额/账面金额）
  *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：抽凭进区块(1)，
+ * 挂凭导入按凭证日期分区，按分录指纹去重，行元数据 `_gt` 随行 JSON 落库
+ * （spec voucher-identity-writeback-and-audit-phase 任务 10）。
+ *
  * Spec: .kiro/specs/d6-contract-assets/
  * Task: 12.1
  * Requirements: 11.1-11.9, 25.1-25.3
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, toValue, type Ref, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { parseNum, calcSubtotal } from './useD6FormulaEngine'
 import type { ChecklistResponse } from './useD6FormData'
+import { metaOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
+import { partyNameForColumn } from './shared/samplingPartyTarget'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +62,10 @@ export interface UseD6InspectionOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  /** 只读（回填 / 挂凭导入 / 撤销都不做） */
+  isReadonly?: MaybeRefOrGetter<boolean>
+  /** 资产负债表日（挂凭导入按凭证日期分区：晚于它的进区块(2)）；缺省全进区块(1) */
+  bsDate?: MaybeRefOrGetter<string | null | undefined>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -81,7 +91,7 @@ function safeParseRows(jsonStr: string | null | undefined): InspectionSampleRow[
 }
 
 function normalizeRow(raw: any): InspectionSampleRow {
-  return {
+  return withRowMeta<InspectionSampleRow>({
     rowId: raw.rowId || generateRowId(),
     customerName: raw.customerName || '',
     date: raw.date || '',
@@ -100,7 +110,7 @@ function normalizeRow(raw: any): InspectionSampleRow {
     indexRef: raw.indexRef || '',
     isAbnormal: raw.isAbnormal || '否',
     remark: raw.remark || '',
-  }
+  }, raw)
 }
 
 function safeParseSamplingParams(jsonStr: string | null | undefined): SamplingParams {
@@ -147,6 +157,32 @@ function createEmptySample(block: 1 | 2): InspectionSampleRow {
   }
 }
 
+/**
+ * 共享回填函数的待写入项 → 检查行（spec voucher-identity-writeback-and-audit-phase 任务 10）：对方科目取后端配对
+ * 结果（配不上写「多科目」），对方明细写对方科目名称，金额落在样本自己的借贷栏（原宿主按对方分录展开、
+ * 把金额翻到对方栏的推断已删除）。
+ */
+export function mapPreparedToInspectionRow(item: PreparedItem): InspectionSampleRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  return {
+    ...createEmptySample(1),
+    customerName: partyNameForColumn(s as never, 'customer'),
+    date: String(s.voucherDate ?? ''),
+    voucherNo: String(s.voucherNo ?? ''),
+    businessContent: String(s.summary ?? ''),
+    counterAccount: item.counterpartAccount,
+    counterDetail: item.counterpartAccountName === item.counterpartAccount ? '' : item.counterpartAccountName,
+    debitAmount: parseNum(item.debitAmount),
+    creditAmount: parseNum(item.creditAmount),
+  }
+}
+
+/** 行上是否已填核对结果 / 文件 / 备注（替换 / 撤销前先确认） */
+export function hasInspectionContent(r: InspectionSampleRow): boolean {
+  return [r.check1, r.check2, r.check3, r.check4, r.check5, r.supportDoc, r.indexRef, r.remark]
+    .some(v => String(v ?? '').trim() !== '') || r.isAbnormal === '是'
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD6Inspection(options: UseD6InspectionOptions) {
@@ -166,6 +202,47 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
   const block1Rows = ref<InspectionSampleRow[]>([])
   const block2Rows = ref<InspectionSampleRow[]>([])
 
+  /** 已在某区块的分录（按指纹）：再次回填 / 挂凭导入仍进那一区块 */
+  function blockHolding(lfp: string | null): 'block1' | 'block2' | null {
+    if (!lfp) return null
+    if (block1Rows.value.some(r => metaOf(r)?.lfp === lfp)) return 'block1'
+    if (block2Rows.value.some(r => metaOf(r)?.lfp === lfp)) return 'block2'
+    return null
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（抽凭进区块(1)，挂凭导入按凭证日期分区）
+  const voucherFill = useVoucherCheckFill<InspectionSampleRow>({
+    projectId: options.projectId,
+    tables: { block1: block1Rows, block2: block2Rows },
+    tableOf: (item) => {
+      const held = blockHolding(item.meta.lfp)
+      if (held || !item.meta.src.includes('attach')) return held
+      const bs = toValue(options.bsDate) || ''
+      const date = String(item.sample.voucherDate ?? '')
+      return date && bs && date > bs ? 'block2' : 'block1'
+    },
+    mapSampleToRow: item => mapPreparedToInspectionRow(item),
+    persist: () => Promise.all([
+      options.saveImmediate(ITEM_ID_BLOCK1_ROWS, { remark: blockJson(1) }),
+      options.saveImmediate(ITEM_ID_BLOCK2_ROWS, { remark: blockJson(2) }),
+    ]),
+    hasUserContent: hasInspectionContent,
+    readonly: () => !!toValue(options.isReadonly),
+  })
+
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedRow(block: 1 | 2, rowId: string): boolean {
+    const row = (block === 1 ? block1Rows.value : block2Rows.value).find(r => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
+  /** 一区块的行 JSON（年审阶段预审行按读入版本写回，防绕过） */
+  function blockJson(block: 1 | 2): string {
+    return block === 1
+      ? JSON.stringify(voucherFill.guardPersist(block1Rows.value, 'block1'))
+      : JSON.stringify(voucherFill.guardPersist(block2Rows.value, 'block2'))
+  }
+
   // Load sampling params
   watch(
     () => allResponses.value.get(ITEM_ID_SAMPLING_PARAMS)?.remark,
@@ -180,6 +257,7 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
     () => allResponses.value.get(ITEM_ID_BLOCK1_ROWS)?.remark,
     (jsonStr) => {
       block1Rows.value = safeParseRows(jsonStr)
+      voucherFill.markLoaded()
     },
     { immediate: true },
   )
@@ -189,6 +267,7 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
     () => allResponses.value.get(ITEM_ID_BLOCK2_ROWS)?.remark,
     (jsonStr) => {
       block2Rows.value = safeParseRows(jsonStr)
+      voucherFill.markLoaded()
     },
     { immediate: true },
   )
@@ -200,11 +279,11 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
   }
 
   function persistBlock1(): void {
-    debouncedSave(ITEM_ID_BLOCK1_ROWS, { remark: JSON.stringify(block1Rows.value) })
+    debouncedSave(ITEM_ID_BLOCK1_ROWS, { remark: blockJson(1) })
   }
 
   function persistBlock2(): void {
-    debouncedSave(ITEM_ID_BLOCK2_ROWS, { remark: JSON.stringify(block2Rows.value) })
+    debouncedSave(ITEM_ID_BLOCK2_ROWS, { remark: blockJson(2) })
   }
 
   // Watch samplingParams changes for auto-save
@@ -224,6 +303,7 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
   }
 
   function removeSample(block: 1 | 2, rowId: string): void {
+    if (lockedRow(block, rowId)) return
     if (block === 1) {
       block1Rows.value = block1Rows.value.filter(r => r.rowId !== rowId)
       persistBlock1()
@@ -234,6 +314,7 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
   }
 
   function updateSampleCell(block: 1 | 2, rowId: string, field: string, value: any): void {
+    if (lockedRow(block, rowId)) return
     const NUMERIC_FIELDS = ['debitAmount', 'creditAmount']
     const mapRow = (r: InspectionSampleRow): InspectionSampleRow => {
       if (r.rowId !== rowId) return r
@@ -343,6 +424,13 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
     updateSampleCell,
     checkRatioSummary,
     auditNotes,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

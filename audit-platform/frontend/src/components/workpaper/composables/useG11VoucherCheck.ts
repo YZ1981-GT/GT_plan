@@ -1,5 +1,9 @@
 /**
  * useG11VoucherCheck — G11-5 凭证检查（样本选取 + 三态核对 + 检查比例 + 截止/推送/回填）
+ *
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行（后端配对），
+ * 只有贷方一栏 ⇒ 借方样本记负数；按分录指纹去重，行元数据 `_gt` 随行 JSON 落库
+ * （spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -33,6 +37,7 @@ import { mapCutoffToG11Voucher, mergeByFillMode } from './gCycleCutoffFill'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import { G11_ACCOUNT_CODE } from './g11Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import { useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 import { api } from '@/services/apiProxy'
 
 export type G11VoucherTab = 'basic' | 'check' | 'conclusion'
@@ -122,13 +127,36 @@ export function computeG11VoucherAnomalyRate(rows: G11VoucherCheckRow[]): number
   return (rows.filter((r) => r.isAbnormal).length / rows.length) * 100
 }
 
+/**
+ * 共享回填函数的待写入项 → G11-5 凭证检查行：表上只有贷方一栏，金额 = 贷方 − 借方（借方样本记负数）；
+ * 对方科目 / 明细取后端配对（配不上写「多科目」）
+ */
+export function mapPreparedToG11VoucherRow(item: PreparedItem, seq: number): G11VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  return enrichG11VoucherRow({
+    voucherDate: s.voucherDate ?? '',
+    voucherNo: s.voucherNo ?? '',
+    businessContent: s.summary ?? '',
+    counterAccount: item.counterpartAccount,
+    counterDetail: item.counterpartAccountName === item.counterpartAccount ? '' : item.counterpartAccountName,
+    creditAmount: parseNum(item.creditAmount) - parseNum(item.debitAmount),
+    source: '抽凭',
+  }, seq)
+}
+
+/** 行上已填核对结果、附件、支持性文件、索引、异常说明或备注（替换与撤销抽凭时据此先确认） */
+export function hasG11VoucherContent(r: G11VoucherCheckRow): boolean {
+  return [r.check1, r.check2, r.check3, r.check4, r.check5].some((v) => v !== null)
+    || [r.attachment, r.supportingDocDesc, r.indexNo, r.abnormalDesc, r.remark].some((v) => String(v ?? '').trim() !== '')
+}
+
 function parseRows(json: string | null | undefined): G11VoucherCheckRow[] {
   if (!json) return []
   try {
     const parsed = JSON.parse(json)
-    if (Array.isArray(parsed)) return parsed.map((r, i) => enrichG11VoucherRow(r, i + 1))
+    if (Array.isArray(parsed)) return parsed.map((r, i) => withRowMeta(enrichG11VoucherRow(r, i + 1), r))
     const rows = Array.isArray(parsed?.rows) ? parsed.rows : []
-    return rows.map((r: any, i: number) => enrichG11VoucherRow(r, i + 1))
+    return rows.map((r: any, i: number) => withRowMeta(enrichG11VoucherRow(r, i + 1), r))
   } catch {
     return []
   }
@@ -206,9 +234,23 @@ export function useG11VoucherCheck(opts: {
   const aiLoading = ref(false)
   const procedureMarking = ref(false)
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G11VoucherCheckRow>({
+    projectId: () => opts.projectId?.value,
+    tables: rows,
+    mapSampleToRow: (item) => mapPreparedToG11VoucherRow(item, rows.value.length + 1),
+    persist: () => persist(),
+    hasUserContent: hasG11VoucherContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: () => opts.isReadonly.value,
+  })
+
   watch(
     () => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (json) => { rows.value = parseRows(json) },
+    (json) => {
+      rows.value = parseRows(json)
+      voucherFill.markLoaded()
+    },
     { immediate: true },
   )
   watch(
@@ -278,7 +320,7 @@ export function useG11VoucherCheck(opts: {
   }
 
   function persist(): void {
-    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
+    opts.debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(voucherFill.guardPersist(rows.value)) })
   }
 
   const creditTotal = computed(() => calcSubtotal(rows.value.map((r) => r.creditAmount)))
@@ -327,7 +369,9 @@ export function useG11VoucherCheck(opts: {
 
   function updateRow(id: string, patch: Partial<G11VoucherCheckRow>): void {
     if (opts.isReadonly.value) return
-    rows.value = rows.value.map((r) => (r.id === id ? recalcG11VoucherAbnormal(enrichG11VoucherRow({ ...r, ...patch }, r.seq)) : r))
+    const current = rows.value.find((r) => r.id === id)
+    if (current && voucherFill.isRowLocked(current)) return
+    rows.value = rows.value.map((r) => (r.id === id ? withRowMeta(recalcG11VoucherAbnormal(enrichG11VoucherRow({ ...r, ...patch }, r.seq)), r) : r))
     persist()
   }
 
@@ -339,6 +383,8 @@ export function useG11VoucherCheck(opts: {
 
   function removeRow(id: string): void {
     if (opts.isReadonly.value) return
+    const current = rows.value.find((r) => r.id === id)
+    if (current && voucherFill.isRowLocked(current)) return
     rows.value = rows.value.filter((r) => r.id !== id).map((r, i) => ({ ...r, seq: i + 1 }))
     persist()
   }
@@ -350,7 +396,7 @@ export function useG11VoucherCheck(opts: {
   }
 
   function loadRows(data: G11VoucherCheckRow[]): void {
-    rows.value = data.map((r, i) => enrichG11VoucherRow(r, i + 1))
+    rows.value = data.map((r, i) => withRowMeta(enrichG11VoucherRow(r, i + 1), r))
     persist()
   }
 
@@ -489,6 +535,13 @@ export function useG11VoucherCheck(opts: {
     removeRow,
     mergeSample,
     loadRows,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     reloadFromStore,
     setActiveRowIndex,
     updateSampling,

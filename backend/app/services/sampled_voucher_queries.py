@@ -18,7 +18,9 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.workpaper_models import SampledVoucher, SamplingRecord
+from app.models.audit_phase_models import InterimSurvivalCheck
+from app.models.workpaper_models import SampledVoucher, SamplingRecord, WorkingPaper, WpIndex
+from app.services.dataset_service import DatasetService
 from app.services.voucher_identity import (
     VoucherKey,
     legacy_voucher_nos_condition,
@@ -205,14 +207,56 @@ async def project_sampling_coverage(db: AsyncSession, project_id: UUID, year: in
             "workpaper_count": int(count or 0),
             "legacy": vk is None,
         })
+    # 当前 active 账套版本的存续核对汇总。汇总可能来自只有手工挂凭、尚无 sampling_record 的底稿，
+    # 因此与抽样记录做并集，不让这类未确认变动从项目概览里消失。
+    active_dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+    survival_rows = [] if active_dataset_id is None else (await db.execute(
+        sa.select(InterimSurvivalCheck).where(
+            InterimSurvivalCheck.project_id == project_id,
+            InterimSurvivalCheck.dataset_id == active_dataset_id,
+        )
+    )).scalars().all()
+    by_wp: dict[UUID | None, dict[str, Any]] = {
+        r.working_paper_id: {
+            "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
+            "batch_count": int(r.batch_count or 0),
+            "sample_count": int(r.sample_count or 0),
+            "interim_survival_check_id": None,
+            "interim_survival_dataset_id": str(active_dataset_id) if active_dataset_id else None,
+            "interim_survival_unacked": 0,
+            "interim_survival_counts": None,
+        }
+        for r in by_wp_rows
+    }
+    for row in survival_rows:
+        item = by_wp.setdefault(row.working_paper_id, {
+            "working_paper_id": str(row.working_paper_id), "batch_count": 0, "sample_count": 0,
+            "interim_survival_check_id": None, "interim_survival_dataset_id": str(active_dataset_id),
+            "interim_survival_unacked": 0, "interim_survival_counts": None,
+        })
+        item.update({
+            "interim_survival_check_id": str(row.id),
+            "interim_survival_dataset_id": str(row.dataset_id),
+            "interim_survival_unacked": int(row.unacked),
+            "interim_survival_counts": {
+                "total": int(row.total), "unchanged": int(row.unchanged), "modified": int(row.changed),
+                "renumbered": int(row.renumbered), "deleted": int(row.deleted),
+            },
+        })
+    wp_ids = [wid for wid in by_wp if wid is not None]
+    names = {} if not wp_ids else {
+        wp_id: {"wp_code": str(code or ""), "wp_name": str(name or "")}
+        for wp_id, code, name in (await db.execute(
+            sa.select(WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name)
+            .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+            .where(WorkingPaper.id.in_(wp_ids), WorkingPaper.project_id == project_id)
+        )).all()
+    }
+    for wid, item in by_wp.items():
+        item.update(names.get(wid, {"wp_code": "", "wp_name": ""}) if wid else {"wp_code": "", "wp_name": ""})
+
     return {
-        "by_workpaper": [
-            {
-                "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
-                "batch_count": int(r.batch_count or 0),
-                "sample_count": int(r.sample_count or 0),
-            }
-            for r in by_wp_rows
-        ],
+        "active_dataset_id": str(active_dataset_id) if active_dataset_id else None,
+        "by_workpaper": sorted(by_wp.values(), key=lambda x: (x["wp_code"], x["working_paper_id"] or "")),
         "duplicated": duplicated,
     }

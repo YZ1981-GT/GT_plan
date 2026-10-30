@@ -74,9 +74,9 @@ WORKBOOK_SHEET_COUNT: dict[str, int] = {
     "N5 所得税费用.xlsx": 16,
 }
 WORKBOOK_FORMULA_CELLS: dict[str, int] = {
-    "N1 递延所得税资产.xlsx": 593,
+    "N1 递延所得税资产.xlsx": 595,
     "N2 应交税费.xlsx": 710,
-    "N3 递延所得税负债.xlsx": 162,
+    "N3 递延所得税负债.xlsx": 164,
     "N4 税金及附加.xlsx": 236,
     "N5 所得税费用.xlsx": 484,
 }
@@ -84,14 +84,17 @@ WORKBOOK_SHEETS_WITH_FORMULA: dict[str, int] = {
     "N1 递延所得税资产.xlsx": 8,
     "N2 应交税费.xlsx": 16,
     "N3 递延所得税负债.xlsx": 4,
-    "N4 税金及附加.xlsx": 7,
+    "N4 税金及附加.xlsx": 6,
     "N5 所得税费用.xlsx": 14,
 }
+LANE2_FORMULA_CELLS = sum(
+    WORKBOOK_FORMULA_CELLS[ENTRY_WORKBOOKS[entry_id]] for entry_id in LANE2_ENTRIES
+)
 
-#: design「算术自检」表：sheets 59 / 公式格 2185 / 带 fx 49
+#: 当前模板算术：N4 净化 -5 格/-1 sheet，N1/N3 footer 补式 +4 格。
 TOTAL_SHEETS = 59
-TOTAL_FORMULA_CELLS = 2185
-TOTAL_SHEETS_WITH_FORMULA = 49
+TOTAL_FORMULA_CELLS = 2184
+TOTAL_SHEETS_WITH_FORMULA = 48
 TOTAL_BARE_IF = 244
 TOTAL_HIDDEN_SHEETS = 8
 
@@ -142,6 +145,10 @@ NEW_DOMAIN_TEST_FILES: tuple[str, ...] = (
     "nCycleCanaryRowIdentity.spec.ts",
     "nCycleLane3RowIdentity.spec.ts",
     "nCycleLane2RouterAndKeys.spec.ts",
+    # 附注页离屏同步 provider 的等价用例（spec note-pull-followup-closure R1）
+    "n1HeadlessDisclosure.spec.ts", "n2HeadlessDisclosure.spec.ts",
+    "n4HeadlessDisclosure.spec.ts", "n5HeadlessDisclosure.spec.ts",
+    "n2ImportExportWire.spec.ts",
 )
 #: 只用 `upper` 分支时的漏检量（design 记 35）
 UPPER_ONLY_MISSED = 39
@@ -165,15 +172,15 @@ REMOVE_DECL_TOTAL = 21
 REMOVE_SIGNATURE_KINDS = 9
 REMOVE_HISTOGRAM_BEFORE: dict[str, int] = {"by_index": 10, "by_rowid": 10, "other": 1}
 
-#: NC-32 超列引用三族（正确口径 17 与 design 逐值吻合）
-OVERFLOW_TOTAL = 17
+#: NC-32 超列引用三族：R1 / 第四批已清零；原基线 17 = A1 3 + A2 11 + B 3。
+OVERFLOW_TOTAL = 0
 OVERFLOW_FAMILIES: dict[str, int] = {
-    "A1_real_defect": 3,
-    "A2_structural_residue": 11,
-    "B_range_end": 3,
+    "A1_real_defect": 0,
+    "A2_structural_residue": 0,
+    "B_range_end": 0,
 }
-#: 错口径（不剔 sheet 限定段）—— design 记 232
-OVERFLOW_WRONG_CALIBER = 193
+#: 错口径（不剔 sheet 限定段）随三族修复 193→176；仍用于证明窄口径必要。
+OVERFLOW_WRONG_CALIBER = 176
 
 #: NC-9 definedName
 DEFINED_NAME_TOTAL = 72
@@ -565,8 +572,12 @@ HEALTH_CONVERGED_HOSTS: frozenset[str] = frozenset({N3})
 #: live dual-mode 模块中已收敛 health / config 直调的个数（lane2 T6/T7：useN1DualMode）
 LIVE_MODULES_HEALTH_CONVERGED = 1
 LIVE_MODULES_CONFIG_CONVERGED = 1
-#: 本系列新增、落在 N 域口径内的生产文件（lower 分支收入）
-NEW_DOMAIN_PROD_FILES: tuple[str, ...] = ("n1SheetRouting.ts", "n3SheetRouting.ts")
+#: 本系列新增、落在 N 域口径内的生产文件（lower 分支收入）。
+#: 后四个是附注页离屏同步的 provider（spec note-pull-followup-closure R1：N1 / N2 / N4 / N5 接入，N3 无披露 Tab）
+NEW_DOMAIN_PROD_FILES: tuple[str, ...] = (
+    "n1SheetRouting.ts", "n3SheetRouting.ts",
+    "n1HeadlessDisclosure.ts", "n2HeadlessDisclosure.ts", "n4HeadlessDisclosure.ts", "n5HeadlessDisclosure.ts",
+)
 #: lane2 T8 后 A 族（位置化持久化键）目标态
 A_FAMILY_AFTER_LANE2 = 0
 
@@ -580,20 +591,19 @@ NOTICE_MOUNTED_ENTRIES: frozenset[str] = frozenset({N4, N5})
 # ═══════════════════════════════════════════════════════════════════════════
 # N4 canary 真双向改线（spec n-cycle-sync-foundation-and-first-canary · N4）
 # ═══════════════════════════════════════════════════════════════════════════
-#: 🔴 N4 已走完五环发布（真 PG：content_version/representation/entry_state 新行，
-#:    representation_generation=1）+ manifest 翻 bidirectional/adapter_registered +
-#:    overlay 追加 N4 override + reviewed 契约 `n4.taxes_and_surcharges.json` 落盘 +
-#:    adapter 注册（STORE_MERGE_REGISTRY / 白名单 / 交付台账各加 N4 一条）。
-#:
-#: 🔴 **仅 N4** —— N1/N2/N3/N5 仍 legacy_fake_bidirectional / capability single_onlyoffice /
-#:    adapter 未注册 / 契约目录零归属。task56 原本锁「N 域无 adapter 注册 / 全 N 仍 legacy /
-#:    契约目录零 N 归属 / manifest_mirror 分歧」的那几条判据，对 **N4** 必然打红（这正是真
-#:    改线的信号），处置是**仅为 N4 开豁免**（不删判据、不翻其余四条）：未登记的 N entry
-#:    仍逐值走旧判据，N4 走翻转后判据。
+#: N4 已走完五环发布并翻 bidirectional/adapter_registered；批 C 又为 N1/N2/N3/N5
+#: 生成 reviewed 契约并登记 store plan，但其 manifest capability 仍是 single_onlyoffice，
+#: 尚未注册运行时 adapter。故「契约归属」豁免全五条，「manifest / adapter」仍只豁免 N4。
 MANIFEST_FLIPPED_ENTRIES: frozenset[str] = frozenset({N4})
-#: N4 已交付 reviewed 生产契约的 adapter_id（契约目录归属豁免，仅此一条）。
-DELIVERED_CONTRACT_ADAPTER_IDS: frozenset[str] = frozenset({"n4.taxes_and_surcharges"})
-#: N4 已注册 adapter 的 entry_id（registry 字面量 / bidirectional 豁免，仅此一条）。
+#: 已交付 reviewed 生产契约的 adapter_id（契约存在不等于运行时 adapter 已翻门）。
+DELIVERED_CONTRACT_ADAPTER_IDS: frozenset[str] = frozenset({
+    "n1.deferred_tax_assets",
+    "n2.taxes_payable",
+    "n3.deferred_tax_liabilities",
+    "n4.taxes_and_surcharges",
+    "n5.income_tax_expense",
+})
+#: 真正翻转并注册运行时 adapter 的 entry_id 仍仅 N4。
 REGISTERED_ADAPTER_ENTRY_IDS: frozenset[str] = frozenset({N4})
 #: N4 权威模板已净化（Task 7a：删 2 外链部件 + 中性化隐藏「原底稿」册 5 个外部引用公式）。
 #:    ⇒ 模板字节已变，sha256 从净化前变为净化后值；task56 的「模板 digest 现算等值」

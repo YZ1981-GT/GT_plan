@@ -1,6 +1,11 @@
 <template>
   <el-table :data="rows" border size="small" class="cutoff-table" max-height="360" :row-class-name="rowClassName">
     <el-table-column type="index" label="序号" width="50" fixed />
+    <el-table-column v-if="projectId" label="来源" width="150">
+      <template #default="{ row }">
+        <VoucherRowMetaCell :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId" :year="year ?? 0" />
+      </template>
+    </el-table-column>
 
     <template v-if="direction === 'backward'">
       <el-table-column label="支出凭单" align="center" class-name="col-doc">
@@ -132,6 +137,7 @@ import type { CutoffRow, CutoffDirection } from '../../composables/useCycleCutof
 import { amountMismatch } from '../../composables/cutoffRowHelpers'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
 
 // 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
 //    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
@@ -139,12 +145,17 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 //    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   rows: CutoffRow[]
   direction: CutoffDirection
   isReadonly?: boolean
   /** 显示日期差、金额不一致样式、滞后提示 */
   showExtended?: boolean
+  /** 年审阶段的预审行只读（父组件的共享回填函数判定）：来源列加「只读」、行置灰点不进 */
+  isRowLocked?: (row: CutoffRow) => boolean
+  /** 来源列「多科目」看整张凭证用；不传则不显示来源列 */
+  projectId?: string
+  year?: number
 }>(), {
   showExtended: false,
 })
@@ -155,10 +166,10 @@ const emit = defineEmits<{
 }>()
 
 function rowClassName({ row }: { row: CutoffRow }) {
-  if (row.isCrossPeriod) return 'cross-period-row'
-  if (row.isLagAnomaly) return 'lag-anomaly-row'
-  if (amountMismatch(row)) return 'amount-mismatch-row'
-  return ''
+  const flag = row.isCrossPeriod ? 'cross-period-row'
+    : row.isLagAnomaly ? 'lag-anomaly-row'
+      : amountMismatch(row) ? 'amount-mismatch-row' : ''
+  return [flag, props.isRowLocked?.(row) ? 'gt-row-locked' : ''].filter(Boolean).join(' ')
 }
 
 function amountClass(row: CutoffRow): string {

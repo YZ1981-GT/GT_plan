@@ -7,6 +7,10 @@
         {{ item.label }}: {{ item.value }}
       </span>
     </div>
+    <LedgerAppendResultPanel
+      :append-report="appendReport"
+      :voucher-diff="voucherDiff"
+    />
     <ImportValidationPanel
       :summary="validationSummary"
       :grouped-items="groupedValidationItems"
@@ -20,6 +24,8 @@
 <script setup lang="ts">
 import { CircleCheck } from '@element-plus/icons-vue'
 import ImportValidationPanel from '@/components/ImportValidationPanel.vue'
+import LedgerAppendResultPanel from '@/components/ledger-import/LedgerAppendResultPanel.vue'
+import type { LedgerAppendReport, VoucherDiffReport } from '@/components/ledger-import/ledgerAppendResult'
 import type { GroupedImportValidationItems, ImportValidationAlertType, ResolvedImportValidationSummary } from '@/utils/importValidation'
 
 interface SummaryEntry {
@@ -47,6 +53,8 @@ withDefaults(defineProps<{
   titleStyle?: string
   summaryStyle?: string
   validationPanelStyle?: string
+  appendReport?: LedgerAppendReport | null
+  voucherDiff?: VoucherDiffReport | null
 }>(), {
   summaryEntries: () => [],
   showSuccessIcon: false,

@@ -148,15 +148,9 @@ KNOWN_UNWIRED: dict[str, str] = {
         "归属 lane：f5-sync-coverage-and-first-canary。声明 2 / 可见 1"
         "（F5-1-adj-other-rows 不可见）。"
     ),
-    "g4.bond_main": (
-        "归属 lane：g4-g6-shared-workbook-three-entry-lanes。声明 1 / 可见 1 但**不是同一个**"
-        "（声明 G4-7-items，可见的是单数常量的另一个值）⇒ 计数相等掩盖了集合不等，"
-        "判据必须比集合而不是比 len。"
-    ),
-    "g6.other_bond_main": (
-        "归属 lane：g4-g6-shared-workbook-three-entry-lanes。同 g4"
-        "（声明 G6-5-fair-value-data 不在可见集合里）。"
-    ),
+    # ── g4.bond_main / g6.other_bond_main 已于 2026-10-28 接通（spec oo-writeback-template-parity-closure
+    #    R3 批 B3：单数 STORE_ITEM_ID 原写成 G4-2-rows / G6-2-rows（照抄 G9 骨架），改为受管的
+    #    G4-7-items / G6-5-fair-value-data；「声明 1 / 可见 1 但不是同一个」——计数相等掩盖了集合不等）。
     "h3.investment_property_detail": (
         "归属 lane：h3-h5-h7-variant-axis-and-dynamic-column-paradigm。声明 2 / 可见 1"
         "（H3-2-fair-rows 不可见）。"

@@ -12,9 +12,7 @@ NA-P: 19~22
 """
 from __future__ import annotations
 
-import hashlib
 import pathlib
-import re
 
 import openpyxl
 import pytest
@@ -27,9 +25,11 @@ FRONTEND = ROOT / "audit-platform" / "frontend" / "src"
 WP_COMPONENTS = FRONTEND / "components" / "workpaper"
 WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
-import sys
+import sys  # noqa: E402
+sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
 import n_cycle_scanner_summary as scanner  # noqa: E402
+from tests.workpaper_sync import n_cycle_facts as F  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -224,9 +224,12 @@ class TestLane2DeliveryChecklist:
             assert f"NA-P{i}" in text, f"NA-P{i} 缺失"
 
     def test_lane2_arithmetic(self):
-        """份额算术：sheets 16 / 公式格 755。"""
+        """份额算术：sheets 16；公式格从共享 facts 派生。"""
         assert 10 + 6 == 16  # N1 + N3
-        assert 593 + 162 == 755
+        assert F.LANE2_FORMULA_CELLS == sum(
+            F.WORKBOOK_FORMULA_CELLS[F.ENTRY_WORKBOOKS[entry_id]]
+            for entry_id in F.LANE2_ENTRIES
+        )
 
     def test_all_lane2_test_files_exist(self):
         """Lane2 全部测试文件存在。"""

@@ -7,13 +7,14 @@
  * 职责：
  * - 借贷平衡实时校验（调用 isDebitCreditBalanced + calcDebitCreditDifference）
  * - 凭证异常判定（调用 isVoucherNormal）
- * - 抽凭结果填入逻辑（fillVoucherSamples）
+ * - 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
+ *   （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）
  * - 行CRUD（addRow / removeRow 含 ElMessageBox.prompt）
  * - 数据持久化（loadRows / toJSON）
  *
  * Requirements: 6.6, 6.7
  */
-import { ref, computed } from 'vue'
+import { ref, computed, type MaybeRefOrGetter } from 'vue'
 import {
   isDebitCreditBalanced,
   calcDebitCreditDifference,
@@ -22,10 +23,59 @@ import {
 } from '@/composables/useG4EclFormulaEngine'
 import { ElMessageBox } from 'element-plus'
 import type { VoucherCheckRow } from './useG4EclFormData'
+import { sideTableOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
+
+/**
+ * 共享回填函数的待写入项 → G4-13 凭证检查行：金额在样本自己的借贷栏，按分录自己的借贷栏分区（`sideTableOf`：
+ * 借方红字仍在借方区，原规则「借方有正数才进借方区」把它分到贷方区、贷方区只显示贷方金额 0）；
+ * 对方科目 = 编码、明细科目 = 名称（配不上写「多科目」时名称与编码相同，明细科目沿用原来的本科目名称兜底）。
+ * 原实现把多科目凭证按分录展开、行金额取对方分录的金额（借方区的行写成贷方金额），已改为后端配对。
+ */
+export function mapPreparedToG4VoucherRow(item: PreparedItem): VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null; accountName?: string | null }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const debit = Number(item.debitAmount ?? 0) || 0
+  return {
+    id: crypto.randomUUID(),
+    seq: 0,
+    section: sideTableOf(item),
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    counterAccount: code,
+    detailAccount: name && name !== code ? name : (s.accountName || ''),
+    debitAmount: debit,
+    creditAmount: Number(item.creditAmount ?? 0) || 0,
+    attachment: null,
+    supportingDocDesc: '',
+    checkOriginalComplete: false,
+    checkAuthorized: false,
+    checkAccountingCorrect: false,
+    checkInitialCostCorrect: false,
+    checkInterestCorrect: false,
+    checkImpairmentCorrect: false,
+    indexRef: '',
+    isAbnormal: true, // 未核对前默认异常
+    abnormalNote: '',
+    remark: '',
+  }
+}
+
+/** 行上已勾核对项或已填附件、支持性文件、索引、异常说明、备注（替换与撤销抽凭时据此先确认） */
+export function hasG4VoucherContent(r: VoucherCheckRow): boolean {
+  return [r.checkOriginalComplete, r.checkAuthorized, r.checkAccountingCorrect, r.checkInitialCostCorrect,
+    r.checkInterestCorrect, r.checkImpairmentCorrect].some(Boolean)
+    || [r.attachment, r.supportingDocDesc, r.indexRef, r.abnormalNote, r.remark].some(v => String(v ?? '').trim() !== '')
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useG4EclVoucherCheck() {
+export function useG4EclVoucherCheck(opts: {
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: MaybeRefOrGetter<string | null | undefined>
+  readonly?: MaybeRefOrGetter<boolean>
+} = {}) {
   const rows = ref<VoucherCheckRow[]>([])
   const activeTab = ref<'tab1' | 'tab2' | 'tab3'>('tab1')
   const activeRowIndex = ref(0)
@@ -98,53 +148,22 @@ export function useG4EclVoucherCheck() {
     ])
   }
 
-  // ─── 抽凭结果填入（Requirements: 6.3） ────────────────────────────────────
+  // ─── 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（Requirements: 6.3；共享回填函数） ─────
 
-  /**
-   * 从抽凭引擎结果批量填入行
-   * samples: 抽样引擎返回的样本列表
-   */
-  function fillVoucherSamples(samples: Array<{
-    voucherNo: string
-    date?: string
-    businessContent?: string
-    counterAccount?: string
-    detailAccount?: string
-    debitAmount?: number
-    creditAmount?: number
-    section?: 'debit' | 'credit'
-  }>): void {
-    for (const sample of samples) {
-      const section = sample.section ?? (sample.debitAmount ? 'debit' : 'credit')
-      const sectionRows = rows.value.filter(r => r.section === section)
-      const newRow: VoucherCheckRow = {
-        id: crypto.randomUUID(),
-        seq: sectionRows.length + 1,
-        section,
-        date: sample.date ?? '',
-        voucherNo: sample.voucherNo,
-        businessContent: sample.businessContent ?? '',
-        counterAccount: sample.counterAccount ?? '',
-        detailAccount: sample.detailAccount ?? '',
-        debitAmount: sample.debitAmount ?? 0,
-        creditAmount: sample.creditAmount ?? 0,
-        attachment: null,
-        supportingDocDesc: '',
-        checkOriginalComplete: false,
-        checkAuthorized: false,
-        checkAccountingCorrect: false,
-        checkInitialCostCorrect: false,
-        checkInterestCorrect: false,
-        checkImpairmentCorrect: false,
-        indexRef: '',
-        isAbnormal: true, // 未核对前默认异常
-        abnormalNote: '',
-        remark: '',
-      }
-      rows.value.push(newRow)
-    }
-    // 重新排序
-    _resequence()
+  const voucherFill = useVoucherCheckFill<VoucherCheckRow>({
+    projectId: opts.projectId ?? null,
+    tables: rows,
+    mapSampleToRow: item => mapPreparedToG4VoucherRow(item),
+    // 宿主深度监听 rows 落库（rowsToPersist 已按读入版本写回预审行），这里不另存
+    persist: () => undefined,
+    hasUserContent: hasG4VoucherContent,
+    afterChange: () => _resequence(),
+    readonly: opts.readonly,
+  })
+
+  /** 保存用的行：年审阶段预审行按读入版本写回（宿主落库与 toJSON 都用它） */
+  function rowsToPersist(): VoucherCheckRow[] {
+    return voucherFill.guardPersist(rows.value)
   }
 
   // ─── 行 CRUD（Requirements: 6.10） ────────────────────────────────────────
@@ -197,6 +216,7 @@ export function useG4EclVoucherCheck() {
    * 删除行
    */
   function removeRow(id: string): void {
+    if (rows.value.some(r => r.id === id && voucherFill.isRowLocked(r))) return
     rows.value = rows.value.filter(r => r.id !== id)
     _resequence()
   }
@@ -220,11 +240,12 @@ export function useG4EclVoucherCheck() {
    * 加载行数据
    */
   function loadRows(data: VoucherCheckRow[]): void {
-    rows.value = (data || []).map((r, i) => ({
+    rows.value = (data || []).map(r => withRowMeta({
       ...r,
       id: r.id || crypto.randomUUID(),
-    }))
+    }, r))
     _resequence()
+    voucherFill.markLoaded()
   }
 
   /**
@@ -238,7 +259,7 @@ export function useG4EclVoucherCheck() {
     isBalanced: boolean
   } {
     return {
-      rows: rows.value.map(r => ({ ...r })),
+      rows: rowsToPersist().map(r => ({ ...r })),
       debitTotal: debitTotal.value,
       creditTotal: creditTotal.value,
       difference: difference.value,
@@ -262,8 +283,14 @@ export function useG4EclVoucherCheck() {
     // Validation
     recalcAbnormal,
     isAllChecked,
-    // Sampling
-    fillVoucherSamples,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    rowsToPersist,
     // CRUD
     addRow,
     removeRow,

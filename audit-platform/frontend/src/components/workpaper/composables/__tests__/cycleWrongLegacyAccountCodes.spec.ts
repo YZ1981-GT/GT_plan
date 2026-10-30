@@ -290,7 +290,7 @@ interface RatchetCase {
 
 const RATCHET_CASES: RatchetCase[] = [
   { wp: 'G1', scopeFile: 'g1AccountScope.ts', wrong: ['1501'], fallback: G1_GROSS_FALLBACK_STANDARD, baseline: 44, why: '1501 是持有至到期投资（G4）；交易性金融资产是 1101' },
-  { wp: 'I2', scopeFile: 'i2AccountScope.ts', wrong: ['1717'], fallback: I2_GROSS_FALLBACK_STANDARD, baseline: 60, why: '1717 真实库无此码；开发支出是 1704' },
+  { wp: 'I2', scopeFile: 'i2AccountScope.ts', wrong: ['1717'], fallback: I2_GROSS_FALLBACK_STANDARD, baseline: 53, why: '1717 真实库无此码；开发支出是 1704' },
   { wp: 'I5', scopeFile: 'i5AccountScope.ts', wrong: ['1911', '1901'], fallback: I5_GROSS_FALLBACK_STANDARD, baseline: 55, why: '其他非流动资产无标准独立码；1901 是其他流动资产（K2）' },
   { wp: 'I6', scopeFile: 'i6AccountScope.ts', wrong: ['6602'], fallback: I6_GROSS_FALLBACK_STANDARD, baseline: 69, why: '6602 是管理费用（K9）；研发费用是 6604' },
 ]

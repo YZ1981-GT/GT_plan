@@ -10,7 +10,7 @@
  *  E (4) 敏感性分析
  *  各区块 JSON 持久化到 checklist_responses.remark（item_id J2-listed-*）。
  */
-import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
+import { ref, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -19,7 +19,7 @@ import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 import J2DisclosureConsistencyPanel from './J2DisclosureConsistencyPanel.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
-import { buildJ2ListedSyncPayload, buildJ2NetAssetPayload, toJ2SyncRequest } from '../composables/j2DisclosureSyncPayload'
+import { J2_LISTED_KEY, useJ2ListedDisclosureState } from '../composables/j2DisclosureTabState'
 import { api } from '@/services/apiProxy'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -45,12 +45,13 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
   return src && typeof src === 'object' ? (src as TbSourceCodes) : null
 })
 
-const KEY = {
-  summary: 'J2-listed-summary', dbo: 'J2-listed-dbo', asset: 'J2-listed-planasset',
-  net: 'J2-listed-netliab', maturity: 'J2-listed-maturity', assets: 'J2-listed-assets',
-  assume: 'J2-listed-assumptions', sens: 'J2-listed-sensitivity',
-  noteTerm: 'J2-listed-note-termination', noteDbp: 'J2-listed-note-dbp', noteSens: 'J2-listed-note-sensitivity',
-}
+// 表单状态 / 默认行 / 读回 / 同步载荷与附注页离屏同步共用 j2DisclosureTabState（spec note-pull-followup-closure R1）
+const KEY = J2_LISTED_KEY
+const listedState = useJ2ListedDisclosureState()
+const {
+  summaryRows, dboRows, assetRows, netRows, maturityRows, assetCompRows, assumeRows, sensRows,
+  noteTerm, noteDbp, noteSens,
+} = listedState
 
 function n(v: unknown): number { const x = typeof v === 'number' ? v : parseFloat(String(v ?? '')); return Number.isFinite(x) ? x : 0 }
 /** 只读金额统一走平台单一真源（千分符 + 单位偏好） */
@@ -59,14 +60,6 @@ function fmt(v: number | null | undefined): string { return displayPrefs.fmtAmou
 function fmtPct(v: number | null | undefined): string { if (v === null || v === undefined) return '-'; return (v * 100).toFixed(2) + '%' }
 
 // ── A 汇总表 ──────────────────────────────────────────────────────────────────
-interface AmtRow { key: string; label: string; end: number; begin: number }
-const summaryRows = reactive<AmtRow[]>([
-  { key: 'dbp_net', label: '设定受益计划净负债', end: 0, begin: 0 },
-  { key: 'termination', label: '辞退福利', end: 0, begin: 0 },
-  { key: 'other_lt_net', label: '符合设定受益计划条件的其他长期职工福利的净负债', end: 0, begin: 0 },
-  { key: 'other_lt', label: '其他长期福利', end: 0, begin: 0 },
-  { key: 'less_within1y', label: '减：一年内到期的长期应付职工薪酬', end: 0, begin: 0 },
-])
 const summarySubtotal = computed(() => {
   const rows = summaryRows.filter(r => r.key !== 'less_within1y')
   return { end: rows.reduce((s, r) => s + n(r.end), 0), begin: rows.reduce((s, r) => s + n(r.begin), 0) }
@@ -76,127 +69,27 @@ const summaryTotal = computed(() => {
   return { end: summarySubtotal.value.end - n(less.end), begin: summarySubtotal.value.begin - n(less.begin) }
 })
 
-// ── B 变动表（本期/上期），三张共用结构 ─────────────────────────────────────────
-interface MoveRow { key: string; label: string; indent: number; group?: boolean; cur: number; prior: number }
-function mv(key: string, label: string, indent = 0, group = false): MoveRow { return { key, label, indent, group, cur: 0, prior: 0 } }
-const dboRows = reactive<MoveRow[]>([
-  mv('begin', '一、期初余额', 0),
-  mv('pl', '二、计入当期损益的设定受益成本', 0, true),
-  mv('pl_service', '1．当期服务成本', 1),
-  mv('pl_past', '2．过去服务成本', 1),
-  mv('pl_settle', '3．结算利得（损失以"-"表示）', 1),
-  mv('pl_interest', '4．利息净额', 1),
-  mv('oci', '三、计入其他综合收益的设定受益成本', 0, true),
-  mv('oci_actuarial', '1．精算利得（损失以"-"表示）', 1),
-  mv('oci_return', '2．计划资产的回报（计入利息净额的除外）', 1),
-  mv('oci_ceiling', '3．资产上限影响的变动（计入利息净额的除外）', 1),
-  mv('other', '四、其他变动', 0, true),
-  mv('other_settle', '1．结算时消除的负债', 1),
-  mv('other_paid', '2．已支付的福利', 1),
-  mv('end', '五、期末余额', 0),
-])
-const assetRows = reactive<MoveRow[]>([
-  mv('begin', '一、期初余额', 0),
-  mv('pl', '二、计入当期损益的设定受益成本', 0, true),
-  mv('pl_interest', '1．利息净额', 1),
-  mv('oci', '三、计入其他综合收益的设定受益成本', 0, true),
-  mv('oci_return', '1．计划资产的回报（计入利息净额的除外）', 1),
-  mv('oci_ceiling', '2．资产上限影响的变动（计入利息净额的除外）', 1),
-  mv('other', '四、其他变动', 0, true),
-  mv('end', '五、期末余额', 0),
-])
-const netRows = reactive<MoveRow[]>([
-  mv('begin', '一、期初余额', 0),
-  mv('pl', '二、计入当期损益的设定受益成本', 0),
-  mv('oci', '三、计入其他综合收益的设定受益成本', 0),
-  mv('other', '四、其他变动', 0),
-  mv('end', '五、期末余额', 0),
-])
-
-// ── 未折现到期分析 ────────────────────────────────────────────────────────────
-const maturityRows = reactive([
-  { key: 'y1', label: '一年以内', amount: 0 },
-  { key: 'y1_2', label: '一到两年', amount: 0 },
-  { key: 'y2_5', label: '二到五年', amount: 0 },
-  { key: 'y5', label: '五年以上', amount: 0 },
-])
+// ── B 变动表（本期/上期，三张共用结构）/ 未折现到期分析：行定义在 j2DisclosureTabState ──────
 const maturityTotal = computed(() => maturityRows.reduce((s, r) => s + n(r.amount), 0))
 
 // ── C 计划资产构成 ────────────────────────────────────────────────────────────
-const assetCompRows = reactive<AmtRow[]>([
-  { key: 'cash', label: '现金和现金等价物', end: 0, begin: 0 },
-  { key: 'equity', label: '权益工具投资', end: 0, begin: 0 },
-  { key: 'debt', label: '债务工具投资', end: 0, begin: 0 },
-  { key: 'other', label: '其他', end: 0, begin: 0 },
-])
 const assetCompTotal = computed(() => ({
   end: assetCompRows.reduce((s, r) => s + n(r.end), 0),
   begin: assetCompRows.reduce((s, r) => s + n(r.begin), 0),
 }))
 
-// ── D 精算假设 ────────────────────────────────────────────────────────────────
-const assumeRows = reactive([
-  { key: 'discount', label: '折现率', end: 0, begin: 0 },
-  { key: 'mortality', label: '死亡率', end: 0, begin: 0 },
-  { key: 'life', label: '预计平均寿命', end: 0, begin: 0 },
-  { key: 'turnover', label: '职工的离职率', end: 0, begin: 0 },
-  { key: 'salary', label: '薪酬的预期增长率', end: 0, begin: 0 },
-])
-// ── E 敏感性分析 ──────────────────────────────────────────────────────────────
-const sensRows = reactive([
-  { key: 'discount', label: '折现率', delta: 0, up: 0, down: 0 },
-  { key: 'mortality', label: '死亡率', delta: 0, up: 0, down: 0 },
-  { key: 'life', label: '预计平均寿命', delta: 0, up: 0, down: 0 },
-  { key: 'turnover', label: '职工的离职率', delta: 0, up: 0, down: 0 },
-  { key: 'salary', label: '薪酬的预期增长率', delta: 0, up: 0, down: 0 },
-])
+// ── D 精算假设 / E 敏感性分析：行定义在 j2DisclosureTabState ──────────────────────
 
 // ── 说明文本 ──────────────────────────────────────────────────────────────────
 // 源模板固定指引作为 placeholder（灰字提示）：空值时显示、用户输入即隐藏，无需手动删除。
 const PH_TERM = '1、辞退福利的性质、内容及计算依据详见附注五、35；\n2、其他长期职工福利的性质及计算依据。'
 const PH_DBP = '1、设定受益计划的内容、形成的原因、特征及与之相关的风险；如有对计划的修改或结算的，还应当披露修改或结算计划的有关情况；\n2、设定受益计划对公司未来现金流量的金额、时间和不确定性的影响。披露影响设定受益计划未来缴存金额的有关筹资政策和计划、下一会计年度预期将缴存的金额，设定受益义务有关到期情况的信息（如设定受益义务的加权平均期间、对有关福利支付的到期日分析等）。'
 const PH_SENS = '上述敏感性分析是基于一个假设发生变动而其他假设均保持不变，但实际上各种假设通常是相互关联的。上述敏感性分析在计算设定受益义务现值时也同样采用累积福利单位法。进行敏感度分析所采用的重大假设的方法和类型与以前年度比较未发生变动。（如发生变动，应进一步说明发生的具体变动及原因。）'
-const noteTerm = ref('')
-const noteDbp = ref('')
-const noteSens = ref('')
 const aiLoading = ref('')
 
-// ── 加载 ──────────────────────────────────────────────────────────────────────
-function parseJson<T>(id: string, fb: T): T { const raw = props.allResponses?.get(id)?.remark; if (!raw) return fb; try { const p = JSON.parse(raw); return (p ?? fb) as T } catch { return fb } }
-function assignRows<T extends object>(target: T[], saved: unknown) {
-  if (!Array.isArray(saved)) return
-  for (const s of saved as Record<string, unknown>[]) { const row = target.find(r => (r as Record<string, unknown>).key === s.key); if (row) Object.assign(row, s) }
-}
+// ── 加载（读回已保存的各区块；汇总表全 0 时按 J2-1 审定表带出期末） ─────────────────
 function load() {
-  assignRows(summaryRows, parseJson(KEY.summary, null))
-  assignRows(dboRows, parseJson(KEY.dbo, null))
-  assignRows(assetRows, parseJson(KEY.asset, null))
-  assignRows(netRows, parseJson(KEY.net, null))
-  assignRows(maturityRows, parseJson(KEY.maturity, null))
-  assignRows(assetCompRows, parseJson(KEY.assets, null))
-  assignRows(assumeRows, parseJson(KEY.assume, null))
-  assignRows(sensRows, parseJson(KEY.sens, null))
-  const t = props.allResponses?.get(KEY.noteTerm)?.remark; if (t) noteTerm.value = t
-  const d = props.allResponses?.get(KEY.noteDbp)?.remark; if (d) noteDbp.value = d
-  const s = props.allResponses?.get(KEY.noteSens)?.remark; if (s) noteSens.value = s
-  // 从审定表(J2-1-main)自动 seed 汇总表期末数（仅在汇总表全 0 时）
-  const anySum = summaryRows.some(r => n(r.end) !== 0 || n(r.begin) !== 0)
-  if (!anySum) {
-    const mainRaw = props.allResponses?.get('J2-1-main')?.remark
-    if (mainRaw) {
-      try {
-        const main = JSON.parse(mainRaw) as Array<Record<string, unknown>>
-        const audited = (k: string) => { const r = main.find(x => x.key === k); return r ? n(r.endUnadj) + n(r.endAje) : 0 }
-        const beginAud = (k: string) => { const r = main.find(x => x.key === k); return r ? n(r.beginUnadj) + n(r.beginAje) : 0 }
-        summaryRows.find(r => r.key === 'dbp_net')!.end = audited('dbp')
-        summaryRows.find(r => r.key === 'dbp_net')!.begin = beginAud('dbp')
-        summaryRows.find(r => r.key === 'termination')!.end = audited('termination')
-        summaryRows.find(r => r.key === 'termination')!.begin = beginAud('termination')
-        summaryRows.find(r => r.key === 'less_within1y')!.end = audited('less_within1y')
-        summaryRows.find(r => r.key === 'less_within1y')!.begin = beginAud('less_within1y')
-      } catch { /* ignore */ }
-    }
-  }
+  listedState.load(props.allResponses)
 }
 
 // ── 保存（防抖） ──────────────────────────────────────────────────────────────
@@ -273,43 +166,13 @@ const { scheduleAutoSync } = useDisclosureAutoSync({ isReadonly: () => isReadonl
 
 async function syncToDisclosureNotes() {
   if (!props.wpId || !props.projectId) return
-  const payload = buildJ2ListedSyncPayload({
-    summaryRows: [...summaryRows],
-    dboRows: [...dboRows],
-    assetRows: [...assetRows],
-    netRows: [...netRows],
-    maturityRows: [...maturityRows],
-    assetCompRows: [...assetCompRows],
-    assumeRows: [...assumeRows],
-    sensRows: [...sensRows],
-    noteTerm: noteTerm.value,
-    noteDbp: noteDbp.value,
-    noteSens: noteSens.value,
-  })
+  // 五、49 一条；净负债表期末为负 = 净资产 → 额外推送 五、17（请求体由 j2DisclosureTabState 组装，离屏同步同一份）
+  const [main, netAsset] = listedState.syncRequests(props.wpId, auditYear.value)
   try {
-    // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）+ 端点契约形状（wp_id / section_id / current_standard）：
+    // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）+ 端点契约形状（wp_id / section_id / current_standard，见 toJ2SyncRequest）：
     //    旧实现用 axios 默认实例 ⇒ 恒 401，且载荷缺这三个必填字段 ⇒ 即便带鉴权也 422，J2 附注从未同步成功过
-    await api.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-      toJ2SyncRequest(payload, { wpId: props.wpId, currentStandard: 'listed_standalone', year: auditYear.value }),
-    )
-
-    // 净负债表期末为负 = 净资产 → 额外推送 五、17
-    const netEndRow = netRows.find(r => r.key === 'end')
-    if (netEndRow && n(netEndRow.cur) < 0) {
-      const netAssetPayload = buildJ2NetAssetPayload({
-        dbpNetRow: {
-          begin: n(netRows.find(r => r.key === 'begin')?.cur ?? 0),
-          increase: n(netRows.find(r => r.key === 'pl')?.cur ?? 0) + n(netRows.find(r => r.key === 'oci')?.cur ?? 0),
-          decrease: Math.abs(n(netRows.find(r => r.key === 'other')?.cur ?? 0)),
-          end: n(netEndRow.cur),
-        },
-      })
-      await api.post(
-        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
-        toJ2SyncRequest(netAssetPayload, { wpId: props.wpId, currentStandard: 'listed_standalone', year: auditYear.value }),
-      )
-    }
+    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, main)
+    if (netAsset) await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, netAsset)
   } catch { /* 失败静默 */ }
 }
 

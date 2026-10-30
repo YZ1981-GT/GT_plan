@@ -19,11 +19,15 @@ export function buildWorkpaperUri(wpCode: string, sheetName?: string, cellRef?: 
 }
 
 /**
- * 从结果行 + 当前选定数据源推断溯源 URI。
- * 优先 workpaper > report > note > selectedSource 兜底。
+ * 从结果行 + 本次结果的数据源推断模板溯源 URI（`GET /api/custom-query/address-resolve` 认的 module 前缀，ADR-AQL-17）。
+ *
+ * 优先行上的底稿编码（有 sheet / 单元格时带上）> 行上的报表 / 附注标记 > 按数据源：底稿选区源原样、报表叶子 →
+ * `report:<类型>`、报表行次配置 → `report:<行上的报表类型>`、附注章节 → `note:<章节号>`、附注目录 → `note:`、
+ * 调整分录 → `adj:<源>`、其余（试算 / 四表 / 合并）→
+ * `tb:<源>`（后端回 `registered=false`：这类结果没有模板定义）。原先注册表源键原样发出（如 `tb_detail`），后端认不出 ⇒ 400。
  */
 export function buildTraceUri(row: Record<string, any>, selectedSource: string): string {
-  if (row.wp_code && row.sheet_name) {
+  if (row.wp_code) {
     return buildWorkpaperUri(row.wp_code, row.sheet_name, row.cell_ref)
   }
   if (row.module === 'report' && row.report_type) {
@@ -32,10 +36,17 @@ export function buildTraceUri(row: Record<string, any>, selectedSource: string):
   if (row.module === 'note' && row.section_id) {
     return `note:${row.section_id}`
   }
-  if (selectedSource) {
-    return selectedSource
-  }
-  return ''
+  const source = selectedSource || ''
+  if (!source) return ''
+  if (source.startsWith('workpaper:')) return source
+  const reportType = reportTypeOfSource(source)
+  if (reportType) return `report:${reportType}`
+  // 报表行次配置 / 通用报表源：行上带报表类型（报表配置即报表模板）
+  if (source === 'report_lines' || source === 'report') return `report:${row.report_type ?? ''}`
+  if (source.startsWith('disclosure_note:')) return `note:${source.slice('disclosure_note:'.length)}`
+  if (source === 'disclosure') return 'note:'
+  if (source === 'adjustment' || source.startsWith('adj_')) return `adj:${source}`
+  return `tb:${source}`
 }
 
 /**
@@ -56,6 +67,7 @@ export function reportTypeOfSource(source: string): string | null {
 /** 统一失败提示文案（各消费方复用，UI 口径一致） */
 export const RESOLVE_FAIL_MSG = {
   wpNotFound: (code: string) => `底稿 ${code} 在当前项目不存在`,
-  notRegistered: '该模板未在 registry，请先 migrate',
-  noUri: '无法确定数据源 URI',
+  notRegistered: '该底稿编码未在模板目录中登记，无法打开模板',
+  noTemplate: '该类结果没有模板定义',
+  noUri: '无法确定该结果的数据源',
 } as const

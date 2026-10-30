@@ -70,7 +70,7 @@ class TestLane3Attribution:
         assert "BP-8" in per[F.N2] and "BP-8" in per[F.N5]
 
     def test_majority_share(self, tf) -> None:
-        """NB-P3：三项过半 —— sheets 34/59 · 公式格 1194/2185 · 带 fx 30/49。"""
+        """NB-P3：三项过半 —— sheets 34/59 · 公式格 1194/2184 · 带 fx 30/48。"""
         mine = [f for f in tf.sheets if f.workbook in (N2_WB, N5_WB)]
         _eq("sheets", len(mine), 34)
         _eq("公式格", sum(f.formula_cells for f in mine), 1194)
@@ -306,20 +306,20 @@ class TestLane3GatesAndPayload:
         _eq("污染", bad, [])
 
 
-# ═══ Task 11 ~ 13 · 模板缺陷登记（记录型，不改 .xlsx）（NB-P21 / NB-P22） ═════
+# ═══ Task 11 ~ 13 · 模板缺陷修复与结构登记（NB-P21 / NB-P22） ════════════════
 class TestLane3TemplateDefects:
-    def test_a1_two_defects_in_n5(self, tf) -> None:
+    def test_a1_defects_are_closed(self, tf) -> None:
         a1 = sorted((h.sheet, h.cell) for h in tf.overflow
                     if h.family == "A1_real_defect" and h.workbook == N5_WB)
-        _eq("N5 A1", a1, [("加计扣除研发费用情况明细表N5-6-1", "E12"), ("递延所得税费用核对表N5-8", "H12")])
+        _eq("N5 A1", a1, [])
 
     @pytest.mark.parametrize("sheet,cell,formula,pattern,expected", [
-        ("加计扣除研发费用情况明细表N5-6-1", "E12", "=C12+N5", r"^=C(\d+)\+D\1$", 37),
-        ("递延所得税费用核对表N5-8", "H12", "=C12-B12+N5-E12-F12+G12",
-         r"^=C(\d+)-B\1\+D\1-E\1-F\1\+G\1$", 28),
+        ("加计扣除研发费用情况明细表N5-6-1", "E12", "=C12+D12", r"^=C(\d+)\+D\1$", 38),
+        ("递延所得税费用核对表N5-8", "H12", "=C12-B12+D12-E12-F12+G12",
+         r"^=C(\d+)-B\1\+D\1-E\1-F\1\+G\1$", 29),
     ])
     def test_a1_reverse_denominators(self, sheet, cell, formula, pattern, expected) -> None:
-        """反向分母 37:1 / 28:1（同列正确形态行数）。"""
+        """修复后同列正确形态 38 / 29（修复前反向分母 37:1 / 28:1）。"""
         wb = S.load_workbook(S.N_TEMPLATE_DIR / N5_WB)
         try:
             ws = wb[sheet]
@@ -332,11 +332,13 @@ class TestLane3TemplateDefects:
         finally:
             wb.close()
 
-    def test_n5_8_total_row_is_contaminated(self) -> None:
-        """🔴 连带影响：N5-8 r39 合计 `=SUM(H10:H38)` 因 H12 恒空而连带错（全域唯一）。"""
+    def test_n5_8_total_row_now_includes_the_repaired_h12(self) -> None:
+        """H39 汇总区间覆盖已修复的 H12，合计链不再漏掉 D12 分量。"""
         wb = S.load_workbook(S.N_TEMPLATE_DIR / N5_WB)
         try:
-            _eq("H39", wb["递延所得税费用核对表N5-8"]["H39"].value, "=SUM(H10:H38)")
+            ws = wb["递延所得税费用核对表N5-8"]
+            _eq("H12", ws["H12"].value, "=C12-B12+D12-E12-F12+G12")
+            _eq("H39", ws["H39"].value, "=SUM(H10:H38)")
         finally:
             wb.close()
 

@@ -175,11 +175,10 @@ function scan(): Site[] {
 describe('全部生产调用点都经构造函数（R2-F10）', () => {
   const sites = scan()
 
-  it('调用点文件集合与登记相等（4 个业务视图 / 构建器入口；useBatchQuery 已被 advanced-query d606c25dd 删除）', () => {
+  it('调用点文件集合与登记相等（3 个业务视图 / 构建器入口；useBatchQuery 与 SheetCellRangePicker 的跨模块单元格模式已被 advanced-query 删除：d606c25dd、任务 34）', () => {
     const byKind = (k: Site['kind']) => [...new Set(sites.filter((s) => s.kind === k).map((s) => s.file))].sort()
     expect(byKind('business')).toEqual([
       'components/query/CustomQueryDialog.vue',
-      'components/query/SheetCellRangePicker.vue',
       'components/template-library/CustomQueryTab.vue',
     ])
     expect(byKind('builder')).toEqual(['views/AdvancedQueryBuilder.vue'])

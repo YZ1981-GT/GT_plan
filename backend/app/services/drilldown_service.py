@@ -29,10 +29,12 @@ from app.services.dataset_query import get_active_filter
 from app.services.voucher_identity import (
     VoucherKey,
     annotate_lines,
+    company_code_condition,
     single_voucher_lines,
     voucher_key_sql,
     voucher_type_condition,
 )
+from app.services.voucher_pairing import annotate_pairing
 
 
 class DrilldownService:
@@ -508,8 +510,9 @@ class DrilldownService:
         month: int | None = None,
         voucher_date: str | None = None,
         voucher_type: str | None = None,
+        company_code: str | None = None,
     ) -> dict:
-        """一张凭证的完整分录，包含借贷合计和平衡状态（按凭证键定位：日期 + 凭证字 + 号）。
+        """一张凭证的完整分录，包含借贷合计和平衡状态（按凭证键定位：主体 + 日期 + 凭证字 + 号）。
 
         🔴 凭证号单独不唯一，同日同号也不唯一（四川物流 2025-01-07 的 FY-0003 与 ZZ-0003 是两张
         凭证）。两张各自平衡的凭证并在一起照样平衡，「借贷平衡」证明不了唯一；命中多张凭证时
@@ -519,6 +522,7 @@ class DrilldownService:
             month: 月份过滤（1~12），只在不给日期时用。
             voucher_date: 凭证日期（YYYY-MM-DD）。
             voucher_type: 凭证字；空串 = 凭证字为空的那张，None = 不限。
+            company_code: 主体编码；None / 空串 = 不限。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
@@ -533,6 +537,9 @@ class DrilldownService:
             conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
         if voucher_type is not None:
             conditions.append(voucher_type_condition(tbl, voucher_type))
+        company_cond = company_code_condition(tbl, company_code)
+        if company_cond is not None:
+            conditions.append(company_cond)
 
         stmt = (
             sa.select(
@@ -555,7 +562,7 @@ class DrilldownService:
         )
         result = await self.db.execute(stmt)
         rows = single_voucher_lines([dict(r._mapping) for r in result.fetchall()], year=year)
-        annotate_lines(rows, year=year)
+        annotate_pairing(annotate_lines(rows, year=year))
 
         entries = []
         total_debit = Decimal("0")
@@ -575,6 +582,7 @@ class DrilldownService:
                 "summary": r["summary"],
                 "side": r["side"],
                 "line_fp": r["line_fp"],
+                "pairing": r["pairing"],
             })
 
         first = rows[0] if rows else {}

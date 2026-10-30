@@ -240,11 +240,16 @@
         size="small"
         class="check-table"
         max-height="520"
-        :row-class-name="rowClassName"
+        :row-class-name="rowsRowClass"
         show-summary
         :summary-method="getSummary"
       >
         <el-table-column type="index" label="#" width="40" fixed align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="isVoucherRowLocked(row)" :project-id="props.projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
 
         <el-table-column prop="projectName" label="研发项目" min-width="120" fixed>
           <template #default="{ row }">
@@ -459,7 +464,7 @@
     <!-- 四、审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header><span>四、审计说明</span></template>
-      <el-input
+      <WpCommitInput
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
@@ -472,7 +477,7 @@
     <!-- 五、审计结论 -->
     <el-card shadow="never" class="audit-conclusion-card">
       <template #header><span>五、审计结论</span></template>
-      <el-input
+      <WpCommitInput
         type="textarea"
         :model-value="auditConclusion"
         :disabled="isReadonly"
@@ -482,15 +487,15 @@
       />
     </el-card>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 开发支出(1717) 委外研发检查" width="90%" top="5vh" destroy-on-close>
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 开发支出(${samplingAccountCode}) 委外研发检查`" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
         :year="samplingYear"
         @filled="onSamplesFilled"
+        @undo-request="onUndoRequest"
       />
     </el-dialog>
   </div>
@@ -500,9 +505,11 @@
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
-import { computed, defineAsyncComponent, inject, ref, toRef } from 'vue'
+import { computed, defineAsyncComponent, inject, onMounted, ref, toRef } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import { combineRowClass, type EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import GtIndexChip from '../../GtIndexChip.vue'
 import {
   useI2OutsourceCheck,
@@ -533,6 +540,7 @@ import {
   listAttachedVouchers,
 } from '../../composables/useAttachedVouchers'
 import type { TbSourceCodes } from '@/components/workpaper/composables/shared/tbSourceCodes'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 /** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 1704；逗号拼接供引擎 split） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -581,7 +589,18 @@ const {
   persistAll,
   saveAuditNote,
   saveAuditConclusion,
-} = useI2OutsourceCheck(toRef(props, 'allResponses'), { saveResponse: props.saveResponse })
+  onEngineFilled,
+  onAttachImported,
+  onUndoRequest,
+  voucherRowClass,
+  isVoucherRowLocked,
+  voucherFillReady,
+} = useI2OutsourceCheck(toRef(props, 'allResponses'), {
+  saveResponse: props.saveResponse,
+  projectId: () => props.projectId,
+  isReadonly: () => props.isReadonly === true,
+})
+onMounted(() => { void voucherFillReady() })
 
 const superDeductionTip = computed(() =>
   buildOutsourceSuperDeductionTip(Number(sampleMeta.value.populationAmount) || 0),
@@ -650,29 +669,16 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, I2_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSamplesFilled({ samples })
+    if (samples.length > 0) await onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSamplesFilled(payload: { samples?: any[] }) {
-  const samples = payload?.samples ?? []
-  let n = 0
-  for (const s of samples) {
-    const amount = Number(s?.debitAmount) || Number(s?.creditAmount) || Number(s?.amount) || 0
-    addRow({
-      entrustedParty: String(s?.counterpart ?? s?.counterparty ?? s?.counterpartAccount ?? ''),
-      amount,
-      voucherNo: String(s?.voucherNo ?? ''),
-      voucherDate: String(s?.voucherDate ?? ''),
-      businessDesc: String(s?.summary ?? ''),
-      projectName: String(s?.projectName ?? s?.accountName ?? ''),
-    })
-    n++
-  }
-  samplingVisible.value = false
-  ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已回填 ${n} 笔抽样凭证` : '未回填新凭证')
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSamplesFilled(payload: EngineFilledPayload) {
+  const out = await onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 async function handleOcr(idx: number) {
@@ -759,6 +765,9 @@ function fmtNum(v: number | null | undefined): string {
   if (v == null || Math.abs(v) < 0.005) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+/** 行样式：异常提示 + 年审阶段预审行只读 */
+const rowsRowClass = combineRowClass(rowClassName, voucherRowClass)
 
 function getSummary({ columns }: { columns: any[] }) {
   return columns.map((col: any, idx: number) => {

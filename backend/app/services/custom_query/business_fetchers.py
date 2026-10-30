@@ -151,29 +151,14 @@ async def _fetch_json(req: QueryRequest, target: ResolvedSource, db: Any, cycle:
     return FetchPage(rows=indexed, columns=columns, total=len(indexed), paged=False, meta=dict(meta), warnings=warnings)
 
 
-async def business_fetcher(
-    req: QueryRequest, resolved: list[Any], db: Any, *, user: Any = None
-) -> "tuple[list[dict], list[ColumnMeta]] | FetchPage":
+async def business_fetcher(req: QueryRequest, resolved: list[Any], db: Any, *, user: Any = None) -> FetchPage:
     """编排器 step4 的业务视图取数钩子（分派见模块文档）。
 
     ``user``：当前用户（router 以 ``functools.partial`` 绑定）—— 试算表、调整分录、附注按其循环范围过滤（R3.8）。
+    跨模块单元格源键（``report:类型|区域`` 等）随任务 34 删除（AQ-25），由 ``resolve_source`` 按未知数据源 400。
     """
     source = (req.source or "").strip()
     filters = dict(req.filters or {})
-
-    # ── 跨模块 cell 级查询（report:type|range / note:section|range / …）——任务 34 随该源族一起删除 ──
-    from app.services.custom_query.module_cell_resolver import (
-        is_module_cell_source,
-        module_cell_resolver,
-    )
-
-    if is_module_cell_source(source):
-        _reject_conditions(req)
-        result = await module_cell_resolver.resolve(db, source, req.project_id, req.year, filters=filters)
-        _raise_fetch_error(req, result)
-        rows = list(result.get("rows") or [])
-        return rows, _columns_from_result(result, rows)
-
     target = resolve_source(source, filters)
     cycle = _cycle_cache(user, db)
     if target.spec is not None:
@@ -184,15 +169,13 @@ async def business_fetcher(
 async def prepare_export(req: QueryRequest, db: Any, *, user: Any = None) -> "paged_fetch.StreamPlan | None":
     """服务端完整导出的取数准备（R8，design §3.5），与 :func:`business_fetcher` 同一分派与校验。
 
-    注册表 SQL 源 → ``paged_fetch.StreamPlan``（与 ``page`` 同一语句、同一排序，不带 LIMIT；400 / 422 在这一步）；其余源
-    （JSON 内存源、跨模块单元格源）→ None：调用方取导出名额后经 :func:`business_fetcher` 取全部行（≤ 5,000，同 execute 的
-    内存路径）。带结构化条件的非 SQL 源在这里就 400 ``CONDITIONS_UNSUPPORTED``。
+    注册表 SQL 源 → ``paged_fetch.StreamPlan``（与 ``page`` 同一语句、同一排序，不带 LIMIT；400 / 422 在这一步）；JSON 内存源
+    → None：调用方取导出名额后经 :func:`business_fetcher` 取全部行（≤ 5,000，同 execute 的内存路径）。带结构化条件的
+    非 SQL 源在这里就 400 ``CONDITIONS_UNSUPPORTED``；未知源（含已删除的跨模块单元格源键）400 ``UNKNOWN_SOURCE``。
     """
-    from app.services.custom_query.module_cell_resolver import is_module_cell_source
-
     source = (req.source or "").strip()
-    target = None if is_module_cell_source(source) else resolve_source(source, dict(req.filters or {}))
-    if target is None or target.spec is None:
+    target = resolve_source(source, dict(req.filters or {}))
+    if target.spec is None:
         _reject_conditions(req)
         return None
     return await paged_fetch.prepare_stream(

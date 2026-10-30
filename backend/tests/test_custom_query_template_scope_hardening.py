@@ -145,6 +145,11 @@ async def test_non_owner_including_admin_cannot_update_or_delete(monkeypatch, op
 
 @pytest.mark.asyncio
 async def test_execute_template_reauthorizes_target_and_reuses_main_execute(monkeypatch):
+    """advanced-query-linkage-closure 任务 24 调整（R9.3）：年度取请求年度（其次目标项目审计年度），不再取模板里存的
+    年度 ⇒ 模板存 2025、请求带 2024，执行用 2024；目标项目归属改在端点函数体内、先于年度解析直接校验（原先只在
+    ``execute_query`` 里间接校验）⇒ 断言它被调用且参数是目标项目。单例方法的桩按 ``vars(单例)`` 置换（不留实例属性残留）。"""
+    from app.services.custom_query.ownership_guard import ownership_guard
+
     owner = uuid.uuid4()
     target_project = uuid.uuid4()
     template = make_template(
@@ -172,20 +177,23 @@ async def test_execute_template_reauthorizes_target_and_reuses_main_execute(monk
         )
         return {"rows": [], "columns": [], "total": 0}
 
-    monkeypatch.setattr(router_mod.template_service, "assert_executable", assert_visible)
+    reauthorized = AsyncMock()
+    monkeypatch.setitem(vars(router_mod.template_service), "assert_executable", assert_visible)
+    monkeypatch.setitem(vars(ownership_guard), "assert_target_accessible", reauthorized)
     monkeypatch.setattr(router_mod, "execute_query", fake_execute)
     response = Response()
     result = await router_mod.execute_template(
         template_id=str(template.id),
-        body=router_mod.TemplateExecuteRequest(project_id=str(target_project)),
+        body=router_mod.TemplateExecuteRequest(project_id=str(target_project), year=2024),
         response=response, db=db, current_user=user,
     )
 
     assert result["total"] == 0
     assert_visible.assert_awaited_once_with(template, user=user, db=db)
+    reauthorized.assert_awaited_once_with(user=user, project_id=str(target_project), db=db)
     query = captured["query"]
     assert query.project_id == str(target_project)
-    assert query.year == 2025
+    assert query.year == 2024
     assert query.filters == {"科目名称": "应收账款"}
     assert query.columns == ["科目编码", "期末余额"]
     assert query.offset == 20 and query.limit == 20

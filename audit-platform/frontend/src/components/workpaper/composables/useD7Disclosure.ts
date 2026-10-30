@@ -14,7 +14,7 @@
  * Task: 13.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD7FormulaEngine'
 import { D7_NOTE_TEXT_KEYS } from './d7NoteSectionMap'
 import { eventBus } from '@/utils/eventBus'
@@ -347,11 +347,15 @@ export function useD7Disclosure(options: UseD7DisclosureOptions) {
     }
   }
 
-  eventBus.on('disclosure:note-text-updated', _handleNoteSectionUpdated)
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不订阅：没有卸载钩子退订，
+  // 订阅会一直留着（spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    eventBus.on('disclosure:note-text-updated', _handleNoteSectionUpdated)
 
-  onBeforeUnmount(() => {
-    eventBus.off('disclosure:note-text-updated', _handleNoteSectionUpdated)
-  })
+    onBeforeUnmount(() => {
+      eventBus.off('disclosure:note-text-updated', _handleNoteSectionUpdated)
+    })
+  }
 
   // ─── Return ──────────────────────────────────────────────────────────
 

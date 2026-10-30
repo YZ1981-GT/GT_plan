@@ -20,8 +20,9 @@ Task 3.7 的落点被 tasks.md 写成 `adopt_row_reader.py`，但该文件交付
 
 ═══ R3 与第 ① 级（provider 门面）的分工 ═══
 
-第 ① 级用 provider 的 `iter_store_rows` 门面。它解不了两类问题（ADR-AOS-005 §2，现算复核见
-Task 3.7 交付记录）：
+第 ① 级用 provider 的 `iter_store_rows` 门面。它曾解不了两类问题（ADR-AOS-005 §2，现算复核见
+Task 3.7 交付记录；两类都已由 spec oo-writeback-template-parity-closure R3 批 B3 在门面侧修好 —— 门面按
+provider 绑定、多区逐段穿线 ⇒ 现在这几条两路都可用，走 :class:`ReconcilingRowReader` 对账）：
 
 * **门面覆盖面不全**：`G1-2-rows` 声明 3 段（`acctClass` = `trading` / `classified_fvpl` /
   `designated_fvpl`），门面是**单 spec** 薄转发（`_spec_of_store_item` 取**首个**匹配 spec）

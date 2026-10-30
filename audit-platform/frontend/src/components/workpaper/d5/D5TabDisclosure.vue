@@ -486,8 +486,18 @@ import {
   buildD5SyncPayload,
   D5_NOTE_SECTION,
   D5_NOTE_TEXT_SECTIONS,
-  type D5DisclosureSnapshot,
 } from '../composables/d5NoteSectionMap'
+// 快照与已质押 / 已背书两表的默认行、持久化解析：与附注页离屏同步共用（spec note-pull-followup-closure R1）
+import {
+  buildD5DisclosureSnapshot,
+  defaultD5EndorsedRows,
+  defaultD5PledgedRows,
+  parseD5NoteRows,
+  D5_ENDORSED_ITEM,
+  D5_PLEDGED_ITEM,
+  type D5EndorsedRow,
+  type D5PledgedRow,
+} from '../composables/d5DisclosureSnapshot'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
@@ -497,6 +507,8 @@ import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
+// 原先这行误写在上面金额格式说明的块注释里（被注释掉）⇒ 同步失败时 catch 里 ReferenceError、错误提示不出现
+import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -520,7 +532,6 @@ const { year: auditYear } = useAuditContext()
  * 🔴 `useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体会静默失效；
  * 且 `fmtAmount` 是 store **成员**不是模块级导出（写
  * `import { fmtAmount } from '@/stores/displayPrefs'` 会让整页崩成
-import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
  * 「页面渲染出错」，而 get_diagnostics 与 vitest 都查不出）。
  */
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
@@ -574,29 +585,22 @@ watch(
 
 // ─── (2) 期末已质押的应收票据 ────────────────────────────────────────────────
 
-interface PledgedRow { key: string; label: string; pledgedAmount: number }
+type PledgedRow = D5PledgedRow
 
-const pledgedRows = ref<PledgedRow[]>([
-  { key: 'bank', label: '银行承兑票据', pledgedAmount: 0 },
-  { key: 'commercial', label: '商业承兑票据', pledgedAmount: 0 },
-])
+const pledgedRows = ref<PledgedRow[]>(defaultD5PledgedRows())
 
 watch(
-  () => allResponsesRef.value.get('D5-note-listed-pledged')?.remark,
+  () => allResponsesRef.value.get(D5_PLEDGED_ITEM)?.remark,
   (val) => {
-    if (val) {
-      try {
-        const parsed = JSON.parse(val)
-        if (Array.isArray(parsed) && parsed.length > 0) pledgedRows.value = parsed
-      } catch { /* ignore */ }
-    }
+    const parsed = parseD5NoteRows<PledgedRow>(val)
+    if (parsed) pledgedRows.value = parsed
   },
   { immediate: true },
 )
 
 watch(
   pledgedRows,
-  (val) => { props.debouncedSave('D5-note-listed-pledged', { remark: JSON.stringify(val) }) },
+  (val) => { props.debouncedSave(D5_PLEDGED_ITEM, { remark: JSON.stringify(val) }) },
   { deep: true },
 )
 
@@ -618,29 +622,22 @@ const pledgedDisplayRows = computed(() => [
 
 // ─── (3) 期末已背书或贴现但尚未到期的应收票据 ────────────────────────────────
 
-interface EndorsedRow { key: string; label: string; derecognizedAmount: number; notDerecognizedAmount: number }
+type EndorsedRow = D5EndorsedRow
 
-const endorsedRows = ref<EndorsedRow[]>([
-  { key: 'bank', label: '银行承兑票据', derecognizedAmount: 0, notDerecognizedAmount: 0 },
-  { key: 'commercial', label: '商业承兑票据', derecognizedAmount: 0, notDerecognizedAmount: 0 },
-])
+const endorsedRows = ref<EndorsedRow[]>(defaultD5EndorsedRows())
 
 watch(
-  () => allResponsesRef.value.get('D5-note-listed-endorsed')?.remark,
+  () => allResponsesRef.value.get(D5_ENDORSED_ITEM)?.remark,
   (val) => {
-    if (val) {
-      try {
-        const parsed = JSON.parse(val)
-        if (Array.isArray(parsed) && parsed.length > 0) endorsedRows.value = parsed
-      } catch { /* ignore */ }
-    }
+    const parsed = parseD5NoteRows<EndorsedRow>(val)
+    if (parsed) endorsedRows.value = parsed
   },
   { immediate: true },
 )
 
 watch(
   endorsedRows,
-  (val) => { props.debouncedSave('D5-note-listed-endorsed', { remark: JSON.stringify(val) }) },
+  (val) => { props.debouncedSave(D5_ENDORSED_ITEM, { remark: JSON.stringify(val) }) },
   { deep: true },
 )
 
@@ -713,36 +710,14 @@ async function syncToDisclosureNotes(): Promise<void> {
   isSyncing.value = true
   const variant = activeVariant.value as DisclosureVariant
   try {
-    let snapshot: D5DisclosureSnapshot
-    if (variant === 'soe') {
-      const sec = soeSections.value[0]
-      snapshot = {
-        mainRows: (sec?.rows ?? []).map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
-        mainTotal: sec?.totalRow ? { label: '合计', endAmount: sec.totalRow.endAmount, priorAmount: sec.totalRow.priorAmount } : undefined,
-        notes: { 'soe-1': noteTexts.value['soe-1'] || '' },
-      }
-    } else {
-      const cls = listedSections.value.find((s) => s.sectionKey === 'listed-classification')
-      const sum = <K extends 'priorEnd' | 'provision' | 'reversal' | 'writeOff' | 'endBalance'>(k: K) =>
-        impairmentRows.value.reduce((s, r) => s + (Number(r[k]) || 0), 0)
-      snapshot = {
-        mainRows: (cls?.rows ?? []).map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
-        impairment: {
-          priorBalance: sum('priorEnd'),
-          provision: sum('provision'),
-          reversal: sum('reversal'),
-          writeOff: sum('writeOff'),
-          endBalance: sum('endBalance'),
-        },
-        pledgedRows: pledgedRows.value.map((r) => ({ label: r.label, pledgedAmount: r.pledgedAmount })),
-        endorsedRows: endorsedRows.value.map((r) => ({ label: r.label, derecognizedAmount: r.derecognizedAmount, notDerecognizedAmount: r.notDerecognizedAmount })),
-        notes: {
-          'listed-1': noteTexts.value['listed-1'] || '',
-          'listed-2': noteTexts.value['listed-2'] || '',
-          'listed-3': noteTexts.value['listed-3'] || '',
-        },
-      }
-    }
+    const snapshot = buildD5DisclosureSnapshot(variant, {
+      listedSections: listedSections.value,
+      soeSections: soeSections.value,
+      impairmentRows: impairmentRows.value,
+      pledgedRows: pledgedRows.value,
+      endorsedRows: endorsedRows.value,
+      noteTexts: noteTexts.value,
+    })
     const payload = buildD5SyncPayload(variant, props.wpId || '', null, snapshot)
     const result: any = await http.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,

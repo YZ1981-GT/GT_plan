@@ -61,6 +61,8 @@ FOOTER_SEARCH_COLUMN: Final[str] = "A"
 STORE_ITEM_ID: Final[str] = "N3-2-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
+PAYLOAD_COLUMN: Final[str] = "conclusion"
+PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
 
 HTML_ONLY_ROW_KEYS: Final[tuple[str, ...]] = (
     "index",
@@ -79,18 +81,18 @@ MANAGED_FIELD_SPECS_7: Final[
 ] = (
     ("item_name", "A", "editable", "text", "itemName", "项  目", ""),
     ("category", "B", "editable", "text", "category", "分类", ""),
-    ("prior_temp_diff", "C", "editable", "amount", "priorTempDiff", "暂时性差异", "C9"),
-    ("prior_tax_rate", "D", "editable", "rate", "taxRate", "适用税率", "C9"),
-    ("prior_dtl_balance", "E", "formula", "amount", "priorDtlBalance", "递延所得税负债期初余额", "C9"),
-    ("prior_aje", "F", "editable", "amount", "priorAje", "账项调整", "C9"),
-    ("prior_rje", "G", "editable", "amount", "priorRje", "重分类调整", "C9"),
-    ("prior_audited", "H", "formula", "amount", "priorAudited", "递延所得税负债期初审定数", "C9"),
-    ("current_temp_diff", "I", "editable", "amount", "currentTempDiff", "暂时性差异", "I9"),
-    ("current_tax_rate", "J", "editable", "rate", "currentTaxRate", "适用税率", "I9"),
-    ("current_dtl_balance", "K", "formula", "amount", "currentDtlBalance", "递延所得税负债期末余额", "I9"),
-    ("current_aje", "L", "editable", "amount", "currentAje", "账项调整", "I9"),
-    ("current_rje", "M", "editable", "amount", "currentRje", "重分类调整", "I9"),
-    ("current_audited", "N", "formula", "amount", "currentAudited", "递延所得税负债期末审定数", "I9"),
+    ("prior_temp_diff", "C", "editable", "amount", "beginDiff", "暂时性差异", "C9"),
+    ("prior_tax_rate", "D", "editable", "rate", "beginTaxRate", "适用税率", "C9"),
+    ("prior_dtl_balance", "E", "formula", "amount", "beginDeferredTax", "递延所得税负债期初余额", "C9"),
+    ("prior_aje", "F", "editable", "amount", "beginAje", "账项调整", "C9"),
+    ("prior_rje", "G", "editable", "amount", "beginRje", "重分类调整", "C9"),
+    ("prior_audited", "H", "formula", "amount", "beginAudited", "递延所得税负债期初审定数", "C9"),
+    ("current_temp_diff", "I", "editable", "amount", "endDiff", "暂时性差异", "I9"),
+    ("current_tax_rate", "J", "editable", "rate", "endTaxRate", "适用税率", "I9"),
+    ("current_dtl_balance", "K", "formula", "amount", "endDeferredTax", "递延所得税负债期末余额", "I9"),
+    ("current_aje", "L", "editable", "amount", "endAje", "账项调整", "I9"),
+    ("current_rje", "M", "editable", "amount", "endRje", "重分类调整", "I9"),
+    ("current_audited", "N", "formula", "amount", "endAudited", "递延所得税负债期末审定数", "I9"),
 )
 
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {

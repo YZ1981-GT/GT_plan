@@ -112,20 +112,5 @@ describe('useG1VoucherCheck', () => {
     expect(inspectionRatio.value).toBeCloseTo(0.1)
   })
 
-  it('抽凭 replace 仅替换当前区段', () => {
-    const map = ref(new Map<string, ChecklistResponse>())
-    const save = vi.fn()
-    const { applySamplingResults, currentRows, subsequentRows, activePeriod } = useG1VoucherCheck({
-      allResponses: map,
-      debouncedSave: save,
-      isReadonly: ref(false),
-    })
-    activePeriod.value = 'current'
-    applySamplingResults(
-      [{ voucherNo: 'A1', debitAmount: '10', creditAmount: '0', summary: 't' } as any],
-      'replace',
-    )
-    expect(currentRows.value.some((r) => r.voucherNo === 'A1')).toBe(true)
-    expect(subsequentRows.value.length).toBeGreaterThanOrEqual(1)
-  })
+  // 抽凭回填（区段、替换范围、去重）改走共享回填函数，用例见 g1VoucherFill.spec.ts
 })

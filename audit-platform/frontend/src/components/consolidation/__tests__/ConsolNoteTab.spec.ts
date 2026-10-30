@@ -56,6 +56,11 @@ const Column = defineComponent({
 const Pass = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
 const Dialog = defineComponent({ props: ['modelValue'], setup(p, { slots }) { return () => p.modelValue ? h('div', slots.default?.()) : null } })
 const Button = defineComponent({ setup(_, { slots, attrs }) { return () => h('button', attrs, slots.default?.()) } })
+const GridCell = defineComponent({
+  name: 'ConsolNoteGridCell',
+  props: ['value'],
+  setup(p) { return () => h('span', { class: 'fixture-grid-cell' }, String(p.value ?? '-')) },
+})
 const wrappers: ReturnType<typeof mount>[] = []
 function mountTab(extra: Record<string, unknown> = {}) {
   const wrapper = mount(ConsolNoteTab, {
@@ -66,7 +71,7 @@ function mountTab(extra: Record<string, unknown> = {}) {
       'el-divider': true, 'el-tag': Pass, 'el-radio-group': Pass, 'el-radio-button': Pass, 'el-tree': true,
       teleport: true, 'el-radio': true,
       CellContextMenu: true, CommentTooltip: Pass, SelectionBar: true, GtAmountCell: true,
-      ConsolNoteAutoRefreshSwitch: true,
+      ConsolNoteGridCell: GridCell, ConsolNoteAutoRefreshSwitch: true,
     } },
   })
   wrappers.push(wrapper)
@@ -370,6 +375,63 @@ describe('CP04 stored coordinates and asynchronous readers', () => {
     await s.exportNoteData()
     const rows = excel.exportMultiSheetData.mock.calls[0][0].sheets[0].rows
     expect(rows).toHaveLength(10); expect(rows[3][5]).toBe('505')
+  })
+
+  it('GtGridCell 提交后才改行：标记手工格并按生产合计规则重算', async () => {
+    const w = await loaded(), s = state(w), sec = exposed(w).selectedNoteSection
+    sec.headers = ['项目', '金额']
+    sec.multiHeader = null
+    sec.columnGroups = null
+    sec.rowTypes = ['data', 'data', 'total']
+    sec.editRows = [['甲', '100'], ['乙', '200'], ['合  计', '']]
+
+    s.onNoteCellCommit(sec.editRows[0], 1, '150')
+
+    expect(sec.editRows[0][1]).toBe('150')
+    expect(sec.editRows[0].__manual).toEqual([1])
+    expect(sec.editRows[2][1]).toBe('350.00')
+    expect(exposed(w).noteDirty).toBe(true)
+  })
+
+  it('编辑模式内核坐标扣除行勾选列：手工标记、批注与差额都落到业务列', async () => {
+    const w = await loaded({ standard: 'listed' }), s = state(w), sec = exposed(w).selectedNoteSection
+    sec.editRows[2][1] = '505'
+    sec.editRows[2].__manual = [1]
+    // 先按经典门面写入可控选区，再模拟内核已经接管；DOM 第 2 列对应业务第 1 列。
+    s.selectedCells = [{ row: 2, col: 2, value: '505' }]
+    s.noteCtx.kernelActive = () => true
+    s.noteEditMode = true
+
+    expect(s.selectedCellIsManual).toBe(true)
+    service.getConsolNoteBreakdown.mockResolvedValue({ node_key: 'G:consol', section_id: sec.section_id, cells: [], children: [] })
+    await exposed(w).openNoteBreakdownForSelection()
+    expect(s.noteBreakdownTarget).toMatchObject({ row: 2, col: 1 })
+
+    s.addCellComment()
+    expect(s.commentTarget).toMatchObject({ itemName: sec.editRows[2][0], colName: sec.headers[1], rowIdx: 2, colIdx: 1 })
+
+    s.restoreSelectedFormula()
+    expect(sec.editRows[2].__manual).toBeUndefined()
+  })
+
+  it('右键已有内核选区内的格仍按本次事件刷新差额目标', async () => {
+    const w = await loaded({ standard: 'listed' }), s = state(w), sec = exposed(w).selectedNoteSection
+    s.noteCtx.kernelActive = () => true
+    s.drillDownCell.itemName = '旧项目'
+    s.onNoteCellContextMenu(sec.editRows[2], { property: '5' }, document.createElement('td'), new MouseEvent('contextmenu'))
+    expect(s.drillDownCell).toMatchObject({ itemName: sec.editRows[2][0], colName: sec.headers[5], rowIdx: 2, colIdx: 5 })
+  })
+
+  it('切换章节通过门面清空内核选区，并重置旧差额坐标', async () => {
+    const w = await loaded(), s = state(w)
+    const clear = vi.spyOn(s.noteCtx, 'clearSelection')
+    s.drillDownCell.rowIdx = 2
+    s.drillDownCell.colIdx = 5
+
+    await exposed(w).onNoteNodeClick({ section_id: '五-5-3' })
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(s.drillDownCell).toMatchObject({ rowIdx: -1, colIdx: -1 })
   })
 
   it('batch import restores exact listed header slots and manual coordinates', async () => {

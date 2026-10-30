@@ -145,6 +145,37 @@ export function buildF3NoteTexts(
   return [{ section: `${variant}-note`, title: '已到期未支付的应付票据说明', text: body }]
 }
 
+/** 披露 Tab 同步要用的三项现算状态（`useF3DisclosureListed` / `useF3DisclosureSoe` 的返回值） */
+export interface F3DisclosureSyncState {
+  section1Rows: { readonly value: readonly F3NoteClassRow[] }
+  section1Subtotal: { readonly value: { endAmount: number; priorAmount: number } }
+  noteText: { readonly value: string }
+}
+
+/**
+ * 披露 Tab「同步到附注」的载荷：分类行 + 合计行（取 composable 的小计）+ 附注说明。
+ * Tab 与附注页离屏同步共用（spec note-pull-followup-closure R1），两条路径发出逐字节相同的载荷。
+ */
+export function buildF3SyncPayloadFromDisclosure(
+  variant: F3DisclosureVariant,
+  wpId: string,
+  applicableStandards: readonly string[] | null | undefined,
+  state: F3DisclosureSyncState,
+): F3SyncFromWorkpaperPayload {
+  return buildF3SyncPayload(
+    variant,
+    wpId,
+    applicableStandards,
+    state.section1Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+    {
+      label: '合计',
+      endAmount: state.section1Subtotal.value.endAmount,
+      priorAmount: state.section1Subtotal.value.priorAmount,
+    },
+    state.noteText.value,
+  )
+}
+
 export function buildF3SyncPayload(
   variant: F3DisclosureVariant,
   wpId: string,

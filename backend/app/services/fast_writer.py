@@ -95,7 +95,8 @@ async def copy_insert(
     for record in payload:
         for k, v in record.items():
             if isinstance(v, UUID):
-                record[k] = str(v)
+                # SQLite 的 UUID(as_uuid=True) 存 32 位 hex；sa.table 无类型时必须手工同口径。
+                record[k] = v.hex
             elif isinstance(v, _Decimal):
                 record[k] = float(v)
     await db.execute(table.insert(), payload)

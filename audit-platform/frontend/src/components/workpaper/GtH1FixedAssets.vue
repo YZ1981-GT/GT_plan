@@ -358,6 +358,7 @@ import {
   mergeSeedRows,
   type H1FourTablePrefill,
 } from './composables/h1FourTablePrefill'
+import { resolveH1ProjectContext } from './composables/h1ProjectContext'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 
@@ -543,14 +544,9 @@ const h1PeriodEnd = computed(() => {
  * 附注披露口径（权威变体源 = projects.template_type / report_scope，由 render project_context 注入）。
  * 上市披露表只能同步上市章节（五、22）、国企只能同步国企章节（八、22），不可混用。
  */
-const projectTemplateType = computed(() => {
-  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
-  return String(ctx.template_type ?? '')
-})
-const projectReportScope = computed(() => {
-  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
-  return String(ctx.report_scope ?? '')
-})
+const h1ProjectContext = computed(() => resolveH1ProjectContext(props.htmlData))
+const projectTemplateType = computed(() => h1ProjectContext.value.templateType)
+const projectReportScope = computed(() => h1ProjectContext.value.reportScope)
 
 // ─── 四表取数（灰度 H1_FOUR_TABLE_EXTRACTION_ENABLED，关闭时载荷不存在）────────
 /** 后端 render 注入的四表取数载荷（明细/序时账增减/对方科目可用性） */

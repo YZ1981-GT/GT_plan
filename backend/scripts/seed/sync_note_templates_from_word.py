@@ -33,7 +33,7 @@ DOCX_DIR = DATA_DIR / "audit_report_templates" / "disclosure_notes"
 # 导入 multi_header_to_column_groups；表头行数判定用平台的 app.services.note_word_table
 sys.path.insert(0, str(ROOT / "scripts" / "seed"))
 sys.path.insert(0, str(ROOT))
-from seed_consol_note_sections import multi_header_to_column_groups
+from seed_consol_note_sections import fill_label_header, multi_header_to_column_groups
 from app.services.note_word_table import seed_table_structure, sync_logical_columns  # noqa: E402  与平台同一构建（R7.6）
 
 
@@ -423,6 +423,7 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             entry.pop("_column_groups", None)
             if built.get("_column_groups"):
                 entry["_column_groups"] = built["_column_groups"]
+            fill_label_header(entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         struct_updated += 1
 
@@ -475,6 +476,7 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         }
         if built.get("_column_groups"):
             new_entry["_column_groups"] = built["_column_groups"]
+        fill_label_header(new_entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         if verbose:
             print(f"    P2 +{sid}: {wt['cols']}col, mh={'Y' if built['multi_header'] else 'N'}, rows={len(built['rows'])}")
@@ -550,6 +552,7 @@ def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             cg = multi_header_to_column_groups(new_entry["multi_header"])
             if cg:
                 new_entry["_column_groups"] = cg
+        fill_label_header(new_entry, std)  # 标签列 Word 留白 ⇒ 单体同名表的表头（R6）
 
         if verbose:
             print(f"    P3 +{sid}: ch={ch}, {wt['cols']}col, mh={'Y' if mh else 'N'}")
@@ -670,71 +673,17 @@ def phase4_standalone(word_tables: list[dict], json_data: dict, std: str, dry_ru
 def phase5_standalone_title(
     word_tables: list[dict], json_data: dict, std: str, dry_run: bool, verbose: bool,
 ) -> int:
-    """Phase 5: 单体模板 title 同步（以 Word 为准）。
+    """已退役：单体表名不再按 ``(section_num, table_idx)`` 位置覆盖。
 
-    遍历 Word 中每张带 tag 的表格，按 ``(section_num, table_idx)`` 匹配到 JSON
-    中的 ``sections[].tables[]``，若 title（即 ``name``）与 Word ``title_text``
-    不同则更新。返回更新数。
-
-    不处理续表（JSON 中有 ``continuation_of_index`` 的条目在 Word 中没有独立 tag）。
+    单体模板中存在按底稿披露表拆出的期初续表，而 Word 可能只写一张表或仅写“续：”。
+    位置覆盖会从第一张续表起把后续标题整体错后一张。标题、表序与结构现由
+    ``note_word_tree``（Word）和 ``note_template_workpaper_alignment``（底稿）共同门禁；
+    本长期工具只保留参数兼容，不再写模板。
     """
-    note_ch = note_chapter_for_std(std)
-    sections = json_data.get("sections", [])
-    updated = 0
-
-    # 建立 JSON 索引：section_number → section dict
-    sec_by_num: dict[str, dict] = {}
-    for s in sections:
-        sn = s.get("section_number", "")
-        if sn:
-            sec_by_num[sn] = s
-
-    # 建立 Word 索引：(parent_seq, table_idx) → word_table
-    word_by_key: dict[tuple[int, int], dict] = {}
-    for wt in word_tables:
-        p = parse_tag(wt["tag"])
-        if not p or p.get("chapter") != note_ch or p.get("section") is None:
-            continue
-        word_by_key[(p["section"], p["table_idx"])] = wt
-
-    for s in sections:
-        sn = s.get("section_number", "")
-        m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
-        if not m:
-            continue
-        parent_seq = int(m.group(1))
-
-        # 遍历该 section 下的表格，跳过续表
-        word_idx = 0  # Word 中的表格索引（不含续表）
-        for ti, t in enumerate(s.get("tables", [])):
-            if t.get("continuation_of_index") is not None:
-                continue  # 续表在 Word 中没有独立 tag，跳过
-
-            wt = word_by_key.get((parent_seq, word_idx))
-            word_idx += 1
-            if not wt:
-                continue
-
-            # 安全校验：Word 表的首列标签应与 JSON 表的首列标签基本匹配
-            # 如果不匹配说明 word_idx 已经错位（可能因为续表位置异常），跳过
-            w_h0 = (wt.get("leaf_headers") or [""])[0].replace(" ", "").replace("\u3000", "").strip()
-            j_headers = t.get("headers") or []
-            j_h0 = (j_headers[0] if j_headers else "").replace(" ", "").replace("\u3000", "").strip()
-            if w_h0 and j_h0 and w_h0 != j_h0 and not w_h0.startswith(j_h0) and not j_h0.startswith(w_h0):
-                if verbose:
-                    print(f"    P5-SKIP {sn} t[{ti}]: 首列不匹配 W='{w_h0[:20]}' J='{j_h0[:20]}'，可能续表位置异常")
-                continue
-
-            w_title = (wt.get("title_text") or "").strip()
-            j_name = (t.get("name") or "").strip()
-            if w_title and w_title != j_name:
-                if not dry_run:
-                    t["name"] = w_title
-                updated += 1
-                if verbose:
-                    print(f"    P5-T {sn} t[{ti}]: '{j_name[:35]}' → '{w_title[:35]}'")
-
-    return updated
+    del word_tables, json_data, std, dry_run
+    if verbose:
+        print("    P5 已退役：标题/表序改由 Word 树与底稿披露表对齐门禁管理")
+    return 0
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -987,35 +936,9 @@ def check_title_drift(
                     print(f"  [info] {sid}: JSON 有但 Word 无对应 tag（可能来自 Markdown 种子）")
 
     elif kind == "standalone":
-        sections = json_data.get("sections", []) if isinstance(json_data, dict) else []
-        word_by_key: dict[tuple[int, int], dict] = {}
-        for wt in word_tables:
-            p = parse_tag(wt["tag"])
-            if not p or p.get("chapter") != note_ch or p.get("section") is None:
-                continue
-            word_by_key[(p["section"], p["table_idx"])] = wt
-
-        for s in sections:
-            sn = s.get("section_number", "")
-            m = re.match(rf"^{re.escape(note_ch)}、(\d+)", sn)
-            if not m:
-                continue
-            parent_seq = int(m.group(1))
-            word_idx = 0
-            for ti, t in enumerate(s.get("tables", [])):
-                if t.get("continuation_of_index") is not None:
-                    continue
-                wt = word_by_key.get((parent_seq, word_idx))
-                word_idx += 1
-                if not wt:
-                    continue
-                w_title = (wt.get("title_text") or "").strip()
-                j_name = (t.get("name") or "").strip()
-                if w_title and w_title != j_name:
-                    msg = f"  {sn} t[{ti}]: W='{w_title[:45]}' vs J='{j_name[:45]}'"
-                    drifts.append(msg)
-                    if verbose:
-                        print(msg)
+        # 单体存在“底稿按期间拆表、Word 只写续表提示”等有意差异，位置式比较会从第一处拆表起整体错位。
+        # 权威校验是 ``check_note_template_word_tree.py --check``；这里不再产生重复且错误的漂移结论。
+        return []
 
     return drifts
 
@@ -1173,7 +1096,7 @@ def main():
 
             if 5 in phases:
                 n = phase5_standalone_title(standalone_word, standalone_data, std, args.dry_run, args.verbose)
-                print(f"  Phase 5 (单体title): {n} 更新")
+                print(f"  Phase 5 (单体title，已退役): {n} 更新")
 
             if 6 in phases:
                 txt_n, _ = phase6_text_after_and_parent(standalone_word, standalone_data, std, "standalone", args.dry_run, args.verbose)
@@ -1219,7 +1142,7 @@ def main():
             print(f"\n🔴 --check 失败：{total_drift} 个问题，请重跑 sync 工具")
             sys.exit(2)
         else:
-            print(f"\n✅ --check 通过：所有模板 JSON 与 Word 同步（含 title）")
+            print("\n✅ --check 通过：模板结构同步无漂移；单体标题/表序由 check_note_template_word_tree.py --check 管理")
     elif total_drift:
         print(f"\n完成：{total_drift} 个文件已更新")
 

@@ -6,11 +6,53 @@
 """
 import argparse
 import json
+import re
 import sys
 import uuid
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+_PLACEHOLDER_HEADER_RE = re.compile(r"列\d+")
+
+
+def _norm_title(text) -> str:
+    return re.sub(r"\s+", "", str(text or ""))
+
+
+@lru_cache(maxsize=None)
+def _standalone_label_headers(std: str) -> dict[str, str]:
+    """单体模板表名（去空白）→ 首列表头（同名表取第一张；首列表头为空的不收）。"""
+    path = ROOT / "data" / f"note_template_{std}.json"
+    if not path.exists():
+        return {}
+    out: dict[str, str] = {}
+    for sec in json.loads(path.read_text(encoding="utf-8")).get("sections") or []:
+        for tb in sec.get("tables") or []:
+            heads = tb.get("headers") or []
+            key = _norm_title(tb.get("name"))
+            if key and heads and str(heads[0] or "").strip():
+                out.setdefault(key, str(heads[0]))
+    return out
+
+
+def standalone_label_header(std: str, title) -> str:
+    """合并表标签列表头为空时用单体同名表的首列表头（spec note-pull-followup-closure R6）；取不到留空，不写「列N」。"""
+    return _standalone_label_headers(std).get(_norm_title(title), "")
+
+
+def fill_label_header(entry: dict, std: str) -> bool:
+    """标签列表头为空（或旧版写进去的「列N」占位）→ 取单体同名表的首列表头，取不到留空；改了返回 True。
+    只改平表头：``multi_header`` 照 Word 原样（标签列表头格本就留白，Word 同步工具按它比对）。"""
+    heads = list(entry.get("headers") or [])
+    head = str(heads[0] or "").strip() if heads else ""
+    if not heads or (head and not _PLACEHOLDER_HEADER_RE.fullmatch(head)):
+        return False
+    label = standalone_label_header(std, entry.get("title"))
+    if label == heads[0]:
+        return False
+    entry["headers"] = [label, *heads[1:]]
+    return True
 
 
 def merge_multi_headers(header_rows: list[list[str]]) -> list[str]:
@@ -55,7 +97,7 @@ def merge_multi_headers(header_rows: list[list[str]]) -> list[str]:
             if val and val not in seen:
                 parts.append(val)
                 seen.add(val)
-        merged.append("/".join(parts) if parts else f"列{ci + 1}")
+        merged.append("/".join(parts))  # 整列留白 ⇒ 空（不写「列N」；标签列由 fill_label_header 取单体同名表的表头，R6）
     
     return merged
 
@@ -242,6 +284,7 @@ def build_tree_json(tables: list[dict], standard: str) -> list[dict]:
             }
             if cg is not None:
                 entry["_column_groups"] = cg
+            fill_label_header(entry, standard)
             result.append(entry)
 
     return result

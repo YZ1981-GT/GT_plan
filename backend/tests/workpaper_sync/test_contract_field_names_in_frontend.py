@@ -25,8 +25,8 @@ from tests.workpaper_sync import contract_field_names_scan as S
 REGISTRY = Path(__file__).resolve().parent / "data" / "contract_field_names_frontend_exceptions.json"
 
 #: 登记的组数 / 字段名数（只许减少：接通一组删一组并改小这里；新增要在评审里说明为什么不改契约或前端）
-BASELINE_GROUPS = 31
-BASELINE_NAMES = 388
+BASELINE_GROUPS = 29
+BASELINE_NAMES = 364
 
 
 @pytest.fixture(scope="module")

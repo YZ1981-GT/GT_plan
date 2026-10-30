@@ -35,7 +35,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -1403,23 +1403,9 @@ def _resolve_sheet_mapping(
     filename: str,
     sheet_name: str,
 ) -> Optional[dict[str, str]]:
-    if not custom_mapping:
-        return None
-    if not any(isinstance(v, dict) for v in custom_mapping.values()):
-        return custom_mapping
+    from app.services.ledger_import_mapping_contract import resolve_sheet_mapping
 
-    keys = [
-        f"{filename}/{sheet_name}",
-        sheet_name,
-    ]
-    if sheet_name == "CSV":
-        keys.append("CSV")
-
-    for key in keys:
-        value = custom_mapping.get(key)
-        if isinstance(value, dict):
-            return value
-    return None
+    return resolve_sheet_mapping(custom_mapping, filename, sheet_name)
 
 
 
@@ -2389,7 +2375,7 @@ async def _stream_csv_import(
                 n = await copy_insert(
                     db, "tb_ledger", _LEDGER_COLS, led_rows,
                     project_id, year, batches["tb_ledger"].id,
-                    is_deleted=True,
+                    is_deleted=False,
                     dataset_id=dataset_id,
                 )
                 counts["tb_ledger"] += n
@@ -2397,7 +2383,7 @@ async def _stream_csv_import(
                 n = await copy_insert(
                     db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
                     project_id, year, batches["tb_aux_ledger"].id,
-                    is_deleted=True,
+                    is_deleted=False,
                     dataset_id=dataset_id,
                 )
                 counts["tb_aux_ledger"] += n
@@ -2408,7 +2394,7 @@ async def _stream_csv_import(
                 n = await copy_insert(
                     db, "tb_balance", _BALANCE_COLS, bal,
                     project_id, year, batches["tb_balance"].id,
-                    is_deleted=True,
+                    is_deleted=False,
                     dataset_id=dataset_id,
                 )
                 counts["tb_balance"] += n
@@ -2416,7 +2402,7 @@ async def _stream_csv_import(
                 n = await copy_insert(
                     db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
                     project_id, year, batches["tb_aux_balance"].id,
-                    is_deleted=True,
+                    is_deleted=False,
                     dataset_id=dataset_id,
                 )
                 counts["tb_aux_balance"] += n
@@ -2432,7 +2418,7 @@ async def _stream_csv_import(
                 seen_codes=seen_codes,
                 acct_records=acct_records,
                 by_category=by_category,
-                staged=True,
+                staged=False,
                 dataset_id=dataset_id,
             )
 
@@ -2508,6 +2494,7 @@ async def smart_import_streaming(
     job_id: UUID | None = None,
     created_by: UUID | None = None,
     force_activate: bool = False,
+    append_options: dict[str, Any] | None = None,
 ) -> dict:
     """多文件流式导入：逐批解析并隐藏写入，成功后统一激活。"""
     import openpyxl
@@ -2619,7 +2606,11 @@ async def smart_import_streaming(
             project_id=project_id,
             year=year,
             source_type="import",
-            source_summary={"files": _source_files, "file_count": len(_source_files)},
+            source_summary={
+                "files": _source_files,
+                "file_count": len(_source_files),
+                **({"append_request": dict(append_options)} if append_options else {}),
+            },
             job_id=job_id,
             created_by=created_by,
         )
@@ -2801,7 +2792,7 @@ async def smart_import_streaming(
                         n = await copy_insert(
                             db, "tb_balance", _BALANCE_COLS, bal,
                             project_id, year, batches["tb_balance"].id,
-                            is_deleted=True,
+                            is_deleted=False,
                             dataset_id=_dataset_id,
                         )
                         counts["tb_balance"] += n
@@ -2809,7 +2800,7 @@ async def smart_import_streaming(
                         n = await copy_insert(
                             db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
                             project_id, year, batches["tb_aux_balance"].id,
-                            is_deleted=True,
+                            is_deleted=False,
                             dataset_id=_dataset_id,
                         )
                         counts["tb_aux_balance"] += n
@@ -2823,7 +2814,7 @@ async def smart_import_streaming(
                             seen_codes=seen_codes,
                             acct_records=acct_records,
                             by_category=by_category,
-                            staged=True,
+                            staged=False,
                             dataset_id=_dataset_id,
                         )
                     await db.commit()
@@ -2863,7 +2854,7 @@ async def smart_import_streaming(
                         n = await copy_insert(
                             db, "tb_ledger", _LEDGER_COLS, led_rows,
                             project_id, year, batches["tb_ledger"].id,
-                            is_deleted=True,
+                            is_deleted=False,
                             dataset_id=_dataset_id,
                         )
                         counts["tb_ledger"] += n
@@ -2871,7 +2862,7 @@ async def smart_import_streaming(
                         n = await copy_insert(
                             db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
                             project_id, year, batches["tb_aux_ledger"].id,
-                            is_deleted=True,
+                            is_deleted=False,
                             dataset_id=_dataset_id,
                         )
                         counts["tb_aux_ledger"] += n
@@ -2882,7 +2873,7 @@ async def smart_import_streaming(
                             seen_codes=seen_codes,
                             acct_records=acct_records,
                             by_category=by_category,
-                            staged=True,
+                            staged=False,
                             dataset_id=_dataset_id,
                         )
                     await db.commit()
@@ -2904,7 +2895,7 @@ async def smart_import_streaming(
                             seen_codes=seen_codes,
                             acct_records=acct_records,
                             by_category=by_category,
-                            staged=True,
+                            staged=False,
                             dataset_id=_dataset_id,
                         )
                 diag["row_count"] = total_rows
@@ -2968,6 +2959,43 @@ async def smart_import_streaming(
         await db.flush()
         account_ids = [record.id for record in acct_records if getattr(record, "id", None)]
 
+    append_report: dict[str, Any] | None = None
+    if append_options and append_options.get("base_dataset_id"):
+        from app.services.ledger_dataset_merge import merge_into_staged
+
+        async def _append_progress(table_name: str, index: int, total: int) -> None:
+            _prog(88, f"继承 {table_name}：第 {index}/{total} 月")
+
+        merged = await merge_into_staged(
+            db,
+            staged_id=_dataset_id,
+            base_id=UUID(str(append_options["base_dataset_id"])),
+            project_id=project_id,
+            year=year,
+            strategy=str(append_options["strategy"]),
+            balance_carry_confirmed=bool(append_options.get("balance_carry_confirmed")),
+            progress_callback=_append_progress,
+        )
+        append_report = merged.to_dict()
+        for table_name in ("tb_balance", "tb_aux_balance", "tb_ledger", "tb_aux_ledger"):
+            counts[table_name] = merged.tables[table_name].actual_rows
+    elif append_options:
+        append_report = dict(append_options)
+        _dataset.source_summary = {**(_dataset.source_summary or {}), "append": append_report}
+
+    from app.services.ledger_dataset_voucher_diff import build_and_store_voucher_diff
+
+    diff_base_id = (
+        UUID(str(append_options["base_dataset_id"]))
+        if append_options and append_options.get("base_dataset_id")
+        else _dataset.previous_dataset_id
+    )
+    voucher_diff_report = await build_and_store_voucher_diff(
+        db,
+        staged_dataset_id=_dataset_id,
+        base_dataset_id=diff_base_id,
+    )
+
     # Phase 17: 第二层 Business Validation（数据解析完成后、激活前）
     _bv_findings: list[dict] = []
     try:
@@ -3027,6 +3055,11 @@ async def smart_import_streaming(
                     "blocking_count": sum(1 for item in _bv_findings if item.get("blocking")),
                     "has_blocking": any(item.get("blocking") for item in _bv_findings),
                 },
+                expected_active_dataset_id=(
+                    UUID(str(append_options["base_dataset_id"]))
+                    if append_options and append_options.get("base_dataset_id")
+                    else None
+                ),
             )
         except Exception as _act_err:
             await DatasetService.mark_failed(db, _dataset_id)
@@ -3086,6 +3119,8 @@ async def smart_import_streaming(
         "sheet_diagnostics": norm_diag,
         "year": year,
         "dataset_id": str(_dataset_id) if _dataset_id else None,
+        "append": append_report,
+        "voucher_diff": voucher_diff_report,
         "errors": errors,
     }
 

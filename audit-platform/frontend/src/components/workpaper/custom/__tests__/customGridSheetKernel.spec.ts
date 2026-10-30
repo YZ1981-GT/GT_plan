@@ -15,6 +15,7 @@ const { put, msg } = vi.hoisted(() => ({
 vi.mock('@/services/apiProxy', () => ({ api: { put } }))
 vi.mock('element-plus', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), ElMessage: msg }))
 vi.mock('@/stores/displayPrefs', () => ({
+  // eslint-disable-next-line gt-audit/no-amount-toFixed -- 测试替身：模拟 displayPrefs.fmtAmount 本身
   useDisplayPrefsStore: () => ({ fmtAmount: (v: number) => v.toFixed(2), gridEditMode: 'excel' }),
 }))
 

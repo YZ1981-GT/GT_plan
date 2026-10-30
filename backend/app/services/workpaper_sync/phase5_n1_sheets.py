@@ -2,13 +2,13 @@
 """N1 递延所得税资产 — 受管 sheet 层声明。
 
 受管 sheet = `递延所得税资产明细表N1-2`：两级表头 R9/R10、14列 A-N、
-数据区 R11-R29（19行固定项）、无 footer 标签行（R30+ 是说明区）。
+数据区 R11-R40（30 行，含 R40 占位行），R41 预留空行，R42 为无标签合计行。
 公式列 E=ROUND(C*D,2) / H=E+F+G / K=ROUND(I*J,2) / N=K+L+M。
 （模板 H / N 原为 =F+E / =L+K，漏了重分类调整 G / M；spec oo-writeback-template-parity-closure R1
 按会计口径修模板，并给合计行补了 G / M 两列 SUM。）
 """
 from __future__ import annotations
-from typing import Any, Final, Mapping
+from typing import Final, Mapping
 from app.services.workpaper_sync.models import AuthorityModel
 from app.services.workpaper_sync.phase5_row_table_sheet import (
     RowTableSheetSpec, StoreKind,
@@ -32,34 +32,36 @@ ROWS_TABLE_KEY: Final[str] = "deferred_tax_asset_detail_rows"
 HEADER_ROW: Final[int] = 9
 HEADER_LEAF_ROW: Final[int] = 10
 FIRST_DATA_ROW: Final[int] = 11
-LAST_DATA_ROW: Final[int] = 29
-FOOTER_ROW: Final[int] = 31
+LAST_DATA_ROW: Final[int] = 40
+FOOTER_ROW: Final[int] = 42
 MANAGED_LAST_COL: Final[str] = "N"
 UUID_COL: Final[str] = "O"
 TABLE_NAME: Final[str] = f"GT_{TEMPLATE_ID}_ROWS"
 AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 FOOTER_MARKER: Final[str] = ""
 FOOTER_SEARCH_COLUMN: Final[str] = "A"
-STORE_ITEM_ID: Final[str] = "N1-2-rows"
+STORE_ITEM_ID: Final[str] = "N1-2-detail-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "id"
-HTML_ONLY_ROW_KEYS: Final[tuple[str, ...]] = ("index", "deductibleDiff", "endDta", "isReversed",)
+PAYLOAD_COLUMN: Final[str] = "conclusion"
+PAYLOAD_COLUMN_MODE: Final[str] = "conclusion_only"
+HTML_ONLY_ROW_KEYS: Final[tuple[str, ...]] = ("bookValue", "taxBase", "recognized", "reversed", "remark",)
 
 MANAGED_FIELD_SPECS_7: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("item_name", "A", "editable", "text", "itemName", "项  目", ""),
     ("category", "B", "editable", "text", "category", "类别", ""),
-    ("prior_temp_diff", "C", "editable", "amount", "priorTempDiff", "暂时性差异", "C9"),
-    ("prior_tax_rate", "D", "editable", "rate", "taxRate", "适用税率", "C9"),
-    ("prior_dta_balance", "E", "formula", "amount", "priorDtaBalance", "递延所得税资产期初余额", "C9"),
-    ("prior_aje", "F", "editable", "amount", "priorAje", "账项调整", "C9"),
-    ("prior_rje", "G", "editable", "amount", "priorRje", "重分类调整", "C9"),
-    ("prior_audited", "H", "formula", "amount", "priorAudited", "递延所得税资产期初审定数", "C9"),
-    ("current_temp_diff", "I", "editable", "amount", "currentTempDiff", "暂时性差异", "I9"),
-    ("current_tax_rate", "J", "editable", "rate", "currentTaxRate", "适用税率", "I9"),
-    ("current_dta_balance", "K", "formula", "amount", "currentDtaBalance", "递延所得税资产期末余额", "I9"),
-    ("current_aje", "L", "editable", "amount", "currentAje", "账项调整", "I9"),
-    ("current_rje", "M", "editable", "amount", "currentRje", "重分类调整", "I9"),
-    ("current_audited", "N", "formula", "amount", "currentAudited", "递延所得税资产期末审定数", "I9"),
+    ("prior_temp_diff", "C", "editable", "amount", "beginDiff", "暂时性差异", "C9"),
+    ("prior_tax_rate", "D", "editable", "rate", "beginTaxRate", "适用税率", "C9"),
+    ("prior_dta_balance", "E", "formula", "amount", "beginDeferredTax", "递延所得税资产期初余额", "C9"),
+    ("prior_aje", "F", "editable", "amount", "beginAje", "账项调整", "C9"),
+    ("prior_rje", "G", "editable", "amount", "beginRje", "重分类调整", "C9"),
+    ("prior_audited", "H", "formula", "amount", "beginAudited", "递延所得税资产期初审定数", "C9"),
+    ("current_temp_diff", "I", "editable", "amount", "endDiff", "暂时性差异", "I9"),
+    ("current_tax_rate", "J", "editable", "rate", "endTaxRate", "适用税率", "I9"),
+    ("current_dta_balance", "K", "formula", "amount", "endDeferredTax", "递延所得税资产期末余额", "I9"),
+    ("current_aje", "L", "editable", "amount", "endAje", "账项调整", "I9"),
+    ("current_rje", "M", "editable", "amount", "endRje", "重分类调整", "I9"),
+    ("current_audited", "N", "formula", "amount", "endAudited", "递延所得税资产期末审定数", "I9"),
 )
 FORMULA_TEMPLATES: Final[Mapping[str, str]] = {
     "E": "=ROUND(C{row}*D{row},2)",
@@ -78,14 +80,14 @@ SPEC_N12: Final[RowTableSheetSpec] = RowTableSheetSpec(
     row_identity_key=ROW_IDENTITY_STORE_KEY, store_kind=StoreKind.rows,
     field_specs=MANAGED_FIELD_SPECS_7, formula_columns=FORMULA_COLUMNS,
     formula_templates=FORMULA_TEMPLATES, footer_marker="",
-    footer_carries_total_formula=False, footer_search_column=FOOTER_SEARCH_COLUMN,
+    footer_carries_total_formula=True, footer_search_column=FOOTER_SEARCH_COLUMN,
     error_label="N1-2 递延所得税资产明细表", ghost_row_anchor_index=0,
 )
 MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = tuple(
     row[:6] for row in _engine_managed_field_specs(SPEC_N12))
 FORMULA_MASK: Final[tuple[str, ...]] = SPEC_N12.formula_mask
-_HTML_STORE_NOTE: Final[str] = "N1-2 明细表存成 N1-2-rows 的 conclusion（JSON 数组）。"
+_HTML_STORE_NOTE: Final[str] = "N1-2 明细表存成 N1-2-detail-rows 的 conclusion（JSON 数组）。"
 _REVIEWED_BASIS: Final[str] = (
     "openpyxl 逐格实测 N1 递延所得税资产.xlsx 的 递延所得税资产明细表N1-2：两级表头 R9/R10，"
-    "14列 A-N，数据区 R11-R29（19行），四公式列 E/H/K/N。审定表 N1-1 全公式一格不写。"
+    "14列 A-N，数据区 R11-R40（30行含占位）、R42 合计 SUM，四公式列 E/H/K/N。审定表 N1-1 全公式一格不写。"
 )

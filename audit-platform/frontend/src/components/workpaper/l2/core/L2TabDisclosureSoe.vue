@@ -80,13 +80,8 @@ import { inject, toRef, onUnmounted, onBeforeUnmount, watch, ref } from 'vue'
 import { useL2FormData } from '../../composables/useL2FormData'
 import { useL2Disclosure } from '../../composables/useL2Disclosure'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import {
-  buildL2SyncPayload,
-  L2_NOTE_SECTION,
-  L2_DISCLOSURE_SHEET_NAME,
-  type L2InterestRow,
-  type L2OverdueRow,
-} from '../../composables/l2NoteSectionMap'
+import { buildL2SyncPayload } from '../../composables/l2NoteSectionMap'
+import { buildL2DisclosureSnapshot, buildL2SyncRequestBody } from '../../composables/l2DisclosureSync'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import { ElMessage } from 'element-plus'
@@ -118,25 +113,13 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (props.isReadonly || !props.projectId) return
   syncing.value = true
   try {
-    const interestData: L2InterestRow[] = disclosureTableData.value.map((r: DisclosureRow) => ({
-      label: r.label,
-      endAmount: r.endAmount ?? 0,
-      priorAmount: r.priorAmount ?? 0,
-    }))
-    const overdueData: L2OverdueRow[] = overdueRows.value.map((r: any) => ({
-      label: r.borrower ?? '',
-      overdueAmount: r.overdueAmount ?? 0,
-      overdueReason: r.overdueReason ?? '',
-    }))
-    const payload = buildL2SyncPayload('soe', interestData, overdueData)
-    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      wp_id: props.wpId,
-      sheet_name: L2_DISCLOSURE_SHEET_NAME.soe,
-      section_id: L2_NOTE_SECTION.soe,
-      current_standard: 'soe_standalone',
-      sub_table_data: payload.sub_table_data,
-      columns: payload._sub_table_columns,
-    })
+    // 快照 / 请求体与附注页离屏同步共用（l2DisclosureSync，spec note-pull-followup-closure R1）
+    const snap = buildL2DisclosureSnapshot(disclosureTableData.value, overdueRows.value)
+    const payload = buildL2SyncPayload('soe', snap.interestRows, snap.overdueRows)
+    await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      buildL2SyncRequestBody('soe', props.wpId, payload),
+    )
   } catch {
     // 自动同步失败静默
   } finally {

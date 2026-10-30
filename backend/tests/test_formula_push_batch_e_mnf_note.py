@@ -95,7 +95,8 @@ def _load_sync_registry() -> list[dict]:
 # N 循环（税费）：
 # N1 → 五、30 / 八、31（递延所得税资产）— 非对称
 # N2 → 五、41 / 八、41（应交税费）— 对称
-# N3 → 五、22 / 八、22（递延所得税负债）— 对称
+# N3 → 无附注推送规则（递延所得税负债：注册表无 N3 章节，两版模板也没有同名表；原挂 五、22 / 八、22 固定资产，
+#      spec note-pull-followup-closure R2.4 删）
 # N4 → 五、63 / None （税金及附加）— 只有 listed，损益类
 # N5 → 五、81 / 八、78（所得税费用）— 上市走关键词章节，损益类
 #
@@ -175,12 +176,12 @@ M_ASYMMETRIC_CODES = ["M2", "M4", "M5", "M6", "M7", "M9", "M10"]
 N_NOTE_SECTIONS_DUAL = [
     ("N1", "五、30", "八、31"),
     ("N2", "五、41", "八、41"),
-    ("N3", "五、22", "八、22"),
+    # N3 无附注推送规则（见文件头）
     # N4 只有 listed（单独测试）
     # N5 上市走关键词（单独测试）
 ]
 
-ALL_N_CODES = ["N1", "N2", "N3", "N4", "N5"]
+ALL_N_CODES = ["N1", "N2", "N4", "N5"]
 
 N4_LISTED_SECTION = "五、63"
 N5_LISTED_SECTION = "五、81"
@@ -204,8 +205,8 @@ N_ACCOUNT_CODES = {
 
 # N 循环损益类科目（account_code 6 开头）
 N_INCOME_CODES = ["N4", "N5"]
-# N 循环资产负债类科目
-N_BALANCE_CODES = ["N1", "N2", "N3"]
+# N 循环资产负债类科目（有附注推送规则的）
+N_BALANCE_CODES = ["N1", "N2"]
 
 
 # ========================================================================
@@ -505,57 +506,27 @@ def test_n2_symmetric_sections():
     assert listed_num == soe_num, "N2 上市/国企章节号数字部分应相同（对称）"
 
 
-# ── N3 无 note.main 规则确认 ────────────────────────────────────────────────
+# ── N3 无附注推送规则 ────────────────────────────────────────────────────────
 
-def test_n3_has_note_main_rule():
-    """N3 递延所得税负债有 note.main 规则：section/fields/policy/table/rows 正面验证。"""
-    rule = _note_rule("N3")
-    assert rule.target.sections == {"listed": "五、22", "soe": "八、22"}
-    assert set(rule.target.fields) == {"end_amount", "prior_amount"}
-    assert rule.policy == "editable"
-    assert rule.target.table == "递延所得税负债"
-    assert rule.target.rows == "n3_note_main"
-    assert rule.stage == "note"
+def test_n3_has_no_note_rule():
+    """N3 递延所得税负债没有附注推送规则：注册表无 N3 章节、两版模板没有同名表；原规则挂 五、22 / 八、22（固定资产），
+    标题校验永远不过（spec note-pull-followup-closure R2.4 删；判据 test_formula_push_note_rule_targets）。"""
+    from app.services.formula_push.rules import load_rules
 
-
-def test_n3_symmetric_sections():
-    """N3 递延所得税负债上市/国企章节号数字部分相同（对称）。"""
-    rule = _note_rule("N3")
-    sections = rule.target.sections
-    listed_num = sections["listed"].split("、")[1]
-    soe_num = sections["soe"].split("、")[1]
-    assert listed_num == soe_num, "N3 上市/国企章节号数字部分应相同（对称）"
-
-
-def test_n3_note_direct_note_rows():
-    """N3 递延所得税负债（资产负债类 2901）: ending 取「期末余额」。"""
-    binding = note_direct_for("N3")
-    binding._last_tb_data = _make_tb("2901", "550000", "380000", "170000")
-
-    rule = _note_rule("N3")
-    rows = binding.note_rows({}, "listed", rule)
-
-    assert len(rows) == 1
-    row = rows[0]
-    assert row["ending"] == 550000.0, "N3 ending 应取期末余额（资产负债类）"
-    assert row["opening"] == 380000.0
-    assert row["ending_resolved"] is True
-    assert row["opening_resolved"] is True
-    assert row["is_total"] is False
-    assert row["label"] == "递延所得税负债"
+    assert [r.rule_id for r in load_rules() if r.wp_code == "N3" and r.stage == "note"] == []
 
 
 # ── N1/N2 资产负债类 binding note_rows ──────────────────────────────────────
 
 @pytest.mark.parametrize(
     "code,account_code,account_name",
-    [("N1", "1811", "递延所得税资产"), ("N2", "2221", "应交税费"), ("N3", "2901", "递延所得税负债")],
-    ids=["N1", "N2", "N3"],
+    [("N1", "1811", "递延所得税资产"), ("N2", "2221", "应交税费")],
+    ids=["N1", "N2"],
 )
 def test_n_balance_note_rows_uses_ending_balance(
     code: str, account_code: str, account_name: str,
 ):
-    """N1/N2/N3 资产负债类 note_rows: ending 取「期末余额」。"""
+    """N1/N2 资产负债类 note_rows: ending 取「期末余额」。"""
     binding = note_direct_for(code)
     binding._last_tb_data = _make_tb(account_code, "450000", "300000", "150000")
 

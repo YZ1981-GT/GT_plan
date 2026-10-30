@@ -972,6 +972,7 @@ import { useReportMapping } from './composables/useReportMapping'
 import { useReportCellActions } from './composables/useReportCellActions'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
 import { buildReportHost } from '@/composables/useAiHostContext'
+import { useReportRouteFocus } from '@/composables/useReportRouteFocus'
 
 const route = useRoute()
 const router = useRouter()
@@ -1075,10 +1076,7 @@ function goBack() {
   router.push(`/projects`)
 }
 
-const routeYear = computed(() => {
-  const value = Number(route.query.year)
-  return Number.isFinite(value) && value > 2000 ? value : null
-})
+const { routeYear, initialTab, attach: attachRouteFocus } = useReportRouteFocus(route) // ?year / ?tab / ?highlight 深链（R7.1）
 const projectYear = ref<number | null>(null)
 /** 已问过项目审计年度（问之前不提示「未设置」，免得加载期间闪一下） */
 const yearResolved = ref(false)
@@ -1118,7 +1116,7 @@ const showDocAiChat = ref(false)
 
 const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
-const activeTab = ref('balance_sheet')
+const activeTab = ref<string>(initialTab)
 const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
 
 // ─── useReportData composable ───────────────────────────────────────────────
@@ -1528,6 +1526,7 @@ const rvTableRef = ref<any>(null)
 const eqTableRef = ref<any>(null)
 const impTableRef = ref<any>(null)
 const compareTableRef = ref<any>(null)
+attachRouteFocus({ activeTab, reportMode, rows, compareRows, rvTableRef, compareTableRef, loading })
 
 // 通用取值函数（适配所有报表类型）
 function getAnyCellValue(rowIdx: number, colIdx: number): any {

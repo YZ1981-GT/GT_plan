@@ -76,16 +76,16 @@
 
     <div class="test-block">
       <div class="block-header"><span class="block-title">三、测试 — 截止日期前样本</span><span class="block-hint">支出凭单日期 ≤ 截止日，追查是否已在本期入账</span></div>
-      <I2CutoffSampleTable direction="backward" :rows="backwardBeforeRows" :is-readonly="isReadonly" show-extended @update="onUpdate" @remove="onRemove" />
+      <I2CutoffSampleTable direction="backward" :rows="backwardBeforeRows" :is-readonly="isReadonly" :is-row-locked="isVoucherRowLocked" :project-id="projectId" :year="currentYear" show-extended @update="onUpdate" @remove="onRemove" />
     </div>
     <div class="cutoff-divider">—— 截止日期：{{ criteria.cutoffDate || '20XX年12月31日' }} ——</div>
     <div class="test-block">
       <div class="block-header"><span class="block-title">截止日期后样本</span><span class="block-hint">支出凭单日期 &gt; 截止日，核查是否被提前计入本期</span></div>
-      <I2CutoffSampleTable direction="backward" :rows="backwardAfterRows" :is-readonly="isReadonly" show-extended @update="onUpdate" @remove="onRemove" />
+      <I2CutoffSampleTable direction="backward" :rows="backwardAfterRows" :is-readonly="isReadonly" :is-row-locked="isVoucherRowLocked" :project-id="projectId" :year="currentYear" show-extended @update="onUpdate" @remove="onRemove" />
     </div>
     <div v-if="backwardUnsortedRows.length > 0" class="test-block">
       <div class="block-header"><span class="block-title">待归类样本</span><span class="block-hint">请填写支出凭单日期与截止日后自动归入截止日前/后</span></div>
-      <I2CutoffSampleTable direction="backward" :rows="backwardUnsortedRows" :is-readonly="isReadonly" show-extended @update="onUpdate" @remove="onRemove" />
+      <I2CutoffSampleTable direction="backward" :rows="backwardUnsortedRows" :is-readonly="isReadonly" :is-row-locked="isVoucherRowLocked" :project-id="projectId" :year="currentYear" show-extended @update="onUpdate" @remove="onRemove" />
     </div>
 
     <div class="table-actions">
@@ -107,9 +107,9 @@
       :default-conditions="cutoffPanelDefaults" :workpaper-id="wpId" :project-id="projectId" :year="currentYear"
       :readonly="isReadonly" @filled="handleCutoffFilled" @applied="saveAuditNote" />
 
-    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（6602 研发费用 · I6-6）" width="720px" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`抽凭引擎（${samplingAccountCode} 研发费用 · I6-6）`" width="720px" destroy-on-close>
       <GtVoucherSamplingEngine v-if="showSamplingDialog" :project-id="projectId" :workpaper-id="wpId"
-        :account-code="samplingAccountCode" phase="final" :year="currentYear" @filled="handleVoucherFilled" />
+        :account-code="samplingAccountCode" :year="currentYear" @filled="handleVoucherFilled" @undo-request="onUndoRequest" />
     </el-dialog>
     <input ref="importInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFile" />
 
@@ -117,10 +117,10 @@
       title="已发现跨期样本：请扩大测试期间与样本量（可扩至审计报告日），并与 I6-5（账→单据）交叉评价；必要时生成 I6-3 调整草稿。" />
 
     <el-card shadow="never" class="audit-note-card"><template #header><span>四、审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+      <WpCommitInput type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
         placeholder="记录样本选取依据、检查范围、发现的跨期事项及处理..." @change="saveAuditNote" /></el-card>
     <el-card shadow="never" class="audit-conclusion-card"><template #header><span>五、审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+      <WpCommitInput type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
         placeholder="基于测试结果，判断研发费用截止认定是否恰当..." @change="saveAuditConclusion" /></el-card>
 
     <details class="guidance-details"><summary>编制提示</summary><div class="guidance-content">
@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { inject, toRef, ref, watch, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -160,6 +161,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
  */
 import { i6GrossQueryCodes } from '@/components/workpaper/composables/i6AccountScope'
 import type { TbSourceCodes } from '@/components/workpaper/composables/shared/tbSourceCodes'
+import WpCommitInput from '../../shared/WpCommitInput.vue'
 
 /** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 6604；逗号拼接供引擎 split） */
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
@@ -190,7 +192,7 @@ const {
   crossCheckSummary, priorPeriodCutoffDate, updateBackwardCriteria, addBackwardRow, removeBackwardRow,
   updateBackwardRow, loadFromAutoSampling, importExtractedVouchers, save: saveCutoff,
   syncCutoffDateFromProject, expandTestWindow, draftAjeFromCrossPeriod, persistCompletion,
-  syncCriteriaToPeer, flushAutoSave,
+  syncCriteriaToPeer, flushAutoSave, onEngineFilled, onUndoRequest, isVoucherRowLocked, voucherFillReady,
 } = useI6Cutoff({
   allResponses: toRef(props, 'allResponses'),
   saveResponses: props.saveResponse,
@@ -224,7 +226,7 @@ function hydrateAudit() { auditNote.value = readRemark(AUDIT_NOTE_KEY); auditCon
 function saveAuditNote(val: string) { auditNote.value = val; void props.saveResponse('I6-6', { [AUDIT_NOTE_KEY]: val }) }
 function saveAuditConclusion(val: string) { auditConclusion.value = val; void props.saveResponse('I6-6', { [AUDIT_CONCLUSION_KEY]: val }) }
 watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
-onMounted(() => { hydrateAudit(); void fetchHint() })
+onMounted(() => { hydrateAudit(); void fetchHint(); void voucherFillReady() })
 onBeforeUnmount(() => { void flushAutoSave() })
 
 function applyMaterialityThreshold() {
@@ -271,14 +273,12 @@ function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: Fi
   showCutoffPanel.value = false
   ElMessage.success(`截止模块已填入 ${payload.samples.length} 笔（单据日期请查原件后补填）`)
 }
-function handleVoucherFilled(payload: any) {
-  const vouchers = payload?.samples ?? []
-  importExtractedVouchers('backward', vouchers.map((v: any) => ({
-    voucher_date: v.voucherDate ?? v.voucher_date, voucher_no: v.voucherNo ?? v.voucher_no,
-    summary: v.summary, amount: Number(v.debitAmount ?? v.debit_amount ?? 0),
-  })), { fillDocumentDate: false })
-  showSamplingDialog.value = false
-  if (vouchers.length) ElMessage.success(`抽凭已填入 ${vouchers.length} 笔`)
+/** 抽凭回填走共享函数：一个样本一行（记账日期、凭证号、金额、摘要），按分录指纹去重；单据日期查原件后补填 */
+async function handleVoucherFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology(payload?.methodology)
+  const out = await onEngineFilled('backward', payload)
+  if (!out.cancelled) showSamplingDialog.value = false
 }
 async function handleDraftAje() { await draftAjeFromCrossPeriod('backward'); emit('navigate-sheet', 'I6-3') }
 async function handleSave() { await saveCutoff('backward'); await persistCompletion('backward'); emit('save'); ElMessage.success('单据→账簿截止性测试已保存') }

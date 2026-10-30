@@ -14,6 +14,7 @@ spec procedure-trim-generation-delegation-chain 需求 3.5：
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -60,6 +61,7 @@ def _get_recyclable_tables() -> dict:
             WpIndex, WpTemplate, ReviewRecord,
         )
         from app.models.attachment_models import Attachment
+        from app.models.custom_query_models import CustomQueryTemplate
 
         _RECYCLABLE_TABLES = {
             "project": (Project, "项目", "name"),
@@ -76,8 +78,22 @@ def _get_recyclable_tables() -> dict:
             "audit_report": (AuditReport, "审计报告", "title"),
             "wp_template": (WpTemplate, "底稿模板", "template_name"),
             "review_record": (ReviewRecord, "复核记录", "id"),
+            # 高级查询模板（spec advanced-query-linkage-closure 任务 25）：按作者可见，见 _OWNER_SCOPED
+            "custom_query_template": (CustomQueryTemplate, "查询模板", "name"),
         }
     return _RECYCLABLE_TABLES
+
+
+#: 按作者可见的类型（类型键 → 作者列表达式）：作者与 admin 可见、可恢复、可彻底删除，不走项目成员判定。
+#: 查询模板不属于任何项目，作者多为系统 auditor（v-permission 按系统角色会把按钮藏掉）⇒ 列表逐行下发 can_restore /
+#: can_purge。作者口径与模型 ``owner_id``（creator_id 优先、否则 created_by）一致。
+_OWNER_SCOPED: dict[str, Any] = {
+    "custom_query_template": lambda model: func.coalesce(model.creator_id, model.created_by),
+}
+
+
+def _is_row_owner(row, user: User) -> bool:
+    return getattr(row, "owner_id", None) == user.id
 
 
 def _is_admin(user: User) -> bool:
@@ -94,10 +110,12 @@ async def _visible_project_ids(db: AsyncSession, user: User) -> set[UUID] | None
     return {r[0] for r in rows.all()}
 
 
-def _visibility_filter(tbl_key: str, model, visible: set[UUID] | None):
-    """列表 / 统计的项目过滤条件；``False`` = 该类型对当前用户整体不可见。"""
+def _visibility_filter(tbl_key: str, model, visible: set[UUID] | None, user: User):
+    """列表 / 统计的过滤条件；``False`` = 该类型对当前用户整体不可见。按作者可见的类型只给作者（admin 不限）。"""
     if visible is None:
         return None
+    if tbl_key in _OWNER_SCOPED:
+        return _OWNER_SCOPED[tbl_key](model) == user.id
     if tbl_key == "project":
         return model.id.in_(visible) if visible else False
     if not hasattr(model, "project_id"):
@@ -110,8 +128,12 @@ def _row_project_id(item_type: str, row) -> UUID | None:
 
 
 async def _authorize_row(db: AsyncSession, user: User, item_type: str, row) -> None:
-    """恢复 / 彻底删除：admin 放行；其余须是该行所属项目的编制（edit）成员；无项目归属的只给 admin。"""
+    """恢复 / 彻底删除：admin 放行；按作者可见的类型只给作者；其余须是该行所属项目的编制（edit）成员；无项目归属的只给 admin。"""
     if _is_admin(user):
+        return
+    if item_type in _OWNER_SCOPED:
+        if not _is_row_owner(row, user):
+            raise HTTPException(status_code=403, detail="该记录只有作者本人或管理员可以操作")
         return
     project_id = _row_project_id(item_type, row)
     if project_id is None:
@@ -130,6 +152,9 @@ def _deleted_by(tbl_key: str, row) -> str | None:
         from app.services.workpaper_recycle_service import last_recycle_actor
 
         return last_recycle_actor(getattr(row, "cross_ref_codes", None))
+    if tbl_key in _OWNER_SCOPED:  # 只有作者能删除（模板端点 admin 亦不例外）⇒ 删除人即作者
+        owner = getattr(row, "owner_id", None)
+        return str(owner) if owner is not None else None
     updated_by = getattr(row, "updated_by", None)
     if updated_by is not None:
         return str(updated_by)
@@ -217,7 +242,7 @@ async def list_recycle_bin(
     for tbl_key, (model, label, name_field) in target_tables.items():
         if not hasattr(model, "is_deleted"):
             continue
-        scope = _visibility_filter(tbl_key, model, visible)
+        scope = _visibility_filter(tbl_key, model, visible, user)
         if scope is False:
             continue
 
@@ -257,7 +282,7 @@ async def list_recycle_bin(
 
             for row in rows:
                 deleted_at = getattr(row, "deleted_at", None) or getattr(row, "updated_at", None)
-                items.append({
+                item = {
                     "id": str(row.id),
                     "type": tbl_key,
                     "type_label": label,
@@ -266,7 +291,12 @@ async def list_recycle_bin(
                     "deleted_by": _deleted_by(tbl_key, row),
                     "project_id": str(getattr(row, "project_id", "")) if hasattr(row, "project_id") else None,
                     "purgeable": tbl_key != WORKPAPER_TYPE,
-                })
+                }
+                if tbl_key in _OWNER_SCOPED:
+                    # 逐行能力 = 与 _authorize_row 同一判定（界面据此显示按钮，不经按系统角色的 v-permission）；
+                    # 其余类型不带这两个键，界面照旧按系统角色权限
+                    item["can_restore"] = item["can_purge"] = _is_admin(user) or _is_row_owner(row, user)
+                items.append(item)
         except Exception as e:
             # 单个表查询失败不阻断其他表
             import logging
@@ -581,7 +611,7 @@ async def recycle_bin_stats(
     for tbl_key, (model, label, _) in tables.items():
         if not hasattr(model, "is_deleted"):
             continue
-        scope = _visibility_filter(tbl_key, model, visible)
+        scope = _visibility_filter(tbl_key, model, visible, user)
         if scope is False:
             continue
         count_q = select(func.count()).select_from(model).where(model.is_deleted == True)  # noqa: E712

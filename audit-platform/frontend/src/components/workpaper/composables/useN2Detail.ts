@@ -5,10 +5,10 @@
  * Task: 3.4
  * Requirements: 3.1-3.6
  *
- * 职责（源模板 16 数据列，唯一模型 useN2Detail16）：
- * - 项目 / 税率 / 未审(期初C·应交D·已交E·期末F) / 期初调整G /
- *   账项调整(应交I·已交J) / 重分类(应交K·已交L) / 审定(期初M·应交N·已交O·期末P) / 备注
- * - 公式：F=C+D−E ; M=C+G ; N=D+I+K ; O=E+J+L ; P=M+N−O（派生列不持久化，读时推导）
+ * 职责（源模板 A~Q 共 17 列，唯一模型 useN2Detail16）：
+ * - 项目 / 税率或税收优惠 / 未审(期初C·应交D·已交E·期末F) / 期初调整(账项G·重分类H) /
+ *   账项调整(应交I·已交J) / 重分类(应交K·已交L) / 审定(期初M·应交N·已交O·期末P) / 备注Q
+ * - 公式：F=C+D−E ; M=C+G+H ; N=D+I+K ; O=E+J+L ; P=M+N−O（派生列不持久化，读时推导）
  * - 13 固定税种 + 可增删；seedFromN21() 无数据时从 N2-1 带入未审期初
  * - item_id: N2-2-detail-rows（只存录入列）
  *
@@ -50,15 +50,15 @@ function generateRowId(): string {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 16 列源模板对齐模型（N2-2 应交税费明细表）
+// A~Q 17 列源模板对齐模型（N2-2 应交税费明细表）
 //
-// 源结构：项目 / 税率 /
+// 源结构：项目 / 税率或税收优惠 /
 //   未审(期初C / 应交D / 已交E / 期末F=C+D-E) /
-//   期初调整G /
+//   期初调整(账项G / 重分类H) /
 //   账项调整(应交I / 已交J) /
 //   重分类(应交K / 已交L) /
-//   审定(期初M=C+G / 应交N=D+I+K / 已交O=E+J+L / 期末P=M+N-O) /
-//   备注
+//   审定(期初M=C+G+H / 应交N=D+I+K / 已交O=E+J+L / 期末P=M+N-O) /
+//   备注Q
 //
 // item_id: N2-2-detail-rows
 // 13 固定税种 + 可新增/删；seedFromN21() 无数据时从 N2-1 带入未审期初。
@@ -78,8 +78,10 @@ export interface N2Detail16Row {
   unadjPaid: number
   /** 未审·期末 F = C + D − E（auto） */
   unadjEnd: number
-  /** 期初调整 G */
+  /** 期初调整·账项 G */
   beginAdjust: number
+  /** 期初调整·重分类 H */
+  beginRje: number
   /** 账项调整·应交 I */
   ajePayable: number
   /** 账项调整·已交 J */
@@ -88,7 +90,7 @@ export interface N2Detail16Row {
   rjePayable: number
   /** 重分类·已交 L */
   rjePaid: number
-  /** 审定·期初 M = C + G（auto） */
+  /** 审定·期初 M = C + G + H（auto） */
   audBegin: number
   /** 审定·应交 N = D + I + K（auto） */
   audPayable: number
@@ -107,6 +109,7 @@ export interface N2Detail16Total {
   unadjPaid: number
   unadjEnd: number
   beginAdjust: number
+  beginRje: number
   ajePayable: number
   ajePaid: number
   rjePayable: number
@@ -142,23 +145,25 @@ export type N2Detail16EditableField =
   | 'unadjPayable'
   | 'unadjPaid'
   | 'beginAdjust'
+  | 'beginRje'
   | 'ajePayable'
   | 'ajePaid'
   | 'rjePayable'
   | 'rjePaid'
   | 'remark'
 
-function _map16(r: any): N2Detail16Row {
+export function enrichN2DetailRow(r: any): N2Detail16Row {
   const C = parseNum(r.unadjBegin)
   const D = parseNum(r.unadjPayable)
   const E = parseNum(r.unadjPaid)
   const G = parseNum(r.beginAdjust)
+  const H = parseNum(r.beginRje)
   const I = parseNum(r.ajePayable)
   const J = parseNum(r.ajePaid)
   const K = parseNum(r.rjePayable)
   const L = parseNum(r.rjePaid)
   const F = C + D - E
-  const M = C + G
+  const M = C + G + H
   const N = D + I + K
   const O = E + J + L
   const P = M + N - O
@@ -171,6 +176,7 @@ function _map16(r: any): N2Detail16Row {
     unadjPaid: E,
     unadjEnd: F,
     beginAdjust: G,
+    beginRje: H,
     ajePayable: I,
     ajePaid: J,
     rjePayable: K,
@@ -199,9 +205,9 @@ export function useN2Detail16(options: UseN2Detail16Options) {
     if (resp?.conclusion) {
       try { raw = JSON.parse(resp.conclusion) } catch { raw = [] }
     }
-    if (Array.isArray(raw) && raw.length > 0) return raw.map(_map16)
+    if (Array.isArray(raw) && raw.length > 0) return raw.map(enrichN2DetailRow)
     // 默认 13 固定税种（display）
-    return N2_DETAIL_FIXED_TYPES.map(t => _map16({ taxType: t }))
+    return N2_DETAIL_FIXED_TYPES.map(t => enrichN2DetailRow({ taxType: t }))
   })
 
   const total: ComputedRef<N2Detail16Total> = computed(() => {
@@ -212,6 +218,7 @@ export function useN2Detail16(options: UseN2Detail16Options) {
       unadjPaid: calcSubtotal(r.map(x => x.unadjPaid)),
       unadjEnd: calcSubtotal(r.map(x => x.unadjEnd)),
       beginAdjust: calcSubtotal(r.map(x => x.beginAdjust)),
+      beginRje: calcSubtotal(r.map(x => x.beginRje)),
       ajePayable: calcSubtotal(r.map(x => x.ajePayable)),
       ajePaid: calcSubtotal(r.map(x => x.ajePaid)),
       rjePayable: calcSubtotal(r.map(x => x.rjePayable)),
@@ -248,6 +255,7 @@ export function useN2Detail16(options: UseN2Detail16Options) {
       unadjPayable: r.unadjPayable,
       unadjPaid: r.unadjPaid,
       beginAdjust: r.beginAdjust,
+      beginRje: r.beginRje,
       ajePayable: r.ajePayable,
       ajePaid: r.ajePaid,
       rjePayable: r.rjePayable,
@@ -266,6 +274,7 @@ export function useN2Detail16(options: UseN2Detail16Options) {
       unadjPayable: 0,
       unadjPaid: 0,
       beginAdjust: 0,
+      beginRje: 0,
       ajePayable: 0,
       ajePaid: 0,
       rjePayable: 0,
@@ -306,6 +315,7 @@ export function useN2Detail16(options: UseN2Detail16Options) {
       unadjPayable: 0,
       unadjPaid: 0,
       beginAdjust: 0,
+      beginRje: 0,
       ajePayable: 0,
       ajePaid: 0,
       rjePayable: 0,
@@ -333,6 +343,7 @@ export function useN2Detail16(options: UseN2Detail16Options) {
       unadjPayable: 0,
       unadjPaid: 0,
       beginAdjust: 0,
+      beginRje: 0,
       ajePayable: 0,
       ajePaid: 0,
       rjePayable: 0,

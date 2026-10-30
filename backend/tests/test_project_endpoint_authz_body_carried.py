@@ -153,7 +153,8 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 2026-10-27 spec acnr-foundation-defect-closure D8：linkage-bus /impact（edit）、/impact-by-addr（readonly）
 #: 两个 stale 写端点加项目鉴权升到 project 档，v2 notify-cell-change 下线去请求体（不再带项目、退出本维）后现算 84。
 #: 2026-10-28 合入远端（BM：上两条分属两条线，合并后两侧修复都在）现算 81。
-_BODY_IDENTITY_ONLY_BASELINE = 81
+#: 2026-10-28 spec advanced-query-linkage-closure 任务 24：模板执行在函数体内直接校验目标项目归属（升到 project 档）后现算 80。
+_BODY_IDENTITY_ONLY_BASELINE = 80
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:

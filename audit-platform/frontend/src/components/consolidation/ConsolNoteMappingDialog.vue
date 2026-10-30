@@ -38,14 +38,19 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="来源名称" prop="source_label" min-width="180" show-overflow-tooltip />
+      <el-table-column label="来源名称" min-width="180" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.source_label }}<span v-if="row.source_occurrence != null" class="gt-mapping-occurrence">（同名第 {{ row.source_occurrence + 1 }} 行）</span>
+        </template>
+      </el-table-column>
       <el-table-column label="涉及企业" width="90" align="center">
         <template #default="{ row }">{{ row._entity_count }}</template>
       </el-table-column>
       <el-table-column label="建议目标" min-width="200">
         <template #default="{ row }">
           <div style="display:flex;align-items:center;gap:4px">
-            <el-select v-model="row.target_row_id" size="small" style="flex:1" filterable clearable placeholder="请选择目标行">
+            <el-select v-model="row.target_row_id" size="small" style="flex:1" filterable clearable placeholder="请选择目标行"
+              @change="onTargetChange(row)">
               <el-option v-for="tr in templateRows" :key="tr.target_row_id" :label="tr.canonical_name" :value="tr.target_row_id" />
             </el-select>
             <el-tooltip v-if="targetMergeCount(row.target_row_id) > 1"
@@ -123,6 +128,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConsolNoteDetailTemplateEditor from './ConsolNoteDetailTemplateEditor.vue'
+import { matchTypeLabel, matchTypeTagType, suggestionStatus } from './composables/consolNoteMappingLabels'
 import type {
   DetailTemplate, DetailTemplateRow, DetailRefreshPreview,
   MappingRuleItem, MappingSuggestion,
@@ -139,6 +145,8 @@ import {
 
 interface MappingRow {
   source_label: string
+  /** 同名行的第几次出现（R11：同一来源表里行名重复时逐行映射；只出现一次的行名没有） */
+  source_occurrence?: number
   target_row_id: string
   mapping_action: 'map' | 'map_merge' | 'ignore'
   _entities: Array<{ node_key: string; company_name: string }>
@@ -230,11 +238,12 @@ async function loadPreview() {
       const entities = (matched || allEntities).filter(e => !staleKeys.has(e.node_key))
       rows.push({
         source_label: suggestion.source_label,
+        source_occurrence: suggestion.source_occurrence ?? undefined,
         target_row_id: suggestion.suggested_target?.target_row_id || '',
         mapping_action: suggestion.match_type === 'manual' ? 'map' : 'map',
         _entities: entities,
         _entity_count: entities.length,
-        _status: suggestion.suggested_target ? 'ready' : 'pending',
+        _status: suggestionStatus(suggestion),
         _confidence: suggestion.confidence,
         _match_type: suggestion.match_type,
       })
@@ -254,26 +263,15 @@ function rowClassName({ row }: { row: MappingRow }) {
   return ''
 }
 
-/** 匹配方式标签文字 */
-function matchTypeLabel(matchType: string): string {
-  const labels: Record<string, string> = {
-    exact: '精确', alias: '别名', fuzzy: '模糊',
-    history: '历史', rule_template: '模板', manual: '手动',
-  }
-  return labels[matchType] || matchType || '手动'
-}
-
-/** 匹配方式标签颜色 */
-function matchTypeTagType(matchType: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
-  if (matchType === 'exact' || matchType === 'rule_template') return 'success'
-  if (matchType === 'alias' || matchType === 'history') return 'primary'
-  if (matchType === 'fuzzy') return 'warning'
-  return 'info'
+/** 用户改选目标行 = 已人工确认这一行（清空则回到待确认） */
+function onTargetChange(row: MappingRow) {
+  row._status = row.target_row_id ? 'ready' : 'pending'
 }
 
 function buildMappings(): MappingRuleItem[] {
   return mappingRows.value.map(r => ({
     source_label: r.source_label,
+    ...(r.source_occurrence != null ? { source_occurrence: r.source_occurrence } : {}),
     target_row_id: r.target_row_id,
     mapping_action: r.mapping_action,
     ignore_reason: r.mapping_action === 'ignore' ? (ignoreReason.value || '不适用') : undefined,
@@ -397,4 +395,5 @@ async function onTemplateSaved(tmpl: DetailTemplate) {
 :deep(.gt-mapping-row-stale) { background-color: #fef0e0 !important; }
 :deep(.gt-mapping-row-pending) { background-color: #fafafa !important; }
 :deep(.gt-mapping-row-low-confidence) { background-color: #fef0f0 !important; }
+.gt-mapping-occurrence { color: var(--gt-color-text-secondary); font-size: 12px; }
 </style>

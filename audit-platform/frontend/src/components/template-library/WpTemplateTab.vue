@@ -133,6 +133,8 @@ import { handleApiError } from '@/utils/errorHandler'
 
 interface Props {
   projectId: string
+  /** 初始搜索词：高级查询「跳模板溯源」带来的底稿编码（TemplateLibraryMgmt 取 ?wp_code，ADR-AQL-17），并标出该底稿 */
+  initialSearch?: string
 }
 
 const props = defineProps<Props>()
@@ -174,11 +176,16 @@ interface TreeNode {
 // ─── State ───────────────────────────────────────────────────────────────
 const loading = ref(false)
 const templates = ref<TemplateItem[]>([])
-const searchInput = ref('')
-const searchText = ref('')  // debounced
+const searchInput = ref((props.initialSearch || '').trim())
+const searchText = ref(searchInput.value)  // debounced（初始搜索词不等防抖）
 const filterComponentType = ref<string>('')
 const filterCycle = ref<string>('')
-const selectedWpCode = ref<string>('')
+const selectedWpCode = ref<string>(searchInput.value)
+// 已在本页时再次跳模板溯源（换了 ?wp_code）：重新种入搜索词并标出该底稿
+watch(() => props.initialSearch, (v) => {
+  const code = (v || '').trim()
+  if (code) { searchInput.value = code; selectedWpCode.value = code }
+})
 const treeRef = ref<any>(null)
 
 // ─── Debounce 搜索 (300ms) ────────────────────────────────────────────────

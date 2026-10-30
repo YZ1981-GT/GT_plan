@@ -390,6 +390,14 @@ def _digests_for(label: str, module_name: str, adapter_const: str,
             ),
             "row_keys": {k: list(v) for k, v in sorted(projection.row_keys.items())},
         }
+        # 🔴 合成 payload 投影为空 ⇒ digest 算得出来却什么都没覆盖（docstring 警告的假绿，原先只防了「空字段清单」）。
+        #    spec oo-writeback-template-parity-closure R3 批 B3 现算：基线里 g1 / g3 / g4 / g5 / g6 五家都是**空投影**的
+        #    digest —— G1 区归属字段受管、被合成占位值盖掉 ⇒ 三区都过滤空；G3~G6 门面借自 G9、按 G9 的 spec 投影。
+        #    抛出 ⇒ 记为 skip ⇒ `main()` 判失败。
+        if not projection.values:
+            raise RuntimeError(
+                f"{label} 的合成 payload（{len(rows)} 行）投影为空 —— digest 什么都没覆盖（门对它不生效）"
+            )
         projection_digest: str | None = _canonical_sha256(proj_canonical)
     else:
         projection_digest = None

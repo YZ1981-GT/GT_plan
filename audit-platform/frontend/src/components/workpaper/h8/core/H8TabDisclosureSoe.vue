@@ -187,7 +187,7 @@ import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
 import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
 import { buildH8SoeChecks } from '../../composables/h8DisclosureConsistency'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { useH8SoeDisclosure } from '../../composables/useH8Disclosure'
+import { h8SoeSyncSnapshot, useH8SoeDisclosure } from '../../composables/useH8Disclosure'
 import {
   H8_SOE_CATEGORIES,
   H8_SOE_GUIDANCE,
@@ -233,6 +233,10 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
+const soeNote = useH8SoeDisclosure({
+  allResponses: toRef(props, 'allResponses'),
+  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
+})
 const {
   layers,
   noteImpairment,
@@ -241,10 +245,7 @@ const {
   persist,
   updateCell,
   pullFromSources,
-} = useH8SoeDisclosure({
-  allResponses: toRef(props, 'allResponses'),
-  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
-})
+} = soeNote
 
 // ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
 // 见 H8TabDisclosureListed 同款注释：原 `emit('open-ai'|'open-review')` 宿主零处理 = 死按钮。
@@ -316,10 +317,8 @@ function handlePull() {
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
   persist()
-  const payloads = buildH8SoeSyncPayloads(props.wpId, props.applicableStandards || [], {
-    layers: layers.value,
-    noteImpairment: noteImpairment.value,
-  })
+  // 快照与附注页离屏同步共用（spec note-pull-followup-closure R1）
+  const payloads = buildH8SoeSyncPayloads(props.wpId, props.applicableStandards || [], h8SoeSyncSnapshot(soeNote))
   if (!payloads.length) {
     ElMessage.warning('当前不适用国企附注同步')
     return

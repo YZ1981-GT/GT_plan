@@ -135,7 +135,9 @@ backend/scripts/fix/fix_projection_representation_rehash.py  1090
 #     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
 #     spec: advanced-query-hardening-wiring-closure
 #     2026-10-27 advanced-query-linkage-closure 任务 7 / 17 / 18：上述取数器已全部下沉（source_registry + fetchers/），baseline 按实际行数下调（1993 → 1841）。
-backend/app/routers/custom_query.py  1841
+#     2026-10-29 同 spec B13（design §9 / N4「基线 = 真实行数」）：B7~B11 新增服务端导出、模板执行与回收站、分享目标、模板溯源修复后实际 1911 行
+#     （一直在门限 1933 内），baseline 同步为实际行数（1841 → 1911）；B14 新增预置模板三条薄路由后再按当时实际行数同步。
+backend/app/routers/custom_query.py  1911
 
 #   disclosure_notes.py（改动前 1454 行）/ wp_editor_router.py（1120 行）——
 #     **两者改动前即已超限**。
@@ -1344,7 +1346,7 @@ backend/tests/test_formula_push_engine.py 934
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
 #     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。拆分方向：企业树侧栏连同搜索、收起状态与样式抽成独立组件。
 audit-platform/frontend/src/views/ConsolidationIndex.vue 2368
-backend/tests/test_module_cell_resolver.py 835
+backend/tests/test_module_cell_resolver.py 115
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
 #   ConsolWorksheetTabs.vue —— 2026-10-23 同上：合并工作底稿新增只读「分录汇总表」页签（D-1，读 /api/consolidation/worksheet/entry-summary），
 #     HEAD 1577 → 1649。拆分方向：各静态表页签（分录汇总 / 抵销表等）抽成子组件，主组件只保留页签调度。
@@ -1726,3 +1728,33 @@ backend/tests/test_advanced_query_hardening_wave012.py  2222
 #   JSON 载荷读写（load_json_payload ~ upsert_json_rows）/ 账龄动态列（subject_aging_periods ~ resolve_aging_segments）/
 #   路由工厂 create_cycle_import_export_router（约 310 行）各成模块，本文件只留 re-export。
 backend/app/routers/wp_render_strategies/_cycle_import_export_common.py  925
+# note-pull-followup-closure（2026-10-28）：两份历史大文件（HEAD 已超限且此前未登记，任何改动都会被门禁拒）。
+#   note_conversion_service.py —— HEAD 2321 行。本 spec 只把一句 docstring 里已删模块 note_total_recalc 的引用改成
+#     现行写入方（行数不变），基线取 HEAD 值。拆分方向：转换规则表 / 单元格三态统计 / 章节转换编排各成模块。
+backend/app/services/note_conversion_service.py  2321
+#   note_validation_executors.py —— HEAD 1337 行。本 spec R8 新增「期间衔接」执行器（期初行 / 期末行按行名认、
+#     本期 / 上期列按表头认、可核上年附注），+91 行，基线取现值 1428。拆分方向：先把取表 / 取值共用 helper
+#     （_to_decimal / _norm_headers / _row_values / _resolve_section_table）下沉到独立模块（否则拆出的执行器与本文件循环导入），
+#     再按规则类型（余额 / 勾稽 / 账龄 / 期间衔接 / 文本）拆成伴生模块，本文件只留 EXECUTORS 登记。
+backend/app/services/note_validation_executors.py  1428
+
+#   test_n_cycle_foundation_canary.py —— N 循环 foundation 的 NF-P1~40 单文件历史守卫，
+#     本批改动前已超过 800 行；本次只把模板缺陷断言翻为修复态并同步现算基线，
+#     代码净减 9 行（1074 → 1065），不应因“改小”而被旧的未登记欠账阻断。
+#     拆分方向：按域基线 / 模板几何 / 传输键 / 真库证据 / 收尾自检五组拆文件；
+#     需与引用其 module fixture 的测试同批迁移，避免只搬代码让变异判据空转。
+#     spec: oo-writeback-template-parity-closure 批 C 复盘收口
+backend/tests/workpaper_sync/test_n_cycle_foundation_canary.py  1065
+
+# ledger-incremental-append-true-merge（2026-10-29）：四个文件在本轮前已超过 800 行且未登记；
+# baseline 为提交前 HEAD 的 splitlines 真值，不含本轮增量（现值分别 1023/1064/3189/807，均在 +5% 内）。
+# 本轮只加 options 透传 / active 科目版本过滤 / staged 合并接线，并把主要逻辑放新模块；
+# 拆分方向：mapping_service 按建议/确认拆，runner 按 legacy/v2 拆，smart engine 按解析/写入拆，v2 router 按 detect/submit/jobs 拆。
+backend/app/services/mapping_service.py  1013
+backend/app/services/import_job_runner.py  1054
+backend/app/services/smart_import_engine.py  3154
+backend/app/routers/ledger_import_v2.py  817
+# import_queue_service.py —— HEAD 已有 932 行。本轮仅把完整导入的 Redis 分布式锁和 active_set
+# 释放接到异步路径（不再只清内存锁），净行数不增；拆分方向：Redis/DB 锁原语、作业批次状态机和
+# 查询/管理接口拆为三个服务模块，本文件保留兼容门面。
+backend/app/services/import_queue_service.py  932

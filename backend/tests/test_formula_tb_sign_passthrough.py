@@ -10,6 +10,8 @@
 - 唯一影响符号的是 `data_fetch_custom` 的 `transform` 显式配置
   （direct/negate/abs），属配置数据（Task 5.2 处理），求值器代码逻辑本身
   对 `direct`（默认）原样透传，不隐式翻转。
+- `module_cell_resolver` 的 TB 取数已随 advanced-query-linkage-closure 任务 34 删除（AQ-25），
+  其守护用例 `test_module_cell_resolver_tb_columns_pure` 一并删除。
 
 本测试守护：求值器代码层在 v2 下不引入隐式符号翻转。
 
@@ -85,24 +87,6 @@ def test_wp_formula_eval_column_map_is_pure_column():
             "rje_adjustment",
             "aje_adjustment",
         }
-
-
-def test_module_cell_resolver_tb_columns_pure():
-    """module_cell_resolver 的 TB 虚拟 sheet 列映射为纯列名（无翻转）。
-
-    Validates: Requirements 11.1
-    """
-    from app.services.custom_query.module_cell_resolver import _TB_COLUMNS
-
-    assert _TB_COLUMNS == [
-        "account_code",
-        "account_name",
-        "opening_balance",
-        "debit_amount",
-        "credit_amount",
-        "closing_balance",
-        "audited_amount",
-    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────

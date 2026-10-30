@@ -87,9 +87,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L231",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L235",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L317",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -103,11 +103,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L231",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L235",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L317",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L452",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L477",
     "how_resolved": "N1 的业务内容由 per-entry 持久化 composable `useN1FormData.ts` 承载：`const ITEM_PREFIX = 'N1-'`（#L61）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L208）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L204）、`api.put(...)` 写（#L290）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L459），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -1022,8 +1022,8 @@
    "template_ref": {
     "workbook": "N5 所得税费用.xlsx",
     "root": "backend/wp_templates/N",
-    "sha256": "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3",
-    "size": 124437,
+    "sha256": "bcf8392a4468c851edf7a1a74895e33717fdbe9092a0014e0ea76c5d6037818c",
+    "size": 92454,
     "sheet_count": 16,
     "in_runtime_index": true,
     "index_wp_code": "N5",
@@ -1423,8 +1423,8 @@
    },
    {
     "name": "N5 所得税费用.xlsx",
-    "size": 92455,
-    "sha256": "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3",
+    "size": 92454,
+    "sha256": "bcf8392a4468c851edf7a1a74895e33717fdbe9092a0014e0ea76c5d6037818c",
     "sheet_count": 16,
     "formula_cells": 484,
     "sheets_with_formula": 14,
@@ -1861,7 +1861,7 @@
     "derivation": "`${ITEM_PREFIX}${sheet}-${field}`（#L315 / #L336），sheet/field 由调用点给出",
     "identity_field": "item_id",
     "persisted_via": "api.put(/checklist-responses)",
-    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L317",
     "status": "resolved"
    },
    {
@@ -1927,7 +1927,7 @@
     "key_order_matters": false,
     "keys_owner_sources": [
      "audit-platform/frontend/src/components/workpaper/composables/useN2CrossSheet.ts#L98",
-     "audit-platform/frontend/src/components/workpaper/composables/useN2Detail.ts#L197",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2Detail.ts#L203",
      "audit-platform/frontend/src/components/workpaper/n2/core/N2TabAdjustment.vue#L326",
      "audit-platform/frontend/src/components/workpaper/composables/useN2VatCalc.ts#L105",
      "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L120",
@@ -2256,7 +2256,6 @@
     "splice_by_index": 9
    },
    "display_sequence_family": [
-    "audit-platform/frontend/src/components/workpaper/composables/useN1Detail.ts#L229",
     "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L145",
     "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L167",
     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabIndex.vue#L210",
@@ -2324,7 +2323,7 @@
     "render_key_consumers": 0,
     "persistence_key_hits": 3,
     "array_addressing_sites": 48,
-    "display_sequence_sites": 8,
+    "display_sequence_sites": 7,
     "generated_opaque_sites": 13,
     "defect_hits_total": 4,
     "tables_total": 5,
@@ -2751,7 +2750,7 @@
   "positional_identity_render_key_consumers": 0,
   "positional_identity_persistence_key_hits": 3,
   "positional_identity_array_addressing_sites": 48,
-  "positional_identity_display_sequence_sites": 8,
+  "positional_identity_display_sequence_sites": 7,
   "positional_identity_generated_opaque_sites": 13,
   "positional_identity_defect_hits_total": 4,
   "tables_total": 5,

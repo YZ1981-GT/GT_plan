@@ -50,12 +50,12 @@ async def summarize_ledger_data(
     优先从 ledger_datasets.record_summary 读取预计算行数（O(1)），
     避免对千万级大表做实时 COUNT。
     """
-    result: dict[str, Any] = {"project_id": str(project_id), "tables": {}}
+    result: dict[str, Any] = {"project_id": str(project_id), "tables": {}, "datasets": {}}
 
     # 从 active dataset 的 record_summary 获取行数（瞬时查询）
     year_filter = "AND year = :year" if year is not None else ""
     ds_sql = f"""
-        SELECT year, record_summary
+        SELECT id, year, record_summary, source_summary
         FROM ledger_datasets
         WHERE project_id = :pid AND status = 'active' {year_filter}
         ORDER BY year
@@ -79,11 +79,18 @@ async def summarize_ledger_data(
         "tb_aux_balance": "aux_balance_rows",
         "tb_aux_ledger": "aux_ledger_rows",
     }
+    for dataset_id, dataset_year, record_summary, source_summary in datasets:
+        result["datasets"][int(dataset_year)] = {
+            "id": str(dataset_id),
+            "record_summary": record_summary or {},
+            "source_summary": source_summary or {},
+        }
+
     for table in LEDGER_TABLES:
         table_data: dict[str, Any] = {"total": 0, "years": {}}
         for ds_row in datasets:
-            y = int(ds_row[0])
-            summary = ds_row[1] or {}
+            y = int(ds_row[1])
+            summary = ds_row[2] or {}
             if not isinstance(summary, dict):
                 continue
             # 尝试两种 key 格式（新格式 balance_rows / 旧格式 tb_balance）
@@ -105,11 +112,14 @@ async def summarize_ledger_data(
                         EXTRACT(MONTH FROM voucher_date)::int AS period,
                         COUNT(*) AS cnt
                     FROM {table}
-                    WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                    WHERE project_id = :pid AND year = :yr AND dataset_id = :did AND is_deleted = false
                     GROUP BY period
                     ORDER BY period
                 """
-                prows = await db.execute(sa.text(period_sql), {"pid": str(project_id), "yr": y})
+                prows = await db.execute(
+                    sa.text(period_sql),
+                    {"pid": str(project_id), "yr": y, "did": result["datasets"][y]["id"]},
+                )
                 periods: dict[int, int] = {}
                 for prow in prows.all():
                     if prow[0] is not None:
@@ -555,106 +565,4 @@ __all__ = [
     "list_trash",
     "detect_existing_periods",
     "compute_incremental_diff",
-    "apply_incremental",
 ]
-
-
-
-async def apply_incremental(
-    db: AsyncSession,
-    *,
-    project_id: UUID,
-    year: int,
-    file_periods: list[int],
-    overlap_strategy: str = "skip",
-) -> dict[str, Any]:
-    """S6-15: 增量追加序时账 — 按期间 diff 执行清理。
-
-    只做"清理将要被新导入覆盖的期间"，不做实际的文件解析和写入
-    （那部分由 _execute_v2 管线负责）。调用顺序：
-
-        1. 前端选好文件 → 调 `/detect` 获取 file_periods
-        2. 前端调用本函数 → 返回 plan（需删的期间 + 行数预估）
-        3. 前端确认后 → 调 `/submit` 触发正常导入（走 _execute_v2）
-        4. 正常导入对 staged dataset activate 后，旧数据自动被标记 superseded
-
-    Args:
-        project_id: 项目 UUID
-        year: 目标年度
-        file_periods: 新导入文件包含的期间（月份列表，1-12）
-        overlap_strategy: 重叠月份策略
-            - "skip": 跳过重叠月份（保留旧数据，只补新月份）
-            - "overwrite": 覆盖重叠月份（删除旧的，导入新的）
-
-    Returns:
-        {
-            "diff": {new: [...], overlap: [...], only_existing: [...]},
-            "action": {
-                "periods_to_delete": [11, 12],  # 将要删除的期间
-                "rows_preview": {tb_ledger: N, tb_aux_ledger: M},
-            },
-            "executed": bool,  # 是否执行了删除（仅 overwrite 策略真执行）
-        }
-    """
-    if overlap_strategy not in ("skip", "overwrite"):
-        raise ValueError(f"overlap_strategy must be skip|overwrite, got {overlap_strategy}")
-
-    # 1. 获取现有期间
-    existing = await detect_existing_periods(db, project_id=project_id, year=year)
-
-    # 2. 计算 diff
-    file_set = set(file_periods)
-    diff = compute_incremental_diff(existing, file_set)
-
-    # 3. 决定哪些期间需要删除
-    if overlap_strategy == "overwrite":
-        # 覆盖策略：删除重叠月份 + 新月份（新月份本来就不存在，删除无害）
-        periods_to_delete = sorted(set(diff["overlap"]) | set(diff["new"]))
-    else:
-        # 跳过策略：只删除新月份（通常这里是空集，除非有脏数据）
-        periods_to_delete = diff["new"]
-
-    # 4. 预估行数
-    rows_preview: dict[str, int] = {}
-    for tbl in LEDGER_TABLES_PERIODIC:
-        if periods_to_delete:
-            sql = f"""
-                SELECT COUNT(*) FROM {tbl}
-                WHERE project_id = :pid AND year = :year
-                  AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
-            """
-            r = await db.execute(
-                sa.text(sql),
-                {"pid": str(project_id), "year": year, "periods": periods_to_delete},
-            )
-            rows_preview[tbl] = int(r.scalar() or 0)
-        else:
-            rows_preview[tbl] = 0
-
-    result: dict[str, Any] = {
-        "diff": diff,
-        "action": {
-            "overlap_strategy": overlap_strategy,
-            "periods_to_delete": periods_to_delete,
-            "rows_preview": rows_preview,
-        },
-        "executed": False,
-    }
-
-    # 5. 仅 overwrite 策略真实执行删除（清理旧数据）
-    if overlap_strategy == "overwrite" and periods_to_delete:
-        deleted = await delete_ledger_data(
-            db,
-            project_id=project_id,
-            year=year,
-            tables=list(LEDGER_TABLES_PERIODIC),
-            periods=periods_to_delete,
-        )
-        result["executed"] = True
-        result["action"]["rows_deleted"] = deleted
-        logger.info(
-            "incremental overwrite: project=%s year=%d periods=%s deleted=%s",
-            project_id, year, periods_to_delete, deleted,
-        )
-
-    return result

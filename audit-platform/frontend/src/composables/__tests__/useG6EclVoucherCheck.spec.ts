@@ -54,34 +54,6 @@ describe('useG6EclVoucherCheck', () => {
     expect(vc.postDebitChecked.value).toBe(900)
   })
 
-  it('抽凭回填按 sourceId 去重，期后剔除截止日前凭证', () => {
-    const vc = useG6EclVoucherCheck(ref('wp-1'), ref('p-1'), ref({ bsDate: '2025-12-31' }))
-    const sample = {
-      voucherNo: 'PZ-1',
-      voucherDate: '2026-01-05',
-      debitAmount: '100',
-      creditAmount: '0',
-      sourceId: 'ledger-1',
-    }
-    expect(vc.fillVoucherSamples('post', [sample, sample]).added).toBe(1)
-    expect(vc.fillVoucherSamples('post', [sample]).skipped).toBe(1)
-
-    const rejected = vc.fillVoucherSamples('post', [{
-      voucherNo: 'OLD',
-      voucherDate: '2025-12-01',
-      debitAmount: 10,
-      creditAmount: 0,
-    }], { bsDate: '2025-12-31' })
-    expect(rejected.rejectedPostDated).toBe(1)
-
-    const replacement = { ...sample, voucherNo: 'PZ-2', sourceId: 'ledger-2', isHighValue: true }
-    vc.fillVoucherSamples('post', [replacement], { mode: 'replace', method: 'systematic' })
-    expect(vc.postPeriodRows.value).toHaveLength(1)
-    expect(vc.postPeriodRows.value[0].voucherNo).toBe('PZ-2')
-    expect(vc.postPeriodRows.value[0].samplingMethod).toBe('systematic')
-    expect(vc.postPeriodRows.value[0].selectionCategory).toBe('specific')
-  })
-
   it('样本计划勾稽：特定与代表性分别告警', () => {
     const vc = useG6EclVoucherCheck(ref('wp-1'), ref('p-1'))
     vc.criteria.value.populationDebitCount = 10

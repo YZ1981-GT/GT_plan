@@ -48,6 +48,7 @@ import {
 } from './d1InspectionFormulas'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
 import http from '@/utils/http'
+import { legacyIdentity, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -202,6 +203,7 @@ function deserializeVouchingRow(raw: any, fallbackSeq: number): VouchingRow {
   for (const f of VOUCHING_NUMERIC_FIELDS) {
     if (raw && raw[f] !== undefined) (row as any)[f] = parseNum(raw[f])
   }
+  withRowMeta(row, raw)
   return row
 }
 
@@ -210,6 +212,7 @@ function serializeVouchingRow(row: VouchingRow): any {
   const data: any = { id: row.id, seq: row.seq }
   for (const f of VOUCHING_STRING_FIELDS) data[f] = (row as any)[f]
   for (const f of VOUCHING_NUMERIC_FIELDS) data[f] = (row as any)[f]
+  withRowMeta(data, row)
   return data
 }
 
@@ -239,6 +242,22 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
   const specificSamples = ref<SpecificSampleRow[]>([])
   const vouchingRows = ref<VouchingRow[]>([])
   const tolerableErrorRate = ref<number>(0.05)
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审预审行只读：共享回填函数（行元数据 `_gt` 随行 JSON 落库）
+  const voucherFill = useVoucherCheckFill<VouchingRow>({
+    projectId: _projectId,
+    tables: vouchingRows,
+    policy: 'join',
+    readonly: isReadonly,
+    mapSampleToRow: item => mapSampleToVouchingRow(item),
+    persist: () => persistVouchingRowsImmediate(),
+    hasUserContent: r => [r.existenceCheck, r.accuracyCheck, r.appropriatenessCheck, r.check4, r.check5, r.supportDoc, r.attachmentId]
+      .some(Boolean),
+    afterChange: (_key, rows) => { vouchingRows.value = rows.map((r, i) => ({ ...r, seq: i + 1 })) },
+    // 旧行（没有 `_gt`）：凭证号记在票据号码里，日期在 B 列或到期日
+    legacy: r => legacyIdentity({
+      voucherNo: r.noteNo, voucherDate: r.voucherDate || r.maturityDate, debitAmount: r.amount, creditAmount: r.creditAmount,
+    }),
+  })
   const testConclusion = ref<string>('')
   const auditNote = ref<string>('')
   const auditConclusion = ref<string>('')
@@ -297,6 +316,7 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
 
   // Initial load
   loadFromResponses()
+  voucherFill.markLoaded()
 
   // Watch allResponses for external changes (other tabs / OO sync)
   watch(
@@ -315,6 +335,7 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
     ([newVouching, newSamples, newNote, newConclusion, _newPopDesc, _newTestScope, _newSpecificScope, _newMethod, newTestConc, newRate]) => {
       if (newVouching !== undefined && newVouching !== serializeVouchingRows()) {
         vouchingRows.value = loadVouchingRows()
+        voucherFill.markLoaded()
       }
       if (newSamples !== undefined && newSamples !== serializeSpecificSamples()) {
         specificSamples.value = loadSpecificSamples()
@@ -340,7 +361,7 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
   // ─── Serialization ───────────────────────────────────────────────────────
 
   function serializeVouchingRows(): string {
-    return JSON.stringify(vouchingRows.value.map(serializeVouchingRow))
+    return JSON.stringify(voucherFill.guardPersist(vouchingRows.value).map(serializeVouchingRow))
   }
 
   function serializeSpecificSamples(): string {
@@ -497,50 +518,28 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
   }
 
   /**
-   * 从抽凭引擎回填样本 → 凭证核对明细行（P0-4 抽凭引擎联动）。
-   * 按票号(noteNo)+摘要去重，仅追加未存在的样本；金额取借方优先贷方。
-   * 抽凭引擎的 SampledVoucher 字段映射到 D1-13 票据核对行：
-   *   voucherNo → noteNo，counterpartAccount → drawer(出票人)，
-   *   voucherDate → maturityDate 兜底，debit/credit → amount，
-   *   abnormal → 预置例外提示（存在性未核实）。
+   * 抽凭样本 → 凭证核对行（回填与挂凭导入都经共享回填函数，按分录指纹去重，voucher-identity-writeback 任务 10）。
+   * 凭证号 → 票据号码（沿用原口径），凭证日期 → B 凭证日期（到期日沿用兜底），对方科目（后端配对）→ F 对方明细科目，
+   * 金额落在样本自己的借贷栏（借 → G、贷 → H；原来贷方样本也写进借方栏），摘要 / 选取原因 → 备注，
+   * 引擎标异常 → 存在性预置「未核实」、是否异常「是」。
    */
-  function fillFromSampledVouchers(samples: Array<{
-    voucherNo?: string
-    voucherDate?: string
-    summary?: string | null
-    debitAmount?: string | null
-    creditAmount?: string | null
-    counterpartAccount?: string | null
-    abnormal?: boolean
-    selectionReason?: string
-  }>): number {
-    if (isReadonly.value || !Array.isArray(samples) || samples.length === 0) return 0
-    const existingKeys = new Set(
-      vouchingRows.value.map((r) => `${r.noteNo}||${r.remark}`.trim()),
-    )
-    const additions: VouchingRow[] = []
-    let seq = vouchingRows.value.length
-    for (const s of samples) {
-      const noteNo = String(s.voucherNo ?? '').trim()
-      const summary = String(s.summary ?? '').trim()
-      const key = `${noteNo}||${summary}`.trim()
-      if (noteNo && existingKeys.has(key)) continue
-      existingKeys.add(key)
-      seq += 1
-      const row = emptyVouchingRow(seq)
-      row.noteNo = noteNo
-      row.drawer = String(s.counterpartAccountName ? `${s.counterpartAccount ?? ''} ${s.counterpartAccountName}` : (s.counterpartAccount ?? '')).trim()
-      row.maturityDate = String(s.voucherDate ?? '').trim()
-      row.amount = parseNum(s.debitAmount ?? s.creditAmount ?? 0)
-      row.remark = String(s.selectionReason ?? summary ?? '').trim()
-      // 抽凭引擎标记异常 → 预置存在性例外，待审计师核实
-      if (s.abnormal) row.existenceCheck = '未核实'
-      additions.push(row)
+  function mapSampleToVouchingRow(item: PreparedItem): VouchingRow {
+    const s = item.sample as PreparedItem['sample'] & { summary?: string | null; abnormal?: boolean; selectionReason?: string }
+    const row = emptyVouchingRow(0)
+    const date = String(s.voucherDate ?? '').trim()
+    row.noteNo = String(s.voucherNo ?? '').trim()
+    row.voucherDate = date
+    row.maturityDate = date
+    row.counterDetail = [item.counterpartAccount, item.counterpartAccountName]
+      .filter((v, i, a) => v && (i === 0 || v !== a[0])).join(' ')
+    row.amount = parseNum(item.debitAmount ?? 0)
+    row.creditAmount = parseNum(item.creditAmount ?? 0)
+    row.remark = String(s.selectionReason || s.summary || '').trim()
+    if (s.abnormal) {
+      row.existenceCheck = '未核实'
+      row.isAbnormal = '是'
     }
-    if (additions.length === 0) return 0
-    vouchingRows.value = [...vouchingRows.value, ...additions]
-    persistVouchingRowsImmediate()
-    return additions.length
+    return row
   }
 
   /** 删除凭证核对行并重新编号 */
@@ -789,7 +788,12 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
     addVouchingRow,
     removeVouchingRow,
     updateVouchingRow,
-    fillFromSampledVouchers,
+    onEngineFilled: voucherFill.onEngineFilled,
+    onAttachImported: voucherFill.onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
 
     // 核对结果统计
     checkedCount,

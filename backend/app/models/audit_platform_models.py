@@ -192,10 +192,18 @@ class AccountChart(Base):
 
     __table_args__ = (
         Index(
-            "uq_account_chart_project_code_source",
+            "uq_account_chart_project_dataset_code_source",
+            "project_id", "dataset_id", "account_code", "source",
+            unique=True,
+            postgresql_where=text("is_deleted = false AND dataset_id IS NOT NULL"),
+            sqlite_where=text("is_deleted = false AND dataset_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_account_chart_project_code_source_legacy",
             "project_id", "account_code", "source",
             unique=True,
-            postgresql_where=text("is_deleted = false"),
+            postgresql_where=text("is_deleted = false AND dataset_id IS NULL"),
+            sqlite_where=text("is_deleted = false AND dataset_id IS NULL"),
         ),
         Index(
             "idx_account_chart_project_dataset_deleted",

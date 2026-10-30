@@ -58,8 +58,18 @@ def _off_list(template: str, data: bytes) -> list[str]:
 
 
 def test_fix_list_is_non_trivial() -> None:
-    """清单为空时下面的参数化一条都不跑 —— 先钉住分母（第一批 19 本 285 格 + 第二批 5 本新册 43 格）。"""
-    assert len(_BOOKS) >= 24 and len(_FIXES) >= 328, (len(_BOOKS), len(_FIXES))
+    """清单为空时参数化测试不会收集；数量棘轮防止整批清单被误删。"""
+    assert len(_BOOKS) >= 27 and len(_FIXES) >= 386, (len(_BOOKS), len(_FIXES))
+
+
+def test_n5_fourth_batch_cells_are_explicitly_in_the_fix_list() -> None:
+    required = {
+        ("N/N5 所得税费用.xlsx", "加计扣除研发费用情况明细表N5-6-1", "D11"),
+        ("N/N5 所得税费用.xlsx", "加计扣除研发费用情况明细表N5-6-1", "E12"),
+        ("N/N5 所得税费用.xlsx", "递延所得税费用核对表N5-8", "H12"),
+    }
+    actual = {(fix.template, fix.sheet, fix.coord) for fix in _FIXES}
+    assert required <= actual
 
 
 @pytest.mark.parametrize("template", _BOOKS)

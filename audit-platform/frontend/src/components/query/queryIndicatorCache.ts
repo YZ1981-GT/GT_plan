@@ -16,6 +16,11 @@ export interface IndicatorCacheKeyParts {
   projectId?: string | null
   year?: number | null
   notesVersion?: string | null
+  /**
+   * 同一项目年度的不同树形（任务 29）：弹窗是全量树（缺省），页面版是「骨架 + 附注分支」（`page`）。写在项目段里
+   * （`{项目}~{树形}`）：两种树形互不命中、写入时也不互相当作过期条目清掉；同一树形的旧附注版本照样清掉。
+   */
+  variant?: string | null
 }
 
 function seg(v: unknown, empty: string): string {
@@ -24,10 +29,12 @@ function seg(v: unknown, empty: string): string {
   return s ? s.replace(/:/g, '_') : empty
 }
 
-/** 缓存键（四段缺省分别为 unknown / no-project / no-year / none） */
+/** 缓存键（四段缺省分别为 unknown / no-project / no-year / none；有树形时项目段为 `{项目}~{树形}`） */
 export function indicatorCacheKey(parts: IndicatorCacheKeyParts): string {
   const year = isKnownYear(parts.year) ? String(parts.year) : 'no-year'
-  return `${INDICATOR_CACHE_PREFIX}${seg(parts.schema, 'unknown')}:${seg(parts.projectId, 'no-project')}:${year}:${seg(parts.notesVersion, 'none')}`
+  const variant = seg(parts.variant, '')
+  const project = `${seg(parts.projectId, 'no-project')}${variant ? `~${variant.replace(/~/g, '_')}` : ''}`
+  return `${INDICATOR_CACHE_PREFIX}${seg(parts.schema, 'unknown')}:${project}:${year}:${seg(parts.notesVersion, 'none')}`
 }
 
 function storageOf(storage?: Storage): Storage | null {

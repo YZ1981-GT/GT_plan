@@ -19,6 +19,7 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { autoSyncCallFacts } from './disclosureAutoSyncAst'
 
 const WP_ROOT = resolve(__dirname, '..')
 
@@ -257,13 +258,12 @@ const CYCLES_WITHOUT_DISCLOSURE: Readonly<Record<string, string>> = {
 /**
  * 尚未接入自动同步的 Tab —— 每条**必须**有 reason。
  *
- * ⚠️ 2026-07-30 重新统计后本表**应为空**：实测 `syncToDisclosureNotes && !scheduleAutoSync`
- * 的真实缺口为 **0**。此前 60 条「未接入」全是没有同步链路的 Tab（已移入
- * `MISSING_SYNC_PATH`）或用别的 syncFn 的 Tab（25 个，合规）。保留本表结构以便
- * 将来新增 Tab 时登记。
+ * 2026-10-29 复核：M6/M9/M10 六个 Tab 曾以错误调用形态冒充已接入；修正 API 会让未对齐模板的载荷真正写库，
+ * 因此先拆掉伪接线并在此具名冻结。清单只许变短，结构与非零等价完成后逐项移出。
  */
 const NOT_WIRED_ALLOWLIST: Record<string, string> = {
-  // 实测为空：真实缺口（有同步能力却未接自动同步）= 0
+  // 这 4 个 Tab 原有 `useDisclosureAutoSync(syncFn)` + 无参 `scheduleAutoSync()` 是静默 TypeError，
+  // 并非有效接线。载荷会覆盖未对齐模板，先明确禁用；完成模板非零等价后必须逐项移出。
 }
 
 interface TabInfo {
@@ -398,6 +398,71 @@ describe('披露 Tab 自动同步覆盖率', () => {
     expect(TABS.length).toBeGreaterThan(140)
   })
 
+  it('AST：useDisclosureAutoSync 只收空参/对象，scheduleAutoSync 必须传可调用引用', () => {
+    const malformed: string[] = []
+    for (const tab of TABS) {
+      const facts = autoSyncCallFacts(tab.path, tab.src)
+      facts.useCalls.forEach((call, index) => {
+        if (!call.firstIsObject) malformed.push(`${tab.name}: use#${index + 1} 首参不是对象`)
+      })
+      facts.scheduleCalls.forEach((call, index) => {
+        if (call.args !== 1 || !call.firstIsCallableRef) {
+          malformed.push(`${tab.name}: schedule#${index + 1} 实参=${call.args}`)
+        }
+      })
+    }
+    expect(malformed).toEqual([])
+  })
+
+  it('AST 自检能抓错首参与无参 schedule，且注释不能骗过判据', () => {
+    const bad = autoSyncCallFacts('bad.vue', `<script setup lang="ts">
+      const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+      scheduleAutoSync()
+      // scheduleAutoSync(syncToDisclosureNotes)
+    </script>`)
+    expect(bad.useCalls).toEqual([{ args: 1, firstIsObject: false }])
+    expect(bad.scheduleCalls).toEqual([{ args: 0, firstIsCallableRef: false }])
+
+    const good = autoSyncCallFacts('good.vue', `<script setup lang="ts">
+      const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({ isReadonly: () => false })
+      scheduleAutoSync(syncToDisclosureNotes)
+      onBeforeUnmount(() => cancelPending())
+    </script>`)
+    expect(good.useCalls).toEqual([{ args: 1, firstIsObject: true }])
+    expect(good.scheduleCalls).toEqual([{ args: 1, firstIsCallableRef: true }])
+    expect(good.cancelInUnmount).toBe(true)
+  })
+
+  it('已验证的 M1/M2/M3/M8/M9/M10 Tab 用正确选项、调度函数并在卸载时取消', () => {
+    const names = [
+      'M1TabDisclosureListed.vue', 'M1TabDisclosureSoe.vue',
+      'M2TabDisclosureListed.vue', 'M2TabDisclosureSoe.vue',
+      'M3TabDisclosureListed.vue',
+      'M8TabDisclosureListed.vue', 'M8TabDisclosureSoe.vue',
+      'M9TabDisclosureListed.vue', 'M9TabDisclosureSoe.vue',
+      'M10TabDisclosureListed.vue', 'M10TabDisclosureSoe.vue',
+    ]
+    for (const name of names) {
+      const tab = TABS.find((candidate) => candidate.name === name)
+      expect(tab, name).toBeTruthy()
+      const facts = autoSyncCallFacts(tab!.path, tab!.src)
+      expect(facts.useCalls, name).toEqual([{ args: 1, firstIsObject: true }])
+      expect(facts.scheduleCalls.length, name).toBeGreaterThan(0)
+      expect(facts.scheduleCalls.every((call) => call.args === 1 && call.firstIsCallableRef), name).toBe(true)
+      expect(facts.cancelInUnmount, name).toBe(true)
+    }
+  })
+
+  it('模板阻断清单中的 Tab 必须完全没有 timer 伪接线', () => {
+    for (const name of Object.keys(NOT_WIRED_ALLOWLIST)) {
+      const tab = TABS.find((candidate) => candidate.name === name)
+      expect(tab, name).toBeTruthy()
+      const facts = autoSyncCallFacts(tab!.path, tab!.src)
+      expect(facts.useCalls, name).toEqual([])
+      expect(facts.scheduleCalls, name).toEqual([])
+    }
+  })
+
   it('接入了 useDisclosureAutoSync 就必须真的调 scheduleAutoSync（不许只 import 或只建实例）', () => {
     const halfWired = TABS.filter((t) => t.hasImport && !t.hasCall).map((t) => t.name)
     expect(
@@ -484,9 +549,12 @@ watch([() => disc.rows], () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
     expect(stale, `以下 Tab 已接入但仍在 allowlist 中，请移出：${stale.join(', ')}`).toEqual([])
   })
 
-  it('真实缺口（有同步能力却未接自动同步）应为 0', () => {
+  it('未登记的真实缺口应为 0，模板阻断清单只许变短', () => {
     const gap = TABS.filter((t) => t.hasSyncFn && !t.hasCall).map((t) => t.name)
-    expect(gap, `出现新的自动同步缺口：${gap.join(', ')}`).toEqual([])
+    const undeclared = gap.filter((name) => !(name in NOT_WIRED_ALLOWLIST))
+    expect(undeclared, `出现新的未登记自动同步缺口：${undeclared.join(', ')}`).toEqual([])
+    expect(Object.keys(NOT_WIRED_ALLOWLIST)).toEqual([])
+    expect(Object.keys(NOT_WIRED_ALLOWLIST).length).toBeLessThanOrEqual(0)
   })
 })
 

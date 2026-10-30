@@ -21,17 +21,40 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, SoftDeleteMixin
+
+#: scope 允许的取值（TemplateScopeAdapter 接受的输入：四个规范值 + 历史 global / personal）；与迁移 V214 的检查约束、
+#: scripts/_ensure_custom_query_tables.py 的 SCOPE_VALUES 同一份（test_advanced_query_ddl_cross_lock 交叉锁死）
+TEMPLATE_SCOPE_VALUES = ("private", "team", "project", "public", "global", "personal")
 
 
-class CustomQueryTemplate(Base):
+class _SqliteUuidList(sa.types.TypeDecorator):
+    """SQLite 测试方言下的 UUID 数组：存成 JSON 文本数组、读回 ``uuid.UUID``，与 PG 的 ``UUID[]`` 同一语义。
+
+    直接用 ``sa.JSON()`` 时元素是 UUID 对象会 ``TypeError: Object of type UUID is not JSON serializable``——
+    「指定项目共享」模板在 SQLite 上一保存就失败（advanced-query-linkage-closure 任务 24 现跑）。PG 不经过这里。
+    """
+
+    impl = sa.JSON
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else [str(item) for item in value]
+
+    def process_result_value(self, value, dialect):
+        return None if value is None else [uuid.UUID(str(item)) for item in value]
+
+
+class CustomQueryTemplate(Base, SoftDeleteMixin):
     """自定义查询模板。
 
     - scope='private'：仅创建者可见
-    - scope='team'：团队可见
+    - scope='team'：团队可见（锚点项目 config.project_id 的成员）
+    - scope='project'：指定项目共享（shared_project_ids 中任一项目有访问权）
     - scope='public'：全员共享
-    - scope='global'：全员共享（legacy alias）
+    - scope='global' / 'personal'：public / private 的历史别名（只作输入与读取兼容）
     - config 含完整查询参数（含 cell_range / sheet_name / page_size / sort）
+    - 删除 = 软删（is_deleted / deleted_at，迁移 V214），进回收站，作者与 admin 可恢复 / 彻底删除
     """
 
     __tablename__ = "custom_query_templates"
@@ -50,16 +73,17 @@ class CustomQueryTemplate(Base):
     )
     # shared_project_ids: 显式分享的项目 id 列表（scope='personal' + 分享场景）
     # 与 V101 逐列对齐：UUID[] NOT NULL DEFAULT '{}'
-    # NOTE: 数组列需要两处适配，缺任一在 SQLite 测试方言下都会炸：
+    # NOTE: 数组列需要三处适配，缺任一在 SQLite 测试方言下都会炸：
     #   ① 方言变体 —— SQLite 无 ARRAY 类型，绑定 list 参数直接
     #      `ProgrammingError: type 'list' is not supported`，故退化为 JSON；
     #   ② Python 侧 `default=list` —— PG 数组字面量 `'{}'` 作为 server_default
     #      在 SQLite 上被当普通字符串存入，读回时 ARRAY 的 item processor 会对
     #      "{}" 逐字符调 `UUID()` → `badly formed hexadecimal UUID string`。
     #      显式 default 使 INSERT 自带空列表，两种方言行为一致。
+    #   ③ UUID 元素 —— JSON 序列化不认 UUID 对象，``_SqliteUuidList`` 存文本、读回 UUID。
     # PG 侧语义完全不变（仍是 UUID[] / TEXT[] + GIN 索引）。
     shared_project_ids: Mapped[list[uuid.UUID]] = mapped_column(
-        ARRAY(PG_UUID(as_uuid=True)).with_variant(sa.JSON(), "sqlite"),
+        ARRAY(PG_UUID(as_uuid=True)).with_variant(_SqliteUuidList(), "sqlite"),
         nullable=False,
         default=list,
         server_default=sa.text("'{}'"),
@@ -108,6 +132,11 @@ class CustomQueryTemplate(Base):
         sa.Index("idx_cqt_tags", "tags", postgresql_using="gin"),
         sa.Index(
             "idx_cqt_shared_projects", "shared_project_ids", postgresql_using="gin"
+        ),
+        sa.Index("idx_cqt_live_updated", "is_deleted", sa.desc("updated_at")),
+        sa.CheckConstraint(
+            "scope IN (" + ", ".join(f"'{value}'" for value in TEMPLATE_SCOPE_VALUES) + ")",
+            name="ck_custom_query_templates_scope",
         ),
     )
 

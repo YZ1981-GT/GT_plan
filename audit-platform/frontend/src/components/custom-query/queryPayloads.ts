@@ -107,8 +107,19 @@ export interface BusinessQueryInput extends QueryProjectContext {
   source: string
   filters?: Record<string, unknown>
   columns?: string[]
+  /** 结构化条件与组合逻辑（后端 `QueryRequest.conditions` / `condition_logic`；advanced-query-linkage-closure 任务 29，R6.1） */
+  conditions?: { field: string; op: string; value: unknown }[]
+  condition_logic?: 'and' | 'or'
+  /** 排序项（后端 `QueryRequest.sort`：数据库内对全量排序、空值在后；R2.2） */
+  sort?: QuerySort[]
   limit?: number
   offset?: number
+}
+
+/** 业务视图的一个排序项（后端 `SortSpec`） */
+export interface QuerySort {
+  field: string
+  direction: 'asc' | 'desc'
 }
 
 /** 业务视图请求体（后端 `QueryRequest`）。`project_id` 恒发送（模板浏览模式为空串，与原行为一致）。 */

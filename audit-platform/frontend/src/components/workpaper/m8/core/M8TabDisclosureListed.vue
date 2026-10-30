@@ -162,7 +162,7 @@
  *
  * Composables: useM8FormData + useVersionTrail（双模式由主入口统一承载）
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
@@ -187,24 +187,26 @@ const aiLoading = ref('')
 
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildM8SyncPayload, type M8DisclosureRow } from '../../composables/m8NoteSectionMap'
+import {
+  buildM8TabSyncPayload,
+  createM8DisclosureRows,
+  restoreM8Disclosure,
+  type M8DisclosureDataRow,
+} from '../../composables/mEquityDisclosureForm'
 import http from '@/utils/http'
 
+// 默认行 / 读回 / 同步快照与附注页离屏同步共用 mEquityDisclosureForm（spec note-pull-followup-closure R1）
 async function syncToDisclosureNotes(): Promise<void> {
-  const rows: M8DisclosureRow[] = dataRows.value.map((r: any) => ({
-    label: r.item || r.label || '',
-    begin: Number(r.beginAmount) || 0,
-    increase: Number(r.increaseAmount) || 0,
-    decrease: Number(r.decreaseAmount) || 0,
-  }))
-  const payload = buildM8SyncPayload(props.wpId, 'listed', rows, disclosureNote.value)
+  const payload = buildM8TabSyncPayload(props.wpId, 'listed', dataRows.value, disclosureNote.value)
   if (!payload) return
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 
-const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+const { scheduleAutoSync, cancelPending } = useDisclosureAutoSync({
+  isReadonly: () => props.isReadonly,
+})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
@@ -217,18 +219,9 @@ const versionTrail = useVersionTrail({
 })
 
 // ─── Data Rows (3 data rows corresponding to xlsx rows 7-9) ─────────────────
-interface DisclosureDataRow {
-  item: string
-  beginBalance: number
-  currentIncrease: number
-  currentDecrease: number
-}
+type DisclosureDataRow = M8DisclosureDataRow
 
-const dataRows = ref<DisclosureDataRow[]>([
-  { item: '一般风险准备—信贷资产', beginBalance: 0, currentIncrease: 0, currentDecrease: 0 },
-  { item: '一般风险准备—投资资产', beginBalance: 0, currentIncrease: 0, currentDecrease: 0 },
-  { item: '一般风险准备—其他', beginBalance: 0, currentIncrease: 0, currentDecrease: 0 },
-])
+const dataRows = ref<DisclosureDataRow[]>(createM8DisclosureRows())
 
 // ─── Computed: table rows with total ─────────────────────────────────────────
 interface TableRow {
@@ -282,13 +275,13 @@ function updateDataRow(tableIndex: number, field: keyof DisclosureDataRow, val: 
   if (tableIndex >= 0 && tableIndex < dataRows.value.length) {
     (dataRows.value[tableIndex] as any)[field] = val
     formData.debouncedSave(`M8-disclosure-listed-row-${tableIndex}-${field}`, { remark: String(val) })
-    scheduleAutoSync()
+    scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
 function handleNoteChange(): void {
   formData.debouncedSave('M8-disclosure-listed-note', { remark: disclosureNote.value || null })
-  scheduleAutoSync()
+  scheduleAutoSync(syncToDisclosureNotes)
 }
 
 async function handleAI(section: string): Promise<void> {
@@ -332,35 +325,18 @@ onMounted(async () => {
   eventBus.on('substantive:adjudicated', onAdjudicatedRefresh)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  cancelPending()
   eventBus.off('substantive:adjudicated', onAdjudicatedRefresh)
 })
 
 /** 从 checklist_responses 恢复数据 */
 function _restoreData(): void {
-  for (let i = 0; i < dataRows.value.length; i++) {
-    const fields: (keyof DisclosureDataRow)[] = ['beginBalance', 'currentIncrease', 'currentDecrease']
-    for (const field of fields) {
-      const resp = formData.allResponses.value.get(`M8-disclosure-listed-row-${i}-${field}`)
-      if (resp?.remark) {
-        (dataRows.value[i] as any)[field] = Number(resp.remark) || 0
-      }
-    }
-  }
-
-  // Cross-sheet reference: 期初余额 B7 from M8-2 detail total
-  const detailBeginTotal = formData.getField('2', 'total-beginBalance')
-  if (detailBeginTotal !== null && detailBeginTotal !== undefined) {
-    // Distribute to first row if available
-    const numVal = Number(detailBeginTotal)
-    if (!isNaN(numVal) && numVal !== 0 && dataRows.value[0].beginBalance === 0) {
-      dataRows.value[0].beginBalance = numVal
-    }
-  }
-
-  // 恢复附注说明
-  const noteResp = formData.allResponses.value.get('M8-disclosure-listed-note')
-  if (noteResp?.remark) disclosureNote.value = noteResp.remark
+  // 金额逐格读回；期初余额 B7 取 M8-2 明细期初合计（首行期初为 0 时）；附注说明
+  const { note } = restoreM8Disclosure(
+    formData.allResponses.value, 'listed', dataRows.value, formData.getField('2', 'total-beginBalance'),
+  )
+  if (note != null) disclosureNote.value = note
 }
 </script>
 

@@ -1557,8 +1557,8 @@
    },
    "date_inputs": [],
    "text_inputs": [
-    "acctClass",
     "confirmationRequested",
+    "investType",
     "realizationRestricted",
     "securityName"
    ],
@@ -2649,30 +2649,30 @@
    ],
    "literals": []
   },
-  "N1-2-rows": {
+  "N1-2-detail-rows": {
    "contract": "n1.deferred_tax_assets",
    "tables": [
     "递延所得税资产明细表N1-2!deferred_tax_asset_detail_rows@11"
    ],
    "inputs": [
-    "currentAje",
-    "currentRje",
-    "currentTaxRate",
-    "currentTempDiff",
-    "priorAje",
-    "priorRje",
-    "priorTempDiff",
-    "taxRate"
+    "beginAje",
+    "beginDiff",
+    "beginRje",
+    "beginTaxRate",
+    "endAje",
+    "endDiff",
+    "endRje",
+    "endTaxRate"
    ],
    "input_types": {
-    "currentAje": "amount",
-    "currentRje": "amount",
-    "currentTaxRate": "rate",
-    "currentTempDiff": "amount",
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorTempDiff": "amount",
-    "taxRate": "rate"
+    "beginAje": "amount",
+    "beginDiff": "amount",
+    "beginRje": "amount",
+    "beginTaxRate": "rate",
+    "endAje": "amount",
+    "endDiff": "amount",
+    "endRje": "amount",
+    "endTaxRate": "rate"
    },
    "date_inputs": [],
    "text_inputs": [
@@ -2682,38 +2682,38 @@
    "auto_fields": [],
    "literals": []
   },
-  "N2-2-rows": {
+  "N2-2-detail-rows": {
    "contract": "n2.taxes_payable",
    "tables": [
     "应交税费明细表N2-2!taxes_payable_detail_rows@10"
    ],
    "inputs": [
-    "adjAje",
-    "adjRje",
-    "ajeAccrued",
     "ajePaid",
-    "priorAccrued",
-    "priorOpening",
-    "priorPaid",
-    "rjeAccrued",
-    "rjePaid"
+    "ajePayable",
+    "beginAdjust",
+    "beginRje",
+    "rjePaid",
+    "rjePayable",
+    "unadjBegin",
+    "unadjPaid",
+    "unadjPayable"
    ],
    "input_types": {
-    "adjAje": "amount",
-    "adjRje": "amount",
-    "ajeAccrued": "amount",
     "ajePaid": "amount",
-    "priorAccrued": "amount",
-    "priorOpening": "amount",
-    "priorPaid": "amount",
-    "rjeAccrued": "amount",
-    "rjePaid": "amount"
+    "ajePayable": "amount",
+    "beginAdjust": "amount",
+    "beginRje": "amount",
+    "rjePaid": "amount",
+    "rjePayable": "amount",
+    "unadjBegin": "amount",
+    "unadjPaid": "amount",
+    "unadjPayable": "amount"
    },
    "date_inputs": [],
    "text_inputs": [
     "remark",
-    "taxName",
-    "taxRate"
+    "taxRate",
+    "taxType"
    ],
    "auto_fields": [],
    "literals": []
@@ -2724,24 +2724,24 @@
     "递延所得税负债明细表N3-2!deferred_tax_liability_detail_rows@11"
    ],
    "inputs": [
-    "currentAje",
-    "currentRje",
-    "currentTaxRate",
-    "currentTempDiff",
-    "priorAje",
-    "priorRje",
-    "priorTempDiff",
-    "taxRate"
+    "beginAje",
+    "beginDiff",
+    "beginRje",
+    "beginTaxRate",
+    "endAje",
+    "endDiff",
+    "endRje",
+    "endTaxRate"
    ],
    "input_types": {
-    "currentAje": "amount",
-    "currentRje": "amount",
-    "currentTaxRate": "rate",
-    "currentTempDiff": "amount",
-    "priorAje": "amount",
-    "priorRje": "amount",
-    "priorTempDiff": "amount",
-    "taxRate": "rate"
+    "beginAje": "amount",
+    "beginDiff": "amount",
+    "beginRje": "amount",
+    "beginTaxRate": "rate",
+    "endAje": "amount",
+    "endDiff": "amount",
+    "endRje": "amount",
+    "endTaxRate": "rate"
    },
    "date_inputs": [],
    "text_inputs": [
@@ -7229,124 +7229,102 @@
    "skip": null
   },
   {
-   "store_item": "N1-2-rows",
-   "contract": "n1.deferred_tax_assets",
-   "sheet": "递延所得税资产明细表N1-2",
-   "cell": "N11",
-   "field": "currentAudited",
-   "header": "递延所得税资产期末审定数",
-   "formula": "=K11+L11+M11",
-   "expr": "currentDtaBalance + currentAje + currentRje",
-   "skip": null
-  },
-  {
-   "store_item": "N1-2-rows",
-   "contract": "n1.deferred_tax_assets",
-   "sheet": "递延所得税资产明细表N1-2",
-   "cell": "K11",
-   "field": "currentDtaBalance",
-   "header": "递延所得税资产期末余额",
-   "formula": "=ROUND(I11*J11,2)",
-   "expr": "ROUND( currentTempDiff * currentTaxRate , 2 )",
-   "skip": null
-  },
-  {
-   "store_item": "N1-2-rows",
+   "store_item": "N1-2-detail-rows",
    "contract": "n1.deferred_tax_assets",
    "sheet": "递延所得税资产明细表N1-2",
    "cell": "H11",
-   "field": "priorAudited",
+   "field": "beginAudited",
    "header": "递延所得税资产期初审定数",
    "formula": "=E11+F11+G11",
-   "expr": "priorDtaBalance + priorAje + priorRje",
+   "expr": "beginDeferredTax + beginAje + beginRje",
    "skip": null
   },
   {
-   "store_item": "N1-2-rows",
+   "store_item": "N1-2-detail-rows",
    "contract": "n1.deferred_tax_assets",
    "sheet": "递延所得税资产明细表N1-2",
    "cell": "E11",
-   "field": "priorDtaBalance",
+   "field": "beginDeferredTax",
    "header": "递延所得税资产期初余额",
    "formula": "=ROUND(C11*D11,2)",
-   "expr": "ROUND( priorTempDiff * taxRate , 2 )",
+   "expr": "ROUND( beginDiff * beginTaxRate , 2 )",
    "skip": null
   },
   {
-   "store_item": "N2-2-rows",
-   "contract": "n2.taxes_payable",
-   "sheet": "应交税费明细表N2-2",
-   "cell": "N10",
-   "field": "auditedAccrued",
-   "header": "本期应交数",
-   "formula": "=D10+I10+K10",
-   "expr": "priorAccrued + ajeAccrued + rjeAccrued",
+   "store_item": "N1-2-detail-rows",
+   "contract": "n1.deferred_tax_assets",
+   "sheet": "递延所得税资产明细表N1-2",
+   "cell": "N11",
+   "field": "endAudited",
+   "header": "递延所得税资产期末审定数",
+   "formula": "=K11+L11+M11",
+   "expr": "endDeferredTax + endAje + endRje",
    "skip": null
   },
   {
-   "store_item": "N2-2-rows",
-   "contract": "n2.taxes_payable",
-   "sheet": "应交税费明细表N2-2",
-   "cell": "P10",
-   "field": "auditedClosing",
-   "header": "期末数",
-   "formula": "=M10+N10-O10",
-   "expr": "auditedOpening + auditedAccrued - auditedPaid",
+   "store_item": "N1-2-detail-rows",
+   "contract": "n1.deferred_tax_assets",
+   "sheet": "递延所得税资产明细表N1-2",
+   "cell": "K11",
+   "field": "endDeferredTax",
+   "header": "递延所得税资产期末余额",
+   "formula": "=ROUND(I11*J11,2)",
+   "expr": "ROUND( endDiff * endTaxRate , 2 )",
    "skip": null
   },
   {
-   "store_item": "N2-2-rows",
+   "store_item": "N2-2-detail-rows",
    "contract": "n2.taxes_payable",
    "sheet": "应交税费明细表N2-2",
    "cell": "M10",
-   "field": "auditedOpening",
+   "field": "audBegin",
    "header": "期初数",
    "formula": "=C10+G10+H10",
-   "expr": "priorOpening + adjAje + adjRje",
+   "expr": "unadjBegin + beginAdjust + beginRje",
    "skip": null
   },
   {
-   "store_item": "N2-2-rows",
+   "store_item": "N2-2-detail-rows",
+   "contract": "n2.taxes_payable",
+   "sheet": "应交税费明细表N2-2",
+   "cell": "P10",
+   "field": "audEnd",
+   "header": "期末数",
+   "formula": "=M10+N10-O10",
+   "expr": "audBegin + audPayable - audPaid",
+   "skip": null
+  },
+  {
+   "store_item": "N2-2-detail-rows",
    "contract": "n2.taxes_payable",
    "sheet": "应交税费明细表N2-2",
    "cell": "O10",
-   "field": "auditedPaid",
+   "field": "audPaid",
    "header": "本期已交数",
    "formula": "=E10+J10+L10",
-   "expr": "priorPaid + ajePaid + rjePaid",
+   "expr": "unadjPaid + ajePaid + rjePaid",
    "skip": null
   },
   {
-   "store_item": "N2-2-rows",
+   "store_item": "N2-2-detail-rows",
+   "contract": "n2.taxes_payable",
+   "sheet": "应交税费明细表N2-2",
+   "cell": "N10",
+   "field": "audPayable",
+   "header": "本期应交数",
+   "formula": "=D10+I10+K10",
+   "expr": "unadjPayable + ajePayable + rjePayable",
+   "skip": null
+  },
+  {
+   "store_item": "N2-2-detail-rows",
    "contract": "n2.taxes_payable",
    "sheet": "应交税费明细表N2-2",
    "cell": "F10",
-   "field": "priorClosing",
+   "field": "unadjEnd",
    "header": "期末数",
    "formula": "=C10+D10-E10",
-   "expr": "priorOpening + priorAccrued - priorPaid",
-   "skip": null
-  },
-  {
-   "store_item": "N3-2-rows",
-   "contract": "n3.deferred_tax_liabilities",
-   "sheet": "递延所得税负债明细表N3-2",
-   "cell": "N11",
-   "field": "currentAudited",
-   "header": "递延所得税负债期末审定数",
-   "formula": "=K11+L11+M11",
-   "expr": "currentDtlBalance + currentAje + currentRje",
-   "skip": null
-  },
-  {
-   "store_item": "N3-2-rows",
-   "contract": "n3.deferred_tax_liabilities",
-   "sheet": "递延所得税负债明细表N3-2",
-   "cell": "K11",
-   "field": "currentDtlBalance",
-   "header": "递延所得税负债期末余额",
-   "formula": "=ROUND(I11*J11,2)",
-   "expr": "ROUND( currentTempDiff * currentTaxRate , 2 )",
+   "expr": "unadjBegin + unadjPayable - unadjPaid",
    "skip": null
   },
   {
@@ -7354,10 +7332,10 @@
    "contract": "n3.deferred_tax_liabilities",
    "sheet": "递延所得税负债明细表N3-2",
    "cell": "H11",
-   "field": "priorAudited",
+   "field": "beginAudited",
    "header": "递延所得税负债期初审定数",
    "formula": "=E11+F11+G11",
-   "expr": "priorDtlBalance + priorAje + priorRje",
+   "expr": "beginDeferredTax + beginAje + beginRje",
    "skip": null
   },
   {
@@ -7365,10 +7343,32 @@
    "contract": "n3.deferred_tax_liabilities",
    "sheet": "递延所得税负债明细表N3-2",
    "cell": "E11",
-   "field": "priorDtlBalance",
+   "field": "beginDeferredTax",
    "header": "递延所得税负债期初余额",
    "formula": "=ROUND(C11*D11,2)",
-   "expr": "ROUND( priorTempDiff * taxRate , 2 )",
+   "expr": "ROUND( beginDiff * beginTaxRate , 2 )",
+   "skip": null
+  },
+  {
+   "store_item": "N3-2-rows",
+   "contract": "n3.deferred_tax_liabilities",
+   "sheet": "递延所得税负债明细表N3-2",
+   "cell": "N11",
+   "field": "endAudited",
+   "header": "递延所得税负债期末审定数",
+   "formula": "=K11+L11+M11",
+   "expr": "endDeferredTax + endAje + endRje",
+   "skip": null
+  },
+  {
+   "store_item": "N3-2-rows",
+   "contract": "n3.deferred_tax_liabilities",
+   "sheet": "递延所得税负债明细表N3-2",
+   "cell": "K11",
+   "field": "endDeferredTax",
+   "header": "递延所得税负债期末余额",
+   "formula": "=ROUND(I11*J11,2)",
+   "expr": "ROUND( endDiff * endTaxRate , 2 )",
    "skip": null
   },
   {

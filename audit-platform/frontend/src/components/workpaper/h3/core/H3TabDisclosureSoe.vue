@@ -646,6 +646,7 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   measurementModel: toRef(props, 'measurementModel') as any,
+  allResponses: toRef(props, 'allResponses') as any,
 })
 
 const crossSheet = useH3CrossSheet(
@@ -654,7 +655,8 @@ const crossSheet = useH3CrossSheet(
 )
 
 const {
-  sectionTexts, updateText, getSectionRows, addSectionRow, removeSectionRow, updateRow,
+  sectionTexts, updateText, getSectionRows, getSectionRowsForSync,
+  addSectionRow, removeSectionRow, updateRow,
   fvHierarchyRows, fvHierarchyTotalsByLevel,
   addFvHierarchyRow, removeFvHierarchyRow, updateFvHierarchyRow, importFvHierarchyFromH38,
 } = useH3Disclosure({
@@ -701,13 +703,13 @@ async function syncToDisclosureNotes() {
     const payload = buildH3SyncPayload({
       variant: 'soe',
       measurementModel: props.measurementModel,
-      costOriginalRows: getSectionRows('soe-cost'),
-      costDepRows: getSectionRows('soe-cost-dep'),
-      // 🔴 原写 'cost-impair'（那是**上市**组件的 section key）→ 国企减值行永远取空、
-      // 减值层与账面价值层恒为 0。国企自身 key 是 'soe-impair'。
-      costImpairRows: getSectionRows('soe-impair'),
-      fairChangeRows: getSectionRows('soe-fair-change'),
-      titleRows: getSectionRows('soe-unlicensed'),
+      costOriginalRows: getSectionRowsForSync('soe-cost'),
+      costDepRows: getSectionRowsForSync('soe-cost-dep'),
+      // 国企减值键与上市隔离；没有宿主来源时保持 undefined，不自动推 0。
+      costImpairRows: getSectionRowsForSync('soe-impair'),
+      // 两个历史录入块均可提供同一国企公允表；优先沿用既有细分列键。
+      fairChangeRows: getSectionRowsForSync('soe-fair-change') ?? getSectionRowsForSync('soe-fair-value'),
+      titleRows: getSectionRowsForSync('soe-unlicensed'),
       sectionTexts: { ...sectionTexts },
       projectId: props.projectId,
       wpId: props.wpId,

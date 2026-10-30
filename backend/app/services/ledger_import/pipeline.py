@@ -98,6 +98,8 @@ class PipelineResult:
     year: int | None = None
     error_message: str | None = None
     blocking_messages: list[str] = field(default_factory=list)
+    append_report: dict[str, Any] | None = None
+    voucher_diff_report: dict[str, Any] | None = None
 
 
 # Callback types
@@ -231,6 +233,7 @@ async def execute_pipeline(
     progress_cb: ProgressCallback | None = None,
     cancel_check: CancelChecker | None = None,
     phase_marker: PhaseMarker | None = None,
+    append_options: dict[str, Any] | None = None,
 ) -> PipelineResult:
     """v2 引擎纯数据管线（detect → parse → convert → validate → write → activate）。
 
@@ -391,13 +394,8 @@ async def execute_pipeline(
         detections[str(filepath)] = fd
     _mark("detect_identify_done")
 
-    # Resolve confirmed mappings
-    confirmed = {}
-    if custom_mapping and "confirmed_mappings" in custom_mapping:
-        for m in custom_mapping["confirmed_mappings"]:
-            sheet_key = f"{m.get('file_name', '')}!{m.get('sheet_name', '')}"
-            confirmed[sheet_key] = m.get("mappings", {})
-
+    # 两条导入链共用确认映射契约，兼容旧「文件/工作表」字典。
+    from app.services.ledger_import_mapping_contract import resolve_sheet_mapping
     import_year = year or 2025
 
     # ── Create staged dataset ──
@@ -415,6 +413,8 @@ async def execute_pipeline(
             break
 
     async with async_session() as stage_db:
+        from .append_stage import staged_source_summary
+
         staged = await DatasetService.create_staged(
             stage_db,
             project_id=project_id,
@@ -422,7 +422,7 @@ async def execute_pipeline(
             source_type="ledger_import_v2",
             job_id=job_id,
             created_by=created_by,
-            source_summary={"amount_unit": _amount_unit} if _amount_unit else None,
+            source_summary=staged_source_summary(_amount_unit, append_options),
         )
         staging_dataset_id = staged.id
         await stage_db.commit()
@@ -489,8 +489,7 @@ async def execute_pipeline(
                 )
                 continue
 
-            sheet_key = f"{filename}!{sheet.sheet_name}"
-            col_mapping = confirmed.get(sheet_key) or {}
+            col_mapping = resolve_sheet_mapping(custom_mapping, filename, sheet.sheet_name) or {}
             if not col_mapping:
                 for cm in sheet.column_mappings:
                     if cm.standard_field and cm.confidence >= 50:
@@ -669,6 +668,18 @@ async def execute_pipeline(
         _t_insert, _t_progress, _n_progress_calls, _t_cancel_check, _n_inserts,
     )
 
+    from .append_stage import expected_base_id, prepare_staged_append
+
+    append_report, voucher_diff_report, merged_business_findings, merged_counts = await prepare_staged_append(
+        session_factory=async_session, staged_dataset_id=staging_dataset_id,
+        project_id=project_id, year=import_year, append_options=append_options,
+        force_activate=force_activate,
+        file_counts=(total_balance_written, total_aux_balance_written, total_ledger_written, total_aux_ledger_written),
+        progress=_progress, mark_phase=_mark,
+    )
+    (total_balance_written, total_aux_balance_written,
+     total_ledger_written, total_aux_ledger_written) = merged_counts
+
     # ── Activation gate ──
     logger.info("Pipeline %s phase=activation_gate", job_id)
     await _progress(85, "评估激活条件")
@@ -708,17 +719,19 @@ async def execute_pipeline(
             dataset_id=staging_dataset_id,
             activated_by=created_by,
             record_summary={
-                "balance_rows": total_balance_written,
-                "aux_balance_rows": total_aux_balance_written,
-                "ledger_rows": total_ledger_written,
-                "aux_ledger_rows": total_aux_ledger_written,
+                "tb_balance": total_balance_written,
+                "tb_aux_balance": total_aux_balance_written,
+                "tb_ledger": total_ledger_written,
+                "tb_aux_ledger": total_aux_ledger_written,
             },
             validation_summary={
                 "warnings": len([f for f in all_findings if not f.blocking]),
                 "blocking": len([f for f in all_findings if f.blocking]),
                 "force_activated": force_activate,
                 "force_skipped_findings": force_skipped_findings,
+                "merged_business_validation": merged_business_findings,
             },
+            expected_active_dataset_id=expected_base_id(append_options),
         )
         await act_db.commit()
     _mark("activate_dataset_done")
@@ -782,4 +795,6 @@ async def execute_pipeline(
         warnings=len([f for f in all_findings if not f.blocking]),
         blocking_findings=len([f for f in all_findings if f.blocking]),
         year=import_year,
+        append_report=append_report,
+        voucher_diff_report=voucher_diff_report,
     )

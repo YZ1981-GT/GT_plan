@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -29,7 +29,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 import sqlalchemy as sa
 
-from app.deps import authorize_wp_edit
+from app.deps import authorize_wp_edit, assert_project_permission
 from app.models.audit_platform_models import WorkpaperExtractionLog
 from app.models.core import Project, User as _CoreUser  # noqa: F401 (Project 用于年度校验)
 from app.models.core import User
@@ -41,6 +41,9 @@ from app.services.ledger_sampling_service import (
     enrich_items_with_aux_party,
     enrich_voucher_context,
 )
+from app.services.project_audit_phase import project_phase
+from app.services.sampling_final_population import resolve_final_population
+from app.services.sampling_phase_evaluation import with_combined
 from app.services.sampling_methodology import build_methodology_snapshot
 from app.services.sampled_voucher_queries import cross_workpaper_duplicate_vouchers, project_sampling_coverage
 from app.services.sampling_registry_service import (
@@ -80,7 +83,11 @@ class VoucherExtractRequest(BaseModel):
     sampling_method: SamplingMethod
     sampling_params: dict = Field(default_factory=dict)
     random_seed: Optional[int] = None
-    phase: str = "preliminary"  # "preliminary" | "final"
+    # 审计阶段只有预审 / 年审两个值（其他 422，需求 6.5）；不给按项目当前阶段（V212，需求 6.2）
+    phase: Optional[Literal["preliminary", "final"]] = None
+    # 年审口径（需求 7.1）：a remaining 只抽剩余期间 / b full_minus_interim 全年扣除预审已检样本。
+    # 年审且本底稿有预审工作时必填（缺 422 FINAL_POPULATION_MODE_REQUIRED），其余情形不适用、带了也不记
+    final_population_mode: Optional[Literal["remaining", "full_minus_interim"]] = None
     filters: dict = Field(default_factory=dict)
     workpaper_id: UUID
     year: int
@@ -123,6 +130,7 @@ async def voucher_extract(
     await _authorize_and_validate_extract(
         db, current_user, pid, req.workpaper_id, req.year
     )
+    phase = req.phase or await project_phase(db, pid)
 
     try:
         # ── 版本链：抽凭前自动快照 ──
@@ -132,7 +140,7 @@ async def voucher_extract(
             workpaper_id=req.workpaper_id,
             user_id=current_user.id,
             snapshot_type="auto_sampling",
-            description=f"抽凭执行: {req.sampling_method}, phase={req.phase}",
+            description=f"抽凭执行: {req.sampling_method}, phase={phase}",
         )
 
         # 1. 解析过滤条件
@@ -209,13 +217,25 @@ async def voucher_extract(
         exclusions = await collect_exclusions(
             db, project_id=pid, year=req.year, workpaper_id=req.workpaper_id,
             extraction_type="voucher_sampling", sampling_unit=sampling_unit,
-            exclude_extracted=exclude_extracted, phase=req.phase, exclude_scope=exclude_scope,
+            exclude_extracted=exclude_extracted, phase=phase, exclude_scope=exclude_scope,
         )
 
         # 4. 科目映射反查：标准编码 → 企业原始编码（无映射退回标准编码）
         effective_codes, _mapping_used = await resolve_effective_codes(
             db, pid, account_codes
         )
+
+        # 4.5 年审口径（需求 7.1~7.4，ADR-VK-10）：本底稿有预审工作时须选 a / b。
+        #     a 把日期窗口收窄到预审截止日次日至期末；b 另扣预审手工挂凭在本次科目范围内的分录
+        #     （预审批次回填的分录在年审已由 collect_exclusions 排除）。口径随 stats 回给前端写进批次留痕。
+        final_population = await resolve_final_population(
+            db, project_id=pid, workpaper_id=req.workpaper_id, year=req.year, phase=phase,
+            mode=req.final_population_mode, date_start=date_start, date_end=date_end,
+            account_codes=effective_codes,
+        )
+        if final_population is not None:
+            date_start, date_end = final_population.date_start, final_population.date_end
+            exclusions.line_ids = sorted({*exclusions.line_ids, *final_population.attach_line_ids})
 
         # 5. 构建 LedgerQueryFilters（用解析后的编码查序时账）
         ledger_filters = LedgerQueryFilters(
@@ -461,6 +481,8 @@ async def voucher_extract(
                 "sampling_unit": sampling_unit,
                 # 已抽排除计数；legacy_exclusion = 有旧日志按凭证号整张排除（会连带同号别日凭证）
                 **exclusions.to_stats(),
+                # 年审口径（只在年审且本底稿有预审工作时出现）：口径、截止日、排除清单规模
+                **({"final_population": final_population.to_trace()} if final_population else {}),
                 # 抽样框数据集版本（R1）：序时账重导后据此判定该批次已不可复算。
                 # None = 未识别到 active 账套版本（如尚未导入账套），前端如实提示不阻断。
                 "dataset_id": (
@@ -475,6 +497,8 @@ async def voucher_extract(
             "truncated": truncated,
         }
 
+    except HTTPException:
+        raise  # 年审口径的 422 / 400 原样返回，不被下面吞成 500
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -514,6 +538,9 @@ async def voucher_evaluation(
         actor_id=current_user.id,
         existing=existing_eval if isinstance(existing_eval, dict) else None,
     )
+    # 年审批次带口径时，全年合并评价由服务端按 ADR-VK-10 现算后写入（客户端传的 combined 不收）；
+    # 不可用（如预审批次缺实际错报合计）就不写，由 GET /sampling/phase-evaluation 说明原因
+    normalized = await with_combined(db, project_id=pid, log=log, evaluation=normalized)
 
     # 🔴 JSONB 必须整体赋一个**新 dict**：原地 mutate 不触发 SQLAlchemy 脏检测 →
     # flush 时该列被跳过，表现为"接口返回成功但库里没变"。
@@ -624,6 +651,7 @@ async def voucher_coverage(
     - `by_workpaper`：按底稿汇总批次数 / 样本数
     - `duplicated`：被 ≥2 个底稿抽取的凭证（跨循环重复抽凭）
     """
+    await assert_project_permission(db, current_user, pid, "readonly")
     resolved_year = year if year is not None else await registry_resolve_project_year(db, pid)
     if resolved_year is None:
         # 年度无法判定时如实返回空 + 原因，不猜年度（跨年归档会算错）
@@ -650,7 +678,7 @@ async def voucher_undo(
     """撤销指定抽凭操作
 
     仅允许撤销最近一次非撤销记录（extraction_type='voucher_sampling'）。
-    标记 is_undone=True 并返回 before_data。
+    标记 is_undone=True，回报批次号（宿主按批次删行，ADR-VK-08）；`before_data` 只为旧调用方保留。
     """
     try:
         # 1. 加载记录
@@ -666,6 +694,8 @@ async def voucher_undo(
         # 2. 验证 extraction_type
         if record.extraction_type != "voucher_sampling":
             raise ValueError("该记录不属于抽凭引擎")
+
+        await _authorize_undo(db, current_user, pid, record)
 
         # 3. 验证是最新非撤销记录
         latest_stmt = (
@@ -699,16 +729,38 @@ async def voucher_undo(
 
         await db.commit()
 
-        # 6. 返回 before_data
+        # 6. 回报批次号（before_data 只为旧调用方保留，新回填不再写快照）
         before_data = record.before_data if record.before_data is not None else []
         return {
             "success": True,
+            "batch_id": str(record.batch_id) if record.batch_id is not None else None,
             "before_data": before_data,
             "undone_registration": undone_projection,
         }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def _authorize_undo(db: AsyncSession, current_user: User, pid: UUID, record: Any) -> None:
+    """撤销的鉴权与阶段规则（撤销会让宿主删底稿行，ADR-VK-08）。
+
+    1. 记录须属于 URL 项目：别的项目的记录按不存在处理（404），不暴露它是否存在；
+    2. 底稿编辑权，与抽凭同口径（authorize_wp_edit：角色 + 项目成员 edit 级）；
+    3. 年审阶段不撤销预审批次（需求 6.3「年审阶段预审行只读，不可删」）：撤销会软删登记表里的
+       预审样本，年审口径 b 扣除预审分录就少了这一批，同一分录会被年审再抽一次。
+    """
+    if str(getattr(record, "project_id", "")) != str(pid):
+        raise HTTPException(status_code=404, detail="提取记录不存在")
+    wp_project_id = await authorize_wp_edit(db, current_user, record.workpaper_id)
+    if str(wp_project_id) != str(pid):
+        raise HTTPException(status_code=403, detail="底稿不属于该项目，禁止跨项目撤销")
+    log_phase = (record.extraction_criteria or {}).get("phase")
+    if log_phase == "preliminary" and await project_phase(db, pid) == "final":
+        raise HTTPException(status_code=409, detail={
+            "error_code": "PRELIMINARY_BATCH_LOCKED",
+            "message": "项目已进入年审阶段，预审抽凭批次只读，不能撤销；确需撤销请先由项目经理把审计阶段改回预审",
+        })
 
 
 # ─── POST /voucher-compare ───────────────────────────────────────────────────
@@ -1032,6 +1084,17 @@ def _normalize_evaluation(
         else:
             kept = prev.get(key)
             out[key] = str(kept) if kept not in (None, "") else None
+
+    # 样本实际错报合计 E（需求 7.6，ADR-VK-10 口径 b 的预审分量）：只在提交了可解析的值时写 ——
+    # 缺省不写，旧记录输出逐字节不变；不可解析、非有限或为负（E 是各样本错报绝对值之和）按「没有」处理，
+    # 不当 0（合并评价据此拒绝给口径 b 的结果）
+    if src.get("sample_error_total") not in (None, ""):
+        try:
+            e_total = Decimal(str(src["sample_error_total"]))
+        except (InvalidOperation, ValueError, TypeError):
+            e_total = None
+        if e_total is not None and e_total.is_finite() and e_total >= 0:
+            out["sample_error_total"] = str(e_total.quantize(Decimal("0.01")))
 
     # 服务端权威字段
     out["evaluated_at"] = datetime.now(timezone.utc).isoformat()

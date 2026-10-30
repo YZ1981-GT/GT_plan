@@ -41,7 +41,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError, model_validator
-from sqlalchemy import or_, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -55,7 +55,7 @@ from app.services.custom_query.template_scope_adapter import (
     TemplateScopeAdapter,
     TemplateScopeValidationError,
 )
-from app.services.custom_query.template_service import template_service
+from app.services.custom_query.template_service import TemplateForbiddenError, TemplateInvalidError, template_service
 from app.services.custom_query.pagination import (
     MAX_LIMIT as PAGE_MAX_LIMIT,
     MIN_LIMIT as PAGE_MIN_LIMIT,
@@ -262,10 +262,12 @@ async def get_indicators(
                 _leaf("ws_consol_tb", "合并试算平衡表"),
             ],
         })
+    # 「底稿清单」叶子在骨架与全量树里都有：页面版（骨架 + 附注分支）的底稿组只留它（ADR-AQL-16）
+    workpaper_list_leaf = _leaf("workpaper", "底稿清单")
     base_tree.append({
         "key": "workpaper", "label": "📋 底稿", "icon": "📋",
         "domain": "wp",
-        "children": [] if skeleton else await _build_workpaper_tree(db, project_id),
+        "children": [workpaper_list_leaf] if skeleton else [workpaper_list_leaf, *await _build_workpaper_tree(db, project_id)],
         "lazy": skeleton,
     })
     base_tree.append({
@@ -305,7 +307,9 @@ _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 #      表里没有的 entry_number，页面版按叶子列发 columns 会 400）；同批任务 22 的试算表重分类列、余额方向列共用 v12
 # v13：树形按项目（任务 19 / 20）——单体项目附注分支按本项目章节（叶子 disclosure_note:八、1 与「附注目录」）、单体隐藏
 #      合并试算平衡表与合并工作底稿组、「科目明细」更名、调整分录叶子 adj_rje、试算组增辅助两叶子、叶子带 supports_conditions
-_INDICATORS_SCHEMA_VERSION = 13
+# v14：底稿组首个叶子「底稿清单」（注册表源 workpaper，骨架里也有）——页面版只加载「骨架 + 附注分支」、底稿组只留它
+#      （ADR-AQL-16，任务 29）；弹窗全量树同样多这一个叶子
+_INDICATORS_SCHEMA_VERSION = 14
 
 
 def _registry_columns(source: str) -> list[str]:
@@ -1028,7 +1032,7 @@ async def _legacy_business_fetcher(req, resolved, db):
     """编排器 ``business_fetcher`` 的 router 侧入口（R3.7 / R4.8）。
 
     实现委托 ``services.custom_query.business_fetchers.business_fetcher``，不构成第二条分派路径；返回
-    ``FetchPage``（注册表 SQL 源 / JSON 内存源）或 ``(rows, columns)``（跨模块单元格源，任务 34 删除）。
+    ``FetchPage``（注册表 SQL 源 / JSON 内存源；跨模块单元格源键已随任务 34 删除，按未知数据源 400）。
     """
     from app.services.custom_query.business_fetchers import business_fetcher
 
@@ -1060,9 +1064,12 @@ class TemplateUpdateRequest(BaseModel):
 
 
 class TemplateExecuteRequest(BaseModel):
-    """模板执行请求：只带目标项目，其余查询参数取自模板 config。"""
+    """模板执行请求：目标项目、可选年度（缺省取目标项目审计年度，R9.3）与翻页；其余查询参数取自模板 config。"""
 
     project_id: str
+    year: int | None = Field(default=None, ge=2000, le=2100)
+    limit: int | None = Field(default=None, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
+    offset: int | None = Field(default=None, ge=0)
 
 
 class TemplateResponse(BaseModel):
@@ -1213,35 +1220,42 @@ from app.routers.custom_query_writeback import (  # noqa: E402
 )
 from app.services.custom_query.template_scope_guard import (  # noqa: E402
     _assert_template_visible,
+    _load_template,
     _normalize_template_scope,
+    _template_not_visible,
     _template_owner_id,
 )
+
+
+def _template_invalid(exc: TemplateInvalidError) -> HTTPException:
+    return HTTPException(status_code=400, detail={"error_code": exc.error_code, "message": exc.message})
+
 
 @router.get("/templates")
 async def list_templates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出可见模板：本人创建的所有 + 全局共享。
-
-    按 updated_at 倒序排列（最近编辑置顶）。
-    """
-    stmt = (
-        select(CustomQueryTemplate)
-        .where(
-            or_(
-                CustomQueryTemplate.created_by == current_user.id,
-                CustomQueryTemplate.scope == "global",
-            )
-        )
-        .order_by(CustomQueryTemplate.updated_at.desc())
-    )
-    result = await db.execute(stmt)
-    templates = result.scalars().all()
+    """列出当前用户可见的模板（本人、公开、指定项目共享、历史 team；R9.2），最近修改在前，最多 500 条（先过滤后截断）。"""
+    templates = await template_service.visible_templates(current_user, db)
     return {
         "templates": [_serialize_template(t, current_user.id) for t in templates],
         "total": len(templates),
     }
+
+
+@router.get("/template-share-targets")
+async def template_share_targets(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """「保存为模板」里「指定项目共享」可选的项目（AQ-39）：与保存时逐项目 edit 鉴权同一口径，只列本人能分享到的项目。
+
+    页面版原先取 ``GET /api/projects`` 的 ``can_edit``，该接口从不下发此字段 ⇒ 分享两档恒置灰。
+    """
+    from app.services.custom_query.template_scope_guard import template_share_target_ids
+
+    return {"project_ids": await template_share_target_ids(db, current_user)}
 
 
 @router.post("/templates", status_code=201)
@@ -1268,16 +1282,19 @@ async def create_template(
         await db.rollback()
         raise
 
-    tpl = await template_service.save_template(
-        db=db,
-        creator_id=current_user.id,
-        name=body.name,
-        scope=normalized.scope,
-        config=body.config,
-        description=body.description,
-        data_source=body.data_source,
-        shared_project_ids=list(normalized.shared_project_ids),
-    )
+    try:
+        tpl = await template_service.save_template(
+            db=db,
+            creator_id=current_user.id,
+            name=body.name,
+            scope=normalized.scope,
+            config=body.config,
+            description=body.description,
+            data_source=body.data_source,
+            shared_project_ids=list(normalized.shared_project_ids),
+        )
+    except TemplateInvalidError as exc:  # 名称 / scope 校验失败：400 中文原因（R9.1），原先未捕获 ⇒ 500
+        raise _template_invalid(exc) from None
     await db.commit()
     await db.refresh(tpl)
     return _serialize_template(tpl, current_user.id)
@@ -1289,17 +1306,9 @@ async def get_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取模板详情。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-    # 权限：本人 or 全局可见
-    if tpl.scope != "global" and tpl.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail={"error_code": "TEMPLATE_NOT_VISIBLE"})
+    """获取模板详情：可见性与列表、执行同一判定（R9.2）。"""
+    tpl = await _load_template(db, template_id)
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
     return _serialize_template(tpl, current_user.id)
 
 
@@ -1311,18 +1320,16 @@ async def update_template(
     current_user: User = Depends(get_current_user),
 ):
     """更新模板（仅创建者）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     # 仅创建者可改 —— **admin 也不例外**（R8.5）。模板承载的是个人查询习惯与分享
     # 意图，管理员改他人模板会让对方看到与自己意图不符的结果却无从察觉。
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_UPDATE"})
+    try:  # 名称与保存同一口径（去首尾空白后 1~200 字符），不合格 400 中文原因（R9.1）
+        name = template_service.validate_name(body.name) if body.name is not None else None
+    except TemplateInvalidError as exc:
+        raise _template_invalid(exc) from None
 
     if body.scope is not None or body.shared_project_ids is not None:
         normalized = _normalize_template_scope(
@@ -1339,19 +1346,18 @@ async def update_template(
         except HTTPException:
             await db.rollback()
             raise
+        # 入库只写归一后的值（原先末尾又把 body.scope 原样写回 ⇒ 传 global 入库仍是 global，AQ-16）
         tpl.scope = normalized.scope
         tpl.shared_project_ids = list(normalized.shared_project_ids)
 
-    if body.name is not None:
-        tpl.name = body.name
+    if name is not None:
+        tpl.name = name
     if body.description is not None:
         tpl.description = body.description
     if body.data_source is not None:
         tpl.data_source = body.data_source
     if body.config is not None:
         tpl.config = body.config
-    if body.scope is not None:
-        tpl.scope = body.scope
     tpl.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(tpl)
@@ -1365,17 +1371,11 @@ async def delete_template(
     current_user: User = Depends(get_current_user),
 ):
     """删除模板 —— **仅创建者**，admin 亦不可删他人模板（R8.5）。"""
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    tpl = await _load_template(db, template_id)
     await _assert_template_visible(tpl, current_user=current_user, db=db)
     if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_DELETE"})
-    await db.delete(tpl)
+    await template_service.soft_delete(tpl, db)  # 进回收站（R9.5）；原先 db.delete 硬删、无法找回（AQ-30）
     await db.commit()
     return None
 
@@ -1388,41 +1388,34 @@ async def execute_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6）。
+    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6；R9.3）。
 
     关键在于**不另走旁路**：模板只是一组查询参数，执行仍经 `execute_query` →
     `ExecuteCompatibilityAdapter` → 编排器，因此归属校验、分页、审计与直接查询
-    完全一致。改造前根本没有此端点，模板「执行」由前端把 config 拼成 execute
-    请求体自行发起，服务端无从校验模板可见性。
+    完全一致。顺序：模板可见（403 ``TEMPLATE_NOT_VISIBLE``）→ 目标项目归属（403，在本函数体内直接校验，先于
+    年度解析，免得无权用户从 422 得知项目有没有审计年度）→ 年度 = 请求年度，否则目标项目审计年度（都没有 422，
+    平台统一文案）→ ``config_to_request``（唯一翻译）→ ``execute_query``。改造前年度取模板里存的值，在别的项目上
+    执行会查错年度；模板没存年度时 ``year=0`` 直接 422。
     """
-    try:
-        tpl_uuid = uuid.UUID(template_id)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
-    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
-    if not tpl:
-        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+    from app.deps import require_project_audit_year
+    from app.services.custom_query.ownership_guard import ownership_guard
 
-    # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
-    await template_service.assert_executable(tpl, user=current_user, db=db)
-
-    config = tpl.config if isinstance(tpl.config, dict) else {}
+    tpl = await _load_template(db, template_id)
+    try:  # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
+        await template_service.assert_executable(tpl, user=current_user, db=db)
+    except TemplateForbiddenError:  # 原先未映射 ⇒ 500
+        raise _template_not_visible() from None
+    await ownership_guard.assert_target_accessible(user=current_user, project_id=body.project_id, db=db)
+    year = await require_project_audit_year(db, body.project_id, body.year)
     try:  # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
-        query_body = QueryRequest(
-            project_id=str(body.project_id),
-            year=int(config.get("year") or 0),
-            source=str(config.get("source") or tpl.data_source or ""),
-            filters=config.get("filters") or {},
-            columns=list(config.get("selected_columns") or config.get("columns") or []),
-            limit=int(config.get("page_size") or config.get("limit") or 500),
-            offset=int(config.get("offset") or 0),
-            sort=list(config.get("sort") or []),
-            group=config.get("group"),
-            pivot=config.get("pivot"),
-            acnr_targets=list(config.get("acnr_targets") or []),
-        )
+        query_body = QueryRequest(**template_service.config_to_request(
+            tpl.config, project_id=body.project_id, year=year, limit=body.limit, offset=body.offset,
+            fallback_source=tpl.data_source,
+        ))
     except ValidationError as exc:
         raise template_config_rejected(exc) from None
+    except ValueError as exc:  # 条件里还有未取值的参数占位
+        raise HTTPException(status_code=400, detail={"error_code": "TEMPLATE_INVALID", "message": str(exc)}) from None
     return await execute_query(query_body, response, db, current_user)
 
 
@@ -1824,9 +1817,39 @@ class AddressResolveResponse(BaseModel):
     template_name: str | None = None
     sheet_name: str | None = None
     cell_ref: str | None = None
-    registered: bool = False  # wp_template_registry 是否已注册
-    route_path: str = ""  # 前端跳转路径
-    route_query: dict = Field(default_factory=dict)  # highlight 参数
+    registered: bool = False  # 模板目录里有没有这个模板（底稿：wp_template_registry 表或 JSON 目录）
+    route_path: str = ""  # 前端跳转路径（未登记 / 没有模板定义时为空）
+    route_query: dict = Field(default_factory=dict)  # 模板库页签名与定位键（tab / wp_code 等），不含 highlight
+
+
+# 模板库（TemplateLibraryMgmt）真实页签名：原先返回 workpaper / report / note，页面认不出、只停在默认页签
+_TEMPLATE_LIBRARY_TABS = {"workpaper": "wp-template", "report": "report-config", "note": "note-template"}
+
+
+async def _wp_template_name(db: AsyncSession, wp_code: str) -> str | None:
+    """底稿编码在模板目录里的名称，未登记为 None（ADR-AQL-17，与指标树 ``_build_workpaper_tree`` 同一目录）。
+
+    ``wp_template_registry`` 表存在且有记录时以表为准；表不存在 / 为空 / 查询失败时用 JSON 目录
+    （wp_account_mapping + step_sheet_mapping）。原先无条件查表，表不存在即 500（AQ-17）。
+    """
+    try:
+        async with db.begin_nested():  # 保存点：查表失败回滚到这里，不让本请求事务停在 aborted（PG）
+            if await wp_template_registry_service.table_exists(db):
+                rows = await wp_template_registry_service.load_tree(db)
+                if rows:
+                    hit = next((r for r in rows if r.get("wp_code") == wp_code), None)
+                    return (hit.get("wp_name") or wp_code) if hit else None
+    except Exception as exc:  # 表不存在（SQLite 无 information_schema）等：改用 JSON 目录
+        logger.debug("address-resolve: wp_template_registry 不可用，改用 JSON 目录：%s", exc)
+    try:
+        step = _load_step_sheet_mapping().get(wp_code)
+        if step:
+            return step.get("wp_name") or wp_code
+        hit = next((m for m in _load_wp_mapping() if m.get("wp_code") == wp_code), None)
+        return (hit.get("wp_name") or hit.get("account_name") or wp_code) if hit else None
+    except Exception as exc:
+        logger.warning("address-resolve: 底稿模板目录读取失败，按未登记返回：%s", exc)
+        return None
 
 
 @router.get("/address-resolve", response_model=AddressResolveResponse)
@@ -1835,80 +1858,47 @@ async def address_resolve(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """URI 反查模板信息（模板溯源）。
+    """URI 反查模板信息（模板溯源，ADR-AQL-17；R7.4）。
 
-    Requirements: Req 14 AC 2, AC 3
-    - 解析 URI 得到 module / wp_code / sheet / cell
-    - 查 wp_template_registry 判断是否已注册
-    - 返回前端跳转路径 + highlight 参数
+    - 底稿：按模板目录判定登记（``_wp_template_name``），登记了才返回模板库「底稿模板」页签与 ``wp_code``（页面按它搜索）；
+    - 报表 / 附注：模板库「报表配置」/「附注模板」页签；
+    - 调整分录 / 试算类结果没有模板定义：``registered=false``、空路由（前端提示「该类结果没有模板定义」）；
+    - 不再返回 ``highlight``：模板页不支持按单元格高亮。
     """
     from app.services.custom_query.module_cell_resolver import parse_source_uri
 
     parsed = parse_source_uri(uri)
     if not parsed:
-        raise HTTPException(status_code=400, detail=f"Invalid source URI: {uri}")
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"无法识别的数据源地址：{uri}"})
 
     module = parsed.get("module", "")
     qualifier = parsed.get("qualifier", "")
     sheet_name = parsed.get("sheet_name")
     cell_range = parsed.get("cell_range")
 
-    # 对于 workpaper 模块，qualifier 是 wp_code
     template_wp_code: str | None = None
-    template_name: str | None = None
+    template_name: str | None = qualifier or None
     registered = False
-    route_path = ""
     route_query: dict = {}
 
     if module == "workpaper":
         template_wp_code = qualifier
-        # 查 wp_template_registry 判断是否已注册
-        result = await db.execute(
-            text("SELECT wp_name FROM wp_template_registry WHERE wp_code = :code"),
-            {"code": qualifier},
-        )
-        row = result.first()
-        if row:
-            registered = True
-            template_name = row[0]
-        # 前端跳转路径：模板库底稿详情
-        route_path = "/template-library"
-        route_query = {"tab": "workpaper", "wp_code": qualifier}
-        if sheet_name:
-            route_query["sheet"] = sheet_name
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        template_name = await _wp_template_name(db, qualifier)
+        registered = template_name is not None
+        route_query = {"wp_code": qualifier}
     elif module == "report":
-        template_wp_code = None
-        template_name = qualifier  # report_type as name
-        registered = True  # 报表模板始终存在于 report_config
-        route_path = "/template-library"
-        route_query = {"tab": "report", "report_type": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
+        registered = True  # 报表模板恒在 report_config
+        route_query = {"report_type": qualifier}
     elif module == "note":
-        template_wp_code = None
-        template_name = qualifier  # section_id as name
-        registered = True  # 附注模板始终存在于 seed JSON
-        route_path = "/template-library"
-        route_query = {"tab": "note", "section_id": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
+        registered = True  # 附注模板恒在种子 JSON
+        route_query = {"section_id": qualifier}
+    elif module not in ("adj", "tb"):
+        raise HTTPException(
+            status_code=400, detail={"error_code": "INVALID_SOURCE_URI", "message": f"不支持的模块：{module}"})
 
-    elif module in ("adj", "tb"):
-        template_wp_code = None
-        template_name = qualifier
-        registered = False
-        route_path = "/template-library"
-        route_query = {"tab": module, "qualifier": qualifier}
-        if cell_range:
-            route_query["highlight"] = cell_range
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported module: {module}")
-
+    route_path = "/template-library" if registered else ""
+    route_query = {"tab": _TEMPLATE_LIBRARY_TABS[module], **route_query} if registered else {}
     return AddressResolveResponse(
         module=module,
         template_wp_code=template_wp_code,

@@ -5,13 +5,17 @@
  * Validates: Requirements 6.1–6.5
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
+import { mount, shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
 // 被测组件在文件顶层静态导入（advanced-query-linkage-closure 任务 1，AQ-32）：原先在第 1 例里
 // `await import(CustomQueryTab.vue)`，组件整棵依赖（含 `vi.importActual('element-plus')`）的首次加载耗时
 // 算进第 1 例的 15 s 超时——磁盘缓存是冷的或并行负载重时超过 15 s，「legacy global」一例即超时（热缓存时同一例约 2 s）。
 // 静态导入让加载发生在收集阶段、不计入任何一例；vi.mock 仍先于它生效（vitest 提升），各例照旧在挂载时读 roleHolder。
 // 超时只在冷缓存下复现，所以守卫不靠计时：末尾一例断言重量级依赖是在收集阶段加载的（见 loadPhase）。
+import ElementPlus from 'element-plus'
 import CustomQueryTab from '@/components/template-library/CustomQueryTab.vue'
+import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
+import QueryTemplateSaveDialog from '@/components/query/QueryTemplateSaveDialog.vue'
+import { normalizeTemplateScope, templateScopeLabel } from '@/components/query/queryTemplateScope'
 
 // ─── 独立 mock ───
 const roleHolder = { value: 'auditor' }
@@ -76,36 +80,64 @@ describe('Feature: advanced-query-disclosure-integration-hardening, Property P7'
     return wrapper as unknown as VueWrapper<any>
   }
 
+  // advanced-query-linkage-closure 任务 33：模板列表从页面版内联表格移到弹窗与页面版共用的 MyTemplatesDialog，
+  // 可见范围标签在那里归一显示（页面版不再自带列表，也就不再持有这两个函数）；本例改为在显示它的组件上断言。
   it('legacy global 只显示为 canonical public/公开', async () => {
-    const wrapper = await mountTabForScope('manager')
-    expect(wrapper.vm.normalizeTemplateScope('global')).toBe('public')
-    expect(wrapper.vm.templateScopeLabel('global')).toBe('公开')
+    expect(normalizeTemplateScope('global')).toBe('public')
+    expect(templateScopeLabel('global')).toBe('公开')
+    const tab = await mountTabForScope('manager')
+    expect(tab.findComponent(MyTemplatesDialog).exists(), '页面版应挂共用的模板选择组件').toBe(true)
+    tab.unmount()
+    apiMocks.get.mockImplementation((url: string) => Promise.resolve(String(url) === '/api/custom-query/templates'
+      ? { templates: [{ id: 't-g', name: '【测试】旧公开模板', data_source: 'tb_detail', scope: 'global', is_owner: false,
+        config: {} }], total: 1 }
+      : []))
+    const wrapper = mount(MyTemplatesDialog, {
+      props: { modelValue: false }, global: { plugins: [ElementPlus] }, attachTo: document.body,
+    })
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+    const item = document.body.querySelector('[data-testid="mtd-item"]')
+    expect(item, '列表应列出这条历史 global 模板').not.toBeNull()
+    expect(item!.querySelector('.el-tag')?.textContent?.trim()).toBe('公开')
+    expect(item!.textContent).not.toContain('global')
+    wrapper.unmount()
+    document.body.innerHTML = ''
   })
 
-  it('只读角色只能保存私人模板，分享 scope fail-closed', async () => {
-    const wrapper = await mountTabForScope('auditor')
+  // advanced-query-linkage-closure 任务 29（AQ-39）：保存对话框抽成页面版与弹窗 💾 共用的 QueryTemplateSaveDialog，
+  // 可分享的项目改取 GET /api/custom-query/template-share-targets（与保存时逐项目 edit 鉴权同一口径）。原先取
+  // GET /api/projects 的 can_edit——该接口从不下发此字段，分享两档恒置灰；下面两例改为驱动分享目标接口，规则不变。
+  async function mountSaveDialog(shareTargets: string[]) {
+    apiMocks.get.mockImplementation((url: string) => Promise.resolve(
+      String(url) === '/api/custom-query/template-share-targets' ? { project_ids: shareTargets } : []))
+    const wrapper = shallowMount(QueryTemplateSaveDialog, {
+      props: { modelValue: true, dataSource: 'tb_detail', config: { source: 'tb_detail', year: 2025 } },
+      global: { stubs: { 'el-dialog': { template: '<div class="el-dialog-stub"><slot /><slot name="footer" /></div>' } } },
+    })
+    await flushPromises()
+    return wrapper as unknown as VueWrapper<any>
+  }
+
+  it('没有可编辑项目时只能保存私人模板，分享 scope fail-closed', async () => {
+    const wrapper = await mountSaveDialog([])
     expect(wrapper.vm.canShareTemplates).toBe(false)
-    wrapper.vm.saveForm.name = '只读用户模板'
-    wrapper.vm.saveForm.scope = 'project'
-    wrapper.vm.saveForm.shared_project_ids = ['00000000-0000-0000-0000-000000000001']
+    wrapper.vm.form.name = '只读用户模板'
+    wrapper.vm.form.scope = 'project'
+    wrapper.vm.form.shared_project_ids = ['00000000-0000-0000-0000-000000000001']
     expect(wrapper.vm.canSaveTemplate).toBe(false)
     await wrapper.vm.onConfirmSaveTemplate()
     expect(apiMocks.post).not.toHaveBeenCalled()
   })
 
-  it('有模板编辑权限时仅提交去重后的可编辑项目', async () => {
-    const wrapper = await mountTabForScope('manager')
-    wrapper.vm.projectList = [
-      { id: '00000000-0000-0000-0000-000000000001', can_edit: true },
-      { id: '00000000-0000-0000-0000-000000000002', can_edit: false },
-    ]
-    wrapper.vm.formCtx.source = 'tb_detail'
-    wrapper.vm.formCtx.project_id = '00000000-0000-0000-0000-000000000001'
-    wrapper.vm.saveForm.name = '项目模板'
-    wrapper.vm.saveForm.scope = 'project'
-    wrapper.vm.saveForm.shared_project_ids = [
+  it('有可编辑项目时仅提交去重后的可编辑项目', async () => {
+    const wrapper = await mountSaveDialog(['00000000-0000-0000-0000-000000000001'])
+    wrapper.vm.form.name = '项目模板'
+    wrapper.vm.form.scope = 'project'
+    wrapper.vm.form.shared_project_ids = [
       '00000000-0000-0000-0000-000000000001',
       '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002',
     ]
     await wrapper.vm.onConfirmSaveTemplate()
     expect(apiMocks.post).toHaveBeenCalledTimes(1)

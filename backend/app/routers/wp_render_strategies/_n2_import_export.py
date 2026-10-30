@@ -16,8 +16,8 @@ _ADJ_KEYS = ["description", "category", "accountName", "debitAmount", "creditAmo
 
 _SPECS: dict[str, dict[str, Any]] = {
     "N2-2": {
-        "item_id": "N2-2-rows",
-        "storage_field": "remark",
+        "item_id": "N2-2-detail-rows",
+        "storage_field": "conclusion",
         "title": "明细表N2-2",
         "headers": _DETAIL_HEADERS,
         "field_keys": _DETAIL_KEYS,

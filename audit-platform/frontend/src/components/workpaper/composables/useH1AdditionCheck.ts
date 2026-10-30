@@ -13,6 +13,11 @@ import {
   calcChecklistProgress,
 } from './h1AdditionMethodChecklist'
 import { readH12BranchRows, saveH12BranchRows } from './h1H12BranchKeys'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf, sampleRemark } from './assetVoucherFill'
 
 export { getMethodChecklist, calcChecklistProgress, METHOD_CHECKLISTS } from './h1AdditionMethodChecklist'
 export type { MethodChecklistItem } from './h1AdditionMethodChecklist'
@@ -161,6 +166,16 @@ export function resolveDepStartDate(row: Pick<AdditionRow, 'depStartDate' | 'acc
   return String(row.depStartDate || row.acceptanceDate || row.acquisitionDate || '').trim()
 }
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：证据、专项勾选、关联方、累计折旧 / 减值、结论等 */
+export function hasH1AdditionContent(r: AdditionRow): boolean {
+  return [r.category, r.assetNo, r.additionMethod, r.acceptanceRef, r.acceptanceDate, r.contractRef, r.contractParty,
+    r.invoiceRef, r.invoiceParty, r.paymentRef, r.capitalizationBasis, r.depStartDate, r.attachmentUrl, r.ocrResult,
+    r.relatedPartyName, r.conclusion, r.indexRef].some(v => String(v ?? '').trim() !== '')
+    || [r.accDep, r.impairment, r.contractAmount, r.invoiceAmount, r.paymentAmount].some(v => Number(v) !== 0)
+    || Object.values(r.methodChecks ?? {}).some(Boolean)
+    || r.checkResult === 'OK' || r.isRelatedParty === 'Y' || r.isProvisional === 'Y'
+}
+
 export function useH1AdditionCheck(
   wpId: Ref<string>,
   projectId: Ref<string>,
@@ -168,6 +183,8 @@ export function useH1AdditionCheck(
   options?: {
     totalAdditionAmount?: Ref<number>
     onSave?: (itemId: string, value: any) => void
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: Ref<boolean>
   },
 ) {
   const rows = ref<AdditionRow[]>([])
@@ -189,13 +206,14 @@ export function useH1AdditionCheck(
     if (rowItem?.remark) {
       try {
         const parsed = JSON.parse(rowItem.remark)
-        rows.value = Array.isArray(parsed) ? parsed.map(_normalizeRow) : []
+        rows.value = Array.isArray(parsed) ? parsed.map((r: any, i: number) => withRowMeta(_normalizeRow(r, i), r)) : []
       } catch {
         rows.value = []
       }
     } else {
       rows.value = []
     }
+    voucherFill.markLoaded()
 
     const traceItem = allResponses.value.get(`${ITEM_PREFIX}-trace-rows`)
     if (traceItem?.remark) {
@@ -466,6 +484,40 @@ export function useH1AdditionCheck(
     }
   }
 
+  /**
+   * 共享回填函数的待写入项 → 增加检查行（spec voucher-identity-writeback-and-audit-phase 任务 12）：一个样本一行，
+   * 对方科目按后端配对用「/」拼接（配不上为「多科目」）；原值取样本自己那一栏的金额，红字带符号照记
+   * （原实现取绝对值，冲销的增加被记成增加）
+   */
+  function _rowFromPrepared(item: PreparedItem): AdditionRow {
+    const s = sampleOf(item)
+    const row = _emptyRow(s.summary || '抽样项')
+    row.originalCost = assetAmount(item, 'debit')
+    row.voucherNo = s.voucherNo || ''
+    row.acquisitionDate = s.voucherDate || ''
+    row.counterpartAccount = item.counterpartAccount
+    row.voucherSampleId = s.voucherNo || ''
+    row.isAbnormal = s.abnormal ? 'Y' : 'N'
+    row.checkResult = s.abnormal ? 'ERR' : ''
+    row.remark = sampleRemark(item)
+    _recalcRow(row)
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<AdditionRow>({
+    projectId: () => projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persist(),
+    hasUserContent: hasH1AdditionContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）：凭证号 + 增加日期 + 原值（原实现取绝对值）
+    legacy: r => assetLegacyKey(r.voucherNo, r.acquisitionDate, r.originalCost),
+    readonly: () => options?.isReadonly?.value === true,
+  })
+
   function addRow(name = ''): void {
     rows.value.push(_emptyRow(name))
     _syncSampleSize()
@@ -474,6 +526,7 @@ export function useH1AdditionCheck(
 
   function removeRow(rowId: string): void {
     const idx = rows.value.findIndex((r) => r.rowId === rowId)
+    if (idx >= 0 && voucherFill.isRowLocked(rows.value[idx])) return
     if (idx >= 0) {
       rows.value.splice(idx, 1)
       rows.value.forEach((r, i) => { r.seq = i + 1 })
@@ -484,7 +537,7 @@ export function useH1AdditionCheck(
 
   function updateCell(rowId: string, field: keyof AdditionRow, value: any): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     if (field === 'isAbnormal' && value === 'Y' && !row.checkResult) row.checkResult = 'ERR'
     if (field === 'isAbnormal' && value === 'N' && row.checkResult === 'ERR') row.checkResult = 'OK'
@@ -498,7 +551,7 @@ export function useH1AdditionCheck(
 
   function updateMethodCheck(rowId: string, key: string, value: string): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     row.methodChecks = { ...row.methodChecks, [key]: value }
     _persist()
   }
@@ -601,7 +654,7 @@ export function useH1AdditionCheck(
 
   function applyOcrFields(rowId: string, fields: Record<string, any>): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     const f = fields || {}
     if (f.invoiceNo || f.invoice_no || f.invoiceRef) {
       row.invoiceRef = String(f.invoiceNo || f.invoice_no || f.invoiceRef)
@@ -756,7 +809,7 @@ export function useH1AdditionCheck(
   }
 
   function _persist(): void {
-    options?.onSave?.(`${ITEM_PREFIX}-rows`, rows.value)
+    options?.onSave?.(`${ITEM_PREFIX}-rows`, voucherFill.guardPersist(rows.value))
     samplingParams.value.sampleSize = rows.value.length
     samplingParams.value.coverageRate = summary.value.coverageRate
     _persistSampling()
@@ -814,6 +867,12 @@ export function useH1AdditionCheck(
     saveConclusion,
     getMethodChecklist,
     calcChecklistProgress,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

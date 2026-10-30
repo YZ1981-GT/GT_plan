@@ -22,11 +22,22 @@ from __future__ import annotations
 import io
 import json
 import logging
+from math import isfinite
 from typing import Any
 from uuid import uuid4
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+
+from app.services.n2_detail_model import (
+    N2_DETAIL_FIELDS,
+    N2_DETAIL_HEADERS,
+    N2_DETAIL_IDENTITY_KEY,
+    N2_DETAIL_ITEM_ID,
+    N2_DETAIL_STORAGE_FIELD,
+    enrich_n2_detail_row,
+    persisted_n2_detail_row,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -384,20 +395,13 @@ _ROW_LIMIT = 500
 _SHEET_CONFIGS: dict[str, dict[str, Any]] = {
     "N2-2": {
         "title": "N2-2 明细表",
-        "headers": [
-            "税种", "明细子目", "税目", "计税依据", "适用税率",
-            "纳税期间", "期初余额", "本期计提", "本期缴纳", "期末余额",
-            "申报表金额", "差异", "差异原因", "核查结论",
-            "完税凭证号", "缴纳日期", "纳税地点", "减免标识",
-            "减免金额", "计提凭证号", "缴纳凭证号", "关联科目", "备注",
-        ],
-        "fields": [
-            "taxType", "subItem", "taxItem", "taxBase", "taxRate",
-            "taxPeriod", "beginBalance", "periodAccrual", "periodPayment", "endBalance",
-            "declarationAmount", "difference", "diffReason", "checkConclusion",
-            "taxReceiptNo", "paymentDate", "taxLocation", "exemptionFlag",
-            "exemptionAmount", "accrualVoucherNo", "paymentVoucherNo", "relatedAccount", "remark",
-        ],
+        "headers": N2_DETAIL_HEADERS,
+        "fields": N2_DETAIL_FIELDS,
+        "item_id": N2_DETAIL_ITEM_ID,
+        "storage_field": N2_DETAIL_STORAGE_FIELD,
+        "identity_key": N2_DETAIL_IDENTITY_KEY,
+        "persist": persisted_n2_detail_row,
+        "enrich": enrich_n2_detail_row,
     },
     "N2-6": {
         "title": "N2-6 增值税测算",
@@ -446,6 +450,9 @@ _SHEET_CONFIGS: dict[str, dict[str, Any]] = {
 }
 
 _NUMERIC_FIELDS: set[str] = {
+    "unadjBegin", "unadjPayable", "unadjPaid", "unadjEnd",
+    "beginAdjust", "beginRje", "ajePayable", "ajePaid", "rjePayable", "rjePaid",
+    "audBegin", "audPayable", "audPaid", "audEnd",
     "taxBase", "taxRate", "beginBalance", "periodAccrual", "periodPayment",
     "endBalance", "declarationAmount", "difference", "exemptionAmount",
     "salesAmount", "outputVat", "inputVat", "inputTransferOut",
@@ -478,14 +485,27 @@ def _style_header_row(ws: Any) -> None:
 
 
 def _parse_num(v: Any) -> float:
-    """安全解析数值，None/空/NaN→0.0."""
+    """安全解析数值，None/空/非数值/非有限数均归零。"""
     if v is None or v == "":
         return 0.0
     try:
-        f = float(v)
-        return 0.0 if f != f else f  # NaN→0.0
+        value = float(v)
     except (ValueError, TypeError):
         return 0.0
+    return value if isfinite(value) else 0.0
+
+
+def _parse_import_num(v: Any, *, sheet: str, row: int, header: str) -> float:
+    """导入边界拒绝 Infinity/NaN；普通非数值文本保持历史归零口径。"""
+    if v is None or v == "":
+        return 0.0
+    try:
+        value = float(v)
+    except (ValueError, TypeError):
+        return 0.0
+    if not isfinite(value):
+        raise ValueError(f"Sheet '{sheet}' 第 {row} 行「{header}」不是有限数")
+    return value
 
 
 def _safe_str(val: Any) -> str:
@@ -502,7 +522,7 @@ def _safe_str(val: Any) -> str:
 async def export_template(wp_id: str, db: Any, sheet: str | None = None) -> io.BytesIO:
     """生成空白xlsx模板（多sheet或单sheet）
 
-    Sheet列表: N2-2(明细23列), N2-6(增值税8列), N2-8(其他税费9列),
+    Sheet列表: N2-2(A:Q 17列), N2-6(增值税8列), N2-8(其他税费9列),
               N2-9(房产税7列), N2-10(土增税7列)
 
     Requirements: 12.2
@@ -553,26 +573,30 @@ async def export_data(wp_id: str, db: Any, sheet: str | None = None) -> io.Bytes
             ws.cell(row=1, column=col_idx, value=header)
         _style_header_row(ws)
 
-        # 读取对应数据
-        item_id = f"N2-{sheet_key}-rows"
+        item_id = str(config.get("item_id") or f"N2-{sheet_key}-rows")
+        storage_field = str(config.get("storage_field") or "remark")
         result = await db.execute(
             sa.text(
-                "SELECT remark FROM checklist_responses "
+                f"SELECT {storage_field} AS payload FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
             ),
             {"wp_id": wp_id, "item_id": item_id},
         )
-        row = result.fetchone()
-        data_rows: list[dict] = []
-        if row and row.remark:
+        stored = result.fetchone()
+        data_rows: list[dict[str, Any]] = []
+        payload = getattr(stored, "payload", None) if stored else None
+        if payload:
             try:
-                data_rows = json.loads(row.remark)
+                parsed = json.loads(payload)
+                if isinstance(parsed, list):
+                    data_rows = [row for row in parsed if isinstance(row, dict)]
             except (json.JSONDecodeError, TypeError):
                 pass
 
+        enrich = config.get("enrich")
         for data_row in data_rows:
-            row_values = [data_row.get(f, "") or "" for f in config["fields"]]
-            ws.append(row_values)
+            projected = enrich(data_row) if callable(enrich) else data_row
+            ws.append(["" if projected.get(field) is None else projected.get(field) for field in config["fields"]])
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -586,104 +610,165 @@ async def export_data(wp_id: str, db: Any, sheet: str | None = None) -> io.Bytes
 
 
 async def import_data(
-    wp_id: str, file_content: bytes, db: Any, sheet: str | None = None
+    wp_id: str,
+    file_content: bytes,
+    db: Any,
+    sheet: str | None = None,
+    *,
+    project_id: Any,
+    updated_by: Any,
 ) -> dict[str, Any]:
-    """解析上传的xlsx并写入checklist_responses
-
-    支持多sheet导入（自动识别区段）或单sheet导入。
-    验证表头结构匹配。
-
-    Requirements: 12.2
-    """
+    """严格解析 xlsx，并在同一事务中原子覆盖对应 checklist 行。"""
     import sqlalchemy as sa
 
     if len(file_content) > 10 * 1024 * 1024:
         raise ValueError("文件大小超过 10MB 限制")
 
+    owner_result = await db.execute(
+        sa.text(
+            "SELECT project_id FROM working_paper "
+            "WHERE id = :wp_id AND is_deleted = false"
+        ),
+        {"wp_id": wp_id},
+    )
+    actual_project_id = owner_result.scalar_one_or_none()
+    if actual_project_id is None:
+        raise ValueError(f"底稿不存在或已删除: {wp_id}")
+    if str(actual_project_id) != str(project_id):
+        raise ValueError("底稿所属项目与已授权项目不一致")
+
     try:
         wb = load_workbook(io.BytesIO(file_content), read_only=True, data_only=True)
-    except Exception:
-        raise ValueError("无法解析xlsx文件")
+    except Exception as exc:
+        raise ValueError("无法解析xlsx文件") from exc
 
     imported_counts: dict[str, int] = {}
     warnings: list[str] = []
-
-    for ws in wb.worksheets:
-        ws_title = ws.title.strip()
-
-        # 尝试匹配到配置
-        matched_config: dict[str, Any] | None = None
-        matched_key: str | None = None
-
-        for sheet_key, config in _SHEET_CONFIGS.items():
-            if config["title"][:31] == ws_title or sheet_key in ws_title:
-                matched_config = config
-                matched_key = sheet_key
-                break
-
-        if not matched_config or not matched_key:
-            continue
-
-        # 若指定了sheet，跳过不匹配的
-        if sheet and matched_key != sheet:
-            continue
-
-        # 读取表头
-        actual_headers: list[str] = []
-        for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-            if cell.value is not None:
-                actual_headers.append(str(cell.value).strip())
-
-        # 校验表头结构
-        expected_headers = matched_config["headers"]
-        if actual_headers and actual_headers[:3] != expected_headers[:3]:
-            warnings.append(f"Sheet '{ws_title}' 表头结构不匹配，尝试按位置解析")
-
-        # 解析数据行
-        parsed_rows: list[dict] = []
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            if row_idx > _ROW_LIMIT + 1:
-                warnings.append(f"Sheet '{ws_title}' 超过 {_ROW_LIMIT} 行限制，已截断")
-                break
-            if all(cell is None or str(cell).strip() == "" for cell in row):
+    prepared: list[dict[str, Any]] = []
+    try:
+        for ws in wb.worksheets:
+            ws_title = ws.title.strip()
+            matched_key: str | None = None
+            matched_config: dict[str, Any] | None = None
+            for sheet_key, config in _SHEET_CONFIGS.items():
+                if config["title"][:31] == ws_title or sheet_key in ws_title:
+                    matched_key = sheet_key
+                    matched_config = config
+                    break
+            if not matched_key or not matched_config or (sheet and matched_key != sheet):
                 continue
+            if matched_key in imported_counts:
+                raise ValueError(f"文件中存在重复的目标 Sheet: {matched_key}")
 
-            row_data: dict[str, Any] = {"rowId": str(uuid4())}
-            fields = matched_config["fields"]
-            headers = matched_config["headers"]
+            header_row = next(ws.iter_rows(min_row=1, max_row=1), ())
+            actual_headers = [
+                "" if cell.value is None else str(cell.value).strip()
+                for cell in header_row
+            ]
+            while actual_headers and actual_headers[-1] == "":
+                actual_headers.pop()
+            expected_headers = [str(value) for value in matched_config["headers"]]
+            duplicates = sorted({
+                value for value in actual_headers
+                if value and actual_headers.count(value) > 1
+            })
+            if actual_headers != expected_headers:
+                reason = f"；重复列：{', '.join(duplicates)}" if duplicates else ""
+                raise ValueError(
+                    f"Sheet '{ws_title}' 表头不匹配：必须严格使用 "
+                    f"{len(expected_headers)} 列模板并保持原顺序{reason}"
+                )
 
-            for i, (header, field) in enumerate(zip(headers, fields)):
-                try:
-                    header_idx = actual_headers.index(header)
-                    raw_val = row[header_idx] if header_idx < len(row) else None
-                except (ValueError, IndexError):
-                    raw_val = row[i] if i < len(row) else None
+            parsed_rows: list[dict[str, Any]] = []
+            fields = list(matched_config["fields"])
+            for row_idx, row in enumerate(
+                ws.iter_rows(min_row=2, values_only=True), start=2
+            ):
+                if row_idx > _ROW_LIMIT + 1:
+                    warnings.append(f"Sheet '{ws_title}' 超过 {_ROW_LIMIT} 行限制，已截断")
+                    break
+                if all(cell is None or str(cell).strip() == "" for cell in row):
+                    continue
 
-                if field in _NUMERIC_FIELDS:
-                    row_data[field] = _parse_num(raw_val)
-                else:
-                    row_data[field] = _safe_str(raw_val)
+                identity = str(uuid4())
+                identity_key = str(matched_config.get("identity_key") or "rowId")
+                row_data: dict[str, Any] = {identity_key: identity}
+                for index, (header, field) in enumerate(zip(expected_headers, fields)):
+                    raw_value = row[index] if index < len(row) else None
+                    row_data[field] = (
+                        _parse_import_num(
+                            raw_value,
+                            sheet=ws_title,
+                            row=row_idx,
+                            header=header,
+                        )
+                        if field in _NUMERIC_FIELDS
+                        else _safe_str(raw_value)
+                    )
 
-            parsed_rows.append(row_data)
+                persist = matched_config.get("persist")
+                parsed_rows.append(
+                    persist(row_data, identity=identity)
+                    if callable(persist)
+                    else row_data
+                )
 
-        imported_counts[matched_key] = len(parsed_rows)
+            item_id = str(matched_config.get("item_id") or f"N2-{matched_key}-rows")
+            imported_counts[matched_key] = len(parsed_rows)
+            prepared.append({
+                "item_id": item_id,
+                "storage_field": str(matched_config.get("storage_field") or "remark"),
+                "payload": json.dumps(
+                    parsed_rows,
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ),
+            })
+    finally:
+        wb.close()
 
-        # 写入 checklist_responses
-        item_id = f"N2-{matched_key}-rows"
-        json_str = json.dumps(parsed_rows, ensure_ascii=False)
+    if not prepared:
+        target = f"目标 Sheet {sheet}" if sheet else "可导入的 N2 Sheet"
+        raise ValueError(f"文件中未找到{target}")
+
+    # 稳定顺序锁住全部目标行；任一后续写失败由路由统一回滚，文件导入保持原子。
+    for target in sorted(prepared, key=lambda item: item["item_id"]):
         await db.execute(
             sa.text(
-                "INSERT INTO checklist_responses (id, wp_id, item_id, remark) "
-                "VALUES (:id, :wp_id, :item_id, :remark) "
-                "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+                "SELECT content_version FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id FOR UPDATE"
             ),
-            {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": json_str},
+            {"wp_id": wp_id, "item_id": target["item_id"]},
+        )
+
+    for target in prepared:
+        storage_field = target["storage_field"]
+        await db.execute(
+            sa.text(
+                "INSERT INTO checklist_responses "
+                f"(id, project_id, wp_id, item_id, {storage_field}, updated_by, "
+                "created_at, updated_at, content_version) "
+                "VALUES (:id, :project_id, :wp_id, :item_id, :payload, :updated_by, "
+                "NOW(), NOW(), 1) "
+                f"ON CONFLICT (wp_id, item_id) DO UPDATE SET {storage_field} = EXCLUDED.{storage_field}, "
+                "updated_by = EXCLUDED.updated_by, updated_at = NOW(), "
+                "content_version = COALESCE(checklist_responses.content_version, 1) + 1"
+            ),
+            {
+                "id": str(uuid4()),
+                "project_id": str(project_id),
+                "wp_id": wp_id,
+                "item_id": target["item_id"],
+                "payload": target["payload"],
+                "updated_by": str(updated_by),
+            },
         )
 
     await db.flush()
-
     return {
         "imported_count": sum(imported_counts.values()),
         "imported_counts": imported_counts,
         "warnings": warnings,
+        "message": "导入成功",
+        "_item_ids": [target["item_id"] for target in prepared],
     }

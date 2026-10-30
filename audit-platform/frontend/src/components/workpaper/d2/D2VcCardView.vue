@@ -12,17 +12,24 @@
  * - Tags: 异常(red) / 来源(info)
  * - Attachment: 缩略图预览
  * - Expandable: 点击展开编辑详情
+ * - 阶段 / 来源 / 配对标签（共享回填函数写的行元数据 `_gt`）；年审阶段的预审行只读
+ *   （spec voucher-identity-writeback-and-audit-phase 任务 10）
  */
 import { ref, computed, inject } from 'vue'
 import type { VoucherCheckRow } from '../composables/useD2VoucherCheckEnhanced'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 
 const props = defineProps<{
   rows: VoucherCheckRow[]
   isReadonly: boolean
   wpId: string
   projectId: string
+  /** 审计年度（「来源」列里「多科目」看整张凭证用） */
+  year?: number
+  /** 年审阶段的预审行只读（共享回填函数 isRowLocked）：不出编辑控件、不能删 */
+  isRowLocked?: (row: VoucherCheckRow) => boolean
 }>()
 
 const emit = defineEmits<{
@@ -165,9 +172,10 @@ const editFields: { field: keyof VoucherCheckRow; label: string; type: 'text' | 
           <el-tag v-if="row.isAbnormal" type="danger" size="small" effect="dark">
             异常：{{ row.isAbnormal }}
           </el-tag>
-          <el-tag v-if="row.source" type="info" size="small" effect="plain">
-            {{ row.source }}
-          </el-tag>
+          <!-- 阶段 / 来源 / 配对（取代旧的来源文字；点「多科目」不展开卡片） -->
+          <span @click.stop>
+            <VoucherRowMetaCell :row="row" :locked="!!isRowLocked?.(row)" :project-id="projectId" :year="year ?? 0" />
+          </span>
         </div>
 
         <!-- Attachment Thumbnails -->
@@ -223,7 +231,7 @@ const editFields: { field: keyof VoucherCheckRow; label: string; type: 'text' | 
             <el-form
               label-position="top"
               size="small"
-              :disabled="isReadonly"
+              :disabled="isReadonly || !!isRowLocked?.(row)"
               class="detail-form"
             >
               <div class="detail-grid">

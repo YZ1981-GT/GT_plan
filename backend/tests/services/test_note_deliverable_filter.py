@@ -243,8 +243,12 @@ def test_lines_repeating_template_subheadings_are_dropped():
 def test_structured_table_with_only_zero_values_is_blank_for_delivery():
     from app.services.note_deliverable_filter import table_blank_for_delivery
 
-    zeros = [{"label": "1年以内", "values": [0, "0.00", None]}, {"label": "合计", "values": [5], "is_total": True}]
+    zeros = [{"label": "1年以内", "values": [0, "0.00", None]}, {"label": "合计", "values": [0], "is_total": True}]
     assert table_blank_for_delivery(zeros) is True  # 模块页口径（无列定义时 0 算填了）这里按交付口径算空
+    # 合计行有数（公式推送的合计行兜底）：有业务，出具（spec note-pull-header-formula-closure R5）
+    pushed = [{"label": "1年以内", "values": [0, None]}, {"label": "合计", "values": [5], "is_total": True}]
+    assert table_blank_for_delivery(pushed) is False
+    assert table_blank_for_delivery([{"label": "合计", "values": ["—"], "is_total": True}]) is True
     assert table_blank_for_delivery([{"label": "1年以内", "values": [0, "12.50"]}]) is False
     assert table_blank_for_delivery([{"label": "单位", "values": ["银行承兑汇票"]}]) is False
 

@@ -19,10 +19,15 @@ export interface UseNotePersistOptions {
   prepareTableData?: (tableData: any) => any
 }
 
+export interface NoteSaveOptions {
+  /** 定时自动保存：只存，不退出编辑、不弹「保存成功」（用户可能正在本章连续编辑） */
+  keepEditing?: boolean
+}
+
 export interface UseNotePersistReturn {
   saveLoading: Ref<boolean>
   justSaved: Ref<boolean>
-  onSave: () => Promise<void>
+  onSave: (opts?: NoteSaveOptions) => Promise<void>
 }
 
 export function useNotePersist(options: UseNotePersistOptions): UseNotePersistReturn {
@@ -31,7 +36,8 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
   const saveLoading = ref(false)
   const justSaved = ref(false)
 
-  async function onSave() {
+  async function onSave(opts: NoteSaveOptions = {}) {
+    const keepEditing = opts.keepEditing === true
     const note = currentNote.value
     if (!note) return
     await withLoading(saveLoading, async () => {
@@ -50,7 +56,7 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
           : tableDataInput
       }
       await updateDisclosureNote(note.id, body)
-      ElMessage.success('保存成功')
+      if (!keepEditing) ElMessage.success('保存成功')
       // 仅在请求成功后回写被保存章节的快照，失败时保留原值。
       if (body.text_content !== undefined) {
         note.text_content = body.text_content
@@ -61,7 +67,8 @@ export function useNotePersist(options: UseNotePersistOptions): UseNotePersistRe
       note.status = 'confirmed'
       // 保存期间若已切章，不得关闭或清理新章节的编辑状态。
       if (currentNote.value?.id !== note.id) return
-      editMode.value = false
+      // 定时保存不收起编辑态：原先 2 分钟一到就退出编辑，正在填的格子直接消失（2026-10-26 浏览器实测）
+      if (!keepEditing) editMode.value = false
       clearEditDirty()
       autoSaveClearDirty()
       clearAutoSaveDraft()

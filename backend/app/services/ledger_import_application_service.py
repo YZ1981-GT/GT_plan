@@ -101,16 +101,19 @@ class LedgerImportApplicationService:
         if custom_mapping is None or custom_mapping == "":
             return None
         if isinstance(custom_mapping, dict):
-            return custom_mapping
-        try:
-            parsed = json.loads(custom_mapping)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误") from exc
+            parsed = custom_mapping
+        else:
+            try:
+                parsed = json.loads(custom_mapping)
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误") from exc
         if parsed is None:
             return None
         if not isinstance(parsed, dict):
             raise HTTPException(status_code=400, detail="自定义列映射必须为JSON对象")
-        return parsed
+        from app.services.ledger_import_mapping_contract import normalize_custom_mapping
+
+        return normalize_custom_mapping(parsed)
 
     @staticmethod
     def build_file_label(file_sources: list[tuple[str, object]]) -> str:
@@ -477,6 +480,8 @@ class LedgerImportApplicationService:
             **suggestion_contract,
             "errors": result.get("errors") or [],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+            "append": result.get("append"),
+            "voucher_diff": result.get("voucher_diff"),
         }
 
     @classmethod
@@ -646,7 +651,7 @@ class LedgerImportApplicationService:
                     year=year,
                 )
             else:
-                ImportQueueService.release_lock(project_id)
+                await ImportQueueService.release_lock_async(project_id)
             raise
 
     @classmethod
@@ -662,8 +667,26 @@ class LedgerImportApplicationService:
         year: int | None = None,
         custom_mapping: str | dict[str, Any] | None = None,
         payload_style: str = "ledger",
+        append_strategy: str | None = None,
+        balance_carry_confirmed: bool = False,
     ) -> dict[str, Any]:
         parsed_mapping = cls.parse_custom_mapping(custom_mapping)
+        append_options = None
+        if append_strategy is not None:
+            if year is None:
+                raise HTTPException(status_code=400, detail="增量追加必须明确指定会计年度")
+            from app.services.ledger_dataset_merge import freeze_append_options
+
+            try:
+                append_options = await freeze_append_options(
+                    db,
+                    project_id=project_id,
+                    year=year,
+                    strategy=append_strategy,
+                    balance_carry_confirmed=balance_carry_confirmed,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
         resolved_token, file_sources = await cls.resolve_file_sources(
             project_id=project_id,
             user_id=user_id,
@@ -702,6 +725,7 @@ class LedgerImportApplicationService:
                 "queue_batch_id": str(job_batch_id) if job_batch_id is not None else None,
                 "upload_token": resolved_token,
                 "force_activate": False,
+                "append": append_options,
             },
             created_by=created_by,
         )

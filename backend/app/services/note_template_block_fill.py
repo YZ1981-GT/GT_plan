@@ -94,6 +94,7 @@ __all__ = [
     "render_cloned_table",
     "block_layout",
     "caption_like",
+    "caption_text",
     "capture_title_order",
     "chapter_contents",
     "collapse_empty_sections",
@@ -379,7 +380,10 @@ def note_tables_indexed(exporter, note) -> list[tuple[int, dict, bool]]:
         final = projected if projected is not None else t
         empty = (not final.get("rows")) or table_blank_for_delivery(final.get("rows"), final.get("columns"))
         out.append((idx, final, empty))
-    return out
+    # 期间层（spec note-pull-header-formula-closure R4）：按期间拆开的表合成一张（与 Word 样例表同列数 ⇒ 克隆其表头）
+    from app.services.note_period_layout import apply_period_layout_indexed
+
+    return apply_period_layout_indexed(out, getattr(note, "source_template", None), getattr(note, "note_section", None))
 
 
 # ── 块内编号与标题清理 ───────────────────────────────────────────────────────
@@ -394,18 +398,54 @@ def strip_title_guidance(el) -> bool:
     return True
 
 
-def _renumber_literals(subs: list[Any], styles: dict[str, Any], names: dict[str, str]) -> int:
-    """保留下来的字面编号子标题（「（3）按账龄披露」、无自动编号）按保留顺序从 1 起重排（每级各自计数）。"""
-    counters: dict[int, int] = {}
-    changed = 0
+def caption_text(name: str) -> str:
+    """库内表名 → 额外表 / 续表的表题：剔除编制指引括注（「（注意：是报表项目）」「（只写现金分配，…）」，规则同标题）。"""
+    cleaned = _TITLE_GUIDE_RE.sub("", name).strip()
+    return cleaned or name.strip()
+
+
+def _literal_number(el) -> int | None:
+    m = _LIT_ENUM_RE.match(_raw_text(el)) if el is not None else None
+    return int(m.group(1) or m.group(2)) if m else None
+
+
+def _literal_groups(subs: list[Any], styles: dict[str, Any], names: dict[str, str]) -> dict[int, tuple[int, int]]:
+    """字面编号子标题（无自动编号）→ 编号组（级别, 该级第几段）：上级子标题换了，下级就是新的一段。"""
+    out: dict[int, tuple[int, int]] = {}
+    segment: dict[int, int] = {}
     for el in subs:
         lvl = _heading_level(el, names) or 0
-        for deeper in [k for k in counters if k > lvl]:
-            del counters[deeper]  # 上级子标题换了：下级字面编号重新从 1 起
-        if is_auto_numbered(el, styles) or not _LIT_ENUM_RE.match(_raw_text(el)):
+        for deeper in [k for k in segment if k > lvl]:
+            segment[deeper] += 1
+        segment.setdefault(lvl, 0)
+        if not is_auto_numbered(el, styles) and _literal_number(el) is not None:
+            out[id(el)] = (lvl, segment[lvl])
+    return out
+
+
+def _renumber_literals(subs: list[Any], styles: dict[str, Any], names: dict[str, str],
+                       template_subs: list[Any] | None = None) -> int:
+    """保留下来的字面编号子标题（「（3）按账龄披露」、无自动编号）按保留顺序从 1 起重排。
+
+    按模板分组（同级、同一上级段）重排，且只重排模板里本来从 1 连续的组：上市 五、71「（7）供应商融资安排」接在
+    自动编号子标题后面，单独一个「（7）」不是从 1 起 ⇒ 不动（原先一律从 1 重排，成了「（1）」）。``template_subs``
+    = 模板块全部子标题（保留前），缺省同 ``subs``；元素须一直被持有（按 ``id`` 认组）。
+    """
+    template = template_subs if template_subs is not None else subs
+    groups = _literal_groups(template, styles, names)
+    numbers: dict[tuple[int, int], list[int | None]] = {}
+    for el in template:
+        if id(el) in groups:
+            numbers.setdefault(groups[id(el)], []).append(_literal_number(el))
+    consecutive = {k for k, v in numbers.items() if v == list(range(1, len(v) + 1))}
+    counters: dict[tuple[int, int], int] = {}
+    changed = 0
+    for el in subs:
+        key = groups.get(id(el))
+        if key not in consecutive:
             continue
-        counters[lvl] = counters.get(lvl, 0) + 1
-        if _set_literal_number(el, counters[lvl]):
+        counters[key] = counters.get(key, 0) + 1
+        if _set_literal_number(el, counters[key]):
             changed += 1
     return changed
 
@@ -530,9 +570,11 @@ def rebuild_block(
     assigned, extras = _match_tables(lay, [(i, t) for i, t, _e in indexed])
     proto = next((s.caption for s in lay.slots if s.caption is not None), None)
     first_sample = next((s.table for s in lay.slots if s.table is not None), None)
+    # 补的表题 → (所属表位带字面编号的子标题 / 表题, 它重排前的编号)：子标题重排后表题编号跟着改
+    numbered_captions: list[tuple[Any, Any, int | None]] = []
 
-    def _render(tables: list[dict], sample, *, first_caption: bool, caption_proto) -> list[Any]:
-        """渲染若干表；第二张起（续表 / 期初表）、或 ``first_caption`` 时首张，按表名补表题。
+    def _render(tables: list[dict], sample, *, first_caption: bool, caption_proto, head=None) -> list[Any]:
+        """渲染若干表；第二张起（续表 / 期初表）、或 ``first_caption`` 时首张，按表名补表题（剔除编制指引）。
 
         克隆路径（design §2.4）：样例表叶子列数 = 库内表列数时，直接克隆样例表行写值（保留表头合并 / 列宽 /
         字体 / 边框）；列数不一致或无样例表时回退到 ``_render_table`` 结构 + ``apply_template_table_look``。
@@ -552,7 +594,10 @@ def rebuild_block(
                         apply_template_table_look(e, sample, header_rows=_header_rows(t))
             name = str(t.get("name") or "").strip()
             if name and (out or first_caption):
-                out.append(_caption_para(name, caption_proto))
+                cap = _caption_para(caption_text(name), caption_proto)
+                out.append(cap)
+                if head is not None:
+                    numbered_captions.append((cap, head, _literal_number(head)))
             out.extend(els)
             st.tables_rendered += 1
         return out
@@ -561,8 +606,9 @@ def rebuild_block(
     for slot in lay.slots:
         ts = [t for t in assigned.get(slot.order, []) if id(t) not in empty_ids]
         # 首张沿用模板表题 / 子标题 / 块标题，不另补
+        head = next((e for e in (slot.subheading, slot.caption) if _literal_number(e) is not None), None)
         rendered = _render(ts, slot.table if slot.table is not None else first_sample, first_caption=False,
-                           caption_proto=slot.caption if slot.caption is not None else proto)
+                           caption_proto=slot.caption if slot.caption is not None else proto, head=head)
         if rendered:
             slot_out[slot.order] = rendered
     extra_out = _render([t for t in extras if id(t) not in empty_ids], first_sample,
@@ -663,7 +709,11 @@ def rebuild_block(
 
     # 5. 编号：子标题字面编号重排、块内编号重启转移；标题 / 子标题里的编制指引括注剔除
     kept_sub_order = [e for e in lay.subheadings if _is_in(e, kept_subs)]
-    _renumber_literals(kept_sub_order, styles, names)
+    _renumber_literals(kept_sub_order, styles, names, lay.subheadings)
+    for cap, head, old in numbered_captions:
+        new = _literal_number(head)
+        if old is not None and new is not None and new != old and _literal_number(cap) == old:
+            _set_literal_number(cap, new)  # 续表表题「（2）…（续：期初数）」跟着所属子标题改号
     _transfer_restarts(lay.subheadings, lambda e: _is_in(e, kept_subs), styles)
     for e in [lay.title, *kept_sub_order]:
         if e is not None and e.tag == _W_P:

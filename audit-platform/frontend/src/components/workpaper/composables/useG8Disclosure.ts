@@ -2,7 +2,7 @@
  * useG8Disclosure — 附注披露（上市/国企）
  * 结构对齐 Excel 底稿：余额表 + 指定原因 + OCI/期末明细表
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { G8_ACCOUNT_CODE } from './g8Constants'
 import {
   createEmptyListedStore,
@@ -373,14 +373,18 @@ export function useG8Disclosure(opts: {
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', onAdjudicated)
-    pullLatestAdjudicated(false)
-    publishNoteUpdate()
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', onAdjudicated)
-  })
+  // 离屏实例化（附注页离屏同步在 effectScope 里调用，没有组件实例）不挂钩子、不订阅审定事件、不广播说明
+  // （spec note-pull-followup-closure R1）。组件内行为不变。
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', onAdjudicated)
+      pullLatestAdjudicated(false)
+      publishNoteUpdate()
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', onAdjudicated)
+    })
+  }
 
   const hasContent = computed(() => disclosureStoreHasContent(store.value))
 

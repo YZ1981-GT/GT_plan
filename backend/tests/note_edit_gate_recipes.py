@@ -149,11 +149,13 @@ _A5 = Recipe(
 )
 
 # A6: POST /api/disclosure-notes/{project_id}/{year}/pull-from-workpapers
+# 业务桩 = 取数服务 pull_sections（spec note-pull-header-formula-closure R2 起端点改调它）：它内部跑公式推送引擎，
+# 引擎自己 commit / rollback —— 不打桩时第一次放行请求就会回滚测试世界里尚未提交的夹具（成员行随之消失）。
 _A6 = Recipe(
     method="POST",
     path_template="/api/disclosure-notes/{project_id}/{year}/pull-from-workpapers",
     url=f"/api/disclosure-notes/{TARGET_PROJECT_ID}/{_YEAR}/pull-from-workpapers",
-    stubs=(),
+    stubs=(StubTarget("app.services.note_workpaper_pull_service", "pull_sections"),),
 )
 
 # A7: POST /api/disclosure-notes/{project_id}/{year}/validate

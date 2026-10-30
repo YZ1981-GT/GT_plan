@@ -287,7 +287,14 @@ async def test_rejection_is_422_with_chinese_issues_and_reads_nothing(world: Wor
 
 
 async def test_permission_matrix_is_the_same_for_both_entries(world: World):
-    """非成员合伙人、只有委派的经理放行；无关经理 403——两入口对同一 (用户, 项目) 结论一致。"""
+    """非成员合伙人、只有委派的经理放行；无关经理 403——两入口的项目归属结论一致。
+
+    「只有委派的经理」（没有成员行、只有一条委派）在两入口都过了项目归属；但 advanced-query-linkage-closure
+    ADR-AQL-19（B6）起它是审计循环受限身份（平台口径：没有成员行 ⇒ 链路不唯一 ⇒ 受限）：业务视图按循环过滤后照常 200，
+    构建器无法按循环过滤，按设计在显式指定项目时 403 ``CYCLE_SCOPED_PROJECT``（该口径另由 advanced_query_linkage
+    配方表 23c / 25c / 26c / 28c 钉住）。B6 起本用例原先的 (200, 200) 断言一直红（KeyError: 'acnr_results'），
+    按设计改为逐入口断言，归属一致性仍由「无关经理」两入口同为 403 ``FORBIDDEN_PROJECT`` 判定。
+    """
     aw = world.aw
     partner = await aw.user(UserRole.partner)
     delegated = await aw.user(UserRole.manager)
@@ -302,10 +309,13 @@ async def test_permission_matrix_is_the_same_for_both_entries(world: World):
         got[label] = (b.status_code, q.status_code)
         if b.status_code == 200:
             assert b.json()["acnr_results"]["items"][0]["value"] == "0.125"
+        if q.status_code == 200:
             assert q.json()["acnr_results"]["items"][0]["value"] == "0.125"
-        else:
+        if (b.status_code, q.status_code) == (403, 403):
             assert b.json()["detail"]["error_code"] == q.json()["detail"]["error_code"] == "FORBIDDEN_PROJECT"
-    assert got == {"非成员合伙人": (200, 200), "只有委派的经理": (200, 200), "无关经理": (403, 403)}
+        if label == "只有委派的经理":
+            assert q.json()["detail"]["error_code"] == "CYCLE_SCOPED_PROJECT", q.text[:300]
+    assert got == {"非成员合伙人": (200, 200), "只有委派的经理": (200, 403), "无关经理": (403, 403)}
 
 
 async def test_template_with_illegal_targets_is_422_not_500(world: World):

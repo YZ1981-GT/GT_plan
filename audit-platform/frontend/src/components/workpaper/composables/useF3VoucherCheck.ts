@@ -6,6 +6,8 @@
  *  2. 本期贷方金额检查（票据增加·开票）：记账凭证 + 入库单/验收单 + 采购发票
  *  3. 资产负债表日后借方检查：结构同借方区，关注应计未计
  * 每笔通过弹窗逐单据上传OCR核对（参照F2-56模式），并计算检查比例。
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
+ * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { calcSubtotal, parseNum } from './useF3FormulaEngine'
@@ -15,7 +17,10 @@ import {
   type F3RowIdentityMintStats,
 } from './f3RowIdentity'
 import type { UseF3BaseOptions } from './useF3Adjudication'
-import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
+import {
+  metaOf, sideTableOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 import { rowClosingAdjusted, rowPeriodCredit, rowPeriodDebit } from './useF3CrossSheet'
 
 export type F3VoucherSection = 'debit' | 'credit' | 'subsequent'
@@ -173,7 +178,7 @@ function migrateRow(
   ].filter(Boolean).join('；')
   const legacyAbnormal = raw.auditConclusion && raw.auditConclusion !== '无异常' ? '是'
     : raw.auditConclusion === '无异常' ? '否' : ''
-  return {
+  return withRowMeta({
     ...base,
     // 🔴 缺 rowId 时铸新并记数（委托 f3RowIdentity 单源）；`loadSection` 据此立即回写。
     rowId: resolveF3RowId(raw, F3_ROW_ID_PREFIX.voucher, stats),
@@ -202,7 +207,7 @@ function migrateRow(
     isAbnormal: String(raw.isAbnormal || legacyAbnormal),
     issueDesc: String(raw.issueDesc || legacyIssue),
     sampleSource: String(raw.sampleSource || ''),
-  }
+  }, raw)
 }
 
 export function safeParseVoucherRows(
@@ -222,6 +227,41 @@ export function safeParseVoucherRows(
     return []
   }
 }
+
+/** 待写入项进哪区：按分录自己的借贷栏（`sideTableOf`，贷方红字进本期贷方区、带符号照记） */
+export function f3SectionOf(item: Pick<PreparedItem, 'debitAmount' | 'creditAmount'>): F3VoucherSection {
+  return sideTableOf(item)
+}
+
+/** 共享回填函数的待写入项 → 检查行：金额取样本自己那一栏，对方科目 = 编码、明细科目 = 名称（配不上写「多科目」） */
+export function mapPreparedToF3Row(item: PreparedItem): F3VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  const amount = f3SectionOf(item) === 'credit'
+    ? parseNum(item.creditAmount)
+    : (parseNum(item.debitAmount) || parseNum(item.creditAmount))
+  return {
+    ...emptyVoucherRow(0, 0),
+    voucherDate: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    counterAccount: code,
+    detailAccount: name && name !== code ? name : '',
+    amount,
+    sampleSource: item.meta.src.includes('attach') ? '挂凭' : '抽凭引擎',
+  }
+}
+
+/** 行上已填票据类别、审批 / 回单 / 入库 / 发票、其他证据、索引、异常判断或说明（替换与撤销抽凭时据此先确认） */
+export function hasF3VoucherContent(r: F3VoucherCheckRow): boolean {
+  return [r.noteType, r.approvalDateNo, r.approvalProper, r.bankReceiptDate, r.bankPayee, r.receiptDateNo,
+    r.receiptProduct, r.receiptUnit, r.invoiceDateNo, r.invoiceCounterparty, r.otherEvidence, r.indexNo,
+    r.isAbnormal, r.issueDesc].some((v) => String(v ?? '').trim() !== '')
+    || [r.bankAmount, r.receiptQty, r.invoiceAmount].some((n) => Number(n) !== 0)
+}
+
+const SECTIONS: readonly F3VoucherSection[] = ['debit', 'credit', 'subsequent']
 
 /** 检查比例：从 F3-2 明细行汇总账面数（借方=本期承兑、贷方=本期开票、期末=审定数） */
 export function calcF3BookAmounts(f3DetailJson: string | null | undefined): {
@@ -256,6 +296,48 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
   }
   const auditConclusion = ref('')
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（三区各一张表）
+  /** 已在某区的分录（按指纹）：再次回填 / 挂凭导入仍进那区 */
+  function sectionHolding(lfp: string | null): F3VoucherSection | null {
+    if (!lfp) return null
+    for (const section of SECTIONS) {
+      if ((stored[section].value ?? []).some((r) => metaOf(r)?.lfp === lfp)) return section
+    }
+    return null
+  }
+  /**
+   * 一区一张表：写入时去掉空白占位行（区里没有行时补的那行空行，原实现追加时留着它），区空了补一行空白行；
+   * 序号重排，新行的附件位按区内现有最大位顺延
+   */
+  const sectionTable = (section: F3VoucherSection) => computed<F3VoucherCheckRow[]>({
+    get: () => stored[section].value ?? [],
+    set: (list) => {
+      const kept = list.filter((r) => !!metaOf(r) || !isBlankVoucherRow(r))
+      const next = kept.length ? kept : [emptyVoucherRow(1)]
+      let slot = Math.max(0, ...next.map((r) => Number(r.attSlot) || 0))
+      next.forEach((r, i) => {
+        r.seq = i + 1
+        if (!r.attSlot) r.attSlot = ++slot
+      })
+      stored[section].value = next
+    },
+  })
+  const sectionTables = { debit: sectionTable('debit'), credit: sectionTable('credit'), subsequent: sectionTable('subsequent') }
+  const voucherFill = useVoucherCheckFill<F3VoucherCheckRow>({
+    projectId: () => options.projectId?.value,
+    tables: sectionTables,
+    tableOf: (item) => sectionHolding(item.meta.lfp) ?? f3SectionOf(item),
+    mapSampleToRow: (item) => mapPreparedToF3Row(item),
+    persist: () => persistRows(),
+    hasUserContent: hasF3VoucherContent,
+    readonly: () => readonly.value,
+  })
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedIn(section: F3VoucherSection, rowId: string): boolean {
+    const row = (stored[section].value ?? []).find((r) => r.rowId === rowId)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   function loadSection(section: F3VoucherSection): void {
     // 🔴 铸了新行身份就立即回写（spec f3-sync-coverage-and-first-canary Task 14）：
     // 不回写则下次载入再铸新 rowId，行身份每次都变，破坏 OO↔HTML roundtrip。
@@ -266,6 +348,7 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
       section,
       stats,
     )
+    voucherFill.markLoaded()
     if (!target.value || target.value.length === 0) {
       target.value = [emptyVoucherRow(1)]
       return
@@ -329,7 +412,7 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
   }
 
   function removeRow(section: F3VoucherSection, rowId: string): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, rowId)) return
     const target = stored[section]
     const rows = target.value ?? []
     if (rows.length <= 1) return
@@ -341,7 +424,7 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
   }
 
   function updateCell(section: F3VoucherSection, rowId: string, field: string, value: unknown): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, rowId)) return
     const row = (stored[section].value ?? []).find((r) => r.rowId === rowId)
     if (!row) return
     const numericFields = ['amount', 'bankAmount', 'receiptQty', 'invoiceAmount']
@@ -353,81 +436,33 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
 
   /** 弹窗“保存本笔”整行回写 */
   function saveRow(section: F3VoucherSection, patch: F3VoucherCheckRow): void {
-    if (readonly.value) return
+    if (readonly.value || lockedIn(section, patch.rowId)) return
     const rows = stored[section].value ?? []
     const idx = rows.findIndex((r) => r.rowId === patch.rowId)
     if (idx === -1) return
-    rows[idx] = { ...patch }
+    rows[idx] = withRowMeta({ ...patch }, rows[idx])
     persistRows()
   }
 
-  function mapVoucherToEntries(v: SampledVoucher): Array<{ direction: 'debit' | 'credit'; data: Partial<F3VoucherCheckRow> }> {
-    const debit = v.debitAmount ? parseFloat(v.debitAmount) : 0
-    const credit = v.creditAmount ? parseFloat(v.creditAmount) : 0
-    const base: Partial<F3VoucherCheckRow> = {
-      businessContent: v.summary || '',
-      counterAccount: v.counterpartAccount || '',
-      voucherDate: v.voucherDate || '',
-      voucherNo: v.voucherNo || '',
-      sampleSource: '抽凭引擎',
-    }
-    const entries: Array<{ direction: 'debit' | 'credit'; data: Partial<F3VoucherCheckRow> }> = []
-    if (credit > 0) entries.push({ direction: 'credit', data: { ...base, amount: credit } })
-    if (debit > 0) entries.push({ direction: 'debit', data: { ...base, amount: debit } })
-    if (entries.length === 0) {
-      const amount = Math.max(debit, credit)
-      entries.push({ direction: credit >= debit ? 'credit' : 'debit', data: { ...base, amount } })
-    }
-    return entries
+  /**
+   * 抽凭引擎回填：分录按借贷方向进本期借方 / 贷方区（贷方有正数且借方没有正数进贷方区，其余进借方区），
+   * 一个对方科目一行（后端配对），按分录指纹去重；「替换本阶段抽凭行」只动这两区。
+   * 原实现借贷双填拆两行、红字进贷方区且金额记 0、不去重，已删除。
+   */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload, { tables: ['debit', 'credit'] })
   }
 
-  function mergeSamples(samples: Array<{ direction: 'debit' | 'credit'; data: Partial<F3VoucherCheckRow> }>): void {
-    if (readonly.value) return
-    for (const s of samples) {
-      const target = stored[s.direction]
-      target.value = [
-        ...(target.value ?? []),
-        { ...emptyVoucherRow((target.value?.length ?? 0) + 1, nextAttSlot(s.direction)), ...s.data },
-      ]
-    }
-    for (const section of ['debit', 'credit'] as F3VoucherSection[]) {
-      (stored[section].value ?? []).forEach((r, i) => { r.seq = i + 1 })
-    }
-    persistRows()
-  }
-
-  /** GtVoucherSamplingEngine @filled 处理（append/replace/merge） */
-  function applySamplingResults(vouchers: SampledVoucher[], fillMode: FillMode): void {
-    if (readonly.value) return
-    const mapped = vouchers.flatMap(mapVoucherToEntries)
-
-    if (fillMode === 'replace') {
-      for (const section of ['debit', 'credit'] as F3VoucherSection[]) {
-        const rows = mapped
-          .filter((m) => m.direction === section)
-          .map((m, i) => ({ ...emptyVoucherRow(i + 1, i + 1), ...m.data }))
-        stored[section].value = rows.length ? rows : [emptyVoucherRow(1)]
-      }
-      persistRows()
-    } else if (fillMode === 'merge') {
-      const existingNos: Record<'debit' | 'credit', Set<string>> = {
-        debit: new Set((stored.debit.value ?? []).map((r) => r.voucherNo).filter(Boolean)),
-        credit: new Set((stored.credit.value ?? []).map((r) => r.voucherNo).filter(Boolean)),
-      }
-      mergeSamples(mapped.filter((m) => {
-        const no = m.data.voucherNo || ''
-        return !no || !existingNos[m.direction].has(no)
-      }))
-    } else {
-      mergeSamples(mapped)
-    }
+  /** 从序时账挂入导入：幂等追加，与抽凭命中同一分录只留一行 */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples, { tables: ['debit', 'credit'] })
   }
 
   function persistRows(): void {
-    for (const section of ['debit', 'credit', 'subsequent'] as F3VoucherSection[]) {
+    for (const section of SECTIONS) {
       const key = ITEM_KEYS[section]
       allResponses.value.set(key, {
-        item_id: key, conclusion: null, remark: JSON.stringify(stored[section].value ?? []),
+        item_id: key, conclusion: null, remark: JSON.stringify(voucherFill.guardPersist(stored[section].value ?? [], section)),
       })
     }
     debounceSave()
@@ -463,7 +498,10 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
     debitAbnormal, creditAbnormal, subsequentAbnormal,
     checkRatios, auditConclusion,
     addRow, removeRow, updateCell, saveRow,
-    mergeSamples, applySamplingResults, mapVoucherToEntries,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled, onAttachImported, onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass, isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

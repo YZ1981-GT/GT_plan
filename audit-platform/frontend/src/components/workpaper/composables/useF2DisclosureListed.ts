@@ -3,7 +3,7 @@
  * 对齐源模板「附注披露信息（上市公司）」与 F2ListedSyncSnapshot
  * Spec: .kiro/specs/f2-inventory-main/ Task 15.5
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
@@ -937,7 +937,8 @@ export function useF2DisclosureListed(options: {
     }
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
+  onScopeDispose(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
     if (dataUpdatedTimer) clearTimeout(dataUpdatedTimer)
     for (const { event, handler } of eventListeners) window.removeEventListener(event, handler)

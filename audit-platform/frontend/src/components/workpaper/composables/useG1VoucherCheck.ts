@@ -5,11 +5,18 @@
  * 目标 → 抽样计划 → 本期发生额检查 / 期后处置新售 → 六项核对 → 检查比例 → 说明/结论
  *
  * 保留：抽凭引擎填入、OCR 附件、旧行字段迁移
+ * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：本期 / 期后两个区段各算
+ * 一张表（「替换本阶段抽凭行」只动当前区段），一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行
+ * JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, watch, type ComputedRef, type Ref } from 'vue'
 import { parseNum, calcSubtotal } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
-import type { SampledVoucher, FillMode } from './useSamplingAlgorithms'
+import type { SampledVoucher } from './useSamplingAlgorithms'
+import {
+  counterpartText, metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 export type G1VoucherPeriod = 'current' | 'subsequent'
 export type G1VoucherTab = 'basic' | 'check' | 'result'
@@ -226,7 +233,7 @@ function loadRows(map: Map<string, ChecklistResponse>): G1VoucherCheckRow[] {
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.length) return [emptyRow(1, 'current'), emptyRow(1, 'subsequent')]
-    return parsed.map((p: Partial<G1VoucherCheckRow>, i: number) => enrichVoucherRow(p, i + 1))
+    return parsed.map((p: Partial<G1VoucherCheckRow>, i: number) => withRowMeta(enrichVoucherRow(p, i + 1), p))
   } catch {
     return [emptyRow(1, 'current'), emptyRow(1, 'subsequent')]
   }
@@ -242,10 +249,45 @@ function loadPlan(map: Map<string, ChecklistResponse>): G1VoucherSamplingPlan {
   }
 }
 
+/**
+ * 共享回填函数的待写入项 → G1-13 检查行（区段由所进的表定）：金额在样本自己的借贷栏；样本在借方则对方科目
+ * 进贷方科目、本科目进借方科目，反之亦然（原实现一律写进贷方科目）
+ */
+export function mapPreparedToG1VoucherRow(item: PreparedItem, period: G1VoucherPeriod, seq: number): G1VoucherCheckRow {
+  const s = item.sample as PreparedItem['sample'] & { summary?: string | null; accountCode?: string; accountName?: string }
+  const debit = parseNum(item.debitAmount)
+  const credit = parseNum(item.creditAmount)
+  const own = [s.accountCode, s.accountName].filter(Boolean).join(' ')
+  const counter = counterpartText(item)
+  const onDebit = item.debitAmount !== null
+  return enrichVoucherRow({
+    period,
+    voucherDate: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    debitAmount: debit,
+    creditAmount: credit,
+    amount: Math.max(debit, credit),
+    debitAccount: onDebit ? own : counter,
+    creditAccount: onDebit ? counter : own,
+    counterAccount: counter,
+    sampleSource: '抽凭引擎',
+  }, seq)
+}
+
+/** 行上已填核对结果、支持性文件、索引、异常说明、备注或附件（替换与撤销抽凭时据此先确认） */
+export function hasG1VoucherContent(r: G1VoucherCheckRow): boolean {
+  return [r.check1DocsComplete, r.check2VoucherMatch, r.check3Accounting, r.check4Period, r.check5FairValue, r.check6Approval]
+    .some((c) => c !== null)
+    || [r.supportingDocs, r.indexRef, r.abnormalDesc, r.remark, r.attachment].some((v) => String(v ?? '').trim() !== '')
+}
+
 export function useG1VoucherCheck(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: Ref<string | undefined> | ComputedRef<string | undefined>
 }) {
   const rows = ref<G1VoucherCheckRow[]>(loadRows(opts.allResponses.value))
   const samplingPlan = ref<G1VoucherSamplingPlan>(loadPlan(opts.allResponses.value))
@@ -253,8 +295,43 @@ export function useG1VoucherCheck(opts: {
   const activePeriod = ref<G1VoucherPeriod>('current')
   const activeTab = ref<G1VoucherTab>('basic')
 
+  /** 已在某个区段的分录（按指纹）：再次回填 / 挂凭导入仍进那个区段 */
+  function periodHolding(lfp: string | null): G1VoucherPeriod | null {
+    if (!lfp) return null
+    return rows.value.find((r) => metaOf(r)?.lfp === lfp)?.period ?? null
+  }
+  /** 两个区段各算一张表：共享回填函数按表替换，「替换本阶段抽凭行」只动当前区段 */
+  const periodTable = (period: G1VoucherPeriod) => computed<G1VoucherCheckRow[]>({
+    get: () => rows.value.filter((r) => r.period === period),
+    set: (list) => {
+      const cur = period === 'current' ? list : rows.value.filter((r) => r.period === 'current')
+      const sub = period === 'subsequent' ? list : rows.value.filter((r) => r.period === 'subsequent')
+      rows.value = [...cur, ...sub]
+    },
+  })
+  const periodTables = { current: periodTable('current'), subsequent: periodTable('subsequent') }
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<G1VoucherCheckRow>({
+    projectId: () => opts.projectId?.value,
+    tables: periodTables,
+    tableOf: (item) => periodHolding(item.meta.lfp),
+    mapSampleToRow: (item, key) => mapPreparedToG1VoucherRow(item, key as G1VoucherPeriod, rows.value.length + 1),
+    persist: () => persistAll(),
+    hasUserContent: hasG1VoucherContent,
+    afterChange: () => { rows.value.forEach((r, i) => { r.seq = i + 1 }) },
+    readonly: () => opts.isReadonly.value,
+  })
+  voucherFill.markLoaded()
+
+  /** 年审阶段的预审行只读（不可改、不可删） */
+  function lockedRow(id: string): boolean {
+    const row = rows.value.find((r) => r.id === id)
+    return !!row && voucherFill.isRowLocked(row)
+  }
+
   function loadAll() {
     rows.value = loadRows(opts.allResponses.value)
+    voucherFill.markLoaded()
     samplingPlan.value = loadPlan(opts.allResponses.value)
     auditConclusion.value = opts.allResponses.value.get(CONCLUSION_KEY)?.conclusion ?? ''
   }
@@ -262,7 +339,9 @@ export function useG1VoucherCheck(opts: {
   watch(
     () => opts.allResponses.value.get(DATA_KEY)?.conclusion,
     (raw) => {
-      if (raw) rows.value = loadRows(opts.allResponses.value)
+      if (!raw) return
+      rows.value = loadRows(opts.allResponses.value)
+      voucherFill.markLoaded()
     },
   )
 
@@ -309,7 +388,11 @@ export function useG1VoucherCheck(opts: {
 
   function persistAll() {
     if (opts.isReadonly.value) return
-    const payload = JSON.stringify(rows.value)
+    // 年审阶段预审行按读入版本写回（两个区段各一张表）
+    const payload = JSON.stringify([
+      ...voucherFill.guardPersist(periodTables.current.value, 'current'),
+      ...voucherFill.guardPersist(periodTables.subsequent.value, 'subsequent'),
+    ])
     opts.debouncedSave(DATA_KEY, { conclusion: payload, remark: payload })
   }
 
@@ -330,10 +413,10 @@ export function useG1VoucherCheck(opts: {
   }
 
   function updateRow(id: string, patch: Partial<G1VoucherCheckRow>) {
-    if (opts.isReadonly.value) return
+    if (opts.isReadonly.value || lockedRow(id)) return
     rows.value = rows.value.map((r) => {
       if (r.id !== id) return r
-      return enrichVoucherRow({ ...r, ...patch, id: r.id }, r.seq)
+      return withRowMeta(enrichVoucherRow({ ...r, ...patch, id: r.id }, r.seq), r)
     })
     persistAll()
   }
@@ -351,7 +434,7 @@ export function useG1VoucherCheck(opts: {
   }
 
   function removeRow(id: string) {
-    if (opts.isReadonly.value) return
+    if (opts.isReadonly.value || lockedRow(id)) return
     const next = rows.value.filter((r) => r.id !== id)
     const cur = next.filter((r) => r.period === 'current')
     const sub = next.filter((r) => r.period === 'subsequent')
@@ -381,32 +464,14 @@ export function useG1VoucherCheck(opts: {
     )
   }
 
-  function mergeSamples(vouchers: SampledVoucher[], period: G1VoucherPeriod = 'current') {
-    if (opts.isReadonly.value) return
-    const mapped = vouchers.map((v, i) => mapVoucherToRow(v, rows.value.length + i + 1, period))
-    rows.value = [...rows.value, ...mapped].map((r, i) => ({ ...r, seq: i + 1 }))
-    persistAll()
+  /** 抽凭引擎回填进当前区段：一个对方科目一行，按分录指纹去重；「替换本阶段抽凭行」只删当前区段本阶段抽凭填入的行 */
+  function onEngineFilled(payload: EngineFilledPayload) {
+    return voucherFill.onEngineFilled(payload, { tables: [activePeriod.value] })
   }
 
-  function applySamplingResults(vouchers: SampledVoucher[], fillMode: FillMode) {
-    if (opts.isReadonly.value) return
-    const period = activePeriod.value
-    if (fillMode === 'replace') {
-      const other = rows.value.filter((r) => r.period !== period)
-      const mapped = vouchers.length
-        ? vouchers.map((v, i) => mapVoucherToRow(v, i + 1, period))
-        : [emptyRow(1, period)]
-      rows.value = [...other, ...mapped].map((r, i) => ({ ...r, seq: i + 1 }))
-      persistAll()
-      return
-    }
-    if (fillMode === 'merge') {
-      const existingNos = new Set(rows.value.map((r) => r.voucherNo).filter(Boolean))
-      const deduped = vouchers.filter((v) => !v.voucherNo || !existingNos.has(v.voucherNo))
-      mergeSamples(deduped, period)
-      return
-    }
-    mergeSamples(vouchers, period)
+  /** 从序时账挂入导入当前区段：幂等追加（已在另一区段的分录留在原处） */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples, { tables: [activePeriod.value] })
   }
 
   return {
@@ -435,9 +500,14 @@ export function useG1VoucherCheck(opts: {
     setCheck,
     addRow,
     removeRow,
-    mergeSamples,
-    applySamplingResults,
     mapVoucherToRow,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
     CHECK_ITEMS: G1_VOUCHER_CHECK_ITEMS,
   }
 }

@@ -448,6 +448,7 @@ import {
   type H1SoeIdleRow,
   type H1SoeFullyDepRow,
 } from '../../composables/h1SoeDisclosureModel'
+import { restoreH1SoeState } from '../../composables/h1DisclosureTabState'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
 const props = defineProps<{
@@ -537,29 +538,16 @@ function parseRemark(itemId: string): unknown {
   try { return JSON.parse(item.remark) } catch { return item.remark }
 }
 
-function parseSoeKey(key: keyof typeof H1_SOE_KEYS): unknown {
-  const raw = readSoeRemark((id) => props.allResponses.get(id), key)
-  if (raw == null) return null
-  try { return JSON.parse(raw) } catch { return raw }
-}
 
 function load(): void {
-  state.summary = hydrateSummary(parseSoeKey('summary'))
-  state.layers = hydrateLayers(parseSoeKey('movement'))
-  state.idleRows = hydrateIdleRows(parseSoeKey('idle'))
-  state.titleRows = hydrateTitleRows(parseSoeKey('title'))
-  state.clearingRows = hydrateClearingRows(parseSoeKey('clearing'))
-  const note = readSoeRemark((id) => props.allResponses.get(id), 'clearingNote')
-  state.clearingNote = typeof note === 'string' ? note : ''
-  fullyDepRows.value = hydrateFullyDepRows(parseSoeKey('fullyDep'))
-
-  // 无已存变动数时，尝试从 H1-2 自动 seed
-  if (!layersHaveAnyAmount(state.layers)) {
-    const detail = parseRemark('H1-2-rows')
-    if (Array.isArray(detail) && detail.length) {
-      state.layers = seedMovementFromDetailRows(detail as Record<string, unknown>[])
-    }
-  }
+  const restored = restoreH1SoeState(props.allResponses)
+  state.summary = restored.state.summary
+  state.layers = restored.state.layers
+  state.idleRows = restored.state.idleRows
+  state.titleRows = restored.state.titleRows
+  state.clearingRows = restored.state.clearingRows
+  state.clearingNote = restored.state.clearingNote
+  fullyDepRows.value = restored.fullyDepRows
 }
 
 watch(() => props.allResponses, () => load(), { immediate: true, deep: false })

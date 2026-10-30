@@ -170,6 +170,8 @@ from app.models.formula_setting_models import (  # noqa: F401
     FormulaTemplateSubscription,
     FormulaTemplateVersion,
 )
+# 预审样本存续核对汇总（迁移 V212）
+from app.models.audit_phase_models import InterimSurvivalCheck  # noqa: F401
 # D5 合并范围用户确认快照（迁移 V183）
 from app.models.consol_scope_confirmation_models import (  # noqa: F401
     ConsolScopeConfirmation,

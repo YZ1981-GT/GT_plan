@@ -77,6 +77,8 @@
 .total-val { font-weight: 700; }
 .gt-cell-wrapper { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .gt-cell-editable { cursor: text; min-height: 20px; min-width: 40px; display: inline-flex; align-items: center; justify-content: flex-end; width: 100%; border-radius: 2px; padding: 0 2px; transition: background-color 0.15s; }
+/* 行名格与金额格共用可编辑样式，但行名靠左（原先编辑态整列右对齐，spec note-pull-followup-closure R18） */
+.gt-cell-editable.gt-cell-editable--label { justify-content: flex-start; }
 .gt-cell-editable:hover { background-color: var(--gt-color-primary-bg, #f5f0ff); outline: 1px dashed var(--gt-color-border-purple, #d8b8ee); }
 .gt-cell-source { font-size: var(--gt-font-size-xs); cursor: help; }
 .gt-cell-manual { font-size: var(--gt-font-size-xs); cursor: help; }

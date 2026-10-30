@@ -52,6 +52,13 @@ def _bypass_extract_auth():
 
 
 @pytest.fixture(autouse=True)
+def _bypass_undo_auth():
+    """撤销端点的鉴权与阶段规则在这些流程测试中放行；规则本身由 test_voucher_undo_authz 用真 ORM 行覆盖。"""
+    with patch("app.routers.voucher_sampling._authorize_undo", new=AsyncMock(return_value=None)):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _stub_population_reconcile():
     """总体完整性核对取数在这些流程测试中显式打桩为「不可用」。
 
@@ -64,6 +71,17 @@ def _stub_population_reconcile():
         "app.routers.voucher_sampling.resolve_population_reconcile",
         new=AsyncMock(return_value=PopulationReconcileFacts(available=False)),
     ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _stub_final_population():
+    """年审口径（任务 15）在这些流程测试中打桩为「不适用」（本底稿没有预审工作）。
+
+    不打桩时它会拿 AsyncMock 会话去读项目阶段而 500。口径本身由 test_sampling_phase_pg.py（真库）
+    与 test_sampling_final_population.py 覆盖。
+    """
+    with patch("app.routers.voucher_sampling.resolve_final_population", new=AsyncMock(return_value=None)):
         yield
 
 

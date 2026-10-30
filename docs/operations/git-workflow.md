@@ -94,16 +94,9 @@ multi 模式阻断，single 模式仅警告。
 
 `.git/hooks/` 是每人本地状态，不进 git 仓库，所以新成员需手动安装。
 
-## 六、紧急救急通道
+## 六、无绕过通道
 
-任何 hook 阻塞时可用 `--no-verify` 绕过：
-
-```powershell
-git push --no-verify
-git commit --no-verify
-```
-
-**仅紧急情况**（如修线上 bug），事后必须补做 6 维核查 + 解决遗留问题。
+Hook 阻塞时必须修复根因或按错误提示补齐验证。禁止使用 `--no-verify` 绕过 pre-commit / pre-push；紧急修复同样要保留版本标签、远端同步和最小回归证据。
 
 ## 七、常见操作示例
 
@@ -170,7 +163,22 @@ git checkout -b spec/my-new-spec
 
 详见模板文件：[`.github/pull_request_template.md`](../../.github/pull_request_template.md)
 
-## 九、参考
+## 九、远端前移时安全重放（2026-10-29）
+
+`push_version.py push` 保持 fail-closed：fetch 或远端版本标签查询失败立即停止；远端分支已经前移时不自动 rebase / cherry-pick。只有第一次 atomic push 返回失败，且远端分支与完整版本标签视图都未变化时，才原样重试一次。标签说明中的提交范围以远端版本标签剥离后的提交为先，不依赖本地是否已抓取标签对象。
+
+多人并发时按以下流程处理：
+
+1. `git fetch --prune --no-tags origin`，记录目标远端分支 SHA。
+2. 在该 SHA 上创建**分离头**临时 worktree，不新建分支。
+3. 将本任务提交或明确的文件块重放到临时 worktree；路径无重叠只能作为提示，仍须检查生成物、注册表和跨文件接口的语义冲突。
+4. 在候选树运行本任务测试和 `check_staged_tree_self_consistency.py`。
+5. 推送前再次 `git ls-remote`；远端 SHA 与第 1 步不同则停止，基于新 SHA 重新构建候选树。
+6. 在分离头 worktree 调 `push_version.py push --branch <目标分支> --notes-file <说明>`，由工具原子推送分支和附注标签。
+
+禁止自动 rebase、force push、`--force-with-lease`、`git stash` 和 `--no-verify`。候选树验证通过也不能覆盖会话开始后新增的远端提交。
+
+## 十、参考
 
 - 三件套：`.kiro/specs/repo-git-workflow-unification/`
 - 检测脚本：`backend/scripts/check_git_*.py`

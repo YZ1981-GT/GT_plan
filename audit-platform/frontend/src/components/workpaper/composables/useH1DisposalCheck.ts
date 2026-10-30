@@ -11,6 +11,11 @@
 import { ref, computed, watch, type Ref } from 'vue'
 import type { ChecklistItem } from './useH1FormData'
 import { calcSubtotal, calcNetValue, calcDisposalGainLoss } from './useH1FormulaEngine'
+import {
+  useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem, type UndoRequestPayload,
+} from './shared/voucherCheckFill'
+import { assetAmount, assetLegacyKey, sampleOf, sampleRemark } from './assetVoucherFill'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -191,6 +196,16 @@ export function normalizeH1DisposalRow(raw: any, idx: number): DisposalRow {
   return row
 }
 
+/** 行上已填核对内容（替换与撤销抽凭时据此先确认）：证据、审批、定价与税务处理、清理收支、结论等 */
+export function hasH1DisposalContent(r: DisposalRow): boolean {
+  return [r.category, r.assetNo, r.disposalMethod, r.applicationRef, r.isApproved, r.contractRef, r.contractParty,
+    r.invoiceRef, r.invoiceParty, r.approvalDoc, r.evaluationReport, r.paymentVoucher, r.relatedPartyName,
+    r.pricingBasis, r.taxTreatment, r.accountEntry, r.conclusion, r.indexRef, r.attachmentUrl]
+    .some(v => String(v ?? '').trim() !== '')
+    || [r.accDep, r.impairment, r.disposalCost, r.disposalIncome, r.contractAmount, r.invoiceAmount].some(v => Number(v) !== 0)
+    || r.checkResult === 'OK' || r.isRelatedParty === 'Y'
+}
+
 export function useH1DisposalCheck(
   wpId: Ref<string>,
   projectId: Ref<string>,
@@ -199,6 +214,8 @@ export function useH1DisposalCheck(
     totalDecreaseAmount?: Ref<number>
     onSave?: (itemId: string, value: any) => void
     onPublishEvent?: (event: string, payload: any) => void
+    /** 整张底稿只读：抽凭回填 / 挂凭导入 / 撤销一律不改行 */
+    isReadonly?: Ref<boolean>
   },
 ) {
   const rows = ref<DisposalRow[]>([])
@@ -220,13 +237,14 @@ export function useH1DisposalCheck(
     if (rowItem?.remark) {
       try {
         const parsed = JSON.parse(rowItem.remark)
-        rows.value = Array.isArray(parsed) ? parsed.map(_normalizeRow) : []
+        rows.value = Array.isArray(parsed) ? parsed.map((r: any, i: number) => withRowMeta(_normalizeRow(r, i), r)) : []
       } catch {
         rows.value = []
       }
     } else {
       rows.value = []
     }
+    voucherFill.markLoaded()
 
     const paramItem = allResponses.value.get(`${ITEM_PREFIX}-sampling-params`)
     if (paramItem?.remark) {
@@ -352,7 +370,13 @@ export function useH1DisposalCheck(
   const gainLossTotal = computed(() => summary.value.gainLossTotal)
 
   function addRow(name = ''): void {
-    const newRow: DisposalRow = {
+    rows.value.push(_emptyRow(name))
+    _syncSampleSize()
+    _persist()
+  }
+
+  function _emptyRow(name = ''): DisposalRow {
+    return {
       rowId: `disp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       seq: rows.value.length + 1,
       category: '',
@@ -393,13 +417,44 @@ export function useH1DisposalCheck(
       voucherSampleId: '',
       attachmentUrl: '',
     }
-    rows.value.push(newRow)
-    _syncSampleSize()
-    _persist()
   }
+
+  /**
+   * 共享回填函数的待写入项 → 减少检查行（任务 12）：一个样本一行，对方科目按后端配对用「/」拼接；
+   * 转出原值取样本自己那一栏的金额（减少在贷方），红字带符号照记（原实现取绝对值）
+   */
+  function _rowFromPrepared(item: PreparedItem): DisposalRow {
+    const s = sampleOf(item)
+    const row = _emptyRow(s.summary || '处置项')
+    row.originalCost = assetAmount(item, 'credit')
+    row.voucherNo = s.voucherNo || ''
+    row.disposalDate = s.voucherDate || ''
+    row.counterpartAccount = item.counterpartAccount
+    row.voucherSampleId = s.voucherNo || ''
+    row.isAbnormal = s.abnormal ? 'Y' : 'N'
+    row.checkResult = s.abnormal ? 'ERR' : ''
+    row.remark = sampleRemark(item)
+    _recalcRow(row)
+    return row
+  }
+
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+  const voucherFill = useVoucherCheckFill<DisposalRow>({
+    projectId: () => projectId.value,
+    tables: rows,
+    policy: 'join',
+    mapSampleToRow: item => _rowFromPrepared(item),
+    persist: () => _persist(),
+    hasUserContent: hasH1DisposalContent,
+    afterChange: (_key, list) => { list.forEach((r, i) => { r.seq = i + 1 }) },
+    // 旧行（没有 `_gt`）：凭证号 + 减少日期 + 转出原值（原实现取绝对值）
+    legacy: r => assetLegacyKey(r.voucherNo, r.disposalDate, r.originalCost),
+    readonly: () => options?.isReadonly?.value === true,
+  })
 
   function removeRow(rowId: string): void {
     const idx = rows.value.findIndex((r) => r.rowId === rowId)
+    if (idx >= 0 && voucherFill.isRowLocked(rows.value[idx])) return
     if (idx >= 0) {
       rows.value.splice(idx, 1)
       rows.value.forEach((r, i) => {
@@ -412,7 +467,7 @@ export function useH1DisposalCheck(
 
   function updateCell(rowId: string, field: keyof DisposalRow, value: any): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     ;(row as any)[field] = value
     if (field === 'isAbnormal' && value === 'Y' && !row.checkResult) {
       row.checkResult = 'ERR'
@@ -430,7 +485,7 @@ export function useH1DisposalCheck(
   /** 将 OCR 识别字段合并入行（仅填空或覆盖金额类） */
   function applyOcrFields(rowId: string, fields: Record<string, any>): void {
     const row = rows.value.find((r) => r.rowId === rowId)
-    if (!row) return
+    if (!row || voucherFill.isRowLocked(row)) return
     const f = fields || {}
     if (f.invoiceNo || f.invoice_no || f.invoiceRef) {
       row.invoiceRef = String(f.invoiceNo || f.invoice_no || f.invoiceRef)
@@ -544,7 +599,7 @@ export function useH1DisposalCheck(
   }
 
   function _persist(): void {
-    options?.onSave?.(`${ITEM_PREFIX}-rows`, rows.value)
+    options?.onSave?.(`${ITEM_PREFIX}-rows`, voucherFill.guardPersist(rows.value))
     samplingParams.value.sampleSize = rows.value.length
     samplingParams.value.coverageRate = summary.value.coverageRate
     _persistSampling()
@@ -586,6 +641,12 @@ export function useH1DisposalCheck(
     updateTestReasons,
     saveNote,
     saveConclusion,
+    onEngineFilled: (payload: EngineFilledPayload) => voucherFill.onEngineFilled(payload),
+    onAttachImported: (samples: FillSample[]) => voucherFill.onAttachImported(samples),
+    onUndoRequest: (payload: UndoRequestPayload) => voucherFill.onUndoRequest(payload),
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
   }
 }
 

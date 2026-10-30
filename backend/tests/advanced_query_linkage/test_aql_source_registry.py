@@ -141,6 +141,36 @@ def test_unknown_source_is_400(source: str) -> None:
     assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE"
 
 
+#: 跨模块单元格源键（``{report|note|adj|tb}:限定词|区域``）：取数实现随任务 34 删除（AQ-25，design §3.9），前端没有入口发它们
+_MODULE_CELL_SOURCES = ["report:balance_sheet|A1:C5", "note:五-1-1|C3:D8", "adj:aje|B2:E10", "tb:detail|C1:C50"]
+
+
+def _module_cell_req(source: str):
+    from app.services.custom_query.query_orchestrator import QueryRequest
+
+    return QueryRequest(entry="business", project_id=str(_PID), year=2025, source=source)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_business_fetcher(source: str) -> None:
+    """execute 的分派入口按未知数据源 400（改前：先认出该源族，交跨模块单元格取数、200 返回虚拟单元格）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.business_fetcher(_module_cell_req(source), [], None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
+@pytest.mark.parametrize("source", _MODULE_CELL_SOURCES)
+async def test_module_cell_source_keys_are_unknown_in_prepare_export(source: str) -> None:
+    """「导出全部」同一分派入口同样 400（改前：当作非 SQL 源返回 None，交内存路径取数）。"""
+    from app.services.custom_query import business_fetchers
+
+    with pytest.raises(HTTPException) as exc:
+        await business_fetchers.prepare_export(_module_cell_req(source), None)
+    assert exc.value.status_code == 400 and _detail(exc)["error_code"] == "UNKNOWN_SOURCE", _detail(exc)
+
+
 # ─── 语句形态 ────────────────────────────────────────────────────────────────
 
 
@@ -343,9 +373,11 @@ async def test_adjustment_statement_compares_type_as_text() -> None:
         "column"])
 async def test_unregistered_inputs_are_400(kwargs: dict, code: str, fixed_active_dataset) -> None:
     # 口径谓词不触库（生效数据集 id 固定）：校验若被跳过，语句照常建出 ⇒ 形态是 DID NOT RAISE，而不是别的报错
-    ctx = _ctx(filters=kwargs.pop("filters", {}))
+    # 不改参数化的 dict（原先 pop 掉 filters：同一会话里再收集到一次时第二次 filters 为空 ⇒ DID NOT RAISE）
+    rest = {key: value for key, value in kwargs.items() if key != "filters"}
+    ctx = _ctx(filters=kwargs.get("filters", {}))
     with pytest.raises(HTTPException) as exc:
-        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, ctx, **kwargs)
+        await paged_fetch.build_statement(sr.LEDGER_ENTRIES, ctx, **rest)
     assert exc.value.status_code == 400 and _detail(exc)["error_code"] == code, _detail(exc)
     assert _detail(exc)["message"], "400 须带中文原因"
 
@@ -422,9 +454,18 @@ async def test_count_paging_nulls_last_and_warning(ledger_db) -> None:
     ids = [r["id"] for r in (*first.rows, *second.rows, *third.rows)]
     assert len(set(ids)) == 5, "逐页并集 = 全集且互不重叠"
     assert sr.NO_ACTIVE_DATASET_WARNING in first.warnings, "没有生效数据集时 warnings 写明按未删除行返回"
-    assert first.meta == {"ref_context": {"template_type": "soe", "year": 2025}}
+    # column_types：显示列的类型（任务 28 / 29 的金额格式化按它判定；隐藏列不在其中）
+    assert first.meta == {"ref_context": {"template_type": "soe", "year": 2025},
+                          "column_types": {c.key: c.dtype for c in sr.LEDGER_ENTRIES.columns}}
+    assert first.meta["column_types"]["debit_amount"] == "number" and first.meta["column_types"]["summary"] == "text"
     assert [c.key for c in first.columns] == sr.LEDGER_ENTRIES.display_keys
     assert {"id", "entry_seq", "accounting_period", "company_code"} <= set(first.rows[0]), "隐藏列随行返回"
+
+
+async def test_column_types_follow_the_projection(ledger_db) -> None:
+    """只选部分列时 column_types 只含所选列（与 columns 同一份显示列）。"""
+    page = await _page(ledger_db, columns=["account_name", "debit_amount"])
+    assert page.meta["column_types"] == {"account_name": "text", "debit_amount": "number"}
 
 
 async def test_column_projection_keeps_hidden_keys(ledger_db) -> None:

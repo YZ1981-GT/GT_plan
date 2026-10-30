@@ -43,11 +43,12 @@ export type G1AcctClass = 'trading' | 'classified_fvpl' | 'designated_fvpl'
 export interface TradingDetailRow {
   id: string
   seq: number
-  // 准入 / 基础（🔴 受管子序列必须是模板列序 ⇒ acctClass=A 在 securityName=B 之前）
+  /** 会计分类 = 所在区（区①②③）。不受管：OO 侧新增行由所在区补，模板 A 列不承载它 */
   acctClass: G1AcctClass
+  // 准入 / 基础（🔴 受管子序列必须是模板列序 ⇒ investType=A「类别」在 securityName=B 之前）
+  investType: G1InvestType
   securityName: string
   securityCode: string
-  investType: G1InvestType
   market: string
   acquisitionDate: string
   initialCost: number

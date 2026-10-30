@@ -11,9 +11,9 @@
           :project-id="projectId"
           :workpaper-id="wpId"
           :account-code="G7_SAMPLING_ACCOUNT_CODE"
-          phase="final"
           :year="auditYear"
           @filled="onSampleFilled"
+          @undo-request="voucherFill.onUndoRequest"
         />
         <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddRow">+ 新增</el-button>
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
@@ -190,10 +190,17 @@
             :current-row-key="rows[activeRowIndex]?.id"
             row-key="id"
             style="font-size: 13px"
+            :row-class-name="voucherFill.rowClass"
             @current-change="handleRowChange"
           >
             <el-table-column label="序号" width="55" align="center">
               <template #default="{ $index }">{{ getAbsoluteIndex($index) }}</template>
+            </el-table-column>
+            <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据） -->
+            <el-table-column label="来源" width="150">
+              <template #default="{ row }">
+                <VoucherRowMetaCell :row="row" :locked="voucherFill.isRowLocked(row)" :project-id="projectId" :year="auditYear" />
+              </template>
             </el-table-column>
             <el-table-column label="日期" width="120">
               <template #default="{ row }">
@@ -268,6 +275,7 @@
             :current-row-key="rows[activeRowIndex]?.id"
             row-key="id"
             style="font-size: 13px"
+            :row-class-name="voucherFill.rowClass"
             @current-change="handleRowChange"
           >
             <el-table-column label="序号" width="55" align="center">
@@ -322,6 +330,7 @@
             :current-row-key="rows[activeRowIndex]?.id"
             row-key="id"
             style="font-size: 13px"
+            :row-class-name="voucherFill.rowClass"
             @current-change="handleRowChange"
           >
             <el-table-column label="序号" width="55" align="center">
@@ -446,7 +455,16 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
+import {
+  createG7CheckRow as createEmptyRow,
+  isG7CheckRowAbnormal as isRowAbnormal,
+  parseG7CheckRows as parseRows,
+  useG7VoucherCheckFill,
+} from '../../composables/g7VoucherCheckRows'
 import { gCycleScope } from '../../composables/gCycleAccountScope'
+import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import {
   pullSamplesForWorkpaper,
@@ -533,6 +551,13 @@ const conclusionText = ref('')
 const aiLoading = ref(false)
 const loading = ref(true)
 const rows = ref<Record<string, any>[]>([])
+// 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数
+const voucherFill = useG7VoucherCheckFill({
+  projectId: () => props.projectId,
+  rows,
+  persist: () => persistRows(),
+  readonly: () => isReadonly.value,
+})
 const criteria = ref<G7SampleCriteria>(emptyCriteria())
 const showMethodGuide = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -550,68 +575,6 @@ const importExport = useG7SubImportExport({
   wpId: computed(() => props.wpId),
 })
 
-function createEmptyRow(seq: number): Record<string, any> {
-  return {
-    id: `g18-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    seq,
-    voucherDate: '',
-    voucherNo: '',
-    businessContent: '',
-    counterAccount: '',
-    debitAmount: 0,
-    creditAmount: 0,
-    attachment: '',
-    supportingDoc: '',
-    check1Original: false,
-    check2Authorization: false,
-    check3Accounting: false,
-    check4Amount: false,
-    check5Classification: false,
-    check6InvestmentIncome: false,
-    indexRef: '',
-    isAbnormal: false,
-    abnormalNote: '',
-    riskLevel: '',
-    remark: '',
-  }
-}
-
-/** 兼容旧前端字段名 → 后端 IE 字段 */
-function normalizeRow(raw: Record<string, any>, index: number): Record<string, any> {
-  const row = {
-    ...createEmptyRow(index + 1),
-    ...raw,
-    id: raw.id || `g18-${Date.now()}-${index}`,
-    seq: index + 1,
-  }
-  if (raw.check1OriginalComplete != null && raw.check1Original == null) {
-    row.check1Original = !!raw.check1OriginalComplete
-  }
-  if (raw.check4AmountCorrect != null && raw.check4Amount == null) {
-    row.check4Amount = !!raw.check4AmountCorrect
-  }
-  if (raw.supportingDocDesc != null && !raw.supportingDoc) {
-    row.supportingDoc = raw.supportingDocDesc
-  }
-  if (raw.abnormalDesc != null && !raw.abnormalNote) {
-    row.abnormalNote = raw.abnormalDesc
-  }
-  if (raw.indexNo != null && !raw.indexRef) {
-    row.indexRef = raw.indexNo
-  }
-  row.debitAmount = parseNum(row.debitAmount)
-  row.creditAmount = parseNum(row.creditAmount)
-  row.isAbnormal = isRowAbnormal(row)
-  return row
-}
-
-function parseRows(raw: unknown): Record<string, any>[] {
-  const source = Array.isArray(raw)
-    ? raw
-    : (raw && typeof raw === 'object' && Array.isArray((raw as any).rows) ? (raw as any).rows : [])
-  return source.map((r: any, i: number) => normalizeRow(r || {}, i))
-}
-
 function parseJson(raw: string | null | undefined): unknown {
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
@@ -621,7 +584,7 @@ function persistRows(): void {
   if (isReadonly.value) return
   for (const r of rows.value) r.isAbnormal = isRowAbnormal(r)
   auditFormData.debouncedSave(ROWS_KEY, {
-    conclusion: JSON.stringify(rows.value),
+    conclusion: JSON.stringify(voucherFill.rowsToPersist()),
     remark: null,
   })
 }
@@ -689,18 +652,6 @@ const lowRatioWarnings = computed(() =>
   checkRatios.value.filter(r => r.ratio != null && r.ratio < 0.3 && r.bookAmount > 0),
 )
 
-function isRowAbnormal(row: any): boolean {
-  if (!row.voucherNo && !parseNum(row.debitAmount) && !parseNum(row.creditAmount)) return false
-  return !(
-    row.check1Original
-    && row.check2Authorization
-    && row.check3Accounting
-    && row.check4Amount
-    && row.check5Classification
-    && row.check6InvestmentIncome
-  )
-}
-
 function handleRowChange(row: any) {
   if (row) {
     const idx = rows.value.findIndex(r => r.id === row.id)
@@ -718,12 +669,9 @@ function handleAddRow(): void {
   persistRows()
 }
 
+/** 删行（年审阶段预审行只读不可删） */
 function handleRemoveRow(id: string): void {
-  const idx = rows.value.findIndex(r => r.id === id)
-  if (idx < 0) return
-  rows.value.splice(idx, 1)
-  rows.value.forEach((r, i) => { r.seq = i + 1 })
-  persistRows()
+  voucherFill.removeRow(id)
 }
 
 const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
@@ -774,25 +722,19 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, auditYear.value, props.wpId, G7_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples })
+    if (samples.length > 0) await voucherFill.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: {
-  samples?: Array<{
-    summary?: string
-    amount?: number
-    debitAmount?: number
-    creditAmount?: number
-    voucherDate?: string
-    voucherNo?: string
-    counterAccount?: string
-  }>
-}): void {
+/**
+ * 抽凭引擎回填：共享回填函数一个对方科目一行（后端配对），按分录指纹去重，填完由它保存并提示填入几行；
+ * 「替换本阶段抽凭行」只删本阶段抽凭填入的行。原实现按凭证分录展开多科目凭证（行金额取对方分录）、不去重，已删除。
+ */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }): Promise<void> {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+  void persistMethodology(payload?.methodology)
 
   if (isReadonly.value) return
   const samples = payload.samples ?? []
@@ -800,56 +742,16 @@ function onSampleFilled(payload: {
     ElMessage.info('未收到抽凭样本')
     return
   }
-  for (const s of samples) {
-    const entries = (s as any).voucherEntries || []
-    const cpAccount = (s as any).counterpartAccount ?? s.counterAccount ?? ''
-    const isMulti = ((s as any).isMultiAccount || cpAccount === '多科目') && entries.length > 0
-    if (isMulti) {
-      const sDebit = parseNum(s.debitAmount ?? s.amount)
-      const counterEntries = entries.filter((e: any) =>
-        sDebit > 0 ? (e.credit_amount && Number(e.credit_amount) > 0) : (e.debit_amount && Number(e.debit_amount) > 0)
-      )
-      const toWrite = counterEntries.length > 0 ? counterEntries : entries
-      for (const e of toWrite) {
-        const row = createEmptyRow(rows.value.length + 1)
-        row.voucherDate = s.voucherDate || ''
-        row.voucherNo = s.voucherNo || ''
-        row.businessContent = e.summary || s.summary || ''
-        row.counterAccount = e.account_code || ''
-        row.debitAmount = Number(e.debit_amount) || 0
-        row.creditAmount = Number(e.credit_amount) || 0
-        row.source = '抽凭'
-        rows.value.push(row)
-      }
-    } else {
-      const row = createEmptyRow(rows.value.length + 1)
-      row.voucherDate = s.voucherDate || ''
-      row.voucherNo = s.voucherNo || ''
-      row.businessContent = s.summary || ''
-      row.counterAccount = cpAccount
-      const amt = parseNum(s.debitAmount ?? s.amount)
-      const credit = parseNum(s.creditAmount)
-    if (credit) {
-      row.creditAmount = credit
-      row.debitAmount = amt
-    } else {
-      row.debitAmount = amt
-      row.creditAmount = 0
-    }
-    row.source = '抽凭'
-    rows.value.push(row)
-    }
-  }
+  const out = await voucherFill.onEngineFilled(payload)
+  if (out.cancelled) return
   if (!criteria.value.representativeSize) {
     criteria.value.representativeSize = samples.length
     persistCriteria()
   }
-  persistRows()
-  ElMessage.success(`已回填 ${samples.length} 笔抽凭样本`)
 }
 
 async function handleOCR(row: Record<string, any>): Promise<void> {
-  if (isReadonly.value) return
+  if (isReadonly.value || voucherFill.isRowLocked(row)) return
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*,.pdf'
@@ -909,6 +811,7 @@ async function handleFileChange(ev: Event): Promise<void> {
     const saved = auditFormData.data.value.get(ROWS_KEY)
     const loaded = parseRows(parseJson(saved?.conclusion as string | undefined))
     rows.value = loaded.length ? loaded : rows.value
+    voucherFill.markLoaded()
     ElMessage.success(loaded.length ? '导入完成' : '导入完成，请核对行数据')
   } catch {
     ElMessage.error('导入失败')
@@ -921,6 +824,7 @@ function hydrateCriteria(raw: unknown): void {
 }
 
 onMounted(async () => {
+  void voucherFill.ready()
   await auditFormData.load()
   const n = auditFormData.data.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
@@ -946,6 +850,7 @@ onMounted(async () => {
     loaded = parseRows(props.htmlData?.voucherCheck?.rows ?? props.htmlData?.voucherCheck)
   }
   rows.value = loaded
+  voucherFill.markLoaded()
   loading.value = false
 })
 

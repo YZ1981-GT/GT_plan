@@ -12,6 +12,10 @@
       * 单项目结果（行不含 project_id）不被误删。
 
 _Requirements: 13.4, 13.5, 13.6, 13.7_
+
+advanced-query-linkage-closure 任务 24 改写（design §10.1）：可见性纯函数改用唯一判定 ``TemplateScopeAdapter.is_visible``
+（``template_service`` 自有的 ``_is_template_visible`` 已删除，ADR-AQL-11；本文件各用例的结论不变）；不可见的错误码
+``TEMPLATE_FORBIDDEN`` → ``TEMPLATE_NOT_VISIBLE``（R9.2 统一错误码）。
 """
 
 from __future__ import annotations
@@ -21,13 +25,15 @@ import uuid
 import pytest
 
 from app.services.custom_query.addressing_service import ResolvedTarget
+from app.services.custom_query.template_scope_adapter import TemplateScopeAdapter
 from app.services.custom_query.template_service import (
     StaleRef,
     TemplateExecutionResult,
     TemplateForbiddenError,
     TemplateService,
-    _is_template_visible,
 )
+
+_is_template_visible = TemplateScopeAdapter.is_visible
 
 
 # ─── 测试替身 ────────────────────────────────────────────────────────────────
@@ -225,7 +231,7 @@ async def test_assert_executable_raises_forbidden_when_not_visible():
     guard = _FakeGuard(accessible=set())
     with pytest.raises(TemplateForbiddenError) as exc:
         await svc.assert_executable(tpl, user=_FakeUser(uuid.uuid4()), db=None, guard=guard)
-    assert exc.value.error_code == "TEMPLATE_FORBIDDEN"
+    assert (exc.value.error_code, exc.value.message) == ("TEMPLATE_NOT_VISIBLE", "无权访问该模板")
 
 
 # ─── execute_template ────────────────────────────────────────────────────────

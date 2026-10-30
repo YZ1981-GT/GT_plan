@@ -479,6 +479,7 @@ const formData = useH3FormData({
   wpId: toRef(props, 'wpId') as any,
   projectId: toRef(props, 'projectId') as any,
   measurementModel: ref('cost') as any, // will be synced below
+  allResponses,
 })
 
 // ─── useH3MeasurementModel — 计量模式切换+持久化 ─────────────────────────────

@@ -25,7 +25,7 @@ vi.mock('element-plus', () => ({
 vi.mock('@/services/apiProxy', () => ({ api: { post: h.post } }))
 vi.mock('@/services/consolidationApi', () => ({ getDetailTemplateBindings: h.bindings }))
 
-import { pushConsolNoteTemplate, pushFailureLines } from '../composables/consolNoteTemplatePush'
+import { pushConsolNoteTemplate, pushFailureLines, pushIssueLines } from '../composables/consolNoteTemplatePush'
 
 const PID = 'p-1'
 
@@ -72,11 +72,10 @@ describe('pushConsolNoteTemplate', () => {
     expect(h.post).toHaveBeenCalledWith('/api/consolidation/notes/p-1/2024/push-template', {
       template_version_id: 'tv-1',
       section_ids: ['五-1'],
-      activate_lock: true,
-    })
+    }, { _silent: true })
     expect(busyDuringRequest).toBe(true)
     expect(busy.value).toBe(false)
-    expect(h.success).toHaveBeenCalledWith('下推成功：3 家子企业已生成行骨架')
+    expect(h.success).toHaveBeenCalledWith('下推成功：3 家子企业已按集团模板对齐行')
     expect(h.alert).not.toHaveBeenCalled()
   })
 
@@ -98,6 +97,41 @@ describe('pushConsolNoteTemplate', () => {
     expect(h.error).not.toHaveBeenCalled()
   })
 
+  it('只有跳过、没有失败：同样不报成功，弹窗写明跳过原因', async () => {
+    h.post.mockResolvedValue({
+      total_success: 1, total_failure: 0, total_skipped: 1,
+      results: [{ entities: [
+        { status: 'success', company_name: '甲' },
+        { status: 'skipped', company_name: '丁', reason: '子企业附注 八、1 由底稿披露表同步，行结构以底稿为准' },
+      ] }],
+    })
+    await pushConsolNoteTemplate(PID, 2025, '五-1', ref(false))
+    expect(h.success).not.toHaveBeenCalled()
+    expect(h.alert).toHaveBeenCalledWith(
+      '成功 1 家，跳过 1 家：\n丁：子企业附注 八、1 由底稿披露表同步，行结构以底稿为准', '下推结果', { type: 'warning' },
+    )
+  })
+
+  it('有跳过的企业：不报成功，弹窗写明跳过原因（失败在前）', async () => {
+    h.post.mockResolvedValue({
+      total_success: 1,
+      total_failure: 1,
+      total_skipped: 2,
+      results: [{ entities: [
+        { status: 'skipped', company_name: '丁', reason: '子企业附注未生成章节 八、1（先在子企业生成附注再下推）' },
+        { status: 'success', company_name: '甲' },
+        { status: 'skipped', node_key: 'n-9', reason: '权限不足' },
+        { status: 'failed', company_name: '乙', reason: '写入失败：x' },
+      ] }],
+    })
+    await pushConsolNoteTemplate(PID, 2025, '五-1', ref(false))
+    expect(h.success).not.toHaveBeenCalled()
+    expect(h.alert).toHaveBeenCalledWith(
+      '成功 1 家，跳过 2 家，失败 1 家：\n乙：写入失败：x\n丁：子企业附注未生成章节 八、1（先在子企业生成附注再下推）\nn-9：权限不足',
+      '下推结果', { type: 'warning' },
+    )
+  })
+
   it('请求失败：显示后端原因', async () => {
     h.post.mockRejectedValue({ response: { data: { message: '无编辑权限' } } })
     const busy = ref(false)
@@ -114,5 +148,13 @@ describe('pushFailureLines', () => {
       { status: 'success', company_name: '丙' },
     ] }] })).toBe('n-1：锁定中')
     expect(pushFailureLines(null)).toBe('')
+  })
+
+  it('pushIssueLines：失败在前、跳过在后，成功不列', () => {
+    expect(pushIssueLines({ results: [{ entities: [
+      { status: 'skipped', company_name: '甲', reason: '标为本期无此情形' },
+      { status: 'success', company_name: '乙' },
+      { status: 'failed', company_name: '丙', reason: '写入失败' },
+    ] }] })).toBe('丙：写入失败\n甲：标为本期无此情形')
   })
 })

@@ -178,6 +178,24 @@ export function buildM10SoeSyncPayload(
       end_value: m10EndValue(r),
     }))
 
+  if (dataRows.length === 0) {
+    if (!noteText?.trim()) return null
+    return {
+      wp_id: wpId,
+      sheet_name: M10_DISCLOSURE_SHEET_NAME.soe,
+      section_id: M10_NOTE_SECTION.soe,
+      current_standard: 'soe_standalone',
+      sub_table_data: {
+        _note_texts: [{
+          section: 'm10-soe-note',
+          title: '其他权益工具说明',
+          text: noteText.trim(),
+        }],
+      } as any,
+      columns: {},
+    }
+  }
+
   // 合计行
   const total: Record<string, unknown> = {
     label: '合计',
@@ -265,7 +283,7 @@ export function buildM10ListedSyncPayload(
     end_value: movement.reduce((s, r) => s + num(r.end_value), 0),
     is_total: true,
   }
-  movement.push(mvTotal)
+  if (movement.length > 0) movement.push(mvTotal)
 
   // 表3：持有者信息
   const holders: Record<string, unknown>[] = holdersRows
@@ -276,10 +294,19 @@ export function buildM10ListedSyncPayload(
       prior: num(r.prior),
     }))
 
-  const sub: Record<string, unknown> = {
-    [M10_LISTED_SUBTABLE.basic]: basic,
-    [M10_LISTED_SUBTABLE.movement]: movement,
-    [M10_LISTED_SUBTABLE.holders]: holders,
+  const sub: Record<string, unknown> = {}
+  const columns: Record<string, ColumnDef[]> = {}
+  if (basic.length > 0) {
+    sub[M10_LISTED_SUBTABLE.basic] = basic
+    columns[M10_LISTED_SUBTABLE.basic] = buildM10ListedBasicColumns()
+  }
+  if (movement.length > 0) {
+    sub[M10_LISTED_SUBTABLE.movement] = movement
+    columns[M10_LISTED_SUBTABLE.movement] = buildM10MovementColumns()
+  }
+  if (holders.length > 0) {
+    sub[M10_LISTED_SUBTABLE.holders] = holders
+    columns[M10_LISTED_SUBTABLE.holders] = buildM10HoldersColumns()
   }
   if (noteText?.trim()) {
     ;(sub as any)._note_texts = [{
@@ -288,6 +315,7 @@ export function buildM10ListedSyncPayload(
       text: noteText.trim(),
     }]
   }
+  if (Object.keys(sub).length === 0) return null
 
   return {
     wp_id: wpId,
@@ -295,6 +323,6 @@ export function buildM10ListedSyncPayload(
     section_id: M10_NOTE_SECTION.listed,
     current_standard: 'listed_standalone',
     sub_table_data: sub as Record<string, Record<string, unknown>[]>,
-    columns: buildM10ListedColumns(),
+    columns,
   }
 }

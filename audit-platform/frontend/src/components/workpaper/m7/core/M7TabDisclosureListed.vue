@@ -128,7 +128,15 @@ import { useM7FormData } from '../../composables/useM7FormData'
 import { useNoteAutoFill } from '../../composables/useNoteAutoFill'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import {
+  applyM7AutoFill,
+  buildM7TabSyncPayload,
+  createM7ListedDisclosureRows,
+  M7_AUTO_FILL_SOURCES,
+  restoreM7Disclosure,
+  type M7ListedDisclosureRow,
+} from '../../composables/mEquityDisclosureForm'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 import { M_CYCLE_ACCOUNT } from '../../composables/mCycleAccountScope'
@@ -155,21 +163,10 @@ const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: co
 const lastRefreshTime = ref('')
 const disclosureNote = ref('')
 
-interface DisclosureRow {
-  item: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  reason: string
-}
+// 默认行 / 读回 / 取数应用 / 同步快照与附注页离屏同步共用 mEquityDisclosureForm（spec note-pull-followup-closure R1）
+type DisclosureRow = M7ListedDisclosureRow
 
-const disclosureRows = ref<DisclosureRow[]>([
-  { item: '安全生产费', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, reason: '' },
-  { item: '维简费', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, reason: '' },
-  { item: '其他专项储备', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, reason: '' },
-  { item: '合  计', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, reason: '' },
-])
+const disclosureRows = ref<DisclosureRow[]>(createM7ListedDisclosureRows())
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtAmount(val: number): string {
@@ -188,20 +185,11 @@ function parseNum(v: any): number {
 // 经 crossWpEventBridge，任一传输通道的 4301 审定事件都能命中；reload 先拉最新再取数。
 const autoFill = useNoteAutoFill({
   allResponses: computed(() => formData.allResponses.value) as any,
-  sources: {
-    safety: 'M7-1-safety-subtotal',
-    maintenance: 'M7-1-maintenance-subtotal',
-    other: 'M7-1-other-subtotal',
-    total: 'M7-1-total-audited',
-  },
+  sources: M7_AUTO_FILL_SOURCES,
   accountCodes: [M_CYCLE_ACCOUNT.M7.code],
   reload: () => formData.loadData(),
   onRefresh: (v) => {
-    if ((v.total ?? 0) !== 0 || (v.safety ?? 0) !== 0) {
-      disclosureRows.value[0].endBalance = v.safety ?? 0
-      disclosureRows.value[1].endBalance = v.maintenance ?? 0
-      disclosureRows.value[2].endBalance = v.other ?? 0
-      disclosureRows.value[3].endBalance = v.total ?? 0
+    if (applyM7AutoFill(disclosureRows.value, v)) {
       lastRefreshTime.value = autoFill.lastRefreshAt.value
       autoSync.scheduleAutoSync(syncToDisclosureNotes)
     }
@@ -224,18 +212,7 @@ function saveDisclosureNote(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildMEquitySyncPayload(props.wpId, {
-    cycle: 'M7',
-    variant: 'listed',
-    rows: disclosureRows.value.map((r) => ({
-      label: r.item,
-      begin: Number(r.beginBalance) || 0,
-      increase: Number(r.increase) || 0,
-      decrease: Number(r.decrease) || 0,
-      end: Number(r.endBalance) || 0,
-    })),
-    note: disclosureNote.value?.trim() || undefined,
-  })
+  const payload = buildM7TabSyncPayload(props.wpId, 'listed', disclosureRows.value, disclosureNote.value)
   if (!payload) {
     ElMessage.warning('当前项目准则不适用上市附注同步')
     return
@@ -286,15 +263,9 @@ function handleReview(): void { openReviewDialog?.('M7-disclosure-listed', '附�
 onMounted(async () => {
   await formData.loadData()
 
-  // 恢复已保存的披露说明
-  const noteResp = formData.allResponses.value.get('M7-disclosure-listed-note')
-  if (noteResp?.remark) disclosureNote.value = noteResp.remark
-
-  // 恢复行原因
-  disclosureRows.value.forEach((row, i) => {
-    const resp = formData.allResponses.value.get(`M7-disclosure-listed-row-${i}-reason`)
-    if (resp?.remark) row.reason = resp.remark
-  })
+  // 恢复已保存的披露说明与行原因
+  const note = restoreM7Disclosure(formData.allResponses.value, 'listed', disclosureRows.value)
+  if (note != null) disclosureNote.value = note
 
   // 数据加载后从审定数据取数刷新（SDK 的初始 pull 在 loadData 前，故此处再 pull 一次）
   autoFill.pull()

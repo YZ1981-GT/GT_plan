@@ -341,10 +341,15 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     return wrapper
   }
 
-  it('初始年度不是日历当年（审计做上一年度，当年在四表里没有数据）', async () => {
+  // advanced-query-linkage-closure 任务 29（R10.2）：原先这里断言初始年度 =「今年 − 1」——那条兜底本身就是猜年度
+  // （猜错即静默查别的年度），旧断言固化的是被修掉的行为。现在没选项目 / 项目没有审计年度时年度留空、执行不可用。
+  it('初始年度为空（不按日历年推算），执行查询不可用并提示选择年度', async () => {
     const wrapper = await mountTabWithProjects([])
-    expect(wrapper.vm.formCtx.year).not.toBe(new Date().getFullYear())
-    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+    expect(wrapper.vm.formCtx.year).toBeNull()
+    wrapper.vm.formCtx.project_id = 'p-any'
+    wrapper.vm.formCtx.source = 'tb_detail'
+    await flushPromises()
+    expect(wrapper.vm.executeBlockedReason).toBe('请选择审计年度')
   })
 
   it('选中项目后年度跟随该项目的 audit_year', async () => {
@@ -359,12 +364,20 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     expect(wrapper.vm.formCtx.year).toBe(2023)
   })
 
-  it('项目没有 audit_year 时退回「当年 - 1」，不退回日历当年', async () => {
+  it('项目没有 audit_year 时年度留空（不退回「今年 − 1」，也不粘住上一个项目的年度），且不发查询', async () => {
     const wrapper = await mountTabWithProjects([
-      { id: 'p-null', name: '无年度项目', audit_year: null, can_edit: true },
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025 },
+      { id: 'p-null', name: '无年度项目', audit_year: null },
     ])
+    wrapper.vm.onProjectChange('p-2025')
+    expect(wrapper.vm.formCtx.year).toBe(2025)
+    wrapper.vm.formCtx.project_id = 'p-null'
     wrapper.vm.onProjectChange('p-null')
-    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+    expect(wrapper.vm.formCtx.year).toBeNull()
+    wrapper.vm.formCtx.source = 'tb_detail'
+    apiMocks.post.mockClear()
+    await wrapper.vm.onExecute()
+    expect(apiMocks.post.mock.calls.filter(([url]: any[]) => String(url).includes('execute'))).toHaveLength(0)
   })
 
   it('列表加载完成时会把已选项目的年度对齐（模板恢复场景）', async () => {
@@ -399,6 +412,7 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
     wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
     wrapper.vm.formCtx.source = 'tb_detail'
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
     await wrapper.vm.onExecute()
@@ -417,6 +431,7 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
     wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
     apiMocks.post.mockClear()
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
     for (const source of ['report_lines', 'report_income_statement']) {

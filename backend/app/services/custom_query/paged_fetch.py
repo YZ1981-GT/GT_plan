@@ -207,6 +207,15 @@ def _column_meta(display: Sequence[SourceColumn]) -> list[ColumnMeta]:
     return [ColumnMeta(key=c.key, title=c.key, dtype=c.dtype) for c in display]
 
 
+async def _page_meta(ctx: FetchContext, display: Sequence[SourceColumn]) -> dict[str, Any]:
+    """响应 ``meta``：引用校验上下文（ADR-AQL-18）+ 显示列的类型 ``column_types``（列键 → number / text / date / bool）。
+
+    ``columns`` 仍是字符串数组（N3 不变），前端金额格式化按这里的类型判定（任务 28 / 29：原先按字符串长度猜，
+    十亿以上带两位小数的金额不加千分位）。
+    """
+    return {"ref_context": await ref_context(ctx), "column_types": {c.key: c.dtype for c in display}}
+
+
 async def _count(ctx: FetchContext, stmt: Select) -> int:
     return int((await ctx.db.execute(sa.select(sa.func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())
 
@@ -235,7 +244,7 @@ async def page(
         total = await _count(ctx, stmt)
         rows = _rows(await ctx.db.execute(stmt.order_by(*order).limit(limit).offset(offset)))
         warnings = await spec.warn(ctx) if spec.warn else []
-        meta = {"ref_context": await ref_context(ctx)}
+        meta = await _page_meta(ctx, display)
     return FetchPage(rows=rows, columns=_column_meta(display), total=total, paged=True, meta=meta, warnings=warnings)
 
 
@@ -260,7 +269,7 @@ async def all_rows(
             )
         rows = _rows(await ctx.db.execute(stmt.order_by(*_order_by(spec, ()))))
         warnings = await spec.warn(ctx) if spec.warn else []
-        meta = {"ref_context": await ref_context(ctx)}
+        meta = await _page_meta(ctx, display)
     return FetchPage(rows=rows, columns=_column_meta(display), total=len(rows), paged=False, meta=meta, warnings=warnings)
 
 

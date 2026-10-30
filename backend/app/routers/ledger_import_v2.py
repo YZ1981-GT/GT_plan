@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -73,18 +73,21 @@ class SubmitRequest(BaseModel):
         False,
         description="规模警告强制继续（detect 返回 scale_warnings 时必填 true）",
     )
-    # S7-9: 增量追加模式
     incremental: bool = Field(
         False,
-        description="S7-9 增量追加模式：true 时 submit 前按 overlap_strategy 清理旧数据",
+        description="增量追加：新 staged 继承基准版本的未覆盖月份",
     )
-    overlap_strategy: str = Field(
+    overlap_strategy: Literal["skip", "overwrite"] = Field(
         "skip",
-        description="增量追加重叠月份策略（skip=跳过 / overwrite=覆盖），仅 incremental=true 时生效",
+        description="重叠月份策略（skip=保留基准 / overwrite=使用文件）",
     )
     file_periods: Optional[list[int]] = Field(
         None,
-        description="文件包含的月份列表（incremental+overwrite 时必填，用于精确清理）",
+        description="兼容旧客户端；实际月份由 staged 数据现算，不信任此字段",
+    )
+    balance_carry_confirmed: bool = Field(
+        False,
+        description="确认新增月份时余额表可能沿用上一版本口径",
     )
 
 
@@ -226,8 +229,8 @@ async def submit_import(
 ):
     """Accept confirmed mappings, create ImportJob, return job info.
 
-    S7-9: 支持 incremental 模式——submit 前自动按 overlap_strategy 清理旧数据，
-    用户无需先调 /incremental/apply 再上传（一步到位）。
+    增量模式只冻结当前 active 作为基准；文件写入新 staged 后由共享合并服务继承月份，
+    不触碰当前 active 数据。
 
     F42 / design D30：detect 阶段产生 ``scale_warnings`` 时必须在前端点"强制
     继续"后以 ``force_submit=True`` 重发；否则此端点返回 400 + 错误码
@@ -283,22 +286,7 @@ async def submit_import(
                 },
             )
 
-    # S7-9: 增量追加模式——submit 前清理旧月份
-    if body.incremental and body.overlap_strategy == "overwrite":
-        if not body.file_periods:
-            raise HTTPException(
-                status_code=400,
-                detail="incremental+overwrite 模式必须提供 file_periods",
-            )
-        from app.services.ledger_data_service import apply_incremental
-        await apply_incremental(
-            db,
-            project_id=project_id,
-            year=body.year,
-            file_periods=body.file_periods,
-            overlap_strategy="overwrite",
-        )
-        # apply_incremental 内部已 commit
+    # 增量模式只冻结基准并写入作业 options；任何删除都只能发生在新 staged 内。
 
     try:
         result = await ImportOrchestrator.submit(
@@ -312,6 +300,8 @@ async def submit_import(
             force_activate=body.force_activate,
             created_by=current_user.id,
             adapter_id=body.adapter_id,
+            append_strategy=body.overlap_strategy if body.incremental else None,
+            balance_carry_confirmed=body.balance_carry_confirmed,
         )
     except ValueError as exc:
         # 并发护栏：同 project+year 已有进行中作业 → 409 冲突

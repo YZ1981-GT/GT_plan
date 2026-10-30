@@ -2,7 +2,7 @@
  * useF3DisclosureSoe — F3 附注披露（国企）
  * Spec: .kiro/specs/f3-notes-payable/ Task 9.2
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { calcSubtotal, parseNum } from './useF3FormulaEngine'
 import { buildF3DisclosureClassRows } from './useF3CrossSheet'
 import type { ChecklistResponse } from './useF3FormData'
@@ -133,7 +133,8 @@ export function useF3DisclosureSoe(options: {
     debounceSave()
   }
 
-  onBeforeUnmount(() => {
+  // 作用域销毁时清理（组件卸载与附注页离屏同步都会走到；onBeforeUnmount 在离屏时不注册 ⇒ 窗口监听泄漏）
+  onScopeDispose(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
     window.removeEventListener('substantive:adjudicated', adjudicatedHandler)
   })

@@ -15,7 +15,6 @@ export {
 
 export {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
-  consolNoteReuse,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,

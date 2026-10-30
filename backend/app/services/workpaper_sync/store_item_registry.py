@@ -55,6 +55,23 @@ from app.services.workpaper_sync.store_item_specs import (  # noqa: F401
     default_payload_for,
 )
 
+_OO_CRASH_FN: Final[str] = "neutralize_oo_crash_if_formulas"
+
+
+def _row_plans(
+    rows: tuple[tuple[str, str, str], ...], *, neutralize: bool
+) -> dict[str, StoreMergePlan]:
+    """同构的单 rows item 注册项；元组顺序即注册表顺序。"""
+    return {
+        adapter_id: StoreMergePlan(
+            adapter_id=adapter_id,
+            provider_module=provider,
+            items=(StoreItemSpec(item_id=item_id, kind=StoreKind.rows),),
+            oo_crash_neutralization_fn=_OO_CRASH_FN if neutralize else None,
+        )
+        for adapter_id, provider, item_id in rows
+    }
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 注册表本体 —— O(1) dict。新接一张底稿只在这里加一条，不改通用回写层。
 #
@@ -478,10 +495,14 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── G6-sppi（spec: g4-g6-shared-workbook-three-entry-lanes · Task 14）──
+    # 🔴 G6-5 前端 store 是 `{rows, conclusion}` 对象（存 conclusion 列）⇒ 回写走 state 分支只换行数组，
+    #    外壳与 conclusion 键原样保留（spec oo-writeback-template-parity-closure R3 批 B3；原按行数组登记、
+    #    provider 的 STORE_ITEM_ID 还写成 G6-2-rows ⇒ 两个方向都没接上）。
     "g6.other_bond_main": StoreMergePlan(
         adapter_id="g6.other_bond_main",
         provider_module="phase5_g6_other_bond",
-        items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.rows),),
+        merge_state_fn="merge_projection_into_store_state",
+        items=(StoreItemSpec(item_id="G6-5-fair-value-data", kind=StoreKind.dict),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     # ── G5（spec: g5-nested-sections-and-template-defects · Task 8）──
@@ -894,41 +915,23 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         items=(StoreItemSpec(item_id="I6-2-detail-rows", kind=StoreKind.rows),),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
-    # ── K2~K7 调整分录汇总（与 K8~K13 同构，共享内核 phase5_k_adjustment_summary）──
-    #
-    # K2~K7 的调整分录汇总 sheet 结构与 K8~K13 完全同构（R5 十列 A..J、json_keys 相同），
-    # 差异仅在科目名/行数。6 册**全部零裸 IF** ⇒ 不需要 oo_crash_neutralization_fn。
-    # K5 的 store_item_id 是 `K5-3-entries`（不是 `K5-3-adj-entries`），与前端 K5TabAdjustment.vue 一致。
-    "k2.other_current_assets_adjustment": StoreMergePlan(
-        adapter_id="k2.other_current_assets_adjustment",
-        provider_module="phase5_k2_other_current_assets",
-        items=(StoreItemSpec(item_id="K2-3-adj-entries", kind=StoreKind.rows),),
-    ),
-    "k3.other_payables_adjustment": StoreMergePlan(
-        adapter_id="k3.other_payables_adjustment",
-        provider_module="phase5_k3_other_payables",
-        items=(StoreItemSpec(item_id="K3-3-adj-entries", kind=StoreKind.rows),),
-    ),
-    "k4.other_current_liabilities_adjustment": StoreMergePlan(
-        adapter_id="k4.other_current_liabilities_adjustment",
-        provider_module="phase5_k4_other_current_liabilities",
-        items=(StoreItemSpec(item_id="K4-3-adj-entries", kind=StoreKind.rows),),
-    ),
-    "k5.provisions_adjustment": StoreMergePlan(
-        adapter_id="k5.provisions_adjustment",
-        provider_module="phase5_k5_provisions",
-        items=(StoreItemSpec(item_id="K5-3-entries", kind=StoreKind.rows),),
-    ),
-    "k6.held_for_sale_adjustment": StoreMergePlan(
-        adapter_id="k6.held_for_sale_adjustment",
-        provider_module="phase5_k6_held_for_sale",
-        items=(StoreItemSpec(item_id="K6-3-adj-entries", kind=StoreKind.rows),),
-    ),
-    "k7.deferred_income_adjustment": StoreMergePlan(
-        adapter_id="k7.deferred_income_adjustment",
-        provider_module="phase5_k7_deferred_income",
-        items=(StoreItemSpec(item_id="K7-3-adj-entries", kind=StoreKind.rows),),
-    ),
+    # ── K2~K7 调整分录汇总（与 K8~K13 同构，零裸 IF；K5 item 是 K5-3-entries）──
+    **_row_plans((
+        ("k2.other_current_assets_adjustment", "phase5_k2_other_current_assets", "K2-3-adj-entries"),
+        ("k3.other_payables_adjustment", "phase5_k3_other_payables", "K3-3-adj-entries"),
+        ("k4.other_current_liabilities_adjustment", "phase5_k4_other_current_liabilities", "K4-3-adj-entries"),
+        ("k5.provisions_adjustment", "phase5_k5_provisions", "K5-3-entries"),
+        ("k6.held_for_sale_adjustment", "phase5_k6_held_for_sale", "K6-3-adj-entries"),
+        ("k7.deferred_income_adjustment", "phase5_k7_deferred_income", "K7-3-adj-entries"),
+    ), neutralize=False),
+    # ── N 循环五条（spec oo-writeback-template-parity-closure R3 批 C，per-file 中性化）──
+    **_row_plans((
+        ("n1.deferred_tax_assets", "phase5_n1_deferred_tax_assets", "N1-2-detail-rows"),
+        ("n2.taxes_payable", "phase5_n2_taxes_payable", "N2-2-detail-rows"),
+        ("n3.deferred_tax_liabilities", "phase5_n3_deferred_tax_liabilities", "N3-2-rows"),
+        ("n4.taxes_and_surcharges", "phase5_n4_taxes_and_surcharges", "N4-2-detail-rows"),
+        ("n5.income_tax_expense", "phase5_n5_income_tax_expense", "N5-2-rows"),
+    ), neutralize=True),
 }
 
 

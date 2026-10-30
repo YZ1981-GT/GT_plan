@@ -56,31 +56,50 @@ def _load_registry_entries() -> tuple[dict[str, Any], ...]:
         return ()
 
 
+def registry_sections(entry: dict[str, Any], variant: str) -> tuple[str, ...]:
+    """返回注册项在某准则下的全部章节，主章节在前，复数章节稳定去重。
+
+    ``listed_sections`` / ``soe_sections`` 是同一底稿额外写入的章节（如 G1 衍生金融资产、
+    G10 衍生金融负债）。所有注册表消费者必须经本函数取章节，避免单章刷新、stale 与
+    跳转状态只认主章节。
+    """
+    values: list[str] = []
+    primary = entry.get(variant)
+    if isinstance(primary, str) and primary.strip():
+        values.append(primary.strip())
+    nested = entry.get(f"{variant}_sections")
+    if isinstance(nested, dict):
+        for value in nested.values():
+            if isinstance(value, str) and value.strip():
+                values.append(value.strip())
+    return tuple(dict.fromkeys(values))
+
+
 def section_workpaper_map() -> dict[str, list[str]]:
-    """``note_section → [wp_code]``（listed 与 soe 章节各自成键，可一对多）。"""
+    """``note_section → [wp_code]``（主章节与复数章节同等纳入，可一对多）。"""
     out: dict[str, list[str]] = {}
     for e in _load_registry_entries():
         code = str(e.get("wp_code") or "").strip()
         if not code:
             continue
-        for key in ("listed", "soe"):
-            sec = e.get(key)
-            if isinstance(sec, str) and sec.strip():
-                out.setdefault(sec.strip(), [])
-                if code not in out[sec.strip()]:
-                    out[sec.strip()].append(code)
+        for variant in ("listed", "soe"):
+            for sec in registry_sections(e, variant):
+                out.setdefault(sec, [])
+                if code not in out[sec]:
+                    out[sec].append(code)
     return out
 
 
 def section_sheet_map() -> dict[str, str]:
-    """``note_section → 底稿披露 sheet 真实 tab 名``（缺失则不登记，供跳转带 ?sheet=）。"""
+    """``note_section → 底稿披露 sheet``；复数章节沿用该准则的同一披露 sheet。"""
     out: dict[str, str] = {}
     for e in _load_registry_entries():
-        for sec_key, sheet_key in (("listed", "sheet_listed"), ("soe", "sheet_soe")):
-            sec = e.get(sec_key)
+        for variant, sheet_key in (("listed", "sheet_listed"), ("soe", "sheet_soe")):
             sheet = e.get(sheet_key)
-            if isinstance(sec, str) and sec.strip() and isinstance(sheet, str) and sheet.strip():
-                out.setdefault(sec.strip(), sheet.strip())
+            if not isinstance(sheet, str) or not sheet.strip():
+                continue
+            for sec in registry_sections(e, variant):
+                out.setdefault(sec, sheet.strip())
     return out
 
 

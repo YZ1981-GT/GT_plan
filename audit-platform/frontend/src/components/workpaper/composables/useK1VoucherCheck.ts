@@ -10,11 +10,19 @@
  *
  * 纯函数 + ref 状态，持久化由组件层 emit('save') 负责。
  * 数据打包为单一 JSON 存 checklist_responses（item_id: K1-12-voucher-check）。
+ *
+ * J1-8、K2-6、K3-7、K4-4、K5-7、K7-5、K8-8、K9-8、M1-6、M2-5、N2 的凭证检查表也用它。抽凭回填 / 挂凭导入 / 撤销 /
+ * 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：本期发生额、期后两张表（加宿主自管的表，如 J1 期后支付），
+ * 回填进哪张由宿主自己选（不再借引擎的 phase 传「本期 / 期后」），一个对方科目一行（后端配对），按分录指纹去重，
+ * 行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 13）。
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { isK1RelatedPartyMarked } from './useK1RelatedParty'
 import { partyNameForColumn } from './shared/samplingPartyTarget'
-import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
+import {
+  metaOf, useVoucherCheckFill, withRowMeta,
+  type EngineFilledPayload, type FillSample, type PreparedItem,
+} from './shared/voucherCheckFill'
 
 // ─── 源模板五项核对（对齐 K1-12 Excel R13 测试内容说明）────────────────────────
 export const K1_VOUCHER_CHECK_LABELS = [
@@ -111,6 +119,53 @@ function emptyRow(seq: number): K1VoucherRow {
     supportingDoc: '', checks: [false, false, false, false, false],
     indexNo: '', abnormal: false, remark: '',
   }
+}
+
+/**
+ * 共享回填函数的待写入项 → 凭证检查行：一个对方科目一行（后端配对），金额在样本自己的借贷栏，对方科目 = 编码、
+ * 对方明细 = 名称（配不上写「多科目」）。原实现经 expandMultiAccountVouchers 展开（把对方分录的金额写进样本行）、
+ * 按凭证号去重（同号的另一条分录被丢掉），已删除。
+ */
+export function mapPreparedToK1VoucherRow(item: PreparedItem): K1VoucherRow {
+  const s = item.sample as PreparedItem['sample'] & {
+    summary?: string | null; selectionReason?: string | null; remark?: string | null
+    abnormal?: boolean | null; supportingDoc?: string | null; debtorName?: string | null
+  }
+  const code = item.counterpartAccount
+  const name = item.counterpartAccountName
+  return {
+    ...emptyRow(0),
+    debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
+    date: s.voucherDate || '',
+    voucherNo: s.voucherNo || '',
+    businessContent: s.summary || '',
+    offsetAccount: code,
+    offsetSubAccount: name && name !== code ? name : '',
+    debitAmount: Number(item.debitAmount ?? 0) || 0,
+    creditAmount: Number(item.creditAmount ?? 0) || 0,
+    supportingDoc: s.supportingDoc || '',
+    abnormal: !!s.abnormal,
+    remark: s.selectionReason || s.remark || '',
+  }
+}
+
+function hasFilledLeaf(v: unknown): boolean {
+  if (v == null) return false
+  if (typeof v === 'object') return Object.values(v as Record<string, unknown>).some(hasFilledLeaf)
+  if (typeof v === 'number') return v !== 0
+  return String(v).trim() !== ''
+}
+
+/**
+ * 行上已勾核对项，或已填支持性文件、索引号、OCR 附件、证据（J1 卡片的三类单据）——替换与撤销抽凭时据此先确认；
+ * 备注缺省是选样原因，不算
+ */
+export function hasK1VoucherContent(r: K1VoucherRow): boolean {
+  const ext = r as K1VoucherRow & { attachments?: Record<string, unknown> | null; evidence?: unknown }
+  return r.checks.some(Boolean)
+    || [r.supportingDoc, r.indexNo, r.ocrAttachment].some(v => String(v ?? '').trim() !== '')
+    || Object.keys(ext.attachments ?? {}).length > 0
+    || hasFilledLeaf(ext.evidence)
 }
 
 function emptyCriteria(): K1SampleCriteria {
@@ -287,6 +342,17 @@ export function useK1VoucherCheck(opts: {
   itemId?: string
   /** 可选：覆盖 5 项核对标签（如 K9 管理费用第⑤项应为「费用分类正确」而非 K1 的「债务人核对」） */
   checkLabels?: readonly string[]
+  /** 项目 id（抽凭回填按项目当前审计阶段标行阶段，年审阶段预审行只读） */
+  projectId?: MaybeRefOrGetter<string | null | undefined>
+  readonly?: MaybeRefOrGetter<boolean | undefined>
+  /** 回填 / 撤销改完行之后保存（宿主的 persist） */
+  persist?: () => unknown
+  /** 审计期末日（YYYY-MM-DD）：有期后表的宿主传，挂凭导入凭证日期在其后的进期后表；不传则一律进本期发生额 */
+  periodEnd?: MaybeRefOrGetter<string | null | undefined>
+  /** 宿主自管的其他表（J1 期后支付）：与本期 / 期后两张表一起去重、撤销、年审阶段只读 */
+  extraTables?: Record<string, Ref<K1VoucherRow[]>>
+  /** 挂凭导入的分表规则（缺省按 periodEnd 分本期 / 期后；J1 按借贷栏与日期分三区） */
+  attachTableOf?: (item: PreparedItem) => string
 }) {
   const itemId = opts.itemId ?? 'K1-12-voucher-check'
 
@@ -304,8 +370,45 @@ export function useK1VoucherCheck(opts: {
     ? [...opts.checkLabels]
     : CHECK_LABELS
 
+  // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读：共享回填函数（本期发生额、期后两张表，加宿主自管的表）
+  const voucherTables: Record<string, Ref<K1VoucherRow[]>> = {
+    occurrence: occurrenceRows, post: postCollectionRows, ...(opts.extraTables ?? {}),
+  }
+  /** 已在某张表的分录（按指纹）：再次回填 / 挂凭导入仍进那张表 */
+  function tableHolding(lfp: string | null): string | null {
+    if (!lfp) return null
+    for (const [key, rows] of Object.entries(voucherTables)) {
+      if (rows.value.some(r => metaOf(r)?.lfp === lfp)) return key
+    }
+    return null
+  }
+  const voucherFill = useVoucherCheckFill<K1VoucherRow>({
+    projectId: opts.projectId ?? null,
+    tables: voucherTables,
+    tableOf: (item) => {
+      const held = tableHolding(item.meta.lfp)
+      if (held || !item.meta.src.includes('attach')) return held
+      if (opts.attachTableOf) return opts.attachTableOf(item)
+      // 挂凭导入没有所选的表：有期后表的宿主按凭证日期分（期末之后进期后），其余进本期发生额
+      const end = toValue(opts.periodEnd) || ''
+      return end && String(item.sample.voucherDate ?? '') > end ? 'post' : 'occurrence'
+    },
+    mapSampleToRow: (item) => mapPreparedToK1VoucherRow(item),
+    persist: () => opts.persist?.(),
+    hasUserContent: hasK1VoucherContent,
+    readonly: () => Boolean(toValue(opts.readonly)),
+  })
+
   // ─── 加载 ────────────────────────────────────────────────────────────────────
   function load(): void {
+    try {
+      loadStored()
+    } finally {
+      // 记下预审行的读入版本（年审阶段保存时据此写回）；宿主自管的表须在 load 之前读好
+      voucherFill.markLoaded()
+    }
+  }
+  function loadStored(): void {
     const stored = opts.allResponses.value.get(itemId)
     const raw = stored?.remark ?? stored?.value
     if (!raw) return
@@ -325,7 +428,7 @@ export function useK1VoucherCheck(opts: {
 
   function normalizeRow(r: any): K1VoucherRow {
     const base = emptyRow(0)
-    return {
+    return withRowMeta({
       ...base,
       ...r,
       checks: Array.isArray(r?.checks) && r.checks.length === 5
@@ -333,16 +436,21 @@ export function useK1VoucherCheck(opts: {
         : [false, false, false, false, false],
       debitAmount: Number(r?.debitAmount ?? 0),
       creditAmount: Number(r?.creditAmount ?? 0),
-    }
+    }, r)
   }
 
   // ─── 行操作 ──────────────────────────────────────────────────────────────────
   function addOccurrenceRow(): void { occurrenceRows.value.push(emptyRow(occurrenceRows.value.length)) }
   function addPostCollectionRow(): void { postCollectionRows.value.push(emptyRow(postCollectionRows.value.length)) }
-  function removeOccurrenceRow(id: string): void { occurrenceRows.value = occurrenceRows.value.filter(r => r.id !== id) }
-  function removePostCollectionRow(id: string): void { postCollectionRows.value = postCollectionRows.value.filter(r => r.id !== id) }
+  /** 删行：年审阶段的预审行不删 */
+  function removeOccurrenceRow(id: string): void {
+    occurrenceRows.value = occurrenceRows.value.filter(r => r.id !== id || voucherFill.isRowLocked(r))
+  }
+  function removePostCollectionRow(id: string): void {
+    postCollectionRows.value = postCollectionRows.value.filter(r => r.id !== id || voucherFill.isRowLocked(r))
+  }
 
-  /** 弹窗/卡片回写：按 id 合并 patch */
+  /** 弹窗/卡片回写：按 id 合并 patch（年审阶段的预审行不改） */
   function updateVoucherRow(
     target: 'occurrence' | 'post',
     id: string,
@@ -352,6 +460,7 @@ export function useK1VoucherCheck(opts: {
     const idx = list.value.findIndex((r) => r.id === id)
     if (idx < 0) return false
     const prev = list.value[idx]
+    if (voucherFill.isRowLocked(prev)) return false
     const next: K1VoucherRow = {
       ...prev,
       ...patch,
@@ -364,30 +473,17 @@ export function useK1VoucherCheck(opts: {
     return true
   }
 
-  /** 抽凭引擎回填：把样本映射为凭证检查行 */
-  function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
-    const expanded = expandMultiAccountVouchers(samples)
-    const mapped: K1VoucherRow[] = expanded.map((s, i) => ({
-      ...emptyRow(i),
-      debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
-      date: s.voucherDate ?? s.date ?? '',
-      voucherNo: s.voucherNo ?? '',
-      businessContent: s.summary ?? s.businessContent ?? '',
-      offsetAccount: s.counterpartAccount ?? s.offsetAccount ?? '',
-      offsetSubAccount: s.counterpartAccountName ?? s.counterpartSubAccount ?? s.offsetSubAccount ?? '',
-      debitAmount: Number(s.debitAmount ?? 0),
-      creditAmount: Number(s.creditAmount ?? 0),
-      supportingDoc: s.supportingDoc ?? '',
-      abnormal: !!s.abnormal,
-      remark: s.selectionReason ?? s.remark ?? '',
-    }))
-    if (target === 'occurrence') {
-      const existing = new Set(occurrenceRows.value.map(r => r.voucherNo).filter(Boolean))
-      occurrenceRows.value.push(...mapped.filter(r => !r.voucherNo || !existing.has(r.voucherNo)))
-    } else {
-      const existing = new Set(postCollectionRows.value.map(r => r.voucherNo).filter(Boolean))
-      postCollectionRows.value.push(...mapped.filter(r => !r.voucherNo || !existing.has(r.voucherNo)))
-    }
+  /**
+   * 抽凭引擎回填进宿主所选的表（本期发生额 `occurrence` / 期后 `post` / 宿主自管的表）：一个对方科目一行，
+   * 按分录指纹去重，「替换本阶段抽凭行」只动所选的表；填完由共享函数保存并提示填入几行。
+   */
+  function onEngineFilled(payload: EngineFilledPayload, target: string = 'occurrence') {
+    return voucherFill.onEngineFilled(payload, { tables: [target] })
+  }
+
+  /** 从序时账挂入导入：幂等追加（已在某张表的分录留在原处，其余按 periodEnd / attachTableOf 分表） */
+  function onAttachImported(samples: FillSample[]) {
+    return voucherFill.onAttachImported(samples)
   }
 
   /** 从 K1-1/K1-2 带入账面发生额与期末余额（对齐 Excel E61–E63 公式） */
@@ -505,8 +601,8 @@ export function useK1VoucherCheck(opts: {
   function serialize(): string {
     return JSON.stringify({
       criteria: criteria.value,
-      occurrenceRows: occurrenceRows.value,
-      postCollectionRows: postCollectionRows.value,
+      occurrenceRows: voucherFill.guardPersist(occurrenceRows.value, 'occurrence'),
+      postCollectionRows: voucherFill.guardPersist(postCollectionRows.value, 'post'),
       auditNote: auditNote.value,
       lowRatioExplanation: lowRatioExplanation.value,
       conclusion: conclusion.value,
@@ -522,7 +618,16 @@ export function useK1VoucherCheck(opts: {
     occurrenceDebitChecked, occurrenceCreditChecked, postCollectionChecked,
     load, addOccurrenceRow, addPostCollectionRow, removeOccurrenceRow, removePostCollectionRow,
     updateVoucherRow,
-    fillFromSamples, applyFromK1Sheets, applyFromK1LargeAmount, recalcSamplingPopulation,
+    applyFromK1Sheets, applyFromK1LargeAmount, recalcSamplingPopulation,
     buildAbnormalAdjDrafts, serialize,
+    // 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读（共享回填函数）
+    onEngineFilled,
+    onAttachImported,
+    onUndoRequest: voucherFill.onUndoRequest,
+    voucherRowClass: voucherFill.rowClass,
+    isVoucherRowLocked: voucherFill.isRowLocked,
+    voucherFillReady: voucherFill.ready,
+    /** 宿主自管的表保存前过一遍（年审阶段预审行按读入版本写回） */
+    guardPersist: voucherFill.guardPersist,
   }
 }

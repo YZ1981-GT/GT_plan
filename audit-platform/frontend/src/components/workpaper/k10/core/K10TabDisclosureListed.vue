@@ -172,6 +172,15 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK10SyncPayload } from '../../composables/k10NoteSectionMap'
+import {
+  buildK10DisclosureSnapshot,
+  K10_DISCLOSURE_CATEGORIES,
+  K10_DISCLOSURE_DYN_PREFIX,
+  k10DefaultDisclosureRows,
+  k10DynamicDisclosureRows,
+  loadK10DisclosureState,
+  type K10ListedFormRow,
+} from '../../composables/k10DisclosureSnapshot'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -197,17 +206,9 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串
-  const payload = buildK10SyncPayload(
-    'listed',
-    props.wpId || '',
-    disclosureRows.value.map(r => ({
-      project: r.category,
-      currentAmount: r.currentAmount,
-      priorAmount: r.priorAmount,
-    })),
-    narrativeText.value,
-  )
+  // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串（快照与离屏同步共用 buildK10DisclosureSnapshot）
+  const { rows } = buildK10DisclosureSnapshot('listed', disclosureRows.value)
+  const payload = buildK10SyncPayload('listed', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -223,95 +224,32 @@ async function syncToDisclosureNotes(): Promise<void> {
 const ABNORMAL_THRESHOLD = 0.5
 
 /** 其他收益标准来源分类（与K10-1审定表行对应） */
-const CATEGORIES = [
-  '政府补助-即征即退',
-  '政府补助-财政贴息',
-  '政府补助-研发补助',
-  '政府补助-稳岗补贴',
-  '政府补助-资源税返还',
-  '政府补助-产业扶持',
-  '政府补助-其他',
-  '其他收益-个税手续费返还',
-  '其他收益-其他',
-]
+const CATEGORIES = K10_DISCLOSURE_CATEGORIES.listed
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  category: string
-  grantType: string
-  recognitionMethod: string
-  currentAmount: number
-  priorAmount: number
-  remark: string
-}
+type DisclosureRow = K10ListedFormRow
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({
-    category: c,
-    grantType: c.startsWith('政府补助') ? '与收益相关' : '',
-    recognitionMethod: '',
-    currentAmount: 0,
-    priorAmount: 0,
-    remark: '',
-  }))
-)
+const disclosureRows = ref<DisclosureRow[]>(k10DefaultDisclosureRows('listed'))
 const narrativeText = ref('')
 
-// ─── Load saved data ─────────────────────────────────────────────────────────
+// ─── Load saved data（固定分类行 + 动态行 + 说明；与离屏同步共用 k10DisclosureSnapshot） ──
 
 function loadSavedData(): void {
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const key = `K10-disc-listed-row-${i}`
-    const saved = props.allResponses.get(key)
-    if (saved) {
-      try {
-        const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-        if (parsed) {
-          disclosureRows.value[i] = {
-            category: CATEGORIES[i],
-            grantType: parsed.grantType || disclosureRows.value[i].grantType,
-            recognitionMethod: parsed.recognitionMethod || '',
-            currentAmount: Number(parsed.currentAmount || 0),
-            priorAmount: Number(parsed.priorAmount || 0),
-            remark: parsed.remark || '',
-          }
-        }
-      } catch { /* ignore */ }
-    }
-  }
-  // 动态行（来自 K10-1 的非标准来源名，name-keyed 持久化）
-  loadDynamicRows()
-  const narrativeSaved = props.allResponses.get('K10-disclosure-listed-narrative')
-  if (narrativeSaved) {
-    narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
-  }
+  const state = loadK10DisclosureState(props.allResponses, 'listed')
+  disclosureRows.value = state.rows
+  narrativeText.value = state.narrativeText
 }
 
-const DYN_PREFIX = 'K10-disc-listed-dyn-'
+const DYN_PREFIX = K10_DISCLOSURE_DYN_PREFIX.listed
 
 /** 加载动态追加行（K10-1 中不在固定 CATEGORIES 的来源） */
 function loadDynamicRows(): void {
   // 先移除已有动态行（避免重复），保留固定 CATEGORIES 行
   disclosureRows.value = disclosureRows.value.slice(0, CATEGORIES.length)
-  for (const [key, saved] of props.allResponses) {
-    if (!key.startsWith(DYN_PREFIX)) continue
-    try {
-      const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
-      if (parsed && parsed.category) {
-        disclosureRows.value.push({
-          category: parsed.category,
-          grantType: parsed.grantType || '',
-          recognitionMethod: parsed.recognitionMethod || '',
-          currentAmount: Number(parsed.currentAmount || 0),
-          priorAmount: Number(parsed.priorAmount || 0),
-          remark: parsed.remark || '',
-        })
-      }
-    } catch { /* ignore */ }
-  }
+  disclosureRows.value.push(...k10DynamicDisclosureRows(props.allResponses, 'listed'))
 }
 
 // ─── Auto-fill from K10-1（读 K10-1-rows JSON，按来源名称匹配） ───────────────

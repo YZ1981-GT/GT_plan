@@ -1,6 +1,5 @@
 # G5 长期应收款 — 底稿编制手册
 
-> **文档副本**：仓库可读版见 `audit-platform/docs/handbooks/`；  
 > 程序内弹窗以本目录 `preparation.md` / `usage.md` 为准。  
 > **适用范围**：科目 **1531**（长期应收款）结构化底稿包  
 > **组件**：`g5-long-term-receivable`  

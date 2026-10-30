@@ -283,6 +283,15 @@ B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上�
 - `routers/recycle_bin.py`：`_RECYCLABLE_TABLES` 增 `"custom_query_template": (CustomQueryTemplate, "查询模板", "name")`；`_OWNER_SCOPED = {"custom_query_template": lambda m: func.coalesce(m.creator_id, m.created_by)}`（与模型属性 `owner_id` = `creator_id or created_by` 同一口径，router 判 `is_owner` 也用它）；`_visibility_filter(tbl_key, model, visible, user)` 对该类型 = `owner_expr == user.id`（admin 不限）；`_authorize_row` 对该类型 = `row.owner_id == user.id` 或 admin，不走项目成员判定；`_deleted_by` 对该类型返回 `owner_id`；列表项对按作者可见的类型增 `can_restore` / `can_purge`（= 作者或 admin，恒为布尔；其余类型不带这两个键，界面照旧按系统角色权限）。合入后同一列表已有逐行 `purgeable`（底稿不可彻底删除），模板为 true。
 - `views/RecycleBin.vue`（合入后 354 行）：操作列按行分支（+6 行）。`<template v-if="typeof row.can_restore === 'boolean'">` 内放两个不带指令的按钮：`v-if="row.can_restore"` 的「恢复」与 `v-if="row.can_purge && row.purgeable !== false"` 的「删除」（各 1 行）；`<template v-else>` 内原样保留现有两个带 `v-permission` 的按钮（内容不改）。其余类型因此仍由指令判定：`directives/permission.ts` 只查前端常量 `ROLE_PERMISSIONS[authStore.user.role]`。不用 `usePermission().can()` 作兜底：它优先用 `authStore.user.permissions`，而 `fetchUserProfile()`（`App.vue`、`Dashboard.vue`、`PrivateStorage.vue` 在 `user` 缺失时调用）把 `/api/users/me` 下发的后端 `permission_service.ROLE_PERMISSION_MATRIX` 权限码（`project:read` 等 14 种，没有 `recycle:*`）写进 `user`，这类会话里经理、合伙人会看不到其余类型的按钮；该函数还标了 `@deprecated`。也不把指令判定抽成共用纯函数：那要改全平台共用的指令文件，行分支只动本页。理由：权限指令只看系统角色，模板作者多为系统 auditor（库内 auditor 114、manager 1），按钮会被藏起来；模板行的能力由后端按 `_authorize_row` 同一判定逐行给出，前后端不会分叉。审计员也能进回收站页（顶栏「回收站」按钮，路由无权限限制）。
 
+B8 实施补记（2026-10-28，任务 24、25；与上文不同或没写到的以此为准）：
+- 迁移号 **V214**（四处现扫 + 共享库登记表均未占用，§8）。V214 除两列、索引外，scope 检查约束按「存在同名约束但不含 `project` ⇒ 先删再建六值约束」处理：`scripts/_ensure_custom_query_tables.py` 建的旧库带同名四值约束（没有 project / personal），「指定项目共享」一保存就违反约束；共享库本表没有任何检查约束。约束取值三处同一份：ORM `custom_query_models.TEMPLATE_SCOPE_VALUES`（ORM 也声明该约束与 `idx_cqt_live_updated`）、建表脚本 `SCOPE_VALUES`、V214，由 `test_advanced_query_ddl_cross_lock.py` 锁死。
+- V214 只落在验证用库副本 `audit_platform_aql`（brief 2026-10-28 第 4 条：落共享库会让主树 `test_real_db_state_is_consistent`（库里已应用 ⊆ 目录）变红）；推送后须尽快落到共享库，否则他人把远端合进主树、9980 热重载后读 `custom_query_templates.is_deleted` 报 UndefinedColumn（模板端点与回收站列表 / 统计 500）。
+- `template_service.config_to_request` 多一个 `fallback_source`（config 没有 `source` 时用模板的 `data_source`）；参数占位的取值（`template_presets.resolve_config`）在任务 41 接入，此前 config 仍含 `$param` 时执行返回 400 `TEMPLATE_INVALID`「模板条件里的参数「{名}」尚未取值，未执行查询」；模板里存了不合格配置时沿用 acnr T15（0e567e267，先于本任务提交）的 `template_config_rejected` ⇒ 422。
+- 模板执行在函数体内先 `await ownership_guard.assert_target_accessible(...)`、再解析年度（无权用户不从 422 得知项目有没有审计年度）；body_carried 请求体维基线 81 → 80。更新模板的名称与保存同一校验（`validate_name`）。SQLite 测试方言下 `shared_project_ids` 用 `_SqliteUuidList`（存文本读回 UUID）。
+- 已软删的模板对详情 / 更新 / 删除 / 执行一律 404 `TEMPLATE_NOT_FOUND`（`_load_template`），列表候选 SQL 带 `is_deleted = false`；恢复只走回收站。回收站统计与列表同一过滤（按作者可见）；模板行「删除人」= 作者（模板端点只许作者删除，admin 亦然）。
+- 页面版删除确认文案改为「确认删除模板「{名}」？删除后可在回收站恢复。」（原「此操作不可撤销」）；`MyTemplatesDialog.vue` 的同类文案随任务 33 改。
+- 浏览器验收发现（新断点 AQ-39，交任务 29 / 28）：页面版「保存为模板」的「指定项目共享」「公开」两档恒置灰——`canShareTemplates` 取 `GET /api/projects` 的 `can_edit`，该接口从不下发此字段（admin 亦然），R9.1 的三档在页面版只能存「仅我可见」；弹窗 💾 固定存 private。后端三档已通（TestClient 与浏览器会话内 API 保存公开模板 201、审计员列表可见）。
+
 ### 3.7 写入收窄与只读查询
 - 删除 `snapshot_writer_modules.write_report_cell / write_adj_cell / write_tb_cell` 与 `SnapshotWriter` 对应薄委托及 `write_cell` 三个分支（未知 module → ValueError）；`CellWritebackRequest.module` 与 writeback 目标 module 改 `Literal["workpaper", "note"]`。
 - 取行带项目：底稿 `… WHERE wp.id = :wp_id AND wp.project_id = :pid FOR UPDATE OF wp`（缺 pid → ValueError → 400），查不到抛新异常 `WritebackTargetNotFound`；附注 `select(ConsolNoteData).where(ConsolNoteData.id == target_id, ConsolNoteData.project_id == note_project_id).with_for_update()`，查不到 `NoteRecordNotFound`。两者都不会锁他项目行。cell-writeback 与 writeback-confirm 同口径映射：`WritebackTargetNotFound` → 404 `WRITEBACK_TARGET_NOT_FOUND`「目标不存在或不属于本项目」，`NoteRecordNotFound` → 404 `NOTE_RECORD_NOT_FOUND`，`NoteOwnershipMismatch` → 403（只剩同项目内年度 / 章节 / 节点不一致），不再以未捕获异常变 500。
@@ -303,6 +312,13 @@ B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上�
 | 跨模块单元格源族 + 选区器模块模式 | `module_cell_resolver.py` 只留 `parse_source_uri` / `format_source_uri` / `_NOTE_COLUMNS`（`_REPORT_COLUMNS` / `_ADJ_COLUMNS` 随本行删除：2026-10-27 B4 现查，tasks 13 删写入实现后它们仍被本源族的取数函数 `_query_report_cells` / `_query_adj_cells` 与 `test_module_cell_resolver.py` 使用，按删旧代码铁律不随 tasks 13 删）；删前后跑 `test_lazy_import_resolvability.py`（覆盖 `write_note_cell` 的惰性导入名）；`test_module_cell_resolver.py` 只留解析用例并下调白名单基线；删 `test_formula_tb_sign_passthrough.py::test_module_cell_resolver_tb_columns_pure` |
 | tb / adj / report 写入 | `test_snapshot_writer.py` 对应用例删除并按实际行数下调白名单基线 1,418；`test_custom_query_auth_*` 的 tb 用例改为断言 422；`test_project_endpoint_authz_body_carried.py` 证明链不变（`_assert_writeback_authorized` 保留） |
 | `SaveAsTemplateButton.vue`、`SnapshotStalenessChip.vue`、`customQuery.cellWriteback` | 删 `useSnapshotStaleness.test.ts`；`components.d.ts` 随构建工具重新生成 |
+
+**B12 实施补记（2026-10-29，任务 34）**：
+- 三类各一个提交（跨模块单元格源族 + 选区器模块模式 / 两个零挂载组件 / `cellWriteback` 常量），删前各打本地 tag。跨模块单元格源键（`{report|note|adj|tb}:限定词|区域`）删后由 `resolve_source` 按未知数据源 400 `UNKNOWN_SOURCE`，execute 与「导出全部」同一口径，有单元、真 PG 端点用例与变异钉住。`business_fetcher` 不再返回 `(rows, columns)`，返回类型收为 `FetchPage`；编排器对旧元组的兼容路径保留（既有编排器测试用它）。
+- 选区器模块分支里的 execute 请求是 acnr 任务 16 登记的业务视图调用点之一：删掉该分支后，`queryPayloads.contract.spec.ts` 的调用点登记同一提交去掉该文件（契约意图不变：其余调用点的请求体仍经 `buildBusinessPayload`）。
+- `components.d.ts` 只手工删两条声明，不整体重新生成：在本 worktree 起 Vite 时重新生成的文件会带进与本 spec 无关的组件；实测重新生成的文件里也没有这两个组件。
+- 不删：`types/custom-query-template.ts`（只被 `SaveAsTemplateButton` 引用，任务 46 要给它加 `filters`）；只在注释里提到 `module_cell_resolver` 的 `addressing_service.py`、`trial_balance_service.py` 与两个测试；`backend/scripts/check/baselines/python_service_lines_baseline.json` 里该文件 541 行的登记（≥ 400 行才登记的膨胀基线，文件变小不触发）。
+- 验收时发现【测试】凭证身份走查_2025（ca8da212）已被他人软删（2026-10-29 01:04 UTC），项目信息接口 404，而 admin 在该项目上照常能执行业务视图查询；业务视图对已删项目是否应拒绝不在本 spec 的需求里（构建器作用域已排除已删项目，R3.1），登记为范围外。选区器验收另在未删的安徽骨科医院_2025 上做了一遍（只读）。
 
 ### 3.10 循环范围（`services/custom_query/cycle_scope.py`，新）
 ```python
@@ -404,6 +420,22 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
   - 构建器请求体仍只由 `queryPayloads.buildBuilderPayload` 构造：增可选 `scopeToProject` / `offset` / `headers`，都不传时与 T16 逐键相同；条件序列化、算子下拉、`opLabel`、`needsValue` 未改（ADR-AQL-03）。
   - 构建器的项目上下文：项目取 `props.projectId`，否则路由项目；年度依次取 `props.year`、路由 `?year`、项目 store 的审计年度（项目一致时），都取不到为空（显示「审计年度未确定，不按年度筛选」），不用日历年。两个宿主（弹窗、页面版）现在都不传这两个 prop，传入在任务 28 / 29。
   - 两个宿主都以 `embedded` 嵌入，页头副标题不渲染；不可用原因显示在构建器顶部的提示条（`aqb-access-blocked`），预览 / 执行 / 导出按钮禁用。原「公式引用」列并入操作列的「复制引用」：只在本次结果限定单个项目（`scope.requested_project_id`）时出现，本页引用批量校验通过后才可复制。schema 缓存键加用户 id（字段按角色隐去 PII，换人登录不沿用上一个人的字段表）。
+- B10 实施补记（任务 28 / 29，2026-10-29）：
+  - 弹窗与页面版共用的部件放在 `components/query/`：`QueryErrorAlert`（失败原因 + 可复制追踪号）、`QueryResultPager`（100 / 200 / 500 + total，改每页行数只发一次 change）、`QueryRowActions` + `useQueryRowLinks`（「打开」「复制引用」接到 `queryResultLinks`；附注表格的行标签取该表表头第一列、取值列取第二列）、`QueryTemplateSaveDialog` + `queryTemplateScope`（三档保存，页面版与弹窗 💾 同一个）、`queryCellFormat`（金额按列类型）、`queryIndicatorLoader`（`full` 弹窗全量树 / `page` 页面版骨架 + 附注分支；`queryIndicatorCache` 键的项目段带树形 `{项目}~page`，两种树形互不命中、写入互不清除）、`queryServerExport`（导出全部）、`queryConditions` + `QueryConditionEditor`。两个大文件因此反而变短或持平：`CustomQueryDialog.vue` 1,070 → 1,111、`CustomQueryTab.vue` 1,236 → 1,029（≤ §9 的 1,450）。
+  - 可分享项目的判定（AQ-39）：新增 `GET /api/custom-query/template-share-targets`（只挂 `get_current_user`，返回本人的 `project_ids`）；判定在 `template_scope_guard.template_share_target_ids`，与保存时逐项目的 `require_project_access("edit")` 同一口径（已归档不列，admin 列全部未删未归档项目，其余身份 = 本项目未删成员行级别达到 edit，系统角色 partner / manager 不因角色放行）。不在前端另写角色清单，也不改 `GET /api/projects` 的响应（远端多个会话在改它）。前端规则不变：至少一个可分享项目才开放「指定项目共享」「公开」两档，接口失败时只能存私有并说明原因。配方表加第 8b 行。
+  - execute 响应 `meta` 增 `column_types`（显示列的键 → number / text / date / bool，与 `columns` 同一份显示列）；`columns` 仍是字符串数组（N3 不变）。内存源没有该键时前端按值判定（数字字符串 ≤ 12 位才按金额）。
+  - 指标树 schema v14：底稿组首个叶子「底稿清单」（注册表源 `workpaper`），骨架里也有——页面版只加载「骨架 + 附注分支」，底稿组只留它；sheet 级查询从弹窗发起。
+  - 排序（实施时补，R2.2 的界面部分）：业务视图原先没有任何排序入口，前端从不发 `sort`，R2.2「数据库内对全量排序」在界面上用不到（§10.5 的「借方降序」也无从操作）。弹窗与页面版的结果列改为 `sortable="custom"`：点表头即带 `sort: [{field, direction}]` 重新查询并回到第 1 页（不是只排本页），表格重新挂载时经 `default-sort` 保留箭头；导出全部与保存的模板带同一排序（模板写 `sort_field` / `sort_order`，由 `config_to_request` 译成 `sort`）；换数据源即清除。载入模板时把排序还原到界面留给任务 33（R9.4）。
+  - 弹窗查询失败时的旧路径：原 `validateStatus: s < 600` 让 axios 把 4xx / 5xx 当成功返回，错误体落到「暂无该数据源记录」；测试替身按 axios 同口径实现 `validateStatus`（放行即把错误体当数据），变异 B10-a 因此红在「应显示失败提示」上，而不只是请求配置的断言。
+  - 浏览器验收的两处取舍：①底稿格引用的「已登记坐标」用 E1「货币资金分析表E1-14」的 C10（有底稿文件的项目里，D 循环底稿只登记了表级与 xref 地址、没有单元格级坐标）；②第二套后端以 `--lifespan off` 起（不跑共享库上的启动任务），事件级联 worker 不在 ⇒ 页面顶部「部分功能暂时不可用」横幅是这个验证环境的现象（`DegradedBanner` 读 `event-cascade/health`），与本批无关。
+- B11 实施补记（任务 31 / 32 / 33，2026-10-29）：
+  - 布局的弹窗年度：`customQueryYear` = 弹窗项目就是路由项目时取 `currentYear`（路由 `?year` → 项目 store 的年度），事件带来别的项目时为 `null`（交弹窗取该项目审计年度）。与上文「只取路由 `?year`」不同：项目 store 的年度是页面正在用的年度（页内切换过的年度、或项目审计年度），自 post-push-residual-defect-closure 6.5 起没有日历年兜底，非项目页随路由清空；`ThreeColumnLayout.year.spec.ts`（他 spec）也断言路由不带年度时弹窗拿到 store 年度。`currentYear` 本身与公式管理 / 一键刷新的绑定不动，静态守卫按 SFC 模板 AST 钉住三处 `:year`。
+  - 模板库页的项目（B11 评审 F1 修订）：模板库是全局页，URL 不带项目时页面（`TemplateLibraryMgmt.ensureFallbackProject`）取项目列表第一项作演示项目，用来展示底稿模板的生成状态，它经 `WpTemplateTab` → `WpTemplateDetail` → `TemplateLibraryButton` 进入 `open-custom-query` 事件的 `project_id`。用户看不到它从哪来，不能当成所选项目 ⇒ `resolveDialogOpenContext` 在路由名为 `TemplateLibraryMgmt`（常量 `TEMPLATE_LIBRARY_ROUTE`）时只认路由明确带的项目（`params.projectId`，其次 `?project_id`，与该页 `currentProjectId` 同序）：事件项目与它一致才采纳，不一致取路由的；路由不带项目、或事件不带项目（报表 / 附注模板按钮、侧栏打开）时为空，后者与 B11 之前相同。R10.1 的「模板库按钮带来的项目优先于路由」因此只在 URL 明确带项目时生效，「非项目页不自动选中任何项目」在模板库页也成立。路由 `?year` 按「弹窗项目就是路由项目（`params.projectId`）」判定，与布局 `customQueryYear` 同一条件（其余路由上与原「事件没带来别的项目」等价）。宿主、`TemplateLibraryButton`、`TemplateLibraryMgmt` 不改（R10.5），演示项目照旧只用于模板库页自身的展示。
+  - 弹窗每次打开都套用 `initialSource`（原先只在它变化时套用：同一页再开一次、或用户换过源后再开，预选不生效），立即选中、树的高亮与展开等树加载完再做；`initialNotice` 只属于带来它的那个源，换源或关闭即清除。
+  - `useReportRouteFocus` 分两段接线：`useReportRouteFocus(route, notify)` 在取数器之前调用，给出 `routeYear` 与 `initialTab`；`attach({activeTab, reportMode, rows, compareRows, rvTableRef, compareTableRef, loading})` 在表格 ref 声明之后调用（报表页的年度要先于取数器给出，表格 ref 与行在取数器之后才有）。执行次数为「同一路由 × 每种报表模式各一次」且只在深链指向的页签上找：深链落地时恒为「已审」，用户之后切到「对比」时在对比表上标出同一行次（对比表在那之前不存在）；切到别的页签不找、不报「未找到」。定位 = `setCurrentRow` + 滚动居中 + 3 秒闪烁（沿用平衡检查跳转的 `gt-highlight-row`）。`ReportView.vue` 净减 1 行，`HARD_CAPS` 1949 → 1943（文件此前已是 1944、cap 未下调，`test_hard_cap_ratchet` 余量 5 打红），前端行数守卫 1950 → 1944。
+  - `address-resolve`（ADR-AQL-17）：底稿编码登记判定在 `_wp_template_name`——表存在且有记录时以表为准（与指标树 `_build_workpaper_tree` 同一取舍），表不存在 / 为空 / 查询失败（查表包在 `begin_nested()` 里，PG 上不让请求事务停在 aborted）时用 JSON 目录（step_sheet_mapping 优先、其次 wp_account_mapping，含 `D2-1` 这类子编码），目录读取失败记 WARNING 按未登记返回。返回的 `route_query` 只有模板库页签名与定位键：底稿 `{tab: 'wp-template', wp_code}`、报表 `{tab: 'report-config', report_type}`、附注 `{tab: 'note-template', section_id}`；未登记的底稿与 adj / tb 结果 `registered=false`、空路由；URI 认不出时 400 `INVALID_SOURCE_URI` 中文原因。前端 `buildTraceUri` 按本次结果的数据源生成 URI（报表叶子 `report:<类型>`、附注章节 `note:<章节号>`、调整分录 `adj:<源>`、其余 `tb:<源>`；原先注册表源键原样发出，后端认不出），提示文案「该类结果没有模板定义」「该底稿编码未在模板目录中登记，无法打开模板」。模板库页面按 `?tab` 选页签（已在本页时 `?tab` 变化也切换），底稿模板页签以 `?wp_code` 种入搜索；报表 / 附注页签内不按 `report_type` / `section_id` 定位（页面原本不读任何查询参数，ADR-AQL-17 只要求底稿页签带搜索）。
+  - 模板选择（R9.3 / R9.4）：`MyTemplatesDialog` 的事件为 `load(config, tpl)` / `run(tpl)`（`allowRun` 控制「执行」是否出现，`runBlockedReason` 不为空时置灰并显示原因）；打开即先显示本人的缓存再向服务端重新取（回收站恢复后再打开能读回）。模板 → 界面状态的唯一翻译在 `queryTemplateRestore.restoreTemplateQuery`：数据源取 `config.source`，缺省模板的 `data_source`（页面版保存的 config 不含 source，原先「加载」后数据源对不上）；条件兼容旧写法；排序取 `sort[0]`，缺省 `sort_field` / `sort_order`（与 `config_to_request` 同一读法）；每页行数只认 100 / 200 / 500；项目与年度不取模板里存的。保存的 config 增 `page_size`。上文「含参数占位的用户模板『载入』先调 `GET /templates/{id}/resolve`」随 W3 的 resolve 端点在任务 41 / 43 做（本批界面保存的模板不含 `$param`；万一载入的模板条件里有未取值的占位，执行时由 `config_to_request` 拒绝，400 `TEMPLATE_INVALID`「模板条件里的参数「…」尚未取值」）。
+  - 弹窗内的模板：弹窗没有条件编辑器（W3 才嵌入），载入的模板里的条件与列照样随查询、导出与「💾 另存」发送，结果区上方的提示写明条数与「弹窗内不能编辑，可在页面版编辑」，关闭提示或换数据源即不再使用。「执行」= 按弹窗当前项目与年度调 `POST /templates/{id}/execute`（服务端重新鉴权、按模板配置取数），之后翻页仍走它；从第 1 页起的其他查询（「▶ 查询」、点表头排序）回到普通执行端点、带同一组条件（模板执行端点不收排序）。`apiPaths.customQuery.templateExecute(id)` 本批加。
 
 ### 4.3 W3 / W6 前端（ADR-AQL-05 / 20；页面文件只加最小接线，逻辑在新组件与 composable）
 - `QueryConditionEditor.vue`（W3 扩展）：props `fields: {key, dtype}[]`（来自叶子 `condition_fields`，缺省按 `columns` 当文本）、`notices?: string[]`（参数说明，显示在条件区上方）、`disabled?`；算子按 dtype 给：文本 等于 / 包含 / 开头是 / 为空 / 不为空 / 为空或空白，数值 等于 / 大于 / 大于等于 / 小于 / 小于等于 / 介于 / 为空 / 不为空，日期 再加「星期为」（多选 周一…周日 ⇒ 1…6、0）；条件行可带 `params` 标记（服务端解析时标上，表示值取自参数），用户改了该行的值或算子即去掉标记；导出 `incompleteReason`（首个未填值的条件：「条件「{字段}」未填写值」），宿主据此禁用「查询」「💾 保存」；导出纯函数 `toSavedConditions(conditions)`（带 `params` 标记的行把值写回 `{"$param": 名}`，`between` 写回两个占位，其余写字面值；请求体只发 field / op / value，不发标记）与常量 `EDITOR_OPS`（vitest 用它核对预置 JSON 的算子都在编辑器选项内）。
@@ -530,6 +562,7 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
 | 查询路径不写 storage | `fetchers/workpaper_cells.py`（写盘只在 `_temp_copy`）+ AST 守卫 | 预览与区域取数唯一实现处 |
 | 回写不碰他项目行 | `snapshot_writer` 两个取行语句（WHERE 含项目）+ `writeback_preview._build_item` 归属核对 | 加锁发生在取行，项目条件必须在同一语句；预览不读他项目旧值 |
 | 模板可见性 | `TemplateScopeAdapter.is_visible`（template_service 委托，router 不自判） | 列表、详情、执行三处结论一致 |
+| 可分享到的项目（保存对话框三档） | `template_scope_guard.template_share_target_ids`（B10，`GET /template-share-targets`；保存时仍逐项目 `require_project_access("edit")`） | 与保存门禁同一张级别表、同一归档规则；前端不持有角色清单 |
 | 构建器准入与作用域计数 | `builder_access.resolve_builder_access`（依赖与 access 接口共用；计数取 `resolve_builder_scope` 的结果） | 前后端同源；入口显示的项目数与执行时的作用域是同一个函数算的 |
 | 导出并发 | `export_gate`（业务视图与构建器导出共用） | 一处计数才有上限 |
 | 下钻路由与引用语法 | 前端 `queryResultLinks.ts`（账簿 query 由 `buildLedgerQuery` 生成） | 三个结果表共用一处 |
@@ -546,6 +579,7 @@ B6 实施补记（2026-10-28，任务 19、20、23；与 §3.2 / §3.8 / §3.10 
 | 空条件值不执行 | 前端 `QueryConditionEditor.incompleteReason` + 后端 `paged_fetch` 的 `CONDITION_VALUE_REQUIRED` | 前端给即时提示，后端是不可绕过的那一道 |
 
 ## 8. 迁移（实施时现扫 `backend/migrations/V*.sql` 取 MAX+1，现最高 V205）
+B8 实施（2026-10-28）：合并树、主树工作区（含未跟踪）、全部已登记 worktree、远端与共享库登记表现扫最大都是 213 ⇒ n = **214**；约束段与下面草案不同，见 §3.6「B8 实施补记」。
 `V{n}__custom_query_template_soft_delete.sql`：
 ```sql
 ALTER TABLE custom_query_templates ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
@@ -645,6 +679,7 @@ END $$;
 | 6 | GET /api/custom-query/templates：含 T / S / Q | P | 401 | 是/否/否 | 是/是/否 | 是/是/否 | 是/是/否 | 是/否/否 | 是/是/否 | 是/是/是 |
 | 7 | POST /api/custom-query/templates（scope=private） | S | 401 | 201 | 201 | 201 | 201 | 201 | 201 | 201 |
 | 8 | POST /api/custom-query/templates（scope=project，共享 X） | S | 401 | 403 | 403 | 201 | 201 | 403 | 403 | 201 |
+| 8b | GET /api/custom-query/template-share-targets（B10 新增，AQ-39；200 格断言 X 在不在列表里，与第 8 行放行与否逐列一致） | S | 401 | 不含 X | 不含 X | 含 X | 含 X | 不含 X | 不含 X | 含 X |
 | 9 | GET /api/custom-query/templates/{S} | P | 401 | 403 | 200 | 200 | 200 | 403 | 200 | 200 |
 | 10 | GET /api/custom-query/templates/{Q} | P | 401 | 403 | 403 | 403 | 403 | 403 | 403 | 200 |
 | 11 | PUT /api/custom-query/templates/{S} | P | 401 | 403 | 403 | 403 | 200 | 403 | 403 | 403 |

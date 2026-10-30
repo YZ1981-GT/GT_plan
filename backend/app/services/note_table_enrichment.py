@@ -277,3 +277,13 @@ def enrich_note_table_data(
             infer_row_types_from_dict_rows(table_data)
     except Exception:
         logger.warning("note_table_enrichment: column_groups/row_types failed section=%s", section_number, exc_info=True)
+
+    # 3. 期间层布局（spec note-pull-header-formula-closure R4 / ADR-3）：底稿按期间并列 / 最上层统一期间的表，
+    #    显示与导出还原（``_display_layout``），存储不动
+    try:
+        from app.services.note_period_layout import attach_display_layout
+
+        std = getattr(source_template, "value", source_template)
+        attach_display_layout(table_data, str(std) if std else None, section_number)
+    except Exception:
+        logger.warning("note_table_enrichment: period layout failed section=%s", section_number, exc_info=True)

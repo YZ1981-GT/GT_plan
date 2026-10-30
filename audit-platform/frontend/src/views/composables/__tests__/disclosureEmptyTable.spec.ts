@@ -12,6 +12,7 @@ import fc from 'fast-check'
 import {
   AMOUNT_FORMATS,
   SKIP_ROW_TYPES,
+  TOTAL_ROW_TYPES,
   emptyTableNames,
   isEmptyTable,
   type EmptyTableColumnDef,
@@ -71,7 +72,7 @@ describe('isEmptyTable — 基本判定', () => {
   })
 })
 
-describe('isEmptyTable — 派生行 / 结构行不参与判定', () => {
+describe('isEmptyTable — 合计 / 小计行只看数；结构行不参与判定（R5）', () => {
   it('只有合计行 → 空表', () => {
     const rows = [
       row('原材料', nulls(6)),
@@ -80,12 +81,34 @@ describe('isEmptyTable — 派生行 / 结构行不参与判定', () => {
     expect(isEmptyTable(rows, DEV_COST_COLUMNS)).toBe(true)
   })
 
-  it('合计行有数也不使表变非空', () => {
+  it('合计行有数 → 非空（公式推送找不到明细时把审定数写在合计行）', () => {
     const rows = [
       row('原材料', nulls(6)),
       { label: '合计', values: ['', '', 0, 999, 0, 0], is_total: true },
     ]
+    expect(isEmptyTable(rows, DEV_COST_COLUMNS)).toBe(false)
+  })
+
+  it('row_type=subtotal 与合计行同样只看数', () => {
+    expect(isEmptyTable([{ label: '小计', values: ['', '', 0, 5, 0, 0], row_type: 'subtotal' }], DEV_COST_COLUMNS))
+      .toBe(false)
+  })
+
+  it('合计行的文字不算内容、文本列里的数也不看', () => {
+    const rows = [{ label: '合计', values: ['说明', 7, '—', '不适用', '', null], is_total: true }]
     expect(isEmptyTable(rows, DEV_COST_COLUMNS)).toBe(true)
+  })
+
+  it('无列定义时合计行只看数', () => {
+    const total = { label: '合计', values: ['0', '—', '(0)'] as unknown[], is_total: true }
+    expect(isEmptyTable([total], null)).toBe(true)
+    expect(isEmptyTable([{ ...total, values: ['1,234.50'] }], null)).toBe(false)
+    expect(isEmptyTable([{ ...total, values: [-0.01] }], null)).toBe(false)
+  })
+
+  it('合计行类型集合与跳过集合不相交', () => {
+    expect([...TOTAL_ROW_TYPES].sort()).toEqual(['subtotal', 'total'])
+    expect([...TOTAL_ROW_TYPES].filter((t) => SKIP_ROW_TYPES.has(t))).toEqual([])
   })
 
   it.each([...SKIP_ROW_TYPES])('row_type=%s 不参与判定', (rowType) => {
@@ -225,7 +248,7 @@ describe('isEmptyTable — PBT（Property 8）', () => {
     )
   })
 
-  it('合计行无论填什么都不改变判定', () => {
+  it('明细全零时：合计行有非零数 ⇒ 非空，全零 ⇒ 空', () => {
     fc.assert(
       fc.property(
         fc.array(fc.double({ min: -1e6, max: 1e6, noNaN: true }), { minLength: 1, maxLength: 5 }),
@@ -235,7 +258,8 @@ describe('isEmptyTable — PBT（Property 8）', () => {
             ...base,
             ...vals.map((v) => ({ label: '合计', values: [v, v], is_total: true })),
           ]
-          expect(isEmptyTable(withTotal, AMOUNT_COLS)).toBe(isEmptyTable(base, AMOUNT_COLS))
+          const hasAmount = vals.some((v) => Math.abs(v) >= 0.005)
+          expect(isEmptyTable(withTotal, AMOUNT_COLS)).toBe(!hasAmount)
         },
       ),
       { numRuns: 40 },

@@ -29,9 +29,12 @@ unadjFairValueLevel / auditedQty / auditedPrice / auditedFairValue / auditedFair
 consistencyWithPrior / sourceInstitution / inputSource / inputValue / valuationFileRef。列键不变。
 D 未审公允价值前端恒按 数量 × 单价 现算（不可手填）⇒ auto_source（HTML 侧带出，OO 改了报受保护冲突）。
 
-🔴 未接通（不在本批）：前端 store 是 `{rows, conclusion}` 对象、存在 conclusion 列，契约按行数组（rows）声明；
-本 provider 的 store 门面还借自 G9（`phase5_g9_store_facade.specs_for` 取 G9 的 spec）⇒ 两方向都没真正接上
-（`check_store_item_two_way_parity.KNOWN_UNWIRED` 冻结），接通要 state 门面 + 门面按本 provider 取 spec（批 B 门面）。
+═══ 接通（R3 批 B3，2026-10-28）═══
+
+前端 store 是 `{rows, conclusion}` 对象、存在 conclusion 列。原先 provider 的 store 门面借自 G9（取 G9 的 spec）、
+单数 STORE_ITEM_ID 照抄成 G6-2-rows、载荷一律读写 remark ⇒ 两方向都没接上（`KNOWN_UNWIRED` 冻结）。现门面按
+本 provider 绑定（`SectionStoreFacade(rows_key="rows")`：投影取 rows、回写只换 rows 其余键原样），载荷列按
+`PAYLOAD_COLUMN = "conclusion"` 读写（`store_payload_columns`），基线已删该条。
 """
 from __future__ import annotations
 

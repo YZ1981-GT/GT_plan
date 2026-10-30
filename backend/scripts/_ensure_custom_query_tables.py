@@ -52,10 +52,10 @@ WHERE table_schema = 'public'
 # ─────────────────────────────────────────────────────────────────────────────
 # 建表（幂等）
 # ─────────────────────────────────────────────────────────────────────────────
-#: scope 合法取值。``global`` 为 ``public`` 的 legacy 别名，读写经
-#: ``TemplateScopeAdapter.normalize`` 归一为 canonical 值后再对外呈现（R8.1），
-#: 但**约束必须继续接受**它，否则历史行会在写回时违反 CHECK。
-SCOPE_VALUES = ("private", "team", "public", "global")
+#: scope 合法取值（与 ORM ``TEMPLATE_SCOPE_VALUES``、迁移 V214 的检查约束同一份）。``global`` / ``personal`` 为
+#: ``public`` / ``private`` 的 legacy 别名，读写经 ``TemplateScopeAdapter.normalize`` 归一为 canonical 值后再对外呈现
+#: （R8.1），但**约束必须继续接受**它们，否则历史行会在写回时违反 CHECK；``project`` 是「指定项目共享」的规范值。
+SCOPE_VALUES = ("private", "team", "project", "public", "global", "personal")
 
 DDL = """
 CREATE TABLE IF NOT EXISTS custom_query_templates (
@@ -73,9 +73,11 @@ CREATE TABLE IF NOT EXISTS custom_query_templates (
     created_by          UUID         NOT NULL REFERENCES users(id),
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    is_deleted          BOOLEAN      NOT NULL DEFAULT false,
+    deleted_at          TIMESTAMPTZ,
     CONSTRAINT pk_custom_query_templates PRIMARY KEY (id),
     CONSTRAINT ck_custom_query_templates_scope
-        CHECK (scope IN ('private', 'team', 'public', 'global'))
+        CHECK (scope IN ('private', 'team', 'project', 'public', 'global', 'personal'))
 )
 """
 
@@ -105,13 +107,22 @@ ALTER_ADD_COLUMNS: dict[str, str] = {
         "ALTER TABLE custom_query_templates "
         "ADD COLUMN IF NOT EXISTS shared_project_ids UUID[] NOT NULL DEFAULT '{}'"
     ),
+    # V214：软删两列（模板删除进回收站）
+    "is_deleted": (
+        "ALTER TABLE custom_query_templates "
+        "ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false"
+    ),
+    "deleted_at": (
+        "ALTER TABLE custom_query_templates "
+        "ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+    ),
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 索引（幂等）
 # ─────────────────────────────────────────────────────────────────────────────
-#: 与 ORM ``__table_args__`` 的 idx_cqt_* 四个索引逐一对应。
-#: ``idx_cqt_tags`` / ``idx_cqt_shared_projects`` 用 GIN 支持数组包含查询。
+#: 与 ORM ``__table_args__`` 的 idx_cqt_* 五个索引逐一对应。
+#: ``idx_cqt_tags`` / ``idx_cqt_shared_projects`` 用 GIN 支持数组包含查询；``idx_cqt_live_updated`` 同迁移 V214。
 INDEXES_DDL = """
 CREATE INDEX IF NOT EXISTS idx_cqt_scope_updated
     ON custom_query_templates (scope, updated_at DESC);
@@ -121,6 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_cqt_tags
     ON custom_query_templates USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_cqt_shared_projects
     ON custom_query_templates USING GIN (shared_project_ids);
+CREATE INDEX IF NOT EXISTS idx_cqt_live_updated
+    ON custom_query_templates (is_deleted, updated_at DESC);
 """
 
 #: 索引名清单（供守卫测试与 ORM 交叉比对，避免解析 SQL 文本）
@@ -129,6 +142,7 @@ INDEX_NAMES = (
     "idx_cqt_creator_updated",
     "idx_cqt_tags",
     "idx_cqt_shared_projects",
+    "idx_cqt_live_updated",
 )
 
 #: DDL 声明的列集（供守卫测试与 ORM 交叉比对）
@@ -147,6 +161,8 @@ DDL_COLUMNS = (
     "created_by",
     "created_at",
     "updated_at",
+    "is_deleted",
+    "deleted_at",
 )
 
 

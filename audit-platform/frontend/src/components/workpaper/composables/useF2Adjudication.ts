@@ -450,7 +450,14 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     })
     debounceMetaSave()
     try {
-      eventBus.emit('disclosure:note-text-updated', { wpCode: 'F2', section: 'adj-note', text: val })
+      eventBus.emit('disclosure:note-text-updated', {
+        wpCode: 'F2',
+        wpId: opts.wpId.value,
+        projectId: opts.projectId.value,
+        section: 'adj-note',
+        text: val,
+        timestamp: Date.now(),
+      })
     } catch { /* silent */ }
   })
 

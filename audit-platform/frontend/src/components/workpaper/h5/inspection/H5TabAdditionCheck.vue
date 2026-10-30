@@ -28,8 +28,14 @@
         <span>资本化项目: {{ state.capitalizedCount.value }}项，金额: {{ fmtAmt(state.capitalizedAmount.value) }}</span>
       </div>
 
-      <el-table :data="state.rows.value" border stripe size="small" class="check-table" max-height="500">
+      <el-table :data="state.rows.value" border stripe size="small" class="check-table" max-height="500"
+        :row-class-name="state.voucherRowClass">
         <el-table-column prop="seq" label="序号" width="50" align="center" />
+        <el-table-column label="来源" width="150">
+          <template #default="{ row }">
+            <VoucherRowMetaCell :row="row" :locked="state.isVoucherRowLocked(row)" :project-id="projectId" :year="samplingYear" />
+          </template>
+        </el-table-column>
         <el-table-column prop="assetName" label="资产名称" min-width="110">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.assetName" size="small" @change="state.updateCell(row.rowId, 'assetName', $event)" />
@@ -98,11 +104,11 @@
     <el-dialog v-model="samplingVisible" title="H5-7 增加检查 — 抽凭引擎" width="85%" destroy-on-close>
       <GtVoucherSamplingEngine
         :account-code="samplingAccountCode"
-        phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"
         :year="samplingYear"
         @filled="onSampleFilled"
+        @undo-request="state.onUndoRequest"
       />
     </el-dialog>
 
@@ -131,7 +137,7 @@
 <script setup lang="ts">
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -142,6 +148,8 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 // 科目码单一真源（禁组件内字面量）
 import { h5Scope } from '../../composables/hCycleAccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
@@ -160,10 +168,11 @@ const samplingAccountCode = computed(() => h5Scope.grossCode(_injectedTbSrc?.val
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const state = useH5AdditionCheck({ allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'), onSave: (itemId: string, value: any) => formData.setResponse(itemId, value) })
+const state = useH5AdditionCheck({ allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'), isReadonly: toRef(props, 'isReadonly'), onSave: (itemId: string, value: any) => formData.setResponse(itemId, value) })
 
 // ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
 const samplingVisible = ref(false)
+onMounted(() => { void state.voucherFillReady() })
 const { year: auditYear } = useAuditContext()
 const samplingYear = computed<number | null>(() => props.year ?? auditYear.value ?? null)
 
@@ -208,25 +217,18 @@ async function importFromAttached(): Promise<void> {
     const { samples, misattached } = await pullSamplesForWorkpaper(
       props.projectId, samplingYear.value, props.wpId, H5_ACCOUNT_PREFIXES.value,
     )
-    if (samples.length > 0) onSampleFilled({ samples, phase: 'final', fillMode: 'append' })
+    if (samples.length > 0) await state.onAttachImported(samples)
     if (misattached.length > 0) ElMessage.warning(`${misattached.length} 张凭证不属于本底稿科目范围，已跳过`)
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
 
-function onSampleFilled(payload: any): void {
+/** 抽凭回填走共享函数：一个样本一行，按分录指纹去重；填入几行由共享函数提示 */
+async function onSampleFilled(payload: EngineFilledPayload & { methodology?: SamplingMethodologySnapshot }) {
   // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
-  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
-
-  const samples = payload?.samples ?? []
-  for (const s of samples) {
-    state.addRow(s.summary || s.counterpartAccount || '抽凭样本', {
-      voucherNo: s.voucherNo || '',
-      amount: s.debitAmount || s.creditAmount || 0,
-      conclusion: '',
-    })
-  }
-  samplingVisible.value = false
+  void persistMethodology(payload?.methodology)
+  const out = await state.onEngineFilled(payload)
+  if (!out.cancelled) samplingVisible.value = false
 }
 
 async function handleAddRow() {

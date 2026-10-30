@@ -257,3 +257,13 @@ async def test_unregistered_filter_key_is_400_and_columns_project(client) -> Non
 async def test_json_sources_reject_conditions(client) -> None:
     response = await _execute(client, HS, "disclosure", conditions=[{"field": "x", "op": "eq", "value": 1}])
     assert response.status_code == 400 and response.json()["detail"]["error_code"] == "CONDITIONS_UNSUPPORTED"
+
+
+@pytest.mark.parametrize("source", ["report:balance_sheet|A1:C5", "note:五-1-1|C3:D8", "adj:aje|B2:E10",
+                                    "tb:detail|C1:C50"])
+async def test_module_cell_source_keys_are_400_unknown_source(client, source: str) -> None:
+    """跨模块单元格源族已删除（任务 34，AQ-25）：这类源键按未知数据源 400，不再 200 返回虚拟单元格。"""
+    response = await _execute(client, HS, source)
+    assert response.status_code == 400, response.text[:500]
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "UNKNOWN_SOURCE" and detail["source"] == source and detail["message"], detail

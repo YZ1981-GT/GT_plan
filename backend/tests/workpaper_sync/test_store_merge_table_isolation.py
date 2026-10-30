@@ -41,13 +41,10 @@ OWN_TABLE_NOT_CREATING: dict[tuple[str, str], str] = {
     ),
 }
 
-#: 已知缺口（批 B 修；修好后本条失效即报红，必须删）
-KNOWN_GAPS: dict[tuple[str, str], str] = {
-    ("g1.trading_financial_assets_detail", "g1_2_rows_r2"): "G1 门面只取区① 的 spec，区②/③ 两个方向都没接",
-    ("g1.trading_financial_assets_detail", "g1_2_rows_r3"): "同上",
-    ("g3.dividend_receivable_detail", "g3_2_rows_r1"): "G3 重导出的 store 门面绑死在 G9 的 spec 上",
-    ("g3.dividend_receivable_detail", "g3_2_rows_r2"): "同上",
-}
+#: 已知缺口（修好后本条失效即报红，必须删）。
+#: 批 B3 已清空：G1 区②③（门面只取区① 的 spec）与 G3 两区（门面重导出自 G9、用 G9 的 spec）改为门面按本 provider
+#: 绑定（`phase5_section_store_facade`）。
+KNOWN_GAPS: dict[tuple[str, str], str] = {}
 
 
 def _probe_value(value_type: str) -> Any:
@@ -158,7 +155,11 @@ def test_probe_row_lands_only_in_its_own_store_item(adapter_id: str, table_key: 
     specs_fn = getattr(bridge, "managed_row_table_specs", None)
     specs = {s.table_key: s for s in specs_fn()} if callable(specs_fn) else {}
     spec = specs.get(table_key)
-    if spec is not None and spec.row_section_field and spec.row_section_field not in _json_paths(table):
+    if spec is not None and spec.row_section_field:
+        # 🔴 区归属字段不得受管：受管就会被 OO 侧那一格的值盖掉（G1 A 列原绑 acctClass，探针文本把行改到三区之外）
+        assert spec.row_section_field not in _json_paths(table), (
+            f"{table_key} 的区归属字段 {spec.row_section_field!r} 是受管列 ⇒ OO 侧改那一格会把行改到区外"
+        )
         assert grown[0].get(spec.row_section_field) == spec.row_section_value, (
             f"{table_key} 新增行落错区：{grown[0].get(spec.row_section_field)!r}，应为 {spec.row_section_value!r}"
         )

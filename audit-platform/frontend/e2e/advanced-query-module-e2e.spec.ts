@@ -8,18 +8,23 @@
  *
  * _Requirements: 2.1, 4.2, 5.2, 6.1, 7.1, 14.1, 14.2_
  *
- * 运行前提：后端 9980 + 前端 3030 需运行（start-dev.bat）。
+ * 运行前提：后端 9980 + 前端 3030 需运行（start-dev.bat）；另起的一套用 `E2E_BASE_URL` / `E2E_BACKEND_URL` 指过去。
  * 服务器未启动时本 spec 自动 skip（beforeAll 健康检查），不阻塞。
- * 手工跑：`npx playwright test advanced-query-module-e2e`
+ * 手工跑：`npx playwright test advanced-query-module-e2e`（globalSetup 会往库里 seed，只读核对时设 `SKIP_E2E_SEED=1`）
  *
  * 设计说明：数据是否已 seed 会影响查询是否返回数据，因此对「数据相关」断言采用
  * 弹性策略（结果表/空态/错误提示三选一即视为不崩）；对「必然渲染」的 UI 骨架
  * （标题/能力说明/字段树/两入口按钮/构建器表单）采用硬断言。核心验收 =「全链路不崩」。
+ *
+ * advanced-query-linkage-closure 任务 36 静态复核（2026-10-29）：条件行改由 QueryConditionEditor 渲染
+ * （`[data-testid="cq-condition-row"]`）；查询缺项目 / 审计年度 / 数据源时「执行查询」置灰并显示原因
+ * （`[data-testid="cqt-run-reason"]`），不再用「今年 − 1」兜底；导出改为「导出 ▾」下拉（全部：服务端 / 当前页：前端）；
+ * 构建器在弹窗里，按钮与标题在弹窗内取（页面与弹窗各有一个「执行查询」，弹窗标题与构建器标题同名）。
  */
 import { test, expect, type Page } from '@playwright/test'
 
-const FRONTEND = 'http://localhost:3030'
-const BACKEND = 'http://localhost:9980'
+const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:3030'
+const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:9980'
 
 // 已知良性前端异常（非崩溃信号），从「致命异常」判定中剔除
 const BENIGN_ERROR_PATTERNS = [
@@ -82,6 +87,30 @@ async function pickProjectAndSource(page: Page) {
   }
 }
 
+/** 业务视图「执行查询」：可点就点；置灰时必须显示原因（缺项目 / 审计年度 / 数据源），这也是不崩的一种结果态 */
+async function runQueryIfPossible(page: Page): Promise<boolean> {
+  const execBtn = page.getByRole('button', { name: /执行查询/ })
+  if (await execBtn.isEnabled()) {
+    await execBtn.click()
+    return true
+  }
+  await expect(page.getByTestId('cqt-run-reason')).toBeVisible()
+  return false
+}
+
+/** 业务视图「添加条件」：所选数据源不支持条件或还没有字段时按钮置灰，此时不点 */
+async function addConditionIfPossible(page: Page): Promise<boolean> {
+  const addCond = page.getByRole('button', { name: /添加条件/ })
+  if (!(await addCond.count()) || !(await addCond.isEnabled())) return false
+  await addCond.click()
+  return true
+}
+
+/** 高级构建器弹窗（弹窗标题与构建器自身标题同名，按钮也与页面重名 ⇒ 一律在弹窗内取） */
+function builderDialog(page: Page) {
+  return page.locator('.el-dialog', { hasText: '高级查询构建器' })
+}
+
 test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page)
@@ -123,17 +152,14 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
     })
 
     await test.step('添加查询条件（R5.2 维度/条件构造入口）', async () => {
-      const addCond = page.getByRole('button', { name: /添加条件/ })
-      if (await addCond.count()) {
-        await addCond.click()
+      if (await addConditionIfPossible(page)) {
         // 出现一行条件（字段/操作符/值）
-        await expect(page.locator('.gt-cqt-cond-row').first()).toBeVisible()
+        await expect(page.getByTestId('cq-condition-row').first()).toBeVisible()
       }
     })
 
     await test.step('执行查询（R4.2 结果链路）→ 结果表/空态/错误三选一（不崩）', async () => {
-      const execBtn = page.getByRole('button', { name: /执行查询/ })
-      await execBtn.click()
+      if (!(await runQueryIfPossible(page))) return
       // 等待任一结果态出现：结果表 / 空态 / 错误提示
       await page.waitForTimeout(1500)
       const table = page.locator('.gt-cqt-table')
@@ -144,8 +170,8 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
       expect(anyState, '查询后结果区应至少渲染 表格/空态/错误 之一').toBeGreaterThan(0)
     })
 
-    await test.step('导出 Excel 按钮存在（R7.1）', async () => {
-      await expect(page.getByRole('button', { name: /导出 Excel/ })).toBeVisible()
+    await test.step('导出按钮存在（R8.1：导出全部 / 导出当前页）', async () => {
+      await expect(page.getByTestId('cqt-export')).toBeVisible()
     })
 
     expect(fatal, `致命前端异常：\n${fatal.join('\n')}`).toEqual([])
@@ -154,7 +180,7 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
   test('结果下钻：GtIndexChip 存在时点击不崩（R4.2）', async ({ page }) => {
     const fatal = collectFatalErrors(page)
     await pickProjectAndSource(page)
-    await page.getByRole('button', { name: /执行查询/ }).click()
+    await runQueryIfPossible(page)
     await page.waitForTimeout(1500)
 
     // 可下钻单元格 chip（仅在结果含可解析 addr_id 列时出现）→ 条件性断言
@@ -180,24 +206,26 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
       await expect(builderBtn).toBeVisible()
       await expect(builderBtn).toBeEnabled()
       await builderBtn.click()
-      // 弹窗标题
-      await expect(page.getByText('高级查询构建器')).toBeVisible()
+      // 弹窗（标题「高级查询构建器」）
+      await expect(builderDialog(page)).toBeVisible()
     })
 
     await test.step('构建器表单骨架渲染（表选择 / ACNR 选字段 / SQL 预览）', async () => {
+      const dialog = builderDialog(page)
       // ACNR 跨模块选字段（构建器内也复用 useAcnr）
-      await expect(page.getByText('ACNR 选字段（跨模块单元格）')).toBeVisible()
+      await expect(dialog.getByText('ACNR 选字段（跨模块单元格）')).toBeVisible()
       // SQL 预览区块（R6.1/分组透视依赖 SQL 编排）
-      await expect(page.getByText('SQL 预览').first()).toBeVisible()
-      // 三个核心动作按钮
-      await expect(page.getByRole('button', { name: /生成 SQL 预览/ })).toBeVisible()
-      await expect(page.getByRole('button', { name: /执行查询/ })).toBeVisible()
-      await expect(page.getByRole('button', { name: /导出 Excel/ })).toBeVisible()
+      await expect(dialog.getByText('SQL 预览').first()).toBeVisible()
+      // 三个核心动作按钮（导出按钮的可访问名是「导出全部结果为 Excel」）
+      await expect(dialog.getByRole('button', { name: /生成 SQL 预览/ })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: /执行查询/ })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: /导出全部结果为 Excel/ })).toBeVisible()
     })
 
     await test.step('选择白名单表 → 触发 SQL 预览（分组/透视编排入口不崩）', async () => {
+      const dialog = builderDialog(page)
       // 表选择：构建器左侧第一个 el-select
-      const tableSelect = page.locator('.gt-aqb .el-select').first()
+      const tableSelect = dialog.locator('.gt-aqb .el-select').first()
       if (await tableSelect.count()) {
         await tableSelect.click()
         const opt = page.locator('.el-select-dropdown__item:not(.is-disabled):visible').first()
@@ -207,14 +235,14 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
         }
       }
       // 生成 SQL 预览
-      const previewBtn = page.getByRole('button', { name: /生成 SQL 预览/ })
+      const previewBtn = dialog.getByRole('button', { name: /生成 SQL 预览/ })
       if (await previewBtn.isEnabled()) {
         await previewBtn.click()
         await page.waitForTimeout(1200)
       }
       // 预览区渲染 SQL 或空态提示（不崩）
-      const sql = page.locator('.gt-aqb-sql')
-      const emptyHint = page.locator('.gt-aqb-empty')
+      const sql = dialog.locator('.gt-aqb-sql')
+      const emptyHint = dialog.locator('.gt-aqb-empty')
       expect((await sql.count()) + (await emptyHint.count())).toBeGreaterThan(0)
     })
 
@@ -245,22 +273,21 @@ test.describe('高级查询模块 端到端全链路 (Task 20.1)', () => {
 
     // 业务视图链路
     await pickProjectAndSource(page)
-    const addCond = page.getByRole('button', { name: /添加条件/ })
-    if (await addCond.count()) await addCond.click()
-    await page.getByRole('button', { name: /执行查询/ }).click()
+    await addConditionIfPossible(page)
+    await runQueryIfPossible(page)
     await page.waitForTimeout(1200)
 
     // 切到高级构建器
     const builderBtn = page.getByRole('button', { name: /高级构建器/ })
     if (await builderBtn.isEnabled()) {
       await builderBtn.click()
-      await expect(page.getByText('高级查询构建器')).toBeVisible()
+      await expect(builderDialog(page)).toBeVisible()
       // 关闭弹窗
       await page.keyboard.press('Escape')
     }
 
-    // 视图根仍存活（未白屏 = 不崩）
-    await expect(page.locator('.gt-cq-view, .gt-cqt')).toBeVisible()
+    // 视图根仍存活（未白屏 = 不崩；`.gt-cq-view` 包着 `.gt-cqt`，只取外层，避免两个元素同时命中）
+    await expect(page.locator('.gt-cq-view')).toBeVisible()
     expect(fatal, `全链路致命前端异常：\n${fatal.join('\n')}`).toEqual([])
   })
 })

@@ -187,6 +187,9 @@ class ProjectCreateResponse(BaseModel):
     created_at: datetime
     # 本次请求产生的说明（仅创建/保存时非空），如「已从同企业的合并项目带入集团关系」
     notices: list[str] = []
+    # V212 当前审计阶段与预审截止日（改动走 PUT /api/projects/{id}/audit-phase）
+    current_audit_phase: str = "final"
+    interim_cutoff_date: date | None = None
 
 
 # ===================================================================
@@ -978,11 +981,8 @@ class EventType(str, enum.Enum):
     # cross-workpaper-dispatch-persistence: D0-1 跨底稿分发事件
     DISPATCH_CREATED = "dispatch.created"
     DISPATCH_REVOKED = "dispatch.revoked"
-
-    # consol-note-mapping-reuse-and-reference-push Phase 4:
-    # 子企业附注值变化 → 合并侧 stale 通知
-    # payload: {consol_project_id, section_id, entity_node_key, entity_project_id, new_fingerprint}
-    CONSOL_NOTE_VALUE_CHANGED = "consol_note.value_changed"
+    # （CONSOL_NOTE_VALUE_CHANGED 从未有发布方 / 订阅方，随 V202 值确认退役删除；子企业附注保存 → 合并侧待更新走
+    #  NOTE_SECTION_SAVED + consol.note_stale SSE，spec note-pull-followup-closure R16）
 
 
 class EventPayload(BaseModel):

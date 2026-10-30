@@ -60,6 +60,19 @@ describe('purgeStaleIndicatorCache / writeIndicatorCache', () => {
     expect(purgeStaleIndicatorCache(current)).toBe(0)
   })
 
+  it('树形（任务 29）：页面版「骨架 + 附注分支」与弹窗全量树互不命中、写入互不清除；同一树形的旧附注版本照样清掉', () => {
+    const full = { schema: 14, projectId: PID, year: 2025, notesVersion: 'v1' }
+    const page = { ...full, variant: 'page' }
+    expect(indicatorCacheKey(page)).toBe(`${INDICATOR_CACHE_PREFIX}14:${PID}~page:2025:v1`)
+    writeIndicatorCache(indicatorCacheKey(full), TREE)
+    expect(readIndicatorCache(indicatorCacheKey(page)), '页面版不能读到弹窗的全量树').toBeNull()
+    writeIndicatorCache(indicatorCacheKey(page), [{ key: 'page-only' }])
+    expect(readIndicatorCache(indicatorCacheKey(full)), '写页面版不清掉弹窗的全量树').toEqual(TREE)
+    writeIndicatorCache(indicatorCacheKey({ ...page, notesVersion: 'v2' }), [])
+    expect(sessionStorage.getItem(indicatorCacheKey(page)), '同一树形旧附注版本清掉').toBeNull()
+    expect(readIndicatorCache(indicatorCacheKey(full))).toEqual(TREE)
+  })
+
   it('损坏条目读回 null 并被删掉', () => {
     const k = indicatorCacheKey({ schema: 12, projectId: PID, year: 2025 })
     sessionStorage.setItem(k, '{broken')

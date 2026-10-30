@@ -123,9 +123,12 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #:   「合并表标题 ↔ 单体表名」对照（gen_consol_standalone_note_mapping._TITLE_ALIASES：合并 Word 提示句 / 「期末本公司…」
 #:   说法认回单体表）：国企 0.9306→0.9418、对上 617→631、none 14→11（五-18-8 超额亏损表补上；五-54-4 单体是三组列合表，
 #:   如实不对）；上市 0.9339→0.9375、对上 819→825、none 25→23。
+#: 2026-10-26 note-pull-header-formula-closure 浏览器实测（自动映射后映射弹窗报「未对上的列」）：上市 五-5-6~10 组合计提表
+#:   单体按底稿 D2 写「期末余额/应收账款」、合并按 Word 写「期末余额/账面余额」→ 词表同义计量词；五-30-2 合并
+#:   「…上年年末互抵金额」↔ 单体「…期初互抵金额」（期间词在计量词中间）→ 计量词别名：上市 0.9375→0.9500、对上 825→836。
 _RATCHET = {
     "soe": {"coverage": 0.9418, "matched": 631, "none": 11},
-    "listed": {"coverage": 0.9375, "matched": 825, "none": 23},
+    "listed": {"coverage": 0.95, "matched": 836, "none": 23},
 }
 
 
@@ -173,6 +176,20 @@ def test_correspondence_ratchet(catalog, std):
     assert stats["coverage"] >= _RATCHET[std]["coverage"]
     assert stats["matched_columns"] >= _RATCHET[std]["matched"]
     assert stats["by_via"].get("none", 0) <= _RATCHET[std]["none"]
+
+
+def test_listed_portfolio_tables_take_carrying_amount_via_synonym(catalog):
+    """上市 五-5-6~10 组合计提表：合并「期末余额/账面余额」↔ 单体（底稿）「期末余额/应收账款」按同义计量词对上，
+    坏账准备照旧精确；五-30-2 上年年末互抵金额按别名对上单体期初互抵金额（2026-10-26）。"""
+    items = {i["consol"]: i for i in catalog["correspondence"]["listed"]}
+    for n in range(6, 11):
+        item = items[f"五-5-{n}"]
+        table = f"五、5#{n - 1}"
+        assert item["standalone"] == table and item["unmatched"] == [], item
+        assert item["columns"] == [[1, table, 1, "synonym"], [2, table, 2, "exact"], [4, table, 4, "synonym"],
+                                   [5, table, 5, "exact"]], item
+    item = items["五-30-2"]
+    assert item["unmatched"] == [] and [3, "五、30#1", 3, "exact"] in item["columns"], item
 
 
 def test_committed_file_location():

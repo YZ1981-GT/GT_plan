@@ -3,8 +3,11 @@
  *
  * 对齐 Excel「附注披露信息（国企）」+ note_template_soe §八、9：
  * 账龄 / 计提方法 / 单项明细 / 组合账龄 / ECL三阶段 / 转回核销 / 前五名 / 政府补助 / 转移
+ *
+ * 附注页离屏同步（spec note-pull-followup-closure R1）调同一套：`initialFillFromSources`（打开时的取数，不弹提示）
+ * + `buildSyncPayloads`（同步载荷）；没有组件实例时不挂生命周期、不订阅审定事件。
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useAgingConfig } from '@/composables/useAgingConfig'
@@ -39,7 +42,7 @@ import {
   readAdjudicationTotals,
   readK1SummaryFigures,
 } from './k1DisclosureModel'
-import { buildK1SoeSyncPayloads } from './k1DisclosureSyncPayload'
+import { buildK1SoeSyncPayloads, type K1SyncFromWorkpaperPayload } from './k1DisclosureSyncPayload'
 import {
   K1_ACCOUNT_CODE,
   K1_NOTE_SECTION,
@@ -59,7 +62,8 @@ export function useK1DisclosureSoe(opts: {
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
   onSave?: (itemId: string, value: unknown) => void
-  applicableStandards?: Ref<readonly string[] | null | undefined>
+  /** Ref 或 getter（Tab 传 `() => props.applicableStandards`）；原只读 `.value`，传 getter 时恒为 undefined */
+  applicableStandards?: Ref<readonly string[] | null | undefined> | (() => readonly string[] | null | undefined)
 }) {
   const { wpId, projectId, allResponses, isReadonly, onSave } = opts
   const agingConfig = useAgingConfig(projectId, 'K1')
@@ -131,7 +135,9 @@ export function useK1DisclosureSoe(opts: {
   const top5Check = computed(() => calcTop5ProportionCheck(payload.value.top5Rows))
 
   function _standards(): readonly string[] | null | undefined {
-    return opts.applicableStandards?.value
+    const s = opts.applicableStandards
+    if (!s) return undefined
+    return typeof s === 'function' ? s() : s.value
   }
 
   function persistPayload(): void {
@@ -172,8 +178,9 @@ export function useK1DisclosureSoe(opts: {
     { immediate: true },
   )
 
-  function refreshFromSources(force = false): void {
-    if (isReadonly.value && !force) return
+  /** 从源底稿取数（不弹提示）；只读且非强制时不取，返回是否取了 */
+  function fillFromSources(force = false): boolean {
+    if (isReadonly.value && !force) return false
     payload.value = autoFillSoeFromK1Sources(
       { ...payload.value },
       allResponses.value,
@@ -182,7 +189,21 @@ export function useK1DisclosureSoe(opts: {
     )
     lastSyncHint.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     persistPayload()
+    return true
+  }
+
+  function notifyRefreshed(force: boolean): void {
     ElMessage.success(force ? '已强制从源底稿覆盖取数' : '已从 K1-1/K1-2/K1-3/K1-7/K1-9 同步取数')
+  }
+
+  function refreshFromSources(force = false): void {
+    if (fillFromSources(force)) notifyRefreshed(force)
+  }
+
+  /** 打开时的初始化（不弹提示）：本底稿还没有已存披露数据 ⇒ 强制从源底稿取数。返回是否取了（Tab 据此提示） */
+  function initialFillFromSources(): boolean {
+    if (allResponses.value.get(K1_SOE_DISC_STORAGE_KEY)?.remark) return false
+    return fillFromSources(true)
   }
 
   function recalcAgingDerived(): void {
@@ -504,15 +525,20 @@ export function useK1DisclosureSoe(opts: {
     return JSON.parse(serializeK1SoePayload(payload.value))
   }
 
-  async function syncToNotes(): Promise<void> {
-    if (isSyncing.value || !projectId.value || isReadonly.value) return
-    const payloads = buildK1SoeSyncPayloads(
+  /** 同步载荷（快照 + 国企 builder；口径不适用回空）。Tab 的同步与附注页离屏同步共用 */
+  function buildSyncPayloads(): K1SyncFromWorkpaperPayload[] {
+    return buildK1SoeSyncPayloads(
       wpId.value,
       _standards(),
       getSyncSnapshot(),
       noteText.value,
       readK1SummaryFigures(allResponses.value),
     )
+  }
+
+  async function syncToNotes(): Promise<void> {
+    if (isSyncing.value || !projectId.value || isReadonly.value) return
+    const payloads = buildSyncPayloads()
     if (!payloads.length) {
       ElMessage.warning('当前项目准则不适用国企附注同步')
       return
@@ -542,15 +568,17 @@ export function useK1DisclosureSoe(opts: {
     refreshFromSources(false)
   }
 
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', handleAdjudicated)
-    const hasData = !!allResponses.value.get(K1_SOE_DISC_STORAGE_KEY)?.remark
-    if (!hasData) refreshFromSources(true)
-  })
+  // 离屏同步在 effectScope 里调用（没有组件实例）：不挂生命周期、不订阅审定事件
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('substantive:adjudicated', handleAdjudicated)
+      if (initialFillFromSources()) notifyRefreshed(true)
+    })
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  })
+    onBeforeUnmount(() => {
+      window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+    })
+  }
 
   return {
     agingConfig,
@@ -585,6 +613,7 @@ export function useK1DisclosureSoe(opts: {
     portfolioSplitTieOut,
     top5Check,
     refreshFromSources,
+    initialFillFromSources,
     updateAgingRow,
     updateMethodRow,
     updateIndividualRow,
@@ -612,6 +641,7 @@ export function useK1DisclosureSoe(opts: {
     removeContinuedInvolvementRow,
     updateNoteSection,
     noteSection,
+    buildSyncPayloads,
     syncToNotes,
     payload,
   }

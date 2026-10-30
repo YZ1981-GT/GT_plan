@@ -34,6 +34,29 @@ describe('buildLedgerQuery（页内同步与站外深链共用，advanced-query-
     expect(back).toMatchObject(state)
     expect(mockQuery.year).toBe('2025')
   })
+
+  // spec voucher-identity-writeback-and-audit-phase 任务 14：每次写 URL 整页按 fullPath 重挂载、从 URL 恢复，
+  // 凭证字 / 主体不进 URL 时同日同号多张凭证会先列候选，选了又列（四川物流 FY-0012 / GZ-0012 实测）
+  it.each([
+    ['凭证字 FY', 'FY', { voucherType: 'FY' }],
+    ['凭证字为空的那张（≠ 不知道）', '', { voucherType: '' }],
+    ['不知道', null, {}],
+  ])('凭证字往返：%s', (_label, voucherType, written) => {
+    Object.keys(mockQuery).forEach(k => delete mockQuery[k])
+    const query = buildLedgerQuery({ level: 'voucher', account: '1002', voucherNo: '0012', voucherDate: '2025-01-20', voucherType })
+    expect(query).toEqual({ level: 'voucher', account: '1002', voucher: '0012', voucherDate: '2025-01-20', ...written })
+    Object.assign(mockQuery, query)
+    expect(useLedgerUrlSync().readFromUrl().voucherType).toBe(voucherType)
+  })
+
+  it('主体往返；空主体不写（四表主体非空，空 = 不限）', () => {
+    Object.keys(mockQuery).forEach(k => delete mockQuery[k])
+    const query = buildLedgerQuery({ level: 'voucher', account: '1002', voucherNo: '0012', voucherCompany: '重庆医药集团四川医药有限公司' })
+    expect(query.voucherCompany).toBe('重庆医药集团四川医药有限公司')
+    Object.assign(mockQuery, query)
+    expect(useLedgerUrlSync().readFromUrl().voucherCompany).toBe('重庆医药集团四川医药有限公司')
+    expect(buildLedgerQuery({ level: 'voucher', voucherCompany: '' })).not.toHaveProperty('voucherCompany')
+  })
 })
 
 describe('useLedgerUrlSync', () => {

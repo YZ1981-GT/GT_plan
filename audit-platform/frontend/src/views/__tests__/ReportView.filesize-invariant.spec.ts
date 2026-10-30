@@ -34,11 +34,12 @@ const MAX_LINES = 1500
  * `non-empty` 用例补上了这一侧。
  *
  * 与后端门禁 `backend/scripts/check/check_file_size.py` 的
- * `HARD_CAPS` 对应，但那里填 **1949**（`splitlines()` 口径恒少 1）。
+ * `HARD_CAPS` 对应，但那里填 **1943**（`splitlines()` 口径恒少 1）。
  * 两个数字差 1 是口径差异，不是笔误。
+ * 2026-10-29 随后端 cap 下调（1949 → 1943，advanced-query-linkage-closure 任务 32），本处 1950 → 1944。
  */
 const PER_FILE_MAX_LINES: Record<string, number> = {
-  'src/views/ReportView.vue': 1950,
+  'src/views/ReportView.vue': 1944,
 }
 
 function maxLinesFor(relativePath: string): number {

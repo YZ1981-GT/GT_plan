@@ -184,7 +184,15 @@ import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaf
 import { calcEquityEndBalance } from '../../composables/useM4FormulaEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import {
+  buildMEquityTabSyncPayload,
+  createMEquityDisclosureRows,
+  M4_DISCLOSURE_FORM,
+  restoreMEquityDisclosure,
+  type MEquityDisclosureRow as DisclosureRow,
+  type MEquityDisclosureState,
+} from '../../composables/mEquityDisclosureForm'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
 
@@ -219,22 +227,16 @@ const formData = useM4FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-interface DisclosureRow {
-  item: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  _isTotal?: boolean
-}
-
-const dataRows = ref<DisclosureRow[]>([
-  { item: '资本溢价（股本溢价）', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-  { item: '其他资本公积', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 },
-])
+// 默认行 / 读回 / 同步快照与附注页离屏同步共用 mEquityDisclosureForm（spec note-pull-followup-closure R1）
+const FORM = M4_DISCLOSURE_FORM.listed
+const dataRows = ref<DisclosureRow[]>(createMEquityDisclosureRows(FORM))
 
 const premiumNote = ref('')
 const otherNote = ref('')
+
+function disclosureState(): MEquityDisclosureState {
+  return { rows: dataRows.value, notes: [premiumNote.value, otherNote.value] }
+}
 
 // ─── 合计行 + 计算 ──────────────────────────────────────────────────────────
 
@@ -273,17 +275,7 @@ function updateRow(index: number, field: 'beginBalance' | 'increase' | 'decrease
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
-  const payload = buildMEquitySyncPayload(props.wpId, {
-    cycle: 'M4',
-    variant: 'listed',
-    rows: dataRows.value.map((r) => ({
-      label: r.item,
-      begin: Number(r.beginBalance) || 0,
-      increase: Number(r.increase) || 0,
-      decrease: Number(r.decrease) || 0,
-    })),
-    note: [premiumNote.value, otherNote.value].filter(Boolean).join('\n') || undefined,
-  })
+  const payload = buildMEquityTabSyncPayload(props.wpId, FORM, disclosureState())
   if (!payload) {
     ElMessage.warning('当前项目准则不适用上市附注同步')
     return
@@ -379,18 +371,9 @@ function fmtAmount(val: number): string {
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 
 function restoreData(): void {
-  for (let i = 0; i < dataRows.value.length; i++) {
-    for (const field of ['beginBalance', 'increase', 'decrease'] as const) {
-      const resp = formData.allResponses.value.get(`M4-disclosure-listed-${i}-${field}`)
-      if (resp?.remark) {
-        dataRows.value[i][field] = Number(resp.remark) || 0
-      }
-    }
-  }
-  const premResp = formData.allResponses.value.get('M4-disclosure-listed-premium-note')
-  if (premResp?.remark) premiumNote.value = premResp.remark
-  const otherResp = formData.allResponses.value.get('M4-disclosure-listed-other-note')
-  if (otherResp?.remark) otherNote.value = otherResp.remark
+  const { notes: [premium, other] } = restoreMEquityDisclosure(formData.allResponses.value, FORM, disclosureState())
+  premiumNote.value = premium
+  otherNote.value = other
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
