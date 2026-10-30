@@ -7,22 +7,22 @@
 
 ## 批 A　只读校验与分叉工具
 
-- [ ] 0. 现状复核与基线
+- [x] 0. 现状复核与基线
   - 按 design §1 的口径重算 15 行（只读探针：链数、链尾数、分叉、断头、v1 不符、同链同 ts、索引；AST：41 处调用 / 吞异常 20 处 / 绕过写入 3 处 / 哈希副本 4 份；咨询锁取锁点），变化追加到 design §1 末尾
   - 三路合扫迁移号并记录；确认母 spec 已入库、记基线 HEAD
   - Verify: 探针输出存 `tmp_audit_chain/baseline/`；design §1 增补段落有日期与数字
 
-- [ ] 1. 规范化、v2 哈希与按链接关系校验（I6、I7，ADR-04/05）
+- [x] 1. 规范化、v2 哈希与按链接关系校验（I6、I7，ADR-04/05）
   - 新建 `audit_chain/canonical.py`、`audit_chain/verify.py`；`routers/audit_logs.py` 改调 `verify.py`（鉴权不变、旧字段保留、新增 `problems` / `legacy_*` / `anchor`）
   - `tests/test_audit_log_hash_chain_property.py` 改为调用 `verify.py`（hypothesis `max_examples=5`）
   - Verify: `tests/audit_chain/test_audit_chain_canonical.py`、`test_audit_chain_verify.py` 全绿；共享库只读跑一次校验，全局链报 1 处 `fork`、`legacy_unverifiable = 1`（v1 重算按 ADR-04 试两种 UUID 写法后只剩 `formula.changed` 那 1 行；或现算值）；另加一条用例：无连字符写法写入的 v1 行计 `legacy_verified`。变异：校验恢复首条任意采信 ⇒ `missing_prefix` 用例红；浮点不规范化 ⇒ `1e20` 用例红
 
-- [ ] 2. 分叉扫描、确认工具与健康字段（I2、I4，ADR-03/10）
+- [x] 2. 分叉扫描、确认工具与健康字段（I2、I4，ADR-03/10）
   - 新建 `audit_chain/forks.py`；脚本 `backend/scripts/ops/audit_chain_fork_ack.py`（默认只读演示，`--apply` 才写，`--operator` 校验 admin）、`backend/scripts/ops/audit_chain_heads.py`（默认只读）
   - `api/health.py` 增 `audit_chain`；隔离区计数先返回 0（批 B 才有隔离区）
   - Verify: 一次性库 PG 用例（造分叉 → 扫描报 1 → 前置校验不符拒绝并列出实际集合 → 确认后扫描报 0、确认条目 `prev_hash` = survivor 哈希）；健康端点在有未确认分叉时 `degraded`。变异：前置校验改为不比集合 ⇒ 拒绝用例红
 
-- [ ] 3. 批 A 回归、提交与推送
+- [x] 3. 批 A 回归、提交与推送
   - 候选树 vs 基线 HEAD 全量后端失败集合对比；只读探针结果贴入本任务
   - Verify: 只候选红 = 0；推送带版本号与主要变动
 
