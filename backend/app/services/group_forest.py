@@ -73,6 +73,7 @@ def _base_node(rec: ProjectRecord, year: int | None) -> dict:
     """旧前端依赖的键（to_dict_v2 形态）+ 新增键的默认值。"""
     return {
         "id": str(rec.id),
+        "nodeKey": f"{_clean(rec.company_code) or rec.id}@{year if year is not None else ''}",
         "label": rec.client_name,
         "companyCode": _clean(rec.company_code) or "",
         "companyName": rec.client_name,

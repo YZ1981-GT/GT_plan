@@ -9,7 +9,10 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import logging
+import threading
 from typing import Any
 from uuid import UUID
 
@@ -26,17 +29,40 @@ logger = logging.getLogger(__name__)
 # 拼音工具
 # ---------------------------------------------------------------------------
 
-try:
-    from pypinyin import lazy_pinyin, Style
-
-    def _pinyin_initials(text: str) -> str:
-        """生成拼音首字母（如 '应收账款' → 'yszk'）"""
-        return "".join(lazy_pinyin(text, style=Style.FIRST_LETTER))
-except ImportError:
+_PYPINYIN_AVAILABLE = importlib.util.find_spec("pypinyin") is not None
+_PINYIN_TOOLS: tuple[Any, Any] | None = None
+_PINYIN_LOCK = threading.Lock()
+if not _PYPINYIN_AVAILABLE:  # pragma: no cover - 取决于运行环境
     logger.warning("pypinyin not installed, pinyin search disabled")
 
-    def _pinyin_initials(text: str) -> str:  # type: ignore[misc]
+
+def _load_pinyin_tools() -> tuple[Any, Any] | None:
+    global _PYPINYIN_AVAILABLE, _PINYIN_TOOLS
+    if not _PYPINYIN_AVAILABLE:
+        return None
+    if _PINYIN_TOOLS is not None:
+        return _PINYIN_TOOLS
+    with _PINYIN_LOCK:
+        if _PINYIN_TOOLS is not None:
+            return _PINYIN_TOOLS
+        try:  # pragma: no cover - ImportError 分支取决于运行环境
+            module = importlib.import_module("pypinyin")
+        except ImportError:
+            _PYPINYIN_AVAILABLE = False
+            logger.warning("pypinyin import failed, pinyin search disabled")
+            return None
+        _PINYIN_TOOLS = (module.lazy_pinyin, module.Style)
+        return _PINYIN_TOOLS
+
+
+def _pinyin_initials(text: str) -> str:
+    """生成拼音首字母；首次真正需要拼音匹配时才导入 pypinyin。"""
+    tools = _load_pinyin_tools()
+    if tools is None:
         return ""
+    lazy_pinyin, style = tools
+    return "".join(lazy_pinyin(text, style=style.FIRST_LETTER))
+
 
 
 # ---------------------------------------------------------------------------

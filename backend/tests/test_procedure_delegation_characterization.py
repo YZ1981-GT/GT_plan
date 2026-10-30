@@ -20,6 +20,7 @@ from app.models.base import Base, ProjectStatus, ProjectType, UserRole
 from app.models.core import Project, User
 from app.models.phase15_models import TaskEvent
 from app.models.procedure_models import ProcedureInstance
+from app.models.template_library_models import ProjectTemplateSelection, TemplateLibraryItem
 from app.models.workpaper_models import (
     WorkingPaper,
     WpCrossRef,
@@ -40,6 +41,8 @@ _CURRENT_TABLES = [
     WpIndex.__table__,
     WorkingPaper.__table__,
     WpCrossRef.__table__,
+    TemplateLibraryItem.__table__,
+    ProjectTemplateSelection.__table__,
     ProcedureInstance.__table__,
     TaskEvent.__table__,
 ]

@@ -94,6 +94,10 @@ export const aging = {
 export const ledger = {
   balance: (pid: string) => `/api/projects/${pid}/ledger/balance`,
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
+  window: (pid: string, code: string) => `/api/projects/${pid}/ledger/window/${encodeURIComponent(code)}`,
+  auxWindow: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-window/${encodeURIComponent(code)}`,
+  windowExport: (pid: string, code: string) => `/api/projects/${pid}/ledger/window-export/${encodeURIComponent(code)}`,
+  auxWindowExport: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-window-export/${encodeURIComponent(code)}`,
   openingBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/opening-balance/${encodeURIComponent(code)}`,
   voucher: (pid: string, voucherNo: string) => `/api/projects/${pid}/ledger/voucher/${encodeURIComponent(voucherNo)}`,
   // 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）

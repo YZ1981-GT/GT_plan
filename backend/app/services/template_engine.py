@@ -398,38 +398,13 @@ class TemplateEngine:
         return ts
 
     async def seed_builtin_template_sets(self, db: AsyncSession) -> list[WpTemplateSet]:
-        """Seed the 6 built-in template sets (idempotent).
+        """幂等初始化内置模板集，返回新建 + 更新的行（实现见 :mod:`app.services.builtin_template_sets`）。
 
         Validates: Requirements 1.7
         """
-        created = []
-        for data in BUILTIN_TEMPLATE_SETS:
-            existing_result = await db.execute(
-                sa.select(WpTemplateSet).where(
-                    WpTemplateSet.set_name == data["set_name"]
-                )
-            )
-            existing = existing_result.scalar_one_or_none()
-            if existing is not None:
-                # 已存在：如果编码数量变化则更新（保证 seed 后编码总是最新）
-                old_codes = existing.template_codes or []
-                new_codes = data["template_codes"]
-                if len(old_codes) != len(new_codes) or set(old_codes) != set(new_codes):
-                    existing.template_codes = new_codes
-                    existing.description = data["description"]
-                    created.append(existing)
-                continue
-            ts = WpTemplateSet(
-                set_name=data["set_name"],
-                template_codes=data["template_codes"],
-                applicable_audit_type=data["applicable_audit_type"],
-                applicable_standard=data.get("applicable_standard"),
-                description=data["description"],
-            )
-            db.add(ts)
-            created.append(ts)
-        await db.flush()
-        return created
+        from app.services.builtin_template_sets import seed_builtin_template_sets_safely
+
+        return (await seed_builtin_template_sets_safely(db)).changed
 
     # ------------------------------------------------------------------
     # 6.5  generate_project_workpapers
@@ -483,7 +458,10 @@ class TemplateEngine:
         from pathlib import Path
 
         ts_result = await db.execute(
-            sa.select(WpTemplateSet).where(WpTemplateSet.id == template_set_id)
+            sa.select(WpTemplateSet).where(
+                WpTemplateSet.id == template_set_id,
+                WpTemplateSet.is_deleted == sa.false(),
+            )
         )
         template_set = ts_result.scalar_one_or_none()
         if template_set is None:

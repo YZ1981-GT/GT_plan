@@ -5,15 +5,16 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 行业守卫：非金融企业提示 -->
-    <div v-else-if="!isFinancialEntity" class="industry-guard">
-      <el-empty description="一般风险准备仅适用金融企业（银行、证券、保险等）">
-        <el-button type="primary" @click="markNotApplicable">标记为不适用</el-button>
-      </el-empty>
-    </div>
-
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- 试算表里找不到一般风险准备科目时提示（不阻断；原按「行业」整页拦截，平台没有行业来源） -->
+      <WpAccountAbsenceHint
+        :project-id="props.projectId"
+        cycle="M"
+        account-name="一般风险准备"
+        usual-scope="一般风险准备通常只在金融企业（银行、证券、保险等）计提"
+        :accounts-found="accountsFound"
+      />
       <!-- 双模式切换（结构化 / OnlyOffice，sync bridge 真双向） -->
       <div v-if="currentSheet !== 'index' && currentSheet !== 'procedure'" class="mode-toggle-bar">
         <el-segmented
@@ -125,10 +126,12 @@
  *
  * 科目覆盖：一般风险准备（**贷方/权益类！**）
  * 核心铁律：期末=期初+贷方-借方（计提时贷方增加，转回/使用时借方减少）
- * 特殊功能：①权益类贷方公式 ②金融企业行业守卫 ③按风险资产期末余额计提测试（1.5%）
+ * 特殊功能：①权益类贷方公式 ②试算表无一般风险准备科目时提示 ③按风险资产期末余额计提测试（1.5%）
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
- * 行业守卫: 非金融企业（银行/证券/保险）不适用，可标记不适用。
+ * 科目提示: 渲染返回 accounts_found=false 时顶部提示（不阻断，WpAccountAbsenceHint）；不按行业拦截
+ *   （平台没有项目级行业来源，原 project_info.industry 恒空 ⇒ 所有项目整页拦截；
+ *   spec trim-followup-residual-findings-closure R1）。不适用的底稿走程序裁剪。
  *
  * 集成（Phase 6）：
  * - EventBus: substantive:adjudicated(一般风险准备) / adjustment:created
@@ -146,6 +149,7 @@ import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import WpAccountAbsenceHint from './shared/WpAccountAbsenceHint.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -196,33 +200,10 @@ const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
 const applicableStandards = useHostApplicableStandards({ htmlData: () => props.htmlData })
 
-// ─── 行业守卫（金融企业适用性） ──────────────────────────────────────────────
-
-/**
- * 判断当前审计项目是否为金融企业（银行、证券、保险等）。
- * 从 render-config 返回的 project_info 或 checklist_responses 中读取行业属性。
- * 默认假设适用（避免阻塞加载），在 selfLoad 后根据实际数据更新。
- */
-const isFinancialEntity = ref(true)
-const FINANCIAL_INDUSTRIES = ['金融', '银行', '证券', '保险', '信托', '基金', '期货', '金融租赁']
-
-function checkIndustryApplicability(projectInfo: any): boolean {
-  if (!projectInfo) return true // 无数据时默认适用
-  const industry = projectInfo.industry || projectInfo.client_industry || ''
-  return FINANCIAL_INDUSTRIES.some((keyword) => industry.includes(keyword))
-}
-
-function markNotApplicable() {
-  // 标记为不适用（保存到 checklist_responses）
-  // item_id 与 useM8CrossSheet 读取的 'M8-industry-guard' 一致
-  // conclusion 存储 "not-applicable"，useM8CrossSheet 降级判断时读取此值
-  http
-    .put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: 'M8-industry-guard', conclusion: 'not-applicable', remark: null }],
-    })
-    .catch(() => {})
-}
+// ─── 科目提示（渲染返回 accounts_found；自加载时从 render-config 取） ──────────
+const selfLoadedAccountsFound = ref<boolean | null>(null)
+const accountsFound = computed<boolean | null>(() =>
+  typeof props.htmlData?.accounts_found === 'boolean' ? props.htmlData.accounts_found : selfLoadedAccountsFound.value)
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 
@@ -345,11 +326,7 @@ function handleM8SaveItems(_e: Event): void {
 
 async function selfLoad() {
   if (props.htmlData) {
-    // 从 props 提供的数据初始化
-    // props.htmlData 来自 GtWpRenderer 传入的当前 sheet 的 html_data
-    // M8 renderer 返回 { component_type, sheets, project_info, tb_snapshot, ... }
-    const projectInfo = props.htmlData?.project_info
-    isFinancialEntity.value = checkIndustryApplicability(projectInfo)
+    // props.htmlData 来自 GtWpRenderer 传入的当前 sheet 的 html_data（accountsFound 直接读它）
     isLoading.value = false
     return
   }
@@ -361,10 +338,9 @@ async function selfLoad() {
       { _silent: true } as any,
     )
     const data = (res as any)?.data ?? res
-    // render-config 返回 { sheets: [{ html_data: { project_info, ... } }] }
-    const firstSheet = data?.sheets?.[0]?.html_data
-    const projectInfo = firstSheet?.project_info || data?.project_info
-    isFinancialEntity.value = checkIndustryApplicability(projectInfo)
+    // render-config 返回 { sheets: [{ html_data: { accounts_found, ... } }] }
+    const found = data?.sheets?.[0]?.html_data?.accounts_found
+    if (typeof found === 'boolean') selfLoadedAccountsFound.value = found
   } catch (err) {
     console.warn('[GtM8GeneralRiskReserve] selfLoad failed:', err)
   }
@@ -391,11 +367,6 @@ onBeforeUnmount(() => {
 
 .loading-container {
   padding: 24px;
-}
-
-.industry-guard {
-  padding: 48px 24px;
-  text-align: center;
 }
 
 .mode-toggle-bar {

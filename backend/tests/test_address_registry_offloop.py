@@ -25,7 +25,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.applications import Starlette
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder
 from starlette.responses import Response, StreamingResponse
 from starlette.routing import Route
@@ -129,14 +128,6 @@ class _NoDbSession:
         return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
 
 
-class _Passthrough(BaseHTTPMiddleware):
-    """生产栈里 GZip 与 ResponseWrapper 之间还有 Observability（BaseHTTPMiddleware）：它把响应改成流式
-    （数据段 more_body=True + 末尾空段）。测试栈缺这一层时 gzip 只见到整段响应，测不到生产形状。"""
-
-    async def dispatch(self, request, call_next):
-        return await call_next(request)
-
-
 @pytest.fixture
 def make_client(monkeypatch):
     if "_get_domain" in vars(svc.address_registry):
@@ -147,9 +138,10 @@ def make_client(monkeypatch):
             return [e for e in entries if e.domain == domain]
 
         monkeypatch.setattr(svc.AddressRegistryService, "_get_domain", fake_get_domain)
+        # 生产栈 GZip 与 ResponseWrapper 之间的中间件都是纯 ASGI（spec backend-startup-and-request-overhead R3.1）：
+        # 包好的信封到 gzip 时是整段；流式形状由下面 _gzip_app 的用例覆盖
         app = FastAPI()
         app.add_middleware(ResponseWrapperMiddleware)
-        app.add_middleware(_Passthrough)
         app.add_middleware(OffloadingGZipMiddleware, minimum_size=1000)
         app.include_router(router_module.router)
 
@@ -189,7 +181,7 @@ def test_large_payload_is_wrapped_too_and_gzipped_off_loop(make_client, monkeypa
     _spy(GZipResponder, "apply_compression", monkeypatch, seen)
     r = _search(client, limit=50_000)
     assert r.headers.get("content-encoding") == "gzip"
-    assert seen == [False, True], "整段载荷在工作线程里压；只剩末尾空段在事件循环上收尾"
+    assert seen == [False], "整段载荷在工作线程里压（只压一次，不在事件循环上）"
     assert len(r.content) > 5 * 1024 * 1024, "要覆盖原「> 5MB 不包信封」那条分支"
     body = r.json()
     assert body["code"] == 200 and body["data"]["returned"] == 12_000

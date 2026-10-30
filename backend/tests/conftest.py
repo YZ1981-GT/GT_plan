@@ -103,13 +103,6 @@ import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强�
 import app.models.share_change_event_models  # noqa: E402, F401  — 动态股比变动事件
 import app.models.consol_note_mapping_models  # noqa: E402, F401  — V186 合并附注明细模板与映射
 
-# Stub for 'workpapers' table referenced by AI models FK
-import sqlalchemy as _sa
-class _WorkpaperStub(Base):
-    __tablename__ = "workpapers"
-    __table_args__ = {"extend_existing": True}
-    id = _sa.Column(_sa.Uuid, primary_key=True)
-
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 if hasattr(SQLiteTypeCompiler, "visit_uuid"):
     SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid

@@ -268,6 +268,7 @@ import { useA171Navigation } from './composables/useA171Navigation'
 import type { A171RenderData } from './composables/useA171AuditSummary'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { classificationOf } from '@/types/projectClassification'
 import ConsistencyPanel from './a17/ConsistencyPanel.vue'
 import type { ConsistencyResult } from './a17/ConsistencyPanel.vue'
 
@@ -446,13 +447,13 @@ async function handleChapterPull(n: number) {
   }
 }
 
-// ─── Signature visibility by business_category ───
+// ─── Signature visibility by 质控分类组别（渲染下发的 project_context.project_classification；原按 business_category 首字母）───
 const visibleSignatureRows = computed(() => {
-  const bc = projectContext.value?.business_category || ''
+  const group = classificationOf(projectContext.value)?.category_group ?? 'C'
   // A类: 4角色全显 | B类: 编制人+复核人+EQCR(跳过质控)=3 | C类: 编制人+复核人=2
-  if (bc.startsWith('A')) {
+  if (group === 'A') {
     return signatureTable.value.map((row, idx) => ({ ...row, originalIndex: idx }))
-  } else if (bc.startsWith('B')) {
+  } else if (group === 'B') {
     // 跳过 index 2 (质量控制复核合伙人)
     return signatureTable.value
       .filter((_, idx) => idx !== 2)

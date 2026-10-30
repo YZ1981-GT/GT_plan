@@ -25,6 +25,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.core import Project
 from app.models.workpaper_models import WpIndex
+from app.services.project_classification import ProjectClassification, project_classification
 from app.services.wp_generation_receipt import GenerationReceipt
 
 logger = logging.getLogger(__name__)
@@ -197,17 +198,21 @@ def _wp_name_lookup() -> dict[str, str]:
     return names
 
 
+def _listed_or_ipo(classification: ProjectClassification) -> bool:
+    """上市 / IPO 口径（项目分类 / 场景单一解释）：上市公司报表模板、场景 ipo / listed、细分类 A1 / A2 / A7。"""
+    return classification.has_tag("listed") or classification.is_ipo
+
+
 def default_flags_from_project(project: Project) -> dict[str, bool]:
     audit_type = str(project.audit_type or "").lower()
-    scenario = str(project.scenario or "")
+    classification = project_classification(project)
     template_type = str(project.template_type or "")
     integrated = (
         "integrated" in audit_type
         or "内控" in str(project.audit_type or "")
         or "icfr" in audit_type
-        or "integrated" in scenario.lower()
     )
-    listed_or_ipo = template_type == "listed" or scenario in ("ipo", "listed")
+    listed_or_ipo = _listed_or_ipo(classification)
     return {
         "integrated_audit": integrated,
         "listed_or_ipo": listed_or_ipo,
@@ -220,14 +225,9 @@ def default_flags_from_project(project: Project) -> dict[str, bool]:
 
 
 def is_pie_project(project: Project) -> bool:
-    template_type = str(project.template_type or "")
-    scenario = str(project.scenario or "")
-    bc = str(getattr(project, "business_category", None) or "")
-    if template_type == "listed" or scenario in ("ipo", "listed"):
-        return True
-    if bc.upper().startswith("A"):
-        return True
-    return False
+    """公众利益实体：上市 / IPO 口径，或质控业务分类 A 类（重大公众利益实体）。"""
+    classification = project_classification(project)
+    return _listed_or_ipo(classification) or classification.category_group == "A"
 
 
 def simplification_for_project(project: Project) -> SimplificationHint:
@@ -321,7 +321,7 @@ async def ensure_workpapers_for_codes(
     for code in plan.to_create:
         await create_template_workpaper(
             db, receipt, project_id=project_id, wp_code=code, wp_name=names.get(code) or f"底稿{code}",
-            audit_cycle="B", scenario=str(project.scenario or "normal"),
+            audit_cycle="B", scenario=project_classification(project).scenario,
             has_foreign_currency=bool(getattr(project, "has_foreign_currency", False)),
         )
     return EnsureWorkpapersResult(created=list(receipt.created_codes), skipped_trimmed_codes=plan.skipped_trimmed_codes,

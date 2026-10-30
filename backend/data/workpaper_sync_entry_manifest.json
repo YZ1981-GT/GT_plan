@@ -13057,9 +13057,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g1.trading_financial_assets_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g1-trading-financial-assets",
@@ -13076,7 +13076,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -13330,9 +13330,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g10.trading_liabilities_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
@@ -13349,7 +13349,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -13588,9 +13588,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g11.investment_income_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g11-investment-income",
@@ -13607,7 +13607,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -13846,9 +13846,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g12.net_hedge_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g12-net-hedge-gains",
@@ -13865,7 +13865,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -14104,9 +14104,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g13.fair_value_changes_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g13-fair-value-changes",
@@ -14123,7 +14123,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -14362,9 +14362,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g14.credit_impairment_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g14-credit-impairment-loss",
@@ -14381,7 +14381,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -14620,9 +14620,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g2.interest_receivable_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g2-interest-receivable",
@@ -14639,7 +14639,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -14893,9 +14893,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g3.dividend_receivable_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g3-dividend-receivable",
@@ -14912,7 +14912,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -15928,9 +15928,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g5.long_term_receivable_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g5-long-term-receivable",
@@ -15947,7 +15947,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -17691,9 +17691,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g8.other_equity_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g8-other-equity-instruments",
@@ -17710,7 +17710,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"
@@ -17949,9 +17949,9 @@
       }
     },
     {
-      "adapter_id": null,
+      "adapter_id": "g9.other_noncurrent_detail",
       "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-g9-other-noncurrent-financial",
@@ -17968,7 +17968,7 @@
       "host_path": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
       "html_store": "unresolved",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mount_components": [
         "GtOnlyOfficeSheet",
         "WorkpaperSyncEditorHost"

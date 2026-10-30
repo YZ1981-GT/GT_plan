@@ -130,10 +130,11 @@ socket 未必立即释放，所以必须显式等端口空闲。
 5. `Get-NetTCPConnection` 会把同地址的重复绑定折叠成一条，只显示其中一个 owner；
    取 owner 必须用 `netstat -ano`。
 
-现行规则：owner 取自 netstat；存活 owner 若启动时间晚于其 socket 创建时间 2s 以上，
-视为 PID 已被复用，不杀；孤儿按命令行 `spawn_main(parent_pid=<owner>,` 匹配；
-一律 `taskkill /F /T`。启动后端前对 9980 也执行 `:wait_port_free`，端口仍被占
-会打出 `[WARN] Port 9980 still occupied`，不再静默共享。
+现行规则：先按启动器专用窗口标题清理自己创建的进程树；`:kill_port` 只清理
+socket 记录的 owner 已死亡、且命令行匹配 `spawn_main(parent_pid=<owner>,` 的孤儿
+worker。端口上仍存活的 listener 一律视为未知进程，不再强杀。随后对 9980 和 3030
+执行 `:wait_port_free`；端口仍被占用时启动器打印 `[ERROR]` 并以非零状态退出，避免
+误杀其他程序，也避免新旧服务共享端口。
 
 守卫：`backend/tests/test_start_dev_kill_port_orphan_guard.py` 真实复现
 「supervisor 先死、worker 持句柄存活」，执行从 bat 原样提取的 `:kill_port`
@@ -149,3 +150,14 @@ socket 未必立即释放，所以必须显式等端口空闲。
 用途：在线编辑验收与计时。每次热重载都会丢掉进程内的注册缓存与解析缓存，紧接着的那次 OnlyOffice 保存要重付冷成本（2026-10-24 实测重载后第一个保存回调 51 s）；多会话共用开发环境时，别的会话改代码会频繁触发重载。
 
 守卫：`backend/tests/test_start_dev_backend_reload_switch.py`（从 bat 原样取出开关与启动行，cmd 里两种模式各展开一次比对）。
+
+## 八、启动成功判据与退出码
+
+前端的 `VITE_API_BASE_URL` / `VITE_DEV_PORT` 在父进程中使用 `set "NAME=value"`
+赋值后再启动子窗口。不要写成 `set NAME=value && ...`：`&&` 前的空格会进入变量值，
+Vite 会原样保留，进而使 `/api` 的绝对 `Location` 重写匹配失败。
+
+后端探针不只检查 HTTP 200，还要求 `/api/health` 的业务状态为 `healthy`；
+`degraded` 不再被误报为启动成功。9980 或 3030 未就绪时，启动器最终返回非零退出码，
+调用脚本可以据此判定失败。退役的 DSH Web UI 3080 不再由启动器清理、注入或展示；
+DSH Agent 统一由后端运行时管理。

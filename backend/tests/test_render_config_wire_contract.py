@@ -35,6 +35,10 @@ UUID_RE = re.compile(
     r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
     re.IGNORECASE,
 )
+#: 只在 ``share_html_data=1`` 时出现的字段（golden 抓的是不带参数的生产路径，不会出现）。
+#: spec platform-perf-hotspots R1
+PARAM_GATED_ROOT_FIELDS = frozenset({"shared_html_data"})
+PARAM_GATED_SHEET_FIELDS = frozenset({"html_data_ref"})
 
 
 def _dump(payload: dict) -> dict:
@@ -117,8 +121,26 @@ def test_render_config_route_binds_strict_response_model() -> None:
                 }
             ],
         },
+        {
+            "audit_year": 2026,
+            "applicable_standards": [],
+            "fill_results": {},
+            "guidance": None,
+            "shared_html_data": {"h1": {"project_context": {"year": 2026}, "rows": []}},
+            "sheets": [
+                {
+                    "sheet_name": name,
+                    "componentType": "d2-accounts-receivable",
+                    "schema": None,
+                    "html_data": {"sheet_name": name},
+                    "html_data_ref": "h1",
+                    "cross_refs": [],
+                }
+                for name in ("审定表D2-1", "明细表D2-2")
+            ],
+        },
     ],
-    ids=["normal-nullability", "redirect", "word-template"],
+    ids=["normal-nullability", "redirect", "word-template", "shared-html-data"],
 )
 def test_render_config_branches_round_trip_without_field_loss(
     branch_payload: dict,
@@ -164,29 +186,29 @@ def test_live_golden_outer_fields_equal_model_plus_declared_reserved_fields() ->
     }
 
     # word-template 分支字段：真实样本未命中，但模型与前端生命周期清单必须同时登记。
-    # ``not_applicable`` 虽未出现在历史 golden 样本中，已由 GtWpRenderer
-    # 消费为顶层适用性覆盖层，因此它是 active，不是 reserved。
+    # （not_applicable 自 golden 于 33b3b67fd 重抓后已在真实样本中出现，且已由 GtWpRenderer
+    #   消费为顶层适用性覆盖层，前端登记为 active，不是 reserved。）
     model_only = root_model_fields - root_runtime_fields
-    assert model_only == {
+    assert PARAM_GATED_ROOT_FIELDS <= model_only, "按参数出现的字段不得出现在不带参数的 golden 里"
+    assert model_only - PARAM_GATED_ROOT_FIELDS == {
         "permissions",
         "sign_status",
         "business_category",
         "applicable_when",
-        "not_applicable",
     }
     frontend_src = DEFAULT_FRONTEND_PATH.read_text(encoding="utf-8")
-    for field in sorted((model_only - {"not_applicable"}) | {"guidance", "scope"}):
+    for field in sorted((model_only - PARAM_GATED_ROOT_FIELDS) | {"guidance", "scope"}):
         assert f"  {field}: 'reserved'" in frontend_src, (
             f"模型/运行时未消费字段 {field} 必须在 RENDER_CONFIG_FIELD_STATUS 登记为 reserved"
         )
-    assert "  not_applicable: 'active'" in frontend_src, (
-        "not_applicable 已由 GtWpRenderer 消费，必须登记为 active"
-    )
-    assert "  decision_trace: 'active'" in frontend_src, (
-        "decision_trace 已由 WpDecisionTracePanel 消费，必须登记为 active"
-    )
+    for field in sorted(PARAM_GATED_ROOT_FIELDS | {"decision_trace", "not_applicable"}):
+        assert f"  {field}: 'active'" in frontend_src, (
+            f"{field} 已有前端消费方（decision_trace → WpDecisionTracePanel，"
+            f"not_applicable → GtWpRenderer，shared_html_data → expandSharedHtmlData），必须登记为 active"
+        )
     assert root_runtime_fields - root_model_fields == set()
-    assert sheet_model_fields == sheet_runtime_fields
+    assert not (PARAM_GATED_SHEET_FIELDS & sheet_runtime_fields)
+    assert sheet_model_fields - PARAM_GATED_SHEET_FIELDS == sheet_runtime_fields
 
 
 def test_known_nullability_quartet_is_aligned_bidirectionally() -> None:

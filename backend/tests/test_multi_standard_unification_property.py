@@ -596,6 +596,8 @@ class TestIntegrationConvertWorkpapers:
         original_shared_parsed = copy.deepcopy(shared_parsed)
 
         mock_db = AsyncMock()
+        # AsyncSession.get_bind() 是同步方法；AsyncMock 默认把所有属性都变成协程，会伪造错误接口。
+        mock_db.get_bind = MagicMock(return_value=None)
         mock_db.flush = AsyncMock()
         mock_db.commit = AsyncMock()
 

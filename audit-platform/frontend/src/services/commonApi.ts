@@ -3,6 +3,7 @@
  * 规则：所有页面必须通过 API 服务层调用，不允许直接拼 URL
  */
 import http from '@/utils/http'
+import { invalidateProjectListQuery, listProjectsShared } from '@/services/projectListQuery'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
   procedureRowTasks as P_prt, workpaperLeads as P_leads,
@@ -25,8 +26,7 @@ import {
 // ── 项目 ──
 
 export async function listProjects(params?: Record<string, any>): Promise<any[]> {
-  const { data } = await http.get(P_proj.list, { params })
-  return Array.isArray(data) ? data : data?.items || []
+  return listProjectsShared(params)
 }
 
 export async function listProjectsWithProgress(): Promise<any[]> {
@@ -1100,16 +1100,19 @@ export async function listRecycleBinItems(params?: Record<string, any>): Promise
 // 请求带 _silent，免得全局拦截器先弹一次、同一原因提示两遍
 export async function restoreRecycleBinItem(itemId: string): Promise<any> {
   const { data } = await http.post(P_rb.restore(itemId), null, { _silent: true } as any)
+  if (itemId.startsWith('project/')) invalidateProjectListQuery()
   return data
 }
 
 export async function permanentDeleteItem(itemId: string): Promise<any> {
   const { data } = await http.delete(P_rb.delete(itemId), { _silent: true } as any)
+  if (itemId.startsWith('project/')) invalidateProjectListQuery()
   return data
 }
 
 export async function emptyRecycleBin(): Promise<any> {
   const { data } = await http.post(P_rb.empty, null, { _silent: true } as any)
+  invalidateProjectListQuery()
   return data
 }
 

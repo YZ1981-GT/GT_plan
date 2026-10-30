@@ -491,6 +491,8 @@ interface QueryResult {
   // 后端可能返回 ColumnMeta[]（含 addr_id/drillable）或 legacy string[]，统一由 normalizeColumns 归一
   columns: Array<string | Record<string, any>>
   total: number
+  count_token?: string
+  count_reused?: boolean
   table: string
   sql: string
   formula_refs?: (string | null)[]
@@ -511,6 +513,7 @@ const acnrFieldIds = ref<string[]>([])
 const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v2'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
+const countToken = ref('')
 /** 最近一次查询失败（结果区持久显示） */
 const queryError = ref<QueryErrorText | null>(null)
 
@@ -734,6 +737,7 @@ function buildPayload() {
   return buildBuilderPayload(dsl, acnrFieldIds.value, {
     projectId: contextProjectId.value, year: contextYear.value, scopeToProject: scopedToProject.value,
     offset: (page.value - 1) * dsl.limit,
+    countToken: page.value > 1 ? countToken.value : undefined,
   })
 }
 
@@ -778,6 +782,7 @@ async function doPreview() {
 /** 执行查询：从第 1 页开始 */
 async function doExecute() {
   page.value = 1
+  countToken.value = ''
   await runQuery()
 }
 
@@ -802,6 +807,7 @@ async function runQuery() {
     lastQuery.projectId = typeof sent.project_id === 'string' ? sent.project_id : null
     lastQuery.year = isKnownYear(sent.year) ? sent.year : null
     result.value = resp
+    if (resp.count_token) countToken.value = resp.count_token
     sqlPreview.value = resp.sql
     void validateRefs()
   } catch (e: any) {

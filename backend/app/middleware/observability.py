@@ -6,13 +6,18 @@
 - 慢请求告警（>3s）
 
 为后续接入 OpenTelemetry/Prometheus 预留接口。
+
+纯 ASGI（spec backend-startup-and-request-overhead R3.1）：计时到下游发出响应头为止（与原版 ``call_next``
+返回的时刻相同），在响应头上加 X-Response-Time。
 """
 
 import logging
 import time
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.middleware._asgi import request_path
 
 logger = logging.getLogger("audit_platform.metrics")
 
@@ -26,42 +31,66 @@ _SKIP_PATHS = ("/api/health", "/api/events/stream", "/docs", "/openapi.json")
 _EXPECTED_SLOW_PATH_MARKERS = ("/ai-generate", "/api/ai/health", "/api/ai/chat")
 
 
-class ObservabilityMiddleware(BaseHTTPMiddleware):
+def _log_decision(duration_ms: float, status: int, path: str) -> tuple[int, str]:
+    """保持原日志优先级：慢请求先于状态码；预期慢路径降为 DEBUG。"""
+    if duration_ms > _SLOW_REQUEST_MS:
+        if any(marker in path for marker in _EXPECTED_SLOW_PATH_MARKERS):
+            return logging.DEBUG, "SLOW_OK"
+        return logging.WARNING, "SLOW_REQUEST"
+    if status >= 500:
+        return logging.ERROR, "SERVER_ERROR"
+    if status >= 400:
+        return logging.INFO, "CLIENT_ERROR"
+    return logging.DEBUG, "REQUEST"
+
+
+class ObservabilityMiddleware:
     """采集请求指标，输出结构化日志"""
 
-    async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = request_path(scope)
 
         # 跳过健康检查和 SSE 等高频/长连接端点
         if any(path.startswith(p) for p in _SKIP_PATHS):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - start) * 1000
 
-        # 结构化日志
-        log_data = {
-            "method": request.method,
-            "path": path,
-            "status": response.status_code,
-            "duration_ms": round(duration_ms, 1),
-            "user_agent": request.headers.get("user-agent", "")[:50],
-        }
+        async def send_with_metrics(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                duration_ms = (time.perf_counter() - start) * 1000
+                status = message["status"]
+                level, label = _log_decision(duration_ms, status, path)
+                # 生产常用 WARNING 级别下，普通 2xx 是 DEBUG：先判级再构造字典与 Headers，
+                # 不为最终会被 logging 丢弃的记录做固定分配。X-Response-Time 响应契约照旧。
+                if logger.isEnabledFor(level):
+                    log_data = {
+                        "method": scope["method"],
+                        "path": path,
+                        "status": status,
+                        "duration_ms": round(duration_ms, 1),
+                        "user_agent": Headers(scope=scope).get("user-agent", "")[:50],
+                    }
+                    if label == "SLOW_OK":
+                        logger.debug("SLOW_OK %s", log_data)
+                    elif label == "SLOW_REQUEST":
+                        logger.warning("SLOW_REQUEST %s", log_data)
+                    elif label == "SERVER_ERROR":
+                        logger.error("SERVER_ERROR %s", log_data)
+                    elif label == "CLIENT_ERROR":
+                        logger.info("CLIENT_ERROR %s", log_data)
+                    else:
+                        logger.debug("REQUEST %s", log_data)
 
-        if duration_ms > _SLOW_REQUEST_MS:
-            if any(m in path for m in _EXPECTED_SLOW_PATH_MARKERS):
-                logger.debug("SLOW_OK %s", log_data)
-            else:
-                logger.warning("SLOW_REQUEST %s", log_data)
-        elif response.status_code >= 500:
-            logger.error("SERVER_ERROR %s", log_data)
-        elif response.status_code >= 400:
-            logger.info("CLIENT_ERROR %s", log_data)
-        else:
-            logger.debug("REQUEST %s", log_data)
+                # 设置响应头（供前端监控使用）
+                MutableHeaders(scope=message)["X-Response-Time"] = f"{duration_ms:.0f}ms"
+            await send(message)
 
-        # 设置响应头（供前端监控使用）
-        response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
-
-        return response
+        await self.app(scope, receive, send_with_metrics)

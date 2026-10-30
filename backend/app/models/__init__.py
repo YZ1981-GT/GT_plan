@@ -129,11 +129,17 @@ from app.models.wp_export_models import (  # noqa: F401
 from app.models.procedure_models import (  # noqa: F401
     ProcedureInstance,
     ProcedureOperationPreview,
+    ProcedureTrimCycleConfirmation,
     ProcedureRowDefinition,
     ProcedureRowTask,
     ProcedureRowTaskHistory,
     ProcedureTrimScheme,
 )
+from app.models.wp_generation_models import (  # noqa: F401
+    WorkpaperGenerationItem,
+    WorkpaperGenerationOperation,
+)
+from app.models.batch_project_models import ProjectBatchImportPlan  # noqa: F401
 from app.models.wp_visibility_models import (  # noqa: F401
     WorkpaperDelegationHistory,
     WpAccessSecurityOutbox,
@@ -354,6 +360,11 @@ __all__ = [
     "ProcedureRowTask",
     "ProcedureRowTaskHistory",
     "ProcedureOperationPreview",
+    # --- 粗裁确认投影 / 两阶段生成 (trim-generation-plan-followup-optimizations / V218、V224) ---
+    "ProcedureTrimCycleConfirmation",
+    "WorkpaperGenerationOperation",
+    "WorkpaperGenerationItem",
+    "ProjectBatchImportPlan",
     # --- 底稿可见性隔离 (procedure-delegation-visibility-isolation / V113) ---
     "WorkpaperDelegationHistory",
     "WpAccessSecurityOutbox",

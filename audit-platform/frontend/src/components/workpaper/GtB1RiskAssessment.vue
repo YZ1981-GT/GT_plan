@@ -468,7 +468,8 @@ async function handleAiGenerate() {
     const ctx: Record<string, string> = {
       被审计单位: header.value.audited_entity || projectContext.value.client_name || '',
       业务类型: variant.value === 'retention' ? '业务保持' : '业务承接',
-      行业: projectContext.value.industry || '',
+      // 平台没有项目级行业来源（渲染恒给空），空时不发「行业：」空行
+      ...(projectContext.value.industry ? { 行业: projectContext.value.industry } : {}),
       风险信号数: String(riskSignalCount.value),
       风险信号明细: riskItems.slice(0, 20).join('；') || '无明显风险信号',
     }

@@ -297,8 +297,8 @@ describe('判据 A: 底稿粒度目标的 wpIndexId 取自 wp_index_id，不由 
     expect(body.length, '函数体过短，疑似截错').toBeGreaterThan(400)
   })
 
-  it('取数走 listWorkpapersPaged（不是 getProcedures）', () => {
-    expect(body, '未调用 listWorkpapersPaged').toContain('listWorkpapersPaged')
+  it('取数走 listWorkpapersAll（不是 getProcedures；原先分页只取第 1 页 100 条，spec platform-perf-hotspots R5）', () => {
+    expect(body, '未调用 listWorkpapersAll').toContain('listWorkpapersAll')
     expect(
       /getProcedures\s*\(/.test(body),
       'buildSuggestionTargets 里调了 getProcedures（它只下发 wp_id，无 wp_index_id）',
@@ -553,7 +553,7 @@ describe('判据 D: 宿主与组件的 props / emits 逐名对齐', () => {
 
   it('无重复顶层 import（重复顶层声明会让 Vite transform 直接失败）', () => {
     for (const sym of [
-      'suggestDelegation', 'roleSeniority', 'GtDelegationSuggestionTable', 'listWorkpapersPaged',
+      'suggestDelegation', 'roleSeniority', 'GtDelegationSuggestionTable', 'listWorkpapersAll',
     ]) {
       const decls = (TRIM_SEG.script.match(
         new RegExp(`^import\\s+(\\{[^}]*\\b${sym}\\b[^}]*\\}|${sym})\\s+from`, 'gm'),

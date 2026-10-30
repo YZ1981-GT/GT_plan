@@ -22,7 +22,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.container import ServiceContainer, get_container
+from app.core.reload_handoff import status_snapshot as reload_status_snapshot
 from app.core.startup_registry import startup_report_as_dict
+from app.core.gc_tuning import get_last_freeze_report
+from app.middleware.audit_log import audit_log_failure_state
 
 router = APIRouter(tags=["健康检查"])
 
@@ -41,7 +44,8 @@ async def health_check(
           "redis": {...},
           "migration": { "applied_count": 26, "failures": [...] },
           "schema_drift": { "count": 0, "items": [...] },
-          "startup": { "status": "complete|not_run", "tasks": [...], "failed": [...], ... }
+          "startup": { "status": "complete|not_run", "tasks": [...], "failed": [...], ... },
+          "reload": { "mode": "standalone|overlap|never", "primary": true, "last": {...} | null }
         }
 
     状态码：
@@ -78,6 +82,15 @@ async def health_check(
     # 迁移失败 + schema 漂移（migration-runner-resilience spec）
     migration_info = await _query_migration_status()
     drift_info = await _query_schema_drift()
+    audit_state = audit_log_failure_state()
+    events_info = _events_replay_info()
+    reload_info = reload_status_snapshot()
+    reload_last = reload_info.get("last") or {}
+    reload_degraded = (
+        reload_info.get("primary_state") == "failed"
+        or reload_last.get("result") == "degraded"
+        or reload_last.get("phase") in {"primary_failed", "primary_timeout", "recovery_primary_failed"}
+    )
 
     # 审计链健康（ADR-ALC-10）
     audit_chain_info = await _query_audit_chain_health(ctx.db)
@@ -95,6 +108,8 @@ async def health_check(
         migration_info["failures"]
         or drift_info["critical_count"] > 0
         or audit_chain_info["unacknowledged_forks"] > 0
+        or reload_degraded
+        or int(audit_state.get("failed_count") or 0) > 0
     ):
         status = "degraded"
         status_code = 200
@@ -113,6 +128,14 @@ async def health_check(
             "audit_chain": audit_chain_info,
             # 启动报告只读进程内快照，不做 I/O；best_effort 失败不翻 status（Req 6.x）
             "startup": startup_report_as_dict(),
+            # HTTP 审计日志写入失败累计（fail-open，但必须可观测；follow-up R4.2）
+            "audit_log": audit_state,
+            # 事件重放可用性与积压（Redis 不可用时 live 仍降级可用，但补拉不可用；R3.4）
+            "events": events_info,
+            # GC 只在连续空闲窗口执行；这里暴露等待 / 重排 / 实际停顿，不额外做 I/O。
+            "gc": get_last_freeze_report(),
+            # 热重载交接：本进程模式 + 最近一次重载结果（读父进程写的小文件；不参与 status 判定）
+            "reload": reload_info,
         },
     )
 
@@ -149,6 +172,26 @@ async def _query_audit_chain_health(db) -> dict:
     _audit_chain_cache["data"] = result
     _audit_chain_cache["ts"] = now
     return result
+
+
+def _events_replay_info() -> dict:
+    """事件补拉可用性（R3.4）。
+
+    Redis 不可用时 live SSE 仍按内存降级工作，但「断线后按 id 补拉」这条路**不可用** ——
+    必须显式说出来，不能让调用方以为事件无损。只读进程内最近一次重放报告，不做 I/O。
+    """
+    try:
+        from app.services.event_bus import event_bus
+
+        report = event_bus.get_replay_report()
+    except Exception:  # noqa: BLE001 — 可观测字段不得影响 health 本身
+        return {"replay_available": None, "pending_remaining": None, "last_checked_at": None}
+    return {
+        "replay_available": bool(report.get("redis_available")),
+        "pending_remaining": report.get("pending_remaining"),
+        "last_checked_at": report.get("checked_at"),
+        "last_error": report.get("last_error"),
+    }
 
 
 async def _query_migration_status() -> dict:

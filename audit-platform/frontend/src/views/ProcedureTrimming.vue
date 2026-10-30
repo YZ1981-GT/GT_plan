@@ -10,10 +10,13 @@
         <el-button size="small" @click="openOverview">📊 全项目概览</el-button>
         <!-- 复核视图对所有角色开放：它只读，且复核恰恰应由不执行裁剪的人做（R12.6） -->
         <el-button size="small" @click="openTrimReview">🔍 裁剪充分性复核</el-button>
+        <el-button v-if="canGenerateWp" size="small" type="success" :disabled="loading || !!procedureLoadError"
+                   @click="openGenerateDialog">⬇️ 生成底稿</el-button>
         <template v-if="canManage">
           <el-button size="small" type="warning" @click="onSmartTrim">🤖 一键智能裁剪</el-button>
           <el-button size="small" @click="openDelegateWizard">🎯 程序委派向导</el-button>
-          <el-button size="small" type="primary" @click="saveTrim(true)" :loading="saving">💾 保存粗裁</el-button>
+          <el-button size="small" type="primary" @click="saveTrim(true)" :loading="saving"
+                     :disabled="loading || !!procedureLoadError">💾 保存粗裁</el-button>
         </template>
         <el-tag v-else size="small" type="info">只读（仅项目经理可裁剪/委派）</el-tag>
         <!-- 低频操作收敛，避免工具栏拥挤/窄屏折行 -->
@@ -271,7 +274,9 @@
 
     <!-- 表格工具栏 -->
     <div class="gt-proc-table-toolbar">
-      <span class="gt-proc-table-toolbar__label">{{ activeCycle }} 循环 · {{ filteredProcedures.length }} 个程序</span>
+      <span class="gt-proc-table-toolbar__label">{{ activeCycle }} 循环 · {{ filteredProcedures.length }} 个程序
+        <el-tag size="small" effect="plain" :type="isTrimConfirmed(activeCycle) ? 'success' : 'warning'">粗裁{{ trimConfirmationText(activeCycle) }}</el-tag>
+        <el-tag v-if="confirmationLoadFailed" size="small" type="danger" effect="plain">状态刷新失败，显示上次结果</el-tag></span>
       <div class="gt-proc-table-toolbar__actions">
         <!-- 复核视图跳转过来的定位提示（Task 20 / R12.5）：明示当前是被过滤到单条的状态，
              否则复核者会以为该循环只剩一个程序 -->
@@ -293,11 +298,14 @@
           <el-divider direction="vertical" />
           <el-button size="small" type="primary" text @click="batchSetAll('execute')">✓ 全部执行</el-button>
           <el-button size="small" type="danger" text @click="batchSetAll('not_applicable')">✗ 全部不适用</el-button>
+          <el-button v-if="categoryHintCount" size="small" type="warning" text @click="adoptAllHints">按业务分类建议裁剪（{{ categoryHintCount }}）</el-button>
           <el-divider direction="vertical" />
           <el-button size="small" @click="addCustom">+ 新增程序</el-button>
         </template>
       </div>
     </div>
+
+    <el-alert v-if="procedureLoadError" type="error" :title="procedureLoadError" :closable="false" show-icon />
 
     <!-- 程序列表 -->
     <div class="gt-proc-table-wrap">
@@ -387,6 +395,13 @@
                 {{ reasonCodeLabel(row.suggestion_state.reason_code) }}
               </el-tag>
             </span>
+            <!-- 业务分类建议（spec trim-generation-plan-linkage R3.4）：本行底稿按项目业务分类全部不适用 -->
+            <div v-else-if="row._applicable && row.category_hint" class="gt-proc-suggest-cell">
+              <el-tooltip :content="row.category_hint.reason" placement="top">
+                <el-tag type="warning" size="small" effect="plain">业务分类不适用</el-tag>
+              </el-tooltip>
+              <el-button v-if="canManage" size="small" type="warning" text @click="adoptCategoryHint(row)">按建议裁剪</el-button>
+            </div>
             <span v-else class="gt-proc-text-muted">—</span>
           </template>
         </el-table-column>
@@ -435,8 +450,9 @@
         </el-table-column>
         <el-table-column label="来源" width="80" align="center">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.is_custom ? 'success' : 'info'">
-              {{ row.is_custom ? '自定义' : '模板' }}
+            <el-tag size="small" :type="row.is_custom ? 'success' : row.origin === 'supplement' ? 'warning' : 'info'"
+                    :title="row.origin === 'supplement' ? '程序目录里没有、模板清单里有的底稿，补成程序行以便裁剪与指定主编' : ''">
+              {{ row.is_custom ? '自定义' : row.origin === 'supplement' ? '补充' : '模板' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -453,7 +469,7 @@
             </el-button>
             <el-tooltip
               v-else-if="row._applicable && !row.wp_id"
-              content="该程序底稿尚未生成。保存粗裁后，保留执行的程序会进入待执行底稿库；可在「底稿列表 / 生命周期」页生成底稿后再回此处逐条细裁。"
+              content="该程序底稿尚未生成：保存粗裁后点工具栏「⬇️ 生成底稿」按粗裁结果生成，再回此处逐条细裁。"
               placement="top"
             >
               <el-button size="small" text disabled>未生成</el-button>
@@ -468,6 +484,12 @@
     <div class="gt-proc-footer-tip">
       💡 双层裁剪：此处<strong>粗裁</strong>底稿范围（是否执行）并指定<strong>底稿主编</strong>；点「程序裁剪 ›」进入底稿程序表控制台，对每条审计程序做<strong>细裁</strong>（程序适用性）并委派<strong>程序执行人 / 操作复核人</strong>。保存后保留执行的程序即进入待执行底稿库。
     </div>
+
+    <!-- 按粗裁结果生成底稿（与底稿列表页共用；首次打开才挂载） -->
+    <GenerationPlanDialog v-if="generateDialogMounted" v-model="showGenerateDialog" :project-id="projectId" :year="year"
+                          :initial-cycle="activeCycle" :can-submit="canGenerateWp"
+                          disabled-reason="项目已归档或你已失去本项目编辑权限，不能生成底稿"
+                          @generated="onGenerated" @navigate-cycle="jumpToCycleFromOverview" />
 
     <!-- 新增自定义程序弹窗 -->
     <el-dialog append-to-body v-model="showAddCustomDialog" title="新增自定义程序" width="520px">
@@ -1203,8 +1225,10 @@ import {
   type ReviewProcedureRow, type ReviewCycleInput, type ReviewAnomalyKind,
   type PlatformDefaultCompletenessCycle,
 } from '@/components/workpaper/composables/trimAdequacyReview'
-import { listWorkpapersPaged } from '@/services/workpaperApi'
+import { listWorkpapersAll } from '@/services/workpaperApi'
 import { programConsoleRoute } from '@/utils/programConsoleRoute'
+import GenerationPlanDialog from '@/components/workpaper/generation/GenerationPlanDialog.vue'
+import { useTrimGenerationLink } from '@/components/workpaper/composables/useTrimGenerationLink'
 import { listAssignments } from '@/services/staffApi'
 import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
 import http from '@/utils/http'
@@ -1262,8 +1286,21 @@ const cycles = [
 ]
 
 const activeCycle = ref('D')
+// 粗裁 ↔ 生成底稿联动（spec trim-generation-plan-linkage R3）：补齐程序行、粗裁状态、业务分类建议、生成弹窗
+// 模板里调用的逐个 `const X =` 声明（判据 D 只认这种写法，解构出来的名字它看不到）
+const trimLink = useTrimGenerationLink(projectId, cycles.map(c => c.code))
+const { initialCycleFromRoute, loadCycleRows, loadConfirmations, categoryHintRows, adoptAllCategoryHints, promptAfterSave } = trimLink
+const canGenerateWp = trimLink.canGenerate
+const trimConfirmationText = trimLink.confirmationText
+const isTrimConfirmed = trimLink.isConfirmed
+const confirmationLoadFailed = trimLink.confirmationLoadFailed
+const adoptCategoryHint = trimLink.adoptCategoryHint
+const showGenerateDialog = ref(false)
+const generateDialogMounted = ref(false)
 const procedures = ref<any[]>([])
 const loading = ref(false)
+const procedureLoadError = ref('')
+let procedureLoadSeq = 0
 const saving = ref(false)
 const showRefDialog = ref(false)
 const showSmartTrimDialog = ref(false)
@@ -2068,12 +2105,18 @@ const isDirty = computed(() => {
 
 // 加载程序列表
 async function loadProcedures() {
+  const mine = ++procedureLoadSeq
+  const cycle = activeCycle.value
   loading.value = true
+  procedureLoadError.value = ''
+  // 新循环开始加载就清掉旧表体，不能在 F 标题下继续显示 D/E 的程序行。
+  procedures.value = []
+  originalSnapshot = []
   try {
-    let procs = await getProcedures(projectId.value, activeCycle.value)
-    if (!procs || procs.length === 0) {
-      procs = await initProcedures(projectId.value, activeCycle.value)
-    }
+    // 委派人先走初始化（没打开过的循环建行；已打开的补齐模板里没有程序行管的底稿，幂等），只读成员只读取
+    const procs = await loadCycleRows(cycle, canManage.value)
+    if (mine !== procedureLoadSeq || cycle !== activeCycle.value) return
+    void loadConfirmations()
     // 转换 status → _applicable 布尔值
     procedures.value = (procs || []).map((p: any) => ({
       ...p,
@@ -2082,9 +2125,15 @@ async function loadProcedures() {
       assigned_to: p.assigned_to || null,
       wp_id: p.wp_id || null,
     }))
-    // 保存初始快照用于恢复
     originalSnapshot = JSON.parse(JSON.stringify(procedures.value))
-  } finally { loading.value = false }
+  } catch {
+    if (mine !== procedureLoadSeq || cycle !== activeCycle.value) return
+    procedures.value = []
+    originalSnapshot = []
+    procedureLoadError.value = `${cycle} 循环程序列表加载失败，请重试或切换循环后再试`
+  } finally {
+    if (mine === procedureLoadSeq && cycle === activeCycle.value) loading.value = false
+  }
 }
 
 // 适用性切换
@@ -2137,6 +2186,10 @@ function batchSetAll(status: 'execute' | 'not_applicable') {
 // promptDelegate=true（点击「保存粗裁」按钮）保存成功后弹窗确认是否前往人员委派界面；
 // 智能裁剪等内部调用传 false，不打断流程
 async function saveTrim(promptDelegate = false) {
+  if (loading.value || procedureLoadError.value) {
+    ElMessage.warning('程序列表尚未成功加载，不能保存粗裁')
+    return
+  }
   // 裁剪理由必填（审计轨迹合规：裁剪必须记录理由）→ 缺失则阻断保存并定位
   const noReason = procedures.value.filter(p => !p._applicable && !p.skip_reason?.trim())
   if (noReason.length > 0) {
@@ -2180,6 +2233,7 @@ async function saveTrim(promptDelegate = false) {
     const unchanged = result.unchanged ?? 0
     ElMessage.success(`裁剪已保存（变更 ${applied}，未变 ${unchanged}），保留执行的程序已加入待执行底稿库${describeRecycleResult(result)}`)
     ok = true
+    void loadConfirmations() // 表格工具栏「粗裁已保存（谁、何时）」
     // 有底稿移入 / 移出回收站 ⇒ 重取程序列表：行上的 wp_id 决定「程序裁剪 ›」还是「未生成」，不重取就指向已移入回收站的底稿
     if (result.recycled_codes?.length || result.restored_codes?.length) {
       await loadProcedures().catch(() => { /* 裁剪已保存；刷新失败下次进入页面即正确 */ })
@@ -2196,22 +2250,35 @@ async function saveTrim(promptDelegate = false) {
     }
   } finally { saving.value = false }
 
-  // 保存成功且来自按钮点击 → 确认后跳转人员委派（委派矩阵）界面
+  // 保存成功且来自按钮点击 → 下一步：生成本循环底稿 / 前往委派（委派矩阵）/ 留在本页
   // 确认框放在 try/finally 之外，避免"取消"被 handleApiError 误判为保存失败
   if (ok && promptDelegate) {
-    try {
-      await ElMessageBox.confirm(
-        '粗裁已保存。是否前往「人员委派」界面，将保留执行的程序委派给审计人员？',
-        '前往人员委派',
-        { type: 'success', confirmButtonText: '前往委派', cancelButtonText: '暂不' },
-      )
-      router.push({
-        name: 'WorkpaperList',
-        params: { projectId: projectId.value },
-        query: { view: 'matrix' },
-      })
-    } catch { /* 用户选择"暂不"，留在当前页 */ }
+    const next = await promptAfterSave()
+    if (next === 'generate') openGenerateDialog()
+    else if (next === 'delegate') {
+      router.push({ name: 'WorkpaperList', params: { projectId: projectId.value }, query: { view: 'matrix' } })
+    }
   }
+}
+
+/** 生成底稿：按已保存的粗裁算计划，有未保存修改先拦下（否则生成的不是页面上看到的结果） */
+function openGenerateDialog() {
+  if (isDirty.value) {
+    ElMessage.warning('当前循环有未保存的粗裁修改，请先保存粗裁再生成底稿')
+    return
+  }
+  generateDialogMounted.value = true
+  showGenerateDialog.value = true
+}
+
+async function onGenerated() {
+  await loadProcedures() // 行上「未生成」→「程序裁剪 ›」
+}
+
+const categoryHintCount = computed(() => categoryHintRows(procedures.value).length)
+function adoptAllHints() {
+  const n = adoptAllCategoryHints(procedures.value)
+  if (n) ElMessage.info(`已按业务分类建议把 ${n} 个程序标为裁剪，点「💾 保存粗裁」后生效`)
 }
 
 // 新增自定义程序
@@ -3306,14 +3373,13 @@ const suggestionMembers = computed<DelegationMember[]>(() =>
 /**
  * 取当前循环的底稿粒度目标。
  *
- * `wpIndexId` 来自 `listWorkpapersPaged` 的 `wp_index_id`（**不是** `wp_id`）；
+ * `wpIndexId` 来自全部可见底稿清单的 `wp_index_id`（**不是** `wp_id`）；
  * `risk` 取 `trimContext.risk[科目名].max_risk`，科目名用与裁剪判据同一个
  * `resolveAccountName`（不另造一套解析，否则同一底稿在两处得到不同风险等级）。
+ * 原先只取分页第 1 页 100 条，循环底稿多于 100 张时后面的拿不到建议（spec platform-perf-hotspots R5）。
  */
 async function buildSuggestionTargets(): Promise<DelegationTarget[]> {
-  const env = await listWorkpapersPaged(projectId.value, {
-    audit_cycle: activeCycle.value, page: 1, page_size: 100,
-  })
+  const env = { items: await listWorkpapersAll(projectId.value, { audit_cycle: activeCycle.value }) }
   const ctx = trimContext.value
   // 每张底稿的程序行数（权重的 rowCount 项）：按 wp_code 聚合当前循环已加载的程序
   const rowCountByCode = new Map<string, number>()
@@ -3824,6 +3890,10 @@ async function openRefDialog() {
 }
 
 onMounted(async () => {
+  // ?cycle=D：从生成底稿弹窗「去程序裁剪」直接打开对应循环（R3.3）
+  const fromRoute = initialCycleFromRoute(route.query)
+  if (fromRoute) activeCycle.value = fromRoute
+  if (route.query.from === 'generate') ElMessage.info('确认本循环粗裁并保存后，可点「⬇️ 生成底稿」按粗裁结果生成')
   await loadProcedures()
   await loadTeamMembers()
   // 负载在进入界面时即可用（不依赖先打开全项目概览抽屉）；失败保持"负载未知"

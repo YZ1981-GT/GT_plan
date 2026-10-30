@@ -12,7 +12,7 @@ import {
   assertFShellConsumerCompatible,
   FSHELL_CONTRACT_VERSION,
   FSHELL_NON_CAPABILITIES,
-} from '@/shell/formula'
+} from '@/shell/formula/fShellContract'
 
 export const CUSTOM_INGESTION_FSHELL_CONSUMER = 'custom-workpaper-template-ingestion-and-sync-closure:X12'
 

@@ -125,7 +125,7 @@ async def get_current_user(
 async def get_current_user_sse(
     request: Request,
     token: str | None = Query(default=None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     """SSE / EventSource 专用鉴权（acnr-invalidation-overlay-hardening R1.2/R3.1）。
 

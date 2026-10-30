@@ -108,6 +108,7 @@ async def consume_and_apply(
     request_id: str,
     current_membership_snapshot: dict | list,
     apply_fn: Callable[[AsyncSession, ProcedureOperationPreview], Awaitable[dict]],
+    after_consume: Callable[[AsyncSession, ProcedureOperationPreview], Awaitable[object]] | None = None,
 ) -> dict:
     """一次性消费 preview 并执行领域变更（事务内 SELECT FOR UPDATE + 逐项校验）。
 
@@ -120,6 +121,7 @@ async def consume_and_apply(
       6. current membership snapshot hash == 存储 hash（成员变化 409）。
       7. 通过后调用 ``apply_fn(db, preview)``；其内部复核 target_versions（版本变化 409）。
       8. 置 consumed_at / consumed_request_id / result。
+      9. ``after_consume(db, preview)``（可选）：同一事务内写派生投影（如粗裁确认）；幂等重试分支不调用。
 
     调用方需在成功后 commit；抛 HTTPException 时不应 commit（保证零副作用）。
     """
@@ -170,4 +172,6 @@ async def consume_and_apply(
     preview.consumed_request_id = request_id
     preview.result = result
     await db.flush()
+    if after_consume is not None:
+        await after_consume(db, preview)
     return result

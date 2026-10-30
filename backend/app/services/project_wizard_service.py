@@ -4,7 +4,7 @@ Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 1.8
 """
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -22,6 +22,7 @@ from app.models.audit_platform_schemas import (
     WizardStepSaveResponse,
 )
 from app.services.note_template_service import NoteTemplateService
+from app.services.project_classification import DEFAULT_SCENARIO
 from app.services.uscc_validator import validate_uscc
 from app.services.uniqueness_checker import check_uniqueness
 
@@ -84,6 +85,16 @@ def _normalize_basic_info(
     return data, locked_snapshot
 
 
+def _store_classification_view(step_data: dict, project: Project) -> None:
+    """向导里存的分类 / 场景与项目解释结果一致（R4）：旧客户端没发这两个键时不留 null 假象，
+    迁移前残留在分类列的 IPO 显示为「分类未填写 + 场景 IPO」，与项目详情响应同口径。"""
+    from app.services.project_classification import project_classification
+
+    classification = project_classification(project)
+    step_data["business_category"] = classification.category_code
+    step_data["scenario"] = classification.scenario
+
+
 def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None:
     project.name = f"{data.client_name}_{data.audit_year}"
     project.client_name = data.client_name
@@ -97,6 +108,12 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     # audit-report-template-integration 需求 1.5/1.8：企业子类型（用户选择优先）
     if data.company_subtype:
         project.company_subtype = data.company_subtype.strip().lower()
+    # R4：质控业务分类 / 专项场景只在请求里出现时写（旧客户端不发这两个键就不动库里的值）；
+    # 值已由 BasicInfoSchema 校验归一（未登记值 422）。
+    if "business_category" in data.model_fields_set:
+        project.business_category = data.business_category
+    if "scenario" in data.model_fields_set:
+        project.scenario = data.scenario or DEFAULT_SCENARIO
     project.report_scope = data.report_scope
     # 集团架构（consol-tree-three-code-autobuild）：调用前已经 group_links.prepare_group_fields
     # 规范化（空串归 None、USCC 校验、关系补默认）。consolidation_type 自 V167 起不再写入 ——
@@ -200,6 +217,9 @@ async def create_project(
     auto_commit: bool = True,
     propagate_group: bool = True,
     sync_links: bool = True,
+    uniqueness_checked: bool = False,
+    group_fields_prepared: bool = False,
+    defer_flush: bool = False,
 ) -> Project:
     """创建项目记录，状态=created，初始化 wizard_state JSONB。
 
@@ -214,7 +234,18 @@ async def create_project(
             批量导入自动建的合并根传 False（只继承不外推，design §七）。
         sync_links: 建项后是否按三码重算本年度派生链接（需求 7.2）。批量导入传 False，
             整批结束后按年度各算一次。
+        uniqueness_checked: 仅供持久批量计划使用。True 表示同一事务已批量检查现存键；
+            仍保留数据库唯一索引作为并发最终防线。
+        group_fields_prepared: 仅供批量规划器使用。True 时字段已按库存覆盖层规范化，
+            本函数只做纯校验，不再逐行查询 counterpart/上级；单项目入口保持原行为。
+        defer_flush: 仅供整批原子 apply 使用。预先分配 UUID 并把 flush 延迟到批量边界；
+            必须与 auto_commit=False、propagate_group=False、sync_links=False 同用。
     """
+    if defer_flush and (auto_commit or propagate_group or sync_links):
+        raise ValueError(
+            "defer_flush 只能与 auto_commit=False、propagate_group=False、sync_links=False 同用"
+        )
+
     # --- 校验链 ---
     # 1. short_name 非空
     short_name = (data.short_name or "").strip() if data.short_name else ""
@@ -231,28 +262,40 @@ async def create_project(
     if not uscc_valid:
         raise HTTPException(status_code=422, detail=uscc_error)
 
-    # 4. 唯一性校验
+    # 4. 唯一性校验。持久批量计划已一次性预取并锁定校验，可跳过重复 SELECT；
+    # 数据库部分唯一索引仍处理并发竞争。
     audit_year = data.audit_year
     report_scope = data.report_scope or DEFAULT_REPORT_SCOPE
-    is_unique, uniqueness_error = await check_uniqueness(
-        company_code, audit_year, report_scope, db
-    )
-    if not is_unique:
-        raise HTTPException(status_code=409, detail=uniqueness_error)
+    if not uniqueness_checked:
+        is_unique, uniqueness_error = await check_uniqueness(
+            company_code, audit_year, report_scope, db
+        )
+        if not is_unique:
+            raise HTTPException(status_code=409, detail=uniqueness_error)
 
-    # --- 集团架构字段：规范化 + 继承同企业另一口径项目 + 补默认（需求 1/2）---
-    from app.services.group_links import prepare_group_fields
-
-    notices = await prepare_group_fields(
-        db, data, project_id=None, report_scope=report_scope, inherit=True
-    )
+    # --- 集团架构字段：单项目按库存继承；批量计划已一次预取，只做同源纯校验 ---
+    if group_fields_prepared:
+        from app.services.group_links import normalize_group_fields
+        normalize_group_fields(data)
+        notices: list[str] = []
+    else:
+        from app.services.group_links import prepare_group_fields
+        notices = await prepare_group_fields(
+            db, data, project_id=None, report_scope=report_scope, inherit=True
+        )
 
     # --- 创建项目 ---
     data, custom_template_snapshot = _normalize_basic_info(data)
-    project = Project(status=ProjectStatus.created)
+    project = (
+        Project(id=uuid4(), status=ProjectStatus.created)
+        if defer_flush else Project(status=ProjectStatus.created)
+    )
     _sync_basic_info_to_project(project, data)
+    if project.scenario is None:  # 新建对象还没有库默认值；显式写 normal，后面读回不触发懒加载
+        project.scenario = DEFAULT_SCENARIO
     db.add(project)
-    await db.flush()  # 获取 project.id
+    if not defer_flush:
+        await db.flush()  # 获取 project.id；批量 apply 已预分配 UUID 并统一 flush
     if propagate_group:
         from app.services.group_links import propagate_to_counterpart
 
@@ -262,6 +305,7 @@ async def create_project(
 
     # 初始化 wizard_state，并将 basic_info 步骤数据写入
     basic_info_data = data.model_dump(mode="json")
+    _store_classification_view(basic_info_data, project)
     if custom_template_snapshot is not None:
         basic_info_data["custom_template_snapshot"] = custom_template_snapshot
     state = WizardState(
@@ -302,7 +346,14 @@ async def get_wizard_state(project_id: UUID, db: AsyncSession) -> WizardState:
     """
     project = await _get_project_or_404(db, project_id)
     await _backfill_locked_custom_template_snapshot(project, db)
-    return _parse_wizard_state(project)
+    state = _parse_wizard_state(project)
+    # R4：旧向导数据没有分类 / 场景键 —— 回填表单时按项目现值（解释后）给出，否则保存会把库里的分类清空
+    basic = state.steps.get(WizardStep.basic_info.value)
+    if basic is not None:
+        view = dict(basic.data)
+        _store_classification_view(view, project)
+        basic.data = view
+    return state
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +433,7 @@ async def update_step(
         if custom_template_snapshot is not None:
             step_data["custom_template_snapshot"] = custom_template_snapshot
         _sync_basic_info_to_project(project, basic_info)
+        _store_classification_view(step_data, project)
         notices += await propagate_to_counterpart(db, project)
         # 需求 7.2：保存基本信息后重算派生链接；改了审计年度时新旧两个年度都要算
         from app.services.group_links import sync_group_links

@@ -84,6 +84,7 @@ SCENARIO_TO_FILE_FILTER: dict[str, dict[str, list[str]]] = {
     },
     "ipo": {},            # 加载全部
     "listed": {},         # 加载全部
+    "refinancing": {},    # 上市公司再融资：加载全部（R4 登记的场景值，原先按未知场景退化为 normal）
     "transfer": {},       # 新三板挂牌：加载全部
     "restructure": {},    # 加载全部
     "fraud_response": {}, # 加载全部
@@ -438,6 +439,8 @@ def init_workpaper_from_template(
     merge_all_files: bool = True,
     scenario: str = "normal",
     has_foreign_currency: bool = False,
+    *,
+    target_base_path: Path | None = None,
 ) -> Optional[Path]:
     """从模板初始化底稿文件
 
@@ -457,6 +460,8 @@ def init_workpaper_from_template(
         merge_all_files: 是否合并多文件底稿的所有 sheet
         scenario: 项目场景（normal/ipo/listed/transfer/restructure/fraud_response）
         has_foreign_currency: 是否有外币业务（保留参数，未来用于 sheet 级裁剪）
+        target_base_path: 可选受控目标基础路径（不含扩展名）；两阶段生成用 operation staging，
+            缺省仍写项目正式存储目录。调用方必须先完成存储根边界校验。
 
     Returns:
         底稿文件路径，如果模板不存在返回 None
@@ -467,9 +472,12 @@ def init_workpaper_from_template(
         logger.warning("模板文件不存在: wp_code=%s", wp_code)
         return None
 
+    target_base = target_base_path or get_workpaper_storage_path(project_id, wp_id)
+    target_base.parent.mkdir(parents=True, exist_ok=True)
+
     # P2-2: docx/doc 模板直接复制，不做 xlsx 转换
     if template_path.suffix.lower() in ('.docx', '.doc'):
-        target_path = get_workpaper_storage_path(project_id, wp_id).with_suffix(template_path.suffix)
+        target_path = target_base.with_suffix(template_path.suffix)
         shutil.copy2(template_path, target_path)
         logger.info(
             "底稿从 Word 模板初始化: wp_code=%s, template=%s, target=%s",
@@ -479,7 +487,7 @@ def init_workpaper_from_template(
 
     # P2-1: xlsm 文件只复制不 prefill（openpyxl 会损坏 VBA 宏）
     if template_path.suffix.lower() == '.xlsm':
-        target_path = get_workpaper_storage_path(project_id, wp_id).with_suffix('.xlsm')
+        target_path = target_base.with_suffix('.xlsm')
         shutil.copy2(template_path, target_path)
         logger.info(
             "Skipping prefill for xlsm template: %s (VBA macros preserved)",
@@ -488,7 +496,7 @@ def init_workpaper_from_template(
         return target_path
 
     # xlsx: 复制主文件
-    target_path = get_workpaper_storage_path(project_id, wp_id)
+    target_path = target_base.with_suffix('.xlsx')
     shutil.copy2(template_path, target_path)
 
     # P1-2: 多文件底稿合并——将其他文件的 sheet 追加到主 workbook

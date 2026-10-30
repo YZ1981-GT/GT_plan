@@ -4,28 +4,13 @@
  * Spec: .kiro/specs/h7-biological-assets/ Task 7.2
  * Requirements: 2.6, 13.1-13.3, 14.1-14.4
  *
- * 验证：双计量模式切换数据隔离 / 行业拦截 / 审定↔明细一致
+ * 验证：双计量模式切换数据隔离 / 审定↔明细一致。
+ * 原 useH7IndustryGuard（按项目「行业」拦截）已删：平台没有项目级行业来源，判定永不命中；
+ * 宿主改按试算表有无生产性生物资产科目提示（spec trim-followup-residual-findings-closure R1）。
  */
 import { describe, it, expect } from 'vitest'
 
 import { useH7MeasurementModel } from '../composables/useH7MeasurementModel'
-import { APPLICABLE_INDUSTRIES, INDUSTRY_GUARD_MESSAGE } from '../composables/useH7IndustryGuard'
-
-// ─── 行业守卫集成 ───────────────────────────────────────────────────────────
-
-describe('H7 行业守卫 - 集成', () => {
-  it('适用行业白名单为4项', () => {
-    expect(APPLICABLE_INDUSTRIES).toHaveLength(4)
-    expect(APPLICABLE_INDUSTRIES).toContain('agriculture')
-    expect(APPLICABLE_INDUSTRIES).toContain('forestry')
-    expect(APPLICABLE_INDUSTRIES).toContain('livestock')
-    expect(APPLICABLE_INDUSTRIES).toContain('fishery')
-  })
-
-  it('非适用行业提示信息正确', () => {
-    expect(INDUSTRY_GUARD_MESSAGE).toBe('本底稿仅适用于农林牧渔行业项目')
-  })
-})
 
 // ─── 双计量模式集成 ─────────────────────────────────────────────────────────
 

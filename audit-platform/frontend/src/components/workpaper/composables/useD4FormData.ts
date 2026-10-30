@@ -17,6 +17,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import type { ProjectClassificationTags } from '@/utils/ipoProjectUtils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,8 @@ export interface ChecklistResponse {
 
 export interface ProjectContext {
   business_category?: string
+  /** R4：项目详情下发的后端分类 / 场景单一解释（IPO 组可见性优先读它） */
+  project_classification?: ProjectClassificationTags | null
   applicable_standards?: string[]
   has_export_business?: boolean
   entity_name?: string

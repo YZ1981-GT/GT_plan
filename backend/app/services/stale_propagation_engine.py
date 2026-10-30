@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 from uuid import UUID
 
 from sqlalchemy import text
@@ -53,6 +54,15 @@ def _identity_of(uri: str, index: Any = None) -> Any:
     return None
 
 
+#: 推迟加载时第一次被读到才补齐的实例字段（spec backend-startup-and-request-overhead R1.4）。
+#: 2026-10-30 合入远端 T21：原 `_addr_id_index` 已换成按目录版本惰性构建的 `_identity_index` / `_identity_version`。
+_DEFERRED_FIELDS: Final[frozenset[str]] = frozenset(
+    {"_graph", "_reverse_graph", "_identity_index", "_identity_version", "_degraded", "_loaded"}
+)
+#: 推迟加载 / 重新加载互斥：两个线程同时第一次读到时只加载一次，读者看不到加载到一半的图。
+_load_lock = threading.RLock()
+
+
 class StalePropagationEngine:
     """统一 Stale 传播引擎。
 
@@ -60,9 +70,18 @@ class StalePropagationEngine:
     - _bfs(): BFS 遍历依赖图，visited 防环，max_depth 截断
     - _mark_stale_by_uri(): 按 URI 前缀分发写 DB
     - _notify_frontend(): SSE 推送 linkage:stale-changed 事件
+
+    ``defer_load=True``（模块单例用）：构造时不读图（依赖图 JSON 约 12 MB，导入时读要 0.1 s 以上），
+    ``_DEFERRED_FIELDS`` 里任一字段第一次被读到时在临时实例里加载完、再一次补进本实例。
+    字段仍是普通实例属性：直接读写 ``_graph`` 的调用方、先赋值 / monkeypatch 某个字段的测试都不用改；
+    已经有的字段不覆盖（与「导入时加载、之后再改」的结果相同）。只补一次：之后缺字段照常
+    AttributeError（``mock.patch`` 退出时据此把原值放回）。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, defer_load: bool = False) -> None:
+        if defer_load:
+            self.__dict__["_deferred_load"] = True
+            return
         self._graph: dict[str, list[str]] = {}  # adjacency list (source → targets)
         self._reverse_graph: dict[str, list[str]] = {}  # target → sources
         # identity_key → 图键列表（同一身份的多种写法）；按目录版本惰性构建（T21）
@@ -71,6 +90,23 @@ class StalePropagationEngine:
         self._degraded: bool = False
         self._loaded: bool = False
         self._load_graph()
+
+    def __getattr__(self, name: str) -> Any:
+        # 只在常规查找找不到时才进来
+        if name in _DEFERRED_FIELDS and self.__dict__.get("_deferred_load"):
+            with _load_lock:
+                if self.__dict__.get("_deferred_load"):
+                    self._finish_deferred_load()
+            if name in self.__dict__:
+                return self.__dict__[name]
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+
+    def _finish_deferred_load(self) -> None:
+        """在临时实例里完整加载，再把本实例还没有的字段补上（调用方须持有 ``_load_lock``）。"""
+        loaded = StalePropagationEngine()
+        for name in _DEFERRED_FIELDS:
+            self.__dict__.setdefault(name, loaded.__dict__[name])
+        self.__dict__["_deferred_load"] = False
 
     # ─── Graph Loading ────────────────────────────────────────────────────
 
@@ -151,12 +187,13 @@ class StalePropagationEngine:
 
     def reload_graph(self) -> None:
         """重新加载依赖图（用于图更新后刷新）。身份索引随之清空、下次使用时重建。"""
-        self._graph.clear()
-        self._reverse_graph.clear()
-        self._identity_index = {}
-        self._identity_version = None
-        self._loaded = False
-        self._load_graph()
+        with _load_lock:
+            self._graph.clear()
+            self._reverse_graph.clear()
+            self._identity_index = {}
+            self._identity_version = None
+            self._loaded = False
+            self._load_graph()
 
     # ─── BFS Traversal (Task 2.2) ────────────────────────────────────────
 
@@ -527,4 +564,5 @@ class StalePropagationEngine:
 
 # ─── Module-level singleton ──────────────────────────────────────────────────
 
-stale_engine = StalePropagationEngine()
+# 导入时不读图：第一次用到（on_change / is_degraded / 直接读 _graph）时才加载
+stale_engine = StalePropagationEngine(defer_load=True)

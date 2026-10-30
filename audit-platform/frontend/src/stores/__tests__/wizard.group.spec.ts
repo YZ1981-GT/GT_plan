@@ -23,6 +23,7 @@ function basicInfo(patch: Partial<BasicInfo> = {}): BasicInfo {
   return {
     client_name: '某某有限公司临港店', short_name: '临港店', audit_year: 2025, project_type: 'annual',
     accounting_standard: 'enterprise', company_code: OWN, template_type: 'soe', company_subtype: null,
+    business_category: null, scenario: 'normal',
     custom_template_id: '', custom_template_name: '', custom_template_version: '',
     report_scope: 'standalone',
     parent_company_name: '某某有限公司', parent_company_code: PARENT, relation_to_parent: '',
@@ -94,5 +95,41 @@ describe('wizard store 集团关系', () => {
     expect(saved.parent_company_name).toBe('')
     expect(saved.relation_to_parent).toBe('branch')
     expect(saved.ultimate_company_code).toBe(GROUP)
+    expect(saved.business_category).toBeNull()
+    expect(saved.scenario).toBe('normal')
+  })
+})
+
+describe('wizard store 质控业务分类 / 专项场景（R4）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    post.mockReset(); get.mockReset(); put.mockReset()
+  })
+
+  it('创建时两个键始终发送（未填写分类发 null），并以响应归一后的值回填', async () => {
+    post.mockResolvedValue({ data: { id: 'p1', business_category: 'A1', scenario: 'listed', notices: [] } })
+    const store = useWizardStore()
+    await store.createProject(basicInfo({ business_category: ' a1 ', scenario: 'listed' }))
+    const payload = post.mock.calls[0][1]
+    expect(payload.business_category).toBe(' a1 ')
+    expect(payload.scenario).toBe('listed')
+    const saved = store.stepData.basic_info as unknown as BasicInfo
+    expect([saved.business_category, saved.scenario]).toEqual(['A1', 'listed'])
+
+    post.mockResolvedValue({ data: { id: 'p2', notices: [] } })
+    await store.createProject(basicInfo({ business_category: '', scenario: '' }))
+    const second = post.mock.calls[1][1]
+    expect([second.business_category, second.scenario]).toEqual([null, 'normal'])
+  })
+
+  it('批量导入项目从项目详情回填分类与场景（详情是后端解释后的值）', async () => {
+    get.mockImplementation((url: string) => {
+      if (url.endsWith('/wizard')) return Promise.resolve({ status: 404, data: null })
+      return Promise.resolve({ data: { client_name: 'X', business_category: null, scenario: 'ipo' } })
+    })
+    const store = useWizardStore()
+    await store.loadWizardState('p1')
+    const saved = store.stepData.basic_info as unknown as BasicInfo
+    expect([saved.business_category, saved.scenario]).toEqual([null, 'ipo'])
   })
 })

@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from uuid import UUID
 
@@ -66,3 +67,28 @@ async def test_anhui_scope_matches_naive_reading():
         assert "G10-2" in plan.skipped_trimmed_codes
     assert scope.is_trimmed("M4A") == ("M4" in trimmed_rows)
     assert "ZZ_NOT_A_CODE" in plan.to_create
+
+
+@pytest.mark.asyncio
+async def test_plan_generation_serializes_same_project_transactions():
+    """plan_generation 取得的项目锁持有到事务结束；第二个生成 / 粗裁事务不能基于旧 scope 并行推进。"""
+    engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+    first = AsyncSession(engine)
+    second = AsyncSession(engine)
+    pending = None
+    try:
+        await plan_generation(first, ANHUI, ["D2"])
+        pending = asyncio.create_task(plan_generation(second, ANHUI, ["D2"]))
+        await asyncio.sleep(0.15)
+        assert not pending.done(), "同项目第二个 plan_generation 未等待项目级 advisory transaction lock"
+        await first.rollback()
+        result = await asyncio.wait_for(pending, timeout=3)
+        assert result.to_create + result.existing_codes + result.in_recycle_codes + result.skipped_trimmed_codes
+    finally:
+        if pending is not None and not pending.done():
+            pending.cancel()
+        await first.rollback()
+        await second.rollback()
+        await first.close()
+        await second.close()
+        await engine.dispose()

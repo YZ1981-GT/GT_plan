@@ -633,10 +633,11 @@ async def _process_fixture(
     elif spec.fixture_id == "FIX-B":
         # FIX-B 以底稿齐备为主；同项目被 FIX-F 覆写 business_category 时仍可用
         prefix_ok = True
-    elif spec.fixture_id == "FIX-F" and result.business_category:
-        prefix_ok = result.business_category in (
-            "IPO", "上市公司年审", "新三板", "重大资产重组", "B3",
-        )
+    elif spec.fixture_id == "FIX-F":
+        # F2 IPO 专项组可见 ⇔ 项目分类 / 场景带资本市场标签（与 _f2_inventory_special 同一判定，R4）
+        from app.services.project_classification import resolve
+
+        prefix_ok = resolve(result.business_category, (proj or {}).get("scenario")).is_capital_market
 
     result.ready = len(result.missing_wp_codes) == 0 and prefix_ok
     if spec.fixture_id == "FIX-I6":

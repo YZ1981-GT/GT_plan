@@ -30,6 +30,7 @@ from app.services.group_relation import (
     effective_parent_code,
     infer_relation_from_name,
     normalize_relation,
+    resolve_relation,
     self_reference_kind,
 )
 from app.services.note_section_catalog import normalize_report_scope
@@ -462,6 +463,90 @@ async def reparent_project(
     return {"synced": synced, "parent_company_name": parent_name, "notices": notices}
 
 
+async def update_group_relationship(
+    db: AsyncSession,
+    project: Project,
+    *,
+    parent_company_code: str | None,
+    ultimate_company_code: str | None,
+    relation_to_parent: str | None,
+    sync_links: bool = True,
+    validate_cycle: bool = True,
+) -> dict[str, Any]:
+    """显式更新三码关系，供导出回导使用；同企业两口径同写，只 flush 不 commit。
+
+    与拖拽的 ``reparent_project`` 不同，本入口把最终控制方和关系也视为用户确认值，
+    且可延迟到整批结束再重算年度链接。
+    """
+    from app.services.consol_group_tree import load_year_records, would_form_cycle
+    from app.services.project_audit_year import resolve_project_audit_year
+
+    own_code = _blank_to_none(project.company_code)
+    year = resolve_project_audit_year(project)
+    probe = SimpleNamespace(
+        company_code=own_code,
+        client_name=project.client_name,
+        parent_company_name=None,
+        parent_company_code=parent_company_code,
+        relation_to_parent=relation_to_parent,
+        ultimate_company_name=None,
+        ultimate_company_code=ultimate_company_code,
+    )
+    normalize_group_fields(probe)
+    parent_code = probe.parent_company_code
+    if validate_cycle and own_code and year is not None and parent_code is not None:
+        if would_form_cycle(await load_year_records(db, year), year, own_code, parent_code):
+            raise HTTPException(status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）")
+
+    parent_name = None
+    if parent_code is not None:
+        parent_name = await _company_name_in_year(db, parent_code, year)
+        if parent_name is None:
+            raise HTTPException(status_code=422, detail="上级企业在本审计年度尚未建项")
+    ultimate_name = None
+    if probe.ultimate_company_code is not None:
+        if probe.ultimate_company_code == own_code:
+            ultimate_name = project.client_name
+        else:
+            ultimate_name = await _company_name_in_year(db, probe.ultimate_company_code, year)
+            if ultimate_name is None:
+                raise HTTPException(status_code=422, detail="最终控制方在本审计年度尚未建项")
+
+    counterpart = await find_counterpart(
+        db, project_id=project.id, company_code=own_code,
+        audit_year=year, report_scope=project.report_scope,
+    )
+    targets = [target for target in (project, counterpart) if target is not None]
+    values = {
+        "parent_company_name": parent_name,
+        "parent_company_code": parent_code,
+        "relation_to_parent": resolve_relation(
+            probe.relation_to_parent, parent_code, project.client_name, own_code
+        ),
+        "ultimate_company_name": ultimate_name,
+        "ultimate_company_code": probe.ultimate_company_code,
+    }
+    synced: list[dict[str, Any]] = []
+    for target in targets:
+        before = _group_values(target)
+        apply_group_values(target, values)
+        after = _group_values(target)
+        synced.append({
+            "id": str(target.id),
+            "name": target.client_name or target.name,
+            "report_scope": normalize_report_scope(target.report_scope),
+            "fields": [FIELD_LABELS[field] for field in GROUP_FIELDS if before[field] != after[field]],
+        })
+    if sync_links:
+        await sync_group_links(db, year)
+    return {
+        "synced": synced,
+        "parent_company_name": parent_name,
+        "ultimate_company_name": ultimate_name,
+        "notices": [],
+    }
+
+
 __all__ = [
     "FIELD_LABELS",
     "GROUP_FIELDS",
@@ -474,6 +559,7 @@ __all__ = [
     "prepare_group_fields",
     "propagate_to_counterpart",
     "reparent_project",
+    "update_group_relationship",
     "sync_group_links",
     "sync_group_links_for",
 ]

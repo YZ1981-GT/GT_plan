@@ -9,6 +9,8 @@ export const workpapersRoutes: RouteRecordRaw[] = [
           path: 'projects/:projectId/workpapers',
           name: 'WorkpaperList',
           component: () => import(/* webpackPrefetch: true */ '@/views/WorkpaperList.vue'),
+          // 切视图只改 ?view=，页面自己监听 ?view= / ?filter=，不必整页重挂重取（spec platform-perf-hotspots R6）
+          meta: { reuseOnQueryChange: true },
         },
 {
           path: 'projects/:projectId/workpapers/:wpId/edit',

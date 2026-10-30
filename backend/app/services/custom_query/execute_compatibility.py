@@ -73,6 +73,7 @@ class ExecuteCompatibilityAdapter:
         raw_targets = getattr(body, "acnr_targets", [])
         raw_limit = getattr(body, "limit", 500)
         raw_offset = getattr(body, "offset", 0)
+        raw_count_token = getattr(body, "count_token", None)
         # 结构化条件（advanced-query-linkage-closure R6.1）：旧请求体没有这两个字段时取默认（无条件、and）
         raw_conditions = getattr(body, "conditions", [])
         conditions = (
@@ -94,6 +95,7 @@ class ExecuteCompatibilityAdapter:
             pivot=pivot,
             limit=int(raw_limit) if isinstance(raw_limit, int) else 500,
             offset=int(raw_offset) if isinstance(raw_offset, int) else 0,
+            count_token=str(raw_count_token) if raw_count_token else None,
             conditions=conditions,
             condition_logic=condition_logic,
         )
@@ -119,6 +121,9 @@ class ExecuteCompatibilityAdapter:
         meta = getattr(result, "meta", None)
         if meta:
             payload["meta"] = meta
+            if meta.get("count_token"):
+                payload["count_token"] = meta["count_token"]
+                payload["count_reused"] = bool(meta.get("count_reused"))
         # acnr_targets 取值块（acnr-foundation-defect-closure T15）：不带目标时整键省略
         acnr_results = getattr(result, "acnr_results", None)
         if acnr_results is not None:

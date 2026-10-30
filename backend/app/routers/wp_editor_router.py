@@ -1092,10 +1092,11 @@ async def get_a16_recommended_version(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ):
-    """根据项目 business_category 推荐 A16 声明书版本。
+    """根据项目质控分类 / 专项场景推荐 A16 声明书版本。
 
     返回推荐版本、所有变体列表（含项目中是否已创建）、始终必需列表。
     """
+    from app.services.project_classification import load_project_classification
     from app.services.template_selector import (
         A16_ALL_VERSIONS,
         A16_ALWAYS_REQUIRED,
@@ -1104,15 +1105,11 @@ async def get_a16_recommended_version(
         recommend_a16_version,
     )
 
-    # 1. 查询项目 business_category
-    row = (await db.execute(
-        sa.text("SELECT business_category FROM projects WHERE id = :pid"),
-        {"pid": str(project_id)},
-    )).first()
-    business_category: str | None = row[0] if row else None
+    # 1. 项目分类 / 场景（单一解释，R4）
+    classification = await load_project_classification(db, project_id)
 
     # 2. 推荐版本
-    recommended_code = recommend_a16_version(business_category)
+    recommended_code = recommend_a16_version(classification)
     recommended_label = get_a16_label(recommended_code)
 
     # 3. 查询项目中已存在的 A16-x 底稿

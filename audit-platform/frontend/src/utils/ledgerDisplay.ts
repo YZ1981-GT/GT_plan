@@ -233,3 +233,50 @@ export function buildLedgerFilteredDisplay(
 
   return rows
 }
+
+
+/**
+ * Materialize one server window. Running balances and month totals are already
+ * query-wide; the browser only inserts synthetic rows and never recomputes the
+ * account from a partial page.
+ */
+export function materializeLedgerWindow(
+  response: import('@/services/ledgerWindowApi').LedgerWindowResponse | null,
+  options: BuildLedgerDisplayOptions & { includeOpening?: boolean } = {},
+): LedgerDisplayRow[] {
+  if (!response) return []
+  const extra = options.syntheticExtra ?? {}
+  const rows: LedgerDisplayRow[] = []
+  if (options.includeOpening !== false) {
+    rows.push({
+      _type: 'opening', voucher_date: '', voucher_no: '', summary: '范围期初余额',
+      debit_amount: null, credit_amount: null,
+      balance: toNum(response.summary.range_opening_signed),
+      balance_direction: response.summary.range_opening_direction,
+      ...extra,
+    })
+  }
+  const subtotals = new Map(response.subtotals.map((item) => [item.after_entry_id, item.month]))
+  for (const item of response.entries) {
+    rows.push({
+      ...item, _type: 'normal',
+      voucher_date: String(item.voucher_date || ''),
+      voucher_no: String(item.voucher_no || ''),
+      summary: String(item.summary || ''),
+      debit_amount: item.debit_amount == null ? null : toNum(item.debit_amount),
+      credit_amount: item.credit_amount == null ? null : toNum(item.credit_amount),
+      balance: toNum(item.running_balance_signed),
+      balance_direction: item.running_balance_direction,
+    } as LedgerDisplayRow)
+    const month = subtotals.get(String(item.id))
+    if (month) {
+      rows.push({
+        _type: 'subtotal', voucher_date: '', voucher_no: '', summary: month.label,
+        debit_amount: toNum(month.debit_total), credit_amount: toNum(month.credit_total),
+        balance: toNum(month.closing_balance_signed), balance_direction: month.closing_direction,
+        ...extra,
+      })
+    }
+  }
+  return rows
+}

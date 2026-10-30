@@ -116,7 +116,8 @@ async def _fetch_sql(req: QueryRequest, target: ResolvedSource, db: Any, cycle: 
         # 分组 / 透视要全量参与计算：> FETCH_HARD_CAP 行即 400，不在截断样本上聚合（ADR-AQL-07）
         return await paged_fetch.all_rows(target.spec, ctx, **common)
     return await paged_fetch.page(
-        target.spec, ctx, **common, sort=list(req.sort), limit=int(req.limit), offset=int(req.offset)
+        target.spec, ctx, **common, sort=list(req.sort), count_token=req.count_token,
+        limit=int(req.limit), offset=int(req.offset)
     )
 
 

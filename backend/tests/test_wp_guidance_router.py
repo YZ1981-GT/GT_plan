@@ -147,6 +147,8 @@ async def test_route_uses_visibility_gate_and_runtime_inventory_for_parent_conte
     assert route_mocks.gate.await_args.kwargs["action"] == "dedicated_read"
     assert route_mocks.gate.await_args.kwargs["wp_id"].hex == wp_id.replace("-", "")
     assert route_mocks.render.await_args.args[1] is None
+    # 只算清册，不跑渲染器 / 取数（spec platform-perf-hotspots R3）
+    assert route_mocks.render.await_args.kwargs.get("manifest_only") is True
     assert route_mocks.authority.call_args.kwargs["parent_wp_code"] == "A3"
     assert route_mocks.authority.call_args.kwargs["render_sheets"] == route_mocks.render.return_value["sheets"]
     route_mocks.resolve.assert_awaited_once()

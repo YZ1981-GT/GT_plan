@@ -197,13 +197,14 @@ class TemplateFillService:
 
         if project is not None:
             from app.services.matching_rules_service import recommend_company_subtype
+            from app.services.project_classification import project_classification
 
             std = project.applicable_standard_v2 or {}
             rec = recommend_company_subtype(
                 {
                     "entity_type": std.get("entity_type"),
                     "scope": std.get("scope"),
-                    "scenario": project.scenario,
+                    "scenario": project_classification(project).scenario,
                     "template_type": project.template_type,
                     "report_scope": project.report_scope,
                     "company_name": project.name,

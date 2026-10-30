@@ -37,6 +37,7 @@ from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table.m_cycle_specs import M8_SPEC
 from app.services.four_table.semantic_account_resolver import (
+    has_resolved_tb_rows,
     resolve_semantic_accounts,
 )
 
@@ -78,7 +79,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     """返回 M8 一般风险准备轻量 html_data.
 
     前端自加载模式：子组件各自拉 checklist-responses，
-    本函数仅返回 project_context（行业信息）+ tb_snapshot（一般风险准备余额）。
+    本函数仅返回 project_info（客户名）+ tb_snapshot（一般风险准备余额）+ accounts_found。
     """
     db = ctx.db
     project_id = ctx.project_id
@@ -89,11 +90,19 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
 
     # ── 取 TB 余额 ──────────────────────────────────────────────────────
     tb_data: dict[str, Any] = {}
+    accounts_found: bool | None = False
     if gross_codes:
         try:
             active_filter = await get_active_filter(
                 ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
             )
+            prefix_conditions = [
+                sa.or_(
+                    TbBalance.account_code == code,
+                    TbBalance.account_code.startswith(code + "."),
+                )
+                for code in gross_codes
+            ]
             stmt = sa.select(
                 TbBalance.account_code,
                 TbBalance.opening_balance.label("begin_balance"),
@@ -102,13 +111,15 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
                 TbBalance.closing_balance.label("end_balance"),
             ).where(
                 TbBalance.project_id == str(project_id),
-                sa.or_(
-                    *[TbBalance.account_code.startswith(c) for c in gross_codes]
-                ),
+                sa.or_(*prefix_conditions),
                 active_filter,
             )
             result = await db.execute(stmt)
-            for row in result.fetchall():
+            tb_rows = list(result.fetchall())
+            accounts_found = has_resolved_tb_rows(
+                accounts, tb_rows, slot_keys=("gross",)
+            )
+            for row in tb_rows:
                 tb_data[row.account_code] = {
                     "begin_balance": _parse_num(row.begin_balance),
                     "end_balance": _parse_num(row.end_balance),
@@ -116,22 +127,22 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
                     "credit_amount": _parse_num(row.credit_amount),
                 }
         except Exception as exc:
+            accounts_found = None
             logger.warning("[M8 render] TB query failed: %s", exc)
 
-    # ── 取项目行业信息（用于行业守卫） ───────────────────────────────────
+    # ── 项目信息 ─────────────────────────────────────────────────────────
+    # 🔴 原先在这里给前端「行业守卫」返回 industry / client_industry：Project 根本没有这两个属性，
+    #    getattr 恒得空串，前端据此把所有项目判成「非金融企业」整页拦截（金融企业也用不了 M8）。
+    #    平台没有项目级行业来源；是否适用改看试算表有没有「一般风险准备」科目（accounts_found），
+    #    前端只给不阻断提示（spec trim-followup-residual-findings-closure R1）。
     project_info: dict[str, Any] = {}
     try:
         from app.models.core import Project
-        result = await db.execute(
-            sa.select(Project).where(Project.id == project_id)
-        )
-        proj = result.scalar_one_or_none()
-        if proj:
-            project_info = {
-                "industry": getattr(proj, "industry", "") or "",
-                "client_industry": getattr(proj, "client_industry", "") or "",
-                "client_name": getattr(proj, "client_name", "") or "",
-            }
+        client_name = (await db.execute(
+            sa.select(Project.client_name).where(Project.id == project_id)
+        )).scalar_one_or_none()
+        if client_name is not None:
+            project_info = {"client_name": client_name or ""}
     except Exception as exc:
         logger.warning("[M8 render] Project query failed: %s", exc)
 
@@ -142,6 +153,8 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_info": project_info,
         # 解析出的科目码（空列表 = 本项目无「一般风险准备」科目，宁缺勿造）
         "account_codes": gross_codes,
+        # active TB 查询实际命中 gross 槽才算找到；有解析码但零行仍为 False，查询失败为 None
+        "accounts_found": accounts_found,
         "tb_source_codes": accounts.as_dict(),
         "direction": "credit",  # 权益类贷方
     }

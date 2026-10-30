@@ -51,6 +51,20 @@ class _SSERegistry:
         logger.debug("[SSE] Registered connection %s (active: %d)", conn_id, len(self._active))
         return conn
 
+    def register_queue(self, queue: "asyncio.Queue[Any]") -> SSEConnection:
+        """注册一个「等队列」的 SSE 连接：drain 时往队列里放 None 叫醒它，不必等到下一次心跳。
+
+        生成器取到 None 结束后由调用方补发 ``server_draining``（spec backend-startup-and-request-overhead R2.4）。
+        """
+
+        async def _wake() -> None:
+            try:
+                queue.put_nowait(None)
+            except asyncio.QueueFull:  # 队列满：下一次取就有数据，照样会看到已关闭
+                pass
+
+        return self.register(close_callback=_wake)
+
     def unregister(self, conn: SSEConnection):
         """Unregister a connection (called on normal disconnect)."""
         self._active.pop(conn.conn_id, None)

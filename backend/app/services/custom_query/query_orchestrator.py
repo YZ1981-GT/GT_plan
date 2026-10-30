@@ -229,6 +229,8 @@ class QueryRequest:
     sort: list[dict] = field(default_factory=list)
     limit: int = DEFAULT_PAGE_SIZE
     offset: int = 0
+    #: 服务端精确 COUNT 凭证；仅用于跳过同一查询后续页的重复计数。
+    count_token: str | None = None
     #: 结构化条件 [{"field", "op", "value"}] 与组合逻辑（advanced-query-linkage-closure R6.1）；
     #: 只有注册表 SQL 源支持，内存源带条件即 400 CONDITIONS_UNSUPPORTED
     conditions: list[dict] = field(default_factory=list)

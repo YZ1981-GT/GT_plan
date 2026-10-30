@@ -125,9 +125,9 @@
     ]
   },
   "summary": {
-    "entry_total": 2340,
-    "http_total": 2325,
-    "http_wp_bound": 840,
+    "entry_total": 2339,
+    "http_total": 2324,
+    "http_wp_bound": 839,
     "http_non_wp_bound": 1485,
     "worker_total": 15,
     "by_family": {
@@ -139,7 +139,7 @@
       "checklist": 2,
       "comment": 4,
       "cross_ref": 2,
-      "detail": 88,
+      "detail": 87,
       "download": 6,
       "export": 248,
       "history": 3,
@@ -161,7 +161,7 @@
       "deferred_editor": 5,
       "editor_security.validate_editor_token(editor_read)": 1,
       "editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write)": 1,
-      "gated": 743,
+      "gated": 742,
       "migrated": 15,
       "native_authz": 64,
       "not_applicable": 1507,
@@ -183,7 +183,7 @@
       "export": 248,
       "import": 129,
       "preview": 5,
-      "read": 895,
+      "read": 893,
       "retry": 1,
       "review": 17,
       "update": 115,
@@ -6782,20 +6782,6 @@
       "method": "POST",
       "family": "non_wp_bound",
       "action": "create",
-      "wp_bound": false,
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": []
-    },
-    {
-      "kind": "http",
-      "entrypoint": "app.routers.h5_oil_gas_assets:h5_industry_check",
-      "callable": "h5_industry_check",
-      "route": "/api/h5/industry-check",
-      "method": "GET",
-      "family": "non_wp_bound",
-      "action": "read",
       "wp_bound": false,
       "binding": "n/a",
       "gate": "not_applicable",
@@ -18906,6 +18892,20 @@
       "entrypoint": "app.routers.working_paper:list_workpapers",
       "callable": "list_workpapers",
       "route": "/api/projects/{project_id}/working-papers",
+      "method": "GET",
+      "family": "non_wp_bound",
+      "action": "read",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.working_paper:list_all_workpapers",
+      "callable": "list_all_workpapers",
+      "route": "/api/projects/{project_id}/working-papers-all",
       "method": "GET",
       "family": "non_wp_bound",
       "action": "read",
@@ -31774,28 +31774,6 @@
       "test_ids": [
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency",
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_dedicated_classifier_by_method"
-      ]
-    },
-    {
-      "kind": "http",
-      "entrypoint": "app.routers.h7_biological_assets:industry_check",
-      "callable": "industry_check",
-      "route": "/api/workpapers/{wp_id}/h7/industry-check",
-      "method": "GET",
-      "family": "detail",
-      "action": "read",
-      "wp_bound": true,
-      "binding": "wp_id",
-      "gate": "gated",
-      "matrix": "workpaper.dedicated_subroute/dedicated_read",
-      "test_ids": [
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_dedicated_classifier_by_method",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_l2_accrual_check_deny_not_delegated",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_l2_accrual_check_allow_lead",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_l2_accrual_check_nonexistent_404",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_m1_dividend_calculation_deny_not_delegated",
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_m1_dividend_calculation_allow_lead"
       ]
     },
     {

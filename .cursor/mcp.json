@@ -18,15 +18,11 @@
       "args": ["-y", "@playwright/mcp@latest"]
     },
     "postgres": {
-      "command": "docker",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
       "args": [
+        "${workspaceFolder}/tools/mcp_stdio_container.py",
         "run",
-        "-i",
-        "--rm",
-        "-e",
-        "DATABASE_URI",
-        "crystaldba/postgres-mcp",
-        "--access-mode=restricted"
+        "postgres"
       ],
       "env": {
         "DATABASE_URI": "postgresql://postgres:postgres@host.docker.internal:5432/audit_platform"

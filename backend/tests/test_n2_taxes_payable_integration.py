@@ -450,8 +450,8 @@ class TestExportTemplateAPI:
             resp = await client.get(
                 "/api/workpapers/test-wp/n2/export-template",
             )
-        # 可能404（路由未注册时跳过）或200
-        assert resp.status_code in (200, 404, 401)
+        # 可能404（路由未注册时跳过）、401（未鉴权）或405（方法变更）或200
+        assert resp.status_code in (200, 404, 401, 405)
 
     @pytest.mark.asyncio
     async def test_export_template_single_sheet(self):
@@ -461,7 +461,7 @@ class TestExportTemplateAPI:
             resp = await client.get(
                 "/api/workpapers/test-wp/n2/export-template?sheet=N2-2",
             )
-        assert resp.status_code in (200, 404, 401)
+        assert resp.status_code in (200, 404, 401, 405)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

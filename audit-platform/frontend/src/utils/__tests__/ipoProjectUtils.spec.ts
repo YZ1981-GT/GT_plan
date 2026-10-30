@@ -59,3 +59,29 @@ describe('isIpoProject', () => {
     expect(isIpoProject('normal', [])).toBe(false)
   })
 })
+
+describe('isIpoProject — 后端 project_classification（R4）', () => {
+  it('按适用性标签精确匹配，不做子串', () => {
+    expect(isIpoProject({ tags: ['ipo'] })).toBe(true)
+    expect(isIpoProject({ tags: ['neeq', 'restructuring'] })).toBe(true)
+    expect(isIpoProject({ tags: [] })).toBe(false)
+    expect(isIpoProject({ tags: ['fraud_risk'] })).toBe(false)
+    expect(isIpoProject({ tags: ['ipo_extra'] })).toBe(false)
+    expect(isIpoProject({ tags: null })).toBe(false)
+    expect(isIpoProject({})).toBe(false)
+  })
+
+  it('allowedCats 同样对标签生效（D4 扩展 fraud_risk、A 程序表按模板声明）', () => {
+    expect(isIpoProject({ tags: ['fraud_risk'] }, [...IPO_BIZ_KEYWORDS, 'fraud_risk'])).toBe(true)
+    expect(isIpoProject({ tags: ['listed'] }, ['ipo'])).toBe(false)
+    expect(isIpoProject({ tags: ['IPO'] }, ['ipo'])).toBe(true)
+  })
+
+  it('分类原值只剩质控分类码时不会被当成 IPO（迁移后分类列与场景已拆开）', () => {
+    for (const code of ['A1', 'A2', 'B1', 'C']) {
+      expect(isIpoProject(code)).toBe(false)
+    }
+    expect(isIpoProject(null)).toBe(false)
+    expect(isIpoProject(undefined)).toBe(false)
+  })
+})

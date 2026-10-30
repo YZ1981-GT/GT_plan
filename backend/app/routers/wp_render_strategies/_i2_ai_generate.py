@@ -142,7 +142,7 @@ def _build_user_prompt(
     if project_context.get("audit_year"):
         ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
     if project_context.get("business_category"):
-        ctx_lines.append(f"行业：{project_context['business_category']}")
+        ctx_lines.append(f"质控业务分类：{project_context['business_category']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:

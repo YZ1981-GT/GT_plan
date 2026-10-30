@@ -1,6 +1,7 @@
 """底稿管理 API 路由
 
 - GET    /api/projects/{id}/working-papers          — 底稿列表
+- GET    /api/projects/{id}/working-papers-all      — 全部可见底稿（不分页）
 - GET    /api/projects/{id}/working-papers/{wp_id}   — 底稿详情
 - GET    /api/projects/{id}/working-papers/{wp_id}/download — 下载
 - POST   /api/projects/{id}/working-papers/{wp_id}/upload   — 上传
@@ -144,6 +145,39 @@ async def list_workpapers(
     except InvalidListParams as exc:
         # 非法分页/排序：在任何底稿数据查询之前返回 422（Req 11.7）
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/working-papers-all")
+async def list_all_workpapers(
+    project_id: UUID,
+    audit_cycle: str | None = None,
+    index_status: str | None = Query(None, description="索引层状态过滤（WpIndex.status）"),
+    file_status: str | None = Query(None, description="文件/编制层状态过滤（WorkingPaper.status）"),
+    assigned_to: UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """全部可见底稿（不分页）：与 ``/working-papers`` 同一鉴权 / 可见性 / 过滤 / 项结构，返回 ``{items,total}``。
+
+    给需要整份清单的页面一次取完（原先按 100 条一页串行拉）；排序固定 wp_code 升序 + wp_index_id。
+    路径用连字符而非 ``/working-papers/all``，避开 ``/working-papers/{wp_id}``。spec platform-perf-hotspots R5
+    """
+    from app.services.wp_visibility import (
+        VisibilityRoleClassifier,
+        WorkpaperListFilters,
+        WorkpaperListQueryService,
+    )
+
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    return await WorkpaperListQueryService(db).list_all_workpapers(
+        context,
+        filters=WorkpaperListFilters(
+            audit_cycle=audit_cycle,
+            index_status=index_status,
+            file_status=file_status,
+            assigned_to=assigned_to,
+        ),
+    )
 
 
 @router.get("/my-lead-workpapers")

@@ -34,9 +34,10 @@ import sqlalchemy as sa
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_context
 from app.deps import get_current_user
-from app.models.core import User
+from app.models.base import ProjectStatus
+from app.models.core import Project, User
 from app.models.procedure_models import ProcedureRowTask, ProcedureRowTaskHistory
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.services.assignment_service import PARTNER_MANAGER_ROLE_ALIASES
@@ -242,16 +243,45 @@ async def ensure_project_delegator(
     """项目级 Delegator 授权核心函数（fail-closed）。
 
     规则（Design C5）：
-      1. 认证 admin：全局通过。
-      2. 其余 user：唯一 active StaffMember(user_id) → 唯一 active ProjectAssignment(project_id, staff_id)。
-      3. assignment role ∈ ``DELEGATOR_ASSIGNMENT_ROLES``（合伙人 / 签字合伙人 / 经理，含中文别名）。
-      4. 任何缺失/重复/inactive/跨项目/查询异常 → 403（不 500 泄露）。
+      1. 项目必须存在、未删除、未归档，并设置项目 RLS 上下文（admin 也不能绕过归档门）。
+      2. 认证 admin：全局通过。
+      3. 其余 user：唯一 active StaffMember(user_id) → 唯一 active ProjectAssignment(project_id, staff_id)。
+      4. assignment role ∈ ``DELEGATOR_ASSIGNMENT_ROLES``（合伙人 / 签字合伙人 / 经理，含中文别名）。
+      5. 任何缺失/重复/inactive/跨项目/查询异常 → 403（不 500 泄露）。
 
     供 materialize、reconcile、trim、scheme、delegation、cancel/reopen、dead-letter replay
     复用；router 可直接 `await ensure_project_delegator(...)`，或用 `require_project_delegator`
     依赖。
     """
-    # ① 认证 admin 全局放行
+    # ① 项目必须存在、未删除、未归档；任何身份（含 admin）都不能改归档项目。随后设置 RLS 上下文。
+    try:
+        status = (
+            await db.execute(
+                sa.select(Project.status).where(
+                    Project.id == project_id,
+                    Project.is_deleted == sa.false(),
+                )
+            )
+        ).scalar_one_or_none()
+        if status is None:
+            raise HTTPException(status_code=404, detail="项目不存在")
+        if status == ProjectStatus.archived:
+            raise HTTPException(
+                status_code=423,
+                detail={
+                    "error_code": "PROJECT_ARCHIVED",
+                    "message": "项目已归档，无法编辑",
+                    "message_en": "Project archived (read-only)",
+                },
+            )
+        await set_rls_context(db, project_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("项目授权前置查询异常 (project=%s user=%s): %s", project_id, current_user.id, exc)
+        raise HTTPException(status_code=403, detail="项目授权失败")
+
+    # ② 认证 admin 全局放行（仍须通过上面的项目状态门）
     try:
         if current_user.role.value == "admin":
             return DelegatorContext(

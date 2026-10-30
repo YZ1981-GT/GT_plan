@@ -112,6 +112,8 @@ class QueryRequest(StrictRequestModel):
     # 前端却一直在传 offset ⇒ 业务视图从来没有第 2 页。
     limit: int = Field(default=500, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
     offset: int = Field(default=0, ge=0)
+    #: 服务端签发的精确 COUNT 复用凭证；查询或身份变化时自动失效并重算。
+    count_token: str | None = Field(default=None, max_length=2048)
     #: 排序项：SQL 源在数据库内排序（可空列空值在后），内存源由 StablePagination 消费。非法方向在此层即 422（R4.7）。
     sort: list[SortSpec] = Field(default_factory=list, max_length=5)
     #: 分组配置 {"dimensions": [...], "aggregates": [{"field","op","alias"}]}。

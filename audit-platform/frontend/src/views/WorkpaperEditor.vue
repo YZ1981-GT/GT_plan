@@ -281,7 +281,7 @@
     <!-- 编制说明面板内容（trigger/placement 由 shell 拥有；G-RAIL adapter） -->
     <template #guidance-panel>
       <WpGuidancePanel
-        v-if="wpDetail && projectYear != null"
+        v-if="wpDetail && projectYear != null && guidanceContextReady"
         shell-owned
         :wp-id="wpId"
         :wp-code="wpDetail.wp_code || ''"
@@ -385,7 +385,7 @@
       :wp-id="wpId"
       :year="projectYear"
       :wp-code="wpDetail?.wp_code"
-      :decision-trace="renderConfig?.decision_trace ?? null"
+      :decision-trace="sidePanelDecisionTrace"
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
@@ -419,7 +419,6 @@ import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
 import {
   resolveUniverSheetContext,
-  useWpRenderer,
   type RenderConfig,
   type SheetRenderConfig,
   type WorkpaperSheetContext,
@@ -468,6 +467,7 @@ import { Clock } from '@element-plus/icons-vue'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { useWorkpaperProjectMeta } from './workpaper-editor/useWorkpaperProjectMeta'
 import { useShellCapability } from './workpaper-editor/useShellCapability'
+import { useEditorRendererFacts, type UniverCatalogFacts } from './workpaper-editor/useEditorRendererFacts'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -494,7 +494,6 @@ function onShellCloseReview(): void {
 }
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
-const { renderConfig } = useWpRenderer(wpId, { silent: true }) // 只给侧栏 decision_trace，失败不弹全局提示（R10）
 // 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
 // GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
 const initialSheetFromQuery = computed<string | undefined>(() => {
@@ -630,7 +629,7 @@ const sheetNavFacade = useSheetNavFacade(univerAPIRef, wpDetail, cycleType, scen
 const sheetNavActiveId = sheetNavFacade.activeSheetId
 const univerRenderSheets = ref<SheetRenderConfig[]>([])
 const univerSheetIdentityReady = ref(false)
-const univerWpCode = ref<string | null>(null)
+const univerCatalog = ref<UniverCatalogFacts | null>(null)
 /** Univer/OnlyOffice host shares the same revision-owner contract as HTML Task 11. */
 const univerContextEmitter = createHtmlStableContextEmitter()
 let univerIdentityRequestId = 0
@@ -640,7 +639,7 @@ async function loadUniverSheetIdentityCatalog(): Promise<void> {
   const requestId = ++univerIdentityRequestId
   const requestedWpId = wpId.value
   univerRenderSheets.value = []
-  univerWpCode.value = null
+  univerCatalog.value = null
   univerSheetIdentityReady.value = false
   if (!requestedWpId || useHtmlRenderer.value) return
   try {
@@ -649,12 +648,12 @@ async function loadUniverSheetIdentityCatalog(): Promise<void> {
     )
     if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
     univerRenderSheets.value = Array.isArray(config?.sheets) ? config.sheets : []
-    univerWpCode.value = config?.wp_code ?? null
+    univerCatalog.value = { wpCode: config?.wp_code ?? null, decisionTrace: config?.decision_trace ?? null }
   } catch {
     if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
     // 目录不可用时仍允许以真实 engine name 请求，后端 guidance membership 继续 fail-closed。
     univerRenderSheets.value = []
-    univerWpCode.value = null
+    univerCatalog.value = null
   } finally {
     if (requestId === univerIdentityRequestId && requestedWpId === wpId.value) {
       univerSheetIdentityReady.value = true
@@ -854,7 +853,7 @@ function updateUniverSheetContext(sheetId: string) {
     sheetNavFacade.flatSheets.value,
     sheetId,
     univerRenderSheets.value,
-    wpDetail.value?.wp_code || univerWpCode.value || null,
+    wpDetail.value?.wp_code || univerCatalog.value?.wpCode || null,
   )
   if (!context) return
   // Univer native/custom/locate converge here — same revision owner as HTML emitter contract.
@@ -978,6 +977,7 @@ const activeSheetContext = ref<WorkpaperSheetContext>({
 /** Task 12 shell bridge — live capability snapshot（useShellCapability）。 */
 const { shellOwnerEpoch, shellCapabilityEpoch, shellError, shellCapabilitySnapshot } =
   useShellCapability({ wpId, projectId, activeSheetContext })
+const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext })
 
 const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
   if (!wpDetail.value || projectYear.value == null) return null // 未设置审计年度：页面不渲染底稿，没有可定位的年度

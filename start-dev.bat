@@ -13,31 +13,51 @@ REM  executes comment fragments as commands. Symptom:
 REM      '<garbage>' is not recognized as an internal or external command
 REM  printed between the [n/5] step banners.
 REM  Rationale in Chinese: docs/runbooks/start-dev-launcher-notes.md
-REM  A guard test enforces ASCII: backend/tests/test_start_dev_bat_ascii.py
+REM  A guard test enforces ASCII: backend/tests/test_start_dev_bat_ascii_guard.py
 REM ============================================================
 
 set "ROOT_DIR=%~dp0"
 if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "BACKEND_DIR=%ROOT_DIR%\backend"
 set "FRONTEND_DIR=%ROOT_DIR%\audit-platform\frontend"
-set "DSH_DIR=D:\DeepHorness"
 set "BACKEND_PORT=9980"
 set "FRONTEND_PORT=3030"
-set "DSH_PORT=3080"
 set "BACKEND_TITLE=GT-Backend-9980"
 set "FRONTEND_TITLE=GT-Frontend-3030"
-set "DSH_TITLE=GT-DSH-AI-3080"
+
+REM --- runtime mode -------------------------------------------
+REM dev    = backend overlap reload + Vite HMR
+REM stable = backend without reload + immutable built frontend
+if not defined GT_RUNTIME_MODE (
+  if "%GT_BACKEND_NO_RELOAD%"=="1" (
+    set "GT_RUNTIME_MODE=stable"
+  ) else (
+    set "GT_RUNTIME_MODE=dev"
+  )
+)
+if /I "%GT_RUNTIME_MODE%"=="dev" goto runtime_mode_ok
+if /I "%GT_RUNTIME_MODE%"=="stable" goto runtime_mode_ok
+echo [ERROR] GT_RUNTIME_MODE must be dev or stable, got "%GT_RUNTIME_MODE%".
+exit /b 1
+:runtime_mode_ok
+echo [GT] GT_RUNTIME_MODE=%GT_RUNTIME_MODE%
 
 REM --- pre-checks ---------------------------------------------
 if not exist "%BACKEND_DIR%\app\main.py" ( echo [ERROR] Backend not found & exit /b 1 )
 if not exist "%FRONTEND_DIR%\package.json" ( echo [ERROR] Frontend not found & exit /b 1 )
 if not exist "%FRONTEND_DIR%\node_modules" ( echo [ERROR] Run "npm install" first & exit /b 1 )
-if not exist "%DSH_DIR%\apps\cli\lib\bin.js" ( echo [WARN] DSH not found at %DSH_DIR%, AI panel will be unavailable. )
+where node >nul 2>nul
+if errorlevel 1 ( echo [ERROR] Node.js not found in PATH & exit /b 1 )
+where npm >nul 2>nul
+if errorlevel 1 ( echo [ERROR] npm not found in PATH & exit /b 1 )
 
 set "PY="
 if exist "%ROOT_DIR%\.venv\Scripts\python.exe" set "PY=%ROOT_DIR%\.venv\Scripts\python.exe"
 if "%PY%"=="" if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" set "PY=%BACKEND_DIR%\.venv\Scripts\python.exe"
-if "%PY%"=="" ( where python >nul 2>nul && set "PY=python" )
+if "%PY%"=="" (
+  where python >nul 2>nul
+  if not errorlevel 1 set "PY=python"
+)
 if "%PY%"=="" ( echo [ERROR] Python not found & exit /b 1 )
 
 REM --- git mode -----------------------------------------------
@@ -52,24 +72,33 @@ echo    GT Audit Platform - Dev Launcher
 echo  ======================================
 echo.
 
+REM Stable mode builds before stopping the currently working snapshot.
+set "VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%"
+set "VITE_DEV_PORT=%FRONTEND_PORT%"
+if /I "%GT_RUNTIME_MODE%"=="stable" (
+  echo [0/5] Building immutable frontend snapshot...
+  call npm --prefix "%FRONTEND_DIR%" run build:runtime
+  if errorlevel 1 (
+    echo       [ERROR] Stable frontend build failed; existing services were not stopped.
+    exit /b 1
+  )
+  echo       Done.
+)
+
 REM --- [1/5] kill old processes -------------------------------
 echo [1/5] Stopping old processes...
 call :kill_named_tree %BACKEND_TITLE%
 call :kill_named_tree %FRONTEND_TITLE%
-call :kill_named_tree %DSH_TITLE%
 taskkill /F /FI "WINDOWTITLE eq %BACKEND_TITLE%*" /T >nul 2>nul
 taskkill /F /FI "WINDOWTITLE eq %FRONTEND_TITLE%*" /T >nul 2>nul
-taskkill /F /FI "WINDOWTITLE eq %DSH_TITLE%*" /T >nul 2>nul
 call :kill_port %BACKEND_PORT%
 call :kill_port %FRONTEND_PORT%
-call :kill_port %DSH_PORT%
 timeout /t 1 /nobreak >nul
-REM strictPort: vite exits if port is taken (no drift to 3031).
-REM Port may linger after taskkill; wait explicitly.
-call :wait_port_free %FRONTEND_PORT%
-REM uvicorn has no strictPort: SO_REUSEADDR lets it bind next to a stale
-REM listener, so a survivor must be reported here instead of shared silently.
+REM Ports may linger after taskkill. Never start beside an unknown listener.
 call :wait_port_free %BACKEND_PORT%
+if errorlevel 1 exit /b 1
+call :wait_port_free %FRONTEND_PORT%
+if errorlevel 1 exit /b 1
 echo       Done.
 
 REM --- [2/5] start backend ------------------------------------
@@ -91,7 +120,9 @@ REM cold cost again (measured 51s callback right after a reload).
 REM Usage: in a cmd window run  set GT_BACKEND_NO_RELOAD=1  then run start-dev.bat
 set "BACKEND_RELOAD_ARGS=--reload --reload-dir app --reload-delay 2.0 --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis" --reload-exclude "*.json" --reload-exclude "tmp_*""
 if "%GT_BACKEND_NO_RELOAD%"=="1" set "BACKEND_RELOAD_ARGS="
+if /I "%GT_RUNTIME_MODE%"=="stable" set "BACKEND_RELOAD_ARGS="
 if "%GT_BACKEND_NO_RELOAD%"=="1" echo       Hot reload OFF ^(GT_BACKEND_NO_RELOAD=1^): restart to pick up code changes.
+if /I "%GT_RUNTIME_MODE%"=="stable" echo       Stable backend snapshot: restart to pick up code changes.
 start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% %BACKEND_RELOAD_ARGS% --log-level warning"
 
 REM --- [3/5] wait for backend ---------------------------------
@@ -109,7 +140,8 @@ for /L %%i in (1,1,60) do (
     REM localhost resolves ::1 first, so with -TimeoutSec 1 the probe
     REM always times out in the IPv6 phase regardless of backend health.
     REM Measured: localhost 2053ms / 127.0.0.1 16ms / [::1] refused.
-    powershell -NoProfile -NonInteractive -Command "$ProgressPreference='SilentlyContinue'; try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:%BACKEND_PORT%/api/health' -TimeoutSec 1 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>nul
+    REM A 200 response can still be degraded. Only healthy is ready.
+    powershell -NoProfile -NonInteractive -Command "$ProgressPreference='SilentlyContinue'; try { $r = Invoke-RestMethod -Uri 'http://127.0.0.1:%BACKEND_PORT%/api/health' -TimeoutSec 1; $s = if ($null -ne $r.data -and $null -ne $r.data.status) { [string]$r.data.status } else { [string]$r.status }; if ($s -eq 'healthy') { exit 0 }; exit 1 } catch { exit 1 }" >nul 2>nul
     if !errorlevel!==0 (
       set "READY=1"
       echo  OK
@@ -121,28 +153,22 @@ for /L %%i in (1,1,60) do (
 )
 if !READY!==0 (
   echo.
-  echo       [WARN] Backend not responding after 60s. Check the %BACKEND_TITLE% window.
+  echo       [ERROR] Backend did not become healthy after 60s. Check the %BACKEND_TITLE% window.
 )
 
-REM --- [3.5] DSH SDK runtime check ----------------------------
-REM dsh-agent-panel-integration Task 30: launcher no longer starts DSH Web UI for iframe.
-REM DSH Agent runs via platform backend DshEngine (per-run subprocess), no standalone Web UI needed.
-REM Only check SDK vendor dir existence as a dev hint.
-REM Parens inside an if-block echo MUST be escaped as ^( ^) - a bare `)`
-REM closes the block early, leaving a stray `.` token, and cmd aborts the
-REM whole script with `. was unexpected at this time.` (exit 255). That
-REM happens at PARSE time, so [4/5] never runs: backend up, frontend dead.
-if exist "%DSH_DIR%\python\sdk-runtime" (
-  echo [3.5] DSH SDK runtime detected at %DSH_DIR% ^(vendor read-only^).
-  echo       DSH Agent runs via platform backend DshEngine ^(per-run subprocess^).
-) else (
-  echo [3.5] DSH SDK not found at %DSH_DIR% - DSH Agent unavailable ^(native engine only^).
-)
+REM --- [3.5] backend-managed DSH runtime --------------------
+echo [3.5] DSH Agent is managed by the backend runtime.
 
 REM --- [4/5] start frontend -----------------------------------
 echo [4/5] Starting frontend on :%FRONTEND_PORT% ...
-REM Use 127.0.0.1 for the API base: backend listens IPv4 only.
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DSH_URL=http://127.0.0.1:%DSH_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev -- --host 0.0.0.0 --port %FRONTEND_PORT%"
+REM Set variables in the parent environment. Quoted SET syntax prevents trailing spaces.
+set "VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT%"
+set "VITE_DEV_PORT=%FRONTEND_PORT%"
+if /I "%GT_RUNTIME_MODE%"=="stable" (
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && npm run preview:stable"
+) else (
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && npm run dev -- --host 0.0.0.0 --port %FRONTEND_PORT%"
+)
 
 REM --- [5/5] wait for frontend --------------------------------
 echo [5/5] Waiting for frontend (max 15s)...
@@ -166,31 +192,31 @@ for /L %%i in (1,1,15) do (
 )
 if !FE_READY!==0 (
   echo.
-  echo       [WARN] Frontend not responding.
+  echo       [ERROR] Frontend not responding.
 )
 
 REM --- done ---------------------------------------------------
 echo.
-if !READY!==1 if !FE_READY!==1 (
+set "LAUNCH_EXIT=0"
+if "!READY!!FE_READY!"=="11" (
   echo  +-------------------------------------+
   echo  ^|  [OK] ALL SERVICES STARTED          ^|
   echo  ^|                                     ^|
-  echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
+  echo  ^|  Backend:  http://127.0.0.1:%BACKEND_PORT%   ^|
   echo  ^|  Frontend: http://127.0.0.1:%FRONTEND_PORT%   ^|
-  echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 ) else (
+  set "LAUNCH_EXIT=1"
   echo  +-------------------------------------+
-  echo  ^|  [WARN] SOME SERVICES NOT READY     ^|
+  echo  ^|  [ERROR] SOME SERVICES NOT READY    ^|
   echo  ^|  Check minimized windows for errors.^|
   echo  ^|                                     ^|
-  echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
+  echo  ^|  Backend:  http://127.0.0.1:%BACKEND_PORT%   ^|
   echo  ^|  Frontend: http://127.0.0.1:%FRONTEND_PORT%   ^|
-  echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 )
 echo.
-exit /b 0
+exit /b !LAUNCH_EXIT!
 
 :kill_named_tree
 REM Elevated cmd windows prefix the visible title with "Administrator:". WINDOWTITLE
@@ -201,21 +227,11 @@ powershell -NoProfile -NonInteractive -Command "$tag='%~1'; Get-CimInstance Win3
 exit /b 0
 
 :kill_port
-REM Kill every listener on the port AND the uvicorn --reload worker it spawned.
-REM The reload supervisor owns the listening socket and hands a duplicate handle
-REM to its multiprocessing spawn worker. If the supervisor dies first (the old
-REM taskkill here had no /T and created exactly that), the worker keeps serving
-REM OLD code and OLD .env on the same port while netstat still reports the dead
-REM supervisor PID as owner. uvicorn binds with SO_REUSEADDR, so the next backend
-REM silently shares the port with the orphan. Rules:
-REM   1. owners come from netstat: Get-NetTCPConnection collapses duplicate
-REM      binds of the same address and hides one of the two owners
-REM   2. a live owner started 2s+ after its socket was created is a reused PID,
-REM      never kill it
-REM   3. orphans are matched by their own command line:
-REM      spawn_main(parent_pid=<owner pid>, pipe_handle=...)
-REM Details: docs/runbooks/start-dev-launcher-notes.md section 6.
-powershell -NoProfile -NonInteractive -Command "$port = %~1; $ids = @(netstat -ano | Select-String -Pattern ('^\s*TCP\s+\S+:' + $port + '\s+\S+\s+LISTENING\s+(\d+)\s*$') | ForEach-Object { [int]$_.Matches[0].Groups[1].Value } | Where-Object { $_ -gt 4 } | Select-Object -Unique); if ($ids.Count -eq 0) { exit 0 }; $kill = @(); foreach ($o in $ids) { $proc = Get-Process -Id $o -ErrorAction SilentlyContinue; if (-not $proc) { continue }; $born = Get-NetTCPConnection -OwningProcess $o -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Sort-Object CreationTime | Select-Object -First 1 -ExpandProperty CreationTime; if (-not $born -or $proc.StartTime -le $born.AddSeconds(2)) { $kill += $o } }; $orphans = @(Get-CimInstance Win32_Process | Where-Object { $cl = [string]$_.CommandLine; $hit = $false; foreach ($o in $ids) { if ($cl -like ('*spawn_main(parent_pid=' + $o + ',*')) { $hit = $true } }; $hit } | Select-Object -ExpandProperty ProcessId); foreach ($p in @($kill + $orphans | Select-Object -Unique)) { & taskkill.exe /PID $p /F /T 2>$null | Out-Null }" >nul 2>nul
+REM Kill only orphaned reload workers whose recorded socket owner is already dead.
+REM Tagged live process trees are stopped by :kill_named_tree above. Any remaining
+REM live listener is treated as unknown; :wait_port_free aborts instead of killing it.
+REM netstat is required because Get-NetTCPConnection can collapse duplicate binds.
+powershell -NoProfile -NonInteractive -Command "$port = %~1; $ids = @(netstat -ano | Select-String -Pattern ('^\s*TCP\s+\S+:' + $port + '\s+\S+\s+LISTENING\s+(\d+)\s*$') | ForEach-Object { [int]$_.Matches[0].Groups[1].Value } | Where-Object { $_ -gt 4 } | Select-Object -Unique); if ($ids.Count -eq 0) { exit 0 }; $dead = @($ids | Where-Object { -not (Get-Process -Id $_ -ErrorAction SilentlyContinue) }); $orphans = @(Get-CimInstance Win32_Process | Where-Object { $cl = [string]$_.CommandLine; $hit = $false; foreach ($o in $dead) { if ($cl -like ('*spawn_main(parent_pid=' + $o + ',*')) { $hit = $true } }; $hit } | Select-Object -ExpandProperty ProcessId); foreach ($p in @($orphans | Select-Object -Unique)) { & taskkill.exe /PID $p /F /T 2>$null | Out-Null }" >nul 2>nul
 exit /b 0
 
 :wait_port_free
@@ -228,5 +244,6 @@ REM   2. Cannot use Get-NetTCPConnection (CIM query, ~1.2s per call)
 REM   3. Cannot use TcpListener bind (only binds one address family, may give false result)
 REM GetActiveTcpListeners() is a pure .NET call (ms-level) returning all address families.
 powershell -NoProfile -Command "$p=[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties(); for ($i=0; $i -lt 20; $i++) { if (-not ($p.GetActiveTcpListeners() | Where-Object { $_.Port -eq %~1 })) { exit 0 }; Start-Sleep -Milliseconds 200 }; exit 1" >nul 2>nul
-if not "!errorlevel!"=="0" echo       [WARN] Port %~1 still occupied, frontend may fail to start.
-exit /b 0
+set "WAIT_RESULT=!errorlevel!"
+if not "!WAIT_RESULT!"=="0" echo       [ERROR] Port %~1 is still occupied; refusing to start.
+exit /b !WAIT_RESULT!

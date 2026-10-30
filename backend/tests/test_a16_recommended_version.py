@@ -33,27 +33,26 @@ class TestRecommendedVersionLogic:
         assert recommend_a16_version("") == "A16-1"
 
     def test_ipo_category(self):
-        """含 IPO → A16-3"""
-        assert recommend_a16_version("IPO审计") == "A16-3"
+        """IPO（细分类 A2 / 迁移前残留的分类值 IPO）→ A16-3"""
+        assert recommend_a16_version("A2") == "A16-3"
         assert recommend_a16_version("IPO") == "A16-3"
 
     def test_listed_category(self):
-        """含 '上市' 或 'listed' → A16-2"""
-        assert recommend_a16_version("上市公司年审") == "A16-2"
-        assert recommend_a16_version("listed company") == "A16-2"
+        """上市（细分类 A1 / A7）→ A16-2"""
+        assert recommend_a16_version("A1") == "A16-2"
+        assert recommend_a16_version("A7") == "A16-2"
 
     def test_neeq_category(self):
-        """含 '新三板' → A16-5"""
-        assert recommend_a16_version("新三板审计") == "A16-5"
+        """新三板（细分类 B1）→ A16-5"""
+        assert recommend_a16_version("B1") == "A16-5"
 
     def test_bond_category(self):
-        """含 '企业债' 或 '债券' → A16-6"""
-        assert recommend_a16_version("企业债审计") == "A16-6"
-        assert recommend_a16_version("债券发行") == "A16-6"
+        """债券发行（细分类 B2）→ A16-6"""
+        assert recommend_a16_version("B2") == "A16-6"
 
     def test_generic_category(self):
-        """其他类型 → A16-1"""
-        assert recommend_a16_version("普通企业") == "A16-1"
+        """其他分类与自由文本 → A16-1（R4 起分类列不按关键词解释）"""
+        assert recommend_a16_version("C") == "A16-1"
         assert recommend_a16_version("年度审计") == "A16-1"
 
     def test_labels_complete(self):
@@ -83,11 +82,9 @@ async def test_endpoint_returns_correct_structure():
     # Mock db session
     db = AsyncMock()
 
-    # Mock business_category query result
-    biz_row = MagicMock()
-    biz_row.__getitem__ = lambda self, i: "IPO审计" if i == 0 else None
+    # Mock 项目分类查询（business_category, scenario, template_type）：IPO 场景
     biz_result = MagicMock()
-    biz_result.first.return_value = biz_row
+    biz_result.first.return_value = ("C", "ipo", "soe")
 
     # Mock wp_index query result (A16-3 and A16-7 exist)
     wp_row_1 = MagicMock()
@@ -138,11 +135,9 @@ async def test_endpoint_no_business_category():
     project_id = uuid.uuid4()
     db = AsyncMock()
 
-    # business_category = None
-    none_row = MagicMock()
-    none_row.__getitem__ = lambda self, i: None
+    # 分类未填写、常规场景
     biz_result = MagicMock()
-    biz_result.first.return_value = none_row
+    biz_result.first.return_value = (None, "normal", None)
 
     # No existing A16 workpapers
     wp_result = MagicMock()
@@ -170,10 +165,8 @@ async def test_endpoint_all_versions_exist():
     project_id = uuid.uuid4()
     db = AsyncMock()
 
-    biz_row = MagicMock()
-    biz_row.__getitem__ = lambda self, i: "上市" if i == 0 else None
     biz_result = MagicMock()
-    biz_result.first.return_value = biz_row
+    biz_result.first.return_value = ("A1", "normal", "soe")  # 细分类 A1 上市公司
 
     # All A16-x codes exist
     wp_rows = []
@@ -189,7 +182,7 @@ async def test_endpoint_all_versions_exist():
 
     result = await get_a16_recommended_version(project_id=project_id, db=db, _user=user)
 
-    assert result["recommended_code"] == "A16-2"  # 上市 → A16-2
+    assert result["recommended_code"] == "A16-2"  # A1 上市公司 → A16-2
     for v in result["all_versions"]:
         assert v["exists_in_project"] is True
 

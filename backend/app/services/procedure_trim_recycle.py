@@ -66,14 +66,13 @@ class ScopeCoverage:
         return row.wp_code if row else None
 
     def covered(self, entry_code: str) -> list[IndexRow]:
-        """由该程序行（最近一级）决定的底稿。决定者与状态无关，只看哪一级有程序行。"""
+        """由该程序行（最近一级）决定的底稿。决定者与状态无关，只看哪一级有程序行。
+
+        跟随下级程序行的科目母码（``D2`` 审定表）算作它每一条下级行都管（``TrimmedScope.deciders``）：
+        只恢复其中一条下级行时，母码也要从回收站恢复。
+        """
         code = normalize_code(entry_code)
-        out = []
-        for row in self.indexes:
-            verdict = self.scope.decided_by(row.wp_code)
-            if verdict is not None and verdict[0] == code:
-                out.append(row)
-        return out
+        return [row for row in self.indexes if code in self.scope.deciders(row.wp_code)]
 
     def simulate(self, overrides: dict[UUID, str]) -> TrimmedScope:
         """把部分程序行换成目标状态后的裁剪结果（preview / apply 写库前判定用）。"""

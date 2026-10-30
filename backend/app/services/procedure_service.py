@@ -9,10 +9,17 @@ import logging
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.procedure_models import ProcedureInstance, ProcedureTrimScheme
 from app.models.workpaper_models import WpTemplate
+from app.services.procedure_identity import (
+    normalize_cycle,
+    normalize_procedure_code,
+    normalize_procedure_identity,
+    normalize_wp_code,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +30,7 @@ class ProcedureService:
 
     async def get_procedures(self, project_id: UUID, cycle: str) -> list[dict]:
         """获取该循环的程序列表（含 wp_id 回填 + 委派人姓名）"""
+        cycle = normalize_cycle(cycle)
         q = (
             sa.select(ProcedureInstance)
             .where(
@@ -50,6 +58,19 @@ class ProcedureService:
             for r in result:
                 if r.get("assigned_to"):
                     r["assigned_to_name"] = name_map.get(r["assigned_to"])
+
+        # ── 来源（目录 / 补齐 / 自定义）与业务分类建议（spec trim-generation-plan-linkage R3.4 / R3.7）──
+        if result:
+            from app.services.procedure_catalog import (
+                annotate_rows,
+                catalog_items,
+                item_code,
+                project_category,
+            )
+
+            category, defaulted = await project_category(self.db, project_id)
+            catalog = {item_code(i) for i in await catalog_items(self.db, project_id, cycle)}
+            annotate_rows(result, cycle, catalog_codes=catalog, category=category, defaulted=defaulted)
 
         return result
 
@@ -158,10 +179,15 @@ class ProcedureService:
 
         裁剪衔接：初始化后用户可通过 save_trim 裁剪程序，
         generate_project_workpapers 会跳过 status=skip/not_applicable 的底稿。
-        """
-        import json
-        from pathlib import Path
 
+        补齐（spec trim-generation-plan-linkage R5）：建行之后、以及已初始化的循环再次初始化时，把模板编码里
+        没有程序行决定的、业务分类适用性与所在程序行不同的补成程序行（``procedure_catalog``），幂等。
+        检查与建行都在同一把咨询锁内（原先两个并发初始化都看到 0 行、各建一套）。
+        """
+        from app.services.procedure_catalog import catalog_items, ensure_supplement_rows, lock_cycle_init
+
+        cycle = normalize_cycle(cycle)
+        await lock_cycle_init(self.db, project_id, cycle)
         # 检查是否已初始化
         existing = await self.db.execute(
             sa.select(sa.func.count()).select_from(ProcedureInstance).where(
@@ -171,59 +197,27 @@ class ProcedureService:
             )
         )
         if (existing.scalar() or 0) > 0:
+            await ensure_supplement_rows(self.db, project_id, cycle)
             return await self.get_procedures(project_id, cycle)
 
-        # 优先从 template_library 表加载项目已选择的底稿模板
-        lib_items = []
-        try:
-            from app.models.template_library_models import TemplateLibraryItem, ProjectTemplateSelection, TemplateType
-            sel_q = (
-                sa.select(TemplateLibraryItem)
-                .join(ProjectTemplateSelection, ProjectTemplateSelection.template_id == TemplateLibraryItem.id)
-                .where(
-                    ProjectTemplateSelection.project_id == project_id,
-                    ProjectTemplateSelection.is_active == sa.true(),
-                    TemplateLibraryItem.template_type == TemplateType.workpaper_preset,
-                    TemplateLibraryItem.audit_cycle == cycle,
-                    TemplateLibraryItem.is_deleted == sa.false(),
-                )
-                .order_by(TemplateLibraryItem.wp_code)
-            )
-            sel_items = (await self.db.execute(sel_q)).scalars().all()
-            for item in sel_items:
-                lib_items.append({
-                    "wp_code": item.wp_code,
-                    "wp_name": item.name,
-                    "cycle_prefix": item.audit_cycle,
-                })
-        except Exception:
-            pass
-
-        # 降级：从 gt_template_library.json 加载
-        if not lib_items:
-            lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
-            if lib_path.exists():
-                try:
-                    with open(lib_path, "r", encoding="utf-8-sig") as f:
-                        raw = json.load(f)
-                    all_items = raw.get("templates", []) if isinstance(raw, dict) else raw
-                    lib_items = [
-                        item for item in all_items
-                        if isinstance(item, dict) and item.get("cycle_prefix") == cycle
-                    ]
-                except Exception:
-                    pass
+        # 项目选用的模板库优先，没有则 gt_template_library.json（procedure_catalog.catalog_items）
+        lib_items = await catalog_items(self.db, project_id, cycle)
 
         if lib_items:
+            seen: set[str] = set()
             for i, item in enumerate(lib_items):
-                wp_code = item.get("wp_code", item.get("code", f"{cycle}-{i}"))
+                raw_code = item.get("wp_code", item.get("code", f"{cycle}-{i}"))
+                identity = normalize_procedure_identity(cycle, raw_code, raw_code)
+                if identity.procedure_code in seen:
+                    continue
+                seen.add(identity.procedure_code)
                 pi = ProcedureInstance(
                     project_id=project_id,
-                    audit_cycle=cycle,
-                    procedure_code=wp_code,
+                    audit_cycle=identity.audit_cycle,
+                    procedure_code=identity.procedure_code,
                     procedure_name=item.get("wp_name", item.get("name", f"程序{cycle}-{i}")),
                     sort_order=i * 10,
-                    wp_code=wp_code,
+                    wp_code=identity.wp_code,
                 )
                 self.db.add(pi)
         else:
@@ -234,18 +228,24 @@ class ProcedureService:
             ).order_by(WpTemplate.template_code)
             templates = (await self.db.execute(tmpl_q)).scalars().all()
 
+            seen: set[str] = set()
             for i, t in enumerate(templates):
+                identity = normalize_procedure_identity(cycle, t.template_code, t.template_code)
+                if identity.procedure_code in seen:
+                    continue
+                seen.add(identity.procedure_code)
                 pi = ProcedureInstance(
                     project_id=project_id,
-                    audit_cycle=cycle,
-                    procedure_code=t.template_code,
+                    audit_cycle=identity.audit_cycle,
+                    procedure_code=identity.procedure_code,
                     procedure_name=t.template_name,
                     sort_order=i * 10,
-                    wp_code=t.template_code,
+                    wp_code=identity.wp_code,
                 )
                 self.db.add(pi)
 
         await self.db.flush()
+        await ensure_supplement_rows(self.db, project_id, cycle)
         return await self.get_procedures(project_id, cycle)
 
     # save_trim 已删除（procedure-mainline-convergence 需求 1/3）：
@@ -274,16 +274,16 @@ class ProcedureService:
         )).all()
         for pc, wc in pi_rows:
             if pc:
-                codes.add(pc)
+                codes.add(normalize_procedure_code(pc))
             if wc:
-                codes.add(wc)
+                codes.add(normalize_wp_code(wc) or "")
         # WpIndex：全部（唯一约束按 project_id+wp_code，无软删列区分）
         wi_rows = (await self.db.execute(
             sa.select(WpIndex.wp_code).where(WpIndex.project_id == project_id)
         )).scalars().all()
         for wc in wi_rows:
             if wc:
-                codes.add(wc)
+                codes.add(normalize_wp_code(wc) or "")
         return codes
 
     @staticmethod
@@ -295,6 +295,8 @@ class ProcedureService:
         """
         import re
 
+        cycle = normalize_cycle(cycle)
+        existing = {normalize_procedure_code(code) for code in existing if str(code or "").strip()}
         prefix = f"{cycle}-C"
         max_seq = 0
         pat = re.compile(rf"^{re.escape(prefix)}(\d+)$")
@@ -317,9 +319,20 @@ class ProcedureService:
         - 未填 → 基于现有最大序号生成 {cycle}-C{n}（序号永不复用，避免软删/并发撞库）。
         procedure_code 为 NOT NULL 列。
         """
+        from app.services.procedure_catalog import standard_template_cycle
+        from app.services.procedure_scope_retention import lock_project_procedure_scope
+
+        cycle = normalize_cycle(cycle)
+        await lock_project_procedure_scope(self.db, project_id)
         existing = await self._existing_custom_codes(project_id, cycle)
 
-        proc_code = (data.get("procedure_code") or "").strip()
+        raw_code = data.get("procedure_code")
+        proc_code = normalize_procedure_code(raw_code) if str(raw_code or "").strip() else ""
+        wp_code = normalize_wp_code(data.get("wp_code"), fallback=proc_code or None)
+        for candidate in dict.fromkeys((proc_code, wp_code)):
+            owner_cycle = standard_template_cycle(candidate)
+            if owner_cycle and owner_cycle != cycle:
+                raise ValueError(f"标准底稿编码 {candidate} 属于 {owner_cycle} 循环，不能在 {cycle} 循环新增")
         if proc_code:
             # 用户手填 → 查重，冲突返回友好错误（避免 WpIndex 唯一约束原始 500）
             if proc_code in existing:
@@ -327,17 +340,22 @@ class ProcedureService:
         else:
             proc_code = self._next_custom_code(cycle, existing)
 
+        identity = normalize_procedure_identity(cycle, proc_code, wp_code)
         pi = ProcedureInstance(
             project_id=project_id,
-            audit_cycle=cycle,
-            procedure_code=proc_code,
+            audit_cycle=identity.audit_cycle,
+            procedure_code=identity.procedure_code,
             procedure_name=data["procedure_name"],
             sort_order=data.get("sort_order") or 999,
             is_custom=True,
-            wp_code=data.get("wp_code") or proc_code,
+            wp_code=identity.wp_code,
         )
-        self.db.add(pi)
-        await self.db.flush()
+        try:
+            async with self.db.begin_nested():
+                self.db.add(pi)
+                await self.db.flush()
+        except IntegrityError as exc:
+            raise ValueError(f"程序编码 {identity.procedure_code} 已存在，请换一个编码") from exc
         return self._to_dict(pi)
 
     async def delete_custom(self, project_id: UUID, proc_id: UUID) -> bool:
@@ -347,7 +365,9 @@ class ProcedureService:
         返回 True 表示删除成功，False 表示未找到 / 非自定义。
         """
         from app.models.workpaper_models import WpIndex
+        from app.services.procedure_scope_retention import lock_project_procedure_scope
 
+        await lock_project_procedure_scope(self.db, project_id)
         pi = (await self.db.execute(
             sa.select(ProcedureInstance).where(
                 ProcedureInstance.id == proc_id,
@@ -358,7 +378,7 @@ class ProcedureService:
         if pi is None or not pi.is_custom:
             return False
 
-        pi.is_deleted = True
+        pi.soft_delete()
         # 软删 WpIndex 占位（不硬删：WorkingPaper.wp_index_id 是 NOT NULL FK，
         # 已上传文件时硬删会违反外键）。wp_code 保留 → 唯一约束(无is_deleted过滤)
         # 仍占位 + _existing_custom_codes 仍计入 → 编号不复用，零撞库。
@@ -494,6 +514,7 @@ class ProcedureService:
 
     async def get_trim_scheme(self, project_id: UUID, cycle: str) -> dict | None:
         """获取裁剪方案"""
+        cycle = normalize_cycle(cycle)
         q = (
             sa.select(ProcedureTrimScheme)
             .where(

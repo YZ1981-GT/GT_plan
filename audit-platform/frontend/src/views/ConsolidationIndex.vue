@@ -832,10 +832,24 @@ function stopConsolPushEvents() {
   consolPushSubs = []
 }
 
+function recoverConsolPushAfterReconnect() {
+  // consol.pushed/push_failed/push_stale 都是 raw：typed replay barrier 补不到，按当前项目全量校准。
+  void Promise.allSettled([
+    loadConsolPushStatus(),
+    refreshCurrentAfterConsolPush(),
+    loadGroupTree(),
+  ])
+}
+
 function bindConsolPushEvents() {
   stopConsolPushEvents()
   for (const eventName of Object.values(CONSOL_PUSH_EVENTS)) {
-    consolPushSubs.push(subscribeProjectEvent(projectId.value, eventName, onConsolPushEvent))
+    consolPushSubs.push(subscribeProjectEvent(
+      projectId.value,
+      eventName,
+      onConsolPushEvent,
+      { onReconnect: recoverConsolPushAfterReconnect },
+    ))
   }
 }
 

@@ -104,7 +104,6 @@ const props = defineProps<{
   year: number
   role: string
   auditType?: string
-  businessCategory?: string
 }>()
 
 const panelData = ref<any>(null)
@@ -119,10 +118,10 @@ const selectedConversations = computed(() => {
 })
 
 async function fetchPanel() {
+  // 复核模板按项目自身的质控业务分类在后端判定（R4：不再由客户端传分类覆盖）
   const params = new URLSearchParams({
     role: props.role,
     audit_type: props.auditType || 'financial',
-    business_category: props.businessCategory || 'C',
   })
   panelData.value = await apiProxy.get(
     `/api/projects/${props.projectId}/review-workflow/${props.year}/panel?${params}`

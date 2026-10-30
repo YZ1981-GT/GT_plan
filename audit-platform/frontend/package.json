@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
+    "build:runtime": "node --max-old-space-size=16384 node_modules/vite/bin/vite.js build --mode production",
     "preview": "vite preview",
+    "preview:stable": "vite preview --host 0.0.0.0 --port 3030 --strictPort",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "stylelint": "stylelint \"src/**/*.{vue,css,scss}\" --max-warnings=0",

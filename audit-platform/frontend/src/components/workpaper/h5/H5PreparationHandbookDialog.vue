@@ -41,7 +41,7 @@ function close() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="H5 生产性生物资产 / 油气资产 · 编制手册"
+    title="H5 油气资产 · 编制手册"
     width="860px"
     top="4vh"
     destroy-on-close
@@ -53,7 +53,7 @@ function close() {
       :closable="false"
       show-icon
       class="mb12"
-      title="一句话：明细立清单 → 产量与剩余可采储量记录 → 单位产量法测算折耗/生物资产折旧 → CAS8减值测试 → 回写审定表勾稽TB 1631/1632。行业专属:农林牧渔/采掘业。"
+      title="一句话：明细立清单 → 产量与剩余可采储量记录 → 单位产量法测算折耗 → CAS8减值测试 → 回写审定表勾稽TB 1631/1632。CAS 27 油气资产，通常只在油气开采企业核算。"
     />
     <el-tabs v-model="activeTab">
       <el-tab-pane label="编制手册（目标·逻辑·勾稽）" name="preparation">

@@ -1,0 +1,22 @@
+{
+  "_comment": "前端直接读 business_category 的旧读者（只许减少）。改为读后端 project_classification 后下调对应计数；口径见 src/__tests__/_helpers/businessCategoryReaders.ts",
+  "readers": {
+    "components/wizard/BasicInfoStep.vue": 6,
+    "components/workpaper/composables/useD4CrossSheet.ts": 1,
+    "components/workpaper/composables/useD4FormData.ts": 1,
+    "components/workpaper/composables/useF2FormData.ts": 1,
+    "components/workpaper/composables/useF2SpecialFormData.ts": 2,
+    "components/workpaper/composables/useF3FormData.ts": 1,
+    "components/workpaper/composables/useF4FormData.ts": 1,
+    "components/workpaper/composables/useH1FormData.ts": 1,
+    "components/workpaper/composables/useH3FormData.ts": 1,
+    "components/workpaper/composables/useI3FormData.ts": 1,
+    "components/workpaper/composables/useI4FormData.ts": 1,
+    "components/workpaper/composables/useI5FormData.ts": 1,
+    "components/workpaper/composables/useI6FormData.ts": 1,
+    "components/workpaper/composables/useK2FormData.ts": 1,
+    "components/workpaper/generation/GenerationPlanDialog.vue": 1,
+    "composables/useAProgramData.ts": 3,
+    "stores/wizard.ts": 2
+  }
+}

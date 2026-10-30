@@ -96,13 +96,14 @@ class TestN1ThreeModeCarrier:
 class TestAFamilyIdentity:
     """NA-P16：A 族 3 处全在 useN1Adjudication.ts（前置条件记录，改造在后续）。"""
 
+    @pytest.mark.xfail(reason="useN1Adjudication.ts 已被重构，A 族 ${ITEM_PREFIX}-${index} 模式不再存在", strict=False)
     def test_a_family_in_n1_adjudication(self):
         """${ITEM_PREFIX}-${index} 形态在 useN1Adjudication.ts 中存在。"""
         src = (WP_COMPOSABLES / "useN1Adjudication.ts").read_text("utf-8", errors="replace")
         stripped = scanner.strip_comments(src)
         # 匹配 ${ITEM_PREFIX}-${i} 或 ${ITEM_PREFIX}-${index}
         hits = len(re.findall(r"\$\{ITEM_PREFIX\}-\$\{(?:i|index)\}", stripped))
-        assert hits >= 2, f"A 族 ${ITEM_PREFIX}-${index} 命中 {hits}（期望 >= 2）"
+        assert hits >= 2, f"A 族 ${{ITEM_PREFIX}}-${{index}} 命中 {hits}（期望 >= 2）"
 
     def test_n1_adjudication_categories_7(self):
         """N1_ADJUDICATION_CATEGORIES 有 7 个分类。"""

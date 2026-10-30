@@ -25,6 +25,21 @@
         "in_recycle_codes": [],
         "existing_codes": []
       }
+    },
+    {
+      "name": "科目程序全部裁掉，审定表（母码）跟随不生成；有一条执行就生成",
+      "scope_rows": [
+        ["D2-1至D2-4", "not_applicable"], ["D2-5", "not_applicable"], ["D2-6至D2-13", "skip"],
+        ["D4-1至D4-4", "not_applicable"], ["D4-5", "execute"]
+      ],
+      "index": { "D2": true },
+      "codes": ["D2", "D2-1", "D4", "D4-2", "D4-5"],
+      "expected": {
+        "to_create": ["D4", "D4-5"],
+        "skipped_trimmed_codes": ["D2", "D2-1", "D4-2"],
+        "in_recycle_codes": [],
+        "existing_codes": []
+      }
     }
   ]
 }

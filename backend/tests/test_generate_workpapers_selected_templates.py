@@ -98,7 +98,7 @@ async def world(tmp_path, monkeypatch):
         api.dependency_overrides[get_db] = _db
         api.dependency_overrides[get_current_user] = _user
         async with AsyncClient(transport=ASGITransport(app=api), base_url="http://gen") as http:
-            yield {"http": http, "db": db, "pid": pid, "set_id": str(ts.id)}
+            yield {"http": http, "db": db, "pid": pid, "set_id": str(ts.id), "user_id": user.id}
     await engine.dispose()
 
 
@@ -144,11 +144,71 @@ async def test_unknown_request_field_is_rejected(world):
     assert await _codes(world) == []
 
 
+async def test_operation_id_replays_original_receipt_and_status(world):
+    operation_id = str(uuid.uuid4())
+    payload = {
+        "template_set_id": world["set_id"], "year": 2025,
+        "selected_templates": ["E1"], "operation_id": operation_id,
+    }
+    first = await _post(world, payload)
+    second = await _post(world, payload)
+    status = await world["http"].get(
+        f"/api/projects/{world['pid']}/working-papers/generation-operations/{operation_id}"
+    )
+    assert first.status_code == second.status_code == status.status_code == 200
+    assert first.json()["created"] == second.json()["created"] == 1
+    assert first.json()["created_codes"] == second.json()["created_codes"] == ["E1"]
+    assert first.json()["operation_id"] == second.json()["operation_id"] == operation_id
+    assert status.json()["status"] == "succeeded" and status.json()["receipt"] == first.json()
+    assert await _codes(world) == ["E1"], "terminal 重放必须返回原回执，不重复建底稿"
+
+
+async def test_operation_id_rejects_different_payload(world):
+    operation_id = str(uuid.uuid4())
+    base = {"template_set_id": world["set_id"], "year": 2025, "operation_id": operation_id}
+    assert (await _post(world, {**base, "selected_templates": ["E1"]})).status_code == 200
+    conflict = await _post(world, {**base, "selected_templates": ["D2"]})
+    assert conflict.status_code == 409
+    assert "不同的生成请求" in str(conflict.json())
+    assert await _codes(world) == ["E1"]
+
+
+async def test_live_operation_lease_returns_202_without_second_executor(world):
+    from app.services.wp_generation_operation_service import claim_operation, prepare_operation
+
+    operation_id = uuid.uuid4()
+    await prepare_operation(
+        world["db"], operation_id=operation_id, project_id=world["pid"],
+        actor_user_id=world["user_id"], year=2025, kind="template_set",
+        template_set_id=uuid.UUID(world["set_id"]), codes=["E1"],
+    )
+    await world["db"].commit()
+    claim = await claim_operation(world["db"], world["pid"], operation_id)
+    await world["db"].commit()
+    assert claim.lease_token is not None
+
+    response = await _post(world, {
+        "template_set_id": world["set_id"], "year": 2025,
+        "selected_templates": ["E1"], "operation_id": str(operation_id),
+    })
+    assert response.status_code == 202
+    assert response.json()["status"] == "materializing"
+    assert response.json()["terminal"] is False and response.json()["resumable"] is False
+    assert await _codes(world) == []
+
+
 # ── 跨语言契约 ──────────────────────────────────────────────────────────────
 
-#: 前端发起生成的全部调用点（grep `working-papers/generate` 全前端得出；新增调用点须登记）
-_CALLERS = ("views/WorkpaperList.vue", "composables/useWorkpaperGenerate.ts")
-_CALL_RE = re.compile(r"/working-papers/(generate(?:-from-codes)?)`\s*,\s*\{")
+#: 前端发起生成的全部调用点（全前端扫描得出；新增调用点须登记）。
+#: spec trim-generation-plan-linkage：生成底稿弹窗（底稿列表页 / 程序裁剪页共用）的调用收进 generationPlanApi；
+#: 旧的两步弹窗与只被自己的单测引用的 useWorkpaperGenerate 已删除。
+_CALLERS = ("services/generationPlanApi.ts",)
+#: 两种写法都认：路径字面量 `` `…/working-papers/generate…`, { `` 与 apiPaths 访问器 ``P_x.generateFromSet(pid), {``
+_CALL_RE = re.compile(
+    r"(?:/working-papers/(?P<lit>generate(?:-from-codes)?)`"
+    r"|\.(?P<acc>generateFromSet|generateFromCodes)\(\s*\w+(?:\.value)?\s*\))\s*,\s*\{"
+)
+_ACCESSORS = {"generateFromSet": "generate", "generateFromCodes": "generate-from-codes"}
 _MODELS = {
     "generate": wp_template.GenerateWorkpapersRequest,
     "generate-from-codes": wp_template.GenerateFromCodesRequest,
@@ -156,7 +216,7 @@ _MODELS = {
 
 
 def _post_bodies(text: str) -> list[tuple[str, set[str]]]:
-    """取 ``api.post(`…/working-papers/generate…`, { … })`` 的请求体键（支持 ``year,`` 简写）。"""
+    """取 ``api.post(<生成接口>, { … })`` 的请求体键（支持 ``year,`` 简写）。"""
     found = []
     for m in _CALL_RE.finditer(text):
         start = m.end() - 1
@@ -173,8 +233,18 @@ def _post_bodies(text: str) -> list[tuple[str, set[str]]]:
             if key:
                 assert re.fullmatch(r"\w+", key), f"无法识别的请求体键：{part!r}"
                 keys.add(key)
-        found.append((m.group(1), keys))
+        found.append((m.group("lit") or _ACCESSORS[m.group("acc")], keys))
     return found
+
+
+def test_call_pattern_recognizes_both_forms():
+    """反向自检：字面量与访问器两种写法都抽得到，否则「调用点清单完整」会因为写法变了而空转。"""
+    lit = "await api.post(`/api/projects/${pid}/working-papers/generate`, { template_set_id: s, year })"
+    acc = "await api.post<R>(P_wp.generateFromCodes(projectId), { wp_codes: c, year: y }, silent)"
+    assert _post_bodies(lit) == [("generate", {"template_set_id", "year"})]
+    assert _post_bodies(acc) == [("generate-from-codes", {"wp_codes", "year"})]
+    # apiPaths 里的路径定义本身不是调用
+    assert _post_bodies("generateFromSet: (pid: string) => `/api/projects/${pid}/working-papers/generate`,\n}") == []
 
 
 def test_frontend_request_bodies_match_backend_models():
@@ -187,7 +257,10 @@ def test_frontend_request_bodies_match_backend_models():
             assert keys <= fields, f"{rel} 发往 {endpoint} 的 {sorted(keys - fields)} 后端模型没有（会被 422）"
             seen.setdefault(endpoint, set()).update(keys)
     assert "selected_templates" in seen["generate"], "裁剪结果没有发给后端"
-    assert seen.keys() == _MODELS.keys(), "两个生成接口都应有前端调用点"
+    assert set(seen) == {"generate"}, (
+        "交互式生成只能调用模板集 generate 端点；禁止 5xx 后自动改调 generate-from-codes，"
+        "否则首请求已提交但响应丢失时会重复生成"
+    )
 
 
 def test_frontend_callers_list_is_complete():
@@ -204,9 +277,10 @@ def test_frontend_callers_list_is_complete():
 async def test_frontend_reads_only_keys_backend_returns(world):
     """前端回执提示读的键 ⊆ 两个生成接口真实回执的键（键名漂移即红）。"""
     gen = (await _post(world, {"template_set_id": world["set_id"], "year": 2025,
-                               "selected_templates": ["E1", "ZZ9"]})).json()
+                               "selected_templates": ["E1", "ZZ9"], "operation_id": str(uuid.uuid4())})).json()
     codes = (await world["http"].post(_CODES_URL.format(pid=world["pid"]),
-                                      json={"wp_codes": ["H1", "ZZ8"], "year": 2025})).json()
+                                      json={"wp_codes": ["H1", "ZZ8"], "year": 2025,
+                                            "operation_id": str(uuid.uuid4())})).json()
     returned = set(gen) | set(codes)
     helper = (_FRONTEND / "utils" / "workpaperGenerateResult.ts").read_text(encoding="utf-8")
     read = set(re.findall(r"result\?\.(\w+)", helper))

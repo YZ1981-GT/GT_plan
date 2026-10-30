@@ -286,14 +286,16 @@ async def _check_trimmed(
 
     返回 (trimmed, reason)。
     """
+    from app.services.procedure_identity import normalize_wp_code
+
     # 确定 wp_code
     if ns == "wp":
-        wp_code = target.upper()
+        wp_code = normalize_wp_code(target) or ""
     elif ns == "sheet":
-        wp_code = target.upper()
+        wp_code = normalize_wp_code(target) or ""
     elif ns == "cell":
         sheet_part = target.split("!")[0] if "!" in target else target
-        wp_code = sheet_part.upper()
+        wp_code = normalize_wp_code(sheet_part) or ""
     else:
         return (False, None)
 

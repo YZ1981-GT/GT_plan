@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chain_execution import ChainExecution
 from app.services.prerequisite_checker import PrerequisiteChecker
+from app.services.project_classification import resolve as resolve_classification
 from app.services.wp_generation_matching import (
     business_category_flags,
     match_workpapers,
@@ -462,6 +463,11 @@ class ChainOrchestrator:
             audit_type, is_large_soe, wizard_state = "financial", False, {}
             business_category = ""
 
+        # 分类 / 场景单一解释（R4）：分类列里残留的 IPO / refinancing 在场景仍为 normal 时按场景处理，
+        # 迁移前后判定一致；下面的场景口径、上市 / IPO 标记与 biz_ flags 都取自同一份结果。
+        classification = resolve_classification(business_category, scenario, template_type)
+        scenario = classification.scenario
+
         # Build project context flags for conditional triggers
         audit_type_l = str(audit_type or "").lower()
         integrated_audit = (
@@ -470,7 +476,7 @@ class ChainOrchestrator:
             or "icfr" in audit_type_l
             or "integrated" in str(scenario or "").lower()
         )
-        listed_or_ipo = template_type == "listed" or scenario in ("ipo", "listed")
+        listed_or_ipo = classification.has_tag("listed") or classification.is_ipo
         project_flags = {
             "consolidated": report_scope == "consolidated",
             "listed": template_type == "listed",
@@ -483,7 +489,7 @@ class ChainOrchestrator:
             "group_audit": report_scope == "consolidated",
             # E1 Sprint 2 Task 2.2: scenario 驱动文件级裁剪（F1.2）
             "scenario_normal": scenario == "normal",
-            "scenario_ipo_or_above": scenario in ("ipo", "listed", "transfer", "restructure", "fraud_response"),
+            "scenario_ipo_or_above": scenario != "normal",
             "has_foreign_currency": has_foreign_currency,
             # B60 P3 attachment matrix flags (overridable via wizard_state.b60_attachment_flags)
             "integrated_audit": integrated_audit,
@@ -512,11 +518,10 @@ class ChainOrchestrator:
         if project_flags.get("it_team_executes"):
             project_flags["needs_it_audit"] = True
 
-        # business_category → biz_ flags for applicable_when matching (S32~S35 etc.).
-        # Keep this in the shared predicate module so generation and render-config
-        # cannot drift on normalization or the listed-template rule.
+        # 分类 / 场景 → biz_ flags（applicable_when.business_category，S32~S35 等）：与 render-config 共用
+        # business_category_flags（内部即 project_classification.resolve），生成与渲染不会各判各的。
         project_flags.update(
-            business_category_flags(business_category, template_type)
+            business_category_flags(business_category, template_type, classification.scenario)
         )
 
 

@@ -54,6 +54,7 @@ import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import WorkpaperModuleHandbookDialog from '@/components/workpaper/WorkpaperModuleHandbookDialog.vue'
 import { listUsers } from '@/services/commonApi'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
+import { indexFirstBy } from '@/utils/indexFirstBy'
 
 defineOptions({ name: 'WorkpaperDelegationMatrix' })
 
@@ -80,9 +81,12 @@ onMounted(async () => {
   } catch { /* 静默 */ }
 })
 
+/** wp_index.id → 索引项（原先每行 find 一遍；同 id 取第一个，与 find 一致。spec platform-perf-hotspots R7） */
+const wpIndexById = computed(() => indexFirstBy(ctx.wpIndex.value, (i: WpIndexItem) => i.id))
+
 const matrixWpItems = computed(() =>
   ctx.wpList.value.map((w: WorkpaperDetail) => {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    const idx = wpIndexById.value.get(w.wp_index_id)
     return {
       id: w.id,
       wp_code: w.wp_code || idx?.wp_code || '',

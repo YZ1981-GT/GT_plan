@@ -121,7 +121,8 @@ FIXTURES: list[FixtureSpec] = [
         required_wp_codes=F2_E2E_WP_CODES,
         env_var="TEST_PROJECT_ID_FIX_F",
         default_project_id=DEFAULT_FIX_B,
-        business_category="IPO",
+        # IPO 是专项场景，不是质控业务分类（R4；分类列有 CHECK，写 IPO 会被拒）。与 FIX-B 共用项目时分类保持 B3。
+        scenario="ipo",
     ),
     FixtureSpec(
         fixture_id="FIX-I6",

@@ -330,7 +330,7 @@ async def stream_run_events(
         default=None, description="断线重连的续传点（等价于 Last-Event-ID 头）"
     ),
     last_event_id_header: str | None = Header(default=None, alias="Last-Event-ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user_sse),
 ):
     """按 ``Last-Event-ID`` 回放并订阅后续事件，带心跳并接入 ``sse_registry`` drain。

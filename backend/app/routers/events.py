@@ -30,12 +30,36 @@ router = APIRouter(
 )
 
 
+def _format_typed_sse(payload) -> str:
+    """把 typed live payload 格式化成 SSE frame；有 Redis id 才写 ``id:``。
+
+    ``SSEEventPayload.stream_event_id`` 是进程内传输字段，不进入业务 JSON。Redis 不可用时
+    收到的是普通 ``EventPayload``，仍 live 下发、但 frame 无 id（health 会标 replay 不可用）。
+    """
+    event_id = getattr(payload, "stream_event_id", None)
+    id_line = f"id: {event_id}\n" if event_id else ""
+    event_data = {
+        "event_type": payload.event_type.value,
+        "project_id": str(payload.project_id),
+        "year": payload.year,
+        "account_codes": payload.account_codes,
+        "entry_group_id": str(payload.entry_group_id) if payload.entry_group_id else None,
+        "batch_id": str(payload.batch_id) if payload.batch_id else None,
+        "context": payload.context.model_dump(mode="json") if payload.context else None,
+        "extra": payload.extra if payload.extra else None,
+    }
+    return (
+        f"{id_line}event: {payload.event_type.value}\n"
+        f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+    )
+
+
 @router.get("/stream")
 async def sse_stream(
     project_id: UUID,
     year: int = Query(default=None),
     current_user: User = Depends(get_current_user_sse),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """SSE 事件流：客户端订阅后接收试算表更新等事件通知
 
@@ -47,8 +71,7 @@ async def sse_stream(
     # R3.1/R3.2: 项目授权（admin/partner 放行；无权 403 脱敏）
     await check_project_access(current_user, project_id, db)
 
-    async def event_generator():
-        queue = event_bus.create_sse_queue()
+    async def event_generator(queue):
         try:
             # 发送初始连接确认
             yield f"event: connected\ndata: {json.dumps({'status': 'connected'})}\n\n"
@@ -95,17 +118,7 @@ async def sse_stream(
                 if year is not None and payload.year is not None and payload.year != year:
                     continue
 
-                # Build SSE event data
-                event_data = {
-                    "event_type": payload.event_type.value,
-                    "project_id": str(payload.project_id),
-                    "year": payload.year,
-                    "account_codes": payload.account_codes,
-                    "entry_group_id": str(payload.entry_group_id) if payload.entry_group_id else None,
-                    "batch_id": str(payload.batch_id) if payload.batch_id else None,
-                    "extra": payload.extra if payload.extra else None,
-                }
-                yield f"event: {payload.event_type.value}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                yield _format_typed_sse(payload)
 
         except asyncio.CancelledError:
             logger.info("SSE stream cancelled for project %s", project_id)
@@ -116,14 +129,18 @@ async def sse_stream(
         """Wrap event_generator with SSE registry for graceful drain."""
         from app.core.sse_registry import sse_registry
 
-        conn = sse_registry.register()
+        queue = event_bus.create_sse_queue()
+        # drain 时往队列放 None 立刻叫醒（原来要等下一次 30 s 心跳才看到已关闭），收尾补发 server_draining
+        conn = sse_registry.register_queue(queue)
         try:
-            async for chunk in event_generator():
+            async for chunk in event_generator(queue):
                 if conn.is_closed:
-                    yield f"event: server_draining\ndata: {{}}\n\n"
                     break
                 yield chunk
+            if conn.is_closed:
+                yield f"event: server_draining\ndata: {{}}\n\n"
         finally:
+            event_bus.remove_sse_queue(queue)
             sse_registry.unregister(conn)
 
     return StreamingResponse(
@@ -140,7 +157,7 @@ async def sse_stream(
 @router.get("/since")
 async def get_events_since(
     project_id: UUID,
-    last_event_id: str | None = Query(default=None),
+    last_event_id: str | None = Query(default=None, pattern=r"^\d+-\d+$"),
     since_timestamp: float | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -194,26 +211,49 @@ async def get_events_since(
             import time
             start_id = f"{int((time.time() - 60) * 1000)}-0"
 
-        # XRANGE 从 start_id（exclusive）到最新，最多 100 条
-        # 使用 "(" 前缀表示 exclusive（不含 start_id 本身）
-        messages = await redis_client.xrange(
-            stream_key,
-            min=f"({start_id}" if last_event_id else start_id,
-            max="+",
-            count=100,
-        )
+        # Redis 的 count 在**项目过滤之前**生效。旧实现只扫全局 Stream 的前 100 条：如果这
+        # 100 条都属于别的项目，当前项目即使紧随其后也会返回空，前端误以为已补齐。按页向后扫，
+        # 最多取 100 条本项目事件；20 页是防御上限，命中上限显式告警而不是无限占用请求。
+        cursor = start_id
+        exclusive = bool(last_event_id)
+        scanned_pages = 0
+        for scanned_pages in range(1, 21):
+            messages = await redis_client.xrange(
+                stream_key,
+                min=f"({cursor}" if exclusive else cursor,
+                max="+",
+                count=100,
+            )
+            if not messages:
+                break
 
-        for msg_id, data in messages:
-            item = replay_entry_projection(msg_id, data)
-            if item is None:
-                # 解析不出来必须显式计数：静默跳过会让「事件被丢弃」在日志与响应里
-                # 都不可见（Requirement 13.9）。
-                dropped_unparseable += 1
-                continue
-            # 过滤当前项目的事件（无归属事件不下发到具体项目流）
-            if not belongs_to_project(item, project_id):
-                continue
-            events.append(item)
+            for msg_id, data in messages:
+                if isinstance(msg_id, bytes):
+                    msg_id = msg_id.decode("ascii", errors="strict")
+                item = replay_entry_projection(msg_id, data)
+                if item is None:
+                    # 解析不出来必须显式计数：静默跳过会让「事件被丢弃」在日志与响应里
+                    # 都不可见（Requirement 13.9）。
+                    dropped_unparseable += 1
+                    continue
+                # 过滤当前项目的事件（无归属事件不下发到具体项目流）
+                if not belongs_to_project(item, project_id):
+                    continue
+                events.append(item)
+                if len(events) >= 100:
+                    break
+
+            if len(events) >= 100 or len(messages) < 100:
+                break
+            tail = messages[-1][0]
+            cursor = tail.decode("ascii", errors="strict") if isinstance(tail, bytes) else str(tail)
+            exclusive = True
+
+        if scanned_pages >= 20 and len(messages) == 100 and len(events) < 100:
+            logger.warning(
+                "get_events_since scan capped at 20 pages project=%s start=%s found=%s",
+                project_id, start_id, len(events),
+            )
 
     except Exception as e:
         logger.warning("get_events_since failed (Redis unavailable): %s", e)

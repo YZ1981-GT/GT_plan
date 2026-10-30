@@ -255,7 +255,7 @@ class TestLane2PayloadAndLiveDb:
 
         rows = _live_db_rows()
         mine = [r for r in rows if r["item_id"].startswith(("N1-", "N3-"))]
-        _eq("lane2 真库行", len(mine), 0)
+        assert len(mine) >= 19, f"lane2 真库行 {len(mine)} < 棘轮 19"
 
 
 # ═══ Task 13 / 14 · 模板缺陷修复与登记（NA-P19 ~ NA-P22） ═══════════════════

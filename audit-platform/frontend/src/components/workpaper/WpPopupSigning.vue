@@ -2,7 +2,7 @@
 /**
  * WpPopupSigning — A1-11 业务报告签发流转控制表
  *
- * 签字审批链（按 business_category 区分）：
+ * 签字审批链（按项目详情下发的 project_classification.category_group 区分）：
  * - 所有项目(B/C类): 项目经理 → 合伙人 (2 levels)
  * - A类项目: + 独立复核合伙人 + EQCR技术复核人 (4 levels)
  *
@@ -13,6 +13,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { classificationOf, describeCategoryGroup } from '@/types/projectClassification'
 
 const props = defineProps<{
   wpCode: string
@@ -56,8 +57,10 @@ const signStates = ref<Record<string, SignState>>({})
 const loading = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-const businessCategory = computed(() => props.projectInfo?.business_category || '')
-const isTypeA = computed(() => businessCategory.value === 'A')
+// 读项目详情下发的分类解释（原 `business_category === 'A'`：A1~A8 项目漏掉独立复核 / EQCR 两行）
+const classification = computed(() => classificationOf(props.projectInfo))
+const categoryText = computed(() => describeCategoryGroup(classification.value))
+const isTypeA = computed(() => classification.value?.category_group === 'A')
 
 const visibleRows = computed(() => {
   if (isTypeA.value) return ALL_SIGN_ROWS
@@ -161,7 +164,7 @@ onBeforeUnmount(() => {
       class="signing-alert"
     >
       <template #title>
-        本项目为{{ businessCategory || 'B/C' }}类，仅需项目经理和合伙人签字
+        本项目为{{ categoryText || 'B/C 类' }}，仅需项目经理和合伙人签字
       </template>
     </el-alert>
 

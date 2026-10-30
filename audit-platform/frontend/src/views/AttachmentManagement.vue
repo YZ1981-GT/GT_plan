@@ -662,10 +662,17 @@ onMounted(async () => {
 //    旧实现用原生 EventSource 直连 `/api/sse/projects/{pid}`：该路由后端不存在、原生 EventSource 也无法带鉴权头
 //    ⇒ 连接即失败，「其他入口上传后本页自动刷新」从未生效。
 let attachmentSub: ProjectEventSubscription | null = null
+function reloadAttachmentsAfterEvent() {
+  // attachment.uploaded 是 raw 事件：重连后可能漏掉，按项目全量重拉列表。
+  void loadAttachments()
+}
 onMounted(() => {
-  attachmentSub = subscribeProjectEvent(projectId.value, 'attachment.uploaded', () => {
-    loadAttachments()
-  })
+  attachmentSub = subscribeProjectEvent(
+    projectId.value,
+    'attachment.uploaded',
+    reloadAttachmentsAfterEvent,
+    { onReconnect: reloadAttachmentsAfterEvent },
+  )
 })
 onUnmounted(() => {
   attachmentSub?.close()

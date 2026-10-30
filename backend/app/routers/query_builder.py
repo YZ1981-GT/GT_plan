@@ -43,6 +43,7 @@ from app.services.custom_query.builder_access import (
     resolve_builder_access,
 )
 from app.services.custom_query.acnr_target_values import acnr_sheet, plan_builder_targets, with_acnr_results
+from app.services.custom_query import count_token as count_tokens
 from app.services.custom_query.builder_scope import (
     BuilderScope,
     resolve_builder_scope,
@@ -312,7 +313,7 @@ async def execute_query(
     cache_key = compute_cache_key(
         user_id=str(current_user.id),
         project_id=f"__query_builder__:{scope_signature(scope)}",
-        query_params=body.model_dump(),
+        query_params=body.model_dump(exclude={"count_token"}),
     )
     cached = await get_cached_result(cache_key)
     if cached is not None:
@@ -321,10 +322,21 @@ async def execute_query(
 
     try:
         async with cancellable_query(db, QUERY_TIMEOUT_MS):
-            # total 对同一语句计数（R2.6）：改造前是本页行数，翻页后 total 跟着变成页大小。
-            # 不分组的聚合恒为一行（与 offset 无关），不必再把整条聚合跑第二遍去数它
+            # total 对同一语句计数（R2.6）；后续页可带服务端签名凭证跳过重复 COUNT。
+            # 不分组的聚合恒为一行（与 offset 无关），无需另跑计数。
             ungrouped_aggregate = bool(body.aggregates) and not body.group_by
-            total = 1 if ungrouped_aggregate else (await db.execute(build_count(stmt))).scalar_one()
+            count_reused = False
+            next_count_token: str | None = None
+            if ungrouped_aggregate:
+                total = 1
+            else:
+                count_stmt = build_count(stmt)
+                count_subject = count_tokens.subject_of(current_user)
+                count_digest = count_tokens.statement_digest(count_stmt, db.get_bind(), subject=count_subject)
+                reused_total = count_tokens.reuse(body.count_token, digest=count_digest, subject=count_subject)
+                count_reused = reused_total is not None
+                total = int(reused_total) if count_reused else (await db.execute(count_stmt)).scalar_one()
+                next_count_token = count_tokens.issue(digest=count_digest, total=int(total), subject=count_subject)
             result = await db.execute(stmt)
             rows = result.fetchall()
     except HTTPException as http_exc:
@@ -355,6 +367,8 @@ async def execute_query(
         "rows": rows_serialized,
         "columns": column_names,
         "total": int(total),
+        "count_token": next_count_token,
+        "count_reused": count_reused,
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
         # 明示本次生效的项目范围（R2.2）：admin/partner 不限项目时也要让用户知道

@@ -11,14 +11,20 @@
           <h1 class="ch-banner-title">集团合并报表</h1>
           <p class="ch-banner-desc">按集团架构树形展示合并项目，点击任意企业节点进入合并工作底稿、抵消分录、差额表、合并报表与附注</p>
         </div>
-        <el-button class="ch-banner-action" @click="showBatchImport = true">
+        <el-button v-if="canBatchCreate" class="ch-banner-action" @click="showBatchImport = true">
           <el-icon style="margin-right:4px"><Upload /></el-icon>批量建项
         </el-button>
       </div>
     </div>
 
     <!-- 批量建项弹窗 -->
-    <BatchImportDialog v-model="showBatchImport" @success="reload" />
+    <BatchImportDialog
+      v-model="showBatchImport"
+      mode="consolidation"
+      :consolidation-roots="batchImportRoots"
+      @success="reload"
+      @open-root="goConsolidation"
+    />
 
     <!-- 统计概览 -->
     <div class="ch-stats" v-if="!loading && hasAnyData">
@@ -262,8 +268,12 @@ import { reparentSummary, type ReparentResult } from '@/components/consolidation
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import { previewScopeConfirmation, type ScopeConfirmationPreview } from '@/services/consolScopeConfirmationApi'
+import { useAuthStore } from '@/stores/auth'
+import { canBatchCreateProjects } from '@/services/batchProjectImport'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const canBatchCreate = computed(() => canBatchCreateProjects(authStore.user?.role))
 const showBatchImport = ref(false)
 
 const {
@@ -312,6 +322,12 @@ function flattenNodes(nodes: TreeNode[]): TreeNode[] {
 const allTreeNodes = computed(() => trees.value.flatMap((t) => flattenNodes(t.children || [])))
 
 const hasAnyData = computed(() => hasTrees.value || independents.value.length > 0)
+const batchImportRoots = computed(() => trees.value
+  .filter((tree) => Boolean(tree.rootProjectId))
+  .map((tree) => ({
+    id: tree.rootProjectId as string,
+    label: `${tree.ultimateName || tree.ultimateCode || '未命名集团'} · ${tree.year || '年度未解析'}`,
+  })))
 
 /** 合并项目数 = 含合并根项目的集团树数量 */
 const consolidatedCount = computed(() => trees.value.filter((t) => t.rootProjectId).length)

@@ -162,14 +162,13 @@ async def _get_project_context(db: AsyncSession, project_id: UUID) -> str:
     parts = []
     if project.name:
         parts.append(f"项目名称: {project.name}")
-    if hasattr(project, "client_name") and project.client_name:
+    if getattr(project, "client_name", None):
         parts.append(f"被审计单位: {project.client_name}")
-    if hasattr(project, "industry") and project.industry:
-        parts.append(f"行业: {project.industry}")
-    if hasattr(project, "audit_period_end") and project.audit_period_end:
+    # 不写「行业」：Project 没有行业属性、平台也没有项目级行业来源（原 hasattr 分支恒不成立）
+    if getattr(project, "audit_period_end", None):
         parts.append(f"审计期间截止日: {project.audit_period_end}")
-    if hasattr(project, "business_category") and project.business_category:
-        parts.append(f"业务类别: {project.business_category}")
+    if getattr(project, "business_category", None):
+        parts.append(f"质控业务分类: {project.business_category}")
     return "\n".join(parts) if parts else "项目基础信息有限"
 
 
@@ -249,7 +248,7 @@ class A17LlmService:
         if not chapter_def:
             return {"error": f"未找到章节定义: {chapter_id}"}
 
-        # 2. 构建项目上下文（始终包含 industry + audit_period_end）
+        # 2. 构建项目上下文（项目名 / 被审计单位 / 截止日 / 质控分类，有值才出现）
         project_context = await _get_project_context(db, project_id)
 
         # 3. 构建跨章上下文
@@ -262,7 +261,8 @@ class A17LlmService:
             )
 
         # 4. RAG 检索相关知识库内容（非阻塞）
-        rag_query = f"{chapter_def.get('title', '')} {project_context.split(chr(10))[2] if len(project_context.split(chr(10))) > 2 else ''}"
+        # 只用章节标题：原先拼上下文的「第 3 行」想取行业，行业行从不存在，实际拼进去的是截止日。
+        rag_query = chapter_def.get("title", "")
         evidence_context = await _retrieve_rag_context(db, project_id, rag_query.strip())
 
         # 5. 构建 prompt（根据 mode 区分）

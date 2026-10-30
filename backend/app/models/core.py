@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
@@ -85,7 +85,8 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # audit-report-template-integration V066: 企业子类型 type_a/type_b/type_c/type_d
     company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    # V077→V209: 业务分类（加宽到 20 以容纳 refinancing 等 11 字符值）
+    # V077→V209→V219: 质控业务分类码（A / A1~A8、B / B1~B6、C），NULL = 未填写；IPO / 再融资等是 scenario。
+    # 判定一律经 app.services.project_classification（不要按首字母 / 子串自行解释）。
     business_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # V087: A21~A25 复核底稿模板选择
     audit_type: Mapped[str | None] = mapped_column(
@@ -150,7 +151,7 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         String(20),
         nullable=False,
         server_default=text("'normal'"),
-        comment="项目场景: normal/ipo/listed/transfer/restructure/fraud_response",
+        comment="专项场景: normal/ipo/listed/refinancing/transfer/restructure/fraud_response（V219 CHECK）",
     )
     has_foreign_currency: Mapped[bool] = mapped_column(
         nullable=False,
@@ -230,6 +231,18 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
             "idx_projects_status",
             "status",
             postgresql_where=text("is_deleted = false"),
+        ),
+        # V219（trim-generation-plan-followup-optimizations R4）：分类只放质控业务分类码、场景只放登记值。
+        # 登记值与 app.services.project_classification / V219 迁移逐值同步（tests/test_project_classification.py）。
+        CheckConstraint(
+            "business_category IS NULL OR business_category IN ("
+            "'A', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', "
+            "'B', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C')",
+            name="ck_projects_business_category_registered",
+        ),
+        CheckConstraint(
+            "scenario IN ('normal', 'ipo', 'listed', 'refinancing', 'transfer', 'restructure', 'fraud_response')",
+            name="ck_projects_scenario_registered",
         ),
     )
 

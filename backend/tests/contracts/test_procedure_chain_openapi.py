@@ -75,7 +75,8 @@ def test_export_reproduces_committed_file_and_check_lists_drift(tmp_path):
 
     write = _run("--out", str(drifted))
     assert write.returncode == 0, write.stdout + write.stderr
-    assert "[OK] 已写入" in write.stdout and "8 个接口" in write.stdout, write.stdout
+    expected_count = len(_script().OPERATIONS)
+    assert "[OK] 已写入" in write.stdout and f"{expected_count} 个接口" in write.stdout, write.stdout
     assert drifted.read_bytes() == OPENAPI.read_bytes().replace(b"\r\n", b"\n"), (
         "重跑写回的内容与仓库里的文件不同：仓库里的 openapi 不是最新的，不带 --check 重跑脚本并提交")
 
@@ -99,14 +100,19 @@ def test_registered_operations_link_responses_and_errors_to_contracts():
         assert ok["allOf"] == [ENVELOPE] and ok["properties"]["data"] == {"$ref": entry["response"]}, ok
         invalid = op["responses"]["422"]["content"]["application/json"]["schema"]
         assert invalid == {"$ref": "common.schema.json#/$defs/validationErrorBody"}
+        successes = entry.get("successes", {})
         errors = entry.get("errors", {})
-        assert sorted(op["responses"]) == sorted(["200", "422", *errors]), op["responses"].keys()
+        assert sorted(op["responses"]) == sorted(["200", "422", *successes, *errors]), op["responses"].keys()
+        assert contract.get("successes", {}) == successes
         assert contract.get("errors", {}) == {status: list(alts) for status, alts in errors.items()}
+        for status, ref in successes.items():
+            body = op["responses"][status]["content"]["application/json"]["schema"]
+            assert body["allOf"] == [ENVELOPE] and body["properties"]["data"] == {"$ref": ref}
         for status, alts in errors.items():
             message = op["responses"][status]["content"]["application/json"]["schema"]["properties"]["message"]
             shapes = message.get("anyOf", [message])
             assert shapes == [{"type": "string"} if a == mod.TEXT else {"$ref": a} for a in alts], (status, message)
-        for ref in [contract["response"], contract.get("request"),
+        for ref in [contract["response"], contract.get("request"), *successes.values(),
                     *(a for alts in errors.values() for a in alts if a != mod.TEXT)]:
             if ref:
                 resolver.lookup(ref)  # x-contract 的字符串不是 $ref 键，单独解析
@@ -191,7 +197,7 @@ def _request_problems(doc: dict) -> tuple[int, list[str]]:
 def test_request_models_match_contract_requests():
     doc = _doc()
     checked, problems = _request_problems(doc)
-    assert checked == 7, "8 个接口里只有程序行归属是 GET、没有请求体"
+    assert checked == 7, "10 个接口里程序行归属、生成计划、粗裁状态三个是 GET、没有请求体"
     assert not problems, "\n".join(problems)
 
     # 比对器本身不空转：三种漂移各报一条，且报在对的位置

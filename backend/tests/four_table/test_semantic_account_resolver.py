@@ -636,8 +636,13 @@ class TestResolveSemanticAccounts:
         db = _FakeSession(chart=[])
         got = await resolve_semantic_accounts(_Ctx(db), H3_SPEC)
         assert got.chart_available is False
-        assert got.slots["gross"].resolved_from == RESOLVED_FROM_FALLBACK
+        slot = got.slots["gross"]
+        assert slot.resolved_from == RESOLVED_FROM_FALLBACK
         assert got.codes_of("gross") == ["1521"]
+        assert slot.standard_codes == ["1521"]
+        assert slot.matched == []
+        assert slot.exact is False
+        assert slot.found is True  # 仅表示有查询落点；不等于 active TB 有实际行
 
     async def test_db_exception_does_not_break_render(self):
         class _Boom:

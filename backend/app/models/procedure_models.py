@@ -63,6 +63,26 @@ class ProcedureInstance(Base, SoftDeleteMixin, TimestampMixin):
     __table_args__ = (
         Index("idx_proc_project_cycle", "project_id", "audit_cycle",
               postgresql_where=text("is_deleted = false")),
+        Index(
+            "uq_procedure_instances_active_identity_norm",
+            "project_id",
+            sa.func.upper(sa.func.trim(audit_cycle)),
+            sa.func.upper(sa.func.trim(procedure_code)),
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+        sa.CheckConstraint(
+            "audit_cycle = upper(trim(audit_cycle)) AND trim(audit_cycle) <> ''",
+            name="ck_procedure_instances_audit_cycle_canonical",
+        ),
+        sa.CheckConstraint(
+            "procedure_code = upper(trim(procedure_code)) AND trim(procedure_code) <> ''",
+            name="ck_procedure_instances_code_canonical",
+        ),
+        sa.CheckConstraint(
+            "wp_code IS NULL OR (wp_code = upper(trim(wp_code)) AND trim(wp_code) <> '')",
+            name="ck_procedure_instances_wp_code_canonical",
+        ),
     )
 
 
@@ -243,3 +263,38 @@ class ProcedureOperationPreview(Base):
     consumed_request_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ProcedureTrimCycleConfirmation(Base, TimestampMixin):
+    """每项目每循环当前粗裁确认投影；历史真源仍是 consumed preview。"""
+
+    __tablename__ = "procedure_trim_cycle_confirmations"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    audit_cycle: Mapped[str] = mapped_column(String(10), primary_key=True)
+    source_preview_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("procedure_operation_previews.id", ondelete="RESTRICT"), nullable=False
+    )
+    confirmed_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    confirmed_at: Mapped[datetime] = mapped_column(nullable=False)
+    request_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    cycle_revision_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    revision_no: Mapped[int] = mapped_column(
+        sa.BigInteger, nullable=False, default=1, server_default=text("1")
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "audit_cycle = upper(trim(audit_cycle)) AND trim(audit_cycle) <> ''",
+            name="ck_procedure_trim_cycle_confirmation_cycle",
+        ),
+        sa.UniqueConstraint(
+            "source_preview_id", "audit_cycle",
+            name="uq_procedure_trim_cycle_confirmation_source",
+        ),
+        sa.CheckConstraint("revision_no >= 1", name="ck_procedure_trim_cycle_confirmation_revision"),
+    )

@@ -189,6 +189,18 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         " V180__share_change_events.sql：原 trio attempt/snapshot 相关对象由后续迁移补建；"
         "share_change_events 表已在真库生效。无需补迁移。",
     ),
+    KnownChecksumDrift(
+        "225",
+        "2f4f4fb127d2a993636b3e343b53975ba8c2aadbc2ecf5ed0bc849456d8cdd5c",
+        "63a26f3f5b73557dae3d933bd6480887b79a8d49562b32e6b153174429c8825a",
+        "trim-generation-plan-followup-optimizations R2：开发中的 V217（2026-10-30 同步时与远端 V217 撞号，改为 V225，"
+        "共享库登记的版本号与文件名同步改为 225、checksum 不动）于 2026-10-29 04:36 UTC 被登记进共享开发库"
+        "（当时只有身份约束部分）。之后两处编辑：三个 CHECK 的存在性判断由「全库 pg_constraint 按名字查」改为"
+        "「按 procedure_instances 本表查」（原写法在随机 schema 迁移测试里被 public 的同名约束骗过、跳过创建），"
+        "头注释改为指向 V218。2026-10-29 逐对象核验 public：3 个 CHECK、部分唯一索引"
+        " uq_procedure_instances_active_identity_norm、备份表 procedure_instance_identity_v217_backup 全部存在，"
+        "效果与当前文件一致，无需补迁移；粗裁确认投影另立 V218。",
+    ),
 )
 
 

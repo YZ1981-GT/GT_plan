@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -25,6 +25,25 @@ export default defineConfig(({ mode }) => {
   // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
   const apiTarget = env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
   const devPort = parseInt(env.VITE_DEV_PORT || '3030', 10)
+  const proxy: Record<string, ProxyOptions> = {
+    '/api': {
+      target: apiTarget,
+      changeOrigin: true,
+      // FastAPI trailing-slash 307 must stay behind the frontend origin.
+      configure: (server) => {
+        server.on('proxyRes', (proxyRes) => {
+          const location = proxyRes.headers['location']
+          if (location && location.startsWith(apiTarget)) {
+            proxyRes.headers['location'] = location.replace(apiTarget, '')
+          }
+        })
+      },
+    },
+    '/wopi': {
+      target: apiTarget,
+      changeOrigin: true,
+    },
+  }
 
   return {
     // 依赖预构建缓存放前端根目录 .vite/（.gitignore 已忽略），不放 node_modules/.vite：
@@ -60,26 +79,15 @@ export default defineConfig(({ mode }) => {
       //    3030 还是后端 CORS_ORIGINS 白名单里的固定值，漂移端口属于约定被破坏。
       //    改成 true 后端口冲突会明确失败并打印占用信息，失败可见 > 静默降级。
       strictPort: true,
-      proxy: {
-        '/api': {
-          target: apiTarget,
-          changeOrigin: true,
-          // 修复 FastAPI trailing-slash 307 重定向绕过代理导致 CORS 的问题：
-          // 拦截后端返回的 Location header 中的绝对 URL，重写为相对路径
-          configure: (proxy) => {
-            proxy.on('proxyRes', (proxyRes) => {
-              const location = proxyRes.headers['location']
-              if (location && location.startsWith(apiTarget)) {
-                proxyRes.headers['location'] = location.replace(apiTarget, '')
-              }
-            })
-          },
-        },
-        '/wopi': {
-          target: apiTarget,
-          changeOrigin: true,
-        },
-      },
+      proxy,
+    },
+    // Stable runtime serves the immutable production snapshot while retaining
+    // the same-origin API/WOPI contract used by the development server.
+    preview: {
+      host: '0.0.0.0',
+      port: devPort,
+      strictPort: true,
+      proxy,
     },
     resolve: {
       alias: {

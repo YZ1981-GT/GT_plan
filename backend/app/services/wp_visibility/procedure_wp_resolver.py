@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.procedure_models import ProcedureInstance, ProcedureRowTask
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.services.procedure_identity import normalize_cycle, normalize_procedure_code, normalize_wp_code
 
 logger = logging.getLogger(__name__)
 
@@ -346,8 +347,9 @@ class ProcedureWpResolver:
         标准/自定义 procedure 可能有多个实例（跨 cycle / 父子）。收集所有匹配实例经
         wp_id/wp_code 解析到的 **去重** wp_index 集合；若结果非唯一（0 或 >1），由上层判 fail-closed。
         """
-        code = (procedure_code or "").strip()
-        if not code:
+        try:
+            code = normalize_procedure_code(procedure_code)
+        except ValueError:
             return frozenset()
         conds = [
             ProcedureInstance.project_id == project_id,
@@ -355,7 +357,7 @@ class ProcedureWpResolver:
             ProcedureInstance.is_deleted == sa.false(),
         ]
         if audit_cycle:
-            conds.append(ProcedureInstance.audit_cycle == audit_cycle.strip())
+            conds.append(ProcedureInstance.audit_cycle == normalize_cycle(audit_cycle))
         rows = (
             await self.db.execute(
                 sa.select(ProcedureInstance.wp_id, ProcedureInstance.wp_code).where(*conds)
@@ -371,7 +373,9 @@ class ProcedureWpResolver:
             if wp_id is not None:
                 wp_ids.append(wp_id)
             elif wp_code:
-                wp_codes.add(wp_code.strip())
+                normalized_wp = normalize_wp_code(wp_code)
+                if normalized_wp:
+                    wp_codes.add(normalized_wp)
         if wp_ids:
             # asyncpg：用 = ANY(:list)，禁止 IN tuple 参数
             r = (

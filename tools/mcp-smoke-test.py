@@ -14,6 +14,7 @@ from mcp.client.stdio import stdio_client
 ROOT = Path(__file__).resolve().parents[1]
 NPX = r"C:\Program Files\nodejs\npx.cmd"
 PYTHON = sys.executable
+MCP_CONTAINER_WRAPPER = str(ROOT / "tools" / "mcp_stdio_container.py")
 
 # (name, command, args, env, probe_tool, probe_args)
 SERVERS: list[tuple[str, str, list[str], dict[str, str] | None, str | None, dict | None]] = [
@@ -27,16 +28,8 @@ SERVERS: list[tuple[str, str, list[str], dict[str, str] | None, str | None, dict
     ),
     (
         "postgres",
-        "docker",
-        [
-            "run",
-            "-i",
-            "--rm",
-            "-e",
-            "DATABASE_URI",
-            "crystaldba/postgres-mcp",
-            "--access-mode=restricted",
-        ],
+        PYTHON,
+        [MCP_CONTAINER_WRAPPER, "run", "postgres"],
         {
             "DATABASE_URI": "postgresql://postgres:postgres@host.docker.internal:5432/audit_platform"
         },
@@ -45,16 +38,8 @@ SERVERS: list[tuple[str, str, list[str], dict[str, str] | None, str | None, dict
     ),
     (
         "postgres-sql",
-        "docker",
-        [
-            "run",
-            "-i",
-            "--rm",
-            "-e",
-            "DATABASE_URI",
-            "crystaldba/postgres-mcp",
-            "--access-mode=restricted",
-        ],
+        PYTHON,
+        [MCP_CONTAINER_WRAPPER, "run", "postgres"],
         {
             "DATABASE_URI": "postgresql://postgres:postgres@host.docker.internal:5432/audit_platform"
         },

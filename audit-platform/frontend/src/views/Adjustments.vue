@@ -804,13 +804,19 @@ const adjStaleRefresh = useStaleRefresh(projectId, {
 // ─── SSE → mitt 桥接：broadcast_raw 事件经 SSE 到达，转发到 mitt 供 useStaleRefresh 消费 ──
 const _sseSubs: ProjectEventSubscription[] = []
 const SSE_BRIDGE_EVENTS = ['adjustment:review-changed', 'adjustment:sync-arrived'] as const
+function _refreshAdjustmentsAfterReconnect() {
+  // 两个事件走 broadcast_raw、没有 typed replay id；barrier 完成后按当前项目全量校准。
+  void fetchEntries()
+  void fetchSummary()
+  void refreshCollabInbox()
+}
 function _setupSseBridge(pid: string) {
   _teardownSseBridge()
   if (!pid) return
   for (const evt of SSE_BRIDGE_EVENTS) {
     _sseSubs.push(subscribeProjectEvent(pid, evt, (data) => {
       eventBus.emit(evt as any, { ...(data as Record<string, unknown> || {}), projectId: pid })
-    }))
+    }, { onReconnect: _refreshAdjustmentsAfterReconnect }))
   }
 }
 function _teardownSseBridge() {

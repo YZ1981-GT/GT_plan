@@ -50,7 +50,12 @@ describe('合并推送 raw SSE 接线', () => {
       expect(sseTypes).toContain(`| '${eventName}'`)
     }
     expect(index).toContain('for (const eventName of Object.values(CONSOL_PUSH_EVENTS))')
-    expect(index).toContain('subscribeProjectEvent(projectId.value, eventName, onConsolPushEvent)')
+    expect(index).toContain('onConsolPushEvent,')
+    expect(index).toContain('{ onReconnect: recoverConsolPushAfterReconnect }')
+    expect(index).toContain('Promise.allSettled([')
+    expect(index).toContain('loadConsolPushStatus()')
+    expect(index).toContain('refreshCurrentAfterConsolPush()')
+    expect(index).toContain('loadGroupTree()')
     // 年度未就绪（null）时不认任何推送事件
     expect(index).toContain('const eventYear = effectiveConsolYear()')
     expect(index).toContain('if (eventYear == null || !isCurrentConsolPushEvent(payload, projectId.value, eventYear)) return')

@@ -266,6 +266,18 @@
       "GenerateFromCodesRequest": {
         "additionalProperties": false,
         "properties": {
+          "operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
           "wp_codes": {
             "items": {
               "type": "string"
@@ -294,6 +306,18 @@
       "GenerateWorkpapersRequest": {
         "additionalProperties": false,
         "properties": {
+          "operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
           "selected_templates": {
             "anyOf": [
               {
@@ -932,6 +956,221 @@
         }
       }
     },
+    "/api/projects/{project_id}/procedure-scope/confirmations": {
+      "get": {
+        "operationId": "get_scope_confirmations_api_projects__project_id__procedure_scope_confirmations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-plan-view.schema.json#/$defs/confirmations"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Scope Confirmations",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "response": "generation-plan-view.schema.json#/$defs/confirmations"
+        }
+      }
+    },
+    "/api/projects/{project_id}/procedure-scope/generation-plan": {
+      "get": {
+        "operationId": "get_generation_plan_api_projects__project_id__procedure_scope_generation_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模板集；不传按全部模板编码",
+            "in": "query",
+            "name": "template_set_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "模板集；不传按全部模板编码",
+              "title": "Template Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-plan-view.schema.json#/$defs/plan"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "资源、模板集或生成 operation 不存在"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "trimmed-scope.schema.json#/$defs/unavailable"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "读不到粗裁结果，停止执行（fail-closed）"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Generation Plan",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "404": [
+              "string"
+            ],
+            "503": [
+              "trimmed-scope.schema.json#/$defs/unavailable"
+            ]
+          },
+          "response": "generation-plan-view.schema.json#/$defs/plan"
+        }
+      }
+    },
     "/api/projects/{project_id}/working-papers/generate": {
       "post": {
         "operationId": "generate_project_workpapers_api_projects__project_id__working_papers_generate_post",
@@ -980,6 +1219,47 @@
             },
             "description": "成功：data 见 x-contract.response"
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-receipt.schema.json#/$defs/operationStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "操作仍在执行：data 为持久 operation 状态"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "冲突：已被他人分配、凭证已消费 / 过期 / 被篡改、目标版本已变化"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1021,12 +1301,18 @@
         ],
         "x-contract": {
           "errors": {
+            "409": [
+              "string"
+            ],
             "503": [
               "trimmed-scope.schema.json#/$defs/unavailable"
             ]
           },
           "request": "generation-receipt.schema.json#/$defs/templateSetGenerateRequest",
-          "response": "generation-receipt.schema.json#/$defs/templateSetGenerateResponse"
+          "response": "generation-receipt.schema.json#/$defs/templateSetGenerateResponse",
+          "successes": {
+            "202": "generation-receipt.schema.json#/$defs/operationStatus"
+          }
         }
       }
     },
@@ -1078,6 +1364,47 @@
             },
             "description": "成功：data 见 x-contract.response"
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-receipt.schema.json#/$defs/operationStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "操作仍在执行：data 为持久 operation 状态"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "冲突：已被他人分配、凭证已消费 / 过期 / 被篡改、目标版本已变化"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1119,12 +1446,115 @@
         ],
         "x-contract": {
           "errors": {
+            "409": [
+              "string"
+            ],
             "503": [
               "trimmed-scope.schema.json#/$defs/unavailable"
             ]
           },
           "request": "generation-receipt.schema.json#/$defs/generateFromCodesRequest",
-          "response": "generation-receipt.schema.json#/$defs/generateFromCodesResponse"
+          "response": "generation-receipt.schema.json#/$defs/generateFromCodesResponse",
+          "successes": {
+            "202": "generation-receipt.schema.json#/$defs/operationStatus"
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/working-papers/generation-operations/{operation_id}": {
+      "get": {
+        "operationId": "get_workpaper_generation_operation_api_projects__project_id__working_papers_generation_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "generation-receipt.schema.json#/$defs/operationStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "成功：data 见 x-contract.response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/responseEnvelope"
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "资源、模板集或生成 operation 不存在"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "common.schema.json#/$defs/validationErrorBody"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Workpaper Generation Operation",
+        "tags": [
+          "procedure-chain"
+        ],
+        "x-contract": {
+          "errors": {
+            "404": [
+              "string"
+            ]
+          },
+          "response": "generation-receipt.schema.json#/$defs/operationStatus"
         }
       }
     },

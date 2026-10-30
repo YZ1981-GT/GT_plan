@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from uuid import UUID
 
@@ -271,6 +272,101 @@ def inject_applicable_standards(sheets: list[dict], standards: list[str]) -> int
     return injected
 
 
+# ─── 同请求 memo 与共享载荷（spec platform-perf-hotspots R1 / R2）──────────────
+
+# D 循环渲染器：输出与具体页签无关（只读 wp_id / project_id / year / business_category，
+# d1 / d2 另写一个 html_data["sheet_name"]），但不在整册专属集合里 ⇒ 原先每个页签重跑一次
+# （D2 一次 render-config 跑 15 遍：checklist_responses / 项目 / 关联方 / 试算表取数各 15 次）。
+# 同一请求内按 componentType 只跑一次，其余页签复用并补本页 sheet_name（_memo_hit_html_data）。
+# 守卫：test_render_config_workbook_scoped_memo.py 用 AST 钉住这些渲染器不读页签相关字段。
+_WORKBOOK_SCOPED_RENDERERS: frozenset[str] = frozenset({
+    "d1-notes-receivable",
+    "d2-accounts-receivable",
+    "d3-prepaid-accounts",
+    "d4-operating-revenue",
+    "d5-receivables-financing",
+    "d6-contract-assets",
+    "d7-contract-liabilities",
+})
+
+
+def _memo_hit_html_data(memoized: dict, component_type: str, sheet_name: str) -> dict:
+    """memo 命中时本页签的 html_data。
+
+    整册专属组件沿用原行为（同一对象，html_data.sheet_name 是第一页的名字）；
+    D 循环渲染器的结果带 sheet_name 时换成本页名字（浅拷贝，大块载荷按引用复用），
+    与逐页重跑的输出逐键相同。
+    """
+    if component_type in _WORKBOOK_SCOPED_RENDERERS and "sheet_name" in memoized:
+        return {**memoized, "sheet_name": sheet_name}
+    return memoized
+
+
+_SHARE_CONTAINER_TYPES = (dict, list, tuple, set)
+
+
+def _html_share_key(html_data: dict) -> tuple | None:
+    """分组键：除 sheet_name 外每个键的值，容器按对象身份、标量按类型 + 值。
+
+    没有非空容器的（如 OnlyOffice 占位 ``{"onlyoffice": True, "sheet_name": …}``）不参与共享。
+    """
+    parts: list[tuple] = []
+    has_payload = False
+    for key, value in html_data.items():
+        if key == "sheet_name":
+            continue
+        if isinstance(value, _SHARE_CONTAINER_TYPES):
+            parts.append((key, "id", id(value)))
+            has_payload = has_payload or len(value) > 0
+            continue
+        try:
+            hash(value)
+        except TypeError:
+            parts.append((key, "id", id(value)))
+            continue
+        parts.append((key, type(value).__name__, value))
+    return tuple(parts) if has_payload else None
+
+
+def share_duplicated_html_data(response: dict) -> dict:
+    """R1：内容相同（只差 sheet_name）的页签 html_data 只下发一份。
+
+    线上形状：顶层 ``shared_html_data: {"h1": {...}}``（去掉 sheet_name）；同组页签的
+    ``html_data`` 只留 ``sheet_name``（原先没有就为空对象），并带 ``html_data_ref: "h1"``。
+    前端 ``expandSharedHtmlData`` 逐页 ``{...structuredClone(shared[ref]), ...html_data}`` 还原。
+
+    分组只认对象身份（memo 产出的页签：整册专属的同一对象、D 循环的 ``{**memo, sheet_name}``），
+    不序列化比较 —— 内容碰巧相同的独立对象照旧各自下发。不改入参：返回新 dict，
+    没有可共享的页签时原样返回入参本身。只由路由在 ``share_html_data=1`` 时调用。
+    """
+    sheets = response.get("sheets")
+    if not isinstance(sheets, list) or len(sheets) < 2:
+        return response
+    groups: dict[tuple, list[int]] = {}
+    for index, sheet in enumerate(sheets):
+        html_data = sheet.get("html_data") if isinstance(sheet, dict) else None
+        if not isinstance(html_data, dict):
+            continue
+        share_key = _html_share_key(html_data)
+        if share_key is not None:
+            groups.setdefault(share_key, []).append(index)
+    shared: dict[str, dict] = {}
+    new_sheets = list(sheets)
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        ref = f"h{len(shared) + 1}"
+        first = sheets[members[0]]["html_data"]
+        shared[ref] = {key: value for key, value in first.items() if key != "sheet_name"}
+        for index in members:
+            html_data = sheets[index]["html_data"]
+            rest = {"sheet_name": html_data["sheet_name"]} if "sheet_name" in html_data else {}
+            new_sheets[index] = {**sheets[index], "html_data": rest, "html_data_ref": ref}
+    if not shared:
+        return response
+    return {**response, "sheets": new_sheets, "shared_html_data": shared}
+
+
 # 标准底稿编号判定：统一使用 ACNR grammar_v1 的 STANDARD_WP_CODE_RE (R12.2)
 # 旧版 [A-I]\d 已修正为 [A-S]\d，覆盖 J~S 循环（R12.4, R12.5）
 from app.services.acnr.grammar import is_standard_wp_code as _is_standard_wp_code_fn
@@ -425,6 +521,8 @@ def _extract_field_sources(sheet_schema: dict | None, full_schema: dict | None, 
 async def _has_custom_procedure(
     db: AsyncSession, project_id: UUID, wp_code: str
 ) -> bool:
+    from app.services.procedure_identity import normalize_wp_code
+    wp_code = normalize_wp_code(wp_code) or ""
     n = (
         await db.execute(
             sa.select(sa.func.count())
@@ -504,3 +602,81 @@ def _resolve_template_path(working_paper, wp_code: str) -> str | None:
         return str(t) if t else fp
     except Exception:  # noqa: BLE001
         return fp
+
+
+# ---------------------------------------------------------------------------
+# Canonical sheet identity helpers（guidance Task 10 — 被测试契约引用）
+# 原在 wp_render_config.py 末尾，原样移入（该文件 re-import，引用路径不变）。
+# ---------------------------------------------------------------------------
+
+
+# 嵌入编码提取：比 _SHEET_CODE_RE（末尾锚定、仅大写尾字母）更宽泛，
+# 允许编码在 sheet_name 中间、小写字母尾缀（如 D0-4b、F1-CONF）。
+_EMBEDDED_CODE_RE = re.compile(r"([A-Z]\d+(?:-\d+)*(?:-?[A-Za-z]+)?)")
+
+
+def annotate_sheet_identity(sheet: dict) -> dict:
+    """为单个 render-config sheet dict 添加 canonical identity 字段（in-place）.
+
+    - ``sheet_code``: 从 sheet_name 提取的标准编码，或保留显式值
+    - ``sheet_code_reason``: 来源（explicit_code / embedded_code / no_canonical_code / whole_workbook）
+    - ``whole_workbook``: 整册标记
+    """
+    whole = bool(sheet.get("whole_workbook", False))
+
+    # whole_workbook 标记冲突检测
+    if whole:
+        if sheet.get("sheet_code") and str(sheet["sheet_code"]).strip():
+            raise ValueError(
+                f"whole_workbook=True 不应携带 sheet_code=null 以外的值，"
+                f"实际 sheet_code={sheet['sheet_code']!r}"
+            )
+        sheet.setdefault("sheet_code", None)
+        sheet["sheet_code_reason"] = "whole_workbook"
+        sheet["whole_workbook"] = True
+        return sheet
+
+    sheet.setdefault("whole_workbook", False)
+
+    # 已有显式 sheet_code
+    existing_code = sheet.get("sheet_code")
+    if existing_code is not None and str(existing_code).strip():
+        # 检查 sheet_name 里的解析结果是否冲突
+        parsed = _EMBEDDED_CODE_RE.search(sheet.get("sheet_name") or "")
+        if parsed and parsed.group(1) != str(existing_code).strip():
+            raise ValueError(
+                f"sheet_name 中的解析结果 {parsed.group(1)!r} 与 "
+                f"显式 sheet_code {existing_code!r} 冲突（解析结果冲突）"
+            )
+        sheet["sheet_code_reason"] = "explicit_code"
+        return sheet
+
+    # 从 sheet_name 提取
+    name = sheet.get("sheet_name") or ""
+    m = _EMBEDDED_CODE_RE.search(name)
+    if m:
+        sheet["sheet_code"] = m.group(1)
+        sheet["sheet_code_reason"] = "embedded_code"
+    else:
+        sheet["sheet_code"] = None
+        # 保留调用方已设置的 reason（如 virtual_sheet_without_standard_code）
+        if not sheet.get("sheet_code_reason"):
+            sheet["sheet_code_reason"] = "no_canonical_code"
+
+    return sheet
+
+
+def annotate_sheet_identities(
+    sheets: list[dict],
+    parent_wp_code: str | None = None,
+) -> list[dict]:
+    """对 sheet 列表批量标注 canonical identity（in-place，返回原列表）."""
+    from app.services.guidance_render_identity import (
+        annotate_sheet_canonical_identity,
+    )
+
+    for sheet in sheets:
+        annotate_sheet_identity(sheet)
+        if parent_wp_code:
+            annotate_sheet_canonical_identity(sheet, parent_wp_code=parent_wp_code)
+    return sheets

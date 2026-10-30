@@ -1,55 +1,218 @@
 /**
- * API 代理层 — 统一解包 + 类型安全
- * 
- * 用法：将页面中的 `import http from '@/utils/http'` 替换为 `import { api } from '@/services/apiProxy'`
- * 
- * 区别：
- * - http.get(url) 返回 AxiosResponse，需要 `const { data } = await http.get(url)`
- * - api.get(url) 直接返回业务数据，`const data = await api.get(url)`
- * 
- * 这样页面不再需要双层解包
+ * API 代理层：统一解包、类型安全与受控 GET single-flight。
  *
- * GET 请求 in-flight 共享：相同 URL 同时发起时返回同一个 Promise（避免 axios dedup 取消旧请求 + 重复网络）
+ * `http.get` 返回 AxiosResponse；`api.get` 返回已解包业务数据。只有可证明语义
+ * 等价的 GET 才共享在途 producer；每个调用者仍拿到自己的订阅 Promise，因此取消
+ * 一个调用者不会取消其他调用者或底层请求。
  */
 import http from '@/utils/http'
-import type { AxiosRequestConfig } from 'axios'
+import {
+  CanceledError,
+  type AxiosRequestConfig,
+} from 'axios'
+import {
+  onRequestIdentityEpochChange,
+  requestIdentityEpoch,
+} from '@/services/requestIdentityEpoch'
 
-/**
- * 在途表键 = `{l|s}{d|n}|url`：l/s = 是否静默，d/n = 是否参与 utils/http 的 GET 去重（`_dedupe:false` 为 n）。
- * 只有 config 为空、或只带 `_silent` / `_dedupe` 标志时共享（带 params / headers / validateStatus 等不共享，行为不变）。
- *
- * spec procedure-chain-hardening-and-java-contracts R16：附加标志原先一律绕开共享 ⇒ 编辑器打开时 GtWpRenderer 与壳的侧栏
- * 同时取 render-config 各发一条。现在静默调用方可以加入同 URL 的任何在途请求（失败时那条请求自己按原样提示，
- * 静默方照常自行处理，不会多出提示）；非静默调用方只加入同类非静默请求 —— 加入静默请求会丢掉它该有的错误提示。
- */
-const _inflightGet = new Map<string, Promise<any>>()
-const _SHARE_FLAGS = new Set(['_silent', '_dedupe'])
-
-function _shareKind(config?: AxiosRequestConfig): string | null {
-  if (!config) return 'ld'
-  if (!Object.keys(config).every((k) => _SHARE_FLAGS.has(k))) return null
-  const c = config as { _silent?: boolean; _dedupe?: boolean }
-  return `${c._silent ? 's' : 'l'}${c._dedupe === false ? 'n' : 'd'}`
+type ProxyGetConfig = AxiosRequestConfig & {
+  _silent?: boolean
+  _dedupe?: boolean
 }
 
-async function get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  const kind = _shareKind(config)
-  if (kind) {
-    const joinable = kind[0] === 's' ? ['ld', 'ln', 'sd', 'sn'] : [kind]
-    for (const k of joinable) {
-      const pending = _inflightGet.get(`${k}|${url}`)
-      if (pending) return pending as Promise<T>
+type Flight = {
+  epoch: number
+  producer: Promise<any>
+}
+
+type Canonical = null | boolean | number | string | Canonical[] | { [key: string]: Canonical }
+const NOT_CANONICAL = Symbol('not-canonical')
+const _inflightGet = new Map<string, Flight>()
+const _SAFE_GET_CONFIG_KEYS = new Set(['params', 'responseType', '_silent', '_dedupe', 'signal'])
+const _SAFE_RESPONSE_TYPES = new Set(['json', 'text', 'arraybuffer', 'blob', 'document'])
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+/** Canonicalize only plain query values. Unknown runtime types bypass sharing. */
+function canonicalValue(value: unknown, active: Set<object> = new Set()): Canonical | typeof NOT_CANONICAL {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NOT_CANONICAL
+  if (Array.isArray(value)) {
+    if (active.has(value)) return NOT_CANONICAL
+    active.add(value)
+    try {
+      const out: Canonical[] = []
+      for (const item of value) {
+        const next = canonicalValue(item, active)
+        if (next === NOT_CANONICAL) return NOT_CANONICAL
+        out.push(next)
+      }
+      return out
+    } finally {
+      active.delete(value)
     }
   }
-  const p = http.get(url, config).then(({ data }) => data as T)
-  if (kind) {
-    const key = `${kind}|${url}`
-    _inflightGet.set(key, p)
-    // 成功失败都移除；then(clear, clear) 而非 finally，派生 Promise 不会成为未处理拒绝
-    const clear = () => { if (_inflightGet.get(key) === p) _inflightGet.delete(key) }
-    p.then(clear, clear)
+  if (!isPlainRecord(value) || active.has(value)) return NOT_CANONICAL
+  active.add(value)
+  try {
+    const out: Record<string, Canonical> = {}
+    for (const key of Object.keys(value).sort()) {
+      const next = canonicalValue(value[key], active)
+      if (next === NOT_CANONICAL) return NOT_CANONICAL
+      out[key] = next
+    }
+    return out
+  } finally {
+    active.delete(value)
   }
-  return p
+}
+
+function canonicalParams(params: unknown): string | null {
+  if (params == null) return '{}'
+  const value = canonicalValue(params)
+  return value === NOT_CANONICAL ? null : JSON.stringify(value)
+}
+
+function asAbortSignal(value: unknown): AbortSignal | undefined | null {
+  if (value == null) return undefined
+  if (typeof value !== 'object') return null
+  const signal = value as AbortSignal
+  return typeof signal.aborted === 'boolean'
+    && typeof signal.addEventListener === 'function'
+    && typeof signal.removeEventListener === 'function'
+    ? signal
+    : null
+}
+
+type SharePlan = {
+  key: string
+  epoch: number
+  signal?: AbortSignal
+  producerConfig: ProxyGetConfig
+}
+
+/**
+ * Return a plan only when every meaningful config field is known and stable.
+ * Caller `_dedupe:false` is an explicit independent-request boundary.
+ */
+function sharePlan(url: string, config?: ProxyGetConfig): SharePlan | null {
+  const raw = config ?? {}
+  if (!Object.keys(raw).every((key) => _SAFE_GET_CONFIG_KEYS.has(key))) return null
+  if (raw._dedupe === false || (raw._dedupe !== undefined && raw._dedupe !== true)) return null
+  if (raw._silent !== undefined && typeof raw._silent !== 'boolean') return null
+  const responseType = raw.responseType ?? 'json'
+  if (typeof responseType !== 'string' || !_SAFE_RESPONSE_TYPES.has(responseType)) return null
+  const signal = asAbortSignal(raw.signal)
+  if (signal === null) return null
+  const params = canonicalParams(raw.params)
+  if (params === null) return null
+  const epoch = requestIdentityEpoch()
+  const { signal: _callerSignal, ...transport } = raw
+  return {
+    key: JSON.stringify(['v1', epoch, url, responseType, Boolean(raw._silent), params]),
+    epoch,
+    signal,
+    // A single producer must not enter utils/http's cancel-previous pending map.
+    producerConfig: { ...transport, _dedupe: false },
+  }
+}
+
+function canceled(config?: AxiosRequestConfig): CanceledError {
+  return new CanceledError('请求已取消或登录身份已切换', config)
+}
+
+
+/**
+ * Give each caller a separate cancellation boundary around a shared producer.
+ * The producer deliberately continues when a subscriber aborts: the remaining
+ * subscriber(s) still receive the response and the in-flight entry self-cleans.
+ */
+function subscribe<T>(flight: Flight, signal: AbortSignal | undefined, expectedEpoch: number, config?: AxiosRequestConfig): Promise<T> {
+  if (signal?.aborted || requestIdentityEpoch() !== expectedEpoch) {
+    return Promise.reject(canceled(config))
+  }
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+    let unsubscribe = () => {}
+    const finish = (callback: (value: any) => void, value: any) => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', onAbort)
+      unsubscribe()
+      callback(value)
+    }
+    const onAbort = () => finish(reject, canceled(config))
+    signal?.addEventListener('abort', onAbort, { once: true })
+    unsubscribe = onRequestIdentityEpochChange((next) => {
+      if (next !== expectedEpoch) finish(reject, canceled(config))
+    })
+    // An identity switch cannot normally interleave with this synchronous setup,
+    // but checking again makes the boundary explicit for future integrations.
+    if (signal?.aborted || requestIdentityEpoch() !== expectedEpoch) {
+      finish(reject, canceled(config))
+      return
+    }
+    flight.producer.then(
+      (value) => {
+        if (requestIdentityEpoch() !== expectedEpoch || flight.epoch !== expectedEpoch) {
+          finish(reject, canceled(config))
+        } else {
+          finish(resolve, value)
+        }
+      },
+      (error) => {
+        if (requestIdentityEpoch() !== expectedEpoch || flight.epoch !== expectedEpoch) {
+          finish(reject, canceled(config))
+        } else {
+          finish(reject, error)
+        }
+      },
+    )
+  })
+}
+
+function createProducer<T>(url: string, config?: ProxyGetConfig): Promise<T> {
+  return http.get(url, config).then(({ data }) => data as T)
+}
+
+/**
+ * GET single-flight with a conservative allowlist. Unsafe configs remain
+ * independent and are explicitly passed to http with `_dedupe:false`, so they
+ * do not fall back to the legacy cancel-previous map.
+ */
+function get<T = any>(url: string, config?: ProxyGetConfig): Promise<T> {
+  const plan = sharePlan(url, config)
+  const signal = asAbortSignal(config?.signal)
+  if (signal?.aborted) return Promise.reject(canceled(config))
+
+  if (!plan) {
+    const epoch = requestIdentityEpoch()
+    const standalone: ProxyGetConfig = { ...(config ?? {}), _dedupe: false }
+    return subscribe<T>({ epoch, producer: createProducer<T>(url, standalone) }, signal ?? undefined, epoch, config)
+  }
+
+  let flight = _inflightGet.get(plan.key)
+  if (!flight) {
+    const producer = createProducer<T>(url, plan.producerConfig)
+    flight = { epoch: plan.epoch, producer }
+    _inflightGet.set(plan.key, flight)
+    // Success and failure both clear. Use `then(clear, clear)`, not `finally`,
+    // so cleanup itself cannot become an unhandled rejected promise.
+    const clear = () => {
+      if (_inflightGet.get(plan.key) === flight) _inflightGet.delete(plan.key)
+    }
+    producer.then(clear, clear)
+  }
+  return subscribe<T>(flight, plan.signal, plan.epoch, config)
+}
+
+/** Vitest only: make flight lifetime explicit between examples. */
+export function resetApiProxyInflightForTests(): void {
+  _inflightGet.clear()
 }
 
 async function post<T = any>(url: string, body?: any, config?: AxiosRequestConfig): Promise<T> {
@@ -72,9 +235,9 @@ async function del<T = any>(url: string, config?: AxiosRequestConfig): Promise<T
   return data as T
 }
 
-/** 下载文件（blob） */
+/** 下载永远独立发送：Blob 预览/下载不得被默认 GET 去重互相取消。 */
 async function download(url: string, filename: string): Promise<void> {
-  const response = await http.get(url, { responseType: 'blob' })
+  const response = await http.get(url, { responseType: 'blob', _dedupe: false } as ProxyGetConfig)
   const blob = new Blob([response.data])
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)

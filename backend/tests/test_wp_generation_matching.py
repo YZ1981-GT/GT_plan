@@ -116,56 +116,38 @@ def test_inline_table_check_would_catch_a_planted_table():
     assert keys == ["1631"]
 
 
+_ALL_FLAGS = {"biz_ipo", "biz_listed", "biz_neeq", "biz_refinancing", "biz_restructuring", "biz_fraud_risk"}
+
+
 @pytest.mark.parametrize(
-    ("business_category", "template_type", "expected"),
+    ("business_category", "template_type", "scenario", "expected_true"),
     [
-        (
-            " IPO ",
-            "soe",
-            {
-                "biz_ipo": True,
-                "biz_listed": False,
-                "biz_neeq": False,
-                "biz_refinancing": False,
-            },
-        ),
-        (
-            "C",
-            "listed",
-            {
-                "biz_ipo": False,
-                "biz_listed": True,
-                "biz_neeq": False,
-                "biz_refinancing": False,
-            },
-        ),
-        (
-            None,
-            None,
-            {
-                "biz_ipo": False,
-                "biz_listed": False,
-                "biz_neeq": False,
-                "biz_refinancing": False,
-            },
-        ),
-        (
-            "NEEQ refinancing",
-            "LISTED",
-            {
-                "biz_ipo": False,
-                "biz_listed": True,
-                "biz_neeq": True,
-                "biz_refinancing": True,
-            },
-        ),
+        # 迁移前残留在分类列的场景值：场景仍为 normal 时按场景解释（V219 迁移前后判定一致）
+        (" IPO ", "soe", None, {"biz_ipo"}),
+        ("refinancing", "soe", "normal", {"biz_refinancing"}),
+        # 场景列（R4 起的权威来源）
+        ("C", "soe", "ipo", {"biz_ipo"}),
+        ("C", "soe", "transfer", {"biz_neeq"}),
+        ("C", "soe", "restructure", {"biz_restructuring"}),
+        ("C", "soe", "fraud_response", {"biz_fraud_risk"}),
+        # 参考标准里语义等价的细分类
+        ("A2", "soe", "normal", {"biz_ipo"}),
+        ("a4", "soe", None, {"biz_refinancing"}),
+        ("B1", "LISTED", "refinancing", {"biz_neeq", "biz_listed", "biz_refinancing"}),
+        # 上市公司报表模板是独立的上市信号
+        ("C", "listed", None, {"biz_listed"}),
+        (None, None, None, set()),
+        # 分类列不再按自由文本子串解释（V219 CHECK 后也写不进去）
+        ("NEEQ refinancing", "LISTED", None, {"biz_listed"}),
     ],
 )
-def test_business_category_flags_normalize_category_and_template(
-    business_category, template_type, expected
+def test_business_category_flags_follow_project_classification(
+    business_category, template_type, scenario, expected_true
 ):
-    """**Validates: Requirements 1.1**"""
-    assert business_category_flags(business_category, template_type) == expected
+    """flags 由 project_classification 单一计算：场景 + 细分类 + 上市模板（R4）。"""
+    flags = business_category_flags(business_category, template_type, scenario)
+    assert set(flags) == _ALL_FLAGS
+    assert {k for k, v in flags.items() if v} == expected_true
 
 
 def test_applicable_when_hit_uses_key_and_value_or_semantics():
@@ -206,36 +188,35 @@ def test_applicable_when_hit_unknown_key_without_matching_flag_is_false():
     assert not applicable_when_hit({"unknown": ["value"]}, {"biz_ipo": True})
 
 
-# **Validates: Requirements 1.1**
+# 独立预言（不调被测实现）：场景 → 标签、细分类 → 标签、上市模板 → listed
+_SCENARIO_ORACLE = {"ipo": "ipo", "listed": "listed", "refinancing": "refinancing", "transfer": "neeq",
+                    "restructure": "restructuring", "fraud_response": "fraud_risk"}
+_CATEGORY_ORACLE = {"A1": "listed", "A2": "ipo", "A3": "restructuring", "A4": "refinancing", "A7": "listed",
+                    "B1": "neeq"}
+
+
 @given(
-    category_tokens=st.lists(
-        st.sampled_from(["ipo", "listed", "neeq", "refinancing", "C"]),
-        unique=True,
-        max_size=5,
-    ),
+    category=st.sampled_from([None, "", " c ", "A", "A1", "a2", "A3", "A4", "A5", "A7", "B", "B1", "B2", "C",
+                              "IPO", "refinancing", "上市公司", "listed", "D9"]),
+    scenario=st.sampled_from([None, "", "normal", "ipo", "listed", "refinancing", "transfer", "restructure",
+                              "fraud_response", "integrated", "IPO"]),
     template_type=st.one_of(st.none(), st.sampled_from(["soe", "listed", "LISTED", ""])),
 )
-def test_business_category_flags_property_has_exact_four_boolean_flags(
-    category_tokens, template_type
-):
-    """Every normalized input produces exactly the four documented flags."""
-    business_category = " / ".join(category_tokens)
-    result = business_category_flags(business_category, template_type)
-    normalized_category = business_category.strip().lower()
-    normalized_template = (template_type or "").strip().lower()
-
-    assert set(result) == {
-        "biz_ipo",
-        "biz_listed",
-        "biz_neeq",
-        "biz_refinancing",
-    }
-    assert result == {
-        "biz_ipo": "ipo" in normalized_category,
-        "biz_listed": "listed" in normalized_category or normalized_template == "listed",
-        "biz_neeq": "neeq" in normalized_category,
-        "biz_refinancing": "refinancing" in normalized_category,
-    }
+def test_business_category_flags_property_matches_independent_oracle(category, scenario, template_type):
+    """任意输入恰好 6 个布尔 flag，且与独立预言一致（场景只认登记值，分类只认登记码 / 旧场景值）。"""
+    result = business_category_flags(category, template_type, scenario)
+    raw_category = (category or "").strip().upper()
+    raw_scenario = (scenario or "").strip().lower()
+    effective = raw_scenario if raw_scenario in _SCENARIO_ORACLE or raw_scenario == "normal" else "normal"
+    if effective == "normal" and raw_category in ("IPO", "REFINANCING"):
+        effective = raw_category.lower()
+    tags = {_SCENARIO_ORACLE[effective]} if effective in _SCENARIO_ORACLE else set()
+    if raw_category in _CATEGORY_ORACLE:
+        tags.add(_CATEGORY_ORACLE[raw_category])
+    if (template_type or "").strip().lower() == "listed":
+        tags.add("listed")
+    assert set(result) == _ALL_FLAGS
+    assert {k for k, v in result.items() if v} == {f"biz_{t}" for t in tags}
 
 
 # **Validates: Requirements 1.2, 1.3**

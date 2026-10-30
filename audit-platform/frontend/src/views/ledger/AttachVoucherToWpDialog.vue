@@ -16,7 +16,7 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listWorkpapersPaged } from '@/services/workpaperApi'
+import { listWorkpapersAll } from '@/services/workpaperApi'
 import {
   ATTACH_BATCH_MAX_PAIRS, ATTACH_STATUS, attachFailureReason, attachVouchersBatch, type AttachBatchResult,
 } from '@/components/workpaper/composables/useAttachedVouchers'
@@ -162,16 +162,8 @@ async function loadWorkpapers(): Promise<void> {
       wpOptions.value = []
       return
     }
-    const collected: any[] = []
-    let page = 1
-    for (;;) {
-      const env: any = await listWorkpapersPaged(props.projectId, { page, page_size: 100 })
-      const items: any[] = Array.isArray(env?.items) ? env.items : []
-      collected.push(...items)
-      const total = Number.isFinite(env?.total) ? Number(env.total) : collected.length
-      if (items.length === 0 || collected.length >= total || page > 20) break
-      page += 1
-    }
+    // 一次取完全部可见底稿（原先 100 条一页串行拉，spec platform-perf-hotspots R5）
+    const collected = await listWorkpapersAll(props.projectId)
     const opts: WpOption[] = []
     let ungeneratedCount = 0
     for (const it of collected) {

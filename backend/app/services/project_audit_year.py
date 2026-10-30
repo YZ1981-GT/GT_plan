@@ -31,13 +31,15 @@ PROJECT_AUDIT_YEAR_SQL = sa.text(
     ") FROM projects WHERE id = :pid"
 )
 
+# 列 1 是原值（不再 COALESCE 成 'C'）：未填写要让 project_classification 判成 defaulted；
+# 调用方原有的 ``or "C"`` 照旧兜底。列 2 / 3 供 project_classification.resolve（R4）。
 PROJECT_AUDIT_YEAR_BIZ_SQL = sa.text(
     "SELECT COALESCE("
     "  audit_year, "
     "  EXTRACT(YEAR FROM audit_period_end)::int, "
     "  EXTRACT(YEAR FROM audit_period_start)::int"
     "), "
-    "COALESCE(business_category, 'C') "
+    "business_category, scenario, template_type "
     "FROM projects WHERE id = :pid"
 )
 

@@ -140,6 +140,10 @@ async def reset_project_state():
             "DELETE FROM procedure_row_task_history WHERE task_id IN "
             "(SELECT id FROM procedure_row_tasks WHERE project_id=:p)"), {"p": PROJECT_ID})
         await db.execute(sa.text("DELETE FROM task_events WHERE project_id=:p"), {"p": PROJECT_ID})
+        # 粗裁确认投影引用已消费预览（V218，FK RESTRICT）：先删投影，再删预览
+        if (await db.execute(sa.text("SELECT to_regclass('procedure_trim_cycle_confirmations')"))).scalar():
+            await db.execute(sa.text(
+                "DELETE FROM procedure_trim_cycle_confirmations WHERE project_id=:p"), {"p": PROJECT_ID})
         await db.execute(sa.text("DELETE FROM procedure_operation_previews WHERE project_id=:p"), {"p": PROJECT_ID})
         await db.execute(sa.text("DELETE FROM procedure_row_tasks WHERE project_id=:p"), {"p": PROJECT_ID})
         await db.commit()

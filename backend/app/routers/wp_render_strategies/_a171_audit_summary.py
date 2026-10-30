@@ -13,7 +13,7 @@ import logging
 
 import sqlalchemy as sa
 
-from ._context import RenderContext
+from ._context import RenderContext, project_classification_of
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +249,9 @@ async def render(ctx: RenderContext) -> dict | None:
         "audit_period": "",
         "preparer": None,
         "business_category": "",
+        # 质控分类单一解释：前端签字栏按 category_group 显示（原按 business_category 首字母，
+        # spec trim-followup-residual-findings-closure R3）
+        "project_classification": project_classification_of(ctx).as_dict(),
     }
     try:
         proj_result = await db.execute(

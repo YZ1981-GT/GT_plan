@@ -54,12 +54,15 @@ async def get_review_panel(
     year: int,
     role: str = Query(..., description="复核角色: field_lead/manager/partner/quality_reviewer/eqcr"),
     audit_type: str = Query("financial"),
-    business_category: str = Query("C"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """获取复核面板数据"""
+    """获取复核面板数据（复核模板按项目自身的质控业务分类，不接受客户端 query 覆盖，R4）"""
+    from app.services.project_classification import load_project_classification
+
+    classification = await load_project_classification(db, project_id)
     svc = ReviewWorkflowService(db)
-    return await svc.get_review_panel(project_id, year, role, audit_type, business_category)
+    return await svc.get_review_panel(
+        project_id, year, role, audit_type, classification.category_code or classification.category_group)
 
 
 @router.post("/{year}/save")

@@ -25,8 +25,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
+from app.core import startup_deferred as _deferred
+
 Criticality = Literal["critical", "best_effort"]
-TaskStatus = Literal["ok", "skipped", "failed"]
+TaskStatus = Literal["ok", "skipped", "failed", "deferred"]
 
 logger = logging.getLogger("audit_platform")
 
@@ -71,6 +73,8 @@ class StartupTaskSpec:
     run: Callable[[StartupContext], Awaitable[None] | None]
     timeout_seconds: float | None = None
     skip_condition: Callable[[StartupContext], str | None] | None = None
+    #: 只能一个进程做：热重载交接时推迟到本进程成为 primary 后执行（``app.core.reload_handoff``）
+    singleton: bool = False
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,19 @@ def _set_runtime_report(results: Sequence[StartupTaskResult]) -> None:
     _runtime_report = tuple(results)
 
 
+def update_task_result(name: str, *, status: TaskStatus, detail: str | None, duration_ms: int | None = None) -> bool:
+    """后台阶段（推迟执行 / 后台核验）结束后回写报告里同名一项；没有这一项返回 False。"""
+    global _runtime_report
+    items = list(_runtime_report or ())
+    for i, r in enumerate(items):
+        if r.name == name:
+            ms = r.duration_ms if duration_ms is None else duration_ms
+            items[i] = StartupTaskResult(r.name, r.phase, status, ms, desensitize_detail(detail))
+            _runtime_report = tuple(items)
+            return True
+    return False
+
+
 def startup_report_as_dict(
     results: Sequence[StartupTaskResult] | None = None,
 ) -> dict[str, Any]:
@@ -117,6 +134,7 @@ def startup_report_as_dict(
             "task_count": 0,
             "failed": [],
             "skipped": [],
+            "deferred": [],
         }
     tasks = [
         {
@@ -134,6 +152,7 @@ def startup_report_as_dict(
         "task_count": len(tasks),
         "failed": [t["name"] for t in tasks if t["status"] == "failed"],
         "skipped": [t["name"] for t in tasks if t["status"] == "skipped"],
+        "deferred": [t["name"] for t in tasks if t["status"] == "deferred"],
     }
 
 
@@ -145,18 +164,29 @@ async def run_startup_tasks(
     tasks: Sequence[StartupTaskSpec] | None = None,
     *,
     context: StartupContext | None = None,
+    report: bool = True,
 ) -> list[StartupTaskResult]:
     """Run startup tasks serially in registry order.
 
     - ``critical`` failures are recorded then re-raised.
     - ``best_effort`` failures are recorded; execution continues.
+    - ``singleton`` tasks are recorded ``deferred`` while this process is not primary (hot-reload
+      handoff, ``app.core.reload_handoff``) and run in order once it is.
+    - ``report=False``: do not touch the process report (the deferred runner writes back itself).
     - No DAG / parallelism / automatic retry.
     """
+    from app.core import reload_handoff
+
     specs = tuple(tasks) if tasks is not None else STARTUP_TASKS
     ctx = context if context is not None else StartupContext()
     results: list[StartupTaskResult] = []
+    deferred: list[StartupTaskSpec] = []
 
     for spec in specs:
+        if spec.singleton and reload_handoff.defers_singletons():
+            deferred.append(spec)
+            results.append(StartupTaskResult(spec.name, spec.phase, "deferred", 0, reload_handoff.deferred_detail()))
+            continue
         skip_reason: str | None = None
         if spec.skip_condition is not None:
             try:
@@ -205,7 +235,8 @@ async def run_startup_tasks(
                 detail=detail,
             )
         )
-        _set_runtime_report(results)
+        if report:
+            _set_runtime_report(results)
 
         if raised is not None:
             if spec.criticality == "critical":
@@ -216,7 +247,9 @@ async def run_startup_tasks(
                 detail,
             )
 
-    _set_runtime_report(results)
+    if report:
+        _set_runtime_report(results)
+    reload_handoff.schedule_deferred(deferred, ctx)
     return results
 
 
@@ -369,18 +402,20 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
         logging.getLogger("audit_platform").warning("[启动] 公式设置传播 handler 注册失败: %s", e)
 
 
-async def _task_replay_startup_events(_ctx: StartupContext) -> None:
-    from app.core.config import settings
-    from app.services.event_bus import event_bus
+async def _task_replay_startup_events(ctx: StartupContext) -> None:
+    """事件恢复整体移出启动路径；只排后台任务，结果回写本项。
 
-    try:
-        replayed = await asyncio.wait_for(event_bus.replay_pending_events(), timeout=5.0)
-        if replayed:
-            logging.getLogger("audit_platform").info(
-                "[启动] 恢复了 %s 个未处理事件", replayed
-            )
-    except Exception:
-        pass
+    🔴 2026-10-29 真实重启实测：前台哪怕只跑**一批**也不行 —— 恢复要对每条认领回来的条目
+    真实重跑业务 handler（stale 传播 / 公式推送 / 循环联动，每条带 DB 往返），真库 PEL 积压
+    264 条时一批 25 条就超过 ``wait_for(5s)``；超时异常被这里的 ``except`` 吞掉后，
+    ``_last_replay_report`` 从不更新、后台续跑也排不上 ⇒ 每次启动白等 5 秒且恢复一条没做
+    （启动报告实测 ``replay_startup_events=5047ms``、``events.replay_available=False``）。
+    """
+    from app.core.config import settings
+
+    drain_task = asyncio.create_task(_drain_events_after_ready(ctx))
+    ctx.extras["event_drain_task"] = drain_task
+    ctx.worker_tasks.append(drain_task)
 
     try:
         from app.core.database import async_session
@@ -399,6 +434,46 @@ async def _task_replay_startup_events(_ctx: StartupContext) -> None:
             )
     except Exception:
         pass
+
+
+#: 后台事件恢复的起跑延迟。两个作用：
+#: ① 让 ``run_startup_tasks`` 先把报告定稿 —— 它每跑完一项都 ``_set_runtime_report(results)``，
+#:    后台任务若在定稿前回写，整份报告会被随后的覆盖吞掉（实测 detail 为空就是这么来的）；
+#: ② 与 workpaper 预热 / lazy route 验证错峰，不在同一瞬间抢 GIL（R5.1）。
+EVENT_DRAIN_START_DELAY_S = float(os.getenv("GT_EVENT_DRAIN_DELAY", "2"))
+
+
+async def _drain_events_after_ready(ctx: StartupContext) -> None:
+    """服务已开始 accept 之后分批清空 Redis Stream 积压，进度回写启动报告。"""
+    log = logging.getLogger("audit_platform")
+    from app.services.event_bus import event_bus
+    from app.core.gc_tuning import heavy_phase
+
+    try:
+        await asyncio.sleep(EVENT_DRAIN_START_DELAY_S)
+        async with heavy_phase("event-replay"):
+            recovered = await event_bus.drain_pending_events_in_background(ctx.stop_event)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — 恢复失败不得影响已在服务中的进程
+        update_task_result("replay_startup_events", status="failed", detail=f"{type(exc).__name__}: {exc}")
+        log.error("[启动] 后台事件恢复异常：%s", exc)
+        return
+
+    report = event_bus.get_replay_report()
+    if not report.get("redis_available"):
+        update_task_result(
+            "replay_startup_events", status="skipped",
+            detail=f"Redis 不可用，事件补拉不可用：{report.get('last_error') or '-'}",
+        )
+        return
+    remaining = report.get("pending_remaining")
+    update_task_result(
+        "replay_startup_events", status="ok",
+        detail=f"后台恢复 {recovered} 条，剩余 pending {remaining if remaining is not None else '未知'}",
+    )
+    if recovered:
+        log.info("[启动] 后台恢复了 %s 个未处理事件（剩余 pending %s）", recovered, remaining)
 
 
 def _task_validate_grammar(_ctx: StartupContext) -> None:
@@ -525,6 +600,12 @@ async def _task_run_schema_drift_check(_ctx: StartupContext) -> None:
         log.warning("[启动] schema 漂移检测失败（不阻塞启动）: %s", e)
 
 
+async def _task_seed_builtin_template_sets(_ctx: StartupContext) -> None:
+    from app.services.builtin_template_sets import ensure_builtin_template_sets  # 原先生成弹窗每次打开先 POST seed
+
+    await ensure_builtin_template_sets()
+
+
 async def _task_warm_render_caches(_ctx: StartupContext) -> None:
     log = logging.getLogger("audit_platform")
     try:
@@ -610,19 +691,14 @@ async def _task_acnr_catalog_snapshot_gc(_ctx: StartupContext) -> None:
     )
 
 
-def _task_schedule_workpaper_sync_prewarm(ctx: StartupContext) -> None:
-    """Schedule the workpaper-sync cold-registration prewarm as a background task.
-
-    Never awaited here: it takes 25~30s and would push Ready past the health wait. The
-    task goes into ``ctx.worker_tasks`` so shutdown cancels it with the workers (a bare
-    ``create_task`` reference could be garbage-collected mid-run).
-    """
-    from app.core.gc_tuning import configure_gc, run_then_freeze
-    from app.services.workpaper_sync.startup_prewarm import warm_workpaper_sync_registry
-
-    # 冷建之前抬 GC 阈值、预热之后冻结长寿对象（writeback-followup-issue-closure R9 / P12）
-    configure_gc()
-    ctx.worker_tasks.append(asyncio.create_task(run_then_freeze(warm_workpaper_sync_registry)))
+# ── ready 之后才跑的重阶段调度（实现在 app/core/startup_deferred.py）────────────────
+# 行数门要求打磨让本文件变小；这一组与「冻结的启动任务有序序列」无耦合，故整体搬走。
+# 这里保留原名 re-export：STARTUP_TASKS 的 run= 引用与既有测试（按 startup_registry.
+# _run_workpaper_prewarm 打 monkeypatch）都不用改。
+_task_schedule_workpaper_sync_prewarm = _deferred.task_schedule_workpaper_sync_prewarm
+_run_workpaper_prewarm = _deferred.run_workpaper_prewarm
+_task_schedule_lazy_route_verification = _deferred.task_schedule_lazy_route_verification
+_task_schedule_openapi_prewarm = _deferred.task_schedule_openapi_prewarm
 
 
 def _task_install_sigterm(_ctx: StartupContext) -> None:
@@ -734,6 +810,7 @@ def _worker_specs() -> tuple[StartupTaskSpec, ...]:
             phase="workers",
             criticality="critical",
             run=_make_worker_starter(mod),
+            singleton=True,
         )
         for name, mod in _WORKER_BINDINGS
     ]
@@ -744,6 +821,7 @@ def _worker_specs() -> tuple[StartupTaskSpec, ...]:
             criticality="critical",
             run=_start_import_job_runner,
             skip_condition=_skip_if_import_runner_disabled,
+            singleton=True,
         )
     )
     return tuple(specs)
@@ -802,6 +880,7 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         phase="handlers",
         criticality="best_effort",
         run=_task_replay_startup_events,
+        singleton=True,
     ),
     StartupTaskSpec(
         name="validate_grammar_on_startup",
@@ -839,6 +918,8 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         criticality="best_effort",
         run=_task_run_schema_drift_check,
     ),
+    StartupTaskSpec(name="seed_builtin_template_sets", phase="seeds", criticality="best_effort",
+                    run=_task_seed_builtin_template_sets, singleton=True),
     StartupTaskSpec(
         name="warm_render_caches",
         phase="caches",
@@ -862,12 +943,14 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         phase="acnr",
         criticality="critical",
         run=_task_acnr_invalidation_outbox_start,
+        singleton=True,
     ),
     StartupTaskSpec(
         name="recover_ai_chat_runs",
         phase="ai",
         criticality="best_effort",
         run=_task_recover_ai_chat_runs,
+        singleton=True,
     ),
     StartupTaskSpec(
         name="run_ai_chat_health_check",
@@ -880,6 +963,7 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         phase="acnr",
         criticality="best_effort",
         run=_task_acnr_catalog_snapshot_gc,
+        singleton=True,
     ),
     *_worker_specs(),
     StartupTaskSpec(
@@ -887,6 +971,21 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         phase="caches",
         criticality="best_effort",
         run=_task_schedule_workpaper_sync_prewarm,
+        singleton=True,
+    ),
+    StartupTaskSpec(
+        name="verify_lazy_routes",
+        phase="caches",
+        # 冷启动只安排后台任务；候选路径在这里同步验证，失败必须阻止 server.started。
+        criticality="critical",
+        run=_task_schedule_lazy_route_verification,
+    ),
+    StartupTaskSpec(
+        name="prewarm_openapi_schema",
+        phase="caches",
+        criticality="best_effort",
+        run=_task_schedule_openapi_prewarm,
+        singleton=True,
     ),
     StartupTaskSpec(
         name="install_sigterm_handler",

@@ -27,6 +27,7 @@ import { gridPlugin } from './components/grid/plugin'
 import http from './utils/http'
 import { installPushKeptNotice } from './utils/disclosureSyncPushNotice'
 import { startSessionHandoff } from './utils/crossWindowAuth'
+import { advanceRequestIdentityEpoch } from './services/requestIdentityEpoch'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
@@ -49,6 +50,8 @@ app.use(VueQueryPlugin, { queryClient })
 // 场景：用户手动在地址栏输入独立查账 URL，浏览器新建标签页没有 opener 复制的 sessionStorage
 // 🔴 必须在 app.use(router) 之前发起：路由守卫判「未登录」前等它结束（原先并行，首个导航先被送去登录页）
 startSessionHandoff(async (session) => {
+  // 新窗口取得的是另一逻辑会话的起点，先作废本页可能已有的匿名/旧订阅者。
+  advanceRequestIdentityEpoch()
   sessionStorage.setItem('token', session.token)
   sessionStorage.setItem('refreshToken', session.refreshToken)
   if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))

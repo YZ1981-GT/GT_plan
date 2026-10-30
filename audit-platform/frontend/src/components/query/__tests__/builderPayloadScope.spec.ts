@@ -53,9 +53,11 @@ describe('buildBuilderPayload — 项目范围（R3.5）', () => {
 })
 
 describe('buildBuilderPayload — 翻页与导出表头（R2.6、R8.1）', () => {
-  it('offset > 0 才发；表头只在传入时发', () => {
+  it('offset / COUNT 凭证有值才发；表头只在传入时发', () => {
     expect('offset' in buildBuilderPayload(DSL, [], { offset: 0 })).toBe(false)
     expect(buildBuilderPayload(DSL, [], { offset: 200 }).offset).toBe(200)
+    expect('count_token' in buildBuilderPayload(DSL, [], {})).toBe(false)
+    expect(buildBuilderPayload(DSL, [], { countToken: 'signed' }).count_token).toBe('signed')
     expect('headers' in buildBuilderPayload(DSL, [], { headers: {} })).toBe(false)
     expect(buildBuilderPayload(DSL, [], { headers: { voucher_date: '凭证日期' } }).headers).toEqual({ voucher_date: '凭证日期' })
   })

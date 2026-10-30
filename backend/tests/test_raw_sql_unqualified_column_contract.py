@@ -60,16 +60,15 @@ _SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "pg_temp"}
 # 修复任意一条后：现算会少一条 ⇒ 第 2 向断言打红 ⇒ 必须从本基线删除对应项。
 # ─────────────────────────────────────────────────────────────────────────────
 _UNQUALIFIED_BASELINE: dict[str, set[str]] = {
-    # projects 无 audit_report_date / balance_sheet_date / industry（真有 client_name / audit_period_end）；
-    # A8-1 / A1-11 render strategy 与 h5 油气资产服务均在 try/except 内降级为默认值（不 500）。
+    # projects 无 audit_report_date / balance_sheet_date（真有 client_name / audit_period_end）；
+    # A8-1 / A1-11 render strategy 在 try/except 内降级为默认值（不 500）。
+    # （原 projects.industry 一项随 H5 行业检查一并删除：那处其实没有 try/except、每次必 500 ——
+    #   spec trim-followup-residual-findings-closure R1.3）
     "projects.audit_report_date": {
         "backend/app/routers/wp_render_strategies/_a81_other_info_representation.py",
     },
     "projects.balance_sheet_date": {
         "backend/app/routers/wp_render_strategies/_a111_subsequent_events_inquiry.py",
-    },
-    "projects.industry": {
-        "backend/app/services/h5_oil_gas_assets_service.py",
     },
     # checklist_responses 无 value / content 列（真实载荷在 remark JSON）；对应 import/export 与 M 系列
     # 服务查询在 try/except 守卫下降级。

@@ -332,9 +332,11 @@ class StandardUnificationService:
             if rs in VALID_SCOPES:
                 derived["scope"] = rs
 
-        scenario = getattr(project, "scenario", None)
-        if scenario:
-            sc = str(scenario).lower()
+        # 场景取 project_classification 单一解释（含迁移前残留在分类列里的 IPO / refinancing，R4）
+        if getattr(project, "scenario", None):
+            from app.services.project_classification import project_classification
+
+            sc = project_classification(project).scenario
             if sc in VALID_STAGES:
                 derived["stage"] = sc
 

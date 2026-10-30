@@ -50,6 +50,7 @@ from app.models.wp_visibility_models import (
     WpVisibilityInvalidationOutbox,
     WpVisibilityPolicyEpoch,
 )
+from app.services.procedure_identity import normalize_wp_code
 from app.services.wp_visibility.delegation_guard import (  # 拒绝原因 / 错误类型自此导出（原定义处）
     DelegationError,
     DelegationGuardMixin,
@@ -548,7 +549,7 @@ class DelegationTransactionService(DelegationGuardMixin):
                     DelegationRejectReason.instance_not_found, "程序实例不存在"
                 )
             return [inst]
-        code = (req.wp_code or "").strip()
+        code = normalize_wp_code(req.wp_code)
         if not code:
             return []
         return list(

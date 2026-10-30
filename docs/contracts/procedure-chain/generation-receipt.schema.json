@@ -55,9 +55,33 @@
       "description": "给用户看的一句话，各入口同一措辞（README「回执措辞」）。",
       "type": "string",
       "minLength": 1
-    }
+    },
+    "operation_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "status": { "$ref": "#/$defs/operationState" }
   },
   "$defs": {
+    "operationState": {
+      "type": "string",
+      "enum": ["prepared", "materializing", "materialized", "finalizing", "succeeded", "partial_failed", "failed", "stale"]
+    },
+    "operationStatus": {
+      "description": "GET operation 或 POST 202 的 data；terminal 时 receipt 是首次执行保存的原回执。",
+      "type": "object",
+      "required": ["operation_id", "status", "progress_total", "progress_done", "attempt", "terminal", "resumable", "resumable_after", "public_error"],
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "status": { "$ref": "#/$defs/operationState" },
+        "progress_total": { "$ref": "common.schema.json#/$defs/count" },
+        "progress_done": { "$ref": "common.schema.json#/$defs/count" },
+        "attempt": { "$ref": "common.schema.json#/$defs/count" },
+        "terminal": { "type": "boolean" },
+        "resumable": { "type": "boolean" },
+        "resumable_after": { "type": ["string", "null"], "format": "date-time" },
+        "public_error": { "type": ["string", "null"] },
+        "receipt": { "anyOf": [{ "$ref": "#" }, { "type": "null" }] }
+      }
+    },
     "generateFromCodesRequest": {
       "description": "POST /api/projects/{project_id}/working-papers/generate-from-codes（extra=forbid）。year 缺省按项目审计年度。",
       "type": "object",
@@ -65,7 +89,8 @@
       "additionalProperties": false,
       "properties": {
         "wp_codes": { "type": "array", "items": { "type": "string" } },
-        "year": { "type": ["integer", "null"] }
+        "year": { "type": ["integer", "null"] },
+        "operation_id": { "anyOf": [{ "$ref": "common.schema.json#/$defs/uuid" }, { "type": "null" }] }
       }
     },
     "generateFromCodesResponse": {
@@ -85,7 +110,8 @@
       "properties": {
         "template_set_id": { "$ref": "common.schema.json#/$defs/uuid" },
         "year": { "type": ["integer", "null"] },
-        "selected_templates": { "anyOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }] }
+        "selected_templates": { "anyOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }] },
+        "operation_id": { "anyOf": [{ "$ref": "common.schema.json#/$defs/uuid" }, { "type": "null" }] }
       }
     },
     "templateSetGenerateResponse": {

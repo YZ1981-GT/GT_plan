@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.audit_platform_models import (
     AccountCategory,
@@ -95,7 +95,11 @@ class BasicInfoSchema(BaseModel):
     company_code: str = Field(min_length=18, max_length=18)  # 企业代码（统一社会信用代码，18位必填）
     short_name: str = Field(min_length=1, max_length=100)  # 项目简称（必填）
     template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
-    company_subtype: str | None = None  # 企业子类型：type_a/type_b/type_c/type_d（audit-report-template-integration 需求 1.5）
+    company_subtype: str | None = None  # 报告模板类型：type_a/type_b/type_c/type_d（audit-report-template-integration 需求 1.5）
+    # 质控业务分类 / 专项场景（trim-generation-plan-followup-optimizations R4）：只在请求里出现时写回项目
+    # （旧客户端不发就不动库里的值）；分类只收参考标准登记码，场景只收登记值，其他值 422。
+    business_category: str | None = None  # A / A1~A8、B / B1~B6、C；null 或空串 = 未填写
+    scenario: str | None = None  # normal / ipo / listed / refinancing / transfer / restructure / fraud_response
     custom_template_id: str | None = None
     custom_template_name: str | None = None
     custom_template_version: str | None = None
@@ -111,6 +115,20 @@ class BasicInfoSchema(BaseModel):
     ultimate_company_code: str | None = None  # 最终控制方代码（统一社会信用代码，可空）
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
+
+    @field_validator("business_category", mode="before")
+    @classmethod
+    def _registered_category(cls, value: Any) -> str | None:
+        from app.services.project_classification import normalize_category
+
+        return normalize_category(value)
+
+    @field_validator("scenario", mode="before")
+    @classmethod
+    def _registered_scenario(cls, value: Any) -> str | None:
+        from app.services.project_classification import normalize_scenario
+
+        return None if value is None else normalize_scenario(value)
 
 
 class TeamMemberAssignment(BaseModel):
@@ -171,6 +189,11 @@ class ProjectCreateResponse(BaseModel):
     template_type: str | None = None
     # audit-report-template-integration 需求 1.5/14.2：企业子类型 type_a/b/c/d 读写往返
     company_subtype: str | None = None
+    # 质控业务分类 / 专项场景（R4）：返回 project_classification 解释后的值 —— 迁移前残留在分类列的
+    # IPO / refinancing 显示为「分类未填写 + 对应场景」，回填表单再保存即写成规范值
+    business_category: str | None = None
+    scenario: str = "normal"
+    project_classification: dict[str, Any] | None = None
     report_scope: str | None = None
     # 集团架构（consol-tree-three-code-autobuild 需求 1.6）：详情回填与树视图用
     parent_company_name: str | None = None

@@ -41,6 +41,18 @@ if sys.getrecursionlimit() < _MIN_RECURSION_FOR_LIFESPAN:
 
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 
+# 导入期调优（spec backend-startup-and-request-overhead R1），都必须在导入任何路由模块之前：
+# 1) 抬 gen0 阈值：导入要建约 83 万个长寿对象，默认阈值下会做约 8 次全量收集（合计约 1.2 s）；
+#    与启动预热同一套调优（app.core.gc_tuning，GT_GC_TUNING=0 关闭）。
+# 2) 路由的依赖分析 / 参数模型推迟到第一次用到时再算：此后新建的 APIRouter 默认用 LazyAPIRoute。
+from app.core.gc_tuning import configure_gc  # noqa: E402
+
+configure_gc()
+
+from app.core.lazy_api_routes import install_lazy_api_routes  # noqa: E402
+
+install_lazy_api_routes()
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Response
@@ -49,6 +61,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.build_version import get_build_version
 from app.core.config import settings
+from app.core.openapi_runtime import fastapi_docs_kwargs, install_deferred_docs
 # 兼容旧导入路径：`app.main._start_workers` 与 lifespan 跑的是同一组 worker spec
 from app.core.startup_registry import start_all_workers as _start_workers  # noqa: F401
 from app.core.tracing import setup_tracing
@@ -89,7 +102,7 @@ async def lifespan(app: FastAPI):
 
     from app.core.startup_registry import StartupContext, run_startup_tasks
 
-    ctx = StartupContext()
+    ctx = StartupContext(extras={"app": app})
     await run_startup_tasks(context=ctx)
     stop_event = ctx.stop_event
     tasks = ctx.worker_tasks
@@ -97,16 +110,17 @@ async def lifespan(app: FastAPI):
     yield
 
     # --- 关闭阶段 ---
-    # 1. SIGTERM 已置 draining=True（readyz 已 503）
-    # 2. 给 nginx 健康检查留窗口（sleep PRE_DRAIN_DELAY）
+    # 热交接已在 reload_handoff 中完成「停 accept → 关 SSE → 0.5 s grace」，这里只跳过重复的
+    # PRE_DRAIN_DELAY 与第二次 close_all；普通 SIGTERM / 关闭窗口保持原路径。
+    from app.core import reload_handoff
     from app.core.graceful_shutdown import PRE_DRAIN_DELAY, drain_http_requests, GRACEFUL_SHUTDOWN_TIMEOUT
-    await asyncio.sleep(PRE_DRAIN_DELAY)
-
-    # 3. 优雅关闭所有 SSE 连接（组件 7a 实现）
     from app.core.sse_registry import sse_registry
-    await sse_registry.close_all()
 
-    # 4. Drain HTTP in-flight 请求
+    if not reload_handoff.handoff_pre_drain_complete():
+        await asyncio.sleep(PRE_DRAIN_DELAY)
+        await sse_registry.close_all()
+
+    # 两种路径都等待已经进入应用的 HTTP 请求完成。
     await drain_http_requests(GRACEFUL_SHUTDOWN_TIMEOUT)
 
     # 5. 后续是现有逻辑（stop_event.set() + worker cancel + dispose_engine）
@@ -137,7 +151,9 @@ app = FastAPI(
     description="面向会计师事务所的审计全流程作业系统",
     version="1.0.0",
     lifespan=lifespan,
+    **fastapi_docs_kwargs(settings.APP_ENV),
 )
+install_deferred_docs(app, settings.APP_ENV)
 
 setup_tracing(app)
 
@@ -294,3 +310,9 @@ app.add_middleware(
 
 # --- 路由注册（按业务域分组，详见 router_registry/ 包） ---
 register_all_routers(app)
+
+# 路由按路径段建索引，一次请求只对可能匹配的几条调 matches（spec backend-startup-and-request-overhead R3.2；
+# GT_ROUTE_INDEX=0 关闭）。必须在全部路由注册之后。
+from app.core.route_index import install_route_index  # noqa: E402
+
+install_route_index(app.router)

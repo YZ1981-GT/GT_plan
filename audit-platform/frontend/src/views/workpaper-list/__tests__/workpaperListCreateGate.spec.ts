@@ -61,7 +61,7 @@ function mountList() {
         WorkpaperWorkbenchView: true, WorkpaperBoardView: true, WorkpaperLifecycleView: true, WorkpaperDependencyGraph: true,
         WorkpaperDelegationMatrix: true, GtPageHeader: plain, GtToolbar: plain, ArchivedBanner: true, ConsolLockedBanner: true,
         BatchActionBar: true, BatchAssignDialog: true, UnifiedImportDialog: true, WpImportDialog: true, WpBatchExportDialog: true,
-        WpBulkDialog: true, WpTemplateCopyDialog: true, WorkpaperTrimDialog: true, GtCustomWpBatchDialog: true,
+        WpBulkDialog: true, WpTemplateCopyDialog: true, GenerationPlanDialog: true, GtCustomWpBatchDialog: true,
         ElRadioGroup: plain, ElRadioButton: true, ElButton: plain, ElInput: true, ElSelect: plain, ElOption: true,
         ElProgress: true, ElPagination: true, ElDropdown: plain, ElDropdownMenu: plain, ElDropdownItem: plain,
         ElIcon: plain, ElTooltip: plain, ElAlert: true, ElTag: plain, ElBadge: plain, ElCheckbox: plain,

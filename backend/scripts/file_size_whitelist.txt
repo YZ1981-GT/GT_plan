@@ -524,7 +524,7 @@ backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3057
 backend/tests/workpaper_sync/test_task53_k_cycle_migration.py  2404
 backend/tests/workpaper_sync/test_task54_l_cycle_migration.py  2527
 backend/tests/workpaper_sync/test_task55_m_cycle_migration.py  2880
-backend/tests/workpaper_sync/test_task56_n_cycle_migration.py  2555
+backend/tests/workpaper_sync/test_task56_n_cycle_migration.py  2955
 backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py  2418
 backend/tests/workpaper_sync/test_task58_word_canonical_resolver.py  916
 backend/tests/workpaper_sync/test_task59_word_sdt_engine.py  1975
@@ -675,7 +675,12 @@ backend/app/services/workpaper_sync/excel_workbook_row_change.py  3021
 #     writeback-followup-issue-closure R3.2 新增常驻 worker oo_apply_redrive_worker，必须在
 #     _WORKER_BINDINGS 与 WORKER_TASK_NAMES 各登记一行（另 1 行注释，与相邻 worker 同格式）。
 #     登记表随 worker 数线性增长，不是打磨膨胀；单文件理由同上。
-backend/app/core/startup_registry.py  935
+#   2026-10-28 startup_registry.py 935 → 991：spec backend-startup-and-request-overhead —— 启动任务
+#     verify_lazy_routes（R1.3，后台核验结果经 update_task_result 回写报告）与热重载交接（R2.3：
+#     StartupTaskSpec.singleton 字段 + 18 个任务的标记、执行器的 deferred 状态与 report 开关、报告投影的
+#     deferred 清单）。交接逻辑在 app/core/reload_handoff.py、核验在 app/core/lazy_api_routes.py，留在本文件的
+#     只是执行器与序列声明本身；单文件理由同上。
+backend/app/core/startup_registry.py  991
 backend/app/routers/wp_render_pipeline.py  1219
 backend/scripts/gen/generate_component_capability_manifest.py  852
 
@@ -1600,7 +1605,7 @@ backend/scripts/seed/sync_note_templates_from_word.py  1179
 #     populate_parsed_data（端点恒 500），改调与准则转换共用的 ensure_parsed_data_placeholder（+2 行）。
 #     拆分方向：模板 / 模板集（/api/templates、/api/template-sets）与项目底稿生成（generate / generate-from-codes 约 360 行 /
 #     create-custom 系列）拆成两个路由模块。
-backend/app/routers/wp_template.py  872
+backend/app/routers/wp_template.py  919
 #   chain_orchestrator.py —— 历史大文件（HEAD 已 963 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-23 汇总提交：试算表重算步骤透传「损益类科目缺发生额列、按期末余额替代」的提醒（C-4，+7 行，
 #     配合 trial_balance_service.full_recalc 返回的替代科目清单）。拆分方向：各 _step_* 步骤按链路环节拆到独立模块，编排类只保留顺序与状态。
@@ -1632,7 +1637,7 @@ backend/tests/workpaper_sync/test_single_pass_verify_not_relaxed.py  1536
 #     procedure_trim_service 方案 preview / apply 与级联按职责拆模块。
 audit-platform/frontend/src/views/ProcedureTrimming.vue  4012
 audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue  1889
-backend/app/services/procedure_trim_service.py  1086
+backend/app/services/procedure_trim_service.py  1166
 #   test_task1_resource_access.py / test_task15_integration_explain.py / test_ai_chat_mcp_tools_data.py —— 历史大文件
 #     （HEAD 已 1104 / 863 / 972 行且未登记）。2026-10-25 procedure-trim-generation-delegation-chain 批 3 / 批 4：
 #     按「主管看全部循环」裁决改写的既有用例（+5 / +2 / +2，样本换成受限审计员、夹具角色改审计员）。
@@ -1709,6 +1714,10 @@ backend/tests/workpaper_sync/test_workbook_propagation_ref_collision.py  902
 #   位置写入与读取都在 components/attachment/rowEvidence.ts。拆分方向：示例抽屉（C1-1 ~ C1-3）、
 #   过程记录（C1-4-1 ~ C1-4-6）、样本测试表与识别上传三块各成子组件。
 audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue  3167
+# platform-perf-hotspots（2026-10-28）：WorkpaperWorkbenchView.vue —— 历史大文件（HEAD 已 1764 行且未登记，任何改动都会被门禁拒；
+#   line-budget.spec 的 1210 预算在 HEAD 即超）。本 spec 把 4 处「每行在 wpIndex 里 find 一遍」换成按 id 的 Map（R7，+4 行）。
+#   拆分方向：手册视图（体系总览 / 循环详解）、列表视图左栏循环导航、工作台卡片三块各成子组件。
+audit-platform/frontend/src/views/workpaper-list/WorkpaperWorkbenchView.vue  1768
 # oo-writeback-template-parity-closure 批 B2b（2026-10-28）：两份历史大文件（HEAD 已超限且此前未登记，任何改动都会被门禁拒），
 #   基线取 HEAD 值（splitlines 口径）。
 #   _d1_import_export/_impl.py —— HEAD 3643 行。本批 D1-8T 背书表按模板改列，新逻辑放 _d1_8t_endorse.py，
@@ -1758,3 +1767,17 @@ backend/app/routers/ledger_import_v2.py  817
 # 释放接到异步路径（不再只清内存锁），净行数不增；拆分方向：Redis/DB 锁原语、作业批次状态机和
 # 查询/管理接口拆为三个服务模块，本文件保留兼容门面。
 backend/app/services/import_queue_service.py  932
+#   wp_surfaced_h.py —— 历史大文件（HEAD 已 1257 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-29 trim-followup-residual-findings-closure R1：H5 适用性条目从「行业守卫 useH5IndustryGuard」改为按试算表科目提示
+#     （WpAccountAbsenceHint），并把与 H7 混写的「生产性生物资产/油气资产」改正（行数不变）。
+#     拆分方向：同 wp_surfaced_k.py，按底稿编码拆成 H1~H10 各自的目录模块，入口只做合并（同 wp_surfaced_formulas）。
+backend/app/routers/wp_surfaced_h.py  1257
+# 2026-10-30 主工作区同步（单一提交入库并发会话的进行中改动）时 5 个文件超行数门，按暂存内容的真实行数登记 / 上调基线，
+#   不替各 spec 拆文件（拆别人进行中的代码等于把风险转给对方），拆分责任归各自 spec，拆完连带删本表条目：
+#   wp_template.py（872 → 现值）/ procedure_trim_service.py（1086 → 现值）：trim-generation-plan-followup-optimizations 与
+#     trim-followup-residual-findings-closure 的生成计划、裁剪改动；拆分方向沿用上方各自条目的说明。
+#   test_task56_n_cycle_migration.py（2555 → 现值）：N 循环同步守卫扩充；按守卫类别（契约 / 宿主 / 迁移）拆文件。
+#   batch_project_plan.py、test_batch_project_import_closure.py：batch-project-import-and-consol-tree-closure 实施中（0/7）；
+#     拆分方向：计划按「预校验 / 依赖库存 / 集团树校验」拆模块，测试按 R 编号拆文件。
+backend/app/services/batch_project_plan.py  971
+backend/tests/test_batch_project_import_closure.py  1069

@@ -6,7 +6,7 @@
         <el-button type="primary" size="small" @click="$router.push('/projects/new')">
           <el-icon><Plus /></el-icon> 新建项目
         </el-button>
-        <el-button size="small" plain @click="showBatchImport = true">
+        <el-button v-if="canBatchCreate" size="small" plain @click="showBatchImport = true">
           <el-icon><Upload /></el-icon> 批量导入
         </el-button>
         <el-button size="small" plain @click="$router.push('/projects/full')">
@@ -70,7 +70,12 @@
     </div>
 
     <!-- 批量导入弹窗 -->
-    <BatchImportDialog v-model="showBatchImport" @success="loadProjects" />
+    <BatchImportDialog
+      v-model="showBatchImport"
+      :selected-project-ids="checkedIds"
+      @success="onBatchImportSuccess"
+      @open-root="openRoot"
+    />
   </div>
 </template>
 
@@ -81,9 +86,11 @@ import { Plus, Search, Delete, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmDelete, confirmBatch } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
+import { invalidateProjectListQuery, listProjectsShared } from '@/services/projectListQuery'
 import ProjectTreeNode from './ProjectTreeNode.vue'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
-import * as P from '@/services/apiPaths'
+import { useAuthStore } from '@/stores/auth'
+import { canBatchCreateProjects } from '@/services/batchProjectImport'
 
 interface ProjectItem {
   id: string
@@ -99,6 +106,8 @@ interface ProjectItem {
 
 const emit = defineEmits<{ (e: 'select', project: any): void }>()
 const router = useRouter()
+const authStore = useAuthStore()
+const canBatchCreate = computed(() => canBatchCreateProjects(authStore.user?.role))
 
 const loading = ref(false)
 const projects = ref<ProjectItem[]>([])
@@ -189,6 +198,7 @@ async function confirmDeleteOne(project: any) {
   try {
     await confirmDelete(project.name || project.client_name || '未命名')
     await api.delete(`/api/projects/${project.id}`)
+    invalidateProjectListQuery()
     ElMessage.success('项目已删除')
     projects.value = projects.value.filter(p => p.id !== project.id)
     checkedIds.value = checkedIds.value.filter(i => i !== project.id)
@@ -200,6 +210,7 @@ async function confirmBatchDelete() {
   try {
     await confirmBatch('删除', checkedIds.value.length)
     await api.post('/api/projects/batch-delete', { project_ids: checkedIds.value })
+    invalidateProjectListQuery()
     ElMessage.success(`已删除 ${checkedIds.value.length} 个项目`)
     projects.value = projects.value.filter(p => !checkedIds.value.includes(p.id))
     if (selectedId.value && checkedIds.value.includes(selectedId.value)) selectedId.value = null
@@ -207,11 +218,19 @@ async function confirmBatchDelete() {
   } catch { /* 用户取消 */ }
 }
 
+async function onBatchImportSuccess() {
+  invalidateProjectListQuery()
+  await loadProjects()
+}
+
+function openRoot(projectId: string) {
+  router.push({ name: 'ProjectEntry', params: { projectId } })
+}
+
 async function loadProjects() {
   loading.value = true
   try {
-    const data = await api.get(P.projects.list)
-    projects.value = data ?? []
+    projects.value = await listProjectsShared()
     // 自动恢复上次选中的项目（用最新数据，修复从向导跳回后旧数据残留）
     const lastId = selectedId.value || localStorage.getItem('gt-last-project-id')
     if (lastId) {

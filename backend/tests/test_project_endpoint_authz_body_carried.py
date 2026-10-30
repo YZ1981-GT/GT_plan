@@ -154,7 +154,9 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 两个 stale 写端点加项目鉴权升到 project 档，v2 notify-cell-change 下线去请求体（不再带项目、退出本维）后现算 84。
 #: 2026-10-28 合入远端（BM：上两条分属两条线，合并后两侧修复都在）现算 81。
 #: 2026-10-28 spec advanced-query-linkage-closure 任务 24：模板执行在函数体内直接校验目标项目归属（升到 project 档）后现算 80。
-_BODY_IDENTITY_ONLY_BASELINE = 80
+#: 2026-10-29 spec trim-followup-residual-findings-closure R1.3：删除 GET /api/h5/industry-check（查询参数项目、
+#: 只校验登录、查不存在的列必 500，无调用方）后现算 79。
+_BODY_IDENTITY_ONLY_BASELINE = 79
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:

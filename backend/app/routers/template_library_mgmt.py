@@ -922,24 +922,18 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
             "errors": [],
         }
     if seed_name == "template_sets":
-        # template_sets 通过 wp_template.py /api/template-sets/seed 端点加载
-        # 直接调用其 service 等价逻辑
-        try:
-            from app.services.wp_template_service import WpTemplateService
-            svc = WpTemplateService(db)
-            if hasattr(svc, "seed_template_sets"):
-                result = await svc.seed_template_sets()
-            else:
-                result = {}
-        except ImportError:
-            result = {}
+        # 与 /api/template-sets/seed、启动任务同一函数。原先 import 不存在的 app.services.wp_template_service，
+        # ImportError 被吞成 {} ⇒ 一键加载报「已加载、0 条」却什么也没做（spec trim-followup-residual-findings-closure R2）
+        from app.services.builtin_template_sets import seed_builtin_template_sets_safely
+
+        result = (await seed_builtin_template_sets_safely(db)).as_dict()
         row = (await db.execute(text("SELECT COUNT(*) AS c FROM wp_template_set"))).mappings().first()
         record_count = int(row["c"] or 0) if row else 0
         return {
             "seed_name": seed_name,
             "status": "loaded",
-            "inserted": int((result or {}).get("inserted", 0)) if isinstance(result, dict) else 0,
-            "updated": int((result or {}).get("updated", 0)) if isinstance(result, dict) else 0,
+            "inserted": result["inserted"],
+            "updated": result["updated"],
             "record_count": record_count,
             "errors": [],
         }

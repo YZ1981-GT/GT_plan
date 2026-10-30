@@ -37,6 +37,8 @@ import sqlalchemy as sa
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.procedure_identity import normalize_cycle, normalize_wp_code
+from app.services.procedure_scope_retention import lock_project_procedure_scope
 from app.services.procedure_trim_engine import TrimReasonCode
 from app.services.program_row_status_sync import align_task_row_status  # 行级适用性变化后对齐状态覆盖值（R4）
 from app.models.procedure_models import (
@@ -53,6 +55,8 @@ from app.services.procedure_operation_preview import (
 )
 from app.services.procedure_reconcile_service import is_legacy_uuid_key
 from app.services.procedure_task_materialization_service import _base_wp_code
+# 粗裁凭证 operation 只在确认投影模块定义一处（投影按它筛凭证，两边不能各写一份）
+from app.services.procedure_trim_confirmation import TRIM_OPERATION, record_confirmations
 from app.services.procedure_trim_recycle import (
     CASCADE_EVENT,
     apply_linkage,
@@ -70,13 +74,23 @@ from app.services.procedure_task_transition_service import (
 
 logger = logging.getLogger(__name__)
 
-TRIM_OPERATION = "trim"
-
 KIND_SCOPE = "scope"
 KIND_ROW = "row"
 
 _SCOPE_STATUSES = ("execute", "skip", "not_applicable")
 _ROW_APPLICABILITIES = (APPLICABILITY_EXECUTE, APPLICABILITY_NOT_APPLICABLE)
+
+
+def _scope_target_version(instance: ProcedureInstance) -> str:
+    """粗裁实例的预览版本摘要；状态 / 理由 / 建议态 / 更新时间任一变化都会使旧 preview 失效。"""
+    updated_at = instance.updated_at
+    return sha256_hex(canonical_json({
+        "id": str(instance.id),
+        "status": instance.status or "",
+        "skip_reason": instance.skip_reason or "",
+        "suggestion_state": instance.suggestion_state,
+        "updated_at": updated_at.isoformat() if isinstance(updated_at, datetime) else str(updated_at or ""),
+    }))
 
 # 粗裁结构化理由码的合法取值集合。
 #
@@ -224,6 +238,8 @@ class ProcedureTrimService:
         self, project_id: UUID, cycle: str, wp_index_code: str
     ) -> bool:
         """粗裁是否为 skip/not_applicable（供 Task 8 委派前置阻断，需求 3.4）。"""
+        cycle = normalize_cycle(cycle)
+        wp_index_code = normalize_wp_code(wp_index_code) or ""
         row = (
             await self.db.execute(
                 sa.select(ProcedureInstance.status).where(
@@ -474,7 +490,9 @@ class ProcedureTrimService:
 
         Returns: ``{"rejected": n, "unchanged": m, "not_found": [...]}``
         """
-        codes = [str(c).strip() for c in (wp_index_codes or []) if str(c or "").strip()]
+        cycle = normalize_cycle(cycle)
+        codes = [normalize_wp_code(c) for c in (wp_index_codes or [])]
+        codes = [c for c in codes if c]
         if not codes:
             return {"rejected": 0, "unchanged": 0, "not_found": []}
 
@@ -482,7 +500,7 @@ class ProcedureTrimService:
             await self.db.execute(
                 sa.select(ProcedureInstance).where(
                     ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.audit_cycle == str(cycle).strip(),
+                    ProcedureInstance.audit_cycle == cycle,
                     ProcedureInstance.wp_code.in_(codes),
                     ProcedureInstance.is_deleted == sa.false(),
                 )
@@ -525,8 +543,13 @@ class ProcedureTrimService:
         """归一单条方案条目为 canonical 形式（含 canonical key）。"""
         kind = entry.get("kind")
         if kind == KIND_SCOPE:
-            cycle = str(entry.get("cycle", "")).strip()
-            wp_index_code = str(entry.get("wp_index_code", "")).strip()
+            # 与 ProcedureInstance 身份同一规范化（去首尾空白 + 大写）；空值 / 超长是请求错误（422），
+            # 不能让 ValueError 冒成 500。
+            try:
+                cycle = normalize_cycle(str(entry.get("cycle") or ""))
+                wp_index_code = normalize_wp_code(str(entry.get("wp_index_code") or "")) or ""
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=f"scope 条目不合法：{exc}") from exc
             target_status = str(entry.get("target_status", "")).strip()
             if not cycle or not wp_index_code:
                 raise HTTPException(status_code=422, detail="scope 条目缺 cycle/wp_index_code")
@@ -656,6 +679,8 @@ class ProcedureTrimService:
         任务按底稿归属匹配（该条目覆盖的 wp_index，含子表 / 程序表；见 ``procedure_trim_recycle``）∪ 同码快照。
         原按 ``audit_cycle_snapshot == cycle``，物化时循环兜底成 ``A`` 的任务裁剪后不被取消。
         """
+        cycle = normalize_cycle(cycle)
+        wp_index_code = normalize_wp_code(wp_index_code) or ""
         instances = (
             (
                 await self.db.execute(
@@ -698,7 +723,7 @@ class ProcedureTrimService:
         """把 canonical 条目解析为可应用计划（纯读）。
 
         返回：
-          - ``row_target_versions``：{task_id: lock_version}（版本守卫用）
+          - ``row_target_versions``：{task_id: lock_version, ``scope:{instance_id}``: 状态摘要}（版本守卫用）
           - ``row_plans``：[(entry, tasks, target_applicability)]
           - ``scope_plans``：[(entry, instances, cascade_tasks, target_status)]
           - ``conflicts``：无法解析的条目 key 列表
@@ -754,6 +779,8 @@ class ProcedureTrimService:
                 if not instances and not tasks:
                     conflicts.append({"key": entry["key"], "reason": "no_scope_target"})
                     continue
+                for inst in instances:
+                    row_target_versions[f"scope:{inst.id}"] = _scope_target_version(inst)
                 for t in tasks:
                     row_target_versions[str(t.id)] = t.lock_version
                 scope_plans.append(
@@ -988,18 +1015,19 @@ class ProcedureTrimService:
         membership = await self._membership_snapshot(project_id)
 
         async def _apply_fn(db: AsyncSession, preview) -> dict:
+            await lock_project_procedure_scope(db, project_id)
             plan = await self._build_plan(project_id, canonical)
 
             # legacy UUID 无法唯一转换 → 409（不按顺序/文本猜测）
             if plan["migration_conflicts"]:
                 raise TrimSchemeError(plan["migration_conflicts"])
 
-            # 目标 task lock_version 自 preview 后变化 → 409
+            # 目标 task lock_version / scope 状态摘要自 preview 后变化 → 409
             current_versions = {
                 k: v for k, v in plan["row_target_versions"].items()
             }
             if current_versions != dict(preview.target_versions or {}):
-                raise HTTPException(status_code=409, detail="目标任务版本已变化，请重新预览")
+                raise HTTPException(status_code=409, detail="粗裁目标版本已变化，请重新预览")
             linkage = plan["linkage"]
             ensure_confirmed(linkage, confirm_substantive_recycle)
 
@@ -1118,6 +1146,7 @@ class ProcedureTrimService:
                 **moved,
             }
 
+        # 粗裁确认投影与凭证消费同一事务：applied=0 的保存也算确认，只有细裁行的请求不写，幂等重试不重复写。
         return await consume_and_apply(
             self.db,
             preview_id=preview_id,
@@ -1128,6 +1157,7 @@ class ProcedureTrimService:
             request_id=request_id,
             current_membership_snapshot=membership,
             apply_fn=_apply_fn,
+            after_consume=record_confirmations,
         )
 
 

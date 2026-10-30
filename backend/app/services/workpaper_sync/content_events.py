@@ -53,6 +53,9 @@ REPLAY_ITEM_KEYS: tuple[str, ...] = (
     "project_id",
     "year",
     "account_codes",
+    "batch_id",
+    "entry_group_id",
+    "context",
     "timestamp",
     "extra",
 )
@@ -95,6 +98,9 @@ def replay_entry_projection(msg_id: str, data: Mapping[str, Any]) -> dict[str, A
         "project_id": str(payload.project_id) if payload.project_id else "",
         "year": payload.year,
         "account_codes": payload.account_codes,
+        "batch_id": str(payload.batch_id) if payload.batch_id else None,
+        "entry_group_id": str(payload.entry_group_id) if payload.entry_group_id else None,
+        "context": payload.context.model_dump(mode="json") if payload.context else None,
         "timestamp": _stream_timestamp(msg_id),
         # 🔴 原样带出。旧实现整片丢掉，于是 `wp_id`/`revision` 在断线补拉后不可得。
         "extra": dict(payload.extra) if payload.extra else None,

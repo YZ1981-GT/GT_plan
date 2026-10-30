@@ -13,7 +13,12 @@ spec procedure-trim-generation-delegation-chain 需求 2 / ADR-3。
 2. 每一级先看同码的普通程序行，再看覆盖该码的区间程序行（``D2-1至D2-4`` 展开为 D2-1~D2-4）。
 3. 第一个命中的行决定结果：状态 ``skip`` / ``not_applicable`` ⇒ 已裁；``execute`` ⇒ 保留。
    同一级多行冲突时 ``execute`` 优先（用户在页面上看到的是「执行」）。
-4. 一直找不到程序行 ⇒ 保留（程序库没覆盖的底稿不受粗裁影响）。
+4. 实质性程序循环（D~N）的科目母码：本身和各级母码都没有程序行、但有下级程序行（普通行或区间行的成员）
+   ⇒ 跟随下级：下级程序行全部已裁才算已裁（spec trim-generation-plan-linkage R4）。``D2`` 应收账款审定表
+   只有 ``D2-1至D2-4`` / ``D2-5`` / ``D2-6至D2-13`` 三条下级程序行，三条都裁掉时审定表也不再生成；
+   B / C / A / S 不用这条（计划类文档不能因为附表被裁就整份裁掉）。只对母码本身生效，不传给它没有
+   程序行的其他下级；按普通编码处理的不合法区间（``F1-5至F2-9``）不算任何编码的下级。
+5. 一直找不到程序行 ⇒ 保留（程序库没覆盖的底稿不受粗裁影响）。
 
 所以裁掉 ``H3``（投资性房地产）会连带 ``H3-1``~``H3-6`` 与 ``H3A``；而 ``A1`` 被裁时，自己有程序行且为
 「执行」的 ``A1-11`` 仍然保留。
@@ -24,6 +29,8 @@ spec procedure-trim-generation-delegation-chain 需求 2 / ADR-3。
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -46,8 +53,13 @@ _IN_CHUNK = 500
 _RANGE_LEFT = re.compile(r"^(.*-)(\d+)$")
 _RANGE_RIGHT_BARE = re.compile(r"^\d+$")
 
+#: 母码跟随下级程序行的循环（科目余额驱动的实质性程序循环，与程序裁剪页 DATA_DRIVEN_CYCLES 同一集合）。
+SUBSTANTIVE_CYCLES = frozenset("DEFGHIJKLMN")
+
 TRIM_SCOPE_UNAVAILABLE = "trim_scope_unavailable"
 TRIM_SCOPE_UNAVAILABLE_MESSAGE = "无法读取程序裁剪结果，已停止生成底稿，请稍后重试"
+#: 粗裁状态与底稿生命周期共锁的 advisory namespace（``PS`` = Procedure Scope）。
+_PROCEDURE_SCOPE_LOCK_NAMESPACE = 0x5053
 
 
 class TrimScopeUnavailable(RuntimeError):
@@ -55,6 +67,21 @@ class TrimScopeUnavailable(RuntimeError):
 
     def http_detail(self) -> dict:
         return {"error": TRIM_SCOPE_UNAVAILABLE, "message": TRIM_SCOPE_UNAVAILABLE_MESSAGE}
+
+
+async def lock_project_procedure_scope(db: AsyncSession, project_id: UUID) -> None:
+    """串行化同一项目的粗裁状态变更与底稿创建（事务结束自动释放）。
+
+    生成若在读 scope 后与粗裁并发提交，会留下「已裁剪但仍在用」的底稿；两条下级程序并发裁剪也会各自
+    看见另一条仍执行，漏回收母码审定表。所有生成入口经 :func:`plan_generation` 取本锁；粗裁 apply、
+    初始化与自定义程序变更也取同一把锁。SQLite 测试库跳过。
+    """
+    bind = db.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        await db.execute(
+            sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
+            {"ns": _PROCEDURE_SCOPE_LOCK_NAMESPACE, "key": f"procedure_scope:{project_id}"},
+        )
 
 
 def normalize_code(code: str | None) -> str:
@@ -119,12 +146,15 @@ class TrimmedScope:
     """一个项目的粗裁结果快照。``exact`` / ``ranged`` / ``ranges`` 的值都是「是否已裁」。
 
     ``ranged_from``：区间成员 → 包含它的区间程序行编码（决定者回报区间行本身，如 ``D2-7`` → ``D2-6至D2-13``）。
+    ``children``：母码 → 它下级的程序行编码（普通行按编码谱系、区间行按成员的谱系登记；按编码字符串升序），
+    只供实质性循环母码跟随下级（规则 4）使用。
     """
 
     exact: Mapping[str, bool] = field(default_factory=lambda: MappingProxyType({}))
     ranged: Mapping[str, bool] = field(default_factory=lambda: MappingProxyType({}))
     ranges: Mapping[str, bool] = field(default_factory=lambda: MappingProxyType({}))
     ranged_from: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    children: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
 
     @classmethod
     def from_rows(cls, rows: Iterable[tuple[str | None, str | None]]) -> "TrimmedScope":
@@ -133,6 +163,12 @@ class TrimmedScope:
         ranged: dict[str, bool] = {}
         ranges: dict[str, bool] = {}
         ranged_from: dict[str, set[str]] = {}
+        children: dict[str, set[str]] = {}
+
+        def _register_child(row_code: str, member: str) -> None:
+            for parent in code_lineage(member)[1:]:
+                children.setdefault(parent, set()).add(row_code)
+
         for raw_code, status in rows:
             code = normalize_code(raw_code)
             if not code:
@@ -144,11 +180,17 @@ class TrimmedScope:
                 for member in members:
                     _merge(ranged, normalize_code(member), trimmed)
                     ranged_from.setdefault(normalize_code(member), set()).add(code)
+                    _register_child(code, normalize_code(member))
             else:
                 _merge(exact, code, trimmed)
+                # 不合法区间（两侧前缀不一致等）按普通编码判定，但不算任何编码的下级：
+                # 它的谱系是字符串切出来的（F1-5至F2-9 → F1-5至F2 / F1-5 / F1），并不是真实的母码。
+                if RANGE_SEPARATOR not in code:
+                    _register_child(code, code)
         return cls(
             MappingProxyType(exact), MappingProxyType(ranged), MappingProxyType(ranges),
             MappingProxyType({m: tuple(sorted(c)) for m, c in ranged_from.items()}),
+            MappingProxyType({p: tuple(sorted(c)) for p, c in children.items()}),
         )
 
     @property
@@ -158,26 +200,75 @@ class TrimmedScope:
             c for c, t in self.ranges.items() if t
         )
 
-    def decided_by(self, wp_code: str | None) -> tuple[str, bool] | None:
-        """返回 ``(决定该编码的程序行编码, 是否已裁)``；没有任何程序行覆盖时返回 ``None``。"""
+    def _row_trimmed(self, row_code: str) -> bool:
+        """一条程序行自己的状态（普通行 / 区间行原文）。"""
+        if row_code in self.exact:
+            return self.exact[row_code]
+        return self.ranges.get(row_code, False)
+
+    def _decide(self, wp_code: str | None) -> tuple[str, bool, str] | None:
+        """``(决定者, 是否已裁, 来源)``，来源 ``range`` / ``lineage`` / ``children``；没有程序行覆盖时 ``None``。"""
         code = normalize_code(wp_code)
         if not code:
             return None
         if code in self.ranges:
-            return code, self.ranges[code]
+            return code, self.ranges[code], "range"
         members = expand_range_code(code)
         if members:
             # 区间编码（模板集里存在这种底稿）：成员全部已裁才算裁掉
             verdicts = [self.decided_by(m) for m in members]
             if verdicts and all(v is not None and v[1] for v in verdicts):
-                return verdicts[0][0], True  # type: ignore[index]
-            return None if all(v is None for v in verdicts) else (code, False)
+                return verdicts[0][0], True, "range"  # type: ignore[index]
+            return None if all(v is None for v in verdicts) else (code, False, "range")
         for level in code_lineage(code):
             if level in self.exact:
-                return level, self.exact[level]
+                return level, self.exact[level], "lineage"
             if level in self.ranged:
-                return (self.ranged_from.get(level) or (level,))[0], self.ranged[level]
+                # 同一成员可能落在多个重叠区间里；execute 优先合并后，代表决定者必须来自与合并结论一致的来源。
+                # 原先无条件取排序第一条，会出现「结论=执行、回报的决定者却是裁剪行」。
+                trimmed = self.ranged[level]
+                sources = self.ranged_from.get(level) or (level,)
+                owner = next((source for source in sources if self._row_trimmed(source) == trimmed), sources[0])
+                return owner, trimmed, "lineage"
+        kids = self.children.get(code) if code[:1] in SUBSTANTIVE_CYCLES else None
+        if kids:
+            # 规则 4：下级全部已裁才算已裁；决定者 = 第一条与结论一致的下级行（按编码升序，两端实现结果一致）
+            trimmed = all(self._row_trimmed(k) for k in kids)
+            owner = next(k for k in kids if self._row_trimmed(k) == trimmed)
+            return owner, trimmed, "children"
         return None
+
+    def decided_by(self, wp_code: str | None) -> tuple[str, bool] | None:
+        """返回 ``(决定该编码的程序行编码, 是否已裁)``；没有任何程序行覆盖时返回 ``None``。"""
+        verdict = self._decide(wp_code)
+        return (verdict[0], verdict[1]) if verdict else None
+
+    def follows_children(self, wp_code: str | None) -> bool:
+        """该编码是不是按规则 4 跟随下级程序行（实质性循环的科目母码，如 ``D2`` 审定表）。"""
+        verdict = self._decide(wp_code)
+        return bool(verdict and verdict[2] == "children")
+
+    def deciders(self, wp_code: str | None) -> tuple[str, ...]:
+        """参与决定该编码的全部程序行（与各行当前状态无关）。
+
+        同码普通行优先时只有该行；重叠区间返回最近层级的全部区间来源；区间型底稿返回各成员来源并集；
+        跟随下级的母码返回全部下级行。联动回收 / 恢复必须用完整集合，不能只用当前结论的代表决定者。
+        """
+        code = normalize_code(wp_code)
+        if not code:
+            return ()
+        if code in self.ranges:
+            return (code,)
+        members = expand_range_code(code)
+        if members:
+            return tuple(sorted({source for member in members for source in self.deciders(member)}))
+        for level in code_lineage(code):
+            if level in self.exact:
+                return (level,)
+            if level in self.ranged:
+                return self.ranged_from.get(level) or (level,)
+        kids = self.children.get(code) if code[:1] in SUBSTANTIVE_CYCLES else None
+        return kids or ()
 
     def is_trimmed(self, wp_code: str | None) -> bool:
         verdict = self.decided_by(wp_code)
@@ -205,6 +296,20 @@ class TrimmedScope:
     def to_payload(self) -> dict:
         """快照规范形（契约 docs/contracts/procedure-chain/trimmed-scope.schema.json）：编码 → 是否已裁，键排序。"""
         return {"exact": dict(sorted(self.exact.items())), "ranges": dict(sorted(self.ranges.items()))}
+
+
+def scope_decision_revision(scope: TrimmedScope, codes: Sequence[str]) -> str:
+    """本次编码集合真正影响生成的裁剪布尔判定摘要。
+
+    决定者或无关程序行变化但每个所选编码的最终裁剪结论不变时不制造假 stale；新增/恢复/裁剪任何
+    会改变生成集合的行都会改变摘要。编码先规范化、去重、排序，调用顺序不影响 revision。
+    """
+    payload = [
+        {"wp_code": code, "trimmed": scope.is_trimmed(code)}
+        for code in sorted({normalize_code(code) for code in codes if normalize_code(code)})
+    ]
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 async def load_trimmed_scope(db: AsyncSession, project_id: UUID) -> TrimmedScope:
@@ -292,8 +397,10 @@ async def plan_generation(
     已被粗裁优先于其他三类（被裁的编码不查库、也不报「在回收站」）。``scope`` 不传时现读，读不到抛
     :class:`TrimScopeUnavailable`。
     """
-    if scope is None:
-        scope = await load_trimmed_scope(db, project_id)
+    await lock_project_procedure_scope(db, project_id)
+    # ``scope`` 只曾用于同事务内复用；锁在本函数里取得后必须现读，不能信任调用方在取锁前读到的旧快照。
+    # 保留参数仅为兼容既有调用签名。
+    scope = await load_trimmed_scope(db, project_id)
     kept, trimmed = scope.split(list(codes))
     states = await wp_index_states(db, project_id, kept)
     to_create: list[str] = []

@@ -174,8 +174,10 @@ class SchemaDriftDetector:
         "schema_drift_log",
         # alembic 历史残留（spec Sprint 4 删除前会出现在此）
         "alembic_version",
-        # PG 系统
+        # PG 系统 —— pg_stat_statements 扩展建**两个**关系：统计视图本体与 _info 元信息视图。
+        # 原来只登记了本体，启用扩展后 _info 会常驻 db_extra（INFO 级噪音）。
         "pg_stat_statements",
+        "pg_stat_statements_info",
         # 业务基础设施表（裸 SQL / 迁移管理，无 ORM 映射）
         "app_audit_log",
         "data_snapshots",
@@ -198,6 +200,10 @@ class SchemaDriftDetector:
         # 科目类别修正迁移(migrate_account_category_correction.py)的回滚备份表，
         # 一次性脚本快照 (project_id,table,record_id,old_category)，需保留以支持 --rollback
         "_category_correction_backup",
+        # V225（原 V217，表名沿用 v217）程序实例身份回填的逐行审计快照；R225 依赖它回滚，故保留且不建 ORM。
+        "procedure_instance_identity_v217_backup",
+        # V219 分类 / 场景拆分前的原值快照；R219 只读它恢复（现值仍等于迁移结果的行），业务代码零读写，不建 ORM。
+        "project_classification_v219_backup",
         "_note_guidance_split_backup",
         "_note_text_ch8_backup",
         # 附注治理一次性清理脚本的回滚备份表（用完保留以支持 --rollback）：

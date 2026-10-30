@@ -156,6 +156,110 @@ class AssignmentService:
             })
         return results
 
+    async def initialize_project_partners(
+        self,
+        project_ids: Iterable[UUID],
+        *,
+        user_id: UUID,
+        assigned_by: UUID,
+        require_pending: bool = True,
+    ) -> list[ProjectUser]:
+        """给 partner 创建的新项目补 partner/edit 成员，不伪造签字委派。"""
+        ids = list(dict.fromkeys(project_ids))
+        if not ids:
+            return []
+        if assigned_by != user_id:
+            raise ValueError("批量初始化 partner 成员的操作者必须是本人")
+        if require_pending:
+            pending = {item.id for item in self.db.new if isinstance(item, Project)}
+            if not set(ids).issubset(pending):
+                raise ValueError("批量初始化 partner 成员只允许当前事务的新项目")
+        with self.db.no_autoflush:
+            existing = await self.db.scalar(sa.select(sa.func.count()).select_from(
+                ProjectUser
+            ).where(
+                ProjectUser.project_id.in_(ids),
+                ProjectUser.is_deleted == False,  # noqa: E712
+            ))
+        if existing:
+            raise ValueError("partner 创建者成员初始化不允许覆盖既有成员")
+        role, level = ROLE_MAP["partner"]
+        members = [
+            ProjectUser(
+                project_id=project_id, user_id=user_id,
+                role=role, permission_level=level,
+            )
+            for project_id in ids
+        ]
+        self.db.add_all(members)
+        await self.db.flush()
+        return members
+
+    async def initialize_project_managers(
+        self,
+        project_ids: Iterable[UUID],
+        *,
+        staff_id: UUID,
+        user_id: UUID,
+        assigned_by: UUID,
+    ) -> list[ProjectAssignment]:
+        """给本事务中新建、尚不可见的项目批量初始化经理与 edit 成员。
+
+        该入口只允许空团队项目：一次查询证明没有 active 委派/成员后，一次 flush 写完。
+        新项目尚无缓存与既有团队，不发“你被自己委派”通知，也无需逐项目失效旧 policy。
+        已存在项目必须走 ``save_assignments``，禁止借本入口覆盖团队。
+        """
+        ids = list(dict.fromkeys(project_ids))
+        if not ids:
+            return []
+        if assigned_by != user_id:
+            raise ValueError("批量初始化经理的操作者必须是经理本人")
+        pending_project_ids = {
+            item.id for item in self.db.new if isinstance(item, Project)
+        }
+        if not set(ids).issubset(pending_project_ids):
+            raise ValueError("批量初始化经理只允许当前事务尚未 flush 的新项目")
+        with self.db.no_autoflush:
+            linked_user = await self.db.scalar(sa.select(StaffMember.user_id).where(
+                StaffMember.id == staff_id,
+                StaffMember.is_deleted == False,  # noqa: E712
+            ))
+            if linked_user != user_id:
+                raise ValueError("经理人员档案与登录用户不匹配")
+            existing_assignment = await self.db.scalar(sa.select(sa.func.count()).select_from(
+                ProjectAssignment
+            ).where(
+                ProjectAssignment.project_id.in_(ids),
+                ProjectAssignment.is_deleted == False,  # noqa: E712
+            ))
+            existing_member = await self.db.scalar(sa.select(sa.func.count()).select_from(
+                ProjectUser
+            ).where(
+                ProjectUser.project_id.in_(ids),
+                ProjectUser.is_deleted == False,  # noqa: E712
+            ))
+        if existing_assignment or existing_member:
+            raise ValueError("批量初始化经理只允许尚无团队的新项目")
+        role, level = ROLE_MAP["manager"]
+        now = datetime.now(timezone.utc)
+        assignments = [
+            ProjectAssignment(
+                project_id=project_id, staff_id=staff_id, role="manager",
+                assigned_cycles=None, assigned_at=now, assigned_by=assigned_by,
+            )
+            for project_id in ids
+        ]
+        self.db.add_all(assignments)
+        self.db.add_all([
+            ProjectUser(
+                project_id=project_id, user_id=user_id,
+                role=role, permission_level=level,
+            )
+            for project_id in ids
+        ])
+        await self.db.flush()
+        return assignments
+
     async def save_assignments(
         self,
         project_id: UUID,

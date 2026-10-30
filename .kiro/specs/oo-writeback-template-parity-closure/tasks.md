@@ -39,9 +39,9 @@
 
 - [ ] 9. 字段名接通（R3，按 design §4 裁定）
   - [ ] 9.1 N 循环（N1~N5，含 N1 几何与 store item 前缀）
-    - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12
-    - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10）
-    - [x] 9.1c 语义审查收口：修 N2 跨项目读写、错误表头按位置写、Infinity JSON、国企披露归零、导入后旧快照、N 域新测试/公式数棘轮，以及 push 远端标签 fail-open / 重试竞态 / 本地旧标签基线；定向后端 25、鉴权/挂载 43、前端 643 项通过，候选相对基线新增失败 0（design §4.10）
+    - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12（明细见 design §4.10 附）
+    - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10、§4.11）
+    - [x] 9.1c 语义审查收口：修 N2 跨项目读写、错误表头按位置写、Infinity JSON、国企披露归零、导入后旧快照、N 域新测试/公式数棘轮，以及 push 远端标签 fail-open / 重试竞态 / 本地旧标签基线；定向后端 25、鉴权/挂载 43、前端 643 项通过，候选相对基线新增失败 0（design §4.10、§4.11）
   - [ ] 9.2 L4-3 与 M 循环（含 `placeholder` store item）
   - [ ] 9.3 G5-2 / G6-5 / G7 / H 循环
     - [x] 9.3a 批 B1：G6-5 全表按前端 `FairValueItem` 改名、D 改 auto_source、前端旧数据反推只在键缺失时做（显式 0 单测）；G4-7 证券名称改名、E 总计 auto_source；G11-2 A 序号 auto_source + 幽灵行锚点改 B；H4-2 J / M auto_source；新守卫 `test_ghost_row_anchor_not_protected.py`（全仓锚点不得受保护，F3-1 种子区可伪证例外）；对拍适配器 +1、未覆盖 14 → 13、例外 4 → 1（design §4.5）。G6-5 store 门面与 `{rows, conclusion}` 载荷未接（批 B3），G5-2 / G7 / H 其余未做

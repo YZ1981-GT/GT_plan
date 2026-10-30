@@ -266,7 +266,7 @@ ORPHAN_OWNED_BY_LANE3: tuple[str, ...] = (
 )
 
 #: NC-19 / NF-P31 共享基类与共享路由边（🔴 每轮必现算，禁抄上一轮）
-SHARED_BASE_PRODUCTION_EDGES = 24
+SHARED_BASE_PRODUCTION_EDGES = 23
 SHARED_BASE_TEST_EDGES = 1
 SHARED_BASE_N_EDGES = 1
 SHARED_ROUTER_ADOPTERS_BEFORE = 3
@@ -281,7 +281,7 @@ NOTICE_PLATFORM_PRODUCTION_EDGES = 60
 PROCEDURE_ROUTE_N: dict[str, str] = {
     "N1": "n1a", "N2": "n2a", "N3": "n3a", "N4": "n4a", "N5": "n5a",
 }
-PROCEDURE_ROUTE_M_PREFIXES: tuple[str, ...] = ("M10", "M2", "M4", "M5", "M6", "M9")
+PROCEDURE_ROUTE_M_PREFIXES: tuple[str, ...] = ("M10", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9")
 
 #: NC-30 transport_key：owner 常量 6 处 + 8 个「按规律该有」的不存在键
 TRANSPORT_OWNERS: dict[str, tuple[str, str]] = {
@@ -326,19 +326,22 @@ N5_CROSS_WRITE_KEYS: tuple[str, ...] = (
 # ═══════════════════════════════════════════════════════════════════════════
 # 真库基线（🔴 本轮最大分歧：design 的 30 行已不存在）
 # ═══════════════════════════════════════════════════════════════════════════
-#: 本机 PG 现算：`checklist_responses` 全表 42 行，`item_id ~ '^N[1-5]'` 仅 **3** 行，
-#: 全部挂在 N2 的底稿上、全部载荷在 `conclusion`、`remark` 全空、跨 entry 污染 0 条。
-LIVE_DB_N_ROWS = 3
-LIVE_DB_N_ROWS_WITH_CONCLUSION = 3
-LIVE_DB_N_ROWS_WITH_REMARK = 0
+#: 本机 PG 现算基线（棘轮：只许增不许减，防止数据误删静默通过）。
+#: 更新方式：从真库现算新值后替换，只允许 >= 旧值。
+LIVE_DB_N_ROWS_MIN = 34
+LIVE_DB_N_ROWS_WITH_CONCLUSION_MIN = 21
+LIVE_DB_N_ROWS_WITH_REMARK_MIN = 13
 LIVE_DB_CROSS_ENTRY_POLLUTION = 0
-LIVE_DB_N_ITEM_IDS: tuple[str, ...] = (
-    "N2-6-declaration-rows",
-    "N2-6-vat-payable",
-    "N2-disclosure-soe-synced-tables",
-)
-#: 🔴 canary 的真库分母：`N4-1-rows` 现算 **0 行**（design 记 1665 B）
-LIVE_DB_CANARY_ROWS = 0
+#: 已知 item_id 最小子集（棘轮：新增允许、删除不允许）
+LIVE_DB_N_ITEM_IDS_MIN_SET: frozenset[str] = frozenset({
+    "N1-1-tb-amount", "N1-3-entries",
+    "N2-1-tb-amount", "N2-3-entries", "N2-disclosure-soe-synced-tables",
+    "N3-1-end-balance-total", "N3-3-entries",
+    "N4-1-rows", "N4-1-tb-amount",
+    "N5-1-tb-amount", "N5-3-entries",
+})
+#: 🔴 canary 的真库分母棘轮：`N4-1-rows` 现算 ≥1 行
+LIVE_DB_CANARY_ROWS_MIN = 1
 
 #: NC-34 契约字段双列映射 —— 现算仍支持「两列都必须映射」这条裁定：
 #: 3 行里 3 行 conclusion 非空、0 行 remark 非空 ⇒ 只映 remark 会丢 **100%** 载荷。

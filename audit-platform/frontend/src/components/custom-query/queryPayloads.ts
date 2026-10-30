@@ -70,6 +70,8 @@ export interface BuilderPayloadContext extends QueryProjectContext {
   scopeToProject?: boolean
   /** 翻页起始行（后端 `QueryDSL.offset`）；0 或缺省不发 */
   offset?: number
+  /** 服务端签发的精确 COUNT 凭证；同一查询翻页时复用。 */
+  countToken?: string | null
   /** 「导出全部」的中文表头（后端 `ExportDSL.headers`，键为结果列名）；只在导出请求里传 */
   headers?: Record<string, string>
 }
@@ -98,6 +100,7 @@ export function buildBuilderPayload(
   }
   if (withTargets) payload.acnr_targets = [...acnrTargets]
   if (typeof ctx.offset === 'number' && Number.isInteger(ctx.offset) && ctx.offset > 0) payload.offset = ctx.offset
+  if (ctx.countToken) payload.count_token = ctx.countToken
   if (ctx.headers && Object.keys(ctx.headers).length) payload.headers = { ...ctx.headers }
   return payload
 }
@@ -114,6 +117,8 @@ export interface BusinessQueryInput extends QueryProjectContext {
   sort?: QuerySort[]
   limit?: number
   offset?: number
+  /** 服务端签发的精确 COUNT 凭证；翻页时发送，查询变化时省略。 */
+  countToken?: string | null
 }
 
 /** 业务视图的一个排序项（后端 `SortSpec`） */
@@ -126,9 +131,10 @@ export interface QuerySort {
 export function buildBusinessPayload(
   input: BusinessQueryInput, acnrTargets: readonly string[] = [],
 ): Record<string, unknown> {
-  const { projectId, year, source, ...rest } = input
+  const { projectId, year, source, countToken, ...rest } = input
   const payload: Record<string, unknown> = { project_id: projectId || '', source, filters: {} }
   if (isKnownYear(year)) payload.year = year
+  if (countToken) payload.count_token = countToken
   for (const [key, value] of Object.entries(rest)) {
     if (value !== undefined) payload[key] = value
   }

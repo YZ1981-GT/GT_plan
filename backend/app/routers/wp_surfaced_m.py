@@ -510,8 +510,9 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "金融企业按风险资产 1.5% 计提（calcRiskProvision，G 列）", "useM8RiskEngine"),
             ("计提差异", "应计提 − 账面计提", "计算",
              "正=计提不足/负=超额计提（calcProvisionDiff）", "useM8RiskEngine"),
-            ("金融企业适用性判定", "被审计单位行业 ∈ 金融/银行/证券/保险/信托/基金/期货/金融租赁", "logic_check",
-             "一般风险准备仅金融企业适用，非金融企业提示不适用（isFinancialEntity）", "useM8CrossSheet"),
+            ("适用性提示", "试算表中找到「一般风险准备」科目（渲染返回 accounts_found）", "logic_check",
+             "找不到该科目时页面顶部提示（通常只有金融企业计提）并给程序裁剪入口，不阻断编制",
+             "WpAccountAbsenceHint"),
         ],
         # 附注披露
         "附注上市": [

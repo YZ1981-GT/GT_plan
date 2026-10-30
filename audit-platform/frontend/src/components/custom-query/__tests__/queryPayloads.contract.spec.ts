@@ -50,10 +50,11 @@ describe('构造的键是后端模型字段的子集', () => {
   it('业务视图：全部入参 + 单元格目标', () => {
     const p = buildBusinessPayload({
       projectId: 'p1', year: 2025, source: 'tb_detail', filters: { a: 1 }, columns: ['c'], limit: 20, offset: 40,
+      countToken: 'signed-count',
     }, TARGETS)
     expectWithin(p, FIELDS.QueryRequest)
     expect(p).toEqual({ project_id: 'p1', year: 2025, source: 'tb_detail', filters: { a: 1 }, columns: ['c'],
-      limit: 20, offset: 40, acnr_targets: TARGETS })
+      limit: 20, offset: 40, count_token: 'signed-count', acnr_targets: TARGETS })
   })
 
   it('构建器：全部 DSL + 项目 + 年度 + 单元格目标（预览 / 执行 / 导出三模型）', () => {

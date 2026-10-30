@@ -6,12 +6,12 @@
  *
  * 数据组合：
  *   1. GET /wp-templates/list  → canonical 科目清单（wp_code/wp_name/cycle，_index.json 派生，无污染）
- *   2. listWorkpapersPaged     → wp_code → wp_id 映射（已生成底稿，供跨底稿跳转导航）
+ *   2. listWorkpapersAll       → wp_code → wp_id 映射（已生成底稿，供跨底稿跳转导航）
  *   两者取交集：canonical 决定"显示哪些"，working-papers 决定"是否可点/跳哪里"。
  */
 import http from '@/utils/http'
 import { workpapers as P_wp } from '@/services/apiPaths'
-import { listWorkpapersPaged } from '@/services/workpaperApi'
+import { listWorkpapersAll } from '@/services/workpaperApi'
 
 export interface CycleWpCard {
   wp_code: string
@@ -60,16 +60,8 @@ export async function loadCycleWorkpaperCards(
   // 2. working-papers → wp_code → wp_id 映射（仅已生成）
   const idByCode = new Map<string, string>()
   try {
-    const collected: any[] = []
-    let page = 1
-    for (;;) {
-      const env: any = await listWorkpapersPaged(projectId, { page, page_size: 100 })
-      const items: any[] = Array.isArray(env?.items) ? env.items : []
-      collected.push(...items)
-      const total = Number.isFinite(env?.total) ? Number(env.total) : collected.length
-      if (items.length === 0 || collected.length >= total || page > 20) break
-      page += 1
-    }
+    // 一次取完全部可见底稿（原先 100 条一页串行拉，spec platform-perf-hotspots R5）
+    const collected = await listWorkpapersAll(projectId)
     for (const it of collected) {
       const code = String(it?.wp_code || '')
       if (!re.test(code)) continue

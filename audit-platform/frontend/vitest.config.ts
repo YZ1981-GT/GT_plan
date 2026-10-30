@@ -14,7 +14,7 @@ export default defineConfig({
     fileParallelism: true,
     maxWorkers: 4,
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', '**/*.pbt.spec.?(c|m)[jt]s?(x)'],
-    exclude: ['e2e/**', 'e2e-uat/**', 'tests/**', 'node_modules/**', 'eslint-rules/**', '**/*.e2e.spec.ts'],
+    exclude: ['e2e/**', 'e2e-uat/**', 'e2e-readonly/**', 'tests/**', 'node_modules/**', 'eslint-rules/**', '**/*.e2e.spec.ts'],
   },
   resolve: {
     alias: {

@@ -86,4 +86,9 @@ if __name__ == "__main__":
     # 两类文件恰好为 0 个，glob 无匹配时 click 原样保留 —— 根目录一旦落一个 .json
     # 就会以同样方式炸。这些 pattern 本就该原样交给 uvicorn 的 reload 过滤器（它
     # 内部用 fnmatch 自己匹配），任何 argv 层展开都是错的。
+    #
+    # --reload 时新 worker 就绪后才停旧 worker（reload_supervisor；GT_OVERLAP_RELOAD=0 退回 uvicorn 原来的方式）。
+    import reload_supervisor
+
+    reload_supervisor.install()
     main(windows_expand_args=False)

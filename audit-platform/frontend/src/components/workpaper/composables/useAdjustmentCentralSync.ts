@@ -239,7 +239,12 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
   onMounted(() => {
     const pid = unwrap(opts.projectId)
     if (pid) {
-      _reviewSub = subscribeProjectEvent(pid, 'adjustment:review-changed', () => refreshStatus())
+      _reviewSub = subscribeProjectEvent(
+        pid,
+        'adjustment:review-changed',
+        () => refreshStatus(),
+        { onReconnect: () => refreshStatus() },
+      )
     }
     refreshStatus()
     // Phase 3: 首次载入完成后解除 firstLoad 标记（下一个 microtask）

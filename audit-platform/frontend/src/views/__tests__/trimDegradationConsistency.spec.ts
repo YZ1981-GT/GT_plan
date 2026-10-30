@@ -68,7 +68,7 @@ const mocks = vi.hoisted(() => ({
   fetchTrimNoteLinkage: vi.fn(),
   applyTrimNoteLinkage: vi.fn(),
   listAssignments: vi.fn(),
-  listWorkpapersPaged: vi.fn(),
+  listWorkpapersAll: vi.fn(),
   httpGet: vi.fn(),
   httpPost: vi.fn(),
   confirm: vi.fn(),
@@ -99,7 +99,7 @@ vi.mock('@/services/commonApi', () => ({
   applyTrimNoteLinkage: mocks.applyTrimNoteLinkage,
 }))
 vi.mock('@/services/staffApi', () => ({ listAssignments: mocks.listAssignments }))
-vi.mock('@/services/workpaperApi', () => ({ listWorkpapersPaged: mocks.listWorkpapersPaged }))
+vi.mock('@/services/workpaperApi', () => ({ listWorkpapersAll: mocks.listWorkpapersAll }))
 vi.mock('@/utils/errorHandler', () => ({ handleApiError: vi.fn() }))
 vi.mock('@/utils/http', () => ({ default: { get: mocks.httpGet, post: mocks.httpPost } }))
 vi.mock('@/composables/usePermissionMatrix', () => ({

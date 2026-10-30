@@ -307,7 +307,8 @@ async def sync_procedure_status(
         raise HTTPException(status_code=404, detail="底稿不存在")
 
     wp, idx = row
-    wp_code = idx.wp_code
+    from app.services.procedure_identity import normalize_wp_code
+    wp_code = normalize_wp_code(idx.wp_code) or ""
     wp_status = wp.status.value if wp.status else "draft"
 
     # 映射底稿状态到程序执行状态

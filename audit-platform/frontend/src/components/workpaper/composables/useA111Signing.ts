@@ -13,6 +13,7 @@
  * - getSlotState(slotId) 辅助方法
  */
 import { computed, type Ref } from 'vue'
+import { categoryGroupOfCode } from '@/types/projectClassification'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,10 +50,14 @@ export function useA111Signing(
 ) {
   // ─── requiredSlots ─────────────────────────────────────────────────────────
 
-  /** 当前业务分类下的必填签字槽位 */
+  /**
+   * 当前业务分类下的必填签字槽位。
+   * 表里存的可能是细分类码（旧版按项目分类原值预填过 A1 等）⇒ 先归到组别再比；原先 `includes('A1')`
+   * 恒假，A1~A8 项目必签槽位算成 0 个、永远「未签完」（spec trim-followup-residual-findings-closure R3）。
+   */
   const requiredSlots = computed<SignSlot[]>(() => {
-    const cat = businessCategory.value as 'A' | 'B' | 'C'
-    if (!cat) return []
+    if (!businessCategory.value) return []
+    const cat = categoryGroupOfCode(businessCategory.value)
     return SIGN_SLOTS.filter(slot => slot.requiredFor.includes(cat))
   })
 

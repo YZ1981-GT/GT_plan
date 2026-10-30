@@ -226,8 +226,8 @@ async def test_export_import_round_trip(prefix: str, engine):
             for err in failure.errors:
                 # Structure/format errors would mention things like:
                 # "为必填项", "格式错误", "无效"
-                # Uniqueness errors mention "已存在"
-                assert "已存在" in err, (
+                # 唯一冲突经统一中文文案返回，不应混入格式/结构错误。
+                assert "当前不能新建" in err, (
                     f"Round-trip produced non-uniqueness error: {err}"
                 )
 
@@ -332,7 +332,10 @@ async def test_generate_template_group_columns_and_rules():
     assert headers[7] == "上级企业代码(parent)"
     assert headers[8] == "最终控制方代码(ultimate)"
     assert headers[9] == "与上级关系(relation)"
-    assert len(headers) == 10
+    assert len(headers) == 13
+    assert headers[10:] == [
+        "操作类型(action)", "项目ID(project_id)", "关系基线摘要(base_hash)"
+    ]
 
     # Req 6.2: 说明事项 sheet 含两字段填写规则 + 18 位 USCC 格式要求
     ws_notes = wb["说明事项"]
@@ -348,17 +351,21 @@ async def test_generate_template_group_columns_and_rules():
     # 字段为选填
     assert "选填" in notes_text
 
-    # 与上级关系：选项与生效条件写进说明
-    assert "与上级关系(relation)" in notes_text
-    assert "子公司（独立法人，合并时抵销）" in notes_text
-    assert "分公司（非独立法人，并入母公司汇总）" in notes_text
+    # 与上级关系和现有树回导规则写进说明
+    assert "集团关系" in notes_text
+    assert "子公司或分公司" in notes_text
+    assert "现有集团树" in notes_text
 
-    # Req 6.3: 数据表提供示例数据行展示集团层级（最终控制方→上级→子公司/分公司）
-    data_rows = list(ws_data.iter_rows(min_row=2, values_only=True))
-    # 至少一行示例，且每行宽度与 header 一致（10 列）
+    # Req 6.3: 数据 sheet 不再放可误导入的示例；示例在独立 sheet
+    assert "填写示例" in wb.sheetnames
+    assert not any(
+        any(value not in (None, "") for value in row)
+        for row in ws_data.iter_rows(min_row=2, values_only=True)
+    )
+    data_rows = list(wb["填写示例"].iter_rows(min_row=2, values_only=True))
     assert len(data_rows) >= 1
     for r in data_rows:
-        assert len(r) == 10
+        assert len(r) == 13
     # 示例行中存在自引用最终控制方（顶层）与子公司指向上级的层级关系
     parent_codes = {r[7] for r in data_rows if r[7]}
     company_codes = {r[1] for r in data_rows}
@@ -384,11 +391,12 @@ async def test_generate_template_relation_dropdown():
     output = await generate_template()
     ws = load_workbook(BytesIO(output.getvalue()))["数据"]
     dvs = [dv for dv in ws.data_validations.dataValidation if dv.type == "list"]
-    assert len(dvs) == 1
-    dv = dvs[0]
-    assert dv.formula1 == '"子公司,分公司"'
-    assert dv.allow_blank is True
-    assert str(dv.sqref) == "J2:J501"
+    by_range = {str(dv.sqref): dv for dv in dvs}
+    assert set(by_range) == {"E2:E501", "F2:F501", "G2:G501", "J2:J501", "K2:K501"}
+    relation = by_range["J2:J501"]
+    assert relation.formula1 == "=GT_BATCH_OPTIONS_10"
+    assert relation.allow_blank is True
+    assert "GT_BATCH_OPTIONS_10" in ws.parent.defined_names
 
 
 # ===========================================================================

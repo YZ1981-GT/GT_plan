@@ -28,15 +28,72 @@ import asyncio
 import gc
 import logging
 import os
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Final
+from weakref import WeakKeyDictionary
 
-__all__ = ["GC_THRESHOLD", "configure_gc", "gc_tuning_enabled", "run_then_freeze"]
+__all__ = [
+    "GC_THRESHOLD",
+    "configure_gc",
+    "freeze_when_idle",
+    "gc_tuning_enabled",
+    "get_last_freeze_report",
+    "heavy_phase",
+    "run_then_freeze",
+]
 
 logger = logging.getLogger("audit_platform")
 
 #: (gen0, gen1, gen2)。只抬 gen0；gen1 / gen2 与解释器默认相同。
 GC_THRESHOLD: Final[tuple[int, int, int]] = (10_000, 10, 10)
+
+# 每个事件循环一把锁：pytest 会创建多个 loop，不能让某个已关闭 loop 绑定的 Lock 污染下一例。
+_HEAVY_LOCKS: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = WeakKeyDictionary()
+_LAST_FREEZE_REPORT: dict[str, object] = {
+    "status": "not_run",
+    "wait_s": 0.0,
+    "requeues": 0,
+    "collected": 0,
+    "duration_ms": 0.0,
+    "freeze_count": 0,
+}
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
+    try:
+        return max(minimum, float(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _heavy_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    lock = _HEAVY_LOCKS.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _HEAVY_LOCKS[loop] = lock
+    return lock
+
+
+@asynccontextmanager
+async def heavy_phase(name: str) -> AsyncIterator[None]:
+    """串行化后台 CPU/GIL 重阶段；不用于普通请求。"""
+    lock = _heavy_lock()
+    waited = time.perf_counter()
+    await lock.acquire()
+    wait_ms = (time.perf_counter() - waited) * 1000
+    if wait_ms >= 100:
+        logger.info("[启动] 重阶段 %s 等待前序阶段 %.0fms", name, wait_ms)
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+def get_last_freeze_report() -> dict[str, object]:
+    return dict(_LAST_FREEZE_REPORT)
 
 
 def gc_tuning_enabled() -> bool:
@@ -51,24 +108,107 @@ def configure_gc() -> bool:
     return True
 
 
-async def run_then_freeze(work: Callable[[], Awaitable[None]]) -> None:
-    """跑完 ``work()``（启动预热）之后，收集一次并冻结此刻存活的对象。
+async def freeze_when_idle(stop_event: asyncio.Event | None = None) -> bool:
+    """只在 HTTP in-flight 连续为 0 的空闲窗口做一次 full collect + freeze。
 
-    收的是可调用对象而不是协程：本任务在开跑之前就被取消时（启动随即关闭），不会留下一个
-    从未 await 的协程。预热失败也照样冻结（已建好的部分同样是长寿对象）；关闭阶段的取消原样
-    抛出、不冻结。冻结本身出错只记日志，绝不影响预热的结果。
+    GC 是进程全局且持 GIL，``to_thread`` 不能消除 stop-the-world。等待一轮超时后退到队尾再试，
+    **绝不**因超时强跑；拿到重阶段锁后再次检查 in-flight，堵住「刚判空闲就进请求」竞态。
+
+    判空闲用 ``value_excluding_streams()``：SSE 长连接在 in-flight 里一挂就是几十分钟，
+    用 ``value()`` 的话只要有一个浏览器标签订阅事件流，freeze 就永不发生（现场实测
+    wait_s=415.5 / requeues=12 / freeze_count=0）。GC 停顿只影响请求延迟，
+    而 SSE 本身是长轮询语义、不计入延迟预算，故可排除。
+    """
+    from app.middleware.inflight import inflight_counter
+
+    poll_s = _env_float("GT_GC_IDLE_POLL_S", 0.05, minimum=0.001)
+    window_s = _env_float("GT_GC_IDLE_WINDOW_S", 0.5, minimum=0.0)
+    timeout_s = _env_float("GT_GC_IDLE_TIMEOUT_S", 30.0, minimum=poll_s)
+    backoff_s = _env_float("GT_GC_IDLE_RETRY_S", 5.0, minimum=0.0)
+    overall_started = time.perf_counter()
+    requeues = 0
+
+    while stop_event is None or not stop_event.is_set():
+        deadline = time.perf_counter() + timeout_s
+        idle_since: float | None = None
+        while time.perf_counter() < deadline:
+            if stop_event is not None and stop_event.is_set():
+                _LAST_FREEZE_REPORT.update(status="cancelled", requeues=requeues)
+                return False
+            now = time.perf_counter()
+            if inflight_counter.value_excluding_streams() == 0:
+                idle_since = now if idle_since is None else idle_since
+                if now - idle_since >= window_s:
+                    break
+            else:
+                idle_since = None
+            await asyncio.sleep(poll_s)
+        else:
+            requeues += 1
+            _LAST_FREEZE_REPORT.update(
+                status="requeued",
+                wait_s=round(time.perf_counter() - overall_started, 3),
+                requeues=requeues,
+            )
+            logger.info(
+                "[启动] GC 等待连续空闲 %.1fs 超时（在途 %d，其中 SSE %d 已排除），%.1fs 后重排",
+                window_s, inflight_counter.value(), inflight_counter.streaming(), backoff_s,
+            )
+            await asyncio.sleep(backoff_s)
+            continue
+
+        async with heavy_phase("gc-freeze"):
+            # 获取锁期间可能来了请求；二次检查失败就重新等待完整空闲窗口。
+            if inflight_counter.value_excluding_streams() != 0:
+                requeues += 1
+                continue
+            started = time.perf_counter()
+            try:
+                collected = gc.collect()
+                gc.freeze()
+            except Exception as exc:  # noqa: BLE001 - 调优失败不影响服务
+                _LAST_FREEZE_REPORT.update(
+                    status="failed",
+                    wait_s=round(time.perf_counter() - overall_started, 3),
+                    requeues=requeues,
+                )
+                logger.warning("[启动] GC 冻结失败（忽略）：%s", exc)
+                return False
+            duration_ms = (time.perf_counter() - started) * 1000
+            freeze_count = gc.get_freeze_count()
+            _LAST_FREEZE_REPORT.update(
+                status="ok",
+                wait_s=round(started - overall_started, 3),
+                requeues=requeues,
+                collected=collected,
+                duration_ms=round(duration_ms, 1),
+                freeze_count=freeze_count,
+            )
+            logger.warning(
+                "[启动] GC 在连续空闲窗口后冻结长寿对象 %d 个（回收 %d，停顿 %.1fms，重排 %d 次）",
+                freeze_count, collected, duration_ms, requeues,
+            )
+            return True
+    _LAST_FREEZE_REPORT.update(status="cancelled", requeues=requeues)
+    return False
+
+
+async def run_then_freeze(
+    work: Callable[[], Awaitable[None]],
+    *,
+    stop_event: asyncio.Event | None = None,
+) -> None:
+    """串行跑预热，再等待安全空闲窗口 collect/freeze。
+
+    收的是可调用对象而不是协程：任务开跑前被取消时不会留下未 await 协程。预热失败仍尝试
+    空闲冻结并原样重抛；关闭取消不冻结。预热本身也走重阶段锁，不与 event replay、lazy
+    verifier、OpenAPI 生成并跑。
     """
     try:
-        await work()
+        async with heavy_phase("workpaper-prewarm"):
+            await work()
     finally:
         task = asyncio.current_task()
         cancelling = task is not None and task.cancelling() > 0
         if gc_tuning_enabled() and not cancelling:
-            try:
-                collected = gc.collect()
-                gc.freeze()
-                logger.warning(
-                    "[启动] GC 预热后冻结长寿对象 %d 个（本次回收 %d 个）", gc.get_freeze_count(), collected
-                )
-            except Exception as exc:  # noqa: BLE001 - 调优失败不影响服务
-                logger.warning("[启动] GC 冻结失败（忽略）：%s", exc)
+            await freeze_when_idle(stop_event)

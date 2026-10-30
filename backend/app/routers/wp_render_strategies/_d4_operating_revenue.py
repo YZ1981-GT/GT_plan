@@ -1,7 +1,7 @@
 """D4 营业收入 — 专属渲染策略.
 
 component_type = "d4-operating-revenue"
-返回 html_data 含：sections结构 / visible_groups（基于business_category）/ sheet配置。
+返回 html_data 含：sections结构 / visible_groups（基于项目分类 / 场景单一解释）/ sheet配置。
 数据持久化在 checklist_responses 表，item_id前缀为 "D4-{sheetCode}-{field}"。
 
 ──────────────────────────────────────────────────────────────────────────
@@ -47,6 +47,9 @@ from app.services.d_cycle_extraction.tier_a_seed import (
 )
 from app.services.four_table import LeafRow
 from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
+from app.services.project_classification import ProjectClassification
+from app.services.project_classification import resolve as resolve_classification
 
 from ._context import RenderContext
 
@@ -460,15 +463,16 @@ async def _fetch_total_assets(
     except Exception:  # noqa: BLE001
         logger.warning("D4 render: 资产总计查询失败 project=%s year=%s", project_id, year)
         return None
-_IPO_KEYWORDS = ("ipo", "listed", "neeq", "restructuring", "fraud_risk")
+#: IPO / 舞弊组可见的适用性标签（project_classification.tags；前端 D4 同一组：IPO_BIZ_KEYWORDS + fraud_risk）。
+_IPO_GROUP_TAGS = ("ipo", "listed", "neeq", "restructuring", "fraud_risk")
 
 
-def _is_ipo_visible(business_category: str) -> bool:
-    """判断IPO/舞弊组一级Tab是否可见"""
-    if not business_category:
-        return False
-    bc_lower = business_category.lower()
-    return any(kw in bc_lower for kw in _IPO_KEYWORDS)
+def _is_ipo_visible(classification: ProjectClassification) -> bool:
+    """IPO / 舞弊组一级 Tab 是否可见：项目分类 / 场景（单一解释）带资本市场或舞弊应对标签。
+
+    原先按 ``business_category`` 子串判断 —— 分类列迁移为纯质控分类、IPO 移到场景后会失效（R4）。
+    """
+    return any(classification.has_tag(tag) for tag in _IPO_GROUP_TAGS)
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -484,16 +488,14 @@ async def render(ctx: RenderContext) -> dict | None:
     db = ctx.db
     business_category = ctx.business_category or ""
 
-    # ─── 可见性判断 ────────────────────────────────────────────────────────
-    ipo_visible = _is_ipo_visible(business_category)
-
+    # ─── 可见性判断（IPO 组在下方读到项目分类 / 场景后再定）────────────────────
     visible_groups = {
         "core": True,
         "policy": True,
         "analysis": True,
         "inspection": True,
         "related": True,
-        "ipo": ipo_visible,
+        "ipo": False,
         "other": True,
     }
 
@@ -612,10 +614,12 @@ async def render(ctx: RenderContext) -> dict | None:
         "has_export_business": False,
     }
 
+    # 项目分类 / 场景单一解释（R4）：查不到项目行时按上下文里的分类原值解释（场景 normal）
+    project_classification = resolve_classification(business_category)
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, business_category "
+                "SELECT client_name, audit_year, business_category, scenario, template_type "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -625,8 +629,14 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["client_name"] = proj_row.client_name or ""
             project_context["audit_year"] = str(proj_row.audit_year or "")
             project_context["business_category"] = proj_row.business_category or business_category
+            project_classification = resolve_classification(
+                proj_row.business_category, getattr(proj_row, "scenario", None),
+                getattr(proj_row, "template_type", None))
     except Exception as e:  # noqa: BLE001
         logger.warning("D4 render: project context 查询失败: %s", e)
+    visible_groups["ipo"] = _is_ipo_visible(project_classification)
+    # 前端 IPO 组可见性与后端同一份分类解释（useD4CrossSheet 读 project_classification.tags）
+    project_context["project_classification"] = project_classification.as_dict()
 
     html_data = {
         "sections": sections,

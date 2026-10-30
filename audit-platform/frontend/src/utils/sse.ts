@@ -225,6 +225,8 @@ export interface SSEOptions {
   signal?: AbortSignal
   /** 初始 Last-Event-ID（断点续传） */
   lastEventId?: string
+  /** 长连接在服务端正常结束后是否重连；有限任务流保持 false，项目事件总线显式开启。 */
+  reconnectOnCleanEnd?: boolean
 }
 
 export interface SSEConnection {
@@ -239,7 +241,13 @@ export interface SSEConnection {
 }
 
 export function createSSE(url: string, options: SSEOptions = {}): SSEConnection {
-  const { maxRetries = 5, retryInterval = 3000, signal, lastEventId: initialLastEventId } = options
+  const {
+    maxRetries = 5,
+    retryInterval = 3000,
+    signal,
+    lastEventId: initialLastEventId,
+    reconnectOnCleanEnd = false,
+  } = options
   let retryCount = 0
   let closed = false
   let connected = false
@@ -253,6 +261,22 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
   // 外部 signal 监听
   if (signal) {
     signal.addEventListener('abort', () => { close() })
+  }
+
+  function reconnect(error?: Error, immediate = false) {
+    connected = false
+    if (closed) return
+    if (error) errorHandler?.(error)
+    if (immediate) {
+      // server_draining 只会在新 worker 已 ready 后由旧 worker 发出，此时无需退避。
+      setTimeout(connect, 0)
+      return
+    }
+    if (retryCount < maxRetries) {
+      retryCount++
+      const delay = retryInterval * Math.pow(2, retryCount - 1)
+      setTimeout(connect, delay)
+    }
   }
 
   async function connect() {
@@ -293,6 +317,7 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
 
       const decoder = new TextDecoder()
       const state = createParseState(currentLastEventId)
+      let sawDraining = false
 
       while (!closed) {
         const { done, value } = await reader.read()
@@ -308,6 +333,7 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
           }
           // 特殊处理 server_draining
           if (evt.type === DRAINING_EVENT_NAME) {
+            sawDraining = true
             let reason = '服务端正在优雅关闭，请稍后重连该会话'
             try {
               const parsed = JSON.parse(evt.data)
@@ -330,7 +356,16 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
       const remaining = flushState(state)
       for (const evt of remaining) {
         if (evt.id !== undefined) currentLastEventId = evt.id
-        if (evt.type === DRAINING_EVENT_NAME) continue
+        if (evt.type === DRAINING_EVENT_NAME) {
+          sawDraining = true
+          let reason = '服务端正在优雅关闭，请稍后重连该会话'
+          try {
+            const parsed = JSON.parse(evt.data)
+            reason = parsed.message || reason
+          } catch { /* use default */ }
+          drainingHandler?.(reason)
+          continue
+        }
         try {
           const parsed = JSON.parse(evt.data)
           messageHandler?.(parsed, evt.type || undefined, evt.id)
@@ -338,17 +373,17 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
           messageHandler?.(evt.data, evt.type || undefined, evt.id)
         }
       }
-    } catch (err: any) {
-      connected = false
-      if (closed || err?.name === 'AbortError') return
 
-      errorHandler?.(err instanceof Error ? err : new Error(String(err)))
-
-      if (retryCount < maxRetries) {
-        retryCount++
-        const delay = retryInterval * Math.pow(2, retryCount - 1)
-        setTimeout(connect, delay)
+      // fetch-based SSE 的 ReadableStream 正常结束不会像原生 EventSource 一样自动重连。
+      // 只有长连接调用方显式开启时才重连；有限任务流的正常 EOF 是终态，不能反复重放。
+      if (reconnectOnCleanEnd) {
+        reconnect(sawDraining ? undefined : new Error('SSE stream ended unexpectedly'), sawDraining)
+      } else {
+        connected = false
       }
+    } catch (err: any) {
+      if (closed || err?.name === 'AbortError') return
+      reconnect(err instanceof Error ? err : new Error(String(err)))
     }
   }
 

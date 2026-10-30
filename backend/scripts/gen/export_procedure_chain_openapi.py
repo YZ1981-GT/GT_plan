@@ -49,6 +49,7 @@ _VALIDATION = "common.schema.json#/$defs/validationErrorBody"
 _UNAVAILABLE = "trimmed-scope.schema.json#/$defs/unavailable"
 _ERROR_TEXT = {
     "400": "请求被拒（委派被拒时 message 带 reason / cycles）",
+    "404": "资源、模板集或生成 operation 不存在",
     "409": "冲突：已被他人分配、凭证已消费 / 过期 / 被篡改、目标版本已变化",
     "503": "读不到粗裁结果，停止执行（fail-closed）",
 }
@@ -64,10 +65,21 @@ OPERATIONS: tuple[dict[str, Any], ...] = (
     {"method": "post", "path": "/api/projects/{project_id}/working-papers/generate",
      "request": "generation-receipt.schema.json#/$defs/templateSetGenerateRequest",
      "response": "generation-receipt.schema.json#/$defs/templateSetGenerateResponse",
-     "errors": {"503": (_UNAVAILABLE,)}},
+     "successes": {"202": "generation-receipt.schema.json#/$defs/operationStatus"},
+     "errors": {"409": (TEXT,), "503": (_UNAVAILABLE,)}},
     {"method": "post", "path": "/api/projects/{project_id}/working-papers/generate-from-codes",
      "request": "generation-receipt.schema.json#/$defs/generateFromCodesRequest",
      "response": "generation-receipt.schema.json#/$defs/generateFromCodesResponse",
+     "successes": {"202": "generation-receipt.schema.json#/$defs/operationStatus"},
+     "errors": {"409": (TEXT,), "503": (_UNAVAILABLE,)}},
+    {"method": "get", "path": "/api/projects/{project_id}/working-papers/generation-operations/{operation_id}",
+     "response": "generation-receipt.schema.json#/$defs/operationStatus",
+     "errors": {"404": (TEXT,)}},
+    {"method": "get", "path": "/api/projects/{project_id}/procedure-scope/generation-plan",
+     "response": "generation-plan-view.schema.json#/$defs/plan",
+     "errors": {"404": (TEXT,), "503": (_UNAVAILABLE,)}},
+    {"method": "get", "path": "/api/projects/{project_id}/procedure-scope/confirmations",
+     "response": "generation-plan-view.schema.json#/$defs/confirmations",
      "errors": {"503": (_UNAVAILABLE,)}},
     {"method": "post", "path": "/api/projects/{pid}/procedure-delegations/preview",
      "request": "delegation-preview.schema.json#/$defs/request",
@@ -119,12 +131,19 @@ def _operation(entry: dict, live: dict) -> dict:
         "200": {"description": "成功：data 见 x-contract.response", "content": _json(_envelope(entry["response"]))},
         "422": {"description": "请求参数校验失败", "content": _json({"$ref": _VALIDATION})},
     }
+    for status, ref in entry.get("successes", {}).items():
+        responses[status] = {
+            "description": "操作仍在执行：data 为持久 operation 状态",
+            "content": _json(_envelope(ref)),
+        }
     for status, alts in entry.get("errors", {}).items():
         responses[status] = {"description": _ERROR_TEXT[status], "content": _json(_error(alts))}
     op["responses"] = responses
     contract: dict[str, Any] = {"response": entry["response"]}
     if entry.get("request"):
         contract["request"] = entry["request"]
+    if entry.get("successes"):
+        contract["successes"] = dict(entry["successes"])
     if entry.get("errors"):
         contract["errors"] = {status: list(alts) for status, alts in entry["errors"].items()}
     op["x-contract"] = contract

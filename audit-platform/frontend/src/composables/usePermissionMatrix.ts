@@ -108,6 +108,7 @@ const SYSTEM_ROLE_TO_MATRIX_ROLE: Record<string, Role> = {
   quality_control: 'qc_partner',
   qc_partner: 'qc_partner',
   eqcr: 'eqcr',
+  readonly: 'readonly',
 }
 
 /**
@@ -122,11 +123,16 @@ export function normalizeRole(role: string): string {
 }
 
 /**
- * 将系统角色转换为 Permission_Matrix 的 5 角色之一
+ * 将系统角色转换为 Permission_Matrix 角色。
+ *
+ * 未登记 / 空角色按最小只读矩阵（`readonly`），不能放大权限：原先兜底成 assistant，
+ * 只读账号与未知角色在界面上能编辑底稿（spec trim-generation-plan-followup-optimizations R5.3）。
+ * 操作码级 `can()` 仍镜像后端 ROLE_OPERATIONS（后端没有 readonly 项 ⇒ 只读角色没有任何操作码）。
  */
-export function toMatrixRole(systemRole: string): Role {
-  const r = systemRole.toLowerCase().trim()
-  return SYSTEM_ROLE_TO_MATRIX_ROLE[r] ?? 'assistant'
+export function toMatrixRole(systemRole: string | null | undefined): Role {
+  const r = (systemRole ?? '').toLowerCase().trim()
+  // 只认自有键：`constructor` / `__proto__` 这类原型属性名不能被当成角色
+  return Object.prototype.hasOwnProperty.call(SYSTEM_ROLE_TO_MATRIX_ROLE, r) ? SYSTEM_ROLE_TO_MATRIX_ROLE[r] : 'readonly'
 }
 
 /**

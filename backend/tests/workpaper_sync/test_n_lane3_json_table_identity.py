@@ -301,7 +301,7 @@ class TestLane3GatesAndPayload:
 
         rows = _live_db_rows()
         mine = [r for r in rows if r["item_id"].startswith(("N2-", "N5-"))]
-        _eq("lane3 真库行", len(mine), 3)
+        assert len(mine) >= 11, f"lane3 真库行 {len(mine)} < 棘轮 11"
         bad = [r for r in mine if not (r["wp_code"] or "").startswith(r["item_id"][:2])]
         _eq("污染", bad, [])
 

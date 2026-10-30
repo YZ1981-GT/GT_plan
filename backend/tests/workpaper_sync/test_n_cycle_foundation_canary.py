@@ -789,12 +789,21 @@ class TestContractFieldMapping:
         )
 
     def test_live_db_payload_lives_in_conclusion(self) -> None:
-        """NF-P16（现算口径）：真库 N 域 3 行全在 conclusion ⇒ 只映 remark 丢 100%。"""
+        """NF-P16（棘轮）：真库 N 域行数只许增不许减，已知 item_id 不许消失。"""
         rows = _live_db_rows()
-        _eq("N 域行数", len(rows), F.LIVE_DB_N_ROWS)
-        _eq("conclusion 非空", sum(1 for r in rows if r["conclusion"]), F.LIVE_DB_N_ROWS_WITH_CONCLUSION)
-        _eq("remark 非空", sum(1 for r in rows if r["remark"]), F.LIVE_DB_N_ROWS_WITH_REMARK)
-        _eq("item_id 集合", tuple(sorted(r["item_id"] for r in rows)), F.LIVE_DB_N_ITEM_IDS)
+        n_rows = len(rows)
+        n_concl = sum(1 for r in rows if r["conclusion"])
+        n_remark = sum(1 for r in rows if r["remark"])
+        assert n_rows >= F.LIVE_DB_N_ROWS_MIN, f"N 域行数 {n_rows} < 棘轮 {F.LIVE_DB_N_ROWS_MIN}"
+        assert n_concl >= F.LIVE_DB_N_ROWS_WITH_CONCLUSION_MIN, (
+            f"conclusion 非空 {n_concl} < 棘轮 {F.LIVE_DB_N_ROWS_WITH_CONCLUSION_MIN}"
+        )
+        assert n_remark >= F.LIVE_DB_N_ROWS_WITH_REMARK_MIN, (
+            f"remark 非空 {n_remark} < 棘轮 {F.LIVE_DB_N_ROWS_WITH_REMARK_MIN}"
+        )
+        actual_ids = {r["item_id"] for r in rows}
+        missing = F.LIVE_DB_N_ITEM_IDS_MIN_SET - actual_ids
+        assert not missing, f"已知 item_id 消失了：{sorted(missing)}"
 
     def test_contract_directory_has_no_n_entry(self) -> None:
         """NF-P38：契约归属逐文件读 `review.entry_id`，除 N4 canary 外 N 域 0。
@@ -830,7 +839,9 @@ class TestCanaryN4Closure:
         """
         rows = _live_db_rows()
         n4 = [r for r in rows if r["item_id"].startswith("N4-1-rows")]
-        _eq("N4-1-rows 真库行数", len(n4), F.LIVE_DB_CANARY_ROWS)
+        assert len(n4) >= F.LIVE_DB_CANARY_ROWS_MIN, (
+            f"N4-1-rows 真库行数 {len(n4)} < 棘轮 {F.LIVE_DB_CANARY_ROWS_MIN}"
+        )
         div = [d for d in F.DESIGN_VS_RECOMPUTED if d.item.startswith("canary")]
         assert div and div[0].cause == F.CAUSE_SNAPSHOT_DRIFT, "空分母未登记进分歧表"
 
@@ -951,16 +962,19 @@ class TestNoticeAndParentDuplicate:
             assert "GtEntrySyncCapabilityNotice" not in S.strip_comments(S.read_text(host)), eid
 
     def test_n_entries_are_still_not_registered_bidirectional(self) -> None:
-        """notice 成立的前提：N entry 未注册 adapter（否则通知是在真双向上说假话）。"""
+        """notice 成立的前提：N entry 未注册 adapter（N4 除外，已完成双向注册）。"""
         text = S.read_text(S.SYNC_DIR / "workpaperSyncManifest.generated.ts")
-        # 生成器按键字母序输出：同一对象里 "capability" 恰在 "entryId" 之前（中间无嵌套对象）
         pair = re.compile(
             r'"capability":\s*"([^"]+)",\s*"documentType"[^{}\[\]]*?"entryId":\s*"([^"]+)"')
         caps = {eid: cap for cap, eid in pair.findall(text)}
         assert "bidirectional" in caps.values(), "解析不到任何 bidirectional ⇒ 判据空跑"
-        for eid in F.ENTRY_IDS:
+        # N4 已完成双向注册（overlay + manifest 均已翻转），其余 N entry 仍未注册
+        n_not_bidirectional = [eid for eid in F.ENTRY_IDS if eid != F.N4]
+        for eid in n_not_bidirectional:
             assert eid in caps, f"{eid} 不在 manifest 里"
             assert caps[eid] != "bidirectional", f"{eid} 已注册双向 ⇒ notice 说的是假话"
+        # N4 应已翻转
+        assert caps.get(F.N4) == "bidirectional", f"N4 应已注册 bidirectional，实际 {caps.get(F.N4)}"
 
     def test_parent_duplicate_condition_is_implemented(self, slice_doc: dict) -> None:
         """Task 20 / NF-P33：N 首次触发（K/L/M 均 0）—— 4 条全挂 N1。"""
@@ -976,8 +990,8 @@ class TestNoticeAndParentDuplicate:
 
 
 class TestProcedureRouteAndStructuralZeros:
-    def test_resolve_procedure_sheet_key_n_complete_m_still_six(self) -> None:
-        """Task 21 / NF-P32：N 段完备 5/5；🔴 M 段仍 6 条（M 轮欠账未修，禁误记已修）。"""
+    def test_resolve_procedure_sheet_key_n_complete_m_all_ten(self) -> None:
+        """Task 21 / NF-P32：N 段完备 5/5；M 段已扩到全部 10 个前缀。"""
         text = S.read_text(S.FRONTEND / "utils" / "resolveProcedureSheetKey.ts")
         code = S.strip_comments(text)
         for code_, key in F.PROCEDURE_ROUTE_N.items():

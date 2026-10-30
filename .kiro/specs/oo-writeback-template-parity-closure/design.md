@@ -312,6 +312,37 @@
 
 验证证据：N2 / push / 模板与 N 域目标后端 25 passed，项目鉴权与真实 router 挂载 43 passed；N2 前端 27 passed，相关前端 23 文件 643 passed，相对基线新增失败 0、修复 2；单区域 vue-tsc 候选 53 / 基线 54，新增 0、消除 1；N1~N5 契约生成器、公式对拍 `--check`、27 本 386 格模板修复清单、N5 OOXML 定向差异、字段名守卫、ruff / py_compile / ESLint / JSON / `git diff --check` 均通过。相关后端成对全组的最终结果见 §9 末段。
 
+#### §4.10 附：批 C 实施明细（2026-10-28 原始记录）
+
+> 2026-10-30 远端 / 本地同步说明：远端与主工作区各自改写了本节。上文是远端（推送时）的合并版；本附与下方 §4.11 是主工作区在推送后补写、未入库的原文，按原样保留。附中「N5 模板缺陷只登记不修」已被上文第四批修复（§2 #33）取代，field-name 计数以上文为准。
+
+- **N1**：`LAST_DATA_ROW` 29→40（模板 R11–R40 含 R40「……」占位行）、`FOOTER_ROW` 31→42（R42 有 SUM 公式）、`footer_carries_total_formula` False→True；`STORE_ITEM_ID` `N1-2-rows`→`N1-2-detail-rows`（前端 `useN1Detail` 的 `ITEM_PREFIX='N1-2-detail'`）；`PAYLOAD_COLUMN=conclusion`（`useN1FormData.debouncedSave` 写 `{conclusion:…}`）；12 个 json_key 改前端名（priorTempDiff→beginDiff、taxRate→beginTaxRate、priorDtaBalance→beginDeferredTax、priorAje→beginAje、priorRje→beginRje、priorAudited→beginAudited、currentTempDiff→endDiff、currentTaxRate→endTaxRate、currentDtaBalance→endDeferredTax、currentAje→endAje、currentRje→endRje、currentAudited→endAudited）；`HTML_ONLY_ROW_KEYS` 改为 `(bookValue, taxBase, recognized, reversed, remark)` —— 前端 store 有但模板无的五个键。对拍例外删除（ALL FOUND）。
+- **N2**：`STORE_ITEM_ID` `N2-2-rows`→`N2-2-detail-rows`（前端 `useN2Detail16` 存 `N2-2-detail-rows`）；`PAYLOAD_COLUMN=conclusion`（`useN2FormData.saveField` 写 conclusion）；13 个 json_key 改前端名（taxName→taxType、priorOpening→unadjBegin、priorAccrued→unadjPayable、priorPaid→unadjPaid、priorClosing→unadjEnd、adjAje→beginAdjust、adjRje→beginRje、ajeAccrued→ajePayable、rjeAccrued→rjePayable、auditedOpening→audBegin、auditedAccrued→audPayable、auditedPaid→audPaid、auditedClosing→audEnd）。H 列（重分类调整，json_key `beginRje`）前端无此列（R2 结构差异：前端 `audBegin=C+G` 不含 H，模板 `M=C+G+H`），对拍例外保留。`_n2_import_export.py` item_id 同步改 `N2-2-detail-rows`。范围外消费方 `cycle_review_context.py`（读 `N2-2-rows`）和 `n2_taxes_payable_service.py`（写 `N2-{sheet}-rows` remark）未改。
+- **N3**：与 N1 同构（14 列 A–N，期初/期末双区），12 个 json_key 同规则改前端名（priorDtlBalance→beginDeferredTax 等）；`PAYLOAD_COLUMN=conclusion`。对拍例外保留（前端 `useN3Detail` 行模型不同构，无两期调整列）。
+- **N4**：无改动（store item `N4-2-detail-rows` 已正确，字段名已与前端一致，载荷列默认 remark 与 `useN4FormData.saveResponse` 写 remark 一致）。对拍例外保留（前端 `taxBasis×taxRate`，非模板的 未审+调整=审定）。
+- **N5**：无改动（同 N4 理由；字段名 `itemName/currentAmount/currentIndex/priorAmount/priorIndex/remark` 对齐模板 6 列）。
+- **N5 模板缺陷**（NC-32 A1 族，只登记不修）：N5-6-1 E12 `=C12+N5`（应为 `=C12+D12`，wp_code 冒充列引用）；N5-8 H12 `=C12-B12+N5-E12-F12+G12`（应为 `+D12`）。列入 `fix_template_formula_defects.py` 第四批。
+- **STORE_MERGE_REGISTRY**：新增 5 条（n1/n2/n3/n4/n5），71→76，全带 `oo_crash_neutralization_fn`；`store_item_registry.py` 1047 行（白名单上限，K2~K7 注释压缩 4 行腾空间）。
+- **契约**：五份全部重生成（N1/N2/N3 全新，N4/N5 digest 变因 store item 改名或注册表改变 import 闭包）；golden 40 家 254 digest 零回归；`generate_phase5_n_contracts.py` 从只含 N4 扩到全五条。
+- **field-name 例外**：31/388 → 30/365（N1 整条删除，N2 改键名，N3/N4 理由更新）。
+- **对拍例外**：UNCOVERED_ITEMS 13 → 12（N1 删除，N2 改键名 `N2-2-detail-rows`，N3/N4 理由更新）。
+- **`n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS`**：`{n4}` → `{n1,n2,n3,n4,n5}`（解 2 个契约归属测试）。
+- 回归：289 passed, 0 new failures（10 条 pre-existing，base 同红）。
+
+### §4.11 批 C 复盘与语义审查收口（2026-10-29）
+
+复盘按运行时调用链补齐三处声明假绿：N1/N2/N3 provider 显式重导出 `PAYLOAD_COLUMN`；N1 行计算抽成生产 `enrichN1DetailRow` 并接公式对拍；N2 实际长前缀导入导出统一到 A:Q 17 列和 `N2-2-detail-rows.conclusion`，补 H=`beginRje` 与 M=C+G+H，复核上下文从原始行重算 P。K2~K7、N1~N5 十一条同构 plan 改表驱动，注册表 1047→1019 行且 76 条顺序与 dataclass 值不变。
+
+首轮语义审查的代码问题全部闭合：N2 导出 / 导入在读取前分别经 `authorize_wp_read` / `authorize_wp_edit` 和 checklist 精确门禁；导入严格校验完整表头、顺序与重复列，拒绝 NaN / Infinity，整本先解析后锁行原子写入 `updated_by` 并递增 `content_version`，router 统一 commit / rollback，提交后只发一次 `WORKPAPER_SAVED`。国企披露在持久化边界调用生产 `enrichN2DetailRow`，不再读取已删除的 `aud*` 缓存；导入成功由子 Tab 发 `imported`，宿主唯一 `selfLoad` 重读，失败不刷新。N 域测试清单和 lane2 公式 facts 同步；N1 helper 抽取后的 display-sequence 站点 8→7；N5 总字节基线净减 1 B。
+
+`push_version.py` 两条入口都 fail-closed：fetch / 远端标签不可读即停；atomic 失败只有分支 SHA 与完整版本标签映射都未变化才原样重试一次；上一发布版本优先取远端 peeled commit。6 条安全测试通过，安装副本在最终提交同步主工作树后更新。
+
+验证：后端按 78 文件清单候选 2621 passed / 112 failed / 24 skipped / 6 errors，基线 2571 / 124 / 24 / 6，逐 node `new_bad=0`、共存红 118、修复 5；前端 23 文件 643 passed，基线 2 failed，新增 0、修复 2；单区域 vue-tsc 53 / 54，新增 0、消除 1。远端前移 8 提交至 `35c49967a` 后在其上重放，远端 71 个改动路径与本批 56 个路径交集 0；以最新远端串行复跑结果不变，暂存树自洽两道门通过。最终提交 `714636126`，附注版本 `v1.0.36`。
+
+浏览器首轮在和平药房 2025 的 N2-2 确认 H「期初重分类调整」与 M=C+G+H 生效，同时发现可见说明仍写“源模板 16 列”。跟随提交 `bece61cdc` 改为 A:Q 17 列并增加真实组件挂载守卫，28 项前端回归与单区域 vue-tsc 通过；附注版本 `v1.0.37`。
+
+浏览器继续点“导出模板”复现 404：项目 `authorize_wp_read` 已通过，拒绝点是精确门禁把业务选择码 `N2-2` 误当 `requested_sheet_key`。同一 admin / 同一底稿去掉该参数后立即放行；提交 `0bb92423c` 移除伪 sheet key，保留 router-level dedicated gate 与显式 read/edit + checklist gate，并用参数捕获测试钉住。附注版本 `v1.0.38`。
+
 ## §5 受保护字段统一（R7，已做）
 
 - 修前三处口径不同：`contracts.PROTECTED_MODES` = {formula, auto_source, cross_sheet}；`adapters.base.FieldValue.is_protected` = {formula, auto_source}；`merge._protection` 把 cross_sheet 当可编辑。影响 25 个字段（G3-1 审定表 21、G11-1 4），模板里全是引用明细表的公式，OO 改了不报冲突、直接合并，物化时还按字面量写进公式格。
@@ -375,3 +406,68 @@
 - `l4.bonds_payable.candidate.json` 与 reviewed 生产契约并存，L 生成器 `--apply` 因此 exit 1（HEAD 既有）。
 - 前端两条随机属性用例偶发红（本 spec 未动这两处）：`tabToRoute` 用对象字面量查表，反例 `"toString"` 取到 `Object.prototype` 上的函数（生产代码缺陷，入参来自路由 query）；`useG5FormulaEngine` P15 断言浮点求和与次序无关，十亿级金额下不成立（用例口径问题）。
 - L8-2 在 R21 之后插入的新增行不计入合计（模板合计公式只列 R13 / R14 / R15 / R16 / R20 / R21，OO 侧同样不计），前端提示并入相应项目；要计入需改模板合计结构，未做（§10）。
+
+
+## §11 预存测试失败修复——xfail 清单（2026-10-29）
+
+本轮修复 118 条预存后端失败时，24 条因外部依赖（并发会话未入库改动、provider 未交付、数据迁移未执行）
+标为 `xfail(strict=False)`。每条的解除条件和归属如下：
+
+### 一、G5 provider 未交付（3 条）— 归属 `g5-nested-sections-and-template-defects` spec
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 1 | `test_adjudication_spec_exists` | G5 provider 实现 `adjudication_spec()` 返回非 None |
+| 2 | `test_g509_sheet_in_managed_names` | G5 provider 在 `all_managed_sheet_names()` 注册 G509 sheet |
+| 3 | `test_g509_sheets_in_contract_payload` | `build_contract_payload()` 产出包含 `g509-managed` |
+
+### 二、H9 manifest 未翻转（1 条）— 归属 `h-cycle-sync-foundation-and-first-canary` spec
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 4 | `test_manifest_capability_gate_is_now_open` | overlay 写入 H9 裁决 + `generate_workpaper_sync_manifest.py --apply` 重算 |
+
+### 三、L5 Observer 接口重构（5 条 class 级）— 归属并发会话 L5 provider 改动
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 5 | `TestObserverSameSheetKeyDisambiguation` 全 5 方法 | 并发会话 L5 改动入库后，按新接口更新测试 |
+
+### 四、F3 provider items 扩展（3 条 class 级）— 归属并发会话 F3 改动
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 6 | `TestMultiItemPartialWriteIsRolledBack` 全 3 方法 | F3 items 从 5→9 入库后，更新 seed/prune 断言数量 |
+
+### 五、task56 源码行号漂移（8 条）— 归属并发会话 N 域源码改动
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 7 | `test_item_prefix_is_read_from_the_owner_constant` | N4 宿主行号稳定后更新 facts 锚点 |
+| 8 | `test_read_write_and_filter_sites_are_the_real_calls` | checklist-responses 读写位置稳定后更新 |
+| 9 | `test_template_ref_resolves_and_digests_recompute` | N1 模板净化入库后更新 size 基线 |
+| 10 | `test_every_declaration_reads_its_owner_constant` | N4 COMPONENT_TYPE 常量稳定后更新 |
+| 11 | `test_two_families_and_the_reverse_families_recompute` | 行身份族锚点稳定后更新 |
+| 12 | `test_nd2_three_carrier_kinds_partition_the_hosts` | carrier import_site 稳定后更新 |
+| 13 | `test_live_modules_edges_match_the_declared_value_both_ways` | DualMode import 行号稳定后更新 |
+| 14 | `test_ui_toolbar_gate_anchors_are_resolvable` | toolbar gate 行号稳定后更新 |
+
+### 六、N1 adjudication 重构（1 条）— 归属并发会话
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 15 | `test_a_family_in_n1_adjudication` | useN1Adjudication.ts 接口稳定后，改用新模式匹配或删除 |
+
+### 七、数据/模板漂移（3 条）
+
+| # | 测试 | 解除条件 |
+|---|------|---------|
+| 16 | `test_no_workpaper_points_into_template_library` | 跑 `fix_wp_template_deref.py --apply` 修复真库残留 |
+| 17 | `test_idempotent_script_check` | 附注模板重生成 `--apply` 后 `--check` 恢复 exit 0 |
+| 18 | `test_aligned_by_marker` | 五、30 的 `_aligned_by` 标记统一后更新断言 |
+
+### 解除纪律
+
+- 并发会话代码入库后，逐个跑 xfail 标记的用例；若通过（xpassed）则删除 `@pytest.mark.xfail` 标记
+- 删除 xfail 标记时同步删除本清单对应行
+- 禁止把新增失败标为 xfail 来凑绿——新失败必须修代码或修断言

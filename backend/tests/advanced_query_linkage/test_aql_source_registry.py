@@ -454,10 +454,14 @@ async def test_count_paging_nulls_last_and_warning(ledger_db) -> None:
     ids = [r["id"] for r in (*first.rows, *second.rows, *third.rows)]
     assert len(set(ids)) == 5, "逐页并集 = 全集且互不重叠"
     assert sr.NO_ACTIVE_DATASET_WARNING in first.warnings, "没有生效数据集时 warnings 写明按未删除行返回"
-    # column_types：显示列的类型（任务 28 / 29 的金额格式化按它判定；隐藏列不在其中）
-    assert first.meta == {"ref_context": {"template_type": "soe", "year": 2025},
-                          "column_types": {c.key: c.dtype for c in sr.LEDGER_ENTRIES.columns}}
+    # meta = 引用校验上下文 + 显示列类型（任务 28 / 29 的金额格式化按它判定；隐藏列不在其中）+ 计数凭证
+    assert set(first.meta) == {"ref_context", "column_types", "count_token", "count_reused"}
+    assert first.meta["ref_context"] == {"template_type": "soe", "year": 2025}
+    assert first.meta["column_types"] == {c.key: c.dtype for c in sr.LEDGER_ENTRIES.columns}
     assert first.meta["column_types"]["debit_amount"] == "number" and first.meta["column_types"]["summary"] == "text"
+    # 首页照常计数并签发凭证；复用判据见 test_count_token_reuse.py
+    assert first.meta["count_token"]
+    assert first.meta["count_reused"] is False
     assert [c.key for c in first.columns] == sr.LEDGER_ENTRIES.display_keys
     assert {"id", "entry_seq", "accounting_period", "company_code"} <= set(first.rows[0]), "隐藏列随行返回"
 

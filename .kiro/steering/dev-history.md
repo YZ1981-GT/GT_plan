@@ -5778,3 +5778,13 @@ instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 
 - 首次本地提交 `06eb2edc2` 后，版本推送 dry-run 再 fetch 发现远端新增 `43b189d49` 并占用 v1.0.42；未推送、未 force，重新从最新远端建锁定 detached 候选。四个重叠文件只有 INDEX 文本冲突，Python 自动合并后人工核对远端 NOTE_SECTION_SAVED/stale/刷新链与本轮 `_source`/owner/strict/派生主表均在。
 - 语义复核抓到 Git 不会报的接缝：owner 空集合删除旧来源表仍会重建共享主表，而 pushed-cell 保护只看 incoming 非空。改门为 `clean_sub_table_data or derived_tables`，新增 L2 放弃/应付股利保留反例；旧门变异稳定红，修复绿。
 - 接缝终验：后端 238 passed、前端 38 passed；vue-tsc 最终远端 3088 / 候选 2987，added 0 / resolved 101；域两树 1304、identity 差集 0。旧本地提交只作保护，最终提交在 43b189d49 之上重建。
+
+## 2026-10-27~28 平台响应速度热点（spec `platform-perf-hotspots`，13/13，未提交）
+缘起：用户 2026-10-27「前后端的处理速度不太好，太慢了，按理不应该」→ 实测分析 →「按你建议来」。
+- 后端：D 循环 d1~d7 渲染器同请求 memo（D4 渲染 41→2 次）、render-config 可选 `share_html_data=1` 共享载荷（D2 14.7MB → 1MB）、编制说明只算清册（`manifest_only`，629 → 约 95ms）、`GET /api/projects/{pid}/working-papers-all` 一次取全部可见底稿（替代 10 页串行）、`event_bus.replay_pending_events` 去掉 `xreadgroup(block=0)`（BLOCK 0 是无限等，每次启动白等 5 秒）；PG `jit=off`、`work_mem=32MB`
+- 前端：`useWpRenderer` 带共享参数并逐页 `structuredClone` 展开；编辑器外壳不再自带 render-config、编制说明等页签上下文（`views/workpaper-editor/useEditorRendererFacts.ts`）；`listWorkpapersAll` 在途共享，试算表 / 目录 / 凭证挂底稿 / 裁剪建议一并改用；底稿列表按路径复用（`utils/routeViewKey.ts` + 路由 meta `reuseOnQueryChange`）与 `shallowRef` + `indexFirstBy`；顺带修 GtChecklistTable / MyTemplatesDialog 编译失败
+- 结果（同一后端前后对照，交替 3 轮）：进入底稿列表最后一个接口 3.1 → 1.35 秒、切视图 / 跳待重算 0 个接口不重挂；试算表 2.65 → 1.25 秒；打开 D2 接口数据 30.4MB → 2.6MB；进入底稿列表 CPU 1.88 → 1.47 秒（`@vue/reactivity` 0.43 → 0.18 秒）
+- 证据：后端候选树（HEAD + 本 spec）失败集合是 HEAD 的子集（46 / 47）；前端 143 个相关测试文件只在候选失败 0 例；收尾回归抓到外壳行数棘轮 1380 > 1362 并已收回
+- 🔴 教训：①浏览器探针 / 实测一律用 127.0.0.1:3030 —— `localhost` 每个新连接多等约 300ms（Chromium 先连 ::1，Vite 只听 IPv4），打开 D2 3.1 vs 1.6 秒、试算表 3.9 vs 1.5 秒，本 spec 前半程据此把浏览器里 300~600ms 的轻接口误归因于事件循环 ②前端前后对照可另起一个 Vite（`createServer` + `configFile: false`、插件同 vite.config、`dts: false` / `hmr: false` / `watch: null`、缓存放 `node_modules/.perf_probe`），用 `enforce: 'pre'` 的 load 钩子把本 spec 改过的文件在内存里换成 `git show HEAD:` 版本，不碰磁盘与 3030 ③Playwright `waitForLoadState('networkidle')` 对 SPA 内导航立即返回，固定等待会截断后续请求（试算表首测漏了最后的底稿清单请求）⇒ 按在途请求计数等静默，并排除 `/events/stream` 长连接 ④相关测试要按「引用改动模块」全量选，任务内只跑直接相关的几组漏了外壳行数棘轮 ⑤vitest 全量跑时 NProgress 定时器在环境拆除后触发的 `document is not defined` 条数随负载浮动（HEAD 两次 12 / 13），不能当新增失败
+- 待用户：PG `shared_buffers` 8GB 与 `shared_preload_libraries=pg_stat_statements` 需重启 audit-postgres（容器来自 `D:\GT_workplan\docker-compose.yml`）；浏览器访问地址（localhost → 127.0.0.1 跳转或改 Vite 监听）；提交推送
+- 未解决：冷启动导入 `app.main` 10 秒与热重载期间不可用；每请求固定开销（单事件循环排队、2550 条路由线性匹配、9 个 `BaseHTTPMiddleware`）

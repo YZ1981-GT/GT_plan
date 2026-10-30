@@ -1,0 +1,132 @@
+{
+  "$id": "https://contracts.gt-plan.local/procedure-chain/v1/generation-plan-view.schema.json",
+  "$comment": "JSON Schema 2020-12。来源：backend/app/services/procedure_generation_plan.py（build_generation_plan / build_scope_confirmations）；接口：GET /api/projects/{project_id}/procedure-scope/generation-plan、/confirmations",
+  "title": "GenerationPlanView（生成计划与粗裁状态）",
+  "description": "生成底稿弹窗与程序裁剪页读取的只读视图。每个模板编码一个状态，按优先级取第一个成立的：trimmed（TrimmedScope 判为已裁）> in_recycle（本项目 wp_index 行已软删）> existing（行在用）> category_excluded（所在循环未保存粗裁、且按项目业务分类不适用）> to_create。前三类与 generation-plan 的分流同一判定；业务分类只是未保存粗裁循环的默认方案，保存过的循环以程序行为准（不适用但判为生成的标 category_conflict）。粗裁保存 = 本项目有已消费的粗裁应用凭证且其中有该循环的 scope 条目，取最近一次。",
+  "$defs": {
+    "trimState": {
+      "description": "循环粗裁状态：not_initialized（没有程序行）/ unconfirmed（有程序行、没人保存过）/ confirmed（保存过）。",
+      "enum": ["not_initialized", "unconfirmed", "confirmed"]
+    },
+    "itemState": {
+      "enum": ["trimmed", "in_recycle", "existing", "category_excluded", "to_create"]
+    },
+    "counts": {
+      "type": "object",
+      "required": ["total", "to_create", "existing", "in_recycle", "trimmed", "category_excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "$ref": "common.schema.json#/$defs/count" },
+        "to_create": { "$ref": "common.schema.json#/$defs/count" },
+        "existing": { "$ref": "common.schema.json#/$defs/count" },
+        "in_recycle": { "$ref": "common.schema.json#/$defs/count" },
+        "trimmed": { "$ref": "common.schema.json#/$defs/count" },
+        "category_excluded": { "$ref": "common.schema.json#/$defs/count" }
+      }
+    },
+    "nullableDateTime": {
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "program": {
+      "description": "程序裁剪页上的一条程序行。origin：catalog（程序目录）/ supplement（补齐的，编码 = 底稿编码）/ custom（自定义）。",
+      "type": "object",
+      "required": ["code", "name", "status", "skip_reason", "origin"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "$ref": "common.schema.json#/$defs/wpCode" },
+        "name": { "type": "string" },
+        "status": { "$ref": "trimmed-scope.schema.json#/$defs/scopeStatus" },
+        "skip_reason": { "type": ["string", "null"] },
+        "origin": { "enum": ["catalog", "supplement", "custom"] }
+      }
+    },
+    "item": {
+      "description": "一个模板编码。decided_by = 决定它的程序行（trimmed-scope decision），follows_children = 实质性循环母码跟随下级程序行。",
+      "type": "object",
+      "required": ["wp_code", "wp_name", "state", "decided_by", "follows_children", "category_applicable", "category_reason", "category_conflict"],
+      "additionalProperties": false,
+      "properties": {
+        "wp_code": { "$ref": "common.schema.json#/$defs/wpCode" },
+        "wp_name": { "type": "string" },
+        "state": { "$ref": "#/$defs/itemState" },
+        "decided_by": { "type": ["string", "null"] },
+        "follows_children": { "type": "boolean" },
+        "category_applicable": { "type": "boolean" },
+        "category_reason": { "type": ["string", "null"] },
+        "category_conflict": { "type": "boolean" }
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "required": ["cycle", "trim_state", "confirmed_at", "confirmed_by", "counts", "programs", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "cycle": { "$ref": "common.schema.json#/$defs/cycle" },
+        "trim_state": { "$ref": "#/$defs/trimState" },
+        "confirmed_at": { "$ref": "#/$defs/nullableDateTime" },
+        "confirmed_by": { "type": ["string", "null"] },
+        "counts": { "$ref": "#/$defs/counts" },
+        "programs": { "type": "array", "items": { "$ref": "#/$defs/program" } },
+        "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "plan": {
+      "description": "GET /api/projects/{project_id}/procedure-scope/generation-plan?template_set_id= 的 data。循环顺序 B C D E F G H I J K L M N A S，其余按字母排后；每个循环的 items 保持模板集顺序。template_set 为 null = 未指定模板集、按全部模板编码。模板集不存在 404；读不到粗裁结果或保存记录 503（trimmed-scope.schema.json#/$defs/unavailable）。",
+      "type": "object",
+      "required": ["template_set", "business_category", "totals", "cycles"],
+      "additionalProperties": false,
+      "properties": {
+        "template_set": {
+          "anyOf": [
+            {
+              "type": "object",
+              "required": ["id", "set_name", "code_count"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "$ref": "common.schema.json#/$defs/uuid" },
+                "set_name": { "type": "string" },
+                "code_count": { "$ref": "common.schema.json#/$defs/count" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "business_category": {
+          "description": "项目业务分类主类（首字母）；defaulted = 项目未填写、按 C 类判断。",
+          "type": "object",
+          "required": ["code", "defaulted"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "enum": ["A", "B", "C"] },
+            "defaulted": { "type": "boolean" }
+          }
+        },
+        "totals": { "$ref": "#/$defs/counts" },
+        "cycles": { "type": "array", "items": { "$ref": "#/$defs/cycle" } }
+      }
+    },
+    "confirmations": {
+      "description": "GET /api/projects/{project_id}/procedure-scope/confirmations 的 data：标准循环（B~N、A、S）全部列出，其他循环有程序行才列。",
+      "type": "object",
+      "required": ["cycles"],
+      "additionalProperties": false,
+      "properties": {
+        "cycles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cycle", "trim_state", "program_count", "confirmed_at", "confirmed_by"],
+            "additionalProperties": false,
+            "properties": {
+              "cycle": { "$ref": "common.schema.json#/$defs/cycle" },
+              "trim_state": { "$ref": "#/$defs/trimState" },
+              "program_count": { "$ref": "common.schema.json#/$defs/count" },
+              "confirmed_at": { "$ref": "#/$defs/nullableDateTime" },
+              "confirmed_by": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

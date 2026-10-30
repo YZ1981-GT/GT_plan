@@ -868,7 +868,8 @@
       "evidence_patch": {
         "review_status": "published_representation_verified",
         "legacy_reasons": []
-      }
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
     },
     {
       "file_glob": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
@@ -881,7 +882,8 @@
       "evidence_patch": {
         "review_status": "published_representation_verified",
         "legacy_reasons": []
-      }
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
     },
     {
       "file_glob": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
@@ -960,6 +962,160 @@
         "review_status": "published_representation_verified",
         "legacy_reasons": []
       }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g1_trading_financial_assets_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g1.trading_financial_assets_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g2_interest_receivable_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g2.interest_receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g3_dividend_receivable_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g3.dividend_receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g5_long_term_receivable_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g5.long_term_receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g8_other_equity_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g8.other_equity_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g9_other_noncurrent_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g9.other_noncurrent_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g10_trading_liabilities_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g10.trading_liabilities_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g11_investment_income_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g11.investment_income_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g12_net_hedge_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g12.net_hedge_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g13_fair_value_changes_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g13.fair_value_changes_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g14_credit_impairment_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g14.credit_impairment_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      },
+      "reason": "六项前置全部满足（契约已发布+注册表已登记+台账已录+provider已接线+golden digest已过+宿主已改线到 sync bridge），overlay 裁决为 bidirectional"
     }
   ]
 }

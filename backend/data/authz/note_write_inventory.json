@@ -687,18 +687,14 @@
             "name": "require_role",
             "params": {
               "roles": [
-                "admin",
-                "manager",
-                "partner"
+                "admin"
               ]
             },
             "via": "signature"
           }
         ],
         "global_roles": [
-          "admin",
-          "manager",
-          "partner"
+          "admin"
         ],
         "identity_only": false,
         "max_level": null,
@@ -735,18 +731,14 @@
             "name": "require_role",
             "params": {
               "roles": [
-                "admin",
-                "manager",
-                "partner"
+                "admin"
               ]
             },
             "via": "signature"
           }
         ],
         "global_roles": [
-          "admin",
-          "manager",
-          "partner"
+          "admin"
         ],
         "identity_only": false,
         "max_level": null,
@@ -783,18 +775,14 @@
             "name": "require_role",
             "params": {
               "roles": [
-                "admin",
-                "manager",
-                "partner"
+                "admin"
               ]
             },
             "via": "signature"
           }
         ],
         "global_roles": [
-          "admin",
-          "manager",
-          "partner"
+          "admin"
         ],
         "identity_only": false,
         "max_level": null,
@@ -831,18 +819,14 @@
             "name": "require_role",
             "params": {
               "roles": [
-                "admin",
-                "manager",
-                "partner"
+                "admin"
               ]
             },
             "via": "signature"
           }
         ],
         "global_roles": [
-          "admin",
-          "manager",
-          "partner"
+          "admin"
         ],
         "identity_only": false,
         "max_level": null,

@@ -4,14 +4,15 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 行业适用性守卫：非 oil_gas/mining 行业 -->
-    <el-empty
-      v-else-if="!isApplicable"
-      description="本底稿仅适用于石油天然气/采矿行业项目"
-      :image-size="120"
-    />
-
     <template v-else>
+      <!-- 试算表里找不到油气资产科目时提示（不阻断；原按「行业」整页拦截，平台没有行业来源） -->
+      <WpAccountAbsenceHint
+        :project-id="props.projectId"
+        cycle="H"
+        account-name="油气资产"
+        usual-scope="油气资产（CAS 27 石油天然气开采）通常只在油气开采企业核算"
+        :accounts-found="accountsFound"
+      />
       <!--
         🔴 切换器改 `v-model` 且**不再带 `:disabled`**：原 `modeOptions` 里
         `disabled: !isOoAvailable.value` 在健康检查（mount 期异步）未就绪时把「在线编辑」
@@ -311,7 +312,8 @@
  * sheetName prop v-if 分发到全部21个子组件，无内部 el-tabs。
  * 外层 GtWpRenderer 通过底稿目录行(chips)控制当前 sheet。
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
- * 行业守卫: applicable_when industry IN ['oil_gas','mining']。
+ * 科目提示: 渲染返回 accounts_found=false 时顶部提示（不阻断，WpAccountAbsenceHint）；不按行业拦截
+ *   （平台没有项目级行业来源，spec trim-followup-residual-findings-closure R1）。
  * useVersionTrail: autoSnapshot on save。
  *
  * Spec: .kiro/specs/h5-oil-gas-assets/ Task 1.1
@@ -322,6 +324,7 @@ import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import WpAccountAbsenceHint from './shared/WpAccountAbsenceHint.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 import { pickHTbSourceCodes } from './composables/hCycleAccountScope'
 import { useH5FormData } from './composables/useH5FormData'
@@ -391,18 +394,10 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 const _h5TbSourceCodes = computed(() => pickHTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _h5TbSourceCodes)
 
-// ─── 行业适用性守卫 ──────────────────────────────────────────────────────────
-const projectContext = inject<any>('projectContext', null)
-const isApplicable = ref(true)
-
-function checkIndustryApplicability() {
-  if (!projectContext?.value && !projectContext) return // 无context默认放行
-  const ctx = projectContext?.value || projectContext
-  const industry = ctx?.industry || ctx?.project?.industry || ''
-  if (industry && !['oil_gas', 'mining'].includes(industry)) {
-    isApplicable.value = false
-  }
-}
+// ─── 科目提示（渲染返回 accounts_found；自加载时从 render-config 取） ──────────
+const selfLoadedAccountsFound = ref<boolean | null>(null)
+const accountsFound = computed<boolean | null>(() =>
+  typeof props.htmlData?.accounts_found === 'boolean' ? props.htmlData.accounts_found : selfLoadedAccountsFound.value)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
@@ -518,6 +513,9 @@ async function selfLoad(): Promise<void> {
         for (const sheet of data.sheets) {
           _mergeResponses(map, sheet.html_data?.allResponses)
           _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          if (typeof sheet.html_data?.accounts_found === 'boolean') {
+            selfLoadedAccountsFound.value = sheet.html_data.accounts_found
+          }
         }
         allResponses.value = map
       }
@@ -542,7 +540,6 @@ provide('h5OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  checkIndustryApplicability()
   void selfLoad()
 })
 </script>

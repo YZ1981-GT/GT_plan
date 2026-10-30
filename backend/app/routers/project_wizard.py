@@ -38,7 +38,10 @@ def _extract_project_audit_year(project: Project) -> int | None:
 
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:
+    from app.services.project_classification import project_classification
+
     audit_year = resolve_project_audit_year(project)
+    classification = project_classification(project)
     return ProjectCreateResponse(
         id=project.id,
         name=project.name,
@@ -50,6 +53,9 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         status=project.status.value,
         template_type=project.template_type,
         company_subtype=project.company_subtype,
+        business_category=classification.category_code,
+        scenario=classification.scenario,
+        project_classification=classification.as_dict(),
         report_scope=project.report_scope,
         parent_company_name=project.parent_company_name,
         parent_company_code=project.parent_company_code,
@@ -616,10 +622,12 @@ async def get_template_recommendation(
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # fallback 推断依赖 company_type（listed/non_listed），从模板/准则属性派生
+    from app.services.project_classification import project_classification
+
     project_attrs = {
         "entity_type": (project.applicable_standard_v2 or {}).get("entity_type"),
         "scope": (project.applicable_standard_v2 or {}).get("scope"),
-        "scenario": project.scenario,
+        "scenario": project_classification(project).scenario,
         "template_type": project.template_type,
         "report_scope": project.report_scope,
         "company_name": project.name,

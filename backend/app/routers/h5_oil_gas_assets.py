@@ -1,13 +1,14 @@
-"""H5 油气资产 — 导入导出 + 行业检查端点
+"""H5 油气资产 — 导入导出端点
 
-4个端点（POST/GET）：
+3个端点（POST）：
 - POST /api/h5/export-template   导出空白xlsx模板
 - POST /api/h5/export-data       导出当前数据xlsx
 - POST /api/h5/import-data       导入xlsx（multipart/form-data）
-- GET  /api/h5/industry-check    检查项目行业适用性
+
+原 ``GET /api/h5/industry-check`` 已删除（spec trim-followup-residual-findings-closure R1.3）：它查不存在的
+``projects.industry`` 列、每次调用必 500，且只校验登录；前端没有调用方。
 
 科目编码: 1631油气资产 + 1632累计折耗（资产类/备抵类）
-行业限制: oil_gas / mining
 前端匹配: useH5ImportExport.ts
 RFC5987 Content-Disposition header with Chinese filename encoding
 
@@ -33,10 +34,18 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user
 from app.models.core import User
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_h5_wp_id(raw: str) -> UUID:
+    """请求体里的底稿 id：非 UUID 按底稿不存在处理（不拿任意字符串去查库）。"""
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=404, detail="底稿不存在") from exc
 
 router = APIRouter(
     prefix="/api/h5",
@@ -48,7 +57,6 @@ router = APIRouter(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _ROW_LIMIT = 500
-_APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
 
 # 支持导入导出的sheet
 _SUPPORTED_SHEETS: set[str] = {"H5-2", "H5-4", "H5-7", "H5-8", "H5-16", "H5-17", "H5-18", "H5-19"}
@@ -158,24 +166,6 @@ class H5ExportRequest(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# GET /api/h5/industry-check — 行业适用性检查
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-@router.get("/industry-check")
-async def h5_industry_check(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-) -> dict[str, Any]:
-    """检查项目行业是否适用H5油气资产底稿"""
-    from app.services.h5_oil_gas_assets_service import check_industry_applicability
-
-    result = await check_industry_applicability(db, project_id)
-    return result
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # POST /api/h5/export-template — 导出空白模板
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -238,9 +228,14 @@ async def h5_export_data(
     if sheet not in _SUPPORTED_SHEETS:
         raise HTTPException(status_code=400, detail=f"不支持的sheet: {sheet}")
 
+    # 底稿 id 在请求体里、路径上没有 ⇒ 路由级底稿门不覆盖本端点，必须在读正文前校验底稿读权
+    # （原只校验登录，任意登录用户可按 wpId 读他人项目的 H5 明细；spec trim-followup-residual-findings-closure R1.3）
+    wp_uuid = _parse_h5_wp_id(body.wpId)
+    await authorize_wp_read(db, user, wp_uuid)
+
     # 从 checklist_responses 读取数据
     item_id = _SHEET_ITEM_ID[sheet]
-    rows_data = await _load_rows_from_db(db, body.wpId, item_id)
+    rows_data = await _load_rows_from_db(db, str(wp_uuid), item_id)
 
     headers = _SHEET_HEADERS[sheet]
     field_map = _FIELD_MAPS[sheet]
@@ -301,6 +296,11 @@ async def h5_import_data(
     """导入xlsx数据到H5底稿"""
     if sheet not in _SUPPORTED_SHEETS:
         raise HTTPException(status_code=400, detail=f"不支持的sheet: {sheet}")
+
+    # 写入前校验底稿编辑权（底稿 id 在表单里，路由级底稿门不覆盖；原只校验登录）
+    wp_uuid = _parse_h5_wp_id(wp_id)
+    await authorize_wp_edit(db, user, wp_uuid)
+    wp_id = str(wp_uuid)
 
     # 读取xlsx
     content = await file.read()

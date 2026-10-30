@@ -33,6 +33,9 @@ Design: 组件 C13（List/Views）/ "Lists, editor, coverage and frontend"（固
   7. 分页——SQL ``LIMIT/OFFSET``。
   8. 仅 hydrate 当前页可见项（不把全量底稿拉到 Python）。
 
+全量清单 ``list_all_workpapers``（spec platform-perf-hotspots R5）：同上 2~4 + 6，不分页、不算 stats，
+给本来就要逐页拉完整份清单的页面一次取完；过滤仍全在 SQL，只 hydrate 可见项。
+
 约定：service 纯读，不 flush/commit。asyncpg 用 ``= ANY(CAST(:ids AS uuid[]))``（禁止 IN tuple）；
 UUID 参数传字符串并 ``CAST(... AS uuid)``；枚举列一律 ``::text`` 比较，规避枚举绑定歧义。
 """
@@ -41,7 +44,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -236,6 +239,40 @@ class WorkpaperListQueryService:
         return await self._paginate(visible_ids, params, filters or WorkpaperListFilters())
 
     # ------------------------------------------------------------------
+    # 全部可见底稿（不分页；spec platform-perf-hotspots R5）
+    # ------------------------------------------------------------------
+    async def list_all_workpapers(
+        self,
+        context: VisibilityContext,
+        *,
+        filters: WorkpaperListFilters | None = None,
+    ) -> dict:
+        """全部可见底稿：与分页端点同一可见集 / 业务过滤 / 去重 / 项结构，一条 SQL 取完。
+
+        需要整份清单的页面（底稿列表 / 试算表 / 程序裁剪等）原先按 100 条一页串行拉，
+        重药安徽 10 页约 2.5 秒。排序固定 ``wp_code ASC NULLS LAST, wp_index_id ASC``，
+        与分页端点默认排序同口径 ⇒ 逐页拼接逐条相等。返回 ``{items, total}``；
+        异常 fail-closed 返回空（同分页端点，不 500 泄露）。
+        """
+        empty: dict = {"items": [], "total": 0}
+        visible_ids = await self.visibility.visible_wp_index_ids(context)
+        if not visible_ids:
+            return empty
+        base_params: dict[str, Any] = {"ids": [str(x) for x in visible_ids]}
+        filter_sql = self._build_filters(filters or WorkpaperListFilters(), base_params)
+        sql = sa.text(
+            _DEDUPED_CTE.format(filters=filter_sql)
+            + f"SELECT * FROM deduped ORDER BY {_SORT_COLUMN[DEFAULT_SORT]} ASC NULLS LAST, wp_index_id ASC"
+        )
+        try:
+            rows = (await self.db.execute(sql, base_params)).mappings().all()
+            items = await self._hydrate_with_names(rows)
+        except Exception as exc:  # noqa: BLE001 — fail-closed：空集而非 500 泄露
+            logger.warning("全部底稿列表查询异常: %s", exc)
+            return empty
+        return {"items": items, "total": len(items)}
+
+    # ------------------------------------------------------------------
     # MyLeadWorkpapers（独立主编身份边界，复用分页/stats 契约；Req 11.12/11.13）
     # ------------------------------------------------------------------
     async def list_lead_workpapers(
@@ -413,6 +450,10 @@ class WorkpaperListQueryService:
         p["limit"] = params.page_size
         p["offset"] = params.offset
         rows = (await self.db.execute(sql, p)).mappings().all()
+        return await self._hydrate_with_names(rows)
+
+    async def _hydrate_with_names(self, rows: Sequence[Mapping[str, Any]]) -> list[dict]:
+        """行 → 列表项 + 编制人 / 复核人显示名（分页与全量两条路径共用）。"""
         items = [self._hydrate(r) for r in rows]
         # 编制人 / 复核人显示名：原先只回 id，底稿列表的「编制人」恒「—」（spec procedure-chain-followup-closure R3.1）
         from app.services.user_display_names import resolve_user_display_names

@@ -95,9 +95,9 @@
         <!-- 换项目后年度定下来之前不挂载页面（6.5：原先页面先按去年 / 上一个项目的年度取数） -->
         <ProjectContextGate>
           <router-view v-slot="{ Component, route: viewRoute }">
-            <ErrorBoundary :key="viewRoute.fullPath">
+            <ErrorBoundary :key="routeViewKey(viewRoute)">
               <Transition :name="transitionName" mode="out-in">
-                <component :is="Component" :key="viewRoute.fullPath" />
+                <component :is="Component" :key="routeViewKey(viewRoute)" />
               </Transition>
             </ErrorBoundary>
           </router-view>
@@ -137,6 +137,7 @@ import { getGlobalReviewInbox } from '@/services/pmApi'
 import { eventBus } from '@/utils/eventBus'
 import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { routeViewKey } from '@/utils/routeViewKey'
 
 const route = useRoute()
 const router = useRouter()

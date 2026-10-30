@@ -25,7 +25,8 @@ const CORE_MODULE = '@/utils/ipoProjectUtils'
 
 const EXPECTED_KEYWORDS = ['ipo', 'listed', 'neeq', 'restructuring', 'refinancing']
 const EXPECTED_F2_CATEGORIES = ['IPO', '上市公司年审', '新三板', '重大资产重组']
-const F2_CONTEXT_FIELDS = ['business_category', 'project_type', 'template_type']
+// R4：首级核心判定先读后端 project_classification（项目分类 / 场景单一解释），没有时退回 business_category
+const F2_CONTEXT_FIELDS = ['project_classification', 'business_category', 'project_type', 'template_type']
 
 // 只用于减少解析量，不参与任何通过/失败判定。候选一旦入选，所有定义、调用和
 // 分支判断都由 TypeScript AST 完成；精确标识符不会被注释/字符串单独当作证据。
@@ -274,13 +275,26 @@ function interfaceFieldNames(unit: SourceUnit, interfaceName: string): string[] 
   return fields
 }
 
-function isNullishBusinessCategory(expression: ts.Expression | undefined): boolean {
-  if (!expression) return false
+function isNullish(expression: ts.Expression, left: (node: ts.Expression) => boolean, right: (node: ts.Expression) => boolean): boolean {
   const value = unwrapExpression(expression)
   return ts.isBinaryExpression(value)
     && value.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
-    && propertyPath(value.left) === 'ctx.business_category'
-    && stringValue(value.right) === ''
+    && left(value.left)
+    && right(value.right)
+}
+
+/** `ctx.project_classification ?? ctx.business_category ?? ''`（?? 左结合：外层右侧是空串） */
+function isClassificationThenBusinessCategory(expression: ts.Expression | undefined): boolean {
+  if (!expression) return false
+  return isNullish(
+    expression,
+    (left) => isNullish(
+      left,
+      (inner) => propertyPath(inner) === 'ctx.project_classification',
+      (inner) => propertyPath(inner) === 'ctx.business_category',
+    ),
+    (right) => stringValue(right) === '',
+  )
 }
 
 function equalityBranch(expression: ts.Expression | undefined): string | null {
@@ -301,7 +315,7 @@ function f2BranchShape(unit: SourceUnit): string[] {
       const condition = unwrapExpression(statement.expression)
       if (ts.isCallExpression(condition) && ts.isIdentifier(condition.expression)) {
         if (condition.expression.text === 'isCoreIpoProject' && condition.arguments.length === 1) {
-          shape.push(isNullishBusinessCategory(condition.arguments[0]) ? 'core-business_category' : 'core-invalid')
+          shape.push(isClassificationThenBusinessCategory(condition.arguments[0]) ? 'core-classification' : 'core-invalid')
         } else {
           shape.push(`call:${condition.expression.text}`)
         }
@@ -408,7 +422,7 @@ function sourceBoundaryViolations(units: SourceUnit[]): string[] {
       if (!fields.includes(field)) errors.push(`F2 ProjectContext 缺少三级字段 ${field}`)
     }
     const shape = f2BranchShape(f2Unit)
-    const expectedShape = ['core-business_category', 'ctx.project_type=ipo', 'ctx.template_type=listed', 'IPO_CATEGORIES.includes']
+    const expectedShape = ['core-classification', 'ctx.project_type=ipo', 'ctx.template_type=listed', 'IPO_CATEGORIES.includes']
     if (JSON.stringify(shape) !== JSON.stringify(expectedShape)) {
       errors.push(`F2 三级瀑布顺序/语义漂移：${JSON.stringify(shape)}`)
     }
@@ -500,6 +514,19 @@ describe('D7.3 IPO 判定来源边界（AST）', () => {
       mutated,
     ])
     expect(violations.some((message) => message.includes('IPO_CATEGORIES 中文内容漂移'))).toBe(true)
+  })
+
+  it('反向自检：F2 首级退回只读 business_category（丢掉后端 project_classification）时必须打红', () => {
+    const f2 = productionUnits.find((unit) => relative(unit.file) === F2_REL)
+    expect(f2).toBeDefined()
+    const mutatedCode = f2!.code.replace('isCoreIpoProject(ctx.project_classification ?? ', 'isCoreIpoProject(')
+    expect(mutatedCode).not.toBe(f2!.code)
+    const mutated = unitWithCode(f2!, mutatedCode)
+    const violations = sourceBoundaryViolations([
+      ...productionUnits.filter((unit) => unit !== f2),
+      mutated,
+    ])
+    expect(violations.some((message) => message.includes('F2 三级瀑布顺序/语义漂移'))).toBe(true)
   })
 
   it('反向自检：删除 project_type 分支时必须识别三级语义缺失', () => {

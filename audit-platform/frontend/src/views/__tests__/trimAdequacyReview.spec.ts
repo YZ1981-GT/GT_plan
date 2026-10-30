@@ -62,7 +62,7 @@ const mocks = vi.hoisted(() => ({
   saveCompletenessScopeOverride: vi.fn(),
   clearCompletenessScopeOverride: vi.fn(),
   listAssignments: vi.fn(),
-  listWorkpapersPaged: vi.fn(),
+  listWorkpapersAll: vi.fn(),
   httpGet: vi.fn(),
   httpPost: vi.fn(),
   confirm: vi.fn(),
@@ -89,7 +89,7 @@ vi.mock('@/services/commonApi', () => ({
   clearCompletenessScopeOverride: mocks.clearCompletenessScopeOverride,
 }))
 vi.mock('@/services/staffApi', () => ({ listAssignments: mocks.listAssignments }))
-vi.mock('@/services/workpaperApi', () => ({ listWorkpapersPaged: mocks.listWorkpapersPaged }))
+vi.mock('@/services/workpaperApi', () => ({ listWorkpapersAll: mocks.listWorkpapersAll }))
 vi.mock('@/utils/errorHandler', () => ({ handleApiError: vi.fn() }))
 vi.mock('@/utils/http', () => ({ default: { get: mocks.httpGet, post: mocks.httpPost } }))
 vi.mock('@/composables/usePermissionMatrix', () => ({

@@ -202,3 +202,8 @@ async def test_plan_generation_routes_codes(db):
     assert await recycled_codes(db, mine.id, ["E1", "E2", "H3-1"]) == {"E2", "H3-1"}
 
     assert await wp_index_states(db, mine.id, ["E1", "E2", "E9"]) == {"E1": False, "E2": True}
+
+    stale_hint = await plan_generation(db, mine.id, ["H3", "ZZ1"], scope=TrimmedScope())
+    assert stale_hint.skipped_trimmed_codes == ["H3"] and stale_hint.to_create == ["ZZ1"], (
+        "plan_generation 取锁后必须现读 scope，不能采用调用方在取锁前得到的旧快照"
+    )

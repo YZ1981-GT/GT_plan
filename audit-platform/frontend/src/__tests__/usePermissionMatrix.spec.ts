@@ -9,7 +9,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { usePermissionMatrix, OPERATION_CODES, type OperationCode } from '@/composables/usePermissionMatrix'
+import { usePermissionMatrix, toMatrixRole, OPERATION_CODES, type OperationCode } from '@/composables/usePermissionMatrix'
+import { ALL_ROLES, getAllowedActions as matrixAllowed } from '@/permissions/permission-matrix'
 
 // Mock auth store
 const mockUser = { role: 'auditor', id: 'user-1', username: 'test' }
@@ -183,6 +184,56 @@ describe('usePermissionMatrix - P0-5', () => {
         mockUser.role = role
         const pm = usePermissionMatrix()
         expect(pm.can('project:view')).toBe(true)
+      }
+    })
+  })
+
+  describe('R5.3 只读 / 未知角色最小权限（trim-generation-plan-followup-optimizations）', () => {
+    const RESOURCES = ['workpaper', 'adjustment', 'report', 'note', 'template', 'project_settings'] as const
+
+    it('readonly 显式映射为只读矩阵：只能查看，任何资源都不能编辑 / 复核 / 导出 / 导入', () => {
+      mockUser.role = 'readonly'
+      const pm = usePermissionMatrix()
+      expect(pm.matrixRole.value).toBe('readonly')
+      for (const resource of RESOURCES) {
+        expect(pm.allowedActionsFor(resource)).toEqual(['view'])
+        expect(pm.isReadonlyFor(resource)).toBe(true)
+        expect(pm.canDo('edit', resource)).toBe(false)
+        expect(pm.whyCannotDo('edit', resource)).toContain('只读用户')
+      }
+      // 操作码级镜像后端 ROLE_OPERATIONS（后端没有 readonly 项）
+      for (const code of OPERATION_CODES) expect(pm.can(code)).toBe(false)
+    })
+
+    it.each(['', '   ', 'guest', 'superuser', 'constructor', '__proto__', 'toString'])(
+      '未登记角色 %j 不兜底成 assistant（不能放大权限）', (role) => {
+        mockUser.role = role
+        const pm = usePermissionMatrix()
+        expect(pm.matrixRole.value).toBe('readonly')
+        expect(pm.canDo('edit', 'workpaper')).toBe(false)
+        expect(pm.canDo('import', 'adjustment')).toBe(false)
+        expect(pm.canDo('view', 'workpaper')).toBe(true)
+      },
+    )
+
+    it('正向：已登记角色映射不变（不因收紧兜底而误伤）', () => {
+      const expected: Record<string, string> = {
+        admin: 'partner', partner: 'partner', signing_partner: 'partner', manager: 'manager',
+        auditor: 'assistant', assistant: 'assistant', qc: 'qc_partner', quality_control: 'qc_partner',
+        qc_partner: 'qc_partner', eqcr: 'eqcr', readonly: 'readonly', ' Auditor ': 'assistant',
+      }
+      for (const [role, matrix] of Object.entries(expected)) expect(toMatrixRole(role), role).toBe(matrix)
+      mockUser.role = 'auditor'
+      const pm = usePermissionMatrix()
+      expect(pm.canDo('edit', 'workpaper')).toBe(true)
+    })
+
+    it('readonly 是所有角色里权限最小的：每个角色的允许动作都包含 readonly 的', () => {
+      for (const role of ALL_ROLES) {
+        for (const resource of RESOURCES) {
+          const allowed = new Set(matrixAllowed(role, resource))
+          for (const action of matrixAllowed('readonly', resource)) expect(allowed.has(action), `${role}/${resource}`).toBe(true)
+        }
       }
     })
   })

@@ -354,6 +354,8 @@ class AuditProcedureStatusRule(QCRule):
             return []
 
         from app.models.procedure_models import ProcedureInstance
+        from app.services.procedure_identity import normalize_wp_code
+        wp_code = normalize_wp_code(wp_code)
         proc = (await context.db.execute(
             sa.select(ProcedureInstance).where(
                 ProcedureInstance.project_id == context.project_id,

@@ -7,7 +7,7 @@
         <el-button type="primary" size="small" @click="goToCreateProject">
           <el-icon><Plus /></el-icon> 新建项目
         </el-button>
-        <el-button size="small" plain @click="showBatchImport = true">
+        <el-button v-if="canBatchCreate" size="small" plain @click="showBatchImport = true">
           <el-icon><Upload /></el-icon> 批量建项
         </el-button>
         <el-button size="small" text @click="$router.push('/projects')">
@@ -230,7 +230,8 @@
     <!-- 批量建项弹窗 -->
     <BatchImportDialog
       v-model="showBatchImport"
-      @success="loadProjectList"
+      @success="onBatchImportSuccess"
+      @open-root="openProject"
     />
   </div>
 </template>
@@ -243,8 +244,12 @@ import { Plus, Upload, OfficeBuilding, Document } from '@element-plus/icons-vue'
 import { getProjectDisplayName, buildConsolidatedKeySet } from '@/utils/project_display'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 import { useGroupTree, highlightSegments, consolMethodLabel, formatShareholding, type TreeNode } from '@/composables/useGroupTree'
+import { useAuthStore } from '@/stores/auth'
+import { canBatchCreateProjects } from '@/services/batchProjectImport'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const canBatchCreate = computed(() => canBatchCreateProjects(authStore.user?.role))
 const loading = ref(false)
 const projects = ref<any[]>([])
 const showBatchImport = ref(false)
@@ -294,6 +299,14 @@ async function loadProjectList() {
     projects.value = await listProjects()
   } catch { /* ignore */ }
   finally { loading.value = false }
+}
+
+async function onBatchImportSuccess() {
+  await loadProjectList()
+  if (treeLoaded || viewMode.value === 'tree') {
+    treeLoaded = true
+    await fetchTree('all')
+  }
 }
 
 // ─── 树形视图 ────────────────────────────────────────────────────────────────

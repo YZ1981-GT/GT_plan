@@ -82,6 +82,8 @@ class QueryDSL(StrictRequestModel):
     order_by: list[OrderBy] = Field(default_factory=list)
     limit: int = Field(default=100, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
+    # 服务端签发的精确 COUNT 复用凭证；只影响计数执行，不改变查询范围。
+    count_token: str | None = Field(default=None, max_length=2048)
     # S-3 v2 新增：JOIN 关联（声明式白名单，不接受用户传 ON）
     # joins 元素：{"table": "wp_index", "type": "inner"|"left"}
     joins: list[dict[str, str]] = Field(default_factory=list)

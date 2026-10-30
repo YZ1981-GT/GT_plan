@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import io
 import urllib.parse
-from typing import Optional
+from datetime import date
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, HTTPException
@@ -30,6 +31,9 @@ from app.models.core import User
 from app.core.redis import get_redis
 from app.services.dataset_query import get_active_filter
 from app.services.ledger_penetration_service import LedgerPenetrationService
+from app.schemas.ledger_window import LedgerWindowQuery, LedgerWindowResponse
+from app.services.ledger_window_service import LedgerWindowService
+from app.services.ledger_window_export import build_ledger_export
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger", tags=["ledger-penetration"])
 
@@ -101,6 +105,109 @@ async def get_opening_balance(
     svc = _svc(db, None)
     opening = await svc.get_account_opening_balance(project_id, year, account_code)
     return {"opening_balance": float(opening), "account_code": account_code}
+
+
+@router.get("/window/{account_code}", response_model=LedgerWindowResponse)
+async def get_ledger_window(
+    project_id: UUID,
+    account_code: str,
+    year: int = Query(..., ge=2000, le=2100),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keyword: str | None = Query(None, max_length=200),
+    amount_dir: Literal["all", "debit", "credit"] = Query("all"),
+    cursor: str | None = Query(None, max_length=16384),
+    limit: int = Query(200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """普通序时账窗口：签名 keyset 游标，首窗精确摘要，后窗不重复 COUNT。"""
+    query = LedgerWindowQuery(
+        year=year, account_code=account_code, date_from=date_from, date_to=date_to,
+        keyword=keyword, amount_dir=amount_dir, cursor=cursor, limit=limit,
+    )
+    return await LedgerWindowService(db).fetch("ledger", project_id, str(current_user.id), query)
+
+
+@router.get("/aux-window/{account_code}", response_model=LedgerWindowResponse)
+async def get_aux_ledger_window(
+    project_id: UUID,
+    account_code: str,
+    year: int = Query(..., ge=2000, le=2100),
+    aux_type: str | None = Query(None, max_length=100),
+    aux_code: str | None = Query(None, max_length=200),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keyword: str | None = Query(None, max_length=200),
+    amount_dir: Literal["all", "debit", "credit"] = Query("all"),
+    cursor: str | None = Query(None, max_length=16384),
+    limit: int = Query(200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """辅助明细窗口；aux_type 必填，防止同一凭证跨辅助维度重复累计。"""
+    query = LedgerWindowQuery(
+        year=year, account_code=account_code, aux_type=aux_type, aux_code=aux_code,
+        date_from=date_from, date_to=date_to, keyword=keyword, amount_dir=amount_dir,
+        cursor=cursor, limit=limit,
+    )
+    return await LedgerWindowService(db).fetch("aux_ledger", project_id, str(current_user.id), query)
+
+
+@router.get("/window-export/{account_code}")
+async def export_ledger_window(
+    project_id: UUID,
+    account_code: str,
+    year: int = Query(..., ge=2000, le=2100),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keyword: str | None = Query(None, max_length=200),
+    amount_dir: Literal["all", "debit", "credit"] = Query("all"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """流式读取完整普通序时账并生成 write-only XLSX；不依赖浏览器当前窗口。"""
+    from fastapi.responses import StreamingResponse
+
+    query = LedgerWindowQuery(
+        year=year, account_code=account_code, date_from=date_from, date_to=date_to,
+        keyword=keyword, amount_dir=amount_dir,
+    )
+    stream, filename, rows = await build_ledger_export(db, "ledger", project_id, query)
+    return StreamingResponse(
+        stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}",
+                 "X-Ledger-Export-Rows": str(rows)},
+    )
+
+
+@router.get("/aux-window-export/{account_code}")
+async def export_aux_ledger_window(
+    project_id: UUID,
+    account_code: str,
+    year: int = Query(..., ge=2000, le=2100),
+    aux_type: str | None = Query(None, max_length=100),
+    aux_code: str | None = Query(None, max_length=200),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keyword: str | None = Query(None, max_length=200),
+    amount_dir: Literal["all", "debit", "credit"] = Query("all"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """流式读取完整辅助明细并生成 write-only XLSX。"""
+    from fastapi.responses import StreamingResponse
+
+    query = LedgerWindowQuery(
+        year=year, account_code=account_code, aux_type=aux_type, aux_code=aux_code,
+        date_from=date_from, date_to=date_to, keyword=keyword, amount_dir=amount_dir,
+    )
+    stream, filename, rows = await build_ledger_export(db, "aux_ledger", project_id, query)
+    return StreamingResponse(
+        stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}",
+                 "X-Ledger-Export-Rows": str(rows)},
+    )
 
 
 @router.get("/entries-all")

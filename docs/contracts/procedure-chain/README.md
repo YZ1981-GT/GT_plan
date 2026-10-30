@@ -10,7 +10,8 @@
 |---|---|---|---|
 | `trimmed-scope.schema.json` | 粗裁结果快照、单码判定；粗裁预览 / 应用的请求与响应（`$defs`） | `procedure_scope_retention`、`procedure_trim_service` | `POST /api/projects/{pid}/procedure-trim/preview`、`/apply` |
 | `generation-plan.schema.json` | 一次生成的四类分流 | `procedure_scope_retention.plan_generation` | （服务层） |
-| `generation-receipt.schema.json` | 建底稿统一回执；按编码生成 / 模板集生成的请求与响应（`$defs`） | `wp_generation_receipt` | `POST /api/projects/{project_id}/working-papers/generate-from-codes`、`/generate` |
+| `generation-plan-view.schema.json` | 生成计划（按循环的五态与粗裁状态）、各循环粗裁状态（`$defs/plan` / `$defs/confirmations`） | `procedure_generation_plan` | `GET /api/projects/{project_id}/procedure-scope/generation-plan`、`/confirmations` |
+| `generation-receipt.schema.json` | 建底稿统一回执、持久生成 operation 状态；按编码生成 / 模板集生成的请求与响应（`$defs`） | `wp_generation_receipt`、`wp_generation_operation_service` | 两个生成 POST；`GET .../working-papers/generation-operations/{operation_id}` |
 | `workpaper-lifecycle-event.schema.json` | 移入 / 恢复回收站事件；旧去向记录（`$defs`） | `workpaper_recycle_service`、V207 | 回收站列表「删除人」 |
 | `program-row-identity.schema.json` | 程序行身份、定义、任务定位；「本人能改哪些行」响应（`$defs/rowAccess`） | `procedure_definition_importer`、`wp_visibility.program_row_guard` | `GET /api/workpapers/{wp_id}/program-row-access` |
 | `delegation-preview.schema.json` | 委派预览请求与响应 | `procedure_delegation_service.preview` | `POST /api/projects/{pid}/procedure-delegations/preview` |
@@ -20,7 +21,7 @@
 | `workpaper-file-materialization.schema.json` | 底稿文件落盘、存量分类与 dry-run 汇总 | `wp_generate_file`、`workpaper_file_backlog` | `scripts/fix/report_workpaper_file_backlog.py` |
 | `procedure-task-event.schema.json` | 任务 outbox 事件载荷、任务历史行 | `procedure_task_transition_service` | （outbox：`task_events`） |
 | `common.schema.json` | 公共类型 | — | — |
-| `openapi.procedure-chain.json` | 上述 8 个接口的 OpenAPI 子集（生成物，勿手改）：请求取自真实应用，响应 data 与错误详情挂到契约 | `scripts/gen/export_procedure_chain_openapi.py` | — |
+| `openapi.procedure-chain.json` | 上述 11 个接口的 OpenAPI 子集（生成物，勿手改）：请求取自真实应用，响应 data 与错误详情挂到契约 | `scripts/gen/export_procedure_chain_openapi.py` | — |
 
 ## 校验方式
 
@@ -44,7 +45,9 @@
 ## 粗裁判定
 
 - 粗裁结果存在 `procedure_instances`：编码 = `coalesce(wp_code, procedure_code)`，状态 `execute` 保留、`skip` / `not_applicable` 已裁。同一编码多行，任一行 `execute` 即保留（与程序裁剪页显示一致）。
-- 判定一个底稿编码：先规范化（去首尾空白、字母大写），再从编码本身往上逐级找母码（`B22A-4-1` → `B22A-4` → `B22A` → `B22`；`M4A` → `M4`；`G10` 不是 `G1` 的子表）；每一级先看同码的普通行，再看覆盖它的区间行（`D2-6至D2-13`，右侧可省前缀 `D2-6至13`）；第一个命中的行决定结果。一直找不到 ⇒ 保留。
+- 判定一个底稿编码：先规范化（去首尾空白、字母大写），再从编码本身往上逐级找母码（`B22A-4-1` → `B22A-4` → `B22A` → `B22`；`M4A` → `M4`；`G10` 不是 `G1` 的子表）；每一级先看同码的普通行，再看覆盖它的区间行（`D2-6至D2-13`，右侧可省前缀 `D2-6至13`）；第一个命中的行决定结果。
+- 都没找到、编码首字母是实质性循环 `D`~`N`、且有下级程序行 ⇒ 跟随下级（科目审定表 `D2` 只有 `D2-1至D2-4` / `D2-5` / `D2-6至D2-13` 三条下级行）：下级行全部已裁才算已裁。下级行 = 编码谱系（同上）的母码里包含它的普通行，以及成员谱系包含它的区间行；按普通编码处理的不合法区间不算任何编码的下级。`decided_by` 回报按编码字符串（Unicode 码位）升序的第一条与结论相同的下级行。只对母码本身生效：没有程序行的其他下级（`D2-14`）仍按上一条判定。B / C / A / S 不用这条。
+- 仍找不到 ⇒ 保留。
 - 区间码本身作为底稿编码：成员全部已裁才算已裁。两侧前缀不一致、终点小于起点、跨度超过 200 的区间行按普通编码处理。
 - 读不到裁剪结果 ⇒ 生成、委派一律停止（503 `trim_scope_unavailable`），不得按「没有裁剪」继续。
 - 粗裁应用联动：被裁的已生成底稿（主码、子表、程序表）两层移入回收站并写事件；有编制内容（保存过、人工填写、附件、复核意见 / 对话）的须 `confirm_substantive_recycle=true`，否则 409 零副作用（预览凭证不消费）；恢复执行只恢复「最后一次因裁剪移入」的底稿，只重开「最近一条历史是粗裁级联取消」的任务（重开为待委派，原执行人不保留）。
@@ -52,6 +55,8 @@
 ## 生成
 
 - 七个入口（模板集 / 按编码 / 自定义单张与批量 / 链路编排 / IPO / B60 / 准则转换）都先经保留范围分流（`generation-plan`），再逐码在保存点里建底稿，回执同一结构（`generation-receipt`）。
+- 生成计划（`generation-plan-view`，只读，项目成员 readonly）：每个模板编码按优先级取一个状态 —— 已裁剪 > 在回收站 > 已生成 > 业务分类不生成 > 将生成，前三类与分流同一判定。业务分类（项目 `business_category` 首字母，不是 A / B / C 的按未填写、用 C 类）只用于没人保存过粗裁的循环；保存过的循环以程序行为准，不适用但判为生成的标 `category_conflict`。「保存过」= 有已消费的 `trim` 凭证且其中有该循环的 scope 条目，取最近一次（时间、操作人：人员档案姓名，没有用登录名）。生成弹窗只按循环勾选，发送所选循环里状态为「将生成」的编码。
+- 两个交互式生成 POST 带客户端 `operation_id` 时走持久两阶段链：Phase A 项目锁内冻结请求/裁剪判定和预留 UUID 后提交；锁外只写同卷 `.generation/{operation_id}` staging；Phase B 再鉴权、重判 scope 并 CAS，通过才建正式行和提升文件。相同 id+请求重放保存的原回执，不同请求 409；active 返回 202 operation 状态，GET 状态端点可在响应丢失后恢复。缺 operation_id 的旧内部调用保持原同步链。
 - 回执措辞（`message`，各段用「；」连接，列举最多 10 个编码、超出写「等」，失败最多列 5 条原因）：`已生成 N 个底稿`；`N 个编码已有底稿，未重复生成：…`；`N 个选中的编码不在所选模板集里，未生成：…`；`N 个编码已在程序裁剪中标为不执行，未生成：…`；`N 个编码的底稿在回收站中，请从回收站恢复：…`；`N 个编码没有找到底稿模板，已建空白底稿：…`；`N 个编码生成失败：编码（原因）…`；表头未填上的说明；`N 份底稿生成时未写入表头（编制单位、审计期间等），需在底稿文件中另行填写`。
 
 ## 任务状态机（workflow × applicability）
@@ -121,5 +126,5 @@
 - 模板集生成在请求内不填表头（如实计入 `header_unfilled`）。
 - 回收站列表与恢复目前只按项目成员判，不按底稿可见性（受限成员能看到别的循环里的底稿名称）—— 待定口径，Java 版不要照抄，见 spec design §11.4。
 - 委派预览文档里提到的 `materialization_pending` 已不再产生（前置同步完成），`status` 恒为 `ready`。
-- OpenAPI 子集只收有响应契约的 8 个接口；细裁（程序行不适用 / 恢复）、任务状态转换、成员负载等接口的语义见上文，没有进子集。
+- OpenAPI 子集只收有响应契约的 10 个接口；细裁（程序行不适用 / 恢复）、任务状态转换、成员负载等接口的语义见上文，没有进子集。
 - 转派的任务历史与 outbox 的 `from_status` 2026-10-27 起记转派前的真实状态（此前一律记 `assigned`）；更早的历史行不回填。

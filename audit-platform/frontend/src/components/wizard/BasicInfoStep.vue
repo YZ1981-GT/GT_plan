@@ -83,21 +83,21 @@
             </span>
           </el-form-item>
 
-          <el-form-item label="业务类型" prop="company_subtype">
+          <el-form-item label="报告模板类型" prop="company_subtype">
             <el-alert
               v-if="showSubtypeBanner"
               type="warning"
               :closable="false"
               show-icon
               class="gt-subtype-banner"
-              title="待确认业务类型"
+              title="待确认报告模板类型"
             >
               <template #default>
-                该项目尚未确认业务类型。系统建议「{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
+                该项目尚未确认报告模板类型。系统建议「{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
                 <el-button link type="primary" size="small" @click="applyRecommendation">采用建议</el-button>
               </template>
             </el-alert>
-            <el-select v-model="form.company_subtype" placeholder="请选择业务类型" style="width: 100%" clearable>
+            <el-select v-model="form.company_subtype" placeholder="请选择报告模板类型" style="width: 100%" clearable>
               <el-option label="A — 上市公司、三板创新层及公开发债（A1-A8）" value="type_a" />
               <el-option label="B — 三板基础层、银行、保险、期货、证券（B1-B6）" value="type_b" />
               <el-option label="C — 其他（非A非B类业务）" value="type_c" />
@@ -105,6 +105,37 @@
             <el-button link type="primary" size="small" class="gt-category-ref-link" @click="showCategoryReference = true">
               📋 查看分类标准
             </el-button>
+          </el-form-item>
+
+          <el-form-item label="质控业务分类" prop="business_category">
+            <el-select
+              v-model="form.business_category"
+              placeholder="未填写（生成计划按 C 类判断）"
+              style="width: 100%"
+              clearable
+              data-testid="business-category-select"
+            >
+              <el-option
+                v-if="keptSubcategory"
+                :label="`${keptSubcategory}（已填写的细分类，保留）`"
+                :value="keptSubcategory"
+              />
+              <el-option v-for="opt in CATEGORY_GROUP_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+            <div v-if="categorySuggestion" class="gt-subtype-recommend" data-testid="business-category-hint">
+              <span class="gt-subtype-recommend-hint">与报告模板类型一致的建议：{{ categorySuggestion }} 类（决定质控措施，需确认后保存）</span>
+              <el-button link type="primary" size="small" @click="form.business_category = categorySuggestion">采用</el-button>
+            </div>
+          </el-form-item>
+
+          <el-form-item label="专项场景" prop="scenario">
+            <el-select v-model="form.scenario" style="width: 100%" data-testid="scenario-select">
+              <el-option v-for="opt in SCENARIO_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+            <div v-if="scenarioSuggestion" class="gt-subtype-recommend" data-testid="scenario-hint">
+              <span class="gt-subtype-recommend-hint">项目类型为 IPO，建议专项场景选「IPO 申报」（只建议，不自动修改）</span>
+              <el-button link type="primary" size="small" @click="form.scenario = 'ipo'">采用</el-button>
+            </div>
           </el-form-item>
 
           <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">
@@ -259,6 +290,7 @@ import {
   type GroupRelation,
 } from '@/utils/groupRelation'
 import BusinessCategoryFlowChart from '@/components/project/BusinessCategoryFlowChart.vue'
+import { CATEGORY_GROUP_OPTIONS, SCENARIO_OPTIONS, categoryGroupFromSubtype } from '@/types/projectClassification'
 
 const router = useRouter()
 const wizardStore = useWizardStore()
@@ -351,6 +383,8 @@ const form = reactive<BasicInfo>({
   company_code: '',
   template_type: 'soe',
   company_subtype: null,
+  business_category: null,
+  scenario: 'normal',
   custom_template_id: '',
   custom_template_name: '',
   custom_template_version: '',
@@ -365,6 +399,18 @@ const form = reactive<BasicInfo>({
   budget_hours: null,
   contract_amount: null,
 })
+
+// ─── 质控业务分类 / 专项场景（R4）：只建议，不暗改用户已确认值 ─────────────────────
+/** 已填写的细分类（A1~B6）读回时作为单独选项保留，界面只提供组级选择 */
+const keptSubcategory = computed(() => {
+  const code = (form.business_category || '').toUpperCase()
+  return code.length > 1 ? code : ''
+})
+/** 分类未填写且报告模板类型是 A / B / C 时，提示同组建议 */
+const categorySuggestion = computed(() =>
+  form.business_category ? null : categoryGroupFromSubtype(form.company_subtype),
+)
+const scenarioSuggestion = computed(() => form.project_type === 'ipo' && form.scenario === 'normal')
 
 // ─── 集团架构：与上级关系联动（需求 1.3 / 1.5 / 2.3 / 2.4）──────────────────────
 // 没有有效上级（上级代码为空，或就是本企业代码）⇒ 下拉置灰且值为空；
@@ -438,6 +484,8 @@ function applySaved(saved: Partial<BasicInfo> & Record<string, unknown>) {
     'ultimate_company_name', 'ultimate_company_code'] as const) {
     if (form[key] == null) form[key] = ''
   }
+  if (!form.business_category) form.business_category = null
+  if (!form.scenario) form.scenario = 'normal'
   const savedRelation = form.relation_to_parent
   manualRelation.value = savedRelation === 'subsidiary' || savedRelation === 'branch' ? savedRelation : ''
   // 已保存的「上级=本企业」当时已确认过（或经批量预校验提示），回填后再保存不重复询问

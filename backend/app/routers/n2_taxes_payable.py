@@ -639,11 +639,14 @@ async def n2_contract_ocr(
 
 
 async def _load_project_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
-    """从 wp_id 加载项目上下文信息供 AI 生成使用。"""
+    """从 wp_id 加载项目上下文信息供 AI 生成使用。
+
+    不给「行业」：平台没有项目级行业来源，原先把质控分类码当行业写进提示词（「行业：A1」；
+    spec trim-followup-residual-findings-closure R1.4）。``_build_ai_user_prompt`` 无值时不出该行。
+    """
     result = await db.execute(
         sa.text("""
-            SELECT p.name AS client_name, p.audit_year,
-                   p.business_category AS industry
+            SELECT p.name AS client_name, p.audit_year
             FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
@@ -656,7 +659,6 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     return {
         "client_name": row.client_name or "",
         "audit_year": str(row.audit_year or ""),
-        "industry": row.industry or "",
     }
 
 

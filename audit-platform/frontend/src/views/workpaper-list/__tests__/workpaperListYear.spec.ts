@@ -1,5 +1,5 @@
 /**
- * 底稿管理页的审计年度：路由 ?year= > 本项目审计年度 > 去年（spec formula-fetch-and-wp-generation-defect-closure，
+ * 底稿管理页的审计年度：路由 ?year= > ProjectContextGate 已解析的项目年度 > null（spec formula-fetch-and-wp-generation-defect-closure，
  * 浏览器实测发现）。
  *
  * 原先缺省取今年：从编辑器「返回」等不带 ?year= 的入口进来，生成底稿 / 刷新全部公式都按今年发请求
@@ -8,11 +8,16 @@
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { computed, defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, reactive, ref } from 'vue'
 import { createMockContext } from '@/composables/useWorkpaperListContext'
 
 const { mockHttpGet } = vi.hoisted(() => ({ mockHttpGet: vi.fn() }))
 let mockQuery: Record<string, string> = {}
+const project = reactive({
+  projectId: 'test-proj', year: 2024, yearStatus: 'ready', projectStatus: 'execution',
+  currentProjectContext: { projectId: 'test-proj', projectName: '某项目_2024' },
+  clientName: '某项目_2024',
+})
 
 vi.mock('@/utils/http', () => ({ default: { get: mockHttpGet, post: vi.fn() } }))
 vi.mock('@/stores/auth', () => ({
@@ -23,9 +28,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn().mockResolvedValue(undefined), push: vi.fn() }),
 }))
 vi.mock('@/composables/useAuditContext', () => ({ useAuditContext: () => ({ onContextChange: vi.fn() }) }))
-vi.mock('@/stores/project', () => ({
-  useProjectStore: () => ({ projectId: 'test-proj', year: null, currentProjectContext: { projectId: 'test-proj' } }),
-}))
+vi.mock('@/stores/project', () => ({ useProjectStore: () => project }))
 vi.mock('@/composables/usePermissionMatrix', () => ({
   usePermissionMatrix: () => ({
     can: () => true, whyCannot: () => null, currentRole: computed(() => 'admin'),
@@ -65,7 +68,7 @@ function mountList() {
         WorkpaperBoardView: true, WorkpaperLifecycleView: true, WorkpaperDependencyGraph: true, WorkpaperDelegationMatrix: true,
         GtPageHeader: plain, GtToolbar: plain, ArchivedBanner: true, ConsolLockedBanner: true, BatchActionBar: true,
         BatchAssignDialog: true, UnifiedImportDialog: true, WpImportDialog: true, WpBatchExportDialog: true, WpBulkDialog: true,
-        WpTemplateCopyDialog: true, WorkpaperTrimDialog: true, GtCustomWpBatchDialog: true,
+        WpTemplateCopyDialog: true, GenerationPlanDialog: true, GtCustomWpBatchDialog: true,
         ElRadioGroup: plain, ElRadioButton: true, ElButton: plain, ElInput: true, ElSelect: plain, ElOption: true,
         ElProgress: true, ElPagination: true, ElDropdown: plain, ElDropdownMenu: plain, ElDropdownItem: plain,
         ElIcon: plain, ElTooltip: plain, ElAlert: true, ElTag: plain, ElBadge: plain,
@@ -80,6 +83,8 @@ describe('底稿管理页按项目审计年度发请求', () => {
     vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
     mockHttpGet.mockReset()
     mockQuery = {}
+    project.year = 2024
+    project.yearStatus = 'ready'
   })
   afterEach(() => { vi.useRealTimers() })
 
@@ -87,7 +92,7 @@ describe('底稿管理页按项目审计年度发请求', () => {
     mockHttpGet.mockResolvedValue({ data: { name: '某项目_2024', audit_year: 2024 } })
     const wrapper = mountList()
     await flushPromises()
-    expect(mockHttpGet).toHaveBeenCalledWith('/api/projects/test-proj')
+    expect(mockHttpGet).not.toHaveBeenCalled()
     expect((wrapper.vm as any).currentYear).toBe(2024)
     expect(wrapper.findComponent({ name: 'WorkpaperWorkbenchView' }).props('year')).toBe(2024)
     wrapper.unmount()
@@ -102,8 +107,18 @@ describe('底稿管理页按项目审计年度发请求', () => {
     wrapper.unmount()
   })
 
-  test('项目信息取不到：保持 null，不猜上一日历年', async () => {
-    mockHttpGet.mockRejectedValue(new Error('network'))
+  test('本页不再二次读取项目信息：仍用 ProjectContextGate 已解析的年度', async () => {
+    mockHttpGet.mockRejectedValue(new Error('即使配置失败也不应调用'))
+    const wrapper = mountList()
+    await flushPromises()
+    expect(mockHttpGet).not.toHaveBeenCalled()
+    expect((wrapper.vm as any).currentYear).toBe(2024)
+    wrapper.unmount()
+  })
+
+  test('项目上下文明确无年度时保持 null，不猜日历年', async () => {
+    project.year = null as any
+    mockHttpGet.mockResolvedValue({ data: { name: '无年度项目', audit_year: 2024 } })
     const wrapper = mountList()
     await flushPromises()
     expect((wrapper.vm as any).currentYear).toBeNull()

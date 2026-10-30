@@ -78,8 +78,8 @@ async def test_h5_render_flag_off_no_extraction_keys(monkeypatch):
 
     from app.routers.wp_render_strategies._h5_oil_gas_assets import render
 
-    # H5 requires oil_gas industry to not return industry_error
-    ctx = _make_mock_ctx("H5", "H5", business_category="oil_gas")
+    # H5 不再按行业拦截（spec trim-followup-residual-findings-closure R1）：任意质控分类都完整取数
+    ctx = _make_mock_ctx("H5", "H5", business_category="A1")
     result = await render(ctx)
 
     assert result is not None

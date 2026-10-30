@@ -3,6 +3,7 @@
     "fields": [
       "acnr_targets",
       "aggregates",
+      "count_token",
       "fields",
       "filter_logic",
       "filters",
@@ -23,6 +24,7 @@
     "fields": [
       "acnr_targets",
       "aggregates",
+      "count_token",
       "fields",
       "file_name",
       "filter_logic",
@@ -45,6 +47,7 @@
     "fields": [
       "acnr_targets",
       "columns",
+      "count_token",
       "condition_logic",
       "conditions",
       "filters",

@@ -1,0 +1,3412 @@
+[
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": 1,
+    "name": "条目",
+    "rid": "<rid>",
+    "inflight": 1
+   }
+  },
+  "body_len": 110,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/item",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/item",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": [
+    {
+     "id": 1
+    },
+    {
+     "id": 2
+    }
+   ]
+  },
+  "body_len": 67,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/items",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/items",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": null
+  },
+  "body_len": 49,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/none",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/none",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": 1
+   }
+  },
+  "body_len": 48,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/wrapped",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/wrapped",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 404,
+   "message": "没有"
+  },
+  "body_len": 31,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/http-error",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/http-error",
+     "status": 404,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 500,
+   "message": "服务器内部错误"
+  },
+  "body_len": 46,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 1,
+  "error": "RuntimeError",
+  "name": "GET /api/boom",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.error",
+    "ERROR",
+    "Unhandled exception on %s %s\n%s",
+    "Unhandled exception on GET /api/boom"
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 503,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "忙"
+  },
+  "body_len": 16,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/server-error",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "ERROR",
+    "SERVER_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/server-error",
+     "status": 503,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "x": [
+     1,
+     2
+    ]
+   }
+  },
+  "body_len": 58,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/preencoded",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/preencoded",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "x"
+  },
+  "body_len": 15,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/preencoded-409",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/preencoded-409",
+     "status": 409,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "a": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  "body_len": 61,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/stream-json",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/stream-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "event: a\ndata: 1\n\nevent: b\ndata: 2\n\n",
+  "body_len": 36,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET /api/sse",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/sse",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-disposition",
+    "attachment; filename=x.bin"
+   ],
+   [
+    "content-type",
+    "application/octet-stream"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "\u0000\u0001binary",
+  "body_len": 8,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/download",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/download",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-disposition",
+    "attachment; filename=a.json"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "a": 1
+  },
+  "body_len": 7,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/attachment-json",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/attachment-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 204,
+  "headers": [
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "",
+  "body_len": 0,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 1,
+  "error": null,
+  "name": "GET /api/no-content",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/no-content",
+     "status": 204,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "text/html; charset=utf-8"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "<p>hi</p>",
+  "body_len": 9,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/html",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/html",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "{not json",
+  "body_len": 9,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/bad-json",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/bad-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "ok": true
+   }
+  },
+  "body_len": 57,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/with-background",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/with-background",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "status": "ok"
+   }
+  },
+  "body_len": 61,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/health",
+  "known_diff": null,
+  "audit": [],
+  "logs": [],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "events": []
+  },
+  "body_len": 13,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/events/stream",
+  "known_diff": null,
+  "audit": [],
+  "logs": [],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "wopi": true
+  },
+  "body_len": 13,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /wopi/files/x",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/wopi/files/x",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "alive": true,
+   "rid": "<rid>",
+   "inflight": 0
+  },
+  "body_len": 48,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /livez",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/livez",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Not Found"
+  },
+  "body_len": 22,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/nope",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/nope",
+     "status": 404,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 307,
+  "headers": [
+   [
+    "location",
+    "http://testserver/api/item"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "",
+  "body_len": 0,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 1,
+  "error": null,
+  "name": "GET /api/item/",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/item/",
+     "status": 307,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "len": 8817,
+   "sha256": "cf7d2f085acfccebc823eefe0e43c5f5cf5b27b502880367f2c11f12c2a188ea"
+  },
+  "body_len": 8817,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /openapi.json",
+  "known_diff": null,
+  "audit": [],
+  "logs": [],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "len": 12545,
+   "sha256": "38a3af865869d1e86fe35c34e229dbd94d2af77bf8878f2ac481d52c228fc69c"
+  },
+  "body_len": 12545,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET /api/mid-json",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/mid-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 422,
+   "message": "请求参数校验失败",
+   "detail": [
+    {
+     "type": "int_parsing",
+     "loc": [
+      "query",
+      "n"
+     ],
+     "msg": "Input should be a valid integer, unable to parse string as an integer",
+     "input": "abc"
+    }
+   ]
+  },
+  "body_len": 195,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET validation",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/validation",
+     "status": 422,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "rid-from-client"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": 1,
+    "name": "条目",
+    "rid": "rid-from-client",
+    "inflight": 1
+   }
+  },
+  "body_len": 113,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET with request id",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/item",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Method Not Allowed"
+  },
+  "body_len": 31,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "HEAD item",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "HEAD",
+     "path": "/api/item",
+     "status": 405,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Method Not Allowed"
+  },
+  "body_len": 31,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST to GET route (405)",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "POST",
+     "path": "/api/item",
+     "status": 405,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "content-encoding",
+    "gzip"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "gzip",
+  "body": {
+   "len": 6048891,
+   "sha256": "e8979b02be3b73d5f803492d5a649374bd03cb852062c2308f29ccab2f1fd5f2"
+  },
+  "body_len": 6048891,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET big-json gzip",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/big-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "len": 6048891,
+   "sha256": "e8979b02be3b73d5f803492d5a649374bd03cb852062c2308f29ccab2f1fd5f2"
+  },
+  "body_len": 6048891,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET big-json identity",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/big-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "content-encoding",
+    "gzip"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "gzip",
+  "body": {
+   "len": 12545,
+   "sha256": "38a3af865869d1e86fe35c34e229dbd94d2af77bf8878f2ac481d52c228fc69c"
+  },
+  "body_len": 12545,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET mid-json gzip",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/mid-json",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "content-encoding",
+    "gzip"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "gzip",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": [
+    {
+     "id": 1
+    },
+    {
+     "id": 2
+    }
+   ]
+  },
+  "body_len": 67,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET small json gzip",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/items",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "content-encoding",
+    "gzip"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "gzip",
+  "body": {
+   "len": 5242970,
+   "sha256": "b8060c7b0514e1247b0755725457202127b32ffaec8fc2dfd464f47fe7552586"
+  },
+  "body_len": 5242970,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET stream-json-big gzip",
+  "known_diff": "stream_big",
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "WARNING",
+    "SLOW_REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/stream-json-big",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "len": 5242970,
+   "sha256": "b8060c7b0514e1247b0755725457202127b32ffaec8fc2dfd464f47fe7552586"
+  },
+  "body_len": 5242970,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET stream-json-big",
+  "known_diff": "stream_big",
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "WARNING",
+    "SLOW_REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/stream-json-big",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "event: a\ndata: 1\n\nevent: b\ndata: 2\n\n",
+  "body_len": 36,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 3,
+  "error": null,
+  "name": "GET sse gzip",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/sse",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "slow": true
+   }
+  },
+  "body_len": 59,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET slow",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "WARNING",
+    "SLOW_REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/slow",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "slow": true
+   }
+  },
+  "body_len": 59,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET expected slow",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "SLOW_OK %s",
+    {
+     "method": "GET",
+     "path": "/api/ai-generate-slow",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "echo": {
+     "name": "x"
+    },
+    "rid": "<rid>",
+    "inflight": 1
+   }
+  },
+  "body_len": 152,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST create",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "create",
+    "object_type": "thing",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "echo": {
+      "name": "x"
+     },
+     "rid": "<rid>",
+     "inflight": 1
+    },
+    "ip_address": "198.51.100.7"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/things",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "echo": {
+     "name": "y"
+    },
+    "rid": "<rid>",
+    "inflight": 1
+   }
+  },
+  "body_len": 152,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST create anon",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": null,
+    "action_type": "create",
+    "object_type": "thing",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "echo": {
+      "name": "y"
+     },
+     "rid": "<rid>",
+     "inflight": 1
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/things",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "updated": true
+   }
+  },
+  "body_len": 108,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "PUT update",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "update",
+    "object_type": "thing",
+    "object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "old_value": null,
+    "new_value": {
+     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "updated": true
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "PUT",
+     "path": "/api/things/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "deleted": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+   }
+  },
+  "body_len": 96,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "DELETE",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "delete",
+    "object_type": "thing",
+    "object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "old_value": null,
+    "new_value": {
+     "deleted": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "DELETE",
+     "path": "/api/things/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "PUT"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Method Not Allowed"
+  },
+  "body_len": 31,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "PATCH unknown",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "PATCH",
+     "path": "/api/things/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "status": 405,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "不行"
+  },
+  "body_len": 19,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST fail",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "POST",
+     "path": "/api/things-fail",
+     "status": 400,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": "data: x\n\n",
+  "body_len": 9,
+  "content_length_ok": true,
+  "has_content_length": false,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST sse",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/things-sse",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": [
+    1,
+    2,
+    3
+   ]
+  },
+  "body_len": 54,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST list",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "create",
+    "object_type": "things-list",
+    "object_id": null,
+    "old_value": null,
+    "new_value": null,
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/things-list",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "access_token": "t"
+   }
+  },
+  "body_len": 66,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST login",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/auth/login",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "error": 0
+  },
+  "body_len": 11,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST onlyoffice",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": null,
+    "action_type": "create",
+    "object_type": "wp",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "error": 0
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/wp/onlyoffice-callback",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "size": 50
+   }
+  },
+  "body_len": 57,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST upload ok",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": null,
+    "action_type": "create",
+    "object_type": "upload",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "size": 50
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/upload",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 413,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 413,
+   "message": "请求体过大，上限 850MB",
+   "data": null
+  },
+  "body_len": 67,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST upload too big",
+  "known_diff": null,
+  "audit": [],
+  "logs": [],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "deleted": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+   }
+  },
+  "body_len": 96,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "DELETE with big body",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": null,
+    "action_type": "delete",
+    "object_type": "thing",
+    "object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "old_value": null,
+    "new_value": {
+     "deleted": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "DELETE",
+     "path": "/api/things/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "llm": true
+   }
+  },
+  "body_len": 58,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST llm under limit",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "create",
+    "object_type": "project",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "llm": true
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/projects/p1/wp-ai/explain",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 429,
+  "headers": [
+   [
+    "retry-after",
+    "42"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 429,
+   "message": "LLM 调用频率超限，每分钟最多 10 次，请 42 秒后重试",
+   "data": null
+  },
+  "body_len": 106,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST llm over limit",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "POST",
+     "path": "/api/projects/p1/wp-ai/explain",
+     "status": 429,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "llm": true
+   }
+  },
+  "body_len": 58,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST llm no token",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": null,
+    "action_type": "create",
+    "object_type": "project",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "llm": true
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/projects/p1/wp-ai/explain",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "llm": true
+   }
+  },
+  "body_len": 58,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST llm redis down",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "create",
+    "object_type": "project",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "llm": true
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/projects/p1/wp-ai/explain",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "run": true
+   }
+  },
+  "body_len": 58,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST ai chat under",
+  "known_diff": null,
+  "audit": [
+   {
+    "user_id": "0b6e6a43-5d4c-4f0e-9a5f-6a4e0c2d7b11",
+    "action_type": "create",
+    "object_type": "ai-chat",
+    "object_id": null,
+    "old_value": null,
+    "new_value": {
+     "run": true
+    },
+    "ip_address": "203.0.113.9"
+   }
+  ],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "POST",
+     "path": "/api/ai-chat/runs",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 429,
+  "headers": [
+   [
+    "retry-after",
+    "42"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 429,
+   "message": "AI 对话请求过于频繁，每分钟最多 20 次，请 42 秒后重试",
+   "data": {
+    "error_code": "rate_limited",
+    "remaining": 0,
+    "reset": "<ts>",
+    "retry_after": 42
+   }
+  },
+  "body_len": 210,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "POST ai chat over",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "POST",
+     "path": "/api/ai-chat/runs",
+     "status": 429,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "POST"
+   ],
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Method Not Allowed"
+  },
+  "body_len": 31,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "GET ai chat path (no limit)",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/ai-chat/runs",
+     "status": 405,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "vary",
+    "Origin"
+   ],
+   [
+    "access-control-allow-methods",
+    "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT"
+   ],
+   [
+    "access-control-max-age",
+    "600"
+   ],
+   [
+    "access-control-allow-credentials",
+    "true"
+   ],
+   [
+    "access-control-allow-origin",
+    "http://localhost:3030"
+   ],
+   [
+    "content-type",
+    "text/plain; charset=utf-8"
+   ]
+  ],
+  "encoding": "",
+  "body": "OK",
+  "body_len": 2,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 1,
+  "error": null,
+  "name": "CORS preflight",
+  "known_diff": null,
+  "audit": [],
+  "logs": [],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding, Origin"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ],
+   [
+    "access-control-allow-credentials",
+    "true"
+   ],
+   [
+    "access-control-allow-origin",
+    "http://localhost:3030"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": 1,
+    "name": "条目",
+    "rid": "<rid>",
+    "inflight": 1
+   }
+  },
+  "body_len": 110,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "CORS simple",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/item",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ],
+   [
+    "access-control-allow-credentials",
+    "true"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "code": 200,
+   "message": "success",
+   "data": {
+    "id": 1,
+    "name": "条目",
+    "rid": "<rid>",
+    "inflight": 1
+   }
+  },
+  "body_len": 110,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "CORS other origin",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "DEBUG",
+    "REQUEST %s",
+    {
+     "method": "GET",
+     "path": "/api/item",
+     "status": 200,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ },
+ {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ],
+   [
+    "x-request-id",
+    "<rid>"
+   ],
+   [
+    "x-response-time",
+    "<ms>"
+   ],
+   [
+    "vary",
+    "Accept-Encoding"
+   ],
+   [
+    "x-app-version",
+    "testcommit"
+   ]
+  ],
+  "encoding": "",
+  "body": {
+   "detail": "Not Found"
+  },
+  "body_len": 22,
+  "content_length_ok": true,
+  "has_content_length": true,
+  "body_messages": 2,
+  "error": null,
+  "name": "path with encoded ?",
+  "known_diff": null,
+  "audit": [],
+  "logs": [
+   [
+    "audit_platform.metrics",
+    "INFO",
+    "CLIENT_ERROR %s",
+    {
+     "method": "GET",
+     "path": "/api/item",
+     "status": 404,
+     "user_agent": ""
+    }
+   ]
+  ],
+  "inflight_after": 0
+ }
+]

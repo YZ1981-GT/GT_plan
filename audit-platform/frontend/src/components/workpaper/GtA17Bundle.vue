@@ -18,6 +18,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
+import { classificationOf, describeCategoryGroup, type ProjectClassification } from '@/types/projectClassification'
 import {
   useA17BundleState,
   statusToDisplay,
@@ -174,15 +175,17 @@ const {
   loadKamReferences,
 } = bundleState
 
-// B/C 类：裁剪默认不选 A17；若底稿已存在则 soft 提示
-const businessCategory = ref('')
+// B/C 类：裁剪默认不选 A17；若底稿已存在则 soft 提示。
+// 组别读项目详情下发的 project_classification（原按 business_category 首字母：旧值 IPO 判成「I 类」不提示）
+const projectClassification = ref<ProjectClassification | null>(null)
 const categorySoftWarning = computed(() => {
-  const prefix = (businessCategory.value || '').charAt(0).toUpperCase()
-  if (prefix === 'C') {
-    return '当前项目为 C 类：A17 默认不适用。若误开可忽略或联系项目经理裁剪。'
+  const group = projectClassification.value?.category_group
+  const label = describeCategoryGroup(projectClassification.value)
+  if (group === 'C') {
+    return `当前项目为 ${label}：A17 默认不适用。若误开可忽略或联系项目经理裁剪。`
   }
-  if (prefix === 'B') {
-    return '当前项目为 B 类：A17 非默认必备（A 类财报签发链路）。可按需编制，不作为签发强制闸门参考。'
+  if (group === 'B') {
+    return `当前项目为 ${label}：A17 非默认必备（A 类财报签发链路）。可按需编制，不作为签发强制闸门参考。`
   }
   return ''
 })
@@ -301,9 +304,9 @@ onMounted(async () => {
       wpIndex.value = await getWpIndex(props.projectId)
       try {
         const proj = await api.get<any>(`/api/projects/${props.projectId}`, { _silent: true } as any)
-        businessCategory.value = proj?.business_category || proj?.data?.business_category || ''
+        projectClassification.value = classificationOf(proj) ?? classificationOf(proj?.data)
       } catch {
-        businessCategory.value = ''
+        projectClassification.value = null
       }
     }
   } catch {

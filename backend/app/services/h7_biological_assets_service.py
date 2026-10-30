@@ -4,7 +4,6 @@ Spec: .kiro/specs/h7-biological-assets/ Task 5.3
 Requirements: 11.1-11.4, 13.1-13.3
 
 业务逻辑：
-- 行业适用性判断（agriculture/forestry/livestock/fishery）
 - 导出模板/数据
 - 导入数据
 - 折旧验证（直线法）
@@ -25,42 +24,10 @@ logger = logging.getLogger(__name__)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-APPLICABLE_INDUSTRIES = {"agriculture", "forestry", "livestock", "fishery"}
 ACCOUNT_CODE_1621 = "1621"
 
-
-# ─── Industry Check ──────────────────────────────────────────────────────────
-
-async def check_industry_applicability(wp_id: str, db: AsyncSession) -> dict[str, Any]:
-    """检查项目行业适用性.
-
-    Returns:
-        {"is_applicable": bool, "industry": str, "message": str}
-    """
-    try:
-        result = await db.execute(
-            sa.text("""
-                SELECT p.business_category
-                FROM projects p
-                JOIN wp_index wi ON wi.project_id = p.id
-                JOIN working_paper wp ON wp.wp_index_id = wi.id
-                WHERE wp.id = :wp_id
-            """),
-            {"wp_id": wp_id},
-        )
-        row = result.fetchone()
-        if row:
-            industry = (row.business_category or "").strip().lower()
-            is_applicable = industry in APPLICABLE_INDUSTRIES
-            return {
-                "is_applicable": is_applicable,
-                "industry": industry,
-                "message": "" if is_applicable else "本底稿仅适用于农林牧渔行业项目",
-            }
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H7 industry check error: %s", e)
-
-    return {"is_applicable": True, "industry": "", "message": ""}
+# 原有的「行业适用性判断」已删除（spec trim-followup-residual-findings-closure R1.3）：它把质控分类码
+# 当行业比对农林牧渔、永不命中，端点也没有调用方；本底稿是否适用看试算表（渲染策略返回 accounts_found）。
 
 
 # ─── Export Template ──────────────────────────────────────────────────────────

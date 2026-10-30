@@ -49,7 +49,7 @@ from tests.contracts._contract_schemas import (  # noqa: E402
 )
 
 PUBLISHED = {
-    "common", "trimmed-scope", "generation-plan", "generation-receipt", "workpaper-lifecycle-event",
+    "common", "trimmed-scope", "generation-plan", "generation-plan-view", "generation-receipt", "workpaper-lifecycle-event",
     "program-row-identity", "delegation-preview", "delegation-apply", "member-scope", "program-row-patch",
     "workpaper-file-materialization", "procedure-task-event",
 }
@@ -352,6 +352,21 @@ def test_generation_receipt_payload_matches_contract(tmp_path):
     assert payload["header_unfilled"] == 1 and payload["failures"] == [{"wp_code": "D2", "error": "模板文件被占用"}]
     assert_valid("generation-receipt", {**payload, "skipped": 1, "skipped_codes": ["E1"]},
                  "/$defs/generateFromCodesResponse")
+    operation_status = {
+        "operation_id": str(uuid.uuid4()), "status": "materializing",
+        "progress_total": 2, "progress_done": 1, "attempt": 1,
+        "terminal": False, "resumable": False,
+        "resumable_after": "2026-10-29T03:00:00+00:00", "public_error": None,
+    }
+    assert_valid("generation-receipt", operation_status, "/$defs/operationStatus")
+    assert_valid("generation-receipt", {
+        **operation_status, "status": "succeeded", "terminal": True,
+        "resumable_after": None, "receipt": {**payload, "operation_id": operation_status["operation_id"],
+                                                  "status": "succeeded"},
+    }, "/$defs/operationStatus")
+    assert errors_of("generation-receipt", {**operation_status, "status": "queued"}, "/$defs/operationStatus")
+    assert errors_of("generation-receipt", {k: v for k, v in operation_status.items() if k != "attempt"},
+                     "/$defs/operationStatus")
     assert errors_of("generation-receipt", {**payload, "skipped": 1}, "/$defs/generateFromCodesResponse"), \
         "按编码生成的响应少了原有字段 skipped_codes 要判不合规"
     for key in ("blank_codes", "message", "header_unfilled"):

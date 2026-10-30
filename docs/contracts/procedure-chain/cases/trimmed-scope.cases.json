@@ -58,6 +58,41 @@
         { "wp_code": "F1-5至F2-9", "decided_by": "F1-5至F2-9", "trimmed": true },
         { "wp_code": "K3-5", "decided_by": null, "trimmed": false }
       ]
+    },
+    {
+      "name": "实质性循环（D~N）的科目母码跟随下级程序行",
+      "rows": [
+        ["D2-1至D2-4", "not_applicable"], ["D2-5", "skip"], ["D2-6至D2-13", "not_applicable"],
+        ["D4-1至D4-4", "not_applicable"], ["D4-5", "execute"],
+        ["F2-16", "not_applicable"], ["F2-16-1", "execute"],
+        ["E1-1至E1-11", "execute"], ["E1-14至E1-15", "not_applicable"],
+        ["B5-1", "not_applicable"], ["B5-2", "not_applicable"],
+        ["G4", "not_applicable"], ["G4-7-1", "execute"],
+        ["F1-5至F2-9", "not_applicable"]
+      ],
+      "payload": {
+        "exact": {
+          "B5-1": true, "B5-2": true, "D2-5": true, "D4-5": false, "F1-5至F2-9": true,
+          "F2-16": true, "F2-16-1": false, "G4": true, "G4-7-1": false
+        },
+        "ranges": {
+          "D2-1至D2-4": true, "D2-6至D2-13": true, "D4-1至D4-4": true,
+          "E1-1至E1-11": false, "E1-14至E1-15": true
+        }
+      },
+      "decisions": [
+        { "wp_code": "D2", "decided_by": "D2-1至D2-4", "trimmed": true },
+        { "wp_code": "d2", "decided_by": "D2-1至D2-4", "trimmed": true },
+        { "wp_code": "D2-14", "decided_by": null, "trimmed": false },
+        { "wp_code": "D2A", "decided_by": null, "trimmed": false },
+        { "wp_code": "D4", "decided_by": "D4-5", "trimmed": false },
+        { "wp_code": "F2", "decided_by": "F2-16-1", "trimmed": false },
+        { "wp_code": "E1", "decided_by": "E1-1至E1-11", "trimmed": false },
+        { "wp_code": "B5", "decided_by": null, "trimmed": false },
+        { "wp_code": "G4-7", "decided_by": "G4", "trimmed": true },
+        { "wp_code": "F1-5", "decided_by": null, "trimmed": false },
+        { "wp_code": "F1", "decided_by": null, "trimmed": false }
+      ]
     }
   ]
 }

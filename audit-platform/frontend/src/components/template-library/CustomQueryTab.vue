@@ -393,6 +393,8 @@ interface QueryResult {
   total: number
   limit?: number
   offset?: number
+  count_token?: string
+  count_reused?: boolean
   /** 非致命提示（没有生效数据集、全局配置表未按项目过滤等） */
   warnings?: string[]
   /** 可选键：引用校验上下文 ref_context、列类型 column_types、附注表清单 tables */
@@ -431,6 +433,7 @@ const supportsConditions = ref(true)
 const acnrFieldIds = ref<string[]>([])
 const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const queryError = ref<QueryErrorText | null>(null)
+const countToken = ref('')
 const executing = ref(false)
 const exporting = ref(false)
 /** 0 行时的空态说明（含实际使用的年度，便于自查年度是否选错） */
@@ -652,8 +655,11 @@ async function onExecute(keepPage = false) {
     ElMessage.warning(incomplete)
     return
   }
-  // 新条件从第 1 页开始；翻页时由 onPagerChange 保持页码
-  if (!keepPage) page.value = 1
+  // 新条件从第 1 页开始、不带 COUNT 凭证（要的是现算的行数）；翻页 / 改每页行数时由 onPagerChange 保持页码与凭证
+  if (!keepPage) {
+    page.value = 1
+    countToken.value = ''
+  }
   executing.value = true
   queryError.value = null
   if (keepPage) {
@@ -675,10 +681,14 @@ async function onExecute(keepPage = false) {
   }
   const targets = [...acnrFieldIds.value]
   try {
+    // 翻页 / 改每页行数仍是同一查询：带上次响应签发的 COUNT 凭证（后端据此跳过重复 COUNT）；新查询不带
+    const requestInput: BusinessQueryInput = keepPage && countToken.value ? { ...input, countToken: countToken.value } : input
     // 请求体唯一构造处（T16 契约：execute 调用点的请求体必须直接是 buildBusinessPayload 调用）
-    const data = await api.post<QueryResult>(P_cq.execute, buildBusinessPayload(input, targets), { _silent: true } as any)
+    const data = await api.post<QueryResult>(P_cq.execute, buildBusinessPayload(requestInput, targets), { _silent: true } as any)
     if (data) {
       result.value = data
+      if (data.count_token) countToken.value = data.count_token
+      // 导出全部 / 保存模板沿用的本次查询不含凭证（凭证只对翻页时的 COUNT 有意义）
       lastRun.value = { source, projectId: formCtx.value.project_id, year, payload: buildBusinessPayload(input, targets) }
       void rowLinks.validateRefs(data.rows || [])
       if ((data.total ?? 0) === 0) {

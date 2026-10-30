@@ -936,7 +936,8 @@ const runtime = useWorkpaperScaffold({
 })
 
 // 外层编辑器的版本按钮委托给 Runtime Boundary，避免同一 HTML 底稿挂载第二个版本 Host。
-defineExpose({ openVersionHistory: runtime.version.openVersionHistory })
+// renderConfig / loading 给外壳侧栏 decision_trace 与编制说明闸门读（外壳不再自带一份 render-config，spec platform-perf-hotspots R4）。
+defineExpose({ openVersionHistory: runtime.version.openVersionHistory, renderConfig, loading })
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
 function getSheetIcon(ct: string): string {

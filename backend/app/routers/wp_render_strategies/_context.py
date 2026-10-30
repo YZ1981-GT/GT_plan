@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.models.workpaper_models import WorkingPaper
+    from app.services.project_classification import ProjectClassification
     from app.services.wp_classification_service import ClassificationResult
 
 
@@ -41,7 +42,7 @@ class RenderContext:
         sheet_schema: YAML schema 解析结果
         template_file_path: 模板文件路径
         year: 会计年度
-        business_category: 行业分类
+        business_category: 项目质控业务分类原值（未填写为 "C"；判定请用 project_classification）
         cross_ref_items: 跨底稿引用列表
         prep_info: 准备信息（lazy，构造时置 None，策略函数按需填充）
     """
@@ -69,3 +70,16 @@ class RenderContext:
     source_files: list[str] = field(default_factory=list)
     # 当前用户 ID（review-checklist RBAC guard 等需要）
     user_id: UUID | None = field(default=None)
+    # 项目质控分类 / 专项场景单一解释（app.services.project_classification，R4）；
+    # 与上面的 ``classification``（底稿 sheet 分类结果）无关。策略经 :func:`project_classification_of` 取。
+    project_classification: ProjectClassification | None = field(default=None)
+
+
+def project_classification_of(ctx: object) -> ProjectClassification:
+    """渲染入口算好的项目分类；单测等直接构造（含 SimpleNamespace）的上下文没给时按 ``business_category`` 现解释。"""
+    resolved = getattr(ctx, "project_classification", None)
+    if resolved is not None:
+        return resolved
+    from app.services.project_classification import resolve
+
+    return resolve(getattr(ctx, "business_category", None))

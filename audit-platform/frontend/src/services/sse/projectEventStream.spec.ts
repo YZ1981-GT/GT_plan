@@ -17,38 +17,49 @@ class MockSSEConn {
   static instances: MockSSEConn[] = []
   url: string
   opts: any
-  msgHandler: ((data: any, event?: string) => void) | null = null
+  msgHandler: ((data: any, event?: string, id?: string) => void) | null = null
   errHandler: ((e: any) => void) | null = null
   openHandler: (() => void) | null = null
   closed = false
   connected = false
+  private _lastEventId: string | undefined
 
   constructor(url: string, opts: any) {
     this.url = url
     this.opts = opts
+    this._lastEventId = opts?.lastEventId
     MockSSEConn.instances.push(this)
   }
-  onMessage(h: (data: any, event?: string) => void) { this.msgHandler = h }
+  onMessage(h: (data: any, event?: string, id?: string) => void) { this.msgHandler = h }
   onError(h: (e: any) => void) { this.errHandler = h }
   onOpen(h: () => void) { this.openHandler = h }
   close() { this.closed = true; this.connected = false }
   get isConnected() { return this.connected }
+  get lastEventId() { return this._lastEventId }
   _open() { this.connected = true; this.openHandler?.() }
   _error() { this.connected = false; this.errHandler?.(new Error('sse err')) }
-  _emit(event: string, data: any) { this.msgHandler?.(data, event) }
+  _emit(event: string, data: any, id?: string) {
+    if (id) this._lastEventId = id
+    this.msgHandler?.(data, event, id)
+  }
   static byProject(pid: string): MockSSEConn[] {
     return MockSSEConn.instances.filter((c) => c.url.includes(`/api/projects/${pid}/`))
   }
 }
 
+const mockApiGet = vi.fn()
 const mockCreateSSE = vi.fn((url: string, opts: any) => new MockSSEConn(url, opts))
 vi.mock('@/utils/sse', () => ({
   createSSE: (url: string, opts: any) => mockCreateSSE(url, opts),
+}))
+vi.mock('@/services/apiProxy', () => ({
+  api: { get: (...args: any[]) => mockApiGet(...args) },
 }))
 
 describe('projectEventStream — 单例总线', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockApiGet.mockResolvedValue([])
     MockSSEConn.instances = []
     vi.resetModules()
   })
@@ -175,9 +186,11 @@ describe('projectEventStream — 单例总线', () => {
   it('P6: 共享连接 URL 为项目级端点且不含 token=', async () => {
     const { subscribeProjectEvent } = await load()
     subscribeProjectEvent(PID_A, 'e1', vi.fn())
-    const url = MockSSEConn.byProject(PID_A)[0].url
+    const conn = MockSSEConn.byProject(PID_A)[0]
+    const url = conn.url
     expect(url).toContain(`/api/projects/${PID_A}/events/stream`)
     expect(url).not.toContain('token=')
+    expect(conn.opts.reconnectOnCleanEnd).toBe(true)
   })
 
   // ─── P7：无 projectId no-op ──────────────────────────────────────────────
@@ -222,5 +235,88 @@ describe('projectEventStream — 单例总线', () => {
     const countBefore = MockSSEConn.instances.length
     subscribeProjectEvent(PID_A, 'e2', vi.fn())
     expect(MockSSEConn.instances.length).toBe(countBefore)
+  })
+
+  // ─── follow-up：typed replay/live barrier ────────────────────────────────
+  it('重连先 replay 再放 live buffer，同 id 只投一次且最后才触发 onReconnect', async () => {
+    const { subscribeProjectEvent } = await load()
+    const seen: string[] = []
+    const onReconnect = vi.fn(() => seen.push('reconnected'))
+    subscribeProjectEvent(PID_A, 'workpaper.saved', (data: any) => seen.push(data.extra.marker), { onReconnect })
+    const conn = MockSSEConn.byProject(PID_A)[0]
+    conn._open()
+    conn._emit('workpaper.saved', { event_type: 'workpaper.saved', extra: { marker: '100' } }, '100-0')
+
+    let resolveReplay!: (rows: any[]) => void
+    mockApiGet.mockImplementationOnce(() => new Promise<any[]>((resolve) => { resolveReplay = resolve }))
+    conn._error()
+    conn._open()
+    // /since 尚未返回：随后到达的 live 102 必须暂存，不能越过 replay 101
+    conn._emit('workpaper.saved', { event_type: 'workpaper.saved', extra: { marker: '102-live' } }, '102-0')
+    expect(seen).toEqual(['100'])
+    expect(onReconnect).not.toHaveBeenCalled()
+
+    resolveReplay([
+      { event_id: '101-0', event_type: 'workpaper.saved', project_id: PID_A, extra: { marker: '101' } },
+      { event_id: '102-0', event_type: 'workpaper.saved', project_id: PID_A, extra: { marker: '102-replay' } },
+    ])
+    await vi.waitFor(() => expect(onReconnect).toHaveBeenCalledTimes(1))
+    expect(seen).toEqual(['100', '101', '102-replay', 'reconnected'])
+    expect(mockApiGet).toHaveBeenCalledWith(
+      `/api/projects/${PID_A}/events/since`,
+      expect.objectContaining({ params: { last_event_id: '100-0' } }),
+    )
+  })
+
+  it('Redis Stream id 按数值排序，不按字符串排序', async () => {
+    const { compareRedisStreamIds } = await load()
+    expect(compareRedisStreamIds('99-9', '100-0')).toBeLessThan(0)
+    expect(compareRedisStreamIds('100-2', '100-10')).toBeLessThan(0)
+    expect(compareRedisStreamIds('100-10', '100-10')).toBe(0)
+  })
+
+  it('replay 失败仍放行 live，并在恢复信号中明确 raw 需全量刷新', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { subscribeProjectEvent, WILDCARD_EVENT } = await load()
+    const seen: string[] = []
+    const recovered: any[] = []
+    const onReconnect = vi.fn()
+    subscribeProjectEvent(PID_A, 'e1', (data: any) => seen.push(data.marker), { onReconnect })
+    subscribeProjectEvent(PID_A, WILDCARD_EVENT, (data, event) => {
+      if (event === 'transport.recovered') recovered.push(data)
+    })
+    const conn = MockSSEConn.byProject(PID_A)[0]
+    conn._open()
+    conn._emit('e1', { marker: 'anchor' }, '1-0')
+    mockApiGet.mockRejectedValueOnce(new Error('redis down'))
+    conn._error()
+    conn._open()
+    conn._emit('e1', { marker: 'live' }, '2-0')
+    await vi.waitFor(() => expect(onReconnect).toHaveBeenCalledTimes(1))
+    expect(seen).toEqual(['anchor', 'live'])
+    expect(recovered).toHaveLength(1)
+    expect(recovered[0]).toMatchObject({
+      typed_replay_complete: true,
+      replay_attempted: true,
+      replay_failed: true,
+      raw_full_refresh_required: true,
+    })
+    expect(recovered[0].raw_events_without_replay).toContain('formula.pushed')
+  })
+
+  it('首次 open 不补拉；无 typed anchor 的 takeover 只触发 raw 全量刷新信号', async () => {
+    const { subscribeProjectEvent, WILDCARD_EVENT } = await load()
+    const recovered: any[] = []
+    subscribeProjectEvent(PID_A, WILDCARD_EVENT, (data, event) => {
+      if (event === 'transport.recovered') recovered.push(data)
+    })
+    const conn = MockSSEConn.byProject(PID_A)[0]
+    conn._open()
+    expect(mockApiGet).not.toHaveBeenCalled()
+    conn._error()
+    conn._open()
+    await vi.waitFor(() => expect(recovered).toHaveLength(1))
+    expect(mockApiGet).not.toHaveBeenCalled()
+    expect(recovered[0]).toMatchObject({ replay_attempted: false, raw_full_refresh_required: true })
   })
 })

@@ -12,6 +12,8 @@
  */
 
 export interface WorkpaperGenerateResult {
+  operation_id?: string
+  status?: 'succeeded' | 'partial_failed' | 'failed' | 'stale'
   created?: number
   count?: number
   ignored_codes?: string[]
@@ -44,7 +46,12 @@ export function summarizeWorkpaperGenerateResult(
   result: WorkpaperGenerateResult | null | undefined,
 ): WorkpaperGenerateNotice {
   const created = result?.created ?? result?.count ?? 0
-  const parts = [`底稿生成完成，共创建 ${created} 份底稿`]
+  const terminalStatus = result?.status
+  const parts = [terminalStatus === 'stale'
+    ? '程序裁剪结果已变化，本次未发布底稿，请刷新生成计划后重试'
+    : terminalStatus === 'failed'
+      ? '底稿生成失败，本次未发布底稿'
+      : `底稿生成完成，共创建 ${created} 份底稿`]
   const ignored = result?.ignored_codes ?? []
   const blank = result?.blank_codes ?? []
   const trimmed = result?.skipped_trimmed_codes ?? []
@@ -77,7 +84,7 @@ export function summarizeWorkpaperGenerateResult(
   if (headerUnfilled > 0) {
     parts.push(`${headerUnfilled} 份底稿生成时未写入表头（编制单位、审计期间等），需在底稿文件中另行填写`)
   }
-  const warn =
+  const warn = terminalStatus === 'stale' || terminalStatus === 'failed' ||
     ignored.length || trimmed.length || recycled.length || blank.length || failed.length || headerFailed.length
   return {
     level: warn ? 'warning' : 'success',

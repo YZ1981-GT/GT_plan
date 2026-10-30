@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from app.services.custom_query.builder_dsl import _serialize_cell
+from app.services.custom_query import count_token as count_tokens
 from app.services.custom_query.execution_guard import EXPORT_TIMEOUT_MS, QUERY_TIMEOUT_MS, cancellable_query
 from app.services.custom_query.pagination import FETCH_HARD_CAP, _reject_sort_direction, _reject_sort_field
 from app.services.custom_query.param_sql_builder import ParamSQLBuilder, build_portable_filter
@@ -216,8 +217,33 @@ async def _page_meta(ctx: FetchContext, display: Sequence[SourceColumn]) -> dict
     return {"ref_context": await ref_context(ctx), "column_types": {c.key: c.dtype for c in display}}
 
 
+def _count_statement(stmt: Select) -> Select:
+    return sa.select(sa.func.count()).select_from(stmt.order_by(None).subquery())
+
+
 async def _count(ctx: FetchContext, stmt: Select) -> int:
-    return int((await ctx.db.execute(sa.select(sa.func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())
+    """同一 WHERE 的精确行数（分组 / 透视与导出预检用，不签发计数凭证）。"""
+    return int((await ctx.db.execute(_count_statement(stmt))).scalar_one())
+
+
+async def _count_page(
+    ctx: FetchContext,
+    stmt: Select,
+    *,
+    reuse_token: str | None = None,
+) -> tuple[int, str, bool]:
+    """翻页用的精确行数：同一查询、同一用户、未过期的计数凭证直接复用，不再发 COUNT。
+
+    返回 ``(total, 下一页可带的凭证, 本次是否复用)``；凭证无效（篡改 / 过期 / 换了查询或用户）时照常计数。
+    """
+    count_stmt = _count_statement(stmt)
+    subject = count_tokens.subject_of(ctx.user)
+    digest = count_tokens.statement_digest(count_stmt, ctx.db.get_bind(), subject=subject)
+    reused_total = count_tokens.reuse(reuse_token, digest=digest, subject=subject)
+    if reused_total is not None:
+        return reused_total, str(reuse_token), True
+    total = int((await ctx.db.execute(count_stmt)).scalar_one())
+    return total, count_tokens.issue(digest=digest, total=total, subject=subject), False
 
 
 async def page(
@@ -228,6 +254,7 @@ async def page(
     logic: str = "and",
     columns: Iterable[str] = (),
     sort: Sequence[Mapping[str, Any]] = (),
+    count_token: str | None = None,
     limit: int,
     offset: int,
 ) -> FetchPage:
@@ -241,10 +268,11 @@ async def page(
     order = _order_by(spec, sort)
     async with cancellable_query(ctx.db, QUERY_TIMEOUT_MS):
         stmt, display = await build_statement(spec, ctx, conditions=conditions, logic=logic, columns=columns)
-        total = await _count(ctx, stmt)
+        total, next_count_token, count_reused = await _count_page(ctx, stmt, reuse_token=count_token)
         rows = _rows(await ctx.db.execute(stmt.order_by(*order).limit(limit).offset(offset)))
         warnings = await spec.warn(ctx) if spec.warn else []
         meta = await _page_meta(ctx, display)
+        meta.update(count_token=next_count_token, count_reused=count_reused)
     return FetchPage(rows=rows, columns=_column_meta(display), total=total, paged=True, meta=meta, warnings=warnings)
 
 

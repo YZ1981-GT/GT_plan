@@ -456,9 +456,17 @@ class ExportJobAttempt(Base):
     snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
-    error_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # 🔴 下面两列原来 ORM 与 DB / 写入方 / 前端契约三处不一致（/api/health schema_drift 的
+    # type_mismatch，spec runtime-performance-and-reload-hardening-followup 任务 2b）：
+    # · error_type 声明 String(50)，而 V181 建表就是 TEXT，写入方写 ``type(exc).__name__``；
+    # · diagnostic_detail 声明 JSONB + ``Mapped[dict]``，而写入方两处都写**字符串**
+    #   （``"".join(traceback.format_exception_only(...))[:2000]``、超时恢复的 f-string），
+    #   DB 是 TEXT，前端契约是 ``string | null`` 且按 ``<pre>`` 纯文本展示。
+    # 对齐方向按「不让任何现有写入失败」选：把写错的那一层（ORM）改回文本，
+    # **不是**把 DB 改成 JSONB —— 那会让写纯文本的两处当场崩（非法 JSON 字面量）。
+    error_type: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
-    diagnostic_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    diagnostic_detail: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)

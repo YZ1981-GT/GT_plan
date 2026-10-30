@@ -20,9 +20,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
+
+from pydantic import Field
 
 from app.models.audit_platform_schemas import EventPayload, EventType
 
@@ -84,6 +87,71 @@ _STREAM_MAX_LEN = 10000  # 保留最近 1 万条事件
 _STREAM_PAYLOAD_FIELD = "payload_json"
 _CONSUMER_GROUP = "event_handlers"
 
+#: 每批最多处理的条目数。启动只跑一批，剩下的由后台续跑 —— 原来一次读 100 条、
+#: 逐条 await handler，实测首次完整启动在这里花 4787 ms，直接压在 readiness 前面。
+REPLAY_BATCH_SIZE = 25
+#: PEL 里空闲超过这个毫秒数的条目才认领：别把另一个活着的 worker 正在处理的条目抢过来。
+PEL_MIN_IDLE_MS = 60_000
+
+# ``broadcast_raw`` 写另一条 ``sse:project:*`` Stream，但 /events/since 只读 audit:events，
+# 因此这些事件**没有 typed replay 保证**。完整清单让新增 raw 事件不能悄悄混进「无损」口径；
+# 前端同名清单在重连完成时随 transport.recovered 下发，消费者走 onReconnect 全量刷新或状态轮询。
+RAW_EVENT_REPLAY_DEGRADED: frozenset[str] = frozenset({
+    "ANNOTATION_CREATED",
+    "ANNOTATION_UPDATED",
+    "PROCEDURE_REVIEW_MESSAGE",
+    "REVIEW_MESSAGE",
+    "a13_summary_updated",
+    "acnr:invalidate",
+    "adjustment:review-changed",
+    "adjustment:sync-arrived",
+    "aging-config:changed",
+    "attachment.uploaded",
+    "consol.note_mapping_confirmed",
+    "consol.note_stale",
+    "consol.scope_changed",
+    "consol.pushed",
+    "consol.push_failed",
+    "consol.push_stale",
+    "consol.refresh.progress",
+    "consol.refresh.completed",
+    "consol.refresh.error",
+    "cross_module_conflict.enqueued",
+    "cross_ref.updated",
+    "deliverable.package.complete",
+    "deliverable.package.progress",
+    "disclosure:note-text-updated",
+    "editing_lock.force_acquired",
+    "export.complete",
+    "export.failed",
+    "export.progress",
+    "formula.pushed",
+    "note.synced",
+    "procedure_task.event",
+    "report.stale",
+    "review_message.created",
+    "review_submitted",
+    "signing_progress_updated",
+    "sync.completed",
+    "workpaper.assigned",
+})
+RAW_EVENT_REPLAY_DEGRADED_PREFIXES: tuple[str, ...] = ("formula_runtime.",)
+
+
+def raw_event_replay_is_degraded(event_type: str) -> bool:
+    return event_type in RAW_EVENT_REPLAY_DEGRADED or any(
+        event_type.startswith(prefix) for prefix in RAW_EVENT_REPLAY_DEGRADED_PREFIXES
+    )
+
+
+def stream_consumer_name() -> str:
+    """每进程唯一的 consumer 名。
+
+    🔴 原来所有进程共用 ``"worker-1"``：热重载的新旧 worker、以及任何另起的实例都挂在同一个
+    consumer 上，谁崩了它的 PEL 条目也没有第二个 consumer 能认领（当前真库 pending=264）。
+    """
+    return f"worker-{os.getpid()}"
+
 
 def serialize_payload_for_stream(payload: EventPayload) -> str:
     """把整份 ``EventPayload`` 序列化成 Redis Stream 字段值（Requirement 13.2）。
@@ -112,6 +180,25 @@ def deserialize_payload_from_stream(data: dict[str, Any]) -> EventPayload:
     )
 
 
+class SSEEventPayload(EventPayload):
+    """只在进程内 SSE 队列中使用的 typed event envelope。
+
+    它继承 :class:`EventPayload`，所以既有 ``_notify_sse`` spy / 队列消费者仍可按原类型与字段
+    使用；``stream_event_id`` 只属于传输层且 ``exclude=True``，不会污染业务 payload、Redis
+    canonical JSON 或 handler 契约。Redis 不可用时队列仍收到原 ``EventPayload``，显式表示
+    live 可用但 replay 无锚点。
+    """
+
+    stream_event_id: str = Field(exclude=True)
+
+
+def sse_payload_with_id(payload: EventPayload, event_id: str | None) -> EventPayload:
+    """给 live typed 事件附上 Redis Stream id；没有 id 时保持原对象与旧行为。"""
+    if not event_id:
+        return payload
+    return SSEEventPayload(**payload.model_dump(mode="python"), stream_event_id=event_id)
+
+
 class EventBus:
     """进程内事件总线，基于 asyncio 实现，支持 debounce 去重 + Redis Stream 持久化"""
 
@@ -133,6 +220,10 @@ class EventBus:
             # 与 replay_pending_events 的 report 保持同一形状：首次重放之前 /metrics
             # 也会读这个字典，缺键会直接 KeyError。
             "dropped_unparseable_count": 0,
+            "claimed_count": 0,
+            "pending_remaining": None,
+            "consumer": None,
+            "exhausted": None,
             "last_error": None,
         }
 
@@ -261,6 +352,13 @@ class EventBus:
             extra: 附加 payload（含 project_id / task_id / 业务字段）
         """
         extra = extra or {}
+        if not raw_event_replay_is_degraded(event_type):
+            # 不阻断业务，但强提示：新增 raw 事件必须登记恢复策略，不能默认混入 typed 无损口径。
+            logger.error(
+                "EventBus.broadcast_raw: 未登记 replay 降级策略的 raw event %s；"
+                "请加入 RAW_EVENT_REPLAY_DEGRADED 或改用 typed EventPayload",
+                event_type,
+            )
         logger.info(
             "EventBus.broadcast_raw: %s (project=%s, extra_keys=%s)",
             event_type, extra.get("project_id"), list(extra.keys()),
@@ -326,9 +424,6 @@ class EventBus:
             len(handlers),
         )
 
-        # 持久化到 Redis Stream（异步，不阻断分发）
-        asyncio.ensure_future(self._persist_to_stream(payload))
-
         for handler in handlers:
             try:
                 await handler(payload)
@@ -353,13 +448,16 @@ class EventBus:
                                 "error": str(exc),
                             },
                         )
-                        await self._notify_sse(fail_payload)
-                        asyncio.ensure_future(self._persist_to_stream(fail_payload))
+                        fail_event_id = await self._persist_to_stream(fail_payload)
+                        await self._notify_sse(sse_payload_with_id(fail_payload, fail_event_id))
                     except Exception:
                         logger.warning("EventBus: failed to publish SYNC_FAILED notification")
 
-        # Push to SSE queues for frontend notification
-        await self._notify_sse(payload)
+        # typed live 事件必须先拿到 XADD 返回的稳定 id 再进入 SSE 队列。若进程在 XADD 后、
+        # live notify 前退出，前端重连仍可从 /events/since 补到；Redis 不可用则 id=None，
+        # live 照常下发但 health 明确 replay_available=false。
+        event_id = await self._persist_to_stream(payload)
+        await self._notify_sse(sse_payload_with_id(payload, event_id))
 
     # ------------------------------------------------------------------
     # Redis Stream 持久化
@@ -379,11 +477,11 @@ class EventBus:
             logger.debug("EventBus: Redis not available, running in memory-only mode")
             return None
 
-    async def _persist_to_stream(self, payload: EventPayload) -> None:
-        """将事件写入 Redis Stream，失败静默降级"""
+    async def _persist_to_stream(self, payload: EventPayload) -> str | None:
+        """写入 typed Stream 并返回 Redis message id；失败显式返回 None，业务仍 live 降级。"""
         redis = await self._get_redis()
         if not redis:
-            return
+            return None
         try:
             event_data = {
                 "event_type": payload.event_type.value,
@@ -393,17 +491,18 @@ class EventBus:
                 # Requirement 13.2 / Property 53：typed replay 必须原样保留整份 payload。
                 _STREAM_PAYLOAD_FIELD: serialize_payload_for_stream(payload),
             }
-            await redis.xadd(_STREAM_KEY, event_data, maxlen=_STREAM_MAX_LEN)
+            event_id = await redis.xadd(_STREAM_KEY, event_data, maxlen=_STREAM_MAX_LEN)
+            if isinstance(event_id, bytes):
+                return event_id.decode("ascii", errors="strict")
+            return str(event_id) if event_id is not None else None
         except Exception as e:
-            logger.debug("EventBus: failed to persist event to Redis Stream: %s", e)
+            self._redis_available = False
+            logger.warning("EventBus: typed event persist failed; live without replay id: %s", e)
+            return None
 
-    async def replay_pending_events(self) -> int:
-        """服务重启后从 Redis Stream 恢复未确认事件（可在 lifespan 中调用）
-
-        Returns:
-            恢复并重新分发的事件数量
-        """
-        report = {
+    @staticmethod
+    def _new_replay_report() -> dict[str, Any]:
+        return {
             "checked_at": datetime.now(timezone.utc).isoformat(),
             "redis_available": False,
             "read_count": 0,
@@ -413,8 +512,95 @@ class EventBus:
             # Requirement 13.9：无法解析而被 ACK 跳过的条目必须可观测。旧实现把它们
             # 直接 xack 丢掉且只并入 failed_count，运维看不出"事件被丢弃"这件事。
             "dropped_unparseable_count": 0,
+            # 本轮从 PEL 认领（XAUTOCLAIM）回来的条目数。
+            "claimed_count": 0,
+            # 本轮结束后组里还有多少 pending（取不到时 None）。
+            "pending_remaining": None,
+            "consumer": stream_consumer_name(),
+            # True = 本轮之后既无 pending 也无新条目，可以停止后台续跑。
+            "exhausted": None,
             "last_error": None,
         }
+
+    async def _handle_replay_entry(self, redis: Any, msg_id: Any, data: Any, report: dict[str, Any]) -> bool:
+        """处理并 ACK 一条 replay 条目；返回是否成功重建并分发。"""
+        report["read_count"] += 1
+        try:
+            payload = deserialize_payload_from_stream(data)
+        except Exception as item_exc:  # noqa: BLE001 — 形态异常是可预期输入
+            report["failed_count"] += 1
+            report["dropped_unparseable_count"] += 1
+            report["last_error"] = str(item_exc)
+            # 仍然 ACK：不 ACK 会让 consumer group 队头永久阻塞。但必须记 ERROR + 单独
+            # 计数，否则"事件被丢弃"这件事在日志和 /metrics 里都不可见（Requirement 13.9）。
+            logger.error(
+                "EventBus: 丢弃无法解析的 Stream 条目 msg_id=%s fields=%s: %s",
+                msg_id,
+                sorted(data.keys()) if isinstance(data, dict) else type(data).__name__,
+                item_exc,
+            )
+            await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+            report["acked_count"] += 1
+            return False
+
+        event_type = payload.event_type
+        for handler in self._handlers.get(event_type, []):
+            try:
+                # 直接分发，不再持久化（避免循环）
+                await handler(payload)
+            except Exception:
+                report["failed_count"] += 1
+                report["last_error"] = f"handler failed for {event_type.value}"
+        await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+        report["acked_count"] += 1
+        report["success_count"] += 1
+        return True
+
+    async def _claim_pending_entries(self, redis: Any, batch_size: int) -> list[tuple[Any, Any]]:
+        """认领 PEL 里空闲超过 :data:`PEL_MIN_IDLE_MS` 的条目。
+
+        redis-py 对 Redis 6 返回 2 元组、Redis 7 返回 3 元组（多一个 deleted 列表），两种都接。
+        """
+        result = await redis.xautoclaim(
+            _STREAM_KEY,
+            _CONSUMER_GROUP,
+            stream_consumer_name(),
+            min_idle_time=PEL_MIN_IDLE_MS,
+            start_id="0-0",
+            count=batch_size,
+        )
+        if not result:
+            return []
+        entries = result[1] if len(result) >= 2 else []
+        return list(entries or [])
+
+    async def _pending_remaining(self, redis: Any) -> int | None:
+        try:
+            summary = await redis.xpending(_STREAM_KEY, _CONSUMER_GROUP)
+        except Exception:  # noqa: BLE001 — 只是可观测字段，取不到按 None
+            return None
+        if isinstance(summary, dict):
+            value = summary.get("pending")
+        elif isinstance(summary, (list, tuple)) and summary:
+            value = summary[0]
+        else:
+            value = None
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    async def replay_pending_events(self, *, batch_size: int | None = None) -> int:
+        """恢复一批未确认事件：先认领 PEL pending，再读新条目。
+
+        单次调用最多处理 ``batch_size``（默认 :data:`REPLAY_BATCH_SIZE`）条，让启动不被
+        队列长度绑定；剩余量写进报告，由 :meth:`drain_pending_events_in_background` 续跑。
+
+        Returns:
+            本轮恢复并重新分发的事件数量
+        """
+        limit = batch_size or REPLAY_BATCH_SIZE
+        report = self._new_replay_report()
         redis = await self._get_redis()
         if not redis:
             self._last_replay_report = report
@@ -428,51 +614,46 @@ class EventBus:
             except Exception:
                 pass  # group 已存在
 
-            # 读取 pending 事件
-            messages = await redis.xreadgroup(
-                _CONSUMER_GROUP, "worker-1", {_STREAM_KEY: ">"}, count=100, block=0
-            )
-            if not messages:
-                self._last_replay_report = report
-                return 0
-
             count = 0
-            for stream_name, entries in messages:
-                for msg_id, data in entries:
-                    report["read_count"] += 1
-                    try:
-                        payload = deserialize_payload_from_stream(data)
-                        event_type = payload.event_type
-                        # 直接分发，不再持久化（避免循环）
-                        handlers = self._handlers.get(event_type, [])
-                        for handler in handlers:
-                            try:
-                                await handler(payload)
-                            except Exception:
-                                report["failed_count"] += 1
-                                report["last_error"] = f"handler failed for {event_type.value}"
-                        # ACK
-                        await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
-                        report["acked_count"] += 1
-                        report["success_count"] += 1
-                        count += 1
-                    except Exception as item_exc:
-                        report["failed_count"] += 1
-                        report["dropped_unparseable_count"] += 1
-                        report["last_error"] = str(item_exc)
-                        # 仍然 ACK：不 ACK 会让 consumer group 队头永久阻塞。但必须记
-                        # ERROR + 单独计数，否则"事件被丢弃"这件事在日志和 /metrics 里
-                        # 都不可见（Requirement 13.9）。
-                        logger.error(
-                            "EventBus: 丢弃无法解析的 Stream 条目 msg_id=%s fields=%s: %s",
-                            msg_id,
-                            sorted(data.keys()) if isinstance(data, dict) else type(data).__name__,
-                            item_exc,
-                        )
-                        await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
-                        report["acked_count"] += 1
+            # 1) 先认领超租约的 pending：崩掉的 worker 留下的条目否则永远没人处理。
+            try:
+                claimed = await self._claim_pending_entries(redis, limit)
+            except Exception as claim_exc:  # noqa: BLE001 — 老版本 Redis 无 XAUTOCLAIM
+                claimed = []
+                report["last_error"] = f"xautoclaim: {claim_exc}"
+                logger.warning("EventBus: XAUTOCLAIM 不可用，仅处理新条目：%s", claim_exc)
+            for msg_id, data in claimed[:limit]:
+                report["claimed_count"] += 1
+                if await self._handle_replay_entry(redis, msg_id, data, report):
+                    count += 1
 
-            logger.info("EventBus: replayed %d pending events from Redis Stream", count)
+            # 2) 再读尚未投递给本组的新条目（">"），把本轮总量压在 limit 内。
+            # 🔴 不传 block：Redis 的 BLOCK 0 是「无限等」，没有新条目时一直挂着，直到启动任务的
+            # wait_for 把它取消 ⇒ 每次启动（含热重载）白等 5 秒（spec platform-perf-hotspots R8）。
+            remaining_budget = limit - report["read_count"]
+            fresh_entries = 0
+            if remaining_budget > 0:
+                messages = await redis.xreadgroup(
+                    _CONSUMER_GROUP, stream_consumer_name(), {_STREAM_KEY: ">"}, count=remaining_budget
+                )
+                for _stream_name, entries in messages or []:
+                    for msg_id, data in entries:
+                        fresh_entries += 1
+                        if await self._handle_replay_entry(redis, msg_id, data, report):
+                            count += 1
+
+            report["pending_remaining"] = await self._pending_remaining(redis)
+            # 本轮两个来源都没取满 ⇒ 没有积压可续跑了。
+            report["exhausted"] = (
+                len(claimed) < limit
+                and fresh_entries < max(0, remaining_budget)
+                and not report["pending_remaining"]
+            )
+            if report["read_count"]:
+                logger.info(
+                    "EventBus: 本轮恢复 %d 条（认领 %d，剩余 pending %s）",
+                    count, report["claimed_count"], report["pending_remaining"],
+                )
             self._last_replay_report = report
             return count
         except Exception as e:
@@ -480,6 +661,31 @@ class EventBus:
             report["last_error"] = str(e)
             self._last_replay_report = report
             return 0
+
+    async def drain_pending_events_in_background(
+        self,
+        stop_event: asyncio.Event | None = None,
+        *,
+        max_rounds: int = 200,
+        pause_s: float = 0.2,
+    ) -> int:
+        """在服务已开始 accept 之后继续分批清空积压（readiness 不等它）。
+
+        每轮之间让出事件循环，避免长时间占住 GIL；``exhausted`` 或 ``stop_event`` 置位即停。
+        """
+        total = 0
+        for _ in range(max_rounds):
+            if stop_event is not None and stop_event.is_set():
+                break
+            recovered = await self.replay_pending_events()
+            total += recovered
+            report = self._last_replay_report
+            if not report.get("redis_available") or report.get("exhausted"):
+                break
+            if report.get("read_count", 0) == 0:
+                break
+            await asyncio.sleep(pause_s)
+        return total
 
     def get_replay_report(self) -> dict[str, Any]:
         return dict(self._last_replay_report)

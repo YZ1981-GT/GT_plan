@@ -12,6 +12,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ROLE_TERMS } from '@/components/workpaper/composables/procedureConsoleOverlay'
 
 const mocks = vi.hoisted(() => ({
+  apiPost: vi.fn(),
+  apiGet: vi.fn(),
+  handleApiError: vi.fn(),
   getProcedures: vi.fn(),
   updateProcedureTrim: vi.fn(),
   canonicalTrimPreview: vi.fn(),
@@ -42,8 +45,9 @@ vi.mock('@/services/commonApi', () => ({
   previewProcedureDelegation: mocks.previewProcedureDelegation,
   applyProcedureDelegation: mocks.applyProcedureDelegation,
 }))
+vi.mock('@/services/apiProxy', () => ({ api: { post: mocks.apiPost, get: mocks.apiGet } }))
 vi.mock('@/services/staffApi', () => ({ listAssignments: mocks.listAssignments }))
-vi.mock('@/utils/errorHandler', () => ({ handleApiError: vi.fn() }))
+vi.mock('@/utils/errorHandler', () => ({ handleApiError: mocks.handleApiError }))
 vi.mock('@/utils/http', () => ({ default: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('@/composables/usePermissionMatrix', () => ({
   usePermissionMatrix: () => ({ currentRole: { value: 'manager' } }),
@@ -127,6 +131,8 @@ const TEAM = [
 async function mountView() {
   mocks.getProcedures.mockResolvedValue([PROC])
   mocks.initProcedures.mockResolvedValue([PROC])
+  mocks.apiPost.mockResolvedValue({ count: 1, procedures: [PROC] })
+  mocks.apiGet.mockResolvedValue({ cycles: [] })
   mocks.listAssignments.mockResolvedValue(TEAM)
   mocks.listProjects.mockResolvedValue([{ id: 'project-1', project_name: '示例项目' }])
   const wrapper = mount(ProcedureTrimming, { global: { stubs } })
@@ -204,5 +210,50 @@ describe('ProcedureTrimming — 两层委派呈现不串线（Task 12）', () =>
     expect(vm.procedures[0].assigned_to).toBe('s-partner')
     // 行层 preview 未再触发主编委派
     expect(mocks.assignProcedures).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('ProcedureTrimming — 循环加载只接纳最新响应', () => {
+  it('E 慢、F 快时，E 的旧响应不能覆盖 F 的表体', async () => {
+    const wrapper = await mountView()
+    const vm = wrapper.vm as any
+    mocks.apiPost.mockReset()
+    let resolveE!: (value: any) => void
+    let resolveF!: (value: any) => void
+    mocks.apiPost
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveE = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveF = resolve }))
+
+    vm.activeCycle = 'E'
+    const e = vm.loadProcedures()
+    vm.activeCycle = 'F'
+    const f = vm.loadProcedures()
+    resolveF({ procedures: [{ ...PROC, id: 'f', procedure_code: 'F1', wp_code: 'F1' }] })
+    await f
+    resolveE({ procedures: [{ ...PROC, id: 'e', procedure_code: 'E1', wp_code: 'E1' }] })
+    await e
+    expect(vm.activeCycle).toBe('F')
+    expect(vm.procedures.map((p: any) => p.procedure_code)).toEqual(['F1'])
+    expect(vm.procedureLoadError).toBe('')
+    wrapper.unmount()
+  })
+
+  it('当前循环加载失败时清空上一循环数据并禁止保存', async () => {
+    const wrapper = await mountView()
+    const vm = wrapper.vm as any
+    vm.procedures = [{ ...PROC, id: 'previous', procedure_code: 'F1', wp_code: 'F1' }]
+    mocks.apiPost.mockRejectedValueOnce(new Error('init failed'))
+    mocks.getProcedures.mockRejectedValueOnce(new Error('get failed'))
+    vm.activeCycle = 'G'
+    await vm.loadProcedures()
+    expect(vm.procedures).toEqual([])
+    expect(vm.procedureLoadError).toContain('G 循环程序列表加载失败')
+
+    mocks.canonicalTrimPreview.mockClear()
+    await vm.saveTrim(true)
+    expect(mocks.canonicalTrimPreview).not.toHaveBeenCalled()
+    expect(mocks.messageWarning).toHaveBeenCalledWith('程序列表尚未成功加载，不能保存粗裁')
+    wrapper.unmount()
   })
 })
