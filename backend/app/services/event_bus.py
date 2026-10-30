@@ -253,6 +253,12 @@ class EventBus:
             value_text = str(value).strip()
             if value_text:
                 identity.append((field, value_text))
+        # NOTE_SECTION_SAVED 的业务实体是单个章节。不同章节不能在同一窗口互相覆盖，
+        # 同一章节的连续保存仍沿用末次 payload 胜出的 debounce 语义。
+        if payload.event_type == EventType.NOTE_SECTION_SAVED:
+            section_code = str(extra.get("section_code") or "").strip()
+            if section_code:
+                identity.append(("section_code", section_code))
         if payload.context is not None:
             # project_id/year 已在 base_key 中，其他字段是合并上下文的稳定身份。
             context_identity = payload.context.identity_dict()

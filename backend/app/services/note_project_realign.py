@@ -9,7 +9,8 @@
 1. 改编号：行编号经 ``normalize_section_code``（种子 ``legacy_section_numbers`` 别名 + 国企「五、N → 八、N」）
    得到现行编号；现行编号已被同项目同年度任何行占用（**含软删**：唯一索引不排除软删行）⇒ 不改，记冲突。
 2. 树字段：对上模板的行按模板重写 ``parent_section_id / level / sort_index / sort_order / section_id``；
-   ``section_title`` 只在行标题是该节某个已知标题（现名、口径名、``legacy_titles``）时改 —— 用户改过的不动。
+   ``section_title`` 只在行标题是该节某个已知标题（现名、口径名、``legacy_titles``）时改；
+   若 ``account_name`` 仍逐字等于该旧系统标题，也跟随改为模板值，人工另改的 account_name 不动。
    ``section_id`` 一律对齐模板（子节点的 ``parent_section_id`` 按模板写，上级不对齐树就断）；目标 id 被别的行
    占用（且那一行不会让出）时不改并报告。
 3. 补章：模板有、项目没有的编号由生成链补（``generate_notes(only_sections=…)``，不复制构造逻辑）；编号被软删行
@@ -38,6 +39,7 @@ class NoteRow:
     id: str
     note_section: str
     section_title: str
+    account_name: str | None = None
     section_id: str | None = None
     parent_section_id: str | None = None
     level: int | None = None
@@ -74,10 +76,11 @@ class RealignPlan:
     sid_conflicts: list[dict[str, Any]] = field(default_factory=list)
     related_conflicts: list[dict[str, Any]] = field(default_factory=list)
     titles_kept: list[dict[str, Any]] = field(default_factory=list)
+    account_names_kept: list[dict[str, Any]] = field(default_factory=list)
 
     ACTION_KEYS = ("renames", "rehangs", "tree_updates", "child_reparents", "inserts", "related_updates")
     REPORT_KEYS = ("rename_conflicts", "insert_blocked", "orphan_conflicts", "orphan_unmatched", "sid_conflicts",
-                   "related_conflicts", "titles_kept")
+                   "related_conflicts", "titles_kept", "account_names_kept")
 
     def action_count(self) -> int:
         return sum(len(getattr(self, k)) for k in self.ACTION_KEYS)
@@ -257,12 +260,22 @@ def _plan_tree(plan: RealignPlan, active: list[NoteRow], final: dict[str, str], 
             if getattr(r, f) != new:
                 changes[f] = [getattr(r, f), new]
         title = t["section_title"]
+        title_is_known = r.section_title in known_titles(seeds.get(code), title)
         if r.section_title != title:
-            if r.section_title in known_titles(seeds.get(code), title):
+            if title_is_known:
                 changes["section_title"] = [r.section_title, title]
             else:
                 plan.titles_kept.append({"note_id": r.id, "note_section": code, "title": r.section_title,
                                          "template_title": title})
+        expected_account = t.get("account_name") or title
+        if r.account_name is not None and r.account_name != expected_account:
+            if title_is_known and r.account_name == r.section_title:
+                changes["account_name"] = [r.account_name, expected_account]
+            else:
+                plan.account_names_kept.append({
+                    "note_id": r.id, "note_section": code, "account_name": r.account_name,
+                    "template_account_name": expected_account,
+                })
         if changes:
             plan.tree_updates.append({"note_id": r.id, "note_section": code, "changes": changes})
 

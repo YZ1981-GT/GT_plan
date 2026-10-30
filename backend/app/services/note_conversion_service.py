@@ -261,9 +261,9 @@ def snapshot_note_state(note: Any) -> dict[str, Any]:
 
     spec: soe-listed-note-conversion-correctness / Requirement 9.3（Property 32）
 
-    只取 :func:`_map_disclosure_notes` 会改写的四个列 —— 快照要能证明「往返后逐
-    字段回到初始」，多存无用字段只会让 30 天前的旧值有机会覆盖新数据
-    （见 :data:`ROLLBACK_UNRESTORED_FIELDS` 的第 1 条理由）。
+    只取 :func:`_map_disclosure_notes` 会改写的六个列（章节标识四列 + 系统标题时改的
+    ``section_title`` / ``account_name``）—— 快照要能证明「往返后逐字段回到初始」，多存无用字段只会让
+    30 天前的旧值有机会覆盖新数据（见 :data:`ROLLBACK_UNRESTORED_FIELDS` 的第 1 条理由）。
 
     ``table_data`` **有意不入快照**：正向对它的唯一改动是 ``binding_id`` 章节号
     前缀，而那是可逆变换（逆向即 ``_rewrite_binding_id_prefix(td, new, old)``）。
@@ -279,7 +279,66 @@ def snapshot_note_state(note: Any) -> dict[str, Any]:
         "note_section": note.note_section,
         "is_deleted": bool(note.is_deleted),
         "template_lineage": deepcopy(lineage) if isinstance(lineage, dict) else None,
+        "section_title": note.section_title,
+        "account_name": note.account_name,
     }
+
+
+def _system_title_values(section: dict[str, Any] | None, title: str = "") -> tuple[set[str], set[str]]:
+    """一节模板的已知系统标题（现名、口径名、``legacy_titles``）与系统科目名（再加模板 ``account_name``）。"""
+    from app.services.note_project_realign import known_titles
+
+    titles = known_titles(section, title or (section or {}).get("section_title") or "")
+    return titles, titles | ({(section or {}).get("account_name")} - {None, ""})
+
+
+def plan_title_fields(
+    title: str | None, account: str | None, *, source: dict[str, Any] | None, target: dict[str, Any] | None,
+    source_title: str = "", target_title: str = "",
+) -> dict[str, Any]:
+    """转换时 ``section_title`` / ``account_name`` 怎么改：只把系统值换成目标模板值，人工改过的保留并上报。
+
+    系统值 = 源节与目标节的已知标题（:func:`_system_title_values`）。目标科目名与生成链同口径：模板
+    ``account_name`` 为空或等于模板标题时取目标标题。``account_name`` 为 None 不补；没有目标标题时都不动。
+    """
+    out: dict[str, Any] = {"section_title": title, "account_name": account, "title_kept": None, "account_kept": None}
+    if not target_title:
+        return out
+    src_titles, src_accounts = _system_title_values(source, source_title)
+    tgt_titles, tgt_accounts = _system_title_values(target, target_title)
+    tgt = target or {}
+    tgt_account = tgt.get("account_name")
+    expected = target_title if not tgt_account or tgt_account == tgt.get("section_title") else tgt_account
+    if title != target_title:
+        if title in src_titles | tgt_titles:
+            out["section_title"] = target_title
+        else:
+            out["title_kept"] = {"title": title, "template_title": target_title}
+    if account is not None and account != expected:
+        if account in src_accounts | tgt_accounts:
+            out["account_name"] = expected
+        else:
+            out["account_kept"] = {"account_name": account, "template_account_name": expected}
+    return out
+
+
+def revert_title_fields(
+    title: str | None, account: str | None, snap: dict[str, Any], current: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """回滚时把标题 / 科目名退回快照值 —— 只在现值仍是当前节的系统值时退（转换后人工改过的保留并上报）。
+
+    快照没有这两个键（本修复之前的 v2 快照，那时转换不改标题）⇒ 不动。
+    """
+    titles, accounts = _system_title_values(current)
+    out: dict[str, Any] = {"section_title": title, "account_name": account, "kept": []}
+    for field, value, allowed in (("section_title", title, titles), ("account_name", account, accounts)):
+        if field not in snap or value == snap[field]:
+            continue
+        if value in allowed:
+            out[field] = snap[field]
+        else:
+            out["kept"].append({"field": field, "current": value, "snapshot": snap[field]})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -584,6 +643,9 @@ class NoteConversionService:
                 "failed": failed,
                 "bridged_by_alias": detail.get("bridged_by_alias") or [],
                 "forbidden_pairs": forbidden,
+                # 人工改过的标题 / 科目名保留原值，不换成目标模板值（审计师据此核对）
+                "titles_kept": detail.get("titles_kept") or [],
+                "account_names_kept": detail.get("account_names_kept") or [],
                 "pending_keys": detail.get("pending_keys") or [],
             },
         }
@@ -681,6 +743,9 @@ class NoteConversionService:
             )
         if notes_detail.get("skipped_reasons"):
             warnings.append(f"附注章节跳过分布：{notes_detail['skipped_reasons']}")
+        kept = len(notes_detail.get("titles_kept") or []) + len(notes_detail.get("account_names_kept") or [])
+        if kept:
+            warnings.append(f"{kept} 处人工改过的章节标题 / 科目名保留原值，未换成目标模板值（明细见 notes_detail）")
         # Requirement 2.5 是平台红线：manual 单元格丢失必须让调用方看到，不能只留日志
         if notes_detail.get("user_edits_dropped"):
             warnings.append(
@@ -836,6 +901,8 @@ class NoteConversionService:
                                     全部随之消失）
         ``binding_id`` 前缀         逆向调 :func:`_rewrite_binding_id_prefix`
                                     （正向 ``(td, old, new)`` ⇒ 逆向 ``(td, new, old)``）
+        ``section_title`` /         现值仍是目标节系统值才退回快照值；转换后人工改过的
+        ``account_name``            保留并进 ``titles_kept``（``complete=False``）
         ==========================  ============================================
 
         ``template_lineage`` 走**整体还原**而不是「逐键删掉我们加的那些」：后者无法
@@ -943,6 +1010,15 @@ class NoteConversionService:
             str(s.get("note_id")): s for s in snap_notes if isinstance(s, dict) and s.get("note_id")
         }
         direction = snapshot_data.get("direction")
+        # 章节此刻在目标侧：标题 / 科目名只在现值仍是目标节系统值时退回（快照缺 target_type ⇒ 一律不退、只上报）
+        from app.services.note_template_diff import load_template_sections
+
+        target_type = snapshot_data.get("target_type")
+        current_sections = {
+            sec["section_id"]: sec for sec in load_template_sections(_conversion_side(target_type))
+            if isinstance(sec, dict) and sec.get("section_id")
+        } if target_type else {}
+        detail["titles_kept"] = []
 
         # 🔴 不过滤 is_deleted：归档章节要复原，新建空章节要识别
         notes_result = await self.db.execute(
@@ -1016,7 +1092,7 @@ class NoteConversionService:
             target_number = snap.get("note_section")
             if note.note_section == target_number:
                 # 章节号无需变动 ⇒ 直接回退其余字段
-                await self._restore_note_from_snapshot(note, snap, detail)
+                await self._restore_note_from_snapshot(note, snap, detail, current_sections)
             else:
                 pending.append((note, snap))
 
@@ -1046,7 +1122,7 @@ class NoteConversionService:
                 # 回退**前**记下它当前占的章节号 —— 成功后 note.note_section 已是
                 # 目标值，届时反查会拿错键
                 prev_number = note.note_section
-                ok = await self._restore_note_from_snapshot(note, snap, detail)
+                ok = await self._restore_note_from_snapshot(note, snap, detail, current_sections)
                 if ok:
                     if prev_number and occupied.get(prev_number) == str(note.id):
                         occupied.pop(prev_number, None)
@@ -1084,6 +1160,12 @@ class NoteConversionService:
             detail["warnings"].append(
                 f"正向转换对 {format_adapted} 个章节做过格式适配（改列结构），"
                 "该变换不可逆，table_data 的列结构未回退"
+            )
+
+        if detail["titles_kept"]:
+            detail["complete"] = False
+            detail["warnings"].append(
+                f"{len(detail['titles_kept'])} 处章节标题 / 科目名在转换后被人工改过，保留现值未退回快照值"
             )
 
         if detail["failed"]:
@@ -1131,8 +1213,9 @@ class NoteConversionService:
         note: Any,
         snap: dict[str, Any],
         detail: dict[str, Any],
+        current_sections: dict[str, dict[str, Any]] | None = None,
     ) -> bool:
-        """把单个章节的四个列 + ``binding_id`` 前缀回退到快照状态。
+        """把单个章节的四个列 + ``binding_id`` 前缀回退到快照状态；标题 / 科目名按 :func:`revert_title_fields`。
 
         spec: soe-listed-note-conversion-correctness / Requirement 9.3
 
@@ -1149,8 +1232,12 @@ class NoteConversionService:
         target_lineage = snap.get("template_lineage")
         was_deleted = bool(note.is_deleted)
         old_number = note.note_section
+        titles = revert_title_fields(note.section_title, note.account_name, snap,
+                                     (current_sections or {}).get(note.section_id))
         try:
             async with self.db.begin_nested():
+                note.section_title = titles["section_title"]
+                note.account_name = titles["account_name"]
                 # binding_id 前缀逆向改写（正向 (td, old, new) ⇒ 逆向 (td, new, old)）。
                 # 必须深拷贝后整体赋值：JSONB 未声明 MutableDict，就地改嵌套不标脏。
                 if (
@@ -1180,6 +1267,8 @@ class NoteConversionService:
             detail["restored"] += 1
             if was_deleted and not target_deleted:
                 detail["unarchived"] += 1
+            for kept in titles["kept"]:
+                detail.setdefault("titles_kept", []).append({"note_id": str(note.id), **kept})
             return True
         except Exception as exc:  # noqa: BLE001 — 逐章节隔离，失败不阻断其余
             logger.warning(
@@ -1449,12 +1538,8 @@ class NoteConversionService:
         章节已进 ``pairs``）—— 直接拿 diff 数据的 ``*_only_sections`` 去归档/新建会
         把那 5 对措辞差异章节做成「归档 + 新建空章」⇒ 丢已录数据。
         """
-        from app.services.note_section_matcher import (
-            FORBIDDEN_MATCH_PAIRS,
-            match_section,
-            normalize_for_match,
-            resolve_alias_counterpart,
-        )
+        from app.services.note_section_matcher import FORBIDDEN_MATCH_PAIRS, normalize_for_match
+        from app.services.note_section_pairing import bridge_alias_pairs
 
         src_side = _conversion_side(current_type)
         tgt_side = _conversion_side(target_type)
@@ -1474,6 +1559,7 @@ class NoteConversionService:
             pairs[src_sid] = {
                 "target_sid": tgt_sid,
                 "title": entry.get("section_title") or "",
+                "target_title": entry.get("section_title") or "",
                 "via": "common",
             }
 
@@ -1483,34 +1569,20 @@ class NoteConversionService:
                 source_only[entry["section_id"]] = entry
 
         target_only: dict[str, dict[str, Any]] = {}
-        target_only_by_title: dict[str, dict[str, Any]] = {}
         for entry in diff_data.get(tgt_only_key) or []:
-            if not isinstance(entry, dict):
-                continue
-            if entry.get("section_id"):
+            if isinstance(entry, dict) and entry.get("section_id"):
                 target_only[entry["section_id"]] = entry
-            key = normalize_for_match(entry.get("title"))
-            if key and key not in target_only_by_title:
-                target_only_by_title[key] = entry
 
-        # 别名桥接
+        # 别名桥接：同一别名在目标侧有多个节时按章类别选、每个目标只给一个源（note_section_pairing；
+        # 原「按标题取第一个目标」会把国企母公司章「营业收入与营业成本」桥到上市合并章「五、62」）。
+        # 桥接内部同样先过 match_section（禁止对优先于一切）
         bridged: list[dict[str, Any]] = []
-        for src_sid, entry in list(source_only.items()):
-            src_title = entry.get("title") or ""
-            counterpart = resolve_alias_counterpart(src_title, tgt_side)
-            if not counterpart:
-                continue
-            tgt_entry = target_only_by_title.get(normalize_for_match(counterpart))
-            if not tgt_entry or not tgt_entry.get("section_id"):
-                continue
-            # 双重保险：再过一次 match_section（禁止对优先于一切）
-            soe_title = src_title if src_side == "soe" else (tgt_entry.get("title") or "")
-            listed_title = (tgt_entry.get("title") or "") if src_side == "soe" else src_title
-            if not match_section(soe_title, listed_title):
-                continue
+        for entry, tgt_entry in bridge_alias_pairs(list(source_only.values()), list(target_only.values()), src_side):
+            src_sid, src_title = entry["section_id"], entry.get("title") or ""
             pairs[src_sid] = {
                 "target_sid": tgt_entry["section_id"],
                 "title": src_title,
+                "target_title": tgt_entry.get("title") or "",
                 "via": "alias",
             }
             bridged.append({
@@ -1535,10 +1607,9 @@ class NoteConversionService:
         # 源侧走归档、目标侧走新建空章。预览要把它显式展示出来，否则审计师看到
         # 「归档 1 + 新建 1」会以为是漏配。
         #
-        # 🔴 只报「双侧都在」的对，不报单侧命中 —— 实测两份模板 JSON 里
-        # 「公司财务报表主要项目注释」（源 docx 无「母」字的写法）**不存在**，
-        # 只有带「母」字的 JSON 现值存在 ⇒ 那一条只有单侧命中，报出来是噪声
-        # （它的价值在于「改一侧另一侧漏防」的防御，不是当期事实）。
+        # 🔴 只报「双侧都在」的对，不报单侧命中 —— 两种写法里模板 JSON 只有一种
+        # （2026-10-17 起是 Word 写法「公司财务报表主要项目注释」，带「母」字的是旧写法）
+        # ⇒ 另一条只有单侧命中，报出来是噪声（它的价值在于「改一侧另一侧漏防」的防御，不是当期事实）。
         # ------------------------------------------------------------------
         src_only_by_title = {
             normalize_for_match(e.get("title")): e for e in source_only.values()
@@ -1741,6 +1812,9 @@ class NoteConversionService:
             # 源侧因此走归档、目标侧走新建空章。预览端点（Requirement 9.1）据此
             # 向审计师展示「这两个章节故意不配对」，避免被误读成漏配。
             "forbidden_hits": [],
+            # 改写章节时人工改过、因此没换成目标模板值的标题 / 科目名（系统值才换，见 plan_title_fields）
+            "titles_kept": [],
+            "account_names_kept": [],
             "pending_keys": list(MAP_NOTES_PENDING_KEYS),
         }
         # 未测量项一律置 None（≠ 0 = 已测量为零）。Task 9 收口后该元组为空，
@@ -1769,7 +1843,10 @@ class NoteConversionService:
         def target_number(sid: str) -> str | None:
             return (target_sections.get(sid) or {}).get("section_number")
 
-        backfill_index = self._build_sid_backfill_index(load_template_sections(src_side))
+        source_templates = load_template_sections(src_side)
+        source_sections = {sec["section_id"]: sec for sec in source_templates
+                           if isinstance(sec, dict) and sec.get("section_id")}
+        backfill_index = self._build_sid_backfill_index(source_templates)
 
         notes_result = await self.db.execute(
             sa.select(DisclosureNote).where(
@@ -1955,10 +2032,19 @@ class NoteConversionService:
                             result["binding_ids_rewritten"] += rewritten
                             lineage_kwargs["legacy_note_section"] = old_number
 
+                    old_title = note.section_title
                     note.section_id = target_sid
                     note.note_section = new_number
+                    tgt_sec = target_sections.get(target_sid) or {}
+                    fields = plan_title_fields(
+                        old_title, note.account_name, source=source_sections.get(src_sid), target=tgt_sec,
+                        source_title=pair.get("title") or "",
+                        target_title=tgt_sec.get("section_title") or pair.get("target_title") or "",
+                    )
+                    note.section_title = fields["section_title"]
+                    note.account_name = fields["account_name"]
                     if pair["via"] == "alias" and pair.get("title"):
-                        lineage_kwargs["alias_source_title"] = note.section_title
+                        lineage_kwargs["alias_source_title"] = old_title
                     self._record_lineage(note, **lineage_kwargs)
 
                     # 格式适配（Requirement 1.5：按事实判据计数，不取自我声明）
@@ -1996,6 +2082,10 @@ class NoteConversionService:
                     if old_number and number_owner.get(old_number) == note.id:
                         number_owner.pop(old_number, None)
                     number_owner[new_number] = note.id
+                    for key, kept in (("titles_kept", fields["title_kept"]),
+                                      ("account_names_kept", fields["account_kept"])):
+                        if kept:
+                            result[key].append({"note_id": str(note.id), "note_section": new_number, **kept})
                     result["mapped"] += 1
             except Exception as exc:  # noqa: BLE001 — 逐章节隔离，失败不阻断其余
                 logger.warning(

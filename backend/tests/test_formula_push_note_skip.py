@@ -1880,3 +1880,37 @@ class TestDeferredSkipSingleAccount:
         assert len(skipped_row_miss) == 0, (
             "兜底成功后不应有 action=skipped 的行匹配失败记录"
         )
+
+
+class TestFinalTotalFallback:
+    def test_fallback_skips_subtotal_and_writes_final_total(self):
+        """无明细匹配时，小计与最终合计并存必须写最终合计。
+
+        旧 find_total_row 返回首个 is_total，兜底写进「小计」后 skip_total_recalc，最后「合计」恒为旧值。
+        """
+        rows = [
+            {"label": "税种甲", "end_amount": 1, "prior_amount": 2},
+            {"label": "小计", "end_amount": 1, "prior_amount": 2, "is_total": True, "row_type": "subtotal"},
+            {"label": "合计", "end_amount": 1, "prior_amount": 2, "is_total": True, "row_type": "total"},
+        ]
+        note = _make_note_mock(table_data=_sub_table_data("应交税费", rows, source="workpaper"))
+        ctx = _make_ctx(db=_setup_db_for_single_note(note))
+        written_labels: list[str] = []
+
+        def _capture(_ctx, *, row, **_kwargs):
+            written_labels.append(row["label"])
+            return True
+
+        binding = _make_binding([{
+            "note_label": "应交税费", "label": "应交税费",
+            "ending": 175, "ending_resolved": True, "opening": 270, "opening_resolved": True,
+            "is_total": False, "is_memo": False,
+        }], account_prefixes=("2221",))
+        with patch.object(engine_mod, "_push_note_cell", side_effect=_capture), \
+                patch.object(engine_mod, "_push_note_total", return_value=False) as recompute:
+            section = asyncio.run(engine_mod._push_note(
+                ctx, rule=_make_rule(), binding=binding, overlay={}, sources=_make_sources(), paper=_make_paper(),
+            ))
+        assert section == "五、22"
+        assert written_labels == ["合计", "合计"]
+        assert recompute.call_count == 0

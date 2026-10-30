@@ -959,10 +959,15 @@ async def run_and_commit(
             await _record_failure(db, project_id=project_id, year=year, trigger=trigger,
                                   triggered_by=triggered_by, error=exc)
         raise
-    if not dry_run and result.run_id is not None:
+    await notify_committed(result)
+    return result
+
+
+async def notify_committed(result: RunResult) -> None:
+    """提交成功后发 SSE 与附注章节事件（dry_run / 无运行记录不发）；调用方须先 commit。"""
+    if not result.dry_run and result.run_id is not None:
         _broadcast(result)
         await publish_note_sections(result.project_id, result.year, result.note_sections, result.run_id)
-    return result
 
 
 async def _record_failure(

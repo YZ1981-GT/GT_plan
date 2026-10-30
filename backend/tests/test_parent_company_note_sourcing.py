@@ -9,8 +9,8 @@
 五组判据：
 
 1. **Property 19（需求 8.1 / 10.4）** ``variant_matrix`` 的母公司维度是 additive ——
-   只新增顶层 ``parent_company_sections``、不新增第五个变体键、102 个科目的
-   ``variants`` 取值逐字不变。
+   只新增顶层 ``parent_company_sections``、不新增第五个变体键；Phase 8 对「投资收益」
+   做了唯一一次有意 canonical 合并（102→101），其余 100 个科目的 variants 保持不变。
 2. **Property 20（需求 8.2）** 母公司章取数指向 ``resolve_parent_standalone_project()``
    返回的项目 id，而非合并项目自身；且**本层不重写三条件**（源码级断言 engine 与
    note_sections 都不自己拼 ``company_code``/``audit_year``/``report_scope`` 查询）。
@@ -196,10 +196,10 @@ _NON_PARENT_SECTION = "五、5"
 
 class TestProperty19MatrixAdditive:
     def test_account_count_unchanged(self) -> None:
-        assert len(_ACCOUNTS) == 102, f"科目数应为 102，实为 {len(_ACCOUNTS)}"
+        assert len(_ACCOUNTS) == 101, f"科目数应为 101，实为 {len(_ACCOUNTS)}"
 
     def test_no_fifth_variant_key(self) -> None:
-        """不得新增第五个变体键（会波及 102 科目 × 全部消费方）。"""
+        """不得新增第五个变体键（会波及 101 个 canonical 科目 × 全部消费方）。"""
         for acct in _ACCOUNTS:
             keys = set(acct.get("variants", {}))
             extra = keys - set(_VARIANT_KEYS)

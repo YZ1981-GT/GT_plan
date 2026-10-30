@@ -18,7 +18,7 @@
   需求 4.1（有源 docx 证据）优先于需求 6.5（笼统措辞连带提到它）。
   **下个会话不得把它加回 ``RENAME_SECTIONS``**（详见该常量处注释）。
 
-  **listed 侧 4 个同构子节（应收票据 / 应收账款 / 其他应收款 / 营业收入与营业成本，
+  **listed 侧 4 个同构子节（应收票据 / 应收账款 / 其他应收款 / 营业收入和营业成本，
   共 53 张表）有意不在本任务范围** —— 它们归 Task 6 按合并章**整体替换** ``tables``，
   在此正名会被那次替换整表覆盖 = 白做。下个会话若按 requirements 6.5 字面「listed 侧
   重名全部正名」再做一遍，属重复劳动，请先看 Task 6 是否已完成。
@@ -111,7 +111,7 @@ TEMPLATE_PATH = {
     "soe": DATA_DIR / "note_template_soe.json",
 }
 LABELS = {
-    "listed": "listed 第十六章 母公司财务报表主要项目注释",
+    "listed": "listed 第十六章 公司财务报表主要项目注释",
     "soe": "soe 第十二章 母公司财务报表的主要项目附注",
 }
 ALIGNED_BY = "fix_note_parent_company_chapter.py"
@@ -174,7 +174,7 @@ ISOMORPHIC_SOURCE: dict[str, dict[str, str]] = {
         "应收票据": "五、4",
         "应收账款": "五、5",
         "其他应收款": "五、8",
-        "营业收入与营业成本": "五、62",
+        "营业收入和营业成本": "五、62",
     },
     "soe": {
         "应收账款": "八、5",
@@ -414,7 +414,7 @@ _UNUSED = (PERCENT, TEXT)  # kit 常量占位（本脚本目标表无百分比/�
 # ─────────────────────────── Task 3: 章标题与标识改写 ───────────────────────────
 
 # 平台既有 slug 生成器的长度上限：listed 侧 `chapter-16-…-ying-ye-shou-ru-yu-ying-ye-cheng`
-# 恰好 95 字符且末尾被截断（源标题是「营业收入与营业成本」，`-ben` 被切掉），
+# 恰好 95 字符且末尾被截断（section_id 沿用旧标题「营业收入与营业成本」生成的稳定标识，`-ben` 被切掉），
 # soe 侧最长 97（`…-cha-cuo-de-g-kua-2`，含去重后缀）⇒ 取 95 与主流形态一致。
 SLUG_MAX_LEN = 95
 
@@ -1777,7 +1777,7 @@ PARENT_ROW_CODE_PLAN: dict[str, dict[str, RowCodePlan]] = {
             main_table="长期股权投资",
             section_reason=_detail_reason("长期股权投资", _r, "长期股权投资"),
         ),
-        "营业收入与营业成本": RowCodePlan(
+        "营业收入和营业成本": RowCodePlan(
             ref=None,
             main_table=None,
             section_reason=(

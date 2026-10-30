@@ -9,7 +9,7 @@
         {
           "section_code": "一、1",
           "section_id": "chapter-01-gong-si-ji-ben-qing-kuang-gong-si-ji-ben-qing-kuang",
-          "section_title": "公司基本情况",
+          "section_title": "公司（企业）基本情况",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -555,7 +555,7 @@
         {
           "section_code": "五、其他调整事项【包",
           "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-qi",
-          "section_title": "其他调整事项【包括同一控制下企业合并和清产核资】",
+          "section_title": "其他调整事项",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -1581,7 +1581,7 @@
         {
           "section_code": "八、70",
           "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-tou-zi-shou-yi-xia-biao-zhong-bu-shi-yong-d",
-          "section_title": "投资收益【下表中不适用的项目，删除】",
+          "section_title": "投资收益",
           "level": 2,
           "content_type": "mixed",
           "placeholders": [
@@ -2060,7 +2060,7 @@
         {
           "section_code": "一、1",
           "section_id": "chapter-01-gong-si-ji-ben-qing-kuang-gong-si-ji-ben-qing-kuang",
-          "section_title": "公司基本情况",
+          "section_title": "公司（企业）基本情况",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -2606,7 +2606,7 @@
         {
           "section_code": "五、其他调整事项【包",
           "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-qi",
-          "section_title": "其他调整事项【包括同一控制下企业合并和清产核资】",
+          "section_title": "其他调整事项",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -3797,7 +3797,7 @@
         {
           "section_code": "八、70",
           "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-tou-zi-shou-yi-xia-biao-zhong-bu-shi-yong-d",
-          "section_title": "投资收益【下表中不适用的项目，删除】",
+          "section_title": "投资收益",
           "level": 2,
           "content_type": "mixed",
           "placeholders": [
@@ -4268,7 +4268,7 @@
         },
         {
           "section_code": "十二、应收账款",
-          "section_id": "chapter-12-gu-fen-zhi-fu-ying-shou-zhang-kuan",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-ying-shou-zhang-kuan",
           "section_title": "应收账款",
           "level": 2,
           "content_type": "mixed",
@@ -4282,7 +4282,7 @@
         },
         {
           "section_code": "十二、其他应收款",
-          "section_id": "chapter-12-gu-fen-zhi-fu-qi-ta-ying-shou-kuan",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-qi-ta-ying-shou-kuan",
           "section_title": "其他应收款",
           "level": 2,
           "content_type": "mixed",
@@ -4296,7 +4296,7 @@
         },
         {
           "section_code": "十二、长期股权投资",
-          "section_id": "chapter-12-gu-fen-zhi-fu-chang-qi-gu-quan-tou-zi",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-chang-qi-gu-quan-tou-zi",
           "section_title": "长期股权投资",
           "level": 2,
           "content_type": "mixed",
@@ -4310,7 +4310,7 @@
         },
         {
           "section_code": "十二、营业收入与营业成本",
-          "section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-ying-ye-shou-ru-yu-ying-ye-che",
           "section_title": "营业收入与营业成本",
           "level": 2,
           "content_type": "mixed",
@@ -4324,7 +4324,7 @@
         },
         {
           "section_code": "十二、投资收益",
-          "section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-tou-zi-shou-yi",
           "section_title": "投资收益",
           "level": 2,
           "content_type": "mixed",
@@ -4338,7 +4338,7 @@
         },
         {
           "section_code": "十二、现金流量表补充资",
-          "section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+          "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-xian-jin-liu-liang-biao-bu-cho",
           "section_title": "现金流量表补充资料",
           "level": 2,
           "content_type": "mixed",
@@ -4690,6 +4690,20 @@
           "legacy_aliases": []
         },
         {
+          "section_code": "三、研发支出",
+          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu",
+          "section_title": "研发支出",
+          "level": 2,
+          "content_type": "mixed",
+          "placeholders": [
+            "{{seq:三}}",
+            "{{section:三、研发支出}}",
+            "{{table:三、研发支出}}"
+          ],
+          "binding_wp_code": null,
+          "legacy_aliases": []
+        },
+        {
           "section_code": "三、资产减值",
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi",
           "section_title": "资产减值",
@@ -4772,7 +4786,7 @@
         {
           "section_code": "三、收入（应当写出适",
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-shou-ru-ying-dang-xie-chu-shi-he-qi-ye-t",
-          "section_title": "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）",
+          "section_title": "收入",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -6237,7 +6251,7 @@
         {
           "section_code": "十四、资产负债表日后利",
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
-          "section_title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+          "section_title": "资产负债表日后利润分配情况",
           "level": 2,
           "content_type": "mixed",
           "placeholders": [
@@ -6669,6 +6683,20 @@
           "legacy_aliases": []
         },
         {
+          "section_code": "三、研发支出",
+          "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu",
+          "section_title": "研发支出",
+          "level": 2,
+          "content_type": "mixed",
+          "placeholders": [
+            "{{seq:三}}",
+            "{{section:三、研发支出}}",
+            "{{table:三、研发支出}}"
+          ],
+          "binding_wp_code": null,
+          "legacy_aliases": []
+        },
+        {
           "section_code": "三、资产减值",
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-chan-jian-zhi",
           "section_title": "资产减值",
@@ -6751,7 +6779,7 @@
         {
           "section_code": "三、收入（应当写出适",
           "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-shou-ru-ying-dang-xie-chu-shi-he-qi-ye-t",
-          "section_title": "收入（应当写出适合企业特点的，尤其是一些特殊业务，以及收入的确认时点）",
+          "section_title": "收入",
           "level": 2,
           "content_type": "text",
           "placeholders": [
@@ -8216,7 +8244,7 @@
         {
           "section_code": "十四、资产负债表日后利",
           "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
-          "section_title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+          "section_title": "资产负债表日后利润分配情况",
           "level": 2,
           "content_type": "mixed",
           "placeholders": [
@@ -8269,7 +8297,7 @@
         {
           "section_code": "十六",
           "section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
-          "section_title": "母公司财务报表主要项目注释",
+          "section_title": "公司财务报表主要项目注释",
           "level": 1,
           "content_type": "text",
           "placeholders": [

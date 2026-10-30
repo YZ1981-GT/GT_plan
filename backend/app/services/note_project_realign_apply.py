@@ -34,6 +34,9 @@ BACKUP_VERSION = 1
 BACKUP_TABLES: dict[str, bool] = {
     "disclosure_notes": True, "formula_push_state": True, "note_section_locks": True, "note_section_instances": False,
 }
+#: 公式推送还会写底稿条目（无年度列，按项目整体）：推送前的备份带上它（``include_workpapers``），恢复时一并原样恢复。
+#: 库内无外键指向 ``checklist_responses``，删后按原 id 插回不会连带删别的表
+WORKPAPER_TABLES: dict[str, bool] = {"checklist_responses": False}
 #: 章节锁表没有 ORM 模型（V046 建表，服务走裸 SQL）；只声明本工具用到的列，查询 / 改写走 Core（类型可移植）
 LOCKS = sa.Table(
     "note_section_locks", sa.MetaData(),
@@ -66,13 +69,13 @@ def seed_index(template_type: str) -> dict[str, dict[str, Any]]:
 async def load_rows(db: AsyncSession, project_id: uuid.UUID, year: int, *, lock: bool = False) -> list[NoteRow]:
     """该项目该年度全部附注行（含软删），Core 查询（不进 ORM 身份映射，执行后再读拿到的是库内现值）。"""
     t = DisclosureNote.__table__
-    stmt = sa.select(t.c.id, t.c.note_section, t.c.section_title, t.c.section_id, t.c.parent_section_id, t.c.level,
+    stmt = sa.select(t.c.id, t.c.note_section, t.c.section_title, t.c.account_name, t.c.section_id, t.c.parent_section_id, t.c.level,
                      t.c.sort_index, t.c.sort_order, t.c.is_deleted, t.c.text_content, t.c.table_data
                      ).where(t.c.project_id == project_id, t.c.year == year)
     if lock:
         stmt = stmt.with_for_update()
     return [NoteRow(id=str(r.id), note_section=r.note_section, section_title=r.section_title or "",
-                    section_id=r.section_id, parent_section_id=r.parent_section_id, level=r.level,
+                    account_name=r.account_name, section_id=r.section_id, parent_section_id=r.parent_section_id, level=r.level,
                     sort_index=r.sort_index, sort_order=r.sort_order, is_deleted=bool(r.is_deleted),
                     text_hash=_hash(r.text_content), table_hash=_hash(r.table_data))
             for r in (await db.execute(stmt)).all()]
@@ -311,10 +314,248 @@ async def _jsonb_columns(db: AsyncSession, table: str) -> list[str]:
         "AND table_name = :t AND data_type = 'jsonb' ORDER BY column_name"), {"t": table})).scalars().all())
 
 
-async def export_rows(db: AsyncSession, project_id: uuid.UUID, year: int) -> dict[str, list[dict[str, Any]]]:
+#: 判「无业务实值」时忽略的结构键 / 明确占位值。100 只在比例字段中视为模板合计占位。
+_DROP_META_KEYS = frozenset({"label", "is_total", "row_type", "_cell_meta", "_cell_modes", "row_key"})
+_DROP_EMPTY_VALUES = frozenset({None, "", 0, 0.0, "0", "/", "-", "—", 100})
+_RATIO_KEYS = ("ratio", "rate", "percent", "比例", "比率", "率")
+
+
+def _is_empty_sample(key: str, value: Any) -> bool:
+    if isinstance(value, (dict, list, tuple, set)):
+        return not value
+    if value == 100:
+        return any(token in key.lower() for token in _RATIO_KEYS)
+    try:
+        return value in (_DROP_EMPTY_VALUES - {100})
+    except TypeError:  # 自定义 JSON 解码对象等不可哈希值，一律按业务值保守处理
+        return False
+
+
+def _protected_cell_payload(value: Any, row_mode: Any) -> tuple[Any, str]:
+    """返回单元格业务值与保护模式；无显式值的元数据对象按空壳处理。"""
+    mode = str(row_mode or "").strip().lower()
+    if not isinstance(value, dict):
+        return value, mode
+    mode = str(value.get("mode") or mode).strip().lower()
+    if "value" in value:
+        return value.get("value"), mode
+    if "manual_value" in value:
+        return value.get("manual_value"), mode
+    return None, mode
+
+
+def _is_protected_zero(value: Any, mode: str) -> bool:
+    """人工确认的零是业务事实；自动零仍是可清理的模板样值。"""
+    if mode not in {"manual", "locked"} or isinstance(value, bool):
+        return False
+    return value in (0, 0.0, "0")
+
+
+def _drop_protection_reasons(table_data: Any) -> list[str]:
+    """破坏性软删的独立保护证据；普通结构元数据不构成阻断。"""
+    if not isinstance(table_data, dict):
+        return []
+    reasons: list[str] = []
+    if table_data.get("_manual_override") is True:
+        reasons.append("manual_override:top")
+    sub = table_data.get("sub_table_data")
+    if isinstance(sub, dict) and sub.get("_manual_override") is True:
+        reasons.append("manual_override:sub_table_data")
+    orphans = table_data.get("_realign_orphans")
+    if orphans:
+        size = len(orphans) if isinstance(orphans, list) else "malformed"
+        reasons.append(f"realign_orphans:{size}")
+    return reasons
+
+
+def _business_values(table_data: Any) -> list[tuple[str, Any]]:
+    """附注 table_data 中的非空业务值；兼容旧顶层表、多表和 sub_table_data。"""
+    out: list[tuple[str, Any]] = []
+    if not isinstance(table_data, dict):
+        return out
+
+    def scan_rows(name: str, rows: Any) -> None:
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            label = row.get("label")
+            values = row.get("values")
+            if isinstance(values, list):
+                modes = row.get("_cell_modes") if isinstance(row.get("_cell_modes"), dict) else {}
+                for ci, raw_value in enumerate(values):
+                    value, mode = _protected_cell_payload(raw_value, modes.get(str(ci)))
+                    if _is_protected_zero(value, mode) or not _is_empty_sample(str(ci), value):
+                        out.append((f"{name}.{label}.{ci}", value))
+            for key, value in row.items():
+                if key in _DROP_META_KEYS or key in {"values", "cells"}:
+                    continue
+                if not _is_empty_sample(key, value):
+                    out.append((f"{name}.{label}.{key}", value))
+
+    sub = table_data.get("sub_table_data") or {}
+    if isinstance(sub, dict):
+        for name, rows in sub.items():
+            scan_rows(str(name), rows)
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        for idx, table in enumerate(tables):
+            if isinstance(table, dict):
+                scan_rows(str(table.get("name") or idx), table.get("rows") or [])
+    else:  # 旧格式单表；多表时顶层是首表镜像，不能重复计数
+        scan_rows(str(table_data.get("name") or "table"), table_data.get("rows") or [])
+    return out
+
+
+def _has_text(value: Any) -> bool:
+    """正文 / 指引是否含用户可见内容；HTML 空壳不算。"""
+    import re
+
+    text = re.sub(r"<[^>]+>", "", str(value or ""))
+    return bool(text.replace("&nbsp;", " ").strip())
+
+
+async def drop_duplicate_sections(
+    db: AsyncSession, project_id: uuid.UUID, year: int, sections: list[str], *,
+    apply: bool = False, backup_dir: Path | None = None, stamp: str = "",
+) -> dict[str, Any]:
+    """软删「跨准则同步进来的重复编号行」—— 四道硬门全过才删（spec Phase 8，宜宾 五、5 / 五、15）。
+
+    判据（任一不满足即拒绝该行，不删）：
+      1. 编号原文不属本项目准则（``note_section`` 不在本准则种子的 ``section_number`` ∪ ``legacy_section_numbers``；
+         五、N 是上市编号，国企项目现行编号是 八、N —— **不归一**，归一会把 五、N 映成 八、N 而误判成「属于本项目」）；
+      2. 表格由**另一准则**底稿同步写入（``_source`` 以 workpaper 开头且 ``_current_standard`` 与项目模板准则不符）；
+      3. 无业务实值（:func:`_business_values` 为空）；
+      4. 现行模板里有同标题的未软删行（删掉这行不丢任何信息）。
+
+    ``--apply``：锁行 → 只备份本操作会改的附注域 → 全部请求项过门后统一置 ``is_deleted=true`` →
+    复核目标已软删且同标题活动行仍在。表无 ``deleted_at`` / ``deleted_by`` 列，只写 ``is_deleted``。
+    调用方管事务（提交 / 回滚）。
+    """
+    deleted = (await db.execute(sa.select(Project.is_deleted).where(Project.id == project_id))).scalar_one_or_none()
+    if deleted is None or deleted:
+        raise RealignSkipped("项目不存在或已删除（回收站），不处理")
+    engine = DisclosureEngine(db)
+    template_type = await engine._get_active_template_type(project_id)
+    if template_type not in ("soe", "listed"):
+        raise RealignError(f"项目模板类型为 {template_type}，只支持国企 / 上市种子")
+    seeds = seed_index(template_type)
+    # 本准则现行编号原文集合（含别名）：判「编号不属于本项目准则」用——不归一（五、N 是 listed 编号，
+    # 归一会把它映成国企 八、N 而误判成「属于本项目」）
+    native_codes = {s.get("section_number") for s in seeds.values()}
+    native_codes |= {alias for s in seeds.values() for alias in (s.get("legacy_section_numbers") or [])}
+    rows = await load_rows(db, project_id, year, lock=apply)
+    by_id = {r.id: r for r in rows}
+    from app.services.note_section_matcher import normalize_for_match
+
+    # 标题按同一规范化口径比较；候选本身不算另一条承载。
+    live_titles: dict[str, list[tuple[str, str]]] = {}
+    for r in rows:
+        if not r.is_deleted:
+            live_titles.setdefault(normalize_for_match(r.section_title), []).append((r.id, r.note_section))
+
+    content_by_id = {str(x["id"]): x for x in await _full_rows(db, project_id, year)}
+    matches_by_code: dict[str, list[NoteRow]] = {
+        code: [r for r in rows if r.note_section == code and not r.is_deleted]
+        for code in sections
+    }
+    candidates: dict[str, dict[str, Any]] = {}
+    ambiguous: dict[str, list[str]] = {}
+    for code, matched in matches_by_code.items():
+        if len(matched) > 1:
+            ambiguous[code] = [r.id for r in matched]
+            continue
+        if not matched:
+            continue
+        r = matched[0]
+        content = content_by_id.get(str(r.id)) or {}
+        td = content.get("table_data") or {}
+        source = str((td.get("_source") or "")) if isinstance(td, dict) else ""
+        cur_std = (td.get("_current_standard") if isinstance(td, dict) else None) or ""
+        title_key = normalize_for_match(r.section_title)
+        same_title_live = [other_code for other_id, other_code in live_titles.get(title_key, []) if other_id != r.id]
+        business_values = _business_values(td)
+        protection_reasons = _drop_protection_reasons(td)
+        gates = {
+            "编号不属本准则": r.note_section not in native_codes,
+            "另一准则底稿同步": source.startswith("workpaper") and bool(cur_std) and not cur_std.startswith(template_type),
+            "无正文指引和业务实值": not business_values
+                and not protection_reasons
+                and not _has_text(content.get("text_content"))
+                and not _has_text(content.get("guidance_text")),
+            "现行有同标题行": bool(same_title_live),
+        }
+        candidates[code] = {
+            "note_id": r.id, "section_title": r.section_title, "current_standard": cur_std, "source": source,
+            "business_values": business_values[:10], "protection_reasons": protection_reasons,
+            "same_title_live": same_title_live,
+            "gates": gates, "droppable": all(gates.values()),
+        }
+
+    missing = [code for code in sections if not matches_by_code.get(code)]
+    report: dict[str, Any] = {
+        "project_id": str(project_id), "year": year, "template_type": template_type,
+        "requested": sections, "candidates": candidates, "missing": missing, "ambiguous": ambiguous,
+    }
+    droppable = [c["note_id"] for c in candidates.values() if c["droppable"]]
+    blockers = [code for code, c in candidates.items() if not c["droppable"]]
+    report["droppable_count"] = len(droppable)
+    report["blocked"] = blockers
+    if not apply:
+        return report
+    # apply 是项目级原子操作：请求项必须全部恰好命中一行并通过全部门，禁止静默部分删除。
+    if missing or ambiguous or blockers or len(droppable) != len(sections):
+        raise RealignError(
+            f"重复行软删未通过全部安全门：missing={missing} ambiguous={ambiguous} blocked={blockers}"
+        )
+    if not droppable:
+        return report
+
+    report["backup"] = await write_backup(
+        db, project_id, year, (backup_dir or Path(".")) / f"note_drop_{project_id}_{year}_{stamp}.json",
+    )
+    t = DisclosureNote.__table__
+    await db.execute(sa.update(t).where(t.c.id.in_([uuid.UUID(nid) for nid in droppable])).values(is_deleted=True))
+    await db.flush()
+    # 复核：目标行已软删，且其同标题现行行仍在（删对了、没误删唯一承载）
+    after = {r.id: r for r in await load_rows(db, project_id, year)}
+    problems: list[str] = []
+    for nid in droppable:
+        row = after.get(nid)
+        if not row or not row.is_deleted:
+            problems.append(f"{by_id[nid].note_section} 未软删")
+        title = by_id[nid].section_title or ""
+        title_key = normalize_for_match(title)
+        if not any(
+            not x.is_deleted and normalize_for_match(x.section_title) == title_key and x.id != nid
+            for x in after.values()
+        ):
+            problems.append(f"{by_id[nid].note_section}「{title}」软删后已无现行同标题行")
+    if problems:
+        raise RealignError("软删复核不通过：" + "；".join(problems))
+    report["dropped"] = [by_id[nid].note_section for nid in droppable]
+    return report
+
+
+async def _full_rows(db: AsyncSession, project_id: uuid.UUID, year: int) -> list[dict[str, Any]]:
+    """该项目该年度活动附注的内容字段（Core，拿库内 JSONB / 正文现值）。"""
+    t = DisclosureNote.__table__
+    stmt = sa.select(t.c.id, t.c.table_data, t.c.text_content, t.c.guidance_text).where(
+        t.c.project_id == project_id, t.c.year == year, t.c.is_deleted == sa.false())
+    return [
+        {"id": r.id, "table_data": r.table_data, "text_content": r.text_content, "guidance_text": r.guidance_text}
+        for r in (await db.execute(stmt)).all()
+    ]
+
+
+def _backup_tables(include_workpapers: bool) -> dict[str, bool]:
+    return {**BACKUP_TABLES, **(WORKPAPER_TABLES if include_workpapers else {})}
+
+
+async def export_rows(db: AsyncSession, project_id: uuid.UUID, year: int, *,
+                      include_workpapers: bool = False) -> dict[str, list[dict[str, Any]]]:
     """表 → ``[{"id", "row": row_to_json 原文, "json_null": [值为 JSON null 的 jsonb 列]}]``，按 id 排序。"""
     out: dict[str, list[dict[str, Any]]] = {}
-    for table, by_year in BACKUP_TABLES.items():
+    for table, by_year in _backup_tables(include_workpapers).items():
         cols = await _jsonb_columns(db, table)
         nulls = ", ".join(f"CASE WHEN jsonb_typeof(x.{c}) = 'null' THEN '{c}' END" for c in cols)
         null_expr = f"array_remove(ARRAY[{nulls}]::text[], NULL)" if cols else "ARRAY[]::text[]"
@@ -330,24 +571,111 @@ def _require_pg(db: AsyncSession) -> None:
         raise RealignError("备份 / 恢复只支持 PostgreSQL")
 
 
-async def write_backup(db: AsyncSession, project_id: uuid.UUID, year: int, path: Path) -> dict[str, Any]:
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    """先写临时文件再替换：补记后像时改写的是已有备份，写到一半中断不能毁掉备份本身。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(path)
+
+
+async def begin_snapshot(db: AsyncSession) -> None:
+    """本事务改用 REPEATABLE READ（须在事务第一条查询前调用）：备份、执行、后像读同一快照。
+
+    读已提交时，备份之后、提交之前别人提交的改动会进后像却不在备份里，按备份恢复就会悄悄抹掉它们；
+    同一快照下这类改动要么与本事务写同一行而让本事务报串行化失败回滚，要么留在快照外、恢复时被后像围栏拦下。
+    """
     _require_pg(db)
-    tables = await export_rows(db, project_id, year)
+    await db.execute(sa.text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
+    level = (await db.execute(sa.text("SELECT current_setting('transaction_isolation')"))).scalar_one()
+    if level != "repeatable read":
+        raise RealignError(f"事务隔离级别没有切到 REPEATABLE READ（实际 {level}），不执行")
+
+
+async def write_backup(db: AsyncSession, project_id: uuid.UUID, year: int, path: Path, *,
+                       include_workpapers: bool = False) -> dict[str, Any]:
+    _require_pg(db)
+    tables = await export_rows(db, project_id, year, include_workpapers=include_workpapers)
     payload = {"version": BACKUP_VERSION, "project_id": str(project_id), "year": year,
                "created_at": datetime.now(timezone.utc).isoformat(), "tables": tables}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    _write_json(path, payload)
     return {"path": str(path), "counts": {k: len(v) for k, v in tables.items()}}
 
 
-async def restore_backup(db: AsyncSession, path: Path) -> dict[str, Any]:
-    """按备份原样恢复（删范围内现有行 → 按原 id 插回 → 补回 JSON null）；恢复后再导出须与备份逐字相等。"""
-    _require_pg(db)
+def _load_backup(path: Path) -> tuple[dict[str, Any], uuid.UUID, int, bool]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("version") != BACKUP_VERSION or set(payload.get("tables", {})) != set(BACKUP_TABLES):
+    names = set(payload.get("tables", {}))
+    with_wp = names == set(_backup_tables(True))
+    if payload.get("version") != BACKUP_VERSION or not (with_wp or names == set(BACKUP_TABLES)):
         raise RealignError(f"备份格式不符：{path}")
-    pid, year = uuid.UUID(payload["project_id"]), int(payload["year"])
-    for table, by_year in BACKUP_TABLES.items():
+    return payload, uuid.UUID(payload["project_id"]), int(payload["year"]), with_wp
+
+
+def _row_digests(entries: list[dict[str, Any]]) -> dict[str, str]:
+    return {e["id"]: _hash([e["row"], sorted(e["json_null"])]) for e in entries}
+
+
+async def record_postimage(db: AsyncSession, path: Path) -> dict[str, Any]:
+    """提交前把本次操作后的逐行摘要补记进备份（恢复围栏），须与操作在同一事务、提交之前调用。
+
+    恢复时现状须与这份后像逐行一致才放行：不一致说明操作提交后又有人改过这些表，原样恢复会连别人的改动一起抹掉。
+    """
+    _require_pg(db)
+    payload, pid, year, with_wp = _load_backup(path)
+    rows = await export_rows(db, pid, year, include_workpapers=with_wp)
+    payload["postimage"] = {"recorded_at": datetime.now(timezone.utc).isoformat(),
+                            "rows": {table: _row_digests(entries) for table, entries in rows.items()}}
+    _write_json(path, payload)
+    return {"counts": {k: len(v) for k, v in rows.items()}}
+
+
+async def plan_restore(db: AsyncSession, path: Path) -> dict[str, Any]:
+    """只读：按备份恢复会删 / 插 / 改多少行，以及后像围栏的判定。
+
+    ``fence``：``ok`` 现状与后像一致 · ``mismatch`` 操作后有改动（``drift`` 列出行 id）· ``unfenced`` 备份没有后像
+    （旧备份或操作未提交）· ``already_restored`` 现状已与备份一致（无需恢复）。
+    """
+    _require_pg(db)
+    payload, pid, year, with_wp = _load_backup(path)
+    current = await export_rows(db, pid, year, include_workpapers=with_wp)
+    delta: dict[str, dict[str, int]] = {}
+    for table, entries in current.items():
+        now, then = _row_digests(entries), _row_digests(payload["tables"][table])
+        delta[table] = {"delete": len(now.keys() - then.keys()), "insert": len(then.keys() - now.keys()),
+                        "change": sum(now[i] != then[i] for i in now.keys() & then.keys())}
+    post = payload.get("postimage")
+    drift: dict[str, list[str]] = {}
+    if current == payload["tables"]:
+        fence = "already_restored"
+    elif not isinstance(post, dict) or not isinstance(post.get("rows"), dict):
+        fence = "unfenced"
+    else:
+        for table, entries in current.items():
+            expected, actual = post["rows"].get(table) or {}, _row_digests(entries)
+            moved = (expected.keys() ^ actual.keys()) | {i for i in expected.keys() & actual.keys()
+                                                         if expected[i] != actual[i]}
+            if moved:
+                drift[table] = sorted(moved)
+        fence = "mismatch" if drift else "ok"
+    return {"project_id": str(pid), "year": year, "fence": fence, "drift": drift, "delta": delta,
+            "postimage_recorded_at": post.get("recorded_at") if isinstance(post, dict) else None}
+
+
+async def restore_backup(db: AsyncSession, path: Path, *, force: bool = False) -> dict[str, Any]:
+    """按备份原样恢复（删范围内现有行 → 按原 id 插回 → 补回 JSON null）；恢复后再导出须与备份逐字相等。
+
+    先过后像围栏（:func:`plan_restore`）：现状须与备份补记的操作后像逐行一致；``unfenced`` / ``mismatch`` 只有
+    ``force`` 才继续（调用方须先 dry-run 看过 ``drift`` 与 ``delta``）。现状已与备份一致时不写。
+    """
+    plan = await plan_restore(db, path)
+    if plan["fence"] == "already_restored":
+        return {**plan, "restored": False, "counts": {}}
+    if plan["fence"] != "ok" and not force:
+        detail = {t: ids[:5] for t, ids in plan["drift"].items()}
+        raise RealignError(f"后像围栏不放行（{plan['fence']}）：{detail or '备份没有后像'}；"
+                           "按备份恢复会覆盖这些改动，确认后用 --force-restore")
+    payload, pid, year, with_wp = _load_backup(path)
+    for table, by_year in _backup_tables(with_wp).items():
         await db.execute(sa.text(f"DELETE {_scope_sql(table, by_year)}"), {"p": pid, "y": year})
         entries = payload["tables"][table]
         if not entries:
@@ -357,8 +685,9 @@ async def restore_backup(db: AsyncSession, path: Path) -> dict[str, Any]:
         for col in sorted({c for e in entries for c in e["json_null"]}):
             ids = [uuid.UUID(e["id"]) for e in entries if col in e["json_null"]]
             await db.execute(sa.text(f"UPDATE {table} SET {col} = 'null'::jsonb WHERE id = ANY(:ids)"), {"ids": ids})
-    restored = await export_rows(db, pid, year)
-    for table in BACKUP_TABLES:
+    restored = await export_rows(db, pid, year, include_workpapers=with_wp)
+    for table in restored:
         if restored[table] != payload["tables"][table]:
             raise RealignError(f"恢复后 {table} 与备份不一致")
-    return {"project_id": str(pid), "year": year, "counts": {k: len(v) for k, v in restored.items()}}
+    return {**plan, "restored": True, "forced": plan["fence"] != "ok",
+            "counts": {k: len(v) for k, v in restored.items()}}

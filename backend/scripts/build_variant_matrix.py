@@ -50,6 +50,16 @@ _NORMALIZE_STRIP = set(" 、，,（）()【】「」/和与及或")
 # section_id 中账户拼音之前的公共片段（soe/listed 一致）
 _PINYIN_SPLIT = "xiang-mu-zhu-shi-"
 
+#: 旧 section_id 曾把标题尾部编制提示拼进 slug；标题清理后仍必须沿用既有语义 account_key。
+#: 只登记有实证的单项，不按标题重算全部键，也不改变 section_id。
+ACCOUNT_KEY_ALIASES = {
+    "tou_zi_shou_yi_xia_biao_zhong_bu_shi_yong_d": "tou_zi_shou_yi",
+}
+
+
+def canonical_account_key(key: str) -> str:
+    return ACCOUNT_KEY_ALIASES.get(key, key)
+
 
 def _chapter_prefix(code: str) -> str:
     return code.split("、")[0] if "、" in code else code
@@ -104,7 +114,7 @@ def build_matrix(index: dict[str, Any]) -> dict[str, Any]:
             rec = accounts.get(norm)
             if rec is None:
                 # 首见此账户：派生稳定 slug + 记录展示标题
-                base_slug = slug_from_section_id(s.get("section_id"), norm)
+                base_slug = canonical_account_key(slug_from_section_id(s.get("section_id"), norm))
                 slug = base_slug
                 n = 2
                 while slug in used_slugs:
@@ -145,6 +155,40 @@ def build_matrix(index: dict[str, Any]) -> dict[str, Any]:
 ADDITIVE_ACCOUNT_FIELDS = ("parent_company_sections",)
 
 
+def carry_over_existing_variants(
+    matrix: dict[str, Any], existing: dict[str, Any] | None
+) -> dict[str, Any]:
+    """补回 POC index 未覆盖、但既有正式矩阵已验证的非空落点。
+
+    只作用于本次生成仍存在的 canonical account；新生成值与既有值冲突时拒绝，不用旧值覆盖新事实。
+    历史投资收益长/短 key 会先规范为同一 key，四个变体取并集。
+    """
+    if not existing:
+        return matrix
+    old_by_key: dict[str, dict[str, str | None]] = {}
+    for account in existing.get("accounts") or []:
+        key = canonical_account_key(str(account.get("account_key") or ""))
+        if not key:
+            continue
+        merged = old_by_key.setdefault(key, {variant: None for variant in VARIANT_ORDER})
+        for variant in VARIANT_ORDER:
+            value = (account.get("variants") or {}).get(variant)
+            if value and merged.get(variant) not in (None, value):
+                raise ValueError(f"canonical account {key!r} 的 {variant} 既有值冲突")
+            if value:
+                merged[variant] = value
+    for account in matrix.get("accounts") or []:
+        key = canonical_account_key(str(account.get("account_key") or ""))
+        account["account_key"] = key
+        for variant, old_value in old_by_key.get(key, {}).items():
+            current = (account.get("variants") or {}).get(variant)
+            if current and old_value and current != old_value:
+                raise ValueError(f"canonical account {key!r} 的 {variant} 新旧值冲突: {current!r} != {old_value!r}")
+            if current is None and old_value:
+                account["variants"][variant] = old_value
+    return matrix
+
+
 def carry_over_additive_fields(
     matrix: dict[str, Any], existing: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -158,14 +202,18 @@ def carry_over_additive_fields(
         return matrix
     extras: dict[str, dict[str, Any]] = {}
     for acct in existing.get("accounts", []) or []:
-        key = acct.get("account_key")
+        key = canonical_account_key(str(acct.get("account_key") or ""))
         if not key:
             continue
         kept = {f: acct[f] for f in ADDITIVE_ACCOUNT_FIELDS if f in acct}
-        if kept:
-            extras[key] = kept
+        for field, value in kept.items():
+            if field in extras.get(key, {}) and extras[key][field] != value:
+                raise ValueError(f"canonical account {key!r} 的 additive 字段 {field!r} 冲突")
+            extras.setdefault(key, {})[field] = value
     for acct in matrix.get("accounts", []) or []:
-        for field, value in extras.get(acct.get("account_key"), {}).items():
+        key = canonical_account_key(str(acct.get("account_key") or ""))
+        acct["account_key"] = key
+        for field, value in extras.get(key, {}).items():
             acct[field] = value
     return matrix
 
@@ -178,6 +226,33 @@ def load_existing_matrix() -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover
         print(f"[WARN] cannot read existing matrix for additive carry-over: {exc}")
         return None
+
+
+def validate_matrix(matrix: dict[str, Any]) -> None:
+    """生成前硬门：稳定键唯一、每个变体的章节号只有一个 owner。"""
+    accounts = matrix.get("accounts") or []
+    keys = [a.get("account_key") for a in accounts]
+    if not all(keys) or len(keys) != len(set(keys)):
+        raise ValueError("variant matrix account_key 为空或重复")
+    for variant in VARIANT_ORDER:
+        owners: dict[str, list[str]] = {}
+        for account in accounts:
+            code = (account.get("variants") or {}).get(variant)
+            if code:
+                owners.setdefault(code, []).append(account["account_key"])
+        duplicates = {code: owner for code, owner in owners.items() if len(owner) > 1}
+        if duplicates:
+            raise ValueError(f"{variant} 同一 section_code 有多个 owner: {duplicates}")
+
+    investment = [a for a in accounts if a.get("account_key") == "tou_zi_shou_yi"]
+    if len(investment) != 1:
+        raise ValueError(f"投资收益 canonical account 应恰有 1 条，实为 {len(investment)}")
+    expected = {
+        "soe_standalone": "八、70", "soe_consolidated": "八、70",
+        "listed_standalone": "五、69", "listed_consolidated": "五、69",
+    }
+    if investment[0].get("variants") != expected:
+        raise ValueError(f"投资收益四变体不完整: {investment[0].get('variants')}")
 
 
 def print_stats(matrix: dict[str, Any]) -> None:
@@ -199,12 +274,15 @@ def main() -> None:
     args = parser.parse_args()
 
     index = load_index()
+    existing = load_existing_matrix()
     matrix = build_matrix(index)
-    matrix = carry_over_additive_fields(matrix, load_existing_matrix())
+    matrix = carry_over_existing_variants(matrix, existing)
+    matrix = carry_over_additive_fields(matrix, existing)
+    validate_matrix(matrix)
     print_stats(matrix)
 
     if args.write:
-        OUT_PATH.write_text(json.dumps(matrix, ensure_ascii=False, indent=2), encoding="utf-8")
+        OUT_PATH.write_text(json.dumps(matrix, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {OUT_PATH}")
     else:
         print("(dry-run; pass --write to save)")

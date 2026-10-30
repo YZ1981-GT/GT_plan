@@ -509,3 +509,23 @@ async def test_table_apply_refuses_orphans_when_disallowed(table_project, db: As
 
     with pytest.raises(RealignError, match="孤儿"):
         await apply_table_realignment(db, table_project["pid"], YEAR, allow_orphans=False)
+
+
+def test_account_name_follows_known_system_title_but_manual_name_is_preserved() -> None:
+    rows = [r for r in _aligned() if r.note_section != "十四"]
+    rows.append(_row("system", "十四", "其他重要事项", account_name="其他重要事项"))
+    plan = _plan(rows)
+    update = next(item for item in plan.tree_updates if item["note_id"] == "system")
+    assert update["changes"] == {
+        "section_title": ["其他重要事项", "财务报表之批准"],
+        "account_name": ["其他重要事项", "财务报表之批准"],
+    }
+
+    rows[-1] = _row("manual", "十四", "其他重要事项", account_name="审计师自定义名称")
+    plan = _plan(rows)
+    update = next(item for item in plan.tree_updates if item["note_id"] == "manual")
+    assert update["changes"] == {"section_title": ["其他重要事项", "财务报表之批准"]}
+    assert plan.account_names_kept == [{
+        "note_id": "manual", "note_section": "十四", "account_name": "审计师自定义名称",
+        "template_account_name": "财务报表之批准",
+    }]

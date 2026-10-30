@@ -117,6 +117,11 @@ def test_find_row_prefers_note_label_then_workpaper_label_and_skips_total():
     assert nw.find_row(rows, ["数字货币"]) is None
     assert nw.find_total_row(rows) == 2
     assert nw.find_total_row([{"label": "合计", "row_type": "total", "values": []}]) == 0
+    assert nw.find_total_row([
+        {"label": "小计", "is_total": True, "values": [1]},
+        {"label": "其他", "values": [2]},
+        {"label": "合计", "is_total": True, "values": [3]},
+    ]) == 2, "小计与最终合计并存时必须选最终合计"
 
 
 # ── 读写 ──────────────────────────────────────────────────────────────────

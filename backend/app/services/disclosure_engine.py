@@ -42,6 +42,7 @@ from app.services.note_section_catalog import (
     normalize_section_code,
     section_title_for_scope,
 )
+from app.services.note_title_hint import merge_title_hint_guidance
 from app.services.parent_company_note_sections import (
     PARENT_PROJECT_MISSING_KEY,
     PARENT_SOURCE_META_KEY,
@@ -1004,6 +1005,7 @@ class DisclosureEngine:
                     template_type=template_type,
                 ),
                 "section_title": section_title_for_scope(s, report_scope),
+                "title_hint": s.get("title_hint") if isinstance(s.get("title_hint"), str) else None,
                 "account_name": (
                     section_title_for_scope(s, report_scope)
                     if not s.get("account_name") or s.get("account_name") == s.get("section_title")
@@ -1808,7 +1810,7 @@ class DisclosureEngine:
             substantive, guidance, per_table_guidance = classify_template_content(
                 text_sections, tmpl.get("text_template"), tmpl.get("tables"),
             )
-            guidance_text = guidance
+            guidance_text = merge_title_hint_guidance(tmpl.get("title_hint"), guidance)
 
             if not text_content and substantive:
                 text_content = substantive

@@ -642,3 +642,24 @@ class TestGuidanceRendering:
         texts = [ws.cell(row=r, column=1).value for r in range(3, 10) if ws.cell(row=r, column=1).value]
         assert any("章节级通用提示" in str(t) for t in texts), "Section guidance missing"
         assert any("表一专属提示" in str(t) for t in texts), "Per-table guidance missing"
+
+
+@pytest.mark.parametrize(
+    ("meta", "mode", "expected_fill"),
+    [
+        ({"source": "trial_balance"}, None, FILL_LOCKED),
+        ({"source": "wp_data"}, None, FILL_LOCKED),
+        ({}, "locked", FILL_LOCKED),
+        ({}, "auto", FILL_LOCKED),
+        ({}, "formula", FILL_FORMULA),
+    ],
+)
+def test_render_locks_every_server_protected_cell(meta, mode, expected_fill):
+    row = {"row_type": "data", "label": "A", "values": [1], "_cell_meta": {"0": meta}}
+    if mode:
+        row["_cell_modes"] = {"0": mode}
+    xlsx_bytes, _ = export_sections_to_xlsx([_make_section(rows=[row])])
+    ws = _load_wb(xlsx_bytes).worksheets[2]
+    cell = ws.cell(row=_first_data_row(ws, "A"), column=2)
+    assert cell.fill.start_color.rgb == expected_fill.start_color.rgb
+    assert cell.protection.locked is True

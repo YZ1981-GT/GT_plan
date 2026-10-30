@@ -33,6 +33,14 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Si
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from app.services.note_offline_package import (
+    PACKAGE_VERSION,
+    SIGNING_KEY_ID,
+    build_manifest,
+    canonical_json,
+    sign_manifest,
+)
+
 __all__ = ["NoteOfflineExportService", "export_sections_to_xlsx"]
 
 
@@ -94,7 +102,7 @@ def _classify_cell(cell_meta: dict[str, Any]) -> str:
 
     if mode == "formula" or source == "formula":
         return "formula"
-    if source in ("wp_data", "trial_balance", "aux_balance", "aux_ledger_aging"):
+    if mode in ("auto", "locked") or source in ("wp_data", "trial_balance", "aux_balance", "aux_ledger_aging"):
         return "locked"
     if is_required:
         return "required"
@@ -190,11 +198,10 @@ def _build_instructions_sheet(ws: Worksheet, context: dict[str, Any]) -> None:
         ("  ⬛ 红底 = 锁定单元格（如来自试算表 / 底稿，禁止改动）", FONT_NORMAL),
         ("  ⬛ 绿底 = 必填项（导入时若为空将告警）", FONT_NORMAL),
         ("", None),
-        ("【3. 动态行操作】", FONT_HEADER),
-        ('  在带 ★ 标识的"动态行"区域：', FONT_NORMAL),
-        ("    - 复制现有行 → 在两个标记行之间粘贴 → 填写新数据", FONT_NORMAL),
-        ("    - 不要在 [DYNAMIC_END:xxx] 标记下方插入数据", FONT_NORMAL),
-        ("    - 删除行：选中整行 → 右键删除（不要清空内容留空行）", FONT_NORMAL),
+        ("【3. 行结构】", FONT_HEADER),
+        ("  本版离线包只允许修改已有单元格的值。", FONT_NORMAL),
+        ("  ⚠ 不要新增、删除或重排行；缺少稳定行 ID 时，系统会拒绝导入结构变化，避免值写错行。", FONT_NORMAL),
+        ("  如需增删动态行，请回到平台附注编辑器操作。", FONT_NORMAL),
         ("", None),
         ("【4. 公式区域】", FONT_HEADER),
         ("  灰底单元格的公式见单元格批注（鼠标悬停查看）。", FONT_NORMAL),
@@ -478,14 +485,10 @@ def _render_section_table(
 
             col_meta = cell_meta.get(str(c), {}) if isinstance(cell_meta, dict) else {}
             mode = cell_modes.get(str(c)) if isinstance(cell_modes, dict) else None
-            # 分类着色：mode=auto / 有 binding_id → 锁定（来自系统取数）
-            has_binding = bool(col_meta.get("binding_id"))
-            if has_binding or mode in ("auto", "formula"):
-                cell.fill = _get_fill_for_type("locked" if has_binding else "formula")
-                cell.protection = Protection(locked=True)
-            else:
-                cell.fill = _get_fill_for_type("editable")
-                cell.protection = Protection(locked=False)
+            descriptor = {**col_meta, "mode": mode or col_meta.get("mode") or "manual"}
+            cell_type = "locked" if col_meta.get("binding_id") else _classify_cell(descriptor)
+            cell.fill = _get_fill_for_type(cell_type)
+            cell.protection = Protection(locked=cell_type in {"locked", "formula"})
 
             # 注：不再写 openpyxl Comment（legacy VML 批注 + sheet protection 组合
             # 在 WPS 下会触发"无法打开指定的文件"。绑定/公式溯源信息已通过 4 色语义
@@ -501,8 +504,12 @@ def _render_section_table(
 # ---------------------------------------------------------------------------
 
 
-def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
-    """Build hidden _meta_ sheet with compressed metadata (C.0.5)."""
+def _build_meta_sheet(
+    ws: Worksheet,
+    sections: list[dict[str, Any]],
+    package_context: dict[str, Any] | None = None,
+) -> None:
+    """构建隐藏元数据；生产导出额外写入服务端签名的 1.1 manifest。"""
     # Collect all metadata
     meta_payload: dict[str, Any] = {}
     for section in sections:
@@ -538,9 +545,23 @@ def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
     ws.cell(row=4, column=1, value="export_time")
     ws.cell(row=4, column=2, value=_now_str())
 
-    # A5: version
+    # A5: version。纯函数旧调用未给上下文时仍产 1.0 兼容包；生产 service 一律签发 1.1。
     ws.cell(row=5, column=1, value="format_version")
-    ws.cell(row=5, column=2, value="1.0")
+    ws.cell(row=5, column=2, value=PACKAGE_VERSION if package_context else "1.0")
+    if package_context:
+        manifest = build_manifest(
+            sections,
+            project_id=package_context["project_id"],
+            year=int(package_context["year"]),
+            template_type=str(package_context["template_type"]),
+            meta_sha256=binding_hash,
+        )
+        ws.cell(row=6, column=1, value="package_manifest")
+        ws.cell(row=6, column=2, value=canonical_json(manifest))
+        ws.cell(row=7, column=1, value="package_signature")
+        ws.cell(row=7, column=2, value=sign_manifest(manifest))
+        ws.cell(row=8, column=1, value="signing_key_id")
+        ws.cell(row=8, column=2, value=SIGNING_KEY_ID)
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +618,7 @@ def export_sections_to_xlsx(
     partner_info: dict[str, str] | None = None,
     project_name: str = "",
     year: int | str = "",
+    package_context: dict[str, Any] | None = None,
 ) -> tuple[bytes, str]:
     """Export disclosure note sections to xlsx bytes.
 
@@ -671,7 +693,7 @@ def export_sections_to_xlsx(
 
     # C.0.5: _meta_ sheet (last, hidden)
     ws_meta = wb.create_sheet("_meta_")
-    _build_meta_sheet(ws_meta, filtered)
+    _build_meta_sheet(ws_meta, filtered, package_context)
     ws_meta.sheet_state = "hidden"
 
     # Save to bytes
@@ -723,6 +745,10 @@ class NoteOfflineExportService:
         # Load sections from DB
         sections = await self._load_sections(project_id, year, section_ids)
         project_name = await self._get_project_name(project_id)
+        from app.services.standard_unification_service import StandardUnificationService
+
+        standard = await StandardUnificationService(self.db).get_standard(project_id)
+        template_type = standard.get("entity_type") or "soe"
 
         return export_sections_to_xlsx(
             sections,
@@ -734,6 +760,7 @@ class NoteOfflineExportService:
             partner_info=partner_info,
             project_name=project_name,
             year=year,
+            package_context={"project_id": project_id, "year": year, "template_type": template_type},
         )
 
     async def _load_sections(
@@ -772,6 +799,7 @@ class NoteOfflineExportService:
         for note in notes:
             section_dict = {
                 "section_id": note.section_id or note.note_section or "",
+                "note_section": note.note_section or "",
                 "section_title": note.section_title or "",
                 "guidance_text": note.guidance_text or "",
                 "table_data": note.table_data or {},

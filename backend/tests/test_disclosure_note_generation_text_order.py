@@ -174,3 +174,28 @@ def test_llm_client_module_exports_chat_completion_not_llm_client():
 
     assert not hasattr(llm_mod, "llm_client")
     assert hasattr(llm_mod, "chat_completion")
+
+
+@pytest.mark.asyncio
+async def test_title_hint_is_written_to_guidance_without_mutating_title_or_body(monkeypatch):
+    """标题后的编制提示只走 guidance_text，不混入标题、账户名或正文。"""
+    import app.services.disclosure_engine as engine_module
+
+    eng = _make_engine()
+    template = _minimal_template([], note_section="八、70", title="投资收益")
+    template["title_hint"] = "下表中不适用的项目，删除"
+    eng._load_templates = AsyncMock(return_value=[template])  # type: ignore[assignment]
+    _with_prior(eng, {})
+    _stub_generate_notes_io(eng)
+    monkeypatch.setattr(
+        engine_module,
+        "classify_template_content",
+        lambda *_args, **_kwargs: (None, "请核对本期金额", {}),
+    )
+
+    await eng.generate_notes(uuid4(), 2025, "soe")
+
+    note = _added_note(eng)
+    assert note.guidance_text == "标题提示：下表中不适用的项目，删除\n\n请核对本期金额"
+    assert note.section_title == note.account_name == "投资收益"
+    assert note.text_content is None

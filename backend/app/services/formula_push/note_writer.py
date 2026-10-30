@@ -558,10 +558,21 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
 
 
 def find_total_row(rows: Sequence[Any]) -> int | None:
-    for index, row in enumerate(rows):
-        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total"):
+    """找整表最终合计，优先级：明确 ``row_type=total`` / 标签「合计、总计」> 其他 is_total。
+
+    一张表可同时有分段「小计」和末尾「合计」。原来返回首个 ``is_total``，公式兜底会把值写进小计并跳过
+    最终合计重算，留下空的合计行。倒序优先最终合计；只有小计时仍返回最后一个可用汇总行。
+    """
+    candidates = [
+        index for index, row in enumerate(rows)
+        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
+    ]
+    for index in reversed(candidates):
+        row = rows[index]
+        label = row_label(row).replace(" ", "")
+        if row.get("row_type") == "total" or label in {"合计", "总计"}:
             return index
-    return None
+    return candidates[-1] if candidates else None
 
 
 def _is_f3(row: Any, field: str) -> bool:
