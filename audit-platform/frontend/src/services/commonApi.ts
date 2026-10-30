@@ -1009,9 +1009,40 @@ export async function createSubsequentEvent(projectId: string, body: any): Promi
 
 // ── 用户管理 ──
 
+/**
+ * 用户列表。
+ *
+ * 🔴 **必须做 in-flight 共享，否则会弹「加载账号列表失败：网络不通」**
+ *    （与 `systemRoleApi.listRoles` 同因，2026-10-30 浏览器实测复现路径）：
+ *
+ *    `UserManagement`（账号权限 Tab）与 `UserRoleBindingPanel`（账号角色绑定 Tab）
+ *    都调本函数，而 `PermissionCenter` 的 Tab 是**累积挂载**（切过的 Tab 不销毁）⇒
+ *    两个组件可同时在飞同一个 `GET /api/users/`。此时 `utils/http.ts` 的 GET 去重
+ *    会 **abort 先发的那个**（同 key 即取消旧请求），被掐的那次 `status=0` ⇒
+ *    `handleApiError` 归类为 network ⇒ 弹「网络不通」。表格数据其实是好的
+ *    （另一个请求 200 了），极易被误判成后端/网络故障。
+ *
+ *    ⇒ 这里让并发调用**复用同一个 promise**，从根上不产生第二个请求。
+ *      （只共享"在飞"期间，结束即释放，不做结果缓存 —— 刷新仍能拿到新数据。）
+ *      按 projectId 分键：不同 project_id 是不同查询，不得互相去重。
+ */
+const _usersInflight = new Map<string, Promise<any[]>>()
+
 export async function listUsers(projectId?: string): Promise<any[]> {
-  const { data } = await http.get(P_usr.list, projectId ? { params: { project_id: projectId } } : undefined)
-  return Array.isArray(data) ? data : []
+  const key = projectId ?? '__all__'
+  const existing = _usersInflight.get(key)
+  if (existing) return existing
+
+  const p = (async () => {
+    const { data } = await http.get(P_usr.list, projectId ? { params: { project_id: projectId } } : undefined)
+    return Array.isArray(data) ? data : []
+  })()
+  _usersInflight.set(key, p)
+  try {
+    return await p
+  } finally {
+    _usersInflight.delete(key)
+  }
 }
 
 export async function createUser(body: any): Promise<any> {
