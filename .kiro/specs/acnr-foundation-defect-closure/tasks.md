@@ -320,6 +320,7 @@
       ④提交边界（现算 `out/t33_boundary.txt`）：提交说明匹配本 spec 的提交在 `.agents/tasks/` 下只触及本 spec 收尾报告 `acnr-foundation-defect-closure-2026-10-26.md`（`00d56b039`、`95e03e72a` 与本次）；ACNR 审计报告 `acnr-platform-foundation-assessment-2026-10-26.md` 在仓库里仍未跟踪，本 spec 不提交、不改动。
       ⑤验证（候选树 `verify_wt_t31` = HEAD `1a9eafb4d` + 本任务 10 个文件）：后端选集 17 个文件（导入 ACNR 路由的 13 个 + 两份现状节守卫 + 鉴权基线 + 路由挂载守卫）219 passed / 1 skipped（空参数集）；前端 `WorkpaperShortLink.spec.ts` 10、`backendRouteShapes.contract.spec.ts` 13、前端现状节守卫 4 全绿；单区域 tsc：候选树与 HEAD 同为 1 条 TS2307（spec 经别名导入 `.vue`，纯 tsc 不经 Vue 插件，与本改动无关），新增 0，探针注入 `number = string` 报 TS2322。
       ⑥变异（候选树磁盘变异，逐条还原并核 sha256；`out/t33_mutate.json`）5 条全红：M33-1 删掉项目回收站 410 → 410 例红；M33-2 把项目回收站判断挪到鉴权之前 → 非成员例（泄露）与 410 例（门禁未经过）红；M33-3 把项目软删放进查询条件 → 两例红（伪装成 404）；F33-1 短链页不按错误码区分 → 项目回收站例红；D33-1 现状节一行改回旧描述 → 登记制两例红。
+      ⑦浏览器（无头 Chromium 自起、不用共享标签页，只读；开发服务 9980 / 3030 已是本提交后的代码，后端 08:10 重载）：未登录打开回收站项目「【测试】ACNR下钻走查_2025」的 E1 底稿短链 `/workpapers/8c8cd491-…?sheet=E1-14&cell=C10` → 跳登录页，`redirect` 等于完整短链（含查询串）；登录 admin 后回到短链页（路径与查询串不变），显示「底稿所属项目已移入回收站」「可在回收站中恢复该项目后再打开。」与「返回上一页 / 进入项目列表」，页面不出现错误码、不进编辑器；ACNR 相关请求只有一次定位（410），没有 legacy 请求（`out/t33_browser.json`，截图 `screenshots/t33_1_login_redirect.png`、`t33_2_project_recycled.png`）。开发后端的真实错误体是 `{code: 410, message: {error_code, message, project_id}}`，经前端 `normaliseErrorEnvelope` 补成 `detail` 后由短链页按错误码区分。台账 RV7.6-02（未登录 → 登录 → 回到编辑器并定位）本次只复测到登录接力这一段：共享库里带底稿的【测试】项目只剩回收站里的两个，回到编辑器并定位的一段留给最终复盘。
 
 ## 问题编号 → 任务映射
 
