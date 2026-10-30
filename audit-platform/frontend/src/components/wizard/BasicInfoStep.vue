@@ -215,47 +215,48 @@
         <div class="gt-form-col">
           <div class="gt-form-section-title">项目团队</div>
 
-          <!-- prop 必须显式写出：缺了 prop 的 el-form-item 不参与校验、也不显示必填星号 -->
-          <el-form-item label="签字合伙人" prop="signing_partner_staff_id">
+          <!-- 数据源 = users 表（账号），按 role 过滤；两个下拉不联动（users 无归属关系）。
+               prop 必须显式写出：缺了 prop 的 el-form-item 不参与校验、也不显示必填星号 -->
+          <el-form-item label="签字合伙人" prop="signing_partner_id">
             <el-select
-              v-model="form.signing_partner_staff_id"
+              v-model="form.signing_partner_id"
               placeholder="请选择签字合伙人"
               style="width: 100%"
               filterable
               clearable
               :loading="teamLoading"
               :disabled="teamLoading || teamFailed"
-              no-data-text="人员档案中暂无合伙人"
+              no-data-text="暂无合伙人账号"
               data-testid="signing-partner-select"
               @change="onPartnerChange"
             >
-              <el-option v-for="person in partnerOptions" :key="person.id" :label="person.name" :value="person.id">
-                <span>{{ person.name }}</span>
-                <span class="gt-staff-option-detail">{{ person.employee_no || person.department }}</span>
+              <el-option v-for="person in partnerOptions" :key="person.id" :label="person.username" :value="person.id">
+                <span>{{ person.username }}</span>
+                <span class="gt-staff-option-detail">{{ person.email }}</span>
               </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="项目经理" prop="manager_staff_id">
+          <el-form-item label="项目经理" prop="manager_id">
             <el-select
-              v-model="form.manager_staff_id"
-              :placeholder="selectedPartner ? '请选择项目经理' : '请先选择签字合伙人'"
+              v-model="form.manager_id"
+              placeholder="请选择项目经理"
               style="width: 100%"
               filterable
               clearable
               :loading="teamLoading"
-              :disabled="!selectedPartner || teamLoading || teamFailed"
-              no-data-text="该合伙人名下暂无可选人员"
+              :disabled="teamLoading || teamFailed"
+              no-data-text="暂无项目经理账号"
               data-testid="project-manager-select"
               @change="onManagerChange"
             >
-              <el-option v-for="person in managerOptions" :key="person.id" :label="person.name" :value="person.id">
-                <span>{{ person.name }}</span>
-                <span class="gt-staff-option-detail">{{ person.employee_no || person.department }}</span>
+              <el-option v-for="person in managerOptions" :key="person.id" :label="person.username" :value="person.id">
+                <span>{{ person.username }}</span>
+                <span class="gt-staff-option-detail">{{ person.email }}</span>
               </el-option>
             </el-select>
           </el-form-item>
-          <el-alert v-if="teamFailed" title="人员档案加载失败" type="error" :closable="false" show-icon>
+          <el-alert v-if="teamFailed" title="账号列表加载失败" type="error" :closable="false" show-icon>
             <el-button link type="primary" @click="loadTeamStaff">重新加载</el-button>
           </el-alert>
           <el-alert v-else-if="selectionError && !teamLoading" :title="selectionError" type="warning" :closable="false" show-icon />
@@ -674,10 +675,10 @@ const rules: FormRules = {
   // 项目团队两项必填（后端 POST /api/projects 同步校验）。
   // 初值是 null 且下拉带 clearable ⇒ 必须用 change 触发，并显式拦 null/空串
   // （required 对 null 生效，但清空后值为 null 仍需即时提示）。
-  signing_partner_staff_id: [
+  signing_partner_id: [
     { required: true, message: '请选择签字合伙人', trigger: 'change' },
   ],
-  manager_staff_id: [
+  manager_id: [
     { required: true, message: '请选择项目经理', trigger: 'change' },
   ],
   template_type: [{ required: true, message: '请选择附注模板类型', trigger: 'change' }],

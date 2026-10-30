@@ -6,9 +6,9 @@
         <el-button type="primary" size="small" @click="$router.push('/projects/new')">
           <el-icon><Plus /></el-icon> 新建项目
         </el-button>
-        <el-button size="small" plain @click="showBatchImport = true">
+        <!-- <el-button size="small" plain @click="showBatchImport = true">
           <el-icon><Upload /></el-icon> 批量导入
-        </el-button>
+        </el-button> -->
         <el-button size="small" plain @click="$router.push('/projects/full')">
           全屏
         </el-button>

@@ -1,58 +1,69 @@
 import { computed, ref } from 'vue'
-import { listStaff, type StaffMember } from '@/services/staffApi'
+import { api } from '@/services/apiProxy'
 import type { BasicInfo } from '@/stores/wizard'
 
+/**
+ * 建项向导的签字合伙人 / 项目经理下拉数据源。
+ *
+ * 🔴 数据源 = users 表（登录账号），不是 staff_members（人员档案）。
+ * 用户 2026-10-30 明确要求：「新建项目时合伙人和项目经理数据应该取得是 users 表」。
+ *
+ * 由此带来的取舍（已向用户说明并确认）：
+ * - 两个下拉按 users.role 过滤（partner / manager），彼此**不联动** ——
+ *   users 表没有「某经理归属哪个合伙人」的字段，无法做级联过滤。
+ *   原先取人员档案时可按 staff.partner_id / partner_name 级联，改回 users 后该能力不存在。
+ * - 只列启用账号（is_active）：停用账号不应再被指派为签字人。
+ */
+interface TeamUserOption {
+  id: string
+  username: string
+  email?: string
+  role: string
+  is_active?: boolean
+}
+
 export function useProjectStaffOptions(form: BasicInfo, publishNames: (names: Record<string, string>) => void) {
-  const staff = ref<StaffMember[]>([])
+  const users = ref<TeamUserOption[]>([])
   const teamLoading = ref(false)
   const teamFailed = ref(false)
   const loaded = ref(false)
   let pending: Promise<void> | null = null
 
-  const partnerOptions = computed(() => staff.value.filter(person => person.title === '合伙人'))
-  const selectedPartner = computed(() => partnerOptions.value.find(person => person.id === form.signing_partner_staff_id))
-  const managerOptions = computed(() => {
-    const partner = selectedPartner.value
-    if (!partner) return []
-    const uniqueName = partnerOptions.value.filter(person => person.name === partner.name).length === 1
-    return staff.value.filter(person => person.partner_id
-      ? person.partner_id === partner.id
-      : uniqueName && person.partner_name === partner.name)
-  })
+  /** 仅启用账号可被指派（停用账号登录即 401，指派上去也用不了） */
+  const activeUsers = computed(() => users.value.filter(u => u.is_active !== false))
+
+  const partnerOptions = computed(() => activeUsers.value.filter(u => u.role === 'partner'))
+  /** 不按合伙人过滤：users 表无归属关系（见文件头说明） */
+  const managerOptions = computed(() => activeUsers.value.filter(u => u.role === 'manager'))
+
+  const selectedPartner = computed(() => partnerOptions.value.find(u => u.id === form.signing_partner_id))
 
   function restoreSelection() {
-    if (!loaded.value) return
-    // 旧项目只存用户编号，必须唯一匹配档案，不能按姓名或角色猜测。
-    if (!form.signing_partner_staff_id && form.signing_partner_id) {
-      const matches = partnerOptions.value.filter(person => person.user_id === form.signing_partner_id)
-      if (matches.length === 1) form.signing_partner_staff_id = matches[0].id
-    }
-    if (!form.manager_staff_id && form.manager_id) {
-      const matches = managerOptions.value.filter(person => person.user_id === form.manager_id)
-      if (matches.length === 1) form.manager_staff_id = matches[0].id
-    }
+    // 账号编号即下拉值，无需按姓名或职级反查（这是取 users 相对取档案的简化）
   }
 
   function onPartnerChange() {
-    form.signing_partner_staff_id = form.signing_partner_staff_id || null
-    form.signing_partner_id = selectedPartner.value?.user_id || null
-    form.manager_staff_id = null
-    form.manager_id = null
+    form.signing_partner_id = form.signing_partner_id || null
+    // 兼容字段：后端 STAFF_FIELDS 协议按「字段是否提交」区分未提交与显式清空，
+    // 这里显式置空，表示本次保存走账号协议、不使用人员档案选择。
+    form.signing_partner_staff_id = null
   }
 
   function onManagerChange() {
-    form.manager_staff_id = form.manager_staff_id || null
-    form.manager_id = managerOptions.value.find(person => person.id === form.manager_staff_id)?.user_id || null
+    form.manager_id = form.manager_id || null
+    form.manager_staff_id = null
   }
 
   const selectionError = computed(() => {
-    const hasSelection = form.signing_partner_staff_id || form.manager_staff_id || form.signing_partner_id || form.manager_id
+    const hasSelection = form.signing_partner_id || form.manager_id
     if (!hasSelection) return ''
-    if (teamLoading.value) return '人员档案正在加载，请稍后保存'
-    if (!loaded.value || teamFailed.value) return '人员档案加载失败，请重试后保存'
-    if (!selectedPartner.value) return '原签字合伙人无法对应人员档案，请重新选择'
-    if ((form.manager_staff_id || form.manager_id) && !managerOptions.value.some(person => person.id === form.manager_staff_id)) {
-      return '原项目经理不在所选合伙人名下，请重新选择'
+    if (teamLoading.value) return '账号列表正在加载，请稍后保存'
+    if (!loaded.value || teamFailed.value) return '账号列表加载失败，请重试后保存'
+    if (form.signing_partner_id && !selectedPartner.value) {
+      return '原签字合伙人账号不可用（已停用或角色变更），请重新选择'
+    }
+    if (form.manager_id && !managerOptions.value.some(u => u.id === form.manager_id)) {
+      return '原项目经理账号不可用（已停用或角色变更），请重新选择'
     }
     return ''
   })
@@ -63,21 +74,13 @@ export function useProjectStaffOptions(form: BasicInfo, publishNames: (names: Re
     teamFailed.value = false
     pending = (async () => {
       try {
-        const all: StaffMember[] = []
-        let total = 0
-        do {
-          const page = await listStaff({ offset: all.length, limit: 200 })
-          total = page.total
-          if (!page.items.length && all.length < total) throw new Error('人员档案名单加载不完整')
-          all.push(...page.items)
-        } while (all.length < total)
-        staff.value = all
+        // GET /api/users/ 返回全量账号（无分页），含 is_active
+        const data = await api.get('/api/users/')
+        const list = (Array.isArray(data) ? data : []) as TeamUserOption[]
+        users.value = list
         loaded.value = true
         const names: Record<string, string> = {}
-        for (const person of all) {
-          names[person.id] = person.name
-          if (person.user_id) names[person.user_id] = person.name
-        }
+        for (const u of list) names[u.id] = u.username
         publishNames(names)
         restoreSelection()
       } catch {

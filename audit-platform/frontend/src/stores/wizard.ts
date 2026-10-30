@@ -226,10 +226,12 @@ export const useWizardStore = defineStore('wizard', {
           const value = (basicInfo[key] ?? '').trim()
           if (value) payload[key] = value
         }
-        // 人员档案保留显式清空，与未提交字段区分。
-        for (const key of ['signing_partner_staff_id', 'manager_staff_id'] as const) {
-          if (key in basicInfo) payload[key] = basicInfo[key] || null
-        }
+        // 🔴 刻意**不发送** signing_partner_staff_id / manager_staff_id：
+        // 用户 2026-10-30 裁定合伙人/经理取 users 表（账号协议）。
+        // 后端 project_staff_selection.STAFF_FIELDS 按「字段是否出现在请求里」
+        // （pydantic model_fields_set）判定走档案协议还是账号协议 —— 即使传 null 也算
+        // "已提交"，会让后端去校验为空的档案 ID 并报「签字合伙人为必填项」（实测踩过）。
+        // 因此这两个键必须完全不出现在 payload 中。
         if (basicInfo.signing_partner_id) {
           payload.signing_partner_id = basicInfo.signing_partner_id
         }

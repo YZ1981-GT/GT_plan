@@ -62,6 +62,17 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         relation_to_parent=project.relation_to_parent,
         ultimate_company_name=project.ultimate_company_name,
         ultimate_company_code=project.ultimate_company_code,
+        # 企业信息 6 列（V209）。
+        # 🔴 本函数是**逐字段手工构造**，不走 model_validate ⇒ ProjectCreateResponse 上的
+        # from_attributes=True 不会自动填充这些字段。漏传就恒为 None，表现为
+        # 「编辑项目时企业信息不回显」（详情/列表/建项响应全部拿不到值）。
+        # 给 ProjectCreateResponse 新增字段时必须同步在此处传参。
+        legal_representative=project.legal_representative,
+        special_industry_type=project.special_industry_type,
+        small_micro_enterprise_type=project.small_micro_enterprise_type,
+        tax_incentive_type=project.tax_incentive_type,
+        branch_institution_type=project.branch_institution_type,
+        overseas_income_credit_method=project.overseas_income_credit_method,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,
         consol_lock=bool(project.consol_lock),
