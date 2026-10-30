@@ -313,6 +313,13 @@
       本 spec design 已设「勘误」节（§15.2 七条，承接审计报告 §11 + 本轮新发现，不改历史报告原文；本 spec 提交不含 `.agents/tasks/` 任何文件）。在 `.kiro/specs/INDEX.md` 顶部登记本 spec（纯 CRLF：Python 读 bytes 解码再写回 bytes；表格单元格禁裸竖线、校验只数未转义竖线；不覆盖他人行），注明「acnr_targets 字段与面板以本 spec 为准（与 advanced-query-linkage-closure 的裁决 §16 Q0）」。
       Files: `.kiro/specs/INDEX.md`（登记）；本 spec design.md（勘误节已就位）
       Verify: `git log --name-only` 核对本 spec 的提交在 `.agents/tasks/` 下只触及本 spec 收尾报告（段四裁定，现算核查）；INDEX 登记行用 bytes 校验（Python 读写、每行行尾 CRLF、无裸竖线）。变异：无（文档任务，核查即验收）。
+      实施记录（第十四段 r4，2026-10-30，待评审核实，本任务未勾选；含台账 RV7.6-01；证据 `tmp_acnr_foundation/out/t33_*`）：
+      ①勘误：design 新增 §22（只追加，不回改上文；§15.2 七条照旧）——`Project.status` 写入点现算 5 个（点名 `archive_orchestrator._step_lock`，由 `4284c0534` 加入）、迁移号 V216 与取号口径（磁盘与共享库已应用版本取大者 + 1；现查共享库已应用 214、215 而磁盘没有这两个号）、版本锁 409 的真实响应形状（顶层 `{code, error_code, message, version?}`）与三类终态、自开会话与快照门禁指向 §8.4、定位端点的项目回收站、共享库锁定基线（项目 150 个、锁定 0 个）。
+      ②台账 RV7.6-01：定位端点 `acnr_locate_workpaper` 联查 `projects.is_deleted`，只读鉴权通过后项目在回收站返回 410 `PROJECT_IN_RECYCLE_BIN`「底稿所属项目已移入回收站」（项目整体进回收站时底稿行不标删，原先返回 200）；非成员照旧 403、响应不含回收站字样；不把项目软删放进查询条件伪装成 404。前端短链页 `workpaperShortLink.ts` 按错误码区分，项目在回收站时提示「可在回收站中恢复该项目后再打开」。用例：`test_workpaper_locate_endpoint.py` 补 2 例（共 12 例），`WorkpaperShortLink.spec.ts` 补 2 例（按后端真实形状 `detail.error_code`，共 10 例）。现状节「底稿短链定位端点」一行改为「底稿或其所属项目在回收站都给中文原因」，登记表补两条用例名（788 → 789 行）。
+      ③INDEX：本 spec 登记行（第 11 行引用块）状态改为「30/33 勾选」与核实情况，「已落地且复核通过」一句改为以 tasks.md 为准；按 bytes 读写，CRLF 1135 处前后不变，其余行逐字节不变，行内无竖线（`out/t33_index_line.txt`）。收尾报告顶部加「段十四修订」说明（§0~§5 停在 2026-10-26 / 27，现状以 tasks.md 为准）。
+      ④提交边界（现算 `out/t33_boundary.txt`）：提交说明匹配本 spec 的提交在 `.agents/tasks/` 下只触及本 spec 收尾报告 `acnr-foundation-defect-closure-2026-10-26.md`（`00d56b039`、`95e03e72a` 与本次）；ACNR 审计报告 `acnr-platform-foundation-assessment-2026-10-26.md` 在仓库里仍未跟踪，本 spec 不提交、不改动。
+      ⑤验证（候选树 `verify_wt_t31` = HEAD `1a9eafb4d` + 本任务 10 个文件）：后端选集 17 个文件（导入 ACNR 路由的 13 个 + 两份现状节守卫 + 鉴权基线 + 路由挂载守卫）219 passed / 1 skipped（空参数集）；前端 `WorkpaperShortLink.spec.ts` 10、`backendRouteShapes.contract.spec.ts` 13、前端现状节守卫 4 全绿；单区域 tsc：候选树与 HEAD 同为 1 条 TS2307（spec 经别名导入 `.vue`，纯 tsc 不经 Vue 插件，与本改动无关），新增 0，探针注入 `number = string` 报 TS2322。
+      ⑥变异（候选树磁盘变异，逐条还原并核 sha256；`out/t33_mutate.json`）5 条全红：M33-1 删掉项目回收站 410 → 410 例红；M33-2 把项目回收站判断挪到鉴权之前 → 非成员例（泄露）与 410 例（门禁未经过）红；M33-3 把项目软删放进查询条件 → 两例红（伪装成 404）；F33-1 短链页不按错误码区分 → 项目回收站例红；D33-1 现状节一行改回旧描述 → 登记制两例红。
 
 ## 问题编号 → 任务映射
 

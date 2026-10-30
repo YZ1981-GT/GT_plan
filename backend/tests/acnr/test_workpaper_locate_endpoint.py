@@ -6,7 +6,8 @@ ACNR 产出的跳转路由是 ``/workpapers/{wp_id}?sheet=…``，前端只有 `
 
 - 未登录 401；非成员 403（且不回 project_id）；readonly 成员 / admin 200（project_id / wp_id / wp_code）；
 - 不存在、或传的是 ``wp_index.id``（两者不同，附件管理曾因此恒 404）→ 404；
-- 底稿在回收站 → 410 + 中文「底稿已移入回收站」（鉴权通过后才区分，非成员照样 403）。
+- 底稿在回收站 → 410 + 中文「底稿已移入回收站」；底稿所属项目整体在回收站（底稿行不标删）→ 410 +
+  「底稿所属项目已移入回收站」（RV7.6-01）；两者都在鉴权通过后才区分，非成员照样 403。
 """
 from __future__ import annotations
 
@@ -100,6 +101,33 @@ async def test_recycle_bin_is_410_with_chinese_reason(world):
     detail = resp.json()["detail"]
     assert detail["error_code"] == "WORKPAPER_IN_RECYCLE_BIN"
     assert detail["message"] == "底稿已移入回收站"
+
+
+async def test_project_recycle_bin_is_410_after_authorization(world):
+    """项目整体移入回收站时底稿行不标删：定位端点另看项目，给中文原因（RV7.6-01）。"""
+    wp, _ = await _workpaper(world)
+    world.target.is_deleted = True
+    await world.db.flush()
+    user = (await world.readonly_member()).user
+    async with world.client(acnr_module.router, user=user) as client:
+        resp = await client.get(_url(wp.id))
+    assert resp.status_code == 410, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "PROJECT_IN_RECYCLE_BIN"
+    assert detail["message"] == "底稿所属项目已移入回收站"
+    client.assert_passed(ASSERT_GATE, times=1)
+
+
+async def test_project_recycle_bin_still_403_for_non_member(world):
+    """项目在回收站同样只在鉴权通过后才区分：非成员拿不到「项目在不在回收站」。"""
+    wp, _ = await _workpaper(world)
+    world.target.is_deleted = True
+    await world.db.flush()
+    user = (await world.non_member()).user
+    async with world.client(acnr_module.router, user=user) as client:
+        resp = await client.get(_url(wp.id))
+    assert resp.status_code == 403, resp.text
+    assert "回收站" not in resp.text
 
 
 async def test_recycle_bin_still_403_for_non_member(world):

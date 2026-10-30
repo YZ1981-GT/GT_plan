@@ -2,7 +2,7 @@
  * 底稿短链页 `/workpapers/:wpId`（spec acnr-foundation-defect-closure T16 / RV7.5-01）。
  *
  * 成功：按 locate 返回的项目 `router.replace` 到底稿编辑器（命名路由 WorkpaperEditor），sheet / cell 原样保留；
- * 失败（403 / 404 / 410 回收站 / 网络错误 / 编号无效）：显示中文原因与下一步，不跳转。
+ * 失败（403 / 404 / 410 回收站——底稿或其所属项目，按错误码区分 / 网络错误 / 编号无效）：显示中文原因与下一步，不跳转。
  * 用真实路由表（memory history）挂载，`api.get` 按生产错误形状返回。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -92,6 +92,19 @@ describe('底稿短链：失败 → 中文原因，不跳转', () => {
     expect(wrapper.text()).toContain('返回上一页')
     expect(wrapper.text()).toContain('进入项目列表')
     expect(wrapper.text()).not.toMatch(/Request failed|status code/)
+  })
+
+  it.each([
+    ['PROJECT_IN_RECYCLE_BIN', SHORT_LINK_TEXT.projectRecycled],
+    ['WORKPAPER_IN_RECYCLE_BIN', SHORT_LINK_TEXT.recycled],
+  ])('HTTP 410 按错误码区分项目 / 底稿在回收站：%s', async (code, text) => {
+    // 后端真实形状：HTTPException(410, detail={error_code, message, project_id})
+    apiMocks.get.mockRejectedValue(httpError(410, { error_code: code, message: text.reason, project_id: PID }))
+    const { replace, wrapper } = await open(`/workpapers/${WP}?sheet=E1-14`)
+    expect(replace).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain(text.reason)
+    expect(wrapper.text()).toContain(text.hint)
+    expect(wrapper.text()).not.toContain(code)
   })
 
   it('网络错误（无 response）', async () => {

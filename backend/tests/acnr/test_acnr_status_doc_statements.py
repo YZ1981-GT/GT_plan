@@ -530,11 +530,12 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/components/custom-query/__tests__/queryPayloads.contract.spec.ts", exists(_FE_GUARD_REL),
             exists("audit-platform/frontend/src/components/custom-query/AcnrTargetResults.vue"),
             has_tests(_T + "test_query_request_fields_fixture.py", "test_fixture_holds_for_backend_models")),
-        "底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，回收站给中文原因）": CB(
+        "底稿短链定位端点（ACNR 跳转路由 `/workpapers/{wp_id}` 按底稿 id 查所属项目，先按所属项目做只读鉴权再区分回收站；不存在或传的是底稿索引 id 即未找到，底稿或其所属项目在回收站都给中文原因）": CB(
             "backend/app/routers/acnr.py", ("acnr_locate_workpaper",), _T + "test_workpaper_locate_endpoint.py",
             claim("定位端点路由与只读项目鉴权（AST）", _locate_gate_ok),
             has_tests(_T + "test_workpaper_locate_endpoint.py", "test_non_member_is_403_without_project_id",
-                      "test_wp_index_id_is_not_a_workpaper_id", "test_recycle_bin_is_410_with_chinese_reason")),
+                      "test_wp_index_id_is_not_a_workpaper_id", "test_recycle_bin_is_410_with_chinese_reason",
+                      "test_project_recycle_bin_is_410_after_authorization", "test_project_recycle_bin_still_403_for_non_member")),
         "底稿短链页（`/workpapers/:wpId` 定位后替换到底稿编辑器、保留 sheet / cell；失败显示中文原因不跳转）与后端跳转路由形态契约": CF(
             "audit-platform/frontend/src/views/composables/workpaperShortLink.ts", ("resolveShortLink", "shortLinkQuery"),
             "audit-platform/frontend/src/views/__tests__/WorkpaperShortLink.spec.ts",
