@@ -2036,9 +2036,9 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 - 推送提交里的每个路径按主工作区现状分三类：内容已等于推送版 ⇒ `git update-ref refs/heads/<分支> <新> <旧>` 后 `git reset -q -- <路径>` 对齐暂存区；仍是旧版 ⇒ 同时写入推送版；有别人的改动 ⇒ 先 `git merge-file -p --diff3` 预演三方合并，无冲突再写
 - 不前移的代价：主工作区脏路径里混进「与远端相同」的副本，下次同步只能整体三方合并；另一会话正在前移时不要抢着做（先看 `git worktree list` 有没有停在新提交上的同步 worktree）
 
-### 六、worktree 里跑 pytest 显式设 `DATABASE_URL`
+### 六、跑 PG 用例显式设 `DATABASE_URL`
 
-- worktree 没有 `.env`，根 conftest 按 `os.getenv("DATABASE_URL", sqlite)` 判库 ⇒ `pg_only` 用例全部静默跳过 ⇒ 设 `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform`
+- 根 conftest（`backend/tests/conftest.py`）按 `os.getenv("DATABASE_URL", "sqlite")` 判库，只认环境变量、不读 `.env` ⇒ 没设时 `pg_only` 用例全部静默跳过，主工作区与 worktree 一样（复盘时一度归因成「worktree 没有 `.env`」，不对：主工作区不设环境变量实测同样跳过）⇒ 设 `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform`，并加 `GT_REQUIRE_PG=1`（地址不是 PG 却收集到 `pg_only` 用例时直接报错，不再静默跳过）
 
 ### 七、缺陷归因用 `git blame` 定到行
 
