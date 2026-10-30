@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { ref, watch, reactive, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import UserManagement from '@/views/UserManagement.vue'
 import RoleDataScopeManager from '@/components/system/RoleDataScopeManager.vue'
 import UserRoleBindingPanel from '@/components/system/UserRoleBindingPanel.vue'
@@ -58,7 +58,6 @@ type TabKey = 'users' | 'role-scope' | 'user-roles'
 const VALID_TABS: TabKey[] = ['users', 'role-scope', 'user-roles']
 
 const route = useRoute()
-const router = useRouter()
 
 /**
  * 从 query.tab 解析 Tab，非法值回退到 users（Requirement 5.4）。
@@ -94,9 +93,18 @@ onMounted(() => {
  */
 watch(activeTab, (tab) => {
   loaded[tab] = true
-  if (route.query.tab !== tab) {
-    router.replace({ query: { ...route.query, tab } })
-  }
+  // 🔴 用 history.replaceState 而非 router.replace：
+  //    DefaultLayout 的 <ErrorBoundary :key="fullPath"> 以 fullPath（含 query）为 key，
+  //    router.replace 改 query 会触发整页重挂载 PermissionCenter → loaded 重置 →
+  //    刚挂载的 Tab 内容二次挂载（实测：UserManagement/UserProjectRoleTree 各挂 2 次，
+  //    listUserNodes/listDepartments 各发 2 次请求；两次若重叠，GET 去重会 abort 先发
+  //    → DevTools 里「Failed to load response data」）。
+  //    history.replaceState 只改地址栏、不触发 Vue Router，故不重挂载。
+  //    与 DisclosureEditor.vue / AttachmentManagement.vue 同一模式（两者都有注释
+  //    明确警示 router.replace 改 query 会整页重挂载）。
+  const url = new URL(window.location.href)
+  url.searchParams.set('tab', tab)
+  history.replaceState(null, '', url.toString())
 })
 
 /** 外部改 query（如从别处带 `?tab=` 跳进来）时同步激活态。 */

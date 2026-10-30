@@ -340,10 +340,12 @@ describe('Tab 初始化 — ?tab= 直达与非法回退（Req 5.3/5.4）', () =>
     expect(vm.activeTab).toBe('users')
   })
 
-  it('非法 tab 下不会因回退而写 query（初始不该产生一次 replace）', async () => {
+  it('非法 tab 下不会因回退而写 query（初始不该产生一次回写）', async () => {
+    const spy = vi.spyOn(window.history, 'replaceState')
     await mountCenter({ tab: 'xxx' })
     // 初始化只解析不回写；回写只发生在用户切 Tab 时（见下一个 describe）
-    expect(hoisted.replace).not.toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })
 
@@ -351,46 +353,64 @@ describe('Tab 初始化 — ?tab= 直达与非法回退（Req 5.3/5.4）', () =>
 // Tab 切换回写 query（Requirement 5.5）
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Tab 切换 — router.replace 回写 ?tab=（Req 5.5）', () => {
-  it('切到 role-scope ⇒ replace 被调用且带 tab=role-scope', async () => {
+describe('Tab 切换 — history.replaceState 回写 ?tab=（Req 5.5）', () => {
+  let replaceStateSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    // 复位地址栏（真实 API）后再装 spy：防止各用例互相污染。
+    window.history.replaceState({}, '', '/settings/permissions')
+    // 不 mock 掉本体（要让它真改 window.location），仅记录调用。
+    replaceStateSpy = vi.spyOn(window.history, 'replaceState')
+    // vitest 对同一方法重复 spyOn 会复用同一 spy（累计旧调用），必须清空。
+    replaceStateSpy.mockClear()
+  })
+  afterEach(() => {
+    replaceStateSpy.mockRestore()
+  })
+
+  // 从最后一次 replaceState 调用（null, '', url）里解析地址。
+  const lastUrl = () => new URL(replaceStateSpy.mock.calls.at(-1)?.[2] as string)
+
+  it('切到 role-scope ⇒ 回写 ?tab=role-scope（不经 Vue Router，防整页重挂载）', async () => {
     const { wrapper, vm } = await mountCenter()
 
     await clickTab(wrapper, 'role-scope')
 
     expect(vm.activeTab).toBe('role-scope')
-    expect(hoisted.replace).toHaveBeenCalledTimes(1)
-    expect(hoisted.replace).toHaveBeenCalledWith({ query: { tab: 'role-scope' } })
-    // 用 replace 而非 push：Tab 切换不该往 history 里压记录
-    expect(hoisted.push).not.toHaveBeenCalled()
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1)
+    expect(lastUrl().searchParams.get('tab')).toBe('role-scope')
   })
 
   it.each(TAB_CHILDREN.map(c => c.tab).filter(t => t !== 'users'))(
-    '切到 %s ⇒ replace 的 query.tab 正是该 Tab',
+    '切到 %s ⇒ 回写的 query.tab 正是该 Tab',
     async (tab) => {
       const { wrapper } = await mountCenter()
       await clickTab(wrapper, tab)
 
-      const arg = hoisted.replace.mock.calls.at(-1)?.[0]
-      expect(arg?.query?.tab).toBe(tab)
+      expect(lastUrl().searchParams.get('tab')).toBe(tab)
     },
   )
 
   it('回写保留 query 里的其他参数（不把别人的 query 冲掉）', async () => {
+    // 先让地址栏带 keep=me（真实 pushState，未被 spy）；组件读 window.location
+    window.history.pushState({}, '', '/settings/permissions?keep=me')
     const { wrapper } = await mountCenter({ keep: 'me' })
 
     await clickTab(wrapper, 'user-roles')
 
-    expect(hoisted.replace).toHaveBeenCalledWith({
-      query: { keep: 'me', tab: 'user-roles' },
-    })
+    expect(lastUrl().searchParams.get('keep')).toBe('me')
+    expect(lastUrl().searchParams.get('tab')).toBe('user-roles')
   })
 
-  it('点当前已激活的 Tab ⇒ 不重复 replace（防回环刷 history）', async () => {
+  it('点当前已激活的 Tab ⇒ 不重复回写（防回环刷 history）', async () => {
     const { wrapper } = await mountCenter({ tab: 'role-scope' })
+    // 用增量而非「整个 spy 0 次」：vi.spyOn 对同一方法跨用例会复用 spy、
+    // mock.calls 会带上前几个用例的调用，绝对值断言恒红（实测踩到）。
+    const before = replaceStateSpy.mock.calls.length
 
     await clickTab(wrapper, 'role-scope')
 
-    expect(hoisted.replace).not.toHaveBeenCalled()
+    expect(replaceStateSpy.mock.calls.length).toBe(before)
   })
 
   it('外部改 route.query.tab ⇒ 激活态跟着同步', async () => {
