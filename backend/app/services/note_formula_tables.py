@@ -70,6 +70,98 @@ def iter_note_tables(td: Any) -> list[tuple[int, dict]]:
     return [(0, td)]
 
 
+# ─── 公式视图（spec note-chain-followup-optimizations ADR-1 / ADR-2） ────────────
+
+
+def formula_view(td: Any) -> Any:
+    """附注公式看到的章节表格 = 编辑器 / Word 导出的同一份显示视图。
+
+    底稿来源章节（``_source`` 为 workpaper / workpaper_html 且 ``sub_table_data`` 投影非空）⇒ 投影出的 ``_tables``
+    （隐藏的旧 ``_tables`` 不再参与）；其余原样返回存储本身（同一对象，就地写即落库位置）。公式的列表、目标、校验、
+    执行、覆盖率都经这里取表，避免「看到 A 表、算 B 表」。
+    """
+    if not isinstance(td, dict):
+        return td
+    from app.services.note_content_utils import effective_table_data
+
+    view = effective_table_data(td)
+    return view if isinstance(view, dict) else td
+
+
+def is_projected_table(table: Any) -> bool:
+    """显示视图里的这张表是不是底稿 ``sub_table_data`` 的读时投影（写入要回写来源，数值以底稿为准）。"""
+    return isinstance(table, dict) and bool(table.get("_source_sub_table_key"))
+
+
+def _source_rows(td: dict, key: str) -> list[Any] | None:
+    sub = td.get("sub_table_data")
+    raw = sub.get(key) if isinstance(sub, dict) else None
+    if isinstance(raw, dict) and isinstance(raw.get("rows"), list):  # 表对象包装（投影器读时也容错这一形态）
+        return raw["rows"]
+    return raw if isinstance(raw, list) else None
+
+
+def view_cell_source(td: dict, table: dict, row_idx: int, col_idx: int) -> tuple[dict | None, str | None]:
+    """投影表一格的来源行与业务列键 ``(sub_table_data 源行, 列键)``；存储表或定位不到 → ``(None, None)``。"""
+    if not is_projected_table(table):
+        return None, None
+    from app.services.note_sub_table_projector import projected_value_keys
+
+    keys = projected_value_keys(table)
+    indexes = table.get("_source_row_indexes")
+    source = _source_rows(td, str(table["_source_sub_table_key"]))
+    if (source is None or not 0 <= col_idx < len(keys) or not isinstance(indexes, list)
+            or not 0 <= row_idx < len(indexes) or not isinstance(indexes[row_idx], int)):
+        return None, None
+    raw_index = indexes[row_idx]
+    if not (0 <= raw_index < len(source)) or not isinstance(source[raw_index], dict):
+        return None, None
+    return source[raw_index], keys[col_idx]
+
+
+def view_cell_mode(td: dict, table: dict, row_idx: int, col_idx: int) -> str:
+    """显示视图一格的单元格模式（``auto`` / ``manual`` / ``locked``），与公式推送同口径。
+
+    存储表读行上的 ``_cell_modes``；投影表的格只有来源行还按位置存（没有该业务键、有 ``values``，旧 binding 快照迁入的
+    形态）时才有模式 —— 推送把这类格的 ``manual`` / ``locked`` 当人工 / 锁定不写（``note_writer.read_cell``），公式同样不写。
+    """
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    if is_projected_table(table):
+        raw, key = view_cell_source(td, table, row_idx, col_idx)
+        if raw is None or key in raw or not isinstance(raw.get("values"), list):
+            return "auto"
+        modes = raw.get("_cell_modes")
+    else:
+        row = rows[row_idx] if 0 <= row_idx < len(rows) and isinstance(rows[row_idx], dict) else {}
+        modes = row.get("_cell_modes")
+    return str((modes if isinstance(modes, dict) else {}).get(str(col_idx), "auto") or "auto")
+
+
+def write_view_cell(td: dict, table: dict, row_idx: int, col_idx: int, value: Any) -> bool:
+    """把显示视图上一格的新值写到它的存储位置；返回是否写入。
+
+    - 投影表：``sub_table_data[_source_sub_table_key][_source_row_indexes[行]][值列键]``（值列键与投影同一切分，
+      ``note_sub_table_projector.projected_value_keys``），视图行同时更新，供同表后续公式读到新值；
+    - 存储表（``_tables`` 或顶层）：就地写 ``rows[行].values[列]``。
+    定位不到（行 / 列越界、来源行不存在）不猜位置、返回 False。
+    """
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    if not (0 <= row_idx < len(rows)) or not isinstance(rows[row_idx], dict) or col_idx < 0:
+        return False
+    row = rows[row_idx]
+    if is_projected_table(table):
+        raw, key = view_cell_source(td, table, row_idx, col_idx)
+        if raw is None:
+            return False
+        raw[key] = value
+    values = list(row.get("values")) if isinstance(row.get("values"), list) else []
+    while len(values) <= col_idx:
+        values.append(None)
+    values[col_idx] = value
+    row["values"] = values
+    return True
+
+
 # ─── 行 / 列分类 ──────────────────────────────────────────────────────────────
 
 

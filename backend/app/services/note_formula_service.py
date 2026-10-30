@@ -118,13 +118,15 @@ def preview_records(td: dict | None, note_section: str) -> list[dict]:
     （与执行器同一份 ``section_preset_formulas``）；现算失败返回空（不阻断弹窗）。"""
     if not isinstance(td, dict) or not td:
         return []
+    from app.services.note_formula_tables import formula_view, section_preset_formulas
+
+    view = formula_view(td)  # 底稿来源章节按显示的投影表（与执行器同一视图），旧 _formulas 只对应存储结构
     existing = td.get("_formulas")
-    if isinstance(existing, dict) and existing:
+    if isinstance(existing, dict) and existing and view is td:
         return _preview_from_formulas_dict(existing)
-    from app.services.note_formula_tables import section_preset_formulas
 
     try:
-        generated, _notes = section_preset_formulas(td)
+        generated, _notes = section_preset_formulas(view)
     except Exception as e:  # generator 现算失败不阻断弹窗
         logger.warning("[NOTE_FORMULA] preview generate 失败 section=%s: %s", note_section, e)
         return []

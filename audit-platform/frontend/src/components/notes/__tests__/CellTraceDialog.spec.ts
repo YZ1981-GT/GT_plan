@@ -207,3 +207,97 @@ describe('CellTraceDialog — error 友好提示', () => {
     expect(html).toContain('加载溯源数据失败')
   })
 })
+
+// ─── 最终来源诊断（spec note-chain-followup-optimizations R2）──────────────────
+
+const sourcesResp = {
+  target: 't1:3:0',
+  target_label: '货币资金 · 合计 · 期末余额',
+  value: 999,
+  projected: true,
+  storage: { kind: 'sub_table', text: '底稿子表「货币资金」第 4 行 · end_amount' },
+  final: { kind: 'workpaper_sync', label: '底稿披露表同步', detail: '底稿 E1「附注披露」' },
+  steps: [
+    { kind: 'formula', label: '预设公式（系统预设）', status: 'kept', detail: 'SUM(0:2, 0)；按当前各格算得 6.00' },
+    { kind: 'sync', label: '底稿披露表同步', status: 'final', detail: '底稿 E1「附注披露」' },
+  ],
+  conflicts: [{ kind: 'workpaper_differs', message: '底稿披露表的值 999.00 与预设公式结果 6.00 不一致，保留底稿值' }],
+}
+
+function routeGet(map: Record<string, unknown>) {
+  mockGet.mockImplementation(async (url: string) => {
+    for (const [part, value] of Object.entries(map)) {
+      if (url.includes(part)) {
+        if (value instanceof Error) throw value
+        return value
+      }
+    }
+    throw new Error(`unexpected ${url}`)
+  })
+}
+
+describe('CellTraceDialog — 最终来源', () => {
+  it('底稿来源的格：只查最终来源（按子表 + 来源行 + 列键），不请求模板取数溯源', async () => {
+    routeGet({ '/cell-sources': sourcesResp })
+    const wrapper = mount(CellTraceDialog, {
+      props: {
+        modelValue: true, noteId: 'n1', rowIdx: 3, colIdx: 0, projectId: 'p1', year: 2025, noteSection: '五、1',
+        sourceRef: { tableIndex: 0, row: 3, col: 0, subTableKey: '货币资金', valueKey: 'end_amount' },
+      },
+      global: globalStubs,
+    })
+    await flushPromises()
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(mockGet).toHaveBeenCalledWith(
+      `/api/disclosure-notes/p1/2025/${encodeURIComponent('五、1')}/cell-sources`,
+      { params: { table_index: 0, row: 3, col: 0, sub_table_key: '货币资金', value_key: 'end_amount' }, _silent: true },
+    )
+    const html = wrapper.html()
+    expect(html).toContain('最终来源')
+    expect(html).toContain('底稿披露表同步')
+    expect(html).toContain('保留底稿值')
+    expect(html).toContain('货币资金 · 合计 · 期末余额')
+    expect(html).not.toContain('binding 元数据')
+  })
+
+  it('存储表第 3 张表：模板取数溯源带表序号，无绑定时提示看最终来源', async () => {
+    routeGet({
+      '/cell-sources': { ...sourcesResp, final: { kind: 'preset_formula', label: '预设公式', detail: 'SUM(0:1, 0)' } },
+      '/trace': { error: 'no_binding', computed_value: 5 },
+    })
+    const wrapper = mount(CellTraceDialog, {
+      props: {
+        modelValue: true, noteId: 'n2', rowIdx: 1, colIdx: 0, tableIndex: 2, projectId: 'p1', year: 2025,
+        noteSection: '五、1', sourceRef: { tableIndex: 2, row: 1, col: 0 },
+      },
+      global: globalStubs,
+    })
+    await flushPromises()
+    expect(mockGet).toHaveBeenCalledWith('/api/disclosure-notes/n2/cells/1/0/trace', { params: { table_index: 2 } })
+    expect(mockGet).toHaveBeenCalledWith(
+      `/api/disclosure-notes/p1/2025/${encodeURIComponent('五、1')}/cell-sources`,
+      { params: { table_index: 2, row: 1, col: 0 }, _silent: true },
+    )
+    const html = wrapper.html()
+    expect(html).toContain('预设公式')
+    expect(html).toContain('无 binding 配置')
+  })
+
+  it('最终来源请求被拒：就地提示，不影响模板取数溯源', async () => {
+    routeGet({
+      '/cell-sources': Object.assign(new Error('forbidden'), { response: { status: 403, data: {} } }),
+      '/trace': baseTraceResp,
+    })
+    const wrapper = mount(CellTraceDialog, {
+      props: {
+        modelValue: true, noteId: 'n3', rowIdx: 0, colIdx: 0, projectId: 'p1', year: 2025, noteSection: '五、1',
+        sourceRef: { tableIndex: 0, row: 0, col: 0 },
+      },
+      global: globalStubs,
+    })
+    await flushPromises()
+    const html = wrapper.html()
+    expect(html).toContain('无权查看本项目附注')
+    expect(html).toContain("SUM(TB('1001'")
+  })
+})

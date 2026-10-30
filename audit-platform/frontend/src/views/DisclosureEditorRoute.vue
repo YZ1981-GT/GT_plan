@@ -1,8 +1,11 @@
 <template>
-  <DisclosureEditor v-if="auditYear != null" :audit-year="auditYear" />
-  <el-empty v-else class="gt-de-missing-year" :description="MISSING_AUDIT_YEAR_MESSAGE">
-    <el-button @click="router.back()">返回</el-button>
-  </el-empty>
+  <!-- 单一元素根：布局的 <Transition> 只能给元素做动画，编辑页本身是多根（页面 + 右键菜单 / 面板 / 弹窗） -->
+  <div>
+    <DisclosureEditor v-if="auditYear != null" :audit-year="auditYear" />
+    <el-empty v-else class="gt-de-missing-year" :description="MISSING_AUDIT_YEAR_MESSAGE">
+      <el-button @click="router.back()">返回</el-button>
+    </el-empty>
+  </div>
 </template>
 
 <script setup lang="ts">

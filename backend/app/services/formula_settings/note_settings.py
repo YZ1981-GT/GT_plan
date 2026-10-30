@@ -162,7 +162,7 @@ async def list_section(db: AsyncSession, project_id: uuid.UUID, year: int, secti
     每条带 ``target_label``「表名 · 行名 · 列名」；按（表, 行, 列）排序。
     """
     from app.services.note_formula_service import target_sort_key
-    from app.services.note_formula_tables import describe_target, formula_targets
+    from app.services.note_formula_tables import describe_target, formula_targets, formula_view
 
     note = next(iter(await _notes(db, project_id, [section], year)), None)
     presets = _presets(note)
@@ -174,7 +174,7 @@ async def list_section(db: AsyncSession, project_id: uuid.UUID, year: int, secti
         if e.definition is None or is_effectively_disabled(DOMAIN, e.definition):
             continue  # 停用 ⇒ 执行器按模板公式算（若有），列表如实显示模板公式
         out[target] = {**_record(target, e.definition, e.layer), "slot_key": key, "pending": e.pending}
-    catalog = formula_targets(note.table_data) if note is not None else []
+    catalog = formula_targets(formula_view(note.table_data)) if note is not None else []
     for rec in out.values():
         rec["layer_label"] = LAYER_LABELS.get(rec["layer"], rec["layer"])
         rec["target_label"] = describe_target(None, rec["target"], catalog)
@@ -190,10 +190,10 @@ async def target_problems(db: AsyncSession, project_id: uuid.UUID, year: int, se
     原先没有目标的公式被当空行静默丢掉、弹窗照样提示「已保存」（spec note-pull-header-formula-closure F7）。
     章节不存在时不在这里报（保存时 404）。
     """
-    from app.services.note_formula_tables import target_issues
+    from app.services.note_formula_tables import formula_view, target_issues
 
     note = next(iter(await _notes(db, project_id, [section], year)), None)
-    return target_issues(note.table_data, formulas) if note is not None else []
+    return target_issues(formula_view(note.table_data), formulas) if note is not None else []
 
 
 async def save_section(db: AsyncSession, project_id: uuid.UUID, year: int, section: str, formulas: list[dict], *,

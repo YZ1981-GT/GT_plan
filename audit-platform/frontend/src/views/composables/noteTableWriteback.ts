@@ -133,8 +133,13 @@ function legacyCellRefFor(table: any, rowIndex: number, valueIndex: number): Sou
   }
 }
 
+/** 显示表一格的存储坐标（与写回同一套源坐标）；没有源坐标返回 null。单元格来源诊断按它取数。 */
+export function sourceCellRefOf(table: any, rowIndex: number, valueIndex: number): SourceCellRef | null {
+  return cellRefFor(table, rowIndex, valueIndex) || legacyCellRefFor(table, rowIndex, valueIndex)
+}
+
 function requireCellRef(table: any, rowIndex: number, valueIndex: number): SourceCellRef {
-  const ref = cellRefFor(table, rowIndex, valueIndex) || legacyCellRefFor(table, rowIndex, valueIndex)
+  const ref = sourceCellRefOf(table, rowIndex, valueIndex)
   if (!ref) {
     throw new NoteTableWritebackError(
       `表「${table?.name || '未命名'}」第 ${rowIndex + 1} 行第 ${valueIndex + 1} 列缺少源坐标，已拒绝写入`,

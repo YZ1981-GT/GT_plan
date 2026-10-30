@@ -56,16 +56,19 @@ def _group(labels: list[str]) -> dict:
 
 
 def test_suggestions_split_repeated_labels():
+    """同名行逐处建议；没有分组可分（模板两个「（1）」挨着、来源中间隔了「（2）」）⇒ 按第几次出现配、须人工复核
+    （spec note-chain-followup-optimizations R3：只能按位置配对的不自动确认）。"""
     tpl = [{"target_row_id": "t0", "canonical_name": "（1）"}, {"target_row_id": "t1", "canonical_name": "（1）"},
            {"target_row_id": "t2", "canonical_name": "（2）"}]
     got = suggest_template_rows([_group(["（1）", "（2）", "（1）"])], existing_template_rows=tpl)
-    by = {(s["source_label"], s.get("source_occurrence")): s["suggested_target"]["target_row_id"] for s in got}
-    assert by == {("（1）", 0): "t0", ("（1）", 1): "t1", ("（2）", None): "t2"}, "第 k 次出现对模板第 k 个同名行"
+    targets = [(s["source_label"], s["suggested_target"]["target_row_id"], s["match_type"]) for s in got]
+    assert targets == [("（1）", "t0", "position"), ("（1）", "t1", "position"), ("（2）", "t2", "exact")], (
+        "第 k 次出现对模板第 k 个同名行，但只能按位置 ⇒ position")
 
     single = [{"target_row_id": "t0", "canonical_name": "（1）"}, {"target_row_id": "t9", "canonical_name": "其他"}]
     got = suggest_template_rows([_group(["（1）", "（1）"])], existing_template_rows=single,
                                 history_mappings=[{"source_label": "（1）", "source_occurrence": 1, "target_row_id": "t9"}])
-    assert [(s["source_occurrence"], s["suggested_target"]["target_row_id"], s["match_type"]) for s in got] == [
+    assert [(s["source_group_occurrence"], s["suggested_target"]["target_row_id"], s["match_type"]) for s in got] == [
         (0, "t0", "exact"), (1, "t9", "history")], "模板只有一个同名行：按名都对它，按序号确认过的历史优先"
 
 
@@ -123,11 +126,18 @@ async def test_apply_legacy_rule_sums_all_same_name_rows_once(db, user, consol_p
 
 @pytest.mark.asyncio
 async def test_auto_mapping_confirms_each_occurrence(db, user, consol_project, child_projects):
+    """自动映射：明细模板里「（1）」只有一行 ⇒ 两处都对它（各自按分组取行），可自动确认（R3 取行条件是分组）。"""
     for child in child_projects:
         await _seed_disclosure(db, child.id, DUP)
     out = await auto_map_sections(db, project_id=consol_project.id, year=_YEAR, section_ids=[_SECTION], user_id=user.id)
     assert out["sections"][0]["status"] == "mapped", out
     [rule] = (await db.execute(sa.select(ConsolNoteMappingRule).where(
         ConsolNoteMappingRule.project_id == consol_project.id))).scalars().all()
-    keys = sorted((m["source_label"], m.get("source_occurrence")) for m in rule.mappings)
-    assert keys == [("（1）", 0), ("（1）", 1), ("（2）", None)]
+    keys = sorted((m["source_label"], m.get("source_group"), m.get("source_group_occurrence"), m.get("source_occurrence"))
+                  for m in rule.mappings)
+    assert keys == [("（1）", "", 0, None), ("（1）", "›（2）", 0, None), ("（2）", None, None, None)], keys
+    await apply_detail_refresh(db, project_id=consol_project.id, section_id=_SECTION, year=_YEAR)
+    record = (await db.execute(sa.select(ConsolNoteData).where(
+        ConsolNoteData.project_id == consol_project.id, ConsolNoteData.section_id == _SECTION))).scalar_one()
+    got = {r[0]: r[1] for r in record.data["rows"]}
+    assert got["（1）"] == "80.00" and got["（2）"] == "40.00", "两处「（1）」各取一次（每家 10 + 30），不重复加"

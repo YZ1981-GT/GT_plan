@@ -111,3 +111,49 @@ describe('ConsolNoteMappingDialog 同名多行（R11）', () => {
     expect('source_occurrence' in body.mappings[2]).toBe(false)
   })
 })
+
+// ─── 同名行按分组（spec note-chain-followup-optimizations R3）────────────────────
+
+function groupedPreview() {
+  const base = preview()
+  const target = (id: string, name: string) => ({ target_row_id: id, canonical_name: name })
+  base.groups[0].source_rows = [
+    { label: '机器设备', row_type: 'data', key: '机器设备#0', occurrence: 0, group: '一、账面原值合计', group_occurrence: 0 } as any,
+    { label: '机器设备', row_type: 'data', key: '机器设备#1', occurrence: 1, group: '二、累计折旧合计', group_occurrence: 0 } as any,
+  ]
+  base.suggestions = [
+    { source_label: '机器设备', source_group: '一、账面原值合计', source_group_label: '一、账面原值合计',
+      source_group_occurrence: 0, suggested_target: target('t0', '机器设备'), confidence: 1, match_type: 'exact',
+      candidates: [], auto_confirmable: true } as any,
+    { source_label: '机器设备', source_group: '二、累计折旧合计', source_group_label: '二、累计折旧合计',
+      source_group_occurrence: 0, suggested_target: target('t1', '机器设备'), confidence: 0.6, match_type: 'position',
+      candidates: [], auto_confirmable: false } as any,
+  ]
+  return base
+}
+
+describe('ConsolNoteMappingDialog 同名行按分组（R3）', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(api)) fn.mockReset()
+    api.previewDetailRefresh.mockResolvedValue(groupedPreview())
+    api.confirmDetailMapping.mockResolvedValue({})
+  })
+
+  it('逐行显示所在分组；只能按位置配对的显示「按位置」', async () => {
+    const w = await open()
+    const names = w.findAll('td[data-label="来源名称"] .cell').map(c => c.text())
+    expect(names).toEqual(['机器设备（「一、账面原值合计」下）', '机器设备（「二、累计折旧合计」下）'])
+    expect(w.text()).toContain('按位置')
+  })
+
+  it('确认时带分组取行条件（不带 source_occurrence）', async () => {
+    const w = await open()
+    const confirm = w.findAll('button').find(b => b.text() === '确认映射')!
+    await confirm.trigger('click')
+    await flushPromises()
+    const body = api.confirmDetailMapping.mock.calls[0][1]
+    expect(body.mappings.map((m: any) => [m.source_label, m.target_row_id, m.source_group, m.source_group_occurrence]))
+      .toEqual([['机器设备', 't0', '一、账面原值合计', 0], ['机器设备', 't1', '二、累计折旧合计', 0]])
+    expect(body.mappings.every((m: any) => !('source_occurrence' in m))).toBe(true)
+  })
+})

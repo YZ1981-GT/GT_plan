@@ -2726,6 +2726,8 @@ class DisclosureEngine:
         note_id: UUID,
         row_idx: int,
         col_idx: int,
+        *,
+        table_index: int = 0,
     ) -> dict:
         """单元格溯源 — 委托 disclosure_trace 模块。
 
@@ -2735,7 +2737,7 @@ class DisclosureEngine:
 
         return await _trace_cell(
             self.db, note_id, row_idx, col_idx,
-            tb_cache=getattr(self, "_tb_cache", None),
+            tb_cache=getattr(self, "_tb_cache", None), table_index=table_index,
         )
 
     @staticmethod

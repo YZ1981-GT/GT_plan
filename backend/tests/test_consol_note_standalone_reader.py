@@ -85,7 +85,7 @@ class TestReadSourceTable:
         st = _read({"_tables": [ANHUI_CASH, ANHUI_RESTRICTED]}, "五-1-1")
         assert st.table_name == "货币资金"
         assert st.unmatched_columns == [] and st.ratio_columns == []
-        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0}
+        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0, "_group": "", "_group_occurrence": 0}
         assert st.rows[2]["values"] == [None, None]
         assert st.rows[3]["row_type"] == "total"
 
@@ -93,7 +93,7 @@ class TestReadSourceTable:
         """五-1-2 与 五-1-1 同属单体「八、1」，按子表名取第二张表。"""
         st = _read({"_tables": [ANHUI_CASH, ANHUI_RESTRICTED]}, "五-1-2")
         assert st.table_name == "受限制的货币资金明细"
-        assert st.rows == [{"label": "银行承兑汇票保证金", "row_type": "data", "values": [5000.0, None], "_occurrence": 0}]
+        assert st.rows == [{"label": "银行承兑汇票保证金", "row_type": "data", "values": [5000.0, None], "_occurrence": 0, "_group": "", "_group_occurrence": 0}]
 
     def test_workpaper_source_is_read_through_projection(self):
         """宜宾形态：workpaper 来源读 sub_table_data 投影（编辑器显示的就是它），不读模板 _tables。"""
@@ -156,7 +156,7 @@ class TestReadSourceTable:
             {"label": "", "values": [1, 2]},
         ]}]}
         st = _read(td, "五-1-1")
-        assert st.rows == [{"label": "库存现金", "row_type": "data", "values": [1234.5, None], "_occurrence": 0}]
+        assert st.rows == [{"label": "库存现金", "row_type": "data", "values": [1234.5, None], "_occurrence": 0, "_group": "", "_group_occurrence": 0}]
 
     def test_prior_continuation_chosen_by_headers(self):
         """国企 五-4-3（期初数续表）：映射子表名精确命中的「（续）」是单项计提表，按表头读「（续：期初数）」。"""
@@ -177,7 +177,7 @@ class TestReadSourceTable:
         assert st.table_name == "按坏账准备计提方法分类披露应收票据（续：期初数）"
         assert st.table_choice == "structure"
         assert st.rows == [{"label": "按组合计提坏账准备", "row_type": "data", "values": [700, None, 35, None, 665],
-                            "_occurrence": 0}]
+                            "_occurrence": 0, "_group": "", "_group_occurrence": 0}]
         assert st.to_status()["table_choice"] == "structure"
 
     def test_row_continuation_rows_are_appended(self):

@@ -17,11 +17,13 @@ vi.mock('../DisclosureEditor.vue', async () => {
     default: defineComponent({
       name: 'DisclosureEditor',
       props: { auditYear: { type: Number, required: true } },
-      setup: (p) => () => h('div', { class: 'editor' }, String(p.auditYear)),
+      // 与真页面一样是多根（页面 + 右键菜单 / 面板 / 弹窗）
+      setup: (p) => () => [h('div', { class: 'editor' }, String(p.auditYear)), h('div', { class: 'editor-dialogs' })],
     }),
   }
 })
 
+import { Transition, defineComponent, h, nextTick } from 'vue'
 import DisclosureEditorRoute from '../DisclosureEditorRoute.vue'
 import { useProjectStore } from '@/stores/project'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
@@ -51,6 +53,23 @@ describe('DisclosureEditorRoute', () => {
     route.query = { year: '2024' }
     const w = mountRoute()
     expect(w.find('.editor').text()).toBe('2024')
+  })
+
+  it('单一元素根：放进布局的 <Transition> 不告警（spec note-chain-followup-optimizations R5）', async () => {
+    useProjectStore().year = 2025
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const Host = defineComponent({
+        setup: () => () => h(Transition, { name: 'slide-left', mode: 'out-in' }, { default: () => h(DisclosureEditorRoute) }),
+      })
+      const w = mount(Host, { global: { plugins: [ElementPlus], stubs: { transition: false } } })
+      await nextTick()
+      expect(w.element.tagName).toBe('DIV')
+      expect(w.find('.editor').text()).toBe('2025')
+      expect(warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('non-element root node'))).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('年度变成 null（离开项目）：直接卸载编辑页，不把 null 传进去', async () => {

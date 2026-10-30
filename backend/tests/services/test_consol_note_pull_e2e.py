@@ -277,7 +277,7 @@ class TestFullChainFromStandaloneNotes:
         sources = await load_source_tables(db, [group["A"].id, group["B"].id], "五-1-2", _YEAR, template_type=tt)
         assert sources[group["A"].id].table_name == "受限制的货币资金明细"
         assert sources[group["A"].id].rows == [
-            {"label": "银行承兑汇票保证金", "row_type": "data", "values": [88.0, None], "_occurrence": 0}]
+            {"label": "银行承兑汇票保证金", "row_type": "data", "values": [88.0, None], "_occurrence": 0, "_group": "", "_group_occurrence": 0}]
         assert sources[group["B"].id].status == "missing"
 
 
@@ -298,7 +298,7 @@ class TestMixedTemplateGroup:
         st = sources[group["A"].id]
         assert st.table_name == "货币资金"
         # 上市版合并表头「期末余额 / 上年年末余额」与国企版「期末余额 / 期初余额」同位置
-        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0}
+        assert st.rows[0] == {"label": "库存现金", "row_type": "data", "values": [376.73, 286.73], "_occurrence": 0, "_group": "", "_group_occurrence": 0}
 
         # 子企业保存「八、1」→ 上市版合并章节（映射到单体「五、1」）照样按标题判为受影响
         affected = await stale_handler._affected_consol_sections(db, group["A"].id, "八、1", "货币资金")

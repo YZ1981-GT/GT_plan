@@ -80,9 +80,11 @@ async def apply_detail_refresh(
         compute_source_structure_hash,
         load_source_tables,
         resolve_section_template_type,
+        source_group,
         source_occurrence,
     )
     from app.services.consol_note_formula_service import find_table
+    from app.services.consol_note_row_groups import row_groups
     from app.services.consol_note_topn import apply_topn_refresh, section_topn_limit
 
     if template_type is None:
@@ -252,6 +254,10 @@ async def apply_detail_refresh(
         source_by_label: dict[str, list[Any]] = {}
         # V204: 同时按 _pushed_row_id 索引（集团下推行即使改了名也能找到）
         source_by_rid: dict[str, list[Any]] = {}
+        # 每行的（分组, 组内同名序号）：读取层带出，没有时按同一函数现算（R3）
+        fallback_groups = row_groups([_first_cell(sr).strip() for sr in source_rows],
+                                     [sr.get("row_type") if isinstance(sr, dict) else None for sr in source_rows])
+        group_of = {id(sr): source_group(sr, *fallback) for sr, fallback in zip(source_rows, fallback_groups)}
         for sr in source_rows:
             source_by_label.setdefault(_first_cell(sr).strip(), []).append(sr)
             rid = sr.get("_pushed_row_id") or (sr if isinstance(sr, dict) else {}).get("_pushed_row_id", "")
@@ -273,7 +279,12 @@ async def apply_detail_refresh(
             # 找不到时 fallback 按 _pushed_row_id（V204）
             matched_rows = source_by_label.get(source_label, [])
             occurrence = m.get("source_occurrence")
-            if isinstance(occurrence, int) and not isinstance(occurrence, bool):
+            group, group_occ = m.get("source_group"), m.get("source_group_occurrence")
+            if isinstance(group, str):
+                # 按（行名, 分组[, 组内序号]）取行（R3）：组里没有就不取，不按位置到别的组找
+                matched_rows = [sr for sr in matched_rows if group_of[id(sr)][0] == group
+                                and (not isinstance(group_occ, int) or group_of[id(sr)][1] == group_occ)]
+            elif isinstance(occurrence, int) and not isinstance(occurrence, bool):
                 matched_rows = [sr for k, sr in enumerate(matched_rows) if source_occurrence(sr, k) == occurrence]
             if not matched_rows:
                 matched_rows = source_by_rid.get(target_row_id, [])

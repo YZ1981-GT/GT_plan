@@ -97,6 +97,8 @@ async def _apply_final_note_formulas(
         "formula_updated": sum(int(item.get("updated") or 0) for item in runs.values()),
         "formula_sections": [section for section, item in runs.items() if int(item.get("updated") or 0) > 0],
         "formula_errors": errors,
+        # 底稿投影表上预设公式结果与底稿值不一致、保留底稿值的格数（刷新提示里请用户核对）
+        "formula_differs": sum(int(item.get("differs") or 0) for item in runs.values()),
     }
 
 

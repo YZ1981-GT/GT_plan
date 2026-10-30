@@ -586,11 +586,11 @@
                       <el-tooltip
                         :disabled="!getCellValidationError($index, headerIdx - 1)"
                         :content="getCellValidationError($index, headerIdx - 1)"
-                        placement="top"
-                        effect="dark"
+                        placement="bottom"
+                        effect="dark" :trigger-keys="[]"
                       >
-                      <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, headerIdx)">
                       <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, headerIdx - 1) === 'auto', 'gt-cell-validation-error': !!getCellValidationError($index, headerIdx - 1), 'gt-cell-resolve-failed': isCellResolveFailed(row, headerIdx - 1) }">
+                        <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, headerIdx)">
                         <GtGridCell
                           :editable="editMode && !row.is_total"
                           :value="getCellValue(row, headerIdx - 1)"
@@ -611,13 +611,13 @@
                             :aria-label="`${label || '列'} 行${$index + 1} 编辑`"
                             @change="onCellValueChange($index, headerIdx - 1, $event)" />
                         </GtGridCell>
+                        </CommentTooltip>
                         <span v-if="getCellMode(row, headerIdx - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, headerIdx - 1, $event)">📊</span>
                         <span v-else-if="getCellMode(row, headerIdx - 1) === 'manual'" class="gt-cell-manual"
                           :class="{ 'gt-cell-trace-trigger': editMode }" data-testid="note-cell-manual"
                           :title="editMode ? '人工改过（推送 / 公式 / 刷新不覆盖），点击恢复自动' : '人工改过：推送 / 公式 / 刷新不覆盖'"
                           @click.stop="editMode && onRestoreCellAuto($index, headerIdx - 1)">✏️</span>
                       </div>
-                      </CommentTooltip>
                       </el-tooltip>
                     </template>
                   </template>
@@ -1106,6 +1106,8 @@
     :note-id="cellTraceCtx.noteId"
     :row-idx="cellTraceCtx.rowIdx"
     :col-idx="cellTraceCtx.colIdx"
+    :table-index="cellTraceCtx.tableIndex" :source-ref="cellTraceCtx.sourceRef"
+    :project-id="projectId" :year="year" :note-section="currentNote?.note_section || ''"
     @penetrate-to-tb="onCellTracePenetrateTb"
   />
 

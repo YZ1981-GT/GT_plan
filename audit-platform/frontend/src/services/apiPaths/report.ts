@@ -133,6 +133,9 @@ export const disclosureNotes = {
   clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
   exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
+  // 单元格最终来源诊断（只读，spec note-chain-followup-optimizations R2）
+  cellSources: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/cell-sources`,
+  cellTrace: (noteId: string, row: number, col: number) => `/api/disclosure-notes/${noteId}/cells/${row}/${col}/trace`,
   relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
   templateStructure: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/template-structure`,
   // Sprint 4 Task 4.4: 致同附注 Word 排版规范（21 项参数）

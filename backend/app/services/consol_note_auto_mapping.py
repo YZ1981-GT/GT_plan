@@ -94,6 +94,24 @@ async def _bound_version(
     return str(version_id)
 
 
+def _suggestion_key(label: str, group: Any, group_occ: Any, occurrence: Any) -> tuple:
+    """建议 / 来源行的对应键：按分组（R3）> 按第几次出现（R11）> 只按行名。"""
+    if isinstance(group, str):
+        return (label, "group", group, int(group_occ or 0))
+    if isinstance(occurrence, int) and not isinstance(occurrence, bool):
+        return (label, "occurrence", occurrence)
+    return (label,)
+
+
+def _mapping_selector(key: tuple) -> dict[str, Any]:
+    """对应键 → 映射里的取行条件（``source_group`` + ``source_group_occurrence`` / ``source_occurrence`` / 无）。"""
+    if len(key) == 4:
+        return {"source_group": key[2], "source_group_occurrence": key[3]}
+    if len(key) == 3:
+        return {"source_occurrence": key[2]}
+    return {}
+
+
 def _no_source_reason(entity_sources: list[dict[str, Any]] | None) -> str:
     reasons = sorted({str(s.get("reason")) for s in entity_sources or [] if s.get("reason")})
     detail = f"（{reasons[0]}{' 等' if len(reasons) > 1 else ''}）" if reasons else ""
@@ -122,8 +140,9 @@ async def _map_section(
     if not preview["groups"]:
         out.status, out.reason = "skipped", _no_source_reason(preview.get("entity_sources"))
         return
-    # 同名行按出现序号各有一条建议（R11：source_occurrence）；只出现一次的行名没有序号
-    by_key = {(s["source_label"], s.get("source_occurrence")): s for s in preview["suggestions"]}
+    # 同名行按（分组, 组内序号）各有一条建议（R3：source_group）；只出现一次、模板也只有一个同名行的行名没有分组
+    by_key = {_suggestion_key(s["source_label"], s.get("source_group"), s.get("source_group_occurrence"),
+                              s.get("source_occurrence")): s for s in preview["suggestions"]}
     bindings = {b.entity_node_key: b for b in (await db.execute(sa.select(ConsolNoteMappingBinding).where(
         ConsolNoteMappingBinding.project_id == project_id, ConsolNoteMappingBinding.section_id == section_id,
     ))).scalars().all()}
@@ -136,22 +155,24 @@ async def _map_section(
                and bindings[e["node_key"]].bound_source_hash == group["hash"] for e in active):
             out.already.extend(active)  # 都已按当前结构确认过（含整组都被排除）
             continue
-        picked: dict[tuple[str, int | None], dict[str, Any]] = {}
+        picked: dict[tuple, dict[str, Any]] = {}
         for sr in group["source_rows"]:
             label = str(sr.get("label") or "")
-            if label:
-                key = (label, sr.get("occurrence")) if (label, sr.get("occurrence")) in by_key else (label, None)
-                picked.setdefault(key, by_key.get(key) or {})
-        undecided = list(dict.fromkeys(lbl for (lbl, _k), s in picked.items() if not is_auto_confirmable(s)))
+            if not label:
+                continue
+            candidates = (_suggestion_key(label, sr.get("group") or "", sr.get("group_occurrence") or 0, None),
+                          _suggestion_key(label, None, None, sr.get("occurrence")), _suggestion_key(label, None, None, None))
+            key = next((c for c in candidates if c in by_key), candidates[-1])
+            picked.setdefault(key, by_key.get(key) or {})
+        undecided = list(dict.fromkeys(k[0] for k, s in picked.items() if not is_auto_confirmable(s)))
         if undecided:
             out.pending.extend({**e, "labels": undecided} for e in active)
             continue
         await confirm_mapping(
             db, project_id=project_id, section_id=section_id, year=year,
             template_version_id=UUID(str(preview["template_version_id"])), source_structure_hash=group["hash"],
-            mappings=[{"source_label": lbl, "target_row_id": s["suggested_target"]["target_row_id"],
-                       "mapping_action": "map", **({"source_occurrence": k} if k is not None else {})}
-                      for (lbl, k), s in picked.items()],
+            mappings=[{"source_label": k[0], "target_row_id": s["suggested_target"]["target_row_id"],
+                       "mapping_action": "map", **_mapping_selector(k)} for k, s in picked.items()],
             entity_node_keys=[{**e, "hash": group["hash"]} for e in group["entities"]],
             excluded_node_keys=excluded or None, confirmed_by=user_id,
         )

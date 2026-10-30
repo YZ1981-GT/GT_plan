@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
@@ -252,12 +253,18 @@ def _split_repeated_labels(
     target_by_rid: dict[str, dict[str, Any]],
     history: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """同一张来源表里同名行出现多次（R11：应收股利「其中：（1）」在一年以内、一年以上各一行）⇒ 按出现序号逐个建议，
-    带 ``source_occurrence``：第 k 次出现对模板里第 k 个同名（含别名）行；模板只有一个同名行 ⇒ 都对它（与原先按行名
-    相加一致，此时确认过的按（行名, 序号）记的历史优先）；下推行按各自行身份。只出现一次的行名不带序号（兼容旧规则）。
+    """同名行逐个建议（R11 起；spec note-chain-followup-optimizations R3 改按分组判别）。
+
+    来源表里同名行出现多次、或模板里同名（含别名）行不止一个 ⇒ 来源每一处（行名, 分组, 组内序号）各一条建议，带
+    ``source_group`` / ``source_group_occurrence``（``consol_note_row_groups``，来源与模板同一函数）：模板里同一一级分组
+    只有一个同名行 ⇒ 对它；同一分组有几个 ⇒ 按完整分组键与组内序号对；确认过的（行名, 分组）历史优先于下面的退回。
+    都对不上 ⇒ 退回按第几次出现对模板第几个同名行，``match_type="position"``（来源少一组 / 组序不同时会配到别的组，
+    须人工复核，不自动确认）。下推行按各自行身份（exact_id）。只出现一次、模板里也只有一个同名行的行名不带分组（兼容旧规则）。
     """
-    counts: dict[str, int] = {}
-    rid_by_occ: dict[tuple[str, int], str] = {}
+    from app.services.consol_note_row_groups import group_label, row_groups
+
+    occs: dict[str, list[tuple[str, int, int, str]]] = {}  # 行名 → [(分组, 组内序号, 第几次出现, 下推行身份)]
+    repeated: set[str] = set()
     for group in source_groups:
         seen: dict[str, int] = {}
         for sr in group.get("source_rows", []):
@@ -266,41 +273,61 @@ def _split_repeated_labels(
                 continue
             k = sr.get("occurrence") if isinstance(sr.get("occurrence"), int) else seen.get(label, 0)
             seen[label] = seen.get(label, 0) + 1
-            if sr.get("_pushed_row_id"):
-                rid_by_occ[(label, k)] = str(sr["_pushed_row_id"])
-        for label, n in seen.items():
-            counts[label] = max(counts.get(label, 0), n)
-    history_occ = {
-        (str(h.get("source_label", "")).strip(), h["source_occurrence"]): str(h.get("target_row_id", ""))
-        for h in history if isinstance(h.get("source_occurrence"), int) and h.get("target_row_id")
-    }
+            entry = (str(sr.get("group") or ""), int(sr.get("group_occurrence") or 0), k, str(sr.get("_pushed_row_id") or ""))
+            if entry[:2] not in {e[:2] for e in occs.setdefault(label, [])}:
+                occs[label].append(entry)
+        repeated.update(label for label, n in seen.items() if n > 1)
+    tpl_groups = row_groups([tr.get("canonical_name", "") for tr in template_rows],
+                            [tr.get("row_type") for tr in template_rows])
     by_id = {str(tr.get("target_row_id", "")): tr for tr in template_rows}
+    history_group = {(str(h.get("source_label", "")).strip(), h["source_group"], int(h.get("source_group_occurrence") or 0)):
+                     str(h.get("target_row_id", ""))
+                     for h in history if isinstance(h.get("source_group"), str) and h.get("target_row_id")}
+    history_occ = {(str(h.get("source_label", "")).strip(), h["source_occurrence"]): str(h.get("target_row_id", ""))
+                   for h in history if isinstance(h.get("source_occurrence"), int) and h.get("target_row_id")}
+
+    def level1(group: str) -> str:
+        return group.split("›", 1)[0]
+
     out: list[dict[str, Any]] = []
     for s in suggestions:
         label = s["source_label"]
-        n = counts.get(label, 1)
-        if n < 2:
+        key = _label_key(label)
+        same = [i for i, tr in enumerate(template_rows) if _label_key(tr.get("canonical_name", "")) == key
+                or key in {_label_key(a) for a in tr.get("aliases", [])}]
+        if label not in repeated and len(same) < 2:
             out.append(s)
             continue
-        key = _label_key(label)
-        same = [tr for tr in template_rows if _label_key(tr.get("canonical_name", "")) == key
-                or key in {_label_key(a) for a in tr.get("aliases", [])}]
-        for k in range(n):
-            rid = rid_by_occ.get((label, k))
-            hist = by_id.get(history_occ.get((label, k), ""))
+        # 按行名对得上模板（精确 / 别名；下推行里没带行身份的那几处按行名对）
+        by_name = s["match_type"] if s["match_type"] in ("exact", "alias") else (
+            "exact" if s["match_type"] == "exact_id" and same else None)
+        src_count = Counter(g for g, _go, _k, _rid in occs.get(label, []))
+        for group, group_occ, k, rid in occs.get(label, []):
+            cands = [i for i in same if level1(tpl_groups[i][0]) == level1(group)]
+            tpl_count = Counter(tpl_groups[i][0] for i in cands)
+            # 同一一级分组里模板有几个同名行：完整分组键两边都唯一才算对上（组内只剩顺序可分的不算）
+            exact = [i for i in cands if tpl_groups[i][0] == group and tpl_count[group] == 1 and src_count[group] == 1]
+            hist = by_id.get(history_group.get((label, group, group_occ)) or history_occ.get((label, k), ""))
+            confidence = s["confidence"] if by_name == s["match_type"] else 1.0
             if rid and rid in target_by_rid:
                 item = _suggestion(label, target_by_rid[rid], "exact_id", 1.0)
-            elif s["match_type"] in ("exact", "alias") and len(same) > 1:
-                item = _suggestion(label, same[min(k, len(same) - 1)], s["match_type"], s["confidence"])
+            elif by_name and len(cands) > 1 and exact:
+                item = _suggestion(label, template_rows[exact[0]], by_name, confidence)
             elif hist is not None:
                 item = _suggestion(label, hist, "history", 0.85)
+            elif by_name and len(cands) == 1:  # 这一组模板里只有一个同名行：都对它（同组同名几行相加）
+                item = _suggestion(label, template_rows[cands[0]], by_name, confidence)
+            elif by_name and same:
+                item = _suggestion(label, template_rows[same[min(k, len(same) - 1)]], "position", 0.6)
             else:
                 item = dict(s)
-            out.append({**item, "source_occurrence": k})
+            out.append({**item, "source_group": group, "source_group_label": group_label(group),
+                        "source_group_occurrence": group_occ})
     return out
 
 
-#: 可自动确认的匹配方式：行身份 / 行名 / 别名 / 用户确认过的同名对应。模糊、上年规则须人工看一眼。
+#: 可自动确认的匹配方式：行身份 / 行名 / 别名 / 用户确认过的同名对应。模糊、上年规则、同名行只能按位置配（``position``）
+#: 须人工看一眼。
 AUTO_CONFIRM_MATCH_TYPES = frozenset({"exact_id", "exact", "alias", "global_alias", "history"})
 
 

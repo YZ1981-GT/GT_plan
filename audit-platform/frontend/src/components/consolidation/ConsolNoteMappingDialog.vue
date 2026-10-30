@@ -40,7 +40,7 @@
       </el-table-column>
       <el-table-column label="来源名称" min-width="180" show-overflow-tooltip>
         <template #default="{ row }">
-          {{ row.source_label }}<span v-if="row.source_occurrence != null" class="gt-mapping-occurrence">（同名第 {{ row.source_occurrence + 1 }} 行）</span>
+          {{ row.source_label }}<span v-if="sourceRowPlace(row)" class="gt-mapping-occurrence">（{{ sourceRowPlace(row) }}）</span>
         </template>
       </el-table-column>
       <el-table-column label="涉及企业" width="90" align="center">
@@ -128,7 +128,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConsolNoteDetailTemplateEditor from './ConsolNoteDetailTemplateEditor.vue'
-import { matchTypeLabel, matchTypeTagType, suggestionStatus } from './composables/consolNoteMappingLabels'
+import { matchTypeLabel, matchTypeTagType, sourceRowPlace, suggestionStatus } from './composables/consolNoteMappingLabels'
 import type {
   DetailTemplate, DetailTemplateRow, DetailRefreshPreview,
   MappingRuleItem, MappingSuggestion,
@@ -147,6 +147,10 @@ interface MappingRow {
   source_label: string
   /** 同名行的第几次出现（R11：同一来源表里行名重复时逐行映射；只出现一次的行名没有） */
   source_occurrence?: number
+  /** 同名行所在分组与组内第几行（R3：按分组取行，组序不同的企业也取对；顶层分组为空串） */
+  source_group?: string
+  source_group_label?: string
+  source_group_occurrence?: number
   target_row_id: string
   mapping_action: 'map' | 'map_merge' | 'ignore'
   _entities: Array<{ node_key: string; company_name: string }>
@@ -213,19 +217,22 @@ async function loadPreview() {
     const staleKeys = new Set((result.stale_entities || []).map(e => e.node_key))
     const groups = result.groups || []
 
-    // 按来源标签→所属 group 的企业列表建索引（一个 label 可能出现在多个 group 中）
+    // 按来源标签（同名行再按分组）→ 所属 group 的企业列表建索引（一个 label 可能出现在多个 group 中）
     const labelToEntities = new Map<string, Array<{ node_key: string; company_name: string }>>()
+    const placeKey = (label: string, group?: string | null) => (group == null ? `${label}\u0001` : `${label}\u0000${group}`)
     for (const group of groups) {
       for (const sr of group.source_rows || []) {
         const label = (sr.label || '').trim()
         if (!label) continue
-        const existing = labelToEntities.get(label) || []
-        for (const ent of group.entities || []) {
-          if (!existing.some(e => e.node_key === ent.node_key)) {
-            existing.push({ node_key: ent.node_key, company_name: ent.company_name })
+        for (const key of [placeKey(label), placeKey(label, sr.group)]) {
+          const existing = labelToEntities.get(key) || []
+          for (const ent of group.entities || []) {
+            if (!existing.some(e => e.node_key === ent.node_key)) {
+              existing.push({ node_key: ent.node_key, company_name: ent.company_name })
+            }
           }
+          labelToEntities.set(key, existing)
         }
-        labelToEntities.set(label, existing)
       }
     }
 
@@ -234,11 +241,14 @@ async function loadPreview() {
 
     for (const suggestion of result.suggestions || []) {
       // 精确匹配 group 的企业列表；找不到时降级为全部非 stale 企业
-      const matched = labelToEntities.get(suggestion.source_label)
+      const matched = labelToEntities.get(placeKey(suggestion.source_label, suggestion.source_group))
       const entities = (matched || allEntities).filter(e => !staleKeys.has(e.node_key))
       rows.push({
         source_label: suggestion.source_label,
         source_occurrence: suggestion.source_occurrence ?? undefined,
+        source_group: suggestion.source_group ?? undefined,
+        source_group_label: suggestion.source_group_label ?? undefined,
+        source_group_occurrence: suggestion.source_group_occurrence ?? undefined,
         target_row_id: suggestion.suggested_target?.target_row_id || '',
         mapping_action: suggestion.match_type === 'manual' ? 'map' : 'map',
         _entities: entities,
@@ -271,7 +281,10 @@ function onTargetChange(row: MappingRow) {
 function buildMappings(): MappingRuleItem[] {
   return mappingRows.value.map(r => ({
     source_label: r.source_label,
-    ...(r.source_occurrence != null ? { source_occurrence: r.source_occurrence } : {}),
+    // 同名行按分组取行（R3）；旧规则按第几次出现
+    ...(r.source_group != null
+      ? { source_group: r.source_group, source_group_occurrence: r.source_group_occurrence ?? 0 }
+      : (r.source_occurrence != null ? { source_occurrence: r.source_occurrence } : {})),
     target_row_id: r.target_row_id,
     mapping_action: r.mapping_action,
     ignore_reason: r.mapping_action === 'ignore' ? (ignoreReason.value || '不适用') : undefined,

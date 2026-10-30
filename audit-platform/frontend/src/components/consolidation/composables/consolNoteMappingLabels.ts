@@ -25,7 +25,23 @@ const MATCH_TYPE_LABELS: Record<string, string> = {
   previous_year: '上年',
   history: '历史',
   fuzzy: '模糊',
+  // 同名行只能按第几次出现配对（分组对不上，spec note-chain-followup-optimizations R3）：须人工复核
+  position: '按位置',
   manual: '手动',
+}
+
+/** 同名行的位置说明：按分组（「二、累计折旧合计」下、组内第 2 行）或按第几次出现（旧规则）；只出现一次的行没有。 */
+export function sourceRowPlace(row: {
+  source_group?: string | null
+  source_group_label?: string | null
+  source_group_occurrence?: number | null
+  source_occurrence?: number | null
+}): string {
+  if (row.source_group != null) {
+    const where = row.source_group_label ? `「${row.source_group_label}」下` : '顶层'
+    return row.source_group_occurrence ? `${where}第 ${row.source_group_occurrence + 1} 行` : where
+  }
+  return row.source_occurrence != null ? `同名第 ${row.source_occurrence + 1} 行` : ''
 }
 
 /** 匹配方式中文名（未登记的值显示「其他」，不把英文代码露给用户）。 */
@@ -38,6 +54,6 @@ export function matchTypeLabel(matchType: string | null | undefined): string {
 export function matchTypeTagType(matchType: string | null | undefined): 'success' | 'primary' | 'warning' | 'info' {
   if (matchType === 'exact_id' || matchType === 'exact') return 'success'
   if (matchType === 'alias' || matchType === 'global_alias' || matchType === 'history') return 'primary'
-  if (matchType === 'previous_year' || matchType === 'fuzzy') return 'warning'
+  if (matchType === 'previous_year' || matchType === 'fuzzy' || matchType === 'position') return 'warning'
   return 'info'
 }

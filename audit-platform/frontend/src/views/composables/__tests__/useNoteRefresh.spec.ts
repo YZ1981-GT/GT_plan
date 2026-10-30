@@ -108,6 +108,33 @@ describe('useNoteRefresh 刷新先从底稿取数（spec note-pull-header-formul
     expect(msg.message).toContain('从底稿取数失败：权限不足')
   })
 
+  it('预设公式与底稿值不一致：提示为警告并写明保留底稿值的格数（spec note-chain-followup-optimizations ADR-2）', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult(), error: null })
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({ cells_updated: 0, formula_differs: 2 } as any)
+
+    await api.onRefreshFromWP()
+
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('warning')
+    expect(msg.message).toContain('2 个单元格的底稿披露表数值与预设公式结果不一致，已保留底稿值')
+    // 差异提示与取数结果并入同一条
+    expect(msg.message).toContain('公式推送按审定数写入 3 格（八、5）')
+    expect(msg.duration).toBeGreaterThanOrEqual(6000)
+  })
+
+  it('无差异时不出现差异提示，取数成功按成功提示', async () => {
+    const { api } = setup()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult(), error: null })
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({ cells_updated: 0, formula_differs: 0 } as any)
+
+    await api.onRefreshFromWP()
+
+    const msg = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(msg.type).toBe('success')
+    expect(msg.message).not.toContain('预设公式结果不一致')
+  })
+
   it('离屏同步抛错按失败记入提示，后续刷新照常', async () => {
     const { api } = setup()
     vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: pullResult({ push: { ran: true, error: null, wp_codes: ['D2'], written: 0, kept: 0, skipped: 0, run_id: 'r1', warnings: [] } }), error: null })

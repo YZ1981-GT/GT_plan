@@ -55,6 +55,16 @@ def source_occurrence(row: Any, fallback: int) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else fallback
 
 
+def source_group(row: Any, fallback: str, fallback_occurrence: int) -> tuple[str, int]:
+    """来源行的（分组, 组内同名序号）：读取层带出的 ``_group`` / ``_group_occurrence``；没有 ⇒ 调用方现算的值。"""
+    group = row.get("_group") if isinstance(row, dict) else None
+    occurrence = row.get("_group_occurrence") if isinstance(row, dict) else None
+    if not isinstance(group, str):
+        return fallback, fallback_occurrence
+    ok = isinstance(occurrence, int) and not isinstance(occurrence, bool) and occurrence >= 0
+    return group, occurrence if ok else fallback_occurrence
+
+
 def _row_type(row: Any) -> str:
     """行类型：声明了合计 / 小计用声明，只有行名时按 ``note_total_terms.label_row_type``（以「小计」结尾 = 小计）。"""
     from app.services.note_total_terms import label_row_type
@@ -112,17 +122,20 @@ def _stable_key(row: Any) -> str:
 def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
     """从 table_data.rows 提取结构信息（不含金额）。
 
-    返回 ``[{label, row_type, key, occurrence}]``（``occurrence`` = 同名行出现序号，从 0 起；不进结构指纹）；
-    集团下推的行另带 ``_pushed_row_id``。
+    返回 ``[{label, row_type, key, occurrence, group, group_occurrence}]``（``occurrence`` = 同名行出现序号，从 0 起；
+    ``group`` / ``group_occurrence`` = 同名行所在分组与组内序号，读取层带出，没有时按 ``consol_note_row_groups`` 现算；
+    三者都不进结构指纹）；集团下推的行另带 ``_pushed_row_id``。
     """
+    from app.services.consol_note_row_groups import row_groups
+
+    kept = [row for row in rows if _row_type(row) != "header"]
+    fallback_groups = row_groups([_first_cell(r).strip() for r in kept], [_row_type(r) for r in kept])
     items: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
     occurrences: dict[str, int] = {}
-    for row in rows:
+    for row, (fallback_group, fallback_group_occ) in zip(kept, fallback_groups):
         label = _first_cell(row).strip()
         rt = _row_type(row)
-        if rt == "header":
-            continue
         sk = _stable_key(row)
         if not sk:
             count = seen.get(label, 0)
@@ -130,12 +143,18 @@ def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
             sk = f"{label}#{count}"
         occurrence = source_occurrence(row, occurrences.get(label, 0))
         occurrences[label] = occurrences.get(label, 0) + 1
-        item = {"label": label, "row_type": rt, "key": sk, "occurrence": occurrence}
+        group, group_occ = source_group(row, fallback_group, fallback_group_occ)
+        item = {"label": label, "row_type": rt, "key": sk, "occurrence": occurrence,
+                "group": group, "group_occurrence": group_occ}
         pushed = row.get("_pushed_row_id") if isinstance(row, dict) else None
         if pushed:  # 集团下推的行：带行身份进指纹与建议（exact_id）
             item["_pushed_row_id"] = str(pushed)
         items.append(item)
     return items
+
+
+#: 只给建议 / 取行做判别、不进结构指纹的键
+_NOT_IN_FINGERPRINT = frozenset({"_pushed_row_id", "occurrence", "group", "group_occurrence"})
 
 
 def compute_source_structure_hash(section_id: str, rows: list[Any]) -> str:
@@ -146,9 +165,9 @@ def compute_source_structure_hash(section_id: str, rows: list[Any]) -> str:
     """
     # 下推行身份（_pushed_row_id）只给建议做 exact_id，不进指纹：下推不改行名 / 行类型，映射照旧有效 ——
     # 进指纹的话每次「📤 下推模板」都让已确认的企业变成「结构已变化」，重新汇总跳过它（2026-10-26 浏览器实测）
-    # 同名行出现序号（occurrence）同理不进指纹：它由行名与顺序决定，key 已含同名序号，加进来只会让已确认的企业全部失效
-    items = [{k: v for k, v in it.items() if k not in ("_pushed_row_id", "occurrence")}
-             for it in extract_source_rows(rows)]
+    # 同名行出现序号（occurrence）同理不进指纹：它由行名与顺序决定，key 已含同名序号，加进来只会让已确认的企业全部失效；
+    # 分组（group / group_occurrence）同理（spec note-chain-followup-optimizations R3）
+    items = [{k: v for k, v in it.items() if k not in _NOT_IN_FINGERPRINT} for it in extract_source_rows(rows)]
     # 分离数据行和合计/小计行——合计行位置不参与指纹
     data_items = [it for it in items if it.get("row_type") == "data"]
     other_items = [it for it in items if it.get("row_type") != "data"]

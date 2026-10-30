@@ -17,6 +17,8 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import { handleApiError } from '@/utils/errorHandler'
 import type { TraceSourceData } from '@/components/common/TraceSourcePopover.vue'
+import type { CellSourceRef } from '@/components/notes/cellSources'
+import { sourceCellRefOf } from './noteTableWriteback'
 
 export interface UseNoteCellActionsOptions {
   projectId: ComputedRef<string> | Ref<string>
@@ -40,11 +42,11 @@ export function useNoteCellActions(options: UseNoteCellActionsOptions) {
   const cellDetailSheet = ref('')
   const cellDetailLabel = ref('')
 
-  // CellTrace 溯源
+  // CellTrace 溯源：坐标按存储位置（与写回同一套源坐标），不是显示表的行列
   const showCellTrace = ref(false)
-  const cellTraceCtx = reactive<{ noteId: string; rowIdx: number; colIdx: number }>({
-    noteId: '', rowIdx: 0, colIdx: 0,
-  })
+  const cellTraceCtx = reactive<{
+    noteId: string; rowIdx: number; colIdx: number; tableIndex: number; sourceRef: CellSourceRef | null
+  }>({ noteId: '', rowIdx: 0, colIdx: 0, tableIndex: 0, sourceRef: null })
 
   // Phase 3 F1: 来源追溯
   const tracePopoverVisible = ref(false)
@@ -104,9 +106,22 @@ export function useNoteCellActions(options: UseNoteCellActionsOptions) {
     if (!note?.id) { ElMessage.warning('请先选择附注章节'); return }
     const sel = deCtx.selectedCells.value[0]
     if (!sel) { ElMessage.warning('请先选中一个单元格'); return }
+    // 选区列号含行名列（0 = 行名，与 setupTableDrag / 单元格点选同口径）⇒ 数据列 = 列号 − 1
+    const valueIndex = Number(sel.col) - 1
+    if (!(valueIndex >= 0)) { ElMessage.warning('请选中数值单元格（行名列没有取数来源）'); return }
+    const ref = sourceCellRefOf(activeTableData.value, sel.row, valueIndex)
+    const sourceRef: CellSourceRef = ref
+      ? {
+          tableIndex: ref.row.tableIndex, row: ref.row.rowIndex, col: ref.column.valueIndex,
+          ...(ref.row.sourceSubTableKey ? { subTableKey: ref.row.sourceSubTableKey } : {}),
+          ...(ref.column.key ? { valueKey: ref.column.key } : {}),
+        }
+      : { tableIndex: 0, row: sel.row, col: valueIndex }
     cellTraceCtx.noteId = String(note.id)
-    cellTraceCtx.rowIdx = sel.row
-    cellTraceCtx.colIdx = sel.col
+    cellTraceCtx.rowIdx = sourceRef.row
+    cellTraceCtx.colIdx = sourceRef.col
+    cellTraceCtx.tableIndex = sourceRef.tableIndex
+    cellTraceCtx.sourceRef = sourceRef
     showCellTrace.value = true
   }
 

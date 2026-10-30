@@ -10,6 +10,9 @@ import { refreshDisclosureFromWorkpapers, refreshDisclosureSection, type Refresh
 import { handleApiError } from '@/utils/errorHandler'
 import { describeWorkpaperPull, pullFromWorkpapers, type HeadlessSyncOutcome } from './noteWorkpaperPull'
 import { runHeadlessDisclosure } from './noteHeadlessDisclosure'
+
+/** 刷新回执里附注公式的差异计数（底稿投影表上预设公式与底稿值不一致、保留底稿值；spec note-chain-followup-optimizations）。 */
+type RefreshResultWithFormulaDiffers = RefreshFromWorkpapersResult & { formula_differs?: number }
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
   isD1NotesReceivableNoteSection,
@@ -117,9 +120,17 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       message = '数据已是最新，无需刷新'
     }
 
+    // 底稿披露表的数是这些表的权威：预设公式结果对不上时不改写，提示用户核对（右键单元格可看最终来源）
+    const formulaDiffers = Number((result as RefreshResultWithFormulaDiffers)?.formula_differs ?? 0)
+    if (formulaDiffers > 0) {
+      type = 'warning'
+      duration = Math.max(duration, 6000)
+      message += `；${formulaDiffers} 个单元格的底稿披露表数值与预设公式结果不一致，已保留底稿值（右键单元格「溯源到底稿/试算表」可查看）`
+    }
+
     // 从底稿取数（公式推送 + 离屏同步披露表）的结果并入同一条提示
     if (extra.lines.length) {
-      message = cellsUpdated > 0 || errors.length > 0 || textOnlySections.length > 0
+      message = cellsUpdated > 0 || errors.length > 0 || textOnlySections.length > 0 || formulaDiffers > 0
         ? `${message}；${extra.lines.join('；')}`
         : extra.lines.join('；')
       duration = Math.max(duration, 6000)

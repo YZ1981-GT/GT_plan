@@ -460,6 +460,9 @@ async def execute_note_formulas(
     - 公式 = 模板层 ∪ 用户集（``_user_formulas``，同目标用户集优先）。模板层：章节存过 ``_formulas`` 用它（旧数据），
       否则按每张表当前结构现算预设（``note_formula_tables.section_preset_formulas``，不落库）；``regenerate=True``
       丢掉存过的 ``_formulas`` 改用现算预设。
+    - 表格 = 编辑器同一份显示视图（``formula_view``）：底稿来源章节按 ``sub_table_data`` 投影算、写回投影来源；投影表上
+      底稿是数值权威 —— 预设公式只补空格，底稿已有不同值时保留并回报 ``kept_workpaper``；用户公式照常覆盖并标
+      ``overrode_workpaper``。存过的旧 ``_formulas`` 只对应存储结构，视图是投影时不套用（spec note-chain-followup-optimizations）。
     - 目标 ``行:列`` = 第 1 张表、``t{n}:行:列`` = 第 n+1 张；写入 ``_tables``（编辑器与 Word 读的位置），第 1 张表
       写完同步顶层镜像。每张表内按引用关系排序（被引用的格先算），循环引用的格不写。
     - 只写 auto 格（人工 / 锁定不动）；审核类公式（逻辑审核 / 合理性）不回填单元格；求值严格（引用全空 / 取不到 /
@@ -474,7 +477,8 @@ async def execute_note_formulas(
 
     from app.services.formula_push.note_writer import sync_first_table_mirror
     from app.services.note_formula_tables import (
-        CROSS_REF_RE, evaluate, iter_note_tables, parse_formula_key, section_preset_formulas, table_order,
+        CROSS_REF_RE, evaluate, formula_view, is_projected_table, iter_note_tables, parse_formula_key,
+        section_preset_formulas, table_order, view_cell_mode, write_view_cell,
     )
 
     note = (await db.execute(
@@ -489,11 +493,16 @@ async def execute_note_formulas(
         return {"executed": 0, "updated": 0, "results": [], "anomalies": []}
 
     td = note.table_data
+    view = formula_view(td)
+    projected = view is not td
     dropped = bool(regenerate and td.get("_formulas"))
     if dropped:
         td.pop("_formulas", None)
     stored = td.get("_formulas")
-    template = stored if isinstance(stored, dict) and stored else section_preset_formulas(td)[0]
+    use_stored = isinstance(stored, dict) and bool(stored) and not projected
+    template = stored if use_stored else section_preset_formulas(view)[0]
+    user_list = td.get("_user_formulas") if isinstance(td.get("_user_formulas"), list) else []
+    user_keys = {conv[0] for rec in user_list if (conv := _user_formula_to_def(rec))}
     formulas = _merge_formula_sets(template, td.get("_user_formulas"))
 
     need_cross = any(CROSS_REF_RE.search(str(f.get("expression") or "")) for f in formulas.values())
@@ -505,7 +514,7 @@ async def execute_note_formulas(
             cross_data.update(loaded)  # 调用方给的空字典：多章节共用这一次预载
     resolve = (lambda token: _resolve_single_cross_ref(token, cross_data or {})) if need_cross else None
 
-    tables = dict(iter_note_tables(td))
+    tables = dict(iter_note_tables(view))
     by_table: dict[int, dict[tuple[int, int], tuple[str, dict]]] = {}
     exec_results: list[dict] = []
     for key, fdef in formulas.items():
@@ -535,8 +544,8 @@ async def execute_note_formulas(
                 exec_results.append({"cell": key, "table_index": t, "type": formula_def.get("type"), "old": None,
                                      "new": None, "status": "skipped", "reason": "目标行超出表格"})
                 continue
-            # 只更新 auto 模式的单元格（Req 17.1）
-            if (row.get("_cell_modes") or {}).get(str(col_idx), "auto") != "auto":
+            # 只更新 auto 模式的单元格（Req 17.1）；投影表按来源行的位置化模式判（与推送同口径）
+            if view_cell_mode(td, tables[t], row_idx, col_idx) != "auto":
                 continue
             cell_addr_id = (_note_cell_addr_id(note_section, row_idx, col_idx) if t == 0
                             else f"note:{note_section}!t{t}:{row_idx}:{col_idx}")
@@ -561,20 +570,28 @@ async def execute_note_formulas(
                                      "status": "skipped", "reason": reason})
                 continue
             new_value = float(value)
+            on_projection = is_projected_table(tables[t])
+            differs = old_value not in (None, "") and not _same_amount(old_value, new_value)
+            if on_projection and differs and key not in user_keys:
+                # 底稿投影表的数值以底稿为准：预设公式只补空，底稿已有不同值不改写、回报差异（ADR-2）
+                exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": old_value, "new": new_value,
+                                     "status": "kept_workpaper",
+                                     "reason": f"底稿披露表的值 {old_value} 与预设公式结果 {new_value:.2f} 不一致，保留底稿值"})
+                continue
             formula_def["evaluated_at"] = datetime.now(timezone.utc).isoformat()
             formula_def["addr_id"] = cell_addr_id  # Req 17.5：溯源 / reaggregate 精准刷新同一身份
             formula_def.setdefault("binding_id", None)
-            exec_results.append({"cell": key, "table_index": t, "type": ftype, "old": old_value, "new": new_value,
-                                 "status": "ok"})
+            item = {"cell": key, "table_index": t, "type": ftype, "old": old_value, "new": new_value, "status": "ok"}
+            if on_projection and differs:
+                item["overrode_workpaper"] = True  # 用户公式覆盖了底稿披露表的值
+            exec_results.append(item)
             if _same_amount(old_value, new_value):
                 continue
-            values = list(values)
-            while len(values) <= col_idx:
-                values.append(None)
-            values[col_idx] = new_value
-            row["values"] = values
+            if not write_view_cell(td, tables[t], row_idx, col_idx, new_value):
+                exec_results[-1] = {**item, "status": "skipped", "reason": "找不到这一格在底稿披露表里的存储位置，未写入"}
+                continue
             updated += 1
-            wrote_first = wrote_first or t == 0
+            wrote_first = wrote_first or (t == 0 and not on_projection)
 
     if wrote_first:
         sync_first_table_mirror(td)  # 第 1 张表写进 _tables[0] ⇒ 顶层镜像跟着改
@@ -585,6 +602,8 @@ async def execute_note_formulas(
 
     anomalies = [{"cell": r["cell"], "table_index": r["table_index"], "message": "合计行为0，请检查子项是否有数据"}
                  for r in exec_results if r["status"] == "ok" and r["new"] == 0 and r.get("type") == "vertical_sum"]
+    anomalies += [{"cell": r["cell"], "table_index": r["table_index"], "kind": "workpaper_differs",
+                   "message": r["reason"]} for r in exec_results if r["status"] == "kept_workpaper"]
     return {"executed": executed, "updated": updated, "results": exec_results, "anomalies": anomalies}
 
 
@@ -1397,16 +1416,17 @@ def compute_formula_coverage(table_data: dict | None) -> dict[str, Any]:
     Returns: {"total_cells": N, "configured_cells": M, "coverage_pct": X.X}
     """
     from app.services.note_formula_tables import (
-        amount_columns, iter_note_tables, parse_formula_key, section_preset_formulas,
+        amount_columns, formula_view, iter_note_tables, parse_formula_key, section_preset_formulas,
     )
 
     if not table_data or not isinstance(table_data, dict):
         return {"total_cells": 0, "configured_cells": 0, "coverage_pct": 0.0}
 
-    formulas, _notes = section_preset_formulas(table_data)
+    view = formula_view(table_data)  # 与执行器、编辑器同一份显示视图（底稿来源章节按投影表统计）
+    formulas, _notes = section_preset_formulas(view)
     targets = {parsed for key in formulas if (parsed := parse_formula_key(key))}
     total_cells = configured_cells = 0
-    for t, table in iter_note_tables(table_data):
+    for t, table in iter_note_tables(view):
         rows = table.get("rows") if isinstance(table.get("rows"), list) else []
         columns = set(amount_columns(table)) if table.get("headers") and rows else set()
         total_cells += len(rows) * len(columns)

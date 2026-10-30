@@ -14,7 +14,9 @@
     - update:modelValue: boolean    弹窗关闭
     - penetrate-to-tb { account_code }   点击 evidence 行 → 跳 TrialBalance
 
-  接口：GET /api/disclosure-notes/{note_id}/cells/{row_idx}/{col_idx}/trace
+  接口：GET /api/disclosure-notes/{note_id}/cells/{row_idx}/{col_idx}/trace（模板取数绑定，?table_index= 第几张表）
+        GET /api/disclosure-notes/{pid}/{year}/{section}/cell-sources（最终来源诊断，spec note-chain-followup-optimizations R2）
+  底稿来源的格（投影表，sourceRef 带 subTableKey）没有模板取数绑定，只显示最终来源。
 -->
 <template>
   <el-dialog
@@ -25,13 +27,42 @@
     destroy-on-close
     @update:model-value="onClose"
   >
-    <div v-loading="loading" class="gt-cell-trace-body">
+    <section v-if="canDiagnose" v-loading="sourcesLoading" class="gt-cell-source" data-test="cell-sources">
+      <el-alert v-if="sourcesError" :title="sourcesError" type="warning" show-icon :closable="false" />
+      <template v-else-if="sources">
+        <div class="gt-cell-source-final">
+          <span class="gt-cell-source-final__label">最终来源</span>
+          <el-tag type="success" size="small">{{ sources.final?.label || '—' }}</el-tag>
+          <span class="gt-cell-source-final__detail">{{ sources.final?.detail }}</span>
+        </div>
+        <div class="gt-cell-source-meta">
+          {{ sources.target_label }} · 当前值 {{ formatValue(sources.value) }} · 存在{{ sources.storage?.text }}
+        </div>
+        <el-alert
+          v-for="item in sources.conflicts || []"
+          :key="item.kind + item.message"
+          :title="item.message"
+          type="warning"
+          show-icon
+          :closable="false"
+          class="gt-cell-source-conflict"
+        />
+        <table class="gt-cell-source-steps">
+          <tr v-for="item in sources.steps || []" :key="item.kind + item.detail">
+            <td class="gt-cell-source-steps__label">{{ item.label }}</td>
+            <td><el-tag :type="stepStatus(item.status).type" size="small">{{ stepStatus(item.status).text }}</el-tag></td>
+            <td class="gt-cell-source-steps__detail">{{ item.detail }}</td>
+          </tr>
+        </table>
+      </template>
+    </section>
+    <div v-if="!isSubTableCell" v-loading="loading" class="gt-cell-trace-body">
       <!-- 错误降级：友好提示 -->
       <el-alert
         v-if="errorState"
         :title="errorTitle"
         :description="errorDesc"
-        type="warning"
+        :type="errorState === 'no_binding' && canDiagnose ? 'info' : 'warning'"
         show-icon
         :closable="false"
         class="gt-cell-trace-error"
@@ -175,7 +206,9 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { fetchCellSources, stepStatus, type CellSourceRef, type CellSourcesResult } from './cellSources'
 
 interface BindingMeta {
   source?: string
@@ -234,9 +267,18 @@ interface Props {
   noteId: string
   rowIdx: number
   colIdx: number
+  /** 第几张表（存储下标；模板取数绑定按它取表） */
+  tableIndex?: number
+  /** 最终来源诊断用：项目 / 年度 / 章节 + 存储坐标；缺任一项不诊断 */
+  projectId?: string
+  year?: number | null
+  noteSection?: string
+  sourceRef?: CellSourceRef | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  tableIndex: 0, projectId: '', year: null, noteSection: '', sourceRef: null,
+})
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'penetrate-to-tb', payload: { account_code: string }): void
@@ -261,7 +303,9 @@ const errorTitle = computed(() => {
 const errorDesc = computed(() => {
   switch (errorState.value) {
     case 'no_binding':
-      return '当前单元格未配置数据源 binding（手工填写或老数据）— 无法溯源'
+      return canDiagnose.value
+        ? '这一格没有模板取数绑定；数是谁写的见上方「最终来源」'
+        : '当前单元格未配置数据源 binding（手工填写或老数据）— 无法溯源'
     case 'binding_not_found':
       return 'binding_id 在模板中不存在 — 可能模板已变更，建议重新生成附注'
     case 'cell_index_out_of_range':
@@ -303,15 +347,47 @@ function formatValue(v: unknown): string {
   return String(v)
 }
 
+// ─── 最终来源诊断（spec note-chain-followup-optimizations R2）───────────────
+const canDiagnose = computed(() => !!(props.projectId && props.year && props.noteSection && props.sourceRef))
+/** 底稿来源（投影表）的格没有模板取数绑定：不请求旧溯源接口，只显示最终来源 */
+const isSubTableCell = computed(() => !!props.sourceRef?.subTableKey)
+const sources = ref<CellSourcesResult | null>(null)
+const sourcesLoading = ref(false)
+const sourcesError = ref<string | null>(null)
+
+function sourcesErrorText(err: any): string {
+  const status = err?.response?.status
+  const detail = err?.response?.data?.detail ?? err?.response?.data?.message
+  if (status === 403) return '无权查看本项目附注，最终来源不可用'
+  return `最终来源加载失败：${typeof detail === 'string' && detail ? detail : '请稍后重试'}`
+}
+
+async function loadSources(): Promise<void> {
+  if (!canDiagnose.value || !props.sourceRef) return
+  sourcesLoading.value = true
+  sourcesError.value = null
+  sources.value = null
+  try {
+    const data = await fetchCellSources(props.projectId, Number(props.year), props.noteSection, props.sourceRef)
+    if (data?.error) sourcesError.value = data.message || '定位不到这一格'
+    else sources.value = data
+  } catch (err) {
+    sourcesError.value = sourcesErrorText(err)
+  } finally {
+    sourcesLoading.value = false
+  }
+}
+
 async function loadTrace(): Promise<void> {
-  if (!props.noteId) return
+  if (!props.noteId || isSubTableCell.value) return
   loading.value = true
   errorState.value = null
   trace.value = null
   try {
-    const data = await api.get(
-      `/api/disclosure-notes/${props.noteId}/cells/${props.rowIdx}/${props.colIdx}/trace`,
-    )
+    const url = P.disclosureNotes.cellTrace(props.noteId, props.rowIdx, props.colIdx)
+    const data = props.tableIndex
+      ? await api.get(url, { params: { table_index: props.tableIndex } })
+      : await api.get(url)
     if (data && data.error) {
       errorState.value = data.error
       // 即使是 no_binding，仍把基础信息保留给中栏展示 computed_value
@@ -347,10 +423,11 @@ function onPenetrate(row: TbEvidenceRow): void {
 }
 
 watch(
-  () => [props.modelValue, props.noteId, props.rowIdx, props.colIdx] as const,
+  () => [props.modelValue, props.noteId, props.rowIdx, props.colIdx, props.tableIndex, props.sourceRef] as const,
   ([open]) => {
     if (open) {
       loadTrace()
+      loadSources()
     }
   },
   { immediate: true },
@@ -358,6 +435,50 @@ watch(
 </script>
 
 <style scoped>
+.gt-cell-source {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.gt-cell-source-final {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-cell-source-final__label {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.gt-cell-source-final__detail,
+.gt-cell-source-meta {
+  color: var(--el-text-color-secondary);
+  word-break: break-word;
+}
+.gt-cell-source-meta {
+  margin: 6px 0;
+}
+.gt-cell-source-conflict {
+  margin: 6px 0;
+}
+.gt-cell-source-steps {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+.gt-cell-source-steps td {
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding: 4px 6px;
+  vertical-align: top;
+}
+.gt-cell-source-steps__label {
+  width: 150px;
+  color: var(--el-text-color-secondary);
+}
+.gt-cell-source-steps__detail {
+  word-break: break-word;
+}
 .gt-cell-trace-body {
   min-height: 480px;
 }

@@ -453,6 +453,24 @@ def _validate_mappings(mappings: list[dict[str, Any]]) -> None:
         if occurrence is not None and (not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 0):
             raise MappingRuleError(400, "INVALID_OCCURRENCE",
                                    f"第 {i+1} 条映射 source_occurrence 必须是从 0 起的整数（同名行的第几次出现）")
+        _validate_group(i, m)
+
+
+def _validate_group(i: int, m: dict[str, Any]) -> None:
+    """同名行按分组取行（spec note-chain-followup-optimizations R3）：``source_group`` 是来源分组键（字符串，顶层为空串），
+    ``source_group_occurrence`` 是组内第几行；与按第几次出现取行（``source_occurrence``）二选一。"""
+    group, occurrence = m.get("source_group"), m.get("source_group_occurrence")
+    if group is None:
+        if occurrence is not None:
+            raise MappingRuleError(400, "INVALID_GROUP", f"第 {i+1} 条映射给了 source_group_occurrence 却没有 source_group")
+        return
+    if not isinstance(group, str) or len(group) > 500:
+        raise MappingRuleError(400, "INVALID_GROUP", f"第 {i+1} 条映射 source_group 必须是不超过 500 字的字符串")
+    if m.get("source_occurrence") is not None:
+        raise MappingRuleError(400, "INVALID_GROUP",
+                               f"第 {i+1} 条映射 source_group 与 source_occurrence 只能给一个（按分组或按第几次出现取行）")
+    if occurrence is not None and (not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 0):
+        raise MappingRuleError(400, "INVALID_GROUP", f"第 {i+1} 条映射 source_group_occurrence 必须是从 0 起的整数")
 
 
 async def _verify_template_version(db: AsyncSession, vid: UUID) -> None:

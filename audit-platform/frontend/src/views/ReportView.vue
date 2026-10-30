@@ -633,14 +633,14 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
-              <GtAmountCell
+            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="bottom" :show-after="500" :disabled="!row.row_code">
+              <span><GtAmountCell
                 :value="row.current_period_amount"
                 :prior-value="row.prior_period_amount"
                 :clickable="true"
                 :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
                 @click="onLineComposition(row)"
-              />
+              /></span>
             </el-tooltip>
           </template>
         </template>
@@ -654,12 +654,12 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="top" :show-after="500" :disabled="!row.row_code">
-              <GtAmountCell
+            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="bottom" :show-after="500" :disabled="!row.row_code">
+              <span><GtAmountCell
                 :value="row.prior_period_amount"
                 :clickable="false"
                 :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)"
-              />
+              /></span>
             </el-tooltip>
           </template>
         </template>

@@ -192,8 +192,11 @@ async def _apply_note_formulas(db: AsyncSession, project_id: UUID, year: int,
             out[sec] = {"updated": 0, "skipped": 0, "error": f"{type(exc).__name__}: {exc}"}
             continue
         if res.get("executed") or res.get("results"):
-            skipped = sum(1 for r in res.get("results") or [] if r.get("status") == "skipped")
-            out[sec] = {"updated": int(res.get("updated") or 0), "skipped": skipped, "error": None}
+            results = res.get("results") or []
+            skipped = sum(1 for r in results if r.get("status") == "skipped")
+            # 底稿投影表上预设公式与底稿值不一致、保留底稿值的格（spec note-chain-followup-optimizations ADR-2）
+            differs = sum(1 for r in results if r.get("status") == "kept_workpaper")
+            out[sec] = {"updated": int(res.get("updated") or 0), "skipped": skipped, "differs": differs, "error": None}
     return out
 
 
@@ -337,6 +340,7 @@ async def pull_sections(
             "updated": sum(r["updated"] for r in formula_runs.values()),
             "sections": [s for s in target_sections if (formula_runs.get(s) or {}).get("updated")],
             "errors": [f"{s}：{r['error']}" for s, r in formula_runs.items() if r.get("error")],
+            "differs": sum(int(r.get("differs") or 0) for r in formula_runs.values()),
         },
         "applicable_standards": await _applicable_standards(db, project_id),
         "section_states": {**other_states, **states},

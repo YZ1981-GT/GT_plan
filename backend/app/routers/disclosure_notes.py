@@ -625,6 +625,7 @@ async def trace_cell(
     col_idx: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    table_index: int = 0,
 ):
     """单元格溯源：返回 binding 元数据 + 公式展开 + 命中数据行采样.
 
@@ -674,7 +675,7 @@ async def trace_cell(
     )
 
     engine = DisclosureEngine(db)
-    return await engine.trace_cell(note_id, row_idx, col_idx)
+    return await engine.trace_cell(note_id, row_idx, col_idx, table_index=table_index)
 
 
 @router.get("/{project_id}/{year}/section-numbers")
@@ -732,6 +733,29 @@ async def get_prior_year_note(
     engine = DisclosureEngine(db)
     data = await engine.get_prior_year_data(project_id, year, note_section)
     return data or {"year": year - 1, "table_data": None, "text_content": None}
+
+
+@router.get("/{project_id}/{year}/{note_section}/cell-sources")
+async def get_cell_sources(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    row: int = Query(..., ge=0, description="行（投影表为底稿子表的来源行号）"),
+    col: int = Query(0, ge=0, description="数据列（不含标签列）"),
+    table_index: int = Query(0, ge=0, description="存储表序号（投影表按 sub_table_key 定位）"),
+    sub_table_key: str | None = Query(None, max_length=200),
+    value_key: str | None = Query(None, max_length=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """单元格最终来源诊断（只读，spec note-chain-followup-optimizations R2）：最终来源、逐层说明与冲突。"""
+    from app.services.note_cell_sources import diagnose_cell
+
+    try:
+        return await diagnose_cell(db, project_id, year, note_section, table_index=table_index, row=row, col=col,
+                                   sub_table_key=sub_table_key, value_key=value_key)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{project_id}/{year}/{note_section}")

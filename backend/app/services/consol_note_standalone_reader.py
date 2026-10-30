@@ -10,9 +10,11 @@ Word 导出实际显示的那张表：
    （补期间 / 补列）按行名对行，行续表（补行）追加在主表后；比例列不加总、说明类列不取数；
    对不上的列不填，列名回报给用户。
 
-产出 V186 标准来源行 ``{label, row_type, values, _occurrence}``：``values[k]`` 对应合并模板第 ``k+1``
-列（第 0 列是行名）；``_occurrence`` 是同名行的出现序号（从 0 起，映射可按（行名, 序号）取行）；集团下推的行另带
-``_pushed_row_id``（明细映射按它精确对应，``exact_id``）。合计 / 小计行由 apply 按本表数据重算，不信任来源合计。
+产出 V186 标准来源行 ``{label, row_type, values, _occurrence, _group, _group_occurrence}``：``values[k]`` 对应合并
+模板第 ``k+1`` 列（第 0 列是行名）；``_occurrence`` 是同名行的出现序号（从 0 起，映射可按（行名, 序号）取行）；
+``_group`` / ``_group_occurrence`` 是同名行所在分组与组内序号（``consol_note_row_groups``，映射可按（行名, 分组）取行）；
+集团下推的行另带 ``_pushed_row_id``（明细映射按它精确对应，``exact_id``）。合计 / 小计行由 apply 按本表数据重算，
+不信任来源合计。
 
 spec: consol-note-pull-from-standalone → consol-note-header-library-and-node-reaggregate（读取层收口）
 """
@@ -261,6 +263,13 @@ def read_source_table(
     for item in rows:
         item["_occurrence"] = seen.get(item["label"], 0)
         seen[item["label"]] = item["_occurrence"] + 1
+    # 同名行所在分组与组内序号：映射按（行名, 分组）取行，来源少一组 / 组序不同也不会配到别的组
+    # （spec note-chain-followup-optimizations R3；与明细模板同一函数，不进结构指纹）
+    from app.services.consol_note_row_groups import row_groups
+
+    for item, (group, group_occurrence) in zip(rows, row_groups([i["label"] for i in rows],
+                                                                [i["row_type"] for i in rows])):
+        item["_group"], item["_group_occurrence"] = group, group_occurrence
 
     return SourceTable(
         rows=rows,

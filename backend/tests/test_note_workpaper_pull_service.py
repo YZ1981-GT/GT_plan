@@ -116,7 +116,7 @@ async def test_pull_pushes_exactly_the_section_workpapers(stubs):
     assert stubs["push"] == (PID, 2025, ["K3", "L2", "M1"], user)
     assert stubs["marks"] == ["八、42"]
     assert stubs["formulas"] == ["八、42"], "推送后对刷新的章节执行附注公式"
-    assert out["formulas"] == {"updated": 2, "sections": ["八、42"], "errors": []}
+    assert out["formulas"] == {"updated": 2, "sections": ["八、42"], "errors": [], "differs": 0}
     row = out["sections"][0]
     assert row["section"] == "八、42" and row["written"] == 1 and row["formula_updated"] == 2
     assert row["wp_ids"] == {"K3": "wp-K3", "L2": "wp-L2", "M1": "wp-M1"}
@@ -214,7 +214,7 @@ async def test_note_formulas_run_per_section_and_one_failure_does_not_stop_other
     assert seen == ["八、1", "八、2", "八、3"], "一节失败不影响其余章节"
     assert db.rolled_back == 1, "失败的那一节在自己的保存点里回滚"
     assert len(shared_ids) == 1, "跨表取数多章节共用一次预载"
-    assert out["八、1"] == {"updated": 1, "skipped": 1, "error": None}
+    assert out["八、1"] == {"updated": 1, "skipped": 1, "differs": 0, "error": None}
     assert out["八、2"]["error"].startswith("RuntimeError") and out["八、3"]["updated"] == 0
 
 
