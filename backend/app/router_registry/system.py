@@ -170,6 +170,17 @@ def register_system_routers(app: FastAPI) -> None:
               ss_router, sc_router]:
         app.include_router(r, tags=["系统管理"])
 
+    # ═══ §8b. 权限中心子系统（sys_role / user_role / project_role_tree / departments） ═══
+    # 四者均自带完整 /api 前缀（/api/system/roles、/api/system/user-roles、
+    # /api/system/user-project-role-tree、/api/departments），直接注册不加前缀。
+    from app.routers.departments import router as departments_router
+    from app.routers.sys_role import router as sys_role_router
+    from app.routers.user_role import router as user_role_router
+    from app.routers.project_role_tree import router as project_role_tree_router
+
+    for r in [departments_router, sys_role_router, user_role_router, project_role_tree_router]:
+        app.include_router(r)
+
     # 地址坐标注册表
     from app.routers.address_registry import router as addr_router
     app.include_router(addr_router, tags=["系统管理"])

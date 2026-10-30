@@ -448,7 +448,7 @@ const FALLBACK_NAV = [
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'formula-global', label: '全局公式', icon: Grid, path: '/settings/formula-global', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
-  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+  { key: 'permissions', label: '权限管理', icon: UserFilled, path: '/settings/permissions', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
   { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin'] },

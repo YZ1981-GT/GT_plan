@@ -34,22 +34,33 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole
     office_code: str | None = None
+    # V149 对齐（权限中心）：全名 + 所属合伙人 + 部门
+    # full_name 前端必填（rules.required），此处保持可空以兼容既有调用方
+    full_name: str | None = None
+    parent_partner_id: UUID | None = None
+    dept_id: UUID | None = None
 
 
 class UserUpdate(BaseModel):
-    """修改用户（管理员使用）：只改传了的字段；用户名不可改（登录名与历史记录都认它）。
+    """修改用户（管理员使用）：只改传了的字段。
 
     密码：空串 / 只有空白视为不改（编辑表单不填密码）；非空密码长度须为 8~64。
-    多余字段直接 422（不默默忽略 ``username`` / ``hashed_password`` 这类不该由这里改的字段）。
+    多余字段直接 422（不默默忽略 ``hashed_password`` 这类不该由这里改的字段）。
+    username 可改（V149 权限中心页面允许），唯一性由 service 校验。
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    username: str | None = None
     email: EmailStr | None = None
     role: UserRole | None = None
     office_code: str | None = None
     is_active: bool | None = None
     password: str | None = None
+    # V149 对齐（权限中心）：全名 + 所属合伙人 + 部门
+    full_name: str | None = None
+    parent_partner_id: UUID | None = None
+    dept_id: UUID | None = None
 
     @field_validator("password")
     @classmethod
@@ -87,6 +98,10 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     permissions: list[str] = []  # 角色对应的权限列表，供前端权限检查使用
+    # V149 对齐（权限中心）
+    full_name: str | None = None
+    parent_partner_id: UUID | None = None
+    dept_id: UUID | None = None
 
 
 class TokenResponse(BaseModel):

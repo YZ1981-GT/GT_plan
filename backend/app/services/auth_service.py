@@ -221,12 +221,38 @@ async def create_user(user_data: UserCreate, db: AsyncSession) -> UserResponse:
     if existing_email.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="邮箱已被注册")
 
+    # V149 对齐（权限中心）：验证上级合伙人存在性
+    if user_data.parent_partner_id:
+        parent_result = await db.execute(
+            select(User).where(
+                User.id == user_data.parent_partner_id,
+                User.is_deleted == False  # noqa: E712
+            )
+        )
+        if not parent_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="指定的上级合伙人不存在")
+
+    # V149 对齐（权限中心）：验证部门存在性
+    if user_data.dept_id:
+        from app.models.core import Department
+        dept_result = await db.execute(
+            select(Department).where(
+                Department.id == user_data.dept_id,
+                Department.is_deleted == False  # noqa: E712
+            )
+        )
+        if not dept_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="指定的部门不存在")
+
     user = User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hash_password(user_data.password),
         role=user_data.role,
         office_code=user_data.office_code,
+        full_name=user_data.full_name,
+        parent_partner_id=user_data.parent_partner_id,
+        dept_id=user_data.dept_id,
     )
     db.add(user)
     await db.commit()
@@ -283,12 +309,45 @@ async def update_user(
         if not [uid for uid in active_admins if uid != user.id]:
             raise HTTPException(status_code=409, detail="至少要保留一个启用的管理员")
 
+    if "username" in fields and fields["username"] != user.username:
+        taken_username = (await db.execute(
+            select(User.id).where(User.username == fields["username"], User.id != user.id)
+        )).first()
+        if taken_username:
+            raise HTTPException(status_code=409, detail="用户名已被其他用户使用")
+
     if "email" in fields and fields["email"] != user.email:
         taken = (await db.execute(
             select(User.id).where(User.email == fields["email"], User.id != user.id)
         )).first()
         if taken:
             raise HTTPException(status_code=409, detail="邮箱已被其他用户使用")
+
+    # V149 对齐（权限中心）：自环保护 + 上级合伙人存在性
+    if fields.get("parent_partner_id") == user.id:
+        raise HTTPException(status_code=400, detail="不能将用户自己设为其上级合伙人")
+
+    if fields.get("parent_partner_id"):
+        parent_result = await db.execute(
+            select(User).where(
+                User.id == fields["parent_partner_id"],
+                User.is_deleted == False  # noqa: E712
+            )
+        )
+        if not parent_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="指定的上级合伙人不存在")
+
+    # V149 对齐（权限中心）：部门存在性
+    if fields.get("dept_id"):
+        from app.models.core import Department
+        dept_result = await db.execute(
+            select(Department).where(
+                Department.id == fields["dept_id"],
+                Department.is_deleted == False  # noqa: E712
+            )
+        )
+        if not dept_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="指定的部门不存在")
 
     for key, value in fields.items():
         setattr(user, key, value)
@@ -343,3 +402,146 @@ async def get_current_user_profile(
     if user is None:
         raise HTTPException(status_code=404, detail="用户不存在")
     return UserResponse.model_validate(user)
+
+# ---------------------------------------------------------------------------
+# delete_user（混合删除：无引用物理删、有引用软删）
+# ---------------------------------------------------------------------------
+
+async def delete_user(
+    user_id: UUID,
+    db: AsyncSession,
+    acting_user: User,
+) -> bool:
+    """删除用户（混合删除，仅 admin 调用，权限在路由层门禁）。
+
+    :return: True = 已物理删除（行从表消失）；False = 已软删（有业务引用）
+
+    守卫（均返回 400 + 「下一步怎么做」）：
+      1. 不能删自己；
+      2. 不能删最后一个可用 admin；
+      3. 仍有下属挂靠（parent_partner_id 指向本人）；
+      4. 仍是活跃项目的签字合伙人 / 项目经理。
+    一并软删 project_users 绑定、软删并解绑人员档案（staff_members）。
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import delete as sql_delete, func, or_, update as sql_update
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.core import Project, ProjectUser, UserRole
+    from app.models.staff_models import StaffMember
+
+    result = await db.execute(
+        select(User).where(User.id == user_id, User.is_deleted == False)  # noqa: E712
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # ── 守卫 1：不能删自己 ────────────────────────────────────────────────
+    if acting_user.id == user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="不能删除当前登录的账号（删除后本次会话将立即失效）",
+        )
+
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+    # ── 守卫 2：不能删最后一个可用 admin ─────────────────────────────────
+    if user_role == "admin":
+        admin_count = await db.execute(
+            select(func.count(User.id)).where(
+                User.role == UserRole.admin,
+                User.is_active == True,  # noqa: E712
+                User.is_deleted == False,  # noqa: E712
+            )
+        )
+        if (admin_count.scalar() or 0) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="这是系统中最后一个可用的管理员账号，删除后将无人能管理用户，"
+                       "请先创建另一个管理员账号",
+            )
+
+    # ── 守卫 3：仍有下属挂靠 ─────────────────────────────────────────────
+    sub_result = await db.execute(
+        select(User.username).where(
+            User.parent_partner_id == user_id,
+            User.is_deleted == False,  # noqa: E712
+        )
+    )
+    subordinates = [r[0] for r in sub_result.all()]
+    if subordinates:
+        shown = "、".join(subordinates[:5])
+        more = f" 等 {len(subordinates)} 个账号" if len(subordinates) > 5 else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"该账号仍是 {shown}{more} 的所属合伙人，"
+                   f"请先将这些账号的「所属合伙人」改派给其他合伙人",
+        )
+
+    # ── 守卫 4：仍是活跃项目的签字合伙人 / 项目经理 ──────────────────────
+    proj_result = await db.execute(
+        select(Project.name).where(
+            or_(Project.manager_id == user_id, Project.partner_id == user_id),
+            Project.is_deleted == False,  # noqa: E712
+        )
+    )
+    projects = [r[0] for r in proj_result.all()]
+    if projects:
+        shown = "、".join(projects[:3])
+        more = f" 等 {len(projects)} 个项目" if len(projects) > 3 else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"该账号仍是「{shown}」{more}的签字合伙人或项目经理，"
+                   f"请先在项目中改派负责人",
+        )
+
+    # ── 级联软删项目成员绑定（本项目无 ProjectMember 模型，仅 ProjectUser） ──
+    await db.execute(
+        sql_update(ProjectUser)
+        .where(
+            ProjectUser.user_id == user_id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+        .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+    )
+
+    # ── 一并软删并解绑该账号的人员档案 ───────────────────────────────────
+    #   软删不硬删（档案承载工时/项目参与/简历等审计留痕）；user_id 置 NULL
+    #   避免悬空引用；清别人对该档案姓名的 partner_name 字符串引用。
+    staff_rows = (
+        await db.execute(
+            select(StaffMember).where(
+                StaffMember.user_id == user_id,
+                StaffMember.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalars().all()
+    for staff in staff_rows:
+        if staff.name:
+            await db.execute(
+                sql_update(StaffMember)
+                .where(
+                    StaffMember.partner_name == staff.name,
+                    StaffMember.is_deleted == False,  # noqa: E712
+                )
+                .values(partner_name=None)
+            )
+        staff.soft_delete()
+        staff.user_id = None
+
+    # ── 删账号本体：能物理删就物理删，否则软删 ───────────────────────────
+    #   try 物理删 + SAVEPOINT，撞 FK（审计留痕）就回滚到存档点转软删；
+    #   不预先逐表 count，让数据库自己当判据才不会漏。
+    hard_deleted = False
+    try:
+        async with db.begin_nested():
+            await db.execute(sql_delete(User).where(User.id == user_id))
+        hard_deleted = True
+    except IntegrityError:
+        user.soft_delete()
+        user.is_active = False
+
+    await db.commit()
+    return hard_deleted

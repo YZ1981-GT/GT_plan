@@ -85,6 +85,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     ...MANAGER_OWN_PERMISSIONS,
     ...AUDITOR_PERMISSIONS,
   ],
+  // 现场经理：权限等同项目经理（与后端 ROLE_ALIAS_MAP['site_lead']='manager' 对齐）
+  site_lead: [
+    ...MANAGER_OWN_PERMISSIONS,
+    ...AUDITOR_PERMISSIONS,
+  ],
   // auditor = base
   auditor: [...AUDITOR_PERMISSIONS],
   // R5 任务 2：EQCR 独立复核合伙人

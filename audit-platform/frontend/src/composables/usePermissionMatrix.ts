@@ -102,6 +102,8 @@ const SYSTEM_ROLE_TO_MATRIX_ROLE: Record<string, Role> = {
   partner: 'partner',
   signing_partner: 'partner',
   manager: 'manager',
+  // 现场经理：权限等同项目经理（后端 ROLE_ALIAS_MAP['site_lead']='manager'）
+  site_lead: 'manager',
   auditor: 'assistant',
   assistant: 'assistant',
   qc: 'qc_partner',
@@ -118,6 +120,7 @@ export function normalizeRole(role: string): string {
   if (r === 'assistant') return 'auditor'
   if (r === 'quality_control') return 'qc'
   if (r === 'signing_partner') return 'partner'
+  if (r === 'site_lead') return 'manager'
   return r
 }
 

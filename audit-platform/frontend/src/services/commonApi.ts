@@ -7,7 +7,7 @@ import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
   procedureRowTasks as P_prt, workpaperLeads as P_leads,
   dashboard as P_dash, disclosureNotes as P_dn, users as P_usr,
-  system as P_sys, recycleBin as P_rb, knowledge as P_kb,
+  departments as P_dept, system as P_sys, recycleBin as P_rb, knowledge as P_kb,
   admin as P_admin, auth as P_auth, attachments as P_att,
   annotations as P_ann, reviewConversations as P_rc, forum as P_forum,
   reportReview as P_rr, ledger as P_ledger, tAccounts as P_ta,
@@ -1021,6 +1021,23 @@ export async function createUser(body: any): Promise<any> {
 
 export async function updateUser(userId: string, body: any): Promise<any> {
   const { data } = await http.put(P_usr.detail(userId), body)
+  return data
+}
+
+export async function deleteUser(userId: string): Promise<{ hard_deleted: boolean }> {
+  const { data } = await http.delete(P_usr.detail(userId))
+  return { hard_deleted: Boolean(data?.hard_deleted) }
+}
+
+// ── 部门管理 ──
+
+export async function listDepartments(): Promise<any[]> {
+  const { data } = await http.get(P_dept.list)
+  return Array.isArray(data) ? data : []
+}
+
+export async function getDepartment(deptId: string): Promise<any> {
+  const { data } = await http.get(P_dept.detail(deptId))
   return data
 }
 

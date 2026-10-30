@@ -15,6 +15,12 @@ export default defineConfig({
     maxWorkers: 4,
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', '**/*.pbt.spec.?(c|m)[jt]s?(x)'],
     exclude: ['e2e/**', 'e2e-uat/**', 'tests/**', 'node_modules/**', 'eslint-rules/**', '**/*.e2e.spec.ts'],
+    /** 让 Vite 转译 element-plus（而非交给 Node 原生 ESM）。inline 后测试环境与生产用同一套模块解析逻辑，校验真实生效。 */
+    server: {
+      deps: {
+        inline: ['element-plus'],
+      },
+    },
   },
   resolve: {
     alias: {

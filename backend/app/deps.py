@@ -576,6 +576,48 @@ async def get_visible_project_ids(
     return [r[0] for r in result.all()]
 
 
+async def _project_level_visible_ids(
+    current_user: User,
+    db: AsyncSession,
+) -> list[UUID]:
+    """项目级可见 ID（data_scope_service scope=6「我参与的」专用）。
+
+    admin/partner → 全部未删除项目；其余角色 → 参与项目（project_users）∪
+    担任经理/合伙人的项目 ∪ 创建的项目（DROP ProjectMember：本项目无该模型）。
+    """
+    from sqlalchemy import or_
+
+    role_str = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role_str in ("admin", "partner"):
+        result = await db.execute(
+            select(Project.id).where(Project.is_deleted == False)  # noqa: E712
+        )
+        return [r[0] for r in result.all()]
+
+    member_ids = (await db.execute(
+        select(ProjectUser.project_id).where(
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )).scalars().all()
+    lead_ids = (await db.execute(
+        select(Project.id).where(
+            or_(
+                Project.manager_id == current_user.id,
+                Project.partner_id == current_user.id,
+            ),
+            Project.is_deleted == False,  # noqa: E712
+        )
+    )).scalars().all()
+    creator_ids = (await db.execute(
+        select(Project.id).where(
+            Project.created_by == current_user.id,
+            Project.is_deleted == False,  # noqa: E712
+        )
+    )).scalars().all()
+    return list(set(member_ids) | set(lead_ids) | set(creator_ids))
+
+
 # ---------------------------------------------------------------------------
 # get_user_scope_cycles — 循环级权限过滤
 # ---------------------------------------------------------------------------

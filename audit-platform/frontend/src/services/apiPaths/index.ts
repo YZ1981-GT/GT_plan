@@ -56,6 +56,7 @@ export {
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
   addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
+  departments, sysRoles, sysUserRoles, userProjectRoleTree,
 } from './system'
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
@@ -100,6 +101,7 @@ import {
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
   addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
+  departments, sysRoles, sysUserRoles, userProjectRoleTree,
 } from './system'
 
 export const API = {
@@ -127,6 +129,7 @@ export const API = {
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
   officePreview, acnr, workpaperLeads,
+  departments, sysRoles, sysUserRoles, userProjectRoleTree,
   formulaSettings, projectFormulaSettings, formulaTemplates, projectFormulaTemplates,
 } as const
 

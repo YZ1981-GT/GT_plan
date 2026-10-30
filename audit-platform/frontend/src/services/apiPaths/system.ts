@@ -27,6 +27,39 @@ export const users = {
   },
 } as const
 
+// ─── 部门 ───────────────────────────────────────────────────────────────────
+
+export const departments = {
+  list: '/api/departments',
+  detail: (id: string) => `/api/departments/${id}`,
+} as const
+
+// ─── 角色与数据权限（dept-role-data-permission） ─────────────────────────────
+
+export const sysRoles = {
+  list: '/api/system/roles',
+  create: '/api/system/roles',
+  detail: (id: number) => `/api/system/roles/${id}`,
+  projects: (id: number) => `/api/system/roles/${id}/projects`,
+} as const
+
+export const sysUserRoles = {
+  ofUser: (userId: string) => `/api/system/user-roles/${userId}`,
+  assign: (userId: string) => `/api/system/user-roles/${userId}/roles`,
+} as const
+
+// ─── 用户→项目→角色 三层树（project-data-permission-isolation，只读） ────────
+
+/**
+ * ⚠️ 两个端点都是 **GET only** —— 本 spec 是纯读展示（Req 6.1/6.4）。
+ *    要变更项目角色分配走既有的 project_users 分配 API，不在此新建写路径。
+ */
+export const userProjectRoleTree = {
+  users: '/api/system/user-project-role-tree/users',
+  subtree: (userId: string) =>
+    `/api/system/user-project-role-tree/users/${userId}/subtree`,
+} as const
+
 // ─── 系统设置 ───────────────────────────────────────────────────────────────
 
 export const system = {
