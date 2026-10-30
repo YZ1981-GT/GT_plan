@@ -11,7 +11,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    __ppux_mut_CustomQueryTab: typeof import('./components/template-library/__ppux_mut_CustomQueryTab.vue')['default']
     A13DetailEnhanced: typeof import('./components/workpaper/A13DetailEnhanced.vue')['default']
     A17ContentRenderer: typeof import('./components/workpaper/a17/A17ContentRenderer.vue')['default']
     A17RichTextEditor: typeof import('./components/workpaper/a17/A17RichTextEditor.vue')['default']
