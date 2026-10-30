@@ -134,8 +134,9 @@ import { CONFIRMATION_REQUIRED_STEPS, STEP_LABELS, useWizardStore, type BasicInf
 
 const wizardStore = useWizardStore()
 
-// 签字合伙人/项目经理：BasicInfo 存的是用户 UUID，确认页显示用户名。
-// 名称映射由 BasicInfoStep 加载团队用户时写入 wizardStore.teamUserNames（同源 /api/users/）。
+// 签字合伙人/项目经理：BasicInfo 存的是用户 UUID，确认页显示**全名**。
+// 名称映射由 BasicInfoStep 加载团队用户时写入 wizardStore.teamUserNames（同源 /api/users/，
+// 取 full_name、缺失回落 username）。
 function teamNameById(id: string | null): string {
   if (!id) return '—'
   return (wizardStore.teamUserNames as Record<string, string>)[id] ?? id
