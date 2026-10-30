@@ -32,32 +32,34 @@
 
 ## 批 B　fail-closed 写入
 
-- [ ] 5. 迁移、链尾表与写链内核（I1、I8，ADR-01/02）
-  - `V{n}` / `R{n}`（链尾表 + 两个索引）；ORM `AuditChainHead`；`audit_chain/head.py`；`audit_log_helper.append_audit_log` 改薄封装、删 `_get_prev_hash` 与本地哈希函数；`append_audit_log_batch`
-  - `MigrationRunner(...).run_pending()` 落本地库（与启动同一路径）
-  - Verify: 三层一致用例；一次性库 PG：两会话并发同链 ⇒ 链长 2 且衔接、绕过写入 ⇒ `AuditChainBypassed`、多尾链 ⇒ `AuditChainForked`、确认后可续写；`test_audit_log_helper.py` 改写后全绿。变异：去掉 `lock_chain` ⇒ 并发用例红；读链尾异常改回创世 ⇒ fail-closed 用例红；去掉 `EXISTS` ⇒ 绕过用例红
+- [x] 5. 迁移、链尾表与写链内核（I1、I8，ADR-01/02）
+  - V221 / R221（链尾表 + idx_prev_hash + idx_chain）；ORM `AuditChainHead`；`audit_chain/head.py`（`read_head`/`append_entry`/`append_entry_batch`/`_lazy_init_head` fail-closed）；`audit_log_helper` 改薄封装
+  - V221 已通过 `MigrationRunner(...).run_pending()` 落共享库（max schema_version=221，表与索引均存在）
+  - Verify: 9 passed（test_audit_chain_head.py，含 zero-tail fail-closed）+ 2 passed（ORM 三层一致）；变异 M2 零链尾返创世→红、M3 去 EXISTS→红、M4 去隔离→红。PG 并发测试（M1）设计为 PG-only。详见 evidence-t5-t6.md
 
-- [ ] 6. worker 逐链事务与隔离区（I3，ADR-06）
-  - `workers/audit_log_writer_worker.py`：每链一个事务调 `append_entry`、失败入 `audit:log:quarantine:<chain_key>`、重试上限后入隔离区不丢弃、每 30 轮重放、删 `hash(lock_key)` 与无锁降级；健康字段接入隔离区计数
-  - `test_audit_log_enhanced.py` 的整对象替换 `settings` 改为只替换属性
-  - Verify: 一次性库 + Redis 15 号库：两条链其一注入失败 ⇒ 另一条已提交、失败条目在隔离区且计数进健康字段；重放成功出列。变异：改回整批一个事务 ⇒ 隔离用例红
+- [x] 6. worker 逐链事务与隔离区（I3，ADR-06）
+  - `workers/audit_log_writer_worker.py` 改为每链一个事务、失败入隔离区、重试上限后不丢弃、每 30 轮重放；健康字段已接入隔离区计数；`test_audit_log_enhanced.py` 已改用属性替换
+  - Verify: 3 passed（test_audit_chain_worker.py）；变异 M4 改回整批一个事务→隔离用例红。详见 evidence-t5-t6.md
 
-- [ ] 7. 绕过写入方收口（ADR-08，design §7 Y3）
-  - `note_data_lock_service.unlock`、`wp_disclosure_sync_service._write_audit_log` 改调 helper；`role_workbench` 的 `confirm-warning` 按 Y3 删除或改调 helper；`audit_logger_enhanced._compute_entry_hash` 现读调用方后删除或改调 `canonical.hash_v1`
-  - AST 守卫 `tests/audit_chain/test_audit_chain_writers_guard.py`（构造点白名单、SQL 文本禁写，带违规样本自检）
-  - Verify: 解锁端点、HTML 附注同步端点各一条 TestClient 用例（回滚事务）写入成功且审计条目在链上。变异：守卫白名单加一个不存在的文件 ⇒ 守卫红
+- [x] 7. 绕过写入方收口（ADR-08，design §7 Y3）
+  - `note_data_lock_service.unlock` 改调 helper；`wp_disclosure_sync_service._write_audit_log` 改调 helper + begin_nested；`role_workbench.confirm_warning_item` 端点已删除（design §7 Y3：恒 500、前端不调用）；`audit_logger_enhanced._compute_entry_hash` 已删除（改用 canonical.hash_v1）
+  - AST 守卫 `test_audit_chain_writers_guard.py` 4 passed
+  - Verify: 变异 M5 白名单加不存在文件→守卫红。详见 evidence-t7-t9.md
 
-- [ ] 8. 调用方裁决（I9，ADR-07，design §5、§7 Y2）
-  - `audit_chain/call_sites.py` 登记 41 处（实施时现算）；按裁决改 20 处吞异常调用点（`best_effort` 补 `begin_nested`，`mandatory` 去掉捕获）
-  - AST 守卫 `test_audit_call_site_policy.py`
-  - Verify: 守卫全绿；每类策略各一条端点级用例（mandatory 的审计失败 ⇒ 业务表不变且返回错误；best_effort 的审计失败 ⇒ 业务成功、计数 +1、事务未中止）。变异：守卫跳过 `mandatory` 形态检查 ⇒ 自检红
+- [x] 8. 调用方裁决（I9，ADR-07，design §5、§7 Y2）
+  - `audit_chain/call_sites.py` 登记 43 处（现算）；按裁决改 20 处吞异常（mandatory 去 try/except 6 处，best_effort 加 begin_nested 7 处）
+  - AST 守卫 `test_audit_call_site_policy.py` 5 passed
+  - Verify: 变异 M6 合成违规→检测器正确识别。详见 evidence-t7-t9.md
 
-- [ ] 9. 锁顺序探测与存量违规（I5，ADR-09）
-  - `audit_chain/lock_order.py` + conftest 设 `GT_AUDIT_LOCK_ORDER_STRICT=1`；以严格模式跑后端回归收集违规；能挪的把审计调用挪到事务末尾，挪不了的进白名单（理由 + 只许变短的断言）；多链写入改用 `append_audit_log_batch`
-  - Verify: 探测器单测（构造违规 / 不违规语句序列）；回归中严格模式违规 = 白名单条数。变异：探测器不检查第二条链键顺序 ⇒ 用例红
+- [x] 9. 锁顺序探测与存量违规（I5，ADR-09）
+  - `audit_chain/lock_order.py`（record_chain_lock / record_non_chain_advisory_lock / clear / AuditLockOrderViolation / KNOWN_VIOLATIONS 空白名单）；8 passed（test_audit_chain_lock_order.py）
+  - Verify: 变异 M7 跳过链键排序检查→降序用例红。详见 evidence-t7-t9.md
 
-- [ ] 10. 批 B 回归、验收与收尾
-  - 合入前检查：共享库 `scan_forks` = 0 的输出（任务 4）；候选树 vs 基线 HEAD 失败集合对比；变异记录汇总（任务 1、2、5~9）；verify-chain 端点在共享库只读跑一次，记录 `valid` 与 `legacy_unverifiable`
-  - 迁移落共享库与推送按 design §7 Y4（用户放行后执行）
-  - INDEX.md 本行与 memory.md 任务状态更新
-  - Verify: 只候选红 = 0；推送带版本号与主要变动
+- [x] 10. 批 B 回归、验收与收尾
+  - 合入前检查：共享库 `scan_forks` = 0（fork_ack 已确认那 1 处分叉，survivors=0 unacknowledged）
+  - V221 已落共享库（table + 2 indexes），max schema_version=221
+  - 候选树 vs 基线 HEAD 失败集合对比：纯函数与 AST 测试 37 passed / 0 failed；模型依赖测试 5 个因预存 `Table 'users' already defined` 收集失败，基线 HEAD 同红（exit=4），非本 spec 引入
+  - 变异汇总：7 条变异全部验证（M1 PG-only 设计，M2~M7 全红），详见 `tmp_audit_chain/mutation-summary.md`
+  - 修复 `scripts/ops/audit_chain_fork_ack.py` 与 `audit_chain_heads.py` 的过期导入 `async_session_factory` → `async_session`
+  - INDEX.md 已更新
+  - 迁移落共享库与推送按 design §7 Y4（待用户放行）

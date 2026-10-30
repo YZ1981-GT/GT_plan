@@ -1612,24 +1612,25 @@ class WpDisclosureSyncService:
     async def _write_audit_log(
         self, db: AsyncSession, action: str, wp_id: UUID, section_id: str, user: User
     ) -> None:
-        """写入审计日志。"""
+        """写入审计日志 — best_effort（ADR-ALC-07/08 收口）。"""
         try:
-            from app.models.audit_log_models import AuditLogEntry
+            from app.services.audit_log_helper import append_audit_log
 
-            log_entry = AuditLogEntry(
-                user_id=user.id,
-                action_type=action,
-                object_type="disclosure_note",
-                object_id=None,
-                payload={
-                    "wp_id": str(wp_id),
-                    "section_id": section_id,
-                    "source": "workpaper_html",
-                },
-            )
-            db.add(log_entry)
+            async with db.begin_nested():
+                await append_audit_log(db, {
+                    "user_id": user.id,
+                    "project_id": None,
+                    "action": action,
+                    "resource_type": "disclosure_note",
+                    "resource_id": str(wp_id),
+                    "details": {
+                        "wp_id": str(wp_id),
+                        "section_id": section_id,
+                        "source": "workpaper_html",
+                    },
+                })
         except Exception as exc:
-            # 审计日志写入失败不阻断主流程
+            # best_effort: 审计日志写入失败不阻断主流程
             logger.warning("Failed to write audit log: %s", exc)
 
     def _broadcast_synced(self, project_id: UUID, section_id: str) -> None:

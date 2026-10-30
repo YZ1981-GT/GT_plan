@@ -184,41 +184,29 @@ class WorkflowGate:
         wp_id: uuid.UUID,
         user: User,
     ) -> None:
-        """写入状态回退审计日志。
+        """写入状态回退审计日志（mandatory — ADR-ALC-07）。"""
+        from app.services.audit_log_helper import append_audit_log
 
-        复用 audit_log_helper.append_audit_log，event_type 不在既有 schema 中
-        则不校验详情字段（audit_log_helper 对未知 event_type 跳过校验）。
-        """
-        try:
-            from app.services.audit_log_helper import append_audit_log
+        # 查询底稿所属项目
+        project_id = (
+            await db.execute(
+                select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
+            )
+        ).scalar_one_or_none()
 
-            # 查询底稿所属项目
-            project_id = (
-                await db.execute(
-                    select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
-                )
-            ).scalar_one_or_none()
-
-            await append_audit_log(
-                db,
-                {
-                    "user_id": user.id,
-                    "project_id": project_id,
-                    "action": "bulk_import_revert_status",
-                    "resource_type": "working_paper",
-                    "resource_id": str(wp_id),
-                    "details": {
-                        "event_type": "bulk_import_revert_status",
-                        "from_status": WpFileStatus.under_review.value,
-                        "to_status": WpFileStatus.draft.value,
-                        "reason": "批量导入前自动回退复核中状态为编制中",
-                    },
+        await append_audit_log(
+            db,
+            {
+                "user_id": user.id,
+                "project_id": project_id,
+                "action": "bulk_import_revert_status",
+                "resource_type": "working_paper",
+                "resource_id": str(wp_id),
+                "details": {
+                    "event_type": "bulk_import_revert_status",
+                    "from_status": WpFileStatus.under_review.value,
+                    "to_status": WpFileStatus.draft.value,
+                    "reason": "批量导入前自动回退复核中状态为编制中",
                 },
-            )
-        except Exception:
-            # 审计日志写入失败不阻断主流程（fail-soft）
-            logger.warning(
-                "WorkflowGate: 审计日志写入失败 wp_id=%s",
-                wp_id,
-                exc_info=True,
-            )
+            },
+        )

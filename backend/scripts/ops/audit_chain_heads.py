@@ -19,13 +19,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 async def _list_heads() -> None:
     from sqlalchemy import func, select
 
-    from app.core.database import async_session_factory
+    from app.core.database import async_session
     from app.models.audit_log_models import AuditLogEntry
     from app.services.audit_chain.head import chain_key_of
 
     ALE = AuditLogEntry
 
-    async with async_session_factory() as db:
+    async with async_session() as db:
         # 取全部条目的 id, entry_hash, prev_hash, payload->project_id
         stmt = select(ALE.id, ALE.entry_hash, ALE.prev_hash, ALE.payload)
         rows = (await db.execute(stmt)).all()

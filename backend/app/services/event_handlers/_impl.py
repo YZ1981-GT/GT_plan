@@ -348,25 +348,24 @@ async def _advance_project_status_on_dataset_activated(payload: "EventPayload") 
                 "[status-advance] LEDGER_DATASET_ACTIVATED 项目状态 %s → execution: project=%s",
                 cur, payload.project_id,
             )
-            # 审计留痕(best-effort)：写 status_change 审计日志，供 dashboard 时间线
-            # (_get_stage_timestamps 按 action_type=status_change + payload.new_status 推断
-            # 阶段进入时间 entered_at)。失败只记日志，不回退已提交的状态推进。
+            # 审计留痕(best-effort ADR-ALC-07)：写 status_change 审计日志
             try:
                 from app.services.audit_log_helper import append_audit_log
 
-                await append_audit_log(db, {
-                    "user_id": None,  # 系统自动推进，无操作用户
-                    "project_id": payload.project_id,
-                    "action": "status_change",
-                    "resource_type": "project",
-                    "resource_id": str(payload.project_id),
-                    "details": {
-                        "new_status": "execution",
-                        "previous_status": cur,
-                        "trigger": "ledger_dataset_activated",
-                        "year": payload.year,
-                    },
-                })
+                async with db.begin_nested():
+                    await append_audit_log(db, {
+                        "user_id": None,  # 系统自动推进，无操作用户
+                        "project_id": payload.project_id,
+                        "action": "status_change",
+                        "resource_type": "project",
+                        "resource_id": str(payload.project_id),
+                        "details": {
+                            "new_status": "execution",
+                            "previous_status": cur,
+                            "trigger": "ledger_dataset_activated",
+                            "year": payload.year,
+                        },
+                    })
                 await db.commit()
             except Exception as ae:  # noqa: BLE001
                 await db.rollback()

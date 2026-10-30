@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import csv
-import hashlib
 import io
 import json
 import logging
@@ -36,22 +35,6 @@ ANOMALY_THRESHOLDS = {
     "off_hours_operation": {"start_hour": 22, "end_hour": 6},
     "rapid_export": {"count": 5, "window_seconds": 60},
 }
-
-
-def _compute_entry_hash(
-    ts: str,
-    user_id: str,
-    action_type: str,
-    object_id: str | None,
-    payload_json: str,
-    prev_hash: str,
-) -> str:
-    """计算审计日志条目哈希。
-
-    entry_hash = sha256(ts|user_id|action_type|object_id|payload_json|prev_hash)
-    """
-    raw = f"{ts}|{user_id}|{action_type}|{object_id or ''}|{payload_json}|{prev_hash}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class AuditLoggerEnhanced:

@@ -24,10 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 async def _scan(chain_key: str | None = None) -> None:
-    from app.core.database import async_session_factory
+    from app.core.database import async_session
     from app.services.audit_chain.forks import scan_forks
 
-    async with async_session_factory() as db:
+    async with async_session() as db:
         forks = await scan_forks(db, chain_key=chain_key)
         if not forks:
             print("✅ 未发现未确认分叉")
@@ -46,7 +46,7 @@ async def _apply(
 ) -> None:
     from sqlalchemy import select
 
-    from app.core.database import async_session_factory
+    from app.core.database import async_session
     from app.models.core import User
     from app.services.audit_chain.forks import append_fork_ack
     from app.services.audit_chain.head import chain_key_of
@@ -55,7 +55,7 @@ async def _apply(
     surv_uuid = uuid.UUID(survivor_id)
     dead_uuid = uuid.UUID(dead_id)
 
-    async with async_session_factory() as db:
+    async with async_session() as db:
         # 验证 operator 是 admin
         user = (
             await db.execute(

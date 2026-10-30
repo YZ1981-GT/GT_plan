@@ -737,32 +737,32 @@ async def execute_formulas_batch(
         if code not in executed:
             results.append({"row_code": code, "value": None, "error": f"循环依赖: {deps - executed}"})
 
-    # 记录审计日志（统一走哈希链 append_audit_log）
-    try:
-        from app.services.audit_log_helper import append_audit_log
-        for r in results:
-            if r.get("value") is not None:
-                formula_str_log = next((f.get("formula", "") for f in formulas if f.get("row_code") == r["row_code"]), "")
-                await append_audit_log(db, {
-                    "user_id": current_user.id,
-                    "project_id": pid,
-                    "action": "formula.changed",
-                    "resource_type": "report_config",
-                    "resource_id": r["row_code"],
-                    "details": {
-                        "event_type": "formula_changed",
-                        "module": "report",
-                        "row_code": r["row_code"],
-                        "action": "execute",
-                        "old_formula": "",
-                        "new_formula": formula_str_log,
-                        "result_value": str(r["value"]),
-                        "trace": r.get("trace", []),
-                    },
-                })
-        await db.commit()
-    except Exception:
-        pass  # 日志记录失败不影响主流程
+    # 记录审计日志（best_effort — ADR-ALC-07，begin_nested 包住）
+    from app.services.audit_log_helper import append_audit_log
+    for r in results:
+        if r.get("value") is not None:
+            formula_str_log = next((f.get("formula", "") for f in formulas if f.get("row_code") == r["row_code"]), "")
+            try:
+                async with db.begin_nested():
+                    await append_audit_log(db, {
+                        "user_id": current_user.id,
+                        "project_id": pid,
+                        "action": "formula.changed",
+                        "resource_type": "report_config",
+                        "resource_id": r["row_code"],
+                        "details": {
+                            "event_type": "formula_changed",
+                            "module": "report",
+                            "row_code": r["row_code"],
+                            "action": "execute",
+                            "old_formula": "",
+                            "new_formula": formula_str_log,
+                            "result_value": str(r["value"]),
+                            "trace": r.get("trace", []),
+                        },
+                    })
+            except Exception:
+                pass  # best_effort: 审计失败不影响主流程
 
     return {"results": results, "row_values": {k: float(v) for k, v in row_values.items()}}
 

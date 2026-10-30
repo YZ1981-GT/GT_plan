@@ -570,30 +570,27 @@ class ReportConfigService:
         # 版本号递增
         candidate.version = candidate.version + 1
 
-        # 审计留痕（event_type='report_config_changed'）；SAVEPOINT 隔离：失败不让 PG 事务中止
-        try:
-            from app.services.audit_log_helper import append_audit_log
+        # 审计留痕（mandatory — ADR-ALC-07）；SAVEPOINT 隔离
+        from app.services.audit_log_helper import append_audit_log
 
-            async with self.db.begin_nested():
-                await append_audit_log(self.db, {
-                    "user_id": reviewer,
-                    "project_id": candidate.source_project_id,
-                    "action": "report_config.review_approved",
-                    "resource_type": "report_config_baseline",
-                    "resource_id": str(candidate_id),
-                    "details": {
-                        "event_type": "report_config_changed",
-                        "sub_action": "review_approved",
-                        "standard": candidate.standard,
-                        "report_type": candidate.report_type,
-                        "row_code": candidate.row_code,
-                        "candidate_id": str(candidate_id),
-                        "old_formula": old_formula,
-                        "new_formula": candidate.candidate_formula or "",
-                    },
-                })
-        except Exception:
-            logger.exception("review_candidate 审计留痕失败")
+        async with self.db.begin_nested():
+            await append_audit_log(self.db, {
+                "user_id": reviewer,
+                "project_id": candidate.source_project_id,
+                "action": "report_config.review_approved",
+                "resource_type": "report_config_baseline",
+                "resource_id": str(candidate_id),
+                "details": {
+                    "event_type": "report_config_changed",
+                    "sub_action": "review_approved",
+                    "standard": candidate.standard,
+                    "report_type": candidate.report_type,
+                    "row_code": candidate.row_code,
+                    "candidate_id": str(candidate_id),
+                    "old_formula": old_formula,
+                    "new_formula": candidate.candidate_formula or "",
+                },
+            })
 
         await self.db.flush()
         return published

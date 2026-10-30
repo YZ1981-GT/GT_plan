@@ -236,37 +236,28 @@ async def _write_wp_formula_audit(
     ``resource_id`` 用 ``target_cell`` 作行标识。审计写失败**不阻断**主 CRUD（降级
     WARNING），且由 router 统一 commit（service 只 flush，审计 append 也只 flush）。
 
-    🔴 必须包 ``begin_nested()``（memory 铁律：commit 前吞异常的非阻塞钩子）：
-    ``append_audit_log`` 内部 ``flush`` 若失败（如 ``audit_log_entries`` 表缺失 /
-    唯一冲突），会把整个 session 事务置为 ``PendingRollbackError`` 态——此后 router
-    的 ``db.commit()`` 必崩，且主 CRUD 写入也随之丢失（接口 500 但公式"看似已存"）。
-    用 SAVEPOINT 隔离：审计失败只回滚审计 INSERT，主 CRUD 写入保留、commit 正常。
+    🔴 mandatory（ADR-ALC-07）：审计失败即业务失败。在 begin_nested 内
+    保证 SAVEPOINT 隔离，但不捕获异常——失败向上传播。
     """
-    try:
-        from app.services.audit_log_helper import append_audit_log
+    from app.services.audit_log_helper import append_audit_log
 
-        async with db.begin_nested():
-            await append_audit_log(db, {
-                "user_id": user.id,
-                "project_id": project_id,
-                "action": "formula.changed",
-                "resource_type": "wp_formula",
-                "resource_id": target_cell,
-                "details": {
-                    "event_type": "formula_changed",
-                    "module": "workpaper",
-                    "row_code": wp_code or "",
-                    "action": action,
-                    "old_formula": old_formula,
-                    "new_formula": new_formula,
-                    "result_value": result_value,
-                },
-            })
-    except Exception as audit_err:  # noqa: BLE001 — 审计写失败不阻断主 CRUD（SAVEPOINT 已回滚审计）
-        logger.warning(
-            "wp_formula 审计哈希链写入失败 wp_code=%s cell=%s action=%s: %s",
-            wp_code, target_cell, action, audit_err,
-        )
+    async with db.begin_nested():
+        await append_audit_log(db, {
+            "user_id": user.id,
+            "project_id": project_id,
+            "action": "formula.changed",
+            "resource_type": "wp_formula",
+            "resource_id": target_cell,
+            "details": {
+                "event_type": "formula_changed",
+                "module": "workpaper",
+                "row_code": wp_code or "",
+                "action": action,
+                "old_formula": old_formula,
+                "new_formula": new_formula,
+                "result_value": result_value,
+            },
+        })
 
 
 def _unsupported_function_detail(expression: str | None) -> tuple[list[str], list[dict]]:

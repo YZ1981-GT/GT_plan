@@ -82,21 +82,22 @@ class OnlyOfficeCallbackService:
         from app.services.audit_log_helper import append_audit_log
 
         try:
-            await append_audit_log(
-                self.db,
-                {
-                    "user_id": None,
-                    "project_id": project_id,
-                    "action": "onlyoffice_callback_rejected",
-                    "resource_type": "word_export_task",
-                    "resource_id": str(task_id),
-                    "details": {
-                        "event_type": "onlyoffice_callback_rejected",
-                        "reason": reason,
+            async with self.db.begin_nested():
+                await append_audit_log(
+                    self.db,
+                    {
+                        "user_id": None,
+                        "project_id": project_id,
+                        "action": "onlyoffice_callback_rejected",
+                        "resource_type": "word_export_task",
+                        "resource_id": str(task_id),
+                        "details": {
+                            "event_type": "onlyoffice_callback_rejected",
+                            "reason": reason,
+                        },
                     },
-                },
-            )
-        except Exception as exc:  # 安全日志写入不应阻断拒绝流程
+                )
+        except Exception as exc:  # best_effort — 安全日志写入不应阻断拒绝流程
             logger.error("OnlyOffice callback 安全日志写入失败: %s", exc)
 
     async def health_check(self) -> bool:
@@ -268,23 +269,24 @@ class OnlyOfficeCallbackService:
         from app.services.audit_log_helper import append_audit_log
 
         try:
-            await append_audit_log(
-                self.db,
-                {
-                    "user_id": editor_id,
-                    "project_id": task.project_id,
-                    "action": "deliverable_oo_stale_base_save",
-                    "resource_type": "word_export_task_version",
-                    "resource_id": str(task.id),
-                    "details": {
-                        "event_type": "deliverable_oo_stale_base_save",
-                        "saved_version_no": saved_version_no,
-                        "base_version_no": base_version_no,
-                        "overwrote_versions": overwrote,
+            async with self.db.begin_nested():
+                await append_audit_log(
+                    self.db,
+                    {
+                        "user_id": editor_id,
+                        "project_id": task.project_id,
+                        "action": "deliverable_oo_stale_base_save",
+                        "resource_type": "word_export_task_version",
+                        "resource_id": str(task.id),
+                        "details": {
+                            "event_type": "deliverable_oo_stale_base_save",
+                            "saved_version_no": saved_version_no,
+                            "base_version_no": base_version_no,
+                            "overwrote_versions": overwrote,
+                        },
                     },
-                },
-            )
-        except Exception:  # noqa: BLE001 — 留痕失败不得回滚已保存的版本
+                )
+        except Exception:  # noqa: BLE001 — best_effort: 留痕失败不得回滚已保存的版本
             logger.warning("陈旧底版保存留痕写入失败 task=%s", task.id, exc_info=True)
         logger.warning(
             "OnlyOffice 保存基于陈旧底版 v%s：期间已有版本 %s；本版 v%s 以旧内容为底 task=%s",

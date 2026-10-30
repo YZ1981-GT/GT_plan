@@ -193,28 +193,23 @@ class NoteDataLockService:
             },
         )
 
-        # 记录审计日志
-        await self._db.execute(
-            text("""
-                INSERT INTO audit_log_entries
-                    (id, user_id, action, object_type, object_id, details, created_at)
-                VALUES
-                    (:id, :uid, :action, :obj_type, :obj_id, :details, :now)
-            """),
-            {
-                "id": str(uuid4()),
-                "uid": str(user_id),
-                "action": "data_unlock",
-                "obj_type": "project",
-                "obj_id": str(project_id),
-                "details": json.dumps({
-                    "year": year,
-                    "reason": reason,
-                    "unlocked_at": now.isoformat(),
-                }),
-                "now": now,
+        # 记录审计日志 — 走统一 helper（ADR-ALC-08 收口）
+        from app.services.audit_log_helper import append_audit_log
+
+        await append_audit_log(self._db, {
+            "user_id": user_id,
+            "project_id": project_id,
+            "action": "data_unlock",
+            "resource_type": "project",
+            "resource_id": str(project_id),
+            "details": {
+                "event_type": "archive_unarchive",
+                "year": year,
+                "reason": reason,
+                "unlocked_at": now.isoformat(),
+                "previous_status": "locked",
             },
-        )
+        })
 
         logger.info(
             "[DataLock] Unlocked project %s year %d by user %s (reason: %s)",

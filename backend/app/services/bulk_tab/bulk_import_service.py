@@ -362,36 +362,28 @@ async def _write_import_audit_log(
     project_id: str,
     report: ImportReport,
 ) -> None:
-    """写入导入审计日志。"""
-    try:
-        from app.services.audit_log_helper import append_audit_log
+    """写入导入审计日志（mandatory — ADR-ALC-07）。"""
+    from app.services.audit_log_helper import append_audit_log
 
-        await append_audit_log(
-            db,
-            {
-                "user_id": user.id,
-                "project_id": uuid.UUID(project_id) if isinstance(project_id, str) else project_id,
-                "action": "bulk_tab_import",
-                "resource_type": "project",
-                "resource_id": str(project_id),
-                "details": {
-                    "event_type": "bulk_tab_import",
-                    "import_id": report.import_id,
-                    "strategy": report.strategy,
-                    "dry_run": report.dry_run,
-                    "summary": report.summary,
-                    "sheet_count": len(report.sheets),
-                    "rolled_back": report.rolled_back,
-                },
+    await append_audit_log(
+        db,
+        {
+            "user_id": user.id,
+            "project_id": uuid.UUID(project_id) if isinstance(project_id, str) else project_id,
+            "action": "bulk_tab_import",
+            "resource_type": "project",
+            "resource_id": str(project_id),
+            "details": {
+                "event_type": "bulk_tab_import",
+                "import_id": report.import_id,
+                "strategy": report.strategy,
+                "dry_run": report.dry_run,
+                "summary": report.summary,
+                "sheet_count": len(report.sheets),
+                "rolled_back": report.rolled_back,
             },
-        )
-    except Exception:
-        # 审计日志写入失败不阻断主流程（fail-soft）
-        logger.warning(
-            "BulkImport: 审计日志写入失败 project_id=%s",
-            project_id,
-            exc_info=True,
-        )
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

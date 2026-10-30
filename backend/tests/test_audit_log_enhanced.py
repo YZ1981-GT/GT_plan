@@ -30,9 +30,9 @@ import app.models.audit_log_models  # noqa: F401
 
 from app.services.audit_logger_enhanced import (
     AuditLoggerEnhanced,
-    _compute_entry_hash,
     AUDIT_LOG_QUEUE_KEY,
 )
+from app.services.audit_chain.canonical import hash_v1 as _compute_entry_hash
 from app.workers.audit_log_writer_worker import (
     _compute_entry_hash as worker_compute_hash,
     _mask_payload,

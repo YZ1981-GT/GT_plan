@@ -280,33 +280,34 @@ async def _write_audit(
     """写审计哈希链（``append_audit_log``），run_id 写进 details。
 
     复用 ``formula_changed`` event_type（report/consol 统一公式执行留痕入口）。
-    fail-open：审计写入失败只记 WARNING，不阻断勾稽结果返回。
+    best_effort（ADR-ALC-07）：审计写入失败只记 WARNING，不阻断勾稽结果返回。
     """
     try:
-        await append_audit_log(
-            db,
-            {
-                "user_id": operator_id,
-                "project_id": project_id,
-                "action": "formula_cross_check_executed",
-                "resource_type": "report_cross_check",
-                "resource_id": str(run_id),
-                "details": {
-                    "event_type": "formula_changed",
-                    "module": "report_cross_check",
-                    "row_code": "*",
-                    "action": "execute",
-                    "old_formula": None,
-                    "new_formula": None,
-                    "result_value": None,
-                    "run_id": str(run_id),
-                    "status": status,
-                    "executed_count": executed_count,
-                    "issue_count": issue_count,
+        async with db.begin_nested():
+            await append_audit_log(
+                db,
+                {
+                    "user_id": operator_id,
+                    "project_id": project_id,
+                    "action": "formula_cross_check_executed",
+                    "resource_type": "report_cross_check",
+                    "resource_id": str(run_id),
+                    "details": {
+                        "event_type": "formula_changed",
+                        "module": "report_cross_check",
+                        "row_code": "*",
+                        "action": "execute",
+                        "old_formula": None,
+                        "new_formula": None,
+                        "result_value": None,
+                        "run_id": str(run_id),
+                        "status": status,
+                        "executed_count": executed_count,
+                        "issue_count": issue_count,
+                    },
                 },
-            },
-        )
-    except Exception as exc:  # noqa: BLE001 — fail-open
+            )
+    except Exception as exc:  # noqa: BLE001 — best_effort
         logger.warning("cross-check 审计写入失败（run=%s）：%s", run_id, exc)
 
 

@@ -105,47 +105,43 @@ async def _write_consol_formula_audit(
     前置：调用方已 commit 报表行 —— 故本函数内的 rollback 只会丢弃审计 INSERT，
     绝不波及已落库的报表（满足"审计失败不得破坏报表生成"约束）。
     """
-    try:
-        from app.services.audit_log_helper import append_audit_log
+    from app.services.audit_log_helper import append_audit_log
 
-        pid = _uuid.UUID(project_id_str) if project_id_str else None
-        for report_type, rows in results.items():
-            for r in rows:
-                formula_str = r.get("formula_used") or ""
-                if not formula_str:
-                    continue
-                result_value = r.get("current_period_amount")
-                try:
-                    rv = str(float(result_value)) if result_value is not None else ""
-                except (TypeError, ValueError):
-                    rv = ""
-                trace = r.get("trace", [])
-                if not trace:
-                    trace = [f"report_type={report_type}", f"row_name={r.get('row_name', '')}"]
-                await append_audit_log(db, {
-                    "user_id": user_id or _uuid.UUID("00000000-0000-0000-0000-000000000000"),
-                    "project_id": pid,
-                    "action": "formula.changed",
-                    "resource_type": "report_config",
-                    "resource_id": r.get("row_code") or "",
-                    "details": {
-                        "event_type": "formula_changed",
-                        "module": "consol",
-                        "row_code": r.get("row_code") or "",
-                        "action": "execute",
-                        "old_formula": "",
-                        "new_formula": formula_str,
-                        "result_value": rv,
-                        "trace": trace,
-                    },
-                })
-        await db.commit()
-    except Exception as exc:  # 审计失败不影响主流程（报表已 commit）
-        logger.warning("合并公式审计写入哈希链失败（不影响报表生成）: %s", exc)
-        try:
-            await db.rollback()
-        except Exception:
-            pass
+    pid = _uuid.UUID(project_id_str) if project_id_str else None
+    for report_type, rows in results.items():
+        for r in rows:
+            formula_str = r.get("formula_used") or ""
+            if not formula_str:
+                continue
+            result_value = r.get("current_period_amount")
+            try:
+                rv = str(float(result_value)) if result_value is not None else ""
+            except (TypeError, ValueError):
+                rv = ""
+            trace = r.get("trace", [])
+            if not trace:
+                trace = [f"report_type={report_type}", f"row_name={r.get('row_name', '')}"]
+            try:
+                async with db.begin_nested():
+                    await append_audit_log(db, {
+                        "user_id": user_id or _uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                        "project_id": pid,
+                        "action": "formula.changed",
+                        "resource_type": "report_config",
+                        "resource_id": r.get("row_code") or "",
+                        "details": {
+                            "event_type": "formula_changed",
+                            "module": "consol",
+                            "row_code": r.get("row_code") or "",
+                            "action": "execute",
+                            "old_formula": "",
+                            "new_formula": formula_str,
+                            "result_value": rv,
+                            "trace": trace,
+                        },
+                    })
+            except Exception as exc:
+                logger.warning("合并公式审计写入失败（best_effort）: %s", exc)
 
 
 @router.get("/{project_id}/{year}")
