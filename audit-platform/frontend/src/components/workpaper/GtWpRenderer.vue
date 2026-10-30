@@ -361,7 +361,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted, watch, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch, Setting, Refresh } from '@element-plus/icons-vue'
@@ -374,7 +374,7 @@ import {
   type WpComponentType,
 } from '@/composables/useWpRenderer'
 import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
-import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
+import { useRendererCellLocate } from '@/composables/useRendererCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
@@ -943,48 +943,27 @@ function getSheetIcon(ct: string): string {
   return registryGetSheetIcon(ct)
 }
 
-// ─── wp-locate-foundation Task 3.1: 监听 workpaper:locate-cell 事件 ───
-const { locateCell } = useCellLocate()
+// ─── 定位：workpaper:locate-cell 事件与深链初始属性（spec wp-deeplink-cell-locate-closure） ───
+// 渲染配置未到时排队；先问当前组件的 locateCell 钩子，再在本渲染器根元素内找；找不到提示一次。
+const rendererLocate = useRendererCellLocate({
+  wpId: () => props.wpId,
+  ready: () => !!renderConfig.value,
+  resolveSheet: (locator) => resolveRenderSheet(visibleSheets.value, locator),
+  activeSheet: () => activeSheet.value,
+  selectSheet: (name) => { selectSheet(name) },
+  root: () => containerRef.value,
+  component: () => activeComponentRef.value,
+  wpCode: () => renderConfig.value?.wp_code ?? '',
+  componentType: () => componentType.value,
+})
 
 function onLocateCell(payload: WorkpaperLocateCellPayload) {
-  if (payload.wpId !== props.wpId || !renderConfig.value) return
-
-  const requestedSheet = payload.sheetName
-  const resolvedSheet = requestedSheet
-    ? resolveRenderSheet(visibleSheets.value, requestedSheet)
-    : activeSheet.value
-  const canonicalSheetName = resolvedSheet?.sheet_name ?? activeSheetName.value
-  const target: LocateTarget = {
-    wp_code: payload.wpCode || '',
-    wp_id: payload.wpId,
-    sheet_name: canonicalSheetName,
-    cell_ref: payload.cellRef || null,
-    component_type: payload.componentType || resolvedSheet?.componentType || componentType.value || null,
-    value: payload.value || null,
-    label: payload.label || null,
-  }
-
-  if (requestedSheet && !resolvedSheet) {
-    ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
-    return
-  }
-
-  const needSwitchSheet = Boolean(
-    resolvedSheet && resolvedSheet.sheet_name !== activeSheetName.value,
-  )
-  if (needSwitchSheet) selectSheet(resolvedSheet!.sheet_name)
-
-  nextTick(() => {
-    const success = locateCell(target)
-    if (!success) {
-      ElMessage.info(
-        needSwitchSheet
-          ? '已切换到目标 sheet，但未能精确定位到目标位置'
-          : '已打开底稿但未能定位到目标位置（可能已变更）',
-      )
-    }
-  })
+  rendererLocate.request(payload)
 }
+
+watch(() => [props.initialSheet, props.initialCell] as const, ([sheetName, cellRef]) => {
+  if (cellRef) rendererLocate.request({ wpId: props.wpId, sheetName: sheetName || null, cellRef })
+}, { immediate: true })
 
 /** 行名映射确认后重刷本底稿（用新映射重算受影响行）。 */
 function onRowNameAlignmentConfirmed(payload: { wpId: string; sheetCode: string }) {

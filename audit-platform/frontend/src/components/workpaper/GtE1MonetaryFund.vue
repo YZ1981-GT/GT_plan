@@ -118,7 +118,7 @@
       <!-- E1-11 承诺书 -->
       <E1TabAccountCommitment v-else-if="currentSheet === 'E1-11'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-14 分析表 -->
-      <E1TabAnalysis v-else-if="currentSheet === 'E1-14'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
+      <E1TabAnalysis v-else-if="currentSheet === 'E1-14'" ref="analysisTabRef" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-15 利息收入月度分析 -->
       <E1TabInterestAnalysis v-else-if="currentSheet === 'E1-15'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-18 企业信用报告查询 -->
@@ -179,6 +179,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { LocateTarget } from '@/composables/useCellLocate'
 import http from '@/utils/http'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useG1DualMode } from './composables/useG1DualMode'
@@ -552,6 +553,13 @@ const currentSheet = computed(() => {
   if (name.includes('上市')) return '附注上市'
   if (name.includes('国企')) return '附注国企'
   return name
+})
+
+/** 定位钩子（GtWpRenderer 经 useRendererCellLocate 调用）：目前只有 E1-14 分析表登记了模板单元格锚点 */
+const analysisTabRef = ref<{ locateCell?: (target: LocateTarget) => boolean | Promise<boolean> } | null>(null)
+defineExpose({
+  locateCell: (target: LocateTarget) =>
+    currentSheet.value === 'E1-14' ? (analysisTabRef.value?.locateCell?.(target) ?? false) : false,
 })
 
 const dualMode = useG1DualMode({

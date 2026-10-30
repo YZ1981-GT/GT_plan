@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import WpAmountInput from '../shared/WpAmountInput.vue'
-import { inject, onMounted, ref, toRef, type Ref } from 'vue'
+import { inject, nextTick, onMounted, ref, toRef, type Ref } from 'vue'
+import { highlightElement, type LocateTarget } from '@/composables/useCellLocate'
+import { findE1AnalysisAnchorElement, resolveE1AnalysisAnchor } from './e1AnalysisCellAnchors'
 import { ElMessage } from 'element-plus'
 import { useE1Analysis, type AnalysisRow, type AnalysisPeriod } from '../composables/useE1Analysis'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
@@ -75,6 +77,18 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
   if (text) saveText(isNote ? NOTE_KEY : CONCLUSION_KEY, isNote ? auditNote : auditConclusion, text)
 }
 
+const rootRef = ref<HTMLElement | null>(null)
+/** 定位钩子（GtE1MonetaryFund 转发）：模板单元格 → 切区段页签 → 高亮对应单元格 / 整行 / 卡片 */
+async function locateCell(target: LocateTarget): Promise<boolean> {
+  const anchor = resolveE1AnalysisAnchor(target.cell_ref)
+  if (!anchor) return false
+  if (anchor.section) activeSection.value = anchor.section
+  await nextTick()
+  const el = rootRef.value ? findE1AnalysisAnchorElement(rootRef.value, anchor) : null
+  return el ? highlightElement(el, `E1-14:${target.cell_ref}`) : false
+}
+defineExpose({ locateCell })
+
 function handleFillFromAdj(): void {
   const filled = analysis.fillFromAdjudication()
   if (filled > 0) {
@@ -86,7 +100,7 @@ function handleFillFromAdj(): void {
 </script>
 
 <template>
-  <div class="e1-analysis">
+  <div ref="rootRef" class="e1-analysis">
     <div class="method-context"><strong>源模板方法论：</strong>先做三年构成和七类其他货币资金分析，再计算八项比例，结合月度变动、银行类型、资金质量和异常事项形成结论。“存贷双高”必须同时满足货币资金和贷款总额的可见阈值；银行存款占比高仅提示集中度关注。</div>
     <el-alert type="info" :closable="false" title="审计目标：通过分析程序识别货币资金余额和变动异常，评估重大错报风险。" class="objective-alert" />
     <div class="tab-toolbar">
@@ -95,7 +109,7 @@ function handleFillFromAdj(): void {
     </div>
     <el-tabs v-model="activeSection" type="border-card">
       <el-tab-pane label="三年货币资金构成" name="composition">
-        <el-table :data="analysis.rows.value" border stripe size="small" :row-class-name="rowClass">
+        <el-table data-e1-table="composition" :data="analysis.rows.value" border stripe size="small" :row-class-name="rowClass">
           <el-table-column prop="itemName" label="项目" min-width="130" fixed="left" />
           <el-table-column label="本期金额" min-width="135" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.endingAmount) }}</template></el-table-column>
           <el-table-column label="本期结构比" width="105" align="center" class-name="auto-calc-col"><template #default="{ row }">{{ structureRatio(row) }}</template></el-table-column>
@@ -107,14 +121,14 @@ function handleFillFromAdj(): void {
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="其他货币资金七类" name="other">
-        <el-table :data="analysis.otherFundRows.value" border stripe size="small">
+        <el-table data-e1-table="other" :data="analysis.otherFundRows.value" border stripe size="small">
           <el-table-column prop="name" label="项目" min-width="150" fixed="left" />
           <el-table-column v-for="period in (['current','prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'current' ? '本期金额' : period === 'prior' ? '上期金额' : '前期金额'" min-width="135" align="right">
             <template #default="{ row }"><el-input-number :model-value="row[period]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateOtherFund(row.key, period, v ?? 0)" /></template>
           </el-table-column>
           <el-table-column label="变动原因" min-width="260"><template #default="{ row }"><div class="ai-cell"><el-input type="textarea" :autosize="{ minRows: 2 }" :model-value="row.reason" :disabled="isReadonly" @change="(v: string) => analysis.updateOtherFund(row.key, 'reason', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.name, row.reason, row, v => analysis.updateOtherFund(row.key, 'reason', v))">🤖</el-button></div></template></el-table-column>
         </el-table>
-        <el-alert class="section-alert" type="info" :closable="false" title="银行承兑汇票保证金测算请交叉索引应付票据底稿 F3-2。" />
+        <el-alert data-e1-anchor="f3-2" class="section-alert" type="info" :closable="false" title="银行承兑汇票保证金测算请交叉索引应付票据底稿 F3-2。" />
       </el-tab-pane>
 
       <el-tab-pane label="八项比例" name="ratios">
@@ -130,7 +144,7 @@ function handleFillFromAdj(): void {
           <label>贷款总额高位阈值<el-input-number :model-value="analysis.loanThreshold.value" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number) => analysis.updateThreshold('loanThreshold', v ?? 0)" /></label>
           <label>银行存款集中度阈值<el-input-number :model-value="analysis.concentrationThreshold.value" :disabled="isReadonly" :controls="false" :min="0" :max="1" :step="0.05" :precision="2" @change="(v: number) => analysis.updateThreshold('concentrationThreshold', v ?? 0)" /></label>
         </div>
-        <el-table :data="analysis.ratioRows.value" border stripe size="small">
+        <el-table data-e1-table="ratios" :data="analysis.ratioRows.value" border stripe size="small">
           <el-table-column prop="name" label="比例项目" min-width="235" fixed="left" />
           <el-table-column label="本期" width="95" class-name="auto-calc-col"><template #default="{ row }">{{ fmtRate(row.current) }}</template></el-table-column>
           <el-table-column label="上期" width="95" class-name="auto-calc-col"><template #default="{ row }">{{ fmtRate(row.prior) }}</template></el-table-column>
@@ -184,8 +198,8 @@ function handleFillFromAdj(): void {
       </el-tab-pane>
     </el-tabs>
 
-    <el-card class="audit-card" shadow="never"><template #header><div class="card-header"><span>审计说明</span><el-button type="primary" plain size="small" :disabled="isReadonly" :loading="isGenerating('analysis-note')" @click="aiLongText('note')">🤖 AI辅助</el-button></div></template><el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" :disabled="isReadonly" @change="(v: string) => saveText(NOTE_KEY, auditNote, v)" /></el-card>
-    <el-card class="audit-card" shadow="never"><template #header><div class="card-header"><span>审计结论</span><el-button type="primary" plain size="small" :disabled="isReadonly" :loading="isGenerating('analysis-conclusion')" @click="aiLongText('conclusion')">🤖 AI辅助</el-button></div></template><el-input type="textarea" :autosize="{ minRows: 3 }" :model-value="auditConclusion" :disabled="isReadonly" @change="(v: string) => saveText(CONCLUSION_KEY, auditConclusion, v)" /></el-card>
+    <el-card data-e1-anchor="note" class="audit-card" shadow="never"><template #header><div class="card-header"><span>审计说明</span><el-button type="primary" plain size="small" :disabled="isReadonly" :loading="isGenerating('analysis-note')" @click="aiLongText('note')">🤖 AI辅助</el-button></div></template><el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" :disabled="isReadonly" @change="(v: string) => saveText(NOTE_KEY, auditNote, v)" /></el-card>
+    <el-card data-e1-anchor="conclusion" class="audit-card" shadow="never"><template #header><div class="card-header"><span>审计结论</span><el-button type="primary" plain size="small" :disabled="isReadonly" :loading="isGenerating('analysis-conclusion')" @click="aiLongText('conclusion')">🤖 AI辅助</el-button></div></template><el-input type="textarea" :autosize="{ minRows: 3 }" :model-value="auditConclusion" :disabled="isReadonly" @change="(v: string) => saveText(CONCLUSION_KEY, auditConclusion, v)" /></el-card>
     <details class="guidance"><summary>📋 编制提示</summary><p>金额单位默认元。比例分母为零时显示“-”。定期存款比例偏高应取得商业理由支持文件；受限资金、财务公司资金及异常波动应与函证、披露和后续程序交叉核对。</p></details>
   </div>
 </template>

@@ -78,6 +78,7 @@
         :audit-year="projectYear"
         :readonly="editLock.forcedReadonly.value || isArchived"
         :initial-sheet="initialSheetFromQuery"
+        :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
         @save-success="onChildSaved"
         @saved-notify="onChildSaved"
         @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
@@ -403,7 +404,7 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, watch, inject, defineAsyncComponent } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -1213,6 +1214,9 @@ onMounted(() => {
     } else {
       loading.value = false
     }
+    // 深链 ?cell=：HTML 路径由 GtWpRenderer 的 initial-cell 处理；Univer 路径在模式判定后才发（spec wp-deeplink-cell-locate-closure）
+    const queryCell = typeof route.query.cell === 'string' ? route.query.cell : ''
+    if (queryCell) setTimeout(() => eventBus.emit('workpaper:locate-cell', { wpId: wpId.value, sheetName: (route.query.sheet as string) || undefined, cellRef: queryCell }), 300)
   })()
 
   // 加载程序步骤映射
@@ -1223,24 +1227,6 @@ onMounted(() => {
 
   // 加载复核对话线程列表
   loadReviewThreadList()
-
-  // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
-  // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
-  // 注意：仅 queryCell 存在时触发 locate-cell（定位单元格）。
-  // 单独 querySheet 无 cell 时，是 Tab 导航请求，由 bundle 组件内部 watcher 处理。
-  const querySheet = route.query.sheet as string | undefined
-  const queryCell = route.query.cell as string | undefined
-  if (queryCell) {
-    nextTick(() => {
-      setTimeout(() => {
-        eventBus.emit('workpaper:locate-cell', {
-          wpId: wpId.value,
-          sheetName: querySheet || undefined,
-          cellRef: queryCell || '',
-        })
-      }, 300)
-    })
-  }
 
   // 浏览器关闭/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)

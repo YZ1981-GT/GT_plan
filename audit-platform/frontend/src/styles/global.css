@@ -871,3 +871,23 @@ body {
     flex: 1;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   底稿定位高亮（useCellLocate.highlightElement / 组件定位钩子共用；
+   此前两个类没有样式，加上也看不见 —— spec wp-deeplink-cell-locate-closure）
+   ═══════════════════════════════════════════════════════════════ */
+.gt-locate-highlight,
+.el-table td.el-table__cell.gt-locate-highlight,
+.el-table tr.gt-locate-highlight > td.el-table__cell {
+  outline: 2px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -2px;
+  background-color: rgba(255, 213, 79, 0.35) !important;
+  transition: background-color 0.3s ease, outline-color 0.3s ease;
+}
+.gt-locate-blink {
+  animation: gtLocateBlink 0.6s ease-in-out 0s 5;
+}
+@keyframes gtLocateBlink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(75, 45, 119, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(75, 45, 119, 0.45); }
+}
