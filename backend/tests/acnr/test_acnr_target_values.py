@@ -27,18 +27,19 @@ from app.services.custom_query.acnr_target_values import read_acnr_target_values
 
 _TABLES = [User.__table__, Project.__table__, WpIndex.__table__, WorkingPaper.__table__]
 _E1_15 = get_catalog().sheets_by_addr_id["E1/E1-15"]["sheet_name"]
-_D2_2 = get_catalog().sheets_by_addr_id["D2/D2-2"]["sheet_name"]
-#: 目录里真实存在的同底稿同 A1 目标对（E1/E1-18/B20 与 E1/E1-19/B20），两张表写不同数值
-_E1_18, _E1_19 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (18, 19))
+_D2_6 = get_catalog().sheets_by_addr_id["D2/D2-6"]["sheet_name"]
+#: 目录里真实存在的同底稿同 A1 有效目标对（E1/E1-14/A50 与 E1/E1-22/A50，两张表的「审计结论」标签格），两张表写不同数值。
+#: 样例格均取模板核对后的有效坐标（spec wp-deeplink-locate-coverage-closure 停用了原 C10 / C8 / B20 等种子坐标）。
+_E1_19, _E1_22 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (19, 22))
 _PAPERS = {
     "E1": {"html_data": {
-        "货币资金分析表E1-14": {"cells": {"C10": "0.125", "B30": "结论文本"}},
-        _E1_15: {"cells": {"C8": "222", "C10": "999"}},
-        _E1_18: {"cells": {"B20": "11"}},
-        _E1_19: {"cells": {"B20": "22"}},
+        "货币资金分析表E1-14": {"cells": {"I18": "0.125", "A50": "11"}},
+        _E1_15: {"cells": {"A31": "222", "I18": "999"}},
+        _E1_19: {"cells": {"A54": "结论文本"}},
+        _E1_22: {"cells": {"A50": "22"}},
     }},
-    "D2": {"html_data": {_D2_2: {"cells": {"E100": "1"}}}},
-    "D2-2": {"html_data": {_D2_2: {"cells": {"E100": "2"}}}},
+    "D2": {"html_data": {_D2_6: {"cells": {"A21": "1"}}}},
+    "D2-6": {"html_data": {_D2_6: {"cells": {"A21": "2"}}}},
 }
 
 
@@ -78,16 +79,16 @@ async def _run(db, pid, raws, year=2025):
 
 async def test_two_sheets_same_a1_each_read_their_own(world):
     db, pid, ids = world
-    got = await _run(db, pid, ["E1/E1-14/C10", "E1/E1-15/C8", "E1/E1-18/B20", "E1/E1-19/B20"])
+    got = await _run(db, pid, ["E1/E1-14/I18", "E1/E1-15/A31", "E1/E1-14/A50", "E1/E1-22/A50"])
     assert got["registry_version"] == get_catalog().registry_version and got["year"] == 2025
     a, b, c, d = got["items"]
     assert [(i["addr_id"], i["state"], i["value"], i["source"]["sheet_code"], i["source"]["sheet_key"])
-            for i in (c, d)] == [("E1/E1-18/B20", "ok", "11", "E1-18", _E1_18),
-                                 ("E1/E1-19/B20", "ok", "22", "E1-19", _E1_19)]
+            for i in (c, d)] == [("E1/E1-14/A50", "ok", "11", "E1-14", "货币资金分析表E1-14"),
+                                 ("E1/E1-22/A50", "ok", "22", "E1-22", _E1_22)]
     assert (a["state"], a["value"], a["text"]) == ("ok", "0.125", "0.125")
     assert (b["state"], b["value"]) == ("ok", "222")
     assert a["source"]["sheet_key"] == "货币资金分析表E1-14" and b["source"]["sheet_key"] == _E1_15
-    assert a["source"]["wp_id"] == str(ids["E1"]) and a["formula_ref"] == "WP('E1','货币资金分析表E1-14','C10')"
+    assert a["source"]["wp_id"] == str(ids["E1"]) and a["formula_ref"] == "WP('E1','货币资金分析表E1-14','I18')"
     assert set(a) == {"input", "addr_id", "display_label", "formula_ref", "state", "value", "text",
                       "reason_code", "reason", "source"}
     assert set(a["source"]) == {"wp_code", "sheet_code", "sheet_key", "cell", "wp_id", "jump_route"}
@@ -95,7 +96,7 @@ async def test_two_sheets_same_a1_each_read_their_own(world):
 
 async def test_text_cell_and_empty_cell(world):
     db, pid, _ = world
-    text_item, empty = (await _run(db, pid, ["E1/E1-14/B30", "E1/E1-15/B25"]))["items"]
+    text_item, empty = (await _run(db, pid, ["E1/E1-19/A54", "E1/E1-14/C34"]))["items"]
     assert (text_item["state"], text_item["value"], text_item["text"], text_item["reason_code"]) == (
         "text", None, "结论文本", "non_numeric")
     assert (empty["state"], empty["value"], empty["reason_code"]) == ("missing", None, "cell_empty")
@@ -105,7 +106,7 @@ async def test_text_cell_and_empty_cell(world):
 async def test_missing_paper_is_wp_missing_not_zero(world):
     """项目里没有 D2-5 的 sheet 级底稿 ⇒ 回落父底稿 D2；D2 存在但没有这张表 ⇒ sheet_missing；夹具之外的底稿（父级与 sheet 级都没生成）⇒ wp_missing。"""
     db, pid, _ = world
-    (item,) = (await _run(db, pid, ["D2/D2-5/C15"]))["items"]
+    (item,) = (await _run(db, pid, ["D2/D2-5/A53"]))["items"]
     assert (item["state"], item["value"], item["reason_code"]) == ("missing", None, "sheet_missing")
     cat = get_catalog()
     other = sorted(a for a, c in cat.cells_by_addr_id.items()
@@ -118,26 +119,26 @@ async def test_missing_paper_is_wp_missing_not_zero(world):
 
 async def test_sheet_level_paper_preferred_and_parent_route_has_sheet(world):
     db, pid, ids = world
-    (sheet_level,) = (await _run(db, pid, ["D2/D2-2/E100"]))["items"]
-    assert (sheet_level["source"]["wp_code"], sheet_level["value"]) == ("D2-2", "2")
-    assert sheet_level["source"]["wp_id"] == str(ids["D2-2"])
-    (parent,) = (await _run(db, pid, ["E1/E1-15/C8"]))["items"]
+    (sheet_level,) = (await _run(db, pid, ["D2/D2-6/A21"]))["items"]
+    assert (sheet_level["source"]["wp_code"], sheet_level["value"]) == ("D2-6", "2")
+    assert sheet_level["source"]["wp_id"] == str(ids["D2-6"])
+    (parent,) = (await _run(db, pid, ["E1/E1-15/A31"]))["items"]
     route = parent["source"]["jump_route"]
     assert parent["source"]["wp_code"] == "E1" and route and str(ids["E1"]) in route and "sheet=E1-15" in route
 
 
 async def test_order_and_duplicates_one_item_each(world):
     db, pid, _ = world
-    raws = ["E1/E1-15/C8", "WP('E1','货币资金分析表E1-14','C10')", "E1/E1-15/C8"]
+    raws = ["E1/E1-15/A31", "WP('E1','货币资金分析表E1-14','I18')", "E1/E1-15/A31"]
     items = (await _run(db, pid, raws))["items"]
     assert [i["input"] for i in items] == raws
-    assert [i["addr_id"] for i in items] == ["E1/E1-15/C8", "E1/E1-14/C10", "E1/E1-15/C8"]
+    assert [i["addr_id"] for i in items] == ["E1/E1-15/A31", "E1/E1-14/I18", "E1/E1-15/A31"]
     assert [i["value"] for i in items] == ["222", "0.125", "222"]
 
 
 async def test_year_mismatch_is_missing(world):
     db, pid, _ = world
-    (item,) = (await _run(db, pid, ["E1/E1-14/C10"], year=2024))["items"]
+    (item,) = (await _run(db, pid, ["E1/E1-14/I18"], year=2024))["items"]
     assert (item["state"], item["value"], item["reason_code"]) == ("missing", None, "year_mismatch")
 
 

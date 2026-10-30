@@ -678,6 +678,7 @@ import { useCellComments } from '@/composables/useCellComments'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { eventBus } from '@/utils/eventBus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefreshEntityPayload } from '@/utils/eventBus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
@@ -1874,15 +1875,10 @@ async function onConsolCtxCellTrace() {
   }
 }
 
-function onConsolTraceLocate(node: any) {
+async function onConsolTraceLocate(node: any) {
   consolTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 function onConsolCtxFormula() {

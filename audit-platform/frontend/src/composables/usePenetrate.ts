@@ -11,6 +11,8 @@
  * toLedger('1001')
  */
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { useNavigationStack, type NavigationEntry } from './useNavigationStack'
 import { useProjectStore } from '@/stores/project'
 import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
@@ -163,16 +165,12 @@ export function usePenetrate() {
       })
     },
 
-    /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1） */
-    toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
+    /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1）：按编码取本项目底稿后打开编辑器并带 ?sheet=&cell=
+     *  （原先跳底稿列表页，列表页不读 code / sheet / cell，定位丢失；spec wp-deeplink-locate-coverage-closure） */
+    async toWorkpaperFromNote(wpCode: string, locate?: { sheet?: string; cell?: string }) {
       _pushCurrentRoute(undefined, 'up')
-      const query: Record<string, string> = { code: wpCode, ...yearQuery(year()) }
-      if (locate?.sheet) query.sheet = locate.sheet
-      if (locate?.cell) query.cell = locate.cell
-      router.push({
-        path: `/projects/${pid()}/workpapers`,
-        query,
-      })
+      const reason = await openWorkpaperCell(router, { projectId: pid(), wpCode, sheet: locate?.sheet, cell: locate?.cell })
+      if (reason) ElMessage.warning(reason)
     },
   }
 }

@@ -61,7 +61,9 @@
 
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import type { OpenReviewsData, ReviewItem } from '@/composables/useDashboardData'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 
 defineProps<{
   openReviews: OpenReviewsData | null
@@ -107,18 +109,13 @@ function formatTime(isoStr: string): string {
 }
 
 /**
- * 点击复核意见 → 跳转到对应底稿 sheet + cell
+ * 点击复核意见 → 打开对应底稿编辑器并定位到 sheet + cell（底稿列表页不读 sheet / cell，原先跳过去即丢失定位）
  */
-function navigateToWorkpaper(item: ReviewItem) {
-  const projectId = route.params.projectId as string
-  const query: Record<string, string> = { highlight: item.wp_code }
-  if (item.sheet_name) query.sheet = item.sheet_name
-  if (item.cell_ref) query.cell = item.cell_ref
-  router.push({
-    name: 'WorkpaperList',
-    params: { projectId },
-    query,
+async function navigateToWorkpaper(item: ReviewItem) {
+  const reason = await openWorkpaperCell(router, {
+    projectId: route.params.projectId as string, wpCode: item.wp_code, sheet: item.sheet_name, cell: item.cell_ref,
   })
+  if (reason) ElMessage.warning(reason)
 }
 </script>
 

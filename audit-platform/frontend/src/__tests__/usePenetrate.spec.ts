@@ -16,12 +16,23 @@ vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
 }))
 
+const { resolveMock, warnMock } = vi.hoisted(() => ({ resolveMock: vi.fn(), warnMock: vi.fn() }))
+vi.mock('@/services/resolveWorkpaperByCode', () => ({ resolveWorkpaperByCode: resolveMock }))
+vi.mock('element-plus', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ElMessage: { warning: warnMock, error: vi.fn(), info: vi.fn(), success: vi.fn() },
+}))
+
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectStore } from '@/stores/project'
+
+const WP_D2 = '3f2b1c0d-9e8f-4a7b-8c6d-5e4f3a2b1c0d'
 
 describe('usePenetrate', () => {
   beforeEach(() => {
     mockPush.mockClear()
+    resolveMock.mockReset()
+    warnMock.mockReset()
     mockRoute.query = { year: '2024' }
     setActivePinia(createPinia())
   })
@@ -35,11 +46,27 @@ describe('usePenetrate', () => {
 
   it('路由与 store 都没有年度：跳转不带 year（原先兜底去年）', () => {
     mockRoute.query = {}
-    const p = usePenetrate()
-    p.toLedger('1001')
-    p.toWorkpaperFromNote('D2', { sheet: 'S1' })
-    expect(mockPush).toHaveBeenNthCalledWith(1, { path: '/projects/proj-001/ledger', query: { code: '1001' } })
-    expect(mockPush).toHaveBeenNthCalledWith(2, { path: '/projects/proj-001/workpapers', query: { code: 'D2', sheet: 'S1' } })
+    usePenetrate().toLedger('1001')
+    expect(mockPush).toHaveBeenCalledWith({ path: '/projects/proj-001/ledger', query: { code: '1001' } })
+  })
+
+  it('toWorkpaperFromNote：按编码取本项目底稿后打开编辑器并带 ?sheet=&cell=（原先跳底稿列表页，列表页不读定位参数）', async () => {
+    resolveMock.mockResolvedValueOnce({ wpId: WP_D2 })
+    await usePenetrate().toWorkpaperFromNote('D2', { sheet: 'S1', cell: 'B5' })
+    expect(resolveMock).toHaveBeenCalledWith('proj-001', 'D2', true)
+    expect(mockPush).toHaveBeenCalledWith({
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_D2 },
+      query: { sheet: 'S1', cell: 'B5' },
+    })
+    expect(warnMock).not.toHaveBeenCalled()
+  })
+
+  it('toWorkpaperFromNote：本项目没有该底稿时提示原因、不跳转', async () => {
+    resolveMock.mockResolvedValue(null)
+    await usePenetrate().toWorkpaperFromNote('Z9')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(warnMock).toHaveBeenCalledWith('本项目未找到底稿 Z9（可能尚未生成）')
   })
 
   it('toLedger navigates to ledger with account code and year', () => {

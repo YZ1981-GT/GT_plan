@@ -375,6 +375,7 @@ import {
 } from '@/composables/useWpRenderer'
 import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useRendererCellLocate } from '@/composables/useRendererCellLocate'
+import { catalogTextAnchor } from '@/generated/catalogTextAnchors'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
@@ -956,6 +957,7 @@ const rendererLocate = useRendererCellLocate({
   component: () => activeComponentRef.value,
   wpCode: () => renderConfig.value?.wp_code ?? '',
   componentType: () => componentType.value,
+  textAnchor: catalogTextAnchor,
 })
 
 function onLocateCell(payload: WorkpaperLocateCellPayload) {

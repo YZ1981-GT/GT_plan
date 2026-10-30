@@ -299,6 +299,7 @@ import { useProjectSelector } from '@/composables/useProjectSelector'
 import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
@@ -394,15 +395,10 @@ async function onMsCtxCellTrace() {
   }
 }
 
-function onMsTraceLocate(node: any) {
+async function onMsTraceLocate(node: any) {
   msTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 const {

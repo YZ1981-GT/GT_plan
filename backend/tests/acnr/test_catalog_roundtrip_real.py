@@ -45,9 +45,12 @@ def _live_cells():
 
 
 def test_live_counts_are_nonzero():
-    """防空转：目录里非停用 cell / sheet 都有（发布批次现算 435 / 1220）。"""
+    """防空转：目录里非停用 cell / sheet 都有（发布批次现算 98 / 1220）。
+
+    cell 98 = 语义待核对 33 + 模板核对坐标 65（spec wp-deeplink-locate-coverage-closure 停用 402 个与模板不符的种子坐标，
+    此前为 435）。"""
     cat = get_catalog()
-    assert len(_live_cells()) == 435
+    assert len(_live_cells()) == 98
     assert sum(1 for s in cat.sheets_by_addr_id.values() if not s.get("deprecated")) == 1220
 
 

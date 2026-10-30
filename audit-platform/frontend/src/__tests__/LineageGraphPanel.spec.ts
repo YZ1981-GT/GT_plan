@@ -4,13 +4,26 @@
  * 验证 props→render + emit 行为：
  * - drawer 打开/关闭
  * - API 响应渲染 upstream/downstream/attachments 区域
- * - node click 触发 locateCell
+ * - node click：当前底稿的节点交渲染器定位（locate-cell 事件），其余打开该底稿编辑器并带 ?sheet=&cell=
+ *   （spec wp-deeplink-locate-coverage-closure 需求 3.2；原先只在当前页面找、找不到却提示「定位到 X」）
  * - attachment click 触发 'preview-attachment' emit
  * - 空溯源显示 el-empty
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { eventBus } from '@/utils/eventBus'
+
+const { mockPush, mockRoute, resolveMock, warnMock } = vi.hoisted(() => ({
+  mockPush: vi.fn(),
+  mockRoute: { params: { projectId: 'proj-001' } as Record<string, string>, query: {} },
+  resolveMock: vi.fn(),
+  warnMock: vi.fn(),
+}))
+const WP_A1 = '0b6f5c1e-2a3d-4e5f-8a9b-0c1d2e3f4a5b'
+const WP_CURRENT = '8c8cd491-2d21-48ce-9622-e2d9bca0d499'
+
+vi.mock('@/services/resolveWorkpaperByCode', () => ({ resolveWorkpaperByCode: resolveMock }))
 
 const mockApiGet = vi.fn()
 
@@ -24,24 +37,16 @@ vi.mock('@/utils/apiProxy', () => ({
   },
 }))
 
-const mockLocateCell = vi.fn().mockReturnValue(true)
-vi.mock('@/composables/useCellLocate', () => ({
-  useCellLocate: () => ({ locateCell: mockLocateCell }),
-}))
-
 vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    params: { projectId: 'proj-001' },
-    query: {},
-  }),
+  useRoute: () => mockRoute,
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
     replace: vi.fn().mockReturnValue(Promise.resolve()),
   }),
 }))
 
 vi.mock('element-plus', () => ({
-  ElMessage: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  ElMessage: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: warnMock },
 }))
 
 import LineageGraphPanel from '@/components/workpaper/LineageGraphPanel.vue'
@@ -125,6 +130,10 @@ function factory(props: Record<string, any> = {}) {
 describe('LineageGraphPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolveMock.mockReset()
+    mockPush.mockReset()
+    mockPush.mockResolvedValue(undefined)
+    mockRoute.params = { projectId: 'proj-001' }
   })
 
   it('opens drawer when modelValue=true', async () => {
@@ -174,20 +183,84 @@ describe('LineageGraphPanel', () => {
     expect(text).toContain('合同扫描件.jpg')
   })
 
-  it('calls locateCell when upstream node is clicked', async () => {
+  it('点别的底稿的节点：按编码取本项目底稿后打开编辑器并带 ?sheet=&cell=，关闭抽屉', async () => {
     mockApiGet.mockResolvedValue(mockLineageData)
+    resolveMock.mockResolvedValueOnce({ wpId: WP_A1 })
     const wrapper = await factoryWithLoad()
     const upstreamNodes = wrapper.findAll('.upstream-node')
     expect(upstreamNodes.length).toBe(2)
     await upstreamNodes[0].trigger('click')
-    expect(mockLocateCell).toHaveBeenCalledWith(
-      expect.objectContaining({
-        wp_code: 'A1',
-        sheet_name: '程序表',
-        cell_ref: 'B3',
-        label: '审计程序',
-      }),
-    )
+    await flushPromises()
+    expect(resolveMock).toHaveBeenCalledWith('proj-001', 'A1', true)
+    expect(mockPush).toHaveBeenCalledWith({
+      name: 'WorkpaperEditor',
+      params: { projectId: 'proj-001', wpId: WP_A1 },
+      query: { sheet: '程序表', cell: 'B3' },
+    })
+    expect(warnMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([false])
+  })
+
+  it('本项目没有该底稿：提示原因、不跳转（不再假报「定位到 X」）', async () => {
+    mockApiGet.mockResolvedValue(mockLineageData)
+    resolveMock.mockResolvedValue(null)
+    const wrapper = await factoryWithLoad()
+    await wrapper.findAll('.downstream-node')[0].trigger('click')
+    await flushPromises()
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(warnMock).toHaveBeenCalledWith('本项目未找到底稿 K8（可能尚未生成）')
+  })
+
+  it('节点就是当前打开的底稿：交渲染器定位（locate-cell 事件），不跳转', async () => {
+    mockRoute.params = { projectId: 'proj-001', wpId: WP_CURRENT }
+    mockApiGet.mockResolvedValue({
+      ...mockLineageData,
+      upstream: [{ wp_code: 'E1', wp_id: WP_CURRENT, sheet_name: '分析程序E1-14', cell_ref: 'C34', label: null }],
+    })
+    const seen: any[] = []
+    const onLocate = (payload: any) => seen.push(payload)
+    eventBus.on('workpaper:locate-cell', onLocate)
+    try {
+      const wrapper = await factoryWithLoad()
+      await wrapper.findAll('.upstream-node')[0].trigger('click')
+      await flushPromises()
+      expect(seen).toEqual([{ wpId: WP_CURRENT, sheetName: '分析程序E1-14', cellRef: 'C34' }])
+      expect(mockPush).not.toHaveBeenCalled()
+      expect(resolveMock).not.toHaveBeenCalled()
+    } finally {
+      eventBus.off('workpaper:locate-cell', onLocate)
+    }
+  })
+
+  it('没带 wp_id 的节点：编码与「当前对象」相同且在编辑器里 ⇒ 交渲染器定位；不在编辑器里 ⇒ 打开编辑器', async () => {
+    mockRoute.params = { projectId: 'proj-001', wpId: WP_CURRENT }
+    mockApiGet.mockResolvedValue(mockLineageData)
+    const seen: any[] = []
+    const onLocate = (payload: any) => seen.push(payload)
+    eventBus.on('workpaper:locate-cell', onLocate)
+    try {
+      const inEditor = await factoryWithLoad()
+      await inEditor.find('.current-node').trigger('click')
+      await flushPromises()
+      expect(seen).toEqual([{ wpId: WP_CURRENT, sheetName: undefined, cellRef: 'C5' }])
+      expect(mockPush).not.toHaveBeenCalled()
+      inEditor.unmount()
+
+      mockRoute.params = { projectId: 'proj-001' }
+      resolveMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ wpId: WP_CURRENT })
+      const elsewhere = await factoryWithLoad()
+      await elsewhere.find('.current-node').trigger('click')
+      await flushPromises()
+      expect(seen).toHaveLength(1)
+      expect(resolveMock.mock.calls.map((c) => c[1])).toEqual(['D2-1', 'D2'])
+      expect(mockPush).toHaveBeenCalledWith({
+        name: 'WorkpaperEditor',
+        params: { projectId: 'proj-001', wpId: WP_CURRENT },
+        query: { sheet: 'D2-1', cell: 'C5' },
+      })
+    } finally {
+      eventBus.off('workpaper:locate-cell', onLocate)
+    }
   })
 
   it('emits preview-attachment when attachment node is clicked', async () => {

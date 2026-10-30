@@ -1,0 +1,1367 @@
+{
+  "description": "模板核对后的单元格坐标（spec wp-deeplink-locate-coverage-closure，design §2）：每个坐标带改指规则（conclusion_label：所在 tab 唯一的「审计结论」标签格；explicit：逐格核对的显式改指）、所替代的旧坐标与模板现值证据。由 backend/scripts/acnr/review_cell_coordinates.py --write 生成，--check 现算比对，勿手改。",
+  "source": "backend/scripts/acnr/review_cell_coordinates.py",
+  "entries": [
+    {
+      "wp_code": "D2-5",
+      "sheet_name": "应收账款分析表D2-5",
+      "coordinates": [
+        {
+          "cell_address": "A53",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "D2/D2-5/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "应收账款分析表D2-5",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "D2-6",
+      "sheet_name": "关联方及交易检查表D2-6",
+      "coordinates": [
+        {
+          "cell_address": "A21",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "D2/D2-6/B20",
+            "D2/D2-6/B40",
+            "D2/D2-6/B60"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "关联方及交易检查表D2-6",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "D4-22",
+      "sheet_name": "重要指标分析表D4-22",
+      "coordinates": [
+        {
+          "cell_address": "A28",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "D4/D4-22/B15",
+            "D4/D4-22/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D4 收入底稿.xlsx",
+            "template_tab": "重要指标分析表D4-22",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "D4-6",
+      "sheet_name": "重要指标分析D4-6",
+      "coordinates": [
+        {
+          "cell_address": "A28",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "D4/D4-6/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D4 收入底稿.xlsx",
+            "template_tab": "重要指标分析D4-6",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-14",
+      "sheet_name": "货币资金分析表E1-14",
+      "coordinates": [
+        {
+          "cell_address": "A50",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-14/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "货币资金分析表E1-14",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        },
+        {
+          "cell_address": "C34",
+          "description": "银行存款÷资产总额（本期）",
+          "purpose": "ratio_analysis",
+          "rule": "explicit",
+          "replaces": [
+            "E1/E1-14/C15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "货币资金分析表E1-14",
+            "cell_value": null,
+            "row_label": "银行存款÷资产总额",
+            "header_row": 33,
+            "column_header": "=C13"
+          }
+        },
+        {
+          "cell_address": "I18",
+          "description": "货币资金合计本期变动率",
+          "purpose": "ratio_analysis",
+          "rule": "explicit",
+          "replaces": [
+            "E1/E1-14/C10"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "货币资金分析表E1-14",
+            "cell_value": "=IF(E18=0,1,(C18-E18)/E18)",
+            "row_label": "合计",
+            "header_row": 14,
+            "column_header": "本期变动"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-15",
+      "sheet_name": "利息收入月度分析E1-15",
+      "coordinates": [
+        {
+          "cell_address": "A31",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-15/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "利息收入月度分析E1-15",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-19",
+      "sheet_name": "企业信用报告信息与账面核对记录E1-19",
+      "coordinates": [
+        {
+          "cell_address": "A54",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-19/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "企业信用报告信息与账面核对记录E1-19",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-20",
+      "sheet_name": "银行存款及其他货币资金应计利息测算E1-20",
+      "coordinates": [
+        {
+          "cell_address": "A29",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-20/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "银行存款及其他货币资金应计利息测算E1-20",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-21",
+      "sheet_name": "银行存款截止测试表E1-21",
+      "coordinates": [
+        {
+          "cell_address": "A51",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-21/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "银行存款截止测试表E1-21",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-22",
+      "sheet_name": "其他货币资金截止测试表E1-22",
+      "coordinates": [
+        {
+          "cell_address": "A50",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-22/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "其他货币资金截止测试表E1-22",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-23",
+      "sheet_name": "货币资金收支检查情况表E1-23",
+      "coordinates": [
+        {
+          "cell_address": "A66",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-23/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+            "template_tab": "货币资金收支检查情况表E1-23",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-26",
+      "sheet_name": "现金交易分析E1-26",
+      "coordinates": [
+        {
+          "cell_address": "A61",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-26/B15",
+            "E1/E1-26/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "现金交易分析E1-26",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-27",
+      "sheet_name": "现金截止测试E1-27",
+      "coordinates": [
+        {
+          "cell_address": "A47",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-27/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "现金截止测试E1-27",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-28",
+      "sheet_name": "现金收支检查表E1-28",
+      "coordinates": [
+        {
+          "cell_address": "A71",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-28/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "现金收支检查表E1-28",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-29",
+      "sheet_name": "银行账户分析E1-29",
+      "coordinates": [
+        {
+          "cell_address": "A35",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-29/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "银行账户分析E1-29",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-30",
+      "sheet_name": "存款规模与利息收入匹配性分析E1-30",
+      "coordinates": [
+        {
+          "cell_address": "A389",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-30/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "存款规模与利息收入匹配性分析E1-30",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-31",
+      "sheet_name": "银行流水双向核对表E1-31",
+      "coordinates": [
+        {
+          "cell_address": "A87",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-31/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "银行流水双向核对表E1-31",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-32",
+      "sheet_name": "董监高及关键岗位流水核查E1-32",
+      "coordinates": [
+        {
+          "cell_address": "A36",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-32/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "董监高及关键岗位流水核查E1-32",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "E1-9",
+      "sheet_name": "银行存单盘点表E1-9",
+      "coordinates": [
+        {
+          "cell_address": "A26",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "E1/E1-9/J30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+            "template_tab": "银行存单盘点表E1-9",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-18",
+      "sheet_name": "存货总体分析表F2-18",
+      "coordinates": [
+        {
+          "cell_address": "A65",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-18/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "存货总体分析表F2-18",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-19",
+      "sheet_name": "存货产销量变动分析表F2-19",
+      "coordinates": [
+        {
+          "cell_address": "A80",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-19/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "存货产销量变动分析表F2-19",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-20",
+      "sheet_name": "产品年度成本比较分析F2-20",
+      "coordinates": [
+        {
+          "cell_address": "A22",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-20/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+            "template_tab": "产品年度成本比较分析F2-20",
+            "cell_value": "审计结论：",
+            "row_label": "审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-24",
+      "sheet_name": "存货账面余额与仓储台账（ERP业务数据)核对记录F2-24",
+      "coordinates": [
+        {
+          "cell_address": "A29",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-24/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+            "template_tab": "存货账面余额与仓储台账（ERP业务数据)核对记录F2-24",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-26",
+      "sheet_name": "盘点倒轧表F2-26",
+      "coordinates": [
+        {
+          "cell_address": "A28",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-26/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+            "template_tab": "盘点倒轧表F2-26",
+            "cell_value": "审计结论：",
+            "row_label": "审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-29",
+      "sheet_name": "截止测试-入库（记账凭证至原始凭证）F2-29",
+      "coordinates": [
+        {
+          "cell_address": "A46",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-29/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+            "template_tab": "截止测试-入库（记账凭证至原始凭证）F2-29",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-30",
+      "sheet_name": "截止测试-入库（原始凭证至记账凭证）F2-30",
+      "coordinates": [
+        {
+          "cell_address": "A46",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-30/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+            "template_tab": "截止测试-入库（原始凭证至记账凭证）F2-30",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-31",
+      "sheet_name": "截止测试-出库（记账凭证至原始凭证）F2-31",
+      "coordinates": [
+        {
+          "cell_address": "A44",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-31/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+            "template_tab": "截止测试-出库（记账凭证至原始凭证）F2-31",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-32",
+      "sheet_name": "截止测试-出库（原始凭证至记账凭证）F2-32",
+      "coordinates": [
+        {
+          "cell_address": "A44",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-32/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+            "template_tab": "截止测试-出库（原始凭证至记账凭证）F2-32",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-35",
+      "sheet_name": "委托加工物资核查表F2-35",
+      "coordinates": [
+        {
+          "cell_address": "A39",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-35/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+            "template_tab": "委托加工物资核查表F2-35",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-38",
+      "sheet_name": "计价方法测试表-平均F2-38",
+      "coordinates": [
+        {
+          "cell_address": "A83",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-38/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "计价方法测试表-平均F2-38",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-39",
+      "sheet_name": "计价方法测试表-先进先出F2-39",
+      "coordinates": [
+        {
+          "cell_address": "A68",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-39/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "计价方法测试表-先进先出F2-39",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-40",
+      "sheet_name": "计价方法测试表-标准成本差异F2-40",
+      "coordinates": [
+        {
+          "cell_address": "A61",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-40/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "计价方法测试表-标准成本差异F2-40",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-41",
+      "sheet_name": "生产成本明细表F2-41",
+      "coordinates": [
+        {
+          "cell_address": "A21",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-41/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "生产成本明细表F2-41",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-42",
+      "sheet_name": "直接人工分析表F2-42",
+      "coordinates": [
+        {
+          "cell_address": "A45",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-42/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "直接人工分析表F2-42",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-43",
+      "sheet_name": "制造费用明细表F2-43",
+      "coordinates": [
+        {
+          "cell_address": "A29",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-43/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+            "template_tab": "制造费用明细表F2-43",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-47",
+      "sheet_name": "跌价准备测试表F2-47",
+      "coordinates": [
+        {
+          "cell_address": "A38",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-47/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+            "template_tab": "跌价准备测试表F2-47",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-56",
+      "sheet_name": "合同履约成本检查表F2-56",
+      "coordinates": [
+        {
+          "cell_address": "A37",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-56/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-55至F2-58 合同履约成本.xlsx",
+            "template_tab": "合同履约成本检查表F2-56",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-62",
+      "sheet_name": "原材料单价分析F2-62",
+      "coordinates": [
+        {
+          "cell_address": "A53",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-62/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "原材料单价分析F2-62",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-63",
+      "sheet_name": "存货产量与产能、能耗分析表F2-63",
+      "coordinates": [
+        {
+          "cell_address": "A44",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-63/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "存货产量与产能、能耗分析表F2-63",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-65",
+      "sheet_name": "关联方采购定价公允性核查（询价函）F2-65",
+      "coordinates": [
+        {
+          "cell_address": "A43",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-65/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "关联方采购定价公允性核查（询价函）F2-65",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-66",
+      "sheet_name": "关联方采购定价公允性核查（市场价）F2-66",
+      "coordinates": [
+        {
+          "cell_address": "A43",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-66/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "关联方采购定价公允性核查（市场价）F2-66",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-67",
+      "sheet_name": "识别未披露的关联方F2-67",
+      "coordinates": [
+        {
+          "cell_address": "A36",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-67/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "识别未披露的关联方F2-67",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-69",
+      "sheet_name": "供应商核查清单F2-69",
+      "coordinates": [
+        {
+          "cell_address": "A30",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-69/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "供应商核查清单F2-69",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F2-70",
+      "sheet_name": "供应商信息核查表F2-70",
+      "coordinates": [
+        {
+          "cell_address": "A43",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F2/F2-70/B15"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+            "template_tab": "供应商信息核查表F2-70",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "F5-3",
+      "sheet_name": "其他业务成本明细表F5-3",
+      "coordinates": [
+        {
+          "cell_address": "A28",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "F5/F5-3/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/F/F5 营业成本.xlsx",
+            "template_tab": "其他业务成本明细表F5-3",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G2-3",
+      "sheet_name": "坏账准备明细表G2-3",
+      "coordinates": [
+        {
+          "cell_address": "A27",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G2/G2-3/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G2 应收利息.xlsx",
+            "template_tab": "坏账准备明细表G2-3",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G4-4",
+      "sheet_name": "利息测算表G4-4",
+      "coordinates": [
+        {
+          "cell_address": "F46",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G4/G4-4/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G4 债权投资.xlsx",
+            "template_tab": "利息测算表G4-4",
+            "cell_value": "四、审计结论：",
+            "row_label": "三、审计说明："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G4-5",
+      "sheet_name": "业务模式分析G4-5",
+      "coordinates": [
+        {
+          "cell_address": "A33",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G4/G4-5/B45"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G4 债权投资.xlsx",
+            "template_tab": "业务模式分析G4-5",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G5-3",
+      "sheet_name": "坏账准备明细表G5-3",
+      "coordinates": [
+        {
+          "cell_address": "A27",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G5/G5-3/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G5 长期应收款.xlsx",
+            "template_tab": "坏账准备明细表G5-3",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G6-3",
+      "sheet_name": "坏账准备明细表G6-3",
+      "coordinates": [
+        {
+          "cell_address": "A26",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G6/G6-3/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G6 其他债权投资.xlsx",
+            "template_tab": "坏账准备明细表G6-3",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G7-4",
+      "sheet_name": "被投资单位基本信息G7-4",
+      "coordinates": [
+        {
+          "cell_address": "A42",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G7/G7-4/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G7 长期股权投资.xlsx",
+            "template_tab": "被投资单位基本信息G7-4",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G7-5",
+      "sheet_name": "被投资单位财务信息（合营、联营）G7-5",
+      "coordinates": [
+        {
+          "cell_address": "A56",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G7/G7-5/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G7 长期股权投资.xlsx",
+            "template_tab": "被投资单位财务信息（合营、联营）G7-5",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "H1-5",
+      "sheet_name": "会计政策估计检查表H1-5",
+      "coordinates": [
+        {
+          "cell_address": "A34",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "H1/H1-5/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/H/H1 固定资产.xlsx",
+            "template_tab": "会计政策估计检查表H1-5",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "H3-4",
+      "sheet_name": "会计政策会计估计检查表H3-4",
+      "coordinates": [
+        {
+          "cell_address": "A27",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "H3/H3-4/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/H/H3 投资性房地产.xlsx",
+            "template_tab": "会计政策会计估计检查表H3-4",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "H8-4",
+      "sheet_name": "租赁的识别H8-4",
+      "coordinates": [
+        {
+          "cell_address": "A59",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "H8/H8-4/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/H/H8 使用权资产.xlsx",
+            "template_tab": "租赁的识别H8-4",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "H9-3",
+      "sheet_name": "未确认融资费用明细表H9-3",
+      "coordinates": [
+        {
+          "cell_address": "A19",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "H9/H9-3/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/H/H9 租赁负债.xlsx",
+            "template_tab": "未确认融资费用明细表H9-3",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I1-4",
+      "sheet_name": "无形资产摊销减值政策检查表I1-4",
+      "coordinates": [
+        {
+          "cell_address": "A32",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I1/I1-4/B30"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx",
+            "template_tab": "无形资产摊销减值政策检查表I1-4",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I1-5",
+      "sheet_name": "无形资产增加检查表I1-5",
+      "coordinates": [
+        {
+          "cell_address": "A29",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I1/I1-5/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx",
+            "template_tab": "无形资产增加检查表I1-5",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I2-4",
+      "sheet_name": "会计政策检查I2-4",
+      "coordinates": [
+        {
+          "cell_address": "A35",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I2/I2-4/B25"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I2 开发支出.xlsx",
+            "template_tab": "会计政策检查I2-4",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I3-4",
+      "sheet_name": "入账价值测算表I3-4",
+      "coordinates": [
+        {
+          "cell_address": "A22",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I3/I3-4/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I3 商誉.xlsx",
+            "template_tab": "入账价值测算表I3-4",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I3-5",
+      "sheet_name": "针对性检查表I3-5",
+      "coordinates": [
+        {
+          "cell_address": "A27",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I3/I3-5/B20"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I3 商誉.xlsx",
+            "template_tab": "针对性检查表I3-5",
+            "cell_value": "五、审计结论：",
+            "row_label": "五、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I4-2",
+      "sheet_name": "明细表I4-2",
+      "coordinates": [
+        {
+          "cell_address": "A32",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I4/I4-2/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I4 长期待摊费用.xlsx",
+            "template_tab": "明细表I4-2",
+            "cell_value": "四、审计结论",
+            "row_label": "四、审计结论"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "I6-2",
+      "sheet_name": "明细表I6-2",
+      "coordinates": [
+        {
+          "cell_address": "A33",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "I6/I6-2/B55"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/I/I6 研发费用.xlsx",
+            "template_tab": "明细表I6-2",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    }
+  ]
+}

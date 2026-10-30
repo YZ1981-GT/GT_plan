@@ -1,10 +1,10 @@
 {
   "description": "V2 静态数据双读对账（T22，需求 9.4）：每个节点 / 边端点的旧字段经 v2_canonical 换成规范身份，按来源文件 × 分类计数，每类附中文原因与前 20 个样本；由 backend/scripts/acnr/reconcile_v2_canonical.py --write 生成，不含时间戳。",
-  "registry_version": "20261029075533",
+  "registry_version": "20261030063137",
   "inputs": [
     {
       "path": "backend/data/acnr/global_catalog.json",
-      "sha256": "b3a08722f11cdb1ea8b10c0a8e3ca0b2cc903d92c3f36e34f4b284e51dc64f6f"
+      "sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f"
     },
     {
       "path": "backend/data/address_registry_l2_semantic.json",
@@ -28,9 +28,65 @@
       "nodes": 239693,
       "by_class": {
         "addr_id": {
-          "count": 14,
+          "count": 139,
           "reason": "得到规范 addr_id（目录登记格）",
           "samples": [
+            {
+              "role": "anchor",
+              "old": "D2|应收账款分析表D2-5|A53",
+              "addr_id": "D2/D2-5/A53",
+              "sheet_addr_id": "D2/D2-5",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D2|应收账款分析表D2-5|A53",
+              "addr_id": "D2/D2-5/A53",
+              "sheet_addr_id": "D2/D2-5",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D2|关联方及交易检查表D2-6|A21",
+              "addr_id": "D2/D2-6/A21",
+              "sheet_addr_id": "D2/D2-6",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D2|关联方及交易检查表D2-6|A21",
+              "addr_id": "D2/D2-6/A21",
+              "sheet_addr_id": "D2/D2-6",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D4|重要指标分析表D4-22|A28",
+              "addr_id": "D4/D4-22/A28",
+              "sheet_addr_id": "D4/D4-22",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D4|重要指标分析表D4-22|A28",
+              "addr_id": "D4/D4-22/A28",
+              "sheet_addr_id": "D4/D4-22",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D4|重要指标分析D4-6|A28",
+              "addr_id": "D4/D4-6/A28",
+              "sheet_addr_id": "D4/D4-6",
+              "unresolved_reason": null
+            },
+            {
+              "role": "anchor",
+              "old": "D4|重要指标分析D4-6|A28",
+              "addr_id": "D4/D4-6/A28",
+              "sheet_addr_id": "D4/D4-6",
+              "unresolved_reason": null
+            },
             {
               "role": "anchor",
               "old": "D6|减值准备测算D6-8|E20",
@@ -40,93 +96,79 @@
             },
             {
               "role": "anchor",
-              "old": "F2|存货总体分析表F2-18|C10",
-              "addr_id": "F2/F2-18/C10",
-              "sheet_addr_id": "F2/F2-18",
+              "old": "E1|货币资金分析表E1-14|A50",
+              "addr_id": "E1/E1-14/A50",
+              "sheet_addr_id": "E1/E1-14",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "G4|业务模式分析G4-5|E15",
-              "addr_id": "G4/G4-5/E15",
-              "sheet_addr_id": "G4/G4-5",
+              "old": "E1|货币资金分析表E1-14|A50",
+              "addr_id": "E1/E1-14/A50",
+              "sheet_addr_id": "E1/E1-14",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "G4|业务模式分析G4-5|E25",
-              "addr_id": "G4/G4-5/E25",
-              "sheet_addr_id": "G4/G4-5",
+              "old": "E1|利息收入月度分析E1-15|A31",
+              "addr_id": "E1/E1-15/A31",
+              "sheet_addr_id": "E1/E1-15",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "G7|被投资单位财务信息（合营、联营）G7-5|B35",
-              "addr_id": "G7/G7-5/B35",
-              "sheet_addr_id": "G7/G7-5",
+              "old": "E1|利息收入月度分析E1-15|A31",
+              "addr_id": "E1/E1-15/A31",
+              "sheet_addr_id": "E1/E1-15",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "I3|针对性检查表I3-5|G10",
-              "addr_id": "I3/I3-5/G10",
-              "sheet_addr_id": "I3/I3-5",
+              "old": "E1|企业信用报告信息与账面核对记录E1-19|A54",
+              "addr_id": "E1/E1-19/A54",
+              "sheet_addr_id": "E1/E1-19",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "K9|明细表K9-2|G35",
-              "addr_id": "K9/K9-2/G35",
-              "sheet_addr_id": "K9/K9-2",
+              "old": "E1|企业信用报告信息与账面核对记录E1-19|A54",
+              "addr_id": "E1/E1-19/A54",
+              "sheet_addr_id": "E1/E1-19",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "L8|截止性测试L8-5|G12",
-              "addr_id": "L8/L8-5/G12",
-              "sheet_addr_id": "L8/L8-5",
+              "old": "E1|银行存款及其他货币资金应计利息测算E1-20|A29",
+              "addr_id": "E1/E1-20/A29",
+              "sheet_addr_id": "E1/E1-20",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "M6|明细表M6-2|C9",
-              "addr_id": "M6/M6-2/C9",
-              "sheet_addr_id": "M6/M6-2",
+              "old": "E1|银行存款及其他货币资金应计利息测算E1-20|A29",
+              "addr_id": "E1/E1-20/A29",
+              "sheet_addr_id": "E1/E1-20",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "M6|明细表M6-2|C9",
-              "addr_id": "M6/M6-2/C9",
-              "sheet_addr_id": "M6/M6-2",
+              "old": "E1|银行存款截止测试表E1-21|A51",
+              "addr_id": "E1/E1-21/A51",
+              "sheet_addr_id": "E1/E1-21",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "N1|调整分录汇总N1-3|D5",
-              "addr_id": "N1/N1-3/D5",
-              "sheet_addr_id": "N1/N1-3",
+              "old": "E1|银行存款截止测试表E1-21|A51",
+              "addr_id": "E1/E1-21/A51",
+              "sheet_addr_id": "E1/E1-21",
               "unresolved_reason": null
             },
             {
               "role": "anchor",
-              "old": "N1|调整分录汇总N1-3|G5",
-              "addr_id": "N1/N1-3/G5",
-              "sheet_addr_id": "N1/N1-3",
-              "unresolved_reason": null
-            },
-            {
-              "role": "anchor",
-              "old": "N3|调整分录汇总表N3-3|D5",
-              "addr_id": "N3/N3-3/D5",
-              "sheet_addr_id": "N3/N3-3",
-              "unresolved_reason": null
-            },
-            {
-              "role": "anchor",
-              "old": "N3|调整分录汇总表N3-3|G5",
-              "addr_id": "N3/N3-3/G5",
-              "sheet_addr_id": "N3/N3-3",
+              "old": "E1|其他货币资金截止测试表E1-22|A50",
+              "addr_id": "E1/E1-22/A50",
+              "sheet_addr_id": "E1/E1-22",
               "unresolved_reason": null
             }
           ]
@@ -424,7 +466,7 @@
           ]
         },
         "cell_not_in_catalog": {
-          "count": 91565,
+          "count": 91440,
           "reason": "该单元格所在表在目录中，但单元格坐标未登记",
           "samples": [
             {
@@ -3020,12 +3062,12 @@
   },
   "totals": {
     "nodes": 325088,
-    "addr_id": 24,
+    "addr_id": 149,
     "by_class": {
-      "addr_id": 24,
+      "addr_id": 149,
       "alias_forbidden": 1138,
       "ambiguous_sheet_name": 6048,
-      "cell_not_in_catalog": 117101,
+      "cell_not_in_catalog": 116976,
       "label_not_a1": 461,
       "not_wellformed": 40,
       "not_workpaper_node": 68,

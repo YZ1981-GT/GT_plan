@@ -53,6 +53,9 @@ const props = defineProps<{
   fCycle: any
   /** 项目审计年度（保存后的下游影响分析按它算；项目没填为 null ⇒ 不分析） */
   projectYear?: number | null
+  /** 深链 ?sheet= / ?cell=：Univer 就绪后切到该 sheet、选中该格（spec wp-deeplink-locate-coverage-closure 需求 4） */
+  initialSheet?: string
+  initialCell?: string
 }>()
 
 const emit = defineEmits<{
@@ -228,25 +231,50 @@ function onRetryLoad() {
   initUniver()
 }
 
-// ─── locate-cell 事件监听 ───────────────────────────────────────────────────
+// ─── 定位：locate-cell 事件与深链初始属性（spec wp-deeplink-locate-coverage-closure 需求 4） ───
+// Univer 未就绪（引擎未建 / 仍在加载 / 还没有活动工作簿）时记为待办（只留最后一个），就绪后切 sheet、选中单元格。
+
+let pendingLocate: { sheetName?: string; cellRef?: string } | null = null
+
+function applyLocate(req: { sheetName?: string; cellRef?: string }): boolean {
+  const workbook = univerAPI.value?.getActiveWorkbook?.()
+  if (!workbook || loading.value) return false
+  const sheets = workbook.getSheets?.() || []
+  const nameOf = (sheet: any) => sheet.getSheetName?.() || sheet.getName?.() || ''
+  let target = workbook.getActiveSheet?.() ?? null
+  if (req.sheetName) {
+    const resolvedName = resolveSheetNameByDeepLink(sheets.map(nameOf), req.sheetName)
+    target = resolvedName ? sheets.find((sheet: any) => nameOf(sheet) === resolvedName) ?? null : null
+    const targetId = target?.getSheetId?.() || target?.getId?.()
+    if (targetId) onSwitchSheet(targetId)
+  }
+  const cellRef = (req.cellRef || '').trim()
+  if (target && /^[A-Za-z]{1,3}\d{1,7}$/.test(cellRef)) {
+    try {
+      const range = target.getRange?.(cellRef.toUpperCase())
+      if (range && typeof workbook.setActiveRange === 'function') workbook.setActiveRange(range)
+    } catch { /* 选中失败只留切 sheet */ }
+  }
+  return true
+}
+
+function requestLocate(req: { sheetName?: string; cellRef?: string }) {
+  if (!req.sheetName && !req.cellRef) return
+  pendingLocate = applyLocate(req) ? null : req
+}
 
 function onBusLocateCell(payload: any) {
-  if (payload?.wpId !== props.wpId || !payload.sheetName || !univerAPI.value) return
-  const workbook = univerAPI.value.getActiveWorkbook?.()
-  if (!workbook) return
-  const sheets = workbook.getSheets?.() || []
-  const resolvedName = resolveSheetNameByDeepLink(
-    sheets.map((sheet: any) => sheet.getSheetName?.() || sheet.getName?.() || ''),
-    payload.sheetName,
-  )
-  if (!resolvedName) return
-  const target = sheets.find((sheet: any) =>
-    (sheet.getSheetName?.() || sheet.getName?.()) === resolvedName,
-  )
-  const targetId = target?.getSheetId?.() || target?.getId?.()
-  if (targetId) onSwitchSheet(targetId)
+  if (payload?.wpId !== props.wpId) return
+  requestLocate({ sheetName: payload.sheetName || undefined, cellRef: payload.cellRef || undefined })
 }
 eventBus.on('workpaper:locate-cell', onBusLocateCell)
+
+watch([univerAPI, loading], () => {
+  if (pendingLocate && applyLocate(pendingLocate)) pendingLocate = null
+})
+watch(() => [props.initialSheet, props.initialCell] as const, ([sheetName, cellRef]) => {
+  requestLocate({ sheetName: sheetName || undefined, cellRef: cellRef || undefined })
+}, { immediate: true })
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 

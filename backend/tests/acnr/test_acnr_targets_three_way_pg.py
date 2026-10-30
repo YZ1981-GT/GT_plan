@@ -1,7 +1,8 @@
 """三者相等（acnr-foundation-defect-closure 需求 1.2，T13 移交、随 T14 交付；pg_only）。
 
-真 PG 回滚事务内建【测试】项目与 E1 底稿（``parsed_data.html_data`` 写 E1-14!C10=0.125、E1-15!C8=222，两张表另在同一
-A1 写不同值），同一夹具上逐值比较：
+真 PG 回滚事务内建【测试】项目与 E1 底稿（``parsed_data.html_data`` 写 E1-14!A50=0.125、E1-14!I18=-3.5、E1-22!A50=222，
+E1-22 另在 I18 写不同值；样例格均为模板核对后的有效坐标，spec wp-deeplink-locate-coverage-closure 停用了原 C10 / C15 / C8），
+同一夹具上逐值比较：
 
 1. 底稿公式三参求值 ``evaluate_wp_formula_expression("WP('E1','<表名>','<A1>')")``；
 2. acnr_targets 取值 ``read_acnr_target_values(resolve_acnr_targets(...))``；
@@ -30,9 +31,11 @@ pytestmark = pytest.mark.pg_only
 
 _E1_14 = "货币资金分析表E1-14"
 _E1_15 = get_catalog().sheets_by_addr_id["E1/E1-15"]["sheet_name"]
-_CELLS = {_E1_14: {"C10": "0.125", "C15": "-3.5"}, _E1_15: {"C8": "222", "C10": "999"}}
-#: (addr_id, 表名, A1)：同一 A1（C10）两张表各取各的；C15 / C8 是目录里登记的另两格
-_CASES = [("E1/E1-14/C10", _E1_14, "C10"), ("E1/E1-14/C15", _E1_14, "C15"), ("E1/E1-15/C8", _E1_15, "C8")]
+_E1_22 = get_catalog().sheets_by_addr_id["E1/E1-22"]["sheet_name"]
+_CELLS = {_E1_14: {"A50": "0.125", "I18": "-3.5"}, _E1_22: {"A50": "222", "I18": "999"}, _E1_15: {"I18": "1"}}
+#: (addr_id, 表名, A1)：同一 A1（A50）两张表各取各的；I18 是目录里登记的另一格（E1-22 的同名 A1 写了别的值）；
+#: E1-15 只写了一格无关值，供「表在、格空」用例
+_CASES = [("E1/E1-14/A50", _E1_14, "A50"), ("E1/E1-14/I18", _E1_14, "I18"), ("E1/E1-22/A50", _E1_22, "A50")]
 
 
 async def _with_world(fn):
@@ -86,7 +89,8 @@ async def test_missing_cell_is_error_in_formula_and_missing_in_targets():
     """取不到：底稿公式 errors 非空（调用方丢弃该值），acnr_targets 为 missing、value 为 None，都不是 0。"""
     async def run(s, pid, _wp_id):
         cat = get_catalog()
-        addr = next(a for a in cat.cells_by_addr_id if a.startswith("E1/E1-15/") and a != "E1/E1-15/C8")
+        addr = next(a for a, c in sorted(cat.cells_by_addr_id.items())
+                    if a.startswith("E1/E1-15/") and not c.get("deprecated") and c["cell_address"] not in _CELLS.get(_E1_15, {}))
         a1 = cat.cells_by_addr_id[addr]["cell_address"]
         _value, errors = await evaluate_wp_formula_expression(
             s, project_id=pid, year=2025, expression=f"WP('E1','{_E1_15}','{a1}')")

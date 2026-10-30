@@ -66,8 +66,14 @@ def test_deprecated_cells_resolve_with_resolvable_replacement():
         if not (r.found and r.deprecated is True and r.replaced_by == v["replaced_by"] and r.reason):
             bad.append((v["addr_id"], r.found, r.deprecated, r.replaced_by))
     assert not bad, bad[:5]
-    targets = asyncio.run(_resolve_all(sorted({v["replaced_by"] for v in _DEPRECATE_CELLS})))
-    assert all(t.found and t.entry_type == "sheet" and not t.deprecated for t in targets)
+    keys = sorted({v["replaced_by"] for v in _DEPRECATE_CELLS})
+    targets = dict(zip(keys, asyncio.run(_resolve_all(keys))))
+    # 替代地址是父 sheet，或模板核对后的新坐标（spec wp-deeplink-locate-coverage-closure 改指的 cell）
+    wrong = [(v["addr_id"], v["replaced_by"], t.found, t.entry_type, t.deprecated) for v in _DEPRECATE_CELLS
+             if not ((t := targets[v["replaced_by"]]).found and not t.deprecated
+                     and t.entry_type == ("sheet" if v["replaced_by"] == v["parent_sheet_code"] else "cell"))]
+    assert not wrong, wrong[:5]
+    assert any(t.entry_type == "cell" for t in targets.values()), "改指新坐标的停用格应至少一个（防空转）"
 
 
 @pytest.mark.parametrize("code", ["K14", "K15", "K16", "K17", "K18"])

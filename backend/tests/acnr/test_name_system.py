@@ -235,8 +235,9 @@ def test_generator_name_rules_roundtrip_all_non_orphan_cells():
         um = exact_identity.cell_of(p, s, a1, index=idx)
         if fm is None or not fm.ok or fm.addr_id != c["addr_id"] or not um.ok or um.addr_id != c["addr_id"]:
             fail.append((c["addr_id"], c["formula_ref"], c["uri"]))
-    # 发布前目录：474 − 25 孤儿 = 449；发布后孤儿父 sheet 已补登，25 个停用 cell 也在其中（共 474）
-    assert checked in (449, 474), checked
+    # 发布前目录：474 − 25 孤儿 = 449；发布后孤儿父 sheet 已补登，25 个停用 cell 也在其中（共 474）；
+    # spec wp-deeplink-locate-coverage-closure 起另有 65 个模板核对坐标（共 539，停用格仍在其中）
+    assert checked == 539, checked
     assert not fail, f"名称规则往返失败 {len(fail)} 条：{fail[:10]}"
     assert named.by_sheet_code >= 1, "防空转：应有模板名不归属本 sheet、改用 sheet_code 的 cell（如 F2/F2-34）"
     assert named.by_template_name + named.by_sheet_code == checked
@@ -292,13 +293,16 @@ def test_apply_cell_verdicts_three_way():
     by_id = {c["addr_id"]: c for c in cat["cells"]}
     keep = [r for r in rows if r["verdict"] == "keep_semantic_unverified"]
     dep = [r for r in rows if r["verdict"] == "deprecate"]
-    assert (len(keep), len(dep)) == (33, 39)
+    # 停用 = T05 孤儿 25 + T06 超范围 14 + spec wp-deeplink-locate-coverage-closure 与模板不符 402
+    assert (len(keep), len(dep)) == (33, 39 + 402)
     for r in keep:
         c = by_id[r["addr_id"]]
         assert c["semantic_label"] is None and c["cell_label"] == f"{c['cell_address']}（语义待核对）" and not c.get("deprecated")
     for r in dep:
         c = by_id[r["addr_id"]]
-        assert c["deprecated"] is True and c["replaced_by"] == r["replaced_by"] == c["parent_addr_id"]
+        assert c["deprecated"] is True and c["replaced_by"] == r["replaced_by"]
+        # 指父 sheet，或（仅本 spec 改指的）同一张表上模板核对后的新坐标
+        assert r["replaced_by"] == c["parent_addr_id"] or r["replaced_by"].rsplit("/", 1)[0] == c["parent_addr_id"], r
 
 
 # ─── 6. 纯函数：传空 sheets 不抛、不读目录单例 ───────────────────────────────

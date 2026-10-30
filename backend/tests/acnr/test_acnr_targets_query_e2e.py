@@ -1,12 +1,13 @@
 """acnr_targets 三个入口的端到端（acnr-foundation-defect-closure T15，design §2.2 / §2.3 / §2.8；pg_only）。
 
-真 PG：一个外层事务里建【测试】项目、E1 底稿（``parsed_data.html_data`` 写 E1-14!C10=0.125、E1-14!B30=「结论文本」、
-E1-15!C8=222，以及同 A1 的 E1-18!B20=11 与 E1-19!B20=22）、只有 ``checklist_responses`` 的 S15 程序表底稿，以及没有年度的另一个【测试】项目；会话以 SAVEPOINT 方式加入
+真 PG：一个外层事务里建【测试】项目、E1 底稿（``parsed_data.html_data`` 写 E1-14!I18=0.125、E1-19!A54=「结论文本」、
+E1-15!A31=222，以及同 A1 的 E1-14!A50=11 与 E1-22!A50=22；样例格均为模板核对后的有效坐标，spec
+wp-deeplink-locate-coverage-closure 停用了原 C10 / C8 / B20 / B30 / E100 等种子坐标）、只有 ``checklist_responses`` 的 S15 程序表底稿，以及没有年度的另一个【测试】项目；会话以 SAVEPOINT 方式加入
 （端点里的 commit 只释放保存点），结束整体回滚，不留数据。经生产注册的 router（``tests/authz_world.build_app``）用 httpx 真发
 请求，只 override ``get_current_user`` 与 ``get_db``；Redis 换成独立的 fakeredis（不连本机 Redis、不留缓存）。
 
-覆盖：业务视图 execute、模板执行、构建器 execute 三入口逐字段断言 §2.2；两张表同一 A1（目录里的 ``E1/E1-18/B20`` 与
-``E1/E1-19/B20``）各取各值并带各自的 ``source.sheet_code``；文本格 ``text``；
+覆盖：业务视图 execute、模板执行、构建器 execute 三入口逐字段断言 §2.2；两张表同一 A1（目录里的 ``E1/E1-14/A50`` 与
+``E1/E1-22/A50``）各取各值并带各自的 ``source.sheet_code``；文本格 ``text``；
 表单底稿 ``value_in_form_storage``；未生成底稿 ``wp_missing``；顺序与重复逐项对应；构建器 ``/preview`` 只解析不取值、
 ``/export-excel`` 追加「单元格取值」工作表；权限矩阵（非成员合伙人、只有委派的经理、无关经理）两入口放行一致；缺年度且项目
 无年度 ⇒ ``YEAR_REQUIRED``；不带 acnr_targets 的旧请求与带目标的响应除 ``acnr_results`` 外逐字段相等；模板存非法
@@ -37,22 +38,22 @@ pytestmark = pytest.mark.pg_only
 
 _E1_14 = "货币资金分析表E1-14"
 _E1_15 = get_catalog().sheets_by_addr_id["E1/E1-15"]["sheet_name"]
-#: 目录里真实存在的同底稿同 A1 目标对（E1/E1-18/B20 与 E1/E1-19/B20），两张表写不同数值
-_E1_18, _E1_19 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (18, 19))
-_PAPERS = {"E1": {_E1_14: {"C10": "0.125", "B30": "结论文本"}, _E1_15: {"C8": "222"},
-                  _E1_18: {"B20": "11"}, _E1_19: {"B20": "22"}}}
-TARGETS = ["E1/E1-14/C10", "E1/E1-15/C8", "E1/E1-18/B20", "E1/E1-19/B20", "E1/E1-14/B30", "S15/S15/C12",
-           "D2/D2-2/E100", "E1/E1-14/C10"]
+#: 目录里真实存在的同底稿同 A1 有效目标对（E1/E1-14/A50 与 E1/E1-22/A50），两张表写不同数值
+_E1_19, _E1_22 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (19, 22))
+_PAPERS = {"E1": {_E1_14: {"I18": "0.125", "A50": "11"}, _E1_15: {"A31": "222"},
+                  _E1_19: {"A54": "结论文本"}, _E1_22: {"A50": "22"}}}
+TARGETS = ["E1/E1-14/I18", "E1/E1-15/A31", "E1/E1-14/A50", "E1/E1-22/A50", "E1/E1-19/A54", "S15/S15/C12",
+           "D2/D2-6/A21", "E1/E1-14/I18"]
 #: (addr_id, state, value, text, reason_code, 实际读取的底稿)
 EXPECTED = [
-    ("E1/E1-14/C10", "ok", "0.125", "0.125", None, "E1"),
-    ("E1/E1-15/C8", "ok", "222", "222", None, "E1"),
-    ("E1/E1-18/B20", "ok", "11", "11", None, "E1"),
-    ("E1/E1-19/B20", "ok", "22", "22", None, "E1"),
-    ("E1/E1-14/B30", "text", None, "结论文本", "non_numeric", "E1"),
+    ("E1/E1-14/I18", "ok", "0.125", "0.125", None, "E1"),
+    ("E1/E1-15/A31", "ok", "222", "222", None, "E1"),
+    ("E1/E1-14/A50", "ok", "11", "11", None, "E1"),
+    ("E1/E1-22/A50", "ok", "22", "22", None, "E1"),
+    ("E1/E1-19/A54", "text", None, "结论文本", "non_numeric", "E1"),
     ("S15/S15/C12", "missing", None, None, "value_in_form_storage", "S15"),
-    ("D2/D2-2/E100", "missing", None, None, "wp_missing", "D2"),
-    ("E1/E1-14/C10", "ok", "0.125", "0.125", None, "E1"),
+    ("D2/D2-6/A21", "missing", None, None, "wp_missing", "D2"),
+    ("E1/E1-14/I18", "ok", "0.125", "0.125", None, "E1"),
 ]
 BUSINESS = "/api/custom-query/execute"
 BUILDER = "/api/query/execute"
@@ -168,7 +169,7 @@ async def test_three_entries_return_the_same_block(world: World):
 
 async def test_two_sheets_same_a1_each_read_their_own(world: World):
     """同一底稿两张表的同一 A1：两个入口各取各的值、``source`` 指向各自的表（跨表取首个同 A1 格会打红）。"""
-    pair = ["E1/E1-18/B20", "E1/E1-19/B20"]
+    pair = ["E1/E1-14/A50", "E1/E1-22/A50"]
     admin = await world.aw.user(UserRole.admin)
     async with world.client(admin) as c:
         got = [await c.post(BUSINESS, json=_business(world.x, targets=pair)),
@@ -177,7 +178,7 @@ async def test_two_sheets_same_a1_each_read_their_own(world: World):
         assert resp.status_code == 200, resp.text
         assert [(i["addr_id"], i["value"], i["source"]["sheet_code"], i["source"]["cell"])
                 for i in resp.json()["acnr_results"]["items"]] == [
-            ("E1/E1-18/B20", "11", "E1-18", "B20"), ("E1/E1-19/B20", "22", "E1-19", "B20")]
+            ("E1/E1-14/A50", "11", "E1-14", "A50"), ("E1/E1-22/A50", "22", "E1-22", "A50")]
 
 
 async def test_builder_year_is_filled_from_project_and_required_when_unknown(world: World):
@@ -220,11 +221,11 @@ async def test_values_are_read_fresh_even_on_cache_hit(world: World):
     这里只断言两次都现读到当时的库内值。
     """
     admin = await world.aw.user(UserRole.admin)
-    body_b, body_q = _business(world.x, targets=["E1/E1-14/C10"]), _builder(world.x, targets=["E1/E1-14/C10"], year=2025)
+    body_b, body_q = _business(world.x, targets=["E1/E1-14/I18"]), _builder(world.x, targets=["E1/E1-14/I18"], year=2025)
     async with world.client(admin) as c:
         first_b, first_q = await c.post(BUSINESS, json=body_b), await c.post(BUILDER, json=body_q)
         await world.aw.db.execute(text(
-            "UPDATE working_paper SET parsed_data = jsonb_set(parsed_data, ARRAY['html_data', :s, 'cells', 'C10'], "
+            "UPDATE working_paper SET parsed_data = jsonb_set(parsed_data, ARRAY['html_data', :s, 'cells', 'I18'], "
             "'\"0.5\"'::jsonb) WHERE id = :id"), {"s": _E1_14, "id": world.wp_ids["E1"]})
         second_b, second_q = await c.post(BUSINESS, json=body_b), await c.post(BUILDER, json=body_q)
     assert second_q.headers.get("X-Cache") == "HIT" and first_q.headers.get("X-Cache") is None
@@ -275,7 +276,7 @@ async def test_rejection_is_422_with_chinese_issues_and_reads_nothing(world: Wor
     monkeypatch.setattr(wp_cell_target, "resolve_wp_cell", _never)
     admin = await world.aw.user(UserRole.admin)
     async with world.client(admin) as c:
-        resp = await c.post(url, json=body_of(world.x, ["E1/E1-14/C10", "E1/E1-14", "tb:1001"]))
+        resp = await c.post(url, json=body_of(world.x, ["E1/E1-14/I18", "E1/E1-14", "tb:1001"]))
     assert resp.status_code == 422, resp.text
     detail = resp.json()["detail"]
     assert detail["error_code"] == "ACNR_TARGETS_REJECTED"
@@ -304,8 +305,8 @@ async def test_permission_matrix_is_the_same_for_both_entries(world: World):
     got = {}
     for label, user in (("非成员合伙人", partner), ("只有委派的经理", delegated), ("无关经理", outsider)):
         async with world.client(user) as c:
-            b = await c.post(BUSINESS, json=_business(world.x, targets=["E1/E1-14/C10"]))
-            q = await c.post(BUILDER, json=_builder(world.x, targets=["E1/E1-14/C10"], year=2025))
+            b = await c.post(BUSINESS, json=_business(world.x, targets=["E1/E1-14/I18"]))
+            q = await c.post(BUILDER, json=_builder(world.x, targets=["E1/E1-14/I18"], year=2025))
         got[label] = (b.status_code, q.status_code)
         if b.status_code == 200:
             assert b.json()["acnr_results"]["items"][0]["value"] == "0.125"
@@ -322,17 +323,17 @@ async def test_template_with_illegal_targets_is_422_not_500(world: World):
     admin = await world.aw.user(UserRole.admin)
     stored = CustomQueryTemplate(
         id=uuid.uuid4(), name="【测试】acnr_targets 非法模板", data_source="tb_detail",
-        config={"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/C10", "   "]},
+        config={"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/I18", "   "]},
         scope="private", shared_project_ids=[], creator_id=admin.id, created_by=admin.id)
     world.aw.db.add(stored)
     await world.aw.db.flush()
     async with world.client(admin) as c:
         save = await c.post("/api/custom-query/templates", json={
             "name": "【测试】acnr_targets 非法", "data_source": "tb_detail", "scope": "public",
-            "config": {"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/C10", ""]}})
+            "config": {"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/I18", ""]}})
         too_many = await c.post("/api/custom-query/templates", json={
             "name": "【测试】acnr_targets 超量", "data_source": "tb_detail", "scope": "public",
-            "config": {"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/C10"] * 51}})
+            "config": {"source": "tb_detail", "year": 2025, "acnr_targets": ["E1/E1-14/I18"] * 51}})
         run = await c.post(f"/api/custom-query/templates/{stored.id}/execute", json={"project_id": world.x})
     assert save.status_code == 422, save.text
     assert "模板里的单元格取值目标不合法：第 2 个单元格引用为空" in save.text

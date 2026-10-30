@@ -46,7 +46,8 @@ def _cells(deprecated: bool) -> list[dict]:
 @pytest.mark.asyncio
 async def test_all_live_cell_formula_refs_pass_save_validation(caplog):
     cells = _cells(False)
-    assert len(cells) == 435
+    # 本批次现算：有效 98 = 语义待核对 33 + 模板核对坐标 65；停用 441 = 孤儿 25 + 超范围 14 + 与模板不符 402（spec wp-deeplink-locate-coverage-closure）
+    assert len(cells) == 98
 
     async def run(s, pid):
         rejected = []
@@ -67,7 +68,7 @@ async def test_all_live_cell_formula_refs_pass_save_validation(caplog):
 @pytest.mark.asyncio
 async def test_deprecated_refs_accepted_and_counted():
     cells = _cells(True)
-    assert len(cells) == 39
+    assert len(cells) == 441
     m = get_acnr_metrics()
     before = m.get_aggregated_metrics()["alerts"]["by_type"].get("deprecated_ref_saved", 0)
 

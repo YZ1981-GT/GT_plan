@@ -1,8 +1,9 @@
 import { ref, computed, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useRouter } from 'vue-router'
 import { handleApiError } from '@/utils/errorHandler'
-import { eventBus } from '@/utils/eventBus'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import type { useCellSelection } from '@/composables/useCellSelection'
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ export interface UseReportTraceReturn {
   rvTraceLoading: Ref<boolean>
   rvTraceResult: Ref<{ upstream: any[]; downstream: any[] } | null>
   onRvCtxCellTrace: () => Promise<void>
-  onRvTraceLocate: (node: any) => void
+  onRvTraceLocate: (node: any) => Promise<void>
 
   showAuditDialog: Ref<boolean>
   auditTab: Ref<string>
@@ -90,15 +91,11 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
     }
   }
 
-  function onRvTraceLocate(node: any) {
+  const router = useRouter()
+  async function onRvTraceLocate(node: any) {
     rvTraceDialogVisible.value = false
-    if (node.wp_code) {
-      eventBus.emit('workpaper:locate-cell', {
-        wpId: node.wp_code,
-        sheetName: node.sheet_name || undefined,
-        cellRef: node.cell_ref || '',
-      })
-    }
+    const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+    if (reason) ElMessage.warning(reason)
   }
 
   // ─── Audit Dialog ─────────────────────────────────────────────────────────

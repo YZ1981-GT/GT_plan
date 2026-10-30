@@ -16,25 +16,25 @@
 
 | 事实 | 值 | 复算键 |
 |---|---|---|
-| 目录版本号 | `20261029075533` | `catalog.registry_version` |
+| 目录版本号 | `20261030063137` | `catalog.registry_version` |
 | 目录 sheet 条目数 | `1225` | `catalog.sheets` |
-| 目录 cell 条目数 | `474` | `catalog.cells` |
-| 父 sheet 在目录内的 cell | `474` | `catalog.cells_with_parent` |
+| 目录 cell 条目数 | `539` | `catalog.cells` |
+| 父 sheet 在目录内的 cell | `539` | `catalog.cells_with_parent` |
 | 孤儿 cell（父 sheet 不在目录） | `0` | `catalog.orphan_cells` |
 | 孤儿 cell 所属 sheet 编码 | `无` | `catalog.orphan_parent_sheet_codes` |
-| 停用（deprecated）条目数 | `44` | `catalog.deprecated_entries` |
+| 停用（deprecated）条目数 | `446` | `catalog.deprecated_entries` |
 | 条目所属域 | `wp` | `catalog.domains` |
 | 父级编码覆盖的循环 | `A、B、C、D、E、F、G、H、I、J、K、L、M、N、S` | `catalog.parent_cycles` |
-| cell 自带 formula_ref 能解析回本身的条目 | `474` | `catalog.formula_ref_roundtrip_ok` |
+| cell 自带 formula_ref 能解析回本身的条目 | `539` | `catalog.formula_ref_roundtrip_ok` |
 | 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
 | 报告是否带 release 段 | `是` | `report.has_release` |
-| 历史快照份数 | `12` | `snapshots.count` |
+| 历史快照份数 | `13` | `snapshots.count` |
 | 仍在仓库的分片文件 | `无` | `shards.files` |
 | 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
 | 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
 | 生产代码中导入发布门禁模块的文件数 | `2` | `catalog_release.production_importers` |
 
-说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 44）；生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
+说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果；孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 446）；生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）。本子节表格以外的数字都写明复算键，守卫逐个比对现算值。
 
 ### 已落地：组件
 

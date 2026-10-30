@@ -4,8 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 import {
+  DEFAULT_LOCATE_WAITS,
   SHEET_MISSING_MESSAGE,
+  TEXT_ANCHOR_EXTRA_WAITS,
   cellMissingMessage,
+  locateSheetCode,
   useRendererCellLocate,
   type RendererCellLocateDeps,
 } from '../useRendererCellLocate'
@@ -206,5 +209,98 @@ describe('useRendererCellLocate — 结果与重试', () => {
     t.scope.stop()
     await vi.advanceTimersByTimeAsync(5000)
     expect(t.notify).not.toHaveBeenCalled()
+  })
+})
+
+describe('useRendererCellLocate — 目录文字锚点（spec wp-deeplink-locate-coverage-closure 需求 2）', () => {
+  const CODED: Record<string, { sheet_name: string; sheet_code: string; componentType: string }> = {
+    S1: { sheet_name: '第一页S1', sheet_code: 'S1', componentType: 'test-html' },
+    S2: { sheet_name: '第二页S2', sheet_code: 'S2', componentType: 'test-html' },
+  }
+  const coded = {
+    resolveSheet: (locator: string) => Object.values(CODED).find((s) => s.sheet_name === locator || s.sheet_code === locator) ?? null,
+    activeSheet: () => CODED.S1,
+  }
+
+  it('钩子与 [data-cell-ref] 都找不到时，按目标 sheet 编码查对照并高亮唯一同名标题', async () => {
+    const textAnchor = vi.fn((code: string | null, cell: string) => (code === 'S2' && cell === 'A50' ? '审计结论' : null))
+    const t = setup({ ...coded, textAnchor })
+    t.root.innerHTML = '<div class="el-card" id="c"><span>四、审计结论：</span></div>'
+    t.api.request({ wpId: 'wp-1', sheetName: 'S2', cellRef: 'A50' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(textAnchor).toHaveBeenCalledWith('S2', 'A50')
+    expect(t.root.querySelector('#c')!.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(true)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(t.notify).not.toHaveBeenCalled()
+    t.scope.stop()
+  })
+
+  it('[data-cell-ref] 命中时不再用文字锚点（同名标题不高亮），每个请求只查一次对照', async () => {
+    const textAnchor = vi.fn(() => '审计结论')
+    const t = setup({ ...coded, textAnchor })
+    t.root.innerHTML = '<div class="el-card" id="c"><span>审计结论</span></div>'
+    const a = anchor(t.root, 'A50')
+    t.api.request({ wpId: 'wp-1', cellRef: 'A50' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(a.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(true)
+    expect(t.root.querySelector('#c')!.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(false)
+    expect(textAnchor).toHaveBeenCalledTimes(1)
+    t.scope.stop()
+  })
+
+  it('有文字锚点：标题晚于默认重试窗口才渲染（重组件取完数才出结论区）也能定位，不误报', async () => {
+    const t = setup({ ...coded, textAnchor: () => '审计结论' })
+    t.api.request({ wpId: 'wp-1', cellRef: 'A28' })
+    await vi.advanceTimersByTimeAsync(DEFAULT_LOCATE_WAITS.reduce((s, w) => s + w, 0) + 1200)
+    expect(t.notify).not.toHaveBeenCalled()
+    t.root.innerHTML = '<h4 class="sec-title" id="h">审计结论</h4>'
+    await vi.advanceTimersByTimeAsync(2500)
+    expect(t.root.querySelector('#h')!.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(true)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(t.notify).not.toHaveBeenCalled()
+    t.scope.stop()
+  })
+
+  it('没有文字锚点的格照旧在默认窗口后提示（不因追加等待变慢）', async () => {
+    const t = setup({ ...coded, textAnchor: () => null })
+    t.api.request({ wpId: 'wp-1', cellRef: 'I18' })
+    await vi.advanceTimersByTimeAsync(DEFAULT_LOCATE_WAITS.reduce((s, w) => s + w, 0) + 50)
+    expect(t.notify).toHaveBeenCalledTimes(1)
+    t.scope.stop()
+  })
+
+  it('模板页签（渲染配置不给 sheet_code）按页签名末尾的编码查对照', async () => {
+    const TPL = { sheet_name: '银行存单盘点表E1-9', sheet_code: null, componentType: 'test-html' }
+    const textAnchor = vi.fn((code: string | null, cell: string) => (code === 'E1-9' && cell === 'A26' ? '审计结论' : null))
+    const t = setup({ resolveSheet: (l) => (l === 'E1-9' || l === TPL.sheet_name ? TPL : null), activeSheet: () => TPL, textAnchor })
+    t.root.innerHTML = '<div class="el-card" id="c"><span>审计说明</span></div><div class="el-card" id="d"><span>审计结论</span></div>'
+    t.api.request({ wpId: 'wp-1', sheetName: 'E1-9', cellRef: 'A26' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(textAnchor).toHaveBeenCalledWith('E1-9', 'A26')
+    expect(t.root.querySelector('#d')!.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(true)
+    expect(t.root.querySelector('#c')!.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(false)
+    t.scope.stop()
+  })
+
+  it('locateSheetCode：先用 sheet_code，否则取页签名末尾的结构化编码（不把 E1-10 当 E1-1）', () => {
+    expect(locateSheetCode({ sheet_name: '货币资金分析表E1-14', sheet_code: 'e1-14' })).toBe('E1-14')
+    expect(locateSheetCode({ sheet_name: '银行存单盘点表E1-9', sheet_code: null })).toBe('E1-9')
+    expect(locateSheetCode({ sheet_name: '销售退货检查表 D4-20', sheet_code: '' })).toBe('D4-20')
+    expect(locateSheetCode({ sheet_name: '已开立银行账户清单核对表E1-10' })).toBe('E1-10')
+    expect(locateSheetCode({ sheet_name: '附注披露信息(上市公司)' })).toBeNull()
+    expect(locateSheetCode(null)).toBeNull()
+  })
+
+  it('标题不唯一：追加等待用完后只提示一次', async () => {
+    const t = setup({ ...coded, textAnchor: () => '审计结论' })
+    t.root.innerHTML = '<div class="el-card"><span>审计结论</span></div><div class="el-card"><span>审计结论</span></div>'
+    t.api.request({ wpId: 'wp-1', cellRef: 'A50' })
+    const windowMs = [...DEFAULT_LOCATE_WAITS, ...TEXT_ANCHOR_EXTRA_WAITS].reduce((s, w) => s + w, 0)
+    await vi.advanceTimersByTimeAsync(windowMs - 100)
+    expect(t.notify).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(t.notify).toHaveBeenCalledTimes(1)
+    expect(t.notify).toHaveBeenCalledWith(cellMissingMessage('第一页S1', 'A50'))
+    t.scope.stop()
   })
 })

@@ -244,7 +244,7 @@
       v-if="modeResolved"
       ref="univerEditorCoreRef"
       :project-id="projectId" :project-year="projectYear"
-      :wp-id="wpId"
+      :wp-id="wpId" :initial-sheet="initialSheetFromQuery" :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
       :wp-detail="wpDetail!"
       :can-edit="effectiveCanEdit"
       :sheet-nav-facade="sheetNavFacade"
@@ -1208,15 +1208,8 @@ onMounted(() => {
     }
 
     await loadUniverSheetIdentityCatalog()
-    if (componentType.value === 'univer' || !componentType.value) {
-      // UniverEditorCore 内部处理 initUniver
-      loading.value = false
-    } else {
-      loading.value = false
-    }
-    // 深链 ?cell=：HTML 路径由 GtWpRenderer 的 initial-cell 处理；Univer 路径在模式判定后才发（spec wp-deeplink-cell-locate-closure）
-    const queryCell = typeof route.query.cell === 'string' ? route.query.cell : ''
-    if (queryCell) setTimeout(() => eventBus.emit('workpaper:locate-cell', { wpId: wpId.value, sheetName: (route.query.sheet as string) || undefined, cellRef: queryCell }), 300)
+    // UniverEditorCore 内部处理 initUniver；深链 ?sheet= / ?cell= 经其 initial-sheet / initial-cell 在 Univer 就绪后执行
+    loading.value = false
   })()
 
   // 加载程序步骤映射
