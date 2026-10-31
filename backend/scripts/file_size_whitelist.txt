@@ -1374,7 +1374,8 @@ backend/tests/test_formula_push_batch_e_mnf_note.py 829
 #   增量来源：consol-node-key-isolation-and-shared-context 四栏入口视觉引导
 #   （12 行 CSS 动画 + 3 行 computed + 模板 class 绑定）。
 #   拆分应在布局组件整体重构时一并做，不塞进本 spec。
-audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1515
+#   2026-10-31：formula-template-dual-project-pilot 增模板深链消费（+83 行）。
+audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1598
 
 #   store_item_registry.py —— 2026-10-06 入册。STORE_MERGE_REGISTRY 字典是全平台
 #     adapter 注册表的单一真源（69 条），每条包含 adapter_id / provider_module /

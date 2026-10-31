@@ -114,6 +114,8 @@
             <!-- formula-global-settings-sync：全局设置 / 保存为模板 / 订阅模板（取代旧共享配置「公式审核配置」） -->
             <FormulaSettingsToolbar ref="settingsToolbarRef" :project-id="projectId" :domain="settingsDomain"
               :default-scope="settingsScope" :can-edit-global="canEditGlobal" :can-edit-project="!formulaReadOnly"
+              :initial-template-id="initialTemplateId" :initial-template-action="initialTemplateAction"
+              :initial-template-domain="initialTemplateDomain"
               @navigate="visible = false"
               @changed="onFormulaSettingsChanged" />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
@@ -367,10 +369,10 @@
           </el-table-column>
           <el-table-column label="计算值" width="110" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length || formulaResults[row.row_code || row.id]?.error" placement="left" :show-after="300">
+              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length || formulaFailureReason(formulaResults[row.row_code || row.id])" placement="left" :show-after="300">
                 <template #content>
                   <div style="max-width:400px;font-size: var(--gt-font-size-xs);line-height:1.6">
-                    <div v-if="formulaResults[row.row_code || row.id]?.error" data-testid="formula-result-error">失败原因：{{ formulaResults[row.row_code || row.id]?.error }}</div>
+                    <div v-if="formulaFailureReason(formulaResults[row.row_code || row.id])" data-testid="formula-result-error">失败原因：{{ formulaFailureReason(formulaResults[row.row_code || row.id]) }}</div>
                     <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
                       <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
                       <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
@@ -378,7 +380,7 @@
                   </div>
                 </template>
                 <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-primary);font-weight:600;cursor:help">
-                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '-' }}
+                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '—' }}
                 </span>
               </el-tooltip>
               <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-placeholder)">—</span>
@@ -666,6 +668,9 @@ const props = withDefaults(defineProps<{
   capabilitySnapshot?: WorkpaperCapabilitySnapshot
   formulaSession?: FormulaManagerSession
   readOnly?: boolean
+  initialTemplateId?: string
+  initialTemplateAction?: 'subscribe'
+  initialTemplateDomain?: string
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -688,6 +693,9 @@ const visible = computed({
 })
 
 const formulaReadOnly = computed(() => props.readOnly === true)
+const initialTemplateId = computed(() => props.initialTemplateId)
+const initialTemplateAction = computed(() => props.initialTemplateAction)
+const initialTemplateDomain = computed(() => props.initialTemplateDomain)
 
 type FormulaMutationGate = SaveDraftDecision | { allow: true; location?: undefined }
 
@@ -1740,8 +1748,25 @@ const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
 const showFormulaImport = ref(false)
 
+type FormulaExecutionResult = {
+  value: number | null
+  trace: any[]
+  error?: string | null
+  errors?: string[]
+  ok?: boolean
+}
+
+/** 失败结果统一取 error / errors，避免只读其中一个字段而吞掉原因。 */
+function formulaFailureReason(result: Partial<FormulaExecutionResult> | null | undefined): string | null {
+  if (!result) return null
+  if (result.error) return result.error
+  const errors = (result.errors || []).filter(Boolean)
+  if (errors.length) return errors.join('；')
+  return result.ok === false ? '公式执行失败' : null
+}
+
 // 公式执行结果缓存（独立于行数据，确保响应式）
-const formulaResults = ref<Record<string, { value: number | null; trace: any[]; error?: string | null }>>({})
+const formulaResults = ref<Record<string, FormulaExecutionResult>>({})
 
 const notePresetFormulas = ref<any[]>([])
 
@@ -3268,17 +3293,21 @@ async function onApplyFormulas() {
     const result = data
     const results = result?.results || []
 
-    // 统计执行结果
-    const successCount = results.filter((r: any) => r.value != null && !r.error).length
-    const errorCount = results.filter((r: any) => r.error).length
+    // 统计执行结果。失败原因优先取 error，其次合并 errors[]，避免失败值被当成空成功。
+    const failureReason = (r: any) => formulaFailureReason(r)
+    const successCount = results.filter((r: any) => r.value != null && !failureReason(r)).length
+    const errorCount = results.filter((r: any) => Boolean(failureReason(r))).length
 
     // 将计算结果写入响应式缓存
     for (const r of results) {
       if (r.row_code) {
+        const error = failureReason(r)
         formulaResults.value[r.row_code] = {
-          value: r.value != null && !r.error ? r.value : null,
+          value: r.value != null && !error ? r.value : null,
           trace: r.trace || [],
-          error: r.error || null, // 失败原因显示在计算值的提示里（FHIC 第 2 轮 A5）
+          error,
+          errors: Array.isArray(r.errors) ? r.errors : [],
+          ok: r.ok,
         }
       }
     }
@@ -3287,7 +3316,7 @@ async function onApplyFormulas() {
     // （原「回写报表配置」写的是报表配置上不存在的金额列，从未落库；该后端接口已删除）
 
     if (errorCount > 0) {
-      const failedRows = results.filter((r: any) => r.error).map((r: any) => r.row_code).join('、')
+      const failedRows = results.filter((r: any) => failureReason(r)).map((r: any) => r.row_code).join('、')
       ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败（${failedRows}），失败原因见计算值提示`)
     } else {
       ElMessage.success(`已执行 ${successCount} 条自动运算公式`)

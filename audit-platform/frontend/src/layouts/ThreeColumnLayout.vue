@@ -346,6 +346,9 @@
       :capability-snapshot="formulaContext?.capabilitySnapshot"
       :formula-session="formulaContext?.formulaSession"
       :read-only="formulaContext?.readOnly ?? false"
+      :initial-template-id="formulaContext?.templateId"
+      :initial-template-action="formulaContext?.templateAction"
+      :initial-template-domain="formulaContext?.templateDomain"
       @session-change="onFormulaSessionChange"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
@@ -953,6 +956,31 @@ watch(() => route.params.projectId, (newId) => {
   connectSSE(newId as string || '')
 }, { immediate: true })
 
+function templateFormulaScope(domain: string): OpenFormulaManagerPayload['scope'] {
+  if (domain === 'note') return 'note'
+  if (domain === 'consol_note') return 'consol_note'
+  if (domain === 'tb_detail') return 'tb'
+  if (domain === 'wp') return 'workpaper'
+  return 'report'
+}
+
+/** 模板详情「到项目中订阅」深链：支持正常跳转和刷新后直达。 */
+function openTemplateSubscribeFromQuery() {
+  const templateId = route.query.formulaTemplateId
+  const action = route.query.formulaAction
+  const domain = route.query.formulaDomain
+  const projectId = route.params.projectId
+  if (typeof templateId !== 'string' || action !== 'subscribe' || typeof projectId !== 'string') return
+  const templateDomain = typeof domain === 'string' ? domain : 'report'
+  eventBus.emit('open-formula-manager', {
+    projectId, scope: templateFormulaScope(templateDomain), templateId,
+    templateAction: 'subscribe', templateDomain,
+  })
+}
+
+watch(() => [route.params.projectId, route.query.formulaTemplateId, route.query.formulaAction,
+  route.query.formulaDomain] as const, openTemplateSubscribeFromQuery)
+
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
   formulaOwnerState.value = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
@@ -1015,6 +1043,7 @@ onMounted(() => {
   checkConsolidatedProjects()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
+  openTemplateSubscribeFromQuery()
   eventBus.on('open-custom-query', onOpenCustomQueryEvent)
   eventBus.on('four-col-switch', onSwitchFourCol)
   eventBus.on('shortcut:undo', onShortcutUndo)

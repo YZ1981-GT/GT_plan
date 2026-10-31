@@ -40,9 +40,13 @@
 
         <el-tabs v-model="tab">
           <el-tab-pane label="公式定义" name="defs">
-            <el-radio-group v-model="activeDomain" size="small" class="gt-ftd-gap">
-              <el-radio-button v-for="d in detail.domains" :key="d" :value="d">{{ domainLabel(d) }}</el-radio-button>
-            </el-radio-group>
+            <div class="gt-ftd-definition-bar">
+              <el-radio-group v-model="activeDomain" size="small" class="gt-ftd-gap">
+                <el-radio-button v-for="d in detail.domains" :key="d" :value="d">{{ domainLabel(d) }}</el-radio-button>
+              </el-radio-group>
+              <el-button v-if="detail.can_manage" size="small" type="primary" plain data-testid="ftd-add-slot"
+                @click="openNewSlot">+ 新增公式位</el-button>
+            </div>
             <el-table :data="domainRows" size="small" border max-height="calc(100vh - 420px)" row-key="slot_key">
               <el-table-column prop="label" label="公式位" min-width="220" show-overflow-tooltip />
               <el-table-column label="定义" min-width="260">
@@ -90,6 +94,14 @@
                 <template #default="{ row }">{{ (row.change_set || []).length }}</template>
               </el-table-column>
               <el-table-column prop="note" label="说明" min-width="200" show-overflow-tooltip />
+              <el-table-column label="操作" width="190" align="center">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" :loading="diffLoading && diffVersion === row.version"
+                    @click="openDiff(row)">与当前对比</el-button>
+                  <el-button v-if="detail.can_manage && row.version < detail.version" link type="warning" size="small"
+                    @click="openRollback(row)">回滚到此版本</el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
           <el-tab-pane v-if="detail.can_manage" label="订阅项目" name="subscribers">
@@ -107,6 +119,11 @@
               </el-table-column>
               <el-table-column prop="local_modified" label="本地改过" width="90" align="center" />
               <el-table-column prop="pending" label="待确认" width="80" align="center" />
+              <el-table-column label="入口" width="130" align="center">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goSubscribe(row)">到项目中订阅</el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
         </el-tabs>
@@ -118,9 +135,9 @@
     :exec-fields="fieldsOf(activeDomain).exec" :desc-fields="fieldsOf(activeDomain).desc"
     :definition="editing?.definition || null" @save="onEditSave" />
   <FormulaPublishPreviewDialog v-model="previewVisible" :preview="preview" :loading="previewLoading" :title="previewTitle"
-    :submit="onSubmitPreview" :submit-text="previewKind === 'publish' ? '发布新版本' : '确认发布'"
-    :conflict-options="previewKind === 'publish' ? TEMPLATE_CHOICES : undefined"
-    :new-label="previewKind === 'publish' ? '模板新定义' : '新全局'" />
+    :submit="onSubmitPreview" :submit-text="previewKind === 'publish' ? '发布新版本' : previewKind === 'rollback' ? '回滚并发布新版本' : '确认发布'"
+    :conflict-options="previewKind === 'promote' ? undefined : TEMPLATE_CHOICES"
+    :new-label="previewKind === 'publish' ? '模板新定义' : previewKind === 'rollback' ? '目标历史版本' : '新全局'" />
   <el-dialog v-model="metaVisible" title="改名 / 共享范围" width="480px" append-to-body destroy-on-close>
     <el-form ref="metaFormRef" :model="meta" :rules="metaRules" label-width="90px">
       <el-form-item label="名称" prop="name"><el-input v-model="meta.name" maxlength="200" /></el-form-item>
@@ -136,10 +153,38 @@
       <el-button type="primary" :loading="metaSaving" @click="onMetaSave">保存</el-button>
     </template>
   </el-dialog>
+  <el-dialog v-model="diffVisible" title="版本差异" width="900px" append-to-body destroy-on-close>
+    <div v-if="diff" class="gt-ftd-diff-summary">v{{ diff.from_version }} → v{{ diff.to_version }}，共 {{ diff.changes.length }} 处变化</div>
+    <el-table v-if="diff" :data="diff.changes" size="small" border max-height="520px" empty-text="两个版本没有差异">
+      <el-table-column prop="domain" label="公式域" width="120" />
+      <el-table-column prop="label" label="公式位" min-width="180" show-overflow-tooltip />
+      <el-table-column prop="kind" label="变化" width="90" />
+      <el-table-column label="旧定义" min-width="220">
+        <template #default="{ row }"><code class="gt-ftd-code">{{ definitionText(row.old) }}</code></template>
+      </el-table-column>
+      <el-table-column label="新定义" min-width="220">
+        <template #default="{ row }"><code class="gt-ftd-code gt-ftd-new">{{ definitionText(row.new) }}</code></template>
+      </el-table-column>
+    </el-table>
+  </el-dialog>
+  <el-dialog v-model="newSlotVisible" title="新增公式位" width="480px" append-to-body destroy-on-close>
+    <el-form label-width="90px">
+      <el-form-item label="公式域"><el-select v-model="newSlotDomain" style="width: 100%">
+        <el-option v-for="d in detail?.domains || []" :key="d" :value="d" :label="domainLabel(d)" />
+      </el-select></el-form-item>
+      <el-form-item label="公式位"><el-input v-model="newSlotKey" maxlength="300" placeholder="请输入唯一公式位" /></el-form-item>
+      <el-form-item label="显示名称"><el-input v-model="newSlotLabel" maxlength="300" placeholder="可选，默认使用公式位" /></el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="newSlotVisible = false">取消</el-button>
+      <el-button type="primary" data-testid="ftd-add-slot-next" @click="beginNewSlot">下一步填写定义</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import FormulaDefinitionEditDialog from './FormulaDefinitionEditDialog.vue'
@@ -147,7 +192,7 @@ import FormulaPublishPreviewDialog from './FormulaPublishPreviewDialog.vue'
 import {
   SHARE_SCOPE_OPTIONS, definitionText, formulaErrorText, formulaSettingsApi, newRequestId, scopeLabel,
   type ConflictChoice, type Decisions, type Definition, type FormulaDomainInfo, type ShareScope, type SyncPreview,
-  type TemplateDetail, type TemplateGlobalHint, type TemplateSubscriber, type TemplateVersion,
+  type TemplateDetail, type TemplateDiff, type TemplateGlobalHint, type TemplateSubscriber, type TemplateVersion,
 } from '@/composables/formula/useFormulaSettings'
 
 defineOptions({ name: 'FormulaTemplateDetailDrawer' })
@@ -164,6 +209,7 @@ const TEMPLATE_CHOICES: ReadonlyArray<{ value: ConflictChoice; label: string }> 
   { value: 'adopt', label: '采用模板新版' }, { value: 'keep', label: '保留项目' }, { value: 'ask', label: '交项目确认' },
 ]
 
+const router = useRouter()
 const visible = computed({ get: () => props.modelValue, set: (v: boolean) => emit('update:modelValue', v) })
 const detail = ref<TemplateDetail | null>(null)
 const versions = ref<TemplateVersion[]>([])
@@ -179,14 +225,26 @@ const editVisible = ref(false)
 const preview = ref<SyncPreview | null>(null)
 const previewVisible = ref(false)
 const previewLoading = ref(false)
-const previewKind = ref<'publish' | 'promote'>('publish')
+const previewKind = ref<'publish' | 'promote' | 'rollback'>('publish')
+const rollbackVersion = ref<number | null>(null)
+const diff = ref<TemplateDiff | null>(null)
+const diffVisible = ref(false)
+const diffLoading = ref(false)
+const diffVersion = ref<number | null>(null)
+const newSlotVisible = ref(false)
+const newSlotDomain = ref('')
+const newSlotKey = ref('')
+const newSlotLabel = ref('')
 const promoting = ref('')
 let promoteDomain = ''
 let requestId = ''
 
 const hints = computed<TemplateGlobalHint[]>(() => detail.value?.global_hints || [])
-const previewTitle = computed(() => (previewKind.value === 'publish'
-  ? `发布模板新版本 v${(detail.value?.version || 0) + 1}：订阅项目影响预览` : '设为全局：发布前影响预览'))
+const previewTitle = computed(() => {
+  if (previewKind.value === 'publish') return `发布模板新版本 v${(detail.value?.version || 0) + 1}：订阅项目影响预览`
+  if (previewKind.value === 'rollback') return `回滚到 v${rollbackVersion.value || ''} 并发布新版本：订阅项目影响预览`
+  return '设为全局：发布前影响预览'
+})
 const domainRows = computed(() => (detail.value?.definitions[activeDomain.value] || []).map((r) => {
   const s = staged.get(`${activeDomain.value}|${r.slot_key}`)
   return s ? { ...r, definition: s.definition, staged: true } : { ...r, staged: false }
@@ -203,6 +261,80 @@ function fmtTime(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString('zh-CN', { hour12: false }) : '—'
 }
 function clearStaged() { staged.clear() }
+
+function openNewSlot() {
+  newSlotDomain.value = activeDomain.value || detail.value?.domains[0] || ''
+  newSlotKey.value = ''
+  newSlotLabel.value = ''
+  newSlotVisible.value = true
+}
+
+function beginNewSlot() {
+  const domain = newSlotDomain.value
+  const slotKey = newSlotKey.value.trim()
+  if (!domain || !slotKey) {
+    ElMessage.warning('请填写公式域和公式位')
+    return
+  }
+  const exists = (detail.value?.definitions[domain] || []).some((row) => row.slot_key === slotKey)
+    || staged.has(`${domain}|${slotKey}`)
+  if (exists) {
+    ElMessage.warning('该公式位已存在，请换一个公式位')
+    return
+  }
+  activeDomain.value = domain
+  editing.value = { slot_key: slotKey, label: newSlotLabel.value.trim() || slotKey, definition: {} }
+  newSlotVisible.value = false
+  editVisible.value = true
+}
+
+async function openDiff(row: TemplateVersion) {
+  if (!detail.value) return
+  diffVersion.value = row.version
+  diffLoading.value = true
+  try {
+    diff.value = await formulaSettingsApi.templateDiff(detail.value.id, {
+      from: row.version, to: detail.value.version,
+    })
+    diffVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(formulaErrorText(e, '加载版本差异失败'))
+  } finally {
+    diffLoading.value = false
+  }
+}
+
+async function openRollback(row: TemplateVersion) {
+  if (!detail.value || row.version >= detail.value.version) return
+  previewKind.value = 'rollback'
+  rollbackVersion.value = row.version
+  previewLoading.value = true
+  try {
+    preview.value = await formulaSettingsApi.templateRollbackPreview(detail.value.id, {
+      target_version: row.version, expected_version: detail.value.version,
+    })
+    requestId = newRequestId()
+    previewVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(formulaErrorText(e, '回滚预览失败'))
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+async function goSubscribe(row: TemplateSubscriber) {
+  if (!detail.value || !row.project_id) return
+  try {
+    await router.push({
+      name: 'ProjectDashboard', params: { projectId: row.project_id },
+      query: {
+        formulaTemplateId: detail.value.id, formulaAction: 'subscribe', formulaDomain: row.domain,
+      },
+    })
+  } catch (e: any) {
+    ElMessage.error(formulaErrorText(e, '打开项目订阅入口失败'))
+  }
+}
 
 async function load() {
   if (!props.templateId) return
@@ -314,6 +446,13 @@ async function onSubmitPreview(payload: { decisions: Decisions; note: string }):
       })
       ElMessage.success(`已发布 v${r?.version ?? detail.value.version + 1}，订阅项目按所选处理`)
       staged.clear()
+    } else if (previewKind.value === 'rollback' && rollbackVersion.value !== null) {
+      const r = await formulaSettingsApi.templateRollback(detail.value.id, {
+        target_version: rollbackVersion.value, expected_version: detail.value.version,
+        decisions: payload.decisions, request_id: requestId || newRequestId(), note: payload.note || undefined,
+      })
+      ElMessage.success(`已回滚到 v${rollbackVersion.value}，并发布新版本 v${r?.version ?? detail.value.version + 1}`)
+      rollbackVersion.value = null
     } else {
       await formulaSettingsApi.templatePromote(detail.value.id, {
         domain: promoteDomain, decisions: payload.decisions, request_id: requestId || newRequestId(),
@@ -325,7 +464,8 @@ async function onSubmitPreview(payload: { decisions: Decisions; note: string }):
     await load()
     return true
   } catch (e: any) {
-    ElMessage.error(formulaErrorText(e, previewKind.value === 'publish' ? '发布失败' : '设为全局失败'))
+    ElMessage.error(formulaErrorText(e,
+      previewKind.value === 'publish' ? '发布失败' : previewKind.value === 'rollback' ? '回滚失败' : '设为全局失败'))
     return false
   }
 }
@@ -384,6 +524,8 @@ async function onMetaSave() {
 .gt-ftd { min-height: 200px; }
 .gt-ftd-gap { margin-bottom: 10px; }
 .gt-ftd-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.gt-ftd-definition-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gt-ftd-diff-summary { margin-bottom: 8px; color: var(--gt-color-text-secondary); }
 .gt-ftd-spacer { flex: 1; }
 .gt-ftd-code { font-size: var(--gt-font-size-xs); word-break: break-all; white-space: normal; }
 .gt-ftd-new { color: var(--gt-color-primary); }

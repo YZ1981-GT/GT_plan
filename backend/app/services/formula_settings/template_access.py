@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import ProjectUser
-from app.models.formula_setting_models import SHARE_SCOPES, FormulaTemplate
+from app.models.core import Project, ProjectUser, User
+from app.models.formula_setting_models import SHARE_SCOPES, FormulaTemplate, FormulaTemplateSubscription
 from app.services.formula_settings.errors import Forbidden, FormulaSettingError, NotFound
 
 SHARE_LABELS = {"personal": "个人", "team": "项目组", "group": "集团", "firm": "事务所"}
@@ -112,3 +112,65 @@ def check_share_scope(share_scope: str, owner_project_id: uuid.UUID | None, *, a
         raise Forbidden("事务所模板只有管理员可以创建或设置")
     if share_scope in ("team", "group") and owner_project_id is None:
         raise FormulaSettingError(f"{SHARE_LABELS[share_scope]}模板须指定所属项目")
+
+
+async def hidden_subscriber_projects(
+    db: AsyncSession,
+    template: FormulaTemplate,
+    *,
+    share_scope: str,
+    owner_project_id: uuid.UUID | None,
+) -> list[dict[str, str]]:
+    """返回更新后无法继续查看模板的 active subscription 项目。
+
+    共享范围变更不能只比较字符串大小：team / group 的可见性取决于项目树和
+    当前有效成员。这里只返回订阅项目的名称与 ID，供模板所有者看到 409 原因。
+    """
+    if share_scope == "firm":
+        return []
+    subscriptions = list((await db.execute(sa.select(FormulaTemplateSubscription).where(
+        FormulaTemplateSubscription.template_id == template.id,
+        FormulaTemplateSubscription.is_active == sa.true(),
+    ))).scalars().all())
+    if not subscriptions:
+        return []
+
+    project_ids = [s.project_id for s in subscriptions]
+    project_rows = (await db.execute(sa.select(Project.id, Project.name).where(
+        Project.id.in_(project_ids), Project.is_deleted == sa.false(),
+    ))).all()
+    names = {pid: (name or "") for pid, name in project_rows}
+    members = (await db.execute(
+        sa.select(ProjectUser.project_id, ProjectUser.user_id, User)
+        .join(User, User.id == ProjectUser.user_id)
+        .where(
+            ProjectUser.project_id.in_(project_ids),
+            ProjectUser.is_deleted == sa.false(),
+            User.is_deleted == sa.false(),
+            User.is_active == sa.true(),
+        )
+    )).all()
+    by_project: dict[uuid.UUID, list[tuple[uuid.UUID, User]]] = {}
+    for project_id, user_id, user in members:
+        by_project.setdefault(project_id, []).append((user_id, user))
+
+    roots: dict[uuid.UUID, uuid.UUID | None] = {}
+    owner_root = await _group_root(db, owner_project_id, roots)
+    hidden: list[dict[str, str]] = []
+    for project_id in project_ids:
+        visible = False
+        for user_id, user in by_project.get(project_id, []):
+            if is_admin(user) or user_id == template.owner_user_id:
+                visible = True
+                break
+            if share_scope == "team" and owner_project_id == project_id:
+                visible = True
+                break
+            if share_scope == "group":
+                subscriber_root = await _group_root(db, project_id, roots)
+                if owner_root is not None and subscriber_root == owner_root:
+                    visible = True
+                    break
+        if not visible:
+            hidden.append({"project_id": str(project_id), "project_name": names.get(project_id, "")})
+    return hidden

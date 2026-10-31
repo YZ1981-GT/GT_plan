@@ -13,7 +13,7 @@ import {
 import type {
   ApplyTarget, ApplyTargetKind, CheckRuleSource, Decisions, Definition, EffectiveResult, FormulaDomainInfo,
   FormulaTemplateInfo, GlobalSlot, PendingItem, PublishRecord, Resolution, SlotChange, SyncPreview, TemplateDetail,
-  TemplateSubscriber, TemplateSubscription, TemplateVersion,
+  TemplateSubscriber, TemplateSubscription, TemplateVersion, TemplateDiff, TemplateDiffChange,
 } from '@/composables/formula/useFormulaSettings'
 
 // ── 请求 ──────────────────────────────────────────────────────────────────────
@@ -69,6 +69,15 @@ export const formulaSettingsApi = {
   deleteTemplate: (id: string, expectedVersion: number) => api.delete<{ id: string; deleted: boolean }>(PT.detail(id),
       silent({ params: { expected_version: expectedVersion } })),
   templateVersions: (id: string) => api.get<{ items: TemplateVersion[] }>(PT.versions(id), silent()),
+  templateDiff: (id: string, params: { from: number; to?: number }) =>
+    api.get<TemplateDiff>(PT.diff(id), silent({ params })),
+  templateRollbackPreview: (id: string, body: {
+    target_version: number; expected_version: number; decisions?: Decisions; note?: string
+  }) => api.post<SyncPreview & { target_version: number; rollback_changes: TemplateDiffChange[] }>(
+    PT.rollbackPreview(id), body, silent()),
+  templateRollback: (id: string, body: {
+    target_version: number; expected_version: number; decisions: Decisions; request_id: string; note?: string
+  }) => api.post<Record<string, any>>(PT.rollback(id), body, silent()),
   templateSubscribers: (id: string) => api.get<{ items: TemplateSubscriber[] }>(PT.subscribers(id), silent()),
   templatePublishPreview: (id: string, body: { expected_version: number; changes: Array<{ domain: string; slot_key: string; definition: Definition | null }> }) =>
     api.post<SyncPreview>(PT.publishPreview(id), body, silent()),

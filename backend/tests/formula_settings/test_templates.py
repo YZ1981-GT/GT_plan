@@ -24,7 +24,7 @@ from app.services.formula_settings.project_ops import resolve_items
 from app.services.formula_settings.publish import publish_global
 from app.services.formula_settings.template_access import Viewer
 
-from ._env import STD, add_global_row, add_project, add_project_row, add_user, make_db, pending_items, project_rows
+from ._env import STD, add_global_row, add_member, add_project, add_project_row, add_user, make_db, pending_items, project_rows
 
 SLOT, SLOT2 = "balance_sheet:BS-001", "balance_sheet:BS-002"
 OLD, MINE, THEIRS, V2, G2 = ("TB('1001','期末余额')", "TB('1001','期末余额')*2", "TB('1002','期末余额')",
@@ -332,3 +332,83 @@ async def test_generic_domain_tb_detail_template_subscribe_and_publish():
              "definition": {"row_name": "库存现金", "formula": "TB('1001','期末余额')*3",
                             "formula_category": "auto_calc"}}])
         assert (await tb_detail.load(db, follower))["overrides"]["1001"]["formula"] == "TB('1001','期末余额')*3"
+
+
+async def test_template_diff_and_rollback_creates_new_version(world):
+    w = world
+    db = w["db"]
+    tpl = await _template(w)
+    await sync.subscribe(db, project_id=w["follower"], tpl=tpl, domain="report", decisions=None,
+                         user_id=w["owner"].id)
+
+    await sync.publish_template(db, tpl, expected_version=1, user_id=w["owner"].id,
+                                changes=[{"domain": "report", "slot_key": SLOT,
+                                          "definition": rdef(V2)}])
+    first_diff = await svc.template_diff(db, tpl, from_version=1, to_version=2)
+    assert [(c["slot_key"], c["kind"], c["old"]["formula"], c["new"]["formula"])
+            for c in first_diff["changes"]] == [(SLOT, "changed", MINE, V2)]
+
+    await sync.publish_template(db, tpl, expected_version=2, user_id=w["owner"].id,
+                                changes=[{"domain": "report", "slot_key": SLOT2,
+                                          "definition": rdef(G2)}])
+    assert tpl.version == 3
+    before_versions = {v.version for v in (await db.execute(
+        sa.select(FormulaTemplateVersion).where(FormulaTemplateVersion.template_id == tpl.id)
+    )).scalars().all()}
+    diff, rollback = await svc.rollback_changes(db, tpl, 1)
+    assert {c["kind"] for c in diff["changes"]} == {"changed", "removed"}
+    rollback_by_slot = {c["slot_key"]: c["definition"] for c in rollback}
+    assert rollback_by_slot[SLOT]["formula"] == MINE
+    assert rollback_by_slot[SLOT2] is None
+
+    replay = await sync.publish_template(
+        db, tpl, changes=rollback, expected_version=3, user_id=w["owner"].id,
+        request_id="rollback-request-1", publish_source="template_rollback",
+        item_action="template_rollback", audit_action="template_rollback",
+        audit_details={"source_version": 1},
+    )
+    assert replay["version"] == 4 and tpl.version == 4
+    assert before_versions.issubset({v.version for v in (await db.execute(
+        sa.select(FormulaTemplateVersion).where(FormulaTemplateVersion.template_id == tpl.id)
+    )).scalars().all()})
+    rows = await svc.template_definitions(db, tpl)
+    assert rows["report"][SLOT].definition["formula"] == MINE
+    assert SLOT2 not in rows["report"]
+    assert any(action == "template_rollback" for action, _ in await _audit(db))
+
+    replay_again = await sync.publish_template(
+        db, tpl, changes=rollback, expected_version=4, user_id=w["owner"].id,
+        request_id="rollback-request-1", publish_source="template_rollback",
+        item_action="template_rollback", audit_action="template_rollback",
+        audit_details={"source_version": 1},
+    )
+    assert replay_again["idempotent"] is True and replay_again["version"] == 4
+
+
+async def test_template_scope_validation_and_narrowing_are_fail_closed(world):
+    w = world
+    db = w["db"]
+    viewer = await Viewer.load(db, w["owner"])
+    with pytest.raises(FormulaSettingError) as exc:
+        await svc.create_template(
+            db, viewer=viewer, name="不相容附注模板", description=None, share_scope="personal",
+            owner_project_id=None, applicable_scope="enterprise", source="manual", domains=["note"],
+            items=[{"domain": "note", "slot_key": "五、1|R1C1", "definition": {"formula": "ROW('x')"}}],
+        )
+    assert exc.value.status_code == 422 and exc.value.code == "FORMULA_DOMAIN_NOT_APPLICABLE"
+
+    tpl = await svc.create_template(
+        db, viewer=viewer, name="共享模板", description=None, share_scope="personal",
+        owner_project_id=None, applicable_scope=STD, source="manual", domains=["report"],
+        items=[{"domain": "report", "slot_key": SLOT, "definition": rdef(MINE)}],
+    )
+    await add_member(db, w["follower"], w["other"], "readonly")
+    await sync.subscribe(db, project_id=w["follower"], tpl=tpl, domain="report", decisions=None,
+                         user_id=w["owner"].id)
+    admin_viewer = await Viewer.load(db, w["admin"])
+    await svc.update_meta(db, tpl, viewer=admin_viewer, changes={"share_scope": "firm"})
+    with pytest.raises(FormulaSettingError) as exc:
+        await svc.update_meta(db, tpl, viewer=admin_viewer, changes={"share_scope": "personal"})
+    assert exc.value.status_code == 409
+    assert exc.value.code == "FORMULA_TEMPLATE_SCOPE_NARROWED"
+    assert exc.value.detail["projects"][0]["project_id"] == str(w["follower"])

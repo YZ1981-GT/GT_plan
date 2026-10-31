@@ -37,7 +37,8 @@
       </el-form-item>
       <el-form-item label="共享范围" prop="share_scope">
         <el-radio-group v-model="form.share_scope">
-          <el-radio v-for="o in shareOptions" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
+          <el-radio v-for="o in shareOptions" :key="o.value" :value="o.value"
+            :disabled="['team', 'group'].includes(o.value) && !canEditProject">{{ o.label }}</el-radio>
         </el-radio-group>
         <div class="gt-fts-hint">{{ shareHint }}</div>
       </el-form-item>
@@ -66,7 +67,9 @@ const props = withDefaults(defineProps<{
   defaultDomain?: string
   /** 默认适用范围（如 `soe_standalone`） */
   defaultScope?: string
-}>(), { projectId: '', defaultDomain: 'report', defaultScope: '' })
+  /** 当前来源 / 所属项目是否有 edit 权限；只读用户不能创建项目组 / 集团模板。 */
+  canEditProject?: boolean
+}>(), { projectId: '', defaultDomain: 'report', defaultScope: '', canEditProject: false })
 
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; saved: [template: TemplateDetail] }>()
 
@@ -96,7 +99,10 @@ const rules: FormRules = {
 
 const shareOptions = computed(() => SHARE_SCOPE_OPTIONS.filter((o) =>
   (o.value !== 'firm' || isAdmin.value) && ((o.value !== 'team' && o.value !== 'group') || !!props.projectId)))
-const shareHint = computed(() => SHARE_SCOPE_OPTIONS.find((o) => o.value === form.share_scope)?.hint || '')
+const shareHint = computed(() => {
+  if (props.projectId && !props.canEditProject) return '当前账号只有只读权限，项目组 / 集团模板需要本项目编辑权限'
+  return SHARE_SCOPE_OPTIONS.find((o) => o.value === form.share_scope)?.hint || ''
+})
 
 watch(() => props.modelValue, async (open) => {
   if (!open) return

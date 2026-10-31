@@ -268,6 +268,15 @@ export interface TemplateVersion {
   published_by: string | null
   published_at: string | null
 }
+export interface TemplateDiffChange extends ChangeRow {
+  kind: 'added' | 'removed' | 'changed'
+}
+export interface TemplateDiff {
+  template_id: string
+  from_version: number
+  to_version: number
+  changes: TemplateDiffChange[]
+}
 export interface TemplateSubscriber {
   project_id: string
   project_name: string

@@ -73,6 +73,14 @@ class PublishBody(BaseModel):
     note: str | None = Field(None, max_length=2000)
 
 
+class RollbackBody(BaseModel):
+    target_version: int = Field(ge=1)
+    expected_version: int | None = None
+    decisions: DecisionsIn = Field(default_factory=DecisionsIn)
+    request_id: str | None = Field(None, max_length=64)
+    note: str | None = Field(None, max_length=2000)
+
+
 class PromoteBody(BaseModel):
     domain: str = Field(min_length=1, max_length=32)
     slot_keys: list[str] | None = Field(None, max_length=5000)
@@ -156,6 +164,7 @@ async def create_template(body: CreateBody, db: AsyncSession = Depends(get_db),
         owner_project_id=body.owner_project_id, applicable_scope=body.applicable_scope, source=body.source,
         domains=body.domains or sorted({i.domain for i in body.items}), source_project_id=body.source_project_id,
         slot_keys=body.slot_keys, items=[i.model_dump() for i in body.items], note=body.note))
+    await db.commit()
     return await _call(svc.template_detail(db, tpl, viewer=viewer))
 
 
@@ -172,6 +181,16 @@ async def get_versions(template_id: uuid.UUID, db: AsyncSession = Depends(get_db
                        current_user: User = Depends(get_current_user)):
     tpl = await _call(get_visible(db, await _viewer(db, current_user), template_id))
     return {"items": await svc.template_versions(db, tpl)}
+
+
+@router.get("/{template_id}/diff")
+async def get_diff(template_id: uuid.UUID, from_version: int = Query(..., alias="from", ge=1),
+                   to_version: int | None = Query(None, alias="to", ge=1),
+                   db: AsyncSession = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    viewer = await _viewer(db, current_user)
+    tpl = await _call(get_visible(db, viewer, template_id))
+    return await _call(svc.template_diff(db, tpl, from_version=from_version, to_version=to_version))
 
 
 @router.get("/{template_id}/subscribers")
@@ -192,6 +211,7 @@ async def update_template(template_id: uuid.UUID, body: UpdateBody, db: AsyncSes
             "share_scope" in changes or "owner_project_id" in changes):
         await assert_project_permission(db, current_user, owner, "edit")
     await _run(db, svc.update_meta(db, tpl, viewer=viewer, changes=changes))
+    await db.commit()
     return await _call(svc.template_detail(db, tpl, viewer=viewer))
 
 
@@ -212,6 +232,7 @@ async def delete_template(template_id: uuid.UUID,
             "message": "模板已被他人修改，请刷新后重试",
             "expected": expected_version, "actual": tpl.version})
     await _run(db, svc.delete_template(db, tpl, user_id=current_user.id))
+    await db.commit()
     return {"id": str(template_id), "deleted": True}
 
 
@@ -221,6 +242,36 @@ async def publish_preview(template_id: uuid.UUID, body: PublishBody, db: AsyncSe
     tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
     return await _call(sync.publish_preview(db, tpl, changes=[c.model_dump() for c in body.changes],
                                             expected_version=body.expected_version))
+
+
+@router.post("/{template_id}/rollback-preview")
+async def rollback_preview(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
+    tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
+    if not changes:
+        raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",
+                                       code="FORMULA_TEMPLATE_ROLLBACK_EMPTY", status_code=422))
+    preview = await _call(sync.publish_preview(db, tpl, changes=changes, expected_version=body.expected_version))
+    return {**preview, "target_version": body.target_version, "rollback_changes": diff["changes"]}
+
+
+@router.post("/{template_id}/rollback")
+async def rollback(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    _diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
+    if not changes and not body.request_id:
+        raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",
+                                       code="FORMULA_TEMPLATE_ROLLBACK_EMPTY", status_code=422))
+    result = await _run(db, sync.publish_template(
+        db, tpl, changes=changes, expected_version=body.expected_version, user_id=current_user.id,
+        decisions=body.decisions.to_decisions(), request_id=body.request_id, note=body.note,
+        publish_source="template_rollback", item_action="template_rollback",
+        audit_action="template_rollback",
+        audit_details={"source_version": body.target_version},
+    ))
+    return await _emit(db, result, "template_rollback")
 
 
 @router.post("/{template_id}/publish")
@@ -254,6 +305,7 @@ async def promote(template_id: uuid.UUID, body: PromoteBody, db: AsyncSession = 
                                         note=body.note))
     await record_changes(db, events=result.get("events") or [], domain=body.domain, source="template_promote",
                          publish_id=result.get("publish_id"))
+    await db.commit()
     return _public_result(result)
 
 

@@ -72,6 +72,10 @@ export interface OpenFormulaManagerPayload {
   capabilitySnapshot?: WorkpaperCapabilitySnapshot
   formulaSession?: FormulaManagerSession
   readOnly?: boolean
+  /** 模板详情深链：打开项目公式管理器并自动进入指定模板订阅弹窗。 */
+  templateId?: string
+  templateAction?: 'subscribe'
+  templateDomain?: string
 }
 
 /**
