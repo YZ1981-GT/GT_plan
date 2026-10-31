@@ -23,6 +23,7 @@ import { parseNum, calcAnomalyRate } from './useD3FormulaEngine'
 import { partyNameForColumn } from './shared/samplingPartyTarget'
 import type { ChecklistResponse } from './useD3FormData'
 import { metaOf, useVoucherCheckFill, withRowMeta, type PreparedItem } from './shared/voucherCheckFill'
+import { appendRowEvidence, refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,12 @@ const ITEM_ID_PARAMS = 'D3-vc-params'
 const ITEM_ID_CURRENT_ROWS = 'D3-vc-current-rows'
 const ITEM_ID_POST_ROWS = 'D3-vc-post-rows'
 const ITEM_ID_CONCLUSION = 'D3-vc-conclusion'
+
+/** D3-7 行级证据位置：表页 D3-7 · `row:{区段}-{行 id}`（表格与核对弹窗的小眼睛、行内识别共用同一位置） */
+export const D3_7_EVIDENCE_SHEET = 'D3-7'
+export function d3VoucherEvidenceCell(section: 'current' | 'postPeriod', rowId: string): string {
+  return rowEvidenceCell(`${section}-${rowId}`)
+}
 
 /**
  * D3-7 检查表 5 项核对内容标签（对齐源模板「测试内容说明」R13）。
@@ -738,11 +745,14 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      // 附件挂到本行（抽样凭证行同时挂到该凭证），表格与核对弹窗的小眼睛按同一位置读取
+      appendRowEvidence(formData, D3_7_EVIDENCE_SHEET, d3VoucherEvidenceCell(section, rowId), rows[idx])
       const res = await http.post(
         `/api/workpapers/${options.wpId.value}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(options.projectId.value, options.wpId.value)
       const data = res.data?.data ?? res.data
       const fields: Record<string, any> = data?.extracted_fields || {}
       const confidence: number = data?.confidence ?? 0

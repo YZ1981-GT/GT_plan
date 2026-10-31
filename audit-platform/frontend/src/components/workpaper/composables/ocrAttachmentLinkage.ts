@@ -19,6 +19,8 @@ export type OcrLinkageOpts = {
   /** 只在未带附件编号时生效：新建附件挂到这个表页 / 单元格（行级证据链接） */
   evidenceSheet?: string | null
   evidenceCell?: string | null
+  /** 只在未带附件编号时生效：凭证检查行的凭证键（按凭证身份挂，spec attachment-voucher-evidence-binding） */
+  voucherKey?: string | null
 }
 
 /** 从上传/创建响应中提取附件 id（兼容多层信封）。 */
@@ -39,6 +41,7 @@ export function appendOcrLinkageFields(form: FormData, opts: OcrLinkageOpts = {}
   if (opts.evidenceType) form.append('evidence_type', opts.evidenceType)
   if (!id && opts.evidenceSheet) form.append('evidence_sheet', opts.evidenceSheet)
   if (!id && opts.evidenceCell) form.append('evidence_cell', opts.evidenceCell)
+  if (!id && opts.voucherKey) form.append('evidence_voucher_key', opts.voucherKey)
   return form
 }
 
@@ -57,6 +60,7 @@ export async function buildLinkedOcrFormData(
     evidenceType?: string | null
     evidenceSheet?: string | null
     evidenceCell?: string | null
+    voucherKey?: string | null
     extraFields?: Record<string, string>
   } = {},
 ): Promise<{ form: FormData; attachmentId: string | null }> {
@@ -74,6 +78,7 @@ export async function buildLinkedOcrFormData(
     evidenceType: opts.evidenceType,
     evidenceSheet: opts.evidenceSheet,
     evidenceCell: opts.evidenceCell,
+    voucherKey: opts.voucherKey,
   })
   return { form, attachmentId }
 }

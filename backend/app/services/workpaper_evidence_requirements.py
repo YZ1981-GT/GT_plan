@@ -87,12 +87,18 @@ def resolve_requirements_for_wp_code(wp_code: str | None) -> list[dict[str, str]
 
 
 def item_satisfies_type(item: dict[str, Any], req_type: str) -> bool:
-    """附件行是否满足某证据类型（attachment_type / association_type / confirmation 来源）。"""
+    """附件行是否满足某证据类型（attachment_type / association_type / 本底稿行级链接的证据类型 / confirmation 来源）。
+
+    行级链接的类型也算（spec attachment-voucher-evidence-binding 需求 5.1）：从别的底稿引用来的附件，附件本身的
+    类型是源底稿上传时选的，在本底稿按链接上的类型（如「凭证 / 原始单据」）作证据。
+    """
     if not req_type:
         return False
     if item.get("attachment_type") == req_type:
         return True
     if item.get("association_type") == req_type:
+        return True
+    if any(isinstance(p, dict) and p.get("evidence_type") == req_type for p in item.get("evidence_positions") or []):
         return True
     sources = item.get("sources") or []
     if req_type == "confirmation" and "confirmation" in sources:

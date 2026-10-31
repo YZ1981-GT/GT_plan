@@ -10,6 +10,8 @@ ledger_penetration.py，整体迁到这里（那个文件已到行数上限）�
   逐条回 created / existed / failed + 原因（任务 14）
 - ``POST   /api/projects/{project_id}/ledger/voucher-links/query``：凭证键 → 已挂 / 已抽于哪些底稿（任务 14；
   键里有主体名称，500 个键放进查询串会超过请求行长度上限，所以用请求体）
+- ``POST   /api/projects/{project_id}/ledger/voucher-evidence/query``：凭证键 → 各可见底稿已取得的凭证证据
+  （spec attachment-voucher-evidence-binding 需求 2.1、7）
 
 挂凭的凭证按当前账套定位成一张凭证（凭证键 = 年度 + 主体 + 日期 + 凭证字 + 号）：只给号（或日期 + 号）
 却命中多张时 409 VOUCHER_KEY_AMBIGUOUS + 候选，找不到 404。手工侧去重键 = 凭证键 + 目标底稿，与 V210 的
@@ -488,3 +490,20 @@ async def query_voucher_links(
         for key, entries in grouped.items()
     }
     return {"links": links}
+
+
+@router.post("/voucher-evidence/query")
+async def query_voucher_evidence(
+    project_id: UUID,
+    body: _LinkQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """凭证键 → 本项目各底稿已取得的这张凭证的证据（附件），只列当前用户可见的底稿；单次最多 500 个键。
+
+    spec attachment-voucher-evidence-binding 需求 2.1 / 7：凭证检查行的「他稿已有」提示与序时账凭证层共用。
+    项目级端点（ADR-AVE-07）：挂在底稿路由下的 POST 会被底稿统一门当成写，复核人看不到提示。
+    """
+    from app.services.voucher_evidence import voucher_evidence_by_keys
+
+    return {"evidence": await voucher_evidence_by_keys(db, current_user, project_id, body.year, body.keys)}

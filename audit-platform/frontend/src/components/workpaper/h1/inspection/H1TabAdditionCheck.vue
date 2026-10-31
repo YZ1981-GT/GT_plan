@@ -1167,7 +1167,7 @@ async function handleOcr(row: AdditionRow) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,

@@ -214,13 +214,14 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="附件" width="72" align="center">
+      <el-table-column label="附件" width="96" align="center">
         <template #default="{ row }">
           <el-upload
             :show-file-list="false"
             :accept="OCR_ACCEPT"
             :disabled="isReadonly || isVoucherRowLocked(row)"
             :before-upload="makeRowOcrHandler('current', row.rowId)"
+            style="display:inline-block"
           >
             <el-tooltip :content="row.attachment ? `已关联：${row.attachment}（点击可重新上传识别）` : '上传图片/PDF 并 OCR 识别'" placement="top">
               <el-button
@@ -232,6 +233,7 @@
               >📎{{ row.attachment ? '✓' : '' }}</el-button>
             </el-tooltip>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="D3_7_EVIDENCE_SHEET" :cell-ref="d3VoucherEvidenceCell('current', row.rowId)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="90" v-if="!isReadonly">
@@ -357,13 +359,14 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="附件" width="72" align="center">
+      <el-table-column label="附件" width="96" align="center">
         <template #default="{ row }">
           <el-upload
             :show-file-list="false"
             :accept="OCR_ACCEPT"
             :disabled="isReadonly || isVoucherRowLocked(row)"
             :before-upload="makeRowOcrHandler('postPeriod', row.rowId)"
+            style="display:inline-block"
           >
             <el-tooltip :content="row.attachment ? `已关联：${row.attachment}（点击可重新上传识别）` : '上传图片/PDF 并 OCR 识别'" placement="top">
               <el-button
@@ -375,6 +378,7 @@
               >📎{{ row.attachment ? '✓' : '' }}</el-button>
             </el-tooltip>
           </el-upload>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="D3_7_EVIDENCE_SHEET" :cell-ref="d3VoucherEvidenceCell('postPeriod', row.rowId)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="90" v-if="!isReadonly">
@@ -579,7 +583,11 @@
  */
 import { computed, ref, toRef, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY, type VoucherCheckRow } from '../composables/useD3VoucherCheck'
+import {
+  useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY, D3_7_EVIDENCE_SHEET, d3VoucherEvidenceCell,
+  type VoucherCheckRow,
+} from '../composables/useD3VoucherCheck'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'

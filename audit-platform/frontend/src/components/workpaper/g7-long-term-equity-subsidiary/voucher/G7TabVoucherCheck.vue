@@ -761,7 +761,7 @@ async function handleOCR(row: Record<string, any>): Promise<void> {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id))
+      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd)
       rowEv.refresh()
       const data = res?.data?.data ?? res?.data ?? {}

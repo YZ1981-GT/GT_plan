@@ -1012,7 +1012,7 @@ async function handleRowOcr(row: VoucherCheckRow, file: File): Promise<boolean> 
   try {
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,

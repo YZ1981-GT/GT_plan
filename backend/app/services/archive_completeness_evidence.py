@@ -3,7 +3,7 @@
 | 类别 | 判据 | 阻断 |
 |---|---|---|
 | missing_files | 归档清单的缺件（与打包同一实现 ``archive_inventory``） | 是 |
-| evidence_gaps | 有证据声明的底稿未满足的类型（``evaluate_wp_evidence_requirements``，与附件抽屉 / QC-17 同一判定） | 否 |
+| evidence_gaps | 有证据声明的底稿未满足的类型（``evaluate_wp_evidence_requirements``，与附件抽屉 / QC-17 同一判定）；「凭证」类声明的缺证据抽凭样本 | 否 |
 | unreplied_confirmations | 函证逐笔拆分 missing > 0（同一工作簿只报一次） | 否 |
 | unconfirmed_ocr | 附件有识别结果但未人工确认 | 否 |
 | orphan_files | 附件存储目录下本项目没有任何附件行 / 版本行引用的文件 | 否 |
@@ -46,8 +46,16 @@ async def check_missing_files(db: AsyncSession, project_id: UUID) -> list:
     ]
 
 
+def _samples_status(samples: dict) -> str:
+    """抽凭样本缺证据（spec attachment-voucher-evidence-binding 需求 6.2，非阻断）。"""
+    labels = [str(m.get("label") or "") for m in (samples.get("missing_items") or [])[:3]]
+    more = "等" if samples["missing"] > 3 else ""
+    return (f"{samples['missing']} 笔抽凭样本未取得凭证证据（共 {samples.get('total', 0)} 笔）："
+            f"{'、'.join(x for x in labels if x)}{more}")
+
+
 async def check_evidence(db: AsyncSession, project_id: UUID) -> tuple[list, list]:
-    """（证据缺口, 未回函）。"""
+    """（证据缺口, 未回函）。证据缺口另含「凭证」类声明的缺证据样本（只要有缺就列，与声明是否满足无关）。"""
     from app.models.workpaper_models import WorkingPaper, WpIndex
     from app.services.attachment_wp_view import evaluate_wp_evidence_requirements
     from app.services.workpaper_evidence_requirements import resolve_requirements_for_wp_code
@@ -69,6 +77,9 @@ async def check_evidence(db: AsyncSession, project_id: UUID) -> tuple[list, list
             who = str(assignee) if assignee else None
             labels = []
             for req in reqs:
+                samples = req.get("samples")
+                if isinstance(samples, dict) and samples.get("missing"):
+                    gaps.append(_item(code, name or "", _samples_status(samples), who))
                 if req.get("satisfied"):
                     continue
                 breakdown = req.get("breakdown")

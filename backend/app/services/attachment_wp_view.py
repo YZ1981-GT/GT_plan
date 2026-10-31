@@ -132,6 +132,29 @@ async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, r
         req["satisfied"] = breakdown["missing"] == 0
 
 
+async def _apply_voucher_samples(db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None) -> None:
+    """「凭证」类声明附逐笔样本统计 ``samples``（spec attachment-voucher-evidence-binding 需求 5.2，ADR-AVE-06）。
+
+    只展示：声明是否满足的口径不变。用新键 ``samples`` 而不是函证的 ``breakdown``（归档完整性与抽屉按
+    ``breakdown`` 当函证处理）。本底稿没有登记样本 ⇒ 不附加；查询在保存点里，失败不污染本次读取（fail-open）。
+    """
+    targets = [r for r in requirements or [] if r.get("type") == "voucher"]
+    if not targets or not wp_meta or not wp_meta.get("project_id"):
+        return
+    try:
+        from app.services.voucher_evidence import voucher_sample_breakdown
+
+        async with db.begin_nested():
+            samples = await voucher_sample_breakdown(db, wp_meta["project_id"], wp_id)
+    except Exception:
+        _fail_open("awp_voucher_samples_fail_open", wp_id=wp_id)
+        return
+    if samples is None:
+        return
+    for req in targets:
+        req["samples"] = samples
+
+
 async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
     """四个来源合并去重后的附件项（不含证据声明与失效信息）。"""
     db = svc.db
@@ -189,6 +212,7 @@ async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
             "cell_ref": link.cell_ref,
             "page_ref": link.page_ref,
             "evidence_type": link.evidence_type,
+            "voucher_key": link.voucher_key,
         })
 
     items = list(by_id.values())
@@ -218,6 +242,7 @@ async def evaluate_wp_evidence_requirements(db, wp_id: UUID) -> list[dict] | Non
     if requirements is None:
         return None
     await _apply_confirmation_breakdown(db, wp_id, wp_meta, requirements)
+    await _apply_voucher_samples(db, wp_id, wp_meta, requirements)
     return requirements
 
 
@@ -241,6 +266,7 @@ async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dic
         _fail_open("awp_evidence_requirements_fail_open", wp_id=wp_id)
     else:
         await _apply_confirmation_breakdown(db, wp_id, wp_meta, result.get("evidence_requirements"))
+        await _apply_voucher_samples(db, wp_id, wp_meta, result.get("evidence_requirements"))
 
     # stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
     try:

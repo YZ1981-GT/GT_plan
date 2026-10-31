@@ -543,9 +543,11 @@
           <template #default="{ row }">{{ fmtAmt(row.diffAmount) }}</template>
         </el-table-column>
         <el-table-column prop="diffReason" label="原因" min-width="120" />
-        <el-table-column label="证据" width="100">
+        <!-- 证据：H1-10 对应行的行内附件（小眼睛预览）；「照片」列是手填文字，按文字显示、不当链接打开 -->
+        <el-table-column label="证据" min-width="160">
           <template #default="{ row }">
-            <a v-if="row.photoUrl" :href="row.photoUrl" target="_blank" rel="noopener">照片</a>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="H1_STOCKTAKE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
+            <span v-if="row.photoUrl" class="diff-photo-note" :title="row.photoUrl">{{ row.photoUrl }}</span>
             <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'H1-10')">回检查表</el-button>
           </template>
         </el-table-column>
@@ -902,6 +904,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { H1_STOCKTAKE_EVIDENCE_SHEET } from '../../composables/useH1StocktakeOcr'
 import { useH1Stocktake } from '../../composables/useH1Stocktake'
 import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import {
@@ -1431,6 +1436,10 @@ async function confirmOcrWriteback() {
 .cat-head h4 { margin: 0; font-size: 13px; }
 .field-with-ocr { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .inline-attach { display: inline-flex; margin-left: 8px; vertical-align: middle; }
+.diff-photo-note {
+  display: inline-block; max-width: 80px; margin: 0 6px; vertical-align: middle;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--el-text-color-secondary);
+}
 .sign-area { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--el-border-color-lighter); }
 .sign-row { display: flex; align-items: center; gap: 8px; }
 .error-amount { color: var(--el-color-danger); }

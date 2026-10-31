@@ -437,7 +437,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
   try {
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowKey))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowKey), rows.value.find((r: K8AmortRow) => r.rowKey === rowKey))
     ElMessage.info('正在OCR识别...')
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

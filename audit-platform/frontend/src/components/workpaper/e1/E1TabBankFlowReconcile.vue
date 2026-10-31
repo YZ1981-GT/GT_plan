@@ -34,6 +34,8 @@ import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 import WpCommitInput from '../shared/WpCommitInput.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -105,6 +107,7 @@ onMounted(() => { void voucherFillReady() })
 
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 const sheetCode = computed(() => 'E1-31')
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
   wpId: toRef(props, 'wpId') as unknown as Ref<string>,
   sheet: sheetCode as unknown as Ref<string>,
@@ -358,9 +361,11 @@ async function runOcr(file: File): Promise<boolean> {
   try {
     const form = new FormData()
     form.append('file', file)
+    rowEv.append(form, sheetCode.value) // 对账单挂到本表页（表页级），「流水 OCR」旁的小眼睛按同一位置读取
     const { data } = await http.post(`/api/workpapers/${props.wpId}/e1/statement-ocr`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    rowEv.refresh()
     const fields = data?.extracted_fields || {}
     if (!Array.isArray(fields.lines) || !fields.lines.length) {
       ElMessage.warning('OCR 完成，未识别到流水明细')
@@ -485,6 +490,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
             <el-icon><Paperclip /></el-icon> 流水 OCR
           </el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="sheetCode" />
         <el-tag v-if="lastOcrHint" size="small" type="info" effect="plain">{{ lastOcrHint }}</el-tag>
         <el-button size="small" :disabled="isReadonly || !isApplicable" @click="onRecalcMonthly">回填月度</el-button>
         <el-button size="small" type="primary" :disabled="isReadonly || !isApplicable" @click="openSampling">抽凭→日记账</el-button>

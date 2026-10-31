@@ -8,7 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { InspectionCheckRow } from './useF2InspectionCheckFormulas'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
-import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { refreshRowEvidence, rowEvidenceCell, rowVoucherKey } from '@/components/attachment/rowEvidence'
 
 export interface F2PurchaseOcrFields {
   purchaseOrderNo?: string
@@ -29,6 +29,8 @@ export function useF2PurchaseOcr(wpId: Ref<string>, projectId?: Ref<string>) {
     rowId: string,
     file: File,
     updateRow: (id: string, patch: Partial<InspectionCheckRow>) => void,
+    /** 凭证检查行：带了就按凭证身份挂（spec attachment-voucher-evidence-binding） */
+    row?: unknown,
   ): Promise<void> {
     ocrLoadingId.value = rowId
     try {
@@ -37,6 +39,7 @@ export function useF2PurchaseOcr(wpId: Ref<string>, projectId?: Ref<string>) {
         wpId: wpId.value,
         evidenceSheet: F2_PURCHASE_EVIDENCE_SHEET,
         evidenceCell: rowEvidenceCell(rowId),
+        voucherKey: rowVoucherKey(row),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2/contract-ocr`,

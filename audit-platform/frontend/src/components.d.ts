@@ -2348,6 +2348,7 @@ declare module 'vue' {
     VersionLineTimeline: typeof import('./components/version/VersionLineTimeline.vue')['default']
     ViewSwitcher: typeof import('./components/workpaper/ViewSwitcher.vue')['default']
     VirtualScrollTable: typeof import('./components/common/VirtualScrollTable.vue')['default']
+    VoucherEvidenceTag: typeof import('./components/workpaper/voucher-sampling/VoucherEvidenceTag.vue')['default']
     VoucherPairingCell: typeof import('./components/workpaper/voucher-sampling/VoucherPairingCell.vue')['default']
     VoucherRowMetaCell: typeof import('./components/workpaper/voucher-sampling/VoucherRowMetaCell.vue')['default']
     VoucherRowMetaTag: typeof import('./components/workpaper/voucher-sampling/VoucherRowMetaTag.vue')['default']

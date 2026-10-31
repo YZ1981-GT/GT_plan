@@ -185,7 +185,7 @@
             :project-id="projectId"
             :wp-id="wpId"
             :sheet-key="`F1-7-${section}`"
-            :item-index="attSlot"
+            :item-index="attSlot" :voucher-key="rowVoucherKey(row)"
             accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
           />
         </el-card>
@@ -266,7 +266,7 @@ import {
 } from '../composables/useF1ComprehensiveCheck'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import ItemAttachment from '../ItemAttachment.vue'
-import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
+import { appendRowEvidence, refreshRowEvidence, rowVoucherKey } from '@/components/attachment/rowEvidence'
 import { f1VoucherAttSlot, f1VoucherEvidence } from './f1VoucherEvidence'
 
 type F1OcrDocumentType = 'voucher' | 'approval' | 'bank-receipt' | 'goods-receipt' | 'invoice'
@@ -326,7 +326,7 @@ async function runOcr(file: File | undefined, documentType: F1OcrDocumentType): 
     formData.append('document_type', documentType)
     // 识别的单据挂到「⑤ 本笔附件」同一位置（原先只挂整稿，⑤ 与表格行里都看不到）
     const ev = f1VoucherEvidence(props.section, form.value.rowId)
-    appendRowEvidence(formData, ev.sheet, ev.cell)
+    appendRowEvidence(formData, ev.sheet, ev.cell, props.row)
     const res = await http.post(`/api/workpapers/${props.wpId}/f4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,

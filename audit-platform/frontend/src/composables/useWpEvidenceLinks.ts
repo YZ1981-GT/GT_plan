@@ -30,9 +30,18 @@ export interface WpEvidenceLink {
   page_ref: string | null
   evidence_type: string | null
   check_conclusion: string | null
+  /** 凭证键规范串（凭证检查行的原件按凭证身份挂，spec attachment-voucher-evidence-binding）；旧链接为 null */
+  voucher_key?: string | null
   created_by: string
   created_at: string | null
   attachment: EvidenceAttachmentBrief
+}
+
+/** 一张凭证在本底稿的一份证据（同一附件的全部链接） */
+export interface VoucherEvidenceGroup {
+  attachmentId: string
+  attachment: EvidenceAttachmentBrief
+  links: WpEvidenceLink[]
 }
 
 interface Slot {
@@ -164,11 +173,28 @@ export function useWpEvidenceLinks(projectId: MaybeRefOrGetter<string>, wpId: Ma
     return links.value.filter((row) => (row.sheet_name ?? null) === sheet && (row.cell_ref ?? null) === cell)
   }
 
+  /**
+   * 本底稿上某张凭证的证据，按附件归组（任何位置：本行识别、同一凭证另一行、凭证级上传与引用都算）。
+   * 同一附件可能挂在多个位置（每组的 `links`），移除时整组删。
+   */
+  function voucherEvidenceOf(voucherKey: string | null | undefined): VoucherEvidenceGroup[] {
+    if (!voucherKey) return []
+    const groups = new Map<string, VoucherEvidenceGroup>()
+    for (const row of links.value) {
+      if (row.voucher_key !== voucherKey) continue
+      const group = groups.get(row.attachment_id)
+      if (group) group.links.push(row)
+      else groups.set(row.attachment_id, { attachmentId: row.attachment_id, attachment: row.attachment, links: [row] })
+    }
+    return [...groups.values()]
+  }
+
   return {
     links,
     loading,
     error,
     linksAt,
+    voucherEvidenceOf,
     reload: () => invalidateWpEvidenceLinks(toValue(projectId), toValue(wpId)),
   }
 }

@@ -299,7 +299,7 @@
           </el-table-column>
           <el-table-column v-if="wpId" label="📎" width="72" align="center">
             <template #default="{ row }">
-              <el-upload v-if="!isReadonly" style="display:inline-block" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="ocrLoadingId === row.id" @change="(f: any) => handleOcrUpload(row.id, f?.raw)">
+              <el-upload v-if="!isReadonly" style="display:inline-block" :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg" :disabled="ocrLoadingId === row.id" @change="(f: any) => handleOcrUpload(row.id, f?.raw, row)">
                 <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
               </el-upload>
               <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="F2_PURCHASE_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
@@ -616,9 +616,9 @@ async function handleSamplingFilled(
   if (!ic.meta.value.samplingMethod) ic.updateMeta({ samplingMethod: samplingInfo.value.method })
 }
 
-function handleOcrUpload(rowId: string, file?: File) {
+function handleOcrUpload(rowId: string, file?: File, row?: unknown) {
   if (!file || !props.wpId) return
-  void uploadAndMerge(rowId, file, (id, patch) => ic.updateRow(id, patch as any))
+  void uploadAndMerge(rowId, file, (id, patch) => ic.updateRow(id, patch as any), row)
 }
 
 function rowClass({ row }: { row: { isAbnormal?: boolean } }) {

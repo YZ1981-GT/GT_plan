@@ -952,7 +952,7 @@ async function uploadOcr(row: G9VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
       let res
       try {
         res = await http.post(`/api/workpapers/${props.wpId}/g9/contract-ocr`, formData)

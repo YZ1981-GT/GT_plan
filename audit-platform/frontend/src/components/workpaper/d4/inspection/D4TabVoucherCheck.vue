@@ -38,6 +38,8 @@ import {
 import { dSlotQueryCodes, pickDTbSourceCodes } from '../../composables/dCycleAccountScope'
 import type { EngineFilledPayload } from '../../composables/shared/voucherCheckFill'
 import VoucherRowMetaCell from '../../voucher-sampling/VoucherRowMetaCell.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 // 抽凭引擎（懒加载，避免首屏体积）
 const GtVoucherSamplingEngine = defineAsyncComponent(
@@ -53,6 +55,10 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+/** 识别附件挂到本事项（行级证据；抽样凭证事项同时挂到该凭证），事项头的小眼睛按同一位置读取（只读也能看） */
+const EVIDENCE_SHEET = 'D4-14'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 // 审计年度由 D4 主入口 provide；缺失时保持空态，不猜日历年。
 const auditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
@@ -310,11 +316,13 @@ async function onSampleFilled(payload: EngineFilledPayload) {
 async function handleOcrUpload(itemId: string, payload: { file: File; dimensionKey: string }) {
   const formData = new FormData()
   formData.append('file', payload.file)
+  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(itemId), transactions.value.find(t => t.id === itemId))
   try {
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`, formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const data = res.data?.data ?? res.data
     const fields = data.extracted_fields || {}
     const mapped = mapOcrToDimension(fields, payload.dimensionKey)
@@ -634,6 +642,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
             <!-- 阶段 / 来源 / 配对（共享回填函数写的行元数据）；年审阶段的预审事项只读 -->
             <div class="d4-row-meta">
               <VoucherRowMetaCell :row="item" :locked="isVoucherRowLocked(item)" :project-id="projectId" :year="samplingYear" />
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(item.id)" />
             </div>
             <D4WalkthroughCard
               :item="item"
@@ -895,7 +904,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 /* ─── 空状态 ─── */
 .empty-hint { padding: 20px 0; }
-.d4-row-meta { margin-bottom: 8px; }
+.d4-row-meta { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 
 /* ─── 审计意见区 ─── */
 .audit-opinion-card { margin-bottom: 24px; border-radius: 8px; }

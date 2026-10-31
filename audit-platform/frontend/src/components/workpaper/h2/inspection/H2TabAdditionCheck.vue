@@ -274,7 +274,7 @@
 
         <el-table-column label="📎" width="50" align="center">
           <template #default="{ row }">
-            <el-button size="small" link @click="handleOcr(row.rowId)" :disabled="isReadonly">📎</el-button>
+            <el-button size="small" link @click="handleOcr(row.rowId, row)" :disabled="isReadonly">📎</el-button>
             <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
@@ -524,7 +524,7 @@ async function onSampleFilled(payload: EngineFilledPayload & { methodology?: Sam
 }
 
 /** 行级 OCR：📎上传→POST contract-ocr→ElMessageBox确认→merge字段 */
-function handleOcr(rowId: string) {
+function handleOcr(rowId: string, row?: unknown) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*,.pdf'
@@ -533,7 +533,7 @@ function handleOcr(rowId: string) {
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
     try {
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,

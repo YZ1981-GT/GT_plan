@@ -88,11 +88,18 @@ def default_evidence_type(
 
 def resolve_evidence_type(
     requested: str | None, wp_code: str | None, *,
-    native_type: str | None = None, native_prefix: str | None = None,
+    native_type: str | None = None, native_prefix: str | None = None, voucher_keyed: bool = False,
 ) -> str:
-    return validate_evidence_type(requested) or default_evidence_type(
-        wp_code, native_type=native_type, native_prefix=native_prefix,
-    )
+    """显式类型优先；带凭证键 ⇒ 凭证 / 原始单据（不按底稿声明取：F1 声明函证，凭证附件曾被记成函证，
+    spec attachment-voucher-evidence-binding ADR-AVE-05）；否则按缺省规则。"""
+    explicit = validate_evidence_type(requested)
+    if explicit:
+        return explicit
+    if voucher_keyed:
+        from app.services.voucher_evidence import VOUCHER_EVIDENCE_TYPE
+
+        return VOUCHER_EVIDENCE_TYPE
+    return default_evidence_type(wp_code, native_type=native_type, native_prefix=native_prefix)
 
 
 # ─── 位置、体量、底稿 ────────────────────────────────────────────────────────
@@ -100,18 +107,25 @@ def resolve_evidence_type(
 
 @dataclass(frozen=True)
 class EvidencePosition:
-    """行级位置：``sheet_name`` = 表页键；``cell_ref`` = A1 单元格 / ``item:{序号}`` / ``row:{行 id}``。"""
+    """行级位置：``sheet_name`` = 表页键；``cell_ref`` = A1 单元格 / ``item:{序号}`` / ``row:{行 id}``；
+    ``voucher_key`` = 凭证键规范串（凭证检查行的原件按凭证身份挂，可只有它，spec attachment-voucher-evidence-binding）。"""
 
     sheet_name: str | None = None
     cell_ref: str | None = None
     page_ref: str | None = None
+    voucher_key: str | None = None
 
     @property
     def is_row_level(self) -> bool:
-        return bool(self.sheet_name or self.cell_ref)
+        return bool(self.sheet_name or self.cell_ref or self.voucher_key)
 
 
-def build_position(sheet_name: str | None, cell_ref: str | None, page_ref: str | None = None) -> EvidencePosition:
+def build_position(
+    sheet_name: str | None, cell_ref: str | None, page_ref: str | None = None, voucher_key: str | None = None,
+) -> EvidencePosition:
+    """位置字段去空白、超长 400；凭证键格式错 400（规范化后存）。"""
+    from app.services.voucher_evidence import normalize_voucher_key
+
     values = {"sheet_name": sheet_name, "cell_ref": cell_ref, "page_ref": page_ref}
     cleaned: dict[str, str | None] = {}
     for key, raw in values.items():
@@ -119,7 +133,7 @@ def build_position(sheet_name: str | None, cell_ref: str | None, page_ref: str |
         if text is not None and len(text) > _POSITION_LIMITS[key]:
             raise HTTPException(status_code=400, detail=f"位置字段过长：{key}")
         cleaned[key] = text
-    return EvidencePosition(**cleaned)
+    return EvidencePosition(**cleaned, voucher_key=normalize_voucher_key(voucher_key))
 
 
 def max_upload_bytes() -> int:
@@ -199,7 +213,7 @@ async def create_evidence(
         link = await WpEvidenceService(db).create_link(
             wp_id=wp.id, attachment_id=att_id, created_by=user.id,
             sheet_name=position.sheet_name, cell_ref=position.cell_ref, page_ref=position.page_ref,
-            evidence_type=evidence_type,
+            evidence_type=evidence_type, voucher_key=position.voucher_key,
         )
     else:
         await svc.ensure_wp_link(att_id, wp.id, association_type=evidence_type, created_by=user.id)
@@ -211,11 +225,13 @@ async def create_evidence(
 
 @dataclass
 class OcrIntakeOptions:
-    """OCR 端点的可选表单字段（需求 2.1、2.4）+ 本次请求产生的识别临时副本（请求结束时删除）。"""
+    """OCR 端点的可选表单字段（需求 2.1、2.4；凭证键见 spec attachment-voucher-evidence-binding 需求 4.1）
+    + 本次请求产生的识别临时副本（请求结束时删除）。"""
 
     evidence_type: str | None = None
     evidence_sheet: str | None = None
     evidence_cell: str | None = None
+    evidence_voucher_key: str | None = None
     temp_paths: list[Path] = field(default_factory=list)
 
     def cleanup(self) -> None:
@@ -228,9 +244,13 @@ async def ocr_intake_options(
     evidence_type: str | None = Form(None),
     evidence_sheet: str | None = Form(None),
     evidence_cell: str | None = Form(None),
+    evidence_voucher_key: str | None = Form(None),
 ) -> AsyncIterator[OcrIntakeOptions]:
-    """OCR 路由的依赖：收三个可选表单字段；带 yield，异常返回时也删临时副本。"""
-    options = OcrIntakeOptions(evidence_type, evidence_sheet, evidence_cell)
+    """OCR 路由的依赖：收四个可选表单字段；带 yield，异常返回时也删临时副本。"""
+    options = OcrIntakeOptions(
+        evidence_type=evidence_type, evidence_sheet=evidence_sheet, evidence_cell=evidence_cell,
+        evidence_voucher_key=evidence_voucher_key,
+    )
     try:
         yield options
     finally:
@@ -302,13 +322,17 @@ async def intake_ocr_upload(
             return OcrSource(attachment_id=linked, path=local)
         return _with_temp(options, svc, linked, att.file_name or file_name, await read_upload_limited(file))
 
+    position = build_position(
+        options.evidence_sheet, options.evidence_cell, voucher_key=options.evidence_voucher_key,
+    )
     content = await read_upload_limited(file)
     etype = resolve_evidence_type(
         options.evidence_type, wp.wp_code, native_type=native_type, native_prefix=native_prefix,
+        voucher_keyed=position.voucher_key is not None,
     )
     created = await create_evidence(
         db, wp=wp, file_name=file_name, content=content, evidence_type=etype, user=user,
-        position=build_position(options.evidence_sheet, options.evidence_cell), ocr_status="processing",
+        position=position, ocr_status="processing",
     )
     await db.commit()
     att_id = UUID(created["attachment"]["id"])

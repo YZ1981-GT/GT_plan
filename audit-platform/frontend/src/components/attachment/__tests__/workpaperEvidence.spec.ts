@@ -22,6 +22,7 @@ import {
   evidencePositionLabel,
   itemCellRef,
   uploadWorkpaperEvidence,
+  voucherKeyLabel,
 } from '../workpaperEvidence'
 import { resetWpEvidenceLinksForTest } from '@/composables/useWpEvidenceLinks'
 
@@ -83,6 +84,18 @@ describe('位置键与标签', () => {
     expect(evidencePositionLabel({ sheet_name: 'G8-6', cell_ref: 'row:3' })).toBe('G8-6 · 第 3 行')
     expect(evidencePositionLabel({ cell_ref: 'B5' })).toBe('B5')
     expect(evidencePositionLabel({})).toBe('整张底稿')
+    // 凭证证据：前缀「凭证 日期 字-号」（spec attachment-voucher-evidence-binding 需求 1.5）；凭证级链接没有表页 / 单元格
+    const VK = JSON.stringify(['2025', '重庆医药', '2025-01-07', 'FY', '0003'])
+    expect(evidencePositionLabel({ voucher_key: VK, sheet_name: 'D2-4', cell_ref: 'row:r-1' })).toBe('凭证 2025-01-07 FY-0003 · D2-4 · 行内证据')
+    expect(evidencePositionLabel({ voucher_key: VK })).toBe('凭证 2025-01-07 FY-0003')
+    expect(evidencePositionLabel({ voucher_key: '不是凭证键', sheet_name: 'D2-4' })).toBe('D2-4')
+  })
+
+  it('voucherKeyLabel：五段键 ⇒「日期 字-号」，凭证字为空只写号；解析不了返回空串', () => {
+    expect(voucherKeyLabel(JSON.stringify(['2025', 'c', '2025-03-01', '', '18']))).toBe('2025-03-01 18')
+    expect(voucherKeyLabel(JSON.stringify(['2025', 'c', '2025-03-01']))).toBe('')
+    expect(voucherKeyLabel('[')).toBe('')
+    expect(voucherKeyLabel(null)).toBe('')
   })
 })
 
@@ -124,6 +137,15 @@ describe('uploadWorkpaperEvidence', () => {
     expect((form.get('file') as File).name).toBe('回单.png')
     expect(res.attachment.id).toBe('a2')
     expect(res.evidenceLink).toEqual({ id: 'l2' })
+  })
+
+  it('凭证证据上传带 voucher_key（不带表页 / 单元格 = 凭证级）', async () => {
+    mockPost.mockResolvedValueOnce({ data: { attachment: { id: 'a3' }, evidence_link: { id: 'l3' } } })
+    const VK = JSON.stringify(['2025', 'c', '2025-01-07', '记', '0003'])
+    await uploadWorkpaperEvidence({ projectId: 'p1', wpId: 'w1', file: new File(['x'], 'v.pdf'), evidenceType: 'voucher', voucherKey: VK })
+    const form = mockPost.mock.calls[0][1] as FormData
+    expect([form.get('voucher_key'), form.get('evidence_type'), form.has('sheet_name'), form.has('cell_ref')])
+      .toEqual([VK, 'voucher', false, false])
   })
 
   it('回执没有附件编号时报错（不让调用方拿空 id 继续识别）', async () => {

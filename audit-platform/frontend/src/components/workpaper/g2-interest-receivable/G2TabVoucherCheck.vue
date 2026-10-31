@@ -333,7 +333,7 @@
                 :show-file-list="false"
                 accept="image/*,.pdf"
                 :disabled="isReadonly"
-                :before-upload="(file: File) => handleRowOcr('debit', row.id, file)"
+                :before-upload="(file: File) => handleRowOcr('debit', row.id, file, row)"
               >
                 <el-button size="small" link :loading="ocrLoadingKey === `debit:${row.id}`" :disabled="isReadonly">📎</el-button>
               </el-upload>
@@ -524,7 +524,7 @@
                 :show-file-list="false"
                 accept="image/*,.pdf"
                 :disabled="isReadonly"
-                :before-upload="(file: File) => handleRowOcr('credit', row.id, file)"
+                :before-upload="(file: File) => handleRowOcr('credit', row.id, file, row)"
               >
                 <el-button size="small" link :loading="ocrLoadingKey === `credit:${row.id}`" :disabled="isReadonly">📎</el-button>
               </el-upload>
@@ -861,13 +861,14 @@ async function handleRowOcr(
   side: 'debit' | 'credit',
   rowId: string,
   file: File,
+  row?: unknown,
 ): Promise<boolean> {
   if (props.isReadonly || !props.wpId) return false
   ocrLoadingKey.value = `${side}:${rowId}`
   try {
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, sideRowCell(side, rowId))
+    rowEv.append(formData, EVIDENCE_SHEET, sideRowCell(side, rowId), row)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,

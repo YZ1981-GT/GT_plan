@@ -731,7 +731,7 @@ async function uploadOcr(row: G12VoucherRow) {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
+      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
         _silent: true,

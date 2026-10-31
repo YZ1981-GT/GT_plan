@@ -1,41 +1,5 @@
 [
   {
-    "file": "components/workpaper/d1/D1TabVoucherCheck.vue",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
-    "reason": "并发会话改动中，合入后按行级证据接入小眼睛"
-  },
-  {
-    "file": "components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
-    "reason": "并发会话改动中，合入后按行级证据接入小眼睛"
-  },
-  {
-    "file": "components/workpaper/composables/useD3VoucherCheck.ts",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
-    "reason": "并发会话改动中；宿主 D3VoucherCheckDialog 已有小眼睛，合入后补识别位置"
-  },
-  {
-    "file": "components/workpaper/composables/useD2VcOcrCheck.ts",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（宿主 D2VcMatrixView.vue 正被并发会话改动）",
-    "reason": "宿主模板在并发会话改动中，合入后接入"
-  },
-  {
-    "file": "components/workpaper/e1/E1TabBankFlowReconcile.vue",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
-    "reason": "并发会话改动中，合入后接入（识别附件编号已随 ocrJobs 持久化）"
-  },
-  {
-    "file": "components/workpaper/e1/E1TabLargeCheck.vue",
-    "kind": "concurrent",
-    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
-    "reason": "并发会话改动中，合入后按行级证据接入"
-  },
-  {
     "file": "composables/useOcrGovernance.ts",
     "kind": "not-workpaper",
     "owner": "证据治理（附件管理页）",

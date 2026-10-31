@@ -60,6 +60,7 @@ export async function shiftIndexedRowEvidence(
         page_ref: link.page_ref,
         evidence_type: link.evidence_type,
         check_conclusion: link.check_conclusion,
+        voucher_key: link.voucher_key ?? null, // 凭证身份随行前移保留（唯一索引带位置，先建后删不相撞）
       }, { _silent: true } as any)
       await http.delete(P_att.evidenceLink(projectId, wpId, link.id), { _silent: true } as any)
     } catch {
@@ -71,10 +72,24 @@ export async function shiftIndexedRowEvidence(
 }
 
 /**
+ * 凭证检查行的凭证键（抽凭 / 挂凭写入行元数据 `_gt.vk`，spec voucher-identity-writeback-and-audit-phase）；
+ * 手工行、非凭证检查行为 null。
+ */
+export function rowVoucherKey(row: unknown): string | null {
+  const meta = (row as { _gt?: { vk?: unknown } } | null | undefined)?._gt
+  return meta && typeof meta.vk === 'string' && meta.vk ? meta.vk : null
+}
+
+/**
  * 给识别 / 上传表单带上位置：表页键必填；单元格 / 行槽位可空（空 = 表页级，如「上传合同识别」这类整页一个的按钮）。
  * 超长（表页 / 单元格各 100 字）由后端 400 拒绝。
+ *
+ * `row` 是凭证检查行时一并带上凭证键（`evidence_voucher_key`）：原件按凭证身份挂，别的底稿抽到同一张凭证时
+ * 能查到并引用；缺省证据类型随之记「凭证 / 原始单据」（spec attachment-voucher-evidence-binding ADR-AVE-04/05）。
  */
-export function appendRowEvidence(form: FormData, sheetKey: string, cellRef?: string | null): void {
+export function appendRowEvidence(form: FormData, sheetKey: string, cellRef?: string | null, row?: unknown): void {
+  const voucherKey = rowVoucherKey(row)
+  if (voucherKey) form.append('evidence_voucher_key', voucherKey)
   if (!sheetKey) return
   form.append('evidence_sheet', sheetKey)
   if (cellRef) form.append('evidence_cell', cellRef)
@@ -105,7 +120,9 @@ export function useRowEvidence(wpId: MaybeRefOrGetter<string | null | undefined>
   const pid = () => toValue(projectId) || fallback
   return {
     projectId: pid,
-    append: (form: FormData, sheetKey: string, cellRef?: string | null) => appendRowEvidence(form, sheetKey, cellRef),
+    /** `row` 为凭证检查行时一并带凭证键（见 appendRowEvidence） */
+    append: (form: FormData, sheetKey: string, cellRef?: string | null, row?: unknown) =>
+      appendRowEvidence(form, sheetKey, cellRef, row),
     refresh: () => refreshRowEvidence(pid(), toValue(wpId)),
     /** 按序号挂附件的表删掉第 removedNo 行后调用（见 shiftIndexedRowEvidence）；返回失败条数 */
     shiftAfterRemove: (sheetKey: string, removedNo: number) =>

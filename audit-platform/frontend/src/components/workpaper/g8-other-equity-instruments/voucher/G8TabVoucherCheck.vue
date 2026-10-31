@@ -1063,7 +1063,7 @@ async function uploadOcr(row: G8VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId), row)
       let res
       try {
         res = await http.post(
