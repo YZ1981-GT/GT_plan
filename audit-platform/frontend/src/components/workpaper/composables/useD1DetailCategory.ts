@@ -15,6 +15,7 @@
  *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 8.2, 8.5, 8.7
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -113,11 +114,7 @@ export function recalcRow(row: CategoryRow): CategoryRow {
 
 /** 生成动态行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `dynamic-${crypto.randomUUID()}`
-  }
-  // Fallback for environments without crypto.randomUUID
-  return `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `dynamic-${newUuid()}`
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

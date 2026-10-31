@@ -14,6 +14,7 @@
  *
  * Requirements: 7.1-7.6
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD5FormulaEngine'
 import type { ChecklistResponse } from './useD5FormData'
@@ -50,7 +51,7 @@ const ITEM_ID_ROWS = 'D5-3-rows'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 安全解析 JSON 数组 */

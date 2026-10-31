@@ -13,6 +13,7 @@
  *
  * Requirements: 5.2, 5.6
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import { isReversalValid, calcSumColumn } from '@/composables/useG4EclFormulaEngine'
 import { ElMessageBox } from 'element-plus'
@@ -138,7 +139,7 @@ export function useG4EclReversalWriteOff() {
     if (!value?.trim()) return
 
     const newRow: ReversalRow = {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: reversals.value.length + 1,
       unitName: value.trim(),
       reversalReason: '',
@@ -166,7 +167,7 @@ export function useG4EclReversalWriteOff() {
     if (!value?.trim()) return
 
     const newRow: WriteOffRow = {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: writeOffs.value.length + 1,
       unitName: value.trim(),
       writeOffType: '',
@@ -203,14 +204,14 @@ export function useG4EclReversalWriteOff() {
     if (data.reversals) {
       reversals.value = data.reversals.map((r, i) => ({
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: i + 1,
       }))
     }
     if (data.writeOffs) {
       writeOffs.value = data.writeOffs.map((r, i) => ({
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: i + 1,
       }))
     }

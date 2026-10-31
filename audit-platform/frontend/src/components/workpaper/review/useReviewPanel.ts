@@ -4,6 +4,7 @@
  * Feature: review-prompt-sheet-level-split
  * Requirements: 6.1, 6.4
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, reactive } from 'vue'
 import http from '@/utils/http'
 import { downloadFile } from '@/utils/http'
@@ -167,7 +168,7 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
     progress.currentSheet = '准备中...'
 
     let progressTimer: ReturnType<typeof setInterval> | null = null
-    const sessionIdForProgress = crypto.randomUUID?.() || `${Date.now()}`
+    const sessionIdForProgress = newUuid()
 
     progressTimer = setInterval(async () => {
       try {

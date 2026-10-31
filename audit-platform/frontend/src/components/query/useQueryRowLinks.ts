@@ -7,6 +7,7 @@
  *   校验一次（`validatePageRefs`，带响应 `meta.ref_context` 的准则类型），校验通过才可复制，不可用时显示原因。
  * 结果只读：这里没有任何回写入口（ADR-AQL-02）。上下文（数据源、项目、年度）取本次结果所属的查询，不取界面当前选择。
  */
+import { copyText } from '@/utils/clipboard'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -93,7 +94,7 @@ export function useQueryRowLinks(ctx: QueryRowLinkContext) {
     const r = refOf(row)
     if (!r || !refUsable(row)) return
     try {
-      await navigator.clipboard.writeText(r)
+      await copyText(r)
       ElMessage.success(`已复制引用 ${r}`)
     } catch {
       ElMessage.warning(`复制失败，请手动复制：${r}`)

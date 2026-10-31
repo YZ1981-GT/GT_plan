@@ -15,6 +15,7 @@
  *
  * Requirements: 10.1-10.9
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcRelatedPartyEndBalance } from './useD3FormulaEngine'
 import type { ChecklistResponse } from './useD3FormData'
@@ -54,7 +55,7 @@ const ITEM_ID_CONCLUSION = 'D3-rp-conclusion'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 function safeParseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {

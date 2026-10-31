@@ -106,6 +106,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -262,7 +263,7 @@ function handleCopy(contract: LinkageContract) {
     `状态: ${getStatusLabel(contract.status)}`,
   ].filter(Boolean).join('\n')
 
-  navigator.clipboard.writeText(text).then(() => {
+  await copyText(text).then(() => {
     ElMessage.success('引用信息已复制')
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

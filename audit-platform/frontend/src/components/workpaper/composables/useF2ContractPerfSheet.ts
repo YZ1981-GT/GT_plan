@@ -3,6 +3,7 @@
  * 对齐 Excel：项目编码/名称 · 开工/预计竣工 · 期初/转入/转出/期末 · 库龄 · 品质
  * 合计 − 跌价准备 = 净额；四问审计说明
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcEndAmount, calcSubtotal } from './useF2InvMaiFormulaEngine'
@@ -67,7 +68,7 @@ function emptyAging(segments: AgingSegment[]): AgingData {
 
 /** BP-7 修复：稳定行身份生成器。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function emptyRow(id: string, segments: AgingSegment[]): ContractPerfRow {

@@ -120,6 +120,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -190,7 +191,7 @@ function onCtxCopy() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) return
   const text = cells.map(c => c.value ?? '-').join('\t')
-  navigator.clipboard.writeText(text)
+  await copyText(text)
   ElMessage.success('已复制')
   ctxMenu.value.visible = false
 }
@@ -240,7 +241,7 @@ function onCtxExportSelection() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) { ElMessage.warning('请先选中单元格'); ctxMenu.value.visible = false; return }
   const text = cells.map(c => c.value ?? '-').join('\n')
-  navigator.clipboard.writeText(text)
+  await copyText(text)
   ElMessage.success(`已导出 ${cells.length} 个单元格到剪贴板`)
   ctxMenu.value.visible = false
 }

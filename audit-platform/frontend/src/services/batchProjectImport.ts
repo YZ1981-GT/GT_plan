@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 import http, { downloadFile } from '@/utils/http'
 
 export type BatchProjectMode = 'project' | 'consolidation'
@@ -5,6 +6,11 @@ export type BatchProjectMode = 'project' | 'consolidation'
 export const BATCH_PROJECT_CREATE_ROLES = new Set(['admin', 'partner', 'manager'])
 export const BATCH_PLAN_STATUS = {
   validated: 'validated', applying: 'applying', applied: 'applied', failed: 'failed',
+} as const
+export const BATCH_PLAN_ERROR_CODE = {
+  stale: 'BATCH_PLAN_STALE',
+  resultUnknown: 'BATCH_PLAN_RESULT_UNKNOWN',
+  statusBusy: 'BATCH_PLAN_STATUS_BUSY',
 } as const
 
 export function canBatchCreateProjects(role: string | null | undefined): boolean {
@@ -98,13 +104,12 @@ export interface BatchPlanStatus {
   template_version: string | null
   receipt: BatchImportResult | null
   public_error: string | null
+  failure_error_code: string | null
   expires_at: string
 }
 
 export function newBatchIdempotencyKey(): string {
-  return typeof globalThis.crypto?.randomUUID === 'function'
-    ? globalThis.crypto.randomUUID()
-    : `batch-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return newUuid()}-${Math.random().toString(16).slice(2)}`
 }
 
 export async function validateBatchProjectFile(
@@ -168,6 +173,17 @@ export async function downloadBatchErrors(validationId: string): Promise<void> {
     fileName: '批量建项错误明细.xlsx',
     silent: true,
   })
+}
+
+export function batchErrorCode(error: any): string | null {
+  const response = error?.response?.data
+  const detail = response?.detail ?? response?.message
+  for (const value of [detail, response]) {
+    if (!value || typeof value !== 'object') continue
+    const code = value.error_code || value.code
+    if (typeof code === 'string' && code.trim()) return code
+  }
+  return null
 }
 
 export function batchErrorMessage(error: any, fallback: string): string {

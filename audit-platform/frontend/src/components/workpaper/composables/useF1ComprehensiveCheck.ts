@@ -14,6 +14,7 @@
  * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
  * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcAnomalyRate } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -387,7 +388,7 @@ export function shouldMarkCrossPeriod(voucherDate: Date, revenueDate: Date): boo
 }
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 export function createEmptyDebitRow(): F1DebitCheckRow {

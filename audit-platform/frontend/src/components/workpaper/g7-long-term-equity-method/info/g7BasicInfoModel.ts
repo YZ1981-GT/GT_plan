@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 export const G7_BASIC_INFO_GROUPS = [
   { value: 'subsidiary', label: '（一）子公司', accountingMethod: '成本法' },
   { value: 'joint_venture', label: '（二）合营企业（共同控制）', accountingMethod: '权益法' },
@@ -125,7 +126,7 @@ export function createG7BasicInfoRow(
   investeeName = '',
 ): G7BasicInfoRow {
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq,
     groupType,
     investeeName,

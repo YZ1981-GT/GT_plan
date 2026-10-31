@@ -13,6 +13,7 @@
  *
  * Requirements: 12.1-12.8, 14.1-14.6
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD3FormulaEngine'
 import type { ChecklistResponse } from './useD3FormData'
@@ -57,7 +58,7 @@ const ITEM_SECTION3_ROWS = `${PREFIX}section3-rows`
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 function safeParseRows(jsonStr: string | null | undefined): DisclosureRow[] {

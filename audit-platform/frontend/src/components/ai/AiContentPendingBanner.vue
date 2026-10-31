@@ -68,12 +68,7 @@
         <div class="gt-aip-card__meta">
           <el-tag size="small" type="warning" effect="plain">AI 生成</el-tag>
           <span v-if="item.instance_type" class="gt-aip-card__where">{{ instanceLabel(item.instance_type) }}</span>
-          <!-- 有目标标签（底稿 / 附注名）时显示「标签 · 位置」，不再露出带 UUID 的原始 target_cell -->
-          <template v-if="item.target_label">
-            <span class="gt-aip-card__target">{{ item.target_label }}</span>
-            <code v-if="item.target_position" class="gt-aip-card__cell">{{ item.target_position }}</code>
-          </template>
-          <code v-else-if="item.target_cell" class="gt-aip-card__cell">{{ item.target_cell }}</code>
+          <code v-if="item.target_cell" class="gt-aip-card__cell">{{ item.target_cell }}</code>
           <span class="gt-aip-card__spacer"></span>
           <span v-if="item.model" class="gt-aip-card__dim">模型 {{ item.model }}</span>
           <span v-if="item.confidence != null" class="gt-aip-card__dim">置信度 {{ pct(item.confidence) }}</span>
@@ -106,8 +101,6 @@
           <el-button size="small" type="danger" plain :loading="actingId === item.id" @click="act(item, 'reject')">
             ❌ 拒绝
           </el-button>
-          <!-- 底稿类确认后不自动写入（后端提示到底稿页面粘贴）：确认前先复制原文 -->
-          <el-button size="small" plain class="gt-aip-card__copy" @click="copyContent(item)">📋 复制</el-button>
         </div>
       </div>
     </div>
@@ -115,20 +108,16 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { copyText } from '@/utils/clipboard'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
 
 interface PendingAiItem {
   id: string
   instance_type?: string | null
   target_cell?: string | null
-  /** 目标展示名：底稿「编码 名称」/ 附注「章节号 标题」（后端 ai_content._enrich_target_labels） */
-  target_label?: string | null
-  /** target_cell 第二个冒号之后的位置原文，如 E5 / 正文第一段 */
-  target_position?: string | null
   model?: string | null
   confidence?: number | null
   generated_at?: string | null
@@ -294,9 +283,9 @@ async function submitRevise(item: PendingAiItem) {
   }
 }
 
-async function copyContent(item: { content?: string | null }) {
+async function copyContent(item: { content?: string }) {
   try {
-    await navigator.clipboard.writeText(item.content || '')
+    await copyText(item.content || '')
     ElMessage.success('已复制 AI 内容到剪贴板')
   } catch {
     ElMessage.warning('复制失败，请手动复制')
@@ -310,19 +299,7 @@ function afterResolved(id: string) {
   if (pendingCount.value === 0) drawerVisible.value = false
 }
 
-/** AI 面板采纳成功会新增一条待确认内容（usePlatformAiChat / useDocAiChat 发出）：同项目才重拉 */
-function onAdopted(payload: { projectId: string }) {
-  if (props.projectId && payload?.projectId === props.projectId) void load()
-}
-
-onMounted(() => {
-  eventBus.on('ai-content:adopted', onAdopted)
-  void load()
-})
-
-onBeforeUnmount(() => {
-  eventBus.off('ai-content:adopted', onAdopted)
-})
+onMounted(load)
 
 watch(() => props.projectId, load)
 
@@ -410,11 +387,6 @@ defineExpose({ refresh: load })
 .gt-aip-card__where {
   font-weight: 600;
   color: var(--gt-color-primary, #6b3fa0);
-}
-
-.gt-aip-card__target {
-  font-weight: 500;
-  color: var(--gt-color-text-primary, #303133);
 }
 
 .gt-aip-card__cell {

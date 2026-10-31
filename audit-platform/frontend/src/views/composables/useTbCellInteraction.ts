@@ -11,6 +11,7 @@
  *
  * @domain tb-cell-interaction
  */
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 
 // ─── 类型 ───
@@ -120,7 +121,7 @@ export function useTbCellInteraction(
     }
     if (currentLine.length > 0) lines.push(currentLine.join('\t'))
     const text = lines.join('\n')
-    navigator.clipboard?.writeText(text)
+    await copyText(text)
     return text
   }
 

@@ -12,6 +12,7 @@
  *
  * Requirements: 8.1-8.2
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 
@@ -67,10 +68,7 @@ const USER_FIELDS: Array<keyof AccountListRow> = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `acct-${crypto.randomUUID()}`
-  }
-  return `acct-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `acct-${newUuid()}`
 }
 
 function createEmptyRow(bank = ''): AccountListRow {

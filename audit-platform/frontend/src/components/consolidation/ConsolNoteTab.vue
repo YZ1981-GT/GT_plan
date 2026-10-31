@@ -703,6 +703,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -2064,12 +2065,14 @@ function copyEntireNoteTable() {
   const text = lines.join('\n')
   const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: string[]) => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    const blob = new Blob([html], { type: 'text/html' })
-    const textBlob = new Blob([text], { type: 'text/plain' })
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob })])
-    ElMessage.success(`已复制 ${rows.length} 行 × ${headers.length} 列，可粘贴到 Word/Excel`)
+    const result = await copyRichText(html, text)
+    if (result === 'rich') {
+      ElMessage.success(`已复制 ${rows.length} 行 × ${headers.length} 列，可粘贴到 Word/Excel`)
+    } else {
+      ElMessage.success('已复制为文本格式')
+    }
   } catch {
-    navigator.clipboard?.writeText(text)
+    await copyText(text)
     ElMessage.success('已复制为文本格式')
   }
 }

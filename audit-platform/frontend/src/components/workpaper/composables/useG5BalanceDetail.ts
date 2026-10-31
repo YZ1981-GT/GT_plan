@@ -13,6 +13,7 @@
  * - 配置变更时 remapAgingDataWithAggregation（5→3 汇入 over3）
  * - 公式：期末余额=合同总额-已收回 / 净额=余额-未实现 / 账龄合计
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { parseNum } from '@/composables/useG5FormulaEngine'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -229,7 +230,7 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
     }
 
     const row: BalanceDetailRow = {
-      id: raw.id ?? crypto.randomUUID(),
+      id: raw.id ?? newUuid(),
       seq: parseNum(raw.seq) || 1,
       debtorName: raw.debtorName ?? '',
       businessType: raw.businessType ?? 'other',
@@ -307,7 +308,7 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
 
     const empty = _createEmptyAging()
     const newRow: BalanceDetailRow = {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: rows.value.length + 1,
       debtorName: value.trim(),
       businessType: 'other',

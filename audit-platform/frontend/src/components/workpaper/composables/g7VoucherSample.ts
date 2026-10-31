@@ -8,6 +8,7 @@
  * （Property 14，同号不同分录被当重复丢掉）、经 expandMultiAccountVouchers 展开，已删除。
  */
 
+import { newUuid } from '@/utils/uuid'
 import { ref, toValue, type MaybeRefOrGetter } from 'vue'
 import {
   counterpartText, useVoucherCheckFill, withRowMeta,
@@ -51,10 +52,7 @@ function num(v: unknown): number {
 }
 
 function uid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `g7vs-${crypto.randomUUID()}`
-  }
-  return `g7vs-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return `g7vs-${newUuid()}`
 }
 
 export function createG7VoucherSampleRow(seq: number): G7VoucherSampleRow {

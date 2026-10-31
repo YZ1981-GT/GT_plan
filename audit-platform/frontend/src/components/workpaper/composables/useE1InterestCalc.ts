@@ -1,4 +1,5 @@
 /** E1-15 账户配置+月度矩阵；E1-20 应计利息兼容。 */
+import { newUuid } from '@/utils/uuid'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
@@ -60,7 +61,7 @@ interface MonthlyAnalysisData {
   anomalies: InterestAnomalyRow[]
 }
 function uid(prefix: string): string {
-  return `${prefix}-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
+  return `${prefix}-${newUuid()}-${Math.random().toString(36).slice(2)}`}`
 }
 function twelve(): number[] { return Array.from({ length: 12 }, () => 0) }
 function createAccount(accountNo = '默认账户'): MonthlyAccount {

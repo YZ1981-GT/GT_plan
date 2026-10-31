@@ -15,6 +15,7 @@
  *
  * Requirements: 7.1-7.7, 21.3
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { UseD4BaseOptions } from './useD4Adjudication'
 
@@ -103,10 +104,7 @@ let _gid = 0
 function nextGroupId(): string {
   _gid += 1
   // UUID-shaped id so Excel row_identity / GTROW align with PolicyGroup.id
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `pg-${Date.now().toString(36)}-${_gid}-${Math.random().toString(36).slice(2, 10)}`
+  return newUuid()
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

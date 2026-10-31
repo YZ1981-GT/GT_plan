@@ -7,6 +7,7 @@
  * - 检查比例：检查金额合计 / 账面发生额
  * - 抽凭回填 mergeDebit/Credit；行级 OCR patch
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, unref, type Ref } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
@@ -126,10 +127,7 @@ const STORAGE_KEY_BY_MODE: Record<LargeCheckMode, string> = {
 const LEGACY_IPO_ROWS_KEY = 'E1-ipo-E1-28-rows'
 
 function generateId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 function emptySampling(): LargeCheckSamplingMeta {

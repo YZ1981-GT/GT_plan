@@ -18,6 +18,7 @@
  *
  * Requirements: 6.1-6.10
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -78,7 +79,7 @@ export const FV_HIERARCHY_TOOLTIP = '可观察输入值(如银行公布贴现利
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 安全解析 JSON 数组 */

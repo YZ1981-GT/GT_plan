@@ -14,6 +14,7 @@
  *
  * Requirements: 7.1-7.7, 18.2
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useF1FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
@@ -51,7 +52,7 @@ const ITEM_ID_ROWS = 'F1-aje-rows'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 安全解析 JSON 数组 */

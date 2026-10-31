@@ -624,6 +624,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
@@ -678,7 +679,6 @@ import { useCellComments } from '@/composables/useCellComments'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { eventBus } from '@/utils/eventBus'
-import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefreshEntityPayload } from '@/utils/eventBus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
@@ -1300,7 +1300,7 @@ function copyDrillDownTable() {
       : [r.company_name, r.company_code, r.amount ?? '', `${r.ratio}%`, r.source]
     lines.push(vals.join('\t'))
   }
-  navigator.clipboard?.writeText(lines.join('\n'))
+  await copyText(lines.join('\n'))
   ElMessage.success('已复制到剪贴板（可粘贴到 Excel）')
 }
 
@@ -1733,11 +1733,7 @@ const {
   equitySpanMethod,
   eqRowClassName,
   eqCellVal,
-} = useReportColumns({
-  isConsolidated: consolIsConsolidated,
-  activeTab: consolReportType,
-  rows: consolReportRows,
-})
+} = useReportColumns({ isConsolidated: consolIsConsolidated })
 
 // ─── 前端缓存：按项目/年度/节点身份/报表类型缓存，刷新时精确清理 ──────────
 // 纯逻辑已提取到 consolCacheKeys.ts（可测试）；这里仅组装当前 reactive 参数。
@@ -1875,10 +1871,15 @@ async function onConsolCtxCellTrace() {
   }
 }
 
-async function onConsolTraceLocate(node: any) {
+function onConsolTraceLocate(node: any) {
   consolTraceDialogVisible.value = false
-  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
-  if (reason) ElMessage.warning(reason)
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
 }
 
 function onConsolCtxFormula() {

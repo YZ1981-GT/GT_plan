@@ -18,6 +18,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ElMessage } from 'element-plus'
 import type { QueryErrorText } from './queryErrorText'
 
@@ -27,7 +28,7 @@ async function copyTrace() {
   const id = props.error.correlationId
   if (!id) return
   try {
-    await navigator.clipboard.writeText(id)
+    await copyText(id)
     ElMessage.success('已复制追踪号')
   } catch {
     ElMessage.warning(`复制失败，请手动复制：${id}`)

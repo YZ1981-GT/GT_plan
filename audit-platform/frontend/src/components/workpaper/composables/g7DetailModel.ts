@@ -4,6 +4,7 @@
  * 模板分为成本法、权益法、减值准备三大区块；每个区块均保留
  * 未审数 → 账项调整(AJE) → 重分类调整(RJE) → 审定数的完整桥接。
  */
+import { newUuid } from '@/utils/uuid'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 
 const amountCalc = useDecimalCalc({ dp: 2 })
@@ -176,10 +177,7 @@ export function g7Num(value: unknown): number {
 }
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return `${prefix}-${newUuid()}`
 }
 
 export function createG7CostRow(seq: number, investeeName = ''): G7CostRow {

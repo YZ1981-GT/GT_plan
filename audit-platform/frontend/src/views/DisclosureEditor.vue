@@ -1211,6 +1211,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { ref, computed, reactive, defineAsyncComponent, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
 import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
@@ -3034,9 +3035,9 @@ function copyNoteTable() {
   const text = [headers.join('\t'), ...rows.map((r: any) => [r.label ?? '', ...(r.values || [])].join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: any) => `<tr><td>${r.label ?? ''}</td>${(r.values || []).map((v: any) => `<td>${v ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    await copyRichText(html, text)
     ElMessage.success(`已复制 ${rows.length} 行，可粘贴到 Word/Excel`)
-  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+  } catch { await copyText(text); ElMessage.success('已复制') }
 }
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────

@@ -4,6 +4,7 @@
  * 对齐 Excel 13 列：债务人|期末余额|账龄|业务说明|未结转原因|计划供货/退款|
  * 是否诉讼|是否转其他应收|坏账准备|审定余额(自动)|期后供货退款|支持性证据|备注
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -48,7 +49,7 @@ const YES_NO = ['Y', 'N'] as const
 // ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 审定余额 = 期末余额 − 坏账准备 */
@@ -229,7 +230,7 @@ export function mergeSuggestedIntoAje(
   }
   const existingDesc = new Set(existing.map((r: any) => String(r.description || '')))
   const toAdd = suggested.filter(s => !existingDesc.has(s.description)).map(s => ({
-    rowId: `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`,
+    rowId: `row-${newUuid()}`,
     placeholder: '',
     ...s,
   }))

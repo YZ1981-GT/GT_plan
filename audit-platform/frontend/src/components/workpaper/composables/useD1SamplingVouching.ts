@@ -36,6 +36,7 @@
  *
  * Requirements: 10.1-10.4, 11.1-11.4, 12.1-12.6, 13.1-13.5, 15.4, 15.6, 15.10
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -126,10 +127,7 @@ const SELECT_FIELDS: Array<keyof VouchingRow> = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function parseNum(val: any): number {

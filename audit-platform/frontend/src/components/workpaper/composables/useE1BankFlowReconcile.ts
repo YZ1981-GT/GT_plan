@@ -7,6 +7,7 @@
  * - OCR 流水明细 + 金额/日期自动匹配
  * - 覆盖率 + 红旗提示 + 说明/结论
  */
+import { newUuid } from '@/utils/uuid'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
@@ -124,10 +125,7 @@ export const TIP_DEFS: Array<{ key: string; label: string }> = [
 ]
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return `${prefix}-${newUuid()}`
 }
 
 function emptyMonthly(): MonthlyRow[] {

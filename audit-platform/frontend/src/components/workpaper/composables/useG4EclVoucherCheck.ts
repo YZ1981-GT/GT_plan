@@ -14,6 +14,7 @@
  *
  * Requirements: 6.6, 6.7
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, type MaybeRefOrGetter } from 'vue'
 import {
   isDebitCreditBalanced,
@@ -37,7 +38,7 @@ export function mapPreparedToG4VoucherRow(item: PreparedItem): VoucherCheckRow {
   const name = item.counterpartAccountName
   const debit = Number(item.debitAmount ?? 0) || 0
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq: 0,
     section: sideTableOf(item),
     date: s.voucherDate || '',
@@ -185,7 +186,7 @@ export function useG4EclVoucherCheck(opts: {
 
     const sectionRows = rows.value.filter(r => r.section === section)
     const newRow: VoucherCheckRow = {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: sectionRows.length + 1,
       section,
       date: '',
@@ -242,7 +243,7 @@ export function useG4EclVoucherCheck(opts: {
   function loadRows(data: VoucherCheckRow[]): void {
     rows.value = (data || []).map(r => withRowMeta({
       ...r,
-      id: r.id || crypto.randomUUID(),
+      id: r.id || newUuid(),
     }, r))
     _resequence()
     voucherFill.markLoaded()

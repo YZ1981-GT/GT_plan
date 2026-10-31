@@ -19,6 +19,7 @@
  *
  * Requirements: 4.1-4.9, 5.1-5.7
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -88,7 +89,7 @@ export const CATEGORY_OPTIONS = ['应收票据', '应收账款'] as const
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 /** 安全解析 JSON 数组 */

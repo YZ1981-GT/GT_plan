@@ -11,6 +11,7 @@
  *
  * section2 组合名称供 G5-3 / 上市·国企附注一致性校验，序列化字段保持兼容。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 
@@ -229,7 +230,7 @@ export function useG5EclPolicy() {
     })
     if (!value?.trim()) return
     section2.value.push({
-      id: crypto.randomUUID(),
+      id: newUuid(),
       checkItem: value.trim(),
       requirement: '与附注披露组合名称一致',
       companyPolicy: value.trim(),
@@ -250,7 +251,7 @@ export function useG5EclPolicy() {
     })
     if (!value?.trim()) return
     section3.value.push({
-      id: crypto.randomUUID(),
+      id: newUuid(),
       checkItem: value.trim(),
       requirement: '',
       companyPolicy: '',

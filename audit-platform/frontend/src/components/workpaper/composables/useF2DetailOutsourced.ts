@@ -7,6 +7,7 @@
  *
  * 跨表：closingAmt = 加工物资成本，供 F2-2 汇总。
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { calcUnitPrice, calcSubtotal, parseNum } from './useF2InvMaiFormulaEngine'
@@ -81,7 +82,7 @@ function labelsToCustomSegments(labels: string[]): AgingSegment[] {
 
 /** BP-7 修复：稳定行身份生成器。 */
 function generateF2RowId(): string {
-  return `f2-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `f2-${newUuid()}`
 }
 
 function emptyRow(id: string, segments: AgingSegment[]): F2OutsourcedRow {

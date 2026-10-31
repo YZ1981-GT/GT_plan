@@ -18,6 +18,7 @@
  *
  * 与G4-9的差异：字段名"投资项目"→"债务人"，引用G5自己的FormulaEngine
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, type Ref } from 'vue'
 import { determineStage } from '@/composables/useG5FormulaEngine'
 import { ElMessageBox } from 'element-plus'
@@ -304,7 +305,7 @@ export function useG5StageClassification(_opts?: any) {
       }))
 
       const row: G5StageClassificationRow = {
-        id: crypto.randomUUID(),
+        id: newUuid(),
         seq: arrIdx + 1,
         debtor: debtor || `债务人${arrIdx + 1}`,
         closingBalance: 0,
@@ -379,7 +380,7 @@ export function useG5StageClassification(_opts?: any) {
   /** 创建空行 */
   function createEmptyRow(debtor: string): G5StageClassificationRow {
     return {
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: rows.value.length + 1,
       debtor,
       closingBalance: 0,
@@ -437,7 +438,7 @@ export function useG5StageClassification(_opts?: any) {
     rows.value = data.map((r, i) => {
       const row: G5StageClassificationRow = {
         ...r,
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: i + 1,
         closingBalance: Number(r.closingBalance) || 0,
         businessType: String(r.businessType || ''),

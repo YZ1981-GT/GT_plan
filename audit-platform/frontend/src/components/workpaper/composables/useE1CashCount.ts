@@ -15,6 +15,7 @@
  *
  * Requirements: 7.1-7.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, calcCountDiff, calcFxConvert, sumField } from './useE1FormulaEngine'
@@ -160,10 +161,7 @@ function recalculateSummary(summary: CashRollForwardSummary, actual: number): Ca
 }
 
 function generateRowId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 function recalcRmbRow(row: RmbCountRow): RmbCountRow {

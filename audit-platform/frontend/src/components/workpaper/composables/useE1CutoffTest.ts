@@ -16,6 +16,7 @@
  *
  * Requirements: 10.4-10.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
@@ -48,10 +49,7 @@ const USER_FIELDS: Array<keyof CutoffTestRow> = [
 
 function generateRowId(variant: CutoffVariant): string {
   const prefix = variant === 'bank' ? 'cutoff-b' : 'cutoff-o'
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 /**

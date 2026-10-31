@@ -1147,6 +1147,7 @@
 
     <!-- 公式管理弹窗 -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       scope="tb"
       :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
@@ -1325,11 +1326,13 @@
 // ProjectContext + 年度切换协议已接入
 // TODO(P1): 逐步替换 selectedYear 本地 ref 为 projectStore.year 直取
 
-import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { copyRichText, copyText } from '@/utils/clipboard'
+import { ref, computed, defineAsyncComponent, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Link, ArrowDown, WarningFilled, MoreFilled } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
@@ -1345,7 +1348,6 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import { api } from '@/services/apiProxy'
-import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
@@ -1686,6 +1688,7 @@ const showTbGuide = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)  // 首次打开才下载 / 挂载公式管理
 const rows = ref<TrialBalanceRow[]>([])
 const consistencyResult = ref<ConsistencyResult | null>(null)
 
@@ -2941,14 +2944,14 @@ function onTbSumCtxCopy() {
   if (!picked.length && tbSumCtxRow.value) {
     // 没有选中行时复制右键行
     const row = tbSumCtxRow.value
-    navigator.clipboard.writeText(`${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.audited || ''}`)
+    await copyText(`${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.audited || ''}`)
     ElMessage.success('已复制')
     return
   }
   const lines = picked.map((row) => {
     return `${row.row_code}\t${row.row_name}\t${row.unadjusted || ''}\t${row.aje_dr || ''}\t${row.aje_cr || ''}\t${row.rcl_dr || ''}\t${row.rcl_cr || ''}\t${row.audited || ''}`
   })
-  navigator.clipboard.writeText(lines.join('\n'))
+  await copyText(lines.join('\n'))
   ElMessage.success(`已复制 ${lines.length} 行`)
 }
 
@@ -3109,9 +3112,9 @@ function copyTbTable() {
   const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    await copyRichText(html, text)
     ElMessage.success(`已复制 ${dataRows.length} 行`)
-  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+  } catch { await copyText(text); ElMessage.success('已复制') }
 }
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
@@ -3440,10 +3443,15 @@ async function onTbCtxCellTrace() {
   }
 }
 
-async function onTbTraceLocate(node: any) {
+function onTbTraceLocate(node: any) {
   tbTraceDialogVisible.value = false
-  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
-  if (reason) ElMessage.warning(reason)
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
 }
 
 function onTbCtxFormula() {

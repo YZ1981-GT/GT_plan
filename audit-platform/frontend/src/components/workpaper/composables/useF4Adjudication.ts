@@ -8,6 +8,7 @@
  * 4. 比较本期与上期审定数，自动计算变动额、变动率并分析重大变动；
  * 5. 期末数按源表逻辑从 F4-2 明细表汇总，期初/期末分别与试算平衡表勾稽。
  */
+import { newUuid } from '@/utils/uuid'
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
@@ -242,7 +243,7 @@ export function migrateF4AdjRows(
     '3plus': '3yearplus',
   }
   const migrated = parsed.map((raw: any, index) => {
-    const key = aliases[String(raw?.rowKey ?? '')] ?? String(raw?.rowKey ?? defaults[index]?.rowKey ?? `custom-${crypto.randomUUID()}`)
+    const key = aliases[String(raw?.rowKey ?? '')] ?? String(raw?.rowKey ?? defaults[index]?.rowKey ?? `custom-${newUuid()}`)
     const openingUnadjusted = parseNum(raw?.openingUnadjusted)
     const openingAje = parseNum(raw?.openingAje)
     const openingRje = parseNum(raw?.openingRje)

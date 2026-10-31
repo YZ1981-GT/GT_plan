@@ -143,6 +143,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -430,7 +431,9 @@ function handleJump(finding: GateReadinessFinding, group: GateReadinessGroup) {
     section === 'adjustments'
     || (loc.sample_entry_group_ids && loc.sample_entry_group_ids.length)
   ) {
-    router.push({ name: 'Adjustments', params: { projectId } })
+    // 有样例分录时在调整大厅定位、高亮第一笔（?focus=）
+    const focus = loc.sample_entry_group_ids?.[0]
+    router.push({ name: 'Adjustments', params: { projectId }, query: focus ? { focus: String(focus) } : undefined })
     return
   }
   if (section === 'misstatements') {
@@ -479,7 +482,7 @@ const shortEvalId = computed(() => {
 async function copyEvalId() {
   if (!props.data?.gate_eval_id) return
   try {
-    await navigator.clipboard.writeText(props.data.gate_eval_id)
+    await copyText(props.data.gate_eval_id)
     ElMessage.success('gate_eval_id 已复制')
   } catch {
     ElMessage.warning('复制失败，请手动复制')

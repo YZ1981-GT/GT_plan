@@ -9,6 +9,7 @@
  * - 下载模板到本地编辑
  * - 关联模块跳转链接
  */
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
@@ -139,7 +140,7 @@ async function generateA18Summary() {
 async function copySummaryPreview() {
   if (!summaryPreview.value) return
   try {
-    await navigator.clipboard.writeText(summaryPreview.value)
+    await copyText(summaryPreview.value)
     ElMessage.success('已复制到剪贴板，可粘贴至 A18-1 文档')
   } catch {
     ElMessage.warning('复制失败，请手动选择文本')

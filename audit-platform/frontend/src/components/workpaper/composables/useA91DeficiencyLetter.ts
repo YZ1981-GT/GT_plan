@@ -12,6 +12,7 @@
  * - B22B refresh via render-config reload
  * - section navigation scrollspy
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
@@ -97,7 +98,7 @@ const VALID_SECTIONS = ['addressee', 'independence', 'deficiency', 'committee', 
 type ValidSection = typeof VALID_SECTIONS[number]
 
 function generateId(): string {
-  return crypto.randomUUID ? crypto.randomUUID() : `def-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return newUuid()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 /** Build item_id for a section+field combination */

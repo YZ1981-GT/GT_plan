@@ -10,6 +10,7 @@
  * - 合计 / 核对 / 账龄占比 / 账龄逻辑校验
  * - 动态账龄配置（useAgingConfig + migrateD3F1Keys）
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -82,7 +83,7 @@ const AGING_TOLERANCE = 0.01
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 function emptyAging(segments: AgingSegment[]): AgingData {

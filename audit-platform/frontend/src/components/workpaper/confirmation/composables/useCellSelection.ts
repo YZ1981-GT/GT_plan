@@ -4,6 +4,7 @@
  * 支持：单击选中 / Ctrl 追加 / Shift 范围 / 拖拽框选
  * 输出：选中的 cell 坐标集 + 选区值（用于复制/求和）
  */
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, type Ref } from 'vue'
 import type { ConfirmationRow } from '../confirmationTypes'
 
@@ -69,7 +70,7 @@ export function useCellSelection(rows: Ref<ConfirmationRow[]>) {
       return row ? String((row as any)[cell.colField] ?? '') : ''
     })
     const text = lines.join('\n')
-    navigator.clipboard?.writeText(text)
+    await copyText(text)
     return text
   }
 

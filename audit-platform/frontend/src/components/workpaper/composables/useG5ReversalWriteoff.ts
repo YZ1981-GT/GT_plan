@@ -5,6 +5,7 @@
  *   （一）本期重要转回/收回检查  （二）本期重要核销检查
  * 校验：转回 ≤ 累计计提；核销须审批完整；关联方高亮
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed } from 'vue'
 import { parseNum, isReversalValid } from '@/composables/useG5FormulaEngine'
 
@@ -96,7 +97,7 @@ function createChecks(defs: { id: string; label: string }[], saved?: Reasonablen
 export function emptyReversalRow(partial?: Partial<ReversalRow>): ReversalRow {
   const { checks: savedChecks, ...rest } = partial || {}
   const row: ReversalRow = {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq: 0,
     debtor: '',
     reason: '',
@@ -120,7 +121,7 @@ export function emptyReversalRow(partial?: Partial<ReversalRow>): ReversalRow {
 export function emptyWriteoffRow(partial?: Partial<WriteoffRow>): WriteoffRow {
   const { checks: savedChecks, approvalComplete, ...rest } = partial || {}
   const row: WriteoffRow = {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq: 0,
     debtor: '',
     nature: '',
@@ -159,7 +160,7 @@ export function summarizeChecks(checks: ReasonablenessItem[]): string {
 
 function migrateReversal(raw: any, index: number): ReversalRow {
   return emptyReversalRow({
-    id: raw?.id || crypto.randomUUID(),
+    id: raw?.id || newUuid(),
     seq: index + 1,
     debtor: raw?.debtor || raw?.entityName || '',
     reason: raw?.reason || '',
@@ -176,7 +177,7 @@ function migrateReversal(raw: any, index: number): ReversalRow {
 
 function migrateWriteoff(raw: any, index: number): WriteoffRow {
   return emptyWriteoffRow({
-    id: raw?.id || crypto.randomUUID(),
+    id: raw?.id || newUuid(),
     seq: index + 1,
     debtor: raw?.debtor || raw?.entityName || '',
     nature: raw?.nature || '',

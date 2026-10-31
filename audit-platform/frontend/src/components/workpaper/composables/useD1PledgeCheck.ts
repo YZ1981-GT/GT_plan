@@ -25,6 +25,7 @@
  *
  * Requirements: 7.1-7.6, 8.1-8.6, 9.1-9.5, 15.3, 15.6, 15.9
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
@@ -93,10 +94,7 @@ const SELECT_FIELDS: Array<keyof PledgeRow> = ['noteType']
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function parseNum(val: any): number {

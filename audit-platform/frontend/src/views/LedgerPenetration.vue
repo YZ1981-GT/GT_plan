@@ -1408,6 +1408,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLedgerUrlSync } from '@/composables/useLedgerUrlSync'
@@ -2679,7 +2680,7 @@ function copySelectedRows(fallbackRow?: any) {
   if (rows.length === 0) return
   const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = lines.join('\n')
-  navigator.clipboard?.writeText(text).then(() => {
+  await copyText(text).then(() => {
     ElMessage.success(`已复制 ${rows.length} 行`)
   })
 }
@@ -2693,7 +2694,7 @@ function copyCurrentVoucher() {
   }
   const { header, lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = [header, ...lines].join('\n')
-  navigator.clipboard?.writeText(text).then(() => {
+  await copyText(text).then(() => {
     ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
   })
 }

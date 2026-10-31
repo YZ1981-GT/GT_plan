@@ -16,6 +16,7 @@
  *
  * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 8.4, 8.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -202,10 +203,7 @@ export function recalcRow(row: BadDebtRow): BadDebtRow {
 
 /** 生成动态子行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `sub-${crypto.randomUUID()}`
-  }
-  return `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `sub-${newUuid()}`
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

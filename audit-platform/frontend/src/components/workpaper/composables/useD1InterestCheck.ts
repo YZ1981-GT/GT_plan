@@ -20,6 +20,7 @@
  *
  * Requirements: 10.1-10.9, 11.1-11.4, 13.4, 13.5, 13.6, 13.9
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
@@ -104,10 +105,7 @@ const TOTAL_SUM_FIELDS: Array<keyof InterestCheckRow> = [
 
 /** 生成动态行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `dynamic-${crypto.randomUUID()}`
-  }
-  return `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `dynamic-${newUuid()}`
 }
 
 /** 空 InterestCheckRow 工厂：所有数值字段 0、字符串字段 ''、全新 rowId、rowType='dynamic' */

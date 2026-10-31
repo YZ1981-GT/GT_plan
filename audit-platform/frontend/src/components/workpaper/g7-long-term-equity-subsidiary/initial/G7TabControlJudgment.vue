@@ -472,6 +472,7 @@
  * Spec: .kiro/specs/g7-long-term-equity-subsidiary/
  * Requirements: 2.1, 2.2, 2.3
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -805,7 +806,7 @@ function initSections(): void {
 
   for (const def of SECTION_DEFINITIONS) {
     const sectionRows: G7ControlRow[] = def.rows.map(r => ({
-      id: crypto.randomUUID(),
+      id: newUuid(),
       seq: globalSeq++,
       dimension: r.dimension,
       criterion: r.criterion,
@@ -841,7 +842,7 @@ function loadFromHtmlData(data: Record<string, any> | null): void {
     sections.length = 0
     for (const sec of savedSections) {
       const rows: G7ControlRow[] = (sec.rows || []).map((r: any, idx: number) => ({
-        id: r.id || crypto.randomUUID(),
+        id: r.id || newUuid(),
         seq: r.seq || idx + 1,
         dimension: r.dimension || '',
         criterion: r.criterion || '',

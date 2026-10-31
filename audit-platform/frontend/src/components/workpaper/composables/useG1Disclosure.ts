@@ -12,6 +12,7 @@
  *
  * Requirements: 4.1~4.5, 14.3
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onScopeDispose, type Ref } from 'vue'
 import { parseNum, calcSubtotal } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -44,9 +45,7 @@ export const G1_DISCLOSURE_MAX_ROWS: Record<G1DisclosureVariant, number> = {
 
 function generateRowId(): string {
   return `row-${
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now().toString(36) + Math.random().toString(36).slice(2)
+    newUuid()
   }`
 }
 

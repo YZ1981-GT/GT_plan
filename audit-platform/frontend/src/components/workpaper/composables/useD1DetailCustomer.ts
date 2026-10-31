@@ -25,6 +25,7 @@
  *   期末未审 = 期末余额 + 重分类（被审计单位重分类调整）
  *   期末审定 = 期末未审 + 期末AJE + 期末RJE
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -100,11 +101,7 @@ export function recalcRow(row: CustomerRow): CustomerRow {
 
 /** 生成动态行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `dynamic-${crypto.randomUUID()}`
-  }
-  // Fallback for environments without crypto.randomUUID
-  return `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `dynamic-${newUuid()}`
 }
 
 /** 创建空白客户行 */

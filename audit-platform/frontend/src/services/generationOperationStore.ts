@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 export interface StoredGenerationOperation {
   projectId: string
   operationId: string
@@ -63,6 +64,5 @@ export function clearGenerationOperation(projectId: string, operationId: string)
 }
 
 export function newGenerationOperationId(): string {
-  if (!globalThis.crypto?.randomUUID) throw new Error('当前浏览器不支持安全生成 operation id')
-  return globalThis.crypto.randomUUID()
+  return newUuid()
 }

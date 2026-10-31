@@ -1,3 +1,4 @@
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReportExcelUrl, type ReportRow } from '@/services/auditPlatformApi'
@@ -87,10 +88,10 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
     const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
     const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
     try {
-      navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+      await copyRichText(html, text)
       ElMessage.success(`已复制 ${dataRows.length} 行，可粘贴到 Word/Excel`)
     } catch {
-      navigator.clipboard?.writeText(text)
+      await copyText(text)
       ElMessage.success('已复制为文本格式')
     }
   }

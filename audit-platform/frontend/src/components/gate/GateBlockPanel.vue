@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading, InfoFilled, CopyDocument } from '@element-plus/icons-vue'
@@ -170,7 +171,7 @@ function handleJump(group: GroupedRule) {
 
 async function copyTrace() {
   try {
-    await navigator.clipboard.writeText(props.traceId)
+    await copyText(props.traceId)
     ElMessage.success('trace_id 已复制')
   } catch {
     ElMessage.warning('复制失败，请手动复制')

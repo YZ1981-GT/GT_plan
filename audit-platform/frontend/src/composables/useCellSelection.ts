@@ -17,6 +17,7 @@
  * （GtAmountCell 的原始金额，不受显示单位影响）或显示文字。
  * 经典方式（以及没装表格插件的单测）走下面原有的实现，行为与改造前一致。
  */
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { customRef, getCurrentInstance, onMounted, onUnmounted, reactive, ref, watch, type ComponentInternalInstance } from 'vue'
 import { isGridInstalled, kernelForElement, onAnyKernelChange, type GridKernel } from '@/components/grid/GridKernel'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -363,14 +364,9 @@ export function useCellSelection() {
     const html = `<table border="1">${htmlRows}</table>`
 
     try {
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([text], { type: 'text/plain' }),
-        }),
-      ])
+      await copyRichText(html, text)
     } catch {
-      navigator.clipboard?.writeText(text)
+      await copyText(text)
     }
   }
 

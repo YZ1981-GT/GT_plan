@@ -14,6 +14,7 @@
  * try { await api.post(...) }
  * catch (e) { handleApiError(e, '保存底稿') }
  */
+import { copyText } from '@/utils/clipboard'
 import { ElMessage, ElNotification } from 'element-plus'
 import { getLastTraceId } from '@/utils/http'
 import { refIssueDetailText } from '@/utils/formulaRefIssues'
@@ -134,7 +135,7 @@ export function handleApiError(e: any, context: string): void {
     title: `${context}失败`,
     dangerouslyUseHTMLString: true,
     message: traceId
-      ? `系统错误，请联系管理员<br/><small style="cursor:pointer;color:var(--gt-color-primary)" onclick="navigator.clipboard.writeText('${traceId}').then(()=>this.textContent='已复制!')">trace: ${traceId} 📋</small>`
+      ? `系统错误，请联系管理员<br/><small style="cursor:pointer;color:var(--gt-color-primary)" onclick="await copyText('${traceId}').then(()=>this.textContent='已复制!')">trace: ${traceId} 📋</small>`
       : '系统错误，请联系管理员',
     type: 'error',
     duration: 10000,

@@ -5,6 +5,7 @@
  * - 按日填写余额；利息 = 余额 × 年利率 / 360（对齐源模板）
  * - 测算合计 vs 账面利息 → 差异
  */
+import { newUuid } from '@/utils/uuid'
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
@@ -233,10 +234,7 @@ export interface DepositDailyPack {
 }
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return `${prefix}-${newUuid()}`
 }
 
 export function createEmptyGroup(

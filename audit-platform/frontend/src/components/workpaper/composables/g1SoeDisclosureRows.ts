@@ -9,6 +9,7 @@
  *    - 指定行 = designated
  *    - 衍生单独进八、3，不计入交易性表「其他」
  */
+import { newUuid } from '@/utils/uuid'
 import { parseG1AdjStore, type G1AdjAsset, type G1AdjClass } from './g1AdjudicationItems'
 import { buildG1AdjudicationRows, type G1AdjudicationRow } from './useG1Adjudication'
 import { parseNum } from './useG1TraFinFormulaEngine'
@@ -115,9 +116,7 @@ export const G1_SOE_TRADING_ROW_DEFS: G1SoeTradingRowDef[] = [
 export function createEmptyDerivativeRow(partial?: Partial<G1SoeDerivativeRow>): G1SoeDerivativeRow {
   return {
     rowId: partial?.rowId
-      ?? `drv-${typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : Date.now().toString(36) + Math.random().toString(36).slice(2)}`,
+      ?? `drv-${newUuid()}`,
     label: partial?.label ?? '',
     endAmount: parseNum(partial?.endAmount),
     priorAmount: parseNum(partial?.priorAmount),

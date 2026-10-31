@@ -1,4 +1,5 @@
 /** E1-14 货币资金分析：源模板七区段、八项比例及旧 JSON 兼容。 */
+import { newUuid } from '@/utils/uuid'
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { calcChange, calcChangeRate, exceedsThreshold, parseNum } from './useE1FormulaEngine'
@@ -86,7 +87,7 @@ interface StructuredState {
 
 function years(): YearValues { return { current: 0, prior: 0, prior2: 0 } }
 function id(prefix: string): string {
-  return `${prefix}-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`
+  return `${prefix}-${newUuid()}-${Math.random()}`}`
 }
 function defaultState(): StructuredState {
   return {

@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 /**
  * 行身份生成（值化 / opaque）—— K 循环 BP-8 位置化行身份的统一修复出口。
  *
@@ -48,9 +49,5 @@
 
 /** 生成一个值化行身份。`prefix` 只作可读前缀，不参与唯一性。 */
 export function newRowIdentity(prefix: string): string {
-  const rand =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 8)
-  return `${prefix}-${Date.now()}-${rand}`
+  return `${prefix}-${Date.now()}-${newUuid().slice(0, 8)}`
 }

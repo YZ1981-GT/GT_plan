@@ -20,6 +20,7 @@
  *
  * Requirements: 7.1-7.5, 8.1-8.5, 9.1-9.4, 13.3, 13.5, 13.6, 13.8, 17.1-17.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { parseNum, calcSubtotal, normalizeMemoStatus } from './useD1FormulaEngine'
@@ -103,10 +104,7 @@ const STRING_FIELDS: Array<keyof EndorsementRow> = [
 
 /** 生成动态行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `dynamic-${crypto.randomUUID()}`
-  }
-  return `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `dynamic-${newUuid()}`
 }
 
 /** 空 EndorsementRow 工厂：所有数值字段 0、字符串字段 ''、全新 rowId、rowType='dynamic' */

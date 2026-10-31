@@ -7,6 +7,7 @@
  * 一个对方科目一行（后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库
  * （spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
+import { newUuid } from '@/utils/uuid'
 import { computed, ref, type MaybeRefOrGetter, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -97,9 +98,7 @@ export function normalizeResult(
 }
 
 function makeId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `g6vc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 function buildSourceId(parts: {

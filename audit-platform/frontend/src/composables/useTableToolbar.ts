@@ -11,6 +11,7 @@
  * @module composables/useTableToolbar
  */
 
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { ref, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
@@ -158,14 +159,14 @@ export function useTableToolbar<T extends Record<string, any>>(tableData: Ref<T[
     const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
 
     try {
-      const htmlBlob = new Blob([html], { type: 'text/html' })
-      const textBlob = new Blob([text], { type: 'text/plain' })
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob }),
-      ])
-      ElMessage.success(`已复制 ${data.length} 行 × ${columns.length} 列，可粘贴到 Word/Excel`)
+      const result = await copyRichText(html, text)
+      if (result === 'rich') {
+        ElMessage.success(`已复制 ${data.length} 行 × ${columns.length} 列，可粘贴到 Word/Excel`)
+      } else {
+        ElMessage.success('已复制为文本格式')
+      }
     } catch {
-      await navigator.clipboard?.writeText(text)
+      await copyText(text)
       ElMessage.success('已复制为文本格式')
     }
   }

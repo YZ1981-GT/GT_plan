@@ -271,6 +271,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyRichText, copyText } from '@/utils/clipboard'
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -1021,9 +1022,9 @@ function copyResult() {
   const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
   const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
   try {
-    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    await copyRichText(html, text)
     ElMessage.success(`已复制 ${filteredRows.value.length} 行`)
-  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制为文本') }
+  } catch { await copyText(text); ElMessage.success('已复制为文本') }
 }
 
 function exportBaseName() {

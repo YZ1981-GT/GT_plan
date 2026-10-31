@@ -16,6 +16,7 @@
  *
  * Requirements: 5.1-5.5
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, sumField, isBalanced } from './useE1FormulaEngine'
@@ -63,10 +64,7 @@ const REPORT_ITEM_TO_ADJ_KEY: Record<string, string> = {
 
 /** 生成行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `adj-${crypto.randomUUID()}`
-  }
-  return `adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `adj-${newUuid()}`
 }
 
 /** 创建空白调整行 */

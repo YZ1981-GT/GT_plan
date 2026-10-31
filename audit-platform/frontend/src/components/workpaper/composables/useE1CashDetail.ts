@@ -20,6 +20,7 @@
  *
  * Requirements: 3.1-3.6
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import {
@@ -62,10 +63,7 @@ const CROSS_SHEET_KEY_ENDING = 'E1-cash-detail-total-unaudited'
 
 /** 生成行 ID */
 function generateRowId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `cash-${crypto.randomUUID()}`
-  }
-  return `cash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `cash-${newUuid()}`
 }
 
 /** 重算行内公式字段 */

@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { CopyDocument, Download } from '@element-plus/icons-vue'
@@ -217,7 +218,7 @@ async function copyToClipboard() {
   if (!draft.value) return
   const text = buildDraftText(draft.value)
   try {
-    await navigator.clipboard.writeText(text)
+    await copyText(text)
     ElMessage.success('已复制到剪贴板')
   } catch {
     ElMessage.warning('复制失败，请手动选择文本')

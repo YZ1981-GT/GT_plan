@@ -97,6 +97,7 @@
 </template>
 
 <script setup lang="ts">
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -158,7 +159,7 @@ async function loadStats() {
   } catch { /* ignore */ }
 }
 
-function idempotencyKey() { return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}` }
+function idempotencyKey() { return newUuid() }
 
 async function batchApprove() {
   if (!selectedRows.value.length) return

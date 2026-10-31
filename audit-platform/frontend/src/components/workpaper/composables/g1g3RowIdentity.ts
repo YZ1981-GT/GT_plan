@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 /**
  * G1 / G3 行身份铸造 —— BP-7（下标派生行身份）+ Req 1.3（timestamp 无随机后缀）的单点修复。
  *
@@ -73,7 +74,7 @@ export function isBareTimestampRowId(value: unknown): boolean {
 }
 
 /**
- * 铸一段**不含前缀**的唯一后缀。优先 `crypto.randomUUID()`，不可用时退时间戳 + 随机。
+ * 铸一段**不含前缀**的唯一后缀。优先 `newUuid()`，不可用时退时间戳 + 随机。
  *
  * 🔴 为什么本模块只出后缀、不出整个 id：前缀（`g1d` / `g3d`）必须**内联在消费方的铸造点**
  * ——「行身份形态回源码核对」的判据要在声明 `id: string` 行模型的那个文件里逐字找到
@@ -82,10 +83,7 @@ export function isBareTimestampRowId(value: unknown): boolean {
  * 还顺带消掉了「同一个 `'g1d'` 字面量两处声明」的漂移面（本模块的常量表 vs 铸造点）。
  */
 export function mintRowIdSuffix(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return newUuid()
 }
 
 /**

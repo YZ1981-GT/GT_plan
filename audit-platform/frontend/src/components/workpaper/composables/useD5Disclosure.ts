@@ -14,6 +14,7 @@
  *
  * Requirements: 8.1-8.8
  */
+import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import { calcImpairmentEnd, parseNum, calcSubtotal } from './useD5FormulaEngine'
 import type { ChecklistResponse } from './useD5FormData'
@@ -70,7 +71,7 @@ const ITEM_SOE_TEXT_1 = 'D5-note-soe-text-1'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+  return `row-${newUuid()}`
 }
 
 function safeParseImpairmentRows(jsonStr: string | null | undefined): ImpairmentRow[] {

@@ -1,3 +1,4 @@
+import { newUuid } from '@/utils/uuid'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import {
   filterDecisionsByCombination,
@@ -112,10 +113,7 @@ export interface G7SameControlValidationContext {
 }
 
 function uid(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${newUuid()}`
 }
 
 export function nullableNumber(value: unknown): number | null {

@@ -415,6 +415,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '@/utils/clipboard'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -854,7 +855,7 @@ async function doExport() {
 function copyCorrelationId() {
   const id = queryError.value?.correlationId
   if (!id) return
-  navigator.clipboard.writeText(id).then(
+  await copyText(id).then(
     () => { ElMessage.success('已复制追踪号') },
     () => { ElMessage.warning('复制失败，请手动复制') },
   )
@@ -925,7 +926,7 @@ function copyFormulaRef(index: number) {
     ElMessage.warning(refHint(index))
     return
   }
-  navigator.clipboard.writeText(ref).then(() => {
+  await copyText(ref).then(() => {
     ElMessage.success(`已复制: ${ref}`)
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

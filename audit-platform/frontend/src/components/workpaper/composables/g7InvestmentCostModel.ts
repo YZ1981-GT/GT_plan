@@ -1,6 +1,7 @@
 /**
  * G7-13 投资成本测试 — 纯函数模型（hydrate / recalc / G7-5 FV / 校验 / 廉价购买分录）
  */
+import { newUuid } from '@/utils/uuid'
 import {
   calcGoodwill,
   calcInvestmentCost,
@@ -44,7 +45,7 @@ export function createEmptyInvestmentCostRow(
   investeeName = '',
 ): InvestmentCostTestRow {
   return {
-    id: crypto.randomUUID(),
+    id: newUuid(),
     seq,
     investeeName,
     investeeId: '',
@@ -112,7 +113,7 @@ export function hydrateInvestmentCostRows(raw: unknown): InvestmentCostTestRow[]
       ...createEmptyInvestmentCostRow(i + 1, String(rawRow.investeeName || '')),
       ...rawRow,
       seq: i + 1,
-      id: rawRow.id || crypto.randomUUID(),
+      id: rawRow.id || newUuid(),
       investeeId: String(rawRow.investeeId ?? rawRow.investee_id ?? ''),
       investmentRatio: parseNum(rawRow.investmentRatio ?? rawRow.investment_ratio),
     }
