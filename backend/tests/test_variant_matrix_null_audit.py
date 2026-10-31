@@ -719,15 +719,19 @@ class TestNonNullValuesUnchanged:
     """补记必须是 additive：既有非 null 取值逐字不变。"""
 
     def test_non_null_count_snapshot(self, matrix: dict) -> None:
-        """102 科目 × 4 变体的非 null 计数快照。
+        """101 科目 × 4 变体的非 null 计数快照。
 
-        补记 FALSE_NULL 会让计数**增加**（允许），但既有值不得被改动 —— 由下一条断言。
+        Phase 8 有意把标题提示导致的两条投资收益合并为一个 canonical account；
+        科目数 102→101，但非空落点数保持 356。其他值由生成器对拍守卫固定。
         """
         accounts = matrix.get("accounts", [])
-        assert len(accounts) == 102, (
-            f"variant_matrix 科目数由 102 变为 {len(accounts)} —— "
-            "本 spec 不新增科目；若是 A spec 增了母公司维度，须复核 null 裁决集合"
+        assert len(accounts) == 101, f"variant_matrix 科目数应为 101，实为 {len(accounts)}"
+        non_null = sum(
+            value is not None
+            for account in accounts
+            for value in (account.get("variants") or {}).values()
         )
+        assert non_null == 356, f"variant_matrix 非空落点数应保持 356，实为 {non_null}"
 
     def test_audited_keys_exist_and_match_verdict(self, matrix: dict) -> None:
         """裁决表里的每条都要在 JSON 里存在，且**当前取值与裁决相符**。
@@ -775,12 +779,11 @@ class TestNonNullValuesUnchanged:
 
 
 class TestBlockingRegistered:
-    """补记要改 `variant_matrix`，与 A spec 的 Task 10 撞车 —— 阻塞方须显式登记。"""
+    """历史阻塞已由 Phase 8 收口，常量保留为可审计的已解决状态。"""
 
-    def test_blocked_by_is_the_parent_company_spec(self) -> None:
-        assert BLOCKED_BY_SPEC == "parent-company-note-chapter-and-sourcing", (
-            "阻塞方登记错误 —— A spec 的 Task 10 也要改 variant_matrix，"
-            "且其 Requirement 10.4 要求「其余 100 个非母公司科目取值不变」"
+    def test_historical_blocker_is_marked_resolved(self) -> None:
+        assert BLOCKED_BY_SPEC == "resolved:disclosure-note-template-word-realignment-phase8", (
+            "投资收益 canonical account 合并后不应继续声称被 parent-company spec 阻塞"
         )
 
     def test_verdict_lookup_never_guesses(self) -> None:

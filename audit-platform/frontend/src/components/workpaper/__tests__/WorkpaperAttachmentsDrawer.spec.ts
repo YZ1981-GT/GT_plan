@@ -530,3 +530,74 @@ describe('WorkpaperAttachmentsDrawer — 函证逐笔判定（spec attachment-co
     expect(wrapper.find('[data-testid="evidence-type-select"]').attributes('data-value')).toBe('confirmation')
   })
 })
+
+describe('WorkpaperAttachmentsDrawer — 抽凭样本逐笔统计（spec attachment-voucher-evidence-binding 需求 5.2）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const voucherReq = (samples: Record<string, unknown>, satisfied = true) => ({
+    type: 'voucher', label: '凭证 / 原始单据', satisfied, samples,
+  })
+
+  it('「凭证」类声明带样本统计：显示汇总、缺证据样本与补救提示；是否满足照后端判定', async () => {
+    mockGet.mockResolvedValue({
+      items: sampleItems,
+      evidence_requirements: [voucherReq({
+        total: 3, with_evidence: 1, missing: 2, truncated: false,
+        missing_items: [
+          { voucher_key: 'k1', label: '2025-01-07 记-0003', phase: 'final', source: '抽凭' },
+          { voucher_key: 'k2', label: '0004', phase: null, source: '挂凭', reason: '旧登记缺凭证日期，无法对应到凭证' },
+        ],
+      })],
+    })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', wpCode: 'D2-4', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    const block = wrapper.find('[data-testid="voucher-samples"]')
+    expect(block.find('.wp-att-breakdown__summary').text()).toBe('登记抽凭样本 3 笔：已取得凭证证据 1、缺 2')
+    expect(block.findAll('.wp-att-breakdown__missing li').map((li) => li.text())).toEqual([
+      '2025-01-07 记-0003',
+      '0004（旧登记缺凭证日期，无法对应到凭证）',
+    ])
+    expect(block.find('.wp-att-breakdown__hint').text()).toBe('在凭证检查表该行「来源」列的 📎 上传或引用其他底稿已有的原件')
+    expect(wrapper.find('[data-testid="evidence-requirements"]').text()).toContain('✓ 凭证 / 原始单据')
+  })
+
+  it('缺证据样本超过上限只列前若干笔并写明共几笔；全部有证据只显示汇总；无样本统计不显示', async () => {
+    mockGet.mockResolvedValueOnce({
+      items: sampleItems,
+      evidence_requirements: [voucherReq({
+        total: 80, with_evidence: 20, missing: 60, truncated: true,
+        missing_items: [{ voucher_key: 'k1', label: '2025-01-07 记-0003' }],
+      }, false)],
+    })
+    const many = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true }, global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(many.findAll('[data-testid="voucher-samples"] li').map((li) => li.text())).toEqual(['2025-01-07 记-0003', '……共 60 笔'])
+
+    mockGet.mockResolvedValueOnce({
+      items: sampleItems,
+      evidence_requirements: [voucherReq({ total: 2, with_evidence: 2, missing: 0, truncated: false, missing_items: [] })],
+    })
+    const done = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true }, global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    const block = done.find('[data-testid="voucher-samples"]')
+    expect(block.find('.wp-att-breakdown__summary').text()).toBe('登记抽凭样本 2 笔：已取得凭证证据 2、缺 0')
+    expect(block.find('.wp-att-breakdown__missing').exists()).toBe(false)
+    expect(block.find('.wp-att-breakdown__hint').exists()).toBe(false)
+
+    mockGet.mockResolvedValueOnce({ items: sampleItems, evidence_requirements: [{ type: 'voucher', label: '凭证 / 原始单据', satisfied: false }] })
+    const none = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true }, global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(none.find('[data-testid="voucher-samples"]').exists()).toBe(false)
+  })
+})

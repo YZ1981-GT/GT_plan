@@ -237,7 +237,7 @@ function onOcrUpload(row: NmRow, uploadFile: any) {
     if (patch.debitAmount) row.debit = patch.debitAmount
     if (patch.businessContent) row.business = patch.businessContent
     persist()
-  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(row.id) })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(row.id), row })
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────

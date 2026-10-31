@@ -222,6 +222,7 @@ const {
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'L6',
   itemId: () => `L6-adj-${activeType.value}`,
+  entryType: activeType,
   buildLineItems: () =>
     filteredEntries.value.map((e: any) => ({
       account_name: e.accountName,

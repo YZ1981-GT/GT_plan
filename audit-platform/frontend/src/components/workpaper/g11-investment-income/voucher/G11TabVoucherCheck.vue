@@ -729,7 +729,7 @@ async function uploadOcr(row: G11VoucherCheckRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id))
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
       const res = await http.post(`/api/workpapers/${props.wpId}/g11/contract-ocr`, formData)
       rowEv.refresh()
       const data = res.data?.data ?? res.data ?? {}

@@ -112,41 +112,63 @@ async def verify_push(
 async def deep_verify_push(
     db: AsyncSession, project_id: uuid.UUID, year: int
 ) -> dict[str, Any]:
-    """深度反向校验：重新 dry_run 推送引擎取当前源头值，对比目标值。
+    """深度反向校验：以 dry-run 重算当前源头，逐项报告目标状态。
 
-    比 verify_push 更准确（后者只比快照），但更重（要跑一遍推送引擎）。
+    ``write`` 表示当前目标和公式值不同，会在正常推送中被改写；``unchanged`` 表示已一致；
+    ``keep_*`` 表示人工/锁定保护；``skipped`` / ``conflict`` 是无法安全验证的未决项。
+    过程在 savepoint 内运行，结束时回滚外层会话，不能写入 run/state/目标表。
     """
     try:
-        from app.services.formula_push.engine import run
+        from app.services.formula_push.engine import MANUAL, run
+        from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED
 
-        # dry_run=True 不写数据，只计算
-        result = await run(db, project_id, year, dry_run=True, trigger_source="deep_verify")
-
+        result = await run(db, project_id=project_id, year=year, trigger=MANUAL, dry_run=True)
+        summary = {"consistent": 0, "diverged": 0, "manual_override": 0, "unresolved": 0, "fallback": 0}
+        action_counts: dict[str, int] = {}
         diverged_items: list[dict[str, Any]] = []
-        consistent_count = 0
-        for item in (result.items if result else []):
-            action = getattr(item, 'action', '')
-            if action in ("written", "unchanged", "kept"):
-                # 这些地址推送引擎认为正确
-                consistent_count += 1
-            elif action in ("skipped", "conflict"):
-                diverged_items.append({
-                    "addr_id": getattr(item, 'addr_id', ''),
-                    "action": action,
-                    "reason": getattr(item, 'reason', ''),
-                    "old_value": str(getattr(item, 'old_value', '')),
-                    "new_value": str(getattr(item, 'new_value', '')),
-                })
-
+        for item in result.items:
+            action = item.action
+            action_counts[action] = action_counts.get(action, 0) + 1
+            if action == "unchanged":
+                summary["consistent"] += 1
+                continue
+            if action.startswith("keep_"):
+                summary["manual_override"] += 1
+                continue
+            if action == FALLBACK_TO_TOTAL:
+                summary["fallback"] += 1
+                continue
+            if action == "write":
+                status = "diverged"
+            elif action in (SKIPPED, CONFLICT):
+                status = "unresolved"
+            else:
+                status = "unresolved"
+            summary[status] += 1
+            diverged_items.append({
+                "addr_id": item.addr_id,
+                "domain": item.domain,
+                "rule_id": item.rule_id,
+                "action": action,
+                "reason": item.reason,
+                "formula_value": str(item.formula) if item.formula is not None else None,
+                "current_value": str(item.current) if item.current is not None else None,
+            })
         return {
             "mode": "deep",
-            "total": consistent_count + len(diverged_items),
-            "consistent": consistent_count,
-            "diverged": len(diverged_items),
+            "total": len(result.items),
+            **summary,
+            "action_counts": action_counts,
             "diverged_items": diverged_items,
-            "run_written": result.written_count if result else 0,
-            "run_skipped": result.skipped_count if result else 0,
+            "run_written": result.written_count,
+            "run_skipped": result.skipped_count,
         }
     except Exception as exc:
         logger.warning("deep_verify 执行失败: %s", exc, exc_info=True)
         return {"mode": "deep", "error": str(exc)[:200], "total": 0}
+    finally:
+        # dry-run 已回滚内部 savepoint；外层 rollback 清掉 advisory/read transaction，避免请求结束留 idle transaction。
+        try:
+            await db.rollback()
+        except Exception:  # pragma: no cover - 连接已中断时只保留原错误报告
+            pass

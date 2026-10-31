@@ -7,7 +7,11 @@
   * deprecate：K14~K18 停用并指向同科目替代审定表（H10-1/K10-1/G11-1/G13-1/K7-1）。
 - `cell_verdicts`：孤儿 cell（kind=orphan，R2-F1，25 格）判 deprecate，replaced_by 指父 sheet；
   T06 追加 §6.4 种子名不一致的 47 格（kind=seed_name_mismatch）：超出模板已用范围 14 格 deprecate，
-  范围内 33 格 keep_semantic_unverified（不带 replaced_by）。
+  范围内 33 格原判 keep_semantic_unverified（不带 replaced_by）。
+  spec wp-deeplink-locate-coverage-closure 追加 kind=seed_coordinate_mismatch：其余旧种子坐标逐格对模板复核后停用，
+  replaced_by 指模板核对后的新坐标（`t_address_registry_seed.json`）或父 sheet；
+  spec wp-deeplink-locate-residual-closure 把上述 33 格纳入同一复核，判定改记为本 kind（原记录删除），
+  现无 keep_semantic_unverified 记录（判定类型仍合法）。
 
 本模块只做加载 + 结构校验（纯函数、只读、仅标准库），不改目录。生成器（T07）据此
 在 classification 骨架之后补 sheet、从种子 loader 输入清除孤儿 cell、产出 deprecated 条目。
@@ -21,11 +25,13 @@ from typing import Any
 
 # sheet verdict 三种结论（design §3.2 / 需求 2.1）
 SHEET_VERDICTS = frozenset({"add_platform_sheet", "fix_parent", "deprecate"})
-# cell verdict：deprecate（R2-F1 孤儿 25 格 + §6.4 超范围 14 格）与 keep_semantic_unverified
-# （§6.4 范围内 33 格：地址保留，semantic_label=null、cell_label「{A1}（语义待核对）」）
+# cell verdict：deprecate 与 keep_semantic_unverified（地址保留，semantic_label=null、cell_label「{A1}（语义待核对）」；
+# §6.4 范围内 33 格原用此判定，wp-deeplink-locate-residual-closure 起改由坐标复核判定，现 0 格）
 CELL_VERDICTS = frozenset({"deprecate", "keep_semantic_unverified"})
-# cell 记录的来源分类：orphan（父 sheet 不在 classification 骨架）/ seed_name_mismatch（§6.4）
-CELL_KINDS = frozenset({"orphan", "seed_name_mismatch"})
+# cell 记录的来源分类：orphan（父 sheet 不在 classification 骨架）/ seed_name_mismatch（§6.4）/
+# seed_coordinate_mismatch（spec wp-deeplink-locate-coverage-closure：逐格对模板复核，种子坐标与模板不符，
+# 由 backend/scripts/acnr/review_cell_coordinates.py 生成）
+CELL_KINDS = frozenset({"orphan", "seed_name_mismatch", "seed_coordinate_mismatch"})
 
 _DEFAULT_PATH = (
     Path(__file__).resolve().parents[4]  # backend/  (loaders → acnr → services → app → backend)

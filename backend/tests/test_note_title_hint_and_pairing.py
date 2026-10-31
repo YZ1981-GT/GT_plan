@@ -145,3 +145,19 @@ async def test_alias_conversion_updates_target_title_and_keeps_values() -> None:
     assert note.note_section == target["section_number"]
     assert note.section_title == note.account_name == "营业收入和营业成本"
     assert note.table_data == {"rows": [{"label": "主营业务", "values": [100]}]}
+
+
+@pytest.mark.asyncio
+async def test_standard_template_loader_preserves_title_hint(monkeypatch) -> None:
+    """标准种子投影不得丢标题提示，否则生成链永远看不见 Phase 8 的修复。"""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+
+    from app.services.disclosure_engine import DisclosureEngine
+    from app.services.note_custom_template_service import NoteCustomTemplateService
+
+    monkeypatch.setattr(NoteCustomTemplateService, "load_custom_template", AsyncMock(return_value=None))
+    templates = await DisclosureEngine(MagicMock())._load_templates(uuid4(), "soe", "standalone")
+    investment_income = next(template for template in templates if template["note_section"] == "八、70")
+    assert investment_income["section_title"] == "投资收益"
+    assert investment_income["title_hint"] == "下表中不适用的项目，删除"

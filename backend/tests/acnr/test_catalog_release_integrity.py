@@ -2,7 +2,8 @@
 
 - 孤儿计数 0（含停用条目，父 sheet 都在目录内）；
 - sheet_verdicts 判 deprecate 的 25 个孤儿 cell 与 14 个超范围 cell 发布后都是 `deprecated=true` 条目，
-  逐个 `full_resolve` 命中、带可解析的 `replaced_by`；判 keep_semantic_unverified 的 33 格仍是有效条目；
+  逐个 `full_resolve` 命中、带可解析的 `replaced_by`；原判 keep_semantic_unverified 的 33 格已由坐标复核接管
+  （spec wp-deeplink-locate-residual-closure：kind=seed_coordinate_mismatch 435 格，含这 33 格），不再有待核对判定；
 - 「无物理来源的有效 cell」为 0：判 deprecate 的 cell 没有一个仍是有效条目；
 - K14~K18 五个 sheet 逐个 `full_resolve` 带 `replaced_by`；
 - `/api/acnr/entries`（TestClient）默认列 5 张补登 sheet、不列 K14~K18，`include_deprecated=true` 时列出；
@@ -37,7 +38,9 @@ def test_verdict_counts_are_design_counts():
     assert _DEPRECATED_SHEETS == ["K14", "K15", "K16", "K17", "K18"]
     assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "orphan") == 25
     assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "seed_name_mismatch") == 14
-    assert len(_KEEP_CELLS) == 33
+    assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "seed_coordinate_mismatch") == 435
+    # T06 原判「语义待核对」的 33 格已纳入坐标复核（同一格不留两份判定）
+    assert len(_KEEP_CELLS) == 0
 
 
 def test_no_orphan_cells_including_deprecated():
@@ -66,8 +69,14 @@ def test_deprecated_cells_resolve_with_resolvable_replacement():
         if not (r.found and r.deprecated is True and r.replaced_by == v["replaced_by"] and r.reason):
             bad.append((v["addr_id"], r.found, r.deprecated, r.replaced_by))
     assert not bad, bad[:5]
-    targets = asyncio.run(_resolve_all(sorted({v["replaced_by"] for v in _DEPRECATE_CELLS})))
-    assert all(t.found and t.entry_type == "sheet" and not t.deprecated for t in targets)
+    keys = sorted({v["replaced_by"] for v in _DEPRECATE_CELLS})
+    targets = dict(zip(keys, asyncio.run(_resolve_all(keys))))
+    # 替代地址是父 sheet，或模板核对后的新坐标（spec wp-deeplink-locate-coverage-closure 改指的 cell）
+    wrong = [(v["addr_id"], v["replaced_by"], t.found, t.entry_type, t.deprecated) for v in _DEPRECATE_CELLS
+             if not ((t := targets[v["replaced_by"]]).found and not t.deprecated
+                     and t.entry_type == ("sheet" if v["replaced_by"] == v["parent_sheet_code"] else "cell"))]
+    assert not wrong, wrong[:5]
+    assert any(t.entry_type == "cell" for t in targets.values()), "改指新坐标的停用格应至少一个（防空转）"
 
 
 @pytest.mark.parametrize("code", ["K14", "K15", "K16", "K17", "K18"])

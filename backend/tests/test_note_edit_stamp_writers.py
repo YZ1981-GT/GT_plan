@@ -23,8 +23,10 @@ import tests.procedure_trim.test_note_linkage_single_source as _linkage
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole
+from app.models.audit_log_models import AuditLogEntry
 from app.models.core import Project, ProjectUser, User
-from app.models.report_models import DisclosureNote, GroupNoteTemplateBaseline
+from app.models.report_models import DisclosureNote, GroupNoteTemplateBaseline, NoteSectionVersionTree
+from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers import group_note_baseline, note_offline, note_wp_mapping, recycle_bin
 from tests.test_note_text_batch_endpoints import _Actor
 
@@ -48,13 +50,41 @@ def _cash_table(values: list) -> dict:
     return {"_tables": [table], **mirror}
 
 
+def _edited_offline_package(env: dict, values: list) -> bytes:
+    """以 DB 当前值签发 1.1 包，再只改可编辑的 worksheet 值。"""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.services.note_offline_export_service import export_sections_to_xlsx
+
+    payload, _ = export_sections_to_xlsx(
+        [{
+            "section_id": "八、1", "note_section": "八、1", "section_title": "货币资金",
+            "guidance_text": "旧指引", "table_data": _cash_table([100, 80]),
+        }],
+        project_name="测试", year=YEAR,
+        package_context={"project_id": env["ids"]["p"], "year": YEAR, "template_type": "soe"},
+    )
+    wb = load_workbook(BytesIO(payload))
+    ws = next(sheet for sheet in wb.worksheets if sheet.title not in {"注意事项", "章节清单", "_meta_"})
+    row = next(r for r in range(1, ws.max_row + 1) if ws.cell(r, 1).value == "库存现金")
+    for index, value in enumerate(values, start=2):
+        ws.cell(row, index, value=value)
+    output = BytesIO()
+    wb.save(output)
+    return output.getvalue()
+
+
 @pytest_asyncio.fixture
 async def env() -> AsyncGenerator[dict, None]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
-            User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__,
-            GroupNoteTemplateBaseline.__table__]))
+            User.__table__, Project.__table__, ProjectUser.__table__, StaffMember.__table__,
+            ProjectAssignment.__table__, DisclosureNote.__table__, GroupNoteTemplateBaseline.__table__,
+            NoteSectionVersionTree.__table__, AuditLogEntry.__table__,
+        ]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     ids = {k: uuid.uuid4() for k in ("me", "viewer", "p", "q", "cash", "other", "gone", "linked", "baseline")}
     async with factory() as s:
@@ -228,9 +258,12 @@ class TestOfflineImportGuidance:
         from app.services import note_offline_import_service as svc
 
         validation = svc.ImportValidationResult(
-            valid=True, meta_data={"八、1": {"guidance_text": "新指引"}, "八、2": {"guidance_text": None}})
+            valid=True, meta_data={"八、1": {"guidance_text": "新指引"}, "八、2": {"guidance_text": None}},
+            manifest={"template_type": "soe"}, legacy_unsigned=False,
+        )
         since = _since()
         with patch.object(svc, "validate_import_file", return_value=validation), \
+                patch.object(svc, "context_errors", return_value=[]), \
                 patch.object(svc, "apply_import", return_value=svc.ImportResult(success=True)):
             resp = await env["client"].post(
                 f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute",
@@ -241,6 +274,88 @@ class TestOfflineImportGuidance:
         assert cash.guidance_text == "新指引", "路由不提交 ⇒ 会话关闭即回滚，回写从未落库"
         _assert_stamped(cash, env["ids"]["me"], since)
         _assert_untouched(await _note(env, "linked"))  # 指引本来就是空：值没变不算编辑
+
+    @pytest.mark.asyncio
+    async def test_execute_writes_tables_reports_actual_changes_and_publishes_event(self, env, monkeypatch):
+        """端点真写 DB：回执按实际变化计数，提交后逐章发 NOTE_SECTION_SAVED；幂等重传报 0。"""
+        import json
+
+        from app.models.audit_platform_schemas import EventType
+        from app.services import event_bus as event_bus_module
+
+        payload = _edited_offline_package(env, [777, 666])
+        published = []
+
+        async def _capture(self, event):
+            published.append(event)
+
+        monkeypatch.setattr(type(event_bus_module.event_bus), "publish", _capture)
+        data = {"decisions": json.dumps({"八、1": "overwrite"}), "merge_cells": "{}"}
+        files = {"file": ("离线包.xlsx", payload, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        since = _since()
+        resp = await env["client"].post(
+            f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute", data=data, files=files,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["sections_imported"] == 1
+        assert resp.json()["tables_written"] == 1
+        assert resp.json()["changed_sections"] == ["八、1"]
+        assert len(resp.json()["version_node_ids"]) == 1
+        assert resp.json()["audit_log_id"]
+        async with env["factory"]() as db:
+            version_count = await db.scalar(sa.select(sa.func.count()).select_from(NoteSectionVersionTree))
+            audit_count = await db.scalar(sa.select(sa.func.count()).select_from(AuditLogEntry).where(
+                AuditLogEntry.action_type == "note_offline_import"))
+        assert version_count == audit_count == 1
+        cash = await _note(env, "cash")
+        assert cash.table_data["_tables"][0]["rows"][0]["values"] == [777, 666]
+        assert cash.table_data["rows"] == cash.table_data["_tables"][0]["rows"]
+        _assert_stamped(cash, env["ids"]["me"], since)
+        assert len(published) == 1
+        assert published[0].event_type == EventType.NOTE_SECTION_SAVED
+        assert published[0].extra == {"section_code": "八、1", "action": "offline_import"}
+
+        before_stamp = cash.updated_at
+        again = await env["client"].post(
+            f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute", data=data, files=files,
+        )
+        assert again.status_code == 400
+        assert "导出后已变化" in again.text
+        assert (await _note(env, "cash")).updated_at == before_stamp
+        assert len(published) == 1, "旧基线重传被拒绝，不应发第二次事件"
+
+    @pytest.mark.asyncio
+    async def test_execute_rolls_back_everything_when_audit_record_fails(self, env, monkeypatch):
+        """审计 / 版本记录不是 best-effort：写不进 ⇒ 400，表格与版本树一行不留，不发事件。"""
+        import json
+
+        from app.services import audit_log_helper
+        from app.services import event_bus as event_bus_module
+
+        payload = _edited_offline_package(env, [555, 444])
+        published = []
+
+        async def _capture(self, event):
+            published.append(event)
+
+        async def _audit_down(db, entry):
+            raise RuntimeError("哈希链写入失败")
+
+        monkeypatch.setattr(type(event_bus_module.event_bus), "publish", _capture)
+        monkeypatch.setattr(audit_log_helper, "append_audit_log", _audit_down)
+        before = (await _note(env, "cash")).table_data
+        resp = await env["client"].post(
+            f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute",
+            data={"decisions": json.dumps({"八、1": "overwrite"}), "merge_cells": "{}"},
+            files={"file": ("离线包.xlsx", payload,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert resp.status_code == 400, resp.text
+        assert "离线导入审计或版本记录失败" in resp.text and "哈希链写入失败" in resp.text
+        assert (await _note(env, "cash")).table_data == before
+        async with env["factory"]() as db:
+            assert await db.scalar(sa.select(sa.func.count()).select_from(NoteSectionVersionTree)) == 0
+        assert published == []
 
 
 # ── 三格式在线表格保存（triple_format_adapter.update_note_from_structure）────────
@@ -321,3 +436,45 @@ class TestFormulaPushKeepsEditor:
             note = await fp.note("五、1")
             assert _main(note.table_data)["库存现金"]["end_amount"] == 490
             assert note.updated_by == pusher
+
+
+class TestOfflineImportMergeWire:
+    @pytest.mark.asyncio
+    async def test_execute_passes_selected_merge_cells_to_multitable_writer(self, env, monkeypatch):
+        """HTTP ``merge_cells`` 必须真正传到服务，不得把 MERGE 静默变成零写入。"""
+        import json
+
+        payload = _edited_offline_package(env, [777, 666])
+        data = {
+            "decisions": json.dumps({"八、1": "merge"}),
+            "merge_cells": json.dumps({"八、1": ["0:1"]}),
+        }
+        files = {"file": ("离线包.xlsx", payload, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        published = []
+
+        async def _capture(self, event):
+            published.append(event)
+
+        from app.services import event_bus as event_bus_module
+        monkeypatch.setattr(type(event_bus_module.event_bus), "publish", _capture)
+        response = await env["client"].post(
+            f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute", data=data, files=files,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["sections_imported"] == 1 and response.json()["tables_written"] == 1
+        row = (await _note(env, "cash")).table_data["_tables"][0]["rows"][0]
+        assert row["values"] == [100, 666], "只选的第二个值应更新，未选的首值保留"
+        assert len(published) == 1 and published[0].extra["section_code"] == "八、1"
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_empty_merge_selection_without_writing(self, env):
+        import json
+
+        payload = _edited_offline_package(env, [777, 666])
+        data = {"decisions": json.dumps({"八、1": "merge"}), "merge_cells": "{}"}
+        files = {"file": ("离线包.xlsx", payload, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        response = await env["client"].post(
+            f"/api/disclosure-notes/{env['ids']['p']}/{YEAR}/offline-import/execute", data=data, files=files,
+        )
+        assert response.status_code == 400
+        assert (await _note(env, "cash")).table_data["_tables"][0]["rows"][0]["values"] == [100, 80]

@@ -26,7 +26,7 @@ vi.mock('element-plus', () => ({
   ElMessageBox: { confirm: vi.fn().mockResolvedValue('confirm') },
 }))
 
-import { appendRowEvidence, rowEvidenceCell, shiftIndexedRowEvidence } from '../rowEvidence'
+import { appendRowEvidence, rowEvidenceCell, rowVoucherKey, shiftIndexedRowEvidence } from '../rowEvidence'
 import { resetWpEvidenceLinksForTest } from '@/composables/useWpEvidenceLinks'
 import { useK1VoucherOcr, voucherEvidenceCell } from '@/components/workpaper/composables/useK1VoucherOcr'
 import { runWorkpaperOcr } from '@/components/workpaper/composables/i2EnhancementHelpers'
@@ -141,5 +141,53 @@ describe('F1 逐笔凭证附件位置', () => {
     expect(f1VoucherAttSlot('f1-debit-abc123')).toBe(1607)
     expect(f1VoucherAttSlot('')).toBe(f1VoucherAttSlot('0'))
     expect(f1VoucherEvidence('credit', 'r1')).toEqual({ sheet: 'F1-7-credit', cell: 'item:3683' })
+  })
+})
+
+describe('凭证键（spec attachment-voucher-evidence-binding ADR-AVE-04，变异 #12 / #15）', () => {
+  const VK = JSON.stringify(['2025', 'default', '2025-01-07', '记', '0003'])
+  const vrow = (id: string, vk?: unknown) => ({ id, _gt: vk === undefined ? {} : { vk } })
+
+  beforeEach(() => {
+    resetWpEvidenceLinksForTest()
+    mockGet.mockReset()
+    mockPost.mockReset().mockResolvedValue({ data: {} })
+    mockDelete.mockReset().mockResolvedValue({ data: {} })
+  })
+
+  it('rowVoucherKey 只认行元数据 _gt.vk 的非空字符串（手工行、合成行没有）', () => {
+    expect(rowVoucherKey(vrow('r1', VK))).toBe(VK)
+    expect(rowVoucherKey(vrow('r2'))).toBeNull()
+    expect(rowVoucherKey(vrow('r3', ''))).toBeNull()
+    expect(rowVoucherKey(vrow('r4', 7))).toBeNull()
+    expect(rowVoucherKey({ id: 'manual' })).toBeNull()
+    expect(rowVoucherKey(null)).toBeNull()
+  })
+
+  it('appendRowEvidence 第四参数是凭证检查行 ⇒ 带 evidence_voucher_key；手工行不带', () => {
+    const a = new FormData()
+    appendRowEvidence(a, 'D2-4', rowEvidenceCell('r1'), vrow('r1', VK))
+    expect([a.get('evidence_sheet'), a.get('evidence_cell'), a.get('evidence_voucher_key')]).toEqual(['D2-4', 'row:r1', VK])
+    const b = new FormData()
+    appendRowEvidence(b, 'D2-4', rowEvidenceCell('r2'), vrow('r2'))
+    expect(b.has('evidence_voucher_key')).toBe(false)
+  })
+
+  it('转交位置的组合式函数：K1 / J1 位置带 row ⇒ 表单带凭证键', async () => {
+    mockPost.mockResolvedValueOnce({ data: { data: { ocr_text: '', extracted_fields: {} } } })
+    const { runOcr } = useK1VoucherOcr(() => 'w1', () => 'p1')
+    await runOcr(new File(['x'], 'a.pdf'), vi.fn(), { sheet: 'K1-12', cell: voucherEvidenceCell('post', 'r9'), row: vrow('r9', VK) })
+    expect(formOf(mockPost.mock.calls[0]).get('evidence_voucher_key')).toBe(VK)
+    mockPost.mockResolvedValueOnce({ data: { extracted_fields: {}, confidence: 0.9 } })
+    const { uploadAndMerge } = useJ1VoucherOcr(ref('w1'), ref('p1'))
+    await uploadAndMerge('r1', new File(['x'], 'c.pdf'), 'debit', vi.fn(), { sheet: 'J1-9', cell: 'row:r1', row: vrow('r1', VK) })
+    expect(formOf(mockPost.mock.calls[1]).get('evidence_voucher_key')).toBe(VK)
+  })
+
+  it('shiftIndexedRowEvidence 移位时保留凭证键（先建新位置再删旧位置）', async () => {
+    mockGet.mockResolvedValueOnce({ data: { items: [{ ...link('b', 'L1-6', 'row:2'), voucher_key: VK }, link('c', 'L1-6', 'row:3')] } })
+    expect(await shiftIndexedRowEvidence('p1', 'w1', 'L1-6', 1)).toBe(0)
+    expect(mockPost.mock.calls.map((c) => [c[1].cell_ref, c[1].voucher_key])).toEqual([['row:1', VK], ['row:2', null]])
+    expect(mockDelete.mock.calls.map((c) => String(c[0]).split('/').pop())).toEqual(['b', 'c'])
   })
 })

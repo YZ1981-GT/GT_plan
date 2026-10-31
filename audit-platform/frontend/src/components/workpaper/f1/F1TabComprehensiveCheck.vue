@@ -998,7 +998,8 @@ async function handleRowOcr(file: File, section: 'debit' | 'credit' | 'postPerio
     formData.append('file', file)
     // 与「逐笔单据核对」弹窗 ⑤ 本笔附件同一位置（f1VoucherEvidence）
     const ev = f1VoucherEvidence(section, rowId)
-    rowEv.append(formData, ev.sheet, ev.cell)
+    const sectionRows = section === 'debit' ? debitRows.value : section === 'credit' ? creditRows.value : postPeriodRows.value
+    rowEv.append(formData, ev.sheet, ev.cell, sectionRows.find(r => r.rowId === rowId))
     const res: any = await api.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,

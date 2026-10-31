@@ -143,7 +143,7 @@
       <el-table-column label="📎" width="80" align="center">
         <template #default="{ row }">
           <el-tooltip content="律师函联动（上传+OCR）" placement="top">
-            <el-button link size="small" :disabled="isReadonly" @click="handleLawyerLetter(row.rowId)">
+            <el-button link size="small" :disabled="isReadonly" @click="handleLawyerLetter(row.rowId, row)">
               📎
             </el-button>
           </el-tooltip>
@@ -437,7 +437,7 @@ async function handleImportData(): Promise<void> {
   input.click()
 }
 
-function handleLawyerLetter(rowId: string) {
+function handleLawyerLetter(rowId: string, row?: unknown) {
   // 触发律师函上传+OCR流程（行级OCR: POST contract-ocr → 确认弹窗 → 填入律师意见）
   const input = document.createElement('input')
   input.type = 'file'
@@ -448,7 +448,7 @@ function handleLawyerLetter(rowId: string) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('doc_type', 'lawyer_letter')
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
     try {
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

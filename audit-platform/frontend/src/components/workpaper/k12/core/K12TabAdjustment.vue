@@ -332,6 +332,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: () => props.wpId,
   wpCode: 'K12',
   itemId: () => `K12-adj-${adjustment.activeType.value}`,
+  entryType: adjustment.activeType,
   buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
     standard_account_code: e.accountCode || undefined,
     account_name: e.accountName,

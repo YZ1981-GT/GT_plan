@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 import pytest
 
@@ -13,6 +14,7 @@ from app.services.note_project_table_realign import (
     _cell_value_multiset,
     plan_section,
     realign_section_tables,
+    section_needs_write,
 )
 
 # 种子表：结构元数据，无 values（与 Task 11 的 SEED 同形）
@@ -169,6 +171,146 @@ def test_plan_section_reports_orphans_and_safety() -> None:
                          {"label": "鬼魂行", "values": [5]}])
     rep = plan_section("八、1", {"_tables": [db]}, [SEED_MONEY])
     assert rep["safe"] is True and rep["changed"] is True and rep["orphan_values"] == 1
+
+
+# ── 写库判据：只差种子元数据不写（2026-10-31 真库：预演 5 节、写入 104 节，已按备份恢复）──────────
+
+
+def _seed_money_with_meta() -> dict:
+    """种子表带生成链元数据（科目码 / 明细标记 / 表后文字）—— 库内表没有这些键。"""
+    seed = copy.deepcopy(SEED_MONEY)
+    seed["rows"][0]["account_codes"] = ["1001"]
+    seed["rows"][1].update(account_codes=["1002"], is_detail=True)
+    seed["text_after_table"] = "注：……"
+    return seed
+
+
+def test_metadata_only_difference_is_not_a_write() -> None:
+    # 库内表与种子表名 / 表头 / 行标签 / 值都一致，只差元数据（is_total:false、空边车、无 columns）
+    db = {"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"],
+          "rows": [{"label": "库存现金", "values": [100, 200], "is_total": False, "_cell_modes": {}},
+                   {"label": "银行存款", "values": [300, 400], "_cell_meta": {}},
+                   {"label": "合计", "values": [400, 600], "is_total": True}]}
+    td = {"name": db["name"], "headers": db["headers"], "rows": copy.deepcopy(db["rows"]), "_tables": [db]}
+    new_td = realign_section_tables(td, [_seed_money_with_meta()])
+    assert new_td != td  # 搬值结果确实带了种子元数据
+    assert section_needs_write(td, new_td) is False
+    assert plan_section("八、1", td, [_seed_money_with_meta()])["changed"] is False
+
+
+def test_trailing_empty_cells_are_not_a_write() -> None:
+    # 库内值数组比表头短（尾部空格没存）⇒ 搬值补成 [100, None]，用户看到的内容不变
+    db = {"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"],
+          "rows": [{"label": "库存现金", "values": [100]}, {"label": "银行存款", "values": [300, 400]},
+                   {"label": "合计", "values": [400, 600]}]}
+    new_td = realign_section_tables({"_tables": [db]}, [SEED_MONEY])
+    assert new_td["_tables"][0]["rows"][0]["values"] == [100, None]
+    assert section_needs_write({"_tables": [db]}, new_td) is False
+
+
+@pytest.mark.parametrize("change", ["header", "label", "label_text", "value", "name", "table_count"])
+def test_visible_changes_are_writes(change: str) -> None:
+    db = _db_money()
+    if change == "header":
+        db["headers"] = ["项目", "期末数", "期初余额"]  # key 一致，值照搬，表头文字换成种子的
+    elif change == "label":
+        db["rows"].insert(2, {"label": "", "values": [None, None]})  # 占位空行，种子没有
+    elif change == "label_text":
+        db["rows"][2]["label"] = "合 计"  # 规范化后同一行，原文不同 ⇒ 写成种子原文
+    elif change == "value":
+        # 表头文字相同、列 key 指明两列互换 ⇒ 按 key 搬，值换位（只有值变）
+        db["columns"] = [{"key": "label", "is_label": True}, {"key": "begin"}, {"key": "end"}]
+    elif change == "name":
+        db["name"] = "货币资金情况"  # 改名配对，无值可搬时允许
+        for r in db["rows"]:
+            r["values"] = [None, None]
+    td = {"_tables": [db, {"name": "多余", "rows": []}]} if change == "table_count" else {"_tables": [db]}
+    new_td = realign_section_tables(td, [SEED_MONEY])
+    assert section_needs_write(td, new_td) is True
+
+
+def test_existing_orphans_alone_are_not_a_write() -> None:
+    # 已搬过一次：孤儿区固化在库里，结构已是种子 ⇒ 再搬不写（二次预演为 0 的前提）
+    first = realign_section_tables({"_tables": [_db_money(rows=[
+        {"label": "库存现金", "values": [100, 200]}, {"label": "鬼魂行", "values": [5]}])]}, [SEED_MONEY])
+    assert first["_realign_orphans"]
+    second = realign_section_tables(first, [SEED_MONEY])
+    assert second["_realign_orphans"] == first["_realign_orphans"]
+    assert section_needs_write(first, second) is False
+
+
+# ── 顶层首表镜像 ─────────────────────────────────────────────────────
+
+
+def test_top_level_mirror_rebuilt_from_new_first_table() -> None:
+    db = _db_money(headers=["项目", "期初余额", "期末余额"],
+                   columns=[{"key": "label", "is_label": True}, {"key": "begin"}, {"key": "end"}],
+                   rows=[{"label": "库存现金", "values": [200, 100]}])
+    td = {"name": db["name"], "headers": db["headers"], "rows": copy.deepcopy(db["rows"]), "_tables": [db],
+          "_source": "workpaper"}
+    out = realign_section_tables(td, [SEED_MONEY])
+    first = out["_tables"][0]
+    assert (out["name"], out["headers"], out["rows"]) == (first["name"], first["headers"], first["rows"])
+    assert out["rows"][0]["values"] == [100, 200]
+    assert out["_source"] == "workpaper"  # 其他顶层键原样保留
+    # 镜像不是第二份值：multiset 只算 _tables + 孤儿区
+    assert _cell_value_multiset(out) == _cell_value_multiset(td)
+
+
+def test_no_top_level_mirror_added_when_input_had_none() -> None:
+    out = realign_section_tables({"_tables": [_db_money()]}, [SEED_MONEY])
+    assert "rows" not in out and "headers" not in out and "name" not in out
+
+
+# ── 表配对：先按表名，表名配不上的才按剩余表序 ─────────────────────────
+
+
+def _aging(name: str, end: Any = None, begin: Any = None, both_periods: bool = False) -> dict:
+    headers = ["账龄", "应收账款", "坏账准备"] + (["应收账款", "坏账准备"] if both_periods else [])
+    width = len(headers) - 1
+    total = [end, None] + ([begin, None] if both_periods else [])
+    return {"name": name, "headers": headers,
+            "rows": [{"label": "1年以内", "values": [None] * width}, {"label": "合计", "values": total[:width]}]}
+
+
+def test_tables_paired_by_name_when_db_order_differs() -> None:
+    """和平 八、5 形态：库内续表排在最后，结构相同的兄弟表按表序配会互相串值。"""
+    db = [_aging("组合：中央企业", end=11), _aging("组合：海外企业", end=22),
+          _aging("组合：中央企业（续：期初数）", end=33), _aging("组合：海外企业（续：期初数）", end=44)]
+    seed = [{**_aging(n), "rows": [{"label": "1年以内"}, {"label": "合计"}]} for n in
+            ("组合：中央企业", "组合：中央企业（续：期初数）", "组合：海外企业", "组合：海外企业（续：期初数）")]
+    out = realign_section_tables({"_tables": db}, seed)
+    got = {t["name"]: t["rows"][1]["values"][0] for t in out["_tables"]}
+    assert got == {"组合：中央企业": 11, "组合：中央企业（续：期初数）": 33,
+                   "组合：海外企业": 22, "组合：海外企业（续：期初数）": 44}
+    assert "_realign_orphans" not in out
+
+
+def test_unpaired_db_table_values_become_orphans_even_if_same_name_exists() -> None:
+    # 库内同名两张（重复生成）：第一张配种子，第二张没得配 ⇒ 值进孤儿，不并进第一张
+    db = [_aging("计划资产", end=1), _aging("计划资产", end=2)]
+    out = realign_section_tables({"_tables": db}, [{**_aging("计划资产"), "rows": [{"label": "合计"}]}])
+    assert out["_tables"][0]["rows"][0]["values"][0] == 1
+    assert [o["values"] for o in out["_realign_orphans"]] == [[2]]
+    assert "整张表" in out["_realign_orphans"][0]["reason"]
+
+
+def test_renamed_pair_carrying_values_is_refused() -> None:
+    """种子改了表名、库内只能按剩余表序配上：要搬非空值 ⇒ 不猜，整节拒绝（plan 报不安全）。"""
+    db = [_aging("组合：中央企业", end=11), _aging("旧表名", end=99)]
+    seed = [{**_aging(n), "rows": [{"label": "合计"}]} for n in ("组合：中央企业", "新表名")]
+    with pytest.raises(TableRealignError, match="表名不同"):
+        realign_section_tables({"_tables": db}, seed)
+    rep = plan_section("八、5", {"_tables": db}, seed)
+    assert rep["safe"] is False and "旧表名" in rep["error"]
+
+
+def test_renamed_pair_without_values_follows_seed() -> None:
+    db = [_aging("组合：中央企业", end=11), _aging("旧表名")]
+    seed = [{**_aging(n), "rows": [{"label": "合计"}]} for n in ("组合：中央企业", "新表名")]
+    out = realign_section_tables({"_tables": db}, seed)
+    assert [t["name"] for t in out["_tables"]] == ["组合：中央企业", "新表名"]
+    assert out["_tables"][0]["rows"][0]["values"][0] == 11
 
 
 # ── 变异证明：破坏三条断言必打红 ───────────────────────────────────────

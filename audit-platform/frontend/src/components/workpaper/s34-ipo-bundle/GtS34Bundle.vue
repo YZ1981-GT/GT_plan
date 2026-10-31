@@ -81,6 +81,14 @@ const visibleGroups = computed(() => {
   return groups
 })
 
+/**
+ * 模板中的内联 `some(t => ...)` 在 vue-tsc 虚拟文件里丢失 `t` 的上下文类型，
+ * 严格检查报 TS7006。收敛到脚本中的显式类型函数，保留完全相同的导航语义。
+ */
+function hasTab(tabs: readonly TabDef[], tabId: string): boolean {
+  return tabs.some((tab) => tab.id === tabId)
+}
+
 // ─── Active Tab (Property 4: sheetName 路由正确激活 Tab) ───
 const activeTab = ref(props.sheetName || 'overview')
 
@@ -264,7 +272,7 @@ onMounted(async () => {
           v-for="g in visibleGroups"
           :key="g.group"
           class="group-nav__tag"
-          :class="{ 'group-nav__tag--active': g.tabs.some(t => t.id === activeTab) }"
+          :class="{ 'group-nav__tag--active': hasTab(g.tabs, activeTab) }"
         >
           {{ g.group }}（{{ g.tabs.length }}）
         </span>
@@ -290,7 +298,7 @@ onMounted(async () => {
               :readonly="props.readonly"
               data-testid="s34-overview"
               @navigate="(wpCode: string) => {
-                if (visibleTabs.some(t => t.id === wpCode)) {
+                if (hasTab(visibleTabs, wpCode)) {
                   activeTab = wpCode
                 }
               }"

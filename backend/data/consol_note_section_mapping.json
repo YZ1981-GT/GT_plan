@@ -1779,7 +1779,7 @@
         "consol_title": "投资收益",
         "consol_seq": 178,
         "standalone_note_section": "八、70",
-        "standalone_section_title": "投资收益【下表中不适用的项目，删除】",
+        "standalone_section_title": "投资收益",
         "match_type": "table_title",
         "standalone_table_name": "投资收益"
       },
@@ -2470,7 +2470,7 @@
         "consol_seq": 321,
         "standalone_note_section": "十二、投资收益",
         "standalone_section_title": "投资收益",
-        "match_type": "table_title",
+        "match_type": "section_override",
         "standalone_table_name": "投资收益"
       },
       {

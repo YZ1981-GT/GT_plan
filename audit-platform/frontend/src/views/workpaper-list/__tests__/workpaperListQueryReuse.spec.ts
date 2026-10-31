@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { computed, defineComponent, h, isReactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { createMockContext } from '@/composables/useWorkpaperListContext'
 
 const hoisted = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const hoisted = vi.hoisted(() => ({
   replace: null as any,
   listWorkpapers: null as any,
   getWpIndex: null as any,
+  mapping: null as any,
 }))
 
 vi.mock('vue-router', async () => {
@@ -26,9 +28,11 @@ vi.mock('vue-router', async () => {
 vi.mock('@/services/workpaperApi', () => {
   hoisted.listWorkpapers = vi.fn().mockResolvedValue([])
   hoisted.getWpIndex = vi.fn().mockResolvedValue([])
+  hoisted.mapping = vi.fn().mockResolvedValue([])
   return {
     listWorkpapers: hoisted.listWorkpapers,
     getWpIndex: hoisted.getWpIndex,
+    getWpMappingByAccount: hoisted.mapping,
     downloadWorkpaperPack: vi.fn().mockResolvedValue(undefined),
     downloadWorkpaper: vi.fn(),
   }
@@ -97,6 +101,7 @@ beforeEach(() => {
   hoisted.replace.mockClear()
   hoisted.listWorkpapers.mockReset().mockResolvedValue([])
   hoisted.getWpIndex.mockReset().mockResolvedValue([])
+  hoisted.mapping.mockReset().mockResolvedValue([])
 })
 
 describe('同页只改 query：按挂载时同一规则同步，不重取', () => {
@@ -200,5 +205,100 @@ describe('R7：浅层响应式 + 按 wp_index_id 合并', () => {
       ['i3', 'x', 'y'],
     ])
     expect(vm.wpIndexById.get('i2').wp_code).toBe('D3')
+  })
+})
+
+describe('入口参数（spec wp-deeplink-locate-residual-closure 需求 2）', () => {
+  test('?highlight= 到达：列表视图 + 定位目标；之后用户切视图不被强制回列表；同页换编码再定位一次', async () => {
+    hoisted.route.query = { view: 'workbench', highlight: 'D2-1 应收账款' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.viewMode).toBe('list')
+    expect(vm.locateTarget).toMatchObject({ code: 'D2-1' })
+    const first = vm.locateTarget.seq
+    expect(hoisted.route.query).toEqual({ view: 'list', highlight: 'D2-1 应收账款' })
+    vm.viewMode = 'kanban'
+    await flushPromises()
+    expect(vm.viewMode).toBe('kanban')
+    expect(hoisted.route.query).toEqual({ view: 'kanban', highlight: 'D2-1 应收账款' })
+    expect(vm.locateTarget.seq).toBe(first)
+    await setQuery({ view: 'kanban', wp_code: 'E1' })
+    expect(vm.viewMode).toBe('list')
+    expect(vm.locateTarget).toMatchObject({ code: 'E1' })
+    expect(vm.locateTarget.seq).toBeGreaterThan(first)
+  })
+
+  test('?search= / ?wp_code= 与 ?highlight= 同样定位（取第一个）', async () => {
+    hoisted.route.query = { search: 'G8' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.locateTarget).toMatchObject({ code: 'G8' })
+    expect(vm.viewMode).toBe('list')
+  })
+
+  test('?cycle= 到达：按循环筛选（按循环取数）并切列表视图；非法值不理', async () => {
+    hoisted.route.query = { cycle: 'd' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.filterCycle).toBe('D')
+    expect(vm.viewMode).toBe('list')
+    expect(hoisted.listWorkpapers.mock.calls.at(-1)[1]).toMatchObject({ audit_cycle: 'D' })
+    await setQuery({ view: 'list', cycle: 'ZZ' })
+    expect(vm.filterCycle).toBe('D')
+  })
+
+  test('?upload= 到达：打开增强导入，并从地址栏去掉 upload（刷新 / 后退不再弹）', async () => {
+    hoisted.route.query = { upload: 'wp-1', view: 'list' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.showWpImportEnhanced).toBe(true)
+    expect(hoisted.route.query).toEqual({ view: 'list' })
+    vm.showWpImportEnhanced = false
+    await setQuery({ view: 'list' })
+    expect(vm.showWpImportEnhanced).toBe(false)
+  })
+
+  test('?assigned=me / unassigned：按编制人筛选（未分配不传给后端）', async () => {
+    hoisted.route.query = { assigned: 'me' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.filterAssignee).toBe('u1')
+    expect(hoisted.listWorkpapers.mock.calls.at(-1)[1]).toMatchObject({ assigned_to: 'u1' })
+    await setQuery({ view: 'list', assigned: 'unassigned' })
+    expect(vm.filterAssignee).toBe('__unassigned__')
+    expect(hoisted.listWorkpapers.mock.calls.at(-1)[1].assigned_to).toBeUndefined()
+  })
+
+  test('?account=：只认本项目已生成的关联底稿（表级编码 / 没生成的跳过，多张时点名）；都没生成按映射第一张；没有关联不设目标', async () => {
+    const info = vi.spyOn(ElMessage, 'info')
+    hoisted.listWorkpapers.mockResolvedValue([{ id: 'w3', wp_index_id: 'i3' }, { id: 'w2', wp_index_id: 'i2' }])
+    hoisted.getWpIndex.mockResolvedValue([{ id: 'i1', wp_code: 'D0' }, { id: 'i2', wp_code: 'D3' }, { id: 'i3', wp_code: 'D2' }])
+    // 浏览器实测（【测试】项目，科目 1122）：映射给出 D2、D0、D2-2…D2-6 等 13 个编码，本项目只生成了 D2
+    hoisted.mapping.mockResolvedValueOnce([{ wp_code: 'D0' }, { wp_code: 'D2' }, { wp_code: 'D2-2' }, { wp_code: 'D2' }, { wp_code: 'D3' }])
+    hoisted.route.query = { account: '1122' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(hoisted.mapping).toHaveBeenCalledWith('test-proj', '1122')
+    expect(vm.locateTarget).toMatchObject({ code: 'D2' })
+    expect(vm.viewMode).toBe('list')
+    expect(info).toHaveBeenCalledWith('科目 1122 关联底稿 D2、D3，已定位到 D2')
+    hoisted.mapping.mockResolvedValueOnce([{ wp_code: 'Z1' }, { wp_code: 'Z2' }])
+    await setQuery({ view: 'list', account: '5555' })
+    expect(vm.locateTarget).toMatchObject({ code: 'Z1' })
+    const seq = vm.locateTarget.seq
+    hoisted.mapping.mockResolvedValueOnce([])
+    await setQuery({ view: 'list', account: '9999' })
+    expect(vm.locateTarget.seq).toBe(seq)
+    expect(info).toHaveBeenCalledTimes(1)
+    info.mockRestore()
+  })
+
+  test('没有入口参数时行为不变（不设定位目标）', async () => {
+    hoisted.route.query = { view: 'lifecycle' }
+    const vm = mountList().vm as any
+    await flushPromises()
+    expect(vm.viewMode).toBe('lifecycle')
+    expect(vm.locateTarget).toBeNull()
+    expect(hoisted.replace).not.toHaveBeenCalled()
   })
 })

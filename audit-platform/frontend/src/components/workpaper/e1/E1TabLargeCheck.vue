@@ -274,6 +274,8 @@ function saveAuditConclusion(val: string): void {
 import E1LargeCheckOcrConfirmDialog from './E1LargeCheckOcrConfirmDialog.vue'
 import type { LargeCheckOcrFields } from './E1LargeCheckOcrConfirmDialog.vue'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const ocrVisible = ref(false)
 const ocrSide = ref<'debit' | 'credit'>('debit')
@@ -281,14 +283,18 @@ const ocrFields = ref<Partial<LargeCheckOcrFields>>({})
 const ocrConfidence = ref<number | undefined>()
 const ocrPreview = ref('')
 const ocrFileName = ref('')
+/** 识别是先传单据、确认后才新建行 ⇒ 附件挂到本表页（表页级），工具栏「借方 / 贷方 OCR」旁的小眼睛按同一位置读取 */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 async function onOcrUpload(file: File, side: 'debit' | 'credit'): Promise<boolean> {
   ocrSide.value = side
   const form = new FormData()
   form.append('file', file)
   form.append('side', side)
+  rowEv.append(form, sheetCode)
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/e1/large-check-ocr`, form)
+    rowEv.refresh()
     const data = res?.data ?? res
     ocrFields.value = data?.fields ?? {}
     ocrConfidence.value = data?.confidence
@@ -394,6 +400,7 @@ async function generateAuditConclusion(): Promise<void> {
         <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="(f: File) => onOcrUpload(f, 'credit')" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
           <el-button size="small" :disabled="isReadonly">📎 贷方OCR</el-button>
         </el-upload>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="sheetCode" />
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button
             size="small"

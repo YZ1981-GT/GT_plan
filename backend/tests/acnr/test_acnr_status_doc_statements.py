@@ -242,8 +242,8 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_FACTS: {
         "说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果": P(
             *SCHEMA_FOLLOWS_CONTRACT, fact_eq("catalog.schema_errors", "0")),
-        "孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 44）": P(
-            fact_eq("catalog.orphan_cells", "0"), fact_eq("catalog.deprecated_entries", "44"),
+        "孤儿 cell 已按判定记录停用（`catalog.orphan_cells` 为 0），原孤儿 cell 仍在目录里、作为停用条目保留，父 sheet 由判定记录补登（`catalog.deprecated_entries` 为 479）": P(
+            fact_eq("catalog.orphan_cells", "0"), fact_eq("catalog.deprecated_entries", "479"),
             claim("sheet_verdicts 里 kind=orphan 的 cell 全部仍在目录、已停用、父 sheet 已补登", _orphan_verdicts_released)),
         "生成器写出前跑 catalog_release 门禁（`generator.runs_release_gates` 为 是），加载期 release 互校已在生产目录生效（`report.has_release` 为 是）": P(
             fact_eq("generator.runs_release_gates", "是"), calls(_GEN_REL, "run_write", "_build_candidate"),

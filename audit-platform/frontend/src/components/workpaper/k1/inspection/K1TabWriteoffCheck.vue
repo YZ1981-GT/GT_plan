@@ -468,7 +468,7 @@ function onWriteoffOcr(
     const prev = row.analysis || ''
     row.analysis = prev ? `${prev}\n[OCR] ${text}` : `[OCR] ${text}`
     persist()
-  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(`${kind}-${row.id}`) })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(`${kind}-${row.id}`), row })
 }
 
 onMounted(() => load())

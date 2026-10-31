@@ -539,7 +539,7 @@ async function handleVoucherOcr(row: K1VoucherRow, file: File): Promise<boolean>
   try {
     const fd = new FormData()
     fd.append('file', file)
-    rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id))
+    rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
     } as any)

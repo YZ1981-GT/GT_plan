@@ -110,18 +110,35 @@ def test_ack_expired_blocked(real):
     assert any("已于 2026-10-26 过期" in d for d in _details(_gates(real, acks=acks), "ack"))
 
 
+def _semantic_unverified_world(real):
+    """真实目录里已无「语义待核对」的格（spec wp-deeplink-locate-residual-closure 收口了那 33 格）：取一个真实有效 cell
+    标成语义待核对（与 catalog_names.apply_cell_verdicts 同一写法），并在真实豁免清单里加一条覆盖它的豁免。"""
+    cat, acks = copy.deepcopy(real["catalog"]), copy.deepcopy(real["acks"])
+    cell = next(c for c in cat["cells"] if not c.get("deprecated"))
+    cell["semantic_label"], cell["cell_label"] = None, f"{cell['cell_address']}（语义待核对）"
+    acks["entries"].insert(0, {"covers": {"addr_ids": [cell["addr_id"]]}, "expires_on": "2027-04-30",
+                               "id": "ack-test-semantic", "kind": "seed_semantic_unverified", "owner": "test",
+                               "reason": "门禁变异用例"})
+    return cat, acks, cell
+
+
+def test_semantic_world_passes_ack_gate(real):
+    cat, acks, _cell = _semantic_unverified_world(real)
+    g = _gates(real, catalog=cat, acks=acks)
+    assert "ack" not in g, [str(v) for v in g.get("ack", [])]
+
+
 def test_ack_covered_cell_gone_blocked(real):
-    cat = copy.deepcopy(real["catalog"])
-    aid = real["acks"]["entries"][0]["covers"]["addr_ids"][0]
-    next(c for c in cat["cells"] if c["addr_id"] == aid)["semantic_label"] = "已核对的语义"
-    assert any("已有语义名" in d for d in _details(_gates(real, catalog=cat), "ack"))
+    cat, acks, cell = _semantic_unverified_world(real)
+    cell["semantic_label"] = "已核对的语义"
+    assert any("已有语义名" in d for d in _details(_gates(real, catalog=cat, acks=acks), "ack"))
 
 
 def test_semantic_cell_not_acknowledged_blocked(real):
-    acks = copy.deepcopy(real["acks"])
-    dropped = acks["entries"][0]["covers"]["addr_ids"].pop()
-    g = _gates(real, acks=acks)
-    assert dropped in {v.addr_id for v in g.get("ack", [])} and any("未登记 seed_semantic_unverified" in d for d in _details(g, "ack"))
+    cat, acks, cell = _semantic_unverified_world(real)
+    acks["entries"].pop(0)
+    g = _gates(real, catalog=cat, acks=acks)
+    assert cell["addr_id"] in {v.addr_id for v in g.get("ack", [])} and any("未登记 seed_semantic_unverified" in d for d in _details(g, "ack"))
 
 
 def test_label_source_key_gone_makes_disposition_stale(real):

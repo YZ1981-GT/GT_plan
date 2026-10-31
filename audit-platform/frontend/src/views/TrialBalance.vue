@@ -1345,6 +1345,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import { api } from '@/services/apiProxy'
+import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
@@ -3439,15 +3440,10 @@ async function onTbCtxCellTrace() {
   }
 }
 
-function onTbTraceLocate(node: any) {
+async function onTbTraceLocate(node: any) {
   tbTraceDialogVisible.value = false
-  if (node.wp_code) {
-    eventBus.emit('workpaper:locate-cell', {
-      wpId: node.wp_code,
-      sheetName: node.sheet_name || undefined,
-      cellRef: node.cell_ref || '',
-    })
-  }
+  const reason = await openWorkpaperCell(router, { projectId: projectId.value, wpId: node?.wp_id, wpCode: node?.wp_code, sheet: node?.sheet_name, cell: node?.cell_ref })
+  if (reason) ElMessage.warning(reason)
 }
 
 function onTbCtxFormula() {

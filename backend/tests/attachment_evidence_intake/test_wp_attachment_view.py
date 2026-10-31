@@ -53,8 +53,10 @@ async def test_view_includes_row_evidence_with_positions(world):
     row = items["行证据.pdf"]
     # 只挂在行上的证据也算出现在本底稿（行级上传只写证据链接，ADR-AEI-02）
     assert (row["source"], row["sources"], row["linked_wp_count"]) == ("evidence_link", ["evidence_link"], 1)
+    # voucher_key：挂在抽样凭证上的证据才有值（spec attachment-voucher-evidence-binding 需求 1.4）
     assert row["evidence_positions"] == [{
         "link_id": str(link.id), "sheet_name": "F3-5", "cell_ref": "item:2", "page_ref": None, "evidence_type": "note",
+        "voucher_key": None,
     }]
     mixed = items["整稿与行.pdf"]
     assert (mixed["source"], mixed["sources"], mixed["linked_wp_count"]) == ("associated", ["associated", "evidence_link"], 2)

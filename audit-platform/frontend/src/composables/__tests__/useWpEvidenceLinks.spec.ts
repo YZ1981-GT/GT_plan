@@ -121,6 +121,31 @@ describe('useWpEvidenceLinks', () => {
     scope.stop()
   })
 
+  it('voucherEvidenceOf：按凭证键取本底稿证据，同一附件的多个位置合成一组（spec attachment-voucher-evidence-binding）', async () => {
+    const VK = JSON.stringify(['2025', 'c', '2025-01-07', '记', '0003'])
+    const other = JSON.stringify(['2025', 'c', '2025-01-08', '记', '0004'])
+    const att = (r: ReturnType<typeof row>, attachmentId: string, vk: string | null) =>
+      ({ ...r, attachment_id: attachmentId, voucher_key: vk, attachment: { ...r.attachment, id: attachmentId } })
+    mockGet.mockResolvedValueOnce({
+      data: {
+        items: [
+          att(row('l1', 'row:r1'), 'a-x', VK), // 本行识别
+          att(row('l2', null, null), 'a-x', VK), // 同一附件的凭证级引用
+          att(row('l3', 'row:r2'), 'a-y', VK), // 同一凭证另一行上传的
+          att(row('l4', 'row:r3'), 'a-z', other),
+          att(row('l5', 'row:r4'), 'a-w', null),
+        ],
+      },
+    })
+    const scope = effectScope()
+    const store = scope.run(() => useWpEvidenceLinks('p1', 'w1'))!
+    await flush()
+    const groups = store.voucherEvidenceOf(VK)
+    expect(groups.map((g) => [g.attachmentId, g.links.map((l) => l.id)])).toEqual([['a-x', ['l1', 'l2']], ['a-y', ['l3']]])
+    expect(store.voucherEvidenceOf(null)).toEqual([])
+    scope.stop()
+  })
+
   it('移除链接走 DELETE 并重取', async () => {
     mockGet
       .mockResolvedValueOnce({ data: { items: [row('l1', 'item:1')] } })

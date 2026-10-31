@@ -111,7 +111,7 @@ async def _reject(targets, addressing=None):
 @pytest.mark.parametrize("raw, code", _REAL_CASES, ids=[c for _, c in _REAL_CASES])
 async def test_each_rejection_code_is_422_and_reads_nothing(spies, raw, code):
     raw = _deprecated_cell() if raw == "<deprecated>" else raw
-    exc = await _reject(["E1/E1-14/C10", raw])
+    exc = await _reject(["E1/E1-14/I18", raw])
     assert exc.status_code == 422
     detail = exc.detail
     assert detail["error_code"] == "ACNR_TARGETS_REJECTED"
@@ -137,17 +137,17 @@ async def test_ambiguous_issue_carries_candidates_and_context(spies):
 
 
 async def test_every_bad_item_listed_in_order(spies):
-    raws = ["ZZZ/不存在/A1", "E1/E1-14/C10", "E1/E1-14", "adj:aje"]
+    raws = ["ZZZ/不存在/A1", "E1/E1-14/I18", "E1/E1-14", "adj:aje"]
     issues = (await _reject(raws)).detail["issues"]
     assert [(i["ref"], i["error_code"]) for i in issues] == [
         ("ZZZ/不存在/A1", "unresolvable"), ("E1/E1-14", "sheet_level"), ("adj:aje", "external_namespace")]
 
 
 async def test_all_l1_cells_accepted_in_order_with_duplicates():
-    raws = ["E1/E1-14/C10", "WP('E1','货币资金分析表E1-14','C10')", "E1/E1-14/C10", "cell:E1-14!C10"]
+    raws = ["E1/E1-14/I18", "WP('E1','货币资金分析表E1-14','I18')", "E1/E1-14/I18", "cell:E1-14!I18"]
     got = await resolve_acnr_targets(raws, project_id=None, db=None)
     assert [t.raw for t in got] == raws
-    assert [t.addr_id for t in got] == ["E1/E1-14/C10"] * 4
+    assert [t.addr_id for t in got] == ["E1/E1-14/I18"] * 4
     assert all(classify_target(t) is None and t.result.source_layer == "L1_cell" for t in got)
 
 
@@ -163,8 +163,8 @@ class _Stub(AddressingService):
         step = self.plan(raw)
         if isinstance(step, (int, float)):
             await asyncio.sleep(step)
-            return ResolvedTarget(raw=raw, found=True, addr_id="E1/E1-14/C10", entry_type="cell",
-                                  result=ResolveResult(found=True, addr_id="E1/E1-14/C10", entry_type="cell",
+            return ResolvedTarget(raw=raw, found=True, addr_id="E1/E1-14/I18", entry_type="cell",
+                                  result=ResolveResult(found=True, addr_id="E1/E1-14/I18", entry_type="cell",
                                                        source_layer="L1_cell"))
         return step
 

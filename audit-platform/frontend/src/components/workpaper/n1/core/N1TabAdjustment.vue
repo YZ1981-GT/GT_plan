@@ -437,6 +437,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: () => props.wpId,
   wpCode: 'N1',
   itemId: () => `N1-adj-${activeType.value}`,
+  entryType: activeType,
   buildLineItems: () => filteredEntries.value.map((e: any) => ({
     account_name: e.accountName,
     report_line_code: e.reportItem || undefined,

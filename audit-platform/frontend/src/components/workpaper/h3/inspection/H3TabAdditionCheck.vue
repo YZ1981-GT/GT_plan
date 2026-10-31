@@ -301,7 +301,7 @@
         </el-table-column>
         <el-table-column label="📎" width="72" align="center">
           <template #default="{ row, $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId)">📎</el-button>
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId, row)">📎</el-button>
             <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
@@ -455,7 +455,7 @@
         </el-table-column>
         <el-table-column label="📎" width="72" align="center">
           <template #default="{ row, $index }">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId)">📎</el-button>
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleOcr($index, row.rowId, row)">📎</el-button>
             <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
@@ -1006,7 +1006,7 @@ async function onSamplesFilled(payload: EngineFilledPayload & { methodology?: Sa
   if (!out.cancelled) samplingVisible.value = false
 }
 
-async function handleOcr(index: number, rowId: string) {
+async function handleOcr(index: number, rowId: string, row?: unknown) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -1017,7 +1017,7 @@ async function handleOcr(index: number, rowId: string) {
       const formData = new FormData()
       formData.append('file', file)
       // 按行 id 挂（不按序号：删行后序号会前移，附件会错位到下一行）
-      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
       const res = await http.post(
         `/api/workpapers/${props.wpId}/d4/contract-ocr`,
         formData,

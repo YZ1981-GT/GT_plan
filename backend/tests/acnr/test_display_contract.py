@@ -1,7 +1,9 @@
 """T29：统一显示名下沉为后端单一函数并由生成器写入（需求 12.1 / D10，design §13.2~13.3）。
 
-跨语言契约夹具 `fixtures/display_contract.json` 从真实目录抽样（同组序号、科目简称前缀、停用、语义待核对、
-停用 cell）；真实目录没有纯编码 sheet，纯编码与去尾编码、停用不参与序号另用合成组。断言：
+跨语言契约夹具 `fixtures/display_contract.json` 从真实目录抽样（同组序号、科目简称前缀、停用、停用 cell；
+原「语义待核对」样本 F3-5 B25 已由 spec wp-deeplink-locate-residual-closure 停用，真实目录不再有该类 cell，样本换成
+有效的合计行坐标 D1-3 J21，「（语义待核对）」写法由 test_name_system 用合成判定核对）；真实目录没有纯编码 sheet，
+纯编码与去尾编码、停用不参与序号另用合成组。断言：
 
 - `display.py` 在已提交输入上重算的显示名与已发布目录全部条目逐字相等（生成器写入的就是这个函数的结果）；
 - 夹具值与已发布目录、`/api/acnr/resolve`（POST / GET）、`/api/acnr/entries`、acnr_targets 预览、V2 节点逐字相等；
@@ -50,8 +52,10 @@ def _recomputed(catalog: dict) -> dict:
 def test_fixture_covers_required_cases_and_exists_in_catalog():
     """防空转：夹具覆盖 design §13.3 的五类情形，真实样本都在目录里。"""
     cases = " ".join(x["case"] for x in _FIXTURE["sheets"] + _FIXTURE["cells"] + _FIXTURE["synthetic"])
-    for need in ("同组序号", "科目简称前缀", "纯编码", "停用", "语义待核对"):
+    for need in ("同组序号", "科目简称前缀", "纯编码", "停用"):
         assert need in cases, f"夹具缺「{need}」样本"
+    # 真实目录已无「语义待核对」cell（有了就应回到夹具里抽样）
+    assert not any(str(c.get("cell_label") or "").endswith("（语义待核对）") for c in _CATALOG["cells"])
     assert all(x["addr_id"] in _SHEETS for x in _FIXTURE["sheets"])
     assert all(x["addr_id"] in _CELLS for x in _FIXTURE["cells"])
     assert any(x["deprecated"] for x in _FIXTURE["sheets"]) and any(x["deprecated"] for x in _FIXTURE["cells"])

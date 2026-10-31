@@ -6,7 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { ContractCostCheckRow } from './useF2ContractCostCheck'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
-import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { refreshRowEvidence, rowEvidenceCell, rowVoucherKey } from '@/components/attachment/rowEvidence'
 
 /** 识别附件挂到本行（F2-56 + `row:{行 id}`，五类单据同一行），小眼睛按同一位置读取 */
 export const F2_SPE_EVIDENCE_SHEET = 'F2-56'
@@ -51,6 +51,8 @@ export function useF2SpecialContractOcr(wpId: Ref<string>, projectId?: Ref<strin
     file: File,
     updateRow: (id: string, patch: Partial<ContractCostCheckRow>) => void,
     documentType: F2SpeDocumentType = 'contract',
+    /** 凭证检查行：带了就按凭证身份挂（spec attachment-voucher-evidence-binding） */
+    row?: unknown,
   ): Promise<void> {
     ocrLoadingId.value = `${rowId}:${documentType}`
     try {
@@ -60,6 +62,7 @@ export function useF2SpecialContractOcr(wpId: Ref<string>, projectId?: Ref<strin
         extraFields: { document_type: documentType },
         evidenceSheet: F2_SPE_EVIDENCE_SHEET,
         evidenceCell: rowEvidenceCell(rowId),
+        voucherKey: rowVoucherKey(row),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-spe/contract-ocr`,

@@ -225,7 +225,7 @@ function onOcrFile(file?: File): void {
         ? `${form.value.remark}\n[OCR附件] ${fileName}`
         : `[OCR附件] ${fileName}`
     }
-  }, evidenceCell.value ? { sheet: 'K1-12', cell: evidenceCell.value } : undefined)
+  }, evidenceCell.value ? { sheet: 'K1-12', cell: evidenceCell.value, row: props.row } : undefined)
 }
 
 function handleSave(): void {

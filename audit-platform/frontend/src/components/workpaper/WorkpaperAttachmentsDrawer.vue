@@ -33,8 +33,20 @@ type ConfirmationBreakdown = {
   missing: number
   missing_items?: Array<{ confirmation_id: string; counterparty: string | null; confirm_type?: string; reason: string }>
 }
-type EvidenceRequirement = { type: string; label: string; satisfied: boolean; breakdown?: ConfirmationBreakdown | null }
-type EvidencePosition = { link_id: string; sheet_name: string | null; cell_ref: string | null; page_ref: string | null }
+/** 「凭证」类声明的抽凭样本逐笔统计（spec attachment-voucher-evidence-binding 需求 5.2；只展示，不改是否满足） */
+type VoucherSamples = {
+  total: number
+  with_evidence: number
+  missing: number
+  truncated?: boolean
+  missing_items?: Array<{ voucher_key: string; label: string; phase?: string | null; source?: string; reason?: string }>
+}
+type EvidenceRequirement = {
+  type: string; label: string; satisfied: boolean; breakdown?: ConfirmationBreakdown | null; samples?: VoucherSamples | null
+}
+type EvidencePosition = {
+  link_id: string; sheet_name: string | null; cell_ref: string | null; page_ref: string | null; voucher_key?: string | null
+}
 
 type StaleInfo = {
   has_stale: boolean
@@ -383,6 +395,18 @@ function formatDate(d: string): string {
                 </li>
               </ul>
               <div v-if="req.breakdown.missing" class="wp-att-breakdown__hint">{{ breakdownHint(req.breakdown) }}</div>
+            </div>
+            <div v-if="req.samples" class="wp-att-breakdown" data-testid="voucher-samples">
+              <div class="wp-att-breakdown__summary">
+                登记抽凭样本 {{ req.samples.total }} 笔：已取得凭证证据 {{ req.samples.with_evidence }}、缺 {{ req.samples.missing }}
+              </div>
+              <ul v-if="req.samples.missing_items?.length" class="wp-att-breakdown__missing">
+                <li v-for="item in req.samples.missing_items" :key="item.voucher_key">
+                  {{ item.label }}{{ item.reason ? `（${item.reason}）` : '' }}
+                </li>
+                <li v-if="req.samples.truncated">……共 {{ req.samples.missing }} 笔</li>
+              </ul>
+              <div v-if="req.samples.missing" class="wp-att-breakdown__hint">在凭证检查表该行「来源」列的 📎 上传或引用其他底稿已有的原件</div>
             </div>
             <el-button
               v-if="canEdit && canQuickUpload(req)"

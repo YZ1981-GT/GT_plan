@@ -306,6 +306,7 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'L1',
   itemId: () => `L1-adj-${activeType.value}`,
+  entryType: activeType,
   buildLineItems: () => filteredEntries.value.map(e => ({
     standard_account_code: e.accountCode || undefined,
     account_name: e.accountName,

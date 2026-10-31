@@ -20,6 +20,8 @@ export interface K1OcrPosition {
   sheet: string
   /** 行槽位（如 `row:occurrence-{id}`）；空 = 表页级 */
   cell?: string | null
+  /** 凭证检查行：带了就按凭证身份挂（spec attachment-voucher-evidence-binding） */
+  row?: unknown
 }
 
 export function useK1VoucherOcr(
@@ -43,7 +45,7 @@ export function useK1VoucherOcr(
     try {
       const formData = new FormData()
       formData.append('file', file)
-      if (position) appendRowEvidence(formData, position.sheet, position.cell)
+      if (position) appendRowEvidence(formData, position.sheet, position.cell, position.row)
       ElMessage.info('正在 OCR 识别…')
       const res = await http.post(`/api/workpapers/${wid}/d4/contract-ocr`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

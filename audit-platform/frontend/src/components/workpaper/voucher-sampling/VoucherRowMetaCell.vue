@@ -8,6 +8,7 @@
 import { computed } from 'vue'
 import VoucherRowMetaTag from './VoucherRowMetaTag.vue'
 import VoucherPairingCell from './VoucherPairingCell.vue'
+import VoucherEvidenceTag from './VoucherEvidenceTag.vue'
 import { metaOf, MULTI_ACCOUNT } from '../composables/shared/voucherCheckFill'
 
 const props = defineProps<{
@@ -38,6 +39,8 @@ const multi = computed(() => {
       :year="year"
       :account-code="accountCode"
     />
+    <!-- 凭证证据：本底稿份数、他稿提示与引用（spec attachment-voucher-evidence-binding 需求 3） -->
+    <VoucherEvidenceTag :row="row" :project-id="projectId" :locked="locked" />
   </span>
 </template>
 

@@ -2007,3 +2007,47 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 - 一次性探针 / 数据修复脚本用 _ 前缀（已有约定），文件头注释标明「用完即删」
 - 介于两者之间的（如清单生成器，只在 spec 交付时跑一次但产物被守卫引用）：文件头注释标明「由 XX spec 引入，产物被 YY 守卫引用，删除前先确认守卫不依赖」
 
+
+## 多会话主工作区同步与缺陷归因（2026-10-30 主工作区同步 v1.0.53 / v1.0.54 复盘沉淀）
+
+> 背景：主工作区本地 HEAD 落后远端 80 个提交、带 1120 个脏路径，其中 566 个与远端内容相同（别的会话从分离头 worktree 推送后没把主工作区前移）。同步在干净 worktree 里把工作区快照与远端三方合并、单一提交推送（v1.0.53），又因生成文件取并集多推了一个修正提交（v1.0.54）。复盘时还发现上一轮「已修复」的 AI 内容标签其实没修好。
+
+### 一、迁移撞号先查两侧各在哪套库落过
+
+- 判据：共享库 `schema_version` 记的是哪一侧的文件 + `pg_stat_statements` 里有没有另一侧的语句；不凭 spec 里写的 id / 时间推断（10-30：远端 V215 / V216 / V217 / V221 在共享库无任何语句，是在另一套库落的）
+- 改**未推送**一侧的号：改远端号会让已落库的那套环境重复执行、本地号在那边永远不跑
+- 改共享库 `schema_version`（只改 version / filename，checksum 与 applied_at 不动，rollback_note 记原号）是改共享记账：先单独征得用户同意，先备份原行，写好回退 SQL，持迁移 advisory lock 再改
+
+### 二、生成文件不取并集
+
+- `components.d.ts` 这类生成产物两边都改时取一侧，或删掉让生成器重建；行级并集带进了另一会话变异测试留下的 `__ppux_mut_CustomQueryTab`，只能再推一个修正提交
+
+### 三、聚合型守卫按违规集合比，不按用例比
+
+- 行数门 / 裸 SQL 列契约 / 白名单棘轮这类「一个用例装全仓违规」的守卫，基线上本来就红时，「基线红、候选也红 ⇒ 无新增」的用例级比较会漏掉新违规 ⇒ 抽出两侧违规集合做差集
+
+### 四、写共享库与主工作区：演练走完核验、预检后一次切换
+
+- 演练（dry-run）要走到写后核验：只打印计划的演练测不到核验代码本身；在回滚事务里真写一遍并跑完核验
+- 主工作区批量写文件前逐个试开（Windows 上被编辑器 / Vite / 后端占用的文件会写失败、只写一半），全部写进暂存目录核对后一次切换，留备份可整体回退
+
+### 五、从分离头 worktree 推送后把主工作区前移
+
+- 推送提交里的每个路径按主工作区现状分三类：内容已等于推送版 ⇒ `git update-ref refs/heads/<分支> <新> <旧>` 后 `git reset -q -- <路径>` 对齐暂存区；仍是旧版 ⇒ 同时写入推送版；有别人的改动 ⇒ 先 `git merge-file -p --diff3` 预演三方合并，无冲突再写
+- 不前移的代价：主工作区脏路径里混进「与远端相同」的副本，下次同步只能整体三方合并；另一会话正在前移时不要抢着做（先看 `git worktree list` 有没有停在新提交上的同步 worktree）
+
+### 六、跑 PG 用例显式设 `DATABASE_URL`
+
+- 根 conftest（`backend/tests/conftest.py`）按 `os.getenv("DATABASE_URL", "sqlite")` 判库，只认环境变量、不读 `.env` ⇒ 没设时 `pg_only` 用例全部静默跳过，主工作区与 worktree 一样（复盘时一度归因成「worktree 没有 `.env`」，不对：主工作区不设环境变量实测同样跳过）⇒ 设 `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform`，并加 `GT_REQUIRE_PG=1`（地址不是 PG 却收集到 `pg_only` 用例时直接报错，不再静默跳过）
+
+### 七、缺陷归因用 `git blame` 定到行
+
+- 「最近改过这个文件的提交」不等于「引入这几行的提交」：ai_content.py 的标签查询曾被误归到 1db8ed43e，`git blame -L` 实为 6d6d093c8（10-21）⇒ `git blame -L <起>,<止> <rev> -- <文件>` 或 `git log -L`
+- 找丢失代码别只用 `git log --all -S`：它默认不看合并提交，而 stash 提交就是合并（`git log -m -S` 才看）。还要查 `refs/tags/rescue/*`（10-21 抢救时打的防 gc 标签）、`git fsck --unreachable --no-reflogs` 的悬空提交、编辑器本地历史（`%APPDATA%\Kiro\User\History`）与 `~/.kiro/sessions/*/messages.jsonl`（能还原谁在什么时候执行了什么）。10-30 曾据此误判「采纳 / 转存笔记接线从没入过库」，实际完整留在救援标签 stash 112bfabec 里
+- 恢复丢失改动一律**逐文件三方合并**，禁 `git checkout <旧rev> -- <file>` 整文件取回：丢失期间这些文件往往已被别人改过（10-31 恢复 AI 采纳接线时，整文件取旧版会回退 SSE 路由的 `get_db(scope="function")` 和 `auditPlatformApi.getDisclosureNoteTree(..., config?)` 两处后续修复）。配套四条：①候选树在隔离 worktree 上做，远端验证期间前移了就换基后比对 `git diff --cached --binary` 字节不变，别重新手工合一遍 ②生成物（`components.d.ts` / `auto-imports.d.ts`）跑一次 Vite 就会补出与本次无关的条目（10-31 补出 `ElImage` / `ElScrollbar`，用在本次未改的 `AttachmentPreviewCore.vue` / `DisclosureEditor.vue`），提交前 `git checkout --` 丢弃，按「生成文件不取并集」处置 ③跟功能绑定的配置改动（`tsconfig.json` 的 `lib`）不能当无关改动剔掉，剔了区域 typecheck 当场红 ④memory / spec 里记的「已知缺陷」会过期，引用前先实测（10-31 实测 `target_label` 已有值，而记录里还写着恒空）
+
+### 八、「已修复」要验到用户看得见的地方
+
+- 反例（`ai-chat-adopt-and-note-target-picker` R6「target_label 全 None 已修」）：底稿查 `working_paper.wp_name`（列在 `wp_index`）、附注把 `target_cell` 末段当章节号、两条查询放同一保存点 ⇒ 列表含底稿项时全部为空；没有一个用例断言标签值，唯一前端消费方也从不显示这个字段
+- 被保存点 / try 吞掉的查询，只有断言真实值的用例能抓；裸 SQL 列名只有 PG 上的 `pg_only` 守卫能抓（`test_raw_sql_unqualified_column_contract` 从 10-21 起在 PG 上一直红），改了裸 SQL 必须在 PG 上跑一次
+- 解析 `target_cell` 这类编码串以写入方为准（`ai_content_log_service.create`：`{instance_type}:{instance_id}[:{target_cell}]`），不信读取方注释

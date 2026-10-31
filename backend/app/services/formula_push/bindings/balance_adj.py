@@ -36,7 +36,9 @@ from app.services.formula_push.bindings.balance_adj_extract import (
 from app.services.formula_push.policy import is_blank
 from app.services.formula_push.js_compat import js_number_to_string
 from app.services.formula_push.rules import PushRule, workpaper_addr_id
-from app.services.formula_push.sources import FormulaSources, load_hall_adjustments, load_tb_audited
+from app.services.formula_push.sources import (
+    FormulaSources, PriorPlSnapshot, load_hall_adjustments, load_prior_pl, load_tb_audited,
+)
 from app.services.four_table.dual_family_codes import codes_for_cycle_slot
 from app.services.four_table.g_cycle_specs import G_CYCLE_SPECS
 from app.services.four_table.h6_account_scope import H6_ACCOUNT_SPEC
@@ -211,16 +213,19 @@ class BalanceAdjudicationBinding:
         self._spec = spec
         # 缓存 TB 数据供 note_rows 使用
         self._last_tb_data: Mapping[str, Mapping[str, Decimal]] | None = None
+        #: 损益类科目的上年发生额（附注上期列）；没有损益类科目为 None
+        self._last_prior_pl: PriorPlSnapshot | None = None
 
     async def load_sources(
         self, db: Any, project_id: UUID, year: int, wp_id: UUID | None,
     ) -> BalanceAdjSources:
-        """取齐推送所需的全部源数据（试算表审定口径 + 大厅调整净额）。"""
+        """取齐推送所需的全部源数据（试算表审定口径 + 大厅调整净额；损益类另取上年试算表作上期）。"""
         warnings: list[str] = []
         tb = await load_tb_audited(db, project_id, year, self.account_prefixes)
         if len(tb.company_codes) > 1:
             warnings.append(f"试算表含多个公司编码 {list(tb.company_codes)}，按全部合计")
         self._last_tb_data = tb.tb_data if tb.available else None
+        self._last_prior_pl = await load_prior_pl(db, project_id, year, self.account_prefixes) if tb.available else None
         # 加载大厅已批准调整净额（与 E1 同口径，ADR-PUSH-001）
         hall = await load_hall_adjustments(db, project_id, year, self.account_prefixes)
         template_type = await _load_template_type(db, project_id)
@@ -384,49 +389,14 @@ class BalanceAdjudicationBinding:
 
         spec = self._spec
         codes = spec.account_codes
-        from app.services.formula_push.bindings.note_direct import _is_pl_code, _tb_value
+        from app.services.formula_push.bindings.note_direct import code_note_rows
 
-        rows: list[dict] = []
         account_name = _load_account_name(spec.wp_code)
         if spec.note_lines:
             return _line_note_rows(spec.wp_code, spec.note_lines, tb_data)
         if spec.merge_note_codes and len(codes) > 1:
             return _merged_note_rows(spec.wp_code, account_name, codes, tb_data)
-        for code in codes:
-            is_pl = _is_pl_code(code)
-            ending_col = "本期发生额" if is_pl else "期末余额"
-            opening_col = "年初余额"
-            ending, ending_resolved = _tb_value(tb_data, code, ending_col)
-            opening, opening_resolved = _tb_value(tb_data, code, opening_col)
-            label = account_name if len(codes) == 1 else f"{account_name}_{code}"
-            rows.append({
-                "key": f"{spec.wp_code}-note-{code}",
-                "label": label,
-                "note_label": label,
-                "is_total": False,
-                "is_memo": False,
-                "ending": ending,
-                "opening": opening,
-                "ending_resolved": ending_resolved,
-                "opening_resolved": opening_resolved,
-            })
-
-        if len(codes) > 1:
-            total_ending = sum(r["ending"] for r in rows)
-            total_opening = sum(r["opening"] for r in rows)
-            rows.append({
-                "key": f"{spec.wp_code}-note-total",
-                "label": account_name,
-                "note_label": account_name,
-                "is_total": True,
-                "is_memo": False,
-                "ending": total_ending,
-                "opening": total_opening,
-                "ending_resolved": True,
-                "opening_resolved": True,
-            })
-
-        return rows
+        return code_note_rows(spec.wp_code, account_name, codes, tb_data, self._last_prior_pl)
 
     def entry_warnings(self, entries: Mapping[str, Any]) -> list[str]:
         return []

@@ -408,6 +408,7 @@ const {
   wpId: toRef(props, 'wpId') as Ref<string>,
   wpCode: 'L2',
   itemId: () => `L2-adj-${activeEntryType.value}`,
+  entryType: activeEntryType,
   buildLineItems: () =>
     currentEntries.value.map((e: any) => ({
       account_name: e.accountName,

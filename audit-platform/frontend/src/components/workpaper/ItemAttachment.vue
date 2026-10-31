@@ -91,8 +91,10 @@ interface Props {
   itemIndex?: number | string
   cellRef?: string
   accept?: string
-  /** 证据类型；不传由后端按底稿编码的证据声明取缺省 */
+  /** 证据类型；不传由后端按底稿编码的证据声明取缺省（带凭证键时缺省记凭证 / 原始单据） */
   evidenceType?: string
+  /** 凭证检查行的凭证键（`_gt.vk`）：上传时带上，按凭证身份挂（spec attachment-voucher-evidence-binding 需求 4.3） */
+  voucherKey?: string | null
   /** 只读：隐藏上传与移除 */
   readonly?: boolean
 }
@@ -101,6 +103,7 @@ const props = withDefaults(defineProps<Props>(), {
   cellRef: undefined,
   accept: undefined,
   evidenceType: undefined,
+  voucherKey: null,
   readonly: false,
 })
 
@@ -139,6 +142,7 @@ async function onUpload(req: { file: File }) {
       evidenceType: props.evidenceType,
       sheetName: props.sheetKey,
       cellRef: cellRef.value,
+      voucherKey: props.voucherKey,
     })
     ElMessage.success('附件已上传')
   } catch (err: unknown) {

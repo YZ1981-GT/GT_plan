@@ -385,7 +385,7 @@
 
 <script setup lang="ts">
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
-import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
+import { rowEvidenceCell, rowVoucherKey } from '@/components/attachment/rowEvidence'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -576,6 +576,7 @@ async function handleOcr(idx: number) {
         projectId: props.projectId,
         evidenceSheet: EVIDENCE_SHEET,
         evidenceCell: rowId ? rowEvidenceCell(rowId) : undefined,
+        voucherKey: rowVoucherKey(rows.value[idx]),
       })
       const name = pickOcrField(fields, 'name', 'staffName', 'personName')
       const education = pickOcrField(fields, 'education', 'degree')

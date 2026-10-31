@@ -18,9 +18,11 @@
  *  - 协作补充过的分录组不自动覆盖（提示手动同步）
  *  - 卸载时有待发同步则立即发出
  */
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
+import { registerAdjustmentEntryGroup } from '@/composables/adjustmentEntryGroupLocate'
+import { highlightElement } from '@/composables/useCellLocate'
 import {
   syncAdjustmentFromWorkpaper,
   getAdjustmentBySourceRef,
@@ -52,6 +54,10 @@ export const COLLAB_STATUS_LABELS_MIN: Record<string, string> = {
   confirmed: '已确认', rejected: '已退回', closed: '已关闭',
 }
 
+/** 按类型分组的页签（K10 / K12 / K13、L、M、N1~N3）的分录类型 */
+export type AdjustmentEntryType = 'AJE' | 'RJE'
+export const ADJUSTMENT_ENTRY_TYPES: readonly AdjustmentEntryType[] = ['AJE', 'RJE']
+
 export interface UseAdjustmentCentralSyncOptions {
   projectId: Ref<string> | (() => string)
   /** 审计年度；项目没填为 null ⇒ 手动同步提示去填、自动同步静默跳过（不按今年写集中登记） */
@@ -60,6 +66,11 @@ export interface UseAdjustmentCentralSyncOptions {
   wpCode: Ref<string> | (() => string) | string
   /** 该 tab 分录组的 checklist item_id（幂等键构成）；可为 getter 以支持随类型切换的动态 itemId */
   itemId: string | (() => string)
+  /**
+   * itemId 随类型切换时传当前类型的 ref（即 itemId 模板串里用的那个）：调整分录页跳来源底稿定位分录组时，
+   * 按 item_id 切到对应类型（spec wp-deeplink-locate-residual-closure 需求 1.2；守卫 adjustmentEntryGroupWiring.spec.ts）。
+   */
+  entryType?: Ref<AdjustmentEntryType>
   /** tab 把自身 rows 映射为标准 line_items */
   buildLineItems: () => CentralSyncLineItem[]
   /** tab 提供 description + adjustmentType（报表调整→rje / 其余→aje） */
@@ -127,6 +138,30 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
   function sourceRef(): string {
     return `${unwrap(opts.wpId)}:${resolveItemId()}`
   }
+
+  // ─── 定位（调整分录页「底稿 X」跳来源底稿，spec wp-deeplink-locate-residual-closure 需求 1.2） ───
+  /** item_id 是本页签的分录组则认领；按类型取 item_id 的先切到该类型，都不是则还原原类型 */
+  function selectEntryGroup(itemId: string): boolean {
+    if (resolveItemId() === itemId) return true
+    const typeRef = opts.entryType
+    if (!typeRef) return false
+    const original = typeRef.value
+    for (const type of ADJUSTMENT_ENTRY_TYPES) {
+      if (type === original) continue
+      typeRef.value = type
+      if (resolveItemId() === itemId) return true
+    }
+    typeRef.value = original
+    return false
+  }
+  const instance = getCurrentInstance()
+  /** 高亮对象：本页签根元素里第一张表格（分录表）；没有表格（在线编辑区等）时高亮根元素 */
+  function entryGroupElement(): Element | null {
+    const el = instance?.proxy?.$el as Node | null | undefined
+    const rootEl = el?.nodeType === 1 ? (el as Element) : ((el as CharacterData | null | undefined)?.nextElementSibling ?? null)
+    return rootEl?.querySelector('.el-table') ?? rootEl
+  }
+  let _unregisterLocate: (() => void) | null = null
 
   // ─── Phase 3: 签名跟踪与错误去重 ─────────────────────────────────
   /** 上一次成功同步时的签名（首次载入前为 null → 跳过首次同步） */
@@ -237,6 +272,12 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
   // P0-4: 订阅集中登记复核状态变更事件，底稿侧自动回流刷新（SSE 真通道）
   let _reviewSub: ProjectEventSubscription | null = null
   onMounted(() => {
+    _unregisterLocate = registerAdjustmentEntryGroup(() => unwrap(opts.wpId), (itemId) => {
+      if (!selectEntryGroup(itemId)) return false
+      const el = entryGroupElement()
+      if (el) highlightElement(el, `adjustment:${unwrap(opts.wpId)}:${itemId}`)
+      return true
+    })
     const pid = unwrap(opts.projectId)
     if (pid) {
       _reviewSub = subscribeProjectEvent(
@@ -251,6 +292,8 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     Promise.resolve().then(() => { _isFirstLoad = false })
   })
   onBeforeUnmount(() => {
+    _unregisterLocate?.()
+    _unregisterLocate = null
     _reviewSub?.close()
     // Phase 3: 卸载冲刷 —— 有待发同步则立即发出
     if (_autoSyncTimer) {
@@ -361,6 +404,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     refreshStatus,
     sourceRef,
     scheduleAutoSync,
+    selectEntryGroup,
   }
 }
 

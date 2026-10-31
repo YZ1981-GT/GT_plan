@@ -401,6 +401,7 @@
           <el-tag v-if="ctx.filterStale?.value" size="small" type="warning" effect="light" round closable @close="ctx.filterStale.value = false">仅看待重算</el-tag>
         </div>
         <el-table
+          ref="listTableRef" highlight-current-row
           :data="listPaged"
           style="width: 100%"
           max-height="calc(100vh - 300px)"
@@ -446,7 +447,7 @@
  * 从 WorkpaperList.vue 抽取 list/workbench/guide 三个 viewMode 的模板和私有逻辑
  * Requirements: 2.5, 3.5, 4.6, 5.1, 5.2
  */
-import { inject, ref, computed, reactive, nextTick } from 'vue'
+import { inject, ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { WP_LIST_CONTEXT_KEY } from '@/composables/useWorkpaperListContext'
 import type { WpChildProps, WpChildEmits, MutatePayload } from '@/composables/useWorkpaperListContext'
@@ -454,6 +455,8 @@ import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
 import { downloadWorkpaper } from '@/services/workpaperApi'
 import { indexFirstBy } from '@/utils/indexFirstBy'
 import { buildWorkpaperTree } from './workpaperTree'
+import { useWorkpaperListLocateInView } from './useWorkpaperListLocate'
+import { UNASSIGNED_FILTER } from './workpaperListEntryQuery'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import WpStaleTag from '@/components/workpaper/WpStaleTag.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
@@ -574,7 +577,7 @@ const filteredWpList = computed<WorkpaperDetail[]>(() => {
     const idx = wpIndexById.value.get(w.wp_index_id)
     if (ctx.filterCycle.value && !idx?.wp_code?.startsWith(ctx.filterCycle.value)) return false
     if (ctx.filterStatus.value && w.status !== ctx.filterStatus.value) return false
-    if (ctx.filterAssignee.value && w.assigned_to !== ctx.filterAssignee.value) return false
+    if (ctx.filterAssignee.value === UNASSIGNED_FILTER ? !!w.assigned_to : ctx.filterAssignee.value && w.assigned_to !== ctx.filterAssignee.value) return false
     // 仅看待重算（?filter=stale / 筛选栏勾选）
     if (ctx.filterStale?.value && w.prefill_stale !== true) return false
     if (ctx.searchKeyword.value) {
@@ -661,6 +664,10 @@ function selectListCycle(code: string) {
   listSelectedCycle.value = listSelectedCycle.value === code ? '' : code
   wbPage.value = 1
 }
+
+// 入口定位（?highlight= / ?wp_code= / ?search=；手册视图点底稿也走它。spec wp-deeplink-locate-residual-closure 需求 2.1）
+const { locateCode, table: listTableRef } = useWorkpaperListLocateInView(ctx, (w) => wpIndexById.value.get(w.wp_index_id)?.wp_code || '', {
+  rows: workbenchTableData, cycleRows: listTableData, page: wbPage, pageSize: wbPageSize, selectCycle: (c) => { listSelectedCycle.value = c } })
 
 // ─── 按循环分组目录数据 ────────────────────────────────────────────────────────
 const expandedCycleGroups = reactive<Record<string, boolean>>({})
@@ -1063,10 +1070,7 @@ function guideGoBack() {
 function onGuideWpClick(wpCode: string) {
   ctx.viewMode.value = 'list'
   guideBreadcrumb.value = ['体系总览']
-  nextTick(() => {
-    const idx = ctx.wpIndex.value.find((i: WpIndexItem) => i.wp_code === wpCode)
-    if (idx) ctx.selectedWpId.value = idx.id
-  })
+  locateCode(wpCode)
 }
 </script>
 

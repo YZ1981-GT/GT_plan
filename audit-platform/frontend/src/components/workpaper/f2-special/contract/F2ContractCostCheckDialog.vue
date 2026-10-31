@@ -263,7 +263,7 @@ function runOcr(file: File | undefined, documentType: F2SpeDocumentType): void {
   if (!file || !form.value) return
   void uploadAndMerge(form.value.id, file, (_id, patch) => {
     if (form.value) Object.assign(form.value, patch)
-  }, documentType)
+  }, documentType, form.value)
 }
 
 function save(): void {

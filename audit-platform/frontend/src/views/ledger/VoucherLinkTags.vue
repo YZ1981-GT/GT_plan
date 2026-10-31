@@ -7,19 +7,22 @@
  */
 import { computed } from 'vue'
 import { AUDIT_PHASE_LABEL } from '@/composables/useProjectAuditPhase'
-import { LINK_SOURCE_LABEL, voucherLinkText, type VoucherLink } from './useVoucherLinkTags'
+import { LINK_SOURCE_LABEL, voucherLinkText, type VoucherTag } from './useVoucherLinkTags'
 
-const props = defineProps<{ links: VoucherLink[] }>()
+const props = defineProps<{ links: VoucherTag[] }>()
 
 const items = computed(() => props.links.map(link => ({
   key: `${link.working_paper_id ?? '-'}|${link.source}|${link.phase ?? '-'}|${link.legacy}`,
-  text: [
-    link.wp_code ?? (link.working_paper_id ? '底稿已删除' : '未指定底稿'),
-    `${LINK_SOURCE_LABEL[link.source] ?? link.source}${link.count > 1 ? ` ×${link.count}` : ''}`,
-    link.phase ? AUDIT_PHASE_LABEL[link.phase] : '阶段未标',
-  ].join(' · ') + (link.legacy ? '（旧登记）' : ''),
+  // 凭证证据条目（spec attachment-voucher-evidence-binding 需求 7）：「D2-4 · 凭证证据 2 份」，蓝色
+  text: link.source === 'evidence'
+    ? `${link.wp_code ?? '其他底稿'} · ${LINK_SOURCE_LABEL.evidence} ${link.count} 份`
+    : [
+        link.wp_code ?? (link.working_paper_id ? '底稿已删除' : '未指定底稿'),
+        `${LINK_SOURCE_LABEL[link.source] ?? link.source}${link.count > 1 ? ` ×${link.count}` : ''}`,
+        link.phase ? AUDIT_PHASE_LABEL[link.phase] : '阶段未标',
+      ].join(' · ') + (link.legacy ? '（旧登记）' : ''),
   tip: voucherLinkText(link),
-  type: link.source === 'manual' ? 'warning' as const : 'success' as const,
+  type: link.source === 'evidence' ? 'primary' as const : link.source === 'manual' ? 'warning' as const : 'success' as const,
 })))
 </script>
 

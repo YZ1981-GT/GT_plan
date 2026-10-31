@@ -214,8 +214,15 @@ def _index_variant_matrix(
         for variant, code in pairs:
             if isinstance(code, str) and code.strip():
                 tt = variant.split("_", 1)[0]
-                by_code.setdefault((tt, code.strip()), key)
-                codes.setdefault((key, tt), set()).add(code.strip())
+                norm_code = code.strip()
+                code_key = (tt, norm_code)
+                previous = by_code.get(code_key)
+                if previous is not None and previous != key:
+                    raise ValueError(
+                        f"变体矩阵 {tt} 章节 {norm_code!r} 同时属于 {previous!r} 与 {key!r}"
+                    )
+                by_code[code_key] = key
+                codes.setdefault((key, tt), set()).add(norm_code)
     return by_code, {k: frozenset(v) for k, v in codes.items()}
 
 

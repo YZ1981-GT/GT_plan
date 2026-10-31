@@ -66,6 +66,8 @@ import { combineRowClass, type EngineFilledPayload } from '../composables/shared
 import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import { dSlotQueryCodes } from '../composables/dCycleAccountScope'
 import WpCommitInput from '../shared/WpCommitInput.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
 const samplingAccountCode = dCycleScope('D1')?.queryCodes().join(',') ?? ''
@@ -88,6 +90,10 @@ const props = defineProps<{
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../voucher-sampling/GtVoucherSamplingEngine.vue'),
 )
+
+/** 识别附件挂到本行（行级证据；抽样凭证行同时挂到该凭证），📎 旁的小眼睛按同一位置读取（只读也能看） */
+const EVIDENCE_SHEET = 'D1-13'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
@@ -397,12 +403,14 @@ async function onUploadOcr(row: VouchingRow, file: File) {
   updateVouchingRow(row.id, 'attachmentName', file.name)
   const fd = new FormData()
   fd.append('file', file)
+  rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id), row)
   try {
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const data = res.data?.data ?? res.data ?? {}
     const extracted = (data.extracted_fields || {}) as Record<string, any>
     ocrExtracted.value.set(row.id, extracted)
@@ -1060,6 +1068,7 @@ const SAMPLING_METHOD_TEXTS = [
                 {{ getOcrStatusLabel(row.ocrStatus) }}
               </el-tag>
               <span class="attach-name" :title="row.attachmentName || ''">{{ row.attachmentName || '未上传附件' }}</span>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
               <div class="attach-actions">
                 <el-button size="small" text :disabled="isReadonly || row.ocrStatus !== 'done'" @click="onApplyOcr(row, 'empty-only')">回填空字段</el-button>
                 <el-button size="small" text :disabled="isReadonly || row.ocrStatus !== 'done'" @click="onApplyOcr(row, 'override-all')">覆盖回填</el-button>

@@ -53,7 +53,7 @@ UPLOAD = SourceContext(kind="upload")
 #: ①章首正文无同名正文节：章标题与第一个节之间的段落全是填写提示（【披露要求…】【提示…】（注：…）
 #:   （具体的报表项目应按以下要求进行注释…）），系统模板不为提示建正文节；上市「重要会计政策及会计估计」
 #:   的章首另有一句模板正文「本公司根据自身生产经营特点…」，种子暂无承载位置（见 spec tasks.md Task 6 待办）
-#: ②上市合并「公司财务报表主要项目注释」：种子章名「母公司财务报表主要项目注释」由需求 3.2 守卫锁定，待用户拍板
+#: ②上市合并母公司章已于 disclosure-note-template-word-realignment Phase 8 Task 32 按 Word 正名，不再是差异。
 _CHAPTER_HEAD_HINTS_SOE = frozenset({"关联方关系及其交易（章首正文）", "资产负债表日后事项（章首正文）"})
 _CHAPTER_HEAD_HINTS_LISTED = frozenset({
     "关联方及关联交易（章首正文）", "资产负债表日后事项（章首正文）", "重要会计政策及会计估计（章首正文）"})
@@ -62,7 +62,7 @@ KNOWN_TREE_GAPS: dict[tuple[str, str], frozenset[str]] = {
     ("soe", "consolidated"): _CHAPTER_HEAD_HINTS_SOE | {
         "母公司财务报表的主要项目附注（章首正文）", "财务报表主要项目注释（章首正文）"},
     ("listed", "standalone"): _CHAPTER_HEAD_HINTS_LISTED,
-    ("listed", "consolidated"): _CHAPTER_HEAD_HINTS_LISTED | {"公司财务报表主要项目注释"},
+    ("listed", "consolidated"): _CHAPTER_HEAD_HINTS_LISTED,
 }
 _GAP_KINDS = ("tree_unmatched", "tree_ambiguous", "chapter_body_unmatched")
 

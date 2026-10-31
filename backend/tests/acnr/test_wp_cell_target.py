@@ -111,12 +111,16 @@ def test_borrowed_and_ambiguous_names_block():
 
 
 def test_live_cells_under_borrowed_sheets_are_exactly_f2_two():
-    """design §2.4「现算影响 F2-33/B20、F2-34/B20 两格」：遍历真实目录全部有效 cell 复算。"""
+    """design §2.4「现算影响 F2-33/B20、F2-34/B20 两格」：遍历真实目录全部有效 cell 复算。
+
+    spec wp-deeplink-locate-coverage-closure 逐格对模板复核后这两格（种子坐标与模板不符）已停用，借名 sheet 下不再有
+    有效 cell；借名判定本身由 test_borrowed_and_ambiguous_names_block 覆盖。"""
     cat = get_catalog()
     hit = sorted(a for a, c in cat.cells_by_addr_id.items() if not c.get("deprecated")
                  and sheet_key_for(cat.sheets_by_addr_id[a.rsplit("/", 1)[0]], index=cat).key is None)
     assert len(cat.cells_by_addr_id) > 400
-    assert hit == ["F2/F2-33/B20", "F2/F2-34/B20"]
+    assert hit == []
+    assert all(cat.cells_by_addr_id[a].get("deprecated") for a in ("F2/F2-33/B20", "F2/F2-34/B20"))
 
 
 # ── bind_wp_code ─────────────────────────────────────────────────────────────

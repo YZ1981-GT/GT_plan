@@ -297,6 +297,8 @@ export const attachments = {
   /** 删除一条证据链接（不删附件） */
   evidenceLink: (pid: string, wpId: string, linkId: string) =>
     `/api/projects/${pid}/workpapers/${wpId}/evidence/${linkId}`,
+  /** 把别的可见底稿上同一凭证的证据引用到本底稿（spec attachment-voucher-evidence-binding） */
+  evidenceVoucherReuse: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/evidence/voucher-reuse`,
 } as const
 
 /** Office 在线预览健康探测（决定是否展示 iframe） */

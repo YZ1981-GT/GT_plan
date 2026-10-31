@@ -1781,3 +1781,21 @@ backend/app/routers/wp_surfaced_h.py  1257
 #     拆分方向：计划按「预校验 / 依赖库存 / 集团树校验」拆模块，测试按 R 编号拆文件。
 backend/app/services/batch_project_plan.py  971
 backend/tests/test_batch_project_import_closure.py  1069
+# test_note_conversion_preview_rollback.py / test_note_conversion_section_mapping_production.py —— HEAD 已有
+# 2004 / 971 行（历史超限、未登记）。spec 49 Phase 8 加固：转换只在系统标题时改 section_title / account_name，
+# 快照与回滚覆盖这两列 ⇒ 快照字段守卫与内存替身（savepoint 快照、dirty 判定）各补这两列（+5 / +4 行）；
+# 新判据放新文件 test_note_conversion_title_fields.py。拆分方向：内存替身（FakeSession / ConversionSession /
+# savepoint）移到 tests/services/note_conversion_fakes.py，两文件按「预览 / 回滚 / 事件」与「映射 / 回填 / 归档」各拆两份。
+backend/tests/test_note_conversion_preview_rollback.py  2009
+backend/tests/services/test_note_conversion_section_mapping_production.py  975
+
+#   formula_push/engine.py —— 2026-10-31 由 951→1040 行（+89）：
+#     新增 _expected_section_title（准则章节标题校验 14 行 + 文档注释 10 行）、_push_note_total 的 None→skip
+#     分支（4 行）、合计兜底歧义说明与 unresolved_fields（60 行引擎主逻辑）。拆分轴：_push_note 内的
+#     兜底分支移入独立 _push_note_fallback（约 −80 行）。
+backend/app/services/formula_push/engine.py 1040
+#   test_formula_push_note_skip.py —— 2026-10-31 由 1926→2106 行（+180）：
+#     新增 TestTotalRecomputeNeedsANumber（合计上方全空不按 0 重算, 40 行）、TestExpectedSectionTitle
+#     （准则章节名校验 10 参数化 + 3 行为, 140 行）。拆分轴：TestExpectedSectionTitle 移入
+#     test_formula_push_section_title_check.py。
+backend/tests/test_formula_push_note_skip.py 2106

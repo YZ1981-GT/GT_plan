@@ -247,6 +247,8 @@ export async function runWorkpaperOcr(
     forceReocr?: boolean
     evidenceSheet?: string
     evidenceCell?: string
+    /** 凭证检查行的凭证键（按凭证身份挂，spec attachment-voucher-evidence-binding） */
+    voucherKey?: string | null
   },
 ): Promise<Record<string, any>> {
   const { buildLinkedOcrFormData } = await import('./ocrAttachmentLinkage')
@@ -257,6 +259,7 @@ export async function runWorkpaperOcr(
     forceReocr: opts?.forceReocr,
     evidenceSheet: opts?.evidenceSheet,
     evidenceCell: opts?.evidenceCell,
+    voucherKey: opts?.voucherKey,
   })
   const res = await http.post(`/api/workpapers/${wpId}/d4/contract-ocr`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },

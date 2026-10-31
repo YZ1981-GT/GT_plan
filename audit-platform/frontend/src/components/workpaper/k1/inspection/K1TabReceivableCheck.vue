@@ -764,7 +764,7 @@ function onRowOcr(row: K1VoucherRow, target: 'occurrence' | 'post', file?: File)
         : (row.remark ? `${row.remark}\n[OCR附件] ${fileName}` : `[OCR附件] ${fileName}`),
     })
     persist()
-  }, { sheet: EVIDENCE_SHEET, cell: voucherEvidenceCell(target, row.id) })
+  }, { sheet: EVIDENCE_SHEET, cell: voucherEvidenceCell(target, row.id), row })
 }
 
 onMounted(() => {

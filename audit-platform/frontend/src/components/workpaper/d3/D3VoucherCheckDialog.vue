@@ -112,9 +112,11 @@ import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
-import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 import {
   D3_VOUCHER_CHECK_ITEMS,
+  D3_7_EVIDENCE_SHEET,
+  d3VoucherEvidenceCell,
   mapOcrToVoucherFields,
   isAllowedAttachment,
   CONFIDENCE_THRESHOLD,
@@ -140,9 +142,8 @@ const OCR_ACCEPT = '.jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf,image/*,application/pdf
 
 const form = ref<VoucherCheckRow | null>(null)
 const ocrLoading = ref(false)
-const D3_7_EVIDENCE_SHEET = 'D3-7'
 const rowEv = useRowEvidence(() => props.wpId)
-const evidenceCell = computed(() => (props.row?.rowId ? rowEvidenceCell(`${props.section}-${props.row.rowId}`) : ''))
+const evidenceCell = computed(() => (props.row?.rowId ? d3VoucherEvidenceCell(props.section, props.row.rowId) : ''))
 
 function hydrate() {
   if (!props.row) { form.value = null; return }
@@ -200,7 +201,7 @@ async function onOcrUpload(file: File): Promise<boolean> {
     const fd = new FormData()
     fd.append('file', file)
     // 凭证挂到本行（行级证据：D3-7 · row:{区段}-{行 id}），弹窗里的小眼睛按同一位置读取（spec attachment-inline-preview）
-    if (evidenceCell.value) rowEv.append(fd, D3_7_EVIDENCE_SHEET, evidenceCell.value)
+    if (evidenceCell.value) rowEv.append(fd, D3_7_EVIDENCE_SHEET, evidenceCell.value, props.row)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       fd,

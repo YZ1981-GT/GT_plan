@@ -5,6 +5,7 @@ Phase 9 Task 9.8 + workpaper-editor-slimdown Task 7.2
 
 from __future__ import annotations
 
+import json
 import logging
 from uuid import UUID
 
@@ -14,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_audit_year
+from app.deps import get_current_user, require_project_audit_year, require_wp_edit_permission
+from app.models.core import User
 from app.services.wp_ai_service import WpAIService
 
 logger = logging.getLogger(__name__)
@@ -458,11 +460,39 @@ class TsjReviewResponse(BaseModel):
     wp_name: str | None = None
 
 
+def _as_tsj_persistence_payload(findings) -> str:
+    """把 ``LlmResponseParser`` 的当前响应口径转为 TSJ 持久层的唯一输入。
+
+    这条兼容端点的 LLM schema 用 ``risk_level/category/location/suggestion``，
+    而 `tsj_structured_output_service` 的历史 schema 用
+    ``severity/issue_type/sheet/cell_range/remediation``。此前只在响应层解析，
+    从不持久化，且两个 schema 断开。这里在**服务端**按字段显式投影，禁止让
+    前端正文或 ID 参与；随后把 canonical JSON 交给 `process_review_response()`，
+    使该生产入口和成功/失败确认链使用同一写入逻辑。
+    """
+    normalized = []
+    for finding in findings:
+        location = str(getattr(finding, "sheet_location", "") or "")
+        parts = location.split("!", 1)
+        normalized.append(
+            {
+                "issue_type": str(getattr(finding, "category", "") or ""),
+                "severity": str(getattr(finding, "risk_level", "medium") or "medium"),
+                "sheet": parts[0] if location else "",
+                "cell_range": parts[1] if len(parts) == 2 else "",
+                "description": str(getattr(finding, "description", "") or ""),
+                "evidence_ref": "",
+                "remediation": str(getattr(finding, "suggestion", "") or ""),
+            }
+        )
+    return json.dumps({"findings": normalized}, ensure_ascii=False)
+
+
 @router.post("/{wp_id}/ai/tsj-review", response_model=TsjReviewResponse)
 async def tsj_review(
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_wp_edit_permission()),
 ):
     """TSJ 提示词驱动 LLM 复核（已迁移至底稿级 ReviewPrompt 链路）
 
@@ -527,7 +557,86 @@ async def tsj_review(
 
     parse_result = LlmResponseParser.parse(raw_response)
 
-    # 审计轨迹
+    # 这条兼容端点此前只把 parser 临时 UUID 回给前端：点击「确认 / 驳回」
+    # 一定 404，且服务端从不留下 ai_content_log，签字门禁也看不到。必须先
+    # 落入 TSJ 单一持久链；日志创建失败时该服务抛 fail-closed 信号，端点返回
+    # 503 而不是携带无法确认的「pending」响应。
+    from app.services.tsj_structured_output_service import (
+        TsjConfirmationLogWriteError,
+        process_review_response,
+    )
+
+    findings: list[TsjReviewItem] = []
+    try:
+        persisted = await process_review_response(
+            db=db,
+            project_id=wp.project_id,
+            workpaper_id=wp_id,
+            wp_code=wp_code_val or "",
+            response_text=_as_tsj_persistence_payload(parse_result.findings),
+            audit_cycle=audit_cycle,
+            user_id=user.id,
+        )
+        if len(persisted) != len(parse_result.findings):
+            # 这是服务层契约破坏，不可用 zip 截断后假装成功。此时 service 只
+            # flush 未 commit，因此下面的 rollback 能撤销全部 pending 记录。
+            raise HTTPException(status_code=500, detail="AI 复核结果持久化数量不一致")
+
+        for finding, saved in zip(parse_result.findings, persisted, strict=True):
+            desc = finding.description or ""
+            rem = finding.suggestion or ""
+            content_text = f"{desc}\n整改建议：{rem}" if rem else desc
+            saved_sources = saved.data_sources or {}
+            log_id = saved_sources.get("ai_content_log_id")
+            if not log_id:
+                # 服务层已经验证它存在；走到这里说明 ORM/JSONB 交接被破坏，不能给
+                # 前端一个无法确认的临时 parser UUID。
+                raise HTTPException(status_code=500, detail="AI 复核确认记录缺失")
+            location = finding.sheet_location or ""
+            location_parts = location.split("!", 1)
+            findings.append(TsjReviewItem(
+                id=str(log_id),
+                content_type="review_finding",
+                content_text=content_text,
+                confidence_level="",
+                confirmation_status="pending",
+                issue_type=finding.category or "",
+                severity=finding.risk_level or "medium",
+                sheet=location_parts[0] if location else "",
+                cell_range=location_parts[1] if len(location_parts) == 2 else "",
+                description=desc,
+                remediation=rem,
+                wp_code=wp_code_val,
+                wp_name=wp_name_val,
+            ))
+
+        # 提交点必须在 DTO/日志 ID 全部校验之后。此前 service 自己 commit，
+        # 路由后续发现数量/ID 不一致仍会 500，数据库却已留下未展示的 pending
+        # 记录并阻断 sign-off。这里是该请求唯一的业务提交点。
+        await db.commit()
+    except TsjConfirmationLogWriteError as exc:
+        await db.rollback()
+        logger.error(
+            "tsj-review 确认日志失败，已拒绝返回未持久化的 findings: wp=%s: %s",
+            wp_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI 复核结果未能进入确认流程，请稍后重试",
+        ) from exc
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as exc:
+        await db.rollback()
+        logger.exception("tsj-review 提交失败，已回滚: wp=%s", wp_id)
+        raise HTTPException(
+            status_code=503,
+            detail="AI 复核结果保存失败，请稍后重试",
+        ) from exc
+
+    # 审计轨迹必须在持久化成功之后：失败请求不能留下「已请求」的成功暗示。
     try:
         from app.services.audit_logger_enhanced import audit_logger
         await audit_logger.log_action(
@@ -537,34 +646,13 @@ async def tsj_review(
             object_id=wp_id,
             project_id=wp.project_id,
             details={
-                "findings_count": len(parse_result.findings),
+                "findings_count": len(persisted),
                 "prompt_source": prompt_result.source_level,
-                "migrated": True,
+                "persistence": "ai_content_log",
             },
         )
-    except Exception as e:
-        logger.warning(f"Failed to write audit trail for TSJ review: {e}")
-
-    findings = []
-    for f in parse_result.findings:
-        desc = f.description or ""
-        rem = f.suggestion or ""
-        content_text = f"{desc}\n整改建议：{rem}" if rem else desc
-        findings.append(TsjReviewItem(
-            id=f.id,
-            content_type="review_finding",
-            content_text=content_text,
-            confidence_level="",
-            confirmation_status="pending",
-            issue_type=f.category or "",
-            severity=f.risk_level or "medium",
-            sheet=(f.sheet_location or "").split("!")[0] if f.sheet_location else "",
-            cell_range=(f.sheet_location or "").split("!")[-1] if f.sheet_location and "!" in f.sheet_location else "",
-            description=desc,
-            remediation=rem,
-            wp_code=wp_code_val,
-            wp_name=wp_name_val,
-        ))
+    except Exception as exc:  # noqa: BLE001 — 非关键观测不能撤销已完成确认链
+        logger.warning("Failed to write audit trail for TSJ review: %s", exc)
 
     return TsjReviewResponse(
         findings=findings,

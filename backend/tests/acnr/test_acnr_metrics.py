@@ -95,7 +95,7 @@ def test_labelled_counters_bound_unknown_codes_to_other():
 
 async def test_full_resolve_project_without_db_is_unchecked_and_does_not_read_lock():
     pid = _lock(get_catalog().registry_version)
-    result = await full_resolve(addr_id="E1/E1-14/C10", project_id=pid)
+    result = await full_resolve(addr_id="E1/E1-14/I18", project_id=pid)
     assert result.found is True and result.version_lock_checked is False
     assert _locks() == (0, 0, 1)
 
@@ -111,14 +111,14 @@ async def test_full_resolve_with_session_is_not_unchecked():
 async def test_full_resolve_missing_snapshot_counts_and_still_raises():
     pid = _lock(_MISSING_VERSION)
     with pytest.raises(VersionNotFoundError):
-        await full_resolve(addr_id="E1/E1-14/C10", project_id=pid, db=object())
+        await full_resolve(addr_id="E1/E1-14/I18", project_id=pid, db=object())
     assert _locks() == (0, 1, 0)
     assert get_acnr_metrics().get_aggregated_metrics()["alerts"]["by_type"].get("version_mismatch") == 1
 
 
 async def test_full_resolve_unlocked_or_projectless_counts_nothing():
-    await full_resolve(addr_id="E1/E1-14/C10", project_id=str(uuid.uuid4()), db=object())
-    await full_resolve(addr_id="E1/E1-14/C10")
+    await full_resolve(addr_id="E1/E1-14/I18", project_id=str(uuid.uuid4()), db=object())
+    await full_resolve(addr_id="E1/E1-14/I18")
     assert _locks() == (0, 0, 0)
 
 
@@ -141,7 +141,7 @@ async def test_effective_catalog_counts_same_as_full_resolve():
 
 
 async def test_rejected_targets_counted_per_error_code():
-    raws = ["E1/E1-14", "adj:aje", "E1/E1-14/C10", "ZZZ/不存在/A1", "E1/E1-15"]
+    raws = ["E1/E1-14", "adj:aje", "E1/E1-14/I18", "ZZZ/不存在/A1", "E1/E1-15"]
     with pytest.raises(HTTPException) as info:
         await resolve_acnr_targets(raws, project_id=None, db=None)
     assert info.value.status_code == 422
@@ -149,7 +149,7 @@ async def test_rejected_targets_counted_per_error_code():
 
 
 async def test_accepted_and_unavailable_are_not_rejections():
-    await resolve_acnr_targets(["E1/E1-14/C10"], project_id=None, db=None)
+    await resolve_acnr_targets(["E1/E1-14/I18"], project_id=None, db=None)
 
     class _Unavailable(AddressingService):
         async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):

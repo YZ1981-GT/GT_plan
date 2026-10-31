@@ -31,7 +31,7 @@ from uuid import UUID
 from app.services.formula_push.bindings import TargetSkip, WorkpaperTarget
 from app.services.formula_push.js_compat import js_number_to_string
 from app.services.formula_push.rules import PushRule, workpaper_addr_id
-from app.services.formula_push.sources import FormulaSources, load_tb_audited
+from app.services.formula_push.sources import FormulaSources, PriorPlSnapshot, load_prior_pl, load_tb_audited
 
 _DATA_DIR = Path(__file__).resolve().parents[4] / "data"
 _WP_MAPPING_PATH = _DATA_DIR / "wp_account_mapping.json"
@@ -104,6 +104,56 @@ def _tb_value(
     return float(raw), True
 
 
+def opening_value(
+    tb_data: Mapping[str, Mapping[str, Decimal]], prior_pl: PriorPlSnapshot | None, code: str,
+) -> tuple[float, bool, str | None]:
+    """附注期初 / 上期列的值：资产负债类取本年试算表年初余额；损益类取上年试算表发生额（:func:`load_prior_pl`）。
+
+    返回 ``(value, resolved, 取不到的原因)``；损益类上年数据取不到 ⇒ ``resolved=False``，附注保持原值（不写 0）。
+    """
+    if not _is_pl_code(code):
+        value, resolved = _tb_value(tb_data, code, "年初余额")
+        return value, resolved, None
+    if prior_pl is None or prior_pl.tb_data is None:
+        return 0.0, False, (prior_pl.reason if prior_pl else "") or "损益类上期发生额取上年试算表：未取上年数据"
+    value, resolved = _tb_value(prior_pl.tb_data, code, "本期发生额")
+    return value, resolved, None
+
+
+def code_note_rows(
+    wp_code: str, account_name: str, codes: tuple[str, ...], tb_data: Mapping[str, Mapping[str, Decimal]],
+    prior_pl: PriorPlSnapshot | None,
+) -> list[dict]:
+    """每个科目一行（多科目另出合计行）：期末 / 本期取本年试算表（损益类取本期发生额），期初 / 上期见 :func:`opening_value`。
+
+    NoteDirect / 审定表族 / Tier A 三个 binding 共用（原来各写一份，损益类上期都取了本年年初余额 0）。
+    """
+    rows: list[dict] = []
+    for code in codes:
+        ending, ending_resolved = _tb_value(tb_data, code, "本期发生额" if _is_pl_code(code) else "期末余额")
+        opening, opening_resolved, opening_reason = opening_value(tb_data, prior_pl, code)
+        label = account_name if len(codes) == 1 else f"{account_name}_{code}"
+        row = {
+            "key": f"{wp_code}-note-{code}", "label": label, "note_label": label, "is_total": False, "is_memo": False,
+            "ending": ending, "opening": opening, "ending_resolved": ending_resolved,
+            "opening_resolved": opening_resolved,
+        }
+        if opening_reason:
+            row["opening_reason"] = opening_reason
+        rows.append(row)
+    if len(codes) > 1:
+        missing = next((r for r in rows if not r["opening_resolved"]), None)
+        total = {
+            "key": f"{wp_code}-note-total", "label": account_name, "note_label": account_name, "is_total": True,
+            "is_memo": False, "ending": sum(r["ending"] for r in rows), "opening": sum(r["opening"] for r in rows),
+            "ending_resolved": True, "opening_resolved": missing is None,
+        }
+        if missing is not None and missing.get("opening_reason"):
+            total["opening_reason"] = missing["opening_reason"]
+        rows.append(total)
+    return rows
+
+
 # ── NoteDirectBinding ───────────────────────────────────────────────────────
 
 
@@ -143,16 +193,19 @@ class NoteDirectBinding:
         self._account_name = account_name
         # load_sources 缓存 TB 数据供 note_rows 使用（engine 的 note_rows 签名不传 sources）
         self._last_tb_data: Mapping[str, Mapping[str, Decimal]] | None = None
+        #: 损益类科目的上年发生额（附注上期列）；没有损益类科目为 None
+        self._last_prior_pl: PriorPlSnapshot | None = None
 
     async def load_sources(
         self, db: Any, project_id: UUID, year: int, wp_id: UUID | None,
     ) -> NoteDirectSources:
-        """取齐推送所需的全部源数据（只有试算表审定口径）。"""
+        """取齐推送所需的全部源数据（只有试算表审定口径；损益类另取上年试算表作上期）。"""
         warnings: list[str] = []
         tb = await load_tb_audited(db, project_id, year, self.account_prefixes)
         if len(tb.company_codes) > 1:
             warnings.append(f"试算表含多个公司编码 {list(tb.company_codes)}，按全部合计")
         self._last_tb_data = tb.tb_data if tb.available else None
+        self._last_prior_pl = await load_prior_pl(db, project_id, year, self.account_prefixes) if tb.available else None
         self._last_book_values = None
         if self._book_value_range is not None and tb.available:
             self._last_book_values = await _load_book_values(db, project_id, year, *self._book_value_range)
@@ -198,54 +251,18 @@ class NoteDirectBinding:
 
         单科目：一行数据（label=科目名, ending=TB审定数, opening=TB年初数）。
         多科目：每个科目一行 + 合计行。
-        损益类（科目码 6 开头）：ending 取「本期发生额」，opening 取「年初余额」。
+        损益类（科目码 6 开头）：ending 取「本期发生额」，opening 取上年试算表发生额（:func:`opening_value`）。
 
         返回格式与 E1 / Tier A 的 ``note_rows`` 一致：
         ``[{key, label, note_label, is_total, is_memo, ending, opening, ending_resolved, opening_resolved}]``
+        （期初取不到时另带 ``opening_reason``）
         """
         tb_data = self._last_tb_data
         if tb_data is None:
             return []
         if self._book_value_range is not None:
             return self._book_value_rows(rule)
-
-        codes = self.account_prefixes
-        rows: list[dict] = []
-        for code in codes:
-            is_pl = _is_pl_code(code)
-            ending_col = "本期发生额" if is_pl else "期末余额"
-            opening_col = "年初余额"
-            ending, ending_resolved = _tb_value(tb_data, code, ending_col)
-            opening, opening_resolved = _tb_value(tb_data, code, opening_col)
-            label = self._account_name if len(codes) == 1 else f"{self._account_name}_{code}"
-            rows.append({
-                "key": f"{self.wp_code}-note-{code}",
-                "label": label,
-                "note_label": label,
-                "is_total": False,
-                "is_memo": False,
-                "ending": ending,
-                "opening": opening,
-                "ending_resolved": ending_resolved,
-                "opening_resolved": opening_resolved,
-            })
-
-        if len(codes) > 1:
-            total_ending = sum(r["ending"] for r in rows)
-            total_opening = sum(r["opening"] for r in rows)
-            rows.append({
-                "key": f"{self.wp_code}-note-total",
-                "label": self._account_name,
-                "note_label": self._account_name,
-                "is_total": True,
-                "is_memo": False,
-                "ending": total_ending,
-                "opening": total_opening,
-                "ending_resolved": True,
-                "opening_resolved": True,
-            })
-
-        return rows
+        return code_note_rows(self.wp_code, self._account_name, self.account_prefixes, tb_data, self._last_prior_pl)
 
     def _book_value_rows(self, rule: PushRule) -> list[dict]:
         """账面价值口径：只给主表规则出一行，按行名「合计」对上附注合计行写六个字段（写后不再按上方各行重算）。

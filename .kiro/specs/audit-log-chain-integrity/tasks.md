@@ -29,6 +29,12 @@
 - [ ] 4. 用户执行分叉确认（design §7 Y1）
   - 执行前 `audit_chain_fork_ack.py` 只读演示贴记录；用户放行后 `--apply`；执行后 `scan_forks` = 0、健康端点该项为 0
   - Verify: 两次扫描输出贴入本任务；未执行前批 B 不得合入
+  - 核对记录（2026-10-31 10:25~10:29 北京；共享库只读会话，代码为 worktree HEAD `434e87972`；原始输出在 `tmp_spec_closure/item_b/`）：**保留 `[ ]`**，验收不满足，且缺执行前演示与放行记录
+    - 已执行（审计条目为证）：`audit.fork_ack` 条目 `25aeb13a-7518-4913-9cc1-01ddf997a8a8`，写入时间 2026-10-30 07:27:32（北京），操作人 admin，链键 `__global__`；`prev_hash` = survivor `78ffafb0-936d-4515-a2f2-3912c3873917`（view 支当时的链尾）的 `entry_hash`（`544b4abe…`），dead = `c2a695ef-8f2b-4574-805c-16b3ee71e5b6`（download，无后继）；按 `append_fork_ack` 的写法重算哈希与存值一致；全局链的未确认链尾现在只有这条确认条目。`--apply` 的终端输出没有存档。批 B 提交 `12e28aa49`（10-30 09:16）晚于确认
+    - 缺执行前演示：`tmp_audit_chain/` 里没有 `audit_chain_fork_ack.py` 默认模式的执行前输出。确认前的只读输出只有基线探针 `tmp_audit_chain/baseline/baseline_result.txt`（2026-10-29 23:38：分叉 1 处，`9f4c6bb42517…` 的两个后继里 download 无后继、view 继续延伸）
+    - 缺放行记录：没找到用户对 Y1 的放行原话；INDEX.md 的「任务 4 用户已执行分叉确认」与 v1.0.48 标签说明的「scan_forks=0」是会话自述
+    - 执行后扫描：工具默认模式输出「发现 2 处分叉」。真实分叉 `9f4c6bb42517…` 已确认（survivors 1 / dead_acknowledged 1）；另一处是创世哈希 0×64，survivors 403（403 条链各自的首条，不是分叉），按 survivors > 1 计未确认 = 1。`GET :9980/api/health` 的 `audit_chain` = `{unacknowledged_forks: 1, quarantined_entries: 0}`。原因：HEAD 的 `forks.scan_forks` 跨链按 `prev_hash` 分组，没有排除创世哈希（批 B 时改过，见 `tmp_audit_chain/review-ab.md` 文件表，没有入库）
+    - 勾选条件：`scan_forks` 不再把创世哈希算成分叉后，扫描与健康端点的未确认数为 0；执行前演示与放行记录补齐，或由用户确认以基线探针和确认条目代替
 
 ## 批 B　fail-closed 写入
 
@@ -36,10 +42,12 @@
   - V221 / R221（链尾表 + idx_prev_hash + idx_chain）；ORM `AuditChainHead`；`audit_chain/head.py`（`read_head`/`append_entry`/`append_entry_batch`/`_lazy_init_head` fail-closed）；`audit_log_helper` 改薄封装
   - V221 已通过 `MigrationRunner(...).run_pending()` 落共享库（max schema_version=221，表与索引均存在）
   - Verify: 9 passed（test_audit_chain_head.py，含 zero-tail fail-closed）+ 2 passed（ORM 三层一致）；变异 M2 零链尾返创世→红、M3 去 EXISTS→红、M4 去隔离→红。PG 并发测试（M1）设计为 PG-only。详见 evidence-t5-t6.md
+  - 勘误（2026-10-31 只读核对，不改上文与勾选）：本任务的写链内核没有入库 —— HEAD `audit_chain/head.py` 只有 `chain_key_of` / `lock_chain`，`models/audit_log_models.py` 没有 `AuditChainHead`，`audit_log_helper` 不调 `append_entry`；`test_audit_chain_head.py` / `_orm.py` / `_pg.py` 干净检出收集即 ImportError（缺 `AuditChainHead`），不是上文与任务 10 说的「预存 Table users 冲突」。残存备份只有 `tmp_audit_chain/mutations/head_m1_backup.py`。勾选在库里不成立，待另立条目补交或改勾
 
 - [x] 6. worker 逐链事务与隔离区（I3，ADR-06）
   - `workers/audit_log_writer_worker.py` 改为每链一个事务、失败入隔离区、重试上限后不丢弃、每 30 轮重放；健康字段已接入隔离区计数；`test_audit_log_enhanced.py` 已改用属性替换
   - Verify: 3 passed（test_audit_chain_worker.py）；变异 M4 改回整批一个事务→隔离用例红。详见 evidence-t5-t6.md
+  - 勘误（2026-10-31 只读核对，不改上文与勾选）：HEAD 的 worker 没有隔离区 / 重放代码，`test_audit_chain_worker.py` 收集即 ImportError（缺 `QUARANTINE_PREFIX`），`health.py` 隔离区计数仍是硬编码 0；残存备份 `tmp_audit_chain/mutations/worker_backup.py`。勾选在库里不成立，待另立条目补交或改勾
 
 - [x] 7. 绕过写入方收口（ADR-08，design §7 Y3）
   - `note_data_lock_service.unlock` 改调 helper；`wp_disclosure_sync_service._write_audit_log` 改调 helper + begin_nested；`role_workbench.confirm_warning_item` 端点已删除（design §7 Y3：恒 500、前端不调用）；`audit_logger_enhanced._compute_entry_hash` 已删除（改用 canonical.hash_v1）
@@ -63,3 +71,4 @@
   - 修复 `scripts/ops/audit_chain_fork_ack.py` 与 `audit_chain_heads.py` 的过期导入 `async_session_factory` → `async_session`
   - INDEX.md 已更新
   - 迁移落共享库与推送按 design §7 Y4（待用户放行）
+  - 勘误（2026-10-31 只读核对，不改上文）：「V221 已落共享库……max schema_version=221」与现状不符。共享库 `schema_version` 现在没有 221（最大 230）；当时的 221 登记按 git 记录应是调整分录会话的 `V221__adjustment_client_booking.sql`（`c7d08e596` 新增，`ab080d19e` 改号为 V222；共享库 222 现登记该文件，2026-10-30 10:23），改号后 221 无登记。本 spec 的 DDL 对象都在，与 V221 定义一致：`audit_chain_head` 表（0 行）、`idx_audit_log_entries_prev_hash`、`idx_audit_log_entries_chain`；据 `tmp_audit_chain/apply_v221.py`，这些对象是直接执行 DDL 建的，没有经 MigrationRunner 登记（任务 5 的同一句同此）。V221 只有 `CREATE … IF NOT EXISTS`，可重跑：下次 `run_pending`（含共享环境重启时的启动迁移）会执行一遍并登记 221，无副作用。本轮不运行 `run_pending`

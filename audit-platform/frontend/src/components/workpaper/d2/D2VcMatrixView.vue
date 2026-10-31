@@ -15,7 +15,9 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  */
 import { ref, computed, toRef } from 'vue'
 import type { VoucherCheckRow } from '../composables/useD2VoucherCheckEnhanced'
-import { useD2VcOcrCheck } from '../composables/useD2VcOcrCheck'
+import { useD2VcOcrCheck, D2_7_EVIDENCE_SHEET } from '../composables/useD2VcOcrCheck'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import GtReviewDot from '../GtReviewDot.vue'
 import VoucherRowMetaCell from '../voucher-sampling/VoucherRowMetaCell.vue'
 import WpCommitInput from '../shared/WpCommitInput.vue'
@@ -45,6 +47,7 @@ const wpIdRef = toRef(props, 'wpId')
 
 const { isProcessing, uploadAndOcr } = useD2VcOcrCheck({
   wpId: wpIdRef,
+  projectId: toRef(props, 'projectId'),
   getRow: (rowId: string) => props.rows.find(r => r.rowId === rowId),
   updateRow: (rowId: string, field: keyof VoucherCheckRow, value: any) => {
     emit('update-row', rowId, field, value)
@@ -288,12 +291,13 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
       </el-table-column>
 
       <!-- ═══ 证据附件组 ═══ -->
-      <el-table-column v-if="isColVisible('supportingDoc')" label="📎 附件" width="100">
+      <el-table-column v-if="isColVisible('supportingDoc')" label="📎 附件" width="128">
         <template #default="{ row }">
           <div class="supporting-doc-cell">
             <el-button v-if="!rowReadonly(row)" size="small" text :loading="isProcessing && currentOcrRowId === row.rowId" title="上传附件并OCR识别" @click="triggerOcrUpload(row.rowId)">📎</el-button>
             <span v-if="row.supportingDoc" class="doc-name" :title="row.supportingDoc">{{ row.supportingDoc }}</span>
             <span v-else-if="rowReadonly(row)">-</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="D2_7_EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </div>
         </template>
       </el-table-column>

@@ -5,7 +5,10 @@
   POST /link            把本底稿已有附件链接到表页 / 单元格
   DELETE /{link_id}     删除证据链接（不删附件）
   POST /batch-link      批量链接
+  POST /voucher-reuse   把别的可见底稿上同一凭证的证据引用到本底稿（spec attachment-voucher-evidence-binding）
   GET  /sufficiency     证据充分性检查
+
+上传、建链接、识别端点都可带凭证键（凭证检查行的原件按凭证身份挂）。
 
 路由级 readonly 保证项目成员；写端点再挂 edit；注册时附加的 ``dedicated_wp_gate`` 按方法判底稿内容读写
 （编制人可写，复核人只读，见 design §5）。底稿必须属于路径项目，否则 404（改造前不校，任何项目的成员
@@ -25,6 +28,7 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
 from app.services.attachment_destructive_guard import assert_project_writable
+from app.services.voucher_evidence import VOUCHER_EVIDENCE_TYPE
 from app.services.wp_evidence_service import WpEvidenceService
 from app.services.workpaper_evidence_intake import (
     build_position,
@@ -54,6 +58,7 @@ class CreateLinkRequest(BaseModel):
     page_ref: str | None = None
     evidence_type: str | None = None
     check_conclusion: str | None = None
+    voucher_key: str | None = None
 
 
 class BatchLinkItem(BaseModel):
@@ -63,10 +68,16 @@ class BatchLinkItem(BaseModel):
     page_ref: str | None = None
     evidence_type: str | None = None
     check_conclusion: str | None = None
+    voucher_key: str | None = None
 
 
 class BatchLinkRequest(BaseModel):
     links: list[BatchLinkItem]
+
+
+class VoucherReuseRequest(BaseModel):
+    voucher_key: str
+    attachment_id: UUID
 
 
 async def _writable_wp(db: AsyncSession, project_id: UUID, wp_id: UUID, user: User):
@@ -76,14 +87,18 @@ async def _writable_wp(db: AsyncSession, project_id: UUID, wp_id: UUID, user: Us
 
 
 async def _validated_link_fields(item: CreateLinkRequest | BatchLinkItem) -> dict:
-    position = build_position(item.sheet_name, item.cell_ref, item.page_ref)
+    position = build_position(item.sheet_name, item.cell_ref, item.page_ref, item.voucher_key)
+    evidence_type = validate_evidence_type(item.evidence_type)
+    if evidence_type is None and position.voucher_key is not None:
+        evidence_type = VOUCHER_EVIDENCE_TYPE  # 带凭证键缺省记凭证 / 原始单据（ADR-AVE-05）
     return {
         "attachment_id": item.attachment_id,
         "sheet_name": position.sheet_name,
         "cell_ref": position.cell_ref,
         "page_ref": position.page_ref,
-        "evidence_type": validate_evidence_type(item.evidence_type),
+        "evidence_type": evidence_type,
         "check_conclusion": item.check_conclusion,
+        "voucher_key": position.voucher_key,
     }
 
 
@@ -113,16 +128,18 @@ async def upload_evidence(
     sheet_name: str | None = Form(None),
     cell_ref: str | None = Form(None),
     page_ref: str | None = Form(None),
+    voucher_key: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """上传新证据：不带位置 ⇒ 整稿关联；带表页或单元格 ⇒ 只写行级证据链接（需求 1.1）。"""
+    """上传新证据：不带位置 ⇒ 整稿关联；带表页、单元格或凭证键 ⇒ 只写行级证据链接（需求 1.1）。"""
     wp = await _writable_wp(db, project_id, wp_id, current_user)
-    position = build_position(sheet_name, cell_ref, page_ref)
+    position = build_position(sheet_name, cell_ref, page_ref, voucher_key)
     content = await read_upload_limited(file)
     result = await create_evidence(
         db, wp=wp, file_name=file.filename or "attachment.bin", content=content,
-        evidence_type=resolve_evidence_type(evidence_type, wp.wp_code), user=current_user, position=position,
+        evidence_type=resolve_evidence_type(evidence_type, wp.wp_code, voucher_keyed=position.voucher_key is not None),
+        user=current_user, position=position,
     )
     await db.commit()
     try:
@@ -188,6 +205,24 @@ async def batch_link_evidence(
     results = await svc.batch_link(wp_id=wp.id, created_by=current_user.id, links=items)
     await db.commit()
     return {"items": results, "total": len(results)}
+
+
+@router.post("/voucher-reuse")
+async def reuse_voucher_evidence_endpoint(
+    project_id: UUID,
+    wp_id: UUID,
+    body: VoucherReuseRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """把另一张可见底稿上同一凭证的证据附件引用到本底稿（不复制文件；重复引用返回已有链接，
+    spec attachment-voucher-evidence-binding 需求 2.2）。"""
+    from app.services.voucher_evidence import reuse_voucher_evidence
+
+    wp = await _writable_wp(db, project_id, wp_id, current_user)
+    link, existed = await reuse_voucher_evidence(db, current_user, wp, body.voucher_key, body.attachment_id)
+    await db.commit()
+    return {"link": link, "existed": existed}
 
 
 @router.get("/sufficiency")

@@ -12,9 +12,12 @@ import { nextTick, ref } from 'vue'
 
 vi.mock('@/utils/http', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 
+import { mount } from '@vue/test-utils'
 import http from '@/utils/http'
 import { voucherKeyString } from '@/utils/voucherIdentity'
+import { resetVoucherEvidenceIndexForTest } from '@/composables/useVoucherEvidenceIndex'
 import { rowVoucherKey, useVoucherLinkTags, voucherLinkText, type VoucherLink } from '../useVoucherLinkTags'
+import VoucherLinkTags from '../VoucherLinkTags.vue'
 
 const post = http.post as unknown as ReturnType<typeof vi.fn>
 const PID = 'p-1'
@@ -150,5 +153,63 @@ describe('标记文字', () => {
       icon: '📎', tip: '已挂 / 已抽于：J1 应付职工薪酬 · 挂凭 · 年审；E1 货币资金 · 抽凭 · 年审' })
     expect(tags.flagOfRow(line('0099'))).toBeNull()
     expect(tags.flagOfRow({ ...line('0012'), _type: 'subtotal' })).toBeNull()
+  })
+})
+
+describe('凭证层并入凭证证据（spec attachment-voucher-evidence-binding 需求 7，ADR-AVE-08）', () => {
+  const settle = async () => {
+    for (let i = 0; i < 6; i++) await Promise.resolve()
+    await nextTick()
+  }
+  const evidence = (key: string) => ({
+    [key]: [{
+      working_paper_id: 'wp-d2', wp_code: 'D2-4', wp_name: '凭证检查表', attachments: [
+        { id: 'a1', file_name: '回单.pdf', file_type: 'pdf', ocr_status: null, evidence_type: 'voucher' },
+        { id: 'a2', file_name: '发票.png', file_type: 'png', ocr_status: null, evidence_type: 'voucher' },
+      ],
+    }],
+  })
+
+  beforeEach(() => {
+    resetVoucherEvidenceIndexForTest()
+  })
+
+  it('linksOfKey = 挂凭 / 抽凭登记 + 各可见底稿的凭证证据（按需查，查到前只有登记）', async () => {
+    const key = keyOf('0012')
+    post.mockImplementation(async (url: string) => (String(url).endsWith('/voucher-evidence/query')
+      ? { data: { evidence: evidence(key) } }
+      : { data: { links: { [key]: [link()] } } }))
+    const tags = useVoucherLinkTags(ref(PID), ref(2025))
+    await tags.loadForRows([line('0012')])
+    expect(tags.linksOfKey(key).map((t) => t.source)).toEqual(['manual'])
+    await settle()
+    const merged = tags.linksOfKey(key)
+    expect(merged.map((t) => [t.source, t.wp_code, t.count])).toEqual([['manual', 'J1', 1], ['evidence', 'D2-4', 2]])
+    expect(voucherLinkText(merged[1])).toBe('D2-4 凭证检查表 · 已取得凭证证据 2 份：回单.pdf、发票.png')
+    const calls = post.mock.calls.filter((c) => String(c[0]).endsWith('/voucher-evidence/query'))
+    expect(calls.map((c) => c[1])).toEqual([{ year: 2025, keys: [key] }])
+  })
+
+  it('明细层 📎（linksOfRow / flagOfRow）照旧只看登记，不查凭证证据', async () => {
+    post.mockResolvedValue({ data: { links: { [keyOf('0012')]: [link()] } } })
+    const tags = useVoucherLinkTags(ref(PID), ref(2025))
+    await tags.loadForRows([line('0012')])
+    expect(tags.linksOfRow(line('0012'))).toHaveLength(1)
+    expect(tags.flagOfRow(line('0012'))?.icon).toBe('📎')
+    await settle()
+    expect(post.mock.calls.every((c) => String(c[0]).endsWith('/voucher-links/query'))).toBe(true)
+  })
+
+  it('标签：证据条目「D2-4 · 凭证证据 2 份」用蓝色，挂凭橙色、抽凭绿色', () => {
+    const ElTag = { props: ['type'], template: '<i class="tag" :data-type="type"><slot /></i>' }
+    const ev = { working_paper_id: 'wp-d2', wp_code: 'D2-4', wp_name: '凭证检查表', wp_missing: false as const, source: 'evidence' as const,
+      phase: null, count: 2, legacy: false as const, files: ['回单.pdf', '发票.png'] }
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [link(), link({ source: 'sampling_engine', wp_code: 'E1' }), ev] },
+      global: { stubs: { 'el-tag': ElTag } },
+    })
+    expect(wrapper.findAll('.tag').map((t) => [t.text(), t.attributes('data-type')])).toEqual([
+      ['J1 · 挂凭 · 年审', 'warning'], ['E1 · 抽凭 · 年审', 'success'], ['D2-4 · 凭证证据 2 份', 'primary'],
+    ])
   })
 })

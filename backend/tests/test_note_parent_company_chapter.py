@@ -91,8 +91,8 @@ DOCX_PARENT_CHAPTER_TITLE = {
     "listed": "公司财务报表主要项目注释",
     "soe": "母公司财务报表的主要项目附注",
 }
-# JSON 现值（listed 侧多一个「母」字，需求 3.2 已裁决保留）
-JSON_PARENT_CHAPTER_TITLE_LISTED = "母公司财务报表主要项目注释"
+# JSON 现值：用户 2026-10-17 拍板按源 Word 修正，现与 docx Heading 1 逐字一致
+JSON_PARENT_CHAPTER_TITLE_LISTED = "公司财务报表主要项目注释"
 
 DOCX_HEADING1_COUNT = {"listed": 17, "soe": 14}
 FORBIDDEN_SOE_HEADING1 = "股份支付"
@@ -157,11 +157,7 @@ SOE_LTE_ALREADY_CORRECT_INDEXES = (0, 1)
 # 同构子节随 `fix_note_parent_company_chapter.py` 同步（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。
 JSON_PARENT_TABLE_COUNT = {"listed": 62, "soe": 44}
 
-# 已登记的两版用语差异：JSON 两版都写「与」，listed 源 docx 写「和」。
-# 属用语差异不属结构缺陷，登记在此防下个会话把它当欠账"修正"。
-KNOWN_WORDING_DIFF = {
-    "listed": {"docx": "营业收入和营业成本", "json": "营业收入与营业成本"},
-}
+# 2026-10-17 用户拍板后，两版种子的母公司营业收入节均已按源 Word 用语落地：soe「与」/ listed「和」。
 
 
 # ── 判定纯函数（真实数据与替身共用，保证判据非空转） ─────────────────────────
@@ -253,19 +249,19 @@ def check_no_forbidden_heading1(
 
 
 def check_listed_title_deviation(json_title: str, docx_title: str) -> list[str]:
-    """listed 标题偏差双向锁死（Property 8 / 需求 3.1、3.2、3.3）。任一侧变化即红。"""
+    """listed 章名按源 Word 逐字对齐（用户 2026-10-17 裁决）；任一侧变化即红。"""
     problems: list[str] = []
     if json_title != JSON_PARENT_CHAPTER_TITLE_LISTED:
         problems.append(
-            f"JSON 现值应保留「{JSON_PARENT_CHAPTER_TITLE_LISTED}」（需求 3.2），实为「{json_title}」"
+            f"JSON 现值应为「{JSON_PARENT_CHAPTER_TITLE_LISTED}」（2026-10-17 裁决），实为「{json_title}」"
         )
     if docx_title != DOCX_PARENT_CHAPTER_TITLE["listed"]:
         problems.append(
             f"源 docx 现值应为「{DOCX_PARENT_CHAPTER_TITLE['listed']}」，实为「{docx_title}」"
-            "（源模板已变更 → 需求 3 的偏差裁决必须重做）"
+            "（源模板已变更，需重新核对章名）"
         )
-    if json_title == docx_title:
-        problems.append("偏差消失：两侧已相等，需求 3 的登记项失去意义，需重新裁决")
+    if json_title != docx_title:
+        problems.append("JSON 与源 docx 章名不一致")
     return problems
 
 
@@ -585,7 +581,7 @@ class TestSoeHeading1:
         assert any("数量应为 14" in p for p in problems)
 
 
-# ── Property 8：listed 标题偏差双向锁死（需求 3.1、3.2、3.3） ─────────────────
+# ── Property 8：listed 章名按源 Word 对齐（用户 2026-10-17 裁决） ────────────────
 class TestListedTitleDeviation:
     def test_deviation_locked_both_sides(
         self, templates: dict[str, list[dict[str, Any]]], docx_facts: dict[str, Any]
@@ -593,23 +589,20 @@ class TestListedTitleDeviation:
         json_title = _chapter(templates["listed"], "listed")["section_title"]
         docx_title = _docx_parent(docx_facts, "listed")["chapter_title"]
         problems = check_listed_title_deviation(json_title, docx_title)
-        assert not problems, "listed 标题偏差锁死违规:\n" + "\n".join(problems)
+        assert not problems, "listed 章名对齐违规:\n" + "\n".join(problems)
 
-    def test_deviation_is_exactly_one_char(
+    def test_title_matches_docx_exactly(
         self, templates: dict[str, list[dict[str, Any]]], docx_facts: dict[str, Any]
     ) -> None:
-        """偏差登记项：JSON 比源 docx 多一个「母」字（需求 3.1）。"""
         json_title = _chapter(templates["listed"], "listed")["section_title"]
         docx_title = _docx_parent(docx_facts, "listed")["chapter_title"]
-        assert json_title == "母" + docx_title, (
-            f"偏差形态应为「母」+ 源 docx 原文；JSON={json_title!r} docx={docx_title!r}"
-        )
+        assert json_title == docx_title == "公司财务报表主要项目注释"
 
     def test_selfcheck_json_side_change_turns_red(self) -> None:
         problems = check_listed_title_deviation(
-            "公司财务报表主要项目注释", DOCX_PARENT_CHAPTER_TITLE["listed"]
+            "母公司财务报表主要项目注释", DOCX_PARENT_CHAPTER_TITLE["listed"]
         )
-        assert problems, "JSON 侧被改成与 docx 相同却未打红"
+        assert problems, "JSON 侧加入「母」字却未打红"
         assert any("JSON 现值" in p for p in problems)
 
     def test_selfcheck_docx_side_change_turns_red(self) -> None:
@@ -850,7 +843,7 @@ class TestSoeSectionIdTarget:
         """改写不得撞键，且母公司章 sid 不得超平台既有 slug 长度上限。
 
         上限 95 的依据：listed 侧最长 sid 实测恰为 95 且末尾被截断
-        （`…-ying-ye-shou-ru-yu-ying-ye-cheng`，源标题「营业收入与营业成本」的 `-ben` 被切掉）。
+        （`…-ying-ye-shou-ru-yu-ying-ye-cheng`，稳定 section_id 仍源自旧标题「营业收入与营业成本」，`-ben` 被切掉）。
 
         ⚠️ 长度断言**只作用于母公司章**（本 spec 改写范围）。全库扫描会命中 soe
         `chapter-05` 一条 **97 字符的预存在 sid**（`…-cha-cuo-de-g-kua-2`，含去重后缀），
@@ -1020,7 +1013,7 @@ class TestColumnsTarget:
         """反向自检：豁免只放行 flat/group 并存，不得放行其他任何违规。
 
         用本例自带的登记（上游登记 ``UPSTREAM_MERGED_COLUMN_CONFLICTS`` 2026-10-24 起为空，自检不能依赖它）。"""
-        ident = "listed/营业收入与营业成本"
+        ident = "listed/营业收入和营业成本"
         name = "营业收入、营业成本按分解信息"
         exempt = {(ident, name): ("五、62", name, "自检用登记")}
 
@@ -1325,7 +1318,7 @@ class TestLongTermEquityTarget:
 # - **已 apply 的正名范围**只含两个「自有表子节」`listed/长期股权投资` 与
 #   `soe/其他应收款`（脚本 `RENAME_SECTIONS`，用户 2026-08-06 裁决 = 方案 A）。
 #   这两个子节的唯一性 / 无空名 / 无泄漏 / legacy_aliases 四条**现在就该全绿**。
-# - **listed 侧 4 个同构子节**（应收票据 / 应收账款 / 其他应收款 / 营业收入与营业成本，
+# - **listed 侧 4 个同构子节**（应收票据 / 应收账款 / 其他应收款 / 营业收入和营业成本，
 #   共 53 张表）仍存在重名与空名，这是**预期状态** —— 它们归 Task 6 按合并章
 #   **整体替换** `tables`，在此正名会被那次替换整表覆盖。故按子节挂
 #   `xfail(strict=True)`，Task 6 完成时 XPASS 会让整套打红，届时**必须移除该 xfail**。
@@ -1425,7 +1418,7 @@ PARENT_TABLE_CENSUS: dict[str, dict[str, tuple[int, int]]] = {
         "应收账款": (17, 17),
         "其他应收款": (21, 21),
         "长期股权投资": (3, 3),
-        "营业收入与营业成本": (6, 6),
+        "营业收入和营业成本": (6, 6),
         "投资收益": (1, 1),
     },
     "soe": {
@@ -1444,7 +1437,7 @@ _SUBSECTION_IDS: list[tuple[str, str, str]] = [
     ("listed", "应收账款", "listed-ar"),
     ("listed", "其他应收款", "listed-other-recv"),
     ("listed", "长期股权投资", "listed-lte"),
-    ("listed", "营业收入与营业成本", "listed-revenue"),
+    ("listed", "营业收入和营业成本", "listed-revenue"),
     ("listed", "投资收益", "listed-inv-income"),
     ("soe", "应收账款", "soe-ar"),
     ("soe", "其他应收款", "soe-other-recv"),
@@ -2028,7 +2021,7 @@ TASK6_ISOMORPHIC_SOURCE: dict[str, dict[str, str]] = {
         "应收票据": "五、4",
         "应收账款": "五、5",
         "其他应收款": "五、8",
-        "营业收入与营业成本": "五、62",
+        "营业收入和营业成本": "五、62",
     },
     "soe": {
         "应收账款": "八、5",
@@ -2046,7 +2039,7 @@ MERGED_CHAPTER_BOLD_TABLES: dict[tuple[str, str], str] = {
 
 # Task 6 替换后各同构子节的 `_removed_table_keys` 条数（2026-08-06 apply 后实测）
 TASK6_REMOVED_KEY_COUNT: dict[str, dict[str, int]] = {
-    "listed": {"应收票据": 7, "应收账款": 5, "其他应收款": 7, "营业收入与营业成本": 4},
+    "listed": {"应收票据": 7, "应收账款": 5, "其他应收款": 7, "营业收入和营业成本": 4},
     # 🔴 soe/其他应收款 由 15 修正为 11（2026-08-07）：15 是「Task 4 中间名也在链条里」
     # 那一版未提交中间态的快照。模板 JSON 经 HEAD 覆盖 + 幂等脚本 `--apply` 恢复后，
     # removed 直接由「HEAD 名集合 − 合并章新名」推导 = 11 项（实测逐字相等），

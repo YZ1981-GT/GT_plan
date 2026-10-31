@@ -36,6 +36,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
+from app.services.note_title_hint import split_title_hint
 from app.services.note_template_docx_base import (
     _CONT_RE,
     _has_sectpr,
@@ -125,9 +126,9 @@ _STYLE_REF_RE = re.compile(r"^##STYLE_REF:[^#]*##$")
 _SEQ_ONLY_RE = re.compile(r"^\{\{seq:[^}]+\}\}$")
 _TABLE_PH_RE = re.compile(r"^\{\{table:(.+?)(?::(\d+))?\}\}$")
 _SECTION_PH_RE = re.compile(r"^\{\{section:(.+?)\}\}$")
-#: 标题里的编制指引括注（「（参考格式同上）」「（以下不适用的，请删除；…）」「（披露格式参考附注五、4）」）；
-#: 正式标题内容（「（按费用性质列示）」「（损失以“—”号填列）」「（单位：万股）」「（或产品类型）」）不在此列
-_TITLE_GUIDE_RE = re.compile(
+#: 表题只移除编制指引括注；「按费用性质列示」「损失以—号填列」「单位：万股」等是正式表题内容。
+#: 章节标题采用更宽的 ``split_title_hint`` 用户口径，两者不能共用同一正则。
+_CAPTION_GUIDE_RE = re.compile(
     r"\s*[（(]\s*(?:参考格式|注意\s*[:：]|针对|仅限于|可选择|注\s*[:：]|如无|如有|应当|以下不适用|不适用|只写|"
     r"披露格式参考|若)[^（）()]*[）)]"
 )
@@ -390,8 +391,9 @@ def note_tables_indexed(exporter, note) -> list[tuple[int, dict, bool]]:
 
 
 def strip_title_guidance(el) -> bool:
+    """交付件标题去掉尾部括号 / 中括号提示；与种子 ``title_hint`` 拆分共用一个口径。"""
     raw = _raw_text(el)
-    new = _TITLE_GUIDE_RE.sub("", raw)
+    new, _hint = split_title_hint(raw)
     if new == raw or not new.strip():
         return False
     _set_paragraph_text(el, new.rstrip())
@@ -400,7 +402,7 @@ def strip_title_guidance(el) -> bool:
 
 def caption_text(name: str) -> str:
     """库内表名 → 额外表 / 续表的表题：剔除编制指引括注（「（注意：是报表项目）」「（只写现金分配，…）」，规则同标题）。"""
-    cleaned = _TITLE_GUIDE_RE.sub("", name).strip()
+    cleaned = _CAPTION_GUIDE_RE.sub("", name).strip()
     return cleaned or name.strip()
 
 

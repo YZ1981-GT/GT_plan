@@ -13,6 +13,7 @@
 import http from '@/utils/http'
 import { attachments as P_att } from '@/services/apiPaths'
 import { invalidateWpEvidenceLinks, type WpEvidenceLink } from '@/composables/useWpEvidenceLinks'
+import { voucherLabel } from '@/utils/voucherIdentity'
 
 /** 证据类型（与后端 `workpaper_evidence_intake.EVIDENCE_TYPES` 逐项一致，守卫钉住）。 */
 export const EVIDENCE_TYPE_OPTIONS = [
@@ -41,9 +42,40 @@ export function itemCellRef(itemIndex: number | string): string {
   return `item:${itemIndex}`
 }
 
+/**
+ * 凭证键规范串 → 「2025-01-07 FY-0003」（与后端 voucher_identity.voucher_label 同口径）；解析不了返回空串。
+ * 键 = JSON [年度, 主体, 日期, 凭证字, 凭证号]（spec voucher-identity-writeback-and-audit-phase 需求 1.1）。
+ */
+export function voucherKeyLabel(voucherKey: string | null | undefined): string {
+  const parts = splitVoucherKey(voucherKey)
+  if (!parts) return ''
+  const [, , date, type, no] = parts
+  return `${date} ${voucherLabel(type, no)}`.trim()
+}
+
+/** 凭证键自带的审计年度（第一段）；解析不了返回 null。 */
+export function voucherKeyYear(voucherKey: string | null | undefined): number | null {
+  const year = Number(splitVoucherKey(voucherKey)?.[0] ?? NaN)
+  return Number.isInteger(year) && year > 0 ? year : null
+}
+
+function splitVoucherKey(voucherKey: string | null | undefined): string[] | null {
+  if (!voucherKey) return null
+  try {
+    const parts = JSON.parse(voucherKey)
+    return Array.isArray(parts) && parts.length === 5 ? parts.map((p) => String(p ?? '').trim()) : null
+  } catch {
+    return null
+  }
+}
+
 /** 位置的中文标签（统一视图「行级证据」位置、证据链接列表用）。 */
-export function evidencePositionLabel(pos: { sheet_name?: string | null; cell_ref?: string | null; page_ref?: string | null }): string {
+export function evidencePositionLabel(pos: {
+  sheet_name?: string | null; cell_ref?: string | null; page_ref?: string | null; voucher_key?: string | null
+}): string {
   const parts: string[] = []
+  const voucher = voucherKeyLabel(pos.voucher_key)
+  if (voucher) parts.push(`凭证 ${voucher}`)
   if (pos.sheet_name) parts.push(pos.sheet_name)
   const cell = pos.cell_ref || ''
   if (cell.startsWith('item:')) parts.push(`第 ${cell.slice(5)} 项`)
@@ -80,6 +112,8 @@ export interface UploadWorkpaperEvidenceOptions {
   sheetName?: string | null
   cellRef?: string | null
   pageRef?: string | null
+  /** 凭证键（凭证检查行 `_gt.vk`）：带了就按凭证身份挂，别的底稿抽到同一凭证时可查到并引用 */
+  voucherKey?: string | null
   /** 上传进度（0-100） */
   onProgress?: (percent: number) => void
 }
@@ -102,6 +136,7 @@ export async function uploadWorkpaperEvidence(opts: UploadWorkpaperEvidenceOptio
   if (opts.sheetName) form.append('sheet_name', opts.sheetName)
   if (opts.cellRef) form.append('cell_ref', opts.cellRef)
   if (opts.pageRef) form.append('page_ref', opts.pageRef)
+  if (opts.voucherKey) form.append('voucher_key', opts.voucherKey)
   const onProgress = opts.onProgress
   const res = await http.post(P_att.evidenceUpload(projectId, wpId), form, {
     headers: { 'Content-Type': 'multipart/form-data' },

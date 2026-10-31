@@ -13,14 +13,13 @@
 - C.0.13: 与 D9 协作锁集成
 - C.0.14: 与 D11 版本树集成
 - C.0.15: 与 D14 template_type 校验
-- C.0.16: 审计日志 + 文件 30 天归档 + 可回滚
+- C.0.16: 哈希链审计 + 章节 pre/post 版本快照（上传文件本身不归档，不承诺自动回滚）
 
 纯函数设计，DB 操作通过外部传入或 async service class。
 """
 from __future__ import annotations
 
 import hashlib
-import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from enum import Enum
@@ -30,7 +29,8 @@ from uuid import UUID
 
 from openpyxl import load_workbook
 
-from app.services.note_offline_export_service import _compress_meta, _decompress_meta
+from app.services.note_offline_package import context_errors, read_package
+from app.services.note_section_version_tree_service import create_version_node
 
 __all__ = [
     "NoteOfflineImportService",
@@ -142,7 +142,10 @@ class SectionDiff:
 class ImportValidationResult:
     """Validation result for import file (C.0.9)."""
 
-    __slots__ = ("valid", "errors", "section_ids", "meta_data", "binding_hash", "format_version")
+    __slots__ = (
+        "valid", "errors", "section_ids", "meta_data", "binding_hash", "format_version",
+        "manifest", "legacy_unsigned",
+    )
 
     def __init__(
         self,
@@ -152,6 +155,8 @@ class ImportValidationResult:
         meta_data: dict[str, Any] | None = None,
         binding_hash: str = "",
         format_version: str = "",
+        manifest: dict[str, Any] | None = None,
+        legacy_unsigned: bool = False,
     ):
         self.valid = valid
         self.errors = errors or []
@@ -159,12 +164,18 @@ class ImportValidationResult:
         self.meta_data = meta_data or {}
         self.binding_hash = binding_hash
         self.format_version = format_version
+        self.manifest = manifest or {}
+        self.legacy_unsigned = legacy_unsigned
 
 
 class ImportResult:
     """Result of applying import (C.0.12)."""
 
-    __slots__ = ("success", "sections_imported", "sections_kept", "sections_discarded", "conflicts", "audit_entry")
+    __slots__ = (
+        "success", "sections_imported", "sections_kept", "sections_discarded", "conflicts",
+        "audit_entry", "applied_sections", "tables_written", "changed_sections", "errors",
+        "version_node_ids", "audit_log_id",
+    )
 
     def __init__(
         self,
@@ -174,6 +185,12 @@ class ImportResult:
         sections_discarded: int = 0,
         conflicts: int = 0,
         audit_entry: dict[str, Any] | None = None,
+        applied_sections: dict[str, dict[str, Any]] | None = None,
+        tables_written: int = 0,
+        changed_sections: list[str] | None = None,
+        errors: list[str] | None = None,
+        version_node_ids: list[str] | None = None,
+        audit_log_id: str | None = None,
     ):
         self.success = success
         self.sections_imported = sections_imported
@@ -181,6 +198,14 @@ class ImportResult:
         self.sections_discarded = sections_discarded
         self.conflicts = conflicts
         self.audit_entry = audit_entry or {}
+        #: {section_id: table_data} —— OVERWRITE/MERGE 实际应用后的表数据，供 execute_import 落库（回执如实依据）
+        self.applied_sections = applied_sections or {}
+        #: 由 DB 实际 UPDATE 结果回填；纯函数阶段只是候选变化表数。
+        self.tables_written = tables_written
+        self.changed_sections = changed_sections or []
+        self.errors = errors or []
+        self.version_node_ids = version_node_ids or []
+        self.audit_log_id = audit_log_id
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -189,6 +214,11 @@ class ImportResult:
             "sections_kept": self.sections_kept,
             "sections_discarded": self.sections_discarded,
             "conflicts": self.conflicts,
+            "tables_written": self.tables_written,
+            "changed_sections": list(self.changed_sections),
+            "version_node_ids": list(self.version_node_ids),
+            "audit_log_id": self.audit_log_id,
+            "errors": list(self.errors),
         }
 
 
@@ -198,82 +228,9 @@ class ImportResult:
 
 
 def validate_import_file(xlsx_bytes: bytes) -> ImportValidationResult:
-    """Validate uploaded xlsx file for import (C.0.9).
-
-    Checks:
-    1. Valid xlsx format
-    2. _meta_ sheet exists
-    3. _meta_ sheet has section_ids + binding_hash (CI-21)
-    4. format_version is compatible
-    """
-    errors: list[str] = []
-
-    # Try to load workbook
-    try:
-        wb = load_workbook(BytesIO(xlsx_bytes), read_only=True, data_only=True)
-    except Exception as e:
-        return ImportValidationResult(valid=False, errors=[f"无法解析 xlsx 文件: {e}"])
-
-    # Check _meta_ sheet exists
-    if "_meta_" not in wb.sheetnames:
-        return ImportValidationResult(valid=False, errors=["缺少 _meta_ 隐藏 sheet，无法导入"])
-
-    ws_meta = wb["_meta_"]
-
-    # Read meta fields
-    meta_data_key = ws_meta.cell(row=1, column=1).value
-    meta_data_val = ws_meta.cell(row=1, column=2).value
-    section_ids_key = ws_meta.cell(row=2, column=1).value
-    section_ids_val = ws_meta.cell(row=2, column=2).value
-    binding_hash_key = ws_meta.cell(row=3, column=1).value
-    binding_hash_val = ws_meta.cell(row=3, column=2).value
-    format_version_key = ws_meta.cell(row=5, column=1).value
-    format_version_val = ws_meta.cell(row=5, column=2).value
-
-    # Validate meta_data
-    if meta_data_key != "meta_data" or not meta_data_val:
-        errors.append("_meta_ sheet 缺少 meta_data 字段")
-
-    # Validate section_ids (CI-21)
-    section_ids: list[str] = []
-    if section_ids_key != "section_ids" or not section_ids_val:
-        errors.append("_meta_ sheet 缺少 section_ids（CI-21 校验失败）")
-    else:
-        try:
-            section_ids = json.loads(section_ids_val)
-        except (json.JSONDecodeError, TypeError):
-            errors.append("section_ids 格式无效")
-
-    # Validate binding_hash (CI-21)
-    binding_hash = ""
-    if binding_hash_key != "binding_hash" or not binding_hash_val:
-        errors.append("_meta_ sheet 缺少 binding_hash（CI-21 校验失败）")
-    else:
-        binding_hash = str(binding_hash_val)
-
-    # Validate format version
-    format_version = str(format_version_val or "")
-    if format_version and format_version not in ("1.0",):
-        errors.append(f"不支持的格式版本: {format_version}")
-
-    # Decompress meta to verify integrity
-    meta_data: dict[str, Any] = {}
-    if meta_data_val:
-        try:
-            meta_data = _decompress_meta(str(meta_data_val))
-        except Exception as e:
-            errors.append(f"meta_data 解压失败: {e}")
-
-    wb.close()
-
-    return ImportValidationResult(
-        valid=len(errors) == 0,
-        errors=errors,
-        section_ids=section_ids,
-        meta_data=meta_data,
-        binding_hash=binding_hash,
-        format_version=format_version,
-    )
+    """Validate uploaded xlsx file for import (C.0.9)；解析、CI-21 与 1.1 签名校验见 ``note_offline_package.read_package``。"""
+    fields = read_package(xlsx_bytes)
+    return ImportValidationResult(valid=not fields["errors"], **fields)
 
 
 # ---------------------------------------------------------------------------
@@ -281,13 +238,29 @@ def validate_import_file(xlsx_bytes: bytes) -> ImportValidationResult:
 # ---------------------------------------------------------------------------
 
 
-def _extract_imported_sections(xlsx_bytes: bytes) -> dict[str, dict[str, Any]]:
+def _extract_imported_sections(
+    xlsx_bytes: bytes,
+    existing_sections: list[dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Extract section data from xlsx sheets.
 
     Returns: {section_id: {title, rows, cells_data}}
     """
+    from app.services.note_offline_import_tables import extract_sheet_tables
+
     wb = load_workbook(BytesIO(xlsx_bytes), data_only=True)
     result: dict[str, dict[str, Any]] = {}
+    # 既有章节的 _tables（按 section_id 与 note_section 两种键都登记）供结构驱动解析：
+    # 按既有每张表的表头在 sheet 里定位、读固定行数，表内空明细行不会被误当表间分隔。
+    expected_by_key: dict[str, list[dict[str, Any]]] = {}
+    for s in existing_sections or []:
+        td = s.get("table_data") or {}
+        exp = td.get("_tables") if isinstance(td.get("_tables"), list) and td.get("_tables") else (
+            [{"name": td.get("name") or "", "headers": td.get("headers") or [], "rows": td.get("rows") or []}]
+            if td.get("rows") else [])
+        for key in (s.get("section_id"), s.get("note_section")):
+            if key:
+                expected_by_key[str(key)] = exp
 
     for ws in wb.worksheets:
         if ws.title in ("注意事项", "章节清单", "_meta_"):
@@ -301,34 +274,22 @@ def _extract_imported_sections(xlsx_bytes: bytes) -> dict[str, dict[str, Any]]:
         section_id = str(sid_cell).replace("section_id:", "").strip()
         title = str(ws.cell(row=1, column=1).value or "").replace("章节: ", "")
 
-        # Read headers (row 3)
-        headers = []
-        col = 1
-        while True:
-            val = ws.cell(row=3, column=col).value
-            if val is None:
-                break
-            headers.append(str(val))
-            col += 1
+        # 第 3 行起（跳过标题行 / section_id 行）读整片二维值，交给多表解析器切块。
+        # 旧实现只读「表头=第 3 行、数据=第 4 行起」的第一张表，多表章节丢其余表。
+        grid: list[list[Any]] = []
+        for r in range(3, ws.max_row + 1):
+            grid.append([ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)])
+        tables = extract_sheet_tables(grid, expected=expected_by_key.get(section_id))
 
-        # Read data rows (row 4+)
-        rows_data: list[dict[str, Any]] = []
-        row_idx = 4
-        while True:
-            first_cell = ws.cell(row=row_idx, column=1).value
-            if first_cell is None and ws.cell(row=row_idx, column=2).value is None:
-                break
-            cells = []
-            for c in range(1, len(headers) + 1):
-                cells.append(ws.cell(row=row_idx, column=c).value)
-            rows_data.append({"cells": cells, "row_idx": row_idx - 4})
-            row_idx += 1
-
+        # 首表作为向后兼容的 rows/headers（既有 diff 以单表 rows[].cells 为口径）；
+        # 全部表块放 tables，供 apply_import 并回生成链结构。
+        first = tables[0] if tables else {"headers": [], "rows": []}
         result[section_id] = {
             "section_id": section_id,
             "section_title": title,
-            "headers": headers,
-            "rows": rows_data,
+            "headers": first.get("headers", []),
+            "rows": first.get("rows", []),
+            "tables": tables,
         }
 
     wb.close()
@@ -503,8 +464,8 @@ def diff_sections(
     Returns:
         List of SectionDiff objects for each section.
     """
-    # Extract imported sections
-    imported = _extract_imported_sections(xlsx_bytes)
+    # Extract imported sections（结构驱动：传既有 sections 以按既有表头定位多表）
+    imported = _extract_imported_sections(xlsx_bytes, existing_sections)
     imported_ids = list(imported.keys())
     existing_ids = [s.get("section_id", "") for s in existing_sections]
 
@@ -577,47 +538,68 @@ def apply_import(
     Returns:
         ImportResult with counts and updated sections.
     """
-    imported = _extract_imported_sections(xlsx_bytes)
-    existing_lookup = {s.get("section_id", ""): deepcopy(s) for s in existing_sections}
+    from app.services.note_offline_import_tables import (
+        OfflineImportStructureError,
+        count_changed_tables,
+        merge_imported_tables_into_section,
+        merge_selected_cells_into_section,
+    )
+
+    imported = _extract_imported_sections(xlsx_bytes, existing_sections)
+    existing_lookup: dict[str, dict[str, Any]] = {}
+    duplicate_keys: set[str] = set()
+    for section in existing_sections:
+        sid = str(section.get("section_id") or "")
+        if sid in existing_lookup:
+            duplicate_keys.add(sid)
+        existing_lookup[sid] = deepcopy(section)
 
     sections_imported = 0
     sections_kept = 0
     sections_discarded = 0
     conflicts = 0
+    errors = [f"当前项目章节键 {sid!r} 重复，拒绝猜测写入目标" for sid in sorted(duplicate_keys)]
+    applied_sections: dict[str, dict[str, Any]] = {}
+    tables_written = 0
 
     for sid, resolution in decisions.items():
         if resolution == ConflictResolution.OVERWRITE:
-            if sid in imported:
-                # Replace local with imported data
-                imp = imported[sid]
-                if sid in existing_lookup:
-                    # 写回附注持久化真源形态：label + values（标签列是 cells[0]），
-                    # 不得写 `cells`（渲染器/投影器/Word 导出只认 `values`）
-                    existing_lookup[sid]["table_data"] = {
-                        "headers": imp.get("headers", []),
-                        "rows": [
-                            {
-                                "label": (r.get("cells") or [None])[0],
-                                "values": list((r.get("cells") or [])[1:]),
-                            }
-                            for r in imp.get("rows", [])
-                        ],
-                    }
-                    if meta_data and sid in meta_data and "guidance_text" in meta_data[sid]:
-                        existing_lookup[sid]["guidance_text"] = meta_data[sid]["guidance_text"]
+            if sid not in imported:
+                errors.append(f"离线包中没有章节 {sid!r}")
+                continue
+            if sid not in existing_lookup:
+                errors.append(f"章节 {sid!r} 不在当前项目中；离线导入不创建新章节，请先在平台生成")
+                continue
+            imp = imported[sid]
+            before = existing_lookup[sid].get("table_data") or {}
+            merged = merge_imported_tables_into_section(before, imp.get("tables") or [])
+            changed = count_changed_tables(before, merged)
+            if changed:
+                existing_lookup[sid]["table_data"] = merged
+                applied_sections[sid] = merged
                 sections_imported += 1
+                tables_written += changed
 
         elif resolution == ConflictResolution.KEEP:
             sections_kept += 1
 
         elif resolution == ConflictResolution.MERGE:
-            if sid in imported and sid in existing_lookup:
-                imp = imported[sid]
-                local = existing_lookup[sid]
-                cells_to_import = (merge_cells or {}).get(sid, [])
-                _merge_cells_into_local(local, imp, cells_to_import)
+            if sid not in imported or sid not in existing_lookup:
+                errors.append(f"合并章节 {sid!r} 不在离线包或当前项目中")
+                continue
+            cells_to_import = (merge_cells or {}).get(sid, [])
+            if not cells_to_import:
+                errors.append(f"章节 {sid!r} 选择了合并，但没有选择任何单元格")
+                continue
+            before = existing_lookup[sid].get("table_data") or {}
+            merged = merge_selected_cells_into_section(before, imported[sid].get("tables") or [], cells_to_import)
+            changed = count_changed_tables(before, merged)
+            conflicts += 1
+            if changed:
+                existing_lookup[sid]["table_data"] = merged
+                applied_sections[sid] = merged
                 sections_imported += 1
-                conflicts += 1
+                tables_written += changed
 
         elif resolution == ConflictResolution.DISCARD:
             sections_discarded += 1
@@ -632,48 +614,17 @@ def apply_import(
     )
 
     return ImportResult(
-        success=True,
+        success=not errors,
         sections_imported=sections_imported,
         sections_kept=sections_kept,
         sections_discarded=sections_discarded,
         conflicts=conflicts,
         audit_entry=audit_entry,
+        applied_sections=applied_sections,
+        tables_written=tables_written,
+        changed_sections=sorted(applied_sections),
+        errors=errors,
     )
-
-
-def _merge_cells_into_local(
-    local: dict[str, Any],
-    imported: dict[str, Any],
-    cell_keys: list[str],
-) -> None:
-    """把 imported 的指定单元格并入 local section。
-
-    cell_key = ``{row_idx}:{value_idx}``（不含标签列）；local 写 ``values``，
-    imported 取 ``cells[value_idx + 1]``（``cells[0]`` 是标签列）。
-    """
-    local_rows = local.get("table_data", {}).get("rows", [])
-    imported_rows = imported.get("rows", [])
-
-    for cell_key in cell_keys:
-        parts = cell_key.split(":")
-        if len(parts) != 2:
-            continue
-        row_idx, col_idx = int(parts[0]), int(parts[1])
-
-        if row_idx < len(imported_rows):
-            imp_cells = imported_rows[row_idx].get("cells") or []
-            imp_values = imp_cells[1:]  # 去掉标签列
-            if col_idx < len(imp_values):
-                # 补足 local 的行/列（缺失处补 None，不改动其他单元格）
-                while len(local_rows) <= row_idx:
-                    local_rows.append({"label": "", "values": []})
-                target = local_rows[row_idx]
-                if not isinstance(target.get("values"), list):
-                    target["values"] = list(target.get("cells") or [])
-                    target.pop("cells", None)
-                while len(target["values"]) <= col_idx:
-                    target["values"].append(None)
-                target["values"][col_idx] = imp_values[col_idx]
 
 
 # ---------------------------------------------------------------------------
@@ -705,32 +656,6 @@ async def acquire_section_locks(
             results[sid] = True
 
     return results
-
-
-# ---------------------------------------------------------------------------
-# C.0.14: D11 版本树集成
-# ---------------------------------------------------------------------------
-
-
-def create_version_node(
-    section_id: str,
-    project_id: UUID,
-    user_id: str,
-    import_source: str = "offline_import",
-) -> dict[str, Any]:
-    """Create a version tree node for imported section (C.0.14).
-
-    Returns version node dict (to be persisted by caller).
-    """
-    return {
-        "section_id": section_id,
-        "project_id": str(project_id),
-        "branch": "main",
-        "label": f"离线导入 ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')})",
-        "created_by": user_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": import_source,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -781,8 +706,8 @@ def _build_audit_entry(
         "sections_kept": sections_kept,
         "sections_discarded": sections_discarded,
         "conflicts": conflicts,
-        "retention_days": 30,
-        "rollback_available": True,
+        "retention_days": 0,
+        "rollback_available": False,
     }
 
 
@@ -792,19 +717,16 @@ def build_archive_record(
     user_id: str,
     import_result: ImportResult,
 ) -> dict[str, Any]:
-    """Build file archive record for 30-day retention (C.0.16).
-
-    Returns dict to be persisted (file stored separately).
-    """
+    """兼容旧调用的文件摘要 helper；当前不持久化原文件，也不声明可自动回滚。"""
     return {
         "project_id": str(project_id),
         "user_id": user_id,
         "file_hash": hashlib.sha256(file_bytes).hexdigest(),
         "file_size": len(file_bytes),
         "archived_at": datetime.now(timezone.utc).isoformat(),
-        "expires_at": None,  # Set by caller: now + 30 days
+        "expires_at": None,
         "import_result": import_result.to_dict(),
-        "rollback_available": True,
+        "rollback_available": False,
     }
 
 
@@ -827,7 +749,7 @@ class NoteOfflineImportService:
         xlsx_bytes: bytes,
         project_id: UUID,
         year: int,
-        project_template_type: str = "soe",
+        project_template_type: str | None = None,
     ) -> dict[str, Any]:
         """Validate file + compute diff preview.
 
@@ -838,17 +760,29 @@ class NoteOfflineImportService:
         if not validation.valid:
             return {"validation": {"valid": False, "errors": validation.errors}}
 
-        # C.0.15: Template type check
-        import_template_type = validation.meta_data.get("template_type")
-        template_check = check_template_type_compatibility(
-            import_template_type, project_template_type
-        )
+        # C.0.15: 准则取项目统一状态，不接受默认 soe 代替真实口径。
+        project_template_type = project_template_type or await self._get_template_type(project_id)
+        import_template_type = validation.manifest.get("template_type") if validation.manifest else None
+        template_check = check_template_type_compatibility(import_template_type, project_template_type)
 
         # Load existing sections
         existing = await self._load_existing_sections(project_id, year)
+        if validation.manifest:
+            errors = context_errors(
+                validation.manifest,
+                project_id=project_id,
+                year=year,
+                template_type=project_template_type,
+                current_sections=existing,
+            )
+            if errors:
+                return {"validation": {"valid": False, "errors": errors}}
 
-        # C.0.10 + C.0.11: Diff
-        diffs = diff_sections(xlsx_bytes, existing, validation.meta_data)
+        # C.0.10 + C.0.11: Diff。结构变化没有稳定行身份时返回可读错误，不让 preview 500。
+        try:
+            diffs = diff_sections(xlsx_bytes, existing, validation.meta_data)
+        except ValueError as exc:
+            return {"validation": {"valid": False, "errors": [str(exc)]}}
 
         # Summary
         match_summary = {
@@ -859,7 +793,12 @@ class NoteOfflineImportService:
         }
 
         return {
-            "validation": {"valid": True},
+            "validation": {
+                "valid": True,
+                "legacy_unsigned": validation.legacy_unsigned,
+                "warnings": (["旧版离线包未绑定项目与导出基线；只能预览，请重新导出后执行"]
+                             if validation.legacy_unsigned else []),
+            },
             "template_check": template_check,
             "diffs": [d.to_dict() for d in diffs],
             "match_summary": match_summary,
@@ -880,32 +819,89 @@ class NoteOfflineImportService:
             return ImportResult(
                 success=False,
                 audit_entry={"errors": validation.errors},
+                errors=list(validation.errors),
             )
 
-        # Load existing
-        existing = await self._load_existing_sections(project_id, year)
+        if validation.legacy_unsigned or not validation.manifest:
+            errors = ["旧版未签名离线包只能预览；请从当前项目重新导出后再执行"]
+            return ImportResult(success=False, audit_entry={"errors": errors}, errors=errors)
 
-        # C.0.12: Apply
-        result = apply_import(
-            xlsx_bytes,
-            existing,
-            decisions,
-            meta_data=validation.meta_data,
-            merge_cells=merge_cells,
+        # 锁定本次写入候选，避免 execute 期间与在线编辑互相覆盖；锁后复核导出基线。
+        existing = await self._load_existing_sections(project_id, year, lock=True)
+        project_template_type = await self._get_template_type(project_id)
+        write_ids = [
+            sid for sid, decision in decisions.items()
+            if decision in (ConflictResolution.OVERWRITE, ConflictResolution.MERGE)
+        ]
+        identity_errors = context_errors(
+            validation.manifest,
+            project_id=project_id,
+            year=year,
+            template_type=project_template_type,
+            current_sections=existing,
+            write_section_ids=write_ids,
         )
+        if identity_errors:
+            return ImportResult(success=False, audit_entry={"errors": identity_errors}, errors=identity_errors)
+
+        # C.0.12: Apply；表 / 行结构变化没有稳定身份可对齐时 fail-closed。
+        try:
+            result = apply_import(
+                xlsx_bytes,
+                existing,
+                decisions,
+                meta_data=validation.meta_data,
+                merge_cells=merge_cells,
+            )
+        except ValueError as exc:
+            return ImportResult(success=False, errors=[str(exc)], audit_entry={"errors": [str(exc)]})
+        if not result.success:
+            return result
 
         # Persist guidance_text from _meta_ (不污染 text_content)；路由传的是 str(user.id)
         try:
             actor = UUID(str(user_id)) if user_id else None
         except ValueError:  # 非 UUID 的调用方（脚本）只记时间、不记编辑人，不因此整次导入失败
             actor = None
-        await self._persist_guidance_from_meta(
-            project_id, year, decisions, validation.meta_data, user_id=actor,
-        )
+        try:
+            guidance_changed = await self._persist_guidance_from_meta(
+                project_id, year, decisions, validation.meta_data, user_id=actor,
+            )
+            # 把应用后的 table_data 真写入 disclosure_notes；返回值来自实际 UPDATE，不拿计划数冒充回执。
+            table_changed = await self._persist_table_data(
+                project_id, year, result.applied_sections, user_id=actor,
+            )
+        except ValueError as exc:
+            return ImportResult(success=False, errors=[str(exc)], audit_entry={"errors": [str(exc)]})
+        result.tables_written = sum(table_changed.values())
+        result.changed_sections = sorted(set(table_changed) | set(guidance_changed))
+        result.sections_imported = len(result.changed_sections)
+        result.audit_entry.update({
+            "sections_imported": result.sections_imported,
+            "tables_written": result.tables_written,
+            "changed_sections": list(result.changed_sections),
+        })
 
-        # C.0.16: Audit log
+        # C.0.16: 版本快照与哈希链审计和业务写入同一事务；失败则 router 回滚全部。
         result.audit_entry["user_id"] = user_id
         result.audit_entry["project_id"] = str(project_id)
+        result.audit_entry["rollback_available"] = False
+        try:
+            from app.services.note_offline_import_governance import record_import_governance
+
+            result.version_node_ids, result.audit_log_id = await record_import_governance(
+                self.db,
+                project_id=project_id,
+                year=year,
+                user_id=user_id,
+                file_bytes=xlsx_bytes,
+                result=result,
+                before_sections=existing,
+                decisions=decisions,
+            )
+        except Exception as exc:  # 审计/版本不是 best-effort；写失败就拒绝整次导入
+            message = f"离线导入审计或版本记录失败：{exc}"
+            return ImportResult(success=False, errors=[message], audit_entry={"errors": [message]})
 
         return result
 
@@ -917,13 +913,13 @@ class NoteOfflineImportService:
         meta_data: dict[str, Any],
         *,
         user_id: UUID | None = None,
-    ) -> None:
-        """从 _meta_ 回写 guidance_text；旧包无键则保留 DB 现值。
+    ) -> set[str]:
+        """从 _meta_ 回写 guidance_text，返回实际变化的章节号；旧包无键则保留 DB 现值。
 
         真改了的行以导入人盖「最近一次编辑」（值没变的行不算编辑，不盖）。
         """
         if self.db is None or not meta_data:
-            return
+            return set()
 
         from datetime import datetime, timezone
 
@@ -931,6 +927,7 @@ class NoteOfflineImportService:
 
         from app.models.report_models import DisclosureNote
 
+        changed: set[str] = set()
         for sid, resolution in decisions.items():
             if resolution != ConflictResolution.OVERWRITE:
                 continue
@@ -954,12 +951,37 @@ class NoteOfflineImportService:
                     DisclosureNote.guidance_text.is_distinct_from(guidance_val),
                 )
                 .values(**values)
+                .returning(DisclosureNote.note_section)
             )
-            await self.db.execute(stmt)
+            changed.update((await self.db.execute(stmt)).scalars().all())
         await self.db.flush()
+        return changed
+
+    async def _persist_table_data(
+        self,
+        project_id: UUID,
+        year: int,
+        applied_sections: dict[str, dict[str, Any]],
+        *,
+        user_id: UUID | None = None,
+    ) -> dict[str, int]:
+        """把离线导入应用后的 ``table_data`` 落库，返回章节及实际变化表数。"""
+        if self.db is None:
+            return {}
+        from app.services.note_offline_import_tables import persist_applied_table_data
+
+        return await persist_applied_table_data(
+            self.db, project_id, year, applied_sections, user_id=user_id,
+        )
+
+    async def _get_template_type(self, project_id: UUID) -> str:
+        from app.services.standard_unification_service import StandardUnificationService
+
+        standard = await StandardUnificationService(self.db).get_standard(project_id)
+        return str(standard.get("entity_type") or "soe")
 
     async def _load_existing_sections(
-        self, project_id: UUID, year: int
+        self, project_id: UUID, year: int, *, lock: bool = False
     ) -> list[dict[str, Any]]:
         """Load existing sections from DB."""
         if self.db is None:
@@ -974,13 +996,17 @@ class NoteOfflineImportService:
             DisclosureNote.year == year,
             DisclosureNote.is_deleted == False,  # noqa: E712
         )
+        if lock:
+            query = query.with_for_update()
         result = await self.db.execute(query)
         notes = result.scalars().all()
 
         return [
             {
                 "section_id": n.section_id or n.note_section or "",
+                "note_section": n.note_section or "",
                 "section_title": n.section_title or "",
+                "guidance_text": n.guidance_text or "",
                 "table_data": n.table_data or {},
             }
             for n in notes

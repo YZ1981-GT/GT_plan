@@ -16,6 +16,10 @@
 - revise 与 confirm 共用 _confirm_or_revise（写 revised_content）
 - target_label enrich 修 key（str(log.id)）+ savepoint 降级
 - 底稿类不自动写入（提示复制）
+
+目标标签修复（spec ai-content-pending-target-label，2026-10-30）：上面 R6 的标签修复没生效 ——
+底稿查 ``working_paper.wp_name``（列在 ``wp_index``）、附注把 ``target_cell`` 末段当章节号、两条查询同一保存点。
+现按 ``target_cell`` 第二段的实例 id 用 ORM 分类查询，口径与 AI 面板宿主标签一致，并补 ``target_position``。
 """
 
 from __future__ import annotations
@@ -58,15 +62,30 @@ class ReviseRequest(BaseModel):
         return v
 
 
+def _parse_target(target_cell: str | None) -> tuple[str | None, str | None, str | None]:
+    """拆 ``target_cell`` 为（类型, 实例 id 原文, 位置原文）。
+
+    编码以写入方为准：``ai_content_log_service.create`` 存 ``{instance_type}:{instance_id}[:{位置}]``。
+    位置是第二个冒号之后的全部原文（本身还可能含冒号），如 ``E5`` / ``正文第一段``。
+    """
+    if not target_cell:
+        return None, None, None
+    parts = target_cell.split(":", 2)
+    kind = parts[0] or None
+    target_id = parts[1] if len(parts) >= 2 and parts[1] else None
+    position = parts[2] if len(parts) == 3 and parts[2] else None
+    return kind, target_id, position
+
+
 def _serialize(log) -> dict:
     """将 AiContentLog ORM 对象序列化为 banner / badge 所需的字典。"""
-    target_cell = log.target_cell or ""
-    instance_type = target_cell.split(":", 1)[0] if target_cell else None
+    instance_type, _target_id, position = _parse_target(log.target_cell)
     return {
         "id": str(log.id),
         "ai_content_log_id": str(log.id),
         "instance_type": instance_type,
         "target_cell": log.target_cell,
+        "target_position": position,
         "model": log.model,
         "confidence": float(log.confidence) if log.confidence is not None else None,
         "generated_at": log.generated_at.isoformat() if log.generated_at else None,
@@ -75,95 +94,103 @@ def _serialize(log) -> dict:
     }
 
 
-async def _enrich_target_labels(db: AsyncSession, items: list) -> list:
-    """给每条 pending 日志补充 target_label（底稿名 / 附注章节标题）。
+def _coerce_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
 
-    用 str(log.id) 做 dict key（修复原 UUID 对象 key 写 / str 查全 miss）。
-    允许多条日志指向同一目标。查询失败降级 None，不毒化外层事务。
-    """
-    if not items:
-        return items
 
-    from sqlalchemy import select, text
+async def _workpaper_labels(db: AsyncSession, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """底稿 id → ``"{wp_code} {wp_name}"``。先当 ``working_paper.id``（经 ``wp_index`` 取名），没取到的再当 ``wp_index.id``。"""
+    from sqlalchemy import select
 
-    serialized = [_serialize(it) for it in items]
+    from app.models.workpaper_models import WorkingPaper, WpIndex
 
+    labels: dict[UUID, str] = {}
+    rows = (await db.execute(
+        select(WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.project_id == project_id, WorkingPaper.id.in_(list(ids)))
+    )).all()
+    for wp_id, code, name in rows:
+        labels[wp_id] = f"{code} {name}".strip()
+    rest = ids - labels.keys()
+    if rest:
+        # 早期写入的记录存的是索引 id（共享库现存一条，2026-10-30 现查）
+        rows = (await db.execute(
+            select(WpIndex.id, WpIndex.wp_code, WpIndex.wp_name)
+            .where(WpIndex.project_id == project_id, WpIndex.id.in_(list(rest)))
+        )).all()
+        for idx_id, code, name in rows:
+            labels[idx_id] = f"{code} {name}".strip()
+    return labels
+
+
+async def _note_labels(db: AsyncSession, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """附注 id（``disclosure_notes.id``）→ ``"{note_section} {section_title}"``。"""
+    from sqlalchemy import select
+
+    from app.models.report_models import DisclosureNote
+
+    rows = (await db.execute(
+        select(DisclosureNote.id, DisclosureNote.note_section, DisclosureNote.section_title)
+        .where(DisclosureNote.project_id == project_id, DisclosureNote.id.in_(list(ids)))
+    )).all()
+    return {note_id: f"{section} {title}".strip() for note_id, section, title in rows}
+
+
+async def _lookup_labels(db: AsyncSession, what: str, fetch, project_id: UUID, ids: set[UUID]) -> dict[UUID, str]:
+    """一类标签一个保存点：查询失败只让这一类为空，不影响另一类，也不中止调用方事务。"""
+    if not ids:
+        return {}
     try:
         async with db.begin_nested():
-            # 按 target_cell 前缀分组
-            wp_logs = {}  # str(log.id) -> target_cell
-            note_logs = {}
-            for it, raw in zip(serialized, items):
-                lid = str(raw.id)
-                tc = raw.target_cell or ""
-                if tc.startswith("workpaper:"):
-                    wp_logs[lid] = tc
-                elif tc.startswith("note:"):
-                    note_logs[lid] = tc
-
-            # 底稿标签：从 target_cell 里提取 wp_id，查 working_paper.wp_name
-            wp_labels = {}
-            if wp_logs:
-                wp_ids = set()
-                for tc in wp_logs.values():
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        try:
-                            wp_ids.add(UUID(parts[1]))
-                        except ValueError:
-                            pass
-                if wp_ids:
-                    placeholders = ", ".join(f"'{str(u)}'" for u in wp_ids)
-                    rows = (await db.execute(
-                        text(f"SELECT id, wp_name FROM working_paper WHERE id IN ({placeholders})")
-                    )).fetchall()
-                    for row in rows:
-                        wp_labels[str(row[0])] = row[1]
-
-            # 附注标签：从 target_cell 里提取 note_section，查 disclosure_notes.section_title
-            note_labels = {}
-            if note_logs:
-                # 提取所有 note_section（target_cell 格式 "note:<note_id>:<section>" 或 "note:<section>"）
-                sections = set()
-                project_ids = set()
-                for raw in items:
-                    if raw.project_id:
-                        project_ids.add(raw.project_id)
-                    tc = raw.target_cell or ""
-                    if tc.startswith("note:"):
-                        parts = tc.split(":")
-                        if len(parts) >= 2:
-                            sections.add(parts[-1])
-                if sections and project_ids:
-                    pid = str(list(project_ids)[0])
-                    sec_list = ", ".join(f"'{s}'" for s in sections)
-                    rows = (await db.execute(
-                        text(f"SELECT note_section, section_title FROM disclosure_notes "
-                             f"WHERE project_id = '{pid}' AND note_section IN ({sec_list})")
-                    )).fetchall()
-                    for row in rows:
-                        note_labels[row[0]] = row[1]
-
-            # 回填 target_label
-            for it, raw in zip(serialized, items):
-                lid = str(raw.id)
-                tc = raw.target_cell or ""
-                label = None
-                if tc.startswith("workpaper:"):
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        label = wp_labels.get(parts[1])
-                elif tc.startswith("note:"):
-                    parts = tc.split(":")
-                    if len(parts) >= 2:
-                        label = note_labels.get(parts[-1])
-                it["target_label"] = label
-
+            return await fetch(db, project_id, ids)
     except Exception:
-        logger.warning("_enrich_target_labels 查询失败，降级 None", exc_info=True)
-        for it in serialized:
-            it.setdefault("target_label", None)
+        logger.warning("待确认 AI 内容：%s标签查询失败，该类标签置空", what, exc_info=True)
+        return {}
 
+
+async def _enrich_target_labels(db: AsyncSession, project_id: UUID, items: list) -> list:
+    """给每条待确认日志补 ``target_label``（底稿 / 附注的展示名）。
+
+    - 口径与 AI 面板宿主标签一致（``ai_chat/host_context.py`` 的 ``_label_workpaper`` / ``_label_note``）。
+    - 实例 id 取 ``target_cell`` 第二段（附注是 ``disclosure_notes.id``，不是章节号）；不是 UUID 的不查。
+    - 只取本项目的行：``target_cell`` 是存下来的字符串，不能凭它读别的项目的名称。
+    - 目标已删除时仍显示原名称，便于认出这段 AI 内容原本写给谁。
+    - 全部 ORM 绑定参数，不拼 SQL。
+    """
+    serialized = [_serialize(it) for it in items]
+    if not items:
+        return serialized
+
+    targets = []
+    wp_ids: set[UUID] = set()
+    note_ids: set[UUID] = set()
+    for raw in items:
+        kind, target_id, _position = _parse_target(raw.target_cell)
+        uid = _coerce_uuid(target_id)
+        targets.append((kind, uid))
+        if uid is None:
+            continue
+        if kind == "workpaper":
+            wp_ids.add(uid)
+        elif kind == "note":
+            note_ids.add(uid)
+
+    wp_labels = await _lookup_labels(db, "底稿", _workpaper_labels, project_id, wp_ids)
+    note_labels = await _lookup_labels(db, "附注", _note_labels, project_id, note_ids)
+
+    for it, (kind, uid) in zip(serialized, targets):
+        label = None
+        if uid is not None and kind == "workpaper":
+            label = wp_labels.get(uid)
+        elif uid is not None and kind == "note":
+            label = note_labels.get(uid)
+        it["target_label"] = label
     return serialized
 
 
@@ -362,7 +389,7 @@ async def list_pending_ai_content(
     count = await ai_content_log_service.count_pending_by_project(
         db=db, project_id=project_id
     )
-    serialized = await _enrich_target_labels(db, items)
+    serialized = await _enrich_target_labels(db, project_id, items)
     return {
         "count": count,
         "items": serialized,

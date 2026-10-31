@@ -53,7 +53,6 @@ const TEMPLATE_BINDINGS: Entry[] = [
   { file: 'views/KnowledgeBase.vue', expr: 'previewUrl', count: 2, kind: 'object-url', why: 'api.get(blob) + createObjectURL' },
   { file: 'components/extension/MetabaseDashboard.vue', expr: 'embedUrl', kind: 'external', why: '后端签发的 Metabase 嵌入地址（自带签名）' },
   { file: 'components/workpaper/confirmation/reliability/ReliabilityGrid.vue', expr: "tooltipMap['注2'].link.url", kind: 'external', why: '致同技术提示外部文档' },
-  { file: 'components/workpaper/h1/stocktake/H1TabStocktakeSummary.vue', expr: 'row.photoUrl', kind: 'user-link', why: '盘点表「照片」列是用户填写的文本（照片改存附件、按行挂证据属 Spec D）' },
   // 以下由「脚本在前的 SFC 也扫模板」新扫出（spec attachment-evidence-intake 需求 6.2）
   { file: 'components/workpaper/d2/D2VcCardView.vue', expr: 'att.thumbnailUrl', kind: 'dormant', why: 'VcAttachment.thumbnailUrl 无写入方（缩略图未接线；接线时指向 /api 须改 useAuthedObjectUrl）' },
 ]

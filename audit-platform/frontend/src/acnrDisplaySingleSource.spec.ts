@@ -371,12 +371,15 @@ describe('渲染：显示文本逐字等于夹具（T30）', () => {
     await store.refresh('p1', 2025, 'soe')
     const results = await store.search('应付票据', 'wp')
     const byUri = new Map(results.map((r) => [r.uri, r.label]))
-    const live = FIXTURE.cells.find((c) => c.addr_id === 'F3/F3-5/B25')!
     const dead = FIXTURE.cells.find((c) => c.addr_id === 'F3/F3-6/E30')!
     expect(dead.deprecated).toBe(true)
-    expect(byUri.get(live.addr_id)).toBe(live.display_label)
     expect(byUri.has(dead.addr_id)).toBe(false)
     expect(byUri.get('F3/F3-1')).toBe('F3-1 应付票据审定表')
+    // 有效 cell 样本（原 F3-5 B25「语义待核对」已停用，夹具换成合计行坐标 D1-3 J21，spec wp-deeplink-locate-residual-closure）
+    const live = FIXTURE.cells.find((c) => c.addr_id === 'D1/D1-3/J21')!
+    expect(live.deprecated).toBe(false)
+    const receivable = new Map((await store.search('应收票据', 'wp')).map((r) => [r.uri, r.label]))
+    expect(receivable.get(live.addr_id)).toBe(live.display_label)
     store.dispose()
   })
 

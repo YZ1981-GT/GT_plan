@@ -553,9 +553,12 @@ def test_n_balance_note_rows_uses_ending_balance(
 def test_n_income_note_rows_uses_current_amount(
     code: str, account_code: str, account_name: str,
 ):
-    """N4/N5 损益类（6xxx）: ending 取「本期发生额」，opening 取「年初余额」。"""
+    """N4/N5 损益类（6xxx）: ending 取「本期发生额」，上期取上年试算表发生额（本年年初余额不是上期）。"""
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = note_direct_for(code)
-    binding._last_tb_data = _make_tb(account_code, "0", "200000", "350000")
+    binding._last_tb_data = _make_tb(account_code, "0", "999", "350000")  # 年初余额不该被当成上期
+    binding._last_prior_pl = PriorPlSnapshot(_make_tb(account_code, "0", "0", "200000"))
 
     rule = _note_rule(code)
     rows = binding.note_rows({}, "listed", rule)

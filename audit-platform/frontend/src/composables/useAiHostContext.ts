@@ -307,6 +307,20 @@ export function buildAmbientHost(input: {
   return buildGlobalKnowledgeHost()
 }
 
+/**
+ * 可接收「采纳」的宿主类型（镜像后端 `adopt.ADOPT_TARGET_TYPES`）。
+ *
+ * 报表没有实例 UUID、知识库没有项目业务实例、全局知识模式没有项目 —— 这些宿主里点「采纳」
+ * 必须先让用户选定底稿或附注章节（spec ai-chat-adopt-and-note-target-picker R1）。
+ */
+export const AI_ADOPT_TARGET_TYPES = ['workpaper', 'note'] as const
+
+/** 当前宿主能否直接作为采纳目标（底稿 / 附注且已绑定项目）。 */
+export function canAdoptInPlace(host: AiHostRef | null | undefined): boolean {
+  if (!host || !host.id || !host.projectId) return false
+  return (AI_ADOPT_TARGET_TYPES as readonly string[]).includes(host.type)
+}
+
 /** 面板上下文条的中文范围说明（可用/不可用共用一条渲染路径）。 */
 export function hostScopeHint(request: AiHostRequest): string {
   if (!request.available) return request.unavailableReason ?? '当前页面无法使用 AI 对话'

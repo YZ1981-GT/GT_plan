@@ -12,20 +12,19 @@ spec: soe-listed-note-conversion-correctness / Requirements 8.1, 8.2, 8.3, 8.4
 * ``soe ch08 → listed ch03`` = 10 条：section_title 两侧完全相同，soe 归「项目
   注释章」、listed 归「会计政策章」= **章节归属差异（NORMAL_MAPPING，正常映射）**，
   非 bug。
-* ``soe ch12 → listed ch05`` = 2 条（投资收益 / 现金流量表补充资料）：母公司章
-  （``scope='consolidated_only'``）子节与 listed 合并章子节同名。Requirement 8.2
-  原预期这 2 条在 A spec 修好 soe 第十二章标题后**消失**，但 A 只改章标题不改
-  子节名，故仍配对。**用户 2026-08-06 裁决 = EXEMPTED（已登记豁免）**，在本 spec
-  内以豁免状态收口，不改母公司章结构、不路由回 A spec。
+* ``soe ch12 → listed ch05`` = 1 条（现金流量表补充资料）：母公司章
+  （``scope='consolidated_only'``）没有对应的 listed 母公司子节，故按同名落到 listed 合并章。
+  **用户 2026-08-06 裁决 = EXEMPTED（已登记豁免）**。原第二条「投资收益」在
+  disclosure-note-template-word-realignment Task 32 改为按章类别配对，现正确映射 ch12→ch16。
 
 三态清单（模块级冻结常量）+ 连实时 ``compute_diff_from_templates()`` 断言：
-- NORMAL_MAPPING（10 条）：正常映射，逐条列 section_title + 判定依据
-- CORRECTED：A spec 已修正项（soe 第十二章 slug gu-fen-zhi-fu → mu-gong-si-…），
-  与实时数据交叉锁死（soe ch12 子节 sid 必须已是新前缀）
-- EXEMPTED（2 条）：已登记豁免 + 豁免依据（每条 reason 非空且 ≥20 字）
+- NORMAL_MAPPING（1 条）：正常映射，逐条列 section_title + 判定依据
+- CORRECTED：A spec 已修正项及 Task 32 同名多节配对修正，
+  与实时数据交叉锁死
+- EXEMPTED（1 条）：已登记豁免 + 豁免依据（reason 非空且 ≥20 字）
 
-**🔴 禁止写 `soe ch12→listed ch05 == 0` 断言**（那会在仍有 2 条时打红 = 假绿风险，
-且与 EXEMPTED 语义矛盾）。断言的是「实际 2 条恰好都在豁免清单里、无第三条漏网」。
+**🔴 禁止写 `soe ch12→listed ch05 == 0` 断言**（仍有现金流量表补充资料 1 条）；
+断言「实际恰为这 1 条，无第二条漏网」。
 """
 from __future__ import annotations
 
@@ -106,16 +105,22 @@ CORRECTED: tuple[Corrected, ...] = (
             "旧编号登记为种子别名、section_id 不变 ⇒ 章号按父节点判（section_id 前缀不再代表所属章）。"
         ),
     ),
+    Corrected(
+        subject="同名多节按章类别一一配对",
+        detail=(
+            "disclosure-note-template-word-realignment Task 32（2026-10-17）删除每个标题只取第一节的缺陷；"
+            "国企十二、投资收益现映射上市十六、投资收益，不再错配到五、69；两侧每个有标题的节恰进一个差异桶。"
+        ),
+    ),
 )
 
-#: EXEMPTED = soe ch12（母公司章）→ listed ch05（合并章）的 2 条，每条 reason ≥20 字
+#: EXEMPTED = soe ch12（母公司章）→ listed ch05（合并章）的 1 条，每条 reason ≥20 字
 _EXEMPT_REASON = (
     "母公司披露与合并披露天然共用同名科目；消除需改母公司章结构，属 A spec "
     "(parent-company-note-chapter-and-sourcing) 范围，B spec 已裁决 out-of-scope（已裁决事项 3）。"
 )
 
 EXEMPTED: tuple[Exempted, ...] = (
-    Exempted("投资收益", "「投资收益」" + _EXEMPT_REASON),
     Exempted("现金流量表补充资料", "「现金流量表补充资料」" + _EXEMPT_REASON),
 )
 
@@ -204,9 +209,9 @@ def test_corrected_registry_shape():
 
 def test_exempted_registry_non_empty_and_reasons():
     """反向自检：EXEMPTED 非空（防被当逃逸阀清空后守卫空转）；每条 reason ≥20 字。"""
-    assert len(EXEMPTED) == 2, "EXEMPTED 必须恰有 2 条（投资收益 / 现金流量表补充资料）"
+    assert len(EXEMPTED) == 1, "EXEMPTED 必须恰有 1 条（现金流量表补充资料）"
     titles = [e.section_title for e in EXEMPTED]
-    assert len(set(titles)) == 2, f"EXEMPTED 有重复 section_title: {titles}"
+    assert len(set(titles)) == 1, f"EXEMPTED 有重复 section_title: {titles}"
     for e in EXEMPTED:
         assert e.section_title.strip(), "EXEMPTED section_title 不得为空"
         assert e.reason.strip(), f"{e.section_title} 的豁免理由为空"
@@ -256,10 +261,9 @@ def test_ch04_ch03_mapping_count_stable(live_diff):
 
 
 def test_ch12_ch05_entries_are_exactly_exempted(live_diff):
-    """soe ch12→listed ch05 实际条目 == EXEMPTED 登记的 2 条。
+    """soe ch12→listed ch05 实际条目 == EXEMPTED 登记的 1 条。
 
-    🔴 断言的是「恰好这 2 条且都在豁免清单里、无第三条漏网」，
-    而非 `== 0`（== 0 在仍有 2 条时会打红 = 假绿风险）。
+    「投资收益」已由同名多节配对修正到 listed ch16；这里只允许「现金流量表补充资料」，无第二条漏网。
     """
     entries = _entries_for_pair(live_diff, "12", "05")
     actual = _titles(entries)
@@ -271,10 +275,17 @@ def test_ch12_ch05_entries_are_exactly_exempted(live_diff):
     )
 
 
+def test_ch12_investment_income_maps_to_listed_parent_ch16(live_diff):
+    """同名多节修复：母公司「投资收益」必须 parent→parent，不得再落到 listed 五、69。"""
+    entries = _entries_for_pair(live_diff, "12", "16")
+    assert "投资收益" in _titles(entries), "soe 十二、投资收益未映射到 listed 十六母公司章"
+    assert "投资收益" not in _titles(_entries_for_pair(live_diff, "12", "05"))
+
+
 def test_corrected_slug_landed_in_live_data(live_diff):
     """CORRECTED 交叉锁死：live 中 soe ch12→ch05 条目的 soe_section_id 已是新前缀，绝不含旧前缀。"""
     entries = _entries_for_pair(live_diff, "12", "05")
-    assert entries, "soe ch12→ch05 应有条目（EXEMPTED 的 2 条），实际为空"
+    assert entries, "soe ch12→ch05 应有条目（EXEMPTED 的 1 条），实际为空"
     for e in entries:
         sid = e.get("soe_section_id", "")
         assert sid.startswith(_SOE_CH12_NEW_SLUG_PREFIX), (
@@ -286,7 +297,7 @@ def test_corrected_slug_landed_in_live_data(live_diff):
 
 
 def test_three_state_union_covers_all_anomalies(live_diff):
-    """三态清单并集覆盖 ch08→ch03(10) + ch12→ch05(2) 全部条目，无遗漏无重复。"""
+    """三态清单并集覆盖 ch08→ch03(1) + ch12→ch05(1) 全部条目，无遗漏无重复。"""
     ch08_03 = _titles(_entries_for_pair(live_diff, "08", "03"))
     ch12_05 = _titles(_entries_for_pair(live_diff, "12", "05"))
     all_anomalies = ch08_03 | ch12_05
@@ -306,7 +317,7 @@ def test_three_state_union_covers_all_anomalies(live_diff):
 
 
 def test_reverse_selfcheck_unregistered_ch12_entry_reddens(live_diff):
-    """反向自检：若 ch12→ch05 出现未登记的第三条，集合相等断言必失败。
+    """反向自检：若 ch12→ch05 出现未登记的第二条，集合相等断言必失败。
 
     注入一个虚构条目模拟「新增未登记豁免项」，确认守卫机制非空转。
     """

@@ -37,6 +37,7 @@ from app.services.note_section_kind import (
     WORD_TITLE_ALIASES,
     normalize_title,
 )
+from app.services.note_title_hint import split_title_hint
 from app.services.note_word_table import (
     WordTable,
     compare_tables,
@@ -68,6 +69,7 @@ __all__ = [
     "norm_cell",
     "parse_word_docx",
     "seed_diffs",
+    "split_title_hint",
 ]
 
 

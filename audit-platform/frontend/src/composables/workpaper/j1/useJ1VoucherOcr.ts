@@ -18,6 +18,8 @@ import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/r
 export interface J1OcrPosition {
   sheet: string
   cell?: string | null
+  /** 抽样凭证行：附件同时挂到该凭证（spec attachment-voucher-evidence-binding） */
+  row?: unknown
 }
 
 export interface J1OcrFields {
@@ -67,7 +69,7 @@ export function useJ1VoucherOcr(wpId: Ref<string>, projectId?: Ref<string | unde
     ocrLoadingId.value = rowId
     const formData = new FormData()
     formData.append('file', file)
-    if (position) appendRowEvidence(formData, position.sheet, position.cell)
+    if (position) appendRowEvidence(formData, position.sheet, position.cell, position.row)
     try {
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d4/contract-ocr`,

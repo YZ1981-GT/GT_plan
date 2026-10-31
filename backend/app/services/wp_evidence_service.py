@@ -1,5 +1,7 @@
 """底稿证据链管理服务（``evidence_links``：底稿表页 / 单元格 / 行槽位 → 附件 → 页码）
 
+- 链接可带凭证键（凭证检查行的原件按凭证身份挂，spec attachment-voucher-evidence-binding）：同一（底稿, 凭证, 附件,
+  位置）只一条，重复请求返回已有的；
 - 列表带附件元数据，附件已软删的不返回；
 - 新链接只能挂本底稿已有的附件（统一视图任一来源，spec attachment-evidence-intake 需求 3.2）；
 - 删除按路径底稿限定；解除整稿关联时连带删除本底稿链接（需求 4.2）；
@@ -16,6 +18,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attachment_models import Attachment
@@ -88,8 +91,16 @@ class WpEvidenceService:
         page_ref: str | None = None,
         evidence_type: str | None = None,
         check_conclusion: str | None = None,
+        voucher_key: str | None = None,
     ) -> dict:
-        """创建单条证据链接（只 flush）。"""
+        """创建单条证据链接（只 flush）。带凭证键的链接按（底稿, 凭证, 附件, 位置）幂等，见 :meth:`create_voucher_link`。"""
+        if voucher_key is not None:
+            link, _existed = await self.create_voucher_link(
+                wp_id=wp_id, attachment_id=attachment_id, created_by=created_by, voucher_key=voucher_key,
+                sheet_name=sheet_name, cell_ref=cell_ref, page_ref=page_ref,
+                evidence_type=evidence_type, check_conclusion=check_conclusion,
+            )
+            return link
         link = EvidenceLink(
             id=uuid.uuid4(),
             wp_id=wp_id,
@@ -104,6 +115,55 @@ class WpEvidenceService:
         self.db.add(link)
         await self.db.flush()
         return self._to_dict(link)
+
+    async def _voucher_link(
+        self, wp_id: UUID, voucher_key: str, attachment_id: UUID, sheet_name: str | None, cell_ref: str | None,
+    ) -> EvidenceLink | None:
+        return (await self.db.execute(
+            sa.select(EvidenceLink).where(
+                EvidenceLink.wp_id == wp_id, EvidenceLink.voucher_key == voucher_key,
+                EvidenceLink.attachment_id == attachment_id,
+                sa.func.coalesce(EvidenceLink.sheet_name, "") == (sheet_name or ""),
+                sa.func.coalesce(EvidenceLink.cell_ref, "") == (cell_ref or ""),
+            ).limit(1)
+        )).scalar_one_or_none()
+
+    async def create_voucher_link(
+        self,
+        *,
+        wp_id: UUID,
+        attachment_id: UUID,
+        created_by: UUID,
+        voucher_key: str,
+        sheet_name: str | None = None,
+        cell_ref: str | None = None,
+        page_ref: str | None = None,
+        evidence_type: str | None = None,
+        check_conclusion: str | None = None,
+    ) -> tuple[dict, bool]:
+        """带凭证键的链接（只 flush）：同一（底稿, 凭证, 附件, 位置）已有 ⇒ 返回已有的（第二项 True）。
+
+        先查再插；并发下撞唯一索引 ``uq_evidence_links_voucher_position`` 时回滚到保存点再读回（spec
+        attachment-voucher-evidence-binding 需求 1.3）。
+        """
+        existing = await self._voucher_link(wp_id, voucher_key, attachment_id, sheet_name, cell_ref)
+        if existing is not None:
+            return self._to_dict(existing), True
+        link = EvidenceLink(
+            id=uuid.uuid4(), wp_id=wp_id, sheet_name=sheet_name, cell_ref=cell_ref, attachment_id=attachment_id,
+            page_ref=page_ref, evidence_type=evidence_type, check_conclusion=check_conclusion,
+            created_by=created_by, voucher_key=voucher_key,
+        )
+        try:
+            async with self.db.begin_nested():
+                self.db.add(link)
+                await self.db.flush()
+        except IntegrityError:
+            existing = await self._voucher_link(wp_id, voucher_key, attachment_id, sheet_name, cell_ref)
+            if existing is None:
+                raise
+            return self._to_dict(existing), True
+        return self._to_dict(link), False
 
     async def batch_link(self, *, wp_id: UUID, created_by: UUID, links: list[dict]) -> list[dict]:
         """批量创建证据链接（字段已由调用方校验）。"""
@@ -187,6 +247,7 @@ class WpEvidenceService:
             "page_ref": link.page_ref,
             "evidence_type": link.evidence_type,
             "check_conclusion": link.check_conclusion,
+            "voucher_key": link.voucher_key,
             "created_by": str(link.created_by),
             "created_at": link.created_at.isoformat() if link.created_at else None,
         }

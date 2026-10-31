@@ -296,9 +296,12 @@ G_INCOME_CODES = [
 def test_note_direct_income_uses_current_amount(
     code: str, account_code: str, account_name: str,
 ):
-    """损益类 G 科目 note_rows: ending 取「本期发生额」，opening 取「年初余额」。"""
+    """损益类 G 科目 note_rows: ending 取「本期发生额」，上期取上年试算表发生额（本年年初余额不是上期）。"""
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = note_direct_for(code)
-    binding._last_tb_data = _make_tb(account_code, "0", "200000", "300000")
+    binding._last_tb_data = _make_tb(account_code, "0", "999", "300000")  # 年初余额不该被当成上期
+    binding._last_prior_pl = PriorPlSnapshot(_make_tb(account_code, "0", "0", "200000"))
 
     rule = _g_note_rule(code)
     rows = binding.note_rows({}, "listed", rule)
@@ -306,7 +309,7 @@ def test_note_direct_income_uses_current_amount(
     assert len(rows) == 1
     row = rows[0]
     assert row["ending"] == 300000.0, "损益类应取本期发生额"
-    assert row["opening"] == 200000.0
+    assert row["opening"] == 200000.0, "损益类上期取上年试算表发生额"
     assert row["ending_resolved"] is True
     assert row["label"] == account_name
 

@@ -489,7 +489,7 @@ function onCardUpload(payload: { rowId: string; file: File; evidenceKey: string 
       }
     }
     persist()
-  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(payload.rowId) })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(payload.rowId), row })
 }
 
 // ─── selfLoad 从 checklist-responses 恢复 ────────────────────────────────────

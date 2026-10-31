@@ -194,7 +194,7 @@ function runOcr(file?: File) {
   if (!file || !form.value) return
   void uploadAndMerge(form.value.id, file, (_id, patch) => {
     if (form.value) Object.assign(form.value, patch)
-  })
+  }, form.value)
 }
 
 function handleSave() {

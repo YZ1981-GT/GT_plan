@@ -38,6 +38,7 @@ from app.services.note_word_tree import (  # noqa: E402
     SeedChapter,
     SeedSection,
     VariantMatch,
+    split_title_hint,
     WordSection,
     clean_word_heading,
     match_all,
@@ -50,6 +51,23 @@ def _scope_from(presence: set[str]) -> str:
     if presence >= {"standalone", "consolidated"}:
         return "both"
     return "consolidated_only" if "consolidated" in presence else "standalone_only"
+
+
+def _seed_title(word_title: str) -> str:
+    """种子标题 = Word 标题去尾部括注（括注是给编制人的提示，另存 ``title_hint``，见 ``split_title_hint``）。"""
+    return split_title_hint(clean_word_heading(word_title))[0] or clean_word_heading(word_title)
+
+
+def _word_hint(word_title: str) -> str | None:
+    return split_title_hint(clean_word_heading(word_title))[1]
+
+
+def _set_hint(raw: dict[str, Any], hint: str | None, changes: list[str]) -> None:
+    """``title_hint`` = 标题尾部括注里的提示；Word 本次未带提示时保留既有来源的提示。"""
+    if not hint or raw.get("title_hint") == hint:
+        return
+    changes.append(f"标题提示 {raw.get('section_number')}：{raw.get('title_hint')!r} → {hint!r}")
+    raw["title_hint"] = hint
 
 
 def _rename(raw: dict[str, Any], new_title: str, changes: list[str], what: str) -> None:
@@ -77,10 +95,17 @@ def _fix_chapters(matches: dict[str, VariantMatch], chapters: list[SeedChapter],
                   allowed: set[tuple[str, str]] = frozenset()) -> None:
     """章名（以合并版为准，单体版不同则记 scope_titles）、章 scope；章正文叶子随章改名。"""
     titles: dict[str, dict[str, str]] = defaultdict(dict)
+    hints: dict[str, dict[str, str]] = defaultdict(dict)
     for m in matches.values():
         for idx, sc in m.chapter_pairs.items():
-            titles[sc.code][m.report_scope] = m.word.chapters[idx - 1].title
+            word_title = m.word.chapters[idx - 1].title
+            titles[sc.code][m.report_scope] = _seed_title(word_title)
+            if hint := _word_hint(word_title):
+                hints[sc.code][m.report_scope] = hint
     for sc in chapters:
+        by_hint = hints.get(sc.code) or {}
+        _set_hint(sc.raw, by_hint.get("consolidated") or by_hint.get("standalone")
+                  or split_title_hint(sc.raw.get("section_title") or "")[1], changes)
         by_scope = titles.get(sc.code)
         if not by_scope:
             changes.append(f"[未处理] 章 {sc.code}「{sc.title}」两版 Word 都没有")
@@ -109,11 +134,13 @@ def _fix_chapters(matches: dict[str, VariantMatch], chapters: list[SeedChapter],
                 raw.pop("scope_titles", None)
 
 
-def _presence(matches: dict[str, VariantMatch]) -> tuple[dict[int, set[str]], dict[int, set[str]], dict[int, dict[str, str]]]:
-    """（种子节位置 → 出现的口径，→ 应改挂的种子章，→ 各口径 Word 标题〔仅标题不同时〕）。"""
+def _presence(matches: dict[str, VariantMatch]) -> tuple[
+        dict[int, set[str]], dict[int, set[str]], dict[int, dict[str, str]], dict[int, dict[str, str]]]:
+    """（种子节位置 → 出现的口径，→ 应改挂的种子章，→ 各口径 Word 标题〔标题不同或种子标题带括注时〕，→ 各口径标题提示）。"""
     presence: dict[int, set[str]] = defaultdict(set)
     targets: dict[int, set[str]] = defaultdict(set)
     titles: dict[int, dict[str, str]] = defaultdict(dict)
+    hints: dict[int, dict[str, str]] = defaultdict(dict)
     for m in matches.values():
         by_pos = m.sections_by_position()
         for pos, (wc, ws) in m.matches.items():
@@ -121,11 +148,13 @@ def _presence(matches: dict[str, VariantMatch]) -> tuple[dict[int, set[str]], di
             target = m.chapter_pairs.get(wc.index)
             if target is not None and target.code != by_pos[pos].chapter_code:
                 targets[pos].add(target.code)
-            if ws.norm != by_pos[pos].norm:
-                titles[pos][m.report_scope] = clean_word_heading(ws.title)
+            if ws.norm != by_pos[pos].norm or split_title_hint(by_pos[pos].title)[1]:
+                titles[pos][m.report_scope] = _seed_title(ws.title)
+            if hint := _word_hint(ws.title):
+                hints[pos][m.report_scope] = hint
         for pos in m.body_leaves:
             presence[pos].add(m.report_scope)
-    return presence, targets, titles
+    return presence, targets, titles, hints
 
 
 def _all_codes(sections: list[dict[str, Any]]) -> set[str]:
@@ -211,8 +240,12 @@ def realign(std: str, data: dict[str, Any], other: dict[str, Any] | None = None)
 
     allowed = _allowed(std)
     _fix_chapters(matches, chapters, changes, allowed)
-    presence, targets, titles = _presence(matches)
+    presence, targets, titles, hints = _presence(matches)
     leaf_positions = {pos for m in matches.values() for pos in m.body_leaves}
+    # 标题提示：Word 标题尾部括注为准；Word 没有、种子标题自带的括注（旧 md 来源）也保留成提示，不丢
+    for pos, s in by_pos.items():
+        word = hints.get(pos) or {}
+        _set_hint(s.raw, word.get("consolidated") or word.get("standalone") or split_title_hint(s.title)[1], changes)
 
     for sc in chapters:  # 提示语误做成的章首节（「九、【企业应当…」）⇒ 章正文叶子
         first = sc.sections[0] if sc.sections else None
@@ -285,7 +318,7 @@ def _assign_codes(std: str, data: dict[str, Any], chapter_by_code: dict[str, See
                 changes.append(f"改挂 {old} → {new}（{chapter.raw['section_title']}）")
                 continue
             ws = obj["ws"]
-            title = clean_word_heading(ws.title)
+            title = _seed_title(ws.title)
             new = codes.numeric(target) if numeric else codes.titled(target, title)
             sid = _make_unique(f"{chapter.raw['section_id']}-{_kebab(title)}"[:95].rstrip("-"), used_ids)
             used_ids.add(sid)
@@ -297,6 +330,8 @@ def _assign_codes(std: str, data: dict[str, Any], chapter_by_code: dict[str, See
                 "auto_numbering": True, "lock_number": False, "tables": [], "text_sections": _text_sections(ws),
                 "_aligned_by": ALIGNED_BY,
             }
+            if hint := _word_hint(ws.title):
+                obj["raw"]["title_hint"] = hint
             if ws.tables:
                 changes.append(f"[待表格口径] 补节 {new} Word 有 {len(ws.tables)} 张表，本脚本只建节不建表")
             changes.append(f"补节 {new}「{title}」（{obj['raw']['scope']}）")

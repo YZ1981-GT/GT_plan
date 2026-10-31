@@ -47,16 +47,16 @@
   "cells": [
     {
       "case": "A1 + 语义标签",
-      "addr_id": "D1/D1-2/F50",
-      "cell_label": "F50 合计行-票面金额合计",
-      "display_label": "D1-2 应收票据原值明细（按类） › F50 合计行-票面金额合计",
+      "addr_id": "E1/E1-14/I18",
+      "cell_label": "I18 货币资金合计本期变动率",
+      "display_label": "E1-14 货币资金分析程序（一） › I18 货币资金合计本期变动率",
       "deprecated": false
     },
     {
-      "case": "语义待核对",
-      "addr_id": "F3/F3-5/B25",
-      "cell_label": "B25（语义待核对）",
-      "display_label": "F3-5 应付票据逾期检查 › B25（语义待核对）",
+      "case": "A1 + 语义标签（模板核对的合计行坐标）",
+      "addr_id": "D1/D1-3/J21",
+      "cell_label": "J21 期末余额合计",
+      "display_label": "D1-3 应收票据原值明细（按客户） › J21 期末余额合计",
       "deprecated": false
     },
     {

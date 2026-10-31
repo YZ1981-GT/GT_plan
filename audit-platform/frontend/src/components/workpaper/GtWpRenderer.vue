@@ -376,6 +376,8 @@ import {
 } from '@/composables/useWpRenderer'
 import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useRendererCellLocate } from '@/composables/useRendererCellLocate'
+import { catalogTextAnchor } from '@/generated/catalogTextAnchors'
+import { entryGroupOfHighlight, locateAdjustmentEntryGroup } from '@/composables/adjustmentEntryGroupLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
@@ -957,14 +959,17 @@ const rendererLocate = useRendererCellLocate({
   component: () => activeComponentRef.value,
   wpCode: () => renderConfig.value?.wp_code ?? '',
   componentType: () => componentType.value,
+  textAnchor: catalogTextAnchor,
+  entryGroup: locateAdjustmentEntryGroup,
 })
 
 function onLocateCell(payload: WorkpaperLocateCellPayload) {
   rendererLocate.request(payload)
 }
 
-watch(() => [props.initialSheet, props.initialCell] as const, ([sheetName, cellRef]) => {
-  if (cellRef) rendererLocate.request({ wpId: props.wpId, sheetName: sheetName || null, cellRef })
+// 深链 ?cell= 与调整分录页跳来源底稿的 ?highlight=<source_ref>（本底稿的分录组，spec wp-deeplink-locate-residual-closure）
+watch(() => [props.initialSheet, props.initialCell, entryGroupOfHighlight(route?.query?.highlight, props.wpId)] as const, ([sheetName, cellRef, entryGroup]) => {
+  if (cellRef || entryGroup) rendererLocate.request({ wpId: props.wpId, sheetName: sheetName || null, cellRef: cellRef || null, entryGroup })
 }, { immediate: true })
 
 /** 行名映射确认后重刷本底稿（用新映射重算受影响行）。 */

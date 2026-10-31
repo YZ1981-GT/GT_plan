@@ -11,12 +11,15 @@
 import { ref, computed, type Ref, onBeforeUnmount } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatRunStateStore, type ChatEvent, type RunPhase } from '@/stores/chatRunState'
+import { eventBus } from '@/utils/eventBus'
 import {
+  canAdoptInPlace,
   hostPathSegments,
   hostQueryString,
   type AiHostRequest,
   type AiHostRef,
 } from '@/composables/useAiHostContext'
+import { readAiChatError, readAiChatErrorResponse } from '@/composables/aiChatWireError'
 
 // ---------------------------------------------------------------------------
 // Feature Flag — 旧路径保留开关（默认 false = 走新两阶段 API）
@@ -52,6 +55,26 @@ export interface ChatMessage {
 export interface UsePlatformAiChatOptions {
   /** 宿主上下文请求（由 useAiHostContext 的宿主 adapter 构造） */
   host: AiHostRequest | Ref<AiHostRequest>
+}
+
+/**
+ * 用户在“采纳到…”对话框里选定的目标。
+ *
+ * `host` 是真正接收待确认内容的底稿或附注；当前宿主只作为 `source_host`
+ * 证明消息的来源会话。后端会同时验证来源类型、同一主体和项目边界。
+ */
+export interface AdoptTarget {
+  host: AiHostRef
+  targetCell?: string | null
+}
+
+/** 映射后端 `AdoptHostRef` 的扁平断言字段。 */
+function toAdoptHost(host: AiHostRef): Record<string, unknown> {
+  return { type: host.type, id: host.id, project_id: host.projectId, year: host.year }
+}
+
+function sameHost(a: AiHostRef, b: AiHostRef): boolean {
+  return a.type === b.type && a.id === b.id && a.projectId === b.projectId
 }
 
 /**
@@ -237,7 +260,8 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      const code = body?.detail?.code || body?.data?.error_code || body?.code || 'unknown'
+      const { code: bizCode, message: bizMessage } = readAiChatError(body)
+      const code = bizCode || 'unknown'
       // 🔴 Req 13.6：429 限流时解析 remaining/reset/retry_after 并更新 store
       if (res.status === 429 && body?.data) {
         runStore.setQuota({
@@ -248,9 +272,8 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
       }
       const err = new Error(code) as any
       err.status = res.status
-      // 复盘 P0 缺陷6：提取后端返回的中文原因，供 catch 块显示给用户
-      const bizMessage = body?.message?.message || body?.message || body?.detail
-      if (typeof bizMessage === 'string') err.reason = bizMessage
+      // 服务端中文原因随错误带出，供失败气泡展示。
+      err.reason = bizMessage
       throw err
     }
 
@@ -469,8 +492,15 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
   // Adopt
   // ---------------------------------------------------------------------------
 
+  /**
+   * 把 assistant 回复送进待确认流。
+   *
+   * 无显式目标时只允许当前底稿或附注就地采纳。全局、报表和知识库宿主
+   * 必须先选择目标，避免把不可写的来源宿主当作接收目标而发送必然失败的请求。
+   */
   async function adoptContent(
     messageId: string,
+    target?: AdoptTarget,
   ): Promise<{ success: boolean; code?: string; message?: string }> {
     if (!isServerMessageId(messageId)) {
       return {
@@ -487,6 +517,23 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
         message: hostUnavailableReason.value ?? '当前页面无法解析文档上下文',
       }
     }
+    const dest = target?.host ?? host
+    if (!canAdoptInPlace(dest)) {
+      return {
+        success: false,
+        code: 'adopt_target_required',
+        message: '请先选择要采纳到的底稿或附注章节',
+      }
+    }
+    const body: Record<string, unknown> = {
+      message_id: messageId,
+      host: toAdoptHost(dest),
+      idempotency_key: newIdempotencyKey(),
+    }
+    if (!sameHost(dest, host)) body.source_host = toAdoptHost(host)
+    const targetCell = (target?.targetCell ?? '').trim()
+    if (targetCell) body.target_cell = targetCell.slice(0, 120)
+
     try {
       const res = await fetch('/api/ai-chat/adopt', {
         method: 'POST',
@@ -494,21 +541,14 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({
-          message_id: messageId,
-          host: { type: host.type, id: host.id, project_id: host.projectId, year: host.year },
-          idempotency_key: newIdempotencyKey(),
-        }),
+        body: JSON.stringify(body),
       })
-      if (res.ok) return { success: true }
-      let code: string | undefined
-      let message: string | undefined
-      try {
-        const body = await res.json()
-        const detail = body?.detail ?? body?.data?.detail ?? body
-        code = detail?.code
-        message = detail?.message ?? (typeof detail === 'string' ? detail : undefined)
-      } catch { /* non-JSON */ }
+      if (res.ok) {
+        // 目标项目才会新增待确认记录。只在这里派发一次，面板不再重复派发。
+        if (dest.projectId) eventBus.emit('ai-content:adopted', { projectId: dest.projectId })
+        return { success: true }
+      }
+      const { code, message } = await readAiChatErrorResponse(res)
       return { success: false, code, message }
     } catch {
       return { success: false, code: 'network_error', message: '网络异常，采纳未生效' }

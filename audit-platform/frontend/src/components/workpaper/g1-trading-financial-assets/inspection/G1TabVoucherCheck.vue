@@ -253,7 +253,7 @@
               :show-file-list="false"
               accept="image/*,.pdf"
               :disabled="isReadonly"
-              :before-upload="(file: File) => handleRowOcr(row.id, file)"
+              :before-upload="(file: File) => handleRowOcr(row.id, file, row)"
             >
               <el-button size="small" link :loading="ocrLoadingRowId === row.id" :disabled="isReadonly">📎</el-button>
             </el-upload>
@@ -547,13 +547,13 @@ const OCR_FIELD_MAP: Record<string, string> = {
   counter_account: 'creditAccount', 对方科目: 'creditAccount',
 }
 
-async function handleRowOcr(rowId: string, file: File): Promise<boolean> {
+async function handleRowOcr(rowId: string, file: File, row?: unknown): Promise<boolean> {
   if (props.isReadonly || !props.wpId) return false
   ocrLoadingRowId.value = rowId
   try {
     const formData = new FormData()
     formData.append('file', file)
-    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId), row)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,

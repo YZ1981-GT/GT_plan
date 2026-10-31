@@ -107,6 +107,8 @@ export const ledger = {
   // 一张凭证挂多张底稿（逐条返回）与已挂 / 已抽标识（凭证键 → 底稿）
   sampleVouchersBatch: (pid: string) => `/api/projects/${pid}/ledger/sample-vouchers/batch`,
   voucherLinksQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-links/query`,
+  // 凭证键 → 各可见底稿已取得的凭证证据（spec attachment-voucher-evidence-binding）
+  voucherEvidenceQuery: (pid: string) => `/api/projects/${pid}/ledger/voucher-evidence/query`,
   years: (pid: string) => `/api/projects/${pid}/ledger/years`,
   validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
   smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
