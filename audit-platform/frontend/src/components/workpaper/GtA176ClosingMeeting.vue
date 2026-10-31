@@ -200,6 +200,14 @@ const {
 // ─── Dual-mode bidirectional sync ───
 watch(mode, async (newMode, oldMode) => {
   if (!props.wpId) return
+  if (props.readonly) {
+    // 只读（编辑锁在别的窗口 / 无编辑权）：生成 / 回写 Word 都是写操作，不进在线编辑（workpaper-multi-window-lock-gaps R3.5）
+    if (newMode === 'docx') {
+      ElMessage.warning('当前为只读，不能进入在线编辑')
+      mode.value = 'html'
+    }
+    return
+  }
   if (oldMode === 'html' && newMode === 'docx') {
     // 结构化 → OO：先flush保存，再生成docx
     await flushPendingSaves()

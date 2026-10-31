@@ -708,7 +708,8 @@ const wpRefresh = useWorkpaperRefresh({
   projectId: () => projectId.value,
   wpId: () => wpId.value,
   onRefresh: async () => {
-    if (manualRefreshing.value) return
+    // 只读（无编辑权 / 编辑锁在别的窗口）不重建模板文件：这是写操作，后端会 423（workpaper-multi-window-lock-gaps R3.5）
+    if (manualRefreshing.value || !effectiveCanEdit.value) return
     manualRefreshing.value = true
     try {
       await httpApi.post(

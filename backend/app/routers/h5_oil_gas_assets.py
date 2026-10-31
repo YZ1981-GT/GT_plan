@@ -25,7 +25,7 @@ from urllib.parse import quote
 from uuid import UUID
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -287,6 +287,7 @@ async def h5_export_data(
 
 @router.post("/import-data")
 async def h5_import_data(
+    request: Request,
     wp_id: str = Form(...),
     sheet: str = Form(default="H5-2"),
     file: UploadFile = File(...),
@@ -300,6 +301,10 @@ async def h5_import_data(
     # 写入前校验底稿编辑权（底稿 id 在表单里，路由级底稿门不覆盖；原只校验登录）
     wp_uuid = _parse_h5_wp_id(wp_id)
     await authorize_wp_edit(db, user, wp_uuid)
+    # 编辑锁在别人或本人另一个窗口手里 ⇒ 423（与路径带 {wp_id} 的导入同口径，spec workpaper-multi-window-lock-gaps R3.2）
+    from app.routers._wp_gate import enforce_edit_lock_for_content_write
+
+    await enforce_edit_lock_for_content_write(db, user, request, wp_uuid)
     wp_id = str(wp_uuid)
 
     # 读取xlsx

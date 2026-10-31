@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -214,6 +214,7 @@ async def rollback_version(
     pid: UUID,
     wp_id: UUID,
     vid: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SnapshotMeta:
@@ -236,6 +237,10 @@ async def rollback_version(
         raise HTTPException(status_code=403, detail="仅现场经理及以上可执行回滚")
 
     await _validate_workpaper_belongs_to_project(db, pid, wp_id)
+    # 回滚用快照覆盖底稿内容：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
+    from app.routers._wp_gate import enforce_edit_lock_for_content_write
+
+    await enforce_edit_lock_for_content_write(db, current_user, request, wp_id)
 
     result = await VersionTrailService.rollback_to_snapshot(
         db=db,

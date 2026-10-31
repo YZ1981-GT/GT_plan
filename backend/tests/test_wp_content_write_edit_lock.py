@@ -1,12 +1,11 @@
-"""底稿内容写入校验编辑锁（spec workpaper-multi-window-lock-gaps R2.3~R2.5）。
+"""底稿写入校验编辑锁（spec workpaper-multi-window-lock-gaps R2.3~R2.5、R3.1）。
 
 原先保存 / 导入接口都不看编辑锁，「同一底稿第二窗只读」只靠前端：只读窗口工具栏「导入」照样把数据写进库。
-现在 ``dedicated_wp_gate`` 对内容写入（导入类 / checklist-responses / save / save-version）查该底稿的有效锁，
-持锁人（用户 + 窗口）以外的请求 423。
+第一轮 ``dedicated_wp_gate`` 只对导入类 / checklist-responses / save / save-version 查锁；第二轮改为 ``{wp_id}`` 写路由默认都查，
+豁免四类见 ``_wp_edit_lock_scope``（全量路由守卫在 ``test_wp_edit_lock_scope_guard.py``）。持锁人（用户 + 窗口）以外 423。
 """
 from __future__ import annotations
 
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -22,6 +21,7 @@ from starlette.requests import Request
 
 import app.routers._wp_gate as wp_gate
 from app.models.base import Base
+from app.routers._wp_edit_lock_scope import EditLockScope, edit_lock_scope
 from app.models.editing_lock_models import EditingLock
 from app.services.editing_lock_service import find_blocking_lock
 
@@ -186,33 +186,135 @@ async def test_gate_ignores_reads_and_non_content_writes(db, gate_passes):
     )
 
 
-def test_content_write_route_pattern():
-    yes = [CHECKLIST, D4_IMPORT, "/api/workpapers/{wp_id}/save", "/api/workpapers/{wp_id}/save-version",
-           "/api/workpapers/{wp_id}/import-export/import", "/api/workpapers/{wp_id}/offline/import-apply",
-           "/api/m7-special-reserve/{wp_id}/import-data", "/api/workpapers/{wp_id}/bad-debt-rows/import-commit"]
-    no = ["/api/workpapers/{wp_id}/ai/tsj-review", "/api/workpapers/{wp_id}/export-data",
-          "/api/workpapers/{wp_id}/g11/save-adjudication", "/api/workpapers/{wp_id}/review", None, ""]
-    assert all(wp_gate.is_content_write_route(p) for p in yes)
-    assert not any(wp_gate.is_content_write_route(p) for p in no)
+def test_edit_lock_scope_of_route_templates():
+    """第二轮（R3.1）：默认校验，只有四类不在门里判。第一轮漏掉的裁决保存、OCR、公式、Univer 保存现在都校验。"""
+    check = [CHECKLIST, D4_IMPORT, "/api/workpapers/{wp_id}/save", "/api/workpapers/{wp_id}/save-version",
+             "/api/workpapers/{wp_id}/g11/save-adjudication", "/api/workpapers/{wp_id}/e1/statement-ocr",
+             "/api/workpapers/{wp_id}/formulas", "/api/projects/{project_id}/working-papers/{wp_id}/univer-save",
+             "/api/projects/{project_id}/workpapers/{wp_id}/template-file/init", "/api/brand-new/{wp_id}/whatever",
+             None, ""]
+    expected = {
+        "/api/workpapers/{wp_id}/ai/tsj-review": EditLockScope.NO_WRITE,
+        "/api/workpapers/{wp_id}/export-data": EditLockScope.NO_WRITE,
+        "/api/workpapers/{wp_id}/d1/ai-generate": EditLockScope.NO_WRITE,
+        "/api/working-papers/{wp_id}/reviews": EditLockScope.COLLAB,
+        "/api/workpapers/{wp_id}/annotations": EditLockScope.COLLAB,
+        "/api/workpapers/{wp_id}/sheets/{sheet_name}/lock": EditLockScope.LOCK,
+        "/api/projects/{project_id}/workpapers/{wp_id}/h1/depreciation-calc": EditLockScope.ON_APPLY,
+    }
+    assert [p for p in check if edit_lock_scope(p) is not EditLockScope.CHECK] == []
+    assert {p: edit_lock_scope(p) for p in expected} == expected
 
 
-def test_every_content_write_route_goes_through_the_gate():
-    """内容写入路由都挂了 dedicated_wp_gate，校验才真的生效（新加的保存 / 导入路由漏挂会在这里打红）。"""
-    from fastapi.routing import APIRoute
+OCR = "/api/workpapers/{wp_id}/e1/statement-ocr"
+REVIEWS = "/api/working-papers/{wp_id}/reviews"
+CALC = "/api/projects/{project_id}/workpapers/{wp_id}/h1/depreciation-calc"
 
-    from app.main import app
 
-    def gated(dep) -> bool:
-        return getattr(dep, "call", None) is wp_gate.dedicated_wp_gate or any(
-            gated(d) for d in getattr(dep, "dependencies", []) or []
-        )
+@pytest.mark.asyncio
+async def test_gate_rejects_writes_missed_in_round_one(db, gate_passes):
+    await _lock(db, holder=OTHER, name="李四")
+    for path in (OCR, "/api/workpapers/{wp_id}/g11/save-adjudication", "/api/workpapers/{wp_id}/formulas"):
+        with pytest.raises(HTTPException) as exc:
+            await wp_gate.dedicated_wp_gate(_request("POST", path, window=WIN_A), db=db, current_user=ME_USER)
+        assert exc.value.status_code == 423 and "李四 正在编辑" in exc.value.detail, path
 
-    content = [
-        r for r in app.routes
-        if isinstance(r, APIRoute) and "{wp_id}" in r.path
-        and r.methods & {"POST", "PUT", "PATCH", "DELETE"} and wp_gate.is_content_write_route(r.path)
-    ]
-    assert len(content) >= 100, f"扫描面异常：只找到 {len(content)} 条内容写入路由"
-    missing = sorted(r.path for r in content if not gated(r.dependant))
-    assert missing == [], f"这些内容写入路由没挂 dedicated_wp_gate（编辑锁校验不生效）: {missing}"
-    assert any(re.search(r"/checklist-responses$", r.path) for r in content)
+
+@pytest.mark.asyncio
+async def test_gate_lets_collaboration_and_calculation_through(db, gate_passes):
+    """复核意见、批注、sheet 锁、AI 文本、只算不写的计算：编制人持锁时照常（R3.1 ①~④）。"""
+    await _lock(db, holder=OTHER)
+    for path in (REVIEWS, "/api/workpapers/{wp_id}/annotations", "/api/workpapers/{wp_id}/sheets/{sheet_name}/lock",
+                 "/api/workpapers/{wp_id}/d1/ai-generate", CALC):
+        await wp_gate.dedicated_wp_gate(_request("POST", path, window=WIN_A), db=db, current_user=ME_USER)
+
+
+@pytest.mark.asyncio
+async def test_write_point_checks_the_requester_recorded_by_the_gate(db, gate_passes):
+    """计算后写回（R3.1 ④）：门放行并记下请求人，写回函数在写之前判。"""
+    await _lock(db)
+    token = wp_gate._WRITE_REQUESTER.set(None)
+    try:
+        await wp_gate.dedicated_wp_gate(_request("POST", CALC, window=WIN_B), db=db, current_user=ME_USER)
+        with pytest.raises(HTTPException) as exc:
+            await wp_gate.enforce_edit_lock_at_write_point(db, str(WP))
+        assert exc.value.status_code == 423 and "你的另一个窗口" in exc.value.detail
+        await wp_gate.enforce_edit_lock_at_write_point(db, str(uuid.uuid4()))  # 别的底稿：不判
+        await wp_gate.dedicated_wp_gate(_request("POST", CALC, window=WIN_A), db=db, current_user=ME_USER)
+        await wp_gate.enforce_edit_lock_at_write_point(db, WP)  # 持锁窗口：放行
+    finally:
+        wp_gate._WRITE_REQUESTER.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_write_point_without_gate_does_not_judge(db):
+    await _lock(db, holder=OTHER)
+    token = wp_gate._WRITE_REQUESTER.set(None)
+    try:
+        await wp_gate.enforce_edit_lock_at_write_point(db, WP)
+    finally:
+        wp_gate._WRITE_REQUESTER.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_online_edit_message_for_other_user(db):
+    await _lock(db, holder=OTHER, name="李四")
+    with pytest.raises(HTTPException) as exc:
+        await wp_gate.raise_if_edit_locked(db, ME, WIN_A, WP, purpose="online_edit")
+    assert exc.value.status_code == 423
+    assert exc.value.detail == "李四 正在编辑这张底稿，当前为只读，不能进入在线编辑。"
+
+
+@pytest.mark.asyncio
+async def test_online_edit_message_for_my_other_window(db):
+    await _lock(db)
+    with pytest.raises(HTTPException) as exc:
+        await wp_gate.raise_if_edit_locked(db, ME, WIN_B, WP, purpose="online_edit")
+    assert exc.value.detail.startswith("这张底稿正在你的另一个窗口编辑，本窗口为只读，不能进入在线编辑。")
+
+
+@pytest.mark.asyncio
+async def test_online_edit_entry_rejects_read_only_window(db):
+    """在线编辑平台入口（R3.3）：持锁窗口照常，本人另一个窗口 / 别人 423「不能进入在线编辑」。"""
+    from app.routers import wp_sync_router as SR
+
+    await _lock(db)
+    svc, scope = SimpleNamespace(session=db, user_id=ME), SimpleNamespace(wp_id=WP)
+    await SR._enforce_entry_edit_lock(svc, _request("POST", "/sync", window=WIN_A), scope)
+    with pytest.raises(HTTPException) as exc:
+        await SR._enforce_entry_edit_lock(svc, _request("POST", "/sync", window=WIN_B), scope)
+    assert exc.value.status_code == 423 and "不能进入在线编辑" in exc.value.detail
+    with pytest.raises(HTTPException):
+        await SR._enforce_entry_edit_lock(SimpleNamespace(session=db, user_id=OTHER), _request(
+            "POST", "/sync", window=WIN_A), scope)
+
+
+def test_requester_recorded_in_dependency_reaches_the_endpoint(monkeypatch):
+    """`ContextVar` 在依赖里设、在处理函数里读：同一请求可见，请求之间不串（真走一遍 FastAPI）。"""
+    from fastapi import APIRouter, Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.core.database import get_db
+    from app.deps import get_current_user
+
+    monkeypatch.setattr(wp_gate, "enforce_wp_gate", AsyncMock(return_value=None))
+    monkeypatch.setattr(wp_gate, "edit_lock_scope", lambda _path: EditLockScope.ON_APPLY)
+    router = APIRouter(dependencies=[Depends(wp_gate.dedicated_wp_gate)])
+
+    @router.post("/x/{wp_id}/calc")
+    async def calc(wp_id: str):
+        req = wp_gate._WRITE_REQUESTER.get()
+        return {"user": str(req.user_id), "instance": req.instance, "wp": str(req.wp_id)}
+
+    @router.post("/x/plain")
+    async def plain():
+        return {"requester": wp_gate._WRITE_REQUESTER.get() is not None}
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_db] = lambda: None
+    app.dependency_overrides[get_current_user] = lambda: ME_USER
+    client = TestClient(app)
+    got = client.post(f"/x/{WP}/calc", headers={"X-Client-Instance": WIN_B}).json()
+    assert got == {"user": str(ME), "instance": WIN_B, "wp": str(WP)}
+    assert client.post("/x/plain").json() == {"requester": False}

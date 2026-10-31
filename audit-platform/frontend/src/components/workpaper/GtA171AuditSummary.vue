@@ -294,7 +294,8 @@ const props = withDefaults(defineProps<{
   wpId: string
   projectId?: string
   htmlData?: A171RenderData | null
-}>(), { projectId: '', htmlData: null })
+  readonly?: boolean
+}>(), { projectId: '', htmlData: null, readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref<'html' | 'docx'>('html')
@@ -525,6 +526,12 @@ const ooError = ref('')
 // Flush + generate docx before switching to OO; sync back when returning
 watch(mode, async (newMode, oldMode) => {
   if (oldMode === 'html' && newMode === 'docx') {
+    if (props.readonly) {
+      // 只读（编辑锁在别的窗口 / 无编辑权）：生成 Word 是写操作，不进在线编辑（workpaper-multi-window-lock-gaps R3.5）
+      ElMessage.warning('当前为只读，不能进入在线编辑')
+      mode.value = 'html'
+      return
+    }
     await flushPendingSaves()
     // Generate docx from structured data
     ooGenerating.value = true
@@ -540,6 +547,7 @@ watch(mode, async (newMode, oldMode) => {
       ooGenerating.value = false
     }
   } else if (oldMode === 'docx' && newMode === 'html') {
+    if (props.readonly) return // 只读：没进过在线编辑，没有要同步回来的
     // Sync docx edits back to structured data
     try {
       const { api } = await import('@/services/apiProxy')

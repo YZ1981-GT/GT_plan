@@ -64,6 +64,8 @@ def _empty_result():
     result.scalar.return_value = None
     result.scalar_one_or_none.return_value = None
     result.scalars.return_value.all.return_value = []
+    # 编辑锁查询（spec workpaper-multi-window-lock-gaps R3.4）用 `.scalars().first()`：没有锁 = None
+    result.scalars.return_value.first.return_value = None
     return result
 
 
@@ -589,6 +591,66 @@ class TestOnlyOfficeConfigEndpoint:
 
             # acquire_session 被调用
             mock_acquire.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_edit_lock_held_elsewhere_gives_view_config(self, tmp_path, monkeypatch):
+        """编辑锁在别人或本人另一个窗口手里 ⇒ 只读配置、不占席位（spec workpaper-multi-window-lock-gaps R3.4）。
+
+        OnlyOffice 开着浏览器令牌校验，以签名里的 mode 为准：只能由后端在签名前给只读。
+        """
+        monkeypatch.setattr(app_settings, "ONLYOFFICE_URL", "http://onlyoffice:80")
+        monkeypatch.setattr(app_settings, "ONLYOFFICE_JWT_SECRET", ONLYOFFICE_SECRET)
+        monkeypatch.setattr(app_settings, "ONLYOFFICE_CALLBACK_BASE", "http://backend:9980")
+        monkeypatch.setattr(app_settings, "STORAGE_ROOT", str(tmp_path))
+        project_id, wp_code, sheet_name = uuid.uuid4(), "D0", "函证检查表"
+        storage_dir = tmp_path / "projects" / str(project_id) / "workpapers" / "onlyoffice"
+        storage_dir.mkdir(parents=True)
+        (storage_dir / f"{wp_code}.xlsx").write_bytes(b"PK\x03\x04" + b"\x00" * 100)
+        fake_wp = MagicMock()
+        fake_wp.project_id = project_id
+        fake_wp.status = "draft"
+        fake_row = MagicMock()
+        fake_row.__getitem__ = lambda self, idx: fake_wp if idx == 0 else wp_code
+        fake_wp_result = MagicMock()
+        fake_wp_result.first.return_value = fake_row
+        fake_proj_result = MagicMock()
+        fake_proj_result.scalar.return_value = False
+        fake_db = AsyncMock()
+        fake_db.execute = AsyncMock(
+            side_effect=_db_execute(_scalar_result(project_id), fake_wp_result, fake_proj_result)
+        )
+        lock = MagicMock(holder_id=uuid.uuid4(), holder_name="李四")
+        app = FastAPI()
+        app.include_router(router)
+        fake_user = _FakeUser()
+
+        async def _override_db():
+            yield fake_db
+
+        from app.core.database import get_db
+        from app.deps import get_current_user
+        app.dependency_overrides[get_db] = _override_db
+        app.dependency_overrides[get_current_user] = lambda: fake_user
+        with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire, \
+             patch("app.services.editing_lock_service.find_blocking_lock", new_callable=AsyncMock,
+                   return_value=lock) as mock_lock, \
+             patch("app.services.wp_template_finder.find_template_file_any", return_value=None), \
+             patch("app.deps.set_rls_context", new_callable=AsyncMock):
+            wp_id = uuid.uuid4()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.get(
+                    f"/api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-config",
+                    params={"project_id": str(project_id)}, headers={"X-Client-Instance": "window-b"},
+                )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["mode"] == "view"
+        assert data["config"]["editorConfig"]["mode"] == "view"
+        assert data["config"]["document"]["permissions"]["edit"] is False
+        signed = jwt.decode(data["token"], ONLYOFFICE_SECRET, algorithms=["HS256"])
+        assert signed["editorConfig"]["mode"] == "view"  # 签名里也是只读：前端改不回编辑
+        mock_acquire.assert_not_awaited()
+        mock_lock.assert_awaited_once_with(fake_db, "workpaper", str(wp_id), fake_user.id, "window-b")
 
     @pytest.mark.asyncio
     async def test_config_contains_action_link_with_sheet_name(self, tmp_path, monkeypatch):

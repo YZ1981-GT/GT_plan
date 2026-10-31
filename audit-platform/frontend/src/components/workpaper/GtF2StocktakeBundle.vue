@@ -162,6 +162,7 @@ const dualMode = useF2StocktakeDualMode({
   wpId: toRef(props, 'wpId'),
   projectId,
   sheetCode: currentSheet,
+  readonly: isReadonly,
   flushPending: async () => {
     // 字段编辑 2s debounce；切 OO 前必须立即落库，否则 plan-sync 读到旧数据
     await flushAllF2StocktakeFields()

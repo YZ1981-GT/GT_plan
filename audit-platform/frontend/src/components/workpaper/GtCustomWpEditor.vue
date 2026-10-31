@@ -198,7 +198,8 @@ const effectiveHtmlData = computed<Record<string, unknown> | undefined>(
  *    「OO 里改的东西丢了」，而清空则比不刷新更糟（本来还看得见旧内容）。
  */
 async function refreshProjection(): Promise<void> {
-  if (!props.wpGenerated) return
+  // 只读（编辑锁在别的窗口 / 无编辑权）：重投影会写 parsed_data，不发（workpaper-multi-window-lock-gaps R3.5）
+  if (!props.wpGenerated || props.readonly) return
   refreshing.value = true
   try {
     const res = (await api.post(

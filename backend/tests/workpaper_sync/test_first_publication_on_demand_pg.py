@@ -76,6 +76,20 @@ CREATE TABLE checklist_responses (
     item_id VARCHAR(120) NOT NULL,
     remark TEXT
 );
+-- 在线编辑入口先查编辑锁（spec workpaper-multi-window-lock-gaps R3.3）；列形态照抄真库 information_schema（2026-10-31 现查）
+CREATE TABLE editing_locks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(255) NOT NULL,
+    holder_id UUID NOT NULL,
+    holder_name VARCHAR(255),
+    acquired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    released_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    client_instance VARCHAR(64)
+);
 """
 
 #: V065 给 outbox enum 加过 'processing'（与 `test_projection_first_publication_pg` 同一处置）。

@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -438,15 +438,19 @@ async def trim_program_row(
     pid: UUID,
     wp_id: UUID,
     body: ProgramRowTrimRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     _guard: DelegatorContext = Depends(require_project_delegator_pid),
 ):
     """程序表某一行 → 不适用（自加的行 / 无模板的程序表 422）。"""
+    from app.routers._wp_gate import enforce_edit_lock_for_content_write
     from app.services.procedure_row_trim_service import trim_row
 
     if not body.reason.strip():
         raise HTTPException(status_code=422, detail="裁剪理由必填")
+    # 改程序表这一行：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
+    await enforce_edit_lock_for_content_write(db, user, request, wp_id)
     try:
         result = await trim_row(db, pid, wp_id, body.sheet_name, body.program_no, actor_user_id=user.id,
                                 reason=body.reason.strip(), request_id=body.request_id)
@@ -492,13 +496,17 @@ async def restore_program_row(
     pid: UUID,
     wp_id: UUID,
     body: ProgramRowRestoreRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     _guard: DelegatorContext = Depends(require_project_delegator_pid),
 ):
     """程序表某一行恢复执行（任务回到待委派，须重新委派）。"""
+    from app.routers._wp_gate import enforce_edit_lock_for_content_write
     from app.services.procedure_row_trim_service import restore_row
 
+    # 改程序表这一行：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
+    await enforce_edit_lock_for_content_write(db, user, request, wp_id)
     try:
         result = await restore_row(db, pid, wp_id, body.sheet_name, body.program_no, actor_user_id=user.id,
                                    reason=body.reason, request_id=body.request_id)

@@ -73,6 +73,12 @@ async def _new_attachment(svc: AttachmentService, project_id: uuid.UUID, name: s
     return uuid.UUID(att["id"])
 
 
+def _plain_request():
+    from starlette.requests import Request
+
+    return Request({"type": "http", "method": "DELETE", "path": "/", "headers": [], "query_string": b""})
+
+
 def _items(result) -> list[dict]:
     return result["items"]
 
@@ -172,7 +178,10 @@ class TestWave3UnlinkAuth:
             patch.object(att_router, "_svc") as svc_factory,
         ):
             with pytest.raises(HTTPException) as ei:
-                await att_router.unlink_wp_attachment(wp_id, att_id, db, user)
+                # 端点多了 request（读窗口编号做编辑锁校验，spec workpaper-multi-window-lock-gaps R3.2）：按名传参
+                await att_router.unlink_wp_attachment(
+                    wp_id=wp_id, attachment_id=att_id, request=_plain_request(), db=db, current_user=user,
+                )
             assert ei.value.status_code == 403
             gate.assert_awaited_once()
             svc_factory.assert_not_called()

@@ -561,6 +561,21 @@ async def _guard(
     return scope
 
 
+async def _enforce_entry_edit_lock(svc: _SyncServices, request: Request, scope: GuardedScope) -> None:
+    """在线编辑入口校验底稿编辑锁（spec workpaper-multi-window-lock-gaps R3.3）。
+
+    房间参与者一律按编辑身份加入（``_join_or_reuse_participant``），没有只读进房间的路 ⇒ 编辑锁在别人或
+    本人另一个窗口手里时挡在入口，423「不能进入在线编辑」。会话内操作（确认 / 强制保存 / 关闭 / 离开 /
+    裁决 / 重试 / 恢复）不挡：会话只能从这些入口建立，挡了已开的会话收不了尾。排在 ``_guard`` 之后
+    （``_guard`` 必须是每个 handler 的第一句 await）。
+    """
+    from app.routers._wp_gate import client_instance_of, raise_if_edit_locked
+
+    await raise_if_edit_locked(
+        svc.session, svc.user_id, client_instance_of(request), scope.wp_id, purpose="online_edit",
+    )
+
+
 def _room_ref(room_id: uuid.UUID) -> tuple[ScopeRef, ...]:
     return declared_refs(((ScopeResourceKind.room, room_id),))
 
@@ -911,6 +926,7 @@ async def create_pending_mutation(
     project_id: uuid.UUID,
     wp_id: uuid.UUID,
     entry_id: str,
+    request: Request,
     payload: Mapping[str, Any] = Body(...),
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
     svc: _SyncServices = Depends(_services),
@@ -927,6 +943,7 @@ async def create_pending_mutation(
         entry_id=entry_id,
         action="create_pending_mutation",
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     coordinator = build_materialize_coordinator(svc.session, secret=_secret())
     request = await _materialize_request(
         svc,
@@ -990,6 +1007,7 @@ async def ensure_first_publication(
     project_id: uuid.UUID,
     wp_id: uuid.UUID,
     entry_id: str,
+    request: Request,
     svc: _SyncServices = Depends(_services),
 ) -> dict[str, Any]:
     """该 (wp, entry) 尚无 published representation 时**按需发布首版**；已有则原样返回。
@@ -1011,6 +1029,7 @@ async def ensure_first_publication(
         entry_id=entry_id,
         action="ensure_first_publication",
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     try:
         outcome = await ensure_first_publication_service(
             session=svc.session,
@@ -1050,6 +1069,7 @@ async def adopt_substrate(
     project_id: uuid.UUID,
     wp_id: uuid.UUID,
     entry_id: str,
+    request: Request,
     payload: Mapping[str, Any] = Body(default_factory=dict),
     svc: _SyncServices = Depends(_services),
 ) -> dict[str, Any]:
@@ -1078,6 +1098,7 @@ async def adopt_substrate(
         entry_id=entry_id,
         action="adopt_substrate",
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     registration = await _registration(svc, scope)
     dry_run = bool(payload.get("dry_run", False))
     raw_rev = payload.get("expected_revision")
@@ -1149,6 +1170,7 @@ async def materialize(
         entry_id=entry_id,
         action="materialize",
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     coordinator = build_materialize_coordinator(svc.session, secret=_secret())
     mat_request = await _materialize_request(
         svc,
@@ -1246,6 +1268,7 @@ async def materialize_from_store(
     scope = await _guard(
         svc, project_id=project_id, wp_id=wp_id, entry_id=entry_id, action="materialize_from_store"
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     from app.services.workpaper_sync import store_materialize as SM
     from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
 
@@ -2805,6 +2828,7 @@ async def rollback_version(
     wp_id: uuid.UUID,
     entry_id: str,
     version_id: str,
+    request: Request,
     payload: Mapping[str, Any] = Body(...),
     svc: _SyncServices = Depends(_services),
 ) -> dict[str, Any]:
@@ -2827,6 +2851,7 @@ async def rollback_version(
         action="rollback",
         refs=(version_ref,),
     )
+    await _enforce_entry_edit_lock(svc, request, scope)
     if not bool(payload.get("confirmed")):
         raise HTTPException(
             status_code=422,

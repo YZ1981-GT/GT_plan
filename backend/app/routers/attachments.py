@@ -16,13 +16,14 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import assert_project_permission, authorize_wp_edit, get_current_user, require_project_access
 from app.models.core import User
+from app.routers._wp_gate import enforce_edit_lock_for_content_write
 from app.services import attachment_destructive_guard as destructive_guard
 from app.services.attachment_access import load_attachment
 from app.services.attachment_ocr_text import OcrTextConflict, assert_base_matches, confirm_ocr_text, full_text_payload
@@ -204,7 +205,7 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
 
 @router.post("/api/attachments/{attachment_id}/associate")
 async def associate_with_wp(
-    attachment_id: UUID, body: AssociateRequest, db: AsyncSession = Depends(get_db),
+    attachment_id: UUID, body: AssociateRequest, request: Request, db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
@@ -219,6 +220,8 @@ async def associate_with_wp(
     # 归档项目只读（spec attachment-security-baseline 需求 4.2；gate 已核对附件与底稿同项目）
     att = await load_attachment(db, attachment_id)
     await destructive_guard.assert_project_writable(db, att.project_id, current_user)
+    # 目标底稿的编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
+    await enforce_edit_lock_for_content_write(db, current_user, request, body.wp_id)
     result = await svc.associate_with_wp(
         attachment_id, body.wp_id, body.association_type, body.notes,
         created_by=current_user.id,
@@ -243,6 +246,7 @@ async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db), cu
 async def unlink_wp_attachment(
     wp_id: UUID,
     attachment_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -265,6 +269,8 @@ async def unlink_wp_attachment(
     wp = await db.get(WorkingPaper, wp_id)
     if wp is not None:
         await destructive_guard.assert_project_writable(db, wp.project_id, current_user)
+    # 编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
+    await enforce_edit_lock_for_content_write(db, current_user, request, wp_id)
 
     svc = _svc(db)
     result = await svc.unlink_wp_attachment(wp_id, attachment_id)

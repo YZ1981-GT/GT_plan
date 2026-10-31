@@ -14,8 +14,13 @@ export function useF2StocktakeDualMode(options: {
   /** 切回结构化前刷盘 pending 保存 */
   flushPending?: () => Promise<void>
   reloadAll?: () => Promise<void>
+  /**
+   * 只读（编辑锁在别的窗口 / 无编辑权）：Word 双向同步是写操作，不做；在线编辑照常打开（后端给只读配置）。
+   * spec workpaper-multi-window-lock-gaps R3.5
+   */
+  readonly?: Readonly<Ref<boolean>>
 }) {
-  const { wpId, projectId, sheetCode, flushPending, reloadAll } = options
+  const { wpId, projectId, sheetCode, flushPending, reloadAll, readonly } = options
   const currentMode = ref<F2StRenderMode>('html')
   const isOoAvailable = ref(false)
   /** 切换到 OO 前同步成功后递增，强制 GtOnlyOfficeSheet 重挂载 */
@@ -89,7 +94,7 @@ export function useF2StocktakeDualMode(options: {
 
   async function syncDocToOo(): Promise<boolean> {
     const sheet = syncSheet()
-    if (!sheet) return true
+    if (!sheet || readonly?.value) return true
     try {
       const params: Record<string, string> = { sheet }
       const pid = projectId?.value?.trim()
@@ -105,7 +110,7 @@ export function useF2StocktakeDualMode(options: {
 
   async function syncDocFromOo(): Promise<boolean> {
     const sheet = syncSheet()
-    if (!sheet) return true
+    if (!sheet || readonly?.value) return true
     try {
       const params: Record<string, string> = { sheet }
       const pid = projectId?.value?.trim()

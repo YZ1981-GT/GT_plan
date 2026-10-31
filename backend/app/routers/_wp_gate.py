@@ -21,8 +21,9 @@ project（Binding_Minimum）。route 只需把已知的最强 identity（通常 
 
 from __future__ import annotations
 
-import re
-from typing import Mapping
+from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Literal, Mapping
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.routers._wp_edit_lock_scope import EditLockScope, edit_lock_scope
 from app.services.wp_visibility.contracts import WpAccessContext
 from app.services.wp_visibility.wp_bound_gate import (
     BindingAdapters,
@@ -41,7 +43,9 @@ __all__ = [
     "enforce_task_gate",
     "dedicated_wp_gate",
     "enforce_edit_lock_for_content_write",
-    "is_content_write_route",
+    "enforce_edit_lock_at_write_point",
+    "raise_if_edit_locked",
+    "client_instance_of",
     "wp_gate_dep",
     "include_router_with_wp_gate",
 ]
@@ -160,39 +164,79 @@ _DEDICATED_ENTRYPOINT = "workpaper.dedicated_subroute"
 _DEDICATED_ENTRY_FAMILY = "workpaper"
 
 
-# 底稿内容写入（保存 / 导入）：路由模板以这些段结尾（spec workpaper-multi-window-lock-gaps R2.3）。
-# 2026-10-31 现算：带 {wp_id} 的写路由 608 条，其中这 132 条全部挂了本门；AI 生成、OCR、复核、批注、
-# 在线编辑同步等写接口不在范围内（不改它们的锁语义）。
-_CONTENT_WRITE_ROUTE = re.compile(r"/(?:import[\w-]*|checklist-responses|save|save-version)$")
+# ── 编辑锁（spec workpaper-multi-window-lock-gaps R2.3 / R3）────────────────────────────
+# 哪些写路由在门里校验、哪些不校验，单一来源是 `_wp_edit_lock_scope`（默认校验）。
+
+EditLockPurpose = Literal["save", "online_edit"]
+
+_LOCK_MESSAGES: dict[str, tuple[str, str]] = {
+    "save": (
+        "这张底稿正在你的另一个窗口编辑，本窗口为只读，本次修改未保存。请在正在编辑的窗口里操作，或关掉那个窗口后刷新本页。",
+        "{name} 正在编辑这张底稿，当前为只读，本次修改未保存。",
+    ),
+    "online_edit": (
+        "这张底稿正在你的另一个窗口编辑，本窗口为只读，不能进入在线编辑。请在正在编辑的窗口里操作，或关掉那个窗口后刷新本页。",
+        "{name} 正在编辑这张底稿，当前为只读，不能进入在线编辑。",
+    ),
+}
 
 
-def is_content_write_route(route_path: str | None) -> bool:
-    """路由模板是不是底稿内容写入（保存 / 导入类）。"""
-    return bool(route_path) and bool(_CONTENT_WRITE_ROUTE.search(route_path))
+@dataclass(frozen=True)
+class _WriteRequester:
+    user_id: UUID
+    instance: str | None
+    wp_id: UUID
+
+
+#: 门对写请求记下请求人，供处理函数深处的写回点（如计算后 `apply_to_sheet` 写回）校验。
+_WRITE_REQUESTER: ContextVar[_WriteRequester | None] = ContextVar("gt_wp_write_requester", default=None)
+
+
+def client_instance_of(request: Request) -> str | None:
+    """请求头 ``X-Client-Instance``（窗口编号）；没带返回 None。"""
+    return (request.headers.get("x-client-instance") or "").strip() or None
+
+
+async def raise_if_edit_locked(
+    db: AsyncSession, user_id: UUID, instance: str | None, wp_id: UUID, *, purpose: EditLockPurpose = "save",
+) -> None:
+    """有效锁的持有人（用户 + 窗口）以外 ⇒ 423，detail 说明谁在编辑。判定见 ``find_blocking_lock``。"""
+    from app.services.editing_lock_service import find_blocking_lock
+
+    lock = await find_blocking_lock(db, "workpaper", str(wp_id), user_id, instance)
+    if lock is None:
+        return
+    own_window, other_user = _LOCK_MESSAGES[purpose]
+    message = own_window if lock.holder_id == user_id else other_user.format(name=lock.holder_name or "其他用户")
+    raise HTTPException(status_code=423, detail=message)
 
 
 async def enforce_edit_lock_for_content_write(
-    db: AsyncSession, current_user, request: Request, wp_id: UUID,
+    db: AsyncSession, current_user, request: Request, wp_id: UUID, *, purpose: EditLockPurpose = "save",
 ) -> None:
     """底稿内容写入前校验编辑锁：有效锁的持有人（用户 + 窗口）以外的请求 423，本次写入不落库。
 
     原先保存 / 导入接口都不看编辑锁，「第二窗只读」只靠前端：只读窗口工具栏「导入」照样能把数据写进库
     （spec workpaper-multi-window-lock-gaps，2026-10-31 实测）。窗口编号取请求头 ``X-Client-Instance``。
+    不经底稿门禁的写接口（版本回滚、在线编辑入口等）在处理函数里直接调本函数。
     """
-    from app.services.editing_lock_service import find_blocking_lock
+    await raise_if_edit_locked(db, current_user.id, client_instance_of(request), wp_id, purpose=purpose)
 
-    instance = (request.headers.get("x-client-instance") or "").strip() or None
-    lock = await find_blocking_lock(db, "workpaper", str(wp_id), current_user.id, instance)
-    if lock is None:
+
+async def enforce_edit_lock_at_write_point(db: AsyncSession, wp_id) -> None:
+    """写回点校验：门记下的请求人（同一张底稿）以外持锁 ⇒ 423。
+
+    给「计算后可选写回」这类路由用：门里不知道这次要不要写（看请求体的 ``apply_to_sheet``），只算不写要放行，
+    写回函数在真正写之前调本函数。没经过门（没有请求人）或底稿对不上 ⇒ 不判（守卫保证这些路由都经门）。
+    """
+    requester = _WRITE_REQUESTER.get()
+    try:
+        wid = UUID(str(wp_id))
+    except (ValueError, TypeError, AttributeError):
         return
-    if lock.holder_id == current_user.id:
-        message = (
-            "这张底稿正在你的另一个窗口编辑，本窗口为只读，本次修改未保存。"
-            "请在正在编辑的窗口里操作，或关掉那个窗口后刷新本页。"
-        )
-    else:
-        message = f"{lock.holder_name or '其他用户'} 正在编辑这张底稿，当前为只读，本次修改未保存。"
-    raise HTTPException(status_code=423, detail=message)
+    if requester is None or requester.wp_id != wid:
+        return
+    await raise_if_edit_locked(db, requester.user_id, requester.instance, wid)
 
 
 def _classify_dedicated(method: str) -> tuple[str, str]:
@@ -246,9 +290,12 @@ async def dedicated_wp_gate(
         route_name=route_name,
         entry_family=_DEDICATED_ENTRY_FAMILY,
     )
-    # 可见性通过后再看编辑锁：内容写入只许持锁的那个窗口（编辑锁按 working_paper.id 记，wp_index_id 路由不适用）
-    if action != "dedicated_read" and not is_index_param and is_content_write_route(route_name):
-        await enforce_edit_lock_for_content_write(db, current_user, request, wp_uuid)
+    # 可见性通过后再看编辑锁：写底稿内容只许持锁的那个窗口（编辑锁按 working_paper.id 记，wp_index_id 路由不适用）。
+    # 默认校验；不写底稿 / 协作与流程 / sheet 锁 / 计算后可选写回不在这里判（`_wp_edit_lock_scope`）。
+    if action != "dedicated_read" and not is_index_param:
+        _WRITE_REQUESTER.set(_WriteRequester(current_user.id, client_instance_of(request), wp_uuid))
+        if edit_lock_scope(route_name) is EditLockScope.CHECK:
+            await enforce_edit_lock_for_content_write(db, current_user, request, wp_uuid)
 
 
 # ---------------------------------------------------------------------------

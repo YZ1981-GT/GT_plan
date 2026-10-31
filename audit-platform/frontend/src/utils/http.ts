@@ -9,7 +9,7 @@ import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
-import { getClientInstanceId } from './clientInstance'
+import { claimClientInstanceId, getClientInstanceId, isClientInstanceSettled } from './clientInstance'
 import { refIssueDetailText } from './formulaRefIssues'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
@@ -236,17 +236,33 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
 }
 
 // ── 请求拦截器 ──────────────────────────────────────────
+
+/**
+ * 要带窗口编号 X-Client-Instance 的请求（不涉鉴权，仅编辑锁隔离；后端按它判断是不是持锁的那个窗口发的）：
+ * 编辑锁端点、所有写请求、取 OnlyOffice 配置（锁在别的窗口时后端给只读配置）。
+ * spec: multi-window-ledger-workbench Phase 3 Task 16；workpaper-multi-window-lock-gaps R2.6 / R3.4
+ */
+export function needsClientInstance(method: string, url: string | undefined): boolean {
+  if (method !== 'GET') return true
+  return !!url && (url.includes('/editing-locks/') || url.includes('/onlyoffice-config'))
+}
+
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const method = (config.method || 'get').toUpperCase()
+  if (needsClientInstance(method, config.url) && !isClientInstanceSettled()) {
+    // 窗口编号定下来之前不发：复制出来的标签页认领时可能换号（workpaper-multi-window-lock-gaps R5.4）
+    return claimClientInstanceId().then(() => prepareRequest(config, method))
+  }
+  return prepareRequest(config, method)
+})
+
+function prepareRequest(config: InternalAxiosRequestConfig, method: string): InternalAxiosRequestConfig {
   const authStore = useAuthStore()
   config.headers = config.headers ?? {}
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
-  // 多窗口编辑锁隔离：编辑锁端点与所有写请求携带 X-Client-Instance（窗口编号，不涉鉴权）
-  // spec: multi-window-ledger-workbench Phase 3 Task 16；workpaper-multi-window-lock-gaps R2.6
-  // （后端按它判断底稿保存 / 导入是不是持锁的那个窗口发的，其他窗口一律只读）
-  const method = (config.method || 'get').toUpperCase()
-  if (method !== 'GET' || (config.url && config.url.includes('/editing-locks/'))) {
+  if (needsClientInstance(method, config.url)) {
     config.headers['X-Client-Instance'] = getClientInstanceId()
   }
   addPending(config)
@@ -260,7 +276,7 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
-})
+}
 
 // ── 401 刷新队列 ────────────────────────────────────────
 let isRefreshing = false
