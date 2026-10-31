@@ -88,10 +88,10 @@ def default_evidence_type(
 
 def resolve_evidence_type(
     requested: str | None, wp_code: str | None, *,
-    native_type: str | None = None, native_prefix: str | None = None, voucher_keyed: bool = False,
+    native_type: str | None = None, native_prefix: str | None = None,
+    voucher_keyed: bool = False, contract_keyed: bool = False,
 ) -> str:
-    """显式类型优先；带凭证键 ⇒ 凭证 / 原始单据（不按底稿声明取：F1 声明函证，凭证附件曾被记成函证，
-    spec attachment-voucher-evidence-binding ADR-AVE-05）；否则按缺省规则。"""
+    """显式类型优先；带凭证键 ⇒ 凭证 / 原始单据；带合同键 ⇒ 合同（Spec F FEAT-001）；否则按缺省规则。"""
     explicit = validate_evidence_type(requested)
     if explicit:
         return explicit
@@ -99,6 +99,10 @@ def resolve_evidence_type(
         from app.services.voucher_evidence import VOUCHER_EVIDENCE_TYPE
 
         return VOUCHER_EVIDENCE_TYPE
+    if contract_keyed:
+        from app.services.contract_evidence import CONTRACT_EVIDENCE_TYPE
+
+        return CONTRACT_EVIDENCE_TYPE
     return default_evidence_type(wp_code, native_type=native_type, native_prefix=native_prefix)
 
 
@@ -108,23 +112,27 @@ def resolve_evidence_type(
 @dataclass(frozen=True)
 class EvidencePosition:
     """行级位置：``sheet_name`` = 表页键；``cell_ref`` = A1 单元格 / ``item:{序号}`` / ``row:{行 id}``；
-    ``voucher_key`` = 凭证键规范串（凭证检查行的原件按凭证身份挂，可只有它，spec attachment-voucher-evidence-binding）。"""
+    ``voucher_key`` = 凭证键规范串（凭证检查行的原件按凭证身份挂）；
+    ``contract_key`` = 合同键规范串（合同检查行的原件按合同身份挂，Spec F FEAT-001 F2）。"""
 
     sheet_name: str | None = None
     cell_ref: str | None = None
     page_ref: str | None = None
     voucher_key: str | None = None
+    contract_key: str | None = None
 
     @property
     def is_row_level(self) -> bool:
-        return bool(self.sheet_name or self.cell_ref or self.voucher_key)
+        return bool(self.sheet_name or self.cell_ref or self.voucher_key or self.contract_key)
 
 
 def build_position(
-    sheet_name: str | None, cell_ref: str | None, page_ref: str | None = None, voucher_key: str | None = None,
+    sheet_name: str | None, cell_ref: str | None, page_ref: str | None = None,
+    voucher_key: str | None = None, contract_key: str | None = None,
 ) -> EvidencePosition:
-    """位置字段去空白、超长 400；凭证键格式错 400（规范化后存）。"""
+    """位置字段去空白、超长 400；凭证键/合同键格式错 400（规范化后存）。"""
     from app.services.voucher_evidence import normalize_voucher_key
+    from app.services.contract_evidence import normalize_contract_key
 
     values = {"sheet_name": sheet_name, "cell_ref": cell_ref, "page_ref": page_ref}
     cleaned: dict[str, str | None] = {}
@@ -133,7 +141,11 @@ def build_position(
         if text is not None and len(text) > _POSITION_LIMITS[key]:
             raise HTTPException(status_code=400, detail=f"位置字段过长：{key}")
         cleaned[key] = text
-    return EvidencePosition(**cleaned, voucher_key=normalize_voucher_key(voucher_key))
+    return EvidencePosition(
+        **cleaned,
+        voucher_key=normalize_voucher_key(voucher_key),
+        contract_key=normalize_contract_key(contract_key),
+    )
 
 
 def max_upload_bytes() -> int:
@@ -213,7 +225,7 @@ async def create_evidence(
         link = await WpEvidenceService(db).create_link(
             wp_id=wp.id, attachment_id=att_id, created_by=user.id,
             sheet_name=position.sheet_name, cell_ref=position.cell_ref, page_ref=position.page_ref,
-            evidence_type=evidence_type, voucher_key=position.voucher_key,
+            evidence_type=evidence_type, voucher_key=position.voucher_key, contract_key=position.contract_key,
         )
     else:
         await svc.ensure_wp_link(att_id, wp.id, association_type=evidence_type, created_by=user.id)
@@ -328,7 +340,7 @@ async def intake_ocr_upload(
     content = await read_upload_limited(file)
     etype = resolve_evidence_type(
         options.evidence_type, wp.wp_code, native_type=native_type, native_prefix=native_prefix,
-        voucher_keyed=position.voucher_key is not None,
+        voucher_keyed=position.voucher_key is not None, contract_keyed=position.contract_key is not None,
     )
     created = await create_evidence(
         db, wp=wp, file_name=file_name, content=content, evidence_type=etype, user=user,

@@ -63,7 +63,6 @@
     "backend/app/services/ai_service.py": 649,
     "backend/app/services/manager_dashboard_service.py": 649,
     "backend/app/services/ledger_import/writer.py": 642,
-    "backend/app/services/contract_analysis_service.py": 638,
     "backend/app/services/note_cell_merge.py": 632,
     "backend/app/services/wopi_service.py": 626,
     "backend/app/services/note_data_extractor.py": 600,

@@ -1,4 +1,4 @@
-"""第四阶段AI赋能：12张AI相关表的 SQLAlchemy ORM 模型
+"""第四阶段AI赋能：AI相关表的 SQLAlchemy ORM 模型
 
 对应 Alembic 迁移脚本 016_ai_tables.py，包含：
 - AIModelConfig：AI模型配置
@@ -6,13 +6,12 @@
 - DocumentExtracted：单据结构化提取
 - DocumentMatch：单据与账面匹配
 - AIContent：AI生成内容
-- Contract：合同
-- ContractExtracted：合同条款提取
-- ContractWPLink：合同与底稿关联
 - EvidenceChain：证据链
 - KnowledgeIndex：知识库索引
 - AIChatHistory：AI对话历史
 - ConfirmationAICheck：函证AI检查
+
+已删除（V231）：Contract / ContractExtracted / ContractWPLink 及其枚举。
 """
 
 import enum
@@ -126,27 +125,14 @@ class AIConfirmationStatus(str, enum.Enum):
     regenerated = "regenerated"
 
 
-class ContractType(str, enum.Enum):
-    """合同类型"""
-    sales = "sales"
-    purchase = "purchase"
-    service = "service"
-    lease = "lease"
-    loan = "loan"
-    guarantee = "guarantee"
-    other = "other"
 
-
-class ContractAnalysisStatus(str, enum.Enum):
-    """合同分析状态"""
-    pending = "pending"
-    analyzing = "analyzing"
-    completed = "completed"
-    failed = "failed"
+# ContractType / ContractAnalysisStatus / ContractLinkType 枚举已随
+# contracts / contract_extracted / contract_wp_link 三张死表在 V231 一并删除
+# （Spec F FEAT-001 F1）。ClauseType 保留（AIAnalysisItem 仍引用）。
 
 
 class ClauseType(str, enum.Enum):
-    """合同条款类型"""
+    """合同条款类型（保留：AIAnalysisItem 引用此枚举）"""
     amount = "amount"
     payment_terms = "payment_terms"
     delivery_terms = "delivery_terms"
@@ -157,15 +143,6 @@ class ClauseType(str, enum.Enum):
     special_terms = "special_terms"
     pricing = "pricing"
     duration = "duration"
-
-
-class ContractLinkType(str, enum.Enum):
-    """合同与底稿关联类型"""
-    revenue_recognition = "revenue_recognition"
-    cutoff_test = "cutoff_test"
-    contingent_liability = "contingent_liability"
-    related_party = "related_party"
-    guarantee = "guarantee"
 
 
 class EvidenceChainType(str, enum.Enum):
@@ -510,147 +487,11 @@ class AIContent(Base):
     )
 
 
-# ---------------------------------------------------------------------------
-# Contract 模型
-# ---------------------------------------------------------------------------
-
-
-class Contract(Base):
-    """合同"""
-
-    __tablename__ = "contracts"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id"), nullable=False
-    )
-    company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    contract_no: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    party_a: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    party_b: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    contract_amount: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    contract_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
-    effective_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
-    expiry_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
-    contract_type: Mapped[ContractType | None] = mapped_column(
-        sa.Enum(ContractType, name="contract_type_enum", create_type=False),
-        nullable=True,
-    )
-    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    analysis_status: Mapped[ContractAnalysisStatus] = mapped_column(
-        sa.Enum(
-            ContractAnalysisStatus,
-            name="contract_analysis_status_enum",
-            create_type=False,
-        ),
-        server_default=text("'pending'"),
-        nullable=False,
-    )
-    is_deleted: Mapped[bool] = mapped_column(
-        server_default=text("false"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
-
-    # 关系
-    extracted_clauses: Mapped[list["ContractExtracted"]] = relationship(
-        "ContractExtracted", back_populates="contract", lazy="selectin"
-    )
-    workpaper_links: Mapped[list["ContractWPLink"]] = relationship(
-        "ContractWPLink", back_populates="contract", lazy="selectin"
-    )
-
-    __table_args__ = (
-        Index("ix_contracts_project_type", "project_id", "contract_type"),
-    )
-
 
 # ---------------------------------------------------------------------------
-# ContractExtracted 模型
+# Contract / ContractExtracted / ContractWPLink 三张死表的 ORM 模型已随 V231 删除
+# （Spec F FEAT-001 F1）。保留 EvidenceChain 在下方。
 # ---------------------------------------------------------------------------
-
-
-class ContractExtracted(Base):
-    """合同条款提取"""
-
-    __tablename__ = "contract_extracted"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    contract_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("contracts.id"), nullable=False
-    )
-    clause_type: Mapped[ClauseType] = mapped_column(
-        sa.Enum(ClauseType, name="clause_type_enum", create_type=False),
-        nullable=False,
-    )
-    clause_content: Mapped[str] = mapped_column(Text, nullable=False)
-    confidence_score: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(3, 2), nullable=True
-    )
-    human_confirmed: Mapped[bool] = mapped_column(
-        server_default=text("false"), nullable=False
-    )
-    is_deleted: Mapped[bool] = mapped_column(
-        server_default=text("false"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
-
-    # 关系
-    contract: Mapped["Contract"] = relationship(
-        "Contract", back_populates="extracted_clauses"
-    )
-
-    __table_args__ = (
-        Index("ix_contract_extracted_contract_clause", "contract_id", "clause_type"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# ContractWPLink 模型
-# ---------------------------------------------------------------------------
-
-
-class ContractWPLink(Base):
-    """合同与底稿关联"""
-
-    __tablename__ = "contract_wp_link"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    contract_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("contracts.id"), nullable=False
-    )
-    workpaper_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
-    link_type: Mapped[ContractLinkType] = mapped_column(
-        sa.Enum(ContractLinkType, name="contract_link_type_enum", create_type=False),
-        nullable=False,
-    )
-    link_description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(
-        server_default=text("false"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    # 关系
-    contract: Mapped["Contract"] = relationship(
-        "Contract", back_populates="workpaper_links"
-    )
-
-    __table_args__ = (
-        Index("ix_contract_wp_link_contract_workpaper", "contract_id", "workpaper_id"),
-    )
 
 
 # ---------------------------------------------------------------------------

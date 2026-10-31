@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_visible_project_ids, require_project_access
+from app.deps import get_current_user, get_visible_project_ids, require_project_access, require_role
 from app.models.core import User
 from app.services.data_lifecycle_service import DataLifecycleService
 from app.services.import_queue_service import ImportQueueService
@@ -39,9 +39,9 @@ async def get_project_stats(
 async def restore_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """恢复已归档的项目数据"""
+    """恢复已归档的项目数据（仅管理员）"""
     svc = DataLifecycleService(db)
     return await svc.restore_project_data(project_id)
 
@@ -50,9 +50,9 @@ async def restore_project(
 async def purge_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """物理删除已归档数据（不可恢复）"""
+    """物理删除已归档数据（不可恢复，仅管理员）"""
     svc = DataLifecycleService(db)
     return await svc.purge_project_data(project_id)
 

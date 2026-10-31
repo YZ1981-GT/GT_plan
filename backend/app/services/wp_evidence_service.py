@@ -92,11 +92,19 @@ class WpEvidenceService:
         evidence_type: str | None = None,
         check_conclusion: str | None = None,
         voucher_key: str | None = None,
+        contract_key: str | None = None,
     ) -> dict:
-        """创建单条证据链接（只 flush）。带凭证键的链接按（底稿, 凭证, 附件, 位置）幂等，见 :meth:`create_voucher_link`。"""
+        """创建单条证据链接（只 flush）。带凭证键/合同键的链接按（底稿, 键, 附件, 位置）幂等。"""
         if voucher_key is not None:
             link, _existed = await self.create_voucher_link(
                 wp_id=wp_id, attachment_id=attachment_id, created_by=created_by, voucher_key=voucher_key,
+                sheet_name=sheet_name, cell_ref=cell_ref, page_ref=page_ref,
+                evidence_type=evidence_type, check_conclusion=check_conclusion,
+            )
+            return link
+        if contract_key is not None:
+            link, _existed = await self.create_contract_link(
+                wp_id=wp_id, attachment_id=attachment_id, created_by=created_by, contract_key=contract_key,
                 sheet_name=sheet_name, cell_ref=cell_ref, page_ref=page_ref,
                 evidence_type=evidence_type, check_conclusion=check_conclusion,
             )
@@ -160,6 +168,53 @@ class WpEvidenceService:
                 await self.db.flush()
         except IntegrityError:
             existing = await self._voucher_link(wp_id, voucher_key, attachment_id, sheet_name, cell_ref)
+            if existing is None:
+                raise
+            return self._to_dict(existing), True
+        return self._to_dict(link), False
+
+    # ─── 合同键链接（镜像凭证键，Spec F FEAT-001 F2）────────────────────────
+
+    async def _contract_link(
+        self, wp_id: UUID, contract_key: str, attachment_id: UUID, sheet_name: str | None, cell_ref: str | None,
+    ) -> EvidenceLink | None:
+        return (await self.db.execute(
+            sa.select(EvidenceLink).where(
+                EvidenceLink.wp_id == wp_id, EvidenceLink.contract_key == contract_key,
+                EvidenceLink.attachment_id == attachment_id,
+                sa.func.coalesce(EvidenceLink.sheet_name, "") == (sheet_name or ""),
+                sa.func.coalesce(EvidenceLink.cell_ref, "") == (cell_ref or ""),
+            ).limit(1)
+        )).scalar_one_or_none()
+
+    async def create_contract_link(
+        self,
+        *,
+        wp_id: UUID,
+        attachment_id: UUID,
+        created_by: UUID,
+        contract_key: str,
+        sheet_name: str | None = None,
+        cell_ref: str | None = None,
+        page_ref: str | None = None,
+        evidence_type: str | None = None,
+        check_conclusion: str | None = None,
+    ) -> tuple[dict, bool]:
+        """带合同键的链接（只 flush）：同一（底稿, 合同, 附件, 位置）已有 ⇒ 返回已有的（第二项 True）。"""
+        existing = await self._contract_link(wp_id, contract_key, attachment_id, sheet_name, cell_ref)
+        if existing is not None:
+            return self._to_dict(existing), True
+        link = EvidenceLink(
+            id=uuid.uuid4(), wp_id=wp_id, sheet_name=sheet_name, cell_ref=cell_ref, attachment_id=attachment_id,
+            page_ref=page_ref, evidence_type=evidence_type, check_conclusion=check_conclusion,
+            created_by=created_by, contract_key=contract_key,
+        )
+        try:
+            async with self.db.begin_nested():
+                self.db.add(link)
+                await self.db.flush()
+        except IntegrityError:
+            existing = await self._contract_link(wp_id, contract_key, attachment_id, sheet_name, cell_ref)
             if existing is None:
                 raise
             return self._to_dict(existing), True
@@ -248,6 +303,7 @@ class WpEvidenceService:
             "evidence_type": link.evidence_type,
             "check_conclusion": link.check_conclusion,
             "voucher_key": link.voucher_key,
+            "contract_key": link.contract_key,
             "created_by": str(link.created_by),
             "created_at": link.created_at.isoformat() if link.created_at else None,
         }

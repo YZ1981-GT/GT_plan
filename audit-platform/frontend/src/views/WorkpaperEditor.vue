@@ -76,7 +76,7 @@
         v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
         :audit-year="projectYear"
-        :readonly="editLock.forcedReadonly.value || isArchived"
+        :readonly="editLock.forcedReadonly.value || isArchived || !canEdit"
         :initial-sheet="initialSheetFromQuery"
         :initial-cell="typeof route.query.cell === 'string' ? route.query.cell : undefined"
         @save-success="onChildSaved"

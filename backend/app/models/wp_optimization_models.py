@@ -212,6 +212,9 @@ class EvidenceLink(Base):
     # V230 凭证键规范串（voucher_identity.VoucherKey.to_str）：凭证检查行的原件按凭证身份挂，
     # 同一张凭证在别的底稿里可查到并引用（spec attachment-voucher-evidence-binding ADR-AVE-01）
     voucher_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # V232 合同键规范串（contract_evidence.normalize_contract_key）：合同检查行的原件按合同身份挂，
+    # 同一份合同在别的底稿里可查到并引用（Spec F FEAT-001 F2）
+    contract_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), nullable=False
     )
@@ -224,6 +227,8 @@ class EvidenceLink(Base):
         # 唯一索引 uq_evidence_links_voucher_position（含 COALESCE 表达式）只在 V230：测试世界在 SQLite 上重建
         # 部分索引只支持普通列；幂等由服务层先查再插保证，PG 上再由唯一索引兜底并发
         Index("idx_evidence_links_voucher_key", "voucher_key", postgresql_where=text("voucher_key IS NOT NULL")),
+        # V232 合同键索引（与凭证键同模式）
+        Index("idx_evidence_links_contract_key", "contract_key", postgresql_where=text("contract_key IS NOT NULL")),
     )
 
 
