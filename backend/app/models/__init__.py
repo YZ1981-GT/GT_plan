@@ -217,6 +217,8 @@ from app.models.workpaper_sync_models import (  # noqa: F401
     WorkpaperSyncScopeIndex,
     WorkpaperSyncTestRun,
 )
+# V233（platform-global-display-settings-closure 任务 1A）：账号级显示偏好
+from app.models.user_display_preferences import UserDisplayPreferences  # noqa: F401
 
 __all__ = [
     # --- base ---
@@ -377,4 +379,6 @@ __all__ = [
     # --- 公式推送引擎 (chain-closure-phase2-formula-push-engine / V169) ---
     "FormulaPushRun",
     "FormulaPushState",
+    # --- 显示偏好 (platform-global-display-settings-closure / V233) ---
+    "UserDisplayPreferences",
 ]

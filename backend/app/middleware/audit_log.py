@@ -270,6 +270,14 @@ class AuditLogMiddleware:
 
             # old_value 在中间件层暂不捕获，后续由具体 CRUD 服务增强
             new_value = _parse_json(capture.body)
+
+            # V233（platform-global-display-settings-closure 任务 2）：
+            # 偏好 PATCH 只落 revision+changed_fields，金额单位、字号、
+            # 小数位、阈值、固定列内容及 pageKey 均不进日志。
+            new_value = _redact_if_display_prefs(
+                scope["method"], path, new_value, request,
+            )
+
             await _write_log(
                 user_id=user_id,
                 action_type=action_type,

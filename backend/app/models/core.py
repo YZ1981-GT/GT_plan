@@ -186,6 +186,14 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     # V212（voucher-identity-writeback-and-audit-phase 任务 8，ADR-VK-09）：当前审计阶段与预审截止日。
     # 抽凭、挂凭、挂凭回拉生成的行按 current_audit_phase 标阶段；改动只走
     # PUT /api/projects/{id}/audit-phase（经理、合伙人含签字合伙人、admin），写 app_audit_log。
+
+    # V233（platform-global-display-settings-closure 任务 1A）：项目默认金额单位。
+    # 正式导出以此为底；「跟随项目」的用户显示偏好读此值。三值枚举，默认元。
+    amount_unit: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text("'yuan'"),
+        comment="项目默认金额单位: yuan/qian/wan（CHECK ck_projects_amount_unit）",
+    )
+
     current_audit_phase: Mapped[str] = mapped_column(
         String(16), nullable=False, default="final", server_default=text("'final'"),
         comment="当前审计阶段: preliminary 预审 / final 年审（CHECK ck_projects_current_audit_phase）",

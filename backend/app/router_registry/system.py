@@ -230,6 +230,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.project_config import router as project_config_router
     app.include_router(project_config_router, tags=["project-config"])
 
+    # ═══ §233. platform-global-display-settings-closure：账号级显示偏好 ═══
+    from app.routers.user_display_preferences import router as display_prefs_router
+    app.include_router(display_prefs_router, tags=["display-preferences"])
+
     # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
     from app.routers.aging_config import router as aging_config_router
     app.include_router(aging_config_router, tags=["aging-config"])
