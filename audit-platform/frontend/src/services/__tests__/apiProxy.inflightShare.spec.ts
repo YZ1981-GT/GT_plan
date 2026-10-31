@@ -10,6 +10,7 @@ const http = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@/utils/http', () => ({ default: http }))
 
 import { api, resetApiProxyInflightForTests } from '../apiProxy'
+import { advanceGetShareBarrier } from '@/utils/getSingleFlight'
 import {
   advanceRequestIdentityEpoch,
   requestIdentityEpoch,
@@ -117,6 +118,33 @@ describe('api.get 独立订阅取消与身份边界', () => {
     fresh.resolve({ data: { owner: 'new-user' } })
     await expect(oldSubscriber).rejects.toMatchObject({ code: 'ERR_CANCELED' })
     await expect(newSubscriber).resolves.toEqual({ owner: 'new-user' })
+  })
+
+  it('后加入者拿深拷贝：一方改数据不影响另一方（R11）', async () => {
+    const d = deferred<{ data: unknown }>()
+    http.get.mockReturnValue(d.promise)
+    const a = api.get('/api/copy')
+    const b = api.get('/api/copy')
+    d.resolve({ data: { rows: [{ v: 1 }] } })
+    const [ra, rb] = await Promise.all([a, b])
+    expect(rb).toEqual(ra)
+    expect(rb).not.toBe(ra)
+    ra.rows[0].v = 99
+    expect(rb.rows[0].v).toBe(1)
+  })
+
+  it('新鲜度屏障推进后（写请求 / 项目事件）同址新请求另起 producer，旧订阅照常拿旧结果（R11）', async () => {
+    const old = deferred<{ data: unknown }>()
+    const fresh = deferred<{ data: unknown }>()
+    http.get.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    const before = api.get('/api/list')
+    advanceGetShareBarrier()
+    const after = api.get('/api/list')
+    expect(http.get).toHaveBeenCalledTimes(2)
+    old.resolve({ data: ['旧'] })
+    fresh.resolve({ data: ['旧', '新'] })
+    await expect(before).resolves.toEqual(['旧'])
+    await expect(after).resolves.toEqual(['旧', '新'])
   })
 
   it('producer 成功、失败后都移出在途表，不会缓存结果', async () => {

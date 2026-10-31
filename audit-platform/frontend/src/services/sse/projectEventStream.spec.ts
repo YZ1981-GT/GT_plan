@@ -111,6 +111,22 @@ describe('projectEventStream — 单例总线', () => {
     expect(h1).toHaveBeenCalledWith({ project_id: PID_A }, 'acnr:invalidate')
   })
 
+  // ─── R11：服务端事件推进 GET 共享的新鲜度屏障 ────────────────────────────
+  it('R11: 收到项目事件后，事件前在飞的 GET 不再给事件触发的重取共用', async () => {
+    const { subscribeProjectEvent } = await load()
+    const shared = await import('@/utils/getSingleFlight') // resetModules 后与总线同一实例
+    const flights = new Map()
+    const plan = shared.planSharedGet('/api/projects/p1/trial-balance')!
+    const start = vi.fn(() => new Promise(() => {}))
+    shared.sharedGet(flights, plan, start, (v) => v)
+    shared.sharedGet(flights, plan, start, (v) => v)
+    expect(start).toHaveBeenCalledTimes(1) // 事件前：共用
+    subscribeProjectEvent(PID_A, 'trial_balance.updated', vi.fn())
+    MockSSEConn.byProject(PID_A)[0]._emit('trial_balance.updated', { project_id: PID_A })
+    shared.sharedGet(flights, plan, start, (v) => v)
+    expect(start).toHaveBeenCalledTimes(2) // 事件后：另起
+  })
+
   // ─── P9：裸事件分发（无 event_type）──────────────────────────────────────
   it('P9: 负载无 event_type 的具名事件仍按 event 名投递', async () => {
     const { subscribeProjectEvent } = await load()

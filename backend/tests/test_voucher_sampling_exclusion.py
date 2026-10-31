@@ -440,7 +440,9 @@ class TestRoutersHandExclusionsToFilters:
         app, _ = _make_app()
         stats = StatsResult(total_count=0, debit_total=Decimal("0"), credit_total=Decimal("0"),
                             by_voucher_type={}, truncated=False)
-        with patch("app.routers.cutoff_sampling.collect_exclusions", new=AsyncMock(return_value=ex)) as collect, \
+        # 底稿编辑权且底稿属于路径项目（spec project-pid-path-authz-coverage）：这张底稿属于 _PID
+        with patch("app.routers.cutoff_sampling.authorize_wp_edit", new=AsyncMock(return_value=_PID)), \
+                patch("app.routers.cutoff_sampling.collect_exclusions", new=AsyncMock(return_value=ex)) as collect, \
                 patch("app.routers.cutoff_sampling.LedgerSamplingService") as svc:
             svc.build_ledger_query = AsyncMock(return_value=MagicMock())
             svc.execute_with_stats = AsyncMock(return_value=([], stats))
@@ -461,7 +463,8 @@ class TestRoutersHandExclusionsToFilters:
         app, mock_db = _make_app()
         mock_db.commit = AsyncMock()
         req = {**_make_fill_request(), "filled_voucher_keys": [_vk("FY-0003").to_str()], "filled_line_fps": ["fp-1"]}
-        with patch("app.routers.cutoff_sampling.LedgerSamplingService") as svc:
+        with patch("app.routers.cutoff_sampling.authorize_wp_edit", new=AsyncMock(return_value=_PID)), \
+                patch("app.routers.cutoff_sampling.LedgerSamplingService") as svc:
             svc.record_extraction_log = AsyncMock(return_value={"id": str(uuid.uuid4()), "created_at": "2025-12-31"})
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(f"/api/projects/{_PID}/sampling/cutoff-fill", json=req)

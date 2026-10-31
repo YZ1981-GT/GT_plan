@@ -78,7 +78,9 @@ describe('401 → 刷新令牌', () => {
     sessionStorage.setItem('token', 'expired-access')
     sessionStorage.setItem('refreshToken', 'revoked-refresh')
     const { http, store } = await setup()
-    await expect(http.get(PROBE)).rejects.toMatchObject({ response: { status: 401 } })
+    // 刷新失败即登出：登出推进请求身份代际，旧身份的 GET 订阅以「取消」结束、不把结果交给登出后的页面
+    //（R11 起 http.get 与 api.get 同一规则；原先这里拿到的是 401 原错误）
+    await expect(http.get(PROBE)).rejects.toMatchObject({ code: 'ERR_CANCELED', name: 'CanceledError' })
     expect(location.href).toBe('/login')
     expect(['token', 'refreshToken', 'user'].map((k) => sessionStorage.getItem(k))).toEqual([null, null, null])
     expect(store.isAuthenticated).toBe(false)

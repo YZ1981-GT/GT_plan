@@ -1,7 +1,7 @@
 """底稿级复核提示词 HTTP 端点
 
 POST /api/workpapers/{wp_id}/review        — 单底稿 AI 复核
-POST /api/projects/{pid}/batch-review      — 批量复核
+POST /api/projects/{pid}/ai-batch-review  — 批量复核
 GET  /api/projects/{pid}/review-export     — 导出 Excel 复核报告
 GET  /api/review-prompts/coverage          — 提示词覆盖率统计
 
@@ -18,12 +18,15 @@ from typing import Optional
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session
+from app.core.database import async_session, get_db
+from app.deps import assert_project_permission, authorize_wp_read, get_current_user
+from app.models.core import User
 from app.services.batch_review_service import BatchReviewService
 from app.services.llm_response_parser import LlmResponseParser, ReviewFinding
 from app.services.review_prompt_service import ReviewPromptService
@@ -170,7 +173,12 @@ class BatchReviewReportResponse(BaseModel):
 
 
 @router.post("/api/workpapers/{wp_id}/review", response_model=ReviewResponse)
-async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
+async def review_workpaper(
+    wp_id: UUID,
+    body: ReviewRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """单底稿 AI 复核
 
     - 有 sheet_name 时：用 ReviewPromptService 匹配 sheet-level prompt
@@ -183,8 +191,13 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     4. LlmResponseParser.parse → 结构化结果
     5. 返回 ReviewResponse
 
+    鉴权：底稿所属项目 review 级（与批量复核同级），先于读底稿、调模型（原先无任何鉴权，
+    spec project-pid-path-authz-coverage）。底稿不存在 404、非成员 403。
+
     Requirements: 3.1, 3.2, 3.3, 3.4
     """
+    wp_project_id = await authorize_wp_read(db, current_user, wp_id)
+    await assert_project_permission(db, current_user, wp_project_id, "review")
     sheet_name = body.sheet_name if body else None
 
     # 1. 查底稿信息（wp_code）
@@ -315,8 +328,8 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
 
 
 @router.get("/api/review-prompts/coverage", response_model=CoverageReportResponse)
-async def get_review_prompt_coverage():
-    """获取提示词覆盖率统计
+async def get_review_prompt_coverage(current_user: User = Depends(get_current_user)):
+    """获取提示词覆盖率统计（全局只读诊断，不含项目数据：须登录）
 
     委托 ReviewPromptService.get_coverage 返回覆盖率报告。
 
@@ -334,8 +347,8 @@ async def get_review_prompt_coverage():
 
 
 @router.get("/api/review-prompts/metrics")
-async def get_review_metrics():
-    """LLM 复核调用监控指标"""
+async def get_review_metrics(current_user: User = Depends(get_current_user)):
+    """LLM 复核调用监控指标（全局只读诊断，不含项目数据：须登录）"""
     calls = _review_metrics["calls"]
     if not calls:
         return {
@@ -365,11 +378,34 @@ async def get_review_metrics():
     }
 
 
+async def _set_finding_status(db: AsyncSession, finding_id: str, status: str) -> int:
+    """写复核发现的 ``data_sources.finding_status``（PG jsonb_set），返回命中行数。"""
+    result = await db.execute(
+        text(
+            "UPDATE ai_content SET "
+            "data_sources = jsonb_set("
+            "COALESCE(data_sources::jsonb, '{}'::jsonb), "
+            "'{finding_status}', CAST(:status_val AS JSONB)) "
+            "WHERE id = :finding_id AND content_type = 'review_finding'"
+        ),
+        {"finding_id": finding_id, "status_val": f'"{status}"'},
+    )
+    return result.rowcount
+
+
 @router.patch("/api/review-findings/{finding_id}/status")
-async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
+async def update_finding_status(
+    finding_id: str,
+    body: FindingStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """更新单条复核发现的状态
 
     允许值: pending（待处理）, resolved（已整改）, ignored（已忽略）, not_applicable（不适用）
+
+    鉴权：该发现所属项目 review 级（原先无任何鉴权，可改任意项目的复核记录，
+    spec project-pid-path-authz-coverage）；发现不存在 404。
     """
     valid_statuses = {"pending", "resolved", "ignored", "not_applicable"}
     if body.status not in valid_statuses:
@@ -378,21 +414,27 @@ async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
             detail=f"无效状态，允许值: {', '.join(valid_statuses)}",
         )
 
-    async with async_session() as db:
-        result = await db.execute(
-            text(
-                "UPDATE ai_content SET "
-                "data_sources = jsonb_set("
-                "COALESCE(data_sources::jsonb, '{}'::jsonb), "
-                "'{finding_status}', CAST(:status_val AS JSONB)) "
-                "WHERE id = :finding_id AND content_type = 'review_finding'"
-            ),
-            {"finding_id": finding_id, "status_val": f'"{body.status}"'},
-        )
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Finding 不存在")
-        await db.commit()
+    from app.models.ai_models import AIContent, AIContentType
 
+    try:
+        finding_uuid = UUID(finding_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    project_id = (
+        await db.execute(
+            select(AIContent.project_id).where(
+                AIContent.id == finding_uuid,
+                AIContent.content_type == AIContentType.review_finding,
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    await assert_project_permission(db, current_user, project_id, "review")
+
+    if await _set_finding_status(db, finding_id, body.status) == 0:
+        raise HTTPException(status_code=404, detail="Finding 不存在")
+    await db.commit()
     return {"id": finding_id, "status": body.status}
 
 
@@ -402,8 +444,18 @@ async def update_finding_status(finding_id: str, body: FindingStatusUpdate):
 
 
 @router.get("/api/projects/{pid}/batch-review-progress")
-async def get_batch_review_progress(pid: UUID, session_id: str = Query(...)):
-    """获取批量复核进度"""
+async def get_batch_review_progress(
+    pid: UUID,
+    session_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取批量复核进度（项目只读级；原先无任何鉴权）
+
+    路径参数叫 ``pid``：``require_project_access`` 的内层依赖按名字取 ``project_id``，挂在这里会变成必填查询参数
+    （前端不带 ⇒ 422），所以函数体首句显式校验。
+    """
+    await assert_project_permission(db, current_user, pid, "readonly")
     progress = _batch_progress.get(session_id)
     if not progress:
         return {"status": "not_found", "current": 0, "total": 0, "current_sheet": ""}
@@ -411,17 +463,25 @@ async def get_batch_review_progress(pid: UUID, session_id: str = Query(...)):
 
 
 @router.post(
-    "/api/projects/{pid}/batch-review",
+    "/api/projects/{pid}/ai-batch-review",
     response_model=BatchReviewReportResponse,
 )
-async def batch_review(pid: UUID, body: BatchReviewRequest):
+async def batch_review(
+    pid: UUID,
+    body: BatchReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """批量复核端点
 
     接收 wp_code_prefix 和 year，委托 BatchReviewService 执行批量复核。
     逐份调用 LLM 复核，容错续行，汇总结果。
 
+    鉴权：项目 review 级（逐张调大模型并写复核结果；原先无任何鉴权，spec project-pid-path-authz-coverage）。
+
     Requirements: 4.1
     """
+    await assert_project_permission(db, current_user, pid, "review")
     # 并发锁：同一项目不允许同时执行批量复核
     lock_key = str(pid)
     if lock_key not in _batch_locks:
@@ -518,8 +578,10 @@ async def export_review_report(
     pid: UUID,
     wp_code_prefix: str = Query(..., description="底稿编码前缀，如 D2"),
     session_id: Optional[str] = Query(None, description="复核会话 ID（可选）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """导出复核结果为 Excel — 从已持久化的数据库结果读取，不重跑 LLM
+    """导出复核结果为 Excel — 从已持久化的数据库结果读取，不重跑 LLM（项目只读级；原先无任何鉴权）
 
     生成 Excel workbook，每张底稿一个 worksheet + 首页汇总。
     列：序号/检查项/风险等级/是否通过/问题描述/涉及底稿定位/整改建议/负责人/状态
@@ -527,6 +589,7 @@ async def export_review_report(
 
     Requirements: 7.1, 7.2, 7.3, 7.4
     """
+    await assert_project_permission(db, current_user, pid, "readonly")
     # 优先从数据库读取已持久化的复核结果
     report = await _load_review_report_from_db(str(pid), wp_code_prefix, session_id)
 

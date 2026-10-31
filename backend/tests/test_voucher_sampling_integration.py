@@ -59,6 +59,15 @@ def _bypass_undo_auth():
 
 
 @pytest.fixture(autouse=True)
+def _workpapers_belong_to_project_a():
+    """抽凭历史 / 对比要底稿只读权且底稿属于路径项目（spec project-pid-path-authz-coverage）。这些流程测试里的底稿
+    都属于项目 A：只把「查底稿所属项目 + 成员级别」换成返回 A，「属于路径项目」的比较照常执行；
+    成员级判权由 test_pid_path_authz_endpoints.py 用真 ORM 行覆盖。"""
+    with patch("app.routers.voucher_sampling.authorize_wp_read", new=AsyncMock(return_value=_PROJECT_A_ID)):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _stub_population_reconcile():
     """总体完整性核对取数在这些流程测试中显式打桩为「不可用」。
 
@@ -112,6 +121,14 @@ def _legacy_exclusions(extracted=(), preliminary=()):
         return SamplingExclusions(voucher_nos=nos, legacy=bool(nos))
 
     return AsyncMock(side_effect=_collect)
+
+
+def _project_a_log() -> MagicMock:
+    """记在项目 A、项目 A 底稿上的抽凭日志行（对比两条记录都须属于路径项目，再按所在底稿判只读权）。"""
+    record = MagicMock()
+    record.project_id = _PROJECT_A_ID
+    record.workpaper_id = _WORKPAPER_ID
+    return record
 
 
 def _make_app() -> tuple[FastAPI, AsyncMock]:
@@ -687,13 +704,13 @@ class TestVoucherSamplingCompare:
         """
         app, mock_db = _make_app()
 
-        mock_record_a = MagicMock()
+        mock_record_a = _project_a_log()
         mock_record_a.extraction_criteria = {
             "filled_voucher_nos": ["记-A", "记-B", "记-C", "记-D"]
         }
         mock_record_a.before_data = None
 
-        mock_record_b = MagicMock()
+        mock_record_b = _project_a_log()
         mock_record_b.extraction_criteria = {
             "filled_voucher_nos": ["记-B", "记-C", "记-E", "记-F"]
         }
@@ -727,7 +744,8 @@ class TestVoucherSamplingCompare:
 
     @pytest.mark.asyncio
     async def test_compare_nonexistent_record_fails(self):
-        """POST /voucher-compare 记录不存在 → 400"""
+        """POST /voucher-compare 记录不存在 → 404（别的项目的记录同样 404，不暴露它是否存在；原先不存在报 400，
+        spec project-pid-path-authz-coverage 与撤销的「别的项目按不存在」对齐）"""
         app, mock_db = _make_app()
 
         mock_result_a = MagicMock()
@@ -746,7 +764,7 @@ class TestVoucherSamplingCompare:
                     "log_id_b": str(uuid.uuid4()),
                 },
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 404
             assert "对比记录不存在" in resp.json()["detail"]
 
     @pytest.mark.asyncio
@@ -755,11 +773,11 @@ class TestVoucherSamplingCompare:
         app, mock_db = _make_app()
         same_nos = ["记-2025-0001", "记-2025-0002", "记-2025-0003"]
 
-        mock_record_a = MagicMock()
+        mock_record_a = _project_a_log()
         mock_record_a.extraction_criteria = {"filled_voucher_nos": same_nos}
         mock_record_a.before_data = None
 
-        mock_record_b = MagicMock()
+        mock_record_b = _project_a_log()
         mock_record_b.extraction_criteria = {"filled_voucher_nos": same_nos}
         mock_record_b.before_data = None
 

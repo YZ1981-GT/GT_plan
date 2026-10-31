@@ -33,11 +33,66 @@ from app.models.workpaper_models import (
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# F8 配置驱动的复核流转规则（spec platform-performance §9.5 方案 A）
+# ---------------------------------------------------------------------------
+
+_DEFAULT_REVIEW_LEVELS = 2
+
+
+def _build_review_transitions(levels: int) -> dict[str, list[str]]:
+    """按项目复核级数（2~4）动态生成合法状态转换表。
+
+    核心规则：
+    - ``pending_levelN`` / ``levelN_in_progress`` 都可直接通过或退回（去掉强制中间步骤）。
+    - 非末级通过自动推进 ``pending_level{N+1}``。
+    - 末级通过为终态（空列表）。
+    - 任何级退回 → ``not_submitted``。
+    """
+    t: dict[str, list[str]] = {
+        "not_submitted": ["pending_level1"],
+    }
+    for n in range(1, levels + 1):
+        passed = f"level{n}_passed"
+        rejected = f"level{n}_rejected"
+        # pending / in_progress 都可以直接通过或退回，也可以撤回（回 not_submitted）
+        t[f"pending_level{n}"] = [passed, rejected, f"level{n}_in_progress", "not_submitted"]
+        t[f"level{n}_in_progress"] = [passed, rejected]
+        # 退回 → 编制人修改后重提
+        t[rejected] = ["not_submitted"]
+        # 通过 → 推进下一级 or 终态
+        if n < levels:
+            t[passed] = [f"pending_level{n + 1}"]
+        else:
+            t[passed] = []  # 终态
+    return t
+
+
 class WorkingPaperService:
     """底稿管理服务
 
     Validates: Requirements 6.1, 7.1-7.5
     """
+
+    # ------------------------------------------------------------------
+    # F8 复核级数读取（project.review_config → levels，缺省 2）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _resolve_review_levels(db: AsyncSession, project_id: UUID) -> int:
+        """读取项目复核配置的级数（2~4），缺省 2。"""
+        from app.models.core import Project
+
+        row = (
+            await db.execute(
+                sa.select(Project.review_config).where(Project.id == project_id)
+            )
+        ).scalar_one_or_none()
+        if isinstance(row, dict):
+            lvl = row.get("levels", _DEFAULT_REVIEW_LEVELS)
+            if isinstance(lvl, int) and 2 <= lvl <= 4:
+                return lvl
+        return _DEFAULT_REVIEW_LEVELS
 
     # ------------------------------------------------------------------
     # 10.1  list_workpapers / get_workpaper
@@ -317,23 +372,14 @@ class WorkingPaperService:
     ) -> dict:
         """更新底稿复核任务状态（独立于编制状态）。
 
-        复核状态流转：
-          not_submitted → pending_level1 → level1_in_progress → level1_passed/level1_rejected
-          level1_passed → pending_level2 → level2_in_progress → level2_passed/level2_rejected
-          level1_rejected/level2_rejected → not_submitted（退回后重新提交）
-        """
-        REVIEW_TRANSITIONS: dict[str, list[str]] = {
-            "not_submitted": ["pending_level1"],
-            "pending_level1": ["level1_in_progress", "not_submitted"],
-            "level1_in_progress": ["level1_passed", "level1_rejected"],
-            "level1_passed": ["pending_level2"],
-            "level1_rejected": ["not_submitted"],
-            "pending_level2": ["level2_in_progress", "level1_passed"],
-            "level2_in_progress": ["level2_passed", "level2_rejected"],
-            "level2_passed": [],
-            "level2_rejected": ["not_submitted", "pending_level1"],
-        }
+        状态机按项目 ``review_config.levels``（2~4，默认 2）动态生成：
+        - ``pending_levelN`` / ``levelN_in_progress`` 都可直接 → ``levelN_passed`` / ``levelN_rejected``
+          （去掉「必须先进复核中」的强制中间步骤，与调整分录对齐；spec platform-performance §9.5 方案 A）。
+        - ``levelN_passed`` 若 N < 级数 → 自动推进 ``pending_level{N+1}``；若 N == 级数 → 终态。
+        - ``levelN_rejected`` → ``not_submitted``（退回编制人修改后重提）。
 
+        Requirements: F8.1, F8.2, F8.3, F8.4
+        """
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
@@ -350,8 +396,12 @@ class WorkingPaperService:
         except ValueError:
             raise ValueError(f"无效复核状态: {new_review_status}")
 
+        # ── 按项目复核配置动态生成流转规则 ──
+        levels = await self._resolve_review_levels(db, wp.project_id)
+        transitions = _build_review_transitions(levels)
+
         current = wp.review_status.value if wp.review_status else "not_submitted"
-        allowed = REVIEW_TRANSITIONS.get(current, [])
+        allowed = transitions.get(current, [])
         if new_review_status not in allowed:
             raise ValueError(
                 f"复核状态转换不允许: {current} → {new_review_status}（允许: {', '.join(allowed) or '无'}）"
@@ -371,10 +421,20 @@ class WorkingPaperService:
         # 复核状态变化联动编制状态
         if new_review_status == "pending_level1":
             wp.status = WpFileStatus.under_review
-        elif new_review_status in ("level1_rejected", "level2_rejected"):
+        elif "rejected" in new_review_status:
             wp.status = WpFileStatus.revision_required
-        elif new_review_status == "level2_passed":
+        elif new_review_status == f"level{levels}_passed":
+            # 末级通过 → 复核完成
             wp.status = WpFileStatus.review_passed
+
+        # 非末级通过 → 自动推进到下一级待复核
+        import re as _re
+        _passed_m = _re.match(r"level(\d+)_passed", new_review_status)
+        if _passed_m:
+            passed_n = int(_passed_m.group(1))
+            if passed_n < levels:
+                next_pending = f"pending_level{passed_n + 1}"
+                wp.review_status = WpReviewStatus(next_pending)
 
         await db.flush()
 

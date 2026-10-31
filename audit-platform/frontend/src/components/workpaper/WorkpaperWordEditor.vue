@@ -788,16 +788,15 @@ async function loadProjectInfo() {
   } catch { /* ignore */ }
 }
 
-/** Task 8.1: Load recommended version from API */
+/** Task 8.1: Load recommended version from API（唯一实现 wp_editor_router：recommended_code / all_versions / always_required） */
 async function loadRecommendedVersion() {
   if (!isA16Mode.value) return
+  let alwaysRequired = false
   try {
     const rec = await api.get<any>(`/api/projects/${projectId.value}/a16/recommended-version`)
     const data = rec?.data || rec
-    // Support both API formats:
-    // Format 1 (design doc): { recommended_code, all_versions, always_required }
-    // Format 2 (legacy): { main: { code, label }, supplement: { code } }
-    const recCode = data?.recommended_code || data?.main?.code
+    // 原先还认 { main: { code }, supplement } —— 那是同路径死实现（completion_phase）的形状，去重后已无来源（2026-10-31 删）
+    const recCode = typeof data?.recommended_code === 'string' ? data.recommended_code : ''
     if (recCode) {
       recommendedCode.value = recCode
       // Update version labels and exists_in_project from API response
@@ -815,11 +814,27 @@ async function loadRecommendedVersion() {
         v.recommended = v.code === recCode
       }
     }
-    // Supplement: check if A16-7 should be enabled
-    if (data?.supplement || (data?.always_required && data.always_required.includes('A16-7'))) {
-      supplementEnabled.value = true
-    }
+    alwaysRequired = Array.isArray(data?.always_required) && data.always_required.includes(SUPPLEMENT_CODE)
   } catch { /* fallback: no recommendation available */ }
+  // 补充声明开关：用户上次的选择（onSupplementToggle 写的 enabled）优先，没有记录才按 always_required。
+  // 原先只写不读，而后端 always_required 恒含 A16-7 ⇒ 每次打开都被打开，用户关掉也留不住。
+  supplementEnabled.value = (await loadPersistedSupplementEnabled()) ?? alwaysRequired
+}
+
+/** 补充声明开关的上次选择（字段覆盖 word_template:A16:A16-7 的 enabled）；没有记录 / 取不到年度 / 读失败 → null */
+async function loadPersistedSupplementEnabled(): Promise<boolean | null> {
+  const year = getAuditYear()
+  if (year == null) return null
+  try {
+    const overrides = await api.get<Record<string, Record<string, any>>>('/api/workpapers/field-overrides', {
+      params: { project_id: projectId.value, year, scope: `word_template:A16:${SUPPLEMENT_CODE}` },
+      _silent: true,
+    } as any)
+    const value = overrides?.enabled?.value
+    return value === 'true' ? true : value === 'false' ? false : null
+  } catch {
+    return null
+  }
 }
 
 /** A16 version resolution (URL query > persisted > recommendation > default) */

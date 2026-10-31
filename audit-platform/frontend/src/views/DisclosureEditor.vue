@@ -848,6 +848,7 @@
     <!-- scope + 当前章节必须传：否则 rows（附注行）会被弹窗的报表启发式误判，
          默认停在「报表 > 资产负债表」而不是本页章节 -->
     <FormulaManagerDialog
+      v-if="noteFormulaManagerMounted"
       v-model="showNoteFormulaManager"
       :rows="currentNoteFormulaRows"
       :project-id="projectId"
@@ -1210,9 +1211,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
+import { ref, computed, reactive, defineAsyncComponent, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick, inject } from 'vue'
 import * as P from '@/services/apiPaths'
-import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
@@ -1244,7 +1245,8 @@ import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Close, ArrowDown, ArrowRight, Loading } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
@@ -1300,6 +1302,7 @@ import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { createNoteDetailPrefetch } from '@/views/composables/noteDetailPrefetch'
 import { useNotePersist } from '@/views/composables/useNotePersist'
+import { useNoteSaveFlow } from '@/views/composables/useNoteSaveFlow'
 import { useNoteEditPermission, createNoteEditRequestGuard, isNoteEditGuardError, noteEditShouldRetry } from '@/views/composables/noteEdit'
 import { WRITE_ENTRIES } from '@/views/composables/noteEdit/noteEditWriteEntries'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
@@ -1451,12 +1454,14 @@ function getSectionLock(sectionId: string | undefined) {
 
 // 编辑锁联动 watch 推迟到 useEditMode 定义之后挂载（避免 TDZ）
 
-// R7-S2-05：后端定时自动保存（2 分钟间隔）
+// R7-S2-05：后端定时自动保存（2 分钟间隔）；下方 useNotePersist 创建后才绑定保存代际（之前的编辑无代际可推进）
+let markNoteSaveEdited: (() => void) | undefined
 const autoSave = useWorkpaperAutoSave(async () => {
-  if (!noteEdit.canWriteLocked.value) return  // 不可写时跳过
-  await saveCurrentNote({ auto: true })  // 定时保存不打断编辑
+  if (!noteEdit.canWriteLocked.value) return false
+  return saveCurrentNote({ auto: true })  // 定时保存不打断编辑
 }, 120_000, undefined, {
   shouldRetry: noteEditShouldRetry,
+  onEdited: () => markNoteSaveEdited?.(),
 })
 
 // 单位切换 — 使用 projectStore
@@ -1469,13 +1474,12 @@ function onProjectChange(newId: string) {
 // 年度切换
 const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
-function onYearChange(y: number) {
-  projectStore.changeYear(y) // 按信息栏选中的年度切（selectedYear 是 number | null；行数已到上限，注释写在行尾）
-  fetchTree().then(async () => {
-    await noteEdit.ready()  // 切年度后等判定结论
-    if (noteList.value.length === 0 && noteEdit.canWrite.value) onGenerate()
-  })
-  currentNote.value = null
+// 取数年度路由优先 ⇒ 写路由 ?year（整页按新年度重挂，「没有附注就自动生成」由重挂后的 onMounted 执行）；只带年度：section 等一次性参数已用 replaceState 清掉、route.query 里还在
+async function onYearChange(y: number) {
+  if (!(await guardUnsaved())) { selectedYear.value = year.value; return }  // 留下未保存改动：不切
+  clearEditDirty(); autoSave.clearDirty()  // 已确认放弃：push 时更新守卫不再问第二次
+  projectStore.changeYear(y)  // 先改 store：year:changed 落在旧实例上，重挂后的新实例不会亮「数据已更新」
+  router.push({ path: route.path, query: { year: String(y) } })
 }
 
 // templateType 提前声明：useNoteTemplate + useNoteTree 均依赖它
@@ -1695,6 +1699,7 @@ function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
 const validateLoading = ref(false)
 const detailLoading = ref(false)
 const showNoteFormulaManager = ref(false)
+const noteFormulaManagerMounted = useMountOnFirstOpen(showNoteFormulaManager)  // 首次打开才下载 / 挂载公式管理
 // 附注模块使用手册（工具栏右侧入口）
 const showNoteHandbook = ref(false)
 // 附注联动复盘 P0-1：就绪度看板（未从底稿同步 / 无数据 / 校验问题）
@@ -2745,7 +2750,7 @@ const onValidate = withLoading(validateLoading, async () => {
 })
 
 // ── 保存功能（useNotePersist composable）──
-const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
+const { saveLoading, justSaved, markEdited: markPersistEdited, onSave: _rawSave } = useNotePersist({
   currentNote,
   textContent,
   editMode,
@@ -2761,37 +2766,25 @@ const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
     }
   },
 })
+markNoteSaveEdited = markPersistEdited
 
-// ── Task #11：保存状态指示器 ──
-const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+// ── Task #11：保存状态指示器与一次保存的收尾（失败 / 保存中切章见 useNoteSaveFlow）──
+/** `auto`：定时自动保存只存不打断 —— 不跳章、不退出编辑、不弹「保存成功」（2026-10-26 浏览器实测：
+ * 填完一格，计时器保存后页面跳到下一章节；不跳章后编辑态又被收起，正在填的格子消失）。 */
+const { saveStatus, saveCurrentNote } = useNoteSaveFlow({
+  currentNoteId: () => currentNote.value?.id,
+  save: (opts) => _rawSave(opts),
+  onSaved: (auto) => {
+    // 保存后表格换成了保存的副本：旧的结构撤销记录指向旧对象，留着撤销会改一份看不见的表。
+    noteTableStructure.clearHistory()
+    // ── Task #12：手工保存成功后自动跳到下一未编制章节 ──
+    const next = !auto && autoAdvance.value ? findNextIncompleteSection() : null
+    if (next) setTimeout(async () => { await fetchDetail(next); await locateTreeNode(next) }, 500)
+  },
+})
 
 /** 手工保存（按钮 / Ctrl+S）：保存后退出编辑，按开关跳到下一未编制章节 */
 function onSave() { return saveCurrentNote({ auto: false }) }
-
-/** `auto`：定时自动保存只存不打断 —— 不跳章、不退出编辑、不弹「保存成功」（2026-10-26 浏览器实测：
- * 填完一格，计时器保存后页面跳到下一章节；不跳章后编辑态又被收起，正在填的格子消失）。 */
-async function saveCurrentNote({ auto }: { auto: boolean }) {
-  saveStatus.value = 'saving'
-  try {
-    await _rawSave({ keepEditing: auto })
-    // 保存后表格换成了保存的副本：旧的结构撤销记录指向旧对象，留着撤销会改一份看不见的表
-    noteTableStructure.clearHistory()
-    saveStatus.value = 'saved'
-    setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 3000)
-    // ── Task #12：保存成功后自动跳到下一未编制章节 ──
-    if (!auto && autoAdvance.value) {
-      const next = findNextIncompleteSection()
-      if (next) {
-        setTimeout(async () => {
-          await fetchDetail(next)
-          await locateTreeNode(next)
-        }, 500)
-      }
-    }
-  } catch {
-    saveStatus.value = 'error'
-  }
-}
 
 // ── Task #12：自动滚到下一未编制章节 ──
 const autoAdvance = ref(readAutoAdvance(localStorage))  // 默认关闭（R19）
@@ -3015,16 +3008,13 @@ function _onWindowContextMenuFallback(event: MouseEvent) {
   _closeTreeContextMenu()
 }
 
-// R8-S2-14：未保存拦截
-onBeforeRouteLeave(async (_to, _from, next) => {
-  if (!editDirty.value && !autoSave.isDirty.value) { next(); return }
-  try {
-    await confirmLeave('附注')
-    next()
-  } catch {
-    next(false)
-  }
-})
+// R8-S2-14：未保存拦截。换项目 / 改 query 是同一路由的「更新」、不触发离开守卫，但本页按 fullPath 整页重挂，改动同样会丢
+async function guardUnsaved(): Promise<boolean> {
+  if (!editDirty.value && !autoSave.isDirty.value) return true
+  try { await confirmLeave('附注'); return true } catch { return false }
+}
+onBeforeRouteLeave(() => guardUnsaved())
+onBeforeRouteUpdate(() => guardUnsaved())
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (editDirty.value || autoSave.isDirty.value) {

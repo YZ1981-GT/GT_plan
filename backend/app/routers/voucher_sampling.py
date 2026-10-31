@@ -29,7 +29,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 import sqlalchemy as sa
 
-from app.deps import authorize_wp_edit, assert_project_permission
+from app.deps import authorize_wp_edit, authorize_wp_read, assert_project_permission
 from app.models.audit_platform_models import WorkpaperExtractionLog
 from app.models.core import Project, User as _CoreUser  # noqa: F401 (Project 用于年度校验)
 from app.models.core import User
@@ -577,7 +577,12 @@ async def voucher_history(
     """获取指定底稿的抽凭历史列表（按时间倒序）
 
     仅返回 extraction_type='voucher_sampling' 的记录。
+    鉴权：底稿只读权且底稿属于路径项目（原先只校验登录，可按任意底稿 id 跨项目读，
+    spec project-pid-path-authz-coverage）。
     """
+    wp_project_id = await authorize_wp_read(db, current_user, wp_id)
+    if str(wp_project_id) != str(pid):
+        raise HTTPException(status_code=403, detail="底稿不属于该项目")
     stmt = (
         select(WorkpaperExtractionLog)
         .where(
@@ -777,23 +782,22 @@ async def voucher_compare(
 
     从 extraction_criteria 或 before_data 中提取凭证号集合，
     计算 added / removed / retained。
+
+    鉴权：两条记录都须属于路径项目（否则按不存在 404，不暴露别的项目的记录是否存在），且对记录所在底稿有只读权
+    （原先只校验登录、按记录 id 跨项目读，spec project-pid-path-authz-coverage）。
     """
+    records = []
+    for log_id in (req.log_id_a, req.log_id_b):
+        record = (
+            await db.execute(select(WorkpaperExtractionLog).where(WorkpaperExtractionLog.id == log_id))
+        ).scalar_one_or_none()
+        if record is None or str(getattr(record, "project_id", "")) != str(pid):
+            raise HTTPException(status_code=404, detail="对比记录不存在")
+        if str(await authorize_wp_read(db, current_user, record.workpaper_id)) != str(pid):
+            raise HTTPException(status_code=403, detail="底稿不属于该项目")
+        records.append(record)
+    record_a, record_b = records
     try:
-        # 加载两条记录
-        stmt_a = select(WorkpaperExtractionLog).where(
-            WorkpaperExtractionLog.id == req.log_id_a
-        )
-        stmt_b = select(WorkpaperExtractionLog).where(
-            WorkpaperExtractionLog.id == req.log_id_b
-        )
-        result_a = await db.execute(stmt_a)
-        result_b = await db.execute(stmt_b)
-        record_a = result_a.scalar_one_or_none()
-        record_b = result_b.scalar_one_or_none()
-
-        if record_a is None or record_b is None:
-            raise ValueError("对比记录不存在")
-
         # 两批都有凭证键时按凭证比（「2025-01-07 FY-0003」），否则按凭证号（旧记录）
         set_a, set_b, compare_by = compare_identity(record_a, record_b)
 

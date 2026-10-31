@@ -1,7 +1,7 @@
 /**
  * 编辑器首屏底稿详情竞态（spec procedure-chain-hardening-and-java-contracts R1）
  *
- * 真实 utils/http（GET 去重取消先发）+ apiProxy（无 config 的 GET 在途共享）+ 假 adapter；
+ * 真实 utils/http（R11 起同一 GET 在飞时共享、不再取消先发）+ apiProxy（GET 在途共享）+ 假 adapter；
  * 不 mock useEditorMode / useEditorUniver / workpaperApi。复现 Shell（fetchComponentType）与
  * Univer 核心（initUniver）同时取同一底稿详情：修复前 2 发、先发被取消、核心判「底稿文件尚未生成」。
  */
@@ -171,19 +171,21 @@ describe('编辑器首屏底稿详情竞态（真实 GET 去重）', () => {
     }
   })
 
-  it('同 URL 的独立请求取消了共享的那一发 ⇒ 两边重取后都就绪（取消不当失败）', async () => {
+  it('同 URL 的另一处独立请求不再取消共享的那一发 ⇒ 三方都就绪（spec platform-performance-residual-findings-closure R11）', async () => {
     const { wpDetail, mode, univer } = await setup()
     const shell = mode.fetchComponentType()
     const core = univer.initUniver()
     await new Promise((r) => setTimeout(r, 0))
-    // 页面上另一处直接用 utils/http 取同一详情（如保存后刷新）：GET 去重取消先发的共享请求
+    // 页面上另一处直接用 utils/http 取同一详情（如保存后刷新）：原先 GET 去重取消先发的那一发、壳与核心靠重取兜底；
+    // 现在同一 GET 在飞时共用、不取消任何一方
     const other = http.get(DETAIL_URL).catch((e: unknown) => e)
     await new Promise((r) => setTimeout(r, 0))
     releaseDetail()
-    await Promise.all([shell, core, other])
+    const [, , otherResult] = await Promise.all([shell, core, other])
 
-    expect(calls.some((c) => c.outcome === 'canceled')).toBe(true)
-    expect(calls.some((c) => c.outcome === 'ok')).toBe(true)
+    expect(calls.length).toBeGreaterThan(0)
+    expect(calls.every((c) => c.outcome === 'ok')).toBe(true)
+    expect((otherResult as any)?.data?.wp_code).toBe('H1A')
     expect(univer.loadErrorState.value).toBeNull()
     expect(mode.componentType.value).toBe('univer') // 详情里没有 component_type 时仍按 univer
     expect(wpDetail.value?.wp_code).toBe('H1A')

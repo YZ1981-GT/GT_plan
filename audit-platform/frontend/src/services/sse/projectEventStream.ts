@@ -17,6 +17,7 @@ import type { AxiosRequestConfig } from 'axios'
 import { createSSE, type SSEConnection } from '@/utils/sse'
 import { events as eventPaths } from '@/services/apiPaths'
 import { api } from '@/services/apiProxy'
+import { advanceGetShareBarrier } from '@/utils/getSingleFlight'
 import { useAuthStore } from '@/stores/auth'
 import {
   PROJECT_TRANSPORT_RECOVERED_EVENT,
@@ -122,6 +123,8 @@ function _fanout(
 function _dispatch(projectId: string, eventName: string, data: unknown): void {
   const st = _byProject.get(projectId)
   if (!st) return
+  // 服务端数据变了：此前在飞的 GET 不再给事件触发的重取共用（新请求另发，见 getSingleFlight 新鲜度屏障）
+  advanceGetShareBarrier()
   // 精确事件名订阅者 + 通配 '*' 订阅者（catch-all）
   _fanout(st.listeners.get(eventName), data, eventName)
   if (eventName !== WILDCARD_EVENT) {

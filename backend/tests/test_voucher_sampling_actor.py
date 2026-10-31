@@ -49,6 +49,10 @@ class TestRealActorInLog:
         )
         db = AsyncMock()
         with patch(
+            # 回填前先校验底稿编辑权且底稿属于路径项目（spec project-pid-path-authz-coverage）：这张底稿属于 _PID
+            "app.routers.cutoff_sampling.authorize_wp_edit",
+            new=AsyncMock(return_value=_PID),
+        ), patch(
             "app.routers.cutoff_sampling.VersionTrailService.create_snapshot_fire_and_forget",
             new=AsyncMock(return_value=None),
         ), patch(

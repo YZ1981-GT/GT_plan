@@ -32,7 +32,29 @@ _USER_ID = uuid.uuid4()
 _PROJECT_A_ID = uuid.uuid4()
 _PROJECT_B_ID = uuid.uuid4()
 _WORKPAPER_ID = uuid.uuid4()
+_OTHER_WP_A_ID = uuid.uuid4()
+_WORKPAPER_B_ID = uuid.uuid4()
 _LOG_ID = uuid.uuid4()
+
+#: 底稿 → 所属项目。四个端点要求底稿权限且底稿属于路径项目（spec project-pid-path-authz-coverage）；成员级判权由
+#: test_pid_path_authz_endpoints.py 走真实成员行覆盖，这里只把「查底稿所属项目 + 成员级别」换成按表返回，
+#: 「底稿属于路径项目」的比较照常执行。
+_WP_OWNER = {_WORKPAPER_ID: _PROJECT_A_ID, _OTHER_WP_A_ID: _PROJECT_A_ID, _WORKPAPER_B_ID: _PROJECT_B_ID}
+
+
+@pytest.fixture(autouse=True)
+def _member_of_the_workpapers_project(monkeypatch):
+    from fastapi import HTTPException
+
+    from app.routers import cutoff_sampling
+
+    async def _owner(db, user, wp_id):
+        if wp_id not in _WP_OWNER:
+            raise HTTPException(status_code=404, detail="底稿不存在")
+        return _WP_OWNER[wp_id]
+
+    monkeypatch.setattr(cutoff_sampling, "authorize_wp_edit", _owner)
+    monkeypatch.setattr(cutoff_sampling, "authorize_wp_read", _owner)
 
 
 # ─── Fake User ────────────────────────────────────────────────────────────────
@@ -327,9 +349,18 @@ class TestCutoffSamplingIntegration:
                     return_value=(items_b, stats_b)
                 )
 
-                resp_b = await client.post(
+                # 项目 A 的底稿走项目 B 的路径：门禁直接拒绝，序时账查询不发生
+                resp_cross = await client.post(
                     f"/api/projects/{_PROJECT_B_ID}/sampling/cutoff-extract",
                     json=_make_extract_request(),
+                )
+                assert resp_cross.status_code == 403
+                assert resp_cross.json()["detail"] == "底稿不属于该项目"
+                MockService.build_ledger_query.assert_not_called()
+
+                resp_b = await client.post(
+                    f"/api/projects/{_PROJECT_B_ID}/sampling/cutoff-extract",
+                    json=_make_extract_request(workpaper_id=_WORKPAPER_B_ID),
                 )
                 assert resp_b.status_code == 200
                 assert len(resp_b.json()["items"]) == 0
@@ -643,7 +674,7 @@ class TestCutoffUndoValidation:
 
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                other_wp_id = uuid.uuid4()
+                other_wp_id = _OTHER_WP_A_ID  # 同项目的另一张底稿：门禁放行，服务层按记录归属拒绝
                 resp = await client.post(
                     f"/api/projects/{_PROJECT_A_ID}/sampling/cutoff-undo",
                     params={

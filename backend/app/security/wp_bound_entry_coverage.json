@@ -38,97 +38,15 @@
     "infra"
   ],
   "known_baseline_gaps": {
-    "duplicate_route_registrations": 9,
-    "note": "Duplicate (route,method) registrations bind distinct endpoints; surfaced for the Route_Drift_Guard (Task 16) to resolve. Recorded as unmigrated where wp-bound, not implemented.",
-    "detail": [
-      {
-        "route": "/api/projects/{project_id}/ledger-import/jobs/{job_id}/retry",
-        "method": "POST",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.ledger_datasets:retry_import_job",
-          "app.routers.ledger_import_v2:retry_job"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/aging/config",
-        "method": "GET",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.aging_config:get_aging_config",
-          "app.routers.aging_analysis:get_config"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/aging/config",
-        "method": "PUT",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.aging_config:put_aging_config",
-          "app.routers.aging_analysis:save_config"
-        ]
-      },
-      {
-        "route": "/api/aging/presets",
-        "method": "GET",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.aging_config:get_aging_presets",
-          "app.routers.aging_analysis:list_presets"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/a16/recommended-version",
-        "method": "GET",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.wp_editor_router:get_a16_recommended_version",
-          "app.routers.completion_phase:get_a16_recommended_version"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/workpaper-summaries/{key}",
-        "method": "GET",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.completion_phase:get_workpaper_summary",
-          "app.routers.workpaper_summaries:get_project_workpaper_summary"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/issue-hints",
-        "method": "GET",
-        "wp_bound": false,
-        "entrypoints": [
-          "app.routers.completion_phase:get_issue_hints",
-          "app.routers.issue_hints:get_project_issue_hints"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/working-papers/{wp_id}/export-word",
-        "method": "GET",
-        "wp_bound": true,
-        "entrypoints": [
-          "app.routers.completion_phase:export_workpaper_word",
-          "app.routers.wp_export_word:get_export_word"
-        ]
-      },
-      {
-        "route": "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete",
-        "method": "GET",
-        "wp_bound": true,
-        "entrypoints": [
-          "app.routers.completion_phase:check_export_incomplete",
-          "app.routers.wp_export_word:get_check_incomplete"
-        ]
-      }
-    ]
+    "duplicate_route_registrations": 0,
+    "note": "2026-10-31 清零（spec platform-performance-residual-findings-closure）：9 组重复注册逐组删掉死实现；守卫 tests/test_duplicate_route_registration_baseline.py 与 tests/test_route_shadow_guard.py。",
+    "detail": []
   },
   "summary": {
-    "entry_total": 2339,
-    "http_total": 2324,
+    "entry_total": 2338,
+    "http_total": 2323,
     "http_wp_bound": 839,
-    "http_non_wp_bound": 1485,
+    "http_non_wp_bound": 1484,
     "worker_total": 15,
     "by_family": {
       "ai": 107,
@@ -146,7 +64,7 @@
       "html": 1,
       "import": 129,
       "infra": 10,
-      "non_wp_bound": 1475,
+      "non_wp_bound": 1474,
       "onlyoffice_wopi": 15,
       "preview": 5,
       "procedure_task": 16,
@@ -164,7 +82,7 @@
       "gated": 742,
       "migrated": 15,
       "native_authz": 64,
-      "not_applicable": 1507,
+      "not_applicable": 1506,
       "resolve_wp_binding_and_access(editor.config)": 1,
       "resolve_wp_binding_and_access(editor.file_write)": 1,
       "resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite": 1,
@@ -1213,11 +1131,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.aging_config:get_aging_presets",
-        "app.routers.aging_analysis:list_presets"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -10611,7 +10525,7 @@
         "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_list_deny_not_delegated",
         "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_list_cross_project_denied"
       ],
-      "notes": "Task 9: enforce_wp_gate read_versions. NOTE: same path as wp_export_import_router:get_version_history (duplicate registration); the latter is resolved first at runtime, so both handlers are gated. Route_Drift_Guard (Task 16) to dedupe."
+      "notes": "Task 9: enforce_wp_gate read_versions. 2026-10-31 起由本 handler 服务 GET …/versions（导入导出归档历史改到 /version-archives；spec platform-performance-residual-findings-closure）。"
     },
     {
       "kind": "http",
@@ -10726,11 +10640,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.wp_editor_router:get_a16_recommended_version",
-        "app.routers.completion_phase:get_a16_recommended_version"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -11389,11 +11299,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.aging_config:get_aging_config",
-        "app.routers.aging_analysis:get_config"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -11408,11 +11314,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.aging_config:put_aging_config",
-        "app.routers.aging_analysis:save_config"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -11996,20 +11898,6 @@
       "method": "GET",
       "family": "non_wp_bound",
       "action": "read",
-      "wp_bound": false,
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": []
-    },
-    {
-      "kind": "http",
-      "entrypoint": "app.routers.pm_dashboard:batch_review",
-      "callable": "batch_review",
-      "route": "/api/projects/{project_id}/batch-review",
-      "method": "POST",
-      "family": "non_wp_bound",
-      "action": "create",
       "wp_bound": false,
       "binding": "n/a",
       "gate": "not_applicable",
@@ -14650,8 +14538,8 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.completion_phase:get_issue_hints",
-      "callable": "get_issue_hints",
+      "entrypoint": "app.routers.issue_hints:get_project_issue_hints",
+      "callable": "get_project_issue_hints",
       "route": "/api/projects/{project_id}/issue-hints",
       "method": "GET",
       "family": "non_wp_bound",
@@ -14661,11 +14549,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.completion_phase:get_issue_hints",
-        "app.routers.issue_hints:get_project_issue_hints"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -15044,11 +14928,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.ledger_datasets:retry_import_job",
-        "app.routers.ledger_import_v2:retry_job"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -19272,8 +19152,8 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.completion_phase:export_workpaper_word",
-      "callable": "export_workpaper_word",
+      "entrypoint": "app.routers.wp_export_word:get_export_word",
+      "callable": "get_export_word",
       "route": "/api/projects/{project_id}/working-papers/{wp_id}/export-word",
       "method": "GET",
       "family": "export",
@@ -19286,16 +19166,12 @@
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
       ],
       "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate",
-      "duplicate_registration": true,
-      "duplicate_entrypoints": [
-        "app.routers.completion_phase:export_workpaper_word",
-        "app.routers.wp_export_word:get_export_word"
-      ]
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.completion_phase:check_export_incomplete",
-      "callable": "check_export_incomplete",
+      "entrypoint": "app.routers.wp_export_word:get_check_incomplete",
+      "callable": "get_check_incomplete",
       "route": "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete",
       "method": "GET",
       "family": "export",
@@ -19308,11 +19184,7 @@
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
       ],
       "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate",
-      "duplicate_registration": true,
-      "duplicate_entrypoints": [
-        "app.routers.completion_phase:check_export_incomplete",
-        "app.routers.wp_export_word:get_check_incomplete"
-      ]
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -19676,8 +19548,8 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.completion_phase:get_workpaper_summary",
-      "callable": "get_workpaper_summary",
+      "entrypoint": "app.routers.workpaper_summaries:get_project_workpaper_summary",
+      "callable": "get_project_workpaper_summary",
       "route": "/api/projects/{project_id}/workpaper-summaries/{key}",
       "method": "GET",
       "family": "non_wp_bound",
@@ -19687,11 +19559,7 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "duplicate_entrypoints": [
-        "app.routers.completion_phase:get_workpaper_summary",
-        "app.routers.workpaper_summaries:get_project_workpaper_summary"
-      ],
-      "duplicate_registration": true
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
     },
     {
       "kind": "http",
@@ -21273,7 +21141,7 @@
       "kind": "http",
       "entrypoint": "app.routers.wp_export_import_router:get_version_history",
       "callable": "get_version_history",
-      "route": "/api/projects/{project_id}/workpapers/{wp_id}/versions",
+      "route": "/api/projects/{project_id}/workpapers/{wp_id}/version-archives",
       "method": "GET",
       "family": "version",
       "action": "read",
@@ -21282,11 +21150,11 @@
       "gate": "gated",
       "matrix": "workpaper.version_list/read_versions",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_list_allow_lead",
-        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_list_deny_not_delegated",
-        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_list_cross_project_denied"
+        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_archives_allow_lead",
+        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_archives_deny_not_delegated",
+        "tests/procedure_delegation_visibility/test_task9_core_route_gate.py::test_version_archives_cross_project_denied"
       ],
-      "notes": "Task 9: duplicate-route handler that actually serves GET /workpapers/{wp_id}/versions (shadows version_trail:list_versions). enforce_wp_gate read_versions before archive read; retains require_project_access (cross-project 403). Route_Drift_Guard (Task 16) to resolve the duplicate registration."
+      "notes": "Task 9: enforce_wp_gate read_versions before archive read; retains require_project_access. 2026-10-31 由 /versions 改到 /version-archives（原与 version_trail:list_versions 同形、先注册，版本链快照列表从未可达；spec platform-performance-residual-findings-closure）。"
     },
     {
       "kind": "http",
@@ -35284,9 +35152,13 @@
       "action": "review",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": []
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/test_pid_path_authz_endpoints.py::test_single_review_needs_review_level_on_the_workpapers_project"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user (authorize_wp_read + assert_project_permission review; spec project-pid-path-authz-coverage)"
     },
     {
       "kind": "http",

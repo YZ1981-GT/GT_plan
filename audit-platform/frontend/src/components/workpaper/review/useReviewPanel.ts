@@ -187,7 +187,7 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
 
     try {
       const { data } = await http.post<BatchReviewResult>(
-        `/api/projects/${projectId}/batch-review`,
+        `/api/projects/${projectId}/ai-batch-review`,
         {
           wp_code_prefix: wpCodePrefix,
           year,

@@ -4,6 +4,8 @@
  * 预取与点击发的是同一个 GET，`http` 的 GET 去重会取消先发的那一个。原实现点击后不掐预取：鼠标移入后 200ms 内点击、
  * 且点击的请求 200ms 内没回（后端慢）时，晚到的预取把点击的请求取消，`onNodeClick` 当失败置空 ⇒ 中间栏回到
  * 「请从左侧目录选择章节」，要再点一次（2026-10-17 和平 八、1 两次复现，请求记录 = 一条 ERR_ABORTED + 一条 200）。
+ * 2026-10-31 起（spec platform-performance-residual-findings-closure R11）同一 GET 在飞时共用一次请求，不再取消先发者；
+ * 点击前掐预取仍保留（省掉多余的预取）。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -42,11 +44,17 @@ describe('与真实 GET 去重一起跑：点击请求不被晚到的预取取�
     return { cache, prefetch }
   }
 
-  it('根因特征：不掐预取 ⇒ 点击的请求被取消', async () => {
-    const { prefetch } = setup()
+  it('根因已在平台层消除：不掐预取，晚到的预取也只是共用点击那一次请求（R11 起同一 GET 在飞时共享，原先会取消点击）', async () => {
+    let sent = 0
+    const adapter = http.defaults.adapter as (c: any) => Promise<any>
+    http.defaults.adapter = (config: any) => { sent += 1; return adapter(config) }
+    const { cache, prefetch } = setup()
     prefetch.schedule('八、1')
     const click = http.get(NOTE_URL)
-    await expect(click).rejects.toMatchObject({ code: 'ERR_CANCELED' })
+    await expect(click).resolves.toMatchObject({ status: 200, data: { note_section: '八、1' } })
+    await sleep(30)
+    expect(sent).toBe(1)
+    expect(cache.size).toBe(1) // 预取拿到的是同一次请求的结果
   })
 
   it('开始取当前章前 cancel() ⇒ 点击的请求照常返回、预取不再发', async () => {

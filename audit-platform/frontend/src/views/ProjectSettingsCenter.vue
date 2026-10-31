@@ -188,6 +188,59 @@
                 管理 Overlay
               </el-button>
             </div>
+
+            <!-- 复核层级配置（F8，spec platform-performance §9.5 方案 A） -->
+            <div class="settings-config-card" style="margin-top: 12px;">
+              <div class="settings-config-card__info">
+                <div class="settings-config-card__name">复核层级</div>
+                <div class="settings-config-card__desc">
+                  底稿复核链级数（2~4 级），以及各级复核人角色。
+                  提交复核后按配置逐级流转；末级通过即完成复核。
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <el-select
+                  v-model="reviewLevels"
+                  size="small"
+                  style="width:90px"
+                  :disabled="!canManageMembers || isReadonly || reviewConfigLoading"
+                  @change="onReviewLevelsChange"
+                >
+                  <el-option :value="2" label="2 级" />
+                  <el-option :value="3" label="3 级" />
+                  <el-option :value="4" label="4 级" />
+                </el-select>
+                <span style="font-size:12px; color:#909399;">
+                  {{ reviewLevelsSummary }}
+                </span>
+              </div>
+            </div>
+            <div v-if="reviewLevels > 0" style="margin-top: 8px;">
+              <el-form :inline="true" size="small" :disabled="!canManageMembers || isReadonly">
+                <el-form-item v-for="n in reviewLevels" :key="n" :label="`L${n}`">
+                  <el-select v-model="reviewLevelRoles[`L${n}`]" placeholder="角色" style="width:120px">
+                    <el-option label="经理" value="manager" />
+                    <el-option label="合伙人" value="partner" />
+                    <el-option label="质控" value="qc" />
+                    <el-option label="EQCR" value="eqcr" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="reviewConfigSaving"
+                    :disabled="!canManageMembers || isReadonly"
+                    @click="saveReviewConfig"
+                  >
+                    保存
+                  </el-button>
+                </el-form-item>
+              </el-form>
+            </div>
+            <p v-if="!canManageMembers" class="settings-panel__desc" style="margin-top: 8px;">
+              仅项目经理及以上角色可修改复核层级。
+            </p>
           </div>
         </el-tab-pane>
 
@@ -267,6 +320,71 @@ if (route.query.openAging === '1') {
 
 function onAgingConfigSaved() {
   ElMessage.success('账龄段配置已更新，相关明细表将自动刷新')
+}
+
+// ─── 复核层级配置（F8，spec platform-performance §9.5 方案 A）───
+const reviewLevels = ref(2)
+const reviewLevelRoles = ref<Record<string, string>>({ L1: 'manager', L2: 'partner' })
+const reviewConfigLoading = ref(false)
+const reviewConfigSaving = ref(false)
+
+const ROLE_LABELS: Record<string, string> = { manager: '经理', partner: '合伙人', qc: '质控', eqcr: 'EQCR' }
+const reviewLevelsSummary = computed(() => {
+  return Array.from({ length: reviewLevels.value }, (_, i) => {
+    const key = `L${i + 1}`
+    return `${key}=${ROLE_LABELS[reviewLevelRoles.value[key]] || reviewLevelRoles.value[key] || '未设'}`
+  }).join('、')
+})
+
+function onReviewLevelsChange(n: number) {
+  // 扩展时补默认角色
+  for (let i = 1; i <= n; i++) {
+    const key = `L${i}`
+    if (!reviewLevelRoles.value[key]) {
+      reviewLevelRoles.value[key] = i <= 2 ? (i === 1 ? 'manager' : 'partner') : 'partner'
+    }
+  }
+}
+
+async function loadReviewConfig() {
+  reviewConfigLoading.value = true
+  try {
+    const cfg = await api.get<{ levels: number; level_roles: Record<string, string> }>(
+      `/api/projects/${projectId.value}/review-config`
+    )
+    if (cfg && typeof cfg.levels === 'number') {
+      reviewLevels.value = cfg.levels
+      reviewLevelRoles.value = { ...cfg.level_roles }
+    }
+  } catch {
+    // 默认 2 级
+  } finally {
+    reviewConfigLoading.value = false
+  }
+}
+
+async function saveReviewConfig() {
+  // 只保留 L1~L{levels} 的角色
+  const roles: Record<string, string> = {}
+  for (let i = 1; i <= reviewLevels.value; i++) {
+    roles[`L${i}`] = reviewLevelRoles.value[`L${i}`] || (i === 1 ? 'manager' : 'partner')
+  }
+  reviewConfigSaving.value = true
+  try {
+    await api.put(`/api/projects/${projectId.value}/review-config`, {
+      levels: reviewLevels.value,
+      level_roles: roles,
+    })
+    ElMessage.success(`复核层级已保存：${reviewLevels.value} 级`)
+  } catch (e: any) {
+    if (e?.response?.status === 409) {
+      ElMessage.warning('有底稿正在复核中，请等待复核完成后再修改层级配置')
+    } else {
+      ElMessage.error('保存失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+    }
+  } finally {
+    reviewConfigSaving.value = false
+  }
 }
 
 // ─── 权限判断 ───
@@ -406,6 +524,9 @@ onMounted(async () => {
 
   // 加载成员列表
   await loadMembers()
+
+  // 加载复核层级配置
+  await loadReviewConfig()
 })
 
 async function loadMembers() {

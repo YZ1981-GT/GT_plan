@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user
 from app.models.audit_platform_models import WorkpaperExtractionLog
 from app.models.core import User
 from app.services.ledger_sampling_service import (
@@ -46,6 +46,19 @@ router = APIRouter(
     prefix="/api/projects/{pid}/sampling",
     tags=["sampling"],
 )
+
+
+async def _authorize_cutoff_wp(
+    db: AsyncSession, current_user: User, pid: UUID, wp_id: UUID, *, edit: bool,
+) -> None:
+    """底稿权限（取数 / 回填 / 撤销要编辑权，历史要只读权）且底稿须属于路径项目，与抽凭同口径。
+
+    原先四个端点只校验登录：任意登录用户可按任意项目取序时账、往任意底稿写抽样日志与版本快照
+    （spec project-pid-path-authz-coverage）。放在各端点的 try 之外：403 / 404 不被吞成 400。
+    """
+    owner = await (authorize_wp_edit if edit else authorize_wp_read)(db, current_user, wp_id)
+    if str(owner) != str(pid):
+        raise HTTPException(status_code=403, detail="底稿不属于该项目")
 
 
 # ─── Request / Response schemas ──────────────────────────────────────────────
@@ -95,6 +108,7 @@ async def cutoff_extract(
     日期窗口计算：cutoff_date - days_before 至 cutoff_date + days_after
     exclude_extracted=true 时排除已填充的凭证号
     """
+    await _authorize_cutoff_wp(db, current_user, pid, req.workpaper_id, edit=True)
     try:
         # 1. 计算日期窗口
         date_start = req.cutoff_date - timedelta(days=req.days_before)
@@ -152,6 +166,7 @@ async def cutoff_history(
     current_user: User = Depends(get_current_user),
 ):
     """获取指定底稿的提取历史列表（按时间倒序，仅截止测试类型）"""
+    await _authorize_cutoff_wp(db, current_user, pid, wp_id, edit=False)
     try:
         history = await LedgerSamplingService.get_extraction_history(
             db, wp_id, extraction_type="cutoff"
@@ -173,6 +188,7 @@ async def cutoff_undo(
     current_user: User = Depends(get_current_user),
 ):
     """撤销指定提取记录，返回 before_data（仅截止测试类型范围内判定最新）"""
+    await _authorize_cutoff_wp(db, current_user, pid, wp_id, edit=True)
     try:
         result = await LedgerSamplingService.undo_extraction(
             db, log_id, wp_id, extraction_type="cutoff"
@@ -197,6 +213,7 @@ async def cutoff_fill(
 
     filled_voucher_nos 存入 extraction_criteria 以支持 exclude_extracted 功能
     """
+    await _authorize_cutoff_wp(db, current_user, pid, req.workpaper_id, edit=True)
     try:
         # ── 版本链：填充前自动快照 ──
         snapshot_type = "auto_sampling"

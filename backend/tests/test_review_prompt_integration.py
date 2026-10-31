@@ -16,9 +16,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-import httpx
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.main import app
+from app.models.base import Base, UserRole
+from app.models.core import Project, ProjectStatus, ProjectType, ProjectUser, User
+from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
+from tests._test_auth_helper import FakeAuthUser, override_auth
+
+SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -27,6 +34,7 @@ from app.main import app
 
 FAKE_WP_ID = str(uuid.uuid4())
 FAKE_PROJECT_ID = str(uuid.uuid4())
+REVIEWER_ID = uuid.uuid4()
 
 # Simulated LLM response with checklist format
 MOCK_LLM_RESPONSE = """\
@@ -48,11 +56,40 @@ MOCK_LLM_RESPONSE = """\
 """
 
 
+_AUTH_TABLES = [t.__table__ for t in (User, Project, ProjectUser, WpIndex, WorkingPaper)]
+
+
 @pytest_asyncio.fixture
-async def client():
-    """Create httpx AsyncClient with ASGITransport for testing."""
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+async def review_db():
+    """单底稿 / 批量 AI 复核按项目 review 级鉴权（spec project-pid-path-authz-coverage）：SQLite 里放这个项目、
+    这张底稿与一个 review 级成员（质控），判权走真实成员行；复核本身照旧打桩。"""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda sync: Base.metadata.create_all(sync, tables=_AUTH_TABLES))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        project_id = uuid.UUID(FAKE_PROJECT_ID)
+        session.add(User(id=REVIEWER_ID, username="reviewer", email="reviewer@test.local",
+                         hashed_password="x", role="qc"))
+        session.add(Project(id=project_id, name="【测试】AI 复核", client_name="测试", project_type=ProjectType.annual,
+                            status=ProjectStatus.execution, created_by=REVIEWER_ID, audit_year=2025))
+        idx = WpIndex(id=uuid.uuid4(), project_id=project_id, wp_code="D2", wp_name="应收账款", audit_cycle="D",
+                      status=WpStatus.not_started)
+        session.add(idx)
+        session.add(WorkingPaper(id=uuid.UUID(FAKE_WP_ID), project_id=project_id, wp_index_id=idx.id,
+                                 file_path="x.xlsx", source_type=WpSourceType.template, file_version=1))
+        session.add(ProjectUser(project_id=project_id, user_id=REVIEWER_ID, role="qc", permission_level="review",
+                                is_deleted=False))
+        await session.commit()
+        yield session
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def client(review_db):
+    """以本项目 review 级成员（质控）的身份调真实应用。"""
+    reviewer = FakeAuthUser(user_id=REVIEWER_ID, username="reviewer", role=UserRole.qc)
+    async with override_auth(app, db_session=review_db, user=reviewer) as c:
         yield c
 
 

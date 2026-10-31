@@ -1288,10 +1288,8 @@ backend/tests/test_doc_ai_context_builder.py  1221
 backend/app/services/knowledge_index_service.py  1307
 
 # --- batch: adjustment+tb+cycles 在途提交 ---
-#   Adjustments.vue —— **改动前即 1853 行已超 1500 上限**。本次净增 +78 行：
-#     调整分录中央同步（useAdjustmentCentralSync 接线 + EventBus 监听 + 审定表联动）。
-#     拆分方向：把「创建/编辑/审批」三组对话框抽为独立组件，属独立打磨任务。
-audit-platform/frontend/src/views/Adjustments.vue  1932
+#   Adjustments.vue 条目已删：spec adjustment-hall-entry-review-closure 把录入 / 提交复核 / 驳回 / 导入弹窗与列表
+#     抽成 components/adjustment/*，页面 1977 → 约 850 行，回到默认 1500 上限内。
 #   wp_disclosure_sync_service.py —— **改动前即 1545 行已超 800 上限**。本次净增 +43 行：
 #     附注同步覆盖率面板接线（覆盖率计算 + duty_rows 去重）。
 #     拆分方向：把「sync 执行」与「覆盖率统计」两个关注点分文件。
@@ -1587,7 +1585,12 @@ audit-platform/frontend/src/views/composables/noteEdit/noteEditWriteEntries.ts  
 #   partner-manager-edit-permission spec 测试文件
 backend/tests/test_continuous_audit_eqcr_skip.py  843
 backend/tests/test_note_design_gated_endpoints.py  1130
-backend/tests/test_project_endpoint_authorization_baseline.py  821
+backend/tests/test_project_endpoint_authorization_baseline.py  879
+#   project-pid-path-authz-coverage: 新增 _PROJECT_SEG / _has_project_segment + 8 token + 3 组历史注释。
+#   拆分方向：prefixed 维的 _scan / self-check 独立到 _prefixed_dim_scan.py。
+backend/app/routers/review_prompt.py  945
+#   project-pid-path-authz-coverage: 7 个端点补鉴权 + docstring + import。
+#   拆分方向：批量复核 / 导出端点 + 辅助函数抽到 review_batch_router.py。
 #   address_registry.py / test_tier_a_detail_seed_properties_pbt.py —— 历史大文件（HEAD 已 1431 / 835 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-22 formula-governance-coverage-closure R6：底稿可编辑公式补齐 ROW/NOTE/AUX 后，保存时的引用校验暴露三处地址库缺陷，
 #     前者 +42 行修复（ROW 按报表类型的本期名转 URI、附注域按模板 sections + 章节编号建、辅助余额补类型合计地址与按科目前缀校验）；
@@ -1781,21 +1784,3 @@ backend/app/routers/wp_surfaced_h.py  1257
 #     拆分方向：计划按「预校验 / 依赖库存 / 集团树校验」拆模块，测试按 R 编号拆文件。
 backend/app/services/batch_project_plan.py  971
 backend/tests/test_batch_project_import_closure.py  1069
-# test_note_conversion_preview_rollback.py / test_note_conversion_section_mapping_production.py —— HEAD 已有
-# 2004 / 971 行（历史超限、未登记）。spec 49 Phase 8 加固：转换只在系统标题时改 section_title / account_name，
-# 快照与回滚覆盖这两列 ⇒ 快照字段守卫与内存替身（savepoint 快照、dirty 判定）各补这两列（+5 / +4 行）；
-# 新判据放新文件 test_note_conversion_title_fields.py。拆分方向：内存替身（FakeSession / ConversionSession /
-# savepoint）移到 tests/services/note_conversion_fakes.py，两文件按「预览 / 回滚 / 事件」与「映射 / 回填 / 归档」各拆两份。
-backend/tests/test_note_conversion_preview_rollback.py  2009
-backend/tests/services/test_note_conversion_section_mapping_production.py  975
-
-#   formula_push/engine.py —— 2026-10-31 由 951→1040 行（+89）：
-#     新增 _expected_section_title（准则章节标题校验 14 行 + 文档注释 10 行）、_push_note_total 的 None→skip
-#     分支（4 行）、合计兜底歧义说明与 unresolved_fields（60 行引擎主逻辑）。拆分轴：_push_note 内的
-#     兜底分支移入独立 _push_note_fallback（约 −80 行）。
-backend/app/services/formula_push/engine.py 1040
-#   test_formula_push_note_skip.py —— 2026-10-31 由 1926→2106 行（+180）：
-#     新增 TestTotalRecomputeNeedsANumber（合计上方全空不按 0 重算, 40 行）、TestExpectedSectionTitle
-#     （准则章节名校验 10 参数化 + 3 行为, 140 行）。拆分轴：TestExpectedSectionTitle 移入
-#     test_formula_push_section_title_check.py。
-backend/tests/test_formula_push_note_skip.py 2106
