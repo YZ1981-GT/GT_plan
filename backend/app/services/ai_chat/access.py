@@ -235,6 +235,44 @@ class ResourceAccessResolver:
             )
             return self._deny(principal_id, host.project_id, AiChatDenialCode.resolver_error)
 
+    async def authorize_project(
+        self,
+        user: Any,
+        project_id: UUID,
+        action: AiChatAction,
+    ) -> AccessDecision:
+        """项目级写目标（用户在对话框里**显式选择**的项目，如 AI 笔记转存到某项目）。
+
+        判据与附注 / 报表宿主完全相同（角色动作上界 → ``_authorize_project_resource``：
+        active 成员或 admin），只是项目来自用户选择而不是页面宿主。异常 fail-closed。
+        """
+        principal_id = _coerce_uuid(getattr(user, "id", None))
+        if principal_id is None:
+            return AccessDecision(
+                allowed=False,
+                principal_id=UUID(int=0),
+                project_id=None,
+                denial_code=AiChatDenialCode.access_denied.value,
+            )
+        role = _system_role(user)
+        if not role_allows_action(role, action):
+            code = (
+                AiChatDenialCode.role_capability_denied
+                if role and action in ACTION_CAPABILITIES
+                else AiChatDenialCode.action_denied
+            )
+            return self._deny(principal_id, project_id, code)
+        try:
+            return await self._authorize_project_resource(
+                user, principal_id, project_id, action, role
+            )
+        except Exception as exc:  # noqa: BLE001 — Req 2.8 fail-closed
+            logger.error(
+                "AI 项目目标授权异常（fail-closed）principal=%s project=%s action=%s: %s",
+                principal_id, project_id, action.value, exc,
+            )
+            return self._deny(principal_id, None, AiChatDenialCode.resolver_error)
+
     async def enforce_host(
         self,
         user: Any,

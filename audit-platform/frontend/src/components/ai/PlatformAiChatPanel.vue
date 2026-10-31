@@ -155,7 +155,7 @@
 
           <!-- 采纳按钮 -->
           <div v-if="msg.role === 'assistant' && msg.status === 'completed'" class="platform-ai-chat-panel__msg-actions">
-            <el-button size="small" type="primary" plain @click="handleAdopt(msg)">
+            <el-button size="small" type="primary" plain :loading="adoptingInPlace === msg.id" :disabled="!!adoptingInPlace" @click="handleAdopt(msg)">
               采纳
             </el-button>
           </div>
@@ -312,6 +312,24 @@
         </el-button>
       </div>
     </div>
+
+    <!-- 采纳目标选择（当前宿主不能直接采纳时；spec ai-chat-adopt-and-note-target-picker R1） -->
+    <ChatAdoptTargetDialog
+      v-model="adoptDialogVisible"
+      :source-host="hostRequest.host"
+      :submit="submitAdoptTarget"
+      @done="onAdoptTargetDone"
+    />
+
+    <!-- 转存笔记：确认名称与保存位置（R3） -->
+    <ChatNoteSaveDialog
+      v-model="noteDialogVisible"
+      :host="hostRequest.host"
+      :count="noteDialogCount"
+      :initial="noteCapture.lastRequest.value"
+      :submit="submitNote"
+      @saved="onNoteSaved"
+    />
   </div>
 </template>
 
@@ -331,9 +349,21 @@ import { WarningFilled, DocumentCopy, Memo, Check, Close, Select } from '@elemen
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import { sanitizeHtml } from '@/composables/useSanitize'
-import { usePlatformAiChat, type ChatMessage } from '@/composables/usePlatformAiChat'
-import { useAiNoteCapture } from '@/composables/useAiNoteCapture'
-import { hostScopeHint, type AiHostRequest } from '@/composables/useAiHostContext'
+import {
+  usePlatformAiChat,
+  type AdoptTarget,
+  type ChatMessage,
+} from '@/composables/usePlatformAiChat'
+import {
+  useAiNoteCapture,
+  type NoteCaptureResult,
+  type NoteSaveRequest,
+} from '@/composables/useAiNoteCapture'
+import {
+  canAdoptInPlace,
+  hostScopeHint,
+  type AiHostRequest,
+} from '@/composables/useAiHostContext'
 import {
   MENTION_TYPE_LABELS,
   type MentionItem,
@@ -343,9 +373,11 @@ import {
   normalizeContextManifest,
   readContextTokenBudget,
 } from '@/utils/chatContextManifest'
+import ChatAdoptTargetDialog from './ChatAdoptTargetDialog.vue'
 import ChatAttachmentPicker from './ChatAttachmentPicker.vue'
 import ChatContextInspector from './ChatContextInspector.vue'
 import ChatMentionPicker from './ChatMentionPicker.vue'
+import ChatNoteSaveDialog from './ChatNoteSaveDialog.vue'
 import ChatReviewModeBar from './ChatReviewModeBar.vue'
 
 // ---------------------------------------------------------------------------
@@ -534,25 +566,32 @@ async function handleCopySelected() {
   await noteCapture.copySelected()
 }
 
-/** 保存为项目笔记 */
-async function handleSaveAsNote() {
-  const result = await noteCapture.saveAsNote()
-  if (result.success && result.jumpRoute) {
-    // 跳转到笔记（使用 router 或 window.open）
-    window.open(result.jumpRoute, '_blank')
-  } else if (!result.success && result.errorMessage && result.errorMessage !== '已取消保存') {
-    ElMessage.error(result.errorMessage)
-  }
+/**
+ * 转存笔记：先弹对话框确认名称与保存位置（spec ai-chat-adopt-and-note-target-picker R3）。
+ *
+ * 2026-10-20 前直接 `saveAsNote()`：无项目页面提示「当前页面无项目上下文」后什么都做不了，
+ * 有项目页面则因请求体与后端契约不一致恒 422。失败后「重试」也回到对话框（预填上次的名称与位置）。
+ */
+const noteDialogVisible = ref(false)
+/** 打开对话框时的选中条数（保存成功会清空选择，对话框里仍显示原条数） */
+const noteDialogCount = ref(0)
+
+function handleSaveAsNote() {
+  noteDialogCount.value = noteCapture.selectedCount.value
+  noteDialogVisible.value = true
 }
 
-/** 重试保存 */
-async function handleRetrySave() {
-  const result = await noteCapture.retrySaveAsNote()
-  if (result.success && result.jumpRoute) {
-    window.open(result.jumpRoute, '_blank')
-  } else if (!result.success && result.errorMessage && result.errorMessage !== '已取消保存') {
-    ElMessage.error(result.errorMessage)
-  }
+function handleRetrySave() {
+  handleSaveAsNote()
+}
+
+function submitNote(request: NoteSaveRequest): Promise<NoteCaptureResult> {
+  return noteCapture.saveAsNote(request)
+}
+
+function onNoteSaved(result: NoteCaptureResult) {
+  const where = result.location ? `「${result.location}」` : ''
+  ElMessage.success(result.replayed ? '笔记此前已保存，未重复创建' : `笔记已保存${where ? `到${where}` : ''}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -731,14 +770,50 @@ function handleKeydown(evt: Event | KeyboardEvent) {
   }
 }
 
+/**
+ * 采纳（spec ai-chat-adopt-and-note-target-picker R1）：
+ * - 当前宿主是底稿 / 附注：直接采纳到当前文件；
+ * - 其余宿主（全局知识 / 报表 / 知识库）：弹「采纳到…」让用户选定底稿或附注章节。
+ *   2026-10-20 前这类宿主直接提交自身，恒「资源不存在或不可访问」。
+ */
+const adoptDialogVisible = ref(false)
+const adoptingMessageId = ref<string | null>(null)
+/** 就地采纳进行中的消息 ID（禁用所有采纳按钮 + 显示 loading 旋转） */
+const adoptingInPlace = ref<string | null>(null)
+
 async function handleAdopt(msg: ChatMessage) {
-  const { success, message } = await adoptContent(msg.id)
-  if (success) {
-    emit('adopt', { content: msg.text, messageId: msg.id })
-    ElMessage.success('已提交采纳，等待确认')
-  } else {
-    ElMessage.error(message || '采纳提交失败，请稍后重试')
+  if (!canAdoptInPlace(hostRequest.value.host)) {
+    adoptingMessageId.value = msg.id
+    adoptDialogVisible.value = true
+    return
   }
+  adoptingInPlace.value = msg.id
+  try {
+    const { success, message } = await adoptContent(msg.id)
+    if (success) {
+      emit('adopt', { content: msg.text, messageId: msg.id })
+      ElMessage.success('已提交采纳：请在底稿页面复制到目标位置后，在「AI 生成内容待确认」中标记为已审阅')
+    } else {
+      ElMessage.error(message || '采纳提交失败，请稍后重试')
+    }
+  } finally {
+    adoptingInPlace.value = null
+  }
+}
+
+function submitAdoptTarget(target: AdoptTarget) {
+  const messageId = adoptingMessageId.value
+  if (!messageId) {
+    return Promise.resolve({ success: false, message: '请重新点击要采纳的回复' })
+  }
+  return adoptContent(messageId, target)
+}
+
+function onAdoptTargetDone(label: string) {
+  adoptingMessageId.value = null
+  ElMessage.success(
+    `已提交采纳到「${label}」：请到该页面的「AI 生成内容待确认」中确认后生效`,
+  )
 }
 
 // ---------------------------------------------------------------------------

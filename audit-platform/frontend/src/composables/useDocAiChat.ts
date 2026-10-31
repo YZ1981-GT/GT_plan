@@ -24,6 +24,7 @@ import {
   hostQueryString,
   type AiHostRequest,
 } from '@/composables/useAiHostContext'
+import { readAiChatErrorResponse } from '@/composables/aiChatWireError'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -418,16 +419,7 @@ export function useDocAiChat(options: UseDocAiChatOptions) {
         return { success: true }
       }
       // 失败必须带出可执行原因（Req 8.5：保留选择状态并显示可重试原因）
-      let code: string | undefined
-      let message: string | undefined
-      try {
-        const body = await res.json()
-        const detail = body?.detail ?? body?.data?.detail ?? body
-        code = detail?.code
-        message = detail?.message ?? (typeof detail === 'string' ? detail : undefined)
-      } catch {
-        /* 非 JSON 响应体：保留 undefined，由调用方给通用文案 */
-      }
+      const { code, message } = await readAiChatErrorResponse(res)
       return { success: false, code, message }
     } catch {
       return { success: false, code: 'network_error', message: '网络异常，采纳未生效' }

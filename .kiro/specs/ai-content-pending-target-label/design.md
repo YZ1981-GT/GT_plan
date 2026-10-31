@@ -71,8 +71,12 @@
 - `ai-chat-adopt-and-note-target-picker` R1 / R3 的前端接线不在库：`ChatAdoptTargetDialog.vue` / `ChatNoteSaveDialog.vue` 由
   021a47269「收集并发会话未提交产物」入库，但没有任何组件挂载它们；前者 import 的 `AdoptTarget` 类型
   `usePlatformAiChat` 从未导出，`PlatformAiChatPanel.handleAdopt` 只调 `adoptContent(msg.id)`（不带 `source_host`）。
-  `git log --all -S` 查不到任何提交有过这段接线（与该 spec 记的「未 commit 改动被并发 checkout 覆盖」一致）。
+  （更正：上句之后曾写「`git log --all -S` 查不到任何提交有过这段接线」，不对 —— `git log -S` 默认不看合并提交，而 stash 提交是合并。实际：11 个已跟踪文件的改动 10-21 17:56 被收进 stash 112bfabec、17:57 pop 回来，18:15 被并发会话 `git checkout --force` 冲掉；完整改动仍在本地救援标签 `rescue/2026-10-21-1756-temp-for-push-reconcile`。）
   `ChatAdoptNoteTarget.spec.ts` 8 例因此在 HEAD 上一直红；要恢复需重做接线，另立 spec。
+  （2026-10-31 结案：另立的是 `stash-1021-lost-changes-recovery`，没有重做接线 —— 直接从救援标签取回原改动并逐文件三方合并，
+  12 个已跟踪文件已随本条所在提交入库；本条前三句「不在库 / 无挂载点 / `AdoptTarget` 未导出」自此不再成立。
+  同时实测确认本 spec 要修的 `target_label` 现在真的有值：待确认弹窗与 `GET /api/projects/{pid}/ai-content/pending`
+  对底稿项都返回「D2 应收账款审定表」。）
 
 ## 勘误（已归档 spec 不回填）
 

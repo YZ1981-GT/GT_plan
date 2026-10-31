@@ -483,6 +483,9 @@ class AdoptRequest(BaseModel):
 
     message_id: UUID = Field(..., description="服务端签发的 assistant 消息 ID")
     host: AdoptHostRef = Field(..., description="采纳目标宿主")
+    source_host: AdoptHostRef | None = Field(
+        None, description="消息所在会话的宿主；用户另选采纳目标时提交"
+    )
     target_cell: str | None = Field(None, max_length=120, description="目标单元格引用")
     target_field: str | None = Field(None, max_length=120, description="目标字段名")
     idempotency_key: UUID = Field(..., description="客户端生成的幂等键")
@@ -792,6 +795,20 @@ async def adopt_ai_content(
         entrypoint="ai_chat.adopt",
         year=req.host.year,
     )
+    # 当前请求可把全局 / 报表 / 知识库会话的消息采纳到已授权业务目标。
+    # 目标仍按 adopt 授权；来源只为读取权威消息而按 history 授权。
+    source_host = None
+    if req.source_host is not None:
+        source_host = await _authorize_doc_host(
+            db,
+            current_user,
+            doc_type=req.source_host.type,
+            doc_id=req.source_host.id,
+            project_id=req.source_host.project_id,
+            action=AiChatAction.history,
+            entrypoint="ai_chat.adopt.source",
+            year=req.source_host.year,
+        )
     try:
         outcome = await adopt_message(
             db,
@@ -801,6 +818,7 @@ async def adopt_ai_content(
             idempotency_key=req.idempotency_key,
             target_cell=req.target_cell,
             target_field=req.target_field,
+            source_host=source_host,
         )
     except AdoptFailed as exc:
         # 下游失败绝不产生成功文案（Property 33）；内部异常细节只进日志（Req 12.5）。
@@ -1055,7 +1073,10 @@ class NoteSaveRequestBody(BaseModel):
     idempotency_key: str = Field(
         ..., min_length=1, max_length=128, description="幂等键（防重复转存）"
     )
-    session_id: UUID = Field(..., description="当前会话 ID")
+    session_id: UUID | None = Field(None, description="会话 ID 断言（缺省由服务端按消息反查）")
+    # 保存位置二选一；都不传时保存到宿主项目的“AI 对话笔记”。
+    target_project_id: UUID | None = Field(None, description="保存到该项目的 AI 对话笔记")
+    target_folder_id: UUID | None = Field(None, description="保存到该知识库文件夹")
 
 
 class NoteSaveResponseBody(BaseModel):
@@ -1067,6 +1088,7 @@ class NoteSaveResponseBody(BaseModel):
     name: str
     replayed: bool = False
     jump_route: str = ""
+    location: str = ""
 
 
 @router.post(
@@ -1095,14 +1117,16 @@ async def save_ai_note(
     """
     from app.services.ai_chat.note_service import NoteSaveFailed, save_note
 
-    # ① 授权
+    # 显式位置时当前宿主只证明消息来源，会在服务内按真正目标重新判写权限。
+    # 没有显式位置时才保留“当前宿主就是项目笔记目标”的 note_create 判定。
+    explicit_target = req.target_project_id is not None or req.target_folder_id is not None
     host = await _authorize_doc_host(
         db,
         current_user,
         doc_type=req.host_type,
         doc_id=req.host_id,
         project_id=req.project_id,
-        action=AiChatAction.note_create,
+        action=AiChatAction.history if explicit_target else AiChatAction.note_create,
         entrypoint="ai_chat.note_save",
         year=req.year,
     )
@@ -1118,6 +1142,8 @@ async def save_ai_note(
             message_ids=req.message_ids,
             name=req.name,
             idempotency_key=req.idempotency_key,
+            target_project_id=req.target_project_id,
+            target_folder_id=req.target_folder_id,
         )
     except NoteSaveFailed as exc:
         raise HTTPException(

@@ -2043,6 +2043,8 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 ### 七、缺陷归因用 `git blame` 定到行
 
 - 「最近改过这个文件的提交」不等于「引入这几行的提交」：ai_content.py 的标签查询曾被误归到 1db8ed43e，`git blame -L` 实为 6d6d093c8（10-21）⇒ `git blame -L <起>,<止> <rev> -- <文件>` 或 `git log -L`
+- 找丢失代码别只用 `git log --all -S`：它默认不看合并提交，而 stash 提交就是合并（`git log -m -S` 才看）。还要查 `refs/tags/rescue/*`（10-21 抢救时打的防 gc 标签）、`git fsck --unreachable --no-reflogs` 的悬空提交、编辑器本地历史（`%APPDATA%\Kiro\User\History`）与 `~/.kiro/sessions/*/messages.jsonl`（能还原谁在什么时候执行了什么）。10-30 曾据此误判「采纳 / 转存笔记接线从没入过库」，实际完整留在救援标签 stash 112bfabec 里
+- 恢复丢失改动一律**逐文件三方合并**，禁 `git checkout <旧rev> -- <file>` 整文件取回：丢失期间这些文件往往已被别人改过（10-31 恢复 AI 采纳接线时，整文件取旧版会回退 SSE 路由的 `get_db(scope="function")` 和 `auditPlatformApi.getDisclosureNoteTree(..., config?)` 两处后续修复）。配套四条：①候选树在隔离 worktree 上做，远端验证期间前移了就换基后比对 `git diff --cached --binary` 字节不变，别重新手工合一遍 ②生成物（`components.d.ts` / `auto-imports.d.ts`）跑一次 Vite 就会补出与本次无关的条目（10-31 补出 `ElImage` / `ElScrollbar`，用在本次未改的 `AttachmentPreviewCore.vue` / `DisclosureEditor.vue`），提交前 `git checkout --` 丢弃，按「生成文件不取并集」处置 ③跟功能绑定的配置改动（`tsconfig.json` 的 `lib`）不能当无关改动剔掉，剔了区域 typecheck 当场红 ④memory / spec 里记的「已知缺陷」会过期，引用前先实测（10-31 实测 `target_label` 已有值，而记录里还写着恒空）
 
 ### 八、「已修复」要验到用户看得见的地方
 

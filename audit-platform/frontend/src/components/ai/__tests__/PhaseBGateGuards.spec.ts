@@ -352,6 +352,9 @@ describe('Phase B Gate Guards', () => {
       /**
        * MUTATION ANCHOR FE-P21-A: 每次 saveAsNote 都新生成 key（重试产生双文档）
        * 或干脆不发 idempotency_key → 打红。
+       * MUTATION ANCHOR FE-P21-C: 保存位置变化仍复用旧 key（换了位置的第二篇被幂等吞掉）→ 打红。
+       * 名称确认（Req 8.2）自 spec ai-chat-adopt-and-note-target-picker 起由 ChatNoteSaveDialog
+       * 负责；composable 不再内置 prompt，空名称直接拒绝且不发请求。
        * MUTATION ANCHOR FE-P21-B: 选择变化后不重置 key（不同意图复用同一 key，
        * 第二篇笔记被幂等吞掉）→ 打红。
        *
@@ -380,45 +383,69 @@ describe('Phase B Gate Guards', () => {
         year: 2025,
       }
 
-      mockPrompt.mockResolvedValue({ value: '应收账款问答记录' })
-
       const capture = useAiNoteCapture({
         messages: () => messages,
         host: () => host as any,
       })
 
+      // 平台真实失败信封：外层 code 是 HTTP 状态，业务码与中文原因在 message 对象里
       const failure = () => ({
         ok: false,
-        status: 500,
-        json: async () => ({ detail: { code: 'internal_error', message: '服务异常' } }),
+        status: 503,
+        json: async () => ({
+          code: 503,
+          message: { code: 'internal_error', message: '笔记保存失败，请重试' },
+        }),
       })
+      const request = { name: '应收账款问答记录', target: { kind: 'host_project' as const } }
 
       capture.toggleMessage(messages[0].id)
       expect(capture.selectedCount.value).toBe(1)
 
+      // ⓪ 名称必须由用户确认（Req 8.2）：空名称不发请求，更不静默生成时间戳名
+      const blank = await capture.saveAsNote({ name: '   ', target: { kind: 'host_project' } })
+      expect(blank.success).toBe(false)
+      expect(blank.errorCode).toBe('empty_name')
+      expect(mockFetch).not.toHaveBeenCalled()
+
       // ① 第一次保存失败 → key 必须保留（成功会清空选择，那时无法再观察复用）
       mockFetch.mockResolvedValueOnce(failure())
-      expect((await capture.saveAsNote()).success).toBe(false)
-
-      // 名称必须经确认对话框（Req 8.2：不静默生成时间戳名）
-      expect(mockPrompt).toHaveBeenCalledTimes(1)
+      const first = await capture.saveAsNote(request)
+      expect(first.success).toBe(false)
+      expect(first.errorMessage, '信封里的中文原因没取到').toBe('笔记保存失败，请重试')
 
       // ② 选择集变了 = 新的保存意图 → 必须换新 key（此时旧 key 仍存活）
       capture.toggleMessage(messages[1].id)
       expect(capture.selectedCount.value).toBe(2)
       mockFetch.mockResolvedValueOnce(failure())
-      expect((await capture.saveAsNote()).success).toBe(false)
+      expect((await capture.saveAsNote(request)).success).toBe(false)
 
-      // ③ 选择没变的重试 → 复用同一 key
+      // ③ 选择没变的重试 → 复用同一 key（沿用上次名称与位置）
+      mockFetch.mockResolvedValueOnce(failure())
+      expect((await capture.retrySaveAsNote()).success).toBe(false)
+
+      // ④ 换了保存位置 = 新的保存意图 → 换新 key
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: { jump_route: '/knowledge/doc/1' } }),
+        json: async () => ({
+          data: {
+            jump_route: '/knowledge?folder_id=f1&doc_id=d1',
+            location: '某项目（项目资料） / AI 对话笔记',
+            name: '应收账款问答记录',
+          },
+        }),
       })
-      expect((await capture.retrySaveAsNote()).success).toBe(true)
+      const saved = await capture.saveAsNote({
+        name: '应收账款问答记录',
+        target: { kind: 'project', projectId: '33333333-3333-4333-8333-333333333334' },
+      })
+      expect(saved.success).toBe(true)
+      expect(saved.location).toBe('某项目（项目资料） / AI 对话笔记')
+      expect(saved.jumpRoute).toBe('/knowledge?folder_id=f1&doc_id=d1')
 
       const bodies = requestBodies()
-      expect(bodies).toHaveLength(3)
+      expect(bodies).toHaveLength(4)
       for (const body of bodies) {
         expect(body.idempotency_key, '未提交 idempotency_key').toMatch(UUID_RE)
       }
@@ -428,9 +455,14 @@ describe('Phase B Gate Guards', () => {
       expect(bodies[2].idempotency_key, '重试未复用同一 key').toBe(
         bodies[1].idempotency_key,
       )
+      expect(bodies[3].idempotency_key, '保存位置变化后仍复用旧 key').not.toBe(
+        bodies[2].idempotency_key,
+      )
       expect(bodies[0].message_ids).toEqual([messages[0].id])
       expect(bodies[2].message_ids).toEqual([messages[0].id, messages[1].id])
       expect(bodies[0].name).toBe('应收账款问答记录')
+      expect(bodies[3].target_project_id).toBe('33333333-3333-4333-8333-333333333334')
+      expect('target_project_id' in bodies[0], '宿主项目位置不应带显式目标').toBe(false)
     })
   })
 
