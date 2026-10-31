@@ -39,6 +39,7 @@ vi.mock('@/services/sse/projectEventStream', () => ({
 import {
   useAdjustmentCentralSync,
   computeContentSignature,
+  syncOutcomeMessage,
   type UseAdjustmentCentralSyncOptions,
   type CentralSyncLineItem,
 } from '@/components/workpaper/composables/useAdjustmentCentralSync'
@@ -173,6 +174,27 @@ describe('useAdjustmentCentralSync', () => {
     await s.syncToCentral()
     expect(syncMock).not.toHaveBeenCalled()
     expect(msg.warning).toHaveBeenCalledWith('未设置审计年度，请先在项目基本信息中填写')
+  })
+
+  // ─── adjustment-hall-entry-review-closure：推送结果与失败原因如实提示 ─────────
+
+  it('推送结果按后端 sync_outcome 提示（新建 / 更新回草稿 / 未变化）', () => {
+    expect(syncOutcomeMessage({ sync_outcome: 'created', adjustment_no: 'AJE-005' }))
+      .toContain('提交复核并批准后计入试算表审定数')
+    const updated = syncOutcomeMessage({ sync_outcome: 'updated', previous_status: 'pending_review', adjustment_no: 'AJE-005' })
+    expect(updated).toContain('已回到草稿')
+    expect(updated).toContain('重新提交复核')
+    expect(syncOutcomeMessage({ sync_outcome: 'updated', previous_status: 'draft' })).not.toContain('重新提交')
+    expect(syncOutcomeMessage({ sync_outcome: 'unchanged', adjustment_no: 'AJE-005' })).toContain('无需重复同步')
+  })
+
+  it('其余错误码显示后端原因（如协作锁定），不再是笼统的「同步失败」', async () => {
+    syncMock.mockRejectedValue({ response: { status: 409, data: { detail: {
+      error_code: 'COLLABORATION_LOCKED', message: '该分录组存在进行中的协作补充' } } } })
+    statusMock.mockResolvedValue(null)
+    const s = makeSync(BALANCED_ITEMS)
+    await s.syncToCentral()
+    expect(msg.error).toHaveBeenCalledWith(expect.stringContaining('该分录组存在进行中的协作补充'))
   })
 
   // ─── Phase 3：computeContentSignature ──────────────────────────────────

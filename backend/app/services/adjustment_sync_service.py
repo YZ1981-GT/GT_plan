@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -50,6 +51,16 @@ class AdjustmentSyncError(ValueError):
         super().__init__(message)
         self.code = code
         self.detail = detail
+
+
+@dataclass(frozen=True)
+class SyncOutcome:
+    """一次推送的结果：新建 / 更新 / 未变化（spec adjustment-hall-entry-review-closure 需求 3.1）。"""
+
+    response: AdjustmentGroupResponse
+    outcome: str  # created / updated / unchanged
+    previous_status: str | None
+    resolved_codes: list[str]
 
 
 class AdjustmentSyncService:
@@ -133,13 +144,22 @@ class AdjustmentSyncService:
         data: AdjustmentSyncRequest,
         user_id: UUID,
     ) -> AdjustmentGroupResponse:
+        """底稿分录组 → 集中登记，只返回分录组（需要推送结果时用 ``sync_with_outcome``）。"""
+        return (await self.sync_with_outcome(project_id, data, user_id)).response
+
+    async def sync_with_outcome(
+        self,
+        project_id: UUID,
+        data: AdjustmentSyncRequest,
+        user_id: UUID,
+    ) -> SyncOutcome:
         """底稿分录组 → 集中登记（幂等 by source_ref + 内容签名去重）。
 
         ADR-P3-008：
-        - 相同内容 → 不写库、不换编号、原样返回
+        - 相同内容 → 不写库、不换编号、原样返回（unchanged）
         - 不同内容 → 原地更新（保 entry_group_id 与 adjustment_no），
-          pending_review/rejected 回 draft 并清复核信息；approved → APPROVED_LOCKED
-        - 新建 → 正常建组
+          pending_review/rejected 回 draft 并清复核信息（updated）；approved → APPROVED_LOCKED
+        - 新建 → 正常建组（created）
         """
         source_ref = self.build_source_ref(data.wp_id, data.item_id)
 
@@ -197,12 +217,12 @@ class AdjustmentSyncService:
             old_entries = await self._adj._get_entry_rows(group_id)
             old_sig = self._compute_existing_signature(existing_rows, old_entries)
             if new_sig == old_sig:
-                return self._adj._build_group_response(
+                return SyncOutcome(self._adj._build_group_response(
                     group_id, adj_no, existing_rows[0].adjustment_type,
                     existing_rows[0].description, status,
                     existing_rows, old_entries,
                     existing_rows[0].created_by,
-                )
+                ), "unchanged", status.value, resolved)
 
             # 内容变化 → 原地更新（保组号与编号，软删旧行写新行）
             # pending_review / rejected 回 draft 并清复核信息
@@ -213,7 +233,7 @@ class AdjustmentSyncService:
             await self.db.flush()
 
             # 写入新行（复用组号 + 编号）
-            return await self._write_group_rows(
+            return SyncOutcome(await self._write_group_rows(
                 project_id=project_id,
                 data=data,
                 resolved=resolved,
@@ -221,14 +241,14 @@ class AdjustmentSyncService:
                 user_id=user_id,
                 entry_group_id=group_id,
                 adjustment_no=adj_no,
-            )
+            ), "updated", status.value, resolved)
 
         # 5. 新建分录组
         adjustment_no = await self._adj._next_adjustment_no(
             project_id, data.year, data.adjustment_type
         )
         entry_group_id = uuid.uuid4()
-        return await self._write_group_rows(
+        return SyncOutcome(await self._write_group_rows(
             project_id=project_id,
             data=data,
             resolved=resolved,
@@ -236,7 +256,7 @@ class AdjustmentSyncService:
             user_id=user_id,
             entry_group_id=entry_group_id,
             adjustment_no=adjustment_no,
-        )
+        ), "created", None, resolved)
 
     # ------------------------------------------------------------------
     # _write_group_rows（内部：写入一组 Adjustment + AdjustmentEntry 行）
@@ -352,9 +372,24 @@ class AdjustmentSyncService:
                 else head.review_status
             ),
             "rejection_reason": head.rejection_reason,
-            "source_wp_code": source_ref.split(":", 1)[0] if source_ref else None,
+            # 原先返回 source_ref 的 wp_id 段（UUID）；改为按底稿索引查真实底稿编码
+            "source_wp_code": await self._source_wp_code(source_ref),
             "collaboration_status": collaboration_status,
         }
+
+    async def _source_wp_code(self, source_ref: str | None) -> str | None:
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+
+        try:
+            wp_id = UUID((source_ref or "").split(":", 1)[0])
+        except ValueError:
+            return None
+        r = await self.db.execute(
+            sa.select(WpIndex.wp_code)
+            .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(WorkingPaper.id == wp_id)
+        )
+        return r.scalar_one_or_none()
 
     # ------------------------------------------------------------------
     # Internal helpers

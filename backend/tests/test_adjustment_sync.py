@@ -248,6 +248,8 @@ def test_p7_source_ref_parse():
 # ─── P8 回流状态一致 ──────────────────────────────────────────────────────────
 @pytest.mark.asyncio
 async def test_p8_status_roundtrip(db_session, pid):
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
     svc = AdjustmentSyncService(db_session)
     await svc.sync_from_workpaper(pid, _req(), _USER_ID)
     await db_session.flush()
@@ -255,7 +257,17 @@ async def test_p8_status_roundtrip(db_session, pid):
     status = await svc.get_status_by_source_ref(pid, source_ref)
     assert status is not None
     assert status["review_status"] == "draft"
-    assert status["source_wp_code"] == str(_WP_ID)
+    # 原先 source_wp_code 返回的是 source_ref 的 wp_id 段（UUID）；改为按底稿索引查真实编码
+    assert status["source_wp_code"] is None, "底稿不存在时没有编码，不能把 UUID 当编码"
+    idx = WpIndex(project_id=pid, wp_code="D4", wp_name="营业收入")
+    db_session.add(idx)
+    await db_session.flush()
+    source_type = WorkingPaper.__table__.c["source_type"].type.enum_class("template")
+    db_session.add(WorkingPaper(id=_WP_ID, project_id=pid, wp_index_id=idx.id, file_path="D4.xlsx",
+                                source_type=source_type))
+    await db_session.flush()
+    status = await svc.get_status_by_source_ref(pid, source_ref)
+    assert status["source_wp_code"] == "D4"
 
 
 # ─── 科目解析：name fallback + unresolved ─────────────────────────────────────

@@ -55,7 +55,7 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 # 不是改 import 路径能解决的，故另立工单。
 #
 # 分类明细：
-# - ChecklistResponse ×3：`checklist_responses` 表**无 ORM 模型**（SQLAlchemy 注册表
+# - ChecklistResponse ×2（原 ×3，adjustments.py 那条 2026-10-31 随协作回写删除）：`checklist_responses` 表**无 ORM 模型**（SQLAlchemy 注册表
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
 # - save_formula_batch：同上
@@ -72,7 +72,8 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/issue_ticket_service.py", "app.services.notification_service", "notification_service"),
     ("app/services/role_workbench_facade.py", "app.models.collaboration_models", "PBCItem"),
     ("app/services/wp_scripts/registry.py", "app.services.tsj_prompt_service", "get_review_points"),
-    ("app/routers/adjustments.py", "app.models.audit_platform_models", "ChecklistResponse"),
+    # adjustments.py 的 ChecklistResponse（协作确认回写，从未执行）：2026-10-31 随回写一并删除
+    # （spec adjustment-hall-entry-review-closure 需求 6.3），已从基线删除。
     ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAccount"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),

@@ -44,6 +44,21 @@ interface PreviewResult {
   unmapped_accounts: string[]
 }
 
+/** 后端 FinancialReportType → 面向用户的中文名称；兼容历史数据中的权益变动表别名。 */
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  balance_sheet: '资产负债表',
+  income_statement: '利润表',
+  cash_flow_statement: '现金流量表',
+  equity_statement: '所有者权益变动表',
+  equity_change_statement: '所有者权益变动表',
+  cash_flow_supplement: '现金流量表补充资料',
+  impairment_provision: '资产减值准备明细表',
+}
+
+function reportTypeLabel(reportType: string): string {
+  return REPORT_TYPE_LABELS[reportType] || reportType || '报表'
+}
+
 const props = withDefaults(
   defineProps<{
     projectId: string
@@ -225,7 +240,7 @@ defineExpose({
           <tbody>
             <tr v-for="(row, idx) in result.affected_report_rows" :key="`${row.report_type}-${row.row_code}-${row.field}-${idx}`">
               <td>
-                <el-tag size="small" type="info" effect="plain">{{ row.report_type }}</el-tag>
+                <el-tag size="small" type="info" effect="plain">{{ reportTypeLabel(row.report_type) }}</el-tag>
               </td>
               <td>
                 <span class="gt-aip-row-code">{{ row.row_code }}</span>

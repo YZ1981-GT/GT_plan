@@ -105,7 +105,8 @@ export interface AccountOption {
   code: string
   name: string
   level: number
-  report_line?: string  // 对应报表行次名称
+  report_line?: string | null  // 对应报表行次名称（已确认映射的才有）
+  balance?: string | null      // 传年度时附试算表审定数（参考余额）
 }
 
 export async function listAdjustments(
@@ -116,6 +117,19 @@ export async function listAdjustments(
     params: { year, ...opts },
   })
   return data
+}
+
+/** 取本年度全部分录组：后端每页最多 200，按 has_more 逐页取（原先只取第一页 200 组） */
+export async function listAllAdjustments(projectId: string, year: number): Promise<any[]> {
+  const items: any[] = []
+  for (let page = 1; page <= 50; page += 1) {
+    const res = await listAdjustments(projectId, year, { page, page_size: 200 })
+    const batch: any[] = Array.isArray(res) ? res : (res?.items || [])
+    items.push(...batch)
+    const more = Array.isArray(res) ? false : (res?.has_more ?? batch.length === 200)
+    if (!more || !batch.length) break
+  }
+  return items
 }
 
 /** 底稿调整分录组 → 集中登记（workpaper-adjustment-centralization） */
@@ -132,7 +146,8 @@ export async function syncAdjustmentFromWorkpaper(projectId: string, body: {
     debit_amount: number; credit_amount: number
   }>
 }) {
-  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body)
+  // 调用方（useAdjustmentCentralSync）按错误码自管提示 ⇒ 静默，免得全局拦截器先弹一次
+  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body, { _silent: true } as any)
   return data
 }
 
@@ -146,21 +161,25 @@ export async function getAdjustmentBySourceRef(projectId: string, sourceRef: str
   }
 }
 
-export async function createAdjustment(projectId: string, body: {
-  adjustment_type: string; year: number; company_code?: string;
-  description?: string; line_items: Array<{
-    standard_account_code: string; account_name?: string;
-    debit_amount: number; credit_amount: number
-  }>
-}, opts?: { batch_mode?: boolean }) {
-  const params: Record<string, any> = {}
-  if (opts?.batch_mode) params.batch_mode = true
-  const { data } = await http.post(P_adj.create(projectId), body, { params })
-  return data
+/** 调整大厅写操作（新建 / 修改 / 删除 / 撤回复核）的调用方都自管失败提示 ⇒ 静默 */
+const ADJ_SILENT = { _silent: true } as any
+
+export interface AdjustmentLineInput {
+  standard_account_code: string
+  account_name?: string
+  detail_account_code?: string | null
+  report_line_code?: string | null
+  debit_amount: number
+  credit_amount: number
 }
 
-export async function batchCommitAdjustments(projectId: string, year: number) {
-  const { data } = await http.post(P_adj.batchCommit(projectId), null, { params: { year } })
+export async function createAdjustment(projectId: string, body: {
+  adjustment_type: string; year: number; company_code?: string;
+  /** 自定义编号（不填自动编号；同项目同年度不得重复） */
+  adjustment_no?: string
+  description?: string; line_items: AdjustmentLineInput[]
+}) {
+  const { data } = await http.post(P_adj.create(projectId), body, ADJ_SILENT)
   return data
 }
 
@@ -223,32 +242,22 @@ export async function rejectCollaboration(projectId: string, cid: string, reason
 }
 
 export async function updateAdjustment(projectId: string, groupId: string, body: {
-  description?: string; line_items: Array<{
-    standard_account_code: string; account_name?: string;
-    debit_amount: number; credit_amount: number
-  }>
+  description?: string; line_items: AdjustmentLineInput[]
 }) {
-  const { data } = await http.put(P_adj.detail(projectId, groupId), body)
+  const { data } = await http.put(P_adj.detail(projectId, groupId), body, ADJ_SILENT)
   return data
 }
 
 export async function deleteAdjustment(projectId: string, groupId: string) {
-  const { data } = await http.delete(P_adj.detail(projectId, groupId))
+  const { data } = await http.delete(P_adj.detail(projectId, groupId), ADJ_SILENT)
   return data
 }
 
-export async function reviewAdjustment(projectId: string, groupId: string, body: {
-  status: string; reason?: string
-}) {
-  const { data } = await http.post(P_adj.review(projectId, groupId), body)
-  return data
-}
-
-/** 撤回复核（approved→draft）（chain-closure-phase3-push-rollout 需求 3.1） */
+/** 撤回复核（approved→draft）（chain-closure-phase3-push-rollout 需求 3.1）；返回含 notified（通知了谁） */
 export async function revokeAdjustmentReview(projectId: string, groupId: string, body: {
   reason?: string
 }) {
-  const { data } = await http.post(P_adj.revokeReview(projectId, groupId), body)
+  const { data } = await http.post(P_adj.revokeReview(projectId, groupId), body, ADJ_SILENT)
   return data
 }
 
@@ -257,10 +266,129 @@ export async function getAdjustmentSummary(projectId: string, year: number): Pro
   return data
 }
 
-export async function getAccountDropdown(projectId: string, reportLineCode?: string): Promise<AccountOption[]> {
-  const params: Record<string, string> = {}
+export async function getAccountDropdown(
+  projectId: string, reportLineCode?: string, year?: number | null,
+): Promise<AccountOption[]> {
+  const params: Record<string, string | number> = {}
   if (reportLineCode) params.report_line_code = reportLineCode
+  if (year != null) params.year = year
   const { data } = await http.get(P_adj.accountDropdown(projectId), { params })
+  return data
+}
+
+// ── 调整分录复核流转 / 导入（spec adjustment-hall-entry-review-closure）──
+// 调用方自管提示 ⇒ 一律 _silent（否则全局拦截器先弹一次，同一原因提示两遍）
+
+export interface AdjustmentReviewer {
+  user_id: string
+  name: string
+  project_role: string | null
+  system_role: string
+}
+
+export interface AdjustmentFlowItem {
+  entry_group_id: string
+  adjustment_no?: string | null
+  status?: string
+  previous_status?: string
+  reason?: string
+  [key: string]: unknown
+}
+
+export interface AdjustmentFlowResult {
+  succeeded: AdjustmentFlowItem[]
+  failed: Array<{ entry_group_id: string; adjustment_no: string | null; reason: string }>
+  notified: Array<{ user_id: string; name: string; kind: string }>
+  warning?: string | null
+}
+
+export async function listAdjustmentReviewers(projectId: string): Promise<AdjustmentReviewer[]> {
+  const { data } = await http.get(P_adj.reviewers(projectId), { _silent: true } as any)
+  return data
+}
+
+export async function submitAdjustmentsForReview(projectId: string, body: {
+  entry_group_ids: string[]; reviewer_ids?: string[]; note?: string
+}): Promise<AdjustmentFlowResult> {
+  const { data } = await http.post(P_adj.submitReview(projectId), body, { _silent: true } as any)
+  return data
+}
+
+export async function withdrawAdjustmentSubmission(projectId: string, groupId: string) {
+  const { data } = await http.post(P_adj.withdrawSubmission(projectId, groupId), null, { _silent: true } as any)
+  return data
+}
+
+export async function reviewAdjustmentsBatch(projectId: string, body: {
+  entry_group_ids: string[]; status: 'approved' | 'rejected'; reason?: string; reasons?: Record<string, string>
+}): Promise<AdjustmentFlowResult> {
+  const { data } = await http.post(P_adj.reviewBatch(projectId), body, { _silent: true } as any)
+  return data
+}
+
+export async function batchDeleteAdjustments(projectId: string, ids: string[]): Promise<{
+  succeeded: string[]; failed: Array<{ id: string; error: string }>
+}> {
+  const { data } = await http.post(P_adj.batchDelete(projectId), { ids }, { _silent: true } as any)
+  return data
+}
+
+export interface AdjustmentImportPreviewGroup {
+  key: string
+  adjustment_no: string
+  adjustment_type: 'AJE' | 'RJE'
+  description: string
+  rows: number[]
+  lines: Array<{ label: string; account_code: string; account_name: string; debit: string; credit: string }>
+  total_debit: string
+  total_credit: string
+  action: 'create' | 'replace' | 'skip'
+  skip_reason: string | null
+  errors: string[]
+  ok: boolean
+}
+
+export interface AdjustmentImportPreview {
+  mode: 'append' | 'overwrite'
+  groups: AdjustmentImportPreviewGroup[]
+  warnings: string[]
+  structure_errors: string[]
+  summary: { total: number; ok: number; error: number; skip: number; replace: number }
+  example_skipped: number
+}
+
+export interface AdjustmentImportResult {
+  imported: number
+  skipped: number
+  failed: number
+  failed_rows: Array<{ row: number; adj_no: string; rows_in_group: number[]; error: string }>
+  skipped_rows?: Array<{ row: number; adj_no: string; rows_in_group: number[]; reason: string }>
+  created: Array<{ key: string; entry_group_id: string; adjustment_no: string | null }>
+  warnings: string[]
+  message: string
+}
+
+function _importForm(file: File): FormData {
+  const form = new FormData()
+  form.append('file', file)
+  return form
+}
+
+export async function previewAdjustmentImport(
+  projectId: string, year: number, mode: 'append' | 'overwrite', file: File,
+): Promise<AdjustmentImportPreview> {
+  const { data } = await http.post(P_adj.importPreview(projectId), _importForm(file), {
+    params: { year, mode }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000, _silent: true,
+  } as any)
+  return data
+}
+
+export async function importAdjustmentsFile(
+  projectId: string, year: number, mode: 'append' | 'overwrite', file: File,
+): Promise<AdjustmentImportResult> {
+  const { data } = await http.post(P_adj.importFile(projectId), _importForm(file), {
+    params: { year, mode }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000, _silent: true,
+  } as any)
   return data
 }
 

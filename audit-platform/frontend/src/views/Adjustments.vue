@@ -269,6 +269,7 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useProjectRole } from '@/composables/useProjectRole'
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import { handleApiError } from '@/utils/errorHandler'
+import { ADJUSTMENT_SHEET_ALIAS } from '@/utils/normalizeSheetName'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { ADJUSTMENT_STATUS, ADJUSTMENT_STATUS_LABELS } from '@/constants/statusEnum'
@@ -676,24 +677,19 @@ function openWorkpaper(wpId: string) {
 }
 
 /**
- * 来源底稿：source_ref='{wp_id}:{item_id}'；item_id 前缀编码（如 K9-3）作 ?sheet= 定位调整分录页签。
- * 只带 ?sheet=（编辑器读它切页签）；item_id 是核对表行键，编辑器没有按它定位的通路，
- * 别再塞编辑器不读的 ?highlight=（看着像能定位到行，其实原样被忽略）。
+ * 跳转到来源底稿的调整分录页（source_ref='{wp_id}:{item_id}'，前缀即 wp_id）。
+ * ?sheet=@adjustment：该底稿名称含「调整分录」的那张表（item_id 前缀落不到它：D1-entry-rows → 审定表、L1-adj-AJE → 程序表）；
+ * ?highlight=source_ref：来源页签认领分录组并切到对应类型（spec wp-deeplink-locate-residual-closure 需求 1，
+ * 守卫 adjustmentEntryGroupWiring.spec.ts）。来源底稿已删除时只提示、不跳转。
  */
 function jumpToSourceWorkpaper(row: any) {
   const ref = String(row?.source_ref || '')
-  const cut = ref.indexOf(':')
-  const wpId = cut >= 0 ? ref.slice(0, cut) : ''
-  if (!wpId || row.source_missing) {
-    ElMessage.info(row.source_missing ? '来源底稿已删除；如这笔分录已无用，可直接删除' : '没有来源底稿信息')
+  const wpId = ref.indexOf(':') >= 0 ? ref.slice(0, ref.indexOf(':')) : ''
+  if (!wpId || row?.source_missing) {
+    ElMessage.info(row?.source_missing ? '来源底稿已删除；如这笔分录已无用，可直接删除' : '没有来源底稿信息')
     return
   }
-  const sheet = ref.slice(cut + 1).match(/^[A-Z]\d+(?:-\d+)?/)?.[0] || ''
-  router.push({
-    name: 'WorkpaperEditor',
-    params: { projectId: projectId.value, wpId },
-    query: sheet ? { sheet } : {},
-  })
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query: { sheet: ADJUSTMENT_SHEET_ALIAS, highlight: ref } })
 }
 
 function goMisstatements() {

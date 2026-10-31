@@ -139,7 +139,8 @@ export function buildRowDrill(ctx: DrillContext, row: Row | null | undefined): R
     case 'adjustment': {
       const group = str(row.entry_group_id)
       if (!group) return null
-      return { label: ADJUSTMENT_LABEL, location: { name: 'Adjustments', params: { projectId }, query: withYear(year, { group }) } }
+      // ?focus= 在调整大厅定位并高亮该分录（?group= 是打开协作对话框，用于协作通知）
+      return { label: ADJUSTMENT_LABEL, location: { name: 'Adjustments', params: { projectId }, query: withYear(year, { focus: group }) } }
     }
     case 'wp_list': {
       // 底稿清单的隐藏列 id 即底稿实例 id：直接打开；没有时按编码解析

@@ -124,6 +124,23 @@ export function computeContentSignature(
   return (hash >>> 0).toString(36)
 }
 
+/**
+ * 推送结果提示（后端 sync_outcome：created / updated / unchanged）。
+ * 更新时原为待复核 / 已驳回的，后端已把分录退回草稿 —— 提示到调整分录模块重新提交复核。
+ */
+export function syncOutcomeMessage(res: { sync_outcome?: string; previous_status?: string | null; adjustment_no?: string } | null | undefined): string {
+  const no = res?.adjustment_no ? `（${res.adjustment_no}）` : ''
+  if (res?.sync_outcome === 'unchanged') return `调整分录模块中的分录${no}已是最新内容，无需重复同步`
+  if (res?.sync_outcome === 'updated') {
+    const prev = res.previous_status
+    if (prev === 'pending_review' || prev === 'rejected') {
+      return `已更新调整分录模块中的分录${no}；原为「${CENTRAL_STATUS_LABELS[prev] || prev}」，已回到草稿，请到调整分录模块重新提交复核`
+    }
+    return `已更新调整分录模块中的分录${no}`
+  }
+  return `已同步到调整分录模块${no}，为草稿：提交复核并批准后计入试算表审定数`
+}
+
 export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) {
   const centralStatus = ref<CentralStatus | null>(null)
   const syncing = ref(false)
@@ -218,7 +235,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     const meta = opts.buildMeta()
     syncing.value = true
     try {
-      await syncAdjustmentFromWorkpaper(projectId, {
+      const res: any = await syncAdjustmentFromWorkpaper(projectId, {
         year,
         wp_id: wpId,
         item_id: resolveItemId(),
@@ -230,28 +247,18 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
       // Phase 3: 记录签名
       _lastSyncedSignature = computeContentSignature(lineItems, meta)
       _lastErrorKey = ''
-      ElMessage.success('已同步到集中调整登记')
+      ElMessage({ type: res?.sync_outcome === 'unchanged' ? 'info' : 'success',
+        message: syncOutcomeMessage(res), duration: 5000, showClose: true })
       await refreshStatus()
-      // P0-3: 显示同步后的编号供确认
-      if (centralStatus.value?.adjustment_no) {
-        ElMessage({
-          type: 'info',
-          message: `集中登记编号：${centralStatus.value.adjustment_no}`,
-          duration: 4000,
-          showClose: true,
-        })
-      }
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       const code = detail?.error_code
       if (code === 'APPROVED_LOCKED') {
-        ElMessage.warning('该调整已在集中登记复核通过，需先撤回复核再同步')
-      } else if (code === 'UNBALANCED') {
-        ElMessage.error(detail?.message || '借贷不平衡，无法同步')
-      } else if (code === 'UNRESOLVED_ACCOUNTS') {
-        ElMessage.error(detail?.message || '存在无法解析的科目，请补全科目编码')
+        ElMessage.warning('该调整已在调整分录模块复核通过（已批准），需由复核人先撤回复核再同步')
       } else {
-        ElMessage.error('同步到集中登记失败')
+        // 其余错误（借贷不平衡 / 科目无法解析 / 协作锁定 / 合并锁定 / 无权限…）显示后端给出的原因
+        const reason = typeof detail === 'string' ? detail : detail?.message
+        ElMessage.error(reason ? `同步到调整分录模块失败：${reason}` : '同步到调整分录模块失败，请稍后重试')
       }
     } finally {
       syncing.value = false

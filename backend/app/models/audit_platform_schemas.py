@@ -663,6 +663,8 @@ class AdjustmentCreate(BaseModel):
     year: int
     company_code: str = "default"
     description: str | None = None
+    # 自定义编号（可选）：不填自动编号；填写时同项目同年度不得与未删除分录组重复
+    adjustment_no: str | None = None
     line_items: list[AdjustmentLineItem] = Field(min_length=1)
 
 
@@ -809,6 +811,7 @@ class AccountOption(BaseModel):
     name: str
     level: int = 1
     report_line: str | None = None  # 对应报表行次名称，用于下拉显示
+    balance: Decimal | None = None  # 传年度时附试算表审定数（参考余额）
 
 
 class WPAdjustmentDetail(BaseModel):

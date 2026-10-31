@@ -208,6 +208,18 @@ class _StoreDB:
     def add(self, _obj):
         return None
 
+    def begin_nested(self):
+        """导入逐笔 SAVEPOINT（spec adjustment-hall-entry-review-closure）：替身里为空操作。"""
+        return _NullSavepoint()
+
+
+class _NullSavepoint:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
 
 class _StoreSvc:
     """AdjustmentService 替身：create/delete 落到同一 store。"""
@@ -356,7 +368,10 @@ def test_overwrite_keeps_numbers_absent_from_file(monkeypatch):
 
 
 def test_overwrite_rows_without_no_are_appended(monkeypatch):
-    """未填编号的行无 by-key 键 → 两种模式均为追加（不误覆盖任何既有组）。"""
+    """未填编号的行无 by-key 键 → 两种模式均为追加（不误覆盖任何既有组）。
+
+    2026-10-31 起无编号连续行按借贷平衡切分为一笔（原先每行各自成组），故每次导入 1 笔。
+    """
     _patch_service(monkeypatch)
     store = _Store()
     rows = [
@@ -367,8 +382,8 @@ def test_overwrite_rows_without_no_are_appended(monkeypatch):
     asyncio.run(_run_import(store, rows, "overwrite"))
     result, db = asyncio.run(_run_import(store, rows, "overwrite"))
 
-    assert result["imported"] == 2 and result["skipped"] == 0
-    assert len(store.active()) == 4
+    assert result["imported"] == 1 and result["skipped"] == 0
+    assert len(store.active()) == 2
     assert db.updates == [], "无编号组不钉编号"
 
 
@@ -471,10 +486,11 @@ def test_overwrite_failure_does_not_abort_other_numbers(monkeypatch):
 
     monkeypatch.setattr(adj_mod, "AdjustmentService", _FlakySvc)
 
+    # 草稿组 + 删除失败（2026-10-31 起待复核组按「需先撤回提交」跳过，不再走到删除）
     existing = _Group(
-        adjustment_no="AJE-001", adj_type="aje", description="待复核",
+        adjustment_no="AJE-001", adj_type="aje", description="草稿",
         lines=[("1122", Decimal("1"), Decimal("0"))],
-        review_status=ReviewStatus.pending_review,
+        review_status=ReviewStatus.draft,
     )
     store = _Store([existing])
     rows = _rows_for("AJE-001", "覆盖失败") + _rows_for("AJE-777", "其余编号照常")
@@ -487,6 +503,23 @@ def test_overwrite_failure_does_not_abort_other_numbers(monkeypatch):
     assert result["imported"] == 1, "其余编号仍应正常导入"
     assert [g.adjustment_no for g in store.active_by_no("AJE-777")] == ["AJE-777"]
     assert not existing.is_deleted, "覆盖失败不得留下半删状态"
+
+
+def test_overwrite_skips_pending_review_with_readable_reason(monkeypatch):
+    """待复核组不覆盖：跳过并说明「需先撤回提交」（原先走到删除才报英文状态值）。"""
+    _patch_service(monkeypatch)
+    existing = _Group(
+        adjustment_no="AJE-001", adj_type="aje", description="待复核",
+        lines=[("1122", Decimal("1"), Decimal("0"))],
+        review_status=ReviewStatus.pending_review,
+    )
+    store = _Store([existing])
+
+    result, _db = asyncio.run(_run_import(store, _rows_for("AJE-001", "覆盖待复核"), "overwrite"))
+
+    assert result["skipped"] == 1 and result["imported"] == 0 and result["failed"] == 0
+    assert "撤回提交" in result["skipped_rows"][0]["reason"]
+    assert not existing.is_deleted
 
 
 def test_overwrite_replace_goes_through_service_delete_entry(monkeypatch):

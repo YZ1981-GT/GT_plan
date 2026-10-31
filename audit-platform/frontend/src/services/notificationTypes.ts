@@ -43,6 +43,13 @@ export const NOTIFICATION_TYPES = {
   ADJ_COLLAB_CONTRIBUTED: 'adjustment_collaboration.contributed',
   ADJ_COLLAB_CONFIRMED: 'adjustment_collaboration.confirmed',
   ADJ_COLLAB_REJECTED: 'adjustment_collaboration.rejected',
+  // ── adjustment-hall-entry-review-closure：调整分录复核流转与影响提醒（与后端 ADJ_HALL_NOTIFICATION_TYPES 同步）──
+  ADJ_REVIEW_SUBMITTED: 'adjustment.review_submitted',
+  ADJ_REVIEW_APPROVED: 'adjustment.review_approved',
+  ADJ_REVIEW_REJECTED: 'adjustment.review_rejected',
+  ADJ_REVIEW_REVOKED: 'adjustment.review_revoked',
+  ADJ_APPROVED_IMPACT: 'adjustment.approved_impact',
+  ADJ_SYNC_ARRIVED: 'adjustment_sync_arrived',
 } as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
@@ -78,6 +85,13 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONTRIBUTED]: '协作补充已提交',
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONFIRMED]: '协作已确认',
   [NOTIFICATION_TYPES.ADJ_COLLAB_REJECTED]: '协作已退回',
+  // 调整分录复核流转
+  [NOTIFICATION_TYPES.ADJ_REVIEW_SUBMITTED]: '调整分录待复核',
+  [NOTIFICATION_TYPES.ADJ_REVIEW_APPROVED]: '调整分录已批准',
+  [NOTIFICATION_TYPES.ADJ_REVIEW_REJECTED]: '调整分录被驳回',
+  [NOTIFICATION_TYPES.ADJ_REVIEW_REVOKED]: '调整分录已撤回复核',
+  [NOTIFICATION_TYPES.ADJ_APPROVED_IMPACT]: '调整影响你负责的底稿',
+  [NOTIFICATION_TYPES.ADJ_SYNC_ARRIVED]: '新调整分录到达',
 }
 
 // ── 跳转规则 ──────────────────────────────────────────────────
@@ -141,16 +155,28 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONTRIBUTED]: (m) => adjCollabRoute(m),
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONFIRMED]: (m) => adjCollabRoute(m),
   [NOTIFICATION_TYPES.ADJ_COLLAB_REJECTED]: (m) => adjCollabRoute(m),
+  // ── 调整分录复核流转 → 调整大厅并定位分录（?focus=，带年度；大厅定位、展开并高亮，参数留在地址栏）──
+  [NOTIFICATION_TYPES.ADJ_REVIEW_SUBMITTED]: (m) => adjFocusRoute(m, 'pending_review'),
+  [NOTIFICATION_TYPES.ADJ_REVIEW_APPROVED]: (m) => adjFocusRoute(m),
+  [NOTIFICATION_TYPES.ADJ_REVIEW_REJECTED]: (m) => adjFocusRoute(m, 'rejected'),
+  [NOTIFICATION_TYPES.ADJ_REVIEW_REVOKED]: (m) => adjFocusRoute(m),
+  [NOTIFICATION_TYPES.ADJ_APPROVED_IMPACT]: (m) => adjFocusRoute(m),
   // #2: 新调整到达→点通知直达审定表带入
-  'adjustment_sync_arrived': (m) => {
+  [NOTIFICATION_TYPES.ADJ_SYNC_ARRIVED]: (m) => {
     if (!m.project_id) return ''
     const wpCodes = m.affected_wp_codes || []
     // 跳转到第一个受影响底稿的审定表（带 bringIn=true 打开带入弹窗）
     if (wpCodes.length > 0) {
       return `/projects/${m.project_id}/workpapers?view=workbench&highlight=${wpCodes[0]}`
     }
-    return `/projects/${m.project_id}/adjustments`
+    return adjFocusRoute(m)
   },
+}
+
+/** 调整分录复核类通知 → 调整大厅 + ?focus=分录组&year=年度[&status=筛选]（定位、展开并高亮该分录）。 */
+function adjFocusRoute(m: Record<string, any>, status?: string): string {
+  if (!m.project_id) return ''
+  return `/projects/${m.project_id}/adjustments${buildQuery({ focus: m.object_id, year: m.year, status })}`
 }
 
 /** 调整分录协作通知 → 集中调整页 + ?group=（Adjustments.vue 消费定位/开协作对话框）。 */

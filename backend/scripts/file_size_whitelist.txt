@@ -1191,7 +1191,8 @@ backend/tests/workpaper_sync/test_k_lane2_p3_variants_template_writepaths.py  10
 # 🔴 baseline 均为当前真实行数，未预留膨胀空间（膨胀 >5% 仍打红）。
 # -------------------------------------------------------------------------
 # AJE/RJE 分录 CRUD + 状态机 + 错报转换
-backend/app/services/adjustment_service.py  980
+#   adjustment-hall-entry-review-closure：录入校验抽到 adjustment_entry_rules.py，980 → 958
+backend/app/services/adjustment_service.py  958
 # 全平台 EventBus handler 注册中心
 backend/app/services/event_handlers/_impl.py  2460
 # OCR 流水线（本次仅修 1 处 lazy import 错名）
@@ -1201,7 +1202,9 @@ backend/app/services/prefill_engine.py  1646
 # 试算表四列重算链
 backend/app/services/trial_balance_service.py  1243
 # 分录大厅全部端点
-backend/app/routers/adjustments.py  1763
+#   adjustment-hall-entry-review-closure：复核 / 导入端点拆到 adjustment_review.py / adjustment_import.py，
+#   列表富化抽到 adjustment_list_enrich.py，1763 → 1671
+backend/app/routers/adjustments.py  1671
 # 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
 # HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
 backend/app/routers/attachments.py  821

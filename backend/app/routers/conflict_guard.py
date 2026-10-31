@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
 from app.services.conflict_guard_service import ConflictGuardService
 
@@ -35,7 +35,7 @@ router = APIRouter(
 async def acquire_lock(
     project_id: UUID,
     entry_group_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """获取调整分录编辑锁。
@@ -57,7 +57,7 @@ async def acquire_lock(
 async def heartbeat_lock(
     project_id: UUID,
     entry_group_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """续期编辑锁心跳。"""
@@ -77,7 +77,7 @@ async def heartbeat_lock(
 async def release_lock(
     project_id: UUID,
     entry_group_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """释放编辑锁。"""

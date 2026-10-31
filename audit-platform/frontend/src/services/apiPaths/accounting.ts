@@ -32,6 +32,15 @@ export const adjustments = {
   syncFromWorkpaper: (pid: string) => `/api/projects/${pid}/adjustments/sync-from-workpaper`,
   /** 按 source_ref 回流集中登记复核状态 */
   bySourceRef: (pid: string) => `/api/projects/${pid}/adjustments/by-source-ref`,
+  // ── 复核流转 / 批量删除 / 项目级导入（adjustment-hall-entry-review-closure） ──
+  reviewers: (pid: string) => `/api/projects/${pid}/adjustments/reviewers`,
+  submitReview: (pid: string) => `/api/projects/${pid}/adjustments/submit-review`,
+  withdrawSubmission: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/withdraw-submission`,
+  reviewBatch: (pid: string) => `/api/projects/${pid}/adjustments/review-batch`,
+  batchDelete: (pid: string) => `/api/projects/${pid}/adjustments/batch-delete`,
+  importPreview: (pid: string) => `/api/projects/${pid}/adjustments/import/preview`,
+  importFile: (pid: string) => `/api/projects/${pid}/adjustments/import`,
+  relatedWorkpapers: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/related-workpapers`,
   // ── 协作接力（adjustment-collaboration-and-propagation） ──
   collabAssign: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/collaboration/assign`,
   collabByGroup: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/collaboration`,

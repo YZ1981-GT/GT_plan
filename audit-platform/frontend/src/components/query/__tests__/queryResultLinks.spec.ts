@@ -83,7 +83,7 @@ describe('buildRowDrill — ADR-AQL-01 每类结果的目标页与深链', () =>
   it('调整分录（各类型键与旧键 adj_rcl）→ 调整分录页 ?year=&group=<分录组>', () => {
     for (const key of ['adj_aje', 'adj_rje', 'adj_rcl', 'adjustment', 'consol_unit:C01:adjustment']) {
       expect(loc(buildRowDrill(src(key), { entry_group_id: 'g-1', adjustment_no: 'AJE-001' }))).toEqual({
-        name: 'Adjustments', params: { projectId: PID }, query: { year: '2025', group: 'g-1' },
+        name: 'Adjustments', params: { projectId: PID }, query: { year: '2025', focus: 'g-1' },
       })
     }
   })

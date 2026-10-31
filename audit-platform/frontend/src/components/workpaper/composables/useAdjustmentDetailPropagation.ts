@@ -104,12 +104,13 @@ export function useAdjustmentDetailPropagation(opts: UseAdjustmentDetailPropagat
   }
 
   const router = useRouter()
+  /** 跳到调整大厅并定位、高亮该分录（?focus=；?group= 是打开协作对话框，不是查看分录） */
   function jumpToAdjustment(entryGroupId: string): void {
     const projectId = unwrap(opts.projectId)
     router.push({
       name: 'Adjustments',
       params: { projectId },
-      query: { group: entryGroupId },
+      query: { focus: entryGroupId },
     }).catch(() => { /* 导航异常允许 */ })
   }
 

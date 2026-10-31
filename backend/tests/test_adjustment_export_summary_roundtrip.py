@@ -91,6 +91,18 @@ class _FakeDB:
     def add(self, _obj):
         return None
 
+    def begin_nested(self):
+        """导入逐笔 SAVEPOINT（spec adjustment-hall-entry-review-closure）：替身里为空操作。"""
+        return _NullSavepoint()
+
+
+class _NullSavepoint:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
 
 def _entry(
     adjustment_no: str,

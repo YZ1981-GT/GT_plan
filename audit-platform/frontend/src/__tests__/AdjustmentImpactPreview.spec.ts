@@ -150,6 +150,10 @@ describe('AdjustmentImpactPreview', () => {
     await nextTick()
 
     const text = wrapper.text()
+    expect(text).toContain('资产负债表')
+    expect(text).toContain('利润表')
+    expect(text).not.toContain('balance_sheet')
+    expect(text).not.toContain('income_statement')
     expect(text).toContain('BS-005')
     expect(text).toContain('IS-008')
 

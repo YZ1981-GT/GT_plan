@@ -80,6 +80,18 @@ class _FakeDB:
     def add(self, _obj):
         return None
 
+    def begin_nested(self):
+        """导入逐笔 SAVEPOINT（spec adjustment-hall-entry-review-closure）：替身里为空操作。"""
+        return _NullSavepoint()
+
+
+class _NullSavepoint:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # A. `_is_example_row` —— 模板内置示例行判定基线
@@ -296,15 +308,23 @@ async def test_b_detail_account_code_kept_only_when_differs_from_level1(recordin
     assert [li.detail_account_code for li in data.line_items] == ["112201", None]
 
 
-async def test_b_rows_without_no_become_independent_groups(recording_service):
-    """未填编号的行各自独立成组（__auto_n），imported 按组数计。"""
+async def test_b_rows_without_no_are_split_by_balance(recording_service):
+    """未填编号的连续行按借贷平衡切分为一笔（spec adjustment-hall-entry-review-closure 需求 2.2）。
+
+    原基线是「每行各自成组」：模板写着「编号可留空」，但多行分录因此被拆成单行、真实
+    create_entry 下必然借贷不平衡失败（本文件的记录式替身不校验平衡才显得「成功」）。
+    """
     rows = [
         {"类型": "AJE", "摘要": "无编号1", "科目名称": "应收账款", "借方金额": "10"},
-        {"类型": "AJE", "摘要": "无编号2", "科目名称": "坏账准备", "贷方金额": "10"},
+        {"类型": "AJE", "摘要": "无编号1", "科目名称": "坏账准备", "贷方金额": "10"},
+        {"类型": "AJE", "摘要": "无编号2", "科目名称": "管理费用", "借方金额": "5"},
+        {"类型": "AJE", "摘要": "无编号2", "科目名称": "坏账准备", "贷方金额": "5"},
     ]
     result = await _run_import(rows)
     assert result["imported"] == 2
-    assert len(recording_service.calls) == 2
+    assert [[li.standard_account_code for li in c[1].line_items] for c in recording_service.calls] == [
+        ["1122", "1231"], ["6602", "1231"],
+    ]
 
 
 async def test_b_fully_empty_rows_are_ignored(recording_service):
@@ -431,9 +451,10 @@ def test_c_export_summary_headers_include_type_column():
     src = inspect.getsource(adj_router._write_adj_sheet)
     # 2026-07-27（f3354f539，调整分录集中登记）起末尾另加「所属循环」「协作状态」两列只读信息；
     # 中央导入按列头取值（import_templates 按名取），尾部多出的列不影响导回 —— 前 8 列契约不变
+    # 2026-10-31（spec adjustment-hall-entry-review-closure 需求 2.7）末尾再加「复核状态」「编制人」两列只读信息
     assert (
         'headers = ["编号", "类型", "摘要", "科目编码", "科目名称", '
-        '"借方金额", "贷方金额", "来源", "所属循环", "协作状态"]'
+        '"借方金额", "贷方金额", "来源", "所属循环", "协作状态", "复核状态", "编制人"]'
     ) in src
     assert 'headers = ["编号", "摘要"' not in src, "旧 7 列列头不得回退"
 

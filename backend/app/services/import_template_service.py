@@ -671,6 +671,7 @@ def parse_import_data(
 
     # ─── 解析数据行 ──────────────────────────────────────
     rows: list[dict[str, Any]] = []
+    locations: list[tuple[str, int]] = []
     example_skipped = 0
     type_inferred_from_sheet = 0
     type_source_conflicts: list[dict[str, Any]] = []
@@ -738,11 +739,15 @@ def parse_import_data(
                         })
 
             rows.append(row_data)
+            locations.append((ws.title, row_idx))
 
     wb.close()
     if stats is not None:
         # 被跳过的示例行以独立口径可见（不计入 failed，见 R2.3）
         stats["example_skipped"] = example_skipped
+        # 与 rows 一一对应的 (sheet 名, Excel 行号)：导入预检 / 报错按文件位置指明（仅 adjustments 写回）
+        if import_type == ImportType.adjustments and locations:
+            stats["row_locations"] = locations
         # 类型兜底 / 冲突：仅在非空时写回，保持既有 stats 形状不变
         if type_inferred_from_sheet:
             stats["type_inferred_from_sheet"] = type_inferred_from_sheet

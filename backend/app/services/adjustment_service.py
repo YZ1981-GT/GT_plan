@@ -45,6 +45,11 @@ from app.models.audit_platform_schemas import (
     WPAdjustmentSummary,
 )
 from app.core.audit_decorator import audit_log
+from app.services.adjustment_entry_rules import (
+    entry_rule_errors,
+    next_free_number,
+    normalize_adjustment_no,
+)
 from app.services.event_bus import event_bus
 from app.services.ledger_import.direction_resolver import resolve_account_direction
 
@@ -56,10 +61,20 @@ _VALID_TRANSITIONS: dict[ReviewStatus, set[ReviewStatus]] = {
         ReviewStatus.approved,
         ReviewStatus.rejected,
     },
-    ReviewStatus.pending_review: {ReviewStatus.approved, ReviewStatus.rejected},
-    ReviewStatus.rejected: {ReviewStatus.draft},
+    # pending_review → draft 只能走「撤回提交」（allow_withdraw）
+    ReviewStatus.pending_review: {ReviewStatus.approved, ReviewStatus.rejected, ReviewStatus.draft},
+    # rejected → pending_review = 驳回后不改明细直接重新提交
+    ReviewStatus.rejected: {ReviewStatus.draft, ReviewStatus.pending_review},
     ReviewStatus.approved: {ReviewStatus.draft},  # 撤回复核
 }
+
+
+def _locked_hint(status: ReviewStatus) -> str:
+    """不可修改 / 删除时的状态说明（中文 + 下一步该做什么）。"""
+    return {
+        ReviewStatus.pending_review: "「待复核」（请先撤回提交），",
+        ReviewStatus.approved: "「已批准」（请先撤回复核），",
+    }.get(status, f"「{status.value}」")
 
 
 class AdjustmentService:
@@ -99,25 +114,27 @@ class AdjustmentService:
         user_id: UUID,
         batch_mode: bool = False,
     ) -> AdjustmentGroupResponse:
-        """创建调整分录组：借贷平衡校验→自动编号→科目校验→写入→发布事件"""
-        # 1. 借贷平衡校验
-        total_debit = sum(li.debit_amount for li in data.line_items)
-        total_credit = sum(li.credit_amount for li in data.line_items)
-        if total_debit != total_credit:
-            raise ValueError(
-                f"借贷不平衡：借方合计 {total_debit}，贷方合计 {total_credit}，"
-                f"差额 {total_debit - total_credit}"
-            )
+        """创建调整分录组：行校验→科目校验→编号（自定义或自动）→写入→发布事件"""
+        # 1. 行校验（科目必填 / 金额非负 / 不同行双向 / 平衡且非零，规则见 adjustment_entry_rules）
+        errors = entry_rule_errors(data.line_items)
+        if errors:
+            raise ValueError("；".join(errors))
 
         # 2. 科目标准化校验
         await self._validate_account_codes(
             project_id, [li.standard_account_code for li in data.line_items]
         )
 
-        # 3. 自动编号
-        adjustment_no = await self._next_adjustment_no(
-            project_id, data.year, data.adjustment_type
-        )
+        # 3. 编号：填了用自定义编号（同年度未删除分录组不得重复），否则自动编号
+        custom_no = normalize_adjustment_no(data.adjustment_no)
+        if custom_no is not None:
+            if custom_no in await self._used_adjustment_nos(project_id, data.year):
+                raise ValueError(f"编号「{custom_no}」已被本年度其他调整分录使用")
+            adjustment_no = custom_no
+        else:
+            adjustment_no = await self._next_adjustment_no(
+                project_id, data.year, data.adjustment_type
+            )
 
         # 4. 生成 entry_group_id
         entry_group_id = uuid.uuid4()
@@ -232,7 +249,7 @@ class AdjustmentService:
 
         status = adj_rows[0].review_status
         if status not in (ReviewStatus.draft, ReviewStatus.rejected):
-            raise ValueError(f"当前状态 {status.value} 不允许修改")
+            raise ValueError(f"当前状态{_locked_hint(status)}不允许修改")
 
         # 更新描述
         if data.description is not None:
@@ -242,12 +259,9 @@ class AdjustmentService:
 
         # 更新行项
         if data.line_items is not None:
-            total_debit = sum(li.debit_amount for li in data.line_items)
-            total_credit = sum(li.credit_amount for li in data.line_items)
-            if total_debit != total_credit:
-                raise ValueError(
-                    f"借贷不平衡：借方合计 {total_debit}，贷方合计 {total_credit}"
-                )
+            errors = entry_rule_errors(data.line_items)
+            if errors:
+                raise ValueError("；".join(errors))
             await self._validate_account_codes(
                 project_id, [li.standard_account_code for li in data.line_items]
             )
@@ -364,7 +378,7 @@ class AdjustmentService:
 
         status = adj_rows[0].review_status
         if status not in (ReviewStatus.draft, ReviewStatus.rejected):
-            raise ValueError(f"当前状态 {status.value} 不允许删除")
+            raise ValueError(f"当前状态{_locked_hint(status)}不允许删除")
 
         for row in adj_rows:
             row.soft_delete()
@@ -395,12 +409,13 @@ class AdjustmentService:
         reviewer_id: UUID,
         *,
         allow_approved_revoke: bool = False,
+        allow_withdraw: bool = False,
     ) -> dict[str, Any]:
-        """执行调整分录复核状态转换并返回事件所需的影响范围。
+        """执行调整分录复核状态转换并返回事件与通知所需的影响范围。
 
         大厅可以直接把草稿转为 approved/rejected；approved 只能通过专用
-        ``revoke-review`` 端点回到 draft。撤回和驳回返工都会清除复核元数据，
-        防止草稿状态继续携带上一轮审批人的身份与时间。
+        ``revoke-review`` 端点回到 draft，pending_review 只能经「撤回提交」回到 draft。
+        提交、撤回和驳回返工都会清除复核元数据，防止新一轮继续携带上一轮审批人的身份与时间。
         """
         adj_rows = await self._get_group_rows(project_id, entry_group_id)
         if not adj_rows:
@@ -415,6 +430,8 @@ class AdjustmentService:
             )
         if current == ReviewStatus.approved and target == ReviewStatus.draft and not allow_approved_revoke:
             raise ValueError("已通过的调整须使用撤回复核端点")
+        if current == ReviewStatus.pending_review and target == ReviewStatus.draft and not allow_withdraw:
+            raise ValueError("待复核的调整须使用撤回提交操作")
 
         if target == ReviewStatus.rejected and not change.reason:
             raise ValueError("驳回时必须填写原因")
@@ -431,19 +448,24 @@ class AdjustmentService:
                 row.reviewer_id = reviewer_id
                 row.reviewed_at = now
                 row.rejection_reason = change.reason
-            elif target == ReviewStatus.draft:
+            else:  # draft / pending_review：新一轮，不带上一轮的复核信息
                 row.reviewer_id = None
                 row.reviewed_at = None
                 row.rejection_reason = None
 
         await self.db.flush()
 
-        # 在 flush 前已加载的 ORM 行上取值（不再查库），供 router 发事件
+        # 在 flush 前已加载的 ORM 行上取值（不再查库），供 router 发事件 / 通知
+        head = adj_rows[0]
         return {
             "previous_status": current.value,
             "status": target.value,
-            "year": adj_rows[0].year,
+            "year": head.year,
             "account_codes": sorted({r.account_code for r in adj_rows if r.account_code}),
+            "entry_group_id": str(entry_group_id),
+            "adjustment_no": head.adjustment_no,
+            "origin": head.origin or "manual",
+            "created_by": sorted({str(r.created_by) for r in adj_rows if r.created_by}),
         }
 
     # ------------------------------------------------------------------
@@ -627,91 +649,15 @@ class AdjustmentService:
         self,
         project_id: UUID,
         report_line_code: str | None = None,
+        year: int | None = None,
     ) -> list[AccountOption]:
-        """
-        科目下拉选项：
-        - report_line_code=None → 返回所有已映射的标准科目（含 report_line 字段）
-        - report_line_code=指定值 → 返回该行次下的标准科目列表
-        """
-        rlm = ReportLineMapping.__table__
-        ac = AccountChart.__table__
+        """科目下拉：不传行次 → 全部标准科目（已确认映射的带报表项目，传年度附审定数）；
+        传行次 → 该行次下已确认映射的科目。实现见 adjustment_account_options。"""
+        from app.services.adjustment_account_options import list_account_options
 
-        if report_line_code is None:
-            # 返回所有已映射且已确认的标准科目，附带报表行次名称
-            q = (
-                sa.select(
-                    rlm.c.standard_account_code,
-                    rlm.c.report_line_name,
-                    ac.c.account_name,
-                    ac.c.level,
-                )
-                .select_from(
-                    rlm.join(
-                        ac,
-                        sa.and_(
-                            ac.c.project_id == rlm.c.project_id,
-                            ac.c.account_code == rlm.c.standard_account_code,
-                            ac.c.source == AccountSource.standard.value,
-                            ac.c.is_deleted == sa.false(),
-                        ),
-                    )
-                )
-                .where(
-                    rlm.c.project_id == project_id,
-                    rlm.c.is_deleted == sa.false(),
-                    rlm.c.is_confirmed == sa.true(),
-                )
-                .distinct()
-                .order_by(rlm.c.standard_account_code)
-            )
-            result = await self.db.execute(q)
-            return [
-                AccountOption(
-                    code=r.standard_account_code,
-                    name=r.account_name or "",
-                    level=r.level if r.level else 1,
-                    report_line=r.report_line_name,
-                )
-                for r in result.fetchall()
-            ]
-        else:
-            # 返回该行次下的标准科目
-            q = (
-                sa.select(
-                    rlm.c.standard_account_code,
-                    rlm.c.report_line_name,
-                    ac.c.account_name,
-                    ac.c.level,
-                )
-                .select_from(
-                    rlm.join(
-                        ac,
-                        sa.and_(
-                            ac.c.project_id == rlm.c.project_id,
-                            ac.c.account_code == rlm.c.standard_account_code,
-                            ac.c.source == AccountSource.standard.value,
-                            ac.c.is_deleted == sa.false(),
-                        ),
-                    )
-                )
-                .where(
-                    rlm.c.project_id == project_id,
-                    rlm.c.report_line_code == report_line_code,
-                    rlm.c.is_deleted == sa.false(),
-                    rlm.c.is_confirmed == sa.true(),
-                )
-                .order_by(rlm.c.standard_account_code)
-            )
-            result = await self.db.execute(q)
-            return [
-                AccountOption(
-                    code=r.standard_account_code,
-                    name=r.account_name or "",
-                    level=r.level if r.level else 1,
-                    report_line=r.report_line_name,
-                )
-                for r in result.fetchall()
-            ]
+        return await list_account_options(
+            self.db, project_id, report_line_code=report_line_code, year=year,
+        )
 
     # ------------------------------------------------------------------
     # 13.8 科目标准化校验（内部方法）
@@ -905,7 +851,20 @@ class AdjustmentService:
         )
         result = await self.db.execute(q)
         count = result.scalar() or 0
-        return f"{prefix}-{count + 1:03d}"
+        # 计数（含已删除组，删除的号不复用）+ 1 起，跳过自定义编号 / 覆盖导入钉入的已占用号
+        return next_free_number(prefix, count + 1, await self._used_adjustment_nos(project_id, year))
+
+    async def _used_adjustment_nos(self, project_id: UUID, year: int) -> set[str]:
+        """本项目本年度未删除分录组已占用的编号。"""
+        adj = Adjustment.__table__
+        rows = await self.db.execute(
+            sa.select(sa.distinct(adj.c.adjustment_no)).where(
+                adj.c.project_id == project_id,
+                adj.c.year == year,
+                adj.c.is_deleted == sa.false(),
+            )
+        )
+        return {r[0] for r in rows.fetchall() if r[0]}
 
     async def _get_group_rows(
         self,
