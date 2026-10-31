@@ -1486,7 +1486,7 @@ async def upsert_note_formulas(
     """
     from app.services.formula_settings import note_settings
     from app.services.formula_settings.errors import FormulaSettingError
-    from app.services.formula_settings.propagation import publish_events
+    from app.services.formula_settings.outbox import record_changes, publish_pending
 
     formulas = body.get("formulas")
     if not isinstance(formulas, list):
@@ -1509,8 +1509,9 @@ async def upsert_note_formulas(
                                                   loaded=body.get("loaded"), user_id=current_user.id)
         await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                  user_id=current_user.id)
+        await record_changes(db, events=result.get("events") or [], domain="note", source="project_edit")
         await db.commit()
-        await publish_events(result.get("events") or [], domain="note", source="project_edit")
+        await publish_pending(db)
         saved = result["formulas"]
         return {"formulas": saved, "saved_count": len(saved), "loaded": result.get("loaded") or {}}
     except ValueError as e:

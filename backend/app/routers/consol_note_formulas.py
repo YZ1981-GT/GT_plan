@@ -28,7 +28,7 @@ from app.services.consol_note_formula_service import (
 from app.services.formula_settings import consol_note_settings as settings
 from app.services.formula_settings.errors import FormulaSettingError
 from app.services.formula_settings.permissions import can_edit_global
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 
 router = APIRouter(prefix="/api/consol-note-formulas", tags=["合并附注公式"])
 
@@ -42,9 +42,10 @@ def _error(exc: NoteFormulaError | FormulaSettingError) -> HTTPException:
 
 
 async def _commit_and_notify(db: AsyncSession, events: list[dict]) -> None:
-    await db.commit()
     if events:
-        await publish_events(events, domain=settings.DOMAIN, source="direct_edit")
+        await record_changes(db, events=events, domain=settings.DOMAIN, source="direct_edit")
+    await db.commit()
+    await publish_pending(db)
 
 
 @router.get("")

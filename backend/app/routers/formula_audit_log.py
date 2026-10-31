@@ -290,7 +290,7 @@ async def rollback_formula(
     """
     from app.deps import assert_project_permission
     from app.services.formula_settings.errors import FormulaSettingError
-    from app.services.formula_settings.propagation import publish_events
+    from app.services.formula_settings.outbox import record_changes, publish_pending
     from app.services.formula_settings.rollback import rollback_from_log
 
     try:
@@ -304,8 +304,9 @@ async def rollback_formula(
     except FormulaSettingError as exc:
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=result["events"], domain=result["domain"], source="history_rollback")
     await db.commit()
-    await publish_events(result["events"], domain=result["domain"], source="history_rollback")
+    await publish_pending(db)
     return {
         "ok": True,
         "row_code": body.row_code,

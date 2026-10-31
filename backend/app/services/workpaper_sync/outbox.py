@@ -89,7 +89,8 @@ FANOUT_HANDLER_VERSION = 1
 #: ledger-import spec 拥有，其 handler 各自已有 ``import_event_consumptions`` 记账，
 #: 在派发口再加一道会改掉它们的既有行为。Task 16 只对自己拥有的两个事件类型负责。
 GATED_FANOUT_EVENT_TYPES: frozenset[EventType] = frozenset(
-    {EventType.WORKPAPER_SAVED, EventType.WORKPAPER_CONTENT_UPDATED}
+    {EventType.WORKPAPER_SAVED, EventType.WORKPAPER_CONTENT_UPDATED,
+     EventType.FORMULA_CONFIG_CHANGED}
 )
 
 

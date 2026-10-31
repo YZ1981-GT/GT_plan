@@ -28,7 +28,7 @@ from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
 from app.services import report_config_execute
 from app.services.formula_settings import legacy_report
 from app.services.formula_settings.errors import FormulaSettingError
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.report_config_service import ReportConfigService
 
 router = APIRouter(
@@ -113,9 +113,10 @@ async def _legacy_write(db: AsyncSession, coro) -> dict:
     except FormulaSettingError as exc:
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=result.get("events") or [], domain="report", source="direct_edit",
+                         publish_id=result.get("publish_id"))
     await db.commit()
-    await publish_events(result.get("events") or [], domain="report", source="direct_edit",
-                         token=result.get("publish_id"))
+    await publish_pending(db)
     return result
 
 
@@ -267,8 +268,9 @@ async def clone_report_config(
                 overwrite=data.overwrite,
                 user_id=current_user.id,
             )
+            await record_changes(db, events=result.pop("events", []), domain="report", source="materialize")
             await db.commit()
-            await publish_events(result.pop("events", []), domain="report", source="materialize")
+            await publish_pending(db)
             return {
                 "message": (
                     f"已落入 {result['created']} 条项目级公式"
@@ -427,8 +429,9 @@ async def load_seed_data(
     except FormulaSettingError as exc:  # 并发修改（409）等：回滚填充，种子行已提交
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=formula_stats.pop("events", []), domain="report", source="seed")
     await db.commit()
-    await publish_events(formula_stats.pop("events", []), domain="report", source="seed")
+    await publish_pending(db)
 
     return {
         "message": f"成功加载 {count} 行种子数据，填充 {formula_stats['updated']} 行公式",
@@ -462,8 +465,9 @@ async def fill_formulas(
     except FormulaSettingError as exc:
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=stats.pop("events", []), domain="report", source="seed")
     await db.commit()
-    await publish_events(stats.pop("events", []), domain="report", source="seed")
+    await publish_pending(db)
 
     return {
         "total": stats["total"],

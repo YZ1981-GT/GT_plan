@@ -43,11 +43,14 @@ async def api(monkeypatch):
             await db.commit()
         events: list = []
 
-        async def fake_publish_events(evs, **kw):
-            events.extend(evs)
-            return len(evs)
+        async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
+            pass  # S4: record_changes 打桩，不实际入队
 
-        monkeypatch.setattr(fs_router, "publish_events", fake_publish_events)
+        async def fake_publish_pending(db):
+            return {"queued": 0}  # S4: publish_pending 打桩
+
+        monkeypatch.setattr(fs_router, "record_changes", fake_record_changes)
+        monkeypatch.setattr(fs_router, "publish_pending", fake_publish_pending)
         app = FastAPI()
         app.include_router(fs_router.router)
         app.include_router(fs_router.project_router)

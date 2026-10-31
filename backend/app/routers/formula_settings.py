@@ -25,7 +25,7 @@ from app.services.formula_settings.engine import Decisions
 from app.services.formula_settings.errors import FormulaSettingError
 from app.services.formula_settings.pending import item_to_dict, list_pending
 from app.services.formula_settings.projects import VALID_STANDARDS, get_project
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.formula_settings.publish import list_publishes, preview_global, publish_global
 from app.services.formula_settings.stores import get_store
 from app.services.formula_settings.template_access import Viewer
@@ -167,13 +167,14 @@ async def _run(db: AsyncSession, coro):
         await db.rollback()
         raise HTTPException(status_code=400, detail={"error_code": "FORMULA_SETTING_INVALID",
                                                      "message": str(exc)}) from None
-    await db.commit()
     return result
 
 
-async def _emit(result: dict[str, Any], *, domain: str, source: str) -> None:
-    await publish_events(result.get("events") or [], domain=domain, source=source,
-                         token=result.get("publish_id"))
+async def _emit(db: AsyncSession, result: dict[str, Any], *, domain: str, source: str) -> None:
+    await record_changes(db, events=result.get("events") or [], domain=domain, source=source,
+                         publish_id=result.get("publish_id"))
+    await db.commit()
+    await publish_pending(db)
 
 
 def _public_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -240,7 +241,7 @@ async def review_candidate(publish_id: uuid.UUID, body: ReviewBody, db: AsyncSes
         from app.services.formula_settings.custom_presets import refresh_cache
 
         await refresh_cache(db)
-    await _emit(result, domain=domain, source="candidate")
+    await _emit(db, result, domain=domain, source="candidate")
     return _public_result(result)
 
 
@@ -280,7 +281,7 @@ async def publish(domain: str, body: PublishBody, db: AsyncSession = Depends(get
         db, domain=domain, scope=body.scope, changes=[c.model_dump() for c in body.changes],
         user_id=current_user.id, decisions=body.decisions.to_decisions(), request_id=body.request_id,
         source="global_edit", note=body.note))
-    await _emit(result, domain=domain, source="global_edit")
+    await _emit(db, result, domain=domain, source="global_edit")
     return _public_result(result)
 
 
@@ -305,7 +306,7 @@ async def resolve(project_id: uuid.UUID, body: ResolveBody, db: AsyncSession = D
         db, project_id=project_id, resolutions=[r.model_dump() for r in body.resolutions], user_id=current_user.id))
     events = result.get("events") or []
     for ev in events:
-        await publish_events([ev], domain=ev["domain"], source="project_resolve")
+        await record_changes(db, events=[ev], domain=ev["domain"], source="project_resolve")
     # recalc_domains：有效定义真的变了、会重算的域（全选「保留本项目」时为空 ⇒ 前端不能说「会按新定义重算」）
     return {**{k: v for k, v in result.items() if k != "events"},
             "recalc_domains": sorted({ev["domain"] for ev in events})}
@@ -356,7 +357,7 @@ async def save_overrides(project_id: uuid.UUID, domain: str, body: OverridesBody
     result = await _run(db, project_ops.save_overrides(
         db, domain=domain, project_id=project_id, items=[i.model_dump() for i in body.items],
         user_id=current_user.id))
-    await _emit(result, domain=domain, source="project_edit")
+    await _emit(db, result, domain=domain, source="project_edit")
     return {k: v for k, v in result.items() if k != "events"}
 
 
@@ -379,7 +380,7 @@ async def restore_global(project_id: uuid.UUID, domain: str,
     result = await _run(db, project_ops.restore_global(db, domain=domain, project_id=project_id,
                                                        slot_keys=slot_key, user_id=current_user.id,
                                                        expected_versions=expected_version))
-    await _emit(result, domain=domain, source="project_restore")
+    await _emit(db, result, domain=domain, source="project_restore")
     return {k: v for k, v in result.items() if k != "events"}
 
 
@@ -426,7 +427,7 @@ async def apply(project_id: uuid.UUID, domain: str, body: ApplyBody, db: AsyncSe
             db, domain=domain, project_id=project_id, slot_keys=body.slot_keys,
             is_admin=body.target == "global", user_id=current_user.id, decisions=decisions,
             request_id=body.request_id, note=body.note))
-        await _emit(result, domain=domain, source="promote")
+        await _emit(db, result, domain=domain, source="promote")
         return _public_result(result)
     if not body.project_ids:
         raise HTTPException(status_code=400, detail={"error_code": "FORMULA_SETTING_INVALID",
@@ -435,7 +436,7 @@ async def apply(project_id: uuid.UUID, domain: str, body: ApplyBody, db: AsyncSe
     result = await _run(db, apply_ops.apply_to_projects(
         db, domain=domain, project_id=project_id, slot_keys=body.slot_keys, target_ids=body.project_ids,
         decisions=decisions, user_id=current_user.id, request_id=body.request_id))
-    await _emit(result, domain=domain, source="apply_to_projects")
+    await _emit(db, result, domain=domain, source="apply_to_projects")
     return _public_result(result)
 
 

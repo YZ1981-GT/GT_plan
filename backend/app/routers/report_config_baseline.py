@@ -21,7 +21,7 @@ from app.core.database import get_db
 from app.deps import assert_project_permission, get_current_user, require_project_access, require_role
 from app.models.core import User
 from app.services.formula_settings.errors import FormulaSettingError
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.report_config_service import ReportConfigService
 
 router = APIRouter(
@@ -105,10 +105,11 @@ async def review_candidate(
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    await db.commit()
     if published:
-        await publish_events(published.get("events") or [], domain="report", source="promote",
-                             token=published.get("publish_id"))
+        await record_changes(db, events=published.get("events") or [], domain="report", source="promote",
+                             publish_id=published.get("publish_id"))
+    await db.commit()
+    await publish_pending(db)
     status = "已通过" if body.approved else "已驳回"
     summary = (published or {}).get("summary") or {}
     return {"message": f"候选审核{status}", "approved": body.approved,
@@ -162,8 +163,9 @@ async def apply_master_update(
         raise HTTPException(status_code=404, detail="项目不存在或已删除")
     result = await sync_project_to_global(db, project_id=body.project_id, standard=body.standard,
                                           keep_local=body.keep_local, user_id=current_user.id)
+    await record_changes(db, events=result["events"], domain="report", source="master_sync")
     await db.commit()
-    await publish_events(result["events"], domain="report", source="master_sync")
+    await publish_pending(db)
     pending = result["pending"]
     message = f"已同步 {result['updated']} 行" + (f"，{pending} 处与本项目修改冲突，已列入待确认" if pending else "")
     return {"updated_count": result["updated"], "pending_count": pending, "rebased_count": result["rebased"],

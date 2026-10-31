@@ -185,7 +185,7 @@ async def save_cross_check_rules(
     service 只 flush，这里 commit 后发变更事件。
     """
     from app.services.formula_settings.errors import FormulaSettingError
-    from app.services.formula_settings.propagation import publish_events
+    from app.services.formula_settings.outbox import record_changes, publish_pending
 
     await _get_project_or_404(db, project_id)
     try:
@@ -197,8 +197,9 @@ async def save_cross_check_rules(
     except FormulaSettingError as exc:
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=result["events"], domain="cross_check", source="cross_check_edit")
     await db.commit()
-    await publish_events(result["events"], domain="cross_check", source="cross_check_edit")
+    await publish_pending(db)
     # 本次真正改动的公式位（供前端保存后问「应用范围」，R7.1）
     changed = sorted({s for ev in result["events"] for s in ev.get("slot_keys", [])})
     return {**await cross_check_rules.load(db, project_id), "changed_slot_keys": changed}

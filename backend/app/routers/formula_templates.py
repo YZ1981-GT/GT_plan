@@ -23,7 +23,7 @@ from app.routers.formula_settings import DecisionsIn, _http, _public_result, _ru
 from app.services.formula_settings import template_service as svc
 from app.services.formula_settings import template_sync as sync
 from app.services.formula_settings.errors import Forbidden, FormulaSettingError
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.formula_settings.template_access import Viewer, get_managed, get_visible, list_visible
 
 router = APIRouter(prefix="/api/formula-templates", tags=["formula-templates"])
@@ -105,9 +105,11 @@ async def _call(coro):
         raise _http(exc) from None
 
 
-async def _emit(result: dict[str, Any], source: str) -> dict[str, Any]:
-    await publish_events(result.get("events") or [], domain="template", source=source,
-                         token=result.get("publish_id"))
+async def _emit(db: AsyncSession, result: dict[str, Any], source: str) -> dict[str, Any]:
+    await record_changes(db, events=result.get("events") or [], domain="template", source=source,
+                         publish_id=result.get("publish_id"))
+    await db.commit()
+    await publish_pending(db)
     return _public_result(result)
 
 
@@ -229,7 +231,7 @@ async def publish(template_id: uuid.UUID, body: PublishBody, db: AsyncSession = 
         db, tpl, changes=[c.model_dump() for c in body.changes], expected_version=body.expected_version,
         user_id=current_user.id, decisions=body.decisions.to_decisions(), request_id=body.request_id,
         note=body.note))
-    return await _emit(result, "template_publish")
+    return await _emit(db, result, "template_publish")
 
 
 @router.post("/{template_id}/promote-preview")
@@ -250,8 +252,8 @@ async def promote(template_id: uuid.UUID, body: PromoteBody, db: AsyncSession = 
     result = await _run(db, svc.promote(db, tpl, viewer=viewer, domain=body.domain, slot_keys=body.slot_keys,
                                         decisions=body.decisions.to_decisions(), request_id=body.request_id,
                                         note=body.note))
-    await publish_events(result.get("events") or [], domain=body.domain, source="template_promote",
-                         token=result.get("publish_id"))
+    await record_changes(db, events=result.get("events") or [], domain=body.domain, source="template_promote",
+                         publish_id=result.get("publish_id"))
     return _public_result(result)
 
 
@@ -283,7 +285,7 @@ async def subscribe(project_id: uuid.UUID, body: SubscribeBody, db: AsyncSession
     tpl = await _call(get_visible(db, await _viewer(db, current_user), body.template_id))
     result = await _run(db, sync.subscribe(db, project_id=project_id, tpl=tpl, domain=body.domain,
                                            decisions=body.decisions.to_decisions(), user_id=current_user.id))
-    return await _emit(result, "template_subscribe")
+    return await _emit(db, result, "template_subscribe")
 
 
 @project_router.post("/unsubscribe-preview")
@@ -297,4 +299,4 @@ async def unsubscribe(project_id: uuid.UUID, body: UnsubscribeBody, db: AsyncSes
                       current_user: User = Depends(require_project_access("edit"))):
     result = await _run(db, sync.unsubscribe(db, project_id=project_id, domain=body.domain, mode=body.mode,
                                              decisions=body.decisions.to_decisions(), user_id=current_user.id))
-    return await _emit(result, "template_unsubscribe")
+    return await _emit(db, result, "template_unsubscribe")

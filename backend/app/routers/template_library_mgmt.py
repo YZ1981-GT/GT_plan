@@ -986,12 +986,14 @@ async def seed_all(
             })
 
     # 全部完成后统一 commit（history 记录 + 各 seed 已 SAVEPOINT 提交）
-    await db.commit()
     formula_events = [ev for r in results for ev in (r.pop("_formula_events", None) or [])]
     if formula_events:
-        from app.services.formula_settings.propagation import publish_events
+        from app.services.formula_settings.outbox import record_changes, publish_pending
 
-        await publish_events(formula_events, domain="report", source="seed")
+        await record_changes(db, events=formula_events, domain="report", source="seed")
+    await db.commit()
+    if formula_events:
+        await publish_pending(db)
 
     success_count = sum(1 for r in results if r.get("status") == "loaded")
     failed_count = sum(1 for r in results if r.get("status") == "failed")

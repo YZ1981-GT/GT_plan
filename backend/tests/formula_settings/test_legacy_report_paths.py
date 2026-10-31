@@ -39,15 +39,18 @@ async def api(monkeypatch):
             ids = {"global": g.id, "conflict_row": pr.id}
         events: list = []
 
-        async def fake_publish_events(evs, **kw):
-            events.extend(evs)
-            return len(evs)
+        async def fake_record_changes(db, *, domain="", events=(), source="", publish_id=None):
+            pass  # S4: record_changes 打桩，不实际入队
+
+        async def fake_publish_pending(db):
+            return {"queued": 0}  # S4: publish_pending 打桩
 
         for mod in (report_config, report_config_baseline):
-            monkeypatch.setattr(mod, "publish_events", fake_publish_events)
+            monkeypatch.setattr(mod, "record_changes", fake_record_changes)
+            monkeypatch.setattr(mod, "publish_pending", fake_publish_pending)
         import app.services.formula_settings.propagation as prop
 
-        monkeypatch.setattr(prop, "publish_events", fake_publish_events)
+        # S4: propagation.publish_events 保留给旧路径，不需要在路由级打桩
         app = FastAPI()
         for r in (report_config.router, report_config_baseline.router, formula_audit_log.router):
             app.include_router(r)

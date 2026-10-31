@@ -3544,18 +3544,9 @@ async function onSaveAllFormulas() {
  * `resolveSaveYear` 口径——缺可解析年份时跳过传播，**不** fallback 到系统当前年（需求 10.2）。
  */
 async function propagateFormulaStale(location?: CanonicalWorkpaperLocation) {
-  const projectId = location?.projectId || props.projectId
-  const year = resolveSaveYear(location?.fiscalYear ?? props.year)
-  if (!projectId || year == null) return  // 缺项目/年份则跳过（不以系统年顶替）
-  try {
-    await api.post(linkageBus.impact, {
-      source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
-      project_id: projectId,
-      year,
-    }, { validateStatus: (s: number) => s < 600 })
-  } catch {
-    // stale propagation failure is non-blocking
-  }
+  // S4 ADR-SDO-05：传播已由后端 outbox 投递完成，前端不再重复发送。
+  // 保留函数签名避免 8 处调用方改动，但不再发请求。
+  void location
 }
 
 // ── 公式看板 ──

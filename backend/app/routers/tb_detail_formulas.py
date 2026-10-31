@@ -23,7 +23,7 @@ from app.deps import require_project_access
 from app.models.core import Project, User
 from app.services.formula_settings import tb_detail
 from app.services.formula_settings.errors import FormulaSettingError
-from app.services.formula_settings.propagation import publish_events
+from app.services.formula_settings.outbox import record_changes, publish_pending
 
 router = APIRouter(prefix="/api/report-config", tags=["report-config"])
 
@@ -87,7 +87,8 @@ async def save_tb_detail_formulas(
     except FormulaSettingError as exc:
         await db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await record_changes(db, events=result["events"], domain="tb_detail", source="tb_detail_edit")
     await db.commit()
-    await publish_events(result["events"], domain="tb_detail", source="tb_detail_edit")
+    await publish_pending(db)
     changed = sorted({s for ev in result["events"] for s in ev.get("slot_keys", [])})
     return {**await tb_detail.load(db, project_id), "changed_slot_keys": changed, "message": "科目明细公式已保存"}
