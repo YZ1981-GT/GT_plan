@@ -22,9 +22,18 @@
     :slot-keys="apply.slotKeys" :can-edit-global="canEditGlobal" @done="() => emit('changed', apply.domain)" />
 </template>
 
+<script lang="ts">
+/**
+ * 支持「应用范围」的域白名单（单一来源）——域不在列表内点应用范围按钮时禁用并提示。
+ * 生产调用方只有 report / tb_detail / cross_check 三个域调 askApplyScope。
+ */
+export const APPLY_SCOPE_DOMAINS: ReadonlyArray<string> = ['report', 'tb_detail', 'cross_check'] as const
+</script>
+
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import FormulaTemplateSaveDialog from './FormulaTemplateSaveDialog.vue'
 import FormulaTemplateSubscribeDialog from './FormulaTemplateSubscribeDialog.vue'
 import FormulaApplyScopeDialog from './FormulaApplyScopeDialog.vue'
@@ -67,6 +76,10 @@ function onPackageApplied(domains: string[]) {
 /** 本项目保存成功后调用：选择仅本项目 / 设为全局（或提交候选）/ 应用到指定项目。 */
 function askApplyScope(domain: string, slotKeys: string[]) {
   if (!props.projectId || !slotKeys.length) return
+  if (!APPLY_SCOPE_DOMAINS.includes(domain)) {
+    ElMessage.warning('该域暂不支持按范围应用')
+    return
+  }
   apply.domain = domain
   apply.slotKeys = [...slotKeys]
   apply.visible = true

@@ -189,8 +189,8 @@ class TestJCycleTriangleLogic:
             checks = await gate.check_j_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "期末=期初+计提-实发" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- VR-J1-02: 薪酬费用率年度波动 < 5% ---
 
@@ -261,8 +261,8 @@ class TestJCycleTriangleLogic:
             checks = await gate.check_j_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "费用率" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- VR-J1-03: 薪酬分配合计 = D5 + K8 + K9 + F2 ---
 
@@ -340,8 +340,8 @@ class TestJCycleTriangleLogic:
             checks = await gate.check_j_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "分配合计" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_j1_03_partial_targets_triggers_check(self, db_session, project_id):
         """VR-J1-03 部分目标已保存: 仅 K8 已保存 → 仍触发 blocking 校验"""
@@ -390,8 +390,8 @@ class TestJCycleTriangleLogic:
             checks = await gate.check_j_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "分配合计" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
 
 # ---------------------------------------------------------------------------
@@ -409,19 +409,19 @@ class TestJCycleIntegration:
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
         ), patch.object(
             gate, "check_tb_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="tb", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="tb", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_bs_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="bs", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="bs", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_is_reconciliation", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="is", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="is", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_notes_completeness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="notes", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="notes", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_data_freshness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="fresh", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="fresh", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_e1_cfs_reconciliation", new_callable=AsyncMock,
             return_value=[],
@@ -446,5 +446,5 @@ class TestJCycleIntegration:
         # J cycle produces 3 checks (all skip since _get_wp_parsed_data returns None)
         j_checks = [c for c in result.checks if "J1" in c.check_name]
         assert len(j_checks) == 3
-        # All should be passed=True (skip mode)
-        assert all(c.passed for c in j_checks)
+        # 数据缺失 ⇒ 全部未执行（五态，spec formula-hub-integrity-closure 需求 16.2）
+        assert all(c.status == "not_executed" for c in j_checks)

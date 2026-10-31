@@ -76,15 +76,19 @@ WP_IMPLS: tuple[WpImplSpec, ...] = (
         impl=EXECUTOR_WP_IMPL,
         positional_args=("wp_code", "column", "field"),
         data_source=(
-            "working_paper.parsed_data：审定数 / 未审数 / 期初余额 / 期末余额映射顶层键，单元格地址经 ACNR 定位后从 "
-            "extract_custom_cells 取；第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）；"
+            "working_paper.parsed_data：审定数 / 未审数 / 期初余额 / 期末余额映射 WP_COLUMN_KEYS 顶层键；"
+            "两参单元格经 resolve_wp_cell(db, project_id, year, wp_code, None, cell) 三态读取；"
+            "第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）；"
             "第三参为 A1 时经 acnr.wp_cell_target.read_formula_cell 按目录 sheet 精确取值（先 sheet 级底稿、无则父底稿），"
             "取不到返回 None"
         ),
-        on_missing="Decimal('0')（两参：底稿不存在 / 键缺失 / 异常一律 0）；三参 A1 取不到返回 None",
+        on_missing=(
+            "Decimal('0')（两参：读取函数非 ok / 底稿不存在 / 键缺失 / 异常一律 0）；三参 A1 取不到返回 None"
+        ),
         measured=(
-            "2026-10-28 acnr-foundation-defect-closure T13：三参 A1 改为按 sheet 精确取值（原来把表名当列名、恒 0）；"
-            "报表引擎与 FormulaEngine.execute 预载的两参 WP 与 D2-3 分支未改动"
+            "2026-10-28 acnr-foundation-defect-closure T13：三参 A1 改为按 sheet 精确取值（原来把表名当列名、恒 0）。"
+            "2026-10-28 formula-hub 任务 23：两参单元格分支改调 resolve_wp_cell、列名映射提为 WP_COLUMN_KEYS；"
+            "报表引擎与预载的 D2-3 分支未改动。两段分属两个 spec 的字段，2026-10-29 整合时合并保留（design §8.2）"
         ),
     ),
     WpImplSpec(
@@ -147,6 +151,17 @@ WP_KNOWN_DIFFERENCES: tuple[WpKnownDifference, ...] = (
             "让 WPExecutor 也走 checklist_responses 需逐个底稿登记锚点（ANCHOR_MAP 只覆盖部分底稿）并改报表取数口径，超出本 spec"
         ),
         owner_spec="formula-fetch-followup-defect-closure",
+    ),
+    WpKnownDifference(
+        dimension="typed_eval_strictness",
+        detail=(
+            "resolve_wp_cell 返回 missing/blocked + 中文原因（不代 0）；WPExecutor.execute 的单元格分支改调后把非 ok 映射回 "
+            "Decimal('0') 保持向后兼容 ⇒ 读取函数有三态，WPExecutor 调用方仍只见 0 / 非 0"
+        ),
+        reason=(
+            "WPExecutor 对外接口是 Decimal（所有报表 / Tier A 公式依赖返回 0）；直接返回三态需改所有调用方，属口径变更需单独裁决"
+        ),
+        owner_spec="formula-hub-integrity-closure",
     ),
 )
 

@@ -4,7 +4,7 @@
  * 守护：askApplyScope 对任意域（tb_detail / cross_check / report）都能打开应用范围对话框并传域与公式位；
  * 无项目上下文或空公式位时不弹（保存了但没有真正改动时不打扰）；layerLabel / LAYER_LABELS 层级标签口径。
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import FormulaSettingsToolbar from '../FormulaSettingsToolbar.vue'
 import { layerLabel, LAYER_LABELS, layerTagType } from '@/composables/formula/useFormulaSettings'
@@ -102,5 +102,40 @@ describe('层级标签口径', () => {
     expect(layerTagType('project')).toBe('warning')
     expect(layerTagType('pinned')).toBe('danger')
     expect(layerTagType('global')).toBe('info')
+  })
+})
+
+
+// ─── Task 34: 应用范围域白名单（需求 15.2） ──────────────────────────────────
+import { APPLY_SCOPE_DOMAINS } from '../FormulaSettingsToolbar.vue'
+import { ElMessage } from 'element-plus'
+
+vi.mock('element-plus', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('element-plus')>()
+  return { ...actual, ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() } }
+})
+
+describe('APPLY_SCOPE_DOMAINS 白名单（Task 34 / 需求 15.2）', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('恰好包含 report / tb_detail / cross_check 三个域', () => {
+    expect([...APPLY_SCOPE_DOMAINS].sort()).toEqual(['cross_check', 'report', 'tb_detail'])
+    expect(APPLY_SCOPE_DOMAINS.length).toBe(3)
+  })
+
+  it('域不在白名单时 askApplyScope 弹 warning 且不打开对话框', async () => {
+    const w = mountToolbar({ domain: 'note', projectId: 'p1' })
+    ;(w.vm as any).askApplyScope('note', ['sec:五、1'])
+    await w.vm.$nextTick()
+    expect(ElMessage.warning).toHaveBeenCalledWith('该域暂不支持按范围应用')
+    expect(w.find('[data-testid="apply"]').attributes('data-visible')).toBe('false')
+  })
+
+  it('白名单域正常打开，不弹 warning', async () => {
+    const w = mountToolbar({ domain: 'report' })
+    ;(w.vm as any).askApplyScope('report', ['balance_sheet:BS-001'])
+    await w.vm.$nextTick()
+    expect(ElMessage.warning).not.toHaveBeenCalled()
+    expect(w.find('[data-testid="apply"]').attributes('data-visible')).toBe('true')
   })
 })

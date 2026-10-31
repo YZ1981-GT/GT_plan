@@ -68,7 +68,6 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/ai_chat/startup_health.py", "app.services.ai_chat.audit", "audit_event"),
     ("app/services/evidence_governance/unified_graph_builder.py", "app.services.workpaper_trace_stale_integration",
      "get_registry_edges"),
-    ("app/services/formula_timeline_service.py", "app.models.audit_platform_models", "Project"),
     ("app/services/issue_ticket_service.py", "app.services.notification_service", "notification_service"),
     ("app/services/role_workbench_facade.py", "app.models.collaboration_models", "PBCItem"),
     ("app/services/wp_scripts/registry.py", "app.services.tsj_prompt_service", "get_review_points"),

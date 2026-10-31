@@ -187,12 +187,12 @@ const props = withDefaults(defineProps<{
   scope?: FormulaDialogScope
   /** 可选：默认选中的页面键（scope:key，如 workpaper:D2） */
   pageKey?: string
-  /** 是否允许新建/编辑自定义预设（默认 true 保持既有调用点不变；无编辑权时传 false 隐藏入口） */
+  /** 是否允许新建/编辑自定义预设（默认 false：仅 FormulaTab 传 true；其余挂载点只读浏览） */
   canEdit?: boolean
 }>(), {
   scope: 'workpaper',
   pageKey: '',
-  canEdit: true,
+  canEdit: false,
 })
 
 /** 判定条目是否为自定义预设（来源标注，Property 3）。 */
@@ -320,7 +320,9 @@ function openEditor(row: FormulaPresetEntry | null) {
 function onEditorSave(payload: FormulaEditPayload) {
   const pageKey = selectedPageKey.value
   emit('edit-formula', { ...payload, page_key: pageKey })
-  ElMessage.success('公式已编辑（可经导入或底稿保存持久化）')
+  if (props.canEdit) {
+    ElMessage.success('公式已编辑（可经导入或底稿保存持久化）')
+  }
 }
 
 /** 供宿主在持久化成功后刷新当前页预设列表（复用现有 selectPage 拉取）。 */

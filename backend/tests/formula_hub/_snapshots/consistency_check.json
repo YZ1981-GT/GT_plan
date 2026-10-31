@@ -1,0 +1,58 @@
+{
+ "all_passed": false,
+ "checks": [
+  {
+   "branch_id": "",
+   "check_name": "试算平衡",
+   "details": "借贷平衡",
+   "passed": true,
+   "reason": "",
+   "severity": "blocking",
+   "status": "passed"
+  },
+  {
+   "branch_id": "",
+   "check_name": "D4勾稽:营业收入合计=主营+其他",
+   "details": "主营 90.00 + 其他 0.00 ≠ 100.00",
+   "passed": false,
+   "reason": "差额 10.00",
+   "severity": "blocking",
+   "status": "failed"
+  },
+  {
+   "branch_id": "e1.cfs_missing",
+   "check_name": "E1勾稽:现金流量表",
+   "details": "",
+   "passed": false,
+   "reason": "现金流量表尚未生成",
+   "severity": "blocking",
+   "status": "not_executed"
+  },
+  {
+   "branch_id": "f.trimmed",
+   "check_name": "F 三角勾稽",
+   "details": "",
+   "passed": false,
+   "reason": "底稿已裁剪",
+   "severity": "warning",
+   "status": "not_applicable"
+  },
+  {
+   "branch_id": "g.exception",
+   "check_name": "G 三角勾稽",
+   "details": "",
+   "passed": false,
+   "reason": "检查异常：RuntimeError：boom",
+   "severity": "warning",
+   "status": "error"
+  }
+ ],
+ "consistent": false,
+ "error_count": 1,
+ "failed_count": 1,
+ "not_applicable_count": 1,
+ "not_executed_count": 1,
+ "overall": "fail",
+ "passed_count": 1,
+ "total_count": 5
+}

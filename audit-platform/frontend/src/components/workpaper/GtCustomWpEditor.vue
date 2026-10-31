@@ -351,8 +351,10 @@ async function removeFormula(row: FormulaListItem) {
     return // 用户取消
   }
   try {
+    // 🔴 删除同样强制 CAS（formula-hub-integrity-closure ADR-FHIC-11 / 需求 13.4）：不带版本号 ⇒ 后端 428
     const res = (await api.delete(
-      apiPaths.workpapers.formulaDetail(props.wpId, row.id)
+      apiPaths.workpapers.formulaDetail(props.wpId, row.id),
+      { params: { expected_version: row.definition_version ?? undefined } },
     )) as { cell_clear_failed?: boolean }
     // 🔴 如实反映「定义已删但残留值清理失败」——静默成功会让用户以为该格已干净
     if (res?.cell_clear_failed) {

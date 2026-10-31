@@ -9,15 +9,25 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { chainWorkflow } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { checkReasonOf, checkStatusLabel, checkStatusOf, type GateCheckStatus } from '@/utils/consistencyCheckStatus'
 
 export interface D4ValidationResult {
   rule_id: string
   description: string
   passed: boolean
+  /** 五态；接口没给出时按「检查异常」显示（不按 passed 推断成通过） */
+  status?: GateCheckStatus
+  /** 非通过原因（未执行 / 不适用 / 异常时由后端给出） */
+  reason?: string
   severity: 'blocking' | 'warning'
   details: string
   check_name: string
+}
+
+function statusOf(item: D4ValidationResult): GateCheckStatus {
+  return checkStatusOf(item)
 }
 
 const props = defineProps<{
@@ -30,21 +40,29 @@ const loading = ref(false)
 const results = ref<D4ValidationResult[]>([])
 const lastCheckedAt = ref<string | null>(null)
 
+// 只有「失败」才是阻断级差异；未执行 / 不适用 / 异常各自显示，不算通过也不算差异
 const hasBlockingFailures = computed(() =>
-  results.value.some(r => !r.passed && r.severity === 'blocking')
+  results.value.some(r => statusOf(r) === 'failed' && r.severity === 'blocking')
 )
 
 const summaryText = computed(() => {
   if (results.value.length === 0) return '未执行'
-  const passed = results.value.filter(r => r.passed).length
-  return `${passed}/${results.value.length} 通过`
+  const count = (s: GateCheckStatus) => results.value.filter(r => statusOf(r) === s).length
+  const passed = count('passed')
+  const total = results.value.length
+  if (passed === total) return `${total}/${total} 通过`
+  const parts: string[] = [`${passed} 通过`]
+  if (count('failed') > 0) parts.push(`${count('failed')} 失败`)
+  if (count('not_executed') > 0) parts.push(`${count('not_executed')} 未执行`)
+  if (count('not_applicable') > 0) parts.push(`${count('not_applicable')} 不适用`)
+  if (count('error') > 0) parts.push(`${count('error')} 检查异常`)
+  return parts.join('、')
 })
 
 const overallStatus = computed(() => {
   if (results.value.length === 0) return 'pending'
   if (hasBlockingFailures.value) return 'blocked'
-  const hasWarnings = results.value.some(r => !r.passed && r.severity === 'warning')
-  if (hasWarnings) return 'warning'
+  if (results.value.some(r => statusOf(r) !== 'passed' && statusOf(r) !== 'not_applicable')) return 'warning'
   return 'pass'
 })
 
@@ -57,15 +75,31 @@ const D4_VR_RULES = [
 ]
 
 function getStatusIcon(item: D4ValidationResult): string {
-  if (item.passed) return '✅'
-  if (item.severity === 'blocking') return '❌'
+  const st = statusOf(item)
+  if (st === 'passed') return '✅'
+  if (st === 'failed') return item.severity === 'blocking' ? '❌' : '⚠️'
+  if (st === 'not_executed') return '⏭️'
+  if (st === 'not_applicable') return '➖'
   return '⚠️'
 }
 
 function getStatusClass(item: D4ValidationResult): string {
-  if (item.passed) return 'status-pass'
-  if (item.severity === 'blocking') return 'status-blocking'
+  const st = statusOf(item)
+  if (st === 'passed') return 'status-pass'
+  if (st === 'failed') return item.severity === 'blocking' ? 'status-blocking' : 'status-warning'
+  if (st === 'not_executed') return 'status-not-executed'
+  if (st === 'not_applicable') return 'status-not-applicable'
   return 'status-warning'
+}
+
+/** 五态标签（需求 16.5：未执行 / 不适用 / 检查异常各有标签，不显示「通过」） */
+function getStatusLabel(item: D4ValidationResult): string {
+  return checkStatusLabel(item)
+}
+
+/** 非通过项显示的原因：后端 reason 优先，没有再用 details；状态缺失时写明接口没给状态 */
+function getReasonText(item: D4ValidationResult): string {
+  return checkReasonOf(item)
 }
 
 function getSeverityLabel(severity: string): string {
@@ -81,31 +115,38 @@ async function fetchD4Results() {
 
   loading.value = true
   try {
-    const data = await api.get(
-      `/api/projects/${props.projectId}/consistency-gate/check`,
-      { params: { year: props.year } }
-    )
-    // 从 consistency gate 结果中提取 D4 勾稽相关的 checks
-    const allChecks: Array<{ check_name: string; passed: boolean; severity: string; details: string }> = data?.checks || []
-    const d4Checks = allChecks.filter((c: { check_name: string }) => c.check_name.startsWith('D4勾稽'))
+    // 展示端点 = 一致性检查（五态，需求 16.5）；原先请求的 /consistency-gate/check 后端不存在（恒 404）
+    const data = await api.get(chainWorkflow.consistencyCheck(props.projectId), {
+      params: { year: props.year },
+    })
+    // 从一致性检查结果中提取 D4 勾稽相关的 checks
+    const allChecks: Array<{
+      check_name: string; passed: boolean; status?: GateCheckStatus; reason?: string
+      severity: string; details: unknown
+    }> = data?.checks || []
+    const d4Checks = allChecks.filter(c => (c.check_name || '').startsWith('D4勾稽'))
 
     if (d4Checks.length > 0) {
       results.value = d4Checks.map((c, idx) => ({
         rule_id: D4_VR_RULES[idx]?.rule_id || `VR-D4-0${idx + 1}`,
         description: D4_VR_RULES[idx]?.description || c.check_name,
         passed: c.passed,
+        status: c.status,
+        reason: c.reason || '',
         severity: (c.severity as 'blocking' | 'warning') || D4_VR_RULES[idx]?.severity || 'warning',
-        details: c.details,
+        details: typeof c.details === 'string' ? c.details : '',
         check_name: c.check_name,
       }))
     } else {
-      // 如果 API 没有返回 D4 勾稽结果，显示默认未执行状态
+      // 接口没有返回 D4 勾稽结果：显示「未执行」并写明原因，不自补「通过」（需求 16.5）
       results.value = D4_VR_RULES.map(rule => ({
         rule_id: rule.rule_id,
         description: rule.description,
-        passed: true,
+        passed: false,
+        status: 'not_executed' as const,
+        reason: '一致性检查未返回该项结果，未执行',
         severity: rule.severity,
-        details: '数据不完整，跳过检查',
+        details: '',
         check_name: '',
       }))
     }
@@ -176,10 +217,11 @@ watch(() => [props.projectId, props.year], () => {
               >
                 {{ getSeverityLabel(item.severity) }}
               </el-tag>
+              <span class="rule-status" data-testid="gate-status-label">{{ getStatusLabel(item) }}</span>
             </div>
             <div class="rule-desc">{{ item.description }}</div>
-            <div v-if="item.details && !item.passed" class="rule-details">
-              {{ item.details }}
+            <div v-if="getReasonText(item)" class="rule-details" data-testid="gate-status-reason">
+              {{ getReasonText(item) }}
             </div>
           </div>
         </div>
@@ -256,6 +298,17 @@ watch(() => [props.projectId, props.year], () => {
   background: var(--el-color-warning-light-9, #fdf6ec);
 }
 
+.rule-item.status-not-executed {
+  border-left: 3px solid var(--el-color-info);
+  background: var(--el-color-info-light-9, #f4f4f5);
+}
+
+.rule-item.status-not-applicable {
+  border-left: 3px solid #c0c4cc;
+  background: #fafafa;
+  opacity: 0.75;
+}
+
 .rule-row {
   display: flex;
   align-items: flex-start;
@@ -285,6 +338,11 @@ watch(() => [props.projectId, props.year], () => {
   font-weight: 600;
   color: var(--gt-color-text-secondary);
   font-family: 'Arial Narrow', Arial, sans-serif;
+}
+
+.rule-status {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 
 .rule-desc {

@@ -128,7 +128,8 @@ async def delete_row(db: AsyncSession, row: ReportConfig, *, user_id: uuid.UUID 
                                       changes=[{"slot_key": slot, "definition": None,
                                                 "expected_version": expected_version}])
     else:
-        result = await restore_global(db, domain="report", project_id=pid, slot_keys=[slot], user_id=user_id)
+        result = await restore_global(db, domain="report", project_id=pid, slot_keys=[slot], user_id=user_id,
+                                     expected_versions=None)  # 同一事务内已做过 CAS
     return {"events": result.get("events") or [], "publish_id": result.get("publish_id")}
 
 
@@ -155,10 +156,10 @@ async def sync_project_to_global(db: AsyncSession, *, project_id: uuid.UUID, sta
                           and same_exec("report", lo.base_definition, up.definition)):
             counts["unchanged"] += 1
             continue
-        item = PlanItem(project=project, slot_key=slot, label=up.label, old_up=lo.base_definition,
+        item = PlanItem(domain="report", project=project, slot_key=slot, label=up.label, old_up=lo.base_definition,
                         old_version=lo.base_version, old_origin=lo.base_origin or "global", new_up=up.definition,
                         new_version=up.version, new_origin="global", local=lo, structure=up.structure)
-        category = item.classify("report")
+        category = item.classify()
         if category is Category.PINNED and not keep_local:
             category = item.category = Category.CONFLICT
         effect = decide("report", category, old_upstream=item.old_up, old_version=item.old_version,

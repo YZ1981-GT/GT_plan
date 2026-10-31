@@ -128,7 +128,7 @@ async def test_save_subscribe_publish_unsubscribe_end_to_end(world):
     items = await pending_items(db, w["deferrer"])
     assert {i.reason for i in items} == {"deferred"} and len(items) == 2
     await resolve_items(db, project_id=w["deferrer"], user_id=w["owner"].id,
-                        resolutions=[{"item_id": str(i.id), "choice": "adopt"} for i in items])
+                        resolutions=[{"item_id": str(i.id), "choice": "adopt", "revision": i.revision} for i in items])
     sub = await _sub(db, w["deferrer"])
     assert (sub.pinned, sub.template_version) == (False, 2) and await _formula(db, w["deferrer"]) == V2
 

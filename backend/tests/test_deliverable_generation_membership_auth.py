@@ -46,7 +46,7 @@ from app.routers import (
     chain_workflow, deliverable, deliverable_lineage, disclosure_notes, note_ai, note_export, word_export,
 )
 from app.services.assignment_service import EQCR_ROLE_ALIASES, ROLE_MAP, map_assignment_role
-from app.services.consistency_gate import ConsistencyGate
+from app.services.consistency_gate import ConsistencyGate, ConsistencyResult
 from app.services.data_health_monitor import DataHealthMonitor
 from app.services.deliverable_refresh_service import DeliverableRefreshService
 from app.services.deliverable_writeback_service import DeliverableWritebackService
@@ -134,7 +134,9 @@ def _stub_business(world: AuthzWorld) -> dict[str, ServiceStub]:
         "run_full_deliverables": (FullDeliverablesExecutor, "run", SimpleNamespace(job_id=JOB)),
         "export_note_word": (NoteWordExporter, "export", io.BytesIO(b"PK\x03\x04 docx")),
         "export_package": (ExportPackageService, "export_package", io.BytesIO(b"PK\x03\x04 zip")),
-        "run_all_checks": (ConsistencyGate, "run_all_checks", SimpleNamespace(overall="pass", checks=[])),
+        # 真结果类型：一致性检查端点要读 status_counts()（五态计数，spec formula-hub-integrity-closure 任务 39），
+        # SimpleNamespace 桩没有这个方法 ⇒ 放行的身份全部 500
+        "run_all_checks": (ConsistencyGate, "run_all_checks", ConsistencyResult(overall="pass", checks=[])),
         "calculate_health_score": (DataHealthMonitor, "calculate_health_score", SimpleNamespace(score=100, checks=[])),
         "sync_report_to_notes": (ReportNoteSyncService, "sync_report_to_notes", {"synced": 0}),
         "trim_and_sort": (NoteTrimSortService, "trim_and_sort", {"trimmed": 0}),

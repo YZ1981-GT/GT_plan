@@ -368,10 +368,15 @@ async def consistency_check(
     gate = ConsistencyGate(db)
     result = await gate.run_all_checks(project_id, year)
 
+    status_counts = result.status_counts()
+
     checks_payload = [
         {
             "check_name": c.check_name,
             "passed": c.passed,
+            "status": c.status,
+            "reason": c.reason,
+            "branch_id": c.branch_id,
             "details": c.details,
             "severity": c.severity,
         }
@@ -383,7 +388,11 @@ async def consistency_check(
         "overall": result.overall,
         "all_passed": all_passed,           # F4 (v3 §2): 顶层方便前端徽章
         "consistent": all_passed,           # alias，兼容多种前端写法
-        "passed_count": sum(1 for c in checks_payload if c["passed"]),
+        "passed_count": status_counts.get("passed", 0),
+        "failed_count": status_counts.get("failed", 0),
+        "not_executed_count": status_counts.get("not_executed", 0),
+        "not_applicable_count": status_counts.get("not_applicable", 0),
+        "error_count": status_counts.get("error", 0),
         "total_count": len(checks_payload),
         "checks": checks_payload,
     }

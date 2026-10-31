@@ -505,22 +505,26 @@ def test_audit_log_writes_real_user_id():
     原实现 `user_id = uuid.UUID("00000000-0000-0000-0000-000000000000")`
     + 注释「POST 端点无 current_user 上下文」⇒ 留痕可伪造。
     """
+    zero = "00000000-0000-0000-0000-000000000000"
+
+    def _strip(text: str) -> str:
+        # 剔注释后再查，避免把「说明为什么不能这么写」的注释数成真实代码
+        return re.sub(r'"""[\s\S]*?"""', "", re.sub(r"#.*$", "", text, flags=re.MULTILINE))
+
     src = (_ROUTERS / "formula_audit_log.py").read_text(encoding="utf-8", errors="replace")
-    # 剔注释后再查，避免把「说明为什么不能这么写」的注释数成真实代码
-    code = re.sub(r"#.*$", "", src, flags=re.MULTILINE)
-    code = re.sub(r'"""[\s\S]*?"""', "", code)
+    code = _strip(src)
     assert '"user_id": current_user.id' in code, (
         "审计日志未写真实操作人 user_id"
     )
-    assert "00000000-0000-0000-0000-000000000000" not in code, (
+    assert zero not in code, (
         "又出现写死的全零 user_id ⇒ 审计留痕可伪造"
     )
 
-    # 双向变异自检：注释里的全零 UUID 不应被数进来
-    assert "00000000-0000-0000-0000-000000000000" in src, (
-        "本文件已完全不含全零 UUID 字样，上一条断言的剔注释逻辑无从验证 —— "
-        "若确实连注释都删了，请同步删除本自检"
-    )
+    # 双向变异自检：剔注释逻辑只剔注释 / docstring，代码里的全零 UUID 照样数进来。原自检依赖本文件注释里恰好留着
+    # 全零 UUID 字样（spec formula-hub-integrity-closure 重写 add_audit_log 的 docstring 后已不含）⇒ 改用合成样本
+    sample = f'"""说明：不得写 {zero}"""\n# 旧写法 {zero}\nuser_id = uuid.UUID("{zero}")\n'
+    assert _strip(sample).count(zero) == 1, "剔注释逻辑失效：注释 / docstring 里的全零 UUID 被数进来，或代码里的被剔掉"
+    assert zero not in _strip(f'"""{zero}"""\n# {zero}\nok = 1\n')
 
 
 def _first_func(sample: str) -> ast.AST:

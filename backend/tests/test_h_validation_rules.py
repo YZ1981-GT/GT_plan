@@ -185,8 +185,8 @@ class TestHCycleTriangleLogic:
             checks = await gate.check_h_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "固定资产原值期末" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- VR-H1-02 ---
 
@@ -241,8 +241,8 @@ class TestHCycleTriangleLogic:
             checks = await gate.check_h_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "累计折旧期末" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- VR-H8-01 ---
 
@@ -297,8 +297,8 @@ class TestHCycleTriangleLogic:
             checks = await gate.check_h_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "使用权资产" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- VR-H1-03 ---
 
@@ -349,13 +349,13 @@ class TestHCycleTriangleLogic:
             checks = await gate.check_h_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "折旧率波动" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- Integration tests ---
 
     async def test_all_skip_when_no_data(self, db_session, project_id):
-        """所有数据缺失时全部跳过 (passed=True), 长度=4"""
+        """所有数据缺失时全部跳过 (status=not_executed), 长度=4"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
@@ -364,7 +364,7 @@ class TestHCycleTriangleLogic:
 
         assert len(checks) == 4
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
 
     async def test_blocking_rule_prevents_signoff(self, db_session, project_id):
         """VR-H1-01 blocking 失败时阻断签字"""
@@ -390,22 +390,22 @@ class TestHCycleTriangleLogic:
     async def test_warnings_do_not_block(self, db_session, project_id):
         """VR-H1-03 warning 失败不阻断签字"""
         checks = [
-            CheckItem(
+            CheckItem(status="passed",
                 check_name="H1勾稽:固定资产原值期末=期初+增加-减少+处置",
                 passed=True,
                 severity="blocking",
             ),
-            CheckItem(
+            CheckItem(status="passed",
                 check_name="H1勾稽:累计折旧期末=期初+计提-处置冲减",
                 passed=True,
                 severity="blocking",
             ),
-            CheckItem(
+            CheckItem(status="passed",
                 check_name="H8勾稽:使用权资产=租赁负债+直接费用-激励",
                 passed=True,
                 severity="blocking",
             ),
-            CheckItem(
+            CheckItem(status="failed",
                 check_name="H1勾稽:平均折旧率波动<5%",
                 passed=False,
                 severity="warning",

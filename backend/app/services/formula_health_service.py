@@ -217,34 +217,21 @@ async def _cross_check_stats(
 async def _stale_stats(
     db: AsyncSession, project_id: uuid.UUID, year: int
 ) -> dict[str, Any]:
-    """统计报表/附注中 is_stale=True 的数量。"""
+    """统计报表行过期数（report_freshness.stale_clause：已标过期或计算版本不是当前版本）及计算失败 / 口径留空数。"""
     try:
-        from app.models.report_models import FinancialReport
+        from app.services.report_freshness import count_summary
 
-        report_total = (await db.execute(
-            sa.select(sa.func.count()).select_from(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == sa.false(),
-            )
-        )).scalar() or 0
-
-        report_stale = (await db.execute(
-            sa.select(sa.func.count()).select_from(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == sa.false(),
-                FinancialReport.is_stale == sa.true(),
-            )
-        )).scalar() or 0
-
+        counts = await count_summary(db, project_id, year)
         return {
-            "report_total": report_total,
-            "report_stale": report_stale,
+            "report_total": counts.total,
+            "report_stale": counts.stale,
             "report_stale_rate": round(
-                report_stale / report_total * 100, 1
-            ) if report_total > 0 else 0,
+                counts.stale / counts.total * 100, 1
+            ) if counts.total > 0 else 0,
+            "report_calc_error": counts.calc_error,
+            "report_blank": counts.blank,
         }
     except Exception:
         logger.warning("过期统计查询失败", exc_info=True)
-        return {"report_total": 0, "report_stale": 0, "report_stale_rate": 0}
+        return {"report_total": 0, "report_stale": 0, "report_stale_rate": 0,
+                "report_calc_error": 0, "report_blank": 0}

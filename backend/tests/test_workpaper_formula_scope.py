@@ -44,6 +44,11 @@ async def db_session() -> AsyncSession:
         tables_to_create = [
             Base.metadata.tables["users"],
             Base.metadata.tables["audit_log_entries"],
+            # 公式历史列表给可回滚条目算当前版本（D-2），定位公式位要读 projects
+            Base.metadata.tables["projects"],
+            Base.metadata.tables["report_config"],
+            Base.metadata.tables["formula_setting"],
+            Base.metadata.tables["formula_sync_item"],
         ]
         await conn.run_sync(Base.metadata.create_all, tables=tables_to_create)
     session_factory = async_sessionmaker(

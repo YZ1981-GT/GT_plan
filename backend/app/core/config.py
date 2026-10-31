@@ -1,6 +1,7 @@
 """配置管理模块 — 使用 pydantic-settings 从环境变量/.env 文件加载配置"""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -205,8 +206,12 @@ class Settings(BaseSettings):
     CHROMADB_URL: str = "http://localhost:8000"
     # Phase 8: 事件总线去重窗口（毫秒）
     EVENT_DEBOUNCE_MS: int = 500
-    # Phase 8: 公式引擎超时（秒）
+    # Phase 8: 公式引擎超时（秒）；PG 上单条语句时限 = 本值 × 1000 − 500 毫秒（spec formula-hub-integrity-closure 需求 12.3）
     FORMULA_EXECUTE_TIMEOUT: int = 10
+    # 两个批量执行端点（/api/formula/batch-execute、/api/report-config/execute-formulas-batch）整批时限（秒）
+    FORMULA_BATCH_TIMEOUT: int = 60
+    # 一致性门禁判定模式（ADR-FHIC-14 第 5 点）：observe = 只提示（默认，= HEAD 实际效果）；enforce = 阻断
+    CONSISTENCY_GATE_ENFORCEMENT: Literal["observe", "enforce"] = "observe"
     # Phase 8: 数据加密密钥
     ENCRYPTION_KEY: str = ""
     # LLM 限流配置

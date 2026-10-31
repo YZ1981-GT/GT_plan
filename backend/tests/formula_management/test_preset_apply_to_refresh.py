@@ -220,6 +220,9 @@ def test_preset_index_failure_fail_open(monkeypatch):
 
 # ── refresh_with_presets：套用 + 编排 + 审计明细统计 ─────────────────────────
 def test_refresh_with_presets_applies_and_records():
+    """刷新单元数按 spec formula-hub-integrity-closure 需求 3.3 改记 ``draft_marked_count``：marker 路径不改业务值，
+    ``affected_count``（= applied + recomputed）为 0（改造前 ``affected_count`` = 刷新单元数）。"""
+
     async def _scenario():
         factory, engine = await _make_session()
         try:
@@ -243,7 +246,8 @@ def test_refresh_with_presets_applies_and_records():
 
                 assert result.status == "success", result.blocking
                 # 预设 3 条 + 上游 1 条 = 4 个刷新单元
-                assert result.affected_count == 4
+                assert result.draft_marked_count == 4
+                assert result.affected_count == 0
                 assert app.preset_count == 3
                 assert app.pending_pages == ["workpaper:PENDING-1"]
 
@@ -278,7 +282,10 @@ def test_refresh_with_presets_applies_and_records():
 
 
 def test_refresh_with_presets_all_pending_only_extra_units():
-    """全部页面 pending 时仅编排上游 extra_units（预设不产单元，无回归）。"""
+    """全部页面 pending 时仅编排上游 extra_units（预设不产单元，无回归）。
+
+    刷新单元数按 spec formula-hub-integrity-closure 需求 3.3 改记 ``draft_marked_count``（``affected_count`` 对 marker 路径为 0）。
+    """
 
     async def _scenario():
         factory, engine = await _make_session()
@@ -302,7 +309,8 @@ def test_refresh_with_presets_all_pending_only_extra_units():
 
                 assert result.status == "success", result.blocking
                 assert app.preset_count == 0
-                assert result.affected_count == 1  # 仅上游单元
+                assert result.draft_marked_count == 1  # 仅上游单元
+                assert result.affected_count == 0
                 assert set(app.pending_pages) == {"workpaper:PENDING-1", "note:pending"}
         finally:
             await engine.dispose()

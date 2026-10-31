@@ -217,3 +217,37 @@ describe('GtFormulaPresetDialog — 说明文档单一源（P24 / Req 23.6, 25.3
     expect(DOC_ENDPOINT.startsWith('/api/formula-management/')).toBe(true)
   })
 })
+
+
+// ─── Task 34: canEdit 只读默认（需求 15.1） ──────────────────────────────────
+import { ElMessage } from 'element-plus'
+
+describe('GtFormulaPresetDialog — canEdit 只读默认（Task 34 / 需求 15.1）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    docReturnRef.value = SINGLE_SOURCE_DOC
+    mockGet.mockImplementation((url: string) => routeGet(url))
+    mockPost.mockResolvedValue({ data: new Blob() })
+  })
+
+  it('canEdit 默认值为 false（源码 withDefaults 层面）', () => {
+    // 不传 canEdit 即取默认值
+    const wrapper = mountDialog()
+    expect((wrapper.vm as any).canEdit).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('canEdit=false 时 onEditorSave 不弹 success toast', async () => {
+    // 默认挂载不传 canEdit → false
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const vm = wrapper.vm as any
+    // 直接调用 onEditorSave（模拟编辑器保存回调）
+    if (typeof vm.onEditorSave === 'function') {
+      vm.onEditorSave({ formula: 'TB(1001)', description: '' })
+      await nextTick()
+    }
+    expect(ElMessage.success).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+})

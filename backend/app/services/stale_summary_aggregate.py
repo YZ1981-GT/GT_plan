@@ -2,7 +2,7 @@
 
 为 PartnerSignDecision / EqcrProjectView / WorkpaperList 提供单端点聚合：
 - workpapers.prefill_stale + .consistency_status
-- financial_report.is_stale
+- financial_report 过期（report_freshness.stale_clause，含计算版本不是当前版本的存量行）+ 计算失败 / 口径留空计数
 - disclosure_notes.is_stale
 - unadjusted_misstatements: 派生（updated_at < materiality.updated_at）
 
@@ -72,35 +72,14 @@ async def get_full_summary(
         for r in (await db.execute(wp_items_sql, {"pid": pid})).all()
     ]
 
-    # 2. financial_report (is_stale)
-    rpt_sql = _sql(
-        """
-        SELECT
-          COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE is_stale = true) AS stale
-        FROM financial_report
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        """
-    )
-    rpt_row = (await db.execute(rpt_sql, {"pid": pid, "yr": year})).first()
-    rpt_items_sql = _sql(
-        """
-        SELECT id, report_type, row_code, row_name
-        FROM financial_report
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-          AND is_stale = true
-        ORDER BY report_type, row_code
-        LIMIT 30
-        """
-    )
+    # 2. financial_report（过期 = report_freshness.stale_clause：已标过期或计算版本不是当前版本；
+    #    明细同时带计算失败原因 calc_error 与口径留空原因 blank_reason）
+    from app.services.report_freshness import count_summary, list_rows, stale_clause
+
+    rpt_counts = await count_summary(db, pid, year)
     rpt_items = [
-        {
-            "id": str(r.id),
-            "report_type": r.report_type,
-            "row_code": r.row_code,
-            "row_name": r.row_name,
-        }
-        for r in (await db.execute(rpt_items_sql, {"pid": pid, "yr": year})).all()
+        {k: r[k] for k in ("id", "report_type", "row_code", "row_name", "calc_error", "blank_reason")}
+        for r in await list_rows(db, pid, year, stale_clause(), limit=30)
     ]
 
     # 3. disclosure_notes (is_stale)
@@ -204,8 +183,10 @@ async def get_full_summary(
             "items": wp_items,
         },
         "reports": {
-            "total": rpt_row.total if rpt_row else 0,
-            "stale": rpt_row.stale if rpt_row else 0,
+            "total": rpt_counts.total,
+            "stale": rpt_counts.stale,
+            "calc_error": rpt_counts.calc_error,
+            "blank": rpt_counts.blank,
             "items": rpt_items,
         },
         "notes": {

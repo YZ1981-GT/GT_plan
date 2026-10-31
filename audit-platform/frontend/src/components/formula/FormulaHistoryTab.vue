@@ -19,20 +19,6 @@
       <span class="gt-fh-count">共 {{ filteredEntries.length }} 条记录</span>
     </div>
 
-    <!-- 依赖提示 -->
-    <el-alert
-      v-if="!specAReady"
-      type="warning"
-      :closable="false"
-      show-icon
-      style="margin-bottom: 12px;"
-    >
-      <template #title>
-        <span>公式变更哈希链（spec A 阶段3）尚未完成，当前展示的是 formula_audit_log 懒建表数据。
-        待 spec A 完成后将自动切换为哈希链 formula.changed 留痕。</span>
-      </template>
-    </el-alert>
-
     <!-- 时间线 -->
     <div v-if="filteredEntries.length" class="gt-fh-timeline">
       <el-timeline>
@@ -122,6 +108,12 @@ interface HistoryEntry {
   created_at: string | null
   /** 写入方式（本项目适配 / 同步全局 / 恢复为全局 / 处理待确认 / 订阅模板 …），旧记录无 */
   operation?: string | null
+  /** 服务端计算：该条目是否可回滚（需求 13.3） */
+  rollbackable?: boolean
+  /** 不可回滚原因 */
+  rollback_blocked_reason?: string | null
+  /** 服务端计算：对应公式位在本项目的当前修订号（回滚请求的 expected_version，需求 13.1） */
+  current_version?: number | null
 }
 
 const props = defineProps<{
@@ -141,10 +133,6 @@ const filterRowCode = ref('')
 const filterAction = ref('')
 const rollingBack = ref<string | null>(null)
 
-// spec A 阶段3 尚未完成，标记为 false
-// 待 spec A 完成后改为动态检测（查 audit_log_entries WHERE action_type='formula.changed'）
-const specAReady = ref(false)
-
 const filteredEntries = computed(() => {
   let result = entries.value
   if (filterRowCode.value.trim()) {
@@ -163,11 +151,10 @@ async function loadHistory() {
   try {
     const data = await api.get(formulaAuditLog.list(props.projectId, props.year), {
       params: { limit: 200 },
-      validateStatus: (s: number) => s < 600,
     })
     entries.value = Array.isArray(data) ? data : []
-  } catch (e) {
-    // 表可能不存在（spec A 未完成），静默处理
+  } catch {
+    // 加载失败时显示空列表（需求 15.3：失败不提示成功）
     entries.value = []
   } finally {
     loading.value = false
@@ -191,20 +178,29 @@ const canRollbackByRole = computed(() =>
 
 function canRollback(entry: HistoryEntry): boolean {
   if (!canRollbackByRole.value) return false
-  return (entry.action === 'update' || entry.action === 'delete') && !!entry.old_formula
+  // 需求 13.3：只看服务端计算的 rollbackable
+  return entry.rollbackable === true
 }
 
 async function onRollback(entry: HistoryEntry) {
-  if (!entry.old_formula) return
   // 项目没填审计年度：先说明，不让用户确认一个发不出去的回滚
   const year = props.year
   if (year == null) {
     ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
     return
   }
+  // ADR-FHIC-10：回滚目标由服务端从 old_definition 快照读取，条目没有展示用的 old_formula 也能回滚
+  // （原先 `if (!entry.old_formula) return` 会把这类条目挡在确认框之前）
+  const oldFormula = entry.old_formula || '（服务端快照恢复）'
+  // 需求 13.1：回滚必带当前修订号（后端缺版本恒 428）；列表没给出版本就不发请求
+  const expectedVersion = entry.current_version
+  if (expectedVersion == null) {
+    ElMessage.warning('无法确定该公式的当前版本，请刷新后重试')
+    return
+  }
   try {
     await ElMessageBox.confirm(
-      `确认将行次 "${entry.row_code}" 的公式回滚为：\n\n${entry.old_formula}\n\n此操作将覆盖当前公式。`,
+      `确认将行次 "${entry.row_code}" 的公式回滚为历史版本？\n\n旧公式：${oldFormula}\n\n此操作将覆盖当前公式。`,
       '一键回滚确认',
       { confirmButtonText: '确认回滚', cancelButtonText: '取消', type: 'warning' },
     )
@@ -214,19 +210,30 @@ async function onRollback(entry: HistoryEntry) {
 
   rollingBack.value = entry.id
   try {
-    await api.post(formulaAuditLog.rollback(props.projectId, year), {
+    // ADR-FHIC-10：不传 target_formula，回滚目标由服务端从 old_definition 读取
+    // 年度用上面收窄过的局部 `year`（props.year 是 number | null，直接传会是类型错）
+    const resp = await api.post(formulaAuditLog.rollback(props.projectId, year), {
       row_code: entry.row_code,
       module: entry.module,
-      target_formula: entry.old_formula,
       source_log_id: entry.id,
-    }, { validateStatus: (s: number) => s < 600 })
-
-    ElMessage.success(`已回滚行次 "${entry.row_code}" 的公式`)
-    emit('rollback-applied', entry.row_code, entry.old_formula)
-    // 刷新历史
+      expected_version: expectedVersion,
+    })
+    // 按状态码判成功（需求 15.3）
+    if (resp && resp.ok) {
+      ElMessage.success(`已回滚行次 "${entry.row_code}" 的公式`)
+      emit('rollback-applied', entry.row_code, resp.restored_formula || oldFormula)
+    }
     await loadHistory()
-  } catch (e) {
-    handleApiError(e, '回滚失败')
+  } catch (e: any) {
+    const status = e?.response?.status || e?.status
+    if (status === 428) {
+      ElMessage.warning('回滚需要提供版本号，请刷新后重试')
+    } else if (status === 409) {
+      ElMessage.warning('版本冲突，公式已被修改，请刷新后重试')
+    } else {
+      handleApiError(e, '回滚失败')
+    }
+    await loadHistory()
   } finally {
     rollingBack.value = null
   }

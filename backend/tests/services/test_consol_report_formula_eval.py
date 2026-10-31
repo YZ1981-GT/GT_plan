@@ -6,8 +6,8 @@ Phase 1（ADR-CONSOL-101/106）把 consol_report_service 的裸 `_execute_formul
 
 - 基础算术正确（+−×÷ 括号）
 - ABS/IF/ROUND/MAX/MIN 函数可用（与单体引擎语义一致 = A1 修复核心）
-- 危险表达式不执行（去 eval 反模式，安全）
-- ROW token 经 evaluate_formula 的 row_cache 替换后求值正确
+- 危险表达式不执行（去 eval 反模式，安全）；除零与危险表达式抛 ``FormulaEvalError``（不再返回 0）
+- ROW token 经 evaluate_formula 的 row_cache 替换后求值正确；缺行时带状态的结果判失败
 
 `_safe_eval_expr` 是纯函数；ROW 路径用 evaluate_formula + 一个不取数的
 resolver（ROW 只读 row_cache，不触发 resolve_tb），均不依赖 DB。
@@ -25,7 +25,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.services.report_engine import _safe_eval_expr, evaluate_formula
+from app.services.formula_engine import FormulaEvalError
+from app.services.report_engine import _safe_eval_expr, evaluate_formula, evaluate_formula_result
 
 
 class _NoopResolver:
@@ -75,13 +76,17 @@ class TestSafeEvalExpr:
         assert _safe_eval_expr("MAX(3, 9)") == Decimal("9")
         assert _safe_eval_expr("MIN(3, 9)") == Decimal("3")
 
-    def test_division_by_zero_returns_zero(self):
-        assert _safe_eval_expr("10 / 0") == Decimal("0")
+    def test_division_by_zero_raises(self):
+        """除零报错、不再按 0（spec formula-hub-integrity-closure 需求 2.3：与 L1 同口径）。"""
+        with pytest.raises(FormulaEvalError, match="除数为 0"):
+            _safe_eval_expr("10 / 0")
 
     def test_dangerous_expression_not_executed(self):
-        """去 eval 反模式：未知函数/属性访问等 AST 节点返回 0，不执行。"""
-        assert _safe_eval_expr("__import__('os')") == Decimal("0")
-        assert _safe_eval_expr("os.system('rm -rf /')") == Decimal("0")
+        """去 eval 反模式：未知函数/属性访问等 AST 节点不执行，报中文原因（原先返回 0 冒充结果）。"""
+        with pytest.raises(FormulaEvalError, match=r"未注册的函数：__import__\(\)"):
+            _safe_eval_expr("__import__('os')")
+        with pytest.raises(FormulaEvalError, match="不支持的写法"):
+            _safe_eval_expr("os.system('rm -rf /')")
 
 
 # ===========================================================================
@@ -114,8 +119,10 @@ class TestEvaluateFormulaRowToken:
 
     @pytest.mark.asyncio
     async def test_missing_row_defaults_zero(self):
-        """row_cache 无该 row_code → 默认 0（不报错）。"""
+        """row_cache 无该 row_code：只取值的 ``evaluate_formula`` 仍给 0，带状态的结果判失败并给原因（需求 2.3）。"""
         result = await evaluate_formula(
             "ROW('UNKNOWN')", resolver=_NoopResolver(), row_cache={}
         )
         assert result == Decimal("0")
+        status = await evaluate_formula_result("ROW('UNKNOWN')", resolver=_NoopResolver(), row_cache={})
+        assert not status.ok and any("ROW('UNKNOWN')" in e for e in status.errors), status

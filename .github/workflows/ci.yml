@@ -25,6 +25,9 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/audit_test
+      # service 容器新建的一次性库：允许提交型夹具与含 DDL 的用例在这里执行（formula-hub ADR-FHIC-25）；
+      # 依赖真实数据的快照库用例只认 fh_snap_ 前缀，这里照旧跳过
+      GT_PG_DISPOSABLE_DB: audit_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -77,6 +80,8 @@ jobs:
       - name: Run PG-only tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
+          # 一次性库声明，同上（backend-tests job）
+          GT_PG_DISPOSABLE_DB: test_audit
         run: python -m pytest tests/ -m pg_only -v --tb=short
         working-directory: backend
 

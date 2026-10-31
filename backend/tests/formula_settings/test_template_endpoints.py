@@ -146,7 +146,7 @@ async def test_manage_publish_subscribe_permissions(api):
     assert [(s["template_id"], s["template_version"]) for s in listed] == [(ids["group"], 1)]
     assert (await c.post(f"/api/projects/{p['child']}/formula-templates/subscribe",
                          json={"template_id": ids["personal"], "domain": "report"})).status_code == 409, "每域只订阅一个"
-    assert (await c.delete(f"/api/formula-templates/{ids['group']}")).status_code == 409, "有订阅不能删"
+    assert (await c.delete(f"/api/formula-templates/{ids['group']}", params={"expected_version": 1})).status_code == 409, "有订阅不能删"
     assert (await c.post(f"/api/formula-templates/{ids['group']}/publish", json={**body, "expected_version": None})
             ).status_code == 428
     pub = await c.post(f"/api/formula-templates/{ids['group']}/publish", json=body)
@@ -158,7 +158,7 @@ async def test_manage_publish_subscribe_permissions(api):
     async with api["f"]() as db:
         assert await db.scalar(sa.select(sa.func.count()).select_from(FormulaTemplateSubscription).where(
             FormulaTemplateSubscription.is_active == sa.true())) == 0
-    assert (await c.delete(f"/api/formula-templates/{ids['group']}")).status_code == 200
+    assert (await c.delete(f"/api/formula-templates/{ids['group']}", params={"expected_version": 2})).status_code == 200
 
     api["as"]("member")  # 可见但不是 admin：设为全局 = 提交候选；预览仅 admin
     assert (await c.post(f"/api/formula-templates/{ids['firm']}/promote-preview", json={"domain": "report"})

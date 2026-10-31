@@ -47,12 +47,27 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 if TYPE_CHECKING:  # 仅用于类型提示，避免运行时循环导入
     from app.services.gate_engine import GateEvaluateResult, GateRuleHit
 
 _logger = logging.getLogger(__name__)
+
+
+def enum_text(value: Any, default: str = "") -> str:
+    """门禁枚举取值文本（``GateSeverity`` / ``GateDecisionResult`` 都是 ``(str, Enum)``）。
+
+    ``str(GateSeverity.blocking)`` 得到 ``'GateSeverity.blocking'``，拿它比 ``'blocking'`` 恒假：就绪页 ready
+    不随阻断命中变 false、分组状态停在「通过」、严重级标签显示原文（spec formula-hub-integrity-closure 第 2 轮 S1）。
+    比较与对外输出一律取 ``.value``；普通字符串（测试替身、补充类目）原样返回。
+    """
+    if value is None:
+        return default
+    if isinstance(value, Enum):
+        return str(value.value)
+    return str(value)
 
 
 # ------------------------------------------------------------------
@@ -147,6 +162,8 @@ _SIGN_OFF_RULE_CATEGORY: dict[str, str] = {
     "R7-MGMT-REP": "mgmt_representation",
     # S2 ADR-CCN-04：跨科目校验签字门禁
     "R4-CROSS-CHECK": "misc",
+    # FHIC 需求 16.4：一致性门禁（没有对应的业务类目，与跨科目校验同归「其他门禁规则」）
+    "CHAIN-CONSISTENCY": "misc",
 }
 
 _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
@@ -173,6 +190,8 @@ _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
     "R7-MGMT-REP": "mgmt_representation",
     # S2 ADR-CCN-04：跨科目校验签字门禁
     "R4-CROSS-CHECK": "misc",
+    # FHIC 需求 16.4：一致性门禁（同上）
+    "CHAIN-CONSISTENCY": "misc",
 }
 
 
@@ -213,7 +232,7 @@ def _hit_to_finding(hit: "GateRuleHit") -> dict[str, Any]:
     return {
         "rule_code": getattr(hit, "rule_code", ""),
         "error_code": getattr(hit, "error_code", ""),
-        "severity": str(getattr(hit, "severity", "info")),
+        "severity": enum_text(getattr(hit, "severity", "info"), "info"),
         "message": getattr(hit, "message", ""),
         "location": dict(getattr(hit, "location", {}) or {}),
         "action_hint": getattr(hit, "suggested_action", "") or "",
@@ -289,7 +308,7 @@ def build_readiness_response(
     # - decision in ('allow', 'warn') 且无 blocking → ready=True
     #
     # 本轮 warn 不阻断签字/归档（与 GateEngine 同语义，warn 为提示）。
-    gate_decision = str(getattr(gate_result, "decision", "allow"))
+    gate_decision = enum_text(getattr(gate_result, "decision", "allow"), "allow")
     has_blocking = any(
         (f.get("severity") == "blocking") for g in groups for f in g["findings"]
     )
@@ -345,4 +364,5 @@ __all__ = [
     "EXPORT_PACKAGE_CATEGORIES",
     "MISC_CATEGORY",
     "build_readiness_response",
+    "enum_text",
 ]

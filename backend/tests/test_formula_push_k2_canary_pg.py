@@ -4,7 +4,8 @@ spec: formula-push-balance-adj-batch-c · 任务 4 · 需求 C4
 
 本测试使用独立临时 schema，避免污染业务项目：
 
-* ``load_tb_audited`` 从真实 PostgreSQL ``trial_balance`` 按 1901 前缀汇总；
+* ``load_tb_audited`` 从真实 PostgreSQL ``trial_balance`` 按 1901 前缀取宽集合、只计叶子（父子并存时
+  本级不计入，与下级合计不符时告警；spec formula-hub-integrity-closure 任务 9）；
 * ``load_hall_adjustments`` 从真实 ``adjustments`` + ``adjustment_entries`` 汇总，
   只纳入 approved 且排除 origin=workpaper；
 * K2 引擎真实执行公式、动态行派生、CAS upsert、formula_push_run/state；
@@ -12,6 +13,10 @@ spec: formula-push-balance-adj-batch-c · 任务 4 · 需求 C4
 
 项目年度解析、模板类型和 SSE 是本 canary 的外围副作用，分别使用固定年度、空模板类型
 和空广播隔离；数据库取数与公式推送写入不 mock。
+
+旧断言「1901 本级 100000 + 190101 子级 25000 = 125000」固化了缺陷（F8 父子双计），改为叶子口径 25000
+（年初 15000、本期 10000、``K2-1-tb-amount`` 25000）。库名除 ``audit_platform`` 外接受 ``fh_snap_`` 开头的
+快照库与 CI 用 ``GT_PG_DISPOSABLE_DB`` 点名的一次性库：真 PG 用例只连快照库（ADR-FHIC-25）。
 """
 from __future__ import annotations
 
@@ -29,6 +34,7 @@ from app.core.database import engine
 from app.services.formula_push import engine as push
 from app.services.formula_push import bindings as bindings_registry
 from app.services.formula_push import sources as push_sources
+from tests.formula_hub._pg_harness import is_disposable_database
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _V169 = _BACKEND / "migrations" / "V169__formula_push_engine.sql"
@@ -163,7 +169,8 @@ async def _scenario(monkeypatch) -> dict:
                 "INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"
             ), {"w": wp_id, "p": project_id, "i": wp_index_id})
 
-            # 两条 1901 前缀试算表行：load_tb_audited 必须汇总本级 + 子级。
+            # 两条 1901 前缀试算表行（本级与子级 190101 并存）：load_tb_audited 只计叶子 190101，
+            # 本级 100000 / 60000 与下级合计 25000 / 15000 不符 ⇒ 告警。
             await conn.execute(sa.text(
                 "INSERT INTO trial_balance "
                 "(id, project_id, year, company_code, standard_account_code, account_name, "
@@ -319,18 +326,21 @@ def test_k2_canary_real_postgres(monkeypatch):
     snap = asyncio.run(_scenario(monkeypatch))
 
     # 连接确实落在 PostgreSQL 的临时 schema；不能用 SQLite 结果替代。
+    # 真 PG 用例只连快照库（ADR-FHIC-25：库名 fh_snap_ 开头）或 CI 点名的一次性库（GT_PG_DISPOSABLE_DB）；
+    # audit_platform 保留原有的接受范围。
     database, user, schema, version = snap["db_identity"]
-    assert database == "audit_platform"
+    assert database == "audit_platform" or is_disposable_database(database), database
     assert user
     assert schema.startswith("tmp_formula_push_k2_")
     assert version.startswith("PostgreSQL")
 
-    # 真实 load_tb_audited：1901 本级 100000 + 190101 子级 25000。
+    # 真实 load_tb_audited：1901 本级与子级 190101 并存 ⇒ 只计叶子 190101（期末 25000 / 年初 15000）。
+    # 旧断言 125000 / 75000 / 50000 = 本级 + 子级，固化了缺陷（F8 父子双计）。
     assert snap["tb_available"] is True
     assert snap["tb_company_codes"] == ("001",)
-    assert snap["tb_1901_ending"] == Decimal("125000.00")
-    assert snap["tb_1901_opening"] == Decimal("75000.00")
-    assert snap["tb_1901_occurrence"] == Decimal("50000.00")
+    assert snap["tb_1901_ending"] == Decimal("25000.00")
+    assert snap["tb_1901_opening"] == Decimal("15000.00")
+    assert snap["tb_1901_occurrence"] == Decimal("10000.00")
 
     # 真实 load_hall_adjustments：只纳入 approved、排除 workpaper，并按前缀吞子级。
     assert snap["hall_1901_aje"] == Decimal("4000.00")
@@ -340,8 +350,19 @@ def test_k2_canary_real_postgres(monkeypatch):
     assert first.workpapers[0]["wp_code"] == "K2"
     assert first.workpapers[0]["status"] == "pushed"
 
+    # 本级 ≠ 下级合计 ⇒ 运行结果与落库明细带父子不符告警（期末、年初各一条，ADR-FHIC-03）。
+    tb_warnings = {text for text in first.warnings if "试算表科目 1901（" in text}
+    assert tb_warnings == {
+        "2025 年度试算表科目 1901（期末余额）本级金额 100,000.00 与下级科目合计 25,000.00 不一致，"
+        "相差 75,000.00；已按下级科目合计取数，本级金额未计入",
+        "2025 年度试算表科目 1901（年初余额）本级金额 60,000.00 与下级科目合计 15,000.00 不一致，"
+        "相差 45,000.00；已按下级科目合计取数，本级金额未计入",
+    }
+    assert tb_warnings <= set(snap["run_detail"]["warnings"])
+
     first_rows = snap["rows_after_first"]
-    assert first_rows["K2-1-tb-amount"] == "125000"
+    # TB('1901','期末余额') 叶子口径；旧值 "125000" 同为父子双计。
+    assert first_rows["K2-1-tb-amount"] == "25000"
     assert first_rows["K2-1-hall-adj-ending"] == "4000"
     assert first_rows["K2-1-audited-receivable"] == "101500"
     assert first_rows["K2-1-audited-net"] == "101500"

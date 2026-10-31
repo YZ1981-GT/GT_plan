@@ -61,9 +61,11 @@ def _version_hash(value: Any) -> str:
 def _get_cell_value(table_data: dict | None, row: str, column: str) -> Any:
     """Extract cell value from table_data JSONB structure.
 
-    Supports two common structures:
+    Supports three common structures:
       1. {"rows": [{"key": ..., "cells": {"col": val}}]} — list of row dicts
       2. {"rows": {"row_key": {"col": val}}} — dict keyed by row
+      3. {"rows": [{"values": {"col": val}, ...}]} — rows[].values 形状
+         此形态 row locator 为行序号（0-based 字符串）或首格文本匹配。
     Returns None if not found.
     """
     if not table_data:
@@ -73,7 +75,13 @@ def _get_cell_value(table_data: dict | None, row: str, column: str) -> Any:
         return None
 
     if isinstance(rows, list):
-        for r in rows:
+        for idx, r in enumerate(rows):
+            # 形态 3: rows[].values
+            if "values" in r and isinstance(r["values"], dict):
+                if row == str(idx) or row == str(r["values"].get(next(iter(r["values"]), ""), "")):
+                    return r["values"].get(column)
+                continue
+            # 形态 1: rows[].cells
             if str(r.get("key", r.get("id", ""))) == row:
                 cells = r.get("cells", r)
                 return cells.get(column)
@@ -88,6 +96,7 @@ def _set_cell_value(table_data: dict | None, row: str, column: str, value: Any) 
     """Set cell value in table_data, returning a new dict (for ORM dirty detection).
 
     Creates structure if needed. Uses dict-keyed rows format for simplicity.
+    For rows[].values 形状, finds the matching row and writes into values dict.
     """
     if table_data is None:
         table_data = {}
@@ -96,16 +105,36 @@ def _set_cell_value(table_data: dict | None, row: str, column: str, value: Any) 
     rows = result.setdefault("rows", {})
 
     if isinstance(rows, list):
-        # Find and update existing row or append
-        found = False
-        for r in rows:
-            if str(r.get("key", r.get("id", ""))) == row:
-                cells = r.setdefault("cells", {})
-                cells[column] = value
-                found = True
-                break
-        if not found:
-            rows.append({"key": row, "cells": {column: value}})
+        # Check if this is rows[].values shape
+        has_values_shape = any(
+            isinstance(r, dict) and "values" in r and isinstance(r["values"], dict)
+            for r in rows
+        )
+        if has_values_shape:
+            # rows[].values 形状：按序号或首格文本定位
+            found = False
+            for idx, r in enumerate(rows):
+                if not isinstance(r, dict) or "values" not in r:
+                    continue
+                vals = r["values"]
+                first_val = str(vals.get(next(iter(vals), ""), "")) if vals else ""
+                if row == str(idx) or row == first_val:
+                    vals[column] = value
+                    found = True
+                    break
+            if not found:
+                rows.append({"values": {column: value}})
+        else:
+            # 形态 1: rows[].cells
+            found = False
+            for r in rows:
+                if str(r.get("key", r.get("id", ""))) == row:
+                    cells = r.setdefault("cells", {})
+                    cells[column] = value
+                    found = True
+                    break
+            if not found:
+                rows.append({"key": row, "cells": {column: value}})
     elif isinstance(rows, dict):
         row_data = rows.setdefault(row, {})
         row_data[column] = value

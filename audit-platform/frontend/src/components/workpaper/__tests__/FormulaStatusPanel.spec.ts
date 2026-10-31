@@ -325,7 +325,10 @@ describe('FormulaStatusPanel', () => {
     await restoreBtns[0].trigger('click')
     await flushPromises()
 
-    expect(mockApiDelete).toHaveBeenCalledWith('/api/workpapers/wp-1/formulas/f-1')
+    expect(mockApiDelete).toHaveBeenCalledWith(
+      '/api/workpapers/wp-1/formulas/f-1',
+      { params: { expected_version: 1 }, _silent: true },
+    )
     expect(mockSuccess).toHaveBeenCalled()
   })
 

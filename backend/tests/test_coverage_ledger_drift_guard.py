@@ -51,7 +51,6 @@ _LEDGER_CONSUMERS: dict[str, str] = {
     "services/wp_parsed_data_service.py": "P6 / Req 10.1 — touch_wp_registry invalidate(domain=wp)",
     "services/event_handlers.py": "P6 / Req 11 — _invalidate_addr_tb/report/note delegation",
     "services/wp_structure_bridge.py": "P15 / Req 21.2 — build_uri/AddressEntry 产出",
-    "services/formula_engine.py": "P15 / Req 21.1 — extract_custom_cells WP cell 解析",
     "routers/query_builder.py": "P15 / Req 21.3 — TB() ref 语法生成",
     "routers/wp_structure.py": "P6 / Req 2.6 — wp_structure invalidate(domain=wp)",
 }

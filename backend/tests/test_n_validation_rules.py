@@ -275,8 +275,8 @@ class TestNCycleTriangleLogic:
             checks = await gate.check_n_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "N2勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_n2_01_skip_partial_data(self, db_session, project_id):
         """VR-N2-01 跳过: N2 仅有期末无期初"""
@@ -291,8 +291,8 @@ class TestNCycleTriangleLogic:
             checks = await gate.check_n_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "N2勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- VR-N5-01: N5 所得税费用 ≈ 利润总额 × 税率 + 递延调整 ---
 
@@ -399,8 +399,8 @@ class TestNCycleTriangleLogic:
             checks = await gate.check_n_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "N5勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_n5_01_skip_n5_not_saved(self, db_session, project_id):
         """VR-N5-01 跳过: N5 审定表未保存"""
@@ -415,8 +415,8 @@ class TestNCycleTriangleLogic:
             checks = await gate.check_n_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "N5勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_n5_01_default_rate(self, db_session, project_id):
         """VR-N5-01 使用默认税率 0.25 当 statutory_rate 未提供"""
@@ -441,17 +441,17 @@ class TestNCycleTriangleLogic:
     # --- Combined: all data None → all skip ---
 
     async def test_all_none_returns_two_skip_checks(self, db_session, project_id):
-        """全部底稿未保存 → 2 条规则全部 skip 但 passed=True"""
+        """全部底稿未保存 → 2 条规则全部 skip ，status=not_executed"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
         ):
             checks = await gate.check_n_cycle_triangle_reconciliation(project_id, 2025)
 
-        # 2 条规则全部 skip 但 passed=True
+        # 2 条规则全部 skip ，status=not_executed
         assert len(checks) == 2
-        assert all(c.passed is True for c in checks)
-        assert all("跳过" in c.details for c in checks)
+        assert all(c.status == "not_executed" for c in checks)
+        assert all("跳过" in c.reason for c in checks)
 
     # --- Integration: check_n_cycle_triangle_reconciliation integrates with consistency_gate ---
 

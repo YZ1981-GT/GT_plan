@@ -32,6 +32,7 @@ from app.models.report_schemas import (
 )
 from app.services.event_bus import event_bus
 from app.services.report_engine import ReportEngine
+from app.services.report_freshness import formula_for, load_effective_formulas, row_status, status_note
 
 router = APIRouter(
     prefix="/api/reports",
@@ -213,26 +214,32 @@ async def get_report(
             ]
         raise HTTPException(status_code=404, detail="报表数据不存在，请先生成报表")
 
+    # 逐行新鲜度（report_freshness：已标过期 / 计算版本不是当前版本 / 生成时公式与当前生效公式不同）+ 两种原因
+    formulas = await load_effective_formulas(db, project_id, report_type=report_type)
+    statuses = {r.row_code: row_status(r, formula_for(formulas, r)) for r in rows}
+    row_dicts = [{**_row_fields(r), **statuses[r.row_code]} for r in rows]
+
     if report_type == FinancialReportType.equity_statement:
         engine = ReportEngine(db)
-        row_dicts = [
-            {
-                "id": r.id,
-                "row_code": r.row_code,
-                "row_name": r.row_name,
-                "current_period_amount": r.current_period_amount,
-                "prior_period_amount": r.prior_period_amount,
-                "indent_level": r.indent_level,
-                "is_total_row": r.is_total_row,
-                "formula_used": r.formula_used,
-                "source_accounts": r.source_accounts,
-            }
-            for r in rows
-        ]
         enriched = await engine.enrich_equity_statement_rows(project_id, year, row_dicts)
-        return [ReportRow.model_validate(d) for d in enriched]
+        return [ReportRow.model_validate({**d, **statuses.get(d.get("row_code"), {})}) for d in enriched]
 
-    return [ReportRow.model_validate(r) for r in rows]
+    return [ReportRow.model_validate(d) for d in row_dicts]
+
+
+def _row_fields(r: FinancialReport) -> dict:
+    """报表视图行的基础字段（过期状态与原因由 report_freshness.row_status 另给，不读原始 is_stale 列）。"""
+    return {
+        "id": r.id,
+        "row_code": r.row_code,
+        "row_name": r.row_name,
+        "current_period_amount": r.current_period_amount,
+        "prior_period_amount": r.prior_period_amount,
+        "indent_level": r.indent_level,
+        "is_total_row": r.is_total_row,
+        "formula_used": r.formula_used,
+        "source_accounts": r.source_accounts,
+    }
 
 
 @router.get("/{project_id}/{year}/{report_type}/drilldown/{row_code}")
@@ -287,8 +294,9 @@ async def export_report_excel(
         ws = wb.active
         ws.title = report_type.value
 
-        # Header
-        ws.append(["行次代码", "项目", "期末余额", "年初余额"])
+        # Header（「说明」= report_freshness.status_note：已过期 / 计算失败原因 / 口径留空原因）
+        ws.append(["行次代码", "项目", "期末余额", "年初余额", "说明"])
+        formulas = await load_effective_formulas(db, project_id, report_type=report_type)
 
         for row in rows:
             ws.append([
@@ -296,6 +304,7 @@ async def export_report_excel(
                 row.row_name or "",
                 float(row.current_period_amount) if row.current_period_amount else 0,
                 float(row.prior_period_amount) if row.prior_period_amount else 0,
+                status_note(row_status(row, formula_for(formulas, row))),
             ])
 
         output = BytesIO()

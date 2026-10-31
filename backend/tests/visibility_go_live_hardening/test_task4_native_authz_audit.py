@@ -20,7 +20,8 @@
   D. 新接门路由真实隔离（Req 3.3/3.4）：**真实 FastAPI 路由 handler + 真实 PostgreSQL**：
      附件族(links/attachment-workpapers/ocr-fields)接 enforce_attachment_wp_visibility 后，
      委派 lead 放行；越权成员(scope_cycles 不含底稿循环)统一 External_Not_Found(404)；跨项目 404；
-     未绑定底稿的附件放行(additive passthrough，不越界收紧项目级证据)。
+     未绑定底稿的附件不受 wp 可见性收紧(additive passthrough)，交项目级判定（附件溯源关联：readonly 成员放行、
+     非成员 403，spec formula-hub-integrity-closure 需求 7.3）。
 
 不改父 spec gate 语义；仅审计分类 + 接线附件族 leak_risk + 扩展 coverage_guard。真实 PostgreSQL
 （audit_platform），每用例事务隔离回滚。leak_risk_deferred 是诚实待接线 GAP，Task 4 marker 不因此翻绿。
@@ -361,17 +362,25 @@ class TestNewlyGatedRouteIsolation:
             await ctx.__aexit__()
 
     async def test_unlinked_attachment_passthrough_additive(self):
-        """未绑定底稿的附件 → 放行(additive passthrough)，不越界收紧项目级证据（Req 3.4 边界）。"""
+        """未绑定底稿的附件：wp 可见性层放行（additive passthrough，不按底稿可见性收紧项目级证据，Req 3.4 边界），
+        交项目级判定 —— 本项目 readonly 成员放行，非项目成员 403。
+
+        旧断言「非项目成员也放行」固化了缺陷：未绑定底稿的附件，任何登录用户都能读到它的溯源关联（跨项目可读）。
+        spec formula-hub-integrity-closure 需求 7.3 / ADR-FHIC-13 要求查询按附件所属项目 readonly 判定，按此改写。
+        """
         from app.routers.attachment_lineage import get_attachment_links
 
         ctx = _PgCtx()
         s = await ctx.__aenter__()
         try:
-            proj, _lead, _wi, _wp = await _lead_scenario(s)
+            proj, lead, _wi, _wp = await _lead_scenario(s)  # lead：本项目 readonly 级成员
             att = await _mk_attachment(s, proj.id)  # 未创建 AttachmentWorkingPaper 关联
-            outsider = await mk_user(s)  # 甚至非项目成员
-            res = await get_attachment_links(attachment_id=att.id, db=s, current_user=outsider)
-            assert res is not None  # passthrough：不因 wp 可见性收紧未绑定底稿的附件
+            res = await get_attachment_links(attachment_id=att.id, db=s, current_user=lead)
+            assert res == []  # passthrough：wp 可见性层不收紧，项目级 readonly 放行（该附件尚无关联）
+            outsider = await mk_user(s)  # 非项目成员
+            with pytest.raises(HTTPException) as ei:
+                await get_attachment_links(attachment_id=att.id, db=s, current_user=outsider)
+            assert ei.value.status_code == 403
         finally:
             await ctx.__aexit__()
 

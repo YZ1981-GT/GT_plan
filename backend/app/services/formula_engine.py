@@ -35,9 +35,11 @@ import operator
 import os
 import re
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import lru_cache
 from typing import Any, Callable, Protocol, runtime_checkable
+
+from app.services.formula_arity import arity_problem, ast_budget_problem, call_argc
 
 logger = logging.getLogger(__name__)
 
@@ -181,12 +183,12 @@ class FormulaContext:
 # （`trial_balance` **没有**发生额列，只有余额与调整），经
 # `aggregate_occurrence()` 按标准码归集（含叶子聚合，父子不双算）。
 COLUMN_ALIASES: dict[str, str] = {
-    # ── 余额类（既有 8 键，映射目标逐字不变） ──
+    # ── 余额类（既有 8 键；「未审数」自 ADR-FHIC-18 起是规范列 ← unadjusted_amount，原指向期末余额 = 审定数） ──
     "期末余额": "期末余额",
     "审定数": "期末余额",
     "年初余额": "年初余额",
     "期初余额": "年初余额",
-    "未审数": "期末余额",
+    "未审数": "未审数",
     "本期发生额": "本期发生额",
     "RJE调整": "RJE调整",
     "AJE调整": "AJE调整",
@@ -226,6 +228,14 @@ class FormulaColumnError(Exception):
     🔴 **必须是独立异常类**：`_execute_ast` 的兜底 ``except Exception`` 会把任何
     异常记成「AST 求值失败」，那样「列名拼错」与「解析崩溃」在 errors 里不可区分，
     审计师无法据此定位是公式写错还是引擎坏了（R3.2 要求二者可区分）。
+    """
+
+
+class FormulaEvalError(Exception):
+    """求值失败：除零、ROW 缺行、未注册函数、参数个数不足、AST 超预算（原先一律按 0 求值且 ``ok=True``）。
+
+    与 :class:`FormulaColumnError` 同处捕获、记入 ``FormulaResult.errors``；``value`` 仍为 0 供只读调用方，
+    写入方一律判 ``ok``（spec formula-hub-integrity-closure ADR-FHIC-01，需求 2.3）。
     """
 
 
@@ -573,6 +583,12 @@ def parse_to_ast(formula: str) -> Any:
     return parser.parse()
 
 
+@lru_cache(maxsize=2048)
+def _ast_budget_problem(formula: str) -> str | None:
+    """AST 预算（需求 12.3 末句）按公式文本缓存：AST 本身已按文本缓存、构造后不改。"""
+    return ast_budget_problem(parse_to_ast(formula))
+
+
 # ─── AST 求值（纯函数，基于 FormulaContext） ─────────────────────────────────
 
 def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
@@ -600,7 +616,9 @@ def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
         elif node.op == '*':
             return left * right
         elif node.op == '/':
-            return left / right if right != 0 else Decimal("0")
+            if right == 0:
+                raise FormulaEvalError(f"除数为 0（被除数 {left}）")
+            return left / right
         return Decimal("0")
 
     if isinstance(node, ASTUnary):
@@ -626,7 +644,7 @@ def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
         return Decimal("0")
 
     if isinstance(node, ASTRowRef):
-        val = ctx.row_cache.get(node.row_code, Decimal("0"))
+        val = _row_value(ctx, node.row_code)
         trace.append(f"ROW('{node.row_code}') = {val}")
         return val
 
@@ -646,22 +664,25 @@ def _eval_ast(node: Any, ctx: FormulaContext, trace: list[str]) -> Decimal:
 
 
 def _eval_func_node(node: ASTFuncCall, ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """求值函数调用 AST 节点。
+    """求值函数调用 AST 节点：handler 取自 FunctionRegistry（Task 4 插件式）。
 
-    优先从 FunctionRegistry 查找 handler（Task 4 插件式），
-    未注册函数返回 0 并记录 trace。
+    未注册函数、内置函数参数个数不足（另查 IF 上限，表在 ``formula_arity``）⇒ :class:`FormulaEvalError`（原先按 0）。
     """
     name = node.name
     args = node.args
-
-    # 从 registry 查找 handler
     handler = _REGISTRY.get(name)
-    if handler is not None:
-        return handler(args, ctx, trace)
+    if handler is None:
+        raise FormulaEvalError(f"未注册的函数：{name}()")
+    if problem := arity_problem(name, call_argc(name, args)):
+        raise FormulaEvalError(problem)
+    return handler(args, ctx, trace)
 
-    # 未注册函数 → 0
-    trace.append(f"{name}(...) = 0 (unknown)")
-    return Decimal("0")
+
+def _row_value(ctx: FormulaContext, row_code: str) -> Decimal:
+    """ROW 取值（AST 两种节点与正则路径共用）：``row_cache`` 无此键 ⇒ :class:`FormulaEvalError`（原先按 0）。"""
+    if row_code not in ctx.row_cache:
+        raise FormulaEvalError(f"ROW('{row_code}')：引用的行次不存在或尚未计算")
+    return ctx.row_cache[row_code]
 
 
 def _extract_string_args(args: list[Any], ctx: FormulaContext, trace: list[str]) -> list[str]:
@@ -762,12 +783,17 @@ def _handle_abs(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decim
     return Decimal("0")
 
 
+def _round_half_up(value: Decimal, ndigits: int) -> Decimal:
+    """ROUND 统一 ROUND_HALF_UP（D4，需求 2.6；原先 ``round()`` = 银行家舍入）：L1 与 ``safe_eval_expr`` 共用。"""
+    return value.quantize(Decimal(1).scaleb(-ndigits), rounding=ROUND_HALF_UP)
+
+
 def _handle_round(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """ROUND(value, ndigits) — 四舍五入"""
+    """ROUND(value, ndigits) — 四舍五入（ROUND_HALF_UP：ROUND(1.005,2)=1.01、ROUND(-1.005,2)=-1.01）"""
     if len(args) >= 1:
         val = _eval_ast(args[0], ctx, trace)
         ndigits = int(_eval_ast(args[1], ctx, trace)) if len(args) > 1 else 2
-        return round(val, ndigits)
+        return _round_half_up(val, ndigits)
     return Decimal("0")
 
 
@@ -870,7 +896,7 @@ def _handle_row(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decim
     """ROW('code') — 引用其他行次"""
     str_args = _extract_string_args(args, ctx, trace)
     row_code = str_args[0] if str_args else ''
-    val = ctx.row_cache.get(row_code, Decimal("0"))
+    val = _row_value(ctx, row_code)
     trace.append(f"ROW('{row_code}') = {val}")
     return val
 
@@ -1135,12 +1161,30 @@ _SAFE_OPS = {
 }
 
 
+#: safe_eval_expr 认的函数（IF 另行惰性求值，只算被选中的分支，与 L1 ``_handle_if`` 同口径）
+_SAFE_FUNCS: dict[str, Callable[[list[Decimal]], Decimal]] = {
+    "ABS": lambda a: abs(a[0]),
+    "ROUND": lambda a: _round_half_up(a[0], int(a[1]) if len(a) > 1 else 2),
+    "MAX": max,
+    "MIN": min,
+}
+
+
 def safe_eval_expr(expr: str) -> Decimal:
-    """安全求值纯算术表达式（+−×÷ 括号 + 内置函数），基于 AST 解析。"""
-    try:
-        tree = ast.parse(expr.strip(), mode="eval")
-    except SyntaxError:
+    """安全求值纯算术表达式（+−×÷ 括号、比较、ABS/ROUND/MAX/MIN/IF），基于 Python AST；正则降级路径的最后一步。
+
+    与 L1 同口径（需求 2.3、2.6）：空串 = 0；语法错误、除零、不支持的运算 / 函数、参数个数不足（另查 IF 上限）、
+    超出 AST 预算一律抛 :class:`FormulaEvalError`（原先一律返回 0）；ROUND 为 ROUND_HALF_UP。
+    """
+    text = expr.strip()
+    if not text:
         return Decimal("0")
+    try:
+        tree = ast.parse(text, mode="eval")
+    except (SyntaxError, ValueError, RecursionError) as exc:
+        raise FormulaEvalError(f"算术表达式语法错误：{text[:200]}") from exc
+    if problem := ast_budget_problem(tree, ast.iter_child_nodes):
+        raise FormulaEvalError(problem)
 
     def _eval_node(node: ast.expr) -> Decimal:
         if isinstance(node, ast.Expression):
@@ -1152,31 +1196,25 @@ def safe_eval_expr(expr: str) -> Decimal:
             right = _eval_node(node.right)
             op_func = _SAFE_OPS.get(type(node.op))
             if op_func is None:
-                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+                raise FormulaEvalError(f"算术表达式不支持运算符 {type(node.op).__name__}")
             if isinstance(node.op, ast.Div) and right == 0:
-                return Decimal("0")
+                raise FormulaEvalError(f"除数为 0（被除数 {left}）")
             return op_func(left, right)
         if isinstance(node, ast.UnaryOp):
             operand = _eval_node(node.operand)
             op_func = _SAFE_OPS.get(type(node.op))
             if op_func is None:
-                raise ValueError("Unsupported unary operator")
+                raise FormulaEvalError(f"算术表达式不支持运算符 {type(node.op).__name__}")
             return op_func(operand)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             fn = node.func.id
-            args = [_eval_node(a) for a in node.args]
-            if fn == "ABS" and len(args) == 1:
-                return abs(args[0])
-            if fn == "ROUND" and len(args) >= 1:
-                ndigits = int(args[1]) if len(args) > 1 else 2
-                return round(args[0], ndigits)
-            if fn == "MAX" and len(args) >= 2:
-                return max(args)
-            if fn == "MIN" and len(args) >= 2:
-                return min(args)
-            if fn == "IF" and len(args) == 3:
-                return args[1] if args[0] != 0 else args[2]
-            raise ValueError(f"Unsupported function: {fn}")
+            if fn != "IF" and fn not in _SAFE_FUNCS:
+                raise FormulaEvalError(f"未注册的函数：{fn}()")
+            if problem := arity_problem(fn, len(node.args)):
+                raise FormulaEvalError(problem)
+            if fn == "IF":
+                return _eval_node(node.args[1] if _eval_node(node.args[0]) != 0 else node.args[2])
+            return _SAFE_FUNCS[fn]([_eval_node(a) for a in node.args])
         if isinstance(node, ast.Compare):
             left = _eval_node(node.left)
             for op, comparator in zip(node.ops, node.comparators):
@@ -1189,12 +1227,12 @@ def safe_eval_expr(expr: str) -> Decimal:
                 if isinstance(op, ast.LtE) and not (left <= right): return Decimal("0")
                 left = right
             return Decimal("1")
-        raise ValueError(f"Unsupported AST node: {type(node).__name__}")
+        raise FormulaEvalError(f"算术表达式不支持的写法：{type(node).__name__}")
 
     try:
         return _eval_node(tree)
-    except (ValueError, InvalidOperation, ZeroDivisionError, TypeError):
-        return Decimal("0")
+    except (ValueError, InvalidOperation, ZeroDivisionError, TypeError) as exc:
+        raise FormulaEvalError(f"算术求值失败：{exc}") from exc
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1290,15 +1328,17 @@ def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
         return result
     try:
         ast_node = parse_to_ast(formula)
+        if problem := _ast_budget_problem(formula):  # 求值前报错（需求 12.3 末句）
+            raise FormulaEvalError(problem)
         result.value = _eval_ast(ast_node, ctx, result.trace)
     except FormulaParseError as e:
         result.errors.append(f"AST 解析失败: {e}")
         logger.warning("AST parse error: %s (formula=%s)", e, formula)
-    except FormulaColumnError as e:
-        # 列名未注册（配置错）—— 必须与「求值崩溃」区分，且**禁**静默回退期末余额。
-        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。
+    except (FormulaColumnError, FormulaEvalError) as e:
+        # 列名未注册（配置错）/ 求值失败（除零、ROW 缺行、未注册函数、参数不足、超预算）—— 必须与「求值崩溃」区分，
+        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。value 保持 0。
         result.errors.append(str(e))
-        logger.warning("Formula fetch error (column / data not available): %s (formula=%s)", e, formula)
+        logger.warning("Formula fetch / eval error: %s (formula=%s)", e, formula)
     except Exception as e:
         result.errors.append(f"AST 求值失败: {e}")
         logger.warning("AST eval error: %s (formula=%s)", e, formula)
@@ -1361,7 +1401,10 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
 
             elif token_name == "ROW":
                 row_code = match.group(1)
-                val = ctx.row_cache.get(row_code, Decimal("0"))
+                try:  # 与 AST 路径同一取值函数：缺行报错，不按 0
+                    val = _row_value(ctx, row_code)
+                except FormulaEvalError as exc:
+                    result.errors.append(str(exc))
                 trace_msg = f"ROW('{row_code}') = {val}"
 
             elif token_name == "SUM_ROW":
@@ -1633,36 +1676,6 @@ def _extract_note_refs(formula: str) -> list[tuple[str, str]]:
 # FormulaEngine 类（向后兼容 formula.py 路由）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-#: `FormulaEngine.execute` 的父子双算告警文案（单一真源，守卫按它断言）。
-#:
-#: spec: formula-management-runtime-closure Task 15（Requirements 7.4, 7.5）
-PARENT_CHILD_DOUBLE_COUNT_WARNING = (
-    "取数口径告警：本端点的 tb_map 按 standard_account_code 全量累加，"
-    "不做叶子聚合，区间求和存在父子双算风险"
-)
-
-
-def _has_parent_child_overlap(tb_map: dict[str, Any]) -> bool:
-    """``tb_map`` 里是否存在「父科目与其子科目同时在册」。
-
-    判据 = 存在两个码 ``a`` / ``b`` 使 ``b`` 以 ``a`` + 分隔符开头。
-    分隔符两种写法都要认：``-``（标准码，如 ``1231-01``）与
-    ``.``（客户原始码，如 ``1002.001``）—— memory 已记两套体系并存，
-    只认一种会漏判。
-
-    🔴 **不能用裸 ``b.startswith(a)``**：``1231`` 与 ``12310`` 是两个无关科目，
-    不带分隔符边界会误判成父子。
-    """
-    codes = [c for c in tb_map if c]
-    code_set = set(codes)
-    for code in codes:
-        for sep in ("-", "."):
-            prefix = code + sep
-            if any(other.startswith(prefix) for other in code_set):
-                return True
-    return False
-
-
 class FormulaEngine:
     """公式引擎类（兼容旧 API 路由）。
 
@@ -1684,47 +1697,32 @@ class FormulaEngine:
         return _REGISTRY.list_all()
 
     def list_custom_functions(self) -> list[dict]:
-        """列出自定义函数"""
-        return [{"name": k, **v} for k, v in self._custom_functions.items()]
+        """列出自定义函数（转发 formula_custom_functions，ADR-FHIC-17 任务 33）。"""
+        from app.services.formula_custom_functions import list_custom_functions as _list
+        return _list()
 
-    def register_custom_function(self, name: str, description: str = "", syntax: str = "", formula: str = "", expression: str = "") -> dict:
-        """注册自定义函数（底层委托 FunctionRegistry.register，Task 4）。"""
-        if not name or not name.strip():
-            raise ValueError("函数名不能为空")
-        # 检查是否与内置函数冲突（权威来源 = _REGISTRY，含 NOTE/WP/AUX 等全部内置）
-        builtin_names = _REGISTRY.known_function_names() - set(self._custom_functions.keys())
-        if name in builtin_names:
-            raise ValueError(f"内置函数 {name} 不可覆盖")
-        # 校验表达式
-        expr = expression or formula
-        if expr and not _validate_custom_expression(expr):
-            raise ValueError(f"表达式语法不合法: {expr}")
-        # 保存到实例级自定义函数列表（向后兼容 list_custom_functions）
-        self._custom_functions[name] = {
-            "description": description,
-            "syntax": syntax,
-            "formula": expr,
-            "expression": expr,
-        }
-        # 委托 FunctionRegistry 注册 handler（使自定义函数在 execute 中可用）
-        def _custom_handler(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-            """自定义函数 handler：对表达式求值。"""
-            if not expr:
-                return Decimal("0")
-            # 自定义函数的表达式中可能引用参数，简单实现：直接求值表达式
-            custom_result = execute(expr, ctx)
-            trace.append(f"{name}(...) = {custom_result.value} (custom)")
-            return custom_result.value
-
-        _REGISTRY.register(name, _custom_handler, description=description, syntax=syntax, category="自定义")
-        return {"registered": True, "name": name}
+    def register_custom_function(
+        self,
+        name: str,
+        description: str = "",
+        syntax: str = "",
+        formula: str = "",
+        expression: str = "",
+        param_names: tuple[str, ...] | list[str] = (),
+    ) -> dict:
+        """注册自定义函数（转发 formula_custom_functions，ADR-FHIC-17 任务 33）。"""
+        from app.services.formula_custom_functions import register_custom_function as _reg
+        return _reg(
+            name=name,
+            expression=expression or formula,
+            description=description,
+            param_names=param_names,
+        )
 
     def unregister_custom_function(self, name: str) -> bool:
-        """注销自定义函数（同步从 FunctionRegistry 移除）"""
-        removed = self._custom_functions.pop(name, None) is not None
-        if removed:
-            _REGISTRY.unregister(name)
-        return removed
+        """注销自定义函数（转发 formula_custom_functions，ADR-FHIC-17 任务 33）。"""
+        from app.services.formula_custom_functions import unregister_custom_function as _unreg
+        return _unreg(name)
 
     async def invalidate_cache(self, project_id=None, year=None, account_codes=None):
         """清除公式缓存（Redis）"""
@@ -1742,131 +1740,20 @@ class FormulaEngine:
             pass  # Redis 不可用时静默
 
     async def execute(self, db, project_id, year, formula_type: str, params: dict, **kwargs) -> dict:
-        """执行公式（兼容旧 API：``POST /api/formula/execute`` 与 ``/batch-execute``）。
+        """执行公式（``POST /api/formula/execute`` 与 ``/batch-execute``）：薄转发到中央执行合同。
 
-        🔴🔴 **已知口径缺陷：``tb_map`` 不做叶子聚合，存在父子双算**
-        （spec formula-management-runtime-closure Task 15 / Requirements 7.4, 7.5）
-
-        本方法把 ``trial_balance`` 的 ``standard_account_code`` **全量**读出并按码累加。
-        而 ``trial_balance`` 里**父科目与子科目并存**（如 ``1231`` 与
-        ``1231-01``…``1231-05``），故：
-
-        - ``TB('1231')`` 取到的是父行本身（正确）；
-        - 但 ``SUM_TB('1401~1499')`` 这类**区间求和**会把父科目与其子科目
-          **同时计入** ⇒ 金额虚增。
-
-        平台铁律是「recalc 只汇总**叶子**科目，未映射叶子按最长前缀继承祖先映射」，
-        共享件在 ``app/services/four_table/leaf_aggregation.py``
-        （``select_leaves`` / ``aggregate_leaves`` / ``resolve_leaf_totals``）。
-
-        **本 spec 刻意只加告警不改口径**（R7.5）：改口径要动 ``FormulaRequest`` /
-        ``FormulaResult`` 契约与前端两个已登记端点
-        （``apiPaths.formula.execute`` / ``.batchExecute``），风险高于收益。
-        待收敛项已在 spec Notes 登记。
-
-        返回体新增 ``warnings`` 键承载该告警，调用方可见（不改既有三个键）。
+        求值、预检、缺科目与告警合并全在 ``formula_central_execute.execute_central``（ADR-FHIC-19）；``formula_type``
+        只是请求里的说明字段，不参与求值（预检按表达式内全部函数调用名分类）。原实现自拼 ``tb_map``（全部列取
+        ``unadjusted_amount`` ⇒ 「审定数」取到未审数、不分叶子）、失败一律 ``error=None``，已删。
         """
-        from decimal import Decimal
-        # 简单实现：构建 tb_map 并调用统一引擎
-        formula_str = params.get("formula", "")
-        if not formula_str:
-            return {"value": 0, "formula": "", "error": None, "warnings": []}
+        from app.services.formula_central_execute import execute_central
 
-        # 从 trial_balance 加载数据
-        import sqlalchemy as sa
-        from app.models.audit_platform_models import TrialBalance
-        tb_table = TrialBalance.__table__
-        q = sa.select(tb_table.c.standard_account_code, tb_table.c.unadjusted_amount).where(
-            tb_table.c.project_id == project_id,
-            tb_table.c.year == year,
-            tb_table.c.is_deleted == sa.false(),
-        )
-        result = await db.execute(q)
-        tb_map: dict[str, Decimal] = {}
-        for r in result.fetchall():
-            if r.standard_account_code:
-                tb_map[r.standard_account_code] = tb_map.get(r.standard_account_code, Decimal("0")) + (r.unadjusted_amount or Decimal("0"))
-
-        # 调整额取数（供 ADJ() 与 TB(code,'AJE调整')）。
-        # 🔴 `exclude_origins=frozenset()` = 口径矩阵**第 2 行**「ADJ() 底稿呈现」，
-        # 与 `prefill_engine._resolve_adj_formula` 对齐（同一张底稿里两种 ADJ 必须
-        # 同口径）；与试算平衡表/报表的第 4 行刻意不同。理由见伴生模块 docstring。
-        from app.services.tb_formula_context import load_adj_map_if_needed
-
-        adj_map = await load_adj_map_if_needed(
-            db, project_id=project_id, year=year, formula=formula_str,
-            account_codes=set(tb_map.keys()), exclude_origins=frozenset(),
-        )
-
-        # ── WP() / NOTE() 跨引用预载（spec: formula-push-user-custom-cross-module T5）──
-        wp_data: dict[str, dict[str, Decimal]] = {}
-        note_data: dict[str, dict[str, Decimal]] = {}
-
-        wp_refs = _extract_wp_refs(formula_str)
-        if wp_refs:
-            # 去重：同一 (wp_code, col) 只查一次库
-            seen_wp: set[tuple[str, str]] = set()
-            for wc, col in wp_refs:
-                if (wc, col) in seen_wp:
-                    continue
-                seen_wp.add((wc, col))
-                if wc not in wp_data:
-                    wp_data[wc] = {}
-                try:
-                    val = await WPExecutor.execute(db, project_id, wc, col)
-                    wp_data[wc][col] = Decimal(str(val)) if val is not None else Decimal("0")
-                except Exception as exc:
-                    logger.warning("FormulaEngine 预载 WP('%s','%s') 失败: %s", wc, col, exc)
-                    wp_data[wc][col] = Decimal("0")
-
-        # NOTE：按章节 / 行 / 列取本年度附注（唯一实现 formula_ref_preload.load_note_values）；取不到按 0 求值但写进
-        # warnings（原先经 NOTEExecutor：未导入 sa ⇒ NameError 被吞、恒 0 且无任何提示）。
-        warnings: list[str] = []
-        from app.services.formula_ref_preload import load_note_values, note_refs_in, note_token
-
-        note_refs = note_refs_in(formula_str)
-        if note_refs:
-            try:
-                note_data, note_missing = await load_note_values(db, project_id, year, note_refs)
-            except Exception as exc:
-                logger.warning("FormulaEngine 预载 NOTE 失败: %s", exc)
-                note_missing = {ref: f"取数失败：{exc}" for ref in note_refs}
-            warnings += [f"{note_token(ref)} 取不到数，按 0 计算：{why}" for ref, why in note_missing.items()]
-
-        # 构建完整 FormulaContext（含 wp_data / note_data）
-        ctx = FormulaContext.from_simple_map(tb_map, {}, adj_map=adj_map)
-        ctx.wp_data = wp_data
-        ctx.note_data = note_data
-        formula_result = execute(formula_str, ctx)
-        val = formula_result.value
-
-        # ── 父子双算显式告警（R7.5：不改口径但必须让调用方知道） ──────────────
-        if _has_parent_child_overlap(tb_map):
-            msg = (
-                f"{PARENT_CHILD_DOUBLE_COUNT_WARNING}"
-                f"（本项目 trial_balance 中存在父子并存科目；区间求和类公式"
-                f"如 SUM_TB 结果可能虚增，请以各循环 four_table 叶子口径复核）"
-            )
-            warnings.append(msg)
-            logger.warning(
-                "FormulaEngine.execute 父子双算风险：project=%s year=%s formula=%s",
-                project_id, year, formula_str,
-            )
-
-        return {
-            "value": float(val),
-            "formula": formula_str,
-            "error": None,
-            "warnings": warnings,
-        }
+        return await execute_central(db, project_id, year, (params or {}).get("formula", ""))
 
     async def batch_execute(self, db, project_id, year, formulas: list[dict], **kwargs) -> list[dict]:
-        """批量执行公式"""
-        results = []
-        for f in formulas:
-            r = await self.execute(db, project_id, year, f.get("formula_type", ""), f.get("params", {}))
-            results.append(r)
-        return results
+        """批量执行：同一会话上逐条串行（不并发）。"""
+        return [await self.execute(db, project_id, year, f.get("formula_type", ""), f.get("params", {}))
+                for f in formulas]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1882,7 +1769,7 @@ class FormulaError(Exception):
 __all__ = [
     "FormulaResult", "FormulaContext", "execute", "execute_formula",
     "validate_formula", "safe_eval_expr", "get_formula_account_codes",
-    "FormulaEngine", "FormulaError",
+    "FormulaEngine", "FormulaError", "FormulaEvalError",
     # Task 3: parse 层
     "parse_to_ast", "FormulaParseError", "_PARSE_MODE",
     "ASTNumber", "ASTString", "ASTFuncCall", "ASTBinOp", "ASTUnary",
@@ -1954,6 +1841,15 @@ def _normalize_provision_name(name: str) -> str:
     if out.startswith("按"):
         out = out[1:]
     return out.replace(" ", "").replace("　", "")
+
+
+#: 两参 WP() 中文列名 → parsed_data 顶层键（ADR-FHIC-06 第 2 点）。
+WP_COLUMN_KEYS: dict[str, str] = {
+    "审定数": "audited_amount",
+    "未审数": "unadjusted_amount",
+    "期初余额": "opening_balance",
+    "期末余额": "audited_amount",
+}
 
 
 class WPExecutor:
@@ -2061,7 +1957,8 @@ class WPExecutor:
 
     @staticmethod
     async def execute(
-        db, project_id, wp_code: str, column: str = "审定数", field: str | None = None
+        db, project_id, wp_code: str, column: str = "审定数", field: str | None = None,
+        *, year: int | None = None,
     ):
         """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable."""
         from decimal import Decimal as D
@@ -2077,7 +1974,6 @@ class WPExecutor:
             import sqlalchemy as sa
 
             from app.models.workpaper_models import WorkingPaper, WpIndex
-            from app.services.address_registry import extract_custom_cells
 
             result = await db.execute(
                 sa.select(WorkingPaper.parsed_data)
@@ -2096,51 +1992,19 @@ class WPExecutor:
             parsed_data = row or {}
             col = (column or "").strip()
 
-            # 单元格地址（B5/C12）→ WP 域解析
+            # 单元格地址（B5/C12）→ 共享读取函数（ADR-FHIC-06 第 2 点）
             if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
-                cell_up = col.upper()
-                # ── Req 21.1: WP 域先试 ACNR full_resolve/runtime 作为寻址真源，
-                #    miss/异常 → 回退 extract_custom_cells（fail-open，永不中断取数）。
-                #    调用点已是 async（await db.execute），可直接 await full_resolve，
-                #    无 sync→async 桥接风险（design §1 option 1）。──
-                resolved_cell = cell_up
+                from app.services.wp_cell_reader import resolve_wp_cell
+
                 try:
-                    from app.services.acnr.resolver import full_resolve
+                    read = await resolve_wp_cell(db, project_id, year, wp_code, None, col)
+                except Exception:
+                    return D("0")
+                if read.state != "ok":
+                    return D("0")
+                return read.value
 
-                    acnr_result = await full_resolve(
-                        formula_ref=f"WP('{wp_code}','{wp_code}','{cell_up}')",
-                        project_id=str(project_id),
-                        db=db,
-                    )
-                    if acnr_result and acnr_result.found and acnr_result.cell_address:
-                        resolved_cell = acnr_result.cell_address.upper()
-                except Exception as exc:
-                    logger.warning(
-                        "ACNR full_resolve failed for WP cell %s/%s: %s "
-                        "(fallback to extract_custom_cells)",
-                        wp_code,
-                        cell_up,
-                        exc,
-                    )
-                # 值仍从 parsed_data 提取（extract_custom_cells 为兜底真源，保证不破坏既有取数）
-                for rec in extract_custom_cells(parsed_data):
-                    if rec.cell == resolved_cell:
-                        v = rec.value
-                        if v is None or v == "":
-                            return D("0")
-                        try:
-                            return D(str(v))
-                        except Exception:
-                            return D("0")
-                return D("0")
-
-            col_map = {
-                "审定数": "audited_amount",
-                "未审数": "unadjusted_amount",
-                "期初余额": "opening_balance",
-                "期末余额": "audited_amount",
-            }
-            key = col_map.get(col, col)
+            key = WP_COLUMN_KEYS.get(col, col)
             value = parsed_data.get(key, 0)
             return D(str(value)) if value is not None else D("0")
         except Exception:

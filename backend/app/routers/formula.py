@@ -11,18 +11,31 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.formula_management.function_support_matrix import (
-    Executor,
-    FormulaSupportViolation,
-    require_function_support,
-)
+from app.services.formula_management.function_support_matrix import FormulaSupportViolation
 
 from app.core.database import get_db
 from app.core.redis import get_redis
 from app.deps import assert_project_permission, get_current_user, require_role
 from app.models.core import User
 from app.models.workpaper_schemas import FormulaRequest, FormulaResult
+from app.services.formula_budget import (
+    batch_seconds,
+    execute_seconds,
+    require_batch_size,
+    run_with_deadline,
+)
+from app.services.formula_central_execute import (
+    EXECUTOR,
+    UNSUPPORTED_ERROR_CODE,
+    issues_message,
+    precheck,
+    precheck_issues,
+    unsupported_detail,
+)
 from app.services.formula_engine import FormulaEngine
+
+#: ``/batch-execute`` 单次上限（需求 12.3；超过 ⇒ 422，整批不求值）
+BATCH_LIMIT = 200
 
 router = APIRouter(
     prefix="/api/formula",
@@ -103,29 +116,24 @@ async def execute_formula(
     redis=Depends(get_redis),
     current_user: User = Depends(get_current_user),
 ):
-    """执行单个取数公式"""
+    """执行单个取数公式（中央执行合同，ADR-FHIC-19：失败 ``ok=false`` / ``value=null`` / ``errors`` 非空）"""
     # Task 5.2 / ADR-FMC-06：按 body.project_id 做项目级鉴权（此前仅 get_current_user =
     # 任意登录用户可对任意项目执行取数，坐实 IDOR）。execute 为只读取数 → readonly。
     await assert_project_permission(db, current_user, data.project_id, "readonly")
+    # 预检按表达式内全部函数调用名分类（原先只查 formula_type ⇒ formula_type=TB + EVIL() 照样放行）
     try:
-        require_function_support(data.formula_type, Executor.CENTRAL_BATCH)
+        precheck(_formula_of(data))
     except FormulaSupportViolation as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
-                "executor": exc.executor.value,
-                "issues": exc.issues,
-            },
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=unsupported_detail(exc)) from exc
     engine = FormulaEngine(redis_client=redis)
-    result = await engine.execute(
+    # 执行预算（需求 12.3）：每请求一个时限，语句超时 / 整体超时 ⇒ 504 FORMULA_TIMEOUT
+    result = await run_with_deadline(db, lambda: engine.execute(
         db=db,
         project_id=data.project_id,
         year=data.year,
         formula_type=data.formula_type,
         params=data.params,
-    )
+    ), seconds=execute_seconds())
     return FormulaResult(**result)
 
 
@@ -136,13 +144,14 @@ async def batch_execute_formulas(
     redis=Depends(get_redis),
     current_user: User = Depends(get_current_user),
 ):
-    """批量执行取数公式"""
+    """批量执行取数公式（同一项目与年度、至多 ``BATCH_LIMIT`` 条，整批一个时限）"""
     if not data:
         return []
 
     project_id = data[0].project_id
     year = data[0].year
     await assert_project_permission(db, current_user, project_id, "readonly")
+    require_batch_size(len(data), BATCH_LIMIT)
 
     mixed = [
         index
@@ -159,19 +168,20 @@ async def batch_execute_formulas(
             },
         )
 
-    support_errors: list[dict] = []
-    for index, item in enumerate(data):
-        try:
-            require_function_support(item.formula_type, Executor.CENTRAL_BATCH)
-        except FormulaSupportViolation as exc:
-            support_errors.append({"index": index, "issues": exc.issues})
+    # 预检全部条目通过才开始求值（任一条不放行 ⇒ 整批 422，逐条点名）
+    support_errors = [
+        {"index": index, "issues": issues}
+        for index, item in enumerate(data)
+        if (issues := precheck_issues(_formula_of(item)))
+    ]
     if support_errors:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
-                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
-                "executor": Executor.CENTRAL_BATCH.value,
+                "error_code": UNSUPPORTED_ERROR_CODE,
+                "executor": EXECUTOR.value,
                 "items": support_errors,
+                "message": "；".join(f"第 {e['index'] + 1} 条{issues_message(e['issues'])}" for e in support_errors),
             },
         )
 
@@ -180,10 +190,17 @@ async def batch_execute_formulas(
         {"formula_type": f.formula_type, "params": f.params}
         for f in data
     ]
-    results = await engine.batch_execute(
+    # 整批一个时限（FORMULA_BATCH_TIMEOUT）；超时 ⇒ 504，不返回部分结果
+    results = await run_with_deadline(db, lambda: engine.batch_execute(
         db=db,
         project_id=project_id,
         year=year,
         formulas=formulas,
-    )
+    ), seconds=batch_seconds())
     return [FormulaResult(**r) for r in results]
+
+
+def _formula_of(item: FormulaRequest) -> str:
+    """请求里的公式文本（``params.formula``，与 ``FormulaEngine.execute`` 取同一个键）。"""
+    value = (item.params or {}).get("formula")
+    return "" if value is None else str(value)

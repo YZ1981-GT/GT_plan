@@ -35,6 +35,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState
+from app.services.formula_warnings import collect as collect_formula_warnings, messages as formula_warning_messages
 from app.services.formula_push import note_writer
 from app.services.formula_push.note_events import publish_note_sections
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
@@ -486,8 +487,9 @@ async def _push_workpaper(
             "status": "frozen", "reason": frozen,
         })
         return
-    sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
-    for text in sources.warnings:
+    with collect_formula_warnings() as fetch_warnings:  # 取数告警（ADR-FHIC-03）并入结果，失败回滚时按检查点撤下
+        sources = await binding.load_sources(ctx.db, ctx.project_id, ctx.year, paper.id)
+    for text in [*sources.warnings, *formula_warning_messages(fetch_warnings)]:
         result.add_warning(text)
     # 从 binding 获取存储列（默认 remark，N3 等使用 conclusion）
     storage_field = getattr(binding, "storage_field", "remark")

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_current_user, get_db, require_project_access
 from app.models.core import User
+from app.schemas.unified_lineage import UnifiedLineageResponse
 from app.services.unified_lineage_service import UnifiedLineageService
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ router = APIRouter(
 )
 
 
-@router.get("")
+@router.get("", response_model=UnifiedLineageResponse)
 async def get_lineage(
     project_id: UUID,
     object_type: Literal["wp_cell", "report_row", "note_cell", "tb_row", "adjustment"] = Query(
@@ -39,7 +40,7 @@ async def get_lineage(
     year: int | None = Query(default=None, description="年度"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
-):
+) -> UnifiedLineageResponse:
     """统一溯源查询：返回 upstream / downstream / current（LocateTarget 格式）+ 关联附件列表。"""
     svc = UnifiedLineageService(db)
     result = await svc.query_lineage(
@@ -49,4 +50,4 @@ async def get_lineage(
         direction=direction,
         year=year,
     )
-    return result
+    return UnifiedLineageResponse.model_validate(result)

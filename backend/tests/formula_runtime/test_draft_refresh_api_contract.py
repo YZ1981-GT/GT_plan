@@ -138,15 +138,18 @@ class TestDraftRefreshResponse:
         return DraftRefreshResponse(**defaults)
 
     def test_all_design_fields_present(self):
-        """All fields from design §11 are present in serialized output."""
+        """All fields from design §11 (+ ADR-FHIC-08 outcome / recomputed_count / draft_marked_count) are present."""
         resp = self._make_response()
         data = resp.model_dump()
         expected_fields = {
             "status",
+            "outcome",
             "run_id",
             "transaction_mode",
             "affected_count",
             "applied_count",
+            "recomputed_count",
+            "draft_marked_count",
             "failed_count",
             "skipped_count",
             "scopes",

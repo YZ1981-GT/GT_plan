@@ -35,7 +35,7 @@ CALL_SITE_REGISTRY: dict[str, dict] = {
         "policy": "mandatory",
         "reason": "时光机恢复（改数据）",
     },
-    "routers/wp_formula.py:_write_wp_formula_audit": {
+    "routers/wp_formula_audit.py:write_wp_formula_audit": {
         "policy": "mandatory",
         "reason": "底稿公式增改（已在 begin_nested 内）",
     },
@@ -140,7 +140,7 @@ CALL_SITE_REGISTRY: dict[str, dict] = {
         "policy": "best_effort",
         "reason": "合并报表公式执行结果留痕",
     },
-    "routers/report_config.py:execute_formulas_batch": {
+    "services/report_config_execute.py:_audit": {
         "policy": "best_effort",
         "reason": "公式批量执行留痕",
     },

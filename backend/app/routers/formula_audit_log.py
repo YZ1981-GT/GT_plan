@@ -1,20 +1,20 @@
 """公式审计日志 API — 记录公式变更历史，满足审计留痕要求
 
 数据源：audit_log_entries 哈希链（action_type='formula.changed'）
-  - payload JSONB 含 project_id / module / row_code / action / old_formula / new_formula / result_value / trace
+  - payload JSONB 含 project_id / module / row_code / action / old_formula / new_formula / result_value / trace / year
   - 写入统一走 audit_log_helper.append_audit_log（Task 14 已收口）
 
 API:
-  GET  /api/formula-audit-log/{project_id}/{year}  — 查询公式变更历史（前端零改动）
-  POST /api/formula-audit-log/{project_id}/{year}  — 记录一条日志（委托 append_audit_log）
+  GET  /api/formula-audit-log/{project_id}/{year}  — 按年度查询公式变更历史；legacy_without_year 含无年度旧条目
+  POST /api/formula-audit-log/{project_id}/{year}  — 人工补记（ManualNoteBody，action=manual_note）
 """
 
 import json
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +23,10 @@ from app.deps import require_project_access, require_role
 from app.models.core import User
 
 router = APIRouter(prefix="/api/formula-audit-log", tags=["formula-audit-log"])
+
+# ── module → domain 映射（与 rollback.py 共用口径）───────────────────────
+_MODULE_TO_DOMAIN = {"report": "report", "consol": "report", "tb_detail": "tb_detail", "wp": "wp",
+                     "workpaper": "wp", "note": "note", "consol_note": "consol_note", "push": "push"}
 
 # ─── 鉴权（2026-09-28 补，三个端点原先全裸）──────────────────────────────
 #
@@ -42,23 +46,26 @@ router = APIRouter(prefix="/api/formula-audit-log", tags=["formula-audit-log"])
 #     （formula-global-settings-sync R9.3），不再改全局行；角色门控保留（与前端按钮逐值对齐）。
 
 
-class LogEntry(BaseModel):
-    module: str = 'report'
-    row_code: str
-    action: str  # create | update | delete | execute
-    old_formula: str = ''
-    new_formula: str = ''
-    result_value: float | None = None
-    trace: list | None = None
+class ManualNoteBody(BaseModel, extra="forbid"):
+    """人工补记请求体（需求 11.2，ADR-FHIC-12）。
+
+    ``extra='forbid'``：提交 ``old_formula`` / ``new_formula`` / ``result_value`` / ``trace``
+    等字段一律 422（客户端只能写备注，不能伪造变更记录）。
+    """
+    note: str = Field(..., max_length=500, description="人工补记备注（≤500 字）")
+    related_formula_id: str | None = Field(None, description="关联公式 ID（可选）")
 
 
 class RollbackRequest(BaseModel):
-    """一键回滚请求体"""
+    """一键回滚请求体（需求 13.1~13.2，ADR-FHIC-10）。
+
+    ``target_formula`` 已删除——回滚目标定义由服务端从审计日志 ``old_definition`` 读取。
+    ``expected_version`` 缺失由服务层抛 428（不靠 pydantic 必填）。
+    """
     row_code: str
     module: str = 'report'
-    target_formula: str  # 要回滚到的公式（old_formula）
-    source_log_id: str = ''  # 来源历史条目 ID（据此定位公式位）
-    expected_version: int | None = None  # 本项目适配的修订号（可选 CAS）
+    source_log_id: str = ''
+    expected_version: int | None = Field(None, ge=0, description="本项目适配的修订号（CAS）")
 
 
 @router.get("/{project_id}/{year}")
@@ -66,38 +73,47 @@ async def get_audit_log(
     project_id: str, year: int,
     module: str = '',
     row_code: str = '',
+    legacy_without_year: bool = Query(False, description="同时返回载荷无 year 字段的旧条目"),
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """查询公式变更历史 — 改查 audit_log_entries WHERE action_type='formula.changed'。
+    """查询公式变更历史（需求 11.1，ADR-FHIC-12）。
 
-    payload JSONB 过滤 project_id / module / row_code。
-    返回结构与旧 formula_audit_log 表完全一致（前端零改动）。
-    year 参数保留（API 路径兼容）但新哈希链不存 year 字段。
+    按 ``payload->>'year'`` 过滤，只返回本年度条目。
+    ``legacy_without_year=true`` 时同时返回载荷无 ``year`` 字段的旧条目。
     """
-    # 检测数据库方言（PG 用 ->>，SQLite 用 json_extract）
     is_pg = _is_postgres(db)
+    year_str = str(year)
 
     if is_pg:
-        # PostgreSQL: payload JSONB ->> 操作符
         query = """
-            SELECT id, payload, ts
+            SELECT id, payload, ts, object_id
             FROM audit_log_entries
             WHERE action_type = 'formula.changed'
               AND payload->>'project_id' = :pid
         """
     else:
-        # SQLite: json_extract 函数
         query = """
-            SELECT id, payload, ts
+            SELECT id, payload, ts, object_id
             FROM audit_log_entries
             WHERE action_type = 'formula.changed'
               AND json_extract(payload, '$.project_id') = :pid
         """
-    params: dict = {"pid": project_id}
+    params: dict = {"pid": project_id, "yr": year_str}
 
-    # payload JSONB 过滤 module
+    # ── 年度过滤（需求 11.1）──
+    if legacy_without_year:
+        if is_pg:
+            query += " AND (payload->>'year' = :yr OR payload->>'year' IS NULL)"
+        else:
+            query += " AND (json_extract(payload, '$.year') = :yr OR json_extract(payload, '$.year') IS NULL)"
+    else:
+        if is_pg:
+            query += " AND payload->>'year' = :yr"
+        else:
+            query += " AND json_extract(payload, '$.year') = :yr"
+
     if module:
         if is_pg:
             query += " AND payload->>'module' = :mod"
@@ -105,7 +121,6 @@ async def get_audit_log(
             query += " AND json_extract(payload, '$.module') = :mod"
         params["mod"] = module
 
-    # payload JSONB 过滤 row_code
     if row_code:
         if is_pg:
             query += " AND payload->>'row_code' = :rc"
@@ -119,24 +134,57 @@ async def get_audit_log(
     result = await db.execute(text(query), params)
     rows = result.fetchall()
 
-    # 映射为与旧表完全一致的返回结构
-    return [
-        {
+    # 映射为与旧表完全一致的返回结构，增加 rollbackable（需求 13.3）与 current_version（需求 13.1：
+    # 回滚必带 expected_version，界面只能从这里拿到当前修订号）
+    from app.services.formula_settings.rollback import can_rollback, current_version_for_entry
+    try:
+        pid_uuid: uuid.UUID | None = uuid.UUID(project_id)
+    except ValueError:
+        pid_uuid = None
+    local_cache: dict = {}
+    items = []
+    for r in rows:
+        p = _parse_payload(r[1])
+        # 计算 rollbackable
+        _domain = p.get("domain") or _MODULE_TO_DOMAIN.get(str(p.get("module") or "report"), "report")
+        rollbackable, blocked_reason = can_rollback(_domain, p)
+        current_version: int | None = None
+        if rollbackable:
+            if pid_uuid is None:
+                rollbackable, blocked_reason = False, "项目编号无效"
+            else:
+                current_version, locate_reason = await current_version_for_entry(
+                    db, pid_uuid, object_id=_as_uuid(r[3]), payload=p, local_cache=local_cache)
+                if current_version is None:
+                    rollbackable, blocked_reason = False, locate_reason
+        item = {
             "id": str(r[0]),
-            "module": _parse_payload(r[1]).get("module", "report"),
-            "row_code": _parse_payload(r[1]).get("row_code", ""),
-            "action": _parse_payload(r[1]).get("action", ""),
-            "old_formula": _parse_payload(r[1]).get("old_formula", ""),
-            "new_formula": _parse_payload(r[1]).get("new_formula", ""),
-            "result_value": _safe_float(_parse_payload(r[1]).get("result_value")),
-            "trace": _parse_payload(r[1]).get("trace"),
-            # formula-global-settings-sync：本项目适配 / 同步全局 / 恢复 / 处理待确认 / 订阅模板 …（旧记录无）
-            "operation": _parse_payload(r[1]).get("operation"),
-            "source": _parse_payload(r[1]).get("source"),
+            "module": p.get("module", "report"),
+            "row_code": p.get("row_code", ""),
+            "action": p.get("action", ""),
+            "old_formula": p.get("old_formula", ""),
+            "new_formula": p.get("new_formula", ""),
+            "result_value": _safe_float(p.get("result_value")),
+            "trace": p.get("trace"),
+            "operation": p.get("operation"),
+            "source": p.get("source"),
             "created_at": str(r[2]) if r[2] else None,
+            "rollbackable": rollbackable,
+            "rollback_blocked_reason": blocked_reason or None,
+            "current_version": current_version,
         }
-        for r in rows
-    ]
+        items.append(item)
+    return items
+
+
+def _as_uuid(val) -> uuid.UUID | None:
+    """``object_id`` 列：PG 返回 UUID、SQLite 返回 32 位十六进制串；解析不了按「无对象」处理（不让列表 500）。"""
+    if val is None or isinstance(val, uuid.UUID):
+        return val
+    try:
+        return uuid.UUID(str(val))
+    except (TypeError, ValueError):
+        return None
 
 
 def _safe_float(val) -> float | None:
@@ -180,16 +228,15 @@ def _is_postgres(db: AsyncSession) -> bool:
 @router.post("/{project_id}/{year}")
 async def add_audit_log(
     project_id: str, year: int,
-    body: LogEntry,
+    body: ManualNoteBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """记录公式变更日志 — 委托 append_audit_log 写入哈希链。
+    """人工补记（需求 11.2，ADR-FHIC-12）。
 
-    🔴 `user_id` 必须是**真实操作人**：原实现写死
-    `00000000-0000-0000-0000-000000000000` 并注释「POST 端点无 current_user 上下文」
-    —— 那不是「没有上下文」，是**没挂鉴权依赖**。审计留痕写不出人等于没有留痕
-    （既无法追责也无法举证），故与鉴权一并修。
+    只接受备注（≤500 字），写 ``action="manual_note"``。
+    ``ManualNoteBody(extra='forbid')`` 使得提交 ``old_formula`` / ``new_formula`` /
+    ``result_value`` / ``trace`` 等字段一律 422。
     """
     from app.services.audit_log_helper import append_audit_log
 
@@ -198,22 +245,28 @@ async def add_audit_log(
     except ValueError:
         pid = None
 
+    details: dict = {
+        "event_type": "formula_changed",
+        "module": "manual",
+        "row_code": "",
+        "action": "manual_note",
+        "old_formula": "",
+        "new_formula": "",
+        "result_value": "",
+        "trace": [],
+        "note": body.note,
+        "year": str(year),
+    }
+    if body.related_formula_id is not None:
+        details["related_formula_id"] = body.related_formula_id
+
     await append_audit_log(db, {
         "user_id": current_user.id,
         "project_id": pid,
         "action": "formula.changed",
-        "resource_type": "report_config",
-        "resource_id": body.row_code,
-        "details": {
-            "event_type": "formula_changed",
-            "module": body.module,
-            "row_code": body.row_code,
-            "action": body.action,
-            "old_formula": body.old_formula,
-            "new_formula": body.new_formula,
-            "result_value": str(body.result_value) if body.result_value is not None else "",
-            "trace": body.trace or [],
-        },
+        "resource_type": "formula_audit_note",
+        "resource_id": body.related_formula_id or "",
+        "details": details,
     })
     await db.commit()
     now = datetime.now(timezone.utc)
@@ -247,7 +300,6 @@ async def rollback_formula(
     await assert_project_permission(db, current_user, pid, "review")
     try:
         result = await rollback_from_log(db, project_id=pid, source_log_id=body.source_log_id,
-                                         target_formula=body.target_formula,
                                          expected_version=body.expected_version, user_id=current_user.id)
     except FormulaSettingError as exc:
         await db.rollback()

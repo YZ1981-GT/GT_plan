@@ -7,9 +7,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
-from typing import Any, Literal, Mapping, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Protocol, runtime_checkable
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.models.audit_platform_schemas import EventPayload
 
 JSONValue = dict | list | str | int | float | bool | None
 
@@ -72,11 +74,17 @@ class ExecutionPlan:
 
 @dataclass
 class ExecutionResult:
-    """公式执行结果。"""
+    """公式执行结果。
+
+    ``outcome`` / ``recomputed_count`` / ``draft_marked_count`` / ``post_commit_events`` 由 Draft Refresh 结果聚合
+    （``formula_management.refresh_outcome``，需求 3.2 / 3.3）写回；``outcome`` 取值见 ``refresh_outcome.OUTCOMES``，
+    未经聚合（如回滚）为 ``None``。``affected_count = applied_count + recomputed_count``（Draft 标记数单列、不计入）；
+    ``post_commit_events`` 是提交成功后才投递的事件，不进 ``to_dict``。
+    """
 
     run_id: UUID
     status: Literal[
-        "success", "partial_success", "failed", "no_effect", "idempotent_hit",
+        "success", "recomputed", "draft_marked", "partial_success", "failed", "no_effect", "idempotent_hit",
         "rolled_back", "conflict",
     ]
     applied_count: int = 0
@@ -88,13 +96,20 @@ class ExecutionResult:
     conflicts: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     rollback_available: bool = True
+    outcome: str | None = None
+    recomputed_count: int = 0
+    draft_marked_count: int = 0
+    post_commit_events: list[EventPayload] = field(default_factory=list, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
+            "outcome": self.outcome,
             "run_id": str(self.run_id),
-            "affected_count": self.applied_count,
+            "affected_count": self.applied_count + self.recomputed_count,
             "applied_count": self.applied_count,
+            "recomputed_count": self.recomputed_count,
+            "draft_marked_count": self.draft_marked_count,
             "restored_count": self.restored_count,
             "failed_count": self.failed_count,
             "skipped_count": self.skipped_count,

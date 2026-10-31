@@ -37,17 +37,13 @@
           v-for="check in checks"
           :key="check.check_name"
           class="gt-export-check-item"
-          :class="{
-            'gt-export-check-item--pass': check.passed,
-            'gt-export-check-item--fail-blocking': !check.passed && check.severity === 'blocking',
-            'gt-export-check-item--fail-warning': !check.passed && check.severity === 'warning',
-          }"
+          :class="checkItemClass(check)"
+          data-testid="export-check-item"
         >
-          <span class="gt-export-check-item__icon">
-            {{ check.passed ? '✅' : (check.severity === 'blocking' ? '❌' : '⚠️') }}
-          </span>
+          <span class="gt-export-check-item__icon">{{ checkIcon(check) }}</span>
           <span class="gt-export-check-item__name">{{ check.check_name }}</span>
-          <span class="gt-export-check-item__details">{{ check.details }}</span>
+          <span class="gt-export-check-item__status" data-testid="export-check-status">{{ checkStatusLabel(check) }}</span>
+          <span class="gt-export-check-item__details">{{ checkReasonOf(check) || check.details }}</span>
         </div>
       </div>
     </div>
@@ -97,6 +93,7 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
+import { checkReasonOf, checkStatusLabel, checkStatusOf, type GateCheckStatus } from '@/utils/consistencyCheckStatus'
 
 const props = defineProps<{
   projectId: string
@@ -118,16 +115,39 @@ const forceExport = ref(false)
 
 // Consistency checks
 const checkLoading = ref(false)
-const checks = ref<Array<{
+interface ExportCheck {
   check_name: string
   passed: boolean
+  status?: GateCheckStatus | string
+  reason?: string
   details: string
   severity: string
-}>>([])
+}
+const checks = ref<ExportCheck[]>([])
 
+// 只有「失败 ∧ 阻断级」才禁用导出（需求 16.4 observe：与导出包服务改造前口径一致）；
+// 未执行 / 不适用 / 检查异常各自显示标签与原因，不当成失败，也不显示成通过（需求 16.5）
 const hasBlockingFailures = computed(() =>
-  checks.value.some(c => !c.passed && c.severity === 'blocking')
+  checks.value.some(c => checkStatusOf(c) === 'failed' && c.severity === 'blocking')
 )
+
+function checkItemClass(check: ExportCheck): string {
+  const st = checkStatusOf(check)
+  if (st === 'passed') return 'gt-export-check-item--pass'
+  if (st === 'failed') {
+    return check.severity === 'blocking' ? 'gt-export-check-item--fail-blocking' : 'gt-export-check-item--fail-warning'
+  }
+  return 'gt-export-check-item--not-run'
+}
+
+function checkIcon(check: ExportCheck): string {
+  const st = checkStatusOf(check)
+  if (st === 'passed') return '✅'
+  if (st === 'failed') return check.severity === 'blocking' ? '❌' : '⚠️'
+  if (st === 'not_executed') return '⏭️'
+  if (st === 'not_applicable') return '➖'
+  return '⚠️'
+}
 
 const canForceExport = computed(() => {
   const role = authStore.user?.role
@@ -144,10 +164,9 @@ async function runChecks() {
   if (!props.projectId || !props.year) return
   checkLoading.value = true
   try {
-    const data: any = await api.get(
-      `/api/projects/${props.projectId}/workflow/consistency-check`,
-      { params: { year: props.year } }
-    )
+    const data: any = await api.get(chainWorkflow.consistencyCheck(props.projectId), {
+      params: { year: props.year },
+    })
     checks.value = data?.checks || []
   } catch (err) {
     handleApiError(err, '一致性检查')
@@ -293,6 +312,13 @@ watch(() => props.projectId, () => runChecks(), { immediate: true })
 
 .gt-export-check-item--fail-warning {
   background: var(--gt-bg-warning);
+}
+.gt-export-check-item--not-run {
+  background: var(--gt-bg-info);
+}
+.gt-export-check-item__status {
+  flex-shrink: 0;
+  font-size: var(--gt-font-size-xs);
 }
 
 .gt-export-check-item__icon {

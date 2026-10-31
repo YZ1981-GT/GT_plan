@@ -231,8 +231,8 @@ class TestMCycleTriangleLogic:
             checks = await gate.check_m_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "M6勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_m6_01_skip_m6_not_saved(self, db_session, project_id):
         """VR-M6-01 跳过: M6 审定数缺失"""
@@ -248,8 +248,8 @@ class TestMCycleTriangleLogic:
             checks = await gate.check_m_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "M6勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_m6_01_partial_sources_triggers_check(self, db_session, project_id):
         """VR-M6-01 部分来源已保存: 仅 PL 已保存 → 仍触发校验"""
@@ -378,8 +378,8 @@ class TestMCycleTriangleLogic:
             checks = await gate.check_m_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "M2勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_m2_01_skip_partial_data(self, db_session, project_id):
         """VR-M2-01 跳过: M2 仅有期末无期初"""
@@ -395,20 +395,20 @@ class TestMCycleTriangleLogic:
             checks = await gate.check_m_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "M2勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- Combined: all data None → all skip ---
 
     async def test_all_none_returns_two_skip_checks(self, db_session, project_id):
-        """全部底稿未保存 → 2 条规则全部 skip 但 passed=True"""
+        """全部底稿未保存 → 2 条规则全部 skip ，status=not_executed"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
         ):
             checks = await gate.check_m_cycle_triangle_reconciliation(project_id, 2025)
 
-        # 2 条规则全部 skip 但 passed=True
+        # 2 条规则全部 skip ，status=not_executed
         assert len(checks) == 2
-        assert all(c.passed is True for c in checks)
-        assert all("跳过" in c.details for c in checks)
+        assert all(c.status == "not_executed" for c in checks)
+        assert all("跳过" in c.reason for c in checks)

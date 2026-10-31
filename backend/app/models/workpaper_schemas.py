@@ -155,10 +155,17 @@ class FormulaRequest(BaseModel):
 
 
 class FormulaResult(BaseModel):
-    """取数公式执行结果"""
+    """取数公式执行结果（中央执行合同，spec formula-hub-integrity-closure ADR-FHIC-19）。
+
+    ``ok=False`` ⇒ ``value=None``、``errors`` 非空、``error`` = 各条原因以「；」连接；``state``：``ok`` / ``missing``
+    （试算表无该科目、取数缺口）/ ``error`` / ``blocked`` / ``damaged``。默认值按失败态（与调试响应同口径）。
+    """
     value: Any = None
     cached: bool = False
     error: str | None = None
+    ok: bool = False
+    state: str = "error"
+    errors: list[str] = Field(default_factory=list)
     #: 取数口径等非阻断告警。
     #:
     #: spec: formula-management-runtime-closure Task 15（Requirements 7.4, 7.5）

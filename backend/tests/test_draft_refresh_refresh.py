@@ -8,7 +8,6 @@ Task 5.3（formula-management-library）：验证 refresh 的五步编排——
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -115,6 +114,8 @@ async def _count(db, model) -> int:
 
 @pytest.mark.asyncio
 async def test_refresh_creates_draft_markers_and_audit(db_session: AsyncSession):
+    """计数口径按 spec formula-hub-integrity-closure 需求 3.3 改：只打 Draft 标记 ⇒ 刷新单元数记 ``draft_marked_count``
+    （结果与审计 ``detail`` 同记），``affected_count``（= applied + recomputed）为 0（改造前 = 刷新单元数）。"""
     db_session.add_all(_seed_core())
     await db_session.commit()
 
@@ -132,7 +133,8 @@ async def test_refresh_creates_draft_markers_and_audit(db_session: AsyncSession)
     assert isinstance(result, RefreshResult)
     assert result.status == "success"
     assert result.idempotent is False
-    assert result.affected_count == 2
+    assert result.draft_marked_count == 2
+    assert result.affected_count == 0
     assert set(result.refreshed_units) == {"report:BS-1", "report:BS-2"}
 
     markers = (await db_session.execute(sa.select(DraftMarker))).scalars().all()
@@ -145,7 +147,8 @@ async def test_refresh_creates_draft_markers_and_audit(db_session: AsyncSession)
     assert audit.project_id == PROJECT_ID
     assert audit.year == YEAR
     assert audit.scope == "report"
-    assert audit.affected_count == 2
+    assert audit.affected_count == 0
+    assert audit.detail["draft_marked_count"] == 2
     assert audit.result_status == "success"
     assert audit.tb_snapshot_hash  # 非空指纹
     assert audit.detail["refreshed_units"] == ["report:BS-1", "report:BS-2"]
@@ -236,6 +239,8 @@ async def test_scope_key_order_independent_idempotency(db_session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_refresh_skips_human_edited_when_not_confirmed(db_session: AsyncSession):
+    """刷新单元数按 spec formula-hub-integrity-closure 需求 3.3 改记 ``draft_marked_count``（``affected_count`` 对 marker
+    路径为 0，改造前 = 刷新单元数）。"""
     db_session.add_all(_seed_core())
     db_session.add(
         DraftMarker(
@@ -256,7 +261,8 @@ async def test_refresh_skips_human_edited_when_not_confirmed(db_session: AsyncSe
 
     assert result.skipped_human_edited == ["report:BS-1"]
     assert result.refreshed_units == ["report:BS-2"]
-    assert result.affected_count == 1
+    assert result.draft_marked_count == 1
+    assert result.affected_count == 0
 
     # 人工编辑单元保持 human_edited 不被覆盖为 draft
     bs1 = (
@@ -451,10 +457,12 @@ def _seed_working_paper(*, prefill_stale: bool = False) -> WorkingPaper:
 
 @pytest.mark.asyncio
 async def test_refresh_triggers_stale_recalc_after_draft(db_session: AsyncSession):
-    """一键刷新生成初稿后经既有 prefill_stale 机制标下游底稿过时（Req 25.5）。
+    """只打 Draft 标记的一键刷新不再把下游底稿标过时（用例名沿用改造前）。
 
-    复用 prefill_engine.mark_stale（不自建）：refresh 成功生成初稿单元后，
-    项目内底稿被标 prefill_stale=True，供既有 /trial-balance/recalc 通道重算对齐。
+    改造前（Req 25.5）：refresh 生成初稿单元后经 prefill_engine.mark_stale 把项目内底稿标 prefill_stale=True。
+    spec formula-hub-integrity-closure 需求 3.4 起，trigger_recalc / mark_stale 只在金额变化 > 0 时调用：
+    refresh() 只打 Draft 标记、不改业务值（金额变化恒为 0）⇒ stale_marked_count = 0、prefill_stale 不变。
+    金额变化 > 0 时触发的正向用例见 tests/formula_hub/test_draft_refresh_service_counts.py。
     """
     db_session.add_all(_seed_core())
     db_session.add(_seed_working_paper(prefill_stale=False))
@@ -468,10 +476,10 @@ async def test_refresh_triggers_stale_recalc_after_draft(db_session: AsyncSessio
     await db_session.commit()
 
     assert result.status == "success"
-    # 至少 1 张底稿被标过时
-    assert result.stale_marked_count >= 1
+    assert result.draft_marked_count == 1
+    assert result.stale_marked_count == 0
     wp = (await db_session.execute(sa.select(WorkingPaper))).scalar_one()
-    assert wp.prefill_stale is True
+    assert wp.prefill_stale is False
 
 
 @pytest.mark.asyncio

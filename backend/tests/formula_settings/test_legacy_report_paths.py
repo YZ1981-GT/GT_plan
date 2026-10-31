@@ -184,9 +184,10 @@ async def test_history_rollback_writes_project_adaptation_not_global(api):
     api["as"]("editor")
     await c.put(f"/api/report-config/{api['ids']['conflict_row']}", json={"formula": "ROW('X')",
                                                                           "expected_version": 1})
-    hist = (await c.get(f"/api/formula-audit-log/{pid}/2025")).json()
+    hist = (await c.get(f"/api/formula-audit-log/{pid}/2025", params={"legacy_without_year": "true"})).json()
     entry = next(e for e in hist if e["new_formula"] == "ROW('X')")
-    body = {"row_code": "BS-001", "target_formula": entry["old_formula"], "source_log_id": entry["id"]}
+    # ADR-FHIC-10：不传 target_formula，目标由服务端从 old_definition 读取
+    body = {"row_code": "BS-001", "source_log_id": entry["id"], "expected_version": 2}
     assert (await c.post(f"/api/formula-audit-log/{pid}/2025/rollback", json=body)).status_code == 403  # 角色门控
     api["as"]("manager")
     r = await c.post(f"/api/formula-audit-log/{pid}/2025/rollback", json=body)
@@ -218,7 +219,7 @@ async def test_rollback_locates_legacy_entry_by_unique_row_code(api, payload_ext
         log_id = (await db.execute(sa.select(AuditLogEntry.id))).scalars().all()[-1]
     api["as"]("manager")
     r = await api["c"].post(f"/api/formula-audit-log/{pid}/2025/rollback", json={
-        "row_code": "BS-001", "target_formula": OLD, "source_log_id": str(log_id)})
+        "row_code": "BS-001", "source_log_id": str(log_id), "expected_version": 1})
     assert r.status_code == 200, r.text
     async with api["f"]() as db:
         assert (await project_rows(db, pid))["BS-001"].formula == OLD

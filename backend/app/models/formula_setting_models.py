@@ -191,6 +191,8 @@ class FormulaSyncItem(Base):
     upstream_definition: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     local_definition: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     upstream_version: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    #: 修订号（V228，ADR-FHIC-11）：新建为 1，每次被覆盖原子 +1；处理待确认以它为唯一 CAS 依据。
+    revision: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=1, server_default=text("1"))
     publish_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending",
                                         server_default=text("'pending'"))

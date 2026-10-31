@@ -17,10 +17,11 @@ from pathlib import Path
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.report_models import FinancialReportType, ReportConfig
+from app.models.report_models import ReportConfig
 from app.services.four_table.report_config_account_names import (
     DERIVED_ROW_NAMES_WITHOUT_ACCOUNT,
 )
+from app.services.report_total_formula_guard import has_explicit_formula, range_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -525,15 +526,20 @@ def _generate_fallback_formula(row_code: str, row_name: str, col: str) -> str | 
     return None
 
 
-def _generate_sum_formula(configs: list, current_idx: int) -> str | None:
+def _generate_sum_formula(configs: list, current_idx: int, warnings: list[str] | None = None) -> str | None:
     """为合计行自动生成 SUM_ROW 公式。
 
     策略：
     1. 向上查找 indent_level 更深的子行（直到遇到同级或更浅的行）
     2. 如果没有子行，查找同级行（直到遇到另一个合计行或标题行）
     3. 对找到的子行范围生成 SUM_ROW('first','last')
+
+    约束（ADR-FHIC-23，判定在 report_total_formula_guard）：本行已有显式定义 ⇒ 不生成；
+    SUM_ROW 区间含其他 is_total_row 行 ⇒ 不生成，warning 追加到 ``warnings``。
     """
     current = configs[current_idx]
+    if has_explicit_formula(current):
+        return None
     ci = current.indent_level
     child_codes: list[str] = []
 
@@ -564,6 +570,8 @@ def _generate_sum_formula(configs: list, current_idx: int) -> str | None:
                 child_codes.append(row.row_code)
 
     if len(child_codes) >= 2:
+        if range_blocked(configs, current_idx, child_codes[-1], child_codes[0], warnings):
+            return None
         return f"SUM_ROW('{child_codes[-1]}','{child_codes[0]}')"
     elif len(child_codes) == 1:
         return f"ROW('{child_codes[0]}')"
@@ -639,7 +647,7 @@ class ReportFormulaService:
             user_id: 操作人（留痕）
 
         Returns:
-            {total, updated, skipped, no_formula, coverage_pct, events}
+            {total, updated, skipped, no_formula, coverage_pct, events, warnings}（warnings：合计行未自动生成的原因）
         """
         from app.services.formula_settings.publish import publish_global
         from app.services.formula_settings.stores import report_slot_key
@@ -654,6 +662,7 @@ class ReportFormulaService:
 
         stats = {"total": 0, "updated": 0, "skipped": 0, "no_formula": 0}
         events: list[dict] = []
+        warnings: list[str] = []
 
         for std in standards:
             std_changes: dict[str, dict] = {}
@@ -723,13 +732,13 @@ class ReportFormulaService:
 
                     # 策略 3: 合计行关键词
                     if not formula and any(kw in row_name for kw in ("合计", "小计", "总计", "总额")):
-                        formula = _generate_sum_formula(type_configs, idx)
+                        formula = _generate_sum_formula(type_configs, idx, warnings)
                         if formula:
                             source = "auto_total"
 
                     # 策略 4: is_total_row 标记
                     if not formula and cfg.is_total_row:
-                        formula = _generate_sum_formula(type_configs, idx)
+                        formula = _generate_sum_formula(type_configs, idx, warnings)
                         if formula:
                             source = "auto_total_flag"
 
@@ -761,6 +770,9 @@ class ReportFormulaService:
                 events.extend(published.get("events") or [])
 
         stats["events"] = events
+        stats["warnings"] = list(dict.fromkeys(warnings))  # 策略 3、4 对同一行各调一次生成器 ⇒ 去重
+        for text in stats["warnings"]:
+            logger.warning("fill_all_formulas: %s", text)
         # 计算覆盖率
         fillable = stats["total"] - stats["skipped"]
         coverage_pct = round(stats["updated"] / max(fillable, 1) * 100, 1)

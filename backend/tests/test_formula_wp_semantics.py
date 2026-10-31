@@ -216,8 +216,10 @@ class TestKnownDifferencesRegistered:
     """Property 17：每处差异都要登记，且带理由与归属 spec。"""
 
     def test_all_three_dimensions_registered(self) -> None:
-        assert REGISTERED_DIFFERENCE_DIMENSIONS == {"positional_arg_count", "on_missing_return", "data_source"}
-        assert len(WP_KNOWN_DIFFERENCES) == 3
+        assert REGISTERED_DIFFERENCE_DIMENSIONS == {
+            "positional_arg_count", "on_missing_return", "data_source", "typed_eval_strictness",
+        }
+        assert len(WP_KNOWN_DIFFERENCES) == 4
 
     def test_each_difference_has_reason_and_owner(self) -> None:
         for diff in WP_KNOWN_DIFFERENCES:

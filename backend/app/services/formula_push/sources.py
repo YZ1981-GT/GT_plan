@@ -3,8 +3,8 @@
 spec: chain-closure-phase2-formula-push-engine · design §四 / ADR-PUSH-001 / ADR-PUSH-002
 
 * ``tb:trial_balance_audited`` —— ``TB(code,'期末余额')`` = ``trial_balance.audited_amount``（试算表
-  持久化审定数），``TB(code,'年初余额')`` = ``opening_balance``；均按标准码前缀汇总（科目及其子级），
-  与报表引擎审定模式（``ReportFormulaParser``）逐值同口径
+  持久化审定数），``TB(code,'年初余额')`` = ``opening_balance``；均按标准码前缀取科目及其子级、只计叶子行
+  （父子并存时父行不计入，ADR-FHIC-03），与报表引擎审定模式（``ReportFormulaParser``）逐值同口径
   （``test_tb_context_matches_report_engine_including_sub_level_codes`` 守卫）。
 * ``adj:hall_approved_excluding_workpaper`` —— ``ADJ(code,'aje_net')`` = 调整分录大厅**已批准**、
   且 ``origin≠workpaper`` 的净额（底稿来源分录已由 E1-5 本地调整计入，排除以免重计）；同样按标准码前缀
@@ -22,6 +22,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from app.services.formula_engine import FormulaContext
+from app.services.tb_leaf_codes import leaf_total, scope_for_year
 
 
 @dataclass(frozen=True)
@@ -34,12 +35,13 @@ class TbAuditedSnapshot:
 
 
 async def load_tb_audited(db, project_id: UUID, year: int, codes: Collection[str]) -> TbAuditedSnapshot:
-    """按标准科目码**前缀**汇总 ``audited_amount`` / ``opening_balance``（缺该科目 = 诚实的 0）。
+    """按标准科目码**前缀**取宽集合、只累加叶子行的 ``audited_amount`` / ``opening_balance``（缺该科目 = 诚实的 0）。
 
-    🔴 必须与报表引擎 ``ReportFormulaParser._get_tb_rows_prefix`` 同口径（``LIKE 'code%'`` = 科目及其全部子级标准码）：
+    🔴 必须与报表引擎 ``ReportFormulaParser._resolve_tb`` 同口径（``LIKE 'code%'`` = 科目及其全部子级标准码）：
     「试算平衡表数」核对的是报表货币资金行。精确匹配会整段漏掉映射到子级标准码的科目 —— 真库和平药房_2024
     的 1012 本行为 0、``101202`` / ``101203`` 合计 52,475,713.77（报表计入），审定表会凭空多出这么大的差异数。
-    试算表行由叶子逐一映射到唯一标准码生成（``recalc_unadjusted``），前缀汇总不会重复计数。
+    父子并存（医疗器械 2025 的 ``1231`` 与 ``1231-01``~``05``）时前缀全加会把父行算两遍 ⇒ 宽集合内只计叶子，
+    父行与叶子合计不符经 ``tb_leaf_codes`` 告警（引擎并入运行结果 ``warnings``，ADR-FHIC-03）。
     """
     from app.models.audit_platform_models import TrialBalance
 
@@ -59,15 +61,13 @@ async def load_tb_audited(db, project_id: UUID, year: int, codes: Collection[str
             TrialBalance.opening_balance,
         ).where(base, sa.or_(*[TrialBalance.standard_account_code.like(f"{c}%") for c in wanted]))
     )).all() if wanted else []
-    audited: dict[str, Decimal] = {c: Decimal("0") for c in wanted}
-    opening: dict[str, Decimal] = {c: Decimal("0") for c in wanted}
-    for r in rows:
-        for c in wanted:  # 每个科目各自按前缀取（与报表引擎逐个 TB() 求值一致）
-            if (r.standard_account_code or "").startswith(c):
-                audited[c] += r.audited_amount or Decimal("0")
-                opening[c] += r.opening_balance or Decimal("0")
-    tb_data = {c: {"期末余额": audited[c], "年初余额": opening[c],
-                   "本期发生额": audited[c] - opening[c]} for c in wanted}
+    scope = scope_for_year(year)
+    tb_data: dict[str, dict[str, Decimal]] = {}
+    for c in wanted:  # 每个科目各自按前缀取宽集合（与报表引擎逐个 TB() 求值一致）
+        wide = [r for r in rows if (r.standard_account_code or "").startswith(c)]
+        audited = leaf_total(wide, lambda r: r.audited_amount, column="期末余额", scope=scope)
+        opening = leaf_total(wide, lambda r: r.opening_balance, column="年初余额", scope=scope)
+        tb_data[c] = {"期末余额": audited, "年初余额": opening, "本期发生额": audited - opening}
     return TbAuditedSnapshot(
         tb_data=tb_data,
         available=bool(company_rows),

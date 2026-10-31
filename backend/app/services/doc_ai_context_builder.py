@@ -57,6 +57,7 @@ from app.services.knowledge_access_policy import (
     KnowledgeResource,
 )
 from app.services.knowledge_index_service import KnowledgeIndexService
+from app.services.report_freshness import stale_clause
 
 logger = logging.getLogger(__name__)
 
@@ -433,7 +434,7 @@ class ContextBuilder:
                     FinancialReport.row_name,
                     FinancialReport.current_period_amount,
                     FinancialReport.prior_period_amount,
-                    FinancialReport.is_stale,
+                    stale_clause().label("is_stale"),
                 )
                 .where(
                     FinancialReport.project_id == host.project_id,
@@ -450,7 +451,7 @@ class ContextBuilder:
 
         parts: list[str] = [f"[{host.display_label} {host.year} 年度]"]
         if any(r[4] for r in rows):
-            parts.append("[提示：本报表存在已标记过期的行次，需刷新后引用]")
+            parts.append("[提示：本报表存在已过期的行次（已标过期或为旧版本计算结果），需重新生成后引用]")
         lines = [
             f"{row_code} {row_name or ''} | 本期 {_fmt_amount(cur)} | 上期 {_fmt_amount(prior)}"
             for row_code, row_name, cur, prior, _stale in rows

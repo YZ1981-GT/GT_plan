@@ -51,9 +51,9 @@ export const formulaSettingsApi = {
   saveOverrides: (pid: string, domain: string, items: SlotChange[]) =>
     api.put<{ saved: Array<{ slot_key: string; version: number | null }> }>(
       PP.overrides(pid, domain), { items }, silent()),
-  restoreGlobal: (pid: string, domain: string, slotKeys: string[]) =>
+  restoreGlobal: (pid: string, domain: string, slotKeys: string[], expectedVersions: number[]) =>
     api.delete<{ restored: string[] }>(PP.overrides(pid, domain),
-      silent({ params: { slot_key: slotKeys }, paramsSerializer: repeatParams })),
+      silent({ params: { slot_key: slotKeys, expected_version: expectedVersions }, paramsSerializer: repeatParams })),
   applyPreview: (pid: string, domain: string, body: { target: ApplyTargetKind; slot_keys: string[]; project_ids?: string[] }) =>
     api.post<SyncPreview>(PP.applyPreview(pid, domain), body, silent()),
   apply: (pid: string, domain: string, body: {
@@ -66,7 +66,8 @@ export const formulaSettingsApi = {
   template: (id: string) => api.get<TemplateDetail>(PT.detail(id), silent()),
   createTemplate: (body: Record<string, any>) => api.post<TemplateDetail>(PT.list, body, silent()),
   updateTemplate: (id: string, body: Record<string, any>) => api.put<TemplateDetail>(PT.detail(id), body, silent()),
-  deleteTemplate: (id: string) => api.delete<{ id: string; deleted: boolean }>(PT.detail(id), silent()),
+  deleteTemplate: (id: string, expectedVersion: number) => api.delete<{ id: string; deleted: boolean }>(PT.detail(id),
+      silent({ params: { expected_version: expectedVersion } })),
   templateVersions: (id: string) => api.get<{ items: TemplateVersion[] }>(PT.versions(id), silent()),
   templateSubscribers: (id: string) => api.get<{ items: TemplateSubscriber[] }>(PT.subscribers(id), silent()),
   templatePublishPreview: (id: string, body: { expected_version: number; changes: Array<{ domain: string; slot_key: string; definition: Definition | null }> }) =>

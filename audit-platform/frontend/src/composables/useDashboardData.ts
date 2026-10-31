@@ -37,11 +37,27 @@ export interface CycleVRStat {
   failed_rules: FailedRuleItem[]
 }
 
+/** 非通过检查项的五态与原因（后端 CheckStatusItem，需求 16.5） */
+export interface VRCheckStatusItem {
+  check_name: string
+  status: string
+  reason: string
+  branch_id?: string
+  severity?: string
+}
+
 export interface VRSummaryData {
   total_rules: number
   blocking_failed: number
+  /** 每项都通过才为真（与 consistency-check 同口径） */
   all_passed: boolean
   by_cycle: CycleVRStat[]
+  /** 没有运行一致性检查（如项目未设置审计年度），原因在 reason */
+  unavailable?: boolean
+  reason?: string | null
+  /** 五态计数：passed / failed / not_executed / not_applicable / error */
+  status_counts?: Record<string, number>
+  not_passed_checks?: VRCheckStatusItem[]
 }
 
 export interface ReviewItem {

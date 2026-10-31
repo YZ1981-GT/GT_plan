@@ -123,7 +123,11 @@ export async function saveReportRows(projectId: string | undefined, rows: any[])
 export async function restoreReportRows(projectId: string, rows: any[]): Promise<void> {
   const keys = rows.map((r) => r._slot_key).filter(Boolean)
   if (!keys.length) return
-  await formulaSettingsApi.restoreGlobal(projectId, 'report', keys)
+  const versions = keys.map((k) => {
+    const row = rows.find((r) => r._slot_key === k)
+    return row?._local_version ?? row?.version ?? 1
+  })
+  await formulaSettingsApi.restoreGlobal(projectId, 'report', keys, versions)
   invalidateEffectiveReport(projectId)
 }
 

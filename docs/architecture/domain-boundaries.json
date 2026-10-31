@@ -129,6 +129,7 @@
         "backend/app/services/formula_management/**",
         "backend/app/services/formula_runtime/**",
         "backend/app/services/*formula*",
+        "backend/app/services/tb_leaf_codes.py",
         "backend/app/routers/*formula*",
         "audit-platform/frontend/src/components/formula/**",
         "audit-platform/frontend/src/views/**/formula/**",

@@ -79,6 +79,13 @@ def _make_formula(
     f.issue_description = issue_description
     f.hint_text = hint_text
     f.formula_source = "custom"
+    # 稳定身份三元组按 ORM 默认值给出（未存 ⇒ 由 sheet_name/target_cell 推导）：
+    # MagicMock 的未设属性是真值，typed_eval 会把 ``stable_key_needs_review`` 读成「公式位置待复核」而 blocked
+    # （spec formula-hub-integrity-closure ADR-FHIC-06 第 4 点起 Runtime 读这些字段）
+    f.stable_sheet_key = None
+    f.row_key = None
+    f.field_key = None
+    f.stable_key_needs_review = False
     return f
 
 
@@ -157,13 +164,18 @@ class TestFormulaRuntimeCoordinator:
 
     @pytest.mark.asyncio
     async def test_workpaper_scope_produces_real_mutations(self):
-        """Workpaper scope should produce real mutations, not just page_keys."""
+        """Workpaper scope should produce real mutations, not just page_keys.
+
+        表达式用可求值的算式：默认 ``=REF1+REF2`` 的两个标识符在 row_cache 里都没有，原先按 0 求值也出 mutation
+        （把「引用取不到」写成 0），spec formula-hub-integrity-closure 需求 2.3 起 ROW 缺行报错、进 scope_failures。
+        """
         project_id = uuid.uuid4()
         wp_id = uuid.uuid4()
         year = 2025
         formula = _make_formula(
             project_id=project_id,
             wp_id=wp_id,
+            expression="=25000*2",
             formula_type="auto_calc",
             target_cell="C10",
             sheet_name="D2-2",
@@ -197,13 +209,12 @@ class TestFormulaRuntimeCoordinator:
 
         assert isinstance(plan, MutationPlanResult)
         # Should have mutations (not just empty page_keys)
-        # The auto_calc formula with resolved ref should produce a mutation
-        assert len(plan.mutations) >= 1 or len(plan.scope_failures) == 0
-        # Verify mutation structure if present
+        assert len(plan.mutations) == 1 and plan.scope_failures == [], (plan.mutations, plan.scope_failures)
         for m in plan.mutations:
             assert isinstance(m, FormulaMutation)
             assert m.target is not None
             assert m.target.domain == "workpaper"
+            assert m.after_value == Decimal("50000")
 
     @pytest.mark.asyncio
     async def test_adjudication_scope_produces_real_mutations(self):
@@ -290,7 +301,12 @@ class TestFormulaRuntimeCoordinator:
 
     @pytest.mark.asyncio
     async def test_missing_refs_result_in_scope_failures(self):
-        """Missing/ambiguous refs should result in scope_failures, not crashes."""
+        """Missing/ambiguous refs should result in scope_failures, not crashes, not mutations.
+
+        spec formula-hub-integrity-closure 需求 1.3 起引用从表达式解析、不读 ``refs`` 列（``FormulaValueLoader`` 不再参与
+        Runtime 求值）⇒ 失败按公式记一条 ``typed_eval_blocked``；``=REF1+REF2`` 的两个标识符都取不到，
+        ``evaluate_wp_formula_expression`` 返回占位 0 + errors，写入方不得把它当成 0 写下去（需求 2.3）。
+        """
         project_id = uuid.uuid4()
         year = 2025
         formula = _make_formula(
@@ -327,10 +343,10 @@ class TestFormulaRuntimeCoordinator:
             )
 
         assert isinstance(plan, MutationPlanResult)
-        # scope_failures should contain the unresolved refs
-        assert len(plan.scope_failures) >= 2
-        kinds = {f["kind"] for f in plan.scope_failures if "kind" in f}
-        assert "miss" in kinds or "unresolved_refs" in kinds
+        assert plan.mutations == []
+        # 一条公式一条失败，原因点名取不到的引用
+        assert [f["kind"] for f in plan.scope_failures] == ["typed_eval_blocked"], plan.scope_failures
+        assert "REF1" in plan.scope_failures[0]["detail"], plan.scope_failures
 
     @pytest.mark.asyncio
     async def test_coordinator_does_not_commit(self):
@@ -531,21 +547,23 @@ def test_pbt_plan_structure_invariants(n_formulas: int, scope: str):
 def test_pbt_missing_refs_produce_failures(missing_count: int):
     """**Validates: Requirements 8 | P8, P9**
 
-    Property: when value loader reports missing refs, those appear as
-    scope_failures and the formula with unresolved refs does NOT produce mutations.
+    Property: when the expression references values that cannot be fetched, the formula appears in
+    scope_failures and does NOT produce mutations（需求 1.3：引用从表达式解析、取不到不按 0 代入；
+    需求 2.3：写入方须判求值是否成功 —— 原先占位 0 照产 mutation，workpaper 域一路走到 adapter）。
     """
     import asyncio
 
     project_id = uuid.uuid4()
     year = 2025
 
-    # Build refs that will be reported missing
+    # 表达式里的引用全部取不到（行次标识符）；refs 列仍给出，证明 Runtime 不靠它
     refs = [f"tb:missing_{i}" for i in range(missing_count)]
     formula = _make_formula(
         project_id=project_id,
         formula_type="auto_calc",
         target_cell="X1",
         refs=refs,
+        expression="=" + "+".join(f"MISSING{i}" for i in range(missing_count)),
     )
 
     session = _mock_session()
@@ -576,8 +594,8 @@ def test_pbt_missing_refs_produce_failures(missing_count: int):
 
     plan = asyncio.run(_run())
 
-    # Scope failures should contain missing refs
-    assert len(plan.scope_failures) >= missing_count
+    # 一条公式一条失败，点名第一个取不到的引用
+    assert [f["kind"] for f in plan.scope_failures] == ["typed_eval_blocked"], plan.scope_failures
+    assert "MISSING0" in plan.scope_failures[0]["detail"], plan.scope_failures
     # No mutations should be produced for unresolved formulas
-    # (engine skips formulas whose refs are in missing set)
     assert len(plan.mutations) == 0

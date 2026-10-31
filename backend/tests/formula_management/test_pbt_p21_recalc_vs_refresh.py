@@ -163,6 +163,9 @@ def _accounts_and_formulas(draw):
 def test_p21_recalc_no_draft_refresh_marks_draft(payload):
     """P21：recalc 不打 Draft/不留痕；一键刷新打 Draft+留痕；既有公式重算结果一致。
 
+    计数口径按 spec formula-hub-integrity-closure 需求 3.3 改：一键刷新的受影响单元数记在 ``draft_marked_count``，
+    ``affected_count``（= applied + recomputed）对只打 Draft 标记的 ``refresh()`` 为 0（改造前 = 受影响单元数）。
+
     **Validates: Requirements 20.4, 20.6**
     """
     accounts, formulas = payload
@@ -210,7 +213,8 @@ def test_p21_recalc_no_draft_refresh_marks_draft(payload):
                 marker_map = {m.unit_scope: m.state for m in markers}
                 assert set(marker_map) == set(unit_scopes)
                 assert all(state == "draft" for state in marker_map.values())
-                assert result.affected_count == len(unit_scopes)
+                assert result.draft_marked_count == len(unit_scopes)
+                assert result.affected_count == 0
 
                 # 恰写入一条审计留痕。
                 assert await _count(db, DraftRefreshAudit) == 1

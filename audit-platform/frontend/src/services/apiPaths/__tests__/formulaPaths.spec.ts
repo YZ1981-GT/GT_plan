@@ -13,9 +13,8 @@
  * 1. **未登记 URL 数只许减少**（`UNREGISTERED_BUDGET` 常量），新增字面量即打红；
  * 2. **登记表里的每条 URL 都必须命中后端真实路由**（交叉锁死，防「访问器名字对、
  *    URL 指到别处」的静默错误 —— 该形态已在 Task 14 的变异检验里复现过）；
- * 3. **`formula.py::execute` 的父子双算说明必须在位**（Task 15 的产出，
- *    它是「为什么 `/execute` 的 tb_map 与 four_table 语义定位脱节」的唯一书面依据，
- *    删掉后下个会话会把那段 `warnings` 当噪声清理）。
+ * 3. **`/execute` 薄转发中央执行合同、叶子口径告警并入 `warnings`**（原为 Task 15 的「`formula.py::execute`
+ *    父子双算说明与告警在位」；spec formula-hub-integrity-closure 任务 12 改写，理由见 Property 24 段首）。
  *
  * 判据设计要点（踩过的坑）：
  * - 抽 URL 一律**先剥注释**：登记表与调用点的 JSDoc 里都会原样写出 URL 举例，
@@ -321,106 +320,110 @@ describe('Property 20: 登记表每条 URL 都命中后端真实路由（交叉�
 })
 
 // ---------------------------------------------------------------------------
-// Property 24: /execute 口径告警说明不可删
+// Property 24: /execute 薄转发中央执行合同，叶子口径告警并入 warnings
+//
+// spec formula-hub-integrity-closure 任务 12（ADR-FHIC-19）改写。原判据钉住的是 `FormulaEngine.execute`
+// 方法体里的旧实现：自拼 `tb_map`（按标准码全量累加 `unadjusted_amount`）+ `if _has_parent_child_overlap(tb_map):`
+// 追加一句「父子双算」告警 —— 把「口径错了、只加告警不改」当成必须在位的形态，谁把口径改对（删掉自拼
+// tb_map）谁就打红，旧断言固化了缺陷（「审定数」取到未审数、区间求和父子双算）。现合同：方法体薄转发
+// `formula_central_execute.execute_central`；试算表取数走预载层叶子口径（`tb_leaf_codes.leaf_total`），父子
+// 不符的告警由 `formula_warnings.collect()` 收集、经 `merge_into` 并入响应 `warnings`。判据只看代码（去掉
+// docstring 与 `#` 注释）：方法 docstring 里本就写着「原实现自拼 tb_map …已删」。
 // ---------------------------------------------------------------------------
 
-describe('Property 24: formula.py::execute 的父子双算说明与告警在位', () => {
-  const enginePath = path.join(
-    REPO_ROOT,
-    'backend',
-    'app',
-    'services',
-    'formula_engine.py',
-  )
-  const engineSrc = fs.readFileSync(enginePath, 'utf-8')
+describe('Property 24: /execute 薄转发中央执行合同，叶子口径告警并入 warnings', () => {
+  const SERVICES = path.join(REPO_ROOT, 'backend', 'app', 'services')
+  const read = (name: string) => fs.readFileSync(path.join(SERVICES, name), 'utf-8')
+  const engineSrc = read('formula_engine.py')
+  const centralSrc = read('formula_central_execute.py')
+  const preloaderSrc = read('formula_preloader.py')
+  const leafSrc = read('tb_leaf_codes.py')
 
   /**
-   * 截取 `FormulaEngine.execute` 的方法体。
-   *
-   * 🔴 **判据必须落在方法体内**：`four_table` / `warnings` / `startswith(` 在
-   * 本文件别处（`_execute_regex` 的注释、`_check_prev_warnings`、`_TOKEN_PATTERNS`）
-   * 都出现，全文断言会让「删掉整段告警」这个**核心变异静默逃逸**
-   * （已在本轮变异检验 M4 复现：GREEN=守卫缺陷）。
-   *
-   * 定位方式：`async def execute(self, db, project_id, year, formula_type` 是
-   * 该方法的唯一签名特征（模块级 `def execute(formula, ctx)` 与三个 Executor 的
-   * `async def execute(db, project_id, ...)` 都不匹配它）；结束于下一个同缩进 `def`。
+   * 截取以 `signature` 开头的 def：先越过（可能跨行的）签名到括号配平，再取到下一个缩进 ≤ 签名缩进的非空行为止
+   * （Python 块边界；多行签名的收尾 `) -> X:` 顶格，不能当块边界）。签名须在文件里恰好出现一次（防止截到同名的
+   * 另一个定义，如三个 Executor 的 `async def execute(db, …`）。
    */
-  function engineExecuteBody(): string {
-    const sigIdx = engineSrc.indexOf(
-      'async def execute(self, db, project_id, year, formula_type',
-    )
-    expect(sigIdx).toBeGreaterThan(0)
-    const rest = engineSrc.slice(sigIdx)
-    // 下一个 `    async def ` / `    def ` （方法级缩进）即边界
-    const endM = /\n {4}(?:async )?def /.exec(rest.slice(1))
-    return endM ? rest.slice(0, endM.index + 1) : rest
+  function defBody(src: string, signature: string): string {
+    const lines = src.replace(/\r\n/g, '\n').split('\n')
+    const hits = lines.flatMap((l, i) => (l.trimStart().startsWith(signature) ? [i] : []))
+    expect(hits, signature).toHaveLength(1)
+    const indent = lines[hits[0]].length - lines[hits[0]].trimStart().length
+    let end = hits[0]
+    for (let depth = 0; end < lines.length; ) {
+      for (const ch of lines[end]) depth += ch === '(' ? 1 : ch === ')' ? -1 : 0
+      end += 1
+      if (depth === 0) break
+    }
+    while (end < lines.length && !(lines[end].trim() && lines[end].length - lines[end].trimStart().length <= indent)) {
+      end += 1
+    }
+    return lines.slice(hits[0], end).join('\n')
   }
 
-  const execBody = engineExecuteBody()
+  /** Python 源码去掉三引号 docstring 与 `#` 注释。 */
+  const pyCode = (src: string) => src.replace(/"""[\s\S]*?"""/g, '').replace(/#[^\n]*/g, '')
 
-  it('提取器自检：方法体非空且不含相邻方法的内容', () => {
-    expect(execBody.length).toBeGreaterThan(400)
-    // batch_execute 是紧随其后的方法，不得被截进来
+  const execBody = defBody(engineSrc, 'async def execute(self, db, project_id, year, formula_type')
+  const batchBody = defBody(engineSrc, 'async def batch_execute(self, db, project_id, year')
+  const centralBody = defBody(centralSrc, 'async def execute_central(')
+
+  it('提取器自检：三个 def 都截到，且不含相邻定义', () => {
     expect(execBody).not.toContain('async def batch_execute')
-    // 模块级 execute 的 parse 层注释也不得被截进来
-    expect(execBody).not.toContain('_PARSE_MODE="parallel"')
+    expect(batchBody).not.toContain('class FormulaError')
+    expect(centralBody).not.toContain('def precheck_issues')
+    expect(pyCode(centralBody).split('\n').filter((l) => l.trim()).length).toBeGreaterThan(10)
   })
 
-  it('execute 方法体内含父子双算口径说明（指向 four_table 叶子聚合）', () => {
-    expect(execBody).toContain('four_table')
-    expect(/父子|双算/.test(execBody)).toBe(true)
-    // 必须点名共享件，否则「说明」退化成一句空话
-    expect(execBody).toContain('leaf_aggregation')
+  it('execute 薄转发到 execute_central，不再自拼 tb_map / 父子双算告警', () => {
+    const code = pyCode(execBody)
+    expect(code).toMatch(/from app\.services\.formula_central_execute import execute_central\b/)
+    expect(code).toMatch(/return\s+await\s+execute_central\(\s*db\s*,\s*project_id\s*,\s*year\s*,/)
+    for (const legacy of ['tb_map', 'unadjusted_amount', 'from_simple_map', '_has_parent_child_overlap', 'FormulaContext']) {
+      expect(code, legacy).not.toContain(legacy)
+    }
+    expect(engineSrc).not.toMatch(/def\s+_has_parent_child_overlap\b/)
   })
 
-  it('execute 会在检出父子共存时产出运行时 warnings（不是只写注释）', () => {
-    // 🔴 判据是**条件表达式形态**而不是标识符出现（memory 铁律：
-    // 只断言标识符抓不住「把条件改成 if False」这类变异）
-    expect(/if\s+_has_parent_child_overlap\(\s*tb_map\s*\)\s*:/.test(execBody)).toBe(
-      true,
-    )
-    // 命中后必须真的把告警写进返回体（只 append 到本地变量却不返回 = dead output）
-    expect(/warnings\.append\(/.test(execBody)).toBe(true)
-    expect(/["']warnings["']\s*:\s*warnings/.test(execBody)).toBe(true)
+  it('batch_execute 在同一会话上逐条经 execute（不并发）', () => {
+    const code = pyCode(batchBody)
+    expect(code).toMatch(/await\s+self\.execute\(/)
+    expect(code).not.toMatch(/gather|create_task/)
   })
 
-  it('父子共存检测函数真实存在且按前缀关系判定（非恒假）', () => {
-    const m = /def\s+_has_parent_child_overlap\b[\s\S]*?(?=\ndef\s|\nclass\s|$)/.exec(
-      engineSrc,
-    )
+  it('中央合同把预载与求值包在 formula_warnings.collect() 里，经 merge_into 并入 warnings', () => {
+    const code = pyCode(centralBody)
+    const m = /^( *)with\s+formula_warnings\.collect\(\)\s+as\s+(\w+)\s*:\s*$/m.exec(code)
     expect(m).not.toBeNull()
-    const body = m![0]
-    expect(/startswith\(/.test(body)).toBe(true)
-    /**
-     * 🔴 **不得退化成恒 False**（那样告警永不触发 = 又一个静默失效）。
-     *
-     * 判据是「存在能触发的 `return True` 路径」，**不是**「函数末尾没有
-     * `return False`」—— 末尾的 `return False` 正是它的正常否定路径，
-     * 按后者断言会把正确实现打红（本轮实测踩中一次）。
-     */
-    expect(/return\s+True\b/.test(body)).toBe(true)
-    /**
-     * 分隔符边界：标准码用 `-`（`1231-01`）、客户原始码用 `.`（`1002.001`），
-     * memory 已记两套体系并存 —— 只认一种会漏判；裸 `startswith` 会把
-     * `1231` 与 `12310` 误判成父子。
-     */
-    expect(body).toContain('"-"')
-    expect(body).toContain('"."')
+    const [line, withIndent, bucket] = m!
+    const block: string[] = []
+    for (const l of code.slice(m!.index + line.length).split('\n').slice(1)) {
+      if (l.trim() && l.length - l.trimStart().length <= withIndent.length) break
+      block.push(l)
+    }
+    const inside = block.join('\n')
+    expect(inside).toMatch(/await\s+preload\(/)
+    expect(inside).toMatch(/=\s*execute\(\s*text\s*,\s*ctx\s*\)/)
+    expect(code).toMatch(new RegExp(`["']warnings["']\\s*:\\s*formula_warnings\\.merge_into\\([^\\n]*,\\s*${bucket}\\s*\\)`))
   })
 
-  it('FormulaResult 声明了 warnings 字段（否则响应键被 pydantic 静默丢弃）', () => {
-    const schemaPath = path.join(
-      REPO_ROOT,
-      'backend',
-      'app',
-      'models',
-      'workpaper_schemas.py',
-    )
-    const schemaSrc = fs.readFileSync(schemaPath, 'utf-8')
-    const m = /class\s+FormulaResult\b[\s\S]*?(?=\nclass\s|\Z)/.exec(schemaSrc)
+  it('父子不符告警来自 tb_leaf_codes：预载层按叶子取数，leaf_total 把告警 emit 给收集器', () => {
+    expect(pyCode(preloaderSrc)).toMatch(/from app\.services\.tb_leaf_codes import [^\n]*\bleaf_total\b/)
+    expect(pyCode(defBody(preloaderSrc, 'async def _load_tb('))).toMatch(/\bleaf_total\(/)
+    expect(pyCode(leafSrc)).toMatch(/from app\.services\.formula_warnings import [^\n]*\bemit\b/)
+    expect(pyCode(defBody(leafSrc, 'def leaf_total('))).toMatch(/\bemit\(\s*selection\.warnings\s*\)/)
+    // 判下级 = 字符串前缀；告警条件是真实比较（不得退化成恒假）
+    expect(pyCode(defBody(leafSrc, 'def leaf_code_set('))).toMatch(/startswith\(/)
+    expect(pyCode(defBody(leafSrc, 'def select_leaves('))).toMatch(/if\s+abs\(diff\)\s*>\s*LEAF_DIFF_TOLERANCE\s*:/)
+  })
+
+  it('FormulaResult 声明 ok / state / errors / warnings（否则响应键被 pydantic 静默丢弃）', () => {
+    const schemaSrc = fs.readFileSync(path.join(REPO_ROOT, 'backend', 'app', 'models', 'workpaper_schemas.py'), 'utf-8')
+    const m = /class\s+FormulaResult\b[\s\S]*?(?=\nclass\s|$)/.exec(schemaSrc)
     expect(m).not.toBeNull()
-    expect(/warnings\s*:/.test(m![0])).toBe(true)
+    for (const name of ['ok', 'state', 'errors', 'warnings']) {
+      expect(new RegExp(`\\n\\s+${name}\\s*:`).test(m![0]), name).toBe(true)
+    }
   })
 })
 

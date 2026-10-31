@@ -30,9 +30,12 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
+
+from app.services.formula_management.function_support_matrix import _CALL_RE, _QUOTED_RE
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +150,47 @@ def _formula_ref_from_expr(formula: str | None) -> list[dict[str, str]]:
     return [ref] if ref else []
 
 
+# ── 预设库函数名归一（spec formula-hub-integrity-closure ADR-FHIC-21） ─────────
+#: 读时唯一要改的函数名：``TB_SUM``（L1 未登记）→ ``SUM_TB``（已登记，同为 ``('起~止','列名')`` 两参）。
+#: 不用 ``preset_acnr_migration.LEGACY_ALIAS_MAP``：它还把已登记的 ``TB_AUX`` 改成 ``AUX``，两者取数口径不同（F7）。
+_LEGACY_RANGE_SUM = "TB_SUM"
+_RANGE_SUM = "SUM_TB"
+
+
+def rename_tb_sum_calls(expression: str | None) -> str | None:
+    """把表达式里**函数调用**名 ``TB_SUM`` 改为 ``SUM_TB``，其余字符原样（ADR-FHIC-21）。
+
+    边界与引号判据不另写：复用预检 ``function_support_matrix.called_function_names`` 的 ``_QUOTED_RE`` /
+    ``_CALL_RE`` —— 单 / 双引号段原样保留；引号外每个 ``标识符\\s*(``（左侧紧挨字母 / 数字 / 下划线的不算）只在名字
+    恰为 ``TB_SUM`` 时改名。所以 ``'TB_SUM(x)'``、``MY_TB_SUM(``、``TB_SUMX(``、``TB_AUX(`` 不动；``TB_SUM (`` 与 L1 词法
+    （``FUNC`` 后可隔空白再接括号）一样算调用，只换名字、保留空白；大小写敏感（L1 ``FUNC`` 只认大写）。
+    None / 空串 / 非字符串原样返回。
+    """
+    if not expression or not isinstance(expression, str):
+        return expression
+
+    def _swap(call: re.Match[str]) -> str:
+        if call.group(1) != _LEGACY_RANGE_SUM:
+            return call.group(0)
+        return _RANGE_SUM + call.group(0)[len(_LEGACY_RANGE_SUM):]
+
+    parts: list[str] = []
+    pos = 0
+    for quoted in _QUOTED_RE.finditer(expression):
+        parts.append(_CALL_RE.sub(_swap, expression[pos:quoted.start()]))
+        parts.append(quoted.group(0))
+        pos = quoted.end()
+    parts.append(_CALL_RE.sub(_swap, expression[pos:]))
+    return "".join(parts)
+
+
 # ── 收敛源 1：prefill_formula_mapping ────────────────────────────────────────
 def convert_prefill_presets() -> list[PresetEntry]:
-    """收敛 ``prefill_formula_mapping.json`` → 预设条目（Req 22.3）。"""
+    """收敛 ``prefill_formula_mapping.json`` → 预设条目（Req 22.3）。
+
+    ``expression`` 经 :func:`rename_tb_sum_calls` 把函数名 ``TB_SUM`` 读时归一为 ``SUM_TB``（ADR-FHIC-21）；``refs`` /
+    ``description`` 仍按原 ``formula`` 取，数据文件不改（预填引擎、联动图另读原文）。
+    """
     data = _safe_load_json(DATA_DIR / "prefill_formula_mapping.json")
     if not isinstance(data, dict):
         return []
@@ -169,7 +210,7 @@ def convert_prefill_presets() -> list[PresetEntry]:
                 PresetEntry(
                     page_key=page_key,
                     target_cell=cell_ref,
-                    expression=formula,
+                    expression=rename_tb_sum_calls(formula),
                     formula_type=_PREFILL_TYPE_TO_TRITYPE,
                     refs=_formula_ref_from_expr(formula),
                     source="prefill_formula_mapping",

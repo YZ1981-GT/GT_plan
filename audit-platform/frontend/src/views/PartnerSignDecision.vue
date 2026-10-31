@@ -226,6 +226,7 @@ import { REPORT_STATUS } from '@/constants/statusEnum'
 import { confirmSignature, confirmSign } from '@/utils/confirm'
 import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
+import { checkReasonOf, checkStatusLabel, checkStatusOf } from '@/utils/consistencyCheckStatus'
 import { fmtAmount as fmtAmt } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
 // Spec A R3：项目状态摘要区块（5 个指标卡片）
@@ -270,7 +271,7 @@ const {
 
 // 一致性 5 项数据（独立调 chain consistency-check）
 const consistencyChecks = ref<any[]>([])
-const consistencyPassed = computed(() => consistencyChecks.value.filter((c: any) => c.passed).length)
+const consistencyPassed = computed(() => consistencyChecks.value.filter((c: any) => checkStatusOf(c) === 'passed').length)
 const consistencyTotal = computed(() => consistencyChecks.value.length)
 const staleSummaryReady = computed(() => wpStale.value.total > 0 || consistencyTotal.value > 0)
 
@@ -475,9 +476,12 @@ function onShowConsistency() {
     ElMessage.info('一致性检查暂无数据')
     return
   }
-  const lines = consistencyChecks.value.map((c: any) =>
-    `${c.passed ? '✓' : '✗'} ${c.check_name}: ${c.details?.message || ''}`
-  ).join('\n')
+  // 五态（需求 16.5）：非通过项写状态标签与原因，不再只分 ✓ / ✗
+  const lines = consistencyChecks.value.map((c: any) => {
+    const ok = checkStatusOf(c) === 'passed'
+    const why = ok ? (typeof c.details === 'string' ? c.details : '') : checkReasonOf(c)
+    return `${ok ? '✓' : '✗'} ${c.check_name}【${checkStatusLabel(c)}】${why ? `：${why}` : ''}`
+  }).join('\n')
   ElMessage({
     message: lines,
     type: 'info',

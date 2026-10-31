@@ -55,6 +55,11 @@ class ReportRow(BaseModel):
     is_total_row: bool = False
     formula_used: str | None = None
     source_accounts: dict | list | None = None
+    # 逐行新鲜度（services/report_freshness.row_status；报表视图显式给值，不从 ORM 原始 is_stale 列读）：
+    # 已标过期 / 计算版本不是当前版本（存量行判过期，D13-A）/ 生成时公式与当前生效公式不同；计算失败与口径留空两种原因
+    is_stale: bool = False
+    calc_error: str | None = None
+    blank_reason: str | None = None
 
 
 class ReportResponse(BaseModel):

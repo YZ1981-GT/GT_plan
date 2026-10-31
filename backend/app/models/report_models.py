@@ -242,9 +242,9 @@ class FinancialReport(Base):
     is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     # V173：留空原因（合并报表公式取数超出口径时金额为 NULL 并写明原因；有值的行为 NULL）
     blank_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(
-        server_default=text("false"), nullable=False
-    )
+    calc_version: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # V229；NULL ⇒ 读取侧判过期
+    calc_error: Mapped[str | None] = mapped_column(String(500), nullable=True)  # V229：计算失败原因；过期判据见 report_freshness
+    is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 

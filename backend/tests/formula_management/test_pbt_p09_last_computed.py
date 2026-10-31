@@ -59,9 +59,10 @@ _DECIMALS = st.decimals(
     allow_infinity=False,
     places=2,
 )
-# 明确畸形、无法求值的表达式（L1 内核解析失败 → fr.ok == False）。
+# 无法求值的表达式（L1 内核 fr.ok == False）：畸形（解析失败），以及 ROW 缺行（row_cache 无键 ⇒ 求值失败；
+# 原先按 0 计、属可求值路径，spec formula-hub-integrity-closure 需求 2.3 起改为报错）。
 _MALFORMED = st.sampled_from(
-    ["1 + * 2", "ROW(", ") (", "TB('x'", "* 3", "()", "1 + + 2"]
+    ["1 + * 2", "ROW(", ") (", "TB('x'", "* 3", "()", "1 + + 2", "ROW('__missing__')", "1 + ROW('__missing__')"]
 )
 
 
@@ -85,8 +86,7 @@ def _ctx_and_context(draw):
         atom_options.append(
             st.sampled_from(codes).map(lambda c: f"TB('{c}','期末余额')")
         )
-    # 缺失键求值为 0，仍属可求值路径。
-    atom_options.append(st.just("ROW('__missing__')"))
+    # ROW 缺行不再是可求值路径（求值失败，见 _MALFORMED），这里只取上下文里存在的行。
     return ctx, st.one_of(atom_options)
 
 

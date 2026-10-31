@@ -50,7 +50,10 @@ class AuthGateSessionMixin:
     async def get(self, model, ident, **_kw):
         self.auth_gate_calls.append(("get", getattr(model, "__name__", str(model)), ident))
         if model is Project:
-            return SimpleNamespace(id=ident, status=self.project_status)
+            # 另给审计年度五级解析读的字段（spec formula-hub-integrity-closure 需求 11.1：底稿公式审计按项目年度补齐）；
+            # 全为 None = 项目没有审计年度，载荷不带 year
+            return SimpleNamespace(id=ident, status=self.project_status, audit_year=None, audit_period_end=None,
+                                   audit_period_start=None, wizard_state=None, name=None)
         return None
 
     def get_bind(self, *_a, **_kw):

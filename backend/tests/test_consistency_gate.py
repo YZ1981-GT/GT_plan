@@ -51,8 +51,8 @@ class TestConsistencyResult:
         result = ConsistencyResult(
             overall="pass",
             checks=[
-                CheckItem(check_name="A", passed=True, severity="blocking"),
-                CheckItem(check_name="B", passed=True, severity="warning"),
+                CheckItem(status="passed", check_name="A", passed=True, severity="blocking"),
+                CheckItem(status="passed", check_name="B", passed=True, severity="warning"),
             ],
         )
         assert not result.has_blocking_failures
@@ -62,8 +62,8 @@ class TestConsistencyResult:
         result = ConsistencyResult(
             overall="fail",
             checks=[
-                CheckItem(check_name="A", passed=False, severity="blocking"),
-                CheckItem(check_name="B", passed=True, severity="warning"),
+                CheckItem(status="failed", check_name="A", passed=False, severity="blocking"),
+                CheckItem(status="passed", check_name="B", passed=True, severity="warning"),
             ],
         )
         assert result.has_blocking_failures
@@ -73,8 +73,8 @@ class TestConsistencyResult:
         result = ConsistencyResult(
             overall="pass",
             checks=[
-                CheckItem(check_name="A", passed=True, severity="blocking"),
-                CheckItem(check_name="B", passed=False, severity="warning"),
+                CheckItem(status="passed", check_name="A", passed=True, severity="blocking"),
+                CheckItem(status="failed", check_name="B", passed=False, severity="warning"),
             ],
         )
         assert not result.has_blocking_failures
@@ -100,13 +100,21 @@ class TestConsistencyGateChecks:
         # 5 base + 3 E1↔CFS + 4 D4 勾稽 = 12
         assert len(result.checks) >= 5
 
-    async def test_run_all_checks_overall_pass_no_data(self, db_session, project_id):
-        """With no data, all checks should pass (skip)."""
+    async def test_run_all_checks_no_data_not_executed(self, db_session, project_id):
+        """无数据：检查项是「未执行」而不是「通过」（spec formula-hub-integrity-closure 需求 16.2；原断言「全部 passed」
+        固化的正是 F29 缺陷）。阻断级未执行 ⇒ overall 不是 pass；但 has_blocking_failures 仍只看「失败」，
+        observe 下的阻断结果与改造前相同（需求 16.4）。"""
         gate = ConsistencyGate(db_session)
         result = await gate.run_all_checks(project_id, 2024)
-        assert result.overall == "pass"
+        statuses = {c.check_name: c.status for c in result.checks}
+        assert set(statuses.values()) <= {"passed", "not_executed"}, statuses
+        assert statuses["试算平衡"] == "not_executed"
         for check in result.checks:
-            assert check.passed is True
+            if check.status == "not_executed":
+                assert check.passed is False and check.reason and check.branch_id, check
+        assert result.overall == "fail"
+        assert result.has_blocking_failures is False
+        assert result.would_block_when_enforced is True
 
     async def test_check_names_correct(self, db_session, project_id):
         """Check names should match expected values."""
@@ -130,32 +138,48 @@ class TestConsistencyGateChecks:
         assert severity_map["附注完整性"] == "warning"
         assert severity_map["数据新鲜度"] == "warning"
 
-    async def test_tb_balance_no_data_passes(self, db_session, project_id):
-        """TB balance check passes when no trial balance data exists."""
+    async def test_tb_balance_no_data_not_executed(self, db_session, project_id):
+        """无试算表数据 ⇒ 未执行（原因写在 reason，分支编号稳定）。"""
         gate = ConsistencyGate(db_session)
         result = await gate.check_tb_balance(project_id, 2024)
-        assert result.passed is True
-        assert "无试算表数据" in result.details
+        assert (result.status, result.passed, result.branch_id) == ("not_executed", False, "tb_balance.1.missing")
+        assert "无试算表数据" in result.reason
 
-    async def test_bs_balance_no_data_passes(self, db_session, project_id):
-        """BS balance check passes when no report data exists."""
+    async def test_bs_balance_no_data_not_executed(self, db_session, project_id):
+        """无资产负债表合计行 ⇒ 未执行。"""
         gate = ConsistencyGate(db_session)
         result = await gate.check_bs_balance(project_id, 2024)
-        assert result.passed is True
-        assert "无资产负债表" in result.details
+        assert (result.status, result.passed, result.branch_id) == ("not_executed", False, "bs_balance.1.missing")
+        assert "无资产负债表" in result.reason
 
-    async def test_is_reconciliation_no_data_passes(self, db_session, project_id):
-        """IS reconciliation check passes when no income statement data exists."""
+    async def test_is_reconciliation_no_data_not_executed(self, db_session, project_id):
+        """无利润表数据 ⇒ 未执行。"""
         gate = ConsistencyGate(db_session)
         result = await gate.check_is_reconciliation(project_id, 2024)
-        assert result.passed is True
-        assert "无利润表数据" in result.details
+        assert (result.status, result.passed, result.branch_id) == (
+            "not_executed", False, "is_reconciliation.1.missing")
+        assert "无利润表数据" in result.reason
 
-    async def test_notes_completeness_no_data_passes(self, db_session, project_id):
-        """Notes completeness check passes when no report data exists."""
+    async def test_notes_completeness_no_data_not_executed(self, db_session, project_id):
+        """无有数据的报表行次 ⇒ 未执行。"""
         gate = ConsistencyGate(db_session)
         result = await gate.check_notes_completeness(project_id, 2024)
-        assert result.passed is True
+        assert (result.status, result.passed, result.branch_id) == (
+            "not_executed", False, "notes_completeness.1.missing")
+
+    async def test_notes_completeness_report_without_notes_fails_with_reason(self, db_session, project_id):
+        """有数据的报表行次、附注未生成 ⇒ 失败且写明原因（五态改造曾把这句原因丢成空串，界面只剩「未通过」）。"""
+        from app.models.report_models import FinancialReport, FinancialReportType
+
+        db_session.add(FinancialReport(
+            project_id=project_id, year=2024, report_type=FinancialReportType.balance_sheet,
+            row_code="BS-002", row_name="货币资金", current_period_amount=Decimal("100.00"),
+        ))
+        await db_session.flush()
+        gate = ConsistencyGate(db_session)
+        result = await gate.check_notes_completeness(project_id, 2024)
+        assert (result.status, result.passed) == ("failed", False)
+        assert result.reason == result.details == "报表有 1 个有数据行次，但附注尚未生成"
 
     async def test_data_freshness_no_stale_passes(self, db_session, project_id):
         """Data freshness check passes when no stale records exist."""
@@ -167,14 +191,14 @@ class TestConsistencyGateChecks:
     async def test_overall_logic_blocking_failure(self, db_session, project_id):
         """Property 10: If a blocking check fails, overall must be 'fail'."""
         gate = ConsistencyGate(db_session)
-        # With no data, all pass → overall = pass
+        # 无数据：阻断级检查未执行（不是通过）⇒ overall = fail（需求 16.2 / 16.5：不显示「通过」）
         result = await gate.run_all_checks(project_id, 2024)
-        assert result.overall == "pass"
+        assert result.overall == "fail"
 
         # Manually verify the property
         # If we had a blocking failure, overall should be fail
         result.checks[0] = CheckItem(
-            check_name="试算平衡", passed=False, severity="blocking", details="test"
+            status="failed", check_name="试算平衡", passed=False, severity="blocking", details="test"
         )
         # Recalculate overall
         has_blocking = any(not c.passed and c.severity == "blocking" for c in result.checks)
@@ -189,13 +213,13 @@ class TestCheckItem:
     """Test CheckItem dataclass."""
 
     def test_default_severity_is_warning(self):
-        item = CheckItem(check_name="test", passed=True)
+        item = CheckItem(status="passed", check_name="test", passed=True)
         assert item.severity == "warning"
 
     def test_blocking_severity(self):
-        item = CheckItem(check_name="test", passed=False, severity="blocking")
+        item = CheckItem(status="failed", check_name="test", passed=False, severity="blocking")
         assert item.severity == "blocking"
 
     def test_details_default_empty(self):
-        item = CheckItem(check_name="test", passed=True)
+        item = CheckItem(status="passed", check_name="test", passed=True)
         assert item.details == ""

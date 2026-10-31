@@ -555,7 +555,10 @@ async def update_user_formulas(
     if updated > 0 or deleted > 0:
         # ── 底稿公式修改走哈希链留痕（mandatory — ADR-ALC-07）──
         from app.services.audit_log_helper import append_audit_log
+        from app.services.project_audit_year import resolve_project_audit_year_for_request
 
+        # 历史页按年度过滤（需求 11.1）：载荷带项目审计年度，否则这些条目查不到
+        audit_year = await resolve_project_audit_year_for_request(db, wp.project_id)
         for cell_key, formula in payload.formulas.items():
             old_formula = _old_formulas.get(cell_key, "")
             # 跳过无实际变更的条目
@@ -576,6 +579,7 @@ async def update_user_formulas(
                     "old_formula": old_formula,
                     "new_formula": formula,
                     "result_value": "",
+                    **({"year": str(audit_year)} if audit_year is not None else {}),
                 },
             })
 
@@ -637,7 +641,10 @@ async def restore_preset_formula(
 
     # ── 底稿公式恢复预设走哈希链留痕（mandatory — ADR-ALC-07）──
     from app.services.audit_log_helper import append_audit_log
+    from app.services.project_audit_year import resolve_project_audit_year_for_request
 
+    # 历史页按年度过滤（需求 11.1）：载荷带项目审计年度，否则这条恢复预设查不到
+    audit_year = await resolve_project_audit_year_for_request(db, wp.project_id)
     await append_audit_log(db, {
         "user_id": _user.id if hasattr(_user, "id") else None,
         "project_id": wp.project_id,
@@ -652,6 +659,7 @@ async def restore_preset_formula(
             "old_formula": removed.get("formula", ""),
             "new_formula": removed.get("original_preset", ""),
             "result_value": "",
+            **({"year": str(audit_year)} if audit_year is not None else {}),
         },
     })
 

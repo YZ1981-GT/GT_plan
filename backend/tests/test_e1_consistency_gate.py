@@ -111,18 +111,24 @@ def test_just_above_2x_tolerance_becomes_blocking():
 # ---------------------------------------------------------------------------
 
 
-def test_check_returns_skip_with_warning_when_data_missing():
-    """e1_end / cfs_end 为 None 时,返回 passed=True severity=warning(跳过检查)"""
-    # 模拟 check 返回值结构
-    item = CheckItem(
-        check_name="E1↔CFS:期末现金等价物勾稽",
-        passed=True,
-        details="数据不完整(E1=None, CFS=None),跳过检查",
+def test_check_returns_not_executed_with_warning_when_data_missing():
+    """e1_end / cfs_end 为 None 时：未执行（不是「通过」），原因写在 reason、分支编号已登记（spec
+    formula-hub-integrity-closure 需求 16.2；原用例断言 passed=True，固化的是「缺数当通过」）。"""
+    from app.services.consistency_gate._branches import BRANCHES
+    from app.services.consistency_gate._models import _not_executed
+
+    item = _not_executed(
+        "E1↔CFS:期末现金等价物勾稽",
+        branch_id="e1_cfs_reconciliation.1.missing",
+        reason="数据不完整(E1=None, CFS=None),跳过检查",
         severity="warning",
     )
-    assert item.passed is True
-    assert "跳过" in item.details or "不完整" in item.details
+    assert (item.status, item.passed) == ("not_executed", False)
+    assert "不完整" in item.reason and item.details == ""
     assert item.severity == "warning"
+    assert BRANCHES[item.branch_id].kind == "missing"
+    # 警告级未执行在 enforce 下也不阻断；observe 下的阻断判据只看「失败」
+    assert item.would_block_when_enforced is False and item.has_blocking_failures is False
 
 
 # ---------------------------------------------------------------------------
@@ -135,13 +141,13 @@ def test_check_item_blocking_means_not_passed_for_overall_fail():
     from app.services.consistency_gate import ConsistencyResult
 
     items = [
-        CheckItem(check_name="t1", passed=True, severity="blocking"),
-        CheckItem(check_name="t2", passed=False, severity="warning"),
+        CheckItem(status="passed", check_name="t1", passed=True, severity="blocking"),
+        CheckItem(status="failed", check_name="t2", passed=False, severity="warning"),
     ]
     r = ConsistencyResult(overall="pass", checks=items)
     assert r.has_blocking_failures is False  # warning fail 不算 blocking
 
-    items2 = items + [CheckItem(check_name="t3", passed=False, severity="blocking")]
+    items2 = items + [CheckItem(status="failed", check_name="t3", passed=False, severity="blocking")]
     r2 = ConsistencyResult(overall="fail", checks=items2)
     assert r2.has_blocking_failures is True
 

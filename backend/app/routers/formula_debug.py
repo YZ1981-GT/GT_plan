@@ -11,7 +11,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,39 +59,55 @@ async def debug_formula(
     判 readonly —— 调试会按该项目实时取数并原样回显（试算表、报表、附注、底稿），
     非成员必须 403 且不触达任何数据（spec formula-governance-coverage-closure R1.1）。
     """
-    from app.services.formula_engine import execute
+    from app.services.formula_budget import execute_seconds, run_with_deadline
+    from app.services.formula_central_execute import precheck, unsupported_detail
+    from app.services.formula_management.function_support_matrix import FormulaSupportViolation
 
     try:
         project_id = uuid.UUID(body.project_id)
     except ValueError:
         return FormulaDebugResponse(errors=["无效的项目 ID"], state="error")
     await assert_project_permission(db, _user, project_id, "readonly")
+    # 与中央 execute 同一预检（ADR-FHIC-19）：表达式内有不放行的函数 ⇒ 422，不取数、不求值
+    try:
+        precheck(body.formula)
+    except FormulaSupportViolation as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=unsupported_detail(exc)) from exc
+    # 执行预算（需求 12.3）：取数 + 求值每请求一个时限，语句超时 / 整体超时 ⇒ 504 FORMULA_TIMEOUT
+    return await run_with_deadline(db, lambda: _debug_run(db, project_id, body), seconds=execute_seconds())
 
-    # ── 构造 FormulaContext（自动取数时按该公式预载；取数缺口进 warnings） ──
+
+async def _debug_run(db: AsyncSession, project_id: uuid.UUID, body: FormulaDebugRequest) -> FormulaDebugResponse:
+    """构造上下文 → 执行 → 组装调试结果（在执行预算内跑）。"""
+    from app.services import formula_warnings
+    from app.services.formula_engine import execute
+
+    # ── 构造 FormulaContext（自动取数时按该公式预载；取数缺口进 warnings；取数告警由收集器并入 warnings） ──
     gaps: list[str] = []
-    try:
-        ctx = await _build_context(db, project_id, body.year, body.scope, body.custom_context,
-                                   formula=body.formula, gaps=gaps)
-    except Exception as exc:
-        logger.warning("调试上下文构造失败: %s", exc)
-        return FormulaDebugResponse(
-            errors=[f"上下文构造失败：{exc}"],
-            state="error",
-        )
+    with formula_warnings.collect() as collected:
+        try:
+            ctx = await _build_context(db, project_id, body.year, body.scope, body.custom_context,
+                                       formula=body.formula, gaps=gaps)
+        except Exception as exc:
+            logger.warning("调试上下文构造失败: %s", exc)
+            return FormulaDebugResponse(
+                errors=[f"上下文构造失败：{exc}"],
+                state="error",
+            )
 
-    # ── 构建上下文摘要（告诉前端加载了多少数据） ──
-    summary = _context_summary(ctx)
+        # ── 构建上下文摘要（告诉前端加载了多少数据） ──
+        summary = _context_summary(ctx)
 
-    # ── 执行公式 ──
-    try:
-        result = execute(body.formula, ctx)
-    except Exception as exc:
-        logger.warning("调试执行失败: %s", exc)
-        return FormulaDebugResponse(
-            errors=[f"执行异常：{exc}"],
-            state="error",
-            context_summary=summary,
-        )
+        # ── 执行公式 ──
+        try:
+            result = execute(body.formula, ctx)
+        except Exception as exc:
+            logger.warning("调试执行失败: %s", exc)
+            return FormulaDebugResponse(
+                errors=[f"执行异常：{exc}"],
+                state="error",
+                context_summary=summary,
+            )
 
     return FormulaDebugResponse(
         value=str(result.value) if result.value is not None else None,
@@ -99,7 +115,7 @@ async def debug_formula(
         state=result.state,
         trace=result.trace,
         errors=result.errors,
-        warnings=[*result.warnings, *gaps],
+        warnings=formula_warnings.merge_into([*result.warnings, *gaps], collected),
         context_summary=summary,
     )
 

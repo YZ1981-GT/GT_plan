@@ -8,6 +8,7 @@ Property 3: 图谱节点点击触发 locateCell 且参数正确
 """
 
 import uuid
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -28,6 +29,17 @@ object_type_st = st.sampled_from(["wp_cell", "report_row", "note_cell", "tb_row"
 direction_st = st.sampled_from(["both", "upstream", "downstream"])
 
 
+def _mock_db() -> AsyncMock:
+    @asynccontextmanager
+    async def _savepoint():
+        yield
+
+    db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=_savepoint)
+    db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+    return db
+
+
 # ─── Property 1: 统一端点超集 ────────────────────────────────────────────────
 
 
@@ -46,8 +58,7 @@ class TestProperty1UnifiedEndpointSuperset:
     async def test_upstream_contains_wp_trace_results(self, wp_code: str, direction: str):
         """统一端点 upstream 包含 wp_trace_service 的所有结果。"""
         project_id = uuid.uuid4()
-        mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        mock_db = _mock_db()
 
         # 构造 wp_trace 返回的 items
         trace_items = [
@@ -86,8 +97,7 @@ class TestProperty1UnifiedEndpointSuperset:
     async def test_downstream_contains_wp_trace_results(self, wp_code: str):
         """统一端点 downstream 包含 wp_trace_service 的所有结果。"""
         project_id = uuid.uuid4()
-        mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        mock_db = _mock_db()
 
         trace_items = [
             TraceItem(wp_code=f"K{i}", sheet=f"汇总{i}", cell=f"C{i}", value=i * 50)
@@ -144,7 +154,7 @@ class TestProperty2AttachmentLinkQueryable:
         mock_row.file_type = "pdf"
         mock_row.created_at = None
 
-        mock_db = AsyncMock()
+        mock_db = _mock_db()  # 带 begin_nested 保存点（每个子源在独立 SAVEPOINT 里跑）
         # execute 返回附件数据
         mock_result = MagicMock()
         mock_result.fetchall = MagicMock(return_value=[mock_row])
@@ -152,9 +162,13 @@ class TestProperty2AttachmentLinkQueryable:
 
         svc = UnifiedLineageService(mock_db)
 
+        # 附件子源先查 attachment_lineage.project_id 列是否就绪（spec formula-hub-integrity-closure 需求 7.2 / V227）；
+        # mock 会话答不了 information_schema ⇒ 直接给「已就绪」，否则子源报错、附件为空
         with patch("app.services.unified_lineage_service.trace_upstream", return_value=MagicMock(items=[])), \
              patch("app.services.unified_lineage_service.trace_downstream", return_value=MagicMock(items=[])), \
              patch("app.services.unified_lineage_service.version_line_service") as mock_vl, \
+             patch("app.services.unified_lineage_service.lineage_project_column_ready",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.unified_lineage_service.ReportTraceService") as mock_rts:
             mock_vl.query_lineage = AsyncMock(return_value=[])
             # Mock report trace to return empty result (avoid DB interaction)

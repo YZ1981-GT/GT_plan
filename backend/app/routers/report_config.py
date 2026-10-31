@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -20,17 +20,12 @@ from app.deps import (
     assert_project_permission,
     get_current_user,
     require_project_access,
-    require_project_audit_year,
     require_role,
 )
 from app.models.core import User
 from app.models.report_models import FinancialReportType, ReportConfig
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
-from app.services.formula_management.function_support_matrix import (
-    Executor,
-    FormulaSupportViolation,
-    require_expression_support,
-)
+from app.services import report_config_execute
 from app.services.formula_settings import legacy_report
 from app.services.formula_settings.errors import FormulaSettingError
 from app.services.formula_settings.propagation import publish_events
@@ -480,291 +475,35 @@ async def fill_formulas(
 
 @router.post("/execute-formula")
 async def execute_formula(
-    body: dict,
+    body: report_config_execute.ExecuteFormulaBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行公式表达式，返回计算结果和执行追踪
+    """公式试算：请求体 ``project_id`` / ``year``（必填）/ ``formula`` / ``row_values``。
 
-    请求体:
-      project_id: 项目ID
-      year: 年度
-      formula: 公式字符串（如 "TB('1001','期末余额') + 100"）
-      row_values: 可选，行引用值映射（如 {"BS-002": 50000, "BS-003": 30000}）
-
-    阶段 2 改造（Task 11）：统一走 L1 内核（formula_engine.execute），
-    不再使用 formula_parser.evaluate_formula 独立求值器。
-    Validates: Requirements 1.1, 1.3, 7.3
+    有项目时按 readonly 鉴权；求值、预算与返回形状见 ``services/report_config_execute.execute_one``。
     """
-    from decimal import Decimal
-
-    from app.services.formula_engine import execute as fe_execute, FormulaContext, FormulaResult
-    from app.services.amount_resolver import TrialBalanceResolver
-    from app.services.report_engine import evaluate_formula as re_evaluate
-
-    project_id_str = body.get("project_id", "")
-    year_val = body.get("year")
-    formula = body.get("formula", "")
-    row_values_raw = body.get("row_values", {})
-
-    if not formula:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error_code": "FORMULA_EMPTY", "message": "公式不能为空"},
-        )
-
-    pid: UUID | None = None
-    if project_id_str:
-        try:
-            pid = UUID(project_id_str)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
-            ) from exc
-        await assert_project_permission(db, current_user, pid, "readonly")
-        year_val = await require_project_audit_year(db, pid, year_val)
-
-    try:
-        require_expression_support(formula, Executor.REPORT_PATH)
-    except FormulaSupportViolation as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
-                "executor": exc.executor.value,
-                "issues": exc.issues,
-            },
-        ) from exc
-
-    row_values = {k: Decimal(str(v)) for k, v in row_values_raw.items()} if row_values_raw else None
-
-    try:
-        # 使用 L2 编排层（report_engine.evaluate_formula）→ 委托 L1 内核
-        # L2 负责 async 取数（经 TrialBalanceResolver）→ 构建 FormulaContext → 调 L1 execute
-        resolver = TrialBalanceResolver(db, pid, year_val) if pid else None
-
-        if resolver:
-            value = await re_evaluate(
-                formula,
-                resolver=resolver,
-                row_cache=row_values,
-                strict_context=True,
-            )
-            # 为了保持返回结构兼容，也跑一次 L1 内核获取 trace
-            ctx = FormulaContext(
-                tb_data={},
-                row_cache={k: Decimal(str(v)) for k, v in (row_values or {}).items()},
-            )
-            result_obj = fe_execute(formula, ctx)
-            trace = result_obj.trace
-        else:
-            # 无 project_id 时直接走 L1 内核纯求值（无取数）
-            ctx = FormulaContext(
-                tb_data={},
-                row_cache={k: Decimal(str(v)) for k, v in (row_values or {}).items()},
-            )
-            result_obj = fe_execute(formula, ctx)
-            value = result_obj.value
-            trace = result_obj.trace
-
-        return {
-            'value': float(value),
-            'trace': trace,
-            'error': None,
-        }
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_code": "FORMULA_CONTEXT_UNAVAILABLE",
-                "message": f"公式执行失败: {exc}",
-            },
-        ) from exc
+    project_id = report_config_execute.parse_project_id(body.project_id)
+    if project_id is not None:
+        await assert_project_permission(db, current_user, project_id, "readonly")
+    return await report_config_execute.execute_one(db, project_id, body)
 
 
 @router.post("/execute-formulas-batch")
 async def execute_formulas_batch(
-    body: dict,
+    body: report_config_execute.ExecuteFormulasBatchBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """批量执行公式（带依赖排序）
+    """批量公式试算：请求体 ``project_id`` / ``year``（必填）/ ``formulas: [{row_code, formula}]``。
 
-    请求体:
-      project_id: 项目ID
-      year: 年度
-      formulas: [{ row_code: "BS-002", formula: "TB('1001','期末余额')" }, ...]
-
-    阶段 2 改造（Task 11）：统一走 L1 内核（formula_engine），
-    不再使用 formula_parser 独立求值器。
-    Validates: Requirements 1.1, 1.3, 7.3
+    有项目时按 readonly 鉴权；行次依赖拓扑序串行、整批一个时限、上限 1000 条，见
+    ``services/report_config_execute.execute_batch``。
     """
-    from app.services.formula_engine import (
-        parse_to_ast, ASTRowRef, ASTRangeSum, ASTBinOp, ASTFuncCall,
-        execute as fe_execute, FormulaContext, FormulaParseError,
-    )
-    from app.services.amount_resolver import TrialBalanceResolver
-    from app.services.report_engine import evaluate_formula as re_evaluate
-    from decimal import Decimal
-
-    project_id_str = body.get("project_id", "")
-    year_val = body.get("year")
-    formulas = body.get("formulas", [])
-
-    pid: UUID | None = None
-    if project_id_str:
-        try:
-            pid = UUID(project_id_str)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
-            ) from exc
-        await assert_project_permission(db, current_user, pid, "readonly")
-        year_val = await require_project_audit_year(db, pid, year_val)
-
-    support_errors: list[dict] = []
-    for index, item in enumerate(formulas):
-        try:
-            require_expression_support(item.get("formula", ""), Executor.REPORT_PATH)
-        except FormulaSupportViolation as exc:
-            support_errors.append({"index": index, "row_code": item.get("row_code"), "issues": exc.issues})
-    if support_errors:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
-                "executor": Executor.REPORT_PATH.value,
-                "items": support_errors,
-            },
-        )
-
-    row_values: dict[str, Decimal] = {}
-    results = []
-
-    # 简单拓扑排序：先执行无依赖的，再执行有依赖的
-    # 第一轮：收集所有行引用依赖
-    def collect_deps(node) -> set[str]:
-        deps = set()
-        if isinstance(node, ASTRowRef):
-            deps.add(node.row_code)
-        elif isinstance(node, ASTRangeSum):
-            deps.add(f"RANGE:{node.start_code}:{node.end_code}")
-        elif isinstance(node, ASTBinOp):
-            deps |= collect_deps(node.left)
-            deps |= collect_deps(node.right)
-        elif isinstance(node, ASTFuncCall):
-            for arg in node.args:
-                deps |= collect_deps(arg)
-        return deps
-
-    parsed = []
-    for f in formulas:
-        code = f.get("row_code", "")
-        formula_str = f.get("formula", "")
-        if not formula_str:
-            parsed.append((code, formula_str, None, set()))
-            continue
-        try:
-            ast = parse_to_ast(formula_str)
-            deps = collect_deps(ast)
-            parsed.append((code, formula_str, ast, deps))
-        except (FormulaParseError, Exception) as e:
-            parsed.append((code, formula_str, None, set()))
-            results.append({"row_code": code, "value": None, "error": str(e)})
-
-    # 构建 resolver（L2 取数适配层）
-    resolver = TrialBalanceResolver(db, pid, year_val) if pid else None
-
-    # 拓扑排序执行（支持并行：同一轮次内无依赖的公式并行执行）
-    executed = set()
-    max_rounds = len(parsed) + 1
-    for _round in range(max_rounds):
-        # 收集本轮可执行的公式
-        batch = []
-        for code, formula_str, ast, deps in parsed:
-            if code in executed:
-                continue
-            unmet = {d for d in deps if not d.startswith("RANGE:") and d not in executed}
-            if unmet:
-                continue
-            if ast is None:
-                executed.add(code)
-                continue
-            batch.append((code, formula_str))
-
-        if not batch:
-            break
-
-        # 并行执行本轮所有公式
-        import asyncio
-
-        async def _exec_one(code: str, formula_str: str):
-            try:
-                if resolver:
-                    value = await re_evaluate(
-                        formula_str,
-                        resolver=resolver,
-                        row_cache=row_values,
-                        strict_context=True,
-                    )
-                    return code, {'value': float(value), 'trace': [], 'error': None}
-                else:
-                    ctx = FormulaContext(
-                        tb_data={},
-                        row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
-                    )
-                    result_obj = fe_execute(formula_str, ctx)
-                    return code, {
-                        'value': float(result_obj.value),
-                        'trace': result_obj.trace,
-                        'error': result_obj.errors[0] if result_obj.errors else None,
-                    }
-            except Exception as e:
-                return code, {'value': None, 'trace': [], 'error': f'执行错误: {e}'}
-
-        batch_results = await asyncio.gather(*[_exec_one(c, f) for c, f in batch])
-
-        for code, result in batch_results:
-            if result.get("value") is not None:
-                row_values[code] = Decimal(str(result["value"]))
-            results.append({"row_code": code, **result})
-            executed.add(code)
-
-    # 未执行的（循环依赖）
-    for code, formula_str, ast, deps in parsed:
-        if code not in executed:
-            results.append({"row_code": code, "value": None, "error": f"循环依赖: {deps - executed}"})
-
-    # 记录审计日志（best_effort — ADR-ALC-07，begin_nested 包住）
-    from app.services.audit_log_helper import append_audit_log
-    for r in results:
-        if r.get("value") is not None:
-            formula_str_log = next((f.get("formula", "") for f in formulas if f.get("row_code") == r["row_code"]), "")
-            try:
-                async with db.begin_nested():
-                    await append_audit_log(db, {
-                        "user_id": current_user.id,
-                        "project_id": pid,
-                        "action": "formula.changed",
-                        "resource_type": "report_config",
-                        "resource_id": r["row_code"],
-                        "details": {
-                            "event_type": "formula_changed",
-                            "module": "report",
-                            "row_code": r["row_code"],
-                            "action": "execute",
-                            "old_formula": "",
-                            "new_formula": formula_str_log,
-                            "result_value": str(r["value"]),
-                            "trace": r.get("trace", []),
-                        },
-                    })
-            except Exception:
-                pass  # best_effort: 审计失败不影响主流程
-
-    return {"results": results, "row_values": {k: float(v) for k, v in row_values.items()}}
+    project_id = report_config_execute.parse_project_id(body.project_id)
+    if project_id is not None:
+        await assert_project_permission(db, current_user, project_id, "readonly")
+    return await report_config_execute.execute_batch(db, current_user, project_id, body)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

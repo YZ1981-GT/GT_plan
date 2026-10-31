@@ -196,56 +196,52 @@ class TestReportModeSelection:
 
 
 class TestFormulaFallback:
-    """Task 1.5: 公式 fallback 取数机制"""
+    """Task 1.5 原「公式 fallback 取数」：spec formula-hub-integrity-closure（F10、需求 5，变异 #19）起取消。
+
+    原实现在公式结果为 0 而试算表科目有余额时把首个科目余额换进去 ⇒ 合法的 0（如 BS-002 = 1101 − 1101）被写成
+    200000。现行：按公式结果 0 写入、不替换，另出一条行告警请人核对公式。原三条断言钉的正是被修掉的替换行为。
+    """
 
     @pytest.mark.asyncio
-    async def test_fallback_applied_when_formula_zero_but_tb_has_balance(self, seeded_db: AsyncSession):
-        """公式结果为 0 但 TB 有余额时，使用 TB 余额作为 fallback"""
+    async def test_zero_result_is_not_replaced_by_tb_balance(self, seeded_db: AsyncSession):
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             mode="audited",
         )
-        bs_rows = result.get("balance_sheet", [])
-        # BS-002 公式 = TB('1101','期末余额') - TB('1101','期末余额') = 0
-        # 但 1101 有 audited_amount = 200000，应 fallback
-        fa_row = next((r for r in bs_rows if r["row_code"] == "BS-002"), None)
+        fa_row = next((r for r in result.get("balance_sheet", []) if r["row_code"] == "BS-002"), None)
         assert fa_row is not None
-        assert Decimal(fa_row["current_period_amount"]) == Decimal("200000")
-        assert fa_row.get("fallback_applied") is True
+        assert Decimal(fa_row["current_period_amount"]) == Decimal("0")
+        assert "fallback_applied" not in fa_row
 
     @pytest.mark.asyncio
-    async def test_fallback_not_applied_when_formula_nonzero(self, seeded_db: AsyncSession):
-        """公式结果非 0 时不触发 fallback"""
+    async def test_nonzero_result_has_no_balance_hint(self, seeded_db: AsyncSession):
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             mode="audited",
         )
-        bs_rows = result.get("balance_sheet", [])
-        # BS-001 公式结果 = 1150000 (非零)，不应 fallback
-        cash_row = next((r for r in bs_rows if r["row_code"] == "BS-001"), None)
+        cash_row = next((r for r in result.get("balance_sheet", []) if r["row_code"] == "BS-001"), None)
         assert cash_row is not None
-        assert cash_row.get("fallback_applied") is False
+        assert Decimal(cash_row["current_period_amount"]) == Decimal("1150000")
+        warnings = result.get("coverage_stats", {}).get("by_type", {}).get("balance_sheet", {}).get("warnings", [])
+        assert not [w for w in warnings if w["row_code"] == "BS-001" and "本级有余额" in w["message"]]
 
     @pytest.mark.asyncio
-    async def test_fallback_marked_in_coverage_warnings(self, seeded_db: AsyncSession):
-        """fallback 应用时在 coverage_stats 中标记为 warning"""
+    async def test_zero_with_balance_marked_in_coverage_warnings(self, seeded_db: AsyncSession):
+        """结果为 0 而科目有余额：在 coverage_stats 里给行告警（不替换值）。"""
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             mode="audited",
         )
-        coverage = result.get("coverage_stats", {})
-        bs_coverage = coverage.get("by_type", {}).get("balance_sheet", {})
-        warnings = bs_coverage.get("warnings", [])
-        # 应该有 BS-002 的 fallback warning
-        fallback_warnings = [w for w in warnings if w["type"] == "fallback_applied"]
-        assert len(fallback_warnings) >= 1
-        assert any(w["row_code"] == "BS-002" for w in fallback_warnings)
+        warnings = result.get("coverage_stats", {}).get("by_type", {}).get("balance_sheet", {}).get("warnings", [])
+        hints = [w for w in warnings if w["row_code"] == "BS-002" and w["type"] == "formula_warning"]
+        assert len(hints) == 1, warnings
+        assert "1101" in hints[0]["message"] and "不替换" in hints[0]["message"]
 
 
 # ===========================================================================
@@ -372,8 +368,8 @@ class TestDebugMode:
         assert "1000000" in bs001_debug["substituted_expression"]
 
     @pytest.mark.asyncio
-    async def test_debug_info_shows_fallback(self, seeded_db: AsyncSession):
-        """调试信息标记 fallback_applied"""
+    async def test_debug_info_shows_zero_balance_hint(self, seeded_db: AsyncSession):
+        """调试信息带「结果为 0 而科目有余额」告警（原 fallback_applied 标记随替换行为一并取消）"""
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
@@ -383,28 +379,27 @@ class TestDebugMode:
         debug_rows = result["debug_info"]["balance_sheet"]
         bs002_debug = next((d for d in debug_rows if d["row_code"] == "BS-002"), None)
         assert bs002_debug is not None
-        assert bs002_debug["fallback_applied"] is True
+        assert "fallback_applied" not in bs002_debug
+        assert bs002_debug["result"] == "0.00" or Decimal(bs002_debug["result"]) == 0
+        assert any("本级有余额" in w for w in bs002_debug["warnings"]), bs002_debug["warnings"]
 
     @pytest.mark.asyncio
-    async def test_formula_error_recorded_as_warning(self, seeded_db: AsyncSession):
-        """公式执行失败时记录 warning 而非抛异常"""
+    async def test_formula_error_not_written_as_zero(self, seeded_db: AsyncSession):
+        """公式执行失败：不抛异常、不写 0（新行金额为 NULL），失败原因进 failed_rows（spec formula-hub-integrity-closure
+        F10 / 需求 5：原实现报错按 0 写入）"""
         engine = ReportEngine(seeded_db)
-        # 不应抛异常
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
             applicable_standard="soe_standalone",
             debug=True,
         )
-        # BS-006 有错误公式，应该正常返回结果
-        bs_rows = result.get("balance_sheet", [])
-        error_row = next((r for r in bs_rows if r["row_code"] == "BS-006"), None)
+        error_row = next((r for r in result.get("balance_sheet", []) if r["row_code"] == "BS-006"), None)
         assert error_row is not None
-        # 错误公式结果为 0
-        assert Decimal(error_row["current_period_amount"]) == Decimal("0")
+        assert error_row["current_period_amount"] is None
 
     @pytest.mark.asyncio
     async def test_debug_info_error_field(self, seeded_db: AsyncSession):
-        """调试信息中错误公式有 error 字段"""
+        """调试信息中错误公式有 error 字段、result 为空（不以 0 冒充）"""
         engine = ReportEngine(seeded_db)
         result = await engine.generate_all_reports(
             FAKE_PROJECT_ID, 2025,
@@ -412,10 +407,7 @@ class TestDebugMode:
             debug=True,
         )
         debug_rows = result["debug_info"]["balance_sheet"]
-        # BS-006 的错误公式 "INVALID_FUNC('xxx')" 不会抛异常
-        # 因为 _safe_eval_expr 会返回 0，但 substituted_expression 会保留原始文本
         bs006_debug = next((d for d in debug_rows if d["row_code"] == "BS-006"), None)
         assert bs006_debug is not None
-        # 公式执行不会抛异常（safe_eval 兜底），所以 error 可能为 None
-        # 但结果应该是 0
-        assert bs006_debug["result"] == "0"
+        assert bs006_debug["result"] is None
+        assert bs006_debug["error"] and "INVALID_FUNC" in bs006_debug["error"], bs006_debug["error"]

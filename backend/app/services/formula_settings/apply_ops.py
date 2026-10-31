@@ -12,7 +12,7 @@ from app.models.formula_setting_models import FormulaPublish
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import display_formula, get_spec
 from app.services.formula_settings.effective import effective_slots, upstream_records
-from app.services.formula_settings.engine import Decisions, lock_domain, lock_project
+from app.services.formula_settings.engine import Decisions, decision_key, lock_domain, lock_project
 from app.services.formula_settings.errors import FormulaSettingError, NotFound
 from app.services.formula_settings.pending import close_pending, upsert_pending
 from app.services.formula_settings.project_ops import require_project
@@ -89,7 +89,8 @@ def _push_item_dict(domain: str, p: dict[str, Any]) -> dict[str, Any]:
     t, e = p["target"], p["effective"]
     lo = e.local if e is not None else None
     return {
-        "key": f"{t.id}|{p['slot_key']}", "project_id": str(t.id), "project_name": t.name,
+        "key": decision_key(domain, t.id, p["slot_key"]), "domain": domain, "project_id": str(t.id),
+        "project_name": t.name,
         "project_status": t.status, "frozen": t.frozen, "slot_key": p["slot_key"], "label": p["label"],
         "category": p["category"].value, "category_label": CATEGORY_LABELS.get(p["category"].value, ""),
         "new_upstream": _plain(p["source"]), "new_formula": display_formula(domain, p["source"]),
@@ -142,7 +143,7 @@ async def apply_to_projects(db: AsyncSession, *, domain: str, project_id: uuid.U
         if t.scope not in upstream_cache:
             upstream_cache[t.scope] = await upstream_records(db, store, t.scope)
         up = upstream_cache[t.scope].get(slot)
-        choice = decisions.conflict_choices.get(f"{t.id}|{slot}", decisions.default_conflict)
+        choice = decisions.conflict_for(domain, t.id, slot)  # 三段键优先，旧两段键仍识别（需求 8.4）
         effect = decide_push(domain, p["category"], source=p["source"], local=lo.local_state() if lo else None,
                              upstream=up.definition if up else None, upstream_version=up.version if up else None,
                              conflict_choice=choice)

@@ -269,15 +269,24 @@ async def _p5_run() -> None:
             await db.commit()
             single = TrialBalanceResolver(db, pid, Y)
             consol = BasisResolver(data)
-            for code in ("1122", "112201", "1123", "11", "6001"):
+            # 取数集合内没有父子并存的科目：两者同值
+            for code in ("1123", "11220101", "6051"):
                 assert await consol.resolve_tb(code, "期末余额") == await single.resolve_tb(code, "期末余额"), code
-            # 损益类无年初数 ⇒ 单体「本期发生额 = 审定 − 年初」与合并「= 审定」同值
-            assert await consol.resolve_tb("6001", "本期发生额") == await single.resolve_tb("6001", "本期发生额")
-            # 区间不含终点子级时两者同值；终点科目有子级时合并口径与 L1 内核一致（含子级），单体不含（已知差异）
-            assert await consol.resolve_sum("6001~6051", "本期发生额") == await single.resolve_sum(
-                "6001~6051", "本期发生额") == D("64.00")
+            # 父子并存（本夹具故意让父 ≠ 子合计）：单体自 spec formula-hub-integrity-closure 需求 4.1 / ADR-FHIC-03 起
+            # 只取叶子（父行不计入、另出告警）；合并口径 BasisResolver 不在该需求的取数点清单内、仍按前缀全加 ——
+            # 已知差异，登记于该 spec 阶段 B 回归记录并移交（原断言「两者同值」钉的是单体旧的前缀双计）
+            for code, leaf, prefix in (("1122", "3.03", "123.15"), ("112201", "3.03", "23.05"),
+                                       ("11", "10.03", "130.15"), ("6001", "5.00", "55.00")):
+                assert await single.resolve_tb(code, "期末余额") == D(leaf), code
+                assert await consol.resolve_tb(code, "期末余额") == D(prefix), code
+            # 损益类无年初数 ⇒ 单体「本期发生额 = 审定 − 年初」与合并「= 审定」口径相同，差别只在叶子 / 前缀
+            assert await single.resolve_tb("6001", "本期发生额") == D("5.00")
+            assert await consol.resolve_tb("6001", "本期发生额") == D("55.00")
+            # 区间：单体按宽集合（含止码下级）取叶子；合并按前缀全加
+            assert await single.resolve_sum("6001~6051", "本期发生额") == D("14.00")
+            assert await consol.resolve_sum("6001~6051", "本期发生额") == D("64.00")
             assert await consol.resolve_sum("1122~1122", "期末余额") == D("123.15")
-            assert await single.resolve_sum("1122~1122", "期末余额") == D("100.10")
+            assert await single.resolve_sum("1122~1122", "期末余额") == D("3.03")
     finally:
         await engine.dispose()
 

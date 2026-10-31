@@ -267,6 +267,12 @@ describe('Property 15: 公式清单面板', () => {
     expect(script).not.toMatch(/`\/api\/workpapers\/\$\{[^}]*\}\/formulas`/)
   })
 
+  it('🔴 删除公式带当前版本号（删除端点强制 CAS，缺版本 428：formula-hub-integrity-closure ADR-FHIC-11）', () => {
+    const del = script.match(/api\.delete\(\s*apiPaths\.workpapers\.formulaDetail\([^;]*?\)\)\s*as\b/)
+    expect(del, '未找到删除公式的调用').not.toBeNull()
+    expect(del![0]).toMatch(/expected_version\s*:\s*row\.definition_version/)
+  })
+
   it('apiPaths 已登记四个自定义底稿端点', () => {
     const ap = readFileAt(APIPATHS_REL)
     for (const k of ['customCells', 'customRefreshProjection', 'formulas:', 'formulaDetail']) {

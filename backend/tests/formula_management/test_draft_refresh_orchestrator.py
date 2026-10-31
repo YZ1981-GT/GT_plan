@@ -7,13 +7,13 @@
 1. **按勾选 scope 分派产 units**（可 mock 各生成器）：``generate`` 仅对被勾选的合法
    scope 调 ``_dispatch`` 归集 units，交治理层 ``refresh_with_presets`` 打 Draft 标记。
 2. **未勾选域零 units**：未被勾选的域不分派、不生成、不写入（Req 21.3）。
-3. **affected_count == len(refreshed_units)**：治理层据真实喂入 units 得出，不再恒为 0
-   （Req 21.4）。
+3. **draft_marked_count == len(refreshed_units)**：治理层据真实喂入 units 得出，不再恒为 0
+   （Req 21.4；spec formula-hub-integrity-closure 需求 3.3 起标记数单列，``affected_count`` = 金额变化 + 仅重算）。
 4. **未知 scope 忽略**：不在 ``RefreshScopeDiscovery.discover`` 发现集合内的 scope 被
    忽略（warning，不静默丢弃、不分派）。
 
-外加**真实 ``_dispatch`` 路由**测试（不 mock，仅桩注入各生成器入口）：report →
-``report:{row_code}``；note → ``note:{section}!{r}:{c}``；workpaper/adjudication →
+外加**真实 ``_dispatch`` 路由**测试（不 mock，仅桩注入各生成器入口）：report → 只登记预设库
+``report:`` 页面、不经 coordinator（ADR-FHIC-07）；note → ``note:{section}!{r}:{c}``；workpaper/adjudication →
 从 ``wp_index`` 派生 ``workpaper:{wp_code}`` page_keys；未识别 scope → ``([], [])``。
 
 用内存 SQLite（``:memory:`` + ``aiosqlite``），每个测试独立引擎隔离；参考
@@ -26,7 +26,6 @@ import asyncio
 import uuid
 from decimal import Decimal
 
-import pytest
 from sqlalchemy import MetaData
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
@@ -157,7 +156,13 @@ def _fake_dispatch_factory(dispatched: list[str], mapping: dict[str, list[str]])
 
 
 def test_generate_dispatches_only_selected_scopes():
-    """① 按勾选 scope 分派产 units；② 未勾选域零 units；③ affected_count 一致。
+    """① 按勾选 scope 分派产 units；② 未勾选域零 units；③ Draft 标记数 == 刷新单元数。
+
+    spec formula-hub-integrity-closure 任务 20（ADR-FHIC-07 / 08，需求 3.2 / 3.3）改断言：报表范围不再经 ``_dispatch``
+    产单元，勾选了就在执行段走报表权威生成路径（本文件 9 张表的 SQLite 夹具跑不了，那条路径由真 PG 用例覆盖），
+    故勾选改为 note / adjudication 两个 marker 路径范围、report 作未勾选域（同时核对报表范围没有执行）；
+    计数按需求 3.3：只打 Draft 标记 ⇒ ``status`` / ``outcome`` = ``draft_marked``、标记数进 ``draft_marked_count``、
+    ``affected_count = applied + recomputed = 0``。
 
     **Validates: Requirements 21.1, 21.3, 21.4**
     """
@@ -171,37 +176,38 @@ def test_generate_dispatches_only_selected_scopes():
 
                 orch = DraftRefreshOrchestrator(db)
                 dispatched: list[str] = []
-                # report→2 units, note→3 units, adjudication→若被分派会产 units（但不勾选）
+                # note→3 units, adjudication→2 units, report→若被分派会产 units（但不勾选）
                 orch._dispatch = _fake_dispatch_factory(
                     dispatched,
                     {
                         "report": ["report:BS-1", "report:BS-2"],
                         "note": ["note:N1!0:1", "note:N1!0:2", "note:N2!1:1"],
-                        "adjudication": ["audit_sheet:X:1"],
+                        "adjudication": ["audit_sheet:X:1", "audit_sheet:X:2"],
                     },
                 )
 
                 result, _app = await orch.generate(
                     project_id=PROJECT_ID, year=YEAR, operator=_Operator(),
-                    scopes=["report", "note"],
+                    scopes=["adjudication", "note"],
                 )
                 await db.commit()
 
-                # ① 仅勾选的 report / note 被分派（② adjudication 未勾选 → 未分派）
-                assert set(dispatched) == {"report", "note"}
-                assert "adjudication" not in dispatched
+                # ① 仅勾选的 adjudication / note 被分派（② report 未勾选 → 未分派、报表范围未执行）
+                assert set(dispatched) == {"adjudication", "note"}
+                assert "report" not in dispatched
+                assert result.rollback_available is True and result.warnings == []
 
-                # ③ affected_count == len(refreshed_units) == 2 + 3
-                assert result.status == "success", result.blocking
-                assert result.affected_count == 5
-                assert result.affected_count == len(result.refreshed_units)
+                # ③ Draft 标记数 == len(refreshed_units) == 2 + 3；无金额变化 / 仅重算 ⇒ affected_count 0
+                assert (result.status, result.outcome) == ("draft_marked", "draft_marked"), result.blocking
+                assert result.draft_marked_count == 5 == len(result.refreshed_units)
+                assert result.affected_count == 0
 
-                # ② 未勾选域（adjudication）零单元：refreshed 全落 report:/note: 前缀
+                # ② 未勾选域（report）零单元：refreshed 全落 audit_sheet:/note: 前缀
                 assert all(
-                    us.startswith(("report:", "note:")) for us in result.refreshed_units
+                    us.startswith(("audit_sheet:", "note:")) for us in result.refreshed_units
                 )
                 assert not any(
-                    us.startswith("audit_sheet:") for us in result.refreshed_units
+                    us.startswith("report:") for us in result.refreshed_units
                 )
 
                 # 治理层已为 5 个单元打 Draft 标记
@@ -257,6 +263,10 @@ def test_generate_unselected_domain_zero_writes():
 def test_generate_ignores_unknown_scope():
     """④ 未知 scope 被忽略（不分派、不生成）；合法 scope 正常处理。
 
+    spec formula-hub-integrity-closure 任务 20 改断言：合法范围由 report 改为 note —— 报表范围勾选后在执行段走报表
+    权威生成路径（ADR-FHIC-08，本文件的 SQLite 夹具跑不了），而本用例只验未知键被忽略；计数按需求 3.3（Draft 标记数进
+    ``draft_marked_count``，``affected_count`` 为 0），审计 ``detail`` 另记汇总的 outcome。
+
     **Validates: Requirements 21.1, 21.3**
     """
 
@@ -270,21 +280,21 @@ def test_generate_ignores_unknown_scope():
                 orch = DraftRefreshOrchestrator(db)
                 dispatched: list[str] = []
                 orch._dispatch = _fake_dispatch_factory(
-                    dispatched, {"report": ["report:BS-1"]}
+                    dispatched, {"note": ["note:N1!0:1"]}
                 )
 
                 result, _ = await orch.generate(
                     project_id=PROJECT_ID, year=YEAR, operator=_Operator(),
-                    scopes=["report", "totally-unknown-scope", "another_bogus"],
+                    scopes=["note", "totally-unknown-scope", "another_bogus"],
                 )
                 await db.commit()
 
                 # 未知 scope 从未进入分派
-                assert dispatched == ["report"]
+                assert dispatched == ["note"]
                 assert "totally-unknown-scope" not in dispatched
                 assert "another_bogus" not in dispatched
-                assert result.affected_count == 1
-                assert result.refreshed_units == ["report:BS-1"]
+                assert (result.draft_marked_count, result.affected_count) == (1, 0)
+                assert result.refreshed_units == ["note:N1!0:1"]
 
                 # 审计 detail.scopes 只记录实际执行的合法范围（Req 21.6）
                 audit = (
@@ -294,7 +304,8 @@ def test_generate_ignores_unknown_scope():
                         )
                     )
                 ).scalar_one()
-                assert audit.detail.get("scopes") == ["report"]
+                assert audit.detail.get("scopes") == ["note"]
+                assert (audit.detail.get("outcome"), audit.affected_count) == ("draft_marked", 0)
         finally:
             await engine.dispose()
 
@@ -305,7 +316,12 @@ def test_generate_ignores_unknown_scope():
 # 真实 _dispatch 路由（桩注入各生成器入口，验证 scope → 生成器映射）
 # ═══════════════════════════════════════════════════════════════════════════
 def test_dispatch_report_routes_to_report_engine(monkeypatch):
-    """report scope → coordinator → 产 report:{addr_id} 单元 + report 域 page_keys。
+    """report scope 只登记：不经 coordinator、不产单元 / mutation，只给出预设库的 report 域 page_keys。
+
+    spec formula-hub-integrity-closure 任务 20（ADR-FHIC-07 第①段「report 范围只登记，不写」）改断言：改造前 report
+    scope 经 coordinator 产 ``report:{addr_id}`` 单元（本用例原断言 4 个）；现在 coordinator 一次都不调（下面的桩若被调
+    就记一次），执行段才走报表权威生成路径（ADR-FHIC-08）。page_keys 仍取预设库全部 ``report:`` 键（需求 3.3：
+    ``preset_application`` 与改造前一致）。用例名沿用。
 
     **Validates: Requirements 21.1**
     """
@@ -313,6 +329,7 @@ def test_dispatch_report_routes_to_report_engine(monkeypatch):
     async def _scenario():
         factory, engine = await _make_session()
         try:
+            from app.services.formula_management.preset_library import build_preset_index
             from app.services.formula_runtime.contracts import (
                 CanonicalFormulaTarget,
                 FormulaMutation,
@@ -322,8 +339,11 @@ def test_dispatch_report_routes_to_report_engine(monkeypatch):
                 MutationPlanResult,
             )
 
-            # 模拟 coordinator 返回 4 条 report 域变更
+            planned: list[list[str]] = []
+
+            # 若被调用：模拟 coordinator 返回 4 条 report 域变更（报表范围不该再走到这里）
             async def _fake_plan(self, *, project_id, year, scopes):
+                planned.append(list(scopes))
                 mutations = []
                 for i, rt in enumerate(["BS-1", "IS-1", "CF-1", "EQ-1"]):
                     mutations.append(FormulaMutation(
@@ -346,14 +366,12 @@ def test_dispatch_report_routes_to_report_engine(monkeypatch):
                 units, page_keys = await orch._dispatch(
                     "report", project_id=PROJECT_ID, year=YEAR
                 )
-                # coordinator 产 4 个 mutation → 4 个 units，全部 report: 前缀
-                assert len(units) == 4
-                assert all(u.unit_scope.startswith("report:") for u in units)
-                # page_keys 从预设库派生（可能为空取决于 preset_index）
-                # 但不应含 non-report 域的键
-                assert all(
-                    k.startswith("report:") for k in page_keys
-                ) if page_keys else True
+                # 不经 coordinator：零单元、零 mutation
+                assert planned == []
+                assert units == [] and orch._runtime_mutations == []
+                # page_keys 从预设库派生：恰为全部 report: 键（判据不空转：预设库确有 report: 键）
+                expected = sorted(k for k in build_preset_index() if k.startswith("report:"))
+                assert expected and page_keys == expected
         finally:
             await engine.dispose()
 

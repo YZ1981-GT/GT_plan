@@ -22,6 +22,13 @@ API 契约（design §11）：
 - idempotency_key: 可选幂等键。
 - rollback endpoint: POST /api/workpapers/draft-refresh/{run_id}/rollback。
 - 响应严格按 DraftRefreshResponse / RollbackResponse Pydantic model。
+- Runtime 冻结期（spec formula-hub-integrity-closure 需求 1.1）：刷新计划含 Runtime mutation ⇒
+  409 ``FORMULA_RUNTIME_FROZEN``，未取项目锁、未写审计、未调用任何写入方。
+- 结果派生（同 spec 需求 3.2 / 3.3）：``outcome == failed`` ⇒ rollback、200 ``status=failed``、不发事件；
+  其余 commit 后投递编排器登记的提交后事件。
+- 幂等（同 spec ADR-FHIC-08，判定在编排器取项目锁之后）：同一有效键的首次运行仍在执行 ⇒ 409
+  ``DRAFT_REFRESH_IN_PROGRESS``、不 commit；命中 ⇒ 200 ``status=idempotent_hit`` + 首次运行的结果与预设套用，照常 commit
+  （没有写入）、提交后事件为空即不发事件。
 """
 
 from __future__ import annotations
@@ -46,6 +53,8 @@ from app.services.draft_refresh_service import DraftRefreshService
 from app.services.formula_management.draft_refresh_orchestrator import (
     DraftRefreshOrchestrator,
 )
+from app.services.event_bus import event_bus
+from app.services.formula_management.refresh_idempotency import RefreshInProgress
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +96,13 @@ async def one_click_draft_refresh(
 
     编排（Req 1.4 / Req 21）：``DraftRefreshService.precheck``（四表库完整度前置校验）→
     ``DraftRefreshOrchestrator.generate``（按勾选 ``scopes`` 分派各上游生成器产出
-    ``RefreshUnit`` + ``page_keys``，交治理层 ``refresh_with_presets`` 统一编排：套预设 +
-    幂等 + Draft 标记 + 覆盖排除 + 快照 + 审计留痕，``affected_count = len(refreshed_units)``
-    不再恒为 0）。
+    ``RefreshUnit`` + ``page_keys``，交治理层统一编排：套预设 + Draft 标记 + 覆盖排除 + 快照 +
+    审计留痕；报表范围走报表权威生成路径）。
+
+    结果（spec formula-hub-integrity-closure 需求 3.2 / 3.3，ADR-FHIC-08）：``status`` / ``outcome`` 按状态表派生、
+    原样返回（不再把 ``no_effect`` 报成 ``success``），``affected_count = applied_count + recomputed_count``；
+    ``outcome == failed`` ⇒ 整体回滚、不发事件、200 返回 ``status=failed`` + failures；否则 commit 后投递
+    ``post_commit_events``（投递失败只记日志）。
     """
     # 注意：空 scopes 已由 Pydantic min_length=1 校验，FastAPI 自动返回 422。
 
@@ -121,6 +134,12 @@ async def one_click_draft_refresh(
             transaction_mode=body.transaction_mode,
             idempotency_key=body.idempotency_key,
         )
+    except RefreshInProgress as busy:
+        # 幂等判定（ADR-FHIC-08）：同一有效键的首次运行仍在执行。判定在取项目锁之后、任何写入之前，
+        # 不 commit（会话随请求结束回滚、释放事务级咨询锁）；必须排在通用 except 之前。
+        logger.info("Draft refresh rejected (same request in progress): project=%s first_run=%s",
+                    body.project_id, busy.run_id)
+        raise HTTPException(status_code=busy.status_code, detail=busy.to_detail()) from busy
     except Exception as exc:
         # all-or-nothing 失败由 router rollback（Req 9）
         if body.transaction_mode == "all_or_nothing":
@@ -131,30 +150,42 @@ async def one_click_draft_refresh(
             detail={"message": f"刷新执行失败: {exc}"},
         ) from exc
 
-    # service 只 flush，router 层 commit（工程铁律）
-    await db.commit()
-
-    # 构造标准响应（design §11）
+    # 构造标准响应（design §11）；幂等命中时预设套用是首次运行存的 dict（ADR-FHIC-08），执行时是 PresetApplication
     result_dict = result.to_dict() if hasattr(result, "to_dict") else {}
-    preset_dict = (
-        preset_application.to_dict()
-        if hasattr(preset_application, "to_dict")
-        else {}
-    )
+    if isinstance(preset_application, dict):
+        preset_dict = preset_application
+    else:
+        preset_dict = preset_application.to_dict() if hasattr(preset_application, "to_dict") else {}
 
-    raw_status = result_dict.get("status", "success")
-    response_status = "success" if raw_status == "no_effect" else raw_status
+    # 需求 3.3 / ADR-FHIC-08：outcome == failed ⇒ 整体回滚（不留业务写入、不发事件），照常 200 返回 status=failed；
+    # 否则 service 只 flush、router 层 commit（工程铁律），提交成功后逐个投递编排器登记的事件（与 reports.py 同法）。
+    if result_dict.get("outcome") == "failed":
+        await db.rollback()
+    else:
+        await db.commit()
+        for event in getattr(result, "post_commit_events", None) or []:
+            try:
+                await event_bus.publish_immediate(event)
+            except Exception:  # noqa: BLE001 — 刷新已提交，发事件失败只记日志，不变成 500
+                logger.exception(
+                    "Draft refresh committed but event %s failed to publish: project=%s",
+                    getattr(event.event_type, "value", event.event_type), body.project_id,
+                )
+
     raw_failures = result_dict.get("failures", [])
     failures = [
         item if isinstance(item, str) else str(item.get("error") or item)
         for item in raw_failures
     ]
     return DraftRefreshResponse(
-        status=response_status,
+        status=result_dict.get("status", "success"),
+        outcome=result_dict.get("outcome"),
         run_id=result_dict.get("run_id") or result_dict.get("refresh_id"),
         transaction_mode=body.transaction_mode,
         affected_count=result_dict.get("affected_count", 0),
         applied_count=result_dict.get("applied_count", 0),
+        recomputed_count=result_dict.get("recomputed_count", 0),
+        draft_marked_count=result_dict.get("draft_marked_count", 0),
         failed_count=result_dict.get("failed_count", 0),
         skipped_count=result_dict.get("skipped_count", 0),
         scopes=body.scopes,

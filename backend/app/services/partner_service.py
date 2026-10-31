@@ -163,7 +163,7 @@ class SignReadinessService:
         """
         from app.services.gate_engine import gate_engine
         from app.services.gate_eval_store import store_gate_eval
-        from app.services.readiness_facade import build_readiness_response
+        from app.services.readiness_facade import build_readiness_response, enum_text
 
         # 若调用方未给 actor，兜底走 project.created_by
         resolved_actor = actor_id
@@ -195,13 +195,14 @@ class SignReadinessService:
         extra = await self._compute_sign_extra_findings(project_id, proj)
 
         # 3) 生成 gate_eval_id（5 分钟 TTL）
-        gate_decision = str(gate_result.decision)
+        # 门禁枚举取 .value 再比（str() 得到 'GateSeverity.blocking'，比较恒假，见 readiness_facade.enum_text）
+        gate_decision = enum_text(gate_result.decision)
         has_blocking = any(
             f["severity"] == "blocking"
             for items in extra.values()
             for f in items
         ) or any(
-            str(getattr(h, "severity", "")) == "blocking"
+            enum_text(getattr(h, "severity", "")) == "blocking"
             for h in (gate_result.hit_rules or [])
         )
         ready_flag = (gate_decision != "block") and (not has_blocking)

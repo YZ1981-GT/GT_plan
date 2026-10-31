@@ -164,6 +164,9 @@ async def _run_case(units_spec: list[tuple[str, str]]):
 def test_p04_unconfirmed_refresh_skips_human_edited(units_spec):
     """P4：未确认覆盖时人工编辑单元被跳过保持不变，非人工编辑单元被刷新为 draft。
 
+    计数口径按 spec formula-hub-integrity-closure 需求 3.3 改：``refresh()`` 只打 Draft 标记、不改业务值，刷新单元数记在
+    ``draft_marked_count``，``affected_count = applied + recomputed`` 恒为 0（改造前 ``affected_count`` = 刷新单元数）。
+
     **Validates: Requirements 3.3, 4.4**
     """
     result, markers = asyncio.run(_run_case(units_spec))
@@ -174,7 +177,8 @@ def test_p04_unconfirmed_refresh_skips_human_edited(units_spec):
     # ── 编排结果集合精确划分（不相交，并集为全部单元）──
     assert set(result.skipped_human_edited) == expected_skipped
     assert set(result.refreshed_units) == expected_refreshed
-    assert result.affected_count == len(expected_refreshed)
+    assert result.draft_marked_count == len(expected_refreshed)
+    assert result.affected_count == 0
     assert not (set(result.refreshed_units) & set(result.skipped_human_edited))
     assert (
         set(result.refreshed_units) | set(result.skipped_human_edited)

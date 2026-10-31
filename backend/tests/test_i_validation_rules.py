@@ -182,8 +182,8 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "无形资产期末" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     async def test_vr_i1_01_boundary_within_tolerance(self, db_session, project_id):
         """VR-I1-01 边界: 差异 = 0.5 (< 1.0 通过)"""
@@ -276,8 +276,8 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "商誉期末" in c.check_name)
-        assert rule.passed is True
-        assert "数据不完整" in rule.details
+        assert rule.status == "not_executed"
+        assert "数据不完整" in rule.reason
 
     # --- VR-I6-01 (双底稿都保存才 blocking) ---
 
@@ -342,8 +342,8 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "研发费用" in c.check_name)
-        assert rule.passed is True
-        assert "对方底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "对方底稿未保存" in rule.reason
 
     async def test_vr_i6_01_skip_i6_not_saved(self, db_session, project_id):
         """VR-I6-01 跳过: I2 已保存但 I6 未保存 → skip 不阻断"""
@@ -361,8 +361,8 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "研发费用" in c.check_name)
-        assert rule.passed is True
-        assert "对方底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "对方底稿未保存" in rule.reason
 
     async def test_vr_i6_01_skip_both_unsaved(self, db_session, project_id):
         """VR-I6-01 跳过: I6 和 I2 都未保存 → skip 不阻断"""
@@ -373,8 +373,8 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "研发费用" in c.check_name)
-        assert rule.passed is True
-        assert "对方底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "对方底稿未保存" in rule.reason
 
     async def test_vr_i6_01_skip_partial_field_missing(self, db_session, project_id):
         """VR-I6-01 跳过: I6 dict 存在但缺关键字段 → 视为未保存 skip"""
@@ -395,13 +395,13 @@ class TestICycleTriangleLogic:
             checks = await gate.check_i_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "研发费用" in c.check_name)
-        assert rule.passed is True
-        assert "对方底稿未保存" in rule.details
+        assert rule.status == "not_executed"
+        assert "对方底稿未保存" in rule.reason
 
     # --- Integration tests ---
 
     async def test_all_skip_when_no_data(self, db_session, project_id):
-        """所有数据缺失时全部跳过 (passed=True), 长度=3"""
+        """所有数据缺失时全部跳过 (status=not_executed), 长度=3"""
         gate = ConsistencyGate(db_session)
         with patch.object(
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
@@ -410,7 +410,7 @@ class TestICycleTriangleLogic:
 
         assert len(checks) == 3
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
 
     async def test_blocking_rule_prevents_signoff(self, db_session, project_id):
         """VR-I1-01 blocking 失败时阻断签字"""

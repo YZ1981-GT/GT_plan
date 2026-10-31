@@ -340,6 +340,7 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
     from app.services.gate_rules_phase14 import register_phase14_rules
     from app.services.gate_rules_eqcr import register_eqcr_gate_rules
     from app.services.gate_rules_cross_check import register_cross_check_rules
+    from app.services.gate_rules_chain import register_consistency_gate_rule
     import app.services.gate_rules_round6  # noqa: F401
     import app.services.gate_rules_b60  # noqa: F401
     import app.services.gate_rules_ai_content  # noqa: F401
@@ -351,6 +352,7 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
     register_phase14_rules()
     register_eqcr_gate_rules()
     register_cross_check_rules()
+    register_consistency_gate_rule()  # 需求 16.4：一致性门禁（observe 只提示）
     register_task_handlers()
 
     try:

@@ -38,6 +38,11 @@
         </el-tag>
       </div>
 
+      <!-- 没有运行一致性检查（如项目未设置审计年度）：写明原因 -->
+      <p v-if="vrSummary.unavailable" class="vr-unavailable-reason">
+        {{ vrSummary.reason || '未运行一致性检查' }}
+      </p>
+
       <!-- 按循环分组列表 -->
       <div v-if="!vrSummary.all_passed" class="vr-cycle-list">
         <el-collapse v-model="activeNames" accordion>
@@ -79,15 +84,42 @@
           </template>
         </el-collapse>
       </div>
+
+      <!-- 未执行 / 检查异常 / 不适用：各有标签、条数与原因，不算「通过」（需求 16.5；失败项在上面按循环列出） -->
+      <div v-if="otherStateCounts.length || otherStateChecks.length" class="vr-status-section">
+        <div class="vr-status-counts">
+          <span v-for="s in otherStateCounts" :key="s.status" class="vr-status-count">
+            {{ s.label }} {{ s.count }} 项
+          </span>
+        </div>
+        <div class="vr-status-list">
+          <div
+            v-for="(check, i) in otherStateChecks"
+            :key="`${i}:${check.check_name}`"
+            class="vr-status-item"
+          >
+            <div class="vr-rule-name">
+              <el-tag :type="statusTagType(check)" size="small" effect="plain">
+                {{ checkStatusLabel(check) }}
+              </el-tag>
+              <span class="vr-rule-name-text">{{ check.check_name }}</span>
+            </div>
+            <div v-if="checkReasonOf(check)" class="vr-rule-details">
+              {{ checkReasonOf(check) }}
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { VRSummaryData } from '@/composables/useDashboardData'
+import { computed, ref } from 'vue'
+import type { VRCheckStatusItem, VRSummaryData } from '@/composables/useDashboardData'
+import { checkReasonOf, checkStatusLabel, checkStatusOf, type GateCheckStatus } from '@/utils/consistencyCheckStatus'
 
-defineProps<{
+const props = defineProps<{
   vrSummary: VRSummaryData | null
   error: string | null
 }>()
@@ -98,6 +130,26 @@ defineEmits<{
 
 /** 当前展开的循环 collapse item */
 const activeNames = ref<string[]>([])
+
+/** 「失败」以外的三种非通过状态，按此顺序显示条数 */
+const OTHER_STATES: GateCheckStatus[] = ['not_executed', 'error', 'not_applicable']
+
+const otherStateCounts = computed(() => {
+  const counts = props.vrSummary?.status_counts ?? {}
+  return OTHER_STATES
+    .map(status => ({ status, label: checkStatusLabel({ status }), count: counts[status] ?? 0 }))
+    .filter(s => s.count > 0)
+})
+
+const otherStateChecks = computed<VRCheckStatusItem[]>(() =>
+  (props.vrSummary?.not_passed_checks ?? []).filter(c => OTHER_STATES.includes(checkStatusOf(c))),
+)
+
+function statusTagType(check: VRCheckStatusItem): 'danger' | 'warning' | 'info' {
+  const st = checkStatusOf(check)
+  if (st === 'error') return 'danger'
+  return st === 'not_executed' ? 'warning' : 'info'
+}
 </script>
 
 <style scoped>
@@ -208,5 +260,39 @@ const activeNames = ref<string[]>([])
   color: var(--gt-color-text-secondary, #909399);
   line-height: 1.5;
   border-left: 2px solid var(--el-border-color-lighter, #ebeef5);
+}
+
+/* 未运行原因与其余三态 */
+.vr-unavailable-reason {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--el-color-warning, #e6a23c);
+}
+
+.vr-status-section {
+  margin-top: 8px;
+}
+
+.vr-status-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--gt-color-text-secondary, #909399);
+}
+
+.vr-status-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.vr-status-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--el-border-color-extra-light, #f2f6fc);
+}
+
+.vr-status-item:last-child {
+  border-bottom: none;
 }
 </style>

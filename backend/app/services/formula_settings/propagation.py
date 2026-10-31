@@ -252,24 +252,14 @@ async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_ke
 
 
 async def propagate_tb_detail(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    """试算表科目明细公式变更 → 标全项目底稿 prefill_stale。
+    """试算表科目明细公式变更 → 当前无消费方，不做任何写入（ADR-FHIC-22 止血）。
 
-    科目明细公式影响所有依赖 TB 取数的底稿（任何使用 ``TB('科目','字段')`` 的底稿），
-    无法按 wp_code 精准缩小范围，故标全部底稿。底稿下次打开时检测 ``prefill_stale``
-    并重新预填。
+    tb_detail 域目前没有有效定义的读取入口（``consumers.READER_ENTRIES["tb_detail"]``
+    为空元组），保存 tb_detail 不应改写任何 ``working_paper.prefill_stale``。
+    当 tb_detail 有了真正的消费方后，在 ``consumers.READER_ENTRIES`` 注册并在此
+    函数里实现对应的过期标记。
     """
-    from app.models.workpaper_models import WorkingPaper
-
-    async with _factory()() as db:
-        frozen = await _is_frozen(db, project_id)
-        if frozen is None or frozen:
-            return {"skipped": "frozen" if frozen else "missing"}
-        n = (await db.execute(sa.update(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        ).values(prefill_stale=True).execution_options(synchronize_session=False))).rowcount or 0
-        await db.commit()
-    return {"slot_keys": slot_keys, "marked": int(n)}
+    return {"slot_keys": slot_keys, "skipped": "no_consumer"}
 
 
 async def propagate_push(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:

@@ -334,11 +334,16 @@ async function onDelete() {
   if (!detail.value) return
   try { await confirmDelete(`模板「${detail.value.name}」`) } catch { return }
   try {
-    await formulaSettingsApi.deleteTemplate(detail.value.id)
+    await formulaSettingsApi.deleteTemplate(detail.value.id, detail.value.version)
     ElMessage.success('模板已删除')
     emit('changed')
     visible.value = false
   } catch (e: any) {
+    if (e?.response?.status === 409 || e?.response?.status === 428) {
+      ElMessage.warning(formulaErrorText(e, '模板已被修改，请刷新后重试'))
+      await load()
+      return
+    }
     ElMessage.error(formulaErrorText(e, '删除模板失败'))
   }
 }

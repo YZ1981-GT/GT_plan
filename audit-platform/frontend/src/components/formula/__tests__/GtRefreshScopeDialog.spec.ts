@@ -80,6 +80,7 @@ import {
   isPartialSuccess,
   isFailed,
   isIdempotentHit,
+  VALID_STATUSES,
 } from '../formulaRuntimeContract'
 
 // ─── Stubs ────────────────────────────────────────────────────────────────────
@@ -439,5 +440,56 @@ describe('GtRefreshScopeDialog — Task 16 production host + contract', () => {
     expect(mockPost).not.toHaveBeenCalled()
 
     wrapper.unmount()
+  })
+})
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('7 种 status 逐个解析（Task 21-2：formulaRuntimeContract 7 值扩展）', () => {
+  it('VALID_STATUSES 恰好 7 值', () => {
+    expect(VALID_STATUSES).toHaveLength(7)
+  })
+
+  it.each([
+    'success', 'recomputed', 'draft_marked', 'no_effect',
+    'partial_success', 'failed', 'idempotent_hit',
+  ] as const)('parseDraftRefreshResponse 接受 status=%s', (status) => {
+    const raw = { status, run_id: `r-${status}` }
+    const result = parseDraftRefreshResponse(raw)
+    expect(result.status).toBe(status)
+  })
+
+  it.each([
+    ['success', false],
+    ['recomputed', false],
+    ['draft_marked', false],
+    ['no_effect', false],
+    ['partial_success', true],
+    ['failed', false],
+    ['idempotent_hit', false],
+  ] as const)('isPartialSuccess 对 status=%s 返回 %s', (status, expected) => {
+    const result = parseDraftRefreshResponse({ status, run_id: `r-${status}` })
+    expect(isPartialSuccess(result)).toBe(expected)
+  })
+
+  it('新增字段 recomputed_count/draft_marked_count/outcome 缺省 fallback', () => {
+    const result = parseDraftRefreshResponse({ status: 'recomputed', run_id: 'r-1' })
+    expect(result.recomputed_count).toBe(0)
+    expect(result.draft_marked_count).toBe(0)
+    expect(result.outcome).toBe('')
+  })
+
+  it('新增字段从 raw 正确解析', () => {
+    const raw = {
+      status: 'draft_marked',
+      run_id: 'r-dm',
+      recomputed_count: 5,
+      draft_marked_count: 3,
+      outcome: 'draft_marked',
+    }
+    const result = parseDraftRefreshResponse(raw)
+    expect(result.recomputed_count).toBe(5)
+    expect(result.draft_marked_count).toBe(3)
+    expect(result.outcome).toBe('draft_marked')
   })
 })

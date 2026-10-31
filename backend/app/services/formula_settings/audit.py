@@ -32,12 +32,24 @@ def slot_row_code(domain: str, slot_key: str) -> str:
 
 
 def change_entry(domain: str, slot_key: str, old: dict | None, new: dict | None, **extra: Any) -> dict[str, Any]:
-    return {
+    """审计变更条目：存完整旧/新定义（需求 13.1，ADR-FHIC-10），供回滚时恢复。
+
+    ``old_definition`` / ``new_definition`` 是归一化后的完整字典（含全部执行字段+说明字段），
+    ``old_formula`` / ``new_formula`` 只是显示文本，不足以还原多字段域（如 cross_check）。
+    """
+    from app.services.formula_settings.definitions import normalize
+    entry: dict[str, Any] = {
         "slot_key": slot_key,
         "old_formula": display_formula(domain, old) if old is not None else "",
         "new_formula": display_formula(domain, new) if new is not None else "",
         **{k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in extra.items() if v is not None},
     }
+    # 完整定义：归一化后存储，回滚读此字段（ADR-FHIC-10）
+    if old is not None:
+        entry["old_definition"] = normalize(domain, old)
+    if new is not None:
+        entry["new_definition"] = normalize(domain, new)
+    return entry
 
 
 async def audit_global(db: AsyncSession, *, user_id: uuid.UUID | None, domain: str, scope: str, action: str,
@@ -54,14 +66,23 @@ async def audit_global(db: AsyncSession, *, user_id: uuid.UUID | None, domain: s
 
 async def audit_project(db: AsyncSession, *, user_id: uuid.UUID | None, project_id: uuid.UUID, domain: str,
                         action: str, source: str, changes: list[dict[str, Any]],
-                        publish_id: uuid.UUID | None = None) -> None:
-    """``changes`` = :func:`change_entry` 列表；``action`` 是具体操作（sync_global / adapt / restore …）。"""
+                        publish_id: uuid.UUID | None = None, year: int | None = None) -> None:
+    """``changes`` = :func:`change_entry` 列表；``action`` 是具体操作（sync_global / adapt / restore …）。
+
+    ``year`` 写入载荷以支持按年度查询（需求 11.1，ADR-FHIC-12）。调用方不传时按项目审计年度补齐
+    （全部生产调用方都不传：历史页按年度过滤，不补齐则公式设置类变更恒查不到）；项目没有审计年度时载荷无该字段。
+    """
     if not changes:
         return
+    if year is None:
+        from app.services.project_audit_year import resolve_project_audit_year_for_request
+        year = await resolve_project_audit_year_for_request(db, project_id)
     module = MODULE_OF_DOMAIN.get(domain, domain)
-    base = {"event_type": "formula_changed", "module": module, "domain": domain,
+    base: dict[str, Any] = {"event_type": "formula_changed", "module": module, "domain": domain,
             "action": _HISTORY_ACTION.get(action, "update"), "operation": action,
             "source": source, "result_value": ""}
+    if year is not None:
+        base["year"] = str(year)
     if publish_id is not None:
         base["publish_id"] = str(publish_id)
     if len(changes) <= PER_SLOT_LIMIT:

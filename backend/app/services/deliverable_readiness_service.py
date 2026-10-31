@@ -454,27 +454,11 @@ class DeliverableReadinessService:
         year: int,
         blockers: list[ReadinessBlocker],
     ) -> SourceStatus:
-        """报表就绪检查 — 存在且无 stale。"""
-        from app.models.report_models import FinancialReport
+        """报表就绪检查 — 存在且无过期行（过期 = report_freshness.stale_clause，含计算版本不是当前版本的存量行）。"""
+        from app.services.report_freshness import count_summary
 
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == False,  # noqa: E712
-            )
-        )
-        report_count = result.scalar_one()
-
-        stale_result = await db.execute(
-            sa.select(sa.func.count()).select_from(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == False,  # noqa: E712
-                FinancialReport.is_stale == True,  # noqa: E712
-            )
-        )
-        stale_count = stale_result.scalar_one()
+        counts = await count_summary(db, project_id, year)
+        report_count, stale_count = counts.total, counts.stale
 
         status = SourceStatus(
             available=report_count > 0,
@@ -489,13 +473,17 @@ class DeliverableReadinessService:
                 evidence={"component": "financial_report", "project_id": str(project_id), "year": year},
             ))
         elif stale_count > 0:
+            failed = f"，其中 {counts.calc_error} 行计算失败" if counts.calc_error else ""
             blockers.append(ReadinessBlocker(
                 code="stale_source",
-                message=f"有 {stale_count} 条报表行标记为过期（is_stale），需刷新后再出具",
+                message=(f"有 {stale_count} 条报表行已过期（已标过期或计算版本不是当前版本{failed}），"
+                         "需重新生成报表后再出具"),
                 evidence={
                     "component": "financial_report",
                     "stale_count": stale_count,
                     "total_count": report_count,
+                    "calc_error_count": counts.calc_error,
+                    "blank_count": counts.blank,
                 },
             ))
 

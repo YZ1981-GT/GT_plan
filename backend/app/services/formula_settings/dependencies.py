@@ -19,15 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.formula_settings.effective import effective_slots
 
-_TB = re.compile(r"(?<![A-Z_])TB\(\s*'([^']+)'\s*,\s*'([^']*)'\s*\)")
-_SUM_TB = re.compile(r"SUM_TB\(\s*'([^']+)'\s*,\s*'([^']*)'\s*\)")
-_ROW = re.compile(r"(?<![A-Z_])ROW\(\s*'([^']+)'\s*\)")
-_SUM_ROW = re.compile(r"SUM_ROW\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
-_REPORT = re.compile(r"REPORT\(\s*'([^']+)'(?:\s*,\s*'([^']*)')?\s*\)")
-_WP = re.compile(r"(?<![A-Z_])WP\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
-_NOTE = re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
-_ADJ = re.compile(r"ADJ\(\s*'([^']+)'(?:\s*,\s*'([^']*)')?\s*\)")
-_PREV = re.compile(r"PREV\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
+_TB = re.compile(r"""(?<![A-Z_])TB\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]*)\3\s*\)""")
+_SUM_TB = re.compile(r"""SUM_TB\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]*)\3\s*\)""")
+_ROW = re.compile(r"""(?<![A-Z_])ROW\(\s*(['"])([^'"]+)\1\s*\)""")
+_SUM_ROW = re.compile(r"""SUM_ROW\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)""")
+_REPORT = re.compile(r"""REPORT\(\s*(['"])([^'"]+)\1(?:\s*,\s*(['"])([^'"]*)\3)?\s*\)""")
+_WP = re.compile(r"""(?<![A-Z_])WP\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3(?:\s*,\s*(['"])([^'"]+)\5)?\s*\)""")
+_NOTE = re.compile(r"""NOTE\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3(?:\s*,\s*(['"])([^'"]+)\5)?\s*\)""")
+_ADJ = re.compile(r"""ADJ\(\s*(['"])([^'"]+)\1(?:\s*,\s*(['"])([^'"]*)\3)?\s*\)""")
+_PREV = re.compile(r"""PREV\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3(?:\s*,\s*(['"])([^'"]+)\5)?\s*\)""")
 
 #: 各域参与依赖分析的公式字段
 FORMULA_FIELDS: dict[str, tuple[str, ...]] = {
@@ -81,42 +81,44 @@ def upstream_refs(formula: str, report_types: dict[str, str]) -> list[dict[str, 
         return f"report:{rt}:{code}" if rt else f"report:{code}"
 
     for m in _SUM_TB.finditer(formula):
-        add("trial_balance", f"SUM_TB('{m.group(1)}','{m.group(2)}')", f"tb:{m.group(1)}")
+        add("trial_balance", f"SUM_TB('{m.group(2)}','{m.group(4)}')", f"tb:{m.group(2)}")
     for m in _TB.finditer(formula):
-        add("trial_balance", f"TB('{m.group(1)}','{m.group(2)}')", f"tb:{m.group(1)}")
+        add("trial_balance", f"TB('{m.group(2)}','{m.group(4)}')", f"tb:{m.group(2)}")
     for m in _SUM_ROW.finditer(formula):
-        add("report", f"SUM_ROW('{m.group(1)}','{m.group(2)}')", f"report:{m.group(1)}~{m.group(2)}")
+        add("report", f"SUM_ROW('{m.group(2)}','{m.group(4)}')", f"report:{m.group(2)}~{m.group(4)}")
     for m in _ROW.finditer(formula):
-        add("report", f"ROW('{m.group(1)}')", row_addr(m.group(1)))
+        add("report", f"ROW('{m.group(2)}')", row_addr(m.group(2)))
     for m in _REPORT.finditer(formula):
-        add("report", f"REPORT('{m.group(1)}')", row_addr(m.group(1)))
+        add("report", f"REPORT('{m.group(2)}')", row_addr(m.group(2)))
     for m in _WP.finditer(formula):
-        parts = [p for p in m.groups() if p]
+        parts = [m.group(2), m.group(4)]
+        if m.group(6):
+            parts.append(m.group(6))
         add("workpaper", "WP(" + ",".join(f"'{p}'" for p in parts) + ")", "wp:" + "/".join(parts))
     for m in _NOTE.finditer(formula):
-        add("note", f"NOTE('{m.group(1)}','{m.group(2)}')", f"note:{m.group(1)}")
+        add("note", f"NOTE('{m.group(2)}','{m.group(4)}')", f"note:{m.group(2)}")
     for m in _ADJ.finditer(formula):
-        add("adjustment", f"ADJ('{m.group(1)}')", f"adj:{m.group(1)}")
+        add("adjustment", f"ADJ('{m.group(2)}')", f"adj:{m.group(2)}")
     for m in _PREV.finditer(formula):
-        add("prior", f"PREV('{m.group(1)}','{m.group(2)}')", f"prev:{m.group(1)}")
+        add("prior", f"PREV('{m.group(2)}','{m.group(4)}')", f"prev:{m.group(2)}")
     return out
 
 
 def references(formula: str, *, row_code: str | None = None, account: str | None = None) -> bool:
     """公式是否精确引用目标行次 / 科目。"""
     if row_code:
-        if any(m.group(1) == row_code for m in _ROW.finditer(formula)):
+        if any(m.group(2) == row_code for m in _ROW.finditer(formula)):
             return True
-        if any(m.group(1) == row_code for m in _REPORT.finditer(formula)):
+        if any(m.group(2) == row_code for m in _REPORT.finditer(formula)):
             return True
-        if any(_in_range(row_code, m.group(1), m.group(2)) and _same_prefix(m.group(1), row_code)
+        if any(_in_range(row_code, m.group(2), m.group(4)) and _same_prefix(m.group(2), row_code)
                for m in _SUM_ROW.finditer(formula)):
             return True
     if account:
-        if any(m.group(1) == account for m in _TB.finditer(formula)):
+        if any(m.group(2) == account for m in _TB.finditer(formula)):
             return True
         for m in _SUM_TB.finditer(formula):
-            a, b = _split_range(m.group(1))
+            a, b = _split_range(m.group(2))
             if _in_range(account, a, b):
                 return True
     return False

@@ -80,29 +80,32 @@ def _result(domain_items: dict[str, list[PlanItem]], projects: list[ProjectInfo]
             outcomes: Mapping[str, ApplyOutcome] | None = None) -> dict[str, Any]:
     items = [it for its in domain_items.values() for it in its]
     return {"summary": summarize(items, projects, outcomes),
-            "items": [{**it.to_dict(d), "domain": d} for d, its in domain_items.items() for it in its
+            "items": [it.to_dict() for its in domain_items.values() for it in its
                       if not (it.category and it.category.value == "inherit" and not it.materialize)]}
 
 
 async def _apply(db: AsyncSession, domain_items: dict[str, list[PlanItem]], decisions: Decisions, *,
                  publish_id: uuid.UUID | None, user_id: uuid.UUID | None, action: str,
                  source: str) -> tuple[dict[str, ApplyOutcome], list[dict[str, Any]]]:
+    """逐域落地。``outcomes`` 按域分组再合并：键 = 决策键（带域），两个域的同名公式位互不覆盖（需求 8.4）。"""
     outcomes: dict[str, ApplyOutcome] = {}
     events: list[dict[str, Any]] = []
     for domain, items in domain_items.items():
         store = get_store(domain)
         audits: dict[uuid.UUID, list[dict]] = {}
+        domain_outcomes: dict[str, ApplyOutcome] = {}
         for it in items:
             out = await apply_effect(db, store, it, decide_item(domain, it, decisions), publish_id=publish_id,
                                      user_id=user_id)
-            outcomes[it.key] = out
+            domain_outcomes[it.key] = out
             if out.audit is not None:
                 audits.setdefault(it.project.id, []).append(out.audit)
+        outcomes.update(domain_outcomes)
         for pid, entries in audits.items():
             await audit_project(db, user_id=user_id, project_id=pid, domain=domain, action=action, source=source,
                                 changes=entries, publish_id=publish_id)
         events += [{"project_id": str(pid), "domain": domain, "slot_keys": slots}
-                   for pid, slots in changed_slots(items, {k: outcomes[k] for k in (i.key for i in items)}).items()]
+                   for pid, slots in changed_slots(items, domain_outcomes).items()]
     return outcomes, events
 
 
@@ -129,13 +132,13 @@ async def _subscribe_plan(db: AsyncSession, project_id: uuid.UUID, tpl: FormulaT
     items = []
     for slot, row in sorted((await template_rows(db, tpl.id, domain)).items()):
         up, lo = upstream.get(slot), local.get(slot)
-        item = PlanItem(project=project, slot_key=slot, label=row.slot_label or slot,
+        item = PlanItem(domain=domain, project=project, slot_key=slot, label=row.slot_label or slot,
                         old_up=up.definition if up else None, old_version=up.version if up else None,
                         old_origin=_origin(up), new_up=dict(row.definition or {}), new_version=tpl.version,
                         new_origin="template", local=lo, structure=dict((row.definition or {}).get("_structure")
                                                                         or {}),
                         new_template_id=tpl.id, materialize=True)
-        item.classify(domain)
+        item.classify()
         items.append(item)
     return project, items
 
@@ -196,12 +199,12 @@ async def _unsubscribe_plan(db: AsyncSession, project_id: uuid.UUID, domain: str
     items = []
     for slot, lo in sorted(rows.items()):
         up = upstream.get(slot)
-        item = PlanItem(project=project, slot_key=slot, label=lo.label or slot,
+        item = PlanItem(domain=domain, project=project, slot_key=slot, label=lo.label or slot,
                         old_up=tdefs.get(slot, lo.base_definition), old_version=tver, old_origin="template",
                         new_up=up.definition if up else None, new_version=up.version if up else None,
                         new_origin=_origin(up), local=lo, structure=dict(lo.structure or {}),
                         old_template_id=sub.template_id, retire_same=True)
-        item.classify(domain)
+        item.classify()
         items.append(item)
     return sub, project, store, upstream, rows, items
 
@@ -316,7 +319,7 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
             row = current[sub.domain].get(slot)
             label = (row.slot_label if row else None) or slot
             item = PlanItem(
-                project=project, slot_key=slot, label=label,
+                domain=sub.domain, project=project, slot_key=slot, label=label,
                 old_up=old_t if old_t is not None else (up.definition if up else None),
                 old_version=old_ver if old_t is not None else (up.version if up else None),
                 old_origin="template" if old_t is not None else _origin(up),
@@ -327,7 +330,7 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
                 old_template_id=tpl.id if old_t is not None else None,
                 new_template_id=tpl.id if new is not None else None,
                 materialize=new is not None, retire_same=new is None)
-            item.classify(sub.domain)
+            item.classify()
             domain_items.setdefault(sub.domain, []).append(item)
     return effective, current, list(subs), list(projects.values()), domain_items
 

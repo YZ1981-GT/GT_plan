@@ -138,6 +138,8 @@ async def _write_consol_formula_audit(
                             "new_formula": formula_str,
                             "result_value": rv,
                             "trace": trace,
+                            # 本次生成的年度：历史页按年度过滤（需求 11.1），不写则这些条目查不到
+                            "year": str(year),
                         },
                     })
             except Exception as exc:

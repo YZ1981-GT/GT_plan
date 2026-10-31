@@ -3,7 +3,7 @@
   全局发布、全局候选审核、模板发布新版本、设为全局、应用到指定项目共用：
   - 变更清单（原 → 新、版本号；版本不一致时禁止提交）；
   - 分类计数 + 受影响项目；逐项目「本次应用 / 暂缓」（冻结项目不可应用，可批量）；
-  - 冲突三方对比 + 逐条 / 批量处理（默认交项目确认）；
+  - 冲突三方对比 + 逐条 / 批量处理（默认交项目确认）；决策键只用服务端条目 key（含域，需求 8.4）；
   - 提交由调用方的 `submit` 执行（返回 true 才关窗），本组件不直接发请求。
 -->
 <template>
@@ -195,6 +195,7 @@ async function onSubmit() {
     const ok = await props.submit({
       decisions: {
         project_choices: props.allowDefer && !props.readonlyDecisions ? { ...projectChoices.value } : {},
+        // 键 = 服务端条目 key 原样（FormulaConflictTable 只认它）
         conflict_choices: props.readonlyDecisions ? {} : { ...conflictChoices.value },
         default_conflict: props.defaultConflict,
       },

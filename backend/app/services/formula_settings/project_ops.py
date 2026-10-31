@@ -26,6 +26,7 @@ from app.services.formula_settings.pending import close_pending, find_pending
 from app.services.formula_settings.projects import ProjectInfo, get_project
 from app.services.formula_settings.stores import DomainStore, SlotRecord, get_store
 from app.services.formula_settings.sync import Action, Resolution, resolve_pending
+from app.services.report_freshness import mark_changed, slot_row_codes
 
 
 def _now() -> datetime:
@@ -116,6 +117,8 @@ async def save_overrides(db: AsyncSession, *, domain: str, project_id: uuid.UUID
         audits.append(change_entry(domain, slot, before, merged, effect=action,
                                    config_id=lo.row_id if lo is not None else None))
     await db.flush()
+    if domain == "report" and changed:  # 同一事务内把有效定义变化的报表行及其闭包标过期（ADR-FHIC-04）
+        await mark_changed(db, {project_id: slot_row_codes(changed)})
     await audit_project(db, user_id=user_id, project_id=project_id, domain=domain, action=action,
                         source=source, changes=audits)
     after = await store.list_project(db, project_id)
@@ -127,14 +130,34 @@ async def save_overrides(db: AsyncSession, *, domain: str, project_id: uuid.UUID
 
 
 async def restore_global(db: AsyncSession, *, domain: str, project_id: uuid.UUID, slot_keys: list[str],
-                         user_id: uuid.UUID | None) -> dict[str, Any]:
-    """删除本项目适配，回到上游；来自订阅模板的公式位回到模板定义。待确认事项一并结案（adopt）。"""
+                         user_id: uuid.UUID | None,
+                         expected_versions: list[int] | None = None) -> dict[str, Any]:
+    """删除本项目适配，回到上游；来自订阅模板的公式位回到模板定义。待确认事项一并结案（adopt）。
+
+    ``expected_versions``：与 ``slot_keys`` 等长的版本列表，按序配对。
+    端点层一律传入；内部调用方（已在同一事务内做过 CAS 的路径）传 ``None`` 并注释跳过检查。
+    """
     get_spec(domain)
     project = await require_project(db, domain, project_id)
     store = get_store(domain)
     await lock_project(db, domain, project_id)
     upstream = await upstream_records(db, store, project.scope)
     local = await store.list_project(db, project_id)
+    # ── CAS 校验（ADR-FHIC-11 / 需求 13.4）──
+    if expected_versions is not None:
+        _ver_map = dict(zip(slot_keys, expected_versions))
+        for slot in dict.fromkeys(slot_keys):
+            lo = local.get(slot)
+            if lo is None:
+                continue
+            ev = _ver_map.get(slot)
+            if ev is None:
+                raise VersionRequired("删除本项目适配必须带版本号，请刷新后重试",
+                                      detail={"slot_key": slot})
+            actual = getattr(lo, "version", None)
+            if actual is not None and actual != ev:
+                raise VersionConflict("本项目公式已被他人修改，请刷新后重试",
+                                      detail={"slot_key": slot, "expected": ev, "actual": actual})
     restored, changed, audits = [], [], []
     for slot in dict.fromkeys(slot_keys):
         lo = local.get(slot)
@@ -161,6 +184,8 @@ async def restore_global(db: AsyncSession, *, domain: str, project_id: uuid.UUID
             changed.append(slot)
         audits.append(change_entry(domain, slot, lo.definition, target, effect="restore", config_id=lo.row_id))
     await db.flush()
+    if domain == "report" and changed:  # 同一事务内把有效定义变化的报表行及其闭包标过期（ADR-FHIC-04）
+        await mark_changed(db, {project_id: slot_row_codes(changed)})
     await audit_project(db, user_id=user_id, project_id=project_id, domain=domain, action="restore",
                         source="project_restore", changes=audits)
     return {"restored": restored, "events": _events(project_id, changed)}
@@ -171,7 +196,12 @@ async def restore_global(db: AsyncSession, *, domain: str, project_id: uuid.UUID
 
 async def resolve_items(db: AsyncSession, *, project_id: uuid.UUID, resolutions: list[Mapping[str, Any]],
                         user_id: uuid.UUID | None) -> dict[str, Any]:
-    """逐条处理：采用最新上游 / 保留本项目 / 手工修改。事项已被新发布更新或已结案 → 409。"""
+    """逐条处理：采用最新上游 / 保留本项目 / 手工修改。
+
+    每条须带列表给出的修订号 ``revision``（唯一 CAS 依据，ADR-FHIC-11）：缺 → 428；事项已被覆盖（修订号不等）
+    或已结案 → 409。全部事项先在锁内核对（修订号、状态、处理方式、项目未归档），任何一条不过即整体拒绝、
+    不写入（需求 8.2）。
+    """
     if not resolutions:
         raise FormulaSettingError("没有要处理的事项")
     ids = []
@@ -180,25 +210,37 @@ async def resolve_items(db: AsyncSession, *, project_id: uuid.UUID, resolutions:
             ids.append(uuid.UUID(str(r.get("item_id"))))
         except (TypeError, ValueError):
             raise FormulaSettingError("事项编号格式不正确") from None
+    if len(set(ids)) != len(ids):
+        raise FormulaSettingError("同一事项不能重复提交")
+    missing = [str(i) for r, i in zip(resolutions, ids) if r.get("revision") is None]
+    if missing:
+        raise VersionRequired("处理待确认事项必须带修订号，请刷新后重试", detail={"item_ids": missing})
     rows = (await db.execute(sa.select(FormulaSyncItem).where(FormulaSyncItem.id.in_(ids)))).scalars().all()
-    by_id = {r.id: r for r in rows}
+    if len(rows) != len(ids) or any(r.project_id != project_id for r in rows):
+        raise NotFound("待确认事项不存在")
     domains = sorted({r.domain for r in rows})
     for d in domains:
         await lock_project(db, d, project_id)
-    events: dict[str, list[str]] = {}
-    done, audits_by_domain = [], {}
+    # 锁内重读并锁行：与覆盖待确认项的原子语句串行，这里核对的修订号就是随后写入时的修订号
+    rows = (await db.execute(sa.select(FormulaSyncItem).where(FormulaSyncItem.id.in_(ids)).with_for_update(),
+                             execution_options={"populate_existing": True})).scalars().all()
+    by_id = {r.id: r for r in rows}
+    plan: list[tuple[Mapping[str, Any], FormulaSyncItem, Resolution]] = []
     for raw, item_id in zip(resolutions, ids):
-        item = by_id.get(item_id)
-        if item is None or item.project_id != project_id:
-            raise NotFound("待确认事项不存在")
-        await db.refresh(item)
-        expected = raw.get("upstream_version")
-        if item.status != "pending" or (expected is not None and item.upstream_version != int(expected)):
+        item, expected = by_id[item_id], int(raw["revision"])
+        if item.status != "pending" or item.revision != expected:
             raise SyncItemStale("该事项已被新的发布更新或已处理，请刷新后重试",
                                 detail={"item_id": str(item.id), "status": item.status,
-                                        "upstream_version": item.upstream_version})
-        await require_project(db, item.domain, project_id)
+                                        "revision": item.revision, "expected_revision": expected})
         choice = Resolution(str(raw.get("choice") or ""))
+        if choice is Resolution.CUSTOM and not isinstance(raw.get("custom_definition"), Mapping):
+            raise FormulaSettingError("手工修改必须提供公式定义")
+        plan.append((raw, item, choice))
+    for d in domains:
+        await require_project(db, d, project_id)
+    events: dict[str, list[str]] = {}
+    done, audits_by_domain = [], {}
+    for raw, item, choice in plan:
         store = get_store(item.domain)
         lo = (await store.list_project(db, project_id)).get(item.slot_key)
         final = await _resolve_one(db, store, item, choice, lo, raw.get("custom_definition"), user_id)

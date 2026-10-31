@@ -402,7 +402,8 @@ async function onRuleAction(rule: PushRuleView, action: RuleAction): Promise<voi
       await saveRule(rule, { disabled: true })
       await afterRuleChange('已在本项目停用')
     } else if (action.key === 'restore' || action.via === 'restore') {
-      await formulaSettingsApi.restoreGlobal(props.projectId, DOMAIN, [rule.rule_id])
+      // 删除本项目层强制 CAS（formula-hub-integrity-closure ADR-FHIC-11）：带本项目版本号，缺 ⇒ 后端 428
+      await formulaSettingsApi.restoreGlobal(props.projectId, DOMAIN, [rule.rule_id], [rule.local_version ?? 1])
       await afterRuleChange(action.key === 'enable' ? '已启用（回到上游定义）' : '已恢复上游定义')
     } else {
       // 上游停用、本项目启用：公式来源的规则同时带回清单原式（只写「启用」会成空公式）

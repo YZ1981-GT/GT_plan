@@ -104,7 +104,9 @@ class _FakeSession:
             # D6 render 聚合（COALESCE(SUM(ABS(...）→ fetchone；_resolve_tb ORM select → scalar
             if "coalesce" in sl or "sum(abs" in sl:
                 return _FakeResult(one=self.tb_agg_row)
-            return _FakeResult(scalar=self.tb_resolve_row)
+            # _resolve_tb 取「科目及其下级」宽集合（.scalars().all()，formula-hub-integrity-closure 任务 9）
+            rows = [self.tb_resolve_row] if self.tb_resolve_row is not None else []
+            return _FakeResult(scalar=self.tb_resolve_row, scalar_rows=rows)
         if "tb_balance" in sl:  # prefill 叶子查询（本测试给空 → 无 adjudication_prefill）
             return _FakeResult(rows=[])
         if "checklist_responses" in sl:
@@ -173,6 +175,7 @@ def _session(*, checklist_rows=None, user_formulas=None, tb_audited="98765.43",
         rp_rows=[SimpleNamespace(name="关联方甲", relation_type="subsidiary")],
         user_formulas=user_formulas or [],
         tb_resolve_row=SimpleNamespace(
+            standard_account_code="1141",
             audited_amount=Decimal(tb_audited),
             opening_balance=Decimal(tb_opening),
             unadjusted_amount=Decimal("0"),

@@ -195,8 +195,8 @@ class TestKCycleTriangleLogic:
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "K8勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_k8_01_skip_k8_total_missing(self, db_session, project_id):
         """VR-K8-01 跳过: K8 审定数缺失"""
@@ -217,8 +217,8 @@ class TestKCycleTriangleLogic:
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "K8勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- VR-K9-01: K9 管理费用 = K9-2 明细 ---
 
@@ -285,8 +285,8 @@ class TestKCycleTriangleLogic:
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "K9勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     # --- VR-K11-01: K11 资产减值汇总（汇总类时机铁律） ---
 
@@ -352,8 +352,8 @@ class TestKCycleTriangleLogic:
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "K11勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
     async def test_vr_k11_01_partial_sources_triggers_check(
         self, db_session, project_id
@@ -394,8 +394,8 @@ class TestKCycleTriangleLogic:
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
         rule = next(c for c in checks if "K11勾稽" in c.check_name)
-        assert rule.passed is True
-        assert "跳过" in rule.details
+        assert rule.status == "not_executed"
+        assert "跳过" in rule.reason
 
 
 # ---------------------------------------------------------------------------
@@ -457,10 +457,10 @@ class TestKCycleBoundaryConditions:
         ):
             checks = await gate.check_k_cycle_triangle_reconciliation(project_id, 2025)
 
-        # 3 条规则全部 skip 但 passed=True
+        # 3 条规则全部 skip ，status=not_executed
         assert len(checks) == 3
         for c in checks:
-            assert c.passed is True
+            assert c.status == "not_executed"
         # 模拟 ConsistencyResult 不会被 K 阻断
         result = ConsistencyResult(overall="pass", checks=checks)
         assert result.has_blocking_failures is False
@@ -481,19 +481,19 @@ class TestKCycleIntegration:
             gate, "_get_wp_parsed_data", new_callable=AsyncMock, return_value=None
         ), patch.object(
             gate, "check_tb_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="tb", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="tb", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_bs_balance", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="bs", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="bs", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_is_reconciliation", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="is", passed=True, severity="blocking"),
+            return_value=CheckItem(status="passed", check_name="is", passed=True, severity="blocking"),
         ), patch.object(
             gate, "check_notes_completeness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="notes", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="notes", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_data_freshness", new_callable=AsyncMock,
-            return_value=CheckItem(check_name="fresh", passed=True, severity="warning"),
+            return_value=CheckItem(status="passed", check_name="fresh", passed=True, severity="warning"),
         ), patch.object(
             gate, "check_e1_cfs_reconciliation", new_callable=AsyncMock,
             return_value=[],
@@ -521,8 +521,8 @@ class TestKCycleIntegration:
         # K cycle produces 3 checks (all skip since _get_wp_parsed_data returns None)
         k_checks = [c for c in result.checks if "K" in c.check_name and "勾稽" in c.check_name]
         assert len(k_checks) == 3
-        # All should be passed=True (skip mode)
-        assert all(c.passed for c in k_checks)
+        # 数据缺失 ⇒ 全部未执行（五态，spec formula-hub-integrity-closure 需求 16.2）
+        assert all(c.status == "not_executed" for c in k_checks)
         # Verify rule names cover K8/K9/K11
         joined = " ".join(c.check_name for c in k_checks)
         assert "K8勾稽" in joined

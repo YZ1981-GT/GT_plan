@@ -83,7 +83,7 @@ async def test_wp_publish_inherit_follow_conflict_then_adopt():
         assert mine.expression == MINE, "冲突不覆盖本项目公式"
         (item,) = await pending_items(db, conflict)
         await resolve_items(db, project_id=conflict, user_id=admin.id,
-                            resolutions=[{"item_id": str(item.id), "choice": "adopt"}])
+                            resolutions=[{"item_id": str(item.id), "choice": "adopt", "revision": item.revision}])
         (mine,) = await wp_rows(db, conflict)
         assert (mine.expression, mine.formula_source, mine.base_version) == (G2, "preset", 2)
 

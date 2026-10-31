@@ -12,7 +12,7 @@ Requirements: 6.1-6.6
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+
 from decimal import Decimal
 from uuid import UUID
 
@@ -26,32 +26,16 @@ from app.models.report_models import (
     FinancialReportType,
 )
 
+from app.services.consistency_gate._models import (
+    CheckItem, ConsistencyResult,
+    _ok, _fail, _not_executed, _not_applicable, _error,
+)
+from app.services.consistency_gate._helpers import _guarded, HelpersMixin
+
 logger = logging.getLogger(__name__)
 
 # 容差：金额比较允许 0.01 元误差（四舍五入）
 _TOLERANCE = Decimal("0.01")
-
-
-@dataclass
-class CheckItem:
-    """单项检查结果"""
-
-    check_name: str
-    passed: bool
-    details: str = ""
-    severity: str = "warning"  # blocking / warning
-
-
-@dataclass
-class ConsistencyResult:
-    """一致性检查总结果"""
-
-    overall: str = "pass"  # pass / fail
-    checks: list[CheckItem] = field(default_factory=list)
-
-    @property
-    def has_blocking_failures(self) -> bool:
-        return any(not c.passed and c.severity == "blocking" for c in self.checks)
 
 
 class ConsistencyGate:
@@ -119,72 +103,110 @@ class ConsistencyGate:
 
         return ConsistencyResult(overall=overall, checks=checks)
 
+    @_guarded("tb_balance")
     async def check_tb_balance(self, project_id: UUID, year: int) -> CheckItem:
-        """检查 1：试算平衡（资产合计 = 负债合计 + 权益合计）
+        """检查 1：试算平衡（五类叶子合计 + 口径识别）
 
-        从 trial_balance 表按 account_category 汇总审定数。
+        ADR-FHIC-15：按 account_category 各取叶子行合计，
+        经 :func:`balance_diff` 识别口径并计算差额。
         """
-        try:
-            from app.models.audit_platform_models import TrialBalance
+        from app.models.audit_platform_models import TrialBalance
+        from app.services.consistency_gate._tb_sign import (
+            EXPECTED_CATEGORIES,
+            balance_diff,
+        )
+        from app.services.tb_leaf_codes import leaf_code_set
 
-            # 按 account_category 汇总 audited_amount
-            stmt = (
-                select(
-                    TrialBalance.account_category,
-                    func.sum(TrialBalance.audited_amount).label("total"),
-                )
-                .where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.is_deleted == False,  # noqa: E712
-                )
-                .group_by(TrialBalance.account_category)
+        # 取全部未删行（科目码 + 类别 + 审定数）
+        stmt = (
+            select(
+                TrialBalance.standard_account_code,
+                TrialBalance.account_category,
+                TrialBalance.audited_amount,
             )
-            result = await self.db.execute(stmt)
-            rows = result.all()
+            .where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == False,  # noqa: E712
+            )
+        )
+        result = await self.db.execute(stmt)
+        rows = result.all()
 
-            if not rows:
-                return CheckItem(
-                    check_name="试算平衡",
-                    passed=True,
-                    details="无试算表数据，跳过检查",
-                    severity="blocking",
-                )
-
-            totals: dict[str, Decimal] = {}
-            for row in rows:
-                cat = row[0] or "unknown"
-                totals[cat] = Decimal(str(row[1] or 0))
-
-            asset_total = totals.get("asset", Decimal("0"))
-            liability_total = totals.get("liability", Decimal("0"))
-            equity_total = totals.get("equity", Decimal("0"))
-
-            diff = asset_total - (liability_total + equity_total)
-            passed = abs(diff) <= _TOLERANCE
-
-            details = (
-                f"资产={asset_total:,.2f}, "
-                f"负债={liability_total:,.2f}, "
-                f"权益={equity_total:,.2f}, "
-                f"差额={diff:,.2f}"
+        if not rows:
+            return _not_executed(
+                '试算平衡',
+                branch_id='tb_balance.1.missing',
+                reason='无试算表数据，跳过检查',
+                severity='blocking',
             )
 
-            return CheckItem(
-                check_name="试算平衡",
-                passed=passed,
-                details=details,
-                severity="blocking",
-            )
-        except Exception as e:
-            logger.warning("check_tb_balance failed: %s", e)
-            return CheckItem(
-                check_name="试算平衡",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
+        # 检查是否有未知类别
+        categories_seen = {r[1] for r in rows if r[1]}
+        unknown = categories_seen - EXPECTED_CATEGORIES
+        if unknown:
+            return _not_executed(
+                '试算平衡',
+                branch_id='tb_balance.unknown_category',
+                reason=f'试算表含未知科目类别：{", ".join(sorted(unknown))}',
+                severity='blocking',
             )
 
+        # 每类先筛叶子再合计
+        by_cat: dict[str, list[tuple[str, Decimal]]] = {}
+        for code, cat, amt in rows:
+            c = cat or "unknown"
+            by_cat.setdefault(c, []).append((
+                str(code) if code else "",
+                amt if isinstance(amt, Decimal) else Decimal(str(amt or 0)),
+            ))
+
+        sums: dict[str, Decimal] = {}
+        for cat, items in by_cat.items():
+            if cat not in EXPECTED_CATEGORIES:
+                continue
+            codes = [c for c, _ in items]
+            leaves = leaf_code_set(codes)
+            sums[cat] = sum(
+                (a for c, a in items if c in leaves),
+                Decimal("0"),
+            )
+
+        # 口径判定
+        verdict = balance_diff(sums)
+
+        if verdict.convention is None:
+            return _not_executed(
+                '试算平衡',
+                branch_id='tb_balance.sign_unknown',
+                reason='负债与权益合计均为 0，无法识别试算表口径',
+                severity='blocking',
+            )
+
+        # 构造详情文本
+        details_parts = [
+            f"口径={verdict.convention}",
+            f"资产={sums.get('asset', Decimal('0')):,.2f}",
+            f"负债={sums.get('liability', Decimal('0')):,.2f}",
+            f"权益={sums.get('equity', Decimal('0')):,.2f}",
+            f"收入={sums.get('revenue', Decimal('0')):,.2f}",
+            f"费用={sums.get('expense', Decimal('0')):,.2f}",
+            f"差额={verdict.diff:,.2f}",
+        ]
+        if verdict.warning:
+            details_parts.append(verdict.warning)
+        details = ", ".join(details_parts)
+
+        passed = abs(verdict.diff) <= _TOLERANCE
+
+        if passed:
+            return _ok('试算平衡', details=details, severity="blocking")
+        else:
+            return _fail(
+                '试算平衡', reason=details, details=details, severity="blocking",
+            )
+
+    @_guarded("bs_balance")
     async def check_bs_balance(self, project_id: UUID, year: int) -> CheckItem:
         """检查 2：报表平衡（BS 资产合计 = 负债+权益合计）
 
@@ -202,12 +224,7 @@ class ConsistencyGate:
             total_rows = result.scalars().all()
 
             if not total_rows:
-                return CheckItem(
-                    check_name="报表平衡",
-                    passed=True,
-                    details="无资产负债表合计行数据，跳过检查",
-                    severity="blocking",
-                )
+                return _not_executed('报表平衡', branch_id='bs_balance.1.missing', reason='无资产负债表合计行数据，跳过检查', severity='blocking')
 
             # 查找资产合计和负债+权益合计
             asset_total = Decimal("0")
@@ -234,21 +251,15 @@ class ConsistencyGate:
                 f"差额={diff:,.2f}"
             )
 
-            return CheckItem(
-                check_name="报表平衡",
-                passed=passed,
-                details=details,
-                severity="blocking",
-            )
+            if passed:
+                return _ok('报表平衡', details=details, severity="blocking")
+            else:
+                return _fail('报表平衡', reason=details, details=details, severity="blocking")
         except Exception as e:
             logger.warning("check_bs_balance failed: %s", e)
-            return CheckItem(
-                check_name="报表平衡",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            )
+            return _not_executed('报表平衡', branch_id='bs_balance.2.exception', reason=f"检查异常: {e}", severity='blocking')
 
+    @_guarded("is_reconciliation")
     async def check_is_reconciliation(self, project_id: UUID, year: int) -> CheckItem:
         """检查 3：利润表勾稽（营业收入 - 营业成本 - 费用 + 营业外 = 净利润）
 
@@ -265,12 +276,7 @@ class ConsistencyGate:
             is_rows = result.scalars().all()
 
             if not is_rows:
-                return CheckItem(
-                    check_name="利润表勾稽",
-                    passed=True,
-                    details="无利润表数据，跳过检查",
-                    severity="warning",
-                )
+                return _not_executed('利润表勾稽', branch_id='is_reconciliation.1.missing', reason='无利润表数据，跳过检查', severity='warning')
 
             # 提取关键行金额
             amounts: dict[str, Decimal] = {}
@@ -290,12 +296,7 @@ class ConsistencyGate:
 
             # 如果没有足够数据做勾稽，跳过
             if "net_profit" not in amounts:
-                return CheckItem(
-                    check_name="利润表勾稽",
-                    passed=True,
-                    details="未找到净利润行，跳过勾稽检查",
-                    severity="warning",
-                )
+                return _not_executed('利润表勾稽', branch_id='is_reconciliation.2.missing', reason='未找到净利润行，跳过勾稽检查', severity='warning')
 
             # 简化勾稽：检查利润总额和净利润的关系是否合理
             # 完整勾稽需要所有费用行，这里做基本检查
@@ -321,21 +322,15 @@ class ConsistencyGate:
                 passed = True
                 details = f"净利润={net_profit:,.2f}（利润总额未生成，跳过勾稽）"
 
-            return CheckItem(
-                check_name="利润表勾稽",
-                passed=passed,
-                details=details,
-                severity="warning",
-            )
+            if passed:
+                return _ok('利润表勾稽', details=details, severity="warning")
+            else:
+                return _fail('利润表勾稽', reason=details, details=details, severity="warning")
         except Exception as e:
             logger.warning("check_is_reconciliation failed: %s", e)
-            return CheckItem(
-                check_name="利润表勾稽",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            )
+            return _not_executed('利润表勾稽', branch_id='is_reconciliation.3.exception', reason=f"检查异常: {e}", severity='warning')
 
+    @_guarded("notes_completeness")
     async def check_notes_completeness(self, project_id: UUID, year: int) -> CheckItem:
         """检查 4：附注完整性（有数据的报表行次对应附注章节已生成）
 
@@ -356,12 +351,7 @@ class ConsistencyGate:
             report_rows_with_data = result.all()
 
             if not report_rows_with_data:
-                return CheckItem(
-                    check_name="附注完整性",
-                    passed=True,
-                    details="无有数据的报表行次，跳过检查",
-                    severity="warning",
-                )
+                return _not_executed('附注完整性', branch_id='notes_completeness.1.missing', reason='无有数据的报表行次，跳过检查', severity='warning')
 
             # 查找已生成的附注章节
             note_stmt = select(DisclosureNote.note_section).where(
@@ -375,12 +365,7 @@ class ConsistencyGate:
             # 检查是否有附注
             total_data_rows = len(report_rows_with_data)
             if not existing_sections:
-                return CheckItem(
-                    check_name="附注完整性",
-                    passed=False,
-                    details=f"报表有 {total_data_rows} 个有数据行次，但附注尚未生成",
-                    severity="warning",
-                )
+                return _fail('附注完整性', reason=f"报表有 {total_data_rows} 个有数据行次，但附注尚未生成", details=f"报表有 {total_data_rows} 个有数据行次，但附注尚未生成", severity='warning')
 
             # 有附注存在即视为基本完整（精确映射需要 note_account_mappings 表）
             note_count = len(existing_sections)
@@ -390,21 +375,15 @@ class ConsistencyGate:
                 f"已生成附注章节 {note_count} 个"
             )
 
-            return CheckItem(
-                check_name="附注完整性",
-                passed=passed,
-                details=details,
-                severity="warning",
-            )
+            if passed:
+                return _ok('附注完整性', details=details, severity="warning")
+            else:
+                return _fail('附注完整性', reason=details, details=details, severity="warning")
         except Exception as e:
             logger.warning("check_notes_completeness failed: %s", e)
-            return CheckItem(
-                check_name="附注完整性",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            )
+            return _not_executed('附注完整性', branch_id='notes_completeness.3.exception', reason=f"检查异常: {e}", severity='warning')
 
+    @_guarded("data_freshness")
     async def check_data_freshness(self, project_id: UUID, year: int) -> CheckItem:
         """检查 5：数据新鲜度（无 stale 标记）
 
@@ -449,20 +428,13 @@ class ConsistencyGate:
                     parts.append(f"{stale_wp_count} 张底稿过期")
                 details = "、".join(parts)
 
-            return CheckItem(
-                check_name="数据新鲜度",
-                passed=passed,
-                details=details,
-                severity="warning",
-            )
+            if passed:
+                return _ok('数据新鲜度', details=details, severity="warning")
+            else:
+                return _fail('数据新鲜度', reason=details, details=details, severity="warning")
         except Exception as e:
             logger.warning("check_data_freshness failed: %s", e)
-            return CheckItem(
-                check_name="数据新鲜度",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            )
+            return _not_executed('数据新鲜度', branch_id='data_freshness.1.exception', reason=f"检查异常: {e}", severity='warning')
 
     # ------------------------------------------------------------------
     # E1 spec Sprint 1 Task 1.13: 3 条 E1↔CFS 勾稽规则
@@ -603,6 +575,7 @@ class ConsistencyGate:
             logger.warning("_get_tb_cash_total failed: %s", e)
             return None
 
+    @_guarded("e1_cfs_reconciliation")
     async def check_e1_cfs_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -625,12 +598,7 @@ class ConsistencyGate:
             e1_end = await self._get_e1_audited_amount(project_id, year)
             cfs_end = await self._get_cfs_ending_cash(project_id, year)
             if e1_end is None or cfs_end is None:
-                checks.append(CheckItem(
-                    check_name="E1↔CFS:期末现金等价物勾稽",
-                    passed=True,
-                    details=f"数据不完整(E1={e1_end}, CFS={cfs_end}),跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('E1↔CFS:期末现金等价物勾稽', branch_id='e1_cfs_reconciliation.1.missing', reason=f"数据不完整(E1={e1_end}, CFS={cfs_end}),跳过检查", severity='warning'))
             else:
                 diff = abs(e1_end - cfs_end)
                 if diff <= tolerance:
@@ -639,36 +607,26 @@ class ConsistencyGate:
                     sev, ok = "warning", False
                 else:
                     sev, ok = "blocking", False
-                checks.append(CheckItem(
-                    check_name="E1↔CFS:期末现金等价物勾稽",
-                    passed=ok,
-                    details=(
-                        f"E1 货币资金期末审定数={e1_end:,.2f}, "
+                if ok:
+                    checks.append(_ok('E1↔CFS:期末现金等价物勾稽', details=f"E1 货币资金期末审定数={e1_end:,.2f}, "
                         f"CFS 期末现金等价物={cfs_end:,.2f}, "
-                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}"
-                    ),
-                    severity=sev,
-                ))
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
+                else:
+                    checks.append(_fail('E1↔CFS:期末现金等价物勾稽', reason=f"E1 货币资金期末审定数={e1_end:,.2f}, "
+                        f"CFS 期末现金等价物={cfs_end:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", details=f"E1 货币资金期末审定数={e1_end:,.2f}, "
+                        f"CFS 期末现金等价物={cfs_end:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
         except Exception as e:
             logger.warning("E1↔CFS rule 1 failed: %s", e)
-            checks.append(CheckItem(
-                check_name="E1↔CFS:期末现金等价物勾稽",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('E1↔CFS:期末现金等价物勾稽', branch_id='e1_cfs_reconciliation.2.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # 规则 2:E1 期末-期初 vs CFS 现金净增加额
         try:
             e1_change = await self._get_e1_period_change(project_id, year)
             cfs_change = await self._get_cfs_net_change(project_id, year)
             if e1_change is None or cfs_change is None:
-                checks.append(CheckItem(
-                    check_name="E1↔CFS:本期现金净增加额勾稽",
-                    passed=True,
-                    details=f"数据不完整(E1 变动={e1_change}, CFS 净增={cfs_change}),跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('E1↔CFS:本期现金净增加额勾稽', branch_id='e1_cfs_reconciliation.3.missing', reason=f"数据不完整(E1 变动={e1_change}, CFS 净增={cfs_change}),跳过", severity='warning'))
             else:
                 diff = abs(e1_change - cfs_change)
                 if diff <= tolerance:
@@ -677,36 +635,26 @@ class ConsistencyGate:
                     sev, ok = "warning", False
                 else:
                     sev, ok = "blocking", False
-                checks.append(CheckItem(
-                    check_name="E1↔CFS:本期现金净增加额勾稽",
-                    passed=ok,
-                    details=(
-                        f"E1 期末-期初={e1_change:,.2f}, "
+                if ok:
+                    checks.append(_ok('E1↔CFS:本期现金净增加额勾稽', details=f"E1 期末-期初={e1_change:,.2f}, "
                         f"CFS 现金净增加额={cfs_change:,.2f}, "
-                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}"
-                    ),
-                    severity=sev,
-                ))
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
+                else:
+                    checks.append(_fail('E1↔CFS:本期现金净增加额勾稽', reason=f"E1 期末-期初={e1_change:,.2f}, "
+                        f"CFS 现金净增加额={cfs_change:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", details=f"E1 期末-期初={e1_change:,.2f}, "
+                        f"CFS 现金净增加额={cfs_change:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
         except Exception as e:
             logger.warning("E1↔CFS rule 2 failed: %s", e)
-            checks.append(CheckItem(
-                check_name="E1↔CFS:本期现金净增加额勾稽",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('E1↔CFS:本期现金净增加额勾稽', branch_id='e1_cfs_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # 规则 3:E1-1 vs TB(1001+1002+1012+1502)
         try:
             e1_total = await self._get_e1_audited_amount(project_id, year)
             tb_total = await self._get_tb_cash_total(project_id, year)
             if e1_total is None or tb_total is None:
-                checks.append(CheckItem(
-                    check_name="E1↔TB:试算平衡表数勾稽",
-                    passed=True,
-                    details=f"数据不完整(E1={e1_total}, TB={tb_total}),跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('E1↔TB:试算平衡表数勾稽', branch_id='e1_cfs_reconciliation.5.missing', reason=f"数据不完整(E1={e1_total}, TB={tb_total}),跳过", severity='warning'))
             else:
                 diff = abs(e1_total - tb_total)
                 if diff <= tolerance:
@@ -715,27 +663,23 @@ class ConsistencyGate:
                     sev, ok = "warning", False
                 else:
                     sev, ok = "blocking", False
-                checks.append(CheckItem(
-                    check_name="E1↔TB:试算平衡表数勾稽",
-                    passed=ok,
-                    details=(
-                        f"E1 货币资金审定数={e1_total:,.2f}, "
+                if ok:
+                    checks.append(_ok('E1↔TB:试算平衡表数勾稽', details=f"E1 货币资金审定数={e1_total:,.2f}, "
                         f"TB(1001+1002+1012+1502)={tb_total:,.2f}, "
-                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}"
-                    ),
-                    severity=sev,
-                ))
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
+                else:
+                    checks.append(_fail('E1↔TB:试算平衡表数勾稽', reason=f"E1 货币资金审定数={e1_total:,.2f}, "
+                        f"TB(1001+1002+1012+1502)={tb_total:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", details=f"E1 货币资金审定数={e1_total:,.2f}, "
+                        f"TB(1001+1002+1012+1502)={tb_total:,.2f}, "
+                        f"差额={diff:,.2f}, 容差={tolerance:,.2f}", severity=sev))
         except Exception as e:
             logger.warning("E1↔CFS rule 3 failed: %s", e)
-            checks.append(CheckItem(
-                check_name="E1↔TB:试算平衡表数勾稽",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('E1↔TB:试算平衡表数勾稽', branch_id='e1_cfs_reconciliation.6.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("d4_revenue_reconciliation")
     async def check_d4_revenue_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -760,33 +704,23 @@ class ConsistencyGate:
             other_revenue = self._extract_decimal(d4_data, "other_revenue")
 
             if revenue_total is None or main_revenue is None or other_revenue is None:
-                checks.append(CheckItem(
-                    check_name="D4勾稽:营业收入合计=主营+其他",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('D4勾稽:营业收入合计=主营+其他', branch_id='d4_revenue_reconciliation.1.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 diff = abs(revenue_total - (main_revenue + other_revenue))
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="D4勾稽:营业收入合计=主营+其他",
-                    passed=passed,
-                    details=(
-                        f"营业收入合计={revenue_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('D4勾稽:营业收入合计=主营+其他', details=f"营业收入合计={revenue_total:,.2f}, "
                         f"主营={main_revenue:,.2f} + 其他={other_revenue:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('D4勾稽:营业收入合计=主营+其他', reason=f"营业收入合计={revenue_total:,.2f}, "
+                        f"主营={main_revenue:,.2f} + 其他={other_revenue:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"营业收入合计={revenue_total:,.2f}, "
+                        f"主营={main_revenue:,.2f} + 其他={other_revenue:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-D4-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="D4勾稽:营业收入合计=主营+其他",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('D4勾稽:营业收入合计=主营+其他', branch_id='d4_revenue_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-D4-02: 应收账款增长率 vs 营业收入增长率合理性
         try:
@@ -794,33 +728,23 @@ class ConsistencyGate:
             rev_growth = self._extract_decimal(d4_data, "growth_rate")
 
             if ar_growth is None or rev_growth is None:
-                checks.append(CheckItem(
-                    check_name="D4勾稽:应收增长率vs收入增长率",
-                    passed=True,
-                    details="增长率数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('D4勾稽:应收增长率vs收入增长率', branch_id='d4_revenue_reconciliation.3.missing', reason='增长率数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(ar_growth - rev_growth)
                 passed = diff < Decimal("0.5")
-                checks.append(CheckItem(
-                    check_name="D4勾稽:应收增长率vs收入增长率",
-                    passed=passed,
-                    details=(
-                        f"应收账款增长率={ar_growth:.4f}, "
+                if passed:
+                    checks.append(_ok('D4勾稽:应收增长率vs收入增长率', details=f"应收账款增长率={ar_growth:.4f}, "
                         f"营业收入增长率={rev_growth:.4f}, "
-                        f"差异={diff:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"差异={diff:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('D4勾稽:应收增长率vs收入增长率', reason=f"应收账款增长率={ar_growth:.4f}, "
+                        f"营业收入增长率={rev_growth:.4f}, "
+                        f"差异={diff:.4f}", details=f"应收账款增长率={ar_growth:.4f}, "
+                        f"营业收入增长率={rev_growth:.4f}, "
+                        f"差异={diff:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-D4-02 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="D4勾稽:应收增长率vs收入增长率",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('D4勾稽:应收增长率vs收入增长率', branch_id='d4_revenue_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # VR-D4-03: 毛利率波动 < 5%
         try:
@@ -828,33 +752,23 @@ class ConsistencyGate:
             prior_gm = self._extract_decimal(d4_data, "prior_gross_margin")
 
             if current_gm is None or prior_gm is None:
-                checks.append(CheckItem(
-                    check_name="D4勾稽:毛利率波动<5%",
-                    passed=True,
-                    details="毛利率数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('D4勾稽:毛利率波动<5%', branch_id='d4_revenue_reconciliation.5.missing', reason='毛利率数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(current_gm - prior_gm)
                 passed = diff < Decimal("0.05")
-                checks.append(CheckItem(
-                    check_name="D4勾稽:毛利率波动<5%",
-                    passed=passed,
-                    details=(
-                        f"本期毛利率={current_gm:.4f}, "
+                if passed:
+                    checks.append(_ok('D4勾稽:毛利率波动<5%', details=f"本期毛利率={current_gm:.4f}, "
                         f"上期毛利率={prior_gm:.4f}, "
-                        f"波动={diff:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"波动={diff:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('D4勾稽:毛利率波动<5%', reason=f"本期毛利率={current_gm:.4f}, "
+                        f"上期毛利率={prior_gm:.4f}, "
+                        f"波动={diff:.4f}", details=f"本期毛利率={current_gm:.4f}, "
+                        f"上期毛利率={prior_gm:.4f}, "
+                        f"波动={diff:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-D4-03 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="D4勾稽:毛利率波动<5%",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('D4勾稽:毛利率波动<5%', branch_id='d4_revenue_reconciliation.6.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # VR-D4-04: 合同负债期末 vs D7-1 审定数一致
         try:
@@ -862,36 +776,27 @@ class ConsistencyGate:
             d7_audited = self._extract_decimal(d7_data, "audited_total")
 
             if d4_liability is None or d7_audited is None:
-                checks.append(CheckItem(
-                    check_name="D4勾稽:合同负债vs D7-1审定数",
-                    passed=True,
-                    details="合同负债数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('D4勾稽:合同负债vs D7-1审定数', branch_id='d4_revenue_reconciliation.7.missing', reason='合同负债数据不完整，跳过检查', severity='blocking'))
             else:
                 diff = abs(d4_liability - d7_audited)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="D4勾稽:合同负债vs D7-1审定数",
-                    passed=passed,
-                    details=(
-                        f"D4合同负债期末={d4_liability:,.2f}, "
+                if passed:
+                    checks.append(_ok('D4勾稽:合同负债vs D7-1审定数', details=f"D4合同负债期末={d4_liability:,.2f}, "
                         f"D7-1审定数={d7_audited:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('D4勾稽:合同负债vs D7-1审定数', reason=f"D4合同负债期末={d4_liability:,.2f}, "
+                        f"D7-1审定数={d7_audited:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"D4合同负债期末={d4_liability:,.2f}, "
+                        f"D7-1审定数={d7_audited:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-D4-04 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="D4勾稽:合同负债vs D7-1审定数",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('D4勾稽:合同负债vs D7-1审定数', branch_id='d4_revenue_reconciliation.8.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         return checks
 
+    @_guarded("f5_f2_triangle_reconciliation")
     async def check_f5_f2_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -920,35 +825,27 @@ class ConsistencyGate:
                 or purchases is None
                 or closing is None
             ):
-                checks.append(CheckItem(
-                    check_name="F5勾稽:营业成本=期初+采购-期末",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('F5勾稽:营业成本=期初+采购-期末', branch_id='f5_f2_triangle_reconciliation.1.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = opening + purchases - closing
                 diff = abs(cost - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="F5勾稽:营业成本=期初+采购-期末",
-                    passed=passed,
-                    details=(
-                        f"营业成本={cost:,.2f}, "
+                if passed:
+                    checks.append(_ok('F5勾稽:营业成本=期初+采购-期末', details=f"营业成本={cost:,.2f}, "
                         f"期初存货={opening:,.2f} + 本期采购={purchases:,.2f} "
                         f"- 期末存货={closing:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('F5勾稽:营业成本=期初+采购-期末', reason=f"营业成本={cost:,.2f}, "
+                        f"期初存货={opening:,.2f} + 本期采购={purchases:,.2f} "
+                        f"- 期末存货={closing:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"营业成本={cost:,.2f}, "
+                        f"期初存货={opening:,.2f} + 本期采购={purchases:,.2f} "
+                        f"- 期末存货={closing:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-F5-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="F5勾稽:营业成本=期初+采购-期末",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('F5勾稽:营业成本=期初+采购-期末', branch_id='f5_f2_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-F5-02: 毛利率波动 < 5% (warning, 与 VR-D4-03 交叉验证)
         try:
@@ -956,33 +853,23 @@ class ConsistencyGate:
             prior_gm = self._extract_decimal(f5_data, "prior_gross_margin")
 
             if current_gm is None or prior_gm is None:
-                checks.append(CheckItem(
-                    check_name="F5勾稽:毛利率波动<5%(交叉VR-D4-03)",
-                    passed=True,
-                    details="毛利率数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('F5勾稽:毛利率波动<5%(交叉VR-D4-03)', branch_id='f5_f2_triangle_reconciliation.3.missing', reason='毛利率数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(current_gm - prior_gm)
                 passed = diff < Decimal("0.05")
-                checks.append(CheckItem(
-                    check_name="F5勾稽:毛利率波动<5%(交叉VR-D4-03)",
-                    passed=passed,
-                    details=(
-                        f"本期毛利率={current_gm:.4f}, "
+                if passed:
+                    checks.append(_ok('F5勾稽:毛利率波动<5%(交叉VR-D4-03)', details=f"本期毛利率={current_gm:.4f}, "
                         f"上期毛利率={prior_gm:.4f}, "
-                        f"波动={diff:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"波动={diff:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('F5勾稽:毛利率波动<5%(交叉VR-D4-03)', reason=f"本期毛利率={current_gm:.4f}, "
+                        f"上期毛利率={prior_gm:.4f}, "
+                        f"波动={diff:.4f}", details=f"本期毛利率={current_gm:.4f}, "
+                        f"上期毛利率={prior_gm:.4f}, "
+                        f"波动={diff:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-F5-02 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="F5勾稽:毛利率波动<5%(交叉VR-D4-03)",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('F5勾稽:毛利率波动<5%(交叉VR-D4-03)', branch_id='f5_f2_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # VR-F2-01: 存货跌价准备计提率 vs 上年变动 < 3% (warning)
         try:
@@ -990,33 +877,23 @@ class ConsistencyGate:
             prior_ratio = self._extract_decimal(f2_data, "prior_impairment_ratio")
 
             if current_ratio is None or prior_ratio is None:
-                checks.append(CheckItem(
-                    check_name="F2勾稽:跌价准备计提率波动<3%",
-                    passed=True,
-                    details="跌价准备计提率数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('F2勾稽:跌价准备计提率波动<3%', branch_id='f5_f2_triangle_reconciliation.5.missing', reason='跌价准备计提率数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(current_ratio - prior_ratio)
                 passed = diff < Decimal("0.03")
-                checks.append(CheckItem(
-                    check_name="F2勾稽:跌价准备计提率波动<3%",
-                    passed=passed,
-                    details=(
-                        f"本期计提率={current_ratio:.4f}, "
+                if passed:
+                    checks.append(_ok('F2勾稽:跌价准备计提率波动<3%', details=f"本期计提率={current_ratio:.4f}, "
                         f"上年计提率={prior_ratio:.4f}, "
-                        f"波动={diff:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"波动={diff:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('F2勾稽:跌价准备计提率波动<3%', reason=f"本期计提率={current_ratio:.4f}, "
+                        f"上年计提率={prior_ratio:.4f}, "
+                        f"波动={diff:.4f}", details=f"本期计提率={current_ratio:.4f}, "
+                        f"上年计提率={prior_ratio:.4f}, "
+                        f"波动={diff:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-F2-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="F2勾稽:跌价准备计提率波动<3%",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('F2勾稽:跌价准备计提率波动<3%', branch_id='f5_f2_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # VR-F2-02: 存货周转天数 vs 行业均值差异 < 30 天 (warning)
         try:
@@ -1024,36 +901,27 @@ class ConsistencyGate:
             industry_avg = self._extract_decimal(f2_data, "industry_avg_days")
 
             if turnover_days is None or industry_avg is None:
-                checks.append(CheckItem(
-                    check_name="F2勾稽:存货周转天数vs行业均值",
-                    passed=True,
-                    details="存货周转天数数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('F2勾稽:存货周转天数vs行业均值', branch_id='f5_f2_triangle_reconciliation.7.missing', reason='存货周转天数数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(turnover_days - industry_avg)
                 passed = diff < Decimal("30")
-                checks.append(CheckItem(
-                    check_name="F2勾稽:存货周转天数vs行业均值",
-                    passed=passed,
-                    details=(
-                        f"本期周转天数={turnover_days:.2f}, "
+                if passed:
+                    checks.append(_ok('F2勾稽:存货周转天数vs行业均值', details=f"本期周转天数={turnover_days:.2f}, "
                         f"行业均值={industry_avg:.2f}, "
-                        f"差异={diff:.2f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"差异={diff:.2f}", severity="warning"))
+                else:
+                    checks.append(_fail('F2勾稽:存货周转天数vs行业均值', reason=f"本期周转天数={turnover_days:.2f}, "
+                        f"行业均值={industry_avg:.2f}, "
+                        f"差异={diff:.2f}", details=f"本期周转天数={turnover_days:.2f}, "
+                        f"行业均值={industry_avg:.2f}, "
+                        f"差异={diff:.2f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-F2-02 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="F2勾稽:存货周转天数vs行业均值",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('F2勾稽:存货周转天数vs行业均值', branch_id='f5_f2_triangle_reconciliation.8.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("h_cycle_triangle_reconciliation")
     async def check_h_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1086,35 +954,27 @@ class ConsistencyGate:
                 or disposals is None
                 or h10_disposal is None
             ):
-                checks.append(CheckItem(
-                    check_name="H1勾稽:固定资产原值期末=期初+增加-减少+处置",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('H1勾稽:固定资产原值期末=期初+增加-减少+处置', branch_id='h_cycle_triangle_reconciliation.1.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = opening + additions - disposals + h10_disposal
                 diff = abs(closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="H1勾稽:固定资产原值期末=期初+增加-减少+处置",
-                    passed=passed,
-                    details=(
-                        f"期末={closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('H1勾稽:固定资产原值期末=期初+增加-减少+处置', details=f"期末={closing:,.2f}, "
                         f"期初={opening:,.2f} + 增加={additions:,.2f} "
                         f"- 减少={disposals:,.2f} + 处置={h10_disposal:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('H1勾稽:固定资产原值期末=期初+增加-减少+处置', reason=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 增加={additions:,.2f} "
+                        f"- 减少={disposals:,.2f} + 处置={h10_disposal:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 增加={additions:,.2f} "
+                        f"- 减少={disposals:,.2f} + 处置={h10_disposal:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-H1-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="H1勾稽:固定资产原值期末=期初+增加-减少+处置",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('H1勾稽:固定资产原值期末=期初+增加-减少+处置', branch_id='h_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-H1-02: 累计折旧期末 = 期初 + 本期计提 − 处置冲减 (blocking)
         try:
@@ -1129,35 +989,27 @@ class ConsistencyGate:
                 or current_provision is None
                 or disposal_offset is None
             ):
-                checks.append(CheckItem(
-                    check_name="H1勾稽:累计折旧期末=期初+计提-处置冲减",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('H1勾稽:累计折旧期末=期初+计提-处置冲减', branch_id='h_cycle_triangle_reconciliation.3.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = dep_opening + current_provision - disposal_offset
                 diff = abs(dep_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="H1勾稽:累计折旧期末=期初+计提-处置冲减",
-                    passed=passed,
-                    details=(
-                        f"累计折旧期末={dep_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('H1勾稽:累计折旧期末=期初+计提-处置冲减', details=f"累计折旧期末={dep_closing:,.2f}, "
                         f"期初={dep_opening:,.2f} + 本期计提={current_provision:,.2f} "
                         f"- 处置冲减={disposal_offset:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('H1勾稽:累计折旧期末=期初+计提-处置冲减', reason=f"累计折旧期末={dep_closing:,.2f}, "
+                        f"期初={dep_opening:,.2f} + 本期计提={current_provision:,.2f} "
+                        f"- 处置冲减={disposal_offset:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"累计折旧期末={dep_closing:,.2f}, "
+                        f"期初={dep_opening:,.2f} + 本期计提={current_provision:,.2f} "
+                        f"- 处置冲减={disposal_offset:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-H1-02 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="H1勾稽:累计折旧期末=期初+计提-处置冲减",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('H1勾稽:累计折旧期末=期初+计提-处置冲减', branch_id='h_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-H8-01: 使用权资产期末 = 租赁负债期末 + 初始直接费用 − 激励 (blocking)
         try:
@@ -1172,35 +1024,27 @@ class ConsistencyGate:
                 or initial_direct_cost is None
                 or incentive is None
             ):
-                checks.append(CheckItem(
-                    check_name="H8勾稽:使用权资产=租赁负债+直接费用-激励",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('H8勾稽:使用权资产=租赁负债+直接费用-激励', branch_id='h_cycle_triangle_reconciliation.5.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = h9_closing + initial_direct_cost - incentive
                 diff = abs(h8_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="H8勾稽:使用权资产=租赁负债+直接费用-激励",
-                    passed=passed,
-                    details=(
-                        f"H8使用权资产期末={h8_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('H8勾稽:使用权资产=租赁负债+直接费用-激励', details=f"H8使用权资产期末={h8_closing:,.2f}, "
                         f"H9租赁负债期末={h9_closing:,.2f} + 初始直接费用={initial_direct_cost:,.2f} "
                         f"- 激励={incentive:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('H8勾稽:使用权资产=租赁负债+直接费用-激励', reason=f"H8使用权资产期末={h8_closing:,.2f}, "
+                        f"H9租赁负债期末={h9_closing:,.2f} + 初始直接费用={initial_direct_cost:,.2f} "
+                        f"- 激励={incentive:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"H8使用权资产期末={h8_closing:,.2f}, "
+                        f"H9租赁负债期末={h9_closing:,.2f} + 初始直接费用={initial_direct_cost:,.2f} "
+                        f"- 激励={incentive:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-H8-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="H8勾稽:使用权资产=租赁负债+直接费用-激励",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('H8勾稽:使用权资产=租赁负债+直接费用-激励', branch_id='h_cycle_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-H1-03: 平均折旧率波动 < 5% (warning)
         try:
@@ -1208,36 +1052,27 @@ class ConsistencyGate:
             prior_dep_rate = self._extract_decimal(h1_data, "prior_dep_rate")
 
             if current_dep_rate is None or prior_dep_rate is None:
-                checks.append(CheckItem(
-                    check_name="H1勾稽:平均折旧率波动<5%",
-                    passed=True,
-                    details="折旧率数据不完整，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('H1勾稽:平均折旧率波动<5%', branch_id='h_cycle_triangle_reconciliation.7.missing', reason='折旧率数据不完整，跳过检查', severity='warning'))
             else:
                 diff = abs(current_dep_rate - prior_dep_rate)
                 passed = diff < Decimal("0.05")
-                checks.append(CheckItem(
-                    check_name="H1勾稽:平均折旧率波动<5%",
-                    passed=passed,
-                    details=(
-                        f"本年折旧率={current_dep_rate:.4f}, "
+                if passed:
+                    checks.append(_ok('H1勾稽:平均折旧率波动<5%', details=f"本年折旧率={current_dep_rate:.4f}, "
                         f"上年折旧率={prior_dep_rate:.4f}, "
-                        f"波动={diff:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"波动={diff:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('H1勾稽:平均折旧率波动<5%', reason=f"本年折旧率={current_dep_rate:.4f}, "
+                        f"上年折旧率={prior_dep_rate:.4f}, "
+                        f"波动={diff:.4f}", details=f"本年折旧率={current_dep_rate:.4f}, "
+                        f"上年折旧率={prior_dep_rate:.4f}, "
+                        f"波动={diff:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-H1-03 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="H1勾稽:平均折旧率波动<5%",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('H1勾稽:平均折旧率波动<5%', branch_id='h_cycle_triangle_reconciliation.8.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("i_cycle_triangle_reconciliation")
     async def check_i_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1272,35 +1107,27 @@ class ConsistencyGate:
                 or disposals is None
                 or amortization is None
             ):
-                checks.append(CheckItem(
-                    check_name="I1勾稽:无形资产期末=期初+增加-减少-摊销",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('I1勾稽:无形资产期末=期初+增加-减少-摊销', branch_id='i_cycle_triangle_reconciliation.1.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = opening + additions - disposals - amortization
                 diff = abs(closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="I1勾稽:无形资产期末=期初+增加-减少-摊销",
-                    passed=passed,
-                    details=(
-                        f"期末={closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('I1勾稽:无形资产期末=期初+增加-减少-摊销', details=f"期末={closing:,.2f}, "
                         f"期初={opening:,.2f} + 增加={additions:,.2f} "
                         f"- 减少={disposals:,.2f} - 摊销={amortization:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('I1勾稽:无形资产期末=期初+增加-减少-摊销', reason=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 增加={additions:,.2f} "
+                        f"- 减少={disposals:,.2f} - 摊销={amortization:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 增加={additions:,.2f} "
+                        f"- 减少={disposals:,.2f} - 摊销={amortization:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-I1-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="I1勾稽:无形资产期末=期初+增加-减少-摊销",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('I1勾稽:无形资产期末=期初+增加-减少-摊销', branch_id='i_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-I3-01: 商誉期末 = 期初 − 减值损失 (blocking, 不摊销)
         try:
@@ -1309,34 +1136,24 @@ class ConsistencyGate:
             impairment_loss = self._extract_decimal(i3_data, "goodwill_impairment_loss")
 
             if closing is None or opening is None or impairment_loss is None:
-                checks.append(CheckItem(
-                    check_name="I3勾稽:商誉期末=期初-减值损失",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('I3勾稽:商誉期末=期初-减值损失', branch_id='i_cycle_triangle_reconciliation.3.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = opening - impairment_loss
                 diff = abs(closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="I3勾稽:商誉期末=期初-减值损失",
-                    passed=passed,
-                    details=(
-                        f"期末={closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('I3勾稽:商誉期末=期初-减值损失', details=f"期末={closing:,.2f}, "
                         f"期初={opening:,.2f} - 减值损失={impairment_loss:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('I3勾稽:商誉期末=期初-减值损失', reason=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} - 减值损失={impairment_loss:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} - 减值损失={impairment_loss:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-I3-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="I3勾稽:商誉期末=期初-减值损失",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('I3勾稽:商誉期末=期初-减值损失', branch_id='i_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-I6-01: 研发费用总额 = 费用化 + 资本化 (blocking, 仅当 I6 和 I2 都已保存)
         try:
@@ -1349,37 +1166,28 @@ class ConsistencyGate:
             i2_saved = i2_data is not None and rd_capitalized is not None
 
             if not i6_saved or not i2_saved:
-                checks.append(CheckItem(
-                    check_name="I6勾稽:研发费用=费用化+资本化",
-                    passed=True,
-                    details="对方底稿未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('I6勾稽:研发费用=费用化+资本化', branch_id='i_cycle_triangle_reconciliation.5.missing', reason='对方底稿未保存，跳过', severity='blocking'))
             else:
                 expected = rd_expensed + rd_capitalized
                 diff = abs(rd_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="I6勾稽:研发费用=费用化+资本化",
-                    passed=passed,
-                    details=(
-                        f"研发费用总额={rd_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('I6勾稽:研发费用=费用化+资本化', details=f"研发费用总额={rd_total:,.2f}, "
                         f"费用化={rd_expensed:,.2f} + 资本化={rd_capitalized:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('I6勾稽:研发费用=费用化+资本化', reason=f"研发费用总额={rd_total:,.2f}, "
+                        f"费用化={rd_expensed:,.2f} + 资本化={rd_capitalized:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"研发费用总额={rd_total:,.2f}, "
+                        f"费用化={rd_expensed:,.2f} + 资本化={rd_capitalized:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-I6-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="I6勾稽:研发费用=费用化+资本化",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('I6勾稽:研发费用=费用化+资本化', branch_id='i_cycle_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         return checks
 
+    @_guarded("g_cycle_triangle_reconciliation")
     async def check_g_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1418,46 +1226,33 @@ class ConsistencyGate:
 
             # skip：持股比例为 0 或权益法投资未保存
             if shareholding_ratio is None or shareholding_ratio == Decimal("0"):
-                checks.append(CheckItem(
-                    check_name="G7勾稽:权益法投资收益=净利润×持股比例-内部抵消",
-                    passed=True,
-                    details="G7 持股比例为零或权益法投资未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('G7勾稽:权益法投资收益=净利润×持股比例-内部抵消', branch_id='g_cycle_triangle_reconciliation.1.missing', reason='G7 持股比例为零或权益法投资未保存，跳过', severity='blocking'))
             elif (
                 recognized_income is None
                 or investee_net_profit is None
                 or internal_offset is None
             ):
-                checks.append(CheckItem(
-                    check_name="G7勾稽:权益法投资收益=净利润×持股比例-内部抵消",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('G7勾稽:权益法投资收益=净利润×持股比例-内部抵消', branch_id='g_cycle_triangle_reconciliation.2.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = investee_net_profit * shareholding_ratio - internal_offset
                 diff = abs(recognized_income - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="G7勾稽:权益法投资收益=净利润×持股比例-内部抵消",
-                    passed=passed,
-                    details=(
-                        f"确认收益={recognized_income:,.2f}, "
+                if passed:
+                    checks.append(_ok('G7勾稽:权益法投资收益=净利润×持股比例-内部抵消', details=f"确认收益={recognized_income:,.2f}, "
                         f"净利润={investee_net_profit:,.2f} × 持股比例={shareholding_ratio} "
                         f"- 内部抵消={internal_offset:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('G7勾稽:权益法投资收益=净利润×持股比例-内部抵消', reason=f"确认收益={recognized_income:,.2f}, "
+                        f"净利润={investee_net_profit:,.2f} × 持股比例={shareholding_ratio} "
+                        f"- 内部抵消={internal_offset:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"确认收益={recognized_income:,.2f}, "
+                        f"净利润={investee_net_profit:,.2f} × 持股比例={shareholding_ratio} "
+                        f"- 内部抵消={internal_offset:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-G7-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="G7勾稽:权益法投资收益=净利润×持股比例-内部抵消",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('G7勾稽:权益法投资收益=净利润×持股比例-内部抵消', branch_id='g_cycle_triangle_reconciliation.3.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-G11-01: G11 投资收益汇总 = G1+G4+G6+G7+G8 (blocking)
         # skip 逻辑：G11 已保存且至少 1 个子循环已保存才触发，全部子循环未保存时跳过
@@ -1475,12 +1270,7 @@ class ConsistencyGate:
             any_sub_saved = any(v is not None for v in sub_values)
 
             if not g11_saved or not any_sub_saved:
-                checks.append(CheckItem(
-                    check_name="G11勾稽:投资收益=G1+G4+G6+G7+G8",
-                    passed=True,
-                    details="子循环底稿未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('G11勾稽:投资收益=G1+G4+G6+G7+G8', branch_id='g_cycle_triangle_reconciliation.4.missing', reason='子循环底稿未保存，跳过', severity='blocking'))
             else:
                 # 缺失子循环视为 0（已至少 1 个保存，避免对方未填时误阻断的语义已覆盖）
                 g1 = g1_income or Decimal("0")
@@ -1491,25 +1281,22 @@ class ConsistencyGate:
                 expected = g1 + g4 + g6 + g7 + g8
                 diff = abs(g11_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="G11勾稽:投资收益=G1+G4+G6+G7+G8",
-                    passed=passed,
-                    details=(
-                        f"G11 合计={g11_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('G11勾稽:投资收益=G1+G4+G6+G7+G8', details=f"G11 合计={g11_total:,.2f}, "
                         f"G1={g1:,.2f} + G4={g4:,.2f} + G6={g6:,.2f} "
                         f"+ G7={g7:,.2f} + G8={g8:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('G11勾稽:投资收益=G1+G4+G6+G7+G8', reason=f"G11 合计={g11_total:,.2f}, "
+                        f"G1={g1:,.2f} + G4={g4:,.2f} + G6={g6:,.2f} "
+                        f"+ G7={g7:,.2f} + G8={g8:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"G11 合计={g11_total:,.2f}, "
+                        f"G1={g1:,.2f} + G4={g4:,.2f} + G6={g6:,.2f} "
+                        f"+ G7={g7:,.2f} + G8={g8:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-G11-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="G11勾稽:投资收益=G1+G4+G6+G7+G8",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('G11勾稽:投资收益=G1+G4+G6+G7+G8', branch_id='g_cycle_triangle_reconciliation.5.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-G1-01: G1 公允价值变动 = 期末公允价值 − 期初公允价值 (blocking)
         # 无 skip 逻辑（G1 内部勾稽）
@@ -1519,35 +1306,27 @@ class ConsistencyGate:
             fv_opening = self._extract_decimal(g1_data, "fv_opening")
 
             if fv_change is None or fv_closing is None or fv_opening is None:
-                checks.append(CheckItem(
-                    check_name="G1勾稽:公允价值变动=期末-期初",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('G1勾稽:公允价值变动=期末-期初', branch_id='g_cycle_triangle_reconciliation.6.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 expected = fv_closing - fv_opening
                 diff = abs(fv_change - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="G1勾稽:公允价值变动=期末-期初",
-                    passed=passed,
-                    details=(
-                        f"本期变动={fv_change:,.2f}, "
+                if passed:
+                    checks.append(_ok('G1勾稽:公允价值变动=期末-期初', details=f"本期变动={fv_change:,.2f}, "
                         f"期末公允价值={fv_closing:,.2f} - 期初公允价值={fv_opening:,.2f} "
                         f"= {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('G1勾稽:公允价值变动=期末-期初', reason=f"本期变动={fv_change:,.2f}, "
+                        f"期末公允价值={fv_closing:,.2f} - 期初公允价值={fv_opening:,.2f} "
+                        f"= {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"本期变动={fv_change:,.2f}, "
+                        f"期末公允价值={fv_closing:,.2f} - 期初公允价值={fv_opening:,.2f} "
+                        f"= {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-G1-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="G1勾稽:公允价值变动=期末-期初",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('G1勾稽:公允价值变动=期末-期初', branch_id='g_cycle_triangle_reconciliation.7.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-G14-01: G14 信用减值损失 = G4 ECL 变动 + G6 ECL 变动 (blocking)
         # skip 逻辑：G14 已保存且至少 1 个子循环已保存才触发
@@ -1560,40 +1339,33 @@ class ConsistencyGate:
             any_sub_saved = (g4_ecl_change is not None) or (g6_ecl_change is not None)
 
             if not g14_saved or not any_sub_saved:
-                checks.append(CheckItem(
-                    check_name="G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动",
-                    passed=True,
-                    details="子循环底稿未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动', branch_id='g_cycle_triangle_reconciliation.8.missing', reason='子循环底稿未保存，跳过', severity='blocking'))
             else:
                 g4_ecl = g4_ecl_change or Decimal("0")
                 g6_ecl = g6_ecl_change or Decimal("0")
                 expected = g4_ecl + g6_ecl
                 diff = abs(g14_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动",
-                    passed=passed,
-                    details=(
-                        f"G14 合计={g14_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动', details=f"G14 合计={g14_total:,.2f}, "
                         f"G4 ECL变动={g4_ecl:,.2f} + G6 ECL变动={g6_ecl:,.2f} "
                         f"= {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动', reason=f"G14 合计={g14_total:,.2f}, "
+                        f"G4 ECL变动={g4_ecl:,.2f} + G6 ECL变动={g6_ecl:,.2f} "
+                        f"= {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"G14 合计={g14_total:,.2f}, "
+                        f"G4 ECL变动={g4_ecl:,.2f} + G6 ECL变动={g6_ecl:,.2f} "
+                        f"= {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-G14-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('G14勾稽:信用减值损失=G4 ECL变动+G6 ECL变动', branch_id='g_cycle_triangle_reconciliation.9.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         return checks
 
+    @_guarded("j_cycle_triangle_reconciliation")
     async def check_j_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1624,37 +1396,29 @@ class ConsistencyGate:
             paid = self._extract_decimal(j1_data, "payroll_paid")
 
             if closing is None or opening is None or (accrued is None and paid is None):
-                checks.append(CheckItem(
-                    check_name="J1勾稽:应付职工薪酬期末=期初+计提-实发",
-                    passed=True,
-                    details="数据不完整，跳过检查",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('J1勾稽:应付职工薪酬期末=期初+计提-实发', branch_id='j_cycle_triangle_reconciliation.1.missing', reason='数据不完整，跳过检查', severity='blocking'))
             else:
                 accrued_val = accrued or Decimal("0")
                 paid_val = paid or Decimal("0")
                 expected = opening + accrued_val - paid_val
                 diff = abs(closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="J1勾稽:应付职工薪酬期末=期初+计提-实发",
-                    passed=passed,
-                    details=(
-                        f"期末={closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('J1勾稽:应付职工薪酬期末=期初+计提-实发', details=f"期末={closing:,.2f}, "
                         f"期初={opening:,.2f} + 计提={accrued_val:,.2f} "
                         f"- 实发={paid_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('J1勾稽:应付职工薪酬期末=期初+计提-实发', reason=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 计提={accrued_val:,.2f} "
+                        f"- 实发={paid_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"期末={closing:,.2f}, "
+                        f"期初={opening:,.2f} + 计提={accrued_val:,.2f} "
+                        f"- 实发={paid_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-J1-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="J1勾稽:应付职工薪酬期末=期初+计提-实发",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('J1勾稽:应付职工薪酬期末=期初+计提-实发', branch_id='j_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-J1-02: 薪酬费用率年度波动 < 5% (warning)
         try:
@@ -1662,35 +1426,25 @@ class ConsistencyGate:
             prev_rate = self._extract_decimal(j1_data, "payroll_expense_rate_prev")
 
             if current_rate is None or prev_rate is None:
-                checks.append(CheckItem(
-                    check_name="J1勾稽:薪酬费用率年度波动<5%",
-                    passed=True,
-                    details="无上年数据或本年数据，跳过检查",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('J1勾稽:薪酬费用率年度波动<5%', branch_id='j_cycle_triangle_reconciliation.3.missing', reason='无上年数据或本年数据，跳过检查', severity='warning'))
             else:
                 # 避免除零
                 denominator = max(abs(prev_rate), Decimal("0.001"))
                 fluctuation = abs(current_rate - prev_rate) / denominator
                 passed = fluctuation < Decimal("0.05")
-                checks.append(CheckItem(
-                    check_name="J1勾稽:薪酬费用率年度波动<5%",
-                    passed=passed,
-                    details=(
-                        f"本年费用率={current_rate:.4f}, "
+                if passed:
+                    checks.append(_ok('J1勾稽:薪酬费用率年度波动<5%', details=f"本年费用率={current_rate:.4f}, "
                         f"上年费用率={prev_rate:.4f}, "
-                        f"波动={fluctuation:.4f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"波动={fluctuation:.4f}", severity="warning"))
+                else:
+                    checks.append(_fail('J1勾稽:薪酬费用率年度波动<5%', reason=f"本年费用率={current_rate:.4f}, "
+                        f"上年费用率={prev_rate:.4f}, "
+                        f"波动={fluctuation:.4f}", details=f"本年费用率={current_rate:.4f}, "
+                        f"上年费用率={prev_rate:.4f}, "
+                        f"波动={fluctuation:.4f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-J1-02 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="J1勾稽:薪酬费用率年度波动<5%",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('J1勾稽:薪酬费用率年度波动<5%', branch_id='j_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         # VR-J1-03: 薪酬分配合计 = D5 + K8 + K9 + F2 (blocking)
         # skip_if_all_targets_missing=true: D5/K8/K9/F2 全部未保存 → skip
@@ -1710,12 +1464,7 @@ class ConsistencyGate:
             any_target_saved = any(v is not None for v in target_values)
 
             if not j1_7_saved or not any_target_saved:
-                checks.append(CheckItem(
-                    check_name="J1勾稽:薪酬分配合计=D5+K8+K9+F2",
-                    passed=True,
-                    details="目标底稿全部未保存或J1-7未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('J1勾稽:薪酬分配合计=D5+K8+K9+F2', branch_id='j_cycle_triangle_reconciliation.5.missing', reason='目标底稿全部未保存或J1-7未保存，跳过', severity='blocking'))
             else:
                 # 已保存的目标取值，未保存的视为 0
                 d5 = d5_payroll or Decimal("0")
@@ -1725,25 +1474,22 @@ class ConsistencyGate:
                 expected = d5 + k8 + k9 + f2
                 diff = abs(total_allocation - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="J1勾稽:薪酬分配合计=D5+K8+K9+F2",
-                    passed=passed,
-                    details=(
-                        f"分配合计={total_allocation:,.2f}, "
+                if passed:
+                    checks.append(_ok('J1勾稽:薪酬分配合计=D5+K8+K9+F2', details=f"分配合计={total_allocation:,.2f}, "
                         f"D5={d5:,.2f} + K8={k8:,.2f} + K9={k9:,.2f} "
                         f"+ F2={f2:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('J1勾稽:薪酬分配合计=D5+K8+K9+F2', reason=f"分配合计={total_allocation:,.2f}, "
+                        f"D5={d5:,.2f} + K8={k8:,.2f} + K9={k9:,.2f} "
+                        f"+ F2={f2:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"分配合计={total_allocation:,.2f}, "
+                        f"D5={d5:,.2f} + K8={k8:,.2f} + K9={k9:,.2f} "
+                        f"+ F2={f2:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-J1-03 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="J1勾稽:薪酬分配合计=D5+K8+K9+F2",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('J1勾稽:薪酬分配合计=D5+K8+K9+F2', branch_id='j_cycle_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         return checks
 
@@ -1751,6 +1497,7 @@ class ConsistencyGate:
     # K spec K-F3: 3 条 K 管理循环三角勾稽规则
     # ------------------------------------------------------------------
 
+    @_guarded("k_cycle_triangle_reconciliation")
     async def check_k_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1792,12 +1539,7 @@ class ConsistencyGate:
             )
 
             if k8_total is None or not k8_2_saved:
-                checks.append(CheckItem(
-                    check_name="K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)",
-                    passed=True,
-                    details="K8-2 销售费用明细表未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)', branch_id='k_cycle_triangle_reconciliation.1.missing', reason='K8-2 销售费用明细表未保存，跳过', severity='blocking'))
             else:
                 payroll_val = k8_payroll or Decimal("0")
                 dep_val = k8_depreciation or Decimal("0")
@@ -1805,25 +1547,22 @@ class ConsistencyGate:
                 expected = payroll_val + dep_val + other_val
                 diff = abs(k8_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)",
-                    passed=passed,
-                    details=(
-                        f"K8 销售费用审定数={k8_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)', details=f"K8 销售费用审定数={k8_total:,.2f}, "
                         f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
                         f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)', reason=f"K8 销售费用审定数={k8_total:,.2f}, "
+                        f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
+                        f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"K8 销售费用审定数={k8_total:,.2f}, "
+                        f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
+                        f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-K8-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('K8勾稽:销售费用合计=K8-2明细(薪酬+折旧+其他)', branch_id='k_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-K9-01: K9 管理费用 = K9-2 明细合计（薪酬+折旧+其他） (blocking)
         # 触发条件：K9-1 AND K9-2 saved；K9-2 未保存 → skip
@@ -1840,12 +1579,7 @@ class ConsistencyGate:
             )
 
             if k9_total is None or not k9_2_saved:
-                checks.append(CheckItem(
-                    check_name="K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)",
-                    passed=True,
-                    details="K9-2 管理费用明细表未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)', branch_id='k_cycle_triangle_reconciliation.3.missing', reason='K9-2 管理费用明细表未保存，跳过', severity='blocking'))
             else:
                 payroll_val = k9_payroll or Decimal("0")
                 dep_val = k9_depreciation or Decimal("0")
@@ -1853,25 +1587,22 @@ class ConsistencyGate:
                 expected = payroll_val + dep_val + other_val
                 diff = abs(k9_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)",
-                    passed=passed,
-                    details=(
-                        f"K9 管理费用审定数={k9_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)', details=f"K9 管理费用审定数={k9_total:,.2f}, "
                         f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
                         f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)', reason=f"K9 管理费用审定数={k9_total:,.2f}, "
+                        f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
+                        f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"K9 管理费用审定数={k9_total:,.2f}, "
+                        f"薪酬={payroll_val:,.2f} + 折旧={dep_val:,.2f} "
+                        f"+ 其他={other_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-K9-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('K9勾稽:管理费用合计=K9-2明细(薪酬+折旧+其他)', branch_id='k_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-K11-01: K11 资产减值损失 = H1-14 + I3 + G14 + F2 减值
         # (warning, tolerance=1.0)
@@ -1891,12 +1622,7 @@ class ConsistencyGate:
             any_source_saved = any(v is not None for v in source_values)
 
             if not k11_saved or not any_source_saved:
-                checks.append(CheckItem(
-                    check_name="K11勾稽:资产减值汇总=H1-14+I3+G+F2",
-                    passed=True,
-                    details="跨循环减值来源底稿未保存或K11未保存，跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('K11勾稽:资产减值汇总=H1-14+I3+G+F2', branch_id='k_cycle_triangle_reconciliation.5.missing', reason='跨循环减值来源底稿未保存或K11未保存，跳过', severity='warning'))
             else:
                 h1_val = h1_impairment or Decimal("0")
                 i3_val = i3_impairment or Decimal("0")
@@ -1905,28 +1631,26 @@ class ConsistencyGate:
                 expected = h1_val + i3_val + g_val + f2_val
                 diff = abs(k11_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="K11勾稽:资产减值汇总=H1-14+I3+G+F2",
-                    passed=passed,
-                    details=(
-                        f"K11 资产减值审定数={k11_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('K11勾稽:资产减值汇总=H1-14+I3+G+F2', details=f"K11 资产减值审定数={k11_total:,.2f}, "
                         f"H1固定资产减值={h1_val:,.2f} + I3商誉减值={i3_val:,.2f} "
                         f"+ G信用减值={g_val:,.2f} + F2存货跌价={f2_val:,.2f} "
-                        f"= {expected:,.2f}, 差额={diff:,.2f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="warning"))
+                else:
+                    checks.append(_fail('K11勾稽:资产减值汇总=H1-14+I3+G+F2', reason=f"K11 资产减值审定数={k11_total:,.2f}, "
+                        f"H1固定资产减值={h1_val:,.2f} + I3商誉减值={i3_val:,.2f} "
+                        f"+ G信用减值={g_val:,.2f} + F2存货跌价={f2_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", details=f"K11 资产减值审定数={k11_total:,.2f}, "
+                        f"H1固定资产减值={h1_val:,.2f} + I3商誉减值={i3_val:,.2f} "
+                        f"+ G信用减值={g_val:,.2f} + F2存货跌价={f2_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-K11-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="K11勾稽:资产减值汇总=H1-14+I3+G+F2",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('K11勾稽:资产减值汇总=H1-14+I3+G+F2', branch_id='k_cycle_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("l_cycle_triangle_reconciliation")
     async def check_l_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -1966,12 +1690,7 @@ class ConsistencyGate:
             any_source_saved = any(v is not None for v in source_values)
 
             if not l8_saved or not any_source_saved:
-                checks.append(CheckItem(
-                    check_name="L8勾稽:利息支出=L1+L3+H9+L5利息",
-                    passed=True,
-                    details="利息来源底稿（L1-5/L3-5/H9/L5）均未保存或L8未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('L8勾稽:利息支出=L1+L3+H9+L5利息', branch_id='l_cycle_triangle_reconciliation.1.missing', reason='利息来源底稿（L1-5/L3-5/H9/L5）均未保存或L8未保存，跳过', severity='blocking'))
             else:
                 l1_val = l1_interest or Decimal("0")
                 l3_val = l3_interest or Decimal("0")
@@ -1980,25 +1699,22 @@ class ConsistencyGate:
                 expected = l1_val + l3_val + h9_val + l5_val
                 diff = abs(l8_interest - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="L8勾稽:利息支出=L1+L3+H9+L5利息",
-                    passed=passed,
-                    details=(
-                        f"L8 利息支出审定数={l8_interest:,.2f}, "
+                if passed:
+                    checks.append(_ok('L8勾稽:利息支出=L1+L3+H9+L5利息', details=f"L8 利息支出审定数={l8_interest:,.2f}, "
                         f"L1利息={l1_val:,.2f} + L3利息={l3_val:,.2f} "
                         f"+ H9租赁利息={h9_val:,.2f} + L5债券利息={l5_val:,.2f} "
-                        f"= {expected:,.2f}, 差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('L8勾稽:利息支出=L1+L3+H9+L5利息', reason=f"L8 利息支出审定数={l8_interest:,.2f}, "
+                        f"L1利息={l1_val:,.2f} + L3利息={l3_val:,.2f} "
+                        f"+ H9租赁利息={h9_val:,.2f} + L5债券利息={l5_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", details=f"L8 利息支出审定数={l8_interest:,.2f}, "
+                        f"L1利息={l1_val:,.2f} + L3利息={l3_val:,.2f} "
+                        f"+ H9租赁利息={h9_val:,.2f} + L5债券利息={l5_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-L8-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="L8勾稽:利息支出=L1+L3+H9+L5利息",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('L8勾稽:利息支出=L1+L3+H9+L5利息', branch_id='l_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-L1-01: L1 期末 = 期初 + 新增借款 − 偿还 (blocking)
         # 触发条件：L1-1 saved（期初/期末/增减字段存在）；缺失 → skip
@@ -2012,37 +1728,29 @@ class ConsistencyGate:
             l1_has_required = l1_closing is not None and l1_opening is not None
 
             if not l1_has_required:
-                checks.append(CheckItem(
-                    check_name="L1勾稽:期末=期初+新增−偿还",
-                    passed=True,
-                    details="L1-1 审定表未保存或数据不完整，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('L1勾稽:期末=期初+新增−偿还', branch_id='l_cycle_triangle_reconciliation.3.missing', reason='L1-1 审定表未保存或数据不完整，跳过', severity='blocking'))
             else:
                 new_val = l1_new or Decimal("0")
                 repay_val = l1_repay or Decimal("0")
                 expected = l1_opening + new_val - repay_val
                 diff = abs(l1_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="L1勾稽:期末=期初+新增−偿还",
-                    passed=passed,
-                    details=(
-                        f"L1 期末余额={l1_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('L1勾稽:期末=期初+新增−偿还', details=f"L1 期末余额={l1_closing:,.2f}, "
                         f"期初={l1_opening:,.2f} + 新增={new_val:,.2f} "
                         f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('L1勾稽:期末=期初+新增−偿还', reason=f"L1 期末余额={l1_closing:,.2f}, "
+                        f"期初={l1_opening:,.2f} + 新增={new_val:,.2f} "
+                        f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"L1 期末余额={l1_closing:,.2f}, "
+                        f"期初={l1_opening:,.2f} + 新增={new_val:,.2f} "
+                        f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-L1-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="L1勾稽:期末=期初+新增−偿还",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('L1勾稽:期末=期初+新增−偿还', branch_id='l_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-L3-01: L3 期末 + 重分类 = 期初 + 新增 − 偿还 (warning)
         # 触发条件：L3-1 saved（期初/期末/重分类字段存在）；缺失 → skip
@@ -2057,12 +1765,7 @@ class ConsistencyGate:
             l3_has_required = l3_closing is not None and l3_opening is not None
 
             if not l3_has_required:
-                checks.append(CheckItem(
-                    check_name="L3勾稽:期末+重分类=期初+新增−偿还",
-                    passed=True,
-                    details="L3-1 审定表未保存或数据不完整，跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('L3勾稽:期末+重分类=期初+新增−偿还', branch_id='l_cycle_triangle_reconciliation.5.missing', reason='L3-1 审定表未保存或数据不完整，跳过', severity='warning'))
             else:
                 new_val = l3_new or Decimal("0")
                 repay_val = l3_repay or Decimal("0")
@@ -2071,29 +1774,29 @@ class ConsistencyGate:
                 actual = l3_closing + reclass_val
                 diff = abs(actual - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="L3勾稽:期末+重分类=期初+新增−偿还",
-                    passed=passed,
-                    details=(
-                        f"L3 期末={l3_closing:,.2f} + 重分类={reclass_val:,.2f} "
+                if passed:
+                    checks.append(_ok('L3勾稽:期末+重分类=期初+新增−偿还', details=f"L3 期末={l3_closing:,.2f} + 重分类={reclass_val:,.2f} "
                         f"= {actual:,.2f}, "
                         f"期初={l3_opening:,.2f} + 新增={new_val:,.2f} "
                         f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"差额={diff:,.2f}", severity="warning"))
+                else:
+                    checks.append(_fail('L3勾稽:期末+重分类=期初+新增−偿还', reason=f"L3 期末={l3_closing:,.2f} + 重分类={reclass_val:,.2f} "
+                        f"= {actual:,.2f}, "
+                        f"期初={l3_opening:,.2f} + 新增={new_val:,.2f} "
+                        f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"L3 期末={l3_closing:,.2f} + 重分类={reclass_val:,.2f} "
+                        f"= {actual:,.2f}, "
+                        f"期初={l3_opening:,.2f} + 新增={new_val:,.2f} "
+                        f"− 偿还={repay_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-L3-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="L3勾稽:期末+重分类=期初+新增−偿还",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('L3勾稽:期末+重分类=期初+新增−偿还', branch_id='l_cycle_triangle_reconciliation.6.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("m_cycle_triangle_reconciliation")
     async def check_m_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -2131,12 +1834,7 @@ class ConsistencyGate:
             any_source_saved = any(v is not None for v in source_values)
 
             if not m6_saved or not any_source_saved:
-                checks.append(CheckItem(
-                    check_name="M6勾稽:期末=期初+净利润−盈余公积−股利",
-                    passed=True,
-                    details="净利润来源底稿（PL/M5/M1）均未保存或M6未保存，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('M6勾稽:期末=期初+净利润−盈余公积−股利', branch_id='m_cycle_triangle_reconciliation.1.missing', reason='净利润来源底稿（PL/M5/M1）均未保存或M6未保存，跳过', severity='blocking'))
             else:
                 np_val = net_profit or Decimal("0")
                 sr_val = surplus_reserve or Decimal("0")
@@ -2144,25 +1842,22 @@ class ConsistencyGate:
                 expected = m6_opening + np_val - sr_val - div_val
                 diff = abs(m6_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="M6勾稽:期末=期初+净利润−盈余公积−股利",
-                    passed=passed,
-                    details=(
-                        f"M6 期末={m6_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('M6勾稽:期末=期初+净利润−盈余公积−股利', details=f"M6 期末={m6_closing:,.2f}, "
                         f"期初={m6_opening:,.2f} + 净利润={np_val:,.2f} "
                         f"− 盈余公积={sr_val:,.2f} − 股利={div_val:,.2f} "
-                        f"= {expected:,.2f}, 差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('M6勾稽:期末=期初+净利润−盈余公积−股利', reason=f"M6 期末={m6_closing:,.2f}, "
+                        f"期初={m6_opening:,.2f} + 净利润={np_val:,.2f} "
+                        f"− 盈余公积={sr_val:,.2f} − 股利={div_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", details=f"M6 期末={m6_closing:,.2f}, "
+                        f"期初={m6_opening:,.2f} + 净利润={np_val:,.2f} "
+                        f"− 盈余公积={sr_val:,.2f} − 股利={div_val:,.2f} "
+                        f"= {expected:,.2f}, 差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-M6-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="M6勾稽:期末=期初+净利润−盈余公积−股利",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('M6勾稽:期末=期初+净利润−盈余公积−股利', branch_id='m_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-M2-01: M2 期末 = 期初 + 增资 − 减资 (warning)
         # 触发条件：M2-1 saved（期初/期末/增减字段存在）；缺失 → skip
@@ -2176,40 +1871,33 @@ class ConsistencyGate:
             m2_has_required = m2_closing is not None and m2_opening is not None
 
             if not m2_has_required:
-                checks.append(CheckItem(
-                    check_name="M2勾稽:期末=期初+增资−减资",
-                    passed=True,
-                    details="M2-1 审定表未保存或数据不完整，跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('M2勾稽:期末=期初+增资−减资', branch_id='m_cycle_triangle_reconciliation.3.missing', reason='M2-1 审定表未保存或数据不完整，跳过', severity='warning'))
             else:
                 inc_val = m2_increase or Decimal("0")
                 dec_val = m2_decrease or Decimal("0")
                 expected = m2_opening + inc_val - dec_val
                 diff = abs(m2_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="M2勾稽:期末=期初+增资−减资",
-                    passed=passed,
-                    details=(
-                        f"M2 期末={m2_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('M2勾稽:期末=期初+增资−减资', details=f"M2 期末={m2_closing:,.2f}, "
                         f"期初={m2_opening:,.2f} + 增资={inc_val:,.2f} "
                         f"− 减资={dec_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"差额={diff:,.2f}", severity="warning"))
+                else:
+                    checks.append(_fail('M2勾稽:期末=期初+增资−减资', reason=f"M2 期末={m2_closing:,.2f}, "
+                        f"期初={m2_opening:,.2f} + 增资={inc_val:,.2f} "
+                        f"− 减资={dec_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"M2 期末={m2_closing:,.2f}, "
+                        f"期初={m2_opening:,.2f} + 增资={inc_val:,.2f} "
+                        f"− 减资={dec_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-M2-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="M2勾稽:期末=期初+增资−减资",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('M2勾稽:期末=期初+增资−减资', branch_id='m_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 
+    @_guarded("n_cycle_triangle_reconciliation")
     async def check_n_cycle_triangle_reconciliation(
         self, project_id: UUID, year: int
     ) -> list[CheckItem]:
@@ -2241,37 +1929,29 @@ class ConsistencyGate:
             n2_has_required = n2_closing is not None and n2_opening is not None
 
             if not n2_has_required:
-                checks.append(CheckItem(
-                    check_name="N2勾稽:期末=期初+计提−缴纳",
-                    passed=True,
-                    details="N2-1 审定表未保存或数据不完整，跳过",
-                    severity="blocking",
-                ))
+                checks.append(_not_executed('N2勾稽:期末=期初+计提−缴纳', branch_id='n_cycle_triangle_reconciliation.1.missing', reason='N2-1 审定表未保存或数据不完整，跳过', severity='blocking'))
             else:
                 accrued_val = n2_accrued or Decimal("0")
                 paid_val = n2_paid or Decimal("0")
                 expected = n2_opening + accrued_val - paid_val
                 diff = abs(n2_closing - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="N2勾稽:期末=期初+计提−缴纳",
-                    passed=passed,
-                    details=(
-                        f"N2 期末={n2_closing:,.2f}, "
+                if passed:
+                    checks.append(_ok('N2勾稽:期末=期初+计提−缴纳', details=f"N2 期末={n2_closing:,.2f}, "
                         f"期初={n2_opening:,.2f} + 计提={accrued_val:,.2f} "
                         f"− 缴纳={paid_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="blocking",
-                ))
+                        f"差额={diff:,.2f}", severity="blocking"))
+                else:
+                    checks.append(_fail('N2勾稽:期末=期初+计提−缴纳', reason=f"N2 期末={n2_closing:,.2f}, "
+                        f"期初={n2_opening:,.2f} + 计提={accrued_val:,.2f} "
+                        f"− 缴纳={paid_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"N2 期末={n2_closing:,.2f}, "
+                        f"期初={n2_opening:,.2f} + 计提={accrued_val:,.2f} "
+                        f"− 缴纳={paid_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="blocking"))
         except Exception as e:
             logger.warning("VR-N2-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="N2勾稽:期末=期初+计提−缴纳",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="blocking",
-            ))
+            checks.append(_not_executed('N2勾稽:期末=期初+计提−缴纳', branch_id='n_cycle_triangle_reconciliation.2.exception', reason=f"检查异常: {e}", severity='blocking'))
 
         # VR-N5-01: N5 所得税费用 ≈ 利润总额 × 税率 + 递延调整 (warning)
         # 汇总类规则时机铁律：利润总额未保存时 skip
@@ -2287,37 +1967,29 @@ class ConsistencyGate:
             pl_saved = profit_before_tax is not None
 
             if not n5_saved or not pl_saved:
-                checks.append(CheckItem(
-                    check_name="N5勾稽:所得税≈利润总额×税率+递延调整",
-                    passed=True,
-                    details="N5 审定表或利润总额（PL）未保存，跳过",
-                    severity="warning",
-                ))
+                checks.append(_not_executed('N5勾稽:所得税≈利润总额×税率+递延调整', branch_id='n_cycle_triangle_reconciliation.3.missing', reason='N5 审定表或利润总额（PL）未保存，跳过', severity='warning'))
             else:
                 rate_val = statutory_rate if statutory_rate is not None else Decimal("0.25")
                 deferred_val = deferred_adjustment or Decimal("0")
                 expected = profit_before_tax * rate_val + deferred_val
                 diff = abs(n5_total - expected)
                 passed = diff < Decimal("1.0")
-                checks.append(CheckItem(
-                    check_name="N5勾稽:所得税≈利润总额×税率+递延调整",
-                    passed=passed,
-                    details=(
-                        f"N5 所得税={n5_total:,.2f}, "
+                if passed:
+                    checks.append(_ok('N5勾稽:所得税≈利润总额×税率+递延调整', details=f"N5 所得税={n5_total:,.2f}, "
                         f"利润总额={profit_before_tax:,.2f} × 税率={rate_val} "
                         f"+ 递延调整={deferred_val:,.2f} = {expected:,.2f}, "
-                        f"差额={diff:,.2f}"
-                    ),
-                    severity="warning",
-                ))
+                        f"差额={diff:,.2f}", severity="warning"))
+                else:
+                    checks.append(_fail('N5勾稽:所得税≈利润总额×税率+递延调整', reason=f"N5 所得税={n5_total:,.2f}, "
+                        f"利润总额={profit_before_tax:,.2f} × 税率={rate_val} "
+                        f"+ 递延调整={deferred_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", details=f"N5 所得税={n5_total:,.2f}, "
+                        f"利润总额={profit_before_tax:,.2f} × 税率={rate_val} "
+                        f"+ 递延调整={deferred_val:,.2f} = {expected:,.2f}, "
+                        f"差额={diff:,.2f}", severity="warning"))
         except Exception as e:
             logger.warning("VR-N5-01 check failed: %s", e)
-            checks.append(CheckItem(
-                check_name="N5勾稽:所得税≈利润总额×税率+递延调整",
-                passed=True,
-                details=f"检查异常: {e}",
-                severity="warning",
-            ))
+            checks.append(_not_executed('N5勾稽:所得税≈利润总额×税率+递延调整', branch_id='n_cycle_triangle_reconciliation.4.exception', reason=f"检查异常: {e}", severity='warning'))
 
         return checks
 

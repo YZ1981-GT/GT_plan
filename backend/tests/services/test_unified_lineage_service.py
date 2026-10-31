@@ -4,6 +4,7 @@ mock 3 个 trace service，断言统一输出格式。
 """
 
 import uuid
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,7 +15,12 @@ from app.services.unified_lineage_service import UnifiedLineageService
 
 @pytest.fixture
 def mock_db():
+    @asynccontextmanager
+    async def _savepoint():
+        yield
+
     db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=_savepoint)
     db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
     return db
 

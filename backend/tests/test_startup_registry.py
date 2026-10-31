@@ -540,6 +540,7 @@ _PHASE_HANDLER_REGISTRATIONS = (
     ("app.services.gate_rules_phase14", "register_phase14_rules", False),
     ("app.services.gate_rules_eqcr", "register_eqcr_gate_rules", False),
     ("app.services.gate_rules_cross_check", "register_cross_check_rules", False),
+    ("app.services.gate_rules_chain", "register_consistency_gate_rule", False),
     ("app.services.task_event_handlers", "register_event_handlers", False),
     ("app.services.consol_note_stale_handler", "register_stale_handler", True),
     ("app.services.consol_trial_stale_handler", "register_consol_trial_stale_handler", True),

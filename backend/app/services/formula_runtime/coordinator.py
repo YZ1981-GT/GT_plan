@@ -37,7 +37,14 @@ from app.services.formula_runtime.contracts import (
     CanonicalFormulaTarget,
     FormulaMutation,
 )
+from app.services.formula_runtime.typed_eval import (
+    BatchDefinition as TypedBatchDefinition,
+    PlanResult as TypedPlanResult,
+    plan_batch,
+)
 from app.services.formula_runtime.value_loader import FormulaValueLoader
+from app.services.wp_cell_reader import WpCellRead, _year_gate
+from app.services.wp_ref_strict import read_wp_ref_strict
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +112,7 @@ class FormulaRuntimeCoordinator:
         plan = MutationPlanResult()
 
         # ── Step 1: Load formula definitions from DB ─────────────────────
-        formulas = await self._load_formulas(project_id, year, scopes)
+        formulas, wp_codes = await self._load_formulas(project_id, year, scopes)
         if not formulas:
             logger.info(
                 "FormulaRuntimeCoordinator: no formulas found for project=%s year=%d scopes=%s",
@@ -127,51 +134,80 @@ class FormulaRuntimeCoordinator:
             })
             return plan
 
-        # ── Step 2: Build BatchFormulaDefinition + canonical targets ──────
+        # ── Step 2: Build typed_eval definitions ──────────────────────────
+        typed_defs = await self._build_typed_eval_definitions(formulas, wp_codes)
+        if not typed_defs:
+            return plan
+
+        # ── Step 3: Year verdict (once for the batch) ────────────────────
+        year_verdict = await _year_gate(self._session, project_id, year)
+
+        # ── Step 4: plan_batch (typed_eval) ──────────────────────────────
+        async def _read(wp_code: str, second: str, third: str | None) -> WpCellRead:
+            return await read_wp_ref_strict(
+                self._session, project_id, None, wp_code, second, third,
+            )
+
+        # 🔴 `eval_fn` 必传：`plan_batch` 在 `eval_fn is None` 时把 ok 结果的 `value` 置 None
+        # （只建图、不求值），而下面 Step 5 产 MutationIntent 的条件里有 `outcome.value is not None`
+        # ⇒ 不传就等于「全部有效公式都不产 mutation」，整条 Runtime 写入路径静默失效。
+        # 2026-10-29 由需求 1.10 的 29 行重放用例（`test_runtime_replay_29_pg.py`）抓出：
+        # 当时 13 条 blocked 与金标准完全一致，而 16 条 ok 产出 0 条 mutation。
+        # 求值口径与预览端点 `typed_eval.evaluate_single` 同一个（严格 WP 代入，ADR-FHIC-06 第 7 点）。
+        async def _eval(expression: str, wp_values: dict[str, Any]) -> tuple[Any, list[str]]:
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
+            return await evaluate_wp_formula_expression(
+                self._session,
+                project_id=project_id,
+                year=year,
+                expression=expression,
+                wp_values=wp_values,
+                strict_wp=True,
+            )
+
+        typed_result: TypedPlanResult = await plan_batch(
+            typed_defs, year_verdict=year_verdict, read_ref=_read, eval_fn=_eval,
+        )
+
+        # ── Step 5: Convert typed_eval outcomes → FormulaMutations ───────
+        # typed_eval PlanOutcome with state="ok" are mutation candidates;
+        # blocked outcomes go to scope_failures.
+        # We still need targets and adapters for actual mutations.
         batch_defs, all_ref_addr_ids, targets_by_formula = self._build_batch_definitions(
             formulas, project_id, year
         )
 
-        if not batch_defs:
-            return plan
-
-        # ── Step 3: Batch load values via FormulaValueLoader ─────────────
-        # Build canonical targets for all referenced addr_ids
-        ref_targets = self._build_ref_targets(all_ref_addr_ids, project_id, year)
-        loader = FormulaValueLoader(self._session)
-        load_result = await loader.load_many(ref_targets)
-
-        # Build BatchFormulaContext from load result
-        context = BatchFormulaContext(
-            values=load_result.values,
-            missing={i.addr_id for i in load_result.issues if i.kind == "miss"},
-            ambiguous={i.addr_id for i in load_result.issues if i.kind == "ambiguous"},
-        )
-
-        # Record load issues as scope failures
-        for issue in load_result.issues:
-            if issue.kind in ("miss", "ambiguous"):
+        # Build engine-compatible intents from typed_eval outcomes
+        # 🔴 求值返回的 errors 非空 = 取不到数 / 写法无法识别 / L1 失败：`evaluate_wp_formula_expression` 此时返回的
+        # value 是占位 0（需求 2.3「写入方须判 ok」），state 仍是 "ok"。照产 mutation 就是把「取不到」写成 0
+        # （需求 1.3「取不到一律 blocked，不按 0 代入」）；value 为 None 时原先既不写也不报，静默丢掉 ⇒ 两种都进 scope_failures。
+        intents: list[MutationIntent] = []
+        for outcome in typed_result.outcomes:
+            fid = str(outcome.formula_id)
+            target = targets_by_formula.get(fid)
+            eval_failed = outcome.state == "ok" and (bool(outcome.errors) or outcome.value is None)
+            if outcome.state == "ok" and not eval_failed and target is not None:
+                intents.append(MutationIntent(
+                    formula_id=fid,
+                    target=target,
+                    computed_value=outcome.value,
+                    formula_type="auto_calc",
+                ))
+            elif outcome.state == "blocked" or eval_failed:
+                addr = ""
+                if target is not None:
+                    addr = target.addr_id or fid
+                detail = outcome.reason or "；".join(outcome.errors) or (
+                    "求值未得到数值" if eval_failed else "评估被拒")
                 plan.scope_failures.append({
-                    "addr_id": issue.addr_id,
-                    "kind": issue.kind,
-                    "detail": issue.detail,
+                    "addr_id": addr,
+                    "kind": "typed_eval_blocked",
+                    "detail": detail,
                 })
 
-        # ── Step 4: Execute batch ────────────────────────────────────────
-        exec_result: BatchExecutionResult = execute_batch(
-            formulas=batch_defs,
-            context=context,
-        )
-
-        # Collect issues, hints, errors
-        plan.issues.extend(exec_result.issues)
-        plan.hints.extend(exec_result.hints)
-        for error in exec_result.errors:
-            plan.scope_failures.append(error)
-
-        # ── Step 5: Convert MutationIntents → FormulaMutations ───────────
         mutations = await self._intents_to_mutations(
-            exec_result.intents, project_id, year, scopes
+            intents, project_id, year, scopes
         )
         plan.mutations = mutations
 
@@ -186,14 +222,17 @@ class FormulaRuntimeCoordinator:
         project_id: UUID,
         year: int,
         scopes: list[str],
-    ) -> list[WpFormula]:
-        """按项目、source_scope 年度、目标 domain 与 workpaper 循环过滤公式。"""
+    ) -> tuple[list[WpFormula], dict[UUID, str]]:
+        """按项目、source_scope 年度、目标 domain 与 workpaper 循环过滤公式。
+
+        Returns: (selected_formulas, wp_codes: {wp_id: wp_code})
+        """
         result = await self._session.execute(
             select(WpFormula).where(WpFormula.project_id == project_id)
         )
         formulas = list(result.scalars().all())
         if not formulas:
-            return []
+            return [], {}
 
         wanted_domains: set[str] = set()
         wanted_cycles: set[str] = set()
@@ -231,7 +270,7 @@ class FormulaRuntimeCoordinator:
                 if not code or code[0] not in wanted_cycles:
                     continue
             selected.append(formula)
-        return selected
+        return selected, wp_codes
 
     def _build_batch_definitions(
         self,
@@ -297,6 +336,48 @@ class FormulaRuntimeCoordinator:
             ))
 
         return batch_defs, all_ref_addr_ids, targets_by_formula
+
+    async def _build_typed_eval_definitions(
+        self,
+        formulas: list[WpFormula],
+        wp_codes: dict[UUID, str],
+    ) -> list[TypedBatchDefinition]:
+        """将 WpFormula ORM 列表转为 typed_eval.BatchDefinition。
+
+        body:
+          - 按已存三元组优先填 stable_sheet_key / row_key / field_key
+          - 取 parsed_data 供 _check_target_sheet 做目标表校验
+          - ACNR full_resolve 不参与身份判定（ADR-FHIC-06 第 9 点）
+        """
+        # 预取 parsed_data（目标表校验用）
+        wp_ids = list({f.wp_id for f in formulas if f.wp_id})
+        pd_map: dict[UUID, dict | None] = {}
+        if wp_ids:
+            from sqlalchemy import select as sa_select
+            rows = (await self._session.execute(
+                sa_select(WorkingPaper.id, WorkingPaper.parsed_data)
+                .where(WorkingPaper.id.in_(wp_ids))
+            )).all()
+            pd_map = {r[0]: r[1] for r in rows}
+
+        defs: list[TypedBatchDefinition] = []
+        for formula in formulas:
+            code = wp_codes.get(formula.wp_id, "").upper()
+            defs.append(TypedBatchDefinition(
+                formula_id=str(formula.id),
+                wp_code=code or str(formula.wp_id),
+                expression=formula.expression or "",
+                stable_sheet_key=formula.stable_sheet_key,
+                row_key=formula.row_key,
+                field_key=formula.field_key,
+                stable_key_needs_review=formula.stable_key_needs_review,
+                sheet_name=formula.sheet_name,
+                target_cell=formula.target_cell,
+                # 读到了底稿行却没有 parsed_data（NULL）⇒ 按「已提供、为空」校验（目标表必然不存在）；
+                # 没读到（不在 pd_map）⇒ None，交由 typed_eval 不校验
+                target_parsed_data=(pd_map[formula.wp_id] or {}) if formula.wp_id in pd_map else None,
+            ))
+        return defs
 
     def _build_ref_targets(
         self,

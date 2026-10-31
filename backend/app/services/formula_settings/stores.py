@@ -160,6 +160,16 @@ def _report_label(row: ReportConfig) -> str:
     return f"{_REPORT_TYPE_LABELS.get(rt, rt)} {row.row_code} {row.row_name or ''}".strip()
 
 
+def _report_label_from_slot(slot_key: str) -> str:
+    """从 slot_key 生成简单标签（校验器错误消息用）。"""
+    try:
+        rt, code = parse_report_slot(slot_key)
+        rt_str = rt.value if hasattr(rt, "value") else str(rt)
+        return f"{_REPORT_TYPE_LABELS.get(rt_str, rt_str)} {code}"
+    except (ValueError, KeyError):
+        return slot_key
+
+
 def _apply_report_definition(row: ReportConfig, definition: dict | None) -> None:
     disabled = is_disabled(definition)
     for f in REPORT_FIELDS:
@@ -237,6 +247,8 @@ class ReportStore(DomainStore):
         )
 
     async def write_global(self, db, scope, slot_key, definition, *, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition("report", definition, label=label or _report_label_from_slot(slot_key), slot_key=slot_key)
         row = await self._find(db, scope, slot_key)
         if definition is None:
             if row is None or row.is_deleted:
@@ -261,6 +273,8 @@ class ReportStore(DomainStore):
 
     async def write_project(self, db, project_id, slot_key, *, definition, base_definition, base_version,
                             pinned, base_origin, base_template_id, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition("report", definition, label=label or _report_label_from_slot(slot_key), slot_key=slot_key)
         std = f"project:{project_id}"
         row = await self._find(db, std, slot_key)
         if row is None:
@@ -364,6 +378,8 @@ class SettingStore(DomainStore):
         return (await db.execute(q)).scalars().first()
 
     async def write_global(self, db, scope, slot_key, definition, *, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition(self.domain, definition, label=label or slot_key, slot_key=slot_key)
         row = await self._find(db, "global", slot_key, scope=scope)
         if definition is None:
             if row is None:
@@ -392,6 +408,8 @@ class SettingStore(DomainStore):
 
     async def write_project(self, db, project_id, slot_key, *, definition, base_definition, base_version,
                             pinned, base_origin, base_template_id, user_id, label="", structure=None):
+        from app.services.formula_settings.validator import validate_formula_definition
+        validate_formula_definition(self.domain, definition, label=label or slot_key, slot_key=slot_key)
         row = await self._find(db, "project", slot_key, project_id=project_id)
         payload = dict(definition or {DISABLED_KEY: True})
         if structure:

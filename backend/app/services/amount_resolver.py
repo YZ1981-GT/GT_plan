@@ -28,6 +28,7 @@ from app.models.audit_platform_models import TrialBalance
 from app.models.consolidation_models import ConsolTrial
 from app.models.report_models import DisclosureNote
 from app.models.workpaper_models import WpIndex, WorkingPaper
+from app.services.tb_leaf_codes import leaf_total, scope_for_year
 
 # 列名 → TrialBalance 字段映射（与 report_engine._COLUMN_MAP 保持一致）
 _COLUMN_MAP = {
@@ -61,7 +62,7 @@ class TrialBalanceResolver:
     """单体报表数据源：读 trial_balance。
 
     完整保留原 report_engine._resolve_tb/_resolve_sum_tb 的列名映射 +
-    未审模式 + 行缓存语义（R1：复用引擎不破坏单体行为）。
+    未审模式 + 行缓存语义（R1：复用引擎不破坏单体行为）；前缀 / 区间宽集合内只计叶子（ADR-FHIC-03）。
     """
 
     def __init__(self, db: AsyncSession, project_id: UUID, year: int, *, use_unadjusted: bool = False):
@@ -89,7 +90,7 @@ class TrialBalanceResolver:
         return row
 
     async def _get_tb_rows_prefix(self, account_code: str) -> list[TrialBalance]:
-        """取「科目及其所有子科目」行（前缀聚合口径，与 report_engine 同口径）。"""
+        """取「科目及其所有子科目」行（宽集合；求和时只计叶子，与 report_engine 同口径，ADR-FHIC-03）。"""
         cached = self._tb_prefix_cache.get(account_code)
         if cached is not None:
             return cached
@@ -107,65 +108,62 @@ class TrialBalanceResolver:
             self._tb_cache[r.standard_account_code] = r
         return rows
 
+    def _amount_reader(self, column_name: str):
+        """列名 → ``(逐行取数函数, 告警用列名)``；未知列名返回 ``None``（TB / SUM_TB 共用）。"""
+        if self._use_unadjusted and column_name in ("期末余额", "审定数"):
+            return (lambda row: row.unadjusted_amount), "未审数"
+        field = _COLUMN_MAP.get(column_name)
+        if field is None:
+            return None
+        if field == "_period_amount":
+            use_unadjusted = self._use_unadjusted
+
+            def period_amount(row: TrialBalance) -> Decimal:
+                amount = row.unadjusted_amount if use_unadjusted else row.audited_amount
+                return (amount or Decimal("0")) - (row.opening_balance or Decimal("0"))
+
+            return period_amount, column_name
+        return (lambda row: getattr(row, field, None)), column_name
+
     async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
-        """解析 TB → 按「科目及其所有子科目」前缀聚合（与 report_engine._resolve_tb 同口径）。"""
+        """解析 TB → 「科目及其所有子科目」宽集合内只计叶子（与 report_engine._resolve_tb 同口径）。"""
         rows = await self._get_tb_rows_prefix(account_code)
         if not rows:
             return Decimal("0")
-
-        field = _COLUMN_MAP.get(column_name)
-        unadjusted_end = self._use_unadjusted and column_name in ("期末余额", "审定数")
-        if not unadjusted_end and field is None:
+        reader = self._amount_reader(column_name)
+        if reader is None:
             return Decimal("0")
-
-        total = Decimal("0")
-        for row in rows:
-            if unadjusted_end:
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
-        return total
+        amount_of, label = reader
+        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
 
     async def resolve_sum(self, code_range: str, column_name: str) -> Decimal:
+        """解析 SUM_TB → 区间宽集合（含止码的下级，同 report_engine._resolve_sum_tb）内只计叶子。"""
         parts = code_range.split("~")
         if len(parts) != 2:
             return Decimal("0")
         start_code, end_code = parts[0].strip(), parts[1].strip()
 
-        field = _COLUMN_MAP.get(column_name)
-        if field is None:
+        reader = self._amount_reader(column_name)
+        if reader is None:
             return Decimal("0")
+        amount_of, label = reader
 
         result = await self.db.execute(
             sa.select(TrialBalance).where(
                 TrialBalance.project_id == self.project_id,
                 TrialBalance.year == self.year,
                 TrialBalance.standard_account_code >= start_code,
-                TrialBalance.standard_account_code <= end_code,
+                sa.or_(
+                    TrialBalance.standard_account_code <= end_code,
+                    TrialBalance.standard_account_code.like(f"{end_code}%"),
+                ),
                 TrialBalance.is_deleted == sa.false(),
             )
         )
         rows = result.scalars().all()
-
-        total = Decimal("0")
         for row in rows:
-            if self._use_unadjusted and column_name in ("期末余额", "审定数"):
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
             self._tb_cache[row.standard_account_code] = row
-
-        return total
+        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
 
 
 class ConsolTrialResolver:

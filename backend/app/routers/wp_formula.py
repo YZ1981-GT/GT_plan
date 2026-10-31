@@ -217,47 +217,7 @@ router = APIRouter(
 _BATCH_MAX_ROWS = 200
 
 
-async def _write_wp_formula_audit(
-    db: AsyncSession,
-    *,
-    user: User,
-    project_id: UUID,
-    wp_code: str | None,
-    target_cell: str,
-    action: str,
-    old_formula: str,
-    new_formula: str,
-    result_value: str = "",
-) -> None:
-    """直接 wp_formula CRUD（save/delete）写 V007 审计哈希链（Task 5.4 / 需求 13.4）。
-
-    统一走 ``audit_log_helper.append_audit_log``（event_type='formula_changed'，与
-    report/consol 同源留痕），``user_id`` 必须是**真实操作人**（``user.id``，禁写死全零）。
-    ``resource_id`` 用 ``target_cell`` 作行标识。审计写失败**不阻断**主 CRUD（降级
-    WARNING），且由 router 统一 commit（service 只 flush，审计 append 也只 flush）。
-
-    🔴 mandatory（ADR-ALC-07）：审计失败即业务失败。在 begin_nested 内
-    保证 SAVEPOINT 隔离，但不捕获异常——失败向上传播。
-    """
-    from app.services.audit_log_helper import append_audit_log
-
-    async with db.begin_nested():
-        await append_audit_log(db, {
-            "user_id": user.id,
-            "project_id": project_id,
-            "action": "formula.changed",
-            "resource_type": "wp_formula",
-            "resource_id": target_cell,
-            "details": {
-                "event_type": "formula_changed",
-                "module": "workpaper",
-                "row_code": wp_code or "",
-                "action": action,
-                "old_formula": old_formula,
-                "new_formula": new_formula,
-                "result_value": result_value,
-            },
-        })
+from app.routers.wp_formula_audit import write_wp_formula_audit as _write_wp_formula_audit
 
 
 def _unsupported_function_detail(expression: str | None) -> tuple[list[str], list[dict]]:
@@ -831,7 +791,26 @@ async def list_formulas(
     )
     # 传 project_id 使 ownership 校验通过并真正列出该底稿公式（此前缺 project_id 恒空）。
     formulas = await wp_formula_service.list_by_wp(db, wp_id, project_id=wp.project_id)
+    # ── 任务 26：预览值改调 typed_eval.evaluate_single（需求 1.5 四方一致）──
+    wp_code = await _resolve_wp_code(db, wp)
+    year = await _resolve_project_year(db, wp.project_id)
+    preview_map: dict[str, dict] = {}
+    if formulas:
+        from app.services.formula_runtime.typed_eval import evaluate_single
+        for f in formulas:
+            f._wp_code = wp_code or ""  # type: ignore[attr-defined]  # evaluate_single 读 _wp_code
+            try:
+                outcome = await evaluate_single(db, f, project_id=wp.project_id, year=year)
+                preview_map[str(f.id)] = {"preview_value": str(outcome.value) if outcome.value is not None else None,
+                                          "preview_state": outcome.state}
+            except Exception as preview_err:  # noqa: BLE001 — 单条预览失败不阻断列表
+                logger.debug("formula preview failed id=%s: %s", f.id, preview_err)
+                preview_map[str(f.id)] = {"preview_value": None, "preview_state": "error"}
     items = [_formula_to_dict(f) for f in formulas]
+    for item in items:
+        pv = preview_map.get(item["id"])
+        if pv:
+            item.update(pv)
     # ── Task 3.1：服务端按 sheet_uid 精确过滤（stable_sheet_key 维度，fail-closed）──
     #    省略 sheet_uid = 整册视图（返回全部，向后兼容）；给定则只返精确当前 sheet 的行。
     items = filter_items_by_sheet_uid(items, sheet_uid)
@@ -1402,6 +1381,7 @@ async def save_formulas_batch(
 async def delete_formula(
     wp_id: UUID,
     formula_id: UUID,
+    expected_version: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1419,6 +1399,18 @@ async def delete_formula(
     ).scalar_one_or_none()
     if existing is None:
         raise HTTPException(status_code=404, detail="公式不存在")
+
+    # ── ADR-FHIC-11 / 需求 13.4：删除强制 CAS ──
+    if expected_version is None:
+        raise HTTPException(status_code=428, detail={
+            "error_code": "FORMULA_VERSION_REQUIRED",
+            "message": "删除公式必须带当前版本号，请刷新后重试"})
+    actual_version = getattr(existing, "definition_version", None)
+    if actual_version is not None and actual_version != expected_version:
+        raise HTTPException(status_code=409, detail={
+            "error_code": "FORMULA_VERSION_CONFLICT",
+            "message": "公式已被他人修改，请刷新后重试",
+            "expected": expected_version, "actual": actual_version})
 
     # 删除前留存目标格坐标 + 表达式（delete 之后 ORM 对象字段不可靠）
     _target_cell = existing.target_cell

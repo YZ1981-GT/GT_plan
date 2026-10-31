@@ -53,7 +53,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.formula_engine import execute as fe_execute, FormulaContext, safe_eval_expr
+from app.services.formula_engine import execute as fe_execute, FormulaContext, FormulaEvalError, safe_eval_expr
 from app.services.report_engine import evaluate_formula as re_evaluate, _safe_eval_expr as re_safe_eval
 from app.services.formula_parse_utils import evaluate_formula as fp_evaluate
 from app.services.cell_formula_evaluator import (
@@ -407,8 +407,18 @@ class TestArithmeticCoreConvergence:
         ("(1+2)*3", Decimal("9")),
         ("100-50", Decimal("50")),
         ("100/4", Decimal("25")),
-        ("100/0", Decimal("0")),   # 4 套统一约定除零 → 0
+        # 除零不再是统一约定的 0：报表 DSL 改为报错，见 test_division_by_zero_* 两条
     ]
+
+    def test_division_by_zero_is_error_in_report_dsl(self):
+        """报表 DSL 的两个入口（同一个 safe_eval_expr）除零报错（spec formula-hub-integrity-closure 需求 2.3）。"""
+        for evaluate in (safe_eval_expr, re_safe_eval):
+            with pytest.raises(FormulaEvalError, match="除数为 0"):
+                evaluate("100/0")
+
+    def test_division_by_zero_cell_formula_evaluator_unchanged(self):
+        """底稿 Excel 语法域（cell_formula_evaluator，独立求值器）不在 L1 失败语义范围内：除零仍按 0（现状记录）。"""
+        assert Decimal(str(fu_safe_eval("100/0"))) == Decimal("0")
 
     @pytest.mark.parametrize("expr,expected", ARITH_CASES)
     def test_formula_engine_arith(self, expr, expected):

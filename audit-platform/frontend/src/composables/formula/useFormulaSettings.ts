@@ -3,7 +3,8 @@
  *
  * - 请求封装在 `services/formulaSettingsApi.ts`（本文件转出 `formulaSettingsApi`）；全部带 `_silent`，
  *   错误提示由调用方给，统一文案用 `formulaErrorText(e, 兜底)`。
- * - 冲突决策的键 = 预览条目的 `key`（`{项目id}|{公式位}`），与后端 `Decisions` 同口径。
+ * - 冲突决策的键 = 预览条目的 `key`（服务端给出 `{域}|{项目id}|{公式位}`，公式位可含 `|`），原样回传、
+ *   前端不拼接也不解析，与后端 `Decisions` 同口径（spec formula-hub-integrity-closure 需求 8.4）。
  * - 状态字面量比较集中在本文件（.vue 里写 `=== 'pending'` 会触发 no-status-string-literal）。
  */
 import { ElMessage } from 'element-plus'
@@ -48,6 +49,7 @@ export interface SlotChange {
 }
 /** 同步预览的一条（项目 × 公式位）。全局发布 / 模板发布 / 订阅 / 退订 / 应用到指定项目同形。 */
 export interface PlanItem {
+  /** 冲突决策键（服务端给出，原样回传）：两个域的同名公式位 key 不同 */
   key: string
   project_id: string
   project_name: string
@@ -133,6 +135,8 @@ export interface PendingItem {
   upstream_formula: string
   local_formula: string
   upstream_version: number | null
+  /** 修订号：新建为 1，每次被新的发布覆盖 +1；处理时原样回传（spec formula-hub-integrity-closure 需求 8.1） */
+  revision: number
   publish_id: string | null
   created_at: string | null
   updated_at: string | null
@@ -140,7 +144,8 @@ export interface PendingItem {
 export interface Resolution {
   item_id: string
   choice: ResolutionChoice
-  upstream_version?: number | null
+  /** 列表给出的修订号：缺 → 428，与服务端当前不等 → 409（需求 8.2、8.3） */
+  revision: number
   custom_definition?: Definition | null
 }
 export interface EffectiveSlot {

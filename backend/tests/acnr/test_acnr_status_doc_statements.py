@@ -319,14 +319,16 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             calls(_A + "wp_cell_target.py", "sheet_key_for", "sheet_of"),
             calls(_A + "wp_cell_target.py", "read_formula_cell", "sheet_of"),
             calls(_CCR_SRC_REL, "_end", "sheet_of", "cell_of")),
-        "底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它）": CB(
+        "底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码导入它的是单元格取值接线与 formula-hub 的四个读取方：底稿公式执行器、Runtime 计划求值、Runtime 协调器、严格外部取值）": CB(
             "backend/app/services/wp_cell_reader.py", ("resolve_wp_cell", "WpCellRead"),
             "backend/tests/test_wp_cell_reader_contract.py",
             has_tests("backend/tests/test_wp_cell_reader.py", "test_every_non_ok_construction_sets_reason_code"),
             has_tests("backend/tests/test_wp_cell_reader_contract.py", "test_missing_reasons",
                       "test_database_error_propagates"),
-            claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
-                  lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
+            claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target 与 formula-hub 四个读取方（AST）",  # FHIC 需求 1.9
+                  lambda: _production_importers_of("wp_cell_reader") == sorted([_A + "wp_cell_target.py"] + [
+                      f"backend/app/services/{m}.py" for m in ("formula_engine", "formula_runtime/coordinator",
+                                                               "formula_runtime/typed_eval", "wp_ref_strict")]))),
         "单元格取值接线（锁定项目按锁定目录判名、锁定来源与 `full_resolve` 同为项目表落库的版本锁、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）、高级查询取值编排与跨 sheet 追溯编排器（追溯只用它按锁定状态取目录））": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",

@@ -32,6 +32,10 @@ from app.models.report_models import (
     ReportConfig,
 )
 from app.services.amount_resolver import AmountResolver
+from app.services.formula_warnings import collect as collect_formula_warnings, merge_into as merge_formula_warnings
+from app.services.report_freshness import is_marked_stale
+from app.services.report_row_compute import GenerateSummary, RowScope, compute_row, write_row
+from app.services.tb_leaf_codes import leaf_total, scope_for_year
 
 logger = logging.getLogger(__name__)
 
@@ -587,10 +591,11 @@ class ReportFormulaParser:
         return row
 
     async def _get_tb_rows_prefix(self, account_code: str) -> list[TrialBalance]:
-        """取「科目及其所有子科目」行（前缀聚合口径）。
+        """取「科目及其所有子科目」行（宽集合，缓存的是宽集合；叶子筛选在求和时做，ADR-FHIC-03）。
 
         标准科目码是层级前缀关系（如 2221 应交税费 → 222102 应交消费税），
-        `LIKE 'code%'` 精确覆盖该科目及全部后代，且已验证报表配置无前缀重叠。
+        `LIKE 'code%'` 覆盖该科目及全部后代。父子并存（``1231`` 与 ``1231-01``）时只有叶子计入，
+        见 :func:`app.services.tb_leaf_codes.select_leaves`。
         """
         cached = self._tb_prefix_cache.get(account_code)
         if cached is not None:
@@ -624,35 +629,42 @@ class ReportFormulaParser:
         rows = await self._get_tb_rows_prefix(account_code)
         if not rows:
             return Decimal("0")
-
-        field = _COLUMN_MAP.get(column_name)
-        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
-            field = "opening_balance"
-        # Phase 9 未审模式：期末/审定列直接取未审数（无需列名映射）
-        unadjusted_end = (
-            self._use_unadjusted
-            and not self._use_opening
-            and column_name in ("期末余额", "审定数")
-        )
-        if not unadjusted_end and field is None:
+        reader = self._tb_amount_reader(column_name)
+        if reader is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
+        amount_of, label = reader
+        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
 
-        total = Decimal("0")
-        for row in rows:
-            if unadjusted_end:
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
-        return total
+    def _tb_amount_reader(self, column_name: str):
+        """列名 → ``(逐行取数函数, 告警用列名)``；未知列名返回 ``None``。TB / SUM_TB 共用（叶子求和前的单行金额）。
+
+        期初模式：期末 / 审定 / 未审列改取 ``opening_balance``；Phase 9 未审模式：期末 / 审定列直接取未审数。
+        """
+        field = _COLUMN_MAP.get(column_name)
+        label = column_name
+        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
+            field, label = "opening_balance", "年初余额"
+        if self._use_unadjusted and not self._use_opening and column_name in ("期末余额", "审定数"):
+            return (lambda row: row.unadjusted_amount), "未审数"
+        if field is None:
+            return None
+        if field == "_period_amount":
+            use_unadjusted = self._use_unadjusted
+
+            def period_amount(row: TrialBalance) -> Decimal:
+                amount = row.unadjusted_amount if use_unadjusted else row.audited_amount
+                return (amount or Decimal("0")) - (row.opening_balance or Decimal("0"))
+
+            return period_amount, label
+        return (lambda row: getattr(row, field, None)), label
 
     async def _resolve_sum_tb(self, code_range: str, column_name: str) -> Decimal:
-        """解析 SUM_TB('start~end','column_name') → Decimal 值"""
+        """解析 SUM_TB('start~end','column_name') → Decimal 值（区间宽集合内只计叶子，ADR-FHIC-03）。
+
+        区间按标准码字符串比较；区间止码自身的下级（``1499`` 的 ``1499-01``）字典序大于止码，另按前缀并入，
+        使「区间内科目及其全部下级」成为宽集合（与 ``formula_preloader._load_tb`` 的区间口径一致），止码的父行不计入。
+        """
         # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
         if self.resolver is not None:
             return await self.resolver.resolve_sum(code_range, column_name)
@@ -662,43 +674,28 @@ class ReportFormulaParser:
             return Decimal("0")
         start_code, end_code = parts[0].strip(), parts[1].strip()
 
-        field = _COLUMN_MAP.get(column_name)
-        if self._use_opening and column_name in ("期末余额", "审定数", "未审数"):
-            field = "opening_balance"
-        if field is None:
+        reader = self._tb_amount_reader(column_name)
+        if reader is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
+        amount_of, label = reader
 
         result = await self.db.execute(
             sa.select(TrialBalance).where(
                 TrialBalance.project_id == self.project_id,
                 TrialBalance.year == self.year,
                 TrialBalance.standard_account_code >= start_code,
-                TrialBalance.standard_account_code <= end_code,
+                sa.or_(
+                    TrialBalance.standard_account_code <= end_code,
+                    TrialBalance.standard_account_code.like(f"{end_code}%"),
+                ),
                 TrialBalance.is_deleted == sa.false(),
             )
         )
         rows = result.scalars().all()
-
-        total = Decimal("0")
-        for row in rows:
-            if (
-                self._use_unadjusted
-                and not self._use_opening
-                and column_name in ("期末余额", "审定数")
-            ):
-                total += row.unadjusted_amount or Decimal("0")
-            elif field == "_period_amount":
-                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-                opening = row.opening_balance or Decimal("0")
-                total += amount - opening
-            else:
-                val = getattr(row, field, None)
-                total += val if val is not None else Decimal("0")
-            # Cache for later use
+        for row in rows:  # Cache for later use
             self._tb_cache[row.standard_account_code] = row
-
-        return total
+        return leaf_total(rows, amount_of, column=label, scope=scope_for_year(self.year))
 
     async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
         """AmountResolver Protocol 公开方法：委托内部 _resolve_tb。"""
@@ -713,7 +710,7 @@ class ReportFormulaParser:
         formula: str | None,
         row_cache: dict[str, Decimal],
     ) -> FormulaResult:
-        """执行公式并保留 ``FormulaResult``，供 stale 重算判断成功状态。"""
+        """执行公式并保留 ``FormulaResult``，供报表逐行计算（``report_row_compute.compute_row``）判断成功状态。"""
         if not formula or not formula.strip():
             return FormulaResult()
 
@@ -857,17 +854,19 @@ async def evaluate_formula_result(
     # Step 1: 预替换所有数据 token 为 Decimal 值（经 resolver 取数，保持原有取数语义）
     expression = formula
 
-    # SUM_TB（必须在 TB 之前替换，避免部分匹配）
-    for match in _SUM_TB_PATTERN.finditer(formula):
-        code_range, col = match.group(1), match.group(2)
-        val = await resolver.resolve_sum(code_range, col)
-        expression = expression.replace(match.group(0), str(val), 1)
+    # 结果合并点（ADR-FHIC-03）：试算表取数期间 emit 的父子不符告警，求值后并入 result.warnings
+    with collect_formula_warnings() as fetch_warnings:
+        # SUM_TB（必须在 TB 之前替换，避免部分匹配）
+        for match in _SUM_TB_PATTERN.finditer(formula):
+            code_range, col = match.group(1), match.group(2)
+            val = await resolver.resolve_sum(code_range, col)
+            expression = expression.replace(match.group(0), str(val), 1)
 
-    # TB
-    for match in _TB_PATTERN.finditer(formula):
-        account_code, col = match.group(1), match.group(2)
-        val = await resolver.resolve_tb(account_code, col)
-        expression = expression.replace(match.group(0), str(val), 1)
+        # TB
+        for match in _TB_PATTERN.finditer(formula):
+            account_code, col = match.group(1), match.group(2)
+            val = await resolver.resolve_tb(account_code, col)
+            expression = expression.replace(match.group(0), str(val), 1)
 
     # PREV / AUX —— 报表域置 0；表间审核另走严格代入（cross_check_rules._substitute_strict，取不到即报原因）。
     # 原有 enable_prev / enable_aux 两个开关已删除（spec formula-fetch-followup-defect-closure 6.6）：唯一调用方传
@@ -938,6 +937,7 @@ async def evaluate_formula_result(
 
     # Step 3: 委托 L1 内核求值（expression 中只剩 ROW/SUM_ROW/REPORT + 算术 + 内置函数）
     result = fe_execute(expression, ctx)
+    merge_formula_warnings(result.warnings, fetch_warnings)
     return result
 
 
@@ -968,6 +968,17 @@ class _DecimalEncoder(json.JSONEncoder):
         if hasattr(o, 'isoformat'):
             return o.isoformat()
         return super().default(o)
+
+
+#: 报表类型的计算顺序（跨表 ROW() 引用按此顺序可见：如权益变动表引用利润表行）；全量 / affected / stale 三路共用
+_TYPE_ORDER = (
+    FinancialReportType.balance_sheet,
+    FinancialReportType.income_statement,
+    FinancialReportType.cash_flow_statement,
+    FinancialReportType.equity_statement,
+    FinancialReportType.cash_flow_supplement,
+    FinancialReportType.impairment_provision,
+)
 
 
 class ReportEngine:
@@ -1103,6 +1114,10 @@ class ReportEngine:
         applicable_standard: str = "enterprise",
         mode: str = "audited",
         debug: bool = False,
+        *,
+        skip_recalc: bool = False,
+        publish_events: bool = True,
+        summary_out: GenerateSummary | None = None,
     ) -> dict[str, Any]:
         """生成四张报表，返回 {report_type: [row_dicts], coverage_stats: {...}, debug_info: {...}}
 
@@ -1112,30 +1127,37 @@ class ReportEngine:
             applicable_standard: 报表标准
             mode: "audited"(审定) 或 "unadjusted"(未审)
             debug: 是否返回调试信息（公式文本+代入值+计算过程）
+            skip_recalc: True 时不在生成前重算试算表（调用方已在同一事务里重算，ADR-FHIC-08）
+            publish_events: False 时不发 ``REPORT_ROW_CHANGED``（调用方提交后自行发事件）
+            summary_out: 传入时填写逐行分类（:class:`GenerateSummary`）；返回 dict 不变
+
+        逐行计算与写库见 ``report_row_compute``（与 affected / stale 重算同一套，ADR-FHIC-05）。
 
         Validates: Requirements 2.1, 2.2, 2.5, 18.1, 18.2, 18.3, 13.6, 18.9, 20.5, 20.6
         """
         # 🔴 报表生成前自动 recalc trial_balance，确保基于最新逻辑计算
         # （修复方向符号/前缀继承等 recalc 逻辑修正后存量项目数据不刷新的问题）
-        try:
-            from app.services.trial_balance_service import TrialBalanceService
-            tb_svc = TrialBalanceService(self.db)
-            await tb_svc.full_recalc(project_id, year)
-            await self.db.flush()
-        except Exception:
-            # fail-open: recalc 失败不阻断报表生成，用现有 trial_balance 数据继续
-            import logging
-            logging.getLogger("audit_platform").warning(
-                "报表生成前 recalc 失败 (project=%s, year=%s), 使用现有 trial_balance 数据",
-                project_id, year,
-            )
+        if not skip_recalc:
+            try:
+                from app.services.trial_balance_service import TrialBalanceService
+                tb_svc = TrialBalanceService(self.db)
+                await tb_svc.full_recalc(project_id, year)
+                await self.db.flush()
+            except Exception:
+                # fail-open: recalc 失败不阻断报表生成，用现有 trial_balance 数据继续
+                import logging
+                logging.getLogger("audit_platform").warning(
+                    "报表生成前 recalc 失败 (project=%s, year=%s), 使用现有 trial_balance 数据",
+                    project_id, year,
+                )
 
         configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         results: dict[str, Any] = {}
 
-        # We need a global row_cache across report types for cross-report ROW() refs
-        # (e.g. equity statement references IS-019 from income statement)
-        global_row_cache: dict[str, Decimal] = {}
+        # 跨报表共享的依赖缓存（如权益变动表引用利润表 IS-019）：起点只有无公式行（ADR-FHIC-01），
+        # 本轮成功的行随算随入、失败的行删除（report_row_compute.compute_row）
+        scope = RowScope.of(c for rows in configs.values() for c in rows)
+        global_row_cache = scope.start_cache()
 
         # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化。
         # 跨报表共享缓存，避免同一引用重复解析。
@@ -1146,16 +1168,6 @@ class ReportEngine:
         # Debug info tracking
         debug_info: dict[str, list[dict]] = {} if debug else {}
 
-        # Process in a specific order to support cross-report references
-        type_order = [
-            FinancialReportType.balance_sheet,
-            FinancialReportType.income_statement,
-            FinancialReportType.cash_flow_statement,
-            FinancialReportType.equity_statement,
-            FinancialReportType.cash_flow_supplement,
-            FinancialReportType.impairment_provision,
-        ]
-
         now = datetime.now(timezone.utc)
 
         # 上期 / 期初来源（资产负债表取本年期初数、流量表取上年项目），全部报表类型共用一份缓存
@@ -1165,7 +1177,7 @@ class ReportEngine:
             self.db, project_id, year, unadjusted=(mode == "unadjusted"),
         )
 
-        for report_type in type_order:
+        for report_type in _TYPE_ORDER:
             config_rows = configs.get(report_type, [])
             if not config_rows:
                 continue
@@ -1177,6 +1189,8 @@ class ReportEngine:
                 debug=debug,
                 row_ref_cache=row_ref_cache,
                 prior_resolver=prior_resolver,
+                scope=scope,
+                summary=summary_out,
             )
             results[report_type.value] = report_rows
             coverage_stats[report_type.value] = type_coverage
@@ -1206,7 +1220,7 @@ class ReportEngine:
         # ── Phase 16: 版本链写入（每种报表类型写一个版本戳） ──
         try:
             from app.services.version_line_service import version_line_service
-            for rt in type_order:
+            for rt in _TYPE_ORDER:
                 if rt.value in results:
                     latest = await version_line_service.get_latest_version(
                         self.db, project_id, "report", project_id
@@ -1222,6 +1236,9 @@ class ReportEngine:
         except Exception as _vl_err:
             import logging
             logging.getLogger(__name__).warning(f"[VERSION_LINE] report write_stamp failed: {_vl_err}")
+
+        if not publish_events:  # 调用方提交后自行发事件（Draft Refresh report 范围，ADR-FHIC-08）
+            return results
 
         # ── Global Linkage Bus Sprint 3: Publish REPORT_ROW_CHANGED event ──
         try:
@@ -1322,13 +1339,20 @@ class ReportEngine:
         debug: bool = False,
         row_ref_cache: dict[str, Any] | None = None,
         prior_resolver: Any = None,
+        scope: RowScope | None = None,
+        summary: GenerateSummary | None = None,
     ) -> tuple[list[dict], dict[str, int], list[dict] | None]:
         """执行每行公式，生成报表数据并写入 financial_report 表。
+
+        逐行计算与写库经 ``report_row_compute``（``compute_row`` / ``write_row``，与 affected / stale 重算同一套）：
+        失败不写 0 —— 既有行保留旧值、新行金额为 NULL，均标过期并写 ``calc_error``。
 
         Args:
             mode: "audited" 或 "unadjusted"
             debug: 是否收集调试信息
             prior_resolver: 上期 / 期初来源（``PriorPeriodResolver``）；缺省时本表单独建一个。
+            scope: 本准则行次全集与无公式行（缺省按本表 ``config_rows``，并把无公式行预置进缓存）
+            summary: 传入时逐行记录分类（:class:`GenerateSummary`）
 
         Returns:
             (report_rows, coverage_stats, debug_rows)
@@ -1351,62 +1375,52 @@ class ReportEngine:
 
         if row_ref_cache is None:
             row_ref_cache = {}
+        if scope is None:
+            scope = RowScope.of(config_rows)
+            global_row_cache.update(scope.start_cache())
+
+        existing_rows = {
+            r.row_code: r
+            for r in (await self.db.execute(
+                sa.select(FinancialReport).where(
+                    FinancialReport.project_id == project_id,
+                    FinancialReport.year == year,
+                    FinancialReport.report_type == report_type,
+                    FinancialReport.is_deleted == sa.false(),
+                )
+            )).scalars().all()
+        }
 
         report_rows = []
         # Task 1.6: 覆盖率统计
         total_rows = 0
         rows_with_data = 0
         # Task 1.7: 调试信息
-        debug_rows: list[dict] = [] if debug else []
-        # Task 1.5: fallback 警告收集
+        debug_rows: list[dict] = []
+        # 行告警（组成行无公式、试算表父子不符、结果为 0 而科目有余额、ROW 悬空）
         warnings: list[dict] = []
         # Req 16.5: 公式解析失败行收集（标注失败行，不产出空报表）
         failed_rows: list[dict] = []
 
         for config in sorted(config_rows, key=lambda r: r.row_number):
             total_rows += 1
-            fallback_applied = False
-            formula_error: str | None = None
-            debug_trace: dict | None = None
-
-            # Task 1.7: 公式执行容错 + 调试模式
-            try:
-                # 报表取数统一走公式(report_config.formula)：公式里的 TB('期末余额')
-                # 在审定模式取 trial_balance.audited_amount、未审模式取 unadjusted_amount。
-                # 数据源唯一为 trial_balance（审定数=未审数+调整分录），不再叠加
-                # report_line_mapping、也不从四表库(tb_balance 等)重新聚合——
-                # report_line_mapping 仅用于试算平衡表按行次汇总，存在与公式不一致的
-                # 历史错配（科目串行映射），不能作为报表取数来源。
-                if config.formula:
-                    current_amount = await parser_current.execute(
-                        config.formula, global_row_cache,
-                    )
-                else:
-                    current_amount = Decimal("0")
-            except Exception as e:
-                # Task 1.7: 公式执行失败记录 warning 而非抛异常
-                formula_error = str(e)
-                current_amount = Decimal("0")
+            # 报表取数统一走公式(report_config.formula)：公式里的 TB('期末余额')
+            # 在审定模式取 trial_balance.audited_amount、未审模式取 unadjusted_amount。
+            # 数据源唯一为 trial_balance（审定数=未审数+调整分录），不再叠加
+            # report_line_mapping、也不从四表库(tb_balance 等)重新聚合——
+            # report_line_mapping 仅用于试算平衡表按行次汇总，存在与公式不一致的
+            # 历史错配（科目串行映射），不能作为报表取数来源。
+            outcome = await compute_row(parser_current, config, global_row_cache, mode=mode, scope=scope)
+            if not outcome.ok:
                 logger.warning(
                     "Formula execution failed for %s (%s): %s",
-                    config.row_code, config.row_name, e,
+                    config.row_code, config.row_name, outcome.calc_error,
                 )
-
-            # Task 1.5: 公式 fallback 取数机制
-            # 当公式计算结果为 0 但 TB 中该科目有余额时，使用 TB 余额作为 fallback
-            if current_amount == Decimal("0") and config.formula:
-                tb_fallback_value = await self._check_tb_fallback(
-                    parser_current, config.formula, mode,
-                )
-                if tb_fallback_value is not None and tb_fallback_value != Decimal("0"):
-                    current_amount = tb_fallback_value
-                    fallback_applied = True
-                    warnings.append({
-                        "row_code": config.row_code,
-                        "row_name": config.row_name,
-                        "type": "fallback_applied",
-                        "message": f"公式结果为0但TB有余额({tb_fallback_value})，已使用TB余额",
-                    })
+            warnings.extend(
+                {"row_code": config.row_code, "row_name": config.row_name,
+                 "type": "formula_warning", "message": text}
+                for text in outcome.warnings
+            )
 
             # 上期 / 期初（spec deliverable-trio-generation-accuracy §1.3）：资产负债表取本年
             # 期初数、期间报表取上年项目；无来源为 None（留空，不再写 0 冒充）
@@ -1418,9 +1432,6 @@ class ReportEngine:
                     exc_info=True,
                 )
                 prior_amount = None
-
-            # Update global row_cache for ROW() references
-            global_row_cache[config.row_code] = current_amount
 
             # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化
             row_refs_meta, dangling_refs = await self._resolve_row_refs_via_acnr(
@@ -1438,8 +1449,21 @@ class ReportEngine:
             source_accounts = parser_current.extract_account_codes(config.formula)
 
             # Task 1.6: 统计有数据的行
-            if current_amount != Decimal("0") or (config.formula and not formula_error):
+            if outcome.ok and (outcome.value != 0 or config.formula):
                 rows_with_data += 1
+
+            # Upsert into financial_report table（失败：既有行保留旧值，新行金额为 NULL）
+            row = existing_rows.get(config.row_code)
+            before = None if row is None else row.current_period_amount
+            if row is None:
+                row = FinancialReport(project_id=project_id, year=year, report_type=report_type,
+                                      row_code=config.row_code, current_period_amount=None)
+                self.db.add(row)
+            write_row(row, config, outcome, generated_at=generated_at, source_accounts=source_accounts)
+            row.prior_period_amount = prior_amount
+            if summary is not None:
+                summary.record(report_type, config.row_code, before, outcome)
+            amount_text = None if row.current_period_amount is None else str(row.current_period_amount)
 
             # Task 1.7: 收集调试信息
             if debug:
@@ -1448,9 +1472,10 @@ class ReportEngine:
                     "row_name": config.row_name,
                     "formula": config.formula,
                     "substituted_expression": None,
-                    "result": str(current_amount),
-                    "fallback_applied": fallback_applied,
-                    "error": formula_error,
+                    "result": amount_text,
+                    "error": outcome.calc_error,
+                    "warnings": outcome.warnings,
+                    "trace": outcome.trace,
                     "source_accounts": source_accounts,
                 }
                 # 获取代入值的表达式（通过重新执行获取中间状态）
@@ -1460,72 +1485,33 @@ class ReportEngine:
                     )
                 debug_rows.append(debug_trace)
 
-            # Upsert into financial_report table
-            existing = await self.db.execute(
-                sa.select(FinancialReport).where(
-                    FinancialReport.project_id == project_id,
-                    FinancialReport.year == year,
-                    FinancialReport.report_type == report_type,
-                    FinancialReport.row_code == config.row_code,
-                    FinancialReport.is_deleted == sa.false(),
-                )
-            )
-            row = existing.scalar_one_or_none()
-            if row:
-                row.row_name = config.row_name
-                row.current_period_amount = current_amount
-                row.prior_period_amount = prior_amount
-                row.formula_used = config.formula
-                row.source_accounts = source_accounts if source_accounts else None
-                row.generated_at = generated_at
-                # 任务 15：成功处理到的报表行就是本次全量重算的实际范围，
-                # 只清这些行的过期标记；配置外的历史行保持原状态。
-                row.is_stale = False
-                row.indent_level = config.indent_level
-                row.is_total_row = config.is_total_row
-            else:
-                row = FinancialReport(
-                    project_id=project_id,
-                    year=year,
-                    report_type=report_type,
-                    row_code=config.row_code,
-                    row_name=config.row_name,
-                    current_period_amount=current_amount,
-                    prior_period_amount=prior_amount,
-                    formula_used=config.formula,
-                    source_accounts=source_accounts if source_accounts else None,
-                    generated_at=generated_at,
-                    indent_level=config.indent_level,
-                    is_total_row=config.is_total_row,
-                    is_stale=False,
-                )
-                self.db.add(row)
-
             # Req 16.5: 标注解析失败行（不产出空报表，行仍保留）
-            if formula_error:
+            if not outcome.ok:
                 failed_rows.append({
                     "row_code": config.row_code,
                     "row_name": config.row_name,
                     "formula": config.formula,
-                    "error": formula_error,
+                    "error": outcome.calc_error,
                 })
 
             row_dict = {
                 "row_code": config.row_code,
                 "row_name": config.row_name,
-                "current_period_amount": str(current_amount),
+                "current_period_amount": amount_text,
                 "prior_period_amount": str(prior_amount) if prior_amount is not None else None,
                 "indent_level": config.indent_level,
                 "is_total_row": config.is_total_row,
                 # Req 16.4: 每单元记来源公式 + 最近计算时间
                 "formula_used": config.formula,
-                "last_computed_at": generated_at.isoformat() if generated_at else None,
+                "last_computed_at": row.generated_at.isoformat() if row.generated_at else None,
                 "source_accounts": source_accounts,
                 # Req 16.3: ROW() 引用经 ACNR 解析后的规范身份（供追溯/tooltip）
                 "row_refs": row_refs_meta,
-                "fallback_applied": fallback_applied,
-                # Req 16.5: 失败标注（None=正常）
-                "formula_error": formula_error,
+                # Req 16.5: 失败标注（None=正常；失败行保留旧值并标过期）
+                "formula_error": outcome.calc_error,
+                "is_stale": not outcome.ok,
+                # 需求 4.3 / 6.4：试算表父子不符、组成行无公式、结果为 0 而科目有余额等告警
+                "warnings": outcome.warnings,
             }
             report_rows.append(row_dict)
 
@@ -1914,35 +1900,6 @@ class ReportEngine:
         return await self._build_unadjusted_bundle(project_id, year, report_types)
 
 
-    async def _check_tb_fallback(
-        self,
-        parser: ReportFormulaParser,
-        formula: str,
-        mode: str,
-    ) -> Decimal | None:
-        """检查公式引用的 TB 科目是否有非零余额，用于 fallback。
-
-        当公式结果为 0 时，检查公式中引用的第一个 TB 科目是否有余额。
-        如果有，返回该余额作为 fallback 值。
-        """
-        # 提取公式中的第一个 TB 引用
-        tb_match = _TB_PATTERN.search(formula)
-        if not tb_match:
-            return None
-
-        account_code = tb_match.group(1)
-        tb_row = await parser._get_tb_row(account_code)
-        if tb_row is None:
-            return None
-
-        # 根据模式选择取数字段
-        if mode == "unadjusted":
-            value = tb_row.unadjusted_amount
-        else:
-            value = tb_row.audited_amount
-
-        return value if value and value != Decimal("0") else None
-
     # ------------------------------------------------------------------
     # Task 1.7: 调试模式辅助方法
     # ------------------------------------------------------------------
@@ -2005,11 +1962,11 @@ class ReportEngine:
         applicable_standard: str | None = None,
         mode: str = "audited",
     ) -> dict[str, Any]:
-        """重算当前项目年度标记为 stale 的报表行。
+        """重算当前项目年度已标过期（``is_stale = true``）的报表行。
 
-        只有公式执行结果 ``FormulaResult.ok`` 且金额已经成功 flush 后，才清除
-        ``is_stale``。公式错误、blocked 或缺少配置的行保留原金额和 stale 标记，
-        并在返回值的 ``failed_rows`` 中给出可定位的失败原因。
+        只选已标过期的行（不因 D13-A 自动重算计算版本为空的存量行，X3）；逐行计算、依赖缓存与写库同全量生成
+        （``report_row_compute``，ADR-FHIC-05）：成功写值、计算版本并清过期；公式错误、blocked、引用行未就绪的行
+        保留原金额与过期标记并写 ``calc_error``；缺少配置的行不动。失败原因都在返回值的 ``failed_rows``。
 
         ``applicable_standard=None`` 时按项目真实配置解析准则，避免默认
         ``enterprise`` 导致配置零命中而静默返回成功。
@@ -2021,48 +1978,26 @@ class ReportEngine:
                 self.db, project_id,
             )
 
-        stale_result = await self.db.execute(
+        configs = await self._load_report_configs(applicable_standard, project_id=project_id)
+        scope = RowScope.of(c for rows in configs.values() for c in rows)
+        all_rows = list((await self.db.execute(
             sa.select(FinancialReport)
             .where(
                 FinancialReport.project_id == project_id,
                 FinancialReport.year == year,
-                FinancialReport.is_stale == sa.true(),
                 FinancialReport.is_deleted == sa.false(),
             )
             .order_by(FinancialReport.report_type, FinancialReport.row_code)
-        )
-        stale_rows = list(stale_result.scalars().all())
-        stale_by_key = {(row.report_type, row.row_code): row for row in stale_rows}
+        )).scalars().all())
+        stale_by_key = {(r.report_type, r.row_code): r for r in all_rows if is_marked_stale(r)}
+        row_cache = scope.start_cache(all_rows)
 
-        configs = await self._load_report_configs(applicable_standard, project_id=project_id)
-        all_rows_result = await self.db.execute(
-            sa.select(FinancialReport).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == sa.false(),
-            )
-        )
-        row_cache: dict[str, Decimal] = {
-            row.row_code: row.current_period_amount
-            for row in all_rows_result.scalars().all()
-            if row.current_period_amount is not None
-        }
-
-        type_order = [
-            FinancialReportType.balance_sheet,
-            FinancialReportType.income_statement,
-            FinancialReportType.cash_flow_statement,
-            FinancialReportType.equity_statement,
-            FinancialReportType.cash_flow_supplement,
-            FinancialReportType.impairment_provision,
-        ]
         now = datetime.now(timezone.utc)
         recalculated_rows: list[dict[str, str]] = []
         failed_rows: list[dict[str, str]] = []
-        successful_models: list[FinancialReport] = []
         handled_keys: set[tuple[FinancialReportType, str]] = set()
 
-        for report_type in type_order:
+        for report_type in _TYPE_ORDER:
             parser = ReportFormulaParser(self.db, project_id, year)
             if mode == "unadjusted":
                 parser._use_unadjusted = True
@@ -2073,50 +2008,17 @@ class ReportEngine:
                 if row is None:
                     continue
                 handled_keys.add(key)
-
-                try:
-                    formula_result = await parser.execute_with_status(
-                        config.formula, row_cache,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    failed_rows.append({
-                        "report_type": report_type.value,
-                        "row_code": config.row_code,
-                        "error": str(exc),
-                        "state": "error",
-                    })
-                    continue
-
-                if not formula_result.ok:
-                    error = "; ".join(formula_result.errors)
-                    if not error and formula_result.blocked:
-                        error = "公式被拦截"
-                    failed_rows.append({
-                        "report_type": report_type.value,
-                        "row_code": config.row_code,
-                        "error": error or "公式执行失败",
-                        "state": formula_result.state,
-                    })
-                    continue
-
-                # 先写入金额及其来源元数据；stale 标记在 flush 成功后再清除。
-                row.current_period_amount = formula_result.value
-                row.row_name = config.row_name
-                row.formula_used = config.formula
-                row.source_accounts = parser.extract_account_codes(config.formula) or None
-                row.generated_at = now
-                row.indent_level = config.indent_level
-                row.is_total_row = config.is_total_row
-                row_cache[config.row_code] = formula_result.value
-                successful_models.append(row)
-                recalculated_rows.append({
-                    "report_type": report_type.value,
-                    "row_code": config.row_code,
-                })
+                outcome = await compute_row(parser, config, row_cache, mode=mode, scope=scope)
+                write_row(row, config, outcome, generated_at=now,
+                          source_accounts=parser.extract_account_codes(config.formula))
+                item = {"report_type": report_type.value, "row_code": config.row_code}
+                if outcome.ok:
+                    recalculated_rows.append(item)
+                else:
+                    failed_rows.append({**item, "error": outcome.calc_error, "state": outcome.state})
 
         # stale 行必须有对应的当前准则配置；缺配置时不能把 stale 静默清掉。
-        for row in stale_rows:
-            key = (row.report_type, row.row_code)
+        for key, row in stale_by_key.items():
             if key not in handled_keys:
                 failed_rows.append({
                     "report_type": row.report_type.value,
@@ -2125,11 +2027,7 @@ class ReportEngine:
                     "state": "missing_config",
                 })
 
-        # 分两次 flush，明确保证「金额已经写入」发生在「清 stale」之前。
-        if successful_models:
-            await self.db.flush()
-            for row in successful_models:
-                row.is_stale = False
+        if handled_keys:
             await self.db.flush()
             await self._invalidate_report_cache(project_id)
 
@@ -2137,7 +2035,7 @@ class ReportEngine:
             "project_id": str(project_id),
             "year": year,
             "applicable_standard": applicable_standard,
-            "stale_count": len(stale_rows),
+            "stale_count": len(stale_by_key),
             "recalculated_count": len(recalculated_rows),
             "failed_count": len(failed_rows),
             "recalculated_rows": recalculated_rows,
@@ -2152,24 +2050,33 @@ class ReportEngine:
         project_id: UUID,
         year: int,
         changed_accounts: list[str] | None = None,
-        applicable_standard: str = "enterprise",
+        applicable_standard: str | None = None,
     ) -> int:
         """增量更新：根据 formula 识别受影响行，只重算受影响行。
 
         AJE/RJE 改 ``aje_adjustment`` → ``audited_amount`` 后，按 ``changed_accounts``
-        只重算直接引用变更审定数的报表行 + 经 ROW() 传递闭包连带受影响的行；
-        未受影响的报表行保持不变（Req 15.1/15.2）。受影响单元更新
+        只重算直接引用变更审定数的报表行（:meth:`_is_affected`：变更码是公式引用码本身或其后代）
+        + 经 ROW() / SUM_ROW() 传递闭包连带受影响的行（``propagation.report_closure``，与定义写入标过期同口径）；
+        未受影响的报表行保持不变（Req 15.1/15.2）。成功的受影响单元更新
         ``generated_at``（即报表单元的最近计算时间 last_computed_at，Req 15.3）。
         调整撤销/修改后再次调用本方法即依最新审定数重算（Req 15.4）。
         增量重算过程中若某报表行公式的 ROW() 引用经 ACNR ``resolve_ref`` 探测悬空
         （found=false 且非 fail-open），记入 Issue_List（``self.last_regenerate_issues``）
-        并**继续重算其余报表单元**（Req 15.5）。
+        并**继续重算其余报表单元**（Req 15.5）。逐行计算、依赖缓存与写库同全量生成（``report_row_compute``）：
+        未受影响但已过期 / 计算失败 / 计算版本不是当前版本的行不作输入，引用它们的行失败并保持过期。
+        ``applicable_standard=None`` 时按项目真实准则（需求 5.3）。
 
         Returns the number of rows regenerated.
         Validates: Requirements 2.4, 8.2, 15.1, 15.2, 15.3, 15.4, 15.5
         """
+        from app.services.formula_settings.propagation import report_closure
+
         # Req 15.5：重置本次增量重算的悬空引用问题清单。
         self.last_regenerate_issues = []
+        if applicable_standard is None:
+            from app.services.report_config_service import ReportConfigService
+
+            applicable_standard = await ReportConfigService.resolve_applicable_standard(self.db, project_id)
 
         if not changed_accounts:
             # If no specific accounts, regenerate all
@@ -2177,104 +2084,53 @@ class ReportEngine:
             return -1  # indicates full regen
 
         configs = await self._load_report_configs(applicable_standard, project_id=project_id)
-        global_row_cache: dict[str, Decimal] = {}
+        flat = [c for rows in configs.values() for c in rows]
+        affected_codes = report_closure(
+            flat, {c.row_code for c in flat if self._is_affected(c.formula, changed_accounts)},
+        )
+        scope = RowScope.of(flat)
+        all_rows = (await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )).scalars().all()
+        by_key = {(r.report_type, r.row_code): r for r in all_rows}
+        row_cache = scope.start_cache(all_rows)
         # Req 15.5：跨报表共享的 ACNR ROW() 引用解析缓存（fail-open 由 resolve_ref 保证）。
         row_ref_cache: dict[str, Any] = {}
         regenerated = 0
         now = datetime.now(timezone.utc)
 
-        # First pass: identify affected row_codes
-        affected_codes: set[str] = set()
-        for report_type, rows in configs.items():
-            for config in rows:
-                if self._is_affected(config.formula, changed_accounts):
-                    affected_codes.add(config.row_code)
-
-        # Also include rows that reference affected rows via ROW()
-        changed = True
-        while changed:
-            changed = False
-            for report_type, rows in configs.items():
-                for config in rows:
-                    if config.row_code in affected_codes:
-                        continue
-                    parser = ReportFormulaParser(self.db, project_id, year)
-                    row_refs = parser.extract_row_refs(config.formula)
-                    if any(ref in affected_codes for ref in row_refs):
-                        affected_codes.add(config.row_code)
-                        changed = True
-
-        # Second pass: regenerate in order, building row_cache
-        type_order = [
-            FinancialReportType.balance_sheet,
-            FinancialReportType.income_statement,
-            FinancialReportType.cash_flow_statement,
-            FinancialReportType.equity_statement,
-            FinancialReportType.cash_flow_supplement,
-            FinancialReportType.impairment_provision,
-        ]
-
-        for report_type in type_order:
-            config_rows = configs.get(report_type, [])
+        for report_type in _TYPE_ORDER:
             parser_current = ReportFormulaParser(self.db, project_id, year)
+            for config in sorted(configs.get(report_type, []), key=lambda r: r.row_number):
+                if config.row_code not in affected_codes:
+                    continue
+                # Req 15.5：先经 ACNR full_resolve 探测本行 ROW() 引用是否悬空，
+                # 悬空记入 Issue_List 但**不跳过**——仍继续重算本行及其余行。
+                _, dangling_refs = await self._resolve_row_refs_via_acnr(
+                    config.formula, project_id, row_ref_cache,
+                )
+                for rc in dangling_refs:
+                    self.last_regenerate_issues.append({
+                        "report_type": report_type.value,
+                        "row_code": config.row_code,
+                        "ref": rc,
+                        "addr_id": None,
+                        "message": (
+                            f"报表行 {config.row_code} 公式引用 ROW('{rc}') "
+                            f"经 ACNR 解析悬空，已记录并继续重算其余报表单元"
+                        ),
+                    })
 
-            for config in sorted(config_rows, key=lambda r: r.row_number):
-                if config.row_code in affected_codes:
-                    # Req 15.5：先经 ACNR full_resolve 探测本行 ROW() 引用是否悬空，
-                    # 悬空记入 Issue_List 但**不跳过**——仍继续重算本行及其余行。
-                    _, dangling_refs = await self._resolve_row_refs_via_acnr(
-                        config.formula, project_id, row_ref_cache,
-                    )
-                    for rc in dangling_refs:
-                        self.last_regenerate_issues.append({
-                            "report_type": report_type.value,
-                            "row_code": config.row_code,
-                            "ref": rc,
-                            "addr_id": None,
-                            "message": (
-                                f"报表行 {config.row_code} 公式引用 ROW('{rc}') "
-                                f"经 ACNR 解析悬空，已记录并继续重算其余报表单元"
-                            ),
-                        })
-
-                    current_amount = await parser_current.execute(
-                        config.formula, global_row_cache,
-                    )
-                    global_row_cache[config.row_code] = current_amount
-
-                    # Update in DB
-                    existing = await self.db.execute(
-                        sa.select(FinancialReport).where(
-                            FinancialReport.project_id == project_id,
-                            FinancialReport.year == year,
-                            FinancialReport.report_type == report_type,
-                            FinancialReport.row_code == config.row_code,
-                            FinancialReport.is_deleted == sa.false(),
-                        )
-                    )
-                    row = existing.scalar_one_or_none()
-                    if row:
-                        row.current_period_amount = current_amount
-                        # 任务 15：仅本次实际增量重算的行清除过期标记。
-                        row.is_stale = False
-                        # Req 15.3：更新受影响报表单元的最近计算时间
-                        # （FinancialReport 以 generated_at 承载 last_computed_at）。
-                        row.generated_at = now
-                    regenerated += 1
-                else:
-                    # Load existing value into cache for ROW() references
-                    existing = await self.db.execute(
-                        sa.select(FinancialReport).where(
-                            FinancialReport.project_id == project_id,
-                            FinancialReport.year == year,
-                            FinancialReport.report_type == report_type,
-                            FinancialReport.row_code == config.row_code,
-                            FinancialReport.is_deleted == sa.false(),
-                        )
-                    )
-                    row = existing.scalar_one_or_none()
-                    if row and row.current_period_amount is not None:
-                        global_row_cache[config.row_code] = row.current_period_amount
+                outcome = await compute_row(parser_current, config, row_cache, mode="audited", scope=scope)
+                row = by_key.get((report_type, config.row_code))
+                if row is not None:
+                    write_row(row, config, outcome, generated_at=now,
+                              source_accounts=parser_current.extract_account_codes(config.formula))
+                regenerated += 1
 
         await self.db.flush()
         # 失效受影响报表类型的缓存
@@ -2282,22 +2138,21 @@ class ReportEngine:
         return regenerated
 
     def _is_affected(self, formula: str | None, changed_accounts: list[str]) -> bool:
-        """判断公式是否引用了变更的科目"""
+        """判断公式是否引用了变更的科目：变更码是 ``TB`` 引用码本身或其后代（``1231-02`` 命中 ``TB('1231')``，
+        与取数的 ``LIKE 'code%'`` 宽集合同一判据），或落在 ``SUM_TB`` 区间内（含止码的下级，同 ``_resolve_sum_tb``）。"""
         if not formula:
             return False
-        for account in changed_accounts:
-            # Direct TB reference
-            if f"TB('{account}'" in formula:
-                return True
-            # SUM_TB range check
-            for match in _SUM_TB_PATTERN.finditer(formula):
-                code_range = match.group(1)
-                parts = code_range.split("~")
-                if len(parts) == 2:
-                    start, end = parts[0].strip(), parts[1].strip()
-                    if start <= account <= end:
-                        return True
-        return False
+        codes = [m.group(1) for m in _TB_PATTERN.finditer(_SUM_TB_PATTERN.sub("", formula))]
+        ranges = [
+            (parts[0].strip(), parts[1].strip())
+            for parts in (m.group(1).split("~") for m in _SUM_TB_PATTERN.finditer(formula))
+            if len(parts) == 2
+        ]
+        return any(
+            any(account.startswith(code) for code in codes)
+            or any(start <= account <= end or account.startswith(end) for start, end in ranges)
+            for account in changed_accounts if account
+        )
 
     # ------------------------------------------------------------------
     # 平衡校验

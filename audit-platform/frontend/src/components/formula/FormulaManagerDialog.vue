@@ -367,9 +367,10 @@
           </el-table-column>
           <el-table-column label="计算值" width="110" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length" placement="left" :show-after="300">
+              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length || formulaResults[row.row_code || row.id]?.error" placement="left" :show-after="300">
                 <template #content>
                   <div style="max-width:400px;font-size: var(--gt-font-size-xs);line-height:1.6">
+                    <div v-if="formulaResults[row.row_code || row.id]?.error" data-testid="formula-result-error">失败原因：{{ formulaResults[row.row_code || row.id]?.error }}</div>
                     <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
                       <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
                       <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
@@ -1740,7 +1741,7 @@ const loadingData = ref(false)
 const showFormulaImport = ref(false)
 
 // 公式执行结果缓存（独立于行数据，确保响应式）
-const formulaResults = ref<Record<string, { value: number | null; trace: any[] }>>({})
+const formulaResults = ref<Record<string, { value: number | null; trace: any[]; error?: string | null }>>({})
 
 const notePresetFormulas = ref<any[]>([])
 
@@ -3093,15 +3094,16 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
             formula: data.formula,
             formula_category: data.category,
             formula_description: data.description,
-          }, { validateStatus: (s: number) => s < 600 })
+          }, { _silent: true } as any)
           if (saved?.id) Object.assign(row, { id: saved.id, formula_version: saved.formula_version })
           row._isNew = false
           showFormulaEdit.value = false
           ElMessage.success('新公式已保存')
           emit('saved')
           await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
-        } catch {
-          ElMessage.warning('公式已添加到列表，保存到后端失败')
+        } catch (e) {
+          // 需求 15.3：非 2xx 不弹成功，按状态码显示中文提示
+          showFormulaError(e, '新公式保存失败')
         }
       }
     }
@@ -3276,6 +3278,7 @@ async function onApplyFormulas() {
         formulaResults.value[r.row_code] = {
           value: r.value != null && !r.error ? r.value : null,
           trace: r.trace || [],
+          error: r.error || null, // 失败原因显示在计算值的提示里（FHIC 第 2 轮 A5）
         }
       }
     }
@@ -3284,7 +3287,8 @@ async function onApplyFormulas() {
     // （原「回写报表配置」写的是报表配置上不存在的金额列，从未落库；该后端接口已删除）
 
     if (errorCount > 0) {
-      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败`)
+      const failedRows = results.filter((r: any) => r.error).map((r: any) => r.row_code).join('、')
+      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败（${failedRows}），失败原因见计算值提示`)
     } else {
       ElMessage.success(`已执行 ${successCount} 条自动运算公式`)
     }
@@ -3485,7 +3489,7 @@ async function onSaveAllFormulas() {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
-        }, { validateStatus: (s: number) => s < 600 })
+        }, { _silent: true } as any)
         row._isNew = false
         saved++
       } else if (row.id && dispatch === 'wp') {
@@ -3501,7 +3505,7 @@ async function onSaveAllFormulas() {
           category: row.formula_category,
           description: row.formula_description,
           expected_version: row.definition_version ?? undefined,
-        }, { validateStatus: (s: number) => s < 600 })
+        }, { _silent: true } as any)
         const savedRowVersion = savedDefinitionVersion(savedRow)
         if (savedRowVersion != null) row.definition_version = savedRowVersion
         const rowNotice = wpFormulaSaveNotice(savedRow)

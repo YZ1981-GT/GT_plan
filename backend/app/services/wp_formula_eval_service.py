@@ -29,6 +29,7 @@ from app.services.four_table.occurrence_by_standard_code import (
     DEBIT_KEY,
     fetch_occurrence_by_standard_code,
 )
+from app.services.tb_leaf_codes import leaf_total, scope_for_year
 
 logger = logging.getLogger(__name__)
 
@@ -196,17 +197,19 @@ async def _resolve_tb(
     active_filter = await get_active_filter(
         db, TrialBalance.__table__, project_id, year
     )
-    row = (
+    # 与报表 / 预载同口径（ADR-FHIC-03）：「科目及其全部下级」宽集合内只计叶子。原先精确码 ``limit(1)``：
+    # 只有子科目时取不到（父码无行 ⇒ 0）、同码多行（多公司编码）只取任意一行
+    rows = (
         await db.execute(
             sa.select(TrialBalance).where(
                 active_filter,
-                TrialBalance.standard_account_code == account_code,
-            ).limit(1)
+                TrialBalance.standard_account_code.like(f"{account_code}%"),
+            )
         )
-    ).scalar_one_or_none()
-    if row is None:
+    ).scalars().all()
+    if not rows:
         return Decimal("0")
-    return _row_amount(row, field)
+    return leaf_total(rows, lambda r: _row_amount(r, field), column=column_name, scope=scope_for_year(year))
 
 
 async def _resolve_sum_tb(
@@ -235,19 +238,20 @@ async def _resolve_sum_tb(
     active_filter = await get_active_filter(
         db, TrialBalance.__table__, project_id, year
     )
+    # 区间宽集合（含止码自身的下级，同报表引擎）内只计叶子（ADR-FHIC-03）
     rows = (
         await db.execute(
             sa.select(TrialBalance).where(
                 active_filter,
                 TrialBalance.standard_account_code >= start_code,
-                TrialBalance.standard_account_code <= end_code,
+                sa.or_(
+                    TrialBalance.standard_account_code <= end_code,
+                    TrialBalance.standard_account_code.like(f"{end_code}%"),
+                ),
             )
         )
     ).scalars().all()
-    total = Decimal("0")
-    for row in rows:
-        total += _row_amount(row, field)
-    return total
+    return leaf_total(rows, lambda r: _row_amount(r, field), column=column_name, scope=scope_for_year(year))
 
 
 def _resolve_cross_sheet_refs(
@@ -319,6 +323,8 @@ async def evaluate_wp_formula_expression(
     expression: str,
     parsed_data: dict | None = None,
     parent_wp_code: str | None = None,
+    wp_values: dict[str, Decimal] | None = None,
+    strict_wp: bool = False,
 ) -> tuple[Decimal, list[str]]:
     """求值自定义底稿公式表达式。
 
@@ -332,6 +338,10 @@ async def evaluate_wp_formula_expression(
         parsed_data: 底稿 ``working_paper.parsed_data``（含 univer_snapshot），
             提供时启用 ``Sheet!Cell`` 跨 sheet 引用追溯求值。
         parent_wp_code: 父底稿码，供 CrossSheetResolver 构造 grammar_v1 3 参 WP。
+        wp_values: 预置 WP 取值表（键 = 匹配文本如 ``"WP('D2','审定数')"``，值 = Decimal）。
+            非 None 时先查此表，命中即用该值、不调 ``WPExecutor``。
+        strict_wp: 严格模式。为 True 时，``wp_values`` 中查不到的 WP 调用
+            直接记错误、不调 ``WPExecutor``（零回归：默认 False 行为不变）。
     """
     from app.services.formula_preloader import preload
     from app.services.formula_ref_preload import substitute_value_refs
@@ -372,6 +382,14 @@ async def evaluate_wp_formula_expression(
     # 三参 WP（D2-3 嵌套寻址）先处理，避免被两参正则截断
     for match in _WP3_PATTERN.finditer(raw):
         wp_code, sheet_name, field = match.group(1), match.group(2), match.group(3)
+        match_text = match.group(0)
+        # 预置值优先（wp_values 非 None 时先查）
+        if wp_values is not None and match_text in wp_values:
+            expr = expr.replace(match_text, str(wp_values[match_text]), 1)
+            continue
+        if strict_wp:
+            errors.append(f"严格模式：WP('{wp_code}',…) 取值失败")
+            continue
         try:
             if _A1_FIELD.match(field) and _D23_SHEET_MARKER not in sheet_name:  # 三参 A1 按 sheet 精确取值（acnr T13）
                 tr = await WPExecutor.read_sheet_cell(db, project_id, year, wp_code, sheet_name, field)
@@ -383,23 +401,37 @@ async def evaluate_wp_formula_expression(
                     db, project_id, wp_code, sheet_name, field=field
                 )
         except Exception as e:
-            logger.warning("WP 三参求值失败 %s: %s", match.group(0), e)
-            val = Decimal("0")
-            errors.append(f"{match.group(0)}: {e}")
-        expr = expr.replace(match.group(0), str(val), 1)
+            logger.warning("WP 三参求值失败 %s: %s", match_text, e)
+            val = None
+            errors.append(f"{match_text}: {e}")
+        if val is None:
+            errors.append(f"{match_text}: 底稿取值返回空")
+            continue
+        expr = expr.replace(match_text, str(val), 1)
 
     for match in _WP_PATTERN.finditer(raw):
         # 跳过已被三参正则消费的片段（三参形态在 raw 中仍可被两参 finditer 命中前两参）
-        if match.group(0) not in expr:
+        match_text = match.group(0)
+        if match_text not in expr:
             continue
         wp_code, col = match.group(1), match.group(2)
+        # 预置值优先
+        if wp_values is not None and match_text in wp_values:
+            expr = expr.replace(match_text, str(wp_values[match_text]), 1)
+            continue
+        if strict_wp:
+            errors.append(f"严格模式：WP('{wp_code}',…) 取值失败")
+            continue
         try:
             val = await WPExecutor.execute(db, project_id, wp_code, col)
         except Exception as e:
-            logger.warning("WP 求值失败 %s: %s", match.group(0), e)
-            val = Decimal("0")
-            errors.append(f"{match.group(0)}: {e}")
-        expr = expr.replace(match.group(0), str(val), 1)
+            logger.warning("WP 求值失败 %s: %s", match_text, e)
+            val = None
+            errors.append(f"{match_text}: {e}")
+        if val is None:
+            errors.append(f"{match_text}: 底稿取值返回空")
+            continue
+        expr = expr.replace(match_text, str(val), 1)
 
     for match in _SUM_TB_PATTERN.finditer(raw):
         try:

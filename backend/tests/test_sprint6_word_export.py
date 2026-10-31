@@ -352,7 +352,12 @@ async def test_zip_manifest_structure():
     assert manifest["year"] == 2025
     assert "files" in manifest
     assert "consistency_check" in manifest
-    assert manifest["consistency_check"]["overall"] == "pass"
+    # mock 会话里门禁检查取不到数 ⇒ 阻断级检查「未执行」，overall 不再记成 pass（五态，spec formula-hub-integrity-closure
+    # 需求 16.2）；observe 模式下照常导出（需求 16.4），manifest 如实记录
+    cc = manifest["consistency_check"]
+    blocking_unpassed = [c for c in cc["checks"] if c["severity"] == "blocking" and not c["passed"]]
+    assert cc["overall"] == ("fail" if blocking_unpassed else "pass"), cc
+    assert cc["checks"], cc
     assert len(manifest["files"]) >= 2  # At least xlsx + docx
 
 

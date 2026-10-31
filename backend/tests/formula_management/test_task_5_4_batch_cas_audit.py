@@ -383,7 +383,8 @@ class TestAuditChain:
         before = await _audit_count(seed.project_id)
         with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
             resp = c.delete(
-                f"/api/workpapers/{seed.wp_id}/formulas/{seed.existing_formula_id}")
+                f"/api/workpapers/{seed.wp_id}/formulas/{seed.existing_formula_id}"
+                f"?expected_version=1")
         assert resp.status_code == 200, resp.text
         assert await _audit_count(seed.project_id) == before + 1
         async with async_sessionmaker(_engine, class_=AsyncSession,
@@ -445,3 +446,51 @@ class TestCASPreconditionRequired:
         assert created is None
         assert existing.expression == "1 + 1"
         assert existing.definition_version == 1
+
+    # ── 删除端点强制 CAS（ADR-FHIC-11 / 需求 13.4）──────────────────────────
+    # 这两条是真发请求（TestClient 打 delete_formula 端点）。
+    # 原 `tests/formula_hub/test_formula_delete_cas.py` 第 1 节的两条同名判据是
+    # 自己 raise 自己断言的空壳，从未触达生产端点，故行为判据落在这里。
+
+    @pytest.mark.asyncio
+    async def test_delete_without_expected_version_returns_428_and_keeps_row(self, db, seed):
+        """缺 expected_version → 428，且公式行不被删除。"""
+        user = await _load_user(db, seed.user_id)
+        app = _make_app(db, user)
+        before = await _audit_count(seed.project_id)
+        with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.delete(
+                f"/api/workpapers/{seed.wp_id}/formulas/{seed.existing_formula_id}")
+        assert resp.status_code == 428, resp.text
+        assert resp.json()["detail"]["error_code"] == "FORMULA_VERSION_REQUIRED"
+        async with async_sessionmaker(_engine, class_=AsyncSession,
+                                      expire_on_commit=False)() as s:
+            kept = (await s.execute(select(WpFormula).where(
+                WpFormula.id == seed.existing_formula_id,
+            ))).scalar_one_or_none()
+        assert kept is not None, "428 之后公式行必须仍在"
+        assert kept.expression == "1 + 1"
+        assert await _audit_count(seed.project_id) == before, "被拒的删除不应写审计"
+
+    @pytest.mark.asyncio
+    async def test_delete_with_wrong_expected_version_returns_409_and_keeps_row(self, db, seed):
+        """expected_version 与库中 definition_version 不符 → 409，且行不被删除。"""
+        user = await _load_user(db, seed.user_id)
+        app = _make_app(db, user)
+        before = await _audit_count(seed.project_id)
+        with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.delete(
+                f"/api/workpapers/{seed.wp_id}/formulas/{seed.existing_formula_id}"
+                f"?expected_version=999")
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert detail["error_code"] == "FORMULA_VERSION_CONFLICT"
+        assert (detail["expected"], detail["actual"]) == (999, 1)
+        async with async_sessionmaker(_engine, class_=AsyncSession,
+                                      expire_on_commit=False)() as s:
+            kept = (await s.execute(select(WpFormula).where(
+                WpFormula.id == seed.existing_formula_id,
+            ))).scalar_one_or_none()
+        assert kept is not None, "409 之后公式行必须仍在"
+        assert kept.definition_version == 1
+        assert await _audit_count(seed.project_id) == before, "被拒的删除不应写审计"

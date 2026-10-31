@@ -103,6 +103,11 @@ _SCOPE_POOL: list[str] = [
     "workpaper:G",
 ]
 
+# spec formula-hub-integrity-closure 任务 20（ADR-FHIC-07 / 08）：report 范围不再经 ``_dispatch`` 产单元，勾选后在执行段
+# 走报表权威生成路径（本文件 9 张表的 SQLite 夹具跑不了，由真 PG 用例覆盖）⇒ 勾选只从其余范围抽；report 恒为未勾选域，
+# 仍在下面的「未勾选域快照不变」判据里，并核对报表范围没有执行（rollback_available 仍为 True）。
+_SELECTABLE_POOL: list[str] = [scope for scope in _SCOPE_POOL if scope != "report"]
+
 # 种子 wp_index：使 workpaper:{cycle} 在发现集合内（双保险，独立于 CYCLE_NAMES）。
 _SEED_WP_CODES = ["D3", "D3-1", "E1", "F1", "G5"]
 
@@ -199,10 +204,14 @@ def _controlled_dispatch_factory(dispatched: list[str]):
 )
 @given(
     # 可含重复的非空勾选列表 → 覆盖"留痕集合恰等于勾选去重集合"；含循环粒度项。
-    selected_raw=st.lists(st.sampled_from(_SCOPE_POOL), min_size=1, max_size=10),
+    selected_raw=st.lists(st.sampled_from(_SELECTABLE_POOL), min_size=1, max_size=10),
 )
 def test_p22_selected_equals_executed_equals_audited(selected_raw: list[str]):
     """勾选 == 执行 == 留痕；未勾选域快照逐一不变。
+
+    spec formula-hub-integrity-closure 任务 20 改断言（需求 3.2 / 3.3）：只打 Draft 标记 ⇒ ``status`` / ``outcome`` =
+    ``draft_marked``，标记数进 ``draft_marked_count``，``affected_count = applied + recomputed = 0``；勾选池去掉 report
+    （理由见 ``_SELECTABLE_POOL``）。
 
     **Validates: Requirements 19.4, 21.3, 21.6**
     """
@@ -229,8 +238,10 @@ def test_p22_selected_equals_executed_equals_audited(selected_raw: list[str]):
                 )
                 await db.commit()
 
-                assert result.status == "success", result.blocking
+                assert (result.status, result.outcome) == ("draft_marked", "draft_marked"), result.blocking
                 assert result.refresh_id is not None
+                # 未勾选的报表范围没有执行（执行过会置 rollback_available=False 并给中文说明）
+                assert result.rollback_available is True and result.warnings == []
 
                 # ── ① 执行范围 == 勾选范围（去重后）──────────────────────────
                 #    仅被勾选的合法 scope 被分派；未勾选 scope 从不进入 _dispatch。
@@ -272,9 +283,10 @@ def test_p22_selected_equals_executed_equals_audited(selected_raw: list[str]):
                 # 落库 Draft 标记的执行范围亦恰等于勾选集合。
                 assert {_scope_of_unit(us) for us in marker_scopes} == selected_set
 
-                # ── affected_count 真实：每被勾选 scope 产 2 单元 ─────────────
-                assert result.affected_count == len(result.refreshed_units)
-                assert result.affected_count == len(selected_set) * 2
+                # ── Draft 标记数真实：每被勾选 scope 产 2 单元；无金额变化 / 仅重算 ⇒ affected_count 0 ─────
+                assert result.draft_marked_count == len(result.refreshed_units)
+                assert result.draft_marked_count == len(selected_set) * 2
+                assert result.affected_count == 0
         finally:
             await engine.dispose()
 

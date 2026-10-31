@@ -173,13 +173,25 @@ async def test_formula_debug_context_takes_value_and_reports_gap(db):
 
 
 @pytest.mark.asyncio
-async def test_legacy_execute_endpoint_takes_value_and_warns(db):
+async def test_legacy_execute_endpoint_takes_value_and_reports_missing(db):
+    """旧执行接口（``FormulaEngine.execute`` 薄转发到中央执行合同，spec formula-hub-integrity-closure ADR-FHIC-19）：
+    取得到的 NOTE 是真值；有一个取不到 ⇒ ``ok=false``、``value=None``、``state=missing``，原因进 ``errors`` 与 ``error``。
+
+    任务 12 改写（原名 ``test_legacy_execute_endpoint_takes_value_and_warns``）：原断言 ``value == 10.0`` 且原因只在
+    ``warnings`` —— 即取不到的 NOTE 按 0 参与求值、结果照常当成功返回，只看 ``value`` 的调用方会把 10 当作
+    ``NOTE('五、1',…) + NOTE('五、9',…)`` 的真值。这正是中央合同要消除的「缺数按 0 冒充正常值」，旧断言固化了该缺陷。
+    """
     from app.services.formula_engine import FormulaEngine
 
-    out = await FormulaEngine().execute(db, P, YEAR, "custom",
-                                        {"formula": "NOTE('五、1','银行存款','期末') + NOTE('五、9','合计')"})
-    assert out["value"] == 10.0, out
-    assert any("NOTE('五、9','合计')" in w and "附注没有章节 五、9" in w for w in out["warnings"]), out
+    engine = FormulaEngine()
+    found = await engine.execute(db, P, YEAR, "custom", {"formula": "NOTE('五、1','银行存款','期末')"})
+    assert (found["ok"], found["value"], found["state"], found["errors"], found["error"]) == (
+        True, 10.0, "ok", [], None), found
+    out = await engine.execute(db, P, YEAR, "custom",
+                               {"formula": "NOTE('五、1','银行存款','期末') + NOTE('五、9','合计')"})
+    assert (out["ok"], out["value"], out["state"]) == (False, None, "missing"), out
+    assert any("NOTE('五、9','合计')" in e and "附注没有章节 五、9" in e for e in out["errors"]), out
+    assert "附注没有章节 五、9" in (out["error"] or ""), out
 
 
 @pytest.mark.asyncio

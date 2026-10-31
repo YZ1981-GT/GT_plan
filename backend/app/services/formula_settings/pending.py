@@ -1,6 +1,8 @@
 """待确认事项（``formula_sync_item``）的写入与读取（R4.4 / R5）。
 
 同一项目同一公式位只保留一条 pending：再次发布时更新它的「新上游」，保留原基线与原因。
+修订号 ``revision``（spec formula-hub-integrity-closure 需求 8.1，ADR-FHIC-11）：新建为 1，每次覆盖原子 +1，
+三种来源（全局设置 / 公式模板 / 其他项目）一律携带并在列表输出；处理待确认以它为唯一 CAS 依据。
 """
 from __future__ import annotations
 
@@ -9,6 +11,8 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.formula_setting_models import FormulaSyncItem
@@ -38,29 +42,53 @@ async def find_pending(db: AsyncSession, project_id: uuid.UUID, domain: str,
     ))).scalars().first()
 
 
+#: 冲突目标 = 部分唯一索引 ``uq_formula_sync_item_pending``（V199，PG 与 SQLite 都声明）。谓词须是字面量：
+#: 写成绑定参数时 PostgreSQL 推断不出仲裁索引。
+_PENDING_INDEX = ["project_id", "domain", "slot_key"]
+_PENDING_WHERE = "status = 'pending'"
+_DIALECT_INSERTS = {"postgresql": pg_insert, "sqlite": sqlite_insert}
+
+
+def _dialect_insert(db: AsyncSession):
+    name = db.get_bind().dialect.name
+    if name not in _DIALECT_INSERTS:
+        raise RuntimeError(f"待确认事项的原子写入不支持数据库方言 {name}")
+    return _DIALECT_INSERTS[name]
+
+
 async def upsert_pending(db: AsyncSession, *, project_id: uuid.UUID, domain: str, slot_key: str,
                          slot_label: str, reason: str, base_definition: dict | None,
                          upstream_definition: dict | None, upstream_version: int | None,
                          local_definition: dict | None, publish_id: uuid.UUID | None,
                          upstream_origin: str = "global",
                          upstream_template_id: uuid.UUID | None = None) -> FormulaSyncItem:
-    item = await find_pending(db, project_id, domain, slot_key)
-    if item is None:
-        item = FormulaSyncItem(
-            project_id=project_id, domain=domain, slot_key=slot_key, slot_label=slot_label,
-            reason=reason, base_definition=_plain(base_definition), status="pending",
-        )
-        db.add(item)
-    item.upstream_definition = _plain(upstream_definition)
-    item.upstream_version = upstream_version
-    item.local_definition = _plain(local_definition)
-    item.publish_id = publish_id
-    item.upstream_origin = upstream_origin
-    item.upstream_template_id = upstream_template_id
-    item.slot_label = slot_label or item.slot_label
-    item.updated_at = _now()
-    await db.flush()
-    return item
+    """新建或覆盖该公式位唯一的 pending：一条 ``INSERT … ON CONFLICT DO UPDATE … RETURNING``（ADR-FHIC-11）。
+
+    新建：修订号 1，记下基线与原因。覆盖：换新上游、上游版本、本项目当前、发布记录与来源（标签非空才换），
+    基线与原因不变，修订号在库内 +1 —— 两个会话同时覆盖拿到不同的修订号（2、3），同时新建则一个插入、
+    一个转为覆盖（1、2），不抛唯一约束错误。返回 RETURNING 的行（同会话先前读到的同一行对象一并刷新）。
+    """
+    now = _now()
+    stmt = _dialect_insert(db)(FormulaSyncItem).values(
+        id=uuid.uuid4(), project_id=project_id, domain=domain, slot_key=slot_key, slot_label=slot_label,
+        reason=reason, base_definition=_plain(base_definition), status="pending", revision=1,
+        upstream_definition=_plain(upstream_definition), upstream_version=upstream_version,
+        local_definition=_plain(local_definition), publish_id=publish_id, upstream_origin=upstream_origin,
+        upstream_template_id=upstream_template_id, updated_at=now,
+    )
+    new = stmt.excluded
+    stmt = stmt.on_conflict_do_update(
+        index_elements=_PENDING_INDEX, index_where=sa.text(_PENDING_WHERE),
+        set_={
+            "upstream_definition": new.upstream_definition, "upstream_version": new.upstream_version,
+            "local_definition": new.local_definition, "publish_id": new.publish_id,
+            "upstream_origin": new.upstream_origin, "upstream_template_id": new.upstream_template_id,
+            "slot_label": sa.func.coalesce(sa.func.nullif(new.slot_label, ""), FormulaSyncItem.slot_label),
+            "revision": FormulaSyncItem.revision + 1, "updated_at": now,
+        },
+    ).returning(FormulaSyncItem)
+    result = await db.execute(stmt, execution_options={"populate_existing": True})
+    return result.scalars().one()
 
 
 async def close_pending(db: AsyncSession, project_id: uuid.UUID, domain: str, slot_keys: Iterable[str], *,
@@ -116,6 +144,7 @@ def item_to_dict(item: FormulaSyncItem) -> dict[str, Any]:
         else "（已删除）",
         "local_formula": display_formula(d, item.local_definition),
         "upstream_version": item.upstream_version,
+        "revision": item.revision,
         "publish_id": str(item.publish_id) if item.publish_id else None,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,

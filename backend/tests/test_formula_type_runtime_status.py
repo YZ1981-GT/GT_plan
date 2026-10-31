@@ -220,8 +220,10 @@ class TestExtractorSelfCheck:
         assert "NEIGHBOR" not in body
 
     def test_callers_of_finds_known_symbol(self) -> None:
-        # 反向自检：一个确定有调用方的符号必须命中；不存在的符号必须为空
-        assert callers_of("execute_batch"), "调用方扫描失效"
+        # 反向自检：一个确定有调用方的符号必须命中；不存在的符号必须为空。
+        # 原用 execute_batch：spec formula-hub-integrity-closure 任务 26 起 coordinator 改走 typed_eval.plan_batch，
+        # engine.execute_batch 已无 backend/app 调用方（登记表 production_callers 的相应条目已过期，移交 S1 复核）
+        assert callers_of("plan_batch"), "调用方扫描失效"
         assert callers_of("__definitely_not_a_symbol__") == []
 
 

@@ -11,7 +11,7 @@ import uuid
 from typing import Any, Literal
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -194,9 +194,21 @@ async def update_template(template_id: uuid.UUID, body: UpdateBody, db: AsyncSes
 
 
 @router.delete("/{template_id}")
-async def delete_template(template_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+async def delete_template(template_id: uuid.UUID,
+                          expected_version: int | None = Query(None),
+                          db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
     tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    # ADR-FHIC-11：删除模板强制 CAS；缺 428、不符 409
+    if expected_version is None:
+        raise HTTPException(status_code=428, detail={
+            "error_code": "FORMULA_VERSION_REQUIRED",
+            "message": "删除模板必须带当前版本号，请刷新后重试"})
+    if tpl.version != expected_version:
+        raise HTTPException(status_code=409, detail={
+            "error_code": "FORMULA_VERSION_CONFLICT",
+            "message": "模板已被他人修改，请刷新后重试",
+            "expected": expected_version, "actual": tpl.version})
     await _run(db, svc.delete_template(db, tpl, user_id=current_user.id))
     return {"id": str(template_id), "deleted": True}
 

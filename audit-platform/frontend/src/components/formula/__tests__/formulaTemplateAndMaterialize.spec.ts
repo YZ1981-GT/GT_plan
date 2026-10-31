@@ -268,7 +268,10 @@ describe('项目上下文：报表行 = 本项目有效定义，保存写本项�
     get.mockClear()
     await state(w).onRestoreGlobal(row)
 
-    expect(del).toHaveBeenCalledWith(OVERRIDES_URL, expect.objectContaining({ params: { slot_key: ['balance_sheet:BS-002'] } }))
+    // 删除本项目适配强制带版本号（spec formula-hub-integrity-closure ADR-FHIC-11 / 需求 13.4）：取该行本项目适配的 local_version
+    expect(del).toHaveBeenCalledWith(OVERRIDES_URL, expect.objectContaining({
+      params: { slot_key: ['balance_sheet:BS-002'], expected_version: [2] },
+    }))
     expect(get.mock.calls.some(([url]) => String(url).includes('/formula-settings/report/effective'))).toBe(true)
     w.unmount()
   })

@@ -3,6 +3,8 @@
 发布步骤：域排他锁 → 请求号幂等 → 逐公式位 CAS（缺版本 428、不一致 409，整批不写）→
 对使用该作用范围的项目逐（项目, 公式位）分类 → 写全局（版本 +1）→ 按决策写各项目 →
 待确认事项 → 发布记录 → 审计（全局一条 + 每项目）。
+
+发布记录列表 :func:`list_publishes` 按查看人过滤与裁剪（spec formula-hub-integrity-closure 需求 7.4，ADR-FHIC-20）。
 """
 from __future__ import annotations
 
@@ -11,9 +13,10 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.formula_setting_models import FormulaPublish
+from app.models.formula_setting_models import FormulaPublish, FormulaTemplate
 from app.services.formula_settings.audit import audit_global, audit_project, change_entry
 from app.services.formula_settings.definitions import ANY_SCOPE, get_spec, is_disabled, normalize
 from app.services.formula_settings.engine import (
@@ -30,6 +33,8 @@ from app.services.formula_settings.engine import (
 from app.services.formula_settings.errors import FormulaSettingError, VersionConflict, VersionRequired
 from app.services.formula_settings.projects import ProjectInfo, list_projects
 from app.services.formula_settings.stores import DomainStore, SlotRecord, get_store
+from app.services.formula_settings.template_access import Viewer
+from app.services.report_freshness import mark_changed, slot_row_codes
 
 PUBLISH_SOURCES = ("global_edit", "promote", "direct_edit", "master_sync", "template_promote", "candidate", "seed")
 
@@ -135,7 +140,7 @@ async def _plan(db: AsyncSession, store: DomainStore, scope: str, changes: list[
             structure = dict(ch.structure or (cur.structure if cur else {}) or (old_rec.structure if old_rec else {}))
             local = locals_by_project.get(p.id, {}).get(slot)
             item = PlanItem(
-                project=p, slot_key=slot,
+                domain=domain, project=p, slot_key=slot,
                 label=ch.label or (cur.label if cur else "") or (local.label if local else "") or slot,
                 old_up=old_rec.definition if old_rec else None,
                 old_version=old_rec.version if old_rec else None,
@@ -146,7 +151,7 @@ async def _plan(db: AsyncSession, store: DomainStore, scope: str, changes: list[
             if local is not None and local.base_origin == "template":
                 item.skipped = TEMPLATE_SKIPPED
             else:
-                item.classify(domain)
+                item.classify()
             items.append(item)
     return items
 
@@ -203,7 +208,7 @@ async def preview_global(db: AsyncSession, *, domain: str, scope: str,
         "changes": _change_rows(ctx),
         "version_problems": _check_versions(ctx),
         "summary": summary,
-        "items": [it.to_dict(domain) for it in ctx.items if not (it.category and it.category.value == "inherit")],
+        "items": [it.to_dict() for it in ctx.items if not (it.category and it.category.value == "inherit")],
     }
 
 
@@ -244,7 +249,7 @@ async def publish_global(db: AsyncSession, *, domain: str, scope: str, changes: 
     for it in ctx.items:
         if it.version_from_change:
             it.new_version = versions.get(it.slot_key)
-    outcomes: dict[str, ApplyOutcome] = {}
+    outcomes: dict[str, ApplyOutcome] = {}  # 键 = 决策键（带域，需求 8.4）
     audits: dict[uuid.UUID, list[dict[str, Any]]] = {}
     for it in ctx.items:
         if it.skipped:
@@ -273,23 +278,125 @@ async def publish_global(db: AsyncSession, *, domain: str, scope: str, changes: 
     for pid, entries in audits.items():
         await audit_project(db, user_id=user_id, project_id=pid, domain=domain, action="sync_global",
                             source=source, changes=entries, publish_id=publish_id)
-    events = [{"project_id": str(pid), "slot_keys": slots}
-              for pid, slots in changed_slots(ctx.items, outcomes).items()]
+    changed = changed_slots(ctx.items, outcomes)
+    if domain == "report" and changed:  # 同一事务内把有效定义变化的报表行及其闭包标过期（ADR-FHIC-04）
+        await mark_changed(db, {pid: slot_row_codes(slots) for pid, slots in changed.items()})
+    events = [{"project_id": str(pid), "slot_keys": slots} for pid, slots in changed.items()]
     return {"publish_id": str(publish_id), "idempotent": False, "domain": domain, "scope": scope,
             "summary": summary, "versions": versions, "events": events}
 
 
-async def list_publishes(db: AsyncSession, *, domain: str | None = None, scope: str | None = None,
+#: 全局候选的状态（审核前 / 被驳回）；``published`` 是已发布全局记录
+_CANDIDATE_STATUSES = ("pending", "rejected")
+
+
+def _visible_sql(viewer: Viewer) -> sa.ColumnElement[bool]:
+    """规则 ①~③ 的 SQL 条件；④ 只取出模板记录，逐条按模板可见性判定（ADR-FHIC-20）。"""
+    fp = FormulaPublish
+    members = sorted(viewer.member_projects, key=str)
+    member_ids = sa.bindparam("viewer_member_ids", members, type_=postgresql.ARRAY(postgresql.UUID(as_uuid=True)))
+    member_text = sa.bindparam("viewer_member_text", [str(p) for p in members], type_=postgresql.ARRAY(sa.Text))
+    in_member = fp.source_project_id == sa.any_(member_ids)
+    return sa.or_(
+        sa.and_(fp.target == "global", fp.status == "published"),
+        sa.and_(fp.target == "global", fp.status.in_(_CANDIDATE_STATUSES),
+                sa.or_(fp.published_by == viewer.user.id, in_member)),
+        sa.and_(fp.target == "projects", sa.or_(in_member, fp.summary["changed_projects"].has_any(member_text))),
+        fp.target == "template",
+    )
+
+
+def _visible_by_rule(viewer: Viewer, r: FormulaPublish) -> bool | None:
+    """规则 ①~③ 的 Python 判定（与 :func:`_visible_sql` 同义，SQLite 用）；模板记录返回 None（交 ④）。"""
+    if r.target == "template":
+        return None
+    member = viewer.member_projects
+    if r.target == "global":
+        if r.status == "published":
+            return True
+        return r.status in _CANDIDATE_STATUSES and (r.published_by == viewer.user.id or r.source_project_id in member)
+    if r.target == "projects":
+        changed = r.summary.get("changed_projects") if isinstance(r.summary, Mapping) else None
+        touched = {str(p) for p in changed} if isinstance(changed, list) else set()
+        return r.source_project_id in member or bool(touched & {str(p) for p in member})
+    return False
+
+
+async def _template_visible(db: AsyncSession, viewer: Viewer, template_id: uuid.UUID | None,
+                            cache: dict[uuid.UUID, bool]) -> bool:
+    """④ 模板记录按模板可见性（``Viewer.can_view``）；模板不存在 ⇒ 不可见。"""
+    if template_id is None:
+        return False
+    if template_id not in cache:
+        tpl = await db.get(FormulaTemplate, template_id)
+        cache[template_id] = tpl is not None and await viewer.can_view(db, tpl)
+    return cache[template_id]
+
+
+def _redact(item: dict[str, Any], member_text: set[str]) -> dict[str, Any]:
+    """裁掉他项目信息：本人不是成员的来源项目，以及 ``summary.projects`` / ``changed_projects`` 中的他项目条目。
+
+    ``change_set`` 各写入方的条目只有公式位与定义（不带项目字段），无可裁条目。
+    """
+    if item["source_project_id"] not in member_text:
+        item["source_project_id"] = None
+    summary = dict(item["summary"]) if isinstance(item["summary"], Mapping) else {}
+    if isinstance(summary.get("changed_projects"), list):
+        summary["changed_projects"] = [p for p in summary["changed_projects"] if str(p) in member_text]
+    if isinstance(summary.get("projects"), list):
+        summary["projects"] = [p for p in summary["projects"]
+                               if isinstance(p, Mapping) and str(p.get("project_id")) in member_text]
+    item["summary"] = summary
+    return item
+
+
+async def list_publishes(db: AsyncSession, *, viewer: Viewer, domain: str | None = None, scope: str | None = None,
                          status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-    q = sa.select(FormulaPublish)
+    """发布记录，按 (published_at, id) 倒序；非 admin 只返回可见记录并裁掉他项目信息（需求 7.4，ADR-FHIC-20）。
+
+    非 admin 可见：①已发布的全局记录；②全局候选（待审核 / 已驳回）—— 提交人本人，或本人是来源项目成员；
+    ③项目间应用 —— 本人是来源项目成员，或 ``summary.changed_projects`` 含本人项目；④模板记录 —— 按模板可见性。
+    PostgreSQL 把 ①~③ 下推为 SQL 条件，④ 逐条判定；SQLite（单测）四条都在 Python 判定。过滤后不足 ``limit`` 条时，
+    以本批最后一条的 (published_at, id) 为游标取下一批（每批 ``limit`` 条），直到满 ``limit`` 或没有更多 ——
+    最近 ``limit`` 条都不可见时第一页仍是其后的可见记录。
+    """
+    limit = max(1, min(limit, 200))
+    base = sa.select(FormulaPublish)
     if domain:
-        q = q.where(FormulaPublish.domain == domain)
+        base = base.where(FormulaPublish.domain == domain)
     if scope:
-        q = q.where(FormulaPublish.scope == scope)
+        base = base.where(FormulaPublish.scope == scope)
     if status:
-        q = q.where(FormulaPublish.status == status)
-    rows = (await db.execute(q.order_by(FormulaPublish.published_at.desc()).limit(max(1, min(limit, 200))))).scalars()
-    return [publish_to_dict(r) for r in rows]
+        base = base.where(FormulaPublish.status == status)
+    order = (FormulaPublish.published_at.desc(), FormulaPublish.id.desc())
+    if viewer.admin:
+        return [publish_to_dict(r) for r in (await db.execute(base.order_by(*order).limit(limit))).scalars()]
+    sql_rules = db.get_bind().dialect.name == "postgresql"
+    if sql_rules:
+        base = base.where(_visible_sql(viewer))
+    member_text = {str(p) for p in viewer.member_projects}
+    templates: dict[uuid.UUID, bool] = {}
+    out: list[dict[str, Any]] = []
+    cursor: tuple[Any, uuid.UUID] | None = None
+    while len(out) < limit:
+        q = base
+        if cursor is not None:
+            at, last_id = cursor
+            q = q.where(sa.or_(FormulaPublish.published_at < at,
+                               sa.and_(FormulaPublish.published_at == at, FormulaPublish.id < last_id)))
+        batch = list((await db.execute(q.order_by(*order).limit(limit))).scalars())
+        for r in batch:
+            verdict = True if sql_rules and r.target != "template" else _visible_by_rule(viewer, r)
+            if verdict is None:
+                verdict = await _template_visible(db, viewer, r.template_id, templates)
+            if verdict:
+                out.append(_redact(publish_to_dict(r), member_text))
+                if len(out) == limit:
+                    break
+        if len(batch) < limit:
+            break
+        cursor = (batch[-1].published_at, batch[-1].id)
+    return out
 
 
 def publish_to_dict(r: FormulaPublish) -> dict[str, Any]:
