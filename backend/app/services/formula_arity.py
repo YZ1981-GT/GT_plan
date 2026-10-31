@@ -5,8 +5,7 @@
 - :data:`ARITY`：内置函数 → ``(最少参数, 最多参数 | None = 不限)``，手工维护；键集合 == 名单（守卫
   ``tests/formula_hub/test_l1_failure_semantics.py::test_arity_keys``）。自定义函数的参数个数 = 注册时
   ``param_names`` 的长度（ADR-FHIC-17），不归本表管。
-- 求值期（L1 ``_eval_func_node`` 与 ``safe_eval_expr``）只查下限，另查 ``IF`` 上限；写入期 validator 上下限都查
-  （``arity_problem(..., full=True)``）。
+- 求值期与写入期都查参数个数上下限（S1 ADR-FGR-02）。
 - AST 预算：节点 > :data:`MAX_AST_NODES` 或深度 > :data:`MAX_AST_DEPTH` 在求值前报错（深度：根为 1，
   父 = 1 + 最深的子；``a+b+c`` 是左结合的链，深度 = 项数）。
 
@@ -20,44 +19,13 @@ import dataclasses
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
-#: L1 内置函数全集（字面量；实施时 = HEAD ``formula_engine._REGISTRY`` 的全部键）。
-BUILTIN_FUNCTION_NAMES: frozenset[str] = frozenset({
-    "TB", "SUM_TB", "PREV", "AUX", "NOTE", "WP", "ADJ",
-    "ROW", "SUM_ROW", "REPORT",
-    "ABS", "ROUND", "MAX", "MIN", "IF",
-    "LEDGER", "LEDGER_DETAIL", "TB_AUX", "COUNT_LEDGER", "PLACEHOLDER",
-})
+#: L1 内置函数全集（从 ``formula_function_catalog`` 派生，S1 ADR-FGR-01）。
+from app.services.formula_function_catalog import L1_FUNCTION_NAMES as _L1_NAMES, arity_dict as _catalog_arity
 
-#: 内置函数 → (最少参数, 最多参数 | None)。
-ARITY: dict[str, tuple[int, int | None]] = {
-    # 取数
-    "TB": (1, 2),             # TB('科目'[,'列名'])，缺列名按上下文默认列
-    "SUM_TB": (1, 2),         # SUM_TB('起~止'[,'列名'])
-    "PREV": (2, 3),           # PREV('科目','列') / PREV('底稿','表','字段')；PREV(TB('科目','列')) 按内层计（call_argc）
-    "AUX": (2, 4),            # AUX('科目','维度'[,'辅助项'],'列')：两参 / 三参 / 四参
-    "NOTE": (2, 3),           # NOTE('章节','行'[,'列'])；预载正则至少两参
-    "WP": (2, 3),             # WP('底稿','列名|单元格') / WP('底稿','表','锚点')
-    "ADJ": (1, 2),            # ADJ('科目'[,'aje_net|rje_net'])
-    # 引用
-    "ROW": (1, 1),
-    "SUM_ROW": (2, 2),
-    "REPORT": (1, 2),         # REPORT('行次'[,'期间'])
-    # 数学 / 逻辑
-    "ABS": (1, 1),
-    "ROUND": (1, 2),          # ROUND(值[,位数])，缺位数按 2
-    "MAX": (2, None),
-    "MIN": (2, None),
-    "IF": (3, 3),
-    # 底稿预填（formula_preloader：_LEDGER_RE / _LEDGER_DETAIL_RE / _TB_AUX_RE / _COUNT_LEDGER_RE）
-    "LEDGER": (2, 3),         # LEDGER('科目','方向'[,'范围'])
-    "LEDGER_DETAIL": (1, 3),  # LEDGER_DETAIL('科目'[,'期间'][,'金额条件'])
-    "TB_AUX": (3, 3),         # TB_AUX('科目','维度','列名')：预载正则只认三参
-    "COUNT_LEDGER": (1, 2),   # COUNT_LEDGER('科目'[,'范围'])
-    "PLACEHOLDER": (0, 1),
-}
+BUILTIN_FUNCTION_NAMES: frozenset[str] = _L1_NAMES
 
-#: 求值期也查上限的函数（其余函数多给的参数由 handler 忽略，写入期 validator 再拒）。
-EVAL_UPPER_CHECKED: frozenset[str] = frozenset({"IF"})
+#: 内置函数 → (最少参数, 最多参数 | None)。从目录派生（S1 ADR-FGR-01）。
+ARITY: dict[str, tuple[int, int | None]] = _catalog_arity("l1")
 
 MAX_AST_NODES = 2000
 MAX_AST_DEPTH = 50
@@ -70,16 +38,16 @@ def call_argc(name: str, args: Sequence[Any]) -> int:
     return len(args)
 
 
-def arity_problem(name: str, argc: int, *, full: bool = False) -> str | None:
+def arity_problem(name: str, argc: int, *, full: bool = True) -> str | None:
     """内置函数参数个数不符的中文原因；符合、或不是内置函数（自定义 / 未注册）⇒ ``None``。
 
-    ``full=False``（求值期）：只查下限，另查 :data:`EVAL_UPPER_CHECKED` 的上限；``full=True``（写入期）：上下限都查。
+    S1 ADR-FGR-02：求值期与写入期都查上下限（``full`` 保留为向后兼容但默认 True）。
     """
     bounds = ARITY.get(name)
     if bounds is None:
         return None
     low, high = bounds
-    too_many = high is not None and argc > high and (full or name in EVAL_UPPER_CHECKED)
+    too_many = high is not None and argc > high
     if argc >= low and not too_many:
         return None
     if low == high:

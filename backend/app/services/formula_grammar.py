@@ -99,16 +99,16 @@ FORMULA_FUNCTION_NAMES: frozenset[str] = frozenset({
     "ABS", "ROUND", "MAX", "MIN", "IF",
 })
 
-# spec: unified-formula-registry Phase 1 · Task 3
-# 从 formula_engine._REGISTRY 派生（单一真源）；保留 WP/PREV 的 [2,3] 多元形式。
+# spec: unified-formula-registry Phase 1 · Task 3 → S1 ADR-FGR-01
+# 从 formula_function_catalog 派生（单一真源）；保留 WP/PREV 的 [2,3] 多元形式。
 def _build_formula_arity() -> dict[str, int | list[int] | None]:
-    from app.services.formula_engine import _REGISTRY
+    from app.services.formula_function_catalog import FUNCTIONS
 
     _MULTI_ARITY: dict[str, list[int]] = {"WP": [2, 3], "PREV": [2, 3]}
     out: dict[str, int | list[int] | None] = {}
-    for meta in _REGISTRY.list_all():
-        name = meta["name"]
-        out[name] = _MULTI_ARITY.get(name, meta.get("arity"))
+    for f in FUNCTIONS:
+        if "l1" in f.engines:
+            out[f.name] = _MULTI_ARITY.get(f.name, f.arity_min)
     return out
 
 

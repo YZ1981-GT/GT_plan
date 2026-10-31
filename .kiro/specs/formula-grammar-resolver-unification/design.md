@@ -51,6 +51,30 @@
 - 存量多余参数：ADR-02 的数据源全扫，输出（来源、标识、函数、实参个数、上限）。
 - float 用法：两个求值器模块 AST 统计 `float(` 调用与 `else 0` 兜底。
 
+### 1.x 2026-10-31 现算（HEAD = b410cfb0c, v1.0.73）
+
+十一行重算结论：全部成立，新增 1 处差异（LEDGER min 2 vs 前端 3）。
+
+| # | design 结论 | 现算 | 变化 |
+|---|---|---|---|
+| 1 | PRIOR 在前端、`%` 后端不支持 | `KNOWN_FUNCTIONS` 含 `PRIOR`；`OPERATORS` 含 `%`；L1 `_AST_TOKEN_PATTERNS` 无 `%` token | 无变化 |
+| 2 | 参数个数表 4 份、10 处不一致 | 21 个函数、4 份表、**11** 处不一致（多 LEDGER min: ARITY=2 vs 前端=3） | 差异数 10→11 |
+| 3 | `EVAL_UPPER_CHECKED = {"IF"}` | 确认 | 无变化 |
+| 4 | 约 20 个调用方 | `FormulaResult.value` 使用点 231 处 / 20+ 文件（grep 简化版） | 精确数待 AST 跟 |
+| 5 | note 32 处 float、cell 7 处 float | note 32、cell 7（合 39 处；分类 conversion 18 / fallback_zero 9 / none_guard 12） | 无变化 |
+| 6 | 底稿公式只读 `wp_formula` 不读全局层 | `wp_effective.py` 模块文档确认 | 无变化 |
+| 7 | R6 建议移交 S9 | S9 spec 已存在（ADR-ISL-01） | 无变化 |
+| 8 | `_handle_report` 忽略期间 | 只取 `row_code`、第二参不使用 | 无变化 |
+| 9 | REPORT 缺行按 0 | `row_cache.get(row_code, Decimal("0"))` | 无变化 |
+| 10 | `typed_eval_strictness` 差异已登记 | `formula_wp_semantics.py` 有该维度 | 无变化 |
+| 11 | 三参读取等 ACNR `_catalog_sheet_keys` | 交接假设已过时：改走 `wp_cell_target`（ACNR design §2.4） | 无变化 |
+
+四份清单：
+- **参数个数差异矩阵**：`tmp_formula_grammar/baseline/arity_diff_matrix.py`（运行时间 <1s）
+- **value_none_callers**：`tmp_formula_grammar/baseline/value_none_callers_preliminary.json`（231 处 grep 简化版，完整 AST 版在批 2 产出）
+- **存量多余参数**：`tmp_formula_grammar/baseline/excess_args_scan.json`（0 条违规，扫描 312 条公式）
+- **float 用法**：`tmp_formula_grammar/baseline/float_usage.json`（39 处，含生成脚本）
+
 ## 4. 测试与变异
 
 - 目录：键集合守卫；生成 `--check`；前端源码守卫；`PRIOR` 在三引擎下的接受 / 拒绝。

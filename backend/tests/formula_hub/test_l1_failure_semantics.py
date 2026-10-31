@@ -110,7 +110,7 @@ SUCCESSES = [  # 失败语义只收紧失败情形，正常写法值不变
     ("IF(1<0, 1/0, 5)", Decimal("5")),
     ("ROW('BS-001') * 2", Decimal("14")),
     ("BS-001 + 1", Decimal("8")),
-    ("ABS(-3, 9)", Decimal("3")),  # 求值期只查下限与 IF 上限；多给的参数由写入期 validator 拒
+    ("ABS(-3)", Decimal("3")),  # S1 ADR-FGR-02：求值期也查上限，ABS 只收 1 参数
     ("MAX(1, 2, 3)", Decimal("3")),
     ("PREV(TB('1001','期末余额'))", Decimal("50")),  # PREV(TB(…)) 按内层两参计
     ("TB('1001')", Decimal("100")),
@@ -123,13 +123,22 @@ def test_success_cases_unchanged(formula, expected):
     assert (result.ok, result.value) == (True, expected), result
 
 
-def test_arity_problem_write_time_checks_upper_bound():
-    assert arity_problem("ABS", 2) is None
+def test_arity_problem_checks_upper_bound_always():
+    """S1 ADR-FGR-02：求值期也查上限。"""
+    # ABS 上限 1，给 2 个也报错（之前求值期不查）
+    assert arity_problem("ABS", 2) == "ABS() 参数个数不符：需要 1 个参数，实际 2 个"
     assert arity_problem("ABS", 2, full=True) == "ABS() 参数个数不符：需要 1 个参数，实际 2 个"
+    # 下限照旧
     assert arity_problem("MAX", 1) == "MAX() 参数个数不符：至少需要 2 个参数，实际 1 个"
-    assert arity_problem("AUX", 5, full=True) == "AUX() 参数个数不符：需要 2~4 个参数，实际 5 个"
+    # 上限（有限）
+    assert arity_problem("AUX", 5) == "AUX() 参数个数不符：需要 2~4 个参数，实际 5 个"
+    # IF 上限照旧
     assert arity_problem("IF", 4) == "IF() 参数个数不符：需要 3 个参数，实际 4 个"
+    # 未知函数不报
     assert arity_problem("NOT_BUILTIN", 0) is None
+    # MAX/MIN 无上限
+    assert arity_problem("MAX", 100) is None
+    assert arity_problem("MIN", 50) is None
 
 
 # ── 二、舍入 ────────────────────────────────────────────────────────────────────────────

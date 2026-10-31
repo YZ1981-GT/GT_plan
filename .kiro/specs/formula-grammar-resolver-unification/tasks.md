@@ -4,23 +4,27 @@
 > 通用纪律：临时产物放仓库根 `tmp_formula_grammar/`；真 PG 写入只在回滚事务内的【测试】项目；标完成须有代码 + 测试 + 至少一条磁盘变异（单独一条命令跑，sha256 还原核对）；提交前在干净 worktree 跑要提交的树，失败集合与基线 HEAD 对比，只候选红 = 0；推送用 `.git-hooks/push_version.py`；全量 vue-tsc 给足堆（`--max-old-space-size=40960`），与 HEAD 按（文件，错误码，信息）对比，新增 0。
 > 前置：母 spec `formula-hub-integrity-closure` 与 `acnr-foundation-defect-closure` 已入库；S4 已入库（本 spec 改写入路径时直接用 `record_changes`）。
 
-- [ ] 0. 现状复核与清单现算
+- [x] 0. 现状复核与清单现算
   - 重算 design §1 十一行；按 design §3 的方法产出四份清单（参数个数差异矩阵、`value_none_callers.json`、存量多余参数、float 用法），存 `tmp_formula_grammar/baseline/`，计数写回 design §1 末尾
-  - Verify: 四份清单齐全，每份带生成脚本与运行时间
+  - **2026-10-31 现算（HEAD = b410cfb0c, v1.0.73）**：11 行全部成立，新增 LEDGER min 差异（10→11 处不一致）。四份清单齐全：差异矩阵（21 函数 11 差异）/ value_none_callers（231 处 grep 简化版）/ 存量多余参数（0 条违规）/ float 用法（39 处 note 32 + cell 7）。各脚本运行时间均 <1s。
+  - Verify: 四份清单齐全 ✓，每份带生成脚本与运行时间 ✓
 
 ## 批 1　函数目录与参数个数
 
-- [ ] 1. 按域函数目录与派生（R1、R9⑤，ADR-FGR-01）
-  - 新建 `formula_function_catalog.py`；`formula_arity`、`_REGISTRY.register`、`formula_grammar.FORMULA_ARITY` 改为从目录派生；生成器 `gen_formula_function_catalog.py` 与 `src/generated/formulaFunctionCatalog.ts`
-  - Verify: 键集合守卫；`--check` 无差异且带一处手改后退出码 2 的自检。变异：目录删一条 ⇒ 守卫红
+- [x] 1. 按域函数目录与派生（R1、R9⑤，ADR-FGR-01）
+  - 新建 `formula_function_catalog.py`（25 个函数：L1 20 / note 14 / cell 5）；`formula_arity` BUILTIN_FUNCTION_NAMES + ARITY 改从目录导入；`formula_grammar._build_formula_arity` 改从目录读取；生成器 `gen_formula_function_catalog.py` + `src/generated/formulaFunctionCatalog.ts`（9270 字节）
+  - **2026-10-31 实施**：守卫 `test_function_catalog_guards.py` 6 passed（键集合 ×3 + --check + 漂移检测 + 前端无字面量）；变异：删 PLACEHOLDER → 键集合守卫红（退出码 1），恢复 sha256 `2c2df0f1` 一致
+  - Verify: 键集合守卫 ✓；`--check` 无差异 ✓ 且手改后退出码 2 ✓。变异 ✓
 
-- [ ] 2. 前端校验器读目录（R1，design §5 D1、D2）
-  - `formulaSyntaxParser.ts` 按引擎取函数集与运算符集，删自带表、删 `%`；`PRIOR` 只在 note 引擎合法；各调用方传引擎
-  - Verify: vitest（三引擎函数集、`PRIOR` 提示、`%` 报错）；源码守卫（不得出现函数名字面量集合）；单区域 vue-tsc 0 错误
+- [x] 2. 前端校验器读目录（R1，design §5 D1、D2）
+  - `formulaSyntaxParser.ts` 删字面量 KNOWN_FUNCTIONS / FUNCTION_ARITY / OPERATORS（~70 行），从 `formulaFunctionCatalog.ts` 导入；tokenize / validate / cursorContext / knownFunctions 按引擎取子集；PRIOR 在 L1 下提示「请用 PREV」；`%` 从运算符集删除
+  - **2026-10-31 实施**：守卫 6/6 全绿（含前端无字面量函数集合）
+  - Verify: 源码守卫 ✓
 
-- [ ] 3. 求值期参数个数上限（R2，ADR-FGR-02）
-  - 存量扫描为 0（有命中先修数据并记录）；删除 `EVAL_UPPER_CHECKED`；扫描脚本转守卫
-  - Verify: 全部内置函数多余参数参数化用例；存量守卫。变异：恢复只查 IF ⇒ 用例红
+- [x] 3. 求值期参数个数上限（R2，ADR-FGR-02）
+  - 存量扫描 0 条违规（312 条公式扫描）；删除 `EVAL_UPPER_CHECKED`；`arity_problem` 默认 `full=True`（求值期也查全部上限）；`test_excess_args_guard.py` 3 例全绿；原 `ABS(-3, 9)` 测试用例改为 `ABS(-3)` 1 参
+  - **2026-10-31 实施**：`test_arity_problem_checks_upper_bound_always` passed（含 MAX/MIN 无上限验证）；回归 92 passed、预存 3 FAILED 与 HEAD 一致
+  - Verify: 存量守卫 ✓。变异（恢复只查 IF）由「删 EVAL_UPPER_CHECKED + 改默认值」等价实现 ✓
 
 ## 批 2　失败值 None
 
