@@ -119,6 +119,20 @@ async def resolve_member_scope(db: AsyncSession, project_id: UUID, user_id: UUID
     is_member = bool(member_rows)
     is_admin = getattr(system_role, "value", system_role) == "admin"
     unique_chain = len(staff_ids) == 1 and len(member_rows) == 1
+
+    # R8：项目创建者即使没有人员档案和委派，仍按主管待遇看到全部循环（只要有活的成员行；
+    # 被移出团队后 is_member=False，不再按创建者放行）。合伙人 / 无档案经理建项都只写成员行不写委派。
+    if is_member and not is_admin and not (unique_chain and roles & SUPERVISOR_ROLES):
+        from app.models.core import Project
+
+        created_by = (await db.execute(
+            sa.select(Project.created_by).where(Project.id == project_id)
+        )).scalar_one_or_none()
+        if created_by == user_id:
+            return MemberScope(
+                True, await project_cycles(db, project_id), assigned, expanded, roles, is_member, is_admin
+            )
+
     if is_admin or (unique_chain and roles & SUPERVISOR_ROLES):
         return MemberScope(
             True, await project_cycles(db, project_id), assigned, expanded, roles, is_member, is_admin

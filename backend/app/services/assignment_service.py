@@ -74,6 +74,21 @@ def map_assignment_role(role: str) -> tuple[ProjectUserRole, PermissionLevel]:
     return ROLE_MAP.get(role, UNMAPPED_ROLE)
 
 
+async def lock_staff_rows_for_share(db: AsyncSession, staff_ids: Iterable) -> None:
+    """保存团队前给本批人员档案加 FOR SHARE（spec batch-project-authorization-and-lock-hardening R6）。
+
+    人员档案绑定 / 解绑以「委派 FOR SHARE → 档案 FOR NO KEY UPDATE」加锁；FOR SHARE 与 NO KEY UPDATE 冲突，
+    保证随后同步成员行读到的是对方提交后的账号映射（否则绑定会漏建成员行、解绑会留下成员行）。
+    调用方须先改完旧委派再调用，与绑定方的锁序一致，不会互等；按 id 升序加锁。SQLite 不渲染行锁。
+    """
+    ids = sorted({UUID(str(staff_id)) for staff_id in staff_ids}, key=str)
+    if ids:
+        await db.execute(
+            sa.select(StaffMember.id).where(StaffMember.id.in_(ids))
+            .order_by(StaffMember.id).with_for_update(read=True)
+        )
+
+
 def resolve_member_mapping(roles: Iterable[str]) -> tuple[ProjectUserRole, PermissionLevel]:
     """同一用户在同一项目的一组委派角色 → 一组成员行取值，与先后顺序无关（需求 3.3、3.8）。"""
     if isinstance(roles, str):  # 单个字符串会被逐字拆开、静默落到未登记 ⇒ 按误用拒绝
@@ -165,15 +180,36 @@ class AssignmentService:
         require_pending: bool = True,
     ) -> list[ProjectUser]:
         """给 partner 创建的新项目补 partner/edit 成员，不伪造签字委派。"""
+        return await self.initialize_creator_members(
+            project_ids, user_id=user_id, assigned_by=assigned_by,
+            role_key="partner", require_pending=require_pending,
+        )
+
+    async def initialize_creator_members(
+        self,
+        project_ids: Iterable[UUID],
+        *,
+        user_id: UUID,
+        assigned_by: UUID,
+        role_key: str,
+        require_pending: bool = True,
+    ) -> list[ProjectUser]:
+        """给创建者在本事务新建的项目只写成员行、不写团队委派。
+
+        partner 一律如此；manager 仅在没有绑定人员档案时如此（spec
+        batch-project-authorization-and-lock-hardening R7），有档案时走 :meth:`initialize_project_managers`。
+        """
+        if role_key not in ("partner", "manager"):
+            raise ValueError(f"不支持的创建者角色：{role_key}")
         ids = list(dict.fromkeys(project_ids))
         if not ids:
             return []
         if assigned_by != user_id:
-            raise ValueError("批量初始化 partner 成员的操作者必须是本人")
+            raise ValueError(f"批量初始化 {role_key} 成员的操作者必须是本人")
         if require_pending:
             pending = {item.id for item in self.db.new if isinstance(item, Project)}
             if not set(ids).issubset(pending):
-                raise ValueError("批量初始化 partner 成员只允许当前事务的新项目")
+                raise ValueError(f"批量初始化 {role_key} 成员只允许当前事务的新项目")
         with self.db.no_autoflush:
             existing = await self.db.scalar(sa.select(sa.func.count()).select_from(
                 ProjectUser
@@ -182,8 +218,8 @@ class AssignmentService:
                 ProjectUser.is_deleted == False,  # noqa: E712
             ))
         if existing:
-            raise ValueError("partner 创建者成员初始化不允许覆盖既有成员")
-        role, level = ROLE_MAP["partner"]
+            raise ValueError(f"{role_key} 创建者成员初始化不允许覆盖既有成员")
+        role, level = ROLE_MAP[role_key]
         members = [
             ProjectUser(
                 project_id=project_id, user_id=user_id,
@@ -202,23 +238,28 @@ class AssignmentService:
         staff_id: UUID,
         user_id: UUID,
         assigned_by: UUID,
+        require_pending: bool = True,
     ) -> list[ProjectAssignment]:
         """给本事务中新建、尚不可见的项目批量初始化经理与 edit 成员。
 
         该入口只允许空团队项目：一次查询证明没有 active 委派/成员后，一次 flush 写完。
         新项目尚无缓存与既有团队，不发“你被自己委派”通知，也无需逐项目失效旧 policy。
         已存在项目必须走 ``save_assignments``，禁止借本入口覆盖团队。
+
+        ``require_pending``：默认 True（只允许还在 ``session.new`` 里的项目）；单建协调器
+        传 False（``create_project`` flush 后项目变 persistent，但仍在同一事务内、无既有团队）。
         """
         ids = list(dict.fromkeys(project_ids))
         if not ids:
             return []
         if assigned_by != user_id:
             raise ValueError("批量初始化经理的操作者必须是经理本人")
-        pending_project_ids = {
-            item.id for item in self.db.new if isinstance(item, Project)
-        }
-        if not set(ids).issubset(pending_project_ids):
-            raise ValueError("批量初始化经理只允许当前事务尚未 flush 的新项目")
+        if require_pending:
+            pending_project_ids = {
+                item.id for item in self.db.new if isinstance(item, Project)
+            }
+            if not set(ids).issubset(pending_project_ids):
+                raise ValueError("批量初始化经理只允许当前事务尚未 flush 的新项目")
         with self.db.no_autoflush:
             linked_user = await self.db.scalar(sa.select(StaffMember.user_id).where(
                 StaffMember.id == staff_id,
@@ -309,6 +350,7 @@ class AssignmentService:
             )
             .values(is_deleted=True, deleted_at=now)
         )
+        await lock_staff_rows_for_share(self.db, [a["staff_id"] for a in assignments])
 
         # 插入新委派
         created = []

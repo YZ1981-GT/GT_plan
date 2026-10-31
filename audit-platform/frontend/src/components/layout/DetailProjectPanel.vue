@@ -621,6 +621,7 @@ import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustments as P_adj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { creationDeniedMessage } from '@/services/projectCreationGrantApi'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog.vue'
@@ -1011,7 +1012,10 @@ async function onCreateNextYear() {
   if (!props.project) return
   try {
     await confirmDangerous('确定要基于「' + props.project.name + '」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。', '创建下年项目')
-    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
+    // 经理建项授权被拒（403）显示后端给出的原因，代替通用的「权限不足」
+    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`, undefined, {
+      _forbiddenHandler: (error: unknown) => ElMessage.error(creationDeniedMessage(error)),
+    } as any)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
     // EQCR skip notification (Requirements 11.4)
@@ -1021,7 +1025,7 @@ async function onCreateNextYear() {
     }
     router.push(`/projects/new?projectId=${result.new_project_id}`)
   } catch (err: any) {
-    if (err !== 'cancel') {
+    if (err !== 'cancel' && err?.response?.status !== 403) {
       handleApiError(err, '创建')
     }
   }

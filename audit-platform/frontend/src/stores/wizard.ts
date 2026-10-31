@@ -157,8 +157,11 @@ export const useWizardStore = defineStore('wizard', {
       }
     },
 
-    /** Create project via POST /api/projects */
-    async createProject(basicInfo: BasicInfo) {
+    /**
+     * Create project via POST /api/projects
+     * @param options.onForbidden 403 时由请求拦截器调用（替代通用的「权限不足」提示），用于显示建项授权的具体原因
+     */
+    async createProject(basicInfo: BasicInfo, options: { onForbidden?: (error: unknown) => void } = {}) {
       this.loading = true
       try {
         // Filter out null values for optional fields
@@ -209,7 +212,9 @@ export const useWizardStore = defineStore('wizard', {
           payload.contract_amount = basicInfo.contract_amount
         }
         
-        const { data } = await http.post('/api/projects', payload)
+        const { data } = options.onForbidden
+          ? await http.post('/api/projects', payload, { _forbiddenHandler: options.onForbidden } as any)
+          : await http.post('/api/projects', payload)
         invalidateProjectListQuery()
         const project = data
         this.projectId = project.id

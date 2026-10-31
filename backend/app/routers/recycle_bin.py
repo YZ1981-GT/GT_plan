@@ -19,7 +19,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 from app.core.bulk_operations import BulkRequest, bulk_hard_delete
 from app.core.database import get_db
@@ -51,11 +53,10 @@ def _get_recyclable_tables() -> dict:
     if not _RECYCLABLE_TABLES:
         from app.models.core import Project
         from app.models.audit_platform_models import (
-            Adjustment, TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
-            AccountChart, AccountMapping, TrialBalance, ImportBatch,
+            Adjustment, AccountChart, AccountMapping, TrialBalance,
         )
         from app.models.report_models import (
-            FinancialReport, DisclosureNote, AuditReport, ExportTask,
+            FinancialReport, DisclosureNote, AuditReport,
         )
         from app.models.workpaper_models import (
             WpIndex, WpTemplate, ReviewRecord,
@@ -168,26 +169,61 @@ def _display_name(tbl_key: str, row, name_field: str) -> str:
     return str(name_val) if name_val else str(row.id)[:8]
 
 
-async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
-    """级联删除单个项目及其所有关联数据。
+async def _lock_deleted_projects_for_purge(
+    db: AsyncSession,
+    rows: list[Project],
+) -> list[Project]:
+    """与恢复共用年度锁，并在锁后确认仍是同一批已删除项目。"""
+    if not rows:
+        return []
+    from app.services.group_topology_lock import lock_topology_years
+    from app.services.project_audit_year import resolve_project_audit_year
 
-    使用独立的 raw connection + session_replication_role=replica 禁用 FK，
-    绕过 SQLAlchemy session 的事务管理避免 rollback 污染。
+    baseline = {row.id: resolve_project_audit_year(row) for row in rows}
+    await lock_topology_years(db, baseline.values())
+    current = list((await db.execute(
+        select(Project)
+        .where(Project.id.in_(baseline))
+        .execution_options(populate_existing=True)
+    )).scalars().all())
+    if (
+        set(baseline) != {row.id for row in current}
+        or any(not row.is_deleted for row in current)
+        or any(resolve_project_audit_year(row) != baseline[row.id] for row in current)
+    ):
+        raise HTTPException(status_code=409, detail="项目回收站状态已变化，请刷新后重试")
+    return current
+
+
+async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
+    """级联删除单个项目及其所有关联数据（R12：不吞失败）。
+
+    使用独立的 raw connection + session_replication_role=replica 禁用 FK 触发器（包括只追加表的禁改触发器），
+    在同一事务里按 FK 关系逐表删除。任一步失败立即中断、事务回滚，不留孤儿行。
     """
     from app.core.database import async_engine
 
     pid = str(project_id)
 
     async with async_engine.connect() as conn:
-        # 获取底层 asyncpg connection 设置 autocommit-like 行为
         raw = await conn.get_raw_connection()
-        pg_conn = raw.driver_connection  # asyncpg connection
+        pg_conn = raw.driver_connection
 
-        # 禁用 FK 检查
+        still_deleted = await pg_conn.fetchval(
+            "SELECT is_deleted FROM projects WHERE id = $1::uuid", pid
+        )
+        if still_deleted is not True:
+            raise RuntimeError("项目已恢复或不存在，拒绝永久删除")
+
         await pg_conn.execute("SET session_replication_role = 'replica'")
 
         try:
-            # 查出所有引用 projects.id 的子表
+            # 处理自引用（必须在删除项目行之前）
+            await pg_conn.execute(
+                "UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = $1::uuid", pid
+            )
+
+            # 查出所有引用 projects.id 的子表并逐表删除——不再 except pass
             rows = await pg_conn.fetch("""
                 SELECT DISTINCT tc.table_name, kcu.column_name
                 FROM information_schema.table_constraints tc
@@ -197,8 +233,6 @@ async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
                   AND ccu.table_name = 'projects'
                   AND tc.table_name != 'projects'
             """)
-
-            # 逐表删除
             for row in rows:
                 table_name = row["table_name"]
                 column_name = row["column_name"]
@@ -206,19 +240,17 @@ async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
                     await pg_conn.execute(
                         f'DELETE FROM "{table_name}" WHERE "{column_name}" = $1::uuid', pid
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"永久删除项目关联数据失败（表 {table_name}）：{type(exc).__name__}",
+                    ) from exc
 
-            # 处理自引用
-            try:
-                await pg_conn.execute(
-                    "UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = $1::uuid", pid
-                )
-            except Exception:
-                pass
-
-            # 删项目本身
-            await pg_conn.execute("DELETE FROM projects WHERE id = $1::uuid", pid)
+            result = await pg_conn.execute(
+                "DELETE FROM projects WHERE id = $1::uuid AND is_deleted = true", pid
+            )
+            if result != "DELETE 1":
+                raise RuntimeError("项目回收站状态已变化，永久删除已取消")
         finally:
             # 恢复 FK 检查
             await pg_conn.execute("SET session_replication_role = 'origin'")
@@ -382,6 +414,19 @@ async def restore_item(
         await db.commit()
         return {"message": f"{label}已恢复", "id": str(item_id)}
 
+    if item_type == "project":
+        from app.services.group_topology_lock import lock_topology_years
+        from app.services.project_audit_year import resolve_project_audit_year
+
+        await lock_topology_years(db, [resolve_project_audit_year(row)])
+        try:
+            await db.refresh(row)
+        except (InvalidRequestError, ObjectDeletedError) as exc:
+            raise HTTPException(
+                status_code=409, detail="项目已被永久删除，请刷新回收站"
+            ) from exc
+        if not row.is_deleted:
+            raise HTTPException(status_code=409, detail="项目已被其他操作恢复，请刷新后重试")
     row.is_deleted = False
     if hasattr(row, "deleted_at"):
         row.deleted_at = None
@@ -423,6 +468,8 @@ async def permanently_delete(
     if not row:
         raise HTTPException(status_code=404, detail="记录不存在或未被删除")
     await _authorize_row(db, user, item_type, row)
+    if item_type == "project":
+        row = (await _lock_deleted_projects_for_purge(db, [row]))[0]
     if item_type == ATTACHMENT_TYPE:
         # 归档 423 / 法定保全 423 / 仍被引用 409，对管理员同样生效（spec attachment-security-baseline 需求 4.3）
         from app.services.attachment_destructive_guard import assert_destructible
@@ -477,6 +524,8 @@ async def batch_permanently_delete(
         await _authorize_row(db, user, item_type, row)
     if item_type == ATTACHMENT_TYPE:
         return await _batch_purge_attachments(db, user, rows, body.ids)
+    if item_type == "project":
+        await _lock_deleted_projects_for_purge(db, list(rows))
     result = await bulk_hard_delete(db, model, body.ids, filter_deleted=True)
     await db.commit()
     return result
@@ -547,10 +596,12 @@ async def empty_recycle_bin(
             return {"message": f"已永久删除 {result.rowcount} 条记录", "deleted_count": result.rowcount}
         return {"message": "该类型不支持软删除", "deleted_count": 0}
 
-    # 获取待删除的项目 ID 列表
-    deleted_project_ids_q = select(Project.id).where(Project.is_deleted == True)  # noqa: E712
-    result = await db.execute(deleted_project_ids_q)
-    deleted_pids = [row[0] for row in result.fetchall()]
+    # 获取并冻结待删除项目；与恢复共用年度锁，锁后状态变化则整次清空失败。
+    deleted_projects = list((await db.execute(
+        select(Project).where(Project.is_deleted == True)  # noqa: E712
+    )).scalars().all())
+    deleted_projects = await _lock_deleted_projects_for_purge(db, deleted_projects)
+    deleted_pids = [row.id for row in deleted_projects]
 
     deleted_count = 0
     skipped: dict[str, int] = {}

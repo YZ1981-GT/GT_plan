@@ -127,6 +127,25 @@ async def resolve_user_active_staff_id(db: AsyncSession, user_id: UUID) -> UUID:
     return rows[0]
 
 
+async def resolve_user_active_staff_id_optional(db: AsyncSession, user_id: UUID) -> UUID | None:
+    """建项创建者用：未绑定人员档案返回 None（只写项目成员、不写团队委派）。
+
+    绑定了多个档案仍属数据异常，与 :func:`resolve_user_active_staff_id` 一样 fail-closed 403
+    （spec batch-project-authorization-and-lock-hardening R7）。
+    """
+    rows = (
+        await db.execute(
+            sa.select(StaffMember.id).where(
+                StaffMember.user_id == user_id,
+                StaffMember.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalars().all()
+    if len(rows) > 1:
+        raise HTTPException(status_code=403, detail="项目授权失败：用户未唯一绑定人员")
+    return rows[0] if rows else None
+
+
 async def normalize_staff_to_user(db: AsyncSession, staff_id: UUID | None) -> UUID | None:
     """staff → active 归一化 user_id；staff 缺失/inactive/无 user_id 返回 None。
 

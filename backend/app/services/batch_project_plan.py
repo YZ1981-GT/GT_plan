@@ -19,6 +19,17 @@ import anyio
 
 from app.models.core import Project
 from app.services import batch_project_workbook as workbook_io
+from app.services.batch_project_inventory import (
+    build_plan_dependencies,
+    entity_key as _entity_key,
+    inventory_baseline_matches,
+    load_dependency_inventory,
+)
+from app.services.batch_project_creator import (
+    assign_new_project_creator,
+    ensure_consolidated_root,
+)
+from app.services.batch_project_template_origin import validate_template_origin
 from app.services.batch_project_types import (
     BatchActionSummary,
     BatchAnalysis,
@@ -40,6 +51,12 @@ from app.services.group_relation import (
     resolve_relation,
     self_reference_kind,
 )
+from app.services.project_creation_grant_service import (
+    ProjectCreationGrantStale,
+    authorize_creation_codes,
+    required_creation_codes,
+    revalidate_plan_grants,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +70,29 @@ _SELF_REFERENCE_ROW_HINTS = {
 async def _load_year_projects(
     db: AsyncSession,
     rows: list[workbook_io.ParsedRow],
+    *,
+    current_user: Any | None = None,
+    permitted_codes: set[str] | None = None,
 ) -> list[Project]:
     years = sorted({row.audit_year for row in rows if row.audit_year is not None})
     ids = sorted({row.project_id for row in rows if row.project_id is not None}, key=str)
     if not years and not ids:
         return []
     predicates = []
+    role = _role_value(current_user)
     if years:
-        predicates.append(Project.audit_year.in_(years))
+        year_predicate = Project.audit_year.in_(years)
+        if role == "manager":
+            # manager 只可读取本人已有项目和已通过精确 grant 的代码；不扫描同年度无关隐藏项目。
+            from app.deps import readable_project_ids
+
+            readable = await readable_project_ids(db, current_user)
+            allowed_ids = sorted(set(readable or set()) | set(ids), key=str)
+            scopes = [Project.id.in_(allowed_ids)]
+            if permitted_codes:
+                scopes.append(Project.company_code.in_(sorted(permitted_codes)))
+            year_predicate = sa.and_(year_predicate, sa.or_(*scopes))
+        predicates.append(year_predicate)
     if ids:
         predicates.append(Project.id.in_(ids))
     result = await db.execute(
@@ -83,158 +115,6 @@ async def _visible_projects(
     readable = await readable_project_ids(db, current_user)
     assert readable is not None
     return [project for project in projects if project.id in readable], readable
-
-
-def _entity_key(code: object, year: int | None) -> tuple[str, int] | None:
-    clean_code = str(code or "").strip()
-    return (clean_code, year) if clean_code and year is not None else None
-
-
-def dependency_entity_keys(rows: list[workbook_io.ParsedRow]) -> set[tuple[str, int]]:
-    """返回会影响计划预览、建项或自动根选择的库存企业集合。"""
-    keys: set[tuple[str, int]] = set()
-    for row in rows:
-        if row.action == "skip" or row.audit_year is None:
-            continue
-        for code in (row.company_code, row.parent_company_code, row.ultimate_company_code):
-            key = _entity_key(code, row.audit_year)
-            if key is not None:
-                keys.add(key)
-    return keys
-
-
-def _inventory_project(project: Project) -> dict[str, str]:
-    return {
-        "id": str(project.id),
-        "report_scope": project.report_scope or "standalone",
-        "parent_company_code": (project.parent_company_code or "").strip(),
-        "ultimate_company_code": (project.ultimate_company_code or "").strip(),
-        "relation_to_parent": project.relation_to_parent or "",
-    }
-
-
-def inventory_snapshot(
-    projects: list[Project], entity_keys: set[tuple[str, int]],
-) -> list[dict[str, Any]]:
-    """稳定序列化指定企业的所有口径，供计划 CAS 比较。"""
-    grouped: dict[tuple[str, int], list[dict[str, str]]] = defaultdict(list)
-    for project in projects:
-        key = _entity_key(project.company_code, _project_year(project))
-        if key in entity_keys:
-            grouped[key].append(_inventory_project(project))
-    return [
-        {
-            "company_code": code,
-            "audit_year": year,
-            "projects": sorted(items, key=lambda item: item["id"]),
-        }
-        for code, year in sorted(entity_keys)
-        for items in [grouped.get((code, year), [])]
-    ]
-
-
-def _preview_project_ids(trees: list[dict]) -> set[str]:
-    ids: set[str] = set()
-    stack = [node for tree in trees for node in (tree.get("children") or [])]
-    for tree in trees:
-        root_id = tree.get("rootProjectId")
-        if root_id:
-            ids.add(str(root_id))
-    while stack:
-        node = stack.pop()
-        for project in node.get("projects") or []:
-            project_id = project.get("id") if isinstance(project, dict) else None
-            if project_id:
-                ids.add(str(project_id))
-        stack.extend(node.get("children") or [])
-    return ids
-
-
-def build_plan_dependencies(
-    rows: list[workbook_io.ParsedRow],
-    *,
-    visible_projects: list[Project],
-    visible_by_code_year: dict[tuple[str, int | None], list[Project]],
-    tree_preview: list[dict],
-    template_root_project_id: UUID | None,
-) -> dict[str, Any]:
-    """构建只存服务端的库存与权限依赖，状态响应绝不回传此对象。"""
-    entity_keys = dependency_entity_keys(rows)
-    known_ids = {str(project.id) for project in visible_projects}
-    read_ids = _preview_project_ids(tree_preview) & known_ids
-    edit_ids: set[str] = set()
-    for row in rows:
-        if row.action not in ("create", "update") or row.audit_year is None:
-            continue
-        codes = [row.company_code] if row.action == "update" else [
-            row.company_code, row.parent_company_code, row.ultimate_company_code,
-        ]
-        for code in codes:
-            key = _entity_key(code, row.audit_year)
-            if key is None:
-                continue
-            for project in visible_by_code_year.get(key, []):
-                project_id = str(project.id)
-                read_ids.add(project_id)
-                edit_ids.add(project_id)
-    if template_root_project_id is not None:
-        root_id = str(template_root_project_id)
-        read_ids.add(root_id)
-        if any(row.action in ("create", "update") for row in rows):
-            edit_ids.add(root_id)
-    return {
-        "version": 1,
-        "template_root_project_id": str(template_root_project_id) if template_root_project_id else None,
-        "inventory_entities": inventory_snapshot(visible_projects, entity_keys),
-        "read_project_ids": sorted(read_ids),
-        "edit_project_ids": sorted(edit_ids),
-    }
-
-
-async def load_dependency_inventory(
-    db: AsyncSession,
-    dependencies: dict[str, Any],
-    *,
-    for_update: bool = False,
-) -> tuple[list[Project], set[tuple[str, int]]]:
-    """按计划中保存的企业集合重读当前库存；调用方已锁全年时仍可重用。"""
-    raw_entities = dependencies.get("inventory_entities")
-    if not isinstance(raw_entities, list):
-        raise HTTPException(status_code=409, detail="预校验计划缺少库存基线，请重新预校验")
-    entity_keys: set[tuple[str, int]] = set()
-    for item in raw_entities:
-        if not isinstance(item, dict):
-            raise HTTPException(status_code=409, detail="预校验计划库存基线无效，请重新预校验")
-        code = item.get("company_code")
-        year = item.get("audit_year")
-        if not isinstance(year, int):
-            raise HTTPException(status_code=409, detail="预校验计划库存基线无效，请重新预校验")
-        key = _entity_key(code, year)
-        if key is None:
-            raise HTTPException(status_code=409, detail="预校验计划库存基线无效，请重新预校验")
-        entity_keys.add(key)
-    if not entity_keys:
-        return [], entity_keys
-    codes = sorted({code for code, _year in entity_keys})
-    years = sorted({year for _code, year in entity_keys})
-    stmt = sa.select(Project).where(
-        Project.company_code.in_(codes),
-        Project.audit_year.in_(years),
-        Project.is_deleted == sa.false(),
-    )
-    if for_update:
-        stmt = stmt.with_for_update()
-    projects = list((await db.execute(stmt)).scalars().all())
-    return projects, entity_keys
-
-
-def inventory_baseline_matches(
-    dependencies: dict[str, Any],
-    current_projects: list[Project],
-    entity_keys: set[tuple[str, int]],
-) -> bool:
-    expected = dependencies.get("inventory_entities")
-    return isinstance(expected, list) and expected == inventory_snapshot(current_projects, entity_keys)
 
 
 def _node_pairs(nodes: list[dict]) -> set[tuple[str, int | None]]:
@@ -400,57 +280,13 @@ def _prepare_create_group_fields(
         )
 
 
-async def _validate_template_origin(
-    db: AsyncSession,
-    *,
-    loaded: workbook_io.LoadedWorkbook,
-    mode: str,
-    current_user: Any | None,
-    rows: list[workbook_io.ParsedRow],
-) -> tuple[Project | None, set[UUID]]:
-    """约束当前集团树导出模板只能回导到同一集团与年度。"""
-    if loaded.mode is not None and loaded.mode != mode:
-        raise HTTPException(status_code=400, detail="模板场景与当前导入入口不匹配，请下载对应模板")
-    root_project_id = loaded.root_project_id
-    if root_project_id is None:
-        return None, set()
-    if mode != "consolidation":
-        raise HTTPException(status_code=400, detail="只有合并模块可以使用当前集团树导出模板")
-    root = await db.get(Project, root_project_id)
-    if root is None or root.is_deleted or (root.report_scope or "standalone") != "consolidated":
-        raise HTTPException(status_code=400, detail="模板来源集团已变化，请重新从当前集团树导出")
-    from app.services.consol_tree_service import build_tree, iter_nodes
-    tree = await build_tree(db, root_project_id)
-    if tree is None:
-        raise HTTPException(status_code=409, detail="模板来源集团树已变化，请重新从当前集团树导出")
-    member_ids = {node.project_id for node in iter_nodes(tree) if node.project_id is not None}
-    if current_user is not None:
-        from app.deps import assert_project_permission
-        try:
-            await assert_project_permission(db, current_user, root_project_id, "readonly")
-        except HTTPException as exc:
-            raise HTTPException(status_code=403, detail="无权使用该集团树模板") from exc
-    root_year = _project_year(root)
-    root_code = (root.company_code or "").strip()
-    for row in rows:
-        if row.action == "skip":
-            continue
-        if row.action == "update" and row.project_id not in member_ids:
-            raise HTTPException(status_code=400, detail="更新项目不属于模板来源集团，请重新导出当前树")
-        if row.audit_year != root_year or row.ultimate_company_code != root_code:
-            raise HTTPException(
-                status_code=400,
-                detail="当前集团树模板只能维护同一最终控制方和审计年度；新建其他集团请下载空白模板",
-            )
-    return root, member_ids
-
-
 async def analyze_batch(
     file_bytes: bytes,
     db: AsyncSession,
     *,
     current_user: Any | None = None,
     mode: str = "project",
+    authorization_entrypoint: str = "batch_validate",
 ) -> BatchAnalysis:
     if mode not in ("project", "consolidation"):
         raise HTTPException(status_code=422, detail="批量建项场景无效")
@@ -471,6 +307,14 @@ async def analyze_batch(
         row_errors[0].append("数据 sheet 没有可导入的项目，请填写后重新上传")
     if loaded.legacy:
         warnings.append(RowWarning(row_number=0, messages=["当前文件为旧版模板，建议重新下载新版模板"] ))
+    # 更新关系是“当前集团树导出”协议专属能力：缺失或清空元数据不能降级为通用模板。
+    for row in parsed_rows:
+        if row.action == "update" and (
+            loaded.mode != "consolidation" or loaded.root_project_id is None
+        ):
+            row_errors[row.row_number].append(
+                "更新集团关系必须使用从当前合并项目导出的完整模板"
+            )
 
     duplicate_rows: dict[tuple[str, int | None, str], list[int]] = defaultdict(list)
     for row in parsed_rows:
@@ -485,25 +329,63 @@ async def analyze_batch(
                 f"企业代码、审计年度和报表类型重复（涉及 Excel 行 {rendered}）"
             )
 
-    all_projects = await _load_year_projects(db, parsed_rows)
-    visible_projects, _ = await _visible_projects(db, all_projects, current_user)
-    template_root, _template_member_ids = await _validate_template_origin(
+    authorization_rows = [
+        row for row in parsed_rows if not row_errors[row.row_number]
+    ]
+    # 第一阶段只按文件显式代码授权，必须先于任何项目库存读取。
+    await authorize_creation_codes(
+        db,
+        current_user,
+        required_creation_codes(authorization_rows),
+        entrypoint=authorization_entrypoint,
+    )
+    template_root, _template_member_ids = await validate_template_origin(
         db, loaded=loaded, mode=mode, current_user=current_user, rows=parsed_rows,
     )
-    existing_by_key: dict[tuple[str, int | None, str], list[Project]] = defaultdict(list)
-    all_by_code_year: dict[tuple[str, int | None], list[Project]] = defaultdict(list)
-    visible_by_code_year: dict[tuple[str, int | None], list[Project]] = defaultdict(list)
-    for project in all_projects:
-        all_by_code_year[((project.company_code or "").strip(), _project_year(project))].append(project)
-    for project in visible_projects:
-        existing_by_key[_project_key(project)].append(project)
-        visible_by_code_year[((project.company_code or "").strip(), _project_year(project))].append(project)
-    _prepare_create_group_fields(parsed_rows, visible_by_code_year)
+    permitted_codes = {
+        str(code).strip().upper()
+        for row in authorization_rows
+        for code in (row.company_code, row.parent_company_code, row.ultimate_company_code)
+        if code
+    }
+    # 授权/模板项目权限必须先于库存读取；manager 只查本人项目与本次已授权精确代码。
+    all_projects = await _load_year_projects(
+        db, parsed_rows, current_user=current_user, permitted_codes=permitted_codes,
+    )
+    while True:
+        visible_projects, _ = await _visible_projects(db, all_projects, current_user)
+        existing_by_key: dict[tuple[str, int | None, str], list[Project]] = defaultdict(list)
+        all_by_code_year: dict[tuple[str, int | None], list[Project]] = defaultdict(list)
+        visible_by_code_year: dict[tuple[str, int | None], list[Project]] = defaultdict(list)
+        visible_ids = {project.id for project in visible_projects}
+        for project in all_projects:
+            existing_by_key[_project_key(project)].append(project)
+            all_by_code_year[((project.company_code or "").strip(), _project_year(project))].append(project)
+        for project in visible_projects:
+            visible_by_code_year[((project.company_code or "").strip(), _project_year(project))].append(project)
+        _prepare_create_group_fields(parsed_rows, visible_by_code_year)
+        # 库存补齐可能新增 parent/ultimate。每轮先授权新增代码，才允许把它加入下一次
+        # 库存查询；最终计划快照因此与持久行严格同域。
+        final_permitted_codes = required_creation_codes(authorization_rows)
+        creation_grants = await authorize_creation_codes(
+            db,
+            current_user,
+            final_permitted_codes,
+            entrypoint=f"{authorization_entrypoint}_final",
+        )
+        if final_permitted_codes.issubset(permitted_codes):
+            break
+        permitted_codes |= final_permitted_codes
+        all_projects = await _load_year_projects(
+            db, parsed_rows, current_user=current_user, permitted_codes=permitted_codes,
+        )
 
     projects_by_id = {project.id: project for project in all_projects}
     from app.deps import assert_project_permission
     for row in parsed_rows:
         if row.action == "skip":
+            continue
+        if row_errors[row.row_number]:
             continue
         if row.action == "update":
             if mode != "consolidation":
@@ -555,14 +437,31 @@ async def analyze_batch(
             if not row_errors[row.row_number] and entity_current_values == {wanted_values}:
                 row.action = "unchanged"
         else:
-            # 非管理员只按当前可读项目做预览与冲突分类；不能把“隐藏但存在”作为 dry-run
-            # 的差异化信号。执行阶段会以完整库存基线 fail-closed，并使用统一的陈旧计划错误。
+            entity_projects = all_by_code_year.get((row.company_code, row.audit_year), [])
+            hidden_entity = [project for project in entity_projects if project.id not in visible_ids]
+            if hidden_entity:
+                row_errors[row.row_number].append(
+                    "该企业已有您无权维护的项目，请联系管理员或项目负责人处理"
+                )
+                continue
+            inaccessible_reference = False
+            for code in (row.parent_company_code, row.ultimate_company_code):
+                if not code:
+                    continue
+                matches = all_by_code_year.get((code, row.audit_year), [])
+                if any(project.id not in visible_ids for project in matches):
+                    inaccessible_reference = True
+                    break
+            if inaccessible_reference:
+                row_errors[row.row_number].append(
+                    "上级企业或最终控制方已有您无权维护的项目，请联系项目负责人处理"
+                )
+                continue
             existing = existing_by_key.get(_key(row), [])
             if existing:
                 row_errors[row.row_number].append(
                     "该企业、年度和报表类型当前不能新建；如需维护既有集团关系，请从有权限的合并模块导出当前树"
                 )
-        # 引用未显示的企业不在预校验中暴露存在性；它会在确认执行时由库存 CAS 统一阻断。
 
     updates_by_entity = {
         (row.company_code, row.audit_year): row
@@ -662,12 +561,13 @@ async def analyze_batch(
     )
     summary.auto_root = len(auto_root_keys)
     dependencies = build_plan_dependencies(
-        valid_rows,
+        parsed_rows,
         visible_projects=visible_projects,
         visible_by_code_year=visible_by_code_year,
         tree_preview=tree_preview,
         template_root_project_id=template_root.id if template_root is not None else None,
     )
+    dependencies["creation_grants"] = creation_grants
     response = BatchValidateResponse(
         valid=not errors, total_rows=len(parsed_rows), tree_preview=tree_preview,
         errors=errors, warnings=warnings, summary=summary,
@@ -681,114 +581,12 @@ async def analyze_batch(
 
 async def validate_batch(
     file_bytes: bytes, db: AsyncSession, *, current_user: Any | None = None,
-    mode: str = "project",
+    mode: str = "project", authorization_entrypoint: str = "batch_validate",
 ) -> BatchValidateResponse:
-    return (await analyze_batch(file_bytes, db, current_user=current_user, mode=mode)).response
-
-
-async def _assign_new_project_manager(
-    db: AsyncSession,
-    project: Project,
-    actor: Any | None,
-    staff_id: UUID | None,
-    *,
-    persist_assignment: bool = True,
-) -> None:
-    if actor is None:
-        return
-    project.created_by = actor.id
-    project.updated_by = actor.id
-    actor_role = _role_value(actor)
-    if actor_role == "partner":
-        if persist_assignment:
-            from app.services.assignment_service import AssignmentService
-            await AssignmentService(db).initialize_project_partners(
-                [project.id], user_id=actor.id, assigned_by=actor.id,
-                require_pending=False,
-            )
-        return
-    if actor_role != "manager":
-        return
-    if staff_id is None:
-        raise HTTPException(status_code=403, detail="项目授权失败：用户未唯一绑定人员")
-    project.manager_id = actor.id
-    if not persist_assignment:
-        return
-    from app.services.assignment_service import AssignmentService
-    await AssignmentService(db).save_assignments(
-        project.id,
-        [{"staff_id": staff_id, "role": "manager", "assigned_cycles": None}],
-        assigned_by=actor.id,
-    )
-
-
-async def _ensure_consolidated_root(
-    db: AsyncSession,
-    *,
-    ultimate_code: str,
-    audit_year: int,
-    group_rows: list[workbook_io.ParsedRow],
-    created_by_key: dict[tuple[str, int, str], Project],
-    actor: Any | None,
-    staff_id: UUID | None,
-    existing_projects: list[Project] | None = None,
-    defer_flush: bool = False,
-    persist_manager_assignment: bool = True,
-) -> tuple[Project, bool]:
-    key = (ultimate_code, audit_year, "consolidated")
-    if key in created_by_key:
-        return created_by_key[key], False
-    candidates = existing_projects
-    if candidates is None:
-        candidates = list((await db.execute(sa.select(Project).where(
-            Project.company_code == ultimate_code,
-            Project.audit_year == audit_year,
-            Project.is_deleted == sa.false(),
-        ))).scalars().all())
-    existing = next(
-        (project for project in candidates if (project.report_scope or "standalone") == "consolidated"),
-        None,
-    )
-    if existing is not None:
-        return existing, False
-
-    own_row = next((row for row in group_rows if row.company_code == ultimate_code), None)
-    existing_standalone = next(
-        (project for project in candidates if (project.report_scope or "standalone") == "standalone"),
-        None,
-    )
-    source = own_row or (group_rows[0] if group_rows else None)
-    display_name = (
-        (own_row.client_name if own_row else "")
-        or (existing_standalone.client_name if existing_standalone else "")
-        or f"{ultimate_code}（自动创建合并项目）"
-    )
-    standard = (
-        source.accounting_standard if source and source.accounting_standard
-        else _accounting_standard(existing_standalone) if existing_standalone else "enterprise"
-    )
-    project_type = source.project_type if source and source.project_type else "annual"
-    from app.models.audit_platform_schemas import BasicInfoSchema
-    from app.services.project_wizard_service import create_project
-    data = BasicInfoSchema(
-        client_name=display_name, audit_year=audit_year,
-        project_type=project_type, accounting_standard=standard,
-        company_code=ultimate_code, short_name=display_name[:100],
-        report_scope="consolidated", ultimate_company_code=ultimate_code,
-        ultimate_company_name=display_name,
-        manager_id=actor.id if actor is not None and _role_value(actor) == "manager" else None,
-    )
-    project = await create_project(
-        data, db, auto_commit=False, propagate_group=False, sync_links=False,
-        uniqueness_checked=True, group_fields_prepared=True,
-        defer_flush=defer_flush,
-    )
-    await _assign_new_project_manager(
-        db, project, actor, staff_id,
-        persist_assignment=persist_manager_assignment,
-    )
-    created_by_key[key] = project
-    return project, True
+    return (await analyze_batch(
+        file_bytes, db, current_user=current_user, mode=mode,
+        authorization_entrypoint=authorization_entrypoint,
+    )).response
 
 
 async def parse_and_import(
@@ -804,7 +602,8 @@ async def parse_and_import(
     rollback 掉此前成功行后继续报假成功。
     """
     analysis = await analyze_batch(
-        file_bytes, db, current_user=current_user, mode=mode
+        file_bytes, db, current_user=current_user, mode=mode,
+        authorization_entrypoint="batch_import",
     )
     actionable = [row for row in analysis.parsed_rows if row.action != "skip"]
     if not actionable:
@@ -843,7 +642,49 @@ async def parse_and_import(
             skipped_count=analysis.response.summary.skip,
         )
 
-    # 兼容入口同样不允许按旧的可见性快照把新项目接入隐藏或已变化的集团。
+    # 兼容入口同样先锁年度，再按当前时间冻结 actor/grant；等待不能把已过期授权带入写路径。
+    from app.services.group_topology_lock import lock_topology_years
+
+    await lock_topology_years(db, [row.audit_year for row in candidates])
+    try:
+        await revalidate_plan_grants(
+            db, current_user, candidates, analysis.dependencies,
+        )
+    except ProjectCreationGrantStale:
+        reason = "当前建项授权已变化，请重新预校验"
+        failures.extend(
+            BatchImportFailure(row_number=row.row_number, errors=[reason]) for row in candidates
+        )
+        return BatchImportResult(
+            success_count=0, fail_count=len(failures), failures=failures,
+            skipped_count=analysis.response.summary.skip,
+        )
+    if current_user is not None:
+        from app.deps import assert_project_permission
+        from app.services.project_creation_grant_service import (
+            lock_actor_and_project_memberships,
+        )
+
+        read_ids = [UUID(str(raw)) for raw in analysis.dependencies.get("read_project_ids", [])]
+        edit_ids = [UUID(str(raw)) for raw in analysis.dependencies.get("edit_project_ids", [])]
+        try:
+            await lock_actor_and_project_memberships(
+                db, current_user, set(read_ids) | set(edit_ids),
+            )
+            for project_id in read_ids:
+                await assert_project_permission(db, current_user, project_id, "readonly")
+            for project_id in edit_ids:
+                await assert_project_permission(db, current_user, project_id, "edit")
+        except (HTTPException, ProjectCreationGrantStale, TypeError, ValueError):
+            reason = "当前项目权限或库存已变化，请重新预校验后确认执行"
+            failures.extend(
+                BatchImportFailure(row_number=row.row_number, errors=[reason]) for row in candidates
+            )
+            return BatchImportResult(
+                success_count=0, fail_count=len(failures), failures=failures,
+                skipped_count=analysis.response.summary.skip,
+            )
+
     current_inventory, inventory_keys = await load_dependency_inventory(
         db, analysis.dependencies, for_update=True,
     )
@@ -856,27 +697,12 @@ async def parse_and_import(
             success_count=0, fail_count=len(failures), failures=failures,
             skipped_count=analysis.response.summary.skip,
         )
-    if current_user is not None:
-        from app.deps import assert_project_permission
-        try:
-            for raw_id in analysis.dependencies.get("read_project_ids", []):
-                await assert_project_permission(db, current_user, UUID(str(raw_id)), "readonly")
-            for raw_id in analysis.dependencies.get("edit_project_ids", []):
-                await assert_project_permission(db, current_user, UUID(str(raw_id)), "edit")
-        except (HTTPException, TypeError, ValueError):
-            reason = "当前项目权限或库存已变化，请重新预校验后确认执行"
-            failures.extend(
-                BatchImportFailure(row_number=row.row_number, errors=[reason]) for row in candidates
-            )
-            return BatchImportResult(
-                success_count=0, fail_count=len(failures), failures=failures,
-                skipped_count=analysis.response.summary.skip,
-            )
 
     staff_id: UUID | None = None
     if current_user is not None and _role_value(current_user) == "manager":
-        from app.services.procedure_authorization import resolve_user_active_staff_id
-        staff_id = await resolve_user_active_staff_id(db, current_user.id)
+        from app.services.procedure_authorization import resolve_user_active_staff_id_optional
+        # 未绑定人员档案时为 None：创建者只加项目成员、不写团队委派（R7）。
+        staff_id = await resolve_user_active_staff_id_optional(db, current_user.id)
 
     created_by_key: dict[tuple[str, int, str], Project] = {}
     created: list[Project] = []
@@ -908,7 +734,7 @@ async def parse_and_import(
                         data, db, auto_commit=False, propagate_group=False, sync_links=False,
                         uniqueness_checked=True, group_fields_prepared=True,
                     )
-                    await _assign_new_project_manager(db, project, current_user, staff_id)
+                    await assign_new_project_creator(db, project, current_user, staff_id)
                 created.append(project)
                 successful_rows.append(row)
                 created_by_key[(row.company_code, row.audit_year, row.report_scope)] = project
@@ -928,7 +754,7 @@ async def parse_and_import(
             if project_key is not None:
                 prefetched_groups[project_key].append(project)
         for (ultimate_code, audit_year), rows in sorted(groups.items()):
-            root, was_created = await _ensure_consolidated_root(
+            root, was_created = await ensure_consolidated_root(
                 db, ultimate_code=ultimate_code, audit_year=audit_year,
                 group_rows=rows, created_by_key=created_by_key,
                 actor=current_user, staff_id=staff_id,

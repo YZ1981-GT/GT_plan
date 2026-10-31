@@ -36,8 +36,12 @@ class StaffService:
         project_id: UUID | None = None,
         offset: int = 0,
         limit: int = 50,
+        *,
+        unbound_only: bool = False,
     ) -> tuple[list[StaffMember], int]:
         q = sa.select(StaffMember).where(StaffMember.is_deleted == False)  # noqa: E712
+        if unbound_only:
+            q = q.where(StaffMember.user_id.is_(None))
 
         if search:
             like = f"%{search}%"

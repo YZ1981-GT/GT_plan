@@ -7,17 +7,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project, ProjectUser
 from app.models.base import ProjectStatus
 from app.models.audit_platform_models import (
-    AccountMapping, TrialBalance, Adjustment, AdjustmentEntry,
+    AccountMapping, TrialBalance, Adjustment,
     UnadjustedMisstatement,
 )
 
@@ -34,6 +34,8 @@ class ContinuousAuditService:
         copy_team: bool = True,
         copy_mapping: bool = True,
         copy_procedures: bool = True,
+        *,
+        actor: Any | None = None,
     ) -> dict[str, Any]:
         """一键创建当年项目
 
@@ -60,6 +62,71 @@ class ContinuousAuditService:
         if prior_year is None:
             raise ValueError("上年项目未设置审计年度，无法推算当年年度")
         new_year = int(prior_year) + 1
+        inherited_company_code = basic_info.get("company_code") or prior.company_code
+        inherited_parent_company_code = basic_info.get("parent_company_code") or prior.parent_company_code
+        inherited_ultimate_company_code = basic_info.get("ultimate_company_code") or prior.ultimate_company_code
+        creation_codes = [code for code in (
+            inherited_company_code,
+            inherited_parent_company_code,
+            inherited_ultimate_company_code,
+        ) if code]
+        grant_snapshots: list[dict[str, Any]] = []
+        if actor is not None:
+            from app.services.project_creation_grant_service import authorize_creation_codes
+
+            grant_snapshots = await authorize_creation_codes(
+                db, actor, creation_codes, entrypoint="continuous_audit",
+            )
+
+        # 来源项目可能在等待期间改年度/三码。旧、新年度一起按统一顺序加锁，随后刷新并逐值
+        # 核对；否则会按旧快照在错误年度创建项目。
+        source_identity = (
+            int(prior_year),
+            inherited_company_code,
+            inherited_parent_company_code,
+            inherited_ultimate_company_code,
+            basic_info.get("report_scope") or prior.report_scope,
+        )
+        from app.services.group_topology_lock import lock_topology_years
+
+        await lock_topology_years(db, [int(prior_year), new_year])
+        await db.refresh(prior)
+        refreshed_ws = prior.wizard_state or {}
+        basic_info = refreshed_ws.get("steps", {}).get("basic_info", {}).get("data", {})
+        refreshed_prior_year = resolve_project_audit_year(prior) or basic_info.get("audit_year")
+        refreshed_identity = (
+            int(refreshed_prior_year) if refreshed_prior_year is not None else None,
+            basic_info.get("company_code") or prior.company_code,
+            basic_info.get("parent_company_code") or prior.parent_company_code,
+            basic_info.get("ultimate_company_code") or prior.ultimate_company_code,
+            basic_info.get("report_scope") or prior.report_scope,
+        )
+        if prior.is_deleted or refreshed_identity != source_identity:
+            raise HTTPException(status_code=409, detail="上年项目基本信息已变化，请刷新后重试")
+
+        if actor is not None:
+            from app.deps import assert_project_permission
+            from app.services.project_creation_grant_service import (
+                ProjectCreationGrantStale,
+                lock_and_revalidate_creation_codes,
+                lock_actor_and_project_memberships,
+            )
+
+            try:
+                await lock_and_revalidate_creation_codes(
+                    db, actor, creation_codes, expected_snapshots=grant_snapshots,
+                )
+                await lock_actor_and_project_memberships(db, actor, [prior_project_id])
+            except ProjectCreationGrantStale as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error_code": "PROJECT_CREATION_GRANT_STALE",
+                        "message": "建项授权或创建者状态已变化，请重新提交",
+                    },
+                ) from exc
+            await assert_project_permission(db, actor, prior_project_id, "readonly")
+
         inherited_template_type = basic_info.get("template_type") or prior.template_type
         inherited_report_scope = basic_info.get("report_scope") or prior.report_scope
         inherited_company_code = basic_info.get("company_code") or prior.company_code
@@ -91,13 +158,20 @@ class ContinuousAuditService:
                 )
 
         # 2. 创建新项目
+        actor_role = (
+            getattr(getattr(actor, "role", None), "value", getattr(actor, "role", None))
+            if actor is not None else None
+        )
         new_project = Project(
+            id=uuid.uuid4(),
             name=f"{prior.client_name}_{new_year}",
             client_name=prior.client_name,
             project_type=prior.project_type,
             status=ProjectStatus.created,
-            manager_id=prior.manager_id,
+            manager_id=actor.id if actor_role == "manager" else prior.manager_id,
             partner_id=prior.partner_id,
+            created_by=actor.id if actor is not None else None,
+            updated_by=actor.id if actor is not None else None,
             company_code=inherited_company_code,
             template_type=inherited_template_type,
             report_scope=inherited_report_scope,
@@ -114,6 +188,34 @@ class ContinuousAuditService:
             consol_level=prior.consol_level,
         )
         db.add(new_project)
+        if actor_role in {"manager", "partner"}:
+            from app.services.assignment_service import AssignmentService
+
+            assignments = AssignmentService(db)
+            if actor_role == "manager":
+                from app.services.procedure_authorization import (
+                    resolve_user_active_staff_id_optional,
+                )
+
+                with db.no_autoflush:
+                    staff_id = await resolve_user_active_staff_id_optional(db, actor.id)
+                if staff_id is None:
+                    # 未绑定人员档案：只加项目成员（经理、编辑），不写团队委派（R7）。
+                    await assignments.initialize_creator_members(
+                        [new_project.id], user_id=actor.id, assigned_by=actor.id,
+                        role_key="manager",
+                    )
+                else:
+                    await assignments.initialize_project_managers(
+                        [new_project.id],
+                        staff_id=staff_id,
+                        user_id=actor.id,
+                        assigned_by=actor.id,
+                    )
+            else:
+                await assignments.initialize_project_partners(
+                    [new_project.id], user_id=actor.id, assigned_by=actor.id,
+                )
         await db.flush()
         # 需求 7.2 / 7.4：新年度的派生链接按三码重算（不串用上年链接）
         from app.services.group_links import sync_group_links
@@ -180,8 +282,12 @@ class ContinuousAuditService:
                 )
             )
             users = result.scalars().all()
-            copied = [u for u in users if u.user_id not in eqcr_skip]
-            skipped = len(users) - len(copied)
+            creator_user_id = actor.id if actor_role in {"manager", "partner"} else None
+            copied = [
+                member for member in users
+                if member.user_id not in eqcr_skip and member.user_id != creator_user_id
+            ]
+            skipped_eqcr = sum(member.user_id in eqcr_skip for member in users)
             for u in copied:
                 new_u = ProjectUser(
                     project_id=new_project.id,
@@ -193,9 +299,9 @@ class ContinuousAuditService:
                 )
                 db.add(new_u)
             items_copied["team_assignments"] = len(copied)
-            items_copied["team_skipped_eqcr"] = skipped
-            if skipped:
-                notices.append(f"已跳过 {skipped} 名成员：独立复核合伙人需在新项目重新委派")
+            items_copied["team_skipped_eqcr"] = skipped_eqcr
+            if skipped_eqcr:
+                notices.append(f"已跳过 {skipped_eqcr} 名成员：独立复核合伙人需在新项目重新委派")
 
         # 5. 试算表审定数 → 当年期初（只取上年度的行：其他年度的行改写成 new_year 会撞
         #    唯一索引 (project_id, year, company_code, standard_account_code)）

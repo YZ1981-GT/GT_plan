@@ -41,6 +41,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
+import { creationDeniedMessage } from '@/services/projectCreationGrantApi'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
 import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import { useFormSubmit } from '@/composables/useFormSubmit'
@@ -88,12 +89,28 @@ async function validateAndPersistCurrentStep(): Promise<Record<string, unknown> 
   if (!data) return null
 
   if (!wizardStore.projectId) {
-    await wizardStore.createProject(data as any)
+    await wizardStore.createProject(data as any, {
+      // 经理建项授权被拒：显示后端给出的原因（全局拦截器对 403 只显示「权限不足」）
+      onForbidden: (error) => ElMessage.error(creationDeniedMessage(error)),
+    })
   } else {
     await wizardStore.saveStep('basic_info', data)
   }
   showGroupNotices()
   return data
+}
+
+/**
+ * 建项 / 保存失败时原因已由请求拦截器提示，这里只吞掉接口错误、保留表单供修改后重试。
+ * 不吞会冒泡到外层 ErrorBoundary，整页换成「页面渲染出错」，已填内容全部丢失。
+ */
+async function persistKeepingForm(): Promise<Record<string, unknown> | null> {
+  try {
+    return await validateAndPersistCurrentStep()
+  } catch (error: any) {
+    if (error?.isAxiosError || error?.response) return null
+    throw error
+  }
 }
 
 /** 后端对集团关系做的补齐/同步要告诉用户（需求 1.8：说明同步了哪个项目） */
@@ -110,7 +127,7 @@ function showGroupNotices() {
 
 async function handleSave() {
   await submitWizard(async () => {
-    const data = await validateAndPersistCurrentStep()
+    const data = await persistKeepingForm()
     if (!data) return
     ElMessage.success('项目信息已保存')
     router.push('/projects')
@@ -119,11 +136,12 @@ async function handleSave() {
 
 async function handleConfirm() {
   await submitWizard(async () => {
-    const data = await validateAndPersistCurrentStep()
+    const isNewProject = !wizardStore.projectId
+    const data = await persistKeepingForm()
     if (!data) return
 
-    if (!wizardStore.projectId) {
-      // 新建项目引导
+    if (isNewProject && wizardStore.projectId) {
+      // 新建项目引导（R10：createProject 已设 projectId，按创建前的快照判断）
       const { showGuide } = await import('@/composables/useWorkflowGuide')
       const proceed = await showGuide(
         'project_create',
@@ -141,7 +159,12 @@ async function handleConfirm() {
         </div>`,
         '确认创建',
       )
-      if (!proceed) return
+      if (!proceed) {
+        ElMessage.info('项目已创建，可在项目列表中继续完善')
+        wizardStore.reset()
+        router.push('/projects')
+        return
+      }
       ElMessage.success('项目创建成功')
       // formula-management-ux-improvements C1：创建成功后提示订阅公式模板
       const createdId = wizardStore.projectId
@@ -156,7 +179,8 @@ async function handleConfirm() {
               type: 'info',
             },
           )
-          // 跳转到项目公式管理（全局设置页的模板 Tab）
+          // 跳转到项目公式管理（全局设置页的模板 Tab）——先确认项目
+          try { await wizardStore.confirmProject() } catch { /* ignore */ }
           router.push(`/settings/formula-global?tab=templates`)
           wizardStore.reset()
           return
@@ -167,19 +191,19 @@ async function handleConfirm() {
       // Phase 3 需求 5.1：合并项目创建后弹"配置合并范围"步骤（R3：仅 consolidated 触发，非合并项目流程不变）
       const isConsolidated = (data as any)?.report_scope === 'consolidated'
       if (isConsolidated && createdId) {
+        // 确认后再弹合并范围（关闭后由 onScopeConfigClosed 跳转到合并模块）
+        try { await wizardStore.confirmProject() } catch { /* ignore */ }
         scopeConfigProjectId.value = createdId
         showScopeConfig.value = true
         return
       }
-      wizardStore.reset()
-      router.push('/projects')
-      return
+      // 非合并新建：fall through 到统一确认（created → planning → 回项目列表）
     }
 
-    // 已有项目，确认保存
+    // 已有项目或新建后的统一确认（created → planning）
     try {
       await wizardStore.confirmProject()
-      ElMessage.success('项目保存成功')
+      ElMessage.success(isNewProject ? '项目创建成功' : '项目保存成功')
       router.push('/projects')
     } catch {
       // Error already handled by http interceptor

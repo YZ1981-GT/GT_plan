@@ -13,15 +13,30 @@ import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
 import Schema from 'async-validator'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn() }))
+const grantApi = vi.hoisted(() => ({ list: vi.fn(), grant: vi.fn(), revoke: vi.fn() }))
+const bindingApi = vi.hoisted(() => ({ list: vi.fn(), bind: vi.fn(), unbind: vi.fn(), search: vi.fn() }))
 vi.mock('@/services/commonApi', () => ({ listUsers: api.list, createUser: api.create, updateUser: api.update }))
+vi.mock('@/services/staffBindingApi', () => ({
+  listStaffBindings: bindingApi.list,
+  bindStaffToUser: bindingApi.bind,
+  unbindStaffFromUser: bindingApi.unbind,
+  searchUnboundStaff: bindingApi.search,
+}))
+vi.mock('@/services/projectCreationGrantApi', () => ({
+  listProjectCreationGrants: grantApi.list,
+  grantProjectCreation: grantApi.grant,
+  revokeProjectCreationGrant: grantApi.revoke,
+}))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ userId: 'u-admin' }) }))
 vi.mock('@/components/common/GtPageHeader.vue', () => ({ default: { name: 'GtPageHeader', template: '<div><slot /></div>' } }))
 
 import UserManagement from '../UserManagement.vue'
+import StaffBindingDialog from '@/components/system/StaffBindingDialog.vue'
 
 const USERS = [
   { id: 'u-admin', username: 'admin', email: 'admin@example.com', role: 'admin', is_active: true },
   { id: 'u-a', username: 'auditor_a', email: 'a@example.com', role: 'auditor', is_active: true },
+  { id: 'u-m', username: 'manager_m', email: 'm@example.com', role: 'manager', is_active: true },
   { id: 'u-b', username: 'reader_b', email: 'b@example.com', role: 'readonly', is_active: false },
 ]
 
@@ -61,6 +76,7 @@ const STUBS = {
 
 async function mountPage() {
   api.list.mockResolvedValue(JSON.parse(JSON.stringify(USERS)))
+  grantApi.list.mockResolvedValue([])
   const wrapper = mount(UserManagement, {
     global: { plugins: [ElementPlus], stubs: STUBS, directives: { permission: {} } },
   })
@@ -74,7 +90,15 @@ beforeEach(() => {
   api.list.mockReset()
   api.create.mockReset().mockResolvedValue({})
   api.update.mockReset().mockResolvedValue({})
+  grantApi.list.mockReset().mockResolvedValue([])
+  grantApi.grant.mockReset().mockResolvedValue([])
+  grantApi.revoke.mockReset().mockResolvedValue({ revoked: true })
+  bindingApi.list.mockReset().mockResolvedValue([])
+  bindingApi.bind.mockReset().mockResolvedValue({ changed: true, project_count: 0 })
+  bindingApi.unbind.mockReset().mockResolvedValue({ changed: true })
+  bindingApi.search.mockReset().mockResolvedValue([])
   vi.spyOn(ElMessage, 'success').mockImplementation((() => undefined) as any)
+  vi.spyOn(ElMessage, 'error').mockImplementation((() => undefined) as any)
   vi.spyOn(ElMessage, 'info').mockImplementation((() => undefined) as any)
 })
 
@@ -169,5 +193,222 @@ describe('用户管理 — 重置密码', () => {
     await vm.submitResetPassword()
     await flushPromises()
     expect(api.update).toHaveBeenCalledWith('u-a', { password: 'Abc#5678' })
+  })
+})
+
+
+describe('用户管理 — 经理精确 USCC 建项授权', () => {
+  it('只列已启用经理，并经二次确认把换行/逗号代码去重后批量授权', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce('confirm' as any)
+    const { wrapper, vm } = await mountPage()
+    expect(wrapper.text()).toContain('经理建项授权')
+    expect(vm.activeManagers.map((item: any) => item.id)).toEqual(['u-m'])
+    vm.openGrantDialog()
+    vm.grantDialog.managerUserId = 'u-m'
+    vm.grantDialog.companyCodes = '91110000300000000G\n91110000400000000U，91110000300000000G'
+    vm.grantDialog.reason = '新客户承接审批通过'
+    await vm.submitGrant()
+    await flushPromises()
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('2 个企业代码'),
+      '确认经理建项授权',
+      expect.objectContaining({ confirmButtonText: '确认授权' }),
+    )
+    expect(grantApi.grant).toHaveBeenCalledWith('u-m', {
+      company_codes: ['91110000300000000G', '91110000400000000U'],
+      valid_until: null,
+      reason: '新客户承接审批通过',
+    })
+    expect(grantApi.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('无效代码在前端拦截，不发授权请求', async () => {
+    const { vm } = await mountPage()
+    vm.openGrantDialog()
+    vm.grantDialog.managerUserId = 'u-m'
+    vm.grantDialog.companyCodes = 'INVALID'
+    vm.grantDialog.reason = '测试授权原因'
+    await vm.submitGrant()
+    expect(grantApi.grant).not.toHaveBeenCalled()
+    expect(ElMessage.error).toHaveBeenCalledWith('请输入有效的18位统一社会信用代码')
+  })
+
+  it('撤销要求原因，确认后调用撤销接口并刷新', async () => {
+    const { vm } = await mountPage()
+    const prompt = vi.spyOn(ElMessageBox, 'prompt').mockResolvedValueOnce({ value: '客户负责人调整' } as any)
+    const grant = {
+      id: 'g-1', version: 3, manager_username: 'manager_m', company_code: '91110000300000000G',
+    }
+    await vm.revokeGrant(grant)
+    await flushPromises()
+    expect(prompt).toHaveBeenCalledWith(
+      expect.stringContaining('91110000300000000G'),
+      '撤销经理建项授权',
+      expect.objectContaining({ confirmButtonText: '撤销' }),
+    )
+    expect(grantApi.revoke).toHaveBeenCalledWith('g-1', 3, '客户负责人调整')
+    expect(grantApi.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('读取失败显示错误与重新加载，保留上次成功数据而不是显示暂无授权', async () => {
+    const { wrapper, vm } = await mountPage()
+    const grant = {
+      id: 'g-load', version: 1, manager_username: 'manager_m', company_code: '91110000300000000G',
+      valid_until: null, reason: '客户承接', granted_by_username: 'admin', status: 'active',
+    }
+    grantApi.list.mockResolvedValueOnce([grant])
+    await vm.loadGrants()
+    await flushPromises()
+    grantApi.list.mockRejectedValueOnce(new Error('network'))
+    await vm.loadGrants()
+    await flushPromises()
+    expect(wrapper.text()).toContain('经理建项授权加载失败')
+    expect(wrapper.find('.stub-row[data-id="g-load"]').exists()).toBe(true)
+
+    grantApi.list.mockResolvedValueOnce([])
+    const retry = wrapper.findAll('button').find((button) => button.text() === '重新加载')!
+    await retry.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('经理建项授权加载失败')
+    expect(wrapper.find('.stub-row[data-id="g-load"]').exists()).toBe(false)
+  })
+
+  it('账号已停用或不再是经理的授权显示为已暂停', async () => {
+    const { wrapper, vm } = await mountPage()
+    grantApi.list.mockResolvedValueOnce([{
+      id: 'g-suspended', version: 2, manager_username: 'former_manager',
+      company_code: '91110000300000000G', valid_until: null, reason: '历史授权',
+      granted_by_username: 'admin', status: 'suspended',
+    }])
+    await vm.loadGrants()
+    await flushPromises()
+    const row = wrapper.find('.stub-row[data-id="g-suspended"]')
+    expect(row.find('[data-label="状态"]').text()).toBe('已暂停')
+  })
+
+  it('撤销失败（如版本冲突）后刷新到服务端当前状态', async () => {
+    const { vm } = await mountPage()
+    vi.spyOn(ElMessageBox, 'prompt').mockResolvedValueOnce({ value: '负责人调整' } as any)
+    grantApi.revoke.mockRejectedValueOnce({ response: { status: 409 } })
+    await vm.revokeGrant({
+      id: 'g-stale', version: 1, manager_username: 'manager_m', company_code: '91110000300000000G',
+    })
+    await flushPromises()
+    expect(grantApi.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('启用 / 停用账号后同时刷新用户与建项授权状态', async () => {
+    const { vm } = await mountPage()
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce('confirm' as any)
+    await vm.toggleActive(USERS[2])
+    await flushPromises()
+    expect(api.update).toHaveBeenCalledWith('u-m', { is_active: false })
+    expect(api.list).toHaveBeenCalledTimes(2)
+    expect(grantApi.list).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+describe('用户管理 — 人员档案绑定', () => {
+  const BINDING = {
+    user_id: 'u-m', staff_id: 's-m', staff_name: '王经理', employee_no: 'A001',
+    department: '审计一部', status: 'active',
+  }
+
+  it('已绑定显示档案与“解除”，未绑定显示“未绑定”与“绑定”', async () => {
+    bindingApi.list.mockResolvedValue([BINDING])
+    const { row } = await mountPage()
+    const bound = row('u-m').find('[data-label="人员档案"]')
+    expect(bound.text()).toContain('王经理（A001）')
+    expect(bound.findAll('button').map((b) => b.text())).toEqual(['解除'])
+    const unbound = row('u-a').find('[data-label="人员档案"]')
+    expect(unbound.text()).toContain('未绑定')
+    expect(unbound.findAll('button').map((b) => b.text())).toEqual(['绑定'])
+    expect(unbound.find('button').attributes('disabled')).toBeUndefined()
+    // 停用的账号不能绑定（后端同样 422）
+    expect(row('u-b').find('[data-label="人员档案"]').find('button').attributes('disabled')).toBeDefined()
+  })
+
+  it('连续重读时慢的旧响应不覆盖新结果（成功与失败都按最后一次）', async () => {
+    const { row, vm } = await mountPage()
+    let resolveOld!: (rows: any[]) => void
+    bindingApi.list
+      .mockReturnValueOnce(new Promise((r) => { resolveOld = r }))
+      .mockResolvedValueOnce([])
+    const older = vm.loadStaffBindings()
+    await vm.loadStaffBindings()
+    resolveOld([{ user_id: 'u-a', staff_id: 's-old', staff_name: '旧档案', employee_no: 'OLD', department: null, status: 'active' }])
+    await older
+    await flushPromises()
+    expect(row('u-a').find('[data-label="人员档案"]').text()).toContain('未绑定')
+
+    let rejectOld!: (e: unknown) => void
+    bindingApi.list
+      .mockReturnValueOnce(new Promise((_r, reject) => { rejectOld = reject }))
+      .mockResolvedValueOnce([])
+    const failing = vm.loadStaffBindings()
+    await vm.loadStaffBindings()
+    rejectOld(new Error('late'))
+    await failing
+    await flushPromises()
+    expect(row('u-a').find('[data-label="人员档案"]').text()).not.toContain('加载失败')
+  })
+
+  it('弹窗绑定成功（bound）或被拒（stale）都重读绑定列表', async () => {
+    const { wrapper } = await mountPage()
+    expect(bindingApi.list).toHaveBeenCalledTimes(1)
+    const dialog = wrapper.findComponent(StaffBindingDialog)
+    dialog.vm.$emit('bound', { user_id: 'u-a', staff_id: 's-a', changed: true })
+    await flushPromises()
+    expect(bindingApi.list).toHaveBeenCalledTimes(2)
+    dialog.vm.$emit('stale')
+    await flushPromises()
+    expect(bindingApi.list).toHaveBeenCalledTimes(3)
+  })
+
+  it('读取绑定失败显示“加载失败”，不误显示为未绑定', async () => {
+    bindingApi.list.mockRejectedValue(new Error('network'))
+    const { row } = await mountPage()
+    const cell = row('u-a').find('[data-label="人员档案"]')
+    expect(cell.text()).toContain('加载失败')
+    expect(cell.text()).not.toContain('未绑定')
+    expect(cell.findAll('button')).toHaveLength(0)
+  })
+
+  it('点“绑定”为该账号打开绑定弹窗', async () => {
+    const { row, vm } = await mountPage()
+    const bindButton = row('u-a').find('[data-label="人员档案"]').findAll('button').find((b) => b.text() === '绑定')!
+    await bindButton.trigger('click')
+    await flushPromises()
+    expect(vm.staffBindingDialog).toEqual({ visible: true, user: { id: 'u-a', username: 'auditor_a' } })
+  })
+
+  it('解除绑定须二次确认；确认后按账号与档案调用并刷新，取消不发请求', async () => {
+    bindingApi.list.mockResolvedValue([BINDING])
+    const { vm } = await mountPage()
+    const confirm = vi.spyOn(ElMessageBox, 'confirm')
+    confirm.mockRejectedValueOnce('cancel')
+    await vm.unbindStaff(USERS[2], BINDING)
+    expect(bindingApi.unbind).not.toHaveBeenCalled()
+
+    confirm.mockResolvedValueOnce('confirm' as any)
+    await vm.unbindStaff(USERS[2], BINDING)
+    await flushPromises()
+    expect(confirm).toHaveBeenLastCalledWith(
+      expect.stringContaining('王经理（A001）'), '解除人员档案绑定', expect.objectContaining({ confirmButtonText: '解除绑定' }),
+    )
+    expect(bindingApi.unbind).toHaveBeenCalledWith('u-m', 's-m')
+    expect(bindingApi.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('解除失败（如仍在项目团队中）也刷新绑定列表', async () => {
+    bindingApi.list.mockResolvedValue([BINDING])
+    const { vm } = await mountPage()
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce('confirm' as any)
+    bindingApi.unbind.mockRejectedValueOnce({ response: { status: 409 } })
+    await vm.unbindStaff(USERS[2], BINDING)
+    await flushPromises()
+    expect(bindingApi.list).toHaveBeenCalledTimes(2)
+    expect(ElMessage.success).not.toHaveBeenCalledWith('已解除人员档案绑定')
   })
 })

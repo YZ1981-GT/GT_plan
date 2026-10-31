@@ -19,14 +19,23 @@ import anyio
 from app.models.batch_project_models import ProjectBatchImportPlan
 from app.models.core import Project
 from app.services import batch_project_workbook as workbook_io
-from app.services.batch_project_plan import (
-    _assign_new_project_manager,
-    _ensure_consolidated_root,
-    _tree_flags,
-    analyze_batch,
+from app.services.batch_project_inventory import (
     inventory_baseline_matches,
     load_dependency_inventory,
 )
+from app.services.batch_project_creator import (
+    assign_new_project_creator,
+    ensure_consolidated_root,
+)
+from app.services.batch_project_plan import (
+    _tree_flags,
+    analyze_batch,
+)
+from app.services.project_creation_grant_service import (
+    ProjectCreationGrantStale,
+    revalidate_plan_grants,
+)
+from app.services.group_topology_lock import lock_topology_years
 from app.services.batch_project_types import (
     BatchAnalysis,
     BatchImportResult,
@@ -40,31 +49,50 @@ from app.services.batch_project_types import (
 
 PLAN_TTL = timedelta(minutes=30)
 _PLAN_DEPENDENCIES_KEY = "_plan_dependencies"
+_PLAN_FAILURE_ERROR_CODE_KEY = "_plan_failure_error_code"
+BATCH_PLAN_STALE_ERROR_CODE = "BATCH_PLAN_STALE"
+BATCH_PLAN_RESULT_UNKNOWN_ERROR_CODE = "BATCH_PLAN_RESULT_UNKNOWN"
+
+
+def _stale_plan_error(message: str = "预校验计划的项目权限或库存已变化，请重新预校验") -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"error_code": BATCH_PLAN_STALE_ERROR_CODE, "message": message},
+    )
+
+
+def is_stale_plan_error(error: BaseException) -> bool:
+    """判断是否为可通过新幂等键重校验的已知计划陈旧错误。"""
+    return (
+        isinstance(error, HTTPException)
+        and isinstance(error.detail, dict)
+        and error.detail.get("error_code") == BATCH_PLAN_STALE_ERROR_CODE
+    )
 
 
 def _public_summary(summary: dict[str, Any] | None) -> dict[str, Any]:
     """移除计划执行期私有基线，避免 status/validate 响应暴露库存和权限依赖。"""
     return {
         key: value for key, value in (summary or {}).items()
-        if key != _PLAN_DEPENDENCIES_KEY
+        if key not in {_PLAN_DEPENDENCIES_KEY, _PLAN_FAILURE_ERROR_CODE_KEY}
     }
 
 
 def _plan_dependencies(plan: ProjectBatchImportPlan) -> dict[str, Any]:
     dependencies = (plan.summary or {}).get(_PLAN_DEPENDENCIES_KEY)
     if not isinstance(dependencies, dict) or dependencies.get("version") != 1:
-        raise HTTPException(status_code=409, detail="预校验计划已过期，请重新上传校验")
+        raise _stale_plan_error("预校验计划已过期，请重新上传校验")
     return dependencies
 
 
 def _dependency_project_ids(dependencies: dict[str, Any], key: str) -> list[UUID]:
     raw_ids = dependencies.get(key)
     if not isinstance(raw_ids, list):
-        raise HTTPException(status_code=409, detail="预校验计划权限基线无效，请重新预校验")
+        raise _stale_plan_error("预校验计划权限基线无效，请重新预校验")
     try:
         return sorted({UUID(str(value)) for value in raw_ids}, key=str)
     except (TypeError, ValueError, AttributeError) as exc:
-        raise HTTPException(status_code=409, detail="预校验计划权限基线无效，请重新预校验") from exc
+        raise _stale_plan_error("预校验计划权限基线无效，请重新预校验") from exc
 
 
 async def _assert_plan_project_access(
@@ -85,10 +113,7 @@ async def _assert_plan_project_access(
     except HTTPException as exc:
         if conceal:
             raise HTTPException(status_code=404, detail="批量建项计划不存在或无权访问") from exc
-        raise HTTPException(
-            status_code=409,
-            detail="预校验计划的项目权限或库存已变化，请重新预校验",
-        ) from exc
+        raise _stale_plan_error() from exc
 
 
 async def get_readable_plan(
@@ -107,6 +132,25 @@ async def get_readable_plan(
     return plan
 
 
+async def _lock_plan_memberships(
+    db: AsyncSession,
+    *,
+    dependencies: dict[str, Any],
+    actor: Any,
+) -> None:
+    """在执行事务内冻结 actor 与当前成员行，使撤权和批量写入形成明确先后。"""
+    project_ids = sorted(
+        set(_dependency_project_ids(dependencies, "read_project_ids"))
+        | set(_dependency_project_ids(dependencies, "edit_project_ids")),
+        key=str,
+    )
+    from app.services.project_creation_grant_service import (
+        lock_actor_and_project_memberships,
+    )
+
+    await lock_actor_and_project_memberships(db, actor, project_ids)
+
+
 async def _assert_template_root_scope(
     db: AsyncSession,
     *,
@@ -120,14 +164,17 @@ async def _assert_template_root_scope(
     try:
         root_project_id = UUID(str(raw_root_id))
     except (TypeError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail="预校验计划的集团来源已变化，请重新预校验") from exc
+        raise _stale_plan_error("预校验计划的集团来源已变化，请重新预校验") from exc
+    # 上一步逐项目权限检查会把 RLS 指向末个项目；这里恢复为已经验证可编辑的来源根。
+    from app.core.database import set_rls_context
+    await set_rls_context(db, root_project_id)
     root = await db.get(Project, root_project_id)
     if root is None or root.is_deleted or (root.report_scope or "standalone") != "consolidated":
-        raise HTTPException(status_code=409, detail="预校验计划的集团来源已变化，请重新预校验")
+        raise _stale_plan_error("预校验计划的集团来源已变化，请重新预校验")
     from app.services.consol_tree_service import build_tree, iter_nodes
     tree = await build_tree(db, root_project_id)
     if tree is None:
-        raise HTTPException(status_code=409, detail="预校验计划的集团来源已变化，请重新预校验")
+        raise _stale_plan_error("预校验计划的集团来源已变化，请重新预校验")
     member_ids = {node.project_id for node in iter_nodes(tree) if node.project_id is not None}
     root_code = (root.company_code or "").strip()
     for row in rows:
@@ -138,7 +185,7 @@ async def _assert_template_root_scope(
             or row.ultimate_company_code != root_code
             or (row.action == "update" and row.project_id not in member_ids)
         ):
-            raise HTTPException(status_code=409, detail="预校验计划的集团来源已变化，请重新预校验")
+            raise _stale_plan_error("预校验计划的集团来源已变化，请重新预校验")
 
 
 class BatchApplyRequest(BaseModel):
@@ -159,6 +206,7 @@ class BatchPlanStatusResponse(BaseModel):
     template_version: str | None = None
     receipt: dict[str, Any] | None = None
     public_error: str | None = None
+    failure_error_code: str | None = None
     expires_at: str
 
 
@@ -356,6 +404,7 @@ def plan_status_response(plan: ProjectBatchImportPlan) -> BatchPlanStatusRespons
         template_version=plan.template_version,
         receipt=plan.receipt,
         public_error=plan.public_error,
+        failure_error_code=(plan.summary or {}).get(_PLAN_FAILURE_ERROR_CODE_KEY),
         expires_at=plan.expires_at.isoformat(),
     )
 
@@ -405,11 +454,12 @@ async def apply_validation_plan(
     plan = await get_owned_plan(db, plan_id, actor, for_update=True)
     if plan.idempotency_key != idempotency_key:
         raise HTTPException(status_code=409, detail="幂等键与预校验计划不匹配")
+    dependencies = _plan_dependencies(plan)
+    # 所有状态（含 invalid/failed/applied 回执）先按当前权限过滤，不能让终态绕过撤权。
+    await _assert_plan_project_access(
+        db, plan=plan, actor=actor, ids_key="read_project_ids", permission="readonly",
+    )
     if plan.status == "applied" and plan.receipt is not None:
-        await _assert_plan_project_access(
-            db, plan=plan, actor=actor, ids_key="read_project_ids",
-            permission="readonly",
-        )
         receipt = BatchImportResult.model_validate(plan.receipt)
         receipt.idempotent = True
         return receipt
@@ -429,35 +479,44 @@ async def apply_validation_plan(
     update_rows = [row for row in rows if row.action == "update"]
     unchanged_rows = [row for row in rows if row.action == "unchanged"]
     skipped_rows = [row for row in rows if row.action == "skip"]
-    # 连“无变化”行也纳入年度锁与最终图校验，避免双口径冲突在无写入路径中漏检。
-    plan_years = {
-        row.audit_year for row in rows if row.audit_year is not None
-    }
+    # 集团边界可动态跨组。先按年度事务级 advisory lock 串行，再以当前时间冻结
+    # actor/grant；否则等待期间到期或撤销的授权仍可能进入写路径。
+    lock_years = {row.audit_year for row in rows}
+    await lock_topology_years(db, lock_years)
+    try:
+        await revalidate_plan_grants(db, actor, create_rows, dependencies)
+    except ProjectCreationGrantStale as exc:
+        raise _stale_plan_error("预校验计划的建项授权已变化，请重新预校验") from exc
+    if update_rows and (
+        plan.mode != "consolidation"
+        or dependencies.get("template_root_project_id") in (None, "")
+    ):
+        raise _stale_plan_error("更新集团关系必须使用从当前合并项目导出的完整模板")
+    # 连“无变化”行也纳入最终图校验，避免双口径冲突在无写入路径中漏检。
+    plan_years = {row.audit_year for row in rows if row.audit_year is not None}
     write_years = {
         row.audit_year for row in create_rows + update_rows if row.audit_year is not None
     }
-    # 正确性优先：同年度关系变更串行，且将库存快照与最终无环判断固定在同一视图。
-    if plan_years:
-        await db.execute(sa.select(Project.id).where(
-            Project.audit_year.in_(sorted(plan_years)),
-            Project.is_deleted == sa.false(),
-        ).with_for_update())
-    dependencies = _plan_dependencies(plan)
-    current_inventory, inventory_keys = await load_dependency_inventory(
-        db, dependencies, for_update=True,
-    )
-    if not inventory_baseline_matches(dependencies, current_inventory, inventory_keys):
-        raise HTTPException(
-            status_code=409,
-            detail="预校验计划的项目权限或库存已变化，请重新预校验",
-        )
-    await _assert_template_root_scope(db, dependencies=dependencies, rows=rows)
+    # 年度、actor/grant 之后先冻结成员行并重验权限，再进入可能等待的库存行锁。
+    try:
+        await _lock_plan_memberships(db, dependencies=dependencies, actor=actor)
+    except ProjectCreationGrantStale as exc:
+        raise _stale_plan_error("预校验计划的创建者状态已变化，请重新预校验") from exc
     await _assert_plan_project_access(
         db, plan=plan, actor=actor, ids_key="read_project_ids", permission="readonly",
     )
     await _assert_plan_project_access(
         db, plan=plan, actor=actor, ids_key="edit_project_ids", permission="edit",
     )
+    try:
+        current_inventory, inventory_keys = await load_dependency_inventory(
+            db, dependencies, for_update=True,
+        )
+    except HTTPException as exc:
+        raise _stale_plan_error("预校验计划库存基线无效，请重新预校验") from exc
+    if not inventory_baseline_matches(dependencies, current_inventory, inventory_keys):
+        raise _stale_plan_error()
+    await _assert_template_root_scope(db, dependencies=dependencies, rows=rows)
 
     plan.status = "applying"
     plan.updated_at = _now()
@@ -465,8 +524,8 @@ async def apply_validation_plan(
 
     staff_id: UUID | None = None
     if _role_value(actor) == "manager":
-        from app.services.procedure_authorization import resolve_user_active_staff_id
-        staff_id = await resolve_user_active_staff_id(db, actor.id)
+        from app.services.procedure_authorization import resolve_user_active_staff_id_optional
+        staff_id = await resolve_user_active_staff_id_optional(db, actor.id)
 
     defer_project_flush = True
     created: list[Project] = []
@@ -494,7 +553,7 @@ async def apply_validation_plan(
             uniqueness_checked=True, group_fields_prepared=True,
             defer_flush=defer_project_flush,
         )
-        await _assign_new_project_manager(
+        await assign_new_project_creator(
             db, project, actor, staff_id, persist_assignment=False
         )
         created.append(project)
@@ -513,7 +572,7 @@ async def apply_validation_plan(
             continue
         prefetched_groups.setdefault((project_code, project_year), []).append(project)
     for (ultimate_code, audit_year), group_rows in sorted(groups.items()):
-        root, was_created = await _ensure_consolidated_root(
+        root, was_created = await ensure_consolidated_root(
             db, ultimate_code=ultimate_code, audit_year=audit_year,
             group_rows=group_rows, created_by_key=created_by_key,
             actor=actor, staff_id=staff_id,
@@ -525,12 +584,18 @@ async def apply_validation_plan(
             roots.append(root)
     actor_role = _role_value(actor)
     if actor_role == "manager" and (created or roots):
-        assert staff_id is not None
         from app.services.assignment_service import AssignmentService
-        await AssignmentService(db).initialize_project_managers(
-            [project.id for project in created + roots],
-            staff_id=staff_id, user_id=actor.id, assigned_by=actor.id,
-        )
+        if staff_id is None:
+            # 未绑定人员档案：只加项目成员（经理、编辑），不写团队委派（R7）。
+            await AssignmentService(db).initialize_creator_members(
+                [project.id for project in created + roots],
+                user_id=actor.id, assigned_by=actor.id, role_key="manager",
+            )
+        else:
+            await AssignmentService(db).initialize_project_managers(
+                [project.id for project in created + roots],
+                staff_id=staff_id, user_id=actor.id, assigned_by=actor.id,
+            )
     elif actor_role == "partner" and (created or roots):
         from app.services.assignment_service import AssignmentService
         await AssignmentService(db).initialize_project_partners(
@@ -654,6 +719,12 @@ async def mark_plan_failed(
     plan = await get_owned_plan(db, plan_id, actor, for_update=True)
     if plan.status == "applied":
         return
+    summary = copy.deepcopy(plan.summary or {})
+    if isinstance(error, IntegrityError) or is_stale_plan_error(error):
+        summary[_PLAN_FAILURE_ERROR_CODE_KEY] = BATCH_PLAN_STALE_ERROR_CODE
+    else:
+        summary.pop(_PLAN_FAILURE_ERROR_CODE_KEY, None)
+    plan.summary = summary
     plan.status = "failed"
     plan.public_error = _public_error(error)
     plan.updated_at = _now()
@@ -675,7 +746,8 @@ async def build_plan_error_workbook(
 
 
 __all__ = [
+    "BATCH_PLAN_RESULT_UNKNOWN_ERROR_CODE", "BATCH_PLAN_STALE_ERROR_CODE",
     "BatchApplyRequest", "BatchPlanStatusResponse", "apply_validation_plan",
     "build_plan_error_workbook", "create_validation_plan", "get_owned_plan", "get_readable_plan",
-    "mark_plan_failed", "plan_status_response",
+    "is_stale_plan_error", "mark_plan_failed", "plan_status_response",
 ]

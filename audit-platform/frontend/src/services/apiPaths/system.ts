@@ -18,6 +18,17 @@ export const users = {
   list: '/api/users/',
   me: '/api/users/me',
   detail: (id: string) => `/api/users/${id}`,
+  projectCreationGrants: {
+    list: '/api/users/project-creation-grants',
+    grant: (managerId: string) => `/api/users/project-creation-grants/${managerId}`,
+    revoke: (grantId: string) => `/api/users/project-creation-grants/${grantId}/revoke`,
+  },
+  /** 人员档案与登录账号绑定（仅 admin） */
+  staffBindings: {
+    list: '/api/users/staff-bindings',
+    bind: (userId: string) => `/api/users/${userId}/staff-binding`,
+    unbind: (userId: string) => `/api/users/${userId}/staff-binding/unbind`,
+  },
   privateStorage: {
     list: (uid: string) => `/api/users/${uid}/private-storage`,
     quota: (uid: string) => `/api/users/${uid}/private-storage/quota`,

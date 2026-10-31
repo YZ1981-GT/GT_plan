@@ -13,8 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
-from app.routers.password_confirm import require_confirmation_token
+from app.deps import get_current_user, require_project_access, require_role
 from app.models.audit_platform_schemas import (
     BasicInfoSchema,
     ProjectCreateResponse,
@@ -26,10 +25,13 @@ from app.models.audit_platform_schemas import (
 from app.models.core import Project, User
 from app.services import project_wizard_service
 from app.services.project_audit_year import resolve_project_audit_year
+from app.services.project_creation_coordinator import create_project_for_actor
+from app.services.project_creation_security import enforce_creation_rate_limit
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+_PROJECT_CREATE_USER = require_role(["admin", "partner", "manager"])
 
 
 def _extract_project_audit_year(project: Project) -> int | None:
@@ -250,13 +252,11 @@ async def get_project(
 async def create_project(
     data: BasicInfoSchema,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_PROJECT_CREATE_USER),
 ) -> ProjectCreateResponse:
-    """创建审计项目（向导步骤1-基本信息）。
-
-    Validates: Requirements 1.2, 1.3
-    """
-    project = await project_wizard_service.create_project(data, db)
+    """创建审计项目；manager 须持精确 USCC 授权并在同事务成为项目经理。"""
+    await enforce_creation_rate_limit(current_user, entrypoint="single_project")
+    project = await create_project_for_actor(data, db, current_user)
     return _to_project_response(project)
 
 
@@ -349,84 +349,26 @@ async def attach_subsidiaries(
     - 成功后广播 CONSOL_SCOPE_CHANGED（需求 5.2）→ 前端树自动刷新。
     - 仅 admin/partner 或有写权限者可操作（沿用项目可见性，权限不足的子项目跳过）。
     """
-    from sqlalchemy import select
-    from app.models.core import ProjectUser
-
-    parent = await db.get(Project, project_id)
-    if parent is None or parent.is_deleted:
-        raise HTTPException(status_code=404, detail="项目不存在")
-    if parent.report_scope != "consolidated":
-        raise HTTPException(status_code=400, detail="仅合并项目可配置合并范围")
-
-    # 可写项目集合（admin/partner 全可写，其他角色仅自己参与的项目）
-    allowed_ids: set[UUID] | None = None
-    if current_user.role.value not in ("admin", "partner"):
-        mine = await db.execute(
-            select(ProjectUser.project_id).where(
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
-            )
-        )
-        allowed_ids = {r[0] for r in mine.all()}
-
-    # consol-tree-three-code-autobuild 需求 7.5：不再直接写 parent_project_id（派生值），
-    # 改为把下级项目的三码与关系改写为「上级 = 本企业」，再按三码重算链接。
-    from app.services.group_links import (
-        apply_group_values,
-        propagate_to_counterpart,
-        sync_group_links,
+    from app.services.project_subsidiary_attachment_service import (
+        attach_subsidiaries as attach_existing_subsidiaries,
     )
-    from app.services.group_relation import resolve_relation
-    from app.services.project_audit_year import resolve_project_audit_year
 
-    parent_code = (parent.company_code or "").strip()
-    if not parent_code:
-        raise HTTPException(status_code=400, detail="本合并项目未填企业代码，无法按三码纳入下级企业")
-    year = resolve_project_audit_year(parent)
-    ultimate_code = (parent.ultimate_company_code or "").strip() or parent_code
-    ultimate_name = parent.ultimate_company_name or parent.client_name
-
-    attached: list[Project] = []
-    for child_id in body.child_project_ids:
-        if child_id == project_id:
-            continue
-        if allowed_ids is not None and child_id not in allowed_ids:
-            continue
-        child = await db.get(Project, child_id)
-        if child is None or child.is_deleted:
-            continue
-        if child.report_scope == "consolidated":
-            continue  # 不允许把合并项目挂为子公司
-        if (child.company_code or "").strip() == parent_code:
-            continue  # 本企业自己的单户项目天然就是「母公司」节点，无需纳入
-        if resolve_project_audit_year(child) != year:
-            continue  # 企业树按审计年度隔离（需求 3.8）
-        apply_group_values(child, {
-            "parent_company_name": parent.client_name,
-            "parent_company_code": parent_code,
-            "relation_to_parent": resolve_relation(
-                child.relation_to_parent, parent_code, child.client_name, child.company_code
-            ),
-            "ultimate_company_name": ultimate_name,
-            "ultimate_company_code": ultimate_code,
-        })
-        await propagate_to_counterpart(db, child)
-        child.consol_level = (parent.consol_level or 1) + 1
-        attached.append(child)
-
-    if attached:
-        await sync_group_links(db, year)
+    attached, year = await attach_existing_subsidiaries(
+        db,
+        parent_project_id=project_id,
+        child_project_ids=body.child_project_ids,
+        actor=current_user,
+    )
     await db.commit()
-    for c in attached:
-        await db.refresh(c)
+    for child in attached:
+        await db.refresh(child)
 
-    # 需求 5.2：合并范围变更广播，前端树自动刷新（ADR-CONSOL-303）。链接没变（已纳入过）时
-    # sync_group_links 不会广播，这里对本合并项目再显式推一次。
+    # 链接没变（已纳入过）时 sync 不广播，因此对本合并项目显式推一次。
     if attached:
         from app.services.consol_scope_service import _emit_scope_changed
-        _emit_scope_changed(project_id, year)
 
-    return [_to_project_response(c) for c in attached]
+        _emit_scope_changed(project_id, year)
+    return [_to_project_response(child) for child in attached]
 
 
 # ---------------------------------------------------------------------------
@@ -709,10 +651,7 @@ async def confirm_project(
 # ── 删除项目 ──
 
 
-from pydantic import BaseModel as _BaseModel
-
-
-class BatchDeleteRequest(_BaseModel):
+class BatchDeleteRequest(BaseModel):
     project_ids: list[UUID]
 
 
@@ -720,12 +659,9 @@ class BatchDeleteRequest(_BaseModel):
 async def delete_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
-    """软删除单个项目（前端已有二次确认弹窗，仅 admin/partner/manager 可操作）"""
-    from fastapi import HTTPException
-    if current_user.role.value not in ("admin", "partner", "manager"):
-        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
+    """软删除单个项目（R9：admin 任意；其余须是本项目 edit 级成员）。"""
     from sqlalchemy import select
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
@@ -733,6 +669,15 @@ async def delete_project(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
+    from app.services.group_topology_lock import lock_topology_years
+
+    year = resolve_project_audit_year(project)
+    await lock_topology_years(db, [year])
+    await db.refresh(project)
+    if project.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    if resolve_project_audit_year(project) != year:
+        raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
     # 记下删除人与删除时间（回收站「删除人 / 删除时间」读它们；原先只置 is_deleted，两列恒空）
     project.soft_delete()
     project.updated_by = current_user.id
@@ -750,24 +695,46 @@ async def batch_delete_projects(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """批量软删除项目（前端已有二次确认弹窗，仅 admin/partner/manager 可操作）"""
+    """批量软删除项目（R9：admin 任意；其余须是本项目 edit 级成员。无权限的报错但不阻断其他项目）。"""
     from fastapi import HTTPException
-    if current_user.role.value not in ("admin", "partner", "manager"):
-        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
     from sqlalchemy import select
 
+    from app.deps import assert_project_permission
     from app.services.group_links import sync_group_links_for
+    from app.services.group_topology_lock import lock_topology_years
 
-    deleted: list[Project] = []
-    for pid in body.project_ids:
-        result = await db.execute(
-            select(Project).where(Project.id == pid, Project.is_deleted == False)  # noqa: E712
-        )
-        p = result.scalar_one_or_none()
-        if p:
-            p.soft_delete()  # 同时记删除时间
-            p.updated_by = current_user.id  # 删除人（回收站读它）
-            deleted.append(p)
+    requested_ids = list(dict.fromkeys(body.project_ids))
+    initial = list((await db.execute(
+        select(Project).where(Project.id.in_(requested_ids), Project.is_deleted == False)  # noqa: E712
+    )).scalars().all())
+
+    # 逐项权限校验（无权限的跳过，不阻断其他项目）
+    forbidden_ids: set[UUID] = set()
+    for project in initial:
+        try:
+            await assert_project_permission(db, current_user, project.id, "edit")
+        except HTTPException:
+            forbidden_ids.add(project.id)
+    initial = [project for project in initial if project.id not in forbidden_ids]
+    if not initial and forbidden_ids:
+        raise HTTPException(status_code=403, detail="权限不足，无法删除选中的项目")
+    initial_years = {
+        project.id: resolve_project_audit_year(project) for project in initial
+    }
+    await lock_topology_years(db, initial_years.values())
+    # 锁后重读并核对年度，避免先按旧年度写删除、再逆序补锁新年度。
+    deleted_stmt = select(Project).where(
+        Project.id.in_(requested_ids), Project.is_deleted == False  # noqa: E712
+    ).execution_options(populate_existing=True)
+    deleted = list((await db.execute(deleted_stmt)).scalars().all())
+    if any(
+        resolve_project_audit_year(project) != initial_years.get(project.id)
+        for project in deleted
+    ):
+        raise HTTPException(status_code=409, detail="项目年度已变化，请刷新后重试")
+    for project in deleted:
+        project.soft_delete()
+        project.updated_by = current_user.id
     # 需求 7.2：整批删除后按涉及的年度各重算一次派生链接
     await sync_group_links_for(db, *deleted)
     await db.commit()

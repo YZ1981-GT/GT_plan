@@ -187,6 +187,8 @@ async def test_member_scope_cases(case):
                         hashed_password="x", role=UserRole(inp["system_role"]), is_active=True)
             s.add_all([project, user])
             await s.flush()
+            if inp.get("is_creator"):
+                project.created_by = user.id
             staff = [StaffMember(name=f"【测试】人员{i}", user_id=user.id) for i in range(inp["staff_count"])]
             s.add_all(staff)
             await s.flush()
