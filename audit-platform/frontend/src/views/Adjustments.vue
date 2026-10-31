@@ -723,6 +723,7 @@ import { useEditMode } from '@/composables/useEditMode'
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
 import StaleIndicator from '@/components/StaleIndicator.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { ADJUSTMENT_SHEET_ALIAS } from '@/utils/normalizeSheetName'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
@@ -1451,7 +1452,7 @@ function sourceWpLabel(row: any): string {
   const m = itemId.match(/^[A-Z]\d+(?:-\d+)?/)
   return m ? m[0] : ''
 }
-/** 跳转到来源底稿的调整分录页（source_ref 前缀即 wp_id；item_id 前缀编码作 ?sheet= 定位 tab） */
+/** 跳转到来源底稿的调整分录页（source_ref 前缀即 wp_id；表由编辑器按名称含「调整分录」解析，不按 item_id 前缀） */
 function jumpToSourceWorkpaper(row: any) {
   const ref = row?.source_ref || ''
   const wpId = ref.indexOf(':') >= 0 ? ref.slice(0, ref.indexOf(':')) : ''
@@ -1459,14 +1460,9 @@ function jumpToSourceWorkpaper(row: any) {
     ElMessage.info('无来源底稿信息')
     return
   }
-  // sheetCode 如 K9-3 / D4-4 → GtWpRenderer 以编码 endsWith/includes 兜底定位调整分录 sheet，
-  // 不带 ?sheet= 会回退到底稿目录页。
-  // P1-8: 带 highlight=source_ref 供底稿侧定位到具体分录行
-  const sheetCode = sourceWpLabel(row)
-  const query: Record<string, string> = {}
-  if (sheetCode) query.sheet = sheetCode
-  if (ref) query.highlight = ref
-  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query })
+  // ?sheet=@adjustment：该底稿名称含「调整分录」的那张表（item_id 前缀落不到它：D1-entry-rows → 审定表、L1-adj-AJE → 程序表）；
+  // ?highlight=source_ref：来源页签认领分录组并切到对应类型（spec wp-deeplink-locate-residual-closure 需求 1）
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query: { sheet: ADJUSTMENT_SHEET_ALIAS, highlight: ref } })
 }
 
 // R1 需求 3 / Task 10 — 将被驳回的 AJE 一键转为未更正错报

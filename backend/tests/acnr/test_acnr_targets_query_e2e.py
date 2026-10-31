@@ -2,7 +2,8 @@
 
 真 PG：一个外层事务里建【测试】项目、E1 底稿（``parsed_data.html_data`` 写 E1-14!I18=0.125、E1-19!A54=「结论文本」、
 E1-15!A31=222，以及同 A1 的 E1-14!A50=11 与 E1-22!A50=22；样例格均为模板核对后的有效坐标，spec
-wp-deeplink-locate-coverage-closure 停用了原 C10 / C8 / B20 / B30 / E100 等种子坐标）、只有 ``checklist_responses`` 的 S15 程序表底稿，以及没有年度的另一个【测试】项目；会话以 SAVEPOINT 方式加入
+wp-deeplink-locate-coverage-closure 停用了原 C10 / C8 / B20 / B30 / E100 等种子坐标）、只有 ``checklist_responses`` 的 H3 底稿
+（表单录入样例取有效坐标 H3-4!A27；原用的 S15!C12 已由 wp-deeplink-locate-residual-closure 停用），以及没有年度的另一个【测试】项目；会话以 SAVEPOINT 方式加入
 （端点里的 commit 只释放保存点），结束整体回滚，不留数据。经生产注册的 router（``tests/authz_world.build_app``）用 httpx 真发
 请求，只 override ``get_current_user`` 与 ``get_db``；Redis 换成独立的 fakeredis（不连本机 Redis、不留缓存）。
 
@@ -42,7 +43,7 @@ _E1_15 = get_catalog().sheets_by_addr_id["E1/E1-15"]["sheet_name"]
 _E1_19, _E1_22 = (get_catalog().sheets_by_addr_id[f"E1/E1-{n}"]["sheet_name"] for n in (19, 22))
 _PAPERS = {"E1": {_E1_14: {"I18": "0.125", "A50": "11"}, _E1_15: {"A31": "222"},
                   _E1_19: {"A54": "结论文本"}, _E1_22: {"A50": "22"}}}
-TARGETS = ["E1/E1-14/I18", "E1/E1-15/A31", "E1/E1-14/A50", "E1/E1-22/A50", "E1/E1-19/A54", "S15/S15/C12",
+TARGETS = ["E1/E1-14/I18", "E1/E1-15/A31", "E1/E1-14/A50", "E1/E1-22/A50", "E1/E1-19/A54", "H3/H3-4/A27",
            "D2/D2-6/A21", "E1/E1-14/I18"]
 #: (addr_id, state, value, text, reason_code, 实际读取的底稿)
 EXPECTED = [
@@ -51,7 +52,7 @@ EXPECTED = [
     ("E1/E1-14/A50", "ok", "11", "11", None, "E1"),
     ("E1/E1-22/A50", "ok", "22", "22", None, "E1"),
     ("E1/E1-19/A54", "text", None, "结论文本", "non_numeric", "E1"),
-    ("S15/S15/C12", "missing", None, None, "value_in_form_storage", "S15"),
+    ("H3/H3-4/A27", "missing", None, None, "value_in_form_storage", "H3"),
     ("D2/D2-6/A21", "missing", None, None, "wp_missing", "D2"),
     ("E1/E1-14/I18", "ok", "0.125", "0.125", None, "E1"),
 ]
@@ -104,9 +105,9 @@ async def world(monkeypatch):
                     await s.flush()
                     ids = {"E1": await _paper(s, x, "E1", {"html_data": {k: {"cells": v}
                                                                          for k, v in _PAPERS["E1"].items()}}),
-                           "S15": await _paper(s, x, "S15", {})}
+                           "H3": await _paper(s, x, "H3", {})}
                     await s.execute(text("INSERT INTO checklist_responses (project_id, wp_id, item_id, conclusion) "
-                                         "VALUES (:p, :w, 'S15-step-1', '已执行')"), {"p": x, "w": ids["S15"]})
+                                         "VALUES (:p, :w, 'H3-4-conclusion', '已执行')"), {"p": x, "w": ids["H3"]})
                     try:
                         yield World(aw, x, z, ids)
                     finally:
@@ -195,6 +196,28 @@ async def test_builder_year_is_filled_from_project_and_required_when_unknown(wor
     assert missing_project.json()["detail"]["error_code"] == "PROJECT_REQUIRED"
 
 
+def _token_free(body: dict) -> dict:
+    """计数凭证（count_token，顶层与 meta 里各一份）含签发时刻（exp 到秒）：两次请求跨秒即不同。比较时换成去掉 exp 的载荷
+    （查询摘要 / 总数 / 身份仍逐字比较）。"""
+    import base64
+    import json as _json
+
+    def payload(tok):
+        if not tok:
+            return tok
+        head = tok.split(".", 1)[0]
+        data = _json.loads(base64.urlsafe_b64decode(head + "=" * (-len(head) % 4)))
+        data.pop("exp", None)
+        return data
+
+    out = dict(body)
+    if "count_token" in out:
+        out["count_token"] = payload(out["count_token"])
+    if isinstance(out.get("meta"), dict) and "count_token" in out["meta"]:
+        out["meta"] = {**out["meta"], "count_token": payload(out["meta"]["count_token"])}
+    return out
+
+
 async def test_requests_without_targets_are_unchanged(world: World):
     """不带 acnr_targets：响应没有 acnr_results 键，其余字段与带目标的同一查询逐字段相等。"""
     admin = await world.aw.user(UserRole.admin)
@@ -210,7 +233,7 @@ async def test_requests_without_targets_are_unchanged(world: World):
         b.pop("acnr_results")
         a.pop("cache_hit", None)
         b.pop("cache_hit", None)
-        assert a == b
+        assert _token_free(a) == _token_free(b)
 
 
 async def test_values_are_read_fresh_even_on_cache_hit(world: World):

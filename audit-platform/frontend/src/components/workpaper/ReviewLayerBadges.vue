@@ -95,7 +95,7 @@ function onClick(layer: LayerInfo) {
   router.push({
     name: 'WorkpaperList',
     params: { projectId: props.projectId },
-    query: { highlight: layer.template_wp, source_wp: props.wpCode || '' },
+    query: { highlight: layer.template_wp },
   })
 }
 

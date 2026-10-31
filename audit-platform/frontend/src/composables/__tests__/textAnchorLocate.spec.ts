@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findTextAnchorElement, locateTextAnchor, normalizeAnchorText } from '../textAnchorLocate'
+import { COMPOUND_EXTRA, findTextAnchorElement, locateTextAnchor, normalizeAnchorText } from '../textAnchorLocate'
 import { GT_LOCATE_HIGHLIGHT_CLASS } from '../useCellLocate'
 import { CATALOG_TEXT_ANCHORS, catalogTextAnchor } from '@/generated/catalogTextAnchors'
 import { locateSheetCode } from '../useRendererCellLocate'
@@ -79,6 +79,55 @@ describe('findTextAnchorElement', () => {
     const outer = root('<div class="el-card" id="outer"><div id="r"><span id="t">审计结论</span></div></div>')
     const r = outer.querySelector('#r') as HTMLElement
     expect(findTextAnchorElement(r, '审计结论')).toBe(outer.querySelector('#t'))
+  })
+})
+
+describe('findTextAnchorElement 二级：复合结论标题（spec wp-deeplink-locate-residual-closure 需求 3）', () => {
+  it('整段相等一处都没有时，认含锚点文字的短标题（F2-18 / F2-62 / 综合 / 带说明）', () => {
+    for (const title of ['分析结论（四、审计结论）', '五、分析结论（审计结论）', '综合审计结论', '三、审计说明 / 四、审计结论', 'M10-4 综合审计结论']) {
+      const r = root(`<div class="el-card" id="c"><div class="el-card__header"><span>${title}</span></div></div><div><span>审计说明</span></div>`)
+      expect(findTextAnchorElement(r, '审计结论'), title).toBe(r.querySelector('#c'))
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('整段相等的标题优先：同页还有复合写法时只认整段相等的那处', () => {
+    const r = root('<div class="el-card" id="exact"><span>四、审计结论</span></div><div class="el-card"><span>综合审计结论</span></div>')
+    expect(findTextAnchorElement(r, '审计结论')).toBe(r.querySelector('#exact'))
+  })
+
+  it('整段相等有两处 ⇒ null（不因二级改变原判据）', () => {
+    const r = root('<div class="el-card"><span>审计结论</span></div><div class="el-card"><span>审计结论</span></div><div><span>综合审计结论</span></div>')
+    expect(findTextAnchorElement(r, '审计结论')).toBeNull()
+  })
+
+  it('二级不唯一 ⇒ null（G4 SPPI「部分(一) / 部分(二) 审计结论」）', () => {
+    const r = root('<div class="el-card"><span>部分(一) 审计结论</span></div><div class="el-card"><span>部分(二) 审计结论</span></div>')
+    expect(findTextAnchorElement(r, '审计结论')).toBeNull()
+  })
+
+  it('提示句（归一后超过锚点 + 8 字）不算标题', () => {
+    for (const hint of ['确认覆盖率达标后填写审计结论', '完成核对清单并填写审计结论', '确认资本化总额并生成审计结论']) {
+      const r = root(`<div class="el-card"><span>${hint}</span></div>`)
+      expect(findTextAnchorElement(r, '审计结论'), hint).toBeNull()
+      document.body.innerHTML = ''
+    }
+    const edge = root('<div class="el-card" id="c"><span>分析结论（四、审计结论）</span></div>')
+    expect(normalizeAnchorText('分析结论（四、审计结论）').length).toBe(4 + COMPOUND_EXTRA)
+    expect(findTextAnchorElement(edge, '审计结论')).toBe(edge.querySelector('#c'))
+  })
+
+  it('按钮 / 链接 / 表格单元格 / 浮层里的复合文字不算；隐藏的不算', () => {
+    const r = root(`
+      <button><span>🤖 AI 生成审计结论</span></button>
+      <a href="#"><span>查看审计结论</span></a>
+      <div role="button"><span>填写审计结论</span></div>
+      <table><tr><td>综合审计结论</td></tr></table>
+      <div class="el-popper"><span>总体审计结论</span></div>
+      <div style="display:none"><span>监盘总结与审计结论</span></div>`)
+    expect(findTextAnchorElement(r, '审计结论')).toBeNull()
+    const withHeading = root('<button><span>🤖 AI 生成审计结论</span></button><div class="section-title" id="h">综合审计结论</div>')
+    expect(findTextAnchorElement(withHeading, '审计结论')).toBe(withHeading.querySelector('#h'))
   })
 })
 

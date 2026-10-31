@@ -10,8 +10,9 @@
   6. loader 只读、不触碰目录单例、不读 DB（纯函数：传入 sheets 序列）。
   7. 生成器名称规则 `catalog_names`（§6.3）：449 个非孤儿 cell 的 formula_ref / uri 全部往返（模板名归属本
      sheet 用模板名，否则用 sheet_code）；同父一名多码 9 组写进顶层 alias_policy.forbidden 并被拒绝。
-  8. §6.4 的 47 格三路判定：openpyxl 现算证据与 cell_verdicts 记录逐条相等（31 行有文字 + 2 行空 = 33 格
-     keep_semantic_unverified，14 格超范围 deprecate）；apply_cell_verdicts 按判定改写 cell。
+  8. §6.4 的 47 格三路判定：openpyxl 现算证据分类不变（31 行有文字 + 2 行空 + 14 格超范围）；14 格超范围 deprecate
+     与 cell_verdicts 记录逐条相等，范围内 33 格原判 keep_semantic_unverified，现由坐标复核判定接管（各一条，
+     spec wp-deeplink-locate-residual-closure）；apply_cell_verdicts 按判定改写 cell。
 
 变异（在 verify_wt 做）：某禁止别名组改成单码（删一条 wp_code 行）→ forbidden 组数红 / 往返
 禁止别名拒绝用例红；某可并入别名改回与模板名相同 → 往返命中数变化红。
@@ -236,8 +237,9 @@ def test_generator_name_rules_roundtrip_all_non_orphan_cells():
         if fm is None or not fm.ok or fm.addr_id != c["addr_id"] or not um.ok or um.addr_id != c["addr_id"]:
             fail.append((c["addr_id"], c["formula_ref"], c["uri"]))
     # 发布前目录：474 − 25 孤儿 = 449；发布后孤儿父 sheet 已补登，25 个停用 cell 也在其中（共 474）；
-    # spec wp-deeplink-locate-coverage-closure 起另有 65 个模板核对坐标（共 539，停用格仍在其中）
-    assert checked == 539, checked
+    # spec wp-deeplink-locate-coverage-closure 起另有 65 个模板核对坐标（共 539，停用格仍在其中）；
+    # spec wp-deeplink-locate-residual-closure 再补 3 个（G8-4 A24、合计行 D1-3 J21 / D2-2 Q26，共 542）
+    assert checked == 542, checked
     assert not fail, f"名称规则往返失败 {len(fail)} 条：{fail[:10]}"
     assert named.by_sheet_code >= 1, "防空转：应有模板名不归属本 sheet、改用 sheet_code 的 cell（如 F2/F2-34）"
     assert named.by_template_name + named.by_sheet_code == checked
@@ -269,12 +271,18 @@ def test_seed_name_mismatch_verdicts_recomputed():
     rows = with_template_evidence(seed_name_mismatch_cells(_load_sheets(), added))
     assert len(rows) == 47 and len({r["sheet_code"] for r in rows}) == 13
     assert collections.Counter(r["class"] for r in rows) == {"in_range_row_text": 31, "in_range_row_empty": 2, "out_of_range": 14}
-    recorded = json.loads((_ACNR / "sources" / "sheet_verdicts.json").read_text(encoding="utf-8"))["cell_verdicts"]
-    recorded = {c["addr_id"]: c for c in recorded if c.get("kind") == "seed_name_mismatch"}
+    all_recorded = json.loads((_ACNR / "sources" / "sheet_verdicts.json").read_text(encoding="utf-8"))["cell_verdicts"]
+    recorded = {c["addr_id"]: c for c in all_recorded if c.get("kind") == "seed_name_mismatch"}
     expected = {r["addr_id"]: verdict_record(r) for r in rows}
+    # 范围内 33 格原判「语义待核对」，spec wp-deeplink-locate-residual-closure 起纳入坐标复核（kind=seed_coordinate_mismatch，
+    # 由 review_cell_coordinates.py 现算）：T06 只保留 14 格超范围判定，那 33 格在复核 kind 里各有一条判定
+    in_range = {a for a, r in expected.items() if r["verdict"] != "deprecate"}
+    expected = {a: r for a, r in expected.items() if a not in in_range}
     assert set(recorded) == set(expected), sorted(set(recorded) ^ set(expected))
     diffs = [aid for aid in expected if recorded[aid] != expected[aid]]
     assert not diffs, f"cell_verdicts 记录与现算不符：{diffs[:10]}"
+    reviewed = collections.Counter(c["addr_id"] for c in all_recorded if c.get("kind") == "seed_coordinate_mismatch")
+    assert len(in_range) == 33 and all(reviewed[a] == 1 for a in in_range), sorted(a for a in in_range if reviewed[a] != 1)
     deprecated = sorted(a for a, r in expected.items() if r["verdict"] == "deprecate")
     assert deprecated == sorted([
         "F3/F3-6/E30", "F4/F4-3/E50", "F4/F4-3/F50", "F4/F4-3/G50", "F4/F4-3/H50", "G14/G14-2/B50",
@@ -293,8 +301,9 @@ def test_apply_cell_verdicts_three_way():
     by_id = {c["addr_id"]: c for c in cat["cells"]}
     keep = [r for r in rows if r["verdict"] == "keep_semantic_unverified"]
     dep = [r for r in rows if r["verdict"] == "deprecate"]
-    # 停用 = T05 孤儿 25 + T06 超范围 14 + spec wp-deeplink-locate-coverage-closure 与模板不符 402
-    assert (len(keep), len(dep)) == (33, 39 + 402)
+    # 停用 = T05 孤儿 25 + T06 超范围 14 + 坐标复核与模板不符 435（spec wp-deeplink-locate-coverage-closure 402 格，
+    # spec wp-deeplink-locate-residual-closure 把原「语义待核对」33 格纳入同一复核，现无待核对判定）
+    assert (len(keep), len(dep)) == (0, 39 + 435)
     for r in keep:
         c = by_id[r["addr_id"]]
         assert c["semantic_label"] is None and c["cell_label"] == f"{c['cell_address']}（语义待核对）" and not c.get("deprecated")
@@ -303,6 +312,12 @@ def test_apply_cell_verdicts_three_way():
         assert c["deprecated"] is True and c["replaced_by"] == r["replaced_by"]
         # 指父 sheet，或（仅本 spec 改指的）同一张表上模板核对后的新坐标
         assert r["replaced_by"] == c["parent_addr_id"] or r["replaced_by"].rsplit("/", 1)[0] == c["parent_addr_id"], r
+    # 真实判定里已没有 keep_semantic_unverified：用合成判定核对这条写法仍有效（判定类型仍合法）
+    live = next(c for c in copy.deepcopy(_load_catalog())["cells"] if not c.get("deprecated"))
+    one = {"version": "1", "sheets": [], "cells": [live]}
+    catalog_names.apply_cell_verdicts(one, [dict(addr_id=live["addr_id"], verdict="keep_semantic_unverified", replaced_by=None)])
+    assert (live["semantic_label"], live["cell_label"], bool(live.get("deprecated"))) == (
+        None, f"{live['cell_address']}（语义待核对）", False)
 
 
 # ─── 6. 纯函数：传空 sheets 不抛、不读目录单例 ───────────────────────────────

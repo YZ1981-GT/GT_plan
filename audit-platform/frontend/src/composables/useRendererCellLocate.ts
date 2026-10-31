@@ -7,6 +7,8 @@
  *   组件钩子 `locateCell` → 本渲染器根元素内的通用策略（useCellLocate）→ 目录登记的文字锚点（textAnchor，
  *   spec wp-deeplink-locate-coverage-closure；登记了锚点的请求在 waits 后再追加 anchorWaits）。全部失败只提示一次；
  *   新请求到来时旧请求的剩余重试作废。
+ * - 请求带调整分录组（entryGroup，spec wp-deeplink-locate-residual-closure）时不按单元格定位：切到表后按
+ *   waits + anchorWaits 问登记的页签认领（`deps.entryGroup`），都不认领提示一次。
  */
 import { nextTick, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -22,6 +24,8 @@ export interface RendererLocateRequest {
   componentType?: string | null
   value?: string | null
   label?: string | null
+  /** 调整分录组 item_id（调整分录页跳来源底稿，spec wp-deeplink-locate-residual-closure 需求 1.2）；有它时不按单元格定位 */
+  entryGroup?: string | null
 }
 
 export interface ResolvedLocateSheet {
@@ -52,6 +56,8 @@ export interface RendererCellLocateDeps {
   textAnchor?: (sheetCode: string | null, cellRef: string) => string | null
   /** 有文字锚点时在 waits 之后追加的等待（ms）；缺省 TEXT_ANCHOR_EXTRA_WAITS */
   anchorWaits?: readonly number[]
+  /** 调整分录组认领（adjustmentEntryGroupLocate.locateAdjustmentEntryGroup）；页签是异步组件，按 waits + anchorWaits 重试 */
+  entryGroup?: (wpId: string, itemId: string) => boolean
 }
 
 export const SHEET_MISSING_MESSAGE = '已打开底稿但未能定位到目标位置（可能已变更）'
@@ -63,6 +69,10 @@ type TextAnchorPlan = { text: string; key: string } | null
 
 export function cellMissingMessage(sheetName: string, cellRef: string): string {
   return `「${sheetName}」的网页视图里没有单元格 ${cellRef} 的对应位置`
+}
+
+export function entryGroupMissingMessage(sheetName: string): string {
+  return `「${sheetName}」里没有找到这组调整分录（可能已删除或改了类型）`
 }
 
 /**
@@ -117,6 +127,11 @@ export function useRendererCellLocate(deps: RendererCellLocateDeps) {
       if (resolved.sheet_name !== sheet?.sheet_name) deps.selectSheet(resolved.sheet_name)
       sheet = resolved
     }
+    const entryGroup = (req.entryGroup || '').trim()
+    if (entryGroup && deps.entryGroup) {
+      scheduleGroup(token, req.wpId, entryGroup, sheet?.sheet_name || '当前页', 0, [...waits, ...(deps.anchorWaits ?? TEXT_ANCHOR_EXTRA_WAITS)])
+      return
+    }
     const cellRef = (req.cellRef || '').trim()
     if (!cellRef) return
     const target: LocateTarget = {
@@ -134,6 +149,20 @@ export function useRendererCellLocate(deps: RendererCellLocateDeps) {
     // 目录登记了文字锚点 ⇒ 该位置在网页视图里应当存在；重组件（如 D4）取完数才渲染结论区，多等一段再下结论
     const plan = anchor ? [...waits, ...(deps.anchorWaits ?? TEXT_ANCHOR_EXTRA_WAITS)] : waits
     schedule(token, target, 0, plan, anchor)
+  }
+
+  /** 分录组：页签异步挂载并取数后才登记，按计划重试认领；都不认领提示一次 */
+  function scheduleGroup(token: number, wpId: string, itemId: string, sheetName: string, index: number, plan: readonly number[]): void {
+    const go = async () => {
+      await nextTick()
+      if (token !== seq) return
+      if (deps.entryGroup?.(wpId, itemId)) return
+      if (index + 1 < plan.length) scheduleGroup(token, wpId, itemId, sheetName, index + 1, plan)
+      else notify(entryGroupMissingMessage(sheetName))
+    }
+    const wait = plan[index] ?? 0
+    if (wait > 0) setTimeout(() => { void go() }, wait)
+    else void go()
   }
 
   function schedule(token: number, target: LocateTarget, index: number, plan: readonly number[], anchor: TextAnchorPlan): void {

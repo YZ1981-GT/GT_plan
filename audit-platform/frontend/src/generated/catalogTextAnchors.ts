@@ -58,6 +58,7 @@ export const CATALOG_TEXT_ANCHORS: Readonly<Record<string, Readonly<Record<strin
   'G6-3': { A26: '审计结论' },
   'G7-4': { A42: '审计结论' },
   'G7-5': { A56: '审计结论' },
+  'G8-4': { A24: '审计结论' },
   'H1-5': { A34: '审计结论' },
   'H3-4': { A27: '审计结论' },
   'H8-4': { A59: '审计结论' },

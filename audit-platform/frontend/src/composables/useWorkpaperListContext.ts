@@ -71,6 +71,12 @@ export interface WpListContextData {
   // ── 选中 ──
   selectedWpId: Ref<string>
 
+  // ── 入口定位（`?highlight=` / `?wp_code=` / `?search=`，spec wp-deeplink-locate-residual-closure 需求 2.1） ──
+  /** 要定位的底稿编码；seq 每次进入递增，列表视图按 seq 只执行一次 */
+  locateTarget?: Ref<{ code: string; seq: number } | null>
+  /** 列表至少取到过一次（定位判「没有」之前要等它） */
+  listLoaded?: Ref<boolean>
+
   // ── 进度 ──
   totalProgress: ComputedRef<ProgressInfo>
 

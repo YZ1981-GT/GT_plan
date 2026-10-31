@@ -1,10 +1,10 @@
 {
   "description": "V2 静态数据双读对账（T22，需求 9.4）：每个节点 / 边端点的旧字段经 v2_canonical 换成规范身份，按来源文件 × 分类计数，每类附中文原因与前 20 个样本；由 backend/scripts/acnr/reconcile_v2_canonical.py --write 生成，不含时间戳。",
-  "registry_version": "20261030063137",
+  "registry_version": "20261030155451",
   "inputs": [
     {
       "path": "backend/data/acnr/global_catalog.json",
-      "sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f"
+      "sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a"
     },
     {
       "path": "backend/data/address_registry_l2_semantic.json",
@@ -28,7 +28,7 @@
       "nodes": 239693,
       "by_class": {
         "addr_id": {
-          "count": 139,
+          "count": 141,
           "reason": "得到规范 addr_id（目录登记格）",
           "samples": [
             {
@@ -466,7 +466,7 @@
           ]
         },
         "cell_not_in_catalog": {
-          "count": 91440,
+          "count": 91438,
           "reason": "该单元格所在表在目录中，但单元格坐标未登记",
           "samples": [
             {
@@ -3062,12 +3062,12 @@
   },
   "totals": {
     "nodes": 325088,
-    "addr_id": 149,
+    "addr_id": 151,
     "by_class": {
-      "addr_id": 149,
+      "addr_id": 151,
       "alias_forbidden": 1138,
       "ambiguous_sheet_name": 6048,
-      "cell_not_in_catalog": 116976,
+      "cell_not_in_catalog": 116974,
       "label_not_a1": 461,
       "not_wellformed": 40,
       "not_workpaper_node": 68,

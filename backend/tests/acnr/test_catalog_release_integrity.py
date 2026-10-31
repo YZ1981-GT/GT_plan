@@ -2,7 +2,8 @@
 
 - 孤儿计数 0（含停用条目，父 sheet 都在目录内）；
 - sheet_verdicts 判 deprecate 的 25 个孤儿 cell 与 14 个超范围 cell 发布后都是 `deprecated=true` 条目，
-  逐个 `full_resolve` 命中、带可解析的 `replaced_by`；判 keep_semantic_unverified 的 33 格仍是有效条目；
+  逐个 `full_resolve` 命中、带可解析的 `replaced_by`；原判 keep_semantic_unverified 的 33 格已由坐标复核接管
+  （spec wp-deeplink-locate-residual-closure：kind=seed_coordinate_mismatch 435 格，含这 33 格），不再有待核对判定；
 - 「无物理来源的有效 cell」为 0：判 deprecate 的 cell 没有一个仍是有效条目；
 - K14~K18 五个 sheet 逐个 `full_resolve` 带 `replaced_by`；
 - `/api/acnr/entries`（TestClient）默认列 5 张补登 sheet、不列 K14~K18，`include_deprecated=true` 时列出；
@@ -37,7 +38,9 @@ def test_verdict_counts_are_design_counts():
     assert _DEPRECATED_SHEETS == ["K14", "K15", "K16", "K17", "K18"]
     assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "orphan") == 25
     assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "seed_name_mismatch") == 14
-    assert len(_KEEP_CELLS) == 33
+    assert sum(1 for v in _DEPRECATE_CELLS if v.get("kind") == "seed_coordinate_mismatch") == 435
+    # T06 原判「语义待核对」的 33 格已纳入坐标复核（同一格不留两份判定）
+    assert len(_KEEP_CELLS) == 0
 
 
 def test_no_orphan_cells_including_deprecated():

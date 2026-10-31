@@ -1,7 +1,53 @@
 {
-  "description": "模板核对后的单元格坐标（spec wp-deeplink-locate-coverage-closure，design §2）：每个坐标带改指规则（conclusion_label：所在 tab 唯一的「审计结论」标签格；explicit：逐格核对的显式改指）、所替代的旧坐标与模板现值证据。由 backend/scripts/acnr/review_cell_coordinates.py --write 生成，--check 现算比对，勿手改。",
+  "description": "模板核对后的单元格坐标（spec wp-deeplink-locate-coverage-closure，design §2；spec wp-deeplink-locate-residual-closure，design §4）：每个坐标带改指规则（conclusion_label：所在 tab 唯一的「审计结论」标签格；explicit：逐格核对的显式改指；total_row：唯一合计行 × 表头恰等于指标的唯一列）、所替代的旧坐标与模板现值证据。由 backend/scripts/acnr/review_cell_coordinates.py --write 生成，--check 现算比对，勿手改。",
   "source": "backend/scripts/acnr/review_cell_coordinates.py",
   "entries": [
+    {
+      "wp_code": "D1-3",
+      "sheet_name": "原值明细表（按客户）D1-3",
+      "coordinates": [
+        {
+          "cell_address": "J21",
+          "description": "期末余额合计",
+          "purpose": "balance_verification",
+          "rule": "total_row",
+          "replaces": [
+            "D1/D1-3/E50"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D1 应收票据.xlsx",
+            "template_tab": "原值明细表（按客户）D1-3",
+            "cell_value": "=SUM(J11:J20)",
+            "row_label": "合计",
+            "header_row": 10,
+            "column_header": "期末余额"
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "D2-2",
+      "sheet_name": "明细表D2-2",
+      "coordinates": [
+        {
+          "cell_address": "Q26",
+          "description": "期末余额合计",
+          "purpose": "balance_verification",
+          "rule": "total_row",
+          "replaces": [
+            "D2/D2-2/E100"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+            "template_tab": "明细表D2-2",
+            "cell_value": "=SUM(Q13:Q25)",
+            "row_label": "合计",
+            "header_row": 12,
+            "column_header": "期末余额"
+          }
+        }
+      ]
+    },
     {
       "wp_code": "D2-5",
       "sheet_name": "应收账款分析表D2-5",
@@ -1126,6 +1172,27 @@
           "evidence": {
             "template_file": "backend/wp_templates/G/G7 长期股权投资.xlsx",
             "template_tab": "被投资单位财务信息（合营、联营）G7-5",
+            "cell_value": "四、审计结论：",
+            "row_label": "四、审计结论："
+          }
+        }
+      ]
+    },
+    {
+      "wp_code": "G8-4",
+      "sheet_name": "公允价值测试表G8-4",
+      "coordinates": [
+        {
+          "cell_address": "A24",
+          "description": "审计结论",
+          "purpose": "conclusion",
+          "rule": "conclusion_label",
+          "replaces": [
+            "G8/G8-4/B35"
+          ],
+          "evidence": {
+            "template_file": "backend/wp_templates/G/G8 其他权益工具投资.xlsx",
+            "template_tab": "公允价值测试表G8-4",
             "cell_value": "四、审计结论：",
             "row_label": "四、审计结论："
           }

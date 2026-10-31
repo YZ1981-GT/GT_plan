@@ -78,12 +78,12 @@ describe('usePenetrate', () => {
     })
   })
 
-  it('toWorkpaper navigates to workpapers with code', () => {
+  it('toWorkpaper navigates to workpapers with highlight（列表页按它定位该行）', () => {
     const { toWorkpaper } = usePenetrate()
     toWorkpaper('D-100')
     expect(mockPush).toHaveBeenCalledWith({
       path: '/projects/proj-001/workpapers',
-      query: { code: 'D-100' },
+      query: { highlight: 'D-100' },
     })
   })
 

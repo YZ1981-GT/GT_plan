@@ -220,7 +220,7 @@ function goToLifecycle() {
   router.push({
     name: 'WorkpaperList',
     params: { projectId: props.projectId },
-    query: { tab: 'lifecycle' },
+    query: { view: 'lifecycle' },
   })
 }
 

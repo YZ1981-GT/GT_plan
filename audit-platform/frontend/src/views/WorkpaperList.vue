@@ -148,6 +148,7 @@
       </el-select>
       <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 110px">
         <el-option label="全部" value="" />
+        <el-option label="未分配" :value="UNASSIGNED_FILTER" />
         <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
       </el-select>
       <!-- 联动状态横条「查看详情」跳转 ?filter=stale 落到这里 -->
@@ -268,8 +269,9 @@ import {
   type ProgressInfo,
 } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
-import { listWorkpapers, getWpIndex, downloadWorkpaperPack } from '@/services/workpaperApi'
+import { listWorkpapers, getWpIndex, downloadWorkpaperPack, getWpMappingByAccount } from '@/services/workpaperApi'
 import { listUsers } from '@/services/commonApi'
+import { UNASSIGNED_FILTER, readListEntryQuery } from './workpaper-list/workpaperListEntryQuery'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
@@ -331,6 +333,12 @@ const filterStatus = ref('')
 const filterStale = ref(false)
 const filterAssignee = ref('')
 const selectedWpId = ref('')
+/** 入口定位（?highlight= / ?wp_code= / ?search=）：列表视图按 seq 只执行一次 */
+const locateTarget = ref<{ code: string; seq: number } | null>(null)
+const listLoaded = ref(false)
+/** 首次取数结束（成功、取消、失败都算）：?account= 要按本项目已生成的底稿筛映射编码 */
+let markFirstLoad: () => void = () => {}
+const firstLoad = new Promise<void>((done) => { markFirstLoad = done })
 const selectedWpIds = ref<string[]>([])
 const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
@@ -504,11 +512,12 @@ async function fetchWpIndex() {
       listWorkpapers(projectId.value, {
         audit_cycle: filterCycle.value || undefined,
         status: filterStatus.value || undefined,
-        assigned_to: filterAssignee.value || undefined,
+        assigned_to: filterAssignee.value && filterAssignee.value !== UNASSIGNED_FILTER ? filterAssignee.value : undefined,
       }),
       getWpIndex(projectId.value),
     ])
     wpList.value = wps
+    listLoaded.value = true
     const wpByIndexId = indexFirstBy(wps, (wp) => wp.wp_index_id)
     wpIndex.value = idx.map((item) => {
       const matchedWorkpaper = wpByIndexId.get(item.id)
@@ -525,6 +534,7 @@ async function fetchWpIndex() {
     throw err
   } finally {
     loading.value = false
+    markFirstLoad()
   }
 }
 
@@ -554,6 +564,8 @@ const ctx: WpListContext = {
   filterStale,
   showTrimmedFilter,
   selectedWpId,
+  locateTarget,
+  listLoaded,
   totalProgress,
   roleViewPreset,
   roleViewWpList,
@@ -714,6 +726,7 @@ async function onBatchStatusChange(payload: { action: string; ids: string[] }) {
 
 // ─── 筛选选项 ─────────────────────────────────────────────────────────────────
 const cycleOptions = [
+  { value: 'A', label: 'A类 完成阶段' },
   { value: 'B', label: 'B类 计划阶段' },
   { value: 'C', label: 'C类 控制测试' },
   { value: 'D', label: 'D类 收入循环' },
@@ -759,16 +772,59 @@ watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())
  * 与「状态 → 地址栏」的两个监听互为幂等：状态与地址一致时什么都不改，不会来回触发。
  * 待重算强制列表而状态本来就是列表时，那个监听不会触发 ⇒ 这里把地址栏的 view 改成 list：否则地址栏留着
  * `view=workbench`，之后一取消勾选就按它跳回工作台（原先整页重挂，挂载时总会写回 view=list）。
+ * 入口参数（`highlight` / `wp_code` / `search` 定位、`cycle` 按循环筛选、`upload` 打开导入，spec wp-deeplink-locate-residual-closure
+ * 需求 2）只在**到达时**（签名变化）处理一次：定位与筛选强制列表视图；签名没变时视图照旧按 `?view=`（否则带着 highlight 就切不出列表）。
  */
-function applyRouteQuery(view: unknown, filter: unknown) {
-  const stale = filter === 'stale'
+let appliedEntry = ''
+let locateSeq = 0
+function applyRouteQuery(query: Record<string, unknown>) {
+  const stale = query.filter === 'stale'
   if (filterStale.value !== stale) filterStale.value = stale
+  const entry = readListEntryQuery(query)
+  const fresh = entry.signature !== appliedEntry
+  appliedEntry = entry.signature
+  if (fresh && entry.cycle && filterCycle.value !== entry.cycle) filterCycle.value = entry.cycle
+  const assignee = entry.assigned === 'me' ? String(authStore.user?.id || '') : entry.assigned === 'unassigned' ? UNASSIGNED_FILTER : ''
+  if (fresh && assignee && filterAssignee.value !== assignee) filterAssignee.value = assignee
+  if (fresh && entry.code) locateTarget.value = { code: entry.code, seq: ++locateSeq }
+  if (fresh && entry.account && !entry.code) void locateAccount(entry.account)
+  if (fresh && entry.upload) {
+    showWpImportEnhanced.value = true
+    const rest = { ...route.query }
+    delete rest.upload
+    router.replace({ query: rest }) // 打开一次即可：去掉后刷新 / 后退不再弹（路由变化会再进本函数，届时已无 upload）
+    return
+  }
+  const view = query.view
   const fromQuery = typeof view === 'string' && VIEW_MODE_WHITELIST.has(view) ? view : 'workbench'
-  const wanted = stale ? 'list' : fromQuery
+  const wanted = stale || (fresh && (entry.code || entry.account || entry.cycle || entry.assigned)) ? 'list' : fromQuery
   if (viewMode.value !== wanted) viewMode.value = wanted // 「状态 → 地址栏」监听随后写回 view
   else if (wanted !== fromQuery) router.replace({ query: { ...route.query, view: wanted } })
 }
-watch(() => [route.query.view, route.query.filter] as const, ([view, filter]) => applyRouteQuery(view, filter))
+watch(() => [route.query.view, route.query.filter, route.query.highlight, route.query.wp_code, route.query.search,
+  route.query.account, route.query.cycle, route.query.assigned, route.query.upload] as const, () => applyRouteQuery(route.query))
+
+/**
+ * ?account=：按科目取关联底稿（与试算表「查看关联底稿」同一映射）。映射里还有表级编码（D2-2）和本项目没有的底稿，
+ * 等首次取数后只认本项目已生成的：定位第一张，多张时点名；一张都没生成时按映射第一张定位（列表按原因提示）；映射为空时提示。
+ */
+async function locateAccount(account: string) {
+  try {
+    const mapped = [...new Set((await getWpMappingByAccount(projectId.value, account)).map((m) => m.wp_code).filter(Boolean))]
+    if (!mapped.length) {
+      ElMessage.warning(`科目 ${account} 没有关联的底稿`)
+      return
+    }
+    await firstLoad
+    const generated = new Set(wpList.value.map((w) => wpIndexById.value.get(w.wp_index_id)?.wp_code))
+    const codes = mapped.filter((c) => generated.has(c))
+    const first = codes[0] ?? mapped[0]
+    locateTarget.value = { code: first, seq: ++locateSeq }
+    if (codes.length > 1) ElMessage.info(`科目 ${account} 关联底稿 ${codes.join('、')}，已定位到 ${first}`)
+  } catch (e: any) {
+    handleApiError(e, '查询科目关联底稿')
+  }
+}
 
 // filterStale 纯前端过滤（prefill_stale 已在列表响应里），无需重拉；仅同步 URL 便于分享/刷新保留
 watch(filterStale, (on) => {
@@ -798,8 +854,8 @@ onMounted(async () => {
     }
   }
 
-  // 从 URL query 读取视图模式 / 待重算过滤（规则见 applyRouteQuery）
-  applyRouteQuery(route.query.view, route.query.filter)
+  // 从 URL query 读取视图模式 / 待重算过滤 / 入口参数（规则见 applyRouteQuery）
+  applyRouteQuery(route.query)
   await fetchWpIndex()
   // 项目标题与年度均由外层 ProjectContextGate / projectStore 提供，不在本页重复请求项目详情。
   // 加载用户列表

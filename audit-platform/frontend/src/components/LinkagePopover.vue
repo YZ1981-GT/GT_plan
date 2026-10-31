@@ -6,6 +6,7 @@
  */
 import { useRouter } from 'vue-router'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { workpaperEditorRoute } from '@/composables/useWorkpaperNavigation'
 
 export interface LinkageItem {
   id: string
@@ -27,7 +28,8 @@ function onItemClick(item: LinkageItem) {
   if (props.type === 'adjustment') {
     router.push({ path: `/projects/${props.projectId}/adjustments`, query: { highlight: item.id } })
   } else {
-    router.push({ path: `/projects/${props.projectId}/workpapers`, query: { wpId: item.id } })
+    // 关联底稿带的是底稿 id：直接打开编辑器（原先带 ?wpId= 去列表页，列表页不读，spec wp-deeplink-locate-residual-closure）
+    router.push(workpaperEditorRoute(props.projectId, item.id))
   }
 }
 </script>

@@ -53,10 +53,10 @@
       "deprecated": false
     },
     {
-      "case": "语义待核对",
-      "addr_id": "F3/F3-5/B25",
-      "cell_label": "B25（语义待核对）",
-      "display_label": "F3-5 应付票据逾期检查 › B25（语义待核对）",
+      "case": "A1 + 语义标签（模板核对的合计行坐标）",
+      "addr_id": "D1/D1-3/J21",
+      "cell_label": "J21 期末余额合计",
+      "display_label": "D1-3 应收票据原值明细（按客户） › J21 期末余额合计",
       "deprecated": false
     },
     {

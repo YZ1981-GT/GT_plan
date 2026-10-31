@@ -162,6 +162,7 @@ import {
   type ProcedureRowTaskTransition,
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import { programConsoleRoute } from '@/utils/programConsoleRoute'
 import { isExternalNotFound, EXTERNAL_NOT_FOUND_MESSAGE } from '@/utils/visibilityAccess'
 
 const router = useRouter()
@@ -342,17 +343,14 @@ async function doTransition(row: ProcedureRowTaskItem, body: ProcedureRowTaskTra
   }
 }
 
-// 深链：有 wp_id 才构造链接，携带 task_id + sheet_key + definition_key（Req 9.6）
+// 深链：有 wp_id 才构造链接，打开该底稿的程序表页签并带 task_id + sheet_key + definition_key（Req 9.6；程序表
+// GtAProgramConsole 按 sheet_key + definition_key 定位行）。原先跳底稿列表页，列表页不读这些参数（spec wp-deeplink-locate-residual-closure）
 function openDeepLink(row: ProcedureRowTaskItem) {
   if (!row.wp_id) return
+  const to = programConsoleRoute(row.project_id, row.wp_id)
   router.push({
-    path: `/projects/${row.project_id}/workpapers`,
-    query: {
-      wp: row.wp_id,
-      task_id: row.task_id,
-      sheet_key: row.sheet_key,
-      definition_key: row.definition_key,
-    },
+    path: to.path,
+    query: { ...to.query, task_id: row.task_id, sheet_key: row.sheet_key, definition_key: row.definition_key },
   })
 }
 

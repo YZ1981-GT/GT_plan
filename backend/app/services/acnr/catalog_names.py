@@ -8,9 +8,9 @@
    - 同父一名多码（现算 9 组）写进目录顶层 `alias_policy.forbidden`，`exact_identity` 第 3 步据此拒绝。
 2. cell 的 `formula_ref` / `uri` 第二参：父 sheet 的模板名（`sheet_name`）在父级内归属本 sheet
    （`exact_identity.name_owner` 是它）时用模板名，否则用 `sheet_code`。种子名不作别名、不进写法。
-3. §6.4 种子名不一致的 cell：`cell_verdicts` 判 keep_semantic_unverified 的格保留地址、
-   `semantic_label=null`、`cell_label="{A1}（语义待核对）"`；判 deprecate 的格（孤儿 25 + 超范围 14）
-   标 `deprecated` + `replaced_by`，`cell_label="{A1}（坐标待核对）"`。
+3. `cell_verdicts` 判 keep_semantic_unverified 的格保留地址、`semantic_label=null`、
+   `cell_label="{A1}（语义待核对）"`（§6.4 的 33 格原用此判定，wp-deeplink-locate-residual-closure 起改由坐标复核判定，
+   现 0 格）；判 deprecate 的格标 `deprecated` + `replaced_by`，`cell_label="{A1}（坐标待核对）"`。
 4. 标签源别名的冲突与未登记键按 `sources/alias_policy.json` 处置（`apply_alias_policy`，design §7.2 / §7.3，T09）。
 
 只依赖标准库与本包（catalog / exact_identity / loaders.from_wp_account_mapping）。

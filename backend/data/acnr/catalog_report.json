@@ -1,50 +1,7 @@
 {
   "acknowledged": {
-    "count": 54,
+    "count": 53,
     "items": [
-      {
-        "covers": {
-          "addr_ids": [
-            "F3/F3-5/B25",
-            "F3/F3-5/C10",
-            "F3/F3-6/B25",
-            "G14/G14-2/E15",
-            "G14/G14-2/E25",
-            "G14/G14-2/E35",
-            "G8/G8-4/B35",
-            "G8/G8-4/F30",
-            "J1/J1-4/F20",
-            "J1/J1-4/G20",
-            "J1/J1-4/H20",
-            "J1/J1-4/I20",
-            "K1/K1-2/F30",
-            "K1/K1-2/G30",
-            "K1/K1-2/H30",
-            "K1/K1-2/I30",
-            "K3/K3-2/F25",
-            "K3/K3-2/G25",
-            "K3/K3-2/H25",
-            "K3/K3-2/I25",
-            "K8/K8-2/D30",
-            "K8/K8-2/E30",
-            "K8/K8-2/F30",
-            "K8/K8-2/G30",
-            "K9/K9-2/D35",
-            "K9/K9-2/E35",
-            "K9/K9-2/F35",
-            "K9/K9-2/G35",
-            "S15/S15/C12",
-            "S15/S15/C8",
-            "S15/S15/D12",
-            "S15/S15/D16",
-            "S15/S15/D8"
-          ]
-        },
-        "expires_on": "2027-04-30",
-        "id": "ack-seed-semantic-unverified-2026-10-27",
-        "kind": "seed_semantic_unverified",
-        "owner": "acnr-foundation-defect-closure"
-      },
       {
         "covers": {
           "ccr_ids": [
@@ -639,7 +596,7 @@
     "items": []
   },
   "deprecated": {
-    "count": 446,
+    "count": 479,
     "items": [
       {
         "addr_id": "D1/D1-2/F50",
@@ -654,7 +611,7 @@
       {
         "addr_id": "D1/D1-3/E50",
         "kind": "cell",
-        "replaced_by": "D1/D1-3"
+        "replaced_by": "D1/D1-3/J21"
       },
       {
         "addr_id": "D1/D1-3/F50",
@@ -664,7 +621,7 @@
       {
         "addr_id": "D2/D2-2/E100",
         "kind": "cell",
-        "replaced_by": "D2/D2-2"
+        "replaced_by": "D2/D2-2/Q26"
       },
       {
         "addr_id": "D2/D2-2/F100",
@@ -1422,6 +1379,21 @@
         "replaced_by": "F3/F3-2"
       },
       {
+        "addr_id": "F3/F3-5/B25",
+        "kind": "cell",
+        "replaced_by": "F3/F3-5"
+      },
+      {
+        "addr_id": "F3/F3-5/C10",
+        "kind": "cell",
+        "replaced_by": "F3/F3-5"
+      },
+      {
+        "addr_id": "F3/F3-6/B25",
+        "kind": "cell",
+        "replaced_by": "F3/F3-6"
+      },
+      {
         "addr_id": "F3/F3-6/E30",
         "kind": "cell",
         "replaced_by": "F3/F3-6"
@@ -1528,6 +1500,21 @@
       },
       {
         "addr_id": "G14/G14-2/B50",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G14/G14-2/E15",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G14/G14-2/E25",
+        "kind": "cell",
+        "replaced_by": "G14/G14-2"
+      },
+      {
+        "addr_id": "G14/G14-2/E35",
         "kind": "cell",
         "replaced_by": "G14/G14-2"
       },
@@ -1735,6 +1722,16 @@
         "addr_id": "G8/G8-3/E30",
         "kind": "cell",
         "replaced_by": "G8/G8-3"
+      },
+      {
+        "addr_id": "G8/G8-4/B35",
+        "kind": "cell",
+        "replaced_by": "G8/G8-4/A24"
+      },
+      {
+        "addr_id": "G8/G8-4/F30",
+        "kind": "cell",
+        "replaced_by": "G8/G8-4"
       },
       {
         "addr_id": "H1/H1-3/B55",
@@ -2197,6 +2194,26 @@
         "replaced_by": "J1/J1-3"
       },
       {
+        "addr_id": "J1/J1-4/F20",
+        "kind": "cell",
+        "replaced_by": "J1/J1-4"
+      },
+      {
+        "addr_id": "J1/J1-4/G20",
+        "kind": "cell",
+        "replaced_by": "J1/J1-4"
+      },
+      {
+        "addr_id": "J1/J1-4/H20",
+        "kind": "cell",
+        "replaced_by": "J1/J1-4"
+      },
+      {
+        "addr_id": "J1/J1-4/I20",
+        "kind": "cell",
+        "replaced_by": "J1/J1-4"
+      },
+      {
         "addr_id": "J2/J2-5/E10",
         "kind": "cell",
         "replaced_by": "J2/J2-5"
@@ -2272,6 +2289,26 @@
         "replaced_by": "J3/J3-5"
       },
       {
+        "addr_id": "K1/K1-2/F30",
+        "kind": "cell",
+        "replaced_by": "K1/K1-2"
+      },
+      {
+        "addr_id": "K1/K1-2/G30",
+        "kind": "cell",
+        "replaced_by": "K1/K1-2"
+      },
+      {
+        "addr_id": "K1/K1-2/H30",
+        "kind": "cell",
+        "replaced_by": "K1/K1-2"
+      },
+      {
+        "addr_id": "K1/K1-2/I30",
+        "kind": "cell",
+        "replaced_by": "K1/K1-2"
+      },
+      {
         "addr_id": "K1/K1-3/C20",
         "kind": "cell",
         "replaced_by": "K1/K1-3"
@@ -2320,6 +2357,26 @@
         "addr_id": "K18/K18",
         "kind": "sheet",
         "replaced_by": "K7/K7-1"
+      },
+      {
+        "addr_id": "K3/K3-2/F25",
+        "kind": "cell",
+        "replaced_by": "K3/K3-2"
+      },
+      {
+        "addr_id": "K3/K3-2/G25",
+        "kind": "cell",
+        "replaced_by": "K3/K3-2"
+      },
+      {
+        "addr_id": "K3/K3-2/H25",
+        "kind": "cell",
+        "replaced_by": "K3/K3-2"
+      },
+      {
+        "addr_id": "K3/K3-2/I25",
+        "kind": "cell",
+        "replaced_by": "K3/K3-2"
       },
       {
         "addr_id": "K3/K3-3/C20",
@@ -2372,6 +2429,26 @@
         "replaced_by": "K5/K5-4"
       },
       {
+        "addr_id": "K8/K8-2/D30",
+        "kind": "cell",
+        "replaced_by": "K8/K8-2"
+      },
+      {
+        "addr_id": "K8/K8-2/E30",
+        "kind": "cell",
+        "replaced_by": "K8/K8-2"
+      },
+      {
+        "addr_id": "K8/K8-2/F30",
+        "kind": "cell",
+        "replaced_by": "K8/K8-2"
+      },
+      {
+        "addr_id": "K8/K8-2/G30",
+        "kind": "cell",
+        "replaced_by": "K8/K8-2"
+      },
+      {
         "addr_id": "K8/K8-3/C15",
         "kind": "cell",
         "replaced_by": "K8/K8-3"
@@ -2390,6 +2467,26 @@
         "addr_id": "K8/K8-3/F15",
         "kind": "cell",
         "replaced_by": "K8/K8-3"
+      },
+      {
+        "addr_id": "K9/K9-2/D35",
+        "kind": "cell",
+        "replaced_by": "K9/K9-2"
+      },
+      {
+        "addr_id": "K9/K9-2/E35",
+        "kind": "cell",
+        "replaced_by": "K9/K9-2"
+      },
+      {
+        "addr_id": "K9/K9-2/F35",
+        "kind": "cell",
+        "replaced_by": "K9/K9-2"
+      },
+      {
+        "addr_id": "K9/K9-2/G35",
+        "kind": "cell",
+        "replaced_by": "K9/K9-2"
       },
       {
         "addr_id": "K9/K9-3/C15",
@@ -2862,6 +2959,31 @@
         "replaced_by": "N5/N5-5"
       },
       {
+        "addr_id": "S15/S15/C12",
+        "kind": "cell",
+        "replaced_by": "S15/S15"
+      },
+      {
+        "addr_id": "S15/S15/C8",
+        "kind": "cell",
+        "replaced_by": "S15/S15"
+      },
+      {
+        "addr_id": "S15/S15/D12",
+        "kind": "cell",
+        "replaced_by": "S15/S15"
+      },
+      {
+        "addr_id": "S15/S15/D16",
+        "kind": "cell",
+        "replaced_by": "S15/S15"
+      },
+      {
+        "addr_id": "S15/S15/D8",
+        "kind": "cell",
+        "replaced_by": "S15/S15"
+      },
+      {
         "addr_id": "S17/S17/E30",
         "kind": "cell",
         "replaced_by": "S17/S17"
@@ -2873,7 +2995,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-30T06:31:38.432204+00:00",
+  "generated_at": "2026-10-30T15:54:51.579205+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -3693,9 +3815,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261030063137",
+  "registry_version": "20261030155451",
   "release": {
-    "catalog_sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f",
+    "catalog_sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -3774,8 +3896,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261029075533.json",
-        "sha256": "b3a08722f11cdb1ea8b10c0a8e3ca0b2cc903d92c3f36e34f4b284e51dc64f6f"
+        "path": "backend/data/acnr/catalog_snapshots/20261030063137.json",
+        "sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -3791,7 +3913,7 @@
       },
       {
         "path": "backend/data/acnr/sources/acknowledgements.json",
-        "sha256": "0912f77c33df9d684bde3261ecf7561de528d8bc6e1532da04b6d3a4ab8ac52f"
+        "sha256": "436a717ebd17f42313cbeaaa3c234f248e09b9da5256f48bea8d84fd4a442eaf"
       },
       {
         "path": "backend/data/acnr/sources/alias_policy.json",
@@ -3835,7 +3957,7 @@
       },
       {
         "path": "backend/data/acnr/sources/sheet_verdicts.json",
-        "sha256": "ed623e17db2afa28568b75aaf60c10f4d60903a82ee55fdeb9279b3e8b3f296c"
+        "sha256": "15bbde348ed3f10cc7841d9618154fc8891e121c98716d82353f59d3a9da20f8"
       },
       {
         "path": "backend/data/c22_address_registry_seed.json",
@@ -3895,7 +4017,7 @@
       },
       {
         "path": "backend/data/t_address_registry_seed.json",
-        "sha256": "e50715d2937d7f72aeeca85b3547919550a1f54f9cdcb02330ed57bb0efdbef8"
+        "sha256": "56374a9ede258e1767a0f11c73f1fa3ad3cb0a3c8468cb6b73dca3ac9e214bbb"
       },
       {
         "path": "backend/data/workpaper_render_registry.json",
@@ -3906,18 +4028,18 @@
         "sha256": "74c881dccc7799f8b27e4bf8e7591e01704e3ff9810c72a0c65585307261e620"
       }
     ],
-    "inputs_fingerprint": "7930c88773f693eb435e24dd93facc717d599d86e7bca494a155b1e923f3cf83",
-    "previous_catalog_sha256": "b3a08722f11cdb1ea8b10c0a8e3ca0b2cc903d92c3f36e34f4b284e51dc64f6f",
-    "previous_version": "20261029075533",
-    "registry_version": "20261030063137",
+    "inputs_fingerprint": "e23183dcd5751c7d74c9ef0c2bb9997c0be6f4f0fbe964b81d9c603a1df6dbb0",
+    "previous_catalog_sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f",
+    "previous_version": "20261030063137",
+    "registry_version": "20261030155451",
     "schema_sha256": "6f3ee9a5c1be46e1c2d290997320317ac3d1080ab25d7afbf3244a196580c896"
   },
   "summary": {
-    "acknowledged": 54,
+    "acknowledged": 53,
     "blocking": 0,
-    "deprecated": 446,
+    "deprecated": 479,
     "info": 116,
-    "total_cells": 539,
+    "total_cells": 542,
     "total_sheets": 1225
   }
 }

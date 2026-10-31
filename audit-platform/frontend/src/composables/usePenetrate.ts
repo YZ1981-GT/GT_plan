@@ -70,12 +70,12 @@ export function usePenetrate() {
       })
     },
 
-    /** 穿透到底稿（按底稿编码） */
+    /** 穿透到底稿（按底稿编码）：列表页按 ?highlight= 定位该行（原 ?code= 列表页不读，spec wp-deeplink-locate-residual-closure） */
     toWorkpaper(wpCode: string) {
       _pushCurrentRoute(undefined, 'down')
       router.push({
         path: `/projects/${pid()}/workpapers`,
-        query: { code: wpCode },
+        query: { highlight: wpCode },
       })
     },
 

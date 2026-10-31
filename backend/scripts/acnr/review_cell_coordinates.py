@@ -1,9 +1,12 @@
-"""ACNR 目录单元格坐标复核（spec wp-deeplink-locate-coverage-closure 需求 1，design §2）。
+"""ACNR 目录单元格坐标复核（spec wp-deeplink-locate-coverage-closure 需求 1，design §2；
+spec wp-deeplink-locate-residual-closure 需求 4 / 5，design §4）。
 
 13 份旧种子（`backend/data/*_address_registry_seed.json`，本脚本写的 `t_` 种子除外）登记的单元格，扣除既有
-cell_verdicts（T05 孤儿 / T06 种子名不一致）已判定的，逐格读模板现算证据并按 design §2.1 处置：
+cell_verdicts（T05 孤儿 / T06 超范围）已判定的，逐格读模板现算证据并处置。T06 判「语义待核对」
+（keep_semantic_unverified）的 33 格也在本脚本复核范围内，其旧判定由本 kind 取代（不留两份判定）：
 - E1-14 C10 / C15 两格按 `EXPLICIT` 改指模板里的对应格；
 - purpose=conclusion 且所在 tab 恰有一个「审计结论」标签格的，改指该标签格；
+- 语义含「合计」、所在 tab 恰有一行合计行、该行以上 15 行内恰有一列表头等于指标、目标格是公式或数值的，改指该格（total_row）；
 - 其余停用、replaced_by 父 sheet。
 改指 = 新坐标写进 `t_address_registry_seed.json`（带 rule 与模板证据），原格停用、replaced_by 新格；停用写进
 `sources/sheet_verdicts.json` 的 cell_verdicts（kind=seed_coordinate_mismatch）。只依赖标准库与 openpyxl。
@@ -39,6 +42,11 @@ _SEED_RE = re.compile(r"^[a-z]\d*_address_registry_seed\.json$")
 #: 「审计结论」标签格：去掉全部空白后整格文字为（可带「四、」类序号与冒号）
 CONCLUSION_RE = re.compile(r"^(?:[一二三四五六七八九十]+、)?审计结论[:：]?$")
 CONCLUSION_LABEL = "审计结论"
+#: T06 的「语义待核对」判定：纳入本脚本复核，由本 kind 的判定取代（spec wp-deeplink-locate-residual-closure 需求 4）
+SUPERSEDED_VERDICT = "keep_semantic_unverified"
+#: 合计行规则（design §4.2）：行标签（行内第一处文字，去空白）为其一、表头在合计行以上 15 行内
+TOTAL_LABELS = frozenset({"合计", "总计", "合计数"})
+TOTAL_HEADER_SPAN = 15
 #: 显式改指（design §2.1）：旧 addr_id → 模板里的对应格；row_label / column_header 是模板现值，守卫逐格复算
 EXPLICIT: dict[str, dict[str, Any]] = {
     "E1/E1-14/C10": {"a1": "I18", "label": "货币资金合计本期变动率", "purpose": "ratio_analysis", "header_row": 14},
@@ -49,6 +57,8 @@ _CLASS_ZH = {"covered": "落在合并区域内", "empty": "空格", "text": "文
 _WORD = re.compile(r"[\u4e00-\u9fffA-Za-z0-9]")
 _DOC_NOTE = ("；kind=seed_coordinate_mismatch 为 wp-deeplink-locate-coverage-closure 逐格对模板复核后停用的种子坐标"
              "（backend/scripts/acnr/review_cell_coordinates.py 生成，--check 现算比对）")
+_DOC_NOTE_SUPERSEDE = ("；T06 原判 keep_semantic_unverified（语义待核对）的 33 格由 wp-deeplink-locate-residual-closure 纳入同一复核，"
+                       "判定改记为 seed_coordinate_mismatch（原记录删除，同一格不留两份判定）")
 
 
 def _rel(p: Path) -> str:
@@ -174,6 +184,54 @@ def column_header(ws, a1: str, header_row: int) -> str | None:
     return None if v in (None, "") else _short(v, 40)
 
 
+def _nospace(v: Any) -> str:
+    return re.sub(r"\s+", "", str(v or ""))
+
+
+def total_metric(label: str) -> str | None:
+    """合计类种子语义的指标：去空白、去「合计行-」前缀（「X合计-Y」取 Y）与末尾「合计」；不含「合计」的不算合计类。"""
+    s = _nospace(label)
+    if "合计" not in s:
+        return None
+    if "-" in s:
+        head, tail = s.split("-", 1)
+        if head == "合计行" or head.endswith("合计"):
+            s = tail
+    s = re.sub(r"合计$", "", s)
+    return s or None
+
+
+def total_rows(ws) -> list[int]:
+    """行标签（行内第一处文字）去空白后为「合计」「总计」「合计数」的行号。"""
+    return [r for r in range(1, (ws.max_row or 0) + 1)
+            if _nospace(row_label(ws, f"A{r}")) in TOTAL_LABELS]
+
+
+def total_target(ws, label: str, rows: list[int] | None = None) -> tuple[str, int] | None:
+    """合计行规则（design §4.2）：唯一合计行 × 其上 15 行内表头恰等于指标的唯一列，目标格是公式或数值 ⇒ (A1, 表头行)。
+    rows：该 tab 的合计行（同表多格复核时由调用方算一次传入）。"""
+    metric = total_metric(label)
+    if not metric:
+        return None
+    rows = total_rows(ws) if rows is None else rows
+    if len(rows) != 1:
+        return None
+    tr = rows[0]
+    hits: list[tuple[int, int]] = []
+    for c in range(1, (ws.max_column or 0) + 1):
+        for rr in range(tr - 1, max(0, tr - TOTAL_HEADER_SPAN - 1), -1):
+            if _nospace(_value_at(ws, rr, c)) == metric:
+                hits.append((c, rr))
+                break
+    if len(hits) != 1:
+        return None
+    c, header_row = hits[0]
+    v = ws.cell(row=tr, column=c).value
+    if isinstance(v, bool) or not (isinstance(v, (int, float)) or (isinstance(v, str) and v.startswith("="))):
+        return None
+    return f"{get_column_letter(c)}{tr}", header_row
+
+
 class ReviewError(RuntimeError):
     """复核输入不成立（父 sheet 不在目录、改指目标与已有 addr_id 撞车等），不写文件。"""
 
@@ -207,19 +265,24 @@ def _target_evidence(ws, book: Path, tab: str, a1: str, header_row: int | None) 
     return ev
 
 
+def review_scope(raw: dict[str, Any], seed_cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """本 kind 复核的种子格：别的 kind 已判定的不复核，T06「语义待核对」的除外（本脚本复核并取代，见 _merged_verdicts）。"""
+    prior = {v["addr_id"] for v in raw["cell_verdicts"]
+             if v.get("kind") != KIND and v.get("verdict") != SUPERSEDED_VERDICT}
+    return [c for c in seed_cells if c["addr_id"] not in prior]
+
+
 def build(templates: Templates | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """现算：(本 kind 的停用判定（按 addr_id 排序）, t_ 种子内容)。纯计算，不写文件。"""
     templates = templates or Templates()
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     sheets = {s["addr_id"]: s for s in catalog["sheets"]}
     raw = json.loads(VERDICTS.read_text(encoding="utf-8"))
-    prior = {v["addr_id"] for v in raw["cell_verdicts"] if v.get("kind") != KIND}
     seed_cells = load_seed_cells()
     old_ids = {c["addr_id"] for c in seed_cells}
     by_sheet: dict[str, list[dict[str, Any]]] = {}
-    for c in seed_cells:
-        if c["addr_id"] not in prior:
-            by_sheet.setdefault(c["sheet_addr_id"], []).append(c)
+    for c in review_scope(raw, seed_cells):
+        by_sheet.setdefault(c["sheet_addr_id"], []).append(c)
     verdicts: list[dict[str, Any]] = []
     added: dict[str, dict[str, dict[str, Any]]] = {}
     for sheet_addr in sorted(by_sheet):
@@ -230,15 +293,21 @@ def build(templates: Templates | None = None) -> tuple[list[dict[str, Any]], dic
         book = templates.find(by_sheet[sheet_addr][0]["parent"], tab) if tab else None
         ws = templates.sheet(book, tab) if book else None
         labels = conclusion_labels(ws) if ws is not None else []
+        trows = total_rows(ws) if ws is not None and any(total_metric(x["label"]) for x in by_sheet[sheet_addr]) else []
         for c in sorted(by_sheet[sheet_addr], key=lambda x: x["addr_id"]):
             ev: dict[str, Any] = {"template_file": _rel(book) if book else None, "template_tab": tab if book else None}
             ev.update(cell_evidence(ws, c["a1"], c["label"]) if ws is not None else {"class": "no_template"})
             klass = _CLASS_ZH.get(ev["class"], ev["class"])
             explicit = EXPLICIT.get(c["addr_id"])
+            total = total_target(ws, c["label"], trows) if ws is not None and c["purpose"] != "conclusion" else None
             if ws is not None and explicit:
                 target, rule = dict(explicit), "explicit"
             elif ws is not None and c["purpose"] == "conclusion" and len(labels) == 1:
                 target, rule = {"a1": labels[0], "label": CONCLUSION_LABEL, "purpose": "conclusion"}, "conclusion_label"
+            elif total is not None:
+                target = {"a1": total[0], "label": f"{total_metric(c['label'])}合计", "purpose": c["purpose"],
+                          "header_row": total[1]}
+                rule = "total_row"
             else:
                 target, rule = None, None
             if target is None:
@@ -253,7 +322,7 @@ def build(templates: Templates | None = None) -> tuple[list[dict[str, Any]], dic
                     "cell_address": target["a1"], "description": target["label"], "purpose": target["purpose"],
                     "rule": rule, "replaces": [], "evidence": tev})
                 coord["replaces"].append(c["addr_id"])
-                where = f"{target['a1']}（{tev['row_label']} / {tev.get('column_header')}）" if rule == "explicit" \
+                where = f"{target['a1']}（{tev['row_label']} / {tev.get('column_header')}）" if rule in ("explicit", "total_row") \
                     else f"{target['a1']}「{tev['cell_value']}」"
                 reason = f"种子坐标与模板不符（{klass}）：「{c['label']}」在模板对应 {where}，改指新坐标"
             verdicts.append({"addr_id": c["addr_id"], "parent_sheet_code": sheet_addr, "kind": KIND,
@@ -264,8 +333,10 @@ def build(templates: Templates | None = None) -> tuple[list[dict[str, Any]], dic
         sheet = sheets[sheet_addr]
         entries.append({"wp_code": sheet["sheet_code"], "sheet_name": sheet["sheet_name"],
                         "coordinates": [added[sheet_addr][a1] for a1 in sorted(added[sheet_addr])]})
-    seed = {"description": ("模板核对后的单元格坐标（spec wp-deeplink-locate-coverage-closure，design §2）：每个坐标带改指规则"
-                             "（conclusion_label：所在 tab 唯一的「审计结论」标签格；explicit：逐格核对的显式改指）、所替代的旧坐标与"
+    seed = {"description": ("模板核对后的单元格坐标（spec wp-deeplink-locate-coverage-closure，design §2；"
+                             "spec wp-deeplink-locate-residual-closure，design §4）：每个坐标带改指规则"
+                             "（conclusion_label：所在 tab 唯一的「审计结论」标签格；explicit：逐格核对的显式改指；"
+                             "total_row：唯一合计行 × 表头恰等于指标的唯一列）、所替代的旧坐标与"
                              "模板现值证据。由 backend/scripts/acnr/review_cell_coordinates.py --write 生成，--check 现算比对，勿手改。"),
             "source": "backend/scripts/acnr/review_cell_coordinates.py", "entries": entries}
     return verdicts, seed
@@ -275,12 +346,23 @@ def _dump(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
 
+def _superseded(raw: dict[str, Any], verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """别的 kind 里被本 kind 取代的「语义待核对」判定（同一格不留两份判定）。"""
+    mine = {v["addr_id"] for v in verdicts}
+    return [v for v in raw["cell_verdicts"]
+            if v.get("kind") != KIND and v.get("verdict") == SUPERSEDED_VERDICT and v["addr_id"] in mine]
+
+
 def _merged_verdicts(raw: dict[str, Any], verdicts: list[dict[str, Any]]) -> dict[str, Any]:
     out = dict(raw)
-    out["cell_verdicts"] = [v for v in raw["cell_verdicts"] if v.get("kind") != KIND] + verdicts
+    gone = {id(v) for v in _superseded(raw, verdicts)}
+    out["cell_verdicts"] = [v for v in raw["cell_verdicts"] if v.get("kind") != KIND and id(v) not in gone] + verdicts
     doc = str(out.get("_doc") or "")
     if KIND not in doc:
-        out["_doc"] = doc + _DOC_NOTE
+        doc += _DOC_NOTE
+    if _DOC_NOTE_SUPERSEDE not in doc:
+        doc += _DOC_NOTE_SUPERSEDE
+    out["_doc"] = doc
     return out
 
 
@@ -298,6 +380,20 @@ def _diff(label: str, committed: Any, rebuilt: Any, limit: int = 20) -> list[str
     return [f"{label}: 内容不同"]
 
 
+def check_lines(raw: dict[str, Any], verdicts: list[dict[str, Any]], seed: dict[str, Any],
+                committed_seed: Any) -> list[str]:
+    """--check 的漂移点名（纯函数）：本 kind 判定与 t_ 种子不等于现算、被取代的「语义待核对」判定还在、_doc 缺说明。"""
+    lines = _diff("cell_verdicts", [v for v in raw["cell_verdicts"] if v.get("kind") == KIND], verdicts)
+    lines += [f"cell_verdicts: {v['addr_id']} 仍留着 {v.get('kind')} 的 {SUPERSEDED_VERDICT} 判定（应由本 kind 取代）"
+              for v in _superseded(raw, verdicts)]
+    lines += _diff("t_address_registry_seed", committed_seed, seed)
+    if KIND not in str(raw.get("_doc") or ""):
+        lines.append("sheet_verdicts._doc: 缺本 kind 的说明")
+    if _DOC_NOTE_SUPERSEDE not in str(raw.get("_doc") or ""):
+        lines.append("sheet_verdicts._doc: 缺「语义待核对」判定由本 kind 取代的说明")
+    return lines
+
+
 def run(write: bool) -> int:
     verdicts, seed = build()
     raw = json.loads(VERDICTS.read_text(encoding="utf-8"))
@@ -305,7 +401,9 @@ def run(write: bool) -> int:
     committed_seed = json.loads(T_SEED.read_text(encoding="utf-8")) if T_SEED.exists() else None
     n_added = sum(len(e["coordinates"]) for e in seed["entries"])
     n_repoint = sum(1 for v in verdicts if v["replaced_by"] != v["parent_sheet_code"])
-    summary = f"停用 {len(verdicts)} 格（改指 {n_repoint}、指向父表 {len(verdicts) - n_repoint}），新增坐标 {n_added} 个"
+    n_sup = len(_superseded(raw, verdicts))
+    summary = f"停用 {len(verdicts)} 格（改指 {n_repoint}、指向父表 {len(verdicts) - n_repoint}），新增坐标 {n_added} 个" + (
+        f"，取代「语义待核对」旧判定 {n_sup} 条" if n_sup else "")
     if write:
         changed = []
         for path, text in ((VERDICTS, _dump(merged)), (T_SEED, _dump(seed))):
@@ -315,10 +413,7 @@ def run(write: bool) -> int:
                 changed.append(_rel(path))
         print(f"[cell-review] {summary}；" + (f"已写出 {changed}" if changed else "内容未变化，不写文件"))
         return 0
-    lines = _diff("cell_verdicts", [v for v in raw["cell_verdicts"] if v.get("kind") == KIND], verdicts)
-    lines += _diff("t_address_registry_seed", committed_seed, seed)
-    if KIND not in str(raw.get("_doc") or ""):
-        lines.append("sheet_verdicts._doc: 缺本 kind 的说明")
+    lines = check_lines(raw, verdicts, seed, committed_seed)
     if lines:
         print(f"[cell-review] 漂移 {len(lines)} 处（模板或种子变了未重新生成，或产物被手改）：", file=sys.stderr)
         for line in lines:

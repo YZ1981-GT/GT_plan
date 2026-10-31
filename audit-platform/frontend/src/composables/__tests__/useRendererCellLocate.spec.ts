@@ -304,3 +304,57 @@ describe('useRendererCellLocate — 目录文字锚点（spec wp-deeplink-locate
     t.scope.stop()
   })
 })
+
+describe('useRendererCellLocate — 调整分录组（spec wp-deeplink-locate-residual-closure 需求 1.2）', () => {
+  const PLAN = [...DEFAULT_LOCATE_WAITS, ...TEXT_ANCHOR_EXTRA_WAITS]
+  const planMs = PLAN.reduce((a, b) => a + b, 0)
+
+  it('切到表后按计划重试，页签登记后认领即停；不按单元格找、不提示', async () => {
+    let registered = false
+    const entryGroup = vi.fn((wpId: string, itemId: string) => registered && wpId === 'wp-1' && itemId === 'L1-adj-RJE')
+    const t = setup({ entryGroup })
+    t.api.request({ wpId: 'wp-1', sheetName: 'S2', entryGroup: 'L1-adj-RJE', cellRef: 'B5' })
+    expect(t.selectSheet).toHaveBeenCalledWith('第二页S2')
+    await vi.advanceTimersByTimeAsync(400)
+    const calls = entryGroup.mock.calls.length
+    expect(calls).toBeGreaterThan(0)
+    registered = true
+    await vi.advanceTimersByTimeAsync(planMs)
+    expect(entryGroup.mock.calls.length).toBe(calls + 1)
+    expect(t.notify).not.toHaveBeenCalled()
+    t.scope.stop()
+  })
+
+  it('一直没有页签认领：按完整计划（含追加等待）问完后提示一次', async () => {
+    const entryGroup = vi.fn(() => false)
+    const t = setup({ entryGroup })
+    t.api.request({ wpId: 'wp-1', sheetName: 'S2', entryGroup: 'D4-4-rows' })
+    await vi.advanceTimersByTimeAsync(planMs - 1)
+    expect(t.notify).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(10)
+    expect(entryGroup).toHaveBeenCalledTimes(PLAN.length)
+    expect(t.notify).toHaveBeenCalledTimes(1)
+    expect(t.notify).toHaveBeenCalledWith('「第二页S2」里没有找到这组调整分录（可能已删除或改了类型）')
+    t.scope.stop()
+  })
+
+  it('新请求到来时旧分录组请求的剩余重试作废', async () => {
+    const entryGroup = vi.fn(() => false)
+    const t = setup({ entryGroup })
+    t.api.request({ wpId: 'wp-1', sheetName: 'S2', entryGroup: 'D4-4-rows' })
+    await vi.advanceTimersByTimeAsync(300)
+    t.api.request({ wpId: 'wp-1', sheetName: 'S1' })
+    await vi.advanceTimersByTimeAsync(planMs + 100)
+    expect(t.notify).not.toHaveBeenCalled()
+    t.scope.stop()
+  })
+
+  it('没给认领函数时照旧按单元格定位（分录组参数不生效）', async () => {
+    const t = setup()
+    const target = anchor(t.root, 'B5')
+    t.api.request({ wpId: 'wp-1', sheetName: 'S1', entryGroup: 'D4-4-rows', cellRef: 'B5' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(target.classList.contains(GT_LOCATE_HIGHLIGHT_CLASS)).toBe(true)
+    t.scope.stop()
+  })
+})
