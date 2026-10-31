@@ -774,8 +774,9 @@ describe('Feature: s34-ipo-review-bundle, Property 8: 子表汇总公式确定�
       fc.property(amountsArb, (amounts) => {
         const result = sumRange(amounts)
         const expected = amounts.reduce((a, b) => a + b, 0)
-        // 浮点数精度比较
-        expect(Math.abs(result - expected)).toBeLessThan(1e-6)
+        // sumRange 与 reduce 走同一输入顺序，必须精确一致；不能用 1e-6
+        // 把 0 与次正规数伪装成相等。
+        expect(result).toBe(expected)
       }),
       { numRuns: 200 },
     )
@@ -794,7 +795,7 @@ describe('Feature: s34-ipo-review-bundle, Property 8: 子表汇总公式确定�
           const result = safeDivide(numerator, denominator)
           expect(result).not.toBeNull()
           const expected = numerator / denominator
-          expect(Math.abs(result! - expected)).toBeLessThan(1e-6)
+          expect(result).toBe(expected)
         },
       ),
       { numRuns: 200 },
@@ -814,58 +815,90 @@ describe('Feature: s34-ipo-review-bundle, Property 8: 子表汇总公式确定�
     )
   })
 
-  it('S34-16-1 公式重算结果等于纯函数计算（不受手工覆盖影响）', () => {
+  it('S34-16-1 公式重算结果按权威模板的输入和依赖计算（不受手工覆盖影响）', () => {
     /**
-     * 构造一个 S34-16-1 数据网格（至少25行），将随机金额填入行7~17的E/F列，
-     * 然后验证 computeFormulas 结果与手动 sumRange/safeDivide 一致。
-     * 即使在公式单元格位置放入"手工覆盖值"，也不影响公式重算。
+     * 权威模板（`S34-16-1 第三方回款情况检查表`）的公式格只有：
+     * - E19 = SUM(E8:E18)
+     * - F19 = SUM(F8:F18)
+     * - C24 = F19
+     * - C25 = C24/C23
+     * C23「当期营业收入」是**人工输入**，不是公式格。
+     *
+     * 旧判据把 C23 误认为 E19、把 C25 误认为 F19/E19；任何非零金额都可能
+     * 红，fast-check 收缩成「E/F 各一个次正规数」后看似浮点误差，实际是测试
+     * 预期错了。这里的 oracle 用独立 Array.reduce 与原生 `/`，不复用被测的
+     * sumRange / safeDivide；同一组 JS 双精度操作必须精确相等，禁用 1e-6 这类
+     * 会把 0 与次正规数错误判成相等的宽松阈值。
      */
     const rowAmountsArb = fc.array(
       fc.float({ min: -1e9, max: 1e9, noNaN: true }),
       { minLength: 11, maxLength: 11 },
     )
+    const revenueArb = fc.oneof(
+      fc.constant(0),
+      fc.float({ min: -1e9, max: 1e9, noNaN: true }),
+    )
 
     fc.assert(
       fc.property(
-        rowAmountsArb, // E column (rows 7~17)
-        rowAmountsArb, // F column (rows 7~17)
-        fc.float({ min: -1e9, max: 1e9, noNaN: true }), // manual override attempt on formula cell
-        (eAmounts, fAmounts, manualOverride) => {
-          // Build data grid (25 rows)
+        rowAmountsArb,
+        rowAmountsArb,
+        fc.float({ min: -1e9, max: 1e9, noNaN: true }),
+        revenueArb,
+        (eAmounts, fAmounts, manualOverride, revenue) => {
           const data: Record<string, number | null>[] = Array.from({ length: 25 }, () => ({}))
-          // Fill E and F columns for rows 7~17
           for (let i = 0; i < 11; i++) {
             data[7 + i] = { E: eAmounts[i], F: fAmounts[i] }
           }
-          // Simulate manual override on row 18 col E (formula cell) — should be ignored
+          // 手工覆写公式格必须被重算覆盖；C23 则必须保持人工输入。
           data[18] = { ...data[18], E: manualOverride, F: manualOverride }
+          data[22] = { C: revenue }
+          data[23] = { C: manualOverride }
+          data[24] = { C: manualOverride }
 
-          // Compute formulas
           const results = computeFormulas(data, S34_16_1_FORMULAS)
+          const expectedSumE = eAmounts.reduce((sum, value) => sum + value, 0)
+          const expectedSumF = fAmounts.reduce((sum, value) => sum + value, 0)
+          const expectedRatio = revenue === 0 ? null : expectedSumF / revenue
 
-          // Expected values computed via pure functions
-          const expectedSumE = sumRange(eAmounts)
-          const expectedSumF = sumRange(fAmounts)
-          const expectedRatio = safeDivide(expectedSumF, expectedSumE)
-
-          // Verify SUM(E8:E18) = sumRange(eAmounts), NOT the manual override
-          expect(Math.abs((results['18:E'] ?? 0) - expectedSumE)).toBeLessThan(1e-6)
-          // Verify SUM(F8:F18)
-          expect(Math.abs((results['18:F'] ?? 0) - expectedSumF)).toBeLessThan(1e-6)
-          // Verify C23 = E19 (sum of E column)
-          expect(Math.abs((results['22:C'] ?? 0) - expectedSumE)).toBeLessThan(1e-6)
-          // Verify C24 = F19 (sum of F column)
-          expect(Math.abs((results['23:C'] ?? 0) - expectedSumF)).toBeLessThan(1e-6)
-          // Verify C25 = C24/C23 (ratio)
-          if (expectedRatio === null) {
-            expect(results['24:C']).toBeNull()
-          } else {
-            expect(Math.abs((results['24:C'] ?? 0) - expectedRatio)).toBeLessThan(1e-6)
-          }
+          expect(results['18:E']).toBe(expectedSumE)
+          expect(results['18:F']).toBe(expectedSumF)
+          // C23 是人工输入，不出现在公式结果中，也不被 computeFormulas 改写。
+          expect('22:C' in results).toBe(false)
+          expect(data[22].C).toBe(revenue)
+          expect(results['23:C']).toBe(expectedSumF)
+          expect(results['24:C']).toBe(expectedRatio)
         },
       ),
       { numRuns: 100 },
     )
+  })
+
+  it('S34-16-1 反例固化：E/F 各一个次正规数、C23 未填时 C25 为 null（不是 1）', () => {
+    const tiny = -1.401298464324817e-45
+    const data: Record<string, number | null>[] = Array.from({ length: 25 }, () => ({}))
+    for (let i = 0; i < 11; i++) {
+      data[7 + i] = { E: i === 10 ? tiny : 0, F: i === 10 ? tiny : 0 }
+    }
+
+    const results = computeFormulas(data, S34_16_1_FORMULAS)
+    expect(results['18:E']).toBe(tiny)
+    expect(results['23:C']).toBe(tiny)
+    expect(results['24:C']).toBeNull()
+  })
+
+  it('S34-16-1 固定非对称夹具：C24 取 F19，C25 以人工 C23 为分母', () => {
+    const data: Record<string, number | null>[] = Array.from({ length: 25 }, () => ({}))
+    for (let i = 0; i < 11; i++) {
+      data[7 + i] = { E: i === 0 ? 100 : 0, F: i === 0 ? 30 : 0 }
+    }
+    data[22] = { C: 200 }
+
+    const results = computeFormulas(data, S34_16_1_FORMULAS)
+    expect(results['18:E']).toBe(100)
+    expect(results['18:F']).toBe(30)
+    expect(results['23:C']).toBe(30)
+    expect(results['24:C']).toBe(0.15)
   })
 
   it('公式重算幂等性：同一数据多次计算结果相同', () => {

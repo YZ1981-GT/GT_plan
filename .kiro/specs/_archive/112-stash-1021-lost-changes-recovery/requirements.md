@@ -45,3 +45,16 @@
 1. 必须保留 82 个完整丢失文件和 24 个未跟踪文件的逐项归属、当前状态与建议处置。
 2. 该清册必须区分本轮恢复、后续 rebase、待原领域 owner 裁决、已被后续实现替代和本轮保持不动的删除记录。
 3. 事故原因和防止再次以强制 checkout 覆盖他人改动的操作教训，必须写入项目长期规则和开发历史。
+
+## R7 用户批准的范围扩展：同批交付欠账收口
+
+2026-10-31，用户明确要求把恢复过程中发现的他人欠账一并修复，再归档并推送。本条仅扩展到下列已经实证的交付断裂，**不**改变 R6 中其余 82 个完整丢失文件与 24 个未跟踪文件的「逐项判断、不批量回灌」结论。
+
+1. `tsj_structured_output_service` 的结构化与 fallback 写入路径必须把触发用户 `user_id` 传给 `wrap_ai_output_with_log`。该包装器只有 `db / project_id / user_id / instance_type / instance_id` 五项齐全时才写 `ai_content_log`；日志缺失会让 `AIContentMustBeConfirmedRule` 看不到 pending 内容，从而无法阻断签字。
+2. TSJ 的日志写入失败必须用内外 SAVEPOINT 隔离，并核验返回的 `ai_content_log_id` 对应真实 pending 行。失败时**整体回滚本次 `AIContent`、日志和响应**，由端点返回 503；不得留下签字门禁读不到的 pending 行，更不得以 200 伪装成功。
+3. `components.d.ts` 与 `auto-imports.d.ts` 必须由当前 Vite 插件生成，连续两次生成字节相同；CI 的前端构建后必须检查这两个生成物未漂移。
+4. 已提交的 S32–S35 bundle 组件引用、但从未提交的 `BundleAssigneeDisplay.vue` 与 `bundleAssignee.ts` 必须原子入库。相应 S34 测试 / 生产 API 分叉、公式 PBT 的错误模板口径以及模板 TS7006 必须一并收口。
+5. 扩展范围须有真实写入/构建/前端与后端验证、针对性故障注入、浏览器渲染验证和数据清理证据。没有合适的【测试】S34 项目时，不得向共享库造业务数据；可在隔离浏览器页加载真实 Vite 模块进行无写入渲染验证。
+
+6. 已有 `POST /api/workpapers/{wp_id}/ai/tsj-review` 必须实际调用上述持久层，并使用已认证用户 ID；响应里每个 finding 的 `id` 必须是可确认的 `ai_content_log.id`，不能是 parser 临时 UUID。该端点会写确认流，必须先通过 `require_wp_edit_permission()`；无权时不得读底稿、调用 LLM 或创建任何记录。
+7. 生成声明检查必须在独立 CI job 中执行，不能排在当前全量 `vue-tsc` 硬失败之后而永远不可达。

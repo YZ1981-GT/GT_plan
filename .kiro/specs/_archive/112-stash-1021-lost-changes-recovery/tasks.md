@@ -1,6 +1,6 @@
 # 任务：10 月 21 日 AI 采纳与笔记恢复
 
-> 范围固定为 `ai-chat-adopt-and-note-target-picker` R1 / R3 的丢失接线。所有恢复在隔离 detached worktree 中完成，禁止以整树 checkout 覆盖当前 origin。
+> 初始范围是 `ai-chat-adopt-and-note-target-picker` R1 / R3 的丢失接线。2026-10-31 用户明确扩展为「发现的交付欠账也全部修完再归档推送」：TSJ 的 `user_id` 溯源、生成 d.ts 漂移、S32–S35 bundle 的未提交模块 / 测试分叉 / PBT 口径 / 模板类型错误纳入本 spec；其余清册项仍禁止批量回灌。所有恢复在隔离 detached worktree 中完成，禁止以整树 checkout 覆盖当前 origin。
 
 - [x] 1. 建立事故证据与丢失清册
   - 以 `dae1129f5`、`112bfabec`、`434e87972` 三方比对，区分 82 个完整丢失文件、134 个已分叉文件和 24 个尚未入库的未跟踪文件。
@@ -32,7 +32,19 @@
   - 写入数据已按平台路径清理并逐表核对回基线（详见 design.md §8）。
   - _需求：R5_
 
-- [ ] 6. 单一提交和安全收尾
-  - 将通过验证的恢复代码、spec、INDEX 与长期教训作为一个提交；用 `push_version.py` 打版本并原子推送当前目标分支。
-  - 主工作区只对齐已验证的后端和文档，前端不直接镜像；解锁并删除临时 worktree，执行 `git worktree prune`。
-  - _需求：R4、R5、R6_
+- [x] 6. 收口用户批准的同批交付欠账
+  - `tsj_structured_output_service` 的两个入口增加必填 `user_id`，经 `_log_ai_content` 单点写入 pending `ai_content_log`；内外 SAVEPOINT + 真实行核验，任何日志 / DTO / commit 异常都整体回滚本次 `AIContent` 与日志并返回 503，绝不留门禁不可见的 pending 行。
+  - 已有 `/api/workpapers/{wp_id}/ai/tsj-review` 接入该服务：先过 `require_wp_edit_permission()`，服务端 schema 显式投影，响应回真实 `ai_content_log.id` 供确认 / 驳回；服务只在外层 SAVEPOINT 内写入，不 commit / rollback 调用方事务，保存点完成必要 flush，路由完成 DTO 数量 / ID 校验后是唯一 commit 点。
+  - 重建 Vite 自动声明，CI 单独 job 跑 Vite + dirty gate（不再被全量 vue-tsc 硬失败遮住）；补齐 S32–S35 已提交调用方缺失的 `BundleAssigneeDisplay.vue` / `bundleAssignee.ts`，修正 S34 assignee API 测试分叉、公式 PBT 模板口径和模板 TS7006。
+  - 已完成：TSJ 单元 / router 32 passed、真实 PG 3 passed（含真实 NOT NULL DML 违例和服务返回后 rollback 边界）、10 组变异；S bundle 325 passed + 8 组变异；raw Vite build 与连续生成幂等；隔离浏览器真实模块渲染有/无 assignment 均通过且 console 0 error。详见 design.md §10。
+  - 语义审阅 P1/P2 已闭合：日志失败整体回滚、真实生产入口与底稿 edit 权、DTO 后单点 commit、独立 d.ts CI job、真实 PG DML 测试和 S32/S33/S35 表驱动映射测试均已补齐；末次复审通过后才推送。
+  - _需求：R7_
+
+- [x] 7. 归档 spec
+  - 已移动本 spec 到 `_archive/112-stash-1021-lost-changes-recovery/`，并更新 INDEX 归档链接与完成摘要。
+  - _需求：R4、R5、R6、R7_
+
+- [x] 8. 单一版本化推送和安全收尾
+  - 将通过验证的恢复代码、扩展收口、归档 spec、INDEX 与长期教训作为一个提交；用 `push_version.py` 打版本并原子推送当前目标分支。
+  - 主工作区只对齐已验证的后端与文档，前端不直接镜像；解锁并删除临时 worktree，执行 `git worktree prune`。
+  - _需求：R4、R5、R6、R7_

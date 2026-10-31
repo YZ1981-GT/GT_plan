@@ -126,9 +126,38 @@ PG 测试必须显式设置 `DATABASE_URL` 与 `GT_REQUIRE_PG=1`。若环境不�
 
 终局核对：知识库存活文档 0 条、存活文件夹 1 个，与实测前基线一致。
 
-## 9. 非范围
+## 9. 用户批准的范围扩展（2026-10-31）
+
+用户随后明确要求把本轮发现的他人欠账一并修复后再归档。扩展范围和处置如下：
+
+| 欠账 | 实证根因 | 本轮处置 |
+| --- | --- | --- |
+| TSJ 结构化复核不进确认门禁 | 两处调用漏 `user_id`，`wrap_ai_output_with_log` 的五参写入门恒不满足；`AIContentMustBeConfirmedRule` 只读 `ai_content_log`。兼容端点还只回 parser 临时 UUID、从未调用持久层。 | `user_id` 改为两个服务入口的必填关键字参数；集中 `_log_ai_content` 以内外 SAVEPOINT 写入、核验真实 `ai_content_log_id`，失败整体回滚；`/ai/tsj-review` 接入该服务、返回日志 ID并加底稿 edit 门。 |
+| 自动声明陈旧 | `components.d.ts` 是 `unplugin-vue-components` 的生成物，前端源码已用到 7 个组件但声明仍旧；`auto-imports.d.ts` 是悬空引用门禁的输入，陈旧会误报/漏报。 | 仅用当前 Vite 生成器重建；CI build 后检查两个 d.ts 没有未提交 diff。 |
+| S32–S35 已提交代码引用未提交模块 | 4 个 bundle UI + 4 个状态 composable 引用了从未进入 Git 历史的 `BundleAssigneeDisplay.vue` / `bundleAssignee.ts`；干净 Vite build `Could not resolve`。 | 两个模块原子入库；同步修正同一次重构留下的 S34 测试/生产 API 分叉、PBT 模板口径和 TS7006。 |
+
+没有扩大范围到清册中其余 73 个非 AI 完整丢失文件。救援标签、备份 refs 与历史目录删除仍需要用户另行确认。
+
+## 10. 扩展范围的实现与验证
+
+### 10.1 TSJ 日志与门禁
+
+`_log_ai_content()` 是唯一调用点。它用真实的触发用户、目标底稿和 finding 位置调用包装器，在内层 SAVEPOINT 中检查非空 `ai_content_log_id` 对应同项目同用户的真实 pending 行。外层 SAVEPOINT 包住本次**全部** `AIContent` 与日志：包装器吞掉写异常、返回伪 ID或审计 DML 失败时，服务抛 `TsjConfirmationLogWriteError`，撤回本次记录；服务不 `commit` 也不 `rollback` 调用方事务，保存点的正常退出完成必要 flush。`POST /api/workpapers/{wp_id}/ai/tsj-review` 先过 `require_wp_edit_permission()`，把服务端 `LlmResponseParser` 的 `risk_level/category/location/suggestion` 显式投影为 TSJ 持久化 schema，调用 `process_review_response()` 并完成 finding 数量、每条日志 ID 和 DTO 校验后才做本请求唯一的 `commit`。任一后置校验或 commit 失败都 rollback 并返回 500/503，不能留下签字门禁看不见的 pending 内容。原有 mock 测试不再用 `AsyncMock` 伪装整个 `AsyncSession`，避免同步 `add()` / async context manager 被误建成未 await coroutine；真实 SQLite + PostgreSQL 用例验证成功、真实 DML 违例和服务返回后的 rollback 边界。
+
+### 10.2 S bundle 与声明文件
+
+四个 bundle 的生产动态入口在 `registry/entries/specialized.ts`，所以 Vite 在生产构建期而非用户点开页面后才会解析缺失模块。`BundleAssigneeDisplay` 有 assignment 时显示姓名和可访问性标签，无 assignment 时不渲染。`buildBundleAssigneeMap` 用 `wp_index` 返回的姓名 → 用户名 → ID 前八位回退。S34 的 `buildWpIdMap` 已拆成仅返回 wp_id 映射，测试改为独立验证新的负责人映射；C23 人工输入 / C24=F19 / C25=C24÷C23 的权威模板口径写入 PBT，次正规数反例和非对称夹具防止回归。模板内联回调收敛为 `hasTab(TabDef[], tabId)`，消除 vue-tsc 虚拟文件的 TS7006。
+
+### 10.3 证据摘要
+
+- TSJ：生产端点已接 `require_wp_edit_permission()` → 服务端 schema 投影 → `process_review_response()` → 真实 `ai_content_log.id` 回前端；服务只在外层 SAVEPOINT 内写入、既不 commit 也不 rollback 调用方事务，路由 DTO 校验后统一 commit。32 个单元 / router 测试、3 个真实 PG 测试（含 NOT NULL DML 违例、服务返回后 rollback、非日志异常保留调用方写入）在显式 PG 环境通过；10 个故障注入（漏 user_id、使参数可选 ×2、去外层 SAVEPOINT、不看真实行、丢位置、丢 wp_id、服务回滚调用方事务、路由通用分支不 rollback、路由在 DTO 校验前 commit）全部在预期断言打红。
+- S bundle：4 个目录 + shared mapper + 组件接线共 325 例通过；8 个前端故障注入（C25 分母错引、导航 helper 反转、移走展示模块、删生成声明、S32/S33/S35 各自的接线丢失、共享映射器放行空负责人）全部打红，恢复后 d.ts gate 通过；共享 mapper 表驱动覆盖 S32/S33/S34/S35 四个前缀、子表和显示名三级回退。
+- Vite：生产 build exit 0；连续两次 d.ts 输出 hash 完全一致。区域 vue-tsc 中 S34 的两条 TS7006 消失，只余 `GtAProgramConsole` 1 条、`apiProxy` 2 条既有错误。
+- 浏览器：隔离 Vite 页实际加载并 mount 真实 `BundleAssigneeDisplay`，有 assignment 时显示「编制人测试编制人」和 `S34-16 编制人：测试编制人` aria-label；无 assignment 时只输出 `<!--v-if-->`；console error 为 0。数据库没有【测试】S34 项目且现有 S34 子稿的 `assigned_to` 都为空，未向共享库写入测试数据。
+
+## 11. 非范围
 
 - 清册中 A 循环 driver、D4、B23、生成物和清理脚本等 73 个非 AI 完整丢失文件，不在本次提交恢复。
-- `tsj_structured_output_service` 未传 `user_id` 因而不写 AI 内容日志，是独立问题，不能在本次借题扩大范围。
+- 主工作区另一份 `platform-performance-user-experience-closure` 未提交 WIP 不纳入：曾把它的 CI 新脚本误读成当前提交树的缺失 script，复核 `1154b99ca` 后确认旧 CI 只有重复 typecheck、没有调用那些 script。
+- 前端「已提交源码 import 只能指向已提交文件」的专用扫描器没有纳入：第一版正则在测试里的假源码和跨行 import 上同时出现误报/漏报，不能以不可信门禁代替真实 Vite build。
 - 备份 refs 和历史目录删除需要用户另行确认。
-- `components.d.ts` 在当前 origin 上是陈旧的：跑一次 Vite 就会补出 `ElImage` / `ElScrollbar` 两条，而这两个组件用在 `AttachmentPreviewCore.vue` / `DisclosureEditor.vue` 等本次未改的文件里。属别人提交时没重生成生成物，本次不混进来（按「生成文件不取并集」处置，已丢弃该工作区改动）。
