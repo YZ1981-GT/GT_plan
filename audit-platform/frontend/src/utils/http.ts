@@ -242,9 +242,11 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
-  // 多窗口编辑锁隔离：编辑锁端点自动携带 X-Client-Instance header
-  // spec: multi-window-ledger-workbench Phase 3 Task 16
-  if (config.url && config.url.includes('/editing-locks/')) {
+  // 多窗口编辑锁隔离：编辑锁端点与所有写请求携带 X-Client-Instance（窗口编号，不涉鉴权）
+  // spec: multi-window-ledger-workbench Phase 3 Task 16；workpaper-multi-window-lock-gaps R2.6
+  // （后端按它判断底稿保存 / 导入是不是持锁的那个窗口发的，其他窗口一律只读）
+  const method = (config.method || 'get').toUpperCase()
+  if (method !== 'GET' || (config.url && config.url.includes('/editing-locks/'))) {
     config.headers['X-Client-Instance'] = getClientInstanceId()
   }
   addPending(config)

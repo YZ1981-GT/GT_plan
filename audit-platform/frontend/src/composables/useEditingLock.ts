@@ -22,6 +22,7 @@ import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { claimClientInstanceId } from '@/utils/clientInstance'
 
 /** 锁冲突信息（他人持锁时由 acquire 409 / SSE 推送返回） */
 export interface LockConflictInfo {
@@ -86,6 +87,9 @@ export function useEditingLock(options: EditingLockOptions) {
     const id = options.resourceId.value
     if (!id) return
 
+    // 窗口编号认领完再取锁：「复制标签页」沿用了原标签页的编号，认领后才换成本页自己的（workpaper-multi-window-lock-gaps R1.3）
+    await claimClientInstanceId()
+    if (options.resourceId.value !== id) return // 等认领期间换了底稿：由 watch 按新 id 取锁
     const base = `/api/editing-locks/${resourceType}/${id}`
     try {
       const res = await api.post(base, undefined, SILENT)
@@ -170,6 +174,7 @@ export function useEditingLock(options: EditingLockOptions) {
     const id = options.resourceId.value
     if (!id) return
 
+    await claimClientInstanceId()
     try {
       const res = await api.post(`/api/editing-locks/${resourceType}/${id}/force`, undefined, SILENT)
       locked.value = true

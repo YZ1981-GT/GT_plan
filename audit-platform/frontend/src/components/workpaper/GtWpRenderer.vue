@@ -135,6 +135,7 @@
         v-if="componentType !== 'a1-dashboard'"
         :fullscreen="isWpFullscreen"
         :wp-id="wpId"
+        :readonly="effectiveReadonly"
         @export-template="onExportTemplate"
         @export-data="onExportData"
         @import-data="onImportData"
@@ -1108,6 +1109,12 @@ function onExportData() {
   }
 }
 function onImportData() {
+  // 只读（编辑锁在别的窗口 / 别人手里等）不转给子组件：子组件的导入直接调后端导入接口写库
+  // （spec workpaper-multi-window-lock-gaps R2.1；工具栏按钮已禁用，这里再拦一次）
+  if (effectiveReadonly.value) {
+    ElMessage.warning('当前为只读，不能导入')
+    return
+  }
   // 如果子组件暴露了 handleImportClick / handleImport 方法，委托给它
   const child = activeComponentRef.value
   if (child && typeof child.handleImportClick === 'function') {

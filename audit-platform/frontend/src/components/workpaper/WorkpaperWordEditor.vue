@@ -225,7 +225,13 @@
             <el-button size="small" :icon="Document" @click="onExportTemplate" :loading="exportingTemplate">
               导出模板
             </el-button>
-            <el-button size="small" :icon="Upload" @click="showImportDialog = true">
+            <el-button
+              size="small"
+              :icon="Upload"
+              :disabled="readonly"
+              :title="readonly ? '当前为只读，不能导入' : undefined"
+              @click="showImportDialog = true"
+            >
               导入数据
             </el-button>
           </div>
@@ -351,6 +357,7 @@ import { ElMessage } from 'element-plus'
 import { Download, Document, Upload } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { getAuthHeaders } from '@/utils/authToken'
+import { getClientInstanceId } from '@/utils/clientInstance'
 import { resolveAuditYearFromProject, resolveAuditYearOrNull } from '@/utils/resolveAuditYear'
 import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
 import GtWordTemplateStructuredView from './GtWordTemplateStructuredView.vue'
@@ -486,13 +493,18 @@ function onImportFileRemove() {
 /** Task 8.3: Import structured data from uploaded docx */
 async function onImportData() {
   if (!importFile.value) return
+  if (props.readonly) {
+    ElMessage.warning('当前为只读，不能导入')
+    return
+  }
   importing.value = true
   try {
     const formData = new FormData()
     formData.append('file', importFile.value)
     const r = await fetch(`/api/workpapers/${props.wpId}/import-structured`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      // 原生请求不经 http 拦截器：窗口编号自己带，后端据此判断是不是持锁的窗口（workpaper-multi-window-lock-gaps R2.6）
+      headers: { ...getAuthHeaders(), 'X-Client-Instance': getClientInstanceId() },
       body: formData,
     })
     if (!r.ok) {

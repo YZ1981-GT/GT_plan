@@ -13,7 +13,12 @@
       <el-button size="small" @click="$emit('export-data')">
         <el-icon><Document /></el-icon> 导出数据
       </el-button>
-      <el-button size="small" @click="$emit('import-data')">
+      <el-button
+        size="small"
+        :disabled="readonly"
+        :title="readonly ? READONLY_TIP : undefined"
+        @click="$emit('import-data')"
+      >
         <el-icon><Upload /></el-icon> 导入
       </el-button>
     </div>
@@ -33,7 +38,12 @@
       <el-button size="small" @click="$emit('open-attachments')">
         <el-icon><Paperclip /></el-icon> 关联附件
       </el-button>
-      <el-button size="small" @click="$emit('add-row')">
+      <el-button
+        size="small"
+        :disabled="readonly"
+        :title="readonly ? READONLY_TIP : undefined"
+        @click="$emit('add-row')"
+      >
         <el-icon><Plus /></el-icon> 增行
       </el-button>
       <el-button
@@ -53,7 +63,14 @@ import { Download, Document, Upload, Plus, FullScreen, Paperclip } from '@elemen
 defineProps<{
   fullscreen?: boolean
   wpId?: string
+  /**
+   * 只读（编辑锁在别的窗口 / 别人手里、项目已归档、在线编辑改动后台合并中）：禁用会写底稿的「导入」「增行」。
+   * 导出、关联附件（抽屉自己按可编辑控制）、全屏照常可用。spec workpaper-multi-window-lock-gaps R2.1
+   */
+  readonly?: boolean
 }>()
+
+const READONLY_TIP = '当前为只读，不能修改底稿'
 
 defineEmits<{
   'export-template': []

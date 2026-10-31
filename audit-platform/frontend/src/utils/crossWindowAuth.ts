@@ -65,7 +65,6 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
     const ch = getChannel()
     if (!ch) { resolve(null); return }
 
-    const myId = getClientInstanceId()
     const timer = setTimeout(() => {
       ch.removeEventListener('message', handler)
       resolve(null)
@@ -73,7 +72,8 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
 
     function handler(ev: MessageEvent<AuthMessage>) {
       const msg = ev.data
-      if (msg.type === 'session-response' && msg.senderId !== myId) {
+      // 按当前编号比较：窗口编号认领后可能换了新号（workpaper-multi-window-lock-gaps R1.4）
+      if (msg.type === 'session-response' && msg.senderId !== getClientInstanceId()) {
         clearTimeout(timer)
         ch!.removeEventListener('message', handler)
         resolve({ token: msg.token, refreshToken: msg.refreshToken, user: msg.user })
@@ -83,7 +83,7 @@ export function requestSession(): Promise<{ token: string; refreshToken: string;
 
     ch.postMessage({
       type: 'session-request',
-      senderId: myId,
+      senderId: getClientInstanceId(),
     } satisfies AuthMessage)
   })
 }
@@ -134,11 +134,11 @@ export function listenAuthEvents(handlers: AuthEventHandlers): void {
   const ch = getChannel()
   if (!ch) return
 
-  const myId = getClientInstanceId()
-
   ch.addEventListener('message', (ev: MessageEvent<AuthMessage>) => {
     const msg = ev.data
-    // 忽略自己发出的消息
+    // 忽略自己发出的消息。按当前编号比较：监听在启动时就装上，「复制标签页」认领后会换新号，
+    // 记下旧号会把原标签页的令牌更新 / 登出广播当成自己的而丢掉（workpaper-multi-window-lock-gaps R1.4）
+    const myId = getClientInstanceId()
     if (msg.senderId === myId) return
 
     switch (msg.type) {

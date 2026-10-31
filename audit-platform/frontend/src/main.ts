@@ -28,6 +28,7 @@ import http from './utils/http'
 import { installPushKeptNotice } from './utils/disclosureSyncPushNotice'
 import { startSessionHandoff } from './utils/crossWindowAuth'
 import { advanceRequestIdentityEpoch } from './services/requestIdentityEpoch'
+import { claimClientInstanceId } from './utils/clientInstance'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
@@ -39,6 +40,10 @@ installPushKeptNotice(http)
 
 // Task 10: 首次升级时清理遗留 AI 聊天敏感缓存（doc_ai_chat_*）
 clearOnUpgrade()
+
+// 多窗口：认领本标签页的窗口编号（「复制标签页」沿用了原标签页的编号时换新号，编辑锁才能区分两个窗口）
+// spec: workpaper-multi-window-lock-gaps R1；取锁前 useEditingLock 会等认领结果，这里不阻塞挂载
+void claimClientInstanceId()
 
 const app = createApp(App)
 

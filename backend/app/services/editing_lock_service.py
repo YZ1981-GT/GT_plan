@@ -332,6 +332,43 @@ async def force_acquire_lock(
     }
 
 
+async def find_blocking_lock(
+    db: AsyncSession,
+    resource_type: str,
+    resource_id: str,
+    requester_id: uuid.UUID,
+    client_instance: str | None = None,
+) -> EditingLock | None:
+    """内容写入前查「挡住本次写入」的有效锁；不挡返回 None。只读查询（不清理过期锁、不 flush）。
+
+    spec workpaper-multi-window-lock-gaps R2.3~R2.5：
+    - 没有有效锁（无锁 / 已释放 / 心跳超过 5 分钟）→ 不挡；
+    - 锁是请求人本人的：请求带了窗口编号、锁上也记了窗口且二者不同 ⇒ 挡（同一人的另一个窗口，第二窗只读）；
+      没带窗口编号 / 锁上没记窗口 ⇒ 不挡（分不出是哪个窗口，保持原行为）；
+    - 锁是别人的 ⇒ 挡（别人正在编辑，本窗口只读）。
+    """
+    stmt = (
+        select(EditingLock)
+        .where(
+            EditingLock.resource_type == resource_type,
+            EditingLock.resource_id == resource_id,
+            EditingLock.released_at.is_(None),
+            EditingLock.heartbeat_at >= _expiry_threshold(),
+        )
+        .order_by(EditingLock.heartbeat_at.desc())
+        .limit(1)
+    )
+    lock = (await db.execute(stmt)).scalars().first()
+    if lock is None:
+        return None
+    if lock.holder_id != requester_id:
+        return lock
+    held_instance = getattr(lock, "client_instance", None)
+    if client_instance and held_instance and client_instance != held_instance:
+        return lock
+    return None
+
+
 async def get_active_locks(
     db: AsyncSession,
     resource_type: str | None = None,

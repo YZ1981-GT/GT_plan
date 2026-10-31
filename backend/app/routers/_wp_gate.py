@@ -21,10 +21,11 @@ project（Binding_Minimum）。route 只需把已知的最强 identity（通常 
 
 from __future__ import annotations
 
+import re
 from typing import Mapping
 from uuid import UUID
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -39,6 +40,8 @@ __all__ = [
     "enforce_wp_gate",
     "enforce_task_gate",
     "dedicated_wp_gate",
+    "enforce_edit_lock_for_content_write",
+    "is_content_write_route",
     "wp_gate_dep",
     "include_router_with_wp_gate",
 ]
@@ -157,6 +160,41 @@ _DEDICATED_ENTRYPOINT = "workpaper.dedicated_subroute"
 _DEDICATED_ENTRY_FAMILY = "workpaper"
 
 
+# 底稿内容写入（保存 / 导入）：路由模板以这些段结尾（spec workpaper-multi-window-lock-gaps R2.3）。
+# 2026-10-31 现算：带 {wp_id} 的写路由 608 条，其中这 132 条全部挂了本门；AI 生成、OCR、复核、批注、
+# 在线编辑同步等写接口不在范围内（不改它们的锁语义）。
+_CONTENT_WRITE_ROUTE = re.compile(r"/(?:import[\w-]*|checklist-responses|save|save-version)$")
+
+
+def is_content_write_route(route_path: str | None) -> bool:
+    """路由模板是不是底稿内容写入（保存 / 导入类）。"""
+    return bool(route_path) and bool(_CONTENT_WRITE_ROUTE.search(route_path))
+
+
+async def enforce_edit_lock_for_content_write(
+    db: AsyncSession, current_user, request: Request, wp_id: UUID,
+) -> None:
+    """底稿内容写入前校验编辑锁：有效锁的持有人（用户 + 窗口）以外的请求 423，本次写入不落库。
+
+    原先保存 / 导入接口都不看编辑锁，「第二窗只读」只靠前端：只读窗口工具栏「导入」照样能把数据写进库
+    （spec workpaper-multi-window-lock-gaps，2026-10-31 实测）。窗口编号取请求头 ``X-Client-Instance``。
+    """
+    from app.services.editing_lock_service import find_blocking_lock
+
+    instance = (request.headers.get("x-client-instance") or "").strip() or None
+    lock = await find_blocking_lock(db, "workpaper", str(wp_id), current_user.id, instance)
+    if lock is None:
+        return
+    if lock.holder_id == current_user.id:
+        message = (
+            "这张底稿正在你的另一个窗口编辑，本窗口为只读，本次修改未保存。"
+            "请在正在编辑的窗口里操作，或关掉那个窗口后刷新本页。"
+        )
+    else:
+        message = f"{lock.holder_name or '其他用户'} 正在编辑这张底稿，当前为只读，本次修改未保存。"
+    raise HTTPException(status_code=423, detail=message)
+
+
 def _classify_dedicated(method: str) -> tuple[str, str]:
     """(entrypoint, action) —— 按 HTTP method 分类（与 Action_Matrix dedicated 族登记一致）。"""
     m = (method or "").upper()
@@ -208,6 +246,9 @@ async def dedicated_wp_gate(
         route_name=route_name,
         entry_family=_DEDICATED_ENTRY_FAMILY,
     )
+    # 可见性通过后再看编辑锁：内容写入只许持锁的那个窗口（编辑锁按 working_paper.id 记，wp_index_id 路由不适用）
+    if action != "dedicated_read" and not is_index_param and is_content_write_route(route_name):
+        await enforce_edit_lock_for_content_write(db, current_user, request, wp_uuid)
 
 
 # ---------------------------------------------------------------------------
