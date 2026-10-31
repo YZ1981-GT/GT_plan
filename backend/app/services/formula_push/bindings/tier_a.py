@@ -31,7 +31,7 @@ from uuid import UUID
 from app.services.formula_push.bindings import TargetSkip, WorkpaperTarget
 from app.services.formula_push.js_compat import js_number_to_string
 from app.services.formula_push.rules import PushRule, workpaper_addr_id
-from app.services.formula_push.sources import FormulaSources, load_tb_audited
+from app.services.formula_push.sources import FormulaSources, PriorPlSnapshot, load_prior_pl, load_tb_audited
 
 _DATA_DIR = Path(__file__).resolve().parents[4] / "data"
 _PRESETS_PATH = _DATA_DIR / "d_cycle_extraction" / "d_cycle_extraction_presets.json"
@@ -334,17 +334,20 @@ class TierAAnchorBinding:
         self.paper_codes: tuple[str, ...] = (wp_code,)
         # 附注推送用：load_sources 时缓存 TB 数据，note_rows 读取
         self._last_tb_data: Mapping[str, Mapping[str, Decimal]] | None = None
+        #: 损益类科目的上年发生额（附注上期列）；没有损益类科目为 None
+        self._last_prior_pl: PriorPlSnapshot | None = None
         # 科目名（从 wp_account_mapping 加载，用作附注行 label）
         self._account_name: str = _load_wp_mapping().get(wp_code, wp_code)
 
     async def load_sources(self, db: Any, project_id: UUID, year: int, wp_id: UUID | None) -> TierASources:
-        """取齐推送所需的全部源数据（只有试算表审定口径）。"""
+        """取齐推送所需的全部源数据（只有试算表审定口径；损益类另取上年试算表作上期）。"""
         warnings: list[str] = []
         tb = await load_tb_audited(db, project_id, year, self.account_prefixes)
         if len(tb.company_codes) > 1:
             warnings.append(f"试算表含多个公司编码 {list(tb.company_codes)}，按全部合计")
         # 缓存 TB 数据供 note_rows 使用（engine 的 note_rows 签名不传 sources）
         self._last_tb_data = tb.tb_data if tb.available else None
+        self._last_prior_pl = await load_prior_pl(db, project_id, year, self.account_prefixes) if tb.available else None
         # 加载附注模板类型
         template_type = await _load_template_type(db, project_id)
         return TierASources(formula=FormulaSources(tb=tb), template_type=template_type, warnings=warnings)
@@ -409,47 +412,10 @@ class TierAAnchorBinding:
             # TB 不可用（未导入四表），返回空让引擎跳过
             return []
 
-        codes = self.account_prefixes
-        # 确定取数列名
-        # 对于损益类科目（6 开头），用「本期发生额」代替「期末余额」；
-        # opening 统一用「年初余额」（对于损益类，这在 TB 口径下就是上期发生额）
-        rows: list[dict] = []
-        for code in codes:
-            is_pl = _is_pl_code(code)
-            ending_col = "本期发生额" if is_pl else "期末余额"
-            opening_col = "年初余额"
-            ending, ending_resolved = _tb_value(tb_data, code, ending_col)
-            opening, opening_resolved = _tb_value(tb_data, code, opening_col)
-            label = self._account_name if len(codes) == 1 else f"{self._account_name}_{code}"
-            rows.append({
-                "key": f"{self.wp_code}-note-{code}",
-                "label": label,
-                "note_label": label,
-                "is_total": False,
-                "is_memo": False,
-                "ending": ending,
-                "opening": opening,
-                "ending_resolved": ending_resolved,
-                "opening_resolved": opening_resolved,
-            })
+        # 损益类（6 开头）期末取「本期发生额」、上期取上年试算表发生额（本年年初余额恒为 0，不能当上期）
+        from app.services.formula_push.bindings.note_direct import code_note_rows
 
-        # 多科目时追加合计行
-        if len(codes) > 1:
-            total_ending = sum(r["ending"] for r in rows)
-            total_opening = sum(r["opening"] for r in rows)
-            rows.append({
-                "key": f"{self.wp_code}-note-total",
-                "label": self._account_name,
-                "note_label": self._account_name,
-                "is_total": True,
-                "is_memo": False,
-                "ending": total_ending,
-                "opening": total_opening,
-                "ending_resolved": True,
-                "opening_resolved": True,
-            })
-
-        return rows
+        return code_note_rows(self.wp_code, self._account_name, self.account_prefixes, tb_data, self._last_prior_pl)
 
     def entry_warnings(self, entries: Mapping[str, Any]) -> list[str]:
         return []

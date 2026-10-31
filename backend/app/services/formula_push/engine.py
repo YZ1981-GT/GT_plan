@@ -604,9 +604,8 @@ async def _push_note(
     from app.models.report_models import DisclosureNote
 
     table_name = rule.target.resolve_table(sources.template_type) or rule.target.table
-    # section_title 校验用的名称：table_by_template 场景下子表名可能不等于章节标题
-    # （如国企 八、4 章节标题"应收票据"、子表名"应收票据分类"），此时用 rule.target.table（章节级）比较
-    _title_check_name = rule.target.table if rule.target.table_by_template else table_name
+    # section_title 校验用的名称（见 _expected_section_title）
+    _title_check_name = _expected_section_title(rule, sources.template_type, table_name)
     template_type = sources.template_type
     section = rule.target.sections.get(template_type) if template_type else None
     if section is None:
@@ -652,7 +651,7 @@ async def _push_note(
             section = fallback_rows[0].note_section
             section_addr = f"note://{section}/{table_name}"
         else:
-            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
+            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{_title_check_name}」，未推送"
     if reason is None and note is not None and str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
     table_data = copy.deepcopy(note.table_data) if note is not None else None
@@ -703,7 +702,8 @@ async def _push_note(
 
     wrote = False
     any_data_row_matched = False
-    pending_row_skips: list[tuple[str, str]] = []  # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason) 延迟记录
+    # spec: formula-push-note-row-matching · 需求 1.2 — (addr_id, reason, 字段) 延迟记录
+    pending_row_skips: list[tuple[str, str, str]] = []
     # 缓存 note_rows 结果，避免重复调用（消除隐式一致性依赖）
     all_note_rows = binding.note_rows(overlay, template_type, rule)
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
@@ -732,7 +732,8 @@ async def _push_note(
             if index is None:
                 # spec: formula-push-note-row-matching · 需求 1.2
                 # 延迟记录：合计行兜底成功后将重分类为 fallback_to_total
-                pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）"))
+                pending_row_skips.append((addr, f"附注「{table_name}」表中没有「{row['note_label']}」行（公式推送不新建行）",
+                                          field_name))
             elif collided:
                 ctx.skip(rule.rule_id, "note", "note", addr,
                          f"取数行「{'」「'.join(dict.fromkeys(claims[index]))}」都对上附注「{note_writer.row_label(table.rows[index])}」"
@@ -743,8 +744,9 @@ async def _push_note(
                 ctx.skip(rule.rule_id, "note", "note", addr,
                          f"取数行没有「{field_name}」的值（本底稿取数只有期末 / 期初数），附注保持原值")
             elif not row[f"{value_key}_resolved"]:
-                # 科目不存在是真正 skip，不参与延迟
-                ctx.skip(rule.rule_id, "note", "note", addr, "底稿未取到该行数值（本项目无此科目），附注保持原值")
+                # 科目不存在是真正 skip，不参与延迟；取数行带了原因（如损益类上期取不到上年数据）就用它的
+                ctx.skip(rule.rule_id, "note", "note", addr,
+                         row.get(f"{value_key}_reason") or "底稿未取到该行数值（本项目无此科目），附注保持原值")
             else:
                 wrote |= _push_note_cell(ctx, rule=rule, section=section, addr=addr, table=table,
                                          row=table.rows[index], field_name=field_name,
@@ -754,8 +756,20 @@ async def _push_note(
     # 所有数据行都未命中附注行 → 把审定数写入合计行
     skip_total_recalc = False
     fallback_wrote = False  # spec: formula-push-note-row-matching · 需求 1.3
+    fallback_ambiguity: str | None = None
+    unresolved_fields: dict[str, str] = {}
     if not any_data_row_matched:
-        total_idx = note_writer.find_total_row(table.rows)
+        candidates = note_writer.total_row_candidates(table.rows)
+        total_idx = candidates[0] if len(candidates) == 1 else None
+        if len(candidates) > 1:
+            # 多个汇总行：分段合计（「一、账面原值合计 / … / 五、账面价值合计」）或「小计 / 减：减值准备 / 合计」。
+            # 取数只有科目余额，是哪一段由科目决定（主科目余额是原值 / 小计，长期借款审定数是重分类后的合计），
+            # 引擎不知道 ⇒ 不兜底、也不按上方各行重算（上方明细一个都没取到）。2026-10-31 真库：按「最终合计」兜底
+            # 把长期股权投资 / 投资性房地产 / 使用权资产的原值写进了账面价值合计（和平 八、26 账面价值
+            # 176,203,072.87，应为 66,389,073.02）。spec disclosure-note-template-word-realignment Task 34/35。
+            labels = "、".join(note_writer.row_label(table.rows[i]) or "（无名）" for i in candidates)
+            fallback_ambiguity = f"表里有 {len(candidates)} 个合计行（{labels}），不知道科目余额该写哪一行，不兜底"
+            skip_total_recalc = True
         if total_idx is not None:
             # 单科目：用唯一数据行（is_total=False）的值
             # 多科目：用 is_total 行的汇总值
@@ -777,6 +791,10 @@ async def _push_note(
                                                  row=total_row, field_name=field_name,
                                                  value=source_row[value_key], paper=paper)
                         fallback_cell_called = True
+                    else:
+                        # 这一格取不到（如损益类上期没有上年数据）：合计格不写，该字段的逐行记录如实记跳过
+                        unresolved_fields[field_name] = (source_row.get(f"{value_key}_reason")
+                                                         or "底稿未取到该行数值（本项目无此科目）")
                 skip_total_recalc = True  # 已直接写入合计行，跳过后续重算
                 # fallback_wrote 仅在至少一个字段真正调用了 _push_note_cell 时为 True
                 # （所有 resolved=False 时兜底路径进入但没写——per-row skip 应保持 skipped）
@@ -784,8 +802,14 @@ async def _push_note(
 
     # spec: formula-push-note-row-matching · 需求 1.4
     # 统一 flush 延迟的 per-row skip 记录：兜底成功 → fallback_to_total；未成功 → skipped
-    for _paddr, _preason in pending_row_skips:
+    for _paddr, _preason, _pfield in pending_row_skips:
         _paction = FALLBACK_TO_TOTAL if fallback_wrote else SKIPPED
+        _unresolved = unresolved_fields.get(_pfield)
+        if _unresolved:
+            _paction = SKIPPED
+            _preason = f"{_preason}；{_unresolved}，附注保持原值"
+        if fallback_ambiguity:
+            _preason = f"{_preason}；{fallback_ambiguity}，附注保持原值"
         ctx.result.items.append(PushItem(
             rule.rule_id, "note", "note", _paddr, _paction, reason=_preason
         ))
@@ -819,6 +843,22 @@ async def _push_note(
     await ctx.db.flush()
     ctx.result.note_sections.append(section)
     return section
+
+
+def _expected_section_title(rule: PushRule, template_type: str | None, table_name: str) -> str:
+    """主表规则校验章节标题（及章节号对不上时按标题反查）用的名称。
+
+    规则按准则声明了表名（``table_by_template``）⇒ 主表名一般不是章节名，取该准则种子在规则章节号上的章节标题：国企
+    八、64「营业收入、营业成本」（规则通用表名是上市章节名「营业收入和营业成本」）、八、12「持有待售资产」（通用表名
+    「持有待售资产和持有待售负债」）、八、5「应收账款」（D2 主表名「（1）按账龄披露应收账款」）。原来一律拿通用表名比，
+    这几条规则在国企项目恒「不是…章节」跳过，跳过原因里印的又是准则表名，看着与章节名一模一样（2026-10-31 三个真实
+    项目 八、64 / 八、12 / 八、5 都是）。种子里没有该章节时沿用通用表名；没声明 ``table_by_template`` 的规则主表名即
+    章节名，照旧按表名比。spec disclosure-note-template-word-realignment Task 34/35。
+    """
+    if not rule.target.table_by_template:
+        return table_name
+    section = rule.target.sections.get(template_type) if template_type else None
+    return note_writer.template_section_title(template_type, section) or rule.target.table
 
 
 def _find_total_by_label(rows: Any, label: str) -> int | None:
@@ -863,7 +903,7 @@ def _note_keep_reason(mode: str | None, decision: Decision) -> str | None:
 def _push_note_total(
     ctx: _Ctx, *, rule: PushRule, section: str, table_name: str, table: note_writer.NoteTable, paper: _Paper,
 ) -> bool:
-    """合计 = 合计行之前各行之和（人工行一并计入）。"""
+    """合计 = 合计行之前各行之和（人工行一并计入）；上方各行这一列都没有数则不重算（不写 0）。"""
     index = note_writer.find_total_row(table.rows)
     if index is None:
         return False
@@ -877,6 +917,10 @@ def _push_note_total(
             continue
         value = note_writer.total_formula(table.rows, index, field_name, table.value_keys)
         addr = note_addr_id(section, table_name, label, period)
+        if value is None:
+            ctx.skip(rule.rule_id, "note", "note", addr,
+                     f"合计行「{label}」上方各行这一列都没有数，合计不按 0 重算，附注保持原值")
+            continue
         mode = note_writer.external_mode(table.section_locked, cell_mode)
         decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)
         if decision.writes:

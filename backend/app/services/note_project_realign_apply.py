@@ -69,13 +69,14 @@ def seed_index(template_type: str) -> dict[str, dict[str, Any]]:
 async def load_rows(db: AsyncSession, project_id: uuid.UUID, year: int, *, lock: bool = False) -> list[NoteRow]:
     """该项目该年度全部附注行（含软删），Core 查询（不进 ORM 身份映射，执行后再读拿到的是库内现值）。"""
     t = DisclosureNote.__table__
-    stmt = sa.select(t.c.id, t.c.note_section, t.c.section_title, t.c.account_name, t.c.section_id, t.c.parent_section_id, t.c.level,
-                     t.c.sort_index, t.c.sort_order, t.c.is_deleted, t.c.text_content, t.c.table_data
-                     ).where(t.c.project_id == project_id, t.c.year == year)
+    stmt = sa.select(t.c.id, t.c.note_section, t.c.section_title, t.c.account_name, t.c.guidance_text, t.c.section_id,
+                     t.c.parent_section_id, t.c.level, t.c.sort_index, t.c.sort_order, t.c.is_deleted, t.c.text_content,
+                     t.c.table_data).where(t.c.project_id == project_id, t.c.year == year)
     if lock:
         stmt = stmt.with_for_update()
     return [NoteRow(id=str(r.id), note_section=r.note_section, section_title=r.section_title or "",
-                    account_name=r.account_name, section_id=r.section_id, parent_section_id=r.parent_section_id, level=r.level,
+                    account_name=r.account_name, guidance_text=r.guidance_text,
+                    section_id=r.section_id, parent_section_id=r.parent_section_id, level=r.level,
                     sort_index=r.sort_index, sort_order=r.sort_order, is_deleted=bool(r.is_deleted),
                     text_hash=_hash(r.text_content), table_hash=_hash(r.table_data))
             for r in (await db.execute(stmt)).all()]
@@ -260,7 +261,9 @@ async def apply_table_realignment(db: AsyncSession, project_id: uuid.UUID, year:
     deleted = (await db.execute(sa.select(Project.is_deleted).where(Project.id == project_id))).scalar_one_or_none()
     if deleted is None or deleted:
         raise RealignSkipped("项目不存在或已删除（回收站），不处理")
-    from app.services.note_project_table_realign import TableRealignError, realign_section_tables
+    from app.services.note_project_table_realign import (
+        TableRealignError, realign_section_tables, section_needs_write,
+    )
 
     seed_tables = await _seed_tables_by_code(db, project_id)
     sections = await _active_sections(db, project_id, year, lock=True)
@@ -282,16 +285,22 @@ async def apply_table_realignment(db: AsyncSession, project_id: uuid.UUID, year:
         if orphans and not allow_orphans:
             raise RealignError(f"节 {code} 产生 {len(orphans)} 条孤儿，allow_orphans=False 拒绝落库")
         orphan_total += sum(len(o.get("values") or []) for o in orphans)
-        if _hash(new_td) == _hash(td):
-            continue  # 结构与值都没变（含孤儿恒无）⇒ 不写
+        if not section_needs_write(td, new_td):
+            continue  # 表头 / 行 / 值 / 孤儿都没变（只差种子元数据）⇒ 不写，与 dry-run 的「会改」同一判据
         await db.execute(sa.update(t).where(t.c.id == uuid.UUID(nid)).values(table_data=new_td))
         written += 1
     await db.flush()
-    # 正文哈希逐行不变（搬值只碰 table_data）
+    # 正文哈希逐行不变（搬值只碰 table_data）；写完再按同一判据重算一遍必须 0 节要改（不幂等 ⇒ 回滚）
     after = await _active_sections(db, project_id, year)
-    for nid, _c, _td, text in after:
+    still: list[str] = []
+    for nid, code, td, text in after:
         if text_before.get(nid) != _hash(text):
             raise RealignError(f"节行 {nid} 正文被改动（搬值只应改表格）")
+        seed = seed_tables.get(code)
+        if seed is not None and (seed or td) and section_needs_write(td, realign_section_tables(td, seed)):
+            still.append(code)
+    if still:
+        raise RealignError(f"搬值后重算仍有 {len(still)} 节要改（{', '.join(sorted(still)[:10])}）：不幂等，整体回滚")
     return {"project_id": str(project_id), "year": year, "written_sections": written,
             "orphan_values": orphan_total, "backup": str(backup_path) if backup_path else None}
 

@@ -10,7 +10,8 @@
    得到现行编号；现行编号已被同项目同年度任何行占用（**含软删**：唯一索引不排除软删行）⇒ 不改，记冲突。
 2. 树字段：对上模板的行按模板重写 ``parent_section_id / level / sort_index / sort_order / section_id``；
    ``section_title`` 只在行标题是该节某个已知标题（现名、口径名、``legacy_titles``）时改；
-   若 ``account_name`` 仍逐字等于该旧系统标题，也跟随改为模板值，人工另改的 account_name 不动。
+   若 ``account_name`` 仍逐字等于该旧系统标题，也跟随改为模板值，人工另改的 account_name 不动；
+   旧标题尾部带着模板 ``title_hint``（编制提示）时，提示经 ``merge_title_hint_guidance`` 并入 ``guidance_text``。
    ``section_id`` 一律对齐模板（子节点的 ``parent_section_id`` 按模板写，上级不对齐树就断）；目标 id 被别的行
    占用（且那一行不会让出）时不改并报告。
 3. 补章：模板有、项目没有的编号由生成链补（``generate_notes(only_sections=…)``，不复制构造逻辑）；编号被软删行
@@ -27,6 +28,7 @@ from typing import Any
 
 from app.services.note_section_catalog import normalize_section_code
 from app.services.note_section_kind import canonical_title, classify_note_section
+from app.services.note_title_hint import merge_title_hint_guidance
 
 #: 对上模板的行要对齐的树字段（与 ``disclosure_engine._fill_tree_fields`` 同一组，外加 sort_order）
 TREE_FIELDS = ("section_id", "parent_section_id", "level", "sort_index", "sort_order")
@@ -40,6 +42,7 @@ class NoteRow:
     note_section: str
     section_title: str
     account_name: str | None = None
+    guidance_text: str | None = None
     section_id: str | None = None
     parent_section_id: str | None = None
     level: int | None = None
@@ -264,6 +267,12 @@ def _plan_tree(plan: RealignPlan, active: list[NoteRow], final: dict[str, str], 
         if r.section_title != title:
             if title_is_known:
                 changes["section_title"] = [r.section_title, title]
+                # 旧标题尾部的编制提示（种子已拆进 title_hint）随标题拿掉时并入编制指引，与生成链同口径，不丢提示
+                hint = t.get("title_hint")
+                if isinstance(hint, str) and hint and hint in (r.section_title or ""):
+                    guidance = merge_title_hint_guidance(hint, r.guidance_text)
+                    if guidance != (r.guidance_text or None):
+                        changes["guidance_text"] = [r.guidance_text, guidance]
             else:
                 plan.titles_kept.append({"note_id": r.id, "note_section": code, "title": r.section_title,
                                          "template_title": title})

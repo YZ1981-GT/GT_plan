@@ -98,6 +98,21 @@ def _load_note_template(template_type: str) -> list[dict]:
     return sections
 
 
+def template_section_title(template_type: str | None, section_number: str | None) -> str | None:
+    """附注模板（种子）里该章节号的章节标题；模板类型 / 章节不存在返回 None。"""
+    if not template_type or not section_number:
+        return None
+    try:
+        sections = _load_note_template(template_type)
+    except (OSError, json.JSONDecodeError):
+        return None
+    for sec in sections:
+        if sec.get("section_number") == section_number:
+            title = str(sec.get("section_title") or "").strip()
+            return title or None
+    return None
+
+
 def _find_template_table(
     template_type: str, section_number: str, table_name: str,
 ) -> dict | None:
@@ -557,16 +572,23 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
     return None
 
 
-def find_total_row(rows: Sequence[Any]) -> int | None:
-    """找整表最终合计，优先级：明确 ``row_type=total`` / 标签「合计、总计」> 其他 is_total。
-
-    一张表可同时有分段「小计」和末尾「合计」。原来返回首个 ``is_total``，公式兜底会把值写进小计并跳过
-    最终合计重算，留下空的合计行。倒序优先最终合计；只有小计时仍返回最后一个可用汇总行。
-    """
-    candidates = [
+def total_row_candidates(rows: Sequence[Any]) -> list[int]:
+    """表里全部汇总行（``is_total`` 或 ``row_type=total``）的下标，按出现顺序。"""
+    return [
         index for index, row in enumerate(rows)
         if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
     ]
+
+
+def find_total_row(rows: Sequence[Any]) -> int | None:
+    """找整表最终合计，优先级：明确 ``row_type=total`` / 标签「合计、总计」> 其他 is_total。
+
+    一张表可同时有分段「小计」和末尾「合计」。合计按上方各行重算时要的是最终合计；倒序优先最终合计，只有小计时
+    仍返回最后一个可用汇总行。🔴 「取数行对不上任何明细行、把科目余额兜底写进合计」不能用它挑行：有多个汇总行时
+    科目余额是哪一段（原值合计还是账面价值合计、小计还是减去减值后的合计）由科目决定，引擎不知道，见
+    ``engine._push_note`` 的兜底分支（只在恰好一个汇总行时兜底）。
+    """
+    candidates = total_row_candidates(rows)
     for index in reversed(candidates):
         row = rows[index]
         label = row_label(row).replace(" ", "")
@@ -614,16 +636,24 @@ def external_mode(section_locked: bool, cell_mode: str | None) -> str | None:
     return None
 
 
-def total_formula(rows: Sequence[Any], total_index: int, field: str, value_keys: list[str]) -> float:
-    """合计 = 合计行之前各非合计行该列之和（缺值按 0；「其中：」行在合计之后，天然不计）。"""
+def total_formula(rows: Sequence[Any], total_index: int, field: str, value_keys: list[str]) -> float | None:
+    """合计 = 合计行之前各非合计行该列之和（缺值按 0；「其中：」行在合计之后，天然不计）。
+
+    上方各行这一列一个数都没有 ⇒ 返回 ``None``：合计是「不知道」，不是 0（填了 0 的格算有数）。原来全空也按 0 求和，
+    推送把空表的合计写成 0（2026-10-31 真库：三个项目 八、9 其他应收款、八、42 其他应付款 主表合计都是 [0, 0]）。
+    spec disclosure-note-template-word-realignment Task 34/35。
+    """
     total = 0.0
+    has_number = False
     for row in rows[:total_index]:
         if not isinstance(row, dict) or row.get("is_total"):
             continue
         ok, current, _ = read_cell(row, field, value_keys)
         number = read_number(current) if ok else None
-        total = total + (number if number is not None else 0.0)
-    return total
+        if number is not None:
+            total = total + number
+            has_number = True
+    return total if has_number else None
 
 
 def has_obscured_data(table_data: dict, table_name: str) -> str | None:

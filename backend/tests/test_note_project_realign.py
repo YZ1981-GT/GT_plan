@@ -78,6 +78,30 @@ def test_title_rewritten_only_when_it_is_a_known_old_title() -> None:
                                  "template_title": "应收账款"}]
 
 
+def test_title_hint_moves_into_guidance_when_old_title_is_cleaned() -> None:
+    """种子把标题尾部编制提示拆进 title_hint：存量行标题按 legacy_titles 清理时，提示并入编制指引（与生成链同口径）。"""
+    old = "投资收益【下表中不适用的项目，删除】"
+    templates = [_t("八", "财务报表主要项目注释", "c8", None, 1, 800),
+                 {**_t("八、70", "投资收益", "c8-70", "c8", 2, 870, 70), "title_hint": "下表中不适用的项目，删除"}]
+    seeds = {"八、70": {"section_title": "投资收益", "legacy_titles": [old]}}
+
+    def plan_for(**kw):
+        rows = [_row("c8", "八", "财务报表主要项目注释", section_id="c8", parent_section_id=None, level=1,
+                     sort_order=800, sort_index=0),
+                NoteRow(id="ii", note_section="八、70", section_title=kw.pop("title", old), section_id="c8-70",
+                        parent_section_id="c8", level=2, sort_order=870, sort_index=70, **kw)]
+        return plan_realignment(rows, templates, template_type="soe", report_scope="standalone", seeds=seeds)
+
+    plan = plan_for(account_name=old)
+    assert plan.tree_updates == [{"note_id": "ii", "note_section": "八、70", "changes": {
+        "section_title": [old, "投资收益"], "guidance_text": [None, "标题提示：下表中不适用的项目，删除"],
+        "account_name": [old, "投资收益"]}}]
+    kept_guidance = plan_for(guidance_text="请核对本期金额").tree_updates[0]["changes"]["guidance_text"]
+    assert kept_guidance == ["请核对本期金额", "标题提示：下表中不适用的项目，删除\n\n请核对本期金额"]
+    assert "guidance_text" not in plan_for(guidance_text="提示：下表中不适用的项目，删除").tree_updates[0]["changes"]
+    assert plan_for(title="投资收益（审计师改）").tree_updates == []  # 人工标题不动，提示也不搬
+
+
 def test_section_ids_swapped_both_fixed_and_custom_child_follows() -> None:
     rows = [r for r in _aligned() if r.note_section not in ("八、5", "八、16")]
     rows += [_row("ar", "八、5", "应收账款", section_id="c8-16"), _row("odi", "八、16", "其他债权投资", section_id=None),
@@ -174,6 +198,8 @@ def test_plan_on_planned_result_is_empty() -> None:
 
 # ── 执行：真 SQLite + 真 ORM + 真生成链（只替换取数与构表）────────────────────
 
+import copy  # noqa: E402
+import json  # noqa: E402
 import uuid  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
 
@@ -475,10 +501,73 @@ async def test_table_apply_idempotent(table_project, db: AsyncSession) -> None:
 
     await apply_table_realignment(db, table_project["pid"], YEAR)
     await db.commit()
-    # 再搬一次：结构已对齐、值在正确落点 ⇒ 0 写（但孤儿已固化，changed 仍报 True）
+    # 再搬一次：结构已对齐、值在正确落点、孤儿区已固化 ⇒ 预演 0 节、写入 0 节
+    plan = await plan_table_realignment(db, table_project["pid"], YEAR)
+    await db.rollback()
+    assert plan["changed_sections"] == 0 and plan["orphan_values"] == 3
     report = await apply_table_realignment(db, table_project["pid"], YEAR)
     await db.commit()
     assert report["written_sections"] == 0
+
+
+@pytest_asyncio.fixture
+async def two_section_project(db: AsyncSession, monkeypatch):
+    """八、1 列序颠倒（要写）+ 八、2 只差种子元数据（不该写）；顶层都带首表镜像（生成链形态）。"""
+    import app.services.note_project_realign_apply as mod
+
+    seed_other = {"name": "其他流动资产", "headers": ["项目", "期末余额", "期初余额"],
+                  "columns": [{"key": "label", "is_label": True}, {"key": "end"}, {"key": "begin"}],
+                  "text_after_table": "注：……",
+                  "rows": [{"label": "待抵扣进项税额", "account_codes": ["2221"]}, {"label": "合计", "is_total": True}]}
+
+    async def _seeds(_db, _pid):
+        return {**_SEED_TABLES, "八、2": [seed_other]}
+
+    monkeypatch.setattr(mod, "_seed_tables_by_code", _seeds)
+    pid = uuid.uuid4()
+    db.add(Project(id=pid, name="搬值乙_2025", client_name="搬值乙", template_type="soe", report_scope="standalone"))
+
+    def _with_mirror(tbl: dict) -> dict:
+        return {"name": tbl["name"], "headers": tbl["headers"], "rows": copy.deepcopy(tbl["rows"]),
+                "_tables": [tbl], "_source": "workpaper"}
+
+    money = {"name": "货币资金", "headers": ["项目", "期初余额", "期末余额"],
+             "rows": [{"label": "库存现金", "values": [200, 100]}, {"label": "银行存款", "values": [400, 300]},
+                      {"label": "合计", "values": [600, 400], "is_total": True}]}
+    other = {"name": "其他流动资产", "headers": ["项目", "期末余额", "期初余额"],
+             "rows": [{"label": "待抵扣进项税额", "values": [5, None], "is_total": False, "_cell_modes": {}},
+                      {"label": "合计", "values": [5, 0], "is_total": True, "_cell_meta": {}}]}
+    ids = {"八、1": uuid.uuid4(), "八、2": uuid.uuid4()}
+    tds = {"八、1": _with_mirror(money), "八、2": _with_mirror(other)}
+    for code, nid in ids.items():
+        db.add(DisclosureNote(id=nid, project_id=pid, year=YEAR, note_section=code, section_title=code,
+                              text_content=f"<p>{code}</p>", table_data=tds[code]))
+    await db.commit()
+    return {"pid": pid, "ids": ids, "tds": copy.deepcopy(tds)}
+
+
+@pytest.mark.asyncio
+async def test_table_apply_writes_only_visible_changes_and_keeps_mirror(two_section_project, db: AsyncSession) -> None:
+    """回归（2026-10-31 真库）：预演报 5 节，写入却按整节哈希写了 104 节（只差种子元数据也重写）。"""
+    from app.services.note_project_realign_apply import apply_table_realignment, plan_table_realignment
+
+    p = two_section_project
+    plan = await plan_table_realignment(db, p["pid"], YEAR)
+    await db.rollback()
+    assert plan["compared_sections"] == 2 and plan["changed_sections"] == 1
+    report = await apply_table_realignment(db, p["pid"], YEAR)
+    await db.commit()
+    assert report["written_sections"] == plan["changed_sections"] == 1
+    untouched = await db.get(DisclosureNote, p["ids"]["八、2"], populate_existing=True)
+    assert json.dumps(untouched.table_data, sort_keys=True) == json.dumps(p["tds"]["八、2"], sort_keys=True)
+    moved = (await db.get(DisclosureNote, p["ids"]["八、1"], populate_existing=True)).table_data
+    assert [r["values"] for r in moved["_tables"][0]["rows"]] == [[100, 200], [300, 400], [400, 600]]
+    # 首表镜像随新首表重建，其他顶层键保留
+    assert moved["rows"] == moved["_tables"][0]["rows"] and moved["headers"] == ["项目", "期末余额", "期初余额"]
+    assert moved["_source"] == "workpaper"
+    again = await plan_table_realignment(db, p["pid"], YEAR)
+    await db.rollback()
+    assert again["changed_sections"] == 0
 
 
 @pytest.mark.asyncio
@@ -501,6 +590,31 @@ async def test_table_apply_refuses_when_text_changes(table_project, db: AsyncSes
     monkeypatch.setattr(mod, "_active_sections", _active_with_text_drift)
     with pytest.raises(RealignError, match="正文被改动"):
         await apply_table_realignment(db, table_project["pid"], YEAR)
+
+
+@pytest.mark.asyncio
+async def test_table_apply_refuses_when_result_is_not_a_fixed_point(table_project, db: AsyncSession,
+                                                                     monkeypatch) -> None:
+    """写完按同一判据重算必须 0 节：注入「写进去的结果再搬还会变」（多一行占位空行）⇒ 不幂等，整体回滚。"""
+    import app.services.note_project_table_realign as kernel
+    from app.services.note_project_realign_apply import RealignError, apply_table_realignment
+
+    real = kernel.realign_section_tables
+    calls = {"n": 0}
+
+    def _unstable(td, seed):
+        out = real(td, seed)
+        calls["n"] += 1
+        if calls["n"] == 1:  # 写入那次多塞一行空占位行（值全空，multiset 不变）
+            out["_tables"][0]["rows"].append({"label": "", "values": [None, None]})
+        return out
+
+    monkeypatch.setattr(kernel, "realign_section_tables", _unstable)
+    with pytest.raises(RealignError, match="不幂等"):
+        await apply_table_realignment(db, table_project["pid"], YEAR)
+    await db.rollback()
+    note = await db.get(DisclosureNote, table_project["nid"], populate_existing=True)
+    assert note.table_data == table_project["td"]
 
 
 @pytest.mark.asyncio

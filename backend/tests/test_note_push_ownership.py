@@ -208,6 +208,35 @@ async def test_fallback_total_is_restored_like_a_cell(env) -> None:
 
 
 @pytest.mark.asyncio
+async def test_total_with_empty_column_is_not_recomputed_to_zero(env) -> None:
+    """恢复了数据格、但合计这一列上方各行都没有数 ⇒ 这一列合计不重算（不写 0，与推送 ``_push_note_total`` 同口径）。
+
+    spec disclosure-note-template-word-realignment Task 34/35（真库 八、9 / 八、42 主表合计被推成 [0, 0]）。
+    """
+    from app.models.formula_push_models import FormulaPushState
+
+    async with env.factory() as db:
+        for addr, value in (("note://五、1/受限制的货币资金明细/保证金.end", 40.0),
+                            ("note://五、1/受限制的货币资金明细/合计.end", 40.0),
+                            ("note://五、1/受限制的货币资金明细/合计.prior", 0.0)):
+            db.add(FormulaPushState(
+                id=uuid.uuid4(), project_id=env.pid, year=YEAR, addr_id=addr, rule_id=E1_NOTE_RULE,
+                domain="note", note_section="五、1", state="auto", last_pushed_value=value,
+            ))
+        await db.commit()
+        td = {"sub_table_data": {"受限制的货币资金明细": [
+            {"label": "保证金", "end_amount": 30, "prior_amount": None},
+            {"label": "合计", "is_total": True, "end_amount": 30, "prior_amount": 12},
+        ]}}
+        kept = await reapply_pushed_cells(db, project_id=env.pid, year=YEAR, section="五、1", table_data=td,
+                                          touched=["受限制的货币资金明细"])
+    rows = td["sub_table_data"]["受限制的货币资金明细"]
+    assert rows[0]["end_amount"] == 40.0 and rows[1]["end_amount"] == 40.0, "期末：恢复数据格后按本表重算（判据不空转）"
+    assert rows[1]["prior_amount"] == 12, "期初上方全空：不重算成 0"
+    assert {(k["row"], k["period"], k["kind"]) for k in kept} == {("保证金", "end", "cell"), ("合计", "end", "total")}
+
+
+@pytest.mark.asyncio
 async def test_untouched_tables_and_unknown_states_are_ignored(env) -> None:
     async with env.factory() as db:
         td = {"sub_table_data": {"货币资金": [{"label": "库存现金", "end_amount": 999}]}}

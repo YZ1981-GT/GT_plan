@@ -75,6 +75,37 @@ async def load_tb_audited(db, project_id: UUID, year: int, codes: Collection[str
     )
 
 
+@dataclass(frozen=True)
+class PriorPlSnapshot:
+    """损益类科目的上年发生额。``tb_data`` = 上年试算表审定口径（``本期发生额``）；取不到为 ``None``，``reason`` 写明原因。"""
+
+    tb_data: Mapping[str, Mapping[str, Decimal]] | None
+    reason: str = ""
+
+
+async def load_prior_pl(db, project_id: UUID, year: int, codes: Collection[str]) -> PriorPlSnapshot | None:
+    """损益类（标准码 6 开头）附注「上期发生额」的来源：上年试算表审定数，与报表上期、PREV 同一查找口径
+    （``prior_year_context.resolve_prior_source``：同项目有上年试算表 → 同项目；否则唯一的上年项目）。
+
+    🔴 不能取本年试算表的 ``opening_balance``：损益类科目年初恒为 0（真库和平药房_2025 的 6 字头年初余额全是 0.00），
+    原来这样取，附注上期发生额全部被推成 0（和平 销售费用上期应为 242,169,736.06，报表上期就是这个数）。取不到上年
+    数据就不出值（附注保持原值、写明原因），不代入 0。没有损益类科目返回 ``None``。
+    spec disclosure-note-template-word-realignment Task 34/35。
+    """
+    wanted = [str(c) for c in codes if str(c).startswith("6")]
+    if not wanted:
+        return None
+    from app.services.prior_year_context import resolve_prior_source
+
+    src = await resolve_prior_source(db, project_id, year)
+    if src.project_id is None:
+        return PriorPlSnapshot(None, f"损益类上期发生额取上年试算表：{src.reason}")
+    prior = await load_tb_audited(db, src.project_id, src.year, wanted)
+    if not prior.available:
+        return PriorPlSnapshot(None, f"损益类上期发生额取上年试算表：上年项目没有 {src.year} 年试算表")
+    return PriorPlSnapshot(prior.tb_data)
+
+
 async def load_hall_adjustments(db, project_id: UUID, year: int, codes: Collection[str]) -> dict[str, dict[str, Decimal]]:
     """大厅已批准、非底稿来源的调整净额，按标准码**前缀**归入所给科目（键名沿用 ``adj_net_batch``，禁转换）。
 

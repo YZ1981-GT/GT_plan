@@ -574,10 +574,23 @@ async def test_d1_listed_entries_push_does_not_touch_soe(env_listed):
 # ── 骨架构建测试（Task 4） ───────────────────────────────────────────────
 
 
+async def _seed_skeleton_d1(env) -> None:
+    """骨架用例的最小 D1 数据：只有银行承兑汇票余额（没有坏账快照 ⇒ 坏账准备 / 账面价值取不到）。
+
+    🔴 原来这几条用例不种 D1 数据也「建出了骨架」，靠的是合计按「缺值按 0」重算、往空骨架合计写了六个 0（假零）；
+    合计上方全空不再重算后（spec disclosure-note-template-word-realignment Task 34/35），没有数可写就不落骨架，
+    见 test_d1_no_data_does_not_persist_empty_skeleton。
+    """
+    await _seed_d1_entries(env, cat_rows=[
+        _make_cat_row("fixed-bank", "银行承兑汇票", prior_unadj=500000, cur_increase=300000),
+    ], bd_rows=[])
+
+
 @pytest.mark.asyncio
 async def test_d1_listed_builds_skeleton_when_table_missing(env_listed):
     """附注章节存在、有 sub_table_data 但缺目标表时，引擎建骨架。"""
     await env_listed.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_listed)
     # 种一个有其他子表但缺「应收票据」的附注章节
     await env_listed.add_note("五、4", {
         "_source": "workpaper",
@@ -593,12 +606,35 @@ async def test_d1_listed_builds_skeleton_when_table_missing(env_listed):
     rows = sub["应收票据"]
     labels = [r["label"] for r in rows]
     assert labels == ["银行承兑汇票", "商业承兑汇票", "合计"]
+    assert rows[0]["end_balance"] == 800000 and rows[2]["end_balance"] == 800000
+
+
+@pytest.mark.asyncio
+async def test_d1_no_data_does_not_persist_empty_skeleton(env_listed):
+    """缺表、但 D1 没有任何数据：骨架只在内存里建，没有一格可写 ⇒ 附注不动，合计不写 0，逐格说明原因。"""
+    await env_listed.seed_entries(base_entries())
+    original = {
+        "_source": "workpaper",
+        "sub_table_data": {"期末已质押的应收票据": [{"label": "合计", "is_total": True}]},
+        "_sub_table_columns": {"期末已质押的应收票据": [{"key": "label", "is_label": True}]},
+    }
+    await env_listed.add_note("五、4", original, title="应收票据")
+
+    result = await env_listed.push(codes=["D1"])
+
+    note = await env_listed.note("五、4")
+    assert note.table_data == original and note.last_sync_source is None
+    assert "五、4" not in result.note_sections
+    total_skips = [i for i in result.items if i.rule_id == "D1.note.main" and i.action == "skipped"
+                   and "上方各行这一列都没有数" in (i.reason or "")]
+    assert len(total_skips) == 6, [(i.addr_id, i.action, i.reason) for i in result.items if i.rule_id == "D1.note.main"]
 
 
 @pytest.mark.asyncio
 async def test_d1_soe_builds_skeleton_with_variant_table_name(env_soe):
     """国企项目：缺表时骨架用「应收票据分类」（soe 变体表名）。"""
     await env_soe.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_soe)
     await env_soe.add_note("八、4", {
         "_source": "workpaper",
         "sub_table_data": {"期末已质押的应收票据": [{"label": "合计", "is_total": True}]},
@@ -687,6 +723,7 @@ async def test_d1_skeleton_then_six_fields_written(env_listed):
 async def test_d1_skeleton_columns_include_six_fields(env_listed):
     """骨架构建后 _sub_table_columns 包含六字段列定义。"""
     await env_listed.seed_entries(base_entries())
+    await _seed_skeleton_d1(env_listed)
 
     # 附注章节有其他子表但缺「应收票据」
     await env_listed.add_note("五、4", {
@@ -1555,16 +1592,21 @@ def test_d4_note_rows_pl_dual_code():
     d4_rule = next(r for r in rules if r.rule_id == "D4.note.main")
     assert d4_rule.target.sections == {"listed": "五、62", "soe": "八、64"}
 
+    from app.services.formula_push.sources import PriorPlSnapshot
+
     binding = TierAAnchorBinding(wp_code="D4", account_prefixes=("6001", "6051"))
-    binding._last_tb_data = {
-        "6001": {"本期发生额": Decimal("900000"), "年初余额": Decimal("700000")},
-        "6051": {"本期发生额": Decimal("600000"), "年初余额": Decimal("500000")},
+    binding._last_tb_data = {  # 本年年初余额（损益类真库恒 0）不是上期，这里故意给非 0 值证明没被读
+        "6001": {"本期发生额": Decimal("900000"), "年初余额": Decimal("1")},
+        "6051": {"本期发生额": Decimal("600000"), "年初余额": Decimal("1")},
     }
+    binding._last_prior_pl = PriorPlSnapshot({
+        "6001": {"本期发生额": Decimal("700000")}, "6051": {"本期发生额": Decimal("500000")},
+    })
     rows = binding.note_rows({}, "listed", d4_rule)
 
     # 双科目 → 2 行数据 + 1 行合计 = 3 行
     assert len(rows) == 3
-    # 损益类：ending 取「本期发生额」
+    # 损益类：ending 取「本期发生额」，上期取上年试算表发生额
     assert rows[0]["ending"] == 900000.0
     assert rows[0]["opening"] == 700000.0
     assert rows[1]["ending"] == 600000.0
@@ -1572,7 +1614,12 @@ def test_d4_note_rows_pl_dual_code():
     # 合计行
     assert rows[2]["is_total"] is True
     assert rows[2]["ending"] == 1500000.0
-    assert rows[2]["opening"] == 1200000.0
+    assert rows[2]["opening"] == 1200000.0 and rows[2]["opening_resolved"] is True
+    # 上年数据取不到 ⇒ 各行与合计行的上期都不出值（不推 0）
+    binding._last_prior_pl = PriorPlSnapshot(None, "损益类上期发生额取上年试算表：没有上年项目")
+    rows = binding.note_rows({}, "listed", d4_rule)
+    assert [r["opening_resolved"] for r in rows] == [False, False, False]
+    assert all("没有上年项目" in r["opening_reason"] for r in rows)
 
 
 def test_d5_has_no_account_and_no_rules():

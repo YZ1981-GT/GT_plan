@@ -189,3 +189,19 @@ def test_total_formula_sums_rows_before_total_only():
     assert nw.total_formula(rows, total, "end_amount", []) == 3.75
     f3_rows = f3()["sub_table_data"]["货币资金"]
     assert nw.total_formula(f3_rows, 2, "end_amount", ["end_amount", "prior_amount"]) == 1.0
+
+
+def test_total_formula_without_any_number_is_unknown():
+    """上方各行这一列一个数都没有 ⇒ None（合计不知道，不是 0）；填了 0 的格算有数；上方的汇总行不算。
+
+    2026-10-31 真库：三个项目 八、9 / 八、42 主表合计被推成 [0, 0]（spec disclosure-note-template-word-realignment Task 34/35）。
+    """
+    rows = [{"label": "甲", "end_amount": None}, {"label": "乙", "end_amount": ""},
+            {"label": "小计", "end_amount": 5, "is_total": True}, {"label": "合计", "end_amount": 7, "is_total": True}]
+    assert nw.total_formula(rows, 3, "end_amount", []) is None
+    rows[1]["end_amount"] = 0
+    assert nw.total_formula(rows, 3, "end_amount", []) == 0.0
+    f3_rows = [{"label": "甲", "values": [None, 1]}, {"label": "合计", "values": [9, 9], "is_total": True}]
+    keys = ["end_amount", "prior_amount"]
+    assert nw.total_formula(f3_rows, 1, "end_amount", keys) is None
+    assert nw.total_formula(f3_rows, 1, "prior_amount", keys) == 1.0

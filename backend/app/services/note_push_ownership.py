@@ -135,7 +135,8 @@ async def reapply_pushed_cells(
             rows, keys = sub[table], _value_keys(table_data, table)
             ok, incoming, _mode = note_writer.read_cell(rows[index], field, keys)
             total = note_writer.total_formula(rows, index, field, keys)
-            if ok and not values_equal(incoming, total):
+            # 上方各行这一列都没有数 ⇒ 不重算（与 ``_push_note_total`` 同口径，不写 0）
+            if ok and total is not None and not values_equal(incoming, total):
                 note_writer.write_cell(rows[index], field, total, keys)
                 kept.append({"table": table, "row": label, "period": period, "field": field, "kind": "total",
                              "pushed": total, "incoming": incoming})
