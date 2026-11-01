@@ -2,14 +2,14 @@
 
 ## Overview
 
-> **状态**：23/49（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：24/49（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
 > 闭合性守卫对这类**外部消费方**零覆盖（14 条判据无一会因此打红）。证据与逐脚本普查见
 > `evidence/phase0-spec-doc-consumer-breakage-2026-11-01.md`。总数因此 48 → 49。
 >
-> 已勾选的 23 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
+> 已勾选的 24 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
 > 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
 >
 > **完成标记规则**：每项必须同时有实际产物、对应测试/检查通过记录和可复核 evidence。
@@ -313,8 +313,26 @@
   - 以 AST 确认生产调用为零，旧测试改为断言空壳不存在且 B60/D2/G7/H1 真桥仍可达；禁止保留兼容墓碑。
   - _AC: 1.4, 1.7_
 
-- [ ] 5.5 把 Task 66 删除计划升级为可收缩执行账
+- [x] 5.5 把 Task 66 删除计划升级为可收缩执行账
   - 已满足 entry 必须从 pending 进入物理删除并重验；失效项自动移除，计划外 legacy/unreachable 新增立即打红。
+  - 产物：`backend/scripts/gen/generate_task66_execution_ledger.py`（`--check`/`--write`，输出幂等无时间戳）
+    + `backend/data/workpaper_sync_task66_execution_ledger.json` + 守卫
+    `backend/tests/workpaper_sync/test_task66_execution_ledger.py`（13 例全绿，带
+    `-W error::pytest.PytestUnhandledThreadExceptionWarning` 复跑同样全绿）。
+  - 三态现算（126 个唯一 path）：`landed 28`（已不在盘上，**自动出账**）/ `drifted 28`（内容变了，
+    须 owner 重判）/ `intact 70`；`outstanding 97` = 125 pending − 28 landed，棘轮基线写在**守卫**
+    里而非产物里；`unplanned_legacy_paths 0`。对照冻结计划自报的 `pending_delete 207`，**44% 已失效**。
+  - BP 全部重算不沿用冻结 verdict：BP-66-1 **已释放**（现算 116 个生产文件 import
+    `WorkpaperSyncEditorHost`，计划冻结值是「unreachable 19」）· BP-66-2 **已释放**（`git ls-files`
+    现问 untracked 0，计划冻结值 22）· BP-66-3 仍成立（authority model 未定，owner 在 Phase 6，
+    如实标 `recomputed: false`）⇒ `eligible_now_count 0`，fail closed 不是豁免。
+  - 冻结生成器登记退役（`retired_superseded_by_this_ledger`）+ 守卫钉死它不在 CI / pre-commit /
+    pre-push 五处任一处被引用（不留永红门禁）；「冻结产物没再变」由 `frozen_inputs.plan_digest` 承担。
+  - 变异：8 组（M0 阴性对照保持绿；M1 棘轮虚高 / M2 忽略 live blocker / M3 landed 不出账 /
+    M4 加时间戳破坏幂等 / M5 fork legacy 正则 / M6 把退役生成器接回门禁 / M7 放计划外 legacy 文件
+    全红），数据级变异先 `--write` 重生成再跑用例，每组逐字节恢复并校验 sha256。
+  - evidence：`evidence/task5.5-execution-ledger-2026-11-01.md`（含守卫首跑抓到的 `text=True`
+    按本机 gbk 解码致中文断言永假的真实问题及根因修复）。
   - _AC: 1.7, 12.9_
 
 ## Phase 6：真实 evidence 与 closure
