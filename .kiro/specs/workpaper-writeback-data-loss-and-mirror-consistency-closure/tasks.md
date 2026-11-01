@@ -91,4 +91,10 @@
 - [ ] 7. 收尾
   - [x] 7.1 语义审查并修复高优先级发现（第一轮 P0/P1 已闭合；第二轮 P1-1~P1-3 见任务 8）
   - [x] 7.2 更新 INDEX / memory（memory 精简至 299 行），锁定分离头候选树复跑关键验证
-  - [ ] 7.3 只提交本 spec 文件与改动块；同步远端后按版本工具推送当前分支
+  - [x] 7.3 只提交本 spec 文件与改动块；同步远端后按版本工具推送当前分支
+        —— 单提交 `68458e2e3`（41 files，+871/-195）+ 附注标签 **v1.0.98**，已在远端
+        `spec/disclosure-note-doc-upload-and-batch-fill` 核对一致。推送前远端前移两次
+        （`a77026baf` → `61997c4fc` → `79d07ccad`），各变基一次并在变基后重跑验证：
+        前端 14 files / 116 passed、后端 488 passed、真实 PG 107 passed、ruff 32 F401
+        全部落在只改了注释的三个文件里（预存）。pre-push 对分离头跳过其余检查，
+        已手工补跑 `check_staged_tree_self_consistency.py`（26207 个文件，2 道门 exit 0）
