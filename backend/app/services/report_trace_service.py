@@ -38,20 +38,19 @@ class ReportTraceService:
             "top_ledger_entries": [],
         }
 
-        # 1. 查附注-底稿映射
+        # 1. 查附注-底稿映射（S5 R2：统一读取注册表）
         try:
-            mapping_result = await db.execute(sa.text(
-                "SELECT wp_code, account_codes, note_title "
-                "FROM note_wp_mapping "
-                "WHERE project_id = :pid AND note_section = :sec "
-                "LIMIT 1"
-            ), {"pid": str(project_id), "sec": section_number})
-            mapping = mapping_result.first()
-            if mapping:
+            from app.services.note_readiness_service import (
+                NoteRegistryUnavailable,
+                ProjectNoteMappingInvalid,
+                resolve_section_workpapers,
+            )
+            resolved = await resolve_section_workpapers(db, project_id, section_number)
+            if resolved.status == "mapped" and resolved.wp_codes:
                 trace["note_data"] = {
-                    "wp_code": mapping.wp_code,
-                    "account_codes": mapping.account_codes,
-                    "note_title": mapping.note_title,
+                    "wp_code": resolved.wp_codes[0],
+                    "wp_codes": list(resolved.wp_codes),
+                    "note_title": section_number,
                 }
                 # 2. 查底稿 parsed_data
                 wp_result = await db.execute(sa.text(
@@ -59,10 +58,12 @@ class ReportTraceService:
                     "JOIN wp_index wi ON wp.wp_index_id = wi.id "
                     "WHERE wi.project_id = :pid AND wi.wp_code = :code "
                     "LIMIT 1"
-                ), {"pid": str(project_id), "code": mapping.wp_code})
+                ), {"pid": str(project_id), "code": resolved.wp_codes[0]})
                 wp_row = wp_result.first()
                 if wp_row and wp_row.parsed_data:
                     trace["workpaper_data"] = wp_row.parsed_data
+        except (NoteRegistryUnavailable, ProjectNoteMappingInvalid) as e:
+            logger.warning("溯源映射查询失败: %s", e)
         except Exception as e:
             logger.warning("溯源映射查询失败: %s", e)
 

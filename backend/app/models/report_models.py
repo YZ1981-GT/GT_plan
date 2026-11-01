@@ -807,3 +807,6 @@ class NoteValidationResult(Base):
             "project_id", "year",
         ),
     )
+
+# S5 来源信封：从独立模块 re-export 运行记录（允许 tests 从 report_models 导入）
+from app.models.report_generation_models import ReportGenerationRun  # noqa: F401, E402

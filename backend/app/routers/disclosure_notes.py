@@ -1414,7 +1414,7 @@ async def apply_formulas(
 
     try:
         await materialize_quietly(db, project_id, [note_section])  # 全局 / 本项目公式设置（新建附注还没物化）
-        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate)
+        result = await execute_note_formulas(db, project_id, year, note_section, regenerate=regenerate, triggered_by=current_user.id)
         if result.get("updated"):
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                      user_id=current_user.id)

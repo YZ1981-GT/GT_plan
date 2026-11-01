@@ -116,14 +116,14 @@ def test_report_provenance_migration_matches_model_surface():
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS run_id" in migration
     assert "ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS provenance" in migration
     assert "DROP TABLE IF EXISTS report_generation_run" in rollback
-    push_migration = (ROOT / "migrations" / "V237__formula_push_provenance.sql").read_text(encoding="utf-8")
-    push_rollback = (ROOT / "migrations" / "R237__rollback_formula_push_provenance.sql").read_text(encoding="utf-8")
+    push_migration = (ROOT / "migrations" / "V248__formula_push_provenance.sql").read_text(encoding="utf-8")
+    push_rollback = (ROOT / "migrations" / "R248__rollback_formula_push_provenance.sql").read_text(encoding="utf-8")
     assert "formula_push_state ADD COLUMN IF NOT EXISTS provenance" in push_migration
     assert "formula_push_state DROP COLUMN IF EXISTS provenance" in push_rollback
     from app.models.formula_push_models import FormulaPushState
     assert "provenance" in FormulaPushState.__table__.columns
-    note_migration = (ROOT / "migrations" / "V238__note_formula_runs.sql").read_text(encoding="utf-8")
-    note_rollback = (ROOT / "migrations" / "R238__rollback_note_formula_runs.sql").read_text(encoding="utf-8")
+    note_migration = (ROOT / "migrations" / "V249__note_formula_runs.sql").read_text(encoding="utf-8")
+    note_rollback = (ROOT / "migrations" / "R249__rollback_note_formula_runs.sql").read_text(encoding="utf-8")
     assert "CREATE TABLE IF NOT EXISTS note_formula_run" in note_migration
     assert "DROP TABLE IF EXISTS note_formula_run" in note_rollback
     from app.models.note_formula_models import NoteFormulaRun

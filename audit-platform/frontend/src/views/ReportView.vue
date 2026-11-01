@@ -633,15 +633,21 @@
             <span class="report-amount" style="color: var(--gt-color-text-placeholder);">—</span>
           </template>
           <template v-else>
-            <el-tooltip :content="row.formula ? `公式：${row.formula}` : `行次 ${row.row_code || ''}`" placement="bottom" :show-after="500" :disabled="!row.row_code">
-              <span><GtAmountCell
+            <ReportProvenanceTooltip
+              :project-id="projectId"
+              :year="year"
+              :report-type="activeTab"
+              :row-code="row.row_code || ''"
+              :formula="row.formula"
+            >
+              <GtAmountCell
                 :value="row.current_period_amount"
                 :prior-value="row.prior_period_amount"
                 :clickable="true"
                 :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
                 @click="onLineComposition(row)"
-              /></span>
-            </el-tooltip>
+              />
+            </ReportProvenanceTooltip>
           </template>
         </template>
       </el-table-column>
@@ -943,6 +949,7 @@ import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import ReportProvenanceTooltip from '@/components/report/ReportProvenanceTooltip.vue'
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'

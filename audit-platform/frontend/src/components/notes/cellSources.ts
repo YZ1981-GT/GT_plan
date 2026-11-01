@@ -34,6 +34,13 @@ export interface CellSourcesResult {
   conflicts?: Array<{ kind: string; message: string }>
   error?: string
   message?: string
+  /** S5 公式来源信封：双层 provenance（applied_attempt + last_calculation） */
+  formula_provenance?: {
+    value_state?: string
+    calculation_applied?: boolean
+    applied_attempt?: Record<string, unknown> | null
+    last_calculation?: Record<string, unknown> | null
+  } | null
 }
 
 export function fetchCellSources(
