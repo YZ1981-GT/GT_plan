@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   WORKPAPER_SYNC_MANIFEST,
   WORKPAPER_SYNC_MANIFEST_DIGEST,
+  WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST,
+  WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST,
   WORKPAPER_SYNC_MANIFEST_STATS,
   WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST,
 } from '../workpaperSyncManifest.generated'
@@ -21,11 +23,29 @@ describe('workpaper sync generated manifest', () => {
   it('keeps a non-empty, unique and closed capability projection', () => {
     expect(WORKPAPER_SYNC_MANIFEST.length).toBeGreaterThan(0)
     expect(WORKPAPER_SYNC_MANIFEST_DIGEST).toMatch(/^[0-9a-f]{64}$/)
+    expect(WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST).toMatch(/^[0-9a-f]{64}$/)
+    expect(WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST).toMatch(/^[0-9a-f]{64}$/)
 
     const ids = WORKPAPER_SYNC_MANIFEST.map((entry) => entry.entryId)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(WORKPAPER_SYNC_MANIFEST.every((entry) => CAPABILITIES.has(entry.capability))).toBe(true)
+    expect(
+      WORKPAPER_SYNC_MANIFEST.every(
+        (entry) => entry.capability === null || CAPABILITIES.has(entry.capability),
+      ),
+    ).toBe(true)
     expect(WORKPAPER_SYNC_MANIFEST.every((entry) => entry.hostPath.endsWith('.vue'))).toBe(true)
+
+    const pending = WORKPAPER_SYNC_MANIFEST.filter(
+      (entry) => entry.independentEntry && entry.capability === null,
+    )
+    expect(pending.length).toBeGreaterThan(0)
+    expect(WORKPAPER_SYNC_MANIFEST_STATS.unadjudicated_count).toBe(pending.length)
+    for (const entry of pending) {
+      expect(entry.adjudicationState, entry.entryId).toBe('pending')
+      expect(entry.capabilityVerdictStage, entry.entryId).toBeTruthy()
+      expect(CAPABILITIES.has(entry.capabilityTarget!), entry.entryId).toBe(true)
+      expect(entry.capabilityTargetBlockedBy.length, entry.entryId).toBeGreaterThan(0)
+    }
   })
 
   it('derives all statistics from the projected entries', () => {
@@ -49,7 +69,10 @@ describe('workpaper sync generated manifest', () => {
     for (const duplicate of duplicates) {
       const parent = byId.get(duplicate.parentEntryId!)
       expect(duplicate.independentEntry).toBe(false)
+      expect(duplicate.effectiveEntryId).toBe(duplicate.parentEntryId)
       expect(parent, duplicate.entryId).toBeDefined()
+      expect(duplicate.capability).toBe(parent?.capability)
+      expect(duplicate.adjudicationState).toBe('inherited')
       expect(parent?.independentEntry).toBe(true)
       expect(parent?.parentEntryId).toBeNull()
       expect(parent?.documentType).toBe(duplicate.documentType)

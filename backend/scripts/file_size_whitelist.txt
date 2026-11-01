@@ -115,7 +115,7 @@ backend/tests/_test_x3_keyfamily_property_criteria.py  808
 #     门禁继续拦膨胀 >5%。拆分方向：待 candidate 就绪、representation-only 真正走通 finalize
 #     后，把「准入判据表 + 结算词表」提为声明式数据模块，属独立任务。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure G1-2
-backend/scripts/fix/fix_projection_representation_rehash.py  1090
+backend/scripts/fix/fix_projection_representation_rehash.py  1205
 
 #   custom_query.py —— **改动前即 2621 行已远超上限**（单文件承担 router + 14 个
 #     裸 SQL 取数器约 900 行）。本次净增 +255：新增 indicators 认证/归属校验、
@@ -271,7 +271,7 @@ backend/app/services/workpaper_sync/content_mutation.py  2485
 backend/app/services/workpaper_sync/contracts.py  1686
 backend/app/services/workpaper_sync/definitions.py  892
 backend/app/services/workpaper_sync/endpoint_guard.py  1119
-backend/app/services/workpaper_sync/entry_source_facts.py  1096
+backend/app/services/workpaper_sync/entry_source_facts.py  1284
 backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 #   excel_extract.py —— 基线 3900 → 4159（+259）。D4 同 sheet 多区累积归一化几轮修复累积
@@ -1014,7 +1014,7 @@ backend/tests/workpaper_sync/test_workbook_row_change_carriers.py  830
 #     仅让 readWireError 兼容 message(+1~2 行)，非膨胀来源，但被这笔历史欠账挡住。首次入册,
 #     baseline 取真实行数 1559。拆分方向: 把状态机转换表与 DTO 构造抽伴生模块, 属独立任务。
 #     spec: d4-html-to-oo-store-contract-alignment（错误信封 normalize）
-audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts  1559
+audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts  1667
 
 #   adapters/excel.py —— **改动前即 >800 上限、从未登记**。D4 同 sheet 多区累积归一化
 #     （_sheet_cumulative_shift + sheet_of_table 映射）几轮修复堆积至 1027 行。首次入册,
@@ -1119,7 +1119,7 @@ backend/tests/workpaper_sync/test_f5_canary_and_contract.py  1311
 #     判据面不因此放松：新条目仍要过 test_contract_directory_matches_the_delivery_ledger
 #     与 test_delivered_slice_contracts_pass_property_20_21_field_level 的双向核验。
 backend/tests/workpaper_sync/test_h_foundation_hc_guards.py  1149
-backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2810
+backend/app/services/workpaper_sync/adapters/delivered_contracts_ledger.py  2976
 
 
 # ── I/J 循环 + e1 修复 + 守卫口径升级（2026-09-27）──────────────────────
@@ -1283,9 +1283,9 @@ backend/app/routers/template_library_mgmt.py  1069
 backend/app/routers/wp_bulk_router.py  888
 backend/app/routers/wp_html_save.py  875
 # wp_sync_router 历史大文件（3257 行），本次仅删 display_name 死分支一行
-backend/app/routers/wp_sync_router.py  3260
+backend/app/routers/wp_sync_router.py  3467
 backend/app/security/coverage_guard.py  1000
-backend/scripts/gen/generate_workpaper_sync_manifest.py  899
+backend/scripts/gen/generate_workpaper_sync_manifest.py  1352
 backend/tests/test_adjustments.py  1024
 backend/tests/test_batch_project_service.py  1113
 backend/tests/test_disclosure_row_level_merge.py  803
@@ -1803,3 +1803,34 @@ backend/tests/services/test_note_conversion_section_mapping_production.py  975
 #   拆分方向：16 个检查方法按循环分组（A/B 基础、D4 收入、E1 现金流、F~N 三角勾稽）各成模块，
 #   本文件只留 ConsistencyGate 编排与 run_all_checks。
 backend/app/services/consistency_gate/_impl.py  2031
+
+#   ── spec workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-11-01）──
+#   下面 6 条基线按现算行数上调。先给归因（口径：`splitlines()`，与门禁一致；
+#   「继承」= HEAD 相对旧基线已超出的部分，「本轮」= 工作树相对 HEAD 的增量）：
+#
+#     文件                                    旧基线   HEAD    现值   继承    本轮
+#     useWorkpaperSyncBridge.ts                1559   1628   1667    +69    +39
+#     wp_sync_router.py                        3260   3430   3467   +170    +37
+#     delivered_contracts_ledger.py            2810   2943   2976   +133    +33
+#     entry_source_facts.py                    1096   1257   1284   +161    +27
+#     fix_projection_representation_rehash.py  1090   1183   1205    +93    +22
+#     generate_workpaper_sync_manifest.py       899    921   1352    +22   +431
+#
+#   前 5 条在 HEAD 上**已经**超出旧基线（继承 +69~+170），本轮各只加 22~39 行：
+#     · useWorkpaperSyncBridge.ts：switchToOnlyOffice 的顺序修正（本地拒绝与状态机出边预检
+#       前移到 readiness 之前 ⇒ 非法转换零网络）+ `assertCanBeginSwitch`。
+#     · wp_sync_router.py：新增 `GET …/sync/entries/{entry_id}/readiness`（项目 readonly 门）。
+#     · delivered_contracts_ledger.py：按设计 append-only 追加 G4/G6 ECL 两条 reviewed 契约行
+#       —— 这两份契约早已在生产契约目录里，台账缺行使「目录↔台账双向等值」判据在 HEAD 必红。
+#     · entry_source_facts.py：抽出唯一判据点 `server_issued_descriptor_room_ref` 供
+#       `derive_room_model`（派生侧）与 `observe_room_facts`（RG-17 实测侧）共用。
+#     · fix_projection_representation_rehash.py：把「文件真缺失」与「文件可读但契约结构不符」
+#       按失败成因分流（原先都结算成 blocked_artifact_missing 并给错解除建议）。
+#
+#   第 6 条 `generate_workpaper_sync_manifest.py` 的 +431 行是本轮自己的，诚实登记：
+#   内容是 pending schema（capability=null + 三字段）、`effective_entry_id`、counterpart 二值
+#   事实、reviewed `supplemental_entries`、wp-code adjudication ledger 接入。
+#   拆分方向（属独立任务，不在本轮做）：该文件现在同时承担「源发现 → 事实推导 → overlay 合并
+#   → 投影渲染 → digest 计算」五段。应把**事实推导**（pending 字段、counterpart、
+#   effective_entry_id、wp-code 裁决合并）提到 `workpaper_sync_manifest_facts.py`，生成器只留
+#   「发现 + 渲染 + digest」；tasks.md 1.7「原子生成」是它的自然承接点，届时一并做。

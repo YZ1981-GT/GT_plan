@@ -9,13 +9,13 @@ import {
   type WorkpaperSyncCapability,
 } from './workpaperSyncManifest.generated'
 
-const BY_ID: ReadonlyMap<string, WorkpaperSyncCapability> = new Map(
+const BY_ID: ReadonlyMap<string, WorkpaperSyncCapability | null> = new Map(
   WORKPAPER_SYNC_MANIFEST.map((e) => [e.entryId, e.capability]),
 )
 
 /**
- * @returns manifest 登记的 capability；entry 未登记时 fail-closed 为 `unreachable`
- *          （与后端 `_capability_of`「未登记不得按 bidirectional」同口径）。
+ * @returns manifest 登记的终态 capability；entry 未登记或仍待裁决时 fail-closed 为
+ *          `unreachable`（与后端「pending 不得进入双向动作」同口径）。
  */
 export function capabilityForEntry(entryId: string): WorkpaperSyncCapability {
   const found = BY_ID.get(String(entryId))

@@ -43,6 +43,7 @@ import {
   listRecoveryCases,
   materialize,
   materializeFromStore,
+  readEntrySyncReadiness,
   readStoreProjection,
   requestForcesave,
   resolveConflicts,
@@ -184,6 +185,7 @@ const DRIVERS: Record<string, () => Promise<unknown>> = {
       expectedRevision: 11,
       projection: { fields: [] },
     }).catch(() => null),
+  read_entry_readiness: () => readEntrySyncReadiness(SCOPE).catch(() => null),
   read_store_projection: () => readStoreProjection(SCOPE).catch(() => null),
   materialize: () =>
     materialize(SCOPE, {
@@ -837,6 +839,61 @@ describe('反向自检', () => {
     expectRefusal(
       () => buildSyncEndpointUrl('materialize', SCOPE, { room_id: UUID(2) }),
       'route_param_unexpected',
+    )
+  })
+})
+
+
+describe('entry readiness API', () => {
+  function readinessPayload() {
+    return {
+      entry_id: SCOPE.entryId,
+      effective_entry_id: SCOPE.entryId,
+      capability: 'bidirectional',
+      adjudication_state: 'terminal',
+      allowed_modes: ['html', 'oo'],
+      can_claim_bidirectional: true,
+      runtime: {
+        ready: true,
+        adapter_id: 'd2.receivable_detail',
+        authority_model: 'projection_contract',
+        definition_bundle_id: UUID(6),
+        definition_bundle_sha256: DIGEST_A,
+        typed_slots_complete: true,
+        typed_slots: [],
+        representation_id: UUID(5),
+        representation_generation: 1,
+      },
+      acceptance: {
+        state: 'missing', stale: false, run_id: null,
+        required_scenario_set_digest: null,
+      },
+      reason: {
+        code: 'EVIDENCE_MISSING', message: '验收证据尚未生成。', next_action: '请执行真实场景。',
+      },
+    }
+  }
+
+  it('走生成路由、GET、silent，并保留多段 entry id', async () => {
+    mockGet.mockResolvedValueOnce({ data: readinessPayload() })
+    const result = await readEntrySyncReadiness(SCOPE)
+    expect(result.runtime.ready).toBe(true)
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    const [url, config] = mockGet.mock.calls[0]
+    expect(url).toBe(`${buildSyncEntryPrefix(SCOPE)}/readiness`)
+    expect(config).toMatchObject({ _silent: true, headers: {} })
+  })
+
+  it('未知 capability 与缺 runtime 时在客户端 fail visible', async () => {
+    mockGet.mockResolvedValueOnce({ data: { ...readinessPayload(), capability: 'dual' } })
+    await expectAsyncRefusal(
+      () => readEntrySyncReadiness(SCOPE),
+      'entry_readiness_invalid',
+    )
+    mockGet.mockResolvedValueOnce({ data: { ...readinessPayload(), runtime: null } })
+    await expectAsyncRefusal(
+      () => readEntrySyncReadiness(SCOPE),
+      'entry_readiness_invalid',
     )
   })
 })

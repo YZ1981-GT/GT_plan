@@ -292,6 +292,7 @@ class RegistryReport:
     independent_entry_count: int
     registered_adapter_ids: tuple[str, ...] = ()
     missing_profile: tuple[str, ...] = ()
+    unadjudicated: tuple[str, ...] = ()
     profile_drift: tuple[str, ...] = ()
     bidirectional_without_adapter: tuple[str, ...] = ()
     fake_bidirectional: tuple[str, ...] = ()
@@ -304,6 +305,7 @@ class RegistryReport:
     def blocking_counts(self) -> Mapping[str, int]:
         return {
             "missing_profile": len(self.missing_profile),
+            "unadjudicated": len(self.unadjudicated),
             "profile_drift": len(self.profile_drift),
             "bidirectional_without_adapter": len(self.bidirectional_without_adapter),
             "fake_bidirectional": len(self.fake_bidirectional),
@@ -680,20 +682,17 @@ class WorkpaperSyncAdapterRegistry:
         assert_profile_consistent_with_room(profile, registration.room)
 
         # ── ④ 伪双向（RG-18 / Property 3）
-        # TEMP: bypass for A5-1 canary (Task 12)
-        _REG_CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
-        if entry_id not in _REG_CANARY_BYPASS:
-            if registration.declares_bidirectional and capability is not Capability.bidirectional:
-                raise FakeBidirectionalError(
-                    f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
-                    "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
-                    "双向同步（Requirement 1.4 / 12.8 / Property 3）"
-                )
-            if capability is Capability.bidirectional and not registration.declares_bidirectional:
-                raise RegistrationError(
-                    f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
-                    f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
-                )
+        if registration.declares_bidirectional and capability is not Capability.bidirectional:
+            raise FakeBidirectionalError(
+                f"entry {entry_id}: manifest capability={capability.value}，却注册了 "
+                "declared_capability=bidirectional 的 adapter —— 「仅能打开 OO」不得伪装成"
+                "双向同步（Requirement 1.4 / 12.8 / Property 3）"
+            )
+        if capability is Capability.bidirectional and not registration.declares_bidirectional:
+            raise RegistrationError(
+                f"entry {entry_id}: manifest capability=bidirectional，但 adapter 只声明 "
+                f"declared_capability={registration.declared_capability.value} —— 两侧必须一致"
+            )
 
         # ── ⑤ document_type 四方一致（RG-6）
         assert_document_types_agree(
@@ -838,9 +837,7 @@ class WorkpaperSyncAdapterRegistry:
         if entry is None:
             raise StaleAdapterError(f"entry {entry_id!r} 不在 source-backed manifest 中")
         capability = capability_of(entry)
-        # TEMP: bypass capability check for A5-1 canary (Task 12 真栈往返)
-        _CANARY_BYPASS = {"xlsx/gt-a51-cashflow-audit"}
-        if entry_id not in _CANARY_BYPASS and capability is not Capability.bidirectional:
+        if capability is not Capability.bidirectional:
             raise FakeBidirectionalError(
                 f"entry {entry_id}: capability={capability.value} 不是 bidirectional，"
                 "不得按双向验收"
@@ -881,6 +878,7 @@ class WorkpaperSyncAdapterRegistry:
         对真实数据结构性不可达 —— 那正是 additive 死代码（假绿第①源）。
         """
         missing_profile: list[str] = []
+        unadjudicated: list[str] = []
         profile_drift: list[str] = []
         profile_drift_reasons: dict[str, str] = {}
         bidirectional_without_adapter: list[str] = []
@@ -890,6 +888,12 @@ class WorkpaperSyncAdapterRegistry:
             if not entry.get("independent_entry"):
                 continue
             independent += 1
+            raw_capability = entry.get("capability")
+            if raw_capability is None:
+                unadjudicated.append(entry_id)
+                # pending entry 不进入 profile↔终态或 adapter 准入；其 blocker 由
+                # manifest 的三个 pending 字段和 readiness DTO 解释。
+                continue
             capability = capability_of(entry)
             if capability is Capability.unreachable:
                 continue
@@ -939,6 +943,7 @@ class WorkpaperSyncAdapterRegistry:
             independent_entry_count=independent,
             registered_adapter_ids=tuple(sorted(self._by_adapter_id)),
             missing_profile=tuple(missing_profile),
+            unadjudicated=tuple(unadjudicated),
             profile_drift=tuple(profile_drift),
             bidirectional_without_adapter=tuple(bidirectional_without_adapter),
             fake_bidirectional=tuple(fake_bidirectional),
@@ -1071,7 +1076,7 @@ class ManifestRegistrationPlanItem:
     """
 
     entry_id: str
-    capability: Capability
+    capability: Capability | None
     contract_id: str | None = None
     provider_module: str | None = None
     blocked_reason: str | None = None
@@ -1279,6 +1284,9 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_m10_other_equity_instruments",
         # ── D2 检查工作簿（spec: d2-inspection-sync-coverage）──────────────────
         "app.services.workpaper_sync.pilot_d2_inspection",
+        # ── G4/G6 ECL 独立 entry（reviewed contract/provider，capability 仍受门控）──
+        "app.services.workpaper_sync.phase5_g4_ecl_entry",
+        "app.services.workpaper_sync.phase5_g6_ecl_entry",
     }
 )
 
@@ -1307,10 +1315,19 @@ def build_manifest_registration_plan(
     plan: list[ManifestRegistrationPlanItem] = []
     for entry_id in sorted(entries):
         entry = entries[entry_id]
-        capability = capability_of(entry)
+        raw_capability = entry.get("capability")
+        capability = None if raw_capability is None else capability_of(entry)
         row = providers.get(entry_id)
         blocked: str | None = None
-        if row is None:
+        if capability is None:
+            blockers = entry.get("capability_target_blocked_by") or []
+            blocked = (
+                "entry 尚未完成逐项 capability 裁决（capability=null，"
+                f"stage={entry.get('capability_verdict_stage')!r}，"
+                f"target={entry.get('capability_target')!r}，blockers={list(blockers)!r}）—— "
+                "未裁决入口不得注册 adapter（AC 1.3 / 12.1）"
+            )
+        elif row is None:
             blocked = (
                 "尚无该 entry 自己的 approved per-entry 生产契约（不在 "
                 "`DELIVERED_PER_ENTRY_CONTRACTS` 里）—— 逐 entry 发布由 Tasks 46~57 / "

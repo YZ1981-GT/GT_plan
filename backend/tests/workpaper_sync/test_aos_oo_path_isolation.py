@@ -568,9 +568,16 @@ class TestJ5PruneHasExactlyOneProductionCallSite:
 #: 🔴 2026-10-11 再次显式更新：spec workpaper-sync-switch-performance P5 **有意**新增
 #:    `POST …/materialize-from-store`（服务端直取投影 + 物化）⇒ handler 分母 `+6 → +7`、
 #:    slashed suffixes `20 → 21`，`_REQUIRED_ENDPOINTS` 不变（14）。
-ROUTER_REQUIRED_ENDPOINTS = 14  # `_REQUIRED_ENDPOINTS` 元组长度
+#: 🔴 2026-11-01 第三次显式更新：spec
+#:    workpaper-html-onlyoffice-bidirectional-writeback-closure **有意**新增
+#:    `GET …/readiness`（统一桥 flush 前查 entry 运行时就绪，避免先写 pending mutation
+#:    再发现契约/representation 不可用）⇒ `_REQUIRED_ENDPOINTS` `14 → 15`、
+#:    slashed suffixes `21 → 22`；handler 分母表达式**逐字不变**（仍 `+7`，其值随
+#:    `_REQUIRED_ENDPOINTS` 自动由 21 变 22）。三处现算值见
+#:    `tmp_workpaper_sync_impl/probe_router_census.py` 的实测输出。
+ROUTER_REQUIRED_ENDPOINTS = 15  # `_REQUIRED_ENDPOINTS` 元组长度
 ROUTER_HANDLER_DENOMINATOR = "len(_REQUIRED_ENDPOINTS) + 7"  # handler 分母表达式（逐字）
-ROUTER_SLASHED_SUFFIXES = 21  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
+ROUTER_SLASHED_SUFFIXES = 22  # `test_a_real_slashed_entry_id_routes` 的 `suffixes` 条数
 
 
 def _router_test_tree() -> ast.Module:

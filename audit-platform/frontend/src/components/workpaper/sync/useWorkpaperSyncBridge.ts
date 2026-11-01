@@ -169,6 +169,8 @@ export interface WorkpaperSyncBridgeOptions {
 
 /** 桥用到的 API 面（`typeof syncApi` 的子集，显式列出便于注入 stub）。 */
 export interface WorkpaperSyncApiSurface {
+  /** AC 1.4：动作前必须核目标底稿的 request-time readiness。 */
+  readEntrySyncReadiness?: typeof syncApi.readEntrySyncReadiness
   createPendingMutation: typeof syncApi.createPendingMutation
   materialize: typeof syncApi.materialize
   /**
@@ -211,6 +213,7 @@ export interface WorkpaperSyncApiSurface {
 }
 
 const DEFAULT_API: WorkpaperSyncApiSurface = {
+  readEntrySyncReadiness: syncApi.readEntrySyncReadiness,
   createPendingMutation: syncApi.createPendingMutation,
   materialize: syncApi.materialize,
   ensureFirstPublication: syncApi.ensureFirstPublication,
@@ -430,6 +433,13 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * `descriptor` 才创建 DocEditor，创建完调 `notifyEditorMounted()`。
    */
   async function switchToOnlyOffice(): Promise<WorkpaperSyncEditorLaunchDescriptor> {
+    // 🔴 顺序是判据的一部分，两头都不能让：
+    //    ① **纯本地**的拒绝（capability 不支持 / 正在后台合并 / 状态机没有这条出边）必须
+    //       排在最前 —— 它们一个网络调用都不该发。`refresh_required` 上点「在线编辑」就是
+    //       这一类：转换非法，发任何请求都是多余的（T69-I10 用 `netCalls()` 条数钉住）。
+    //    ② readiness 预检必须排在**任何写请求**之前（pending-mutations / materialize），
+    //       否则会先写 pending mutation 再发现契约或 representation 不可用。
+    //    于是：本地拒绝 → 状态机可达性 → readiness（读） → attempt（首个写）。
     if (!supportedModesForCapability(capabilityOf()).includes('oo')) {
       refuse(
         'bridge_mode_not_supported',
@@ -439,7 +449,36 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     if (WP_BRIDGE_BACKGROUND_MERGE_STATES.includes(state.value)) {
       refuse('bridge_background_merge_in_progress', `${WP_BRIDGE_STATE_TEXT[state.value]}，请等合并完成或在表单顶部提示里处理后再进入在线编辑`)
     }
+    assertCanBeginSwitch()
+    if (api.readEntrySyncReadiness) {
+      let readiness: Awaited<ReturnType<typeof syncApi.readEntrySyncReadiness>>
+      try {
+        readiness = await api.readEntrySyncReadiness(scope())
+      } catch (error) {
+        return fail('readiness', error)
+      }
+      if (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo')) {
+        const reason = readiness.reason
+        refuse(
+          'bridge_runtime_not_ready',
+          reason
+            ? `${reason.message} ${reason.next_action}`
+            : '当前底稿未通过运行时双向回写校验',
+        )
+      }
+    }
     return attemptSwitchToOnlyOffice(true)
+  }
+
+  /**
+   * 状态机可达性预检：`flush_started` 在当前状态有没有出边。
+   *
+   * 不改状态、不发请求 —— 只把 `attemptSwitchToOnlyOffice` 第一步会抛的那个错**提前**抛
+   * 出来，使非法转换在 readiness 之前就被拒（零网络）。判据来自同一张转换表，不是第二份
+   * 规则拷贝。
+   */
+  function assertCanBeginSwitch(): void {
+    transitionBridgeState(state.value, 'flush_started', mode.value)
   }
 
   /**

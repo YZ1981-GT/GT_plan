@@ -185,6 +185,9 @@ def _entry_characterization(entry: dict[str, Any]) -> dict[str, Any]:
             and entry.get("capability") in {"single_html", "single_onlyoffice"}
             and bool(mode_evidence)
         ),
+        "pending_mode_switch_visible": (
+            is_independent and entry.get("capability") is None and bool(mode_evidence)
+        ),
         "claimed_bidirectional_without_adapter": entry.get("capability") == "bidirectional" and not has_adapter,
     }
     reason_codes = sorted(name for name, value in flags.items() if value)
@@ -234,6 +237,12 @@ def build_baseline(manifest: dict[str, Any]) -> dict[str, Any]:
         "missing_adapter_count": sum(entry["flags"]["missing_adapter"] for entry in independent),
         "single_mode_switch_visible_count": sum(
             entry["flags"]["single_mode_switch_visible"] for entry in independent
+        ),
+        "pending_mode_switch_visible_count": sum(
+            entry["flags"]["pending_mode_switch_visible"] for entry in independent
+        ),
+        "mode_switch_visible_count": sum(
+            entry["ui_characterization"]["mode_switch_visible"] for entry in independent
         ),
         "claimed_bidirectional_without_adapter_count": sum(
             entry["flags"]["claimed_bidirectional_without_adapter"] for entry in independent

@@ -8,9 +8,12 @@ valid *and* still red, preventing current debt from being converted into an allo
 from __future__ import annotations
 
 import argparse
+import asyncio
+import hashlib
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,12 +21,14 @@ _REPO = Path(__file__).resolve().parents[3]
 _BACKEND = _REPO / "backend"
 _MANIFEST_PATH = _BACKEND / "data" / "workpaper_sync_entry_manifest.json"
 _BASELINE_PATH = _BACKEND / "data" / "workpaper_sync_legacy_baseline.json"
+_RUNTIME_REPORT_PATH = _BACKEND / "data" / "workpaper_sync_runtime_closure.json"
 
 #: Registry-derived closure facts (Task 13). Kept as an explicit tuple so the wiring
 #: cannot silently disappear: `test_task13_contract_registry.py` asserts that every
 #: key here is produced by `build_registry_facts()` and consumed by `main()`.
 REGISTRY_ISSUE_KEYS: tuple[str, ...] = (
     "registry_missing_entry_profile",
+    "registry_unadjudicated",
     # RG-15/16/17: the source-backed profile of a real entry contradicts its reviewed
     # capability, the descriptor mode the host actually offers, or the room facts probed
     # from the live doc_key provider. Without this key the three rules would only ever run
@@ -33,6 +38,8 @@ REGISTRY_ISSUE_KEYS: tuple[str, ...] = (
     "registry_fake_bidirectional",
     "registry_stale_adapter",
     "registry_contract_file_without_adapter",
+    "registry_unregistered_supply",
+    "registry_registration_failure",
 )
 
 
@@ -102,6 +109,7 @@ def build_registry_facts(manifest: dict[str, Any]) -> dict[str, list[str]]:
         ) from exc
     return {
         "registry_missing_entry_profile": list(report.missing_profile),
+        "registry_unadjudicated": list(report.unadjudicated),
         "registry_profile_drift": list(report.profile_drift),
         "registry_bidirectional_without_registered_adapter": list(
             report.bidirectional_without_adapter
@@ -109,7 +117,55 @@ def build_registry_facts(manifest: dict[str, Any]) -> dict[str, list[str]]:
         "registry_fake_bidirectional": list(report.fake_bidirectional),
         "registry_stale_adapter": list(report.stale_adapters),
         "registry_contract_file_without_adapter": list(report.contract_files_without_adapter),
+        "registry_unregistered_supply": [],
+        "registry_registration_failure": [],
     }
+
+
+async def build_runtime_registry_facts(
+    manifest: dict[str, Any], session: Any
+) -> dict[str, list[str]]:
+    """用真实 DB session 执行 manifest 注册，而不是读取构造后的空 registry。"""
+    if str(_BACKEND) not in sys.path:
+        sys.path.insert(0, str(_BACKEND))
+    from app.services.workpaper_sync.adapters.registry import (
+        ObservedEntryFacts,
+        build_production_registry,
+    )
+    from app.services.workpaper_sync.contracts import available_contract_ids
+    from app.services.workpaper_sync.entry_source_facts import (
+        observe_descriptor_facts,
+        observe_room_facts,
+    )
+
+    def observer(entry: dict[str, Any]) -> Any:
+        return ObservedEntryFacts(
+            descriptor=observe_descriptor_facts(entry), room=observe_room_facts(entry)
+        )
+
+    registry = build_production_registry(manifest=manifest)
+    outcome = await registry.register_from_manifest(session=session)
+    report = registry.build_report(
+        contract_ids=available_contract_ids(), facts_observer=observer
+    )
+    facts = build_registry_facts(manifest)
+    facts.update({
+        "registry_missing_entry_profile": list(report.missing_profile),
+        "registry_unadjudicated": list(report.unadjudicated),
+        "registry_profile_drift": list(report.profile_drift),
+        "registry_bidirectional_without_registered_adapter": list(
+            report.bidirectional_without_adapter
+        ),
+        "registry_fake_bidirectional": list(report.fake_bidirectional),
+        "registry_stale_adapter": list(report.stale_adapters),
+        "registry_contract_file_without_adapter": list(report.contract_files_without_adapter),
+        "registry_unregistered_supply": sorted(outcome.reasons),
+        "registry_registration_failure": sorted(
+            f"{entry_id}:{failure.error_code}"
+            for entry_id, failure in outcome.failures.items()
+        ),
+    })
+    return facts
 
 
 def evaluate_closure(
@@ -144,7 +200,7 @@ def evaluate_closure(
             continue
         if not entry.get("independent_entry"):
             continue
-        if entry.get("html_store") == "unresolved":
+        if entry.get("capability") is None:
             issues["unadjudicated"].append(entry_id)
         if entry.get("migration_state") == "legacy_fake_bidirectional":
             issues["legacy_fake_bidirectional"].append(entry_id)
@@ -156,7 +212,10 @@ def evaluate_closure(
                 issues["bidirectional_without_contract_evidence"].append(entry_id)
             if not evidence.get("browser_case"):
                 issues["bidirectional_without_browser_evidence"].append(entry_id)
-        if legacy["flags"].get("single_mode_switch_visible"):
+        if (
+            legacy["flags"].get("single_mode_switch_visible")
+            or legacy["flags"].get("pending_mode_switch_visible")
+        ):
             issues["single_mode_switch_visible"].append(entry_id)
         if legacy["flags"].get("no_forcesave_command"):
             issues["missing_forcesave_command"].append(entry_id)
@@ -184,6 +243,53 @@ def _print_report(issues: dict[str, list[str]]) -> None:
     print(f"  total blocking facts: {sum(len(values) for values in issues.values())}")
 
 
+async def _collect_runtime_registry_facts(
+    manifest: dict[str, Any]
+) -> dict[str, list[str]]:
+    if str(_BACKEND) not in sys.path:
+        sys.path.insert(0, str(_BACKEND))
+    os.environ.setdefault("DB_DISABLE_SSL", "True")
+    from app.core.database import async_session
+
+    async with async_session() as session:
+        return await build_runtime_registry_facts(manifest, session)
+
+
+def _write_runtime_report(
+    manifest: dict[str, Any], issues: dict[str, list[str]]
+) -> None:
+    issue_digest = hashlib.sha256(
+        json.dumps(issues, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    observed_at = datetime.now(timezone.utc).isoformat()
+    if _RUNTIME_REPORT_PATH.is_file():
+        try:
+            previous = _load(_RUNTIME_REPORT_PATH)
+            if (
+                previous.get("manifest_digest") == manifest.get("manifest_digest")
+                and previous.get("issue_digest") == issue_digest
+            ):
+                observed_at = str(previous.get("observed_at") or observed_at)
+        except ClosureGuardError:
+            pass
+    payload = {
+        "schema_version": "workpaper-sync-runtime-closure:v1",
+        "observed_at": observed_at,
+        "manifest_digest": manifest.get("manifest_digest"),
+        "source_digest": manifest.get("source_digest"),
+        "issue_digest": issue_digest,
+        "counts": {name: len(values) for name, values in issues.items()},
+        "total_blocking_facts": sum(len(values) for values in issues.values()),
+        "issues": issues,
+    }
+    _RUNTIME_REPORT_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(f"[WROTE] {_RUNTIME_REPORT_PATH.relative_to(_REPO)}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -192,16 +298,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Wave 0 only: require a structurally valid but still-red closure baseline",
     )
     parser.add_argument("--json", action="store_true", help="print the issue map as JSON")
+    parser.add_argument(
+        "--write-report",
+        action="store_true",
+        help="write the current runtime issue projection to backend/data",
+    )
     args = parser.parse_args(argv)
 
     try:
         manifest = _load(_MANIFEST_PATH)
         baseline = _load(_BASELINE_PATH)
-        issues = evaluate_closure(manifest, baseline, build_registry_facts(manifest))
+        registry_facts = asyncio.run(_collect_runtime_registry_facts(manifest))
+        issues = evaluate_closure(manifest, baseline, registry_facts)
     except ClosureGuardError as exc:
         print(f"[FAIL] {exc}")
         return 2
 
+    if args.write_report:
+        _write_runtime_report(manifest, issues)
     if args.json:
         print(json.dumps(issues, ensure_ascii=False, indent=2, sort_keys=True))
     else:

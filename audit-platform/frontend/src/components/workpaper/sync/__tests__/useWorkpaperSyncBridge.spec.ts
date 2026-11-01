@@ -163,6 +163,35 @@ class MemoryStorage {
   }
 }
 
+function readinessFixture() {
+  return {
+    entry_id: ENTRY,
+    effective_entry_id: ENTRY,
+    capability: 'bidirectional' as const,
+    adjudication_state: 'terminal' as const,
+    allowed_modes: ['html', 'oo'] as const,
+    can_claim_bidirectional: true,
+    runtime: {
+      ready: true,
+      adapter_id: 'test.adapter',
+      authority_model: 'projection_contract',
+      definition_bundle_id: UUID(25),
+      definition_bundle_sha256: DIGEST(4),
+      typed_slots_complete: true,
+      typed_slots: [],
+      representation_id: UUID(24),
+      representation_generation: 1,
+    },
+    acceptance: {
+      state: 'verified' as const,
+      stale: false,
+      run_id: UUID(26),
+      required_scenario_set_digest: DIGEST(5),
+    },
+    reason: null,
+  }
+}
+
 interface Harness {
   bridge: ReturnType<typeof useWorkpaperSyncBridge>
   api: { [K in keyof WorkpaperSyncApiSurface]: ReturnType<typeof vi.fn> }
@@ -177,6 +206,7 @@ function harness(
 ): Harness {
   const storage = new MemoryStorage()
   const api = {
+    readEntrySyncReadiness: vi.fn(async () => readinessFixture()),
     createPendingMutation: vi.fn(async () => ({
       pendingMutationToken: 'tok-1',
       expectedRevision: 11,
@@ -346,10 +376,76 @@ describe('switchToOnlyOffice：消费 pending token，materialize 成功才 moun
     expect(verdict?.canForcesave).toBe(false)
   })
 
-  it('capability 不支持 OO 时直接拒绝（不打任何端点）', async () => {
+  it('capability 不支持 OO 时直接拒绝：纯本地判断，连 readiness 都不打', async () => {
+    // 🔴 顺序判据：capability 来自 manifest（本地），不需要任何请求就能判。原先这里断言
+    //    readiness 被调用过 1 次，那是把「读请求也发了」当成正常 —— 非法/不支持的动作一个
+    //    请求都不该发（同一条纪律让 `refresh_required` 上点在线编辑的网络调用数为 0）。
     const h = harness({}, { capability: 'single_html' })
     await expectRejection(() => h.bridge.switchToOnlyOffice(), 'bridge_mode_not_supported')
+    expect(h.api.readEntrySyncReadiness).not.toHaveBeenCalled()
     expect(h.flushHtml).not.toHaveBeenCalled()
+  })
+
+  it('状态机没有这条出边时零请求拒绝（readiness 也不打）', async () => {
+    const h = harness()
+    await h.bridge.switchToOnlyOffice()
+    h.api.readEntrySyncReadiness.mockClear()
+    h.api.createPendingMutation.mockClear()
+    // 已在 oo_loading：`flush_started` 没有出边 ⇒ 必须在发任何请求前就拒。
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toThrow()
+    expect(h.api.readEntrySyncReadiness).not.toHaveBeenCalled()
+    expect(h.api.createPendingMutation).not.toHaveBeenCalled()
+  })
+
+  it('readiness 必须早于第一个写请求', async () => {
+    const order: string[] = []
+    const h = harness({
+      readEntrySyncReadiness: vi.fn(async () => {
+        order.push('readiness')
+        return readinessFixture()
+      }),
+    })
+    h.api.createPendingMutation.mockImplementation(async () => {
+      order.push('pending_mutation')
+      return {
+        pendingMutationToken: 'tok-1',
+        expectedRevision: 11,
+        payloadSha256: 'a'.repeat(64),
+        expiresAt: '2026-09-01T00:05:00Z',
+      }
+    })
+    await h.bridge.switchToOnlyOffice()
+    expect(order.slice(0, 2)).toEqual(['readiness', 'pending_mutation'])
+  })
+
+  it('runtime readiness 未过时在 flush 前拒绝', async () => {
+    const h = harness({
+      readEntrySyncReadiness: vi.fn(async () => ({
+        ...readinessFixture(),
+        can_claim_bidirectional: false,
+        allowed_modes: ['html'] as const,
+        runtime: { ...readinessFixture().runtime, ready: false },
+        reason: {
+          code: 'CONTRACT_DRIFT',
+          message: '契约与发布版本不一致。',
+          next_action: '重新发布后重试。',
+        },
+      })),
+    })
+    await expectRejection(() => h.bridge.switchToOnlyOffice(), 'bridge_runtime_not_ready')
+    expect(h.flushHtml).not.toHaveBeenCalled()
+    expect(h.api.createPendingMutation).not.toHaveBeenCalled()
+    expect(h.api.materialize).not.toHaveBeenCalled()
+  })
+
+  it('readiness 请求失败时 fail visible 且不发任何写请求', async () => {
+    const h = harness({
+      readEntrySyncReadiness: vi.fn(async () => { throw new Error('readiness down') }),
+    })
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toThrow('readiness down')
+    expect(h.bridge.state.value).toBe('error')
+    expect(h.flushHtml).not.toHaveBeenCalled()
+    expect(h.api.createPendingMutation).not.toHaveBeenCalled()
   })
 })
 

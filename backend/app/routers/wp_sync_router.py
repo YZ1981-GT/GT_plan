@@ -93,6 +93,10 @@ from app.services.workpaper_sync.endpoint_payloads import (
     build_resolve_fence,
 )
 from app.services.workpaper_sync.failure_wording import describe_sync_failure_code
+from app.services.workpaper_sync.entry_readiness import (
+    EntryReadinessNotFound,
+    evaluate_entry_readiness,
+)
 from app.services.workpaper_sync.endpoint_guard import (
     GuardedScope,
     ScopeClaimCodec,
@@ -328,6 +332,7 @@ class WpGateVisibilityProbe:
 _READ_ONLY_ACTIONS: frozenset[str] = frozenset(
     {
         "read_recovery_cases",
+        "read_entry_readiness",
         "read_operation",
         "read_conflicts",
         "read_timeline",
@@ -960,6 +965,38 @@ async def create_pending_mutation(
             exc, status=classify_materialize_rejection(exc)
         ) from exc
     return receipt.as_dict()
+
+
+@router.get(USER_SYNC_PREFIX + "/readiness")
+async def read_entry_readiness(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """只读返回静态裁决、目标底稿运行时供给和最新验收证据。
+
+    该端点不调用 materialize/first-publication，不创建 room、operation 或 artifact。
+    未就绪是合法 200 + typed reason；未知/跨 scope entry 仍走统一 404。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="read_entry_readiness",
+    )
+    try:
+        readiness = await evaluate_entry_readiness(
+            session=svc.session,
+            registry=svc.registry,
+            project_id=scope.project_id,
+            wp_id=scope.wp_id,
+            entry_id=scope.entry_id,
+        )
+    except EntryReadinessNotFound as exc:
+        raise _not_found() from exc
+    return readiness.as_dict()
 
 
 @router.get(USER_SYNC_PREFIX + "/store-projection")

@@ -114,6 +114,31 @@ def _delivered_entry_ids() -> tuple[str, ...]:
     return tuple(str(row["entry_id"]) for row in DELIVERED_PER_ENTRY_CONTRACTS)
 
 
+def _delivered_adjudicated_entry_ids() -> tuple[str, ...]:
+    """台账里 **capability 已终裁** 的 entry —— `projection` lane 的正确分母。
+
+    🔴 不能拿整张台账当分母：`capability=null` 的 pending entry 按 L4 判 `undecided`
+    是**设计行为**（spec `workpaper-html-onlyoffice-bidirectional-writeback-closure`
+    AC 1.3：契约已交付 ≠ capability 已裁决）。混在一起会让本类判据报「lane 裁决坏了」，
+    而真因是「这条 entry 还没裁决」—— 判据指错人。
+    """
+    return tuple(
+        entry_id
+        for entry_id in _delivered_entry_ids()
+        if (_MANIFEST_BY_ID.get(entry_id) or {}).get("capability") is not None
+    )
+
+
+def _delivered_pending_entry_ids() -> tuple[str, ...]:
+    """台账已交付契约、但 capability 仍 pending 的 entry（L4 的否定侧分母）。"""
+    return tuple(
+        entry_id
+        for entry_id in _delivered_entry_ids()
+        if entry_id in _MANIFEST_BY_ID
+        and _MANIFEST_BY_ID[entry_id].get("capability") is None
+    )
+
+
 #: 反向自检的种植目录 —— 必须在 `assert_no_second_lane_decision_site` 的**真实**扫描根
 #: 内（`backend/app/**` 与 `backend/scripts/**`）。选 `scripts/diagnose/`：那里本就放
 #: 一次性诊断脚本，且 `_wip_*` 前缀已被 `.gitignore` 收，万一 finally 没跑到也不会入库。
@@ -228,11 +253,21 @@ class TestLaneOrderIsLoadBearing:
         )
 
     def test_delivered_pilot_entries_are_projection(self) -> None:
-        """四个已交付 pilot entry 全判 `projection` —— 非空分母，防「全 undecided 也绿」。"""
-        delivered = _delivered_entry_ids()
-        assert len(delivered) >= 4, f"已交付 entry 只有 {len(delivered)} 个，分母过小"
+        """已交付且 **capability 已终裁** 的 entry 全判 `projection` —— 非空分母，防「全 undecided 也绿」。"""
+        delivered = _delivered_adjudicated_entry_ids()
+        assert len(delivered) >= 4, f"已终裁的已交付 entry 只有 {len(delivered)} 个，分母过小"
         for entry_id in delivered:
             assert R.adjudicate_lane(entry_id) is R.LaneVerdict.projection, entry_id
+
+    def test_delivered_but_pending_entries_are_undecided(self) -> None:
+        """已交付契约但 capability 仍 pending ⇒ `undecided`（L4 fail closed，不得当 projection 放行）。"""
+        pending = _delivered_pending_entry_ids()
+        assert pending, (
+            "pending 分母为空 —— 要么 manifest 已全部终裁（那就删本条），"
+            "要么 pending 判据失效了"
+        )
+        for entry_id in pending:
+            assert R.adjudicate_lane(entry_id) is R.LaneVerdict.undecided, entry_id
 
     def test_verdict_domain_is_closed_at_three(self) -> None:
         """三值域封闭 —— 加第四个值必须改判据，不能悄悄多一格。"""
@@ -330,11 +365,25 @@ class TestAssertProjectionLaneDistinguishesRejections:
         assert len(set(present)) == len(present), codes
 
     def test_projection_lane_entries_pass_without_raising(self) -> None:
-        """非空分母：四个 pilot entry 必须全部通过（否则本类判据全在空集上）。"""
-        delivered = _delivered_entry_ids()
+        """非空分母：已终裁的 pilot entry 必须全部通过（否则本类判据全在空集上）。"""
+        delivered = _delivered_adjudicated_entry_ids()
         assert len(delivered) >= 4
         for entry_id in delivered:
             R.assert_projection_lane(entry_id)  # 不抛即通过
+
+    def test_pending_capability_raises_undecided_at_criterion_l4(self) -> None:
+        """pending entry 抛 `LaneUndecidedError` 且点名 L4（capability 已终裁）那条判据。
+
+        没有这一条时，L4 可以被整条删掉而本类仍绿 —— 未裁决入口就会被当 projection 放行。
+        """
+        pending = _delivered_pending_entry_ids()
+        assert pending, "pending 分母为空 —— 判据会在空集上恒真"
+        for entry_id in pending:
+            with pytest.raises(R.LaneUndecidedError) as caught:
+                R.assert_projection_lane(entry_id)
+            assert caught.value.criterion_number == 4, entry_id
+            assert "capability" in caught.value.criterion_label, entry_id
+            assert entry_id in str(caught.value)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1427,7 +1476,7 @@ class TestVerdictDomainIsClosedAndDeterministic:
         「三值封闭」就在一个值上恒真。
         """
         opaque = R.adjudicate_lane(_real_opaque_entry_id())
-        projection = R.adjudicate_lane(_delivered_entry_ids()[0])
+        projection = R.adjudicate_lane(_delivered_adjudicated_entry_ids()[0])
         undecided = R.adjudicate_lane("xlsx/definitely-not-a-manifest-entry")
         assert {opaque, projection, undecided} == set(R.LaneVerdict), (
             f"三类输入只覆盖到 {sorted(v.value for v in {opaque, projection, undecided})}"

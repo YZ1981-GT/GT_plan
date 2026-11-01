@@ -1,0 +1,70 @@
+{
+  "schema_version": "workpaper-sync-source-review:v1",
+  "reviewed_at": "2026-11-01",
+  "reviewed_by": "workpaper-html-onlyoffice-bidirectional-writeback-closure:Phase-0",
+  "generator": "backend/scripts/gen/generate_workpaper_sync_manifest.py::discover_source+build_manifest",
+  "approved_source_digest_before": "83ffa47d67099f496b5782361bc4698b2f4271e4d68e6af629aa7de80872c0ea",
+  "approved_source_digest_after": "07f66e91c4d4fc388c7d2be43eecbe706985bbf1a3cd37b129c262a99d97ce1b",
+  "disk_manifest_digest_before": "cd42e7db2de961115b409f852df47f69dc4965c32f942a5e8991301ec4c77cfc",
+  "rebuilt_manifest_digest_before_overlay_provenance": "9a9f2bcdc2e4ab324cade181117cc9c5414a5571db12cda96e694fcb3523f627",
+  "manifest_digest_after_phase1_schema": "60622c3de362f2ea976278b3626f321f3d77062db37fec89357f30395e65630a",
+  "disk_mount_count_including_historical_duplicate": 342,
+  "source_fact_count_including_dispatcher": 340,
+  "semantic_diff": {
+    "removed": 39,
+    "added": 37,
+    "classification": [
+      {
+        "kind": "reviewed_resolution_metadata_change",
+        "files": 36,
+        "detail": "30 个 D4 子 Tab 与 6 个 K 调整 Tab 的 WorkpaperSyncEditorHost 发现事实不再内联 documentType/entryIdDeclaration；现有 reviewed sync_host_entry_rules 仍逐文件补回同一 document type 与父 entry，重建后这些业务 entry 的 capability/adapter/parent 关系不变。"
+      },
+      {
+        "kind": "reviewed_import_kind_change",
+        "files": 1,
+        "detail": "GtA3ConsolidationConsole.vue 的 WorkpaperSyncEditorHost 从 global-auto 变为 dynamic import；entry、document type、capability 与父子关系不变。"
+      },
+      {
+        "kind": "reviewed_component_rename",
+        "files": 1,
+        "detail": "D4TabOccurrence.vue 已由 commit 14b510221 重命名为 D4TabVoucherCheck.vue；D4-14 路由、D4 父 entry 与 adapter 不变，parent duplicate 的派生子 entry 随文件名更新。"
+      },
+      {
+        "kind": "rejected_manual_manifest_entry",
+        "entries": ["xlsx/gt-d2-inspection"],
+        "detail": "该 entry 曾由历史任务直接手工追加到 generated manifest，并重复占用 GtD2AccountsReceivable.vue 的两个物理 mount；直接手改产物已被拒绝。当前改由 reviewed supplemental entry rule 纳入同一生成链：不复制物理 mount、保持 capability pending，并明确 dedicated_host_binding/runtime evidence 两个 blocker；已有 contract/provider/definition 因而仍可追踪且不会伪装成生产已接线。"
+      }
+    ]
+  },
+  "reviewed_overlay_projection_changes": {
+    "count": 11,
+    "entries": [
+      "xlsx/gt-g1-trading-financial-assets",
+      "xlsx/gt-g2-interest-receivable",
+      "xlsx/gt-g3-dividend-receivable",
+      "xlsx/gt-g5-long-term-receivable",
+      "xlsx/gt-g8-other-equity-instruments",
+      "xlsx/gt-g9-other-noncurrent-financial",
+      "xlsx/gt-g10-trading-financial-liabilities",
+      "xlsx/gt-g11-investment-income",
+      "xlsx/gt-g12-net-hedge-gains",
+      "xlsx/gt-g13-fair-value-changes",
+      "xlsx/gt-g14-credit-impairment-loss"
+    ],
+    "detail": "这些变化来自已 reviewed overlay 的 html_store/canonical_resolver，不是源码挂载差异；manifest 重生成后纳入当前投影。静态 bidirectional 仍不等于运行时 ready，Phase 2/3 会补 request-time readiness。"
+  },
+  "safety_checks": {
+    "affected_source_files_clean_against_head": true,
+    "rebuilt_manifest_available": true,
+    "rebuild_error": null,
+    "authoritative_templates_modified_for_review": false,
+    "manual_manifest_edits_allowed": false
+  },
+  "decision": "approved",
+  "next_actions": [
+    "更新 overlay approved_source_digest 并记录本 evidence 路径",
+    "只通过 generator --apply 重建 manifest 与前端投影",
+    "把 D2 inspection 作为未接宿主 residual lane，而不是恢复手工 manifest 行",
+    "继续用 runtime readiness 区分静态 capability 与真实注册状态"
+  ]
+}

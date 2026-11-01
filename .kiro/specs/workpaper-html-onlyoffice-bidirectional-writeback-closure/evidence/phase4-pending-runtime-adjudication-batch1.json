@@ -1,0 +1,241 @@
+{
+  "candidate_count": 37,
+  "counts": {
+    "failed": 15,
+    "no_current_representation": 6,
+    "runtime_ready": 16
+  },
+  "database_mutated": false,
+  "manifest_digest": "60622c3de362f2ea976278b3626f321f3d77062db37fec89357f30395e65630a",
+  "meaning": "runtime_ready 只证明目标 representation 上 adapter/bundle/contract 可注册，不等于验收完成",
+  "real_onlyoffice_executed": false,
+  "results": [
+    {
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "verdict": "no_current_representation"
+    },
+    {
+      "entry_id": "xlsx/gt-a51-cashflow-audit",
+      "verdict": "no_current_representation"
+    },
+    {
+      "entry_id": "xlsx/gt-c-control-test",
+      "error_code": "published_identity_frozen_child_unusable",
+      "error_type": "FrozenChildUnusableError",
+      "message": "frozen instrumentation payload 缺 managed_sheets/table/uuid 列锚点 —— 请求时刻的反读参数只能来自冻结 instrumentation，不得按 sheet 展示名猜",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-d2-inspection",
+      "error_code": "entry_source_fact_unavailable",
+      "error_type": "EntrySourceFactError",
+      "message": "entry xlsx/gt-d2-inspection: 无挂载点事实，无法推导 profile",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-d3-prepaid-accounts",
+      "error_code": "sync_contract_structure_drift",
+      "error_type": "ContractDriftError",
+      "message": "contract d3.prepaid_receipts_detail: 结构漂移，首个不一致位置 sheet='d31-managed' table='adj_aging_rows' field='d31_adj_aging/change_amount' locator='J:static:17' —— 不得继续按旧坐标写格；必须按 `template → instrumentation → contract → bundle → representation` 显式发布新 definitions（Requirement 6.10）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-d5-receivables-financing",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash ebed53747c9c1ea4ef4fce286f6d40db8ab2cfafeee357e2507edfe4db4fcda3 与 representation 冻结的 5dd3d265b8bced8904c6adfb466376b9b6ca93607ffa1f5bec7319ce855443be 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-d6-contract-assets",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash c86383fb250a9231b152167cc527a5d958a3c110f6ff4b1a33313ae703f0cab4 与 representation 冻结的 8b8e3e66966c8515a74f0c9bcafc01818948f80c2029df3aa2eb8354a6936a5a 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-d7-contract-liabilities",
+      "verdict": "no_current_representation"
+    },
+    {
+      "entry_id": "xlsx/gt-e1-monetary-fund",
+      "error_code": "sync_phase5_e1_selection_invalid",
+      "error_type": "EntrySelectionError",
+      "message": "'xlsx/gt-e1-monetary-fund' 的 wp_code_patterns=['E1M'] 与冻结的 matcher 域 ['E1'] 不一致 —— matcher 必须覆盖该 entry 的全部 wp_code",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-g4-bond-investment-ecl",
+      "verdict": "no_current_representation"
+    },
+    {
+      "entry_id": "xlsx/gt-g6-other-bond-investment-ecl",
+      "verdict": "no_current_representation"
+    },
+    {
+      "adapter_id": "h10.asset_disposal_income_adjustment",
+      "bundle_sha256": "3a3d7a7162a013f5be52018095f11c917bf8c441c98ea9b02e1102003ff6ed62",
+      "entry_id": "xlsx/gt-h10-asset-disposal-income",
+      "verdict": "runtime_ready"
+    },
+    {
+      "entry_id": "xlsx/gt-h2-construction-in-progress",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 37de3f937e129fe42712e28e3ba29fd6b76079602d8d2e20fb6f32f2fa5968f6 与 representation 冻结的 23a31da2a505611c6c443a6cb40f3411b7e157bd6991a074ddc7d79436ce7e81 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-h3-investment-property",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 3e156727b91489113dbc69587dfa9bb4c03aafa8ad73c03d203029185a610904 与 representation 冻结的 b683a1e50aab76adb455f2f8973de10c97e16e77e64a1544165c0ee61716cac7 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-h4-engineering-materials",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 28c02ac4f1bdcd22bb4a9e4e4cf12368560d4a35fa0ca67d19737d5f53359270 与 representation 冻结的 5013fdac0e8ee76a98848d5631c7925cb383c620095743a887e90d22524873da 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "adapter_id": "h5.oil_gas_assets_detail",
+      "bundle_sha256": "fb65c1209126c62f1e1914a1140fb5ca07c87649bcd87dd833fbc5b0719c44a8",
+      "entry_id": "xlsx/gt-h5-oil-gas-assets",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "h6.asset_disposal_clearing_detail",
+      "bundle_sha256": "aa910a0b77501128f80ef54f989fbf5e40fc6432a3789a66db143cb16983d4b4",
+      "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "h7.biological_assets_detail",
+      "bundle_sha256": "5b2179d5d464f66e6da2c2f89e3b46e889f901fa2d27794eaf1b03ecc87a9c29",
+      "entry_id": "xlsx/gt-h7-biological-assets",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "h8.right_of_use_assets_detail",
+      "bundle_sha256": "d3ea1a90f96049a8838eec28548c3729ebf7e9d19b599f9439a1e469afeae08a",
+      "entry_id": "xlsx/gt-h8-right-of-use-assets",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "h9.lease_liability_detail",
+      "bundle_sha256": "00dbc160cd852bf8f50f929cac1a90644be84702a03a78b23c8e56794c438c33",
+      "entry_id": "xlsx/gt-h9-lease-liabilities",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "i1.intangible_assets_detail",
+      "bundle_sha256": "a03555675bd6082f15a034680362241208b1c602435c4b9b8aaeabe3b0afc94c",
+      "entry_id": "xlsx/gt-i1-intangible-assets",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "i2.development_expenditure_detail",
+      "bundle_sha256": "cdc2b124289d6f19ea3c53b6ea31c502905fadcf32bdceaea04ce2e917aeb4a7",
+      "entry_id": "xlsx/gt-i2-development-expenditure",
+      "verdict": "runtime_ready"
+    },
+    {
+      "entry_id": "xlsx/gt-i3-goodwill",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 59c4b3a0b0a658011aaa2df3c22c3abaca43cf4ef438cd57939624ba6e4258cd 与 representation 冻结的 5be0151c22c81b04badbc2586c70acc2862414e82bd6b9f6bfa3dcd54681e9dd 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "adapter_id": "i4.long_term_prepaid_detail",
+      "bundle_sha256": "c6799de68d115571d9b07ac630e236a1fb5a5b528007441c1817cddf50d0c562",
+      "entry_id": "xlsx/gt-i4-long-term-prepaid",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "i5.other_noncurrent_assets_detail",
+      "bundle_sha256": "9454705fccc83fa8d3837b82c943201eec353ac26f362a5566b57ed1d57a6ac4",
+      "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "i6.research_development_expense_detail",
+      "bundle_sha256": "f89b30c51966638d3be628d419b34af8c94761563949f6db8be735214f118c58",
+      "entry_id": "xlsx/gt-i6-research-development-expense",
+      "verdict": "runtime_ready"
+    },
+    {
+      "entry_id": "xlsx/gt-k10-other-income",
+      "verdict": "no_current_representation"
+    },
+    {
+      "adapter_id": "m10.other_equity_instruments",
+      "bundle_sha256": "47f2f4466a5f89c2bf35fe67a7e71d36201c7036d963228fb5d837abde5617a6",
+      "entry_id": "xlsx/gt-m10-other-equity-instruments",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "m2.paid_in_capital",
+      "bundle_sha256": "b986a099e6ba97e307fab553e0a04a8c960359ebed9780dabc9a263441f124d6",
+      "entry_id": "xlsx/gt-m2-paid-in-capital",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "m3.treasury_stock",
+      "bundle_sha256": "d2473e8b2b74e34d6e52b05da08910e08adfe8dabb4c112b9cf5bb1e9d12ed10",
+      "entry_id": "xlsx/gt-m3-treasury-stock",
+      "verdict": "runtime_ready"
+    },
+    {
+      "adapter_id": "m4.capital_reserve",
+      "bundle_sha256": "f58671d2e746191f478337c5ed719045f18f31569c1d5cc03a917680cf4ff541",
+      "entry_id": "xlsx/gt-m4-capital-reserve",
+      "verdict": "runtime_ready"
+    },
+    {
+      "entry_id": "xlsx/gt-m6-retained-earnings",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 8e7fb9a3914a3604c6094131bf51d5fc106b65c7e04d609ee44a86acc349f63f 与 representation 冻结的 da950aefa7438fdd48cbf03037588a4cee6c39b447e30405ba0ddf7921e183ce 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "adapter_id": "m7.special_reserve",
+      "bundle_sha256": "07e0e84feb042cd6c5910b550ae80972e2911e1b159725249cf2a326f5fc3180",
+      "entry_id": "xlsx/gt-m7-special-reserve",
+      "verdict": "runtime_ready"
+    },
+    {
+      "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 8b90e5b9562873401a938a9aca08f2ac480330b89a2c5e644cd9fbe25d151415 与 representation 冻结的 741aa8d7a636e0bb576a700b52ec7464d0d703569df42f72569b6a8261c4cd0d 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-n2-taxes-payable",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 74b8a3794ddb081c03b431953c5a1695ddba00fcc2c8f3ba32ae9f2c751e3275 与 representation 冻结的 8a748bbfd89842d312432812147d29ce81b2f5533a474ef09e7afbf076a0c1f8 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 579a21245707c806101576876c9fac4ffe3a1f7aec01564b681434b45f9d810d 与 representation 冻结的 e0fcf39e35939ee195b00bbaf56e5f8602357ba203f2a4851ba1a119bc34ad5e 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    },
+    {
+      "entry_id": "xlsx/gt-n5-income-tax-expense",
+      "error_code": "published_identity_observed_drift",
+      "error_type": "ObservedIdentityDriftError",
+      "message": "重算 structure_hash 55c6e81405f1b3d977d4cf73c47b5b87e9f72a34d4d96363e6c461ef4b4a6ade 与 representation 冻结的 3f806edfb4e19498490127e634bc1cfeaf9f1e1ebc79c90944bdf5cbb07fbd4d 不一致 —— 受管结构已漂移，不得继续按旧坐标写格（Requirement 6.10 / Property 28）",
+      "verdict": "failed"
+    }
+  ],
+  "schema_version": "pending-entry-runtime-readiness:v1",
+  "source_digest": "07f66e91c4d4fc388c7d2be43eecbe706985bbf1a3cd37b129c262a99d97ce1b"
+}
