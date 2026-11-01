@@ -22,8 +22,8 @@
  * fail visible / readiness 必须早于第一个写请求）。这里不写跨文件的文本断言 —— 那种判据
  * 会被注释骗过，也证明不了请求真的没发出去。
  */
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -199,18 +199,63 @@ describe('UI 诚实性总守卫 —— 分母是 manifest 全域', () => {
 
 describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch', () => {
   const SRC = resolve(__dirname, '../../../..')
-  /** 已接单源的宿主（棘轮基线之外的那些）。只 import 不用 = 假接线。 */
-  const WIRED_HOSTS = ['components/workpaper/GtM7SpecialReserve.vue']
 
-  it.each(WIRED_HOSTS)('%s 的模式开关 v-if 绑在 presentation.showModeSwitch 上', (rel) => {
-    const text = readFileSync(resolve(SRC, rel), 'utf-8')
-    expect(text).toMatch(/useEntrySyncReadiness/)
-    // el-segmented 的开标签内必须出现绑到 showModeSwitch 的 v-if
-    const segmented = text.match(/<el-segmented[\s\S]{0,400}?>/g) ?? []
+  // 🔴 原先这里是一份**手抄清单**（只有 `GtM7SpecialReserve.vue` 一条）。task 3.5 分批迁移后，
+  //    真实已接单源的宿主有十几个，清单却一条没涨 ⇒ 这条判据声称覆盖「已接单源的宿主」，
+  //    实际只看过其中一个，另外十几个的假接线它一律看不见。改为**现算**：
+  //    「画了 segmented + 自身文本出现单源」即纳入，清单不可能再与代码漂移。
+  // 🔴 带 `g` 标志的正则，`.test()` 会累进 `lastIndex`（有状态）⇒ 同一个对象反复 test 会
+  //    交替返回 false。取标签用 `g` 版（配 `.match`），判存在用无标志版。
+  const SEGMENTED_TAG_ALL = /<el-segmented[\s\S]{0,400}?>/g
+  const SEGMENTED_TAG_ONE = /<el-segmented[\s\S]{0,400}?>/
+  const SINGLE_SOURCE = /useEntrySyncReadiness|entrySyncPresentation/
+  /** 与棘轮同一口径：HTML↔OO 模式值字面量，用来把业务分段器排除出去。 */
+  const MODE_VALUE = /['"](?:onlyoffice|online-edit|structured|docx)['"]|value:\s*['"]html['"]/
+  // 🔴 不可写 `/mode/i`：它会命中 `v-model` 里的 "mode"，把纯业务分段器当成模式开关
+  //    （下面那条可伪证用例正是据此把第一版判据打红的）。改认模式开关特有的绑定名。
+  const MODE_BINDING = /currentMode|modeOptions|renderMode|onModeChange|modeToggle/
+
+  function walkVue(dir: string, out: string[]): string[] {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (name === '__tests__' || name === 'node_modules') continue
+      if (statSync(full).isDirectory()) walkVue(full, out)
+      else if (name.endsWith('.vue')) out.push(full)
+    }
+    return out
+  }
+
+  /** 这个 segmented 是模式开关还是业务分段器？用它自己的 options/绑定表达式判。 */
+  function isModeSwitchTag(tag: string): boolean {
+    return MODE_VALUE.test(tag) || MODE_BINDING.test(tag)
+  }
+
+  const wiredHosts = walkVue(SRC, [])
+    .map((file) => relative(SRC, file).split('\\').join('/'))
+    .filter((rel) => {
+      const text = readFileSync(join(SRC, rel), 'utf-8')
+      return SEGMENTED_TAG_ONE.test(text) && SINGLE_SOURCE.test(text)
+    })
+    .sort()
+
+  it('分母不为空且含样板宿主（否则本判据在空集上恒绿）', () => {
+    expect(wiredHosts, '一个已接单源的宿主都算不出 ⇒ 扫描器失锚').not.toEqual([])
+    expect(wiredHosts).toContain('components/workpaper/GtM7SpecialReserve.vue')
+  })
+
+  it.each(wiredHosts)('%s 的模式开关 v-if 绑在 presentation.showModeSwitch 上', (rel) => {
+    const text = readFileSync(join(SRC, rel), 'utf-8')
+    expect(text).toMatch(SINGLE_SOURCE)
+    const segmented = text.match(SEGMENTED_TAG_ALL) ?? []
     expect(segmented.length, '宿主里找不到 el-segmented ⇒ 判据失锚').toBeGreaterThan(0)
-    const gated = segmented.filter((tag) => /v-if="[^"]*showModeSwitch[^"]*"/.test(tag))
-    expect(gated.length, `开关没绑 showModeSwitch：${segmented[0]?.slice(0, 120)}`).toBe(
-      segmented.length,
+    // 🔴 只要求**模式开关**被门控。同一宿主里的业务分段器（如 L4 的债券分支选择器）
+    //    不该被同步能力门控 —— 原先按 `segmented.length` 全量要求会把它们一起误伤。
+    const modeTags = segmented.filter(isModeSwitchTag)
+    expect(modeTags.length, `算不出模式开关 ⇒ 判据失锚：${segmented[0]?.slice(0, 160)}`)
+      .toBeGreaterThan(0)
+    const gated = modeTags.filter((tag) => /v-if="[^"]*showModeSwitch[^"]*"/.test(tag))
+    expect(gated.length, `开关没绑 showModeSwitch：${modeTags[0]?.slice(0, 160)}`).toBe(
+      modeTags.length,
     )
   })
 
@@ -219,5 +264,13 @@ describe('接线闭合：已接单源的宿主必须真的用上 showModeSwitch'
     expect(/v-if="[^"]*showModeSwitch[^"]*"/.test(tag)).toBe(false)
     const real = '<el-segmented v-if="entrySync.presentation.value.showModeSwitch" :options="o">'
     expect(/v-if="[^"]*showModeSwitch[^"]*"/.test(real)).toBe(true)
+  })
+
+  it('业务分段器判据可伪证：纯业务分段器不得被当成模式开关', () => {
+    const business = '<el-segmented v-model="bondBranch" :options="branchOptions" size="default" />'
+    expect(isModeSwitchTag(business)).toBe(false)
+    const modeSwitch =
+      '<el-segmented :model-value="dual.currentMode.value" :options="dual.modeOptions.value" />'
+    expect(isModeSwitchTag(modeSwitch)).toBe(true)
   })
 })

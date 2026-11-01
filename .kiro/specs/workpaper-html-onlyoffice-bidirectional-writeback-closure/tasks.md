@@ -253,21 +253,39 @@
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
-  - 🔴 **渐进迁移，棘轮只减**：现算 **113** 条宿主仍自行决定（126 → 125 → **113**）。
+  - 🔴 **渐进迁移，棘轮只减**：现算 **110** 条宿主仍自行决定（126 → 125 → 113 → **110**）。
   - **共享切换器已接单源**：`sync/useGRenderModeSwitch.ts` 新增可选 `entrySync` 入参 +
     暴露 `showModeSwitch`（不传时恒 true，保持改线前行为）⇒ G 循环 16 个宿主只需传入已有的
     readiness 实例即可完成迁移，不用各写一遍判断。**这是本任务的杠杆点**：改 1 个 composable
     + 每宿主 3 行，取代 126 份各写一遍判断。
-  - **已迁移 14 个**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
-    （第一批）· 第二批 12 个 G 循环宿主（G1 / G3 / G4-ECL / G4-Main / G4-SPPI / G5 /
-    G6-Main / G6-SPPI / G8 / G9 / G13 / G14）。
+  - **已迁移 17 个**：`GtM7SpecialReserve.vue`（样板，task 3.4）· `GtG2InterestReceivable.vue`
+    （第一批）· 第二批 12 个（G1 / G3 / G4-ECL / G4-Main / G4-SPPI / G5 / G6-Main /
+    G6-SPPI / G8 / G9 / G13 / G14）· 第三批 3 个（G10 / G11 / G12）。
+  - 🔴 第三批是**第二批的漏点**：它们同样 import `useGRenderModeSwitch`、`v-if` 同为
+    `"isHtmlSheet"`、也有 entry 常量，只因第二批的 TARGETS 是**手列的**而漏掉。教训与下面
+    「闭合判据手抄清单」同源 —— 批量迁移的目标集合也该现算（扫载体 import），不该手列。
   - 第二批可机械批量化的依据：现算 16 个宿主的 `el-segmented` 的 `v-if` **逐字相同**
     （全部 `"isHtmlSheet"`）⇒ 三处改动（import / readiness 实例 / `v-if` 合取）可脚本生成；
     entry id 取**宿主已有的**常量或它 notice 上的字面量，不新造标识符。
   - 棘轮收缩用**现算**而非手抄清单：扫「是否 import `useEntrySyncReadiness`」逐条判定
     （`tmp_workpaper_sync_impl/shrink_baseline2.py`），避免清单与代码各自漂移。
-  - 第二批验证链：12 文件 `get_diagnostics` **0 错** → 棘轮**先打红**（12 条已接单源却仍在基线
-    ⇒ 判据有效）→ 收缩基线 125→113 → 重跑 **23 passed**（棘轮 4 + UI 诚实性 9 + presentation 10）。
+  - 每批验证链：逐文件 `get_diagnostics` **0 错** → 棘轮**先打红**（已接单源却仍在基线
+    ⇒ 判据有效）→ 现算收缩基线 → 重跑转绿。第二批 125→113 / 23 passed；第三批 113→110。
+  - 🔴 **顺带修一条「声称覆盖全部、实际只看过一个」的判据**（task 3.6 的接线闭合，
+    `entrySyncUiHonesty.spec.ts`）：它的 `WIRED_HOSTS` 是**手抄清单**且只有样板宿主一条 ——
+    分批迁移后真实已接单源的宿主涨到 17 个，清单一条没涨 ⇒ 另外 16 个的假接线它一律看不见。
+    改为**现算**（「画了 segmented + 自身文本出现单源」即纳入）+ 加「分母不为空且含样板宿主」
+    防空集恒绿。现算后逐宿主断言 **17 条**，文件从 9 例涨到 **27 例**。
+  - 🔴 同时修它两处会误判的实现细节（**都是被我自己新加的可伪证用例打红后才发现的**）：
+    ① 原判据要求宿主内**所有** `el-segmented` 都被门控，而 L4 一类宿主还有纯业务分段器
+    （债券分支选择器）—— 同步能力不该门控业务分段器 ⇒ 改为只要求**模式开关**被门控；
+    ② 区分模式开关的正则第一版写 `/mode/i`，它命中 `v-model` 里的 "mode" ⇒ 把业务分段器
+    也当成模式开关；改认模式开关特有绑定名（`currentMode|modeOptions|renderMode|
+    onModeChange|modeToggle`）。另修一处 JS 陷阱：带 `g` 标志的正则 `.test()` 会累进
+    `lastIndex`（有状态），同一对象反复 test 交替返回 false ⇒ 取标签与判存在分用两个对象。
+  - 磁盘变异证明闭合判据有效：把 `GtG13FairValueChanges.vue` 的 `v-if` 退回 `isHtmlSheet`
+    （= import 了单源却不用 = 假接线）⇒ **精确只红那一条**（1 failed / 26 passed），
+    其余 16 宿主仍绿；跑完逐字节恢复，sha256 `f6400a6f23ee9bee` 前后一致。
   - 🔴 顺带修 `entrySyncUiHonesty.spec.ts` 一条**把过渡态写成永久不变量**的判据：
     原 `expect(unreachable.length).toBe(1)`（「分母不为空」）在 task 5.3 删掉 G6 旧桩后必红，
     而唯一的「修法」会是把旧桩加回来 —— AC 1.7 的要求正是「不可达旧桩 SHALL 删除」，
