@@ -13,7 +13,7 @@
     <template v-else>
       <div class="g6-other-bond-investment-ecl-toolbar">
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g6OEntrySync.presentation.value.showModeSwitch"
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -116,6 +116,7 @@
  *       + g6:save-items + @imported 重载 + 始终 loadAll
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useG6EclDualMode } from './composables/useG6EclDualMode'
 import { useG6EclFormData, type ChecklistResponse } from './composables/useG6EclFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -266,6 +267,21 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('g6:save-items', handleG6SaveItems)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const g6OEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-g6-other-bond-investment-ecl',
+})
+
 </script>
 
 <style scoped>

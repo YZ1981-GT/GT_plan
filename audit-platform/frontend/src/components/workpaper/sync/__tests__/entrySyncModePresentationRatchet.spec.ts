@@ -74,8 +74,29 @@ describe('模式开关表现单源棘轮', () => {
     expect(actual).not.toContain(WIRED_REFERENCE)
   })
 
-  it('分母不为空（否则本棘轮在空集上恒绿）', () => {
-    expect(BASELINE.length).toBeGreaterThan(50)
+  // 🔴 原判据是 `expect(BASELINE.length).toBeGreaterThan(50)`，注释写的是「分母不为空，
+  //    否则本棘轮在空集上恒绿」。但它把「写下它时还剩 126 条债」这个**过渡量**写成了永久
+  //    不变量：棘轮每接走一批宿主，基线就更接近 50，减到 50 以下必红 —— 也就是**惩罚进展**，
+  //    而唯一的「修法」会是把已接单源的宿主塞回基线。这与棘轮本身的方向正好相反
+  //    （task 3.5 分批迁移到第六批时基线降到 32，这条就红了）。
+  //
+  //    它真正要防的事是「扫描器瞎了」：`walk` / `read` 一出问题，`actual` 变空集，
+  //    下面两条差集判据就都恒绿。那件事与「还剩多少债」无关，应当直接断言**扫描面**非空
+  //    与**识别正则可伪证**。基线自身的大小不需要另设下限 —— 下面两条差集判据合起来已经
+  //    把 `BASELINE` 钉成与现实**逐条相等**的集合（双向差集都必须为空）。
+  it('扫描面非空且识别正则可伪证（防本棘轮在空集 / 失锚上恒绿）', () => {
+    const drawsSegmented = walk(SRC, [])
+      .map((file) => relative(SRC, file).split('\\').join('/'))
+      .filter((rel) => SEGMENTED.test(read(rel)))
+    expect(drawsSegmented.length, '全前端一个 el-segmented 都扫不到 ⇒ 扫描器失锚').toBeGreaterThan(50)
+
+    // 识别正则必须对已知正例命中、对已知反例不命中（否则 `actual` 可能恒空）
+    expect(MODE_VALUE.test(`<el-segmented :options="[{value:'onlyoffice'}]" />`)).toBe(true)
+    expect(HTML_MODE_VALUE.test(`currentMode === 'html'`)).toBe(true)
+    expect(
+      MODE_VALUE.test(`<el-segmented v-model="bondBranch" :options="branchOptions" />`),
+      '纯业务分段器被当成模式开关 ⇒ 分母虚高',
+    ).toBe(false)
   })
 
   it('没有新的「宿主自行决定模式开关」', () => {

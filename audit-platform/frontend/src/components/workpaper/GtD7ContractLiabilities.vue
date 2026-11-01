@@ -6,7 +6,7 @@
 
     <template v-else>
       <div v-if="showModeToolbar" class="d7-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD7DetailSheet && syncBusy" />
+        <el-segmented v-if="d7CEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD7DetailSheet && syncBusy" />
         <el-tag v-if="!isD7DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d7-contract-liabilities" />
       </div>
@@ -175,6 +175,7 @@
  * GtD7ContractLiabilities.vue — D7 合同负债底稿主入口（比照 D5）
  */
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useD7FormData } from './composables/useD7FormData'
 import { useD7CrossSheet } from './composables/useD7CrossSheet'
 import { useD7EntryDualMode, type D7RenderMode } from './composables/useD7EntryDualMode'
@@ -454,6 +455,21 @@ async function saveImmediateBatch(
 onMounted(async () => {
   await loadAll()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const d7CEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => D7_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

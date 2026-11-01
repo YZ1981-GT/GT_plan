@@ -7,6 +7,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f1-header-toolbar">
         <el-segmented
+          v-if="f1PEntrySync.presentation.value.showModeSwitch"
           v-model="renderMode"
           :options="dualMode.modeOptions"
           size="small"
@@ -200,6 +201,7 @@
  * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
 import { ref, computed, onMounted, provide, inject, toRef, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { ElMessage } from 'element-plus'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
@@ -538,6 +540,21 @@ async function selfLoad() {
 onMounted(() => {
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f1PEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F1_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

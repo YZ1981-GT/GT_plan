@@ -32,6 +32,7 @@
       <template v-else>
         <div class="mode-toggle-bar">
           <el-segmented
+            v-if="m6REntrySync.presentation.value.showModeSwitch"
             :model-value="dualMode.mode.value"
             :options="modeToggleOptions"
             size="small"
@@ -138,6 +139,7 @@
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM6EntryDualMode } from './composables/useM6EntryDualMode'
@@ -308,6 +310,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('m6:save-items', handleM6SaveItems)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const m6REntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-m6-retained-earnings',
+})
+
 </script>
 
 <style scoped>
