@@ -2675,7 +2675,7 @@ function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: 
 const COPY_EXCLUDE_KEYS = ['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra', 'extra_fields']
 
 /** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copySelectedRows(fallbackRow?: any) {
+async function copySelectedRows(fallbackRow?: any) {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
   if (rows.length === 0) return
   const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
@@ -2686,7 +2686,7 @@ function copySelectedRows(fallbackRow?: any) {
 }
 
 /** 复制本凭证全部分录到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copyCurrentVoucher() {
+async function copyCurrentVoucher() {
   const rows = voucherItems.value.filter(r => r._type !== 'subtotal' && r._type !== 'view_subtotal')
   if (rows.length === 0) {
     ElMessage.warning('本凭证无分录可复制')

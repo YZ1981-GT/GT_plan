@@ -155,7 +155,9 @@ async function onRetry(evt: FailedEvent, idx: number) {
   retryingIdx.value = idx
   try {
     const { api } = await import('@/services/apiProxy')
-    await api.post(endpoint, {}, { validateStatus: (s: number) => s < 600 })
+    // 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：非 2xx 抛出 ⇒ 落入
+    // catch 保留失败记录；不再用 `validateStatus: s<600` 把 5xx 当重试成功而误删记录。
+    await api.post(endpoint, {})
     // 重试成功，移除该条失败记录
     failedEvents.value.splice(idx, 1)
     if (failedEvents.value.length === 0) {

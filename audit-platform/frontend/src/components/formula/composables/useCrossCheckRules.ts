@@ -209,7 +209,7 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
       }
       const data = await deps.api.post(deps.P_rc.executeFormulasBatch, {
         project_id: deps.projectId.value, year: deps.year.value, formulas: allFormulas,
-      }, { validateStatus: (s: number) => s < 600 })
+      }, { _silent: true } as any)
       const resultMap = new Map<string, number>()
       for (const r of (data?.results || [])) {
         if (r.row_code && r.value != null && r.error == null) resultMap.set(r.row_code, Number(r.value))
@@ -229,6 +229,10 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
         }
       }
       return { passCount, failCount }
+    } catch (e: any) {
+      // 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：原先 `validateStatus: s<600`
+      // 把 5xx 当成功 ⇒ `data.results` 空、所有勾稽静默未校验。现非 2xx 抛出，显式报错。
+      deps.showFormulaError(e, '执行表间审核失败')
     } finally { running.value = false }
   }
 

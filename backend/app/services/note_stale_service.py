@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote
@@ -37,9 +37,13 @@ class StaleSection:
 
 @dataclass
 class RefreshResult:
-    """刷新结果"""
+    """刷新结果及章节级成功/失败集合。"""
     sections_refreshed: int = 0
     cells_updated: int = 0
+    recomputed_sections: list[str] = field(default_factory=list)
+    changed_sections: list[str] = field(default_factory=list)
+    failed_sections: list[str] = field(default_factory=list)
+    cleared_sections: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -89,16 +93,14 @@ class NoteStaleService:
             # 获取关联的附注章节编码
             section_codes = list({m.note_section_code for m in mappings})
 
-            # 标记这些章节为 stale（通过更新 disclosure_notes 表的 is_stale 字段）
-            stmt_update = (
-                update(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == str(project_id),
-                    DisclosureNote.note_section.in_(section_codes),
-                )
-                .values(is_stale=True)
+            from app.services.stale_state import StaleSource, mark_note_stale
+
+            await mark_note_stale(
+                self.db,
+                project_id,
+                source=StaleSource.WORKPAPER_SAVED,
+                sections=section_codes,
             )
-            await self.db.execute(stmt_update)
 
             for code in section_codes:
                 stale_sections.append(StaleSection(
@@ -151,15 +153,14 @@ class NoteStaleService:
             section_codes = list({m.note_section_code for m in mappings})
 
             if section_codes:
-                stmt_update = (
-                    update(DisclosureNote)
-                    .where(
-                        DisclosureNote.project_id == str(project_id),
-                        DisclosureNote.note_section.in_(section_codes),
-                    )
-                    .values(is_stale=True)
+                from app.services.stale_state import StaleSource, mark_note_stale
+
+                await mark_note_stale(
+                    self.db,
+                    project_id,
+                    source=StaleSource.REPORT,
+                    sections=section_codes,
                 )
-                await self.db.execute(stmt_update)
 
                 for code in section_codes:
                     stale_sections.append(StaleSection(
@@ -236,24 +237,25 @@ class NoteStaleService:
             refresh_result.errors.append(f"重算失败: {e}")
             return refresh_result
 
-        # 4. 只对 report.sections_recomputed 清 is_stale
-        if report.sections_recomputed:
-            stmt_clear = (
-                update(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == str(project_id),
-                    DisclosureNote.year == year,
-                    DisclosureNote.note_section.in_(report.sections_recomputed),
-                )
-                .values(is_stale=False)
-            )
-            await self.db.execute(stmt_clear)
+        # 4. 最终公式成功后才清 stale
+        from app.services.note_wp_mapping_service import _finalize_refill_report
+
+        await _finalize_refill_report(
+            self.db,
+            project_id if isinstance(project_id, UUID) else UUID(str(project_id)),
+            year,
+            report,
+        )
 
         # 5. text_only_sections 与取数失败章节保留 is_stale=True（不动）
 
         # 6. 填充 result
-        refresh_result.sections_refreshed = len(report.sections_recomputed)
+        refresh_result.sections_refreshed = len(report.recomputed_sections)
         refresh_result.cells_updated = report.cells_updated
+        refresh_result.recomputed_sections = list(report.recomputed_sections)
+        refresh_result.changed_sections = list(report.changed_sections)
+        refresh_result.failed_sections = list(report.failed_sections)
+        refresh_result.cleared_sections = list(report.cleared_sections)
         refresh_result.errors = list(report.errors)
 
         # 7. 只 flush 不 commit
@@ -343,24 +345,25 @@ class NoteStaleService:
             refresh_result.errors.append(f"重算失败: {e}")
             return refresh_result
 
-        # 3. 对 report.sections_recomputed 清 is_stale
-        if report.sections_recomputed:
-            stmt_clear = (
-                update(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == str(project_id),
-                    DisclosureNote.year == year,
-                    DisclosureNote.note_section.in_(report.sections_recomputed),
-                )
-                .values(is_stale=False)
-            )
-            await self.db.execute(stmt_clear)
+        # 3. 最终公式成功后才清 stale
+        from app.services.note_wp_mapping_service import _finalize_refill_report
+
+        await _finalize_refill_report(
+            self.db,
+            project_id if isinstance(project_id, UUID) else UUID(str(project_id)),
+            year,
+            report,
+        )
 
         # text_only_sections 与取数失败章节保留 is_stale=True（不动）
 
         # 4. 填充 result
         refresh_result.cells_updated = report.cells_updated
-        refresh_result.sections_refreshed = len(report.sections_recomputed)
+        refresh_result.sections_refreshed = len(report.recomputed_sections)
+        refresh_result.recomputed_sections = list(report.recomputed_sections)
+        refresh_result.changed_sections = list(report.changed_sections)
+        refresh_result.failed_sections = list(report.failed_sections)
+        refresh_result.cleared_sections = list(report.cleared_sections)
         refresh_result.errors = list(report.errors)
 
         # 5. 只 flush 不 commit

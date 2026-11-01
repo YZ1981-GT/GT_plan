@@ -254,7 +254,7 @@ function handleJump(contract: LinkageContract) {
   router.push(contract.route)
 }
 
-function handleCopy(contract: LinkageContract) {
+async function handleCopy(contract: LinkageContract) {
   const text = [
     `来源: ${getTypeLabel(contract.source_type)} [${contract.source_id}]`,
     `目标: ${getTypeLabel(contract.target_type)} [${contract.target_id}]`,

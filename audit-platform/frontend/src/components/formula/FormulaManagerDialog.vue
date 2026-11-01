@@ -3284,7 +3284,7 @@ async function onApplyFormulas() {
       project_id: props.projectId,
       year: props.year,
       formulas,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
 
     const result = data
     const results = result?.results || []

@@ -214,6 +214,11 @@ class Settings(BaseSettings):
     CONSISTENCY_GATE_ENFORCEMENT: Literal["observe", "enforce"] = "observe"
     # Phase 8: 数据加密密钥
     ENCRYPTION_KEY: str = ""
+    # 项目创建限流（单建 / 批量预校验 / 兼容批量导入共用 actor 级固定窗口）
+    # 必须声明在 Settings 上：只在调用方写 getattr(settings, "...", 默认值) 会让同名
+    # 环境变量被 pydantic-settings 当成未知字段忽略，文档声称「可配置」但实际永远用默认值。
+    PROJECT_CREATION_RATE_LIMIT_PER_MINUTE: int = Field(default=30, ge=1)
+    PROJECT_CREATION_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60, ge=1)
     # LLM 限流配置
     LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
     # AI Chat Run 独立限流（dsh-agent-panel-integration Task 12 / Req 13.5–13.7）
@@ -495,7 +500,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 启动时校验关键安全配置
-import logging as _logging
+import logging as _logging  # noqa: E402 — 初始化后的启动告警刻意放在文件末尾
 _logger = _logging.getLogger("audit_platform.config")
 if not settings.is_jwt_key_secure:
     # Q5: production 模式下强制失败，防止弱密钥上线

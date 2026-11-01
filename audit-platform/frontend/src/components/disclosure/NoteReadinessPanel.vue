@@ -155,11 +155,11 @@
             <el-tag v-else type="danger" size="small" round>从未同步</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="上游变更" width="120" align="center">
+        <el-table-column label="上游变更" min-width="170" align="center">
           <template #default="{ row }">
-            <el-tooltip v-if="row.is_stale" :content="staleTip(row.stale_source)" placement="top">
+            <el-tooltip v-if="row.is_stale" :content="noteStaleSourceTip(row.stale_source)" placement="top">
               <el-tag :type="row.stale_source === 'report' ? 'warning' : 'info'" size="small" round>
-                {{ row.stale_source === 'report' ? '关联变更' : '待刷新' }}
+                {{ noteStaleSourceLabel(row.stale_source) }}
               </el-tag>
             </el-tooltip>
             <span v-else class="gt-nrp-muted">—</span>
@@ -215,6 +215,7 @@ import {
 import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import DisclosureSyncCoveragePanel from './DisclosureSyncCoveragePanel.vue'
+import { noteStaleSourceLabel, noteStaleSourceTip } from './noteStaleSource'
 
 const props = defineProps<{
   visible: boolean
@@ -294,14 +295,6 @@ function onOpenWorkpaper(row: NoteReadinessSection) {
     params: { projectId: props.projectId, wpId },
     query: row.wp_sheet ? { sheet: row.wp_sheet } : undefined,
   })
-}
-
-function staleTip(source: string | null): string {
-  if (source === 'report') return '报表中与本章节存在关联关系的行次发生变更，建议刷新本章节'
-  if (source === 'report_fallback') return '报表发生变更（本项目暂无逐章节关联关系，故整体提示）'
-  if (source === 'workpaper') return '关联底稿发生变更，建议刷新本章节'
-  if (source === 'trial_balance') return '试算表数据发生变更，建议刷新本章节'
-  return '上游数据已变更，建议刷新本章节'
 }
 
 function fmtTime(iso: string | null): string {

@@ -80,6 +80,29 @@ async def test_members_are_tree_subsidiaries(db, group) -> None:
     assert len({m.company_code for m in members}) == len(members), "同一企业只列一次"
 
 
+async def test_tree_members_include_branches_as_independent_members(db, group) -> None:
+    """用户 2026-10-31 拍板：分公司作为**独立成员**出现在合并范围成员里。
+
+    - ``tree_members``：子公司 + 分公司，每项带 ``kind``；
+    - ``tree_subsidiaries``：仍只给会计口径的「子公司」（供「N 家子公司」这类表述）；
+    - ``tree_branches``：只给分公司；
+    - 母公司（根企业 G）本身不是成员。
+    """
+    from app.services.consol_scope_members import tree_branches, tree_members
+
+    members = await tree_members(db, group["G"].id)
+    by_code = {m.company_code: m for m in members}
+    assert set(by_code) == {"A", "X", "GB"}, "分公司 GB 必须是独立成员"
+    assert by_code["GB"].kind == "branch" and by_code["GB"].is_branch is True
+    assert by_code["A"].kind == "subsidiary" and by_code["A"].is_branch is False
+    assert "G" not in by_code, "母公司本身不是成员"
+
+    assert {m.company_code for m in await tree_subsidiaries(db, group["G"].id)} == {"A", "X"}
+    assert [m.company_code for m in await tree_branches(db, group["G"].id)] == ["GB"]
+    # 三者构成完整划分，且同一企业只列一次
+    assert len(members) == len({m.company_code for m in members}) == 3
+
+
 async def test_mid_level_consolidated_subsidiary_is_listed_once(db) -> None:
     """下级合并的企业在树里有合并户 / 差额户 / 母公司户多个节点（同一企业代码）⇒ 成员、子公司数、取数都只算一次。"""
     rows = [
@@ -126,11 +149,18 @@ async def test_note_vars_follow_tree_and_take_ratio_from_scope_attributes(db, gr
     await db.commit()
 
     out = await _load_consolidation_vars(db, g.id, Y)
+    # 用户 2026-10-31 拍板：分公司也是独立成员、进子企业清单；但 subsidiary_count 仍是
+    # 会计口径的「子公司」家数（分公司单独记 branch_count），不能把分公司混成子公司。
     assert out["subsidiary_count"] == 2 and out["has_consolidation"] is True
+    assert out["branch_count"] == 1 and out["member_count"] == 3
     by_code = {s["company_code"]: s for s in out["subsidiaries"]}
-    assert set(by_code) == {"A", "X"}
-    assert by_code["A"] == {"name": "甲公司", "company_code": "A", "ownership_ratio": 60.0}
+    assert set(by_code) == {"A", "X", "GB"}, "分公司 GB 必须出现在子企业清单里"
+    assert by_code["A"] == {
+        "name": "甲公司", "company_code": "A", "kind": "subsidiary",
+        "is_branch": False, "ownership_ratio": 60.0,
+    }
     assert by_code["X"]["ownership_ratio"] is None
+    assert by_code["GB"]["kind"] == "branch" and by_code["GB"]["is_branch"] is True
 
 
 async def test_note_vars_ignore_scope_table_when_tree_has_no_subsidiary(db, group) -> None:
@@ -138,7 +168,8 @@ async def test_note_vars_ignore_scope_table_when_tree_has_no_subsidiary(db, grou
     db.add(_scope_row(group["G_s"], "Z", ratio="51.00"))
     await db.commit()
     assert await _load_consolidation_vars(db, group["G_s"].id, Y) == {
-        "subsidiary_count": 0, "subsidiaries": [], "has_consolidation": False}
+        "subsidiary_count": 0, "branch_count": 0, "member_count": 0,
+        "subsidiaries": [], "has_consolidation": False}
 
 
 async def test_note_vars_failure_does_not_roll_back_caller(db, group, monkeypatch) -> None:
@@ -147,7 +178,9 @@ async def test_note_vars_failure_does_not_roll_back_caller(db, group, monkeypatc
     async def _boom(*_args, **_kwargs):
         raise RuntimeError("企业树读取失败")
 
-    monkeypatch.setattr(consol_scope_members, "tree_subsidiaries", _boom)
+    # 🔴 必须打 `tree_members`（附注变量现在调的是它）。原先打 `tree_subsidiaries`，
+    # 2026-10-31 调用方改名后这条故障注入就不再拦得住任何东西 ⇒ 守卫静默失效。
+    monkeypatch.setattr(consol_scope_members, "tree_members", _boom)
     pending = _p("P", "未提交项目", "standalone")
     db.add(pending)
     assert await _load_consolidation_vars(db, group["G"].id, Y) == {}
@@ -157,7 +190,8 @@ async def test_note_vars_failure_does_not_roll_back_caller(db, group, monkeypatc
 
 async def test_procedure_resolver_counts_tree_subsidiaries(db, group) -> None:
     resolve = _REGISTRY["consol_scope_status"]
-    assert await resolve(db, group["G"].id, Y) == {"summary": "已纳入2家子公司"}
+    # 分公司进成员后，文案按子公司 / 分公司分别表述（不把分公司说成子公司）
+    assert await resolve(db, group["G"].id, Y) == {"summary": "已纳入2家子公司、1家分公司"}
     assert await resolve(db, group["G_s"].id, Y) == {"summary": "待确定"}
     db.add(_scope_row(group["G_s"], "Z", ratio=None))
     await db.commit()

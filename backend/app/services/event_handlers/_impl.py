@@ -879,7 +879,7 @@ def register_event_handlers() -> None:
         本 handler 补齐 AuditReport.is_stale 和 DisclosureNote.is_stale。
         """
         import sqlalchemy as _sa
-        from app.models.report_models import AuditReport, DisclosureNote
+        from app.models.report_models import AuditReport
 
         project_id = payload.project_id
         year = payload.year
@@ -897,14 +897,14 @@ def register_event_handlers() -> None:
                     )
                     .values(is_stale=True)
                 )
-                await session.execute(
-                    _sa.update(DisclosureNote)
-                    .where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == False,  # noqa: E712
-                    )
-                    .values(is_stale=True)
+                from app.services.stale_state import StaleSource, mark_note_stale
+
+                await mark_note_stale(
+                    session,
+                    project_id,
+                    source=StaleSource.ROLLBACK,
+                    sections=None,
+                    year=year,
                 )
                 await session.commit()
                 logger.debug(
@@ -1080,7 +1080,7 @@ def register_event_handlers() -> None:
     async def _mark_reports_stale_on_adjustment(payload: EventPayload) -> None:
         """调整分录变更 → 标记报表和附注为 stale（级联）"""
         import sqlalchemy as _sa
-        from app.models.report_models import AuditReport, DisclosureNote
+        from app.models.report_models import AuditReport
 
         project_id = payload.project_id
         year = payload.year
@@ -1205,14 +1205,14 @@ def register_event_handlers() -> None:
                     )
 
                 # 标记附注 stale
-                await session.execute(
-                    _sa.update(DisclosureNote)
-                    .where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == False,  # noqa: E712
-                    )
-                    .values(is_stale=True)
+                from app.services.stale_state import StaleSource, mark_note_stale
+
+                await mark_note_stale(
+                    session,
+                    project_id,
+                    source=StaleSource.ADJUSTMENT,
+                    sections=None,
+                    year=year,
                 )
                 await session.commit()
                 logger.debug(
@@ -1836,23 +1836,27 @@ def register_event_handlers() -> None:
         标记后自动调度 _refresh_stale_notes_background 做真实重算，
         不再仅标 stale 等待前端打开页面。
         """
-        import sqlalchemy as _sa
-        from app.models.report_models import DisclosureNote
-
         project_id = payload.project_id
         year = payload.year
         if project_id is None or year is None:
             return
         async with async_session_factory() as session:
             try:
-                await session.execute(
-                    _sa.update(DisclosureNote)
-                    .where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == False,  # noqa: E712
-                    )
-                    .values(is_stale=True)
+                from app.services.stale_state import StaleSource, mark_note_stale
+
+                source_by_event = {
+                    "LEDGER_DATASET_ACTIVATED": StaleSource.LEDGER_ACTIVATED,
+                    "WORKPAPER_REVIEW_PASSED": StaleSource.WORKPAPER_REVIEWED,
+                    "ADJUSTMENT_APPROVED": StaleSource.ADJUSTMENT,
+                    "ADJUSTMENT_REVIEW_REVOKED": StaleSource.ADJUSTMENT_REVIEW_REVOKED,
+                    "ADJUSTMENT_BATCH_COMMITTED": StaleSource.ADJUSTMENT_BATCH_COMMITTED,
+                }
+                await mark_note_stale(
+                    session,
+                    project_id,
+                    source=source_by_event.get(source_event, StaleSource.ADJUSTMENT),
+                    sections=None,
+                    year=year,
                 )
                 await session.commit()
                 logger.debug(

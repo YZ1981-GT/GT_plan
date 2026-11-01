@@ -2027,7 +2027,7 @@ async function executeAggregate() {
         mode: 'direct',
         standard: props.standard,
         node_key: currentNodeKey(),
-      }, { validateStatus: (s: number) => s < 600 })
+      }, { _silent: true } as any)
       applyCellAggregate(sec, c, data)
     } else {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
@@ -2046,7 +2046,7 @@ async function executeAggregate() {
         note_sections: aggTarget.noteSections,
         standard: props.standard,
         node_key: currentNodeKey(),
-      }, { validateStatus: (s: number) => s < 600 })
+      }, { _silent: true } as any)
       applyCellAggregate(sec, c, data)
     }
     showAggregateDialog.value = false
@@ -2239,7 +2239,7 @@ async function saveNoteData(): Promise<boolean> {
     const result: any = await api.put(
       url,
       { data },
-      { validateStatus: (s: number) => s < 600 },
+      { _silent: true } as any,
     )
     if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
     // CP-05：A-B-A 保护——PUT 返回时若上下文已切换，旧保存结果既不能报成功也不能清 dirty。
@@ -2539,7 +2539,7 @@ async function onNoteBatchImport(e: Event) {
       await api.put(
         importUrl,
         { data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant } },
-        { validateStatus: (s: number) => s < 600 },
+        { _silent: true } as any,
       )
       matched++
     }
@@ -2719,7 +2719,7 @@ async function onNoteAuditAll(_e?: Event) {
       standard: props.standard,
       company_code: entityCode,
       node_key: currentNodeKey(),
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = result?.total_sections || 0
@@ -2774,7 +2774,7 @@ async function auditCurrentNote() {
       node_key: currentNodeKey(),
       headers: sec.headers,
       rows: currentRows,
-    }, { validateStatus: (s: number) => s < 600, signal: ticket.signal })
+    }, { _silent: true, signal: ticket.signal } as any)
     if (noteSubOpGuard.isStale(ticket)) return
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []

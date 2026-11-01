@@ -97,15 +97,16 @@ async def refresh_all_bindings(
         project_id, year, section_codes, skip_manual=True
     )
 
-    # 2. 公式二次求值：对重算过的章节再跑一遍公式
+    # 2. 公式二次求值：只对完整重算成功的章节再跑一遍
     formula_evaluated = 0
     formula_on = await is_note_formula_enabled(db, project_id)
-    if formula_on and report.sections_recomputed:
+    if formula_on and report.recomputed_sections:
         import sqlalchemy as sa
+        from copy import deepcopy
         from app.models.report_models import DisclosureNote
         from sqlalchemy.orm.attributes import flag_modified
 
-        for section in report.sections_recomputed:
+        for section in list(report.recomputed_sections):
             try:
                 result = await db.execute(
                     sa.select(DisclosureNote).where(
@@ -116,46 +117,61 @@ async def refresh_all_bindings(
                     )
                 )
                 note = result.scalar_one_or_none()
-                if note and note.table_data:
-                    updated_td = await engine._evaluate_note_formulas(
-                        project_id, year, section, note.table_data,
-                    )
+                if not note or not note.table_data:
+                    raise ValueError("章节没有可供公式求值的表格数据")
+                original_td = deepcopy(note.table_data)
+                updated_td = await engine._evaluate_note_formulas(
+                    project_id, year, section, note.table_data,
+                )
+                if updated_td != original_td:
                     note.table_data = updated_td
                     flag_modified(note, "table_data")
-                    formula_evaluated += 1
+                    if section not in report.changed_sections:
+                        report.changed_sections.append(section)
+                formula_evaluated += 1
             except Exception as e:
-                report.errors.append(f"公式求值失败 {section}: {e}")
+                message = f"公式求值失败 {section}: {e}"
+                report.errors.append(message)
+                report.error_details.append({
+                    "section": section,
+                    "stage": "formula",
+                    "message": str(e),
+                })
+                if section not in report.failed_sections:
+                    report.failed_sections.append(section)
+                if section in report.recomputed_sections:
+                    report.recomputed_sections.remove(section)
 
-    # 3. 对成功重算的章节清除 is_stale 标记
+    # 3. 对完整重算成功的章节清除 stale（统一入口）
     stale_cleared = 0
-    if report.sections_recomputed:
-        import sqlalchemy as sa
-        from app.models.report_models import DisclosureNote as DN2
-        stale_result = await db.execute(
-            sa.select(DN2).where(
-                DN2.project_id == project_id,
-                DN2.year == year,
-                DN2.note_section.in_(report.sections_recomputed),
-                DN2.is_deleted == sa.false(),
-                DN2.is_stale == sa.true(),
-            )
+    if report.recomputed_sections:
+        from app.services.stale_state import clear_note_stale
+
+        stale_cleared = await clear_note_stale(
+            db,
+            project_id,
+            sections=report.recomputed_sections,
+            year=year,
         )
-        for note in stale_result.scalars().all():
-            note.is_stale = False
-            note.stale_source = None
-            stale_cleared += 1
+        report.cleared_sections = list(report.recomputed_sections)
 
     await db.flush()
     await db.commit()
 
     resp = {
+        "requested_sections": report.requested_sections,
+        "recomputed_sections": report.recomputed_sections,
+        "sections_recomputed": report.recomputed_sections,  # 兼容旧客户端
+        "changed_sections": report.changed_sections,
+        "failed_sections": report.failed_sections,
+        "cleared_sections": report.cleared_sections,
         "cells_updated": report.cells_updated,
-        "sections_recomputed": report.sections_recomputed,
         "text_only_sections": report.text_only_sections,
         "formula_evaluated": formula_evaluated,
         "stale_cleared": stale_cleared,
         "errors": report.errors,
-        "message": f"已刷新 {len(report.sections_recomputed)} 个章节，"
+        "error_details": report.error_details,
+        "message": f"已刷新 {len(report.recomputed_sections)} 个章节，"
                    f"更新 {report.cells_updated} 个单元格，"
                    f"公式求值 {formula_evaluated} 个章节"
                    + (f"，清除 {stale_cleared} 个过期标记" if stale_cleared else ""),
@@ -163,7 +179,7 @@ async def refresh_all_bindings(
     # 底稿来源章节列表（被 refill 跳过的，前端据此提示"请在底稿中同步"）
     wp_source_sections = [
         s for s in report.text_only_sections
-        if s not in report.sections_recomputed
+        if s not in report.recomputed_sections
     ]
     if wp_source_sections:
         resp["workpaper_source_skipped"] = wp_source_sections

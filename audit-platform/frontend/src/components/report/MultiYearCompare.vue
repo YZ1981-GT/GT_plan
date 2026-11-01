@@ -187,7 +187,7 @@ function onCellDblClick(row: any, column: any) {
   }
 }
 
-function onCtxCopy() {
+async function onCtxCopy() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) return
   const text = cells.map(c => c.value ?? '-').join('\t')
@@ -237,7 +237,7 @@ function onCtxViewFormula() {
   ctxMenu.value.visible = false
 }
 
-function onCtxExportSelection() {
+async function onCtxExportSelection() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) { ElMessage.warning('请先选中单元格'); ctxMenu.value.visible = false; return }
   const text = cells.map(c => c.value ?? '-').join('\n')

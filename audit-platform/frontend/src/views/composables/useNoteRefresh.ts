@@ -92,15 +92,19 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     const cellsUpdated = result?.cells_updated ?? 0
     const textOnlySections = result?.text_only_sections ?? []
     const errors = result?.errors ?? []
+    const recomputedSections = result?.recomputed_sections ?? result?.sections_recomputed ?? []
+    const failedSections = result?.failed_sections ?? []
+    const clearedSections = result?.cleared_sections ?? []
+    const failureMessages = errors.length > 0 ? errors : failedSections.map((section) => `${section} 计算失败`)
     let type: 'success' | 'info' | 'warning' = 'info'
     let message: string
     let duration = 3000
 
-    if (errors.length > 0) {
-      // 有错误时优先提示错误
+    if (failureMessages.length > 0) {
+      // 有错误时优先提示错误；failed_sections 即使旧 errors 为空也不能冒充成功
       type = 'warning'
       duration = 5000
-      message = `刷新完成，${errors.length} 个章节取数失败：${errors.slice(0, 3).join('；')}${errors.length > 3 ? '…' : ''}`
+      message = `刷新完成，${failedSections.length || failureMessages.length} 个章节取数失败：${failureMessages.slice(0, 3).join('；')}${failureMessages.length > 3 ? '…' : ''}`
     } else if (cellsUpdated > 0) {
       type = 'success'
       duration = 4000
@@ -111,6 +115,11 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         const suffix = textOnlySections.length > 5 ? '等' : ''
         message += `；以下章节需手动重填：${sectionNames}${suffix}`
       }
+    } else if (recomputedSections.length > 0) {
+      type = 'success'
+      duration = 4000
+      message = `已重新计算 ${recomputedSections.length} 个章节，数据未变化`
+      if (clearedSections.length > 0) message += `；已清除 ${clearedSections.length} 个过期标记`
     } else if (textOnlySections.length > 0) {
       duration = 4000
       const sectionNames = textOnlySections.slice(0, 5).join('、')
@@ -130,7 +139,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
 
     // 从底稿取数（公式推送 + 离屏同步披露表）的结果并入同一条提示
     if (extra.lines.length) {
-      message = cellsUpdated > 0 || errors.length > 0 || textOnlySections.length > 0 || formulaDiffers > 0
+      message = cellsUpdated > 0 || failureMessages.length > 0 || recomputedSections.length > 0 || textOnlySections.length > 0 || formulaDiffers > 0
         ? `${message}；${extra.lines.join('；')}`
         : extra.lines.join('；')
       duration = Math.max(duration, 6000)

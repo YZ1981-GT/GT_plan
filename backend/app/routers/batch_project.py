@@ -26,6 +26,7 @@ from app.services.batch_project_service import (
     parse_and_import,
 )
 from app.services.batch_project_workbook import MAX_UPLOAD_BYTES
+from app.services.project_creation_security import enforce_creation_rate_limit
 from app.services.batch_project_execution import (
     BatchApplyRequest,
     BatchPlanStatusResponse,
@@ -97,6 +98,7 @@ async def batch_validate_projects(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_BATCH_CREATE_USER),
 ) -> BatchValidateResponse:
+    await enforce_creation_rate_limit(current_user, entrypoint="batch_validate")
     file_bytes = await _read_xlsx(file)
     _plan, response, _reused = await create_validation_plan(
         file_bytes, db, actor=current_user,
@@ -178,6 +180,7 @@ async def batch_import_projects(
     current_user: User = Depends(_BATCH_CREATE_USER),
 ) -> BatchImportResult:
     """兼容入口：错误行隔离且回执准确；新前端走持久计划的整批原子 apply。"""
+    await enforce_creation_rate_limit(current_user, entrypoint="batch_import")
     file_bytes = await _read_xlsx(file)
     return await parse_and_import(
         file_bytes, db, current_user=current_user, mode=mode

@@ -814,7 +814,7 @@ async function onRemindOverdue() {
     const wpIds = overdueItems.value.map(i => i.id)
     await http.post(`/api/projects/${props.projectId}/notifications/remind-overdue`, {
       wp_ids: wpIds,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
     ElMessage.success(`已向 ${overdueItems.value.length} 份逾期底稿的编制人发送催办通知`)
   } catch {
     // 端点可能不存在，降级提示
