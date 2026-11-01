@@ -10,7 +10,7 @@
   <div class="gt-a1721">
     <!-- Toolbar -->
     <div class="gt-a1721__toolbar">
-      <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <el-segmented v-if="a1721KEntrySync.presentation.value.showModeSwitch" v-model="mode" :options="modeOptions" size="small" />
       <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a1721-kam" />
       <span class="gt-a1721__save-status">
         <template v-if="saveStatus === 'saving'">
@@ -336,6 +336,7 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useA1721Kam } from './composables/useA1721Kam'
@@ -536,6 +537,21 @@ const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 onMounted(() => { checkOOHealth(); selfLoad() })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => flushPendingSaves() })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const a1721KEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => 'xlsx/gt-a1721-kam',
+})
+
 </script>
 
 <style scoped>

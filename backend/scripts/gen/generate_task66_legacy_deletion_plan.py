@@ -90,6 +90,20 @@ SPEC_DIR: pathlib.Path = (
 TASKS_MD_PATH: pathlib.Path = SPEC_DIR / "tasks.md"
 REQUIREMENTS_PATH: pathlib.Path = SPEC_DIR / "requirements.md"
 
+#: 🔴 两份 requirements 各管一段，不可互换：`REQUIREMENTS_PATH`（active）是 paradigm JSON
+#: 的投影、**只有 7 条 AC**（本轮裁决准则）；归档件（随 spec 归档于 239eb9a89）有 **170 条**，
+#: 是 Wave 6 冻结义务的权威源，本生成器用的 AC 11.5 只在那一份里。不把 11.5 塞回 active：
+#: 它不在本轮范围内，且 `TestAcceptanceCriteriaVerbatim` 逐字比对投影与 JSON，多一条就打红。
+ARCHIVED_REQUIREMENTS_PATH: pathlib.Path = (
+    _REPO
+    / ".kiro"
+    / "specs"
+    / "_archive"
+    / "17-2026-10-03-verified-batch"
+    / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
+    / "requirements.md"
+)
+
 #: 替代面（统一 bridge / 统一 coordinator）—— 这些路径是 replacement map 的**靶**。
 MODE_STORAGE_TS: pathlib.Path = SYNC_DIR / "workpaperSyncModeStorage.ts"
 BRIDGE_TS: pathlib.Path = SYNC_DIR / "useWorkpaperSyncBridge.ts"
@@ -460,38 +474,85 @@ def load_json(path: pathlib.Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+#: 「per-cycle owner」任务的标题形态。两代都认，但**只认这两种**，不做宽松兜底。
+#:
+#: 🔴 旧实现的 ``([A-Z](?:/[A-Z])+)\s*与跨循环共享`` 已删除而非保留：它会命中
+#: ``1.6 重生成并核对 A/B/C/S 与跨循环共享 slice``，而 1.6 是 slice 重生成不是 owner；
+#: ``setdefault`` + 1.6 更靠前 ⇒ 四个字母会被静默绑到错任务上。宽松在这里不是兼容性。
+_CYCLE_OWNER_TITLE_FORMS: tuple[re.Pattern[str], ...] = (
+    # 新形态：`对账并收口 <段> entries`，段内用 `/` 或 `、` 分隔，只取单个大写字母
+    re.compile(r"^对账并收口\s*(?P<segment>.+?)\s*entries\s*$"),
+    # 旧形态：`逐一迁移 <段> 循环 …` / `逐一迁移 <段> 与跨循环共享 …`
+    re.compile(r"^逐一迁移\s*(?P<segment>[A-Z](?:/[A-Z])*)\s*(?:循环|与跨循环共享)"),
+)
+
+#: 任务号：旧 `46.` 与新 `4.2` 都认，且必须整段捕获 —— 只写 `(\d+)\.` 时 `4.2` 的 `.` 后面
+#: 接数字而非空白，整行不匹配（本次失效的直接成因）。
+_TASK_LINE = re.compile(r"^\s*-\s\[[ x~\-]\]\s+(?P<task_id>\d+(?:\.\d+)+|\d+)\.?\s+(?P<title>.*)$")
+
+#: 段内分隔符：`/`（D/E）与 `、`（S、跨循环共享）。
+_CYCLE_SEGMENT_SPLIT = re.compile(r"[/、]")
+
+
+def _cycle_letters_in_segment(segment: str) -> list[str]:
+    """按 `/` 和 `、` 切开标题段后**只**留单个 A-Z：``S、跨循环共享、Word/custom/opaque``
+    只得 ``S``（``Word`` 是载体名、``跨循环共享`` 是分组名，都不是循环字母）。"""
+    letters: list[str] = []
+    for token in _CYCLE_SEGMENT_SPLIT.split(segment):
+        token = token.strip()
+        if len(token) == 1 and "A" <= token <= "Z":
+            letters.append(token)
+    return letters
+
+
 def cycle_owner_tasks() -> dict[str, str]:
     """从 tasks.md 的任务标题现算 `cycle letter -> owner task id`。
 
-    两种标题形态都认：`逐一迁移 D 循环 …` 与 `逐一迁移 A/B/C/S 与跨循环共享 …`。
-    禁手抄 46..57 —— 任务号漂移时必须打红。
+    形态见 `_CYCLE_OWNER_TITLE_FORMS`。禁手抄任务号 —— 任务号漂移时必须打红。
     """
     text = TASKS_MD_PATH.read_text(encoding="utf-8")
     mapping: dict[str, str] = {}
     for line in text.splitlines():
-        match = re.match(r"^\s*-\s\[[ x~\-]\]\s+(\d+)\.\s+(.*)$", line)
+        match = _TASK_LINE.match(line)
         if not match:
             continue
-        task_id, title = match.group(1), match.group(2)
-        for group in re.findall(r"([A-Z](?:/[A-Z])*)\s*循环", title):
-            for letter in group.split("/"):
-                mapping.setdefault(letter, task_id)
-        for group in re.findall(r"([A-Z](?:/[A-Z])+)\s*与跨循环共享", title):
-            for letter in group.split("/"):
+        task_id, title = match.group("task_id"), match.group("title")
+        for pattern in _CYCLE_OWNER_TITLE_FORMS:
+            form = pattern.match(title)
+            if not form:
+                continue
+            for letter in _cycle_letters_in_segment(form.group("segment")):
                 mapping.setdefault(letter, task_id)
     if len(mapping) < 10:
         raise Task66GeneratorError(
-            f"从 tasks.md 只解析出 {len(mapping)} 个 cycle→task 映射 —— 标题形态变了"
+            f"从 tasks.md 只解析出 {len(mapping)} 个 cycle→task 映射 —— 标题形态变了。"
+            "认的两种形态见 generate_task66_legacy_deletion_plan._CYCLE_OWNER_TITLE_FORMS；"
+            "改 tasks.md 的 per-cycle 任务标题时必须同步改那里，不要在这里加宽松兜底"
+            "（会把 slice 重生成类任务误绑成 cycle owner）"
         )
     return mapping
 
 
 def tasks_md_task_ids() -> frozenset[str]:
+    """tasks.md 里全部任务号。
+
+    🔴 必须走 `_TASK_LINE`：旧的 ``(\\d+)\\.`` 对 ``4.2`` 会**静默**只捕到 ``4``，整份清单
+    退化成 ``{"0".."7"}`` —— 不抛异常，只是让「这个任务号存在吗」全部得出错结论。
+    """
     text = TASKS_MD_PATH.read_text(encoding="utf-8")
-    ids = frozenset(re.findall(r"^\s*-\s\[[ x~\-]\]\s+(\d+)\.", text, re.M))
+    ids = frozenset(
+        match.group("task_id")
+        for line in text.splitlines()
+        if (match := _TASK_LINE.match(line))
+    )
     if not ids:
         raise Task66GeneratorError("tasks.md 里一个任务复选框都没解析到")
     return ids
+
+
+def _task_id_sort_key(task_id: str) -> tuple[int, ...]:
+    """两级编号按段比较：``4.10`` 排在 ``4.9`` 之后，而不是字典序的之前。"""
+    return tuple(int(part) for part in task_id.split("."))
 
 
 def deletion_execution_owner() -> str:
@@ -530,6 +591,47 @@ def deletion_execution_owner() -> str:
     return executor
 
 
+#: per-cycle 删除计划（冻结数据）写的执行方是 Wave 6 的 `Task 72`，该号在新 tasks.md 里
+#: 不存在、义务并进了「把 Task 66 删除计划升级为可收缩执行账」。锚点取**标题同时含
+#: `Task 66` 与 `删除计划`**：现算唯一命中，语义就是「执行这份计划」。
+_DELETION_EXECUTOR_TITLE_NEEDLES: tuple[str, ...] = ("删除计划",)
+
+
+def resolve_current_deletion_executor(
+    legacy_executor: str, known_task_ids: frozenset[str]
+) -> str:
+    """把 per-cycle 计划里的 legacy 执行方任务号映射到**当前** tasks.md 的任务号。
+
+    🔴 不手抄 `"72" -> "5.5"`：映射从 tasks.md 现算，标题形态变了就打红。
+    """
+    if legacy_executor in known_task_ids:
+        return legacy_executor
+    text = TASKS_MD_PATH.read_text(encoding="utf-8")
+    hits: list[str] = []
+    for line in text.splitlines():
+        match = _TASK_LINE.match(line)
+        if not match:
+            continue
+        title = match.group("title")
+        if f"Task {OWNER_TASK}" not in title:
+            continue
+        if not all(needle in title for needle in _DELETION_EXECUTOR_TITLE_NEEDLES):
+            continue
+        hits.append(match.group("task_id"))
+    unique = sorted(set(hits), key=_task_id_sort_key)
+    if not unique:
+        raise Task66GeneratorError(
+            f"删除执行方 Task {legacy_executor} 不在当前 tasks.md 里，也找不到标题同时含"
+            f" 'Task {OWNER_TASK}' 与 {list(_DELETION_EXECUTOR_TITLE_NEEDLES)} 的承接任务"
+            " —— 给承接任务的标题加上这个锚点，或把 legacy 号留在 tasks.md 里"
+        )
+    if len(unique) > 1:
+        raise Task66GeneratorError(
+            f"承接 Task {OWNER_TASK} 删除计划执行的任务不唯一：{unique} —— 请由 tasks.md 收敛"
+        )
+    return unique[0]
+
+
 def ac_11_5_required_events() -> list[str]:
     """从 requirements.md 的 AC 11.5 现读「必须发出的事件」清单。
 
@@ -537,12 +639,22 @@ def ac_11_5_required_events() -> list[str]:
     save-requested、incoming-durable、applied/conflict、recovery-case、error 事件；
     不得只 emit fallback …`
     """
-    text = REQUIREMENTS_PATH.read_text(encoding="utf-8")
+    # AC 11.5 是 Wave 6 的冻结义务，只在**归档**件里；active 投影只有 7 条 AC。
+    # 路径与两份文档的分工见 `ARCHIVED_REQUIREMENTS_PATH` 的注释。
+    if not ARCHIVED_REQUIREMENTS_PATH.is_file():
+        raise Task66GeneratorError(
+            f"归档 requirements 不在：{rel(ARCHIVED_REQUIREMENTS_PATH)} —— "
+            "AC 11.5 的事件清单无从现读。归档 spec 被再次移动时必须改这里的路径，"
+            "不要退回去读 active 投影（那份只有本轮 7 条 AC，不含 11.5）"
+        )
+    text = ARCHIVED_REQUIREMENTS_PATH.read_text(encoding="utf-8")
     line = next(
         (ln for ln in text.splitlines() if ln.strip().startswith("11.5.")), None
     )
     if line is None:
-        raise Task66GeneratorError("requirements.md 里找不到 AC 11.5")
+        raise Task66GeneratorError(
+            f"{rel(ARCHIVED_REQUIREMENTS_PATH)} 里找不到 AC 11.5"
+        )
     match = re.search(r"发出\s*(.+?)\s*事件", line)
     if not match:
         raise Task66GeneratorError(f"AC 11.5 的事件清单抓取失败：{line[:160]!r}")
@@ -1243,7 +1355,11 @@ def _owner(
         "replacement_owner_task": replacement_owner_task,
         "replacement_owner_reason": replacement_owner_reason,
         "deletion_owner_task": deletion_owner_task,
-        "deletion_owner_source": "per-cycle deletion plan 的 `deletion_execution_owner` 现读",
+        "deletion_owner_source": (
+            "per-cycle deletion plan 的 `deletion_execution_owner` 现读，再经 "
+            "`resolve_current_deletion_executor` 把 legacy 任务号映射到当前 tasks.md "
+            "的承接任务（锚点＝标题同时含 `Task 66` 与 `删除计划`，现算唯一命中）"
+        ),
     }
 
 
@@ -1951,17 +2067,31 @@ def cycle_owner_for_paths(
 def _word_lane_owner_task(known_task_ids: frozenset[str]) -> str:
     """从 tasks.md 现算 Word entry 门任务号（标题含 `Word` 且含 `门`/`gate`）。"""
     text = TASKS_MD_PATH.read_text(encoding="utf-8")
-    hits: list[str] = []
+    word_tasks: list[str] = []
+    gate_tasks: list[str] = []
     for line in text.splitlines():
-        match = re.match(r"^\s*-\s\[[ x~\-]\]\s+(\d+)\.\s+(.*)$", line)
+        match = _TASK_LINE.match(line)
         if not match:
             continue
-        task_id, title = match.group(1), match.group(2)
-        if "Word" in title and ("gate" in title.lower() or "门" in title):
-            hits.append(task_id)
-    if not hits:
-        raise Task66GeneratorError("tasks.md 里找不到 Word 门任务 —— owner 无从派生")
-    chosen = sorted(hits, key=int)[0]
+        task_id, title = match.group("task_id"), match.group("title")
+        if "Word" not in title:
+            continue
+        word_tasks.append(task_id)
+        if "gate" in title.lower() or "门" in title:
+            gate_tasks.append(task_id)
+    # 旧 Word 门任务标题同时带 Word 与「门/gate」（Task 61）；新计划把 Word lane 并进了
+    # 「对账并收口 S、跨循环共享、Word/custom/opaque entries」，标题只剩 Word。
+    # 先用更窄的「Word + 门」口径，为空再退到「标题含 Word」。
+    candidates = gate_tasks or word_tasks
+    if not candidates:
+        raise Task66GeneratorError("tasks.md 里找不到承接 Word lane 的任务 —— owner 无从派生")
+    unique = sorted(set(candidates), key=_task_id_sort_key)
+    if len(unique) > 1:
+        # 🔴 旧实现这里直接取 sorted(...)[0]：多候选时**静默**挑一个，owner 就可能绑错。
+        raise Task66GeneratorError(
+            f"tasks.md 里承接 Word lane 的任务不唯一：{unique} —— 请收敛到一个任务标题上"
+        )
+    chosen = unique[0]
     if chosen not in known_task_ids:  # pragma: no cover - 结构上不可能
         raise Task66GeneratorError(f"Word 门任务号 {chosen} 不在 tasks.md 任务集合里")
     return chosen
@@ -2504,7 +2634,10 @@ def build_record() -> dict[str, Any]:
     manifest = ManifestFacts()
     cycle_owners = cycle_owner_tasks()
     known_task_ids = tasks_md_task_ids()
-    deletion_owner = deletion_execution_owner()
+    deletion_owner_legacy = deletion_execution_owner()
+    deletion_owner = resolve_current_deletion_executor(
+        deletion_owner_legacy, known_task_ids
+    )
     ac_events = ac_11_5_required_events()
     legacy_key_pattern, legacy_key_re = legacy_key_migration_regex()
     unified_prefix = unified_key_prefix()

@@ -762,6 +762,7 @@ class TestSignedScopeClaim:
 #: Task 28 明文要求的端点（design §API 逐条列出）。
 _REQUIRED_ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("POST", "/pending-mutations"),
+    ("GET", "/readiness"),
     ("GET", "/store-projection"),
     ("POST", "/materialize"),
     ("POST", "/rooms/{room_id}/confirm-descriptor"),
@@ -862,6 +863,7 @@ class TestRouterShape:
         room, op, case, version = (uuid.uuid4() for _ in range(4))
         suffixes = [
             ("POST", "/pending-mutations"),
+            ("GET", "/readiness"),
             ("GET", "/store-projection"),
             # spec d2-online-edit-platform-closure R7 追加：按需发布首版 representation。
             ("POST", "/first-publication"),

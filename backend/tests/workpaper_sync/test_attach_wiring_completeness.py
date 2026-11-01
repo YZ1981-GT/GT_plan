@@ -117,7 +117,7 @@ def skeleton_hop(node: ast.AST, provider_path: Path) -> tuple[Path, ast.AST, ast
 
 @dataclass(frozen=True)
 class Wiring:
-    form: str  # factory / def / skeleton / no_adapter
+    form: str  # factory / def / skeleton / no_adapter / no_attach
     supplies_siblings: bool
     awaited: frozenset[str]  # def / skeleton 形态：attach 链上被 await 的调用名
     where: str
@@ -125,7 +125,16 @@ class Wiring:
 
 def attach_wiring(module: Any) -> Wiring:
     attach = getattr(module, "attach_pilot_adapters", None)
-    assert callable(attach), f"{module.__name__} 没有 attach_pilot_adapters"
+    if attach is None:
+        # 🔴 第五形态：契约已进生产目录（故 `DELIVERED_PER_ENTRY_CONTRACTS` 必须有行，见
+        #    test_task13 的目录↔台账双向等值），但 provider **没有** attach 入口 ⇒ 这条
+        #    entry 的受管结构在生产里一次都不会被挂上。原先这里直接 assert，于是台账漏登
+        #    反而让本门看不见该缺口（两套机制互相兜底）。现在落成可枚举形态，由
+        #    `_NO_ATTACH` 逐条登记可伪证原因。
+        return Wiring(
+            "no_attach", False, frozenset(), f"{module.__name__}::<无 attach_pilot_adapters>"
+        )
+    assert callable(attach), f"{module.__name__}.attach_pilot_adapters 不可调用"
     if is_factory_closure(attach, "attach_adapters"):
         cfg = closure_cell(attach, "cfg")
         return Wiring("factory", cfg.instrumentation_specs_fn is not None, frozenset(), "build_orchestration")
@@ -180,12 +189,15 @@ class _Case:
     contract: Any
     row_tables: frozenset[str]
     wiring: Wiring
+    ledger_row: Any
 
 
 def _load_case(row: Any) -> _Case:
     module = importlib.import_module(str(row["provider_module"]))
     contract = load_contract(str(row["contract_id"]))
-    return _Case(module, contract, frozenset(_row_tables(contract)), attach_wiring(module))
+    return _Case(
+        module, contract, frozenset(_row_tables(contract)), attach_wiring(module), row
+    )
 
 
 _CASES: dict[str, _Case] = {str(r["contract_id"]): _load_case(r) for r in _XLSX_ROWS}
@@ -211,9 +223,39 @@ def _factory_instrumentation_still_singular(case: _Case) -> str | None:
     return None
 
 
+def _ledger_still_declares_adapter_unregistered(case: _Case) -> str | None:
+    """G4/G6 ECL：台账仍自称 adapter 未注册（翻 True 却没 attach ⇒ 自相矛盾，必须打红）。"""
+    if case.ledger_row.get("adapter_registered") is not False:
+        return (
+            "台账 adapter_registered 已不是 False —— 自称已注册却没有 attach 入口，"
+            "生产路径不可能挂上该 entry"
+        )
+    return None
+
+
 #: attach 根本不构造 adapter 的 entry（与行表数无关，单列）→ 原因。
 _NO_ADAPTER: dict[str, str] = {
     "e1.monetary_fund_detail": "attach 尚未实现 adapter 构造（capability 放行即显式抛，BP-61-1）",
+}
+
+#: 连 attach 入口都没有的 entry → (原因, 「原因仍成立」判据)。
+#:
+#: 这些契约已在生产契约目录里（`available_contract_ids()` 扫得到），故台账必须有行；但
+#: provider 只有 `build_registration` / `register_adapter`，没有任何生产调用方会构造
+#: adapter。接上 attach 后形态即变 ⇒ 下方集合等值判据打红 ⇒ 逼着删条目。
+_NO_ATTACH: dict[str, tuple[str, Any]] = {
+    "g4.ecl_stage": (
+        "G4-9 ECL 独立 entry：reviewed 契约与 provider 在库，但无 attach 入口；该 entry "
+        "现无 published representation（phase4-representation-preflight.json 记 "
+        "not_published_use_first_publication_host），capability 仍 pending",
+        _ledger_still_declares_adapter_unregistered,
+    ),
+    "g6.ecl_stage": (
+        "G6-11 ECL 独立 entry：reviewed 契约与 provider 在库，但无 attach 入口；该 entry "
+        "现无 published representation（phase4-representation-preflight.json 记 "
+        "not_published_use_first_publication_host），capability 仍 pending",
+        _ledger_still_declares_adapter_unregistered,
+    ),
 }
 
 _D567_REASON = (
@@ -229,7 +271,9 @@ _KNOWN_GAPS: dict[str, tuple[str, Any]] = {
     "d7.contract_liabilities_detail": (_D567_REASON, _factory_instrumentation_still_singular),
 }
 _WIRED_MULTI: tuple[str, ...] = tuple(
-    cid for cid in _MULTI if cid not in _KNOWN_GAPS and cid not in _NO_ADAPTER
+    cid
+    for cid in _MULTI
+    if cid not in _KNOWN_GAPS and cid not in _NO_ADAPTER and cid not in _NO_ATTACH
 )
 
 
@@ -247,6 +291,11 @@ class TestSiblingBindingsSupplied:
     @pytest.mark.parametrize("contract_id", _MULTI)
     def test_multi_table_attach_supplies_siblings(self, contract_id: str) -> None:
         case = _CASES[contract_id]
+        if contract_id in _NO_ATTACH:
+            assert case.wiring.form == "no_attach", (
+                f"{contract_id} 已有 attach 入口 —— 从 _NO_ATTACH 删掉再核兄弟 binding"
+            )
+            return
         if contract_id in _NO_ADAPTER:
             assert case.wiring.form == "no_adapter", f"{contract_id} 已构造 adapter —— 从 _NO_ADAPTER 删掉再核兄弟 binding"
             return
@@ -266,6 +315,8 @@ class TestSiblingBindingsSupplied:
     def test_gap_registry_has_no_stale_entries(self) -> None:
         stale = sorted(set(_KNOWN_GAPS) - set(_MULTI))
         assert not stale, f"缺口清单里有不再是多行表 entry 的条目：{stale}"
+        gone = sorted(set(_NO_ATTACH) - set(_CASES))
+        assert not gone, f"_NO_ATTACH 里有已不在 xlsx 台账的条目：{gone}"
 
     @pytest.mark.parametrize("contract_id", _WIRED_MULTI)
     def test_alignment_covers_every_row_table(self, contract_id: str) -> None:
@@ -320,6 +371,20 @@ class TestAttachResolvesThroughDigestCheck:
     def test_only_registered_entries_build_no_adapter(self) -> None:
         no_adapter = sorted(cid for cid, c in _CASES.items() if c.wiring.form == "no_adapter")
         assert no_adapter == sorted(_NO_ADAPTER), "不构造 adapter 的 attach 必须逐条登记原因（反之登记了的必须仍不构造）"
+
+    def test_only_registered_entries_lack_attach(self) -> None:
+        """没有 attach 入口的台账行必须逐条登记（反之登记了的必须仍然没有）。"""
+        no_attach = sorted(cid for cid, c in _CASES.items() if c.wiring.form == "no_attach")
+        assert no_attach == sorted(_NO_ATTACH), (
+            "交付契约却无 attach 入口 = 该 entry 在生产里一次都挂不上，必须逐条登记可伪证原因"
+        )
+
+    @pytest.mark.parametrize("contract_id", sorted(_NO_ATTACH))
+    def test_no_attach_reason_still_holds(self, contract_id: str) -> None:
+        reason, still_true = _NO_ATTACH[contract_id]
+        assert reason.strip(), f"{contract_id} 的缺口原因是空文本"
+        problem = still_true(_CASES[contract_id])
+        assert problem is None, f"{contract_id} 登记的缺口原因已不成立（{problem}）"
 
 
 class TestPredicatesAreFalsifiable:

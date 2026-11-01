@@ -2939,5 +2939,38 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
                   "76 字段，7 个 store item。D2-8 纯文本不需 provider，D2-9/D2-10 后续扩容。"
                   "待首版 representation。",
     },
+    # ── G4/G6 ECL 独立 entry（既有 reviewed 契约与 provider，等待 capability/runtime）──
+    {
+        "contract_id": "g4.ecl_stage",
+        "provider_module": "app.services.workpaper_sync.phase5_g4_ecl_entry",
+        "delivered_by_task": "g4-g6-shared-workbook-three-entry-lanes",
+        "pilot_class": "phase5_bond_investment_ecl",
+        "entry_id": "xlsx/gt-g4-bond-investment-ecl",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G4 债权投资.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "G4-9 ECL 独立 entry 的 reviewed 契约与 provider 已在库；当前主 manifest "
+            "按 AC 1.3 保持 pending，待本 entry 的 capability 终裁、published "
+            "representation 与真实 OO evidence 后才允许运行时注册。"
+        ),
+    },
+    {
+        "contract_id": "g6.ecl_stage",
+        "provider_module": "app.services.workpaper_sync.phase5_g6_ecl_entry",
+        "delivered_by_task": "g4-g6-shared-workbook-three-entry-lanes",
+        "pilot_class": "phase5_other_bond_ecl",
+        "entry_id": "xlsx/gt-g6-other-bond-investment-ecl",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "G/G6 其他债权投资.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "G6-11 ECL 独立 entry 的 reviewed 契约与 provider 已在库；当前主 manifest "
+            "按 AC 1.3 保持 pending，待本 entry 的 capability 终裁、published "
+            "representation 与真实 OO evidence 后才允许运行时注册。"
+        ),
+    },
 
 )

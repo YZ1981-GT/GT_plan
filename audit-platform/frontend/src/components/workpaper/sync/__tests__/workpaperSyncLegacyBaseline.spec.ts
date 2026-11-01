@@ -23,15 +23,20 @@ describe('workpaper sync false-bidirectional baseline', () => {
     for (const entry of openEntries) {
       expect(entry.reasonCodes.length, entry.entryId).toBeGreaterThan(0)
       expect(entry.reasonCodes, entry.entryId).toContain('no_durable_forcesave_ack')
-      expect(entry.reasonCodes, entry.entryId).toContain('missing_adapter')
+      if (entry.capability === null) {
+        expect(entry.reasonCodes, entry.entryId).toContain('missing_adapter')
+        if (entry.modeSwitchVisible) {
+          expect(entry.reasonCodes, entry.entryId).toContain('pending_mode_switch_visible')
+        }
+      }
     }
   })
 
-  it('records a real source location for every visible single-mode switch debt', () => {
+  it('records a real source location for every visible mode switch debt', () => {
     const switchDebts = WORKPAPER_SYNC_LEGACY_ENTRIES.filter(
       (entry) => entry.independentEntry && entry.modeSwitchVisible,
     )
-    expect(switchDebts.length).toBe(WORKPAPER_SYNC_LEGACY_STATS.single_mode_switch_visible_count)
+    expect(switchDebts.length).toBe(WORKPAPER_SYNC_LEGACY_STATS.mode_switch_visible_count)
     expect(switchDebts.length).toBeGreaterThan(0)
     for (const entry of switchDebts) {
       expect(entry.modeSwitchEvidence.length, entry.entryId).toBeGreaterThan(0)

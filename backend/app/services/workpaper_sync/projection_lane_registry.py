@@ -237,7 +237,7 @@ def adjudicate_lane(
         capability_of,
     )
     entry = entries[entry_id]
-    if not entry.get("independent_entry"):
+    if not entry.get("independent_entry") or entry.get("capability") is None:
         return LaneVerdict.undecided
     cap = capability_of(entry)
     if cap is Capability.unreachable:
@@ -320,6 +320,17 @@ def _adjudicate_with_diagnostic(
             criterion_label="L4: independent_entry",
             source_path=_L4_SOURCE,
             detail=f"entry_id {entry_id!r} 不是 independent_entry",
+        )
+    if entry.get("capability") is None:
+        return LaneVerdict.undecided, _UndecidedDiagnostic(
+            criterion_number=4,
+            criterion_label="L4: capability 已终裁",
+            source_path=_L4_SOURCE,
+            detail=(
+                f"entry_id {entry_id!r} 仍为 pending："
+                f"stage={entry.get('capability_verdict_stage')!r}，"
+                f"target={entry.get('capability_target')!r}"
+            ),
         )
     cap = capability_of(entry)
     if cap is Capability.unreachable:

@@ -27,7 +27,7 @@
  *   · 清单里某个**已经修好** ⇒ 也打红，要求从清单删掉（否则清单会退化成永久豁免）。
  */
 import { describe, it, expect } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const WP = resolve(__dirname, '..', '..')
@@ -285,9 +285,9 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(hollow).not.toContain('k8/core/K8TabAdjustment.vue')
   })
 
-  it('🔴 usePilotBridgeAdapter 不得被当成驱动方（它 docstring 提到但实现零 API）', () => {
-    const adapter = stripComments(read(resolve(SYNC, 'usePilotBridgeAdapter.ts')))
-    expect(DRIVE_RE.test(adapter)).toBe(false)
+  it('🔴 usePilotBridgeAdapter 已删除（Task 5.4），不得复活且不得被当成驱动方', () => {
+    const adapterPath = resolve(SYNC, 'usePilotBridgeAdapter.ts')
+    expect(existsSync(adapterPath)).toBe(false)
     expect(drivingWrappers().has('usePilotBridgeAdapter')).toBe(false)
   })
 

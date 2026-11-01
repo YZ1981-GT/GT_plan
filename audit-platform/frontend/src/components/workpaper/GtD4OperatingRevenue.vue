@@ -8,7 +8,7 @@
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
       <div v-if="showModeToolbar && !isD4DedicatedSyncSheet" class="d4-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
+        <el-segmented v-if="d4OEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
         <el-tag v-if="isLegacyOoBlocked" size="small" type="info" title="本表尚未接入双向同步，在线编辑的改动无法回写到结构化数据，故暂不开放，以免数据丢失">
           本表暂不支持在线编辑
         </el-tag>
@@ -154,6 +154,7 @@
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
 import { useD4ImportExport, type D4ImportableSheet } from './composables/useD4ImportExport'
 // 注：D4_MAIN_REVENUE_STANDARD / D4_OTHER_REVENUE_STANDARD 原仅用于已移除的
@@ -741,6 +742,21 @@ defineExpose({
     return [{ row_key: sheet, row_label: sheet, account_prefixes: [] }]
   },
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const d4OEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => D4_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

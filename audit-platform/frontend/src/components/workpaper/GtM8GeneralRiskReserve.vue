@@ -18,6 +18,7 @@
       <!-- 双模式切换（结构化 / OnlyOffice，sync bridge 真双向） -->
       <div v-if="currentSheet !== 'index' && currentSheet !== 'procedure'" class="mode-toggle-bar">
         <el-segmented
+          v-if="m8GEntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="renderModeOptions"
           size="small"
@@ -140,6 +141,7 @@
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
@@ -358,6 +360,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('m8:save-items', handleM8SaveItems)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const m8GEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => M8_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

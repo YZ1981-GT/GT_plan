@@ -1,0 +1,63 @@
+{
+  "schema_version": "workpaper-sync-source-digest-review:v1",
+  "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "reviewed_at": "2026-11-01",
+  "trigger": "本会话把样板宿主 GtM7SpecialReserve.vue 接到同步能力单源（useEntrySyncReadiness），宿主源码内容变了 ⇒ discovery 的 sourceDigest 随之变化，manifest 生成器的 reviewed-overlay 门按设计 fail closed。",
+  "found_by": "backend/scripts/gen/generate_workpaper_sync_artifacts.py --check（Task 1.7 的原子入口）—— 四个生成器各自 --check 时发现不了：本会话先跑过 manifest --check 才改宿主，之后只跑了下游三件。",
+  "digest_transition": {
+    "source_digest": {
+      "approved_before": "07f66e91c4d4fc388c7d2be43eecbe706985bbf1a3cd37b129c262a99d97ce1b",
+      "current": "189cbda5722cd049afc41f61babc0326ef6a1559a259391a8131295eb482b108"
+    },
+    "manifest_digest": {
+      "before": "dcde4f2377050e7e5527ff0bc2a7a32913c325339657e25358289139b4c92424",
+      "predicted_during_review": "7673ed4841b876bb7fd771e5659f3d8c6f91dc4b9b5d5197deba839f19335f5e",
+      "after_regeneration": "31a23eaca6000a84fbc478ee6789adda2b9a4b7a00f00f83eeb307161eee4e50",
+      "why_predicted_differs_from_final": "复核时只在内存里改了 approved_source_digest，而正式批准还会往 overlay 的 review_basis 追加本次复核记录 —— overlay 内容进 overlay_digest、overlay_digest 进 manifest_digest，所以最终值必然不同于复核时的预测值。两个数都如实留下：预测值用于证明「除 digest 外零变化」，最终值才是落盘事实。"
+    }
+  },
+  "zero_capability_loss_review": {
+    "method": "tmp_workpaper_sync_impl/review_mount_diff.py —— 按完整 manifest 现 build 与磁盘版逐 entry 比（只在内存里放行那道 digest 门，磁盘 overlay 未改一个字节）。",
+    "compared_fields": [
+      "capability",
+      "migration_state",
+      "adapter_id",
+      "html_store",
+      "canonical_resolver",
+      "independent_entry",
+      "html_counterpart_verdict",
+      "effective_entry_id",
+      "capability_verdict_stage",
+      "capability_target"
+    ],
+    "entry_set": {
+      "disk": 198,
+      "built": 198,
+      "only_disk": [],
+      "only_built": []
+    },
+    "stats_diff": {},
+    "changed_entries": {},
+    "mount_count_changes": {},
+    "verdict": "零能力损失：entry 集合不增不减、stats 逐项相同（含 capability_counts）、无任何 entry 的裁决字段变化、无 per-entry mount 数变化。唯一变化是被改宿主文件的内容哈希。",
+    "post_regeneration_counts": {
+      "entries": 198,
+      "independent": 145,
+      "pending": 78,
+      "cycle_groups": 12,
+      "cycle_entries": 145,
+      "legacy_baseline_digest": "e18500cddb2ce678c4b81f076d6667d59fee3495fe0b08b0130c45f0f10c573b"
+    }
+  },
+  "host_change_summary": {
+    "file": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
+    "what": "模式开关可见性改由 useEntrySyncReadiness 的 presentation.showModeSwitch 决定；OnlyOffice 选项禁用态改为「本地 ooAvailable ∧ presentation.canSwitchToOnlyOffice」；entry id 收成单一常量 M7_SYNC_ENTRY_ID 供开关与 notice 共用。",
+    "did_not": [
+      "未新增/删除任何 OnlyOffice 或 dispatcher 挂载点",
+      "未翻转任何 entry 的 capability 或 migration_state",
+      "未改 overlay 的任何 override 行"
+    ]
+  },
+  "approved": true,
+  "approved_source_digest_after": "189cbda5722cd049afc41f61babc0326ef6a1559a259391a8131295eb482b108"
+}

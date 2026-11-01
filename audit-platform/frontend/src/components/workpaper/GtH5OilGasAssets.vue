@@ -20,7 +20,7 @@
         `useHSyncMode.switchMode`（await 兜底），切换器保持可点。
       -->
       <div v-if="showHtmlToolbar && currentSheet !== 'H5'" class="h5-header-toolbar">
-        <el-segmented v-model="currentMode" :options="modeOptions" size="small" />
+        <el-segmented v-if="h5OEntrySync.presentation.value.showModeSwitch" v-model="currentMode" :options="modeOptions" size="small" />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h5-oil-gas-assets" />
         <span class="h5-oo-tag" :class="`h5-oo-tag--${hSync.syncStateTag.value.type}`">
           {{ hSync.syncStateTag.value.text }}
@@ -320,6 +320,7 @@
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 1.11
  */
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -542,6 +543,21 @@ provide('h5OpenVersionHistory', openVersionHistory)
 onMounted(() => {
   void selfLoad()
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const h5OEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => H5_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

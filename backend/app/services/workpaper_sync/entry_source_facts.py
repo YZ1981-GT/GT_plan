@@ -422,6 +422,24 @@ def normalize_endpoint(raw: str) -> str:
     return value.rstrip("/")
 
 
+def server_issued_descriptor_room_ref(canonical_file: str) -> str | None:
+    """canonical 组件是「room 身份来自服务端签发 descriptor」形态时返回证据 `file#Lnn`。
+
+    🔴 **唯一判据点**：`derive_room_model`（派生侧）与 `observe_room_facts`（RG-17 实测
+    侧）都调用本函数。两侧各写一份时实测过真实后果：派生侧认得同步载体、实测侧认不得
+    ⇒ 每条迁到 `WorkpaperSyncEditorHost` 且已终裁 bidirectional 的 entry 都被报成
+    `profile_drift`，而漂移文案写的是「per-client doc_key」—— 与事实相反（这类 entry 的
+    宿主与组件 doc_key 客户端兜底实测均为 None）。
+    spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
+    """
+    canonical = _read_source(canonical_file)
+    room_match = _DESCRIPTOR_ROOM_RE.search(canonical)
+    if room_match is None or _DESCRIPTOR_DOC_KEY_RE.search(canonical) is None:
+        return None
+    line = canonical.count(chr(10), 0, room_match.start()) + 1
+    return f"{canonical_file}#L{line}"
+
+
 def _client_local_doc_key(relative: str) -> str | None:
     """doc_key 赋值行上的客户端本地兜底证据（`file#Lnn`），没有则 None。"""
     text = strip_source_comments(_read_source(relative))
@@ -906,16 +924,12 @@ def derive_room_model(
         # 服务端签发的 descriptor。这不是「缺少证据」，而是**比客户端自拼 doc_key 更强**
         # 的证据：room 身份由服务端决定，天然 wp 维度共享、无用户成分。
         # spec: sync-editor-host-discovery-contract-closure · Requirement 2
-        canonical = _read_source(host.canonical_file)
-        if (
-            _DESCRIPTOR_ROOM_RE.search(canonical) is not None
-            and _DESCRIPTOR_DOC_KEY_RE.search(canonical) is not None
-        ):
-            line = canonical.count(chr(10), 0, _DESCRIPTOR_ROOM_RE.search(canonical).start()) + 1  # type: ignore[union-attr]
+        server_descriptor_ref = server_issued_descriptor_room_ref(host.canonical_file)
+        if server_descriptor_ref is not None:
             return (
                 RoomModel.shared,
                 FACT_ROOM_FROM_SERVER_DESCRIPTOR,
-                (f"{host.canonical_file}#L{line}",),
+                (server_descriptor_ref,),
                 (),
             )
         raise EntrySourceFactError(
@@ -1161,6 +1175,19 @@ def observe_room_facts(entry: Mapping[str, Any]) -> RoomFacts:
         # 不可达宿主永远不会发出 config 请求 ⇒ 没有 doc_key、没有 room、没有 lease。
         # 这里若照常返回组件端点的 provider 事实，就等于宣称一个从不存在的 room。
         return RoomFacts(shared_doc_key=False, doc_key_includes_mtime=False, participant_lease=False)
+    if not facts.endpoints and server_issued_descriptor_room_ref(
+        facts.canonical_file
+    ) is not None:
+        # 🔴 同步载体：room/docKey 来自服务端签发的 descriptor，组件刻意不请求 config。
+        #    与派生侧共用 `server_issued_descriptor_room_ref` 这一个判据点（见该函数的
+        #    注释：两侧各写一份时，实测结果是迁移完成的 entry 反而被报成 profile_drift，
+        #    且文案与事实相反）。descriptor 由服务端按 wp 维度签发 ⇒ 同 wp 共享、无用户
+        #    成分、不含 mtime。
+        return RoomFacts(
+            shared_doc_key=True,
+            doc_key_includes_mtime=False,
+            participant_lease=bool(room_service_wiring()),
+        )
     providers = doc_key_providers()
     includes_mtime = False
     matched = False

@@ -3,7 +3,7 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="showHtmlToolbar" class="f2-spe-toolbar">
-        <el-segmented v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="isF2SSyncManagedSheet && syncBusy"
+        <el-segmented v-if="f2IEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="isF2SSyncManagedSheet && syncBusy"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
@@ -211,6 +211,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useF2SpecialFormData, type ChecklistResponse } from './composables/useF2SpecialFormData'
 import { useF2SpecialDualMode } from './composables/useF2SpecialDualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -421,6 +422,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('f2-spe:save-items', handleF2SpeSaveItems)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f2IEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F2S_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

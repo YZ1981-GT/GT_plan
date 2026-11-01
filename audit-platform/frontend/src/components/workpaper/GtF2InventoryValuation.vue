@@ -3,7 +3,7 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="showHtmlToolbar" class="f2-val-toolbar">
-        <el-segmented v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="isF2VSyncManagedSheet && syncBusy"
+        <el-segmented v-if="f2IEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="dualMode.modeOptions" size="small" :disabled="isF2VSyncManagedSheet && syncBusy"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
@@ -159,6 +159,7 @@
  * GtF2InventoryValuation.vue — F2 计价减值组主入口（比照 GtF2InventoryMain / GtF3）
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useF2ValuationFormData, type ChecklistResponse } from './composables/useF2ValuationFormData'
 import { useF2ValuationDualMode } from './composables/useF2ValuationDualMode'
 import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
@@ -335,6 +336,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('f2-val:save-items', handleF2ValSaveItems)
 })
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const f2IEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => F2V_SYNC_ENTRY_ID,
+})
+
 </script>
 
 <style scoped>

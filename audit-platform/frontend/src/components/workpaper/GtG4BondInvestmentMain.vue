@@ -18,7 +18,7 @@
           现在统一走 `switchRenderMode`：受管 sheet 经桥（四分支保存协议），非受管委派 legacy。
         -->
         <el-segmented
-          v-if="isHtmlSheet"
+          v-if="isHtmlSheet && g4EntrySync.presentation.value.showModeSwitch"
           :model-value="renderMode"
           :options="syncModeOptions"
           size="small"
@@ -177,6 +177,7 @@ import http from '@/utils/http'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ── G4_MAIN sync bridge（spec: g4-g6-shared-workbook-three-entry-lanes）──
 import { useGRenderModeSwitch } from './sync/useGRenderModeSwitch'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
 import { pendingWriteBarrierActive } from './sync/pendingWrites'
 import { readStoreProjection } from './sync/workpaperSyncApi'
@@ -501,6 +502,17 @@ const {
   legacy: dualMode,
   isManagedSheet: isG4MainSyncManagedSheet,
   editorHostRef: syncEditorHostRef,
+})
+
+/**
+ * 同步能力单源（spec task 3.5 / AC 1.4）：开关可见性来自 entry 级三层事实
+ * （静态裁决 + 运行时 readiness + 真实验收），不再由宿主的 `isHtmlSheet` 独自决定。
+ * `isHtmlSheet` 保留为 sheet 级附加条件（这张 sheet 本身是不是 HTML 可渲染的）。
+ */
+const g4EntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => G4_MAIN_SYNC_ENTRY_ID,
 })
 
 const isOoMode = computed(

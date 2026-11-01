@@ -66,11 +66,31 @@ export interface GRenderModeSwitchOptions {
    * xlsx 会少掉最后那批编辑且无任何提示。宿主的 flush 已经是同步的就不用传。
    */
   readonly flushBeforeSwitch?: () => void | Promise<void>
+  /**
+   * 同步能力单源（`useEntrySyncReadiness()` 的返回值）。
+   *
+   * 传了它，`showModeSwitch` 就由**单源**决定（静态裁决 + 运行时 readiness 三层事实），
+   * 宿主不再自行判断「这条 entry 能不能双向」。不传则 `showModeSwitch` 恒 `true`
+   * （保持改线前行为，供尚未接单源的宿主渐进迁移）。
+   *
+   * spec workpaper-html-onlyoffice-bidirectional-writeback-closure task 3.5 / AC 1.4：
+   * 「能不能双向」是 entry 级事实，不是宿主的局部判断。
+   */
+  readonly entrySync?: {
+    readonly presentation: { readonly value: { readonly showModeSwitch: boolean } }
+  }
 }
 
 export interface GRenderModeSwitch {
   /** 当前渲染模式：受管 sheet 以**桥**为真源，非受管 sheet 读 legacy。 */
   readonly renderMode: ComputedRef<GRenderMode>
+  /**
+   * 模式开关该不该出现 —— 来自同步能力**单源**（传了 `entrySync` 才生效）。
+   *
+   * 宿主把它和自己的 sheet 级条件合取：`v-if="isHtmlSheet && showModeSwitch"`。
+   * 没传 `entrySync` 时恒 `true`，等价于改线前的行为。
+   */
+  readonly showModeSwitch: ComputedRef<boolean>
   /**
    * 切换器选项。
    *
@@ -99,7 +119,7 @@ export interface GRenderModeSwitch {
  * | ④ | 回 HTML 且 dirty | `editorHost.forceSave()` | 慢（用户没先保存，允许） |
  */
 export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRenderModeSwitch {
-  const { bridge, legacy, isManagedSheet, editorHostRef, flushBeforeSwitch } = options
+  const { bridge, legacy, isManagedSheet, editorHostRef, flushBeforeSwitch, entrySync } = options
   const switching = ref(false)
 
   const renderMode = computed<GRenderMode>(() =>
@@ -164,6 +184,18 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
     { flush: 'sync' },
   )
 
+  /**
+   * 开关可见性 —— 单源优先，没接单源时保持改线前行为（恒显示）。
+   *
+   * 🔴 不在这里判 `canSwitchToOnlyOffice`：`modeOptions` 刻意不带 `disabled`
+   * （见该字段的注释，D4 bug ③），门禁在 `switchRenderMode` 里 await 兜底。
+   * 本计算只管「这条 entry 到底该不该露出模式开关」这一件事。
+   */
+  const showModeSwitch = computed(() => {
+    if (!entrySync) return true
+    return entrySync.presentation.value.showModeSwitch
+  })
+
   async function switchRenderMode(rawTarget: string | number | boolean): Promise<void> {
     const target = rawTarget as GRenderMode
     if (target !== 'html' && target !== 'onlyoffice') return
@@ -214,5 +246,5 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
     }
   }
 
-  return { renderMode, modeOptions, switching, switchRenderMode }
+  return { renderMode, showModeSwitch, modeOptions, switching, switchRenderMode }
 }

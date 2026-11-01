@@ -16,7 +16,7 @@
 
       <div v-if="showModeToolbar" class="d1-mode-toolbar">
 
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD1DetailSheet && syncBusy" />
+        <el-segmented v-if="d1NEntrySync.presentation.value.showModeSwitch" v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD1DetailSheet && syncBusy" />
 
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d1-notes-receivable" />
 
@@ -482,6 +482,7 @@
  */
 
 import { ref, computed, defineAsyncComponent, toRef, inject, onMounted, onBeforeUnmount, provide } from 'vue'
+import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 
 import { useD1FormData } from './composables/useD1FormData'
 
@@ -1084,6 +1085,21 @@ onBeforeUnmount(() => {
 
   flushPendingSave()
 
+})
+
+/**
+ * 同步能力单源（spec workpaper-html-onlyoffice-bidirectional-writeback-closure
+ * · task 3.5 / AC 1.4）：模式开关的可见性来自 entry 级三层事实（静态裁决 + 运行时
+ * readiness + 真实验收），不由本宿主的局部判断决定。
+ *
+ * 🔴 声明位置在 setup 末尾是**有意**的：`useEntrySyncReadiness` 内部
+ * `watch(..., { immediate: true })` 会在 setup 期立即读下面三个 getter，放在
+ * `props` 之前会让 `props` 落在 TDZ 里（运行时 ReferenceError，静态门看不出来）。
+ */
+const d1NEntrySync = useEntrySyncReadiness({
+  projectId: () => String(props.projectId ?? ''),
+  wpId: () => String(props.wpId ?? ''),
+  entryId: () => D1_SYNC_ENTRY_ID,
 })
 
 </script>
