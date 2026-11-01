@@ -185,3 +185,66 @@ owner 都对当前 tasks.md 校验。要全部复活，就得为每个 legacy �
 退役、由执行账取代」，并给冻结产物钉 digest 断言它**真的没再变**；**不**把它的 `--check`
 留在任何门禁里当永红项。三处解析层的修复**保留**（它们本身是真缺陷，且执行账要复用
 `_TASK_LINE` / `cycle_owner_tasks` / `_task_id_sort_key` 这些现算件）。
+
+## 7. 消费方 #2 `generate_workpaper_sync_program_milestones.py`：wave 图已修，里程碑归属待拍板
+
+### 7.1 已修（可验证）
+
+原报 `wave id must be an integer`。查清后**不是**标题解析问题：该生成器从 tasks.md 里
+`## Task Dependency Graph` 下的 ` ```json ` 块现读依赖图，要求
+
+* 每个 wave 的键名是 **`wave`**（我重写时写成了 `id`）；
+* wave 覆盖的任务集合与 tasks.md 的任务号**恰好相等**（我新增 0.6 后忘了进 wave ⇒ 会报
+  `wave/task denominator differs`）；
+* 同 wave 内不得依赖编号不更小的任务，也不得依赖更后 wave 的任务。
+
+已改 tasks.md：`id` → `wave`（20 条）、`0.6` 纳入 wave 0（它是 `0.5` 的前置，必须在更早的
+wave，否则 `0.5 → 0.6` 会触发 same-wave non-earlier 规则）、显式加 `dependencies: {"0.5": ["0.6"]}`，
+并在 §Notes 写明这块是机器可读契约与三条约束。改完 wave 图这一层通过。
+
+### 7.2 下一层：里程碑归属引用的是旧任务号（**需拍板**）
+
+错误前移到 `SYNC-ENTRY-NAMESPACE: producer task does not exist: …:1`。源头是
+`backend/data/workpaper_sync_program_milestone_definitions.json`，`review_status: "reviewed"`，
+是**跨 8 个 spec 的程序级契约**。其中 6 条里程碑引用本 spec，共 **26 个失效 producer 任务号**；
+`HOST-CONSUMES-UNIFIED-PATH` 的 **consumers** 也引用本 spec 的旧号 `40/41/42/43/70/72`
+⇒ 重映射是**双向**的。
+
+一条重要事实：**里程碑闭合由 `predicates` 判定，不由 producer 任务是否勾选判定**
+（现读每条的 predicates：`manifest_integrity` / `python_symbols` / `database_readonly_schema` /
+`runtime_evidence_required` / `host_path_entry_fact`）。所以改 `producers` 是**归属更新**，
+不松动也不收紧任何门禁 —— 这一点降低了风险，但不解除「该归给谁」这个判断。
+
+按 predicates 语义逐条对新计划：
+
+| 里程碑 | 判据 | 旧 producer | 新计划里真正承接的任务 | 是否有诚实对应 |
+|---|---|---|---|---|
+| SYNC-ENTRY-NAMESPACE | manifest 完整性 + registry 三个符号 + request-path runtime evidence | 1/13/28/73/75 | `1.1` manifest 终态 · `1.7` 原子生成 · `2.7` closure checker 动态注册口径 · `6.2` runtime evidence 当前投影 | **有** |
+| PUBLISHED-ENTRY-READY | manifest 完整性 + `PublishedIdentityObserver.observe` + registry 符号 + per-entry request-path evidence | 75/76 | `1.1` · `1.7` · `6.1` required scenario set · `6.2` | **有** |
+| SYNC-DURABLE-APPLICATION | `CallbackDeliveryService` / `RequestApplicationService` / `OoToHtmlCoordinator` + DB schema + 真实回调 evidence | 22/23/26/29/30 | `6.3` 真实 OnlyOffice scenarios · `7.3` schema 与迁移边界 | **有**（但原始交付在归档轮，新计划只负责复验） |
+| SYNC-UNIFIED-ROOM | `RoomService` / `CommandServiceClient` / `MaterializeCoordinator` + DB schema + 真实 room forcesave/close evidence | 21–30（10 个） | `6.3` · `7.3` | **有**（同上） |
+| HOST-CONSUMES-UNIFIED-PATH（per_entry，8 条 host_path_entry_fact） | 宿主走统一路径的 8 条事实 | producer `33`；consumer 本 spec `40/41/42/43/70/72` | producer → `3.5` 宿主迁到共享 presentation 门；consumer → `4.2`~`4.8` 逐 entry 收口 | **有** |
+| **SYNC-MULTI-RESOLVER** | `writer_gate_issue_zero` + `CanonicalResolutionService` 符号 | 12/71/74 | **新计划没有专任承接项**。最接近的是 `2.7`（closure checker 口径）与 `7.1`/`7.2`（全量与辐射面回归），但那是「复验」不是「生产」 | **没有** |
+
+### 7.3 为什么停在这里问
+
+1. 这份文件 `review_status: "reviewed"`，且是**跨 spec** 契约：`custom-workpaper-template-ingestion-and-sync-closure`
+   的任务 10 / 14 以它为前置。改它影响另一份 spec 的读数，不该由本 spec 单方面定。
+2. **SYNC-MULTI-RESOLVER 在新计划里没有诚实对应**。硬塞给 `7.1`/`7.2` 就是把「复验」写成
+   「生产」—— 属于伪造归属，正是本 spec 要消灭的那类事。
+3. 另四条的「原始交付在归档轮、新计划只负责复验」同样需要确认：是否接受把 producer 改成
+   复验方，还是应当保留对归档轮的指向（若保留，`specs` 清单里没有归档 spec 名，需要先决定
+   是否允许 producer 指向已归档 spec）。
+
+三个可选方向（按我的推荐排序）：
+
+* **A（推荐）**：按上表改 5 条有诚实对应的；`SYNC-MULTI-RESOLVER` **新增一项任务**承接
+  writer gate zero 与 CanonicalResolutionService 的收口，再把 producer 指向它。代价是任务数
+  49 → 50，但归属全部真实。
+* **B**：按上表改 5 条；`SYNC-MULTI-RESOLVER` 的 producer 显式标注为「原始交付在归档轮，
+  本轮无承接项」—— 需要 schema 支持这种表达（当前 `producers` 只有 `spec` + `tasks`，
+  要加字段就得动 reviewed schema）。
+* **C**：整份定义文件按「程序级契约随 spec 重编一并重审」处理，由上游 owner 统一改，
+  本 spec 只登记阻塞。
+
+未经拍板不动这份 reviewed 文件。
