@@ -128,6 +128,45 @@ if _PROMETHEUS_AVAILABLE:
         ["engine", "status"],
         registry=AI_CHAT_REGISTRY,
     )
+    MODEL_TTFT_SECONDS = Histogram(
+        "ai_chat_model_ttft_seconds",
+        "Time from model request to first non-empty token",
+        ["engine", "deployment", "fallback"],
+        buckets=[0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30],
+        registry=AI_CHAT_REGISTRY,
+    )
+    MODEL_OUTPUT_TOKENS_PER_SECOND = Histogram(
+        "ai_chat_model_output_tokens_per_second",
+        "Estimated or provider-reported output token rate",
+        ["engine", "deployment", "fallback"],
+        buckets=[1, 2, 5, 10, 20, 40, 80, 160],
+        registry=AI_CHAT_REGISTRY,
+    )
+    AI_TASK_INVOCATIONS = Counter(
+        "ai_task_invocations_total",
+        "Registered AI task invocations",
+        ["task_code", "status", "deployment", "fallback", "verifier_status"],
+        registry=AI_CHAT_REGISTRY,
+    )
+    AI_TASK_LATENCY_SECONDS = Histogram(
+        "ai_task_latency_seconds",
+        "Registered AI task total latency",
+        ["task_code", "status"],
+        buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60, 120],
+        registry=AI_CHAT_REGISTRY,
+    )
+    AI_TASK_TOKENS_TOTAL = Counter(
+        "ai_task_tokens_total",
+        "Registered AI task token usage",
+        ["task_code", "token_type"],
+        registry=AI_CHAT_REGISTRY,
+    )
+    AI_HUMAN_ACTIONS_TOTAL = Counter(
+        "ai_human_actions_total",
+        "Human decisions on AI draft artifacts",
+        ["action"],
+        registry=AI_CHAT_REGISTRY,
+    )
 else:
     ACTIVE_RUNS = Gauge()
     QUEUED_RUNS = Gauge()
@@ -139,6 +178,12 @@ else:
     ATTACHMENT_BYTES_TOTAL = Counter()
     CLEANUP_FAILURES_TOTAL = Counter()
     RUNS_TOTAL = Counter()
+    MODEL_TTFT_SECONDS = Histogram()
+    MODEL_OUTPUT_TOKENS_PER_SECOND = Histogram()
+    AI_TASK_INVOCATIONS = Counter()
+    AI_TASK_LATENCY_SECONDS = Histogram()
+    AI_TASK_TOKENS_TOTAL = Counter()
+    AI_HUMAN_ACTIONS_TOTAL = Counter()
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +222,62 @@ def inc_tokens(engine: str, prompt_tokens: int = 0, completion_tokens: int = 0) 
             TOKENS_TOTAL.labels(engine=engine, token_type="prompt").inc(prompt_tokens)
         if completion_tokens:
             TOKENS_TOTAL.labels(engine=engine, token_type="completion").inc(completion_tokens)
+
+
+def observe_model_timing(
+    engine: str,
+    *,
+    deployment: str | None,
+    fallback_used: bool,
+    ttft_seconds: float | None,
+    tokens_per_second: float | None,
+) -> None:
+    """记录低基数 transport timing；不可观测值保持空，不以总时延冒充。"""
+    if not _PROMETHEUS_AVAILABLE:
+        return
+    labels = {
+        "engine": engine,
+        "deployment": deployment or "unknown",
+        "fallback": "true" if fallback_used else "false",
+    }
+    if ttft_seconds is not None:
+        MODEL_TTFT_SECONDS.labels(**labels).observe(ttft_seconds)
+    if tokens_per_second is not None:
+        MODEL_OUTPUT_TOKENS_PER_SECOND.labels(**labels).observe(tokens_per_second)
+
+
+def record_ai_task_metric(
+    *,
+    task_code: str,
+    status: str,
+    deployment: str | None,
+    fallback_used: bool,
+    verifier_status: str,
+    latency_ms: int,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+) -> None:
+    if not _PROMETHEUS_AVAILABLE:
+        return
+    AI_TASK_INVOCATIONS.labels(
+        task_code=task_code,
+        status=status,
+        deployment=deployment or "unknown",
+        fallback="true" if fallback_used else "false",
+        verifier_status=verifier_status,
+    ).inc()
+    AI_TASK_LATENCY_SECONDS.labels(task_code=task_code, status=status).observe(
+        max(0, latency_ms) / 1000
+    )
+    if prompt_tokens:
+        AI_TASK_TOKENS_TOTAL.labels(task_code=task_code, token_type="prompt").inc(prompt_tokens)
+    if completion_tokens:
+        AI_TASK_TOKENS_TOTAL.labels(task_code=task_code, token_type="completion").inc(completion_tokens)
+
+
+def record_human_action_metric(action: str) -> None:
+    if _PROMETHEUS_AVAILABLE:
+        AI_HUMAN_ACTIONS_TOTAL.labels(action=action).inc()
 
 
 def observe_cancel_latency(seconds: float) -> None:
@@ -233,11 +334,20 @@ __all__ = [
     "ATTACHMENT_BYTES_TOTAL",
     "CLEANUP_FAILURES_TOTAL",
     "RUNS_TOTAL",
+    "MODEL_TTFT_SECONDS",
+    "MODEL_OUTPUT_TOKENS_PER_SECOND",
+    "AI_TASK_INVOCATIONS",
+    "AI_TASK_LATENCY_SECONDS",
+    "AI_TASK_TOKENS_TOTAL",
+    "AI_HUMAN_ACTIONS_TOTAL",
     "set_active_runs",
     "set_queued_runs",
     "observe_queue_wait",
     "observe_run_latency",
     "inc_tokens",
+    "observe_model_timing",
+    "record_ai_task_metric",
+    "record_human_action_metric",
     "observe_cancel_latency",
     "inc_denial",
     "inc_attachment_bytes",

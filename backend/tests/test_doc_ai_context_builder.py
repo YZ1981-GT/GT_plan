@@ -358,21 +358,76 @@ class TestGetDocContent:
 
     @pytest.mark.asyncio
     async def test_knowledge_folder_content(self):
-        """文件夹级对话注入文件夹下文档集合"""
+        """文件夹级对话逐文档判权后，以稳定内容集合注入。"""
         db = _mock_db()
-        rows = [
-            ("文档1.pdf", "文档1内容", None),
-            ("文档2.docx", None, "文档2摘要"),
+        doc1, doc2 = uuid4(), uuid4()
+        permission_result = MagicMock()
+        permission_result.all.return_value = [
+            (doc1, None, None, None),
+            (doc2, None, None, None),
         ]
-        result = MagicMock()
-        result.all.return_value = rows
-        db.execute.return_value = result
+        content_result = MagicMock()
+        content_result.all.return_value = [
+            (doc1, "文档1.pdf", "文档1内容", None, 1, None),
+            (doc2, "文档2.docx", None, "文档2摘要", 1, None),
+        ]
+        db.execute.side_effect = [permission_result, content_result]
+        folder = KnowledgeResource.of_row("public", None, None)
+        subject = KnowledgeAccessSubject(user_id=FAKE_USER.id, project_ids=frozenset({FAKE_PROJECT_ID}))
 
-        builder = ContextBuilder(db)
-        content = await builder._get_doc_content(_host("knowledge_folder"))
+        with patch.object(
+            KnowledgeAccessPolicy,
+            "load_folder_permission",
+            new=AsyncMock(return_value=folder),
+        ), patch.object(
+            KnowledgeAccessPolicy,
+            "resolve_subject",
+            new=AsyncMock(return_value=subject),
+        ), patch.object(
+            KnowledgeAccessPolicy,
+            "can_retrieve",
+            return_value=True,
+        ) as can_retrieve:
+            builder = ContextBuilder(db)
+            content = await builder._get_doc_content(_host("knowledge_folder"))
 
         assert "文档1" in content
         assert "文档2摘要" in content
+        assert [item["source_id"] for item in builder._host_sources] == [str(doc1), str(doc2)]
+        assert can_retrieve.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_knowledge_folder_excludes_document_level_denial_before_content_read(self):
+        """能打开父文件夹不代表能读取其中每篇文档。"""
+        db = _mock_db()
+        denied_id, allowed_id = uuid4(), uuid4()
+        permission_result = MagicMock()
+        permission_result.all.return_value = [
+            (denied_id, "private", None, uuid4()),
+            (allowed_id, "public", None, None),
+        ]
+        content_result = MagicMock()
+        content_result.all.return_value = [
+            (allowed_id, "允许文档.pdf", "允许正文", None, 2, None),
+        ]
+        db.execute.side_effect = [permission_result, content_result]
+        folder = KnowledgeResource.of_row("public", None, None)
+        subject = KnowledgeAccessSubject(user_id=FAKE_USER.id, project_ids=frozenset({FAKE_PROJECT_ID}))
+
+        with patch.object(
+            KnowledgeAccessPolicy,
+            "load_folder_permission",
+            new=AsyncMock(return_value=folder),
+        ), patch.object(
+            KnowledgeAccessPolicy,
+            "resolve_subject",
+            new=AsyncMock(return_value=subject),
+        ):
+            builder = ContextBuilder(db)
+            content = await builder._get_doc_content(_host("knowledge_folder"))
+
+        assert "允许正文" in content
+        assert str(denied_id) not in {item["source_id"] for item in builder._host_sources}
 
     @pytest.mark.asyncio
     async def test_loader_dispatch_covers_every_host_without_fallback(self):

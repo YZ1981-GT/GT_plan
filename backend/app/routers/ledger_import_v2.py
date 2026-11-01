@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session, get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_access_stream
 from app.models.core import User
 from app.models.dataset_models import ImportJob, JobStatus
 
@@ -400,7 +400,7 @@ async def _sse_generator(project_id: UUID, job_id: UUID):
 async def stream_job_progress(
     project_id: UUID,
     job_id: UUID,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """SSE endpoint for real-time job progress updates.
 

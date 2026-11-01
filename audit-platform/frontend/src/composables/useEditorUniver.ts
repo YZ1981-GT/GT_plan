@@ -52,6 +52,8 @@ export interface UseEditorUniverReturn {
   loadErrorState: Ref<'no_file' | 'no_index' | 'invalid_id' | 'error' | null>
   loadErrorMessage: Ref<string>
   dirty: Ref<boolean>
+  /** 每个会改变工作簿的 Univer 命令都递增，即使 dirty 已经为 true。 */
+  editRevision: Ref<number>
   initUniver: () => Promise<void>
   dispose: () => void
 }
@@ -63,6 +65,7 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
   const loadErrorState = ref<'no_file' | 'no_index' | 'invalid_id' | 'error' | null>(null)
   const loadErrorMessage = ref('')
   const dirty = ref(false)
+  const editRevision = ref(0)
 
   // 内部 Univer 实例引用（用于 dispose）
   let univerInstance: any = null
@@ -192,6 +195,7 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     api.onCommandExecuted((command: any) => {
       if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
         dirty.value = true
+        editRevision.value += 1
         opts.onEdited?.()
       }
       // 监听 sheet 切换/增删，刷新 Sheet 导航
@@ -231,6 +235,7 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     loadErrorState,
     loadErrorMessage,
     dirty,
+    editRevision,
     initUniver,
     dispose,
   }

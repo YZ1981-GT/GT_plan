@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import zipfile
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -183,7 +184,7 @@ class ZipReader:
     def __init__(
         self,
         zf: zipfile.ZipFile,
-        buffer: io.BytesIO,
+        buffer: io.BytesIO | None,
         manifest_dict: dict[str, Any],
         *,
         max_single_file_size: int = DEFAULT_MAX_SINGLE_FILE_SIZE,
@@ -227,7 +228,47 @@ class ZipReader:
 
         buf = io.BytesIO(zip_bytes)
         zf = zipfile.ZipFile(buf, mode="r")
+        return cls._from_zip(
+            zf,
+            owner=buf,
+            max_single_file_size=max_single_file_size,
+            max_total_zip_size=max_total_zip_size,
+        )
 
+    @classmethod
+    def from_path(
+        cls,
+        zip_path: str | Path,
+        *,
+        max_single_file_size: int = DEFAULT_MAX_SINGLE_FILE_SIZE,
+        max_total_zip_size: int = DEFAULT_MAX_TOTAL_ZIP_SIZE,
+    ) -> "ZipReader":
+        """从磁盘路径打开 ZIP，不把完整压缩包复制进 Python bytes。"""
+        path = Path(zip_path)
+        compressed_size = path.stat().st_size
+        if compressed_size > max_total_zip_size:
+            raise ZipSizeLimitExceeded(
+                f"ZIP 文件大小 ({compressed_size} bytes) 超过上限 "
+                f"({max_total_zip_size} bytes)"
+            )
+        zf = zipfile.ZipFile(path, mode="r")
+        return cls._from_zip(
+            zf,
+            owner=None,
+            max_single_file_size=max_single_file_size,
+            max_total_zip_size=max_total_zip_size,
+        )
+
+    @classmethod
+    def _from_zip(
+        cls,
+        zf: zipfile.ZipFile,
+        *,
+        owner: io.BytesIO | None,
+        max_single_file_size: int,
+        max_total_zip_size: int,
+    ) -> "ZipReader":
+        """校验已打开 ZIP；所有失败出口都关闭文件句柄。"""
         # 校验解压后总大小上限
         total_uncompressed = sum(info.file_size for info in zf.infolist())
         if total_uncompressed > max_total_zip_size:
@@ -263,7 +304,7 @@ class ZipReader:
 
         return cls(
             zf=zf,
-            buffer=buf,
+            buffer=owner,
             manifest_dict=manifest_dict,
             max_single_file_size=max_single_file_size,
             max_total_zip_size=max_total_zip_size,
@@ -340,8 +381,16 @@ class ZipReader:
         return failed
 
     def close(self) -> None:
-        """关闭内部 ZipFile。"""
+        """关闭内部 ZipFile 及 bytes 模式的缓冲区。"""
         self._zf.close()
+        if self._buffer is not None:
+            self._buffer.close()
+
+    def __enter__(self) -> "ZipReader":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
 
 # ---------------------------------------------------------------------------

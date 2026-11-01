@@ -46,8 +46,15 @@ describe('TrialBalance TB 重分类自动持久化接线', () => {
     const body = functionBody(SCRIPT, 'onTbSummaryRclChange')
     expect(body).toContain('!canEdit.value || row.is_total || row.is_category')
     expect(body).toContain('markManualRcl(row, field)')
-    expect(body).toContain('recalcTbSummaryAudited()')
+    expect(body).toContain('recalcTbSummaryRow(row)')
+    expect(body).not.toContain('recalcTbSummaryAudited()')
     expect(body).toContain('tbSummaryPersistence.queue()')
+  })
+
+  it('编辑热路径只重算目标行且不恢复全表 deep watch', () => {
+    expect(TEMPLATE).toContain('@change="onTbSummaryUnadjustedChange(row)"')
+    expect(SCRIPT).toContain('recalcTbSummaryRows(tbSummaryRows.value)')
+    expect(SCRIPT).not.toContain('watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })')
   })
 
   it('加载委托控制器合并并 prime 版本，显式保存只走同一 CAS 队列', () => {

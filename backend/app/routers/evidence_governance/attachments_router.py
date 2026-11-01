@@ -34,6 +34,7 @@ from fastapi import (
     File,
     Form,
     Header,
+    HTTPException,
     Response,
     UploadFile,
 )
@@ -41,7 +42,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.services.attachment_service import AttachmentService
 from app.services.evidence_governance.frozen_contracts import (
     ActorContext,
@@ -188,6 +189,18 @@ async def upload_attachment(
     在此阶段即以脱敏 SCOPE_NOT_FOUND_OR_FORBIDDEN 拒绝。
     """
     pid = _parse_uuid(project_id, "project_id")
+    await assert_project_permission(db, current_user, pid, "edit")
+    if not synchronous_finalize:
+        # 当前没有持久任务、租约或 worker 消费 staged 上传。继续返回 202 会让内容永久
+        # 停在不可读状态，直到 reaper 清理；在 worker 真正接线前明确拒绝，避免假成功。
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": "ASYNC_FINALIZE_UNAVAILABLE",
+                "message": "异步附件处理暂不可用，请使用同步上传",
+            },
+        )
+
     actor = ActorContext.for_user(current_user.id)
     role = await _get_user_role(db, current_user, pid)
 

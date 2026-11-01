@@ -3,9 +3,9 @@
 | 类别 | 判据 | 阻断 |
 |---|---|---|
 | missing_files | 归档清单的缺件（与打包同一实现 ``archive_inventory``） | 是 |
-| evidence_gaps | 有证据声明的底稿未满足的类型（``evaluate_wp_evidence_requirements``，与附件抽屉 / QC-17 同一判定）；「凭证」类声明的缺证据抽凭样本 | 否 |
-| unreplied_confirmations | 函证逐笔拆分 missing > 0（同一工作簿只报一次） | 否 |
-| unconfirmed_ocr | 附件有识别结果但未人工确认 | 否 |
+| evidence_gaps | 有证据声明的底稿未满足、关键证据 OCR 未确认或状态不可判断 | 是 |
+| unreplied_confirmations | 函证逐笔拆分 missing > 0（同一工作簿只报一次） | 是 |
+| unconfirmed_ocr | 普通附件有识别结果但未人工确认 | 否 |
 | orphan_files | 附件存储目录下本项目没有任何附件行 / 版本行引用的文件 | 否 |
 
 非阻断类别查询失败 ⇒ 该类为空并记 WARNING（与 ``sampling_records`` 同口径）；``missing_files`` 查询失败 ⇒ 给一条
@@ -55,51 +55,51 @@ def _samples_status(samples: dict) -> str:
 
 
 async def check_evidence(db: AsyncSession, project_id: UUID) -> tuple[list, list]:
-    """（证据缺口, 未回函）。证据缺口另含「凭证」类声明的缺证据样本（只要有缺就列，与声明是否满足无关）。"""
-    from app.models.workpaper_models import WorkingPaper, WpIndex
-    from app.services.attachment_wp_view import evaluate_wp_evidence_requirements
-    from app.services.workpaper_evidence_requirements import resolve_requirements_for_wp_code
+    """把统一四态就绪度映射为归档证据缺口和未回函；unknown 也是阻断缺口。"""
+    from app.services.evidence_readiness import EvidenceReadinessService
 
-    try:
-        rows = (await db.execute(
-            sa.select(WorkingPaper.id, WpIndex.wp_code, WpIndex.wp_name, WorkingPaper.assigned_to)
-            .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
-            .where(WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false())
-            .order_by(WpIndex.wp_code, WorkingPaper.id)
-        )).all()
-        gaps: list = []
-        unreplied: list = []
-        seen_breakdowns: set[frozenset[str]] = set()
-        for wp_id, code, name, assignee in rows:
-            if not resolve_requirements_for_wp_code(code):
+    result = await EvidenceReadinessService(db).evaluate_project(project_id)
+    gaps: list = []
+    unreplied: list = []
+    seen_breakdowns: set[frozenset[str]] = set()
+    for row in sorted(result.workpapers, key=lambda item: (item.wp_code or "", str(item.wp_id))):
+        if row.status == "not_declared":
+            continue
+        code = row.wp_code or "证据状态"
+        name = row.wp_name or ""
+        who = str(row.assignee) if row.assignee else None
+        if row.status == "unknown":
+            message = row.errors[0].get("message") if row.errors else "证据状态无法判断"
+            gaps.append(_item(code, name, str(message), who))
+            continue
+
+        labels: list[str] = []
+        for req in row.requirements:
+            samples = req.get("samples")
+            if isinstance(samples, dict) and samples.get("missing"):
+                gaps.append(_item(code, name, _samples_status(samples), who))
+            if req.get("satisfied"):
                 continue
-            reqs = await evaluate_wp_evidence_requirements(db, wp_id) or []
-            who = str(assignee) if assignee else None
-            labels = []
-            for req in reqs:
-                samples = req.get("samples")
-                if isinstance(samples, dict) and samples.get("missing"):
-                    gaps.append(_item(code, name or "", _samples_status(samples), who))
-                if req.get("satisfied"):
+            breakdown = req.get("breakdown")
+            if isinstance(breakdown, dict) and breakdown.get("missing"):
+                key = frozenset(str(item.get("confirmation_id")) for item in breakdown.get("missing_items") or [])
+                if key in seen_breakdowns:
                     continue
-                breakdown = req.get("breakdown")
-                if isinstance(breakdown, dict) and breakdown.get("missing"):
-                    key = frozenset(str(m.get("confirmation_id")) for m in breakdown.get("missing_items") or [])
-                    if key in seen_breakdowns:
-                        continue
-                    seen_breakdowns.add(key)
-                    names = [str(m.get("counterparty") or "") for m in breakdown["missing_items"][:3]]
-                    more = "等" if breakdown["missing"] > 3 else ""
-                    unreplied.append(_item(code, name or "", f"{breakdown['missing']} 笔未回函且无替代程序："
-                                           f"{'、'.join(n for n in names if n)}{more}", who))
-                else:
-                    labels.append(req["label"])
-            if labels:
-                gaps.append(_item(code, name or "", "缺" + "、".join(labels), who))
-        return gaps, unreplied
-    except Exception:  # noqa: BLE001 — 非阻断类别
-        logger.warning("证据缺口检查失败 project=%s", project_id, exc_info=True)
-        return [], []
+                seen_breakdowns.add(key)
+                names = [str(item.get("counterparty") or "") for item in breakdown["missing_items"][:3]]
+                more = "等" if breakdown["missing"] > 3 else ""
+                unreplied.append(_item(
+                    code, name,
+                    f"{breakdown['missing']} 笔未回函且无替代程序：{'、'.join(value for value in names if value)}{more}",
+                    who,
+                ))
+            else:
+                labels.append(str(req["label"]))
+        if "key_evidence_ocr_confirmation" in row.missing_types:
+            labels.append("关键证据识别结果未人工确认")
+        if labels:
+            gaps.append(_item(code, name, "缺" + "、".join(labels), who))
+    return gaps, unreplied
 
 
 async def check_unconfirmed_ocr(db: AsyncSession, project_id: UUID) -> list:

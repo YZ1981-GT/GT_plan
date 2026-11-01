@@ -41,6 +41,9 @@ export interface Citation {
   source_id: string
   source_name: string
   paragraph_index?: number
+  jump_route?: string
+  doc_version?: number
+  is_stale?: boolean
 }
 
 export interface ChatMessage {
@@ -90,6 +93,8 @@ export interface ChatRunExtras {
   mentions?: Array<{ type: string; id: string }>
   /** 会话附件 ID（正文与 OCR 由服务端按 owner/session 授权后读取） */
   attachmentIds?: string[]
+  /** 显式临时加入本次 run 的项目附件 ID；确定 version/blob/hash 由服务端授权后钉住 */
+  projectAttachmentIds?: string[]
   /** 是否启用底稿复核模式 */
   reviewMode?: boolean
   /** 复核模式的目标 sheet */
@@ -227,6 +232,10 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
     if (attachmentIds.length > 0) {
       payload.attachment_ids = attachmentIds
     }
+    const projectAttachmentIds = (extras.projectAttachmentIds ?? []).filter(Boolean)
+    if (projectAttachmentIds.length > 0) {
+      payload.project_attachment_ids = projectAttachmentIds
+    }
     if (extras.reviewMode) {
       payload.review_mode = true
       if (extras.sheetName) payload.sheet_name = extras.sheetName
@@ -295,8 +304,8 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
     })
 
     const unsubCitation = runStore.on('citation', (event: ChatEvent) => {
-      if (event.payload?.sources) {
-        assistantCitations = event.payload.sources
+      if (event.payload?.citations) {
+        assistantCitations = event.payload.citations
       }
     })
 

@@ -451,6 +451,7 @@ class KnowledgeDocumentService:
         file_type: str | None = None,
         file_size: int = 0,
         storage_path: str | None = None,
+        blob_id: UUID | None = None,
         tags: list[str] | None = None,
         access_level: str | None = None,
         project_ids: list[str] | None = None,
@@ -466,6 +467,7 @@ class KnowledgeDocumentService:
             file_type=file_type,
             file_size=file_size,
             storage_path=storage_path,
+            blob_id=blob_id,
             tags=tags,
             access_level=KnowledgeAccessLevel(access_level) if access_level else None,
             project_ids=project_ids,
@@ -559,6 +561,7 @@ class KnowledgeDocumentService:
             file_type=target.file_type,
             file_size=target.file_size,
             storage_path=target.storage_path,
+            blob_id=target.blob_id,
             tags=target.tags,
             access_level=target.access_level,
             project_ids=target.project_ids,
@@ -578,7 +581,7 @@ class KnowledgeDocumentService:
             "name": d.name,
             "file_type": d.file_type,
             "file_size": d.file_size,
-            "storage_path": d.storage_path,
+            "storage_path": f"/api/knowledge-library/documents/{d.id}/download" if d.storage_path else None,
             "version": getattr(d, "version", 1),
             "previous_version_id": (
                 str(d.previous_version_id) if getattr(d, "previous_version_id", None) else None

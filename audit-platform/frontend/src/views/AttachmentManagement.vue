@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="gt-attachment-page" @dragover.prevent="onDragOver" @dragleave="onDragLeave" @drop.prevent="onDrop">
+  <div class="gt-attachment-page" @dragenter.prevent="onDragEnter" @dragover.prevent @dragleave="onDragLeave" @drop.prevent="onDrop">
     <!-- 拖拽上传遮罩 -->
     <Transition name="gt-fade">
       <div v-if="isDragging" class="gt-att-dropzone">
@@ -21,7 +21,7 @@
         <div class="gt-att-actions">
           <el-input v-model="searchQuery" placeholder="搜索文件名..." size="default" clearable
             :prefix-icon="Search" class="gt-att-search" @keyup.enter="onSearch" />
-          <el-select v-model="filterType" placeholder="全部类型" size="default" clearable class="gt-att-type-filter" @change="loadAttachments">
+          <el-select v-model="filterType" placeholder="全部类型" size="default" clearable class="gt-att-type-filter" @change="onFilterChange">
             <el-option label="PDF" value="pdf" />
             <el-option label="Word" value="word" />
             <el-option label="Excel" value="excel" />
@@ -32,11 +32,11 @@
             <el-option label="邮件" value="email" />
             <el-option label="OFD/CAD" value="ofd" />
           </el-select>
-          <el-upload :show-file-list="false" :before-upload="beforeUpload" :http-request="uploadAttachment" multiple :accept="ACCEPT_TYPES">
+          <el-upload v-if="capabilities.upload" :show-file-list="false" :before-upload="beforeUpload" :http-request="uploadAttachment" :disabled="uploadBusy" :accept="ACCEPT_TYPES">
             <el-button type="primary"><el-icon><Upload /></el-icon> 上传文件</el-button>
           </el-upload>
-          <el-tooltip content="上传整个文件夹（含子目录）" placement="bottom">
-            <el-button @click="triggerFolderUpload"><el-icon><FolderOpened /></el-icon> 上传文件夹</el-button>
+          <el-tooltip v-if="capabilities.upload" content="上传整个文件夹（含子目录）" placement="bottom">
+            <el-button :disabled="uploadBusy" @click="triggerFolderUpload"><el-icon><FolderOpened /></el-icon> 上传文件夹</el-button>
           </el-tooltip>
           <el-tooltip content="附件·OCR·AI·证据链治理中心" placement="bottom">
             <el-button @click="router.push({ name: 'EvidenceGovernanceCenter', params: { projectId } })">
@@ -49,7 +49,8 @@
             type="file"
             webkitdirectory
             multiple
-            :accept="ACCEPT_TYPES"
+            :disabled="uploadBusy"
+          :accept="ACCEPT_TYPES"
             class="gt-att-hidden-input"
             @change="onFolderSelected"
           />
@@ -59,7 +60,7 @@
       <!-- 统计卡片 -->
       <div class="gt-att-stats">
         <div class="gt-att-stat-card">
-          <div class="gt-att-stat-value">{{ attachments.length }}</div>
+          <div class="gt-att-stat-value">{{ listTotal }}</div>
           <div class="gt-att-stat-label">总文件数</div>
         </div>
         <div class="gt-att-stat-card">
@@ -79,34 +80,42 @@
 
     <!-- 附件列表 -->
     <div v-loading="loading" class="gt-att-body">
+      <!-- 加载失败与无权限不能伪装成业务空列表 -->
+      <div v-if="!loading && (listStatus === 'error' || listStatus === 'forbidden')" class="gt-att-empty" role="alert">
+        <div class="gt-att-empty-icon">⚠️</div>
+        <div class="gt-att-empty-title">{{ listStatus === 'forbidden' ? '无权查看本项目附件' : '附件加载失败' }}</div>
+        <div class="gt-att-empty-desc">{{ listError || '请检查网络后重试' }}</div>
+        <el-button type="primary" style="margin-top: 12px" @click="loadAttachments">重试</el-button>
+      </div>
+
       <!-- 空状态 -->
-      <div v-if="!loading && attachments.length === 0" class="gt-att-empty">
+      <div v-else-if="!loading && listStatus === 'empty'" class="gt-att-empty">
         <div class="gt-att-empty-icon">📂</div>
         <div class="gt-att-empty-title">暂无附件</div>
         <div class="gt-att-empty-desc">拖拽文件或文件夹到此区域，或点击上方按钮上传</div>
       </div>
 
       <!-- 文件列表 -->
-      <TransitionGroup v-else name="gt-list" tag="div" class="gt-att-list">
+      <TransitionGroup v-else-if="listStatus === 'ready'" name="gt-list" tag="div" class="gt-att-list">
         <div v-for="(row, idx) in filteredAttachments" :key="row.id" class="gt-att-item" :class="{ 'gt-att-item--highlight': row.id === highlightId }" :data-att-id="row.id" :style="{ '--delay': idx * 0.03 + 's' }">
           <div class="gt-att-item-icon" :class="'gt-att-icon--' + getFileCategory(row.file_type)">
             {{ getFileEmoji(row.file_type) }}
           </div>
           <div class="gt-att-item-info">
-            <div class="gt-att-item-name" @click="preview(row)">{{ row.file_name }}</div>
+            <button type="button" class="gt-att-item-name" @click="preview(row)" :title="`预览 ${row.file_name}`">{{ row.file_name }}</button>
             <div class="gt-att-item-meta">
               <el-tag size="small" :type="typeTagType(row.file_type) || undefined" effect="plain">{{ row.file_type || '未知' }}</el-tag>
               <span class="gt-att-item-size">{{ formatSize(row.file_size) }}</span>
               <span class="gt-att-item-date">{{ formatDate(row.created_at) }}</span>
               <!-- 溯源：关联底稿 chip -->
-              <span v-if="row.wp_code" class="gt-att-lineage-chip" @click="jumpToWorkpaper(row)">
+              <button v-if="row.wp_code" type="button" class="gt-att-lineage-chip" @click="jumpToWorkpaper(row)" :aria-label="`打开底稿 ${row.wp_code}`">
                 📋 {{ row.wp_code }}
                 <el-icon :size="12" class="gt-att-lineage-arrow"><Right /></el-icon>
-              </span>
+              </button>
             </div>
           </div>
           <div class="gt-att-item-status">
-            <el-tag v-if="row.ocr_status === 'completed' && !row.ocr_confirmed" size="small" type="warning" effect="dark" round class="gt-att-pending-badge" @click="openOcrConfirm(row)">
+            <el-tag v-if="capabilities.ocr_confirm && row.ocr_status === 'completed' && !row.ocr_confirmed" size="small" type="warning" effect="dark" round>
               🔍 待确认
             </el-tag>
             <el-tag v-else-if="row.ocr_status" size="small" :type="ocrTagType(row.ocr_status) || undefined" effect="light" round>
@@ -115,23 +124,34 @@
           </div>
           <div class="gt-att-item-actions">
             <el-tooltip content="预览" placement="top">
-              <el-button circle size="small" @click="preview(row)"><el-icon><View /></el-icon></el-button>
+              <el-button circle size="small" :aria-label="`预览 ${row.file_name}`" :title="`预览 ${row.file_name}`" @click="preview(row)"><el-icon><View /></el-icon></el-button>
             </el-tooltip>
-            <el-tooltip v-if="row.ocr_status === 'completed' && !row.ocr_confirmed" content="确认 OCR 结果" placement="top">
-              <el-button circle size="small" type="warning" @click="openOcrConfirm(row)"><el-icon><Check /></el-icon></el-button>
+            <el-tooltip v-if="capabilities.ocr_confirm && row.ocr_status === 'completed' && !row.ocr_confirmed" content="确认 OCR 结果" placement="top">
+              <el-button circle size="small" type="warning" :aria-label="`确认 ${row.file_name} 的 OCR 结果`" title="确认 OCR 结果" @click="openOcrConfirm(row)"><el-icon><Check /></el-icon></el-button>
             </el-tooltip>
-            <el-tooltip content="关联底稿" placement="top">
-              <el-button circle size="small" @click="associateDialog(row)"><el-icon><Link /></el-icon></el-button>
+            <el-tooltip v-if="capabilities.associate" content="关联底稿" placement="top">
+              <el-button circle size="small" :aria-label="`将 ${row.file_name} 关联到底稿`" title="关联底稿" @click="associateDialog(row)"><el-icon><Link /></el-icon></el-button>
             </el-tooltip>
             <el-tooltip content="下载" placement="top">
-              <el-button circle size="small" @click="download(row)"><el-icon><Download /></el-icon></el-button>
+              <el-button circle size="small" :aria-label="`下载 ${row.file_name}`" :title="`下载 ${row.file_name}`" @click="download(row)"><el-icon><Download /></el-icon></el-button>
             </el-tooltip>
-            <el-tooltip v-if="row.ocr_status === 'failed'" content="重试 OCR" placement="top">
-              <el-button circle size="small" type="warning" @click="retryOCR(row)"><el-icon><RefreshRight /></el-icon></el-button>
+            <el-tooltip v-if="capabilities.ocr_retry && row.ocr_status === 'failed'" content="重试 OCR" placement="top">
+              <el-button circle size="small" type="warning" :aria-label="`重新识别 ${row.file_name}`" title="重试 OCR" @click="retryOCR(row)"><el-icon><RefreshRight /></el-icon></el-button>
             </el-tooltip>
           </div>
         </div>
       </TransitionGroup>
+      <el-pagination
+        v-if="listStatus === 'ready' && listTotal > pageSize"
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="listTotal"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next"
+        class="gt-att-pagination"
+        @current-change="loadAttachments"
+        @size-change="onPageSizeChange"
+      />
     </div>
 
     <!-- 附件预览弹窗 -->
@@ -147,7 +167,7 @@
     />
 
     <!-- 关联底稿弹窗 -->
-    <el-dialog append-to-body v-model="associateVisible" title="关联到底稿" width="480px" class="gt-att-assoc-dialog">
+    <el-dialog append-to-body v-model="associateVisible" title="关联到底稿" width="min(480px, calc(100vw - 24px))" class="gt-att-assoc-dialog">
       <el-form ref="assocFormRef" :model="assocForm" :rules="assocRules" label-width="80px">
         <el-form-item label="搜索底稿" prop="associateWpId">
           <el-select
@@ -230,6 +250,25 @@ const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)
+type AttachmentListStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
+interface AttachmentCapabilities {
+  upload: boolean
+  associate: boolean
+  ocr_confirm: boolean
+  ocr_retry: boolean
+}
+const listStatus = ref<AttachmentListStatus>('idle')
+const listError = ref('')
+const listTotal = ref(0)
+const page = ref(1)
+const pageSize = ref(50)
+const listSummary = ref({ total_size: 0, ocr_completed: 0, linked_count: 0 })
+const capabilities = ref<AttachmentCapabilities>({
+  upload: false, associate: false, ocr_confirm: false, ocr_retry: false,
+})
+let listLoadSeq = 0
+let listAbort: AbortController | null = null
+const uploadBusy = ref(false)
 const attachments = ref<any[]>([])
 const handbookVisible = ref(false)
 const highlightId = ref('')
@@ -268,28 +307,18 @@ const ACCEPT_TYPES = [
 
 /** 支持的文件类型说明（用于拖拽区提示） */
 const SUPPORTED_TYPES_DESC = 'PDF / Word / Excel / PPT / 图片 / 文本 / 扫描件 / 压缩包 / 邮件 / DXF / OFD / 音视频'
+const MAX_BATCH_FILES = 250
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+const MAX_BATCH_BYTES = 250 * 1024 * 1024
 
 // 统计 computed
-const totalSizeFormatted = computed(() => {
-  const total = attachments.value.reduce((sum, a) => sum + (a.file_size || 0), 0)
-  return formatSize(total)
-})
+const totalSizeFormatted = computed(() => formatSize(listSummary.value.total_size))
 const ocrCompletedPct = computed(() => {
-  const total = attachments.value.length
-  if (total === 0) return 0
-  const done = attachments.value.filter(a => a.ocr_status === 'completed').length
-  return Math.round((done / total) * 100)
+  if (listTotal.value === 0) return 0
+  return Math.round((listSummary.value.ocr_completed / listTotal.value) * 100)
 })
-// 列表项不带 wp_code / wp_id（原先按它们统计恒为 0）；后端逐项给出现的底稿数
-// （整稿关联 ∪ 行级证据链接 ∪ reference，spec attachment-evidence-intake 需求 4.5）
-const linkedCount = computed(() =>
-  attachments.value.filter(a => Number(a.linked_wp_count || 0) > 0).length
-)
-const filteredAttachments = computed(() => {
-  if (!searchQuery.value) return attachments.value
-  const q = searchQuery.value.toLowerCase()
-  return attachments.value.filter(a => (a.file_name || '').toLowerCase().includes(q))
-})
+const linkedCount = computed(() => listSummary.value.linked_count)
+const filteredAttachments = computed(() => attachments.value)
 
 // 预览
 const previewVisible = ref(false)
@@ -323,114 +352,106 @@ const assocRules: FormRules = {
 
 // ─── 拖拽上传 ───
 let dragCounter = 0
-function onDragOver(e: DragEvent) {
-  dragCounter++
+function onDragEnter() {
+  if (!capabilities.value.upload || uploadBusy.value) return
+  dragCounter += 1
   isDragging.value = true
 }
 function onDragLeave() {
   dragCounter--
   if (dragCounter <= 0) { isDragging.value = false; dragCounter = 0 }
 }
+async function uploadBatch(files: File[]): Promise<void> {
+  if (!capabilities.value.upload || uploadBusy.value) {
+    if (uploadBusy.value) ElMessage.warning('已有附件批次正在上传，请等待完成')
+    return
+  }
+  if (files.length > MAX_BATCH_FILES) {
+    ElMessage.warning(`单批最多上传 ${MAX_BATCH_FILES} 个文件`)
+    return
+  }
+  if (files.reduce((sum, file) => sum + file.size, 0) > MAX_BATCH_BYTES) {
+    ElMessage.warning('单批文件总大小不能超过 250MB')
+    return
+  }
+  uploadBusy.value = true
+  ElMessage.info(`正在上传 ${files.length} 个文件...`)
+  const results: BatchUploadItem[] = []
+  try {
+    for (const file of files) {
+      const item: BatchUploadItem = {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.name.split('.').pop() || '',
+        status: 'success',
+      }
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const resp = await api.post(P_att.upload(projectId.value), formData, { _silent: true } as any)
+        const att = resp ?? {}
+        item.attachmentId = att.id
+        item.previewUrl = att.id ? P_att.preview(att.id) : ''
+        if (att.ocr_text || att.ocr_status === 'completed') {
+          item.status = 'ocr_pending'
+          item.ocrText = att.ocr_text || ''
+          item.confidence = att.ocr_confidence
+        }
+      } catch (err: any) {
+        item.status = 'failed'
+        item.error = err?.response?.data?.detail || err?.message || '上传失败'
+      }
+      results.push(item)
+    }
+    batchItems.value = results
+    batchResultVisible.value = true
+    await loadAttachments()
+  } finally {
+    uploadBusy.value = false
+  }
+}
+
 async function onDrop(e: DragEvent) {
   isDragging.value = false
   dragCounter = 0
-  const files = e.dataTransfer?.files
-  if (!files || files.length === 0) return
-
-  const validFiles = Array.from(files).filter(beforeUpload)
-  if (validFiles.length === 0) return
-
-  // 单文件走原逻辑（直接上传 + 单个 OCR 弹窗）
-  if (validFiles.length === 1) {
-    await uploadAttachment({ file: validFiles[0] } as any)
+  if (!capabilities.value.upload || uploadBusy.value) {
+    if (uploadBusy.value) ElMessage.warning('已有附件批次正在上传，请等待完成')
     return
   }
-
-  // 多文件走批量台账
-  ElMessage.info(`正在上传 ${validFiles.length} 个文件...`)
-  const results: BatchUploadItem[] = []
-  for (const file of validFiles) {
-    const item: BatchUploadItem = {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.name.split('.').pop() || '',
-      status: 'success',
-    }
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const resp = await api.post(P_att.upload(projectId.value), formData)
-      const att = resp ?? {}
-      item.attachmentId = att.id
-      item.previewUrl = att.id ? P_att.preview(att.id) : ''
-      if (att.ocr_text || att.ocr_status === 'completed') {
-        item.status = 'ocr_pending'
-        item.ocrText = att.ocr_text || ''
-        item.confidence = att.ocr_confidence
-      }
-    } catch (err: any) {
-      item.status = 'failed'
-      item.error = err?.response?.data?.detail || err?.message || '上传失败'
-    }
-    results.push(item)
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+  const validFiles = Array.from(files).filter(beforeUpload)
+  if (validFiles.length === 0) return
+  if (validFiles.length === 1) {
+    await uploadAttachment({ file: validFiles[0] } as any)
+  } else {
+    await uploadBatch(validFiles)
   }
-  batchItems.value = results
-  batchResultVisible.value = true
-  await loadAttachments()
 }
 
 /** 触发隐藏的文件夹选择 input */
 function triggerFolderUpload() {
+  if (!capabilities.value.upload || uploadBusy.value) return
   folderInputRef.value?.click()
 }
 
 /** 文件夹选择后批量上传 */
 async function onFolderSelected(e: Event) {
   const input = e.target as HTMLInputElement
-  const files = input.files
-  if (!files || files.length === 0) return
-
-  const validFiles = Array.from(files).filter(beforeUpload)
-  if (validFiles.length === 0) {
-    ElMessage.warning('所选文件夹中没有支持的文件类型')
+  if (!capabilities.value.upload || uploadBusy.value) {
     input.value = ''
+    if (uploadBusy.value) ElMessage.warning('已有附件批次正在上传，请等待完成')
     return
   }
-
-  ElMessage.info(`正在上传 ${validFiles.length} 个文件...`)
-  const results: BatchUploadItem[] = []
-
-  for (const file of validFiles) {
-    const item: BatchUploadItem = {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.name.split('.').pop() || '',
-      status: 'success',
-    }
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const resp = await api.post(P_att.upload(projectId.value), formData)
-      const att = resp ?? {}
-      item.attachmentId = att.id
-      item.previewUrl = att.id ? P_att.preview(att.id) : ''
-      if (att.ocr_text || att.ocr_status === 'completed') {
-        item.status = 'ocr_pending'
-        item.ocrText = att.ocr_text || ''
-        item.confidence = att.ocr_confidence
-      }
-    } catch (err: any) {
-      item.status = 'failed'
-      item.error = err?.response?.data?.detail || err?.message || '上传失败'
-    }
-    results.push(item)
-  }
-
-  // 显示批量结果台账
-  batchItems.value = results
-  batchResultVisible.value = true
-  await loadAttachments()
+  const files = input.files
+  if (!files || files.length === 0) return
+  const validFiles = Array.from(files).filter(beforeUpload)
   input.value = ''
+  if (validFiles.length === 0) {
+    ElMessage.warning('所选文件夹中没有支持的文件类型')
+    return
+  }
+  await uploadBatch(validFiles)
 }
 
 // ─── API ───
@@ -445,26 +466,70 @@ async function searchWorkpapers(query: string) {
 }
 
 async function loadAttachments() {
+  const mine = ++listLoadSeq
+  listAbort?.abort()
+  const controller = new AbortController()
+  listAbort = controller
   loading.value = true
+  listStatus.value = 'loading'
+  listError.value = ''
   try {
-    const params: any = {}
+    const params: Record<string, unknown> = {
+      page: page.value,
+      page_size: pageSize.value,
+    }
     if (filterType.value) params.file_type = filterType.value
-    const data = await api.get(P_att.list(projectId.value), { params })
-    attachments.value = data ?? []
-  } catch { attachments.value = [] }
-  finally { loading.value = false }
+    if (searchQuery.value.trim()) params.q = searchQuery.value.trim()
+    const data: any = await api.get(P_att.list(projectId.value), {
+      params,
+      signal: controller.signal,
+      _silent: true,
+      _dedupe: false,
+    } as any)
+    if (mine !== listLoadSeq) return
+    if (!data || !Array.isArray(data.items) || typeof data.total !== 'number') {
+      throw new Error('附件列表响应格式不正确')
+    }
+    attachments.value = data.items
+    listTotal.value = data.total
+    listSummary.value = {
+      total_size: Number(data.summary?.total_size || 0),
+      ocr_completed: Number(data.summary?.ocr_completed || 0),
+      linked_count: Number(data.summary?.linked_count || 0),
+    }
+    capabilities.value = {
+      upload: data.capabilities?.upload === true,
+      associate: data.capabilities?.associate === true,
+      ocr_confirm: data.capabilities?.ocr_confirm === true,
+      ocr_retry: data.capabilities?.ocr_retry === true,
+    }
+    listStatus.value = data.total === 0 ? 'empty' : 'ready'
+  } catch (error: any) {
+    if (mine !== listLoadSeq || controller.signal.aborted) return
+    const status = Number(error?.response?.status || 0)
+    listStatus.value = status === 403 ? 'forbidden' : 'error'
+    listError.value = status === 403 ? '你没有查看本项目附件的权限' : '请检查网络或稍后重试'
+  } finally {
+    if (mine === listLoadSeq) {
+      loading.value = false
+      if (listAbort === controller) listAbort = null
+    }
+  }
 }
 
-async function onSearch() {
-  if (!searchQuery.value) { loadAttachments(); return }
-  loading.value = true
-  try {
-    const data = await api.get(P_att.search, {
-      params: { project_id: projectId.value, q: searchQuery.value },
-    })
-    attachments.value = data ?? []
-  } catch { attachments.value = [] }
-  finally { loading.value = false }
+function onSearch() {
+  page.value = 1
+  void loadAttachments()
+}
+
+function onFilterChange() {
+  page.value = 1
+  void loadAttachments()
+}
+
+function onPageSizeChange() {
+  page.value = 1
+  void loadAttachments()
 }
 
 function preview(row: any) {
@@ -482,6 +547,7 @@ async function download(row: any) {
 }
 
 function associateDialog(row: any) {
+  if (!capabilities.value.associate) return
   associateAttachmentId.value = row.id
   associateWpId.value = ''
   associateNotes.value = ''
@@ -489,6 +555,7 @@ function associateDialog(row: any) {
 }
 
 async function submitAssociate() {
+  if (!capabilities.value.associate) return
   if (!associateWpId.value) { ElMessage.warning('请选择底稿'); return }
   try {
     await api.post(P_att.associate(associateAttachmentId.value), {
@@ -509,13 +576,13 @@ function jumpToWorkpaper(row: any) {
 }
 
 function beforeUpload(file: File) {
-  const maxSize = 50 * 1024 * 1024
-  if (file.size > maxSize) { ElMessage.warning(`"${file.name}" 超过 50MB 限制`); return false }
+  if (!capabilities.value.upload || uploadBusy.value) return false
+  if (file.size > MAX_FILE_BYTES) { ElMessage.warning(`"${file.name}" 超过 50MB 限制`); return false }
   // 验证文件扩展名
   const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()!.toLowerCase() : ''
   const allowedExts = ACCEPT_TYPES.split(',')
-  if (ext && !allowedExts.includes(ext)) {
-    ElMessage.warning(`"${file.name}" 文件类型不支持（${ext}）`)
+  if (!ext || !allowedExts.includes(ext)) {
+    ElMessage.warning(`"${file.name}" 文件类型不支持${ext ? `（${ext}）` : '（缺少扩展名）'}`)
     return false
   }
   // 跳过隐藏文件（文件夹上传时常见 .DS_Store / Thumbs.db）
@@ -526,6 +593,11 @@ function beforeUpload(file: File) {
 }
 
 async function uploadAttachment(options: any) {
+  if (!capabilities.value.upload || uploadBusy.value) {
+    if (uploadBusy.value) ElMessage.warning('已有附件批次正在上传，请等待完成')
+    return
+  }
+  uploadBusy.value = true
   const formData = new FormData()
   formData.append('file', options.file)
   try {
@@ -547,6 +619,8 @@ async function uploadAttachment(options: any) {
     }
   } catch (error) {
     handleApiError(error, '上传')
+  } finally {
+    uploadBusy.value = false
   }
 }
 
@@ -561,6 +635,7 @@ function onOcrRejected() {
 
 /** 从列表打开异步 OCR 结果确认（针对上传时未同步返回 OCR 的场景） */
 function openOcrConfirm(row: any) {
+  if (!capabilities.value.ocr_confirm) return
   ocrConfirmPayload.value = {
     attachmentId: row.id,
     fileName: row.file_name,
@@ -573,6 +648,7 @@ function openOcrConfirm(row: any) {
 }
 
 async function retryOCR(row: any) {
+  if (!capabilities.value.ocr_retry) return
   try {
     // 原先只把状态改回 pending，后端不会调度识别（spec attachment-security-baseline 需求 3.6）
     await api.post(P_att.retryOcr(row.id))
@@ -675,6 +751,11 @@ onMounted(() => {
   )
 })
 onUnmounted(() => {
+  listLoadSeq += 1
+  listAbort?.abort()
+  listAbort = null
+  dragCounter = 0
+  isDragging.value = false
   attachmentSub?.close()
   if (highlightTimer) clearTimeout(highlightTimer)
 })
@@ -833,6 +914,11 @@ onUnmounted(() => {
 /* 信息区 */
 .gt-att-item-info { flex: 1; min-width: 0; }
 .gt-att-item-name {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
   font-size: 14px;
   font-weight: 600;
   color: var(--gt-color-text-primary);
@@ -855,6 +941,8 @@ onUnmounted(() => {
 
 /* 溯源跳转 chip */
 .gt-att-lineage-chip {
+  appearance: none;
+  border: 0;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -887,7 +975,9 @@ onUnmounted(() => {
   opacity: 0;
   transition: opacity 0.2s;
 }
-.gt-att-item:hover .gt-att-item-actions { opacity: 1; }
+.gt-att-item:hover .gt-att-item-actions,
+.gt-att-item:focus-within .gt-att-item-actions { opacity: 1; }
+.gt-att-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
 
 /* ─── 空状态 ─── */
 .gt-att-empty {
@@ -922,8 +1012,28 @@ onUnmounted(() => {
 .gt-att-hidden-input { display: none; }
 
 @media (max-width: 768px) {
+  .gt-attachment-page { padding: 16px; }
   .gt-att-stats { grid-template-columns: repeat(2, 1fr); }
-  .gt-att-title-row { flex-direction: column; align-items: flex-start; }
-  .gt-att-actions { flex-wrap: wrap; }
+  .gt-att-title-row { flex-direction: column; align-items: stretch; }
+  .gt-att-actions { width: 100%; flex-wrap: wrap; }
+  .gt-att-search, .gt-att-type-filter { flex: 1 1 220px; }
+  .gt-att-item { flex-wrap: wrap; }
+  .gt-att-item-actions { opacity: 1; margin-left: 56px; }
+}
+
+@media (max-width: 390px) {
+  .gt-attachment-page { padding: 10px; }
+  .gt-att-stats { grid-template-columns: 1fr; }
+  .gt-att-actions, .gt-att-search, .gt-att-type-filter { width: 100%; }
+  .gt-att-actions :deep(.el-upload), .gt-att-actions :deep(.el-button) { width: 100%; }
+  .gt-att-item { padding: 12px 8px; gap: 8px; }
+  .gt-att-item-meta { flex-wrap: wrap; gap: 6px; }
+  .gt-att-item-status { min-width: 0; }
+  .gt-att-item-actions { width: 100%; margin-left: 0; justify-content: flex-end; flex-wrap: wrap; }
+  .gt-att-pagination { justify-content: center; overflow-x: auto; }
+}
+
+@media (hover: none) {
+  .gt-att-item-actions { opacity: 1; }
 }
 </style>

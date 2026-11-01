@@ -241,7 +241,9 @@ class LlmResponseParser:
             )
 
         if not findings:
-            return None
+            # 合法的空数组表示“AI 未发现新增疑点”，不是业务复核通过；最终状态由
+            # ai_review_verdict 统一判为待人工复核。
+            return ParseResult(findings=[], raw_text=raw_text, parse_success=True)
 
         return ParseResult(
             findings=findings,

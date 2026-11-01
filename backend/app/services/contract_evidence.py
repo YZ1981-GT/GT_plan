@@ -154,6 +154,7 @@ async def contract_evidence_by_keys(
 
 async def reuse_contract_evidence(
     db: AsyncSession, user: Any, wp: Any, contract_key: str, attachment_id: UUID,
+    *, sheet_name: str | None = None, cell_ref: str | None = None, page_ref: str | None = None,
 ) -> tuple[dict, bool]:
     """把另一张可见底稿上同一合同的证据附件引用到本底稿（合同级链接，只 flush）。返回（链接, 是否已存在）。
 
@@ -176,5 +177,6 @@ async def reuse_contract_evidence(
         raise HTTPException(status_code=404, detail="其他底稿上没有这份合同的这份证据，或你无权查看")
     return await WpEvidenceService(db).create_contract_link(
         wp_id=wp.id, attachment_id=attachment_id, created_by=user.id, contract_key=ck,
+        sheet_name=sheet_name, cell_ref=cell_ref, page_ref=page_ref,
         evidence_type=source.evidence_type or CONTRACT_EVIDENCE_TYPE,
     )

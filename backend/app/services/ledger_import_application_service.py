@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import io
 import json
 import logging
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -20,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 class LedgerImportApplicationService:
     SMART_SUGGESTION_RULE_VERSION = "import-rules-2026.04"
+    PREVIEW_MAX_FILES = 20
+    PREVIEW_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+    PREVIEW_MAX_SHEETS = 200
 
     @staticmethod
     def collect_uploads(
@@ -39,6 +45,112 @@ class LedgerImportApplicationService:
                 raise HTTPException(
                     status_code=400,
                     detail="暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
+                )
+
+    @staticmethod
+    def _preview_source_size(source: object) -> int:
+        if isinstance(source, (bytes, bytearray)):
+            return len(source)
+        if isinstance(source, (str, Path)):
+            return Path(source).stat().st_size
+        if hasattr(source, "seek") and hasattr(source, "tell"):
+            position = source.tell()
+            try:
+                source.seek(0, 2)
+                return int(source.tell())
+            finally:
+                source.seek(position)
+        return 0
+
+    @classmethod
+    def _validate_preview_budget(
+        cls,
+        file_sources: list[tuple[str, object]],
+    ) -> None:
+        """在线程中校验文件、压缩字节和工作表资源预算。"""
+        max_files = min(
+            cls.PREVIEW_MAX_FILES,
+            max(1, int(settings.LEDGER_UPLOAD_MAX_FILE_COUNT)),
+        )
+        if len(file_sources) > max_files:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "LEDGER_PREVIEW_FILE_LIMIT_EXCEEDED",
+                    "message": f"预览文件数超过限制（最多 {max_files} 个）",
+                    "limit": max_files,
+                    "actual": len(file_sources),
+                },
+            )
+
+        max_total_bytes = min(
+            cls.PREVIEW_MAX_TOTAL_BYTES,
+            max(1, int(settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB)) * 1024 * 1024,
+        )
+        total_bytes = sum(
+            cls._preview_source_size(source) for _, source in file_sources
+        )
+        if total_bytes > max_total_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "LEDGER_PREVIEW_SIZE_LIMIT_EXCEEDED",
+                    "message": "预览文件总大小超过限制，请拆分后重试",
+                    "limit": max_total_bytes,
+                    "actual": total_bytes,
+                },
+            )
+
+        import openpyxl
+
+        sheet_count = 0
+        for filename, source in file_sources:
+            lower = filename.lower()
+            if lower.endswith(".csv"):
+                sheet_count += 1
+            elif lower.endswith((".xlsx", ".xlsm")):
+                workbook_source: object
+                if isinstance(source, (str, Path)):
+                    workbook_source = str(source)
+                elif isinstance(source, (bytes, bytearray)):
+                    workbook_source = io.BytesIO(source)
+                else:
+                    if hasattr(source, "seek"):
+                        source.seek(0)
+                    workbook_source = source
+                try:
+                    workbook = openpyxl.load_workbook(
+                        workbook_source,
+                        read_only=True,
+                        data_only=True,
+                    )
+                except Exception:
+                    # 解析器保留原有逐文件诊断语义；预算预检不改变格式错误回执。
+                    continue
+                try:
+                    sheet_count += len(workbook.worksheets)
+                finally:
+                    workbook.close()
+                    if hasattr(source, "seek") and not isinstance(
+                        source, (str, Path, bytes, bytearray)
+                    ):
+                        source.seek(0)
+            else:
+                sheet_count += 1
+
+            if sheet_count > cls.PREVIEW_MAX_SHEETS:
+                raise HTTPException(
+                    status_code=413,
+                    detail={
+                        "code": "LEDGER_PREVIEW_SHEET_LIMIT_EXCEEDED",
+                        "message": (
+                            "预览工作表数量超过限制"
+                            f"（最多 {cls.PREVIEW_MAX_SHEETS} 个）"
+                        ),
+                        "limit": cls.PREVIEW_MAX_SHEETS,
+                        "actual": sheet_count,
+                        "source_file": filename,
+                    },
                 )
 
     @classmethod
@@ -379,12 +491,17 @@ class LedgerImportApplicationService:
             file=file,
             upload_token=upload_token,
         )
-        result = smart_parse_files(
+        # 文件来源已经落盘为 Path；预算扫描与 openpyxl/CSV 探测都在线程中执行，
+        # 不复制大文件到请求内存，也不阻塞同 worker 的登录、列表和 SSE 心跳。
+        await asyncio.to_thread(cls._validate_preview_budget, file_sources)
+        bounded_preview_rows = max(1, min(int(preview_rows), 200))
+        result = await asyncio.to_thread(
+            smart_parse_files,
             file_sources,
             year_override=year,
             custom_mapping=custom_mapping,
             preview_mode=True,
-            preview_rows=preview_rows,
+            preview_rows=bounded_preview_rows,
         )
         diagnostics = result.get("diagnostics") or []
         validation = cls._build_validation_report(diagnostics)
@@ -398,7 +515,7 @@ class LedgerImportApplicationService:
             **suggestion_contract,
             "diagnostics": diagnostics,
             "preview_mode": True,
-            "preview_rows": preview_rows,
+            "preview_rows": bounded_preview_rows,
             "upload_token": resolved_token,
             "sheets": cls._build_preview_sheets(diagnostics),
             "active_sheet": 0,

@@ -11,6 +11,8 @@ export type OCRProtocol = 'local' | 'paddlex_json'
 export type AIAuthScheme = 'none' | 'bearer' | 'x_api_key' | 'api_key' | 'custom_header'
 /** 部署位置（V197）：由端点推导，环回地址或本机 OCR 引擎为本机；调用按「本机 → 服务器」选择已启用模型 */
 export type AIDeployment = 'local' | 'server'
+export type AITrustZone = 'local_device' | 'firm_private' | 'approved_provider' | 'restricted'
+export type AIMaskPolicy = 'none' | 'role_based' | 'strict'
 export type AIRouteKind = 'chat' | 'embedding' | 'ocr' | 'layout_parsing'
 export type AIRouteCandidateStatus = 'available' | 'unavailable' | 'unknown'
 export type AIProvider =
@@ -44,6 +46,9 @@ export interface AIModel {
   has_api_key: boolean
   api_key_updated_at: string | null
   deployment: AIDeployment
+  trust_zone: AITrustZone
+  client_data_allowed: boolean
+  mask_policy: AIMaskPolicy
   /** 参与路由（V197 起不再是「唯一生效」：对话 / OCR 本机、服务器各可启用一条） */
   is_active: boolean
   context_window: number | null
@@ -75,6 +80,9 @@ export interface AIRouteCandidate {
   endpoint?: string | null
   source: 'database' | 'environment' | 'builtin'
   reasoning_effort: ReasoningEffort | null
+  trust_zone: AITrustZone | null
+  client_data_allowed: boolean
+  mask_policy: AIMaskPolicy | null
   /** 没有启用行时的兜底（对话 / 向量 = `.env`，文字识别 = 本机进程内引擎） */
   implicit: boolean
   status: AIRouteCandidateStatus
@@ -116,6 +124,9 @@ export interface AIModelCreate {
   request_timeout_seconds?: number | null
   context_window?: number | null
   performance_notes?: string | null
+  trust_zone?: AITrustZone
+  client_data_allowed?: boolean
+  mask_policy?: AIMaskPolicy
 }
 
 export interface AIModelUpdate {
@@ -133,6 +144,9 @@ export interface AIModelUpdate {
   request_timeout_seconds?: number | null
   context_window?: number | null
   performance_notes?: string | null
+  trust_zone?: AITrustZone
+  client_data_allowed?: boolean
+  mask_policy?: AIMaskPolicy
 }
 
 export interface AIProviderOption {

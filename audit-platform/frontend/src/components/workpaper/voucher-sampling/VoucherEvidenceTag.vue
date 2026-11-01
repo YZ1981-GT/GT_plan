@@ -105,6 +105,10 @@ async function onReuse(att: VoucherEvidenceAttachment, entry: VoucherEvidenceEnt
   }
 }
 
+async function retryEvidence(): Promise<void> {
+  await Promise.allSettled([store.reload(), index.retry()])
+}
+
 async function onRemove(group: VoucherEvidenceGroup): Promise<void> {
   try {
     await confirmDelete({
@@ -132,7 +136,7 @@ async function onRemove(group: VoucherEvidenceGroup): Promise<void> {
 <template>
   <!-- persistent=false：弹出内容点开才渲染、收起即销毁（凭证检查表可能有上千行，每行常驻一份面板太重） -->
   <el-popover
-    v-if="voucherKey && wpId && (here.length || elsewhereCount || canWrite)"
+    v-if="voucherKey && wpId && (here.length || elsewhereCount || canWrite || store.error.value || index.error?.value || index.forbidden?.value)"
     placement="bottom-start"
     trigger="click"
     :width="320"
@@ -143,9 +147,9 @@ async function onRemove(group: VoucherEvidenceGroup): Promise<void> {
         class="gt-voucher-evidence__ref"
         link
         size="small"
-        :type="here.length ? 'primary' : elsewhereCount ? 'warning' : 'info'"
+        :type="store.error.value || index.error?.value || index.forbidden?.value ? 'danger' : here.length ? 'primary' : elsewhereCount ? 'warning' : 'info'"
         data-testid="voucher-evidence-tag"
-        :aria-label="here.length ? `凭证 ${label} 已有证据 ${here.length} 份` : elsewhereCount ? `凭证 ${label} 他稿已有证据 ${elsewhereCount} 份` : `上传凭证 ${label} 的证据`"
+        :aria-label="store.error.value || index.error?.value || index.forbidden?.value ? `凭证 ${label} 的证据加载失败` : here.length ? `凭证 ${label} 已有证据 ${here.length} 份` : elsewhereCount ? `凭证 ${label} 他稿已有证据 ${elsewhereCount} 份` : `上传凭证 ${label} 的证据`"
         @click.stop
       >
         <el-icon><Paperclip /></el-icon>
@@ -155,6 +159,10 @@ async function onRemove(group: VoucherEvidenceGroup): Promise<void> {
     </template>
     <div class="gt-voucher-evidence" data-testid="voucher-evidence-panel">
       <div class="gt-voucher-evidence__title">凭证 {{ label }} 的证据</div>
+      <div v-if="store.error.value || index.error?.value || index.forbidden?.value" class="gt-voucher-evidence__error" role="alert">
+        {{ index.forbidden?.value ? '无权查看其他底稿的凭证证据' : '凭证证据加载失败，不能据此判断为无证据' }}
+        <el-button link type="primary" size="small" @click="retryEvidence">重试</el-button>
+      </div>
       <ul v-if="here.length" class="gt-voucher-evidence__list">
         <li v-for="g in here" :key="g.attachmentId" class="gt-voucher-evidence__item">
           <span class="gt-voucher-evidence__name" :title="g.attachment.file_name">{{ g.attachment.file_name }}</span>
@@ -244,6 +252,11 @@ async function onRemove(group: VoucherEvidenceGroup): Promise<void> {
 }
 .gt-voucher-evidence__wp {
   color: var(--gt-color-text-tertiary, #909399);
+}
+.gt-voucher-evidence__error {
+  margin: 4px 0;
+  color: var(--gt-color-danger, #f56c6c);
+  font-size: var(--gt-font-size-xs, 12px);
 }
 .gt-voucher-evidence__empty,
 .gt-voucher-evidence__hint {

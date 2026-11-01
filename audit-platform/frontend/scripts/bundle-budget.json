@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "policy": {
+    "maxGrowthRatio": 0.05,
+    "ordinaryChunkGzipLimitBytes": 512000,
+    "exemptChunkNames": [
+      "heavy-univer",
+      "heavy-office",
+      "heavy-excel"
+    ]
+  },
+  "baseline": {
+    "entryIds": [
+      "index.html"
+    ],
+    "entry": {
+      "rawBytes": 1894912,
+      "gzipBytes": 542885,
+      "fileCount": 5
+    },
+    "total": {
+      "rawBytes": 67408869,
+      "gzipBytes": 20818425,
+      "fileCount": 4087
+    },
+    "ordinaryChunkCount": 2477,
+    "ordinaryLargeChunks": [
+      {
+        "id": "WorkpaperEditor",
+        "rawBytes": 1810008,
+        "gzipBytes": 554742
+      }
+    ],
+    "exemptChunkCount": {
+      "heavy-univer": 1,
+      "heavy-office": 1,
+      "heavy-excel": 1
+    }
+  }
+}

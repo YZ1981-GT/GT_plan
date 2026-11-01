@@ -4,7 +4,7 @@
 - LibreOffice 不可用 → 503 + reason="libreoffice_unavailable"
 - 模板不存在 → 404
 - 转换成功 → 200 + application/pdf + X-Preview-Cache=miss/hit
-- 缓存命中 → 第 2 次调用 X-Preview-Cache=hit 且 subprocess.run 仅调一次
+- 缓存命中 → 第 2 次调用 X-Preview-Cache=hit 且底层转换仅执行一次
 
 绕开：
 - set_rls_context 在 SQLite 测试环境下 mock 为 no-op（生产是 PG set_config）
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -70,7 +70,7 @@ async def test_503_when_libreoffice_unavailable(db_session: AsyncSession, tmp_pa
 
     project_id = str(uuid.uuid4())
     with patch("app.routers.wp_template_download.find_all_template_files", return_value=[fake_xlsx]), \
-         patch("app.routers.wp_template_download._find_libreoffice", return_value=None), \
+         patch("app.routers.wp_template_download.find_soffice_path", return_value=None), \
          patch("app.deps.set_rls_context", new=AsyncMock()):
         app = _make_app(db_session)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -112,17 +112,12 @@ async def test_conversion_success_and_cache(
     monkeypatch.setattr(cfg_mod.settings, "STORAGE_ROOT", str(storage_root))
 
     fake_pdf_bytes = b"%PDF-1.4 fake content"
-
-    def _fake_subprocess_run(cmd, capture_output=False, timeout=None, **kwargs):
-        outdir = Path(cmd[5])
-        src = Path(cmd[6])
-        (outdir / f"{src.stem}.pdf").write_bytes(fake_pdf_bytes)
-        return MagicMock(returncode=0, stderr=b"")
+    convert = AsyncMock(return_value=fake_pdf_bytes)
 
     project_id = str(uuid.uuid4())
     with patch("app.routers.wp_template_download.find_all_template_files", return_value=[fake_xlsx]), \
-         patch("app.routers.wp_template_download._find_libreoffice", return_value="/usr/bin/soffice"), \
-         patch("app.routers.wp_template_download.subprocess.run", side_effect=_fake_subprocess_run) as mock_run, \
+         patch("app.routers.wp_template_download.find_soffice_path", return_value="/usr/bin/soffice"), \
+         patch("app.services.libreoffice_pool.convert_office_to_pdf_bytes", convert), \
          patch("app.deps.set_rls_context", new=AsyncMock()):
         app = _make_app(db_session)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -136,6 +131,6 @@ async def test_conversion_success_and_cache(
 
     assert r2.status_code == 200
     assert r2.headers["x-preview-cache"] == "hit"
-    assert mock_run.call_count == 1
+    assert convert.await_count == 1
     assert cache_dir.exists()
     assert any(p.suffix == ".pdf" for p in cache_dir.iterdir())

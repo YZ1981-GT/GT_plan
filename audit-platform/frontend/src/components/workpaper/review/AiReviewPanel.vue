@@ -31,6 +31,7 @@ const {
   progress,
   expandedSheet,
   startBatchReview,
+  cancelBatchReview,
   reviewCurrentSheet,
   exportReviewExcel,
   toggleSheet,
@@ -61,7 +62,7 @@ const fallbackCount = computed(() =>
 
 /** 批量复核按钮可见性：现场经理/业务合伙人/QC合伙人 */
 const canStartReview = computed(() => {
-  const allowedRoles = ['manager', 'partner', 'qc', 'admin']
+  const allowedRoles = ['manager', 'partner', 'qc', 'eqcr', 'admin']
   return allowedRoles.includes(currentRole.value)
 })
 
@@ -75,8 +76,12 @@ const progressPercent = computed(() => {
 function getPassBadgeType(status: string): string {
   switch (status) {
     case 'pass': return 'success'
-    case 'fail': return 'danger'
-    case 'review_error': return 'warning'
+    case 'fail':
+    case 'ai_findings_present':
+    case 'deterministic_failure': return 'danger'
+    case 'review_error':
+    case 'manual_review_required': return 'warning'
+    case 'ai_no_new_findings': return 'info'
     default: return 'info'
   }
 }
@@ -86,6 +91,10 @@ function getPassBadgeText(status: string): string {
   switch (status) {
     case 'pass': return '通过'
     case 'fail': return '未通过'
+    case 'ai_findings_present': return 'AI 有待核实疑点'
+    case 'deterministic_failure': return '系统检查未通过'
+    case 'manual_review_required': return '需人工复核'
+    case 'ai_no_new_findings': return 'AI 未发现新增疑点'
     case 'review_error': return '复核异常'
     default: return '待复核'
   }
@@ -133,15 +142,32 @@ function getPromptSourceTagType(source?: string): string {
 
 <template>
   <div class="review-panel">
+    <el-alert
+      v-if="currentRole === 'qc' || currentRole === 'eqcr'"
+      type="info"
+      :closable="false"
+      show-icon
+      title="独立挑战模式：系统检查与 AI 提示仅供质询，不会把底稿标记为通过，也不能代替项目组采纳或写回。"
+      class="review-panel__challenge"
+    />
     <!-- 工具栏 -->
     <div class="review-panel__toolbar">
       <el-button
         v-if="canStartReview"
         type="primary"
         :loading="isReviewing"
+        :disabled="isReviewing"
         @click="startBatchReview"
       >
         {{ isReviewing ? '复核中...' : '开始批量复核' }}
+      </el-button>
+      <el-button
+        v-if="canStartReview && isReviewing"
+        type="danger"
+        plain
+        @click="cancelBatchReview"
+      >
+        取消复核
       </el-button>
       <el-button
         :disabled="sheets.length === 0"
@@ -166,8 +192,8 @@ function getPromptSourceTagType(source?: string): string {
     <!-- 复核汇总统计 -->
     <div v-if="sheets.length > 0" class="review-panel__summary">
       <el-statistic title="底稿总数" :value="sheets.length" />
-      <el-statistic title="通过" :value="sheets.filter(s => s.passStatus === 'pass').length" />
-      <el-statistic title="未通过" :value="sheets.filter(s => s.passStatus === 'fail').length" />
+      <el-statistic title="AI 未发现新增疑点" :value="sheets.filter(s => s.passStatus === 'ai_no_new_findings').length" />
+      <el-statistic title="有待核实疑点" :value="sheets.filter(s => s.passStatus === 'ai_findings_present' || s.passStatus === 'fail' || s.passStatus === 'deterministic_failure').length" />
       <el-statistic title="总发现项" :value="sheets.reduce((sum, s) => sum + s.findingCount, 0)" />
       <el-statistic title="降级提示词" :value="fallbackCount" />
     </div>
@@ -240,8 +266,27 @@ function getPromptSourceTagType(source?: string): string {
             </div>
           </template>
 
-          <!-- 展开后的 Finding 列表 -->
+          <!-- 系统确定性检查与 AI 提示分栏；系统阻断不被 AI 空 findings 覆盖 -->
+          <div class="review-card__system" v-if="sheet.systemChecks.length">
+            <div class="review-card__section-title">系统检查</div>
+            <div
+              v-for="check in sheet.systemChecks"
+              :key="check.code"
+              class="system-check"
+            >
+              <el-tag
+                :type="check.passed === true ? 'success' : (check.passed === false ? 'danger' : 'warning')"
+                size="small"
+              >
+                {{ check.passed === true ? '通过' : (check.passed === false ? '未通过' : '需人工核实') }}
+              </el-tag>
+              <span>{{ check.message }}</span>
+            </div>
+          </div>
+
+          <!-- 展开后的 AI Finding 列表 -->
           <div class="review-card__findings">
+            <div class="review-card__section-title">AI 复核提示（不代表人工通过）</div>
             <div
               v-for="finding in sheet.findings"
               :key="finding.id"
@@ -279,7 +324,7 @@ function getPromptSourceTagType(source?: string): string {
             </div>
             <el-empty
               v-if="sheet.findings.length === 0"
-              description="暂无发现项"
+              description="AI 未发现新增疑点，仍需人工完成复核"
               :image-size="60"
             />
           </div>
@@ -304,6 +349,10 @@ function getPromptSourceTagType(source?: string): string {
 <style scoped>
 .review-panel {
   padding: 16px;
+}
+
+.review-panel__challenge {
+  margin-bottom: 12px;
 }
 
 .review-panel__toolbar {
@@ -367,6 +416,28 @@ function getPromptSourceTagType(source?: string): string {
   display: flex;
   gap: 4px;
   margin-left: auto;
+}
+
+.review-card__section-title {
+  margin: 4px 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.review-card__system {
+  padding: 10px;
+  margin-bottom: 10px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+}
+
+.system-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 .review-card__findings {

@@ -48,6 +48,12 @@ __all__ = [
     "MCP_READONLY_TOOLS",
     "MCP_ROLE_MASK_POLICY",
     "McpMaskLevel",
+    "register_token_distributed",
+    "token_revoked_distributed",
+    "revoke_token_distributed",
+    "revoke_token_for_user_distributed",
+    "revoke_run_distributed",
+    "mcp_token_service",
 ]
 
 
@@ -244,6 +250,8 @@ class McpTokenService:
     def __init__(self) -> None:
         # 已撤销 token 集合（token_id → 撤销时间）
         self._revoked: dict[str, float] = {}
+        # 仅保存短命身份元数据，不保存 token 字符串；Redis 不可用时用于撤销归属校验。
+        self._issued: dict[str, tuple[UUID, UUID, float]] = {}
 
     def create_token(
         self,
@@ -298,6 +306,7 @@ class McpTokenService:
             parent_token_id=parent_token_id,
         )
         token_str = self._encode(payload)
+        self._issued[token_id] = (user_id, run_id, payload.expires_at)
         return McpScopedToken(token=token_str, payload=payload)
 
     def create_child_token(
@@ -397,7 +406,13 @@ class McpTokenService:
         expired = [tid for tid, ts in self._revoked.items() if ts < cutoff]
         for tid in expired:
             del self._revoked[tid]
-        return len(expired)
+        expired_issued = [
+            tid for tid, (_uid, _rid, expires_at) in self._issued.items()
+            if expires_at < now
+        ]
+        for tid in expired_issued:
+            del self._issued[tid]
+        return len(expired) + len(expired_issued)
 
     # ------------------------------------------------------------------
     # 编解码（HMAC 签名的 JSON）
@@ -458,3 +473,116 @@ class McpScopedToken:
 
     token: str
     payload: McpTokenPayload
+
+
+# Redis-backed revocation：生产校验同时看 token 与 run 两个 key；Redis 不可用时保留
+# 进程内短命撤销作为降级，不把可用性故障变成客户请求 500。
+def _revoked_token_key(token_id: str) -> str:
+    return f"ai:mcp:revoked:token:{token_id}"
+
+
+def _revoked_run_key(run_id: UUID) -> str:
+    return f"ai:mcp:revoked:run:{run_id}"
+
+
+def _token_meta_key(token_id: str) -> str:
+    return f"ai:mcp:token:{token_id}"
+
+
+async def _revocation_redis():
+    try:
+        from app.core.redis import get_redis
+        return await get_redis()
+    except Exception:
+        return None
+
+
+async def register_token_distributed(scoped: McpScopedToken) -> None:
+    redis = await _revocation_redis()
+    if redis is None:
+        return
+    ttl = max(1, int(scoped.payload.expires_at - time.time()) + 1)
+    try:
+        await redis.hset(_token_meta_key(scoped.payload.token_id), mapping={
+            "run_id": str(scoped.payload.run_id),
+            "user_id": str(scoped.payload.user_id),
+        })
+        await redis.expire(_token_meta_key(scoped.payload.token_id), ttl)
+    except Exception:
+        return
+
+
+async def token_revoked_distributed(
+    service: McpTokenService, payload: McpTokenPayload
+) -> bool:
+    if payload.token_id in service._revoked:
+        return True
+    if payload.parent_token_id and payload.parent_token_id in service._revoked:
+        return True
+    redis = await _revocation_redis()
+    if redis is None:
+        return False
+    try:
+        keys = [_revoked_token_key(payload.token_id), _revoked_run_key(payload.run_id)]
+        if payload.parent_token_id:
+            keys.append(_revoked_token_key(payload.parent_token_id))
+        return bool(await redis.exists(*keys))
+    except Exception:
+        return False
+
+
+async def revoke_token_distributed(
+    service: McpTokenService, token_id: str, *, ttl_seconds: int = 600
+) -> None:
+    service.revoke_token(token_id)
+    redis = await _revocation_redis()
+    if redis is None:
+        return
+    try:
+        await redis.set(_revoked_token_key(token_id), "1", ex=max(60, ttl_seconds))
+    except Exception:
+        return
+
+
+async def revoke_token_for_user_distributed(
+    service: McpTokenService,
+    token_id: str,
+    *,
+    user_id: UUID,
+    ttl_seconds: int = 600,
+) -> None:
+    """仅 token owner 可撤销；未知 token 与他人 token 都按 scope mismatch 拒绝。"""
+    redis = await _revocation_redis()
+    owner: UUID | None = None
+    if redis is not None:
+        try:
+            raw = await redis.hget(_token_meta_key(token_id), "user_id")
+            if isinstance(raw, bytes):
+                raw = raw.decode("ascii", errors="ignore")
+            if raw:
+                owner = UUID(str(raw))
+        except Exception:
+            owner = None
+    if owner is None:
+        local = service._issued.get(token_id)
+        owner = local[0] if local is not None else None
+    if owner != user_id:
+        raise McpTokenScopeMismatch("token 不属于当前用户")
+    await revoke_token_distributed(service, token_id, ttl_seconds=ttl_seconds)
+
+
+async def revoke_run_distributed(
+    service: McpTokenService, run_id: UUID, *, ttl_seconds: int = 600
+) -> None:
+    service.revoke_by_run(run_id)
+    redis = await _revocation_redis()
+    if redis is None:
+        return
+    try:
+        await redis.set(_revoked_run_key(run_id), "1", ex=max(60, ttl_seconds))
+    except Exception:
+        return
+
+
+# 同一进程所有入口共用；跨进程撤销由 Redis run/token key 统一。
+mcp_token_service = McpTokenService()

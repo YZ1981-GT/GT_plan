@@ -83,6 +83,7 @@ const {
   loadErrorState,
   loadErrorMessage,
   dirty,
+  editRevision,
   initUniver,
   dispose,
 } = useEditorUniver({
@@ -97,8 +98,7 @@ const {
 
 // ─── 自动保存（先实例化，供 useEditorSave 引用）────────────────────────────
 
-// autoSave 的 onSave 回调通过闭包引用下方的 editorSave.onSave
-// 利用 JS 函数 hoisting 特性：autoSave 触发时 editorSave 已完成实例化
+// autoSave 的 onSave 回调通过闭包引用下方的 editorSave.onSave；计时器触发时已完成实例化。
 const autoSave = useWorkpaperAutoSave(async () => {
   const ok = await onSave()
   if (!ok) {
@@ -121,6 +121,7 @@ const {
   syncLoading,
   prefillLoading,
   exportingPdf,
+  markEdited: markSaveEdited,
   onSave,
   onSubmitForReview,
   onSyncStructure,
@@ -154,11 +155,16 @@ const autoSaveMsg = computed(() => {
   return ''
 })
 
-// ─── dirty 同步到 Shell（autoSave 代际由 useEditorUniver 的逐命令回调推进） ────────
+// ─── dirty / 编辑代际同步到 Shell 与保存协调器 ──────────────────────────────
 
 watch(dirty, (val) => {
   emit('dirty-change', val)
 })
+
+watch(editRevision, () => {
+  markSaveEdited()
+  autoSave.markDirty()
+}, { flush: 'sync' })
 
 // ─── saved 事件 → Shell 刷新 wpDetail ───────────────────────────────────────
 

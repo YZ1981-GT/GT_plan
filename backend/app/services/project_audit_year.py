@@ -102,7 +102,14 @@ async def fetch_project_audit_year(
     db: AsyncSession,
     project_id: UUID | str,
 ) -> int | None:
-    """异步查询项目审计年度（SQL COALESCE 路径）。"""
+    """异步查询项目审计年度；PG 用 COALESCE SQL，其他方言复用 ORM 五级解析。"""
+    if db.get_bind().dialect.name != "postgresql":
+        try:
+            pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        project = await db.get(Project, pid)
+        return resolve_project_audit_year(project) if project is not None else None
     row = (await db.execute(PROJECT_AUDIT_YEAR_SQL, {"pid": str(project_id)})).first()
     if not row or row[0] is None:
         return None

@@ -25,6 +25,7 @@ import pytest
 from app.models.audit_platform_schemas import EventType
 from app.services.export_progress_service import (
     EXPORT_DIR,
+    ExportFile,
     ExportProgressService,
     ExportTask,
     export_progress_service,
@@ -113,34 +114,22 @@ class TestSseEventOrder:
         def _capture(event_type, extra=None):
             events.append((event_type, extra or {}))
 
-        # 拦截 _add_one_workpaper 跳过 DB 访问
-        async def _add_stub(self, db, zf, wp_id_str):
-            # 写一个占位文件
-            zf.writestr(f"{wp_id_str}.txt", b"placeholder")
+        # 返回真实临时文件，压缩阶段仍走生产 _write_zip（在线程直接写盘）。
+        sources = []
+        for name in ("wp-a", "wp-b", "wp-c"):
+            source = tmp_path / f"{name}.txt"
+            source.write_bytes(b"placeholder")
+            sources.append(ExportFile(source=source, arcname=f"{name}.txt"))
 
-        # 拦截数据库 session
-        class _DummyDb:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, *a):
-                return False
-
-            async def execute(self, *a, **kw):
-                m = MagicMock()
-                m.first.return_value = None
-                return m
-
-        def _dummy_session():
-            return _DummyDb()
+        async def _load_stub(self, task):
+            return sources
 
         # 重定向 EXPORT_DIR 到 tmp_path
         export_dir_patch = tmp_path / "exports"
 
         with patch.object(eb_module.event_bus, "broadcast_raw", _capture), \
-             patch.object(ExportProgressService, "_add_one_workpaper", _add_stub), \
-             patch("app.services.export_progress_service.EXPORT_DIR", export_dir_patch), \
-             patch("app.core.database.async_session", _dummy_session):
+             patch.object(ExportProgressService, "_load_export_files", _load_stub), \
+             patch("app.services.export_progress_service.EXPORT_DIR", export_dir_patch):
 
             task = ExportTask(
                 task_id="t-1",
@@ -192,19 +181,11 @@ class TestSseEventOrder:
         def _capture(event_type, extra=None):
             events.append((event_type, extra or {}))
 
-        # 让 db session __aenter__ 抛错
-        class _BoomDb:
-            async def __aenter__(self):
-                raise RuntimeError("db unavailable")
-
-            async def __aexit__(self, *a):
-                return False
-
-        def _boom_session():
-            return _BoomDb()
+        async def _boom_load(_task):
+            raise RuntimeError("db unavailable")
 
         with patch.object(eb_module.event_bus, "broadcast_raw", _capture), \
-             patch("app.core.database.async_session", _boom_session), \
+             patch.object(svc, "_load_export_files", _boom_load), \
              patch("app.services.export_progress_service.EXPORT_DIR", tmp_path / "exports"):
 
             task = ExportTask(
@@ -262,3 +243,86 @@ class TestGlobalSingleton:
     def test_singleton_importable(self):
         assert export_progress_service is not None
         assert isinstance(export_progress_service, ExportProgressService)
+
+
+@pytest.mark.asyncio
+async def test_zip_compression_runs_off_event_loop_without_bytes_buffer(tmp_path):
+    """大 ZIP 直接写临时文件，压缩不得占住 Web 事件循环或使用 BytesIO 双份驻留。"""
+    import threading
+
+    svc = ExportProgressService()
+    source = tmp_path / "large.bin"
+    source.write_bytes(b"x" * 1024)
+    task = ExportTask(
+        task_id="offloop",
+        project_id="00000000-0000-0000-0000-000000000001",
+        user_id="u-1",
+        wp_ids=["00000000-0000-0000-0000-000000000002"],
+        total=1,
+    )
+    event_loop_thread = threading.get_ident()
+    writer_threads: list[int] = []
+    original = ExportProgressService._write_zip
+
+    async def _load_stub(_task):
+        return [ExportFile(source=source, arcname="D/D2.xlsx")]
+
+    def _write_stub(temp_path, final_path, files, progress):
+        writer_threads.append(threading.get_ident())
+        original(temp_path, final_path, files, progress)
+
+    with patch.object(svc, "_load_export_files", _load_stub), \
+         patch.object(ExportProgressService, "_write_zip", staticmethod(_write_stub)), \
+         patch("app.services.export_progress_service.EXPORT_DIR", tmp_path / "exports"), \
+         patch("app.services.event_bus.event_bus.broadcast_raw"):
+        await svc._run_export(task)
+
+    assert task.status == "complete"
+    assert writer_threads and writer_threads[0] != event_loop_thread
+    assert task.file_path and task.file_path.exists()
+    assert not list((tmp_path / "exports").glob("*.tmp"))
+    source_text = inspect.getsource(ExportProgressService._run_export)
+    assert "asyncio.to_thread" in source_text
+    assert "BytesIO" not in inspect.getsource(ExportProgressService)
+
+
+def test_export_service_keeps_background_task_reference():
+    source = inspect.getsource(ExportProgressService.create_task)
+    assert "self._background_tasks.add" in source
+    assert "add_done_callback" in source
+
+
+@pytest.mark.asyncio
+async def test_export_status_and_download_are_owner_scoped(monkeypatch):
+    """知道 task id 也不能读取其他用户的状态或下载文件。"""
+    from fastapi import HTTPException
+    from app.routers.batch_export_progress import get_export_status, download_export
+
+    task = ExportTask(
+        task_id="private-task",
+        project_id="p-1",
+        user_id="owner",
+        wp_ids=[],
+        total=0,
+        status="complete",
+    )
+    monkeypatch.setattr(export_progress_service, "get_task", lambda _task_id: task)
+    stranger = MagicMock(id="stranger")
+
+    with pytest.raises(HTTPException) as status_error:
+        await get_export_status("private-task", stranger)
+    assert status_error.value.status_code == 404
+
+    with pytest.raises(HTTPException) as download_error:
+        await download_export("private-task", stranger)
+    assert download_error.value.status_code == 404
+
+
+def test_batch_export_request_has_hard_item_limit():
+    from pydantic import ValidationError
+    from app.routers.batch_export_progress import BatchExportAsyncRequest
+
+    with pytest.raises(ValidationError):
+        BatchExportAsyncRequest(wp_ids=[])
+    with pytest.raises(ValidationError):
+        BatchExportAsyncRequest(wp_ids=[str(i) for i in range(1001)])

@@ -109,7 +109,9 @@ async def annotate_linked_wp_count(db, items: list[dict]) -> list[dict]:
     return items
 
 
-async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None) -> None:
+async def _apply_confirmation_breakdown(
+    db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None, *, strict: bool = False,
+) -> None:
     """「函证」声明改为按工作簿登记的函证逐笔判定（spec attachment-confirmation-evidence-loop 需求 6）。
 
     族内没有登记函证时保持原判定；查询放在保存点里，失败不污染本次读取的事务（fail-open）。
@@ -124,6 +126,8 @@ async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, r
             breakdown = await confirmation_breakdown(db, wp_meta["project_id"], wp_meta.get("wp_code"))
     except Exception:
         _fail_open("awp_confirmation_breakdown_fail_open", wp_id=wp_id)
+        if strict:
+            raise
         return
     if breakdown is None:
         return
@@ -132,7 +136,9 @@ async def _apply_confirmation_breakdown(db, wp_id: UUID, wp_meta: dict | None, r
         req["satisfied"] = breakdown["missing"] == 0
 
 
-async def _apply_voucher_samples(db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None) -> None:
+async def _apply_voucher_samples(
+    db, wp_id: UUID, wp_meta: dict | None, requirements: list[dict] | None, *, strict: bool = False,
+) -> None:
     """「凭证」类声明附逐笔样本统计 ``samples``（spec attachment-voucher-evidence-binding 需求 5.2，ADR-AVE-06）。
 
     只展示：声明是否满足的口径不变。用新键 ``samples`` 而不是函证的 ``breakdown``（归档完整性与抽屉按
@@ -148,6 +154,8 @@ async def _apply_voucher_samples(db, wp_id: UUID, wp_meta: dict | None, requirem
             samples = await voucher_sample_breakdown(db, wp_meta["project_id"], wp_id)
     except Exception:
         _fail_open("awp_voucher_samples_fail_open", wp_id=wp_id)
+        if strict:
+            raise
         return
     if samples is None:
         return
@@ -155,7 +163,7 @@ async def _apply_voucher_samples(db, wp_id: UUID, wp_meta: dict | None, requirem
         req["samples"] = samples
 
 
-async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
+async def _collect_items(svc: "AttachmentService", wp_id: UUID, *, strict: bool = False) -> list[dict]:
     """四个来源合并去重后的附件项（不含证据声明与失效信息）。"""
     db = svc.db
     by_id: dict[str, dict] = {}
@@ -194,6 +202,8 @@ async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
             _add_source(by_id, svc, att, "confirmation")
     except Exception:
         _fail_open("awp_confirmation_lookup_fail_open", wp_id=wp_id)
+        if strict:
+            raise
 
     # 4) 本底稿证据链接（行级 / 单元格级）
     from app.models.wp_optimization_models import EvidenceLink
@@ -213,6 +223,7 @@ async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
             "page_ref": link.page_ref,
             "evidence_type": link.evidence_type,
             "voucher_key": link.voucher_key,
+            "contract_key": link.contract_key,
         })
 
     items = list(by_id.values())
@@ -223,27 +234,13 @@ async def _collect_items(svc: "AttachmentService", wp_id: UUID) -> list[dict]:
 
 
 async def evaluate_wp_evidence_requirements(db, wp_id: UUID) -> list[dict] | None:
-    """底稿证据声明的满足情况（与附件抽屉同一判定，含函证逐笔拆分）；无声明 ⇒ None。
+    """兼容入口；事实判定委托四态 EvidenceReadinessService。"""
+    from app.services.evidence_readiness import EvidenceReadinessService
 
-    QC-17 与归档完整性检查共用（spec attachment-archive-and-a-class-evidence ADR-AE-09）。
-    """
-    from app.services.attachment_service import AttachmentService
-    from app.services.workpaper_evidence_requirements import (
-        build_evidence_requirements,
-        resolve_requirements_for_wp_code,
-    )
-
-    svc = AttachmentService(db)
-    wp_meta = await svc._resolve_wp_meta(wp_id)
-    wp_code = wp_meta.get("wp_code") if wp_meta else None
-    if not resolve_requirements_for_wp_code(wp_code):
+    result = await EvidenceReadinessService(db).evaluate_workpaper(wp_id)
+    if result.status in {"not_declared", "unknown"}:
         return None
-    requirements = build_evidence_requirements(wp_code, await _collect_items(svc, wp_id))
-    if requirements is None:
-        return None
-    await _apply_confirmation_breakdown(db, wp_id, wp_meta, requirements)
-    await _apply_voucher_samples(db, wp_id, wp_meta, requirements)
-    return requirements
+    return [dict(row) for row in result.requirements]
 
 
 async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dict:
@@ -255,18 +252,15 @@ async def build_wp_attachment_view(svc: "AttachmentService", wp_id: UUID) -> dic
     # 一次取 wp 元数据，供证据声明 + stale 共用
     wp_meta = await svc._resolve_wp_meta(wp_id)
 
-    # 证据类型声明（无声明不附加键；失败 fail-open）
-    try:
-        from app.services.workpaper_evidence_requirements import build_evidence_requirements
+    # 证据就绪度：展示与 QC/签发/归档共用四态事实；unknown 不伪装成无声明或已满足。
+    from app.services.evidence_readiness import EvidenceReadinessService
 
-        ev_req = build_evidence_requirements(wp_meta.get("wp_code") if wp_meta else None, items)
-        if ev_req is not None:
-            result["evidence_requirements"] = ev_req
-    except Exception:
-        _fail_open("awp_evidence_requirements_fail_open", wp_id=wp_id)
-    else:
-        await _apply_confirmation_breakdown(db, wp_id, wp_meta, result.get("evidence_requirements"))
-        await _apply_voucher_samples(db, wp_id, wp_meta, result.get("evidence_requirements"))
+    readiness = await EvidenceReadinessService(db).evaluate_workpaper(
+        wp_id, preloaded_items=items, wp_meta=wp_meta,
+    )
+    result["evidence_readiness"] = readiness.as_dict()
+    if readiness.status in {"ready", "not_ready"}:
+        result["evidence_requirements"] = [dict(row) for row in readiness.requirements]
 
     # stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
     try:

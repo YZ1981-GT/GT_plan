@@ -179,21 +179,52 @@ def frozen_reason(status: Any) -> str | None:
     return f"底稿已{label}，公式推送不改写（重新打开编辑后下次推送纳入）" if label else None
 
 
-async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
-    """裸 SQL 按编码找底稿；一个项目一个编码至多一张（多于一张直接报错）。"""
+async def _find_workpapers_for_codes(
+    db,
+    project_id: UUID,
+    wp_codes: Iterable[str],
+) -> dict[str, list[_Paper]]:
+    """一次查询定位全部目标编码；每个项目/编码仍强制至多一张底稿。"""
+    codes = list(dict.fromkeys(str(code) for code in wp_codes if str(code)))
+    if not codes:
+        return {}
+    stmt = sa.text(
+        "SELECT wp.id, wp.status, wi.wp_code FROM working_paper wp "
+        "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+        "WHERE wp.project_id = :pid AND wi.project_id = :pid "
+        "AND wi.wp_code IN :codes "
+        "AND wp.is_deleted = false AND wi.is_deleted = false "
+        "ORDER BY wi.wp_code, wp.id"
+    ).bindparams(sa.bindparam("codes", expanding=True))
     rows = (await db.execute(
-        sa.text(
-            "SELECT wp.id, wp.status FROM working_paper wp "
-            "JOIN wp_index wi ON wi.id = wp.wp_index_id "
-            "WHERE wp.project_id = :pid AND wi.project_id = :pid AND wi.wp_code = :code "
-            "AND wp.is_deleted = false AND wi.is_deleted = false "
-            "ORDER BY wp.id"
-        ),
-        {"pid": str(project_id), "code": wp_code},
+        stmt,
+        {"pid": str(project_id), "codes": codes},
     )).all()
-    if len(rows) > 1:
-        raise RuntimeError(f"项目 {project_id} 有 {len(rows)} 张 {wp_code} 底稿，违反唯一约束，公式推送中止")
-    return [_Paper(id=UUID(str(r[0])), status=_enum_value(r[1]), paper_code=wp_code) for r in rows]
+    grouped: dict[str, list[_Paper]] = {code: [] for code in codes}
+    for row in rows:
+        code = str(row[2])
+        grouped.setdefault(code, []).append(
+            _Paper(
+                id=UUID(str(row[0])),
+                status=_enum_value(row[1]),
+                paper_code=code,
+            )
+        )
+    for code, papers in grouped.items():
+        if len(papers) > 1:
+            raise RuntimeError(
+                f"项目 {project_id} 有 {len(papers)} 张 {code} 底稿，"
+                "违反唯一约束，公式推送中止"
+            )
+    return grouped
+
+
+async def _find_workpapers(db, project_id: UUID, wp_code: str) -> list[_Paper]:
+    """兼容单编码调用；运行计划使用批量定位。"""
+    return (await _find_workpapers_for_codes(db, project_id, [wp_code])).get(
+        wp_code,
+        [],
+    )
 
 
 async def _read_entries(
@@ -320,7 +351,8 @@ async def _execute(
         if codes is None or code_of.get(rid) in codes:
             result.add_warning(msg)
     pick = MANUAL if trigger == FORMULA_CONFIG_CHANGED else trigger
-    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
+    candidates: list[tuple[str, Any, tuple[PushRule, ...], tuple[str, ...]]] = []
+    all_paper_codes: list[str] = []
     for code in supported_wp_codes():
         if codes is not None and code not in codes:
             continue
@@ -329,14 +361,18 @@ async def _execute(
             continue
         binding = get_binding(code)
         paper_codes = tuple(getattr(binding, "paper_codes", None) or (code,))
-        papers: list[_Paper] = []
-        missing: list[str] = []
-        for pc in paper_codes:
-            found = await _find_workpapers(db, project_id, pc)
-            if found:
-                papers.extend(found)
-            else:
-                missing.append(pc)
+        candidates.append((code, binding, code_rules, paper_codes))
+        all_paper_codes.extend(paper_codes)
+
+    located = await _find_workpapers_for_codes(
+        db,
+        project_id,
+        all_paper_codes,
+    )
+    plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
+    for code, binding, code_rules, paper_codes in candidates:
+        papers = [paper for pc in paper_codes for paper in located.get(pc, [])]
+        missing = [pc for pc in paper_codes if not located.get(pc)]
         if wp_id is not None:
             # 事件指向具体底稿：只推命中的那一张（分册也算命中），其余册本次不动
             papers = [p for p in papers if p.id == wp_id]
@@ -564,22 +600,24 @@ async def _write_entries(
     if not changed:
         return None
     adapter = WorkpaperMutationAdapter(ctx.db)
+    mutations: list[FormulaMutation] = []
+    for item_id in changed:
+        before, version = snapshot.get(item_id, (None, _version_from_timestamp(None)))
+        target = CanonicalFormulaTarget(
+            domain="workpaper", project_id=ctx.project_id, year=ctx.year,
+            addr_id=f"{paper_code}/*/{item_id}",
+            locator={
+                "wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL,
+                "storage_field": storage_field,
+            },
+            wp_id=wp_id,
+        )
+        mutations.append(FormulaMutation(
+            target=target, before_value=before, after_value=overlay[item_id], expected_version=version,
+        ))
     savepoint = await ctx.db.begin_nested()
     try:
-        for item_id in changed:
-            before, version = snapshot.get(item_id, (None, _version_from_timestamp(None)))
-            target = CanonicalFormulaTarget(
-                domain="workpaper", project_id=ctx.project_id, year=ctx.year,
-                addr_id=f"{paper_code}/*/{item_id}",
-                locator={
-                    "wp_id": str(wp_id), "item": item_id, "cell": RAW_CELL,
-                    "storage_field": storage_field,
-                },
-                wp_id=wp_id,
-            )
-            await adapter.apply_many([FormulaMutation(
-                target=target, before_value=before, after_value=overlay[item_id], expected_version=version,
-            )])
+        await adapter.apply_many(mutations)
     except VersionConflict as exc:
         await savepoint.rollback()
         return str(exc.target.locator.get("item"))

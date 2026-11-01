@@ -609,6 +609,8 @@ async def smart_preview(
             year=year,
             preview_rows=preview_rows,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback, logging
         logging.getLogger(__name__).error(f"smart-preview error: {e}\n{traceback.format_exc()}")

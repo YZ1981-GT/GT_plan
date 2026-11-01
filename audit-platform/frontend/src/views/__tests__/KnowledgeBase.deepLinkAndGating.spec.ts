@@ -172,6 +172,31 @@ const ElInputStub = defineComponent({
   },
 })
 
+const ElSelectStub = defineComponent({
+  name: 'ElSelect',
+  inheritAttrs: false,
+  props: { modelValue: [String, Array], loading: Boolean },
+  emits: ['update:modelValue', 'change'],
+  setup(props, { emit, slots, attrs }) {
+    return () => h('select', {
+      class: 'el-select',
+      'aria-label': attrs['aria-label'],
+      value: props.modelValue as any,
+      onChange: (event: Event) => {
+        const value = (event.target as HTMLSelectElement).value
+        emit('update:modelValue', value)
+        emit('change', value)
+      },
+    }, slots.default?.())
+  },
+})
+
+const ElOptionStub = defineComponent({
+  name: 'ElOption',
+  props: { label: String, value: String, disabled: Boolean },
+  setup: (props) => () => h('option', { value: props.value, disabled: props.disabled }, props.label),
+})
+
 const STUBS = {
   'el-table': ElTableStub,
   'el-table-column': ElTableColumnStub,
@@ -190,8 +215,9 @@ const STUBS = {
   'el-progress': true,
   'el-form': passthrough('el-form'),
   'el-form-item': passthrough('el-form-item'),
-  'el-select': passthrough('el-select'),
-  'el-option': true,
+  'el-select': ElSelectStub,
+  'el-option': ElOptionStub,
+  'el-alert': defineComponent({ props: { title: String }, setup: (p) => () => h('div', { class: 'el-alert' }, p.title) }),
   'el-radio-group': passthrough('el-radio-group'),
   'el-radio': true,
   'el-radio-button': true,
@@ -242,6 +268,12 @@ function httpError(status: number) {
 function routeApi() {
   state.api.get.mockImplementation(async (url: string) => {
     if (url === '/api/knowledge-library/tree') return TREE
+    if (url === '/api/projects') return [
+      { id: 'p-edit', client_name: '测试公司', audit_year: 2025, status: 'execution' },
+      { id: 'p-second', client_name: '第二项目', audit_year: 2025, status: 'execution' },
+      { id: 'p-no-year', name: '无年度项目', audit_year: null, status: 'execution' },
+      { id: 'p-archived', name: '已归档项目', audit_year: 2024, status: 'archived' },
+    ]
     const docs = url.match(/^\/api\/knowledge-library\/folders\/([^/]+)\/documents$/)
     if (docs) return DOCS[docs[1]] ?? []
     const preview = url.match(/^\/api\/knowledge-library\/documents\/([^/]+)\/preview$/)
@@ -364,6 +396,63 @@ describe('KnowledgeBase 写按钮门控（Req 6.8）', () => {
     expect(theirs.text()).not.toContain('删除')
     expect((mine.find('input.kb-select').element as HTMLInputElement).disabled).toBe(false)
     expect((theirs.find('input.kb-select').element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('可读但不可管理的文档仍可显式转为项目证据，失败重试复用同一幂等键', async () => {
+    state.api.post.mockRejectedValueOnce(httpError(503)).mockResolvedValueOnce({ replayed: true })
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    const theirs = docRow(w, 'd-theirs')
+    const promote = theirs.findAll('button').find((button) => button.text().includes('转为项目证据'))
+    expect(promote?.exists()).toBe(true)
+    await promote!.trigger('click')
+    await flushPromises()
+
+    const select = w.find('select[aria-label="目标项目"]')
+    expect(select.exists()).toBe(true)
+    const options = select.findAll('option')
+    expect(options.find((option) => option.text().includes('未设置审计年度'))?.attributes('disabled')).toBeDefined()
+    expect(options.find((option) => option.text().includes('已归档'))?.attributes('disabled')).toBeDefined()
+    await select.setValue('p-edit')
+    const confirm = buttons(w, '确认转为证据')[0]
+    await confirm.trigger('click')
+    await flushPromises()
+    await confirm.trigger('click')
+    await flushPromises()
+
+    expect(state.api.post).toHaveBeenCalledTimes(2)
+    const [firstUrl, firstBody, firstConfig] = state.api.post.mock.calls[0]
+    const [secondUrl, secondBody] = state.api.post.mock.calls[1]
+    expect(firstUrl).toBe('/api/knowledge-library/projects/p-edit/evidence/from-document/d-theirs')
+    expect(secondUrl).toBe(firstUrl)
+    expect(firstBody).toEqual({ idempotency_key: expect.any(String) })
+    expect(secondBody.idempotency_key).toBe(firstBody.idempotency_key)
+    expect(firstBody).not.toHaveProperty('blob_id')
+    expect(firstBody).not.toHaveProperty('content_hash')
+    expect(firstBody).not.toHaveProperty('storage_path')
+    expect(firstConfig).toMatchObject({ _silent: true })
+    expect(state.message.success).toHaveBeenCalledWith('该知识版本已在项目证据中')
+  })
+
+  it('切换目标项目会生成新的幂等意图键', async () => {
+    state.api.post.mockRejectedValue(httpError(503))
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    const promote = docRow(w, 'd-mine').findAll('button').find((button) => button.text().includes('转为项目证据'))!
+    await promote.trigger('click')
+    await flushPromises()
+    const select = w.find('select[aria-label="目标项目"]')
+    await select.setValue('p-edit')
+    await buttons(w, '确认转为证据')[0].trigger('click')
+    await flushPromises()
+    const firstKey = state.api.post.mock.calls[0][1].idempotency_key
+
+    await select.setValue('p-second')
+    await buttons(w, '确认转为证据')[0].trigger('click')
+    await flushPromises()
+    expect(state.api.post.mock.calls[1][1].idempotency_key).not.toBe(firstKey)
   })
 
   it('「上传到此文件夹」只在有 can_create 的文件夹出现；无创建权时工具栏上传给出中文提示且不开弹窗', async () => {
@@ -553,7 +642,7 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
           : name === 'huge.pdf' ? { status: 413, body: JSON.stringify({ code: 413, message: '请求体过大，上限 850MB' }) }
             : { status: 200, body: uploadOk(name) }
 
-    const bulk = Array.from({ length: 250 }, (_, i) => fsFile(`/资料/批量/f${i}.txt`))
+    const bulk = Array.from({ length: 247 }, (_, i) => fsFile(`/资料/批量/f${i}.txt`))
     const root = fsDir('/资料', [
       fsFile('/资料/bad.txt'),
       fsFile('/资料/scan.pdf'),
@@ -568,22 +657,22 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
       dataTransfer: { items: [{ webkitGetAsEntry: () => root }] },
     })
     await flushPromises()
-    expect(w.text()).toContain('253 个文件')
+    expect(w.text()).toContain('250 个文件')
     expect(w.text()).toContain('已跳过 1 个系统临时文件')
 
-    await buttons(w, '上传 (253 个文件)')[0].trigger('click')
+    await buttons(w, '上传 (250 个文件)')[0].trigger('click')
     for (let i = 0; i < 20; i++) await flushPromises()
 
-    expect(FakeXhr.sent).toHaveLength(253)
+    expect(FakeXhr.sent).toHaveLength(250)
     // 结构保留：「资料」建在目标文件夹下，「批量」建在「资料」下，文件各进各的目录
     const fetchBodies = (globalThis.fetch as any).mock.calls.map((c: any[]) => JSON.parse(c[1].body))
     expect(fetchBodies.map((b: any) => [b.name, b.parent_id])).toEqual([['资料', 'f-own'], ['批量', 'sub-资料']])
-    expect(FakeXhr.sent.filter((s) => s.url.includes('/folders/sub-批量/upload'))).toHaveLength(250)
+    expect(FakeXhr.sent.filter((s) => s.url.includes('/folders/sub-批量/upload'))).toHaveLength(247)
     expect(FakeXhr.sent.find((s) => s.name === 'bad.txt')?.url).toContain('/folders/sub-资料/upload')
 
     expect(state.notify).toHaveBeenCalledTimes(1)
     const arg = state.notify.mock.calls[0][0]
-    expect(arg.title).toBe('上传完成：251 成功，2 失败')
+    expect(arg.title).toBe('上传完成：248 成功，2 失败')
     expect(arg.type).toBe('warning')
     const text = JSON.stringify(arg.message)
     expect(text).toContain('资料/bad.txt：文件内容含无法存储的字符')
@@ -759,5 +848,105 @@ describe('KnowledgeBase 扫描件后台识别', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+
+describe('KnowledgeBase 可靠性边界', () => {
+  beforeEach(() => {
+    FakeXhr.sent = []
+    FakeXhr.respond = (name) => ({ status: 200, body: uploadOk(name) })
+    vi.stubGlobal('XMLHttpRequest', FakeXhr as any)
+  })
+
+  it('目录加载失败不伪装成空目录，也不弹首次使用指南；可重试恢复', async () => {
+    const { showGuide } = await import('@/composables/useWorkflowGuide')
+    const base = state.api.get.getMockImplementation()!
+    state.api.get.mockRejectedValueOnce(httpError(500)).mockImplementation(base)
+    const w = await mountPage()
+    expect(w.text()).toContain('目录加载失败，请重试')
+    expect(w.text()).not.toContain('暂无文件夹')
+    expect(showGuide).not.toHaveBeenCalled()
+    await buttons(w, '重试')[0].trigger('click')
+    await flushPromises()
+    expect(treeNode(w, 'f-own').exists()).toBe(true)
+  })
+
+  it('文档加载失败显示重试而不是“暂无文档”', async () => {
+    const base = state.api.get.getMockImplementation()!
+    state.api.get.mockImplementation(async (url: string, cfg?: any) => {
+      if (url === '/api/knowledge-library/folders/f-own/documents') throw httpError(500)
+      return base(url, cfg)
+    })
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('文档加载失败，请检查网络后重试')
+    expect(w.text()).not.toContain('暂无文档')
+  })
+
+  it('251 个文件超过批次上限时零网络写入', async () => {
+    const root = fsDir('/资料', Array.from({ length: 251 }, (_, i) => fsFile(`/资料/f${i}.txt`)))
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    await buttons(w, '上传文件夹')[0].trigger('click')
+    await flushPromises()
+    await w.find('.gt-kb-folder-drop').trigger('drop', {
+      dataTransfer: { items: [{ webkitGetAsEntry: () => root }] },
+    })
+    await flushPromises()
+    await buttons(w, '上传 (251 个文件)')[0].trigger('click')
+    await flushPromises()
+    expect(FakeXhr.sent).toHaveLength(0)
+    expect(state.message.warning).toHaveBeenCalledWith('单批最多上传 250 个文件')
+  })
+})
+
+
+describe('KnowledgeBase 二进制预览竞态', () => {
+  it('A/B 逆序响应只显示 B，关闭时释放唯一 blob URL', async () => {
+    const wait = <T,>() => {
+      let resolve!: (value: T) => void
+      const promise = new Promise<T>((done) => { resolve = done })
+      return { promise, resolve }
+    }
+    const a = wait<Blob>()
+    const b = wait<Blob>()
+    const base = state.api.get.getMockImplementation()!
+    state.api.get.mockImplementation(async (url: string, cfg?: any) => {
+      if (url === '/api/knowledge-library/folders/f-own/documents') return [
+        { id: 'pdf-a', name: 'A.pdf', file_type: 'pdf', file_size: 1, can_manage: true },
+        { id: 'pdf-b', name: 'B.pdf', file_type: 'pdf', file_size: 1, can_manage: true },
+      ]
+      if (url.endsWith('/pdf-a/download')) return a.promise
+      if (url.endsWith('/pdf-b/download')) return b.promise
+      return base(url, cfg)
+    })
+    const create = vi.fn(() => 'blob:current-b')
+    const revoke = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: create })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
+
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    await docRow(w, 'pdf-a').findAll('button').find((button) => button.text() === '预览')!.trigger('click')
+    await flushPromises()
+    await docRow(w, 'pdf-b').findAll('button').find((button) => button.text() === '预览')!.trigger('click')
+    await flushPromises()
+    b.resolve(new Blob(['B'], { type: 'application/pdf' }))
+    await flushPromises()
+    expect(w.find('.gt-kb-preview-title').text()).toBe('B.pdf')
+    expect(w.find('iframe.gt-kb-preview-iframe').attributes('src')).toBe('blob:current-b')
+
+    a.resolve(new Blob(['A'], { type: 'application/pdf' }))
+    await flushPromises()
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(w.find('.gt-kb-preview-title').text()).toBe('B.pdf')
+    await w.find('.gt-kb-preview-header').findAll('button').find((button) => button.text() === '关闭')!.trigger('click')
+    await flushPromises()
+    expect(revoke).toHaveBeenCalledWith('blob:current-b')
+    expect(w.find('.gt-kb-preview-panel').exists()).toBe(false)
   })
 })

@@ -34,7 +34,10 @@ async def world(monkeypatch, tmp_path):
 async def _reply(world, tmp_path: Path, **att_values):
     """一笔已发函（账面 100）+ 发函件 + 回函件（缺省本地原件存在、没有识别全文）。"""
     conf = await add_confirmation(world, world.target)
-    original = tmp_path / "回函.pdf"
+    from app.services.attachment_storage_resolver import project_attachment_root
+
+    original = project_attachment_root(world.target.id) / "confirmation" / "回函.pdf"
+    original.parent.mkdir(parents=True, exist_ok=True)
     original.write_bytes(b"%PDF-1.4 reply")
     outbound = await add_attachment(world, world.target, file_name="发函.pdf", attachment_type="confirmation")
     values = {"file_name": "回函.pdf", "file_path": str(original), "attachment_type": "confirmation",
@@ -74,7 +77,11 @@ async def test_no_text_recognizes_original_then_compares(world, tmp_path):
     data = _data(resp)
     assert (data["match_verdict"], data["reply_amount"], data["counterparty_mismatch"]) == ("matched", 100.0, False)
     recognize.assert_awaited_once()
-    assert Path(recognize.await_args.args[0]).resolve() == (tmp_path / "回函.pdf").resolve()  # 识别的就是原件
+    from app.services.attachment_storage_resolver import project_attachment_root
+
+    assert Path(recognize.await_args.args[0]).resolve() == (
+        project_attachment_root(world.target.id) / "confirmation" / "回函.pdf"
+    ).resolve()  # 识别的就是项目边界内原件
     att = await _reload(world, inbound.id)
     assert (att.ocr_text, att.ocr_status) == (REPLY_TEXT, "completed")
     status = (await world.db.execute(sa.select(Confirmation.status).where(Confirmation.id == conf_id))).scalar_one()

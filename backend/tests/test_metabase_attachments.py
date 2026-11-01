@@ -265,6 +265,18 @@ class TestAttachmentService:
 
 # ── API Tests ──
 
+
+async def _seed_api_attachment(db: AsyncSession, *, file_name: str, file_path: str, file_type: str, file_size: int = 100):
+    """测试夹具直接调用可信存储落地后的内部记录原语，不经过已退役 raw-path HTTP。"""
+    from app.services.attachment_service import AttachmentService
+
+    row = await AttachmentService(db).create_attachment(FAKE_PROJECT_ID, {
+        "file_name": file_name, "file_path": file_path, "file_type": file_type, "file_size": file_size,
+    })
+    await db.commit()
+    return row
+
+
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, seeded_db):
     from app.main import app
@@ -301,11 +313,12 @@ class TestMetabaseAPI:
 class TestAttachmentAPI:
 
     @pytest.mark.asyncio
-    async def test_create_api(self, client):
+    async def test_raw_path_create_api_is_retired(self, client):
+        """客户端不得登记服务器 file_path；只能走受控 multipart 上传。"""
         resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
             "file_name": "test.pdf", "file_path": "/test", "file_type": "pdf", "file_size": 100,
         })
-        assert resp.status_code == 200
+        assert resp.status_code in (404, 405)
 
     @pytest.mark.asyncio
     async def test_upload_api_fallback_local(self, client, tmp_path, monkeypatch):
@@ -318,7 +331,7 @@ class TestAttachmentAPI:
         ref_id = uuid.uuid4()
         resp = await client.post(
             f"/api/projects/{FAKE_PROJECT_ID}/attachments/upload",
-            files={"file": ("reply.pdf", b"reply-content", "application/pdf")},
+            files={"file": ("reply.pdf", b"%PDF-1.4\nreply-content", "application/pdf")},
             data={
                 "attachment_type": "confirmation",
                 "reference_id": str(ref_id),
@@ -331,34 +344,28 @@ class TestAttachmentAPI:
         assert data["attachment_type"] == "confirmation"
 
     @pytest.mark.asyncio
-    async def test_list_api(self, client):
-        await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "a.pdf", "file_path": "/a", "file_type": "pdf", "file_size": 100,
-        })
+    async def test_list_api(self, client, db_session):
+        await _seed_api_attachment(db_session, file_name="a.pdf", file_path="/a", file_type="pdf")
         resp = await client.get(f"/api/projects/{FAKE_PROJECT_ID}/attachments")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_detail_api(self, client):
-        create_resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "b.pdf", "file_path": "/b", "file_type": "pdf", "file_size": 200,
-        })
-        aid = create_resp.json().get("data", create_resp.json())["id"]
+    async def test_detail_api(self, client, db_session):
+        created = await _seed_api_attachment(db_session, file_name="b.pdf", file_path="/b", file_type="pdf", file_size=200)
+        aid = created["id"]
         resp = await client.get(f"/api/attachments/{aid}")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_search_api(self, client):
-        await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "银行流水.xlsx", "file_path": "/bank", "file_type": "excel", "file_size": 500,
-        })
+    async def test_search_api(self, client, db_session):
+        await _seed_api_attachment(db_session, file_name="银行流水.xlsx", file_path="/bank", file_type="excel", file_size=500)
         resp = await client.get("/api/attachments/search", params={
             "project_id": str(FAKE_PROJECT_ID), "q": "银行",
         })
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_associate_api(self, client, seeded_db, monkeypatch):
+    async def test_associate_api(self, client, seeded_db, db_session, monkeypatch):
         """附件 associate API：本用例聚焦服务层关联写入；可见性门控在 SQLite 夹具下 mock。"""
         async def _allow(*_a, **_k):
             return object()
@@ -367,10 +374,14 @@ class TestAttachmentAPI:
             "app.routers.attachments.gate_attachment_associate",
             _allow,
         )
-        create_resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "evidence.pdf", "file_path": "/ev", "file_type": "pdf", "file_size": 100,
-        })
-        aid = create_resp.json().get("data", create_resp.json())["id"]
+        monkeypatch.setattr(
+            "app.routers.attachments.enforce_edit_lock_for_content_write",
+            _allow,
+        )
+        created = await _seed_api_attachment(
+            db_session, file_name="evidence.pdf", file_path="/ev", file_type="pdf",
+        )
+        aid = created["id"]
         resp = await client.post(f"/api/attachments/{aid}/associate", json={
             "wp_id": str(seeded_db["wp"].id), "association_type": "evidence",
         })
@@ -524,24 +535,22 @@ class TestConfirmationOCR:
 class TestClassifyAndOCRAPI:
 
     @pytest.mark.asyncio
-    async def test_classify_api(self, client):
-        create_resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "合同-客户C-2025.pdf", "file_path": "/c.pdf",
-            "file_type": "pdf", "file_size": 100,
-        })
-        aid = create_resp.json().get("data", create_resp.json())["id"]
+    async def test_classify_api(self, client, db_session):
+        created = await _seed_api_attachment(
+            db_session, file_name="合同-客户C-2025.pdf", file_path="/c.pdf", file_type="pdf",
+        )
+        aid = created["id"]
         resp = await client.post(f"/api/attachments/{aid}/classify")
         assert resp.status_code == 200
         data = resp.json().get("data", resp.json())
         assert data["document_type"] == "contract"
 
     @pytest.mark.asyncio
-    async def test_extract_confirmation_api(self, client):
-        create_resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
-            "file_name": "回函.pdf", "file_path": "/reply.pdf",
-            "file_type": "pdf", "file_size": 100,
-        })
-        aid = create_resp.json().get("data", create_resp.json())["id"]
+    async def test_extract_confirmation_api(self, client, db_session):
+        created = await _seed_api_attachment(
+            db_session, file_name="回函.pdf", file_path="/reply.pdf", file_type="pdf",
+        )
+        aid = created["id"]
         resp = await client.post(f"/api/attachments/{aid}/extract-confirmation")
         assert resp.status_code == 200
 

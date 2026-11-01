@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
+from app.core.db_pool_metrics import (
+    InstrumentedAsyncAdaptedQueuePool,
+    install_pool_metrics,
+)
 
 # 任务 14.1：根据数据库类型配置不同的连接池参数
 # - PostgreSQL 生产：pool_size=20 / max_overflow=80（总计 100 连接），recycle 30 分钟
@@ -37,10 +41,13 @@ if _is_postgres and settings.DB_USE_PGBOUNCER:
         echo=False,
     )
 elif _is_postgres:
+    _direct_pool_size = max(settings.DB_POOL_SIZE, 20)
+    _direct_max_overflow = max(settings.DB_MAX_OVERFLOW, 80)
     engine = create_async_engine(
         settings.DATABASE_URL,
-        pool_size=max(settings.DB_POOL_SIZE, 20),
-        max_overflow=max(settings.DB_MAX_OVERFLOW, 80),
+        poolclass=InstrumentedAsyncAdaptedQueuePool,
+        pool_size=_direct_pool_size,
+        max_overflow=_direct_max_overflow,
         pool_timeout=30,
         pool_pre_ping=True,
         pool_recycle=1800,  # 30 分钟，与 PG idle_in_transaction_session_timeout 协调
@@ -54,6 +61,28 @@ else:
         max_overflow=settings.DB_MAX_OVERFLOW,
         pool_pre_ping=True,
         pool_recycle=3600,
+    )
+
+if _is_postgres and settings.DB_USE_PGBOUNCER:
+    install_pool_metrics(
+        engine.sync_engine.pool,
+        mode="pgbouncer",
+        configured_size=None,
+        configured_overflow=None,
+    )
+elif _is_postgres:
+    install_pool_metrics(
+        engine.sync_engine.pool,
+        mode="direct",
+        configured_size=_direct_pool_size,
+        configured_overflow=_direct_max_overflow,
+    )
+else:
+    install_pool_metrics(
+        engine.sync_engine.pool,
+        mode="sqlite",
+        configured_size=settings.DB_POOL_SIZE,
+        configured_overflow=settings.DB_MAX_OVERFLOW,
     )
 
 async_session = async_sessionmaker(

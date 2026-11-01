@@ -96,6 +96,7 @@ describe('useEditorUniver — 核心返回值结构', () => {
     expect(isRef(result.loadErrorState)).toBe(true)
     expect(isRef(result.loadErrorMessage)).toBe(true)
     expect(isRef(result.dirty)).toBe(true)
+    expect(isRef(result.editRevision)).toBe(true)
     // 已删除的 xlsx 回写状态不得再暴露（否则调用方会以为回写还在）
     expect('loadedFromXlsx' in result).toBe(false)
     expect('fileOpenedAt' in result).toBe(false)
@@ -107,6 +108,7 @@ describe('useEditorUniver — 核心返回值结构', () => {
     expect(result.loadErrorState.value).toBe(null)
     expect(result.loadErrorMessage.value).toBe('')
     expect(result.dirty.value).toBe(false)
+    expect(result.editRevision.value).toBe(0)
 
     // 函数
     expect(typeof result.initUniver).toBe('function')
@@ -228,6 +230,19 @@ describe('useEditorUniver — 原生 sheet tab 事件', () => {
 
     expect(opts.sheetNavFacade.refresh).toHaveBeenCalledTimes(1)
     expect(result.dirty.value).toBe(false)
+    expect(result.editRevision.value).toBe(0)
+  })
+
+  it('dirty 已为 true 后的每条写命令仍推进单调 editRevision', async () => {
+    const result = useEditorUniver(makeOptions())
+    await result.initUniver()
+    const commandHandler = vi.mocked(result.univerAPI.value.onCommandExecuted).mock.calls[0][0]
+
+    commandHandler({ id: 'sheet.command.set-cell-value' })
+    commandHandler({ id: 'sheet.command.set-cell-value' })
+
+    expect(result.dirty.value).toBe(true)
+    expect(result.editRevision.value).toBe(2)
   })
 
   it('每一条 dirty 命令都通知编辑代际，即使 dirty 已经为 true', async () => {

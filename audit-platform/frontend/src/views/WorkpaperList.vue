@@ -123,6 +123,12 @@
     <ArchivedBanner />
     <ConsolLockedBanner />
 
+    <ExportProgressBar
+      v-if="batchExportTask"
+      :task-id="batchExportTask.task_id"
+      :total="batchExportTask.total"
+    />
+
     <!-- 批量状态变更操作栏 -->
     <BatchActionBar
       v-if="selectedWpIds.length > 0"
@@ -269,7 +275,7 @@ import {
   type ProgressInfo,
 } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
-import { listWorkpapers, getWpIndex, downloadWorkpaperPack, getWpMappingByAccount } from '@/services/workpaperApi'
+import { listWorkpapers, getWpIndex, startWorkpaperPackExport, getWpMappingByAccount, type WorkpaperPackExportTask } from '@/services/workpaperApi'
 import { listUsers } from '@/services/commonApi'
 import { UNASSIGNED_FILTER, readListEntryQuery } from './workpaper-list/workpaperListEntryQuery'
 import { api } from '@/services/apiProxy'
@@ -296,6 +302,7 @@ import WpBulkDialog from '@/components/workpaper/bulk-tab/WpBulkDialog.vue'
 import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
 import GenerationPlanDialog from '@/components/workpaper/generation/GenerationPlanDialog.vue'
 import GtCustomWpBatchDialog from '@/components/workpaper/custom/GtCustomWpBatchDialog.vue'
+import ExportProgressBar from '@/components/workpaper/ExportProgressBar.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -350,6 +357,7 @@ const showTemplateCopy = ref(false)
 const showCustomBatch = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
+const batchExportTask = ref<WorkpaperPackExportTask | null>(null)
 const formulaRefreshLoading = ref(false)
 const showGenerateDialog = ref(false)
 
@@ -684,9 +692,17 @@ function goProcedureTrim(cycle?: string) {
 }
 
 async function onBatchDownload() {
+  const wpIds = selectedWpIds.value.length > 0
+    ? [...selectedWpIds.value]
+    : wpList.value.map((workpaper) => workpaper.id).filter(Boolean)
+  if (wpIds.length === 0) {
+    ElMessage.warning('当前没有可下载的底稿')
+    return
+  }
   downloadLoading.value = true
   try {
-    await downloadWorkpaperPack(projectId.value, selectedWpIds.value.length > 0 ? selectedWpIds.value : undefined)
+    batchExportTask.value = await startWorkpaperPackExport(projectId.value, wpIds)
+    ElMessage.info(`已提交 ${batchExportTask.value.total} 份底稿，完成后可下载 ZIP`)
   } catch (e: any) {
     handleApiError(e, '批量下载')
   } finally {

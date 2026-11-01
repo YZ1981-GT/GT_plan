@@ -18,6 +18,9 @@ dist/
 .nuxt/
 .output/
 
+# Vite verified stable snapshots（候选验证成功后才切换 current.json）
+audit-platform/frontend/.verified-dist/
+
 # IDE
 .vscode/
 .idea/

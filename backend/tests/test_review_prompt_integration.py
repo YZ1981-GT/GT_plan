@@ -23,6 +23,7 @@ from app.main import app
 from app.models.base import Base, UserRole
 from app.models.core import Project, ProjectStatus, ProjectType, ProjectUser, User
 from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
+from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
 from tests._test_auth_helper import FakeAuthUser, override_auth
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -242,9 +243,13 @@ async def test_batch_review_response_structure(client):
             return_value=fake_sheets,
         ),
         patch(
-            "app.services.batch_review_service.chat_completion",
+            "app.services.batch_review_service.chat_completion_result",
             new_callable=AsyncMock,
-            return_value=MOCK_LLM_RESPONSE,
+            return_value=LLMInvocationResult(
+                status=LLMInvocationStatus.success,
+                text=MOCK_LLM_RESPONSE,
+                model_name="test-model",
+            ),
         ),
         patch(
             "app.services.batch_review_service.BatchReviewService._get_workpaper_content",

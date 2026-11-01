@@ -25,6 +25,15 @@ import {
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
+const PROGRESS_COUNTED = Symbol('gtProgressCounted')
+const SERIALIZED_BODY_FINGERPRINT = Symbol('gtSerializedBodyFingerprint')
+
+export type GtRequestConfig = AxiosRequestConfig & {
+  _background?: boolean
+  _dedupe?: boolean
+  _retrySafe?: boolean
+  _silent?: boolean
+}
 
 // ── Trace ID 存储（R7-S2-11）──────────────────────────────
 let _lastTraceId = ''
@@ -109,19 +118,51 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const DEDUPE_KEY = Symbol('gtDedupeKey')
 const DEDUPE_OWNER = Symbol('gtDedupeOwner')
 
+function hashRequestBody(text: string): string {
+  // 两路 32-bit FNV，完整扫描正文，避免「前 100 字符 + 长度」碰撞误杀不同写请求。
+  let first = 0x811c9dc5
+  let second = 0x9e3779b9
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index)
+    first = Math.imul(first ^ code, 0x01000193)
+    second = Math.imul(second ^ code, 0x85ebca6b)
+  }
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+}
+
+function isPlainJsonBody(value: unknown): value is Record<string, unknown> | unknown[] {
+  if (Array.isArray(value)) return true
+  if (!value || typeof value !== 'object') return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function sameTransforms(left: unknown, right: unknown): boolean {
+  const a = Array.isArray(left) ? left : left == null ? [] : [left]
+  const b = Array.isArray(right) ? right : right == null ? [] : [right]
+  return a.length === b.length && a.every((item, index) => item === b[index])
+}
+
+function prepareJsonBody(config: InternalAxiosRequestConfig): void {
+  if (!isPlainJsonBody(config.data)) return
+  if (!sameTransforms(config.transformRequest, http.defaults.transformRequest)) return
+  try {
+    const serialized = JSON.stringify(config.data)
+    ;(config as any)[SERIALIZED_BODY_FINGERPRINT] = `${hashRequestBody(serialized)}|len:${serialized.length}`
+    config.data = serialized
+    const headers = config.headers as any
+    if (typeof headers?.setContentType === 'function') headers.setContentType('application/json')
+    else if (typeof headers?.set === 'function') headers.set('Content-Type', 'application/json')
+    else headers['Content-Type'] = 'application/json'
+  } catch {
+    // 环引用或自定义序列化失败时保持 Axios 原路径，由它给出标准错误。
+  }
+}
+
 function getRequestKey(config: InternalAxiosRequestConfig): string {
   const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
-  // POST/PUT/PATCH 请求：对 body 做轻量 hash（取前100字符+总长度），避免大 body 时 JSON.stringify 性能差
-  if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
-    try {
-      const bodyStr = JSON.stringify(config.data)
-      const bodyHash = `${bodyStr.slice(0, 100)}|len:${bodyStr.length}`
-      return `${base}:${bodyHash}`
-    } catch {
-      return base
-    }
-  }
-  return base
+  const fingerprint = (config as any)[SERIALIZED_BODY_FINGERPRINT] as string | undefined
+  return fingerprint ? `${base}:${fingerprint}` : base
 }
 
 function addPending(config: InternalAxiosRequestConfig) {
@@ -264,12 +305,36 @@ export function needsClientInstance(method: string, url: string | undefined): bo
 
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = (config.method || 'get').toUpperCase()
+  // 正文序列化与同写防重必须在任何异步窗口认领之前完成。否则两个同体写请求会因
+  // claimClientInstanceId 的完成顺序倒置，后调用者反而占到闸门。
+  prepareJsonBody(config)
+  addPending(config)
   if (needsClientInstance(method, config.url) && !isClientInstanceSettled()) {
     // 窗口编号定下来之前不发：复制出来的标签页认领时可能换号（workpaper-multi-window-lock-gaps R5.4）
-    return claimClientInstanceId().then(() => prepareRequest(config, method))
+    return claimClientInstanceId()
+      .then(() => prepareRequest(config, method))
+      .catch((error) => {
+        removePending(config)
+        throw error
+      })
   }
   return prepareRequest(config, method)
 })
+
+function beginProgress(config: InternalAxiosRequestConfig): void {
+  if ((config as any)._background === true) return
+  ;(config as any)[PROGRESS_COUNTED] = true
+  activeRequests += 1
+  if (activeRequests === 1) NProgress.start()
+  else NProgress.inc()
+}
+
+function endProgress(config?: InternalAxiosRequestConfig): void {
+  if (!config || !(config as any)[PROGRESS_COUNTED]) return
+  delete (config as any)[PROGRESS_COUNTED]
+  activeRequests = Math.max(0, activeRequests - 1)
+  if (activeRequests === 0) NProgress.done()
+}
 
 function prepareRequest(config: InternalAxiosRequestConfig, method: string): InternalAxiosRequestConfig {
   const authStore = useAuthStore()
@@ -280,16 +345,9 @@ function prepareRequest(config: InternalAxiosRequestConfig, method: string): Int
   if (needsClientInstance(method, config.url)) {
     config.headers['X-Client-Instance'] = getClientInstanceId()
   }
-  addPending(config)
   // 写请求发出：此前在飞的 GET 不再给之后的请求共用（结束时再推一次，见 getSingleFlight 新鲜度屏障）
   if (method !== 'GET') advanceGetShareBarrier()
-  // NProgress：首个请求启动进度条，后续请求递增
-  activeRequests++
-  if (activeRequests === 1) {
-    NProgress.start()
-  } else {
-    NProgress.inc()
-  }
+  beginProgress(config)
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
@@ -323,6 +381,33 @@ function _hideRetryToast() {
   }
 }
 
+const RETRYABLE_5XX = new Set([500, 502, 503])
+
+function headerValue(headers: unknown, name: string): unknown {
+  if (!headers || typeof headers !== 'object') return undefined
+  const value = headers as any
+  if (typeof value.get === 'function') {
+    const found = value.get(name)
+    if (found != null) return found
+  }
+  const wanted = name.toLowerCase()
+  const key = Object.keys(value).find((item) => item.toLowerCase() === wanted)
+  return key ? value[key] : undefined
+}
+
+/** 5xx 自动重试只允许幂等读，或带服务端幂等键/显式安全声明的写请求。 */
+export function shouldRetry5xx(
+  config: (AxiosRequestConfig & { _retrySafe?: boolean }) | undefined,
+  status: number | undefined,
+): boolean {
+  if (!config || status == null || !RETRYABLE_5XX.has(status)) return false
+  const method = String(config.method || 'get').toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true
+  if ((config as any)._retrySafe === true) return true
+  const idempotencyKey = headerValue(config.headers, 'Idempotency-Key')
+  return typeof idempotencyKey === 'string' && idempotencyKey.trim().length > 0
+}
+
 // ── 响应拦截器 ──────────────────────────────────────────
 http.interceptors.response.use(
   (response: AxiosResponse) => {
@@ -337,9 +422,8 @@ http.interceptors.response.use(
     }
     // R10 Spec C: 5xx 环形缓冲区记录响应
     _trackResponse(response.status)
-    // NProgress：所有请求完成后结束进度条
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
+    // NProgress：只结束本请求在发送时实际登记的前台进度。
+    endProgress(response.config as InternalAxiosRequestConfig)
     // 记录请求日志
     const startTime = (response.config as any)._startTime
     if (startTime) {
@@ -373,9 +457,8 @@ http.interceptors.response.use(
     _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // R10 Spec C: 5xx 环形缓冲区记录错误响应
     _trackResponse(error.response?.status ?? 0)
-    // NProgress：错误时也递减计数
-    activeRequests = Math.max(0, activeRequests - 1)
-    if (activeRequests === 0) NProgress.done()
+    // NProgress：background 请求未登记，不得减少其他前台请求的计数。
+    endProgress(error.config as InternalAxiosRequestConfig | undefined)
 
     // 记录错误请求日志
     if (error.config) {
@@ -428,6 +511,7 @@ http.interceptors.response.use(
         return new Promise((resolve, reject) => {
           refreshQueue.push({
             resolve: (token: string) => {
+              originalRequest._retry = true
               originalRequest.headers = originalRequest.headers ?? {}
               originalRequest.headers.Authorization = `Bearer ${token}`
               resolve(http(originalRequest))
@@ -503,8 +587,8 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 500/502/503 自动重试（最多 2 次）+ loading 提示
-    if (status && status >= 500 && originalRequest && (originalRequest._retryCount ?? 0) < 2) {
+    // 500/502/503 自动重试（最多 2 次）。写请求必须携带服务端幂等键或显式声明安全。
+    if (shouldRetry5xx(originalRequest, status) && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
       _showRetryToast(originalRequest._retryCount)
       try {

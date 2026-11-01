@@ -56,6 +56,29 @@ class AIDeployment(str, enum.Enum):
     server = "server"
 
 
+class AITrustZone(str, enum.Enum):
+    """模型数据处理信任域（V236）；与部署位置是两个正交维度。"""
+    local_device = "local_device"
+    firm_private = "firm_private"
+    approved_provider = "approved_provider"
+    restricted = "restricted"
+
+
+class AIMaskPolicy(str, enum.Enum):
+    """发往该模型前要求的最低脱敏策略。"""
+    none = "none"
+    role_based = "role_based"
+    strict = "strict"
+
+
+def default_trust_zone(*, deployment: str, preset_key: str | None = None) -> str:
+    if deployment == AIDeployment.local.value:
+        return AITrustZone.local_device.value
+    if preset_key:
+        return AITrustZone.firm_private.value
+    return AITrustZone.restricted.value
+
+
 def endpoint_is_loopback(endpoint: str | None) -> bool:
     """端点主机字面量是否为本机环回（localhost / 127.0.0.0/8 / ::1）。
 

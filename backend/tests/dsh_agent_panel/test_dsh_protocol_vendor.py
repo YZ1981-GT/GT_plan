@@ -319,3 +319,21 @@ def test_session_dir_and_home_layout(tmp_path: Path) -> None:
     env = D._build_dsh_env(cordis_config="c.json", session_dir=str(tmp_path), llm_token="t")
     for key in ("DSH_HOME", "DSH_CWD", "DSH_SESSION_ROOT", "TEMP", "TMP"):
         assert Path(env[key]).is_relative_to(tmp_path), (key, env[key])
+
+
+@pytest.mark.asyncio
+async def test_dsh_prompt_consumes_shared_context_plan_project_attachment(tmp_path: Path) -> None:
+    """项目附件进入统一 ContextPlan 后必须出现在 DSH 实际 session/prompt 中。"""
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    sentinel = "项目附件唯一哨兵：收入截止测试"
+    request = _request("分析附件")
+    plan = SimpleNamespace(agent_prompt=lambda query: f"【项目附件】\n{sentinel}\n【用户问题】\n{query}")
+    request = replace(request, context_plan=plan)
+    harness = _Harness(tmp_path, "ok")
+    await _run(harness, request)
+
+    prompt = harness.requests()[1]["params"]["contentBlocks"][0]["text"]
+    assert sentinel in prompt
+    assert prompt.endswith("【用户问题】\n分析附件")

@@ -21,7 +21,7 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -86,6 +86,21 @@ class VoucherReuseRequest(BaseModel):
 class ContractReuseRequest(BaseModel):
     contract_key: str
     attachment_id: UUID
+    sheet_name: str | None = None
+    cell_ref: str | None = None
+    page_ref: str | None = None
+
+
+class ContractQueryRequest(BaseModel):
+    keys: list[str] = Field(default_factory=list, max_length=500)
+
+
+class ContractLinkRequest(BaseModel):
+    attachment_id: UUID
+    contract_key: str
+    sheet_name: str | None = None
+    cell_ref: str | None = None
+    page_ref: str | None = None
 
 
 async def _writable_wp(db: AsyncSession, project_id: UUID, wp_id: UUID, user: User):
@@ -241,6 +256,52 @@ async def reuse_voucher_evidence_endpoint(
     return {"link": link, "existed": existed}
 
 
+@router.post("/contract-query")
+async def query_contract_evidence_endpoint(
+    project_id: UUID,
+    wp_id: UUID,
+    body: ContractQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """批量查询本项目可见底稿上的合同证据；目标底稿须属于路径项目。"""
+    from app.services.contract_evidence import contract_evidence_by_keys
+
+    await load_workpaper(db, wp_id, project_id=project_id)
+    evidence = await contract_evidence_by_keys(db, current_user, project_id, body.keys)
+    return {"evidence": evidence}
+
+
+@router.put("/contract-link")
+async def bind_contract_evidence_endpoint(
+    project_id: UUID,
+    wp_id: UUID,
+    body: ContractLinkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """给本底稿既有附件的位置链接绑定或改绑合同身份；重复请求幂等。"""
+    wp = await _writable_wp(db, project_id, wp_id, current_user)
+    position = build_position(
+        body.sheet_name, body.cell_ref, body.page_ref, contract_key=body.contract_key,
+    )
+    if position.contract_key is None:
+        raise HTTPException(status_code=400, detail="缺少合同键")
+    svc = WpEvidenceService(db)
+    await svc.assert_attachments_in_wp(wp, [body.attachment_id])
+    link, existed = await svc.bind_contract_identity(
+        wp_id=wp.id,
+        attachment_id=body.attachment_id,
+        created_by=current_user.id,
+        contract_key=position.contract_key,
+        sheet_name=position.sheet_name,
+        cell_ref=position.cell_ref,
+        page_ref=position.page_ref,
+    )
+    await db.commit()
+    return {"link": link, "existed": existed}
+
+
 @router.post("/contract-reuse")
 async def reuse_contract_evidence_endpoint(
     project_id: UUID,
@@ -254,7 +315,10 @@ async def reuse_contract_evidence_endpoint(
     from app.services.contract_evidence import reuse_contract_evidence
 
     wp = await _writable_wp(db, project_id, wp_id, current_user)
-    link, existed = await reuse_contract_evidence(db, current_user, wp, body.contract_key, body.attachment_id)
+    link, existed = await reuse_contract_evidence(
+        db, current_user, wp, body.contract_key, body.attachment_id,
+        sheet_name=body.sheet_name, cell_ref=body.cell_ref, page_ref=body.page_ref,
+    )
     await db.commit()
     return {"link": link, "existed": existed}
 

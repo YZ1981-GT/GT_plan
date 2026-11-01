@@ -346,6 +346,7 @@
       :confirmation-id="attachmentDrawerCid"
       :project-id="projectId"
       :counterparty-name="attachmentDrawerName"
+      :readonly="confirmationReadonly"
       @updated="onAttachmentUpdated"
     />
   </div>
@@ -363,6 +364,7 @@ import { confirmDelete } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { parseServerTime } from '@/utils/formatters'
 import { useProjectStore } from '@/stores/project'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import ConfirmationAttachmentDrawer from '@/components/workpaper/confirmation/ConfirmationAttachmentDrawer.vue'
 import {
@@ -395,7 +397,11 @@ interface ConfirmationItem {
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const { canDo } = usePermissionMatrix()
 const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
+const confirmationReadonly = computed(() =>
+  projectStore.projectStatus === 'archived' || !canDo('edit', 'workpaper'),
+)
 
 const loading = ref(false)
 const confirmations = ref<ConfirmationItem[]>([])

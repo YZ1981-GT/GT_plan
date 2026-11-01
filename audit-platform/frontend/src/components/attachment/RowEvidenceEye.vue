@@ -40,6 +40,16 @@
       </ul>
     </el-popover>
   </span>
+  <el-button
+    v-else-if="store.error.value"
+    class="gt-row-eye__error"
+    link
+    type="danger"
+    size="small"
+    aria-label="本行证据加载失败，点此重试"
+    title="本行证据加载失败，点此重试"
+    @click.stop="store.reload"
+  >!</el-button>
 </template>
 
 <script setup lang="ts">
@@ -77,6 +87,11 @@ const rows = computed(() => (props.sheetKey ? store.linksAt(props.sheetKey, prop
   align-items: center;
   vertical-align: middle;
   margin-left: 2px;
+}
+.el-button.gt-row-eye__error {
+  padding: 0 2px;
+  min-height: auto;
+  font-weight: 700;
 }
 .el-button.gt-row-eye__multi {
   padding: 0 2px;

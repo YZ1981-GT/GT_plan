@@ -364,6 +364,7 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
     from app.services.gate_rules_cross_check import register_cross_check_rules
     from app.services.gate_rules_chain import register_consistency_gate_rule
     import app.services.gate_rules_round6  # noqa: F401
+    import app.services.gate_rules_evidence  # noqa: F401
     import app.services.gate_rules_b60  # noqa: F401
     import app.services.gate_rules_ai_content  # noqa: F401
     import app.services.gate_rules_cross_module_conflict  # noqa: F401
@@ -773,6 +774,7 @@ def _start_import_job_runner(ctx: StartupContext) -> None:
 #: 或用 ``@with_leader_lock``（``app.workers._leader_lock``）。
 _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("sla_worker", "app.workers.sla_worker"),
+    ("event_loop_lag_worker", "app.workers.event_loop_lag_worker"),
     ("import_recover_worker", "app.workers.import_recover_worker"),
     ("outbox_replay_worker", "app.workers.outbox_replay_worker"),
     ("audit_log_writer_worker", "app.workers.audit_log_writer_worker"),
@@ -789,14 +791,19 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("invalidation_dispatcher_worker", "app.workers.invalidation_dispatcher_worker"),
     # 知识库扫描件后台 OCR（dsh-kb-ocr-local-first-routing；受 KNOWLEDGE_OCR_WORKER_ENABLED 控制）。
     ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
+    # 耐久 AI 批任务（附注预填 / 底稿复核）：DB 租约围栏、重启自动接管。
+    ("ai_task_worker", "app.workers.ai_task_worker"),
+    # 平台通用重任务：DB claim/lease/attempt fence，首个迁移对象为 bulk-tab import。
+    ("platform_job_worker", "app.workers.platform_job_worker"),
     # OO→HTML apply 中断后的重驱（writeback-followup-issue-closure R3.2；选主，一轮一条）。
     ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
 )
 
-# Stable worker names (13 always-on + 1 conditional ImportJobRunner) — pinned contract,
+# Stable worker names (15 always-on + 1 conditional ImportJobRunner) — pinned contract,
 # tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
 WORKER_TASK_NAMES: tuple[str, ...] = (
     "sla_worker",
+    "event_loop_lag_worker",
     "import_recover_worker",
     "outbox_replay_worker",
     "audit_log_writer_worker",
@@ -808,6 +815,8 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "procedure_dispatcher_worker",
     "invalidation_dispatcher_worker",
     "knowledge_ocr_worker",
+    "ai_task_worker",
+    "platform_job_worker",
     "oo_apply_redrive_worker",
     "ImportJobRunner.run_forever",
 )

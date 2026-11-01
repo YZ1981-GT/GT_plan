@@ -103,7 +103,7 @@ async def test_orphan_files_category(world):
     ]
 
 
-async def test_report_blocks_only_on_missing_files_among_new(world, tmp_path, monkeypatch):
+async def test_report_blocks_on_declared_evidence_gaps_and_missing_files(world, tmp_path, monkeypatch):
     from app.services import archive_completeness_service as acs
 
     async def empty(db, project_id):
@@ -112,13 +112,13 @@ async def test_report_blocks_only_on_missing_files_among_new(world, tmp_path, mo
     for name in ("_check_missing", "_check_unsigned", "_check_unresolved_reviews", "_check_stale",
                  "_check_sampling_records"):
         monkeypatch.setattr(acs, name, empty)
-    f3 = await add_wp(world, world.target, wp_code="F3-5")  # 证据缺口：提示，不阻断
+    f3 = await add_wp(world, world.target, wp_code="F3-5")  # 已声明证据缺口：正式归档 fail-closed
     f3.file_path = ""  # 未生成文件 ≠ 缺件
     await world.db.flush()
     report = await acs.get_archive_completeness_report(world.db, world.target.id)
     cats = {c.category: c for c in report.categories}
-    assert cats["evidence_gaps"].count == 1 and not cats["evidence_gaps"].is_blocking
-    assert report.can_proceed is True
+    assert cats["evidence_gaps"].count == 1 and cats["evidence_gaps"].is_blocking
+    assert report.can_proceed is False
     gone = await add_wp(world, world.target, wp_code="E1-1")
     gone.file_path = str(tmp_path / "gone.xlsx")
     await world.db.flush()

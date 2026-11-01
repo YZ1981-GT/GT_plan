@@ -250,3 +250,65 @@ async def test_llm_metrics_endpoint_empty(mock_admin_user, reset_llm_metrics):
         assert data["recent_calls"] == []
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_task_and_human_observability_uses_low_cardinality_fields():
+    collector = LLMMetricsCollector()
+    collector.record_call(
+        duration_ms=1200,
+        tokens_used=100,
+        success=True,
+        model="served-model",
+        task_code="note.change_analysis",
+        deployment="server",
+        fallback_used=True,
+        verifier_status="passed",
+        ttft_ms=200,
+        tokens_per_second=25.0,
+    )
+    collector.record_human_action("revised")
+    metrics = collector.get_metrics()
+    row = metrics["recent_calls"][0]
+    assert row["task_code"] == "note.change_analysis"
+    assert row["deployment"] == "server"
+    assert row["fallback_used"] is True
+    assert row["verifier_status"] == "passed"
+    assert row["ttft_ms"] == 200
+    assert row["tokens_per_second"] == 25.0
+    assert metrics["human_actions"]["revised"] == 1
+
+
+def test_prometheus_metrics_cover_task_timing_verifier_and_human_action():
+    from app.services.ai_chat import metrics as ai_metrics
+    from app.services.ai_chat.metrics import (
+        observe_model_timing,
+        record_ai_task_metric,
+        record_human_action_metric,
+        render_ai_chat_metrics,
+    )
+    if not ai_metrics._PROMETHEUS_AVAILABLE:
+        pytest.skip("prometheus_client 未安装")
+
+    record_ai_task_metric(
+        task_code="note.change_analysis", status="success", deployment="server",
+        fallback_used=True, verifier_status="passed", latency_ms=1200,
+        prompt_tokens=20, completion_tokens=10,
+    )
+    observe_model_timing(
+        "native", deployment="server", fallback_used=True,
+        ttft_seconds=0.2, tokens_per_second=25.0,
+    )
+    record_human_action_metric("confirmed")
+    body, _content_type = render_ai_chat_metrics()
+    text = body.decode("utf-8")
+    for metric in (
+        "ai_task_invocations_total",
+        "ai_task_latency_seconds",
+        "ai_task_tokens_total",
+        "ai_chat_model_ttft_seconds",
+        "ai_chat_model_output_tokens_per_second",
+        "ai_human_actions_total",
+    ):
+        assert metric in text
+    assert "note.change_analysis" in text
+    assert "server" in text

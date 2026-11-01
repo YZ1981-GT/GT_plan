@@ -40,6 +40,7 @@ EventType = Literal[
     "archive_unarchive",
     "delete_with_confirm",
     "ai_content_lifecycle",
+    "ai_model_config_changed",
     "cross_module_conflict_resolved",
     "time_machine_restore",
     "consol_lifecycle",
@@ -75,6 +76,7 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "archive_unarchive": {"reason", "previous_status"},
     "delete_with_confirm": {"object_type", "object_name", "soft_or_hard", "recoverable"},
     "ai_content_lifecycle": {"ai_content_log_id", "action"},
+    "ai_model_config_changed": {"action", "model_id", "before", "after", "credential_changed"},
     "cross_module_conflict_resolved": {
         "conflict_id",
         "resolution",

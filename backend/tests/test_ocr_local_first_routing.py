@@ -42,6 +42,7 @@ def _remote_ocr_candidate(name="paddleocrv6", capability="ocr", deployment="serv
         api_path="/ocr" if capability == "ocr" else "/layout-parsing",
         auth_scheme="none", auth_header_name=None, api_key=None,
         timeout_seconds=60, deployment=deployment,
+        trust_zone="firm_private", client_data_allowed=True, mask_policy="strict",
     )
     return OCRRouteCandidate(capability, deployment, name, config.model_id, config)
 

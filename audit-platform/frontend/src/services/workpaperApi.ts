@@ -438,6 +438,32 @@ export async function downloadWorkpaper(projectId: string, wpId: string) {
   return downloadFile(P_wp.download(projectId, wpId))
 }
 
+export interface WorkpaperPackExportTask {
+  task_id: string
+  total: number
+  status: 'pending' | 'running' | 'complete' | 'failed'
+}
+
+export interface WorkpaperPackExportStatus extends WorkpaperPackExportTask {
+  done: number
+  percent: number
+  error?: string | null
+  download_url?: string | null
+}
+
+/** 提交异步 ZIP 任务；压缩和文件读取在后端线程中完成。 */
+export async function startWorkpaperPackExport(projectId: string, wpIds: string[]): Promise<WorkpaperPackExportTask> {
+  return apiProxy.post(`/api/projects/${projectId}/working-papers/batch-export-async`, { wp_ids: wpIds })
+}
+
+/** SSE 丢失或重连时的权威状态恢复入口。 */
+export async function getWorkpaperPackExportStatus(taskId: string): Promise<WorkpaperPackExportStatus> {
+  return apiProxy.get(`/api/exports/${taskId}/status`, {
+    _background: true,
+    _silent: true,
+  } as any)
+}
+
 export async function downloadWorkpaperPack(projectId: string, wpIds?: string[], includePrefill: boolean = true) {
   return downloadFile(P_wp.downloadPack(projectId), {
     method: 'post',

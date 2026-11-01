@@ -21,6 +21,13 @@
         </el-tag>
       </template>
     </el-table-column>
+    <el-table-column label="信任域" prop="trust_zone" width="130" align="center">
+      <template #default="{ row }">
+        <el-tag :type="row.client_data_allowed ? 'success' : 'warning'" size="small" effect="plain">
+          {{ trustZoneLabel(row.trust_zone) }}
+        </el-tag>
+      </template>
+    </el-table-column>
     <el-table-column label="API Key" width="105" align="center">
       <template #default="{ row }">
         <el-tag v-if="row.has_api_key" type="success" size="small">已配置</el-tag>
@@ -60,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AIDeployment, AIModel, AIProvider } from '@/services/aiModelApi'
+import type { AIDeployment, AIModel, AIProvider, AITrustZone } from '@/services/aiModelApi'
 import { DEPLOYMENT_LABELS, activeTagText } from './modelRouteView'
 
 const props = withDefaults(defineProps<{
@@ -77,6 +84,15 @@ function providerLabel(p: AIProvider): string {
 
 function deploymentLabel(d: AIDeployment | null | undefined): string {
   return d ? DEPLOYMENT_LABELS[d] ?? '-' : '-'
+}
+
+function trustZoneLabel(zone: AITrustZone | null | undefined): string {
+  return ({
+    local_device: '本机设备',
+    firm_private: '事务所私有',
+    approved_provider: '经批准外部',
+    restricted: '受限',
+  } as Record<AITrustZone, string>)[zone || 'restricted']
 }
 
 const emit = defineEmits<{

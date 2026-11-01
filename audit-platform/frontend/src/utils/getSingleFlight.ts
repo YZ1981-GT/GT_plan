@@ -15,7 +15,11 @@ import { CanceledError, type AxiosRequestConfig, type InternalAxiosRequestConfig
 import { onRequestIdentityEpochChange, requestIdentityEpoch } from '@/services/requestIdentityEpoch'
 import { clonePlain } from '@/utils/cloneable'
 
-export type SharedGetConfig = AxiosRequestConfig & { _silent?: boolean; _dedupe?: boolean }
+export type SharedGetConfig = AxiosRequestConfig & {
+  _background?: boolean
+  _silent?: boolean
+  _dedupe?: boolean
+}
 
 export interface Flight<T> {
   epoch: number
@@ -35,7 +39,7 @@ export interface SharePlan {
 
 type Canonical = null | boolean | number | string | Canonical[] | { [key: string]: Canonical }
 const NOT_CANONICAL = Symbol('not-canonical')
-const SAFE_CONFIG_KEYS = new Set(['params', 'responseType', '_silent', '_dedupe', 'signal'])
+const SAFE_CONFIG_KEYS = new Set(['params', 'responseType', '_background', '_silent', '_dedupe', 'signal'])
 const SAFE_RESPONSE_TYPES = new Set(['json', 'text', 'arraybuffer', 'blob', 'document'])
 
 let shareBarrier = 0
@@ -112,6 +116,7 @@ export function planSharedGet(url: string, config?: SharedGetConfig): SharePlan 
   if (!Object.keys(raw).every((key) => SAFE_CONFIG_KEYS.has(key))) return null
   if (raw._dedupe === false || (raw._dedupe !== undefined && raw._dedupe !== true)) return null
   if (raw._silent !== undefined && typeof raw._silent !== 'boolean') return null
+  if (raw._background !== undefined && typeof raw._background !== 'boolean') return null
   const responseType = raw.responseType ?? 'json'
   if (typeof responseType !== 'string' || !SAFE_RESPONSE_TYPES.has(responseType)) return null
   const signal = asAbortSignal(raw.signal)
@@ -121,7 +126,15 @@ export function planSharedGet(url: string, config?: SharedGetConfig): SharePlan 
   const epoch = requestIdentityEpoch()
   const { signal: _callerSignal, ...transport } = raw
   return {
-    key: JSON.stringify(['v1', epoch, url, responseType, Boolean(raw._silent), params]),
+    key: JSON.stringify([
+      'v1',
+      epoch,
+      url,
+      responseType,
+      Boolean(raw._silent),
+      Boolean(raw._background),
+      params,
+    ]),
     epoch,
     signal,
     transport: transport as SharedGetConfig,
@@ -138,7 +151,16 @@ export function canceledError(config?: AxiosRequestConfig): CanceledError<unknow
 /** 后加入者拿到的数据拷贝：普通对象 / 数组深拷贝，ArrayBuffer 复制，Blob / 字符串等不可变值原样共用。 */
 export function copySharedData<T>(value: T): T {
   if (value instanceof ArrayBuffer) return value.slice(0) as unknown as T
-  if (Array.isArray(value) || isPlainRecord(value)) return clonePlain(value)
+  if (Array.isArray(value) || isPlainRecord(value)) {
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(value)
+      } catch {
+        // Vue Proxy / 不可克隆宿主值回退到现有净化路径。
+      }
+    }
+    return clonePlain(value)
+  }
   return value
 }
 

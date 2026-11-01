@@ -142,6 +142,11 @@ def _uuids(raw_ids: Iterable[str], *, status: int, detail: str) -> set[uuid.UUID
 async def _json_body(request: Request) -> dict[str, Any] | None:
     if (request.method or "").upper() in _READ_METHODS:
         return None
+    # multipart/form-data 的文件流可能已被 FastAPI 参数解析器消费；本门对其中对象身份
+    # 只依赖 path params，不能再次 request.body()。JSON 端点才读取缓存正文做跨对象归属校验。
+    content_type = request.headers.get("content-type", "").lower()
+    if "application/json" not in content_type:
+        return None
     raw = await request.body()
     if not raw:
         return None

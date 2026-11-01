@@ -18,6 +18,7 @@ from app.middleware.audit_log import (
     _extract_object_id,
     _extract_object_type,
     _extract_user_id_from_token,
+    _redact_if_display_prefs,
 )
 
 
@@ -305,3 +306,21 @@ async def test_captures_user_id_from_token(client):
         assert resp.status_code == 200
         call_kwargs = mock_log.call_args.kwargs
         assert call_kwargs["user_id"] == uuid.UUID(uid)
+
+
+def test_display_preferences_audit_redacts_values() -> None:
+    request = MagicMock()
+    request.state.audit_changed_fields = ["font_size", "fixed_columns", "font_size"]
+    payload = {
+        "code": 200,
+        "data": {
+            "revision": 7,
+            "font_size": "lg",
+            "amount_unit_override": "wan",
+            "fixed_columns": {"trial-balance": ["account_code"]},
+        },
+    }
+    assert _redact_if_display_prefs(
+        "PATCH", "/api/users/me/display-preferences", payload, request,
+    ) == {"revision": 7, "changed_fields": ["fixed_columns", "font_size"]}
+    assert _redact_if_display_prefs("POST", "/api/users", payload, request) is payload

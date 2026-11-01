@@ -2471,7 +2471,7 @@ def test_sequencer_seed_only_moves_forward():
 def test_capabilities_snapshot_is_available_for_execution_context():
     """执行上下文携带 capability 快照（engine 与审计都从这里读，不各自假设）。"""
     assert "capabilities" in RunExecution.__dataclass_fields__
-    assert capabilities_for(ChatEngineName.native).local_only is True
+    assert capabilities_for(ChatEngineName.native).local_only is False
 
 
 # ===========================================================================

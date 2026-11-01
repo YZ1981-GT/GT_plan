@@ -19,6 +19,8 @@ import {
   EVIDENCE_TYPE_LABEL,
   EVIDENCE_TYPE_OPTIONS,
   associateCandidates,
+  contractKeyLabel,
+  contractKeyString,
   evidencePositionLabel,
   itemCellRef,
   uploadWorkpaperEvidence,
@@ -89,6 +91,11 @@ describe('位置键与标签', () => {
     expect(evidencePositionLabel({ voucher_key: VK, sheet_name: 'D2-4', cell_ref: 'row:r-1' })).toBe('凭证 2025-01-07 FY-0003 · D2-4 · 行内证据')
     expect(evidencePositionLabel({ voucher_key: VK })).toBe('凭证 2025-01-07 FY-0003')
     expect(evidencePositionLabel({ voucher_key: '不是凭证键', sheet_name: 'D2-4' })).toBe('D2-4')
+    const CK = contractKeyString(' HT-001 ', ' 甲方 ')
+    expect(CK).toBe('["HT-001","甲方"]')
+    expect(contractKeyLabel(CK)).toBe('HT-001 / 甲方')
+    expect(evidencePositionLabel({ contract_key: CK, sheet_name: 'D4-12' })).toBe('合同 HT-001 / 甲方 · D4-12')
+    expect(contractKeyString(' ', '甲方')).toBeNull()
   })
 
   it('voucherKeyLabel：五段键 ⇒「日期 字-号」，凭证字为空只写号；解析不了返回空串', () => {
@@ -146,6 +153,18 @@ describe('uploadWorkpaperEvidence', () => {
     const form = mockPost.mock.calls[0][1] as FormData
     expect([form.get('voucher_key'), form.get('evidence_type'), form.has('sheet_name'), form.has('cell_ref')])
       .toEqual([VK, 'voucher', false, false])
+  })
+
+  it('合同证据上传带 contract_key 与稳定行位置', async () => {
+    mockPost.mockResolvedValueOnce({ data: { attachment: { id: 'a4' }, evidence_link: { id: 'l4' } } })
+    const key = contractKeyString('HT-001', '甲方')
+    await uploadWorkpaperEvidence({
+      projectId: 'p1', wpId: 'w1', file: new File(['x'], 'c.pdf'), evidenceType: 'contract',
+      sheetName: 'D4-12', cellRef: 'row:c-1', contractKey: key,
+    })
+    const form = mockPost.mock.calls[0][1] as FormData
+    expect([form.get('contract_key'), form.get('sheet_name'), form.get('cell_ref')])
+      .toEqual([key, 'D4-12', 'row:c-1'])
   })
 
   it('回执没有附件编号时报错（不让调用方拿空 id 继续识别）', async () => {

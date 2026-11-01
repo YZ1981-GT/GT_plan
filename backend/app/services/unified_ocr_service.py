@@ -110,6 +110,7 @@ class UnifiedOCRService:
         )
         from app.services.remote_ocr_runtime import (
             RemoteOCRRuntimeError,
+            filter_ocr_route_for_client_data,
             recognize_remote_file,
             resolve_ocr_route,
         )
@@ -117,6 +118,7 @@ class UnifiedOCRService:
         capability = "layout_parsing" if mode == OCREngine.LAYOUT_PARSING else "ocr"
         try:
             route = await resolve_ocr_route(capability)
+            route = filter_ocr_route_for_client_data(route)
         except RemoteOCRRuntimeError as exc:
             raise OCRServiceUnavailableError(str(exc)) from exc
         if not route:

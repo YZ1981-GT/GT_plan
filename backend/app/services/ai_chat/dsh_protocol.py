@@ -157,13 +157,15 @@ async def execute_agent_run(
     """
     session_id = session_id_for(request)
     ctx.session_tree = {session_id}
+    plan = getattr(request, "context_plan", None)
+    prompt_text = plan.agent_prompt(request.query) if plan is not None else request.query
     await _send(ctx, {
         "jsonrpc": "2.0",
         "id": _PROMPT_ID,
         "method": "session/prompt",
         "params": {
             "sessionId": session_id,
-            "contentBlocks": [{"type": "text", "text": request.query}],
+            "contentBlocks": [{"type": "text", "text": prompt_text}],
         },
     })
     run_timeout = _dsh_run_timeout()

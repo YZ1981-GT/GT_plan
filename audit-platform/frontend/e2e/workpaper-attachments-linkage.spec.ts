@@ -154,14 +154,15 @@ test.describe('底稿关联附件抽屉 — Wave 7', () => {
     const stamp = Date.now()
     const fileName = `e2e-wp-link-${stamp}.pdf`
 
-    // create
-    const createResp = await request.post(`/api/projects/${PROJECT_ID}/attachments`, {
+    // 受控 multipart 上传；公开 raw file_path 建档端点已退役。
+    const createResp = await request.post(`/api/projects/${PROJECT_ID}/attachments/upload`, {
       headers: auth,
-      data: {
-        file_name: fileName,
-        file_path: `/tmp/${fileName}`,
-        file_type: 'pdf',
-        file_size: 128,
+      multipart: {
+        file: {
+          name: fileName,
+          mimeType: 'application/pdf',
+          buffer: Buffer.from('%PDF-1.4\n% attachment linkage e2e\n'),
+        },
         attachment_type: 'general',
       },
     })
@@ -178,6 +179,7 @@ test.describe('底稿关联附件抽屉 — Wave 7', () => {
         headers: auth,
       }).catch(() => {})
       await request.delete(`/api/attachments/${attId}`, { headers: auth }).catch(() => {})
+      await request.delete(`/api/recycle-bin/attachment/${attId}`, { headers: auth }).catch(() => {})
     }
 
     try {

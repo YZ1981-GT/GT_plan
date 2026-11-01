@@ -221,7 +221,7 @@
 
     <!-- 步骤三：执行中 / 报告 -->
     <div v-else-if="step === 'executing'" class="bulk-executing-step">
-      <div v-if="loading" class="bulk-loading">
+      <div v-if="loading || asyncImportRunning" class="bulk-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>正在{{ actionLabel }}，请稍候...</p>
         <el-progress
@@ -235,6 +235,8 @@
           :label="actionLabel"
           :task-id="progressTaskId"
           style="width: 100%; margin-top: 8px;"
+          @complete="handleAsyncImportComplete"
+          @error="handleAsyncImportError"
         />
       </div>
       <div v-else-if="report" class="bulk-report">
@@ -259,7 +261,13 @@
         </el-button>
       </template>
       <template v-else-if="step === 'executing' && !loading">
-        <el-button @click="handleClose">关闭</el-button>
+        <el-button
+          v-if="asyncImportRunning && progressTaskId"
+          type="danger"
+          plain
+          @click="handleCancelAsyncImport"
+        >取消导入</el-button>
+        <el-button @click="handleClose">{{ asyncImportRunning ? '后台运行并关闭' : '关闭' }}</el-button>
         <el-button
           v-if="dryRun && currentAction === 'import-data' && report"
           type="primary"
@@ -346,6 +354,9 @@ const {
   exportTemplates,
   exportData,
   importData,
+  startImportData,
+  getImportResult,
+  cancelImport,
   loading,
   downloadProgress,
 } = useBulkTabImportExport(projectIdRef)
@@ -482,6 +493,7 @@ const uploadFile = ref<File | null>(null)
 const report = ref<ImportReport | null>(null)
 /** 异步任务 ID（同步端点无此值时进度条走不确定态） */
 const progressTaskId = ref<string | null>(null)
+const asyncImportRunning = ref(false)
 
 // ─── 计算属性 ───
 /**
@@ -632,8 +644,21 @@ async function handleExecute() {
       }
       case 'import-data': {
         if (!uploadFile.value) return
+        if (!dryRun.value) {
+          const taskId = await startImportData(uploadFile.value, {
+            strategy: conflictStrategy.value,
+            cycles: selectedCycles.value,
+          })
+          if (!taskId) {
+            step.value = 'options'
+            return
+          }
+          progressTaskId.value = taskId
+          asyncImportRunning.value = true
+          return
+        }
         const result = await importData(uploadFile.value, {
-          dryRun: dryRun.value,
+          dryRun: true,
           strategy: conflictStrategy.value,
           cycles: selectedCycles.value,
         })
@@ -643,9 +668,6 @@ async function handleExecute() {
           return
         }
         report.value = result
-        if (!dryRun.value) {
-          emit('imported')
-        }
         break
       }
     }
@@ -654,6 +676,43 @@ async function handleExecute() {
     step.value = 'options'
     void err
   }
+}
+
+async function handleAsyncImportComplete() {
+  if (!asyncImportRunning.value || !progressTaskId.value) return
+  const taskId = progressTaskId.value
+  let result: ImportReport | null = null
+  for (let attempt = 0; attempt < 5 && result === null; attempt += 1) {
+    result = await getImportResult(taskId)
+    if (result === null && attempt < 4) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+  }
+  asyncImportRunning.value = false
+  progressTaskId.value = null
+  if (result === null) {
+    ElMessage.error('导入已结束，但暂时无法读取结果，请重新打开后查看任务状态')
+    step.value = 'options'
+    return
+  }
+  report.value = result
+  emit('imported')
+  ElMessage.success(
+    `导入完成：成功 ${result.summary.success ?? 0}，部分 ${result.summary.partial ?? 0}，失败 ${result.summary.failed ?? 0}`,
+  )
+}
+
+function handleAsyncImportError(message: string) {
+  if (!asyncImportRunning.value) return
+  asyncImportRunning.value = false
+  progressTaskId.value = null
+  ElMessage.error(message || '导入失败')
+  step.value = 'options'
+}
+
+async function handleCancelAsyncImport() {
+  if (!progressTaskId.value) return
+  await cancelImport(progressTaskId.value)
 }
 
 async function handleConfirmImport() {
@@ -672,6 +731,7 @@ function handleClose() {
   report.value = null
   uploadFile.value = null
   progressTaskId.value = null
+  asyncImportRunning.value = false
 }
 
 /**

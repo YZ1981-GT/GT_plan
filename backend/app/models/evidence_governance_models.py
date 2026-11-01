@@ -171,6 +171,9 @@ class AttachmentVersion(Base):
     media_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     byte_size: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    blob_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("asset_blobs.id", ondelete="RESTRICT"), nullable=True
+    )
     config_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     availability: Mapped[str] = mapped_column(
         String(20), server_default=text("'staged'"), nullable=False

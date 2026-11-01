@@ -19,12 +19,14 @@ hypothesis 覆盖 P1 / P8 / P9（fast profile，显式 max_examples=5）。
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from app.services.llm_client import LLMInvocationResult, LLMInvocationStatus
 from app.services.note_knowledge_enricher import (
     _GROUNDED_SYSTEM_PROMPT_ZH,
     Citation,
@@ -33,6 +35,16 @@ from app.services.note_knowledge_enricher import (
 )
 
 _ENRICHER_MOD = "app.services.note_knowledge_enricher"
+_TASK_EXECUTOR = "app.services.ai_task_executor.invoke_ai_task"
+
+
+def _invocation(text: str | None, *, failed: bool = False):
+    result = LLMInvocationResult(
+        status=LLMInvocationStatus.unavailable if failed else LLMInvocationStatus.success,
+        text=None if failed else text,
+        error_code="provider_unreachable" if failed else None,
+    )
+    return SimpleNamespace(result=result)
 
 
 # ── 测试替身 ──────────────────────────────────────────────────────────────
@@ -287,8 +299,8 @@ def test_build_grounded_prompt_truncates_to_budget():
 # ── P13: reference_only 不调 chat_completion ──────────────────────────────
 @pytest.mark.asyncio
 async def test_reference_only_does_not_call_llm(monkeypatch):
-    cc = AsyncMock(return_value="不该被调用")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation("不该被调用"))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(results=[_result("d1", content="原文片段")])
     draft = await enricher.generate_note_text(
         "pid", 2025, "note1", "五、应收账款", "应收账款", reference_only=True
@@ -303,22 +315,22 @@ async def test_reference_only_does_not_call_llm(monkeypatch):
 # ── generate_note_text: 正常生成 / fail-open ──────────────────────────────
 @pytest.mark.asyncio
 async def test_generate_note_text_success(monkeypatch):
-    cc = AsyncMock(return_value="这是生成的中文附注正文。")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation("这是生成的中文附注正文。"))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(results=[_result("d1")])
     draft = await enricher.generate_note_text("pid", 2025, "n1", "五、应收账款", "应收账款")
     assert draft.text == "这是生成的中文附注正文。"
     assert draft.degraded is False  # 有命中
     assert cc.call_count == 1
-    # system prompt 为反幻觉中文约束（chat_completion 的 messages 为首个位置参数）
-    sent_messages = cc.call_args.args[0]
-    assert sent_messages[0]["content"] == _GROUNDED_SYSTEM_PROMPT_ZH
+    # system prompt 作为任务 addendum，正文由登记 Prompt 统一提供。
+    assert cc.call_args.kwargs["system_addendum"] == _GROUNDED_SYSTEM_PROMPT_ZH
+    assert cc.call_args.args[0] == "note.policy_draft"
 
 
 @pytest.mark.asyncio
 async def test_generate_note_text_llm_error_degrades(monkeypatch):
-    cc = AsyncMock(return_value="[LLM 服务暂不可用，请检查 vLLM 是否启动]")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation(None, failed=True))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(results=[_result("d1")])
     draft = await enricher.generate_note_text("pid", 2025, "n1", "五、应收账款", "应收账款")
     assert draft.text is None
@@ -329,8 +341,8 @@ async def test_generate_note_text_llm_error_degrades(monkeypatch):
 async def test_generate_note_text_no_hits_degraded(monkeypatch):
     """P2：检索空命中 → generate_note_text 返回 text=None/citations=[]（不生成），
     由 DisclosureEngine caller 退回带 TB 上下文的通用 LLM 路径（design Property 2）。"""
-    cc = AsyncMock(return_value="不该被调用")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation("不该被调用"))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(results=[])
     draft = await enricher.generate_note_text("pid", 2025, "n1", "五、应收账款", "应收账款")
     assert draft.text is None  # 无 RAG 依据 → 不由 enricher 生成（Property 2）
@@ -343,8 +355,8 @@ async def test_generate_note_text_no_hits_degraded(monkeypatch):
 async def test_generate_note_text_retrieve_exception_fail_open(monkeypatch):
     """P2：semantic_search 抛异常 → retrieve fail-open 返回 [] → generate_note_text
     返回 text=None/citations=[]，绝不向上抛异常（design Property 2）。"""
-    cc = AsyncMock(return_value="不该被调用")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation("不该被调用"))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(raise_exc=RuntimeError("kb down"))
     draft = await enricher.generate_note_text("pid", 2025, "n1", "五、应收账款", "应收账款")
     assert draft.text is None
@@ -373,8 +385,8 @@ async def test_prior_year_note_miss_returns_none():
 # ── P15: batch 跳过已有 / 锁定 / manual_override ──────────────────────────
 @pytest.mark.asyncio
 async def test_batch_skips_existing_locked_override(monkeypatch):
-    cc = AsyncMock(return_value="新生成")
-    monkeypatch.setattr(f"{_ENRICHER_MOD}.chat_completion", cc)
+    cc = AsyncMock(return_value=_invocation("新生成"))
+    monkeypatch.setattr(_TASK_EXECUTOR, cc)
     enricher, _, _ = _make_enricher(results=[_result("d1")])
     sections = [
         {"note_section": "has_text", "text_content": "已有实质正文", "section_title": "T", "account_name": "A"},

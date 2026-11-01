@@ -69,13 +69,36 @@ function splitVoucherKey(voucherKey: string | null | undefined): string[] | null
   }
 }
 
+/** 合同身份规范串；合同号为空时不建立权威身份。 */
+export function contractKeyString(contractNo: unknown, counterparty: unknown): string | null {
+  const no = String(contractNo ?? '').trim()
+  if (!no) return null
+  return JSON.stringify([no, String(counterparty ?? '').trim()])
+}
+
+export function contractKeyLabel(contractKey: string | null | undefined): string {
+  if (!contractKey) return ''
+  try {
+    const value = JSON.parse(contractKey)
+    if (!Array.isArray(value) || value.length !== 2) return ''
+    const no = String(value[0] ?? '').trim()
+    const party = String(value[1] ?? '').trim()
+    return party ? `${no} / ${party}` : no
+  } catch {
+    return ''
+  }
+}
+
 /** 位置的中文标签（统一视图「行级证据」位置、证据链接列表用）。 */
 export function evidencePositionLabel(pos: {
-  sheet_name?: string | null; cell_ref?: string | null; page_ref?: string | null; voucher_key?: string | null
+  sheet_name?: string | null; cell_ref?: string | null; page_ref?: string | null;
+  voucher_key?: string | null; contract_key?: string | null
 }): string {
   const parts: string[] = []
   const voucher = voucherKeyLabel(pos.voucher_key)
+  const contract = contractKeyLabel(pos.contract_key)
   if (voucher) parts.push(`凭证 ${voucher}`)
+  if (contract) parts.push(`合同 ${contract}`)
   if (pos.sheet_name) parts.push(pos.sheet_name)
   const cell = pos.cell_ref || ''
   if (cell.startsWith('item:')) parts.push(`第 ${cell.slice(5)} 项`)
@@ -114,6 +137,8 @@ export interface UploadWorkpaperEvidenceOptions {
   pageRef?: string | null
   /** 凭证键（凭证检查行 `_gt.vk`）：带了就按凭证身份挂，别的底稿抽到同一凭证时可查到并引用 */
   voucherKey?: string | null
+  /** 合同键（JSON [合同号, 对方名称]）：带了就按合同身份挂 */
+  contractKey?: string | null
   /** 上传进度（0-100） */
   onProgress?: (percent: number) => void
 }
@@ -137,6 +162,7 @@ export async function uploadWorkpaperEvidence(opts: UploadWorkpaperEvidenceOptio
   if (opts.cellRef) form.append('cell_ref', opts.cellRef)
   if (opts.pageRef) form.append('page_ref', opts.pageRef)
   if (opts.voucherKey) form.append('voucher_key', opts.voucherKey)
+  if (opts.contractKey) form.append('contract_key', opts.contractKey)
   const onProgress = opts.onProgress
   const res = await http.post(P_att.evidenceUpload(projectId, wpId), form, {
     headers: { 'Content-Type': 'multipart/form-data' },

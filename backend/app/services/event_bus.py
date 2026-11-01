@@ -105,6 +105,7 @@ RAW_EVENT_REPLAY_DEGRADED: frozenset[str] = frozenset({
     "acnr:invalidate",
     "adjustment:review-changed",
     "adjustment:sync-arrived",
+    "ai.task.updated",
     "aging-config:changed",
     "attachment.uploaded",
     "consol.note_mapping_confirmed",

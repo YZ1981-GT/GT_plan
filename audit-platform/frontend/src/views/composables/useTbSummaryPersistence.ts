@@ -49,7 +49,7 @@ interface PendingSave {
   context: TbSummaryPersistContext
   generation: number
   revision: number
-  rows: TbSummaryPersistRow[]
+  sourceRows: TbSummaryPersistRow[]
 }
 
 export interface TbSummaryPersistenceOptions {
@@ -191,7 +191,7 @@ export function useTbSummaryPersistence(options: TbSummaryPersistenceOptions) {
       context,
       generation: generations.get(key) ?? 0,
       revision: ++revision,
-      rows: serializeTbSummaryRows(options.getRows()),
+      sourceRows: options.getRows(),
     }
   }
 
@@ -229,7 +229,7 @@ export function useTbSummaryPersistence(options: TbSummaryPersistenceOptions) {
           job.context.projectId,
           job.context.year,
           job.context.sheetKey,
-          { rows: job.rows },
+          { rows: serializeTbSummaryRows(job.sourceRows) },
           expectedVersion,
         )
         if (disposed) return false

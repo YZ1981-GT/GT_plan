@@ -26,6 +26,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { newUuid } from '@/utils/uuid'
 import { createSSE, type SSEConnection } from '@/utils/sse'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -94,7 +95,8 @@ export interface BulkImportOptions {
 
 /** SSE 进度事件数据 */
 export interface BulkProgressEvent {
-  task_id: string
+  task_id?: string
+  type?: 'progress' | 'complete' | 'error'
   current: number
   total: number
   message?: string
@@ -110,6 +112,9 @@ function buildPaths(projectId: string) {
     exportTemplates: `${base}/export-templates`,
     exportData: `${base}/export-data`,
     import: `${base}/import`,
+    importAsync: `${base}/import/async`,
+    importResult: (taskId: string) => `${base}/import/${taskId}/result`,
+    importCancel: (taskId: string) => `${base}/import/${taskId}/cancel`,
     rollback: `${base}/import/rollback`,
     progress: (taskId: string) => `${base}/progress/${taskId}`,
   }
@@ -362,6 +367,65 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
     }
   }
 
+  async function startImportData(
+    file: File,
+    options: BulkImportOptions = {},
+  ): Promise<string | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const paths = buildPaths(projectId.value)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('strategy', options.strategy ?? 'overwrite')
+      formData.append('all_or_nothing', 'false')
+      const response = await http.post(paths.importAsync, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Idempotency-Key': newUuid(),
+        },
+      })
+      const data = response.data?.data ?? response.data
+      const taskId = String(data?.task_id ?? '').trim()
+      if (!taskId) throw new Error('后端未返回任务 ID')
+      ElMessage.info('导入任务已提交，可在进度条中查看处理状态')
+      return taskId
+    } catch (e: unknown) {
+      const msg = extractError(e, '导入任务提交失败')
+      error.value = msg
+      ElMessage.error(msg)
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function getImportResult(taskId: string): Promise<ImportReport | null> {
+    try {
+      const paths = buildPaths(projectId.value)
+      const response = await http.get(paths.importResult(taskId), {
+        _background: true,
+        _silent: true,
+      } as any)
+      const data = response.data?.data ?? response.data
+      return data?.status === 'complete' ? data.report as ImportReport : null
+    } catch {
+      return null
+    }
+  }
+
+  async function cancelImport(taskId: string): Promise<boolean> {
+    try {
+      const paths = buildPaths(projectId.value)
+      await http.post(paths.importCancel(taskId), undefined, { _silent: true } as any)
+      ElMessage.info('已请求取消导入')
+      return true
+    } catch (e: unknown) {
+      ElMessage.error(extractError(e, '取消导入失败'))
+      return false
+    }
+  }
+
   // ─── 回滚 ─────────────────────────────────────────────────────────────
 
   /**
@@ -457,6 +521,9 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
     exportData,
     // 导入
     importData,
+    startImportData,
+    getImportResult,
+    cancelImport,
     // 回滚
     rollback,
     // SSE 进度

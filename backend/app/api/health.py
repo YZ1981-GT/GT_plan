@@ -97,6 +97,7 @@ async def health_check(
     drift_info = await _query_schema_drift()
     audit_state = audit_log_failure_state()
     events_info = _events_replay_info()
+    capacity_info = _capacity_snapshot()
     reload_info = reload_status_snapshot()
     reload_last = reload_info.get("last") or {}
     reload_degraded = (
@@ -145,12 +146,30 @@ async def health_check(
             "audit_log": audit_state,
             # 事件重放可用性与积压（Redis 不可用时 live 仍降级可用，但补拉不可用；R3.4）
             "events": events_info,
+            # 只读进程内容量快照；不在 health 请求中扫描任务表或执行外部探针。
+            "capacity": capacity_info,
             # GC 只在连续空闲窗口执行；这里暴露等待 / 重排 / 实际停顿，不额外做 I/O。
             "gc": get_last_freeze_report(),
             # 热重载交接：本进程模式 + 最近一次重载结果（读父进程写的小文件；不参与 status 判定）
             "reload": reload_info,
         },
     )
+
+
+def _capacity_snapshot() -> dict[str, object]:
+    """汇总进程内即时容量，不把采样本身变成 health 热点。"""
+    from app.core.database import engine
+    from app.core.db_pool_metrics import pool_capacity_snapshot
+    from app.services.bulk_tab.bulk_async_runner import get_import_capacity_snapshot
+    from app.services.libreoffice_pool import get_capacity_snapshot
+    from app.services.platform_metrics import event_loop_snapshot
+
+    return {
+        "db_pool": pool_capacity_snapshot(engine.sync_engine.pool),
+        "event_loop": event_loop_snapshot(time.monotonic()),
+        "libreoffice": get_capacity_snapshot(),
+        "bulk_import": get_import_capacity_snapshot(),
+    }
 
 
 # ── 审计链健康缓存（进程级，300 秒） ──────────────────────────────

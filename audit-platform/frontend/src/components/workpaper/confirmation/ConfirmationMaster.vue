@@ -23,7 +23,7 @@
     <el-table
       :data="rows"
       @selection-change="onSelectionChange"
-      @row-click="(row) => $emit('row-click', row)"
+      @row-click="$emit('row-click', $event)"
       highlight-current-row
       border
       size="small"

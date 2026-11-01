@@ -56,6 +56,14 @@
         </table>
       </template>
     </section>
+    <OutputAttachmentLinks
+      v-if="projectId && noteSection"
+      :project-id="projectId"
+      object-type="note_cell"
+      target-type="note_section"
+      :target-ref="noteSection"
+      resource="note"
+    />
     <div v-if="!isSubTableCell" v-loading="loading" class="gt-cell-trace-body">
       <!-- 错误降级：友好提示 -->
       <el-alert
@@ -208,6 +216,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import OutputAttachmentLinks from '@/components/attachment/OutputAttachmentLinks.vue'
 import { fetchCellSources, stepStatus, type CellSourceRef, type CellSourcesResult } from './cellSources'
 
 interface BindingMeta {

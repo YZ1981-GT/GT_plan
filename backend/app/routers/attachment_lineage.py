@@ -75,6 +75,17 @@ async def link_attachment(
     await ensure_lineage_project_column(db)
     project_id = await _visible_attachment_project(db, current_user, attachment_id)
     await assert_project_permission(db, current_user, project_id, "edit")
+    existing = (await db.execute(
+        select(AttachmentLineage).where(
+            AttachmentLineage.attachment_id == attachment_id,
+            AttachmentLineage.project_id == project_id,
+            AttachmentLineage.target_type == body.target_type,
+            AttachmentLineage.target_id.is_(None) if body.target_id is None else AttachmentLineage.target_id == body.target_id,
+            AttachmentLineage.target_ref == body.target_ref,
+        ).order_by(AttachmentLineage.created_at, AttachmentLineage.id).limit(1)
+    )).scalar_one_or_none()
+    if existing is not None:
+        return existing
     lineage = AttachmentLineage(
         attachment_id=attachment_id,
         project_id=project_id,

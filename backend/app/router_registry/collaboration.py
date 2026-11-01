@@ -98,9 +98,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
               procedure_delivery_router, procedure_review_router]:
         app.include_router(r, tags=["团队与看板"])
 
-    # 角色AI辅助
+    # 角色 AI 辅助与耐久 AI 批任务
     from app.routers.role_ai_features import router as rai_router
+    from app.routers.ai_task_jobs import router as ai_task_jobs_router
     app.include_router(rai_router, tags=["团队与看板"])
+    app.include_router(ai_task_jobs_router, tags=["AI批任务"])
 
     # ═══ §9. Phase 14: 门禁引擎与治理 ═══
     from app.routers.gate import router as gate_router

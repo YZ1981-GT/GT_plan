@@ -44,7 +44,7 @@ vi.mock('element-plus', () => ({
 vi.mock('@/services/apiPaths', () => ({
   attachments: {
     associate: (id: string) => `/api/attachments/${id}/associate`,
-    upload: (pid: string) => `/api/projects/${pid}/attachments`,
+    upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   },
 }))
 

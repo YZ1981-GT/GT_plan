@@ -37,7 +37,8 @@ vi.mock('@/composables/usePermissionMatrix', () => ({
 vi.mock('@/services/workpaperApi', () => ({
   listWorkpapers: vi.fn().mockResolvedValue([]),
   getWpIndex: vi.fn().mockResolvedValue([]),
-  downloadWorkpaperPack: vi.fn().mockResolvedValue(undefined),
+  startWorkpaperPackExport: vi.fn().mockResolvedValue({ task_id: 'export-1', total: 0, status: 'pending' }),
+  getWorkpaperPackExportStatus: vi.fn(() => new Promise(() => {})),
   downloadWorkpaper: vi.fn(),
 }))
 vi.mock('@/services/commonApi', () => ({ listUsers: vi.fn().mockResolvedValue([]) }))

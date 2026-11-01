@@ -24,6 +24,7 @@ from app.models.confirmation_models import ConfirmationActionLog, ConfirmationAt
 from app.routers import confirmations as confirmations_router_module
 from app.services import confirmation_evidence_service as evidence_svc
 from app.services import confirmation_service as confirmation_svc
+from app.services.attachment_service import AttachmentService
 from app.services.confirmation_scope_gate import confirmation_project_gate, required_level
 from tests.attachment_security_baseline._world import (
     add_attachment,
@@ -105,6 +106,7 @@ class Recipe:
     expected: dict[str, int]
     counted: tuple[Any, str, Any]  # 判定通过后必被调用一次的业务 service（owner, attr, 桩返回值）
     body: Callable[[Objs], dict] | None = None
+    request_kwargs: Callable[[Objs], dict] | None = None
     extra_stubs: tuple[tuple[Any, str, Any], ...] = ()
 
 
@@ -116,6 +118,20 @@ _LINK = SimpleNamespace(
     id=uuid.uuid4(), confirmation_id=uuid.uuid4(), attachment_id=uuid.uuid4(), role="outbound",
     paired_outbound_attachment_id=None, match_status="manual",
 )
+
+class _AnyProject:
+    def __eq__(self, _other: object) -> bool:
+        return True
+
+    def __ne__(self, _other: object) -> bool:
+        return False
+
+
+_UPLOAD_ID = uuid.uuid4()
+_UPLOAD_RESULT = {"id": str(_UPLOAD_ID), "file_name": "回函.pdf", "storage_type": "local"}
+_UPLOAD_STORAGE = {
+    "project_id": None, "storage_type": "local", "file_path": "safe.pdf", "paperless_document_id": None,
+}
 
 RECIPES: tuple[Recipe, ...] = (
     # 读
@@ -143,6 +159,20 @@ RECIPES: tuple[Recipe, ...] = (
     Recipe("批量同步", "POST", "/batch-sync", lambda o: f"{_base(o)}/batch-sync", _WRITE,
            (confirmation_svc, "list_confirmations", []), body=lambda o: {"items": [], "wp_id": str(o.wp)}),
     # 函证附件
+    Recipe(
+        "原子上传挂载", "POST", "/{confirmation_id}/attachments/upload",
+        lambda o: f"{_base(o)}/{o.cid}/attachments/upload", _WRITE,
+        (AttachmentService, "upload_attachment_file", _UPLOAD_RESULT),
+        request_kwargs=lambda o: {
+            "files": {"file": ("回函.pdf", b"%PDF-1.4 reply", "application/pdf")},
+            "data": {"role": "outbound"},
+        },
+        extra_stubs=(
+            (evidence_svc, "validate_attachment_link_request", (SimpleNamespace(project_id=_AnyProject()), None)),
+            (AttachmentService, "get_raw_storage", _UPLOAD_STORAGE),
+            (evidence_svc, "link_attachment", _LINK),
+        ),
+    ),
     Recipe("挂载", "POST", "/{confirmation_id}/attachments", lambda o: f"{_base(o)}/{o.cid}/attachments", _WRITE,
            (evidence_svc, "link_attachment", _LINK), body=lambda o: {"attachment_id": str(o.aid), "role": "outbound"}),
     Recipe("解绑", "DELETE", "/{confirmation_id}/attachments/{link_id}",
@@ -171,7 +201,7 @@ def test_table_covers_every_route():
         for route in ROUTER.routes for method in route.methods
     }
     assert {(r.method, r.path) for r in RECIPES} == declared
-    assert len(declared) == 17
+    assert len(declared) == 18
 
 
 def test_gate_is_router_level():
@@ -198,7 +228,7 @@ async def test_permission_matrix(world, recipe: Recipe, identity: str):
     objs = await _objects(world)
     user = await _user(world, identity)
     stub = _install(world, recipe)
-    kwargs = {"json": recipe.body(objs)} if recipe.body else {}
+    kwargs = recipe.request_kwargs(objs) if recipe.request_kwargs else ({"json": recipe.body(objs)} if recipe.body else {})
     async with world.client(ROUTER, user=user) as client:
         resp = await client.request(recipe.method, recipe.url(objs), **kwargs)
     expected = recipe.expected[identity]

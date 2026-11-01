@@ -1517,6 +1517,7 @@ def _parse_csv_for_preview(
     raw_rows: list[dict] = []
     row_count = 0
     BATCH = 100_000
+    batch_size = min(BATCH, max_rows) if max_rows else BATCH
 
     def _consume_lines(lines: list[str]):
         nonlocal row_count
@@ -1567,7 +1568,7 @@ def _parse_csv_for_preview(
                 continue
             if not max_rows or row_count < max_rows:
                 line_buf.append(line)
-                if len(line_buf) >= BATCH:
+                if len(line_buf) >= batch_size:
                     _consume_lines(line_buf)
                     line_buf.clear()
 
@@ -1780,6 +1781,28 @@ def smart_parse_files(
             except Exception:
                 pass
         wb.close()
+
+        # 预览也不得因复杂/合并表头对大文件切到 openpyxl 非只读全量物化。
+        if needs_full_mode and preview_mode:
+            from app.core.config import settings
+
+            full_mode_limit_bytes = (
+                max(1, settings.LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB)
+                * 1024
+                * 1024
+            )
+            if _source_size_bytes(content) > full_mode_limit_bytes:
+                diagnostics.append({
+                    "file": filename,
+                    "sheet": None,
+                    "status": "error",
+                    "message": (
+                        "该 Excel 需要非只读模式解析复杂表头，文件超过 "
+                        f"{settings.LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB}MB 内存保护阈值。"
+                        "请拆分文件或另存为 CSV。"
+                    ),
+                })
+                continue
 
         # 如果需要完整模式（有合并单元格），直接用完整模式打开
         # 完整模式打开约4秒，iter_rows遍历50000行约0.4秒，可接受

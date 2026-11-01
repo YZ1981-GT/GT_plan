@@ -9,19 +9,27 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AttachmentLineageCreate(BaseModel):
     """创建附件关联请求"""
 
-    target_type: Literal["wp_cell", "report_row", "note_section"] = Field(
+    target_type: Literal["wp_cell", "report_row", "note_section", "deliverable_section"] = Field(
         ..., description="关联目标类型"
     )
     target_id: UUID | None = Field(default=None, description="关联目标 UUID")
-    target_ref: str | None = Field(
-        default=None, max_length=200, description="精确位置引用，如 D2-3!B5"
+    target_ref: str = Field(
+        ..., min_length=1, max_length=200, description="稳定位置引用，如 D2-3!B5"
     )
+
+    @field_validator("target_ref")
+    @classmethod
+    def normalize_target_ref(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("target_ref 不能为空")
+        return normalized
 
 
 class AttachmentLineageResponse(BaseModel):

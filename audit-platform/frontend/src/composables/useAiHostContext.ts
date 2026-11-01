@@ -303,8 +303,9 @@ export function buildAmbientHost(input: {
       auditYear: input.auditYear,
     })
   }
-  // 有项目但没有具体文档宿主：仍用显式全局模式（不伪造一个项目级文档宿主）。
-  return buildGlobalKnowledgeHost()
+  // 已处于项目内却没有具体资源时不能静默退回无项目全局模式，否则用户会以为
+  // AI 看到了当前项目。页面内嵌的底稿/附注/报表面板会提供精确宿主。
+  return unavailable('global_knowledge', '当前项目尚未选定具体底稿、附注或报表，请先打开一项业务资料')
 }
 
 /**
@@ -325,13 +326,9 @@ export function canAdoptInPlace(host: AiHostRef | null | undefined): boolean {
 export function hostScopeHint(request: AiHostRequest): string {
   if (!request.available) return request.unavailableReason ?? '当前页面无法使用 AI 对话'
   if (!request.projectToolsEnabled) {
-    // 🔴 别写成「仅检索你有权访问的公共知识」——服务端在无项目绑定时是**不检索**的：
-    // ContextBuilder._get_global_knowledge_content() 直接返回空串，
-    // _search_related_knowledge() 在 project_id 为 None 时跳过 semantic_search。
-    // 承诺"会检索"会让审计师把「上下文空」当成故障来排查。
-    return '全局知识模式：未绑定项目，不自动检索项目数据与知识库，项目工具不可用'
+    return '全局知识模式：仅检索你有权访问的非项目知识，不读取项目数据，项目工具不可用'
   }
-  return `当前范围：${request.label}`
+  return `当前范围：${request.label}；AI 只读取已保存内容，当前未保存修改不会纳入本轮`
 }
 
 // ---------------------------------------------------------------------------

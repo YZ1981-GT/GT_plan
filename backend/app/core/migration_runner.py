@@ -476,6 +476,24 @@ class MigrationRunner:
                     checksum=checksum,
                 ))
 
+        _by_version: dict[str, list[str]] = {}
+        for migration in result:
+            _by_version.setdefault(migration.version, []).append(migration.filename)
+        duplicates = {
+            version: names
+            for version, names in _by_version.items()
+            if len(names) > 1
+        }
+        if duplicates:
+            detail = "; ".join(
+                f"R{version}: {sorted(names)}"
+                for version, names in sorted(duplicates.items())
+            )
+            raise RuntimeError(
+                "[Migration] 检测到重复版本号回滚文件（须与 V 迁移一一配对）："
+                f"{detail}"
+            )
+
         # 按版本号数值排序
         result.sort(key=lambda x: int(x.version))
         return result

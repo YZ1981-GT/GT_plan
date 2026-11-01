@@ -180,3 +180,24 @@ describe('useWpEvidenceLinks', () => {
     scope.stop()
   })
 })
+
+
+describe('useWpEvidenceLinks 缓存生命周期', () => {
+  beforeEach(() => {
+    resetWpEvidenceLinksForTest()
+    mockGet.mockReset()
+  })
+
+  it('TTL 内复用，过期后重新请求', async () => {
+    let now = 1_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    mockGet.mockResolvedValue({ data: { items: [] } })
+    await loadWpEvidenceLinks('p1', 'w1')
+    await loadWpEvidenceLinks('p1', 'w1')
+    expect(mockGet).toHaveBeenCalledTimes(1)
+    now += 60_001
+    await loadWpEvidenceLinks('p1', 'w1')
+    expect(mockGet).toHaveBeenCalledTimes(2)
+    clock.mockRestore()
+  })
+})

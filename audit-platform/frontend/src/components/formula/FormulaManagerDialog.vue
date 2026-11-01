@@ -671,6 +671,8 @@ const props = withDefaults(defineProps<{
   initialTemplateId?: string
   initialTemplateAction?: 'subscribe'
   initialTemplateDomain?: string
+  /** 每次活动打开请求递增；同 project/year 只变域或目标时也重新定位。 */
+  openRevision?: number
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -2344,8 +2346,9 @@ async function applyConsolNoteTarget() {
   }
 }
 
-// 初始加载当前报表的数据
-watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
+// 初始加载当前报表的数据。
+// 异步宿主可能在模块下载完成时已是打开态，必须 immediate，否则首次打开不会执行任何加载。
+watch([visible, () => props.openRevision, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
@@ -2521,7 +2524,7 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     // 没有目标且停在报表节点时补加载当前报表（打开时已清报表行缓存）
     if (!(await applyTargetNode()) && activeReportType.value && !allRowsMap.value[activeReportType.value]) await loadRowsForNode(selectedNodeKey.value)
   }
-})
+}, { immediate: true })
 
 function onTreeNodeClick(data: any) {
   // 外链节点: 跳转到独立页面

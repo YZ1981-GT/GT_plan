@@ -965,16 +965,24 @@ export async function fetchNoteAutoPull(
 
 // ── 附注 LLM 辅助 ──
 
+export interface NoteAiResultMeta {
+  error?: string
+  error_code?: string
+  model?: string | null
+  deployment?: 'local' | 'server' | null
+  fallback_used?: boolean
+}
+
 export async function noteAiGeneratePolicy(projectId: string, params: {
   section_number: string; template_type?: string; industry?: string; year?: number
-}): Promise<{ generated_text: string; reference_count: number }> {
+}): Promise<NoteAiResultMeta & { generated_text: string | null; reference_count: number }> {
   const { data } = await http.post(P_dn.ai.generatePolicy(projectId), params)
   return data
 }
 
 export async function noteAiGenerateAnalysis(projectId: string, params: {
-  section_number: string; current_data?: Record<string, any>; prior_data?: Record<string, any>; year?: number
-}): Promise<{ generated_text: string; reference_count: number }> {
+  section_number: string; year?: number
+}): Promise<NoteAiResultMeta & { generated_text: string | null; reference_count: number }> {
   const { data } = await http.post(P_dn.ai.generateAnalysis(projectId), params)
   return data
 }
@@ -986,14 +994,14 @@ export async function noteAiGenerateAnalysis(projectId: string, params: {
  */
 export async function noteAiRewrite(projectId: string, params: {
   text: string; instruction?: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
-}): Promise<{ original: string; rewritten: string; error?: string; knowledge_count?: number }> {
+}): Promise<NoteAiResultMeta & { original: string; rewritten: string | null; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.rewrite(projectId), params)
   return data
 }
 
 export async function noteAiContinueWrite(projectId: string, params: {
   text: string; section_number?: string; year?: number; knowledge_doc_ids?: string[]
-}): Promise<{ result: string; appended: string; error?: string; knowledge_count?: number }> {
+}): Promise<NoteAiResultMeta & { result: string; appended: string; knowledge_count?: number }> {
   const { data } = await http.post(P_dn.ai.complete(projectId), params)
   return data
 }

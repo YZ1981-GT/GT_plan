@@ -76,6 +76,11 @@ PRESET_PLUGINS = [
         "config": {"max_members": 50},
     },
 ]
+PRESET_PLUGIN_IDS = frozenset(row["plugin_id"] for row in PRESET_PLUGINS)
+
+
+def is_developing_plugin(plugin_id: str) -> bool:
+    return plugin_id in PRESET_PLUGIN_IDS
 
 
 class PluginExecutor:
@@ -287,8 +292,11 @@ class AIPluginService:
         return self._to_dict(plugin)
 
     def get_preset_plugins(self) -> list[dict]:
-        """返回8个预设插件stub"""
-        return PRESET_PLUGINS
+        """返回8个预设插件的开发中清单，不暴露可执行假象。"""
+        return [
+            {**preset, "maturity": "developing", "executable": False}
+            for preset in PRESET_PLUGINS
+        ]
 
     async def load_preset_plugins(self, db: AsyncSession) -> dict:
         """加载预设插件到数据库（幂等）"""
@@ -326,6 +334,7 @@ class AIPluginService:
         return plugin
 
     def _to_dict(self, plugin: AIPlugin) -> dict:
+        developing = is_developing_plugin(plugin.plugin_id)
         return {
             "id": str(plugin.id),
             "plugin_id": plugin.plugin_id,
@@ -334,15 +343,19 @@ class AIPluginService:
             "description": plugin.plugin_description,
             "is_enabled": plugin.is_enabled,
             "config": plugin.config,
+            "maturity": "developing" if developing else "available",
+            "executable": not developing,
         }
 
     async def execute_plugin(
         self, db: AsyncSession, plugin_id: str, params: dict
     ) -> dict:
-        """执行插件（调用对应的 stub 执行器）"""
+        """执行已实现插件；预设开发中插件 fail-closed。"""
         plugin = await self._get_or_raise(db, plugin_id)
         if not plugin.is_enabled:
             raise ValueError(f"插件 {plugin_id} 未启用")
+        if is_developing_plugin(plugin_id):
+            raise ValueError(f"插件 {plugin_id} 正在开发中，当前不可执行")
 
         executor_cls = PLUGIN_EXECUTORS.get(plugin_id)
         if not executor_cls:

@@ -320,6 +320,10 @@ class EngineOutcome:
     usage: dict[str, Any] = field(default_factory=dict)
     #: 端到端耗时（含上下文构建）。
     latency_ms: int = 0
+    #: 模型调用到首个非空正文片段的时延；非流式任务明确为空。
+    ttft_ms: int | None = None
+    #: 首片段到流结束的生成时长。
+    generation_ms: int | None = None
     #: 引用来源（写入 ``ai_chat_message.referenced_sources``）。
     citations: list[dict[str, Any]] = field(default_factory=list)
     #: Context Manifest（Task 14 扩展为完整 included/trimmed/denied/unavailable 清单）。
@@ -413,6 +417,11 @@ class AuthorizedChatRunRequest:
     principal: Any = None
     review_mode: bool = False
     sheet_name: str | None = None
+    # 客户端只提交稳定 ID；正文和 label 必须由 ContextPlan 在服务端重新授权后加载。
+    mentions: tuple[tuple[Any, str], ...] = ()
+    attachment_ids: tuple[UUID, ...] = ()
+    project_attachment_ids: tuple[UUID, ...] = ()
+    context_plan: Any = None
 
     @classmethod
     def from_creation(
@@ -437,10 +446,17 @@ class AuthorizedChatRunRequest:
             query=creation.request.query,
             engine=creation.engine,
             capabilities=creation.capabilities,
-            assistant_message_id=assistant_message_id or uuid4(),
+            assistant_message_id=(
+                assistant_message_id
+                or getattr(creation, "assistant_message_id", None)
+                or uuid4()
+            ),
             principal=principal,
             review_mode=creation.request.review_mode,
             sheet_name=creation.request.sheet_name,
+            mentions=tuple(creation.request.mention_pairs()),
+            attachment_ids=tuple(creation.request.attachment_ids),
+            project_attachment_ids=tuple(creation.request.project_attachment_ids),
         )
 
     @classmethod
