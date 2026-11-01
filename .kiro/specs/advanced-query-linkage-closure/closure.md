@@ -470,3 +470,105 @@ spec 候选 `79d07ccad`），再合最新远端 `85af801a0`。
 
 本轮临时产物在仓库根 `tmp_advanced_query_phase0/`（`tmp_*` 已 gitignore）：`probes/` 四个探针
 （INDEX 链接修改、gold 用量普查、410 三层核验、410 守卫变异驱动）与现算输出。
+
+### 16.6 共享库迁移状态核实（用户 2026-11-01「以实际为准」）
+
+直接查共享库 + 按 `MigrationRunner` 同口径（文件名里的**数字**版本号）比对磁盘，现算结果：
+
+| 项 | 现算 |
+|---|---|
+| 共享库 `schema_version` | **234 行，最高 V234，1~234 无缺号**，最后一次应用 2026-11-01 06:38:25 |
+| 候选树磁盘 | **248 个 `V*.sql`，最高 V251，重复版本号 0 组**；缺号 200 / 201 / 240 |
+| **待执行** | **16 条**：V235~V239、V241~V251（V240 磁盘上不存在） |
+| 关键对象仍缺 | `projects.amount_unit` · `user_display_preferences` · `report_generation_run` · `adjustments.content_revision` 四项在共享库里**都不存在** |
+
+🔴 **更正**：§十二与任务 37 此前写「约 16~17 条」是估数，现算**恰为 16 条**，逐条列明如上。
+16 条**全部是他域 spec 的产物**（adjustment 复核 / ai_chat 快照 / ai 模型信任域 / ai 任务 /
+asset_blob / 附件血缘 / 平台耐久任务 / 合并运行 / 抵销工作表 / 报表生成运行 / 合并附注投影 /
+公式推送溯源 / 附注公式运行 / 显示偏好 / 公式溯源报表），**本 spec 零迁移**（本 spec 的 V214 早已应用）。
+
+两项顺带核实（都不是缺陷，登记备查）：
+- 缺号 200 / 201 是**已应用但文件按裁决移除**（`V200__consol_note_mapping_reuse_and_reference` /
+  `V201__partner_manager_edit_level_backfill`），与现有记录一致；
+- V189 在库里记的文件名是 `V189__deliverable_edit_and_writeback_integrity.sql`，磁盘上留的是
+  `V189__create_share_change_event_table.sql`（历史撞号残留，磁盘那份因版本号已登记而**永远不会执行**）。
+  查库确认两侧的产物**都在**（`share_change_event`、`deliverable_section_state`、
+  `word_export_task_versions` 三张表齐全）⇒ 无实际损害，不代改。
+
+### 16.7 真 PG 夹具改造（用户 2026-11-01「按你建议来」）—— 基础设施已落地并验证
+
+#### 改法定稿
+
+新增 `tests/advanced_query_linkage/project_picks.py`：**按数据能力解析项目**，而不是按项目代号。
+之所以不是「把 9 个 UUID 换成 9 个解析器」，是因为本轮现算证明**老的角色划分已经无解**：
+原 `HS` 同时被要求「有 AJE」「RJE 恰好 0 行」「有底稿」「有附注」「六类报表且过期与未过期都有」，
+而现库里华氏 `a7fc75e5` 的 adjustments 与底稿都是 0、重药安徽 `0ec33ac9` 有 8 条 AJE 但
+**RJE 有 2 条**（原用例断言 RJE == 0）——**没有任何一个活项目能同时满足**。
+
+三条实现纪律写进了模块说明：① 只用显式列的裸 SQL，**禁 `db.get(Project, ...)`**（共享库缺
+`projects.amount_unit` 时全列投影会整体 500，正是前十五节那 5 处 500 的同一机理）；
+② 取不到候选就**当场失败并打印库内度量前 8 名**，绝不 skip、绝不退化成「空集也算过」；
+③ 排序确定（`度量 DESC, id ASC`），同一个库必须选出同一个项目。
+
+#### 13 条能力的现算解析结果（共享库，2026-11-01）
+
+| 能力 | 判据要点 | 本次解析到 | 度量 |
+|---|---|---|---|
+| `tb_detail` | 审计年度的试算表有行 | 重药安徽_2025 | 196 |
+| `balance_direction_columns` | 余额表期末方向列有值 | 重药安徽_2025 | 2,436 |
+| `aux_balance_direction_columns` | 辅助余额期末方向列有值 | 陕西华氏_2025 | 132,575 |
+| `aux_multi_dimension` | 辅助维度 ≥ 2 个 | 重药安徽_2025 | 23 |
+| `ledger_over_fetch_cap` | 生效数据集序时账 > 5,000 行 | 陕西华氏_2025 | 2,532,279 |
+| `ledger_over_export_hard_limit` | 生效数据集序时账 > 1,000,000 行 | 陕西华氏_2025 | 2,532,279 |
+| `report_full_with_stale_mix` | 报表**既有过期又有未过期** | 重药安徽_2025 | 352 |
+| `report_absent` | 有试算表但**没有任何报表** | 和平物流_2025 | 174 |
+| `workpapers` | 有未删除底稿 | 宜宾临港店_2025 | 1,026 |
+| `disclosure_notes` | 有附注章节 | 【测试】公式同步甲_2025 | 199 |
+| `adjustments_aje` | 有 AJE 调整分录 | 重药安徽_2025 | 8 |
+| `balance_without_active_dataset` | 有余额表行但该年度无 active 数据集 | 和平药房_2025 | 367 |
+| `consolidated_with_notes` | 合并口径且有合并附注数据 | 某测试集团_2098 | 3,514 |
+
+自测 `test_aql_project_picks_pg.py`（**28 passed**，真库）钉三件事：每条能力都真能解析出项目 ·
+解析确定（另起一个解析器绕过缓存，两次必须同一个项目）· **一条故意不可满足的能力必须失败**
+（反向断言；若 `resolve` 在无候选时静默返回兜底值，上面那些「都能解析」会在数据消失后继续全绿）。
+🔴 写这条反向断言时踩到：`pytest.fail` 抛的 `Failed` 继承 **BaseException 而不是 Exception**，
+`pytest.raises(Exception)` 抓不到 —— 改用 `pytest.raises(pytest.fail.Exception)`。
+
+#### 首个转换文件与**归因证明**
+
+`test_aql_columns_pg.py`（HS + LN → `tb_detail` / `balance_direction_columns` /
+`aux_balance_direction_columns`，年度改取所选项目自己的 `audit_year`）：
+
+| 树 | 结果 |
+|---|---|
+| 转换前（`HEAD` 原文，临时同名探针跑真库） | **3 failed** —— 1 条 `FORBIDDEN_PROJECT`（403，正是写死 UUID 失效的那种形态）+ 2 条卡在「前置：辽宁卫生服务的方向列有值」 |
+| 转换后 | **3 passed** |
+
+即这次改动修的是**真的不工作的用例**，不是换个写法。`BusinessClient` 顺带支持直接传 `Pick`
+（项目与年度一起带出，年度不再默认常量 2025）；裸 UUID 的旧调用方行为不变。
+`ruff check` 本轮 6 个文件 **All checks passed**。
+
+#### 余下 14 个文件的逐文件能力映射（下一步按此转换）
+
+| 文件 | 原代号 | 对应能力 |
+|---|---|---|
+| `test_aql_fixtures.py` | WL、YB | `balance_without_active_dataset`、`tb_detail` |
+| `test_aql_dataset_predicate_pg.py` | WL、YB | 同上 |
+| `test_aql_cycle_scope_pg.py` | HS | `tb_detail` + `disclosure_notes`（复制源） |
+| `test_aql_disclosure_source_pg.py` | HS | `disclosure_notes` |
+| `test_aql_aux_source_pg.py` | HP、HS、UA | `aux_multi_dimension`、`report_full_with_stale_mix`、可写自建 |
+| `test_aql_business_view_pg.py` | HP、HS、WL、YB | `ledger_over_fetch_cap`、`tb_detail`、`workpapers`、`balance_without_active_dataset` |
+| `test_aql_builder_scope_pg.py` | HS、UA、YB | `tb_detail`、可写自建、`balance_direction_columns` |
+| `test_aql_builder_total_refs_pg.py` | HP、HS、YB | `ledger_over_fetch_cap`、`tb_detail` |
+| `test_aql_builder_sql_shape.py` | （无真实项目依赖，按现状复核） | — |
+| `test_aql_report_source_pg.py` | HS、UA、UB | `report_full_with_stale_mix`、`report_absent`、可写自建 |
+| `test_aql_adjustment_source_pg.py` | HS、UA | `adjustments_aje` + **RJE 断言改按金标准现算**（不再断言恒 0） |
+| `test_aql_join_cardinality_pg.py` | HS、UA | `tb_detail`、可写自建 |
+| `test_aql_export_pg.py` | HP、HS、UA | `ledger_over_export_hard_limit`、可写自建 |
+| `test_aql_templates_pg.py` | UA | 可写自建 |
+| `test_aql_writeback_isolation_pg.py` | UA、UB、UP | 可写自建（含 `report_scope='consolidated'` + `consol_note_data`） |
+
+另：`MD` 代号现算 **0 个文件引用**（导入即死码），随上述转换一并删除 `gold.py` 的 9 个常量。
+🔴 **`test_aql_adjustment_source_pg.py` 有一处判据必须改而不是换项目**：原来断言「RJE 行数 == 0」，
+那是华氏当年**恰好没有** RJE 的偶然事实，不是业务不变式 —— 改为与金标准现算的 RJE 行数相等
+（空与非空都对），否则这条用例会在任何有 RJE 的项目上红，而红的原因与被测行为无关。
