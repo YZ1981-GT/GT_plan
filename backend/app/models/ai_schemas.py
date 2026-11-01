@@ -4,7 +4,6 @@
 - AI模型配置 (AIModelConfig)
 - OCR单据识别 (DocumentScan, DocumentExtracted, DocumentMatch)
 - AI内容管理 (AIContent)
-- 合同分析 (Contract, ContractExtracted, ContractWPLink)
 - 证据链验证 (EvidenceChain)
 - 知识库索引 (KnowledgeIndex)
 - AI对话 (AIChatHistory)
@@ -31,9 +30,6 @@ from app.models.ai_models import (
     ClauseType,
     ConfirmationCheckType,
     ConfidenceLevel,
-    ContractAnalysisStatus,
-    ContractLinkType,
-    ContractType,
     DocumentType,
     EvidenceChainType,
     KnowledgeSourceType,
@@ -290,97 +286,13 @@ class AIContentFilter(BaseModel):
 
 
 # ===================================================================
-# 4. 合同分析 (Contract, ContractExtracted, ContractWPLink)
+# 4.（已删除）合同分析 —— contracts / contract_extracted / contract_wp_link
+#     三张死表与 ContractType / ContractAnalysisStatus / ContractLinkType
+#     三个枚举已在 V231 删除（Spec F FEAT-001 F1）。本文件原先仍 import 这三个
+#     枚举并定义 8 个 Contract* schema ⇒ `import app.models.ai_schemas` 直接
+#     ImportError，连带 test_model_server_default_portability.py 整个收集失败
+#     （那正是 `::jsonb` 回归没被守卫拦住的原因）。2026-10-31 一并删除。
 # ===================================================================
-
-
-class ContractUpload(BaseModel):
-    """上传合同"""
-    company_code: str | None = None
-    contract_no: str | None = None
-    party_a: str | None = None
-    party_b: str | None = None
-    contract_amount: Decimal | None = None
-    contract_date: date | None = None
-    effective_date: date | None = None
-    expiry_date: date | None = None
-    contract_type: ContractType | None = None
-
-
-class ContractResponse(BaseModel):
-    """合同响应"""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    project_id: UUID
-    company_code: str | None = None
-    contract_no: str | None = None
-    party_a: str | None = None
-    party_b: str | None = None
-    contract_amount: Decimal | None = None
-    contract_date: date | None = None
-    effective_date: date | None = None
-    expiry_date: date | None = None
-    contract_type: ContractType | None = None
-    file_path: str | None = None
-    analysis_status: ContractAnalysisStatus
-    created_at: datetime
-
-
-class ContractExtractedResponse(BaseModel):
-    """合同条款提取响应"""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    contract_id: UUID
-    clause_type: ClauseType
-    clause_content: str
-    confidence_score: Decimal | None = None
-    human_confirmed: bool
-
-
-class ContractCrossReferenceResult(BaseModel):
-    """合同与账面交叉比对结果"""
-    contract_id: UUID
-    checks: list[dict[str, Any]] = []  # amount / payment_terms / expiry_date / related_party
-
-
-class ContractWPLinkCreate(BaseModel):
-    """关联底稿"""
-    workpaper_id: UUID
-    link_type: ContractLinkType
-    link_description: str | None = None
-
-
-class ContractWPLinkResponse(BaseModel):
-    """合同与底稿关联响应"""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    contract_id: UUID
-    workpaper_id: UUID
-    link_type: ContractLinkType
-    link_description: str | None = None
-    created_at: datetime
-
-
-class ContractSummary(BaseModel):
-    """合同汇总报告"""
-    total_contracts: int = 0
-    by_type: dict[str, int] = {}
-    total_amount: Decimal = Decimal("0")
-    pending_analysis: int = 0
-    completed_analysis: int = 0
-    special_terms_count: int = 0
-    related_party_count: int = 0
-
-
-class ContractFilter(BaseModel):
-    """合同筛选"""
-    contract_type: ContractType | None = None
-    analysis_status: ContractAnalysisStatus | None = None
-    page: int = Field(1, ge=1)
-    page_size: int = Field(50, ge=1, le=500)
 
 
 # ===================================================================
