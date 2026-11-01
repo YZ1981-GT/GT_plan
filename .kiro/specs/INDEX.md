@@ -391,7 +391,7 @@
 > D4-33~36 的导出导入/A13/跨项目隔离浏览器实测（代码层守卫已覆盖同一行为）。
 > ⚠️ **逐张 L1 必须 `--workers=1` 串行**：多 worker 会因 OnlyOffice 8080 单实例并发 contention 假失败（已实证）。
 >
-> **未随本批归档（仍 active）**：① `workpaper-html-onlyoffice-bidirectional-writeback-closure` 平台总纲
+> **未随本批归档（仍 active）**：① [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) 平台总纲
 > 仍有 **5 个 `[-]`**（Tasks 61 / 71 / 72 / 74 / 75），`legacy_fake_bidirectional` 现 **137**，不具备归档条件；
 > 其 `requirements.md` / `tasks.md` 末尾已追加 2026-09-22 现状刷新节（§背景 旧快照 185/276/186/43/136 中 5 个数字
 > 已过期，现读数 175/265/176/33/132；并登记 D4 lane 与「四类 Excel pilot」不是同一组 —— Task 40 的 checklist entry
