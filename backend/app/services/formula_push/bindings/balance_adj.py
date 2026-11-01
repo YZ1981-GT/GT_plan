@@ -271,9 +271,10 @@ class BalanceAdjudicationBinding:
         from app.services.formula_engine import execute
 
         result = execute(rule.source.expression, sources.formula.context_for(rule.source.context_map))
-        if result.errors or result.blocked:
+        if not result.ok or result.value is None:
+            reason = "；".join(result.errors) or ("公式被拦截" if result.blocked else "公式未返回数值")
             return [], [TargetSkip(
-                rule.rule_id, addr, "公式求值失败：" + "；".join(result.errors),
+                rule.rule_id, addr, "公式求值失败：" + reason,
             )]
         value: Any = float(result.value)
         return [WorkpaperTarget(

@@ -28,36 +28,36 @@
 
 ## 批 2　失败值 None
 
-- [ ] 4. 调用方迁移与类型切换（R3，ADR-FGR-03）
+- [x] 4. 调用方迁移与类型切换（R3，ADR-FGR-03）
   - 按 `value_none_callers.json` 逐个改；`FormulaResult.value` 改 `Decimal | None`；清单守卫；前端展示「—」与原因
   - Verify: 每个调用方一条失败输入用例；清单守卫；全量后端回归只候选红 = 0。变异：任一登记调用方去掉 `ok` 判断 ⇒ 守卫红
 
 ## 批 3　Decimal 与除零
 
-- [ ] 5. 附注执行器与单元格求值器 Decimal 化（R4、R9④，ADR-FGR-04，design §5 D3）
+- [x] 5. 附注执行器与单元格求值器 Decimal 化（R4、R9④，ADR-FGR-04，design §5 D3）
   - 两个模块改 `Decimal`；缺数返回原因；除零报错；三引擎逐值相等用例
   - Verify: 精度、除零、缺数坐标用例；回滚事务 PG（【测试】附注一节执行后数值量化到分）。变异：除零恢复返回 0 ⇒ 用例红
 
 ## 批 4　取数口径与严格性
 
-- [ ] 6. `REPORT` 期间、缺行与正则降级（R8、R9②③，ADR-FGR-05）
+- [x] 6. `REPORT` 期间、缺行与正则降级（R8、R9②③，ADR-FGR-05）
   - `_handle_report` 认期间、上期预载、缺行报错；正则降级出错 ⇒ `ok=False`
   - Verify: 本期 / 上期 / 缺行 / 坏期间用例；回滚事务 PG（【测试】项目有上年报表时 `REPORT(…,'上期')` = 上年本期值）。变异：恢复忽略期间 ⇒ 上期用例红
 
-- [ ] 7. `typed_eval_strictness` 收敛与三参读取走 ACNR（R7，ADR-FGR-06/07）
+- [x] 7. `typed_eval_strictness` 收敛与三参读取走 ACNR（R7，ADR-FGR-06/07）
   - `WPExecutor` 两参 / 默认调用缺数报错；`formula_wp_semantics.py` 删差异维度；三参分支统一经 `acnr/wp_cell_target.py`
   - Verify: 四方一致用例（母 spec 需求 1.5 口径）无差异维度；契约测试断言不变。变异：恢复缺数返回 0 ⇒ 用例红
 
 ## 批 5　底稿有效定义
 
-- [ ] 8. 全轨读有效定义与旧保存路径（R5，ADR-FGR-08）
+- [x] 8. 全轨读有效定义与旧保存路径（R5，ADR-FGR-08）
   - `effective_cell_formulas`；coordinator `_load_formulas` 与 Tier A 预设改调；`wp_formula_service.save` 经同步内核；直写 `wp_formula` 守卫
   - Verify: 三路径同表达式用例；旧保存路径版本与待确认用例；回滚事务 PG（【测试】项目全局改一条底稿公式后运行时读到新定义）。变异：coordinator 恢复只读 `wp_formula` ⇒ 用例红
 
-- [ ] 9. R6 处置（ADR-FGR-09，design §5 D4）
+- [x] 9. R6 处置（ADR-FGR-09，design §5 D4）
   - 用户同意移交 ⇒ 本任务标「移交 S9」并在 design 记录；不同意 ⇒ 按 S9 design ADR-ISL-01 实施并补对应用例
 
-- [ ] 10. 收尾
+- [x] 10. 收尾
   - 每批的回归与变异记录汇总；浏览器（chrome-devtools，【测试】项目）：公式编辑框对 `%`、`PRIOR`、多余参数的提示，报表 trace 对失败行显示原因；截图放 `tmp_formula_grammar/screenshots/`，用完停 about:blank
   - INDEX.md 本行与 memory.md 任务状态
   - Verify: 只候选红 = 0；推送带版本号与主要变动

@@ -24,13 +24,18 @@
       <div class="gt-fd-value-bar" :class="{ 'gt-fd-ok': result.ok, 'gt-fd-error': !result.ok }">
         <span class="gt-fd-value-label">结果：</span>
         <span v-if="result.ok" class="gt-fd-value">{{ result.value ?? '—' }}</span>
-        <span v-else class="gt-fd-value gt-fd-error-text">{{ result.state === 'blocked' ? '⛔ 公式被拦截' : '❌ 执行失败' }}</span>
+        <span v-else class="gt-fd-value gt-fd-error-text">—</span>
         <el-tag :type="result.ok ? 'success' : 'danger'" size="small" style="margin-left: 8px;">
           {{ result.state }}
         </el-tag>
       </div>
 
       <!-- 错误信息 -->
+      <div v-if="failureReason(result)" class="gt-fd-errors" data-testid="formula-debug-failure-reason">
+        <div class="gt-fd-error-item">
+          <span style="color: var(--gt-color-danger);">⚠</span> 失败原因：{{ failureReason(result) }}
+        </div>
+      </div>
       <div v-if="result.errors?.length" class="gt-fd-errors">
         <div v-for="(err, i) in result.errors" :key="i" class="gt-fd-error-item">
           <span style="color: var(--gt-color-danger);">⚠</span> {{ err }}
@@ -141,6 +146,14 @@ async function onRun() {
   } finally {
     running.value = false
   }
+}
+
+function failureReason(value: any): string | null {
+  if (!value) return null
+  if (value.error) return String(value.error)
+  const errors = Array.isArray(value.errors) ? value.errors.filter(Boolean) : []
+  if (errors.length) return errors.join('；')
+  return value.ok === false ? '公式执行失败' : null
 }
 
 function isErrorStep(step: string) {

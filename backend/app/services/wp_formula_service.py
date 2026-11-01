@@ -509,6 +509,7 @@ class WpFormulaService:
         stable = derive_stable_key(sheet_name, target_cell)
 
         # ── upsert：按 (wp_id, sheet_name, target_cell) 维度 ──
+        # 写入后追加同步跟踪（ADR-FGR-08：旧保存路径经同步内核跟踪）
         existing = (
             await db.execute(
                 sa.select(WpFormula).where(
@@ -577,6 +578,8 @@ class WpFormulaService:
                 )
 
             await db.refresh(existing)
+            # ── 同步跟踪（ADR-FGR-08）──
+            await self._update_sync_tracking(db, existing, project_uuid, sheet_name, target_cell)
             await self._invalidate_reference_dependents(
                 db, source_formula_id=existing.id, project_id=project_uuid
             )
@@ -616,7 +619,68 @@ class WpFormulaService:
             formula.lifecycle_state = "saved"
         db.add(formula)
         await db.flush()
+        # ── 同步跟踪（ADR-FGR-08）──
+        await self._update_sync_tracking(db, formula, project_uuid, sheet_name, target_cell)
         return formula, []
+
+    async def _update_sync_tracking(
+        self,
+        db: AsyncSession,
+        formula: WpFormula,
+        project_id: uuid.UUID,
+        sheet_name: str,
+        target_cell: str,
+    ) -> None:
+        """写入后同步跟踪（ADR-FGR-08）：记录上游基线定义，使同步内核能发现冲突与待确认项。"""
+        try:
+            from app.services.formula_settings.domain_stores import (
+                WP_SOURCES,
+                _mapping_records,
+                split_wp_slot,
+                wp_slot,
+            )
+            from app.services.formula_settings.definitions import ANY_SCOPE
+            from app.models.formula_setting_models import FormulaSetting
+            from app.models.workpaper_models import WorkingPaper, WpIndex
+
+            # 获取 wp_code
+            code = (await db.execute(
+                sa.select(WpIndex.wp_code)
+                .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(WorkingPaper.id == formula.wp_id)
+            )).scalar_one_or_none()
+            if not code:
+                return
+
+            slot = wp_slot(code, sheet_name, target_cell)
+
+            # 查全局层
+            global_row = (await db.execute(
+                sa.select(FormulaSetting).where(
+                    FormulaSetting.domain == "wp",
+                    FormulaSetting.layer == "global",
+                    FormulaSetting.scope == ANY_SCOPE,
+                    FormulaSetting.slot_key == slot,
+                    FormulaSetting.is_deleted == sa.false(),
+                )
+            )).scalar_one_or_none()
+
+            if global_row is not None:
+                formula.base_definition = dict(global_row.definition or {})
+                formula.base_version = global_row.version
+                formula.base_origin = "global"
+            else:
+                presets = _mapping_records()
+                preset = presets.get(slot)
+                if preset is not None:
+                    formula.base_definition = dict(preset.definition or {})
+                    formula.base_version = preset.version
+                    formula.base_origin = "preset"
+                # 无上游 ⇒ base_* 保留原值（可能为 None）
+
+            await db.flush()
+        except Exception:  # noqa: BLE001 — 同步跟踪失败不阻断保存
+            logger.warning("wp_formula sync tracking 更新失败 formula=%s", formula.id, exc_info=True)
 
     async def list_by_wp(
         self,

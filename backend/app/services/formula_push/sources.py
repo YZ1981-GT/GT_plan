@@ -164,8 +164,16 @@ class FormulaSources:
             if self.tb is None:
                 raise RuntimeError("试算表审定口径未加载")
             tb_data = {k: dict(v) for k, v in self.tb.tb_data.items()}
+            from app.services.formula_inputs import emit
+            for code, values in tb_data.items():
+                for column, value in values.items():
+                    emit("TB", f"{code}|{column}", value, f"trial_balance:{code}")
         if context.get("adj") == "hall_approved_excluding_workpaper":
             adj_data = {k: dict(v) for k, v in self.hall_adj.items()}
+            from app.services.formula_inputs import emit
+            for code, values in adj_data.items():
+                for column, value in values.items():
+                    emit("ADJ", f"{code}|{column}", value, f"adjustment:{code}")
         return FormulaContext(tb_data=tb_data, adj_data=adj_data)
 
     def unavailable_reason(self, context: Mapping[str, str]) -> str | None:

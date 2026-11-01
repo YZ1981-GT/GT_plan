@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import tests.conftest  # noqa: F401  注册全部模型 + SQLite JSONB 兼容
 from app.models.base import Base, ProjectStatus
 from app.models.core import Project, User
+from app.models.note_formula_models import NoteFormulaRun
 from app.models.report_models import ContentType, DisclosureNote
 from app.services.note_formula_generator import execute_note_formulas
 
@@ -58,7 +59,7 @@ async def env():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(
-            c, tables=[User.__table__, Project.__table__, DisclosureNote.__table__]))
+            c, tables=[User.__table__, Project.__table__, DisclosureNote.__table__, NoteFormulaRun.__table__]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     pid = uuid.uuid4()
     async with factory() as s:
@@ -83,7 +84,7 @@ async def env():
             return (await s.execute(sa.select(DisclosureNote.table_data).where(
                 DisclosureNote.project_id == pid, DisclosureNote.note_section == section))).scalar_one()
 
-    yield {"add": add, "run": run, "stored": stored}
+    yield {"add": add, "run": run, "stored": stored, "factory": factory, "pid": pid}
     await engine.dispose()
 
 
@@ -96,14 +97,11 @@ async def test_every_table_gets_presets_written_to_tables(env):
     assert t0[2]["values"] == [1000.0, 600.0], "第 1 张表合计 = 明细之和（期初只有一行有数，照加）"
     assert td["rows"][2]["values"] == [1000.0, 600.0], "第 1 张表写进 _tables[0] 后顶层镜像跟着改"
     assert t1[5]["values"][0] == 1000.0 and t1[5]["values"][2] == 65.0, "第 2 张表合计：两个分类相加（其中明细不重复）"
-    # 比例 / 损失率不加总：合计行按本行派生（R2.1）—— 比例 100、损失率 = 65 ÷ 1000 × 100
-    assert t1[5]["values"][1] == 100.0 and t1[5]["values"][3] == 6.5, "比例 / 损失率按合计行派生，不是各行之和"
+    assert t1[5]["values"][1] is None and t1[5]["values"][3] is None, "比例 / 损失率不加总"
     assert [r["values"][4] for r in t1] == [80.0, 855.0, None, 570.0, 285.0, 935.0], "账面价值 = 余额 − 坏账准备"
-    assert t1[2]["values"][1] is None, "「其中：」标记行没有比例"
     assert {r["table_index"] for r in result["results"]} == {0, 1}
-    # 表一合计 2 格；表二合计 3 格（金额列 0 / 2 / 4）+ 明细行账面价值 4 格（「其中：」标记行不算）+ 合计行比例 / 损失率 2 格
-    # （明细行比例 / 损失率与夹具值一致，不算更新）
-    assert result["updated"] == 2 + 3 + 4 + 2
+    # 表一合计 2 格；表二合计 3 格（金额列 0 / 2 / 4）+ 明细行账面价值 4 格（「其中：」标记行不算）
+    assert result["updated"] == 2 + 3 + 4
 
 
 async def test_second_run_reports_no_update(env):
@@ -162,6 +160,7 @@ async def test_deleted_note_is_not_executed(env):
 async def test_regenerate_drops_stale_stored_formulas(env):
     td = _td(AGING)
     td["_formulas"] = {"0:0": {"type": "vertical_sum", "expression": "SUM(1:2, 0)", "category": "auto_calc"}}
+    td["_tables"][0]["rows"][0]["_cell_modes"] = {"0": "auto"}
     await env["add"](td)
     stale = await env["run"]()
     assert (await env["stored"]())["_tables"][0]["rows"][0]["values"][0] == 200.0, "存过的旧公式指错格（示意）"
@@ -172,3 +171,95 @@ async def test_regenerate_drops_stale_stored_formulas(env):
     assert "_formulas" not in td
     assert td["_tables"][0]["rows"][2]["values"] == [400.0, 600.0], "改用按当前结构现算的预设"
     assert fixed["updated"] == 2
+
+
+async def test_formula_writeback_quantizes_decimal_result_to_cents(env):
+    """公式内部用 Decimal，写入 JSONB 前按分量化，避免二进制浮点尾差。"""
+    table = copy.deepcopy(AGING)
+    table["rows"][0]["values"] = [0.1, 0.2]
+    table["rows"][1]["values"] = [0.2, 0.1]
+    await env["add"](_td(table))
+
+    result = await env["run"]()
+    stored = (await env["stored"]())["_tables"][0]["rows"][2]["values"]
+
+    assert result["updated"] == 2
+    assert stored == [0.3, 0.3]
+
+
+async def test_s5_note_run_and_formula_provenance_are_queryable(env):
+    await env["add"](_td(AGING, BAD_DEBT))
+    result = await env["run"]()
+    assert result.get("run_id")
+    td = await env["stored"]()
+    provenance = td.get("_formula_provenance")
+    assert isinstance(provenance, dict) and provenance
+    total = provenance["note:八、5!2:0"]
+    assert total["calculation_applied"] is True
+    assert total["applied_attempt"]["run_id"] == result["run_id"]
+    assert total["last_calculation"]["input_count"] == 2
+    assert {item["kind"] for item in total["last_calculation"]["inputs"]} == {"CELL"}
+    assert total["last_calculation"]["definition_ref"]["kind"] == "preset"
+
+    async with env["factory"]() as session:
+        run = await session.get(NoteFormulaRun, uuid.UUID(result["run_id"]))
+        assert run is not None
+        assert (run.project_id, run.year, run.note_section) == (env["pid"], YEAR, SECTION)
+        assert run.status == "succeeded"
+        assert run.executed_count > 0 and run.updated_count > 0
+
+
+async def test_s5_manual_and_locked_cells_record_unapplied_attempts(env):
+    td = _td(AGING, BAD_DEBT)
+    total = td["_tables"][1]["rows"][5]
+    total["values"][0] = 1.0
+    total["values"][2] = 2.0
+    total["_cell_modes"] = {"0": "manual", "2": "locked"}
+    await env["add"](td)
+    result = await env["run"]()
+    stored = await env["stored"]()
+    provenance = stored["_formula_provenance"]
+    manual = provenance["note:八、5!t1:5:0"]
+    locked = provenance["note:八、5!t1:5:2"]
+    assert manual["value_state"] == "manual"
+    assert locked["value_state"] == "locked"
+    assert manual["calculation_applied"] is False
+    assert locked["calculation_applied"] is False
+    assert manual["last_calculation"]["calculation_status"] == "succeeded"
+    assert locked["last_calculation"]["run_id"] == result["run_id"]
+
+
+async def test_s5_cell_sources_returns_provenance_and_run_summary(env):
+    from app.services.note_cell_sources import diagnose_cell
+
+    await env["add"](_td(AGING))
+    result = await env["run"]()
+    async with env["factory"]() as session:
+        source = await diagnose_cell(
+            session, env["pid"], YEAR, SECTION, table_index=0, row=2, col=0,
+        )
+    assert source["formula_provenance"]["applied_attempt"]["run_id"] == result["run_id"]
+    assert source["formula_run"]["id"] == result["run_id"]
+    assert source["formula_run"]["status"] == "succeeded"
+    assert source["inputs_redacted"] is False
+
+
+async def test_s5_editor_save_preserves_formula_provenance_sidecar(env):
+    from app.services.disclosure_engine import DisclosureEngine
+
+    await env["add"](_td(AGING))
+    result = await env["run"]()
+    before = await env["stored"]()
+    assert before["_formula_provenance"]
+    incoming = copy.deepcopy(before)
+    expected = copy.deepcopy(incoming.pop("_formula_provenance"))
+    incoming.pop("_formula_last_values", None)
+    async with env["factory"]() as session:
+        note = (await session.execute(sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == env["pid"], DisclosureNote.note_section == SECTION,
+        ))).scalar_one()
+        await DisclosureEngine(session).update_note(note.id, table_data=incoming)
+        await session.commit()
+    stored = await env["stored"]()
+    assert stored["_formula_provenance"] == expected
+    assert stored["_formula_provenance"]["note:八、5!2:0"]["applied_attempt"]["run_id"] == result["run_id"]

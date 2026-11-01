@@ -24,7 +24,6 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper
@@ -291,191 +290,100 @@ class WorkpaperMutationAdapter:
             )
         return mutations
 
-    async def _apply_checklist_group(
-        self,
-        mutations: list[FormulaMutation],
-        *,
-        wp_id: UUID,
-        storage_col: str,
-        now: datetime,
-    ) -> list[AppliedMutation]:
-        """一次锁读并批量写同一底稿/存储列，SQL 数不随条目数线性增长。"""
-        item_ids = list(dict.fromkeys(str(m.target.locator["item"]) for m in mutations))
-        lock_suffix = " FOR UPDATE" if self._session.get_bind().dialect.name == "postgresql" else ""
-        select_sql = text(
-            "SELECT item_id, remark, conclusion, updated_at "
-            "FROM checklist_responses "
-            "WHERE wp_id = :wp_id AND item_id IN :item_ids "
-            f"ORDER BY item_id{lock_suffix}"
-        ).bindparams(sa.bindparam("item_ids", expanding=True))
-        rows = (
-            await self._session.execute(
-                select_sql,
-                {"wp_id": str(wp_id), "item_ids": item_ids},
-            )
-        ).all()
-        existing = {
-            str(row[0]): {
-                "remark": row[1],
-                "conclusion": row[2],
-                "updated_at": row[3],
-            }
-            for row in rows
-        }
-        working_values = {
-            item_id: row[storage_col] for item_id, row in existing.items()
-        }
-        target_by_item: dict[str, CanonicalFormulaTarget] = {}
-
-        for mutation in mutations:
-            locator = dict(mutation.target.locator)
-            item_id = str(locator["item"])
-            current = existing.get(item_id)
-            current_version = _version_from_timestamp(
-                current["updated_at"] if current is not None else None
-            )
-            if (
-                mutation.expected_version is not None
-                and current_version != mutation.expected_version
-            ):
-                raise VersionConflict(
-                    mutation.target,
-                    mutation.expected_version,
-                    current_version,
-                )
-            working_values[item_id] = _cell_write(
-                working_values.get(item_id),
-                locator.get("cell", "."),
-                mutation.after_value,
-            )
-            target_by_item[item_id] = mutation.target
-
-        update_params = [
-            {
-                "wp_id": str(wp_id),
-                "item_id": item_id,
-                "col_value": working_values[item_id],
-                "updated_at": now,
-            }
-            for item_id in item_ids
-            if item_id in existing
-        ]
-        insert_params = [
-            {
-                "id": str(uuid4()),
-                "project_id": str(mutations[0].target.project_id),
-                "wp_id": str(wp_id),
-                "item_id": item_id,
-                "col_value": working_values[item_id],
-                "created_at": now,
-                "updated_at": now,
-            }
-            for item_id in item_ids
-            if item_id not in existing
-        ]
-
-        if storage_col == "conclusion":
-            update_sql = text(
-                "UPDATE checklist_responses "
-                "SET conclusion = :col_value, updated_at = :updated_at, "
-                "content_version = content_version + 1 "
-                "WHERE wp_id = :wp_id AND item_id = :item_id"
-            )
-            insert_sql = text(
-                "INSERT INTO checklist_responses "
-                "(id, project_id, wp_id, item_id, conclusion, created_at, updated_at, content_version) "
-                "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1)"
-            )
-        else:
-            update_sql = text(
-                "UPDATE checklist_responses "
-                "SET remark = :col_value, updated_at = :updated_at, "
-                "content_version = content_version + 1 "
-                "WHERE wp_id = :wp_id AND item_id = :item_id"
-            )
-            insert_sql = text(
-                "INSERT INTO checklist_responses "
-                "(id, project_id, wp_id, item_id, remark, created_at, updated_at, content_version) "
-                "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1)"
-            )
-
-        if update_params:
-            await self._session.execute(update_sql, update_params)
-        if insert_params:
-            try:
-                # 缺失行不使用 ON CONFLICT UPDATE：若用户在锁读后抢先创建，唯一约束
-                # 必须让整批冲突回滚，不能覆盖刚保存的用户值。
-                await self._session.execute(insert_sql, insert_params)
-            except IntegrityError as exc:
-                first = next(item for item in item_ids if item not in existing)
-                raise VersionConflict(
-                    target_by_item[first],
-                    "__none__",
-                    "concurrently_created",
-                ) from exc
-
-        applied_at = now.isoformat()
-        return [
-            AppliedMutation(
-                target=mutation.target,
-                applied_version=applied_at,
-                applied_at=applied_at,
-            )
-            for mutation in mutations
-        ]
-
     async def apply_many(
         self,
         mutations: list[FormulaMutation],
     ) -> list[AppliedMutation]:
-        """批量 CAS 写入。普通 checklist 路径每底稿一次归属校验、一次锁读和有界 DML。"""
-        if not mutations:
-            return []
+        """写入新值，校验项目归属与版本。仅 flush 不 commit。"""
         applied: list[AppliedMutation] = []
         now = datetime.now(timezone.utc)
-        verified: set[tuple[UUID, UUID]] = set()
-        checklist_groups: dict[tuple[UUID, UUID, str], list[FormulaMutation]] = {}
 
         for mutation in mutations:
             locator = dict(mutation.target.locator)
             wp_id = UUID(locator["wp_id"])
-            ownership = (wp_id, mutation.target.project_id)
-            if ownership not in verified:
-                await self._verify_ownership(wp_id, mutation.target.project_id)
-                verified.add(ownership)
 
-            if not _is_parsed_data_target(locator):
-                storage_col = _storage_field(locator)
-                checklist_groups.setdefault(
-                    (wp_id, mutation.target.project_id, storage_col), []
-                ).append(mutation)
+            if _is_parsed_data_target(locator):
+                sheet_name = locator.get("sheet_name", "")
+                cell_ref = locator.get("cell_ref", "")
+                wp = (
+                    await self._session.execute(
+                        sa.select(WorkingPaper)
+                        .where(
+                            WorkingPaper.id == wp_id,
+                            WorkingPaper.project_id == mutation.target.project_id,
+                        )
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if wp is None:
+                    raise OwnershipViolation(wp_id, mutation.target.project_id, None)
+                current_version = _version_from_timestamp(wp.updated_at)
+                if mutation.expected_version is not None and current_version != mutation.expected_version:
+                    raise VersionConflict(mutation.target, mutation.expected_version, current_version)
+                write_cell_to_parsed_data(
+                    wp,
+                    sheet_name=sheet_name,
+                    cell_ref=cell_ref,
+                    value=format_cell_display_value(mutation.after_value),
+                    require_existing_sheet=True,
+                )
+                wp.updated_at = now
+                await self._session.flush()
+                applied.append(
+                    AppliedMutation(
+                        target=mutation.target,
+                        applied_version=now.isoformat(),
+                        applied_at=now.isoformat(),
+                    )
+                )
                 continue
 
-            sheet_name = locator.get("sheet_name", "")
-            cell_ref = locator.get("cell_ref", "")
-            wp = (
-                await self._session.execute(
-                    sa.select(WorkingPaper)
-                    .where(
-                        WorkingPaper.id == wp_id,
-                        WorkingPaper.project_id == mutation.target.project_id,
-                    )
-                    .with_for_update()
-                )
-            ).scalar_one_or_none()
-            if wp is None:
-                raise OwnershipViolation(wp_id, mutation.target.project_id, None)
-            current_version = _version_from_timestamp(wp.updated_at)
+            item_id = locator["item"]
+            cell = locator.get("cell", ".")
+            storage_col = _storage_field(locator)
+
+            await self._verify_ownership(wp_id, mutation.target.project_id)
+            col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
+            current_version = _version_from_timestamp(updated_at)
             if mutation.expected_version is not None and current_version != mutation.expected_version:
                 raise VersionConflict(mutation.target, mutation.expected_version, current_version)
-            write_cell_to_parsed_data(
-                wp,
-                sheet_name=sheet_name,
-                cell_ref=cell_ref,
-                value=format_cell_display_value(mutation.after_value),
-                require_existing_sheet=True,
+
+            new_value = _cell_write(col_value, cell, mutation.after_value)
+
+            # UPSERT — 按 storage_col 选列写入
+            # 白名单分支避免 f-string 拼列名
+            if storage_col == "conclusion":
+                upsert_sql = (
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, conclusion, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
+                    "ON CONFLICT (wp_id, item_id) DO UPDATE "
+                    "SET conclusion = EXCLUDED.conclusion, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
+                )
+            else:
+                upsert_sql = (
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, remark, created_at, updated_at, content_version) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :col_value, :created_at, :updated_at, 1) "
+                    "ON CONFLICT (wp_id, item_id) DO UPDATE "
+                    "SET remark = EXCLUDED.remark, updated_at = EXCLUDED.updated_at, "
+                    "content_version = checklist_responses.content_version + 1"
+                )
+            await self._session.execute(
+                text(upsert_sql),
+                {
+                    "id": str(uuid4()),
+                    "project_id": str(mutation.target.project_id),
+                    "wp_id": str(wp_id),
+                    "item_id": item_id,
+                    "col_value": new_value,
+                    "created_at": now,
+                    "updated_at": now,
+                },
             )
-            wp.updated_at = now
+            await self._session.flush()
+
             applied.append(
                 AppliedMutation(
                     target=mutation.target,
@@ -483,18 +391,6 @@ class WorkpaperMutationAdapter:
                     applied_at=now.isoformat(),
                 )
             )
-
-        for (wp_id, _project_id, storage_col), group in checklist_groups.items():
-            applied.extend(
-                await self._apply_checklist_group(
-                    group,
-                    wp_id=wp_id,
-                    storage_col=storage_col,
-                    now=now,
-                )
-            )
-
-        await self._session.flush()
         return applied
 
     async def restore_many(

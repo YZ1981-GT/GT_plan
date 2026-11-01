@@ -173,8 +173,9 @@ class E1Binding:
             if reason:
                 return [], [TargetSkip(rule.rule_id, addr, reason)]
             result = execute(rule.source.expression, sources.formula.context_for(rule.source.context_map))
-            if result.errors or result.blocked:
-                return [], [TargetSkip(rule.rule_id, addr, "公式求值失败：" + "；".join(result.errors))]
+            if not result.ok or result.value is None:
+                reason = "；".join(result.errors) or ("公式被拦截" if result.blocked else "公式未返回数值")
+                return [], [TargetSkip(rule.rule_id, addr, "公式求值失败：" + reason)]
             value: Any = float(result.value)
         else:
             value = self._derive(rule, entries, sources)

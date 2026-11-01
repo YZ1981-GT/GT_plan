@@ -109,12 +109,18 @@ async def _debug_run(db: AsyncSession, project_id: uuid.UUID, body: FormulaDebug
                 context_summary=summary,
             )
 
+    # ``FormulaResult.value`` 失败时是 ``None``。这里显式把 ``ok`` 与值绑定，
+    # 防止将未来某个不完整结果误展示成可用数字（ADR-FGR-03）。
+    ok = result.ok and result.value is not None
+    errors = list(result.errors)
+    if not ok and not errors:
+        errors.append(f"公式执行失败（{result.state}）")
     return FormulaDebugResponse(
-        value=str(result.value) if result.value is not None else None,
-        ok=result.ok,
+        value=str(result.value) if ok else None,
+        ok=ok,
         state=result.state,
         trace=result.trace,
-        errors=result.errors,
+        errors=errors,
         warnings=formula_warnings.merge_into([*result.warnings, *gaps], collected),
         context_summary=summary,
     )

@@ -365,6 +365,9 @@ class FormulaEvaluator:
             prior_tb_data={},
         )
         result = fe_execute(func_formula, ctx)
+        if not result.ok or result.value is None:
+            reason = "；".join(result.errors) or "公式未返回数值"
+            raise ValueError(reason)
         val = result.value
         self.trace.append({'type': 'FUNC', 'name': name, 'args': str_args, 'value': str(val)})
         return val

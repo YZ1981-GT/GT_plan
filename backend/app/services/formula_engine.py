@@ -62,10 +62,11 @@ class FormulaResult:
     """公式执行结果。
 
     ``blocked``（P0-项2）：公式结构合法但含**非白名单**内容（未注册函数 / eval/exec /
-    URL / 外链）。此时 ``value`` 仍会给出（通常 0），但 ``ok`` 为 False 且分类明确为
+    URL / 外链）。失败结果的 ``value`` 为 ``None``，``ok`` 为 False 且分类明确为
     blocked —— **不静默返 0 冒充正常**，供调用方区分「配置/注入问题」与「诚实的 0」。
+    成功的真实零值仍使用 ``Decimal("0")``；调用方必须先判 ``ok`` 再消费 ``value``。
     """
-    value: Decimal = Decimal("0")
+    value: Decimal | None = None
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)  # 取数轨迹（审计用）
@@ -73,7 +74,7 @@ class FormulaResult:
 
     @property
     def ok(self) -> bool:
-        return len(self.errors) == 0 and not self.blocked
+        return self.value is not None and len(self.errors) == 0 and not self.blocked
 
     @property
     def state(self) -> str:
@@ -83,6 +84,8 @@ class FormulaResult:
         if self.errors and any("解析失败" in e for e in self.errors):
             return "damaged"
         if self.errors:
+            return "error"
+        if self.value is None:
             return "error"
         return "ok"
 
@@ -98,6 +101,8 @@ class FormulaContext:
     tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 行次编码 → 已计算值（供 ROW/SUM_ROW/REPORT 引用）
     row_cache: dict[str, Decimal] = field(default_factory=dict)
+    # 上期报表行次编码 → 金额（供 REPORT('行次','上期') 引用）
+    prior_row_cache: dict[str, Decimal] = field(default_factory=dict)
     # 上年科目数据（供 PREV 两参引用）
     prior_tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # PREV 三参（上年同底稿取数）预载值：(底稿, 表, 字段) → 值；取不到的原因另存，L1 据此报错、不按 0
@@ -232,10 +237,10 @@ class FormulaColumnError(Exception):
 
 
 class FormulaEvalError(Exception):
-    """求值失败：除零、ROW 缺行、未注册函数、参数个数不足、AST 超预算（原先一律按 0 求值且 ``ok=True``）。
+    """求值失败：除零、ROW 缺行、未注册函数、参数个数不足、AST 超预算。
 
-    与 :class:`FormulaColumnError` 同处捕获、记入 ``FormulaResult.errors``；``value`` 仍为 0 供只读调用方，
-    写入方一律判 ``ok``（spec formula-hub-integrity-closure ADR-FHIC-01，需求 2.3）。
+    与 :class:`FormulaColumnError` 同处捕获、记入 ``FormulaResult.errors``；失败结果的
+    ``value`` 为 ``None``，调用方必须先判 ``ok``，不能把失败伪装成 0。
     """
 
 
@@ -685,6 +690,25 @@ def _row_value(ctx: FormulaContext, row_code: str) -> Decimal:
     return ctx.row_cache[row_code]
 
 
+def _report_value(row_code: str, period_raw: str, ctx: FormulaContext) -> Decimal:
+    """AST / regex 两路径共用：REPORT 期间识别 + 缺行报错（ADR-FGR-05）。"""
+    period_lower = period_raw.strip().lower()
+    if period_lower in _REPORT_CURRENT_PERIOD:
+        cache = ctx.row_cache
+    elif period_lower in _REPORT_PRIOR_PERIOD:
+        cache = ctx.prior_row_cache
+    else:
+        raise FormulaEvalError(
+            f"REPORT('{row_code}','{period_raw}')：无法识别期间「{period_raw}」"
+            f"（可选：本期/期末/current 或 上期/期初/prior）"
+        )
+    if row_code not in cache:
+        raise FormulaEvalError(
+            f"REPORT('{row_code}','{period_raw}')：报表行不存在或未生成：{row_code}"
+        )
+    return cache[row_code]
+
+
 def _extract_string_args(args: list[Any], ctx: FormulaContext, trace: list[str]) -> list[str]:
     """从 AST 参数列表中提取字符串值。"""
     str_args: list[str] = []
@@ -914,12 +938,22 @@ def _handle_sum_row(args: list[Any], ctx: FormulaContext, trace: list[str]) -> D
     return val
 
 
+# ── REPORT 期间映射（ADR-FGR-05）──────────────────────────────────────────────
+_REPORT_CURRENT_PERIOD: frozenset[str] = frozenset({"本期", "期末", "current"})
+_REPORT_PRIOR_PERIOD: frozenset[str] = frozenset({"上期", "期初", "prior"})
+
+
 def _handle_report(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """REPORT('row_code','period') — 跨报表引用"""
+    """REPORT('row_code', 'period') — 跨报表引用。
+
+    期间参数认「本期/期末/current」（取 ``row_cache``）和「上期/期初/prior」（取 ``prior_row_cache``）；
+    无法识别的期间 ⇒ 报错；行次不存在 ⇒ 报错（不再按 0）。ADR-FGR-05。
+    """
     str_args = _extract_string_args(args, ctx, trace)
-    row_code = str_args[0] if str_args else ''
-    val = ctx.row_cache.get(row_code, Decimal("0"))
-    trace.append(f"REPORT('{row_code}') = {val}")
+    row_code = str_args[0].strip() if str_args else ""
+    period_raw = str_args[1].strip() if len(str_args) > 1 else "本期"
+    val = _report_value(row_code, period_raw, ctx)
+    trace.append(f"REPORT('{row_code}','{period_raw}') = {val}")
     return val
 
 
@@ -1245,14 +1279,16 @@ def execute_formula(
     row_cache: dict[str, Any],
     column: str = "期末余额",
     adj_map: dict[str, dict[str, Decimal]] | None = None,
-) -> Decimal:
-    """简易版执行（向后兼容）。返回 Decimal 值。
+) -> Decimal | None:
+    """简易版执行（向后兼容）。返回成功的 Decimal 值，失败返回 ``None``。
 
     ``adj_map``：``adj_net_batch`` 的返回值。**本函数同步**不能自己取数 ——
     调用方（async）取好传进来；不传则 ``ADJ()`` 返 0（既有行为，零回归）。
     """
     ctx = FormulaContext.from_simple_map(tb_map, row_cache, adj_map=adj_map)
     result = execute(formula, ctx)
+    if not result.ok or result.value is None:
+        return None
     return result.value
 
 
@@ -1272,6 +1308,8 @@ def execute(formula: str | None, ctx: FormulaContext) -> FormulaResult:
     result = FormulaResult()
 
     if not formula or not formula.strip():
+        # 空公式是成功的空计算，保持兼容入口的零值语义；真正失败路径不走这里。
+        result.value = Decimal("0")
         return result
 
     mode = _PARSE_MODE
@@ -1314,7 +1352,7 @@ def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
 
     P0-项2：求值前先做 blocked 判定（非白名单函数 / eval/exec / URL / 外链）——
     命中则标 ``result.blocked=True`` 并记 error，**不静默返 0 冒充正常**。
-    仍会尝试给出 value（通常 0），但 ``ok`` 因 blocked/errors 为 False。
+    失败结果保持 ``value=None``，成功求值才写入 Decimal 值。
     """
     result = FormulaResult()
     # ── blocked 前置判定（结构合法但语义越权/未授权）──
@@ -1336,7 +1374,7 @@ def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
         logger.warning("AST parse error: %s (formula=%s)", e, formula)
     except (FormulaColumnError, FormulaEvalError) as e:
         # 列名未注册（配置错）/ 求值失败（除零、ROW 缺行、未注册函数、参数不足、超预算）—— 必须与「求值崩溃」区分，
-        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。value 保持 0。
+        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。失败结果保持 ``value=None``。
         result.errors.append(str(e))
         logger.warning("Formula fetch / eval error: %s (formula=%s)", e, formula)
     except Exception as e:
@@ -1416,8 +1454,13 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
 
             elif token_name == "REPORT":
                 row_code = match.group(1)
-                val = ctx.row_cache.get(row_code, Decimal("0"))
-                trace_msg = f"REPORT('{row_code}') = {val}"
+                period_raw = match.group(2).strip() if match.group(2) else "本期"
+                # 与 AST 路径同一取值逻辑（ADR-FGR-05）
+                try:
+                    val = _report_value(row_code, period_raw, ctx)
+                except FormulaEvalError as exc:
+                    result.errors.append(str(exc))
+                trace_msg = f"REPORT('{row_code}','{period_raw}') = {val}"
 
             elif token_name == "PREV":
                 # 与 AST 路径同一取值函数（三参读预载值、两参按列名；取不到报错不按 0）
@@ -1474,6 +1517,9 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
         result.errors.append(f"算术求值失败: {e} (expr={expression})")
         logger.warning("Formula eval error: %s (expr=%s, formula=%s)", e, expression, formula)
 
+    # token 取数或最终算术任一路径失败时，禁止把部分替换结果作为成功值返回。
+    if result.errors:
+        result.value = None
     return result
 
 
@@ -1960,7 +2006,13 @@ class WPExecutor:
         db, project_id, wp_code: str, column: str = "审定数", field: str | None = None,
         *, year: int | None = None,
     ):
-        """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable."""
+        """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable.
+
+        ADR-FGR-06（formula-grammar-resolver-unification Task 7）：两参与默认调用缺数抛
+        ``FormulaEvalError``（原因透传），不再返回 ``D('0')``。与 ``wp_ref_strict`` /
+        ``typed_eval`` 严格轨口径一致 ⇒ ``typed_eval_strictness`` 差异维度消除。
+        D2-3 与三参 A1 分支保持各自语义不变。
+        """
         from decimal import Decimal as D
 
         # D2-3 嵌套寻址：第二参含「坏账准备明细表」标记时走 NestedTableService
@@ -1987,7 +2039,7 @@ class WPExecutor:
             )
             row = result.scalar_one_or_none()
             if row is None:
-                return D("0")
+                raise FormulaEvalError(f"底稿 {wp_code} 不存在或未找到")
 
             parsed_data = row or {}
             col = (column or "").strip()
@@ -1996,19 +2048,22 @@ class WPExecutor:
             if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
                 from app.services.wp_cell_reader import resolve_wp_cell
 
-                try:
-                    read = await resolve_wp_cell(db, project_id, year, wp_code, None, col)
-                except Exception:
-                    return D("0")
+                read = await resolve_wp_cell(db, project_id, year, wp_code, None, col)
                 if read.state != "ok":
-                    return D("0")
+                    raise FormulaEvalError(
+                        read.reason or f"底稿 {wp_code} 单元格 {col} 取不到数")
                 return read.value
 
             key = WP_COLUMN_KEYS.get(col, col)
-            value = parsed_data.get(key, 0)
-            return D(str(value)) if value is not None else D("0")
-        except Exception:
-            return D("0")
+            value = parsed_data.get(key)
+            if value is None or (isinstance(value, str) and not str(value).strip()):
+                raise FormulaEvalError(f"底稿 {wp_code} 无「{col}」的值")
+            return D(str(value))
+        except FormulaEvalError:
+            raise
+        except Exception as exc:
+            raise FormulaEvalError(
+                f"底稿 {wp_code} 取值异常：{exc}") from exc
 
 
 class REPORTExecutor:

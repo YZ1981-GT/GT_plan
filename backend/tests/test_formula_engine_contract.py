@@ -41,8 +41,8 @@ from app.services.formula_engine import (
 class TestFormulaResultContract:
     def test_has_all_four_fields_with_defaults(self):
         r = FormulaResult()
-        # 四字段齐全且类型/默认值正确
-        assert r.value == Decimal("0")
+        # 失败态不再用 0 伪装，必须由调用方先判 ok。
+        assert r.value is None
         assert r.errors == []
         assert r.warnings == []
         assert r.trace == []
@@ -58,7 +58,12 @@ class TestFormulaResultContract:
         bad_result = FormulaResult(errors=["boom"])
         assert bad_result.ok is False
 
-    def test_default_lists_are_independent(self):
+    def test_failed_result_value_is_none(self):
+        result = execute("ROW('MISSING')", FormulaContext())
+        assert result.ok is False
+        assert result.value is None
+        assert result.errors
+
         """default_factory 不应在实例间共享同一 list 对象。"""
         a = FormulaResult()
         b = FormulaResult()

@@ -247,7 +247,8 @@ async def _wire(env, monkeypatch, template_type: str | None = "listed") -> None:
     env.failures = []
 
     async def capture(payload):
-        env.failures.append(payload)
+        if payload.event_type == EventType.SYNC_FAILED:
+            env.failures.append(payload)
 
     monkeypatch.setattr(event_bus, "_notify_sse", capture)
     await set_template(env, template_type)

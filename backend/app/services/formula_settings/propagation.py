@@ -181,54 +181,40 @@ async def propagate_wp(project_id: uuid.UUID, year: int | None, slot_keys: list[
 
 
 async def propagate_note(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    """先把有效集合物化进各年度附注（执行器读 ``_user_formulas``），再标章节过期。"""
-    from app.models.report_models import DisclosureNote
+    """先物化有效公式，再经 stale_state 标记附注过期。"""
     from app.services.formula_settings.note_settings import materialize
+    from app.services.stale_state import StaleSource, mark_note_stale
 
     sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
     async with _factory()() as db:
         if await _is_frozen(db, project_id) is not False:
             return {"skipped": True}
         materialized = await materialize(db, project_id, sections)
-        n = (await db.execute(sa.update(DisclosureNote).where(
-            DisclosureNote.project_id == project_id, DisclosureNote.note_section.in_(sections),
-            DisclosureNote.is_deleted == sa.false(),
-        ).values(is_stale=True).execution_options(synchronize_session=False))).rowcount or 0
+        n = await mark_note_stale(
+            db,
+            project_id,
+            source=StaleSource.FORMULA_SETTINGS,
+            sections=sections,
+            year=year,
+        )
         await db.commit()
     return {"sections": sections, "materialized": materialized, "marked": int(n)}
 
 
 async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    """合并附注公式变化进入统一持久 operation，不再旁路只刷新附注。"""
-    from app.services.consol_operation_service import request_operation
-    from app.services.consol_push_service import TRIGGER_FORMULA
-    from app.workers.consol_operation_worker import wake
+    from app.services.consol_note_formula_service import fill_note_sections
 
     sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
     if year is None:
         return {"skipped": "no_year", "sections": sections}
     async with _factory()() as db:
         if not await _is_consolidated(db, project_id):
-            return {"skipped": "not_consolidated", "sections": sections}
+            return {"skipped": "not_consolidated"}
         if await _is_frozen(db, project_id) is not False:
-            return {"skipped": True, "sections": sections}
-        requested = await request_operation(
-            db,
-            project_id=project_id,
-            year=year,
-            operation_type="push",
-            idempotency_key=f"formula:{uuid.uuid4().hex}",
-            trigger_source=TRIGGER_FORMULA,
-            requested_actions=("notes",),
-        )
+            return {"skipped": True}
+        result = await fill_note_sections(db, project_id, year, sections)
         await db.commit()
-    wake()
-    return {
-        "sections": sections,
-        "operation_id": str(requested.operation.id),
-        "status": requested.operation.status,
-        "disposition": requested.disposition,
-    }
+    return {"sections": sections, "result": result}
 
 
 async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:

@@ -69,14 +69,14 @@ def test_prior_closing_hit():
     """=PRIOR('货币资金','期末') 命中 cross_data['prior']['货币资金']['closing']."""
     cross = _sample_cross_data_with_prior_aging()
     val = _resolve_single_cross_ref("PRIOR('货币资金','期末')", cross)
-    assert val == 1234.56
+    assert val == Decimal("1234.56")
 
 
 def test_prior_opening_hit():
     """=PRIOR('货币资金','期初') 取上年期初值."""
     cross = _sample_cross_data_with_prior_aging()
     val = _resolve_single_cross_ref("PRIOR('货币资金','期初')", cross)
-    assert val == 1100.00
+    assert val == Decimal("1100")
 
 
 def test_prior_account_missing_returns_none():
@@ -97,7 +97,7 @@ def test_prior_section_number_index():
     """按 section_number（如"五、1"）索引也能命中（兼容多 key 索引）."""
     cross = _sample_cross_data_with_prior_aging()
     val = _resolve_single_cross_ref("PRIOR('五、1','期末')", cross)
-    assert val == 1234.56
+    assert val == Decimal("1234.56")
 
 
 def test_prior_in_compound_expression():
@@ -106,7 +106,7 @@ def test_prior_in_compound_expression():
     val = _exec_cross_table(
         "PRIOR('货币资金','期末') - PRIOR('货币资金','期初')", cross
     )
-    assert val == pytest.approx(1234.56 - 1100.00)
+    assert val == Decimal("134.56")
 
 
 def test_prior_empty_cross_data():
@@ -150,10 +150,10 @@ def test_aging_unknown_bucket_returns_none():
 
 
 def test_aging_account_with_partial_buckets():
-    """科目存在但请求的桶下无数据（其他应收款无 5 年以上桶）→ 0.0（行为对齐 TB 缺账户返 0）."""
+    """科目存在但请求的桶下无数据（没有该龄段数据）→ None。"""
     cross = _sample_cross_data_with_prior_aging()
     val = _resolve_single_cross_ref("AGING('其他应收款','5年以上')", cross)
-    assert val == 0.0
+    assert val is None
 
 
 def test_aging_account_missing_returns_none():
@@ -294,11 +294,11 @@ async def test_load_cross_table_data_loads_prior_year_notes():
     cross = await _load_cross_table_data(db, project_id, year)
     # section_title 索引
     assert "货币资金" in cross["prior"]
-    assert cross["prior"]["货币资金"]["closing"] == 1234.56
-    assert cross["prior"]["货币资金"]["opening"] == 1100.0
+    assert cross["prior"]["货币资金"]["closing"] == Decimal("1234.56")
+    assert cross["prior"]["货币资金"]["opening"] == Decimal("1100")
     # section_number 索引（多 key 兜底）
     assert "五、1" in cross["prior"]
-    assert cross["prior"]["五、1"]["closing"] == 1234.56
+    assert cross["prior"]["五、1"]["closing"] == Decimal("1234.56")
 
 
 @pytest.mark.asyncio

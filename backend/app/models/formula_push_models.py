@@ -109,6 +109,8 @@ class FormulaPushState(Base):
     last_pushed_value: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     last_formula_value: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     current_value: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    # V237：计算尝试 + 最终值状态双层来源信封。
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     state: Mapped[str] = mapped_column(
         String(20), nullable=False, default="auto", server_default=sa.text("'auto'")
     )

@@ -92,10 +92,10 @@ async def _scenario(monkeypatch) -> dict:
         rule for rule in all_rules if rule.wp_code == wp_code and trigger in rule.triggers
     ))
 
-    async def find_workpapers_for_codes(db, project_id, paper_codes):
-        return {code: [papers[code]] for code in paper_codes if code in papers}
+    async def find_workpapers(db, project_id, wp_code):
+        return [papers[wp_code]]
 
-    monkeypatch.setattr(push, "_find_workpapers_for_codes", find_workpapers_for_codes)
+    monkeypatch.setattr(push, "_find_workpapers", find_workpapers)
 
     async with engine.begin() as admin:
         await admin.execute(sa.text(f'CREATE SCHEMA "{schema}"'))

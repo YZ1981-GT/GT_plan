@@ -118,11 +118,11 @@ class TestEvaluateFormulaRowToken:
         assert result == Decimal("500")
 
     @pytest.mark.asyncio
-    async def test_missing_row_defaults_zero(self):
-        """row_cache 无该 row_code：只取值的 ``evaluate_formula`` 仍给 0，带状态的结果判失败并给原因（需求 2.3）。"""
+    async def test_missing_row_returns_none(self):
+        """row_cache 无该 row_code：兼容值入口返回 None，带状态结果保留失败原因。"""
         result = await evaluate_formula(
             "ROW('UNKNOWN')", resolver=_NoopResolver(), row_cache={}
         )
-        assert result == Decimal("0")
+        assert result is None
         status = await evaluate_formula_result("ROW('UNKNOWN')", resolver=_NoopResolver(), row_cache={})
         assert not status.ok and any("ROW('UNKNOWN')" in e for e in status.errors), status

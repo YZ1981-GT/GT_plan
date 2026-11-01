@@ -202,3 +202,20 @@ def test_report_view_and_export_rows_pg():
         export = client.get(EXPORT.format(pid=world.project_id, year=YEAR))
         assert export.status_code == 200, export.text
         _assert_export(export.content)
+
+
+def test_definition_hash_is_authoritative_when_new_provenance_exists():
+    """S5：同公式文本但其他执行字段变化时，definition hash 仍能标过期。"""
+    stored_hash = "a" * 64
+    row = _row(
+        provenance={"applied_attempt": {"definition_hash": stored_hash}},
+        formula_used="TB('1001','期末余额')",
+    )
+    assert rf.is_effectively_stale(row, "TB('1001','期末余额')", stored_hash) is False
+    assert rf.is_effectively_stale(row, "TB('1001','期末余额')", "b" * 64) is True
+
+
+def test_legacy_row_without_definition_hash_falls_back_to_formula_text():
+    row = _row(provenance=None, formula_used="TB('1001','期末余额')")
+    assert rf.is_effectively_stale(row, "TB('1001','期末余额')", "b" * 64) is False
+    assert rf.is_effectively_stale(row, "TB('1002','期末余额')", "b" * 64) is True

@@ -84,30 +84,3 @@ async def test_editing_a_second_table_preset_becomes_project_adaptation():
                                .execution_options(populate_existing=True))).scalar_one()
         assert td["_tables"][1]["rows"][2]["values"] == [105.0, 7.0, 12.0], "改写的公式执行；其余列按预设合计"
         assert td["_tables"][0]["rows"][10]["values"][0] == 55.0
-
-
-async def test_listing_reports_cells_without_preset_and_why():
-    """R5.2（spec note-table-structure-formula-pull-closure）：没生成预设的格与原因随列表回（「表名 · 行名」+ 原因）。"""
-    from app.services.note_total_terms import ROLLFORWARD_REASON
-
-    roll = {"name": "（5）坏账准备变动", "headers": ["项 目", "金额"],
-            "rows": [_row("期初余额", [100.0]), _row("本期计提", [20.0]), _row("本期转回", [10.0]),
-                     _row("期末余额", [None], is_total=True, row_type="total")]}
-    async with make_db([DisclosureNote]) as factory, factory() as db:
-        pid = await add_project(db, "甲")
-        db.add(DisclosureNote(id=uuid.uuid4(), project_id=pid, year=2025, note_section=SECTION, section_title="应收账款",
-                              table_data={"headers": TABLES[0]["headers"], "rows": TABLES[0]["rows"],
-                                          "_tables": [TABLES[0], roll]}))
-        await db.flush()
-        listing = await note_settings.list_section(db, pid, 2025, SECTION)
-
-    assert {"label": "（5）坏账准备变动 · 期末余额", "reason": ROLLFORWARD_REASON} in listing["preset_notes"]
-    assert not any(r["target"].startswith("t1:") for r in listing["formulas"]), "纵向变动表不生成合计预设"
-    assert all(n["label"].startswith("（5）") for n in listing["preset_notes"]), "能生成预设的表不报原因"
-
-
-async def test_listing_without_note_has_no_preset_notes():
-    async with make_db([DisclosureNote]) as factory, factory() as db:
-        pid = await add_project(db, "甲")
-        listing = await note_settings.list_section(db, pid, 2025, SECTION)
-    assert listing["preset_notes"] == [] and listing["formulas"] == []

@@ -1,4 +1,4 @@
-"""底稿域有效公式接入预填（design §12 wp，tasks 6.1）。
+"""底稿域有效公式（design §12 wp + formula-grammar-resolver-unification ADR-FGR-08）。
 
 优先级：本项目（``wp_formula`` 行）> 全局（``formula_setting``）> 系统预设映射（``prefill_formula_mapping.json``）
 > 模板内置公式。
@@ -9,15 +9,15 @@
   （如「期初余额」）用初始化同一套定位规则；只算单个取数函数，复合表达式记一条提示、交公式运行时。
   曾有全局定义、现已删除的公式位按系统预设重算，免得残留已删除全局公式算出的值。
 * 只处理改过的公式位：从没有全局 / 本项目定义的映射单元格维持原行为（只在初始化时写值）。
-* 已知限制：公式运行时（``formula_runtime``）与各循环 Tier A 预设只读 ``wp_formula`` 行，不读全局层；
-  同步内核为有适配的项目写的行它们照常读到。
+* 公式运行时 coordinator 与 Tier A 预设通过 ``effective_project_formulas`` 读有效定义（ADR-FGR-08），
+  而非直接查 ``wp_formula``。
 """
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from typing import Any
 
 import sqlalchemy as sa
@@ -91,6 +91,94 @@ async def effective_cell_formulas(db: AsyncSession, project_id: uuid.UUID,
     except Exception as exc:  # noqa: BLE001 —— 预填照原行为继续
         logger.warning("底稿有效公式读取失败，按预设预填 wp=%s: %s", wp_id, exc)
         return None, []
+
+
+# ── 全轨有效定义：公式运行时 coordinator / Tier A 预设用（ADR-FGR-08）──────────
+
+
+@dataclass(frozen=True)
+class SyntheticWpFormula:
+    """coordinator / Tier A 可直接消费的轻量公式对象——属性子集与 ``WpFormula`` 兼容。
+
+    来自全局层或预设层的有效定义没有 ``wp_formula`` 行；本对象代替 ORM 对象出现在
+    ``_load_formulas`` 返回列表中。``id`` 由 ``wp_id + sheet + cell`` 确定性推导（UUID v5），
+    保证同一公式位在同一次评估批次内不重复。
+    """
+    id: uuid.UUID  # noqa: A003  — deterministic, stable across calls
+    project_id: uuid.UUID
+    wp_id: uuid.UUID
+    sheet_name: str
+    target_cell: str
+    expression: str
+    formula_type: str
+    formula_source: str  # "global" | "preset" | "custom"
+    category: str | None = None
+    description: str | None = None
+    source_scope: dict | None = None
+    refs: list = dataclass_field(default_factory=list)
+    issue_description: str | None = None
+    hint_text: str | None = None
+    stable_sheet_key: str | None = None
+    row_key: str | None = None
+    field_key: str | None = None
+    definition_version: int = 0
+    lifecycle_state: str = "saved"
+    reference_formula_id: uuid.UUID | None = None
+    binding: dict | None = None
+    stable_key_needs_review: bool = False
+
+
+_WP_EFFECTIVE_NS = uuid.UUID("b2e0da3e-4f1a-4e2b-8c5f-9a0e3d7f1c2b")
+
+
+def _synthetic_id(wp_id: uuid.UUID, sheet: str, cell: str) -> uuid.UUID:
+    return uuid.uuid5(_WP_EFFECTIVE_NS, f"{wp_id}|{sheet}|{cell}")
+
+
+async def effective_project_formulas(
+    db: AsyncSession, project_id: uuid.UUID
+) -> tuple[list[SyntheticWpFormula], dict[uuid.UUID, str]]:
+    """项目所有底稿的有效公式定义（本项目 > 全局 > 系统预设）。
+
+    公式运行时 coordinator ``_load_formulas`` 与 Tier A ``resolve_effective``
+    改调本函数读有效定义，不再直接查 ``wp_formula``（ADR-FGR-08）。
+
+    Returns:
+        (formulas, wp_codes)  与 coordinator._load_formulas 同签名。
+        ``formulas`` 每条是 SyntheticWpFormula（兼容 WpFormula 属性子集），
+        包含来自项目层 / 全局层 / 预设层的有效公式。
+    """
+    from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
+
+    # ── 取本项目所有底稿 ──────────────────────────────────────────────
+    rows = (await db.execute(
+        sa.select(WorkingPaper.id, WpIndex.wp_code)
+        .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+        .where(WorkingPaper.project_id == project_id,
+               WorkingPaper.is_deleted == sa.false())
+    )).all()
+    if not rows:
+        return [], {}
+
+    wp_codes: dict[uuid.UUID, str] = {r.id: str(r.wp_code or "") for r in rows}
+
+    # ── 逐底稿取有效定义 ──────────────────────────────────────────────
+    out: list[SyntheticWpFormula] = []
+    for wp_id, wp_code in wp_codes.items():
+        _, cells = await effective_cell_formulas(db, project_id, wp_id)
+        for cf in cells:
+            out.append(SyntheticWpFormula(
+                id=_synthetic_id(wp_id, cf.sheet, cf.cell),
+                project_id=project_id,
+                wp_id=wp_id,
+                sheet_name=cf.sheet,
+                target_cell=cf.cell,
+                expression=cf.expression,
+                formula_type=cf.formula_type,
+                formula_source=cf.layer,
+            ))
+
+    return out, wp_codes
 
 
 # ── 初始化预填 ────────────────────────────────────────────────────────────────

@@ -37,86 +37,35 @@ class NoteCellFormula:
     description: str | None = None
 
 
-def _overlay_formulas(
-    sections: Sequence[str],
-    global_by_section: dict[str, Sequence[Any]],
-    project_rows: Sequence[Any],
-) -> dict[str, list[Any]]:
-    """把一次预取的项目定义叠加到多章节全局公式。"""
-    wanted = set(sections)
-    cells: dict[str, dict[tuple[int, int], Any]] = {
-        section: {(f.row_index, f.col_index): f for f in global_by_section.get(section, ())}
-        for section in sections
-    }
-    for row in project_rows:
-        try:
-            section, row_index, col_index = split_consol_slot(row.slot_key)
-        except FormulaSettingError:
-            continue
-        if section not in wanted:
-            continue
-        definition = row.definition or {}
-        text = str(definition.get("formula") or "").strip()
-        key = (row_index, col_index)
-        if is_disabled(definition) or not text:
-            cells[section].pop(key, None)
-        else:
-            cells[section][key] = NoteCellFormula(
-                row_index,
-                col_index,
-                text,
-                "project",
-                definition.get("description"),
-            )
-    return {
-        section: [cells[section][key] for key in sorted(cells[section])]
-        for section in sections
-    }
-
-
-async def effective_formulas_many(
-    db: AsyncSession,
-    project_id: uuid.UUID,
-    global_by_section: dict[str, Sequence[Any]],
-) -> dict[str, list[Any]]:
-    """一次读取项目层定义并计算多章节有效公式。"""
-    from app.models.formula_setting_models import FormulaSetting
-
-    sections = list(global_by_section)
-    if not sections:
-        return {}
-    try:
-        async with db.begin_nested():
-            rows = (
-                await db.execute(
-                    sa.select(FormulaSetting).where(
-                        FormulaSetting.domain == DOMAIN,
-                        FormulaSetting.layer == "project",
-                        FormulaSetting.project_id == project_id,
-                        FormulaSetting.is_deleted == sa.false(),
-                    )
-                )
-            ).scalars().all()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "合并附注本项目公式批量读取失败，按全局填数 project=%s: %s",
-            project_id,
-            exc,
-        )
-        return {section: list(rows) for section, rows in global_by_section.items()}
-    return _overlay_formulas(sections, global_by_section, rows)
-
-
 async def effective_formulas(db: AsyncSession, project_id: uuid.UUID, section_id: str,
                              global_rows: Sequence[Any]) -> list[Any]:
     """某章节的有效单元格公式（按行、列排序）。"""
-    return (
-        await effective_formulas_many(
-            db,
-            project_id,
-            {section_id: global_rows},
-        )
-    )[section_id]
+    from app.models.formula_setting_models import FormulaSetting
+
+    try:
+        async with db.begin_nested():
+            rows = (await db.execute(sa.select(FormulaSetting).where(
+                FormulaSetting.domain == DOMAIN, FormulaSetting.layer == "project",
+                FormulaSetting.project_id == project_id, FormulaSetting.is_deleted == sa.false(),
+                FormulaSetting.slot_key.startswith(f"{section_id}|", autoescape=True)))).scalars().all()
+    except Exception as exc:  # noqa: BLE001 —— 填数照全局继续
+        logger.warning("合并附注本项目公式读取失败，按全局填数 project=%s: %s", project_id, exc)
+        return list(global_rows)
+    if not rows:
+        return list(global_rows)
+    cells: dict[tuple[int, int], Any] = {(f.row_index, f.col_index): f for f in global_rows}
+    for r in rows:
+        try:
+            _, ri, ci = split_consol_slot(r.slot_key)
+        except FormulaSettingError:
+            continue
+        d = r.definition or {}
+        text = str(d.get("formula") or "").strip()
+        if is_disabled(d) or not text:
+            cells.pop((ri, ci), None)
+        else:
+            cells[(ri, ci)] = NoteCellFormula(ri, ci, text, "project", d.get("description"))
+    return [cells[k] for k in sorted(cells)]
 
 
 # ── 旧端点收口 ────────────────────────────────────────────────────────────────

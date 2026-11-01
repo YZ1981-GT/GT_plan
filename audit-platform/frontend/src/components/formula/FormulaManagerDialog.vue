@@ -569,7 +569,7 @@ import {
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
   type FormulaScope,
 } from '@/composables/useFormulaScopeCatalog'
-import { noteSectionToNodeKey, buildNoteFormulaRows, buildNoteSectionRows, isNoteDomainNodeKey, type NotePresetNote, type NoteUserFormula } from './noteScopeTargeting'
+import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NoteUserFormula } from './noteScopeTargeting'
 // Task 4.1 / ADR-FMC-04：弹窗附注节点改调 list_note_formulas（含用户编辑集 _user_formulas）。
 import { noteFormula as P_nf } from '@/services/apiPaths/formula'
 import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
@@ -671,8 +671,6 @@ const props = withDefaults(defineProps<{
   initialTemplateId?: string
   initialTemplateAction?: 'subscribe'
   initialTemplateDomain?: string
-  /** 每次活动打开请求递增；同 project/year 只变域或目标时也重新定位。 */
-  openRevision?: number
 }>(), {
   scope: 'report',
   readOnly: false,
@@ -1776,8 +1774,6 @@ const notePresetFormulas = ref<any[]>([])
 // 含 table_data._user_formulas）。按 section 缓存最近一次加载结果，避免切节点时串章。
 const noteUserFormulas = ref<NoteUserFormula[]>([])
 const noteUserFormulasSection = ref<string>('')
-/** 同一次加载的「本章节没生成预设公式的格与原因」（list_note_formulas 的 preset_notes） */
-const notePresetNotes = ref<NotePresetNote[]>([])
 
 /**
  * Task 4.1 / ADR-FMC-04：加载指定附注章节的用户编辑集公式（list_note_formulas）。
@@ -1801,23 +1797,20 @@ async function fetchNoteUserFormulas(sid: string, force = false): Promise<void> 
   if (!props.projectId || !props.year || !sid) {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
-    notePresetNotes.value = []
     return
   }
   if (!force && noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
   try {
-    const data = await api.get<{ formulas?: NoteUserFormula[]; preset_notes?: NotePresetNote[] }>(
+    const data = await api.get<{ formulas?: NoteUserFormula[] }>(
       P_nf.list(props.projectId, Number(props.year), sid),
       { validateStatus: (s: number) => s < 600 },
     )
     noteUserFormulas.value = Array.isArray(data?.formulas) ? data.formulas : []
-    notePresetNotes.value = Array.isArray(data?.preset_notes) ? data.preset_notes : []
     noteUserFormulasSection.value = sid
   } catch {
     // 用户集加载失败不阻断：保持预设行可见
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
-    notePresetNotes.value = []
   }
 }
 
@@ -2346,9 +2339,8 @@ async function applyConsolNoteTarget() {
   }
 }
 
-// 初始加载当前报表的数据。
-// 异步宿主可能在模块下载完成时已是打开态，必须 immediate，否则首次打开不会执行任何加载。
-watch([visible, () => props.openRevision, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
+// 初始加载当前报表的数据
+watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
@@ -2524,7 +2516,7 @@ watch([visible, () => props.openRevision, () => props.wpId, () => props.wpCode, 
     // 没有目标且停在报表节点时补加载当前报表（打开时已清报表行缓存）
     if (!(await applyTargetNode()) && activeReportType.value && !allRowsMap.value[activeReportType.value]) await loadRowsForNode(selectedNodeKey.value)
   }
-}, { immediate: true })
+})
 
 function onTreeNodeClick(data: any) {
   // 外链节点: 跳转到独立页面
@@ -2628,15 +2620,24 @@ const currentRows = computed(() => {
     const rt = activeReportType.value
     return allRowsMap.value[rt] || []
   }
-  // 附注节点：本章节可执行公式（有效集，list_note_formulas）在前、审核要点（文字版校验预设）在后、
-  // 末尾列没生成预设的原因；章级节点/无上下文 → 列全部审核要点（规则见 noteScopeTargeting.buildNoteSectionRows）
-  if (isNoteDomainNodeKey(selectedNodeKey.value)
-    && (notePresetFormulas.value.length || noteUserFormulas.value.length || notePresetNotes.value.length)) {
-    const sectionRef = resolveNoteSectionRef(selectedNodeKey.value)
+  // 附注节点：显示该章节的预设公式（含用户编辑集，Task 4.1 / ADR-FMC-04）
+  if (isNoteDomainNodeKey(selectedNodeKey.value) && (notePresetFormulas.value.length || noteUserFormulas.value.length)) {
+    const { sectionId: targetSectionId, sectionTitle: targetTitle } = resolveNoteSectionRef(selectedNodeKey.value)
+    // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
+    const presetRows = buildNoteFormulaRows(notePresetFormulas.value, {
+      sectionId: targetSectionId,
+      sectionTitle: targetTitle,
+    })
+    // Task 4.1 / ADR-FMC-04：并入用户编辑集公式（list_note_formulas），用户集优先/去重。
     // 仅当当前已加载的用户集属于本章节时并入，避免切章时把上一章的用户公式串过来。
-    const own = !!noteUserFormulasSection.value && noteUserFormulasSection.value === sectionRef.sectionId
-    return buildNoteSectionRows(notePresetFormulas.value, own ? noteUserFormulas.value : [], sectionRef,
-      own ? notePresetNotes.value : [])
+    const userForSection =
+      noteUserFormulasSection.value && noteUserFormulasSection.value === targetSectionId
+        ? noteUserFormulas.value
+        : []
+    return mergeNoteUserFormulaRows(presetRows, userForSection, {
+      sectionId: targetSectionId,
+      sectionTitle: targetTitle,
+    })
   }
   // 合并报表节点：显示对应表样的行结构
   if (selectedNodeKey.value.startsWith('consol_')) {

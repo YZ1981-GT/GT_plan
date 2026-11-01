@@ -130,14 +130,10 @@ async def _install_isolation_plan(env: Env, monkeypatch, *, failing_code: str | 
     monkeypatch.setattr(push, "load_push_rules", lambda: tuple(rules))
     monkeypatch.setattr(push, "get_binding", lambda code: bindings[code])
 
-    async def find_workpapers_for_codes(db, project_id, paper_codes):
-        return {
-            code: [push._Paper(id=wp_ids[code], status="draft", paper_code=code)]
-            for code in paper_codes
-            if code in wp_ids
-        }
+    async def find_workpapers(db, project_id, wp_code):
+        return [push._Paper(id=wp_ids[wp_code], status="draft")]
 
-    monkeypatch.setattr(push, "_find_workpapers_for_codes", find_workpapers_for_codes)
+    monkeypatch.setattr(push, "_find_workpapers", find_workpapers)
     return wp_ids
 
 
@@ -173,7 +169,14 @@ async def test_first_push_writes_system_and_derived_values_and_holds_unknown_edi
 
     states = await env.states()
     assert states[CASH_OPENING].state == "pending_confirm" and states[CASH_OPENING].last_pushed_value is None
+    assert states[CASH_OPENING].provenance["calculation_applied"] is False
+    assert states[CASH_OPENING].provenance["last_calculation"]["input_count"] >= 1
+    assert {item["kind"] for item in states[CASH_OPENING].provenance["last_calculation"]["inputs"]} == {"FOUR_TABLE"}
+    assert states[CASH_OPENING].provenance["last_calculation"]["definition_ref"]["kind"] == "push_rule"
     assert states[TB_ENDING].last_pushed_value == 606.73 and states[TB_ENDING].state == "auto"
+    assert states[TB_ENDING].provenance["calculation_applied"] is True
+    assert "TB" in {item["kind"] for item in states[TB_ENDING].provenance["last_calculation"]["inputs"]}
+    assert states[TB_ENDING].provenance["applied_attempt"]["run_id"] == str(result.run_id)
     [run] = await env.runs()
     assert (run.status, run.written_count, run.kept_count) == ("succeeded", 20, 2)
     assert run.detail["items"] and run.detail["wp"][0]["status"] == "pushed"
@@ -246,6 +249,8 @@ async def test_locked_target_is_never_overwritten_and_unlock_goes_pending(env):
                                       locked=True, user_id=None)
         await db.commit()
     assert row.state == "locked"
+    assert row.provenance["value_state"] == "locked"
+    assert row.provenance["calculation_applied"] is True
     env.sources = make_sources(cash_opening=999)
     result = await env.push("TRIAL_BALANCE_UPDATED")
     assert by_addr(result)[CASH_OPENING].action == "keep_locked"
@@ -255,6 +260,7 @@ async def test_locked_target_is_never_overwritten_and_unlock_goes_pending(env):
                                       locked=False, user_id=None)
         await db.commit()
     assert row.state == "pending_confirm", "解锁不直接覆盖，下次推送重新判定"
+    assert row.provenance["value_state"] == "pending_confirm"
 
 
 # ── 冻结 / 并发 / 试跑 ─────────────────────────────────────────────────────
@@ -756,11 +762,8 @@ async def test_execute_filters_plan_to_explicit_codes(monkeypatch, codes, expect
 
             return Savepoint()
 
-    async def fake_find_workpapers_for_codes(db, project_id, paper_codes):
-        return {
-            code: [push._Paper(id=uuid.uuid4(), status="draft", paper_code=code)]
-            for code in paper_codes
-        }
+    async def fake_find_workpapers(db, project_id, wp_code):
+        return [push._Paper(id=uuid.uuid4(), status="draft")]
 
     async def fake_push_workpaper(ctx, *, wp_code, binding, rules, paper, push_note=True):
         seen.append(wp_code)
@@ -782,7 +785,7 @@ async def test_execute_filters_plan_to_explicit_codes(monkeypatch, codes, expect
     monkeypatch.setattr(push_settings, "effective_push_rules", no_overrides)
     monkeypatch.setattr(push, "supported_wp_codes", lambda: ("E1", "K1"))
     monkeypatch.setattr(push, "rules_for", lambda rules, *, wp_code, trigger: (wp_code,))
-    monkeypatch.setattr(push, "_find_workpapers_for_codes", fake_find_workpapers_for_codes)
+    monkeypatch.setattr(push, "_find_workpapers", fake_find_workpapers)
     monkeypatch.setattr(push, "get_binding", lambda wp_code: wp_code)
     monkeypatch.setattr(push, "_load_states", load_states)
     monkeypatch.setattr(push, "_save_states", save_states)
@@ -964,36 +967,3 @@ async def test_dual_paper_frozen_owner_skips_note_but_second_paper_pushes(env, m
     assert "Z9-1/Z9/Z9-value" in states
     # 附注不推（owner = papers[0] = frozen）
     assert result.note_sections == []
-
-
-@pytest.mark.asyncio
-async def test_workpaper_plan_locates_all_codes_in_one_query():
-    project_id = uuid.uuid4()
-    ids = {"E1": uuid.uuid4(), "K1": uuid.uuid4()}
-
-    class Result:
-        def all(self):
-            return [
-                (ids["E1"], "draft", "E1"),
-                (ids["K1"], "review_passed", "K1"),
-            ]
-
-    class Db:
-        def __init__(self):
-            self.calls = []
-
-        async def execute(self, statement, params):
-            self.calls.append((statement, params))
-            return Result()
-
-    db = Db()
-    found = await push._find_workpapers_for_codes(
-        db,
-        project_id,
-        ["E1", "K1", "E1"],
-    )
-
-    assert len(db.calls) == 1
-    assert db.calls[0][1]["codes"] == ["E1", "K1"]
-    assert found["E1"][0].id == ids["E1"]
-    assert found["K1"][0].status == "review_passed"

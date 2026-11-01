@@ -260,11 +260,11 @@ class TestRegistryDrivenExecution:
 
         契约变更（spec d4-dual-mode-formula-governance 项2）：此前未注册函数静默返 0
         且 ok=True，会把"配置错/注入"伪装成"诚实的 0"。现在标 blocked（ok=False，
-        state='blocked'），value 仍给 0 但语义明确。
+        state='blocked'），value 为 None，失败原因通过 errors 返回。
         """
         ctx = FormulaContext()
         result = execute("NONEXIST('x')", ctx)
-        assert result.value == Decimal("0")
+        assert result.value is None
         assert result.blocked is True
         assert result.ok is False
         assert result.state == "blocked"

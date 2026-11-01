@@ -147,8 +147,9 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
         result = await evaluate_formula_result(text, resolver=resolver, row_cache=row_cache, strict_context=True)
     except Exception as exc:  # noqa: BLE001 —— 取不到数如实记为不通过
         return None, str(exc)[:200]
-    if not result.ok:
-        return None, "；".join(result.errors)[:200] or "公式被拦截"
+    if not result.ok or result.value is None:
+        reason = "；".join(result.errors)[:200] if result.errors else "公式执行未返回数值"
+        return None, reason or "公式被拦截"
     return result.value, ""
 
 

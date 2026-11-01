@@ -1,7 +1,7 @@
 /**
  * 报表试算失败原因显示在界面上（spec formula-hub-integrity-closure 第 2 轮 A5；阶段 D 浏览器实测 ① 的部分通过项）。
  *
- * 原状：「⚡ 应用自动运算」55 条中 1 条失败时只提示「54 条成功，1 条失败」，失败行计算值显示「-」，失败原因
+ * 原状：「⚡ 应用自动运算」55 条中 1 条失败时只提示「54 条成功，1 条失败」，失败行计算值显示「—」，失败原因
  * （如「ROW('BS-127')：引用的行次不存在或尚未计算」）只在响应里 —— onApplyFormulas 只存 value / trace。
  * 本文件挂载 FormulaManagerDialog（表格、列、提示框换成直接渲染行与插槽的桩，其余子组件照常桩掉），
  * 走真实 onApplyFormulas，读计算值列里渲染出的原因与提示里点名的行次。
@@ -121,7 +121,7 @@ describe('报表试算：失败原因显示在计算值提示里，提示点名�
     getNoteTree.mockReset(); getNoteTree.mockResolvedValue([])
   })
 
-  it('1 条失败：失败行显示「-」与原因，成功行显示值、没有原因；提示里列出失败行次', async () => {
+  it('1 条失败：失败行显示「—」与原因，成功行显示值、没有原因；提示里列出失败行次', async () => {
     const w = create()
     await w.setProps({ modelValue: true })
     for (let i = 0; i < 4; i++) await flushPromises()
@@ -142,7 +142,7 @@ describe('报表试算：失败原因显示在计算值提示里，提示点名�
     expect(post.mock.calls[0][1]).toMatchObject({ project_id: 'project-1', year: 2025 })
     const failed = valueCell(w, 'BS-128')
     expect(failed.find('[data-testid="formula-result-error"]').text()).toBe(`失败原因：${REASON}`)
-    expect(failed.text()).toContain('-')
+    expect(failed.text()).toContain('—')
     const ok = valueCell(w, 'BS-001')
     expect(ok.find('[data-testid="formula-result-error"]').exists()).toBe(false)
     expect(ok.text()).toContain('150')

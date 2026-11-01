@@ -37,14 +37,32 @@ from __future__ import annotations
 
 import re
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
 _logger = logging.getLogger(__name__)
 
 
-# ═══ 公式解析器 ═══
+def _as_decimal(value: Any) -> Decimal | None:
+    """把单元格 / 跨表输入安全归一为有限 Decimal。"""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return result if result.is_finite() else None
+
+
+def _missing_value_error(refs: list[str]) -> str:
+    """生成稳定的缺数错误，供 API 和 Excel 写回层直接展示。"""
+    unique = list(dict.fromkeys(refs))
+    if not unique:
+        return "公式无法求值"
+    return f"单元格 {'、'.join(unique)} 无数值"
+
+
 
 # Excel 列字母→数字
 def _letter_to_col(letter: str) -> int:
@@ -306,7 +324,7 @@ async def execute_formula(
         sheet_cells: 当前表格的 cells 字典（用于表内引用）
 
     Returns:
-        {"value": Decimal|float|None, "sources": [...], "error": str|None}
+        {"value": Decimal|None, "sources": [...], "error": str|None}
     """
     parsed = parse_formula(formula)
     sources = []
@@ -316,17 +334,18 @@ async def execute_formula(
         return {"value": None, "sources": [], "error": None}
 
     if parsed["type"] == "literal":
-        # 纯字面量
-        try:
-            return {"value": float(formula.lstrip("=").strip()), "sources": [], "error": None}
-        except ValueError:
-            return {"value": None, "sources": [], "error": "非数值字面量"}
+        # 纯字面量也走 Decimal，避免 0.1 + 0.2 在二进制浮点中失真。
+        value = _as_decimal(formula.lstrip("=").strip())
+        if value is not None:
+            return {"value": value, "sources": [], "error": None}
+        return {"value": None, "sources": [], "error": "非数值字面量"}
 
     # 解析跨表引用并获取值
-    cross_values: dict[str, float] = {}
+    cross_values: dict[str, Decimal] = {}
+    missing_cross_refs: list[str] = []
     if parsed["cross_refs"]:
         # 优先从预加载的 _tb_context 取值（避免N+1查询）
-        tb_context = sheet_cells.get("_tb_context", {}) if sheet_cells else {}
+        tb_context = sheet_cells.get("_tb_context", {}) if isinstance(sheet_cells, dict) else {}
 
         for cr in parsed["cross_refs"]:
             # 尝试从缓存取值
@@ -339,10 +358,20 @@ async def execute_formula(
                 from app.services.data_fetch_custom import CustomFetchService
                 svc = CustomFetchService(db, project_id, year)
                 source = _cross_ref_to_source(cr)
-                if source:
-                    val = await svc._fetch_from_source(source)
-                    cross_values[cr["raw"]] = float(val) if val is not None else 0
-                    sources.append({"type": cr["type"], "args": cr["args"], "value": cross_values[cr["raw"]], "source": "db"})
+                val = await svc._fetch_from_source(source) if source else None
+                converted = _as_decimal(val)
+                if converted is None:
+                    missing_cross_refs.append(cr["raw"])
+                    continue
+                cross_values[cr["raw"]] = converted
+                sources.append({"type": cr["type"], "args": cr["args"], "value": converted, "source": "db"})
+
+    if missing_cross_refs:
+        return {
+            "value": None,
+            "sources": sources,
+            "error": f"跨表引用 {'、'.join(dict.fromkeys(missing_cross_refs))} 无数值",
+        }
 
     # 构建可计算的表达式
     expr = formula.lstrip("=").strip()
@@ -351,55 +380,73 @@ async def execute_formula(
     for raw, val in cross_values.items():
         expr = expr.replace(raw, str(val))
 
-    # 替换表内单元格引用为值
-    if sheet_cells:
+    # 替换表内单元格引用为值；缺失坐标不再伪造为 0。
+    missing_cells: list[str] = []
+    if parsed["references"]:
+        cells = sheet_cells if isinstance(sheet_cells, dict) else {}
+
+        def _cell_value(key: str, display: str) -> Decimal | None:
+            cell = cells.get(key)
+            value = cell.get("value") if isinstance(cell, dict) else None
+            converted = _as_decimal(value)
+            if converted is None:
+                missing_cells.append(display)
+            return converted
+
         def _replace_excel_ref(m):
             col = _letter_to_col(m.group(1))
             row = int(m.group(2)) - 1
-            key = f"{row}:{col}"
-            cell = sheet_cells.get(key, {})
-            v = cell.get("value")
-            return str(float(v)) if v is not None and _is_number(v) else "0"
+            value = _cell_value(f"{row}:{col}", m.group(0))
+            return str(value) if value is not None else "__missing__"
 
         def _replace_coord_ref(m):
             row, col = int(m.group(1)), int(m.group(2))
-            key = f"{row}:{col}"
-            cell = sheet_cells.get(key, {})
-            v = cell.get("value")
-            return str(float(v)) if v is not None and _is_number(v) else "0"
+            display = f"[{row},{col}]"
+            value = _cell_value(f"{row}:{col}", display)
+            return str(value) if value is not None else "__missing__"
 
-        # 先处理 SUM 函数
+        # 先处理 SUM 函数。SUM 中只要有引用格缺数，最终返回具体坐标错误；
+        # 缺数使用内部哨兵只为完成正则替换，不会作为成功结果返回。
         def _replace_sum_range(m):
-            start_col = _letter_to_col(m.group(1)[:1])  # 简化：取第一个字母
             sm = _EXCEL_CELL_RE.match(m.group(1))
             em = _EXCEL_CELL_RE.match(m.group(2))
-            if sm and em:
-                s_row = int(sm.group(2)) - 1
-                e_row = int(em.group(2)) - 1
-                col = _letter_to_col(sm.group(1))
-                total = 0.0
-                for r in range(s_row, e_row + 1):
-                    cell = sheet_cells.get(f"{r}:{col}", {})
-                    v = cell.get("value")
-                    if v is not None and _is_number(v):
-                        total += float(v)
-                return str(total)
-            return "0"
+            if not sm or not em:
+                return "__invalid__"
+            s_row = int(sm.group(2)) - 1
+            e_row = int(em.group(2)) - 1
+            col = _letter_to_col(sm.group(1))
+            start, end = sorted((s_row, e_row))
+            total = Decimal("0")
+            missing_before = len(missing_cells)
+            for row in range(start, end + 1):
+                value = _cell_value(
+                    f"{row}:{col}",
+                    f"{sm.group(1)}{row + 1}",
+                )
+                if value is not None:
+                    total += value
+            return "__missing__" if len(missing_cells) > missing_before else str(total)
 
         expr = _SUM_RANGE_RE.sub(_replace_sum_range, expr)
         expr = _COORD_CELL_RE.sub(_replace_coord_ref, expr)
         expr = _EXCEL_CELL_RE.sub(_replace_excel_ref, expr)
 
+    if missing_cells:
+        return {"value": None, "sources": sources, "error": _missing_value_error(missing_cells)}
+
     # 安全计算表达式
     try:
-        import ast
         result = _safe_eval(expr)
+        if result is None:
+            return {"value": None, "sources": sources, "error": "公式无法求值"}
         return {"value": result, "sources": sources, "error": None}
+    except ZeroDivisionError:
+        return {"value": None, "sources": sources, "error": "除数为 0"}
     except Exception as e:
         return {"value": None, "sources": sources, "error": str(e)}
 
 
-def _try_get_from_cache(cr: dict, tb_context: dict) -> float | None:
+def _try_get_from_cache(cr: dict, tb_context: dict) -> Decimal | None:
     """尝试从预加载的 _tb_context 缓存中获取跨表引用值
 
     仅支持 TB 类型引用（最常见的跨表引用），其他类型返回 None 走数据库。
@@ -423,8 +470,8 @@ def _try_get_from_cache(cr: dict, tb_context: dict) -> float | None:
     field = field_map.get(field_name, field_name)
 
     account_data = tb_context.get(account_code)
-    if account_data and field in account_data:
-        return account_data[field]
+    if isinstance(account_data, dict) and field in account_data:
+        return _as_decimal(account_data.get(field))
     return None
 
 
@@ -453,22 +500,13 @@ def _cross_ref_to_source(cr: dict) -> dict | None:
 
 
 def _is_number(v) -> bool:
-    """判断值是否可转为数字"""
-    if isinstance(v, (int, float)):
-        return True
-    if isinstance(v, str):
-        try:
-            float(v)
-            return True
-        except ValueError:
-            return False
-    return False
+    """判断值是否可转为有限 Decimal（排除 bool）。"""
+    return _as_decimal(v) is not None
 
 
-def _safe_eval(expr: str) -> float | None:
-    """安全计算数学表达式（只允许数字和+-*/()）"""
+def _safe_eval(expr: str) -> Decimal | None:
+    """安全计算数学表达式，返回 Decimal；除零向调用方报告错误。"""
     import ast
-    import operator
 
     # 清理：只保留数字、运算符、小数点、括号、空格
     allowed = set("0123456789.+-*/() ")
@@ -478,13 +516,13 @@ def _safe_eval(expr: str) -> float | None:
 
     try:
         tree = ast.parse(cleaned, mode="eval")
-        return _eval_node(tree.body)
-    except Exception:
+    except (SyntaxError, ValueError):
         return None
+    return _eval_node(tree.body)
 
 
-def _eval_node(node) -> float:
-    """递归求值 AST 节点"""
+def _eval_node(node) -> Decimal:
+    """递归求值 AST 节点，所有算术均保持 Decimal。"""
     import ast
     import operator
 
@@ -493,25 +531,30 @@ def _eval_node(node) -> float:
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
         ast.Div: operator.truediv,
+        ast.UAdd: operator.pos,
         ast.USub: operator.neg,
     }
 
     if isinstance(node, ast.Constant):
-        return float(node.value)
-    elif isinstance(node, ast.BinOp):
+        if isinstance(node.value, bool):
+            raise ValueError("不支持的常量类型")
+        value = _as_decimal(node.value)
+        if value is None:
+            raise ValueError("不支持的常量类型")
+        return value
+    if isinstance(node, ast.BinOp):
         left = _eval_node(node.left)
         right = _eval_node(node.right)
         op = ops.get(type(node.op))
         if op is None:
             raise ValueError(f"不支持的运算符: {type(node.op)}")
         if isinstance(node.op, ast.Div) and right == 0:
-            return 0.0  # 除零返回0
+            raise ZeroDivisionError("除数为 0")
         return op(left, right)
-    elif isinstance(node, ast.UnaryOp):
+    if isinstance(node, ast.UnaryOp):
         operand = _eval_node(node.operand)
         op = ops.get(type(node.op))
         if op:
             return op(operand)
-        raise ValueError(f"不支持的一元运算符")
-    else:
-        raise ValueError(f"不支持的节点类型: {type(node)}")
+        raise ValueError("不支持的一元运算符")
+    raise ValueError(f"不支持的节点类型: {type(node)}")
