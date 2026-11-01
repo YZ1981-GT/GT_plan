@@ -404,8 +404,15 @@ async function handleConfirmAndApply() {
   try {
     await handleConfirmOnlyInternal()
     confirmOk = true
-  } catch {
-    // handleConfirmOnlyInternal 已经处理了错误展示
+  } catch (err: any) {
+    // R18：确认失败必须可见——与「确认映射」按钮共用同一错误处理
+    const detail = err?.response?.data?.detail
+    if (err?.response?.status === 409) {
+      ElMessage.warning(detail?.message || '来源数据已变化，请重新预览')
+      await loadPreview()
+    } else {
+      ElMessage.error(detail?.message || '确认映射失败')
+    }
   } finally {
     confirming.value = false
   }

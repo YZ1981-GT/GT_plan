@@ -27,10 +27,13 @@ const pct = (part: number, whole: number): number => (whole > 0 ? Math.round((pa
  */
 function coverageLines(s: AutoMapResult['summary']): string[] {
   const out: string[] = []
-  const entityTotal = s.confirmed_entities + s.pending_entities
+  // R16 去重：优先用后端按企业去重的字段；旧后端没有新字段时回退逐章节之和（兼容）
+  const confirmed = (s as any).confirmed_unique_entities ?? s.confirmed_entities
+  const pendingE = (s as any).pending_unique_entities ?? s.pending_entities
+  const entityTotal = confirmed + pendingE
   if (entityTotal > 0) {
-    out.push(`企业覆盖 ${s.confirmed_entities}/${entityTotal}（${pct(s.confirmed_entities, entityTotal)}%）`
-      + (s.pending_entities ? `，${s.pending_entities} 家仍需人工确认` : '，全部自动确认'))
+    out.push(`企业覆盖 ${confirmed}/${entityTotal}（${pct(confirmed, entityTotal)}%）`
+      + (pendingE ? `，${pendingE} 家仍需人工确认` : '，全部自动确认'))
   }
   const sectionTotal = s.sections - s.skipped
   if (sectionTotal > 0) {
@@ -48,7 +51,8 @@ function coverageLines(s: AutoMapResult['summary']): string[] {
 /** 结果文字：确认了几家；哪些企业的哪些行要去「📋 明细映射」确认；失败 / 跳过的章节与原因。`ok` = 没有要用户处理的。 */
 export function autoMapReport(result: AutoMapResult): { ok: boolean; text: string } {
   const s = result.summary
-  const lines = [`已确认 ${s.confirmed_entities} 家企业的映射，${s.mapped} 个章节全部确认`
+  const confirmedDisplay = (s as any).confirmed_unique_entities ?? s.confirmed_entities
+  const lines = [`已确认 ${confirmedDisplay} 家企业的映射，${s.mapped} 个章节全部确认`
     + (s.templates_created ? `，新建 / 更新明细模板 ${s.templates_created} 个` : '')]
   // R11：覆盖比例——只报「已确认 N 家」看不出还剩多少要人工处理
   lines.push(...coverageLines(s))
@@ -61,7 +65,7 @@ export function autoMapReport(result: AutoMapResult): { ok: boolean; text: strin
   const onlySkipped = skipped.length > 0 && skipped.length === result.sections.length
   if (onlySkipped && skipped.length === 1) lines.push(`未映射：${skipped[0].reason}`)
   else if (skipped.length) lines.push(`${skipped.length} 个章节没有读到子企业单体附注，已跳过`)
-  if (s.confirmed_entities) lines.push('点「🔄 重新汇总」把子企业数据写入合并附注')
+  if (confirmedDisplay) lines.push('点「🔄 重新汇总」把子企业数据写入合并附注')
   return { ok: !pending.length && !failed.length && !onlySkipped, text: lines.join('\n') }
 }
 

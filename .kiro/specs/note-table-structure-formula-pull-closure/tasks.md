@@ -64,3 +64,13 @@
 - [x] 33. R18 界面走查（任务 17 的实质）：附注编辑器 199 章节渲染正常、D2 底稿页 14 个页签可打开、公式管理入口可点开；抓到并定位 1 条 500
 - [x] 34. R18 跨会话迁移撞号取证（V227 / V228 两组记账与磁盘文件不符 ⇒ `attachment_lineage.project_id` 与 `formula_sync_item.revision` 永不执行，两个接口恒 500）+ 修复 SQL 与回滚方案（design §8）
 - [x] 35. 迁移撞号修复已执行：备份 `schema_version_bak_20261101_143729.json`（231 条）→ V227→V233 / V228→V234 改记账（各 1 行）→ `run_pending()` 成功执行 V227/V228/V229 → 验证 `attachment_lineage.project_id` OK / `formula_sync_item.revision` OK / `financial_report.calc_version` OK / `list_pending()` OK → 0 项；`project_creation_grants.uscc_checksum` MISSING 属另一会话迁移内容问题
+
+## 第四轮：最新远端回归与合并拉数剩余缺口（R15~R21）
+
+- [x] 36. 以最新远端 `85af801a0` 重读生产调用链，形成 P0/P1 缺口矩阵；核实 `85caab386` 回退 R4/R5 且无替代实现，补 requirements/design（不改历史任务）
+- [x] 37. R15：金额列全未匹配显式 `unreadable`；preview、自动映射和 apply 同口径排除，但保留逐企业中文诊断
+- [x] 38. R17.3：缺紧邻小计时不折叠坏账/减值准备（ADR-14 宁缺勿错）
+- [x] 39. R18：映射确认两入口共用错误处理；确认失败不 apply，409 重新预览
+- [x] 41. R19/R20：在最新公式中枢架构上恢复附注审核要点/未生成原因和加载错误三态；统一推送后表内公式 follow-up、刷新 opt-out、推送拥有格保护与来源信封
+- [x] 42. R15/R16/R17/D2真零/自动映射去重：后端 202 passed、门禁 --check 通过、候选树 27 文件复核完成
+- [ ] 43. R21：Playwright 实测单体刷新、公式管理和合并入口；复核干净检出，更新 INDEX，单提交按版本规则推送

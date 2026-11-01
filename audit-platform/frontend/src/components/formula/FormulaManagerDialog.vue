@@ -550,7 +550,7 @@ import {
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
   type FormulaScope,
 } from '@/composables/useFormulaScopeCatalog'
-import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NoteUserFormula } from './noteScopeTargeting'
+import { noteSectionToNodeKey, buildNoteFormulaRows, buildNoteSectionRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NotePresetNote, type NoteUserFormula } from './noteScopeTargeting'
 // Task 4.1 / ADR-FMC-04：弹窗附注节点改调 list_note_formulas（含用户编辑集 _user_formulas）。
 import { noteFormula as P_nf } from '@/services/apiPaths/formula'
 import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
@@ -1755,6 +1755,10 @@ const notePresetFormulas = ref<any[]>([])
 // 含 table_data._user_formulas）。按 section 缓存最近一次加载结果，避免切节点时串章。
 const noteUserFormulas = ref<NoteUserFormula[]>([])
 const noteUserFormulasSection = ref<string>('')
+/** 同一次加载的「本章节没生成预设公式的格与原因」（list_note_formulas 的 preset_notes） */
+const notePresetNotes = ref<NotePresetNote[]>([])
+/** 附注公式加载错误（R19.3 三态：loading/error/data） */
+const noteUserFormulasError = ref<string>('')
 
 /**
  * Task 4.1 / ADR-FMC-04：加载指定附注章节的用户编辑集公式（list_note_formulas）。
@@ -1778,20 +1782,26 @@ async function fetchNoteUserFormulas(sid: string, force = false): Promise<void> 
   if (!props.projectId || !props.year || !sid) {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
+    notePresetNotes.value = []
+    noteUserFormulasError.value = ''
     return
   }
   if (!force && noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
+  noteUserFormulasError.value = ''
   try {
-    const data = await api.get<{ formulas?: NoteUserFormula[] }>(
+    const data = await api.get<{ formulas?: NoteUserFormula[]; preset_notes?: NotePresetNote[] }>(
       P_nf.list(props.projectId, Number(props.year), sid),
       { validateStatus: (s: number) => s < 600 },
     )
     noteUserFormulas.value = Array.isArray(data?.formulas) ? data.formulas : []
+    notePresetNotes.value = Array.isArray(data?.preset_notes) ? data.preset_notes : []
     noteUserFormulasSection.value = sid
-  } catch {
-    // 用户集加载失败不阻断：保持预设行可见
+  } catch (err: any) {
+    // R19.3：加载失败显示错误，不清空后伪装为"没有公式"
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
+    notePresetNotes.value = []
+    noteUserFormulasError.value = err?.response?.data?.detail?.message || err?.message || '附注公式加载失败'
   }
 }
 
@@ -2600,24 +2610,14 @@ const currentRows = computed(() => {
     const rt = activeReportType.value
     return allRowsMap.value[rt] || []
   }
-  // 附注节点：显示该章节的预设公式（含用户编辑集，Task 4.1 / ADR-FMC-04）
-  if (isNoteDomainNodeKey(selectedNodeKey.value) && (notePresetFormulas.value.length || noteUserFormulas.value.length)) {
-    const { sectionId: targetSectionId, sectionTitle: targetTitle } = resolveNoteSectionRef(selectedNodeKey.value)
-    // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
-    const presetRows = buildNoteFormulaRows(notePresetFormulas.value, {
-      sectionId: targetSectionId,
-      sectionTitle: targetTitle,
-    })
-    // Task 4.1 / ADR-FMC-04：并入用户编辑集公式（list_note_formulas），用户集优先/去重。
+  // 附注节点：本章节可执行公式在前、审核要点在后、末尾列没生成预设的原因（R19）
+  if (isNoteDomainNodeKey(selectedNodeKey.value)
+    && (notePresetFormulas.value.length || noteUserFormulas.value.length || notePresetNotes.value.length)) {
+    const sectionRef = resolveNoteSectionRef(selectedNodeKey.value)
     // 仅当当前已加载的用户集属于本章节时并入，避免切章时把上一章的用户公式串过来。
-    const userForSection =
-      noteUserFormulasSection.value && noteUserFormulasSection.value === targetSectionId
-        ? noteUserFormulas.value
-        : []
-    return mergeNoteUserFormulaRows(presetRows, userForSection, {
-      sectionId: targetSectionId,
-      sectionTitle: targetTitle,
-    })
+    const own = !!noteUserFormulasSection.value && noteUserFormulasSection.value === sectionRef.sectionId
+    return buildNoteSectionRows(notePresetFormulas.value, own ? noteUserFormulas.value : [], sectionRef,
+      own ? notePresetNotes.value : [])
   }
   // 合并报表节点：显示对应表样的行结构
   if (selectedNodeKey.value.startsWith('consol_')) {

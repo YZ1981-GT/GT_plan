@@ -210,3 +210,57 @@ export function buildNoteFormulaRows(
     formula_source: f.source,
   }))
 }
+
+function presetRow(f: NotePresetFormula, i: number): NoteFormulaRow {
+  return {
+    id: `note_preset_${i}`,
+    row_code: f.note_section,
+    row_name: f.section_title,
+    formula: f.formula,
+    formula_category: f.category,
+    formula_description: f.description,
+    formula_source: f.source,
+  }
+}
+
+/** 本章节没生成预设公式的格与原因（GET list_note_formulas 的 ``preset_notes``）。 */
+export interface NotePresetNote {
+  label?: string
+  reason?: string
+}
+
+/** 文字版校验预设只是审核要点：执行器不跑它们。 */
+export const NOTE_GUIDE_LAYER_LABEL = '审核要点（不执行）'
+export const NOTE_GAP_LAYER_LABEL = '未生成预设'
+
+/**
+ * 附注章节节点 → 公式管理表格行（spec note-table-structure-formula-pull-closure R19）。
+ *
+ * 顺序：可执行公式（有效集）→ 审核要点（文字版校验预设，不执行）→ 未生成预设原因。
+ */
+export function buildNoteSectionRows(
+  presets: readonly NotePresetFormula[],
+  userFormulas: readonly NoteUserFormula[] | null | undefined,
+  ref: NoteSectionRef,
+  notes?: readonly NotePresetNote[] | null,
+): NoteFormulaRow[] {
+  const executable = mergeNoteUserFormulaRows([], userFormulas, ref)
+  const list = Array.isArray(presets) ? presets : []
+  const scoped = filterNotePresetsForSection(list, ref)
+  const guides = (scoped.length || executable.length ? scoped : list).map((f, i) => ({
+    ...presetRow(f, i), _layer: 'guide', _layer_label: NOTE_GUIDE_LAYER_LABEL,
+  }))
+  const sectionId = (ref.sectionId || '').trim() || undefined
+  const gaps = (Array.isArray(notes) ? notes : []).map((n, i): NoteFormulaRow => ({
+    id: `note_preset_gap_${i}`,
+    row_code: sectionId,
+    row_name: String(n?.label || '').trim() || (ref.sectionTitle || '').trim() || undefined,
+    formula: '',
+    formula_category: '未生成',
+    formula_description: String(n?.reason || ''),
+    formula_source: 'preset_gap',
+    _layer: 'gap',
+    _layer_label: NOTE_GAP_LAYER_LABEL,
+  }))
+  return [...executable, ...guides, ...gaps]
+}

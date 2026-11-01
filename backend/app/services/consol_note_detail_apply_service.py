@@ -158,7 +158,8 @@ async def apply_detail_refresh(
 
     def _rows_of(pid: UUID) -> list[Any]:
         src = sources.get(pid)
-        return src.rows if src is not None else []
+        # R15 / ADR-11：unreadable（金额列全未匹配）的来源不当作有行——apply 不应按空金额写入
+        return src.rows if src is not None and src.usable else []
 
     # 服务端每次 apply 都复核绑定时结构，不能只相信可选的客户端 preview hash。
     fresh_confirmed: list[ConsolNoteMappingBinding] = []

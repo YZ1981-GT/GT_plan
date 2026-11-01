@@ -58,13 +58,13 @@ from app.services.consol_note_formula_service import (
     fill_by_formula,
     find_table,
     formula_snapshot,
-    label_key,
     note_cell_values,
     record_write_source,
     resolve_note_template_type,
     section_formulas,
 )
 from app.services.consol_note_detail_suggest import is_placeholder_label
+from app.services.consol_note_row_identity import note_row_key
 from app.services.consol_note_table_totals import TOTAL_ROW_TYPES, build_note_rows, to_decimal
 from app.services.consol_note_topn import (
     group_unit_names,
@@ -453,7 +453,7 @@ class _Run:
         index: dict[tuple[str, int], int] = {}
         seen: Counter = Counter()
         for i, (name, _rt) in enumerate(skeleton):
-            key = label_key(name)
+            key = note_row_key(name)
             index[(key, seen[key])] = i
             seen[key] += 1
 
@@ -603,7 +603,7 @@ class _Run:
                 continue
             width = max(width, len(cells))
             name = str(cells[0] or "").strip()
-            key = label_key(name)
+            key = note_row_key(name)
             idx = index.get((key, seen[key]))
             seen[key] += 1
             values = {c: v for c in range(1, len(cells)) if (v := to_decimal(cells[c])) is not None}

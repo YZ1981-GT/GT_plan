@@ -237,5 +237,8 @@ async def auto_map_sections(
             "templates_created": sum(1 for r in results if r.template_action in ("created", "versioned")),
             "confirmed_entities": sum(len(r.confirmed) for r in results),
             "pending_entities": sum(len(r.pending) for r in results),
+            # R16 去重：同一家企业在多个章节确认只算一家（前端显示"N 家企业"）
+            "confirmed_unique_entities": len({e["node_key"] for r in results for e in r.confirmed}),
+            "pending_unique_entities": len({e["node_key"] for r in results for e in r.pending}),
         },
     }

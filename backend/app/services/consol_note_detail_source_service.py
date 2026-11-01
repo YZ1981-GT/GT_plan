@@ -329,12 +329,25 @@ async def load_source_tables(
             out[pid] = SourceTable(reason=f"单体附注 {standalone_section} 标为本期无此情形", status="not_applicable")
         else:
             std = source_variants.get(pid, template_type)
+            # R16 / ADR-12：跨口径按三件套定位；缺三件套 fail closed
+            cross_source = (entry.get("standalone_source_by_std") or {}).get(std) if std != template_type else None
+            if std != template_type and not cross_source:
+                # 旧映射只有 standalone_table_name_by_std（表名）：按旧字段兼容
+                old_cross_name = (entry.get("standalone_table_name_by_std") or {}).get(std)
+                if old_cross_name:
+                    cross_source = {"table_name": old_cross_name}
+            if std != template_type and not cross_source:
+                out[pid] = SourceTable(
+                    reason=f"跨口径（{std}）无对应的单体章节映射，无法拉取",
+                    status="no_source",
+                )
+                continue
+            use_table_name = cross_source["table_name"] if cross_source else (
+                entry.get("standalone_table_name"))
             out[pid] = read_source_table(
                 note.table_data,
                 consol_table=consol_table,
-                # 子企业是另一口径时按它自己模板里的表名选表（R6.8；映射生成时逐表算好）
-                table_name=(entry.get("standalone_table_name_by_std") or {}).get(std)
-                or entry.get("standalone_table_name"),
+                table_name=use_table_name,
                 title=entry.get("consol_title"),
                 section_title=note.section_title,
                 std=std,
@@ -375,7 +388,10 @@ async def scan_all_entities(
     entities: list[dict[str, Any]] = []
     for leaf in leaves:
         source = sources.get(leaf.project_id)
-        rows = source.rows if source is not None else []
+        # R15 / ADR-11：只有 usable（status=found）的来源行才参与映射与 apply；
+        # unreadable（金额列全未匹配）保留诊断但行置空，与 missing / not_applicable 同口径。
+        usable = source is not None and source.usable
+        rows = source.rows if usable else []
         entities.append({
             "node_key": leaf.node_key,
             "project_id": leaf.project_id,

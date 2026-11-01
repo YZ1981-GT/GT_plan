@@ -61,12 +61,14 @@ def fold_provision_rows(
         return rows, []
     sub = m - 1 if m and rows[m - 1].get("row_type") == "subtotal" and _key(rows[m - 1].get("label")) not in template \
         else None
+    # ADR-14 / R17.3：缺紧邻小计时不折叠——没有可靠的账面余额合计，折了会让净额留在账面余额列
+    if sub is None:
+        return rows, []
     values = list(rows[total].get("values") or [])
     for prov, gross in pairs:
         if 0 < prov <= len(values) and 0 < gross <= len(values):
             values[prov - 1] = rows[m]["values"][gross - 1]
-            if sub is not None:
-                values[gross - 1] = rows[sub]["values"][gross - 1]
-    drop = {m} if sub is None else {m, sub}
+            values[gross - 1] = rows[sub]["values"][gross - 1]
+    drop = {m, sub}
     out = [{**r, "values": values} if i == total else r for i, r in enumerate(rows) if i not in drop]
     return out, [str(rows[i].get("label") or "") for i in sorted(drop)]

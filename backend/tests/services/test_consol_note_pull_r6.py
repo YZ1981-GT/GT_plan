@@ -182,8 +182,8 @@ def test_fold_only_when_template_lacks_the_row_and_has_an_unmatched_provision_co
     assert fold_provision_rows(rows, keys, [1], ["1年以内", "减：坏账准备", "合计"]) == (rows, []), "模板有这一行：照常对行"
     assert fold_provision_rows(rows, keys[:2], [1], ["1年以内", "合计"]) == (rows, []), "没有坏账准备列：不折"
     assert fold_provision_rows(rows, keys, [1, 2], ["1年以内", "合计"]) == (rows, []), "坏账准备列对上了来源列：不折"
-    folded, names = fold_provision_rows(rows, keys, [1], ["1年以内", "合计"])
-    assert names == ["减：坏账准备"] and folded[-1]["values"] == [3.0, 2.0], "没有小计行：账面余额列不改"
+    # ADR-14 / R17.3：缺紧邻小计时不折叠——没有可靠的账面余额合计，折了会让净额留在账面余额列
+    assert fold_provision_rows(rows, keys, [1], ["1年以内", "合计"]) == (rows, []), "没有小计行：不折叠（宁缺勿错）"
 
 
 def test_built_consol_total_takes_folded_provision_and_recomputes_gross():
@@ -274,7 +274,9 @@ def test_reader_reports_reason_when_no_amount_column_matches():
                        "rows": [{"label": "A", "values": [1, 2]}]}]}
     src = read_source_table(td, consol_table=consol, table_name="X", title="X", std="soe")
     assert src.rows and src.reason and "一列都没对上" in src.reason
-    assert src.to_status()["status"] == "found"
+    # R15 / ADR-11：金额列全未匹配必须是 unreadable，不能参与映射和 apply
+    assert src.to_status()["status"] == "unreadable"
+    assert not src.usable
 
 
 # ── ⑨ 自动映射按忽略提交 ──

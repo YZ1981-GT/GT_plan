@@ -64,9 +64,19 @@ class SourceTable:
     # 并进「合计」行的单体行（「小计」「减：坏账准备」，consol_note_provision_fold）
     folded_rows: list[str] = field(default_factory=list)
 
+    @property
+    def status_code(self) -> str:
+        """来源读取状态；观察到行不代表读到了合并所需金额列。"""
+        return self.status or ("found" if self.rows else "unreadable")
+
+    @property
+    def usable(self) -> bool:
+        """该来源能否参与映射、apply 与父节点汇总。"""
+        return self.status_code == "found"
+
     def to_status(self) -> dict[str, Any]:
         return {
-            "status": self.status or ("found" if self.rows else "unreadable"),
+            "status": self.status_code,
             "reason": self.reason,
             "table_name": self.table_name,
             "table_choice": self.table_choice or None,
@@ -360,9 +370,10 @@ def _read_aligned(
         matched_columns=sorted(match.col_map),
         unmatched_columns=[target_keys[c].label for c in match.unmatched],
         ratio_columns=[target_keys[c].label for c in match.ratio],
-        # 金额列一列都没对上：行能映射，但拉不到数（原先报「已读到」，合并表整表为空也看不出原因）
+        # 金额列一列都没对上：有行但拉不到数 ⇒ 显式 unreadable（R15 / ADR-11）
         reason=("单体附注对应表格没有行" if not rows else
                 f"单体表「{name or '主表'}」的金额列与合并表一列都没对上，拉不到数" if no_amount else None),
+        status="unreadable" if no_amount else "",
         table_choice=choice.method,
         folded_rows=folded,
     )

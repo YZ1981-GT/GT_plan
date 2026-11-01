@@ -153,14 +153,22 @@ def _standalone_by_title(template_type: str) -> dict[str, dict]:
     return _STANDALONE_BY_TITLE[template_type]
 
 
-def _cross_std_table(other_std: str, consol_table: dict, section_title: str) -> str | None:
-    """另一口径子企业里这张合并表对应的单体表名（国企集团含上市子企业时按它读，spec
-    note-table-structure-formula-pull-closure R6.8）。按章节标题定章（运行时同一依据），表按标题行库选。"""
+def _cross_std_table(other_std: str, consol_table: dict, section_title: str) -> dict[str, str] | None:
+    """另一口径子企业里这张合并表对应的来源身份三件套（R16 / ADR-12）。
+
+    返回 ``{note_section, section_title, table_name}``；找不到对应章节或表 → None（fail closed）。
+    """
     single = _standalone_by_title(other_std).get(section_title)
     if single is None:
         return None
     name, _method = _choose_table(other_std, consol_table, single, None)
-    return name
+    if not name:
+        return None
+    return {
+        "note_section": str(single.get("section_number") or ""),
+        "section_title": str(single.get("section_title") or ""),
+        "table_name": name,
+    }
 
 
 def _choose_table(template_type: str, consol_table: dict, single: dict, table_name: str | None) -> tuple[str | None, str]:
@@ -348,7 +356,8 @@ def generate(template_type: str) -> tuple[list[dict], Counter]:
                 "match_type": how if single else "consol_only",
                 "standalone_table_name": table_name if single else None,
                 # 子企业是另一口径时（国企集团含上市子公司）按它自己的模板选表；没有对应章节 / 表 ⇒ 不写
-                **({"standalone_table_name_by_std": {other: cross}} if cross else {}),
+                **({"standalone_table_name_by_std": {other: cross["table_name"]},
+                    "standalone_source_by_std": {other: cross}} if cross else {}),
             })
             if cross:
                 stats["cross_std_table"] += 1

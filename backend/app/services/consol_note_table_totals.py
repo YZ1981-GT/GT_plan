@@ -103,13 +103,13 @@ def row_correspondence(names: Sequence[str], existing_rows: Sequence[Any]) -> di
     按（行名比较键, 同名序号）对（与节点子树汇总对下级行同一口径）；名字对不上的新行，若同号的已保存行也没被别的新行
     认领，按位置对（行名被改过、前后没有插删行时与旧行为一致）。对不上的新行没有对应（不读已保存值、不带手工保护）。
     """
-    from app.services.consol_elimination_sheet_service import row_name_key
+    from app.services.consol_note_row_identity import note_row_key
 
     def keyed(labels: Sequence[str]) -> list[tuple[str, int]]:
         seen: dict[str, int] = {}
         out = []
         for label in labels:
-            key = row_name_key(label)
+            key = note_row_key(label)
             out.append((key, seen.get(key, 0)))
             seen[key] = seen.get(key, 0) + 1
         return out

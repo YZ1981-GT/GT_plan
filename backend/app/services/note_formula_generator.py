@@ -545,6 +545,14 @@ async def _execute_note_formulas_body(
     resolve = (lambda token: _resolve_single_cross_ref(token, cross_data or {})) if need_cross else None
 
     tables = dict(iter_note_tables(view))
+    # R20.3 / ADR-15：存储表上推送拥有的格，预设公式不改写（用户公式照常覆盖）
+    from app.services.note_formula_push_guard import push_owned_cells
+
+    _push_owned: set[tuple[int, int, int]] = set()
+    try:
+        _push_owned = await push_owned_cells(db, project_id=project_id, year=year, section=note_section, td=td, view=view)
+    except Exception:  # noqa: BLE001 — 保护层读取失败不阻断执行
+        logger.warning("附注公式：推送拥有格加载失败 section=%s", note_section, exc_info=True)
     by_table: dict[int, dict[tuple[int, int], tuple[str, dict]]] = {}
     exec_results: list[dict] = []
     checks: list[dict[str, Any]] = []
@@ -615,6 +623,7 @@ async def _execute_note_formulas_body(
 
             if value is not None and (
                 cell_mode in {"manual", "locked"}
+                or (t, row_idx, col_idx) in _push_owned and key not in user_keys  # R20.3：推送拥有格不被预设公式改写
                 or (
                     not is_projected_table(tables[t])
                     and not explicit_mode
@@ -622,7 +631,9 @@ async def _execute_note_formulas_body(
                     and not _matches_last_value(td, key, old_value, formula_def)
                 )
             ):
-                state = "locked" if cell_mode == "locked" else "manual"
+                state = ("locked" if cell_mode == "locked"
+                         else "kept_push" if (t, row_idx, col_idx) in _push_owned and key not in user_keys
+                         else "manual")
                 exec_results.append({
                     "cell": key, "table_index": t, "type": ftype, "old": old_value,
                     "new": float(value), "status": "skipped_manual",

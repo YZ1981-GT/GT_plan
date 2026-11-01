@@ -262,3 +262,40 @@ console error 4 条，**同一根因且与本轮无关**：
 10. **`Start-Process -WorkingDirectory` 会改变相对路径基准**：`node` 脚本用相对路径找不到自己；
     而脚本放在无 `node_modules` 的 `tmp_` 目录时，ESM 裸包名（`playwright`）也解析不到
     ⇒ 脚本用绝对 `file://` URL 取依赖、调用方传绝对路径。
+
+## 7. 第三、四轮历史证据索引恢复
+
+公式中枢批次 `85caab386` 曾删除本 spec 的 `design.md` / `requirements.md`，后续 `6640edfc4` 只恢复到第二轮版本，导致 tasks 26~35 引用的设计段落从 HEAD 消失。历史全文仍可由 `git show 7e5c08897:.kiro/specs/note-table-structure-formula-pull-closure/design.md` 复核；第三轮提交为 `7e5c08897`，写真库和迁移撞号处置完成记录为 `dcf881b39`。本段只恢复索引，不改写历史结论。
+
+## 8. 第四轮现状与缺口矩阵（2026-11-01，基线 `85af801a0`）
+
+| 等级 | 缺口 | 真实影响 | 证据 |
+|---|---|---|---|
+| P0 | 金额列全未匹配仍 `found` | 参与自动映射，apply 可把旧自动值重建成空表 | `SourceTable.to_status()` 只看 `rows`；既有测试反而断言 `found` |
+| P0 | 跨口径只登记表名 | 缺另一口径章节时回退目标口径章节/表名，可能选错或静默无来源 | `load_source_tables()` 全企业共用一个 `standalone_section`；生成器只写 `standalone_table_name_by_std` |
+| P1 | 行名新规则未贯穿父级 | 存量/手工行含提示、可选括号或别名时在父节点成为 `unplaced` | `row_correspondence()` / `_aggregate()` 仍用报表行 `row_name_key` |
+| P1 | 无小计仍折叠准备行 | 最终合计可能是净额，却留在账面余额列 | `fold_provision_rows()` 允许 `sub is None` |
+| P1 | “确认并写入”吞确认错误 | 用户看不到失败原因，apply 不执行但界面没有解释 | `handleConfirmAndApply()` 空 `catch`，注释与实际不符 |
+| P0 | R4/R5 被后续公式批次回退 | 推送后不再自动算合计/比例；公式管理不再显示审核要点和未生成原因 | `85caab386` 删除 `note_followup.py` / guard / `preset_notes` / `buildNoteSectionRows`，当前生产无替代调用 |
+| P1 | 附注公式加载失败伪装为空 | 网络/权限/500 被显示成“无公式”，用户无法区分 | `fetchNoteUserFormulas()` catch 后清空且无 error 状态 |
+
+## 9. 第四轮架构裁决
+
+- **ADR-11 来源可用性是显式状态。** `SourceTable` 保留观察到的行用于诊断，但只有 `status == found` 才向映射和 apply 暴露行；`no_amount` 明确设为 `unreadable`。preview 与 apply 调同一属性，不能一边过滤一边仍写。
+- **ADR-12 跨口径映射保存来源身份三件套。** 生成器新增 `standalone_source_by_std.{soe|listed} = {note_section, section_title, table_name}`。同口径继续读旧顶层字段；跨口径必须命中新字段，否则 `no_source`。查询按每家来源口径构造项目限定的 OR 条件，不把一家企业的章节候选用于另一家。
+- **ADR-13 行身份分“字面规范化”和“业务规范化”。** 新共享模块提供 `normalize_note_row_label()` 与应用全局别名后的 `canonical_note_row_label()`；建议匹配保留 match_type 语义，父级行对应使用业务规范键。结构 hash 暂不改，避免全量 stale。
+- **ADR-14 折叠宁缺勿错。** 缺紧邻小计时不反推账面余额，也不折掉准备行；现有映射弹窗会把它作为待确认行展示。
+- **ADR-15 公式中枢只恢复能力，不恢复旧架构。** follow-up 接在最新 `formula_push.persistence.execute_and_commit` 的统一提交边界，以回调形式在领域通知前执行；刷新专用调用显式 opt-out。附注执行器接入推送拥有格判定，并沿用最新 provenance run，而不是回退 `85caab386` 的 S5 重构。
+- **ADR-16 公式管理使用可见三态。** 后端恢复 `preset_notes`；前端恢复 `buildNoteSectionRows`，同时新增加载错误状态与重试按钮。不得恢复已经退役的行内编辑器或 `FormulaParamPicker`。
+
+## 10. 预计改动面与风险
+
+| 交付单元 | 文件 | 风险控制 |
+|---|---|---|
+| 来源与跨口径 | `consol_note_standalone_reader.py`、`consol_note_detail_source_service.py`、映射生成器与 JSON | 显式状态；缺映射 fail closed；生成器 `--check`/重生成对拍 |
+| 行身份与折叠 | 新 `consol_note_row_identity.py`、suggest/groups/totals/subtree、`consol_note_provision_fold.py` | 不改结构 hash；正反例覆盖 |
+| 映射 UI | `ConsolNoteMappingDialog.vue` 及既有测试 | 共用错误处理，不改成功路径 |
+| 公式管理 | `note_settings.py`、`noteScopeTargeting.ts`、`FormulaManagerDialog.vue` | 只移植 R5 能力到最新统一编辑器；错误不清空为假空态 |
+| 推送 follow-up | `formula_push/persistence.py`、新 `note_followup.py`、`note_workpaper_pull_service.py`、`note_formula_generator.py`、推送拥有格 helper | 统一提交边界；refresh opt-out；dry-run 不执行；失败不回滚主推送 |
+
+不新增数据库迁移，不写真实项目。若共享库没有【测试】合并集团，合并全链用回滚事务/服务夹具验证，浏览器只读走查并保留数据阻塞。

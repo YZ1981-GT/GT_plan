@@ -127,6 +127,7 @@ async def execute_and_commit(
 ) -> RunResult:
     """运行公式推送并统一提交、回滚、失败留痕和提交后通知。"""
     dry_run = bool(kwargs.get("dry_run"))
+    skip_note_followup = bool(kwargs.pop("_skip_note_followup", False))
     try:
         result = await operation(db, **kwargs)
         if dry_run:
@@ -143,5 +144,11 @@ async def execute_and_commit(
                 error=exc,
             )
         raise
+    # R20 / ADR-15：推送提交后、领域通知前，对写入的附注章节自动执行表内公式
+    # （合计/比例跟着审定数更新）。刷新链路自己最后执行公式，通过 _skip_note_followup opt-out。
+    if not dry_run and not skip_note_followup:
+        from app.services.formula_push.note_followup import recalc_pushed_notes
+
+        await recalc_pushed_notes(db, result)
     await notify_committed(result)
     return result

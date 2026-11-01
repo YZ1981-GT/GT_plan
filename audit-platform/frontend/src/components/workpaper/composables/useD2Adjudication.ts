@@ -301,9 +301,11 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     if (agg) {
       const aggKey = rowKey === 'customer-type' ? 'customerType' : rowKey
       const aggGroup = (agg as any)[aggKey]
-      if (aggGroup && aggGroup[sumifField] !== undefined) {
+      // R20 / ADR-5 真零：聚合组存在且字段有值（含合法 0）⇒ 用聚合值；
+      // 原先 `sumifVal !== 0` 把真零回退到手工值，审定表显示陈旧非零数。
+      if (aggGroup && sumifField in aggGroup) {
         const sumifVal = aggGroup[sumifField]
-        if (sumifVal !== 0) return sumifVal
+        if (typeof sumifVal === 'number') return sumifVal
       }
     }
     return parseNum(getVal(manualItemId).remark)

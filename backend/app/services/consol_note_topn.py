@@ -374,7 +374,8 @@ async def apply_topn_refresh(db: AsyncSession, *, project_id: UUID, section_id: 
     skipped: list[dict[str, Any]] = []
     for leaf in leaves:
         src = sources.get(leaf.project_id)
-        rows = src.rows if src is not None else []
+        # R15 / ADR-11：unreadable（金额列全未匹配）的来源不当作有行——topn 按空行跳过
+        rows = src.rows if src is not None and src.usable else []
         if not rows:
             skipped.append({"node_key": leaf.node_key,
                             "reason": (src.reason if src is not None else None) or "未读到来源"})
