@@ -23,11 +23,10 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -796,7 +795,7 @@ async def _record_history(
 async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> dict:
     """执行单个 seed（在 SAVEPOINT 内调用，由调用方处理事务边界）。
 
-    返回结构 {seed_name, status, inserted, updated, record_count, errors}
+    返回结构 {seed_name, status, inserted, updated, record_count, errors, warnings?}
     """
     if seed_name == "report_config":
         from app.services.report_config_service import ReportConfigService
@@ -811,6 +810,7 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
             "updated": 0,
             "record_count": int(count or 0),
             "errors": [],
+            "warnings": list(formula_stats.get("warnings") or []),
             # 填出的公式经全局发布（formula-global-settings-sync）：commit 后由调用方发变更事件，不进响应
             "_formula_events": formula_stats.get("events") or [],
         }

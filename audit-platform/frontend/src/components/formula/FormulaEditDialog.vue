@@ -50,14 +50,12 @@
             />
           </div>
           <div class="gt-fe-formula-input">
-            <el-input
+            <FormulaInput
               v-model="f.expression"
-              type="textarea"
-              :rows="1"
-              :autosize="{ minRows: 2, maxRows: 6 }"
+              :project-id="projectId"
+              :report-rows="formulaInputReportRows"
+              :wp-codes="formulaInputWpCodes"
               placeholder="输入公式，如 TB('1001','期末余额') 或 ROW('BS-001')+ROW('BS-002')"
-              resize="none"
-              :input-style="{ fontSize: '11px', fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace', lineHeight: '1.5' }"
             />
             <div class="gt-fe-quick-btns">
               <span class="gt-fe-btn-label">取数:</span>
@@ -256,7 +254,7 @@
         </el-button>
         <div>
           <el-button @click="visible = false">取消</el-button>
-          <el-button type="primary" @click="onSave">保存公式</el-button>
+          <el-button type="primary" :disabled="hasFormulaValidationError" @click="onSave">保存公式</el-button>
         </div>
       </div>
     </template>
@@ -446,6 +444,8 @@ import {
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 import { ADDRESS_REGISTRY_FULL_LOAD_LIMIT } from '@/stores/addressRegistry'
 import FormulaDebugPanel from './FormulaDebugPanel.vue'
+import FormulaInput from './FormulaInput.vue'
+import { validate } from '@/composables/formula/formulaSyntaxParser'
 
 const route = useRoute()
 
@@ -466,6 +466,8 @@ const props = defineProps<{
   applicableStandard?: string
   projectId?: string
   year?: number
+  /** 当前底稿编码，供 WP 参数补全；报表编辑场景可不传。 */
+  wpCode?: string
   wpContext?: WpFormulaContext
 }>()
 
@@ -486,6 +488,29 @@ const visible = computed({
 })
 
 const formulas = ref<FormulaItem[]>([])
+
+/** 增强输入器候选：当前报表行次和底稿编码均从本次弹窗上下文派生。 */
+const formulaInputReportRows = computed(() => {
+  const seen = new Set<string>()
+  const rows: Array<{ row_code: string; row_name?: string }> = []
+  for (const source of props.sourceRows || []) {
+    const code = String(source?.row_code || '').trim()
+    if (!code || seen.has(code)) continue
+    seen.add(code)
+    rows.push({ row_code: code, row_name: String(source?.row_name || '') })
+  }
+  return rows
+})
+
+const formulaInputWpCodes = computed(() => {
+  const candidates = [props.wpCode, props.wpContext?.wpCode, props.row?.wp_code,
+    ...(props.sourceRows || []).map((source: any) => source?.wp_code)]
+  return [...new Set(candidates.map((code) => String(code || '').trim()).filter(Boolean))]
+})
+
+const formulaValidationErrors = computed(() => formulas.value.flatMap((formula) => validate(formula.expression).errors))
+const hasFormulaValidationError = computed(() => formulaValidationErrors.value.length > 0)
+
 const initialDraftFingerprint = ref('')
 const showDebugPanel = ref(false)
 const currentEditFormula = computed(() => {
@@ -910,6 +935,10 @@ async function openSourceBrowserForWP() {
 }
 
 function onSave() {
+  if (hasFormulaValidationError.value) {
+    ElMessage.warning(`请先修正公式语法错误：${formulaValidationErrors.value[0]?.message || '公式不合法'}`)
+    return
+  }
   const validFormulas = formulas.value.filter(f => f.expression.trim())
   if (!validFormulas.length) {
     const first = formulas.value[0]

@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { tokenize, validate, cursorContext, knownFunctions, type ParseToken, type ValidationError } from '@/composables/formula/formulaSyntaxParser'
 import { getCandidateConfig, filterCandidates, type CandidateItem } from '@/composables/formula/formulaParamCandidates'
 import { loadAccountCodes } from '@/composables/formula/useFormulaParamCache'
@@ -137,6 +137,10 @@ function scheduleValidation() {
 
 watch(() => props.modelValue, () => {
   scheduleValidation()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  if (validateTimer) clearTimeout(validateTimer)
 })
 
 // ── 自动补全 ─────────────────────────────────────────────────────────────

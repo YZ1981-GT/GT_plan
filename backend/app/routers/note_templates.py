@@ -14,12 +14,12 @@ Validates: Requirements 9.2-9.5
 
 from __future__ import annotations
 
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.core import User
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.services.note_formula_engine import validate_note, Finding
+from app.services.note_formula_engine import validate_note
 from app.services.note_template_service import NoteTemplateService
 
 router = APIRouter(tags=["note-templates"])
@@ -55,7 +55,10 @@ class RollbackRequest(BaseModel):
 # ── 校验 ──
 
 @router.post("/api/note-templates/validate")
-async def validate_note_data(body: ValidateNoteRequest):
+async def validate_note_data(
+    body: ValidateNoteRequest,
+    current_user: User = Depends(get_current_user),
+):
     """校验附注数据（双层架构：本地规则 + LLM兜底）"""
     findings = validate_note(body.note_data, body.rule_types)
     return {
@@ -70,14 +73,18 @@ async def validate_note_data(body: ValidateNoteRequest):
 # ── SOE / Listed 模版 ──
 
 @router.get("/api/note-templates/soe")
-async def get_soe_template():
+async def get_soe_template(
+    current_user: User = Depends(get_current_user),
+):
     """获取国企版附注模版"""
     svc = NoteTemplateService()
     return svc.get_soe_template()
 
 
 @router.get("/api/note-templates/listed")
-async def get_listed_template():
+async def get_listed_template(
+    current_user: User = Depends(get_current_user),
+):
     """获取上市版附注模版"""
     svc = NoteTemplateService()
     return svc.get_listed_template()
@@ -86,14 +93,20 @@ async def get_listed_template():
 # ── 自定义模版 CRUD ──
 
 @router.get("/api/note-templates/custom")
-async def list_custom_templates(category: str | None = None):
+async def list_custom_templates(
+    category: str | None = None,
+    current_user: User = Depends(get_current_user),
+):
     """列出自定义模版"""
     svc = NoteTemplateService()
     return svc.list_templates(category=category)
 
 
 @router.post("/api/note-templates/custom")
-async def create_custom_template(body: CreateNoteTemplateRequest):
+async def create_custom_template(
+    body: CreateNoteTemplateRequest,
+    current_user: User = Depends(require_role(["admin", "partner"])),
+):
     """创建自定义模版"""
     svc = NoteTemplateService()
     return svc.create_template(
@@ -101,12 +114,15 @@ async def create_custom_template(body: CreateNoteTemplateRequest):
         category=body.category,
         sections=body.sections,
         description=body.description,
-        created_by=body.created_by,
+        created_by=str(current_user.id),
     )
 
 
 @router.get("/api/note-templates/custom/{template_id}")
-async def get_custom_template(template_id: str):
+async def get_custom_template(
+    template_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """获取自定义模版详情"""
     svc = NoteTemplateService()
     result = svc.get_template(template_id)
@@ -116,18 +132,25 @@ async def get_custom_template(template_id: str):
 
 
 @router.put("/api/note-templates/custom/{template_id}")
-async def update_custom_template(template_id: str, body: UpdateNoteTemplateRequest):
+async def update_custom_template(
+    template_id: str,
+    body: UpdateNoteTemplateRequest,
+    current_user: User = Depends(require_role(["admin", "partner"])),
+):
     """更新自定义模版"""
     svc = NoteTemplateService()
     try:
         updates = body.model_dump(exclude_none=True, exclude={"changed_by"})
-        return svc.update_template(template_id, updates, changed_by=body.changed_by)
+        return svc.update_template(template_id, updates, changed_by=str(current_user.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/api/note-templates/custom/{template_id}")
-async def delete_custom_template(template_id: str):
+async def delete_custom_template(
+    template_id: str,
+    current_user: User = Depends(require_role(["admin", "partner"])),
+):
     """删除自定义模版"""
     svc = NoteTemplateService()
     try:
@@ -137,7 +160,10 @@ async def delete_custom_template(template_id: str):
 
 
 @router.get("/api/note-templates/custom/{template_id}/versions")
-async def get_template_versions(template_id: str):
+async def get_template_versions(
+    template_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """获取模版版本历史"""
     svc = NoteTemplateService()
     try:
@@ -147,11 +173,15 @@ async def get_template_versions(template_id: str):
 
 
 @router.post("/api/note-templates/custom/{template_id}/rollback")
-async def rollback_template(template_id: str, body: RollbackRequest):
+async def rollback_template(
+    template_id: str,
+    body: RollbackRequest,
+    current_user: User = Depends(require_role(["admin", "partner"])),
+):
     """回滚模版到指定版本"""
     svc = NoteTemplateService()
     try:
-        return svc.rollback_version(template_id, body.target_version)
+        return svc.rollback_version(template_id, body.target_version, changed_by=str(current_user.id))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -159,7 +189,10 @@ async def rollback_template(template_id: str, body: RollbackRequest):
 # ── 附注校验预设公式（供公式管理中心一键导入） ──
 
 @router.get("/api/note-templates/preset-formulas/{template_type}")
-async def get_note_preset_formulas(template_type: str):
+async def get_note_preset_formulas(
+    template_type: str,
+    current_user: User = Depends(get_current_user),
+):
     """获取附注校验预设公式列表（从 check_presets 生成）
 
     template_type: soe 或 listed
@@ -184,7 +217,10 @@ async def get_note_preset_formulas(template_type: str):
 # ── 报表Excel公式预设（供公式管理中心加载） ──
 
 @router.get("/api/report-templates/excel-formulas/{template_type}")
-async def get_report_excel_formulas(template_type: str):
+async def get_report_excel_formulas(
+    template_type: str,
+    current_user: User = Depends(get_current_user),
+):
     """获取报表Excel模板中的计算公式
 
     template_type: soe 或 listed

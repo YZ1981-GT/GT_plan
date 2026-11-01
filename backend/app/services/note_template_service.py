@@ -12,11 +12,9 @@ from __future__ import annotations
  
 from copy import deepcopy
 import json
-import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 
 def _get_custom_dir() -> Path:
@@ -24,6 +22,15 @@ def _get_custom_dir() -> Path:
     d = Path.home() / ".gt_audit_helper" / "note_templates" / "custom"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _template_path(template_id: str) -> Path | None:
+    """把模板 UUID 映射到受控目录；非法标识不能参与路径拼接。"""
+    try:
+        canonical_id = str(UUID(str(template_id)))
+    except (TypeError, ValueError, AttributeError):
+        return None
+    return _get_custom_dir() / f"{canonical_id}.json"
 
 
 class NoteTemplateService:
@@ -41,6 +48,10 @@ class NoteTemplateService:
             if f.name.startswith("_"):
                 continue
             try:
+                UUID(f.stem)
+            except ValueError:
+                continue
+            try:
                 data = json.loads(f.read_text(encoding="utf-8-sig"))
                 if category and data.get("category") != category:
                     continue
@@ -51,8 +62,8 @@ class NoteTemplateService:
 
     def get_template(self, template_id: str) -> dict | None:
         """获取模版详情"""
-        path = _get_custom_dir() / f"{template_id}.json"
-        if not path.exists():
+        path = _template_path(template_id)
+        if path is None or not path.exists():
             return None
         try:
             return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -84,7 +95,9 @@ class NoteTemplateService:
             "updated_at": now,
             "created_by": created_by or "system",
         }
-        path = _get_custom_dir() / f"{template_id}.json"
+        path = _template_path(template_id)
+        if path is None:  # UUID 由本函数生成，纵深防御
+            raise RuntimeError("生成了无效的模版 ID")
         path.write_text(json.dumps(template, ensure_ascii=False, indent=2), encoding="utf-8")
         return template
 
@@ -119,14 +132,16 @@ class NoteTemplateService:
         })
         template["version_history"] = history
 
-        path = _get_custom_dir() / f"{template_id}.json"
+        path = _template_path(template_id)
+        if path is None:  # get_template 已校验；保留纵深防御
+            raise ValueError(f"模版不存在: {template_id}")
         path.write_text(json.dumps(template, ensure_ascii=False, indent=2), encoding="utf-8")
         return template
 
     def delete_template(self, template_id: str) -> dict:
         """删除自定义模版"""
-        path = _get_custom_dir() / f"{template_id}.json"
-        if not path.exists():
+        path = _template_path(template_id)
+        if path is None or not path.exists():
             raise ValueError(f"模版不存在: {template_id}")
         path.unlink()
         return {"id": template_id, "deleted": True}
@@ -142,7 +157,12 @@ class NoteTemplateService:
             raise ValueError(f"模版不存在: {template_id}")
         return template.get("version_history", [])
 
-    def rollback_version(self, template_id: str, target_version: str) -> dict:
+    def rollback_version(
+        self,
+        template_id: str,
+        target_version: str,
+        changed_by: str | None = None,
+    ) -> dict:
         """回滚到指定版本（当前实现：仅更新版本号标记，实际内容回滚需要版本快照）"""
         template = self.get_template(template_id)
         if not template:
@@ -160,11 +180,13 @@ class NoteTemplateService:
         history.append({
             "version": rollback_version,
             "changed_at": now,
-            "changed_by": "system",
+            "changed_by": changed_by or "system",
         })
         template["version_history"] = history
 
-        path = _get_custom_dir() / f"{template_id}.json"
+        path = _template_path(template_id)
+        if path is None:  # get_template 已校验；保留纵深防御
+            raise ValueError(f"模版不存在: {template_id}")
         path.write_text(json.dumps(template, ensure_ascii=False, indent=2), encoding="utf-8")
         return template
 

@@ -451,7 +451,7 @@ async def fill_formulas(
       standard: "all" | "soe" | "listed"（默认 "all"）
 
     返回:
-      {total, updated, skipped, coverage_pct}
+      {total, updated, skipped, coverage_pct, warnings}
     """
     from app.services.report_formula_service import report_formula_service
 
@@ -473,6 +473,7 @@ async def fill_formulas(
         "updated": stats["updated"],
         "skipped": stats["skipped"],
         "coverage": f"{stats['coverage_pct']}%",
+        "warnings": stats.get("warnings", []),
     }
 
 

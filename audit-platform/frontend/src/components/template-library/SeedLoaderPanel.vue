@@ -177,6 +177,16 @@
             >
               部分 <span class="gt-amt">{{ batchSummary.partial }}</span>
             </el-tag>
+            <el-tag
+              v-if="batchWarningCount > 0"
+              size="small"
+              type="warning"
+              effect="plain"
+              round
+              style="margin-left: 4px"
+            >
+              提示 <span class="gt-amt">{{ batchWarningCount }}</span>
+            </el-tag>
           </span>
         </template>
         <el-table
@@ -209,11 +219,11 @@
               <span class="gt-amt">{{ row.record_count ?? 0 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="错误" min-width="240">
+          <el-table-column label="问题" min-width="260">
             <template #default="{ row }">
-              <span v-if="!row.errors || row.errors.length === 0" class="gt-slp-no-error">—</span>
+              <span v-if="(!row.errors || row.errors.length === 0) && (!row.warnings || row.warnings.length === 0) && !row.error" class="gt-slp-no-error">—</span>
               <el-popover
-                v-else
+                v-if="row.errors?.length"
                 placement="top-start"
                 :width="420"
                 trigger="hover"
@@ -233,6 +243,30 @@
                   </div>
                   <div v-if="row.errors.length > 5" class="gt-slp-error-more">
                     … 仅展示前 5 条
+                  </div>
+                </div>
+              </el-popover>
+              <el-popover
+                v-if="row.warnings?.length"
+                placement="top-start"
+                :width="520"
+                trigger="hover"
+              >
+                <template #reference>
+                  <el-tag size="small" type="warning" effect="plain">
+                    {{ row.warnings.length }} 条提示
+                  </el-tag>
+                </template>
+                <div class="gt-slp-error-list">
+                  <div
+                    v-for="(warning, idx) in row.warnings.slice(0, 8)"
+                    :key="idx"
+                    class="gt-slp-warning-item"
+                  >
+                    {{ warning }}
+                  </div>
+                  <div v-if="row.warnings.length > 8" class="gt-slp-error-more">
+                    … 仅展示前 8 条
                   </div>
                 </div>
               </el-popover>
@@ -273,6 +307,7 @@ interface SeedResult {
   updated?: number
   record_count?: number
   errors?: any[]
+  warnings?: string[]
   error?: string  // SAVEPOINT 失败时的整体错误
 }
 
@@ -310,6 +345,10 @@ const batchSummary = computed(() => {
   const failed = lastBatchResults.value.filter(r => r.status === 'failed').length
   return { loaded, partial, failed }
 })
+
+const batchWarningCount = computed(() =>
+  lastBatchResults.value.reduce((count, result) => count + (result.warnings?.length || 0), 0),
+)
 
 const batchHasFailed = computed(() => batchSummary.value.failed > 0)
 
@@ -442,6 +481,8 @@ async function onLoadAll() {
 
     if (data?.failed && data.failed > 0) {
       ElMessage.warning(`加载完成，${data.loaded} 成功 / ${data.failed} 失败 / ${data.partial} 部分`)
+    } else if (batchWarningCount.value > 0) {
+      ElMessage.warning(`种子加载完成，另有 ${batchWarningCount.value} 条非阻断提示，请展开结果查看`)
     } else {
       ElMessage.success(`全部种子加载成功（共 ${data?.loaded ?? 0} 项）`)
     }
@@ -474,8 +515,25 @@ async function onReloadSingle(row: SeedInfo) {
 
   reloadingSeed.value = row.seed_name
   try {
-    await api.post(endpoint)
-    ElMessage.success(`${seedLabel(row.seed_name)} 重新加载成功`)
+    const data: any = await api.post(endpoint)
+    const warnings = Array.isArray(data?.formula_stats?.warnings)
+      ? data.formula_stats.warnings as string[]
+      : (Array.isArray(data?.warnings) ? data.warnings as string[] : [])
+    lastBatchResults.value = [{
+      seed_name: row.seed_name,
+      status: 'loaded',
+      inserted: Number(data?.formula_stats?.updated ?? data?.inserted ?? 0),
+      updated: Number(data?.updated ?? 0),
+      record_count: Number(data?.count ?? data?.record_count ?? row.record_count ?? 0),
+      errors: [],
+      warnings,
+    }]
+    resultsExpanded.value = ['results']
+    if (warnings.length) {
+      ElMessage.warning(`${seedLabel(row.seed_name)} 已重新加载，另有 ${warnings.length} 条非阻断提示`)
+    } else {
+      ElMessage.success(`${seedLabel(row.seed_name)} 重新加载成功`)
+    }
     await refreshStatus()
   } catch (e: any) {
     handleApiError(e, `重新加载 ${seedLabel(row.seed_name)}`)
@@ -588,6 +646,14 @@ defineExpose({ refreshStatus })
   word-break: break-all;
 }
 .gt-slp-error-item code { font-size: var(--gt-font-size-xs); color: var(--gt-color-coral); }
+.gt-slp-warning-item {
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  color: var(--gt-color-wheat-dark, #8a5a00);
+  background: var(--gt-bg-warning, #fdf6ec);
+  border-radius: 3px;
+  word-break: break-word;
+}
 .gt-slp-error-more { color: var(--gt-color-info); font-size: var(--gt-font-size-xs); padding: 4px 0; }
 .gt-slp-no-error { color: var(--gt-color-text-placeholder); }
 .gt-slp-fatal-error { color: var(--gt-color-coral); font-size: var(--gt-font-size-xs); }

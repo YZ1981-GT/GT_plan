@@ -86,6 +86,11 @@ async def fill_formulas(dry_run: bool = False, standard_filter: str = "all") -> 
     )
     if "coverage_pct" in stats:
         print(f"覆盖率: {stats['coverage_pct']}")
+    warnings = list(stats.get("warnings") or [])
+    if warnings:
+        print(f"提示: {len(warnings)} 条公式未自动生成")
+        for warning in warnings:
+            print(f"  - {warning}")
     print("=" * 60)
     print(
         "判据真源：app/services/report_formula_service.py"

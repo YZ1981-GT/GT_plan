@@ -22,6 +22,14 @@ const EXEC_FIELDS = ['formula', 'aje_formula', 'rje_formula', 'formula_category'
 const norm = (v: unknown) => (v == null ? '' : String(v).trim())
 const snap = (src: any, fields: readonly string[]) => JSON.stringify(fields.map((f) => norm(src?.[f])))
 
+/** 给建议面板的上游定义副本；与用于判等的字符串摘要分开，避免类型一物两用。 */
+function pickUpstreamDefinition(src: Definition | null | undefined): Definition | null {
+  if (!src) return null
+  const out: Definition = {}
+  for (const field of EXEC_FIELDS) out[field] = norm(src[field]) || null
+  return out
+}
+
 /** 每个项目的有效定义只拉一次（同一次打开内各报表共用）；保存 / 恢复 / 订阅后失效。 */
 const cache = new Map<string, Promise<EffectiveResult>>()
 
@@ -54,6 +62,7 @@ export function rowChanged(row: any): boolean {
 function toRow(s: EffectiveSlot, reportType: string, projectId: string): Record<string, any> {
   const st = s.structure || {}
   const d = s.definition || {}
+  const upstream = s.global_definition || s.preset_definition || null
   const code = s.slot_key.slice(reportType.length + 1)
   return {
     id: s.slot_key, report_type: reportType, row_code: code, applicable_standard: `project:${projectId}`,
@@ -64,7 +73,8 @@ function toRow(s: EffectiveSlot, reportType: string, projectId: string): Record<
     formula_source: d.formula_source ?? null,
     _slot_key: s.slot_key, _layer: s.layer, _layer_label: s.layer_label, _pending: s.pending, _disabled: s.disabled,
     _local_version: s.local_version,
-    _upstream: snap(s.global_definition || s.preset_definition, EXEC_FIELDS),
+    _upstream: pickUpstreamDefinition(upstream),
+    _upstream_snapshot: snap(upstream, EXEC_FIELDS),
   }
 }
 
@@ -105,7 +115,7 @@ export async function saveReportRows(projectId: string | undefined, rows: any[])
     const versions = new Map((res?.saved || []).map((s) => [s.slot_key, s.version]))
     for (const r of projectRows) {
       r._local_version = versions.get(r._slot_key) ?? r._local_version
-      const same = r._upstream === snap(r, EXEC_FIELDS)
+      const same = r._upstream_snapshot === snap(r, EXEC_FIELDS)
       r._layer = same ? 'global' : 'project'
       r._layer_label = same ? '全局' : '本项目'
     }
