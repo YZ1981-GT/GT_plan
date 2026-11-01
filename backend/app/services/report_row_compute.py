@@ -43,6 +43,7 @@ class RowOutcome:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
+    inputs: list[Any] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -57,16 +58,26 @@ class RowOutcome:
 
 @dataclass(frozen=True)
 class RowScope:
-    """本准则有效定义（准则行 ⊕ 本项目行）的行次全集与其中的无公式行；``SUM_ROW`` 的未就绪判定要用行次全集。"""
+    """本准则有效定义的行次全集、输入行、无公式行与循环引用成员。"""
 
     codes: frozenset[str]
     formula_less: frozenset[str]
+    input_codes: frozenset[str] = frozenset()
+    cycles: frozenset[str] = frozenset()
 
     @classmethod
-    def of(cls, configs: Iterable[Any]) -> RowScope:
+    def of(cls, configs: Iterable[Any], *, cycles: Iterable[str] = ()) -> RowScope:
         configs = list(configs)
-        return cls(frozenset(c.row_code for c in configs),
-                   frozenset(c.row_code for c in configs if not (c.formula or "").strip()))
+        formula_less = frozenset(c.row_code for c in configs if not (c.formula or "").strip())
+        return cls(
+            frozenset(c.row_code for c in configs),
+            formula_less,
+            frozenset(
+                c.row_code for c in configs
+                if c.row_code in formula_less and str(getattr(c, "formula_source", "") or "").strip().lower() == "input"
+            ),
+            frozenset(cycles),
+        )
 
     def start_cache(self, rows: Iterable[Any] = ()) -> dict[str, Decimal]:
         """依赖缓存起点：库中本准则行里的就绪行（:func:`build_row_cache`）+ 无公式行预置为 :data:`FORMULA_LESS_VALUE`。"""
@@ -91,7 +102,19 @@ async def compute_row(
 
     ``parser`` = ``ReportFormulaParser``（审定 / 未审模式由调用方设定）；``mode`` 只用于结果为 0 时的余额核对提示。
     """
-    outcome = await _evaluate(parser, config.formula, row_cache, mode=mode, scope=scope)
+    if config.row_code in scope.cycles:
+        outcome = RowOutcome(
+            state="cycle",
+            errors=[f"循环引用：{config.row_code}（本套循环行：{'、'.join(sorted(scope.cycles))}）"],
+        )
+        row_cache.pop(config.row_code, None)
+        return outcome
+
+    from app.services.formula_inputs import collect as collect_formula_inputs
+
+    with collect_formula_inputs() as inputs:
+        outcome = await _evaluate(parser, config.formula, row_cache, mode=mode, scope=scope)
+    outcome.inputs = list(inputs)
     if outcome.ok:
         row_cache[config.row_code] = outcome.value
     else:
@@ -105,8 +128,16 @@ async def _evaluate(
     if not (formula or "").strip():
         return RowOutcome(value=FORMULA_LESS_VALUE)
     refs = list(dict.fromkeys(ROW_PATTERN.findall(formula)))
-    components = [code for code in refs if code in scope.formula_less]
-    warnings = [f"组成行 {'、'.join(components)} 未定义公式"] if components else []
+    components = _formula_less_components(formula, refs, scope)
+    manual = [code for code in components if code in scope.input_codes]
+    undefined = [code for code in components if code not in scope.input_codes]
+    warnings: list[str] = []
+    if manual:
+        warnings.append(
+            f"组成行 {'、'.join(manual)} 为手工输入行；重新生成会清零，请确认手工金额后再生成"
+        )
+    if undefined:
+        warnings.append(f"组成行 {'、'.join(undefined)} 未定义公式")
     waiting = _not_ready(formula, refs, row_cache, scope)
     if waiting:
         return RowOutcome(state="not_ready", errors=[f"引用行未就绪：{'、'.join(waiting)}（过期或计算失败）"],
@@ -121,6 +152,8 @@ async def _evaluate(
     if not result.ok:
         errors = list(result.errors) or ["公式被拦截" if result.blocked else "公式执行失败"]
         return RowOutcome(state=result.state, errors=errors, warnings=warnings, trace=list(result.trace))
+    if result.value is None:
+        return RowOutcome(state="error", errors=["公式执行未返回数值"], warnings=warnings, trace=list(result.trace))
     trace = [*result.trace, *await _missing_account_notes(parser, formula)]
     value = result.value
     if value == 0:
@@ -128,6 +161,16 @@ async def _evaluate(
         if hint is not None:
             warnings.append(f"公式结果为 0，而试算表科目 {hint[0]} 本级有余额 {hint[1]}：按公式结果 0 写入（不替换），请核对公式")
     return RowOutcome(value=value, warnings=warnings, trace=trace)
+
+
+def _formula_less_components(
+    formula: str, refs: list[str], scope: RowScope,
+) -> list[str]:
+    """公式直接或区间引用到的无公式行，按首次出现顺序返回。"""
+    wanted = [code for code in refs if code in scope.formula_less]
+    for start, end in SUM_ROW_PATTERN.findall(formula):
+        wanted.extend(sorted(code for code in scope.formula_less if start <= code <= end))
+    return list(dict.fromkeys(wanted))
 
 
 def _not_ready(formula: str, refs: list[str], row_cache: dict[str, Decimal], scope: RowScope) -> list[str]:
@@ -165,18 +208,75 @@ async def _tb_balance_hint(parser: Any, formula: str, mode: str) -> tuple[str, D
 def write_row(
     row: Any, config: Any, outcome: RowOutcome, *, generated_at: Any, source_accounts: list[str] | None,
 ) -> None:
-    """三路统一写库（ADR-FHIC-05）。
-
-    成功 ⇒ 值、计算版本、来源公式与科目、计算时间，清 ``calc_error`` 与过期；失败 ⇒ 金额与来源保持原样（新行为 NULL）、
-    标过期、``calc_error`` = 首条错误。行名 / 缩进 / 合计标志总按当前定义写。
-    """
+    """三路统一写库；有 S5 运行上下文时原子同步最终值来源。"""
     row.row_name, row.indent_level, row.is_total_row = config.row_name, config.indent_level, config.is_total_row
+    context = _report_context()
     if not outcome.ok:
         row.is_stale, row.calc_error = True, outcome.calc_error
+        if context is not None:
+            attempt = _report_attempt(config, outcome, context, generated_at)
+            prior_state = _prior_value_state(getattr(row, "provenance", None))
+            row.provenance = _advance_report_provenance(
+                getattr(row, "provenance", None), value_state=prior_state, attempt=attempt,
+                calculation_applied=False,
+            )
         return
     row.current_period_amount, row.formula_used = outcome.value, config.formula
     row.source_accounts, row.generated_at = source_accounts or None, generated_at
     row.calc_version, row.calc_error, row.is_stale = CALC_VERSION, None, False
+    if context is not None:
+        attempt = _report_attempt(config, outcome, context, generated_at)
+        row.provenance = _advance_report_provenance(
+            getattr(row, "provenance", None), value_state="auto", attempt=attempt,
+            calculation_applied=True,
+        )
+        row.run_id = context.run_id
+
+
+def _report_context() -> Any | None:
+    from app.services.report_provenance import current_context
+
+    return current_context()
+
+
+def _report_attempt(config: Any, outcome: RowOutcome, context: Any, generated_at: Any) -> Any:
+    from app.services.formula_provenance import build_attempt, report_definition_identity
+
+    return build_attempt(
+        domain="report",
+        identity=report_definition_identity(config),
+        run_id=context.run_id,
+        computed_at=generated_at,
+        computed_by=context.triggered_by,
+        calc_version=context.calc_version,
+        inputs=outcome.inputs,
+        calculated_value=outcome.value if outcome.ok else None,
+        calculation_status="succeeded" if outcome.ok else "failed",
+        error_code=None if outcome.ok else f"REPORT_{outcome.state.upper()}",
+    )
+
+
+def _prior_value_state(raw: Any) -> str:
+    if isinstance(raw, dict) and raw.get("value_state") in {"auto", "manual", "locked", "kept", "pending_confirm", "failed"}:
+        return str(raw["value_state"])
+    return "failed"
+
+
+def _advance_report_provenance(
+    raw: Any, *, value_state: str, attempt: Any, calculation_applied: bool,
+) -> dict[str, Any]:
+    from app.services.formula_provenance import FinalValueProvenanceV1, advance_final_value
+
+    try:
+        prior = FinalValueProvenanceV1.model_validate(raw) if isinstance(raw, dict) else None
+    except Exception:  # 历史 / 损坏 JSON 不能让报表写入失败；成功重算自然覆盖，失败保留原文。
+        if not calculation_applied:
+            return raw if isinstance(raw, dict) else {}
+        prior = None
+    return advance_final_value(
+        prior, value_slot="current", value_state=value_state,
+        attempt=attempt, calculation_applied=calculation_applied,
+    ).model_dump(mode="json")
 
 
 def _cents(value: Any) -> Decimal:

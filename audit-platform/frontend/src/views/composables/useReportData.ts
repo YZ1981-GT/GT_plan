@@ -390,6 +390,14 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
         } else {
           ElMessage.success('报表生成完成')
         }
+        const generationWarnings: string[] = Array.isArray(result?.warnings)
+          ? Array.from(new Set<string>(result.warnings
+            .map((item: any) => typeof item === 'string' ? item : item?.message)
+            .filter((message: unknown): message is string => typeof message === 'string' && message.trim().length > 0)))
+          : []
+        for (const message of generationWarnings) {
+          ElMessage.warning(message)
+        }
         await fetchReport()
         // F29/D10: 报表生成后自动执行报表平衡检查
         await runBalanceCheck()

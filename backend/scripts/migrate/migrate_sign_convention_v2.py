@@ -231,9 +231,10 @@ async def _ensure_backup_table(session) -> None:
 
 
 def _dataset_clause(dataset_id: Optional[str], alias: str = "t") -> tuple[str, dict]:
-    """构造可选 dataset 过滤子句。"""
+    """构造可选 dataset 过滤子句。*alias* 为空串时不带表限定（用于 UPDATE）。"""
     if dataset_id:
-        return f" AND {alias}.dataset_id = :dataset_id", {"dataset_id": dataset_id}
+        prefix = f"{alias}." if alias else ""
+        return f" AND {prefix}dataset_id = :dataset_id", {"dataset_id": dataset_id}
     return "", {}
 
 
@@ -395,7 +396,7 @@ async def _update_balance_bucket(
         _, source = code_dir[code]
         by_source.setdefault(source, []).append(code)
 
-    ds_sql, ds_params = _dataset_clause(dataset_id)
+    ds_sql, ds_params = _dataset_clause(dataset_id, alias="")
     flip_open = "-opening_balance" if flip else "opening_balance"
     flip_close = "-closing_balance" if flip else "closing_balance"
 
@@ -449,6 +450,7 @@ async def _migrate_ledger_table(
     year = report.year
     dataset_id = report.dataset_id
     ds_sql, ds_params = _dataset_clause(dataset_id)
+    ds_sql_bare, _ = _dataset_clause(dataset_id, alias="")   # UPDATE 无表别名
     base_params = {"pid": project_id, "yr": year, **ds_params}
 
     # 候选行 = entry_direction 为空且未删除
@@ -511,7 +513,7 @@ async def _migrate_ledger_table(
             entry_direction_source = 'split_columns',
             updated_at = now()
         WHERE project_id = :pid AND year = :yr AND is_deleted = false
-          AND entry_direction IS NULL {ds_sql}
+          AND entry_direction IS NULL {ds_sql_bare}
           AND (
             (COALESCE(debit_amount, 0) <> 0 AND COALESCE(credit_amount, 0) = 0)
             OR (COALESCE(credit_amount, 0) <> 0 AND COALESCE(debit_amount, 0) = 0)
@@ -529,7 +531,7 @@ async def _migrate_ledger_table(
                 entry_direction_source = 'account_category_inferred',
                 updated_at = now()
             WHERE project_id = :pid AND year = :yr AND is_deleted = false
-              AND entry_direction IS NULL AND account_code = ANY(:codes) {ds_sql}
+              AND entry_direction IS NULL AND account_code = ANY(:codes) {ds_sql_bare}
         """  # noqa: S608
         await session.execute(
             sa.text(fb_sql), {**base_params, "dir": direction, "codes": codes}

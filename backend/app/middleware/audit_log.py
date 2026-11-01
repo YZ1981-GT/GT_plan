@@ -125,18 +125,26 @@ def _parse_json(body_bytes: bytes) -> object:
 def _redact_if_display_prefs(
     method: str,
     path: str,
-    payload: object,
+    new_value: object,
     request: Request,
 ) -> object:
-    """显示偏好 PATCH 的审计投影只保留版本与字段名，不记录个人显示值。"""
+    """显示偏好 PATCH 的审计载荷只保留修订号与变更字段名。
+
+    字号、金额单位、小数位、阈值、固定列和 pageKey 都是用户显示偏好，
+    不进入通用操作日志；``changed_fields`` 由路由在保存成功后写入 request.state。
+    """
     if method.upper() != "PATCH" or path.rstrip("/") != "/api/users/me/display-preferences":
-        return payload
-    body = payload if isinstance(payload, dict) else {}
-    data = body.get("data") if isinstance(body.get("data"), dict) else body
-    revision = data.get("revision") if isinstance(data, dict) else None
+        return new_value
+    payload = new_value if isinstance(new_value, dict) else {}
+    body = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    revision = body.get("revision") if isinstance(body, dict) else None
     changed = getattr(request.state, "audit_changed_fields", [])
-    safe_changed = sorted({str(value) for value in changed if isinstance(value, str)})
-    return {"revision": revision, "changed_fields": safe_changed}
+    if not isinstance(changed, (list, tuple, set)):
+        changed = []
+    return {
+        "revision": revision,
+        "changed_fields": sorted({str(field) for field in changed if str(field).strip()}),
+    }
 
 
 async def _write_log(
@@ -288,7 +296,7 @@ class AuditLogMiddleware:
             # old_value 在中间件层暂不捕获，后续由具体 CRUD 服务增强
             new_value = _parse_json(capture.body)
 
-            # V240（platform-global-display-settings-closure 任务 2）：
+            # V233（platform-global-display-settings-closure 任务 2）：
             # 偏好 PATCH 只落 revision+changed_fields，金额单位、字号、
             # 小数位、阈值、固定列内容及 pageKey 均不进日志。
             new_value = _redact_if_display_prefs(

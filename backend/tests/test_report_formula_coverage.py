@@ -201,11 +201,20 @@ class TestBSSpecialCoverage:
 class TestISSpecialCoverage:
     """Validate IS special formula coverage meets 70%+ target."""
 
-    def test_is_has_minimum_entries(self):
-        """IS special should have at least 25 entries for 70%+ coverage."""
-        assert len(_IS_SPECIAL) >= 25, (
-            f"IS special has only {len(_IS_SPECIAL)} entries, need >= 25"
-        )
+    def test_is_has_only_nonempty_allowed_entries(self):
+        """利润表特殊表按正确性守门，不再用「至少 25 条」数量阈值。
+
+        S9 ADR-ISL-04 删除 9 条错误 / 双口径映射后，条目从 33 降到 24；旧数量门会反向要求
+        恢复一条错误公式才能变绿。目标行的完整性由 ``test_income_statement_formula_single_source``
+        按四套种子逐行验证，这里只守特殊表自身：值非空、已裁掉的行不得回归。
+        """
+        removed = {
+            "汇兑收益", "其他综合收益的税后净额", "综合收益总额", "基本每股收益", "稀释每股收益",
+            "营业总成本", "利息费用", "利息收入", "以摊余成本计量的金融资产终止确认收益",
+        }
+        assert _IS_SPECIAL, "IS special 为空：守卫空转"
+        assert all(isinstance(value, str) and value.strip() for value in _IS_SPECIAL.values())
+        assert removed.isdisjoint(_IS_SPECIAL), f"已裁掉的错误 / 双口径映射回归：{sorted(removed & _IS_SPECIAL.keys())}"
 
     def test_is_covers_core_items(self):
         """All core IS items must have formulas."""

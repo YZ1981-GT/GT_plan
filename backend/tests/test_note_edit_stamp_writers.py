@@ -23,7 +23,7 @@ import tests.procedure_trim.test_note_linkage_single_source as _linkage
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole
-from app.models.audit_log_models import AuditLogEntry
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
 from app.models.core import Project, ProjectUser, User
 from app.models.report_models import DisclosureNote, GroupNoteTemplateBaseline, NoteSectionVersionTree
 from app.models.staff_models import ProjectAssignment, StaffMember
@@ -83,7 +83,7 @@ async def env() -> AsyncGenerator[dict, None]:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
             User.__table__, Project.__table__, ProjectUser.__table__, StaffMember.__table__,
             ProjectAssignment.__table__, DisclosureNote.__table__, GroupNoteTemplateBaseline.__table__,
-            NoteSectionVersionTree.__table__, AuditLogEntry.__table__,
+            NoteSectionVersionTree.__table__, AuditLogEntry.__table__, AuditChainHead.__table__,
         ]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     ids = {k: uuid.uuid4() for k in ("me", "viewer", "p", "q", "cash", "other", "gone", "linked", "baseline")}

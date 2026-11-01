@@ -9,7 +9,16 @@ from .canonical import (
     hash_v1,
     hash_v2,
 )
-from .head import chain_key_of, lock_chain
+from .head import (
+    AuditChainBypassed,
+    AuditChainError,
+    AuditChainForked,
+    append_entry,
+    append_entry_batch,
+    chain_key_of,
+    lock_chain,
+    read_head,
+)
 from .lock_order import (
     AuditLockOrderViolation,
     record_chain_lock,
@@ -25,6 +34,12 @@ __all__ = [
     "hash_v2",
     "chain_key_of",
     "lock_chain",
+    "read_head",
+    "append_entry",
+    "append_entry_batch",
+    "AuditChainError",
+    "AuditChainForked",
+    "AuditChainBypassed",
     "AuditLockOrderViolation",
     "record_chain_lock",
     "record_non_chain_advisory_lock",
