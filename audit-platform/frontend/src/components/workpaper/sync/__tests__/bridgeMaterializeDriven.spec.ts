@@ -286,6 +286,10 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
   })
 
   it('🔴 usePilotBridgeAdapter 不得被当成驱动方（它 docstring 提到但实现零 API）', () => {
+    // 🔴 task 5.4 的删除**尚未执行**：它要在同一笔里删文件 + 改 6 处断言它存在的判据
+    //    （test_task45 整类字段契约 + test_task46/48/49 各一条 + 本条）。半截状态会让
+    //    CI 的 `pytest -x` 停在第一条红上，所以本条暂时保持「读文件并断言它不是驱动方」。
+    //    删除清单见 spec 的 evidence/phase5-pre-delete-eligibility-2026-11-01.md。
     const adapter = stripComments(read(resolve(SYNC, 'usePilotBridgeAdapter.ts')))
     expect(DRIVE_RE.test(adapter)).toBe(false)
     expect(drivingWrappers().has('usePilotBridgeAdapter')).toBe(false)
