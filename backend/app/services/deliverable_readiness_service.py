@@ -404,29 +404,16 @@ class DeliverableReadinessService:
         blockers: list[ReadinessBlocker],
         warnings: list[ReadinessBlocker],
     ) -> SourceStatus:
-        """调整分录确认检查 — draft 状态的调整是硬阻断。"""
-        from app.models.audit_platform_models import Adjustment
+        """调整分录确认检查，所有业务数量均按分录组统计。"""
+        from app.services.wp_adjustment_helpers import count_adjustment_groups
 
-        # 所有非删除调整分录
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.is_deleted == False,  # noqa: E712
-            )
+        total_count = await count_adjustment_groups(db, project_id, year)
+        unconfirmed = await count_adjustment_groups(
+            db,
+            project_id,
+            year,
+            review_statuses=("draft", "pending_review", "rejected"),
         )
-        total_count = result.scalar_one()
-
-        # 未确认（draft / pending_review）的调整
-        result = await db.execute(
-            sa.select(sa.func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id,
-                Adjustment.year == year,
-                Adjustment.is_deleted == False,  # noqa: E712
-                Adjustment.review_status.in_(["draft", "pending_review"]),
-            )
-        )
-        unconfirmed = result.scalar_one()
 
         status = SourceStatus(
             available=True,
@@ -437,7 +424,7 @@ class DeliverableReadinessService:
         if unconfirmed > 0:
             blockers.append(ReadinessBlocker(
                 code="upstream_not_ready",
-                message=f"有 {unconfirmed} 条调整分录尚未确认（draft/pending_review），出具前需全部确认或删除",
+                message=f"有 {unconfirmed} 笔调整分录尚未确认（草稿/待复核），出具前需全部确认或删除",
                 evidence={
                     "component": "adjustments",
                     "unconfirmed_count": unconfirmed,

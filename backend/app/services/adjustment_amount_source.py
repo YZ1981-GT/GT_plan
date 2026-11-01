@@ -127,6 +127,7 @@ async def adj_net(
     adj_type: str,
     include_statuses: frozenset[str] | None = None,
     exclude_origins: frozenset[str] = frozenset(),
+    exclude_client_booked: bool = True,
 ) -> Decimal:
     """从调整分录表取指定科目的 AJE/RJE 净额（单点取数，三处调用点的唯一实现）。
 
@@ -187,6 +188,14 @@ async def adj_net(
                 sa.or_(Adjustment.origin.is_(None), Adjustment.origin != origin)
             )
 
+    # 最终处理判定只有这一处；所有计算读取方排除当前有效的“客户已入账 / 不予更正”。
+    if exclude_client_booked:
+        from app.services.adjustment_treatment_service import effective_groups_clause
+
+        q = q.where(await effective_groups_clause(
+            db, Adjustment, project_id=project_id, year=year,
+        ))
+
     result = await db.execute(q)
     row = result.first()
 
@@ -217,6 +226,7 @@ async def adj_net_batch(
     account_codes: "Collection[str]",
     include_statuses: frozenset[str] | None = None,
     exclude_origins: frozenset[str] = frozenset(),
+    exclude_client_booked: bool = True,
 ) -> dict[str, dict[str, Decimal]]:
     """批量取多科目的 AJE/RJE 调整额（``adj_net`` 的批量对偶）。
 
@@ -291,6 +301,13 @@ async def adj_net_batch(
             q = q.where(
                 sa.or_(Adjustment.origin.is_(None), Adjustment.origin != origin)
             )
+
+    if exclude_client_booked:
+        from app.services.adjustment_treatment_service import effective_groups_clause
+
+        q = q.where(await effective_groups_clause(
+            db, Adjustment, project_id=project_id, year=year,
+        ))
 
     result = await db.execute(q)
 

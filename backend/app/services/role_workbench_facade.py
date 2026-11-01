@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlalchemy as sa
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 # ─── 角色 → Section 注册 ─────────────────────────────────────────────────────
 
 ROLE_SECTION_REGISTRY: dict[str, list[str]] = {
-    "auditor": ["todo", "review_return", "due_soon", "material_gap", "ai_pending"],
-    "manager": ["completion_rate", "review_aging", "budget_consumption", "personnel_load", "risk_overview"],
-    "partner": ["signoff_blockers", "ai_unconfirmed", "risk_overview", "key_adjustments"],
-    "qc": ["qc_rule_hits", "issue_rectification", "quality_trend", "cycle_matrix"],
-    "eqcr": ["eqcr_dimensions", "eqcr_checklist", "eqcr_annotations"],
+    "auditor": ["todo", "review_return", "due_soon", "material_gap", "ai_pending", "adj_my_drafts"],
+    "manager": ["completion_rate", "review_aging", "budget_consumption", "personnel_load", "risk_overview", "adj_pending_review", "adj_material_items"],
+    "partner": ["signoff_blockers", "ai_unconfirmed", "risk_overview", "key_adjustments", "adj_material_items", "adj_exceptions"],
+    "qc": ["qc_rule_hits", "issue_rectification", "quality_trend", "cycle_matrix", "adj_exceptions"],
+    "eqcr": ["eqcr_dimensions", "eqcr_checklist", "eqcr_annotations", "adj_snapshot_drift", "adj_material_items"],
 }
 
 SECTION_TITLES: dict[str, str] = {
@@ -48,6 +49,12 @@ SECTION_TITLES: dict[str, str] = {
     "eqcr_dimensions": "EQCR 复核维度",
     "eqcr_checklist": "EQCR Checklist",
     "eqcr_annotations": "EQCR 批注",
+    # 调整分录跨角色 section
+    "adj_my_drafts": "我的草稿分录",
+    "adj_pending_review": "待我复核的调整",
+    "adj_material_items": "重大调整事项",
+    "adj_exceptions": "调整例外与下游失败",
+    "adj_snapshot_drift": "EQCR 快照漂移",
 }
 
 
@@ -160,6 +167,12 @@ class RoleWorkbenchFacade:
             "eqcr_dimensions": self._fetch_eqcr_dimensions,
             "eqcr_checklist": self._fetch_eqcr_checklist,
             "eqcr_annotations": self._fetch_eqcr_annotations,
+            # 调整分录跨角色 section
+            "adj_my_drafts": self._fetch_adj_my_drafts,
+            "adj_pending_review": self._fetch_adj_pending_review,
+            "adj_material_items": self._fetch_adj_material_items,
+            "adj_exceptions": self._fetch_adj_exceptions,
+            "adj_snapshot_drift": self._fetch_adj_snapshot_drift,
         }
         handler = dispatch.get(section_id)
         if handler is None:
@@ -796,3 +809,153 @@ class RoleWorkbenchFacade:
             priority="normal",
             source="eqcr_review_workbench",
         )]
+
+    # ─── 调整分录跨角色 Sections ──────────────────────────────────────────
+
+    async def _fetch_adj_my_drafts(self) -> list[dict[str, Any]]:
+        """审计助理：我编制的草稿和被驳回分录。"""
+        try:
+            from app.models.audit_platform_models import Adjustment, ReviewStatus
+            rows = (await self.db.execute(
+                sa.select(
+                    Adjustment.entry_group_id,
+                    Adjustment.adjustment_no,
+                    Adjustment.review_status,
+                ).where(
+                    Adjustment.project_id == self.project_id,
+                    Adjustment.created_by == self.user_id,
+                    Adjustment.is_deleted == sa.false(),
+                    Adjustment.review_status.in_([ReviewStatus.draft, ReviewStatus.rejected]),
+                ).group_by(
+                    Adjustment.entry_group_id,
+                    Adjustment.adjustment_no,
+                    Adjustment.review_status,
+                ).order_by(Adjustment.adjustment_no)
+                .limit(20)
+            )).all()
+            if not rows:
+                return [_build_item("adj-draft-0", "暂无草稿或被驳回的分录", missing_reason="no_data")]
+            return [
+                _build_item(
+                    f"adj-draft-{str(gid)[:8]}",
+                    f"{no} · {'草稿' if str(getattr(status, 'value', status)) == 'draft' else '被驳回'}",
+                    route=f"/projects/{self.project_id}/adjustments?focus={gid}",
+                    priority="medium" if str(getattr(status, "value", status)) == "rejected" else "normal",
+                )
+                for gid, no, status in rows
+            ]
+        except Exception as exc:
+            logger.warning("[RoleWorkbench] adj_my_drafts failed: %s", exc)
+            return [_build_item("adj-draft-err", "草稿数据加载失败", missing_reason="data_source_error")]
+
+    async def _fetch_adj_pending_review(self) -> list[dict[str, Any]]:
+        """经理：分配给我的待复核调整分录任务。"""
+        try:
+            from app.services import adjustment_review_task_service as tasks
+            my_tasks = await tasks.list_tasks(
+                self.db, project_id=self.project_id, actor_id=self.user_id, status="pending",
+            )
+            if not my_tasks:
+                return [_build_item("adj-review-0", "暂无分配给我的待复核分录", missing_reason="no_data")]
+            return [
+                _build_item(
+                    f"adj-review-{str(t.id)[:8]}",
+                    f"待复核 · {'合伙人' if t.required_level == 'partner' else '经理'}",
+                    route=f"/projects/{self.project_id}/adjustments?focus={t.entry_group_id}",
+                    priority="high" if t.required_level == "partner" else "medium",
+                )
+                for t in my_tasks[:20]
+            ]
+        except Exception as exc:
+            logger.warning("[RoleWorkbench] adj_pending_review failed: %s", exc)
+            return [_build_item("adj-review-err", "复核任务加载失败", missing_reason="data_source_error")]
+
+    async def _fetch_adj_material_items(self) -> list[dict[str, Any]]:
+        """经理/合伙人/EQCR：达到执行重要性或命中性质风险的分录。"""
+        try:
+            from app.models.audit_platform_models import Adjustment, AdjustmentType, ReviewStatus
+            from app.services.adjustment_risk_projection import project_adjustment_risks
+
+            group_ids = list((await self.db.execute(
+                sa.select(sa.distinct(Adjustment.entry_group_id)).where(
+                    Adjustment.project_id == self.project_id,
+                    Adjustment.is_deleted == sa.false(),
+                    Adjustment.review_status.in_([ReviewStatus.approved, ReviewStatus.pending_review]),
+                ).limit(200)
+            )).scalars().all())
+            if not group_ids:
+                return [_build_item("adj-mat-0", "暂无重大调整", missing_reason="no_data")]
+            from app.services.project_audit_year import fetch_project_audit_year
+            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            risks = await project_adjustment_risks(self.db, project_id=self.project_id, year=year, group_ids=group_ids)
+            material = [
+                (gid, risk) for gid, risk in risks.items()
+                if risk.get("required_level") == "partner" or risk.get("reaches_performance")
+            ]
+            if not material:
+                return [_build_item("adj-mat-0", "暂无达到执行重要性的调整分录", missing_reason="no_data")]
+            return [
+                _build_item(
+                    f"adj-mat-{gid[:8]}",
+                    f"执行重要性 {risk.get('performance_ratio', '?')}%"
+                    + (f" · {'、'.join(f.get('label', '') for f in risk.get('risk_flags', []))}" if risk.get("risk_flags") else ""),
+                    route=f"/projects/{self.project_id}/adjustments?focus={gid}",
+                    priority="high",
+                )
+                for gid, risk in material[:20]
+            ]
+        except Exception as exc:
+            logger.warning("[RoleWorkbench] adj_material_items failed: %s", exc)
+            return [_build_item("adj-mat-err", "重大调整数据加载失败", missing_reason="data_source_error")]
+
+    async def _fetch_adj_exceptions(self) -> list[dict[str, Any]]:
+        """合伙人/QC：调整例外（未完成处理 + 下游失败）。"""
+        try:
+            from app.services.wp_adjustment_helpers import count_unresolved_adjustment_groups
+            from app.services.project_audit_year import fetch_project_audit_year
+            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            unresolved = await count_unresolved_adjustment_groups(self.db, self.project_id, year)
+            if unresolved == 0:
+                return [_build_item("adj-exc-0", "全部分录均已完成内部复核", missing_reason="no_data")]
+            return [_build_item(
+                "adj-exc-unresolved",
+                f"{unresolved} 笔分录尚未完成内部复核",
+                route=f"/projects/{self.project_id}/adjustments?review_status=draft",
+                priority="high" if unresolved > 5 else "medium",
+            )]
+        except Exception as exc:
+            logger.warning("[RoleWorkbench] adj_exceptions failed: %s", exc)
+            return [_build_item("adj-exc-err", "例外数据加载失败", missing_reason="data_source_error")]
+
+    async def _fetch_adj_snapshot_drift(self) -> list[dict[str, Any]]:
+        """EQCR：快照漂移检测——当前快照的调整数量是否与实时一致。"""
+        try:
+            from app.services.eqcr_snapshot_service import get_current_snapshot
+            from app.services.project_audit_year import fetch_project_audit_year
+            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            snapshot = await get_current_snapshot(self.db, self.project_id, year)
+            if snapshot is None:
+                return [_build_item("adj-snap-none", "尚未创建 EQCR 快照", missing_reason="no_snapshot",
+                                    route=f"/projects/{self.project_id}/eqcr")]
+            snapshot_adj = snapshot.get("snapshot_data", {}).get("adjustments", [])
+            from app.models.audit_platform_models import Adjustment
+            live_count = int((await self.db.execute(sa.select(
+                sa.func.count(sa.distinct(Adjustment.entry_group_id)),
+            ).where(
+                Adjustment.project_id == self.project_id,
+                Adjustment.year == year,
+                Adjustment.is_deleted == sa.false(),
+            ))).scalar() or 0)
+            snap_count = len(snapshot_adj)
+            if live_count == snap_count:
+                return [_build_item("adj-snap-ok", f"快照与实时一致（{snap_count} 笔）",
+                                    route=f"/projects/{self.project_id}/eqcr", priority="normal")]
+            return [_build_item(
+                "adj-snap-drift",
+                f"快照 {snap_count} 笔 vs 实时 {live_count} 笔，请刷新快照",
+                route=f"/projects/{self.project_id}/eqcr",
+                priority="high",
+            )]
+        except Exception as exc:
+            logger.warning("[RoleWorkbench] adj_snapshot_drift failed: %s", exc)
+            return [_build_item("adj-snap-err", "快照漂移检测失败", missing_reason="snapshot_service_error")]

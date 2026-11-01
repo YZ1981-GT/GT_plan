@@ -46,6 +46,7 @@ export interface CentralStatus {
   source_wp_code?: string
   /** 协作接力状态回流（pending/acknowledged/contributed/confirmed/rejected/closed），底稿侧只读展示 + 覆盖保护 */
   collaboration_status?: string | null
+  client_booking?: { status: string; effective: boolean; voucher_keys: string[] } | null
 }
 
 /** 协作状态中文标签（底稿侧展示） */
@@ -138,7 +139,7 @@ export function syncOutcomeMessage(res: { sync_outcome?: string; previous_status
     }
     return `已更新调整分录模块中的分录${no}`
   }
-  return `已同步到调整分录模块${no}，为草稿：提交复核并批准后计入试算表审定数`
+  return `已同步到调整分录模块${no}，为草稿：请提交复核；批准后方可从来源审定表显式发布到试算表`
 }
 
 export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) {
@@ -278,6 +279,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
 
   // P0-4: 订阅集中登记复核状态变更事件，底稿侧自动回流刷新（SSE 真通道）
   let _reviewSub: ProjectEventSubscription | null = null
+  let _bookingSub: ProjectEventSubscription | null = null
   onMounted(() => {
     _unregisterLocate = registerAdjustmentEntryGroup(() => unwrap(opts.wpId), (itemId) => {
       if (!selectEntryGroup(itemId)) return false
@@ -293,6 +295,12 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
         () => refreshStatus(),
         { onReconnect: () => refreshStatus() },
       )
+      _bookingSub = subscribeProjectEvent(
+        pid,
+        'adjustment:client-booking-changed',
+        () => refreshStatus(),
+        { onReconnect: () => refreshStatus() },
+      )
     }
     refreshStatus()
     // Phase 3: 首次载入完成后解除 firstLoad 标记（下一个 microtask）
@@ -302,6 +310,7 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     _unregisterLocate?.()
     _unregisterLocate = null
     _reviewSub?.close()
+    _bookingSub?.close()
     // Phase 3: 卸载冲刷 —— 有待发同步则立即发出
     if (_autoSyncTimer) {
       clearTimeout(_autoSyncTimer)

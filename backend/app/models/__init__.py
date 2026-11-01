@@ -382,3 +382,16 @@ __all__ = [
     # --- 显示偏好 (platform-global-display-settings-closure / V233) ---
     "UserDisplayPreferences",
 ]
+
+# 调整分录持久化复核、处理历史与客户已入账（迁移 V235）
+from app.models.adjustment_review_models import (  # noqa: F401
+    AdjustmentClientBooking,
+    AdjustmentReviewTask,
+    AdjustmentTreatmentEvent,
+)
+
+# 调整分录导入批次与逐组结果（迁移 V235）
+from app.models.adjustment_import_models import (  # noqa: F401
+    AdjustmentImportBatch,
+    AdjustmentImportGroupResult,
+)

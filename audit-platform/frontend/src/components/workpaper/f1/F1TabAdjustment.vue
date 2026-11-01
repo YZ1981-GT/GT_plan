@@ -35,12 +35,7 @@
         @click="syncToCentral"
         title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
       >同步到集中登记</el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
     </div>
     <div class="toolbar-right">
       <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
@@ -168,6 +163,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * F1TabAdjustment.vue — F1-3 调整分录汇总表
  * 10列表 + 借贷平衡 + 推送A13
@@ -175,7 +171,7 @@
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF1Adjustment } from '../composables/useF1Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 

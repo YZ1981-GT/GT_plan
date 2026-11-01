@@ -6,7 +6,6 @@
 - 借贷平衡校验 + 自动编号
 - 科目标准化校验
 - 科目下拉（报表行次级联）
-- 底稿审定表数据
 - 事件发布（通过 EventBus 触发试算表重算）
 """
 
@@ -27,7 +26,6 @@ from app.models.audit_platform_models import (
     Adjustment,
     AdjustmentEntry,
     AdjustmentType,
-    ReportLineMapping,
     ReviewStatus,
     TrialBalance,
 )
@@ -41,8 +39,6 @@ from app.models.audit_platform_schemas import (
     EventPayload,
     EventType,
     ReviewStatusChange,
-    WPAdjustmentDetail,
-    WPAdjustmentSummary,
 )
 from app.core.audit_decorator import audit_log
 from app.services.adjustment_entry_rules import (
@@ -51,16 +47,12 @@ from app.services.adjustment_entry_rules import (
     normalize_adjustment_no,
 )
 from app.services.event_bus import event_bus
-from app.services.ledger_import.direction_resolver import resolve_account_direction
+from app.services.adjustment_group_writer import AdjustmentGroupLine, AdjustmentGroupWriter
 
 
 # 合法的状态转换
 _VALID_TRANSITIONS: dict[ReviewStatus, set[ReviewStatus]] = {
-    ReviewStatus.draft: {
-        ReviewStatus.pending_review,
-        ReviewStatus.approved,
-        ReviewStatus.rejected,
-    },
+    ReviewStatus.draft: {ReviewStatus.pending_review},
     # pending_review → draft 只能走「撤回提交」（allow_withdraw）
     ReviewStatus.pending_review: {ReviewStatus.approved, ReviewStatus.rejected, ReviewStatus.draft},
     # rejected → pending_review = 驳回后不改明细直接重新提交
@@ -125,7 +117,12 @@ class AdjustmentService:
             project_id, [li.standard_account_code for li in data.line_items]
         )
 
-        # 3. 编号：填了用自定义编号（同年度未删除分录组不得重复），否则自动编号
+        # 3. 解析主体与审计阶段；不允许无语义的 ``default`` 落库。
+        company_code, audit_phase = await self._resolve_group_context(
+            project_id, data.year, data.company_code
+        )
+
+        # 4. 编号：填了用自定义编号（同年度未删除分录组不得重复），否则自动编号
         custom_no = normalize_adjustment_no(data.adjustment_no)
         if custom_no is not None:
             if custom_no in await self._used_adjustment_nos(project_id, data.year):
@@ -136,46 +133,32 @@ class AdjustmentService:
                 project_id, data.year, data.adjustment_type
             )
 
-        # 4. 生成 entry_group_id
+        # 5. 生成 entry_group_id
         entry_group_id = uuid.uuid4()
 
-        # 5. 写入 adjustments 表（每行一条记录，共享 entry_group_id）
-        adj_rows: list[Adjustment] = []
-        entry_rows: list[AdjustmentEntry] = []
-        for idx, li in enumerate(data.line_items, start=1):
-            adj = Adjustment(
-                project_id=project_id,
-                year=data.year,
-                company_code=data.company_code,
-                adjustment_no=adjustment_no,
-                adjustment_type=data.adjustment_type,
-                description=data.description,
-                account_code=li.standard_account_code,
-                account_name=li.account_name,
-                debit_amount=li.debit_amount,
-                credit_amount=li.credit_amount,
-                entry_group_id=entry_group_id,
-                created_by=user_id,
-            )
-            self.db.add(adj)
-            await self.db.flush()  # get adj.id
-
-            entry = AdjustmentEntry(
-                adjustment_id=adj.id,
-                entry_group_id=entry_group_id,
-                line_no=idx,
-                standard_account_code=li.standard_account_code,
-                detail_account_code=li.detail_account_code,
-                account_name=li.account_name,
-                report_line_code=li.report_line_code,
-                debit_amount=li.debit_amount,
-                credit_amount=li.credit_amount,
-            )
-            self.db.add(entry)
-            adj_rows.append(adj)
-            entry_rows.append(entry)
-
-        await self.db.flush()
+        # 6. 写入 adjustments 表（每行一条记录，共享 entry_group_id）
+        written = await AdjustmentGroupWriter(self.db).write_group(
+            project_id=project_id,
+            year=data.year,
+            company_code=company_code,
+            adjustment_no=adjustment_no,
+            adjustment_type=data.adjustment_type,
+            description=data.description,
+            entry_group_id=entry_group_id,
+            lines=[AdjustmentGroupLine(
+                standard_account_code=line.standard_account_code,
+                detail_account_code=line.detail_account_code,
+                account_name=line.account_name,
+                report_line_code=line.report_line_code,
+                debit_amount=line.debit_amount,
+                credit_amount=line.credit_amount,
+            ) for line in data.line_items],
+            content_revision=1,
+            audit_phase=audit_phase,
+            created_by=user_id,
+        )
+        adj_rows = written.adjustments
+        entry_rows = written.entries
 
         resp = self._build_group_response(
             entry_group_id, adjustment_no, data.adjustment_type,
@@ -243,11 +226,18 @@ class AdjustmentService:
         user_id: UUID,
     ) -> AdjustmentGroupResponse:
         """修改分录（仅 draft/rejected 可改）"""
-        adj_rows = await self._get_group_rows(project_id, entry_group_id)
+        adj_rows = await self._get_group_rows(project_id, entry_group_id, for_update=True)
         if not adj_rows:
             raise ValueError("调整分录不存在")
+        current_revision = self._group_content_revision(adj_rows)
+        if data.expected_revision is not None and data.expected_revision != current_revision:
+            raise ValueError(
+                f"分录已被其他人更新（当前版本 {current_revision}），请刷新后重试"
+            )
 
         status = adj_rows[0].review_status
+        if (adj_rows[0].origin or "manual") == "workpaper":
+            raise ValueError("底稿来源分录只能回来源底稿修改后重新同步，不能在调整大厅直接修改")
         if status not in (ReviewStatus.draft, ReviewStatus.rejected):
             raise ValueError(f"当前状态{_locked_hint(status)}不允许修改")
 
@@ -255,6 +245,10 @@ class AdjustmentService:
         if data.description is not None:
             for row in adj_rows:
                 row.description = data.description
+                row.updated_by = user_id
+        if data.audit_phase is not None:
+            for row in adj_rows:
+                row.audit_phase = data.audit_phase
                 row.updated_by = user_id
 
         # 更新行项
@@ -266,56 +260,45 @@ class AdjustmentService:
                 project_id, [li.standard_account_code for li in data.line_items]
             )
 
-            # 软删除旧行
-            for row in adj_rows:
-                row.soft_delete()
-            # 软删除旧 entry 行
             old_entries = await self._get_entry_rows(entry_group_id)
-            for e in old_entries:
-                e.soft_delete()
+            await AdjustmentGroupWriter(self.db).soft_delete_group(
+                adj_rows, old_entries, user_id=user_id,
+            )
 
             # 写入新行
             adj_no = adj_rows[0].adjustment_no
             adj_type = adj_rows[0].adjustment_type
             desc = data.description if data.description is not None else adj_rows[0].description
-            new_adj_rows: list[Adjustment] = []
-            new_entry_rows: list[AdjustmentEntry] = []
-            for idx, li in enumerate(data.line_items, start=1):
-                adj = Adjustment(
-                    project_id=project_id,
-                    year=adj_rows[0].year,
-                    company_code=adj_rows[0].company_code,
-                    adjustment_no=adj_no,
-                    adjustment_type=adj_type,
-                    description=desc,
-                    account_code=li.standard_account_code,
-                    account_name=li.account_name,
-                    debit_amount=li.debit_amount,
-                    credit_amount=li.credit_amount,
-                    entry_group_id=entry_group_id,
-                    review_status=ReviewStatus.draft,
-                    created_by=adj_rows[0].created_by,
-                    updated_by=user_id,
-                )
-                self.db.add(adj)
-                await self.db.flush()
-
-                entry = AdjustmentEntry(
-                    adjustment_id=adj.id,
-                    entry_group_id=entry_group_id,
-                    line_no=idx,
-                    standard_account_code=li.standard_account_code,
-                    detail_account_code=li.detail_account_code,
-                    account_name=li.account_name,
-                    report_line_code=li.report_line_code,
-                    debit_amount=li.debit_amount,
-                    credit_amount=li.credit_amount,
-                )
-                self.db.add(entry)
-                new_adj_rows.append(adj)
-                new_entry_rows.append(entry)
-
-            await self.db.flush()
+            new_revision = current_revision + 1
+            audit_phase = data.audit_phase or adj_rows[0].audit_phase or "final"
+            origin = adj_rows[0].origin or "manual"
+            source_ref = adj_rows[0].source_ref
+            written = await AdjustmentGroupWriter(self.db).write_group(
+                project_id=project_id,
+                year=adj_rows[0].year,
+                company_code=adj_rows[0].company_code,
+                adjustment_no=adj_no,
+                adjustment_type=adj_type,
+                description=desc,
+                entry_group_id=entry_group_id,
+                lines=[AdjustmentGroupLine(
+                    standard_account_code=line.standard_account_code,
+                    detail_account_code=line.detail_account_code,
+                    account_name=line.account_name,
+                    report_line_code=line.report_line_code,
+                    debit_amount=line.debit_amount,
+                    credit_amount=line.credit_amount,
+                ) for line in data.line_items],
+                content_revision=new_revision,
+                audit_phase=audit_phase,
+                review_status=ReviewStatus.draft,
+                origin=origin,
+                source_ref=source_ref,
+                created_by=adj_rows[0].created_by,
+                updated_by=user_id,
+            )
+            new_adj_rows = written.adjustments
+            new_entry_rows = written.entries
             resp = self._build_group_response(
                 entry_group_id, adj_no, adj_type, desc,
                 ReviewStatus.draft, new_adj_rows, new_entry_rows,
@@ -335,9 +318,9 @@ class AdjustmentService:
             try:
                 from app.models.core import Log
                 diff_log = Log(
-                    action="adjustment_updated",
-                    resource_type="adjustment",
-                    resource_id=str(entry_group_id),
+                    action_type="adjustment_updated",
+                    object_type="adjustment",
+                    object_id=entry_group_id,
                     new_value={
                         "_diff": {
                             "old_lines": [{"account": r.account_code, "debit": str(r.debit_amount), "credit": str(r.credit_amount)} for r in adj_rows],
@@ -348,7 +331,7 @@ class AdjustmentService:
                         "project_id": str(project_id),
                         "year": adj_rows[0].year,
                     },
-                    performed_by=user_id,
+                    user_id=user_id,
                 )
                 self.db.add(diff_log)
             except Exception:
@@ -356,6 +339,11 @@ class AdjustmentService:
 
             return resp
 
+        # 摘要也是组内容的一部分；摘要-only 更新同样推进内容修订号。
+        if data.description is not None or data.audit_phase is not None:
+            next_revision = current_revision + 1
+            for row in adj_rows:
+                row.content_revision = next_revision
         await self.db.flush()
         entries = await self._get_entry_rows(entry_group_id)
         return self._build_group_response(
@@ -370,25 +358,26 @@ class AdjustmentService:
         self,
         project_id: UUID,
         entry_group_id: UUID,
+        *,
+        expected_revision: int | None = None,
+        user_id: UUID | None = None,
     ) -> None:
-        """软删除分录（仅 draft/rejected 可删）"""
-        adj_rows = await self._get_group_rows(project_id, entry_group_id)
+        """软删除分录组（仅 draft/rejected 可删，支持内容版本 CAS）。"""
+        adj_rows = await self._get_group_rows(project_id, entry_group_id, for_update=True)
         if not adj_rows:
             raise ValueError("调整分录不存在")
+        current_revision = self._group_content_revision(adj_rows)
+        if expected_revision is not None and expected_revision != current_revision:
+            raise ValueError(f"分录已被其他人更新（当前版本 {current_revision}），请刷新后重试")
 
         status = adj_rows[0].review_status
         if status not in (ReviewStatus.draft, ReviewStatus.rejected):
             raise ValueError(f"当前状态{_locked_hint(status)}不允许删除")
 
-        for row in adj_rows:
-            row.soft_delete()
-
-        # 软删除 entry 行
         entry_rows = await self._get_entry_rows(entry_group_id)
-        for e in entry_rows:
-            e.soft_delete()
-
-        await self.db.flush()
+        await AdjustmentGroupWriter(self.db).soft_delete_group(
+            adj_rows, entry_rows, user_id=user_id,
+        )
 
         # 发布事件
         affected_codes = list({r.account_code for r in adj_rows})
@@ -413,13 +402,16 @@ class AdjustmentService:
     ) -> dict[str, Any]:
         """执行调整分录复核状态转换并返回事件与通知所需的影响范围。
 
-        大厅可以直接把草稿转为 approved/rejected；approved 只能通过专用
-        ``revoke-review`` 端点回到 draft，pending_review 只能经「撤回提交」回到 draft。
-        提交、撤回和驳回返工都会清除复核元数据，防止新一轮继续携带上一轮审批人的身份与时间。
+        草稿只能提交复核；批准/驳回必须由有效复核任务从 pending_review 进入。
+        ``approved`` 只能通过专用 revoke-review 端点回到 draft，pending_review
+        只能经「撤回提交」回到 draft。新一轮会清除旧复核信息。
         """
-        adj_rows = await self._get_group_rows(project_id, entry_group_id)
+        adj_rows = await self._get_group_rows(project_id, entry_group_id, for_update=True)
         if not adj_rows:
             raise ValueError("调整分录不存在")
+        current_revision = self._group_content_revision(adj_rows)
+        if change.expected_revision is not None and change.expected_revision != current_revision:
+            raise ValueError(f"分录已被其他人更新（当前版本 {current_revision}），请刷新后重试")
 
         current = adj_rows[0].review_status
         target = change.status
@@ -538,6 +530,20 @@ class AdjustmentService:
         adjustment_type: AdjustmentType | None = None,
         review_status: ReviewStatus | None = None,
         origin: str | None = None,
+        search: str | None = None,
+        account_code: str | None = None,
+        amount_min: Decimal | None = None,
+        amount_max: Decimal | None = None,
+        created_by: UUID | None = None,
+        reviewer_id: UUID | None = None,
+        audit_phase: str | None = None,
+        treatment_status: str | None = None,
+        focus_entry_group_id: UUID | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        allowed_account_codes: set[str] | None = None,
+        sort_by: str = "adjustment_no",
+        sort_order: str = "asc",
         page: int = 1,
         page_size: int = 50,
     ) -> dict:
@@ -558,6 +564,9 @@ class AdjustmentService:
                 sa.func.min(adj.c.rejection_reason).label("rejection_reason"),
                 sa.func.min(sa.cast(adj.c.created_by, sa.Text)).label("created_by"),
                 sa.func.min(adj.c.created_at).label("created_at"),
+                sa.func.min(adj.c.audit_phase).label("audit_phase"),
+                sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0).label("total_credit"),
             )
             .where(
                 adj.c.project_id == project_id,
@@ -572,22 +581,120 @@ class AdjustmentService:
         if review_status is not None:
             base = base.where(adj.c.review_status == review_status)
         if origin is not None:
-            # origin 组内共享（同 entry_group 全 workpaper 或全 manual），组级过滤正确。
-            # 'manual' 兼容历史 NULL 数据。
             if origin == "manual":
                 base = base.where(sa.or_(adj.c.origin.is_(None), adj.c.origin == "manual"))
             else:
                 base = base.where(adj.c.origin == origin)
+        if allowed_account_codes is not None:
+            if not allowed_account_codes:
+                return {
+                    "items": [], "total": 0, "page": page, "page_size": page_size,
+                    "has_more": False, "status_counts": {},
+                }
+            base = base.where(adj.c.account_code.in_(sorted(allowed_account_codes)))
+        if account_code:
+            base = base.where(adj.c.account_code == account_code.strip())
+        if created_by is not None:
+            base = base.where(adj.c.created_by == created_by)
+        if reviewer_id is not None:
+            base = base.where(adj.c.reviewer_id == reviewer_id)
+        if audit_phase in {"preliminary", "final"}:
+            base = base.where(adj.c.audit_phase == audit_phase)
+        if created_from is not None:
+            base = base.where(adj.c.created_at >= created_from)
+        if created_to is not None:
+            base = base.where(adj.c.created_at <= created_to)
+        if search and search.strip():
+            term = f"%{search.strip().lower()}%"
+            base = base.where(sa.or_(
+                sa.func.lower(adj.c.adjustment_no).like(term),
+                sa.func.lower(sa.func.coalesce(adj.c.description, "")).like(term),
+                sa.func.lower(adj.c.account_code).like(term),
+                sa.func.lower(sa.func.coalesce(adj.c.account_name, "")).like(term),
+            ))
+        if treatment_status:
+            all_group_ids = list((await self.db.execute(sa.select(sa.distinct(adj.c.entry_group_id)).where(
+                adj.c.project_id == project_id,
+                adj.c.year == year,
+                adj.c.is_deleted == sa.false(),
+            ))).scalars().all())
+            from app.services.adjustment_treatment_service import treatment_projection
+            projections = await treatment_projection(
+                self.db, project_id=project_id, year=year, group_ids=all_group_ids,
+            )
+            def _matches_treatment(projection: Any) -> bool:
+                if treatment_status == "client_booked":
+                    return projection.status == "client_booked" and projection.effective
+                if treatment_status == "client_booked_inactive":
+                    return projection.status == "client_booked" and not projection.effective
+                if treatment_status == "pending":
+                    return projection.status in {"pending_internal_review", "awaiting_workpaper_publish"}
+                return projection.status == treatment_status
 
-        # 用子查询做分页
+            matching = [
+                UUID(group_id) for group_id, projection in projections.items()
+                if _matches_treatment(projection)
+            ]
+            if not matching:
+                return {
+                    "items": [], "total": 0, "page": page, "page_size": page_size,
+                    "has_more": False, "status_counts": {},
+                }
+            base = base.where(adj.c.entry_group_id.in_(matching))
+
+        # 用子查询做稳定分页
         sub = base.subquery()
-        count_q = sa.select(sa.func.count()).select_from(sub)
-        total = (await self.db.execute(count_q)).scalar() or 0
-
-        # 获取分页后的 group_ids
+        amount_expr = sa.case(
+            (sub.c.total_debit >= sub.c.total_credit, sub.c.total_debit),
+            else_=sub.c.total_credit,
+        )
+        filtered = sa.select(sub)
+        if amount_min is not None:
+            filtered = filtered.where(amount_expr >= amount_min)
+        if amount_max is not None:
+            filtered = filtered.where(amount_expr <= amount_max)
+        filtered_sub = filtered.subquery()
+        total = int((await self.db.execute(
+            sa.select(sa.func.count()).select_from(filtered_sub)
+        )).scalar() or 0)
+        status_counts = {
+            str(status): int(count)
+            for status, count in (await self.db.execute(sa.select(
+                filtered_sub.c.review_status, sa.func.count(),
+            ).group_by(filtered_sub.c.review_status))).all()
+        }
+        sort_map = {
+            "adjustment_no": filtered_sub.c.adjustment_no,
+            "description": filtered_sub.c.description,
+            "created_at": filtered_sub.c.created_at,
+            "review_status": filtered_sub.c.review_status,
+            "amount": sa.case(
+                (filtered_sub.c.total_debit >= filtered_sub.c.total_credit, filtered_sub.c.total_debit),
+                else_=filtered_sub.c.total_credit,
+            ),
+        }
+        sort_expr = sort_map.get(sort_by, filtered_sub.c.adjustment_no)
+        sort_expr = sort_expr.desc() if sort_order.lower() == "desc" else sort_expr.asc()
+        stable_order = (sort_expr, sa.cast(filtered_sub.c.entry_group_id, sa.Text).asc())
+        if focus_entry_group_id is not None:
+            ordered_ids = list((await self.db.execute(
+                sa.select(filtered_sub.c.entry_group_id).order_by(*stable_order)
+            )).scalars().all())
+            target_group_id = focus_entry_group_id
+            if target_group_id not in ordered_ids:
+                target_group_id = (await self.db.execute(sa.select(
+                    AdjustmentEntry.entry_group_id,
+                ).where(
+                    AdjustmentEntry.id == focus_entry_group_id,
+                    AdjustmentEntry.is_deleted == sa.false(),
+                ))).scalar_one_or_none() or focus_entry_group_id
+            try:
+                page = ordered_ids.index(target_group_id) // page_size + 1
+            except ValueError:
+                pass
         groups_q = (
-            sa.select(sub)
-            .order_by(sub.c.adjustment_no)
+            sa.select(filtered_sub)
+            .order_by(*stable_order)
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -595,7 +702,10 @@ class AdjustmentService:
         group_ids = [g.entry_group_id for g in groups]
 
         if not group_ids:
-            return {"items": [], "total": total, "page": page, "page_size": page_size}
+            return {
+                "items": [], "total": total, "page": page, "page_size": page_size,
+                "has_more": False, "status_counts": status_counts,
+            }
 
         # 批量查询所有 Adjustment 行（替代 N 次单独查询，解决 N+1 问题）
         all_adj_q = sa.select(Adjustment).where(
@@ -639,6 +749,8 @@ class AdjustmentService:
             "total": total,
             "page": page,
             "page_size": page_size,
+            "has_more": page * page_size < total,
+            "status_counts": status_counts,
         }
 
 
@@ -658,6 +770,49 @@ class AdjustmentService:
         return await list_account_options(
             self.db, project_id, report_line_code=report_line_code, year=year,
         )
+
+    async def _resolve_group_context(
+        self,
+        project_id: UUID,
+        year: int,
+        requested_company_code: str | None,
+    ) -> tuple[str, str]:
+        """解析分录主体和创建阶段，拒绝把无语义的 ``default`` 写入账簿。"""
+        from app.models.core import Project
+
+        requested = str(requested_company_code or "").strip()
+        phase = (
+            await self.db.execute(
+                sa.select(Project.current_audit_phase).where(Project.id == project_id)
+            )
+        ).scalar_one_or_none() or "final"
+        if requested and requested.lower() != "default":
+            return requested, str(phase)
+
+        companies = [
+            str(value)
+            for value in (
+                await self.db.execute(
+                    sa.select(sa.distinct(TrialBalance.company_code)).where(
+                        TrialBalance.project_id == project_id,
+                        TrialBalance.year == year,
+                        TrialBalance.is_deleted == sa.false(),
+                    )
+                )
+            ).scalars().all()
+            if value
+        ]
+        if len(companies) == 1:
+            return companies[0], str(phase)
+        if len(companies) > 1:
+            raise ValueError("本项目该年度存在多个主体，请明确选择调整分录所属主体")
+
+        project_company = (
+            await self.db.execute(
+                sa.select(Project.company_code).where(Project.id == project_id)
+            )
+        ).scalar_one_or_none()
+        return str(project_company or "standalone"), str(phase)
 
     # ------------------------------------------------------------------
     # 13.8 科目标准化校验（内部方法）
@@ -687,136 +842,6 @@ class AdjustmentService:
             raise ValueError(
                 f"科目编码不存在于标准科目表中: {', '.join(sorted(missing))}"
             )
-
-    # ------------------------------------------------------------------
-    # 13.9 get_wp_adjustment_summary
-    # ------------------------------------------------------------------
-    async def get_wp_adjustment_summary(
-        self,
-        project_id: UUID,
-        year: int,
-        wp_code: str,
-    ) -> WPAdjustmentSummary:
-        """
-        底稿审定表数据：
-        通过 wp_code 查找关联的标准科目 → 汇总 AJE/RJE 明细 → 返回审定表
-        简化实现：wp_code 直接作为 account_category 或 report_line_code 查找
-        """
-        # 通过 report_line_mapping 查找 wp_code 关联的标准科目
-        rlm = ReportLineMapping.__table__
-        q = (
-            sa.select(rlm.c.standard_account_code)
-            .where(
-                rlm.c.project_id == project_id,
-                rlm.c.report_line_code == wp_code,
-                rlm.c.is_deleted == sa.false(),
-            )
-        )
-        result = await self.db.execute(q)
-        account_codes = [r.standard_account_code for r in result.fetchall()]
-
-        if not account_codes:
-            return WPAdjustmentSummary(wp_code=wp_code, accounts=account_codes)
-
-        # 获取未审数和底稿调整分量（从 trial_balance）
-        tb = TrialBalance.__table__
-        tb_q = (
-            sa.select(
-                sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
-                sa.func.coalesce(sa.func.sum(tb.c.wp_adjustment), 0).label("wp_adj"),
-            )
-            .where(
-                tb.c.project_id == project_id,
-                tb.c.year == year,
-                tb.c.standard_account_code.in_(account_codes),
-                tb.c.is_deleted == sa.false(),
-            )
-        )
-        tb_result = await self.db.execute(tb_q)
-        tb_row = tb_result.one()
-        unadjusted = Decimal(str(tb_row.unadj or 0))
-        wp_adjustment = Decimal(str(tb_row.wp_adj or 0))
-
-        # 获取 AJE/RJE 明细
-        # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit) 是"借正贷负"，
-        # 但 unadjusted_amount 已按科目自然方向存正数（Task 3.1）。为使
-        # audited = unadjusted + aje + rje 在所有类别（尤其负债/权益/收入贷方类）下方向正确，
-        # 须把净额按科目自然方向归一：借方类用 (debit-credit)，贷方类取反 (credit-debit)。
-        # 与 trial_balance_service.recalc_adjustments（Task 3.3）使用同一 direction_resolver 口径，
-        # 此处仅做"按方向归一"，不叠加额外翻转——调整分录本身仍是原始借贷金额。
-        adj = Adjustment.__table__
-        adj_q = (
-            sa.select(
-                adj.c.entry_group_id,
-                adj.c.adjustment_no,
-                adj.c.adjustment_type,
-                adj.c.description,
-                adj.c.account_code,
-                adj.c.account_name,
-                (sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0)
-                 - sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0)).label("net"),
-            )
-            .where(
-                adj.c.project_id == project_id,
-                adj.c.year == year,
-                adj.c.account_code.in_(account_codes),
-                adj.c.is_deleted == sa.false(),
-            )
-            .group_by(
-                adj.c.entry_group_id,
-                adj.c.adjustment_no,
-                adj.c.adjustment_type,
-                adj.c.description,
-                adj.c.account_code,
-                adj.c.account_name,
-            )
-        )
-        adj_result = await self.db.execute(adj_q)
-
-        # 按 (entry_group_id, type) 聚合方向归一后的净额，多科目同组时按各自方向归一再相加
-        group_acc: dict[tuple, WPAdjustmentDetail] = {}
-        for r in adj_result.fetchall():
-            direction, _src = resolve_account_direction(
-                r.account_code, r.account_name or ""
-            )
-            sign = Decimal("-1") if direction == "credit" else Decimal("1")
-            normalized = sign * Decimal(str(r.net))
-            key = (r.entry_group_id, r.adjustment_type)
-            existing = group_acc.get(key)
-            if existing is None:
-                group_acc[key] = WPAdjustmentDetail(
-                    entry_group_id=r.entry_group_id,
-                    adjustment_no=r.adjustment_no,
-                    adjustment_type=r.adjustment_type,
-                    description=r.description,
-                    amount=normalized,
-                )
-            else:
-                existing.amount += normalized
-
-        aje_details: list[WPAdjustmentDetail] = []
-        rje_details: list[WPAdjustmentDetail] = []
-        aje_total = Decimal("0")
-        rje_total = Decimal("0")
-
-        for detail in group_acc.values():
-            if detail.adjustment_type in (AdjustmentType.aje.value, AdjustmentType.aje):
-                aje_details.append(detail)
-                aje_total += detail.amount
-            else:
-                rje_details.append(detail)
-                rje_total += detail.amount
-
-        return WPAdjustmentSummary(
-            wp_code=wp_code,
-            accounts=account_codes,
-            unadjusted_amount=unadjusted,
-            aje_details=aje_details,
-            rje_details=rje_details,
-            aje_total=aje_total,
-            rje_total=rje_total,
-            audited_amount=unadjusted + aje_total + rje_total + wp_adjustment,
-        )
 
     # ------------------------------------------------------------------
     # 内部辅助方法
@@ -870,8 +895,10 @@ class AdjustmentService:
         self,
         project_id: UUID,
         entry_group_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> list[Adjustment]:
-        """获取同一 entry_group_id 的所有未删除行"""
+        """获取同一 entry_group_id 的全部活跃行，可选数据库行锁。"""
         q = (
             sa.select(Adjustment)
             .where(
@@ -880,8 +907,17 @@ class AdjustmentService:
                 Adjustment.is_deleted == sa.false(),
             )
         )
+        if for_update and self.db.get_bind() is not None and self.db.get_bind().dialect.name == "postgresql":
+            q = q.with_for_update()
         result = await self.db.execute(q)
         return list(result.scalars().all())
+
+    @staticmethod
+    def _group_content_revision(rows: list[Adjustment]) -> int:
+        revisions = {int(row.content_revision or 1) for row in rows}
+        if len(revisions) != 1:
+            raise ValueError(f"分录组内容版本不一致：{sorted(revisions)}")
+        return next(iter(revisions))
 
     async def _get_entry_rows(
         self,
@@ -938,6 +974,10 @@ class AdjustmentService:
         created_at = adj_rows[0].created_at if adj_rows else None
         origin = getattr(adj_rows[0], "origin", None) or "manual" if adj_rows else "manual"
         source_ref = getattr(adj_rows[0], "source_ref", None) if adj_rows else None
+        content_revision = int(getattr(adj_rows[0], "content_revision", 1) or 1) if adj_rows else 1
+        audit_phase = str(getattr(adj_rows[0], "audit_phase", "final") or "final") if adj_rows else "final"
+        external_reference = getattr(adj_rows[0], "external_reference", None) if adj_rows else None
+        import_batch_id = getattr(adj_rows[0], "import_batch_id", None) if adj_rows else None
 
         return AdjustmentGroupResponse(
             entry_group_id=entry_group_id,
@@ -945,6 +985,10 @@ class AdjustmentService:
             adjustment_type=adjustment_type,
             description=description,
             review_status=review_status,
+            content_revision=content_revision,
+            audit_phase=audit_phase,
+            external_reference=external_reference,
+            import_batch_id=import_batch_id,
             reviewer_id=reviewer_id,
             reviewed_at=reviewed_at,
             rejection_reason=rejection_reason,

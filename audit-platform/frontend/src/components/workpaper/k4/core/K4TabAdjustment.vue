@@ -18,14 +18,7 @@
         >
           同步到集中登记
         </el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button v-if="!isReadonly && pendingAbnormalCount > 0" size="small" type="warning" plain @click="importFromK44Abnormal">
           从K4-4异常带入（{{ pendingAbnormalCount }}笔）
         </el-button>
@@ -237,6 +230,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * K4TabAdjustment.vue — K4-3 调整分录汇总
  *
@@ -259,7 +253,7 @@ import http from '@/utils/http'
 import { useK4ImportExport } from '@/components/workpaper/composables/useK4ImportExport'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
 import {

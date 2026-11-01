@@ -29,7 +29,7 @@
           保存并发布
         </el-button>
         <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
-        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
         <el-button size="small" :loading="aiLoading === 'adjustment'" :disabled="isReadonly" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -210,6 +210,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * M1TabAdjustment — M1-3 调整分录汇总（借贷平衡+EventBus双向同步M1-1）
  *
@@ -231,7 +232,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useM1FormData } from '../../composables/useM1FormData'
 import { useM1Adjustment, type M1AdjustmentEntry } from '../../composables/useM1Adjustment'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 

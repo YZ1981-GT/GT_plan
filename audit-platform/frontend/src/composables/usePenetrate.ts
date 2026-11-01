@@ -16,6 +16,7 @@ import { openWorkpaperCell } from '@/services/openWorkpaperCell'
 import { useNavigationStack, type NavigationEntry } from './useNavigationStack'
 import { useProjectStore } from '@/stores/project'
 import { parseAuditYear, yearQuery } from '@/utils/resolveAuditYear'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 
 export function usePenetrate() {
   const router = useRouter()
@@ -88,13 +89,24 @@ export function usePenetrate() {
       })
     },
 
-    /** 穿透到调整分录（按科目或分录组 ID） */
-    toAdjustment(accountOrGroupId: string) {
+    /** 穿透到调整分录（按科目编码筛选）。 */
+    toAdjustment(accountCode: string) {
       _pushCurrentRoute(undefined, 'down')
-      router.push({
-        path: `/projects/${pid()}/adjustments`,
-        query: { account: accountOrGroupId, ...yearQuery(year()) },
-      })
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'account', accountCode },
+        { year: year() },
+      ))
+    },
+
+    /** 穿透到调整分录组（定位、展开并高亮）。 */
+    toAdjustmentGroup(entryGroupId: string) {
+      _pushCurrentRoute(undefined, 'down')
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'focus', entryGroupId },
+        { year: year() },
+      ))
     },
 
     /** 穿透到未更正错报 */
@@ -157,12 +169,13 @@ export function usePenetrate() {
     },
 
     /** 调整分录 → 影响范围分析 */
-    toImpactAnalysis(adjustmentId: string) {
+    toImpactAnalysis(entryGroupId: string) {
       _pushCurrentRoute(undefined, 'down')
-      router.push({
-        path: `/projects/${pid()}/adjustments`,
-        query: { impact: adjustmentId, ...yearQuery(year()) },
-      })
+      router.push(buildAdjustmentRouteTarget(
+        pid(),
+        { kind: 'impact', entryGroupId },
+        { year: year() },
+      ))
     },
 
     /** 附注 → 底稿 cell 直达（wp-traceability-panel Task 4.1）：按编码取本项目底稿后打开编辑器并带 ?sheet=&cell=

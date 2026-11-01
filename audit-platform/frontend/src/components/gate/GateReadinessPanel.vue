@@ -149,6 +149,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 import {
   Refresh,
   WarningFilled,
@@ -431,9 +432,12 @@ function handleJump(finding: GateReadinessFinding, group: GateReadinessGroup) {
     section === 'adjustments'
     || (loc.sample_entry_group_ids && loc.sample_entry_group_ids.length)
   ) {
-    // 有样例分录时在调整大厅定位、高亮第一笔（?focus=）
+    // 有样例分录时在调整大厅定位、高亮第一笔。
     const focus = loc.sample_entry_group_ids?.[0]
-    router.push({ name: 'Adjustments', params: { projectId }, query: focus ? { focus: String(focus) } : undefined })
+    router.push(buildAdjustmentRouteTarget(
+      projectId,
+      focus ? { kind: 'focus', entryGroupId: String(focus) } : null,
+    ))
     return
   }
   if (section === 'misstatements') {

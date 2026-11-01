@@ -33,14 +33,7 @@
       >
         同步到集中登记
       </el-button>
-      <el-tag
-        v-if="centralStatus?.review_status"
-        size="small"
-        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-        :title="centralStatus.rejection_reason || ''"
-      >
-        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-      </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
     </div>
 
     <el-table :data="displayRows" border stripe size="small" class="adj-table">
@@ -135,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabAdjustment.vue — H7-3 调整分录汇总
@@ -150,7 +144,7 @@ import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useH7Adjustment } from '../../composables/useH7Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{

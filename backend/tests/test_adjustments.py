@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, UserRole
+from app.models.adjustment_review_models import AdjustmentReviewTask
 from app.models.audit_platform_models import (
     AccountCategory,
     AccountChart,
@@ -36,7 +38,9 @@ from app.models.audit_platform_schemas import (
     AdjustmentUpdate,
     ReviewStatusChange,
 )
-from app.models.core import Project, ProjectStatus, ProjectType
+from app.models.core import Log, Notification, Project, ProjectStatus, ProjectType, ProjectUser, User
+from app.models.staff_models import ProjectAssignment, StaffMember
+from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.adjustment_service import AdjustmentService
 from app.routers.adjustments import router
 
@@ -61,9 +65,27 @@ TEST_USER = _FakeUser()
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 仅建本模块触达的表；全量 metadata 含 PG 专用 CHECK，不能由 SQLite 编译。
+    tables = [
+        User.__table__,
+        Project.__table__,
+        ProjectUser.__table__,
+        StaffMember.__table__,
+        ProjectAssignment.__table__,
+        Log.__table__,
+        Notification.__table__,
+        AccountChart.__table__,
+        ReportLineMapping.__table__,
+        TrialBalance.__table__,
+        WpIndex.__table__,
+        WorkingPaper.__table__,
+        Adjustment.__table__,
+        AdjustmentEntry.__table__,
+        AdjustmentReviewTask.__table__,
+    ]
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.drop_all, tables=tables)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     session_factory = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -564,8 +586,8 @@ async def test_review_status_rejected_to_draft(db_session: AsyncSession, seeded_
 
 
 @pytest.mark.asyncio
-async def test_review_status_draft_to_approved(db_session: AsyncSession, seeded_db):
-    """draft → approved：大厅允许直接审批，并记录完整复核元数据。"""
+async def test_review_status_draft_cannot_skip_submission(db_session: AsyncSession, seeded_db):
+    """draft 不得直接批准；必须先形成持久化复核任务。"""
     pid = seeded_db
     svc = AdjustmentService(db_session)
     created = await svc.create_entry(pid, AdjustmentCreate(
@@ -577,18 +599,15 @@ async def test_review_status_draft_to_approved(db_session: AsyncSession, seeded_
     ), TEST_USER.id)
     await db_session.flush()
 
-    await svc.change_review_status(
-        pid, created.entry_group_id,
-        ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
-    )
-    await db_session.flush()
+    with pytest.raises(ValueError, match="非法状态转换"):
+        await svc.change_review_status(
+            pid, created.entry_group_id,
+            ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
+        )
 
     rows = await svc._get_group_rows(pid, created.entry_group_id)
-    assert rows[0].review_status == ReviewStatus.approved
-    assert rows[0].reviewer_id == TEST_USER.id
-    assert rows[0].reviewed_at is not None
-    assert rows[0].rejection_reason is None
-    assert rows[0].updated_by == TEST_USER.id
+    assert rows[0].review_status == ReviewStatus.draft
+    assert rows[0].reviewer_id is None
 
 
 @pytest.mark.asyncio
@@ -607,6 +626,10 @@ async def test_review_status_approved_to_draft_requires_revoke_path(
     ), TEST_USER.id)
     await db_session.flush()
 
+    await svc.change_review_status(
+        pid, created.entry_group_id,
+        ReviewStatusChange(status=ReviewStatus.pending_review), TEST_USER.id,
+    )
     await svc.change_review_status(
         pid, created.entry_group_id,
         ReviewStatusChange(status=ReviewStatus.approved), TEST_USER.id,
@@ -807,19 +830,20 @@ async def test_api_review_status(client: AsyncClient, seeded_db):
     })
     group_id = create_resp.json()["entry_group_id"]
 
-    # draft → pending_review
+    # 旧通用 /review 不再承担提交复核；必须走专用 submit-review 创建任务。
     resp = await client.post(
         f"/api/projects/{pid}/adjustments/{group_id}/review",
         json={"status": "pending_review"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 400 and "只接受批准或驳回" in resp.text
 
-    # pending_review → approved
+    # 没有任务的草稿也不能直接批准。
     resp2 = await client.post(
         f"/api/projects/{pid}/adjustments/{group_id}/review",
         json={"status": "approved"},
     )
-    assert resp2.status_code == 200
+    assert resp2.status_code in (400, 409)
+    assert "提交复核" in resp2.text
 
 
 @pytest.mark.asyncio
@@ -868,52 +892,40 @@ async def test_api_account_dropdown_level2(client: AsyncClient, seeded_db):
     assert "1002" in codes
 
 
-# ===== 13.9 / 13.10 wp-summary =====
+# ===== 13.9 / 13.10 wp-summary 退役 =====
 
 @pytest.mark.asyncio
-async def test_api_wp_summary(client: AsyncClient, seeded_db):
-    """GET wp-summary"""
+async def test_api_wp_summary_returns_stable_410_contract(client: AsyncClient, seeded_db):
+    """仓内无生产调用方；旧错误口径仅保留鉴权后的 410 壳。"""
     pid = seeded_db
-    # 先创建一笔 AJE
-    await client.post(f"/api/projects/{pid}/adjustments", json={
-        "adjustment_type": "aje", "year": 2025,
-        "line_items": [
-            {"standard_account_code": "1001", "debit_amount": "500"},
-            {"standard_account_code": "6001", "credit_amount": "500"},
-        ],
-    })
-
     resp = await client.get(
         f"/api/projects/{pid}/adjustments/wp-summary/BS-001?year=2025"
     )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert "1001" in body["accounts"]
-    assert Decimal(str(body["unadjusted_amount"])) == Decimal("12000")
+    assert resp.status_code == 410
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "WP_SUMMARY_RETIRED"
+    assert detail["wp_code"] == "BS-001"
+    assert detail["replacements"] == {
+        "trial_balance": (
+            f"/api/projects/{pid}/trial-balance/summary-with-adjustments?year=2025"
+        ),
+        "adjustments": f"/api/projects/{pid}/adjustments?year=2025",
+    }
 
 
-@pytest.mark.asyncio
-async def test_api_wp_summary_empty(client: AsyncClient, seeded_db):
-    """GET wp-summary 无关联科目"""
-    pid = seeded_db
-    resp = await client.get(
-        f"/api/projects/{pid}/adjustments/wp-summary/NONEXIST?year=2025"
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["accounts"] == []
-    assert Decimal(str(body["unadjusted_amount"])) == Decimal("0")
+def test_wp_summary_wrong_projection_implementation_is_removed():
+    """不得在 410 壳后残留一条会汇总草稿/驳回状态的旧 service。"""
+    import app.models.audit_platform_schemas as schemas
+
+    assert not hasattr(AdjustmentService, "get_wp_adjustment_summary")
+    assert not hasattr(schemas, "WPAdjustmentDetail")
+    assert not hasattr(schemas, "WPAdjustmentSummary")
 
 
-# ===== Task 4.3：v2 符号约定下调整分录符号对齐守护 =====
+# ===== Task 4.3：v2 符号约定下调整分录借贷平衡守护 =====
 #
-# 守护两点：
-# 1. 分录级借贷平衡校验（SUM(debit)=SUM(credit)）不依赖科目类别符号约定，
-#    与 v2 无关、对借方类/贷方类混合分录均正确。
-# 2. get_wp_adjustment_summary 的审定数 = 未调整数 + 调整数，在 v2（未调整数已存
-#    自然正数）下方向正确：贷方正常类（收入/负债）一笔贷记增加应使审定数增大。
-#    与 trial_balance_service.recalc_adjustments（Task 3.3）使用同一 direction_resolver
-#    口径做方向归一，不重复叠加。
+# 分录级借贷平衡校验（SUM(debit)=SUM(credit)）不依赖科目类别符号约定，
+# 与 v2 无关、对借方类/贷方类混合分录均正确。
 
 
 @pytest.mark.asyncio
@@ -949,76 +961,46 @@ async def test_entry_balance_check_v2_independent(db_session: AsyncSession, seed
 
 
 @pytest.mark.asyncio
-async def test_wp_summary_revenue_credit_increases_audited(
-    db_session: AsyncSession, seeded_db
-):
-    """v2：收入(贷方类)一笔贷记调整 → wp-summary 审定数增大（方向归一正确）。
-
-    6001 主营业务收入 unadjusted=100000（v2 自然正数）。AJE 借 1001 / 贷 6001 各 500。
-    贷方类按 direction_resolver 归一：净额取 (credit-debit) → +500，
-    审定数 = 100000 + 500 = 100500（贷记使收入增大，方向正确）。
-    """
-    pid = seeded_db
+async def test_update_uses_content_revision_cas(db_session: AsyncSession, seeded_db):
     svc = AdjustmentService(db_session)
-    data = AdjustmentCreate(
-        adjustment_type=AdjustmentType.aje,
-        year=2025,
-        description="收入贷记调整",
+    created = await svc.create_entry(seeded_db, AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje, year=2025, description="版本 1",
         line_items=[
-            AdjustmentLineItem(
-                standard_account_code="1001", account_name="库存现金",
-                debit_amount=Decimal("500"), credit_amount=Decimal("0"),
-            ),
-            AdjustmentLineItem(
-                standard_account_code="6001", account_name="主营业务收入",
-                debit_amount=Decimal("0"), credit_amount=Decimal("500"),
-            ),
+            AdjustmentLineItem(standard_account_code="1001", debit_amount=Decimal("10")),
+            AdjustmentLineItem(standard_account_code="6001", credit_amount=Decimal("10")),
         ],
-    )
-    await svc.create_entry(pid, data, TEST_USER.id)
-    await db_session.commit()
+    ), TEST_USER.id)
+    assert created.content_revision == 1
 
-    summary = await svc.get_wp_adjustment_summary(pid, 2025, "IS-001")
-    # 6001 关联 IS-001，unadjusted=100000
-    assert summary.unadjusted_amount == Decimal("100000")
-    # 贷记 500 归一为 +500（收入增大），非旧约定的原始净额 -500
-    assert summary.aje_total == Decimal("500")
-    # 审定数 = 未调整 + 调整，方向正确
-    assert summary.audited_amount == Decimal("100500")
+    updated = await svc.update_entry(
+        seeded_db, created.entry_group_id,
+        AdjustmentUpdate(expected_revision=1, description="版本 2"), TEST_USER.id,
+    )
+    assert updated.content_revision == 2
+    with pytest.raises(ValueError, match="当前版本 2"):
+        await svc.update_entry(
+            seeded_db, created.entry_group_id,
+            AdjustmentUpdate(expected_revision=1, description="过期写入"), TEST_USER.id,
+        )
 
 
 @pytest.mark.asyncio
-async def test_wp_summary_asset_debit_increases_audited(
-    db_session: AsyncSession, seeded_db
-):
-    """v2：资产(借方类)一笔借记调整 → wp-summary 审定数增大（借方类不取反）。
-
-    1001 库存现金 unadjusted=12000（v2 自然正数）。AJE 借 1001 / 贷 6001 各 300。
-    借方类归一保持 (debit-credit) → +300，审定数 = 12000 + 300 = 12300。
-    """
-    pid = seeded_db
+async def test_workpaper_origin_cannot_be_edited_in_hall(db_session: AsyncSession, seeded_db):
     svc = AdjustmentService(db_session)
-    data = AdjustmentCreate(
-        adjustment_type=AdjustmentType.aje,
-        year=2025,
-        description="资产借记调整",
+    created = await svc.create_entry(seeded_db, AdjustmentCreate(
+        adjustment_type=AdjustmentType.aje, year=2025, description="底稿来源",
         line_items=[
-            AdjustmentLineItem(
-                standard_account_code="1001", account_name="库存现金",
-                debit_amount=Decimal("300"), credit_amount=Decimal("0"),
-            ),
-            AdjustmentLineItem(
-                standard_account_code="6001", account_name="主营业务收入",
-                debit_amount=Decimal("0"), credit_amount=Decimal("300"),
-            ),
+            AdjustmentLineItem(standard_account_code="1001", debit_amount=Decimal("10")),
+            AdjustmentLineItem(standard_account_code="6001", credit_amount=Decimal("10")),
         ],
-    )
-    await svc.create_entry(pid, data, TEST_USER.id)
-    await db_session.commit()
+    ), TEST_USER.id)
+    await db_session.execute(sa.update(Adjustment).where(
+        Adjustment.entry_group_id == created.entry_group_id,
+    ).values(origin="workpaper", source_ref=f"{uuid.uuid4()}:D2-adj-1"))
+    await db_session.flush()
 
-    summary = await svc.get_wp_adjustment_summary(pid, 2025, "BS-001")
-    # 1001/1002 关联 BS-001，unadjusted = 12000（仅 1001 有 tb 行）
-    assert summary.unadjusted_amount == Decimal("12000")
-    # 借方类借记 300 → +300（不取反）
-    assert summary.aje_total == Decimal("300")
-    assert summary.audited_amount == Decimal("12300")
+    with pytest.raises(ValueError, match="只能回来源底稿修改"):
+        await svc.update_entry(
+            seeded_db, created.entry_group_id,
+            AdjustmentUpdate(expected_revision=1, description="大厅旁路修改"), TEST_USER.id,
+        )

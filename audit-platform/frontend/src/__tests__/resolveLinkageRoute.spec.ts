@@ -114,7 +114,7 @@ describe('resolveLinkageRoute', () => {
   it('resolves adjustment target', async () => {
     const contract = makeContract({ target_type: 'adjustment', target_id: 'adj-001' })
     const result = await resolveLinkageRoute(contract, PROJECT_ID)
-    expect(result).toBe(`/projects/${PROJECT_ID}/adjustments?highlight=adj-001`)
+    expect(result).toBe(`/projects/${PROJECT_ID}/adjustments?focus=adj-001`)
   })
 
   it('resolves ledger target', async () => {

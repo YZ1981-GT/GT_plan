@@ -734,6 +734,11 @@ def test_the_gate_covers_the_two_workpaper_sync_event_types_only() -> None:
     assert GATED_FANOUT_EVENT_TYPES == {
         EventType.WORKPAPER_SAVED,
         EventType.WORKPAPER_CONTENT_UPDATED,
+        EventType.FORMULA_CONFIG_CHANGED,
+        EventType.ADJUSTMENT_APPROVED,
+        EventType.ADJUSTMENT_REVIEW_REVOKED,
+        EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED,
+        EventType.TRIAL_BALANCE_UPDATED,
     }
     for gated in GATED_FANOUT_EVENT_TYPES:
         assert DurableEventOutboxService.is_fanout_gated(gated)

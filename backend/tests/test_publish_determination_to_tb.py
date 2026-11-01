@@ -43,6 +43,7 @@ def _scalar(value):
 def _admin_db():
     """mock db：authorize_wp_edit(admin) 查底稿 → project_id；consol_lock → 未锁。"""
     db = AsyncMock()
+    db.add = MagicMock()
 
     def _side(stmt, *a, **k):
         sql = str(getattr(stmt, "text", stmt)).lower()
@@ -65,30 +66,43 @@ def _valid_html():
 
 @pytest.fixture(autouse=True)
 def _patch_deps(monkeypatch):
-    """patch 审定数取数 + year + event_bus.publish（避免真实 DB/事件总线）。"""
+    """patch 审定取数、年度与同步发布 service，隔离端点编排。"""
     async def _fake_tb(audit_rows, *, db, project_id):
-        return {}  # 取数为空 → 用 row 自带值
+        return {}
 
     async def _fake_year(db, project_id):
         return 2025
 
-    published = []
+    calls = []
 
-    async def _fake_publish(payload):
-        published.append(payload)
+    async def _fake_publish_rows(_db, **kwargs):
+        from app.services.tb_audited_writer import PublishRowsResult
+        from app.services.tb_publish_service import TbPublishResult
+
+        calls.append(kwargs)
+        report = PublishRowsResult(updated_account_codes=[row["account_code"] for row in kwargs["rows"]])
+        return TbPublishResult(report=report, duplicate=False, related_adjustment_groups=("g1",))
+
+    async def _fake_publish_pending(_db):
+        return None
+
+    async def _no_booking_impacts(_db, **_kwargs):
+        return []
 
     monkeypatch.setattr(
         "app.services.wp_audit_sheet_tb_service.fetch_audit_sheet_tb_values", _fake_tb
     )
-    # 端点在模块顶层 import 了 fetch_project_audit_year，故 patch 端点模块内的引用
+    monkeypatch.setattr("app.routers.wp_html_save.fetch_project_audit_year", _fake_year)
+    monkeypatch.setattr("app.services.tb_publish_service.publish_workpaper_rows", _fake_publish_rows)
     monkeypatch.setattr(
-        "app.routers.wp_html_save.fetch_project_audit_year", _fake_year
+        "app.services.adjustment_client_booking.effective_booking_impacts_for_accounts",
+        _no_booking_impacts,
     )
     monkeypatch.setattr(
-        "app.services.event_bus.event_bus.publish", _fake_publish
+        "app.services.workpaper_sync.outbox.DurableEventOutboxService.publish_pending",
+        _fake_publish_pending,
     )
-    # extract_determination_wp_code 是纯函数，正常工作，无需 patch
-    return published
+    return calls
 
 
 async def _call(role, body_overrides=None, db=None):
@@ -106,19 +120,21 @@ async def _call(role, body_overrides=None, db=None):
 
 
 @pytest.mark.asyncio
-async def test_publish_emits_confirmed_signal(_patch_deps):
-    """admin 发布 → 事件带 publish_confirmed=True + confirmed_by + publish_token。"""
+async def test_publish_writes_tb_before_return(_patch_deps):
+    """admin 发布 → 同步 service 收到完整发布载荷，响应只在 TB 写完后返回。"""
     resp = await _call(UserRole.admin)
     assert resp.published is True
     assert resp.wp_code == "D2-1"
+    assert resp.updated_accounts == ["1122", "6001"]
+    assert resp.related_adjustment_groups == ["g1"]
     assert len(_patch_deps) == 1
-    extra = _patch_deps[0].extra
-    assert extra["publish_confirmed"] is True
-    assert extra["confirmed_by"]
-    assert extra["publish_token"] == resp.publish_token
-    assert extra["wp_code"] == "D2-1"
-    # 两行都是可回写科目行
-    assert len(extra["parsed_data"]["rows"]) == 2
+    call = _patch_deps[0]
+    assert call["wp_id"] == _WP_ID
+    assert call["project_id"] == _PROJECT_ID
+    assert call["confirmed_by"]
+    assert call["publish_token"] == resp.publish_token
+    assert call["wp_code"] == "D2-1"
+    assert len(call["rows"]) == 2
 
 
 @pytest.mark.asyncio
@@ -147,7 +163,7 @@ async def test_publish_token_passthrough(_patch_deps):
     """传入 publish_token 时透传（供 handler 幂等 ack）。"""
     resp = await _call(UserRole.admin, body_overrides={"publish_token": "my-token-123"})
     assert resp.publish_token == "my-token-123"
-    assert _patch_deps[0].extra["publish_token"] == "my-token-123"
+    assert _patch_deps[0]["publish_token"] == "my-token-123"
 
 
 @pytest.mark.asyncio
@@ -157,3 +173,29 @@ async def test_publish_400_when_no_audit_rows(_patch_deps):
         await _call(UserRole.admin, body_overrides={"html_data": {"audit_rows": []}})
     assert ei.value.status_code == 400
     assert _patch_deps == []
+
+
+@pytest.mark.asyncio
+async def test_client_booked_adjustment_requires_explicit_group_ack(monkeypatch, _patch_deps):
+    async def impacts(_db, **_kwargs):
+        return [{
+            "entry_group_id": "00000000-0000-4000-8000-000000000001",
+            "adjustment_no": "AJE-008", "description": "客户已入账", "account_codes": ["1122"],
+        }]
+
+    monkeypatch.setattr(
+        "app.services.adjustment_client_booking.effective_booking_impacts_for_accounts",
+        impacts,
+    )
+    with pytest.raises(HTTPException) as caught:
+        await _call(UserRole.admin)
+    assert caught.value.status_code == 409
+    assert caught.value.detail["error_code"] == "BOOKED_ADJUSTMENTS_UNACKED"
+    assert caught.value.detail["groups"][0]["adjustment_no"] == "AJE-008"
+    assert _patch_deps == []
+
+    response = await _call(UserRole.admin, body_overrides={
+        "booked_adjustments_ack": ["00000000-0000-4000-8000-000000000001"],
+    })
+    assert response.published is True
+    assert len(_patch_deps) == 1

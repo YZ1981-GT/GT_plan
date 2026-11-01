@@ -180,7 +180,7 @@ describe('useAdjustmentCentralSync', () => {
 
   it('推送结果按后端 sync_outcome 提示（新建 / 更新回草稿 / 未变化）', () => {
     expect(syncOutcomeMessage({ sync_outcome: 'created', adjustment_no: 'AJE-005' }))
-      .toContain('提交复核并批准后计入试算表审定数')
+      .toContain('请提交复核；批准后方可从来源审定表显式发布到试算表')
     const updated = syncOutcomeMessage({ sync_outcome: 'updated', previous_status: 'pending_review', adjustment_no: 'AJE-005' })
     expect(updated).toContain('已回到草稿')
     expect(updated).toContain('重新提交复核')

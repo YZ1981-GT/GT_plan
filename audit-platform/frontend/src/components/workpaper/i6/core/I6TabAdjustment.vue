@@ -134,14 +134,7 @@
         <span class="chip-wrap"><GtIndexChip value="wp:I6-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="A13" @click="emit('navigate-sheet', 'A13')" /></span>
         <el-button size="small" type="default" link @click="openReview('I6-3')">复核</el-button>
-        <el-tag
-          v-if="centralStatus?.review_status"
-          size="small"
-          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-          :title="centralStatus.rejection_reason || ''"
-        >
-          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
-        </el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
       </div>
     </div>
 
@@ -337,6 +330,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * I6TabAdjustment.vue — I6-3 研发费用调整分录汇总
  * 对齐致同 Excel + 中央调整分录模块双向联动 + I6-1 回写 + A13
@@ -347,7 +341,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { useI6Adjustment, resolveI6AuditYear } from '../../composables/useI6Adjustment'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../../composables/useAdjustmentCentralSync'
 import { I6_DETAIL_DEFAULT_CATEGORIES } from '../../composables/useI6Detail'
 
 const props = defineProps<{

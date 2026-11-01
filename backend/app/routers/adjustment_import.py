@@ -79,7 +79,7 @@ async def import_adjustments_file(
     mode: str = Query("append"),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_project_permission("adjustment:import")),
     _lock_check=Depends(check_consol_lock),
 ):
     """导入：逐笔保存点，一笔失败不影响其他笔。"""

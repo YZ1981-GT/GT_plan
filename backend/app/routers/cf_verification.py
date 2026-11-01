@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.services.cash_flow_verification_service import CashFlowVerificationService
 
-# 路由级 readonly 保证项目隔离；两个写端点（explanation / create-adjustment）各自再挂 edit（Phase 8 Task 8 补）
+# 路由级 readonly 保证项目隔离；explanation 是写端点，create-adjustment 仅保留带 edit 鉴权的 410 墓碑
 router = APIRouter(
     prefix="/api/projects/{project_id}/cf-verification", tags=["cf-verification"],
     dependencies=[Depends(require_project_access("readonly"))],
@@ -97,29 +97,24 @@ async def save_explanation(
     return {"success": ok}
 
 
-class CreateAdjustmentRequest(BaseModel):
-    item_code: str
-    difference: float
-    description: str = ""
-
-
 @router.post("/{year}/create-adjustment")
 async def create_cf_adjustment(
     project_id: UUID,
     year: int,
-    body: CreateAdjustmentRequest,
-    db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_project_access("edit")),
-) -> dict[str, Any]:
-    """从 CF 差异一键创建调整分录"""
-    from decimal import Decimal
-    svc = CashFlowVerificationService(db)
-    result = await svc.create_cf_adjustment_from_diff(
-        project_id, year, body.item_code, Decimal(str(body.difference)), body.description
+) -> None:
+    """旧现金流差异自动建分录入口已退役；保留墓碑帮助旧客户端迁移。"""
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "CF_ADJUSTMENT_CREATE_RETIRED",
+            "message": (
+                "旧现金流差异自动创建调整分录入口已停用。请返回现金流核查页，"
+                "打开标准调整分录弹窗，手工选择完整借贷科目和方向后保存草稿。"
+            ),
+            "replacement": f"POST /api/projects/{project_id}/adjustments",
+        },
     )
-    if result.get("success"):
-        await db.commit()
-    return result
 
 
 @router.get("/{year}/export")

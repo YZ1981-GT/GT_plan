@@ -1,5 +1,6 @@
 <template>
-  <el-dialog v-model="visible" :title="title" width="920px" append-to-body :close-on-click-modal="false" class="gt-adj-entry-dialog">
+  <el-dialog v-model="visible" :title="title" width="920px" append-to-body :close-on-click-modal="false"
+    :before-close="beforeDialogClose" class="gt-adj-entry-dialog" style="max-width: calc(100vw - 32px)">
     <el-alert
       v-if="accountsReady && !accountOptions.length"
       type="warning" show-icon :closable="false" class="gt-adj-entry-alert"
@@ -26,6 +27,12 @@
           <el-input v-if="form.mode === 'create'" v-model="form.adjustment_no" size="small" maxlength="30" clearable
             placeholder="留空自动编号" style="width: 170px" />
           <span v-else class="gt-adj-entry-no">{{ form.adjustment_no }}</span>
+        </el-form-item>
+        <el-form-item v-if="form.mode === 'edit'" label="阶段">
+          <el-select v-model="form.audit_phase" size="small" style="width: 120px">
+            <el-option label="预审提出" value="preliminary" />
+            <el-option label="年审提出" value="final" />
+          </el-select>
         </el-form-item>
         <el-form-item v-if="form.mode === 'create'" label="模板">
           <el-select v-model="templateKey" size="small" clearable placeholder="常用分录（按科目名称匹配）" style="width: 230px"
@@ -103,11 +110,11 @@
       </template>
     </el-alert>
     <el-alert v-if="serverError" type="error" show-icon :closable="false" class="gt-adj-entry-alert" :title="`保存失败：${serverError}`" />
-    <AdjustmentImpactPreview v-if="visible" class="gt-adj-entry-impact" :project-id="projectId" :line-items="previewLines" :year="year" />
+    <AdjustmentImpactPreview v-if="visible" class="gt-adj-entry-impact" :project-id="projectId" :line-items="previewLines" :year="year" :adjustment-type="form.adjustment_type" />
 
     <template #footer>
       <span class="gt-adj-entry-foot-tip">草稿不计入试算表；提交复核并批准后才计入审定数</span>
-      <el-button @click="visible = false">取消</el-button>
+      <el-button @click="requestClose">取消</el-button>
       <el-button :loading="saving === 'save'" :disabled="!canEdit || !!saving" :title="canEdit ? '' : '项目已归档或无编辑权限'"
         @click="save(false)">{{ form.mode === 'edit' ? '保存' : '保存草稿' }}</el-button>
       <el-button type="primary" :loading="saving === 'submit'" :disabled="!canEdit || !!saving" @click="save(true)">保存并提交复核</el-button>
@@ -122,8 +129,8 @@
  * 行校验与后端同一套规则（adjustmentLineRules）；保存只建草稿，「保存并提交复核」交给大厅打开提交复核弹窗。
  * 大厅经 ref 调 openCreate / openEdit；草稿每 30 秒存一次，误关页面后可恢复。
  */
-import { computed, nextTick, reactive, ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import AdjustmentImpactPreview from './AdjustmentImpactPreview.vue'
 import { createAdjustment, updateAdjustment, type AccountOption } from '@/services/auditPlatformApi'
 import { fmtAmount, fmtAmountWithZero } from '@/utils/formatters'
@@ -152,6 +159,8 @@ interface EntryForm {
   mode: 'create' | 'edit'
   entryGroupId: string
   reviewStatus: string
+  contentRevision: number
+  audit_phase: 'preliminary' | 'final'
   rejectionReason: string
   adjustment_type: 'aje' | 'rje'
   adjustment_no: string
@@ -161,12 +170,24 @@ interface EntryForm {
 
 const blankLine = (): EditableLine => ({ standard_account_code: '', account_name: '', debit_amount: undefined, credit_amount: undefined })
 const blankForm = (): EntryForm => ({
-  mode: 'create', entryGroupId: '', reviewStatus: 'draft', rejectionReason: '', adjustment_type: 'aje',
+  mode: 'create', entryGroupId: '', reviewStatus: 'draft', contentRevision: 1, audit_phase: 'final', rejectionReason: '', adjustment_type: 'aje',
   adjustment_no: '', description: '', line_items: [blankLine(), blankLine()],
 })
 
+function formSignature(value: EntryForm): string {
+  return JSON.stringify({
+    mode: value.mode,
+    entryGroupId: value.entryGroupId,
+    adjustment_type: value.adjustment_type,
+    adjustment_no: value.adjustment_no,
+    description: value.description,
+    line_items: value.line_items,
+  })
+}
+
 const visible = ref(false)
 const form = reactive<EntryForm>(blankForm())
+let initialSignature = formSignature(form)
 const saving = ref<'' | 'save' | 'submit'>('')
 /** 点过保存后才把全部规则错误列出来（录入过程中只看合计差额） */
 const attempted = ref(false)
@@ -190,6 +211,8 @@ const previewLines = computed(() => linesForSubmit(form.line_items).filter((li) 
 
 function reset(next: Partial<EntryForm> = {}) {
   Object.assign(form, blankForm(), next)
+  if (!form.line_items.length) form.line_items = [blankLine(), blankLine()]
+  initialSignature = formSignature(form)
   attempted.value = false
   serverError.value = ''
   templateKey.value = ''
@@ -203,12 +226,13 @@ function openCreate(prefill?: { lines?: EditableLine[]; description?: string; pr
     description: prefill?.description || '',
   })
   visible.value = true
+  void offerCurrentDraft()
   if (prefill?.problems?.length) ElMessage.warning({ message: prefill.problems.slice(0, 3).join('；'), duration: 6000, showClose: true })
 }
 
 function openEdit(row: {
   entry_group_id: string; adjustment_no?: string | null; adjustment_type?: string; description?: string | null
-  review_status?: string; rejection_reason?: string | null
+  review_status?: string; content_revision?: number; rejection_reason?: string | null; audit_phase?: 'preliminary' | 'final'
   line_items?: Array<{ standard_account_code: string; account_name?: string | null; detail_account_code?: string | null
     report_line_code?: string | null; debit_amount: unknown; credit_amount: unknown }>
 }) {
@@ -217,6 +241,8 @@ function openEdit(row: {
     mode: 'edit',
     entryGroupId: row.entry_group_id,
     reviewStatus: row.review_status || 'draft',
+    contentRevision: Number(row.content_revision) || 1,
+    audit_phase: row.audit_phase === 'preliminary' ? 'preliminary' : 'final',
     rejectionReason: row.rejection_reason || '',
     adjustment_type: String(row.adjustment_type || 'aje').toLowerCase() === 'rje' ? 'rje' : 'aje',
     adjustment_no: row.adjustment_no || '',
@@ -230,8 +256,8 @@ function openEdit(row: {
       credit_amount: amount(li.credit_amount),
     })),
   })
-  if (!form.line_items.length) form.line_items = [blankLine(), blankLine()]
   visible.value = true
+  void offerCurrentDraft()
 }
 
 function addLine() {
@@ -307,7 +333,9 @@ async function save(submit: boolean) {
     const line_items = linesForSubmit(form.line_items)
     const description = form.description.trim()
     const result: { entry_group_id: string; adjustment_no: string } = form.mode === 'edit'
-      ? await updateAdjustment(props.projectId, form.entryGroupId, { description, line_items })
+      ? await updateAdjustment(props.projectId, form.entryGroupId, {
+        expected_revision: form.contentRevision, description, audit_phase: form.audit_phase, line_items,
+      })
       : await createAdjustment(props.projectId, {
         adjustment_type: form.adjustment_type, year: props.year, description, line_items,
         adjustment_no: form.adjustment_no.trim() || undefined,
@@ -337,26 +365,110 @@ async function save(submit: boolean) {
   }
 }
 
-// ── 草稿自动保存（兼容旧页面存的 {isEditing, editingGroupId} 形状）──
-const { clearDraft } = useAutoSave(
-  () => `adjustment_form_${props.projectId}`,
+// ── 草稿自动保存：key/context 同时绑定项目、年度、创建/编辑模式和分录组 ──
+const draftKey = computed(() => {
+  const scope = form.mode === 'edit' ? form.entryGroupId || 'unknown' : 'new'
+  return `adjustment_form_${encodeURIComponent(props.projectId)}_${props.year ?? 'unknown'}_${form.mode}_${encodeURIComponent(scope)}`
+})
+const draftContext = computed(() => (props.year == null ? null : {
+  project_id: props.projectId,
+  year: props.year,
+  section: `adjustment:${form.mode}:${form.mode === 'edit' ? form.entryGroupId || 'unknown' : 'new'}`,
+}))
+
+function applyDraft(data: any): void {
+  if (!data) return
+  const baseline = initialSignature
+  Object.assign(form, blankForm(), {
+    mode: data.mode === 'edit' || data.isEditing ? 'edit' : 'create',
+    entryGroupId: data.entryGroupId || data.editingGroupId || '',
+    reviewStatus: data.reviewStatus || 'draft',
+    contentRevision: Number(data.contentRevision) || 1,
+    audit_phase: data.audit_phase === 'preliminary' ? 'preliminary' : 'final',
+    rejectionReason: data.rejectionReason || '',
+    adjustment_type: data.adjustment_type === 'rje' ? 'rje' : 'aje',
+    adjustment_no: data.adjustment_no || '',
+    description: data.description || '',
+    line_items: Array.isArray(data.line_items) && data.line_items.length ? data.line_items : [blankLine(), blankLine()],
+  })
+  initialSignature = baseline
+  visible.value = true
+}
+
+const { clearDraft, saveDraft, restoreDraft, checkDraft, getDraftTime } = useAutoSave(
+  draftKey,
   () => (visible.value ? JSON.parse(JSON.stringify(form)) : null),
-  (data: any) => {
-    if (!data) return
-    reset({
-      mode: data.mode === 'edit' || data.isEditing ? 'edit' : 'create',
-      entryGroupId: data.entryGroupId || data.editingGroupId || '',
-      reviewStatus: data.reviewStatus || 'draft',
-      rejectionReason: data.rejectionReason || '',
-      adjustment_type: data.adjustment_type === 'rje' ? 'rje' : 'aje',
-      adjustment_no: data.adjustment_no || '',
-      description: data.description || '',
-      line_items: Array.isArray(data.line_items) && data.line_items.length ? data.line_items : [blankLine(), blankLine()],
-    })
-    visible.value = true
-  },
-  { enabled: visible },
+  applyDraft,
+  { enabled: visible, context: draftContext },
 )
+
+async function offerCurrentDraft(): Promise<void> {
+  if (!checkDraft()) return
+  const savedAt = getDraftTime()
+  try {
+    await ElMessageBox.confirm(
+      `检测到此${form.mode === 'edit' ? '分录' : '新建分录'}的未保存草稿${savedAt ? `（保存于 ${savedAt}）` : ''}，是否恢复？`,
+      '草稿恢复',
+      { confirmButtonText: '恢复草稿', cancelButtonText: '放弃草稿', type: 'info' },
+    )
+    restoreDraft()
+  } catch {
+    clearDraft()
+  }
+}
+
+function isDirty(): boolean {
+  return formSignature(form) !== initialSignature
+}
+
+function finishClose(done?: () => void): void {
+  if (done) done()
+  else visible.value = false
+}
+
+async function decideClose(done?: () => void): Promise<void> {
+  if (saving.value) return
+  if (!isDirty()) {
+    clearDraft()
+    finishClose(done)
+    return
+  }
+  try {
+    const action = await ElMessageBox({
+      title: '未保存的调整分录',
+      message: '本次修改尚未保存到平台。请选择保存本地草稿后关闭，或明确放弃本次修改。',
+      type: 'warning',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      confirmButtonText: '保存草稿后关闭',
+      cancelButtonText: '放弃并关闭',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+    })
+    if (action === 'confirm') {
+      saveDraft()
+      finishClose(done)
+    }
+  } catch (action) {
+    if (action === 'cancel') {
+      clearDraft()
+      finishClose(done)
+    }
+    // 关闭确认框代表继续编辑。
+  }
+}
+
+function requestClose(): void {
+  void decideClose()
+}
+
+function beforeDialogClose(done: () => void): void {
+  void decideClose(done)
+}
+
+onBeforeUnmount(() => {
+  if (visible.value && isDirty()) saveDraft()
+})
 
 defineExpose({ openCreate, openEdit, visible })
 </script>
@@ -389,6 +501,10 @@ defineExpose({ openCreate, openEdit, visible })
 }
 .gt-adj-entry-totals.is-unbalanced { background: var(--gt-color-coral-light); color: var(--gt-color-coral); }
 .gt-adj-entry-impact { margin-top: 8px; }
-.gt-adj-entry-lines:focus { outline: none; }
+.gt-adj-entry-lines:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
 .gt-adj-entry-foot-tip { float: left; line-height: 32px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+@media (max-width: 760px) {
+  .gt-adj-entry-lines-head, .gt-adj-entry-totals { flex-wrap: wrap; }
+  .gt-adj-entry-foot-tip { float: none; display: block; line-height: 1.5; margin-bottom: 8px; }
+}
 </style>

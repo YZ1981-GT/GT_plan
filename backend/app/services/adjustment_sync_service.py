@@ -42,6 +42,7 @@ from app.models.audit_platform_schemas import (
     AdjustmentSyncRequest,
 )
 from app.services.adjustment_service import AdjustmentService
+from app.services.adjustment_group_writer import AdjustmentGroupLine, AdjustmentGroupWriter
 
 
 class AdjustmentSyncError(ValueError):
@@ -226,11 +227,10 @@ class AdjustmentSyncService:
 
             # 内容变化 → 原地更新（保组号与编号，软删旧行写新行）
             # pending_review / rejected 回 draft 并清复核信息
-            for row in existing_rows:
-                row.soft_delete()
-            for e in old_entries:
-                e.soft_delete()
-            await self.db.flush()
+            old_entries = await self._adj._get_entry_rows(group_id)
+            await AdjustmentGroupWriter(self.db).soft_delete_group(
+                existing_rows, old_entries, user_id=user_id,
+            )
 
             # 写入新行（复用组号 + 编号）
             return SyncOutcome(await self._write_group_rows(
@@ -241,9 +241,15 @@ class AdjustmentSyncService:
                 user_id=user_id,
                 entry_group_id=group_id,
                 adjustment_no=adj_no,
+                company_code=existing_rows[0].company_code,
+                audit_phase=existing_rows[0].audit_phase or "final",
+                content_revision=max(int(row.content_revision or 1) for row in existing_rows) + 1,
             ), "updated", status.value, resolved)
 
         # 5. 新建分录组
+        company_code, audit_phase = await self._adj._resolve_group_context(
+            project_id, data.year, data.company_code
+        )
         adjustment_no = await self._adj._next_adjustment_no(
             project_id, data.year, data.adjustment_type
         )
@@ -256,6 +262,9 @@ class AdjustmentSyncService:
             user_id=user_id,
             entry_group_id=entry_group_id,
             adjustment_no=adjustment_no,
+            company_code=company_code,
+            audit_phase=audit_phase,
+            content_revision=1,
         ), "created", None, resolved)
 
     # ------------------------------------------------------------------
@@ -271,46 +280,35 @@ class AdjustmentSyncService:
         user_id: UUID,
         entry_group_id: UUID,
         adjustment_no: str,
+        company_code: str,
+        audit_phase: str,
+        content_revision: int,
     ) -> AdjustmentGroupResponse:
-        """写入新分录组行。抽取自 sync_from_workpaper 以消除新建/更新的代码重复。"""
-        adj_rows: list[Adjustment] = []
-        entry_rows: list[AdjustmentEntry] = []
-        for idx, (li, code) in enumerate(zip(data.line_items, resolved), start=1):
-            adj = Adjustment(
-                project_id=project_id,
-                year=data.year,
-                company_code=data.company_code,
-                adjustment_no=adjustment_no,
-                adjustment_type=data.adjustment_type,
-                description=data.description,
-                account_code=code,
-                account_name=li.account_name,
-                debit_amount=li.debit_amount,
-                credit_amount=li.credit_amount,
-                entry_group_id=entry_group_id,
-                review_status=ReviewStatus.draft,
-                origin="workpaper",
-                source_ref=source_ref,
-                created_by=user_id,
-            )
-            self.db.add(adj)
-            await self.db.flush()
-
-            entry = AdjustmentEntry(
-                adjustment_id=adj.id,
-                entry_group_id=entry_group_id,
-                line_no=idx,
+        """写入新分录组行；新建、同步和协作共用组 writer。"""
+        written = await AdjustmentGroupWriter(self.db).write_group(
+            project_id=project_id,
+            year=data.year,
+            company_code=company_code,
+            adjustment_no=adjustment_no,
+            adjustment_type=data.adjustment_type,
+            description=data.description,
+            entry_group_id=entry_group_id,
+            lines=[AdjustmentGroupLine(
                 standard_account_code=code,
-                account_name=li.account_name,
-                report_line_code=li.report_line_code,
-                debit_amount=li.debit_amount,
-                credit_amount=li.credit_amount,
-            )
-            self.db.add(entry)
-            adj_rows.append(adj)
-            entry_rows.append(entry)
-
-        await self.db.flush()
+                account_name=line.account_name,
+                report_line_code=line.report_line_code,
+                debit_amount=line.debit_amount,
+                credit_amount=line.credit_amount,
+            ) for line, code in zip(data.line_items, resolved)],
+            content_revision=content_revision,
+            audit_phase=audit_phase,
+            review_status=ReviewStatus.draft,
+            origin="workpaper",
+            source_ref=source_ref,
+            created_by=user_id,
+        )
+        adj_rows = written.adjustments
+        entry_rows = written.entries
 
         return self._adj._build_group_response(
             entry_group_id, adjustment_no, data.adjustment_type,
@@ -358,6 +356,20 @@ class AdjustmentSyncService:
                 collaboration_status = collab.status
         except Exception:  # noqa: BLE001
             collaboration_status = None
+        client_booking = None
+        try:
+            from app.services.adjustment_client_booking import booking_projection
+
+            projected = await booking_projection(
+                self.db,
+                project_id=project_id,
+                year=head.year,
+                group_ids=[head.entry_group_id],
+            )
+            value = projected.get(str(head.entry_group_id))
+            client_booking = value.as_dict() if value else None
+        except Exception:  # noqa: BLE001
+            client_booking = None
         return {
             "entry_group_id": str(head.entry_group_id),
             "adjustment_no": head.adjustment_no,
@@ -375,6 +387,7 @@ class AdjustmentSyncService:
             # 原先返回 source_ref 的 wp_id 段（UUID）；改为按底稿索引查真实底稿编码
             "source_wp_code": await self._source_wp_code(source_ref),
             "collaboration_status": collaboration_status,
+            "client_booking": client_booking,
         }
 
     async def _source_wp_code(self, source_ref: str | None) -> str | None:

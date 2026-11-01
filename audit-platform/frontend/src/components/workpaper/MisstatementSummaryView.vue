@@ -280,7 +280,7 @@ function onFieldChange(payload: { itemKey: string; field: string; value: any }) 
     void api.post(
       `/api/workpapers/${resolvedProjectId.value}/${resolvedYear.value}/misstatement-communication`,
       {
-        adjustment_id: payload.itemKey,
+        misstatement_id: payload.itemKey,
         communication_date: new Date().toISOString(),
         reason: payload.value,
       },

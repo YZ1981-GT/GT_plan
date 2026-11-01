@@ -7,7 +7,7 @@
 
 import enum
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -675,6 +675,21 @@ class Adjustment(Base):
     entry_group_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), nullable=False
     )
+    # V235：组内全部活跃行共享同一内容修订号；仅内容变化递增，状态变化不递增。
+    content_revision: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=1, server_default=text("1")
+    )
+    # 创建时冻结项目当前审计阶段，供客户已入账判定使用。
+    audit_phase: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="final", server_default=text("'final'")
+    )
+    # 外部文件编号与耐久导入批次；组内活跃行必须保持一致。
+    external_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("adjustment_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     review_status: Mapped[ReviewStatus] = mapped_column(
         sa.Enum(ReviewStatus, name="review_status", create_type=False),
         server_default=text("'draft'"),
@@ -707,11 +722,14 @@ class Adjustment(Base):
         ForeignKey("users.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
 
     def soft_delete(self) -> None:
-        """标记为软删除"""
+        """标记整组行删除时写真实删除时间。"""
         self.is_deleted = True
+        self.deleted_at = datetime.now(timezone.utc)
 
     __table_args__ = (
         Index(
@@ -996,11 +1014,14 @@ class AdjustmentEntry(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
 
     def soft_delete(self) -> None:
-        """标记为软删除"""
+        """标记明细行删除时写真实删除时间。"""
         self.is_deleted = True
+        self.deleted_at = datetime.now(timezone.utc)
 
     __table_args__ = (
         Index("idx_adjustment_entries_adjustment_id", "adjustment_id"),
@@ -1170,6 +1191,9 @@ class UnadjustedMisstatement(Base):
         nullable=False,
     )
     management_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    management_communication_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True,
+    )
     auditor_evaluation: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_carried_forward: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False

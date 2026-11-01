@@ -100,8 +100,19 @@ describe('usePenetrate', () => {
     const { toAdjustment } = usePenetrate()
     toAdjustment('6001')
     expect(mockPush).toHaveBeenCalledWith({
-      path: '/projects/proj-001/adjustments',
+      name: 'Adjustments',
+      params: { projectId: 'proj-001' },
       query: { account: '6001', year: '2024' },
+    })
+  })
+
+  it('toAdjustmentGroup uses focus rather than treating a group id as an account', () => {
+    const { toAdjustmentGroup } = usePenetrate()
+    toAdjustmentGroup('group-uuid')
+    expect(mockPush).toHaveBeenCalledWith({
+      name: 'Adjustments',
+      params: { projectId: 'proj-001' },
+      query: { focus: 'group-uuid', year: '2024' },
     })
   })
 

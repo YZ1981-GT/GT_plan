@@ -282,6 +282,34 @@ async def list_recycle_bin(
             conds = [model.is_deleted == True]  # noqa: E712
             if scope is not None:
                 conds.append(scope)
+
+            if tbl_key == "adjustment":
+                # adjustments 每条借贷行都复制组信息；回收站只列一笔，恢复/删除也以组为单位。
+                rows = list((await db.execute(
+                    select(model).where(*conds).order_by(
+                        func.coalesce(model.deleted_at, model.updated_at).desc().nulls_last(),
+                        model.id,
+                    )
+                )).scalars().all())
+                representatives: dict[UUID, Any] = {}
+                for row in rows:
+                    representatives.setdefault(row.entry_group_id, row)
+                total += len(representatives)
+                for row in list(representatives.values())[:pagination.offset + pagination.page_size]:
+                    deleted_at = row.deleted_at or row.updated_at
+                    items.append({
+                        "id": str(row.id),
+                        "entry_group_id": str(row.entry_group_id),
+                        "type": tbl_key,
+                        "type_label": label,
+                        "name": f"{row.adjustment_no} · {row.description or '无摘要'}",
+                        "deleted_at": deleted_at.isoformat() if deleted_at else None,
+                        "deleted_by": _deleted_by(tbl_key, row),
+                        "project_id": str(row.project_id),
+                        "purgeable": True,
+                    })
+                continue
+
             # 计数
             count_q = select(func.count()).select_from(model).where(*conds)
             count_result = await db.execute(count_q)
@@ -414,6 +442,20 @@ async def restore_item(
         await db.commit()
         return {"message": f"{label}已恢复", "id": str(item_id)}
 
+    if item_type == "adjustment":
+        from app.services.adjustment_group_writer import AdjustmentGroupWriter
+
+        try:
+            group_id = await AdjustmentGroupWriter(db).restore_by_adjustment_row_id(
+                project_id=row.project_id,
+                adjustment_row_id=item_id,
+                user_id=user.id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        await db.commit()
+        return {"message": "调整分录组已恢复", "id": str(item_id), "entry_group_id": str(group_id)}
+
     if item_type == "project":
         from app.services.group_topology_lock import lock_topology_years
         from app.services.project_audit_year import resolve_project_audit_year
@@ -444,6 +486,29 @@ async def restore_item(
     await db.commit()
 
     return {"message": f"{label}已恢复", "id": str(item_id)}
+
+
+async def _purge_adjustment_group(db: AsyncSession, anchor) -> tuple[UUID, int]:
+    """永久删除完整调整分录组；明细先删，避免留下孤儿或撞 FK。"""
+    from app.models.audit_platform_models import Adjustment, AdjustmentEntry
+
+    active = (await db.execute(select(func.count()).select_from(Adjustment).where(
+        Adjustment.project_id == anchor.project_id,
+        Adjustment.entry_group_id == anchor.entry_group_id,
+        Adjustment.is_deleted == False,  # noqa: E712
+    ))).scalar() or 0
+    if active:
+        raise HTTPException(status_code=409, detail="该分录组已有活跃行，永久删除已取消")
+    await db.execute(delete(AdjustmentEntry).where(
+        AdjustmentEntry.entry_group_id == anchor.entry_group_id,
+        AdjustmentEntry.is_deleted == True,  # noqa: E712
+    ))
+    result = await db.execute(delete(Adjustment).where(
+        Adjustment.project_id == anchor.project_id,
+        Adjustment.entry_group_id == anchor.entry_group_id,
+        Adjustment.is_deleted == True,  # noqa: E712
+    ))
+    return anchor.entry_group_id, int(result.rowcount or 0)
 
 
 @router.delete("/{item_type}/{item_id}")
@@ -480,6 +545,15 @@ async def permanently_delete(
     file_paths = [row.file_path] if item_type == ATTACHMENT_TYPE else []
     if item_type == "project":
         await _cascade_delete_project(db, item_id)
+    elif item_type == "adjustment":
+        group_id, deleted_rows = await _purge_adjustment_group(db, row)
+        await db.commit()
+        return {
+            "message": "调整分录组已永久删除",
+            "id": str(item_id),
+            "entry_group_id": str(group_id),
+            "deleted_rows": deleted_rows,
+        }
     else:
         await db.delete(row)
 
@@ -526,6 +600,29 @@ async def batch_permanently_delete(
         return await _batch_purge_attachments(db, user, rows, body.ids)
     if item_type == "project":
         await _lock_deleted_projects_for_purge(db, list(rows))
+    if item_type == "adjustment":
+        representatives: dict[UUID, Any] = {}
+        for row in rows:
+            representatives.setdefault(row.entry_group_id, row)
+        succeeded: list[str] = []
+        failed: list[dict[str, str]] = []
+        for group_id, anchor in representatives.items():
+            try:
+                async with db.begin_nested():
+                    await _purge_adjustment_group(db, anchor)
+                succeeded.append(str(group_id))
+            except HTTPException as exc:
+                failed.append({"id": str(group_id), "error": str(exc.detail)})
+        found_row_ids = {row.id for row in rows}
+        failed.extend({"id": str(row_id), "error": "记录不存在或未在回收站"} for row_id in body.ids if row_id not in found_row_ids)
+        await db.commit()
+        return {
+            "succeeded": succeeded,
+            "failed": failed,
+            "total": len(body.ids),
+            "success_count": len(succeeded),
+            "fail_count": len(failed),
+        }
     result = await bulk_hard_delete(db, model, body.ids, filter_deleted=True)
     await db.commit()
     return result
@@ -588,6 +685,22 @@ async def empty_recycle_bin(
                 "deleted_count": count, "skipped": skipped, "file_cleanup": cleanup}
 
     # 如果指定了非 project 类型，直接删
+    if item_type == "adjustment":
+        from app.models.audit_platform_models import Adjustment
+
+        rows = list((await db.execute(select(Adjustment).where(
+            Adjustment.is_deleted == True,  # noqa: E712
+        ))).scalars().all())
+        representatives: dict[tuple[UUID, UUID], Any] = {}
+        for row in rows:
+            representatives.setdefault((row.project_id, row.entry_group_id), row)
+        deleted_groups = 0
+        for anchor in representatives.values():
+            await _purge_adjustment_group(db, anchor)
+            deleted_groups += 1
+        await db.commit()
+        return {"message": f"已永久删除 {deleted_groups} 笔调整分录", "deleted_count": deleted_groups}
+
     if item_type and item_type != "project" and item_type in tables:
         model = tables[item_type][0]
         if hasattr(model, "is_deleted"):
@@ -617,6 +730,19 @@ async def empty_recycle_bin(
             # 附件只删可删的（归档 / 保全 / 仍被引用的保留）；判定失败整体保留，不吞成「已删」
             count, skipped, file_paths = await _purge_deleted_attachments(db, user)
             deleted_count += count
+            continue
+        if tbl_key == "adjustment":
+            from app.models.audit_platform_models import Adjustment
+
+            rows = list((await db.execute(select(Adjustment).where(
+                Adjustment.is_deleted == True,  # noqa: E712
+            ))).scalars().all())
+            representatives: dict[tuple[UUID, UUID], Any] = {}
+            for row in rows:
+                representatives.setdefault((row.project_id, row.entry_group_id), row)
+            for anchor in representatives.values():
+                await _purge_adjustment_group(db, anchor)
+                deleted_count += 1
             continue
         try:
             r = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712

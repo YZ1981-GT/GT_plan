@@ -273,62 +273,25 @@ async def test_workpaper_review_passed_handler_scopes_by_project_and_year(
 
 
 # ===========================================================================
-# T5 / T6  ADJUSTMENT_BATCH_COMMITTED
+# T5 / T6  草稿批量提交不得污染正式附注
 # ===========================================================================
 
 
 @pytest.mark.asyncio
-async def test_adjustment_batch_committed_handler_updates_disclosure_notes(
+async def test_adjustment_batch_committed_does_not_update_disclosure_notes(
     fresh_event_bus, captured_executes,
 ):
-    project_id = uuid.uuid4()
-    year = 2025
-
+    """批量提交只是草稿进入复核流程，正式附注只在批准/撤回后过期。"""
     handlers = fresh_event_bus._handlers.get(EventType.ADJUSTMENT_BATCH_COMMITTED, [])
-    handler_names = [
-        getattr(h, "__qualname__", h.__name__) for h in handlers
-    ]
-    assert any(
-        "on_event_adjustment_batch_committed" in n for n in handler_names
-    ), f"on_event_adjustment_batch_committed 未注册，实际 handlers={handler_names}"
+    handler_names = [getattr(handler, "__qualname__", handler.__name__) for handler in handlers]
+    assert not any("on_event_adjustment_batch_committed" in name for name in handler_names)
 
-    await fresh_event_bus.publish_immediate(
-        EventPayload(
-            event_type=EventType.ADJUSTMENT_BATCH_COMMITTED,
-            project_id=project_id,
-            year=year,
-        )
-    )
-
-    upd = _find_disclosure_note_update(captured_executes)
-    assert upd is not None
-    sql = _stmt_compiled_str(upd)
-    assert "is_stale" in sql.lower()
-    assert (str(project_id) in sql or str(project_id).replace("-", "") in sql)
-    assert str(year) in sql
-
-
-@pytest.mark.asyncio
-async def test_adjustment_batch_committed_handler_scopes_by_project_and_year(
-    fresh_event_bus, captured_executes,
-):
-    project_id = uuid.uuid4()
-    year = 2025
-
-    await fresh_event_bus.publish_immediate(
-        EventPayload(
-            event_type=EventType.ADJUSTMENT_BATCH_COMMITTED,
-            project_id=project_id,
-            year=year,
-        )
-    )
-
-    upd = _find_disclosure_note_update(captured_executes)
-    assert upd is not None
-    sql = _stmt_compiled_str(upd).lower()
-    assert "project_id" in sql
-    assert "year" in sql
-    assert "is_deleted" in sql
+    await fresh_event_bus.publish_immediate(EventPayload(
+        event_type=EventType.ADJUSTMENT_BATCH_COMMITTED,
+        project_id=uuid.uuid4(),
+        year=2025,
+    ))
+    assert _find_disclosure_note_update(captured_executes) is None
 
 
 # ===========================================================================
@@ -385,12 +348,13 @@ async def test_rolled_back_compat_existing_handler_fires(
 async def test_new_handlers_coexist_with_rollback_handler(
     fresh_event_bus, captured_executes,
 ):
-    """T8：4 个事件订阅清单完整，互不挤占。"""
+    """T8：正式生效事件与现有 rollback handler 共存。"""
     eb = fresh_event_bus
     expected = {
         EventType.LEDGER_DATASET_ACTIVATED: "on_event_ledger_activated",
         EventType.WORKPAPER_REVIEW_PASSED: "on_event_workpaper_reviewed",
-        EventType.ADJUSTMENT_BATCH_COMMITTED: "on_event_adjustment_batch_committed",
+        EventType.ADJUSTMENT_APPROVED: "on_event_adjustment_approved",
+        EventType.ADJUSTMENT_REVIEW_REVOKED: "on_event_adjustment_review_revoked",
         EventType.LEDGER_DATASET_ROLLED_BACK: "_mark_downstream_stale_on_rollback",
     }
     for evt_type, expected_name in expected.items():

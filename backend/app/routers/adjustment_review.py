@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from app.models.audit_platform_models import ReviewStatus
 from app.models.core import User
 from app.services import adjustment_hall_notify as notify
 from app.services import adjustment_review_service as review
+from app.services import adjustment_review_task_service as review_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,14 @@ class BatchReviewRequest(BaseModel):
 
 
 def _http(e: review.ReviewFlowError) -> HTTPException:
-    code = 404 if e.code == "NOT_FOUND" else 400
+    if e.code in {"NOT_ASSIGNED_REVIEWER", "SELF_REVIEW_FORBIDDEN", "NOT_TASK_SUBMITTER", "PARTNER_APPROVAL_REQUIRED"}:
+        code = 403
+    elif e.code in {"NO_REVIEWER", "PARTNER_REVIEWER_REQUIRED", "REVIEW_TASK_REQUIRED", "REVIEW_TASK_STALE", "GROUP_REVISION_INCONSISTENT"}:
+        code = 409
+    elif e.code == "NOT_FOUND":
+        code = 404
+    else:
+        code = 400
     return HTTPException(status_code=code, detail={"error_code": e.code, "message": str(e), "detail": e.detail})
 
 
@@ -60,23 +68,52 @@ def broadcast_review_changed(project_id: UUID, items: list[dict], new_status: st
         pass
 
 
-async def publish_review_events(project_id: UUID, items: list[dict], user: User) -> None:
-    """批准 → ADJUSTMENT_APPROVED（commit 之后逐笔发，与单笔端点同语义）。失败只记 warning。"""
-    from app.models.audit_platform_schemas import EventPayload, EventType
-    from app.services.event_bus import event_bus
+async def publish_review_events(db: AsyncSession) -> None:
+    """提交后投递本事务记住的耐久事件；失败留在 outbox 自动重试。"""
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
 
-    for it in items:
-        try:
-            await event_bus.publish(EventPayload(
-                event_type=EventType.ADJUSTMENT_APPROVED,
-                project_id=project_id,
-                year=it.get("year"),
-                account_codes=it.get("account_codes") or [],
-                entry_group_id=UUID(it["entry_group_id"]),
-                extra={"operator_id": str(user.id), "operator_name": getattr(user, "username", "")},
-            ))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("[adj-approved] 事件发布失败（审批已落库）: %s", exc)
+    await DurableEventOutboxService.publish_pending(db)
+
+
+@router.get("/review-tasks")
+async def list_adjustment_review_tasks(
+    project_id: UUID,
+    year: int | None = Query(None),
+    mine_only: bool = Query(True),
+    status: str | None = Query("pending"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """调整分录复核任务；默认只返回分配给当前用户的待办。"""
+    if not mine_only:
+        from app.services.project_permissions import resolve_project_context
+
+        context = await resolve_project_context(db, current_user, project_id)
+        if "adjustment:review" not in context.permissions:
+            raise HTTPException(status_code=403, detail="没有查看团队调整复核任务的权限")
+    rows = await review_tasks.list_tasks(
+        db,
+        project_id=project_id,
+        year=year,
+        actor_id=current_user.id if mine_only else None,
+        status=status,
+    )
+    return [{
+        "id": str(row.id),
+        "entry_group_id": str(row.entry_group_id),
+        "year": row.year,
+        "status": row.status,
+        "required_level": row.required_level,
+        "revision": row.revision,
+        "group_content_revision": row.group_content_revision,
+        "assigned_reviewer_ids": [str(value) for value in row.assigned_reviewer_ids or []],
+        "submitted_by": str(row.submitted_by),
+        "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
+        "submit_note": row.submit_note,
+        "decided_by": str(row.decided_by) if row.decided_by else None,
+        "decided_at": row.decided_at.isoformat() if row.decided_at else None,
+        "decision_reason": row.decision_reason,
+    } for row in rows]
 
 
 @router.get("/reviewers")
@@ -94,9 +131,10 @@ async def submit_adjustments_for_review(
     project_id: UUID,
     body: SubmitReviewRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_project_permission("adjustment:edit")),
+    user: User = Depends(require_project_permission("adjustment:submit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """草稿 / 已驳回分录提交复核（批量逐笔），并通知复核人。"""
+    """草稿 / 已驳回分录提交复核（批量逐笔），并创建持久化任务。"""
     try:
         result = await review.submit_for_review(
             db, project_id, group_ids=body.entry_group_ids, actor=user,
@@ -114,9 +152,10 @@ async def withdraw_adjustment_submission(
     project_id: UUID,
     entry_group_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_project_permission("adjustment:edit")),
+    user: User = Depends(require_project_permission("adjustment:submit")),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """撤回提交：待复核 → 草稿。"""
+    """撤回提交：待复核 → 草稿，同时关闭持久化复核任务。"""
     try:
         info = await review.withdraw_submission(db, project_id, entry_group_id, actor=user)
     except review.ReviewFlowError as e:
@@ -135,6 +174,12 @@ async def review_adjustments_batch(
     _lock_check=Depends(check_consol_lock),
 ):
     """批量通过 / 驳回（逐笔独立），通知编制人与受影响底稿负责人。"""
+    if body.status == ReviewStatus.approved:
+        from app.services.project_permissions import resolve_project_context
+
+        context = await resolve_project_context(db, user, project_id)
+        if "adjustment:approve" not in context.permissions:
+            raise HTTPException(status_code=403, detail="没有批准调整分录的权限")
     try:
         result = await review.review_groups(
             db, project_id, group_ids=body.entry_group_ids, status=body.status, actor=user,
@@ -143,7 +188,6 @@ async def review_adjustments_batch(
     except review.ReviewFlowError as e:
         raise _http(e)
     await db.commit()
-    if body.status == ReviewStatus.approved:
-        await publish_review_events(project_id, result["succeeded"], user)
+    await publish_review_events(db)
     broadcast_review_changed(project_id, result["succeeded"], body.status.value)
     return result

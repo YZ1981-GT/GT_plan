@@ -1374,6 +1374,7 @@ import TbVersionDrawer from '@/components/trial-balance/TbVersionDrawer.vue'
 import TbComparisonView from '@/components/trial-balance/TbComparisonView.vue'
 import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { buildAdjustmentRouteTarget } from '@/utils/adjustmentRouteTarget'
 import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
@@ -3560,11 +3561,11 @@ function onTbCtxViewAdj() {
     ElMessage.info('请先选中一个科目行')
     return
   }
-  router.push({
-    path: `/projects/${projectId.value}/adjustments`,
-    // 年度为空不带 year（原先 String(null) 带成 year=null）
-    query: { ...(year.value != null ? { year: String(year.value) } : {}), account: row.standard_account_code },
-  })
+  router.push(buildAdjustmentRouteTarget(
+    projectId.value,
+    { kind: 'account', accountCode: row.standard_account_code },
+    { year: year.value },
+  ))
 }
 
 // enterprise-linkage 3.10：右键"查看关联底稿" → 跳转底稿列表筛选该科目

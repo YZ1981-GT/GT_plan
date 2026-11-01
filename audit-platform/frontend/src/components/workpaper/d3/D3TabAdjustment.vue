@@ -15,12 +15,7 @@
       @click="syncToCentral"
       title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
     >同步到集中登记</el-button>
-    <el-tag
-      v-if="centralStatus?.review_status"
-      size="small"
-      :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
-      :title="centralStatus.rejection_reason || ''"
-    >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
+        <AdjustmentCentralStatusTag :status="centralStatus" />
     <el-button-group size="small" style="margin-left: auto">
       <el-button @click="onExportTemplate">导出模板</el-button>
       <el-button @click="onExportData">导出数据</el-button>
@@ -131,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import AdjustmentCentralStatusTag from '@/components/adjustment/AdjustmentCentralStatusTag.vue'
 /**
  * D3TabAdjustment.vue — D3-3 调整分录汇总表
  * 10列表 + 借贷平衡 + 推送A13
@@ -138,7 +134,7 @@
 import { computed, ref, toRef, type Ref } from 'vue'
 import { useD3Adjustment } from '../composables/useD3Adjustment'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
-import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAdjustmentCentralSync } from '../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'

@@ -16,9 +16,11 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.pagination import PaginationParams
+from app.models.adjustment_review_models import AdjustmentClientBooking, AdjustmentTreatmentEvent
 from app.models.audit_platform_models import (
-    AccountCategory, AccountChart, AccountDirection, AccountSource, Adjustment, AdjustmentType, MisstatementType,
-    ReviewStatus, UnadjustedMisstatement,
+    AccountCategory, AccountChart, AccountDirection, AccountSource, Adjustment, AdjustmentEntry,
+    AdjustmentType, Materiality, MisstatementType,
+    ReviewStatus, TrialBalance, UnadjustedMisstatement,
 )
 from app.models.audit_platform_schemas import AdjustmentCreate, AdjustmentLineItem, ReviewStatusChange
 from app.models.base import Base, UserRole
@@ -35,8 +37,15 @@ YEAR = 2025
 @pytest_asyncio.fixture
 async def db() -> AsyncSession:
     eng = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    tables = [
+        User.__table__, Project.__table__, StaffMember.__table__, AccountChart.__table__,
+        Adjustment.__table__, AdjustmentEntry.__table__, Materiality.__table__,
+        TrialBalance.__table__,
+        AdjustmentClientBooking.__table__, AdjustmentTreatmentEvent.__table__,
+        UnadjustedMisstatement.__table__, WpIndex.__table__, WorkingPaper.__table__,
+    ]
     async with eng.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     async with async_sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)() as session:
         yield session
     await eng.dispose()
@@ -61,11 +70,12 @@ async def world(db: AsyncSession):
     return w
 
 
-async def _entry(db, w, no: str) -> uuid.UUID:
+async def _entry(db, w, no: str, amount: str = "10") -> uuid.UUID:
+    value = Decimal(amount)
     res = await AdjustmentService(db).create_entry(w.pid, AdjustmentCreate(
         adjustment_type=AdjustmentType.aje, year=YEAR, description=no, adjustment_no=no,
-        line_items=[AdjustmentLineItem(standard_account_code="6702", debit_amount=Decimal("10")),
-                    AdjustmentLineItem(standard_account_code="1231", credit_amount=Decimal("10"))]), w.preparer.id)
+        line_items=[AdjustmentLineItem(standard_account_code="6702", debit_amount=value),
+                    AdjustmentLineItem(standard_account_code="1231", credit_amount=value)]), w.preparer.id)
     return res.entry_group_id
 
 
@@ -80,6 +90,8 @@ async def _items(db, w) -> dict[str, dict]:
 async def test_names_converted_misstatement_and_source_workpaper(db, world):
     plain = await _entry(db, world, "A-1")
     rejected = await _entry(db, world, "A-2")
+    await AdjustmentService(db).change_review_status(
+        world.pid, rejected, ReviewStatusChange(status=ReviewStatus.pending_review), world.preparer.id)
     await AdjustmentService(db).change_review_status(
         world.pid, rejected, ReviewStatusChange(status=ReviewStatus.rejected, reason="比例不对"), world.reviewer.id)
     first_row = (await db.execute(sa.select(Adjustment.id).where(Adjustment.entry_group_id == rejected).limit(1))).scalar_one()
@@ -143,9 +155,71 @@ async def test_list_endpoint_reports_has_more_before_scope_filter(db, world, mon
         return None
 
     monkeypatch.setattr(adj_router, "get_user_scope_cycles", no_scope)
-    kwargs = dict(project_id=world.pid, year=YEAR, adjustment_type=None, review_status=None, origin=None, fields=None,
-                  db=db, current_user=world.preparer)
+    kwargs = dict(
+        project_id=world.pid, year=YEAR, adjustment_type=None, review_status=None, origin=None,
+        search=None, account_code=None, amount_min=None, amount_max=None,
+        created_by=None, reviewer_id=None, audit_phase=None, treatment_status=None,
+        focus_entry_group_id=None, created_from=None, created_to=None,
+        sort_by="adjustment_no", sort_order="asc", fields=None,
+        db=db, current_user=world.preparer,
+    )
     first = await adj_router.list_adjustments(pagination=PaginationParams(page=1, page_size=2), **kwargs)
     last = await adj_router.list_adjustments(pagination=PaginationParams(page=2, page_size=2), **kwargs)
     assert (len(first["items"]), first["has_more"]) == (2, True)
     assert (len(last["items"]), last["has_more"]) == (1, False)
+
+
+@pytest.mark.asyncio
+async def test_server_side_search_amount_sort_and_focus_page_are_stable(db, world):
+    gids = [
+        await _entry(db, world, "P-003", "30"),
+        await _entry(db, world, "P-001", "10"),
+        await _entry(db, world, "P-002", "20"),
+    ]
+    await db.commit()
+    service = AdjustmentService(db)
+
+    searched = await service.list_entries(world.pid, YEAR, search="P-002", page=1, page_size=50)
+    assert searched["total"] == 1
+    assert searched["items"][0]["adjustment_no"] == "P-002"
+
+    sorted_page = await service.list_entries(
+        world.pid, YEAR, amount_min=Decimal("15"), sort_by="amount", sort_order="desc",
+        page=1, page_size=1,
+    )
+    assert sorted_page["total"] == 2 and sorted_page["has_more"] is True
+    assert sorted_page["items"][0]["adjustment_no"] == "P-003"
+
+    located = await service.list_entries(
+        world.pid, YEAR, focus_entry_group_id=gids[0],
+        sort_by="adjustment_no", sort_order="asc", page=1, page_size=1,
+    )
+    assert located["page"] == 3
+    assert located["items"][0]["entry_group_id"] == gids[0]
+
+
+@pytest.mark.asyncio
+async def test_server_side_scope_filter_applies_before_count_and_pagination(db, world, monkeypatch):
+    from app.routers import adjustments as adj_router
+
+    await _entry(db, world, "S-ALLOW")
+    await db.commit()
+
+    async def limited_scope(*_args, **_kwargs):
+        return ["D"]
+
+    async def allowed_codes(*_args, **_kwargs):
+        return {"6702"}
+
+    monkeypatch.setattr(adj_router, "get_user_scope_cycles", limited_scope)
+    monkeypatch.setattr(adj_router, "get_codes_by_cycles", allowed_codes)
+    result = await adj_router.list_adjustments(
+        project_id=world.pid, year=YEAR, adjustment_type=None, review_status=None,
+        origin=None, search=None, account_code=None, amount_min=None, amount_max=None,
+        created_by=None, reviewer_id=None, audit_phase=None, treatment_status=None,
+        focus_entry_group_id=None, created_from=None, created_to=None,
+        sort_by="adjustment_no", sort_order="asc", fields=None,
+        pagination=PaginationParams(page=1, page_size=1), db=db, current_user=world.preparer,
+    )
+    assert result["total"] == 1
+    assert len(result["items"]) == 1 and result["has_more"] is False

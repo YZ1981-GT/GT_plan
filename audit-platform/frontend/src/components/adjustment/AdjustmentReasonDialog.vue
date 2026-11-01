@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" :title="mode === 'reject' ? '驳回调整分录' : '撤回复核'" width="560px" append-to-body :close-on-click-modal="false">
+  <el-dialog v-model="visible" :title="mode === 'reject' ? '驳回调整分录' : '撤回复核'" width="560px" append-to-body :close-on-click-modal="false" style="max-width: calc(100vw - 32px)">
     <p class="gt-adj-reason-lead">{{ lead }}</p>
     <div class="gt-adj-reason-nos">{{ entryNos }}</div>
     <el-radio-group v-if="mode === 'reject' && entries.length > 1" v-model="perEntry" size="small" class="gt-adj-reason-mode">

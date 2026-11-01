@@ -348,6 +348,12 @@ class TrialBalanceService:
             .group_by(ae.c.standard_account_code, adj.c.adjustment_type)
         )
 
+        # 客户已入账与不予更正共用最终处理单源，和 adj_net/adj_net_batch 逐值一致。
+        from app.services.adjustment_treatment_service import effective_groups_clause
+
+        agg_q = agg_q.where(await effective_groups_clause(
+            self.db, adj, project_id=project_id, year=year,
+        ))
         if account_codes:
             agg_q = agg_q.where(ae.c.standard_account_code.in_(account_codes))
 
