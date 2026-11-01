@@ -19,10 +19,13 @@
       <span>取数来源：
         <a class="ws-link" @click="$emit('goto-sheet', 'cost')">投资明细-成本法</a>(现金红利) →
         <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a>(投资收益/还原分红) →
-        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(抵消投资收益)。
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(抵消投资收益，<b>已审批分录</b>派生只读)。
         <b>可编辑覆盖，可增删行</b>。
       </span>
     </div>
+    <el-alert v-if="elimUnallocated !== 0" v-show="!isFullscreen" type="warning" :closable="false" class="ws-unalloc"
+      :title="`有 ${fmt(elimUnallocated)} 的投资收益抵销无法唯一归属到单家子企业，未计入上表逐企业列`" />
+    <el-alert v-for="(w, i) in elimWarnings" :key="i" v-show="!isFullscreen" type="info" :closable="false" class="ws-unalloc" :title="w" />
 
     <el-table :data="tableRows" border size="small" class="ws-table"
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -63,12 +66,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { splitPersistedProjectionRows } from '@/components/consolidation/composables/consolProjectionDraft'
+import { POST_ELIM_ACCOUNT, type PostEliminationProjection } from '@/services/consolidationApi'
+import { companyElimMap, unallocatedOf, warningsOf } from '@/components/consolidation/composables/consolPostElimView'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -76,10 +82,17 @@ const props = defineProps<{
   companies: CompanyCol[]
   investmentCost: any[]
   equitySimDirect: any[]
-  elimIncome: any[]
+  // 服务端 canonical projection：投资收益（6111）逐企业抵销合计（approved 分录唯一真源）
+  projection: PostEliminationProjection | null
+  initialRows?: any[]
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'save', data: any[]): void
+  (e: 'draft-change', data: any[]): void
+  (e: 'goto-sheet', key: string): void
+  (e: 'open-formula', key: string): void
+}>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
@@ -88,24 +101,52 @@ const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
 
+function emitDraft() {
+  emit('draft-change', tableRows.value)
+}
+
 function addRow() {
   const nr = { companyName: '', ratio: 0, bookDividend: 0, simInvestIncome: 0, dividendReverse: 0, elimInvestIncome: 0, postElimIncome: 0, _manual: true, _editable: true }
   if (selectedRows.value.length > 0) {
     const last = selectedRows.value[selectedRows.value.length - 1]
     const idx = manualRows.indexOf(last)
-    if (idx >= 0) { manualRows.splice(idx + 1, 0, nr); return }
+    if (idx >= 0) {
+      manualRows.splice(idx + 1, 0, nr)
+      emitDraft()
+      return
+    }
   }
   manualRows.push(nr)
+  emitDraft()
 }
 async function batchDeleteRows() {
   if (!selectedRows.value.length) return
-  try { await confirmBatch('删除', selectedRows.value.length)
-    const del = new Set(selectedRows.value); const remaining = manualRows.filter(r => !del.has(r)); manualRows.length = 0; manualRows.push(...remaining); selectedRows.value = []
+  try {
+    await confirmBatch('删除', selectedRows.value.length)
+    const del = new Set(selectedRows.value)
+    const remaining = manualRows.filter(r => !del.has(r))
+    manualRows.length = 0; manualRows.push(...remaining)
+    selectedRows.value = []
+    emitDraft()
   } catch {}
 }
 const n = (v: any) => Number(v) || 0
 
-const overrides = reactive<Record<string, Record<string, number | null>>>({})
+const overrides = reactive<Record<string, Record<string, any>>>({})
+
+function hydratePersistedRows() {
+  const hydrated = splitPersistedProjectionRows(props.companies, props.initialRows)
+  for (const key of Object.keys(overrides)) delete overrides[key]
+  Object.assign(overrides, hydrated.overrides)
+  manualRows.length = 0
+  manualRows.push(...hydrated.manualRows)
+}
+watch([() => props.initialRows, () => props.companies], hydratePersistedRows, { deep: true, immediate: true })
+
+// 投资收益（6111）抵销：企业代码 → 逐企业合计（projection 真源）
+const elimByCompany = computed(() => companyElimMap(props.projection, POST_ELIM_ACCOUNT.investIncome))
+const elimUnallocated = computed(() => unallocatedOf(props.projection, POST_ELIM_ACCOUNT.investIncome))
+const elimWarnings = computed(() => warningsOf(props.projection, POST_ELIM_ACCOUNT.investIncome))
 
 const { exportData: _exportData } = useExcelIO()
 
@@ -129,7 +170,7 @@ async function exportData() {
 }
 
 const tableRows = computed(() => {
-  return props.companies.map((comp, ci) => {
+  const automaticRows = props.companies.map((comp, ci) => {
     // 账面现金红利
     const costRow = props.investmentCost.find((r: any) => r.company_name === comp.name || r.company_code === comp.code)
     const bookDividend = n(costRow?.current_dividend)
@@ -143,9 +184,8 @@ const tableRows = computed(() => {
     // 第3步的投资收益（还原分红影响）通常是第二个投资收益行
     const dividendReverse = dividendRows.length > 1 ? n(dividendRows[1]?.values?.[ci] || dividendRows[1]?.total) : 0
 
-    // 合并抵消的投资收益
-    const elimRow = props.elimIncome.find((r: any) => r.subject === '投资收益')
-    const elimInvestIncome = elimRow?.values?.[ci] != null ? n(elimRow.values[ci]) : 0
+    // 合并抵消的投资收益：服务端 canonical projection 的投资收益（6111）逐企业抵销合计（approved 分录真源）
+    const elimInvestIncome = elimByCompany.value.get(comp.code || comp.name) ?? 0
 
     // 抵消后 = 账面红利 + 模拟投资收益 - 还原分红 - 抵消投资收益
     const postElimIncome = bookDividend + simInvestIncome - dividendReverse - elimInvestIncome
@@ -155,6 +195,7 @@ const tableRows = computed(() => {
     for (const k of Object.keys(ov)) { if (ov[k] != null) result[k] = ov[k] }
     return result
   })
+  return [...automaticRows, ...manualRows]
 })
 
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }

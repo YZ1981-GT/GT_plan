@@ -129,9 +129,13 @@ interface CashFlowRow {
   receiverItem: string; receiverAmount: number|null
 }
 
-const props = defineProps<{ companies: CompanyCol[] }>()
+const props = defineProps<{
+  companies: CompanyCol[]
+  initialRows?: CashFlowRow[] | null
+}>()
 const emitCf = defineEmits<{
   (e: 'save', data: CashFlowRow[]): void
+  (e: 'draft-change', data: CashFlowRow[]): void
   (e: 'entries-changed', entries: any[]): void
   (e: 'open-formula', key: string): void
 }>()
@@ -155,7 +159,16 @@ const cashFlowItems = [
   '分配股利、利润或偿付利息支付的现金', '收到的其他与筹资活动有关的现金',
 ]
 
-const rows = ref<CashFlowRow[]>([mkEmpty(), mkEmpty()])
+const rows = ref<CashFlowRow[]>(
+  props.initialRows?.map((row) => ({ ...row })) || [mkEmpty(), mkEmpty()],
+)
+
+watch(() => props.initialRows, (saved) => {
+  rows.value = saved?.map((row) => ({ ...row })) || [mkEmpty(), mkEmpty()]
+}, { deep: true })
+watch(rows, (value) => {
+  emitCf('draft-change', value)
+}, { deep: true })
 
 function mkEmpty(): CashFlowRow {
   return {

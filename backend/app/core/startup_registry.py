@@ -769,6 +769,8 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
     # OO→HTML apply 中断后的重驱（writeback-followup-issue-closure R3.2；选主，一轮一条）。
     ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
+    # V240：持久合并 operation，数据库 claim + lease 使重启后可恢复。
+    ("consol_operation_worker", "app.workers.consol_operation_worker"),
 )
 
 # Stable worker names (13 always-on + 1 conditional ImportJobRunner) — pinned contract,
@@ -787,6 +789,7 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "invalidation_dispatcher_worker",
     "knowledge_ocr_worker",
     "oo_apply_redrive_worker",
+    "consol_operation_worker",
     "ImportJobRunner.run_forever",
 )
 

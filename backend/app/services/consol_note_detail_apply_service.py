@@ -368,6 +368,16 @@ async def apply_detail_refresh(
     note_record.data = data
     note_record.is_stale = False
     note_record.updated_at = datetime.now(timezone.utc)
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+    _mode = compute_source_mode(
+        "detail_mapping",
+        manual_cells=manual,
+        locked_cells=locked,
+        previous_source=getattr(note_record, "source_mode", None),
+    )
+    update_source_projection(note_record, _mode, digest=_sd(data))
     await db.flush()
 
     return {

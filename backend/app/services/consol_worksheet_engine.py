@@ -26,7 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import ConsolWorksheet
 from app.schemas.consol_context import ConsolContext
-from app.services.consol_calc_basis import NodeAmounts, load_calc_basis, worksheet_rows
+from app.services.consol_calc_basis import (
+    CalcBasis,
+    NodeAmounts,
+    load_calc_basis,
+    validate_calc_basis,
+    worksheet_rows,
+)
 from app.services.consol_context_service import validate_context
 from app.services.consol_tree_service import TreeNode, build_tree, iter_nodes
 
@@ -41,6 +47,7 @@ async def recalc_full(
     *,
     context: ConsolContext | None = None,
     tree: TreeNode | None = None,
+    basis: CalcBasis | None = None,
 ) -> dict:
     """全量重算差额表并提交。
 
@@ -49,21 +56,24 @@ async def recalc_full(
     Returns: ``node_count`` / ``account_count`` / ``rows_written`` / ``rows_removed`` /
     ``orphan_entries``（未归属分录清单，两条路径都不计入，需求 6.4）。
     """
-    resolved_tree = tree if tree is not None else await build_tree(db, project_id)
+    resolved_tree = tree if tree is not None else (basis.tree if basis is not None else await build_tree(db, project_id))
     validate_context(context, project_id, year, tree=resolved_tree)
     if resolved_tree is None:
         return {"node_count": 0, "account_count": 0, "rows_written": 0, "rows_removed": 0, "orphan_entries": []}
-    basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
-    assert basis is not None
-    rows = worksheet_rows(basis)
+    resolved_basis = basis
+    if resolved_basis is None:
+        resolved_basis = await load_calc_basis(db, project_id, year, tree=resolved_tree)
+    assert resolved_basis is not None
+    validate_calc_basis(resolved_basis, project_id, year, tree=resolved_tree)
+    rows = worksheet_rows(resolved_basis)
     written, removed = await _write_rows(db, project_id, year, rows)
     await db.commit()
     return {
         "node_count": sum(1 for _ in iter_nodes(resolved_tree)),
-        "account_count": len(basis.accounts),
+        "account_count": len(resolved_basis.accounts),
         "rows_written": written,
         "rows_removed": removed,
-        "orphan_entries": [o.to_dict() for o in basis.orphans],
+        "orphan_entries": [o.to_dict() for o in resolved_basis.orphans],
     }
 
 

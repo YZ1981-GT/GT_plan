@@ -306,6 +306,10 @@ async def save_scoped_note_record(
     if record is not None:
         record.data = copy.deepcopy(data)
         record.updated_at = now
+        # V243：手工保存 → source_mode=manual
+        from app.services.consol_note_source_projection import update_source_projection
+
+        update_source_projection(record, "manual")
         return record
 
     inherited_stale = bool(scope.node_key)

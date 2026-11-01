@@ -185,8 +185,9 @@ const props = defineProps<{
   indirectSections: IndirectSection[]
   netAssetData?: any[]  // 净资产表数据，用于自动提取期末值
 }>()
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save', data: { direct: EquitySimRow[]; indirect: IndirectSection[] }): void
+  (e: 'draft-change', data: { direct: EquitySimRow[]; indirect: IndirectSection[] }): void
   (e: 'open-formula', sheetKey: string): void
 }>()
 
@@ -269,6 +270,9 @@ async function restoreDirectDefaults() {
 
 watch(() => props.directRows, (v) => { directRows.value = [...v] }, { deep: true })
 watch(() => props.indirectSections, (v) => { indirectSections.value = [...v] }, { deep: true })
+watch([directRows, indirectSections], () => {
+  emit('draft-change', { direct: directRows.value, indirect: indirectSections.value })
+}, { deep: true })
 
 // 同步 total 字段（在 watch 中而非渲染函数中）
 watch(directRows, (rows) => {

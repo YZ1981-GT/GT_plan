@@ -199,19 +199,36 @@ async def propagate_note(project_id: uuid.UUID, year: int | None, slot_keys: lis
 
 
 async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
-    from app.services.consol_note_formula_service import fill_note_sections
+    """合并附注公式变化进入统一持久 operation，不再旁路只刷新附注。"""
+    from app.services.consol_operation_service import request_operation
+    from app.services.consol_push_service import TRIGGER_FORMULA
+    from app.workers.consol_operation_worker import wake
 
     sections = sorted({s.split("|", 1)[0] for s in slot_keys if s})
     if year is None:
         return {"skipped": "no_year", "sections": sections}
     async with _factory()() as db:
         if not await _is_consolidated(db, project_id):
-            return {"skipped": "not_consolidated"}
+            return {"skipped": "not_consolidated", "sections": sections}
         if await _is_frozen(db, project_id) is not False:
-            return {"skipped": True}
-        result = await fill_note_sections(db, project_id, year, sections)
+            return {"skipped": True, "sections": sections}
+        requested = await request_operation(
+            db,
+            project_id=project_id,
+            year=year,
+            operation_type="push",
+            idempotency_key=f"formula:{uuid.uuid4().hex}",
+            trigger_source=TRIGGER_FORMULA,
+            requested_actions=("notes",),
+        )
         await db.commit()
-    return {"sections": sections, "result": result}
+    wake()
+    return {
+        "sections": sections,
+        "operation_id": str(requested.operation.id),
+        "status": requested.operation.status,
+        "disposition": requested.disposition,
+    }
 
 
 async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:

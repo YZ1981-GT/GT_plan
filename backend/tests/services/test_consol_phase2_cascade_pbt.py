@@ -69,8 +69,9 @@ _CRITICAL_STEP_TO_SYMBOL = {
 }
 
 _PATCH_KEYS = (
-    "build_tree", "build_consol_context", "get_descendants", "recalc_full", "recalculate_trial",
-    "reconcile_worksheet_vs_trial", "generate_consol_reports_sync", "refresh_notes_exclusive",
+    "build_tree", "build_consol_context", "load_calc_basis", "get_descendants",
+    "recalc_full", "recalculate_trial", "reconcile_worksheet_vs_trial",
+    "generate_consol_reports_sync", "refresh_notes_exclusive",
 )
 
 
@@ -113,6 +114,8 @@ def _patch_all(*, node_count: int = 1, note_status: str = "persisted", **stats_k
         return context
 
     build_context_mock = AsyncMock(side_effect=_build_context)
+    basis = object()
+    load_basis_mock = AsyncMock(return_value=basis)
     recalc_full_mock = AsyncMock(return_value=None)
     recalculate_trial_mock = AsyncMock(return_value=None)
     reconcile_mock = AsyncMock(return_value=MagicMock())
@@ -124,6 +127,9 @@ def _patch_all(*, node_count: int = 1, note_status: str = "persisted", **stats_k
         "build_tree": patch(f"{_MODULE}.build_tree", new=AsyncMock(return_value=tree)),
         "build_consol_context": patch(f"{_MODULE}.build_consol_context", new=build_context_mock),
         "build_context_mock": build_context_mock,
+        "basis": basis,
+        "load_calc_basis": patch(f"{_MODULE}.load_calc_basis", new=load_basis_mock),
+        "load_basis_mock": load_basis_mock,
         "get_descendants": patch(f"{_MODULE}.get_descendants", new=MagicMock(return_value=descendants)),
         "recalc_full": patch(f"{_MODULE}.recalc_full", new=recalc_full_mock),
         "recalc_full_mock": recalc_full_mock,
@@ -153,18 +159,24 @@ async def _run(patchers, *, db=None, project_id=None, progress_cb=None) -> Casca
 
 
 def _assert_shared_identity(patchers, *steps: str) -> None:
-    """断言级联只构造一次上下文，并把同一 tree/context 透传给各阶段。"""
+    """断言级联只构造一次上下文/口径，并把同一 tree/context/basis 透传给各阶段。"""
     assert patchers["build_context_mock"].await_count == 1
+    assert patchers["load_basis_mock"].await_count == 1
     assert len(patchers["context_box"]) == 1
     context = patchers["context_box"][0]
     tree = patchers["tree"]
+    basis = patchers["basis"]
     assert context.tree_fingerprint == tree_fingerprint(tree)
+    load_call = patchers["load_basis_mock"].await_args
+    assert load_call.args[1:] == (context.project_id, context.year)
+    assert load_call.kwargs["tree"] is tree
     for step in steps:
         mock = patchers[f"{step}_mock"]
         assert mock.await_count == 1, step
         call = mock.await_args
         assert call.kwargs["tree"] is tree, step
         assert call.kwargs["context"] is context, step
+        assert call.kwargs["basis"] is basis, step
 
 
 class _ProgressRecorder:
@@ -400,7 +412,7 @@ class TestRefreshNotesExclusive:
         project_id, year = uuid4(), 2025
         order: list[str] = []
 
-        async def fake_refresh(_db, pid, yr, *, context=None, tree=None):
+        async def fake_refresh(_db, pid, yr, *, context=None, tree=None, basis=None):
             order.append("refresh")
             return _note_stats()
 
