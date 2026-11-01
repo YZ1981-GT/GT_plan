@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tests.advanced_query_linkage.builder_client import BuilderClient, builder_client
 from tests.advanced_query_linkage.business_client import BusinessClient, business_client
 from tests.advanced_query_linkage.gold import Gold, require_pg_only
+from tests.advanced_query_linkage.project_picks import PickResolver
 from tests.authz_world import pg_engine
 
 
@@ -34,6 +35,21 @@ async def gold(request: pytest.FixtureRequest) -> AsyncIterator[Gold]:
     engine = pg_engine()
     try:
         yield Gold(engine)
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def picks(request: pytest.FixtureRequest) -> AsyncIterator[PickResolver]:
+    """按数据能力动态解析真库项目（见 ``project_picks``）。
+
+    取代 ``gold.py`` 里写死的 9 个项目 UUID —— 那 9 个 2026-11-01 现算在 ``projects``
+    表里全都查不到行，用例会拿 403 / 空集跟空金标准互相印证而假绿。
+    """
+    require_pg_only(request.node)
+    engine = pg_engine()
+    try:
+        yield PickResolver(engine)
     finally:
         await engine.dispose()
 

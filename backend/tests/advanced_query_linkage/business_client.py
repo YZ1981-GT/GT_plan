@@ -25,10 +25,23 @@ from app.models.core import User
 from app.routers import custom_query
 from app.services.custom_query import audit_helper
 from tests.advanced_query_linkage.gold import AUDIT_YEAR
+from tests.advanced_query_linkage.project_picks import Pick
 from tests.authz_world import build_app
 
 EXEC = "/api/custom-query/execute"
 PAGE = 2000
+
+#: 目标项目既可以是裸 UUID（旧写法，年度回落 ``AUDIT_YEAR``），也可以是按能力解析出的 ``Pick``
+#: （年度取该项目自己的 ``audit_year`` —— 动态解析出的项目年度不一定是 2025）。
+ProjectTarget = uuid.UUID | Pick
+
+
+def _target(project: ProjectTarget) -> tuple[uuid.UUID, int]:
+    if isinstance(project, Pick):
+        if project.audit_year is None:
+            raise AssertionError(f"{project} 没有 audit_year，无法构造请求年度；请在能力判据里排除它")
+        return project.id, project.audit_year
+    return project, AUDIT_YEAR
 
 
 class BusinessClient:
@@ -38,21 +51,22 @@ class BusinessClient:
         self.session = session
         self.http = http
 
-    async def execute(self, project_id: uuid.UUID, source: str, **body: Any) -> Response:
-        payload = {"project_id": str(project_id), "year": AUDIT_YEAR, "source": source, "limit": 100, **body}
+    async def execute(self, project_id: ProjectTarget, source: str, **body: Any) -> Response:
+        pid, year = _target(project_id)
+        payload = {"project_id": str(pid), "year": year, "source": source, "limit": 100, **body}
         return await self.http.post(EXEC, json=payload)
 
-    async def ok(self, project_id: uuid.UUID, source: str, **body: Any) -> dict:
+    async def ok(self, project_id: ProjectTarget, source: str, **body: Any) -> dict:
         response = await self.execute(project_id, source, **body)
         assert response.status_code == 200, response.text[:800]
         return response.json()
 
-    async def error(self, project_id: uuid.UUID, source: str, status: int, **body: Any) -> dict:
+    async def error(self, project_id: ProjectTarget, source: str, status: int, **body: Any) -> dict:
         response = await self.execute(project_id, source, **body)
         assert response.status_code == status, response.text[:800]
         return response.json()["detail"]
 
-    async def all_rows(self, project_id: uuid.UUID, source: str, **body: Any) -> tuple[dict, list[dict]]:
+    async def all_rows(self, project_id: ProjectTarget, source: str, **body: Any) -> tuple[dict, list[dict]]:
         """逐页取全量（每页 2,000 行）；返回最后一页的响应与全部行。"""
         rows: list[dict] = []
         offset = 0
