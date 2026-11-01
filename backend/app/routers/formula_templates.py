@@ -22,7 +22,9 @@ from app.models.formula_setting_models import FormulaTemplate, FormulaTemplateSu
 from app.routers.formula_settings import DecisionsIn, _http, _public_result, _run
 from app.services.formula_settings import template_service as svc
 from app.services.formula_settings import template_sync as sync
-from app.services.formula_settings.errors import Forbidden, FormulaSettingError
+from app.services.formula_settings.errors import (
+    Forbidden, FormulaSettingError, VersionConflict, VersionRequired,
+)
 from app.services.formula_settings.outbox import record_changes, publish_pending
 from app.services.formula_settings.template_access import Viewer, get_managed, get_visible, list_visible
 
@@ -244,10 +246,28 @@ async def publish_preview(template_id: uuid.UUID, body: PublishBody, db: AsyncSe
                                             expected_version=body.expected_version))
 
 
+def _rollback_cas(tpl: FormulaTemplate, expected_version: int | None) -> None:
+    """回滚的 CAS 前置校验：必须先于任何内容判断。
+
+    🔴 次序有业务含义：客户端拿着过期版本号来回滚时，必须收到 428 / 409「请刷新后重试」，
+    而不是先按自己这份过期视图算差集、再得到「没有可回滚的变化」422 —— 后者会让用户
+    以为目标版本没差异，实际是他看到的版本已经不是当前版本（S6 Task 4 UAT 7.6 实测）。
+    """
+    if expected_version is None:
+        raise VersionRequired("回滚模板必须带当前版本号，请刷新后重试")
+    if int(expected_version) != tpl.version:
+        raise VersionConflict("模板已被他人修改，请刷新后重试",
+                              detail={"expected_version": expected_version, "current_version": tpl.version})
+
+
 @router.post("/{template_id}/rollback-preview")
 async def rollback_preview(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
                            current_user: User = Depends(get_current_user)):
     tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    try:
+        _rollback_cas(tpl, body.expected_version)
+    except FormulaSettingError as exc:
+        raise _http(exc) from None
     diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
     if not changes:
         raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",
@@ -260,6 +280,10 @@ async def rollback_preview(template_id: uuid.UUID, body: RollbackBody, db: Async
 async def rollback(template_id: uuid.UUID, body: RollbackBody, db: AsyncSession = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
     tpl = await _call(get_managed(db, await _viewer(db, current_user), template_id))
+    try:
+        _rollback_cas(tpl, body.expected_version)
+    except FormulaSettingError as exc:
+        raise _http(exc) from None
     _diff, changes = await _call(svc.rollback_changes(db, tpl, body.target_version))
     if not changes and not body.request_id:
         raise _http(FormulaSettingError("目标版本与当前版本没有可回滚的定义变化",

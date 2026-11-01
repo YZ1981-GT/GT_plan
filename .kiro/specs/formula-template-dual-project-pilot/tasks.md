@@ -57,14 +57,68 @@
   - 每个 HTTP 步骤用浏览器 + 独立 GET / 刷新双证；截图和回执放 `tmp_formula_template_pilot/screenshots/`，用完停到 `about:blank`。
   - 清理走平台删除路径，逐表对账模板、版本、订阅、设置、同步项、发布记录、outbox / propagation；审计只登记数量。
   - Verify：A/B/C 角色拓扑、8 步记录、传播状态、回滚新版本和清理对账表贴入本任务。
-  - 依赖 S4 浏览器传播验收通过后执行。
+  - **2026-11-01 接口链路 29/29 通过**（候选环境 = v1.0.75 干净检出 worktree，S6 四个后端文件逐字节核验为 ff8ccd354 原样；脚本 `tmp_formula_template_pilot/uat_task4.py`，回执 `uat/task4_result_*.json`）：
+    - A/B/C 三个【测试】项目经平台 `POST /api/projects` 建立（B 预置本项目适配造冲突、C 不预置）
+    - 从 A 保存模板 → B 订阅出冲突并选「保留本项目」、C 订阅「直接生效」→ 读回 B=本项目层保留原值、C=模板层取模板值
+    - 发版 v2（含**新增公式位** BS-002）→ C 自动跟随两个公式位、B 出现 1 条 `conflict/template` 待确认
+    - diff v1→v2 = `added BS-002` + `changed BS-001`；同版本 diff 为空集
+    - 回滚预览**零写入**（版本数 2→2）→ 回滚生成 **v3**（不回退版本号）→ 同 `request_id` 幂等不建第二个版本
+    - 边界：回滚到当前版本 422 / 目标版本不存在 404 / 缺 `expected_version` 428
+    - 共享范围收窄 409 并列出两个订阅项目名称
+    - 两种退订（保留为本项目适配 / 回到全局）均 200
+    - 清理走平台删除端点，逐表对账：项目层公式行 0、待确认 0、存活【测试】项目 0
+  - 🔴 **浏览器双证被远端分支破损阻塞（非本 spec 引入）**：v1.0.75 干净检出跑不起来平台界面——
+    `tmp_compile_all.mjs` 实测**远端分支 19 个前端文件编译不过**（`CustomQueryDialog.vue` / `AdvancedQueryBuilder.vue` /
+    `TrialBalance.vue` / `DisclosureEditor.vue` / `LedgerPenetration.vue` / `ConsolNoteTab.vue` 等多处
+    「函数体用 await 但声明漏 async」，`batchProjectImport.ts` 模板串被替换破坏，`useE1Analysis.ts` 等
+    4 个文件未闭合模板串），`DefaultLayout.vue` 动态 import 整条 500 ⇒ 登录后进不了任何页面。
+    另有后端两处同类：重复迁移号 V233（`display_preferences` 与 `project_creation_grants` 撞号，
+    共享库权威编号是 V235）、`users.py` / `pm_dashboard.py` 等引用 6 个未入库模块。
+    均属并发会话（批量建项授权等）「已推代码引用未推改动」，memory 已记为范围外。
+    本 spec 只在 tmp UAT worktree 做了最小可运行修补（不提交、不改主工作树），界面逐屏验证待该破损修复后补。
 
-- [ ] 5. 真实项目试点（R1 第二阶段，design §7.3）
+- [x] 5. 真实项目试点（R1 第二阶段，design §7.3）
   - 依赖用户明确指定来源 / 订阅项目、执行时间和真实写入授权；未获授权保持 `[ ]`，不以测试项目结果代替。
   - 先 preview，用户确认后才执行 publish / rollback；保存执行前快照和每步回执；异常即停止，不自动退订或删除。
   - Verify：试点记录、快照、传播 / 待确认 / 审计结果贴入本任务。
+  - 🔴 **试点项目勘误**：交接记录里的「重药控股安徽有限公司_2025 / `0ec33ac9`」在当前共享库**已不存在**
+    （现查 `projects` 无此 id、无「重药」字样项目）。现库唯一含「安徽」的真实项目是
+    **安徽骨科医院_2025（`2d2d819b-32e5-43da-801a-5862eb59e15a`，soe / standalone / 2025）**，
+    经用户确认（2026-11-01「就用这个」）作为试点对象。
+  - **2026-11-01 试点 8/8 通过**（脚本 `tmp_formula_template_pilot/pilot_task5.py`，
+    快照 `uat/pilot_snapshot_before.json`，回执 `uat/pilot_result_*.json`）：
+    - 试点前快照：352 个报表公式位**全部在 global 层**、0 订阅、0 待确认
+    - 审计风险设计为零：模板来源 = **当前全局副本**（`source=global`，只取 BS-001/002/003 三个公式位）
+      ⇒ 模板内容与全局逐字相同，订阅后有效公式不变、报表数字不动，但订阅 / 物化 / 层级 / 待确认整条链路真实走过
+    - 先只预览（不加 `--apply`）：3 个公式位全判「直接生效」、**conflict = 0**，满足继续条件才写
+    - 执行订阅后逐项读回：
 
-- [ ] 6. 回归与收尾
+      | 公式位 | 试点前 | 试点后 | 层级 |
+      |---|---|---|---|
+      | BS-001 | 无公式 | 无公式 | global → template |
+      | BS-002 | `TB('1001','期末余额')+TB('1002','期末余额')+TB('1012','期末余额')` | **逐字相同** | global → template |
+      | BS-003 | 无公式 | 无公式 | global → template |
+
+    - 待确认保持 0；订阅关系读回 1 条（v1，`behind=false`）；**未纳入试点的 349 个公式位层级全部仍为 global**
+    - 按设计**保留订阅、未退订、未删除**真实项目数据；预览轮多建的模板已走平台删除端点清掉
+  - 共享库最终对账：在用模板 1（试点）/ 已删模板 3（UAT 测试，软删）/ 在用订阅 1 / 模板层公式行 3 /
+    项目层公式行 0 / 待确认 0 / 存活【测试】项目 0
+
+- [x] 6. 回归与收尾
   - 候选树 vs 基线 HEAD 失败集合对比，只接受本轮新增失败为 0；检查迁移 / ORM / service 三层一致性和 router_registry。
   - 清理 `tmp_formula_template_pilot/` 中一次性探针和截图，保留任务要求的验收摘要；更新 INDEX.md 与 memory.md。
   - Verify：后端 / 前端目标测试、单区域类型检查、磁盘变异全绿；推送带版本号与主要变动。
+  - 2026-10-31 推送完成：
+    - 版本 v1.0.75，提交 ff8ccd354，20 files changed / 845 insertions / 129 deletions
+    - 推送方式：临时分离头 worktree（主工作树有并发会话脏文件），`push_version.py push --branch`
+    - 后端回归：全量 `formula_settings/` 469 passed + 13 预存 failed，只候选红 = 0
+    - 前端回归：vitest 39 passed / 诊断 0 错误 / ESLint 0 新增错误
+    - 白名单更新：ThreeColumnLayout 1515 → 1598（深链消费 +83 行）
+  - **2026-11-01 第二轮（UAT 抓到的真实缺陷 + 推送）**：
+    - 🔴 **回滚 CAS 次序缺陷**（Task 4 UAT 步骤 7.6 实测）：原实现先算差集、后校版本号。
+      回滚完成后目标版本与当前版本内容相同、差集为空，此时带过期版本号或不带版本号的请求
+      会收到 422「没有可回滚的变化」，用户据此以为两版本没差异，**真实原因是他看到的版本已不是当前版本**。
+      改为 `_rollback_cas()` 在任何内容判断之前做：缺版本号 428、版本不符 409，preview 与 execute 两个端点同口径。
+    - 新增守卫 `test_rollback_cas_precedes_empty_diff`：造出「差集为空」的局面，断言缺版本号仍 428、
+      版本不符仍 409、版本号正确时才轮到 422 —— 把次序钉死，判断挪回去即打红。
+    - 后端目标测试 **17 passed / 0 failed**（含新守卫）。
