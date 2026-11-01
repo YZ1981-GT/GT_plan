@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：24/49（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：24/50（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 勘误：0.5 已从 `[x]` **退回** `[ ]`，并新增 0.6。原因是本轮重写
 > requirements.md / tasks.md 打坏了 7 个把这两份文档当机器可读契约解析的脚本，而 0.5 建的
@@ -203,6 +203,13 @@
     `registry_registration_failure` 27 条各带精确 error code。
   - _AC: 1.4, 12.1_
 
+- [ ] 2.8 承接 SYNC-MULTI-RESOLVER 里程碑的 writer gate 与 CanonicalResolutionService 收口
+  - 本任务是方案 A 新增：里程碑定义 `SYNC-MULTI-RESOLVER` 的判据是 `writer_gate_issue_zero(multi_resolver)` + `CanonicalResolutionService` 符号存在性。旧 producer 是 Wave 6 的 Task 12/71/74（已不在当前 tasks.md 里），新计划里没有专任承接项，硬塞给复验类任务等于伪造归属。
+  - writer gate 现算 `multi_resolver` 待清 **3 条**：`get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `post_sheet_onlyoffice_callback`（全在 `wp_onlyoffice_router`）。`CanonicalResolutionService` 已存在于 `backend/app/services/workpaper_sync/resolution.py`。
+  - 自 Task 30 移交至本门，承接 writer gate issue key `multi_resolver`，3 条 resolver 行（`get_sheet_onlyoffice_config`、`get_sheet_wopi_contents`、`post_sheet_onlyoffice_callback`）。
+  - 验收：writer gate `multi_resolver` 计数从 3 降至 0；`CanonicalResolutionService` 仍在磁盘且可 import。不做变异（属里程碑管道的领地，自带 `writer_gate_issue_zero` 判据）。
+  - _AC: 12.1_
+
 ## Phase 3：前端模式与可操作原因单一来源
 
 - [x] 3.1 扩展 `workpaperSyncApi.ts` 并实现 `useEntrySyncReadiness`
@@ -391,7 +398,7 @@
     { "wave": 5, "tasks": ["1.7"] },
     { "wave": 6, "tasks": ["2.1", "2.2"] },
     { "wave": 7, "tasks": ["2.3", "2.4", "2.5"] },
-    { "wave": 8, "tasks": ["2.6", "2.7"] },
+    { "wave": 8, "tasks": ["2.6", "2.7", "2.8"] },
     { "wave": 9, "tasks": ["3.1", "3.2", "3.3", "3.4"] },
     { "wave": 10, "tasks": ["3.5", "3.6"] },
     { "wave": 11, "tasks": ["4.1"] },
