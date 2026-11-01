@@ -19,6 +19,11 @@
       <span class="gt-fh-count">共 {{ filteredEntries.length }} 条记录</span>
     </div>
 
+    <div v-if="loadError" class="gt-fh-load-error">
+      <el-alert :title="loadError" type="error" :closable="false" show-icon />
+      <el-button size="small" :loading="loading" @click="loadHistory">重试</el-button>
+    </div>
+
     <!-- 时间线 -->
     <div v-if="filteredEntries.length" class="gt-fh-timeline">
       <el-timeline>
@@ -74,7 +79,7 @@
     </div>
 
     <!-- 空状态 -->
-    <el-empty v-else-if="!loading" description="暂无公式变更记录" />
+    <el-empty v-else-if="!loading && !loadError" description="暂无公式变更记录" />
 
     <!-- 加载中 -->
     <div v-if="loading" style="text-align: center; padding: 40px;">
@@ -93,6 +98,7 @@ import { formulaAuditLog } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
+import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
 
 const authStore = useAuthStore()
 
@@ -128,6 +134,7 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(false)
+const loadError = ref('')
 const entries = ref<HistoryEntry[]>([])
 const filterRowCode = ref('')
 const filterAction = ref('')
@@ -145,19 +152,33 @@ const filteredEntries = computed(() => {
   return result
 })
 
+let loadSequence = 0
+
 async function loadHistory() {
-  if (!props.projectId || !props.year) return
+  const sequence = ++loadSequence
+  entries.value = []
+  loadError.value = ''
+  if (!props.projectId || !props.year) {
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const data = await api.get(formulaAuditLog.list(props.projectId, props.year), {
       params: { limit: 200 },
-    })
+      _silent: true,
+      _dedupe: false,
+    } as any)
+    if (sequence !== loadSequence) return
     entries.value = Array.isArray(data) ? data : []
-  } catch {
-    // 加载失败时显示空列表（需求 15.3：失败不提示成功）
+  } catch (error: any) {
+    if (sequence !== loadSequence) return
     entries.value = []
+    if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError' && error?.name !== 'AbortError') {
+      loadError.value = formulaErrorText(error, '公式历史加载失败')
+    }
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 
@@ -307,6 +328,15 @@ watch(() => [props.projectId, props.year], () => {
   padding: 8px;
   height: 100%;
   overflow-y: auto;
+}
+.gt-fh-load-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gt-fh-load-error :deep(.el-alert) {
+  flex: 1;
 }
 .gt-fh-filter-bar {
   display: flex;

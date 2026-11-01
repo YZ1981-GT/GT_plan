@@ -758,7 +758,6 @@ declare module 'vue' {
     FormulaImportExportDropdown: typeof import('./components/formula/FormulaImportExportDropdown.vue')['default']
     FormulaInput: typeof import('./components/formula/FormulaInput.vue')['default']
     FormulaManagerDialog: typeof import('./components/formula/FormulaManagerDialog.vue')['default']
-    FormulaParamPicker: typeof import('./components/formula/FormulaParamPicker.vue')['default']
     FormulaPendingSyncDialog: typeof import('./components/formula/settings/FormulaPendingSyncDialog.vue')['default']
     FormulaPublishPreviewDialog: typeof import('./components/formula/settings/FormulaPublishPreviewDialog.vue')['default']
     FormulaPublishRecords: typeof import('./components/formula/settings/FormulaPublishRecords.vue')['default']

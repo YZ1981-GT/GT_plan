@@ -27,15 +27,22 @@ export function useTbDetailFormulas(deps: TbDetailDeps) {
   const fallbackAccounts = ref<Array<{ code: string; name: string }>>([])
 
   async function load() {
+    // 切项目或重试时先清旧状态，失败后宁可显示错误，也不能继续展示上一项目的公式。
+    overrides.value = {}
+    added.value = []
+    loaded.value = {}
+    fallbackAccounts.value = []
     if (!deps.projectId.value) return
     try {
       const data: any = await deps.api.get(deps.reportConfigFormula.tbDetail(deps.projectId.value), {
-        _silent: true, validateStatus: (s: number) => s < 600,
+        _silent: true,
       } as any)
       overrides.value = data?.overrides || {}
       added.value = Array.isArray(data?.added) ? data.added : []
       loaded.value = data?.loaded || {}
-    } catch { /* silent */ }
+    } catch (e) {
+      deps.showFormulaError(e, '加载试算表科目明细公式失败')
+    }
     if (!(deps.addrStore.loaded && deps.addrStore.tbAddresses.length > 0)
         && !(deps.rows.value && deps.rows.value.length > 0)
         && !fallbackAccounts.value.length) {

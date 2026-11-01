@@ -54,7 +54,11 @@ describe('公式历史回滚：点按钮发出的请求带 expected_version', ()
     post.mockResolvedValue({ ok: true, restored_formula: ENTRY.old_formula })
     const w = mountTab()
     await flushPromises()
-    expect(get).toHaveBeenCalledWith(LIST_PATH, { params: { limit: 200 } })
+    expect(get).toHaveBeenCalledWith(LIST_PATH, {
+      params: { limit: 200 },
+      _silent: true,
+      _dedupe: false,
+    })
     const [btn] = rollbackButtons(w)
     expect(btn, '可回滚条目应渲染「一键回滚」按钮').toBeTruthy()
     await btn.trigger('click')

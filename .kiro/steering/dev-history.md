@@ -5842,3 +5842,9 @@ instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 
 - 交付：R8 创建者可见本项目底稿（`resolve_member_scope` 增 `Project.created_by == user_id and is_member` → 主管 + 全循环，被移出团队后不再放行；member-scope 契约 12 条通过）；R9 删除项目按项目 edit 授权（`require_project_access("edit")`，批删逐项 `assert_project_permission`）；R10 向导新建分支恢复（`isNewProject` 在 `createProject` 前记住，引导 / 公式订阅 / 合并弹窗在创建后、confirmProject 前）；R11 单建经理有档案改走 `initialize_project_managers(require_pending=False)`，不给本人发通知；R12 `_cascade_delete_project` 逐表删除不 except pass。6.5 手动审查前几轮关键路径无 P0/P1。
 - 验证：后端 138 passed（9 文件）；member-scope 契约 13 passed（+2 R8 用例）；前端 135 passed（23 文件）；ruff / 行数门 / `git diff --check` 通过。
 - 回归完成：PG 组 36 passed；创建者可见 5 单测 + 12 契约 passed；前端向导 7 passed；ruff / 行数门 / diff-check 通过。浏览器实测待环境。
+
+## 2026-11-01 公式管理残留安全与可用性收口
+
+- `formula-management-residual-closure` 6/6：附注/报表模板 12 个端点全部补登录，4 个全局写端点限 admin/partner；模板 actor 服务端绑定，文件 ID 只认 UUID，阻断路径穿越。
+- 修报表上游建议恒空；真实公式编辑器接 `FormulaInput`、初始语法校验和保存门；删除不可达行内 UI 与零调用 `FormulaParamPicker`；历史/TB 明细故障改显式错误；`fill_all_formulas` warnings 接通 API、种子面板、CLI；修 `ThreeColumnLayout` 重复 import 的构建阻断。
+- 验收：后端 10+12 passed、两个行为探针 PASS、ruff 0；前端 78 passed/3 skipped、vue-tsc HEAD 12→候选10（added 0）、行数门/Vite build/独立 Playwright 通过。共享库最高 V236、磁盘 V249，未启动主服务、未执行迁移或写库。
