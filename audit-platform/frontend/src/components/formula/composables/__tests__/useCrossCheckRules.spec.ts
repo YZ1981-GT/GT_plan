@@ -256,3 +256,26 @@ describe('不拿写死的示例冒充本项目规则', () => {
     expect(Object.keys(cc.rulesMap.value)).toEqual(['cross_report_note'])
   })
 })
+
+
+describe('run — 写请求按状态码判成功（formula-writer-ownership-and-stale R4）', () => {
+  it('执行端点非 2xx 时显式报错，不把空 results 冒充未校验成功', async () => {
+    const deps = makeDeps()
+    const error = { response: { status: 500, data: { detail: '执行失败' } } }
+    deps.api.post.mockRejectedValue(error)
+    const cc = useCrossCheckRules(deps)
+    cc.rulesMap.value.cross_report_note = [{ label: '规则', left_ref: '1', operator: '=', right_ref: '2' }]
+
+    await expect(cc.run()).resolves.toBeUndefined()
+
+    expect(deps.showFormulaError).toHaveBeenCalledWith(error, '执行表间审核失败')
+    expect(cc.running.value).toBe(false)
+    expect(deps.api.post).toHaveBeenCalledWith(
+      '/api/report-config/execute-formulas-batch',
+      expect.objectContaining({ project_id: 'p1', year: 2025 }),
+      expect.objectContaining({ _silent: true }),
+    )
+    expect(deps.api.post.mock.calls[0][2].validateStatus).toBeUndefined()
+    expect(cc.rulesMap.value.cross_report_note[0]._checked).toBeUndefined()
+  })
+})

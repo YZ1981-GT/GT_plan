@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noFallthroughCasesInSwitch": true,
+    "paths": { "@/*": ["./src/*"], "@fixtures/*": ["../../backend/tests/fixtures/*"] },
+    "baseUrl": "."
+  },
+  "include": [
+    "src/composables/useEditorSave.ts",
+    "src/composables/__tests__/useEditorSave.spec.ts",
+    "src/components/formula/composables/useCrossCheckRules.ts",
+    "src/components/formula/composables/__tests__/useCrossCheckRules.spec.ts",
+    "src/views/composables/useReportMapping.ts",
+    "src/__tests__/writeRequestValidateStatusGuard.spec.ts",
+    "src/env.d.ts"
+  ]
+}

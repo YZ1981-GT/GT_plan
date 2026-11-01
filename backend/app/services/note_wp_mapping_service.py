@@ -92,14 +92,63 @@ async def _apply_final_note_formulas(
     from app.services.note_workpaper_pull_service import _apply_note_formulas
 
     runs = await _apply_note_formulas(db, project_id, year, list(dict.fromkeys(sections)))
-    errors = [f"附注公式失败 {section}: {item['error']}" for section, item in runs.items() if item.get("error")]
+    failed_sections = [section for section, item in runs.items() if item.get("error")]
+    errors = [
+        f"附注公式失败 {section}: {runs[section]['error']}"
+        for section in failed_sections
+    ]
     return {
         "formula_updated": sum(int(item.get("updated") or 0) for item in runs.values()),
         "formula_sections": [section for section, item in runs.items() if int(item.get("updated") or 0) > 0],
+        "formula_failed_sections": failed_sections,
         "formula_errors": errors,
         # 底稿投影表上预设公式结果与底稿值不一致、保留底稿值的格数（刷新提示里请用户核对）
         "formula_differs": sum(int(item.get("differs") or 0) for item in runs.values()),
     }
+
+
+async def _finalize_refill_report(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    report: Any,
+) -> dict[str, Any]:
+    """执行最终附注公式，剔除失败章节，并只清完整成功章节的 stale。"""
+    from app.services.stale_state import clear_note_stale
+
+    formulas = await _apply_final_note_formulas(
+        db, project_id, year, list(report.recomputed_sections)
+    )
+    for section in formulas.get("formula_sections") or []:
+        if section not in report.changed_sections:
+            report.changed_sections.append(section)
+    failed = set(formulas.get("formula_failed_sections") or [])
+    if failed:
+        report.sections_recomputed[:] = [
+            section for section in report.recomputed_sections if section not in failed
+        ]
+        for section in sorted(failed):
+            if section not in report.failed_sections:
+                report.failed_sections.append(section)
+            message = next(
+                (text for text in formulas["formula_errors"] if f" {section}:" in text),
+                f"附注公式失败 {section}",
+            )
+            report.error_details.append({
+                "section": section,
+                "stage": "formula",
+                "message": message,
+            })
+    report.errors.extend(formulas["formula_errors"])
+    if report.recomputed_sections:
+        await clear_note_stale(
+            db,
+            project_id,
+            sections=report.recomputed_sections,
+            year=year,
+        )
+    report.cleared_sections = list(report.recomputed_sections)
+    return formulas
 
 
 def _iter_formula_rows(table_data: dict[str, Any]) -> Iterator[dict[str, Any]]:
@@ -247,17 +296,24 @@ class NoteWpMappingService:
             project_id, year, affected_sections, skip_manual=True
         )
 
-        # 4. 最后执行附注表内预设/用户公式：headless 披露明细与 binding 已全部落到当前事务。
-        formulas = await _apply_final_note_formulas(self.db, project_id, year, affected_sections)
-        report.errors.extend(formulas["formula_errors"])
+        # 4. 最终公式成功后才清 stale；任一章节失败会从成功集合剔除。
+        formulas = await _finalize_refill_report(
+            self.db, project_id, year, report
+        )
 
         # 5. 构造向后兼容的响应体
         return {
             "refreshed": report.cells_updated,
             "total_notes": total_notes,
-            "sections_recomputed": report.sections_recomputed,
+            "requested_sections": report.requested_sections,
+            "recomputed_sections": report.recomputed_sections,
+            "sections_recomputed": report.recomputed_sections,
+            "changed_sections": report.changed_sections,
+            "failed_sections": report.failed_sections,
+            "cleared_sections": report.cleared_sections,
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
+            "error_details": report.error_details,
             **formulas,
         }
 
@@ -276,14 +332,21 @@ class NoteWpMappingService:
         report = await engine.refill_sections(
             project_id, year, [note_section], skip_manual=True
         )
-        formulas = await _apply_final_note_formulas(self.db, project_id, year, [note_section])
-        report.errors.extend(formulas["formula_errors"])
+        formulas = await _finalize_refill_report(
+            self.db, project_id, year, report
+        )
         return {
             "refreshed": report.cells_updated,
             "total_notes": 1,
-            "sections_recomputed": report.sections_recomputed,
+            "requested_sections": report.requested_sections,
+            "recomputed_sections": report.recomputed_sections,
+            "sections_recomputed": report.recomputed_sections,
+            "changed_sections": report.changed_sections,
+            "failed_sections": report.failed_sections,
+            "cleared_sections": report.cleared_sections,
             "text_only_sections": report.text_only_sections,
             "errors": report.errors,
+            "error_details": report.error_details,
             **formulas,
         }
 

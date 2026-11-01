@@ -1203,8 +1203,14 @@ async def sync_from_workpaper(
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now
         note.last_sync_user_id = user.id
-        note.is_stale = False
-        note.stale_source = None
+        from app.services.stale_state import clear_note_stale
+
+        await clear_note_stale(
+            db,
+            project_id,
+            sections=[section_id],
+            year=note.year,
+        )
         note.updated_by = user.id
         note.updated_at = now
         logger.info(
@@ -1513,7 +1519,14 @@ class WpDisclosureSyncService:
             )
 
         note.table_data = existing_table_data
-        note.is_stale = False
+        from app.services.stale_state import clear_note_stale
+
+        await clear_note_stale(
+            db,
+            project_id,
+            sections=[section_id],
+            year=note.year,
+        )
         note.last_sync_source = "workpaper_html"
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now

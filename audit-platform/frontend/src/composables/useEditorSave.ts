@@ -72,17 +72,24 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
     const api = opts.univerAPI.value
     if (!api || !opts.wpDetail.value) return false
     saving.value = true
+    let snapshot: any = null
     try {
       const workbook = api.getActiveWorkbook()
       if (!workbook) throw new Error('无法获取工作簿数据')
-      const snapshot = workbook.getSnapshot()
+      snapshot = workbook.getSnapshot()
 
       // 🔴 保存只走 univerSave（snapshot + 版本冲突检测）。原有的「导出 xlsx 覆盖服务端底稿原文件」
       //    回写已删除（spec knowledge-base-retrieval-and-authz-closure 收尾，用户裁定删除而非启用）：
       //    它自 token 迁到 sessionStorage 起恒 401 从未生效；若修好鉴权，每次保存都会用 Univer 的
       //    有损导出覆盖原模板文件（公式 / 样式 / 数据验证丢失且无法回滚）。后端端点一并删除。
 
-      // 调用完整保存 API（含版本冲突检测）
+      // 调用完整保存 API（含版本冲突检测）。
+      // 🔴 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：不再用
+      //    `validateStatus: s<600` 把 4xx/5xx 当成功 —— 原先 500 会误报「保存成功」并清 dirty、
+      //    静默丢失未保存改动。版本冲突 409 的 error_code 嵌在后端 message 里（全局 http_exception_handler
+      //    把 dict detail 放进 message），经 http 拦截器 normaliseErrorEnvelope 回填到 detail ⇒
+      //    必须在 catch 里按 err.response 判；原成功路径读 `data.detail.error_code` 对真实后端恒不命中。
+      //    `_silent` 让全局拦截器不弹通用 toast（版本冲突有专门的对话框，其余错误由 catch 的 handleApiError 提示）。
       const data = await httpApi.post(
         P_wp.univerSave(opts.projectId.value, opts.wpId.value),
         {
@@ -90,32 +97,8 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
           expected_version: opts.wpDetail.value.file_version,
           parsed_data_patch: { user_overrides: opts.userOverrides.serializeOverrides() },
         },
-        { validateStatus: (s: number) => s < 600 },
+        { _silent: true } as any,
       )
-
-      // 版本冲突处理
-      if (data?.detail?.error_code === 'VERSION_CONFLICT' || data?.error_code === 'VERSION_CONFLICT') {
-        const detail = data.detail || data
-        try {
-          await confirmVersionConflict(detail.server_version, detail.expected_version)
-          if (opts.initUniver) await opts.initUniver()
-          return false
-        } catch (action) {
-          if (action === 'cancel') {
-            const retryData = await httpApi.post(
-              P_wp.univerSave(opts.projectId.value, opts.wpId.value),
-              { snapshot },
-            )
-            opts.dirty.value = false
-            opts.autoSave.clearDirty()
-            ElMessage.success(retryData?.message || '已强制覆盖保存')
-            eventBus.emit('workpaper:saved', { projectId: opts.projectId.value, wpId: opts.wpId.value } as WorkpaperSavedPayload)
-            await refreshDetail()
-            return true
-          }
-          return false
-        }
-      }
 
       opts.dirty.value = false
       opts.autoSave.clearDirty()
@@ -158,6 +141,35 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
       await refreshDetail()
       return true
     } catch (err: any) {
+      // 版本冲突（409）：后端把 error_code 放在 message 里，经 http 拦截器 normaliseErrorEnvelope
+      // 回填到 detail。弹冲突对话框，用户可刷新重载或强制覆盖（不带 expected_version 重存当前快照）。
+      const resp = err?.response
+      const vcDetail = resp?.data?.detail ?? resp?.data
+      if (resp?.status === 409 && vcDetail?.error_code === 'VERSION_CONFLICT') {
+        try {
+          await confirmVersionConflict(vcDetail.server_version, vcDetail.expected_version)
+          if (opts.initUniver) await opts.initUniver()
+          return false
+        } catch (action) {
+          if (action !== 'cancel') return false
+          try {
+            const retryData = await httpApi.post(
+              P_wp.univerSave(opts.projectId.value, opts.wpId.value),
+              { snapshot },
+              { _silent: true } as any,
+            )
+            opts.dirty.value = false
+            opts.autoSave.clearDirty()
+            ElMessage.success(retryData?.message || '已强制覆盖保存')
+            eventBus.emit('workpaper:saved', { projectId: opts.projectId.value, wpId: opts.wpId.value } as WorkpaperSavedPayload)
+            await refreshDetail()
+            return true
+          } catch (retryErr: any) {
+            handleApiError(retryErr, '强制覆盖保存')
+            return false
+          }
+        }
+      }
       handleApiError(err, '保存底稿')
       return false
     } finally {

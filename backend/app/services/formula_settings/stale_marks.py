@@ -64,23 +64,16 @@ async def mark_note_stale(
     project_id: uuid.UUID,
     slot_keys: Iterable[str],
 ) -> int:
-    """附注：受影响章节的 ``disclosure_notes.is_stale = true``。只 flush 不 commit。"""
-    from app.models.report_models import DisclosureNote
+    """S4 附注域标记：统一委托 stale_state，保持 outbox 同事务。"""
+    from app.services.stale_state import StaleSource, mark_note_stale as mark_note_stale_state
 
     sections = _sections_from_slots(slot_keys)
-    if not sections:
-        return 0
-    result = await db.execute(
-        sa.update(DisclosureNote)
-        .where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.note_section.in_(sections),
-            DisclosureNote.is_deleted == sa.false(),
-        )
-        .values(is_stale=True)
-        .execution_options(synchronize_session=False)
+    return await mark_note_stale_state(
+        db,
+        project_id,
+        source=StaleSource.FORMULA_SETTINGS,
+        sections=sections,
     )
-    return result.rowcount or 0
 
 
 # ── 合并附注域 ──────────────────────────────────────────────────────────────

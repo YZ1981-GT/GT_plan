@@ -194,7 +194,7 @@ async function logPriorYearViewed() {
         wp_id: props.wpId,
         prior_year_wp_id: priorYearData.value?.wp_id || null,
       },
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
   } catch {
     // 审计日志记录失败不阻断用户操作
   }

@@ -43,7 +43,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -129,31 +128,16 @@ async def mark_sections_stale(
     year: int | None = None,
     source: str = STALE_SOURCE,
 ) -> int:
-    """把指定章节标记为过期。返回受影响行数。
+    """兼容旧调用方，统一委托到 ``stale_state``。"""
+    from app.services.stale_state import mark_note_stale
 
-    只改 `is_stale` / `stale_source`，**不动 table_data**（Property 5：手工覆盖免疫 ——
-    过期标记只是提示，不修改任何业务内容）。
-    """
-    if not sections:
-        return 0
-    params: dict[str, Any] = {
-        "pid": str(project_id),
-        "secs": list(sections),
-        "src": source,
-    }
-    year_clause = ""
-    if year:
-        year_clause = " AND year = :year"
-        params["year"] = year
-    result = await db.execute(
-        sa.text(
-            "UPDATE disclosure_notes SET is_stale = true, stale_source = :src "
-            "WHERE project_id = :pid AND is_deleted = false "
-            "  AND note_section = ANY(:secs)" + year_clause
-        ),
-        params,
+    return await mark_note_stale(
+        db,
+        project_id,
+        source=source,
+        sections=sections,
+        year=year,
     )
-    return int(result.rowcount or 0)
 
 
 async def handle_workpaper_saved_for_disclosure(payload: Any) -> dict[str, Any]:

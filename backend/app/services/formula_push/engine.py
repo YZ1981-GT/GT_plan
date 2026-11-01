@@ -40,7 +40,10 @@ from app.services.formula_push import note_writer
 from app.services.formula_push.note_events import publish_note_sections
 from app.services.formula_push.bindings import get_binding, supported_wp_codes
 from app.services.formula_push.policy import Decision, decide, decide_note, values_equal
-from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value, _jsonable
+from app.services.formula_push.results import CONFLICT, FALLBACK_TO_TOTAL, SKIPPED, PushItem, RunResult, _enum_value
+from app.services.formula_push.state_store import load_states as _load_states
+from app.services.formula_push.state_store import record_failure as _record_failure
+from app.services.formula_push.state_store import save_states as _save_states
 from app.services.formula_push.rules import (
     TRIGGERS,
     BindingSpec,
@@ -218,15 +221,6 @@ async def _read_entries(
         {"wp_id": str(wp_id), "prefix": f"{wp_code}-%"},
     )).all()
     return {r[0]: (r[1], _version_from_timestamp(r[2])) for r in rows}
-
-
-async def _load_states(db, project_id: UUID, year: int) -> dict[str, FormulaPushState]:
-    rows = (await db.execute(
-        sa.select(FormulaPushState).where(
-            FormulaPushState.project_id == project_id, FormulaPushState.year == year,
-        )
-    )).scalars().all()
-    return {r.addr_id: r for r in rows}
 
 
 @dataclass
@@ -835,8 +829,14 @@ async def _push_note(
     note.last_sync_wp_id = paper.id
     note.last_sync_at = ctx.now
     note.last_sync_user_id = ctx.triggered_by
-    note.is_stale = False  # 推送成功 → 清除 stale（与 sync-from-workpaper 同语义）
-    note.stale_source = None
+    from app.services.stale_state import clear_note_stale
+
+    await clear_note_stale(
+        ctx.db,
+        note.project_id,
+        sections=[section],
+        year=note.year,
+    )
     # 「最近一次编辑」：用户点推送记操作人；事件触发的推送没有操作人，不动编辑人（原来直接赋 None，
     # 把上一位编辑人清空；spec disclosure-note-template-word-realignment Task 18）
     if ctx.triggered_by is not None:
@@ -947,33 +947,6 @@ def _record_note(
     ))
 
 
-async def _save_states(ctx: _Ctx, run_id: UUID) -> None:
-    """``(project_id, year, addr_id)`` 唯一的推送状态 upsert。"""
-    for w in ctx.state_writes:
-        row = ctx.states.get(w.addr_id)
-        if row is None:
-            row = FormulaPushState(
-                id=uuid.uuid4(), project_id=ctx.project_id, year=ctx.year, addr_id=w.addr_id,
-                rule_id=w.rule_id, domain=w.domain, state=w.state,
-            )
-            ctx.db.add(row)
-            ctx.states[w.addr_id] = row
-        row.rule_id = w.rule_id
-        row.domain = w.domain
-        row.wp_id = w.wp_id
-        row.note_section = w.note_section
-        row.last_formula_value = _jsonable(w.formula_value)
-        row.current_value = _jsonable(w.current_after)
-        if w.record_pushed:
-            row.last_pushed_value = _jsonable(w.formula_value)
-        row.state = w.state
-        row.last_run_id = run_id
-        row.updated_at = ctx.now
-        if w.forced:
-            row.updated_by = ctx.triggered_by
-    await ctx.db.flush()
-
-
 # ── 提交包装（路由与事件 handler 共用）────────────────────────────────────────
 
 
@@ -1014,23 +987,6 @@ async def notify_committed(result: RunResult) -> None:
     if not result.dry_run and result.run_id is not None:
         _broadcast(result)
         await publish_note_sections(result.project_id, result.year, result.note_sections, result.run_id)
-
-
-async def _record_failure(
-    db, *, project_id: UUID, year: int, trigger: str, triggered_by: UUID | None, error: BaseException,
-) -> None:
-    """失败运行记录（面板可见降级）。"""
-    now = datetime.now(timezone.utc)
-    try:
-        db.add(FormulaPushRun(
-            id=uuid.uuid4(), project_id=project_id, year=year, trigger_source=trigger,
-            triggered_by=triggered_by, status="failed", started_at=now, finished_at=now,
-            detail={"error": f"{type(error).__name__}: {error}"[:2000]},
-        ))
-        await db.commit()
-    except Exception:  # noqa: BLE001 — 记录失败本身不能掩盖原始异常
-        logger.exception("formula_push: 失败运行记录写入失败 project=%s year=%s", project_id, year)
-        await db.rollback()
 
 
 def _broadcast(result: RunResult) -> None:

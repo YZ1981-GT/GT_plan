@@ -639,12 +639,26 @@ class CellRefillRecord:
 
 @dataclass
 class RefillReport:
-    """refill_sections 返回的重算报告"""
+    """refill_sections 返回的重算报告。
+
+    ``sections_recomputed`` 保留旧 API 名称；``recomputed_sections`` 是新契约的
+    语义别名，值不变但完整计算成功的章节也会进入该集合。
+    """
+    requested_sections: list[str] = field(default_factory=list)
     sections_recomputed: list[str] = field(default_factory=list)
+    changed_sections: list[str] = field(default_factory=list)
+    failed_sections: list[str] = field(default_factory=list)
+    cleared_sections: list[str] = field(default_factory=list)
     text_only_sections: list[str] = field(default_factory=list)
     cells_updated: int = 0
     records: list[CellRefillRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    error_details: list[dict[str, str]] = field(default_factory=list)
+
+    @property
+    def recomputed_sections(self) -> list[str]:
+        """新契约名称，兼容旧调用方继续使用 sections_recomputed。"""
+        return self.sections_recomputed
 
 
 class DisclosureEngine:
@@ -2117,6 +2131,10 @@ class DisclosureEngine:
             sa.select(DisclosureNote).where(*where_clauses)
         )
         notes = result.scalars().all()
+        report.requested_sections = list(dict.fromkeys(
+            section_codes if section_codes is not None
+            else [note.note_section for note in notes if note.note_section]
+        ))
 
         for note in notes:
             section = note.note_section or ""
@@ -2173,6 +2191,7 @@ class DisclosureEngine:
             ctx["table_data"] = td
 
             section_had_error = False
+            section_attempted = False
             section_touched = False
             table0_touched = False
 
@@ -2254,13 +2273,32 @@ class DisclosureEngine:
                                 if not getattr(self, '_formula_on', settings.DISCLOSURE_NOTE_FORMULA_ENABLED):
                                     # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
                                     continue
+                                section_attempted = True
                                 new_val = await resolve_formula(cell_binding, ctx)
                                 if new_val is None:
-                                    # 缺数据不覆盖既有值（fail-open）
-                                    continue
+                                    message = f"{section}：公式单元格无法计算"
+                                    report.errors.append(message)
+                                    report.error_details.append({
+                                        "section": section,
+                                        "stage": "formula",
+                                        "message": message,
+                                    })
+                                    section_had_error = True
+                                    break
                             else:
                                 # 调 dispatch_resolver（含 prior_year_note / 数据源）
+                                section_attempted = True
                                 new_val = await dispatch_resolver(cell_binding, ctx)
+                                if new_val is None:
+                                    message = f"{section}：数据解析器未返回结果"
+                                    report.errors.append(message)
+                                    report.error_details.append({
+                                        "section": section,
+                                        "stage": "resolver",
+                                        "message": message,
+                                    })
+                                    section_had_error = True
+                                    break
 
                             old_val = values[col_idx]
 
@@ -2293,6 +2331,9 @@ class DisclosureEngine:
                                 new_value=new_val,
                             ))
 
+                    if section_had_error:
+                        break
+
                     # 重算合计行（逐表）
                     if table_touched:
                         self._backfill_totals(rows, num_value_cols, table_obj)
@@ -2301,13 +2342,25 @@ class DisclosureEngine:
 
                 except Exception as err:
                     section_had_error = True
-                    report.errors.append(f"{section}: {err}")
+                    message = f"{section}: {err}"
+                    report.errors.append(message)
+                    report.error_details.append({
+                        "section": section,
+                        "stage": "table",
+                        "message": str(err),
+                    })
                     logger.warning(
                         "refill_sections: section %s table %s failed: %s",
                         section, table_index, err,
                     )
 
             if section_had_error:
+                if section not in report.failed_sections:
+                    report.failed_sections.append(section)
+                continue
+
+            if not section_attempted:
+                # 没有可计算的自动单元格（纯手工/锁定/无 binding），不能宣称重算成功。
                 continue
 
             if section_touched:
@@ -2329,7 +2382,10 @@ class DisclosureEngine:
                     if nested[0].get("name") is not None:
                         td["name"] = nested[0].get("name") or ""
                 flag_modified(note, "table_data")
-                report.sections_recomputed.append(section)
+                report.changed_sections.append(section)
+
+            # 至少一个自动单元格完成计算即为重算成功；值不变也必须进入该集合。
+            report.sections_recomputed.append(section)
 
         # 5. flush（不 commit）
         await self.db.flush()
