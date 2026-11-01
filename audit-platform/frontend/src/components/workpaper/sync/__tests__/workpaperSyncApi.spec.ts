@@ -896,4 +896,32 @@ describe('entry readiness API', () => {
       'entry_readiness_invalid',
     )
   })
+
+  it('reason.code 不做封闭枚举校验 —— 后端细分新成因时不得被客户端拒掉', async () => {
+    // 🔴 reason 的中文 message/next_action 由**后端单一映射**产出（AC 1.5），前端只负责
+    //    显示。若这里把 code 收成封闭枚举，后端每细分一类成因（Task 2.4 把泛化的
+    //    RUNTIME_REGISTRATION_FAILED 拆成 CONTRACT_DRIFT / PUBLISHED_IDENTITY_DRIFT /
+    //    FROZEN_INSTRUMENTATION_UNUSABLE / ENTRY_SOURCE_FACT_UNAVAILABLE /
+    //    ENTRY_SELECTION_INVALID / DEFINITION_BUNDLE_MISMATCH / DEFINITION_SLOT_INVALID）
+    //    就会在客户端整条被拒，用户反而看不到更精确的原因。
+    for (const code of [
+      'CONTRACT_DRIFT',
+      'PUBLISHED_IDENTITY_DRIFT',
+      'FROZEN_INSTRUMENTATION_UNUSABLE',
+      'ENTRY_SOURCE_FACT_UNAVAILABLE',
+      'ENTRY_SELECTION_INVALID',
+      'DEFINITION_BUNDLE_MISMATCH',
+      'DEFINITION_SLOT_INVALID',
+    ]) {
+      mockGet.mockResolvedValueOnce({
+        data: {
+          ...readinessPayload(),
+          reason: { code, message: `原因 ${code}`, next_action: '按提示处理。' },
+        },
+      })
+      const result = await readEntrySyncReadiness(SCOPE)
+      expect(result.reason?.code).toBe(code)
+      expect(result.reason?.message).toBe(`原因 ${code}`)
+    }
+  })
 })

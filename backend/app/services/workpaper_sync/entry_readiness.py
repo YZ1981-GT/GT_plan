@@ -181,6 +181,35 @@ def _reason(code: str, detail: str | None = None) -> ReadinessReason:
             "当前底稿的双向 adapter 尚未就绪。",
             "请按提示补齐契约、definition bundle 或目标版本绑定。",
         ),
+        "CONTRACT_DRIFT": (
+            "同步契约声明的结构与已发布版本不一致。",
+            "按「模板 → 插桩 → 契约 → bundle → representation」重新发布新 definitions，"
+            "不要按旧坐标继续写格。",
+        ),
+        "PUBLISHED_IDENTITY_DRIFT": (
+            "该版本冻结的受管结构与当前实测不一致。",
+            "先对该底稿重新投影产出新版本，再进入在线编辑。",
+        ),
+        "FROZEN_INSTRUMENTATION_UNUSABLE": (
+            "该版本冻结的插桩信息缺少反读所需的锚点。",
+            "该底稿需重新插桩并发布新版本；请勿按 sheet 展示名猜锚点。",
+        ),
+        "ENTRY_SOURCE_FACT_UNAVAILABLE": (
+            "该入口缺少可观测的挂载点事实，无法推导同步档案。",
+            "先确认该入口在前端有真实挂载，再重新检查。",
+        ),
+        "ENTRY_SELECTION_INVALID": (
+            "该入口的底稿编码匹配域与已冻结声明不一致。",
+            "请修正该 entry 的 wp_code 匹配域，使其覆盖全部底稿编码。",
+        ),
+        "DEFINITION_BUNDLE_MISMATCH": (
+            "目标版本与 adapter 冻结的 definition bundle 不是同一份。",
+            "请把该底稿绑定到与 adapter 一致的 bundle，或重新发布版本。",
+        ),
+        "DEFINITION_SLOT_INVALID": (
+            "definition bundle 的 typed slots 不完整。",
+            "补齐 template / instrumentation / contract 三个 slot 后重新发布 bundle。",
+        ),
         "RUNTIME_REGISTRATION_FAILED": (
             "同步定义校验失败，当前不能进入在线编辑。",
             "请修复契约或发布版本漂移后重试。",
@@ -210,6 +239,51 @@ def _reason(code: str, detail: str | None = None) -> ReadinessReason:
 
 class EntryReadinessNotFound(SyncDomainError):
     error_code = "entry_readiness_not_found"
+
+
+class DefinitionBundleMismatch(SyncDomainError):
+    """目标 representation 与 adapter 冻结的 bundle 不是同一份。
+
+    🔴 与 :class:`EntryReadinessNotFound` 分开：后者是「指针悬空 / 跨 scope」（对外 404），
+    前者是「两边都在、但不是同一份 bundle」（对外 200 + 可操作原因）。原先两种情形共用
+    同一个 error_code，前端只能显示同一句笼统文案（AC 1.5 要求可操作原因）。
+    """
+
+    error_code = "definition_bundle_mismatch"
+
+
+#: registry / domain 的 **typed** 失败 → readiness reason code 的**显式**映射。
+#:
+#: 🔴 为什么必须显式：原实现只按 `not_registered` / `not_ready` 子串二分，其余全部压成
+#:    `RUNTIME_REGISTRATION_FAILED`。而真库实测的失败是五类不同成因（契约结构漂移 /
+#:    已发布身份漂移 / 冻结插桩不可用 / 无挂载点事实 / wp_code 匹配域不一致），压成一句
+#:    「同步定义校验失败」后，用户拿不到下一步动作 —— 这正是 Task 2.4 点名禁止的
+#:    「不得合并成泛化未注册」。
+#:
+#: 维护约束由 `test_readiness_typed_failure_alignment.py` 钉住：registry 侧已知 typed
+#: error_code 全集必须被本表覆盖，新增一类而忘了映射即打红。
+_RUNTIME_FAILURE_REASONS: Mapping[str, str] = {
+    "sync_contract_structure_drift": "CONTRACT_DRIFT",
+    "published_identity_observed_drift": "PUBLISHED_IDENTITY_DRIFT",
+    "published_identity_frozen_child_unusable": "FROZEN_INSTRUMENTATION_UNUSABLE",
+    "entry_source_fact_unavailable": "ENTRY_SOURCE_FACT_UNAVAILABLE",
+    "sync_phase5_e1_selection_invalid": "ENTRY_SELECTION_INVALID",
+    "definition_bundle_mismatch": "DEFINITION_BUNDLE_MISMATCH",
+    "entry_readiness_not_found": "DEFINITION_BUNDLE_MISMATCH",
+}
+
+
+def runtime_failure_reason_code(error_code: str) -> str:
+    """typed error_code → reason code。先查显式表，再按族前缀，最后才兜底。
+
+    兜底保留但**不是**主路径：兜底被命中说明出现了没登记的新失败类型，守卫会打红。
+    """
+    mapped = _RUNTIME_FAILURE_REASONS.get(error_code)
+    if mapped is not None:
+        return mapped
+    if "not_registered" in error_code or "not_ready" in error_code:
+        return "ADAPTER_NOT_READY"
+    return "RUNTIME_REGISTRATION_FAILED"
 
 
 async def _read_representation(
@@ -486,20 +560,16 @@ async def _evaluate_runtime(
         )
         bundle = registration.bundle
         if str(bundle.bundle_id) != str(representation.definition_bundle_id):
-            raise EntryReadinessNotFound(
+            raise DefinitionBundleMismatch(
                 "目标 representation 与 adapter 冻结的 definition bundle 不一致"
             )
         if bundle.bundle_sha256 != representation.definition_bundle_sha256:
-            raise EntryReadinessNotFound(
+            raise DefinitionBundleMismatch(
                 "目标 representation 与 adapter 的 definition bundle digest 不一致"
             )
     except (RegistryError, SyncDomainError) as exc:
         error_code = str(getattr(exc, "error_code", "adapter_not_ready"))
-        reason_code = (
-            "ADAPTER_NOT_READY"
-            if "not_registered" in error_code or "not_ready" in error_code
-            else "RUNTIME_REGISTRATION_FAILED"
-        )
+        reason_code = runtime_failure_reason_code(error_code)
         return EntrySyncReadiness(
             entry_id=requested_entry_id,
             effective_entry_id=effective_entry_id,
@@ -545,7 +615,7 @@ async def _evaluate_runtime(
             can_claim_bidirectional=False,
             runtime=runtime,
             acceptance=acceptance,
-            reason=_reason("RUNTIME_REGISTRATION_FAILED", "definition_slot_invalid"),
+            reason=_reason("DEFINITION_SLOT_INVALID", "definition_slot_invalid"),
         )
     return EntrySyncReadiness(
         entry_id=requested_entry_id,
@@ -563,7 +633,9 @@ async def _evaluate_runtime(
 __all__ = [
     "AcceptanceFacts",
     "AcceptanceReadiness",
+    "DefinitionBundleMismatch",
     "EntryReadinessNotFound",
+    "runtime_failure_reason_code",
     "EntrySyncReadiness",
     "ReadinessReason",
     "RepresentationFacts",

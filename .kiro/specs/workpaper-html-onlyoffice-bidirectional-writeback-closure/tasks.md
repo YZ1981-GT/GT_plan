@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：21/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：23/48（2026-11-01）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 已勾选的 18 项都有「代码 + 点名测试通过记录 + spec evidence」三件齐备；未勾选的在
 > 末尾 §Notes 的「未完成项实况」里逐条写了当前状态与阻塞原因，不以「文件已存在」充数。
@@ -139,8 +139,22 @@
     常量按新增端点显式更新为 15 / `len(_REQUIRED_ENDPOINTS) + 7` / 22（`test_aos_oo_path_isolation.py`）。
   - _AC: 1.4, 12.1_
 
-- [ ] 2.4 对齐 registry supply reason、typed failure 与 readiness 响应
+- [x] 2.4 对齐 registry supply reason、typed failure 与 readiness 响应
   - current representation 缺失、悬空 pointer、bundle/slot 非法、contract drift 和 provider failure 不得合并成泛化“未注册”。
+  - 🔴 **这是真缺陷**：`_evaluate_runtime` 原先只按 `not_registered` / `not_ready` 子串二分，
+    其余全部压成 `RUNTIME_REGISTRATION_FAILED` ——真库实测的五类成因（契约结构漂移 / 已发布
+    身份漂移 / 冻结插桩缺反读锚点 / 无挂载点事实 / wp_code 匹配域不一致）下一步动作完全不同，
+    压成一句「同步定义校验失败」等于没给可操作原因。
+  - 修法：新增显式封闭映射 `_RUNTIME_FAILURE_REASONS` + `runtime_failure_reason_code()`，
+    七个新 reason code 各配中文 message/next_action；新增 `DefinitionBundleMismatch`
+    把「bundle 不是同一份」（200 + 可操作原因）与「指针悬空 / 跨 scope」（404）分开；
+    typed slots 不完整也从泛化码独立为 `DEFINITION_SLOT_INVALID`。
+  - 守卫：`backend/tests/workpaper_sync/test_readiness_typed_failure_alignment.py`（17 例，
+    分母**现读** `evidence/phase4-pending-runtime-readiness.json` 的实测 error_code，不手抄）
+    + 前端 `workpaperSyncApi.spec.ts` 新增「reason.code 不做封闭枚举校验」—— 否则后端细分
+    成因会在客户端整条被拒。
+  - 变异：M0 阴性对照不红；M1 清空显式表 7 红 / M2 两类成因合并 1 红 / M3 指针与 bundle 共用
+    error_code 1 红 / M4 reason 名不在词表 2 红，生产文件按字节恢复。
   - _AC: 1.4, 12.1_
 
 - [x] 2.5 删除 A5-1 生产准入临时 bypass
@@ -179,8 +193,20 @@
   - 删除“`capability=bidirectional` 即 registered”的推导；notice 只消费 readiness，reason code 到中文展示保持单一映射。
   - _AC: 1.4_
 
-- [ ] 3.4 升级 `GtEntrySyncCapabilityNotice.vue`
+- [x] 3.4 升级 `GtEntrySyncCapabilityNotice.vue`
   - 摘要默认可见，blocked/error/loading 分态；tooltip 只放补充信息，键盘、窄屏和中文可读性通过组件测试。
+  - 🔴 **原实现把「可操作原因」只放在 hover 浮层里**：`查看原因` 是 `<span tabindex="0">`
+    （无 role / aria-expanded，读屏只念出一段文字），原因文本仅存在于 el-tooltip ⇒ 触屏与窄屏
+    下实际拿不到，与 AC 1.5 和本任务「tooltip 只放补充信息」都冲突。
+  - 改为：真 `<button type="button">` + `aria-expanded` / `aria-controls`，点击**内联**展开
+    `role="note"` 的原因节点（不再依赖 hover）；摘要常显并带 `title` 兜底、窄屏下截断不撑破
+    工具栏，原因节点允许折行；焦点有可见 `:focus-visible` 轮廓。
+  - `aria-controls` 的 id 由 entry id 派生，**不用** `crypto.randomUUID()` —— 内网 http 不是
+    安全上下文拿不到它，且随机 id 会让 aria 关联在重渲染后失效（守卫逐条断言）。
+  - 守卫：`workpaperEntrySyncNotice.spec.ts` 新增 5 例（按钮语义而非 tabindex span、展开/收起
+    与 aria 同步且指向真实节点、原因是中文且不含 `A_B` 式枚举码且与摘要不同句、摘要 title
+    兜底、id 稳定且不依赖安全上下文 API）。
+  - 回归：`sync/__tests__` 全目录 13 failed / 1180 passed，与同一 HEAD 基线逐节点 added 0。
   - _AC: 1.4, 1.5_
 - [ ] 3.5 把所有生产模式工具栏迁到共享 presentation 门
   - AST + Vue 模板扫描得到完整宿主集合；删除宿主内 capability 分支、静态可用值和第二份原因词表，逐宿主核外层/祖先门控。
@@ -330,12 +356,6 @@
 
 ### 已有部分产物、但判据尚未成立
 
-- **2.4**：registry 侧的 typed failure 已能区分五类（现算：`sync_contract_structure_drift` /
-  `published_identity_observed_drift` / `published_identity_frozen_child_unusable` /
-  `entry_source_fact_unavailable` / `sync_phase5_e1_selection_invalid`），但**尚未逐条核对
-  readiness 响应是否把同一区分度原样透出** ⇒ 不勾。
-- **3.4**：notice 已分 loading / revalidating / blocked / error / acceptance 五态并显示中文原因与重试。
-  任务另要求键盘可达、窄屏与中文可读性的组件测试，**这部分没做** ⇒ 不勾。
 - **3.5 全宿主迁移**：现算 **126** 条宿主仍自行决定模式开关表现（其中 101 条已挂能力披露 notice）。
   本轮只把样板宿主 `GtM7SpecialReserve.vue` 接到单源，并把余量冻结成只许变短的棘轮
   `sync/__tests__/entrySyncModePresentationRatchet.spec.ts`（+ `.baseline.json`）。

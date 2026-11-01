@@ -130,3 +130,80 @@ describe('GtEntrySyncCapabilityNotice — DOM', () => {
     wrapper.unmount()
   })
 })
+
+describe('能力披露的可达性（键盘 / 窄屏 / 中文可读性，tasks 3.4）', () => {
+  const pendingEntry = WORKPAPER_SYNC_MANIFEST.find(
+    (entry) => entry.independentEntry && entry.capability === null,
+  )
+
+  function mountNotice() {
+    expect(pendingEntry, 'manifest 里没有 pending entry ⇒ 判据会在空集上恒真').toBeDefined()
+    return mount(GtEntrySyncCapabilityNotice, {
+      props: { entryId: pendingEntry!.entryId },
+      global: { plugins: [ElementPlus] },
+    })
+  }
+
+  it('原因入口是真按钮语义，不是带 tabindex 的 span', () => {
+    const wrapper = mountNotice()
+    const trigger = wrapper.get('.entry-sync-notice__detail')
+    expect(trigger.element.tagName).toBe('BUTTON')
+    expect(trigger.attributes('type')).toBe('button')
+    // 原实现用 `tabindex="0"` 伪造可聚焦：读屏不知道这是可操作元素
+    expect(trigger.attributes('tabindex')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('点击可展开/收起，aria-expanded 与 aria-controls 同步且指向真实节点', async () => {
+    const wrapper = mountNotice()
+    const trigger = wrapper.get('.entry-sync-notice__detail')
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('.entry-sync-notice__reason').exists()).toBe(false)
+
+    await trigger.trigger('click')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    const reason = wrapper.get('.entry-sync-notice__reason')
+    expect(reason.attributes('id')).toBe(trigger.attributes('aria-controls'))
+    expect(reason.attributes('role')).toBe('note')
+    expect(trigger.text()).toContain('收起')
+
+    await trigger.trigger('click')
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('.entry-sync-notice__reason').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('展开后的原因是中文、不含占位 code，且与摘要不是同一句', async () => {
+    const wrapper = mountNotice()
+    await wrapper.get('.entry-sync-notice__detail').trigger('click')
+    const reason = wrapper.get('.entry-sync-notice__reason').text().trim()
+    const summary = wrapper.get('.entry-sync-notice__summary').text().trim()
+
+    expect(reason.length).toBeGreaterThan(8)
+    expect(/[\u4e00-\u9fa5]/.test(reason), `原因无中文：${reason}`).toBe(true)
+    // 不得把 reason code / 英文枚举直接甩给用户
+    expect(reason).not.toMatch(/[A-Z]{3,}_[A-Z_]{3,}/)
+    expect(reason).not.toBe(summary)
+    wrapper.unmount()
+  })
+
+  it('摘要常显并带 title 兜底（窄屏截断时仍能看到全文）', () => {
+    const wrapper = mountNotice()
+    const summary = wrapper.get('.entry-sync-notice__summary')
+    expect(summary.text().trim().length).toBeGreaterThan(0)
+    expect(summary.attributes('title')).toBe(summary.text().trim())
+    wrapper.unmount()
+  })
+
+  it('原因节点 id 不依赖安全上下文 API（内网 http 下 randomUUID 不可用）', () => {
+    const wrapper = mountNotice()
+    const id = wrapper.get('.entry-sync-notice__detail').attributes('aria-controls')
+    expect(id).toBeTruthy()
+    expect(id).toMatch(/^entry-sync-reason-[\w-]+$/)
+    // 同一 entry 重复挂载必须得到同一个 id（随机 id 会让 aria 关联在重渲染后失效）
+    const again = mountNotice()
+    expect(again.get('.entry-sync-notice__detail').attributes('aria-controls')).toBe(id)
+    wrapper.unmount()
+    again.unmount()
+  })
+})
