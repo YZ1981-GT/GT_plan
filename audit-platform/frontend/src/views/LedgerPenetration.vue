@@ -773,7 +773,12 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ voucherLabel(currentVoucherType, currentVoucher) }}</el-tag>
-        <VoucherLinkTags v-if="!voucherAmbiguity && voucherItems.length" :links="voucherLinks.linksOfKey(voucherItems.find((r: any) => r.voucher_key)?.voucher_key)" />
+        <VoucherLinkTags
+          v-if="!voucherAmbiguity && voucherItems.length"
+          :links="voucherLinks.linksOfKey(currentVoucherEvidenceKey)"
+          :evidence-status="voucherLinks.evidenceStatusOf(currentVoucherEvidenceKey)"
+          @retry="voucherLinks.retryEvidence(currentVoucherEvidenceKey)"
+        />
         <el-button size="small" plain :disabled="!!voucherAmbiguity" @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
         <el-button size="small" type="primary" plain :disabled="!!voucherAmbiguity" @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
         <el-button size="small" type="warning" plain :disabled="!!voucherAmbiguity" @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表（同号多张凭证时先在下方选定一张）">挂凭到底稿</el-button>
@@ -2675,18 +2680,18 @@ function onNavigateToWp(payload: { workpaperId: string; wpCode: string; wpName: 
 const COPY_EXCLUDE_KEYS = ['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra', 'extra_fields']
 
 /** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copySelectedRows(fallbackRow?: any) {
+async function copySelectedRows(fallbackRow?: any) {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
   if (rows.length === 0) return
   const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = lines.join('\n')
-  await copyText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success(`已复制 ${rows.length} 行`)
   })
 }
 
 /** 复制本凭证全部分录到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
-function copyCurrentVoucher() {
+async function copyCurrentVoucher() {
   const rows = voucherItems.value.filter(r => r._type !== 'subtotal' && r._type !== 'view_subtotal')
   if (rows.length === 0) {
     ElMessage.warning('本凭证无分录可复制')
@@ -2694,7 +2699,7 @@ function copyCurrentVoucher() {
   }
   const { header, lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = [header, ...lines].join('\n')
-  await copyText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
   })
 }
@@ -3057,6 +3062,9 @@ const ledgerExtraAllKeys = computed(() =>
 const ledgerExtraColumns = computed(() => visibleExtra(ledgerExtraAllKeys.value))
 
 const voucherItems = ref<any[]>([])
+const currentVoucherEvidenceKey = computed<string | null>(() =>
+  voucherItems.value.find((row: any) => row.voucher_key)?.voucher_key ?? null,
+)
 /** 凭证明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
 const voucherExtraAllKeys = computed(() => buildExtraColumns(voucherItems.value))
 /** 凭证明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */

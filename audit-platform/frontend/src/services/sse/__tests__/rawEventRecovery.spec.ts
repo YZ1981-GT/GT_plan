@@ -49,6 +49,7 @@ describe('raw event 恢复清单', () => {
 
   it('长任务进度有状态轮询兜底，不靠不可重放的 progress 帧决定终态', () => {
     expect(RAW_CONSUMER_RECOVERY['consol.refresh.*']).toBe('status_poll')
+    expect(RAW_CONSUMER_RECOVERY['ai.task.updated']).toBe('status_poll')
     expect(refreshTracking).toContain('refreshStatus(')
     expect(refreshTracking).toContain('pollTimer = setTimeout(poll, 3000)')
   })

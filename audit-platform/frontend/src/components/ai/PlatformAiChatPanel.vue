@@ -144,13 +144,18 @@
           <!-- 引用来源 -->
           <div v-if="msg.citations && msg.citations.length > 0" class="platform-ai-chat-panel__citations">
             <span class="citation-label">📚 引用来源：</span>
-            <span
+            <button
               v-for="(cite, idx) in msg.citations"
               :key="idx"
+              type="button"
               class="citation-tag"
+              :class="{ 'is-clickable': !!cite.jump_route }"
+              :disabled="!cite.jump_route"
+              :title="cite.jump_route ? '打开引用来源' : '该来源暂无可跳转位置'"
+              @click.stop="openCitation(cite)"
             >
               {{ cite.source_name || cite.source_type }}
-            </span>
+            </button>
           </div>
 
           <!-- 采纳按钮 -->
@@ -274,6 +279,12 @@
         :disabled="loading || !hostAvailable"
         @change="onAttachmentChange"
       />
+      <ChatProjectAttachmentPicker
+        ref="projectAttachmentPickerRef"
+        :project-id="hostRequest.host?.projectId"
+        :disabled="loading || !hostAvailable"
+        @change="onProjectAttachmentChange"
+      />
 
       <!-- 状态描述（屏幕阅读器可见） -->
       <span id="chat-input-status" class="gt-sr-only">
@@ -345,6 +356,7 @@
  * Properties: 5, 39
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { WarningFilled, DocumentCopy, Memo, Check, Close, Select } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
@@ -353,6 +365,7 @@ import {
   usePlatformAiChat,
   type AdoptTarget,
   type ChatMessage,
+  type Citation,
 } from '@/composables/usePlatformAiChat'
 import {
   useAiNoteCapture,
@@ -375,6 +388,7 @@ import {
 } from '@/utils/chatContextManifest'
 import ChatAdoptTargetDialog from './ChatAdoptTargetDialog.vue'
 import ChatAttachmentPicker from './ChatAttachmentPicker.vue'
+import ChatProjectAttachmentPicker from './ChatProjectAttachmentPicker.vue'
 import ChatContextInspector from './ChatContextInspector.vue'
 import ChatMentionPicker from './ChatMentionPicker.vue'
 import ChatNoteSaveDialog from './ChatNoteSaveDialog.vue'
@@ -400,6 +414,8 @@ const emit = defineEmits<{
   /** 采纳 AI 内容 */
   adopt: [payload: { content: string; messageId: string }]
 }>()
+
+const router = useRouter()
 
 // ---------------------------------------------------------------------------
 // Composable
@@ -428,7 +444,9 @@ const scopeHint = computed(() => hostScopeHint(props.host))
 const messageListRef = ref<HTMLElement | null>(null)
 const inputAreaRef = ref<HTMLElement | null>(null)
 const attachmentPickerRef = ref<InstanceType<typeof ChatAttachmentPicker> | null>(null)
+const projectAttachmentPickerRef = ref<InstanceType<typeof ChatProjectAttachmentPicker> | null>(null)
 const pendingAttachmentIds = ref<string[]>([])
+const pendingProjectAttachmentIds = ref<string[]>([])
 
 // ---------------------------------------------------------------------------
 // Mention（Task 15 / Req 5.1, 5.4, 5.5 / Properties 12, 13）
@@ -529,6 +547,10 @@ function handleReviewModeChange(enabled: boolean) {
 
 function onAttachmentChange(ids: string[]) {
   pendingAttachmentIds.value = ids
+}
+
+function onProjectAttachmentChange(ids: string[]) {
+  pendingProjectAttachmentIds.value = ids
 }
 
 function handleInputPaste(event: ClipboardEvent) {
@@ -742,6 +764,7 @@ function handleSend() {
   void sendMessage(undefined, {
     mentions: selectedMentions.value.map((m) => ({ type: m.type, id: m.id })),
     attachmentIds: [...pendingAttachmentIds.value],
+    projectAttachmentIds: [...pendingProjectAttachmentIds.value],
     reviewMode: reviewModeEnabled.value,
     sheetName: props.sheetName ?? null,
   })
@@ -749,6 +772,8 @@ function handleSend() {
   selectedMentions.value = []
   mentionPickerOpen.value = false
   mentionPickerEpoch.value += 1
+  pendingProjectAttachmentIds.value = []
+  projectAttachmentPickerRef.value?.clear()
 }
 
 function handleCancel() {
@@ -821,6 +846,13 @@ function onAdoptTargetDone(label: string) {
 // Task 10: 不可信内容统一净化
 // Validates: Requirements 13.1, 13.2
 // ---------------------------------------------------------------------------
+
+function openCitation(citation: Citation): void {
+  const route = citation.jump_route
+  // 只允许站内绝对路径；目标页仍执行自身的项目/对象鉴权。
+  if (!route || !route.startsWith('/') || route.startsWith('//')) return
+  void router.push(route)
+}
 
 function renderMarkdown(text: string): string {
   if (!text) return ''
@@ -954,8 +986,21 @@ function renderMarkdown(text: string): string {
   background: rgba(75, 45, 119, 0.08);
   color: var(--el-color-primary, #4b2d77);
   padding: 2px 6px;
+  border: 0;
   border-radius: 4px;
+  font: inherit;
   font-size: 12px;
+}
+
+.citation-tag.is-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.citation-tag:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 /* 采纳按钮 */

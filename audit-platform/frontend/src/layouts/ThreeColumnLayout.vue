@@ -235,7 +235,7 @@
             </transition>
           </div>
           <!-- 高级查询（弹窗触发，非路由） -->
-          <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
+          <div class="gt-nav-item" @click="openCustomQueryFromSidebar" title="高级查询">
             <el-icon :size="20"><Search /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
@@ -324,11 +324,16 @@
       </section>
 
       <!-- AI 助手面板（dsh） -->
-      <DshPanel v-model="showDshPanel" @message-count="onDshMessageCount" />
+      <DshPanel
+        v-if="dshPanelMounted"
+        v-model="showDshPanel"
+        @message-count="onDshMessageCount"
+      />
     </div>
 
     <!-- 全局公式管理弹窗 -->
     <FormulaManagerDialog
+      v-if="formulaManagerMounted"
       v-model="showFormulaManager"
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
@@ -349,6 +354,7 @@
       :initial-template-id="formulaContext?.templateId"
       :initial-template-action="formulaContext?.templateAction"
       :initial-template-domain="formulaContext?.templateDomain"
+      :open-revision="formulaOpenRevision"
       @session-change="onFormulaSessionChange"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
@@ -363,12 +369,14 @@
 
     <!-- 全局自定义查询弹窗 -->
     <CustomQueryDialog
+      v-if="customQueryMounted"
       v-model="showCustomQuery"
       :project-id="customQueryContext.projectId"
       :year="customQueryYear"
       :initial-tab="customQueryContext.initialTab"
       :initial-source="customQueryContext.initialSource"
       :initial-notice="customQueryContext.initialNotice"
+      :open-revision="customQueryOpenRevision"
     />
 
     <!-- 全局快捷键帮助面板 [R7-S2-12] -->
@@ -377,7 +385,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -394,13 +402,14 @@ import {
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
   Search,
 } from '@element-plus/icons-vue'
-import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendingSyncDialog.vue'
-import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import { resolveDialogOpenContext, type OpenCustomQueryPayload } from '@/components/query/queryEntryContext'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import DshPanel from '@/components/ai/DshPanel.vue'
+import DshPanelLoadError from '@/components/ai/DshPanelLoadError.vue'
+import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
 import {
   legacyPayloadToPartialCommand,
@@ -417,6 +426,15 @@ import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type F
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
+
+// 这些组件只在用户首次打开时下载和挂载；挂载后保留实例，避免关闭再开丢局部状态。
+const CustomQueryDialog = defineAsyncComponent(() => import('@/components/query/CustomQueryDialog.vue'))
+const DshPanel = defineAsyncComponent({
+  loader: () => import('@/components/ai/DshPanel.vue'),
+  errorComponent: DshPanelLoadError,
+  delay: 0,
+  suspensible: false,
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -569,6 +587,7 @@ const sidebarWidth = ref(220)
 const middleWidth = ref(340)
 const middleCollapsed = ref(false)
 const showDshPanel = ref(false)
+const dshPanelMounted = useMountOnFirstOpen(showDshPanel)
 const dshUnreadCount = ref(0)
 
 const dshAssistBridge: DshAssistBridge = {
@@ -596,9 +615,13 @@ const isConsolNotePage = computed(() =>
 )
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const formulaManagerMounted = useMountOnFirstOpen(showFormulaManager)
+const formulaOpenRevision = ref(0)
 const formulaOwnerState = ref<FormulaManagerContextOwnerState>({})
 const formulaContext = computed(() => formulaOwnerState.value.active)
 const showCustomQuery = ref(false)
+const customQueryMounted = useMountOnFirstOpen(showCustomQuery)
+const customQueryOpenRevision = ref(0)
 const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 // 全局弹窗（公式管理 / 一键刷新 / 自定义查询）的年度：路由 → 项目 store；都没有为 null（原先兜底去年）
@@ -983,7 +1006,11 @@ watch(() => [route.params.projectId, route.query.formulaTemplateId, route.query.
 
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
-  formulaOwnerState.value = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
+  const nextOwner = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
+  formulaOwnerState.value = nextOwner
+  // dirty 会话只登记 pending，不驱动活动弹窗重置；其余每次打开都推进代际，
+  // 即使 project/year 相同、只变 scope/章节/nodeKey，也会让真实弹窗重新定位。
+  if (!nextOwner.pending) formulaOpenRevision.value += 1
   sessionStorage.removeItem('gt-formula-target-node')
   // EventBus 只负责适配；dirty 会话由唯一 owner 固定完整上下文，nodeKey 仅为迁移元数据。
   const meta = legacyPayloadToPartialCommand(payload ?? {})
@@ -994,16 +1021,29 @@ function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
 }
 
 function onFormulaSessionChange(session: FormulaManagerSession) {
-  formulaOwnerState.value = receiveFormulaManagerSession(formulaOwnerState.value, session)
+  const pending = formulaOwnerState.value.pending
+  const nextOwner = receiveFormulaManagerSession(formulaOwnerState.value, session)
+  formulaOwnerState.value = nextOwner
+  if (pending && !nextOwner.pending && nextOwner.active === pending) {
+    formulaOpenRevision.value += 1
+  }
 }
 
 watch(showFormulaManager, (open) => {
   if (!open) formulaOwnerState.value = {}
 })
 
+/** 从侧栏打开时也推进代际：弹窗已打开时再次点击仍重新采用当前路由上下文。 */
+function openCustomQueryFromSidebar() {
+  customQueryEvent.value = null
+  customQueryOpenRevision.value += 1
+  showCustomQuery.value = true
+}
+
 /** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发）；项目、年度、页签与预选源经 resolveDialogOpenContext */
 function onOpenCustomQueryEvent(payload?: OpenCustomQueryPayload) {
   customQueryEvent.value = payload ?? null
+  customQueryOpenRevision.value += 1
   showCustomQuery.value = true
 }
 

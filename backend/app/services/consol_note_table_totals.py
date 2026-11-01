@@ -163,11 +163,15 @@ def build_note_rows(
     protected: set[tuple[int, int]],
     existing_rows: Sequence[Any],
     placeholders: Iterable[int] = (),
+    table: dict | None = None,
 ) -> BuiltRows:
     """骨架 + 金额 → 写入用的行。
 
     - ``skeleton[i]`` = (行名, 行类型)；``amounts[i][col]`` = 第 i 行第 col 列金额（col ≥ 1）。判得准的合计 / 小计行不写来源
-      金额，按合计构成用本表已组装的行重算（先小计、后合计）；判不准的合计行与数据行一样写来源金额。
+      金额，按合计构成用本表已组装的行重算（先小计、后合计）；这一列构成全空时用来源同一行之和（各企业合计之和，线性汇总
+      成立；spec note-table-structure-formula-pull-closure R6.5）。判不准的合计行与数据行一样写来源金额。
+    - ``table``：合并模板表（表头）。给了 ⇒ 合计只加金额列（比例 / 说明列不加总），汇总后按 ``note_formula_ratios`` 派生
+      比例 / 损失率（R2.4）；不给保持旧行为（全部列按合计构成算）。
     - ``placeholders``：骨架里的「……」可扩位占位行（模板的意思是「此处按实际列示」）。没有映射来的金额、也没有手填值的
       不写（修复前建的明细模板把它标成固定行，拉数 / 重新汇总原样写出一行「……」）。
     - ``protected`` / ``existing_rows`` 的行号是已保存数据的行号：按行名对到新行（``row_correspondence``），占位行不写、模板
@@ -219,17 +223,49 @@ def build_note_rows(
                     row[col] = formatted
                     filled.append({"row": i, "col": col, "value": formatted, "target_name": name})
         new_rows.append(row)
+    total_cols = _amount_cols(table, width)
     for i in total_order(shaped, plans):
         row = new_rows[i]
-        for col in range(1, width):
+        for col in total_cols:
             if (i, col) in guard:
                 row[col] = saved(i, col)
                 continue
             total = sum_terms(plans[i], lambda r, col=col: to_decimal(new_rows[r][col]))
+            if total is None and col in (new_amounts.get(i) or {}):
+                total = new_amounts[i][col]  # 构成这一列全空：用来源同一行之和（R6.5）
             if total is not None:
                 row[col] = fmt_amount(total)
+    if table is not None:
+        _derive_ratios(table, shaped, new_rows, guard)
     return BuiltRows(new_rows, filled, kept, old_to_new, {i: n for n, i in enumerate(keep)},
                      [skeleton[i][0] for i in sorted(drop)])
+
+
+def _amount_cols(table: dict | None, width: int) -> list[int]:
+    """合计重算的列（行内列号，第 0 列是行名）：给了表头只取金额列，否则全部列（旧行为）。"""
+    if table is None:
+        return list(range(1, width))
+    from app.services.note_formula_tables import amount_columns
+
+    return [c + 1 for c in amount_columns(table) if 0 < c + 1 < width]
+
+
+def _derive_ratios(table: dict, shaped: list[dict], rows: list[list[str]], guard: set[tuple[int, int]]) -> None:
+    """汇总后的比例 / 损失率（与单体预设同一判定）；手工 / 锁定格不动，分子为空、分母为 0 不写。"""
+    from app.services.note_formula_ratios import derive_ratio, ratio_plans, ratio_rows
+
+    plans, _notes = ratio_plans(table, shaped)
+
+    def read(r: int, vcol: int) -> Decimal | None:
+        return to_decimal(rows[r][vcol + 1]) if 0 <= r < len(rows) and vcol + 1 < len(rows[r]) else None
+
+    for plan in plans:
+        col = plan.column + 1
+        for r in ratio_rows(shaped):
+            if (r, col) in guard or col >= len(rows[r]):
+                continue
+            value = derive_ratio(plan, r, read)
+            rows[r][col] = fmt_amount(value) if value is not None else ""
 
 
 def build_table_rows(

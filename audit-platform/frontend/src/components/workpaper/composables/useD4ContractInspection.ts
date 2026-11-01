@@ -45,6 +45,7 @@ export interface ContractInspectionItem {
   // 附件
   attachmentId?: string
   attachmentName?: string
+  evidenceLinkId?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
 }
 
@@ -273,11 +274,12 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
     }
   }
 
-  function setAttachment(id: string, attachmentId: string, attachmentName: string) {
+  function setAttachment(id: string, attachmentId: string, attachmentName: string, evidenceLinkId = '') {
     const item = contracts.value.find(c => c.id === id)
     if (item) {
       item.attachmentId = attachmentId
       item.attachmentName = attachmentName
+      item.evidenceLinkId = evidenceLinkId
       persistContracts()
     }
   }
@@ -328,7 +330,7 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
   })
 
   const completedCount = computed(() =>
-    contracts.value.filter(c => c.conclusion && c.conclusion !== '').length,
+    contracts.value.filter(c => Boolean(c.conclusion)).length,
   )
 
   const summaryConclusion = computed(() => {

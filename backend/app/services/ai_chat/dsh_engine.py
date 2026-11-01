@@ -52,6 +52,7 @@ spec dsh-kb-ocr-local-first-routing 把进程管理拆到 ``dsh_process``、协�
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import tempfile
 import time
@@ -299,6 +300,11 @@ class DshEngine:
         try:
             await self._abort_if_cancelled(cancel, "run 开始前")
 
+            # Native/DSH 共用同一套已授权上下文计划；DSH 不能只收到裸 query。
+            plan = await self._build_context_plan(request)
+            if plan is not None:
+                request = dataclasses.replace(request, context_plan=plan)
+
             # ② SDK discovery 验证
             self._verify_sdk_available()
 
@@ -327,24 +333,35 @@ class DshEngine:
 
                 await self._abort_if_cancelled(cancel, "上下文创建后")
 
-                # ⑥ 发出 context_ready
+                # ⑥ 发出与 Native 同形的完整 Context Manifest 和引用。
+                if plan is not None:
+                    manifest = dict(plan.manifest)
+                    manifest.update({"engine": "dsh", "tools_enabled": True})
+                    outcome.citations = [dict(c) for c in plan.citations]
+                else:
+                    # db=None 仅供协议级测试/独立探针；生产 build_engine 始终传 db。
+                    manifest = {
+                        "manifest_version": "dsh-agent-v1",
+                        "engine": "dsh",
+                        "tools_enabled": True,
+                        "project_tools_enabled": request.host.project_tools_enabled,
+                    }
+                    outcome.citations = []
+                outcome.context_manifest = manifest
                 yield build_event(
                     request,
                     self._events,
                     ChatEventType.context_ready,
-                    payload={
-                        "manifest": {
-                            "manifest_version": "dsh-agent-v1",
-                            "engine": "dsh",
-                            "tools_enabled": True,
-                            "project_tools_enabled": (
-                                request.host.project_tools_enabled
-                                if hasattr(request.host, "project_tools_enabled")
-                                else True
-                            ),
-                        }
-                    },
+                    payload={"manifest": manifest},
                 )
+                if outcome.citations:
+                    yield build_event(
+                        request,
+                        self._events,
+                        ChatEventType.citation,
+                        payload={"citations": outcome.citations},
+                        message_id=request.assistant_message_id,
+                    )
 
                 # ⑦ 启动 DSH root（audit-data MCP 由它的 mcp-client 按 Cordis 配置以 stdio 拉起）
                 await DshProcessManager.spawn_dsh_root(ctx)
@@ -367,6 +384,7 @@ class DshEngine:
                     "model": outcome.model,
                     "deployment": route.deployment,
                     "fallback_used": bool(route.notes),
+                    "attempts": list(route.notes),
                     "tool_calls": ctx.tool_call_count,
                     "elapsed_seconds": ctx.elapsed_seconds,
                     **ctx.token_usage,
@@ -380,6 +398,8 @@ class DshEngine:
                         "usage": dict(outcome.usage),
                         "model": outcome.model,
                         "deployment": route.deployment,
+                        "fallback_used": bool(route.notes),
+                        "attempts": list(route.notes),
                         "latency_ms": outcome.latency_ms,
                         "delta_count": outcome.delta_count,
                         "tool_calls": ctx.tool_call_count,
@@ -427,6 +447,41 @@ class DshEngine:
     # ------------------------------------------------------------------
     # 分步实现
     # ------------------------------------------------------------------
+
+    async def _build_context_plan(self, request: AuthorizedChatRunRequest) -> Any:
+        """在启动 DSH 子进程前构造可信上下文，失败不留进程或会话目录。
+
+        ``db=None`` 是既有协议测试的显式接缝：它只验证 vendor 协议，不执行数据加载。
+        生产 ``build_engine`` 始终传入请求数据库会话。
+        """
+        if self._db is None:
+            return None
+        try:
+            from app.models.core import User
+            from app.services.ai_chat.context_plan import build_context_plan
+
+            principal = request.principal or await self._db.get(
+                User, request.host.principal_id
+            )
+            if principal is None:
+                raise RuntimeError("当前用户记录缺失")
+            return await build_context_plan(
+                self._db,
+                request=dataclasses.replace(request, principal=principal),
+            )
+        except EngineFailure:
+            raise
+        except Exception as exc:
+            logger.error(
+                "run %s DSH ContextPlan 构建失败：%s: %s",
+                request.run_id,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            raise EngineFailure(
+                ChatErrorCode.context_build_failed, f"{type(exc).__name__}: {exc}"
+            ) from exc
 
     async def _select_model(self) -> dsh_model_bridge.DshModelRoute:
         """本 run 的模型（实现在 ``dsh_model_bridge.select_run_candidate``）。"""

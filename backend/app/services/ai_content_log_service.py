@@ -27,7 +27,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,9 +88,9 @@ async def _write_lifecycle_audit(
 async def _load_pending_or_raise(
     db: AsyncSession, log_id: uuid.UUID
 ) -> AiContentLog:
-    """加载指定 log，校验存在 + 当前为 pending。"""
+    """加载并锁定指定 log，校验存在 + 当前为 pending。"""
     result = await db.execute(
-        select(AiContentLog).where(AiContentLog.id == log_id)
+        select(AiContentLog).where(AiContentLog.id == log_id).with_for_update()
     )
     ai_log = result.scalar_one_or_none()
     if ai_log is None:
@@ -98,6 +98,13 @@ async def _load_pending_or_raise(
     if ai_log.confirm_action != "pending":
         raise AiContentLogAlreadyProcessedError("AI 内容已处理过，不可重复确认")
     return ai_log
+
+
+async def load_pending_for_update(
+    db: AsyncSession, log_id: uuid.UUID
+) -> AiContentLog:
+    """DraftArtifact facade 专用：锁定并返回仍待确认的产物。"""
+    return await _load_pending_or_raise(db, log_id)
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +126,17 @@ async def create(
     generated_content: str,
     confidence: Decimal | float | None = None,
     wp_id: uuid.UUID | None = None,
+    generation_id: uuid.UUID | None = None,
+    task_code: str | None = None,
+    source_message_id: uuid.UUID | None = None,
+    prompt_version: str | None = None,
+    context_manifest: dict[str, Any] | None = None,
+    target_locator: dict[str, Any] | None = None,
+    baseline_version: str | None = None,
+    before_hash: str | None = None,
+    before_content: str | None = None,
+    proposed_hash: str | None = None,
+    preview_diff: dict[str, Any] | None = None,
 ) -> AiContentLog:
     """写入 pending 状态的 AI 内容日志。
 
@@ -178,6 +196,20 @@ async def create(
         # 显式设置 generated_at（DB DEFAULT NOW() 仅 PG 生效，
         # 单元测试 SQLite 环境下需应用层提供值；PG 生产环境此值仍由 DB 兜底）
         generated_at=datetime.now(timezone.utc),
+        output_hash=content_hash,
+        generation_id=generation_id,
+        task_code=task_code,
+        source_message_id=source_message_id,
+        prompt_version=prompt_version,
+        context_manifest=context_manifest,
+        target_locator=target_locator,
+        baseline_version=baseline_version,
+        before_hash=before_hash,
+        before_content=before_content,
+        proposed_hash=proposed_hash,
+        preview_diff=preview_diff,
+        artifact_version=0,
+        writeback_status="pending",
     )
     db.add(ai_log)
     await db.flush()

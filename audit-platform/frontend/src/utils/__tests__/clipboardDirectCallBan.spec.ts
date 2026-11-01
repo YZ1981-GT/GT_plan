@@ -49,4 +49,17 @@ describe('navigator.clipboard 禁止裸调', () => {
     }
     expect(violations, `navigator.clipboard 应统一用 clipboard.ts，以下文件违规：\n${violations.join('\n')}`).toEqual([])
   })
+
+  // 反向断言：豁免名单不得变成死条目。
+  // 本守卫原先只查「有没有多出裸调」，不查「该有的还在不在」。他会话的批量替换把
+  // errorHandler.ts 内联 onclick 串里的 navigator.clipboard.writeText( 换成了
+  // await copyText(（内联处理器里既不能 await、也拿不到模块作用域的 copyText ⇒ 运行时必失败），
+  // 守卫照绿、缺陷长期不可见。
+  it('豁免名单无失效条目：每个豁免文件仍确实裸调 navigator.clipboard', () => {
+    const stale: string[] = []
+    for (const rel of EXEMPTED_FILES) {
+      if (!readFileSync(join(SRC, rel), 'utf-8').includes('navigator.clipboard')) stale.push(rel)
+    }
+    expect(stale, `以下文件已不再裸调 navigator.clipboard，应从 EXEMPTED_FILES 移除：\n${stale.join('\n')}`).toEqual([])
+  })
 })

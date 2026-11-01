@@ -22,6 +22,7 @@ import type { WorkpaperDetail } from '@/services/workpaperApi'
 import type { useStaleImpact } from './useStaleImpact'
 import type { useUserOverrides } from './useUserOverrides'
 import type { useWorkpaperAutoSave } from './useWorkpaperAutoSave'
+import { createSaveCoordinator, type SaveAttempt } from './saveCoordinator'
 
 type StaleImpactAPI = ReturnType<typeof useStaleImpact>
 type UserOverridesAPI = ReturnType<typeof useUserOverrides>
@@ -62,107 +63,147 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
   const syncLoading = ref(false)
   const prefillLoading = ref(false)
   const exportingPdf = ref(false)
+  const saveCoordinator = createSaveCoordinator<string>()
+  let activeSave: Promise<boolean> | null = null
+  let versionDocumentKey = ''
+  let nextExpectedVersion: number | null = null
+
+  function documentKey(): string {
+    return `${opts.projectId.value}:${opts.wpId.value}`
+  }
+
+  /** Univer 每条写命令都调用，不能依赖 dirty 的 false→true 边沿。 */
+  function markEdited(): number {
+    return saveCoordinator.markEdited(documentKey())
+  }
 
   /** 重取详情交回持有者（🔴 原先直接写只读 computed，写入被丢弃 ⇒ 版本号停在旧值，下次保存误报版本冲突）。 */
   async function refreshDetail(): Promise<void> {
     opts.setWpDetail(await getWorkpaper(opts.projectId.value, opts.wpId.value))
   }
 
-  async function onSave(): Promise<boolean> {
+  function versionConflictOf(data: any): any | null {
+    return [data?.detail, data?.message, data]
+      .find(detail => detail?.error_code === 'VERSION_CONFLICT') ?? null
+  }
+
+  async function saveRevision(
+    attempt: SaveAttempt<string>,
+    saved: { data: any; workbook: any },
+  ): Promise<boolean> {
+    if (attempt.documentKey !== documentKey()) return false
     const api = opts.univerAPI.value
-    if (!api || !opts.wpDetail.value) return false
+    const detail = opts.wpDetail.value
+    if (!api || !detail) return false
+    const workbook = api.getActiveWorkbook()
+    if (!workbook) throw new Error('无法获取工作簿数据')
+    const snapshot = workbook.getSnapshot()
+
+    if (versionDocumentKey !== attempt.documentKey) {
+      versionDocumentKey = attempt.documentKey
+      nextExpectedVersion = null
+    }
+    const expectedVersion = nextExpectedVersion ?? detail.file_version
+    const data = await httpApi.post(
+      P_wp.univerSave(opts.projectId.value, opts.wpId.value),
+      {
+        snapshot,
+        expected_version: expectedVersion,
+        parsed_data_patch: { user_overrides: opts.userOverrides.serializeOverrides() },
+      },
+      { validateStatus: (status: number) => (status >= 200 && status < 300) || status === 409 },
+    )
+
+    const conflict = versionConflictOf(data)
+    if (conflict) {
+      try {
+        await confirmVersionConflict(conflict.server_version, conflict.expected_version)
+        const serverVersion = Number(conflict.server_version)
+        if (Number.isFinite(serverVersion)) nextExpectedVersion = serverVersion
+        if (opts.initUniver) await opts.initUniver()
+      } catch { /* 取消时保留本地修改，不再绕过 CAS 强制覆盖。 */ }
+      return false
+    }
+    if (data?.success === false) return false
+
+    const responseVersion = Number(data?.version)
+    if (Number.isFinite(responseVersion)) nextExpectedVersion = responseVersion
+    else {
+      const prior = Number(expectedVersion)
+      if (Number.isFinite(prior)) nextExpectedVersion = prior + 1
+    }
+    saved.data = data
+    saved.workbook = workbook
+    return true
+  }
+
+  async function notifyStaleImpact(workbook: any): Promise<void> {
+    try {
+      const activeSheet = workbook?.getActiveSheet?.()
+      const sheetName = activeSheet?.getSheetName?.() || activeSheet?.getName?.() || ''
+      const impactResp = await opts.staleImpact.notify({
+        sheet: sheetName,
+        max_depth: 3,
+        project_id: opts.projectId.value,
+        year: opts.year?.value ?? opts.wpDetail.value?.year ?? null,
+      })
+      if (impactResp && (impactResp.total || impactResp.total_affected) > 0) {
+        const total = impactResp.total || impactResp.total_affected
+        ElMessage.info({ message: `已识别 ${total} 个下游影响点（点击右侧"影响范围"查看）`, duration: 4000 })
+        if (opts.showStaleImpactPanel) opts.showStaleImpactPanel.value = true
+      }
+      const unresolved = String(opts.staleImpact.unresolvedReason?.value || '').trim()
+      if (unresolved) {
+        const noticeKey = `${opts.wpDetail.value?.wp_code || opts.wpId.value}|${sheetName}`
+        if (!notifiedUnresolved.has(noticeKey)) {
+          notifiedUnresolved.add(noticeKey)
+          ElMessage.info({ message: `未能分析下游影响：${unresolved}`, duration: 5000 })
+        }
+      }
+    } catch (error) {
+      logger.warn('[stale-impact] notify failed (non-blocking):', error)
+    }
+  }
+
+  async function performSave(): Promise<boolean> {
+    if (!opts.univerAPI.value || !opts.wpDetail.value) return false
+    const key = documentKey()
+    const saved = { data: null as any, workbook: null as any }
     saving.value = true
     try {
-      const workbook = api.getActiveWorkbook()
-      if (!workbook) throw new Error('无法获取工作簿数据')
-      const snapshot = workbook.getSnapshot()
+      // 后处理期间仍允许编辑；若代际又前进，继续串行补存后再做最终清脏与提示。
+      while (true) {
+        const ok = await saveCoordinator.run(key, attempt => saveRevision(attempt, saved))
+        if (!ok) return false
+        await notifyStaleImpact(saved.workbook)
+        await refreshDetail()
+        if (saveCoordinator.isDirty(key)) continue
 
-      // 🔴 保存只走 univerSave（snapshot + 版本冲突检测）。原有的「导出 xlsx 覆盖服务端底稿原文件」
-      //    回写已删除（spec knowledge-base-retrieval-and-authz-closure 收尾，用户裁定删除而非启用）：
-      //    它自 token 迁到 sessionStorage 起恒 401 从未生效；若修好鉴权，每次保存都会用 Univer 的
-      //    有损导出覆盖原模板文件（公式 / 样式 / 数据验证丢失且无法回滚）。后端端点一并删除。
-
-      // 调用完整保存 API（含版本冲突检测）
-      const data = await httpApi.post(
-        P_wp.univerSave(opts.projectId.value, opts.wpId.value),
-        {
-          snapshot,
-          expected_version: opts.wpDetail.value.file_version,
-          parsed_data_patch: { user_overrides: opts.userOverrides.serializeOverrides() },
-        },
-        { validateStatus: (s: number) => s < 600 },
-      )
-
-      // 版本冲突处理
-      if (data?.detail?.error_code === 'VERSION_CONFLICT' || data?.error_code === 'VERSION_CONFLICT') {
-        const detail = data.detail || data
-        try {
-          await confirmVersionConflict(detail.server_version, detail.expected_version)
-          if (opts.initUniver) await opts.initUniver()
-          return false
-        } catch (action) {
-          if (action === 'cancel') {
-            const retryData = await httpApi.post(
-              P_wp.univerSave(opts.projectId.value, opts.wpId.value),
-              { snapshot },
-            )
-            opts.dirty.value = false
-            opts.autoSave.clearDirty()
-            ElMessage.success(retryData?.message || '已强制覆盖保存')
-            eventBus.emit('workpaper:saved', { projectId: opts.projectId.value, wpId: opts.wpId.value } as WorkpaperSavedPayload)
-            await refreshDetail()
-            return true
-          }
-          return false
-        }
+        opts.dirty.value = false
+        opts.autoSave.clearDirty()
+        ElMessage.success(saved.data?.message || '保存成功')
+        eventBus.emit('workpaper:saved', {
+          projectId: opts.projectId.value,
+          wpId: opts.wpId.value,
+        } as WorkpaperSavedPayload)
+        return true
       }
-
-      opts.dirty.value = false
-      opts.autoSave.clearDirty()
-      ElMessage.success(data?.message || '保存成功')
-      eventBus.emit('workpaper:saved', { projectId: opts.projectId.value, wpId: opts.wpId.value } as WorkpaperSavedPayload)
-
-      // Stale impact 通知（非阻塞）
-      try {
-        const activeSheet = workbook.getActiveSheet?.()
-        const sheetName = activeSheet?.getSheetName?.() || activeSheet?.getName?.() || ''
-        const impactResp = await opts.staleImpact.notify({
-          sheet: sheetName,
-          max_depth: 3,
-          project_id: opts.projectId.value,
-          // 年度：项目审计年度 → 底稿详情的年度；都没有时传 null（由 useStaleImpact 跳过，不兜底日历年）
-          // （post-push-residual-defect-closure 6.5.3：原先兜底今年，2025 年度项目在 2026 年保存标的是 2026 的下游；
-          //  acnr-foundation-defect-closure D8 / 需求 10 同一意图）
-          year: opts.year?.value ?? opts.wpDetail.value?.year ?? null,
-        })
-        if (impactResp && (impactResp.total || impactResp.total_affected) > 0) {
-          const total = impactResp.total || impactResp.total_affected
-          ElMessage.info({ message: `已识别 ${total} 个下游影响点（点击右侧"影响范围"查看）`, duration: 4000 })
-          if (opts.showStaleImpactPanel) opts.showStaleImpactPanel.value = true
-        }
-        // 起点地址算不出规范身份：后端没写 stale，照实告诉用户这次没分析下游，
-        // 别让人以为「没有下游」。同一会话同一 (底稿, sheet) 只提示一次，避免反复保存刷屏。
-        // （design §10.2 / RV9.1-02）
-        const unresolved = String(opts.staleImpact.unresolvedReason?.value || '').trim()
-        if (unresolved) {
-          const key = `${opts.wpDetail.value?.wp_code || opts.wpId.value}|${sheetName}`
-          if (!notifiedUnresolved.has(key)) {
-            notifiedUnresolved.add(key)
-            ElMessage.info({ message: `未能分析下游影响：${unresolved}`, duration: 5000 })
-          }
-        }
-      } catch (e) {
-        logger.warn('[stale-impact] notify failed (non-blocking):', e)
-      }
-
-      await refreshDetail()
-      return true
     } catch (err: any) {
       handleApiError(err, '保存底稿')
       return false
     } finally {
       saving.value = false
     }
+  }
+
+  function onSave(): Promise<boolean> {
+    if (activeSave) return activeSave
+    let tracked!: Promise<boolean>
+    tracked = performSave().finally(() => {
+      if (activeSave === tracked) activeSave = null
+    })
+    activeSave = tracked
+    return tracked
   }
 
   async function onSubmitForReview(): Promise<void> {
@@ -297,6 +338,7 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
     syncLoading,
     prefillLoading,
     exportingPdf,
+    markEdited,
     onSave,
     onSubmitForReview,
     onSyncStructure,

@@ -9,6 +9,8 @@
  */
 import { computed, onScopeDispose, reactive, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
+import { onRequestIdentityEpochChange } from '@/services/requestIdentityEpoch'
 import { attachments as P_att } from '@/services/apiPaths'
 
 export interface EvidenceAttachmentBrief {
@@ -32,6 +34,8 @@ export interface WpEvidenceLink {
   check_conclusion: string | null
   /** 凭证键规范串（凭证检查行的原件按凭证身份挂，spec attachment-voucher-evidence-binding）；旧链接为 null */
   voucher_key?: string | null
+  /** 合同身份规范串 JSON [合同号, 对方名称] */
+  contract_key?: string | null
   created_by: string
   created_at: string | null
   attachment: EvidenceAttachmentBrief
@@ -49,22 +53,43 @@ interface Slot {
   loaded: boolean
   loading: boolean
   error: boolean
+  cachedAt: number
+  lastAccessedAt: number
+  controller: AbortController | null
   /** 失效纪元：每次失效 +1，旧纪元的在途结果不回写 */
   epoch: number
   /** 正在使用本仓的组件数（为 0 时失效只标记，不立即重取） */
   users: number
 }
 
+const EVIDENCE_CACHE_TTL_MS = 60_000
+const EVIDENCE_CACHE_MAX_SCOPES = 32
 const slots = reactive(new Map<string, Slot>()) as Map<string, Slot>
 const inflight = new Map<string, { epoch: number; promise: Promise<WpEvidenceLink[]> | null }>()
 
 const keyOf = (projectId: string, wpId: string) => `${projectId}::${wpId}`
 
 function slotOf(key: string): Slot {
-  if (!slots.has(key)) {
-    slots.set(key, { links: [], loaded: false, loading: false, error: false, epoch: 0, users: 0 })
+  let slot = slots.get(key)
+  if (!slot) {
+    if (slots.size >= EVIDENCE_CACHE_MAX_SCOPES) {
+      const victim = [...slots.entries()]
+        .filter(([, value]) => value.users === 0)
+        .sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt)[0]
+      if (victim) {
+        victim[1].controller?.abort()
+        inflight.delete(victim[0])
+        slots.delete(victim[0])
+      }
+    }
+    slot = {
+      links: [], loaded: false, loading: false, error: false,
+      cachedAt: 0, lastAccessedAt: Date.now(), controller: null, epoch: 0, users: 0,
+    }
+    slots.set(key, slot)
   }
-  return slots.get(key) as Slot
+  slot.lastAccessedAt = Date.now()
+  return slot
 }
 
 function normalizeLinks(raw: unknown): WpEvidenceLink[] {
@@ -84,21 +109,29 @@ export function loadWpEvidenceLinks(
   if (!projectId || !wpId) return Promise.resolve([])
   const key = keyOf(projectId, wpId)
   const slot = slotOf(key)
-  if (slot.loaded && !opts.force) return Promise.resolve(slot.links)
+  const fresh = slot.loaded && Date.now() - slot.cachedAt < EVIDENCE_CACHE_TTL_MS
+  if (fresh && !opts.force) return Promise.resolve(slot.links)
+  if (slot.loaded && !fresh) slot.loaded = false
   const running = inflight.get(key)
   if (running?.promise && running.epoch === slot.epoch && !opts.force) return running.promise
   const epoch = slot.epoch
   const entry: { epoch: number; promise: Promise<WpEvidenceLink[]> | null } = { epoch, promise: null }
   inflight.set(key, entry)
+  slot.controller?.abort()
+  const controller = new AbortController()
+  slot.controller = controller
   slot.loading = true
   entry.promise = (async () => {
     try {
-      const res = await http.get(P_att.evidenceLinks(projectId, wpId), { _dedupe: false, _silent: true } as any)
+      const res = await http.get(P_att.evidenceLinks(projectId, wpId), {
+        _dedupe: false, _silent: true, signal: controller.signal,
+      } as any)
       const links = normalizeLinks(res?.data)
       if (slot.epoch === epoch) {
         slot.links = links
         slot.loaded = true
         slot.error = false
+        slot.cachedAt = Date.now()
       }
       return links
     } catch (err) {
@@ -106,6 +139,7 @@ export function loadWpEvidenceLinks(
       throw err
     } finally {
       if (inflight.get(key) === entry) inflight.delete(key)
+      if (slot.controller === controller) slot.controller = null
       if (slot.epoch === epoch) slot.loading = false
     }
   })()
@@ -117,6 +151,8 @@ export function invalidateWpEvidenceLinks(projectId: string, wpId: string): Prom
   if (!projectId || !wpId) return Promise.resolve([])
   const slot = slotOf(keyOf(projectId, wpId))
   slot.epoch += 1
+  slot.controller?.abort()
+  slot.controller = null
   slot.loaded = false
   if (slot.users <= 0) return Promise.resolve([])
   return loadWpEvidenceLinks(projectId, wpId)
@@ -128,8 +164,20 @@ export async function removeWpEvidenceLink(projectId: string, wpId: string, link
   await invalidateWpEvidenceLinks(projectId, wpId).catch(() => [])
 }
 
-/** 测试用：清空全部缓存与在途记录。 */
+/** 清理一个项目的全部 scope，并中止在途请求。 */
+export function clearWpEvidenceLinksForProject(projectId: string): void {
+  for (const [key, slot] of [...slots]) {
+    if (!key.startsWith(`${projectId}::`)) continue
+    slot.epoch += 1
+    slot.controller?.abort()
+    inflight.delete(key)
+    slots.delete(key)
+  }
+}
+
+/** 测试/身份切换用：清空全部缓存与在途记录。 */
 export function resetWpEvidenceLinksForTest(): void {
+  for (const slot of slots.values()) slot.controller?.abort()
   slots.clear()
   inflight.clear()
 }
@@ -198,3 +246,8 @@ export function useWpEvidenceLinks(projectId: MaybeRefOrGetter<string>, wpId: Ma
     reload: () => invalidateWpEvidenceLinks(toValue(projectId), toValue(wpId)),
   }
 }
+
+
+// 模块级缓存必须随项目和登录身份清理，避免跨项目/跨账号复用陈旧授权结果。
+eventBus.on('project:reset', ({ projectId }) => clearWpEvidenceLinksForProject(projectId))
+onRequestIdentityEpochChange(() => resetWpEvidenceLinksForTest())

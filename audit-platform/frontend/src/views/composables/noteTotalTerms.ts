@@ -15,7 +15,7 @@
 import Decimal from 'decimal.js'
 import { noteColumnPaths } from './noteColumnTree'
 
-export type NoteRowKind = 'skip' | 'total' | 'subtotal' | 'marker' | 'sub' | 'minus' | 'plus' | 'data'
+export type NoteRowKind = 'skip' | 'total' | 'subtotal' | 'marker' | 'sub' | 'minus' | 'plus' | 'title' | 'data'
 /** [行号, 符号] */
 export type TotalTerm = [number, number]
 export interface TotalTermsResult {
@@ -28,15 +28,25 @@ const PLACEHOLDER_RE = /^[.…·]+$/
 const MARKER_RE = /^其中[:：]?$/
 const HEADING_RE = /^(?:[一二三四五六七八九十]+、|[（(][一二三四五六七八九十]+[）)])/
 const PLAIN_SUBTOTAL_RE = /^小计[:：]?$/
+/** 冒号结尾的分段标题（「资产：」「组合：」）；以小计 / 合计 / 总计结尾的是合计类行，不是标题（同后端 `_TITLE_RE`） */
+const TITLE_RE = /^.+[:：]$/
+const TOTAL_WORD_RE = /(?:小计|合计|总计)[:：]?$/
+/** 纵向变动表：第一行期初类、合计行期末类（同后端 `_ROLL_OPEN` / `_ROLL_CLOSE`） */
+const ROLL_OPEN = new Set(['期初余额', '期初数', '期初金额', '年初余额', '年初数', '上年年末余额', '上年年末数',
+  '上期期末余额', '本年年初余额', '本期期初余额'])
+const ROLL_CLOSE = new Set(['期末余额', '期末数', '期末金额', '年末余额', '年末数', '本期期末余额', '本年年末余额'])
+const LEAD_ENUM_RE = /^(?:[一二三四五六七八九十]+[、.．]|[（(][一二三四五六七八九十\d]+[）)]|\d+[、.．])/
 const NO_DETAIL = '没有可合计的明细行'
 const SUB_DETAIL = '表里有「其中：…」明细行，分不出明细到哪一行为止'
 const MINUS_PLUS = '减项 / 加项不在小计之后'
 const SEGMENT_HEADING = '合计的范围跨了几个分段标题（「一、」「（二）」），合计范围无法自动判定'
+const NESTED = '分项小计与小计并存（嵌套小计），合计范围无法自动判定'
+export const ROLLFORWARD_REASON = '纵向变动表：期末 = 期初 + 本期增加 − 本期减少，属审核勾稽，不按明细之和自动运算'
 
 /** 标题行库 `ratio_pattern` / `text_pattern`（`backend/data/note_table_header_vocabulary.json`，golden 逐字对照） */
 export const RATIO_PATTERN = '比例|比率|率\\(|率$|%'
 export const TEXT_PATTERN =
-  '性质|原因|方式|程序|^是否|款项是否|依据|理由|日期|期限|备注|说明|到期日|区间|条件|标准|方法|进度|来源|时间|安排|类型|情况$|地$|分类$|^代码$'
+  '性质|原因|方式|程序|^是否|款项是否|依据|理由|日期|期限|备注|说明|到期日|区间|条件|标准|方法|进度|来源|时间|安排|类型|情况$|地$|分类$|^代码$|账龄$'
 const RATIO_RE = new RegExp(RATIO_PATTERN)
 const TEXT_RE = new RegExp(TEXT_PATTERN)
 
@@ -71,7 +81,18 @@ export function rowKind(row: unknown): NoteRowKind {
   if (l.startsWith('其中')) return 'sub'
   if (l.startsWith('减:') || l.startsWith('减：')) return 'minus'
   if (l.startsWith('加:') || l.startsWith('加：')) return 'plus'
+  if (TITLE_RE.test(l) && !TOTAL_WORD_RE.test(l)) return 'title'
   return 'data'
+}
+
+function rollKey(row: unknown): string {
+  return label(row).replace(LEAD_ENUM_RE, '').replace(/[:：]+$/, '')
+}
+
+/** 纵向变动表：第一行（跳过占位 / 标题）是期初类、合计行是期末类（同后端 `_is_rollforward`）。 */
+function isRollforward(rows: readonly unknown[], kinds: NoteRowKind[], total: number): boolean {
+  const first = kinds.findIndex((k) => k !== 'skip' && k !== 'title')
+  return first >= 0 && first !== total && ROLL_OPEN.has(rollKey(rows[first])) && ROLL_CLOSE.has(rollKey(rows[total]))
 }
 
 /** 合计 / 小计行（删行、加行、只读渲染用）。 */
@@ -153,6 +174,63 @@ function segmentHeadTerms(rows: readonly unknown[], kinds: NoteRowKind[], totals
   return { plans, reasons }
 }
 
+/** 分项小计本组参与合计的行：有「其中：X」⇒ 第一个「其中」之前的明细；否则同 `topRows`（同后端 `_named_block_rows`）。 */
+function namedBlockRows(rows: readonly unknown[], kinds: NoteRowKind[], idxs: number[]): [number[] | null, string | null] {
+  const seq = idxs.filter((i) => kinds[i] !== 'skip')
+  if (seq.some((i) => kinds[i] === 'minus' || kinds[i] === 'plus')) return [null, MINUS_PLUS]
+  const subs = seq.filter((i) => kinds[i] === 'sub')
+  let top: number[] | null
+  let why: string | null
+  if (!subs.length) {
+    ;[top, why] = topRows(kinds, idxs)
+  } else {
+    top = seq.filter((i) => i < subs[0] && kinds[i] === 'data')
+    why = top.length ? null : NO_DETAIL
+    if (!top.length) top = null
+  }
+  if (top && top.length) {
+    const issue = headingIssue(rows, kinds, idxs)
+    if (issue) return [null, issue]
+  }
+  return [top, why]
+}
+
+/** 账龄嵌套小计：分项小计都在唯一的「小计」之前 ⇒ 逐组判定；不是这种形态 ⇒ null（同后端 `_nested_terms`）。 */
+function nestedTerms(rows: readonly unknown[], kinds: NoteRowKind[], subs: number[], plain: boolean[],
+  tots: number[]): TotalTermsResult | null {
+  if (plain.filter(Boolean).length !== 1 || !plain[plain.length - 1]) return null
+  const planSub = subs[subs.length - 1]
+  const plans = new Map<number, TotalTerm[]>()
+  const reasons = new Map<number, string>()
+  let prev = -1
+  for (const s of subs.slice(0, -1)) {
+    const [top, why] = namedBlockRows(rows, kinds, range(prev + 1, s))
+    if (top && top.length) plans.set(s, top.map((i): TotalTerm => [i, 1]))
+    else reasons.set(s, why || NO_DETAIL)
+    prev = s
+  }
+  const tail = range(prev + 1, planSub).filter((i) => kinds[i] !== 'skip' && kinds[i] !== 'title')
+  if (tail.some((i) => kinds[i] !== 'data')) {
+    reasons.set(planSub, '小计与上一个分项小计之间有「其中」 / 减项行，合计范围无法自动判定')
+  } else if (subs.slice(0, -1).some((s) => reasons.has(s))) {
+    reasons.set(planSub, '分项小计判不准，小计范围无法自动判定')
+  } else {
+    plans.set(planSub, [...subs.slice(0, -1).map((s): TotalTerm => [s, 1]), ...tail.map((i): TotalTerm => [i, 1])])
+  }
+  if (tots.length) {
+    const t = tots[0]
+    const between = range(planSub + 1, t).filter((i) => kinds[i] !== 'skip')
+    if (reasons.has(planSub)) {
+      reasons.set(t, reasons.get(planSub) as string)
+    } else if (between.some((i) => !['data', 'minus', 'plus'].includes(kinds[i]))) {
+      reasons.set(t, '最后一个小计与合计之间有「其中」行，合计范围无法自动判定')
+    } else {
+      plans.set(t, [[planSub, 1], ...between.map((i): TotalTerm => [i, kinds[i] === 'minus' ? -1 : 1])])
+    }
+  }
+  return { plans, reasons }
+}
+
 /** 合计 / 小计行 → 参与合计的 [行号, 符号]；判不准的合计行 → 原因（不算、不回填）。 */
 export function totalTerms(rows: readonly unknown[]): TotalTermsResult {
   const kinds = rows.map(rowKind)
@@ -160,6 +238,11 @@ export function totalTerms(rows: readonly unknown[]): TotalTermsResult {
   const plans = new Map<number, TotalTerm[]>()
   const reasons = new Map<number, string>()
   if (!totals.length) return { plans, reasons }
+  if (isRollforward(rows, kinds, totals[totals.length - 1])) {
+    const last = totals[totals.length - 1]
+    for (const t of totals) reasons.set(t, t === last ? ROLLFORWARD_REASON : '纵向变动表里的其他合计行，合计范围无法自动判定')
+    return { plans, reasons }
+  }
   const head = segmentHeadTerms(rows, kinds, totals)
   if (head) return head
   if (totals.length === 1) {
@@ -181,7 +264,11 @@ export function totalTerms(rows: readonly unknown[]): TotalTermsResult {
     whole = '表里有多个合计行（或合计行之后还有小计），合计范围无法自动判定'
   } else {
     const plain = subs.map((s) => PLAIN_SUBTOTAL_RE.test(label(rows[s])))
-    if (plain.some(Boolean) && !plain.every(Boolean)) whole = '分项小计与小计并存（嵌套小计），合计范围无法自动判定'
+    if (plain.some(Boolean) && !plain.every(Boolean)) {
+      const nested = nestedTerms(rows, kinds, subs, plain, tots)
+      if (nested) return nested
+      whole = NESTED
+    }
   }
   let groups: Array<[number, number[]]> = []
   let heading = false

@@ -54,22 +54,19 @@
       </el-link>
     </el-alert>
 
-    <!-- 横幅：单位名称 + 年度 + 准则类型 -->
-    <GtPageHeader title="合并报表" @back="$router.push('/consolidation')">
+    <!-- 年度与准则是项目级计算口径：这里只读展示，避免本地切换造成“界面变了、后端没变”。 -->
+    <GtPageHeader title="集团合并工作台" @back="$router.push('/consolidation')">
       <GtInfoBar
-        :show-year="true"
-        :show-template="true"
-        :year-value="projectInfo.year"
-        :template-value="projectInfo.standard"
-        :badges="[{ label: '单位', value: displayPrefs.unitSuffix }]"
-        @year-change="(y: number) => { projectInfo.year = y; onYearChange() }"
-        @template-change="(s: string) => { projectInfo.standard = s as 'soe' | 'listed'; onStandardChange() }"
-      />
+        :badges="[
+          { label: '年度', value: projectInfo.year ? `${projectInfo.year}年` : '未设置' },
+          { label: '模板', value: projectInfo.standard === 'listed' ? '上市版' : '国企版' },
+          { label: '金额单位', value: displayPrefs.unitSuffix },
+        ]"
+      >
+        <el-button link class="gt-consol-settings-link" @click="openProjectSettings">修改项目口径</el-button>
+      </GtInfoBar>
       <template #actions>
-        <GtToolbar
-          :show-formula="true"
-          @formula="onOpenFormula"
-        >
+        <GtToolbar :show-formula="true" @formula="onOpenFormula">
           <template #left>
             <el-tooltip
               content="合并方式按下级企业的与上级关系自动识别：只有子公司为母子合并，只有分公司为总分汇总，两者都有则同时进行"
@@ -79,18 +76,12 @@
                 合并方式：{{ consolModeLabel }}
               </el-tag>
             </el-tooltip>
-            <SharedTemplatePicker
-              config-type="consol_scope"
-              :project-id="projectId"
-              :get-config-data="getConsolScopeConfigData"
-              @applied="onConsolScopeTemplateApplied"
-            />
             <el-tooltip content="选中单元格后点击，查看该数值的汇总明细过程" placement="bottom">
               <el-button size="small" @click="openCellDrillDown">📊 查看</el-button>
             </el-tooltip>
           </template>
           <template #right-extra>
-            <el-button size="small" type="primary" :loading="refreshAllLoading" @click="onRefreshAll">🔄 一键刷新全部</el-button>
+            <el-button size="small" type="primary" :loading="refreshAllLoading" @click="onRefreshAll">🔄 更新合并结果</el-button>
             <span v-if="refreshState.note === 'failed' || refreshState.note === 'skipped'" class="gt-consol-refresh-note-status" data-testid="consol-note-refresh-status">
               附注{{ refreshState.note === 'failed' ? '刷新失败' : '已跳过' }}：{{ refreshState.noteReason }}
             </span>
@@ -98,11 +89,14 @@
               {{ refreshProgress.current }}/{{ refreshProgress.total }} {{ refreshProgress.step }}
             </span>
             <el-button size="small" :loading="reaggregateLoading" @click="onReaggregateNotes">📝 重新汇总附注</el-button>
-            <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
           </template>
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <ConsolReadinessBar ref="consolReadinessBarRef"
+      :project-id="projectId" :year="effectiveConsolYear()"
+      data-testid="consol-readiness-bar" />
 
     <!-- 合并页只保留布局中栏一棵企业树（spec consol-autotree-linkage-closure R7.1，原页内常驻侧栏已删）；
          节点相关的三页（试算 / 报表 / 附注）顶部显示当前节点与口径（R7.3） -->
@@ -116,7 +110,7 @@
         @go-root="groupTree[0] && setCurrentNode(groupTree[0])"
       />
 
-    <el-tabs v-model="activeTab" class="gt-consol-tabs">
+    <el-tabs v-model="activeTab" class="gt-consol-tabs" :before-leave="beforeConsolTabLeave">
       <!-- Tab 0: 合并工作底稿 -->
       <el-tab-pane label="合并工作底稿" name="worksheets">
         <ConsolWorksheetTabs
@@ -126,6 +120,7 @@
           :project-id="projectId"
           :year="consolYear"
           :consol-mode="treeMode"
+          :readonly-reason="workspaceReadonlyReason"
           :is-root-selection="currentConsolEntity.nodeKey === groupTree[0]?.node_key"
         />
       </el-tab-pane>
@@ -245,14 +240,35 @@
                 <el-radio-button value="report">合并报表</el-radio-button>
                 <el-radio-button value="breakdown">差额表</el-radio-button>
               </el-radio-group>
+              <el-radio-group v-if="consolReportView === 'report' && !currentStandalone"
+                :model-value="consolReportMode" size="small" data-testid="consol-report-mode"
+                @change="(v: any) => setConsolReportMode(v)">
+                <el-radio-button value="published" :disabled="!isRootConsolReportNode">正式结果</el-radio-button>
+                <el-radio-button value="preview">实时预览</el-radio-button>
+              </el-radio-group>
+              <el-tag v-if="consolReportView === 'report' && !currentStandalone"
+                :type="consolReportIsPublished ? 'success' : 'warning'" size="small" effect="plain">
+                {{ consolReportIsPublished ? `正式运行 ${consolReportRunId?.slice(0, 8)}` : '未发布预览' }}
+              </el-tag>
+              <span v-if="consolReportIsPublished" class="gt-run-meta"
+                :title="`operation=${consolReportOperationId} · row_digest=${consolReportRowDigest}`">
+                第 {{ consolReportOperationRevision }} 版
+              </span>
               <span v-if="consolReportView === 'report' && !currentStandalone" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ consolReportRows.length }} 行 · {{ currentReportLabel }}</span>
               <span v-else-if="consolReportView === 'breakdown'" style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary)">{{ currentReportLabel }} · 差额表</span>
             </div>
             <div v-if="consolReportView === 'report' && !currentStandalone" class="gt-ctb-toolbar-right">
-              <el-button size="small" type="primary" @click="loadConsolReport(true)" :loading="consolReportLoading">🔄 刷新</el-button>
-              <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
+              <el-button size="small" type="primary" @click="loadConsolReport(true)" :loading="consolReportLoading">🔄 重新读取</el-button>
+              <el-button size="small" :disabled="!consolReportIsPublished" :loading="consolReportExporting"
+                @click="exportConsolReport">📤 导出正式运行</el-button>
             </div>
           </div>
+          <el-alert v-if="consolReportView === 'report' && !currentStandalone && consolReportNotice"
+            :type="consolReportIsPublished ? 'success' : 'warning'" :closable="false" show-icon
+            :title="consolReportNotice" style="margin-bottom:6px" data-testid="consol-report-mode-notice" />
+          <el-alert v-if="consolReportError" type="error" :closable="false" show-icon
+            :title="consolReportError" description="已保留上次成功读取的数据；请稍后重新读取。"
+            style="margin-bottom:6px" data-testid="consol-report-error" />
           <el-alert v-if="consolReportView === 'report' && !currentStandalone && priorBlankBanner" type="info" :closable="false"
             show-icon style="margin-bottom:6px" :title="`${reportColumnLabels.prior}整列留空：${priorBlankBanner.replace(/^合并上期留空：/, '')}`"
             data-testid="consol-prior-blank-banner" />
@@ -390,12 +406,15 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-else-if="!consolReportLoading" description="选择报表类型后点击刷新" />
+          <el-empty v-else-if="!consolReportLoading && !consolReportError" description="当前报表暂无数据" />
         </div>
       </el-tab-pane>
 
       <!-- Tab 6: 合并附注 -->
       <el-tab-pane label="合并附注" name="consol_note">
+        <el-alert v-if="consolNoteTreeError" type="error" :closable="false" show-icon
+          :title="consolNoteTreeError" description="已保留上次成功读取的附注目录。"
+          style="margin-bottom:8px" data-testid="consol-note-tree-error" />
         <!-- 数据节点：显示该企业单体项目的附注（目录 + 表格只读，按单体模板表头，R6）；合并附注组件保持挂载、不改保存目标 -->
         <ConsolEntityStandalonePanel
           v-if="currentStandalone"
@@ -415,44 +434,15 @@
             :current-entity="noteEntity"
             :group-tree="groupTree"
             :consol-note-tree="consolNoteTree"
+            :readonly-reason="workspaceReadonlyReason"
             @revert-standard="consolNoteTemplateType = $event"
+            @restore-note-context="restoreNoteContext"
           />
         </div>
       </el-tab-pane>
     </el-tabs>
     </div><!-- .gt-consol-content -->
 
-
-    <!-- 报表转换规则弹窗 -->
-    <el-dialog v-model="showConsolConversion" title="国企/上市报表转换规则" width="80%" top="4vh" append-to-body destroy-on-close>
-      <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
-        <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ consolReportTemplateType === 'soe' ? '国企版 → 上市版' : '上市版 → 国企版' }}</span>
-        <el-button size="small" @click="loadConsolMappingPreset" :loading="consolMappingLoading">一键加载预设</el-button>
-        <el-button size="small" type="primary" @click="applyConsolConversion" :loading="consolMappingLoading">应用转换</el-button>
-      </div>
-      <el-table :data="consolMappingRules" border size="small" max-height="60vh" style="width:100%"
-        :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }">
-        <el-table-column label="源行次" prop="source_code" width="100" />
-        <el-table-column label="源项目" prop="source_name" min-width="200" show-overflow-tooltip />
-        <el-table-column label="→" width="40" align="center"><template #default><span>→</span></template></el-table-column>
-        <el-table-column label="目标行次" width="100">
-          <template #default="{ row }"><el-input v-model="row.target_code" size="small" /></template>
-        </el-table-column>
-        <el-table-column label="目标项目" min-width="200">
-          <template #default="{ row }"><el-input v-model="row.target_name" size="small" /></template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-
-    <!-- 附注转换弹窗（由顶部栏准则切换驱动） -->
-    <el-dialog v-model="showConsolNoteConversion" title="国企/上市附注模板切换" width="400px" append-to-body>
-      <p style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary);margin-bottom:16px">
-        请使用顶部栏的准则选择器（国企版/上市版）切换模板，附注章节结构会自动更新。
-      </p>
-      <template #footer>
-        <el-button @click="showConsolNoteConversion = false">关闭</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 单元格汇总穿透查看弹窗 -->
     <el-dialog v-model="showCellDrillDown" :title="drillDownTitle" width="80%" top="4vh" append-to-body destroy-on-close>
@@ -619,6 +609,10 @@
       :project-id="projectId"
       @recorded="onScopeConfirmed"
     />
+    <ConsolWorkspaceGuardDialog
+      :state="workspaceGuard.state"
+      @decide="workspaceGuard.decide"
+    />
 
   </div>
 </template>
@@ -626,7 +620,7 @@
 <script setup lang="ts">
 import { copyText } from '@/utils/clipboard'
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { exportMultiSheetData } from '@/composables/useExcelIO'
@@ -634,20 +628,25 @@ import {
   getConsolPushStatus,
   getWorksheetTree,
   pushConsolidation,
+  createConsolArtifact,
+  consolArtifactDownloadUrl,
   type ConsolMode,
   type ConsolPushStatus,
+  type ConsolReportEnvelope,
+  type ConsolReportMode,
   type ConsolTreeDiagnostic,
   type ConsolTreeNode,
   type CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports as reportPaths, consolidation as P_consol } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, consolNoteSections as P_cn, consolidation as P_consol } from '@/services/apiPaths'
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import ConsolReportBreakdownView from '@/components/consolidation/ConsolReportBreakdownView.vue'
+import ConsolReadinessBar from '@/components/consolidation/ConsolReadinessBar.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
 import ConsolElimNodePanel from '@/components/consolidation/ConsolElimNodePanel.vue'
 import ConsolNodeContextBar from '@/components/consolidation/ConsolNodeContextBar.vue'
@@ -669,7 +668,9 @@ import {
   viaLabel,
 } from '@/components/consolidation/composables/consolTreeView'
 import { relationLabel } from '@/utils/groupRelation'
-import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import ConsolWorkspaceGuardDialog from '@/components/consolidation/ConsolWorkspaceGuardDialog.vue'
+import { provideConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
+import { useConsolWorkspaceAccess } from '@/components/consolidation/composables/useConsolWorkspaceAccess'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -726,6 +727,27 @@ const year = computed<number | null>(() => {
   const value = Number(route.query.year)
   return Number.isFinite(value) && value > 0 ? value : null
 })
+const workspaceGuard = provideConsolWorkspaceGuard()
+const workspaceAccess = useConsolWorkspaceAccess(projectId)
+const workspaceReadonlyReason = workspaceAccess.readonlyReason
+
+function openProjectSettings() {
+  router.push(`/projects/${projectId.value}/settings`)
+}
+
+async function beforeConsolTabLeave(next: string | number, current: string | number): Promise<boolean> {
+  if (next === current) return true
+  return workspaceGuard.confirmTransition('切换合并功能前，请处理未保存修改。')
+}
+
+function onConsolBeforeUnload(event: BeforeUnloadEvent) {
+  if (!workspaceGuard.hasDirty.value && !workspaceGuard.hasPendingSave.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onBeforeRouteLeave(() => workspaceGuard.confirmTransition('离开集团合并工作台前，请处理未保存修改。'))
+onBeforeRouteUpdate(() => workspaceGuard.confirmTransition('切换项目或年度前，请处理未保存修改。'))
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
 const consolComments = useCellComments(() => projectId.value, effectiveConsolYear, 'consol_report')
@@ -781,6 +803,7 @@ async function loadConsolPushStatus() {
 
 async function queueConsolPush() {
   if (consolPushQueuing.value) return
+  if (!(await workspaceGuard.confirmTransition('推送合并结果前，请先处理未保存修改。'))) return
   const pushYear = effectiveConsolYear()
   if (pushYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
   consolPushQueuing.value = true
@@ -881,6 +904,7 @@ const refreshProgress = refreshTracking.progress
  */
 async function onRefreshAll() {
   if (refreshAllLoading.value) return
+  if (!(await workspaceGuard.confirmTransition('更新合并结果前，请先处理未保存修改。'))) return
   if (!projectId.value) {
     refreshAllLoading.value = false
     refreshProgress.visible = false
@@ -936,6 +960,7 @@ async function onRefreshAll() {
  */
 async function onReaggregateNotes() {
   if (reaggregateLoading.value) return
+  if (!(await workspaceGuard.confirmTransition('重新汇总附注前，请先处理未保存修改。'))) return
   const context = captureRefreshContext()
   if (!context) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
   reaggregateLoading.value = true
@@ -993,37 +1018,9 @@ const visibleDiagnostics = computed(() => {
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
   clientName: '',
-  // 原先 `year: null` 推断成 null 字面类型：信息栏切年度的赋值与年度显示都是类型错
   year: null as number | null,
   standard: 'soe' as 'soe' | 'listed',
 })
-
-const currentYear = new Date().getFullYear()
-const barYearOptions = computed(() => {
-  const years = []
-  for (let y = currentYear; y >= currentYear - 5; y--) years.push(y)
-  return years
-})
-
-function onYearChange() {
-  // 年度切换后让企业树年度与报表/附注读取口径保持一致。
-  groupTreeLoaded.value = false
-  treeYear.value = projectInfo.year
-  reportCache.clear()
-  noteCache.clear()
-  loadConsolReport(true)
-  loadConsolNoteTree(true)
-  void loadGroupTree()
-}
-
-function onStandardChange() {
-  consolReportTemplateType.value = projectInfo.standard
-  consolNoteTemplateType.value = projectInfo.standard
-  loadConsolReport(true)
-  loadConsolNoteTree(true)
-  // 通知 ConsolCatalog 更新准则
-  eventBus.emit('standard-change', { standard: projectInfo.standard })
-}
 
 function onOpenFormula() {
   // 年度未就绪时公式管理按项目口径打开（不传 null）
@@ -1288,7 +1285,7 @@ function drillDownSummary({ columns, data }: any) {
   return sums
 }
 
-function copyDrillDownTable() {
+async function copyDrillDownTable() {
   const rows = currentDrillDownRows.value
   if (!rows.length) { ElMessage.warning('无数据可复制'); return }
   const isLeaf = drillDownLevel.value === 'leaf'
@@ -1468,23 +1465,9 @@ async function loadGroupTree(): Promise<boolean> {
   return true
 }
 
-function onTreeNodeClick(data: ConsolTreeNode) {
+async function onTreeNodeClick(data: ConsolTreeNode) {
   // 差额户也切为当前节点（右侧显示本级调整与抵销），不再自动弹分录抽屉：用「📝 差额分录」打开（R7.2）
-  setCurrentNode(data)
-}
-
-// ── 合并范围模板保存/引用 ──
-function getConsolScopeConfigData(): Record<string, any> {
-  return {
-    group_tree: groupTree.value,
-    standard: projectInfo.standard,
-  }
-}
-
-function onConsolScopeTemplateApplied(_data: Record<string, any>) {
-  // 企业树只来自后端按三码推导（需求 9.1）：模板里存的旧树不再覆盖当前树，只重新读取一次
-  loadGroupTree()
-  ElMessage.success('合并范围模板已应用（企业树按各项目的企业代码自动生成）')
+  await setCurrentNode(data)
 }
 
 /** 下级合并企业（不是本项目）可以跳到它自己的合并页 */
@@ -1568,6 +1551,17 @@ function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
 const consolReportTemplateType = ref('soe')
 const consolReportType = ref('balance_sheet')
 const consolReportLoading = ref(false)
+const consolReportError = ref('')
+const consolReportMode = ref<ConsolReportMode>('published')
+const consolReportOperationId = ref<string | null>(null)
+const consolReportOperationRevision = ref<number | null>(null)
+const consolReportRunId = ref<string | null>(null)
+const consolReportRowDigest = ref<string | null>(null)
+const consolReportNotice = ref('')
+const consolReportExporting = ref(false)
+const consolReportIsPublished = computed(() => (
+  consolReportMode.value === 'published' && !!consolReportRunId.value
+))
 
 // 当前选中的合并主体（树形节点），每个合并节点有独立的报表和附注
 const ROOT_CONSOL_NODE_KEY = 'root:consol'
@@ -1580,6 +1574,9 @@ function effectiveEntityYear(): number | null {
 const currentEntityNodeKey = computed((): string => {
   return currentConsolEntity.value.nodeKey || groupTree.value[0]?.node_key || ROOT_CONSOL_NODE_KEY
 })
+const isRootConsolReportNode = computed(() => (
+  !!groupTree.value[0]?.node_key && currentEntityNodeKey.value === groupTree.value[0]?.node_key
+))
 
 // ─── 当前节点（spec consol-autotree-linkage-closure R6 / R7）──────────────────────
 // 中栏 / 组织图 / 树形列表 / 试算页 / 差额表切换节点都经 setCurrentNode；页面广播 consol-current-node，中栏同步高亮。
@@ -1603,11 +1600,35 @@ watch([currentConsolEntity, currentStandalone], () => {
   if (!currentStandalone.value) noteEntity.value = { ...currentConsolEntity.value }
 }, { deep: true })
 
-function setCurrentNode(node: ConsolTreeNode, opts: { reload?: boolean; force?: boolean } = {}) {
-  const changed = currentEntityNodeKey.value !== node.node_key
+function restoreNoteContext(context: { projectId: string; year: number; nodeKey: string; variant: string }) {
+  if (context.projectId !== projectId.value || context.year !== effectiveConsolYear()) return
+  consolNoteTemplateType.value = context.variant === 'listed' ? 'listed' : 'soe'
+  const node = findNodeByKey(groupTree.value[0], context.nodeKey)
+  if (!node) return
   selectedNode.value = node
   currentConsolEntity.value = currentConsolEntityForNode(node)
-  if (opts.reload !== false && (changed || opts.force)) reloadCurrentNodeContent()
+  noteEntity.value = { ...currentConsolEntity.value }
+  broadcastCurrentNode()
+}
+
+async function setCurrentNode(node: ConsolTreeNode, opts: { reload?: boolean; force?: boolean } = {}): Promise<boolean> {
+  const changed = currentEntityNodeKey.value !== node.node_key
+  if (!changed && !opts.force) return true
+  return workspaceGuard.runTransition(
+    `切换到“${nodeLabel(node)}”前，请处理未保存修改。`,
+    async () => {
+      selectedNode.value = node
+      currentConsolEntity.value = currentConsolEntityForNode(node)
+      if (node.node_key !== groupTree.value[0]?.node_key && consolReportMode.value === 'published') {
+        consolReportMode.value = 'preview'
+        consolReportOperationId.value = null
+        consolReportOperationRevision.value = null
+        consolReportRunId.value = null
+        consolReportRowDigest.value = null
+      }
+      if (opts.reload !== false && (changed || opts.force)) await reloadCurrentNodeContent()
+    },
+  )
 }
 
 /** 当前节点变化后重读本页；试算页与差额表监听 selectedNodeKey 自行重读，这里不重复发请求 */
@@ -1626,7 +1647,7 @@ async function reloadCurrentNodeContent() {
 /** 试算页 / 差额表自己切换了节点（已按新节点重读）⇒ 回写当前节点，中栏同步高亮（R7.1 / R10.2） */
 function onChildNodeChange(key: string) {
   const node = findNodeByKey(groupTree.value[0], key)
-  if (node) setCurrentNode(node, { reload: false })
+  if (node) void setCurrentNode(node, { reload: false })
 }
 
 function broadcastCurrentNode() {
@@ -1670,6 +1691,7 @@ async function reloadNoteForRefresh(context: RefreshContext): Promise<any> {
     year: context.year,
     nodeKey: context.nodeKey,
     sectionId: context.sectionId,
+    variant: consolNoteTemplateType.value,
   })
 }
 
@@ -1690,7 +1712,23 @@ const consolReportRows = ref<any[]>([])
 const consolReportView = ref<'report' | 'breakdown'>('report')
 const consolBreakdownViewRef = ref<InstanceType<typeof ConsolReportBreakdownView> | null>(null)
 
-/** 切报表类型：合并报表视图读已生成的报表；差额表视图由组件监听报表类型自行重读 */
+/** 正式结果只支持根节点；实时预览不产生可导出 run。 */
+function setConsolReportMode(mode: ConsolReportMode) {
+  if (mode === 'published' && !isRootConsolReportNode.value) {
+    ElMessage.info('非根节点属于分析视图，只能查看实时预览')
+    return
+  }
+  if (consolReportMode.value === mode) return
+  consolReportMode.value = mode
+  consolReportOperationId.value = null
+  consolReportOperationRevision.value = null
+  consolReportRunId.value = null
+  consolReportRowDigest.value = null
+  consolReportNotice.value = ''
+  loadConsolReport(true)
+}
+
+/** 切报表类型：合并报表视图读正式 run 或显式实时预览；差额表视图由组件监听报表类型自行重读 */
 function selectConsolReportType(key: string) {
   consolReportType.value = key
   if (consolReportView.value === 'report') loadConsolReport()
@@ -1722,10 +1760,6 @@ function reportAccountChip(row: any): string | null {
   return consolReportAddr.accountIndexRef(consolReportAddr.accountForRow(row))
 }
 
-const showConsolConversion = ref(false)
-const consolMappingLoading = ref(false)
-const consolMappingRules = ref<any[]>([])
-
 const consolIsConsolidated = computed(() => true)
 const {
   eqColumns,
@@ -1733,7 +1767,7 @@ const {
   equitySpanMethod,
   eqRowClassName,
   eqCellVal,
-} = useReportColumns({ isConsolidated: consolIsConsolidated })
+} = useReportColumns({ isConsolidated: consolIsConsolidated, activeTab, rows: consolReportRows })
 
 // ─── 前端缓存：按项目/年度/节点身份/报表类型缓存，刷新时精确清理 ──────────
 // 纯逻辑已提取到 consolCacheKeys.ts（可测试）；这里仅组装当前 reactive 参数。
@@ -1745,7 +1779,11 @@ function cacheScopeKey(nodeKey = currentEntityNodeKey.value): string {
 }
 
 function reportCacheKey(): string {
-  return _reportCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey.value, consolReportType.value, consolReportTemplateType.value)
+  const base = _reportCacheKey(
+    projectId.value, effectiveEntityYear(), currentEntityNodeKey.value,
+    consolReportType.value, consolReportTemplateType.value,
+  )
+  return `${base}|${consolReportMode.value}|${consolReportRunId.value || 'latest'}`
 }
 function noteCacheKey(): string {
   return _noteCacheKey(projectId.value, effectiveEntityYear(), currentEntityNodeKey.value, consolNoteTemplateType.value)
@@ -1905,8 +1943,16 @@ async function loadConsolReport(forceRefresh = false) {
   // 年度未就绪不发请求（R7.4）；数据节点显示单体项目报表面板，不取合并口径（R6）
   const reportYear = effectiveEntityYear()
   if (!reportYear || currentStandalone.value) return
+  const requestedMode: ConsolReportMode = isRootConsolReportNode.value ? consolReportMode.value : 'preview'
+  if (consolReportMode.value !== requestedMode) consolReportMode.value = requestedMode
+  if (forceRefresh && requestedMode === 'published') {
+    consolReportOperationId.value = null
+    consolReportOperationRevision.value = null
+    consolReportRunId.value = null
+    consolReportRowDigest.value = null
+  }
   const cacheKey = reportCacheKey()
-  // 优先读缓存
+  // 优先读绑定 mode + 精确 run 的缓存
   if (!forceRefresh && reportCache.has(cacheKey)) {
     consolReportRows.value = reportCache.get(cacheKey)!
     return
@@ -1914,99 +1960,80 @@ async function loadConsolReport(forceRefresh = false) {
   // §七 请求上下文保护：快照当前上下文与序号，响应提交前校验（P9）
   const ticket = reportRequestGuard.startRequest()
   consolReportLoading.value = true
+  consolReportError.value = ''
   try {
     const nodeKey = currentEntityNodeKey.value
-    const rows = await api.get(
+    const params: Record<string, string | number> = {
+      report_type: consolReportType.value,
+      node_key: nodeKey,
+      mode: requestedMode,
+    }
+    // 页面已固定到某 run 时继续请求同一 run，避免加载期间新发布导致页面/下载换版。
+    if (requestedMode === 'published' && consolReportRunId.value) {
+      params.report_run_id = consolReportRunId.value
+    }
+    const envelope = await api.get(
       P_consol.reports.list(projectId.value, reportYear),
-      { params: { report_type: consolReportType.value, node_key: nodeKey } },
-    )
+      { params },
+    ) as ConsolReportEnvelope
     // 响应到达：上下文或序号已变则丢弃（切换节点后旧请求先返回的场景）
     if (reportRequestGuard.isStale(ticket)) return
-    const result = Array.isArray(rows) ? rows : []
+    const result = Array.isArray(envelope?.rows) ? envelope.rows : []
     consolReportRows.value = result
-    reportCache.set(cacheKey, result)
+    consolReportOperationId.value = envelope?.operation_id || null
+    consolReportOperationRevision.value = envelope?.operation_revision ?? null
+    consolReportRunId.value = envelope?.report_run_id || null
+    consolReportRowDigest.value = envelope?.row_digest || null
+    consolReportNotice.value = envelope?.notice || ''
+    reportCache.set(reportCacheKey(), result)
     consolComments.loadComments(`report_${consolReportType.value}`)
   } catch (err: any) {
     // 过期请求的错误也丢弃，不清空当前节点数据
     if (reportRequestGuard.isStale(ticket)) return
-    if (err?.response?.status === 404) {
+    const status = err?.response?.status
+    const detail = err?.response?.data?.detail
+    const message = detail?.message || detail || err?.message || '合并报表读取失败'
+    if (status === 404) {
       consolReportRows.value = []
+      reportCache.delete(cacheKey)
+      consolReportError.value = message
     } else {
-      consolReportRows.value = []
+      consolReportError.value = message
+    }
+    if (status === 409 && requestedMode === 'published') {
+      consolReportOperationId.value = null
+      consolReportOperationRevision.value = null
+      consolReportRunId.value = null
+      consolReportRowDigest.value = null
+      consolReportNotice.value = '尚无正式结果，可切换到“实时预览”查看当前计算值'
     }
   }
   finally { consolReportLoading.value = false }
 }
 
-async function loadConsolMappingPreset() {
-  consolMappingLoading.value = true
-  try {
-    const scope = 'consolidated'
-    const data = await api.get(P_rm.preset(projectId.value), {
-      params: { report_type: consolReportType.value, scope },
-      validateStatus: (s: number) => s < 600,
-    })
-    const rules = Array.isArray(data) ? data : (data ?? [])
-    // 转换字段名适配前端表格
-    consolMappingRules.value = rules.map((r: any) => ({
-      source_code: r.soe_row_code ?? r.source_code ?? '',
-      source_name: r.soe_row_name ?? r.source_name ?? '',
-      target_code: r.listed_row_code ?? r.target_code ?? '',
-      target_name: r.listed_row_name ?? r.target_name ?? '',
-    }))
-    if (!consolMappingRules.value.length) {
-      ElMessage.info('当前报表类型暂无预设映射规则')
-    } else {
-      ElMessage.success(`已加载 ${consolMappingRules.value.length} 条预设规则`)
-    }
-  } catch { consolMappingRules.value = [] }
-  finally { consolMappingLoading.value = false }
-}
-
-async function applyConsolConversion() {
-  consolMappingLoading.value = true
-  try {
-    // 切换模板类型
-    const newType = consolReportTemplateType.value === 'soe' ? 'listed' : 'soe'
-    consolReportTemplateType.value = newType
-    projectInfo.standard = newType as 'soe' | 'listed'
-    consolNoteTemplateType.value = newType
-    await loadConsolReport()
-    showConsolConversion.value = false
-    ElMessage.success('已切换为' + (newType === 'soe' ? '国企版' : '上市版'))
-    // 通知其他组件
-    eventBus.emit('standard-change', { standard: newType as 'soe' | 'listed' })
-  } catch (e: any) {
-    handleApiError(e, '切换合并映射')
-  } finally { consolMappingLoading.value = false }
-}
-
 async function exportConsolReport() {
-  const reportType = consolReportType.value
   const exportYear = effectiveEntityYear()
   if (exportYear == null) { ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE); return }
-  const mainReportTypes = ['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement']
+  if (!consolReportIsPublished.value || !consolReportRunId.value) {
+    ElMessage.warning('实时预览不能正式导出，请切换到“正式结果”并完成更新合并结果')
+    return
+  }
+  consolReportExporting.value = true
   try {
-    if (mainReportTypes.includes(reportType)) {
-      await downloadFile(reportPaths.exportAllExcel(projectId.value), {
-        method: 'post',
-        data: {
-          year: exportYear,
-          mode: 'audited',
-          report_types: [reportType],
-          include_prior_year: true,
-        },
-        fileName: `合并报表_${reportType}_${exportYear}.xlsx`,
-      })
+    const artifact = await createConsolArtifact(
+      projectId.value, exportYear, consolReportRunId.value, 'report_excel',
+    )
+    if (artifact.status !== 'ready') {
+      ElMessage.info('正式报表文件正在生成，请稍后重试')
       return
     }
-
-    // 项目级整包导出器目前只接受四张主表；两张特殊表走已有单表 GET 导出。
-    await downloadFile(reportPaths.exportExcel(projectId.value, exportYear, reportType), {
-      fileName: `合并报表_${reportType}_${exportYear}.xlsx`,
+    await downloadFile(consolArtifactDownloadUrl(projectId.value, exportYear, artifact.id), {
+      fileName: artifact.file_name || `合并正式报表_${exportYear}.xlsx`,
     })
   } catch (e) {
-    handleApiError(e, '导出合并报表')
+    handleApiError(e, '导出合并正式报表')
+  } finally {
+    consolReportExporting.value = false
   }
 }
 
@@ -2021,8 +2048,8 @@ function _onConsolReportTemplateApplied(_data: Record<string, any>) {
 // ─── Tab 6: 合并附注 ─────────────────────────────────────────────────────────
 const consolNoteTemplateType = ref('soe')
 const consolNoteLoading = ref(false)
+const consolNoteTreeError = ref('')
 const consolNoteTree = ref<any[]>([])
-const showConsolNoteConversion = ref(false)
 
 // ─── 附注全审（delegated to ConsolNoteTab, kept for TB audit reuse） ─────────
 const noteAuditResults = ref<any[]>([])
@@ -2043,6 +2070,7 @@ async function loadConsolNoteTree(forceRefresh = false) {
     return
   }
   consolNoteLoading.value = true
+  consolNoteTreeError.value = ''
   try {
     const data = await api.get(P_cn.list(consolNoteTemplateType.value), {
       validateStatus: (s: number) => s < 600,
@@ -2066,15 +2094,10 @@ async function loadConsolNoteTree(forceRefresh = false) {
     }))
     consolNoteTree.value = tree
     noteCache.set(cacheKey, tree)
-  } catch { consolNoteTree.value = [] }
+  } catch (err: any) {
+    consolNoteTreeError.value = err?.message || '合并附注目录读取失败'
+  }
   finally { consolNoteLoading.value = false }
-}
-
-function _switchNoteTemplate() {
-  consolNoteTemplateType.value = consolNoteTemplateType.value === 'soe' ? 'listed' : 'soe'
-  loadConsolNoteTree()
-  showConsolNoteConversion.value = false
-  ElMessage.success('已切换为' + (consolNoteTemplateType.value === 'soe' ? '国企版' : '上市版'))
 }
 
 function _getConsolNoteConfigData(): Record<string, any> {
@@ -2094,26 +2117,21 @@ function onNoteNodeClick(data: any) {
 
 
 // 中栏企业树选择节点（含右键「查看报表 / 查看附注」）：一律切为当前节点（差额户不再自动弹抽屉，R7.2）
-function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
+async function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
   if (!data) return
   const node = findNodeByKey(groupTree.value[0], data.nodeKey)
   if (!node) return
   const tab = data.isReport ? 'consol_report' : data.switchTab
+  if (!(await setCurrentNode(node, { reload: !tab || tab === activeTab.value, force: Boolean(data.isReport) }))) return
   if (data.isReport && data.reportType) consolReportType.value = data.reportType
-  if (tab && tab !== activeTab.value) {
-    setCurrentNode(node, { reload: false })
-    activeTab.value = tab // watch(activeTab) 按当前节点加载新页
-    return
-  }
-  setCurrentNode(node, { force: Boolean(data.isReport) })
+  if (tab && tab !== activeTab.value) activeTab.value = tab
 }
 
 /** 中栏右键 / 上下文条「📝 差额分录」：打开差额户的分录面板（并切为当前节点） */
-function onOpenElimPanelEvent(payload: { nodeKey: string }) {
+async function onOpenElimPanelEvent(payload: { nodeKey: string }) {
   const node = findNodeByKey(groupTree.value[0], payload?.nodeKey)
   if (!node || !isElimNode(node)) return
-  setCurrentNode(node)
-  openElimPanel(node)
+  if (await setCurrentNode(node)) openElimPanel(node)
 }
 
 /** 企业树变化（推送完成 / 分录变化 / 范围变化）⇒ 通知中栏重读（版本标签、结构变化提示、诊断） */
@@ -2144,6 +2162,7 @@ function syncTabFromQuery() {
 }
 
 onMounted(async () => {
+  window.addEventListener('beforeunload', onConsolBeforeUnload)
   syncTabFromQuery()
   updateConsolEquityTableHeight()
   window.addEventListener('resize', updateConsolEquityTableHeight)
@@ -2175,6 +2194,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', onConsolBeforeUnload)
+  workspaceGuard.cancelPending()
   window.removeEventListener('resize', updateConsolEquityTableHeight)
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
@@ -2291,6 +2312,14 @@ watch([
 // 同一路由组件切换项目/企业树年度时重绑项目级 raw SSE，并重读权威推送状态
 watch(() => [projectId.value, effectiveConsolYear()] as const, ([pid, y], old) => {
   if (!pid || !y || (old && old[0] === pid && old[1] === y)) return
+  reportCache.clear()
+  consolReportRows.value = []
+  consolReportMode.value = 'published'
+  consolReportOperationId.value = null
+  consolReportOperationRevision.value = null
+  consolReportRunId.value = null
+  consolReportRowDigest.value = null
+  consolReportNotice.value = ''
   bindConsolPushEvents()
   loadConsolPushStatus()
 })
@@ -2333,6 +2362,7 @@ watch(() => route.query.tab, syncTabFromQuery)
   display: inline-block; width: 1px; height: 20px;
   background: var(--gt-color-border, #e5e5ea); margin: 0 4px;
 }
+.gt-run-meta { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); cursor: help; }
 
 .gt-structure-layout { display: flex; gap: 24px; }
 .gt-structure-tree { flex: 1; min-width: 300px; }

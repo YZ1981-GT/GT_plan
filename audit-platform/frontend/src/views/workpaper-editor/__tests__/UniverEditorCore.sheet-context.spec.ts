@@ -45,6 +45,8 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
   const switchTo = vi.fn()
   const initUniver = vi.fn()
   const dispose = vi.fn()
+  const recordEdit = vi.fn()
+  const editorOnSave = vi.fn()
   const sheets = [
     makeSheet('sheet-a', '询证函控制表D0-4b'),
     makeSheet('sheet-b', '附注披露信息（上市公司）D0-8'),
@@ -62,6 +64,7 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
       loadErrorState: ref(null),
       loadErrorMessage: ref(''),
       dirty: ref(false),
+      editRevision: ref(0),
       initUniver,
       dispose,
     } as any)
@@ -69,10 +72,12 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
       saving: ref(false),
       lastSavedAt: ref(null),
       markDirty: vi.fn(),
+      recordEdit,
     } as any)
+    editorOnSave.mockResolvedValue(true)
     vi.mocked(useEditorSave).mockReturnValue({
       saving: ref(false), submitting: ref(false), syncLoading: ref(false),
-      prefillLoading: ref(false), exportingPdf: ref(false),
+      prefillLoading: ref(false), exportingPdf: ref(false), markEdited: vi.fn(),
       onSave: vi.fn().mockResolvedValue(true), onSubmitForReview: vi.fn(),
       onSyncStructure: vi.fn(), onRefreshPrefill: vi.fn(), onDownload: vi.fn(),
       onExportPdf: vi.fn(), onUpload: vi.fn(),
@@ -122,6 +127,18 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
       },
     })
   }
+
+  it('逐命令编辑回调推进 auto-save，且自动保存回调原样返回 false', async () => {
+    mountCore()
+    const univerOptions = vi.mocked(useEditorUniver).mock.calls[0][0] as any
+    univerOptions.onEdited()
+    univerOptions.onEdited()
+    expect(recordEdit).toHaveBeenCalledTimes(2)
+
+    editorOnSave.mockResolvedValueOnce(false)
+    const autoSaveCallback = vi.mocked(useWorkpaperAutoSave).mock.calls[0][0]
+    expect(await autoSaveCallback()).toBe(false)
+  })
 
   it('custom nav 既操作真实 facade，也向 Shell 发同一 engine id', async () => {
     const wrapper = mountCore()

@@ -186,6 +186,7 @@ describe('凭证层并入凭证证据（spec attachment-voucher-evidence-binding
     const merged = tags.linksOfKey(key)
     expect(merged.map((t) => [t.source, t.wp_code, t.count])).toEqual([['manual', 'J1', 1], ['evidence', 'D2-4', 2]])
     expect(voucherLinkText(merged[1])).toBe('D2-4 凭证检查表 · 已取得凭证证据 2 份：回单.pdf、发票.png')
+    expect(merged[1].source === 'evidence' ? merged[1].attachments.map((a) => a.id) : []).toEqual(['a1', 'a2'])
     const calls = post.mock.calls.filter((c) => String(c[0]).endsWith('/voucher-evidence/query'))
     expect(calls.map((c) => c[1])).toEqual([{ year: 2025, keys: [key] }])
   })
@@ -200,16 +201,34 @@ describe('凭证层并入凭证证据（spec attachment-voucher-evidence-binding
     expect(post.mock.calls.every((c) => String(c[0]).endsWith('/voucher-links/query'))).toBe(true)
   })
 
+  it('凭证证据加载失败显示重试，不伪装成尚未挂底稿', async () => {
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [], evidenceStatus: 'error' },
+      global: { stubs: { AttachmentEyeButton: true } },
+    })
+    expect(wrapper.text()).toContain('凭证证据加载失败')
+    expect(wrapper.text()).not.toContain('尚未挂到底稿')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('retry')).toHaveLength(1)
+  })
+
   it('标签：证据条目「D2-4 · 凭证证据 2 份」用蓝色，挂凭橙色、抽凭绿色', () => {
     const ElTag = { props: ['type'], template: '<i class="tag" :data-type="type"><slot /></i>' }
     const ev = { working_paper_id: 'wp-d2', wp_code: 'D2-4', wp_name: '凭证检查表', wp_missing: false as const, source: 'evidence' as const,
-      phase: null, count: 2, legacy: false as const, files: ['回单.pdf', '发票.png'] }
+      phase: null, count: 2, legacy: false as const, files: ['回单.pdf', '发票.png'], attachments: [
+        { id: 'a1', file_name: '回单.pdf', file_type: 'pdf', ocr_status: null, evidence_type: 'voucher' },
+        { id: 'a2', file_name: '发票.png', file_type: 'png', ocr_status: null, evidence_type: 'voucher' },
+      ] }
     const wrapper = mount(VoucherLinkTags, {
       props: { links: [link(), link({ source: 'sampling_engine', wp_code: 'E1' }), ev] },
-      global: { stubs: { 'el-tag': ElTag } },
+      global: { stubs: {
+        'el-tag': ElTag,
+        AttachmentEyeButton: { props: ['attachmentId'], template: '<button class="eye" :data-id="attachmentId" />' },
+      } },
     })
     expect(wrapper.findAll('.tag').map((t) => [t.text(), t.attributes('data-type')])).toEqual([
       ['J1 · 挂凭 · 年审', 'warning'], ['E1 · 抽凭 · 年审', 'success'], ['D2-4 · 凭证证据 2 份', 'primary'],
     ])
+    expect(wrapper.findAll('.eye').map((eye) => eye.attributes('data-id'))).toEqual(['a1', 'a2'])
   })
 })

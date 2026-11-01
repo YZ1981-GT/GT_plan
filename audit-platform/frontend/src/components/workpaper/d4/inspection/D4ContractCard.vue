@@ -7,28 +7,51 @@
  */
 import { computed } from 'vue'
 import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
+import { contractKeyString } from '@/components/attachment/workpaperEvidence'
+import {
+  useContractEvidenceIndex,
+  type ContractEvidenceAttachment,
+  type ContractEvidenceEntry,
+} from '@/composables/useContractEvidenceIndex'
 import { FIELD_GROUPS, type ContractInspectionItem } from '../../composables/useD4ContractInspection'
 
 const props = defineProps<{
   item: ContractInspectionItem
   isReadonly: boolean
   ocrLoading: boolean
+  projectId: string
+  wpId: string
+  evidenceBusy?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'update', field: keyof ContractInspectionItem, value: any): void
+  (e: 'update', payload: { field: keyof ContractInspectionItem; value: unknown }): void
   (e: 'upload', file: File): void
   (e: 'remove-attachment'): void
+  (e: 'reuse-evidence', payload: { attachment: ContractEvidenceAttachment; entry: ContractEvidenceEntry }): void
 }>()
 
-function onFieldUpdate(key: string, val: any) {
-  emit('update', key as keyof ContractInspectionItem, val)
+function onFieldUpdate(key: string, val: unknown) {
+  emit('update', { field: key as keyof ContractInspectionItem, value: val })
 }
 
 function handleUpload(file: any): boolean {
   emit('upload', file.raw || file)
   return false
 }
+
+const contractKey = computed(() => contractKeyString(props.item.contractNo, props.item.counterparty))
+const evidenceIndex = useContractEvidenceIndex(
+  () => props.projectId, () => props.wpId, () => contractKey.value,
+)
+const otherEvidence = computed(() => evidenceIndex.entries.value
+  .filter(entry => entry.working_paper_id !== props.wpId)
+  .map(entry => ({
+    ...entry,
+    attachments: entry.attachments.filter(attachment => attachment.id !== props.item.attachmentId),
+  }))
+  .filter(entry => entry.attachments.length > 0))
+const otherEvidenceCount = computed(() => otherEvidence.value.reduce((sum, entry) => sum + entry.attachments.length, 0))
 
 const ocrBadge = computed(() => {
   switch (props.item.ocrStatus) {
@@ -97,6 +120,44 @@ const filledCount = computed(() => {
           <span class="upload-text">{{ ocrLoading ? '正在OCR识别...' : '上传合同附件（PDF/图片），自动OCR提取信息' }}</span>
         </div>
       </el-upload>
+    </div>
+
+    <div v-if="contractKey" class="other-evidence" data-testid="contract-evidence-state">
+      <div v-if="evidenceIndex.loading.value" class="evidence-hint">正在查询其他底稿的同一合同证据…</div>
+      <div v-else-if="evidenceIndex.forbidden?.value" class="evidence-error">
+        无权查看其他底稿的合同证据
+      </div>
+      <div v-else-if="evidenceIndex.error.value" class="evidence-error">
+        合同证据加载失败，不能据此判断为无证据
+        <el-button data-testid="contract-evidence-retry" link type="primary" size="small" @click="evidenceIndex.retry">重试</el-button>
+      </div>
+      <template v-else-if="otherEvidenceCount">
+        <div class="evidence-title">其他底稿已有 {{ otherEvidenceCount }} 份同一合同原件</div>
+        <ul class="evidence-list">
+          <template v-for="entry in otherEvidence" :key="entry.working_paper_id">
+            <li v-for="attachment in entry.attachments" :key="`${entry.working_paper_id}:${attachment.id}`">
+              <span class="evidence-wp">{{ entry.wp_code || '其他底稿' }}</span>
+              <span class="evidence-name" :title="attachment.file_name">{{ attachment.file_name }}</span>
+              <AttachmentEyeButton
+                :attachment-id="attachment.id"
+                :file-name="attachment.file_name"
+                :file-type="attachment.file_type"
+                :ocr-status="attachment.ocr_status"
+              />
+              <el-button
+                v-if="!isReadonly"
+                link
+                type="primary"
+                size="small"
+                :loading="evidenceBusy === attachment.id"
+                data-testid="contract-evidence-reuse"
+                @click="$emit('reuse-evidence', { attachment, entry })"
+              >引用到本底稿</el-button>
+            </li>
+          </template>
+        </ul>
+      </template>
+      <div v-else class="evidence-hint">其他可见底稿暂无这份合同的原件</div>
     </div>
 
     <!-- 填写进度 -->
@@ -287,4 +348,21 @@ const filledCount = computed(() => {
   color: #e6a23c;
   border-bottom-color: #faecd8;
 }
+</style>
+
+<style scoped>
+.other-evidence {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-light, #e4e7ed);
+  border-radius: 8px;
+  background: var(--gt-color-bg, #fafafa);
+}
+.evidence-title { margin-bottom: 6px; font-size: var(--gt-font-size-xs, 12px); font-weight: 600; }
+.evidence-hint { color: var(--gt-color-text-secondary, #606266); font-size: var(--gt-font-size-xs, 12px); }
+.evidence-error { color: var(--el-color-danger); font-size: var(--gt-font-size-xs, 12px); }
+.evidence-list { list-style: none; margin: 0; padding: 0; }
+.evidence-list li { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 4px; }
+.evidence-wp { flex: 0 0 auto; color: var(--gt-color-primary, #7c5cff); }
+.evidence-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

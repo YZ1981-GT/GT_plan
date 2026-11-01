@@ -79,14 +79,14 @@ describe('合批与分段', () => {
 })
 
 describe('缓存与失败', () => {
-  it('失败的键不进缓存，下次再查；年度未知不查', async () => {
+  it('失败的键进入显式错误态、不自动重试风暴；年度未知不查', async () => {
     mockPost.mockRejectedValueOnce(new Error('网络'))
     requestVoucherEvidence(PID, 2025, vk('0001'))
     await flush()
     expect(voucherEvidenceOf(PID, null, vk('0001'))).toEqual([])
     mockPost.mockResolvedValueOnce({ data: { evidence: { [vk('0001')]: [entry('F1', ['b.pdf'])] } } })
-    expect(voucherEvidenceOf(PID, 2025, vk('0001'))).toEqual([]) // 登记重查
-    await flush()
+    expect(voucherEvidenceOf(PID, 2025, vk('0001'))).toEqual([]) // 错误态不自动重试风暴
+    await refreshVoucherEvidence(PID, 2025, [vk('0001')])
     expect(mockPost).toHaveBeenCalledTimes(2)
     expect(voucherEvidenceOf(PID, 2025, vk('0001')).map((e) => e.wp_code)).toEqual(['F1'])
     requestVoucherEvidence(PID, null, vk('0009'))
@@ -126,5 +126,29 @@ describe('useVoucherEvidenceIndex', () => {
     expect(index.entries.value).toEqual([])
     expect(mockPost).toHaveBeenCalledTimes(2)
     scope.stop()
+  })
+})
+
+
+describe('凭证证据缓存生命周期', () => {
+  it('TTL 过期后重新查询；项目 reset 清除旧项目缓存', async () => {
+    const { eventBus } = await import('@/utils/eventBus')
+    let now = 1_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    mockPost.mockResolvedValue({ data: { evidence: {} } })
+    requestVoucherEvidence(PID, 2025, vk('0099'))
+    await flush()
+    requestVoucherEvidence(PID, 2025, vk('0099'))
+    await flush()
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    now += 60_001
+    requestVoucherEvidence(PID, 2025, vk('0099'))
+    await flush()
+    expect(mockPost).toHaveBeenCalledTimes(2)
+    eventBus.emit('project:reset', { reason: 'switch', projectId: PID })
+    requestVoucherEvidence(PID, 2025, vk('0099'))
+    await flush()
+    expect(mockPost).toHaveBeenCalledTimes(3)
+    clock.mockRestore()
   })
 })

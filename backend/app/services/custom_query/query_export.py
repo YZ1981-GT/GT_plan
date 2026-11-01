@@ -350,12 +350,17 @@ async def export_builder_query(
             response = await respond_xlsx(slot, rows(), columns, info_rows=info, file_name=file_name,
                                           sheet_title=table_label, extra_sheets=(extra_sheet,) if extra_sheet else ())
         except SQLAlchemyError as exc:
+            correlation_id = uuid.uuid4().hex
             try:
                 await db.rollback()
             except Exception:  # noqa: BLE001
                 pass
+            logger.exception("query_builder export failed [correlation_id=%s]", correlation_id)
             raise HTTPException(status_code=400, detail={
-                "error_code": "QUERY_EXECUTION_FAILED", "message": f"查询执行失败：{exc}"}) from exc
+                "error_code": "QUERY_EXECUTION_FAILED",
+                "message": "查询执行失败，请检查字段、条件和关联关系",
+                "correlation_id": correlation_id,
+            }) from exc
     except BaseException:
         slot.release()
         raise

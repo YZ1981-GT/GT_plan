@@ -65,8 +65,8 @@ const LINKS = [
     link_created_at: '2026-10-28T01:00:00.996300+00:00' },
 ]
 
-async function openDrawer(readonly = false) {
-  mockGet.mockImplementation(() => axiosLike({ items: LINKS, total: LINKS.length }))
+async function openDrawer(readonly = false, links: any[] = LINKS) {
+  mockGet.mockImplementation(() => axiosLike({ items: links, total: links.length }))
   const w = mount(ConfirmationAttachmentDrawer, {
     props: { visible: false, confirmationId: 'C1', projectId: 'P1', counterpartyName: '甲公司', readonly },
     global: { stubs },
@@ -111,6 +111,38 @@ describe('函证附件抽屉', () => {
     expect(mockHandleApiError).toHaveBeenCalledWith(expect.anything(), '识别比对')
     expect(mockGet.mock.calls.length).toBe(before + 1)
     expect(w.text()).not.toContain('AI辅助·待人工确认') // 失败不出比对面板
+  })
+
+  it('上传只发一个原子 multipart 请求，不再先建附件再挂载', async () => {
+    mockPost.mockImplementation(() => axiosLike({ attachment_id: 'A3', link_id: 'L3' }))
+    const w = await openDrawer()
+    const file = new File(['%PDF'], '发函2.pdf', { type: 'application/pdf' })
+    await (w.vm as any).handleBeforeUpload(file)
+    await flushPromises()
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [url, form, config] = mockPost.mock.calls[0]
+    expect(url).toBe('/api/projects/P1/confirmations/C1/attachments/upload')
+    expect(form).toBeInstanceOf(FormData)
+    expect((form as FormData).get('role')).toBe('outbound')
+    expect(((form as FormData).get('file') as File).name).toBe('发函2.pdf')
+    expect(config).toMatchObject({ _silent: true })
+  })
+
+  it('刷新后从服务端回执恢复比对表单和回填能力', async () => {
+    const links = LINKS.map(row => row.role === 'inbound' ? {
+      ...row,
+      can_apply_reply: true,
+      apply_reply_block_reason: null,
+      ocr_compare: {
+        reply_amount: 100, reply_date: '2025-12-31', reply_entity: '甲公司', confidence: 'high',
+        diff: 0, match_verdict: 'matched', counterparty_mismatch: false,
+        governed: false, requires_human_confirmation: true,
+      },
+      backfill_defaults: { confirmed_amount: 100, reply_date: '2025-12-31', target_status: 'matched' },
+    } : row)
+    const w = await openDrawer(false, links)
+    expect(w.text()).toContain('AI辅助·待人工确认')
+    expect(buttons(w, '确认回填')).toHaveLength(1)
   })
 
   it('只读：没有上传区、解绑、识别比对，仍可预览', async () => {

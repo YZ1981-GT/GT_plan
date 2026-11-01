@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -391,10 +392,17 @@ async def _write_import_audit_log(
 # ---------------------------------------------------------------------------
 
 
+def _open_zip_source(zip_source: bytes | Path) -> ZipReader:
+    """异步 worker 传路径以避免整包驻留内存；旧同步调用仍兼容 bytes。"""
+    if isinstance(zip_source, Path):
+        return ZipReader.from_path(zip_source)
+    return ZipReader.from_bytes(zip_source)
+
+
 async def dry_run(
     db: AsyncSession,
     project_id: str,
-    zip_bytes: bytes,
+    zip_bytes: bytes | Path,
     strategy: ConflictStrategy = "overwrite",
     *,
     preflight: Callable[[str, str | None], Any] | None = None,
@@ -423,7 +431,7 @@ async def dry_run(
 
     # ① ZipReader 解析（manifest + 大小上限校验）
     try:
-        reader = ZipReader.from_bytes(zip_bytes)
+        reader = _open_zip_source(zip_bytes)
     except (ZipSizeLimitExceeded, ZipManifestMissing) as e:
         report.mark("__zip__", "failed", reason=str(e))
         return report
@@ -436,6 +444,7 @@ async def dry_run(
         reader.verify_integrity()
     except ZipIntegrityError as e:
         report.mark("__integrity__", "failed", reason=str(e))
+        reader.close()
         return report
 
     manifest = reader.manifest
@@ -532,7 +541,7 @@ async def dry_run(
 async def run(
     db: AsyncSession,
     project_id: str,
-    zip_bytes: bytes,
+    zip_bytes: bytes | Path,
     strategy: ConflictStrategy = "overwrite",
     user: User | None = None,
     *,
@@ -564,7 +573,7 @@ async def run(
 
     # ① ZipReader 解析
     try:
-        reader = ZipReader.from_bytes(zip_bytes)
+        reader = _open_zip_source(zip_bytes)
     except (ZipSizeLimitExceeded, ZipManifestMissing) as e:
         report.mark("__zip__", "failed", reason=str(e))
         return report

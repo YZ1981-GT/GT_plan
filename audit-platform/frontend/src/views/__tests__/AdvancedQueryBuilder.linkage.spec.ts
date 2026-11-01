@@ -85,7 +85,9 @@ async function mountBuilder(props: Record<string, unknown> = {}): Promise<VueWra
   const wrapper = mount(AdvancedQueryBuilder, {
     props: { embedded: true, ...props },
     // 真实 Element Plus（未注册时 el-* 渲染成同名自定义元素：具名插槽丢失、表格列的作用域插槽以 undefined 调用）
-    global: { plugins: [ElementPlus], stubs: { GtIndexChip: true, CustomQueryFieldPicker: true, AcnrTargetResults: true } },
+    global: { plugins: [ElementPlus], stubs: { GtIndexChip: true,
+      CustomQueryFieldPicker: { name: 'CustomQueryFieldPicker', props: ['modelValue', 'projectId'], template: '<div />' },
+      AcnrTargetResults: true } },
   })
   await flushPromises()
   return wrapper as unknown as VueWrapper<any>
@@ -369,5 +371,86 @@ describe('单项目结果：逐行「打开」与「复制引用」（R7.1~R7.3�
     expect(wrapper.vm.rowActionsEnabled).toBe(false)
     expect(wrapper.find('[data-testid="aqb-row-open"]').exists()).toBe(false)
     expect(postsTo('/api/address-registry/validate')).toHaveLength(0)
+  })
+})
+
+
+describe('阶段 0：上下文失效与请求代际', () => {
+  it('ACNR 字段选择器显式接收宿主项目', async () => {
+    const wrapper = await mountBuilder({ projectId: PID, year: 2025 })
+    expect(wrapper.findComponent({ name: 'CustomQueryFieldPicker' }).props('projectId')).toBe(PID)
+  })
+
+  it('预览在途时修改查询会结束 loading，旧预览不能回填 SQL', async () => {
+    let resolvePreview!: (value: unknown) => void
+    apiMocks.post.mockImplementation((url: string) => {
+      if (url === '/api/query/preview') return new Promise((resolve) => { resolvePreview = resolve })
+      return Promise.resolve(url === '/api/address-registry/validate' ? { issues: [] } : tbResult())
+    })
+    const wrapper = await mountBuilder({ projectId: PID, year: 2025 })
+    wrapper.vm.dsl.table = 'trial_balance'
+    const pending = wrapper.vm.doPreview()
+    expect(wrapper.vm.loadingPreview).toBe(true)
+    wrapper.vm.dsl.filters.push({ field: 'standard_account_code', op: 'eq', value: '1001' })
+    expect(wrapper.vm.loadingPreview).toBe(false)
+    resolvePreview({ sql: 'OLD SQL', columns: [] })
+    await pending
+    expect(wrapper.vm.sqlPreview).toBe('')
+  })
+
+  it('后到的旧查询不能覆盖新表结果', async () => {
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    let queryCalls = 0
+    apiMocks.post.mockImplementation((url: string) => {
+      if (url === '/api/address-registry/validate') return Promise.resolve({ issues: [] })
+      if (url !== '/api/query/execute') return Promise.resolve({})
+      queryCalls += 1
+      return new Promise((resolve) => {
+        if (queryCalls === 1) resolveOld = resolve
+        else resolveNew = resolve
+      })
+    })
+    const wrapper = await mountBuilder({ projectId: PID, year: 2025 })
+    wrapper.vm.dsl.table = 'trial_balance'
+    const oldRun = wrapper.vm.doExecute()
+    wrapper.vm.dsl.table = 'tb_ledger'
+    const newRun = wrapper.vm.doExecute()
+    const newer = { rows: [{ voucher_no: '记-2' }], columns: ['voucher_no'], total: 1,
+      table: 'tb_ledger', sql: 'new', scope: { requested_project_id: PID, all_projects: false, project_count: 1 } }
+    resolveNew(newer)
+    await newRun
+    resolveOld(tbResult())
+    await oldRun
+    expect(wrapper.vm.result.table).toBe('tb_ledger')
+    expect(wrapper.vm.result.rows).toEqual(newer.rows)
+    expect(wrapper.vm.sqlPreview).toBe('new')
+  })
+
+  it('翻页复用 COUNT 凭证，修改查询定义立即清空结果', async () => {
+    apiMocks.post.mockImplementation((url: string) => Promise.resolve(
+      url === '/api/address-registry/validate' ? { issues: [] } : tbResult({ total: 250, count_token: 'count-1' }),
+    ))
+    const wrapper = await mountBuilder({ projectId: PID, year: 2025 })
+    wrapper.vm.dsl.table = 'trial_balance'
+    await wrapper.vm.doExecute()
+    wrapper.vm.onPageChange(2)
+    await flushPromises()
+    expect(postsTo('/api/query/execute')[1][1]).toMatchObject({ offset: 100, count_token: 'count-1' })
+    wrapper.vm.dsl.filters.push({ field: 'standard_account_code', op: 'eq', value: '1001' })
+    expect(wrapper.vm.result).toBeNull()
+    expect(wrapper.vm.countToken).toBe('')
+    expect(wrapper.vm.rowActionsEnabled).toBe(false)
+  })
+
+  it('切换单项目与跨项目范围立即清空旧结果', async () => {
+    accessHolder.value = ACCESS.all
+    const wrapper = await mountBuilder({ projectId: PID, year: 2025 })
+    wrapper.vm.dsl.table = 'trial_balance'
+    await wrapper.vm.doExecute()
+    expect(wrapper.vm.result).not.toBeNull()
+    wrapper.vm.crossProject = true
+    expect(wrapper.vm.result).toBeNull()
+    expect(wrapper.vm.lastQuery.projectId).toBeNull()
   })
 })

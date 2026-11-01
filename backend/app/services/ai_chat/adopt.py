@@ -233,6 +233,7 @@ class AuthoritativeMessage:
     text: str
     content_hash: str
     model_used: str | None
+    context_manifest: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -315,6 +316,7 @@ async def load_authoritative_message(
                 AIChatMessage.message_text,
                 AIChatMessage.content_hash,
                 AIChatMessage.model_used,
+                AIChatMessage.context_manifest,
                 AIChatSession.user_id.label("session_user_id"),
                 AIChatSession.project_id.label("session_project_id"),
                 AIChatSession.host_type.label("session_host_type"),
@@ -329,6 +331,7 @@ async def load_authoritative_message(
             .join(AIChatSession, AIChatSession.id == AIChatMessage.session_id)
             .outerjoin(AIChatRun, AIChatRun.id == AIChatMessage.run_id)
             .where(AIChatMessage.id == message_id)
+            .with_for_update()
         )
     ).first()
     if row is None:
@@ -384,6 +387,7 @@ async def load_authoritative_message(
         text=text,
         content_hash=stored_hash,
         model_used=row.model_used,
+        context_manifest=row.context_manifest,
     )
 
 
@@ -640,15 +644,42 @@ async def _write_content_log(
       ① ``ai_content_log_id`` 非空 —— 不能读 ``id``（那是与数据库无关的临时 uuid4）；
       ② 该 ID 在同一事务内**查得到行** —— 防"返回了 ID 但行没落库"。
     """
+    if host.resource_type.value == "note":
+        from app.models.ai_task_job_models import AiTaskItem
+        from app.services.draft_artifact_facade import prepare_note_artifact
+
+        task_item = (await db.execute(
+            sa.select(AiTaskItem).where(AiTaskItem.message_id == source.message_id).limit(1)
+        )).scalar_one_or_none()
+        ai_log = await prepare_note_artifact(
+            db,
+            project_id=host.project_id,
+            user_id=actor_id,
+            note_id=instance_id,
+            content=source.text,
+            model=source.model_used or "unknown",
+            source_message_id=source.message_id,
+            generation_id=task_item.generation_id if task_item else None,
+            task_code=(
+                "note.policy_draft"
+                if task_item
+                else str((source.context_manifest or {}).get("task_code") or "chat.general")
+            ),
+            context_manifest=source.context_manifest,
+        )
+        log_id = ai_log.id
+        if ai_log.confirm_action != "pending" or ai_log.writeback_status not in {"pending", "stale"}:
+            raise _LogWriteFailed("DraftArtifact 未处于可确认状态")
+        if ai_log.content_hash != source.content_hash:
+            raise _LogWriteFailed("DraftArtifact content_hash 与服务端消息哈希不一致")
+        return log_id
+
+    # 底稿等尚无稳定 typed locator 的宿主继续进入人工复制确认流，不自动写业务数据。
     from app.services.wp_ai_service import wrap_ai_output_with_log
 
     result = await wrap_ai_output_with_log(
-        # 权威正文：数据库里的服务端消息，客户端不参与。
         content=source.text,
-        # 平台未记录 per-message 模型置信度；客户端提交的置信度不可信 ⇒ 显式留空，
-        # 不用 0.85 之类的假值冒充（ai_content_log.confidence 可空）。
         confidence=None,
-        # 模型标识同样取服务端记录（None 时由 wrap 回落 settings 默认）。
         source_model=source.model_used,
         target_cell=target_cell,
         target_field=target_field,
@@ -673,8 +704,6 @@ async def _write_content_log(
             f"ai_content_log 未处于 pending：{result.get('confirm_action')!r}"
         )
     if result.get("content_hash") != source.content_hash:
-        # wrap 对同一正文重算的 sha256 必须与消息哈希一致；不一致说明送进确认流的
-        # 不是这条消息的正文。
         raise _LogWriteFailed("确认流记录的 content_hash 与服务端消息哈希不一致")
     return log_id
 

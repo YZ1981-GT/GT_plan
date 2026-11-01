@@ -381,3 +381,71 @@ describe('「我的模板」载入（R9.4，任务 33）', () => {
     expect(wrapper.vm.templateConfig).toMatchObject({ page_size: 200 })
   })
 })
+
+
+describe('阶段 0：项目上下文与请求代际', () => {
+  it('ACNR 字段选择器显式接收表单当前项目', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    const picker = wrapper.findComponent({ name: 'CustomQueryFieldPicker' })
+    expect(picker.props('projectId')).toBe(PID)
+  })
+
+  it('后到的旧请求不能覆盖新数据源结果', async () => {
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    apiMocks.post.mockImplementation((url: string) => {
+      if (url === '/api/address-registry/validate') return Promise.resolve({ issues: [] })
+      if (url !== '/api/custom-query/execute') return Promise.resolve({})
+      return new Promise((resolve) => {
+        if (!resolveOld) resolveOld = resolve
+        else resolveNew = resolve
+      })
+    })
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    const oldRun = wrapper.vm.onExecute()
+    wrapper.vm.formCtx.source = 'workpaper'
+    wrapper.vm.onSourceChange()
+    const newRun = wrapper.vm.onExecute()
+    const newer = { rows: [{ wp_code: 'D2' }], columns: ['wp_code'], total: 1 }
+    resolveNew(newer)
+    await newRun
+    resolveOld(LEDGER_RESULT)
+    await oldRun
+    expect(wrapper.vm.result.rows).toEqual(newer.rows)
+    expect(wrapper.vm.lastRun.source).toBe('workpaper')
+  })
+
+  it('同一数据源内改变条件、返回列或 ACNR 目标都立即使旧结果失效并回第一页', async () => {
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    for (const mutate of [
+      () => wrapper.vm.conditionState.conditions.push({ field: 'account_code', op: 'eq', value: '1002' }),
+      () => wrapper.vm.selectedColumns.splice(0, 1),
+      () => wrapper.vm.acnrFieldIds.push('E1/E1-14/C10'),
+    ]) {
+      await wrapper.vm.onExecute()
+      wrapper.vm.page = 3
+      mutate()
+      expect(wrapper.vm.result.rows).toEqual([])
+      expect(wrapper.vm.lastRun.payload).toBeNull()
+      expect(wrapper.vm.countToken).toBe('')
+      expect(wrapper.vm.page).toBe(1)
+    }
+  })
+
+  it('项目或年度变化清空结果、COUNT 凭证和下钻上下文', async () => {
+    executeHolder.value = { ...LEDGER_RESULT, count_token: 'token-1' }
+    const wrapper = await mountTab()
+    await selectLedger(wrapper)
+    await wrapper.vm.onExecute()
+    expect(wrapper.vm.countToken).toBe('token-1')
+    wrapper.vm.formCtx.year = 2024
+    await flushPromises()
+    expect(wrapper.vm.result.rows).toEqual([])
+    expect(wrapper.vm.countToken).toBe('')
+    expect(wrapper.vm.lastRun.payload).toBeNull()
+    expect(wrapper.vm.canExport).toBe(false)
+  })
+})

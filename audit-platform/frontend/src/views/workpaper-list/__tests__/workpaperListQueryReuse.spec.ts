@@ -33,7 +33,8 @@ vi.mock('@/services/workpaperApi', () => {
     listWorkpapers: hoisted.listWorkpapers,
     getWpIndex: hoisted.getWpIndex,
     getWpMappingByAccount: hoisted.mapping,
-    downloadWorkpaperPack: vi.fn().mockResolvedValue(undefined),
+    startWorkpaperPackExport: vi.fn().mockResolvedValue({ task_id: 'export-1', total: 0, status: 'pending' }),
+    getWorkpaperPackExportStatus: vi.fn(() => new Promise(() => {})),
     downloadWorkpaper: vi.fn(),
   }
 })

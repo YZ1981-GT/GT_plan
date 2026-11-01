@@ -124,23 +124,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarnTriangleFilled, Refresh, Select } from '@element-plus/icons-vue'
 import { useAcnr, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
-import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 import { eventBus } from '@/utils/eventBus'
 
 const props = withDefaults(
   defineProps<{
     /** v-model：已选字段的 addr_id 列表 */
     modelValue?: string[]
+    /** 宿主当前选中的项目；不传 / 传空即「无项目」，不回退到路由或 store 项目 */
+    projectId?: string | null
     /** 循环码过滤（如 'D'），不传返回所有循环 */
     cycle?: string
     /** 是否显示内置循环过滤下拉（acnr Req 8.5） */
     showCycleFilter?: boolean
   }>(),
-  { modelValue: () => [], cycle: undefined, showCycleFilter: false },
+  { modelValue: () => [], projectId: null, cycle: undefined, showCycleFilter: false },
 )
 
 const emit = defineEmits<{
@@ -151,8 +152,9 @@ const emit = defineEmits<{
   ): void
 }>()
 
-// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
-const { buildAddressTree, loadCellNodes, clearCache } = useAcnr(useCurrentProjectId())
+// 查询宿主显式传入项目；空值就是“无项目”，不得借用路由/store 中残留的上一个项目。
+const effectiveProjectId = computed(() => props.projectId || '')
+const { buildAddressTree, loadCellNodes, clearCache } = useAcnr(effectiveProjectId)
 
 // ─── 循环过滤（acnr Req 8.5） ────────────────────────────────────────────────
 const cycleOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'S']
@@ -338,6 +340,15 @@ function reload() {
   loadState.value = 'loading'
   treeKey.value += 1 // 强制 el-tree 重挂 → 重新触发 loadRoot
 }
+
+// 宿主切项目：addr_id 不编码项目，旧选择不能在新项目上继续解释；清缓存、选择和树。
+watch(effectiveProjectId, (value, previous) => {
+  if (value === previous) return
+  clearCache()
+  labelMap.value = {}
+  emit('update:modelValue', [])
+  reload()
+})
 
 // 循环下拉切换（acnr Req 8.5）→ 重载树
 function onCycleChange() {

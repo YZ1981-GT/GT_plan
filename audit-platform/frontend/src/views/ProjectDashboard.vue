@@ -258,30 +258,30 @@ async function onRemind(row: any) {
   }
   row._reminding = true
   try {
-    const { data, status } = await http.post(
+    // 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：成功只走 2xx；
+    // 催办超限 429 与其它错误都抛出，由 catch 分流。`_silent` 让全局拦截器不弹通用 toast
+    //（催办超限有专门的「重新分配」提示）。
+    const { data } = await http.post(
       P.workpapers.remind(projectId.value, row.wp_id),
       {},
-      { validateStatus: (s: number) => s < 600 },
+      { _silent: true } as any,
     )
-    if (status === 429) {
-      // 超限
-      const detail = data?.detail
-      const msg = typeof detail === 'object' ? detail.message : detail
-      remindLimitTip.value = msg || '已连续催办 3 次，请考虑重新分配'
-      remindCounts.value[row.wp_id] = 3
-      ElMessage.warning(msg || '已连续催办 3 次，请考虑重新分配')
-    } else if (status >= 400) {
-      handleApiError({ response: { status, data } }, '催办')
+    if (data?.remind_count !== undefined) {
+      remindCounts.value[row.wp_id] = data.remind_count
+      ElMessage.success(`催办成功（第 ${data.remind_count} 次）`)
     } else {
-      // 成功
-      if (data?.remind_count !== undefined) {
-        remindCounts.value[row.wp_id] = data.remind_count
-        ElMessage.success(`催办成功（第 ${data.remind_count} 次）`)
-      } else {
-        ElMessage.success('催办成功')
-      }
+      ElMessage.success('催办成功')
     }
   } catch (err: any) {
+    // 催办超限（429）是业务信号：标记达到上限 + 给重新分配提示，不当系统错误
+    if (err?.response?.status === 429) {
+      const d = err.response?.data?.detail ?? err.response?.data?.message
+      const msg = (d && typeof d === 'object' ? d.message : d) || '已连续催办 3 次，请考虑重新分配'
+      remindLimitTip.value = msg
+      remindCounts.value[row.wp_id] = 3
+      ElMessage.warning(msg)
+      return
+    }
     handleApiError(err, '催办')
   } finally {
     row._reminding = false
@@ -302,7 +302,7 @@ async function onEscalateToPartner() {
     await http.post(P.workpapers.escalateToPartner(projectId.value), {
       wp_ids: overdueItems.map((r: any) => r.wp_id),
       reason: '催办 3 次未响应',
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { _silent: true } as any)
     ElMessage.success('已通知合伙人关注')
     remindLimitTip.value = ''
   } catch (e: any) {

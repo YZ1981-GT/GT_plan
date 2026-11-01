@@ -36,6 +36,7 @@ const props = defineProps<{
 const store = useWpEvidenceLinks(() => props.projectId, () => props.wpId)
 const links = computed(() => store.links.value)
 const loading = computed(() => store.loading.value)
+const loadError = computed(() => store.error.value)
 
 const showAddDialog = ref(false)
 const saving = ref(false)
@@ -119,7 +120,11 @@ function typeLabel(value: string | null): string {
       </el-button>
     </div>
 
-    <el-table :data="links" v-loading="loading" size="small" max-height="300" stripe>
+    <div v-if="loadError" class="evidence-load-error" role="alert">
+      <span>证据链接加载失败，不能据此判断为无证据</span>
+      <el-button link type="primary" size="small" @click="store.reload">重试</el-button>
+    </div>
+    <el-table v-else :data="links" v-loading="loading" size="small" max-height="300" stripe>
       <el-table-column label="文件" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           <span>{{ row.attachment?.file_name }}</span>
@@ -192,6 +197,15 @@ function typeLabel(value: string | null): string {
 <style scoped>
 .evidence-link-panel {
   padding: 8px;
+}
+.evidence-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  color: var(--gt-color-danger);
+  font-size: var(--gt-font-size-xs);
 }
 .panel-header {
   display: flex;

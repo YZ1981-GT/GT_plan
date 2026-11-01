@@ -19,12 +19,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_role
 from app.models.core import User
 from app.services.ai_plugin_service import AIPluginService
 from app.services.unified_ai_service import UnifiedAIService
 
 router = APIRouter(tags=["ai-plugins"])
+_admin = require_role(["admin"])
 
 
 class RegisterPluginRequest(BaseModel):
@@ -44,20 +45,27 @@ def _get_unified(db: AsyncSession = Depends(get_db)) -> UnifiedAIService:
 
 
 @router.get("/api/ai-plugins")
-async def list_plugins(svc: UnifiedAIService = Depends(_get_unified)):
+async def list_plugins(
+    svc: UnifiedAIService = Depends(_get_unified),
+    current_user: User = Depends(_admin),
+):
     """插件列表"""
     return await svc.list_plugins()
 
 
 @router.get("/api/ai-plugins/presets")
-async def get_preset_plugins():
+async def get_preset_plugins(current_user: User = Depends(_admin)):
     """预设插件列表"""
     svc = AIPluginService()
     return svc.get_preset_plugins()
 
 
 @router.get("/api/ai-plugins/{plugin_id}")
-async def get_plugin(plugin_id: str, db: AsyncSession = Depends(get_db)):
+async def get_plugin(
+    plugin_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
     """插件详情"""
     svc = AIPluginService()
     result = await svc.get_plugin(db, plugin_id)
@@ -69,7 +77,7 @@ async def get_plugin(plugin_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/api/ai-plugins")
 async def register_plugin(
     body: RegisterPluginRequest, db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_admin),
 ):
     """注册插件"""
     svc = AIPluginService()
@@ -89,7 +97,10 @@ async def register_plugin(
 
 
 @router.post("/api/ai-plugins/seed")
-async def load_preset_plugins(db: AsyncSession = Depends(get_db)):
+async def load_preset_plugins(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
     """加载预设插件（幂等）"""
     svc = AIPluginService()
     result = await svc.load_preset_plugins(db)
@@ -98,19 +109,35 @@ async def load_preset_plugins(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/api/ai-plugins/{plugin_id}/enable")
-async def enable_plugin(plugin_id: str, svc: UnifiedAIService = Depends(_get_unified)):
-    """启用插件"""
+async def enable_plugin(
+    plugin_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
+    """仅已实现的自定义插件可以启用；预设插件保持开发中。"""
+    from app.services.ai_plugin_service import is_developing_plugin
+
+    if is_developing_plugin(plugin_id):
+        raise HTTPException(status_code=409, detail="该插件正在开发中，当前不可启用")
     try:
-        return await svc.enable_plugin(plugin_id)
+        result = await AIPluginService().enable_plugin(db, plugin_id)
+        await db.commit()
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/api/ai-plugins/{plugin_id}/disable")
-async def disable_plugin(plugin_id: str, svc: UnifiedAIService = Depends(_get_unified)):
-    """禁用插件"""
+async def disable_plugin(
+    plugin_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
+    """禁用插件。"""
     try:
-        return await svc.disable_plugin(plugin_id)
+        result = await AIPluginService().disable_plugin(db, plugin_id)
+        await db.commit()
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -120,7 +147,7 @@ async def update_config(
     plugin_id: str,
     body: UpdateConfigRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_admin),
 ):
     """更新插件配置"""
     svc = AIPluginService()

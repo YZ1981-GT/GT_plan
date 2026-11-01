@@ -6,27 +6,27 @@ spec proposal-remaining-18 task 5.2
 - LibreOffice 不可用 → 503 + reason="libreoffice_unavailable"
 - 附件不存在 → 404
 - 附件类型非 Office → 400
-- 转换成功（mock subprocess）→ 200 + application/pdf
-- 缓存命中：第二次调用不再调 subprocess
-- 转换超时 → 500
+- 转换成功（mock 异步执行器）→ 200 + application/pdf
+- 缓存命中：第二次调用不再启动转换
+- 转换超时 → 504
 - 转换失败（非零退出码）→ 500
 - 健康检查端点：available 字段切换
 """
 
 from __future__ import annotations
 
-import subprocess
 import uuid
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
@@ -50,6 +50,11 @@ class _FakeUser:
         self.email = "tester@example.com"
         self.username = "tester"
         self.is_active = True
+
+
+@pytest.fixture(autouse=True)
+def _secure_attachment_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(settings, "ATTACHMENT_LOCAL_STORAGE_ROOT", str(tmp_path / "attachments"))
 
 
 @pytest_asyncio.fixture
@@ -94,6 +99,11 @@ async def _seed_attachment(
     src_path: Path,
     file_name: str = "test.docx",
 ) -> uuid.UUID:
+    # 安全读取只接受项目附件根内的文件；测试也必须经真实存储布局造数据。
+    stored = Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT) / str(PROJECT_ID) / "general" / file_name
+    if src_path.exists():
+        stored.parent.mkdir(parents=True, exist_ok=True)
+        stored.write_bytes(src_path.read_bytes())
     db.add(Project(
         id=PROJECT_ID,
         name="OfficePreview 测试",
@@ -106,16 +116,16 @@ async def _seed_attachment(
     att = Attachment(
         project_id=PROJECT_ID,
         file_name=file_name,
-        file_path=str(src_path),
+        file_path=str(stored),
         file_type=Path(file_name).suffix.lstrip(".").lower(),
-        file_size=src_path.stat().st_size if src_path.exists() else 0,
+        file_size=stored.stat().st_size if stored.exists() else 0,
         attachment_type="general",
         storage_type="local",
         ocr_status="completed",
         created_by=USER_ID,
     )
     db.add(att)
-    await db.flush()
+    await db.commit()
     return att.id
 
 
@@ -182,7 +192,7 @@ async def test_400_when_file_type_not_office(db_session: AsyncSession, tmp_path:
 
 
 # ---------------------------------------------------------------------------
-# 4. 转换成功 → 200 + application/pdf（mock subprocess）
+# 4. 转换成功 → 200 + application/pdf（mock 异步执行器）
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -200,36 +210,28 @@ async def test_convert_success_returns_pdf(
 
     fake_pdf_bytes = b"%PDF-1.7\n%fake-pdf-content\n%%EOF\n"
 
-    def _fake_subprocess_run(cmd, capture_output=False, timeout=None, **kwargs):
-        # cmd: [soffice, --headless, --convert-to, pdf, --outdir, tmpdir, src_path]
-        outdir = Path(cmd[5])
-        src_path = Path(cmd[6])
-        (outdir / f"{src_path.stem}.pdf").write_bytes(fake_pdf_bytes)
-        return MagicMock(returncode=0, stderr=b"", stdout=b"")
-
     app = _make_app(db_session)
     transport = ASGITransport(app=app)
+    convert = AsyncMock(return_value=(fake_pdf_bytes, "miss"))
 
     with patch("app.routers.office_preview._find_libreoffice", return_value="/usr/bin/libreoffice"), \
-         patch("app.routers.office_preview.subprocess.run", side_effect=_fake_subprocess_run) as mock_run:
+         patch("app.routers.office_preview.get_or_create_preview_pdf", convert):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get(f"/api/attachments/{aid}/preview-pdf")
 
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("application/pdf")
+    assert resp.headers["x-preview-cache"] == "miss"
     assert resp.content == fake_pdf_bytes
-    assert mock_run.call_count == 1
-    # 缓存文件已写入
-    assert cache_dir.exists()
-    assert any(p.suffix == ".pdf" for p in cache_dir.iterdir())
+    convert.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
-# 5. 缓存命中：第二次调用不再调 subprocess
+# 5. 缓存命中：第二次调用不再启动转换
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_cache_hit_skips_subprocess(
+async def test_cache_hit_skips_conversion(
     db_session: AsyncSession,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -243,37 +245,33 @@ async def test_cache_hit_skips_subprocess(
 
     fake_pdf_bytes = b"%PDF-1.7\nfake\n%%EOF"
 
-    def _fake_subprocess_run(cmd, capture_output=False, timeout=None, **kwargs):
-        outdir = Path(cmd[5])
-        src_path = Path(cmd[6])
-        (outdir / f"{src_path.stem}.pdf").write_bytes(fake_pdf_bytes)
-        return MagicMock(returncode=0, stderr=b"")
-
     app = _make_app(db_session)
     transport = ASGITransport(app=app)
+    convert = AsyncMock(return_value=fake_pdf_bytes)
 
     with patch("app.routers.office_preview._find_libreoffice", return_value="/usr/bin/soffice"), \
-         patch("app.routers.office_preview.subprocess.run", side_effect=_fake_subprocess_run) as mock_run:
+         patch("app.services.libreoffice_pool.convert_office_to_pdf_bytes", convert):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # 第一次：转换
             r1 = await client.get(f"/api/attachments/{aid}/preview-pdf")
             assert r1.status_code == 200
             assert r1.content == fake_pdf_bytes
+            assert r1.headers["x-preview-cache"] == "miss"
             # 第二次：缓存命中
             r2 = await client.get(f"/api/attachments/{aid}/preview-pdf")
             assert r2.status_code == 200
             assert r2.content == fake_pdf_bytes
+            assert r2.headers["x-preview-cache"] == "hit"
 
-    # subprocess 仅调用 1 次（缓存命中第二次跳过）
-    assert mock_run.call_count == 1
+    assert convert.await_count == 1
 
 
 # ---------------------------------------------------------------------------
-# 6. 转换超时 → 500
+# 6. 转换超时 → 504
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_500_on_conversion_timeout(
+async def test_504_on_conversion_timeout(
     db_session: AsyncSession,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -284,18 +282,24 @@ async def test_500_on_conversion_timeout(
 
     monkeypatch.setenv("OFFICE_PREVIEW_CACHE_DIR", str(tmp_path / "preview_cache"))
 
-    def _timeout(cmd, **kwargs):
-        raise subprocess.TimeoutExpired(cmd=cmd, timeout=90)
-
     app = _make_app(db_session)
     transport = ASGITransport(app=app)
+    timeout_error = HTTPException(
+        status_code=504,
+        detail={"reason": "libreoffice_timeout", "message": "Office 转换超时"},
+        headers={"Retry-After": "10"},
+    )
     with patch("app.routers.office_preview._find_libreoffice", return_value="/usr/bin/libreoffice"), \
-         patch("app.routers.office_preview.subprocess.run", side_effect=_timeout):
+         patch(
+             "app.routers.office_preview.get_or_create_preview_pdf",
+             new=AsyncMock(side_effect=timeout_error),
+         ):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get(f"/api/attachments/{aid}/preview-pdf")
 
-    assert resp.status_code == 500
-    assert "超时" in resp.json()["detail"]
+    assert resp.status_code == 504
+    assert resp.headers["retry-after"] == "10"
+    assert resp.json()["detail"]["reason"] == "libreoffice_timeout"
 
 
 # ---------------------------------------------------------------------------
@@ -318,8 +322,13 @@ async def test_500_on_nonzero_exit(
     transport = ASGITransport(app=app)
     with patch("app.routers.office_preview._find_libreoffice", return_value="/usr/bin/libreoffice"), \
          patch(
-             "app.routers.office_preview.subprocess.run",
-             return_value=MagicMock(returncode=1, stderr=b"file format error"),
+             "app.routers.office_preview.get_or_create_preview_pdf",
+             new=AsyncMock(
+                 side_effect=HTTPException(
+                     status_code=500,
+                     detail="PDF 转换失败: file format error",
+                 )
+             ),
          ):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get(f"/api/attachments/{aid}/preview-pdf")

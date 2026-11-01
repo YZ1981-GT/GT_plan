@@ -186,3 +186,19 @@ def test_read_time_enrichment_attaches_and_replaces_stale_marks():
 @pytest.mark.parametrize("bad", [None, {}, {"_tables": "x"}])
 def test_attach_tolerates_bad_input(bad):
     assert npl.attach_display_layout(bad, "soe", "八、5") == 0
+
+
+def test_tables_with_their_own_period_layer_get_no_extra_period():
+    """存量旧结构（R3.1）：同名的组合计提表自带「期末数 / 期初数」两组列 ⇒ 不再套一层期间（原先导出表头变成
+    「期末数 / 期末数 / 应收账款 … 期末数 / 期初数 / 坏账准备」）；模板结构（账面余额分组）照常补「期末数」。"""
+    old = {"name": "组合计提项目：应收中央企业客户",
+           "headers": ["账 龄", "应收账款", "比例（%）", "坏账准备", "应收账款", "比例（%）", "坏账准备"],
+           "_column_groups": [{"group": "期末数", "start": 1, "span": 3}, {"group": "期初数", "start": 4, "span": 3}],
+           "rows": []}
+    new = {"name": "组合计提项目：应收中央企业客户", "headers": ["账 龄", "应收账款", "比例（%）", "坏账准备"],
+           "_column_groups": [{"group": "账面余额", "start": 1, "span": 2}], "rows": []}
+    td_old, td_new = {"_tables": [old]}, {"_tables": [new]}
+    assert npl.attach_display_layout(td_old, "soe", "八、5") == 0 and "_display_layout" not in old
+    assert npl.attach_display_layout(td_new, "soe", "八、5") == 1
+    assert new["_display_layout"] == {"mode": "top", "period": "期末数"}
+    assert npl.header_paths(old)[1] == ("期末数", "应收账款"), "旧结构按自己的分组显示，不叠第二层期间"

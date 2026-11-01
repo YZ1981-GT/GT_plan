@@ -1596,7 +1596,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1608,7 +1608,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1620,7 +1620,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1632,7 +1632,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1641,10 +1641,10 @@
         "row_name": "二、营业总成本",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-008')+ROW('IS-009')+ROW('IS-010')+ROW('IS-011')+ROW('IS-012')+ROW('IS-013')+ROW('IS-014')+ROW('IS-015')+ROW('IS-016')+ROW('IS-017')+ROW('IS-018')+ROW('IS-019')+ROW('IS-020')+ROW('IS-021')+ROW('IS-022')+ROW('IS-023')+ROW('IS-024')+ROW('IS-025')+ROW('IS-029')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -1668,7 +1668,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1680,7 +1680,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1692,7 +1692,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1704,7 +1704,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1716,7 +1716,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1728,7 +1728,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1740,7 +1740,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1752,7 +1752,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1764,7 +1764,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1776,7 +1776,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1788,7 +1788,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1800,7 +1800,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1872,7 +1872,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1884,7 +1884,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1896,7 +1896,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1908,7 +1908,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1929,10 +1929,10 @@
         "row_name": "投资收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6111','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -1944,7 +1944,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1956,7 +1956,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1968,7 +1968,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1980,7 +1980,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -1989,10 +1989,10 @@
         "row_name": "公允价值变动收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6101','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -2001,10 +2001,10 @@
         "row_name": "信用减值损失（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6702','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -2013,10 +2013,10 @@
         "row_name": "资产减值损失（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6701','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -2025,10 +2025,10 @@
         "row_name": "资产处置收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6115','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -2037,10 +2037,10 @@
         "row_name": "三、营业利润（亏损以“－”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-001')-ROW('IS-007')+ROW('IS-030')+ROW('IS-031')+ROW('IS-034')+ROW('IS-035')+ROW('IS-036')+ROW('IS-037')+ROW('IS-038')+ROW('IS-039')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2064,7 +2064,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2085,10 +2085,10 @@
         "row_name": "四、利润总额（亏损总额以“－”号填列）",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-040')+ROW('IS-041')-ROW('IS-043')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2109,10 +2109,10 @@
         "row_name": "五、净利润（净亏损以“－”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-044')-ROW('IS-045')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2133,10 +2133,10 @@
         "row_name": "1.归属于母公司所有者的净利润",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-046')-ROW('IS-049')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2148,7 +2148,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2169,10 +2169,10 @@
         "row_name": "1.持续经营净利润",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-046')-ROW('IS-052')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2184,7 +2184,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2193,10 +2193,10 @@
         "row_name": "六、其他综合收益的税后净额",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-054')+ROW('IS-072')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2205,10 +2205,10 @@
         "row_name": "归属于母公司所有者的其他综合收益的税后净额",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-055')+ROW('IS-062')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2217,10 +2217,10 @@
         "row_name": "（一）不能重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-056','IS-061')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2232,7 +2232,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2244,7 +2244,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2256,7 +2256,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2268,7 +2268,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2280,7 +2280,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2292,7 +2292,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2301,10 +2301,10 @@
         "row_name": "（二）将重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-063','IS-071')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2316,7 +2316,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2328,7 +2328,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2340,7 +2340,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2352,7 +2352,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2364,7 +2364,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2376,7 +2376,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2388,7 +2388,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2400,7 +2400,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2412,7 +2412,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2424,7 +2424,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2433,10 +2433,10 @@
         "row_name": "七、综合收益总额",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-046')+ROW('IS-053')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2448,7 +2448,7 @@
         "formula": "ROW('IS-048')+ROW('IS-054')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2460,7 +2460,7 @@
         "formula": "ROW('IS-049')+ROW('IS-072')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -2472,7 +2472,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2484,7 +2484,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -2496,7 +2496,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       }
     ]
@@ -5268,7 +5268,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5280,7 +5280,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5292,7 +5292,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5304,7 +5304,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5313,10 +5313,10 @@
         "row_name": "二、营业总成本",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-008')+ROW('IS-009')+ROW('IS-010')+ROW('IS-011')+ROW('IS-012')+ROW('IS-013')+ROW('IS-014')+ROW('IS-015')+ROW('IS-016')+ROW('IS-017')+ROW('IS-018')+ROW('IS-019')+ROW('IS-020')+ROW('IS-021')+ROW('IS-022')+ROW('IS-023')+ROW('IS-024')+ROW('IS-025')+ROW('IS-029')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5340,7 +5340,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5352,7 +5352,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5364,7 +5364,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5376,7 +5376,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5388,7 +5388,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5400,7 +5400,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5412,7 +5412,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5424,7 +5424,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5436,7 +5436,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5448,7 +5448,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5460,7 +5460,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5472,7 +5472,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5544,7 +5544,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5556,7 +5556,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5568,7 +5568,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5580,7 +5580,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5601,10 +5601,10 @@
         "row_name": "投资收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6111','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -5616,7 +5616,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5628,7 +5628,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5640,7 +5640,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5652,7 +5652,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5661,10 +5661,10 @@
         "row_name": "公允价值变动收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6101','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -5673,10 +5673,10 @@
         "row_name": "信用减值损失（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6702','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -5685,10 +5685,10 @@
         "row_name": "资产减值损失（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6701','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -5697,10 +5697,10 @@
         "row_name": "资产处置收益（损失以“－”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6115','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -5709,10 +5709,10 @@
         "row_name": "三、营业利润（亏损以“－”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-001')-ROW('IS-007')+ROW('IS-030')+ROW('IS-031')+ROW('IS-034')+ROW('IS-035')+ROW('IS-036')+ROW('IS-037')+ROW('IS-038')+ROW('IS-039')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5736,7 +5736,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5757,10 +5757,10 @@
         "row_name": "四、利润总额（亏损总额以“－”号填列）",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-040')+ROW('IS-041')-ROW('IS-043')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5781,10 +5781,10 @@
         "row_name": "五、净利润（净亏损以“－”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-044')-ROW('IS-045')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5805,10 +5805,10 @@
         "row_name": "1.归属于母公司所有者的净利润",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-046')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5820,7 +5820,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5841,10 +5841,10 @@
         "row_name": "1.持续经营净利润",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-046')-ROW('IS-052')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5856,7 +5856,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5865,10 +5865,10 @@
         "row_name": "六、其他综合收益的税后净额",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-054')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5877,10 +5877,10 @@
         "row_name": "归属于母公司所有者的其他综合收益的税后净额",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-055')+ROW('IS-062')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5889,10 +5889,10 @@
         "row_name": "（一）不能重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-056','IS-061')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5904,7 +5904,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5916,7 +5916,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5928,7 +5928,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5940,7 +5940,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5952,7 +5952,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5964,7 +5964,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -5973,10 +5973,10 @@
         "row_name": "（二）将重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-063','IS-071')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -5988,7 +5988,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6000,7 +6000,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6012,7 +6012,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6024,7 +6024,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6036,7 +6036,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6048,7 +6048,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6060,7 +6060,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6072,7 +6072,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6084,7 +6084,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6096,7 +6096,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6105,10 +6105,10 @@
         "row_name": "七、综合收益总额",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-046')+ROW('IS-053')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -6120,7 +6120,7 @@
         "formula": "ROW('IS-048')+ROW('IS-054')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -6132,7 +6132,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6144,7 +6144,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6156,7 +6156,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -6168,7 +6168,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       }
     ]
@@ -8508,7 +8508,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8520,7 +8520,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8541,10 +8541,10 @@
         "row_name": "投资收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6111','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -8556,7 +8556,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8568,7 +8568,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8580,7 +8580,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8589,10 +8589,10 @@
         "row_name": "公允价值变动收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6101','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -8601,10 +8601,10 @@
         "row_name": "信用减值损失(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6702','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -8613,10 +8613,10 @@
         "row_name": "资产减值损失(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6701','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -8625,10 +8625,10 @@
         "row_name": "资产处置收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6115','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -8637,10 +8637,10 @@
         "row_name": "二、营业利润(亏损以“-”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-001')-ROW('IS-002')-ROW('IS-003')-ROW('IS-004')-ROW('IS-005')-ROW('IS-006')-ROW('IS-007')+ROW('IS-010')+ROW('IS-011')+ROW('IS-014')+ROW('IS-015')+ROW('IS-016')+ROW('IS-017')+ROW('IS-018')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8673,10 +8673,10 @@
         "row_name": "三、利润总额(亏损总额以“-”号填列）",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-019')+ROW('IS-020')-ROW('IS-021')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8697,10 +8697,10 @@
         "row_name": "四、净利润(净亏损以“-”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-022')-ROW('IS-023')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8721,10 +8721,10 @@
         "row_name": "其中：持续经营净利润（净亏损以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-024')-ROW('IS-027')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8736,7 +8736,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8757,10 +8757,10 @@
         "row_name": "其中：归属于母公司股东的净利润（净亏损以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-024')-ROW('IS-030')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8772,7 +8772,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8781,10 +8781,10 @@
         "row_name": "五、其他综合收益的税后净额",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-032')+ROW('IS-049')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8793,10 +8793,10 @@
         "row_name": "归属于母公司股东的其他综合收益的税后净额",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-033')+ROW('IS-039')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8805,10 +8805,10 @@
         "row_name": "（一）不能重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-034','IS-038')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8820,7 +8820,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8832,7 +8832,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8844,7 +8844,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8856,7 +8856,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8868,7 +8868,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8877,10 +8877,10 @@
         "row_name": "（二）将重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-040','IS-048')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -8892,7 +8892,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8904,7 +8904,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8916,7 +8916,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8928,7 +8928,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8940,7 +8940,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8952,7 +8952,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8964,7 +8964,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8976,7 +8976,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -8988,7 +8988,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -9000,7 +9000,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -9009,10 +9009,10 @@
         "row_name": "六、综合收益总额",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-024')+ROW('IS-031')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -9024,7 +9024,7 @@
         "formula": "ROW('IS-029')+ROW('IS-032')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -9036,7 +9036,7 @@
         "formula": "ROW('IS-030')+ROW('IS-049')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -9048,7 +9048,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -9060,7 +9060,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -9072,7 +9072,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       }
     ]
@@ -11112,7 +11112,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11124,7 +11124,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11145,10 +11145,10 @@
         "row_name": "投资收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6111','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -11160,7 +11160,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11172,7 +11172,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11184,7 +11184,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11193,10 +11193,10 @@
         "row_name": "公允价值变动收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6101','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -11205,10 +11205,10 @@
         "row_name": "信用减值损失(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6702','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -11217,10 +11217,10 @@
         "row_name": "资产减值损失(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "-TB('6701','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -11229,10 +11229,10 @@
         "row_name": "资产处置收益(损失以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "TB('6115','本期发生额')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "special",
         "parent_row_code": null
       },
       {
@@ -11241,10 +11241,10 @@
         "row_name": "二、营业利润(亏损以“-”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-001')-ROW('IS-002')-ROW('IS-003')-ROW('IS-004')-ROW('IS-005')-ROW('IS-006')-ROW('IS-007')+ROW('IS-010')+ROW('IS-011')+ROW('IS-014')+ROW('IS-015')+ROW('IS-016')+ROW('IS-017')+ROW('IS-018')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11277,10 +11277,10 @@
         "row_name": "三、利润总额(亏损总额以“-”号填列）",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-019')+ROW('IS-020')-ROW('IS-021')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11301,10 +11301,10 @@
         "row_name": "四、净利润(净亏损以“-”号填列）",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-022')-ROW('IS-023')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11325,10 +11325,10 @@
         "row_name": "其中：持续经营净利润（净亏损以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-024')-ROW('IS-027')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11340,7 +11340,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11361,10 +11361,10 @@
         "row_name": "其中：归属于母公司股东的净利润（净亏损以“-”号填列）",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-024')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11376,7 +11376,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11385,10 +11385,10 @@
         "row_name": "五、其他综合收益的税后净额",
         "indent_level": 0,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-032')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11397,10 +11397,10 @@
         "row_name": "归属于母公司股东的其他综合收益的税后净额",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "ROW('IS-033')+ROW('IS-039')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11409,10 +11409,10 @@
         "row_name": "（一）不能重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-034','IS-038')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11424,7 +11424,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11436,7 +11436,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11448,7 +11448,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11460,7 +11460,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11472,7 +11472,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11481,10 +11481,10 @@
         "row_name": "（二）将重分类进损益的其他综合收益",
         "indent_level": 1,
         "is_total_row": false,
-        "formula": null,
+        "formula": "SUM_ROW('IS-040','IS-048')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11496,7 +11496,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11508,7 +11508,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11520,7 +11520,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11532,7 +11532,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11544,7 +11544,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11556,7 +11556,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11568,7 +11568,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11580,7 +11580,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11592,7 +11592,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11604,7 +11604,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11613,10 +11613,10 @@
         "row_name": "六、综合收益总额",
         "indent_level": 0,
         "is_total_row": true,
-        "formula": null,
+        "formula": "ROW('IS-024')+ROW('IS-031')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11628,7 +11628,7 @@
         "formula": "ROW('IS-029')+ROW('IS-032')",
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "identity",
         "parent_row_code": null
       },
       {
@@ -11640,7 +11640,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11652,7 +11652,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11664,7 +11664,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       },
       {
@@ -11676,7 +11676,7 @@
         "formula": null,
         "formula_category": null,
         "formula_description": null,
-        "formula_source": null,
+        "formula_source": "input",
         "parent_row_code": null
       }
     ]

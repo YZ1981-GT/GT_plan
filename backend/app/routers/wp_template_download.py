@@ -643,16 +643,15 @@ async def download_all_templates(
 # 复用 office_preview 的 LibreOffice 抽象，模板库 `WpTemplateDetail` 主文件预览管线。
 
 import hashlib
-import subprocess
-import tempfile
 
 from fastapi import Response
 
 from app.core.config import settings
-from app.routers.office_preview import (
-    LIBREOFFICE_TIMEOUT_SECONDS,
-    OFFICE_EXTENSIONS,
-    _find_libreoffice,
+from app.routers.office_preview import LIBREOFFICE_TIMEOUT_SECONDS, OFFICE_EXTENSIONS
+from app.services.libreoffice_pool import (
+    find_soffice_path,
+    get_or_create_preview_pdf,
+    get_queue_depth_header,
 )
 
 
@@ -660,6 +659,7 @@ from app.routers.office_preview import (
 async def preview_template_as_pdf(
     project_id: str,
     wp_code: str,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """模板主文件转 PDF 在线预览。
@@ -691,7 +691,7 @@ async def preview_template_as_pdf(
             detail=f"模板格式 {ext or '未知'} 非 Office 类型，无法预览",
         )
 
-    soffice = _find_libreoffice()
+    soffice = find_soffice_path()
     if soffice is None:
         raise HTTPException(
             status_code=503,
@@ -701,49 +701,23 @@ async def preview_template_as_pdf(
             },
         )
 
-    # 缓存键：wp_code + file_size + mtime（mtime 兜底，避免模板更新后命中旧 PDF）
+    # 缓存键：wp_code + 真实文件大小 + 纳秒 mtime，模板替换后不会命中旧 PDF。
     stat = src_path.stat()
-    cache_raw = f"tpl|{wp_code}|{src_path.name}|{stat.st_size}|{int(stat.st_mtime)}".encode()
+    cache_raw = (
+        f"tpl|{wp_code}|{src_path.name}|{stat.st_size}|{stat.st_mtime_ns}".encode()
+    )
     cache_key = hashlib.sha256(cache_raw).hexdigest()[:16]
     cache_dir = Path(settings.STORAGE_ROOT) / "preview_cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / f"{cache_key}.pdf"
 
-    if cache_path.exists():
-        pdf_bytes = cache_path.read_bytes()
-        cache_status = "hit"
-    else:
-        with tempfile.TemporaryDirectory(prefix="tpl_preview_") as tmpdir:
-            try:
-                proc = subprocess.run(
-                    [soffice, "--headless", "--convert-to", "pdf",
-                     "--outdir", tmpdir, str(src_path)],
-                    capture_output=True,
-                    timeout=LIBREOFFICE_TIMEOUT_SECONDS,
-                )
-            except subprocess.TimeoutExpired:
-                logger.warning("[TPL_PREVIEW] LibreOffice timed out for %s", src_path.name)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"PDF 转换超时（{LIBREOFFICE_TIMEOUT_SECONDS}s）",
-                )
-            if proc.returncode != 0:
-                err = proc.stderr.decode("utf-8", errors="ignore")[:500] if proc.stderr else ""
-                logger.warning(
-                    "[TPL_PREVIEW] LibreOffice conversion failed (rc=%d): %s",
-                    proc.returncode, err,
-                )
-                raise HTTPException(status_code=500, detail=f"PDF 转换失败: {err}" if err else "PDF 转换失败")
-            pdf_path = Path(tmpdir) / f"{src_path.stem}.pdf"
-            if not pdf_path.exists():
-                raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
-            pdf_bytes = pdf_path.read_bytes()
-
-        try:
-            cache_path.write_bytes(pdf_bytes)
-        except OSError as e:
-            logger.warning("[TPL_PREVIEW] cache write failed: %s", e)
-        cache_status = "miss"
+    # 项目门禁已完成，排队和转换阶段不应占用数据库连接。
+    await db.close()
+    pdf_bytes, cache_status = await get_or_create_preview_pdf(
+        src_path,
+        cache_path,
+        timeout=LIBREOFFICE_TIMEOUT_SECONDS,
+        soffice_path=soffice,
+    )
 
     # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
     from urllib.parse import quote as _quote
@@ -756,5 +730,6 @@ async def preview_template_as_pdf(
         headers={
             "Content-Disposition": _disposition,
             "X-Preview-Cache": cache_status,
+            **get_queue_depth_header(),
         },
     )

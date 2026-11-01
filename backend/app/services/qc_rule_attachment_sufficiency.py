@@ -26,21 +26,26 @@ def _missing_label(req: dict[str, Any]) -> str:
 
 
 async def evidence_sufficiency_findings(db, wp_id: UUID) -> list[dict[str, Any]]:
-    """返回 ``QCFindingItem`` 的关键字参数列表（不含 rule_id / severity）；查询失败 ⇒ 空（与改造前同为 fail-open）。"""
-    from app.services.attachment_wp_view import evaluate_wp_evidence_requirements
+    """把统一四态证据事实映射为 QC-17 阻断项。``unknown`` 不能伪装成通过。"""
+    from app.services.evidence_readiness import EvidenceReadinessService
 
-    try:
-        requirements = await evaluate_wp_evidence_requirements(db, wp_id)
-    except Exception:
-        logger.warning("QC-17 证据声明判定失败，底稿 id=%s", wp_id, exc_info=True)
+    result = await EvidenceReadinessService(db).evaluate_workpaper(wp_id)
+    if result.status in {"ready", "not_declared"}:
         return []
-    if not requirements:
-        return []
-    missing = [r for r in requirements if not r.get("satisfied")]
-    if not missing:
-        return []
+    if result.status == "unknown":
+        message = result.errors[0]["message"] if result.errors else "证据状态无法判断"
+        return [{
+            "message": message,
+            "expected_value": "可证明的证据就绪状态",
+            "actual_value": "unknown",
+        }]
+    requirements = [dict(row) for row in result.requirements]
+    missing = [row for row in requirements if not row.get("satisfied")]
+    labels = [_missing_label(row) for row in missing]
+    if "key_evidence_ocr_confirmation" in result.missing_types:
+        labels.append("关键证据识别结果未人工确认")
     return [{
-        "message": "应收集证据未齐：" + "；".join(_missing_label(r) for r in missing),
-        "expected_value": [r["type"] for r in requirements],
-        "actual_value": [r["type"] for r in requirements if r.get("satisfied")],
+        "message": "应收集证据未齐：" + "；".join(labels),
+        "expected_value": [row["type"] for row in requirements],
+        "actual_value": [row["type"] for row in requirements if row.get("satisfied")],
     }]

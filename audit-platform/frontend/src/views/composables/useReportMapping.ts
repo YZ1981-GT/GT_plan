@@ -128,7 +128,7 @@ export function useReportMapping(options: UseReportMappingOptions): UseReportMap
             report_type: rt.key,
             scope: reportScope.value,
             rules: mapped.map(r => ({ soe_row_code: r.soe_row_code, listed_row_code: r.listed_row_code })),
-          }, { validateStatus: (s: number) => s < 600 })
+          }, { _silent: true } as any)
         }
       }
       ElMessage.success('全部转换规则已保存')

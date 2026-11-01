@@ -187,11 +187,11 @@ function onCellDblClick(row: any, column: any) {
   }
 }
 
-function onCtxCopy() {
+async function onCtxCopy() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) return
   const text = cells.map(c => c.value ?? '-').join('\t')
-  await copyText(text)
+  void copyText(text)
   ElMessage.success('已复制')
   ctxMenu.value.visible = false
 }
@@ -237,11 +237,11 @@ function onCtxViewFormula() {
   ctxMenu.value.visible = false
 }
 
-function onCtxExportSelection() {
+async function onCtxExportSelection() {
   const cells = cellSel.selectedCells.value
   if (!cells.length) { ElMessage.warning('请先选中单元格'); ctxMenu.value.visible = false; return }
   const text = cells.map(c => c.value ?? '-').join('\n')
-  await copyText(text)
+  void copyText(text)
   ElMessage.success(`已导出 ${cells.length} 个单元格到剪贴板`)
   ctxMenu.value.visible = false
 }

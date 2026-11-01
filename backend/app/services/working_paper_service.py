@@ -329,6 +329,15 @@ class WorkingPaperService:
             )
 
         wp.status = new_enum
+        # 退回意见继续保留在 rejection_* / ReviewRecord；编制人标记修改完成时，
+        # 复核状态回到可提交起点，避免 levelN_rejected → pending_level1 被状态机卡死。
+        if (
+            current == WpFileStatus.revision_required.value
+            and new_enum == WpFileStatus.edit_complete
+            and wp.review_status is not None
+            and "rejected" in wp.review_status.value
+        ):
+            wp.review_status = WpReviewStatus.not_submitted
         wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
 

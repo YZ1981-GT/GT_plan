@@ -37,7 +37,13 @@ from app.deps import get_current_user
 from app.services.ai_chat.access import ResourceAccessResolver
 from app.services.ai_chat.audit import audit_tool_finished, audit_tool_started
 from app.services.ai_chat.contracts import AccessDecision
-from app.services.ai_chat.mcp_budget import McpBudgetExceeded, McpBudgetTracker
+from app.services.ai_chat.mcp_budget import (
+    McpBudgetExceeded,
+    McpBudgetTracker,
+    distributed_check_and_consume,
+    distributed_get_or_create,
+    distributed_pre_check,
+)
 from app.services.ai_chat.mcp_token import (
     MCP_READONLY_TOOLS,
     McpMaskLevel,
@@ -48,7 +54,11 @@ from app.services.ai_chat.mcp_token import (
     McpTokenRevoked,
     McpTokenScopeMismatch,
     McpTokenService,
+    mcp_token_service,
+    register_token_distributed,
     resolve_mask_policy,
+    revoke_token_for_user_distributed,
+    token_revoked_distributed,
 )
 from app.services.ai_chat.mcp_tools import (
     McpToolContext,
@@ -76,7 +86,7 @@ router = APIRouter(prefix="/api/ai-chat/mcp", tags=["ai-chat-mcp"])
 # `ai_chat.dsh_masking.mask_tool_result`（见 `mcp_tool_call` 第 ⑥ 段的说明）。
 # 曾存在一个 `_mask_service = ExportMaskService()` 模块级单例，切到 dsh_masking 后
 # 零引用，已按「死代码立即删除」清掉。
-_token_service = McpTokenService()
+_token_service = mcp_token_service
 _budget_tracker = McpBudgetTracker()
 
 
@@ -190,7 +200,10 @@ async def _validate_mcp_token(
 ) -> McpTokenPayload:
     """验证 MCP token 并返回 payload。"""
     try:
-        return _token_service.validate_token(token_str)
+        payload = _token_service.validate_token(token_str)
+        if await token_revoked_distributed(_token_service, payload):
+            raise McpTokenRevoked()
+        return payload
     except McpTokenExpired:
         raise HTTPException(status_code=401, detail="MCP token 已过期")
     except McpTokenRevoked:
@@ -240,7 +253,8 @@ async def create_mcp_token(
     except McpTokenError as exc:
         raise HTTPException(status_code=400, detail=exc.message)
 
-    budget = _budget_tracker.get_or_create(req.run_id)
+    budget = await distributed_get_or_create(_budget_tracker, req.run_id)
+    await register_token_distributed(scoped)
 
     return McpTokenCreateResponse(
         token=scoped.token,
@@ -267,7 +281,8 @@ async def create_child_token(
     except McpTokenError as exc:
         raise HTTPException(status_code=400, detail=exc.message)
 
-    budget = _budget_tracker.get_or_create(token_payload.run_id)
+    budget = await distributed_get_or_create(_budget_tracker, token_payload.run_id)
+    await register_token_distributed(child)
 
     return McpTokenCreateResponse(
         token=child.token,
@@ -284,7 +299,12 @@ async def revoke_mcp_token(
     user: Any = Depends(get_current_user),
 ) -> dict:
     """撤销指定 token（cancel / run terminal 时调用）。"""
-    _token_service.revoke_token(req.token_id)
+    try:
+        await revoke_token_for_user_distributed(
+            _token_service, req.token_id, user_id=UUID(str(user.id))
+        )
+    except McpTokenScopeMismatch as exc:
+        raise HTTPException(status_code=404, detail="token 不存在或不可访问") from exc
     return {"status": "revoked", "token_id": req.token_id}
 
 
@@ -321,7 +341,7 @@ async def mcp_tool_call(
 
     # ② 预算预检
     try:
-        _budget_tracker.pre_check(token_payload.run_id)
+        await distributed_pre_check(_budget_tracker, token_payload.run_id)
     except McpBudgetExceeded as exc:
         return McpToolCallResponse(
             tool_call_id=req.tool_call_id,
@@ -329,7 +349,9 @@ async def mcp_tool_call(
             status="error",
             error_code="tool_budget_exceeded",
             error_message=str(exc),
-            budget=_budget_tracker.get_or_create(token_payload.run_id).to_dict(),
+            budget=(await distributed_get_or_create(
+                _budget_tracker, token_payload.run_id
+            )).to_dict(),
         )
 
     # ③ 审计 tool_started（Property 32：每个 tool call 有 started）
@@ -403,7 +425,8 @@ async def mcp_tool_call(
     result_bytes = len(str(result).encode("utf-8")) if result else 0
     budget_dict: dict = {}
     try:
-        budget = _budget_tracker.check_and_consume(
+        budget = await distributed_check_and_consume(
+            _budget_tracker,
             token_payload.run_id,
             response_bytes=result_bytes,
         )
@@ -412,7 +435,9 @@ async def mcp_tool_call(
         status = "error"
         error_code = "tool_budget_exceeded"
         error_message = str(exc)
-        budget_dict = _budget_tracker.get_or_create(token_payload.run_id).to_dict()
+        budget_dict = (await distributed_get_or_create(
+            _budget_tracker, token_payload.run_id
+        )).to_dict()
 
     # ⑧ 审计 tool_finished（Property 32：每个 tool call 有 finished/failed）
     duration_ms = int((time.time() - start_time) * 1000)
@@ -450,7 +475,7 @@ async def get_budget(
     if token_payload.run_id != run_id:
         raise HTTPException(status_code=403, detail="token 不属于此 run")
 
-    budget = _budget_tracker.get_or_create(run_id)
+    budget = await distributed_get_or_create(_budget_tracker, run_id)
     return McpBudgetResponse(
         run_id=str(budget.run_id),
         max_calls=budget.max_calls,

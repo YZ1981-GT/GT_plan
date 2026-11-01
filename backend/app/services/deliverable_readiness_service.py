@@ -17,7 +17,6 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -26,13 +25,22 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
+from app.services.deliverable_readiness_sources import ReadinessSourceChecks
+from app.services.deliverable_readiness_types import ReadinessBlocker, SourceStatus
 
 logger = logging.getLogger(__name__)
 
 
 # ── 快照 digest 纯函数 ─────────────────────────────────────────────
 
-_SNAPSHOT_SOURCE_KEYS = ("adjustments", "formula_push", "notes", "reports", "tb")
+_SNAPSHOT_SOURCE_KEYS = (
+    "adjustments",
+    "dataset",
+    "formula_push",
+    "notes",
+    "reports",
+    "tb",
+)
 
 
 def build_snapshot_digest(
@@ -54,6 +62,11 @@ def build_snapshot_digest(
                 "available": v.get("available"),
                 "count": v.get("count"),
                 "stale_count": v.get("stale_count", 0),
+                "content_digest": v.get("content_digest") or v.get("detail", {}).get("content_digest"),
+                "version_id": v.get("version_id") or v.get("detail", {}).get("version_id"),
+                "run_id": v.get("run_id") or v.get("detail", {}).get("run_id"),
+                "run_status": v.get("run_status") or v.get("detail", {}).get("run_status"),
+                "source_kind": v.get("source_kind") or v.get("detail", {}).get("source_kind"),
             }
             for k, v in sorted(sources.items())  # 排序确保稳定
             if k in _SNAPSHOT_SOURCE_KEYS
@@ -80,23 +93,6 @@ TRIO_STEP_KEYS: list[dict[str, Any]] = [
 # ── 结果数据类 ─────────────────────────────────────────────────────
 
 @dataclass
-class ReadinessBlocker:
-    """一条硬闸门或软警告。"""
-    code: str
-    message: str
-    evidence: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class SourceStatus:
-    """某一数据源的 readiness 摘要。"""
-    available: bool = False
-    count: int = 0
-    stale_count: int = 0
-    detail: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class TrioStepStatus:
     """正式三件套某步骤的 readiness 状态。"""
     key: str
@@ -115,7 +111,7 @@ class ReadinessResult:
     trio: dict[str, Any] = field(default_factory=dict)
 
 
-class DeliverableReadinessService:
+class DeliverableReadinessService(ReadinessSourceChecks):
     """交付中心 readiness 检查。
 
     ``check(db, project_id, year)`` 真读取 TB、公式推送、调整、
@@ -150,7 +146,21 @@ class DeliverableReadinessService:
                 evidence={"component": "project", "error": str(exc)[:200]},
             ))
 
-        # 2. 试算表（TB）
+        # 2. 当前账套数据集版本。没有 active 数据集可兼容历史项目，但快照必须显式记下 None。
+        try:
+            async with db.begin_nested():
+                dataset_status = await self._check_dataset(db, project_id, year)
+                sources["dataset"] = dataset_status.__dict__
+        except Exception as exc:
+            logger.warning("Dataset readiness check failed: %s", exc)
+            blockers.append(ReadinessBlocker(
+                code="upstream_not_ready",
+                message="当前账套数据集不可查询",
+                evidence={"component": "dataset", "error": str(exc)[:200]},
+            ))
+            sources["dataset"] = SourceStatus().__dict__
+
+        # 3. 试算表（TB）
         try:
             async with db.begin_nested():
                 tb_status = await self._check_trial_balance(db, project_id, year, blockers)
@@ -164,10 +174,16 @@ class DeliverableReadinessService:
             ))
             sources["tb"] = SourceStatus().__dict__
 
-        # 3. 公式推送
+        # 4. 公式推送
         try:
             async with db.begin_nested():
-                fp_status = await self._check_formula_push(db, project_id, year, blockers)
+                fp_status = await self._check_formula_push(
+                    db,
+                    project_id,
+                    year,
+                    blockers,
+                    report_scope=(project.report_scope if project is not None else None),
+                )
                 sources["formula_push"] = fp_status.__dict__
         except Exception as exc:
             logger.warning("Formula push readiness check failed: %s", exc)
@@ -209,7 +225,14 @@ class DeliverableReadinessService:
         # 6. 附注
         try:
             async with db.begin_nested():
-                notes_status = await self._check_notes(db, project_id, year, blockers)
+                notes_status = await self._check_notes(
+                    db,
+                    project_id,
+                    year,
+                    blockers,
+                    report_scope=(project.report_scope if project is not None else None),
+                    template_type=(project.template_type if project is not None else None),
+                )
                 sources["notes"] = notes_status.__dict__
         except Exception as exc:
             logger.warning("Notes readiness check failed: %s", exc)

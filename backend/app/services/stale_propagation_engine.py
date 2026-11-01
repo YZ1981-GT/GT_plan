@@ -252,17 +252,32 @@ class StalePropagationEngine:
     # ─── Mark Stale by URI (Task 2.3) ────────────────────────────────────
 
     async def _mark_stale_by_uri(
-        self, uris: list[str], project_id: UUID | str, year: int
+        self,
+        uris: list[str],
+        project_id: UUID | str,
+        year: int,
+        *,
+        source_uri: str | None = None,
     ) -> dict[str, int]:
         """按 URI 前缀分发写 DB：
 
         - WP:* → UPDATE working_paper SET prefill_stale=true WHERE wp_code=...
         - REPORT:* → UPDATE financial_report SET is_stale=true WHERE ...
-        - NOTE:* → UPDATE disclosure_notes SET is_stale=true WHERE ...
+        - NOTE:* → 经 ``stale_state.mark_note_stale`` 按章节写入
         - DELIVERABLE:{word_export_task_id}:{section_code} → UPDATE deliverable_section_state SET is_stale=true
         """
         pid = str(project_id)
         counts: dict[str, int] = {"wp": 0, "report": 0, "note": 0, "deliverable": 0}
+        from app.services.stale_state import StaleSource, mark_note_stale
+
+        source_prefix = str(source_uri or "").split(":", 1)[0].upper()
+        note_source = {
+            "TB": StaleSource.TRIAL_BALANCE,
+            "ADJ": StaleSource.ADJUSTMENT,
+            "REPORT": StaleSource.REPORT,
+            "WP": StaleSource.WORKPAPER_SYNC,
+            "NOTE": StaleSource.LINKAGE_PROPAGATION,
+        }.get(source_prefix, StaleSource.LINKAGE_PROPAGATION)
 
         # Group URIs by module prefix
         wp_codes: list[str] = []
@@ -313,17 +328,15 @@ class StalePropagationEngine:
                     )
                     counts["report"] = result.rowcount or 0
 
-                # Mark notes stale (实际列名 note_section 不是 section_code)
+                # Mark notes stale through the single DisclosureNote state entry point.
                 if note_codes:
-                    result = await session.execute(
-                        text(
-                            "UPDATE disclosure_notes SET is_stale = true "
-                            "WHERE project_id = :pid AND year = :year "
-                            "AND note_section = ANY(:codes)"
-                        ),
-                        {"pid": pid, "year": year, "codes": note_codes},
+                    counts["note"] = await mark_note_stale(
+                        session,
+                        project_id,
+                        source=note_source,
+                        sections=note_codes,
+                        year=year,
                     )
-                    counts["note"] = result.rowcount or 0
 
                 # Mark deliverable sections stale (deliverable_section_state)
                 if deliverable_codes:
@@ -503,7 +516,12 @@ class StalePropagationEngine:
             return {"affected": [], "total": 0, "degraded": False}
 
         # 写 DB stale 标记
-        await self._mark_stale_by_uri(affected_uris, project_id, year)
+        await self._mark_stale_by_uri(
+            affected_uris,
+            project_id,
+            year,
+            source_uri=source_uri,
+        )
 
         # SSE 推送前端
         await self._notify_frontend(project_id, affected_uris)

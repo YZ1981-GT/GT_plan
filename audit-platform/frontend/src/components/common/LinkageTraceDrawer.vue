@@ -254,7 +254,7 @@ function handleJump(contract: LinkageContract) {
   router.push(contract.route)
 }
 
-function handleCopy(contract: LinkageContract) {
+async function handleCopy(contract: LinkageContract) {
   const text = [
     `来源: ${getTypeLabel(contract.source_type)} [${contract.source_id}]`,
     `目标: ${getTypeLabel(contract.target_type)} [${contract.target_id}]`,
@@ -263,7 +263,7 @@ function handleCopy(contract: LinkageContract) {
     `状态: ${getStatusLabel(contract.status)}`,
   ].filter(Boolean).join('\n')
 
-  await copyText(text).then(() => {
+  void copyText(text).then(() => {
     ElMessage.success('引用信息已复制')
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

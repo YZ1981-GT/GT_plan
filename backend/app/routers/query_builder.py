@@ -24,7 +24,9 @@ Validates: requirements §三 · S-3 高级查询构建器
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -65,6 +67,7 @@ from app.services.custom_query.table_whitelist import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/query", tags=["query-builder"])
+SUCCESS_AUDIT_TIMEOUT_S = 1.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -117,7 +120,7 @@ async def require_query_builder_access(
 # 此处 re-export，保持 `from app.routers.query_builder import QueryDSL,
 # _build_select` 等既有导入与测试不变。
 # ─────────────────────────────────────────────────────────────────────────────
-from app.services.custom_query.builder_dsl import (  # noqa: E402
+from app.services.custom_query.builder_dsl import (  # noqa: E402, F401
     ExportDSL,
     FilterCond,
     OrderBy,
@@ -165,8 +168,8 @@ async def get_schema(
                         "target_table": target,
                         "target_label": TABLE_WHITELIST[target]["label"],
                         "on": [
-                            {"left_field": l, "right_field": r}
-                            for l, r in spec["on"]
+                            {"left_field": left_name, "right_field": right_name}
+                            for left_name, right_name in spec["on"]
                         ],
                         # many_to_one / one_to_many：一对多的关联会放大结果行数（R3.4）
                         "cardinality": spec["cardinality"],
@@ -261,6 +264,56 @@ async def _audit_query_rejection(
     )
 
 
+async def _audit_query_success(
+    body: QueryDSL,
+    *,
+    user: User,
+    scope: BuilderScope,
+    total: int,
+    cache_hit: bool,
+    db: AsyncSession,
+) -> None:
+    """成功查询留痕；值只用于节流摘要，审计明细不复制业务数据。"""
+    try:
+        dialect = str(db.get_bind().dialect.name).lower()
+    except Exception:
+        return
+    if dialect not in {"postgres", "postgresql"}:
+        return
+
+    from app.core.redis import get_redis
+    from app.services.custom_query.audit_helper import record_query_execution
+
+    try:
+        definition = body.model_dump(mode="json", exclude={"count_token"})
+
+        async def record() -> None:
+            redis = await get_redis()
+            await record_query_execution(
+                redis=redis,
+                user_id=user.id,
+                source=f"builder:{body.table}",
+                filters={"definition": definition},
+                project_id=body.project_id,
+                action="custom_query.builder_execute",
+                details={
+                    "table": body.table,
+                    "scope": scope.describe(),
+                    "row_count": int(total),
+                    "condition_count": len(body.filters),
+                    "condition_fields": sorted({item.field for item in body.filters}),
+                    "join_count": len(body.joins),
+                    "aggregate_count": len(body.aggregates),
+                    "cross_project": body.project_id is None,
+                    "cache_hit": cache_hit,
+                },
+            )
+
+        await asyncio.wait_for(record(), timeout=SUCCESS_AUDIT_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — 只读查询不因审计通道故障失败
+        logger.warning("query_builder 成功审计写入失败: %s", exc)
+
+
 def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
     """为查询结果每行派生可用的公式引用语法（无法定位返回 None；R3.7，ADR-AQL-18）。
 
@@ -318,7 +371,11 @@ async def execute_query(
     cached = await get_cached_result(cache_key)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
-        return with_acnr_results(cached, await acnr.results(db) if acnr else None)
+        final = with_acnr_results(cached, await acnr.results(db) if acnr else None)
+        await _audit_query_success(
+            body, user=current_user, scope=scope, total=int(cached.get("total", 0)), cache_hit=True, db=db
+        )
+        return final
 
     try:
         async with cancellable_query(db, QUERY_TIMEOUT_MS):
@@ -331,7 +388,7 @@ async def execute_query(
                 total = 1
             else:
                 count_stmt = build_count(stmt)
-                count_subject = count_tokens.subject_of(current_user)
+                count_subject = f"{count_tokens.subject_of(current_user)}:{scope_signature(scope)}"
                 count_digest = count_tokens.statement_digest(count_stmt, db.get_bind(), subject=count_subject)
                 reused_total = count_tokens.reuse(body.count_token, digest=count_digest, subject=count_subject)
                 count_reused = reused_total is not None
@@ -344,16 +401,20 @@ async def execute_query(
         await _audit_query_rejection(http_exc, user=current_user, table=body.table)
         raise
     except SQLAlchemyError as exc:
+        correlation_id = uuid.uuid4().hex
         try:
             await db.rollback()
         except Exception:
             pass
-        logger.exception("query_builder execute failed")
+        logger.exception("query_builder execute failed [correlation_id=%s]", correlation_id)
         raise HTTPException(
             status_code=400,
-            detail={"error_code": "QUERY_EXECUTION_FAILED",
-                    "message": f"查询执行失败：{exc}"},
-        )
+            detail={
+                "error_code": "QUERY_EXECUTION_FAILED",
+                "message": "查询执行失败，请检查字段、条件和关联关系",
+                "correlation_id": correlation_id,
+            },
+        ) from exc
 
     rows_serialized: list[dict] = []
     for r in rows:
@@ -383,7 +444,11 @@ async def execute_query(
     # 回写 Redis 缓存（短 TTL）；单元格取值每次现读，不进缓存
     await set_cached_result(cache_key, query_result)
 
-    return with_acnr_results(query_result, await acnr.results(db) if acnr else None)
+    final = with_acnr_results(query_result, await acnr.results(db) if acnr else None)
+    await _audit_query_success(
+        body, user=current_user, scope=scope, total=int(total), cache_hit=False, db=db
+    )
+    return final
 
 
 _EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数（服务端游标），避免全量加载

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,9 +18,12 @@ from app.deps import require_role
 from app.models.ai_model_options import (
     AIAuthScheme,
     AIDeployment,
+    AIMaskPolicy,
+    AITrustZone,
     OCRCapability,
     OCRProtocol,
     ReasoningEffort,
+    default_trust_zone,
 )
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
 from app.models.core import User
@@ -28,6 +32,7 @@ from app.services.ai_model_secret_service import (
     apply_api_key_update,
     has_api_key,
 )
+from app.services.audit_log_helper import append_audit_log
 from app.services.ai_model_presets import (
     PRESET_BY_KEY,
     PRESET_USER_EDITABLE_FIELDS,
@@ -53,6 +58,61 @@ router = APIRouter(prefix="/api/ai-models", tags=["ai-models"])
 _admin = require_role(["admin"])
 
 
+def _enum_value(value):
+    return value.value if hasattr(value, "value") else value
+
+
+def _audit_model_snapshot(model: AIModelConfig) -> dict[str, object]:
+    endpoint = str(model.endpoint_url or "")
+    parsed = urlsplit(endpoint) if endpoint else None
+    origin = None
+    if parsed and parsed.scheme and parsed.hostname:
+        host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+        origin = f"{parsed.scheme}://{host}{f':{parsed.port}' if parsed.port else ''}"
+    return {
+        "model_name": model.model_name,
+        "model_type": _enum_value(model.model_type),
+        "provider": _enum_value(model.provider),
+        "endpoint_origin": origin,
+        "deployment": model.deployment,
+        "trust_zone": model.trust_zone,
+        "client_data_allowed": bool(model.client_data_allowed),
+        "mask_policy": model.mask_policy,
+        "is_active": bool(model.is_active),
+        "ocr_capability": model.ocr_capability,
+        "ocr_protocol": model.ocr_protocol,
+    }
+
+
+async def _audit_model_change(
+    db: AsyncSession,
+    *,
+    user: User,
+    model: AIModelConfig,
+    action: str,
+    before: dict[str, object] | None,
+    credential_changed: bool = False,
+    replaced_model_ids: list[str] | None = None,
+) -> None:
+    """与配置变更同事务写哈希链；正文、密钥和完整端点均不入审计。"""
+    await append_audit_log(db, {
+        "user_id": user.id,
+        "project_id": None,
+        "action": "ai_model_config_changed",
+        "resource_type": "ai_model_config",
+        "resource_id": str(model.id),
+        "details": {
+            "event_type": "ai_model_config_changed",
+            "action": action,
+            "model_id": str(model.id),
+            "before": before,
+            "after": _audit_model_snapshot(model),
+            "credential_changed": credential_changed,
+            "replaced_model_ids": replaced_model_ids or [],
+        },
+    })
+
+
 class ModelCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -70,6 +130,9 @@ class ModelCreate(BaseModel):
     request_timeout_seconds: int | None = Field(default=None, ge=1, le=600)
     context_window: int | None = Field(default=None, ge=1)
     performance_notes: str | None = Field(default=None, max_length=4000)
+    trust_zone: AITrustZone | None = None
+    client_data_allowed: bool | None = None
+    mask_policy: AIMaskPolicy | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -89,6 +152,9 @@ class ModelUpdate(BaseModel):
     request_timeout_seconds: int | None = Field(default=None, ge=1, le=600)
     context_window: int | None = Field(default=None, ge=1)
     performance_notes: str | None = Field(default=None, max_length=4000)
+    trust_zone: AITrustZone | None = None
+    client_data_allowed: bool | None = None
+    mask_policy: AIMaskPolicy | None = None
 
 
 def _validated_endpoint(
@@ -107,6 +173,45 @@ def _validated_endpoint(
         return validate_endpoint_structure(endpoint_url or profile.default_endpoint, profile)
     except LLMEndpointPolicyError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+def _trust_values(
+    *,
+    deployment: str,
+    preset_key: str | None,
+    trust_zone: AITrustZone | None,
+    client_data_allowed: bool | None,
+    mask_policy: AIMaskPolicy | None,
+) -> dict[str, object]:
+    """规范化信任域。位置不能由表单伪造，信任域必须与客户数据政策一致。"""
+    zone = trust_zone.value if trust_zone else default_trust_zone(
+        deployment=deployment, preset_key=preset_key
+    )
+    if deployment == AIDeployment.local.value and zone != AITrustZone.local_device.value:
+        raise HTTPException(422, "本机端点的信任域必须是‘本机设备’")
+    if deployment != AIDeployment.local.value and zone == AITrustZone.local_device.value:
+        raise HTTPException(422, "服务器端点不能标记为‘本机设备’")
+
+    allowed = client_data_allowed
+    if allowed is None:
+        allowed = zone in {
+            AITrustZone.local_device.value,
+            AITrustZone.firm_private.value,
+        }
+    policy = mask_policy.value if mask_policy else (
+        AIMaskPolicy.role_based.value
+        if zone == AITrustZone.local_device.value
+        else AIMaskPolicy.strict.value
+    )
+    if zone == AITrustZone.restricted.value and allowed:
+        raise HTTPException(422, "受限端点禁止处理客户数据")
+    if zone == AITrustZone.approved_provider.value and allowed and policy != AIMaskPolicy.strict.value:
+        raise HTTPException(422, "经批准外部服务处理客户数据时必须使用严格脱敏")
+    return {
+        "trust_zone": zone,
+        "client_data_allowed": bool(allowed),
+        "mask_policy": policy,
+    }
 
 
 def _ocr_values_for_create(body: ModelCreate) -> dict[str, object | None]:
@@ -222,7 +327,30 @@ async def seed_models(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ):
+    before_models = list((await db.execute(
+        select(AIModelConfig).where(AIModelConfig.is_deleted.is_(False))
+    )).scalars().all())
+    before = {str(model.id): _audit_model_snapshot(model) for model in before_models}
     await AIService.init_default_models(db)
+    await db.flush()
+    after_models = list((await db.execute(
+        select(AIModelConfig).where(AIModelConfig.is_deleted.is_(False))
+    )).scalars().all())
+    await append_audit_log(db, {
+        "user_id": current_user.id,
+        "project_id": None,
+        "action": "ai_model_config_changed",
+        "resource_type": "ai_model_config",
+        "resource_id": None,
+        "details": {
+            "event_type": "ai_model_config_changed",
+            "action": "seed",
+            "model_id": "bulk",
+            "before": before,
+            "after": {str(model.id): _audit_model_snapshot(model) for model in after_models},
+            "credential_changed": False,
+        },
+    })
     await db.commit()
     logger.info("AI 默认模型已初始化 by=%s", current_user.username)
     return {"message": "默认模型已初始化"}
@@ -274,9 +402,24 @@ async def create_model(
         **ocr_values,
     )
     model.deployment = classify_model_deployment(model)
+    trust_values = _trust_values(
+        deployment=model.deployment,
+        preset_key=model.preset_key,
+        trust_zone=body.trust_zone,
+        client_data_allowed=body.client_data_allowed,
+        mask_policy=body.mask_policy,
+    )
+    model.trust_zone = str(trust_values["trust_zone"])
+    model.client_data_allowed = bool(trust_values["client_data_allowed"])
+    model.mask_policy = str(trust_values["mask_policy"])
     _apply_secret_or_raise(model, api_key=body.api_key, clear_api_key=False)
     db.add(model)
     try:
+        await db.flush()
+        await _audit_model_change(
+            db, user=current_user, model=model, action="create", before=None,
+            credential_changed=bool(str(body.api_key or "").strip()),
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -294,9 +437,11 @@ async def update_model(
     current_user: User = Depends(_admin),
 ):
     model = await _get_model(db, model_id)
+    before = _audit_model_snapshot(model)
     changed = body.model_dump(exclude_unset=True)
     if model.preset_key:
         allowed = set(PRESET_USER_EDITABLE_FIELDS)
+        allowed.update({"trust_zone", "client_data_allowed", "mask_policy"})
         if model.model_type != AIModelType.chat:
             allowed.discard("reasoning_effort")
         forbidden = set(changed) - allowed
@@ -377,6 +522,40 @@ async def update_model(
         & set(changed)
     )
     new_deployment = classify_model_deployment(model)
+    trust_fields_changed = bool(
+        {"trust_zone", "client_data_allowed", "mask_policy"} & set(changed)
+    )
+    reset_for_new_location = new_deployment != model.deployment and not trust_fields_changed
+    try:
+        requested_zone = (
+            body.trust_zone
+            if "trust_zone" in changed
+            else None if reset_for_new_location else AITrustZone(model.trust_zone)
+        )
+    except (ValueError, TypeError):
+        requested_zone = None
+    try:
+        requested_policy = (
+            body.mask_policy
+            if "mask_policy" in changed
+            else None if reset_for_new_location else AIMaskPolicy(model.mask_policy)
+        )
+    except (ValueError, TypeError):
+        requested_policy = None
+    trust_values = _trust_values(
+        deployment=new_deployment,
+        preset_key=model.preset_key,
+        trust_zone=requested_zone,
+        client_data_allowed=(
+            body.client_data_allowed
+            if "client_data_allowed" in changed
+            else None if reset_for_new_location else model.client_data_allowed
+        ),
+        mask_policy=requested_policy,
+    )
+    model.trust_zone = str(trust_values["trust_zone"])
+    model.client_data_allowed = bool(trust_values["client_data_allowed"])
+    model.mask_policy = str(trust_values["mask_policy"])
     if model.is_active and new_deployment != model.deployment:
         with db.no_autoflush:  # 冲突检查不得提前把未校验完的改动刷进库
             taken = await AIService.route_slot_taken(
@@ -405,6 +584,11 @@ async def update_model(
             warning = await _local_unavailable_warning(db, model, failure)
 
     try:
+        await db.flush()
+        await _audit_model_change(
+            db, user=current_user, model=model, action="update", before=before,
+            credential_changed=secret_changed,
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -426,12 +610,19 @@ async def delete_model(
     current_user: User = Depends(_admin),
 ):
     model = await _get_model(db, model_id)
+    before = _audit_model_snapshot(model)
     if model.preset_key:
         raise HTTPException(409, "企业预设模型不能删除，可编辑后录入 API Key")
     if model.is_active:
         raise HTTPException(409, "已启用的模型不能删除，请先停用")
+    had_api_key = has_api_key(model)
     model.is_deleted = True
     model.api_key_ciphertext = None
+    await db.flush()
+    await _audit_model_change(
+        db, user=current_user, model=model, action="delete", before=before,
+        credential_changed=had_api_key,
+    )
     await db.commit()
     logger.info("AI 模型已软删除 id=%s by=%s", model.id, current_user.username)
     return {"message": "已移入回收状态"}
@@ -486,6 +677,22 @@ async def activate_model(
 ):
     """启用模型参与路由：只替换同类型（OCR 同能力槽）同部署位置的那一条（ADR-ROUTE-002）。"""
     model = await _get_model(db, model_id)
+    before = _audit_model_snapshot(model)
+    slot_conditions = [
+        AIModelConfig.model_type == model.model_type,
+        AIModelConfig.is_active.is_(True),
+        AIModelConfig.is_deleted.is_(False),
+        AIModelConfig.id != model.id,
+    ]
+    if model.model_type == AIModelType.ocr:
+        slot_conditions.append(AIModelConfig.ocr_capability == model.ocr_capability)
+    if model.model_type != AIModelType.embedding:
+        slot_conditions.append(AIModelConfig.deployment == deployment_of(model))
+    replaced_model_ids = [
+        str(value) for value in (await db.execute(
+            select(AIModelConfig.id).where(*slot_conditions)
+        )).scalars().all()
+    ]
     service = AIService(db)
     try:
         ok = await service.switch_model(model.model_name, model.model_type)
@@ -497,6 +704,10 @@ async def activate_model(
         raise HTTPException(400, _validation_failure_detail(failure, "模型验证失败，未启用"))
     warning = await _local_unavailable_warning(db, model, service.last_validation_warning)
     try:
+        await _audit_model_change(
+            db, user=current_user, model=model, action="activate", before=before,
+            replaced_model_ids=replaced_model_ids,
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -520,7 +731,11 @@ async def deactivate_model(
     """停用：退出路由；该类型没有任何启用模型时回落 `.env` / 本机进程内 OCR。"""
     model = await _get_model(db, model_id)
     if model.is_active:
+        before = _audit_model_snapshot(model)
         await AIService(db).disable_model(model)
+        await _audit_model_change(
+            db, user=current_user, model=model, action="deactivate", before=before,
+        )
         await db.commit()
         logger.info("AI 模型已停用 id=%s by=%s", model.id, current_user.username)
     return {"message": "已停用", "model_name": model.model_name}
@@ -566,7 +781,7 @@ async def _local_unavailable_warning(
         head = f"模型当前不可用（{failure.message}），已启用"
 
     if model.model_type == AIModelType.embedding:
-        return f"{head}；向量模型不跨模型兜底，恢复前向量检索不可用"
+        return f"{head}；向量模型不跨模型兜底，本机恢复前向量检索不可用"
     with db.no_autoflush:
         has_fallback = await AIService.route_slot_taken(
             db, model_type=model.model_type,
@@ -574,7 +789,8 @@ async def _local_unavailable_warning(
             ocr_capability=model.ocr_capability, exclude_id=model.id,
         )
     if has_fallback:
-        return f"{head}；调用时会自动使用另一候选兜底"
+        fallback_label = "服务器模型" if is_local else "本机模型"
+        return f"{head}；调用时会自动使用已启用的{fallback_label}兜底"
     if is_preset:
         return f"{head}；该类型尚无其他候选，连上公司网络前 AI 调用会失败"
     return f"{head}；该类型尚未启用服务器模型，本机恢复前调用会失败"
@@ -643,6 +859,9 @@ def _to_dict(model: AIModelConfig) -> dict[str, object]:
             model.api_key_updated_at.isoformat() if model.api_key_updated_at else None
         ),
         "deployment": model.deployment,
+        "trust_zone": model.trust_zone,
+        "client_data_allowed": model.client_data_allowed,
+        "mask_policy": model.mask_policy,
         "is_active": model.is_active,
         "context_window": model.context_window,
         "performance_notes": model.performance_notes,

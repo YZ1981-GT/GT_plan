@@ -408,6 +408,7 @@ describe('Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体', ()
     expect(body).not.toBeNull()
     expect('mentions' in body!).toBe(false)
     expect('attachment_ids' in body!).toBe(false)
+    expect('project_attachment_ids' in body!).toBe(false)
     expect('review_mode' in body!).toBe(false)
   })
 
@@ -424,6 +425,23 @@ describe('Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体', ()
 
     const body = readRunRequestBody(calls)
     expect(body!.attachment_ids).toEqual(['att-1', 'att-2'])
+  })
+
+  it('项目附件只以稳定 ID 进入请求体，不提交版本、blob、hash 或路径', async () => {
+    const calls = installFetchSpy()
+    const wrapper = await mountPanel()
+    const { default: ChatProjectAttachmentPicker } = await import('../ChatProjectAttachmentPicker.vue')
+
+    wrapper.findComponent(ChatProjectAttachmentPicker).vm.$emit('change', ['project-att-1'])
+    await nextTick()
+    await typeDraft(wrapper, '分析项目证据')
+    await clickSend(wrapper)
+
+    const body = readRunRequestBody(calls)!
+    expect(body.project_attachment_ids).toEqual(['project-att-1'])
+    for (const forbidden of ['attachment_version_id', 'blob_id', 'content_hash', 'storage_key']) {
+      expect(body).not.toHaveProperty(forbidden)
+    }
   })
 
   it('复核模式开启时提交 review_mode + sheet_name', async () => {

@@ -22,7 +22,7 @@ export interface UseReportExportReturn {
   onExportExcel: () => void
   onExportAllExcel: () => void
   onExportAllUnadjusted: () => void
-  copyReportTable: () => void
+  copyReportTable: () => Promise<void>
   showReportImport: Ref<boolean>
   onReportImported: () => void
 }
@@ -81,7 +81,7 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
     })
   }
 
-  function copyReportTable() {
+  async function copyReportTable() {
     if (!rows.value.length) { ElMessage.warning('无数据可复制'); return }
     const headers = ['行次', '项目', '本期金额', '上期金额']
     const dataRows = rows.value.map((r: any) => [r.row_code || '', r.row_name || '', r.current_period_amount ?? '', r.prior_period_amount ?? ''])

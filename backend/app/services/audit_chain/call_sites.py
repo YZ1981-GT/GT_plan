@@ -115,6 +115,10 @@ CALL_SITE_REGISTRY: dict[str, dict] = {
         "policy": "mandatory",
         "reason": "数据解锁（ADR-ALC-08 收口）",
     },
+    "services/note_offline_import_governance.py:record_import_governance": {
+        "policy": "mandatory",
+        "reason": "附注离线导入版本与业务数据必须同事务留痕",
+    },
     "services/workpaper_ai_conclusion_audit_trail.py:record_draft_generation_audit": {
         "policy": "mandatory",
         "reason": "AI 结论草稿生成留痕",

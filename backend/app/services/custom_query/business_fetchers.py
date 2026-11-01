@@ -91,9 +91,12 @@ def _too_large(req: QueryRequest, row_count: int) -> HTTPException:
     )
 
 
-def _cycle_cache(user: Any, db: Any) -> CycleScopeCache | None:
-    """请求级循环范围缓存（R3.8）：业务视图的 execute / export / 模板执行都按当前用户带上；无用户（内部调用）时不限。"""
-    return CycleScopeCache(user, db) if user is not None else None
+def _cycle_cache(req: QueryRequest, user: Any, db: Any) -> CycleScopeCache | None:
+    """复用编排器为缓存身份解析的循环范围；导出等旁路才新建请求级缓存。"""
+    if user is None:
+        return None
+    existing = getattr(req, "cycle_scope_cache", None)
+    return existing if isinstance(existing, CycleScopeCache) else CycleScopeCache(user, db)
 
 
 def _sql_context(req: QueryRequest, target: ResolvedSource, db: Any, cycle: CycleScopeCache | None = None) -> FetchContext:
@@ -161,7 +164,7 @@ async def business_fetcher(req: QueryRequest, resolved: list[Any], db: Any, *, u
     source = (req.source or "").strip()
     filters = dict(req.filters or {})
     target = resolve_source(source, filters)
-    cycle = _cycle_cache(user, db)
+    cycle = _cycle_cache(req, user, db)
     if target.spec is not None:
         return await _fetch_sql(req, target, db, cycle)
     return await _fetch_json(req, target, db, cycle)
@@ -180,6 +183,6 @@ async def prepare_export(req: QueryRequest, db: Any, *, user: Any = None) -> "pa
         _reject_conditions(req)
         return None
     return await paged_fetch.prepare_stream(
-        target.spec, _sql_context(req, target, db, _cycle_cache(user, db)), conditions=list(req.conditions),
+        target.spec, _sql_context(req, target, db, _cycle_cache(req, user, db)), conditions=list(req.conditions),
         logic=req.condition_logic, columns=list(req.columns), sort=list(req.sort),
     )

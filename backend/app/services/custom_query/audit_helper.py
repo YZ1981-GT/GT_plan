@@ -278,6 +278,10 @@ async def record_query_execution(
 # ─────────────────────────────────────────────────────────────────────────────
 #: 查询被时间预算掐断
 ACTION_QUERY_TIMEOUT = "custom_query.timeout"
+#: 查询保护未能在数据库侧启用
+ACTION_QUERY_GUARD_UNAVAILABLE = "custom_query.guard_unavailable"
+#: 查询变换失败，未返回降级明细
+ACTION_QUERY_TRANSFORM_FAILED = "custom_query.transform_failed"
 #: 查询因复杂度预算被拒（JOIN 条数 / 分组维度 / 聚合个数超限）
 ACTION_QUERY_BUDGET_DENIED = "custom_query.budget_denied"
 #: 查询因 PII 字段无权被拒
@@ -287,6 +291,8 @@ ACTION_PII_DENIED = "custom_query.pii_denied"
 #: ``advanced_query.ownership_denied``，不在此表内（避免同一事件记两条）。
 REJECTION_ACTION_BY_ERROR_CODE: dict[str, str] = {
     "QUERY_TIMEOUT": ACTION_QUERY_TIMEOUT,
+    "QUERY_GUARD_UNAVAILABLE": ACTION_QUERY_GUARD_UNAVAILABLE,
+    "QUERY_TRANSFORM_FAILED": ACTION_QUERY_TRANSFORM_FAILED,
     "COMPLEXITY_BUDGET_EXCEEDED": ACTION_QUERY_BUDGET_DENIED,
     "PII_FIELD_FORBIDDEN": ACTION_PII_DENIED,
     # 构建器人员表角色门（advanced-query-linkage-closure 任务 9）：与 PII 列越权同一处置（走权限申请）

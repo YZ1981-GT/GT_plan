@@ -8,7 +8,10 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import timezone
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .canonical import GENESIS_HASH, hash_v1, hash_v2
 
@@ -60,6 +63,19 @@ def _try_hash_v1(entry: dict) -> bool:
         for oid in _uuid_variants(entry.get("object_id", "") or ""):
             if hash_v1(ts, uid, action_type, oid, payload_json, prev_hash) == stored_hash:
                 return True
+    return False
+
+
+def _has_v2_ancestor(entry: dict, hash_to_entry: dict[str, dict]) -> bool:
+    """链一旦进入 v2，后继不得通过删除标记降级成 legacy。"""
+    seen: set[str] = set()
+    previous = entry.get("prev_hash", "")
+    while previous in hash_to_entry and previous not in seen:
+        seen.add(previous)
+        ancestor = hash_to_entry[previous]
+        if (ancestor.get("payload") or {}).get("_hash_v") == 2:
+            return True
+        previous = ancestor.get("prev_hash", "")
     return False
 
 
@@ -129,7 +145,17 @@ def verify_entries(
                     "message": f"v2 条目 {entry['id']} 重算哈希不匹配",
                 })
         else:
-            if _try_hash_v1(entry):
+            if _has_v2_ancestor(entry, hash_to_entry):
+                problems.append({
+                    "type": "content_mismatch",
+                    "entry_id": entry["id"],
+                    "entry_hash": eh,
+                    "message": (
+                        f"条目 {entry['id']} 位于 v2 链段却缺少 _hash_v=2，"
+                        "疑似版本降级或载荷篡改"
+                    ),
+                })
+            elif _try_hash_v1(entry):
                 legacy_verified += 1
             else:
                 legacy_unverifiable += 1
@@ -158,6 +184,16 @@ def verify_entries(
         legacy_verified=legacy_verified,
         legacy_unverifiable=legacy_unverifiable,
     )
+
+
+def _timestamp_text(value, *, v2: bool) -> str:
+    if value is None:
+        return ""
+    if not v2:
+        return value.isoformat()
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="microseconds")
 
 
 async def verify_chain(
@@ -210,7 +246,7 @@ async def verify_chain(
         entries_dicts.append({
             "id": str(row.id), "entry_hash": row.entry_hash,
             "prev_hash": row.prev_hash,
-            "ts": row.ts.isoformat() if row.ts else "",
+            "ts": _timestamp_text(row.ts, v2=payload.get("_hash_v") == 2),
             "user_id": str(row.user_id) if row.user_id else "",
             "action_type": row.action_type or "",
             "object_type": row.object_type or "",

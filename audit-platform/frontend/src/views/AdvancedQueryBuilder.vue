@@ -96,7 +96,7 @@
 
           <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；跨模块 cell 级字段） -->
           <el-form-item label="ACNR 选字段（跨模块单元格）">
-            <CustomQueryFieldPicker v-model="acnrFieldIds" />
+            <CustomQueryFieldPicker v-model="acnrFieldIds" :project-id="contextProjectId || null" />
             <div v-if="!contextProjectId" class="gt-aqb-field-hint" data-testid="acnr-no-project">{{ BUILDER_NO_PROJECT_HINT }}</div>
           </el-form-item>
 
@@ -416,7 +416,7 @@
 
 <script setup lang="ts">
 import { copyText } from '@/utils/clipboard'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -515,6 +515,8 @@ const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v2'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
 const countToken = ref('')
+let queryGeneration = 0
+let previewGeneration = 0
 /** 最近一次查询失败（结果区持久显示） */
 const queryError = ref<QueryErrorText | null>(null)
 
@@ -618,6 +620,11 @@ const currentTable = computed<TableMeta | null>(() => {
 
 const availableJoins = computed(() => currentTable.value?.joins || [])
 
+// 查询定义或作用域变化后，旧结果、导出和行操作立即失效。
+watch([contextProjectId, contextYear, scopedToProject], invalidateResult, { flush: 'sync' })
+watch(dsl, invalidateResult, { deep: true, flush: 'sync' })
+watch(acnrFieldIds, invalidateResult, { deep: true, flush: 'sync' })
+
 function joinOnSummary(j: JoinRow): string {
   if (!j.table || !currentTable.value) return ''
   const meta = currentTable.value.joins?.find(x => x.target_table === j.table)
@@ -643,18 +650,29 @@ onMounted(async () => {
   }
 })
 
+function invalidateResult() {
+  queryGeneration += 1
+  previewGeneration += 1
+  result.value = null
+  countToken.value = ''
+  queryError.value = null
+  sqlPreview.value = ''
+  page.value = 1
+  lastQuery.projectId = null
+  lastQuery.year = null
+  loadingPreview.value = false
+  loadingExecute.value = false
+}
+
 function onTableChange() {
   // 切表后重置字段/条件，避免引用旧表的字段名
+  invalidateResult()
   dsl.fields = []
   dsl.filters = []
   dsl.order_by = []
   dsl.joins = []
   dsl.aggregates = []
   dsl.group_by = []
-  sqlPreview.value = ''
-  result.value = null
-  queryError.value = null
-  page.value = 1
 }
 
 function addJoin() {
@@ -766,17 +784,20 @@ async function doPreview() {
     return
   }
   loadingPreview.value = true
+  const generation = ++previewGeneration
   try {
     const resp = await api.post<{ sql: string; columns: string[] }>(
       '/api/query/preview',
       buildPayload(),
       { _silent: true } as any,
     )
+    if (generation !== previewGeneration) return
     sqlPreview.value = resp.sql
   } catch (e: any) {
+    if (generation !== previewGeneration) return
     ElMessage.warning(queryErrorToast('生成 SQL 预览', describeQueryError(e)))
   } finally {
-    loadingPreview.value = false
+    if (generation === previewGeneration) loadingPreview.value = false
   }
 }
 
@@ -799,12 +820,14 @@ async function runQuery() {
     return
   }
   loadingExecute.value = true
+  const generation = ++queryGeneration
   queryError.value = null
   // 记下本次发送的项目与年度（纯函数，与下面请求体同一份输入；请求体须直接是构造函数调用，见 queryPayloads 契约）
   const sent = buildPayload()
   try {
     // 调用方自管错误提示（_silent）：失败时结果区显示后端原因与追踪号，确定性错误不自动重试（R11.1）
     const resp = await api.post<QueryResult>('/api/query/execute', buildPayload(), { _silent: true } as any)
+    if (generation !== queryGeneration) return
     lastQuery.projectId = typeof sent.project_id === 'string' ? sent.project_id : null
     lastQuery.year = isKnownYear(sent.year) ? sent.year : null
     result.value = resp
@@ -812,10 +835,11 @@ async function runQuery() {
     sqlPreview.value = resp.sql
     void validateRefs()
   } catch (e: any) {
+    if (generation !== queryGeneration) return
     result.value = null
     queryError.value = describeQueryError(e)
   } finally {
-    loadingExecute.value = false
+    if (generation === queryGeneration) loadingExecute.value = false
   }
 }
 
@@ -852,10 +876,10 @@ async function doExport() {
   }
 }
 
-function copyCorrelationId() {
+async function copyCorrelationId() {
   const id = queryError.value?.correlationId
   if (!id) return
-  await copyText(id).then(
+  void copyText(id).then(
     () => { ElMessage.success('已复制追踪号') },
     () => { ElMessage.warning('复制失败，请手动复制') },
   )
@@ -919,14 +943,14 @@ function refHint(index: number): string {
 }
 
 /** 复制公式引用：只复制经地址库校验通过的引用 */
-function copyFormulaRef(index: number) {
+async function copyFormulaRef(index: number) {
   const ref = refOf(index)
   if (!ref) return
   if (!refUsable(index)) {
     ElMessage.warning(refHint(index))
     return
   }
-  await copyText(ref).then(() => {
+  void copyText(ref).then(() => {
     ElMessage.success(`已复制: ${ref}`)
   }).catch(() => {
     ElMessage.warning('复制失败，请手动复制')

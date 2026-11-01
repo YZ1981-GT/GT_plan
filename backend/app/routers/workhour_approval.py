@@ -15,7 +15,6 @@ Validates: Requirements F10.1, F10.2, F10.3, F10.4, F10.6 + M-5
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,7 +23,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import Project, User
 from app.models.workhour_entry_models import WorkHourEntry, WorkHourEntryStatus
 from app.models.workpaper_models import WorkingPaper, WpFileStatus
@@ -117,9 +116,13 @@ async def _calc_user_wp_completion_rates(
 async def list_pending_approvals(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """列出待审批工时（含底稿进度列）"""
+    """列出待审批工时（含底稿进度列）
+
+    原先被 workhour_entries 的 ``/workhours/{entry_id}`` 截走、从未可达（只校验登录 + 系统角色）；2026-10-31 改由
+    router_registry 先注册后可达，补项目成员校验（本项目成员或 admin），系统角色仍须 manager / partner / admin。
+    """
     if current_user.role.value not in ("admin", "partner", "manager"):
         raise HTTPException(403, "权限不足：仅 manager/partner/admin 可访问")
 

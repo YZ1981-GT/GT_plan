@@ -244,10 +244,8 @@ export function createEmptyGroup(
   const acctId = uid('da')
   return {
     id: uid('dg'),
-    depositType,
     bank: '',
     annualRate: 0,
-    accounts: [{ id: acctId, accountNo: '账号1' }],
     ...(partial || {}),
     accounts: partial?.accounts?.length
       ? partial.accounts.map(a => ({

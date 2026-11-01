@@ -98,7 +98,7 @@ const VALID_SECTIONS = ['addressee', 'independence', 'deficiency', 'committee', 
 type ValidSection = typeof VALID_SECTIONS[number]
 
 function generateId(): string {
-  return newUuid()}-${Math.random().toString(36).slice(2, 9)}`
+  return newUuid()
 }
 
 /** Build item_id for a section+field combination */

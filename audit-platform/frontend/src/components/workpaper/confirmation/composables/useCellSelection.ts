@@ -64,13 +64,13 @@ export function useCellSelection(rows: Ref<ConfirmationRow[]>) {
   const selectionSum = computed(() => selectedValues.value.reduce((a, b) => a + b, 0))
 
   /** 复制选中内容为 TSV 格式 */
-  function copyToClipboard() {
+  async function copyToClipboard() {
     const lines = selectedCells.value.map(cell => {
       const row = rows.value[cell.rowIndex]
       return row ? String((row as any)[cell.colField] ?? '') : ''
     })
     const text = lines.join('\n')
-    await copyText(text)
+    void copyText(text)
     return text
   }
 

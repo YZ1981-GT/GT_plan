@@ -134,6 +134,35 @@ def _standalone_tables(template_type: str, section_number: str) -> list[dict]:
     return _STANDALONE_TABLES[template_type].get(section_number) or []
 
 
+_STANDALONE_BY_TITLE: dict[str, dict[str, dict]] = {}
+
+
+def _standalone_by_title(template_type: str) -> dict[str, dict]:
+    """单体章节标题 → 章节（主章节优先；与运行时 ``standalone_note_filter`` 按标题取节同一依据）。"""
+    if template_type not in _STANDALONE_BY_TITLE:
+        from app.services.note_section_catalog import section_applies_to_scope
+
+        data = _load_json(DATA / f"note_template_{template_type}.json")
+        secs = data.get("sections", []) if isinstance(data, dict) else []
+        main = _MAIN_CHAPTER.get(template_type, "八")
+        index: dict[str, dict] = {}
+        for s in sorted(secs, key=lambda s: 0 if str(s.get("section_number", "")).startswith(main) else 1):
+            if s.get("tables") and section_applies_to_scope(s, "standalone"):
+                index.setdefault(str(s.get("section_title") or ""), s)
+        _STANDALONE_BY_TITLE[template_type] = index
+    return _STANDALONE_BY_TITLE[template_type]
+
+
+def _cross_std_table(other_std: str, consol_table: dict, section_title: str) -> str | None:
+    """另一口径子企业里这张合并表对应的单体表名（国企集团含上市子企业时按它读，spec
+    note-table-structure-formula-pull-closure R6.8）。按章节标题定章（运行时同一依据），表按标题行库选。"""
+    single = _standalone_by_title(other_std).get(section_title)
+    if single is None:
+        return None
+    name, _method = _choose_table(other_std, consol_table, single, None)
+    return name
+
+
 def _choose_table(template_type: str, consol_table: dict, single: dict, table_name: str | None) -> tuple[str | None, str]:
     """在已定的单体章节里按标题行库选子表（与运行时读取层同一个 choose_unit）。返回 (子表名, 选表方式)。
 
@@ -307,6 +336,8 @@ def generate(template_type: str) -> tuple[list[dict], Counter]:
                     table_name = chosen
             resolved[i] = (single, table_name, how)  # 下一张「续：」按改过的子表名接
             stats[how or "consol_only"] += 1
+            other = "listed" if template_type == "soe" else "soe"
+            cross = _cross_std_table(other, t, str(single.get("section_title") or "")) if single else None
             mappings.append({
                 "consol_section_id": t.get("section_id", ""),
                 "consol_parent": t.get("parent_section", ""),
@@ -316,7 +347,11 @@ def generate(template_type: str) -> tuple[list[dict], Counter]:
                 "standalone_section_title": single.get("section_title", "") if single else None,
                 "match_type": how if single else "consol_only",
                 "standalone_table_name": table_name if single else None,
+                # 子企业是另一口径时（国企集团含上市子公司）按它自己的模板选表；没有对应章节 / 表 ⇒ 不写
+                **({"standalone_table_name_by_std": {other: cross}} if cross else {}),
             })
+            if cross:
+                stats["cross_std_table"] += 1
 
     return mappings, stats
 
@@ -329,7 +364,7 @@ def main():
     for tt in ("soe", "listed"):
         mappings, stats = generate(tt)
         result["mappings"][tt] = mappings
-        total = sum(stats.values())
+        total = len(mappings)  # cross_std_table 是附加计数（同一张表既有口径内映射、也有跨口径表名），不计入表数
         print(f"\n{tt.upper()}: {total} 张合并表")
         for k, v in stats.most_common():
             print(f"  {k}: {v}")

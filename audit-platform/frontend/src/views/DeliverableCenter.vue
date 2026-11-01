@@ -271,8 +271,8 @@ import {
   archiveDeliverables,
   createPackage,
   packageFileUrl,
-  createFullDeliverables,
-  fetchExportJob,
+  createTrioJob,
+  getTrioJob,
   renderDisclosureNotes,
   renderFinancialReports,
   previewReportBody,
@@ -286,7 +286,6 @@ import {
   type DeliverableVersion,
   type OptionalSection,
   type TrioJob,
-  type NoteConsistency,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -295,10 +294,7 @@ import {
 } from '@/components/deliverable/generateGuard'
 import { useProjectStore } from '@/stores/project'
 import { getDisclosureReadiness } from '@/services/commonApi'
-import {
-  buildNoteConsistencyMessage,
-  notesInconsistencyFromError,
-} from '@/components/deliverable/noteConsistencyMessage'
+import { buildNoteConsistencyMessage } from '@/components/deliverable/noteConsistencyMessage'
 
 const route = useRoute()
 const projectStore = useProjectStore()
@@ -433,9 +429,8 @@ async function onTrioRetried(updatedJob: TrioJob) {
     while (attempts < 60) {
       await new Promise(r => setTimeout(r, 2000))
       try {
-        const j = await fetchExportJob(projectId.value, updatedJob.id)
-        // 映射 ExportJobResult 到 TrioJob 简化类型
-        trioJob.value = { ...updatedJob, status: j.status as TrioJob['status'] }
+        const j = await getTrioJob(projectId.value, updatedJob.id)
+        trioJob.value = j
         if (TERMINAL.includes(j.status)) break
       } catch { break }
       attempts++
@@ -851,87 +846,64 @@ async function runGenerateFull() {
     ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
     return
   }
-  // 前端先做依赖链根节点提示（报表就绪即视为试算表就绪），服务端再做权威校验
   if (!guardGenerate('reports')) return
-  const pending = await startFullDeliverables(false)
-  if (!pending) return
-  try {
-    await ElMessageBox.confirm(buildNoteConsistencyMessage(pending), '附注与底稿不一致', {
-      confirmButtonText: '仍要导出',
-      cancelButtonText: '返回同步',
-      type: 'warning',
-      dangerouslyUseHTMLString: true,
-    })
-  } catch {
-    return // 「返回同步」：不生成
-  }
-  await startFullDeliverables(true)
-}
-
-/** 发起一键全套；命中附注一致性闸门时返回待确认清单（未建任务），其余情况返回 null。 */
-async function startFullDeliverables(confirmInconsistent: boolean): Promise<NoteConsistency | null> {
-  if (year.value == null) {
-    ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
-    return null
-  }
   fullGenerating.value = true
   try {
-    const job = await createFullDeliverables(projectId.value, {
-      year: year.value,
-      template_variant: 'simple',
-      confirm_inconsistent: confirmInconsistent,
-    })
-    ElMessage.success('已创建一键生成全套任务，正在生成…')
-    const finalJob = await pollExportJob(job.id)
-    await loadList()
-    summarizeFullJob(finalJob)
-    return null
-  } catch (e: any) {
-    const pending = notesInconsistencyFromError(e)
-    if (pending) return pending
-    // 请求已静默全局拦截器（调用方自管提示）：超时与失败原因在这里给中文提示
-    if (e?.code === 'ECONNABORTED') {
-      ElMessage.warning('生成耗时较长，请稍后刷新交付中心查看结果')
-    } else {
-      const detail = e?.response?.data?.detail || e?.message || '一键生成全套失败'
-      ElMessage.error(typeof detail === 'string' ? detail : '一键生成全套失败')
+    const check: any = await checkTrioReadiness(projectId.value, year.value)
+    trioSnapshotValid.value = check?.status !== 'blocked'
+    if (check?.status === 'blocked') {
+      const reasons = Array.isArray(check.hard_blockers)
+        ? check.hard_blockers.map((item: any) => item?.message).filter(Boolean)
+        : []
+      ElMessage.warning(reasons.join('；') || '交付前检查未通过，请先处理阻断事项')
+      return
     }
-    return null
+
+    const created = await createTrioJob(projectId.value, year.value)
+    ElMessage.success('正式三件套任务已创建，正在生成…')
+    const finalJob = await pollTrioJob(created.job_id)
+    trioJob.value = finalJob
+    trioSelectedItemId.value = finalJob.items?.find((item) => item.status === 'failed')?.id ?? null
+    await loadList()
+    summarizeTrioJob(finalJob)
+  } catch (error: any) {
+    const detail = error?.response?.data?.detail
+    const blockers = Array.isArray(detail?.blockers)
+      ? detail.blockers.map((item: any) => item?.message).filter(Boolean)
+      : []
+    const message = blockers.join('；')
+      || (typeof detail?.message === 'string' ? detail.message : '')
+      || (typeof detail === 'string' ? detail : '')
+      || '正式三件套生成失败'
+    ElMessage.error(message)
   } finally {
     fullGenerating.value = false
   }
 }
 
-/** 轮询 ExportJob 直至终态（succeeded/partial_failed/failed）或超时。 */
-async function pollExportJob(jobId: string) {
-  const TERMINAL = ['succeeded', 'partial_failed', 'failed', 'cancelled']
-  let attempts = 0
-  const maxAttempts = 60 // ~2min @ 2s
-  // eslint-disable-next-line no-constant-condition
-  while (attempts < maxAttempts) {
-    const job = await fetchExportJob(projectId.value, jobId)
-    if (TERMINAL.includes(job.status)) return job
-    attempts += 1
-    await new Promise((r) => setTimeout(r, 2000))
+async function pollTrioJob(jobId: string): Promise<TrioJob> {
+  const terminal: TrioJob['status'][] = ['succeeded', 'partial', 'failed', 'blocked']
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const job = await getTrioJob(projectId.value, jobId)
+    if (terminal.includes(job.status)) return job
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   }
-  return await fetchExportJob(projectId.value, jobId)
+  return getTrioJob(projectId.value, jobId)
 }
 
-/** 全套任务终态摘要：成功/部分失败提示 + KAM 警告 Toast（设计 §14 第 6 步）。 */
-function summarizeFullJob(job: { status: string; payload: Record<string, unknown> | null; items: { status: string; word_export_task_id: string | null }[] }) {
-  const kamWarning = job.payload?.kam_warning as string | null | undefined
+function summarizeTrioJob(job: TrioJob) {
   if (job.status === 'succeeded') {
-    ElMessage.success(`全套交付件已生成（${job.items.length} 项）`)
-  } else if (job.status === 'partial_failed') {
-    const failed = job.items.filter((i) => i.status === 'failed').length
-    ElMessage.warning(`全套生成部分完成：${failed} 项失败，可在任务中重试失败项`)
-  } else if (job.status === 'failed') {
-    ElMessage.error('全套生成失败，请检查前置数据后重试')
-  }
-  if (kamWarning) {
-    ElMessage.warning(kamWarning)
+    ElMessage.success('正式三件套已全部生成')
+  } else if (job.status === 'partial') {
+    const failed = job.items.filter((item) => item.status === 'failed' || item.status === 'blocked').length
+    ElMessage.warning(`三件套部分完成：${failed} 项失败或被阻断，可查看原因后重试`)
+  } else if (job.status === 'blocked') {
+    ElMessage.warning('三件套被前置依赖阻断，请处理后重试')
+  } else {
+    ElMessage.error('三件套生成失败，请查看任务明细')
   }
 }
+
 async function onSubmitApproval() {
   if (!selectedItem.value) return
   approvalLoading.value = true

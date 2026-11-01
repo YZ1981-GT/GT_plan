@@ -220,16 +220,27 @@ async def create_evidence(
     except UploadRejected as exc:
         raise HTTPException(status_code=422, detail=exc.as_detail())
     att_id = UUID(attachment["id"])
-    link = None
-    if row_level:
-        link = await WpEvidenceService(db).create_link(
-            wp_id=wp.id, attachment_id=att_id, created_by=user.id,
-            sheet_name=position.sheet_name, cell_ref=position.cell_ref, page_ref=position.page_ref,
-            evidence_type=evidence_type, voucher_key=position.voucher_key, contract_key=position.contract_key,
-        )
-    else:
-        await svc.ensure_wp_link(att_id, wp.id, association_type=evidence_type, created_by=user.id)
-    return {"attachment": attachment, "evidence_link": link}
+    raw = await svc.get_raw_storage(att_id)
+    try:
+        link = None
+        if row_level:
+            link = await WpEvidenceService(db).create_link(
+                wp_id=wp.id, attachment_id=att_id, created_by=user.id,
+                sheet_name=position.sheet_name, cell_ref=position.cell_ref, page_ref=position.page_ref,
+                evidence_type=evidence_type, voucher_key=position.voucher_key, contract_key=position.contract_key,
+            )
+        else:
+            await svc.ensure_wp_link(att_id, wp.id, association_type=evidence_type, created_by=user.id)
+        return {"attachment": attachment, "evidence_link": link}
+    except Exception:
+        if raw is not None:
+            await svc.compensate_uploaded_storage(
+                project_id=wp.project_id,
+                storage_type=raw.get("storage_type"),
+                storage_key=raw.get("file_path"),
+                paperless_document_id=raw.get("paperless_document_id"),
+            )
+        raise
 
 
 # ─── OCR 端点前半段 ──────────────────────────────────────────────────────────
@@ -297,10 +308,30 @@ async def linked_attachment_or_404(db: AsyncSession, attachment_id: UUID, wp: In
     return att
 
 
-def _local_file(storage_type: str | None, file_path: str | None) -> str | None:
-    if storage_type == "local" and file_path and Path(file_path).is_file():
-        return str(file_path)
-    return None
+async def _local_file(
+    db: AsyncSession,
+    attachment_id: UUID,
+    project_id: UUID,
+    storage_type: str | None,
+    file_path: str | None,
+) -> str | None:
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+    from app.services.attachment_asset_projection import asset_blob_read_authoritative
+    from app.services.attachment_storage_resolver import resolve_project_attachment_file
+
+    try:
+        blob = await AssetBlobService(db).read_current_attachment_blob(
+            attachment_id,
+            project_id=project_id,
+        )
+    except AssetBlobReadRejected:
+        if storage_type == "asset_blob" or asset_blob_read_authoritative():
+            return None
+        blob = None
+    if blob is not None:
+        return str(blob.canonical_path)
+    path = resolve_project_attachment_file(project_id, storage_type, file_path)
+    return str(path) if path is not None else None
 
 
 async def intake_ocr_upload(
@@ -329,7 +360,9 @@ async def intake_ocr_upload(
             if reused is not None:
                 return OcrSource(attachment_id=linked, reused=reused)
         await assert_project_writable(db, wp.project_id, user)
-        local = _local_file(att.storage_type, att.file_path)
+        local = await _local_file(
+            db, att.id, att.project_id, att.storage_type, att.file_path,
+        )
         if local is not None:
             return OcrSource(attachment_id=linked, path=local)
         return _with_temp(options, svc, linked, att.file_name or file_name, await read_upload_limited(file))
@@ -349,7 +382,13 @@ async def intake_ocr_upload(
     await db.commit()
     att_id = UUID(created["attachment"]["id"])
     raw = await svc.get_raw_storage(att_id) or {}
-    local = _local_file(raw.get("storage_type"), raw.get("file_path"))
+    local = await _local_file(
+        db,
+        att_id,
+        UUID(str(raw["project_id"])),
+        raw.get("storage_type"),
+        raw.get("file_path"),
+    )
     if local is not None:
         return OcrSource(attachment_id=att_id, path=local, created=True)
     source = _with_temp(options, svc, att_id, file_name, content)

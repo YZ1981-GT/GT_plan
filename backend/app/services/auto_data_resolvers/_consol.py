@@ -17,10 +17,20 @@ async def _resolve_consol_scope(db: AsyncSession, project_id: UUID, year: int, *
     程序表「确定合并范围」恒「待确定」（spec consol-autotree-residual-closure R5.1）。
     返回结构: {"summary": str}
     """
-    from app.services.consol_scope_members import tree_subsidiaries
+    from app.services.consol_scope_members import tree_members
 
-    count = len(await tree_subsidiaries(db, project_id))
-    return {"summary": f"已纳入{count}家子公司" if count else "待确定"}
+    members = await tree_members(db, project_id)
+    subs = sum(1 for m in members if not m.is_branch)
+    branches = len(members) - subs
+    if not members:
+        return {"summary": "待确定"}
+    # 分公司 2026-10-31 起也是独立成员，但不能说成子公司（会计口径不同）⇒ 分开表述
+    parts = []
+    if subs:
+        parts.append(f"{subs}家子公司")
+    if branches:
+        parts.append(f"{branches}家分公司")
+    return {"summary": "已纳入" + "、".join(parts)}
 
 
 @auto_resolver("consol_elimination_count")

@@ -179,6 +179,9 @@ async def test_p15_admin_all_access_passthrough():
     user = _user(role_value="admin")
     db = AsyncMock()
     rows = [{"project_id": uuid4(), "amount": 1} for _ in range(4)]
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = [row["project_id"] for row in rows]
+    db.execute.return_value = result
     kept = await guard.filter_accessible_rows(rows, user=user, db=db)
     assert kept == rows
 
@@ -285,6 +288,7 @@ async def test_p16_ownership_check_single_point_no_bypass(entry, deny, n_targets
     req = QueryRequest(entry=entry, project_id=str(uuid4()), year=2025, targets=targets)
     user = MagicMock()
     user.id = "u1"
+    user.role = SimpleNamespace(value="admin")  # 缓存身份走确定性不限循环快路，不让裸 AsyncMock 冒充权限查询
     db = AsyncMock()
     from unittest.mock import patch
 

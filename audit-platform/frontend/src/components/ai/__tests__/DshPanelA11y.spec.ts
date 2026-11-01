@@ -94,6 +94,8 @@ beforeEach(() => {
   setViewport(1920) // 默认大屏
   document.body.style.overflow = ''
   document.body.style.position = ''
+  document.body.style.width = ''
+  document.body.style.top = ''
   localStorage.clear()
   // jsdom 不实现 scrollTo
   window.scrollTo = vi.fn() as any
@@ -103,6 +105,8 @@ afterEach(() => {
   vi.restoreAllMocks()
   document.body.style.overflow = ''
   document.body.style.position = ''
+  document.body.style.width = ''
+  document.body.style.top = ''
 })
 
 function mountPanel(open = false) {
@@ -382,6 +386,46 @@ describe('DshPanel 键盘交互', () => {
 })
 
 describe('DshPanel 滚动隔离', () => {
+  it('异步模块晚到时若已关闭，不清除其他组件持有的 body 样式', async () => {
+    document.body.style.overflow = 'clip'
+    document.body.style.position = 'relative'
+    document.body.style.width = '75%'
+    document.body.style.top = '3px'
+    const wrapper = mountPanel(false)
+    await flushPromises()
+
+    expect(document.body.style.overflow).toBe('clip')
+    expect(document.body.style.position).toBe('relative')
+    expect(document.body.style.width).toBe('75%')
+    expect(document.body.style.top).toBe('3px')
+    wrapper.unmount()
+  })
+
+  it('打开态卸载会恢复本实例加锁前的 body 样式', async () => {
+    setViewport(1024)
+    document.body.style.overflow = 'auto'
+    document.body.style.position = 'relative'
+    const wrapper = mountPanel(true)
+    await flushPromises()
+    expect(document.body.style.position).toBe('fixed')
+
+    wrapper.unmount()
+    expect(document.body.style.overflow).toBe('auto')
+    expect(document.body.style.position).toBe('relative')
+  })
+
+  it('异步组件以打开态首次挂载时立即执行打开副作用', async () => {
+    setViewport(1024)
+    const wrapper = mountPanel(true)
+    await flushPromises()
+    await nextTick()
+    await nextTick()
+
+    expect(wrapper.emitted('message-count')?.[0]).toEqual([0])
+    expect(document.body.style.position).toBe('fixed')
+    wrapper.unmount()
+  })
+
   it('drawer 模式打开时 body overflow=hidden', async () => {
     setViewport(1024)
     const wrapper = mountPanel(false)
@@ -394,16 +438,19 @@ describe('DshPanel 滚动隔离', () => {
     // 实际浏览器验收在 Playwright 中完成
   })
 
-  it('关闭时恢复 body overflow', async () => {
+  it('关闭时恢复本实例加锁前的 body 样式', async () => {
     setViewport(1024)
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
+    document.body.style.overflow = 'auto'
+    document.body.style.position = 'relative'
     const wrapper = mountPanel(true)
+    await flushPromises()
+    expect(document.body.style.position).toBe('fixed')
+
     await wrapper.setProps({ modelValue: false })
     await flushPromises()
     await nextTick()
-    // watch 应恢复 body style
-    expect(document.body.style.position).toBe('')
+    expect(document.body.style.overflow).toBe('auto')
+    expect(document.body.style.position).toBe('relative')
   })
 })
 

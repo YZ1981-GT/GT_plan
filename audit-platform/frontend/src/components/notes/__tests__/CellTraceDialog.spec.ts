@@ -237,7 +237,7 @@ function routeGet(map: Record<string, unknown>) {
 }
 
 describe('CellTraceDialog — 最终来源', () => {
-  it('底稿来源的格：只查最终来源（按子表 + 来源行 + 列键），不请求模板取数溯源', async () => {
+  it('底稿来源的格：查最终来源与章节附件，不请求模板取数溯源', async () => {
     routeGet({ '/cell-sources': sourcesResp })
     const wrapper = mount(CellTraceDialog, {
       props: {
@@ -247,7 +247,11 @@ describe('CellTraceDialog — 最终来源', () => {
       global: globalStubs,
     })
     await flushPromises()
-    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(mockGet).toHaveBeenCalledTimes(2)
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/projects/p1/lineage',
+      expect.objectContaining({ params: { object_type: 'note_cell', object_id: '五、1', direction: 'both' } }),
+    )
     expect(mockGet).toHaveBeenCalledWith(
       `/api/disclosure-notes/p1/2025/${encodeURIComponent('五、1')}/cell-sources`,
       { params: { table_index: 0, row: 3, col: 0, sub_table_key: '货币资金', value_key: 'end_amount' }, _silent: true },

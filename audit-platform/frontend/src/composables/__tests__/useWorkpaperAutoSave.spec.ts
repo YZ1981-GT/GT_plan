@@ -175,4 +175,86 @@ describe('Property 13: autoSave 不丢失不变量', () => {
     // 间隔恢复
     expect(currentIntervalMs.value).toBe(60_000)
   })
+
+  it('显式返回 false 视为失败，不重试、不清 dirty', async () => {
+    const saveFn = vi.fn().mockResolvedValue(false)
+    const autoSave = useWorkpaperAutoSave(saveFn, 60_000)
+
+    autoSave.markDirty()
+    await autoSave.doSave()
+
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(autoSave.isSaveFailed.value).toBe(true)
+    expect(autoSave.isDirty.value).toBe(true)
+    expect(autoSave.lastSavedAt.value).toBeNull()
+  })
+
+  it('保存期间发生新编辑：旧回执不能清除新代 dirty 或恢复慢间隔', async () => {
+    let resolveSave!: () => void
+    const saveFn = vi.fn(() => new Promise<void>((resolve) => { resolveSave = resolve }))
+    const autoSave = useWorkpaperAutoSave(saveFn, 60_000, undefined, {
+      fastTriggerThreshold: 1,
+      fastIntervalMs: 30_000,
+    })
+
+    autoSave.recordEdit()
+    expect(autoSave.editEpoch.value).toBe(1)
+    const pending = autoSave.doSave()
+    await Promise.resolve()
+
+    autoSave.recordEdit()
+    expect(autoSave.editEpoch.value).toBe(2)
+    resolveSave()
+    await pending
+
+    expect(autoSave.isDirty.value).toBe(true)
+    expect(autoSave.currentIntervalMs.value).toBe(30_000)
+    expect(autoSave.lastSavedAt.value).toBeInstanceOf(Date)
+  })
+
+  it('每次编辑推进 epoch 并通知保存协调器', () => {
+    const onEdited = vi.fn()
+    const autoSave = useWorkpaperAutoSave(vi.fn().mockResolvedValue(undefined), 60_000, undefined, { onEdited })
+
+    autoSave.markDirty()
+    autoSave.recordEdit()
+
+    expect(autoSave.editEpoch.value).toBe(2)
+    expect(onEdited).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('保存协调兼容协议', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+
+  it('每次 markDirty/recordEdit 都通知编辑代际，不依赖 dirty 边沿', () => {
+    const onEdited = vi.fn()
+    const autoSave = useWorkpaperAutoSave(
+      vi.fn().mockResolvedValue(undefined),
+      60_000,
+      undefined,
+      { onEdited },
+    )
+
+    autoSave.markDirty()
+    autoSave.markDirty()
+    autoSave.recordEdit()
+
+    expect(onEdited).toHaveBeenCalledTimes(3)
+    expect(autoSave.isDirty.value).toBe(true)
+  })
+
+  it('onSave 显式返回 false 时不清 dirty、不更新时间且不重试', async () => {
+    const saveFn = vi.fn().mockResolvedValue(false)
+    const autoSave = useWorkpaperAutoSave(saveFn, 60_000)
+    autoSave.markDirty()
+
+    await autoSave.doSave()
+
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(autoSave.isDirty.value).toBe(true)
+    expect(autoSave.isSaveFailed.value).toBe(true)
+    expect(autoSave.lastSavedAt.value).toBeNull()
+  })
 })

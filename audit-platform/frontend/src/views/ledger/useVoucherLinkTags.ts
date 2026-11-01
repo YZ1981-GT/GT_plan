@@ -17,7 +17,12 @@ import {
   queryVoucherLinks, VOUCHER_LINKS_MAX_KEYS, type VoucherLink,
 } from '@/components/workpaper/composables/useAttachedVouchers'
 import { AUDIT_PHASE_LABEL } from '@/composables/useProjectAuditPhase'
-import { voucherEvidenceOf } from '@/composables/useVoucherEvidenceIndex'
+import {
+  refreshVoucherEvidence,
+  voucherEvidenceOf,
+  voucherEvidenceStatusOf,
+  type VoucherEvidenceAttachment,
+} from '@/composables/useVoucherEvidenceIndex'
 import { normText, voucherKeyString } from '@/utils/voucherIdentity'
 
 export type { VoucherLink }
@@ -36,6 +41,7 @@ export interface VoucherEvidenceTag {
   count: number
   legacy: false
   files: string[]
+  attachments: VoucherEvidenceAttachment[]
 }
 export type VoucherTag = VoucherLink | VoucherEvidenceTag
 
@@ -130,7 +136,7 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
     const evidence: VoucherEvidenceTag[] = voucherEvidenceOf(projectId.value, year.value, key).map((e) => ({
       working_paper_id: e.working_paper_id, wp_code: e.wp_code, wp_name: e.wp_name, wp_missing: false,
       source: 'evidence', phase: null, count: e.attachments.length, legacy: false,
-      files: e.attachments.map((a) => a.file_name),
+      files: e.attachments.map((a) => a.file_name), attachments: e.attachments,
     }))
     return [...registrationsOf(key), ...evidence]
   }
@@ -146,5 +152,16 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
     return { icon: '📎', tip: `已挂 / 已抽于：${list.map(voucherLinkText).join('；')}` }
   }
 
-  return { links, loadForRows, refresh, clear, linksOfKey, linksOfRow, flagOfRow }
+  function evidenceStatusOf(key: string | null | undefined) {
+    return voucherEvidenceStatusOf(projectId.value, year.value, key)
+  }
+
+  async function retryEvidence(key: string | null | undefined): Promise<void> {
+    await refreshVoucherEvidence(projectId.value, year.value, [key])
+  }
+
+  return {
+    links, loadForRows, refresh, clear, linksOfKey, linksOfRow, flagOfRow,
+    evidenceStatusOf, retryEvidence,
+  }
 }

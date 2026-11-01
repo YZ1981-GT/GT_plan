@@ -245,8 +245,12 @@ class AIModelConfig(Base, SoftDeleteMixin):
     auth_scheme: Mapped[str | None] = mapped_column(String(32), nullable=True)
     auth_header_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     request_timeout_seconds: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
-    # local / server（V197）；由 classify_deployment() 按端点推导写入，见 ai_model_options。
+    # local / server（V197）；由 classify_deployment() 按端点推导写入。
     deployment: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'server'"))
+    # 信任域与部署位置正交：server 可是事务所私有服务，也可是不允许客户数据的受限端点。
+    trust_zone: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'restricted'"))
+    client_data_allowed: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=text("false"))
+    mask_policy: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'strict'"))
     # 参与路由（V197 起不再是「唯一生效」）：唯一索引按部署位置约束。
     is_active: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
@@ -880,6 +884,8 @@ class AIChatRun(Base):
         default=ChatRunStatus.queued.value,
     )
     capability_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    #: 重启恢复所需的最小请求快照，只含 mention/附件 ID、复核开关和 sheet。
+    context_request_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     queued_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=func.now(), nullable=False
     )

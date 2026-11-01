@@ -90,6 +90,9 @@ async def _push(
                 wp_id=wp_id,
                 codes=codes,
             )
+            from app.services.formula_push.note_followup import recalc_pushed_notes
+
+            await recalc_pushed_notes(db, result)  # 合计 / 账面价值 / 比例随审定数更新（R4.1）
         logger.info(
             "formula_push[%s] project=%s year=%s run=%s written=%s kept=%s skipped=%s",
             trigger, project_id, year, result.run_id, result.written_count, result.kept_count, result.skipped_count,

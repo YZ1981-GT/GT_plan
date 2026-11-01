@@ -13,12 +13,14 @@ spec: knowledge-upload-robustness-and-consumer-wiring（R1 逐文件容错 / R2 
 from __future__ import annotations
 
 import logging
+import os
 import re
+from pathlib import Path
 from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import BackgroundTasks, UploadFile
+from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import User
@@ -33,6 +35,14 @@ InsertDocument = Callable[..., Awaitable[Any]]
 ExtractText = Callable[[str, bytes, str], Awaitable[str | None]]
 #: 提交后的索引钩子：``(project_ids, doc_id, content_text, **kw) -> None``（失败不抛）
 TriggerIndexUpdate = Callable[..., Awaitable[None]]
+
+KNOWLEDGE_ALLOWED_EXTENSIONS = frozenset({
+    ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".xlsm", ".pptx", ".ppt",
+    ".txt", ".md", ".csv",
+})
+KNOWLEDGE_MAX_FILES = 250
+KNOWLEDGE_MAX_FILE_BYTES = 50 * 1024 * 1024
+KNOWLEDGE_MAX_REQUEST_BYTES = 250 * 1024 * 1024
 
 
 async def extract_text_with_ocr(
@@ -195,16 +205,18 @@ async def trigger_index_update(
                 )
 
 
-def _knowledge_storage_base(folder_id: UUID):
+def knowledge_storage_root() -> Path:
     from app.core.config import settings
-    from pathlib import Path
 
     storage_root = Path(settings.STORAGE_ROOT)
     if not storage_root.is_absolute():
-        # 相对路径时，确保相对于 backend/ 目录
         backend_root = Path(__file__).resolve().parent.parent.parent
         storage_root = backend_root / settings.STORAGE_ROOT
-    base = storage_root / "knowledge" / str(folder_id)
+    return (storage_root / "knowledge").resolve(strict=False)
+
+
+def _knowledge_storage_base(folder_id: UUID):
+    base = knowledge_storage_root() / str(folder_id)
     base.mkdir(parents=True, exist_ok=True)
     return base
 
@@ -289,6 +301,8 @@ async def store_uploaded_files(
 
     svc = KnowledgeDocumentService(db)
     storage_base = _knowledge_storage_base(folder_id)
+    if len(files) > KNOWLEDGE_MAX_FILES:
+        raise HTTPException(status_code=413, detail=f"一次最多上传 {KNOWLEDGE_MAX_FILES} 个文件")
     _logger.info("[KB Upload] received %d files for folder %s", len(files), folder_id)
 
     uploaded: list[dict] = []
@@ -296,6 +310,7 @@ async def store_uploaded_files(
     failed: list[dict] = []
     #: 本请求已落盘的文件：末尾 commit 失败时一并删除，不留孤儿
     written: list[Path] = []
+    total_received = 0
     for file in files:
         if not file.filename:
             _logger.warning("[KB Upload] skipping file with empty filename")
@@ -314,11 +329,32 @@ async def store_uploaded_files(
             continue
         file_path = storage_base / disk_file_name(safe_name)
         try:
-            content = await file.read()
-            with open(file_path, "wb") as f:
-                f.write(content)
+            from app.services.attachment_upload_policy import UploadRejected
+            from app.services.safe_file_ingress import read_upload_bounded
+
+            ingress = await read_upload_bounded(
+                file,
+                allowed_extensions=KNOWLEDGE_ALLOWED_EXTENSIONS,
+                max_bytes=KNOWLEDGE_MAX_FILE_BYTES,
+            )
+        except UploadRejected as exc:
+            failed.append({"filename": safe_name, "reason": exc.message})
+            continue
+        if total_received + ingress.byte_size > KNOWLEDGE_MAX_REQUEST_BYTES:
+            failed.append({"filename": safe_name, "reason": "本批文件总大小超过 250MB，请分批上传"})
+            continue
+        total_received += ingress.byte_size
+        content = ingress.content
+        part_path = file_path.with_name(file_path.name + ".part")
+        try:
+            with open(part_path, "xb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(part_path, file_path)
         except Exception as exc:  # noqa: BLE001 - 单个文件落盘失败不阻断其他文件
             _logger.warning("[KB Upload] 落盘失败 %s: %s", safe_name, exc)
+            _remove_quietly(part_path)
             _remove_quietly(file_path)
             failed.append({"filename": safe_name, "reason": "文件写入存储失败，请重试"})
             continue
@@ -337,6 +373,25 @@ async def store_uploaded_files(
         except Exception:  # noqa: BLE001 - 文本提取失败不阻断文件保存
             content_text = None
 
+        blob = None
+        try:
+            from app.services.asset_blob_service import AssetBlobService
+
+            blob = await AssetBlobService(db).register_if_enabled(
+                storage_type="local",
+                storage_key=str(file_path),
+                content=content,
+                media_type=ingress.detected_media_type,
+                actor_user_id=current_user.id,
+                mode_env="KNOWLEDGE_BLOB_MODE",
+            )
+        except Exception as exc:  # blob_only 下必须明确失败；shadow 不会从 helper 抛出
+            _logger.warning("[KB Upload] 不可变字节登记失败 %s: %s", safe_name, exc)
+            _remove_quietly(file_path)
+            written.remove(file_path)
+            failed.append({"filename": safe_name, "reason": "文件安全登记失败，请重试"})
+            continue
+
         try:
             doc = await insert_document(
                 db,
@@ -346,6 +401,7 @@ async def store_uploaded_files(
                 file_type=Path(safe_name).suffix or None,
                 file_size=len(content),
                 storage_path=str(file_path),
+                blob_id=blob.id if blob is not None else None,
                 content_text=content_text,
                 created_by=current_user.id,
             )
@@ -353,6 +409,12 @@ async def store_uploaded_files(
             _logger.warning("[KB Upload] 写库失败 %s: %s", safe_name, exc)
             _remove_quietly(file_path)
             written.remove(file_path)
+            if blob is not None:
+                try:
+                    await db.delete(blob)
+                    await db.flush()
+                except Exception:
+                    _logger.warning("[KB Upload] 清理孤立 blob 记录失败", exc_info=True)
             failed.append({"filename": safe_name, "reason": upload_failure_reason(exc)})
             continue
         text_extracted = bool(content_text and content_text.strip())
@@ -369,6 +431,8 @@ async def store_uploaded_files(
             "text_extracted": text_extracted,
             "ocr_queued": ocr_queued,
             "version": doc.version,
+            "content_hash": ingress.content_hash,
+            "blob_id": str(blob.id) if blob is not None else None,
             "previous_version_id": str(doc.previous_version_id) if doc.previous_version_id else None,
         })
 

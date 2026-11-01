@@ -246,11 +246,29 @@ describe('合并附注编辑行合计回填', () => {
   })
 
   it('行类型缺省按行名判（「X小计」= 小计）；判不准的合计不动', () => {
-    const rows = [{ 0: '资产：', 1: '7' }, { 0: '资产小计', 1: '' }, { 0: '负债：', 1: '3' }, { 0: '负债小计', 1: '' }]
+    const rows = [{ 0: '资产甲', 1: '7' }, { 0: '资产小计', 1: '' }, { 0: '负债甲', 1: '3' }, { 0: '负债小计', 1: '' }]
     recalcConsolTotalRows(rows, null, { headers: ['项目', '金额'] })
     expect(rows.map((r) => r[1])).toEqual(['7', '7.00', '3', '3.00'])
     const ambiguous = [{ 0: '甲', 1: '1' }, { 0: '其中：乙', 1: '2' }, { 0: '合计', 1: '9' }]
     expect(recalcConsolTotalRows(ambiguous, null, { headers: ['项目', '金额'] })).toBe(0)
+  })
+
+  it('冒号结尾的分段标题不是明细（R1.1）：「资产小计」不等于「资产：」，标题下的明细照常加', () => {
+    const titles = [{ 0: '资产：', 1: '7' }, { 0: '资产小计', 1: '' }, { 0: '负债：', 1: '3' }, { 0: '负债小计', 1: '' }]
+    expect(recalcConsolTotalRows(titles, null, { headers: ['项目', '金额'] })).toBe(0)
+    const withRows = [{ 0: '资产：', 1: '' }, { 0: '应收款项', 1: '5' }, { 0: '资产小计', 1: '' }]
+    recalcConsolTotalRows(withRows, null, { headers: ['项目', '金额'] })
+    expect(withRows[2][1]).toBe('5.00')
+  })
+
+  it('账龄嵌套小计与纵向变动表（R1.2 / R1.3）', () => {
+    const aging = totalTerms(['1年以内', '其中：0-X个月', 'X-Y个月', '1年以内小计：', '1至2年', '小计', '减：坏账准备', '合计']
+      .map((l, i) => ({ label: l, row_type: [3, 5].includes(i) ? 'subtotal' : i === 7 ? 'total' : 'data' })))
+    expect([...aging.plans.entries()]).toEqual([[3, [[0, 1]]], [5, [[3, 1], [4, 1]]], [7, [[5, 1], [6, -1]]]])
+    const roll = totalTerms(['上年年末余额', '本期计提', '本期核销', '期末余额']
+      .map((l, i) => ({ label: l, row_type: i === 3 ? 'total' : 'data' })))
+    expect(roll.plans.size).toBe(0)
+    expect(roll.reasons.get(3)).toContain('纵向变动表')
   })
 })
 

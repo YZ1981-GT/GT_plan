@@ -1399,6 +1399,16 @@ async def fill_by_formula(
         record.is_stale = False
         record.updated_at = now
         record.last_formula_value = formula_values
+    # V243：来源投影
+    from app.services.consol_note_source_projection import compute_source_mode, source_digest, update_source_projection
+
+    mode = compute_source_mode(
+        "formula",
+        manual_cells=manual_set,
+        written_cells={(r, c) for r, c, *_ in summary.get("filled", []) if isinstance(r, int)},
+        previous_source=getattr(record, "source_mode", None),
+    )
+    update_source_projection(record, mode, digest=source_digest(data))
     await db.flush()
     return {
         "project_id": str(project_id),

@@ -519,6 +519,16 @@ class _Run:
         record.data = data
         record.is_stale = False
         record.updated_at = now
+        # V243：来源投影
+        from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
+
+        _mode = compute_source_mode(
+            "subtree_aggregate",
+            manual_cells=manual,
+            locked_cells=locked,
+            previous_source=getattr(record, "source_mode", None),
+        )
+        update_source_projection(record, _mode, digest=_sd(data))
         await self._snapshot(sid, node, record)
         await self.db.flush()
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={

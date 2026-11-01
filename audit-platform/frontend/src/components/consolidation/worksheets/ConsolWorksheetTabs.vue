@@ -1,5 +1,5 @@
 <template>
-  <div class="cw-layout" :data-load-status="worksheetLoadState">
+  <div class="cw-layout" :class="{ 'cw-layout--readonly': contentBlocked }" :data-load-status="worksheetLoadState">
     <el-alert
       v-if="worksheetLoadState === 'error'"
       type="error"
@@ -8,6 +8,7 @@
       class="cw-load-error"
       data-testid="cw-load-error"
       :title="worksheetLoadError || '合并工作底稿加载失败，请稍后重试'"
+      :description="hasHydratedData ? '已保留上次成功加载的数据；重新读取成功前暂不可编辑。' : '未加载到可编辑数据。'"
     />
     <el-alert
       v-else-if="worksheetLoadState === 'empty'"
@@ -17,6 +18,15 @@
       class="cw-empty-state"
       data-testid="cw-empty-state"
       title="当前年度暂无已保存的合并工作底稿，已加载可编辑默认表格"
+    />
+    <el-alert
+      v-if="readonlyReason"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cw-readonly-state"
+      data-testid="cw-readonly-state"
+      :title="readonlyReason"
     />
     <!-- 总分汇总提示：仅在验证结果为纯「总分汇总」时显示（需求 4.6） -->
     <el-alert
@@ -66,7 +76,7 @@
           <template v-if="!group.collapsed">
             <div v-for="sheet in group.sheets" :key="sheet.key"
               class="cw-nav-item" :class="{ 'cw-nav-item--active': activeSheet === sheet.key }"
-              @click="activeSheet = sheet.key">
+              @click="requestSheetChange(sheet.key)">
               <el-icon :size="14"><component :is="sheet.icon" /></el-icon>
               <div class="cw-nav-item-text">
                 <span class="cw-nav-item-label">{{ sheet.label }}</span>
@@ -80,7 +90,15 @@
     </aside>
     <div class="cw-resizer" @mousedown="startResize" />
     <!-- 右侧：表样内容 -->
-    <main class="cw-content">
+    <main
+      class="cw-content"
+      v-loading="worksheetLoading && hasHydratedData"
+      :inert="contentBlocked || undefined"
+      :aria-busy="worksheetLoading"
+    >
+      <el-skeleton v-if="worksheetLoading && !hasHydratedData" :rows="10" animated data-testid="cw-loading-skeleton" />
+      <el-empty v-else-if="!hasHydratedData" description="工作底稿尚未成功加载" data-testid="cw-unavailable-state" />
+      <template v-else>
       <!-- 导入导出工具栏（合并工作底稿 Phase 1） -->
       <div class="cw-ie-toolbar">
         <el-button size="small" type="success" plain :loading="g7LinkageLoading" @click="openG7Linkage">
@@ -103,27 +121,38 @@
           </template>
         </el-dropdown>
         <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
+        <span v-if="worksheetSaving" class="cw-save-state">正在保存…</span>
+        <span v-else-if="worksheetDrafts.hasDirty.value" class="cw-save-state cw-save-state--dirty">有未保存修改</span>
       </div>
-      <SubsidiaryInfoSheet v-if="activeSheet === 'info'" v-model="data.subsidiaryInfo" :tree-codes="treeInfoCodes"
-        @save="onSave('基本信息表', $event)" @open-share-change="onOpenShareChange" @open-formula="onOpenFormula" />
-      <InvestmentCostSheet v-else-if="activeSheet === 'cost'" v-model="data.investmentCost"
-        @save="onSave('投资明细-成本法', $event)" @open-formula="onOpenFormula" />
-      <InvestmentEquitySheet v-else-if="activeSheet === 'equity_inv'" v-model="data.investmentEquity"
-        @save="onSave('投资明细-权益法', $event)" @open-formula="onOpenFormula" />
-      <NetAssetSheet v-else-if="activeSheet === 'net_asset'" :companies="companyColumns" v-model="data.netAsset"
-        @save="onSave('净资产表', $event)" @open-formula="onOpenFormula"
-        @restore-defaults="data.netAsset = buildNetAsset()" />
+      <SubsidiaryInfoSheet v-if="activeSheet === 'info'" :model-value="data.subsidiaryInfo" :tree-codes="treeInfoCodes"
+        @update:model-value="onModelDraft('info', 'subsidiaryInfo', $event)"
+        @save="onSheetSave('info', $event)" @open-share-change="onOpenShareChange" @open-formula="onOpenFormula" />
+      <InvestmentCostSheet v-else-if="activeSheet === 'cost'" :model-value="data.investmentCost"
+        @update:model-value="onModelDraft('cost', 'investmentCost', $event)"
+        @save="onSheetSave('cost', $event)" @open-formula="onOpenFormula" />
+      <InvestmentEquitySheet v-else-if="activeSheet === 'equity_inv'" :model-value="data.investmentEquity"
+        @update:model-value="onModelDraft('equity_inv', 'investmentEquity', $event)"
+        @save="onSheetSave('equity_inv', $event)" @open-formula="onOpenFormula" />
+      <NetAssetSheet v-else-if="activeSheet === 'net_asset'" :companies="companyColumns" :model-value="data.netAsset"
+        @update:model-value="onModelDraft('net_asset', 'netAsset', $event)"
+        @save="onSheetSave('net_asset', $event)" @open-formula="onOpenFormula"
+        @restore-defaults="restoreNetAssetDefaults" />
       <EquitySimSheet v-else-if="activeSheet === 'equity_sim'" :companies="companyColumns"
         :direct-rows="data.equitySimDirect" :indirect-sections="computedIndirectSections"
         :net-asset-data="data.netAsset"
-        @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
-      <!-- 合并抵消分录明细表：唯一来源 elimination_entries；工作底稿三类来源的计算结果作为待生成分组传入 -->
+        @draft-change="onSheetDraft('equity_sim', $event)"
+        @save="onSheetSave('equity_sim', $event)" @open-formula="onOpenFormula" />
+      <!-- 草稿分组由服务端按已保存工作表和版本向量重算，浏览器不再提交权威 groups。 -->
       <EliminationSheet v-else-if="activeSheet === 'elimination'" ref="eliminationSheetRef" :project-id="projectId" :year="year"
-        :source-groups="sourceGroups" :source-origins="sourceOrigins"
+        :source-sheet-keys="serverSourceSheetKeys" :source-versions="serverSourceVersions"
         @open-formula="onOpenFormula" @goto-sheet="onGotoSheet" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
-        v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
-        @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
+        :model-value="data.capitalReserve" :elimination-data="elimSummaryForCapital"
+        :initial-adjustment-items="capitalAdjustmentItems"
+        :initial-consol-report-amount="capitalConsolReportAmount"
+        @update:model-value="onCapitalRowsUpdate"
+        @draft-change="onSheetDraft('capital', $event)"
+        @save="onSheetSave('capital', $event)" @open-formula="onOpenFormula" />
       <!-- 动态股比变动表 -->
       <ShareChangeSheet v-else-if="activeSheet.startsWith('share_change_')"
         :key="activeSheet"
@@ -132,35 +161,41 @@
         :all-companies="companyColumns"
         :indirect-companies="indirectCompanyList"
         :initial-data="shareChangeData[activeSheet] || []"
-        @save="onShareChangeSave" @open-formula="onOpenFormula" />
+        @draft-change="onSheetDraft(activeSheet, $event)"
+        @save="onSheetSave(activeSheet, $event)" @open-formula="onOpenFormula" />
       <!-- 汇总计算表 -->
       <PostElimInvestSheet v-else-if="activeSheet === 'post_invest'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :investment-equity="data.investmentEquity" :equity-sim-direct="data.equitySimDirect"
-        :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="onGotoSheet" />
+        :projection="postElimProjection" :initial-rows="postInvestRows"
+        @draft-change="onSheetDraft('post_invest', $event)" @save="onSheetSave('post_invest', $event)"
+        @open-formula="onOpenFormula" @goto-sheet="onGotoSheet" />
       <PostElimIncomeSheet v-else-if="activeSheet === 'post_income'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
-        :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
-        @save="onSave('抵消后投资收益', $event)"
+        :equity-sim-direct="data.equitySimDirect" :projection="postElimProjection"
+        :initial-rows="postIncomeRows" @draft-change="onSheetDraft('post_income', $event)"
+        @save="onSheetSave('post_income', $event)"
         @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
         :companies="companyColumns" :net-asset-data="data.netAsset"
-        :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
-        :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)"
+        :equity-sim-direct="data.equitySimDirect" :projection="postElimProjection"
+        :initial-rows="minorityRows"
+        @draft-change="onSheetDraft('minority', $event)" @save="onSheetSave('minority', $event)"
         @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
         :companies="companyColumns" :initial-rows="internalRows.arap"
-        @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
-        @rows-changed="(r: any[]) => internalRows.arap = r" />
+        @save="onSheetSave('internal_arap', $event)" @open-formula="onOpenFormula"
+        @rows-changed="onInternalRowsChanged('internal_arap', $event)" />
       <InternalTradeSheet v-else-if="activeSheet === 'internal_trade'"
         :companies="companyColumns" :initial-rows="internalRows.trade"
-        @save="onSave('内部交易抵消', $event)" @open-formula="onOpenFormula"
-        @rows-changed="(r: any[]) => internalRows.trade = r" />
+        @save="onSheetSave('internal_trade', $event)" @open-formula="onOpenFormula"
+        @rows-changed="onInternalRowsChanged('internal_trade', $event)" />
       <!-- 内部现金流没有会计科目（属现金流量表工作底稿），不生成抵销分录 -->
       <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
-        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula" />
+        :companies="companyColumns" :initial-rows="internalCashflowRows"
+        @draft-change="onSheetDraft('internal_cashflow', $event)"
+        @save="onSheetSave('internal_cashflow', $event)" @open-formula="onOpenFormula" />
       <!-- G7 建议草稿（只读；由 G7 联动勾选建议后写入，不参与合并计算） -->
       <G7SuggestionDraftSheet v-else-if="activeSheet === 'g7_suggestions'"
         :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
@@ -169,6 +204,7 @@
       <!-- 分录汇总表（只读；与合并试算同一计算口径，每次进入都重读） -->
       <EntrySummarySheet v-else-if="activeSheet === 'entry_summary'" ref="entrySummarySheetRef"
         :project-id="projectId" :year="year" @goto-sheet="onGotoSheet" />
+      </template>
     </main>
 
     <el-dialog v-model="g7LinkageVisible" title="G7 → 合并工作底稿联动" width="920px" destroy-on-close>
@@ -394,10 +430,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, markRaw, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, reactive, markRaw, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
-import { getWorksheetTree } from '@/services/consolidationApi'
+import {
+  getWorksheetTree,
+  getPostEliminationProjection,
+  POST_ELIM_ACCOUNT,
+  type PostEliminationProjection,
+} from '@/services/consolidationApi'
 import {
   alignInfoRows,
   mergeImportedInfoRows,
@@ -405,11 +446,6 @@ import {
   worksheetCompanyColumns,
   type TreeMemberInfo,
 } from '@/components/consolidation/composables/consolSubsidiaryInfo'
-import {
-  declaredOrigins,
-  sourceGroupsByOrigin,
-  WORKSHEET_ORIGINS,
-} from '@/components/consolidation/composables/elimSourceGroups'
 import {
   importG7Linkage,
   loadAllWorksheetData,
@@ -442,25 +478,39 @@ import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { useConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
+import { useConsolWorksheetDrafts } from '@/components/consolidation/composables/useConsolWorksheetDrafts'
+import { clonePlain } from '@/utils/cloneable'
 
 interface ConsolWorksheetTabsProps {
   projectId: string
   year: number
   consolMode?: string | null
   isRootSelection?: boolean
+  readonlyReason?: string
 }
 
 const props = withDefaults(defineProps<ConsolWorksheetTabsProps>(), {
   consolMode: null,
   isRootSelection: false,
+  readonlyReason: '',
 })
 
 const projectId = computed(() => props.projectId)
 const year = computed(() => props.year)
 
-const worksheetLoadState = ref<WorksheetLoadStatus>('empty')
+type WorksheetViewLoadStatus = WorksheetLoadStatus | 'loading'
+const worksheetLoadState = ref<WorksheetViewLoadStatus>('loading')
 const worksheetLoadError = ref('')
 const worksheetLoading = ref(false)
+const hasHydratedData = ref(false)
+const draftsReady = ref(false)
+const contentBlocked = computed(() => (
+  !hasHydratedData.value
+  || worksheetLoading.value
+  || worksheetLoadState.value === 'error'
+  || Boolean(props.readonlyReason)
+))
 let worksheetRequestSeq = 0
 let scopeRequestSeq = 0
 
@@ -622,10 +672,6 @@ interface IndirectSection {
   companyName: string; ratio: number; rows: EquitySimRow[]
   endLongInvest: number; endNetAssetShare: number; difference: number; diffReason: string
 }
-interface ElimRow {
-  direction: string; subject: string; detail?: string
-  total?: number | null; values?: (number | null)[]; isComputed?: boolean
-}
 interface CapitalReserveRow {
   item: string; total: number | null; elimAdj: number | null; parentVal: number | null
   values?: (number | null)[]; bold?: boolean; isComputed?: boolean; fromElim?: boolean; isDiff?: boolean; note?: string
@@ -738,6 +784,20 @@ const navGroups = computed(() => [
 const activeSheet = ref('info')
 const eliminationSheetRef = ref<InstanceType<typeof EliminationSheet> | null>(null)
 const entrySummarySheetRef = ref<InstanceType<typeof EntrySummarySheet> | null>(null)
+const workspaceGuard = useConsolWorkspaceGuard()
+const worksheetDrafts = useConsolWorksheetDrafts()
+const worksheetSaving = ref(false)
+const postInvestRows = ref<any[]>([])
+const postIncomeRows = ref<any[]>([])
+const minorityRows = ref<any[]>([])
+// 四张抵销后表的服务端 canonical projection（抵消分录数唯一真源，batch 3 / ADR-CRW-004）。
+// 加载失败保留上一次结果（不清空成空态）；按 worksheetRequestSeq 防切项目/年度串数。
+const postElimProjection = ref<PostEliminationProjection | null>(null)
+const internalCashflowRows = ref<any[] | null>(null)
+const capitalAdjustmentItems = ref<Array<{ description: string; amount: number | null }>>([])
+const capitalConsolReportAmount = ref<number | null>(null)
+let unregisterWorkspaceDraft: (() => void) | null = null
+let worksheetSaveInFlight: Promise<boolean> | null = null
 
 // ─── 从合并范围加载子企业列表 ────────────────────────────────────────────────
 // 项目和年度由父页提供，确保工作底稿与左树/报表使用同一年度上下文。
@@ -988,6 +1048,8 @@ async function loadAllData() {
   if (!projectSnapshot || !yearSnapshot) return
   const ticket = ++worksheetRequestSeq
   worksheetLoading.value = true
+  draftsReady.value = false
+  if (!hasHydratedData.value) worksheetLoadState.value = 'loading'
   try {
     const result = await loadAllWorksheetData(projectSnapshot, yearSnapshot)
     if (ticket !== worksheetRequestSeq || !isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) return
@@ -996,6 +1058,7 @@ async function loadAllData() {
       // 同一上下文重载失败时保留已展示数据，避免网络抖动把有效表格清空。
       worksheetLoadState.value = 'error'
       worksheetLoadError.value = result.errorMessage || '工作底稿批量加载失败'
+      draftsReady.value = hasHydratedData.value
       return
     }
 
@@ -1011,36 +1074,43 @@ async function loadAllData() {
       if (Array.isArray(saved.equity_sim.rows.direct)) data.equitySimDirect = saved.equity_sim.rows.direct
       if (Array.isArray(saved.equity_sim.rows.indirect)) data.equitySimIndirect = saved.equity_sim.rows.indirect
     }
-    // 旧版「合并抵消分录」JSON（saved.elimination）不再恢复：分录唯一来源是 elimination_entries，
-    // 旧版自定义行由明细表提示并转为草稿分录（需求 1.6 / 9.2）。旧实现读的 rows.equity/income/cross
-    // 是对象形状，而旧明细表保存的是数组 ⇒ 这三项从未恢复成功（design §一 F3），data.elimEquity 等
-    // 一直是骨架行，下游 PostElimInvest / PostElimIncome / MinorityInterest / 资本公积沿用骨架，行为不变。
-    // 内部往来 / 内部交易：恢复已保存的行（原先不恢复 ⇒ 刷新页面后表空、待生成也空）
+    // 旧版 elimination JSON 不恢复：正式分录唯一来源仍是 elimination_entries。
     internalRows.arap = Array.isArray(saved.internal_arap?.rows) ? saved.internal_arap.rows : null
     internalRows.trade = Array.isArray(saved.internal_trade?.rows) ? saved.internal_trade.rows : null
+    internalCashflowRows.value = Array.isArray(saved.internal_cashflow?.rows) ? saved.internal_cashflow.rows : null
+    postInvestRows.value = Array.isArray(saved.post_invest?.rows) ? saved.post_invest.rows : []
+    postIncomeRows.value = Array.isArray(saved.post_income?.rows) ? saved.post_income.rows : []
+    minorityRows.value = Array.isArray(saved.minority?.rows) ? saved.minority.rows : []
     savedSheetKeys.value = new Set(Object.keys(saved))
-    // 记录各表版本号（CAS 保存用）
-    Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
-    if (result.versions) {
-      Object.assign(sheetVersions, result.versions)
-    }
-    if (Array.isArray(saved.capital?.rows)) data.capitalReserve = saved.capital.rows
-    // G7 建议草稿（只读；由 G7 联动勾选建议写入）
+    Object.keys(sheetVersions).forEach((key) => delete sheetVersions[key])
+    Object.assign(sheetVersions, result.versions || {})
+
+    const capital = savedPayload('capital', saved.capital) as CapitalDraftPayload
+    if (capital.rows.length) data.capitalReserve = capital.rows
+    capitalAdjustmentItems.value = capital.adjustment_items
+    capitalConsolReportAmount.value = capital.consol_report_amount
+
     const draft = saved.g7_suggestions
     g7SuggestionDraft.rows = Array.isArray(draft?.rows) ? draft.rows : []
     g7SuggestionDraft.note = typeof draft?.note === 'string' ? draft.note : ''
     g7SuggestionDraft.importedAt = typeof draft?.imported_at === 'string' ? draft.imported_at : ''
-    // 动态股比变动表：按后端返回的 share_change_N 键恢复，不把 3 次写死为业务上限。
     for (const [key, content] of Object.entries(saved)) {
-      if (!/^share_change_\d+$/.test(key)) continue
-      const rows = content?.rows
-      if (Array.isArray(rows)) shareChangeData[key] = rows
+      if (/^share_change_\d+$/.test(key) && Array.isArray(content?.rows)) {
+        shareChangeData[key] = content.rows
+      }
     }
     alignSubsidiaryInfo()
+    hasHydratedData.value = true
+    await nextTick()
+    primeWorksheetDrafts(saved)
+    draftsReady.value = true
+    // 四表抵销 canonical projection 另行取数（失败保留上次，不阻断底稿加载）
+    void loadPostElimProjection(projectSnapshot, yearSnapshot, ticket)
   } catch (error: any) {
     if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
       worksheetLoadState.value = 'error'
       worksheetLoadError.value = error?.message || '工作底稿批量加载失败'
+      draftsReady.value = hasHydratedData.value
     }
   } finally {
     if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
@@ -1049,24 +1119,59 @@ async function loadAllData() {
   }
 }
 
-/** 推送完成后的统一重载：范围、各工作底稿数据，以及当前抵消分录明细。 */
-async function reload() {
+/** 取四表抵销 canonical projection。按 ticket 防切项目/年度串数；失败保留上次结果（不清空）。 */
+async function loadPostElimProjection(
+  projectSnapshot: string, yearSnapshot: number, ticket: number,
+) {
+  try {
+    const projection = await getPostEliminationProjection(projectSnapshot, yearSnapshot, { silent: true })
+    if (ticket === worksheetRequestSeq && isWorksheetContextCurrent(projectSnapshot, yearSnapshot)) {
+      postElimProjection.value = projection
+    }
+  } catch {
+    // 非合并项目 / 暂无数据：保留上次结果，四表抵销列显示为缺来源（由组件兜底展示 0）
+  }
+}
+
+/** 推送完成后的统一重载：先处理未保存草稿，再重读范围、底稿数据和当前只读明细。 */
+async function reloadNow() {
   await Promise.all([loadConsolScope(), loadAllData()])
   if (activeSheet.value === 'elimination') await eliminationSheetRef.value?.reload()
   else if (activeSheet.value === 'entry_summary') await entrySummarySheetRef.value?.load()
 }
 
+async function reload(): Promise<boolean> {
+  if (!workspaceGuard) {
+    await reloadNow()
+    return true
+  }
+  return workspaceGuard.runTransition(
+    '重新读取合并工作底稿前，请处理未保存修改。',
+    reloadNow,
+    ['consol-worksheets'],
+  )
+}
+
 onMounted(async () => {
+  unregisterWorkspaceDraft = workspaceGuard?.register({
+    id: 'consol-worksheets',
+    label: () => `合并工作底稿·${sheetLabel(activeSheet.value)}`,
+    contextKey: () => `${projectId.value}:${year.value}:${activeSheet.value}`,
+    isDirty: () => worksheetDrafts.hasDirty.value,
+    isSaving: () => worksheetSaving.value,
+    save: savePendingWorksheetDrafts,
+    discard: discardPendingWorksheetDrafts,
+  }) || null
   void loadConsolScope()
   eventBus.on('formula-changed', onFormulaChanged)
-  // 从后端加载已保存的工作底稿数据
   await loadAllData()
-  // Task 6.1: 挂载时刷新 stale 状态（Property 12：失败静默降级）
   void linkageStale.refreshStale()
 })
 onUnmounted(() => {
   worksheetRequestSeq += 1
   scopeRequestSeq += 1
+  unregisterWorkspaceDraft?.()
+  unregisterWorkspaceDraft = null
   eventBus.off('formula-changed', onFormulaChanged)
 })
 
@@ -1074,20 +1179,33 @@ watch([projectId, year], ([nextProjectId, nextYear], previous) => {
   if (nextProjectId === previous?.[0] && nextYear === previous?.[1]) return
   worksheetRequestSeq += 1
   scopeRequestSeq += 1
+  draftsReady.value = false
+  hasHydratedData.value = false
+  worksheetDrafts.clear()
   resetWorksheetData()
-  worksheetLoadState.value = 'empty'
+  postElimProjection.value = null  // 切项目/年度清空抵销投影，避免显示上一个项目的数
+  worksheetLoadState.value = 'loading'
   worksheetLoadError.value = ''
+  workspaceGuard?.notifyStateChange()
   if (nextProjectId && nextYear) {
     void Promise.all([loadConsolScope(), loadAllData()])
   }
 })
 
 async function onFormulaChanged(_payload: FormulaChangedPayload) {
-  // 公式变更后重新加载已保存的合并数据（各表持久化值）。
-  // 注：按新公式的完整重算需走「一键刷新」（后端 recalc_full）；前端仅重载展示，
-  // 不在此处虚假声称"重算"（原实现只 loadConsolScope 却提示"数据同步中"=误导）。
-  ElMessage.info('公式已更新，正在重新加载合并数据；如需按新公式重算请使用「一键刷新」')
-  await Promise.all([loadConsolScope(), loadAllData()])
+  const reloadAfterFormula = async () => {
+    ElMessage.info('公式已更新，正在重新读取已保存的合并数据；按新公式计算仍请使用“更新合并结果”')
+    await reloadNow()
+  }
+  if (workspaceGuard) {
+    await workspaceGuard.runTransition(
+      '公式已变化，重新读取工作底稿前请处理未保存修改。',
+      reloadAfterFormula,
+      ['consol-worksheets'],
+    )
+  } else {
+    await reloadAfterFormula()
+  }
 }
 
 // ─── 拖拽 ─────────────────────────────────────────────────────────────────────
@@ -1179,23 +1297,6 @@ function buildEquitySim(): EquitySimRow[] {
   return r
 }
 
-function buildElimEquity(): ElimRow[] {
-  const mk = (d: string, s: string, det = ''): ElimRow => ({ direction: d, subject: s, detail: det, values: [] })
-  return [mk('借','实收资本（或股本）'),mk('借','其他权益工具'),mk('借','资本公积'),mk('借','减：库存股'),
-    mk('借','其他综合收益'),mk('借','专项储备'),mk('借','盈余公积'),mk('借','△一般风险准备'),mk('借','未分配利润'),
-    mk('借','商誉'),mk('借','长期股权投资','减值准备'),mk('贷','长期股权投资','投资成本'),
-    mk('贷','长期股权投资','损益调整'),mk('贷','长期股权投资','其他权益变动'),mk('贷','少数股东权益')]
-}
-function buildElimIncome(): ElimRow[] {
-  const mk = (d: string, s: string, det = ''): ElimRow => ({ direction: d, subject: s, detail: det, values: [] })
-  return [mk('借','年初未分配利润'),mk('借','投资收益'),mk('借','少数股权损益'),
-    mk('贷','2-3股份支付计入所有者权益的金额','（二）所有者投入和减少资本'),mk('贷','2-4其他','（二）所有者投入和减少资本'),
-    mk('贷','4-1提取盈余公积','（四）利润分配'),mk('贷','4-1-1法定公积金','（四）利润分配'),
-    mk('贷','4-1-2任意公积金','（四）利润分配'),mk('贷','4-1-3#储备基金','（四）利润分配'),
-    mk('贷','4-1-4#企业发展基金','（四）利润分配'),mk('贷','4-1-5#利润归还投资','（四）利润分配'),
-    mk('贷','4-2△提取一般风险准备','（四）利润分配'),mk('贷','4-3对所有者（或股东）的分配','（四）利润分配'),
-    mk('贷','4-4其他','（四）利润分配')]
-}
 function buildCapitalReserve(): CapitalReserveRow[] {
   const mk = (item: string, o: Partial<CapitalReserveRow> = {}): CapitalReserveRow =>
     ({ item, total: null, elimAdj: null, parentVal: null, values: [], ...o })
@@ -1219,10 +1320,8 @@ function createDefaultWorksheetData() {
   netAsset: buildNetAsset(),
   equitySimDirect: buildEquitySim(),
   equitySimIndirect: [] as IndirectSection[],
-  // 下游抵消后长投 / 投资收益 / 少数股东 / 资本公积表的「抵消」取数骨架（逐企业列）。旧版从合并抵消分录 JSON 恢复，
-  // 该恢复从未生效（形状不符）且已删除；分录唯一来源改为 elimination_entries 后这些表的抵消列另行接入（不在本 spec 范围）
-  elimEquity: buildElimEquity(),
-  elimIncome: buildElimIncome(),
+  // 四张抵销后表的「抵消」列不再用前端空骨架：改读服务端 canonical projection（approved 分录真源，
+  // batch 3 / ADR-CRW-004），见 postElimProjection + consolPostElimView。
   capitalReserve: buildCapitalReserve(),
   }
 }
@@ -1232,11 +1331,132 @@ const data = reactive(createDefaultWorksheetData())
 /** 股比变动表本地缓存（按 share_change_N），避免刷新丢失 */
 const shareChangeData = reactive<Record<string, any[]>>({})
 
+type WorksheetModelKey = 'subsidiaryInfo' | 'investmentCost' | 'investmentEquity' | 'netAsset'
+type CapitalDraftPayload = {
+  rows: CapitalReserveRow[]
+  adjustment_items: Array<{ description: string; amount: number | null }>
+  consol_report_amount: number | null
+}
+
+function savedPayload(sheetKey: string, content: Record<string, any> | undefined): unknown {
+  if (sheetKey === 'capital') {
+    return {
+      rows: Array.isArray(content?.rows) ? content.rows : [],
+      adjustment_items: Array.isArray(content?.adjustment_items) ? content.adjustment_items : [],
+      consol_report_amount: content?.consol_report_amount ?? null,
+    } satisfies CapitalDraftPayload
+  }
+  return content?.rows
+}
+
+function currentPayload(sheetKey: string): unknown {
+  if (sheetKey === 'info') return data.subsidiaryInfo
+  if (sheetKey === 'cost') return data.investmentCost
+  if (sheetKey === 'equity_inv') return data.investmentEquity
+  if (sheetKey === 'net_asset') return data.netAsset
+  if (sheetKey === 'equity_sim') return { direct: data.equitySimDirect, indirect: data.equitySimIndirect }
+  if (sheetKey === 'capital') return {
+    rows: data.capitalReserve,
+    adjustment_items: capitalAdjustmentItems.value,
+    consol_report_amount: capitalConsolReportAmount.value,
+  } satisfies CapitalDraftPayload
+  if (sheetKey === 'post_invest') return postInvestRows.value
+  if (sheetKey === 'post_income') return postIncomeRows.value
+  if (sheetKey === 'minority') return minorityRows.value
+  if (sheetKey === 'internal_arap') return internalRows.arap || []
+  if (sheetKey === 'internal_trade') return internalRows.trade || []
+  if (sheetKey === 'internal_cashflow') return internalCashflowRows.value || []
+  if (sheetKey.startsWith('share_change_')) return shareChangeData[sheetKey] || []
+  return undefined
+}
+
+function applyPayloadToState(sheetKey: string, payload: any): void {
+  const value = clonePlain(payload)
+  if (sheetKey === 'info') data.subsidiaryInfo = Array.isArray(value) ? value : []
+  else if (sheetKey === 'cost') data.investmentCost = Array.isArray(value) ? value : []
+  else if (sheetKey === 'equity_inv') data.investmentEquity = Array.isArray(value) ? value : []
+  else if (sheetKey === 'net_asset') data.netAsset = Array.isArray(value) ? value : []
+  else if (sheetKey === 'equity_sim') {
+    data.equitySimDirect = Array.isArray(value?.direct) ? value.direct : []
+    data.equitySimIndirect = Array.isArray(value?.indirect) ? value.indirect : []
+  } else if (sheetKey === 'capital') {
+    data.capitalReserve = Array.isArray(value?.rows) ? value.rows : []
+    capitalAdjustmentItems.value = Array.isArray(value?.adjustment_items) ? value.adjustment_items : []
+    capitalConsolReportAmount.value = value?.consol_report_amount ?? null
+  } else if (sheetKey === 'post_invest') postInvestRows.value = Array.isArray(value) ? value : []
+  else if (sheetKey === 'post_income') postIncomeRows.value = Array.isArray(value) ? value : []
+  else if (sheetKey === 'minority') minorityRows.value = Array.isArray(value) ? value : []
+  else if (sheetKey === 'internal_arap') internalRows.arap = Array.isArray(value) ? value : []
+  else if (sheetKey === 'internal_trade') internalRows.trade = Array.isArray(value) ? value : []
+  else if (sheetKey === 'internal_cashflow') internalCashflowRows.value = Array.isArray(value) ? value : []
+  else if (sheetKey.startsWith('share_change_')) shareChangeData[sheetKey] = Array.isArray(value) ? value : []
+}
+
+function contentForSave(sheetKey: string, payload: any): Record<string, any> {
+  if (sheetKey === 'capital' && payload && !Array.isArray(payload)) return payload
+  return { rows: payload }
+}
+
+function onSheetDraft(sheetKey: string, payload: unknown): void {
+  if (!draftsReady.value || contentBlocked.value) return
+  worksheetDrafts.update(sheetKey, payload)
+  workspaceGuard?.notifyStateChange()
+}
+
+function onModelDraft(sheetKey: string, modelKey: WorksheetModelKey, payload: any[]): void {
+  data[modelKey] = payload as never
+  onSheetDraft(sheetKey, payload)
+}
+
+function onCapitalRowsUpdate(rows: CapitalReserveRow[]): void {
+  data.capitalReserve = rows
+}
+
+function onInternalRowsChanged(sheetKey: 'internal_arap' | 'internal_trade', rows: any[]): void {
+  if (sheetKey === 'internal_arap') internalRows.arap = rows
+  else internalRows.trade = rows
+  onSheetDraft(sheetKey, rows)
+}
+
+function restoreNetAssetDefaults(): void {
+  const rows = buildNetAsset()
+  data.netAsset = rows
+  onSheetDraft('net_asset', rows)
+}
+
+function primeWorksheetDrafts(saved: Record<string, Record<string, any>>): void {
+  worksheetDrafts.clear()
+  const keys = new Set([
+    'info', 'cost', 'equity_inv', 'net_asset', 'equity_sim', 'capital',
+    'post_invest', 'post_income', 'minority', 'internal_arap', 'internal_trade',
+    'internal_cashflow',
+    ...Object.keys(saved).filter((key) => key.startsWith('share_change_')),
+  ])
+  for (const key of keys) worksheetDrafts.prime(key, currentPayload(key))
+  workspaceGuard?.notifyStateChange()
+}
+
+async function requestSheetChange(sheetKey: string): Promise<boolean> {
+  if (!sheetKey || sheetKey === activeSheet.value) return true
+  const change = () => { activeSheet.value = sheetKey }
+  if (!workspaceGuard) {
+    change()
+    return true
+  }
+  return workspaceGuard.runTransition(`切换到“${sheetLabel(sheetKey)}”前，请处理当前未保存修改。`, change, ['consol-worksheets'])
+}
+
 function resetWorksheetData(options: { clearScope?: boolean; resetView?: boolean } = {}) {
   Object.assign(data, createDefaultWorksheetData())
   for (const key of Object.keys(shareChangeData)) delete shareChangeData[key]
   internalRows.arap = null
   internalRows.trade = null
+  internalCashflowRows.value = null
+  postInvestRows.value = []
+  postIncomeRows.value = []
+  minorityRows.value = []
+  capitalAdjustmentItems.value = []
+  capitalConsolReportAmount.value = null
   savedSheetKeys.value = new Set()
   Object.keys(sheetVersions).forEach((k) => delete sheetVersions[k])
   g7SuggestionDraft.rows = []
@@ -1282,8 +1502,9 @@ const computedIndirectSections = computed(() => {
 
 const elimSummaryForCapital = computed(() => {
   const nn = (v: any) => Number(v) || 0
-  const elimRow = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
-  const elimCapital = elimRow ? (elimRow.values||[]).reduce((s: number, v: number|null) => s + nn(v), 0) : 0
+  // 资本公积（4002）合并抵消合计：服务端 canonical projection 权威总额（approved 分录派生，替代空骨架）
+  const capitalAccount = postElimProjection.value?.accounts?.[POST_ELIM_ACCOUNT.capitalReserve] ?? null
+  const elimCapital = nn(capitalAccount?.total)
   // 从模拟权益法提取资本公积贷方合计
   let equitySimCapital = 0
   for (const row of data.equitySimDirect) {
@@ -1313,51 +1534,93 @@ const activeShareChangeCompanies = computed(() => {
 })
 
 function onOpenShareChange(_row: SubsidiaryInfoRow, times: number) {
-  // 直接切换到对应的股比变动表
-  activeSheet.value = `share_change_${times}`
+  void requestSheetChange(`share_change_${times}`)
 }
-function onShareChangeSave(d: any) {
-  const key = `share_change_${activeShareChangeTimes.value}`
-  shareChangeData[key] = d
-  doSave(key, d)
+
+async function onSheetSave(sheetKey: string, payload: unknown): Promise<boolean> {
+  if (draftsReady.value) worksheetDrafts.update(sheetKey, payload)
+  workspaceGuard?.notifyStateChange()
+  return saveSingleSheet(sheetKey, payload)
 }
-async function onSave(sheet: string, payload: any) {
-  const keyMap: Record<string, string> = {
-    '基本信息表': 'info', '投资明细-成本法': 'cost', '投资明细-权益法': 'equity_inv',
-    '净资产表': 'net_asset', '模拟权益法': 'equity_sim',
-    '资本公积变动': 'capital', '抵消后长投': 'post_invest', '抵消后投资收益': 'post_income',
-    '少数股东权益损益': 'minority', '内部往来抵消': 'internal_arap',
-    '内部交易抵消': 'internal_trade', '内部现金流抵消': 'internal_cashflow',
+
+async function performSheetSave(sheetKey: string, payload: unknown): Promise<boolean> {
+  if (props.readonlyReason) {
+    ElMessage.warning(props.readonlyReason)
+    return false
   }
-  const key = keyMap[sheet] || sheet
-  // 企业列随基本信息表的持股比例实时变化（computed），保存后无需再读合并范围
-  await doSave(key, payload)
-}
-async function doSave(sheetKey: string, payload: any) {
-  if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
+  if (!projectId.value) {
+    ElMessage.warning('项目ID缺失')
+    return false
+  }
+  const snapshot = clonePlain(payload)
   try {
-    // 传入已知版本号启用 CAS；首次保存用 0（首次创建语义，后端验证当前不存在）。
     const currentVersion = sheetVersions[sheetKey] ?? 0
     const result = await saveWorksheetData(
-      projectId.value, year.value, sheetKey, { rows: payload }, currentVersion,
+      projectId.value,
+      year.value,
+      sheetKey,
+      contentForSave(sheetKey, snapshot),
+      currentVersion,
     )
     if (!result.ok) {
       ElMessage.error(`${sheetLabel(sheetKey)}保存失败，请检查后端服务`)
-      return
+      return false
     }
-    // 更新本地版本号，下次保存用新版本做 CAS
     sheetVersions[sheetKey] = result.version
-    // 已保存 ⇒ 该表数据已知，生成草稿分录时由它负责（其中不再产出的来源键可删草稿）
     savedSheetKeys.value = new Set([...savedSheetKeys.value, sheetKey])
+    worksheetDrafts.markSaved(sheetKey, snapshot)
+    if (!worksheetDrafts.dirtyKeys.value.has(sheetKey)) applyPayloadToState(sheetKey, snapshot)
+    workspaceGuard?.notifyStateChange()
     ElMessage.success(`${sheetLabel(sheetKey)}已保存`)
+    return true
   } catch (err: any) {
     if (err instanceof WorksheetVersionConflictError) {
-      ElMessage.warning('工作底稿已被其他操作修改，正在重新加载……')
-      await loadAllData()
-      return
+      ElMessage.warning('工作底稿已被其他操作修改；当前编辑已保留，请保存到别处或放弃后重新读取')
+      return false
     }
     handleApiError(err, `${sheetLabel(sheetKey)}保存`)
+    return false
   }
+}
+
+async function saveSingleSheet(sheetKey: string, payload: unknown): Promise<boolean> {
+  if (worksheetSaveInFlight) await worksheetSaveInFlight
+  worksheetSaving.value = true
+  workspaceGuard?.notifyStateChange()
+  const task = performSheetSave(sheetKey, payload)
+  worksheetSaveInFlight = task
+  try {
+    return await task
+  } finally {
+    if (worksheetSaveInFlight === task) worksheetSaveInFlight = null
+    worksheetSaving.value = false
+    workspaceGuard?.notifyStateChange()
+  }
+}
+
+async function savePendingWorksheetDrafts(): Promise<boolean> {
+  if (worksheetSaveInFlight && !(await worksheetSaveInFlight)) return false
+  for (let pass = 0; pass < 8; pass += 1) {
+    const keys = [...worksheetDrafts.dirtyKeys.value]
+    if (!keys.length) return true
+    for (const key of keys) {
+      const payload = worksheetDrafts.current(key)
+      if (payload === undefined || !(await saveSingleSheet(key, payload))) return false
+    }
+  }
+  return worksheetDrafts.dirtyKeys.value.size === 0
+}
+
+async function discardPendingWorksheetDrafts(): Promise<void> {
+  if (worksheetSaveInFlight) await worksheetSaveInFlight
+  draftsReady.value = false
+  for (const key of [...worksheetDrafts.dirtyKeys.value]) {
+    const baseline = worksheetDrafts.discard(key)
+    applyPayloadToState(key, baseline)
+  }
+  await nextTick()
+  draftsReady.value = true
+  workspaceGuard?.notifyStateChange()
 }
 
 // ─── 合并工作底稿导入导出（Phase 1：前端 useExcelIO 统一） ──────────────────
@@ -1463,20 +1726,13 @@ async function handleImportFile(e: Event) {
       }
       if (!merged.updated) return
       data.subsidiaryInfo = merged.rows
-      await doSave('info', merged.rows)
+      await onSheetSave('info', merged.rows)
       return
     }
 
-    // 保存到后端
-    try {
-      const currentVersion = sheetVersions[activeSheet.value] ?? 0
-      const saveResult = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped }, currentVersion)
-      sheetVersions[activeSheet.value] = saveResult.version
+    const imported = await onSheetSave(activeSheet.value, mapped)
+    if (imported) {
       ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
-      // 触发前端数据刷新
-      await loadAllData()
-    } catch (error: any) {
-      handleApiError(error, '导入保存')
     }
   }, { skipRows: 0 })
   // 重置 file input
@@ -1493,15 +1749,11 @@ const savedSheetKeys = ref<Set<string>>(new Set())
 /** 每个 sheet_key 当前已知的后端版本号（加载/保存后更新），用于 CAS 保存。 */
 const sheetVersions = reactive<Record<string, number>>({})
 
-const sourceGroupsByOriginMap = computed(() => sourceGroupsByOrigin({
-  equitySimRows: data.equitySimDirect,
-  arapRows: internalRows.arap || [],
-  tradeRows: internalRows.trade || [],
-  companies: companyColumns.value,
-  rootCode: rootCompanyCode.value,
-}))
-const sourceGroups = computed(() => WORKSHEET_ORIGINS.flatMap((o) => sourceGroupsByOriginMap.value[o]))
-const sourceOrigins = computed(() => declaredOrigins(sourceGroupsByOriginMap.value, savedSheetKeys.value))
+const SERVER_SOURCE_SHEETS = ['equity_sim', 'internal_arap', 'internal_trade'] as const
+const serverSourceSheetKeys = computed(() => SERVER_SOURCE_SHEETS.filter((key) => savedSheetKeys.value.has(key)))
+const serverSourceVersions = computed(() => Object.fromEntries(
+  serverSourceSheetKeys.value.map((key) => [key, sheetVersions[key] ?? 0]),
+))
 
 // ─── 公式 / 跨表导航统一接线（acnr-consumer-wiring Req 20.5/20.6/20.7, task 31.3）──
 // 单一父级接线点：所有 ~15 个子 worksheet 的 `open-formula` 事件都绑定到此处，

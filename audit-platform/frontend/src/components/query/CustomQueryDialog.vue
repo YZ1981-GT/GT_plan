@@ -272,7 +272,7 @@
 
 <script setup lang="ts">
 import { copyRichText, copyText } from '@/utils/clipboard'
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted, type WatchStopHandle } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FullScreen, Aim, Close, RefreshLeft } from '@element-plus/icons-vue'
@@ -312,6 +312,8 @@ const props = defineProps<{
   initialSource?: string
   /** 随初始 source 带来的说明（模板库附注按钮：模板章节号与项目附注编号不同），用户换数据源即清除 */
   initialNotice?: string
+  /** 每次打开请求递增；组件保持挂载时也重新采用入口上下文。 */
+  openRevision?: number
 }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
 const visible = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) })
@@ -326,8 +328,10 @@ const router = useRouter()
 const { canUseBuilder, builderDisabledReason } = useQueryBuilderAccess()
 
 const activeTab = ref<'basic' | 'advanced'>(props.initialTab || 'basic')
-// 弹窗每次打开都按 initialTab 重置 active
-watch(visible, (v) => { if (v) activeTab.value = props.initialTab || 'basic' })
+// 弹窗每次打开都按 initialTab 重置 active；已打开时的新入口也靠 revision 重置。
+watch([visible, () => props.openRevision], ([open]) => {
+  if (open) activeTab.value = props.initialTab || 'basic'
+})
 
 // 项目 / 年度（R10.1 / R10.2，design §4.2）：每次打开都以路由项目为准，非项目页不预选任何项目（原先取项目列表第一项）；
 // 年度依次取 props.year（路由 ?year）→ 所选项目审计年度 → 留空要求选择，不按日历年推算
@@ -355,7 +359,7 @@ function onProjectPicked(pid: string) {
 }
 
 async function loadProjectList() {
-  if (projectOptions.value.length > 0) return
+  if (projectOptions.value.length > 0 || projectsLoading.value) return
   projectsLoading.value = true
   try {
     const list = await listProjectsWithProgress()
@@ -365,8 +369,8 @@ async function loadProjectList() {
   } catch { projectOptions.value = [] } finally { projectsLoading.value = false }
 }
 // 弹窗打开时：采用路由上下文、按需加载项目列表与指标树
-watch(visible, (v) => {
-  if (!v) return
+watch([visible, () => props.openRevision], ([open]) => {
+  if (!open) return
   adoptRouteContext()
   void loadProjectList()
 }, { immediate: true })
@@ -1015,7 +1019,7 @@ function onNoteTableChange(index: number) {
   void executeQuery()
 }
 
-function copyResult() {
+async function copyResult() {
   if (!resultRows.value.length) { ElMessage.warning('无数据'); return }
   const headers = resultColumns.value.map(c => columnLabel(c))
   const dataRows = filteredRows.value.map(r => resultColumns.value.map(c => r[c] ?? ''))
@@ -1070,10 +1074,19 @@ async function exportAll() {
 }
 
 // 指标树：带项目与审计年度加载（附注分支按该项目该年度章节），缓存键含附注版本（queryIndicatorCache，R10.4）
+let indicatorRequest = 0
 async function loadIndicators(pid: string | undefined) {
+  const request = ++indicatorRequest
+  const year = localYear.value
+  const isCurrent = () => request === indicatorRequest
+    && visible.value
+    && (localProjectId.value || undefined) === pid
+    && localYear.value === year
   try {
-    indicatorTree.value = await loadIndicatorTree({ projectId: pid, year: localYear.value, shape: 'full' })
+    const tree = await loadIndicatorTree({ projectId: pid, year, shape: 'full' })
+    if (isCurrent()) indicatorTree.value = tree
   } catch {
+    if (!isCurrent()) return
     // 兜底：用 STATIC_SOURCES 重建一棵简易树（按 parentKey 分组）
     const grouped: Record<string, any[]> = {}
     for (const s of STATIC_SOURCES) {
@@ -1083,24 +1096,37 @@ async function loadIndicators(pid: string | undefined) {
   }
 }
 
-// 弹窗打开、项目或年度变了 → 重新取树（命中缓存时只发一次骨架探测）
+// 弹窗打开、项目或年度变了 → 重新取树；关闭时推进代际，让晚到响应失效。
 watch([visible, localProjectId, localYear], ([open]) => {
   if (open) void loadIndicators(localProjectId.value || undefined)
+  else indicatorRequest += 1
 }, { immediate: true })
 // 加载查询历史（localStorage 持久）
 loadQueryHistory()
 
 // ─── 入口预选（R10.3 / R10.5）：每次打开都套用 initialSource（原先只在它变化时套用：同一页再开一次、或用户换过源后再开，
 // 预选不生效）；数据源立即选中，树里的高亮与展开等树加载完再做（原先连选中也等树，树取不到时预选整个丢失）──
-watch(() => [visible.value, props.initialSource, props.initialNotice] as const, ([open, source, notice]) => {
-  if (!open) { entryNotice.value = null; return }
-  entryNotice.value = source && notice ? { source, text: notice } : null
-  if (source) revealSource(source)
-}, { immediate: true })
+let pendingRevealStop: WatchStopHandle | null = null
+function clearPendingReveal() {
+  pendingRevealStop?.()
+  pendingRevealStop = null
+}
+watch(
+  () => [visible.value, props.openRevision, props.initialSource, props.initialNotice] as const,
+  ([open, _revision, source, notice]) => {
+    clearPendingReveal()
+    if (!open) { entryNotice.value = null; return }
+    entryNotice.value = source && notice ? { source, text: notice } : null
+    if (source) revealSource(source)
+  },
+  { immediate: true },
+)
 
 function revealSource(source: string) {
+  clearPendingReveal()
   selectedSource.value = source
   const doReveal = () => {
+    if (!visible.value || selectedSource.value !== source) return
     // 在树中查找匹配节点并展开 + 选中
     if (treeRef.value) {
       treeRef.value.setCurrentKey(source)
@@ -1123,15 +1149,17 @@ function revealSource(source: string) {
   if (indicatorTree.value.length) {
     doReveal()
   } else {
-    // 树尚未加载，等加载完成后 reveal
-    const stop = watch(indicatorTree, (tree) => {
+    // 树尚未加载，等加载完成后 reveal；下一次入口或关闭会先撤销旧 watcher。
+    pendingRevealStop = watch(indicatorTree, (tree) => {
       if (tree.length) {
-        stop()
+        clearPendingReveal()
         setTimeout(doReveal, 50)
       }
     })
   }
 }
+
+onUnmounted(clearPendingReveal)
 </script>
 
 <style scoped>

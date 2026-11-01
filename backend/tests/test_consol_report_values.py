@@ -206,7 +206,7 @@ class TestResolverAndRows:
             ("balance_sheet", "BS-3", 3, "TB('1001','未审数')"),               # 已注册但不在口径内
             ("balance_sheet", "BS-4", 4, "TB('1001','乱写的列')"),             # 未注册列
             ("balance_sheet", "BS-5", 5, "ROW('BS-1') + ROW('BS-2')"),
-            ("balance_sheet", "BS-6", 6, "ROW('BS-9')"),                       # 排在后面
+            ("balance_sheet", "BS-6", 6, "ROW('BS-9')"),                       # 合法前向引用，拓扑序先算 BS-9
             ("balance_sheet", "BS-7", 7, "ROW('NOPE')"),                        # 不存在
             ("balance_sheet", "BS-8", 8, "SUM_ROW('BS-1','BS-2')"),             # 区间含留空行
             ("balance_sheet", "BS-9", 9, "TB('1001','期末余额')"),
@@ -216,8 +216,10 @@ class TestResolverAndRows:
         )
         got = run(report_values(rows, {"1702": D(4), "1001": D(1), "3102": D(3)}))
         assert got["BS-2"].amount == D("0.00") and got["BS-9"].amount == D("1.00")
+        # ADR-ISL-01：合法前向引用由拓扑序解决，不再以「排在后面」留空
+        assert got["BS-6"].amount == D("1.00") and got["BS-6"].reason is None
         expect = {
-            "BS-1": "年初余额", "BS-3": "未审数", "BS-4": "未注册", "BS-5": "BS-1 留空", "BS-6": "尚未计算",
+            "BS-1": "年初余额", "BS-3": "未审数", "BS-4": "未注册", "BS-5": "BS-1 留空",
             "BS-7": "NOPE 不存在", "BS-8": "BS-1 留空", "IS-1": "3102 不是损益类", "IS-2": "PREV",
             "IS-3": "循环引用",
         }

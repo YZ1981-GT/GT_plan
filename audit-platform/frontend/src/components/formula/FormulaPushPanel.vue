@@ -19,6 +19,13 @@
 
     <el-alert v-if="error" type="error" :title="error" :closable="false" show-icon class="gt-fp-block" />
 
+    <!-- 规则已不存在、格里还留着推送值的附注单元格（spec note-table-structure-formula-pull-closure R10）：
+         这类格既不再被推送维护，又挡着附注预设公式（按「推送拥有格」跳过）⇒ 数停在当年推的那个值。推送不自动清。 -->
+    <el-alert v-if="orphanStates > 0" type="warning" :closable="false" show-icon class="gt-fp-block"
+      data-testid="fp-orphan-states"
+      :title="`有 ${orphanStates} 个附注单元格的推送规则已不存在`"
+      description="这些格既不再被推送维护，也挡着附注预设公式重算。清理（会改数据）：python backend/scripts/fix/purge_orphan_push_states.py --apply --confirm" />
+
     <!-- 最近一次推送 -->
     <div class="gt-fp-block">
       <div class="gt-fp-subtitle">最近一次推送</div>
@@ -234,6 +241,8 @@ const props = withDefaults(defineProps<{
 const rules = ref<PushRuleView[]>([])
 const states = ref<PushStateView[]>([])
 const latest = ref<any>(null)
+/** 规则已不存在的附注推送状态行条数（R10：只提示，清理走修复脚本） */
+const orphanStates = ref(0)
 const dryRun = ref<any>(null)
 const warnings = ref<string[]>([])
 const loading = ref(false)
@@ -270,6 +279,7 @@ async function loadAll(): Promise<void> {
     latest.value = (l as any)?.run ?? null
     warnings.value = latest.value?.detail?.warnings ?? []
     states.value = (s as any)?.states ?? []
+    orphanStates.value = Number((l as any)?.orphan_push_states ?? 0) || 0
   } catch (e) {
     error.value = detailOf(e)
   } finally {

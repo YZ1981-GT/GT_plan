@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
+from fastapi import HTTPException
 
 from app.core.database import engine
 from app.core.migration_runner import MigrationRunner
@@ -91,14 +92,16 @@ async def test_persisted_plan_pg_lock_makes_status_wait_and_apply_replays_once()
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     from app.core.config import settings
-    from app.models.base import UserRole
+    from app.models.base import PermissionLevel, ProjectUserRole, UserRole
     from app.models.batch_project_models import ProjectBatchImportPlan
-    from app.models.core import User
+    from app.models.core import Project, ProjectUser, User
+    from app.services.batch_project_workbook import ParsedRow
     from app.services.batch_project_execution import (
         apply_validation_plan,
         get_owned_plan,
         get_readable_plan,
         plan_status_response,
+        _lock_plan_memberships,
     )
 
     database_url = settings.DATABASE_URL
@@ -111,6 +114,10 @@ async def test_persisted_plan_pg_lock_makes_status_wait_and_apply_replays_once()
     token = uuid.uuid4().hex
     plan_ids: list[uuid.UUID] = []
     actor_id: uuid.UUID | None = None
+    locked_member_id: uuid.UUID | None = None
+    locked_project_id: uuid.UUID | None = None
+    locked_manager_id: uuid.UUID | None = None
+    concurrent_company_code: str | None = None
     try:
         async with factory() as session:
             actor = User(
@@ -181,14 +188,165 @@ async def test_persisted_plan_pg_lock_makes_status_wait_and_apply_replays_once()
 
         first, second = await asyncio.gather(apply_once(), apply_once())
         assert sorted((first, second)) == [False, True]
+
+        # 执行前取得成员行共享锁：撤权要么先完成并让权限检查失败，要么等待当前批次结束。
+        async with factory() as session:
+            manager = User(
+                username=f"batch_lock_{token[:16]}",
+                email=f"batch_lock_{token[:16]}@example.test",
+                hashed_password="x",
+                role=UserRole.manager,
+            )
+            project = Project(
+                name="【测试】批量成员锁",
+                client_name="【测试】批量成员锁",
+                company_code=f"LOCK{token[:12]}",
+                audit_year=2052,
+                report_scope="standalone",
+            )
+            session.add_all([manager, project])
+            await session.flush()
+            member = ProjectUser(
+                project_id=project.id,
+                user_id=manager.id,
+                role=ProjectUserRole.manager,
+                permission_level=PermissionLevel.edit,
+            )
+            session.add(member)
+            await session.flush()
+            locked_manager_id = manager.id
+            locked_project_id = project.id
+            locked_member_id = member.id
+            await session.commit()
+
+        async with factory() as locker:
+            await _lock_plan_memberships(
+                locker,
+                dependencies={
+                    "read_project_ids": [str(locked_project_id)],
+                    "edit_project_ids": [str(locked_project_id)],
+                },
+                actor=manager,
+            )
+
+            async def revoke_membership() -> None:
+                async with factory() as revoker:
+                    await revoker.execute(
+                        sa.update(ProjectUser)
+                        .where(ProjectUser.id == locked_member_id)
+                        .values(is_deleted=True)
+                    )
+                    await revoker.commit()
+
+            revoker = asyncio.create_task(revoke_membership())
+            await asyncio.sleep(0.12)
+            assert not revoker.done()
+            await locker.commit()
+            await asyncio.wait_for(revoker, timeout=2)
+
+        # 两份不同计划从同一空库存出发时，唯一索引仍是最后防线；后一份必须得到可重校验的
+        # 竞争失败，绝不能静默复用对方刚创建的项目。
+        from app.services.uscc_validator import USCC_CHARSET, _CHAR_TO_VALUE, _WEIGHTS, validate_uscc
+        prefix = f"91110000{token[:9].upper()}"
+        check_digit = (31 - sum(_CHAR_TO_VALUE[value] * _WEIGHTS[index] for index, value in enumerate(prefix)) % 31) % 31
+        concurrent_company_code = prefix + USCC_CHARSET[check_digit]
+        assert validate_uscc(concurrent_company_code)[0]
+        concurrent_year = 2053
+        concurrent_row = ParsedRow(
+            row_number=2,
+            client_name="【测试】并发唯一键",
+            company_code=concurrent_company_code,
+            short_name="并发唯一",
+            audit_year=concurrent_year,
+            project_type="annual",
+            accounting_standard="enterprise",
+            report_scope="standalone",
+            action="create",
+        )
+        dependencies = {
+            "version": 1,
+            "template_root_project_id": None,
+            "inventory_entities": [{
+                "company_code": concurrent_company_code,
+                "audit_year": concurrent_year,
+                "projects": [],
+            }],
+            "read_project_ids": [],
+            "edit_project_ids": [],
+            "creation_grants": [],
+        }
+        async with factory() as session:
+            for suffix in ("first", "second"):
+                plan = ProjectBatchImportPlan(
+                    actor_user_id=actor.id,
+                    mode="project",
+                    status="validated",
+                    file_name="【测试】并发建项.xlsx",
+                    file_sha256="c" * 64,
+                    request_hash=f"{suffix[0]}" * 64,
+                    idempotency_key=f"pg-unique-{suffix}-{token[:16]}",
+                    rows=[{"row": concurrent_row.model_dump(mode="json"), "errors": []}],
+                    tree_preview=[],
+                    summary={"_plan_dependencies": dependencies},
+                    warnings=[],
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                )
+                session.add(plan)
+                await session.flush()
+                plan_ids.append(plan.id)
+            await session.commit()
+
+        start_barrier = asyncio.Barrier(2)
+
+        async def apply_unique(plan_id: uuid.UUID, suffix: str):
+            async with factory() as session:
+                await start_barrier.wait()
+                try:
+                    result = await apply_validation_plan(
+                        session,
+                        plan_id=plan_id,
+                        actor=actor,
+                        idempotency_key=f"pg-unique-{suffix}-{token[:16]}",
+                    )
+                    await session.commit()
+                    return result
+                except Exception as exc:
+                    await session.rollback()
+                    return exc
+
+        unique_outcomes = await asyncio.wait_for(
+            asyncio.gather(
+                apply_unique(plan_ids[-2], "first"),
+                apply_unique(plan_ids[-1], "second"),
+            ),
+            timeout=8,
+        )
+        successes = [value for value in unique_outcomes if not isinstance(value, Exception)]
+        failures = [value for value in unique_outcomes if isinstance(value, Exception)]
+        assert len(successes) == 1
+        assert len(failures) == 1
+        assert isinstance(failures[0], HTTPException)
+        assert failures[0].status_code == 409
+        assert failures[0].detail["error_code"] == "BATCH_PLAN_STALE"
     finally:
         try:
-            if plan_ids or actor_id is not None:
+            if plan_ids or actor_id is not None or locked_member_id is not None or concurrent_company_code:
                 async with factory() as cleanup:
                     if plan_ids:
                         await cleanup.execute(sa.delete(ProjectBatchImportPlan).where(
                             ProjectBatchImportPlan.id.in_(plan_ids)
                         ))
+                    if concurrent_company_code:
+                        await cleanup.execute(sa.delete(Project).where(
+                            Project.company_code == concurrent_company_code,
+                            Project.audit_year == 2053,
+                        ))
+                    if locked_member_id is not None:
+                        await cleanup.execute(sa.delete(ProjectUser).where(ProjectUser.id == locked_member_id))
+                    if locked_project_id is not None:
+                        await cleanup.execute(sa.delete(Project).where(Project.id == locked_project_id))
+                    if locked_manager_id is not None:
+                        await cleanup.execute(sa.delete(User).where(User.id == locked_manager_id))
                     if actor_id is not None:
                         await cleanup.execute(sa.delete(User).where(User.id == actor_id))
                     await cleanup.commit()

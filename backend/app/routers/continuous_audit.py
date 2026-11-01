@@ -12,10 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
-from app.models.phase10_schemas import CreateNextYearRequest, CreateNextYearResponse
+from app.models.phase10_schemas import CreateNextYearRequest
 from app.services.continuous_audit_service import ContinuousAuditService
+from app.services.project_creation_security import enforce_creation_rate_limit
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["continuous-audit"])
 
@@ -25,9 +26,13 @@ async def create_next_year(
     project_id: UUID,
     body: CreateNextYearRequest | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """一键创建当年项目（继承上年配置和数据）"""
+    """一键创建当年项目（继承上年配置和数据）。"""
+    role = getattr(current_user.role, "value", current_user.role)
+    if role not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="当前角色无项目创建权限")
+    await enforce_creation_rate_limit(current_user, entrypoint="continuous_audit")
     svc = ContinuousAuditService()
     req = body or CreateNextYearRequest()
     try:
@@ -37,6 +42,7 @@ async def create_next_year(
             copy_team=req.copy_team,
             copy_mapping=req.copy_mapping,
             copy_procedures=req.copy_procedures,
+            actor=current_user,
         )
         await db.commit()
         return result
@@ -53,7 +59,6 @@ async def get_prior_year_data(
 ):
     """获取上年同科目数据（跨年对比）"""
     import sqlalchemy as sa
-    from app.models.core import Project
     from app.models.audit_platform_models import TrialBalance
 
     # 查找当前项目的 prior_year_project_id

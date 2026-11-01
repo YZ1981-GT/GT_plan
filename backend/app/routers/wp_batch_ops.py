@@ -136,44 +136,18 @@ async def batch_export_pdf(
     )
 
 
-@router.post("/batch-submit", response_model=BatchSubmitResult)
+@router.post("/batch-submit")
 async def batch_submit_review(
     project_id: uuid.UUID,
-    body: BatchSubmitRequest,
-    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """批量提交复核 — blocking finding 的跳过+结果清单"""
-    from app.services.gate_engine import GateEngine
-
-    submitted = 0
-    skipped = 0
-    skipped_reasons = []
-
-    for wp_id in body.wp_ids:
-        try:
-            # 检查是否有 blocking findings
-            # Stub: 实际实现调用 gate_engine 检查
-            has_blocking = False  # placeholder
-
-            if has_blocking:
-                skipped += 1
-                skipped_reasons.append({
-                    "wp_id": str(wp_id),
-                    "reason": "存在阻断性问题",
-                })
-            else:
-                submitted += 1
-        except Exception as e:
-            skipped += 1
-            skipped_reasons.append({
-                "wp_id": str(wp_id),
-                "reason": str(e),
-            })
-
-    return BatchSubmitResult(
-        total=len(body.wp_ids),
-        submitted=submitted,
-        skipped=skipped,
-        skipped_reasons=skipped_reasons,
+    """退役不写库的假成功入口；旧客户端稳定得到 410。"""
+    _ = current_user
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "LEGACY_BATCH_REVIEW_RETIRED",
+            "message": "旧批量提交入口已退役，请刷新页面后重试",
+            "replacement": f"/api/projects/{project_id}/working-papers/batch-submit",
+        },
     )

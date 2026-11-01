@@ -29,8 +29,22 @@
 
       <!-- ── legacy: 客户端 vue-office（原 Preview_Host 弹窗）── -->
       <template v-else-if="variant === 'client'">
+        <el-empty
+          v-if="clientStateText && !officeLoadError"
+          :description="clientStateText"
+          :image-size="80"
+        >
+          <el-button type="primary" @click="onDownload">下载文件</el-button>
+        </el-empty>
+        <el-empty
+          v-else-if="officeLoadError && isOfficeClient"
+          description="预览组件加载失败，请下载文件后查看"
+          :image-size="80"
+        >
+          <el-button type="primary" @click="onDownload">下载文件</el-button>
+        </el-empty>
         <vue-office-docx
-          v-if="isDocx && previewSrc"
+          v-else-if="isDocx && previewSrc"
           :src="previewSrc"
           @rendered="onRendered"
           @error="onError"
@@ -55,6 +69,7 @@
           :src="previewSrc"
           fit="contain"
           class="gt-preview-image"
+          :alt="fileName"
           @load="loading = false"
         />
         <div v-else-if="loading && !isExtended" class="gt-preview-loading-placeholder" />
@@ -69,7 +84,7 @@
           v-if="(isPdfServer || (isOfficeServer && officeAvailable !== false)) && serverObjectUrl"
           :src="serverObjectUrl"
           class="gt-attach-preview__frame"
-          title="原件"
+          :title="`预览：${fileName || '原件'}`"
         />
         <img
           v-else-if="isImageServer && serverObjectUrl"
@@ -103,10 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
-import VueOfficeDocx from '@vue-office/docx'
-import VueOfficeExcel from '@vue-office/excel'
-import VueOfficePdf from '@vue-office/pdf'
+import { computed, defineAsyncComponent, defineComponent, ref, watch } from 'vue'
 import '@vue-office/docx/lib/index.css'
 import '@vue-office/excel/lib/index.css'
 import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
@@ -120,6 +132,28 @@ import { attachments as P_att, officePreview as P_office } from '@/services/apiP
 import { api } from '@/services/apiProxy'
 import { downloadFile } from '@/utils/http'
 import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+
+// 任一客户端 Office 预览首次命中时加载共享重块；失败重试一次，再显示中文下载降级。
+const officeLoadError = ref(false)
+const OfficePreviewUnavailable = defineComponent({ name: 'OfficePreviewUnavailable', render: () => null })
+function lazyOffice(loader: () => Promise<any>) {
+  return defineAsyncComponent(async () => {
+    try {
+      return await loader()
+    } catch {
+      try {
+        return await loader()
+      } catch {
+        officeLoadError.value = true
+        loading.value = false
+        return OfficePreviewUnavailable
+      }
+    }
+  })
+}
+const VueOfficeDocx = lazyOffice(() => import('@vue-office/docx'))
+const VueOfficeExcel = lazyOffice(() => import('@vue-office/excel'))
+const VueOfficePdf = lazyOffice(() => import('@vue-office/pdf'))
 
 /** 单一预览宿主统一附件描述 */
 export interface AttachmentForPreview {
@@ -146,7 +180,6 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(true)
-const previewSrc = ref('')
 
 const attachmentId = computed(() => props.attachment?.id || '')
 const downloadUrl = computed(() => props.attachment?.download_url || '')
@@ -196,8 +229,9 @@ const isImageClient = computed(
     normalizedFileType.value === 'image' ||
     (LEGACY_CAPABILITIES.previewHost.image as readonly string[]).includes(ext.value),
 )
+const isOfficeClient = computed(() => isDocx.value || isExcel.value || isPdfClient.value)
 const isPreviewableClient = computed(
-  () => isDocx.value || isExcel.value || isPdfClient.value || isImageClient.value,
+  () => isOfficeClient.value || isImageClient.value,
 )
 
 // ─────────── server variant（原 Drawer_Host 抽屉，按 image/* mime + office 扩展名判定）───────────
@@ -250,29 +284,22 @@ const { url: serverObjectUrl, state: serverState } = useAuthedObjectUrl(
 )
 const serverStateText = computed(() => authedObjectUrlFailureText(serverState.value) || '原件加载中…')
 
-// ── client variant 的 blob 加载 ──
-function revokePreviewSrc() {
-  if (previewSrc.value) {
-    window.URL.revokeObjectURL(previewSrc.value)
-    previewSrc.value = ''
-  }
-}
-async function loadClientPreview() {
-  const fileUrl = props.attachment?.preview_url || ''
-  if (!props.active || !fileUrl || !isPreviewableClient.value || isExtended.value) {
-    loading.value = false
-    revokePreviewSrc()
-    return
-  }
-  loading.value = true
-  revokePreviewSrc()
-  try {
-    const blob = await api.get(fileUrl, { responseType: 'blob' })
-    previewSrc.value = window.URL.createObjectURL(blob as Blob)
-  } catch {
-    loading.value = false
-  }
-}
+// ── client variant：与 server 共用鉴权 blob URL 生命周期（Abort/序号/revoke/错误分型）──
+const clientPreviewUrl = computed(() =>
+  props.variant === 'client' && props.active && isPreviewableClient.value && !isExtended.value
+    ? (props.attachment?.preview_url || '')
+    : '',
+)
+const { url: previewSrc, state: clientState } = useAuthedObjectUrl(clientPreviewUrl)
+const clientStateText = computed(() => authedObjectUrlFailureText(clientState.value))
+watch(
+  () => [clientPreviewUrl.value, clientState.value],
+  () => {
+    officeLoadError.value = false
+    loading.value = clientState.value === 'loading'
+  },
+  { immediate: true },
+)
 function onRendered() {
   loading.value = false
 }
@@ -297,39 +324,6 @@ watch(
   { immediate: true },
 )
 
-// ── variant=client 的 blob 生命周期 ──
-watch(
-  () => [
-    props.variant,
-    props.active,
-    props.attachment?.preview_url,
-    props.attachment?.name,
-    props.attachment?.type_hint,
-    props.attachment?.id,
-  ],
-  async () => {
-    if (props.variant !== 'client') {
-      revokePreviewSrc()
-      return
-    }
-    if (props.active) {
-      if (isExtended.value) {
-        loading.value = false
-        revokePreviewSrc()
-      } else {
-        await loadClientPreview()
-      }
-    } else {
-      loading.value = true
-      revokePreviewSrc()
-    }
-  },
-  { immediate: true },
-)
-
-onUnmounted(() => {
-  revokePreviewSrc()
-})
 </script>
 
 <style scoped>

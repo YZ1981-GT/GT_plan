@@ -1,19 +1,14 @@
-/**
- * 凭证证据索引：凭证键 → 本项目各可见底稿已取得的这张凭证的证据（spec attachment-voucher-evidence-binding 需求 2.1、3.4）
- *
- * 凭证检查表每行一个「来源」列组件，逐行查会发几百个请求 ⇒ 同一时刻登记的键合成一次请求
- * （`POST …/ledger/voucher-evidence/query`，键里有主体名称走请求体，一次最多 500 个，超过分段顺序发）。
- *
- * - 按（项目, 年度）缓存：查过的键（含没有证据的）不再查；引用 / 上传后 `refreshVoucherEvidence` 只重查这几个键；
- * - 竞态：每个键记最近一次为它发起的请求序号，晚到的旧响应不覆盖（不比时间戳）；
- * - 查不到（网络 / 权限）只是不显示提示，不打断编辑；失败的键不进缓存，下次再查；
- * - 审计年度未知（项目没填）不查：凭证键带年度，拼不出来。
- */
-import { computed, shallowRef, toValue, watch, type MaybeRefOrGetter } from 'vue'
+/** 凭证键→可见底稿证据的合批索引，含 TTL、容量、错误状态与项目/身份清理。 */
+import { computed, onScopeDispose, shallowRef, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import http from '@/utils/http'
 import { ledger as P_ledger } from '@/services/apiPaths'
+import { eventBus } from '@/utils/eventBus'
+import { onRequestIdentityEpochChange } from '@/services/requestIdentityEpoch'
 
 export const VOUCHER_EVIDENCE_MAX_KEYS = 500
+export const VOUCHER_EVIDENCE_CACHE_TTL_MS = 60_000
+export const VOUCHER_EVIDENCE_MAX_SCOPES = 32
+export const VOUCHER_EVIDENCE_MAX_CACHED_KEYS = 2_000
 
 export interface VoucherEvidenceAttachment {
   id: string
@@ -30,34 +25,70 @@ export interface VoucherEvidenceEntry {
   attachments: VoucherEvidenceAttachment[]
 }
 
+type EvidenceIndexError = 'forbidden' | 'error'
 interface Scope {
-  /** 凭证键 → 各底稿的证据；查过但没有的存空数组 */
   data: Map<string, VoucherEvidenceEntry[]>
-  /** 凭证键 → 最近一次为它发起的请求序号 */
+  cachedAt: Map<string, number>
   latest: Map<string, number>
   pending: Set<string>
+  errors: Map<string, EvidenceIndexError>
+  controllers: Map<number, AbortController>
   scheduled: boolean
+  lastAccessedAt: number
+  users: number
 }
 
 const scopes = new Map<string, Scope>()
 const version = shallowRef(0)
 let seq = 0
-
 const scopeKey = (projectId: string, year: number) => `${projectId}::${year}`
+
+function evictScopes(): void {
+  while (scopes.size >= VOUCHER_EVIDENCE_MAX_SCOPES) {
+    const victim = [...scopes.entries()]
+      .filter(([, scope]) => scope.users === 0)
+      .sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt)[0]
+    if (!victim) return
+    for (const controller of victim[1].controllers.values()) controller.abort()
+    scopes.delete(victim[0])
+  }
+}
 
 function scopeOf(key: string): Scope {
   let scope = scopes.get(key)
   if (!scope) {
-    scope = { data: new Map(), latest: new Map(), pending: new Set(), scheduled: false }
+    evictScopes()
+    scope = {
+      data: new Map(), cachedAt: new Map(), latest: new Map(), pending: new Set(),
+      errors: new Map(), controllers: new Map(), scheduled: false, lastAccessedAt: Date.now(), users: 0,
+    }
     scopes.set(key, scope)
   }
+  scope.lastAccessedAt = Date.now()
   return scope
 }
 
 function unwrapEvidence(raw: unknown): Record<string, VoucherEvidenceEntry[]> {
   const body = (raw ?? {}) as { data?: unknown; evidence?: unknown }
   const inner = (body.evidence ?? (body.data as { evidence?: unknown } | undefined)?.evidence) as unknown
-  return inner && typeof inner === 'object' ? (inner as Record<string, VoucherEvidenceEntry[]>) : {}
+  return inner && typeof inner === 'object' ? inner as Record<string, VoucherEvidenceEntry[]> : {}
+}
+
+function trimKeys(scope: Scope): void {
+  if (scope.data.size <= VOUCHER_EVIDENCE_MAX_CACHED_KEYS) return
+  const victims = [...scope.cachedAt.entries()]
+    .filter(([key]) => !scope.latest.has(key) && !scope.pending.has(key))
+    .sort((a, b) => a[1] - b[1])
+  for (const [key] of victims.slice(0, scope.data.size - VOUCHER_EVIDENCE_MAX_CACHED_KEYS)) {
+    scope.data.delete(key)
+    scope.cachedAt.delete(key)
+    scope.errors.delete(key)
+  }
+}
+
+function isFresh(scope: Scope, key: string): boolean {
+  const at = scope.cachedAt.get(key)
+  return at !== undefined && Date.now() - at < VOUCHER_EVIDENCE_CACHE_TTL_MS
 }
 
 async function fetchKeys(projectId: string, year: number, keys: string[]): Promise<void> {
@@ -65,20 +96,38 @@ async function fetchKeys(projectId: string, year: number, keys: string[]): Promi
   for (let i = 0; i < keys.length; i += VOUCHER_EVIDENCE_MAX_KEYS) {
     const chunk = keys.slice(i, i + VOUCHER_EVIDENCE_MAX_KEYS)
     const mine = ++seq
-    for (const k of chunk) scope.latest.set(k, mine)
-    let found: Record<string, VoucherEvidenceEntry[]>
+    const controller = new AbortController()
+    scope.controllers.set(mine, controller)
+    for (const key of chunk) {
+      scope.latest.set(key, mine)
+      scope.errors.delete(key)
+    }
     try {
-      const res = await http.post(P_ledger.voucherEvidenceQuery(projectId), { year, keys: chunk },
-        { _silent: true, _dedupe: false } as any)
-      found = unwrapEvidence(res?.data ?? res)
-    } catch {
-      for (const k of chunk) if (scope.latest.get(k) === mine) scope.latest.delete(k)
-      continue
+      const res = await http.post(
+        P_ledger.voucherEvidenceQuery(projectId),
+        { year, keys: chunk },
+        { _silent: true, _dedupe: false, signal: controller.signal } as any,
+      )
+      const found = unwrapEvidence(res?.data ?? res)
+      for (const key of chunk) {
+        if (scope.latest.get(key) !== mine) continue
+        scope.data.set(key, Array.isArray(found[key]) ? found[key] : [])
+        scope.cachedAt.set(key, Date.now())
+        scope.latest.delete(key)
+      }
+      trimKeys(scope)
+    } catch (error: any) {
+      for (const key of chunk) {
+        if (scope.latest.get(key) !== mine) continue
+        scope.latest.delete(key)
+        if (!controller.signal.aborted) {
+          scope.errors.set(key, Number(error?.response?.status) === 403 ? 'forbidden' : 'error')
+        }
+      }
+    } finally {
+      scope.controllers.delete(mine)
+      version.value += 1
     }
-    for (const k of chunk) {
-      if (scope.latest.get(k) === mine) scope.data.set(k, Array.isArray(found[k]) ? found[k] : [])
-    }
-    version.value += 1
   }
 }
 
@@ -86,7 +135,6 @@ function schedule(projectId: string, year: number): void {
   const scope = scopeOf(scopeKey(projectId, year))
   if (scope.scheduled) return
   scope.scheduled = true
-  // 同一轮渲染里各行登记完再一起发（微任务在本轮同步渲染之后执行）
   queueMicrotask(() => {
     scope.scheduled = false
     const keys = [...scope.pending]
@@ -95,61 +143,131 @@ function schedule(projectId: string, year: number): void {
   })
 }
 
-/** 登记一个要查的键（已查过 / 在查的跳过）。 */
-export function requestVoucherEvidence(projectId: string, year: number | null | undefined, voucherKey: string): void {
-  if (!projectId || year == null || !voucherKey) return
+export function requestVoucherEvidence(projectId: string, year: number | null | undefined, key: string): void {
+  if (!projectId || year == null || !key) return
   const scope = scopeOf(scopeKey(projectId, year))
-  if (scope.data.has(voucherKey) || scope.latest.has(voucherKey) || scope.pending.has(voucherKey)) return
-  scope.pending.add(voucherKey)
+  if (scope.data.has(key) && !isFresh(scope, key)) {
+    scope.data.delete(key)
+    scope.cachedAt.delete(key)
+  }
+  if (isFresh(scope, key) || scope.latest.has(key) || scope.pending.has(key) || scope.errors.has(key)) return
+  scope.pending.add(key)
   schedule(projectId, year)
 }
 
-/** 引用 / 上传之后重查这几个键（不论缓存）。 */
 export async function refreshVoucherEvidence(
-  projectId: string, year: number | null | undefined, keys: ReadonlyArray<string | null | undefined>,
+  projectId: string,
+  year: number | null | undefined,
+  keys: ReadonlyArray<string | null | undefined>,
 ): Promise<void> {
-  const todo = [...new Set(keys.filter((k): k is string => !!k))]
+  const todo = [...new Set(keys.filter((key): key is string => !!key))]
   if (!projectId || year == null || !todo.length) return
+  const scope = scopeOf(scopeKey(projectId, year))
+  for (const key of todo) scope.errors.delete(key)
   await fetchKeys(projectId, year, todo)
 }
 
-/** 读缓存（响应式：在 computed / 模板里调用会随查询结果更新）；没查过的键先登记查询。 */
-export function voucherEvidenceOf(
-  projectId: string, year: number | null | undefined, voucherKey: string | null | undefined,
-): VoucherEvidenceEntry[] {
+export type VoucherEvidenceIndexStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
+
+export function voucherEvidenceStatusOf(
+  projectId: string,
+  year: number | null | undefined,
+  key: string | null | undefined,
+): VoucherEvidenceIndexStatus {
   void version.value
-  if (!projectId || year == null || !voucherKey) return []
-  requestVoucherEvidence(projectId, year, voucherKey)
-  return scopes.get(scopeKey(projectId, year))?.data.get(voucherKey) ?? []
+  if (!projectId || year == null || !key) return 'idle'
+  const scope = scopes.get(scopeKey(projectId, year))
+  if (!scope) return 'idle'
+  if (scope.latest.has(key) || scope.pending.has(key)) return 'loading'
+  const failure = scope.errors.get(key)
+  if (failure) return failure
+  if (!scope.data.has(key)) return 'idle'
+  return (scope.data.get(key)?.length ?? 0) > 0 ? 'ready' : 'empty'
 }
 
-/** 测试用：清空缓存。 */
+export function voucherEvidenceOf(
+  projectId: string,
+  year: number | null | undefined,
+  key: string | null | undefined,
+): VoucherEvidenceEntry[] {
+  void version.value
+  if (!projectId || year == null || !key) return []
+  requestVoucherEvidence(projectId, year, key)
+  return scopes.get(scopeKey(projectId, year))?.data.get(key) ?? []
+}
+
+export function clearVoucherEvidenceForProject(projectId: string): void {
+  for (const [key, scope] of [...scopes]) {
+    if (!key.startsWith(`${projectId}::`)) continue
+    for (const controller of scope.controllers.values()) controller.abort()
+    scopes.delete(key)
+  }
+  version.value += 1
+}
+
 export function resetVoucherEvidenceIndexForTest(): void {
+  for (const scope of scopes.values()) {
+    for (const controller of scope.controllers.values()) controller.abort()
+  }
   scopes.clear()
   seq = 0
   version.value += 1
 }
 
-/** 某行凭证在各可见底稿的证据（含本底稿；调用方按需排除）。 */
 export function useVoucherEvidenceIndex(
   projectId: MaybeRefOrGetter<string>,
   year: MaybeRefOrGetter<number | null | undefined>,
   voucherKey: MaybeRefOrGetter<string | null | undefined>,
 ) {
+  let heldScope = ''
+  const release = () => {
+    if (!heldScope) return
+    const held = scopes.get(heldScope)
+    if (held) held.users = Math.max(0, held.users - 1)
+    heldScope = ''
+  }
   watch(
     () => [toValue(projectId), toValue(year), toValue(voucherKey)] as const,
-    ([pid, yr, vk]) => {
-      if (pid && vk && yr != null) requestVoucherEvidence(pid, yr, vk)
+    ([pid, yr, key]) => {
+      const nextScope = pid && yr != null ? scopeKey(pid, yr) : ''
+      if (nextScope !== heldScope) {
+        release()
+        if (nextScope) {
+          scopeOf(nextScope).users += 1
+          heldScope = nextScope
+        }
+      }
+      if (pid && key && yr != null) requestVoucherEvidence(pid, yr, key)
     },
     { immediate: true },
   )
-  const entries = computed<VoucherEvidenceEntry[]>(() => {
+  onScopeDispose(release)
+  const state = computed(() => {
     void version.value
     const pid = toValue(projectId)
     const yr = toValue(year)
-    const vk = toValue(voucherKey)
-    if (!pid || yr == null || !vk) return []
-    return scopes.get(scopeKey(pid, yr))?.data.get(vk) ?? []
+    const key = toValue(voucherKey)
+    const scope = pid && yr != null ? scopes.get(scopeKey(pid, yr)) : undefined
+    const entries = key ? scope?.data.get(key) ?? [] : []
+    const failure = key ? scope?.errors.get(key) : undefined
+    const loading = !!key && (!!scope?.latest.has(key) || !!scope?.pending.has(key))
+    return {
+      entries,
+      loading,
+      error: failure === 'error',
+      forbidden: failure === 'forbidden',
+      status: loading ? 'loading' : failure ?? (key && scope?.data.has(key) ? (entries.length ? 'ready' : 'empty') : 'idle'),
+    }
   })
-  return { entries }
+  return {
+    entries: computed(() => state.value.entries),
+    loading: computed(() => state.value.loading),
+    error: computed(() => state.value.error),
+    forbidden: computed(() => state.value.forbidden),
+    status: computed(() => state.value.status),
+    retry: () => refreshVoucherEvidence(toValue(projectId), toValue(year), [toValue(voucherKey)]),
+  }
 }
+
+eventBus.on('project:reset', ({ projectId }) => clearVoucherEvidenceForProject(projectId))
+onRequestIdentityEpochChange(() => resetVoucherEvidenceIndexForTest())

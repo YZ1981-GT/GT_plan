@@ -4,8 +4,6 @@ Feature: project-creation-enhancement
 Properties 10-11 + unit tests
 """
 
-import uuid
-
 import pytest
 import pytest_asyncio
 import hypothesis.strategies as st
@@ -22,7 +20,6 @@ from app.services.uscc_validator import (
     validate_uscc,
 )
 from app.services.batch_project_service import (
-    BatchImportResult,
     BatchValidateResponse,
     generate_template,
     parse_and_import,

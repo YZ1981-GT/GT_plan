@@ -31,9 +31,8 @@ from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
-from docx.oxml.ns import qn, nsdecls
-from docx.oxml.parser import parse_xml
-from docx.shared import Cm, Pt, RGBColor, Emu
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt, RGBColor
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -832,8 +831,14 @@ class NoteWordExporter:
             report_scope = await self._resolve_report_scope(project_id)
         report_scope = normalize_report_scope(report_scope)
 
-        # Load notes data
-        notes = await self._load_notes(project_id, year, sections)
+        # Load notes data. 合并项目必须读企业树根节点 ConsolNoteData；单体路径保持原查询。
+        notes = await self._load_export_notes(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+        )
         notes = [
             n for n in notes
             if note_applies_to_report_scope(n.note_section, template_type, report_scope)
@@ -862,7 +867,6 @@ class NoteWordExporter:
         level1_idx = 0
         level2_idx = 0
         level3_idx = 0
-        current_level1 = ""
 
         for note in notes:
             section_code = note.note_section or ""
@@ -872,7 +876,6 @@ class NoteWordExporter:
                 level1_idx += 1
                 level2_idx = 0
                 level3_idx = 0
-                current_level1 = section_code
                 self._add_heading1(doc, level1_idx, note.section_title or section_code, section_code)
             elif level == 2:
                 level2_idx += 1
@@ -1018,7 +1021,14 @@ class NoteWordExporter:
         index_sections = _load_section_code_index(variant_key)
 
         # 2~5. 模板预处理 → 块与附注对应 → 删除 / 按模板结构重建（spec deliverable-trio-generation-accuracy §2）
-        notes = await self._load_notes(project_id, year, sections)
+        notes = await self._load_export_notes(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            index_sections=index_sections,
+        )
         notes = [
             n
             for n in notes
@@ -1363,7 +1373,7 @@ class NoteWordExporter:
         notes = await self._load_notes(project_id, year)
 
         html_parts = ['<div class="note-preview" style="font-family: 仿宋_GB2312, FangSong; font-size: 12pt;">']
-        html_parts.append(f'<h1 style="text-align:center;">财务报表附注</h1>')
+        html_parts.append('<h1 style="text-align:center;">财务报表附注</h1>')
         html_parts.append(f'<p style="text-align:center;">（{year}年度）</p>')
 
         level1_idx = 0
@@ -1424,6 +1434,37 @@ class NoteWordExporter:
         )
         row = result.scalar_one_or_none()
         return normalize_report_scope(row if isinstance(row, str) else None)
+
+    async def _load_export_notes(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str,
+        report_scope: str,
+        sections: list[str] | None = None,
+        index_sections: list[dict[str, Any]] | None = None,
+    ) -> list[Any]:
+        """按项目口径加载 Word 导出章节；合并项目只读企业树根节点。"""
+        if report_scope != "consolidated":
+            return await self._load_notes(project_id, year, sections)
+
+        from app.services.consol_note_export_adapter import (
+            load_root_consol_export_notes,
+        )
+
+        if index_sections is None:
+            index_sections = _load_section_code_index(
+                build_variant_key(template_type, report_scope)
+            )
+        return await load_root_consol_export_notes(
+            self.db,
+            project_id,
+            year,
+            template_type=template_type,
+            index_sections=index_sections,
+            selected_sections=sections,
+        )
 
     async def _load_notes(
         self, project_id: UUID, year: int, sections: list[str] | None = None

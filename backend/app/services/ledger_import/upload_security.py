@@ -23,7 +23,7 @@ ip_address=None) -> None`，通过 raise `HTTPException` 中断流程；合法�
 
 from __future__ import annotations
 
-import io
+import asyncio
 import logging
 import zipfile
 from dataclasses import dataclass
@@ -156,21 +156,48 @@ async def validate_upload_safety(
             limit_bytes=detected.size_limit,
         )
 
-    # 3. xlsx/zip 结构扫描（magic number = PK\x03\x04 的文件进入此分支）
+    # 3. xlsx/zip 结构扫描直接读取 UploadFile 的 seekable spool；只解析 central
+    # directory，不再为 500MB 文件创建第二份完整 bytes。
     if detected.mime in (MIME_XLSX, MIME_ZIP):
-        # 读取完整文件到内存做 zip 分析；对超过 MAX_SIZE_BY_MIME 的已经在
-        # 第 2 步被拒掉，不会进到这里
-        full_bytes = head + await file.read()
         try:
-            await file.seek(0)
-        except Exception:  # pragma: no cover
-            pass
+            infos, measured_size = await asyncio.to_thread(
+                _read_zip_infos,
+                file.file,
+            )
+        except zipfile.BadZipFile as exc:
+            await _reject(
+                status=400,
+                reason="corrupted_zip",
+                message=f"压缩文件已损坏: {exc}",
+                filename=filename,
+                mime=detected.mime,
+                size=size_known,
+                user_id=user_id,
+                project_id=project_id,
+                ip_address=ip_address,
+            )
+            raise AssertionError("unreachable")
 
-        total_size = len(full_bytes) if size_known is None else size_known
+        if measured_size > detected.size_limit:
+            limit_mb = detected.size_limit // _MB
+            await _reject(
+                status=413,
+                reason="file_too_large",
+                message=f"文件超出 {detected.mime} 类型的大小上限 {limit_mb}MB",
+                filename=filename,
+                mime=detected.mime,
+                size=measured_size,
+                user_id=user_id,
+                project_id=project_id,
+                ip_address=ip_address,
+                detected_by=detected.detected_by,
+                limit_bytes=detected.size_limit,
+            )
+        size_known = measured_size
         await _scan_zip_structure(
-            full_bytes=full_bytes,
+            infos=infos,
             declared_mime=detected.mime,
-            total_size=total_size,
+            total_size=measured_size,
             filename=filename,
             user_id=user_id,
             project_id=project_id,
@@ -335,9 +362,25 @@ _FORBIDDEN_XLSX_PREFIXES = (
 )
 
 
+def _read_zip_infos(source) -> tuple[list[zipfile.ZipInfo], int]:
+    """从 seekable spool 读取 ZIP 元数据，不复制压缩包正文。"""
+    try:
+        source.seek(0, 2)
+        measured_size = int(source.tell())
+        source.seek(0)
+        with zipfile.ZipFile(source) as zf:
+            infos = list(zf.infolist())
+        return infos, measured_size
+    finally:
+        try:
+            source.seek(0)
+        except Exception:
+            pass
+
+
 async def _scan_zip_structure(
     *,
-    full_bytes: bytes,
+    infos: list[zipfile.ZipInfo],
     declared_mime: str,
     total_size: int,
     filename: str,
@@ -345,76 +388,58 @@ async def _scan_zip_structure(
     project_id: Optional[UUID],
     ip_address: Optional[str],
 ) -> None:
-    """读取完整 zip 字节 → 扫描条目 → 检查宏 / 外部链接 / zip bomb。"""
+    """检查已读取的 ZIP 元数据中的宏、外部链接与压缩比。"""
+    names = [zi.filename for zi in infos]
 
-    try:
-        with zipfile.ZipFile(io.BytesIO(full_bytes)) as zf:
-            infos = zf.infolist()
-            names = [zi.filename for zi in infos]
-
-            # xlsx 宏 / 外部链接
-            if declared_mime == MIME_XLSX:
-                for name in names:
-                    lower = name.lower()
-                    if lower == "xl/vbaproject.bin":
-                        await _reject(
-                            status=400,
-                            reason="macro_detected",
-                            message="禁止含宏（vbaProject.bin）的 Excel 文件",
-                            filename=filename,
-                            mime=declared_mime,
-                            size=total_size,
-                            user_id=user_id,
-                            project_id=project_id,
-                            ip_address=ip_address,
-                            offending_entry=name,
-                        )
-                    if lower.startswith("xl/externallinks/"):
-                        await _reject(
-                            status=400,
-                            reason="external_links_detected",
-                            message="禁止含外部链接的 Excel 文件",
-                            filename=filename,
-                            mime=declared_mime,
-                            size=total_size,
-                            user_id=user_id,
-                            project_id=project_id,
-                            ip_address=ip_address,
-                            offending_entry=name,
-                        )
-
-            # zip bomb：总解压后大小 > 压缩前 × 100
-            total_uncompressed = sum(max(0, zi.file_size) for zi in infos)
-            if total_size > 0 and total_uncompressed > total_size * ZIP_BOMB_RATIO:
+    # xlsx 宏 / 外部链接
+    if declared_mime == MIME_XLSX:
+        for name in names:
+            lower = name.lower()
+            if lower == "xl/vbaproject.bin":
                 await _reject(
                     status=400,
-                    reason="zip_bomb_suspected",
-                    message=(
-                        f"可疑的高压缩比文件（解压后 {total_uncompressed} 字节 / "
-                        f"压缩前 {total_size} 字节 > {ZIP_BOMB_RATIO}×）"
-                    ),
+                    reason="macro_detected",
+                    message="禁止含宏（vbaProject.bin）的 Excel 文件",
                     filename=filename,
                     mime=declared_mime,
                     size=total_size,
                     user_id=user_id,
                     project_id=project_id,
                     ip_address=ip_address,
-                    uncompressed_size=total_uncompressed,
-                    ratio=total_uncompressed / max(1, total_size),
+                    offending_entry=name,
                 )
-    except HTTPException:
-        raise
-    except zipfile.BadZipFile as exc:
+            if lower.startswith("xl/externallinks/"):
+                await _reject(
+                    status=400,
+                    reason="external_links_detected",
+                    message="禁止含外部链接的 Excel 文件",
+                    filename=filename,
+                    mime=declared_mime,
+                    size=total_size,
+                    user_id=user_id,
+                    project_id=project_id,
+                    ip_address=ip_address,
+                    offending_entry=name,
+                )
+
+    # zip bomb：总解压后大小 > 压缩前 × 100
+    total_uncompressed = sum(max(0, zi.file_size) for zi in infos)
+    if total_size > 0 and total_uncompressed > total_size * ZIP_BOMB_RATIO:
         await _reject(
             status=400,
-            reason="corrupted_zip",
-            message=f"压缩文件已损坏: {exc}",
+            reason="zip_bomb_suspected",
+            message=(
+                f"可疑的高压缩比文件（解压后 {total_uncompressed} 字节 / "
+                f"压缩前 {total_size} 字节 > {ZIP_BOMB_RATIO}×）"
+            ),
             filename=filename,
             mime=declared_mime,
             size=total_size,
             user_id=user_id,
             project_id=project_id,
             ip_address=ip_address,
+            uncompressed_size=total_uncompressed,
+            ratio=total_uncompressed / max(1, total_size),
         )
 
 

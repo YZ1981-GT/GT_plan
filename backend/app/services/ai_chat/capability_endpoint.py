@@ -158,7 +158,7 @@ def get_capabilities(
         gate_reason_zh = ENGINE_GATE_REASON_ZH.get(gate_reason, gate_reason)
 
     # 收集健康状态
-    health = _collect_service_health()
+    health = _collect_service_health(require_local_model=caps.local_only)
 
     return CapabilityResponse(
         engine=engine.value,
@@ -169,7 +169,7 @@ def get_capabilities(
     )
 
 
-def _collect_service_health() -> dict[str, ServiceHealth]:
+def _collect_service_health(*, require_local_model: bool = True) -> dict[str, ServiceHealth]:
     """收集 model/embedding/OCR/MCP 的健康状态。
 
     各服务独立检查，错误码分离（Req 12.4）。
@@ -179,7 +179,9 @@ def _collect_service_health() -> dict[str, ServiceHealth]:
     health: dict[str, ServiceHealth] = {}
 
     # Model health
-    health["model"] = _check_model_health(settings)
+    health["model"] = _check_model_health(
+        settings, require_local=require_local_model
+    )
 
     # Embedding health
     health["embedding"] = _check_embedding_health(settings)
@@ -194,8 +196,8 @@ def _collect_service_health() -> dict[str, ServiceHealth]:
     return health
 
 
-def _check_model_health(settings: Any) -> ServiceHealth:
-    """检查模型 endpoint 是否为本地（Req 12.1 / 12.2）。"""
+def _check_model_health(settings: Any, *, require_local: bool = True) -> ServiceHealth:
+    """检查模型配置；只有 local-only 引擎才拒绝服务器端点。"""
     from app.services.ai_chat.dsh_discovery import validate_model_route
 
     endpoint = getattr(settings, "LLM_BASE_URL", "") or ""
@@ -208,7 +210,7 @@ def _check_model_health(settings: Any) -> ServiceHealth:
         )
 
     errors = validate_model_route(endpoint)
-    if errors:
+    if errors and require_local:
         logger.warning(
             "[ai-chat] 模型 endpoint local-only 校验失败: %s (endpoint=%s)",
             "; ".join(errors), _mask_endpoint(endpoint),
@@ -223,7 +225,11 @@ def _check_model_health(settings: Any) -> ServiceHealth:
     return ServiceHealth(
         available=True,
         endpoint=_mask_endpoint(endpoint),
-        message="本地模型可用。",
+        message=(
+            "本地模型已配置。"
+            if not errors
+            else "模型路由已配置；Native 可按任务信任域使用事务所私有服务兜底。"
+        ),
     )
 
 

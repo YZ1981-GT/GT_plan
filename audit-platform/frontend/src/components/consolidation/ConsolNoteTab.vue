@@ -3,6 +3,8 @@
     <!-- 右侧：章节内容（左侧树已移到第3栏 ConsolCatalog） -->
     <div class="gt-note-content" style="flex:1">
       <div v-if="selectedNoteSection" class="gt-note-detail">
+        <el-alert v-if="props.readonlyReason" type="warning" :closable="false" show-icon
+          :title="props.readonlyReason" style="margin-bottom:8px" data-testid="consol-note-readonly" />
         <!-- 工具栏 -->
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
@@ -10,53 +12,70 @@
             {{ noteAggregateSource }}
           </el-tag>
           <div class="gt-note-actions">
+            <!-- ── 分组 1：编辑与查看 ────────────── -->
             <el-tooltip content="复制整表（可粘贴到 Word/Excel）" placement="bottom">
               <el-button size="small" @click="copyEntireNoteTable">📋 整表</el-button>
             </el-tooltip>
             <el-button-group size="small">
-              <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
-              <el-button :type="noteEditMode ? 'primary' : ''" @click="enterNoteEdit()">✏️ 编辑</el-button>
+              <el-button :type="noteEditMode ? '' : 'primary'" @click="leaveNoteEdit">📋 查看</el-button>
+              <el-button :type="noteEditMode ? 'primary' : ''" :disabled="Boolean(props.readonlyReason)" @click="requestEnterNoteEdit">✏️ 编辑</el-button>
             </el-button-group>
             <el-tooltip content="全屏编辑（ESC 退出）" placement="bottom">
               <el-button size="small" @click="toggleNoteFullscreen">{{ noteFullscreen ? '退出' : '全屏' }}</el-button>
             </el-tooltip>
             <el-tooltip content="保存当前表格数据" placement="bottom">
-              <el-button size="small" @click="saveNoteData">💾</el-button>
+              <el-button size="small" :disabled="Boolean(props.readonlyReason)" @click="saveNoteData">💾</el-button>
             </el-tooltip>
-            <el-tooltip content="导入导出与批量操作" placement="bottom">
-              <el-button size="small" @click="showNoteBatchDialog = true">📦</el-button>
+            <span class="gt-note-sep" />
+            <!-- ── 分组 2：计算更新（主按钮按 source_mode 分派） ────────────── -->
+            <el-dropdown v-if="noteSourceMode === 'mixed' || !noteSourceMode" size="small" split-button type="primary"
+              :disabled="Boolean(props.readonlyReason)"
+              @click="noteSourceMode === 'formula' ? fillCurrentByFormula() : handleReaggregate()"
+              data-testid="consol-note-update-main">
+              <template #default>▶ 更新本章节</template>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="fillCurrentByFormula">ƒx 按公式填入</el-dropdown-item>
+                  <el-dropdown-item @click="handleReaggregate">🔄 重新汇总</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-tooltip v-else-if="noteSourceMode === 'formula'" content="按合并附注公式把合并数填入本章节；手工单元格保留原值" placement="bottom">
+              <el-button size="small" type="primary" data-testid="consol-note-fill" :disabled="Boolean(props.readonlyReason)" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
             </el-tooltip>
-            <el-tooltip content="按合并附注公式把合并数填入本章节；手工单元格保留原值" placement="bottom">
-              <el-button size="small" type="primary" data-testid="consol-note-fill" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
+            <el-tooltip v-else content="重新汇总：本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点" placement="bottom">
+              <el-button size="small" type="primary" :disabled="Boolean(props.readonlyReason)" @click="handleReaggregate" :loading="reaggregating">🔄 重新汇总</el-button>
             </el-tooltip>
             <el-tooltip content="查看本章节有公式单元格的个别数汇总、调整、抵销、合并数及各下级贡献" placement="bottom">
               <el-button size="small" data-testid="consol-note-breakdown" @click="openNoteBreakdown()">📊 查看差额</el-button>
             </el-tooltip>
-            <!-- 重新汇总 = 本节点子树逐节点更新 + 自下而上汇总（spec consol-note-header-library-and-node-reaggregate） -->
-            <el-tooltip content="重新汇总：本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点（映射在「📋 明细映射」确认）" placement="bottom">
-              <el-button size="small" @click="handleReaggregate" :loading="reaggregating">🔄 重新汇总</el-button>
-            </el-tooltip>
-            <ConsolNoteAutoRefreshSwitch v-if="props.projectId" :project-id="props.projectId" />
+            <ConsolNoteAutoRefreshSwitch v-if="props.projectId && !props.readonlyReason" :project-id="props.projectId" />
+            <span class="gt-note-sep" />
+            <!-- ── 分组 3：复核 ────────────── -->
             <el-tooltip content="审核当前表格公式一致性" placement="bottom">
               <el-button size="small" @click="auditCurrentNote" :loading="noteSingleAuditLoading">✅</el-button>
             </el-tooltip>
             <el-tooltip content="公式管理（编辑取数规则）" placement="bottom">
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
             </el-tooltip>
+            <span class="gt-note-sep" />
+            <!-- ── 分组 4：数据准备 ────────────── -->
             <el-tooltip content="明细映射：匹配子企业附注科目到合并模板行" placement="bottom">
-              <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping"
-                :disabled="!selectedNoteSection?.section_id">📋 明细映射</el-button>
+              <el-button size="small" :disabled="Boolean(props.readonlyReason) || !selectedNoteSection?.section_id" @click="showMappingDialog = true" data-testid="consol-note-open-mapping">📋 明细映射</el-button>
             </el-tooltip>
             <el-tooltip content="自动映射：未绑定模板的章节按子企业附注建模板，行名能确定对上的企业直接确认映射（其余在「📋 明细映射」确认）" placement="bottom">
-              <el-button size="small" @click="handleAutoMap" :loading="autoMapping" data-testid="consol-note-auto-map">⚡ 自动映射</el-button>
+              <el-button size="small" :disabled="Boolean(props.readonlyReason)" @click="handleAutoMap" :loading="autoMapping" data-testid="consol-note-auto-map">⚡ 自动映射</el-button>
             </el-tooltip>
             <el-tooltip content="下推集团模板到子企业：子企业附注对应表上打集团行标识、补上缺的行（不改已有行名与数据）" placement="bottom">
               <el-button size="small" @click="handlePushTemplate" :loading="pushingTemplate"
-                :disabled="!selectedNoteSection?.section_id" data-testid="consol-note-push-template">📤 下推模板</el-button>
+                :disabled="Boolean(props.readonlyReason) || !selectedNoteSection?.section_id" data-testid="consol-note-push-template">📤 下推模板</el-button>
             </el-tooltip>
             <el-tooltip content="管理合并附注明细模板：查看、编辑、绑定模板版本" placement="bottom">
               <el-button size="small" @click="showTemplateManager = true" data-testid="consol-note-open-template-manager"
-                :disabled="!selectedNoteSection?.section_id">📝 模板管理</el-button>
+                :disabled="Boolean(props.readonlyReason) || !selectedNoteSection?.section_id">📝 模板管理</el-button>
+            </el-tooltip>
+            <el-tooltip content="导入导出与批量操作" placement="bottom">
+              <el-button size="small" @click="showNoteBatchDialog = true">📦</el-button>
             </el-tooltip>
           </div>
         </div>
@@ -183,8 +202,8 @@
 
           <div class="gt-note-table-footer">
             <template v-if="noteEditMode">
-              <el-button size="small" @click="addNoteRow">+ 新增行</el-button>
-              <el-button size="small" type="danger" :disabled="!noteSelectedRows.length" @click="deleteNoteRows">
+              <el-button size="small" :disabled="Boolean(props.readonlyReason)" @click="addNoteRow">+ 新增行</el-button>
+              <el-button size="small" type="danger" :disabled="Boolean(props.readonlyReason) || !noteSelectedRows.length" @click="deleteNoteRows">
                 删除{{ noteSelectedRows.length ? `(${noteSelectedRows.length})` : '' }}
               </el-button>
             </template>
@@ -270,11 +289,11 @@
           </el-tag>
           <div class="gt-note-actions">
             <el-button-group size="small">
-              <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
-              <el-button :type="noteEditMode ? 'primary' : ''" @click="enterNoteEdit()">✏️ 编辑</el-button>
+              <el-button :type="noteEditMode ? '' : 'primary'" @click="leaveNoteEdit">📋 查看</el-button>
+              <el-button :type="noteEditMode ? 'primary' : ''" :disabled="Boolean(props.readonlyReason)" @click="requestEnterNoteEdit">✏️ 编辑</el-button>
             </el-button-group>
             <el-tooltip content="按公式填入" placement="bottom">
-              <el-button size="small" type="primary" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
+              <el-button size="small" type="primary" :disabled="Boolean(props.readonlyReason)" @click="fillCurrentByFormula" :loading="formulaFilling">ƒx 按公式填入</el-button>
             </el-tooltip>
             <el-tooltip content="查看差额" placement="bottom">
               <el-button size="small" @click="openNoteBreakdown()">📊 查看差额</el-button>
@@ -372,7 +391,7 @@
     @compare="onNoteCtxCompare"
   >
     <div class="gt-ucell-ctx-item" @click="openNoteBreakdownForSelection"><span class="gt-ucell-ctx-icon">📊</span> 查看该格差额</div>
-    <div v-if="selectedCellIsManual" class="gt-ucell-ctx-item" @click="restoreSelectedFormula"><span class="gt-ucell-ctx-icon">↩</span> 恢复按公式填入</div>
+    <div v-if="selectedCellIsManual && !props.readonlyReason" class="gt-ucell-ctx-item" @click="restoreSelectedFormula"><span class="gt-ucell-ctx-icon">↩</span> 恢复按公式填入</div>
     <div class="gt-ucell-ctx-item" @click="addCellComment"><span class="gt-ucell-ctx-icon">💬</span> 添加批注</div>
     <div class="gt-ucell-ctx-item" @click="markCellReviewed"><span class="gt-ucell-ctx-icon">✅</span> 标记已复核</div>
     <div class="gt-ucell-ctx-divider" />
@@ -386,14 +405,14 @@
       <div style="display:flex;gap:8px">
         <el-button size="small" @click="exportNoteTemplate" :disabled="!selectedNoteSection">📥 导出当前模板</el-button>
         <el-button size="small" @click="exportNoteData" :disabled="!selectedNoteSection">📤 导出当前数据</el-button>
-        <el-button size="small" @click="noteFileRef?.click()" :disabled="!selectedNoteSection">📤 导入当前表格</el-button>
+        <el-button size="small" @click="noteFileRef?.click()" :disabled="Boolean(props.readonlyReason) || !selectedNoteSection">📤 导入当前表格</el-button>
       </div>
       <el-divider style="margin:6px 0" />
       <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">全部附注批量操作</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <el-button size="small" @click="batchExportAllTemplates" :loading="noteBatchLoading">📥 一键导出全部模板</el-button>
         <el-button size="small" @click="batchExportAllData" :loading="noteBatchLoading">📤 一键导出全部数据</el-button>
-        <el-button size="small" type="primary" @click="noteBatchFileRef?.click()" :loading="noteBatchLoading">📤 一键导入全部数据</el-button>
+        <el-button size="small" type="primary" @click="noteBatchFileRef?.click()" :disabled="Boolean(props.readonlyReason)" :loading="noteBatchLoading">📤 一键导入全部数据</el-button>
       </div>
       <el-divider style="margin:6px 0" />
       <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-secondary);margin:0 0 4px;font-weight:600">公式审核</p>
@@ -406,8 +425,8 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <el-button size="small" @click="() => { openNoteFormula(); showNoteBatchDialog = false }">ƒx 打开公式管理</el-button>
         <el-button size="small" @click="exportNoteFormulas" :loading="noteBatchLoading">📥 导出公式模板</el-button>
-        <el-button size="small" @click="noteFormulaFileRef?.click()" :loading="noteBatchLoading">📤 导入公式</el-button>
-        <el-button size="small" type="primary" @click="fillAllByFormula" :loading="noteBatchLoading">ƒx 全部按公式填入</el-button>
+        <el-button size="small" @click="noteFormulaFileRef?.click()" :disabled="Boolean(props.readonlyReason)" :loading="noteBatchLoading">📤 导入公式</el-button>
+        <el-button size="small" type="primary" @click="fillAllByFormula" :disabled="Boolean(props.readonlyReason)" :loading="noteBatchLoading">ƒx 全部按公式填入</el-button>
       </div>
       <p style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary);margin:4px 0 0">
         导出 Excel 每个表格一个 Sheet（编号+标题），导入按 Sheet 名自动匹配。
@@ -603,7 +622,7 @@
   <!-- 「按公式填入」结果：手工保留与取不到数必须显式列出，不静默 -->
   <el-dialog v-model="showFillResultDialog" title="按公式填入结果" width="720px" append-to-body destroy-on-close
     data-testid="consol-note-fill-result">
-    <el-alert :title="fillResultSummary" :type="fillDetails.some((r) => r.kind === 'blank') ? 'warning' : 'success'"
+    <el-alert :title="fillResultSummary" :type="fillDetails.some((r: FillDetailRow) => r.kind === 'blank') ? 'warning' : 'success'"
       :closable="false" show-icon style="margin-bottom:10px" />
     <el-table :data="fillDetails" border size="small" max-height="400" empty-text="全部公式单元格已填入">
       <el-table-column label="结果" width="90">
@@ -764,10 +783,12 @@ import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useAutoSave, buildDisclosureDraftKey, type DraftContext } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
+import { useConsolWorkspaceGuard } from '@/components/consolidation/composables/useConsolWorkspaceGuard'
 import { handleApiError } from '@/utils/errorHandler'
 // deleteNoteRows 用：此前未导入 ⇒ ReferenceError 被「用户取消」的 catch 吞掉，删除行恒静默无效
 import { confirmBatch } from '@/utils/confirm'
 import { exportMultiSheetData, readSheetAoa, readWorkbookAoa } from '@/composables/useExcelIO'
+import { clonePlain } from '@/utils/cloneable'
 
 const props = defineProps<{
   projectId: string
@@ -776,6 +797,7 @@ const props = defineProps<{
   currentEntity: CurrentConsolEntity
   groupTree: ConsolTreeNode[]
   consolNoteTree: any[]
+  readonlyReason?: string
 }>()
 
 const emit = defineEmits<{
@@ -840,18 +862,23 @@ const textAfterExpanded = ref(false)
 const noteAggregateSource = computed(() => {
   const data = selectedNoteSection.value?.savedData
   if (!data || typeof data !== 'object') return ''
-  const lastWrite = data._last_write_source
-  if (lastWrite === 'detail_mapping') {
-    const entityCount = Number(data._detail_entity_count) || 0
-    return `📋 明细映射（${entityCount} 家子企业单体附注）`
-  }
-  if (lastWrite === 'subtree_aggregate') {
-    const childCount = Number(data._subtree_child_count) || 0
-    return `🔄 子树汇总（${childCount} 个下级 + 差额）`
-  }
-  if (lastWrite === 'formula') {
-    return '🧮 公式计算（含调整/抵销）'
-  }
+  const source = (data as Record<string, unknown>)._last_write_source
+  if (source === 'detail_mapping') return '📋 明细映射'
+  if (source === 'subtree_aggregate') return '🔄 子树汇总'
+  if (source === 'formula') return '🧮 公式计算'
+  return ''
+})
+
+/** 服务端来源投影 source_mode（V243）：按此分派主按钮动作 */
+const noteSourceMode = computed((): string => {
+  const record = selectedNoteSection.value?.savedData as Record<string, unknown> | null | undefined
+  if (!record) return ''
+  // 优先读 V243 投影字段（后端写入后随 GET 返回）
+  const mode = record.source_mode || record._source_mode
+  if (typeof mode === 'string' && mode) return mode
+  // 兼容旧数据：按 _last_write_source 推导
+  const source = record._last_write_source
+  if (source === 'detail_mapping' || source === 'subtree_aggregate' || source === 'formula') return String(source)
   return ''
 })
 const isTextAfterLong = computed(() => {
@@ -1088,6 +1115,21 @@ function collectChildren(
 }
 
 const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode({ guardRoute: false })
+const workspaceGuard = useConsolWorkspaceGuard()
+const noteSaving = ref(false)
+let noteSaveInFlight: Promise<boolean> | null = null
+let unregisterWorkspaceDraft: (() => void) | null = null
+
+function ensureNoteWritable(action = '修改合并附注'): boolean {
+  if (!props.readonlyReason) return true
+  ElMessage.warning(`${props.readonlyReason}，不能${action}`)
+  return false
+}
+
+function requestEnterNoteEdit() {
+  if (!ensureNoteWritable('进入编辑')) return
+  enterNoteEdit()
+}
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const formulaFilling = ref(false)
 const reaggregating = ref(false)
@@ -1313,6 +1355,7 @@ function applyPersistedNoteContent(section: any, content: Record<string, unknown
   section.headers = headers
   section.savedData = { ...content }
   section.editRows = toEditRows(headers, rows, content.manual_cells)
+  section.baselineEditRows = clonePlain(section.editRows)
   clearNoteDirty()
   clearAutoSaveDraft()
 }
@@ -1586,6 +1629,7 @@ const noteDirtyEpoch = ref(0)
 function markNoteDirtyTracked() {
   noteDirtyEpoch.value++
   markNoteDirty()
+  workspaceGuard?.notifyStateChange()
 }
 
 function onNoteCellCommit(row: NoteEditRow, col: number, value: string) {
@@ -1616,6 +1660,7 @@ function recalcTotalRows() {
 /** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化。
  *  CP-05：删除确认晚到（切 scope/变体后）不得删掉新章节的行，也不得标脏。 */
 async function deleteNoteRows() {
+  if (!ensureNoteWritable('删除行')) return
   const sec = selectedNoteSection.value
   const rows = noteSelectedRows.value
   if (!sec || !rows.length) {
@@ -2056,7 +2101,7 @@ async function executeAggregate() {
 }
 
 // ─── 附注数据操作 ────────────────────────────────────────────────────────────
-function copyEntireNoteTable() {
+async function copyEntireNoteTable() {
   const sec = selectedNoteSection.value
   if (!sec?.headers?.length) { ElMessage.warning('无表格数据'); return }
   const headers = sec.headers
@@ -2089,6 +2134,7 @@ function noteFormulaError(err: any, action: string) {
 
 /** 把该章节有公式单元格的合并数写入已保存数据；手工单元格保留，取不到数逐格提示 */
 async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
+  if (!ensureNoteWritable('按公式填入')) return noteRefreshResult('skipped', null, { reason: props.readonlyReason })
   const sec = selectedNoteSection.value
   const context = captureNoteSnapshot(sec)
   if (!sec || !context || !props.projectId) {
@@ -2149,11 +2195,13 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
 
 // 下推集团模板到子企业（spec: consol-note-template-push-to-subsidiaries；实现见 consolNoteTemplatePush）
 function handlePushTemplate() {
+  if (!ensureNoteWritable('下推模板')) return
   return pushConsolNoteTemplate(props.projectId, props.year, selectedNoteSection.value?.section_id, pushingTemplate)
 }
 
 // ⚡ 自动映射：建模板 + 确认能确定的映射（note-pull-header-formula-closure R6.3；实现见 consolNoteAutoMap）
 function handleAutoMap() {
+  if (!ensureNoteWritable('自动映射')) return
   return runConsolNoteAutoMap(props.projectId, props.year, selectedNoteSection.value?.section_id, autoMapping)
 }
 
@@ -2161,6 +2209,7 @@ function handleAutoMap() {
 // + 自下而上汇总（后端 reaggregate_subtree，spec consol-note-header-library-and-node-reaggregate）。
 // 映射在「📋 明细映射」确认；前端只负责触发、按节点汇报、重读当前章节。
 async function handleReaggregate(): Promise<NoteRefreshResult> {
+  if (!ensureNoteWritable('重新汇总')) return noteRefreshResult('skipped', null, { reason: props.readonlyReason })
   if (!props.projectId) return noteRefreshResult('skipped', null, { reason: '当前项目无效' })
   const sec = selectedNoteSection.value
   const context = captureNoteSnapshot(sec)
@@ -2205,6 +2254,7 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
 }
 
 function addNoteRow() {
+  if (!ensureNoteWritable('新增行')) return
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
   sec.editRows.push(emptyEditRow(sec.headers.length))
@@ -2214,6 +2264,25 @@ function addNoteRow() {
 // deleteNoteRows 封装 useTableToolbar.deleteSelectedRows：删除后同步 dirty，手工标记随行移动
 
 async function saveNoteData(): Promise<boolean> {
+  if (props.readonlyReason) {
+    ElMessage.warning(props.readonlyReason)
+    return false
+  }
+  if (noteSaveInFlight) return noteSaveInFlight
+  noteSaving.value = true
+  workspaceGuard?.notifyStateChange()
+  const task = performSaveNoteData()
+  noteSaveInFlight = task
+  try {
+    return await task
+  } finally {
+    if (noteSaveInFlight === task) noteSaveInFlight = null
+    noteSaving.value = false
+    workspaceGuard?.notifyStateChange()
+  }
+}
+
+async function performSaveNoteData(): Promise<boolean> {
   const sec = selectedNoteSection.value
   if (!sec || !props.projectId) return false
   // CP-05：保存前身份校验——已加载上下文的变体/章节必须与当前 props/章节一致，
@@ -2253,6 +2322,7 @@ async function saveNoteData(): Promise<boolean> {
     }
     // 落库快照 = 发起时冻结的 data；PUT 期间的实时编辑保留在 editRows 中不被覆盖。
     sec.savedData = data
+    sec.baselineEditRows = toEditRows(sec.headers, Array.isArray(data.rows) ? data.rows : [], data.manual_cells)
     ElMessage.success('附注数据已保存')
     // 勾稽校验读的是已保存数据：保存后按同一上下文重跑
     loadCheckRules(context)
@@ -2922,6 +2992,7 @@ async function onNoteNodeClick(
       multiHeader: sec.multi_header || null,
       columnGroups: sec._column_groups || null,
       editRows,
+      baselineEditRows: clonePlain(editRows),
       savedData: savedContent,
       // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
       // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
@@ -2962,31 +3033,43 @@ function switchToFourCol() {
   eventBus.emit('four-col-switch', { tab: 'notes' })
 }
 
-// CP-05：退出编辑模式。脏时先确认丢弃；确认期间若 scope/变体切换或产生了新上下文，
-// 本次（针对旧上下文的）确认结果一律作废，不得清除新章节的 dirty/编辑态。
+async function discardCurrentNoteDraft(): Promise<void> {
+  if (noteSaveInFlight) await noteSaveInFlight
+  const sec = selectedNoteSection.value
+  if (sec) {
+    sec.editRows = clonePlain(sec.baselineEditRows || sec.editRows || [])
+  }
+  clearNoteDirty()
+  clearAutoSaveDraft()
+  workspaceGuard?.notifyStateChange()
+}
+
+// CP-05：退出编辑统一走工作区“保存并继续/放弃修改/取消”协调器。
 async function leaveNoteEdit() {
   if (!noteEditMode.value) return
+  if (workspaceGuard) {
+    await workspaceGuard.runTransition(
+      '退出附注编辑前，请处理当前章节的未保存修改。',
+      () => { exitNoteEdit(true) },
+      ['consol-note'],
+    )
+    return
+  }
   const ctxAtStart = loadedNoteContext.value ? { ...loadedNoteContext.value } : null
   if (noteDirty.value) {
-    let accepted = false
     try {
       await ElMessageBox.confirm(
         '当前附注章节有未保存的编辑内容，退出编辑后将丢失。是否放弃修改并退出？',
         '退出编辑',
         { confirmButtonText: '放弃修改并退出', cancelButtonText: '取消', type: 'warning' },
       )
-      accepted = true
     } catch {
-      accepted = false
+      return
     }
-    // 确认晚到：上下文已切换（variant/section/node/scope 变化）→ 作废，不碰新上下文
     const now = loadedNoteContext.value
     if (!ctxAtStart || !now || !sameNoteContext(ctxAtStart, now)) return
-    if (!accepted) return
-    clearNoteDirty()
-    clearAutoSaveDraft()
+    await discardCurrentNoteDraft()
   }
-  // 已在上面自行确认过丢弃，强制退出避免 useEditMode 再弹一次
   exitNoteEdit(true)
 }
 
@@ -3016,16 +3099,21 @@ watch(
     noteRequestGuard.abort()
     noteSubOpGuard.abort()
 
+    const stashed = stashedContext.value
+    if (stashedNoteSection.value && stashed
+      && stashed.projectId === next.projectId
+      && stashed.year === next.year
+      && stashed.nodeKey === next.nodeKey
+      && stashed.variant === next.variant) {
+      selectedNoteSection.value = stashedNoteSection.value
+      loadedNoteContext.value = { ...stashed }
+      stashedNoteSection.value = null
+      stashedContext.value = null
+      return
+    }
+
     // ── 变体变化（模板切换）：脏时确认，否则重载同章节 ──
     if (variantChanged && !scopeChanged) {
-      // 父组件把 standard 恢复到暂存上下文的变体 → 原样恢复暂存的章节对象（保留 dirty）
-      if (stashedNoteSection.value && stashedContext.value?.variant === next.variant) {
-        selectedNoteSection.value = stashedNoteSection.value
-        loadedNoteContext.value = { ...stashedContext.value }
-        stashedNoteSection.value = null
-        stashedContext.value = null
-        return
-      }
       // 以"最后请求的章节"为重载目标：即便首个加载还在飞行中（selectedNoteSection 尚空），
       // 也要用新变体重载，否则 A-B-A 后页面会停在空态。
       const reloadSectionId = String(requestedSectionId.value || selectedNoteSection.value?.section_id || '').trim()
@@ -3053,6 +3141,14 @@ watch(
     // ── scope 变化（年度/项目/节点）：清空当前章节 + 关闭过程弹窗，禁写直到重载 ──
     if (scopeChanged) {
       const hadSection = !!selectedNoteSection.value
+      if (noteDirty.value && selectedNoteSection.value && loadedNoteContext.value) {
+        // 非预期的外部 scope 变化不得清除未保存内容；请求父级恢复原节点。
+        stashedNoteSection.value = selectedNoteSection.value
+        stashedContext.value = { ...loadedNoteContext.value }
+        emit('restore-note-context', { ...loadedNoteContext.value })
+        selectedNoteSection.value = null
+        return
+      }
       selectedNoteSection.value = null
       loadedNoteContext.value = null
       stashedNoteSection.value = null
@@ -3122,6 +3218,15 @@ function onShortcutSave() {
 }
 
 onMounted(() => {
+  unregisterWorkspaceDraft = workspaceGuard?.register({
+    id: 'consol-note',
+    label: () => `合并附注·${selectedNoteSection.value?.title || '当前章节'}`,
+    contextKey: () => `${props.projectId}:${props.year}:${currentNodeKey() || ''}:${selectedNoteSection.value?.section_id || ''}`,
+    isDirty: () => noteDirty.value,
+    isSaving: () => noteSaving.value,
+    save: saveNoteData,
+    discard: discardCurrentNoteDraft,
+  }) || null
   document.addEventListener('click', onDocClick)
   eventBus.on('consol-catalog-select', onConsolCatalogSelect)
   eventBus.on('consol-tree-aggregate', onTreeAggregate)
@@ -3131,6 +3236,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unregisterWorkspaceDraft?.()
+  unregisterWorkspaceDraft = null
   document.removeEventListener('click', onDocClick)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-tree-aggregate', onTreeAggregate)
@@ -3177,7 +3284,8 @@ defineExpose({
   margin-bottom: 8px; gap: 8px; flex-wrap: wrap;
 }
 .gt-note-section-title { margin: 0; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); white-space: nowrap; }
-.gt-note-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.gt-note-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.gt-note-sep { display: inline-block; width: 1px; height: 18px; background: var(--gt-color-border-light, #e8e4f0); margin: 0 2px; flex-shrink: 0; }
 .gt-note-table-wrap { flex: 1; min-height: 0; }
 .gt-note-table-footer {
   display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--gt-color-border-purple); margin-top: 4px;

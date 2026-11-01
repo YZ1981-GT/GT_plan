@@ -110,6 +110,27 @@ def load_layouts() -> dict[str, dict[str, list[dict[str, Any]]]]:
         return {}
 
 
+def _has_period_layer(table: dict) -> bool:
+    """表头最上层已经是期间（某个数据列的路径有两层以上、第一层是纯期间词）。
+
+    布局文件按表名记录「模板这张表没有期间层、显示时补一层」；库里存量的旧结构表（同名、列上自带「期末数 / 期初数」
+    分组）按表名也能对上，补层后表头变成「期末数 / 期末数 / 应收账款 … 期末数 / 期初数 / 坏账准备」（spec
+    note-table-structure-formula-pull-closure R3.1，5 个项目 八、5 实测）。
+    """
+    from app.services.note_table_header_library import column_paths, parse_segment
+
+    try:
+        paths = column_paths(table)
+    except Exception:  # noqa: BLE001 —— 表头坏了不补层
+        return True
+    for path in paths[1:]:
+        if len(path) >= 2:
+            period, measure = parse_segment(path[0])
+            if period and not measure:
+                return True
+    return False
+
+
 def attach_display_layout(table_data: Any, std: str | None, section: str | None) -> int:
     """按表名把 ``_display_layout`` 挂到 ``_tables`` 各表（就地；读时增强、不落库）。返回挂上的表数。
 
@@ -135,6 +156,8 @@ def attach_display_layout(table_data: Any, std: str | None, section: str | None)
         found = [by_name.get(_norm(n)) for n in e.get("tables") or []]
         if not found or any(t is None for t in found):
             continue
+        if any(_has_period_layer(t) for t in found):
+            continue  # 表自己已有期间层（存量旧结构：期末 / 期初分组并列）⇒ 再套一层期间就错（R3.1）
         periods = list(e.get("periods") or [])
         for k, t in enumerate(found):
             layout = {"mode": e["mode"], "period": periods[k] if k < len(periods) else ""}

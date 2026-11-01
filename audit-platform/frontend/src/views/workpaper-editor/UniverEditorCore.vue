@@ -74,6 +74,7 @@ const univerContainer = ref<HTMLElement | null>(null)
 const wpDetailRef = computed(() => props.wpDetail)
 const projectIdComputed = computed(() => props.projectId)
 const wpIdComputed = computed(() => props.wpId)
+let recordUniverEdit: (() => void) | undefined
 
 const {
   univerAPI,
@@ -82,6 +83,7 @@ const {
   loadErrorState,
   loadErrorMessage,
   dirty,
+  editRevision,
   initUniver,
   dispose,
 } = useEditorUniver({
@@ -90,19 +92,21 @@ const {
   wpId: wpIdComputed,
   wpDetail: wpDetailRef,
   onDetailLoaded: (detail) => emit('update:wpDetail', detail),
+  onEdited: () => recordUniverEdit?.(),
   sheetNavFacade: props.sheetNavFacade,
 })
 
 // ─── 自动保存（先实例化，供 useEditorSave 引用）────────────────────────────
 
-// autoSave 的 onSave 回调通过闭包引用下方的 editorSave.onSave
-// 利用 JS 函数 hoisting 特性：autoSave 触发时 editorSave 已完成实例化
+// autoSave 的 onSave 回调通过闭包引用下方的 editorSave.onSave；计时器触发时已完成实例化。
 const autoSave = useWorkpaperAutoSave(async () => {
   const ok = await onSave()
   if (!ok) {
     ElMessage.warning({ message: '自动保存失败，请手动保存', duration: 5000 })
   }
+  return ok
 }, 60_000)
+recordUniverEdit = autoSave.recordEdit
 
 // ─── 保存/导出逻辑 ──────────────────────────────────────────────────────────
 
@@ -117,6 +121,7 @@ const {
   syncLoading,
   prefillLoading,
   exportingPdf,
+  markEdited: markSaveEdited,
   onSave,
   onSubmitForReview,
   onSyncStructure,
@@ -150,14 +155,16 @@ const autoSaveMsg = computed(() => {
   return ''
 })
 
-// ─── dirty 同步到 Shell + autoSave ──────────────────────────────────────────
+// ─── dirty / 编辑代际同步到 Shell 与保存协调器 ──────────────────────────────
 
 watch(dirty, (val) => {
   emit('dirty-change', val)
-  if (val) {
-    autoSave.markDirty()
-  }
 })
+
+watch(editRevision, () => {
+  markSaveEdited()
+  autoSave.markDirty()
+}, { flush: 'sync' })
 
 // ─── saved 事件 → Shell 刷新 wpDetail ───────────────────────────────────────
 

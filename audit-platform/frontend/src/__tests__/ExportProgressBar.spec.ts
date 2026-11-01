@@ -3,13 +3,17 @@
  * Validates: requirements.md §三 C-3
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+
+const { getStatus } = vi.hoisted(() => ({ getStatus: vi.fn() }))
+vi.mock('@/services/workpaperApi', () => ({ getWorkpaperPackExportStatus: getStatus }))
 import { eventBus } from '@/utils/eventBus'
 import ExportProgressBar from '@/components/workpaper/ExportProgressBar.vue'
 
 describe('ExportProgressBar', () => {
   beforeEach(() => {
     eventBus.all.clear()
+    getStatus.mockReset().mockImplementation(() => new Promise(() => {}))
   })
 
   it('renders initial pending state with total', () => {
@@ -87,5 +91,25 @@ describe('ExportProgressBar', () => {
     expect(emitted).toBeTruthy()
     expect(emitted?.[0]?.[0]).toBe('db unavailable')
     expect(wrapper.text()).toContain('db unavailable')
+  })
+})
+
+
+describe('ExportProgressBar 状态恢复', () => {
+  it('SSE 事件缺失时从权威状态端点恢复完成结果', async () => {
+    getStatus.mockResolvedValueOnce({
+      task_id: 'task-poll', status: 'complete', done: 6, total: 6, percent: 100,
+      download_url: '/api/exports/task-poll', error: null,
+    })
+    const wrapper = mount(ExportProgressBar, {
+      props: { taskId: 'task-poll', total: 6 },
+    })
+    await flushPromises()
+
+    expect(getStatus).toHaveBeenCalledWith('task-poll')
+    expect(wrapper.text()).toContain('6 / 6')
+    expect(wrapper.text()).toContain('下载 ZIP')
+    expect(wrapper.emitted('complete')?.[0]?.[0]).toBe('/api/exports/task-poll')
+    wrapper.unmount()
   })
 })

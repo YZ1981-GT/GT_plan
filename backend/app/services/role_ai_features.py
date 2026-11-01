@@ -285,7 +285,7 @@ async def generate_project_summary(
 async def _llm_polish_report(raw_data: dict) -> str:
     """LLM 润色周报"""
     try:
-        from app.services.llm_client import chat_completion
+        from app.services.ai_task_executor import invoke_ai_task
         from app.services.export_mask_service import export_mask_service
 
         # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 38）
@@ -310,15 +310,15 @@ async def _llm_polish_report(raw_data: dict) -> str:
 
 要求：专业简洁，突出进展和风险，给出下周建议。"""
 
-        from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
-
-        # 旧实现把字符串当 messages 传入，每次都失败并累计全局熔断。
-        result = await chat_completion(
-            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=300
+        invocation = await invoke_ai_task(
+            "project.weekly_report",
+            user_prompt=prompt,
         )
-        if is_llm_fail_soft_placeholder(result):
-            raise RuntimeError(str(result)[:80])
-        return result
+        if not invocation.result.succeeded:
+            raise RuntimeError(
+                invocation.result.error_code or invocation.result.status.value
+            )
+        return invocation.result.text or ""
     except Exception as e:
         _logger.warning("LLM polish failed: %s", e)
         return f"本周完成{raw_data['completed_this_week']}个底稿，总进度{raw_data['completion_rate']}%，{raw_data['stale_workpapers']}个底稿超期待跟进。"
@@ -327,7 +327,7 @@ async def _llm_polish_report(raw_data: dict) -> str:
 async def _llm_generate_summary(summary_data: dict) -> str:
     """LLM 生成项目摘要"""
     try:
-        from app.services.llm_client import chat_completion
+        from app.services.ai_task_executor import invoke_ai_task
         from app.services.export_mask_service import export_mask_service
 
         metrics = summary_data["metrics"]
@@ -355,14 +355,15 @@ async def _llm_generate_summary(summary_data: dict) -> str:
 
 要求：开头一句话总结项目状态（正常/需关注/有风险），然后分点说明关键信息和建议。"""
 
-        from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
-
-        result = await chat_completion(
-            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=400
+        invocation = await invoke_ai_task(
+            "project.status_summary",
+            user_prompt=prompt,
         )
-        if is_llm_fail_soft_placeholder(result):
-            raise RuntimeError(str(result)[:80])
-        return result
+        if not invocation.result.succeeded:
+            raise RuntimeError(
+                invocation.result.error_code or invocation.result.status.value
+            )
+        return invocation.result.text or ""
     except Exception as e:
         _logger.warning("LLM summary failed: %s", e)
         return f"项目进度{metrics['workpaper_progress']}，{'有风险需关注' if risks else '进展正常'}。"

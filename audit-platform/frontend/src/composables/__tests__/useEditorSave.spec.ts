@@ -68,6 +68,7 @@ import { useEditorSave, __resetUnresolvedNotices, type UseEditorSaveOptions } fr
 import { api as httpApi } from '@/services/apiProxy'
 import { getWorkpaper } from '@/services/workpaperApi'
 import { eventBus } from '@/utils/eventBus'
+import { confirmVersionConflict } from '@/utils/confirm'
 import { ElMessage } from 'element-plus'
 
 function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSaveOptions {
@@ -276,5 +277,92 @@ describe('useEditorSave — 起点身份算不出时提示「未能分析下游�
     await useEditorSave(optsWithReason('')).onSave()
     await useEditorSave(optsWithReason('   ')).onSave()
     expect(unresolvedNotices()).toEqual([])
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+describe('useEditorSave — 保存代际与单飞', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getWorkpaper).mockResolvedValue({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 3 } as any)
+  })
+
+  it('保存期间继续编辑会串行补存最新 snapshot，并使用首轮返回的新版本', async () => {
+    const first = deferred<any>()
+    const second = deferred<any>()
+    vi.mocked(httpApi.post)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    let snapshot: any = { revision: 1 }
+    const opts = makeOptions({
+      dirty: ref(true),
+      univerAPI: ref({
+        getActiveWorkbook: () => ({
+          getSnapshot: () => snapshot,
+          getActiveSheet: () => ({ getSheetName: () => 'Sheet1' }),
+        }),
+      }),
+    })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    const pending = save.onSave()
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(1))
+    snapshot = { revision: 2 }
+    save.markEdited()
+    const joined = save.onSave()
+    expect(joined).toBe(pending)
+
+    first.resolve({ success: true, version: 2, message: '保存成功 v2' })
+    await vi.waitFor(() => expect(httpApi.post).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(httpApi.post).mock.calls[1][1]).toMatchObject({
+      snapshot: { revision: 2 },
+      expected_version: 2,
+    })
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+
+    second.resolve({ success: true, version: 3, message: '保存成功 v3' })
+    await expect(pending).resolves.toBe(true)
+    expect(opts.dirty.value).toBe(false)
+    expect(opts.autoSave.clearDirty).toHaveBeenCalledTimes(1)
+    expect(ElMessage.success).toHaveBeenCalledTimes(1)
+  })
+
+  it('409 选择留下时不绕过 expected_version 强制覆盖，并保留 dirty', async () => {
+    vi.mocked(httpApi.post).mockResolvedValue({
+      detail: { error_code: 'VERSION_CONFLICT', server_version: 4, expected_version: 1 },
+    })
+    vi.mocked(confirmVersionConflict).mockRejectedValueOnce('cancel')
+    const initUniver = vi.fn().mockResolvedValue(undefined)
+    const opts = makeOptions({ dirty: ref(true), initUniver })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    await expect(save.onSave()).resolves.toBe(false)
+
+    expect(httpApi.post).toHaveBeenCalledTimes(1)
+    expect(initUniver).not.toHaveBeenCalled()
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+    expect(eventBus.emit).not.toHaveBeenCalled()
+  })
+
+  it('网络异常返回 false 且不清除 dirty', async () => {
+    vi.mocked(httpApi.post).mockRejectedValue({ response: { status: 500 } })
+    const opts = makeOptions({ dirty: ref(true) })
+    const save = useEditorSave(opts)
+    save.markEdited()
+
+    await expect(save.onSave()).resolves.toBe(false)
+
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
   })
 })

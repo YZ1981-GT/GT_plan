@@ -320,3 +320,64 @@ describe('useNoteRefresh disclosure:note-text-updated', () => {
     expect(fetchDetail).not.toHaveBeenCalled()
   })
 })
+
+
+describe('useNoteRefresh 重算结果集合提示（formula-writer-ownership-and-stale R2）', () => {
+  function setupOutcome() {
+    vi.mocked(pullFromWorkpapers).mockReset()
+    vi.mocked(pullFromWorkpapers).mockResolvedValue({ result: null, error: null })
+    vi.mocked(runHeadlessDisclosure).mockReset()
+    vi.mocked(refreshDisclosureSection).mockReset()
+    vi.mocked(ElMessage).mockReset()
+    return useNoteRefresh({
+      projectId: ref('p1'),
+      year: ref(2025),
+      currentNote: ref({ note_section: '八、5' }),
+      fetchDetail: vi.fn(async () => undefined),
+      fetchTree: vi.fn(async () => undefined),
+      staleRecalc: vi.fn(async () => undefined),
+    })
+  }
+
+  it('值不变但重算成功：明确显示 recomputed 与 stale 已清除', async () => {
+    const api = setupOutcome()
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
+      cells_updated: 0,
+      sections_recomputed: ['八、5'],
+      recomputed_sections: ['八、5'],
+      changed_sections: [],
+      failed_sections: [],
+      cleared_sections: ['八、5'],
+      text_only_sections: [],
+      errors: [],
+    })
+    await api.onRefreshFromWP()
+    const message = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(message.type).toBe('success')
+    expect(message.message).toBe('已重新计算 1 个章节，数据未变化；已清除 1 个过期标记')
+  })
+
+  it('failed_sections 非空但旧 errors 为空：仍显示失败，不冒充重算成功', async () => {
+    const api = setupOutcome()
+    vi.mocked(refreshDisclosureSection).mockResolvedValue({
+      refreshed: 1,
+      total_notes: 1,
+      cells_updated: 0,
+      sections_recomputed: [],
+      recomputed_sections: [],
+      changed_sections: [],
+      failed_sections: ['八、5'],
+      cleared_sections: [],
+      text_only_sections: [],
+      errors: [],
+    })
+    await api.onRefreshFromWP()
+    const message = vi.mocked(ElMessage).mock.calls.at(-1)?.[0] as any
+    expect(message.type).toBe('warning')
+    expect(message.message).toContain('1 个章节取数失败')
+    expect(message.message).toContain('八、5 计算失败')
+    expect(message.message).not.toContain('数据已是最新')
+  })
+})

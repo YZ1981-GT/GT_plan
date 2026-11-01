@@ -656,6 +656,29 @@ async def build_cycle_reconciliation_findings(wp_id: str, wp_code: str) -> list[
 # ---------------------------------------------------------------------------
 
 
+async def build_review_reconciliation_findings(wp_id: str, wp_code: str | None) -> list[dict]:
+    """复核确定性检查统一入口；与文本提示使用同一计算函数和容差。"""
+    code = (wp_code or "").upper()
+    try:
+        if code.startswith("D2"):
+            from app.services.d2_review_context import build_d2_reconciliation_findings
+
+            return await build_d2_reconciliation_findings(str(wp_id))
+        return await build_cycle_reconciliation_findings(str(wp_id), code)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("build_review_reconciliation_findings failed (%s): %s", wp_code, e)
+        return [{
+            "code": f"{code or 'WP'}-DETERMINISTIC-UNAVAILABLE",
+            "passed": None,
+            "actual": None,
+            "expected": None,
+            "diff": None,
+            "message": "系统确定性勾稽检查暂不可用，须人工复核",
+            "severity": _SEV_BLOCKING,
+            "check_type": "system_unavailable",
+        }]
+
+
 async def build_review_reconciliation_context(wp_id: str, wp_code: str | None) -> str:
     """复核勾稽上下文统一入口：D2 走专用富勾稽，K/N 走通用勾稽，其余返回空串。
 
@@ -686,6 +709,7 @@ __all__ = [
     "build_cycle_reconciliation_context",
     "build_cycle_reconciliation_findings",
     "build_review_reconciliation_context",
+    "build_review_reconciliation_findings",
     "append_reconciliation_to_user_prompt",
     "extract_cycle_code",
 ]

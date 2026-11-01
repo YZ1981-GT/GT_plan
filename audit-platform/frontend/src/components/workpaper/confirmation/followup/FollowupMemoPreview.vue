@@ -118,9 +118,9 @@ function handleManualEdit(value: string) {
   emit('update', 'memo_text', value)
 }
 
-function handleCopy() {
+async function handleCopy() {
   const text = composedResult.value.text || props.row?.memo_text || ''
-  await copyText(text)
+  void copyText(text)
 }
 </script>
 

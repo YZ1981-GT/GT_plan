@@ -42,8 +42,8 @@ export interface ToolbarButton {
   divided?: boolean
   /** v-permission 指令值（dropdown item 用） */
   permission?: string
-  /** 仅当 wpStatus === 该值时可见（如 submitReview 仅在 draft 显示） */
-  visibleWhenStatus?: string
+  /** 仅当 wpStatus 落在这些值时可见。 */
+  visibleWhenStatuses?: string[]
   /** 静态 tooltip 文本（动态文本走 enriched.tooltip） */
   staticTooltip?: string
   group?: 'primary' | 'standalone' | 'more'
@@ -119,7 +119,7 @@ export const PRIMARY_TOOLBAR_BUTTONS: ToolbarButton[] = [
     type: 'success',
     group: 'primary',
     requireEdit: true,
-    visibleWhenStatus: 'draft',
+    visibleWhenStatuses: ['draft', 'edit_complete', 'revision_required'],
   },
   {
     key: 'manualRefresh',
@@ -216,13 +216,13 @@ export function useEditorToolbar(
     return { ...btn, dynamicLabel, dynamicType, loading, disabled, tooltip, title }
   }
 
-  /** 主操作区可见按钮：requireEdit + visibleWhenStatus 过滤后 enrich */
+  /** 主操作区可见按钮：requireEdit + status 白名单过滤后 enrich */
   const availableButtons = computed<EnrichedToolbarButton[]>(() => {
     const status = ctx.wpStatus?.value ?? ''
     return PRIMARY_TOOLBAR_BUTTONS
       .filter((btn) => {
         if (btn.requireEdit && !ctx.canEdit.value) return false
-        if (btn.visibleWhenStatus && status !== btn.visibleWhenStatus) return false
+        if (btn.visibleWhenStatuses && !btn.visibleWhenStatuses.includes(status)) return false
         return true
       })
       .map(enrichButton)

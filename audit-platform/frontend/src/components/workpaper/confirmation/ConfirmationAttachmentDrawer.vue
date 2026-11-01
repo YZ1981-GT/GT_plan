@@ -199,11 +199,13 @@
           <!-- 确认回填按钮 -->
           <div class="gt-ca-drawer__ocr-action">
             <el-button
+              v-if="att.can_apply_reply"
               type="primary"
               size="small"
               :loading="applyLoadingMap[att.attachment_id]"
               @click="handleApplyReply(att)"
             >确认回填</el-button>
+            <span v-else class="gt-ca-drawer__apply-block">{{ att.apply_reply_block_reason || '当前不能回填' }}</span>
           </div>
         </div>
       </div>
@@ -264,6 +266,10 @@ interface AttachmentLink {
   paired_outbound_attachment_id: string | null
   match_status?: string | null
   ocr_status: string | null
+  can_apply_reply: boolean
+  apply_reply_block_reason: string | null
+  ocr_compare: OcrCompareResult | null
+  backfill_defaults: BackfillForm | null
   upload_time: string | null
   link_created_at: string | null
 }
@@ -304,32 +310,15 @@ async function handleBeforeUpload(file: File): Promise<boolean> {
   }
 
   try {
-    // Step1: 上传附件（复用现有附件上传机制）
+    // 单一原子端点：后端先校验配对，再在一个事务内完成存储、挂载、reference 与留痕。
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('attachment_type', 'confirmation')
-    formData.append('reference_type', 'confirmation_list')
-    formData.append('reference_id', props.confirmationId)
-
-    const uploadRes: any = await http.post(
-      `/api/projects/${props.projectId}/attachments/upload`,
-      formData,
-    )
-    const attachmentId = uploadRes?.data?.id || uploadRes?.id
-
-    if (!attachmentId) {
-      ElMessage.error('上传失败：未获取到附件ID')
-      return false
-    }
-
-    // Step2: 挂载到函证（POST attachments 链接）
+    formData.append('role', uploadRole.value)
+    if (uploadRole.value === 'inbound' && pairedId) formData.append('paired_outbound_id', pairedId)
     await http.post(
-      `/api/projects/${props.projectId}/confirmations/${props.confirmationId}/attachments`,
-      {
-        attachment_id: attachmentId,
-        role: uploadRole.value,
-        paired_outbound_id: uploadRole.value === 'inbound' ? pairedId : undefined,
-      },
+      `/api/projects/${props.projectId}/confirmations/${props.confirmationId}/attachments/upload`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
 
     ElMessage.success(`${uploadRole.value === 'outbound' ? '发函件' : '回函件'}上传成功`)
@@ -444,6 +433,10 @@ async function handleTriggerOcr(att: AttachmentLink) {
 // ─── 确认回填 ───
 
 async function handleApplyReply(att: AttachmentLink) {
+  if (!att.can_apply_reply) {
+    ElMessage.warning(att.apply_reply_block_reason || '当前不能确认回填')
+    return
+  }
   const form = backfillFormMap[att.attachment_id]
   if (!form) return
 
@@ -507,7 +500,12 @@ async function loadAttachments() {
     const res: any = await http.get(
       `/api/projects/${props.projectId}/confirmations/${props.confirmationId}/attachments`,
     )
-    attachments.value = res?.data?.items ?? res?.items ?? res?.data ?? []
+    const rows: AttachmentLink[] = res?.data?.items ?? res?.items ?? res?.data ?? []
+    attachments.value = rows
+    for (const row of rows) {
+      if (row.ocr_compare) ocrResultMap[row.attachment_id] = row.ocr_compare
+      if (row.backfill_defaults) backfillFormMap[row.attachment_id] = { ...row.backfill_defaults }
+    }
   } catch (e) {
     handleApiError(e, '加载附件列表')
   } finally {
@@ -722,5 +720,12 @@ function ocrLabel(status: string | null): string {
 }
 .gt-ca-drawer__ocr-action {
   text-align: right;
+}
+</style>
+
+<style scoped>
+.gt-ca-drawer__apply-block {
+  font-size: var(--gt-font-size-xs, 12px);
+  color: var(--gt-color-text-secondary, #606266);
 }
 </style>

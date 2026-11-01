@@ -100,12 +100,17 @@ async def test_confirmation_breakdown_decides(world, monkeypatch, missing, expec
         assert found == []
 
 
-async def test_evaluation_failure_is_fail_open(world, monkeypatch):
+async def test_evaluation_failure_is_unknown_and_blocks(world, monkeypatch):
     wp = await add_wp(world, world.target, wp_code="F3-5")
 
-    async def boom(db, wp_id):
+    async def boom(self, wp_id, wp_meta, *, preloaded_items):
         raise RuntimeError("db down")
 
-    import app.services.attachment_wp_view as view_mod
-    monkeypatch.setattr(view_mod, "evaluate_wp_evidence_requirements", boom)
-    assert await _qc17(world, wp) == []
+    from app.services.evidence_readiness import EvidenceReadinessService
+
+    monkeypatch.setattr(EvidenceReadinessService, "_evaluate_strict", boom)
+    found = await _qc17(world, wp)
+    assert len(found) == 1
+    assert found[0]["severity"] == "blocking"
+    assert found[0]["actual_value"] == "unknown"
+    assert "无法判断" in found[0]["message"]

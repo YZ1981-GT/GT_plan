@@ -377,3 +377,98 @@ describe('导出与构建器', () => {
   })
 })
 
+
+
+describe('阶段 0：上下文、竞态与 COUNT 凭证', () => {
+  it('未选项目时只浏览模板结构，不向执行端点发送空项目', async () => {
+    const w = await mountDialog({ projectId: '', year: 2025 })
+    w.vm.selectedSource = 'report_balance_sheet'
+    await flushPromises()
+    expect(w.vm.queryBlockedReason).toContain('仅可浏览模板结构')
+    await w.vm.executeQuery()
+    expect(executeCalls()).toHaveLength(0)
+  })
+
+  it('后续页复用 count_token，查询定义变化后清空', async () => {
+    executeHolder.value = { ...TB_RESULT, count_token: 'count-1' }
+    const w = await mountDialog()
+    await run(w)
+    expect(w.vm.countToken).toBe('count-1')
+    w.vm.page = 2
+    w.vm.onPageChange()
+    await flushPromises()
+    expect(executeCalls()[1][1]).toMatchObject({ offset: 100, count_token: 'count-1' })
+    w.vm.selectedSource = 'account_balance'
+    await flushPromises()
+    expect(w.vm.countToken).toBe('')
+    expect(w.vm.resultRows).toEqual([])
+    expect(w.vm.hasQueried).toBe(false)
+  })
+
+  it('后到的旧请求不能覆盖新数据源结果', async () => {
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    const oldResult = { rows: [{ account_name: '旧结果' }], columns: ['account_name'], total: 1 }
+    const newResult = { rows: [{ account_name: '新结果' }], columns: ['account_name'], total: 1 }
+    apiMocks.post.mockImplementation((url: string) => {
+      if (url === '/api/address-registry/validate') return Promise.resolve({ issues: [] })
+      if (url !== '/api/custom-query/execute') return Promise.resolve({})
+      return new Promise((resolve) => {
+        if (!resolveOld) resolveOld = resolve
+        else resolveNew = resolve
+      })
+    })
+    const w = await mountDialog()
+    w.vm.selectedSource = 'tb_detail'
+    const oldRun = w.vm.executeQuery()
+    w.vm.selectedSource = 'account_balance'
+    await flushPromises()
+    const newRun = w.vm.executeQuery()
+    resolveNew(newResult)
+    await newRun
+    resolveOld(oldResult)
+    await oldRun
+    expect(w.vm.resultRows).toEqual(newResult.rows)
+    expect(w.vm.lastRun.source).toBe('account_balance')
+  })
+
+  it('项目或年度变化立即使旧结果与操作状态失效', async () => {
+    const w = await mountDialog()
+    await run(w)
+    expect(w.vm.hasQueried).toBe(true)
+    w.vm.localYear = 2024
+    await flushPromises()
+    expect(w.vm.hasQueried).toBe(false)
+    expect(w.vm.resultRows).toEqual([])
+    expect(w.vm.canExport).toBe(false)
+  })
+
+  it('指标骨架失败时使用明确的静态降级树，不留下空侧栏', async () => {
+    httpMocks.get.mockRejectedValue(new Error('offline'))
+    const w = await mountDialog()
+    expect(w.vm.indicatorTree.length).toBeGreaterThan(0)
+    expect(w.vm.allSources.some((item: any) => item.key === 'tb_detail')).toBe(true)
+  })
+
+  it('弹窗只取指标骨架，展开底稿分支时才按需加载 sheet', async () => {
+    const skeleton = [{ key: 'workpaper', label: '📋 底稿', lazy: true,
+      children: [{ key: 'workpaper', label: '底稿清单' }] }]
+    const branch = [{ key: 'workpaper:D2|审定表D2-1', label: 'D2 / 审定表D2-1' }]
+    httpMocks.get.mockImplementation((_url: string, config: any) => {
+      const params = config?.params || {}
+      if (params.branch === 'workpaper') return Promise.resolve({ data: branch, headers: {} })
+      if (params.depth === 1) return Promise.resolve({ data: JSON.parse(JSON.stringify(skeleton)),
+        headers: { 'x-indicators-schema-version': '15', 'x-notes-version': 'n1' } })
+      return Promise.resolve({ data: [{ key: 'should-not-load' }], headers: {} })
+    })
+    const w = await mountDialog()
+    expect(httpMocks.get.mock.calls.some((call) => {
+      const params = call[1]?.params || {}
+      return params.depth === undefined && params.branch === undefined
+    })).toBe(false)
+    const group = w.vm.indicatorTree[0]
+    await w.vm.onIndicatorExpand(group)
+    expect(group.children.map((child: any) => child.key)).toEqual(['workpaper', 'workpaper:D2|审定表D2-1'])
+    expect(httpMocks.get.mock.calls.some((call) => call[1]?.params?.branch === 'workpaper')).toBe(true)
+  })
+})

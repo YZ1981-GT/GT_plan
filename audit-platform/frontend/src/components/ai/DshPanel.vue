@@ -148,7 +148,7 @@
  * Validates: Requirements 1.2, 1.6, 1.7, 14.6
  * Property: 37
  */
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ChatDotSquare, Link, DArrowRight } from '@element-plus/icons-vue'
 import { buildAmbientHost } from '@/composables/useAiHostContext'
@@ -251,61 +251,70 @@ function handleClose() {
   emit('update:modelValue', false)
 }
 
-// 打开时：锁定背景滚动 + 聚焦面板内首个可交互元素
+interface BodyLockSnapshot {
+  overflow: string
+  position: string
+  width: string
+  top: string
+  scrollY: number
+}
+let bodyLock: BodyLockSnapshot | null = null
+
+function acquireBodyLock() {
+  if (bodyLock) return
+  bodyLock = {
+    overflow: document.body.style.overflow,
+    position: document.body.style.position,
+    width: document.body.style.width,
+    top: document.body.style.top,
+    scrollY: window.scrollY,
+  }
+  document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.width = '100%'
+  document.body.style.top = `-${bodyLock.scrollY}px`
+}
+
+function releaseBodyLock() {
+  if (!bodyLock) return
+  const snapshot = bodyLock
+  bodyLock = null
+  document.body.style.overflow = snapshot.overflow
+  document.body.style.position = snapshot.position
+  document.body.style.width = snapshot.width
+  document.body.style.top = snapshot.top
+  window.scrollTo(0, snapshot.scrollY)
+}
+
+// 打开时：锁定背景滚动 + 聚焦面板内首个可交互元素。
+// 布局按需下载本组件，首次挂载时 modelValue 可能已经为 true，故必须 immediate。
 watch(() => props.modelValue, async (open) => {
   if (open) {
     emit('message-count', 0)
+    if (layoutMode.value !== 'column') acquireBodyLock()
+    else releaseBodyLock()
 
-    // drawer/fullscreen 时锁定背景滚动
-    if (layoutMode.value !== 'column') {
-      document.body.style.overflow = 'hidden'
-      // iOS safe-area 需要固定 body
-      document.body.style.position = 'fixed'
-      document.body.style.width = '100%'
-      document.body.style.top = `-${window.scrollY}px`
-    }
-
-    // 等待 DOM 渲染后聚焦
+    // 等待 DOM 渲染后聚焦；等待期间如果已关闭，不执行过期副作用。
     await nextTick()
     await nextTick() // Transition 需要两轮 tick
-    if (closeButtonRef.value) {
-      closeButtonRef.value.focus()
-    }
+    if (!props.modelValue) return
+    closeButtonRef.value?.focus()
   } else {
-    // 恢复背景滚动
-    const scrollY = document.body.style.top
-    document.body.style.overflow = ''
-    document.body.style.position = ''
-    document.body.style.width = ''
-    document.body.style.top = ''
-    if (scrollY) {
-      window.scrollTo(0, parseInt(scrollY || '0') * -1)
-    }
-
-    // 焦点恢复到触发器
+    releaseBodyLock()
     await nextTick()
-    if (triggerRef.value) {
-      triggerRef.value.focus()
-    }
+    if (props.modelValue) return
+    triggerRef.value?.focus()
   }
-})
+}, { immediate: true })
 
 // layoutMode 变化时，如面板打开需更新滚动隔离
 watch(layoutMode, (mode) => {
   if (!props.modelValue) return
-  if (mode === 'column') {
-    // column 模式无需隔离
-    document.body.style.overflow = ''
-    document.body.style.position = ''
-    document.body.style.width = ''
-    document.body.style.top = ''
-  } else {
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.width = '100%'
-    document.body.style.top = `-${window.scrollY}px`
-  }
+  if (mode === 'column') releaseBodyLock()
+  else acquireBodyLock()
 })
+
+onBeforeUnmount(releaseBodyLock)
 
 // ---------------------------------------------------------------------------
 // 键盘处理

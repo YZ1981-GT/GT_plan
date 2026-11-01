@@ -412,6 +412,9 @@ class _RecordingSession:
         self._in_tx = in_tx
         self.rolled_back = False
 
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
     def in_transaction(self):
         return self._in_tx
 
@@ -555,12 +558,11 @@ class TestBuilderWiring:
         """R6.2 接线：超预算的 DSL 在 `_build_select` 即被拒。"""
         from app.routers.query_builder import _build_select
 
+        dsl = self._dsl()
+        # 绕过请求模型后再篡改，证明服务层预算仍是第二道门。
+        dsl.group_by = [f"g{i}" for i in range(MAX_GROUP_DIMS + 1)]
         with pytest.raises(HTTPException) as exc:
-            _build_select(
-                self._dsl(
-                    group_by=[f"g{i}" for i in range(MAX_GROUP_DIMS + 1)],
-                )
-            )
+            _build_select(dsl)
         assert exc.value.detail["error_code"] == "COMPLEXITY_BUDGET_EXCEEDED"
 
     def test_pii_access_is_enforced_by_build_select(self):

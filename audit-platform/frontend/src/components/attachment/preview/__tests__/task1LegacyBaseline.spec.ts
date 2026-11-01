@@ -72,12 +72,15 @@ vi.mock('@/utils/http', () => ({
 }))
 
 vi.mock('@vue-office/docx', () => ({
+  __esModule: true,
   default: { name: 'VueOfficeDocx', template: '<div class="vue-office-docx" />', props: ['src'] },
 }))
 vi.mock('@vue-office/excel', () => ({
+  __esModule: true,
   default: { name: 'VueOfficeExcel', template: '<div class="vue-office-excel" />', props: ['src'] },
 }))
 vi.mock('@vue-office/pdf', () => ({
+  __esModule: true,
   default: { name: 'VueOfficePdf', template: '<div class="vue-office-pdf" />', props: ['src'] },
 }))
 

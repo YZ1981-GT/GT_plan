@@ -3,7 +3,7 @@
     <div class="cm-nav-header">
       <span class="cm-nav-title">企业树</span>
       <el-tooltip content="重新读取企业树（按各项目的企业代码、上级代码与与上级关系自动生成）" placement="bottom">
-        <el-button size="small" :loading="loading" data-testid="cm-reload" @click="loadTree">🔄 刷新</el-button>
+        <el-button size="small" :loading="loading" data-testid="cm-reload" @click="loadTree">↻ 重新读取</el-button>
       </el-tooltip>
       <el-tooltip content="查看企业树版本与差异（合并计算不需要确认；推送时自动记录版本）" placement="bottom">
         <el-button size="small" data-testid="cm-scope-confirm" @click="eventBus.emit('consol-open-scope-confirm')">📋 树版本</el-button>
@@ -41,8 +41,8 @@
             </el-tooltip>
             <!-- 企业节点刷新按钮（hover 显示）；差额节点金额来自分录，不提供 -->
             <el-button v-if="!data.isElim" size="small" link class="cm-refresh-btn"
-              title="刷新该单位数据" @click.stop="openRefreshDialog(data)">
-              🔄
+              title="重新读取该单位已生成的报表和附注" @click.stop="openRefreshDialog(data)">
+              ↻
             </el-button>
           </span>
         </template>
@@ -67,7 +67,7 @@
             <div class="cm-ctx-item" @click="treeCtxAggregateDirect"><span class="cm-ctx-icon">Σ</span> 直接下级汇总</div>
             <div class="cm-ctx-item" @click="treeCtxAggregateCustom"><span class="cm-ctx-icon">📊</span> 自定义汇总</div>
             <div class="cm-ctx-divider" />
-            <div class="cm-ctx-item" @click="treeCtxRefresh"><span class="cm-ctx-icon">🔄</span> 刷新数据</div>
+            <div class="cm-ctx-item" @click="treeCtxRefresh"><span class="cm-ctx-icon">↻</span> 重新读取</div>
             <div class="cm-ctx-item" @click="treeCtxViewReport"><span class="cm-ctx-icon">📋</span> 查看报表</div>
             <div class="cm-ctx-item" @click="treeCtxViewNote"><span class="cm-ctx-icon">📝</span> 查看附注</div>
           </template>
@@ -75,10 +75,10 @@
       </Transition>
     </Teleport>
 
-    <!-- 刷新范围选择弹窗 -->
-    <el-dialog v-model="showRefreshDialog" :title="`刷新 — ${refreshTarget.name}`" width="420px" append-to-body>
+    <!-- 重新读取范围选择弹窗：只重读已生成内容，不声称执行后台计算。 -->
+    <el-dialog v-model="showRefreshDialog" :title="`重新读取 — ${refreshTarget.name}`" width="420px" append-to-body>
       <p style="font-size: var(--gt-font-size-sm);color: var(--gt-color-text-secondary);margin-bottom:12px">
-        选择要从项目数据中刷新的内容（从子企业单体数据重新汇总）：
+        选择要从服务端重新读取的已生成内容。需要重新计算时，请使用主工具栏“更新合并结果”。
       </p>
       <div class="cm-refresh-options">
         <el-checkbox v-model="refreshOptions.allReports" @change="onAllReportsChange">全部报表（6张）</el-checkbox>
@@ -90,12 +90,11 @@
           <el-checkbox v-model="refreshOptions.cash_flow_supplement">现金流附表</el-checkbox>
           <el-checkbox v-model="refreshOptions.impairment_provision">资产减值准备表</el-checkbox>
         </div>
-        <el-checkbox v-model="refreshOptions.notes">全部附注</el-checkbox>
-        <el-checkbox v-model="refreshOptions.worksheet">差额表</el-checkbox>
+        <el-checkbox v-model="refreshOptions.notes">附注目录与当前章节</el-checkbox>
       </div>
       <template #footer>
         <el-button @click="showRefreshDialog = false">取消</el-button>
-        <el-button type="primary" @click="doRefresh" :loading="refreshing">开始刷新</el-button>
+        <el-button type="primary" @click="doRefresh">重新读取</el-button>
       </template>
     </el-dialog>
   </div>
@@ -104,7 +103,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { getWorksheetTree, type ConsolTreeNode, type ConsolTreeResponse } from '@/services/consolidationApi'
 import { eventBus, type ConsolCurrentNodePayload } from '@/utils/eventBus'
 import { relationLabel } from '@/utils/groupRelation'
@@ -289,15 +287,14 @@ function onDocClickTree(e: MouseEvent) {
   if (!(e.target as HTMLElement)?.closest('.cm-context-menu')) closeTreeCtxMenu()
 }
 
-// ─── 刷新功能 ────────────────────────────────────────────────────────────────
+// ─── 重新读取已生成内容 ──────────────────────────────────────────────────────
 const showRefreshDialog = ref(false)
-const refreshing = ref(false)
 const refreshTarget = reactive({ code: '', name: '', nodeKey: '' })
 const refreshOptions = reactive({
   allReports: true,
   balance_sheet: true, income_statement: true, cash_flow_statement: true,
   equity_statement: true, cash_flow_supplement: true, impairment_provision: true,
-  notes: true, worksheet: true,
+  notes: true,
 })
 
 function openRefreshDialog(data: NavNode) {
@@ -308,7 +305,7 @@ function openRefreshDialog(data: NavNode) {
   refreshOptions.balance_sheet = true; refreshOptions.income_statement = true
   refreshOptions.cash_flow_statement = true; refreshOptions.equity_statement = true
   refreshOptions.cash_flow_supplement = true; refreshOptions.impairment_provision = true
-  refreshOptions.notes = true; refreshOptions.worksheet = true
+  refreshOptions.notes = true
   showRefreshDialog.value = true
 }
 
@@ -319,8 +316,7 @@ function onAllReportsChange(val: string | number | boolean) {
   refreshOptions.cash_flow_supplement = v; refreshOptions.impairment_provision = v
 }
 
-async function doRefresh() {
-  refreshing.value = true
+function doRefresh() {
   const types: string[] = []
   if (refreshOptions.allReports) {
     types.push('all_reports')
@@ -330,19 +326,16 @@ async function doRefresh() {
     }
   }
   if (refreshOptions.notes) types.push('notes')
-  if (refreshOptions.worksheet) types.push('worksheet')
+  if (!types.length) return
 
-  // 通知 ConsolidationIndex 执行刷新
+  // 这里只重新读取服务端已有结果；后台计算统一由主工具栏“更新合并结果”发起。
   eventBus.emit('consol-refresh-entity', {
     companyCode: refreshTarget.code,
     companyName: refreshTarget.name,
     nodeKey: refreshTarget.nodeKey,
     types,
   })
-  await new Promise((r) => setTimeout(r, 500))
-  refreshing.value = false
   showRefreshDialog.value = false
-  ElMessage.success(`已发起刷新：${refreshTarget.name}（${types.length} 项）`)
 }
 
 // 一键刷新 / 分录变更完成后重新读取企业树（诊断与合并方式可能变化）

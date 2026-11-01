@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import logging
+import time as _time
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID
@@ -60,8 +64,6 @@ from app.services.deliverable_service import DeliverableService
 from app.services.deliverable_snapshot_service import DeliverableSnapshotService
 from app.services.onlyoffice_callback_service import OnlyOfficeCallbackService
 from app.services.report_body_service import ReportBodyService, should_watermark
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -1134,7 +1136,7 @@ async def create_trio_job(
         project_id=project_id,
         year=year,
         digest=readiness.snapshot.get("digest", ""),
-        payload=readiness.sources,
+        payload=readiness.snapshot.get("payload", readiness.sources),
     )
     db.add(snapshot)
     await db.flush()
@@ -1883,9 +1885,6 @@ async def delete_deliverable(
 
 
 # ── OnlyOffice 免认证签名下载（document.url 不支持 Bearer header）────────────
-import hashlib
-import hmac
-import time as _time
 
 
 def _sign_download_url(project_id: UUID, task_id: UUID, version_no: int, expires: int) -> str:

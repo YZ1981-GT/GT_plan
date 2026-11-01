@@ -98,7 +98,7 @@ export function normalizeResult(
 }
 
 function makeId(): string {
-  return newUuid()}-${Math.random().toString(36).slice(2, 8)}`
+  return newUuid()
 }
 
 function buildSourceId(parts: {

@@ -302,99 +302,55 @@ class _FakeNote:
 
 
 class TestBatchAiFillEndpoint:
-    """POST /{project_id}/{year}/batch-ai-fill 逐章结果结构。"""
+    """旧 URL 兼容为 DB-backed AI task，不再同步执行 LLM。"""
 
-    def test_batch_returns_per_section_results(self):
-        """batch-ai-fill 返回逐章 results + generated/degraded/skipped 计数；不落库。"""
-        notes = [
-            _FakeNote("五、1", "货币资金", "货币资金", None, NoteStatus.draft),
-            _FakeNote("五、2", "应收账款", "应收账款", "", NoteStatus.draft),
-            _FakeNote("五、3", "存货", "存货", None, NoteStatus.draft),
-        ]
-        db = MagicMock()
-        db.execute = AsyncMock(return_value=_ScalarsResult(notes))
-        db.commit = AsyncMock()
-        db.flush = AsyncMock()
+    def test_batch_creates_durable_job_and_returns_snapshot(self):
+        snapshot = {
+            "job_id": str(uuid4()), "status": "queued", "items": [],
+            "progress_total": 3, "progress_done": 0,
+        }
+        create = AsyncMock(return_value=snapshot)
+        user = _user()
+        with patch("app.routers.ai_task_jobs.create_job", new=create):
+            result = _run(notes_router.batch_ai_fill_notes(
+                PROJECT_ID,
+                2025,
+                notes_router.NoteBatchAiFillRequest(
+                    doc_filter=[uuid4()], idempotency_key="idem-1"
+                ),
+                MagicMock(),
+                user,
+            ))
+        assert result == snapshot
+        body = create.await_args.args[1]
+        assert body.task_kind == "note_batch_prefill"
+        assert body.year == 2025
+        assert body.idempotency_key == "idem-1"
+        assert len(body.doc_filter) == 1
+        assert create.await_args.args[3] is user
 
-        batch_result = [
-            {"note_section": "五、1", "status": "generated", "text": "正文1", "citations": [_citation()]},
-            {"note_section": "五、2", "status": "degraded", "text": None, "citations": []},
-            {"note_section": "五、3", "status": "skipped", "text": None, "citations": []},
-        ]
+    def test_batch_generates_idempotency_key_for_legacy_client(self):
+        create = AsyncMock(return_value={"job_id": str(uuid4()), "status": "queued"})
+        with patch("app.routers.ai_task_jobs.create_job", new=create):
+            _run(notes_router.batch_ai_fill_notes(
+                PROJECT_ID, 2025, notes_router.NoteBatchAiFillRequest(),
+                MagicMock(), _user(),
+            ))
+        body = create.await_args.args[1]
+        assert UUID(body.idempotency_key)
 
-        with patch(
+    def test_batch_never_calls_legacy_synchronous_prefill(self):
+        create = AsyncMock(return_value={"job_id": str(uuid4()), "status": "succeeded", "items": []})
+        old_prefill = AsyncMock()
+        with patch("app.routers.ai_task_jobs.create_job", new=create), patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.batch_prefill",
-            new=AsyncMock(return_value=batch_result),
+            new=old_prefill,
         ):
-            result = _run(
-                notes_router.batch_ai_fill_notes(
-                    PROJECT_ID, 2025,
-                    notes_router.NoteBatchAiFillRequest(),
-                    db, _user(),
-                )
-            )
-
-        assert len(result["results"]) == 3
-        assert result["generated"] == 1
-        assert result["degraded"] == 1
-        assert result["skipped"] == 1
-        # 逐章结构正确 + citations 序列化为 dict
-        gen_row = next(r for r in result["results"] if r["note_section"] == "五、1")
-        assert gen_row["status"] == "generated"
-        assert gen_row["text"] == "正文1"
-        assert gen_row["citations"][0]["document_name"] == "上年审计报告及附注.pdf"
-        # 不落库
-        db.commit.assert_not_awaited()
-
-    def test_batch_sections_built_from_empty_or_draft_notes(self):
-        """构造 sections 时携带 note_section/section_title/account_name，供 enricher 使用。"""
-        notes = [_FakeNote("五、1", "货币资金", "货币资金", None, NoteStatus.draft)]
-        db = MagicMock()
-        db.execute = AsyncMock(return_value=_ScalarsResult(notes))
-        db.commit = AsyncMock()
-        bp = AsyncMock(return_value=[])
-
-        with patch(
-            "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.batch_prefill",
-            new=bp,
-        ):
-            _run(
-                notes_router.batch_ai_fill_notes(
-                    PROJECT_ID, 2025,
-                    notes_router.NoteBatchAiFillRequest(),
-                    db, _user(),
-                )
-            )
-
-        bp.assert_awaited_once()
-        sections = bp.await_args.args[2]
-        assert sections[0]["note_section"] == "五、1"
-        assert sections[0]["section_title"] == "货币资金"
-        assert sections[0]["account_name"] == "货币资金"
-        assert sections[0]["is_draft"] is True
-
-    def test_batch_empty_when_no_matching_sections(self):
-        """无匹配章节 → results 空、计数全 0，不 500。"""
-        db = MagicMock()
-        db.execute = AsyncMock(return_value=_ScalarsResult([]))
-        db.commit = AsyncMock()
-
-        with patch(
-            "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.batch_prefill",
-            new=AsyncMock(return_value=[]),
-        ):
-            result = _run(
-                notes_router.batch_ai_fill_notes(
-                    PROJECT_ID, 2025,
-                    notes_router.NoteBatchAiFillRequest(),
-                    db, _user(),
-                )
-            )
-
-        assert result["results"] == []
-        assert result["generated"] == 0
-        assert result["degraded"] == 0
-        assert result["skipped"] == 0
+            result = _run(notes_router.batch_ai_fill_notes(
+                PROJECT_ID, 2025, None, MagicMock(), _user(),
+            ))
+        assert result["status"] == "succeeded"
+        old_prefill.assert_not_awaited()
 
 
 # ===========================================================================

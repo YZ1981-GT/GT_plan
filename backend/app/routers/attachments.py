@@ -1,6 +1,6 @@
 """附件管理 API 路由
 
-- POST   /api/projects/{id}/attachments          — 创建附件
+- POST   /api/projects/{id}/attachments/upload   — 受控上传附件
 - GET    /api/projects/{id}/attachments          — 附件列表
 - GET    /api/attachments/{id}                   — 附件详情
 - POST   /api/attachments/{id}/associate         — 关联到底稿
@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import assert_project_permission, authorize_wp_edit, get_current_user, require_project_access
+from app.deps import assert_project_permission, authorize_wp_edit, get_current_user, get_current_user_stream, require_project_access
 from app.models.core import User
 from app.routers._wp_gate import enforce_edit_lock_for_content_write
 from app.services import attachment_destructive_guard as destructive_guard
@@ -38,18 +38,6 @@ from app.services.wp_visibility.entry_integration import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["attachments"])
-
-
-class AttachmentCreate(BaseModel):
-    file_name: str
-    file_path: str
-    file_type: str = "unknown"
-    file_size: int = 0
-    paperless_document_id: int | None = None
-    attachment_type: str = "general"
-    reference_id: UUID | None = None
-    reference_type: str | None = None
-    storage_type: str | None = None
 
 
 class AssociateRequest(BaseModel):
@@ -75,25 +63,48 @@ async def _ensure_project_access(
     await assert_project_permission(db, current_user, project_id, min_permission)
 
 
+async def _resolved_list_capabilities(
+    db: AsyncSession,
+    current_user: User,
+    project_id: UUID,
+) -> dict[str, bool]:
+    """附件页的粗粒度能力投影；具体对象/底稿门仍由各写端点最终校验。"""
+    import sqlalchemy as sa
+    from app.deps import PERMISSION_HIERARCHY
+    from app.models.core import Project, ProjectStatus, ProjectUser
+    from app.services.evidence_governance.role_capability_contract import Capability, is_permitted
+
+    project = await db.get(Project, project_id)
+    writable = bool(project is not None and project.status != ProjectStatus.archived)
+    role = getattr(current_user, "role", None)
+    role_value = role.value if hasattr(role, "value") else str(role or "")
+    if role_value == "admin":
+        has_edit = writable
+    else:
+        level = (await db.execute(sa.select(ProjectUser.permission_level).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == sa.false(),
+        ))).scalar_one_or_none()
+        level_value = level.value if hasattr(level, "value") else str(level or "")
+        has_edit = writable and PERMISSION_HIERARCHY.get(level_value, 0) >= PERMISSION_HIERARCHY["edit"]
+
+    def allowed(capability: Capability) -> bool:
+        return has_edit and is_permitted(role_value, capability.value)
+
+    return {
+        "upload": allowed(Capability.attachment_create),
+        "associate": allowed(Capability.evidence_ref_create),
+        "ocr_confirm": allowed(Capability.ocr_confirm),
+        "ocr_retry": allowed(Capability.ocr_retry),
+    }
+
+
 def _paperless_document_id_from_path(file_path: str) -> str:
     doc_id = file_path.replace("paperless://", "", 1).lstrip("/")
     if doc_id.startswith("documents/"):
         doc_id = doc_id[len("documents/"):]
     return doc_id
-
-
-@router.post("/api/projects/{project_id}/attachments")
-async def create_attachment(
-    project_id: UUID, body: AttachmentCreate, db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    svc = _svc(db)
-    try:
-        result = await svc.create_attachment(project_id, body.model_dump(), created_by=current_user.id)
-    except UploadRejected as exc:
-        raise HTTPException(status_code=422, detail=exc.as_detail())
-    await db.commit()
-    return result
 
 
 @router.post("/api/projects/{project_id}/attachments/upload")
@@ -110,17 +121,25 @@ async def upload_attachment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    # #2: 文件大小限制（默认 50MB，防止 OOM）
+    # 分块读取并在超过上限时立即停止；扩展名、实际 MIME 与恶意签名均在落盘前校验。
     from app.core.config import settings
+    from app.services.attachment_upload_policy import ALLOWED_EXTENSIONS
+    from app.services.safe_file_ingress import read_upload_bounded
+
     max_size = getattr(settings, "ATTACHMENT_MAX_UPLOAD_BYTES", 50 * 1024 * 1024)
-    content = await file.read()
-    if len(content) > max_size:
-        raise HTTPException(
-            status_code=413,
-            detail=f"文件过大（{len(content) / 1024 / 1024:.1f}MB），最大允许 {max_size / 1024 / 1024:.0f}MB",
+    try:
+        ingress = await read_upload_bounded(
+            file,
+            allowed_extensions=ALLOWED_EXTENSIONS,
+            max_bytes=max_size,
         )
+    except UploadRejected as exc:
+        status_code = 413 if exc.code == "ATTACHMENT_TOO_LARGE" else 422
+        raise HTTPException(status_code=status_code, detail=exc.as_detail()) from exc
+    content = ingress.content
 
     svc = _svc(db)
+    raw: dict | None = None
     try:
         result = await svc.upload_attachment_file(
             project_id=project_id,
@@ -137,9 +156,23 @@ async def upload_attachment(
             },
             created_by=current_user.id,
         )
+        raw = await svc.get_raw_storage(UUID(result["id"]))
+        await db.commit()
     except UploadRejected as exc:
-        raise HTTPException(status_code=422, detail=exc.as_detail())
-    await db.commit()
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=exc.as_detail()) from exc
+    except Exception as exc:
+        await db.rollback()
+        cleanup = None
+        if raw is not None:
+            cleanup = await svc.compensate_uploaded_storage(
+                project_id=project_id,
+                storage_type=raw.get("storage_type"),
+                storage_key=raw.get("file_path"),
+                paperless_document_id=raw.get("paperless_document_id"),
+            )
+        logger.error("附件上传事务失败，已执行存储补偿: cleanup=%s", cleanup, exc_info=True)
+        raise HTTPException(status_code=500, detail="附件上传失败，已撤销本次写入") from exc
 
     # SSE 广播附件上传事件，供其他打开的页面实时同步
     try:
@@ -162,18 +195,27 @@ async def list_attachments(
     attachment_type: str | None = None,
     reference_type: str | None = None,
     reference_id: UUID | None = None,
+    q: str | None = Query(None, max_length=200),
+    page: int | None = Query(None, ge=1),
+    page_size: int | None = Query(None, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     svc = _svc(db)
-    return await svc.list_attachments(
+    result = await svc.list_attachments(
         project_id,
         file_type,
         ocr_status,
         attachment_type,
         reference_type,
         reference_id,
+        q=q,
+        page=page,
+        page_size=page_size,
     )
+    if isinstance(result, dict):
+        result["capabilities"] = await _resolved_list_capabilities(db, current_user, project_id)
+    return result
 
 
 @router.get("/api/attachments/search")
@@ -188,7 +230,38 @@ async def search_attachments(
     return await svc.search(project_id, q)
 
 
-@router.get("/api/attachments/{attachment_id}")
+
+
+
+# ── Paperless 健康检查 ──
+# 静态路径必须注册在 ``/api/attachments/{attachment_id}`` 之前：Starlette 按注册顺序取第一条命中，
+# 放在后面时 ``paperless-health`` 会被当成附件 id（恒 422）。守卫 ``tests/test_route_shadow_guard.py``。
+
+@router.get("/api/attachments/paperless-health")
+async def check_paperless_health(current_user: User = Depends(get_current_user)):
+    """检查 Paperless-ngx 服务是否可用"""
+    import os
+    import httpx
+
+    paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
+    paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+
+    try:
+        async with httpx.AsyncClient(timeout=5, mounts={}, trust_env=False) as client:
+            resp = await client.get(
+                f"{paperless_url}/api/",
+                headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
+            )
+            if resp.status_code == 200:
+                return {"available": True, "url": paperless_url, "message": "Paperless 服务正常"}
+            return {"available": False, "url": paperless_url, "status": resp.status_code, "message": f"Paperless 返回 {resp.status_code}"}
+    except httpx.ConnectError:
+        return {"available": False, "url": paperless_url, "message": "Paperless 服务不可达"}
+    except Exception as e:
+        return {"available": False, "url": paperless_url, "message": str(e)}
+
+
+@router.get("/api/attachments/{attachment_id:uuid}")
 async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
     result = await svc.get_attachment(attachment_id)
@@ -203,7 +276,7 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
     return result
 
 
-@router.post("/api/attachments/{attachment_id}/associate")
+@router.post("/api/attachments/{attachment_id:uuid}/associate")
 async def associate_with_wp(
     attachment_id: UUID, body: AssociateRequest, request: Request, db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -290,7 +363,7 @@ class OcrConfirmRequest(BaseModel):
     ocr_text: str | None = None  # 修订后的全文；不带 = 原文确认
 
 
-@router.get("/api/attachments/{attachment_id}/ocr-text")
+@router.get("/api/attachments/{attachment_id:uuid}/ocr-text")
 async def get_ocr_text(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """识别全文 + sha256 + 确认状态（确认弹窗打开时取；列表里的 ocr_text 只是 200 字预览）。"""
     att = await load_attachment(db, attachment_id)
@@ -302,7 +375,7 @@ async def get_ocr_text(attachment_id: UUID, db: AsyncSession = Depends(get_db), 
     return full_text_payload(att)
 
 
-@router.post("/api/attachments/{attachment_id}/ocr-confirm")
+@router.post("/api/attachments/{attachment_id:uuid}/ocr-confirm")
 async def confirm_ocr(
     attachment_id: UUID, body: OcrConfirmRequest, db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -322,7 +395,7 @@ async def confirm_ocr(
     return result
 
 
-@router.put("/api/attachments/{attachment_id}/ocr-status")
+@router.put("/api/attachments/{attachment_id:uuid}/ocr-status")
 async def update_ocr_status(
     attachment_id: UUID, body: OCRStatusUpdate, db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -433,7 +506,7 @@ async def _match_ocr_to_ledger(
     ]
 
 
-@router.post("/api/attachments/{attachment_id}/classify")
+@router.post("/api/attachments/{attachment_id:uuid}/classify")
 async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
     att = await svc.get_attachment(attachment_id)
@@ -450,7 +523,7 @@ async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/api/attachments/{attachment_id}/extract-confirmation")
+@router.post("/api/attachments/{attachment_id:uuid}/extract-confirmation")
 async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
     att = await svc.get_attachment(attachment_id)
@@ -469,8 +542,12 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
 
 # ── 统一预览/下载代理（屏蔽 paperless:// 和本地路径差异）──
 
-@router.get("/api/attachments/{attachment_id}/download")
-async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.get("/api/attachments/{attachment_id:uuid}/download")
+async def download_attachment(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user_stream),
+):
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
     import httpx
@@ -506,9 +583,40 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
         str(current_user.id), str(attachment_id), file_name,
     )
 
-    # Paperless 存储：通过 Paperless API 代理下载
-    if file_path.startswith("paperless://"):
-        doc_id = _paperless_document_id_from_path(file_path)
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+    from app.services.attachment_storage_resolver import plan_project_attachment
+
+    try:
+        blob = await AssetBlobService(db).read_current_attachment_blob(
+            attachment_id,
+            project_id=UUID(raw["project_id"]),
+        )
+    except AssetBlobReadRejected as exc:
+        from app.services.attachment_asset_projection import asset_blob_read_authoritative
+
+        logger.warning(
+            "attachment blob download rejected: attachment=%s reason=%s",
+            attachment_id,
+            exc.reason,
+        )
+        if raw.get("storage_type") == "asset_blob" or asset_blob_read_authoritative():
+            raise HTTPException(status_code=404, detail="文件不存在") from exc
+        blob = None
+    if blob is not None:
+        return Response(
+            content=blob.content,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": _disposition,
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    plan = plan_project_attachment(
+        raw["project_id"], raw.get("storage_type"), file_path,
+    )
+    if plan.kind == "remote":
+        doc_id = _paperless_document_id_from_path(plan.remote_locator or "")
         import os
         paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
@@ -521,18 +629,19 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
                 if resp.status_code == 200:
                     return Response(
                         content=resp.content,
-                        media_type=resp.headers.get("content-type", "application/octet-stream"),
-                        headers={"Content-Disposition": _disposition},
+                        media_type="application/octet-stream",
+                        headers={
+                            "Content-Disposition": _disposition,
+                            "X-Content-Type-Options": "nosniff",
+                        },
                     )
         except httpx.RequestError:
-            pass
+            logger.warning("Paperless attachment download failed: attachment=%s", attachment_id)
+        raise HTTPException(status_code=404, detail="文件不存在")
 
-    # 本地存储
-    local_path = Path(file_path)
-    if not local_path.exists():
-        local_path = Path("storage") / file_path.lstrip("/")
-    if local_path.exists():
-        # #6: 用 generator 确保 file handle 正确关闭（客户端中断时不泄露）
+    if plan.kind == "local" and plan.canonical_path is not None:
+        local_path = plan.canonical_path
+
         async def _file_stream():
             with open(local_path, "rb") as f:
                 while chunk := f.read(65536):
@@ -541,14 +650,21 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
         return StreamingResponse(
             _file_stream(),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": _disposition},
+            headers={
+                "Content-Disposition": _disposition,
+                "X-Content-Type-Options": "nosniff",
+            },
         )
 
     raise HTTPException(status_code=404, detail="文件不存在")
 
 
-@router.get("/api/attachments/{attachment_id}/preview")
-async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.get("/api/attachments/{attachment_id:uuid}/preview")
+async def preview_attachment(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user_stream),
+):
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
     import httpx
@@ -572,10 +688,16 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
     file_name = att.get("file_name", "")
     file_type = att.get("file_type", "")
 
-    # 判断是否可直接预览
-    previewable_types = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".csv"}
+    from app.services.attachment_storage_resolver import (
+        inline_preview_allowed,
+        plan_project_attachment,
+    )
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+
+    # 活动内容（SVG/HTML）只允许下载，不以内联同源资源执行。
+    previewable_types = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".csv"}
     ext = Path(file_name).suffix.lower() if file_name else ""
-    can_preview = ext in previewable_types
+    can_preview = ext in previewable_types and inline_preview_allowed(file_name)
 
     if not can_preview:
         return {
@@ -586,9 +708,34 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
             "download_url": f"/api/attachments/{attachment_id}/download",
         }
 
-    # Paperless 存储
-    if file_path.startswith("paperless://"):
-        doc_id = _paperless_document_id_from_path(file_path)
+    try:
+        blob = await AssetBlobService(db).read_current_attachment_blob(
+            attachment_id,
+            project_id=UUID(raw["project_id"]),
+        )
+    except AssetBlobReadRejected as exc:
+        from app.services.attachment_asset_projection import asset_blob_read_authoritative
+
+        logger.warning(
+            "attachment blob preview rejected: attachment=%s reason=%s",
+            attachment_id,
+            exc.reason,
+        )
+        if raw.get("storage_type") == "asset_blob" or asset_blob_read_authoritative():
+            raise HTTPException(status_code=404, detail="文件不存在") from exc
+        blob = None
+    if blob is not None:
+        return Response(
+            content=blob.content,
+            media_type=blob.media_type or "application/octet-stream",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
+
+    plan = plan_project_attachment(
+        raw["project_id"], raw.get("storage_type"), file_path,
+    )
+    if plan.kind == "remote":
+        doc_id = _paperless_document_id_from_path(plan.remote_locator or "")
         import os
         paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
@@ -603,61 +750,36 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
                     return Response(
                         content=resp.content,
                         media_type=resp.headers.get("content-type", "application/octet-stream"),
+                        headers={"X-Content-Type-Options": "nosniff"},
                     )
         except httpx.RequestError:
-            pass
+            logger.warning("Paperless attachment preview failed: attachment=%s", attachment_id)
 
-    # 本地存储
-    local_path = Path(file_path)
-    if not local_path.exists():
-        local_path = Path("storage") / file_path.lstrip("/")
-    if local_path.exists():
+    if plan.kind == "local" and plan.canonical_path is not None:
         mime_map = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml",
+                    ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
                     ".doc": "application/msword", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     ".csv": "text/csv"}
         mime = mime_map.get(ext, "application/octet-stream")
+        local_path = plan.canonical_path
 
         async def _preview_stream():
             with open(local_path, "rb") as f:
                 while chunk := f.read(65536):
                     yield chunk
 
-        return StreamingResponse(_preview_stream(), media_type=mime)
+        return StreamingResponse(
+            _preview_stream(), media_type=mime,
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     return {"previewable": False, "file_name": file_name, "ocr_text": att.get("ocr_text", ""), "download_url": f"/api/attachments/{attachment_id}/download", "message": "文件暂不可预览，请下载查看"}
 
 
-# ── Paperless 健康检查 ──
-
-@router.get("/api/attachments/paperless-health")
-async def check_paperless_health(current_user: User = Depends(get_current_user)):
-    """检查 Paperless-ngx 服务是否可用"""
-    import os
-    import httpx
-
-    paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
-    paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
-
-    try:
-        async with httpx.AsyncClient(timeout=5, mounts={}, trust_env=False) as client:
-            resp = await client.get(
-                f"{paperless_url}/api/",
-                headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
-            )
-            if resp.status_code == 200:
-                return {"available": True, "url": paperless_url, "message": "Paperless 服务正常"}
-            return {"available": False, "url": paperless_url, "status": resp.status_code, "message": f"Paperless 返回 {resp.status_code}"}
-    except httpx.ConnectError:
-        return {"available": False, "url": paperless_url, "message": "Paperless 服务不可达"}
-    except Exception as e:
-        return {"available": False, "url": paperless_url, "message": str(e)}
-
-
 # ── 附件重试 OCR ──
 
-@router.post("/api/attachments/{attachment_id}/retry-ocr")
+@router.post("/api/attachments/{attachment_id:uuid}/retry-ocr")
 async def retry_ocr(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -690,7 +812,7 @@ async def retry_ocr(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@router.delete("/api/attachments/{attachment_id}")
+@router.delete("/api/attachments/{attachment_id:uuid}")
 async def delete_attachment(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -725,7 +847,7 @@ async def delete_attachment(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@router.get("/api/attachments/{attachment_id}/versions")
+@router.get("/api/attachments/{attachment_id:uuid}/versions")
 async def list_attachment_versions(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -751,7 +873,7 @@ async def list_attachment_versions(
     return {"versions": versions, "total": len(versions)}
 
 
-@router.post("/api/attachments/{attachment_id}/versions/{version_id}/rollback")
+@router.post("/api/attachments/{attachment_id:uuid}/versions/{version_id}/rollback")
 async def rollback_attachment_version(
     attachment_id: UUID,
     version_id: UUID,

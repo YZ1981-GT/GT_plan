@@ -24,6 +24,7 @@ from app.services.batch_project_service import (
     parse_and_import,
     validate_batch,
 )
+from tests._batch_project_test_support import grant_manager_codes
 
 ROOT = "91110000100000000R"
 PARENT = "911100002000000005"
@@ -71,6 +72,7 @@ def row(name: str, code: str, year: int | float, scope: str = "单户", *,
 
 def admin():
     return SimpleNamespace(id=uuid4(), role=SimpleNamespace(value="admin"))
+
 
 @pytest.mark.asyncio
 async def test_template_has_empty_data_sheet_and_separate_examples():
@@ -308,6 +310,7 @@ async def test_manager_creator_gets_assignment_and_edit_membership(db):
     staff = StaffMember(user_id=manager.id, name="批量项目经理", employee_no="BP-MGR-1")
     db.add(staff)
     await db.commit()
+    await grant_manager_codes(db, manager, CHILD)
 
     result = await parse_and_import(
         make_excel([row("经理创建项目", CHILD, 2031)]), db,
@@ -674,6 +677,7 @@ async def test_plan_apply_batch_initializes_manager_memberships(db):
     staff = StaffMember(user_id=manager.id, name="计划经理", employee_no="BP-MGR-2")
     db.add(staff)
     await db.commit()
+    await grant_manager_codes(db, manager, CHILD, BRANCH)
     key = "manager-plan-batch-0001"
     plan, validation, _ = await create_validation_plan(
         make_excel([row("经理计划甲", CHILD, 2039), row("经理计划乙", BRANCH, 2039)]),
@@ -749,6 +753,7 @@ async def test_unauthorized_existing_entity_does_not_leak_group_fields(db):
     )
     db.add(manager)
     await db.commit()
+    await grant_manager_codes(db, manager, CHILD, BRANCH)
 
     update_row = [
         "隐藏企业", CHILD, "隐藏企业", 2041, "年报审计", "企业会计准则", "单户",
@@ -759,7 +764,9 @@ async def test_unauthorized_existing_entity_does_not_leak_group_fields(db):
         make_excel([update_row]), db, current_user=manager, mode="consolidation"
     )
     messages = "；".join(message for item in update.response.errors for message in item.errors)
-    assert "不存在或无权访问" in messages
+    # update 行必须来自当前合并项目导出的完整模板；普通模板在任何库存读取前统一拒绝，
+    # 既不泄露目标是否存在，也不回显项目 ID / 基线摘要。
+    assert "完整模板" in messages
     assert "项目ID与" not in messages
     assert "基线摘要" not in messages
 
@@ -771,25 +778,34 @@ async def test_unauthorized_existing_entity_does_not_leak_group_fields(db):
         make_excel([row("不存在企业", BRANCH, 2041, "合并")]),
         db, current_user=manager, mode="consolidation",
     )
-    # 非管理员预校验只以当前可见库存分类，不能用“隐藏但存在”作为无副作用的探测信号。
-    assert creation.response.valid is absent.response.valid is True
-    assert creation.response.errors == absent.response.errors == []
-    assert creation.parsed_rows[0].parent_company_code == ""
-    assert creation.parsed_rows[0].ultimate_company_code == ""
-    # 兼容入口也不能把未显示的同年度库存误当作可新建项目并写入。
+    # manager 已持精确 USCC 建项授权，所以可以在不扫描无关年度库存的前提下查询该代码；
+    # 授权只允许「创建」，不授予既有项目访问权。已有但无权的代码统一返回不含项目字段的
+    # 泛化错误，不存在的代码正常通过。旧断言要求两者都显示为可新建，会把确认阶段才发现的
+    # 冲突留到写路径，已经不符合 batch-project-authorization-and-lock-hardening 的 fail-closed 口径。
+    assert creation.response.valid is False
+    hidden_messages = "；".join(
+        message for item in creation.response.errors for message in item.errors
+    )
+    assert "无权维护" in hidden_messages
+    assert str(hidden.id) not in hidden_messages
+    assert "基线摘要" not in hidden_messages
+    assert absent.response.valid is True and absent.response.errors == []
+    assert absent.parsed_rows[0].parent_company_code == ""
+    assert absent.parsed_rows[0].ultimate_company_code == ""
+    # 兼容入口也必须在预校验阶段拒绝，不能把隐藏库存误当作可新建项目并写入。
     legacy = await parse_and_import(
         make_excel([create_row]), db, current_user=manager, mode="consolidation"
     )
     assert legacy.success_count == 0
     assert legacy.fail_count == 1
-    assert "权限或库存已变化" in legacy.failures[0].errors[0]
+    assert "无权维护" in legacy.failures[0].errors[0]
 
     persisted, persisted_validation, _ = await create_validation_plan(
         make_excel([row("隐藏企业单户", CHILD, 2041)]), db,
         actor=manager, file_name="隐藏冲突.xlsx", mode="project",
         idempotency_key="hidden-existing-plan-0001",
     )
-    assert persisted_validation.valid is True
+    assert persisted_validation.valid is False
     await db.commit()
     with pytest.raises(Exception) as hidden_apply_error:
         await apply_validation_plan(
@@ -797,7 +813,7 @@ async def test_unauthorized_existing_entity_does_not_leak_group_fields(db):
             idempotency_key="hidden-existing-plan-0001",
         )
     assert getattr(hidden_apply_error.value, "status_code", None) == 409
-    assert "权限或库存已变化" in str(getattr(hidden_apply_error.value, "detail", ""))
+    assert "预校验未通过" in str(getattr(hidden_apply_error.value, "detail", ""))
     await db.rollback()
 
 @pytest.mark.asyncio
@@ -818,7 +834,7 @@ async def test_legacy_endpoint_never_treats_update_rows_as_new_projects(db):
     result = await parse_and_import(make_excel([update_row]), db, mode="consolidation")
     assert result.success_count == 0
     assert result.fail_count == 1
-    assert "确认执行" in result.failures[0].errors[0]
+    assert "完整模板" in result.failures[0].errors[0]
     count = await db.scalar(select(func.count()).select_from(Project).where(
         Project.company_code == CHILD, Project.audit_year == 2042,
         Project.is_deleted == False,  # noqa: E712
@@ -975,6 +991,7 @@ async def test_revoked_group_dependency_hides_plan_and_blocks_create_apply(db):
     )
     db.add(membership)
     await db.commit()
+    await grant_manager_codes(db, manager, BRANCH, ROOT)
 
     key = "revoked-plan-dependency-0001"
     plan, validation, _ = await create_validation_plan(
@@ -1053,6 +1070,19 @@ async def test_template_metadata_binds_mode_and_group_root_scope(db):
         accounting_standard="enterprise", company_code=ROOT,
         short_name="来源集团", report_scope="consolidated", ultimate_company_code=ROOT,
     ), db)
+    # 携带 root_project_id 的合并模板不能把 ultimate 留空后借壳创建独立企业。
+    # 这项必须在库存读取前拒绝；否则模板来源约束可以被空值绕过。
+    blank_ultimate = export_workbook(
+        [row("越界独立企业", BRANCH, 2049)],
+        mode="consolidation", root_project_id=str(root.id),
+    )
+    with pytest.raises(Exception) as blank_scope_error:
+        await analyze_batch(
+            blank_ultimate.getvalue(), db, current_user=admin(), mode="consolidation"
+        )
+    assert getattr(blank_scope_error.value, "status_code", None) == 400
+    assert "不属于模板来源集团" in str(getattr(blank_scope_error.value, "detail", ""))
+
     outsider = await create_project(BasicInfoSchema(
         client_name="其他集团企业", audit_year=2049, project_type="annual",
         accounting_standard="enterprise", company_code=PARENT,

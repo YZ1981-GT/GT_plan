@@ -85,6 +85,15 @@ describe('同一 GET 在飞时共用一次请求', () => {
     expect(gets('/api/y')).toHaveLength(4)
   })
 
+  it('同址 background 与 foreground 不共享，以免前台调用丢失进度反馈', async () => {
+    const foreground = http.get('/api/background-key')
+    const background = http.get('/api/background-key', { _background: true } as any)
+    await tick()
+    expect(gets('/api/background-key')).toHaveLength(2)
+    gets('/api/background-key').forEach((request) => request.release())
+    await Promise.all([foreground, background])
+  })
+
   it('A 取消只拒绝 A，B 照常拿结果；底层请求不带任何调用方的 signal', async () => {
     const ca = new AbortController()
     const cb = new AbortController()

@@ -162,10 +162,16 @@ async function onTakeover() {
     const { value: reason } = await ElMessageBox.prompt(
       '请输入接管原因（如：原操作人离线）',
       '接管导入',
-      { confirmButtonText: '确认接管', cancelButtonText: '取消', inputPlaceholder: '接管原因' }
+      {
+        confirmButtonText: '确认接管',
+        cancelButtonText: '取消',
+        inputPlaceholder: '接管原因',
+        inputValidator: value => Boolean(value?.trim()),
+        inputErrorMessage: '请输入接管原因',
+      }
     )
     takeoverLoading.value = true
-    await ledgerImportV2Api.takeover(pid, props.entry.job_id)
+    await ledgerImportV2Api.takeover(pid, props.entry.job_id, reason.trim())
     ElMessage.success('已接管导入任务')
     emit('taken-over', props.entry.job_id)
   } catch (e: any) {

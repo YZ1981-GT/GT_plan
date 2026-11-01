@@ -97,6 +97,30 @@
           </el-select>
           <div class="form-help">{{ reasoningHelp }}</div>
         </el-form-item>
+        <el-form-item label="信任域" prop="trust_zone">
+          <el-select v-model="form.trust_zone" style="width:100%">
+            <el-option label="本机设备" value="local_device" />
+            <el-option label="事务所私有服务" value="firm_private" />
+            <el-option label="经批准外部服务" value="approved_provider" />
+            <el-option label="受限（禁止客户数据）" value="restricted" />
+          </el-select>
+          <div class="form-help">信任域决定哪些 AI 任务可以选用该模型；部署在服务器不等于外部服务。</div>
+        </el-form-item>
+        <el-form-item label="客户数据">
+          <el-switch v-model="form.client_data_allowed" active-text="允许" inactive-text="禁止" />
+        </el-form-item>
+        <el-form-item label="最低脱敏">
+          <el-select v-model="form.mask_policy" style="width:100%">
+            <el-option label="不额外脱敏" value="none" />
+            <el-option label="按角色脱敏" value="role_based" />
+            <el-option label="严格脱敏" value="strict" />
+          </el-select>
+        </el-form-item>
+        <el-alert
+          v-if="form.trust_zone === 'approved_provider' || form.trust_zone === 'restricted'"
+          type="warning" :closable="false" show-icon
+          :title="form.trust_zone === 'restricted' ? '受限端点不会接收客户数据' : '外部服务处理客户数据必须经过事务所审批并使用严格脱敏'"
+        />
         <el-form-item v-if="form.model_type !== 'ocr'" label="上下文窗口"><el-input-number v-model="form.context_window" :disabled="!!editingModel?.preset_key" :min="1" :step="1024" style="width:100%" /></el-form-item>
         <el-form-item v-else-if="form.ocr_protocol === 'paddlex_json'" label="请求超时（秒）"><el-input-number v-model="form.request_timeout_seconds" :disabled="!!editingModel?.preset_key" :min="1" :max="600" style="width:100%" /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.performance_notes" :disabled="!!editingModel?.preset_key" type="textarea" :rows="2" /></el-form-item>
@@ -117,8 +141,8 @@ import { confirmDelete } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
 import { isRequestCancelled } from '@/utils/http'
 import type {
-  AIAuthScheme, AIModel, AIModelCreate, AIModelType, AIProvider,
-  AIProviderOption, AIRoute, OCRCapability, OCRProtocol, ReasoningEffort,
+  AIAuthScheme, AIMaskPolicy, AIModel, AIModelCreate, AIModelType, AIProvider,
+  AIProviderOption, AIRoute, AITrustZone, OCRCapability, OCRProtocol, ReasoningEffort,
 } from '@/services/aiModelApi'
 import {
   activateAIModel, createAIModel, deactivateAIModel, deleteAIModel, getAIModels,
@@ -141,6 +165,9 @@ interface ModelForm {
   request_timeout_seconds: number
   context_window: number
   performance_notes: string
+  trust_zone: AITrustZone
+  client_data_allowed: boolean
+  mask_policy: AIMaskPolicy
 }
 
 const tabs: Array<{ name: AIModelType; label: string }> = [
@@ -165,7 +192,8 @@ function emptyForm(): ModelForm {
     model_name: '', model_type: 'chat', provider: 'openai_compatible', endpoint_url: '', api_key: '',
     clear_api_key: false, reasoning_effort: '', ocr_capability: 'ocr', ocr_protocol: 'local',
     api_path: '/ocr', auth_scheme: 'bearer', auth_header_name: '', request_timeout_seconds: 60,
-    context_window: 8192, performance_notes: '',
+    context_window: 8192, performance_notes: '', trust_zone: 'local_device',
+    client_data_allowed: true, mask_policy: 'role_based',
   }
 }
 const form = ref<ModelForm>(emptyForm())
@@ -200,6 +228,7 @@ const formRules = {
   model_name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
   model_type: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
   provider: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  trust_zone: [{ required: true, message: '请选择模型信任域', trigger: 'change' }],
 }
 
 async function fetchModels() {
@@ -232,11 +261,32 @@ async function fetchRoutes(refresh = false) {
   } finally { routesLoading.value = false }
 }
 function refreshRoutes() { return fetchRoutes(true) }
+function destinationIsLocal(): boolean {
+  if (form.value.model_type === 'ocr' && form.value.ocr_protocol === 'local') return true
+  try {
+    const host = new URL(form.value.endpoint_url).hostname.toLowerCase()
+    return host === 'localhost' || host === '::1' || /^127(?:\.|$)/.test(host)
+  } catch {
+    return false
+  }
+}
+function syncTrustForDestination() {
+  if (destinationIsLocal()) {
+    form.value.trust_zone = 'local_device'
+    form.value.client_data_allowed = true
+    if (form.value.mask_policy === 'strict') form.value.mask_policy = 'role_based'
+  } else if (form.value.trust_zone === 'local_device') {
+    form.value.trust_zone = 'restricted'
+    form.value.client_data_allowed = false
+    form.value.mask_policy = 'strict'
+  }
+}
 function openCreate() {
   editingModel.value = null
   form.value = emptyForm()
   const profile = providers.value.find(item => item.value === form.value.provider)
   form.value.endpoint_url = profile?.default_endpoint || ''
+  syncTrustForDestination()
   showDialog.value = true
 }
 function resetDialog() { editingModel.value = null; form.value = emptyForm(); formRef.value?.clearValidate?.() }
@@ -245,6 +295,7 @@ function onProviderChange(value: AIProvider) {
   form.value.endpoint_url = profile?.default_endpoint || ''
   form.value.api_key = ''
   form.value.clear_api_key = false
+  syncTrustForDestination()
 }
 function onModelTypeChange(value: AIModelType) {
   const first = providers.value.find(item => item.supported_types.includes(value))
@@ -264,6 +315,7 @@ function onOcrProtocolChange(value: OCRProtocol) {
     form.value.endpoint_url = ''
     form.value.api_key = ''
   }
+  syncTrustForDestination()
 }
 function onOcrCapabilityChange(value: OCRCapability) {
   form.value.api_path = value === 'layout_parsing' ? '/layout-parsing' : '/ocr'
@@ -281,6 +333,9 @@ function onEdit(model: AIModel) {
     auth_scheme: model.auth_scheme || 'bearer', auth_header_name: model.auth_header_name || '',
     request_timeout_seconds: model.request_timeout_seconds || (model.ocr_capability === 'layout_parsing' ? 120 : 60),
     context_window: model.context_window || 8192, performance_notes: model.performance_notes || '',
+    trust_zone: model.trust_zone || (model.deployment === 'local' ? 'local_device' : 'restricted'),
+    client_data_allowed: model.client_data_allowed ?? model.deployment === 'local',
+    mask_policy: model.mask_policy || (model.deployment === 'local' ? 'role_based' : 'strict'),
   }
   showDialog.value = true
 }
@@ -350,14 +405,26 @@ async function onDelete(model: AIModel) {
   }
 }
 async function onSubmit() {
+  syncTrustForDestination()
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+  if (form.value.trust_zone === 'restricted' && form.value.client_data_allowed) {
+    ElMessage.warning('受限端点不能处理客户数据'); return
+  }
+  if (form.value.trust_zone === 'approved_provider' && form.value.client_data_allowed && form.value.mask_policy !== 'strict') {
+    ElMessage.warning('经批准外部服务处理客户数据时必须使用严格脱敏'); return
+  }
   if (form.value.clear_api_key && form.value.api_key.trim()) {
     ElMessage.warning('不能同时替换并清除 API Key'); return
   }
   const reasoningChanged = !!editingModel.value && form.value.model_type === 'chat'
     && (editingModel.value.reasoning_effort || '') !== form.value.reasoning_effort
-  if (editingModel.value?.preset_key && !editingModel.value.has_api_key && !form.value.api_key.trim() && !reasoningChanged) {
+  const trustPolicyChanged = !!editingModel.value && (
+    editingModel.value.trust_zone !== form.value.trust_zone
+    || editingModel.value.client_data_allowed !== form.value.client_data_allowed
+    || editingModel.value.mask_policy !== form.value.mask_policy
+  )
+  if (editingModel.value?.preset_key && !editingModel.value.has_api_key && !form.value.api_key.trim() && !reasoningChanged && !trustPolicyChanged) {
     ElMessage.warning('企业预设只需录入 API Key，请先填写 Key'); return
   }
   const destinationChanged = !!editingModel.value && (
@@ -391,13 +458,21 @@ async function onSubmit() {
   try {
     if (editingModel.value) {
       const payload: Parameters<typeof updateAIModel>[1] = editingModel.value.preset_key
-        ? { clear_api_key: form.value.clear_api_key }
+        ? {
+            clear_api_key: form.value.clear_api_key,
+            trust_zone: form.value.trust_zone,
+            client_data_allowed: form.value.client_data_allowed,
+            mask_policy: form.value.mask_policy,
+          }
         : {
             model_name: form.value.model_name, provider: form.value.provider,
             endpoint_url: endpointRequired ? (form.value.endpoint_url || null) : null,
             context_window: form.value.model_type === 'ocr' ? null : form.value.context_window,
             performance_notes: form.value.performance_notes || null,
             clear_api_key: form.value.clear_api_key,
+            trust_zone: form.value.trust_zone,
+            client_data_allowed: form.value.client_data_allowed,
+            mask_policy: form.value.mask_policy,
           }
       // 企业预设只在用户改了思考强度时才提交该字段（后端对预设只放行 Key 与思考强度）。
       if (form.value.model_type === 'chat' && (!editingModel.value.preset_key || reasoningChanged)) {
@@ -423,6 +498,9 @@ async function onSubmit() {
         endpoint_url: endpointRequired ? (form.value.endpoint_url || null) : null,
         context_window: form.value.model_type === 'ocr' ? null : form.value.context_window,
         performance_notes: form.value.performance_notes || null,
+        trust_zone: form.value.trust_zone,
+        client_data_allowed: form.value.client_data_allowed,
+        mask_policy: form.value.mask_policy,
       }
       if (form.value.model_type === 'chat') payload.reasoning_effort = form.value.reasoning_effort || null
       if (form.value.model_type === 'ocr') {

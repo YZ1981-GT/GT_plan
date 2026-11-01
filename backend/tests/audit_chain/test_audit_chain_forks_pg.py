@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-from app.models.audit_log_models import AuditLogEntry
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
 from app.services.audit_chain.canonical import GENESIS_HASH, hash_v1
 
 
@@ -63,6 +63,7 @@ async def _throwaway_engine():
     try:
         async with eng.begin() as conn:
             await conn.run_sync(AuditLogEntry.__table__.create, checkfirst=True)
+            await conn.run_sync(AuditChainHead.__table__.create, checkfirst=True)
         yield eng
     finally:
         await eng.dispose()
@@ -245,3 +246,26 @@ async def test_health_degraded_on_fork():
         # 清理缓存
         health_mod._audit_chain_cache["data"] = None
         health_mod._audit_chain_cache["ts"] = 0.0
+
+
+@pytest.mark.asyncio
+async def test_scan_forks_ignores_independent_genesis_entries():
+    """不同项目各自的创世条目不能被当成同一条链的分叉。"""
+    from app.services.audit_chain.forks import scan_forks
+
+    async with _throwaway_engine() as eng:
+        async_session = sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            for _ in range(3):
+                project_id = str(uuid.uuid4())
+                session.add(
+                    _make_entry(
+                        "project.genesis",
+                        GENESIS_HASH,
+                        payload={"project_id": project_id},
+                    )
+                )
+            await session.commit()
+
+        async with async_session() as session:
+            assert await scan_forks(session) == []

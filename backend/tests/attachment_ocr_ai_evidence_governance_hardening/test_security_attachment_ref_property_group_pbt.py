@@ -213,7 +213,7 @@ def test_p2_only_within_boundary_path_reaches_byte_reader():
         plan = resolver.resolve_read_plan("local", str(inside_abs))
         assert plan.kind == "local" and plan.safe_path is not None
         # safe_path 必须落在 boundary 内。
-        Path(plan.safe_path).relative_to(Path(os.path.normpath(boundary)).absolute())
+        Path(plan.safe_path).relative_to(Path(boundary).resolve())
         content = _guarded_read(resolver, reader, "local", str(inside_abs))
         assert content == b"HELLO-EVIDENCE"
         assert reader.read_calls == 1

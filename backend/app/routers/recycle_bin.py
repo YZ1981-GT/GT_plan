@@ -195,65 +195,67 @@ async def _lock_deleted_projects_for_purge(
     return current
 
 
-async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
-    """级联删除单个项目及其所有关联数据（R12：不吞失败）。
+def _actor_role(user: User) -> str:
+    return str(getattr(getattr(user, "role", None), "value", getattr(user, "role", "")))
 
-    使用独立的 raw connection + session_replication_role=replica 禁用 FK 触发器（包括只追加表的禁改触发器），
-    在同一事务里按 FK 关系逐表删除。任一步失败立即中断、事务回滚，不留孤儿行。
-    """
-    from app.core.database import async_engine
 
-    pid = str(project_id)
+def _error_text(exc: Exception) -> str:
+    if isinstance(exc, HTTPException):
+        detail = exc.detail
+        if isinstance(detail, dict):
+            return str(detail.get("message") or detail.get("error_code") or "永久删除被拒绝")
+        return str(detail)
+    return f"{type(exc).__name__}：{exc}"
 
-    async with async_engine.connect() as conn:
-        raw = await conn.get_raw_connection()
-        pg_conn = raw.driver_connection
 
-        still_deleted = await pg_conn.fetchval(
-            "SELECT is_deleted FROM projects WHERE id = $1::uuid", pid
-        )
-        if still_deleted is not True:
-            raise RuntimeError("项目已恢复或不存在，拒绝永久删除")
+async def _purge_project_in_current_transaction(
+    db: AsyncSession, user: User, project_id: UUID,
+):
+    """只写数据库、不提交；调用方提交成功后再消费 file_refs 清理物理对象。"""
+    from app.services.project_purge_service import ProjectPurgeService
 
-        await pg_conn.execute("SET session_replication_role = 'replica'")
+    return await ProjectPurgeService(db).purge(project_id, actor_role=_actor_role(user))
 
+
+async def _batch_purge_projects(
+    db: AsyncSession, user: User, rows: list[Project], ids: list[UUID],
+) -> dict:
+    """逐项目 SAVEPOINT 隔离，成功数只按真实删除计；整项目内部保持原子。"""
+    by_id = {row.id: row for row in rows}
+    succeeded: list[str] = []
+    failed: list[dict[str, str]] = [
+        {"id": str(pid), "error": "记录不存在"} for pid in ids if pid not in by_id
+    ]
+    file_refs = []
+    table_counts: dict[str, int] = {}
+    for pid in ids:
+        if pid not in by_id:
+            continue
+        savepoint = await db.begin_nested()
         try:
-            # 处理自引用（必须在删除项目行之前）
-            await pg_conn.execute(
-                "UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = $1::uuid", pid
-            )
+            result = await _purge_project_in_current_transaction(db, user, pid)
+            await savepoint.commit()
+        except Exception as exc:  # 每个项目一个保存点；失败项目零变化，其他项目可继续
+            await savepoint.rollback()
+            failed.append({"id": str(pid), "error": _error_text(exc)})
+            continue
+        succeeded.append(str(pid))
+        file_refs.extend(result.file_refs)
+        for table, count in result.table_counts.items():
+            table_counts[table] = table_counts.get(table, 0) + int(count)
 
-            # 查出所有引用 projects.id 的子表并逐表删除——不再 except pass
-            rows = await pg_conn.fetch("""
-                SELECT DISTINCT tc.table_name, kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-                JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
-                WHERE tc.constraint_type = 'FOREIGN KEY'
-                  AND ccu.table_name = 'projects'
-                  AND tc.table_name != 'projects'
-            """)
-            for row in rows:
-                table_name = row["table_name"]
-                column_name = row["column_name"]
-                try:
-                    await pg_conn.execute(
-                        f'DELETE FROM "{table_name}" WHERE "{column_name}" = $1::uuid', pid
-                    )
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"永久删除项目关联数据失败（表 {table_name}）：{type(exc).__name__}",
-                    ) from exc
-
-            result = await pg_conn.execute(
-                "DELETE FROM projects WHERE id = $1::uuid AND is_deleted = true", pid
-            )
-            if result != "DELETE 1":
-                raise RuntimeError("项目回收站状态已变化，永久删除已取消")
-        finally:
-            # 恢复 FK 检查
-            await pg_conn.execute("SET session_replication_role = 'origin'")
+    await db.commit()
+    cleanup = await _unlink_purged_files(db, file_refs)
+    return {
+        "succeeded": succeeded,
+        "failed": failed,
+        "total": len(ids),
+        "success_count": len(succeeded),
+        "fail_count": len(failed),
+        "deleted_count": len(succeeded),
+        "table_counts": dict(sorted(table_counts.items())),
+        "file_cleanup": cleanup,
+    }
 
 
 @router.get("")
@@ -541,8 +543,6 @@ async def permanently_delete(
 
         await assert_destructible(db, user, row, operation="purge")
 
-    # 项目类型需要级联删除子表
-    file_paths = [row.file_path] if item_type == ATTACHMENT_TYPE else []
     if item_type == "project":
         await _cascade_delete_project(db, item_id)
     elif item_type == "adjustment":
@@ -555,19 +555,20 @@ async def permanently_delete(
             "deleted_rows": deleted_rows,
         }
     else:
-        await db.delete(row)
+        file_refs = []
+    await db.delete(row)
 
     await db.commit()
-    cleanup = await _unlink_purged_files(db, file_paths)
+    cleanup = await _unlink_purged_files(db, file_refs)
     return {"message": f"{label}已永久删除" + _cleanup_message(cleanup), "id": str(item_id),
-            **({"file_cleanup": cleanup} if file_paths else {})}
+            **({"file_cleanup": cleanup} if file_refs else {})}
 
 
-async def _unlink_purged_files(db: AsyncSession, file_paths: list[str | None]) -> dict[str, int]:
+async def _unlink_purged_files(db: AsyncSession, file_refs) -> dict[str, int]:
     """提交之后删无人引用的附件文件（spec attachment-archive-and-a-class-evidence 需求 9）。"""
     from app.services.attachment_file_purge import unlink_unreferenced_files
 
-    return await unlink_unreferenced_files(db, file_paths) if file_paths else {}
+    return await unlink_unreferenced_files(db, file_refs) if file_refs else {}
 
 
 def _cleanup_message(stats: dict[str, int]) -> str:
@@ -634,7 +635,9 @@ async def _batch_purge_attachments(db: AsyncSession, user: User, rows, ids: list
 
     purgeable, skipped = await partition_purgeable(db, user, rows)
     skipped_ids = {row.id for skipped_rows in skipped.values() for row in skipped_rows}
-    file_paths = [row.file_path for row in purgeable]
+    from app.services.attachment_storage_resolver import StoredAttachmentRef
+
+    file_refs = [StoredAttachmentRef(row.project_id, row.storage_type, row.file_path) for row in purgeable]
     model = _get_recyclable_tables()[ATTACHMENT_TYPE][0]
     result = await bulk_hard_delete(db, model, [i for i in ids if i not in skipped_ids], filter_deleted=True)
     for reason, skipped_rows in skipped.items():
@@ -644,20 +647,22 @@ async def _batch_purge_attachments(db: AsyncSession, user: User, rows, ids: list
     result["skipped"] = skipped_summary(skipped)
     await db.commit()
     # 没删成的行仍引用自己的文件 ⇒ 引用检查会保留它（不必再按回执筛）
-    result["file_cleanup"] = await _unlink_purged_files(db, file_paths)
+    result["file_cleanup"] = await _unlink_purged_files(db, file_refs)
     return result
 
 
-async def _purge_deleted_attachments(db: AsyncSession, user: User) -> tuple[int, dict[str, int], list[str]]:
-    """清空回收站里的附件：只删可删的，返回（删除数，按原因的跳过数，被删行的文件路径）（需求 4.3）。"""
+async def _purge_deleted_attachments(db: AsyncSession, user: User):
+    """清空附件：只删可删行，并返回带项目作用域的存储引用供提交后清理。"""
     from app.models.attachment_models import Attachment
     from app.services.attachment_destructive_guard import partition_purgeable, skipped_summary
+    from app.services.attachment_storage_resolver import StoredAttachmentRef
 
     rows = (await db.execute(select(Attachment).where(Attachment.is_deleted == True))).scalars().all()  # noqa: E712
     purgeable, skipped = await partition_purgeable(db, user, rows)
     if purgeable:
         await db.execute(delete(Attachment).where(Attachment.id.in_([row.id for row in purgeable])))
-    return len(purgeable), skipped_summary(skipped), [row.file_path for row in purgeable]
+    refs = [StoredAttachmentRef(row.project_id, row.storage_type, row.file_path) for row in purgeable]
+    return len(purgeable), skipped_summary(skipped), refs
 
 
 @router.post("/empty")
@@ -678,9 +683,9 @@ async def empty_recycle_bin(
     tables = _get_recyclable_tables()
 
     if item_type == ATTACHMENT_TYPE:
-        count, skipped, file_paths = await _purge_deleted_attachments(db, user)
+        count, skipped, file_refs = await _purge_deleted_attachments(db, user)
         await db.commit()
-        cleanup = await _unlink_purged_files(db, file_paths)
+        cleanup = await _unlink_purged_files(db, file_refs)
         return {"message": f"已永久删除 {count} 条记录" + _skipped_message(skipped) + _cleanup_message(cleanup),
                 "deleted_count": count, "skipped": skipped, "file_cleanup": cleanup}
 
@@ -709,27 +714,39 @@ async def empty_recycle_bin(
             return {"message": f"已永久删除 {result.rowcount} 条记录", "deleted_count": result.rowcount}
         return {"message": "该类型不支持软删除", "deleted_count": 0}
 
-    # 获取并冻结待删除项目；与恢复共用年度锁，锁后状态变化则整次清空失败。
+    # 获取并冻结待删除项目；每个项目由统一 purge service 在 SAVEPOINT 内原子处理。
     deleted_projects = list((await db.execute(
         select(Project).where(Project.is_deleted == True)  # noqa: E712
     )).scalars().all())
     deleted_projects = await _lock_deleted_projects_for_purge(db, deleted_projects)
-    deleted_pids = [row.id for row in deleted_projects]
+    project_result = await _batch_purge_projects(
+        db, user, deleted_projects, [row.id for row in deleted_projects],
+    )
+    if item_type == "project":
+        return {
+            **project_result,
+            "message": (
+                f"已永久删除 {project_result['success_count']} 个项目"
+                + (f"，{project_result['fail_count']} 个项目未删除" if project_result["fail_count"] else "")
+                + _cleanup_message(project_result["file_cleanup"])
+            ),
+        }
 
-    deleted_count = 0
+    deleted_count = int(project_result["success_count"])
     skipped: dict[str, int] = {}
-    file_paths: list[str] = []
+    file_refs = []
+    failures: list[dict[str, str]] = list(project_result["failed"])
 
-    # 1. 先删非 project 类型的软删除记录（这些通常没有复杂 FK）；底稿两层软删保留，不清除
+    # 项目先完整删除；再清理其余仍在回收站的独立记录。每类用 SAVEPOINT，失败不虚增成功数。
     for tbl_key, (model, label, _) in tables.items():
         if tbl_key in ("project", WORKPAPER_TYPE):
             continue
         if not hasattr(model, "is_deleted"):
             continue
         if tbl_key == ATTACHMENT_TYPE:
-            # 附件只删可删的（归档 / 保全 / 仍被引用的保留）；判定失败整体保留，不吞成「已删」
-            count, skipped, file_paths = await _purge_deleted_attachments(db, user)
+            count, skipped, refs = await _purge_deleted_attachments(db, user)
             deleted_count += count
+            file_refs.extend(refs)
             continue
         if tbl_key == "adjustment":
             from app.models.audit_platform_models import Adjustment
@@ -745,25 +762,31 @@ async def empty_recycle_bin(
                 deleted_count += 1
             continue
         try:
-            r = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
-            deleted_count += r.rowcount
-        except Exception:
-            await db.rollback()
-
-    # 2. 级联删除已删除项目
-    if deleted_pids:
-        for pid in deleted_pids:
-            try:
-                await _cascade_delete_project(db, pid)
-            except Exception:
-                pass
-        deleted_count += len(deleted_pids)
+            result = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
+            count = int(result.rowcount or 0)
+            await savepoint.commit()
+        except Exception as exc:
+            await savepoint.rollback()
+            failures.append({"id": tbl_key, "error": f"{label}清理失败：{type(exc).__name__}"})
+            continue
+        deleted_count += count
 
     await db.commit()
-    cleanup = await _unlink_purged_files(db, file_paths)
-    return {"message": f"已永久删除 {deleted_count} 条记录（底稿不支持彻底删除，仍保留在回收站）"
-                       + _skipped_message(skipped) + _cleanup_message(cleanup),
-            "deleted_count": deleted_count, "skipped": skipped, "file_cleanup": cleanup}
+    standalone_cleanup = await _unlink_purged_files(db, file_refs)
+    project_cleanup = project_result["file_cleanup"]
+    cleanup = {
+        key: int(project_cleanup.get(key, 0)) + int(standalone_cleanup.get(key, 0))
+        for key in {"deleted", "kept_referenced", "skipped_outside_root", "failed"}
+    }
+    return {
+        "message": f"已永久删除 {deleted_count} 条记录（底稿不支持彻底删除，仍保留在回收站）"
+                   + _skipped_message(skipped) + _cleanup_message(cleanup),
+        "deleted_count": deleted_count,
+        "skipped": skipped,
+        "failed": failures,
+        "fail_count": len(failures),
+        "file_cleanup": cleanup,
+    }
 
 
 def _skipped_message(skipped: dict[str, int]) -> str:

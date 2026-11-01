@@ -28,7 +28,12 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import assert_project_permission, get_current_user, require_project_access
+from app.deps import (
+    assert_project_permission,
+    get_current_user,
+    require_project_access,
+    require_project_access_stream,
+)
 from app.models.core import User
 from app.routers.deliverable import _guard_action
 from app.services.chain_orchestrator import (
@@ -184,7 +189,7 @@ async def execute_full_chain(
 async def get_progress_stream(
     project_id: UUID,
     execution_id: str,
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(require_project_access_stream("readonly")),
 ):
     """SSE 进度流 — 实时推送步骤状态
 

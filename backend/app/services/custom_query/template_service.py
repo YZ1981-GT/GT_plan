@@ -380,6 +380,7 @@ class TemplateService:
         year: int,
         limit: int | None = None,
         offset: int | None = None,
+        count_token: str | None = None,
         fallback_source: str | None = None,
     ) -> dict[str, Any]:
         """模板 config → 业务视图 execute 请求体（模板执行的唯一翻译，design §3.6；R9.3）。
@@ -407,7 +408,7 @@ class TemplateService:
             descending = str(cfg.get("sort_order") or "").lower() in ("desc", "descending")
             sort = [{"field": cfg["sort_field"], "direction": "desc" if descending else "asc"}]
         logic = cfg.get("condition_logic")
-        return {
+        request = {
             "project_id": str(project_id),
             "year": year,
             "source": str(cfg.get("source") or fallback_source or ""),
@@ -422,6 +423,9 @@ class TemplateService:
             "pivot": cfg.get("pivot"),
             "acnr_targets": cfg.get("acnr_targets") or [],
         }
+        if count_token:
+            request["count_token"] = count_token
+        return request
 
     # ── Task 14.2：执行 + 失效引用降级（R13.5 / R13.7）───────────────────────
 

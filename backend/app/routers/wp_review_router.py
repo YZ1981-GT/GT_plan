@@ -18,10 +18,9 @@ import sqlalchemy as sa
 
 from app.core.database import get_db
 from app.deps import require_project_access, check_consol_lock
-from app.models.ai_models import AIConfirmationStatus, AIContent
 from app.models.core import User
 from app.services.working_paper_service import WorkingPaperService
-from app.models.workpaper_models import WpIndex, WorkingPaper, WpFileStatus
+from app.models.workpaper_models import WpIndex, WorkingPaper
 
 # 共享请求模型从 schemas 引入（避免反向依赖主 router）
 from app.schemas.workpaper_requests import (
@@ -199,201 +198,33 @@ async def submit_review(
     current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """专用提交复核端点 — 统一校验 5 项门禁后流转复核状态
-
-    门禁：1.复核人已分配 2.QC阻断=0 3.未解决批注=0 4.AI未确认=0 5.open复核意见已回复
-    全部通过后：
-      - 编制状态 → under_review
-      - 复核状态 → pending_level1
-    """
-    wp_result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
+    """提交复核；单笔和批量入口共用同一服务与门禁。"""
+    from app.services.workpaper_review_submission_service import (
+        ReviewSubmissionUnavailable,
+        WorkpaperReviewSubmissionService,
     )
-    wp = wp_result.scalar_one_or_none()
-    if not wp:
-        raise HTTPException(status_code=404, detail="底稿不存在")
 
-    # 只有 edit_complete 或 revision_required→edit_complete 后才能提交
-    if wp.status != WpFileStatus.edit_complete:
-        current_s = wp.status.value if wp.status else "unknown"
-        raise HTTPException(
-            status_code=400,
-            detail=f"当前编制状态 {current_s} 不允许提交复核，需先完成编制（edit_complete）",
-        )
-
-    # ── Phase 14: 统一门禁引擎评估 ──
     try:
-        from app.services.gate_engine import gate_engine as _gate_engine
-        gate_result = await _gate_engine.evaluate(
-            db=db,
-            gate_type="submit_review",
-            project_id=project_id,
-            wp_id=wp_id,
-            actor_id=current_user.id,
-            context={"wp_status": wp.status, "year": getattr(wp, 'year', None)},
-        )
-        if gate_result.decision == "block":
-            return {
-                "status": "blocked",
-                "blocking_reasons": [
-                    f"[{h.rule_code}] {h.message}" for h in gate_result.hit_rules
-                    if h.severity == "blocking"
-                ],
-                "hit_rules": [
-                    {
-                        "rule_code": h.rule_code,
-                        "error_code": h.error_code,
-                        "severity": h.severity,
-                        "message": h.message,
-                        "location": h.location,
-                        "suggested_action": h.suggested_action,
-                    }
-                    for h in gate_result.hit_rules
-                ],
-                "can_submit": False,
-                "trace_id": gate_result.trace_id,
-            }
-    except Exception as _gate_err:
-        import logging
-        logging.getLogger(__name__).warning(f"[GATE] submit_review gate eval failed: {_gate_err}")
-        # 门禁引擎故障不阻断，降级走原有门禁逻辑
-
-    # ── Phase 14: SoD 职责分离校验 ──
-    try:
-        from app.services.sod_guard_service import sod_guard_service as _sod_svc
-        sod_result = await _sod_svc.check(
-            db=db,
-            project_id=project_id,
-            wp_id=wp_id,
-            actor_id=current_user.id,
-            target_role="reviewer",
-        )
-        if not sod_result.allowed:
-            raise HTTPException(status_code=403, detail={
-                "error_code": "SOD_CONFLICT_DETECTED",
-                "message": sod_result.conflict_type,
-                "policy_code": sod_result.policy_code,
-                "trace_id": sod_result.trace_id,
-            })
-    except HTTPException:
-        raise
-    except Exception as _sod_err:
-        import logging
-        logging.getLogger(__name__).warning(f"[SOD] submit_review sod check failed: {_sod_err}")
-
-    blocking_reasons = []
-
-    # 门禁 1：复核人已分配
-    if not wp.reviewer:
-        blocking_reasons.append("复核人未分配")
-
-    # 门禁 2：阻断级 QC 通过
-    from app.models.workpaper_models import WpQcResult
-    qc_result = await db.execute(
-        sa.select(WpQcResult).where(WpQcResult.working_paper_id == wp_id)
-        .order_by(WpQcResult.check_timestamp.desc()).limit(1)
-    )
-    qc = qc_result.scalar_one_or_none()
-    if qc is None:
-        blocking_reasons.append("未执行质量自检")
-    elif qc.blocking_count > 0:
-        blocking_reasons.append(f"存在 {qc.blocking_count} 个阻断级 QC 问题")
-
-    # 门禁 3：无未解决复核意见
-    try:
-        from app.models.phase10_models import CellAnnotation
-        ann_result = await db.execute(
-            sa.select(sa.func.count()).select_from(CellAnnotation).where(
-                CellAnnotation.project_id == project_id,
-                CellAnnotation.object_type == "workpaper",
-                CellAnnotation.object_id == wp_id,
-                CellAnnotation.status != "resolved",
-                CellAnnotation.is_deleted == sa.false(),
-            )
-        )
-        unresolved = ann_result.scalar() or 0
-        if unresolved > 0:
-            blocking_reasons.append(f"{unresolved} 条未解决复核意见")
-    except Exception as e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning("统计未解决复核意见失败 wp=%s: %s", wp_id, e)
-
-    # 门禁 4：无未确认 AI 内容
-    ai_pending_result = await db.execute(
-        sa.select(sa.func.count()).select_from(AIContent).where(
-            AIContent.project_id == project_id,
-            AIContent.workpaper_id == wp_id,
-            AIContent.confirmation_status == AIConfirmationStatus.pending,
-            AIContent.is_deleted == sa.false(),
-        )
-    )
-    unconfirmed_ai_count = ai_pending_result.scalar() or 0
-    if unconfirmed_ai_count > 0:
-        blocking_reasons.append(f"{unconfirmed_ai_count} 项未确认的 AI 生成内容")
-
-    # 门禁 5：所有 open 状态的复核意见必须已被 replied
-    from app.models.workpaper_models import ReviewRecord, ReviewCommentStatus
-    open_unreplied = await db.execute(
-        sa.select(sa.func.count()).select_from(ReviewRecord).where(
-            ReviewRecord.working_paper_id == wp_id,
-            ReviewRecord.status == ReviewCommentStatus.open,
-            ReviewRecord.is_deleted == sa.false(),
-        )
-    )
-    unreplied_count = open_unreplied.scalar() or 0
-    if unreplied_count > 0:
-        blocking_reasons.append(f"{unreplied_count} 条复核意见未回复（状态仍为 open）")
-
-    if blocking_reasons:
-        return {
-            "status": "blocked",
-            "blocking_reasons": blocking_reasons,
-            "can_submit": False,
-        }
-
-    # 全部通过 → 流转复核状态
-    svc = WorkingPaperService()
-    try:
-        result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status="pending_level1", project_id=project_id,
+        result = await WorkpaperReviewSubmissionService().submit(
+            db, project_id=project_id, wp_id=wp_id, actor_id=current_user.id,
         )
         await db.commit()
-
-        # 自动同步程序状态（底稿提交复核→程序标记completed）
-        try:
-            from app.models.procedure_models import ProcedureInstance
-            wp_result = await db.execute(
-                sa.select(WpIndex.wp_code).where(WpIndex.id == (
-                    sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id).scalar_subquery()
-                ))
-            )
-            wp_code_row = wp_result.scalar_one_or_none()
-            if wp_code_row:
-                await db.execute(
-                    sa.update(ProcedureInstance).where(
-                        ProcedureInstance.project_id == project_id,
-                        ProcedureInstance.wp_code == wp_code_row,
-                        ProcedureInstance.is_deleted == sa.false(),
-                    ).values(execution_status="completed")
-                )
-                await db.commit()
-        except Exception as e:
-            import logging as _logging
-            _logging.getLogger(__name__).warning("底稿提交后同步程序状态失败 wp=%s: %s", wp_id, e)  # 程序联动失败不阻断提交
-
-        return {
-            "status": "submitted",
-            "can_submit": True,
-            "blocking_reasons": [],
-            "wp_status": result.get("status"),
-            "review_status": result.get("review_status"),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return result.as_dict()
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ReviewSubmissionUnavailable as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
 
 
 @router.put("/working-papers/{wp_id}/review-status")
@@ -412,7 +243,13 @@ async def update_review_status(
       pending_level2 → level2_in_progress → level2_passed/level2_rejected
     """
     svc = WorkingPaperService()
+    from app.services.workpaper_review_submission_service import assert_review_level_actor
+
     try:
+        await assert_review_level_actor(
+            db, project_id=project_id, wp_id=wp_id,
+            new_review_status=data.review_status, actor=current_user,
+        )
         result = await svc.update_review_status(
             db=db, wp_id=wp_id, new_review_status=data.review_status,
             project_id=project_id, reason=data.reason,
@@ -420,5 +257,12 @@ async def update_review_status(
         )
         await db.commit()
         return result
+    except LookupError as e:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except PermissionError as e:
+        await db.rollback()
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e

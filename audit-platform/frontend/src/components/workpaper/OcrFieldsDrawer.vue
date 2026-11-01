@@ -282,7 +282,7 @@ async function onExtractFields(attachment: AttachmentItem) {
     const data = await api.post(
       `/api/attachments/${attachment.id}/ocr-fields`,
       {},
-      { validateStatus: (s: number) => s < 600 },
+      { _silent: true } as any,
     )
 
     // 检查响应状态
@@ -315,7 +315,9 @@ async function onExtractFields(attachment: AttachmentItem) {
       step.value = 'error'
     }
   } catch (err: any) {
-    errorMessage.value = 'OCR 提取失败: ' + (err?.message || '未知错误')
+    // 写请求按状态码判成败（spec formula-writer-ownership-and-stale R4）：非 2xx 抛出，
+    // 错误详情取后端 detail（经 http 拦截器 normaliseErrorEnvelope 回填），inline 显示到错误步骤。
+    errorMessage.value = 'OCR 提取失败: ' + (err?.response?.data?.detail || err?.message || '未知错误')
     step.value = 'error'
   }
 }

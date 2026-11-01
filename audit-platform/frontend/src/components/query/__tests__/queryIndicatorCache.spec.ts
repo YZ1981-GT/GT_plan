@@ -60,16 +60,22 @@ describe('purgeStaleIndicatorCache / writeIndicatorCache', () => {
     expect(purgeStaleIndicatorCache(current)).toBe(0)
   })
 
-  it('树形（任务 29）：页面版「骨架 + 附注分支」与弹窗全量树互不命中、写入互不清除；同一树形的旧附注版本照样清掉', () => {
+  it('树形（任务 29）：页面版、弹窗骨架与全量树互不命中；同一树形的旧附注版本照样清掉', () => {
     const full = { schema: 14, projectId: PID, year: 2025, notesVersion: 'v1' }
     const page = { ...full, variant: 'page' }
+    const dialog = { ...full, variant: 'dialog' }
     expect(indicatorCacheKey(page)).toBe(`${INDICATOR_CACHE_PREFIX}14:${PID}~page:2025:v1`)
+    expect(indicatorCacheKey(dialog)).toBe(`${INDICATOR_CACHE_PREFIX}14:${PID}~dialog:2025:v1`)
     writeIndicatorCache(indicatorCacheKey(full), TREE)
     expect(readIndicatorCache(indicatorCacheKey(page)), '页面版不能读到弹窗的全量树').toBeNull()
+    expect(readIndicatorCache(indicatorCacheKey(dialog)), '弹窗骨架不能读到旧全量树').toBeNull()
     writeIndicatorCache(indicatorCacheKey(page), [{ key: 'page-only' }])
+    writeIndicatorCache(indicatorCacheKey(dialog), [{ key: 'dialog-only' }])
     expect(readIndicatorCache(indicatorCacheKey(full)), '写页面版不清掉弹窗的全量树').toEqual(TREE)
+    expect(readIndicatorCache(indicatorCacheKey(dialog))).toEqual([{ key: 'dialog-only' }])
     writeIndicatorCache(indicatorCacheKey({ ...page, notesVersion: 'v2' }), [])
     expect(sessionStorage.getItem(indicatorCacheKey(page)), '同一树形旧附注版本清掉').toBeNull()
+    expect(readIndicatorCache(indicatorCacheKey(dialog)), '不同树形缓存保留').toEqual([{ key: 'dialog-only' }])
     expect(readIndicatorCache(indicatorCacheKey(full))).toEqual(TREE)
   })
 

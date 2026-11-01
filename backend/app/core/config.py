@@ -13,6 +13,9 @@ if not Path(_env_file).exists() and _root_env.exists():
     _env_file = str(_root_env)
 
 
+DEFAULT_METABASE_EMBEDDING_SECRET = "audit-metabase-secret-key"
+
+
 class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform"
@@ -23,6 +26,9 @@ class Settings(BaseSettings):
     REDIS_MODE: str = "single"  # "single"（默认） | "sentinel"（HA）
     REDIS_SENTINEL_HOSTS: str = "localhost:26379,localhost:26380,localhost:26381"
     REDIS_SENTINEL_SERVICE: str = "mymaster"
+    # Metabase
+    METABASE_URL: str = "http://localhost:3000"
+    METABASE_EMBEDDING_SECRET: str = DEFAULT_METABASE_EMBEDDING_SECRET
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -214,6 +220,11 @@ class Settings(BaseSettings):
     CONSISTENCY_GATE_ENFORCEMENT: Literal["observe", "enforce"] = "observe"
     # Phase 8: 数据加密密钥
     ENCRYPTION_KEY: str = ""
+    # 项目创建限流（单建 / 批量预校验 / 兼容批量导入共用 actor 级固定窗口）
+    # 必须声明在 Settings 上：只在调用方写 getattr(settings, "...", 默认值) 会让同名
+    # 环境变量被 pydantic-settings 当成未知字段忽略，文档声称「可配置」但实际永远用默认值。
+    PROJECT_CREATION_RATE_LIMIT_PER_MINUTE: int = Field(default=30, ge=1)
+    PROJECT_CREATION_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60, ge=1)
     # LLM 限流配置
     LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
     # AI Chat Run 独立限流（dsh-agent-panel-integration Task 12 / Req 13.5–13.7）
@@ -480,6 +491,21 @@ class Settings(BaseSettings):
                 self.ONLYOFFICE_JWT_ENFORCE = True
         return self
 
+    @model_validator(mode="after")
+    def _reject_default_metabase_secret_in_release(self) -> "Settings":
+        """发布环境必须显式配置非默认的 Metabase 嵌入签名密钥。"""
+        env = (self.APP_ENV or "").strip().lower()
+        secret = (self.METABASE_EMBEDDING_SECRET or "").strip()
+        if env in ("prod", "production", "staging") and secret in {
+            "",
+            DEFAULT_METABASE_EMBEDDING_SECRET,
+        }:
+            raise ValueError(
+                "APP_ENV=production/staging 时必须设置非默认的 "
+                "METABASE_EMBEDDING_SECRET"
+            )
+        return self
+
     @property
     def is_jwt_key_secure(self) -> bool:
         """检查 JWT 密钥是否为安全值（非默认弱密钥）"""
@@ -495,7 +521,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 启动时校验关键安全配置
-import logging as _logging
+import logging as _logging  # noqa: E402 — 初始化后的启动告警刻意放在文件末尾
 _logger = _logging.getLogger("audit_platform.config")
 if not settings.is_jwt_key_secure:
     # Q5: production 模式下强制失败，防止弱密钥上线

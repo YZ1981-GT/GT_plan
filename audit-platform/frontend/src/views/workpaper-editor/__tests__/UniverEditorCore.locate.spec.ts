@@ -89,14 +89,14 @@ describe('UniverEditorCore — 深链与定位事件等 Univer 就绪后执行',
     loading.value = true
     vi.mocked(useEditorUniver).mockReturnValue({
       univerAPI, loading, loadingHint: ref(''), loadErrorState: ref(null),
-      loadErrorMessage: ref(''), dirty: ref(false), initUniver: vi.fn(), dispose: vi.fn(),
+      loadErrorMessage: ref(''), dirty: ref(false), editRevision: ref(0), initUniver: vi.fn(), dispose: vi.fn(),
     } as any)
     vi.mocked(useWorkpaperAutoSave).mockReturnValue({
       saving: ref(false), lastSavedAt: ref(null), markDirty: vi.fn(),
     } as any)
     vi.mocked(useEditorSave).mockReturnValue({
       saving: ref(false), submitting: ref(false), syncLoading: ref(false), prefillLoading: ref(false),
-      exportingPdf: ref(false), onSave: vi.fn(), onSubmitForReview: vi.fn(), onSyncStructure: vi.fn(),
+      exportingPdf: ref(false), markEdited: vi.fn(), onSave: vi.fn(), onSubmitForReview: vi.fn(), onSyncStructure: vi.fn(),
       onRefreshPrefill: vi.fn(), onDownload: vi.fn(), onExportPdf: vi.fn(), onUpload: vi.fn(),
     } as any)
   })

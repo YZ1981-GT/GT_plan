@@ -211,6 +211,38 @@ async def test_diff_rollback_preview_and_idempotent_publish(api):
     assert current.status_code == 422
 
 
+async def test_rollback_cas_precedes_empty_diff(api):
+    """回滚的 CAS 必须先于「有没有差集」判断（S6 Task 4 UAT 7.6 实测缺陷）。
+
+    回滚完成后目标版本与当前版本内容相同、差集为空。此时若先算差集，
+    带着过期版本号或不带版本号的请求会收到 422「没有可回滚的变化」，
+    用户看不出真正原因是版本已变 —— 必须是 428 / 409。
+    """
+    ids = await _templates(api)
+    c = api["c"]
+    api["as"]("owner")
+    tid = ids["group"]
+    body = {"expected_version": 1, "changes": [{"domain": "report", "slot_key": SLOT,
+                                                "definition": {"formula": "TB('1001','审定数')"}}]}
+    assert (await c.post(f"/api/formula-templates/{tid}/publish", json=body)).status_code == 200
+    rolled = await c.post(f"/api/formula-templates/{tid}/rollback",
+                          json={"target_version": 1, "expected_version": 2})
+    assert rolled.status_code == 200 and rolled.json()["version"] == 3
+
+    # v3 与 v1 内容相同 ⇒ 差集为空。缺版本号必须 428、版本不符必须 409，都不得被 422 吞掉。
+    empty_no_cas = await c.post(f"/api/formula-templates/{tid}/rollback", json={"target_version": 1})
+    assert empty_no_cas.status_code == 428, empty_no_cas.text
+    stale = await c.post(f"/api/formula-templates/{tid}/rollback",
+                         json={"target_version": 1, "expected_version": 1})
+    assert stale.status_code == 409, stale.text
+    pre_no_cas = await c.post(f"/api/formula-templates/{tid}/rollback-preview", json={"target_version": 1})
+    assert pre_no_cas.status_code == 428, pre_no_cas.text
+    # 版本号正确时才轮到内容判断：此时差集确实为空 ⇒ 422
+    empty = await c.post(f"/api/formula-templates/{tid}/rollback-preview",
+                         json={"target_version": 1, "expected_version": 3})
+    assert empty.status_code == 422, empty.text
+
+
 async def test_diff_and_rollback_keep_template_visibility(api):
     ids = await _templates(api)
     api["as"]("outsider")

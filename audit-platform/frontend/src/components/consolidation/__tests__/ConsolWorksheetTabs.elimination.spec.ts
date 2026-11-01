@@ -56,10 +56,10 @@ vi.mock('@/composables/useExcelIO', () => ({
 
 import ConsolWorksheetTabs from '../worksheets/ConsolWorksheetTabs.vue'
 
-/** 明细表替身：记下拿到的 props（按来源分组与负责来源） */
+/** 明细表替身：记下服务端来源表与版本向量。 */
 const ElimStub = defineComponent({
   name: 'EliminationSheet',
-  props: ['projectId', 'year', 'sourceGroups', 'sourceOrigins'],
+  props: ['projectId', 'year', 'sourceSheetKeys', 'sourceVersions'],
   setup() { return () => h('div', { 'data-testid': 'elim-stub' }) },
 })
 /** 内部往来表替身：可以触发保存与行变化 */
@@ -121,17 +121,16 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
       internal_arap: { rows: ARAP_ROWS },
       elimination: { rows: [{ _custom: true, source: '', direction: '借', subject: '应付账款', amount: 99 }] },
     }
-    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({ status: 'loaded', data: saved.value, versions: {} })
+    worksheetApi.loadAllWorksheetData.mockResolvedValueOnce({ status: 'loaded', data: saved.value, versions: { internal_arap: 7 } })
     const wrapper = mountTabs()
     await flushPromises()
     await openSheet(wrapper, 'elimination')
     const elim = wrapper.findComponent(ElimStub)
     expect(elim.props('projectId')).toBe('p-g')
     expect(elim.props('year')).toBe(2025)
-    expect(elim.props('sourceGroups').map((g: any) => g.origin_key)).toEqual(['internal_arap:pair:应收账款|应付账款'])
-    expect(elim.props('sourceGroups')[0].related_company_codes).toEqual(['A', 'G'])
-    // elimination 有已保存数据但不是来源表；没保存过的模拟权益法 / 内部交易不声明负责
-    expect(elim.props('sourceOrigins')).toEqual(['ws_internal_arap'])
+    expect(elim.props('sourceSheetKeys')).toEqual(['internal_arap'])
+    expect(elim.props('sourceVersions')).toEqual({ internal_arap: 7 })
+    // elimination 有已保存数据但不是来源表；没保存过的模拟权益法 / 内部交易不进入服务端生成范围
     // 恢复的行也交给内部往来表
     await openSheet(wrapper, 'internal_arap')
     expect(wrapper.findComponent(ArApStub).props('initialRows')).toEqual(ARAP_ROWS)
@@ -140,7 +139,7 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
     expect(apiProxy.delete).not.toHaveBeenCalled()
   })
 
-  it('编辑内部往来表 ⇒ 待生成分组随之变化；表被清空后，只有保存过才声明负责（才会删旧草稿）', async () => {
+  it('未保存编辑不进入草稿来源；保存后只传服务端 sheet key 和 CAS 版本', async () => {
     const wrapper = mountTabs()
     await flushPromises()
     await openSheet(wrapper, 'internal_arap')
@@ -148,15 +147,15 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
     await flushPromises()
     await openSheet(wrapper, 'elimination')
     let elim = wrapper.findComponent(ElimStub)
-    expect(elim.props('sourceGroups')).toHaveLength(1)
-    expect(elim.props('sourceOrigins')).toEqual(['ws_internal_arap'])
+    expect(elim.props('sourceSheetKeys')).toEqual([])
+    expect(elim.props('sourceVersions')).toEqual({})
 
     // 清空表格但未保存：数据未知 ⇒ 不声明（不能据此删掉它以前生成的草稿）
     await openSheet(wrapper, 'internal_arap')
     wrapper.findComponent(ArApStub).vm.$emit('rows-changed', [])
     await flushPromises()
     await openSheet(wrapper, 'elimination')
-    expect(wrapper.findComponent(ElimStub).props('sourceOrigins')).toEqual([])
+    expect(wrapper.findComponent(ElimStub).props('sourceSheetKeys')).toEqual([])
 
     // 保存空表：该表数据已知且为空 ⇒ 声明负责，后端据此删除其草稿
     await openSheet(wrapper, 'internal_arap')
@@ -165,8 +164,8 @@ describe('ConsolWorksheetTabs → 合并抵消分录明细表', () => {
     expect(wsApi.saveWorksheetData).toHaveBeenCalledWith('p-g', 2025, 'internal_arap', { rows: [] }, 0)
     await openSheet(wrapper, 'elimination')
     elim = wrapper.findComponent(ElimStub)
-    expect(elim.props('sourceGroups')).toEqual([])
-    expect(elim.props('sourceOrigins')).toEqual(['ws_internal_arap'])
+    expect(elim.props('sourceSheetKeys')).toEqual(['internal_arap'])
+    expect(elim.props('sourceVersions')).toEqual({ internal_arap: 1 })
     expect(apiProxy.post).not.toHaveBeenCalled()
   })
 })

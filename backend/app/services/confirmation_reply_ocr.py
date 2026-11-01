@@ -30,26 +30,36 @@ class ReplyOcrFailed(Exception):
         self.status_code = status_code
 
 
-def _local_original(file_path: str | None) -> Path | None:
-    """本地原件（与附件下载同口径，见 ``attachment_upload_policy.resolve_local_attachment_file``）。"""
-    from app.services.attachment_upload_policy import resolve_local_attachment_file
+async def _local_original(db: AsyncSession, att: Attachment) -> Path | None:
+    """优先读取附件确定版本的 blob；无 blob 时按项目根解析 legacy 本地原件。"""
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
+    from app.services.attachment_asset_projection import asset_blob_read_authoritative
+    from app.services.attachment_storage_resolver import resolve_project_attachment_file
 
-    return resolve_local_attachment_file(file_path)
+    try:
+        blob = await AssetBlobService(db).read_current_attachment_blob(att.id, project_id=att.project_id)
+    except AssetBlobReadRejected:
+        if att.storage_type == "asset_blob" or asset_blob_read_authoritative():
+            return None
+        blob = None
+    if blob is not None:
+        return blob.canonical_path
+    return resolve_project_attachment_file(att.project_id, att.storage_type, att.file_path)
 
 
 async def _recognize_original(db: AsyncSession, att: Attachment) -> str:
     from app.services.attachment_service import AttachmentService
     from app.services.unified_ocr_service import OCRServiceUnavailableError, UnifiedOCRService
 
-    if att.storage_type == "paperless":
-        if att.paperless_document_id is None:
-            raise ReplyOcrFailed("原件不在本地存储，也没有 Paperless 文档编号，无法识别")
-        text = await AttachmentService(db).get_paperless_ocr(att.paperless_document_id)
-        if text is None:
-            raise ReplyOcrFailed("Paperless 未返回识别文本（服务未配置或不可达）", status_code=503)
-        return text
-    path = _local_original(att.file_path)
+    path = await _local_original(db, att)
     if path is None:
+        if att.storage_type == "paperless":
+            if att.paperless_document_id is None:
+                raise ReplyOcrFailed("原件不在本地存储，也没有 Paperless 文档编号，无法识别")
+            text = await AttachmentService(db).get_paperless_ocr(att.paperless_document_id)
+            if text is None:
+                raise ReplyOcrFailed("Paperless 未返回识别文本（服务未配置或不可达）", status_code=503)
+            return text
         raise ReplyOcrFailed("原件文件不存在，无法识别")
     try:
         result = await UnifiedOCRService().recognize(str(path))

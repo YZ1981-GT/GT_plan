@@ -102,7 +102,7 @@ export function useTbCellInteraction(
   }
 
   // ─── 复制 ───
-  function copySelection(): string {
+  async function copySelection(): Promise<string> {
     if (selectedCells.value.length === 0) return ''
     // 按行列排序
     const sorted = [...selectedCells.value].sort(
@@ -121,7 +121,7 @@ export function useTbCellInteraction(
     }
     if (currentLine.length > 0) lines.push(currentLine.join('\t'))
     const text = lines.join('\n')
-    await copyText(text)
+    void copyText(text)
     return text
   }
 

@@ -28,7 +28,13 @@ export interface UseReportTraceOptions {
 export interface UseReportTraceReturn {
   rvTraceDialogVisible: Ref<boolean>
   rvTraceLoading: Ref<boolean>
-  rvTraceResult: Ref<{ upstream: any[]; downstream: any[] } | null>
+  rvTraceResult: Ref<{
+    upstream: any[]
+    downstream: any[]
+    attachments: any[]
+    objectId: string
+    projectId: string
+  } | null>
   onRvCtxCellTrace: () => Promise<void>
   onRvTraceLocate: (node: any) => Promise<void>
 
@@ -59,7 +65,13 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
   // ─── Cell Trace (Lineage) ─────────────────────────────────────────────────
   const rvTraceDialogVisible = ref(false)
   const rvTraceLoading = ref(false)
-  const rvTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+  const rvTraceResult = ref<{
+    upstream: any[]
+    downstream: any[]
+    attachments: any[]
+    objectId: string
+    projectId: string
+  } | null>(null)
 
   async function onRvCtxCellTrace() {
     rvCtx.closeContextMenu()
@@ -78,8 +90,13 @@ export function useReportTrace(options: UseReportTraceOptions): UseReportTraceRe
       )
       const upstream = data?.upstream || []
       const downstream = data?.downstream || []
-      rvTraceResult.value = { upstream, downstream }
-      if (!upstream.length && !downstream.length) {
+      const attachments = data?.attachments || []
+      rvTraceResult.value = {
+        upstream, downstream, attachments,
+        objectId: row.row_code,
+        projectId: projectId.value,
+      }
+      if (!upstream.length && !downstream.length && !attachments.length) {
         rvTraceDialogVisible.value = false
         ElMessage.info('该数字暂无溯源信息')
       }

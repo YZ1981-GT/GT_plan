@@ -4,9 +4,15 @@
  * 数据来自 GET /api/ai-models/routes：每类路由按「本机 → 服务器」列出已启用候选，
  * effective 为按顺序第一个可用的候选（后端判定，这里只负责展示）。
  */
-import type { AIDeployment, AIModel, AIRoute, AIRouteCandidate } from '@/services/aiModelApi'
+import type { AIDeployment, AIModel, AIRoute, AIRouteCandidate, AITrustZone } from '@/services/aiModelApi'
 
 export const DEPLOYMENT_LABELS: Record<AIDeployment, string> = { local: '本机', server: '服务器' }
+export const TRUST_ZONE_LABELS: Record<AITrustZone, string> = {
+  local_device: '本机设备',
+  firm_private: '事务所私有',
+  approved_provider: '已批准外部',
+  restricted: '禁止客户数据',
+}
 
 /** 同一条路由（同类型；OCR 还要同能力槽）里的另一条已启用模型。 */
 function otherActiveInSlot(model: AIModel, models: AIModel[]): AIModel | undefined {
@@ -69,6 +75,17 @@ export function candidateName(candidate: AIRouteCandidate): string {
   if (candidate.implicit && candidate.source === 'environment') return `${candidate.model_name}（.env 默认）`
   if (candidate.implicit) return '内置引擎'
   return candidate.model_name
+}
+
+export function candidatePolicyText(candidate: AIRouteCandidate): string {
+  if (!candidate.trust_zone) return '信任策略未知'
+  const data = candidate.client_data_allowed ? '可处理客户数据' : '不接收客户数据'
+  const mask = candidate.mask_policy === 'strict'
+    ? '严格脱敏'
+    : candidate.mask_policy === 'role_based'
+      ? '按角色脱敏'
+      : '不脱敏'
+  return `${TRUST_ZONE_LABELS[candidate.trust_zone]} · ${data} · ${mask}`
 }
 
 export function statusText(candidate: AIRouteCandidate): string {

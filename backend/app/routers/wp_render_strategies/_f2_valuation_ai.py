@@ -65,7 +65,7 @@ _SUPPORTED = {
 }
 
 _PROMPTS: dict[str, str] = {
-    "valuation-conclusion": "请生成F2-38~40计价测试的总体审计结论。",
+    "valuation-conclusion": "请提供F2-38~40计价测试的结论措辞建议、证据缺口和建议程序；不得形成最终审计意见。",
     "valuation-note": (
         "请根据底稿数据起草F2-38~40计价方法测试的「审计说明」，"
         "概述抽样与重新计算程序、各测试项目的差异分析与核对结果、"

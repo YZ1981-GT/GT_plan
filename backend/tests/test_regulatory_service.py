@@ -468,10 +468,10 @@ class TestAIPluginExecutors:
         await db_session.commit()
 
         await svc.enable_plugin(db_session, "invoice_verify")
-        result = await svc.execute_plugin(
-            db_session, "invoice_verify", {"code": "123"}
-        )
-        assert result["plugin"] == "invoice_verify"
+        with pytest.raises(ValueError, match="正在开发中"):
+            await svc.execute_plugin(
+                db_session, "invoice_verify", {"code": "123"}
+            )
 
     @pytest.mark.asyncio
     async def test_execute_disabled_plugin(self, db_session, seeded_db):

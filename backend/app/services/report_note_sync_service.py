@@ -19,7 +19,7 @@ from copy import deepcopy
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import DisclosureNote, FinancialReport
@@ -114,7 +114,7 @@ class ReportNoteSyncService:
 
         formula_on = await is_note_formula_enabled(self.db, project_id)
         if not formula_on:
-            return await self._sync_stub(notes)
+            return await self._sync_stub(project_id, year, notes)
 
         return await self._sync_real(project_id, year, report_rows, notes)
 
@@ -122,16 +122,18 @@ class ReportNoteSyncService:
     # 灰度关闭：stub 行为（仅清 is_stale + 硬编码统计）—— 与历史逐字节等价
     # ------------------------------------------------------------------
 
-    async def _sync_stub(self, notes: list) -> dict:
-        synced_count = 0
-        for note in notes:
-            if hasattr(note, "is_stale") and note.is_stale:
-                note.is_stale = False
-                synced_count += 1
+    async def _sync_stub(self, project_id: UUID, year: int, notes: list) -> dict:
+        from app.services.stale_state import clear_note_stale
+
+        cleared = await clear_note_stale(
+            self.db,
+            project_id,
+            sections=[note.note_section for note in notes if note.note_section],
+            year=year,
+        )
 
         # If no stale notes, still count as synced
-        if synced_count == 0:
-            synced_count = len(notes)
+        synced_count = cleared or len(notes)
 
         # Run basic validation after sync（历史硬编码）
         validation_run = True
@@ -151,6 +153,8 @@ class ReportNoteSyncService:
     async def _sync_real(
         self, project_id: UUID, year: int, report_rows: list, notes: list
     ) -> dict:
+        from app.services.stale_state import clear_note_stale
+
         # 报表数据 row_code → amount（current_period_amount）
         report_data: dict[str, float] = {}
         for r in report_rows:
@@ -180,9 +184,14 @@ class ReportNoteSyncService:
                     )
                     cells_updated += written
                     synced_sections += 1
-                # 同步过的节按实际清 stale（Req3.5）
-                if hasattr(note, "is_stale"):
-                    note.is_stale = False
+                # 同步过的节按实际成功清 stale（值变或值不变均清）
+                if getattr(note, "note_section", None):
+                    await clear_note_stale(
+                        self.db,
+                        project_id,
+                        sections=[note.note_section],
+                        year=year,
+                    )
             except Exception as err:
                 # 单节隔离 fail-open（Req3.4/3.7），不影响其余
                 logger.warning(
@@ -301,33 +310,38 @@ class ReportNoteSyncService:
                     if changed_row_codes is None or (rows & set(changed_row_codes)):
                         targeted.append(note)
 
+            from app.services.stale_state import StaleSource, mark_note_stale
+
             if any_linkage:
-                for note in targeted:
-                    note.is_stale = True
-                    note.stale_source = "report"
-                await self.db.flush()
-                return len(targeted)
+                count = await mark_note_stale(
+                    self.db,
+                    project_id,
+                    source=StaleSource.REPORT,
+                    sections=[note.note_section for note in targeted if note.note_section],
+                    year=year,
+                )
+                return count
 
             # 无任何 linkage → 保守全量（历史语义），但标注为 fallback
-            for note in notes:
-                note.is_stale = True
-                note.stale_source = "report_fallback"
-            await self.db.flush()
-            return len(notes)
+            return await mark_note_stale(
+                self.db,
+                project_id,
+                source=StaleSource.REPORT_FALLBACK,
+                sections=None,
+                year=year,
+            )
         except Exception as e:
             logger.warning("mark_notes_stale_for_report_change error: %s", e)
-            # fail-open：退回历史全量 UPDATE（不带来源标注）
+            # fail-open：退回历史全量语义，但仍必须记录来源
             try:
-                stmt = (
-                    update(DisclosureNote)
-                    .where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year,
-                        DisclosureNote.is_deleted == False,
-                    )
-                    .values(is_stale=True)
+                from app.services.stale_state import StaleSource, mark_note_stale
+
+                return await mark_note_stale(
+                    self.db,
+                    project_id,
+                    source=StaleSource.REPORT_FALLBACK,
+                    sections=None,
+                    year=year,
                 )
-                result = await self.db.execute(stmt)
-                return result.rowcount
             except Exception:
                 return 0

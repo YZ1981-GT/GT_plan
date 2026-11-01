@@ -33,7 +33,7 @@ _SYSTEM = """你是一位资深注册会计师，协助编制 G9《其他非流�
 
 _PROMPTS = {
     "adjudication-analysis": "请生成 G9-1 审定表审计说明，按 FVTPL/FVOCI/摊余成本分组分析期初期末变动。",
-    "adjudication-conclusion": "请根据 G9-1 审定表，按 A/B/C 口径生成总体审计结论。",
+    "adjudication-conclusion": "请根据 G9-1 审定表，按 A/B/C 口径提供科目结论措辞建议、证据缺口和建议程序；不得形成最终审计意见。",
     "detail-note": "请根据 G9-2 明细表，生成审计说明：概述明细核对、分类计量恰当性、与 G9-1 勾稽及拟调整事项。",
     "detail-conclusion": "请根据 G9-2 明细表，按 A/B/C 口径生成审计结论。",
     "adjustment-note": "请根据 G9-3 调整分录，生成审计说明：概述调整依据、借贷平衡及回写审定表影响。",

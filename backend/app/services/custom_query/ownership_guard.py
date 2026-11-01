@@ -34,7 +34,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import set_rls_context
-from app.models.core import ProjectUser
+from app.models.core import Project, ProjectUser
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.services.audit_logger_enhanced import audit_logger
 
@@ -84,11 +84,14 @@ class OwnershipGuard:
 
         ids: set[UUID] = set()
 
-        # (1) project_users 成员（复用 require_project_access 的数据源）
+        # (1) 未删除项目的 project_users 成员（复用 require_project_access 的数据源）
         pu_res = await db.execute(
-            select(ProjectUser.project_id).where(
+            select(ProjectUser.project_id)
+            .join(Project, Project.id == ProjectUser.project_id)
+            .where(
                 ProjectUser.user_id == user_id,
                 ProjectUser.is_deleted == False,  # noqa: E712
+                Project.is_deleted == False,  # noqa: E712
             )
         )
         for r in pu_res.all():
@@ -100,10 +103,12 @@ class OwnershipGuard:
         pa_res = await db.execute(
             select(ProjectAssignment.project_id)
             .join(StaffMember, StaffMember.id == ProjectAssignment.staff_id)
+            .join(Project, Project.id == ProjectAssignment.project_id)
             .where(
                 StaffMember.user_id == user_id,
                 ProjectAssignment.is_deleted == False,  # noqa: E712
                 StaffMember.is_deleted == False,  # noqa: E712
+                Project.is_deleted == False,  # noqa: E712
             )
         )
         for r in pa_res.all():
@@ -124,19 +129,26 @@ class OwnershipGuard:
         """
         return await self._accessible_project_ids(user, db)
 
+    async def _project_is_live(self, project_id: UUID, db: AsyncSession) -> bool:
+        """全项目角色也必须经过项目存活门，回收站项目一律不可查询。"""
+        result = await db.execute(
+            select(Project.id).where(
+                Project.id == project_id,
+                Project.is_deleted == False,  # noqa: E712
+            ).limit(1)
+        )
+        return result.first() is not None
+
     async def _can_access_project(
         self, user: Any, project_id: UUID, db: AsyncSession
     ) -> bool:
-        """判断用户是否可访问指定项目（每次按 project_users 成员 ∪ project_assignments 有效分派直接查库）。"""
-        if getattr(getattr(user, "role", None), "value", None) in _ALL_ACCESS_ROLES:
-            return True
-
-        user_id = getattr(user, "id", None)
-        if user_id is None:
-            return False
-
+        """判断用户是否可访问指定的未删除项目。"""
         accessible = await self._accessible_project_ids(user, db)
-        return accessible is None or project_id in accessible
+        if accessible is not None:
+            # 普通用户的集合查询已 JOIN projects 并排除软删项目。
+            return project_id in accessible
+        # admin / partner 的 None 哨兵只代表「全部活项目」，不是回收站旁路。
+        return await self._project_is_live(project_id, db)
 
     # ── 审计：越权尝试 ──────────────────────────────────────────────────
 
@@ -204,8 +216,24 @@ class OwnershipGuard:
         无法确定项目归属的行 fail-closed 剔除。
         """
         accessible = await self._accessible_project_ids(user, db)
-        if accessible is None:  # admin / partner 可见全部
-            return list(rows)
+        if accessible is None:
+            # 全项目角色仍只看活项目；一次收集本批行里的项目，避免逐行查询。
+            candidates = {
+                pid
+                for row in rows
+                if (pid := _to_uuid(self._extract_row_project_id(row))) is not None
+            }
+            if not candidates:
+                return []
+            result = await db.execute(
+                select(Project.id).where(
+                    Project.id.in_(sorted(candidates, key=str)),
+                    Project.is_deleted == False,  # noqa: E712
+                )
+            )
+            accessible = {
+                pid for value in result.scalars().all() if (pid := _to_uuid(value)) is not None
+            }
 
         kept: list[Any] = []
         for row in rows:
@@ -227,8 +255,6 @@ class OwnershipGuard:
             return
 
         accessible = await self._accessible_project_ids(user, db)
-        if accessible is None:  # admin / partner 可访问全部
-            return
 
         # (target, project_id) 解析：优先显式 project_id，其次 wp_id 反查
         resolved: list[tuple[Any, UUID | None]] = []
@@ -258,6 +284,21 @@ class OwnershipGuard:
                 mapped = pid_map.get(wid)
                 for t in ts:
                     resolved.append((t, mapped))
+
+        if accessible is None:
+            candidates = {pid for _, pid in resolved if pid is not None}
+            if candidates:
+                live = await db.execute(
+                    select(Project.id).where(
+                        Project.id.in_(sorted(candidates, key=str)),
+                        Project.is_deleted == False,  # noqa: E712
+                    )
+                )
+                accessible = {
+                    pid for value in live.scalars().all() if (pid := _to_uuid(value)) is not None
+                }
+            else:
+                accessible = set()
 
         for t, pid in resolved:
             if pid is None or pid not in accessible:

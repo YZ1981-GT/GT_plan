@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_log_models import AuditLogEntry
+from app.models.audit_log_models import AuditChainHead, AuditLogEntry
 
 from .canonical import GENESIS_HASH, hash_v1
 from .head import chain_key_of, lock_chain
@@ -68,7 +67,6 @@ async def _unconfirmed_tails(db: AsyncSession, chain_key: str) -> set[uuid.UUID]
     all_stmt = select(ALE.id, ALE.entry_hash).where(chain_filter)
     all_rows = (await db.execute(all_stmt)).all()
     all_hashes = {row.entry_hash for row in all_rows}
-    all_ids_by_hash = {row.entry_hash: row.id for row in all_rows}
 
     # 所有被引用为 prev_hash 的哈希（同链内）
     prev_stmt = select(ALE.prev_hash).where(chain_filter).where(
@@ -112,6 +110,8 @@ async def scan_forks(
     # 找 prev_hash 有多于 1 个后继的
     count_stmt = (
         select(ALE.prev_hash, func.count(ALE.id).label("cnt"))
+        # 每条独立链都从同一个创世哈希开始；它们不是彼此的分叉。
+        .where(ALE.prev_hash != GENESIS_HASH)
         .group_by(ALE.prev_hash)
         .having(func.count(ALE.id) > 1)
     )
@@ -140,7 +140,6 @@ async def scan_forks(
 
         survivors = []
         dead_ack = []
-        dead_unack = []
 
         for sr in succ_rows:
             sid = str(sr.id)
@@ -223,6 +222,8 @@ async def append_fork_ack(
         "reason": reason,
         "operator_id": str(operator_id),
     }
+    if chain_key != "__global__":
+        payload["project_id"] = chain_key.removeprefix("project:")
     payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
 
     entry_hash = hash_v1(
@@ -240,5 +241,12 @@ async def append_fork_ack(
         entry_hash=entry_hash,
     )
     db.add(entry)
+
+    # 旧链尾表可能仍指向分叉前的分支。删除后由下一次安全写入在链锁内
+    # 按确认记录重新惰性初始化，避免把确认条目误判为绕过写入。
+    existing_head = await db.get(AuditChainHead, chain_key)
+    if existing_head is not None:
+        await db.delete(existing_head)
+
     await db.flush()
     return entry

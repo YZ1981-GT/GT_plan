@@ -139,6 +139,11 @@ from app.models.wp_generation_models import (  # noqa: F401
     WorkpaperGenerationItem,
     WorkpaperGenerationOperation,
 )
+from app.models.consol_operation_models import ConsolOperation  # noqa: F401
+from app.models.report_generation_models import (  # noqa: F401
+    ConsolArtifact,
+    ReportGenerationRun,
+)
 from app.models.batch_project_models import ProjectBatchImportPlan  # noqa: F401
 from app.models.wp_visibility_models import (  # noqa: F401
     WorkpaperDelegationHistory,
@@ -366,6 +371,9 @@ __all__ = [
     "ProcedureTrimCycleConfirmation",
     "WorkpaperGenerationOperation",
     "WorkpaperGenerationItem",
+    "ConsolOperation",
+    "ReportGenerationRun",
+    "ConsolArtifact",
     "ProjectBatchImportPlan",
     # --- 底稿可见性隔离 (procedure-delegation-visibility-isolation / V113) ---
     "WorkpaperDelegationHistory",

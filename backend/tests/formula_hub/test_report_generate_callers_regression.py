@@ -5,7 +5,7 @@ Refresh 报表范围传；其余两个调用方本任务未改（``git diff 0052
 
 - 报表路由 ``POST /api/reports/generate``（``routers/reports.py::generate_reports``）：``_draft_refresh_world`` 换挂 ``reports.router``
   真发请求；三道门禁 ``require_operation("report:edit")`` / ``check_consol_lock`` / ``PrerequisiteChecker`` 都真实运行（夹具合伙人按
-  生产权限矩阵即可通过，时间线上各记一笔）。200；响应键 = message / report_types / row_counts / summary（summary 三键）；
+  生产权限矩阵即可通过，时间线上各记一笔）。200；响应键 = message / report_types / row_counts / warnings / summary（summary 三键）；
   ``report_types`` 照原样是结果的全部键（含 coverage_stats）；``generate_all_reports`` 只收（项目, 年度, 准则）三个位置参数、不带三个
   新参数 ⇒ ``full_recalc`` 1 次；``REPORT_ROW_CHANGED`` 经 ``publish``（防抖通道）恰 1 条、由 ``generate_all_reports`` 内部发、在
   commit 之前，``changed_row_codes`` 非空、≤ 100；``REPORTS_UPDATED`` 经 ``publish_immediate`` 恰 1 条、在 commit 之后，
@@ -46,7 +46,7 @@ GENERATE = "/api/reports/generate"
 ROW_CHANGED, UPDATED = EventType.REPORT_ROW_CHANGED.value, EventType.REPORTS_UPDATED.value
 ROW_CODE_LIMIT = 100
 NEW_PARAMS = ("skip_recalc", "publish_events", "summary_out")
-RESPONSE_KEYS = {"message", "report_types", "row_counts", "summary"}
+RESPONSE_KEYS = {"message", "report_types", "row_counts", "warnings", "summary"}
 SUMMARY_KEYS = {"total_rows", "non_zero_rows", "failed_rows"}
 CHAIN_KEYS = {"applicable_standard", "report_types", "coverage"}
 GATES = ("call:_resolve_project_role", "call:check_consol_lock", "call:PrerequisiteChecker.check")
@@ -191,6 +191,7 @@ def test_reports_generate_route_default_contract(request):
     assert response.status_code == 200, body
     assert set(body) == RESPONSE_KEYS and set(body["summary"]) == SUMMARY_KEYS, f"响应键 {sorted(body)}"
     assert body["message"] == "报表生成成功", body["message"]
+    assert body["warnings"] == [], body["warnings"]
     report_types = body["report_types"]
     assert "coverage_stats" in report_types and "debug_info" not in report_types, report_types
     assert sorted(set(report_types) - {"coverage_stats"}) == produced, f"report_types {report_types} / 写库 {produced}"

@@ -33,7 +33,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 class AddCommentRequest(BaseModel):
-    commenter_id: UUID
+    # 旧客户端仍可发送 commenter_id；Pydantic 默认忽略额外字段，actor 只取登录用户。
     comment_text: str
     cell_reference: str | None = None
     # R1 需求 2：复核人退回底稿并附意见时传 true，会同步创建
@@ -42,12 +42,13 @@ class AddCommentRequest(BaseModel):
 
 
 class ReplyRequest(BaseModel):
-    replier_id: UUID
+    # 旧 replier_id 字段仅为兼容输入，不进入模型也不参与写入。
     reply_text: str
 
 
 class ResolveRequest(BaseModel):
-    resolved_by: UUID
+    # 旧 resolved_by 字段作为额外字段被忽略，解决人只取登录用户。
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +92,7 @@ async def add_comment(
     result = await svc.add_comment(
         db=db,
         working_paper_id=wp_id,
-        commenter_id=data.commenter_id,
+        commenter_id=current_user.id,
         comment_text=data.comment_text,
         cell_reference=data.cell_reference,
         is_reject=data.is_reject,
@@ -113,8 +114,9 @@ async def reply_review(
     try:
         result = await svc.reply(
             db=db,
+            working_paper_id=wp_id,
             review_id=review_id,
-            replier_id=data.replier_id,
+            replier_id=current_user.id,
             reply_text=data.reply_text,
         )
         await db.commit()
@@ -132,12 +134,14 @@ async def resolve_review(
     current_user: User = Depends(get_current_user),
 ):
     """标记为已解决"""
+    _ = data  # 兼容旧请求体；客户端 actor 字段不得参与审计身份。
     svc = WpReviewService()
     try:
         result = await svc.resolve(
             db=db,
+            working_paper_id=wp_id,
             review_id=review_id,
-            resolved_by=data.resolved_by,
+            resolved_by=current_user.id,
         )
         await db.commit()
         return result

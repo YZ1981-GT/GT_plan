@@ -4,6 +4,7 @@ spec: chain-closure-phase2-formula-push-engine · 任务 10 / 12（由 engine.py
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import Any
@@ -16,6 +17,8 @@ from app.services.formula_push.engine import MANUAL, PushActionError, load_push_
 from app.services.formula_push.policy import PolicyError, apply_user_action, values_equal
 from app.services.formula_push.results import RunResult
 from app.services.formula_push.rules import PushRule
+
+logger = logging.getLogger(__name__)
 
 
 def _dedupe(addr_ids: Iterable[str]) -> list[str]:
@@ -58,9 +61,13 @@ async def _checked_targets(
 async def adopt(db, *, project_id: UUID, year: int, addr_ids: Iterable[str], user_id: UUID | None) -> RunResult:
     """采用公式值：重新算出当前公式值写入并转 auto。"""
     wanted, _, _ = await _checked_targets(db, project_id, year, addr_ids)
-    return await run_and_commit(
+    result = await run_and_commit(
         db, project_id=project_id, year=year, trigger=MANUAL, triggered_by=user_id, force_addr_ids=wanted,
     )
+    from app.services.formula_push.note_followup import recalc_pushed_notes
+
+    await recalc_pushed_notes(db, result)  # R4.1
+    return result
 
 
 async def set_locked(
@@ -154,6 +161,22 @@ async def state_counts(db, *, project_id: UUID, year: int, wp_code: str | None =
         stmt = stmt.where(FormulaPushState.rule_id.like(f"{wp_code}.%"))
     rows = (await db.execute(stmt.group_by(FormulaPushState.state))).all()
     return {str(state): int(n) for state, n in rows}
+
+
+async def orphan_state_count(db, *, project_id: UUID, year: int) -> int:
+    """规则已不存在的附注推送状态行条数（R10）。
+
+    这类行既不再被推送维护（规则没了），又挡着附注预设公式（执行器按 state 判「推送拥有格」就跳过）⇒ 格里的数
+    停在当年推的那个值。只报数，不自动清（清理走 ``backend/scripts/fix/purge_orphan_push_states.py``）。
+    取不到不影响推送 / 面板：返回 0（判定要读规则清单文件，不该因为它出问题就让推送回执 500）。
+    """
+    from app.services.formula_push.orphan_states import count_orphans
+
+    try:
+        return await count_orphans(db, project_id=project_id, year=year)
+    except Exception:  # noqa: BLE001
+        logger.warning("孤儿推送状态统计失败 project=%s year=%s", project_id, year, exc_info=True)
+        return 0
 
 
 async def list_states(

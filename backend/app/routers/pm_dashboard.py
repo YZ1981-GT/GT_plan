@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 from uuid import UUID
-from typing import Optional, Union
+from typing import Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.bulk_operations import BulkResult
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.pm_service import (
     ReviewInboxService,
-    BatchReviewService,
     ProjectProgressService,
     ProgressBriefService,
     CrossRefCheckService,
@@ -26,12 +24,6 @@ router = APIRouter(tags=["pm-dashboard"])
 
 
 # ── Schemas ──
-
-class BatchReviewRequest(BaseModel):
-    wp_ids: list[str]
-    action: str  # "approve" | "reject"
-    comment: str = ""
-
 
 class CommunicationCreate(BaseModel):
     date: str = ""
@@ -70,43 +62,7 @@ async def get_project_review_inbox(
     return await svc.get_inbox(current_user.id, project_id=project_id, page=page, page_size=page_size)
 
 
-# ── 2. 批量复核 ──
-
-@router.post("/api/projects/{project_id}/batch-review")
-async def batch_review(
-    project_id: UUID,
-    body: BatchReviewRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("review")),
-) -> BulkResult:
-    """批量通过/退回底稿 — 返回统一 BulkResult 格式"""
-    if body.action not in ("approve", "reject"):
-        raise HTTPException(400, "action 必须是 approve 或 reject")
-    svc = BatchReviewService(db)
-    raw = await svc.batch_review(
-        project_id,
-        [UUID(wid) for wid in body.wp_ids],
-        body.action,
-        current_user.id,
-        body.comment,
-    )
-    await db.commit()
-
-    # 将旧格式 succeeded/skipped 转为统一 BulkResult
-    succeeded = raw.get("succeeded", [])
-    skipped = raw.get("skipped", [])
-    failed = [{"id": sid, "error": "状态不允许此操作"} for sid in skipped]
-    total = len(succeeded) + len(skipped)
-    return BulkResult(
-        succeeded=succeeded,
-        failed=failed,
-        total=total,
-        success_count=len(succeeded),
-        fail_count=len(skipped),
-    )
-
-
-# ── 3. 项目进度看板 ──
+# ── 2. 项目进度看板 ──
 
 @router.get("/api/projects/{project_id}/progress-board")
 async def get_progress_board(

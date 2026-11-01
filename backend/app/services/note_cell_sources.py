@@ -253,7 +253,9 @@ def _decide(*, mode: str, projected: bool, value: Any, formula: dict | None, bin
     for push in pushes:
         pushed = push.get("last_pushed_value")
         detail = (f"规则 {push['rule_id']}（底稿 {push.get('wp_code') or '—'}）上次推送 {_num(pushed)}，状态 {push['state']}"
-                  f"{'；规则已删除' if push['rule_status'] == 'deleted' else ''}")
+                  f"{'；规则已删除' if push['rule_status'] == 'deleted' else ''}"
+                  # 取数口径（「期末 = TB('1122','期末余额')」）：溯源到试算表科目（R4.3）
+                  f"{'；取数：' + str(push['source_formula']) if push.get('source_formula') else ''}")
         if section_locked:
             status = "blocked"
         elif push["ambiguous"] or pushed is None or push["state"] != "auto":

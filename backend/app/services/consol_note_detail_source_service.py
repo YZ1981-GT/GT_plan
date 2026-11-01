@@ -25,9 +25,7 @@ from app.models.consol_note_mapping_models import (
 )
 from app.models.report_models import DisclosureNote
 from app.services.consol_note_detail_suggest import (  # 建议算法拆出；本模块重新导出以兼容原导入路径
-    _label_key,
     is_auto_confirmable,
-    is_placeholder_label,
     suggest_template_rows,
 )
 from app.services.consol_note_standalone_reader import SourceTable
@@ -330,13 +328,16 @@ async def load_source_tables(
         elif note.is_empty:
             out[pid] = SourceTable(reason=f"单体附注 {standalone_section} 标为本期无此情形", status="not_applicable")
         else:
+            std = source_variants.get(pid, template_type)
             out[pid] = read_source_table(
                 note.table_data,
                 consol_table=consol_table,
-                table_name=entry.get("standalone_table_name"),
+                # 子企业是另一口径时按它自己模板里的表名选表（R6.8；映射生成时逐表算好）
+                table_name=(entry.get("standalone_table_name_by_std") or {}).get(std)
+                or entry.get("standalone_table_name"),
                 title=entry.get("consol_title"),
                 section_title=note.section_title,
-                std=source_variants.get(pid, template_type),
+                std=std,
                 consol_section_id=section_id,
                 standalone_section=note.note_section,
             )
@@ -559,13 +560,14 @@ async def suggest_template_for_section(
     year: int,
     tree: Any = None,
 ) -> dict[str, Any]:
-    """模板行建议：以合并附注模板该表的行（顺序 / 行类型）为骨架，标出每行在子企业来源里
-    出现的频率与金额；来源里有而模板没有的明细行按来源出现顺序替换模板的「……」占位行（没有占位行插在
-    首个合计行之前），全局别名库认得的写法并进模板行别名。
+    """模板行建议：以合并附注模板该表的行（顺序 / 行类型）为骨架，标出每行在子企业来源里出现的频率与金额；
+    行的取舍与位置见 ``consol_note_detail_order.suggest_detail_rows``（别名 / 账龄档并进模板行，来源独有的明细行按来源
+    位置放、替换紧跟的「……」占位行）。
 
     明细模板与合并附注模板同行序，「按公式填入」与明细映射写的才是同一批行。
     合并模板缺该表时退回按来源频率排序。
     """
+    from app.services.consol_note_detail_order import suggest_detail_rows
     from app.services.consol_note_formula_service import find_table
 
     template_type = await resolve_section_template_type(db, project_id)
@@ -575,94 +577,12 @@ async def suggest_template_for_section(
     )
     entities = [e for e in scanned if e["rows"]]
     groups = group_entities_by_structure(entities)
-
-    # 统计来源行标签出现频率和金额（按规范化标签合并，展示取首次出现的写法）
-    label_stats: dict[str, dict[str, Any]] = {}
-    for entity in entities:
-        for row in entity["rows"]:
-            label = _first_cell(row).strip()
-            key = _label_key(label)
-            if not key:
-                continue
-            stats = label_stats.setdefault(
-                key, {"label": label, "count": 0, "row_type": _row_type(row), "total_amount": 0.0},
-            )
-            stats["count"] += 1
-            stats["total_amount"] += sum(abs(float(v)) for v in _row_numbers(row))
-
-    skeleton: list[dict[str, Any]] = []
-    table = find_table(template_type, section_id) or {}
-    row_types = table.get("_row_types") or []
-    for i, trow in enumerate(table.get("rows") or []):
-        label = _first_cell(trow).strip()
-        key = _label_key(label)
-        if not key:
-            continue
-        declared = row_types[i] if i < len(row_types) else ""
-        rt = declared if declared in ("total", "subtotal") else _row_type([label])
-        stats = label_stats.get(key)
-        canonical = key if key in ("合计", "小计") else label
-        skeleton.append({
-            "canonical_name": canonical,
-            "aliases": [stats["label"]] if stats and stats["label"] != canonical else [],
-            "row_type": rt,
-            "origin": "template",
-            "_key": key,
-            # 「……」可扩位占位：动态行区（下推不写进子企业附注；有来源独有行时由它们替换）
-            **({"category": "dynamic_zone"} if is_placeholder_label(label) else {}),
-        })
-
-    template_keys = {r["_key"] for r in skeleton}
-    # 全局别名库认得的写法（「现金」→「库存现金」）并进模板行别名，不单列一行（否则合并附注两行各算一半）
-    from app.services.consol_note_detail_suggest import _load_global_aliases
-
-    variants = _load_global_aliases()
-    by_key = {r["_key"]: r for r in skeleton}
-    for key, stats in label_stats.items():
-        target = by_key.get(variants.get(key, "")) if key not in template_keys else None
-        if target is not None:
-            if stats["label"] not in target["aliases"]:
-                target["aliases"].append(stats["label"])
-            template_keys.add(key)
-    extras = [
-        {
-            "canonical_name": stats["label"],
-            "aliases": [],
-            "row_type": stats["row_type"],
-            "origin": "source",
-            "_key": key,
-        }
-        for key, stats in label_stats.items()  # 来源出现顺序（企业树先序、表内行序）
-        if key not in template_keys and stats["row_type"] == "data"
-    ]
-    holder = next((i for i, r in enumerate(skeleton) if r.get("category") == "dynamic_zone"), None) if extras else None
-    if holder is not None:  # 来源独有的明细行替换模板的「……」占位行（模板的意思是「此处按实际列示」）
-        ordered = skeleton[:holder] + extras + skeleton[holder + 1:]
-    elif skeleton:
-        cut = next((i for i, r in enumerate(skeleton) if r["row_type"] == "total"), len(skeleton))
-        ordered = skeleton[:cut] + extras + skeleton[cut:]
-    else:  # 合并模板缺该表：按来源频率，合计行放最后
-        ordered = extras + [
-            {"canonical_name": s["label"], "aliases": [], "row_type": s["row_type"], "origin": "source", "_key": k}
-            for k, s in label_stats.items() if s["row_type"] != "data"
-        ]
-
-    suggested_rows: list[dict[str, Any]] = []
-    for i, r in enumerate(ordered):
-        stats = label_stats.get(r.pop("_key"))
-        suggested_rows.append({
-            **r,
-            "sort_order": i * 10,
-            "frequency": stats["count"] if stats else 0,
-            "total_amount": round(stats["total_amount"], 2) if stats else 0.0,
-            "entity_total": len(entities),
-        })
-
     return {
         "section_id": section_id,
         "entity_count": len(entities),
         "group_count": len(groups),
-        "suggested_rows": suggested_rows,
+        "suggested_rows": suggest_detail_rows(find_table(template_type, section_id) or {},
+                                              [entity["rows"] for entity in entities]),
         "entity_sources": _entity_source_report(scanned),
     }
 

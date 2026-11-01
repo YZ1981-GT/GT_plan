@@ -37,6 +37,14 @@ import {
   type D2DisclosureVariant,
 } from './d2NoteSectionMap'
 import { seedSyncedTableBaseline } from './disclosureSyncedTables'
+// R7：四张逐项明细表的来源派生（「带入」按钮与离屏快照共用同一份映射）
+import {
+  deriveIndividualRows,
+  deriveReversalRows,
+  deriveTop5Rows,
+  deriveWriteOffRows,
+  missingByName,
+} from './d2DisclosureDerive'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -968,31 +976,22 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   /** 从 D2-3「按单项计提」子行带入（名称 + 期末/期初坏账准备），仅填充空白行不覆盖已录入 */
   function importIndividualFromBadDebt(): number {
     if (isReadonly.value) return 0
-    const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-bd-individual-rows')?.remark, [])
-    const subRows = (Array.isArray(rows) ? rows : []).filter((r) => r?.isSubRow && String(r.label ?? '').trim())
-    if (subRows.length === 0) return 0
-    const existing = new Set(individualRows.value.map((r) => r.name.trim()).filter(Boolean))
-    const added: D2IndividualRow[] = []
-    for (const raw of subRows) {
-      const name = String(raw.label).trim()
-      if (existing.has(name)) continue
-      added.push({
-        rowId: genId('ind'),
-        name,
-        endAmount: 0,
-        priorAmount: 0,
-        provision: parseNum(raw.currentAudited),
-        priorProvision: parseNum(raw.priorAudited),
-        aging: '',
-        basis: '',
-      })
-      existing.add(name)
-    }
+    const added = missingByName(individualRows.value, derivedIndividualRows(), (r: any) => String(r.name ?? ''))
+      .map((r) => ({ rowId: genId('ind'), ...r }))
     if (added.length === 0) return 0
     individualRows.value = [...individualRows.value, ...added]
     persistJson('individual-rows', individualRows.value)
     return added.length
   }
+
+  // ── 四张逐项明细表的来源派生（R7）：「带入」按钮与离屏快照共用 d2DisclosureDerive 的同一份映射 ──
+  function sourceRows(itemId: string): unknown {
+    return safeParse<unknown>(allResponses.value.get(itemId)?.remark, [])
+  }
+  const derivedIndividualRows = () => deriveIndividualRows(sourceRows('D2-bd-individual-rows'))
+  const derivedReversalRows = () => deriveReversalRows(sourceRows('D2-writeoff-reversal-rows'))
+  const derivedWriteOffRows = () => deriveWriteOffRows(sourceRows('D2-writeoff-writeoff-rows'))
+  const derivedTop5Rows = () => deriveTop5Rows(sourceRows('D2-analysis-top10'))
 
   // 组合计提分表
   function buildPortfolioRows(): D2PortfolioRow[] {
@@ -1135,25 +1134,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   /** 从 D2-11 转回明细带入（单位名称 / 转回原因 / 收回方式 / 原确定依据 / 累计已计提 / 金额，D2-11 按模板补列后都有来源） */
   function importReversalFromWriteoffCheck(): number {
     if (isReadonly.value) return 0
-    const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-writeoff-reversal-rows')?.remark, [])
-    const source = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.debtorName ?? '').trim() || parseNum(r?.amount))
-    if (source.length === 0) return 0
-    const existing = new Set(reversalRows.value.map((r) => r.companyName.trim()).filter(Boolean))
-    const added: D2ReversalRow[] = []
-    for (const raw of source) {
-      const name = String(raw.debtorName ?? '').trim()
-      if (name && existing.has(name)) continue
-      added.push({
-        rowId: genId('rv'),
-        companyName: name,
-        reversalReason: String(raw.reason ?? ''),
-        recoveryMethod: String(raw.recoveryMethod ?? ''),
-        originalBasis: String(raw.originalBasis ?? ''),
-        cumulativeProvision: parseNum(raw.cumulativeProvision),
-        amount: parseNum(raw.amount),
-      })
-      if (name) existing.add(name)
-    }
+    const added = missingByName(reversalRows.value, derivedReversalRows(), (r: any) => String(r.companyName ?? ''))
+      .map((r) => ({ rowId: genId('rv'), ...r }))
     if (added.length === 0) return 0
     reversalRows.value = [...reversalRows.value, ...added]
     persistJson('reversal-rows', reversalRows.value)
@@ -1187,25 +1169,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   /** 从 D2-11 核销明细带入（单位名称 / 性质 / 核销金额 / 核销原因 / 履行的核销程序 / 是否关联交易） */
   function importWriteOffFromWriteoffCheck(): number {
     if (isReadonly.value) return 0
-    const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-writeoff-writeoff-rows')?.remark, [])
-    const source = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.debtorName ?? '').trim() || parseNum(r?.amount))
-    if (source.length === 0) return 0
-    const existing = new Set(writeOffRows.value.map((r) => r.companyName.trim()).filter(Boolean))
-    const added: D2WriteOffRow[] = []
-    for (const raw of source) {
-      const name = String(raw.debtorName ?? '').trim()
-      if (name && existing.has(name)) continue
-      added.push({
-        rowId: genId('wo'),
-        companyName: name,
-        nature: String(raw.receivableType ?? ''),
-        amount: parseNum(raw.amount),
-        reason: String(raw.reason ?? ''),
-        procedure: String(raw.approvalDoc ?? ''),
-        relatedParty: String(raw.isRelatedParty ?? ''),
-      })
-      if (name) existing.add(name)
-    }
+    const added = missingByName(writeOffRows.value, derivedWriteOffRows(), (r: any) => String(r.companyName ?? ''))
+      .map((r) => ({ rowId: genId('wo'), ...r }))
     if (added.length === 0) return 0
     writeOffRows.value = [...writeOffRows.value, ...added]
     persistJson('writeoff-rows', writeOffRows.value)
@@ -1244,26 +1209,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   /** 从 D2-5 分析表「期末前十名」带入前 5 名（单位名称 + 期末余额；合同资产与减值准备需手工） */
   function importTop5FromAnalysis(): number {
     if (isReadonly.value) return 0
-    const rows = safeParse<Record<string, any>[]>(allResponses.value.get('D2-analysis-top10')?.remark, [])
-    const source = (Array.isArray(rows) ? rows : [])
-      .filter((r) => String(r?.customerName ?? '').trim())
-      .sort((a, b) => parseNum(b?.endBalance) - parseNum(a?.endBalance))
-      .slice(0, 5)
-    if (source.length === 0) return 0
-    const existing = new Set(top5Rows.value.map((r) => r.companyName.trim()).filter(Boolean))
-    const added: D2Top5Row[] = []
-    for (const raw of source) {
-      const name = String(raw.customerName).trim()
-      if (existing.has(name)) continue
-      added.push({
-        rowId: genId('t5'),
-        companyName: name,
-        arAmount: parseNum(raw.endBalance),
-        contractAssetAmount: 0,
-        provision: 0,
-      })
-      existing.add(name)
-    }
+    const added = missingByName(top5Rows.value, derivedTop5Rows(), (r: any) => String(r.companyName ?? ''))
+      .map((r) => ({ rowId: genId('t5'), ...r }))
     if (added.length === 0) return 0
     top5Rows.value = [...top5Rows.value, ...added]
     persistJson('top5-rows', top5Rows.value)
@@ -1527,6 +1474,12 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
 
   function buildSnapshot(): D2DisclosureSnapshot {
     const m = movementValues.value
+    // 用户一行都没录 ⇒ 按底稿来源派生（R7：原先离屏同步推出去的是空表，而 D2-3 / D2-5 / D2-11 已有数据）。
+    // 只作快照兜底、不落库：用户删掉的行不会被下一次刷新又塞回来。
+    const individual = individualRows.value.length ? individualRows.value : derivedIndividualRows()
+    const reversal = reversalRows.value.length ? reversalRows.value : derivedReversalRows()
+    const writeOff = writeOffRows.value.length ? writeOffRows.value : derivedWriteOffRows()
+    const top5 = top5Rows.value.length ? top5Rows.value : derivedTop5Rows()
     return {
       agingRows: agingRows.value.map((r) => ({
         // key 必须透出：同步层据此把配置口径标签映射为披露口径（R6，`1-2年`→`1至2年`）
@@ -1561,7 +1514,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         carryingValue: r.carryingValue,
         isTotal: r.kind === 'total',
       })),
-      individualRows: individualRows.value.map((r) => ({
+      individualRows: individual.map((r) => ({
         name: r.name,
         endAmount: r.endAmount,
         priorAmount: r.priorAmount,
@@ -1617,7 +1570,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         endAmount: r.endAmount,
         isTotal: r.isTotal,
       })),
-      reversalRows: reversalRows.value.map((r) => ({
+      reversalRows: reversal.map((r) => ({
         companyName: r.companyName,
         reversalReason: r.reversalReason,
         recoveryMethod: r.recoveryMethod,
@@ -1626,7 +1579,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         amount: r.amount,
       })),
       writeOffAmount: writeOffAmountCell.value.amount,
-      writeOffRows: writeOffRows.value.map((r) => ({
+      writeOffRows: writeOff.map((r) => ({
         companyName: r.companyName,
         nature: r.nature,
         amount: r.amount,
@@ -1634,7 +1587,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         procedure: r.procedure,
         relatedParty: r.relatedParty,
       })),
-      top5Rows: top5Rows.value.map((r) => ({
+      top5Rows: top5.map((r) => ({
         companyName: r.companyName,
         arAmount: r.arAmount,
         contractAssetAmount: r.contractAssetAmount,

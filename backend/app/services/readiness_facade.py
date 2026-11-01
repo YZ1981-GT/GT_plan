@@ -164,6 +164,8 @@ _SIGN_OFF_RULE_CATEGORY: dict[str, str] = {
     "R4-CROSS-CHECK": "misc",
     # FHIC 需求 16.4：一致性门禁（没有对应的业务类目，与跨科目校验同归「其他门禁规则」）
     "CHAIN-CONSISTENCY": "misc",
+    # 附件平台闭环：实时证据就绪度
+    "EVIDENCE-READINESS": "qc_all_pass",
 }
 
 _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
@@ -192,6 +194,8 @@ _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
     "R4-CROSS-CHECK": "misc",
     # FHIC 需求 16.4：一致性门禁（同上）
     "CHAIN-CONSISTENCY": "misc",
+    # 附件平台闭环：实时证据就绪度
+    "EVIDENCE-READINESS": "qc_passed",
 }
 
 

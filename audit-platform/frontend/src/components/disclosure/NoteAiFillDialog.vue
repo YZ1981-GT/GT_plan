@@ -34,6 +34,7 @@ interface Citation {
 
 interface AiFillResult {
   text: string | null
+  message_id: string | null
   citations: Citation[]
   degraded: boolean
   skipped_docs: string[]

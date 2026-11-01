@@ -131,8 +131,9 @@ async def _workpaper_entries(db: AsyncSession, project_id: UUID, names: _ArcName
 
 async def _attachment_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
     from app.models.attachment_models import Attachment
+    from app.services.asset_blob_service import AssetBlobReadRejected, AssetBlobService
     from app.services.attachment_service import AttachmentService
-    from app.services.attachment_upload_policy import resolve_local_attachment_file
+    from app.services.attachment_storage_resolver import resolve_project_attachment_file
 
     atts = (await db.execute(
         sa.select(Attachment).where(Attachment.project_id == project_id, Attachment.is_deleted == sa.false())
@@ -160,7 +161,28 @@ async def _attachment_entries(db: AsyncSession, project_id: UUID, names: _ArcNam
             else:
                 out.append(InventoryEntry(**base, arcname=arcname, status=OK, paperless_document_id=doc_id))
             continue
-        path = resolve_local_attachment_file(att.file_path)
+        try:
+            blob = await AssetBlobService(db).read_current_attachment_blob(
+                att.id,
+                project_id=att.project_id,
+            )
+        except AssetBlobReadRejected:
+            from app.services.attachment_asset_projection import asset_blob_read_authoritative
+
+            if att.storage_type == "asset_blob" or asset_blob_read_authoritative():
+                out.append(InventoryEntry(
+                    **base,
+                    arcname="",
+                    status=MISSING,
+                    reason="附件不可变版本完整性校验失败",
+                ))
+                continue
+            blob = None
+        path = blob.canonical_path if blob is not None else resolve_project_attachment_file(
+            att.project_id,
+            att.storage_type,
+            att.file_path,
+        )
         if path is None:
             out.append(InventoryEntry(**base, arcname="", status=MISSING, reason="附件文件不存在"))
         else:
@@ -215,22 +237,33 @@ async def referenced_local_paths(db: AsyncSession, *, name_hint: str | None = No
     """
     from app.models.attachment_models import Attachment
     from app.models.evidence_governance_models import AttachmentVersion
-    from app.services.attachment_upload_policy import resolve_local_attachment_file
+    from app.services.attachment_storage_resolver import resolve_project_attachment_file
 
-    raws: list[str | None] = []
-    att_q = sa.select(Attachment.file_path)
-    ver_q = sa.select(AttachmentVersion.storage_key)
+    att_q = sa.select(Attachment.project_id, Attachment.storage_type, Attachment.file_path)
+    ver_q = sa.select(
+        AttachmentVersion.project_id,
+        AttachmentVersion.storage_type,
+        AttachmentVersion.storage_key,
+        AttachmentVersion.config_snapshot,
+    )
     if project_id is not None:
         att_q = att_q.where(Attachment.project_id == project_id)
         ver_q = ver_q.where(AttachmentVersion.project_id == project_id)
     if name_hint:
         att_q = att_q.where(Attachment.file_path.like(f"%{name_hint}"))
         ver_q = ver_q.where(AttachmentVersion.storage_key.like(f"%{name_hint}"))
-    raws.extend((await db.execute(att_q)).scalars().all())
-    raws.extend((await db.execute(ver_q)).scalars().all())
+    refs: list[tuple[UUID, str | None, str | None]] = list((await db.execute(att_q)).all())
+    for pid, storage_type, storage_key, snapshot in (await db.execute(ver_q)).all():
+        finalized = snapshot.get("finalized_storage") if isinstance(snapshot, dict) else None
+        finalized = finalized if isinstance(finalized, dict) else {}
+        refs.append((
+            pid,
+            finalized.get("storage_type") or storage_type,
+            finalized.get("storage_key") or finalized.get("file_path") or storage_key,
+        ))
     out: set[str] = set()
-    for raw in raws:
-        path = resolve_local_attachment_file(raw)
+    for pid, storage_type, storage_key in refs:
+        path = resolve_project_attachment_file(pid, storage_type, storage_key)
         if path is not None:
             out.add(normalized_path(path))
     return out
@@ -238,9 +271,9 @@ async def referenced_local_paths(db: AsyncSession, *, name_hint: str | None = No
 
 async def orphan_files(db: AsyncSession, project_id: UUID) -> list[Path]:
     """附件存储根 ``{root}/{pid}`` 下没有任何附件行（含已删除）/ 版本行引用的文件。"""
-    from app.core.config import settings
+    from app.services.attachment_storage_resolver import project_attachment_root
 
-    project_dir = Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT) / str(project_id)
+    project_dir = project_attachment_root(project_id)
     if not project_dir.is_dir():
         return []
     referenced = await referenced_local_paths(db, project_id=project_id)

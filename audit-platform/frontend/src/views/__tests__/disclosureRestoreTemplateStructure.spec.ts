@@ -44,18 +44,20 @@ describe('onRestoreTemplateStructure', () => {
 })
 
 describe('定时自动保存只存不打断（浏览器实测：填完一格，计时器保存后跳到下一章节 / 收起编辑态）', () => {
-  it('计时器回调走 saveCurrentNote({ auto: true })，手工保存走 onSave → saveCurrentNote({ auto: false })', () => {
+  it('计时器与手工保存都走 saveCurrentNote，并把结果返回给自动保存层', () => {
     const start = editorSource.indexOf('const autoSave = useWorkpaperAutoSave(')
     const timerCallback = editorSource.slice(start, editorSource.indexOf('}, 120_000', start))
-    expect(timerCallback).toContain('await saveCurrentNote({ auto: true })')
+    expect(timerCallback).toContain('return saveCurrentNote({ auto: true })')
     expect(timerCallback).not.toMatch(/\bonSave\(/)
     expect(editorSource).toContain('function onSave() { return saveCurrentNote({ auto: false }) }')
   })
 
-  it('自动保存不退出编辑、不跳章；保存后清结构撤销记录', () => {
-    const save = functionBody(editorSource, 'async function saveCurrentNote({ auto }: { auto: boolean })')
-    expect(save).toContain('await _rawSave({ keepEditing: auto })')
-    expect(save).toContain('if (!auto && autoAdvance.value) {')
-    expect(save.indexOf('noteTableStructure.clearHistory()')).toBeGreaterThan(save.indexOf('await _rawSave('))
+  it('保存流只在最终成功后清结构历史，自动保存不触发自动跳章', () => {
+    const start = editorSource.indexOf('const { saveStatus, saveCurrentNote } = useNoteSaveFlow(')
+    expect(start).toBeGreaterThan(-1)
+    const flow = editorSource.slice(start, editorSource.indexOf('/** 手工保存', start))
+    expect(flow).toContain('save: (opts) => _rawSave(opts)')
+    expect(flow).toContain('noteTableStructure.clearHistory()')
+    expect(flow).toContain('const next = !auto && autoAdvance.value')
   })
 })

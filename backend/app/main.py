@@ -158,96 +158,6 @@ install_deferred_docs(app, settings.APP_ENV)
 setup_tracing(app)
 
 
-# TEMP: diagnostic endpoint for debugging registry capability issue
-@app.get("/api/_debug/a51-capability")
-async def debug_a51_capability():
-    import os
-    from app.services.workpaper_sync.entry_profile import (
-        load_entry_manifest, manifest_entries_by_id, capability_of, ENTRY_MANIFEST_PATH,
-    )
-    m = load_entry_manifest()
-    entries = manifest_entries_by_id(m)
-    e = entries.get("xlsx/gt-a51-cashflow-audit", {})
-    cap_raw = e.get("capability")
-    mig = e.get("migration_state")
-    has_bypass = False
-    try:
-        import app.services.workpaper_sync.adapters.registry as reg_mod
-        src = open(reg_mod.__file__, "r", encoding="utf-8").read()
-        has_bypass = "_CANARY_BYPASS" in src
-    except Exception:
-        pass
-    return {
-        "cwd": os.getcwd(),
-        "manifest_path": str(ENTRY_MANIFEST_PATH),
-        "manifest_exists": ENTRY_MANIFEST_PATH.exists(),
-        "capability_raw": cap_raw,
-        "migration_state": mig,
-        "registry_has_bypass": has_bypass,
-        "entry_count": len(entries),
-    }
-
-
-@app.get("/api/_debug/a51-content-revision")
-async def debug_a51_content_revision(wp_id: str = "2246b5c0-19c3-4d66-bfb2-72d9afdc2996"):
-    """返回指定底稿的 content_revision（canary 临时端点，无需认证）。"""
-    import sqlalchemy as sa
-    from app.core.database import engine
-    from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import sessionmaker
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        rev = (await session.execute(
-            sa.text("SELECT content_revision FROM working_paper WHERE id = :wp"),
-            {"wp": wp_id},
-        )).scalar_one_or_none()
-    return {"content_revision": int(rev) if rev is not None else 0}
-
-
-@app.get("/api/_debug/a51-registration")
-async def debug_a51_registration():
-    """检查 A5-1 adapter 注册的详细状态。"""
-    from app.core.database import engine
-    from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import sessionmaker
-    result = {}
-    try:
-        from app.services.workpaper_sync.adapters.registry import build_production_registry
-        registry = build_production_registry()
-        # 检查 plan
-        plan_items = registry.registration_plan or []
-        a51_plan = [
-            {"entry_id": item.entry_id, "blocked_reason": item.blocked_reason}
-            for item in plan_items
-            if "a51" in item.entry_id.lower()
-        ]
-        result["plan"] = a51_plan
-        # 检查已注册
-        regs = registry.registrations()
-        a51_regs = [r.adapter_id for r in regs if "a51" in r.entry_id.lower()]
-        result["registered_adapters"] = a51_regs
-        # 尝试注册
-        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        async with async_session() as session:
-            try:
-                outcome = await registry.register_from_manifest(session=session)
-                result["outcome_registered"] = list(outcome.registered_entry_ids)
-                result["outcome_failures"] = {
-                    k: {"error_code": v.error_code, "message": v.message[:200]}
-                    for k, v in outcome.failures.items()
-                    if "a51" in k.lower()
-                }
-                result["outcome_reasons"] = {
-                    k: v[:200] for k, v in outcome.reasons.items()
-                    if "a51" in k.lower()
-                }
-            except Exception as exc:
-                result["registration_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
-    except Exception as exc:
-        result["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
-    return result
-
-
 @app.get("/api/version")
 async def api_version():
     bv = get_build_version()
@@ -264,12 +174,11 @@ async def metrics_endpoint():
     """Prometheus /metrics 端点（F16 / Sprint 4.10）。
 
     prometheus_client 未安装时返回占位文本；安装后返回完整指标。
-    暴露 ledger_import_{duration_seconds,jobs_total} + ledger_dataset_count
-    + event_outbox_dlq_depth + ledger_import_health_status 共 5 项。
+    暴露账表导入、AI Chat、LibreOffice、DB pool 与事件循环容量指标。
     """
-    from app.services.ledger_import.metrics import render_metrics
+    from app.services.platform_metrics import render_platform_metrics
 
-    body, content_type = render_metrics()
+    body, content_type = render_platform_metrics()
     return Response(content=body, media_type=content_type)
 
 

@@ -17,7 +17,8 @@ const api = vi.hoisted(() => ({
   listDetailTemplates: vi.fn(),
 }))
 vi.mock('@/services/consolidationApi', () => api)
-vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() }, ElMessageBox: {} }))
+const box = vi.hoisted(() => ({ confirm: vi.fn() }))
+vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() }, ElMessageBox: box }))
 
 import ConsolNoteMappingDialog from '../ConsolNoteMappingDialog.vue'
 
@@ -137,6 +138,8 @@ describe('ConsolNoteMappingDialog 同名行按分组（R3）', () => {
     for (const fn of Object.values(api)) fn.mockReset()
     api.previewDetailRefresh.mockResolvedValue(groupedPreview())
     api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+    box.confirm.mockResolvedValue('confirm')
   })
 
   it('逐行显示所在分组；只能按位置配对的显示「按位置」', async () => {
@@ -155,5 +158,115 @@ describe('ConsolNoteMappingDialog 同名行按分组（R3）', () => {
     expect(body.mappings.map((m: any) => [m.source_label, m.target_row_id, m.source_group, m.source_group_occurrence]))
       .toEqual([['机器设备', 't0', '一、账面原值合计', 0], ['机器设备', 't1', '二、累计折旧合计', 0]])
     expect(body.mappings.every((m: any) => !('source_occurrence' in m))).toBe(true)
+  })
+})
+
+// ─── 待确认建议过目 + 模板没有的合计行建议忽略（spec note-table-structure-formula-pull-closure R6.5 / R6.7）──────
+
+describe('ConsolNoteMappingDialog 确认前过目（R6.7）', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(api)) fn.mockReset()
+    api.previewDetailRefresh.mockResolvedValue(groupedPreview())
+    api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+  })
+
+  async function clickConfirm() {
+    const w = await open()
+    await w.findAll('button').find(b => b.text() === '确认映射')!.trigger('click')
+    await flushPromises()
+    return w
+  }
+
+  it('有按位置 / 模糊建议的行：先弹窗列出，确认后才写规则', async () => {
+    box.confirm.mockResolvedValue('confirm')
+    await clickConfirm()
+    expect(box.confirm).toHaveBeenCalledTimes(1)
+    const [message, title] = box.confirm.mock.calls[0]
+    expect(title).toBe('1 行待确认')
+    expect(String(message.children)).toContain('「机器设备」→「一年以上（1）」（按位置）')
+    expect(api.confirmDetailMapping).toHaveBeenCalledTimes(1)
+  })
+
+  it('弹窗里选「返回检查」：不写规则', async () => {
+    box.confirm.mockRejectedValue('cancel')
+    await clickConfirm()
+    expect(api.confirmDetailMapping).not.toHaveBeenCalled()
+  })
+
+  it('全部可自动确认：不弹窗', async () => {
+    api.previewDetailRefresh.mockResolvedValue(preview())
+    await clickConfirm()
+    expect(box.confirm).not.toHaveBeenCalled()
+    expect(api.confirmDetailMapping).toHaveBeenCalledTimes(1)
+  })
+
+  it('模板没有的合计 / 小计行：后端建议忽略 ⇒ 就绪、按忽略带原因提交', async () => {
+    const p = preview()
+    p.suggestions.push({ source_label: '小 计', suggested_target: null, confidence: 1, match_type: 'total_ignored',
+      mapping_action: 'ignore', ignore_reason: '合并模板没有这一行合计 / 小计（合计按本表数据重算）', candidates: [],
+      auto_confirmable: true } as any)
+    api.previewDetailRefresh.mockResolvedValue(p)
+    const w = await clickConfirm()
+    expect(w.text()).toContain('模板无此合计')
+    expect(box.confirm).not.toHaveBeenCalled()
+    const body = api.confirmDetailMapping.mock.calls[0][1]
+    expect(body.mappings.at(-1)).toMatchObject({ source_label: '小 计', mapping_action: 'ignore',
+      ignore_reason: '合并模板没有这一行合计 / 小计（合计按本表数据重算）' })
+  })
+})
+
+// ─── 可自动确认比例（spec note-table-structure-formula-pull-closure R11）────────
+
+describe('ConsolNoteMappingDialog 可自动确认比例（R11）', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(api)) fn.mockReset()
+    api.confirmDetailMapping.mockResolvedValue({})
+    box.confirm.mockReset()
+    box.confirm.mockResolvedValue('confirm')
+  })
+
+  function ratioText(w: any): string {
+    return w.find('[data-testid="mapping-auto-ratio"]').text().replace(/\s+/g, '')
+  }
+
+  it('全部可自动确认：显示 3/3（100%）', async () => {
+    api.previewDetailRefresh.mockResolvedValue({ ...preview(), auto_confirmable_count: 3, needs_review_count: 0 })
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
+    expect(w.find('[data-testid="mapping-ratio-mismatch"]').exists()).toBe(false)
+  })
+
+  it('部分需人工：按前端行状态算比例（1/2 = 50%）', async () => {
+    api.previewDetailRefresh.mockResolvedValue({ ...groupedPreview(), auto_confirmable_count: 1, needs_review_count: 1 })
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认1/2（50%）')
+  })
+
+  it('没有建议行时不显示比例标签（避免 0/0）', async () => {
+    const empty = { ...preview(), suggestions: [], auto_confirmable_count: 0, needs_review_count: 0 }
+    api.previewDetailRefresh.mockResolvedValue(empty)
+    const w = await open()
+    expect(w.find('[data-testid="mapping-auto-ratio"]').exists()).toBe(false)
+  })
+
+  it('后端不回该字段（旧后端）：仍显示比例，不报口径不一致', async () => {
+    const p = preview() as any
+    delete p.auto_confirmable_count
+    api.previewDetailRefresh.mockResolvedValue(p)
+    const w = await open()
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
+    expect(w.find('[data-testid="mapping-ratio-mismatch"]').exists()).toBe(false)
+  })
+
+  it('🔴 前后端口径漂移：显式报出来，不显示两个打架的数字', async () => {
+    // 后端说只有 1 行可自动确认，而建议里 3 行都标了 auto_confirmable ⇒ 判定已不一致
+    api.previewDetailRefresh.mockResolvedValue({ ...preview(), auto_confirmable_count: 1, needs_review_count: 2 })
+    const w = await open()
+    const warn = w.find('[data-testid="mapping-ratio-mismatch"]')
+    expect(warn.exists()).toBe(true)
+    expect(warn.text()).toContain('前端 3 / 后端 1')
+    // 表格与顶部标签一律以前端统计为准（不被后端数字带偏）
+    expect(ratioText(w)).toBe('可自动确认3/3（100%）')
   })
 })

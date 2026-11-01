@@ -12,6 +12,7 @@ import json
 import os
 import uuid
 import zipfile
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -580,3 +581,42 @@ class TestDataModels:
         writable = plan.writable_wp_ids
         assert len(writable) == 1
         assert str(writable[0]) == id1
+
+
+@pytest.mark.asyncio
+async def test_dry_run_bytes_and_spooled_path_have_identical_business_result(tmp_path: Path):
+    """同一个 ZIP 改为路径传递后，清单、SHA 校验和导入摘要不得变化。"""
+    zip_bytes, manifest = _make_standard_zip(sheet_codes=["D2-1", "D2-2"])
+    zip_path = tmp_path / "spooled.zip"
+    zip_path.write_bytes(zip_bytes)
+    topo = [
+        {
+            "sheet_code": entry["sheet_code"],
+            "api_prefix": entry["api_prefix"],
+            "item_id": entry["item_id"],
+            "import_order": entry["import_order"],
+            "depends_on_sheets": entry["depends_on_sheets"],
+            "wp_id": entry["wp_id"],
+        }
+        for entry in manifest["files"]
+    ]
+
+    async def list_sheets(*_args, **_kwargs):
+        return topo
+
+    with patch(_PATCH_LIST_IMPORT, side_effect=list_sheets), patch(
+        _PATCH_GET_STATUSES, return_value={}
+    ):
+        from_bytes = await dry_run(
+            AsyncMock(), str(uuid.uuid4()), zip_bytes, "overwrite"
+        )
+        from_path = await dry_run(
+            AsyncMock(), str(uuid.uuid4()), zip_path, "overwrite"
+        )
+
+    bytes_result = from_bytes.to_dict()
+    path_result = from_path.to_dict()
+    bytes_result.pop("import_id")
+    path_result.pop("import_id")
+    assert path_result == bytes_result
+    assert path_result["summary"] == {"success": 2}

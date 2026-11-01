@@ -206,6 +206,9 @@ def _llm_slots(kind: str, route: list[Any]) -> list[_Slot]:
             "endpoint": config.endpoint_url if config else None,
             "source": config.source if config else "database",
             "reasoning_effort": config.reasoning_effort if config else None,
+            "trust_zone": config.trust_zone if config else None,
+            "client_data_allowed": config.client_data_allowed if config else False,
+            "mask_policy": config.mask_policy if config else None,
             "implicit": candidate.implicit,
         }
         if config is None:
@@ -231,6 +234,9 @@ def _ocr_slots(kind: str, route: list[Any]) -> list[_Slot]:
             "endpoint": f"{config.endpoint_url}{config.api_path or ''}" if remote else None,
             "source": "builtin" if candidate.implicit else "database",
             "reasoning_effort": None,
+            "trust_zone": getattr(config, "trust_zone", None),
+            "client_data_allowed": bool(getattr(config, "client_data_allowed", False)),
+            "mask_policy": getattr(config, "mask_policy", None),
             "implicit": candidate.implicit,
         }
         if candidate.error is not None:

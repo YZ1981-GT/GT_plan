@@ -910,7 +910,7 @@
                     {{ fmt(row.unadjusted) }}
                   </span>
                 </template>
-                <el-input-number v-model="row.unadjusted" size="small" :controls="false" style="width:100%" @change="recalcTbSummaryAudited()" />
+                <el-input-number v-model="row.unadjusted" size="small" :controls="false" style="width:100%" @change="onTbSummaryUnadjustedChange(row)" />
               </GtGridCell>
               <span v-else-if="row.unadjusted == null && !row.is_total && !row.is_category" class="gt-tb-nomap" title="该报表行无对应科目映射（不适用）">—</span>
               <span v-else class="gt-amt" :data-gt-value="row.unadjusted">
@@ -1392,6 +1392,7 @@ import {
   type TbSummaryPersistContext, type TbSummaryRclField,
 } from '@/views/composables/useTbSummaryPersistence'
 import { useTbSummaryNavigationGuard } from '@/views/composables/useTbSummaryNavigationGuard'
+import { recalcTbSummaryRow, recalcTbSummaryRows } from '@/views/composables/tbSummaryRecalc'
 import * as P from '@/services/apiPaths'
 import LinkageBadge from '@/components/LinkageBadge.vue'
 import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
@@ -2396,7 +2397,10 @@ const fetchData = withLoading(loading, async () => {
   if (y == null) { rows.value = []; return }
   const result = await getTrialBalance(projectId.value, y, hasMultipleCompanies.value ? companyCode.value : undefined)
   rows.value = Array.isArray(result) ? result : []
-  await loadBalanceCheck()
+  await Promise.all([
+    loadBalanceCheck(),
+    tbComments.loadComments('trial_balance'),
+  ])
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {
@@ -2754,8 +2758,12 @@ const tbSummaryNavigation = useTbSummaryNavigationGuard(tbSummaryPersistence)
 function onTbSummaryRclChange(row: any, field: TbSummaryRclField): void {
   if (!canEdit.value || row.is_total || row.is_category) return
   markManualRcl(row, field)
-  recalcTbSummaryAudited()
+  recalcTbSummaryRow(row)
   tbSummaryPersistence.queue()
+}
+
+function onTbSummaryUnadjustedChange(row: any): void {
+  recalcTbSummaryRow(row)
 }
 
 // 未审数列是否可编辑（编辑模式开启时所有报表类型都可编辑）
@@ -2938,7 +2946,7 @@ function onTbSumTrace(row: any) {
   }, 200)
 }
 
-function onTbSumCtxCopy() {
+async function onTbSumCtxCopy() {
   tbSumCtxVisible.value = false
   // 多行复制
   const picked = tbSumPickedRows.value
@@ -3078,18 +3086,9 @@ function _closeTbSumCtx() { tbSumCtxVisible.value = false }
 
 
 function recalcTbSummaryAudited() {
-  for (const r of tbSummaryRows.value) {
-    const u = Number(r.unadjusted) || 0
-    const ad = Number(r.aje_dr) || 0
-    const ac = Number(r.aje_cr) || 0
-    const rd = Number(r.rcl_dr) || 0
-    const rc = Number(r.rcl_cr) || 0
-    const result = u + ad - ac + rd - rc
-    r.audited = result !== 0 ? Math.round(result * 100) / 100 : null
-  }
+  recalcTbSummaryRows(tbSummaryRows.value)
 }
 
-watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })
 const { isFullscreen: tbFullscreen, toggleFullscreen: toggleTbFullscreen } = useFullscreen()
 
 // 表格最大高度（视口高度 - 顶部区域，实现表头固定）
@@ -3099,7 +3098,7 @@ const tableMaxHeight = computed(() => {
   return 'calc(100vh - 320px)'
 })
 
-function copyTbTable() {
+async function copyTbTable() {
   const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
   if (!data?.length) { ElMessage.warning('无数据可复制'); return }
   let headers: string[], dataRows: any[][]
@@ -3240,7 +3239,7 @@ function tbCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
   const selClass = tbCtx.cellClassName({ rowIndex, columnIndex })
   if (selClass) classes.push(selClass)
-  const ccClass = tbComments.commentCellClass('tb_detail', rowIndex, columnIndex)
+  const ccClass = tbComments.commentCellClass('trial_balance', rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
   return classes.join(' ')
 }
@@ -3656,6 +3655,8 @@ async function loadTbSummary() {
         rcl_dr: r.rcl_dr ?? null,
         rcl_cr: r.rcl_cr ?? null,
         audited: r.audited ?? null,
+        _formula: r._formula ?? r.formula ?? r.formula_used ?? null,
+        formula_used: r.formula_used ?? r.formula ?? r._formula ?? null,
       }))
     } else {
       // 新接口无数据（报表行次未配置），降级：从报表配置+科目明细构建
@@ -3705,6 +3706,8 @@ async function loadTbSummary() {
           rcl_dr: rcl.dr || null,
           rcl_cr: rcl.cr || null,
           audited: null as number | null,
+          _formula: r.formula ?? r.formula_used ?? null,
+          formula_used: r.formula_used ?? r.formula ?? null,
         }
       })
       recalcTbSummaryAudited()

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models import AIModelConfig, AIModelType, AIProvider
 from app.models.ai_model_options import AIDeployment
-from app.services.llm_route import route_chat_stream, route_chat_sync
+from app.services.llm_route import filter_route_by_policy, route_chat_stream, route_chat_sync
 from app.services.llm_runtime import (
     LLMRuntimeError,
     deployment_of,
@@ -333,11 +333,19 @@ class AIService:
         stream: bool = False,
         temperature: float = 0.3,
         max_tokens: int | None = None,
+        allowed_trust_zones: set[str] | frozenset[str] | None = None,
+        client_data: bool = True,
     ) -> str | AsyncGenerator[str, None]:
         """按本机优先路由完成对话（无启用模型时回落 `.env`）；``model`` 只作优先提示。"""
         if stream:
-            return self._chat_stream(model, messages, temperature, max_tokens)
-        return await self._chat_sync(model, messages, temperature, max_tokens)
+            return self._chat_stream(
+                model, messages, temperature, max_tokens,
+                allowed_trust_zones=allowed_trust_zones, client_data=client_data,
+            )
+        return await self._chat_sync(
+            model, messages, temperature, max_tokens,
+            allowed_trust_zones=allowed_trust_zones, client_data=client_data,
+        )
 
     async def _chat_sync(
         self,
@@ -345,9 +353,15 @@ class AIService:
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int | None,
+        *,
+        allowed_trust_zones: set[str] | frozenset[str] | None = None,
+        client_data: bool = True,
     ) -> str:
         try:
             route = await resolve_route(self.db, AIModelType.chat, requested_model=model)
+            route = filter_route_by_policy(
+                route, allowed_trust_zones=allowed_trust_zones, client_data=client_data
+            )
             return await route_chat_sync(
                 route,
                 messages,
@@ -363,9 +377,15 @@ class AIService:
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int | None,
+        *,
+        allowed_trust_zones: set[str] | frozenset[str] | None = None,
+        client_data: bool = True,
     ) -> AsyncGenerator[str, None]:
         try:
             route = await resolve_route(self.db, AIModelType.chat, requested_model=model)
+            route = filter_route_by_policy(
+                route, allowed_trust_zones=allowed_trust_zones, client_data=client_data
+            )
             async for chunk in route_chat_stream(
                 route,
                 messages,
@@ -610,6 +630,7 @@ class AIService:
             [preset.orm_values() for preset in ENTERPRISE_MODEL_PRESETS]
         )
 
+        from app.models.ai_model_options import default_trust_zone
         from app.services.llm_runtime import classify_model_deployment
 
         for model_data in default_models:
@@ -624,6 +645,15 @@ class AIService:
             if not existing:
                 model = AIModelConfig(**model_data)
                 model.deployment = classify_model_deployment(model)
+                model.trust_zone = default_trust_zone(
+                    deployment=model.deployment, preset_key=model.preset_key
+                )
+                model.client_data_allowed = model.trust_zone in {
+                    "local_device", "firm_private"
+                }
+                model.mask_policy = (
+                    "role_based" if model.trust_zone == "local_device" else "strict"
+                )
                 if model.is_active and await AIService.route_slot_taken(
                     db, model_type=model.model_type, deployment=model.deployment,
                     ocr_capability=model.ocr_capability,

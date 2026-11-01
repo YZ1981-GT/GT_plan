@@ -61,7 +61,7 @@ interface MonthlyAnalysisData {
   anomalies: InterestAnomalyRow[]
 }
 function uid(prefix: string): string {
-  return `${prefix}-${newUuid()}-${Math.random().toString(36).slice(2)}`}`
+  return `${prefix}-${newUuid()}`
 }
 function twelve(): number[] { return Array.from({ length: 12 }, () => 0) }
 function createAccount(accountNo = '默认账户'): MonthlyAccount {

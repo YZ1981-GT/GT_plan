@@ -153,7 +153,12 @@ async def _load_consolidation_vars(
 
     输出键：
     - ``subsidiary_count`` 合并范围内的子公司数（int）
-    - ``subsidiaries`` 简化清单 ``[{"name", "company_code", "ownership_ratio"}]``，按企业树顺序
+    - ``subsidiaries`` 子企业清单 ``[{"name", "company_code", "kind", "is_branch", "ownership_ratio"}]``，
+      按企业树顺序；**含分公司**（用户 2026-10-31 拍板：分公司作为独立成员出现在子企业清单里），
+      每项用 ``kind`` 区分 ``subsidiary`` / ``branch``
+    - ``subsidiary_count`` 只数**子公司**（会计口径，不含分公司）
+    - ``branch_count`` 分公司家数
+    - ``member_count`` 成员总数（子公司 + 分公司）= ``len(subsidiaries)``
     - ``has_consolidation`` bool
 
     持股比例取合并范围表里同一企业代码、本年度的属性行，没有则为空；非合并项目 0 / 空 / False。
@@ -163,10 +168,10 @@ async def _load_consolidation_vars(
     """
     try:
         from app.models.consolidation_models import ConsolScope
-        from app.services.consol_scope_members import tree_subsidiaries
+        from app.services.consol_scope_members import tree_members
 
         async with db.begin_nested():
-            members = await tree_subsidiaries(db, project_id)
+            members = await tree_members(db, project_id)
             ratios: dict[str, Any] = {}
             if members:
                 rows = await db.execute(
@@ -182,17 +187,28 @@ async def _load_consolidation_vars(
         logger.warning("collect_paragraph_vars: load consolidation members failed: %s", exc)
         return {}
     if not members:
-        return {"subsidiary_count": 0, "subsidiaries": [], "has_consolidation": False}
+        return {
+            "subsidiary_count": 0,
+            "branch_count": 0,
+            "member_count": 0,
+            "subsidiaries": [],
+            "has_consolidation": False,
+        }
     subs = [
         {
             "name": m.company_name,
             "company_code": m.company_code,
+            "kind": m.kind,
+            "is_branch": m.is_branch,
             "ownership_ratio": float(ratios[m.company_code]) if m.company_code in ratios else None,
         }
         for m in members
     ]
+    # subsidiary_count 仍是会计口径的「子公司」家数：分公司进清单但不混入子公司计数
     return {
-        "subsidiary_count": len(subs),
+        "subsidiary_count": sum(1 for m in members if not m.is_branch),
+        "branch_count": sum(1 for m in members if m.is_branch),
+        "member_count": len(subs),
         "subsidiaries": subs,
         "has_consolidation": True,
     }

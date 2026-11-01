@@ -107,7 +107,14 @@ describe('useEditorToolbar — availableButtons 过滤', () => {
     expect(keys).toEqual(['save', 'prefill', 'submitReview', 'manualRefresh', 'formulaManager'])
   })
 
-  it('wpStatus !== "draft" 时 submitReview 隐藏（visibleWhenStatus 过滤）', () => {
+  it.each(['draft', 'edit_complete', 'revision_required'])('wpStatus=%s 时可提交复核', (status) => {
+    const ctx = makeCtx({ canEdit: true, wpStatus: status })
+    const { actions } = makeActions()
+    const { availableButtons } = useEditorToolbar(ctx, actions)
+    expect(availableButtons.value.map((b) => b.key)).toContain('submitReview')
+  })
+
+  it('复核中或已通过时 submitReview 隐藏（status 白名单过滤）', () => {
     const ctx = makeCtx({ canEdit: true, wpStatus: 'review_passed' })
     const { actions } = makeActions()
     const { availableButtons } = useEditorToolbar(ctx, actions)

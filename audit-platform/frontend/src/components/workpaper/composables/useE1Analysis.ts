@@ -87,7 +87,7 @@ interface StructuredState {
 
 function years(): YearValues { return { current: 0, prior: 0, prior2: 0 } }
 function id(prefix: string): string {
-  return `${prefix}-${newUuid()}-${Math.random()}`}`
+  return `${prefix}-${newUuid()}`
 }
 function defaultState(): StructuredState {
   return {

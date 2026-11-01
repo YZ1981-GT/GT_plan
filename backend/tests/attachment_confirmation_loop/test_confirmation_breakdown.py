@@ -188,7 +188,7 @@ async def test_family_without_confirmations_keeps_original_rule(world):
     assert view["evidence_requirements"] == [{"type": "confirmation", "label": "函证回函件", "satisfied": True}]
 
 
-async def test_breakdown_failure_keeps_original_rule(world, monkeypatch):
+async def test_breakdown_failure_is_unknown_not_false_ready(world, monkeypatch):
     wp = await add_wp(world, world.target, wp_code="D0")
     await _whole_wp_reply(world, wp)
     await _conf(world, wp, "甲公司", status="pending")
@@ -200,8 +200,9 @@ async def test_breakdown_failure_keeps_original_rule(world, monkeypatch):
 
     monkeypatch.setattr(status_module, "confirmation_breakdown", boom)
     view = await AttachmentService(world.db).get_wp_attachments(wp.id)
-    assert view["evidence_requirements"] == [{"type": "confirmation", "label": "函证回函件", "satisfied": True}]
-    assert len(view["items"]) == 1  # 其余部分照常返回
+    assert view["evidence_readiness"]["status"] == "unknown"
+    assert "evidence_requirements" not in view
+    assert len(view["items"]) == 1  # 其余附件视图照常返回
 
 
 async def test_a12_1_legal_letter(world):

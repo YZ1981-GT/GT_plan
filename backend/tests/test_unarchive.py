@@ -76,6 +76,7 @@ async def db_session() -> AsyncSession:
             Base.metadata.tables["users"],
             Base.metadata.tables["projects"],
             Base.metadata.tables["audit_log_entries"],
+            Base.metadata.tables["audit_chain_head"],
             Base.metadata.tables["archive_jobs"],
         ]
         await conn.run_sync(

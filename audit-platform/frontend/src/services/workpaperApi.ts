@@ -438,6 +438,32 @@ export async function downloadWorkpaper(projectId: string, wpId: string) {
   return downloadFile(P_wp.download(projectId, wpId))
 }
 
+export interface WorkpaperPackExportTask {
+  task_id: string
+  total: number
+  status: 'pending' | 'running' | 'complete' | 'failed'
+}
+
+export interface WorkpaperPackExportStatus extends WorkpaperPackExportTask {
+  done: number
+  percent: number
+  error?: string | null
+  download_url?: string | null
+}
+
+/** 提交异步 ZIP 任务；压缩和文件读取在后端线程中完成。 */
+export async function startWorkpaperPackExport(projectId: string, wpIds: string[]): Promise<WorkpaperPackExportTask> {
+  return apiProxy.post(`/api/projects/${projectId}/working-papers/batch-export-async`, { wp_ids: wpIds })
+}
+
+/** SSE 丢失或重连时的权威状态恢复入口。 */
+export async function getWorkpaperPackExportStatus(taskId: string): Promise<WorkpaperPackExportStatus> {
+  return apiProxy.get(`/api/exports/${taskId}/status`, {
+    _background: true,
+    _silent: true,
+  } as any)
+}
+
 export async function downloadWorkpaperPack(projectId: string, wpIds?: string[], includePrefill: boolean = true) {
   return downloadFile(P_wp.downloadPack(projectId), {
     method: 'post',
@@ -556,23 +582,21 @@ export async function listReviews(wpId: string, status?: string): Promise<Review
 }
 
 export async function addReview(wpId: string, body: {
-  commenter_id: string; comment_text: string; cell_reference?: string
+  comment_text: string; cell_reference?: string
 }): Promise<ReviewComment> {
   const { data } = await http.post(P_wr.list(wpId), body)
   return data
 }
 
 export async function replyReview(wpId: string, reviewId: string, body: {
-  replier_id: string; reply_text: string
+  reply_text: string
 }): Promise<ReviewComment> {
   const { data } = await http.put(P_wr.reply(wpId, reviewId), body)
   return data
 }
 
-export async function resolveReview(wpId: string, reviewId: string, body: {
-  resolved_by: string
-}): Promise<ReviewComment> {
-  const { data } = await http.put(P_wr.resolve(wpId, reviewId), body)
+export async function resolveReview(wpId: string, reviewId: string): Promise<ReviewComment> {
+  const { data } = await http.put(P_wr.resolve(wpId, reviewId), {})
   return data
 }
 

@@ -76,7 +76,8 @@ async def env(tmp_path: Path) -> AsyncGenerator[dict, None]:
         ids[key] = uuid.uuid4()
         return ids[key]
 
-    stored = tmp_path / "stored.txt"
+    stored = tmp_path / "knowledge" / "manual" / "stored.txt"
+    stored.parent.mkdir(parents=True)
     stored.write_text("原始文件字节", encoding="utf-8")
     async with factory() as s:
         s.add(Project(id=P, name="项目P", client_name="客户P", project_type=ProjectType.annual,
@@ -121,7 +122,11 @@ async def env(tmp_path: Path) -> AsyncGenerator[dict, None]:
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = lambda: current["actor"]
-    with patch("app.routers.knowledge_folders._trigger_index_delete", new=AsyncMock()):
+    from app.core.config import settings
+
+    with patch.object(settings, "STORAGE_ROOT", str(tmp_path)), patch(
+        "app.routers.knowledge_folders._trigger_index_delete", new=AsyncMock()
+    ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield {"client": client, "ids": ids, "factory": factory, "as": lambda k: current.update(actor=ACTORS[k])}
     await engine.dispose()
@@ -182,12 +187,12 @@ async def test_delete_invisible_document_is_404_not_403(env):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("actor,expected", [("other", 403), ("reader", 403), ("owner", 200)])
+@pytest.mark.parametrize("actor,expected", [("other", 403), ("reader", 403), ("owner", 403)])
 async def test_delete_folder_matrix(env, actor, expected):
     env["as"](actor)
     resp = await env["client"].delete(f"/api/knowledge-library/folders/{env['ids']['pub']}")
     assert resp.status_code == expected, resp.text
-    assert (await _folder(env, "pub")).is_deleted is (expected == 200)
+    assert (await _folder(env, "pub")).is_deleted is False
 
 
 @pytest.mark.asyncio

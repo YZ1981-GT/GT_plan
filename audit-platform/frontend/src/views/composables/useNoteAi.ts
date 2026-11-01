@@ -12,6 +12,7 @@ import {
   noteAiGenerateAnalysis,
 } from '@/services/commonApi'
 import { useKnowledge } from '@/composables/useKnowledge'
+import { eventBus } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
 
 export interface UseNoteAiOptions {
@@ -115,9 +116,9 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         knowledge_doc_ids: knowledgeDocIds.value,
       })
       if (res.error) { ElMessage.warning(res.error); return }
-      if (res.appended) {
-        editor.value?.commands.insertContent(res.appended)
-        reportKnowledgeUsage(res.knowledge_count, '续写')
+      if (res.appended && res.artifact_id) {
+        eventBus.emit('ai-content:adopted', { projectId: projectId.value })
+        reportKnowledgeUsage(res.knowledge_count, '续写草稿已生成并送入待确认')
       }
     } catch (e: any) {
       handleApiError(e, 'AI续写')
@@ -146,11 +147,9 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         knowledge_doc_ids: knowledgeDocIds.value,
       })
       if (res.error) { ElMessage.warning(res.error); return }
-      if (res.rewritten && res.rewritten !== res.original) {
-        // 替换选中文本
-        const { from, to } = editor.value!.state.selection
-        editor.value!.chain().focus().deleteRange({ from, to }).insertContent(res.rewritten).run()
-        reportKnowledgeUsage(res.knowledge_count, '改写')
+      if (res.rewritten && res.rewritten !== res.original && res.artifact_id) {
+        reportKnowledgeUsage(res.knowledge_count, '改写草稿已生成并送入待确认')
+        eventBus.emit('ai-content:adopted', { projectId: projectId.value })
       }
     } catch (e: any) {
       handleApiError(e, 'AI改写')
@@ -168,9 +167,10 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         template_type: templateType.value || 'soe',
         year: year.value,
       })
-      if (res.generated_text) {
-        editor.value?.commands.setContent(res.generated_text)
-        ElMessage.success(`会计政策已生成（参照${res.reference_count}篇文档）`)
+      if (res.error) { ElMessage.warning(res.error); return }
+      if (res.generated_text && res.artifact_id) {
+        eventBus.emit('ai-content:adopted', { projectId: projectId.value })
+        ElMessage.success(`会计政策草稿已生成并送入待确认（参照${res.reference_count}篇文档）`)
       }
     } catch (e: any) {
       handleApiError(e, '生成会计政策')
@@ -186,9 +186,10 @@ export function useNoteAi(options: UseNoteAiOptions): UseNoteAiReturn {
         section_number: currentNote.value?.note_section || '',
         year: year.value,
       })
-      if (res.generated_text) {
-        editor.value?.commands.insertContent('\n\n' + res.generated_text)
-        ElMessage.success('变动分析已生成')
+      if (res.error) { ElMessage.warning(res.error); return }
+      if (res.generated_text && res.artifact_id) {
+        eventBus.emit('ai-content:adopted', { projectId: projectId.value })
+        ElMessage.success('变动分析草稿已生成并送入待确认')
       }
     } catch (e: any) {
       handleApiError(e, '生成变动分析')

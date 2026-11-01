@@ -50,7 +50,7 @@ from app.models.audit_platform_models import (
     AccountSource,
     TrialBalance,
 )
-from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
+from app.models.core import Project, ProjectStatus, ProjectType, UserRole
 from app.models.workpaper_models import WpIndex
 from app.routers.query_builder import router as query_builder_router
 from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
@@ -404,7 +404,7 @@ async def test_unregistered_join_returns_400(db_session):
 
 
 @pytest.mark.asyncio
-async def test_invalid_join_type_returns_400(db_session):
+async def test_invalid_join_type_is_rejected_by_strict_request_model(db_session):
     app = _make_app(db_session)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         resp = await ac.post(
@@ -415,8 +415,9 @@ async def test_invalid_join_type_returns_400(db_session):
                 "fields": ["trial_balance.id"],
             },
         )
-    assert resp.status_code == 400
-    assert resp.json()["detail"]["error_code"] == "JOIN_TYPE_NOT_ALLOWED"
+    assert resp.status_code == 422
+    errors = resp.json()["detail"]
+    assert any(item.get("loc", [None])[-1] == "type" for item in errors), errors
 
 
 @pytest.mark.asyncio

@@ -229,7 +229,8 @@ import { confirmDangerous, confirmDelete, promptRejectReason } from '@/utils/con
 import {
   convertLegacyEliminationSheet,
   deleteElimination,
-  generateEliminationsFromWorksheet,
+  generateEliminationsFromWorksheets,
+  previewEliminationsFromWorksheets,
   getEliminationTreeLines,
   getLegacyEliminationSheet,
   getWorksheetAccounts,
@@ -243,8 +244,6 @@ import {
   type GenerateGroupResult,
   type GeneratePlannedLine,
   type LegacySheetResult,
-  type WorksheetOrigin,
-  type WorksheetSourceGroup,
 } from '@/services/consolidationApi'
 import {
   canApprove,
@@ -267,23 +266,18 @@ import {
   pendingSummary,
   pendingSummaryText,
 } from '@/components/consolidation/composables/elimSheet'
-import { WORKSHEET_ORIGINS } from '@/components/consolidation/composables/elimSourceGroups'
 
 defineOptions({ name: 'EliminationSheet' })
 
 const props = withDefaults(defineProps<{
   projectId: string
   year: number | null
-  /** 工作底稿来源分组（ConsolWorksheetTabs 按模拟权益法 / 内部往来 / 内部交易算出） */
-  sourceGroups?: ReadonlyArray<WorksheetSourceGroup>
-  /**
-   * 本次负责的来源（其数据已知：已保存或本次打开过）。只有这些来源里不再产出的来源键才删除草稿 ——
-   * 某张表的数据本次没加载，就不能当成「它算出来是空的」去删它以前生成的草稿。
-   */
-  sourceOrigins?: ReadonlyArray<WorksheetOrigin>
+  /** 服务端按这些已保存工作表及其版本构建 canonical 分组。 */
+  sourceSheetKeys?: ReadonlyArray<string>
+  sourceVersions?: Readonly<Record<string, number>>
 }>(), {
-  sourceGroups: () => [],
-  sourceOrigins: () => [...WORKSHEET_ORIGINS],
+  sourceSheetKeys: () => [],
+  sourceVersions: () => ({}),
 })
 const emit = defineEmits<{
   (e: 'open-formula', key: string): void
@@ -507,50 +501,55 @@ function lineLabel(line: GeneratePlannedLine): string {
   return line.detail ? `${line.subject}-${line.detail}` : line.subject
 }
 
-const ORIGIN_NAMES: Record<WorksheetOrigin, string> = {
-  ws_equity_sim: '模拟权益法',
-  ws_internal_arap: '内部往来',
-  ws_internal_trade: '内部交易',
+const SOURCE_NAMES: Record<string, string> = {
+  equity_sim: '模拟权益法',
+  internal_arap: '内部往来',
+  internal_trade: '内部交易',
 }
+const ALL_SOURCE_SHEETS = Object.keys(SOURCE_NAMES)
 
-/** 本次没纳入的来源（数据未加载）：提示用户，其已生成的草稿本次不动 */
+/** 尚未保存的来源不会进入服务端生成，也不会删除其历史草稿。 */
 const missingOriginsText = computed(() => {
-  const names = WORKSHEET_ORIGINS.filter((o) => !props.sourceOrigins.includes(o)).map((o) => ORIGIN_NAMES[o])
+  const available = new Set(props.sourceSheetKeys)
+  const names = ALL_SOURCE_SHEETS.filter((key) => !available.has(key)).map((key) => SOURCE_NAMES[key])
   return names.length
-    ? `${names.join('、')}表尚无已保存的数据，本次不参与生成（其已生成的草稿保持不变）；请先打开该表填写并保存`
+    ? `${names.join('、')}表尚无已保存的数据，本次不参与生成（其已生成的草稿保持不变）；请先填写并保存`
     : ''
 })
 
-function requestBody(dryRun: boolean) {
-  const origins = [...props.sourceOrigins]
+function requestBody(previewToken?: string) {
+  const sourceSheetKeys = [...props.sourceSheetKeys].filter((key) => key in SOURCE_NAMES)
   return {
     year: props.year as number,
-    groups: props.sourceGroups.filter((g) => origins.includes(g.origin)),
-    // 显式声明负责的来源：其中某张表本次一组都没算出时，它以前生成的草稿也随之删除（需求 2.5）
-    origins,
-    dry_run: dryRun,
+    source_sheet_keys: sourceSheetKeys,
+    expected_versions: Object.fromEntries(sourceSheetKeys.map((key) => [key, props.sourceVersions[key] ?? 0])),
+    ...(previewToken ? { preview_token: previewToken } : {}),
   }
 }
 
 let previewSeq = 0
 
 async function preview() {
-  if (!props.projectId || !props.year) return
+  if (!props.projectId || !props.year || !props.sourceSheetKeys.length) {
+    previewResult.value = null
+    previewError.value = props.sourceSheetKeys.length ? '' : '请先填写并保存至少一张来源工作表'
+    return
+  }
   const seq = ++previewSeq
   previewing.value = true
   previewError.value = ''
   try {
-    const res = await generateEliminationsFromWorksheet(props.projectId, requestBody(true), { silent: true })
+    const res = await previewEliminationsFromWorksheets(props.projectId, requestBody(), { silent: true })
     if (seq === previewSeq) previewResult.value = res
   } catch (e: any) {
     if (seq === previewSeq) {
       previewResult.value = null
       const status = e?.response?.status
       const detail = e?.response?.data?.detail
-      const why = typeof detail === 'string' ? detail.trim() : ''
+      const why = typeof detail === 'string' ? detail.trim() : String(detail?.message || '')
       previewError.value = status === 403
         ? '需要本项目的编辑权限才能预览与生成草稿分录'
-        : `预览失败${why ? `：${why}` : ''}，请稍后点「重新预览」`
+        : `预览失败${why ? `：${why}` : ''}，请稍后点“重新预览”`
     }
   } finally {
     if (seq === previewSeq) previewing.value = false
@@ -560,7 +559,11 @@ async function preview() {
 async function generate() {
   if (!props.projectId || !props.year || generating.value) return
   const dry = previewResult.value
-  if (dry?.deleted_entries?.length) {
+  if (!dry?.preview_token) {
+    previewError.value = '预览已失效，请重新预览'
+    return
+  }
+  if (dry.deleted_entries?.length) {
     try {
       await confirmDangerous({ title: '删除草稿分录', message: deletionConfirmText(dry), confirmText: '确认生成' })
     } catch {
@@ -569,21 +572,25 @@ async function generate() {
   }
   generating.value = true
   try {
-    const res = await generateEliminationsFromWorksheet(props.projectId, requestBody(false))
+    const res = await generateEliminationsFromWorksheets(
+      props.projectId,
+      requestBody(dry.preview_token) as ReturnType<typeof requestBody> & { preview_token: string },
+    )
     ElMessage.success(generateResultText(res))
     await afterChange()
   } catch {
-    /* 由 http 拦截器提示（409 并发 / 400 请求错误） */
+    // 409 表示预览后工作表已变化；全局拦截器给出服务端中文原因，当前预览同时作废。
+    previewResult.value = null
   } finally {
     generating.value = false
   }
 }
 
-// 来源数据变化 ⇒ 重新预演（去抖：工作底稿逐格编辑时不逐键请求）
+// 已保存工作表集合或版本变化后重新向服务端预览；未保存的逐格编辑由父级切页保护先落库。
 let previewTimer: ReturnType<typeof setTimeout> | null = null
-watch(() => [props.sourceGroups, props.sourceOrigins], () => {
+watch(() => [props.sourceSheetKeys, props.sourceVersions], () => {
   if (previewTimer) clearTimeout(previewTimer)
-  previewTimer = setTimeout(() => { previewTimer = null; preview() }, 600)
+  previewTimer = setTimeout(() => { previewTimer = null; preview() }, 200)
 }, { deep: true })
 onBeforeUnmount(() => { if (previewTimer) clearTimeout(previewTimer) })
 

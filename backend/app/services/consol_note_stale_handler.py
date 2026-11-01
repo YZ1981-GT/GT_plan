@@ -92,37 +92,30 @@ async def mark_consol_sections_stale(
         标记为 stale 的章节数
     """
     try:
-        from sqlalchemy import text
+        import sqlalchemy as sa
+        from app.models.report_models import DisclosureNote
+        from app.services.stale_state import StaleSource, mark_note_stale
 
+        conditions = [
+            DisclosureNote.project_id == parent_project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.false(),
+        ]
         if section_id:
-            # 标记对应章节
-            result = await db.execute(
-                text(
-                    "UPDATE disclosure_notes SET is_stale = true "
-                    "WHERE project_id = :pid AND year = :year "
-                    "AND is_deleted = false "
-                    "AND (section_id = :sid OR "
-                    "     template_lineage::text LIKE :pattern)"
-                ),
-                {
-                    "pid": str(parent_project_id),
-                    "year": year,
-                    "sid": section_id,
-                    "pattern": f"%{section_id}%",
-                },
-            )
-        else:
-            # 无具体章节信息，标全部
-            result = await db.execute(
-                text(
-                    "UPDATE disclosure_notes SET is_stale = true "
-                    "WHERE project_id = :pid AND year = :year "
-                    "AND is_deleted = false"
-                ),
-                {"pid": str(parent_project_id), "year": year},
-            )
-
-        count = result.rowcount or 0
+            conditions.append(sa.or_(
+                DisclosureNote.section_id == section_id,
+                sa.cast(DisclosureNote.template_lineage, sa.Text).like(f"%{section_id}%"),
+            ))
+        sections = list((await db.execute(
+            sa.select(DisclosureNote.note_section).where(*conditions)
+        )).scalars().all())
+        count = await mark_note_stale(
+            db,
+            parent_project_id,
+            source=StaleSource.CONSOL_CHILD_CHANGED,
+            sections=sections,
+            year=year,
+        )
         if count > 0:
             logger.info(
                 "Marked %d sections stale for consol project %s (trigger: %s)",
